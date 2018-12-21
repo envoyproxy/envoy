@@ -148,7 +148,7 @@ public:
 template <class DeserializerImpl>
 class DeserializerFactoryBase : public NamedDeserializerConfigFactory {
   DeserializerPtr createDeserializer() override {
-    return std::move(std::make_unique<DeserializerImpl>());
+    return std::make_unique<DeserializerImpl>();
   }
 
   std::string name() override { return name_; }

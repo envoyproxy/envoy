@@ -131,7 +131,7 @@ public:
  */
 template <class ProtocolImpl> class ProtocolFactoryBase : public NamedProtocolConfigFactory {
   ProtocolPtr createProtocol(ProtocolCallbacks& callbacks) override {
-    return std::move(std::make_unique<ProtocolImpl>(callbacks));
+    return std::make_unique<ProtocolImpl>(callbacks);
   }
 
   std::string name() override { return name_; }
