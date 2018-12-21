@@ -531,15 +531,3 @@ Adding the following parameter to Bazel everytime or persist them in `.bazelrc`.
 ```
 --remote_http_cache=http://127.0.0.1:28080/
 ```
-
-## Restrict environment variables
-
-You might need the following parameters for Bazel or persist in `.bazelrc` as well to make cache
-more efficient. This will let Bazel use an environment with a static value for _PATH_ and does
-not inherit _LD_LIBRARY_PATH_ or _TMPDIR_. See
-[Bazel Command-Line References](https://docs.bazel.build/versions/master/command-line-reference.html#flag--experimental_strict_action_env)
-for more information.
-
-```
---experimental_strict_action_env
-```
