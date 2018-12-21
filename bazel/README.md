@@ -59,7 +59,7 @@ In order for bazel to be aware of the tools installed by brew, the PATH
 variable must be set for bazel builds. This can be accomplished setting
 
 ```
---action_env=PATH=/bin:/opt/local/bin:/usr/bin:/usr/local/bin"
+--action_env=PATH=/usr/local/bin:/opt/local/bin:/usr/bin:/bin"
 ```
 
 either on the command line when running `bazel build`/`bazel test` or
