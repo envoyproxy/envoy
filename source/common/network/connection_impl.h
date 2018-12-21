@@ -134,8 +134,8 @@ protected:
   void onHighWatermark();
 
   TransportSocketPtr transport_socket_;
-  FilterManagerImpl filter_manager_;
   ConnectionSocketPtr socket_;
+  FilterManagerImpl filter_manager_;
   StreamInfo::StreamInfoImpl stream_info_;
 
   Buffer::OwnedImpl read_buffer_;

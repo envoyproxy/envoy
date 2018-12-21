@@ -1573,6 +1573,14 @@ void HttpIntegrationTest::testInvalidVersion() {
   EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n", response);
 }
 
+void HttpIntegrationTest::testHttp10DisabledWithUpgrade() {
+  initialize();
+  std::string response;
+  sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.0\r\nUpgrade: h2c\r\n\r\n",
+                                &response, true);
+  EXPECT_TRUE(response.find("HTTP/1.1 426 Upgrade Required\r\n") == 0);
+}
+
 void HttpIntegrationTest::testHttp10Disabled() {
   initialize();
   std::string response;

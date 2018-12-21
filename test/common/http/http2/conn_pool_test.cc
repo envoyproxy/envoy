@@ -65,7 +65,8 @@ public:
   };
 
   Http2ConnPoolImplTest()
-      : pool_(dispatcher_, host_, Upstream::ResourcePriority::Default, nullptr) {}
+      : api_(Api::createApiForTest(stats_store_)),
+        pool_(dispatcher_, host_, Upstream::ResourcePriority::Default, nullptr) {}
 
   ~Http2ConnPoolImplTest() {
     // Make sure all gauges are 0.
@@ -83,7 +84,7 @@ public:
     test_client.codec_ = new NiceMock<Http::MockClientConnection>();
     test_client.connect_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
     test_client.client_dispatcher_ =
-        std::make_unique<Event::DispatcherImpl>(test_time_.timeSystem());
+        std::make_unique<Event::DispatcherImpl>(test_time_.timeSystem(), *api_);
     EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
         .WillOnce(Return(test_client.connection_));
     auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
@@ -117,6 +118,8 @@ public:
 
   MOCK_METHOD0(onClientDestroy, void());
 
+  Stats::IsolatedStoreImpl stats_store_;
+  Api::ApiPtr api_;
   DangerousDeprecatedTestTime test_time_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
