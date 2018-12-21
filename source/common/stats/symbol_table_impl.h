@@ -180,11 +180,11 @@ public:
 
   /**
    * Since SymbolTable does manual reference counting, a client of SymbolTable
-   * must manually call free(symbol_vec) when it is freeing the backing store
+   * must manually call free(stat_name) when it is freeing the backing store
    * for a StatName. This way, the symbol table will grow and shrink
    * dynamically, instead of being write-only.
    *
-   * @param symbol_vec the vector of symbols to be freed.
+   * @param stat_name the stat name whose symbols should be freed.
    */
   void free(const StatName& stat_name);
 
@@ -195,7 +195,7 @@ public:
    * helps callers ensure the symbol-storage is maintained for the lifetime
    * of a reference.
    *
-   * @param symbol_vec the vector of symbols to be freed.
+   * @param stat_name the stat name whose symbols should be freed.
    */
   void incRefCount(const StatName& stat_name);
 
@@ -231,6 +231,15 @@ private:
   // This must be called during both encode() and free().
   mutable Thread::MutexBasicLockable lock_;
 
+  /**
+   * Decodes a vector of symbols back into its period-delimited stat name. If
+   * decoding fails on any part of the symbol_vec, we release_assert and crash
+   * hard, since this should never happen, and we don't want to continue running
+   * with a corrupt stats set.
+   *
+   * @param symbols the vector of symbols to decode.
+   * @return std::string the retrieved stat name.
+   */
   std::string decodeSymbolVec(const SymbolVec& symbols) const;
 
   /**
@@ -290,8 +299,17 @@ private:
  */
 class StatNameStorage {
 public:
+  // Basic constructor for when you have a name as a string, and need to
+  // generate symbols for it.
   StatNameStorage(absl::string_view name, SymbolTable& table);
+
+  // Move constructor; needed for using StatNameStorage as an
+  // absl::flat_hash_map value.
   StatNameStorage(StatNameStorage&& src) : bytes_(std::move(src.bytes_)) {}
+
+  // Obtains new backing storage for an already existing StatName. Used to
+  // record a computed StatName held in a temp into a more persistent data
+  // structure.
   StatNameStorage(StatName src, SymbolTable& table);
 
   /**
@@ -422,12 +440,25 @@ private:
   std::unique_ptr<SymbolStorage> bytes_;
 };
 
+/**
+ * Contains the backing store for a StatName and enough context so it can
+ * self-delete through RAII. This works by augmenting StatNameStorage with a
+ * reference to the SymbolTable&, so it has an extra 8 bytes of footprint. It
+ * is intendended to be used in tests or as a scoped temp in a function, rather
+ * than stored in a larger structure such as a map, where the redundant copies
+ * of the SymbolTable& would be costly in aggregate.
+ */
 class StatNameTempStorage : public StatNameStorage {
 public:
+  // Basic constructor for when you have a name as a string, and need to
+  // generate symbols for it.
   StatNameTempStorage(absl::string_view name, SymbolTable& table)
       : StatNameStorage(name, table), symbol_table_(table) {}
+
+  // Obtains new backing storage for an already existing StatName.
   StatNameTempStorage(StatName src, SymbolTable& table)
       : StatNameStorage(src, table), symbol_table_(table) {}
+
   ~StatNameTempStorage() { free(symbol_table_); }
 
 private:
