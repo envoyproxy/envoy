@@ -3,6 +3,7 @@ Version history
 
 1.10.0 (pending)
 ================
+* cors: added :ref:`filter_enabled & shadow_enabled RuntimeFractionalPercent flags <cors-runtime>` to filter.
 
 1.9.0
 ===============
@@ -21,7 +22,6 @@ Version history
 * config: removed support for the v1 API.
 * config: added support for :ref:`rate limiting<envoy_api_msg_core.RateLimitSettings>` discovery request calls.
 * cors: added :ref:`invalid/valid stats <cors-statistics>` to filter.
-* cors: added :ref:`filter_enabled & shadow_enabled runtime flags <cors-runtime>` to filter.
 * ext-authz: added support for providing per route config - optionally disable the filter and provide context extensions.
 * fault: removed integer percentage support.
 * grpc-json: added support for :ref:`ignoring query parameters
