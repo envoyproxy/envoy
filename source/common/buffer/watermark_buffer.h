@@ -39,23 +39,24 @@ public:
   void setWatermarks(uint32_t low_watermark, uint32_t high_watermark);
   uint32_t highWatermark() const { return high_watermark_; }
 
-  void incAddOperations() { total_add_op_++; }
-  bool hasNewData() const { return total_add_op_ > consumed_add_op_; }
-  class ConsumeAddOpertions {
+  // This class watchs a counter, and mark some of counts as consumed
+  // so that the new counts can be detected.
+  class CountWatcher {
   public:
-    explicit ConsumeAddOpertions(WatermarkBuffer& buf) : buf_(buf) {
-      old_add_op_ = buf_.total_add_op_;
-    }
-    ~ConsumeAddOpertions() {
-      if (old_add_op_ > buf_.consumed_add_op_) {
-        buf_.consumed_add_op_ = old_add_op_;
+    bool hasNewCount() const { return counter_ > consumed_; }
+    void incCount() { counter_++; }
+    uint32_t getCount() const { return counter_; }
+    void setConsumed(uint32_t c) {
+      if (c > consumed_) {
+        consumed_ = c;
       }
     }
 
   private:
-    WatermarkBuffer& buf_;
-    uint32_t old_add_op_;
+    uint32_t counter_{0};
+    uint32_t consumed_{0};
   };
+  CountWatcher& getOpWatcher() { return op_watcher; }
 
 private:
   void checkHighWatermark();
@@ -73,9 +74,8 @@ private:
   // been called.
   bool above_high_watermark_called_{false};
 
-  // Followings are used to detect any new data has been added to the buffer
-  uint32_t total_add_op_{1};
-  uint32_t consumed_add_op_{0};
+  // This counter watcher to detect any new add operations to this buffer.
+  CountWatcher op_watcher;
 };
 
 typedef std::unique_ptr<WatermarkBuffer> WatermarkBufferPtr;

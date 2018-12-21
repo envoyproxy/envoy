@@ -1473,9 +1473,19 @@ void ConnectionManagerImpl::ActiveStreamFilterBase::commonContinue() {
 
   // TODO(mattklein123): If a filter returns StopIterationNoBuffer and then does a continue, we
   // won't be able to end the stream if there is no buffered data. Need to handle this.
-  if (bufferedData() && bufferedData()->hasNewData()) {
-    Buffer::WatermarkBuffer::ConsumeAddOpertions marker(*bufferedData());
+
+  // commonContinue() function could be nested; e.g. a continueDecode() of a headers-only request
+  // calls a fitler's decodeHeaders(, true) which may call addDecodedData() which may call
+  // commonContinue() again.
+  // There is only one bufferedData for each stream direction, added data may have been consumed
+  // by the doData() in the inner commonContinue().  If outer commonContinue() calls doData() again
+  // it is wrong.
+  // Needs a way to watch the buffer add operations, mark if some of operations as consumed so that
+  // the new add operations can be detected.
+  if (bufferedData() && bufferedData()->getOpWatcher().hasNewCount()) {
+    auto counter = bufferedData()->getOpWatcher().getCount();
     doData(complete() && !trailers());
+    bufferedData()->getOpWatcher().setConsumed(counter);
   }
 
   if (trailers()) {
@@ -1535,7 +1545,7 @@ void ConnectionManagerImpl::ActiveStreamFilterBase::commonHandleBufferData(
     }
     bufferedData()->move(provided_data);
   }
-  bufferedData()->incAddOperations();
+  bufferedData()->getOpWatcher().incCount();
 }
 
 bool ConnectionManagerImpl::ActiveStreamFilterBase::commonHandleAfterDataCallback(
