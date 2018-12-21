@@ -172,6 +172,8 @@ void setHealthFlag(Upstream::Host::HealthFlag flag, const Upstream::Host& host, 
               : envoy::api::v2::core::HealthStatus::HEALTHY);
       break;
     case Upstream::Host::HealthFlag::DEGRADED_ACTIVE_HC:
+      health_status.set_failed_active_degraded_check(
+          host.healthFlagGet(Upstream::Host::HealthFlag::DEGRADED_ACTIVE_HC));
       break;
   }
 }
