@@ -55,6 +55,16 @@ _note_: `coreutils` is used for realpath
 Envoy compiles and passes tests with the version of clang installed by XCode 9.3.0:
 Apple LLVM version 9.1.0 (clang-902.0.30).
 
+In order for bazel to be aware of the tools installed by brew, the PATH
+variable must be set for bazel builds. This can be accomplished setting
+
+```
+--action_env=PATH=/bin:/opt/local/bin:/usr/bin:/usr/local/bin"
+```
+
+either on the command line when running `bazel build`/`bazel test` or
+in your `bazelrc` file.
+
 3. Install Golang on your machine. This is required as part of building [BoringSSL](https://boringssl.googlesource.com/boringssl/+/HEAD/BUILDING.md)
 and also for [Buildifer](https://github.com/bazelbuild/buildtools) which is used for formatting bazel BUILD files.
 4. `go get github.com/bazelbuild/buildtools/buildifier` to install buildifier
