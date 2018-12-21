@@ -185,7 +185,8 @@ protected:
   void testEnvoyProxyMetadataInResponse();
   void testEnvoyProxyMultipleMetadata();
   void testEnvoyProxyInvalidMetadata();
-  void testConsumeAndInsertResponseMetadata();
+  void testInsertBeforeConsumeResponseMetadata();
+  void testConsumeBeforeInsertResponseMetadata();
   void testEnvoyMultipleMetadataReachSizeLimit();
   void testEnvoyHandling100Continue(bool additional_continue_from_upstream = false,
                                     const std::string& via = "");

@@ -217,7 +217,6 @@ public:
   // Http::StreamEncoderFilterCallbacks
   MOCK_METHOD2(addEncodedData, void(Buffer::Instance& data, bool streaming));
   MOCK_METHOD0(addEncodedTrailers, HeaderMap&());
-  MOCK_METHOD0(addEncodedMetadata, MetadataMapVector&());
   MOCK_METHOD0(continueEncoding, void());
   MOCK_METHOD0(encodingBuffer, const Buffer::Instance*());
 

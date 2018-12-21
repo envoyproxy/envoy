@@ -451,13 +451,6 @@ public:
   virtual HeaderMap& addEncodedTrailers() PURE;
 
   /**
-   * Adds encoded metadata.
-   *
-   * @return a reference to a vector of metadata maps, where a new metadata map can be added.
-   */
-  virtual MetadataMapVector& addEncodedMetadata() PURE;
-
-  /**
    * Called when an encoder filter goes over its high watermark.
    */
   virtual void onEncoderFilterAboveWriteBufferHighWatermark() PURE;

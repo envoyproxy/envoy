@@ -86,13 +86,18 @@ users get a reference to the metadata map associated with the request stream. Us
 insert new metadata to the metadata map, and Envoy will proxy the new metadata
 map to the upstream.
 
-If users need to add new metadata for a response proxied to downstream, a
-StreamEncoderFilter should be created. The StreamEncoderFilterCallbacks object that Envoy passes to the
-StreamEncoderFilter has an interface MetadataMapVector&
-StreamEncoderFilterCallbacks::addEncodedMetadata(). By calling the interface,
-users get a reference to the metadata map associated with the response stream. Users can
-insert new metadata to the metadata map, and Envoy will proxy the new metadata
-map to the downstream.
+If users need to add new metadata for a response to downstream, a
+StreamFilter should be created. Users pass the metadata to be added to
+StreamDecoderFilterCallbacks::encodeMetadata(MetadataMapPtr&&
+metadata\_map\_ptr). This function can be called in any interface that performs encoding, including
+StreamFilter::encode100ContinueHeaders(HeaderMap& headers), StreamFilter::encodeHeaders(HeaderMap& headers, bool end\_stream),
+StreamFilter::encodeData(Buffer::Instance& data, bool end\_stream) and StreamFilter::encodeTrailers(HeaderMap& trailers).
+Consequently, the new metadata will be passed through all the
+downstream filters next to the filter that adds the new metadata. Note that, if the added metadata and
+the metadata received from upstream share the same key, to avoid the added
+metadata to be consumed instead of forwarding downstream, the filter consuming
+the metadata must be before the filter adding the metadata, unless the
+consumption is intentional.
 
 ### Metadata implementation
 
@@ -155,29 +160,10 @@ ConnectionManagerImpl::ActiveStream::response\_encoder\_-\>encodeMetadata(Metada
 If no filter consumes the response metadata, the response metadata is proxied to
 the downstream untouched.
 
-Envoy can also add new response metadata through filters. Envoy stores added response metadata in a vector of
-metadata maps: ConnectionManagerImpl::ActiveStream::response\_metadata\_map\_vector\_.
-Filter interface StreamEncoderFilterCallbacks::addEncodedMetadata() returns a
-reference to the vector, and the new response metadata maps can be added to the vector.
-Similarly as the consuming response metadata case, after
-going through the filter chain, the metadata stored in
-ConnectionManagerImpl::ActiveStream::response\_metadata\_map\_vector\_ is forwarded
-to the next hop immediately through codec, and the vector is cleared. For
-example, a user can add new response metadata by calling
-StreamEncoderFilterCallbacks::addEncodedMetadata() in filter
-interface FilterHeadersStatus encodeHeaders(HeaderMap& headers, bool end\_stream).
-Function ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilter\*filter,
-HeaderMap& headers, bool end\_stream) goes through the filter chain, and the newly added response
-metadata is stored in ConnectionManagerImpl::ActiveStream::response\_metadata\_map\_vector\_.
-ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilter\*filter,
-HeaderMap& headers, bool end\_stream) calls
-ConnectionManagerImpl::ActiveStream::response\_encoder\_-\>encodeMetadata(response\_metadata\_map\_vector\_) to forward
-new metadata through codec at the end. If another new response metadata is added in a different filter interface,
-for example, FilterDataStatus
-encodeData(Buffer::Instance& data, bool end\_stream), the newly added response metadata
-will be passed to codec at the end of function
-ConnectionManagerImpl::ActiveStream::encodeData(ActiveStreamEncoderFilter\*filter, Buffer::Instance&
-data, bool end\_stream) following a similar procedure as in
-ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilter\*filter, HeaderMap&
-headers, bool end\_stream).
-
+Envoy can also add new response metadata through filters's encoding interfaces (See section Inserting metadata for
+detailed interfaces). Filters add new
+metadata by calling
+StreamDecoderFilterCallbacks::encodeMetadata(MetadataMapPtr&& metadata\_map\_ptr), which triggers
+ActiveStream::encodeMetadata(ConnectionManagerImpl::ActiveStream::encodeMetadata(ActiveStreamEncoderFilter\*
+filter, MetadataMapPtr&& metadata\_map) to go through each filter that is
+downstream to the filter that adds the new metadata.
