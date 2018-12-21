@@ -7,6 +7,9 @@ The following features have been DEPRECATED and will be removed in the specified
 A logged warning is expected for each deprecated item that is in deprecation window.
 
 ## Version 1.10.0 (pending)
+* Use of `enabled` in `CorsPolicy`, found in
+  [route.proto](https://github.com/envoyproxy/envoy/blob/master/api/envoy/api/v2/route/route.proto).
+  Set the `filter_enabled` field instead.
 
 ## Version 1.9.0
 
@@ -19,9 +22,6 @@ A logged warning is expected for each deprecated item that is in deprecation win
   [route.proto](https://github.com/envoyproxy/envoy/blob/master/api/envoy/api/v2/route/route.proto)
   is deprecated. Set the `runtime_fraction` field instead.
 * Use of buffer filter `max_request_time` is deprecated in favor of the request timeout found in [HttpConnectionManager](https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.proto)
-* Use of `enabled` in `CorsPolicy`, found in
-  [route.proto](https://github.com/envoyproxy/envoy/blob/master/api/envoy/api/v2/route/route.proto).
-  Set the `filter_enabled` field instead.
 
 ## Version 1.8.0 (Oct 4, 2018)
 
