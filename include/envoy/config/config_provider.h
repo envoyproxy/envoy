@@ -27,7 +27,7 @@ public:
    */
   class Config {
   public:
-    virtual ~Config() {}
+    virtual ~Config() = default;
   };
   using ConfigConstSharedPtr = std::shared_ptr<const Config>;
 
@@ -41,7 +41,7 @@ public:
     std::string version_;
   };
 
-  virtual ~ConfigProvider() {}
+  virtual ~ConfigProvider() = default;
 
   /**
    * Returns a ConfigProtoInfo associated with the provider.

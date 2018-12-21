@@ -89,7 +89,7 @@ std::ostream& operator<<(std::ostream& os, ConfigProviderInstanceType type);
  */
 class ImmutableConfigProviderImplBase : public ConfigProvider {
 public:
-  virtual ~ImmutableConfigProviderImplBase();
+  ~ImmutableConfigProviderImplBase() override;
 
   // Envoy::Config::ConfigProvider
   SystemTime lastUpdated() const override { return last_updated_; }
@@ -134,7 +134,7 @@ public:
     std::string last_config_version_;
   };
 
-  virtual ~ConfigSubscriptionInstanceBase();
+  ~ConfigSubscriptionInstanceBase() override;
 
   // Init::Target
   void initialize(std::function<void()> callback) override {
@@ -243,7 +243,7 @@ using ConfigSubscriptionInstanceBaseSharedPtr = std::shared_ptr<ConfigSubscripti
  */
 class MutableConfigProviderImplBase : public ConfigProvider {
 public:
-  virtual ~MutableConfigProviderImplBase() { subscription_->unbindConfigProvider(this); }
+  ~MutableConfigProviderImplBase() override { subscription_->unbindConfigProvider(this); }
 
   // Envoy::Config::ConfigProvider
   SystemTime lastUpdated() const override { return subscription_->lastUpdated(); }
@@ -260,7 +260,7 @@ public:
    * @param initial_config supplies an initial Envoy::Config::ConfigProvider::Config associated with
    *                       the underlying subscription.
    */
-  void initialize(ConfigConstSharedPtr initial_config) {
+  void initialize(const ConfigConstSharedPtr& initial_config) {
     subscription_->bindConfigProvider(this);
     tls_->set([initial_config](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
       return std::make_shared<ThreadLocalConfig>(initial_config);
@@ -271,7 +271,7 @@ public:
    * Propagates a newly instantiated Envoy::Config::ConfigProvider::Config to all workers.
    * @param config supplies the newly instantiated config.
    */
-  void onConfigUpdate(ConfigConstSharedPtr config) {
+  void onConfigUpdate(const ConfigConstSharedPtr& config) {
     tls_->runOnAllThreads(
         [this, config]() -> void { tls_->getTyped<ThreadLocalConfig>().config_ = config; });
   }
@@ -286,7 +286,7 @@ protected:
 private:
   struct ThreadLocalConfig : public ThreadLocal::ThreadLocalObject {
     ThreadLocalConfig(ConfigProvider::ConfigConstSharedPtr initial_config)
-        : config_(initial_config) {}
+        : config_(std::move(initial_config)) {}
 
     ConfigProvider::ConfigConstSharedPtr config_;
   };
@@ -314,7 +314,7 @@ private:
  */
 class ConfigProviderManagerImplBase : public ConfigProviderManager, public Singleton::Instance {
 public:
-  virtual ~ConfigProviderManagerImplBase() {}
+  ~ConfigProviderManagerImplBase() override = default;
 
   /**
    * This is invoked by the /config_dump admin handler.
@@ -351,11 +351,10 @@ protected:
    * @return std::shared_ptr<T> an existing (if a match is found) or newly allocated subscription.
    */
   template <typename T>
-  std::shared_ptr<T> getSubscription(const Protobuf::Message& config_source_proto,
-                                     Init::Manager& init_manager,
-                                     std::function<ConfigSubscriptionInstanceBaseSharedPtr(
-                                         const std::string&, ConfigProviderManagerImplBase&)>
-                                         subscription_factory_fn) {
+  std::shared_ptr<T> getSubscription(
+      const Protobuf::Message& config_source_proto, Init::Manager& init_manager,
+      const std::function<ConfigSubscriptionInstanceBaseSharedPtr(
+          const std::string&, ConfigProviderManagerImplBase&)>& subscription_factory_fn) {
     static_assert(std::is_base_of<ConfigSubscriptionInstanceBase, T>::value,
                   "T must be a subclass of ConfigSubscriptionInstanceBase");
 

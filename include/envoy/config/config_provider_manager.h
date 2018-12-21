@@ -25,7 +25,7 @@ namespace Config {
  */
 class ConfigProviderManager {
 public:
-  virtual ~ConfigProviderManager() {}
+  virtual ~ConfigProviderManager() = default;
 
   /**
    * Returns a dynamic ConfigProvider which receives configuration via an xDS API.

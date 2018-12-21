@@ -89,7 +89,7 @@ ConfigProviderManagerImplBase::immutableConfigProviders(ConfigProviderInstanceTy
     return empty_set;
   }
 
-  return *it->second.get();
+  return *it->second;
 }
 
 void ConfigProviderManagerImplBase::bindImmutableConfigProvider(
@@ -111,10 +111,8 @@ void ConfigProviderManagerImplBase::unbindImmutableConfigProvider(
     ImmutableConfigProviderImplBase* provider) {
   ASSERT(provider->type() == ConfigProviderInstanceType::Static ||
          provider->type() == ConfigProviderInstanceType::Inline);
-  ConfigProviderMap::iterator it = immutable_config_providers_map_.find(provider->type());
-  RELEASE_ASSERT(it != immutable_config_providers_map_.end(),
-                 fmt::format("trying to unbind config provider, but failed to find type = {}",
-                             provider->type()));
+  auto it = immutable_config_providers_map_.find(provider->type());
+  ASSERT(it != immutable_config_providers_map_.end());
   it->second->erase(provider);
 }
 
