@@ -1199,9 +1199,10 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
 
   // Now actually encode via the codec.
   stream_info_.onFirstDownstreamTxByteSent();
-  response_encoder_->encodeHeaders(
-      headers,
-      encoding_headers_only_ || (end_stream && continue_data_entry == encoder_filters_.end()));
+  const bool encoder_end_stream =
+      encoding_headers_only_ || (end_stream && continue_data_entry == encoder_filters_.end());
+  response_encoder_->encodeHeaders(headers, encoder_end_stream);
+  response_encoder_end_stream_ = encoder_end_stream;
 
   if (continue_data_entry != encoder_filters_.end()) {
     // We use the continueEncoding() code since it will correctly handle not calling
@@ -1360,6 +1361,7 @@ void ConnectionManagerImpl::ActiveStream::encodeTrailers(ActiveStreamEncoderFilt
   ENVOY_STREAM_LOG(debug, "encoding trailers via codec:\n{}", *this, trailers);
 
   response_encoder_->encodeTrailers(trailers);
+  response_encoder_end_stream_ = true;
   maybeEndEncode(true);
 }
 
@@ -1787,10 +1789,12 @@ void ConnectionManagerImpl::ActiveStreamEncoderFilter::responseDataTooLarge() {
           [&](HeaderMapPtr&& response_headers, bool end_stream) -> void {
             parent_.response_headers_ = std::move(response_headers);
             parent_.response_encoder_->encodeHeaders(*parent_.response_headers_, end_stream);
+            parent_.response_encoder_end_stream_ = end_stream;
             parent_.state_.local_complete_ = end_stream;
           },
           [&](Buffer::Instance& data, bool end_stream) -> void {
             parent_.response_encoder_->encodeData(data, end_stream);
+            parent_.response_encoder_end_stream_ = end_stream;
             parent_.state_.local_complete_ = end_stream;
           },
           parent_.state_.destroyed_, Http::Code::InternalServerError,
