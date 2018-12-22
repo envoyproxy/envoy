@@ -842,6 +842,26 @@ TEST(HostImplTest, HostnameCanaryAndLocality) {
   EXPECT_EQ(1, host.priority());
 }
 
+TEST(HostImplTest, HealthFlags) {
+  MockCluster cluster;
+  HostSharedPtr host = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 1);
+
+  // To begin with, no flags are set so we're healthy.
+  EXPECT_EQ(Host::Health::Healthy, host->health());
+
+  // Setting an unhealthy flag make the host unhealthy.
+  host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+  EXPECT_EQ(Host::Health::Unhealthy, host->health());
+
+  // Setting a degraded flag on an unhealthy host has no effect.
+  host->healthFlagSet(Host::HealthFlag::DEGRADED_ACTIVE_HC);
+  EXPECT_EQ(Host::Health::Unhealthy, host->health());
+
+  // If the degraded flag is the only thing set, host is degraded.
+  host->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+  EXPECT_EQ(Host::Health::Degraded, host->health());
+}
+
 TEST(StaticClusterImplTest, InitialHosts) {
   Stats::IsolatedStoreImpl stats;
   Ssl::MockContextManager ssl_context_manager;
