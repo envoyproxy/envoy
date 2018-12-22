@@ -184,6 +184,7 @@ const std::string Json::Schema::LISTENER_SCHEMA(R"EOF(
        "drain_type": {"type" : "string", "enum" : ["default", "modify_only"]},
        "ssl_context" : {"$ref" : "#/definitions/ssl_context"},
        "transparent" : {"type": "boolean"},
+       "bind_to_port" : {"type": "boolean"},
        "use_proxy_proto" : {"type" : "boolean"},
        "use_original_dst" : {"type" : "boolean"},
        "per_connection_buffer_limit_bytes" : {
@@ -935,7 +936,7 @@ const std::string Json::Schema::BUFFER_HTTP_FILTER_SCHEMA(R"EOF(
       "max_request_bytes" : {"type" : "integer"},
       "max_request_time_s" : {"type" : "integer"}
     },
-    "required" : ["max_request_bytes", "max_request_time_s"],
+    "required" : ["max_request_bytes"],
     "additionalProperties" : false
   }
   )EOF");

@@ -41,6 +41,11 @@ rm -f server_ecdsacert.cfg
 # Generate cert for the client.
 generate_rsa_key client ca
 generate_x509_cert client ca
+# Generate ECDSA cert for the client.
+cp -f clientcert.cfg client_ecdsacert.cfg
+generate_ecdsa_key client_ecdsa ca
+generate_x509_cert client_ecdsa ca
+rm -f client_ecdsacert.cfg
 
 # Generate cert for the upstream CA.
 generate_ca upstreamca

@@ -129,6 +129,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/stats:symbol_table_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:logger_lib",
         "//source/common/common:thread_lib",
         "//source/common/common:utility_lib",
     ],

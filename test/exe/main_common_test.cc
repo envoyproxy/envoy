@@ -200,6 +200,16 @@ TEST_P(AdminRequestTest, AdminRequestGetStatsAndKill) {
   EXPECT_TRUE(waitForEnvoyToExit());
 }
 
+// This test is the same as AdminRequestGetStatsAndQuit, except we send ourselves a SIGINT,
+// equivalent to receiving a Ctrl-C from the user.
+TEST_P(AdminRequestTest, AdminRequestGetStatsAndCtrlC) {
+  startEnvoy();
+  started_.WaitForNotification();
+  EXPECT_THAT(adminRequest("/stats", "GET"), HasSubstr("filesystem.reopen_failed"));
+  kill(getpid(), SIGINT);
+  EXPECT_TRUE(waitForEnvoyToExit());
+}
+
 TEST_P(AdminRequestTest, AdminRequestContentionDisabled) {
   startEnvoy();
   started_.WaitForNotification();

@@ -1,7 +1,7 @@
 #include "extensions/filters/http/grpc_json_transcoder/json_transcoder_filter.h"
 
 #include <memory>
-#include <set>
+#include <unordered_set>
 
 #include "envoy/common/exception.h"
 #include "envoy/http/filter.h"
@@ -105,7 +105,7 @@ JsonTranscoderConfig::JsonTranscoderConfig(
   }
 
   PathMatcherBuilder<const Protobuf::MethodDescriptor*> pmb;
-  std::set<ProtobufTypes::String> ignored_query_parameters;
+  std::unordered_set<ProtobufTypes::String> ignored_query_parameters;
   for (const auto& query_param : proto_config.ignored_query_parameters()) {
     ignored_query_parameters.insert(query_param);
   }

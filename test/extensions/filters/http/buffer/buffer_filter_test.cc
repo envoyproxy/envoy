@@ -79,6 +79,20 @@ TEST_F(BufferFilterTest, RequestWithData) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data2, true));
 }
 
+TEST_F(BufferFilterTest, RequestTimeoutNotEnabledWithZero) {
+  InSequence s;
+
+  expectTimerCreate();
+
+  // timer config is 0 by default
+  EXPECT_CALL(*timer_, enableTimer(_)).Times(0);
+  Http::TestHeaderMapImpl headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_.decodeHeaders(headers, false));
+
+  filter_.onDestroy();
+  EXPECT_EQ(0U, config_->stats().rq_timeout_.value());
+}
+
 TEST_F(BufferFilterTest, RequestTimeout) {
   InSequence s;
 

@@ -33,15 +33,15 @@ namespace Envoy {
 namespace {
 
 std::string makeTempDir(char* name_template) {
-#if !defined(WIN32)
-  char* dirname = ::mkdtemp(name_template);
-  RELEASE_ASSERT(dirname != nullptr,
-                 fmt::format("failed to create tempdir: {} {}", dirname, strerror(errno)));
-#else
+#ifdef WIN32
   char* dirname = ::_mktemp(name_template);
   RELEASE_ASSERT(dirname != nullptr,
                  fmt::format("failed to create tempdir: {} {}", dirname, strerror(errno)));
   std::experimental::filesystem::create_directories(dirname);
+#else
+  char* dirname = ::mkdtemp(name_template);
+  RELEASE_ASSERT(dirname != nullptr,
+                 fmt::format("failed to create tempdir: {} {}", dirname, strerror(errno)));
 #endif
   return std::string(dirname);
 }
@@ -305,10 +305,7 @@ std::string TestEnvironment::writeStringToFileForTest(const std::string& filenam
 }
 
 void TestEnvironment::setEnvVar(const std::string& name, const std::string& value, int overwrite) {
-#if !defined(WIN32)
-  const int rc = ::setenv(name.c_str(), value.c_str(), overwrite);
-  ASSERT_EQ(rc, 0);
-#else
+#ifdef WIN32
   if (!overwrite) {
     size_t requiredSize;
     const int rc = ::getenv_s(&requiredSize, NULL, 0, name.c_str());
@@ -319,6 +316,9 @@ void TestEnvironment::setEnvVar(const std::string& name, const std::string& valu
   }
   const int rc = ::_putenv_s(name.c_str(), value.c_str());
   ASSERT_EQ(0, rc);
+#else
+  const int rc = ::setenv(name.c_str(), value.c_str(), overwrite);
+  ASSERT_EQ(rc, 0);
 #endif
 }
 

@@ -61,14 +61,14 @@ TYPED_TEST(StatNameTest, TestArbitrarySymbolRoundtrip) {
   }
 }
 
-TYPED_TEST(StatNameTest, Test100kSymbolsRoundtrip) {
+TEST_F(StatNameTest, Test100kSymbolsRoundtrip) {
   for (int i = 0; i < 100 * 1000; ++i) {
     const std::string stat_name = absl::StrCat("symbol_", i);
     EXPECT_EQ(stat_name, this->encodeDecode(stat_name));
   }
 }
 
-TYPED_TEST(StatNameTest, TestUnusualDelimitersRoundtrip) {
+TEST_F(StatNameTest, TestUnusualDelimitersRoundtrip) {
   const std::vector<std::string> stat_names = {".",    "..",    "...",    "foo",    "foo.",
                                                ".foo", ".foo.", ".foo..", "..foo.", "..foo.."};
   for (auto stat_name : stat_names) {
@@ -76,13 +76,13 @@ TYPED_TEST(StatNameTest, TestUnusualDelimitersRoundtrip) {
   }
 }
 
-TYPED_TEST(StatNameTest, TestSuccessfulDoubleLookup) {
+TEST_F(StatNameTest, TestSuccessfulDoubleLookup) {
   StatName stat_name_1(this->makeStat("foo.bar.baz"));
   StatName stat_name_2(this->makeStat("foo.bar.baz"));
   EXPECT_EQ(stat_name_1, stat_name_2);
 }
 
-TYPED_TEST(StatNameTest, TestSuccessfulDecode) {
+TEST_F(StatNameTest, TestSuccessfulDecode) {
   std::string stat_name = "foo.bar.baz";
   StatName stat_name_1(this->makeStat(stat_name));
   StatName stat_name_2(this->makeStat(stat_name));
@@ -90,7 +90,7 @@ TYPED_TEST(StatNameTest, TestSuccessfulDecode) {
   EXPECT_EQ(this->table_.toString(stat_name_1), stat_name);
 }
 
-TYPED_TEST(StatNameTest, TestBadDecodes) {
+TEST_F(StatNameTest, TestBadDecodes) {
   {
     // If a symbol doesn't exist, decoding it should trigger an ASSERT() and crash.
     SymbolVec bad_symbol_vec = {1}; // symbol 0 is the empty symbol.
@@ -108,14 +108,14 @@ TYPED_TEST(StatNameTest, TestBadDecodes) {
   }
 }
 
-TYPED_TEST(StatNameTest, TestDifferentStats) {
+TEST_F(StatNameTest, TestDifferentStats) {
   StatName stat_name_1(this->makeStat("foo.bar"));
   StatName stat_name_2(this->makeStat("bar.foo"));
   EXPECT_NE(this->table_.toString(stat_name_1), this->table_.toString(stat_name_2));
   EXPECT_NE(stat_name_1, stat_name_2);
 }
 
-TYPED_TEST(StatNameTest, TestSymbolConsistency) {
+TEST_F(StatNameTest, TestSymbolConsistency) {
   StatName stat_name_1(this->makeStat("foo.bar"));
   StatName stat_name_2(this->makeStat("bar.foo"));
   // We expect the encoding of "foo" in one context to be the same as another.
@@ -125,7 +125,7 @@ TYPED_TEST(StatNameTest, TestSymbolConsistency) {
   EXPECT_EQ(vec_2[0], vec_1[1]);
 }
 
-TYPED_TEST(StatNameTest, TestSameValueOnPartialFree) {
+TEST_F(StatNameTest, TestSameValueOnPartialFree) {
   // This should hold true for components as well. Since "foo" persists even when "foo.bar" is
   // freed, we expect both instances of "foo" to have the same symbol.
   this->makeStat("foo");
@@ -177,7 +177,7 @@ TEST_F(SymbolTableStatNameTest, FreePoolTest) {
   EXPECT_EQ(this->table_.numSymbols(), 6);
 }
 
-TYPED_TEST(StatNameTest, TestShrinkingExpectation) {
+TEST_F(StatNameTest, TestShrinkingExpectation) {
   // We expect that as we free stat names, the memory used to store those underlying symbols will
   // be freed.
   // ::size() is a public function, but should only be used for testing.
@@ -227,7 +227,7 @@ TYPED_TEST(StatNameTest, TestShrinkingExpectation) {
 // want to allocate two different StatName objects in contiguous memory. The
 // safety-net here in terms of leaks is that SymbolTable will assert-fail if
 // you don't free all the StatNames you've allocated bytes for.
-TYPED_TEST(StatNameTest, StoringWithoutStatNameStorage) {
+TEST_F(StatNameTest, StoringWithoutStatNameStorage) {
   SymbolEncoding hello_encoding = this->table_.encode("hello.world");
   SymbolEncoding goodbye_encoding = this->table_.encode("goodbye.world");
   size_t size = hello_encoding.bytesRequired() + goodbye_encoding.bytesRequired();
@@ -248,7 +248,7 @@ TYPED_TEST(StatNameTest, StoringWithoutStatNameStorage) {
   this->table_.free(goodbye);
 }
 
-TYPED_TEST(StatNameTest, HashTable) {
+TEST_F(StatNameTest, HashTable) {
   StatName ac = this->makeStat("a.c");
   StatName ab = this->makeStat("a.b");
   StatName de = this->makeStat("d.e");
@@ -266,7 +266,7 @@ TYPED_TEST(StatNameTest, HashTable) {
   EXPECT_EQ(3, name_int_map[de]);
 }
 
-TYPED_TEST(StatNameTest, Sort) {
+TEST_F(StatNameTest, Sort) {
   std::vector<StatName> names{this->makeStat("a.c"),   this->makeStat("a.b"), this->makeStat("d.e"),
                               this->makeStat("d.a.a"), this->makeStat("d.a"), this->makeStat("a.c")};
   const std::vector<StatName> sorted_names{this->makeStat("a.b"), this->makeStat("a.c"),   this->makeStat("a.c"),
@@ -276,47 +276,47 @@ TYPED_TEST(StatNameTest, Sort) {
   EXPECT_EQ(names, sorted_names);
 }
 
-TYPED_TEST(StatNameTest, Concat2) {
+TEST_F(StatNameTest, Concat2) {
   StatNameJoiner joiner(this->makeStat("a.b"), this->makeStat("c.d"));
   EXPECT_EQ("a.b.c.d", this->table_.toString(joiner.statName()));
 }
 
-TYPED_TEST(StatNameTest, ConcatFirstEmpty) {
+TEST_F(StatNameTest, ConcatFirstEmpty) {
   StatNameJoiner joiner(this->makeStat(""), this->makeStat("c.d"));
   EXPECT_EQ("c.d", this->table_.toString(joiner.statName()));
 }
 
-TYPED_TEST(StatNameTest, ConcatSecondEmpty) {
+TEST_F(StatNameTest, ConcatSecondEmpty) {
   StatNameJoiner joiner(this->makeStat("a.b"), this->makeStat(""));
   EXPECT_EQ("a.b", this->table_.toString(joiner.statName()));
 }
 
-TYPED_TEST(StatNameTest, ConcatAllEmpty) {
+TEST_F(StatNameTest, ConcatAllEmpty) {
   StatNameJoiner joiner(this->makeStat(""), this->makeStat(""));
   EXPECT_EQ("", this->table_.toString(joiner.statName()));
 }
 
-TYPED_TEST(StatNameTest, Join3) {
+TEST_F(StatNameTest, Join3) {
   StatNameJoiner joiner({this->makeStat("a.b"), this->makeStat("c.d"), this->makeStat("e.f")});
   EXPECT_EQ("a.b.c.d.e.f", this->table_.toString(joiner.statName()));
 }
 
-TYPED_TEST(StatNameTest, Join3FirstEmpty) {
+TEST_F(StatNameTest, Join3FirstEmpty) {
   StatNameJoiner joiner({this->makeStat(""), this->makeStat("c.d"), this->makeStat("e.f")});
   EXPECT_EQ("c.d.e.f", this->table_.toString(joiner.statName()));
 }
 
-TYPED_TEST(StatNameTest, Join3SecondEmpty) {
+TEST_F(StatNameTest, Join3SecondEmpty) {
   StatNameJoiner joiner({this->makeStat("a.b"), this->makeStat(""), this->makeStat("e.f")});
   EXPECT_EQ("a.b.e.f", this->table_.toString(joiner.statName()));
 }
 
-TYPED_TEST(StatNameTest, Join3ThirdEmpty) {
+TEST_F(StatNameTest, Join3ThirdEmpty) {
   StatNameJoiner joiner({this->makeStat("a.b"), this->makeStat("c.d"), this->makeStat("")});
   EXPECT_EQ("a.b.c.d", this->table_.toString(joiner.statName()));
 }
 
-TYPED_TEST(StatNameTest, JoinAllEmpty) {
+TEST_F(StatNameTest, JoinAllEmpty) {
   StatNameJoiner joiner({this->makeStat(""), this->makeStat(""), this->makeStat("")});
   EXPECT_EQ("", this->table_.toString(joiner.statName()));
 }
@@ -356,7 +356,7 @@ private:
 
 } // namespace
 
-TYPED_TEST(StatNameTest, RacingSymbolCreation) {
+TEST_F(StatNameTest, RacingSymbolCreation) {
   Thread::ThreadFactory& thread_factory = Thread::threadFactoryForTest();
   MutexTracerImpl& mutex_tracer = MutexTracerImpl::getOrCreateTracer();
 
@@ -407,6 +407,74 @@ TYPED_TEST(StatNameTest, RacingSymbolCreation) {
   }
 }
 
+TEST_F(StatNameTest, MutexContentionOnExistingSymbols) {
+  Thread::ThreadFactory& thread_factory = Thread::threadFactoryForTest();
+  MutexTracerImpl& mutex_tracer = MutexTracerImpl::getOrCreateTracer();
+
+  // Make 100 threads, each of which will race to encode an overlapping set of
+  // symbols, triggering corner-cases in SymbolTable::toSymbol.
+  constexpr int num_threads = 100;
+  std::vector<Thread::ThreadPtr> threads;
+  threads.reserve(num_threads);
+  ConditionalInitializer creation, access, wait;
+  absl::BlockingCounter creates(num_threads), accesses(num_threads);
+  for (int i = 0; i < num_threads; ++i) {
+    threads.push_back(
+        thread_factory.createThread([this, i, &creation, &access, &wait, &creates, &accesses]() {
+          // Rotate between 20 different symbols to try to get some
+          // contention. Based on a logging print statement in
+          // SymbolTable::toSymbol(), this appears to trigger creation-races,
+          // even when compiled with optimization.
+          std::string stat_name_string = absl::StrCat("symbol", i % 20);
+
+          // Block each thread on waking up a common condition variable,
+          // so we make it likely to race on creation.
+          creation.wait();
+          StatNameTempStorage initial(stat_name_string, table_);
+          creates.DecrementCount();
+
+          access.wait();
+          StatNameTempStorage second(stat_name_string, table_);
+          accesses.DecrementCount();
+
+          wait.wait();
+        }));
+  }
+  creation.setReady();
+  creates.Wait();
+
+  int64_t create_contentions = mutex_tracer.numContentions();
+  ENVOY_LOG_MISC(info, "Number of contentions: {}", create_contentions);
+
+  // But when we access the already-existing symbols, we guarantee that no
+  // further mutex contentions occur.
+  access.setReady();
+  accesses.Wait();
+
+  // In a perfect world, we could use reader-locks in the SymbolTable
+  // implementation, and there should be zero additional contentions
+  // after latching 'create_contentions' above. And we can definitely
+  // have this world, but this slows down BM_CreateRace in
+  // symbol_table_speed_test.cc, even on a 72-core machine.
+  //
+  // Thus it is better to avoid symbol-table contention by refactoring
+  // all stat-creation code to symbolize all stat string elements at
+  // construction, as composition does not require a lock.
+  //
+  // See this commit
+  // https://github.com/envoyproxy/envoy/pull/5321/commits/ef712d0f5a11ff49831c1935e8a2ef8a0a935bc9
+  // for a working reader-lock implementation, which would pass this EXPECT:
+  //     EXPECT_EQ(create_contentions, mutex_tracer.numContentions());
+  //
+  // Note also that we cannot guarantee there *will* be contentions
+  // as a machine or OS is free to run all threads serially.
+
+  wait.setReady();
+  for (auto& thread : threads) {
+    thread->join();
+  }
+}
+
 // Tests the memory savings realized from using symbol tables with 1k clusters. This
 // test shows the memory drops from almost 8M to less than 2M.
 TEST(SymbolTableTest, Memory) {
@@ -446,11 +514,11 @@ TEST(SymbolTableTest, Memory) {
   // This test only works if Memory::Stats::totalCurrentlyAllocated() works, which
   // appears not to be the case in some tests, including asan, tsan, and mac.
   if (Memory::Stats::totalCurrentlyAllocated() == 0) {
-    std::cerr << "SymbolTableTest.Memory comparison skipped due to malloc-stats returning 0."
-              << std::endl;
+    ENVOY_LOG_MISC(info,
+                   "SymbolTableTest.Memory comparison skipped due to malloc-stats returning 0.");
   } else {
     EXPECT_LT(symbol_table_mem_used, string_mem_used / 4);
-    EXPECT_LT(symbol_table_mem_used, 1740000); // Dec 16, 2018: 1734552 bytes.
+    EXPECT_LT(symbol_table_mem_used, 1750000); // Dec 16, 2018: 1744280 bytes.
   }
 }
 

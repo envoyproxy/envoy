@@ -74,6 +74,23 @@ envoy_cc_test(
         ":stat_test_utility_lib",
         "//source/common/common:mutex_tracer_lib",
         "//source/common/memory:stats_lib",
+        "//source/common/stats:symbol_table_lib",
+        "//test/mocks/stats:stats_mocks",
+        "//test/test_common:logging_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test_binary(
+    name = "symbol_table_speed_test",
+    srcs = ["symbol_table_speed_test.cc"],
+    external_deps = [
+        "abseil_strings",
+        "benchmark",
+    ],
+    deps = [
+        ":stat_test_utility_lib",
+        "//source/common/memory:stats_lib",
         "//source/common/stats:fake_symbol_table_lib",
         "//source/common/stats:symbol_table_lib",
         "//test/mocks/stats:stats_mocks",
@@ -134,5 +151,6 @@ envoy_cc_test_binary(
         "//source/common/stats:thread_local_store_lib",
         "//source/common/thread_local:thread_local_lib",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:utility_lib",
     ],
 )

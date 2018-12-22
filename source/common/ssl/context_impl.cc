@@ -204,6 +204,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config, TimeS
     }
   }
 
+  std::unordered_set<int> cert_pkey_ids;
   for (uint32_t i = 0; i < tls_certificates.size(); ++i) {
     auto& ctx = tls_contexts_[i];
     // Load certificate chain.
@@ -247,7 +248,14 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config, TimeS
     }
 
     bssl::UniquePtr<EVP_PKEY> public_key(X509_get_pubkey(ctx.cert_chain_.get()));
-    switch (EVP_PKEY_id(public_key.get())) {
+    const int pkey_id = EVP_PKEY_id(public_key.get());
+    if (!cert_pkey_ids.insert(pkey_id).second) {
+      throw EnvoyException(fmt::format("Failed to load certificate chain from {}, at most one "
+                                       "certificate of a given type may be specified",
+                                       ctx.cert_chain_file_path_));
+    }
+    ctx.is_ecdsa_ = pkey_id == EVP_PKEY_EC;
+    switch (pkey_id) {
     case EVP_PKEY_EC: {
       // We only support P-256 ECDSA today.
       const EC_KEY* ecdsa_public_key = EVP_PKEY_get0_EC_KEY(public_key.get());
@@ -255,7 +263,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config, TimeS
       ASSERT(ecdsa_public_key != nullptr);
       const EC_GROUP* ecdsa_group = EC_KEY_get0_group(ecdsa_public_key);
       if (ecdsa_group == nullptr || EC_GROUP_get_curve_name(ecdsa_group) != NID_X9_62_prime256v1) {
-        throw EnvoyException(fmt::format("Failed to load certificate from chain {}, only P-256 "
+        throw EnvoyException(fmt::format("Failed to load certificate chain from {}, only P-256 "
                                          "ECDSA certificates are supported",
                                          ctx.cert_chain_file_path_));
       }
@@ -267,12 +275,27 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config, TimeS
       // Since we checked the key type above, this should be valid.
       ASSERT(rsa_public_key != nullptr);
       const unsigned rsa_key_length = RSA_size(rsa_public_key);
+#ifdef BORINGSSL_FIPS
+      if (rsa_key_length != 2048 / 8 && rsa_key_length != 3072 / 8) {
+        throw EnvoyException(
+            fmt::format("Failed to load certificate chain from {}, only RSA certificates with "
+                        "2048-bit or 3072-bit keys are supported in FIPS mode",
+                        ctx.cert_chain_file_path_));
+      }
+#else
       if (rsa_key_length < 2048 / 8) {
-        throw EnvoyException(fmt::format("Failed to load certificate from chain {}, only RSA "
+        throw EnvoyException(fmt::format("Failed to load certificate chain from {}, only RSA "
                                          "certificates with 2048-bit or larger keys are supported",
                                          ctx.cert_chain_file_path_));
       }
+#endif
     } break;
+#ifdef BORINGSSL_FIPS
+    default:
+      throw EnvoyException(fmt::format("Failed to load certificate chain from {}, only RSA and "
+                                       "ECDSA certificates are supported in FIPS mode",
+                                       ctx.cert_chain_file_path_));
+#endif
     }
 
     // Load private key.
@@ -287,6 +310,28 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config, TimeS
       throw EnvoyException(
           fmt::format("Failed to load private key from {}", tls_certificate.privateKeyPath()));
     }
+
+#ifdef BORINGSSL_FIPS
+    // Verify that private keys are passing FIPS pairwise consistency tests.
+    switch (pkey_id) {
+    case EVP_PKEY_EC: {
+      const EC_KEY* ecdsa_private_key = EVP_PKEY_get0_EC_KEY(pkey.get());
+      if (!EC_KEY_check_fips(ecdsa_private_key)) {
+        throw EnvoyException(fmt::format("Failed to load private key from {}, ECDSA key failed "
+                                         "pairwise consistency test required in FIPS mode",
+                                         tls_certificate.privateKeyPath()));
+      }
+    } break;
+    case EVP_PKEY_RSA: {
+      RSA* rsa_private_key = EVP_PKEY_get0_RSA(pkey.get());
+      if (!RSA_check_fips(rsa_private_key)) {
+        throw EnvoyException(fmt::format("Failed to load private key from {}, RSA key failed "
+                                         "pairwise consistency test required in FIPS mode",
+                                         tls_certificate.privateKeyPath()));
+      }
+    } break;
+    }
+#endif
   }
 
   // use the server's cipher list preferences
@@ -407,8 +452,20 @@ void ContextImpl::logHandshake(SSL* ssl) const {
   const char* cipher = SSL_get_cipher_name(ssl);
   scope_.counter(fmt::format("ssl.ciphers.{}", std::string{cipher})).inc();
 
-  std::string protocol_version = std::string{SSL_get_version(ssl)};
-  scope_.counter(fmt::format("ssl.versions.{}", protocol_version)).inc();
+  const char* version = SSL_get_version(ssl);
+  scope_.counter(fmt::format("ssl.versions.{}", std::string{version})).inc();
+
+  uint16_t curve_id = SSL_get_curve_id(ssl);
+  if (curve_id) {
+    const char* curve = SSL_get_curve_name(curve_id);
+    scope_.counter(fmt::format("ssl.curves.{}", std::string{curve})).inc();
+  }
+
+  uint16_t sigalg_id = SSL_get_peer_signature_algorithm(ssl);
+  if (sigalg_id) {
+    const char* sigalg = SSL_get_signature_algorithm_name(sigalg_id, 1 /* include curve */);
+    scope_.counter(fmt::format("ssl.sigalgs.{}", std::string{sigalg})).inc();
+  }
 
   bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl));
   if (!cert.get()) {
@@ -579,9 +636,11 @@ ClientContextImpl::ClientContextImpl(Stats::Scope& scope, const ClientContextCon
   }
 
   if (!config.signingAlgorithmsForTest().empty()) {
+    const uint16_t sigalgs = parseSigningAlgorithmsForTest(config.signingAlgorithmsForTest());
+    RELEASE_ASSERT(sigalgs != 0, "");
+
     for (auto& ctx : tls_contexts_) {
-      int rc =
-          SSL_CTX_set1_sigalgs_list(ctx.ssl_ctx_.get(), config.signingAlgorithmsForTest().c_str());
+      int rc = SSL_CTX_set_verify_algorithm_prefs(ctx.ssl_ctx_.get(), &sigalgs, 1);
       RELEASE_ASSERT(rc == 1, "");
     }
   }
@@ -657,6 +716,17 @@ int ClientContextImpl::newSessionKey(SSL_SESSION* session) {
   // Add new session key at the front of the queue, so that it's used first.
   session_keys_.push_front(bssl::UniquePtr<SSL_SESSION>(session));
   return 1; // Tell BoringSSL that we took ownership of the session.
+}
+
+uint16_t ClientContextImpl::parseSigningAlgorithmsForTest(const std::string& sigalgs) {
+  // This is used only when testing RSA/ECDSA certificate selection, so only the signing algorithms
+  // used in tests are supported here.
+  if (sigalgs == "rsa_pss_rsae_sha256") {
+    return SSL_SIGN_RSA_PSS_RSAE_SHA256;
+  } else if (sigalgs == "ecdsa_secp256r1_sha256") {
+    return SSL_SIGN_ECDSA_SECP256R1_SHA256;
+  }
+  return 0;
 }
 
 ServerContextImpl::ServerContextImpl(Stats::Scope& scope, const ServerContextConfig& config,
