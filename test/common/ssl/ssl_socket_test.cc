@@ -274,24 +274,103 @@ void testUtil(const TestUtilOptions& options) {
   }
 }
 
-// TODO replace the long parameter list with an options object
-const std::string testUtilV2(
-    const envoy::api::v2::Listener& server_proto,
-    const envoy::api::v2::auth::UpstreamTlsContext& client_ctx_proto,
-    const std::string& client_session, bool expect_success,
-    const std::string& expected_protocol_version, const std::string& expected_server_cert_digest,
-    const std::string& expected_client_cert_uri, const std::string& expected_requested_server_name,
-    const std::string& expected_alpn_protocol, const std::string& expected_server_stats,
-    const std::string& expected_client_stats, const Network::Address::IpVersion version,
-    Network::TransportSocketOptionsSharedPtr transport_socket_options) {
+/**
+ * A class to hold the options for testUtilV2().
+ */
+class TestUtilOptionsV2 : public TestUtilOptionsBase {
+public:
+  TestUtilOptionsV2(const envoy::api::v2::Listener& listener,
+                    const envoy::api::v2::auth::UpstreamTlsContext& client_ctx_proto,
+                    const std::string& expected_client_stats,
+                    const std::string& expected_server_stats, bool expect_success,
+                    Network::Address::IpVersion version)
+      : TestUtilOptionsBase(expected_server_stats, expect_success, version), listener_(listener),
+        client_ctx_proto_(client_ctx_proto), expected_client_stats_(expected_client_stats),
+        transport_socket_options_(nullptr) {}
+
+  const envoy::api::v2::Listener& listener() const { return listener_; }
+  const envoy::api::v2::auth::UpstreamTlsContext& clientCtxProto() const {
+    return client_ctx_proto_;
+  }
+  const std::string& expectedClientStats() const { return expected_client_stats_; }
+
+  TestUtilOptionsV2& expectedClientCertURI(const std::string& expected_client_cert_uri) {
+    TestUtilOptionsBase::expectedClientCertURI(expected_client_cert_uri);
+    return *this;
+  }
+
+  const std::string& expectedClientCertURI() const {
+    return TestUtilOptionsBase::expectedClientCertURI();
+  }
+
+  TestUtilOptionsV2& clientSession(const std::string& client_session) {
+    client_session_ = client_session;
+    return *this;
+  }
+
+  const std::string& clientSession() const { return client_session_; }
+
+  TestUtilOptionsV2& expectedProtocolVersion(const std::string& expected_protocol_version) {
+    expected_protocol_version_ = expected_protocol_version;
+    return *this;
+  }
+
+  const std::string& expectedProtocolVersion() const { return expected_protocol_version_; }
+
+  TestUtilOptionsV2& expectedServerCertDigest(const std::string& expected_server_cert_digest) {
+    expected_server_cert_digest_ = expected_server_cert_digest;
+    return *this;
+  }
+
+  const std::string& expectedServerCertDigest() const { return expected_server_cert_digest_; }
+
+  TestUtilOptionsV2&
+  expectedRequestedServerName(const std::string& expected_requested_server_name) {
+    expected_requested_server_name_ = expected_requested_server_name;
+    return *this;
+  }
+
+  const std::string& expectedRequestedServerName() const { return expected_requested_server_name_; }
+
+  TestUtilOptionsV2& expectedALPNProtocol(const std::string& expected_alpn_protocol) {
+    expected_alpn_protocol_ = expected_alpn_protocol;
+    return *this;
+  }
+
+  const std::string& expectedALPNProtocol() const { return expected_alpn_protocol_; }
+
+  TestUtilOptionsV2&
+  transportSocketOptions(Network::TransportSocketOptionsSharedPtr transport_socket_options) {
+    transport_socket_options_ = transport_socket_options;
+    return *this;
+  }
+
+  Network::TransportSocketOptionsSharedPtr transportSocketOptions() const {
+    return transport_socket_options_;
+  }
+
+private:
+  const envoy::api::v2::Listener& listener_;
+  const envoy::api::v2::auth::UpstreamTlsContext& client_ctx_proto_;
+  const std::string& expected_client_stats_;
+
+  std::string client_session_;
+  std::string expected_protocol_version_;
+  std::string expected_server_cert_digest_;
+  std::string expected_requested_server_name_;
+  std::string expected_alpn_protocol_;
+  Network::TransportSocketOptionsSharedPtr transport_socket_options_;
+};
+
+const std::string testUtilV2(const TestUtilOptionsV2& options) {
   Event::SimulatedTimeSystem time_system;
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
   ContextManagerImpl manager(time_system);
   std::string new_session = EMPTY_STRING;
 
   // SNI-based selection logic isn't happening in Ssl::SslSocket anymore.
-  ASSERT(server_proto.filter_chains().size() == 1);
-  const auto& filter_chain = server_proto.filter_chains(0);
+  ASSERT(options.listener().filter_chains().size() == 1);
+  const auto& filter_chain = options.listener().filter_chains(0);
   std::vector<std::string> server_names(filter_chain.filter_chain_match().server_names().begin(),
                                         filter_chain.filter_chain_match().server_names().end());
   auto server_cfg =
@@ -303,28 +382,29 @@ const std::string testUtilV2(
   DangerousDeprecatedTestTime test_time;
   Api::ApiPtr api = Api::createApiForTest(server_stats_store);
   Event::DispatcherImpl dispatcher(test_time.timeSystem(), *api);
-  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(version), nullptr,
-                                  true);
+  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(options.version()),
+                                  nullptr, true);
   NiceMock<Network::MockListenerCallbacks> callbacks;
   Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener = dispatcher.createListener(socket, callbacks, true, false);
 
-  auto client_cfg = std::make_unique<ClientContextConfigImpl>(client_ctx_proto, factory_context);
+  auto client_cfg =
+      std::make_unique<ClientContextConfigImpl>(options.clientCtxProto(), factory_context);
   Stats::IsolatedStoreImpl client_stats_store;
   ClientSslSocketFactory client_ssl_socket_factory(std::move(client_cfg), manager,
                                                    client_stats_store);
   Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
       socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
-      client_ssl_socket_factory.createTransportSocket(transport_socket_options), nullptr);
+      client_ssl_socket_factory.createTransportSocket(options.transportSocketOptions()), nullptr);
 
-  if (!client_session.empty()) {
+  if (!options.clientSession().empty()) {
     const Ssl::SslSocket* ssl_socket =
         dynamic_cast<const Ssl::SslSocket*>(client_connection->ssl());
     SSL* client_ssl_socket = ssl_socket->rawSslForTest();
     SSL_CTX* client_ssl_context = SSL_get_SSL_CTX(client_ssl_socket);
     SSL_SESSION* client_ssl_session =
-        SSL_SESSION_from_bytes(reinterpret_cast<const uint8_t*>(client_session.data()),
-                               client_session.size(), client_ssl_context);
+        SSL_SESSION_from_bytes(reinterpret_cast<const uint8_t*>(options.clientSession().data()),
+                               options.clientSession().size(), client_ssl_context);
     int rc = SSL_set_session(client_ssl_socket, client_ssl_session);
     ASSERT(rc == 1);
     SSL_SESSION_free(client_ssl_session);
@@ -336,10 +416,11 @@ const std::string testUtilV2(
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
         // TODO(htuch): remove std::string(..) wrappers when Google's string
         // implementation converges with std::string.
-        std::string sni = transport_socket_options != NULL &&
-                                  transport_socket_options->serverNameOverride().has_value()
-                              ? std::string(transport_socket_options->serverNameOverride().value())
-                              : std::string(client_ctx_proto.sni());
+        std::string sni =
+            options.transportSocketOptions() != NULL &&
+                    options.transportSocketOptions()->serverNameOverride().has_value()
+                ? std::string(options.transportSocketOptions()->serverNameOverride().value())
+                : std::string(options.clientCtxProto().sni());
         socket->setRequestedServerName(sni);
         Network::ConnectionPtr new_connection = dispatcher.createServerConnection(
             std::move(socket), server_ssl_socket_factory.createTransportSocket(nullptr));
@@ -358,19 +439,19 @@ const std::string testUtilV2(
   size_t connect_count = 0;
   auto connect_second_time = [&]() {
     if (++connect_count == 2) {
-      if (!expected_server_cert_digest.empty()) {
-        EXPECT_EQ(expected_server_cert_digest,
+      if (!options.expectedServerCertDigest().empty()) {
+        EXPECT_EQ(options.expectedServerCertDigest(),
                   client_connection->ssl()->sha256PeerCertificateDigest());
       }
-      if (!expected_alpn_protocol.empty()) {
-        EXPECT_EQ(expected_alpn_protocol, client_connection->nextProtocol());
+      if (!options.expectedALPNProtocol().empty()) {
+        EXPECT_EQ(options.expectedALPNProtocol(), client_connection->nextProtocol());
       }
-      EXPECT_EQ(expected_client_cert_uri, server_connection->ssl()->uriSanPeerCertificate());
+      EXPECT_EQ(options.expectedClientCertURI(), server_connection->ssl()->uriSanPeerCertificate());
       const Ssl::SslSocket* ssl_socket =
           dynamic_cast<const Ssl::SslSocket*>(client_connection->ssl());
       SSL* client_ssl_socket = ssl_socket->rawSslForTest();
-      if (!expected_protocol_version.empty()) {
-        EXPECT_EQ(expected_protocol_version, SSL_get_version(client_ssl_socket));
+      if (!options.expectedProtocolVersion().empty()) {
+        EXPECT_EQ(options.expectedProtocolVersion(), SSL_get_version(client_ssl_socket));
       }
 
       absl::optional<std::string> server_ssl_requested_server_name;
@@ -382,9 +463,9 @@ const std::string testUtilV2(
         server_ssl_requested_server_name = std::string(requested_server_name);
       }
 
-      if (!expected_requested_server_name.empty()) {
+      if (!options.expectedRequestedServerName().empty()) {
         EXPECT_TRUE(server_ssl_requested_server_name.has_value());
-        EXPECT_EQ(expected_requested_server_name, server_ssl_requested_server_name.value());
+        EXPECT_EQ(options.expectedRequestedServerName(), server_ssl_requested_server_name.value());
       } else {
         EXPECT_FALSE(server_ssl_requested_server_name.has_value());
       }
@@ -410,12 +491,13 @@ const std::string testUtilV2(
     }
   };
 
-  if (expect_success) {
+  if (options.expectSuccess()) {
     EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
         .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
     EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
         .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
-          EXPECT_EQ(expected_requested_server_name, server_connection->requestedServerName());
+          EXPECT_EQ(options.expectedRequestedServerName(),
+                    server_connection->requestedServerName());
           connect_second_time();
         }));
     EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
@@ -429,15 +511,36 @@ const std::string testUtilV2(
 
   dispatcher.run(Event::Dispatcher::RunType::Block);
 
-  if (!expected_server_stats.empty()) {
-    EXPECT_EQ(1UL, server_stats_store.counter(expected_server_stats).value());
+  if (!options.expectedServerStats().empty()) {
+    EXPECT_EQ(1UL, server_stats_store.counter(options.expectedServerStats()).value());
   }
 
-  if (!expected_client_stats.empty()) {
-    EXPECT_EQ(1UL, client_stats_store.counter(expected_client_stats).value());
+  if (!options.expectedClientStats().empty()) {
+    EXPECT_EQ(1UL, client_stats_store.counter(options.expectedClientStats()).value());
   }
 
   return new_session;
+}
+
+const std::string testUtilV2(
+    const envoy::api::v2::Listener& server_proto,
+    const envoy::api::v2::auth::UpstreamTlsContext& client_ctx_proto,
+    const std::string& client_session, bool expect_success,
+    const std::string& expected_protocol_version, const std::string& expected_server_cert_digest,
+    const std::string& expected_client_cert_uri, const std::string& expected_requested_server_name,
+    const std::string& expected_alpn_protocol, const std::string& expected_server_stats,
+    const std::string& expected_client_stats, const Network::Address::IpVersion version,
+    Network::TransportSocketOptionsSharedPtr transport_socket_options) {
+  TestUtilOptionsV2 test_options(server_proto, client_ctx_proto, expected_client_stats,
+                                 expected_server_stats, expect_success, version);
+  test_options.clientSession(client_session)
+      .expectedProtocolVersion(expected_protocol_version)
+      .expectedServerCertDigest(expected_server_cert_digest)
+      .expectedClientCertURI(expected_client_cert_uri)
+      .expectedRequestedServerName(expected_requested_server_name)
+      .expectedALPNProtocol(expected_alpn_protocol)
+      .transportSocketOptions(transport_socket_options);
+  return testUtilV2(test_options);
 }
 
 // Configure the listener with unittest{cert,key}.pem and ca_cert.pem.
