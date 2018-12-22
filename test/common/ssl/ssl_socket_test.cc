@@ -281,8 +281,8 @@ class TestUtilOptionsV2 : public TestUtilOptionsBase {
 public:
   TestUtilOptionsV2(const envoy::api::v2::Listener& listener,
                     const envoy::api::v2::auth::UpstreamTlsContext& client_ctx_proto,
-                    const std::string& expected_client_stats,
-                    const std::string& expected_server_stats, bool expect_success,
+                    const std::string& expected_server_stats,
+                    const std::string& expected_client_stats, bool expect_success,
                     Network::Address::IpVersion version)
       : TestUtilOptionsBase(expected_server_stats, expect_success, version), listener_(listener),
         client_ctx_proto_(client_ctx_proto), expected_client_stats_(expected_client_stats),
@@ -531,8 +531,8 @@ const std::string testUtilV2(
     const std::string& expected_alpn_protocol, const std::string& expected_server_stats,
     const std::string& expected_client_stats, const Network::Address::IpVersion version,
     Network::TransportSocketOptionsSharedPtr transport_socket_options) {
-  TestUtilOptionsV2 test_options(server_proto, client_ctx_proto, expected_client_stats,
-                                 expected_server_stats, expect_success, version);
+  TestUtilOptionsV2 test_options(server_proto, client_ctx_proto, expected_server_stats,
+                                 expected_client_stats, expect_success, version);
   test_options.clientSession(client_session)
       .expectedProtocolVersion(expected_protocol_version)
       .expectedServerCertDigest(expected_server_cert_digest)
