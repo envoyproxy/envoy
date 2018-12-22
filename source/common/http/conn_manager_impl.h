@@ -95,7 +95,7 @@ private:
   struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks {
     ActiveStreamFilterBase(ActiveStream& parent, bool dual_filter)
         : parent_(parent), headers_continued_(false), continue_headers_continued_(false),
-          stopped_(false), dual_filter_(dual_filter) {}
+          stopped_(false), end_stream_(false), dual_filter_(dual_filter) {}
 
     bool commonHandleAfter100ContinueHeadersCallback(FilterHeadersStatus status);
     bool commonHandleAfterHeadersCallback(FilterHeadersStatus status, bool& headers_only);
@@ -131,6 +131,8 @@ private:
     bool headers_continued_ : 1;
     bool continue_headers_continued_ : 1;
     bool stopped_ : 1;
+    // If true, end_stream is called for this filter.
+    bool end_stream_ : 1;
     const bool dual_filter_ : 1;
   };
 
@@ -426,6 +428,8 @@ private:
     // Whether a filter has indicated that the response should be treated as a headers only
     // response.
     bool encoding_headers_only_{};
+    // If true, response_encoder is end_stream
+    bool response_encoder_end_stream_{};
   };
 
   typedef std::unique_ptr<ActiveStream> ActiveStreamPtr;
