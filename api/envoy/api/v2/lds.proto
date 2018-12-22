@@ -65,7 +65,7 @@ message Listener {
   repeated listener.FilterChain filter_chains = 3 [(gogoproto.nullable) = false];
 
   message FcdsConfig {
-    core.ConfigSource fds_config = 1;
+    core.ConfigSource config = 1 [(validate.rules).message.required = true];
 
     // Optional alternative to the listener name to present to FCDS.
     string filter_chain_name = 2;

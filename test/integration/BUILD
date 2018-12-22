@@ -75,6 +75,18 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test(
+    name = "fcds_integration_test",
+    srcs = ["fcds_integration_test.cc"],
+    deps = [
+        ":http_integration_lib",
+        "//source/common/upstream:load_balancer_lib",
+        "//test/config:utility_lib",
+        "//test/test_common:network_utility_lib",
+        "@envoy_api//envoy/api/v2:fcds_cc",
+    ],
+)
+
 # TODO(mattklein123): This test uses extensions mixed in, so we just register all extensions.
 # This will go away when we delete v1 configuration.
 envoy_cc_test(

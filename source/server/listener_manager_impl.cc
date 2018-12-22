@@ -135,6 +135,25 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
       config_(config), version_info_(version_info),
       listener_filters_timeout_(
           PROTOBUF_GET_MS_OR_DEFAULT(config, listener_filters_timeout, 15000)) {
+  if (config.has_fcds_config()) {
+    if (!config.filter_chains().empty()) {
+      throw EnvoyException(fmt::format(
+          "Invalid configuration of listener {}: both fcds_config and filter_chains are set.",
+          config.name()));
+    }
+
+    fcds_subscription_ = Config::SubscriptionFactory::subscriptionFromConfigSource<
+        envoy::api::v2::listener::FilterChain>(
+        config.fcds_config().config(), parent.server_.localInfo(), parent.server_.dispatcher(),
+        parent.server_.clusterManager(), parent.server_.random(), *listener_scope_,
+        []() -> Config::Subscription<envoy::api::v2::listener::FilterChain>* {
+          throw EnvoyException("FilterChainDiscoveryService does not support rest_legacy");
+        },
+        "envoy.api.v2.FilterChainDiscoveryService.FetchFilterChains",
+        "envoy.api.v2.FilterChainDiscoveryService.StreamFilterChains");
+
+    initManager().registerTarget(*this);
+  }
   if (config.has_transparent()) {
     addListenSocketOptions(Network::SocketOptionFactory::buildIpTransparentOptions());
   }
@@ -167,7 +186,8 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
   // TODO(jrajahalme): This is the last listener filter on purpose. When filter chain matching
   //                   is implemented, this needs to be run after the filter chain has been
   //                   selected.
-  if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.filter_chains()[0], use_proxy_proto, false)) {
+  if (!config.filter_chains().empty() &&
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.filter_chains()[0], use_proxy_proto, false)) {
     auto& factory =
         Config::Utility::getAndCheckFactory<Configuration::NamedListenerFilterConfigFactory>(
             Extensions::ListenerFilters::ListenerFilterNames::get().ProxyProtocol);
@@ -590,6 +610,32 @@ void ListenerImpl::initialize() {
       }
     });
   }
+}
+
+void ListenerImpl::initialize(std::function<void()> callback) {
+  fcds_initialized_cb_ = callback;
+
+  const auto& alternate_name = config_.fcds_config().filter_chain_name();
+  const std::string& resource = alternate_name.empty() ? config_.name() : alternate_name;
+  fcds_subscription_->start({resource}, *this);
+}
+
+void ListenerImpl::onConfigUpdate(const ResourceVector& resources,
+                                  const std::string& version_info) {
+  ENVOY_LOG(warn, "onConfigUpdate {} {}", resources.size(), version_info);
+  fcds_initialized_cb_();
+  fcds_initialized_cb_ = nullptr;
+}
+
+void ListenerImpl::onConfigUpdateFailed(const EnvoyException* e) {
+  ENVOY_LOG(warn, "onConfigUpdateFailed {}", e->what());
+  fcds_initialized_cb_();
+  fcds_initialized_cb_ = nullptr;
+}
+
+std::string ListenerImpl::resourceName(const ProtobufWkt::Any&) {
+  // TODO
+  return "";
 }
 
 Init::Manager& ListenerImpl::initManager() {

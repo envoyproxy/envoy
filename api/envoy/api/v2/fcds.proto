@@ -19,7 +19,7 @@ option (gogoproto.equal_all) = true;
 // The resource_names field in DiscoveryRequest specifies a listener.
 // The resources field in DiscoveryResponse is values of type listener.FilterChain.
 service FilterChainDiscoveryService {
-  rpc StreamRoutes(stream DiscoveryRequest) returns (stream DiscoveryResponse) {
+  rpc StreamFilterChains(stream DiscoveryRequest) returns (stream DiscoveryResponse) {
   }
 
   rpc IncrementalFilterChains(stream IncrementalDiscoveryRequest)

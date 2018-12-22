@@ -12,6 +12,7 @@
 #include "envoy/stats/scope.h"
 
 #include "common/common/logger.h"
+#include "common/config/subscription_factory.h"
 #include "common/network/cidr_range.h"
 #include "common/network/lc_trie.h"
 
@@ -188,6 +189,8 @@ private:
  * Maps proto config to runtime config for a listener with a network filter chain.
  */
 class ListenerImpl : public Network::ListenerConfig,
+                     public Init::Target,
+                     public Config::SubscriptionCallbacks<envoy::api::v2::listener::FilterChain>,
                      public Configuration::ListenerFactoryContext,
                      public Network::DrainDecision,
                      public Network::FilterChainManager,
@@ -256,6 +259,14 @@ public:
   uint64_t listenerTag() const override { return listener_tag_; }
   const std::string& name() const override { return name_; }
   bool reverseWriteFilterOrder() const override { return reverse_write_filter_order_; }
+
+  // Init::Target
+  void initialize(std::function<void()> callback) override;
+
+  // Config::SubscriptionCallbacks
+  void onConfigUpdate(const ResourceVector& resources, const std::string& version_info) override;
+  void onConfigUpdateFailed(const EnvoyException* e) override;
+  std::string resourceName(const ProtobufWkt::Any& resource) override;
 
   // Server::Configuration::ListenerFactoryContext
   AccessLog::AccessLogManager& accessLogManager() override {
@@ -407,6 +418,8 @@ private:
   const std::string version_info_;
   Network::Socket::OptionsSharedPtr listen_socket_options_;
   const std::chrono::milliseconds listener_filters_timeout_;
+  std::unique_ptr<Config::Subscription<envoy::api::v2::listener::FilterChain>> fcds_subscription_;
+  std::function<void()> fcds_initialized_cb_;
 };
 
 class FilterChainImpl : public Network::FilterChain {
