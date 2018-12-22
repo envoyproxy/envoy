@@ -55,26 +55,54 @@ namespace Ssl {
 namespace {
 
 /**
+ * A base class to hold the options for testUtil() and testUtilV2().
+ */
+class TestUtilOptionsBase {
+public:
+  const std::string& expectedClientCertURI() const { return expected_client_cert_uri_; }
+  const std::string& expectedServerStats() const { return expected_server_stats_; }
+  bool expectSuccess() const { return expect_success_; }
+  Network::Address::IpVersion version() const { return version_; }
+
+protected:
+  TestUtilOptionsBase(const std::string& expected_server_stats, bool expect_success,
+                      Network::Address::IpVersion version)
+      : expected_server_stats_(expected_server_stats), expect_success_(expect_success),
+        version_(version) {}
+
+  void expectedClientCertURI(const std::string& expected_client_cert_uri) {
+    expected_client_cert_uri_ = expected_client_cert_uri;
+  }
+
+private:
+  const std::string expected_server_stats_;
+  const bool expect_success_;
+  const Network::Address::IpVersion version_;
+  std::string expected_client_cert_uri_;
+};
+
+/**
  * A class to hold the options for testUtil().
  */
-class TestUtilOptions {
+class TestUtilOptions : public TestUtilOptionsBase {
 public:
   TestUtilOptions(const std::string& client_ctx_yaml, const std::string& server_ctx_yaml,
                   const std::string& expected_server_stats, bool expect_success,
                   Network::Address::IpVersion version)
-      : client_ctx_yaml_(client_ctx_yaml), server_ctx_yaml_(server_ctx_yaml),
-        expected_server_stats_(expected_server_stats), expect_success_(expect_success),
-        version_(version) {}
+      : TestUtilOptionsBase(expected_server_stats, expect_success, version),
+        client_ctx_yaml_(client_ctx_yaml), server_ctx_yaml_(server_ctx_yaml) {}
 
   const std::string& clientCtxYAML() const { return client_ctx_yaml_; }
-
   const std::string& serverCtxYAML() const { return server_ctx_yaml_; }
 
-  const std::string& expectedServerStats() const { return expected_server_stats_; }
+  TestUtilOptions& expectedClientCertURI(const std::string& expected_client_cert_uri) {
+    TestUtilOptionsBase::expectedClientCertURI(expected_client_cert_uri);
+    return *this;
+  }
 
-  bool expectSuccess() const { return expect_success_; }
-
-  Network::Address::IpVersion version() const { return version_; }
+  const std::string& expectedClientCertURI() const {
+    return TestUtilOptionsBase::expectedClientCertURI();
+  }
 
   TestUtilOptions& expectedDigest(const std::string& expected_digest) {
     expected_digest_ = expected_digest;
@@ -82,13 +110,6 @@ public:
   }
 
   const std::string& expectedDigest() const { return expected_digest_; }
-
-  TestUtilOptions& expectedClientCertURI(const std::string& expected_client_cert_uri) {
-    expected_client_cert_uri_ = expected_client_cert_uri;
-    return *this;
-  }
-
-  const std::string& expectedClientCertURI() const { return expected_client_cert_uri_; }
 
   TestUtilOptions& expectedLocalURI(const std::string& expected_local_uri) {
     expected_local_uri_ = expected_local_uri;
@@ -128,12 +149,8 @@ public:
 private:
   const std::string client_ctx_yaml_;
   const std::string server_ctx_yaml_;
-  const std::string expected_server_stats_;
-  const bool expect_success_;
-  const Network::Address::IpVersion version_;
 
   std::string expected_digest_;
-  std::string expected_client_cert_uri_;
   std::string expected_local_uri_;
   std::string expected_serial_number_;
   std::string expected_subjectl_;
