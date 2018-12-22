@@ -47,6 +47,12 @@ namespace Network {
 #define ENVOY_SOCKET_SO_KEEPALIVE Network::SocketOptionName()
 #endif
 
+#ifdef SO_MARK
+#define ENVOY_SOCKET_SO_MARK Network::SocketOptionName(std::make_pair(SOL_SOCKET, SO_MARK))
+#else
+#define ENVOY_SOCKET_SO_MARK Network::SocketOptionName()
+#endif
+
 #ifdef TCP_KEEPCNT
 #define ENVOY_SOCKET_TCP_KEEPCNT Network::SocketOptionName(std::make_pair(IPPROTO_TCP, TCP_KEEPCNT))
 #else
