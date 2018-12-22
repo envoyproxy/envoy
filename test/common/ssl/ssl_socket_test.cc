@@ -719,7 +719,7 @@ TEST_P(SslSocketTest, GetUriWithLocalUriSan) {
 )EOF";
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, "ssl.handshake", true, GetParam());
-  testUtil(test_options.expectedURI("spiffe://lyft.com/test-team")
+  testUtil(test_options.expectedLocalURI("spiffe://lyft.com/test-team")
                .expectedSerialNumber(TEST_NO_SAN_CERT_SERIAL));
 }
 
