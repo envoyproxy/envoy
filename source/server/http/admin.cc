@@ -154,27 +154,29 @@ void populateFallbackResponseHeaders(Http::Code code, Http::HeaderMap& header_ma
   header_map.addReference(headers.XContentTypeOptions, headers.XContentTypeOptionValues.Nosniff);
 }
 
-// Helper method that ensures that we've setting flags based on all the health flag values on the host.
-void setHealthFlag(Upstream::Host::HealthFlag flag, const Upstream::Host& host, envoy::admin::v2alpha::HostHealthStatus& health_status) {
+// Helper method that ensures that we've setting flags based on all the health flag values on the
+// host.
+void setHealthFlag(Upstream::Host::HealthFlag flag, const Upstream::Host& host,
+                   envoy::admin::v2alpha::HostHealthStatus& health_status) {
   switch (flag) {
-    case Upstream::Host::HealthFlag::FAILED_ACTIVE_HC:
-      health_status.set_failed_active_health_check(
-          host.healthFlagGet(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC));
-      break;
-    case Upstream::Host::HealthFlag::FAILED_OUTLIER_CHECK:
-      health_status.set_failed_outlier_check(
-          host.healthFlagGet(Upstream::Host::HealthFlag::FAILED_OUTLIER_CHECK));
-      break;
-    case Upstream::Host::HealthFlag::FAILED_EDS_HEALTH:
-      health_status.set_eds_health_status(
-          host.healthFlagGet(Upstream::Host::HealthFlag::FAILED_EDS_HEALTH)
-              ? envoy::api::v2::core::HealthStatus::UNHEALTHY
-              : envoy::api::v2::core::HealthStatus::HEALTHY);
-      break;
-    case Upstream::Host::HealthFlag::DEGRADED_ACTIVE_HC:
-      health_status.set_failed_active_degraded_check(
-          host.healthFlagGet(Upstream::Host::HealthFlag::DEGRADED_ACTIVE_HC));
-      break;
+  case Upstream::Host::HealthFlag::FAILED_ACTIVE_HC:
+    health_status.set_failed_active_health_check(
+        host.healthFlagGet(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC));
+    break;
+  case Upstream::Host::HealthFlag::FAILED_OUTLIER_CHECK:
+    health_status.set_failed_outlier_check(
+        host.healthFlagGet(Upstream::Host::HealthFlag::FAILED_OUTLIER_CHECK));
+    break;
+  case Upstream::Host::HealthFlag::FAILED_EDS_HEALTH:
+    health_status.set_eds_health_status(
+        host.healthFlagGet(Upstream::Host::HealthFlag::FAILED_EDS_HEALTH)
+            ? envoy::api::v2::core::HealthStatus::UNHEALTHY
+            : envoy::api::v2::core::HealthStatus::HEALTHY);
+    break;
+  case Upstream::Host::HealthFlag::DEGRADED_ACTIVE_HC:
+    health_status.set_failed_active_degraded_check(
+        host.healthFlagGet(Upstream::Host::HealthFlag::DEGRADED_ACTIVE_HC));
+    break;
   }
 }
 } // namespace
@@ -353,7 +355,8 @@ void AdminImpl::writeClustersAsJson(Buffer::Instance& response) {
             *host_status.mutable_health_status();
 
 // Invokes setHealthFlag for each health flag.
-#define SET_HEALTH_FLAG(name, notused) setHealthFlag(Upstream::Host::HealthFlag:: name, *host, health_status);
+#define SET_HEALTH_FLAG(name, notused)                                                             \
+  setHealthFlag(Upstream::Host::HealthFlag::name, *host, health_status);
         HEALTH_FLAG_ENUM_VALUES(SET_HEALTH_FLAG)
 #undef SET_HEALTH_FLAG
 
