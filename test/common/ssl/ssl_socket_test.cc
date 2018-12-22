@@ -60,16 +60,17 @@ namespace {
 class TestUtilOptions {
 public:
   TestUtilOptions(const std::string& client_ctx_yaml, const std::string& server_ctx_yaml,
-                  const std::string& expected_stats, bool expect_success,
+                  const std::string& expected_server_stats, bool expect_success,
                   Network::Address::IpVersion version)
       : client_ctx_yaml_(client_ctx_yaml), server_ctx_yaml_(server_ctx_yaml),
-        expected_stats_(expected_stats), expect_success_(expect_success), version_(version) {}
+        expected_server_stats_(expected_server_stats), expect_success_(expect_success),
+        version_(version) {}
 
   const std::string& clientCtxYAML() const { return client_ctx_yaml_; }
 
   const std::string& serverCtxYAML() const { return server_ctx_yaml_; }
 
-  const std::string& expectedStats() const { return expected_stats_; }
+  const std::string& expectedServerStats() const { return expected_server_stats_; }
 
   bool expectSuccess() const { return expect_success_; }
 
@@ -127,7 +128,7 @@ public:
 private:
   const std::string client_ctx_yaml_;
   const std::string server_ctx_yaml_;
-  const std::string expected_stats_;
+  const std::string expected_server_stats_;
   const bool expect_success_;
   const Network::Address::IpVersion version_;
 
@@ -251,8 +252,8 @@ void testUtil(const TestUtilOptions& options) {
 
   dispatcher.run(Event::Dispatcher::RunType::Block);
 
-  if (!options.expectedStats().empty()) {
-    EXPECT_EQ(1UL, server_stats_store.counter(options.expectedStats()).value());
+  if (!options.expectedServerStats().empty()) {
+    EXPECT_EQ(1UL, server_stats_store.counter(options.expectedServerStats()).value());
   }
 }
 
