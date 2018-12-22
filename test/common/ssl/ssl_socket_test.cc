@@ -55,7 +55,7 @@ namespace Ssl {
 namespace {
 
 /**
- * A class to hold the options for AsyncRequest object.
+ * A class to hold the options for testUtil().
  */
 class TestUtilOptions {
 public:
