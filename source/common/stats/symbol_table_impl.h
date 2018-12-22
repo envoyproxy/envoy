@@ -96,6 +96,7 @@ public:
   void swap(SymbolEncoding& src) { vec_.swap(src.vec_); }
 
 private:
+  friend class FakeSymbolTable;
   std::vector<uint8_t> vec_;
 };
 
@@ -216,9 +217,16 @@ public:
    */
   std::string toString(const StatName& stat_name) const;
 
+  std::string decodeSymbolVec(const SymbolVec& symbols) const;
+
+  Symbol monotonicCounter() {
+    absl::ReaderMutexLock lock(&lock_);
+    return monotonic_counter_;
+  }
+
 private:
   friend class StatName;
-  friend class StatNameTest;
+  //friend class StatNameTest<SymbolTable>;
 
   struct SharedSymbol {
     SharedSymbol(Symbol symbol) : symbol_(symbol), ref_count_(1) {}
@@ -229,8 +237,6 @@ private:
 
   // This must be held during both encode() and free().
   mutable absl::Mutex lock_;
-
-  std::string decodeSymbolVec(const SymbolVec& symbols) const;
 
   /**
    * Convenience function for encode(), symbolizing one string segment at a time.
@@ -250,11 +256,6 @@ private:
 
   // Stages a new symbol for use. To be called after a successful insertion.
   void newSymbol();
-
-  Symbol monotonicCounter() {
-    absl::ReaderMutexLock lock(&lock_);
-    return monotonic_counter_;
-  }
 
   // Stores the symbol to be used at next insertion. This should exist ahead of insertion time so
   // that if insertion succeeds, the value written is the correct one.
