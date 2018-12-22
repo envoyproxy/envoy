@@ -54,19 +54,100 @@ namespace Ssl {
 
 namespace {
 
-// TODO replace the long parameter list with an options object
-void testUtil(const std::string& client_ctx_yaml, const std::string& server_ctx_yaml,
-              const std::string& expected_digest, const std::string& expected_uri,
-              const std::string& expected_local_uri, const std::string& expected_serial_number,
-              const std::string& expected_subject, const std::string& expected_local_subject,
-              const std::string& expected_peer_cert, const std::string& expected_stats,
-              bool expect_success, const Network::Address::IpVersion version) {
+/**
+ * A class to hold the options for AsyncRequest object.
+ */
+class TestUtilOptions {
+public:
+  TestUtilOptions(const std::string& client_ctx_yaml, const std::string& server_ctx_yaml,
+                  const std::string& expected_stats, bool expect_success,
+                  Network::Address::IpVersion version)
+      : client_ctx_yaml_(client_ctx_yaml), server_ctx_yaml_(server_ctx_yaml),
+        expected_stats_(expected_stats), expect_success_(expect_success), version_(version) {}
+
+  const std::string& clientCtxYAML() const { return client_ctx_yaml_; }
+
+  const std::string& serverCtxYAML() const { return server_ctx_yaml_; }
+
+  const std::string& expectedStats() const { return expected_stats_; }
+
+  bool expectSuccess() const { return expect_success_; }
+
+  Network::Address::IpVersion version() const { return version_; }
+
+  TestUtilOptions& expectedDigest(const std::string& expected_digest) {
+    expected_digest_ = expected_digest;
+    return *this;
+  }
+
+  const std::string& expectedDigest() const { return expected_digest_; }
+
+  TestUtilOptions& expectedURI(const std::string& expected_uri) {
+    expected_uri_ = expected_uri;
+    return *this;
+  }
+
+  const std::string& expectedURI() const { return expected_uri_; }
+
+  TestUtilOptions& expectedLocalURI(const std::string& expected_local_uri) {
+    expected_local_uri_ = expected_local_uri;
+    return *this;
+  }
+
+  const std::string& expectedLocalURI() const { return expected_local_uri_; }
+
+  TestUtilOptions& expectedSerialNumber(const std::string& expected_serial_number) {
+    expected_serial_number_ = expected_serial_number;
+    return *this;
+  }
+
+  const std::string& expectedSerialNumber() const { return expected_serial_number_; }
+
+  TestUtilOptions& expectedSubjectl(const std::string& expected_subjectl) {
+    expected_subjectl_ = expected_subjectl;
+    return *this;
+  }
+
+  const std::string& expectedSubjectl() const { return expected_subjectl_; }
+
+  TestUtilOptions& expectedLocalSubject(const std::string& expected_local_subject) {
+    expected_local_subject_ = expected_local_subject;
+    return *this;
+  }
+
+  const std::string& expectedLocalSubject() const { return expected_local_subject_; }
+
+  TestUtilOptions& expectedPeerCert(const std::string& expected_peer_cert) {
+    expected_peer_cert_ = expected_peer_cert;
+    return *this;
+  }
+
+  const std::string& expectedPeerCert() const { return expected_peer_cert_; }
+
+private:
+  const std::string client_ctx_yaml_;
+  const std::string server_ctx_yaml_;
+  const std::string expected_stats_;
+  const bool expect_success_;
+  const Network::Address::IpVersion version_;
+
+  std::string expected_digest_;
+  std::string expected_uri_;
+  std::string expected_local_uri_;
+  std::string expected_serial_number_;
+  std::string expected_subjectl_;
+  std::string expected_local_subject_;
+  std::string expected_peer_cert_;
+};
+
+void testUtil(const TestUtilOptions& options) {
   Event::SimulatedTimeSystem time_system;
 
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
 
   envoy::api::v2::auth::DownstreamTlsContext server_tls_context;
-  MessageUtil::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), server_tls_context);
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(options.serverCtxYAML()),
+                            server_tls_context);
   auto server_cfg = std::make_unique<ServerContextConfigImpl>(server_tls_context, factory_context);
   ContextManagerImpl manager(time_system);
   Stats::IsolatedStoreImpl server_stats_store;
@@ -76,14 +157,15 @@ void testUtil(const std::string& client_ctx_yaml, const std::string& server_ctx_
   DangerousDeprecatedTestTime test_time;
   Api::ApiPtr api = Api::createApiForTest(server_stats_store);
   Event::DispatcherImpl dispatcher(test_time.timeSystem(), *api);
-  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(version), nullptr,
-                                  true);
+  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(options.version()),
+                                  nullptr, true);
   Network::MockListenerCallbacks callbacks;
   Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener = dispatcher.createListener(socket, callbacks, true, false);
 
   envoy::api::v2::auth::UpstreamTlsContext client_tls_context;
-  MessageUtil::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml), client_tls_context);
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(options.clientCtxYAML()),
+                            client_tls_context);
   auto client_cfg = std::make_unique<ClientContextConfigImpl>(client_tls_context, factory_context);
   Stats::IsolatedStoreImpl client_stats_store;
   Ssl::ClientSslSocketFactory client_ssl_socket_factory(std::move(client_cfg), manager,
@@ -112,25 +194,29 @@ void testUtil(const std::string& client_ctx_yaml, const std::string& server_ctx_
   size_t connect_count = 0;
   auto connect_second_time = [&]() {
     if (++connect_count == 2) {
-      if (!expected_digest.empty()) {
+      if (!options.expectedDigest().empty()) {
         // Assert twice to ensure a cached value is returned and still valid.
-        EXPECT_EQ(expected_digest, server_connection->ssl()->sha256PeerCertificateDigest());
-        EXPECT_EQ(expected_digest, server_connection->ssl()->sha256PeerCertificateDigest());
+        EXPECT_EQ(options.expectedDigest(),
+                  server_connection->ssl()->sha256PeerCertificateDigest());
+        EXPECT_EQ(options.expectedDigest(),
+                  server_connection->ssl()->sha256PeerCertificateDigest());
       }
-      EXPECT_EQ(expected_uri, server_connection->ssl()->uriSanPeerCertificate());
-      if (!expected_local_uri.empty()) {
-        EXPECT_EQ(expected_local_uri, server_connection->ssl()->uriSanLocalCertificate());
+      EXPECT_EQ(options.expectedURI(), server_connection->ssl()->uriSanPeerCertificate());
+      if (!options.expectedLocalURI().empty()) {
+        EXPECT_EQ(options.expectedLocalURI(), server_connection->ssl()->uriSanLocalCertificate());
       }
-      EXPECT_EQ(expected_serial_number, server_connection->ssl()->serialNumberPeerCertificate());
-      if (!expected_subject.empty()) {
-        EXPECT_EQ(expected_subject, server_connection->ssl()->subjectPeerCertificate());
+      EXPECT_EQ(options.expectedSerialNumber(),
+                server_connection->ssl()->serialNumberPeerCertificate());
+      if (!options.expectedSubjectl().empty()) {
+        EXPECT_EQ(options.expectedSubjectl(), server_connection->ssl()->subjectPeerCertificate());
       }
-      if (!expected_local_subject.empty()) {
-        EXPECT_EQ(expected_local_subject, server_connection->ssl()->subjectLocalCertificate());
+      if (!options.expectedLocalSubject().empty()) {
+        EXPECT_EQ(options.expectedLocalSubject(),
+                  server_connection->ssl()->subjectLocalCertificate());
       }
-      if (!expected_peer_cert.empty()) {
+      if (!options.expectedPeerCert().empty()) {
         std::string urlencoded = absl::StrReplaceAll(
-            expected_peer_cert,
+            options.expectedPeerCert(),
             {{"\n", "%0A"}, {" ", "%20"}, {"+", "%2B"}, {"/", "%2F"}, {"=", "%3D"}});
         // Assert twice to ensure a cached value is returned and still valid.
         EXPECT_EQ(urlencoded, server_connection->ssl()->urlEncodedPemEncodedPeerCertificate());
@@ -149,7 +235,7 @@ void testUtil(const std::string& client_ctx_yaml, const std::string& server_ctx_
     }
   };
 
-  if (expect_success) {
+  if (options.expectSuccess()) {
     EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
         .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
     EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
@@ -165,8 +251,8 @@ void testUtil(const std::string& client_ctx_yaml, const std::string& server_ctx_
 
   dispatcher.run(Event::Dispatcher::RunType::Block);
 
-  if (!expected_stats.empty()) {
-    EXPECT_EQ(1UL, server_stats_store.counter(expected_stats).value());
+  if (!options.expectedStats().empty()) {
+    EXPECT_EQ(1UL, server_stats_store.counter(options.expectedStats()).value());
   }
 }
 
@@ -403,8 +489,9 @@ TEST_P(SslSocketTest, GetCertDigest) {
         filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"
 )EOF";
 
-  testUtil(client_ctx_yaml, server_ctx_yaml, TEST_NO_SAN_CERT_HASH, "", "", TEST_NO_SAN_CERT_SERIAL,
-           "", "", "", "ssl.handshake", true, GetParam());
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, "ssl.handshake", true, GetParam());
+  testUtil(test_options.expectedDigest(TEST_NO_SAN_CERT_HASH)
+               .expectedSerialNumber(TEST_NO_SAN_CERT_SERIAL));
 }
 
 TEST_P(SslSocketTest, GetCertDigestInline) {
@@ -470,8 +557,9 @@ TEST_P(SslSocketTest, GetCertDigestServerCertWithIntermediateCA) {
         filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"
 )EOF";
 
-  testUtil(client_ctx_yaml, server_ctx_yaml, TEST_NO_SAN_CERT_HASH, "", "", TEST_NO_SAN_CERT_SERIAL,
-           "", "", "", "ssl.handshake", true, GetParam());
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, "ssl.handshake", true, GetParam());
+  testUtil(test_options.expectedDigest(TEST_NO_SAN_CERT_HASH)
+               .expectedSerialNumber(TEST_NO_SAN_CERT_SERIAL));
 }
 
 TEST_P(SslSocketTest, GetCertDigestServerCertWithoutCommonName) {
@@ -496,8 +584,9 @@ TEST_P(SslSocketTest, GetCertDigestServerCertWithoutCommonName) {
         filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"
 )EOF";
 
-  testUtil(client_ctx_yaml, server_ctx_yaml, TEST_NO_SAN_CERT_HASH, "", "", TEST_NO_SAN_CERT_SERIAL,
-           "", "", "", "ssl.handshake", true, GetParam());
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, "ssl.handshake", true, GetParam());
+  testUtil(test_options.expectedDigest(TEST_NO_SAN_CERT_HASH)
+               .expectedSerialNumber(TEST_NO_SAN_CERT_SERIAL));
 }
 
 TEST_P(SslSocketTest, GetUriWithUriSan) {
@@ -523,8 +612,9 @@ TEST_P(SslSocketTest, GetUriWithUriSan) {
       verify_subject_alt_name: "spiffe://lyft.com/test-team"
 )EOF";
 
-  testUtil(client_ctx_yaml, server_ctx_yaml, "", "spiffe://lyft.com/test-team", "",
-           TEST_SAN_URI_CERT_SERIAL, "", "", "", "ssl.handshake", true, GetParam());
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, "ssl.handshake", true, GetParam());
+  testUtil(test_options.expectedURI("spiffe://lyft.com/test-team")
+               .expectedSerialNumber(TEST_SAN_URI_CERT_SERIAL));
 }
 
 TEST_P(SslSocketTest, GetNoUriWithDnsSan) {
@@ -550,8 +640,8 @@ TEST_P(SslSocketTest, GetNoUriWithDnsSan) {
 )EOF";
 
   // The SAN field only has DNS, expect "" for uriSanPeerCertificate().
-  testUtil(client_ctx_yaml, server_ctx_yaml, "", "", "", TEST_SAN_DNS_CERT_SERIAL, "", "", "",
-           "ssl.handshake", true, GetParam());
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, "ssl.handshake", true, GetParam());
+  testUtil(test_options.expectedSerialNumber(TEST_SAN_DNS_CERT_SERIAL));
 }
 
 TEST_P(SslSocketTest, NoCert) {
@@ -568,8 +658,9 @@ TEST_P(SslSocketTest, NoCert) {
         filename: "{{ test_tmpdir }}/unittestkey.pem"
 )EOF";
 
-  testUtil(client_ctx_yaml, server_ctx_yaml, "", "", "", "", "", "", "", "ssl.no_certificate", true,
-           GetParam());
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, "ssl.no_certificate", true,
+                               GetParam());
+  testUtil(test_options);
 }
 
 // Prefer ECDSA certificate when multiple RSA certificates are present and the
@@ -601,8 +692,8 @@ TEST_P(SslSocketTest, MultiCertPreferEcdsa) {
         filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_ecdsa_p256_key.pem"
 )EOF";
 
-  testUtil(client_ctx_yaml, server_ctx_yaml, "", "", "", "", "", "", "", "ssl.handshake", true,
-           GetParam());
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, "ssl.handshake", true, GetParam());
+  testUtil(test_options);
 }
 
 TEST_P(SslSocketTest, GetUriWithLocalUriSan) {
@@ -627,8 +718,9 @@ TEST_P(SslSocketTest, GetUriWithLocalUriSan) {
         filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"
 )EOF";
 
-  testUtil(client_ctx_yaml, server_ctx_yaml, "", "", "spiffe://lyft.com/test-team",
-           TEST_NO_SAN_CERT_SERIAL, "", "", "", "ssl.handshake", true, GetParam());
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, "ssl.handshake", true, GetParam());
+  testUtil(test_options.expectedURI("spiffe://lyft.com/test-team")
+               .expectedSerialNumber(TEST_NO_SAN_CERT_SERIAL));
 }
 
 TEST_P(SslSocketTest, GetSubjectsWithBothCerts) {
@@ -654,10 +746,12 @@ TEST_P(SslSocketTest, GetSubjectsWithBothCerts) {
   require_client_certificate: true
 )EOF";
 
-  testUtil(client_ctx_yaml, server_ctx_yaml, "", "", "", TEST_NO_SAN_CERT_SERIAL,
-           "CN=Test Server,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US",
-           "CN=Test Server,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US", "",
-           "ssl.handshake", true, GetParam());
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, "ssl.handshake", true, GetParam());
+  testUtil(test_options.expectedSerialNumber(TEST_NO_SAN_CERT_SERIAL)
+               .expectedSubjectl(
+                   "CN=Test Server,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US")
+               .expectedLocalSubject(
+                   "CN=Test Server,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US"));
 }
 
 TEST_P(SslSocketTest, GetPeerCert) {
@@ -683,12 +777,15 @@ TEST_P(SslSocketTest, GetPeerCert) {
   require_client_certificate: true
 )EOF";
 
-  testUtil(client_ctx_yaml, server_ctx_yaml, "", "", "", TEST_NO_SAN_CERT_SERIAL,
-           "CN=Test Server,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US",
-           "CN=Test Server,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US",
-           TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
-               "{{ test_rundir }}/test/common/ssl/test_data/no_san_cert.pem")),
-           "ssl.handshake", true, GetParam());
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, "ssl.handshake", true, GetParam());
+  std::string expected_peer_cert = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/no_san_cert.pem"));
+  testUtil(test_options.expectedSerialNumber(TEST_NO_SAN_CERT_SERIAL)
+               .expectedSubjectl(
+                   "CN=Test Server,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US")
+               .expectedLocalSubject(
+                   "CN=Test Server,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US")
+               .expectedPeerCert(expected_peer_cert));
 }
 
 TEST_P(SslSocketTest, FailedClientAuthCaVerificationNoClientCert) {
@@ -709,8 +806,9 @@ TEST_P(SslSocketTest, FailedClientAuthCaVerificationNoClientCert) {
   require_client_certificate: true
 )EOF";
 
-  testUtil(client_ctx_yaml, server_ctx_yaml, "", "", "", "", "", "", "", "ssl.fail_verify_no_cert",
-           false, GetParam());
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, "ssl.fail_verify_no_cert", false,
+                               GetParam());
+  testUtil(test_options);
 }
 
 TEST_P(SslSocketTest, FailedClientAuthCaVerification) {
@@ -735,8 +833,9 @@ TEST_P(SslSocketTest, FailedClientAuthCaVerification) {
         filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"
 )EOF";
 
-  testUtil(client_ctx_yaml, server_ctx_yaml, "", "", "", "", "", "", "", "ssl.fail_verify_error",
-           false, GetParam());
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, "ssl.fail_verify_error", false,
+                               GetParam());
+  testUtil(test_options);
 }
 
 TEST_P(SslSocketTest, FailedClientAuthSanVerificationNoClientCert) {
@@ -757,8 +856,9 @@ TEST_P(SslSocketTest, FailedClientAuthSanVerificationNoClientCert) {
       verify_subject_alt_name: "example.com"
 )EOF";
 
-  testUtil(client_ctx_yaml, server_ctx_yaml, "", "", "", "", "", "", "", "ssl.fail_verify_no_cert",
-           false, GetParam());
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, "ssl.fail_verify_no_cert", false,
+                               GetParam());
+  testUtil(test_options);
 }
 
 TEST_P(SslSocketTest, FailedClientAuthSanVerification) {
@@ -784,8 +884,9 @@ TEST_P(SslSocketTest, FailedClientAuthSanVerification) {
       verify_subject_alt_name: "example.com"
 )EOF";
 
-  testUtil(client_ctx_yaml, server_ctx_yaml, "", "", "", "", "", "", "", "ssl.fail_verify_san",
-           false, GetParam());
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, "ssl.fail_verify_san", false,
+                               GetParam());
+  testUtil(test_options);
 }
 
 // By default, expired certificates are not permitted.
@@ -901,8 +1002,9 @@ TEST_P(SslSocketTest, ClientCertificateHashVerification) {
       verify_certificate_hash: ")EOF",
                                                    TEST_SAN_URI_CERT_HASH, "\"");
 
-  testUtil(client_ctx_yaml, server_ctx_yaml, "", "spiffe://lyft.com/test-team", "",
-           TEST_SAN_URI_CERT_SERIAL, "", "", "", "ssl.handshake", true, GetParam());
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, "ssl.handshake", true, GetParam());
+  testUtil(test_options.expectedURI("spiffe://lyft.com/test-team")
+               .expectedSerialNumber(TEST_SAN_URI_CERT_SERIAL));
 }
 
 TEST_P(SslSocketTest, ClientCertificateHashVerificationNoCA) {
@@ -926,8 +1028,9 @@ TEST_P(SslSocketTest, ClientCertificateHashVerificationNoCA) {
       verify_certificate_hash: ")EOF",
                                                    TEST_SAN_URI_CERT_HASH, "\"");
 
-  testUtil(client_ctx_yaml, server_ctx_yaml, "", "spiffe://lyft.com/test-team", "",
-           TEST_SAN_URI_CERT_SERIAL, "", "", "", "ssl.handshake", true, GetParam());
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, "ssl.handshake", true, GetParam());
+  testUtil(test_options.expectedURI("spiffe://lyft.com/test-team")
+               .expectedSerialNumber(TEST_SAN_URI_CERT_SERIAL));
 }
 
 TEST_P(SslSocketTest, ClientCertificateHashListVerification) {
@@ -1018,8 +1121,8 @@ TEST_P(SslSocketTest, FailedClientCertificateHashVerificationNoClientCertificate
       verify_certificate_hash: ")EOF",
                                                    TEST_SAN_URI_CERT_HASH, "\"");
 
-  testUtil(client_ctx_yaml, server_ctx_yaml, "", "", "", "", "", "", "", "ssl.fail_verify_no_cert",
-           false, GetParam());
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, "ssl.fail_verify_no_cert", true,
+                               GetParam());
 }
 
 TEST_P(SslSocketTest, FailedClientCertificateHashVerificationNoCANoClientCertificate) {
@@ -1038,8 +1141,9 @@ TEST_P(SslSocketTest, FailedClientCertificateHashVerificationNoCANoClientCertifi
       verify_certificate_hash: ")EOF",
                                                    TEST_SAN_URI_CERT_HASH, "\"");
 
-  testUtil(client_ctx_yaml, server_ctx_yaml, "", "", "", "", "", "", "", "ssl.fail_verify_no_cert",
-           false, GetParam());
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, "ssl.fail_verify_no_cert", false,
+                               GetParam());
+  testUtil(test_options);
 }
 
 TEST_P(SslSocketTest, FailedClientCertificateHashVerificationWrongClientCertificate) {
@@ -1065,8 +1169,9 @@ TEST_P(SslSocketTest, FailedClientCertificateHashVerificationWrongClientCertific
       verify_certificate_hash: ")EOF",
                                                    TEST_SAN_URI_CERT_HASH, "\"");
 
-  testUtil(client_ctx_yaml, server_ctx_yaml, "", "", "", "", "", "", "",
-           "ssl.fail_verify_cert_hash", false, GetParam());
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, "ssl.fail_verify_cert_hash", false,
+                               GetParam());
+  testUtil(test_options);
 }
 
 TEST_P(SslSocketTest, FailedClientCertificateHashVerificationNoCAWrongClientCertificate) {
@@ -1090,8 +1195,9 @@ TEST_P(SslSocketTest, FailedClientCertificateHashVerificationNoCAWrongClientCert
       verify_certificate_hash: ")EOF",
                                                    TEST_SAN_URI_CERT_HASH, "\"");
 
-  testUtil(client_ctx_yaml, server_ctx_yaml, "", "", "", "", "", "", "",
-           "ssl.fail_verify_cert_hash", false, GetParam());
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, "ssl.fail_verify_cert_hash", false,
+                               GetParam());
+  testUtil(test_options);
 }
 
 TEST_P(SslSocketTest, FailedClientCertificateHashVerificationWrongCA) {
@@ -1117,8 +1223,9 @@ TEST_P(SslSocketTest, FailedClientCertificateHashVerificationWrongCA) {
       verify_certificate_hash: ")EOF",
                                                    TEST_SAN_URI_CERT_HASH, "\"");
 
-  testUtil(client_ctx_yaml, server_ctx_yaml, "", "", "", "", "", "", "", "ssl.fail_verify_error",
-           false, GetParam());
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, "ssl.fail_verify_error", false,
+                               GetParam());
+  testUtil(test_options);
 }
 
 TEST_P(SslSocketTest, CertificatesWithPassword) {
@@ -3049,8 +3156,9 @@ TEST_P(SslSocketTest, RevokedCertificate) {
         filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem"
 )EOF";
 
-  testUtil(revoked_client_ctx_yaml, server_ctx_yaml, "", "", "", "", "", "", "",
-           "ssl.fail_verify_error", false, GetParam());
+  TestUtilOptions revoked_test_options(revoked_client_ctx_yaml, server_ctx_yaml,
+                                       "ssl.fail_verify_error", false, GetParam());
+  testUtil(revoked_test_options);
 
   // This should succeed, since the cert isn't revoked.
   const std::string successful_client_ctx_yaml = R"EOF(
@@ -3062,8 +3170,9 @@ TEST_P(SslSocketTest, RevokedCertificate) {
         filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns2_key.pem"
 )EOF";
 
-  testUtil(successful_client_ctx_yaml, server_ctx_yaml, "", "", "", TEST_SAN_DNS2_CERT_SERIAL, "",
-           "", "", "ssl.handshake", true, GetParam());
+  TestUtilOptions successful_test_options(successful_client_ctx_yaml, server_ctx_yaml,
+                                          "ssl.handshake", true, GetParam());
+  testUtil(successful_test_options.expectedSerialNumber(TEST_SAN_DNS2_CERT_SERIAL));
 }
 
 TEST_P(SslSocketTest, RevokedCertificateCRLInTrustedCA) {
@@ -3090,8 +3199,9 @@ TEST_P(SslSocketTest, RevokedCertificateCRLInTrustedCA) {
         filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem"
 )EOF";
 
-  testUtil(revoked_client_ctx_yaml, server_ctx_yaml, "", "", "", "", "", "", "",
-           "ssl.fail_verify_error", false, GetParam());
+  TestUtilOptions revoked_test_options(revoked_client_ctx_yaml, server_ctx_yaml,
+                                       "ssl.fail_verify_error", false, GetParam());
+  testUtil(revoked_test_options);
 
   // This should succeed, since the cert isn't revoked.
   const std::string successful_client_ctx_yaml = R"EOF(
@@ -3102,9 +3212,9 @@ TEST_P(SslSocketTest, RevokedCertificateCRLInTrustedCA) {
       private_key:
         filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns2_key.pem"
 )EOF";
-
-  testUtil(successful_client_ctx_yaml, server_ctx_yaml, "", "", "", TEST_SAN_DNS2_CERT_SERIAL, "",
-           "", "", "ssl.handshake", true, GetParam());
+  TestUtilOptions successful_test_options(successful_client_ctx_yaml, server_ctx_yaml,
+                                          "ssl.handshake", true, GetParam());
+  testUtil(successful_test_options.expectedSerialNumber(TEST_SAN_DNS2_CERT_SERIAL));
 }
 
 TEST_P(SslSocketTest, GetRequestedServerName) {
