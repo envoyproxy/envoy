@@ -82,12 +82,12 @@ public:
 
   const std::string& expectedDigest() const { return expected_digest_; }
 
-  TestUtilOptions& expectedURI(const std::string& expected_uri) {
-    expected_uri_ = expected_uri;
+  TestUtilOptions& expectedClientCertURI(const std::string& expected_client_cert_uri) {
+    expected_client_cert_uri_ = expected_client_cert_uri;
     return *this;
   }
 
-  const std::string& expectedURI() const { return expected_uri_; }
+  const std::string& expectedClientCertURI() const { return expected_client_cert_uri_; }
 
   TestUtilOptions& expectedLocalURI(const std::string& expected_local_uri) {
     expected_local_uri_ = expected_local_uri;
@@ -132,7 +132,7 @@ private:
   const Network::Address::IpVersion version_;
 
   std::string expected_digest_;
-  std::string expected_uri_;
+  std::string expected_client_cert_uri_;
   std::string expected_local_uri_;
   std::string expected_serial_number_;
   std::string expected_subjectl_;
@@ -201,7 +201,7 @@ void testUtil(const TestUtilOptions& options) {
         EXPECT_EQ(options.expectedDigest(),
                   server_connection->ssl()->sha256PeerCertificateDigest());
       }
-      EXPECT_EQ(options.expectedURI(), server_connection->ssl()->uriSanPeerCertificate());
+      EXPECT_EQ(options.expectedClientCertURI(), server_connection->ssl()->uriSanPeerCertificate());
       if (!options.expectedLocalURI().empty()) {
         EXPECT_EQ(options.expectedLocalURI(), server_connection->ssl()->uriSanLocalCertificate());
       }
@@ -613,7 +613,7 @@ TEST_P(SslSocketTest, GetUriWithUriSan) {
 )EOF";
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, "ssl.handshake", true, GetParam());
-  testUtil(test_options.expectedURI("spiffe://lyft.com/test-team")
+  testUtil(test_options.expectedClientCertURI("spiffe://lyft.com/test-team")
                .expectedSerialNumber(TEST_SAN_URI_CERT_SERIAL));
 }
 
@@ -1003,7 +1003,7 @@ TEST_P(SslSocketTest, ClientCertificateHashVerification) {
                                                    TEST_SAN_URI_CERT_HASH, "\"");
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, "ssl.handshake", true, GetParam());
-  testUtil(test_options.expectedURI("spiffe://lyft.com/test-team")
+  testUtil(test_options.expectedClientCertURI("spiffe://lyft.com/test-team")
                .expectedSerialNumber(TEST_SAN_URI_CERT_SERIAL));
 }
 
@@ -1029,7 +1029,7 @@ TEST_P(SslSocketTest, ClientCertificateHashVerificationNoCA) {
                                                    TEST_SAN_URI_CERT_HASH, "\"");
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, "ssl.handshake", true, GetParam());
-  testUtil(test_options.expectedURI("spiffe://lyft.com/test-team")
+  testUtil(test_options.expectedClientCertURI("spiffe://lyft.com/test-team")
                .expectedSerialNumber(TEST_SAN_URI_CERT_SERIAL));
 }
 
