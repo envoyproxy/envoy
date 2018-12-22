@@ -121,7 +121,8 @@ MockWorker::~MockWorker() {}
 
 MockInstance::MockInstance()
     : secret_manager_(new Secret::SecretManagerImpl()), cluster_manager_(timeSystem()),
-      ssl_context_manager_(timeSystem()), singleton_manager_(new Singleton::ManagerImpl()) {
+      ssl_context_manager_(timeSystem()), singleton_manager_(new Singleton::ManagerImpl(
+                                              Thread::threadFactoryForTest().currentThreadId())) {
   ON_CALL(*this, threadLocal()).WillByDefault(ReturnRef(thread_local_));
   ON_CALL(*this, stats()).WillByDefault(ReturnRef(stats_store_));
   ON_CALL(*this, httpContext()).WillByDefault(ReturnRef(http_context_));
@@ -160,7 +161,9 @@ MockMain::MockMain(int wd_miss, int wd_megamiss, int wd_kill, int wd_multikill)
 
 MockMain::~MockMain() {}
 
-MockFactoryContext::MockFactoryContext() : singleton_manager_(new Singleton::ManagerImpl()) {
+MockFactoryContext::MockFactoryContext()
+    : singleton_manager_(
+          new Singleton::ManagerImpl(Thread::threadFactoryForTest().currentThreadId())) {
   ON_CALL(*this, accessLogManager()).WillByDefault(ReturnRef(access_log_manager_));
   ON_CALL(*this, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
   ON_CALL(*this, dispatcher()).WillByDefault(ReturnRef(dispatcher_));

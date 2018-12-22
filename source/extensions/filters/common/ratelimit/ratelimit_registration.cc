@@ -43,6 +43,27 @@ ClientFactoryPtr rateLimitClientFactory(Server::Configuration::FactoryContext& c
       });
 }
 
+ClientPtr rateLimitClient(ClientFactoryPtr client_factory,
+                          Server::Configuration::FactoryContext& context,
+                          const envoy::api::v2::core::GrpcService& grpc_service,
+                          const std::chrono::milliseconds timeout) {
+  Filters::Common::RateLimit::ClientPtr ratelimit_client;
+  // If ratelimit service is defined in bootstrap, just use the factory registered to singleton,
+  // otherwise create it based on the filter config.
+  if (client_factory->rateLimitConfig().has_value()) {
+    ratelimit_client = client_factory->create(timeout);
+  } else {
+    // TODO(ramaraochavali): register this factory/client to singleton when bootstrap config is
+    // completely deleted.
+    const auto async_client_factory =
+        context.clusterManager().grpcAsyncClientManager().factoryForGrpcService(
+            grpc_service, context.scope(), true);
+    ratelimit_client = std::make_unique<Filters::Common::RateLimit::GrpcClientImpl>(
+        async_client_factory->create(), timeout);
+  }
+  return ratelimit_client;
+}
+
 } // namespace RateLimit
 } // namespace Common
 } // namespace Filters

@@ -222,8 +222,8 @@ BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version,
                                          TestTimeSystemPtr time_system, const std::string& config)
     : api_(Api::createApiForTest(stats_store_)),
       mock_buffer_factory_(new NiceMock<MockBufferFactory>), time_system_(std::move(time_system)),
-      dispatcher_(new Event::DispatcherImpl(*time_system_,
-                                            Buffer::WatermarkFactoryPtr{mock_buffer_factory_})),
+      dispatcher_(new Event::DispatcherImpl(
+          *time_system_, Buffer::WatermarkFactoryPtr{mock_buffer_factory_}, *api_)),
       version_(version), config_helper_(version, config),
       default_log_level_(TestEnvironment::getOptions().logLevel()) {
   // This is a hack, but there are situations where we disconnect fake upstream connections and

@@ -284,6 +284,12 @@ public:
    *         increments.
    */
   virtual const std::string& runtimeKey() const PURE;
+
+  /**
+   * @return the default fraction of traffic the should be shadowed, if the runtime key is not
+   *         present.
+   */
+  virtual const envoy::type::FractionalPercent& defaultValue() const PURE;
 };
 
 /**

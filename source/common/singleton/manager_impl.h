@@ -3,8 +3,7 @@
 #include <unordered_map>
 
 #include "envoy/singleton/manager.h"
-
-#include "common/common/thread.h"
+#include "envoy/thread/thread.h"
 
 namespace Envoy {
 namespace Singleton {
@@ -16,14 +15,14 @@ namespace Singleton {
  */
 class ManagerImpl : public Manager {
 public:
-  ManagerImpl() : run_tid_(Thread::currentThreadId()) {}
+  ManagerImpl(Thread::ThreadIdPtr&& thread_id) : run_tid_(std::move(thread_id)) {}
 
   // Singleton::Manager
   InstanceSharedPtr get(const std::string& name, SingletonFactoryCb cb) override;
 
 private:
   std::unordered_map<std::string, std::weak_ptr<Instance>> singletons_;
-  Thread::ThreadId run_tid_{};
+  Thread::ThreadIdPtr run_tid_;
 };
 
 } // namespace Singleton

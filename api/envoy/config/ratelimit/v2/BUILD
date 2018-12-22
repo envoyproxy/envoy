@@ -5,9 +5,7 @@ licenses(["notice"])  # Apache 2
 api_proto_library_internal(
     name = "rls",
     srcs = ["rls.proto"],
-    visibility = [
-        "//envoy/config/bootstrap/v2:__pkg__",
-    ],
+    visibility = ["//visibility:public"],
     deps = [
         "//envoy/api/v2/core:grpc_service",
     ],

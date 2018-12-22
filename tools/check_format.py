@@ -273,6 +273,11 @@ def checkSourceLine(line, file_path, reportError):
        'std::chrono::system_clock::now' in line or 'std::chrono::steady_clock::now' in line or \
        'std::this_thread::sleep_for' in line or hasCondVarWaitFor(line):
       reportError("Don't reference real-world time sources from production code; use injection")
+  if "std::get_time" in line:
+    if "test/" in file_path:
+      reportError("Don't use std::get_time; use TestUtility::parseTimestamp in tests")
+    else:
+      reportError("Don't use std::get_time; use the injectable time system")
   if 'std::atomic_' in line:
     # The std::atomic_* free functions are functionally equivalent to calling
     # operations on std::atomic<T> objects, so prefer to use that instead.

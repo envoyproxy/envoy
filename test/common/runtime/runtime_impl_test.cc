@@ -258,7 +258,7 @@ TEST(LoaderImplTest, All) {
 }
 
 TEST(DiskLayer, IllegalPath) {
-#if defined(WIN32)
+#ifdef WIN32
   // no illegal paths on Windows at the moment
   return;
 #endif
