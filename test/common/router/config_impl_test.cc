@@ -3945,6 +3945,113 @@ TEST(RoutePropertyTest, excludeVHRateLimits) {
 }
 
 TEST(RoutePropertyTest, TestVHostCorsConfig) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: "default"
+    domains: ["*"]
+    cors:
+      allow_origin: ["test-origin"]
+      allow_methods: "test-methods"
+      allow_headers: "test-headers"
+      expose_headers: "test-expose-headers"
+      max_age: "test-max-age"
+      allow_credentials: true
+      filter_enabled:
+        default_value:
+          numerator: 0
+          denominator: "HUNDRED"
+      shadow_enabled:
+        default_value:
+          numerator: 100
+          denominator: "HUNDRED"
+    routes:
+      - match:
+          prefix: "/api"
+        route:
+          cluster: "ats"
+)EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  Runtime::MockSnapshot snapshot;
+  ON_CALL(factory_context.runtime_loader_, snapshot()).WillByDefault(ReturnRef(snapshot));
+
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, false);
+
+  const Router::CorsPolicy* cors_policy =
+      config.route(genHeaders("api.lyft.com", "/api", "GET"), 0)
+          ->routeEntry()
+          ->virtualHost()
+          .corsPolicy();
+
+  envoy::api::v2::core::RuntimeFractionalPercent enabled_;
+  enabled_.mutable_default_value()->set_numerator(0);
+  enabled_.mutable_default_value()->set_denominator(envoy::type::FractionalPercent::HUNDRED);
+  EXPECT_THAT(cors_policy->enabled(), ProtoEq(enabled_));
+  envoy::api::v2::core::RuntimeFractionalPercent shadowEnabled_;
+  shadowEnabled_.mutable_default_value()->set_numerator(100);
+  shadowEnabled_.mutable_default_value()->set_denominator(envoy::type::FractionalPercent::HUNDRED);
+  EXPECT_THAT(cors_policy->shadowEnabled(), ProtoEq(shadowEnabled_));
+  EXPECT_THAT(cors_policy->allowOrigins(), ElementsAreArray({"test-origin"}));
+  EXPECT_EQ(cors_policy->allowMethods(), "test-methods");
+  EXPECT_EQ(cors_policy->allowHeaders(), "test-headers");
+  EXPECT_EQ(cors_policy->exposeHeaders(), "test-expose-headers");
+  EXPECT_EQ(cors_policy->maxAge(), "test-max-age");
+  EXPECT_EQ(cors_policy->allowCredentials(), true);
+}
+
+TEST(RoutePropertyTest, TestRouteCorsConfig) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: "default"
+    domains: ["*"]
+    routes:
+      - match:
+          prefix: "/api"
+        route:
+          cluster: "ats"
+          cors:
+            allow_origin: ["test-origin"]
+            allow_methods: "test-methods"
+            allow_headers: "test-headers"
+            expose_headers: "test-expose-headers"
+            max_age: "test-max-age"
+            allow_credentials: true
+            filter_enabled:
+              default_value:
+                numerator: 0
+                denominator: "HUNDRED"
+            shadow_enabled:
+              default_value:
+                numerator: 100
+                denominator: "HUNDRED"
+)EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  Runtime::MockSnapshot snapshot;
+  ON_CALL(factory_context.runtime_loader_, snapshot()).WillByDefault(ReturnRef(snapshot));
+
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, false);
+
+  const Router::CorsPolicy* cors_policy =
+      config.route(genHeaders("api.lyft.com", "/api", "GET"), 0)->routeEntry()->corsPolicy();
+
+  envoy::api::v2::core::RuntimeFractionalPercent enabled_;
+  enabled_.mutable_default_value()->set_numerator(0);
+  enabled_.mutable_default_value()->set_denominator(envoy::type::FractionalPercent::HUNDRED);
+  EXPECT_THAT(cors_policy->enabled(), ProtoEq(enabled_));
+  // envoy::api::v2::core::RuntimeFractionalPercent shadowEnabled_;
+  // shadowEnabled_.mutable_default_value()->set_numerator(100);
+  // shadowEnabled_.mutable_default_value()->set_denominator(envoy::type::FractionalPercent::HUNDRED);
+  // EXPECT_THAT(cors_policy->shadowEnabled(), ProtoEq(shadowEnabled_));
+  EXPECT_THAT(cors_policy->allowOrigins(), ElementsAreArray({"test-origin"}));
+  EXPECT_EQ(cors_policy->allowMethods(), "test-methods");
+  EXPECT_EQ(cors_policy->allowHeaders(), "test-headers");
+  EXPECT_EQ(cors_policy->exposeHeaders(), "test-expose-headers");
+  EXPECT_EQ(cors_policy->maxAge(), "test-max-age");
+  EXPECT_EQ(cors_policy->allowCredentials(), true);
+}
+
+TEST(RoutePropertyTest, TestVHostCorsLegacyConfig) {
   const std::string json = R"EOF(
 {
   "virtual_hosts": [
@@ -3979,7 +4086,14 @@ TEST(RoutePropertyTest, TestVHostCorsConfig) {
           ->virtualHost()
           .corsPolicy();
 
-  EXPECT_EQ(cors_policy->enabled(), true);
+  envoy::api::v2::core::RuntimeFractionalPercent enabled_;
+  enabled_.mutable_default_value()->set_numerator(100);
+  enabled_.mutable_default_value()->set_denominator(envoy::type::FractionalPercent::HUNDRED);
+  EXPECT_THAT(cors_policy->enabled(), ProtoEq(enabled_));
+  envoy::api::v2::core::RuntimeFractionalPercent shadowEnabled_;
+  shadowEnabled_.mutable_default_value()->set_numerator(0);
+  shadowEnabled_.mutable_default_value()->set_denominator(envoy::type::FractionalPercent::HUNDRED);
+  EXPECT_THAT(cors_policy->shadowEnabled(), ProtoEq(shadowEnabled_));
   EXPECT_THAT(cors_policy->allowOrigins(), ElementsAreArray({"test-origin"}));
   EXPECT_EQ(cors_policy->allowMethods(), "test-methods");
   EXPECT_EQ(cors_policy->allowHeaders(), "test-headers");
@@ -3988,7 +4102,7 @@ TEST(RoutePropertyTest, TestVHostCorsConfig) {
   EXPECT_EQ(cors_policy->allowCredentials(), true);
 }
 
-TEST(RoutePropertyTest, TestRouteCorsConfig) {
+TEST(RoutePropertyTest, TestRouteCorsLegacyConfig) {
   const std::string json = R"EOF(
 {
   "virtual_hosts": [
@@ -4000,12 +4114,12 @@ TEST(RoutePropertyTest, TestRouteCorsConfig) {
           "prefix": "/api",
           "cluster": "ats",
           "cors" : {
-              "allow_origin": ["test-origin"],
-              "allow_methods": "test-methods",
-              "allow_headers": "test-headers",
-              "expose_headers": "test-expose-headers",
-              "max_age": "test-max-age",
-              "allow_credentials": true
+            "allow_origin": ["test-origin"],
+            "allow_methods": "test-methods",
+            "allow_headers": "test-headers",
+            "expose_headers": "test-expose-headers",
+            "max_age": "test-max-age",
+            "allow_credentials": true
           }
         }
       ]
@@ -4020,7 +4134,14 @@ TEST(RoutePropertyTest, TestRouteCorsConfig) {
   const Router::CorsPolicy* cors_policy =
       config.route(genHeaders("api.lyft.com", "/api", "GET"), 0)->routeEntry()->corsPolicy();
 
-  EXPECT_EQ(cors_policy->enabled(), true);
+  envoy::api::v2::core::RuntimeFractionalPercent enabled_;
+  enabled_.mutable_default_value()->set_numerator(100);
+  enabled_.mutable_default_value()->set_denominator(envoy::type::FractionalPercent::HUNDRED);
+  EXPECT_THAT(cors_policy->enabled(), ProtoEq(enabled_));
+  envoy::api::v2::core::RuntimeFractionalPercent shadowEnabled_;
+  shadowEnabled_.mutable_default_value()->set_numerator(0);
+  shadowEnabled_.mutable_default_value()->set_denominator(envoy::type::FractionalPercent::HUNDRED);
+  EXPECT_THAT(cors_policy->shadowEnabled(), ProtoEq(shadowEnabled_));
   EXPECT_THAT(cors_policy->allowOrigins(), ElementsAreArray({"test-origin"}));
   EXPECT_EQ(cors_policy->allowMethods(), "test-methods");
   EXPECT_EQ(cors_policy->allowHeaders(), "test-headers");
