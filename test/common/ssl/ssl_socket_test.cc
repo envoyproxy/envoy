@@ -1019,8 +1019,7 @@ TEST_P(SslSocketTest, FailedClientCertificateDefaultExpirationVerification) {
 
   TestUtilOptionsV2 test_options(listener, client, "ssl.fail_verify_error", "ssl.connection_error",
                                  false, GetParam());
-  test_options.expectedClientCertURI("spiffe://lyft.com/test-team"));
-  testUtilV2(test_options);
+  testUtilV2(test_options.expectedClientCertURI("spiffe://lyft.com/test-team"));
 }
 
 // Expired certificates will not be accepted when explicitly disallowed via
@@ -1056,8 +1055,7 @@ TEST_P(SslSocketTest, ClientCertificateExpirationAllowedVerification) {
 
   TestUtilOptionsV2 test_options(listener, client, "ssl.handshake", "ssl.handshake", true,
                                  GetParam());
-  test_options.expectedClientCertURI("spiffe://lyft.com/test-team");
-  testUtilV2(test_options);
+  testUtilV2(test_options.expectedClientCertURI("spiffe://lyft.com/test-team"));
 }
 
 // Allow expired certificates, but add a certificate hash requirement so it still fails.
