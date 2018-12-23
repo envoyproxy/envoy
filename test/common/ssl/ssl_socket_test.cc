@@ -522,27 +522,6 @@ const std::string testUtilV2(const TestUtilOptionsV2& options) {
   return new_session;
 }
 
-const std::string testUtilV2(
-    const envoy::api::v2::Listener& server_proto,
-    const envoy::api::v2::auth::UpstreamTlsContext& client_ctx_proto,
-    const std::string& client_session, bool expect_success,
-    const std::string& expected_protocol_version, const std::string& expected_server_cert_digest,
-    const std::string& expected_client_cert_uri, const std::string& expected_requested_server_name,
-    const std::string& expected_alpn_protocol, const std::string& expected_server_stats,
-    const std::string& expected_client_stats, const Network::Address::IpVersion version,
-    Network::TransportSocketOptionsSharedPtr transport_socket_options) {
-  TestUtilOptionsV2 test_options(server_proto, client_ctx_proto, expected_server_stats,
-                                 expected_client_stats, expect_success, version);
-  test_options.clientSession(client_session)
-      .expectedProtocolVersion(expected_protocol_version)
-      .expectedServerCertDigest(expected_server_cert_digest)
-      .expectedClientCertURI(expected_client_cert_uri)
-      .expectedRequestedServerName(expected_requested_server_name)
-      .expectedALPNProtocol(expected_alpn_protocol)
-      .transportSocketOptions(transport_socket_options);
-  return testUtilV2(test_options);
-}
-
 // Configure the listener with unittest{cert,key}.pem and ca_cert.pem.
 // Configure the client with expired_san_uri_{cert,key}.pem
 void configureServerAndExpiredClientCertificate(envoy::api::v2::Listener& listener,
@@ -1389,15 +1368,15 @@ TEST_P(SslSocketTest, CertificatesWithPassword) {
       TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
           "{{ test_rundir }}/test/common/ssl/test_data/password_protected_password.txt")));
 
-  testUtilV2(listener, client, "", true, "", TEST_PASSWORD_PROTECTED_CERT_HASH,
-             "spiffe://lyft.com/test-team", "", "", "ssl.handshake", "ssl.handshake", GetParam(),
-             nullptr);
+  TestUtilOptionsV2 test_options(listener, client, "ssl.handshake", "ssl.handshake", true,
+                                 GetParam());
+  testUtilV2(test_options.expectedClientCertURI("spiffe://lyft.com/test-team")
+                 .expectedServerCertDigest(TEST_PASSWORD_PROTECTED_CERT_HASH));
+  testUtilV2(test_options);
 
   // Works even with client renegotiation.
   client.set_allow_renegotiation(true);
-  testUtilV2(listener, client, "", true, "", TEST_PASSWORD_PROTECTED_CERT_HASH,
-             "spiffe://lyft.com/test-team", "", "", "ssl.handshake", "ssl.handshake", GetParam(),
-             nullptr);
+  testUtilV2(test_options);
 }
 
 TEST_P(SslSocketTest, ClientCertificateSpkiVerification) {
@@ -2949,6 +2928,15 @@ TEST_P(SslSocketTest, SslError) {
   EXPECT_EQ(1UL, server_stats_store.counter("ssl.connection_error").value());
 }
 
+static TestUtilOptionsV2
+createProtocolTestOptions(const envoy::api::v2::Listener& listener,
+                          const envoy::api::v2::auth::UpstreamTlsContext& client_ctx,
+                          Network::Address::IpVersion version, std::string protocol) {
+  std::string stats = "ssl.versions." + protocol;
+  TestUtilOptionsV2 options(listener, client_ctx, stats, stats, true, version);
+  return options.expectedProtocolVersion(protocol);
+}
+
 TEST_P(SslSocketTest, ProtocolVersions) {
   envoy::api::v2::Listener listener;
   envoy::api::v2::listener::FilterChain* filter_chain = listener.add_filter_chains();
@@ -2966,33 +2954,37 @@ TEST_P(SslSocketTest, ProtocolVersions) {
       client.mutable_common_tls_context()->mutable_tls_params();
 
   // Connection using defaults (client & server) succeeds, negotiating TLSv1.2.
-  testUtilV2(listener, client, "", true, "TLSv1.2", "", "", "", "", "ssl.handshake",
-             "ssl.handshake", GetParam(), nullptr);
+  TestUtilOptionsV2 success_test_options(listener, client, "ssl.handshake", "ssl.handshake", true,
+                                         GetParam());
+  success_test_options.expectedProtocolVersion("TLSv1.2");
+  testUtilV2(success_test_options);
 
   // Connection using defaults (client & server) succeeds, negotiating TLSv1.2,
   // even with client renegotiation.
   client.set_allow_renegotiation(true);
-  testUtilV2(listener, client, "", true, "TLSv1.2", "", "", "", "", "ssl.handshake",
-             "ssl.handshake", GetParam(), nullptr);
+  testUtilV2(success_test_options);
   client.set_allow_renegotiation(false);
 
   // Connection using TLSv1.0 (client) and defaults (server) succeeds.
   client_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_0);
   client_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_0);
-  testUtilV2(listener, client, "", true, "TLSv1", "", "", "", "", "ssl.versions.TLSv1",
-             "ssl.versions.TLSv1", GetParam(), nullptr);
+  TestUtilOptionsV2 tls_v1_test_options =
+      createProtocolTestOptions(listener, client, GetParam(), "TLSv1");
+  testUtilV2(tls_v1_test_options);
 
   // Connection using TLSv1.1 (client) and defaults (server) succeeds.
   client_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_1);
   client_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_1);
-  testUtilV2(listener, client, "", true, "TLSv1.1", "", "", "", "", "ssl.versions.TLSv1.1",
-             "ssl.versions.TLSv1.1", GetParam(), nullptr);
+  TestUtilOptionsV2 tls_v1_1_test_options =
+      createProtocolTestOptions(listener, client, GetParam(), "TLSv1.1");
+  testUtilV2(tls_v1_1_test_options);
 
   // Connection using TLSv1.2 (client) and defaults (server) succeeds.
   client_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_2);
   client_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_2);
-  testUtilV2(listener, client, "", true, "TLSv1.2", "", "", "", "", "ssl.versions.TLSv1.2",
-             "ssl.versions.TLSv1.2", GetParam(), nullptr);
+  TestUtilOptionsV2 tls_v1_2_test_options =
+      createProtocolTestOptions(listener, client, GetParam(), "TLSv1.2");
+  testUtilV2(tls_v1_2_test_options);
 
   // Connection using TLSv1.3 (client) and defaults (server) fails.
   client_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_3);
@@ -3004,28 +2996,26 @@ TEST_P(SslSocketTest, ProtocolVersions) {
   // Connection using TLSv1.3 (client) and TLSv1.0-1.3 (server) succeeds.
   server_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_0);
   server_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_3);
-  testUtilV2(listener, client, "", true, "TLSv1.3", "", "", "", "", "ssl.versions.TLSv1.3",
-             "ssl.versions.TLSv1.3", GetParam(), nullptr);
+  TestUtilOptionsV2 tls_v1_3_test_options =
+      createProtocolTestOptions(listener, client, GetParam(), "TLSv1.3");
+  testUtilV2(tls_v1_3_test_options);
 
   // Connection using defaults (client) and TLSv1.0 (server) succeeds.
   client_params->clear_tls_minimum_protocol_version();
   client_params->clear_tls_maximum_protocol_version();
   server_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_0);
   server_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_0);
-  testUtilV2(listener, client, "", true, "TLSv1", "", "", "", "", "ssl.versions.TLSv1",
-             "ssl.versions.TLSv1", GetParam(), nullptr);
+  testUtilV2(tls_v1_test_options);
 
   // Connection using defaults (client) and TLSv1.1 (server) succeeds.
   server_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_1);
   server_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_1);
-  testUtilV2(listener, client, "", true, "TLSv1.1", "", "", "", "", "ssl.versions.TLSv1.1",
-             "ssl.versions.TLSv1.1", GetParam(), nullptr);
+  testUtilV2(tls_v1_1_test_options);
 
   // Connection using defaults (client) and TLSv1.2 (server) succeeds.
   server_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_2);
   server_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_2);
-  testUtilV2(listener, client, "", true, "TLSv1.2", "", "", "", "", "ssl.versions.TLSv1.2",
-             "ssl.versions.TLSv1.2", GetParam(), nullptr);
+  testUtilV2(tls_v1_2_test_options);
 
   // Connection using defaults (client) and TLSv1.3 (server) fails.
   server_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_3);
@@ -3035,8 +3025,7 @@ TEST_P(SslSocketTest, ProtocolVersions) {
   // Connection using TLSv1.0-TLSv1.3 (client) and TLSv1.3 (server) succeeds.
   client_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_0);
   client_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_3);
-  testUtilV2(listener, client, "", true, "TLSv1.3", "", "", "", "", "ssl.versions.TLSv1.3",
-             "ssl.versions.TLSv1.3", GetParam(), nullptr);
+  testUtilV2(tls_v1_3_test_options);
 }
 
 TEST_P(SslSocketTest, ALPN) {
@@ -3192,8 +3181,9 @@ TEST_P(SslSocketTest, EcdhCurves) {
   server_params->add_ecdh_curves("X25519");
   server_params->add_ecdh_curves("P-256");
   server_params->add_cipher_suites("ECDHE-RSA-AES128-GCM-SHA256");
-  testUtilV2(listener, client, "", true, "", "", "", "", "", "ssl.curves.X25519",
-             "ssl.curves.X25519", GetParam(), nullptr);
+  TestUtilOptionsV2 ecdh_curves_test_options(listener, client, "ssl.curves.X25519",
+                                             "ssl.curves.X25519", true, GetParam());
+  testUtilV2(ecdh_curves_test_options);
   client_params->clear_ecdh_curves();
   server_params->clear_ecdh_curves();
   server_params->clear_cipher_suites();
@@ -3215,8 +3205,7 @@ TEST_P(SslSocketTest, EcdhCurves) {
 #ifdef BORINGSSL_FIPS
   testUtilV2(error_test_options);
 #else
-  testUtilV2(listener, client, "", true, "", "", "", "", "", "ssl.curves.X25519",
-             "ssl.curves.X25519", GetParam(), nullptr);
+  testUtilV2(ecdh_curves_test_options);
 #endif
   client_params->clear_ecdh_curves();
   server_params->clear_cipher_suites();
@@ -3249,15 +3238,14 @@ TEST_P(SslSocketTest, SignatureAlgorithms) {
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_uri_key.pem"));
 
   // Connection using defaults (client & server) succeeds.
-  testUtilV2(listener, client, "", true, "", "", "spiffe://lyft.com/test-team", "", "",
-             "ssl.sigalgs.rsa_pss_rsae_sha256", "ssl.sigalgs.ecdsa_secp256r1_sha256", GetParam(),
-             nullptr);
+  TestUtilOptionsV2 algorithm_test_options(listener, client, "ssl.handshake", "ssl.handshake", true,
+                                           GetParam());
+  algorithm_test_options.expectedClientCertURI("spiffe://lyft.com/test-team");
+  testUtilV2(algorithm_test_options);
 
   // Connection using defaults (client & server) succeeds, even with client renegotiation.
   client.set_allow_renegotiation(true);
-  testUtilV2(listener, client, "", true, "", "", "spiffe://lyft.com/test-team", "", "",
-             "ssl.sigalgs.rsa_pss_rsae_sha256", "ssl.sigalgs.ecdsa_secp256r1_sha256", GetParam(),
-             nullptr);
+  testUtilV2(algorithm_test_options);
   client.set_allow_renegotiation(false);
 }
 
@@ -3361,8 +3349,9 @@ TEST_P(SslSocketTest, GetRequestedServerName) {
   envoy::api::v2::auth::UpstreamTlsContext client;
   client.set_sni("lyft.com");
 
-  testUtilV2(listener, client, "", true, "", "", "", "lyft.com", "", "ssl.handshake",
-             "ssl.handshake", GetParam(), nullptr);
+  TestUtilOptionsV2 test_options(listener, client, "ssl.handshake", "ssl.handshake", true,
+                                 GetParam());
+  testUtilV2(test_options.expectedRequestedServerName("lyft.com"));
 }
 
 TEST_P(SslSocketTest, OverrideRequestedServerName) {
@@ -3381,8 +3370,10 @@ TEST_P(SslSocketTest, OverrideRequestedServerName) {
   Network::TransportSocketOptionsSharedPtr transport_socket_options(
       new Network::TransportSocketOptionsImpl("example.com"));
 
-  testUtilV2(listener, client, "", true, "", "", "", "example.com", "", "ssl.handshake",
-             "ssl.handshake", GetParam(), transport_socket_options);
+  TestUtilOptionsV2 test_options(listener, client, "ssl.handshake", "ssl.handshake", true,
+                                 GetParam());
+  testUtilV2(test_options.expectedRequestedServerName("example.com")
+                 .transportSocketOptions(transport_socket_options));
 }
 
 TEST_P(SslSocketTest, OverrideRequestedServerNameWithoutSniInUpstreamTlsContext) {
@@ -3399,8 +3390,10 @@ TEST_P(SslSocketTest, OverrideRequestedServerNameWithoutSniInUpstreamTlsContext)
 
   Network::TransportSocketOptionsSharedPtr transport_socket_options(
       new Network::TransportSocketOptionsImpl("example.com"));
-  testUtilV2(listener, client, "", true, "", "", "", "example.com", "", "ssl.handshake",
-             "ssl.handshake", GetParam(), transport_socket_options);
+  TestUtilOptionsV2 test_options(listener, client, "ssl.handshake", "ssl.handshake", true,
+                                 GetParam());
+  testUtilV2(test_options.expectedRequestedServerName("example.com")
+                 .transportSocketOptions(transport_socket_options));
 }
 
 // Validate that if downstream secrets are not yet downloaded from SDS server, Envoy creates
