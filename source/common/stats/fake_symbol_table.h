@@ -31,21 +31,23 @@ namespace Stats {
  * intended only for transitioning the stats codebase to the SymbolTable API
  * without introducing any computational change.
  */
-class FakeSymbolTable {
+class FakeSymbolTable : public SymbolTable {
 public:
-  SymbolEncoding encode(absl::string_view name) {
+  SymbolEncoding encode(absl::string_view name) override {
     SymbolEncoding encoding;
     encoding.vec_.resize(name.size());
     memcpy(encoding.vec_.data(), name.data(), name.size());
     return encoding;
   }
 
-  std::string toString(const StatName& stat_name) const {
+  std::string toString(const StatName& stat_name) const override {
     return std::string(reinterpret_cast<const char*>(stat_name.data()), stat_name.dataSize());
   }
 
-  uint64_t numSymbols() const { return 0; }
-  bool lessThan(const StatName& a, const StatName& b) const { return toString(a) < toString(b); }
+  uint64_t numSymbols() const override { return 0; }
+  bool lessThan(const StatName& a, const StatName& b) const override {
+    return toString(a) < toString(b);
+  }
   void free(const StatName&) {}
   void incRefCount(const StatName&) {}
 };
