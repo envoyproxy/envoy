@@ -247,10 +247,12 @@ void testUtil(const TestUtilOptions& options) {
   };
 
   size_t close_count = 0;
-  auto close_second_time = [&close_count, &dispatcher, &options, &server_stats_store]() {
+  const std::string expected_server_stats = options.expectedServerStats();
+  auto close_second_time = [&close_count, &dispatcher, expected_server_stats,
+                            &server_stats_store]() {
     if (++close_count == 2) {
-      if (!options.expectedServerStats().empty()) {
-        EXPECT_EQ(1UL, server_stats_store.counter(options.expectedServerStats()).value());
+      if (!expected_server_stats.empty()) {
+        EXPECT_EQ(1UL, server_stats_store.counter(expected_server_stats).value());
       }
       dispatcher.exit();
     }
@@ -484,15 +486,17 @@ const std::string testUtilV2(const TestUtilOptionsV2& options) {
   };
 
   size_t close_count = 0;
-  auto close_second_time = [&close_count, &dispatcher, &options, &server_stats_store,
-                            &client_stats_store]() {
+  const std::string& expected_server_stats = options.expectedServerStats();
+  const std::string& expected_client_stats = options.expectedClientStats();
+  auto close_second_time = [&close_count, &dispatcher, expected_server_stats, expected_client_stats,
+                            &server_stats_store, &client_stats_store]() {
     if (++close_count == 2) {
-      if (!options.expectedServerStats().empty()) {
-        EXPECT_EQ(1UL, server_stats_store.counter(options.expectedServerStats()).value());
+      if (!expected_server_stats.empty()) {
+        EXPECT_EQ(1UL, server_stats_store.counter(expected_server_stats).value());
       }
 
-      if (!options.expectedClientStats().empty()) {
-        EXPECT_EQ(1UL, client_stats_store.counter(options.expectedClientStats()).value());
+      if (!expected_client_stats.empty()) {
+        EXPECT_EQ(1UL, client_stats_store.counter(expected_client_stats).value());
       }
       dispatcher.exit();
     }
