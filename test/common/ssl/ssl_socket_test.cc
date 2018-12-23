@@ -352,7 +352,7 @@ public:
 private:
   const envoy::api::v2::Listener& listener_;
   const envoy::api::v2::auth::UpstreamTlsContext& client_ctx_proto_;
-  const std::string& expected_client_stats_;
+  const std::string expected_client_stats_;
 
   std::string client_session_;
   std::string expected_protocol_version_;
