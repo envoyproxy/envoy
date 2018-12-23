@@ -1019,7 +1019,7 @@ TEST_P(SslSocketTest, FailedClientCertificateDefaultExpirationVerification) {
 
   TestUtilOptionsV2 test_options(listener, client, "ssl.fail_verify_error", "ssl.connection_error",
                                  false, GetParam());
-  test_options.expectedClientCertURI("spiffe://lyft.com/test-team"));
+  test_options.expectedClientCertURI("spiffe://lyft.com/test-team");
   testUtilV2(test_options);
 }
 
