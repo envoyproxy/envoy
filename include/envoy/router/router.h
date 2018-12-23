@@ -131,25 +131,15 @@ public:
   virtual const absl::optional<bool>& allowCredentials() const PURE;
 
   /**
-   * @return bool Whether CORS policy uses filterEnabled instead of the deprecated enabled.
-   */
-  virtual bool hasFilterEnabled() const PURE;
-  /**
    * @return bool Whether CORS is enabled for the route or virtual host.
    */
-  virtual bool enabled() const PURE;
-
-  /**
-   * @return envoy::api::v2::base::RuntimeFractionalPercent Whether CORS is enabled for the route or
-   * virtual host.
-   */
-  virtual envoy::api::v2::core::RuntimeFractionalPercent filterEnabled() const PURE;
+  virtual const envoy::api::v2::core::RuntimeFractionalPercent& enabled() const PURE;
 
   /**
    * @return envoy::api::v2::base::RuntimeFractionalPercent Whether CORS policies are evaluated when
    * filter is off.
    */
-  virtual envoy::api::v2::core::RuntimeFractionalPercent shadowEnabled() const PURE;
+  virtual const envoy::api::v2::core::RuntimeFractionalPercent& shadowEnabled() const PURE;
 };
 
 /**

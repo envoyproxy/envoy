@@ -225,12 +225,9 @@ bool CorsFilter::enabled() {
       continue;
     }
 
-    if (!policy->hasFilterEnabled()) {
-      return policy->enabled();
-    }
-    const std::string key = policy->filterEnabled().runtime_key();
-    return config_->runtime().snapshot().featureEnabled(key,
-                                                        policy->filterEnabled().default_value());
+    const std::string key = policy->enabled().runtime_key();
+    std::cout << "Default value: " << policy->enabled().default_value().numerator() << std::endl;
+    return config_->runtime().snapshot().featureEnabled(key, policy->enabled().default_value());
   }
   return false;
 }

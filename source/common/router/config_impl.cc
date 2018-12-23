@@ -115,9 +115,14 @@ CorsPolicyImpl::CorsPolicyImpl(const envoy::api::v2::route::CorsPolicy& config) 
   if (config.has_allow_credentials()) {
     allow_credentials_ = PROTOBUF_GET_WRAPPED_REQUIRED(config, allow_credentials);
   }
-  has_filter_enabled_ = config.has_filter_enabled();
-  enabled_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enabled, true);
-  filter_enabled_ = config.filter_enabled();
+  bool legacy_enabled = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enabled, true);
+  if (!config.has_filter_enabled()) {
+    filter_enabled_.mutable_default_value()->set_denominator(
+        envoy::type::FractionalPercent::HUNDRED);
+    filter_enabled_.mutable_default_value()->set_numerator(100 * int(legacy_enabled));
+  } else {
+    filter_enabled_ = config.filter_enabled();
+  }
   shadow_enabled_ = config.shadow_enabled();
 }
 

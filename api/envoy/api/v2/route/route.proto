@@ -408,10 +408,15 @@ message CorsPolicy {
     // .. attention::
     //
     //   **This field is deprecated**. Set the
-    //   :ref:`runtime_fraction<envoy_api_field_route.CorsPolicy.filter_enabled>` field instead.
+    //   :ref:`filter_enabled<envoy_api_field_route.CorsPolicy.filter_enabled>` field instead.
     google.protobuf.BoolValue enabled = 7 [deprecated = true];
 
     // Specifies if CORS is enabled.
+    //
+    // .. note::
+    //
+    //   This defaults to 100/:ref:`HUNDRED
+    //   <envoy_api_enum_type.FractionalPercent.DenominatorType>`.
     core.RuntimeFractionalPercent filter_enabled = 9;
   }
 

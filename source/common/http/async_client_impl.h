@@ -102,12 +102,10 @@ private:
     const std::string& exposeHeaders() const override { return EMPTY_STRING; };
     const std::string& maxAge() const override { return EMPTY_STRING; };
     const absl::optional<bool>& allowCredentials() const override { return allow_credentials_; };
-    bool hasFilterEnabled() const override { return false; };
-    bool enabled() const override { return false; };
-    envoy::api::v2::core::RuntimeFractionalPercent filterEnabled() const override {
+    const envoy::api::v2::core::RuntimeFractionalPercent& enabled() const override {
       return filter_enabled_;
-    }
-    envoy::api::v2::core::RuntimeFractionalPercent shadowEnabled() const override {
+    };
+    const envoy::api::v2::core::RuntimeFractionalPercent& shadowEnabled() const override {
       return shadow_enabled_;
     }
 

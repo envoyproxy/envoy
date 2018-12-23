@@ -19,7 +19,8 @@ Runtime
 The CORS filter supports the following RuntimeFractionalPercent settings:
 
 filter_enabled
-  The % of requests for which the filter is enabled. Default is 0.
+  The % of requests for which the filter is enabled. The default is
+  100/:ref:`HUNDRED <envoy_api_enum_type.FractionalPercent.DenominatorType>`.
   If present, this will override the :ref: `enabled <envoy_api_msg_route.CorsPolicy.enabled>`
   field of the configuration.
 
