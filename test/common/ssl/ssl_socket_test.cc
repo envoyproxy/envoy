@@ -486,8 +486,8 @@ const std::string testUtilV2(const TestUtilOptionsV2& options) {
   };
 
   size_t close_count = 0;
-  const std::string& expected_server_stats = options.expectedServerStats();
-  const std::string& expected_client_stats = options.expectedClientStats();
+  const std::string expected_server_stats = options.expectedServerStats();
+  const std::string expected_client_stats = options.expectedClientStats();
   auto close_second_time = [&close_count, &dispatcher, expected_server_stats, expected_client_stats,
                             &server_stats_store, &client_stats_store]() {
     if (++close_count == 2) {
