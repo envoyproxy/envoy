@@ -247,11 +247,8 @@ void testUtil(const TestUtilOptions& options) {
   };
 
   size_t close_count = 0;
-  auto close_second_time = [&close_count, &dispatcher, &options, &server_stats_store]() {
+  auto close_second_time = [&close_count, &dispatcher]() {
     if (++close_count == 2) {
-      if (!options.expectedServerStats().empty()) {
-        EXPECT_EQ(1UL, server_stats_store.counter(options.expectedServerStats()).value());
-      }
       dispatcher.exit();
     }
   };
@@ -271,6 +268,10 @@ void testUtil(const TestUtilOptions& options) {
   }
 
   dispatcher.run(Event::Dispatcher::RunType::Block);
+
+  if (!options.expectedServerStats().empty()) {
+    EXPECT_EQ(1UL, server_stats_store.counter(options.expectedServerStats()).value());
+  }
 }
 
 /**
@@ -484,16 +485,8 @@ const std::string testUtilV2(const TestUtilOptionsV2& options) {
   };
 
   size_t close_count = 0;
-  auto close_second_time = [&close_count, &dispatcher, &options, &server_stats_store,
-                            &client_stats_store]() {
+  auto close_second_time = [&close_count, &dispatcher]() {
     if (++close_count == 2) {
-      if (!options.expectedServerStats().empty()) {
-        EXPECT_EQ(1UL, server_stats_store.counter(options.expectedServerStats()).value());
-      }
-
-      if (!options.expectedClientStats().empty()) {
-        EXPECT_EQ(1UL, client_stats_store.counter(options.expectedClientStats()).value());
-      }
       dispatcher.exit();
     }
   };
@@ -517,6 +510,15 @@ const std::string testUtilV2(const TestUtilOptionsV2& options) {
   }
 
   dispatcher.run(Event::Dispatcher::RunType::Block);
+
+  if (!options.expectedServerStats().empty()) {
+    EXPECT_EQ(1UL, server_stats_store.counter(options.expectedServerStats()).value());
+  }
+
+  if (!options.expectedClientStats().empty()) {
+    EXPECT_EQ(1UL, client_stats_store.counter(options.expectedClientStats()).value());
+  }
+
   return new_session;
 }
 
