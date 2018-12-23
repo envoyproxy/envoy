@@ -22,7 +22,7 @@ static void BM_CreateRace(benchmark::State& state) {
   threads.reserve(num_threads);
   Envoy::ConditionalInitializer access, wait;
   absl::BlockingCounter accesses(num_threads);
-  Envoy::Stats::SymbolTable table;
+  Envoy::Stats::SymbolTableImpl table;
   const absl::string_view stat_name_string = "here.is.a.stat.name";
   Envoy::Stats::StatNameStorage initial(stat_name_string, table);
 

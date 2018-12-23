@@ -96,7 +96,6 @@ public:
   void swap(SymbolEncoding& src) { vec_.swap(src.vec_); }
 
 private:
-  friend class FakeSymbolTable;
   std::vector<uint8_t> vec_;
 };
 
@@ -129,10 +128,10 @@ private:
  * same string is re-encoded, it may or may not encode to the same underlying
  * symbol.
  */
-class SymbolTable {
+class SymbolTableImpl : public SymbolTable {
 public:
-  SymbolTable();
-  ~SymbolTable();
+  SymbolTableImpl();
+  ~SymbolTableImpl() override;
 
   /**
    * Encodes a stat name using the symbol table, returning a SymbolEncoding. The
@@ -149,17 +148,12 @@ public:
    * @param name The name to encode.
    * @return SymbolEncoding the encoded symbols.
    */
-  SymbolEncoding encode(absl::string_view name);
+  SymbolEncoding encode(absl::string_view name) override;
 
   /**
    * @return uint64_t the number of symbols in the symbol table.
    */
-  uint64_t numSymbols() const {
-    Thread::LockGuard lock(&lock_);
-    ASSERT(encode_map_.size() == decode_map_.size());
-    uint64_t sz = encode_map_.size();
-    return sz;
-  }
+  uint64_t numSymbols() const override;
 
   /**
    * Deterines whether one StatName lexically precedes another. Note that
@@ -177,7 +171,7 @@ public:
    * @param b the second stat name
    * @return bool true if a lexically precedes b.
    */
-  bool lessThan(const StatName& a, const StatName& b) const;
+  bool lessThan(const StatName& a, const StatName& b) const override;
 
   /**
    * Since SymbolTable does manual reference counting, a client of SymbolTable
@@ -187,7 +181,7 @@ public:
    *
    * @param stat_name the stat name whose symbols should be freed.
    */
-  void free(const StatName& stat_name);
+  void free(const StatName& stat_name) override;
 
   /**
    * StatName backing-store can be managed by callers in a variety of ways
@@ -198,13 +192,13 @@ public:
    *
    * @param stat_name the stat name whose symbols should be freed.
    */
-  void incRefCount(const StatName& stat_name);
+  void incRefCount(const StatName& stat_name) override;
 
 #ifndef ENVOY_CONFIG_COVERAGE
   // It is convenient when debugging to be able to print the state of the table,
   // but this code is not hit during tests ordinarily, and is not needed in
   // production code.
-  void debugPrint() const;
+  void debugPrint() const override;
 #endif
 
   /**
@@ -216,7 +210,7 @@ public:
    * @param stat_name symbol_vec the vector of symbols to decode.
    * @return std::string the retrieved stat name.
    */
-  std::string toString(const StatName& stat_name) const;
+  std::string toString(const StatName& stat_name) const override;
 
   /**
    * @param symbol_vec the vector of symbols to decode.
@@ -226,13 +220,13 @@ public:
 
 private:
   friend class StatName;
-  //friend class StatNameTest<SymbolTable>;
+  friend class StatNameTest;
 
   struct SharedSymbol {
     SharedSymbol(Symbol symbol) : symbol_(symbol), ref_count_(1) {}
 
     Symbol symbol_;
-    std::atomic<uint32_t> ref_count_;
+    uint32_t ref_count_;
   };
 
   // This must be called during both encode() and free().
@@ -313,7 +307,6 @@ public:
   // Move constructor; needed for using StatNameStorage as an
   // absl::flat_hash_map value.
   StatNameStorage(StatNameStorage&& src) : bytes_(std::move(src.bytes_)) {}
-  StatNameStorage(StatName src, SymbolTable& table);
 
   // Obtains new backing storage for an already existing StatName. Used to
   // record a computed StatName held in a temp into a more persistent data
