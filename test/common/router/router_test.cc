@@ -6,6 +6,7 @@
 #include "common/common/empty_string.h"
 #include "common/config/metadata.h"
 #include "common/config/well_known_names.h"
+#include "common/http/context_impl.h"
 #include "common/network/utility.h"
 #include "common/router/config_impl.h"
 #include "common/router/router.h"
@@ -35,6 +36,7 @@ using testing::AssertionSuccess;
 using testing::AtLeast;
 using testing::InSequence;
 using testing::Invoke;
+using testing::Matcher;
 using testing::MockFunction;
 using testing::NiceMock;
 using testing::Ref;
@@ -77,7 +79,7 @@ public:
       : shadow_writer_(new MockShadowWriter()),
         config_("test.", local_info_, stats_store_, cm_, runtime_, random_,
                 ShadowWriterPtr{shadow_writer_}, true, start_child_span, suppress_envoy_headers,
-                test_time_.timeSystem()),
+                test_time_.timeSystem(), http_context_),
         router_(config_) {
     router_.setDecoderFilterCallbacks(callbacks_);
     upstream_locality_.set_zone("to_az");
@@ -189,6 +191,7 @@ public:
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   Http::ConnectionPool::MockCancellable cancellable_;
+  Http::ContextImpl http_context_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
   MockShadowWriter* shadow_writer_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
@@ -2344,6 +2347,21 @@ TEST(RouterFilterUtilityTest, ShouldShadow) {
     NiceMock<Runtime::MockLoader> runtime;
     EXPECT_CALL(runtime.snapshot_, featureEnabled("foo", 0, 5, 10000)).WillOnce(Return(true));
     EXPECT_TRUE(FilterUtility::shouldShadow(policy, runtime, 5));
+  }
+  // Use default value instead of runtime key.
+  {
+    TestShadowPolicy policy;
+    envoy::type::FractionalPercent fractional_percent;
+    fractional_percent.set_numerator(5);
+    fractional_percent.set_denominator(envoy::type::FractionalPercent::TEN_THOUSAND);
+    policy.cluster_ = "cluster";
+    policy.runtime_key_ = "foo";
+    policy.default_value_ = fractional_percent;
+    NiceMock<Runtime::MockLoader> runtime;
+    EXPECT_CALL(runtime.snapshot_,
+                featureEnabled("foo", Matcher<const envoy::type::FractionalPercent&>(_), 3))
+        .WillOnce(Return(true));
+    EXPECT_TRUE(FilterUtility::shouldShadow(policy, runtime, 3));
   }
 }
 

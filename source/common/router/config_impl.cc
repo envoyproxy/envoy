@@ -124,7 +124,14 @@ ShadowPolicyImpl::ShadowPolicyImpl(const envoy::api::v2::route::RouteAction& con
   }
 
   cluster_ = config.request_mirror_policy().cluster();
-  runtime_key_ = config.request_mirror_policy().runtime_key();
+
+  if (config.request_mirror_policy().has_runtime_fraction()) {
+    runtime_key_ = config.request_mirror_policy().runtime_fraction().runtime_key();
+    default_value_ = config.request_mirror_policy().runtime_fraction().default_value();
+  } else {
+    runtime_key_ = config.request_mirror_policy().runtime_key();
+    default_value_.set_numerator(0);
+  }
 }
 
 class HashMethodImplBase : public HashPolicyImpl::HashMethod {
@@ -369,6 +376,17 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
 
   if (route.route().has_cors()) {
     cors_policy_ = std::make_unique<CorsPolicyImpl>(route.route().cors());
+  }
+  for (const auto upgrade_config : route.route().upgrade_configs()) {
+    const bool enabled = upgrade_config.has_enabled() ? upgrade_config.enabled().value() : true;
+    const bool success =
+        upgrade_map_
+            .emplace(std::make_pair(
+                Envoy::Http::LowerCaseString(upgrade_config.upgrade_type()).get(), enabled))
+            .second;
+    if (!success) {
+      throw EnvoyException(fmt::format("Duplicate upgrade {}", upgrade_config.upgrade_type()));
+    }
   }
 }
 

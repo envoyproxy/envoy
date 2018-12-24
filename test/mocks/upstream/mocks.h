@@ -24,6 +24,7 @@
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/tcp/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
+#include "test/mocks/upstream/load_balancer_context.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -50,27 +51,28 @@ public:
   // Upstream::HostSet
   MOCK_CONST_METHOD0(hosts, const HostVector&());
   MOCK_CONST_METHOD0(healthyHosts, const HostVector&());
+  MOCK_CONST_METHOD0(degradedHosts, const HostVector&());
   MOCK_CONST_METHOD0(hostsPerLocality, const HostsPerLocality&());
   MOCK_CONST_METHOD0(healthyHostsPerLocality, const HostsPerLocality&());
+  MOCK_CONST_METHOD0(degradedHostsPerLocality, const HostsPerLocality&());
   MOCK_CONST_METHOD0(localityWeights, LocalityWeightsConstSharedPtr());
   MOCK_METHOD0(chooseLocality, absl::optional<uint32_t>());
-  MOCK_METHOD8(updateHosts, void(std::shared_ptr<const HostVector> hosts,
-                                 std::shared_ptr<const HostVector> healthy_hosts,
-                                 HostsPerLocalityConstSharedPtr hosts_per_locality,
-                                 HostsPerLocalityConstSharedPtr healthy_hosts_per_locality,
+  MOCK_METHOD5(updateHosts, void(HostSet::UpdateHostsParams&& update_hosts_params,
                                  LocalityWeightsConstSharedPtr locality_weights,
                                  const HostVector& hosts_added, const HostVector& hosts_removed,
                                  absl::optional<uint32_t> overprovisioning_factor));
   MOCK_CONST_METHOD0(priority, uint32_t());
-  uint32_t overprovisioning_factor() const override { return overprovisioning_factor_; }
-  void set_overprovisioning_factor(const uint32_t overprovisioning_factor) {
+  uint32_t overprovisioningFactor() const override { return overprovisioning_factor_; }
+  void setOverprovisioningFactor(const uint32_t overprovisioning_factor) {
     overprovisioning_factor_ = overprovisioning_factor;
   }
 
   HostVector hosts_;
   HostVector healthy_hosts_;
+  HostVector degraded_hosts_;
   HostsPerLocalitySharedPtr hosts_per_locality_{new HostsPerLocalityImpl()};
   HostsPerLocalitySharedPtr healthy_hosts_per_locality_{new HostsPerLocalityImpl()};
+  HostsPerLocalitySharedPtr degraded_hosts_per_locality_{new HostsPerLocalityImpl()};
   LocalityWeightsConstSharedPtr locality_weights_{{}};
   Common::CallbackManager<uint32_t, const HostVector&, const HostVector&> member_update_cb_helper_;
   uint32_t priority_{};
@@ -155,20 +157,6 @@ public:
   NiceMock<MockPrioritySet> priority_set_;
 };
 
-class MockLoadBalancerContext : public LoadBalancerContext {
-public:
-  MockLoadBalancerContext();
-  ~MockLoadBalancerContext();
-
-  MOCK_METHOD0(computeHashKey, absl::optional<uint64_t>());
-  MOCK_METHOD0(metadataMatchCriteria, Router::MetadataMatchCriteria*());
-  MOCK_CONST_METHOD0(downstreamConnection, const Network::Connection*());
-  MOCK_CONST_METHOD0(downstreamHeaders, const Http::HeaderMap*());
-  MOCK_METHOD2(determinePriorityLoad, const PriorityLoad&(const PrioritySet&, const PriorityLoad&));
-  MOCK_METHOD1(shouldSelectAnotherHost, bool(const Host&));
-  MOCK_CONST_METHOD0(hostSelectionRetryCount, uint32_t());
-};
-
 class MockLoadBalancer : public LoadBalancer {
 public:
   MockLoadBalancer();
@@ -213,11 +201,11 @@ public:
                                      ResourcePriority priority, Http::Protocol protocol,
                                      const Network::ConnectionSocket::OptionsSharedPtr& options));
 
-  MOCK_METHOD4(
-      allocateTcpConnPool,
-      Tcp::ConnectionPool::InstancePtr(Event::Dispatcher& dispatcher, HostConstSharedPtr host,
-                                       ResourcePriority priority,
-                                       const Network::ConnectionSocket::OptionsSharedPtr& options));
+  MOCK_METHOD5(allocateTcpConnPool, Tcp::ConnectionPool::InstancePtr(
+                                        Event::Dispatcher& dispatcher, HostConstSharedPtr host,
+                                        ResourcePriority priority,
+                                        const Network::ConnectionSocket::OptionsSharedPtr& options,
+                                        Network::TransportSocketOptionsSharedPtr));
 
   MOCK_METHOD5(clusterFromProto,
                ClusterSharedPtr(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
@@ -251,7 +239,8 @@ public:
   }
 
   Host::CreateConnectionData tcpConnForCluster(const std::string& cluster,
-                                               LoadBalancerContext* context) override {
+                                               LoadBalancerContext* context,
+                                               Network::TransportSocketOptionsSharedPtr) override {
     MockHost::MockCreateConnectionData data = tcpConnForCluster_(cluster, context);
     return {Network::ClientConnectionPtr{data.connection_}, data.host_description_};
   }
@@ -268,9 +257,11 @@ public:
                Http::ConnectionPool::Instance*(const std::string& cluster,
                                                ResourcePriority priority, Http::Protocol protocol,
                                                LoadBalancerContext* context));
-  MOCK_METHOD3(tcpConnPoolForCluster,
-               Tcp::ConnectionPool::Instance*(const std::string& cluster, ResourcePriority priority,
-                                              LoadBalancerContext* context));
+  MOCK_METHOD4(tcpConnPoolForCluster,
+               Tcp::ConnectionPool::Instance*(
+                   const std::string& cluster, ResourcePriority priority,
+                   LoadBalancerContext* context,
+                   Network::TransportSocketOptionsSharedPtr transport_socket_options));
   MOCK_METHOD2(tcpConnForCluster_,
                MockHost::MockCreateConnectionData(const std::string& cluster,
                                                   LoadBalancerContext* context));
@@ -320,6 +311,9 @@ public:
                                        envoy::data::core::v2alpha::HealthCheckFailureType));
   MOCK_METHOD3(logAddHealthy, void(envoy::data::core::v2alpha::HealthCheckerType,
                                    const HostDescriptionConstSharedPtr&, bool));
+  MOCK_METHOD4(logUnhealthy, void(envoy::data::core::v2alpha::HealthCheckerType,
+                                  const HostDescriptionConstSharedPtr&,
+                                  envoy::data::core::v2alpha::HealthCheckFailureType, bool));
 };
 
 class MockCdsApi : public CdsApi {

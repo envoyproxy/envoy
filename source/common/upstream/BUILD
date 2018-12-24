@@ -59,6 +59,7 @@ envoy_cc_library(
         ":load_stats_reporter_lib",
         ":ring_hash_lb_lib",
         ":subset_lb_lib",
+        "//include/envoy/api:api_interface",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/http:codes_interface",
         "//include/envoy/local_info:local_info_interface",

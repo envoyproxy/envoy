@@ -23,12 +23,16 @@ MockHostSet::MockHostSet(uint32_t priority, uint32_t overprovisioning_factor)
   ON_CALL(*this, priority()).WillByDefault(Return(priority_));
   ON_CALL(*this, hosts()).WillByDefault(ReturnRef(hosts_));
   ON_CALL(*this, healthyHosts()).WillByDefault(ReturnRef(healthy_hosts_));
+  ON_CALL(*this, degradedHosts()).WillByDefault(ReturnRef(healthy_hosts_));
   ON_CALL(*this, hostsPerLocality()).WillByDefault(Invoke([this]() -> const HostsPerLocality& {
     return *hosts_per_locality_;
   }));
   ON_CALL(*this, healthyHostsPerLocality())
       .WillByDefault(
           Invoke([this]() -> const HostsPerLocality& { return *healthy_hosts_per_locality_; }));
+  ON_CALL(*this, degradedHostsPerLocality())
+      .WillByDefault(
+          Invoke([this]() -> const HostsPerLocality& { return *degraded_hosts_per_locality_; }));
   ON_CALL(*this, localityWeights()).WillByDefault(Invoke([this]() -> LocalityWeightsConstSharedPtr {
     return locality_weights_;
   }));
@@ -81,10 +85,6 @@ MockCluster::MockCluster() {
 
 MockCluster::~MockCluster() = default;
 
-MockLoadBalancerContext::MockLoadBalancerContext() = default;
-
-MockLoadBalancerContext::~MockLoadBalancerContext() = default;
-
 MockLoadBalancer::MockLoadBalancer() { ON_CALL(*this, chooseHost(_)).WillByDefault(Return(host_)); }
 
 MockLoadBalancer::~MockLoadBalancer() = default;
@@ -104,7 +104,7 @@ MockClusterManager::MockClusterManager(TimeSource&) : MockClusterManager() {}
 
 MockClusterManager::MockClusterManager() {
   ON_CALL(*this, httpConnPoolForCluster(_, _, _, _)).WillByDefault(Return(&conn_pool_));
-  ON_CALL(*this, tcpConnPoolForCluster(_, _, _)).WillByDefault(Return(&tcp_conn_pool_));
+  ON_CALL(*this, tcpConnPoolForCluster(_, _, _, _)).WillByDefault(Return(&tcp_conn_pool_));
   ON_CALL(*this, httpAsyncClientForCluster(_)).WillByDefault(ReturnRef(async_client_));
   ON_CALL(*this, httpAsyncClientForCluster(_)).WillByDefault((ReturnRef(async_client_)));
   ON_CALL(*this, bindConfig()).WillByDefault(ReturnRef(bind_config_));

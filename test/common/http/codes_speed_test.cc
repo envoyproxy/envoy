@@ -24,11 +24,11 @@ public:
                    const std::string& request_vcluster_name = EMPTY_STRING,
                    const std::string& from_az = EMPTY_STRING,
                    const std::string& to_az = EMPTY_STRING) {
-    Http::CodeUtility::ResponseStatInfo info{
+    Http::CodeStats::ResponseStatInfo info{
         global_store_,      cluster_scope_,        "prefix.", code,  internal_request,
         request_vhost_name, request_vcluster_name, from_az,   to_az, canary};
 
-    Http::CodeUtility::chargeResponseStat(info);
+    code_stats_.chargeResponseStat(info);
   }
 
   void addResponses() {
@@ -44,15 +44,16 @@ public:
   }
 
   void responseTiming() {
-    Http::CodeUtility::ResponseTimingInfo info{
+    Http::CodeStats::ResponseTimingInfo info{
         global_store_, cluster_scope_, "prefix.",    std::chrono::milliseconds(5),
         true,          true,           "vhost_name", "req_vcluster_name",
         "from_az",     "to_az"};
-    Http::CodeUtility::chargeResponseTiming(info);
+    code_stats_.chargeResponseTiming(info);
   }
 
   Stats::IsolatedStoreImpl global_store_;
   Stats::IsolatedStoreImpl cluster_scope_;
+  Http::CodeStatsImpl code_stats_;
 };
 
 } // namespace Http

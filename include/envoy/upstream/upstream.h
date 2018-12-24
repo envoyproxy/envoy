@@ -38,14 +38,24 @@ public:
     HostDescriptionConstSharedPtr host_description_;
   };
 
-  enum class HealthFlag {
-    // The host is currently failing active health checks.
-    FAILED_ACTIVE_HC = 0x1,
-    // The host is currently considered an outlier and has been ejected.
-    FAILED_OUTLIER_CHECK = 0x02,
-    // The host is currently marked as unhealthy by EDS.
-    FAILED_EDS_HEALTH = 0x04,
-  };
+  // We use an X-macro here to make it easier to verify that all the enum values are accounted for.
+  // clang-format off
+#define HEALTH_FLAG_ENUM_VALUES(m)                                               \
+  /* The host is currently failing active health checks. */                      \
+  m(FAILED_ACTIVE_HC, 0x1)                                                       \
+  /* The host is currently considered an outlier and has been ejected. */        \
+  m(FAILED_OUTLIER_CHECK, 0x02)                                                  \
+  /* The host is currently marked as unhealthy by EDS. */                        \
+  m(FAILED_EDS_HEALTH, 0x04)                                                     \
+  /* The host is currently marked as degraded through active health checking. */ \
+  m(DEGRADED_ACTIVE_HC, 0x08)
+  // clang-format on
+
+#define DECLARE_ENUM(name, value) name = value,
+
+  enum class HealthFlag { HEALTH_FLAG_ENUM_VALUES(DECLARE_ENUM) };
+
+#undef DECLARE_ENUM
 
   enum class ActiveHealthFailureType {
     // The failure type is unknown, all hosts' failure types are initialized as UNKNOWN
@@ -73,7 +83,8 @@ public:
    */
   virtual CreateConnectionData
   createConnection(Event::Dispatcher& dispatcher,
-                   const Network::ConnectionSocket::OptionsSharedPtr& options) const PURE;
+                   const Network::ConnectionSocket::OptionsSharedPtr& options,
+                   Network::TransportSocketOptionsSharedPtr transport_socket_options) const PURE;
 
   /**
    * Create a health check connection for this host.
@@ -103,11 +114,28 @@ public:
    */
   virtual void healthFlagSet(HealthFlag flag) PURE;
 
+  enum class Health {
+    /**
+     * Host is unhealthy and is not able to serve traffic. A host may be marked as unhealthy either
+     * through EDS or through active health checking.
+     */
+    Unhealthy,
+    /**
+     * Host is healthy, but degraded. It is able to serve traffic, but hosts that aren't degraded
+     * should be preferred. A host may be marked as degraded either through EDS or through active
+     * health checking.
+     */
+    Degraded,
+    /**
+     * Host is healthy and is able to serve traffic.
+     */
+    Healthy,
+  };
+
   /**
-   * @return whether in aggregate a host is healthy and routable. Multiple health flags and other
-   *         information may be considered.
+   * @return the health of the host.
    */
-  virtual bool healthy() const PURE;
+  virtual Health health() const PURE;
 
   /**
    * Returns the host's ActiveHealthFailureType. Types are specified in ActiveHealthFailureType.
@@ -159,6 +187,7 @@ public:
 typedef std::shared_ptr<const Host> HostConstSharedPtr;
 
 typedef std::vector<HostSharedPtr> HostVector;
+typedef std::unordered_map<std::string, Upstream::HostSharedPtr> HostMap;
 typedef std::shared_ptr<HostVector> HostVectorSharedPtr;
 typedef std::shared_ptr<const HostVector> HostVectorConstSharedPtr;
 
@@ -235,6 +264,14 @@ public:
   virtual const HostVector& healthyHosts() const PURE;
 
   /**
+   * @return all degraded hosts contained in the set at the current time. NOTE: This set is
+   *         eventually consistent. There is a time window where a host in this set may become
+   *         undegraded and calling degraded() on it will return false. Code should be written to
+   *         deal with this case if it matters.
+   */
+  virtual const HostVector& degradedHosts() const PURE;
+
+  /**
    * @return hosts per locality.
    */
   virtual const HostsPerLocality& hostsPerLocality() const PURE;
@@ -243,6 +280,11 @@ public:
    * @return same as hostsPerLocality but only contains healthy hosts.
    */
   virtual const HostsPerLocality& healthyHostsPerLocality() const PURE;
+
+  /**
+   * @return same as hostsPerLocality but only contains degraded hosts.
+   */
+  virtual const HostsPerLocality& degradedHostsPerLocality() const PURE;
 
   /**
    * @return weights for each locality in the host set.
@@ -255,20 +297,27 @@ public:
   virtual absl::optional<uint32_t> chooseLocality() PURE;
 
   /**
+   * Parameter class for updateHosts.
+   */
+  struct UpdateHostsParams {
+    HostVectorConstSharedPtr hosts;
+    HostVectorConstSharedPtr healthy_hosts;
+    HostVectorConstSharedPtr degraded_hosts;
+    HostsPerLocalityConstSharedPtr hosts_per_locality;
+    HostsPerLocalityConstSharedPtr healthy_hosts_per_locality;
+    HostsPerLocalityConstSharedPtr degraded_hosts_per_locality;
+  };
+
+  /**
    * Updates the hosts in a given host set.
    *
-   * @param hosts supplies the (usually new) list of hosts in the host set.
-   * @param healthy hosts supplies the subset of hosts which are healthy.
-   * @param hosts_per_locality supplies the hosts subdivided by locality.
-   * @param hosts_per_locality supplies the healthy hosts subdivided by locality.
+   * @param update_hosts_param supplies the list of hosts and hosts per localitiy.
    * @param locality_weights supplies a map from locality to associated weight.
    * @param hosts_added supplies the hosts added since the last update.
    * @param hosts_removed supplies the hosts removed since the last update.
    * @param overprovisioning_factor if presents, overwrites the current overprovisioning_factor.
    */
-  virtual void updateHosts(HostVectorConstSharedPtr hosts, HostVectorConstSharedPtr healthy_hosts,
-                           HostsPerLocalityConstSharedPtr hosts_per_locality,
-                           HostsPerLocalityConstSharedPtr healthy_hosts_per_locality,
+  virtual void updateHosts(UpdateHostsParams&& update_host_params,
                            LocalityWeightsConstSharedPtr locality_weights,
                            const HostVector& hosts_added, const HostVector& hosts_removed,
                            absl::optional<uint32_t> overprovisioning_factor) PURE;
@@ -281,7 +330,7 @@ public:
   /**
    * @return uint32_t the overprovisioning factor of this host set.
    */
-  virtual uint32_t overprovisioning_factor() const PURE;
+  virtual uint32_t overprovisioningFactor() const PURE;
 };
 
 typedef std::unique_ptr<HostSet> HostSetPtr;
@@ -534,6 +583,12 @@ public:
    * @return the service discovery type to use for resolving the cluster.
    */
   virtual envoy::api::v2::Cluster::DiscoveryType type() const PURE;
+
+  /**
+   * @return configuration for least request load balancing, only used if LB type is least request.
+   */
+  virtual const absl::optional<envoy::api::v2::Cluster::LeastRequestLbConfig>&
+  lbLeastRequestConfig() const PURE;
 
   /**
    * @return configuration for ring hash load balancing, only used if type is set to ring_hash_lb.

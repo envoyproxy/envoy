@@ -1,5 +1,6 @@
 #include "envoy/stats/scope.h"
 
+#include "common/api/api_impl.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/grpc/google_async_client_impl.h"
 #include "common/stats/isolated_store_impl.h"
@@ -8,6 +9,7 @@
 #include "test/mocks/tracing/mocks.h"
 #include "test/proto/helloworld.pb.h"
 #include "test/test_common/test_time.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -45,23 +47,26 @@ public:
 class EnvoyGoogleAsyncClientImplTest : public testing::Test {
 public:
   EnvoyGoogleAsyncClientImplTest()
-      : dispatcher_(test_time_.timeSystem()),
+      : stats_store_(new Stats::IsolatedStoreImpl), api_(Api::createApiForTest(*stats_store_)),
+        dispatcher_(test_time_.timeSystem(), *api_), scope_(stats_store_),
         method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")) {
     envoy::api::v2::core::GrpcService config;
     auto* google_grpc = config.mutable_google_grpc();
     google_grpc->set_target_uri("fake_address");
     google_grpc->set_stat_prefix("test_cluster");
-    tls_ = std::make_unique<GoogleAsyncClientThreadLocal>();
-    grpc_client_ = std::make_unique<GoogleAsyncClientImpl>(dispatcher_, *tls_, stub_factory_,
-                                                           stats_store_, config);
+    tls_ = std::make_unique<GoogleAsyncClientThreadLocal>(*api_);
+    grpc_client_ =
+        std::make_unique<GoogleAsyncClientImpl>(dispatcher_, *tls_, stub_factory_, scope_, config);
   }
 
   DangerousDeprecatedTestTime test_time_;
+  Stats::IsolatedStoreImpl* stats_store_; // Ownership transerred to scope_.
+  Api::ApiPtr api_;
   Event::DispatcherImpl dispatcher_;
+  Stats::ScopeSharedPtr scope_;
   std::unique_ptr<GoogleAsyncClientThreadLocal> tls_;
   MockStubFactory stub_factory_;
   const Protobuf::MethodDescriptor* method_descriptor_;
-  Stats::ScopeSharedPtr stats_store_ = std::make_shared<Stats::IsolatedStoreImpl>();
   std::unique_ptr<GoogleAsyncClientImpl> grpc_client_;
 };
 

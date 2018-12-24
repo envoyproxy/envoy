@@ -28,6 +28,7 @@ envoy_cc_test(
     srcs = ["main_common_test.cc"],
     data = ["//test/config/integration:google_com_proxy_port_0"],
     deps = [
+        "//source/common/api:api_lib",
         "//source/exe:envoy_main_common_lib",
         "//test/test_common:contention_lib",
         "//test/test_common:environment_lib",

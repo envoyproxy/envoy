@@ -55,9 +55,14 @@ public:
   MOCK_METHOD1(healthCheck, void(bool is_hc));
   MOCK_METHOD1(setDownstreamLocalAddress, void(const Network::Address::InstanceConstSharedPtr&));
   MOCK_CONST_METHOD0(downstreamLocalAddress, const Network::Address::InstanceConstSharedPtr&());
+  MOCK_METHOD1(setDownstreamDirectRemoteAddress,
+               void(const Network::Address::InstanceConstSharedPtr&));
+  MOCK_CONST_METHOD0(downstreamDirectRemoteAddress,
+                     const Network::Address::InstanceConstSharedPtr&());
   MOCK_METHOD1(setDownstreamRemoteAddress, void(const Network::Address::InstanceConstSharedPtr&));
   MOCK_CONST_METHOD0(downstreamRemoteAddress, const Network::Address::InstanceConstSharedPtr&());
   MOCK_CONST_METHOD0(routeEntry, const Router::RouteEntry*());
+  MOCK_METHOD0(dynamicMetadata, envoy::api::v2::core::Metadata&());
   MOCK_CONST_METHOD0(dynamicMetadata, const envoy::api::v2::core::Metadata&());
   MOCK_METHOD2(setDynamicMetadata, void(const std::string&, const ProtobufWkt::Struct&));
   MOCK_METHOD3(setDynamicMetadata,
@@ -87,6 +92,7 @@ public:
   uint64_t bytes_sent_{};
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
   Network::Address::InstanceConstSharedPtr downstream_local_address_;
+  Network::Address::InstanceConstSharedPtr downstream_direct_remote_address_;
   Network::Address::InstanceConstSharedPtr downstream_remote_address_;
   std::string requested_server_name_;
 };

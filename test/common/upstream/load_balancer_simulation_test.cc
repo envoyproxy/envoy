@@ -53,7 +53,8 @@ TEST(DISABLED_LeastRequestLoadBalancerWeightTest, Weight) {
   }
   HostVectorConstSharedPtr updated_hosts{new HostVector(hosts)};
   HostsPerLocalitySharedPtr updated_locality_hosts{new HostsPerLocalityImpl(hosts)};
-  host_set.updateHosts(updated_hosts, updated_hosts, updated_locality_hosts, updated_locality_hosts,
+  host_set.updateHosts(HostSetImpl::updateHostsParams(updated_hosts, updated_locality_hosts,
+                                                      updated_hosts, updated_locality_hosts),
                        {}, hosts, {}, absl::nullopt);
 
   Stats::IsolatedStoreImpl stats_store;
@@ -61,8 +62,10 @@ TEST(DISABLED_LeastRequestLoadBalancerWeightTest, Weight) {
   stats.max_host_weight_.set(weight);
   NiceMock<Runtime::MockLoader> runtime;
   Runtime::RandomGeneratorImpl random;
+  envoy::api::v2::Cluster::LeastRequestLbConfig least_request_lb_config;
   envoy::api::v2::Cluster::CommonLbConfig common_config;
-  LeastRequestLoadBalancer lb_{priority_set, nullptr, stats, runtime, random, common_config};
+  LeastRequestLoadBalancer lb_{
+      priority_set, nullptr, stats, runtime, random, common_config, least_request_lb_config};
 
   std::unordered_map<HostConstSharedPtr, uint64_t> host_hits;
   const uint64_t total_requests = 100;
@@ -154,8 +157,9 @@ public:
       }
       auto per_zone_local_shared = makeHostsPerLocality(std::move(per_zone_local));
       local_priority_set_->getOrCreateHostSet(0).updateHosts(
-          originating_hosts, originating_hosts, per_zone_local_shared, per_zone_local_shared, {},
-          empty_vector_, empty_vector_, absl::nullopt);
+          HostSetImpl::updateHostsParams(originating_hosts, per_zone_local_shared,
+                                         originating_hosts, per_zone_local_shared),
+          {}, empty_vector_, empty_vector_, absl::nullopt);
 
       HostConstSharedPtr selected = lb.chooseHost(nullptr);
       hits[selected->address()->asString()]++;

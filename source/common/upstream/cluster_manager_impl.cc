@@ -167,14 +167,12 @@ void ClusterManagerInitHelper::setInitializedCb(std::function<void()> callback) 
   }
 }
 
-ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,
-                                       ClusterManagerFactory& factory, Stats::Store& stats,
-                                       ThreadLocal::Instance& tls, Runtime::Loader& runtime,
-                                       Runtime::RandomGenerator& random,
-                                       const LocalInfo::LocalInfo& local_info,
-                                       AccessLog::AccessLogManager& log_manager,
-                                       Event::Dispatcher& main_thread_dispatcher,
-                                       Server::Admin& admin)
+ClusterManagerImpl::ClusterManagerImpl(
+    const envoy::config::bootstrap::v2::Bootstrap& bootstrap, ClusterManagerFactory& factory,
+    Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,
+    Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
+    AccessLog::AccessLogManager& log_manager, Event::Dispatcher& main_thread_dispatcher,
+    Server::Admin& admin, Api::Api& api, Http::Context& http_context)
     : factory_(factory), runtime_(runtime), stats_(stats), tls_(tls.allocateSlot()),
       random_(random), log_manager_(log_manager),
       bind_config_(bootstrap.cluster_manager().upstream_bind_config()), local_info_(local_info),
@@ -182,8 +180,10 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
       init_helper_([this](Cluster& cluster) { onClusterInit(cluster); }),
       config_tracker_entry_(
           admin.getConfigTracker().add("clusters", [this] { return dumpClusterConfigs(); })),
-      time_source_(main_thread_dispatcher.timeSystem()), dispatcher_(main_thread_dispatcher) {
-  async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(*this, tls, time_source_);
+      time_source_(main_thread_dispatcher.timeSystem()), dispatcher_(main_thread_dispatcher),
+      http_context_(http_context) {
+  async_client_manager_ =
+      std::make_unique<Grpc::AsyncClientManagerImpl>(*this, tls, time_source_, api);
   const auto& cm_config = bootstrap.cluster_manager();
   if (cm_config.has_outlier_detection()) {
     const std::string event_log_file_path = cm_config.outlier_detection().event_log_path();
@@ -664,9 +664,9 @@ ClusterManagerImpl::httpConnPoolForCluster(const std::string& cluster, ResourceP
   return entry->second->connPool(priority, protocol, context);
 }
 
-Tcp::ConnectionPool::Instance*
-ClusterManagerImpl::tcpConnPoolForCluster(const std::string& cluster, ResourcePriority priority,
-                                          LoadBalancerContext* context) {
+Tcp::ConnectionPool::Instance* ClusterManagerImpl::tcpConnPoolForCluster(
+    const std::string& cluster, ResourcePriority priority, LoadBalancerContext* context,
+    Network::TransportSocketOptionsSharedPtr transport_socket_options) {
   ThreadLocalClusterManagerImpl& cluster_manager = tls_->getTyped<ThreadLocalClusterManagerImpl>();
 
   auto entry = cluster_manager.thread_local_clusters_.find(cluster);
@@ -675,7 +675,7 @@ ClusterManagerImpl::tcpConnPoolForCluster(const std::string& cluster, ResourcePr
   }
 
   // Select a host and create a connection pool for it if it does not already exist.
-  return entry->second->tcpConnPool(priority, context);
+  return entry->second->tcpConnPool(priority, context, transport_socket_options);
 }
 
 void ClusterManagerImpl::postThreadLocalClusterUpdate(const Cluster& cluster, uint32_t priority,
@@ -686,18 +686,25 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(const Cluster& cluster, ui
   // TODO(htuch): Can we skip these copies by exporting out const shared_ptr from HostSet?
   HostVectorConstSharedPtr hosts_copy(new HostVector(host_set->hosts()));
   HostVectorConstSharedPtr healthy_hosts_copy(new HostVector(host_set->healthyHosts()));
+  HostVectorConstSharedPtr degraded_hosts_copy(new HostVector(host_set->healthyHosts()));
   HostsPerLocalityConstSharedPtr hosts_per_locality_copy = host_set->hostsPerLocality().clone();
   HostsPerLocalityConstSharedPtr healthy_hosts_per_locality_copy =
       host_set->healthyHostsPerLocality().clone();
+  HostsPerLocalityConstSharedPtr degraded_hosts_per_locality_copy =
+      host_set->degradedHostsPerLocality().clone();
 
-  tls_->runOnAllThreads(
-      [this, name = cluster.info()->name(), priority, hosts_copy, healthy_hosts_copy,
-       hosts_per_locality_copy, healthy_hosts_per_locality_copy,
-       locality_weights = host_set->localityWeights(), hosts_added, hosts_removed]() {
-        ThreadLocalClusterManagerImpl::updateClusterMembership(
-            name, priority, hosts_copy, healthy_hosts_copy, hosts_per_locality_copy,
-            healthy_hosts_per_locality_copy, locality_weights, hosts_added, hosts_removed, *tls_);
-      });
+  tls_->runOnAllThreads([this, name = cluster.info()->name(), priority, hosts_copy,
+                         healthy_hosts_copy, degraded_hosts_copy, hosts_per_locality_copy,
+                         healthy_hosts_per_locality_copy, degraded_hosts_per_locality_copy,
+                         locality_weights = host_set->localityWeights(), hosts_added,
+                         hosts_removed]() {
+    ThreadLocalClusterManagerImpl::updateClusterMembership(
+        name, priority,
+        HostSetImpl::updateHostsParams(hosts_copy, hosts_per_locality_copy, healthy_hosts_copy,
+                                       healthy_hosts_per_locality_copy, degraded_hosts_copy,
+                                       degraded_hosts_per_locality_copy),
+        locality_weights, hosts_added, hosts_removed, *tls_);
+  });
 }
 
 void ClusterManagerImpl::postThreadLocalHealthFailure(const HostSharedPtr& host) {
@@ -705,8 +712,9 @@ void ClusterManagerImpl::postThreadLocalHealthFailure(const HostSharedPtr& host)
       [this, host] { ThreadLocalClusterManagerImpl::onHostHealthFailure(host, *tls_); });
 }
 
-Host::CreateConnectionData ClusterManagerImpl::tcpConnForCluster(const std::string& cluster,
-                                                                 LoadBalancerContext* context) {
+Host::CreateConnectionData ClusterManagerImpl::tcpConnForCluster(
+    const std::string& cluster, LoadBalancerContext* context,
+    Network::TransportSocketOptionsSharedPtr transport_socket_options) {
   ThreadLocalClusterManagerImpl& cluster_manager = tls_->getTyped<ThreadLocalClusterManagerImpl>();
 
   auto entry = cluster_manager.thread_local_clusters_.find(cluster);
@@ -716,8 +724,8 @@ Host::CreateConnectionData ClusterManagerImpl::tcpConnForCluster(const std::stri
 
   HostConstSharedPtr logical_host = entry->second->lb_->chooseHost(context);
   if (logical_host) {
-    auto conn_info =
-        logical_host->createConnection(cluster_manager.thread_local_dispatcher_, nullptr);
+    auto conn_info = logical_host->createConnection(cluster_manager.thread_local_dispatcher_,
+                                                    nullptr, transport_socket_options);
     if ((entry->second->cluster_info_->features() &
          ClusterInfo::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE) &&
         conn_info.connection_ != nullptr) {
@@ -938,9 +946,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::removeTcpConn(
 }
 
 void ClusterManagerImpl::ThreadLocalClusterManagerImpl::updateClusterMembership(
-    const std::string& name, uint32_t priority, HostVectorConstSharedPtr hosts,
-    HostVectorConstSharedPtr healthy_hosts, HostsPerLocalityConstSharedPtr hosts_per_locality,
-    HostsPerLocalityConstSharedPtr healthy_hosts_per_locality,
+    const std::string& name, uint32_t priority, HostSet::UpdateHostsParams&& update_hosts_params,
     LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
     const HostVector& hosts_removed, ThreadLocal::Slot& tls) {
 
@@ -948,11 +954,11 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::updateClusterMembership(
 
   ASSERT(config.thread_local_clusters_.find(name) != config.thread_local_clusters_.end());
   const auto& cluster_entry = config.thread_local_clusters_[name];
-  ENVOY_LOG(debug, "membership update for TLS cluster {}", name);
+  ENVOY_LOG(debug, "membership update for TLS cluster {} added {} removed {}", name,
+            hosts_added.size(), hosts_removed.size());
   cluster_entry->priority_set_.getOrCreateHostSet(priority).updateHosts(
-      std::move(hosts), std::move(healthy_hosts), std::move(hosts_per_locality),
-      std::move(healthy_hosts_per_locality), std::move(locality_weights), hosts_added,
-      hosts_removed, absl::nullopt);
+      std::move(update_hosts_params), std::move(locality_weights), hosts_added, hosts_removed,
+      absl::nullopt);
 
   // If an LB is thread aware, create a new worker local LB on membership changes.
   if (cluster_entry->lb_factory_ != nullptr) {
@@ -1019,7 +1025,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
       http_async_client_(cluster, parent.parent_.stats_, parent.thread_local_dispatcher_,
                          parent.parent_.local_info_, parent.parent_, parent.parent_.runtime_,
                          parent.parent_.random_,
-                         Router::ShadowWriterPtr{new Router::ShadowWriterImpl(parent.parent_)}) {
+                         Router::ShadowWriterPtr{new Router::ShadowWriterImpl(parent.parent_)},
+                         parent_.parent_.http_context_) {
   priority_set_.getOrCreateHostSet(0);
 
   // TODO(mattklein123): Consider converting other LBs over to thread local. All of them could
@@ -1028,14 +1035,14 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
     lb_ = std::make_unique<SubsetLoadBalancer>(
         cluster->lbType(), priority_set_, parent_.local_priority_set_, cluster->stats(),
         parent.parent_.runtime_, parent.parent_.random_, cluster->lbSubsetInfo(),
-        cluster->lbRingHashConfig(), cluster->lbConfig());
+        cluster->lbRingHashConfig(), cluster->lbLeastRequestConfig(), cluster->lbConfig());
   } else {
     switch (cluster->lbType()) {
     case LoadBalancerType::LeastRequest: {
       ASSERT(lb_factory_ == nullptr);
-      lb_ = std::make_unique<LeastRequestLoadBalancer>(priority_set_, parent_.local_priority_set_,
-                                                       cluster->stats(), parent.parent_.runtime_,
-                                                       parent.parent_.random_, cluster->lbConfig());
+      lb_ = std::make_unique<LeastRequestLoadBalancer>(
+          priority_set_, parent_.local_priority_set_, cluster->stats(), parent.parent_.runtime_,
+          parent.parent_.random_, cluster->lbConfig(), cluster->lbLeastRequestConfig());
       break;
     }
     case LoadBalancerType::Random: {
@@ -1129,7 +1136,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
 
 Tcp::ConnectionPool::Instance*
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
-    ResourcePriority priority, LoadBalancerContext* context) {
+    ResourcePriority priority, LoadBalancerContext* context,
+    Network::TransportSocketOptionsSharedPtr transport_socket_options) {
   HostConstSharedPtr host = lb_->chooseHost(context);
   if (!host) {
     ENVOY_LOG(debug, "no healthy host for TCP connection pool");
@@ -1155,11 +1163,16 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
     }
   }
 
+  if (transport_socket_options != nullptr) {
+    transport_socket_options->hashKey(hash_key);
+  }
+
   TcpConnPoolsContainer& container = parent_.host_tcp_conn_pool_map_[host];
   if (!container.pools_[hash_key]) {
     container.pools_[hash_key] = parent_.parent_.factory_.allocateTcpConnPool(
         parent_.thread_local_dispatcher_, host, priority,
-        have_options ? context->downstreamConnection()->socketOptions() : nullptr);
+        have_options ? context->downstreamConnection()->socketOptions() : nullptr,
+        transport_socket_options);
   }
 
   return container.pools_[hash_key].get();
@@ -1172,7 +1185,7 @@ ClusterManagerPtr ProdClusterManagerFactory::clusterManagerFromProto(
     Server::Admin& admin) {
   return ClusterManagerPtr{new ClusterManagerImpl(bootstrap, *this, stats, tls, runtime, random,
                                                   local_info, log_manager, main_thread_dispatcher_,
-                                                  admin)};
+                                                  admin, api_, http_context_)};
 }
 
 Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
@@ -1190,9 +1203,10 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
 
 Tcp::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateTcpConnPool(
     Event::Dispatcher& dispatcher, HostConstSharedPtr host, ResourcePriority priority,
-    const Network::ConnectionSocket::OptionsSharedPtr& options) {
+    const Network::ConnectionSocket::OptionsSharedPtr& options,
+    Network::TransportSocketOptionsSharedPtr transport_socket_options) {
   return Tcp::ConnectionPool::InstancePtr{
-      new Tcp::ConnPoolImpl(dispatcher, host, priority, options)};
+      new Tcp::ConnPoolImpl(dispatcher, host, priority, options, transport_socket_options)};
 }
 
 ClusterSharedPtr ProdClusterManagerFactory::clusterFromProto(

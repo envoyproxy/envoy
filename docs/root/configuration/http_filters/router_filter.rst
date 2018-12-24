@@ -9,6 +9,7 @@ configured :ref:`route table <envoy_api_msg_RouteConfiguration>`. In addition to
 redirection, the filter also handles retry, statistics, etc.
 
 * :ref:`v2 API reference <envoy_api_msg_config.filter.http.router.v2.Router>`
+* This filter should be configured with the name *envoy.router*.
 
 .. _config_http_filters_router_headers_consumed:
 

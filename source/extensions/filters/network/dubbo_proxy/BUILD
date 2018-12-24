@@ -34,6 +34,8 @@ envoy_cc_library(
     hdrs = ["protocol.h"],
     deps = [
         ":buffer_helper_lib",
+        "//source/common/common:assert_lib",
+        "//source/common/config:utility_lib",
         "//source/common/singleton:const_singleton",
     ],
 )
@@ -117,5 +119,15 @@ envoy_cc_library(
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
         "@envoy_api//envoy/config/filter/network/dubbo_proxy/v2alpha1:dubbo_proxy_cc",
+    ],
+)
+
+envoy_cc_library(
+    name = "metadata_lib",
+    hdrs = ["metadata.h"],
+    external_deps = ["abseil_optional"],
+    deps = [
+        ":protocol_interface",
+        "//source/common/http:header_map_lib",
     ],
 )

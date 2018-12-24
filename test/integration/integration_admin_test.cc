@@ -64,7 +64,7 @@ TEST_P(IntegrationAdminTest, AdminLogging) {
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       lookupPort("admin"), "POST", "/logging", "", downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("404", response->headers().Status()->value().c_str());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 
   // Bad level
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "POST", "/logging?level=blah",
@@ -519,8 +519,7 @@ TEST_P(StatsMatcherIntegrationTest, IncludeExact) {
       "listener_manager.listener_create_success");
   initialize();
   makeRequest();
-  EXPECT_THAT(response_->body(),
-              testing::Eq("listener_manager.listener_create_success: 1\nstats.overflow: 0\n"));
+  EXPECT_EQ(response_->body(), "listener_manager.listener_create_success: 1\n");
 }
 
 } // namespace Envoy

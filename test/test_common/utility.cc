@@ -1,6 +1,6 @@
 #include "utility.h"
 
-#if defined(WIN32)
+#ifdef WIN32
 #include <windows.h>
 // <windows.h> uses macros to #define a ton of symbols, two of which (DELETE and GetMessage)
 // interfere with our code. DELETE shows up in the base.pb.h header generated from
@@ -22,10 +22,12 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/http/codec.h"
 
+#include "common/api/api_impl.h"
 #include "common/common/empty_string.h"
 #include "common/common/fmt.h"
 #include "common/common/lock_guard.h"
 #include "common/common/stack_array.h"
+#include "common/common/thread_impl.h"
 #include "common/common/utility.h"
 #include "common/config/bootstrap_json.h"
 #include "common/json/json_loader.h"
@@ -185,30 +187,27 @@ std::vector<std::string> TestUtility::split(const std::string& source, const std
 }
 
 void TestUtility::renameFile(const std::string& old_name, const std::string& new_name) {
-#if !defined(WIN32)
-  const int rc = ::rename(old_name.c_str(), new_name.c_str());
-  ASSERT_EQ(0, rc);
-#else
+#ifdef WIN32
   // use MoveFileEx, since ::rename will not overwrite an existing file. See
   // https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/rename-wrename?view=vs-2017
   const BOOL rc = ::MoveFileEx(old_name.c_str(), new_name.c_str(), MOVEFILE_REPLACE_EXISTING);
   ASSERT_NE(0, rc);
+#else
+  const int rc = ::rename(old_name.c_str(), new_name.c_str());
+  ASSERT_EQ(0, rc);
 #endif
 };
 
 void TestUtility::createDirectory(const std::string& name) {
-#if !defined(WIN32)
-  ::mkdir(name.c_str(), S_IRWXU);
-#else
+#ifdef WIN32
   ::_mkdir(name.c_str());
+#else
+  ::mkdir(name.c_str(), S_IRWXU);
 #endif
 }
 
 void TestUtility::createSymlink(const std::string& target, const std::string& link) {
-#if !defined(WIN32)
-  const int rc = ::symlink(target.c_str(), link.c_str());
-  ASSERT_EQ(rc, 0);
-#else
+#ifdef WIN32
   const DWORD attributes = ::GetFileAttributes(target.c_str());
   ASSERT_NE(attributes, INVALID_FILE_ATTRIBUTES);
   int flags = SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE;
@@ -218,8 +217,23 @@ void TestUtility::createSymlink(const std::string& target, const std::string& li
 
   const BOOLEAN rc = ::CreateSymbolicLink(link.c_str(), target.c_str(), flags);
   ASSERT_NE(rc, 0);
+#else
+  const int rc = ::symlink(target.c_str(), link.c_str());
+  ASSERT_EQ(rc, 0);
 #endif
 }
+
+// static
+std::tm TestUtility::parseTimestamp(const std::string& format, const std::string& time_str) {
+  std::tm timestamp{};
+  const char* parsed_to = strptime(time_str.c_str(), format.c_str(), &timestamp);
+
+  EXPECT_EQ(parsed_to, time_str.c_str() + time_str.size())
+      << " from failing to parse timestamp \"" << time_str << "\" with format string \"" << format
+      << "\"";
+  return timestamp;
+}
+
 void ConditionalInitializer::setReady() {
   Thread::LockGuard lock(mutex_);
   EXPECT_FALSE(ready_);
@@ -237,6 +251,13 @@ void ConditionalInitializer::waitReady() {
   cv_.wait(mutex_);
   EXPECT_TRUE(ready_);
   ready_ = false;
+}
+
+void ConditionalInitializer::wait() {
+  Thread::LockGuard lock(mutex_);
+  while (!ready_) {
+    cv_.wait(mutex_);
+  }
 }
 
 ScopedFdCloser::ScopedFdCloser(int fd) : fd_(fd) {}
@@ -326,13 +347,13 @@ bool TestHeaderMapImpl::has(const LowerCaseString& key) { return get(key) != nul
 namespace Stats {
 
 MockedTestAllocator::MockedTestAllocator(const StatsOptions& stats_options)
-    : alloc_(stats_options) {
+    : TestAllocator(stats_options) {
   ON_CALL(*this, alloc(_)).WillByDefault(Invoke([this](absl::string_view name) -> RawStatData* {
-    return alloc_.alloc(name);
+    return TestAllocator::alloc(name);
   }));
 
   ON_CALL(*this, free(_)).WillByDefault(Invoke([this](RawStatData& data) -> void {
-    return alloc_.free(data);
+    return TestAllocator::free(data);
   }));
 
   EXPECT_CALL(*this, alloc(absl::string_view("stats.overflow")));
@@ -341,5 +362,28 @@ MockedTestAllocator::MockedTestAllocator(const StatsOptions& stats_options)
 MockedTestAllocator::~MockedTestAllocator() {}
 
 } // namespace Stats
+
+namespace Thread {
+
+// TODO(sesmith177) Tests should get the ThreadFactory from the same location as the main code
+ThreadFactory& threadFactoryForTest() {
+#ifdef WIN32
+  static ThreadFactoryImplWin32* thread_factory = new ThreadFactoryImplWin32();
+#else
+  static ThreadFactoryImplPosix* thread_factory = new ThreadFactoryImplPosix();
+#endif
+  return *thread_factory;
+}
+
+} // namespace Thread
+
+namespace Api {
+
+ApiPtr createApiForTest(Stats::Store& stat_store) {
+  return std::make_unique<Impl>(std::chrono::milliseconds(1000), Thread::threadFactoryForTest(),
+                                stat_store);
+}
+
+} // namespace Api
 
 } // namespace Envoy

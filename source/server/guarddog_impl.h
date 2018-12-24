@@ -3,6 +3,7 @@
 #include <chrono>
 #include <vector>
 
+#include "envoy/api/api.h"
 #include "envoy/event/timer.h"
 #include "envoy/server/configuration.h"
 #include "envoy/server/guarddog.h"
@@ -39,7 +40,7 @@ public:
    * See the configuration documentation for details on the timeout settings.
    */
   GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuration::Main& config,
-               Event::TimeSystem& time_system);
+               Event::TimeSystem& time_system, Api::Api& api);
   ~GuardDogImpl();
 
   /**
@@ -53,7 +54,7 @@ public:
   }
 
   // Server::GuardDog
-  WatchDogSharedPtr createWatchDog(int32_t thread_id) override;
+  WatchDogSharedPtr createWatchDog(Thread::ThreadIdPtr&& thread_id) override;
   void stopWatching(WatchDogSharedPtr wd) override;
 
 private:
@@ -62,7 +63,7 @@ private:
    * @return True if we should continue, false if signalled to stop.
    */
   bool waitOrDetectStop();
-  void start() EXCLUSIVE_LOCKS_REQUIRED(exit_lock_);
+  void start(Api::Api& api) EXCLUSIVE_LOCKS_REQUIRED(exit_lock_);
   void stop();
   // Per the C++ standard it is OK to use these in ctor initializer as long as
   // it is after kill and multikill timeout values are initialized.

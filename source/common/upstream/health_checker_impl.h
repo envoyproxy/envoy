@@ -55,7 +55,8 @@ private:
     ~HttpActiveHealthCheckSession();
 
     void onResponseComplete();
-    bool isHealthCheckSucceeded();
+    enum class HealthCheckResult { Succeeded, Degraded, Failed };
+    HealthCheckResult healthCheckResult();
 
     // ActiveHealthCheckSession
     void onInterval() override;
@@ -338,6 +339,7 @@ private:
 
   const Protobuf::MethodDescriptor& service_method_;
   absl::optional<std::string> service_name_;
+  absl::optional<std::string> authority_value_;
 };
 
 /**

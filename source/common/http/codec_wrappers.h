@@ -91,8 +91,8 @@ public:
     onEncodeComplete();
   }
 
-  void encodeMetadata(const MetadataMap& metadata_map) override {
-    inner_.encodeMetadata(metadata_map);
+  void encodeMetadata(const MetadataMapVector& metadata_map_vector) override {
+    inner_.encodeMetadata(metadata_map_vector);
   }
 
   Stream& getStream() override { return inner_.getStream(); }

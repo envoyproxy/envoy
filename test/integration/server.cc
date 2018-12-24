@@ -5,6 +5,7 @@
 
 #include "envoy/http/header_map.h"
 
+#include "common/common/thread.h"
 #include "common/filesystem/filesystem_impl.h"
 #include "common/local_info/local_info_impl.h"
 #include "common/network/utility.h"
@@ -48,9 +49,9 @@ IntegrationTestServerPtr
 IntegrationTestServer::create(const std::string& config_path,
                               const Network::Address::IpVersion version,
                               std::function<void()> pre_worker_start_test_steps, bool deterministic,
-                              Event::TestTimeSystem& time_system) {
+                              Event::TestTimeSystem& time_system, Api::Api& api) {
   IntegrationTestServerPtr server{
-      std::make_unique<IntegrationTestServerImpl>(time_system, config_path)};
+      std::make_unique<IntegrationTestServerImpl>(time_system, api, config_path)};
   server->start(version, pre_worker_start_test_steps, deterministic);
   return server;
 }
@@ -60,7 +61,7 @@ void IntegrationTestServer::start(const Network::Address::IpVersion version,
                                   bool deterministic) {
   ENVOY_LOG(info, "starting integration test server");
   ASSERT(!thread_);
-  thread_ = std::make_unique<Thread::Thread>(
+  thread_ = api_.threadFactory().createThread(
       [version, deterministic, this]() -> void { threadRoutine(version, deterministic); });
 
   // If any steps need to be done prior to workers starting, do them now. E.g., xDS pre-init.
@@ -154,7 +155,8 @@ void IntegrationTestServerImpl::createAndRunEnvoyServer(
   Stats::ThreadLocalStoreImpl stat_store(options.statsOptions(), stats_allocator);
 
   Server::InstanceImpl server(options, time_system, local_address, hooks, restarter, stat_store,
-                              access_log_lock, component_factory, std::move(random_generator), tls);
+                              access_log_lock, component_factory, std::move(random_generator), tls,
+                              Thread::threadFactoryForTest());
   // This is technically thread unsafe (assigning to a shared_ptr accessed
   // across threads), but because we synchronize below through serverReady(), the only
   // consumer on the main test thread in ~IntegrationTestServerImpl will not race.

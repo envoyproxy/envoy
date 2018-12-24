@@ -173,14 +173,17 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onResetStream(Http::St
   handleFailure(envoy::data::core::v2alpha::HealthCheckFailureType::NETWORK);
 }
 
-bool HttpHealthCheckerImpl::HttpActiveHealthCheckSession::isHealthCheckSucceeded() {
+HttpHealthCheckerImpl::HttpActiveHealthCheckSession::HealthCheckResult
+HttpHealthCheckerImpl::HttpActiveHealthCheckSession::healthCheckResult() {
   uint64_t response_code = Http::Utility::getResponseStatus(*response_headers_);
   ENVOY_CONN_LOG(debug, "hc response={} health_flags={}", *client_, response_code,
                  HostUtility::healthFlagsToString(*host_));
 
   if (response_code != enumToInt(Http::Code::OK)) {
-    return false;
+    return HealthCheckResult::Failed;
   }
+
+  const auto degraded = response_headers_->EnvoyDegraded() != nullptr;
 
   if (parent_.service_name_ &&
       parent_.runtime_.snapshot().featureEnabled("health_check.verify_cluster", 100UL)) {
@@ -190,18 +193,28 @@ bool HttpHealthCheckerImpl::HttpActiveHealthCheckSession::isHealthCheckSucceeded
             ? response_headers_->EnvoyUpstreamHealthCheckedCluster()->value().c_str()
             : EMPTY_STRING;
 
-    return service_cluster_healthchecked.find(parent_.service_name_.value()) == 0;
+    if (service_cluster_healthchecked.find(parent_.service_name_.value()) == 0) {
+      return degraded ? HealthCheckResult::Degraded : HealthCheckResult::Succeeded;
+    } else {
+      return HealthCheckResult::Failed;
+    }
   }
 
-  return true;
+  return degraded ? HealthCheckResult::Degraded : HealthCheckResult::Succeeded;
 }
 
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onResponseComplete() {
-  if (isHealthCheckSucceeded()) {
-    handleSuccess();
-  } else {
+  switch (healthCheckResult()) {
+  case HealthCheckResult::Succeeded:
+    handleSuccess(false);
+    break;
+  case HealthCheckResult::Degraded:
+    handleSuccess(true);
+    break;
+  case HealthCheckResult::Failed:
     host_->setActiveHealthFailureType(Host::ActiveHealthFailureType::UNHEALTHY);
     handleFailure(envoy::data::core::v2alpha::HealthCheckFailureType::ACTIVE);
+    break;
   }
 
   if ((response_headers_->Connection() &&
@@ -297,7 +310,7 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onData(Buffer::Instance&
   if (TcpHealthCheckMatcher::match(parent_.receive_bytes_, data)) {
     ENVOY_CONN_LOG(trace, "healthcheck passed", *client_);
     data.drain(data.length());
-    handleSuccess();
+    handleSuccess(false);
     if (!parent_.reuse_connection_) {
       client_->close(Network::ConnectionCloseType::NoFlush);
     }
@@ -332,7 +345,7 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onEvent(Network::Connect
     // be written, since we currently have no way to know if the bytes actually get written via
     // the connection interface. We might want to figure out how to handle this better later.
     client_->close(Network::ConnectionCloseType::NoFlush);
-    handleSuccess();
+    handleSuccess(false);
   }
 }
 
@@ -374,6 +387,10 @@ GrpcHealthCheckerImpl::GrpcHealthCheckerImpl(const Cluster& cluster,
           "grpc.health.v1.Health.Check")) {
   if (!config.grpc_health_check().service_name().empty()) {
     service_name_ = config.grpc_health_check().service_name();
+  }
+
+  if (!config.grpc_health_check().authority().empty()) {
+    authority_value_ = config.grpc_health_check().authority();
   }
 }
 
@@ -488,9 +505,12 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onInterval() {
   request_encoder_ = &client_->newStream(*this);
   request_encoder_->getStream().addCallbacks(*this);
 
-  auto headers_message = Grpc::Common::prepareHeaders(
-      parent_.cluster_.info()->name(), parent_.service_method_.service()->full_name(),
-      parent_.service_method_.name(), absl::nullopt);
+  const std::string& authority = parent_.authority_value_.has_value()
+                                     ? parent_.authority_value_.value()
+                                     : parent_.cluster_.info()->name();
+  auto headers_message =
+      Grpc::Common::prepareHeaders(authority, parent_.service_method_.service()->full_name(),
+                                   parent_.service_method_.name(), absl::nullopt);
   headers_message->headers().insertUserAgent().value().setReference(
       Http::Headers::get().UserAgentValues.EnvoyHealthChecker);
   Router::FilterUtility::setUpstreamScheme(headers_message->headers(), *parent_.cluster_.info());
@@ -498,7 +518,7 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onInterval() {
   request_encoder_->encodeHeaders(headers_message->headers(), false);
 
   grpc::health::v1::HealthCheckRequest request;
-  if (parent_.service_name_) {
+  if (parent_.service_name_.has_value()) {
     request.set_service(parent_.service_name_.value());
   }
 
@@ -556,7 +576,7 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onRpcComplete(
     Grpc::Status::GrpcStatus grpc_status, const std::string& grpc_message, bool end_stream) {
   logHealthCheckStatus(grpc_status, grpc_message);
   if (isHealthCheckSucceeded(grpc_status)) {
-    handleSuccess();
+    handleSuccess(false);
   } else {
     handleFailure(envoy::data::core::v2alpha::HealthCheckFailureType::ACTIVE);
   }

@@ -16,14 +16,13 @@ using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::SaveArg;
-using testing::Test;
 using namespace std::string_literals;
 
 /**
  * Test with fake frame protector. The protected frame header is 4 byte length (little endian,
  * include header itself) and following the body.
  */
-class TsiFrameProtectorTest : public Test {
+class TsiFrameProtectorTest : public testing::Test {
 public:
   TsiFrameProtectorTest()
       : raw_frame_protector_(tsi_create_fake_frame_protector(nullptr)),

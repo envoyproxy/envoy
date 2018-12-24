@@ -42,7 +42,8 @@ OptionsImpl asConfigYaml(const OptionsImpl& src) {
 
 class ConfigTest {
 public:
-  ConfigTest(const OptionsImpl& options) : options_(options) {
+  ConfigTest(const OptionsImpl& options)
+      : api_(Api::createApiForTest(stats_store_)), options_(options) {
     ON_CALL(server_, options()).WillByDefault(ReturnRef(options_));
     ON_CALL(server_, random()).WillByDefault(ReturnRef(random_));
     ON_CALL(server_, sslContextManager()).WillByDefault(ReturnRef(ssl_context_manager_));
@@ -57,7 +58,7 @@ public:
     cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
         server_.runtime(), server_.stats(), server_.threadLocal(), server_.random(),
         server_.dnsResolver(), ssl_context_manager_, server_.dispatcher(), server_.localInfo(),
-        server_.secretManager());
+        server_.secretManager(), *api_, server_.httpContext());
 
     ON_CALL(server_, clusterManager()).WillByDefault(Invoke([&]() -> Upstream::ClusterManager& {
       return *main_config.clusterManager();
@@ -90,6 +91,8 @@ public:
     server_.thread_local_.shutdownThread();
   }
 
+  Stats::IsolatedStoreImpl stats_store_;
+  Api::ApiPtr api_;
   NiceMock<Server::MockInstance> server_;
   NiceMock<Ssl::MockContextManager> ssl_context_manager_;
   OptionsImpl options_;

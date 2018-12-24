@@ -32,14 +32,13 @@ using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
-using testing::Test;
 
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace Datadog {
 
-class DatadogDriverTest : public Test {
+class DatadogDriverTest : public testing::Test {
 public:
   void setup(envoy::config::trace::v2::DatadogConfig& datadog_config, bool init_timer) {
     ON_CALL(cm_, httpAsyncClientForCluster("fake_cluster"))
@@ -47,7 +46,7 @@ public:
 
     if (init_timer) {
       timer_ = new NiceMock<Event::MockTimer>(&tls_.dispatcher_);
-      EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(1000)));
+      EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(900)));
     }
 
     driver_ = std::make_unique<Driver>(datadog_config, cm_, stats_, tls_, runtime_);
@@ -126,10 +125,11 @@ TEST_F(DatadogDriverTest, FlushSpansTimer) {
   Http::MockAsyncClientRequest request(&cm_.async_client_);
   Http::AsyncClient::Callbacks* callback;
   const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(1));
-  EXPECT_CALL(cm_.async_client_, send_(_, _, timeout))
-      .WillOnce(Invoke(
-          [&](Http::MessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
-              const absl::optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
+  EXPECT_CALL(cm_.async_client_,
+              send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(timeout)))
+      .WillOnce(
+          Invoke([&](Http::MessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
             callback = &callbacks;
 
             EXPECT_STREQ("fake_cluster", message->headers().Host()->value().c_str());
@@ -143,7 +143,7 @@ TEST_F(DatadogDriverTest, FlushSpansTimer) {
   span->finishSpan();
 
   // Timer should be re-enabled.
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(1000)));
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(900)));
 
   timer_->callback_();
 

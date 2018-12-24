@@ -3,9 +3,12 @@
 #include "envoy/event/timer.h"
 #include "envoy/runtime/runtime.h"
 
+#include "common/common/thread.h"
 #include "common/event/real_time_system.h"
 #include "common/stats/thread_local_store.h"
 #include "common/thread_local/thread_local_impl.h"
+
+#include "exe/platform_impl.h"
 
 #include "server/options_impl.h"
 #include "server/server.h"
@@ -32,7 +35,8 @@ public:
   // destructed.
   MainCommonBase(OptionsImpl& options, Event::TimeSystem& time_system, TestHooks& test_hooks,
                  Server::ComponentFactory& component_factory,
-                 std::unique_ptr<Runtime::RandomGenerator>&& random_generator);
+                 std::unique_ptr<Runtime::RandomGenerator>&& random_generator,
+                 Thread::ThreadFactory& thread_factory);
   ~MainCommonBase();
 
   bool run();
@@ -62,6 +66,7 @@ protected:
   Envoy::OptionsImpl& options_;
 
   Server::ComponentFactory& component_factory_;
+  Thread::ThreadFactory& thread_factory_;
 
   std::unique_ptr<ThreadLocal::InstanceImpl> tls_;
   std::unique_ptr<Server::HotRestart> restarter_;
@@ -103,20 +108,12 @@ private:
   Envoy::TerminateHandler log_on_terminate;
 #endif
 
+  PlatformImpl platform_impl_;
   Envoy::OptionsImpl options_;
   Event::RealTimeSystem real_time_system_;
   DefaultTestHooks default_test_hooks_;
   ProdComponentFactory prod_component_factory_;
   MainCommonBase base_;
 };
-
-/**
- * This is the real main body that executes after site-specific
- * main() runs.
- *
- * @param options Options object initialized by site-specific code
- * @return int Return code that should be returned from the actual main()
- */
-int main_common(OptionsImpl& options);
 
 } // namespace Envoy

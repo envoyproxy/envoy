@@ -54,7 +54,8 @@ protected:
   protected:
     ActiveHealthCheckSession(HealthCheckerImplBase& parent, HostSharedPtr host);
 
-    void handleSuccess();
+    void handleSuccess(bool degraded = false);
+    void handleDegraded();
     void handleFailure(envoy::data::core::v2alpha::HealthCheckFailureType type);
 
     HostSharedPtr host_;
@@ -82,6 +83,7 @@ protected:
   virtual ActiveHealthCheckSessionPtr makeSession(HostSharedPtr host) PURE;
   virtual envoy::data::core::v2alpha::HealthCheckerType healthCheckerType() const PURE;
 
+  const bool always_log_health_check_failures_;
   const Cluster& cluster_;
   Event::Dispatcher& dispatcher_;
   const std::chrono::milliseconds timeout_;
@@ -141,6 +143,10 @@ public:
                          envoy::data::core::v2alpha::HealthCheckFailureType failure_type) override;
   void logAddHealthy(envoy::data::core::v2alpha::HealthCheckerType health_checker_type,
                      const HostDescriptionConstSharedPtr& host, bool first_check) override;
+  void logUnhealthy(envoy::data::core::v2alpha::HealthCheckerType health_checker_type,
+                    const HostDescriptionConstSharedPtr& host,
+                    envoy::data::core::v2alpha::HealthCheckFailureType failure_type,
+                    bool first_check) override;
 
 private:
   TimeSource& time_source_;

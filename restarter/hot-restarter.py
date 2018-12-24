@@ -76,12 +76,23 @@ def force_kill_all_children():
   pid_list = []
 
 
-def sigterm_handler(signum, frame):
-  """ Handler for SIGTERM. See term_all_children() for further discussion. """
-
-  print("got SIGTERM")
+def shutdown():
+  """ Attempt to gracefully shutdown all child Envoy processes and then exit.
+  See term_all_children() for further discussion. """
   term_all_children()
   sys.exit(0)
+
+
+def sigterm_handler(signum, frame):
+  """ Handler for SIGTERM. """
+  print("got SIGTERM")
+  shutdown()
+
+
+def sigint_handler(signum, frame):
+  """ Handler for SIGINT (ctrl-c). The same as the SIGTERM handler. """
+  print("got SIGINT")
+  shutdown()
 
 
 def sighup_handler(signum, frame):
@@ -179,6 +190,7 @@ def main():
   print("starting hot-restarter with target: {}".format(sys.argv[1]))
 
   signal.signal(signal.SIGTERM, sigterm_handler)
+  signal.signal(signal.SIGINT, sigint_handler)
   signal.signal(signal.SIGHUP, sighup_handler)
   signal.signal(signal.SIGCHLD, sigchld_handler)
   signal.signal(signal.SIGUSR1, sigusr1_handler)

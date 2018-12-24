@@ -6,6 +6,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::Const;
 using testing::Invoke;
 using testing::Return;
 using testing::ReturnPointee;
@@ -16,6 +17,7 @@ namespace StreamInfo {
 
 MockStreamInfo::MockStreamInfo()
     : downstream_local_address_(new Network::Address::Ipv4Instance("127.0.0.2")),
+      downstream_direct_remote_address_(new Network::Address::Ipv4Instance("127.0.0.1")),
       downstream_remote_address_(new Network::Address::Ipv4Instance("127.0.0.1")) {
   ON_CALL(*this, upstreamHost()).WillByDefault(ReturnPointee(&host_));
   ON_CALL(*this, startTime()).WillByDefault(ReturnPointee(&start_time_));
@@ -47,6 +49,13 @@ MockStreamInfo::MockStreamInfo()
             downstream_local_address_ = downstream_local_address;
           }));
   ON_CALL(*this, downstreamLocalAddress()).WillByDefault(ReturnRef(downstream_local_address_));
+  ON_CALL(*this, setDownstreamDirectRemoteAddress(_))
+      .WillByDefault(Invoke(
+          [this](const Network::Address::InstanceConstSharedPtr& downstream_direct_remote_address) {
+            downstream_direct_remote_address_ = downstream_direct_remote_address;
+          }));
+  ON_CALL(*this, downstreamDirectRemoteAddress())
+      .WillByDefault(ReturnRef(downstream_direct_remote_address_));
   ON_CALL(*this, setDownstreamRemoteAddress(_))
       .WillByDefault(
           Invoke([this](const Network::Address::InstanceConstSharedPtr& downstream_remote_address) {
@@ -64,7 +73,9 @@ MockStreamInfo::MockStreamInfo()
   }));
   ON_CALL(*this, bytesSent()).WillByDefault(ReturnPointee(&bytes_sent_));
   ON_CALL(*this, dynamicMetadata()).WillByDefault(ReturnRef(metadata_));
+  ON_CALL(Const(*this), dynamicMetadata()).WillByDefault(ReturnRef(metadata_));
   ON_CALL(*this, filterState()).WillByDefault(ReturnRef(filter_state_));
+  ON_CALL(Const(*this), filterState()).WillByDefault(ReturnRef(filter_state_));
   ON_CALL(*this, setRequestedServerName(_))
       .WillByDefault(Invoke([this](const absl::string_view requested_server_name) {
         requested_server_name_ = std::string(requested_server_name);

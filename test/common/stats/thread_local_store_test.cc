@@ -630,6 +630,36 @@ public:
   HeapStatDataAllocator heap_alloc_;
 };
 
+TEST_F(HeapStatsThreadLocalStoreTest, RemoveRejectedStats) {
+  Counter& counter = store_->counter("c1");
+  Gauge& gauge = store_->gauge("g1");
+  Histogram& histogram = store_->histogram("h1");
+  ASSERT_EQ(2, store_->counters().size()); // "stats.overflow" and "c1".
+  EXPECT_TRUE(&counter == store_->counters()[0].get() ||
+              &counter == store_->counters()[1].get()); // counters() order is non-deterministic.
+  ASSERT_EQ(1, store_->gauges().size());
+  EXPECT_EQ("g1", store_->gauges()[0]->name());
+  ASSERT_EQ(1, store_->histograms().size());
+  EXPECT_EQ("h1", store_->histograms()[0]->name());
+
+  // Will effectively block all stats, and remove all the non-matching stats.
+  envoy::config::metrics::v2::StatsConfig stats_config;
+  stats_config.mutable_stats_matcher()->mutable_inclusion_list()->add_patterns()->set_exact(
+      "no-such-stat");
+  store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config));
+
+  // They can no longer be found.
+  EXPECT_EQ(0, store_->counters().size());
+  EXPECT_EQ(0, store_->gauges().size());
+  EXPECT_EQ(0, store_->histograms().size());
+
+  // However, referencing the previously allocated stats will not crash.
+  counter.inc();
+  gauge.inc();
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(histogram), 42));
+  histogram.recordValue(42);
+}
+
 TEST_F(HeapStatsThreadLocalStoreTest, NonHotRestartNoTruncation) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
@@ -884,6 +914,58 @@ TEST_F(HistogramTest, BasicHistogramUsed) {
   for (const ParentHistogramSharedPtr& histogram : store_->histograms()) {
     EXPECT_TRUE(histogram->used());
   }
+}
+
+class TruncatingAllocTest : public HeapStatsThreadLocalStoreTest {
+protected:
+  TruncatingAllocTest() : test_alloc_(options_), long_name_(options_.maxNameLength() + 1, 'A') {}
+
+  void SetUp() override {
+    store_ = std::make_unique<ThreadLocalStoreImpl>(options_, test_alloc_);
+    // Do not call superclass SetUp.
+  }
+
+  TestAllocator test_alloc_;
+  std::string long_name_;
+};
+
+TEST_F(TruncatingAllocTest, CounterNotTruncated) {
+  EXPECT_NO_LOGS({
+    Counter& counter = store_->counter("simple");
+    EXPECT_EQ(&counter, &store_->counter("simple"));
+  });
+}
+
+TEST_F(TruncatingAllocTest, GaugeNotTruncated) {
+  EXPECT_NO_LOGS({
+    Gauge& gauge = store_->gauge("simple");
+    EXPECT_EQ(&gauge, &store_->gauge("simple"));
+  });
+}
+
+TEST_F(TruncatingAllocTest, CounterTruncated) {
+  Counter* counter = nullptr;
+  EXPECT_LOG_CONTAINS("warning", "is too long with", {
+    Counter& c = store_->counter(long_name_);
+    counter = &c;
+  });
+  EXPECT_NO_LOGS(EXPECT_EQ(counter, &store_->counter(long_name_)));
+}
+
+TEST_F(TruncatingAllocTest, GaugeTruncated) {
+  Gauge* gauge = nullptr;
+  EXPECT_LOG_CONTAINS("warning", "is too long with", {
+    Gauge& g = store_->gauge(long_name_);
+    gauge = &g;
+  });
+  EXPECT_NO_LOGS(EXPECT_EQ(gauge, &store_->gauge(long_name_)));
+}
+
+TEST_F(TruncatingAllocTest, HistogramWithLongNameNotTruncated) {
+  EXPECT_NO_LOGS({
+    Histogram& histogram = store_->histogram(long_name_);
+    EXPECT_EQ(&histogram, &store_->histogram(long_name_));
+  });
 }
 
 } // namespace Stats
