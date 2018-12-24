@@ -168,7 +168,6 @@ std::string SymbolTableImpl::decodeSymbolVec(const SymbolVec& symbols) const {
   return absl::StrJoin(name_tokens, ".");
 }
 
-
 void SymbolTableImpl::incRefCount(const StatName& stat_name) {
   // Before taking the lock, decode the array of symbols from the SymbolStorage.
   SymbolVec symbols = SymbolEncoding::decodeSymbols(stat_name.data(), stat_name.dataSize());
@@ -236,7 +235,8 @@ Symbol SymbolTableImpl::toSymbol(absl::string_view sv) {
   return result;
 }
 
-absl::string_view SymbolTableImpl::fromSymbol(const Symbol symbol) const SHARED_LOCKS_REQUIRED(lock_) {
+absl::string_view SymbolTableImpl::fromSymbol(const Symbol symbol) const
+    SHARED_LOCKS_REQUIRED(lock_) {
   auto search = decode_map_.find(symbol);
   RELEASE_ASSERT(search != decode_map_.end(), "no such symbol");
   return absl::string_view(*search->second);
@@ -312,30 +312,29 @@ void StatNameStorage::free(SymbolTable& table) {
   bytes_.reset();
 }
 
-StatNameJoiner::StatNameJoiner(StatName a, StatName b) {
+SymbolStoragePtr SymbolTableImpl::join(const StatName& a, const StatName& b) const {
   const uint64_t a_size = a.dataSize();
   const uint64_t b_size = b.dataSize();
-  uint8_t* const p = alloc(a_size + b_size);
+  auto bytes = std::make_unique<uint8_t[]>(a_size + b_size);
+  uint8_t* p = saveLengthToBytesReturningNext(a_size + b_size, bytes.get());
   memcpy(p, a.data(), a_size);
   memcpy(p + a_size, b.data(), b_size);
+  return bytes;
 }
 
-StatNameJoiner::StatNameJoiner(const std::vector<StatName>& stat_names) {
+SymbolStoragePtr SymbolTableImpl::join(const std::vector<StatName>& stat_names) const {
   uint64_t num_bytes = 0;
   for (StatName stat_name : stat_names) {
     num_bytes += stat_name.dataSize();
   }
-  uint8_t* p = alloc(num_bytes);
+  auto bytes = std::make_unique<uint8_t[]>(num_bytes + StatNameSizeEncodingBytes);
+  uint8_t* p = saveLengthToBytesReturningNext(num_bytes, bytes.get());
   for (StatName stat_name : stat_names) {
     num_bytes = stat_name.dataSize();
     memcpy(p, stat_name.data(), num_bytes);
     p += num_bytes;
   }
-}
-
-uint8_t* StatNameJoiner::alloc(uint64_t num_bytes) {
-  bytes_ = std::make_unique<uint8_t[]>(num_bytes + StatNameSizeEncodingBytes);
-  return saveLengthToBytesReturningNext(num_bytes, bytes_.get());
+  return bytes;
 }
 
 } // namespace Stats

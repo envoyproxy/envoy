@@ -29,15 +29,6 @@ namespace Stats {
 using Symbol = uint32_t;
 
 /**
- * Efficient byte-encoded storage of an array of tokens. The most common tokens
- * are typically < 127, and are represented directly. tokens >= 128 spill into
- * the next byte, allowing for tokens of arbitrary numeric value to be stored.
- * As long as the most common tokens are low-valued, the representation is
- * space-efficient. This scheme is similar to UTF-8.
- */
-using SymbolStorage = uint8_t[];
-
-/**
  * We encode the byte-size of a StatName as its first two bytes.
  */
 constexpr uint64_t StatNameSizeEncodingBytes = 2;
@@ -133,90 +124,18 @@ public:
   SymbolTableImpl();
   ~SymbolTableImpl() override;
 
-  /**
-   * Encodes a stat name using the symbol table, returning a SymbolEncoding. The
-   * SymbolEncoding is not intended for long-term storage, but is used to help
-   * allocate and StatName with the correct amount of storage.
-   *
-   * When a name is encoded, it bumps reference counts held in the table for
-   * each symbol. The caller is responsible for creating a StatName using this
-   * SymbolEncoding and ultimately disposing of it by calling
-   * StatName::free(). Otherwise the symbols will leak for the lifetime of the
-   * table, though they won't show up as a C++ leaks as the memory is still
-   * reachable from the SymolTable.
-   *
-   * @param name The name to encode.
-   * @return SymbolEncoding the encoded symbols.
-   */
+  // SymbolTable
+  std::string toString(const StatName& stat_name) const override;
   SymbolEncoding encode(absl::string_view name) override;
-
-  /**
-   * @return uint64_t the number of symbols in the symbol table.
-   */
   uint64_t numSymbols() const override;
-
-  /**
-   * Deterines whether one StatName lexically precedes another. Note that
-   * the lexical order may not exactly match the lexical order of the
-   * elaborated strings. For example, stat-name of "-.-" would lexically
-   * sort after "---" but when encoded as a StatName would come lexically
-   * earlier. In practice this is unlikely to matter as those are not
-   * reasonable names for Envoy stats.
-   *
-   * Note that this operation has to be performed with the context of the
-   * SymbolTable so that the individual Symbol objects can be converted
-   * into strings for lexical comparison.
-   *
-   * @param a the first stat name
-   * @param b the second stat name
-   * @return bool true if a lexically precedes b.
-   */
   bool lessThan(const StatName& a, const StatName& b) const override;
-
-  /**
-   * Since SymbolTable does manual reference counting, a client of SymbolTable
-   * must manually call free(stat_name) when it is freeing the backing store
-   * for a StatName. This way, the symbol table will grow and shrink
-   * dynamically, instead of being write-only.
-   *
-   * @param stat_name the stat name whose symbols should be freed.
-   */
   void free(const StatName& stat_name) override;
-
-  /**
-   * StatName backing-store can be managed by callers in a variety of ways
-   * to minimize overhead. But any persistent reference to a StatName needs
-   * to hold onto its own reference-counts for all symbols. This method
-   * helps callers ensure the symbol-storage is maintained for the lifetime
-   * of a reference.
-   *
-   * @param stat_name the stat name whose symbols should be freed.
-   */
   void incRefCount(const StatName& stat_name) override;
-
+  SymbolStoragePtr join(const StatName& a, const StatName& b) const override;
+  SymbolStoragePtr join(const std::vector<StatName>& stat_names) const override;
 #ifndef ENVOY_CONFIG_COVERAGE
-  // It is convenient when debugging to be able to print the state of the table,
-  // but this code is not hit during tests ordinarily, and is not needed in
-  // production code.
   void debugPrint() const override;
 #endif
-
-  /**
-   * Decodes a vector of symbols back into its period-delimited stat name. If
-   * decoding fails on any part of the symbol_vec, we release_assert, since this
-   * should never happen, and we don't want to continue running with a corrupt
-   * stats set.
-   *
-   * @param stat_name symbol_vec the vector of symbols to decode.
-   * @return std::string the retrieved stat name.
-   */
-  std::string toString(const StatName& stat_name) const override;
-
-  /**
-   * @param symbol_vec the vector of symbols to decode.
-   * @return std::string the retrieved stat name.
-   */
-  std::string decode(const SymbolStorage symbol_vec, uint64_t size) const;
 
 private:
   friend class StatName;
@@ -262,7 +181,10 @@ private:
   // Stages a new symbol for use. To be called after a successful insertion.
   void newSymbol();
 
-  Symbol monotonicCounter() { return monotonic_counter_; }
+  Symbol monotonicCounter() {
+    Thread::LockGuard lock(lock_);
+    return monotonic_counter_;
+  }
 
   // Stores the symbol to be used at next insertion. This should exist ahead of insertion time so
   // that if insertion succeeds, the value written is the correct one.
@@ -333,7 +255,7 @@ public:
   inline StatName statName() const;
 
 private:
-  std::unique_ptr<SymbolStorage> bytes_;
+  SymbolStoragePtr bytes_;
 };
 
 /**
@@ -434,9 +356,7 @@ public:
   StatName statName() const { return StatName(bytes_.get()); }
 
 private:
-  uint8_t* alloc(uint64_t num_bytes);
-
-  std::unique_ptr<SymbolStorage> bytes_;
+  SymbolStoragePtr bytes_;
 };
 
 /**

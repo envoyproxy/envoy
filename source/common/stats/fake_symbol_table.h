@@ -33,23 +33,54 @@ namespace Stats {
  */
 class FakeSymbolTable : public SymbolTable {
 public:
-  SymbolEncoding encode(absl::string_view name) override {
+  SymbolEncoding encode(absl::string_view name) override { return encodeHelper(name); }
+
+  std::string toString(const StatName& stat_name) const override {
+    return std::string(toStringView(stat_name));
+  }
+  uint64_t numSymbols() const override { return 0; }
+  bool lessThan(const StatName& a, const StatName& b) const override {
+    return toStringView(a) < toStringView(b);
+  }
+  void free(const StatName&) override {}
+  void incRefCount(const StatName&) override {}
+  SymbolStoragePtr join(const StatName& a, const StatName& b) const override {
+    return join({a, b});
+  }
+  SymbolStoragePtr join(const std::vector<StatName>& names) const override {
+    std::vector<absl::string_view> strings;
+    for (StatName name : names) {
+      absl::string_view str = toStringView(name);
+      if (!str.empty()) {
+        strings.push_back(str);
+      }
+    }
+    return stringToStorage(absl::StrJoin(strings, "."));
+  }
+
+#ifndef ENVOY_CONFIG_COVERAGE
+  void debugPrint() const override {}
+#endif
+
+private:
+  SymbolEncoding encodeHelper(absl::string_view name) const {
     SymbolEncoding encoding;
-    encoding.vec_.resize(name.size());
-    memcpy(encoding.vec_.data(), name.data(), name.size());
+    for (char c : name) {
+      encoding.addSymbol(static_cast<Symbol>(c));
+    }
     return encoding;
   }
 
-  std::string toString(const StatName& stat_name) const override {
-    return std::string(reinterpret_cast<const char*>(stat_name.data()), stat_name.dataSize());
+  absl::string_view toStringView(const StatName& stat_name) const {
+    return absl::string_view(reinterpret_cast<const char*>(stat_name.data()), stat_name.dataSize());
   }
 
-  uint64_t numSymbols() const override { return 0; }
-  bool lessThan(const StatName& a, const StatName& b) const override {
-    return toString(a) < toString(b);
+  SymbolStoragePtr stringToStorage(absl::string_view name) const {
+    SymbolEncoding encoding = encodeHelper(name);
+    auto bytes = std::make_unique<uint8_t[]>(encoding.bytesRequired());
+    encoding.moveToStorage(bytes.get());
+    return bytes;
   }
-  void free(const StatName&) {}
-  void incRefCount(const StatName&) {}
 };
 
 } // namespace Stats

@@ -11,6 +11,16 @@ class StatName;
 class SymbolEncoding;
 
 /**
+ * Efficient byte-encoded storage of an array of tokens. The most common tokens
+ * are typically < 127, and are represented directly. tokens >= 128 spill into
+ * the next byte, allowing for tokens of arbitrary numeric value to be stored.
+ * As long as the most common tokens are low-valued, the representation is
+ * space-efficient. This scheme is similar to UTF-8.
+ */
+using SymbolStorage = uint8_t[];
+using SymbolStoragePtr = std::unique_ptr<SymbolStorage>;
+
+/**
  * SymbolTable manages a namespace optimized for stats, which are typically
  * composed of arrays of "."-separated tokens, with a significant overlap
  * between the tokens. Each token is mapped to a Symbol (uint32_t) and
@@ -66,7 +76,7 @@ public:
   virtual uint64_t numSymbols() const PURE;
 
   /**
-   * Decodes a vector of symbols back into its period-delimited stat name.  If
+   * Decodes a vector of symbols back into its period-delimited stat name. If
    * decoding fails on any part of the symbol_vec, we release_assert and crash
    * hard, since this should never happen, and we don't want to continue running
    * with a corrupt stats set.
@@ -114,6 +124,25 @@ public:
    * @param symbol_vec the vector of symbols to be freed.
    */
   virtual void incRefCount(const StatName& stat_name) PURE;
+
+  /**
+   * Joins two or more StatNames. For example if we have StatNames for {"a.b",
+   * "c.d", "e.f"} then the joined stat-name matches "a.b.c.d.e.f". The
+   * advantage of using this representation is that it avoids having to
+   * decode/encode into the elaborted form, and does not require locking the
+   * SymbolTable.
+   *
+   * The caveat is that this representation does not bump reference counts on
+   * for the referenced Symbols in the SymbolTable, so it's only valid as long
+   * for the lifetime of the joined StatNames.
+   *
+   * This is intended for use doing cached name lookups of scoped stats, where
+   * the scope prefix and the names to combine it with are already in StatName
+   * form. Using this class, they can be combined without acessingm the
+   * SymbolTable or, in particular, taking its lock.
+   */
+  virtual SymbolStoragePtr join(const StatName& a, const StatName& b) const PURE;
+  virtual SymbolStoragePtr join(const std::vector<StatName>& stat_names) const PURE;
 
 #ifndef ENVOY_CONFIG_COVERAGE
   virtual void debugPrint() const PURE;

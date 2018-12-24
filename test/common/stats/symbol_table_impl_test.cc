@@ -2,6 +2,7 @@
 
 #include "common/common/mutex_tracer_impl.h"
 #include "common/memory/stats.h"
+#include "common/stats/fake_symbol_table.h"
 #include "common/stats/symbol_table_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
@@ -14,9 +15,26 @@
 namespace Envoy {
 namespace Stats {
 
-class StatNameTest : public testing::Test {
+enum class SymbolTableType {
+  Real,
+  Fake,
+};
+
+class StatNameTest : public testing::TestWithParam<SymbolTableType> {
 protected:
-  StatNameTest() : table_(std::make_unique<SymbolTableImpl>()) {}
+  StatNameTest() : real_symbol_table_(nullptr) {
+    switch (GetParam()) {
+    case SymbolTableType::Real: {
+      auto table = std::make_unique<SymbolTableImpl>();
+      real_symbol_table_ = table.get();
+      table_ = std::move(table);
+      break;
+    }
+    case SymbolTableType::Fake:
+      table_ = std::make_unique<FakeSymbolTable>();
+      break;
+    }
+  }
   ~StatNameTest() { clearStorage(); }
 
   void clearStorage() {
@@ -30,12 +48,10 @@ protected:
   SymbolVec getSymbols(StatName stat_name) {
     return SymbolEncoding::decodeSymbols(stat_name.data(), stat_name.dataSize());
   }
-#if 0
   std::string decodeSymbolVec(const SymbolVec& symbol_vec) {
-    return table_->decodeSymbolVec(symbol_vec);
+    return real_symbol_table_->decodeSymbolVec(symbol_vec);
   }
-  Symbol monotonicCounter() { return table_->monotonicCounter(); }
-#endif
+  Symbol monotonicCounter() { return real_symbol_table_->monotonicCounter(); }
   std::string encodeDecode(absl::string_view stat_name) {
     return table_->toString(makeStat(stat_name));
   }
@@ -47,30 +63,32 @@ protected:
     return stat_name_storage_.back().statName();
   }
 
+  SymbolTableImpl* real_symbol_table_;
   std::unique_ptr<SymbolTable> table_;
 
   std::vector<StatNameStorage> stat_name_storage_;
 };
 
-TEST_F(StatNameTest, AllocFree) {
-  encodeDecode("hello.world");
-}
+INSTANTIATE_TEST_CASE_P(StatNameTest, StatNameTest,
+                        testing::ValuesIn({SymbolTableType::Real, SymbolTableType::Fake}));
 
-TEST_F(StatNameTest, TestArbitrarySymbolRoundtrip) {
+TEST_P(StatNameTest, AllocFree) { encodeDecode("hello.world"); }
+
+TEST_P(StatNameTest, TestArbitrarySymbolRoundtrip) {
   const std::vector<std::string> stat_names = {"", " ", "  ", ",", "\t", "$", "%", "`", "."};
   for (auto stat_name : stat_names) {
     EXPECT_EQ(stat_name, encodeDecode(stat_name));
   }
 }
 
-TEST_F(StatNameTest, Test100KSymbolsRoundtrip) {
+TEST_P(StatNameTest, Test100KSymbolsRoundtrip) {
   for (int i = 0; i < 100 * 1000; ++i) {
     const std::string stat_name = absl::StrCat("symbol_", i);
     EXPECT_EQ(stat_name, encodeDecode(stat_name));
   }
 }
 
-TEST_F(StatNameTest, TestUnusualDelimitersRoundtrip) {
+TEST_P(StatNameTest, TestUnusualDelimitersRoundtrip) {
   const std::vector<std::string> stat_names = {".",    "..",    "...",    "foo",    "foo.",
                                                ".foo", ".foo.", ".foo..", "..foo.", "..foo.."};
   for (auto stat_name : stat_names) {
@@ -78,13 +96,13 @@ TEST_F(StatNameTest, TestUnusualDelimitersRoundtrip) {
   }
 }
 
-TEST_F(StatNameTest, TestSuccessfulDoubleLookup) {
+TEST_P(StatNameTest, TestSuccessfulDoubleLookup) {
   StatName stat_name_1(makeStat("foo.bar.baz"));
   StatName stat_name_2(makeStat("foo.bar.baz"));
   EXPECT_EQ(stat_name_1, stat_name_2);
 }
 
-TEST_F(StatNameTest, TestSuccessfulDecode) {
+TEST_P(StatNameTest, TestSuccessfulDecode) {
   std::string stat_name = "foo.bar.baz";
   StatName stat_name_1(makeStat(stat_name));
   StatName stat_name_2(makeStat(stat_name));
@@ -92,8 +110,11 @@ TEST_F(StatNameTest, TestSuccessfulDecode) {
   EXPECT_EQ(table_->toString(stat_name_1), stat_name);
 }
 
-#if 0
-TEST_F(StatNameTest, TestBadDecodes) {
+TEST_P(StatNameTest, TestBadDecodes) {
+  if (GetParam() == SymbolTableType::Fake) {
+    return;
+  }
+
   {
     // If a symbol doesn't exist, decoding it should trigger an ASSERT() and crash.
     SymbolVec bad_symbol_vec = {1}; // symbol 0 is the empty symbol.
@@ -110,16 +131,18 @@ TEST_F(StatNameTest, TestBadDecodes) {
     EXPECT_DEATH(decodeSymbolVec(vec_1), "");
   }
 }
-#endif
 
-TEST_F(StatNameTest, TestDifferentStats) {
+TEST_P(StatNameTest, TestDifferentStats) {
   StatName stat_name_1(makeStat("foo.bar"));
   StatName stat_name_2(makeStat("bar.foo"));
   EXPECT_NE(table_->toString(stat_name_1), table_->toString(stat_name_2));
   EXPECT_NE(stat_name_1, stat_name_2);
 }
 
-TEST_F(StatNameTest, TestSymbolConsistency) {
+TEST_P(StatNameTest, TestSymbolConsistency) {
+  if (GetParam() == SymbolTableType::Fake) {
+    return;
+  }
   StatName stat_name_1(makeStat("foo.bar"));
   StatName stat_name_2(makeStat("bar.foo"));
   // We expect the encoding of "foo" in one context to be the same as another.
@@ -129,7 +152,7 @@ TEST_F(StatNameTest, TestSymbolConsistency) {
   EXPECT_EQ(vec_2[0], vec_1[1]);
 }
 
-TEST_F(StatNameTest, TestSameValueOnPartialFree) {
+TEST_P(StatNameTest, TestSameValueOnPartialFree) {
   // This should hold true for components as well. Since "foo" persists even when "foo.bar" is
   // freed, we expect both instances of "foo" to have the same symbol.
   makeStat("foo");
@@ -144,8 +167,11 @@ TEST_F(StatNameTest, TestSameValueOnPartialFree) {
   // And we have no expectation for the "bar" components, because of the free pool.
 }
 
-#if 0
-TEST_F(StatNameTest, FreePoolTest) {
+TEST_P(StatNameTest, FreePoolTest) {
+  if (GetParam() == SymbolTableType::Fake) {
+    return;
+  }
+
   // To ensure that the free pool is being used, we should be able to cycle through a large number
   // of stats while validating that:
   //   a) the size of the table has not increased, and
@@ -179,9 +205,8 @@ TEST_F(StatNameTest, FreePoolTest) {
   EXPECT_EQ(monotonicCounter(), 6);
   EXPECT_EQ(table_->numSymbols(), 6);
 }
-#endif
 
-TEST_F(StatNameTest, TestShrinkingExpectation) {
+TEST_P(StatNameTest, TestShrinkingExpectation) {
   // We expect that as we free stat names, the memory used to store those underlying symbols will
   // be freed.
   // ::size() is a public function, but should only be used for testing.
@@ -231,7 +256,7 @@ TEST_F(StatNameTest, TestShrinkingExpectation) {
 // want to allocate two different StatName objects in contiguous memory. The
 // safety-net here in terms of leaks is that SymbolTable will assert-fail if
 // you don't free all the StatNames you've allocated bytes for.
-TEST_F(StatNameTest, StoringWithoutStatNameStorage) {
+TEST_P(StatNameTest, StoringWithoutStatNameStorage) {
   SymbolEncoding hello_encoding = table_->encode("hello.world");
   SymbolEncoding goodbye_encoding = table_->encode("goodbye.world");
   size_t size = hello_encoding.bytesRequired() + goodbye_encoding.bytesRequired();
@@ -252,7 +277,7 @@ TEST_F(StatNameTest, StoringWithoutStatNameStorage) {
   table_->free(goodbye);
 }
 
-TEST_F(StatNameTest, HashTable) {
+TEST_P(StatNameTest, HashTable) {
   StatName ac = makeStat("a.c");
   StatName ab = makeStat("a.b");
   StatName de = makeStat("d.e");
@@ -270,7 +295,7 @@ TEST_F(StatNameTest, HashTable) {
   EXPECT_EQ(3, name_int_map[de]);
 }
 
-TEST_F(StatNameTest, Sort) {
+TEST_P(StatNameTest, Sort) {
   std::vector<StatName> names{makeStat("a.c"),   makeStat("a.b"), makeStat("d.e"),
                               makeStat("d.a.a"), makeStat("d.a"), makeStat("a.c")};
   const std::vector<StatName> sorted_names{makeStat("a.b"), makeStat("a.c"),   makeStat("a.c"),
@@ -280,52 +305,52 @@ TEST_F(StatNameTest, Sort) {
   EXPECT_EQ(names, sorted_names);
 }
 
-TEST_F(StatNameTest, Concat2) {
-  StatNameJoiner joiner(makeStat("a.b"), makeStat("c.d"));
-  EXPECT_EQ("a.b.c.d", table_->toString(joiner.statName()));
+TEST_P(StatNameTest, Concat2) {
+  SymbolStoragePtr joined = table_->join(makeStat("a.b"), makeStat("c.d"));
+  EXPECT_EQ("a.b.c.d", table_->toString(StatName(joined.get())));
 }
 
-TEST_F(StatNameTest, ConcatFirstEmpty) {
-  StatNameJoiner joiner(makeStat(""), makeStat("c.d"));
-  EXPECT_EQ("c.d", table_->toString(joiner.statName()));
+TEST_P(StatNameTest, ConcatFirstEmpty) {
+  SymbolStoragePtr joined = table_->join(makeStat(""), makeStat("c.d"));
+  EXPECT_EQ("c.d", table_->toString(StatName(joined.get())));
 }
 
-TEST_F(StatNameTest, ConcatSecondEmpty) {
-  StatNameJoiner joiner(makeStat("a.b"), makeStat(""));
-  EXPECT_EQ("a.b", table_->toString(joiner.statName()));
+TEST_P(StatNameTest, ConcatSecondEmpty) {
+  SymbolStoragePtr joined = table_->join(makeStat("a.b"), makeStat(""));
+  EXPECT_EQ("a.b", table_->toString(StatName(joined.get())));
 }
 
-TEST_F(StatNameTest, ConcatAllEmpty) {
-  StatNameJoiner joiner(makeStat(""), makeStat(""));
-  EXPECT_EQ("", table_->toString(joiner.statName()));
+TEST_P(StatNameTest, ConcatAllEmpty) {
+  SymbolStoragePtr joined = table_->join(makeStat(""), makeStat(""));
+  EXPECT_EQ("", table_->toString(StatName(joined.get())));
 }
 
-TEST_F(StatNameTest, Join3) {
-  StatNameJoiner joiner({makeStat("a.b"), makeStat("c.d"), makeStat("e.f")});
-  EXPECT_EQ("a.b.c.d.e.f", table_->toString(joiner.statName()));
+TEST_P(StatNameTest, Join3) {
+  SymbolStoragePtr joined = table_->join({makeStat("a.b"), makeStat("c.d"), makeStat("e.f")});
+  EXPECT_EQ("a.b.c.d.e.f", table_->toString(StatName(joined.get())));
 }
 
-TEST_F(StatNameTest, Join3FirstEmpty) {
-  StatNameJoiner joiner({makeStat(""), makeStat("c.d"), makeStat("e.f")});
-  EXPECT_EQ("c.d.e.f", table_->toString(joiner.statName()));
+TEST_P(StatNameTest, Join3FirstEmpty) {
+  SymbolStoragePtr joined = table_->join({makeStat(""), makeStat("c.d"), makeStat("e.f")});
+  EXPECT_EQ("c.d.e.f", table_->toString(StatName(joined.get())));
 }
 
-TEST_F(StatNameTest, Join3SecondEmpty) {
-  StatNameJoiner joiner({makeStat("a.b"), makeStat(""), makeStat("e.f")});
-  EXPECT_EQ("a.b.e.f", table_->toString(joiner.statName()));
+TEST_P(StatNameTest, Join3SecondEmpty) {
+  SymbolStoragePtr joined = table_->join({makeStat("a.b"), makeStat(""), makeStat("e.f")});
+  EXPECT_EQ("a.b.e.f", table_->toString(StatName(joined.get())));
 }
 
-TEST_F(StatNameTest, Join3ThirdEmpty) {
-  StatNameJoiner joiner({makeStat("a.b"), makeStat("c.d"), makeStat("")});
-  EXPECT_EQ("a.b.c.d", table_->toString(joiner.statName()));
+TEST_P(StatNameTest, Join3ThirdEmpty) {
+  SymbolStoragePtr joined = table_->join({makeStat("a.b"), makeStat("c.d"), makeStat("")});
+  EXPECT_EQ("a.b.c.d", table_->toString(StatName(joined.get())));
 }
 
-TEST_F(StatNameTest, JoinAllEmpty) {
-  StatNameJoiner joiner({makeStat(""), makeStat(""), makeStat("")});
-  EXPECT_EQ("", table_->toString(joiner.statName()));
+TEST_P(StatNameTest, JoinAllEmpty) {
+  SymbolStoragePtr joined = table_->join({makeStat(""), makeStat(""), makeStat("")});
+  EXPECT_EQ("", table_->toString(StatName(joined.get())));
 }
 
-TEST_F(StatNameTest, RacingSymbolCreation) {
+TEST_P(StatNameTest, RacingSymbolCreation) {
   Thread::ThreadFactory& thread_factory = Thread::threadFactoryForTest();
   MutexTracerImpl& mutex_tracer = MutexTracerImpl::getOrCreateTracer();
 
@@ -393,7 +418,7 @@ TEST_F(StatNameTest, RacingSymbolCreation) {
   }
 }
 
-TEST_F(StatNameTest, MutexContentionOnExistingSymbols) {
+TEST_P(StatNameTest, MutexContentionOnExistingSymbols) {
   Thread::ThreadFactory& thread_factory = Thread::threadFactoryForTest();
   MutexTracerImpl& mutex_tracer = MutexTracerImpl::getOrCreateTracer();
 
