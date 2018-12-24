@@ -201,7 +201,7 @@ HealthCheckerImplBase::ActiveHealthCheckSession::~ActiveHealthCheckSession() {
   }
 }
 
-void HealthCheckerImplBase::ActiveHealthCheckSession::handleSuccess() {
+void HealthCheckerImplBase::ActiveHealthCheckSession::handleSuccess(bool degraded) {
   // If we are healthy, reset the # of unhealthy to zero.
   num_unhealthy_ = 0;
 
@@ -218,6 +218,21 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::handleSuccess() {
         parent_.event_logger_->logAddHealthy(parent_.healthCheckerType(), host_, first_check_);
       }
     } else {
+      changed_state = HealthTransition::ChangePending;
+    }
+  }
+
+  // TODO(snowp): stats and event logger.
+  if (degraded != host_->healthFlagGet(Host::HealthFlag::DEGRADED_ACTIVE_HC)) {
+    if (degraded) {
+      host_->healthFlagSet(Host::HealthFlag::DEGRADED_ACTIVE_HC);
+    } else {
+      host_->healthFlagClear(Host::HealthFlag::DEGRADED_ACTIVE_HC);
+    }
+
+    // This check ensures that we honor the decision made about Changed vs ChangePending in the
+    // above block.
+    if (changed_state == HealthTransition::Unchanged) {
       changed_state = HealthTransition::ChangePending;
     }
   }
