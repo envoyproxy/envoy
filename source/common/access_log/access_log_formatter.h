@@ -60,10 +60,10 @@ private:
                            std::vector<std::string>& sub_items, absl::optional<size_t>& max_length);
 
   // the indexes of where the parameters for each directive is expected to begin
-  static const size_t ReqParamStart{std::strlen("REQ(")};
-  static const size_t RespParamStart{std::strlen("RESP(")};
-  static const size_t TrailParamStart{std::strlen("TRAILER(")};
-  static const size_t StartTimeParamStart{std::strlen("START_TIME(")};
+  static const size_t ReqParamStart{sizeof("REQ(") - 1};
+  static const size_t RespParamStart{sizeof("RESP(") - 1};
+  static const size_t TrailParamStart{sizeof("TRAILER(") - 1};
+  static const size_t StartTimeParamStart{sizeof("START_TIME(") - 1};
 };
 
 /**
