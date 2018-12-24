@@ -121,7 +121,7 @@ private:
     // Network::UdpListenerCallbacks
     void onData(Network::Address::InstanceConstSharedPtr local_address,
                 Network::Address::InstanceConstSharedPtr peer_address,
-                Buffer::Instance&& data) override;
+                Buffer::InstancePtr&& data) override;
 
     // TODO(conqerAtapple): Refactor common data in TCP/UDP active listeners to
     // a common base class.

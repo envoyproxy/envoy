@@ -117,6 +117,21 @@ public:
   MOCK_METHOD1(onNewConnection_, void(ConnectionPtr& conn));
 };
 
+class MockUdpListenerCallbacks : public UdpListenerCallbacks {
+public:
+  MockUdpListenerCallbacks();
+  ~MockUdpListenerCallbacks();
+
+  void onData(Address::InstanceConstSharedPtr local_address,
+              Address::InstanceConstSharedPtr peer_address, Buffer::InstancePtr&& data) override {
+
+    onData_(local_address, peer_address, data.get());
+  }
+
+  MOCK_METHOD3(onData_, void(Address::InstanceConstSharedPtr local_address,
+                             Address::InstanceConstSharedPtr peer_address, Buffer::Instance* data));
+};
+
 class MockDrainDecision : public DrainDecision {
 public:
   MockDrainDecision();

@@ -135,7 +135,7 @@ ConnectionHandlerImpl::ActiveUdpListener::~ActiveUdpListener() {
 
 void ConnectionHandlerImpl::ActiveUdpListener::onData(
     Network::Address::InstanceConstSharedPtr local_address,
-    Network::Address::InstanceConstSharedPtr peer_address, Buffer::Instance&& data) {
+    Network::Address::InstanceConstSharedPtr peer_address, Buffer::InstancePtr&& data) {
 
   (void)local_address;
   (void)peer_address;

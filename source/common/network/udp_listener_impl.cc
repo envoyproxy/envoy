@@ -43,26 +43,63 @@ void UdpListenerImpl::readCallback(int fd, short flags, void* arg) {
   (void)flags;
 
   UdpListenerImpl* instance = static_cast<UdpListenerImpl*>(arg);
-  // TODO(conqerAtApple): Replace with envoy style assert
+  ASSERT(instance);
 
-  assert(instance);
   // TODO(conqerAtAppple): Make this configurable or get from system.
   constexpr uint64_t const read_length = 16384;
-  Buffer::OwnedImpl buffer;
+  Buffer::InstancePtr buffer(new Buffer::OwnedImpl());
+  sockaddr_storage addr;
+  socklen_t addr_len;
 
-  Api::SysCallIntResult result = buffer.read(fd, read_length);
+  Api::SysCallIntResult result = buffer->recvFrom(fd, read_length, addr, addr_len);
   if (result.rc_ < 0) {
     // TODO(conqerAtApple): Call error callback.
   }
 
   Address::InstanceConstSharedPtr local_address = instance->socket_.localAddress();
-  RELEASE_ASSERT(local_address, fmt::format("Unable to get local address for fd: {}", fd));
+  RELEASE_ASSERT(
+      addr_len,
+      fmt::format(
+          "Unable to get remote address for fd: {}, local address: {}. address length is 0 ", fd,
+          local_address->asString()));
 
-  Address::InstanceConstSharedPtr peer_address = Address::peerAddressFromFd(fd);
+  Address::InstanceConstSharedPtr peer_address;
+
+  // TODO(conqerAtApple): Current implementation of Address::addressFromSockAddr
+  // cannot be used here unfortunately. This should belong in Address namespace.
+  switch (addr.ss_family) {
+  case AF_INET: {
+    const struct sockaddr_in* sin = reinterpret_cast<const struct sockaddr_in*>(&addr);
+    ASSERT(AF_INET == sin->sin_family);
+    peer_address = std::make_shared<Address::Ipv4Instance>(sin);
+    break;
+  }
+  case AF_INET6: {
+    const struct sockaddr_in6* sin6 = reinterpret_cast<const struct sockaddr_in6*>(&addr);
+    ASSERT(AF_INET6 == sin6->sin6_family);
+    if (IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr)) {
+#if defined(__APPLE__)
+      struct sockaddr_in sin = {
+          {}, AF_INET, sin6->sin6_port, {sin6->sin6_addr.__u6_addr.__u6_addr32[3]}, {}};
+#else
+      struct sockaddr_in sin = {AF_INET, sin6->sin6_port, {sin6->sin6_addr.s6_addr32[3]}, {}};
+#endif
+      peer_address = std::make_shared<Address::Ipv4Instance>(&sin);
+    } else {
+      peer_address = std::make_shared<Address::Ipv6Instance>(*sin6, true);
+    }
+  }
+
+  break;
+  default:
+    ASSERT(false);
+  }
 
   RELEASE_ASSERT(peer_address,
                  fmt::format("Unable to get remote address for fd: {}, local address: {} ", fd,
                              local_address->asString()));
+
+  RELEASE_ASSERT(local_address, fmt::format("Unable to get local address for fd: {}", fd));
 
   instance->cb_.onData(local_address, peer_address, std::move(buffer));
 }

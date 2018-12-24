@@ -128,7 +128,8 @@ public:
    * @param new_connection supplies the new connection that is moved into the callee.
    */
   virtual void onData(Address::InstanceConstSharedPtr local_address,
-                      Address::InstanceConstSharedPtr peer_address, Buffer::Instance&& data) PURE;
+                      Address::InstanceConstSharedPtr peer_address,
+                      Buffer::InstancePtr&& data) PURE;
 };
 
 /**
