@@ -49,7 +49,7 @@ public:
   m(FAILED_EDS_HEALTH, 0x04)                                                     \
   /* The host is currently marked as degraded through active health checking. */ \
   m(DEGRADED_ACTIVE_HC, 0x08)
-  // clang-format on
+// clang-format on
 
 #define DECLARE_ENUM(name, value) name = value,
 
