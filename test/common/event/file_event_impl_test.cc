@@ -3,6 +3,7 @@
 #include "envoy/event/file_event.h"
 
 #include "common/event/dispatcher_impl.h"
+#include "common/stats/isolated_store_impl.h"
 
 #include "test/mocks/common.h"
 #include "test/test_common/environment.h"
@@ -16,7 +17,8 @@ namespace Event {
 
 class FileEventImplTest : public testing::Test {
 public:
-  FileEventImplTest() : dispatcher_(test_time_.timeSystem()) {}
+  FileEventImplTest()
+      : api_(Api::createApiForTest(stats_store_)), dispatcher_(test_time_.timeSystem(), *api_) {}
 
   void SetUp() override {
     int rc = socketpair(AF_UNIX, SOCK_DGRAM, 0, fds_);
@@ -33,6 +35,8 @@ public:
 
 protected:
   int fds_[2];
+  Stats::IsolatedStoreImpl stats_store_;
+  Api::ApiPtr api_;
   DangerousDeprecatedTestTime test_time_;
   DispatcherImpl dispatcher_;
 };
@@ -53,7 +57,9 @@ TEST_P(FileEventImplActivateTest, Activate) {
   ASSERT_NE(-1, fd);
 
   DangerousDeprecatedTestTime test_time;
-  DispatcherImpl dispatcher(test_time.timeSystem());
+  Stats::IsolatedStoreImpl stats_store;
+  Api::ApiPtr api = Api::createApiForTest(stats_store);
+  DispatcherImpl dispatcher(test_time.timeSystem(), *api);
   ReadyWatcher read_event;
   EXPECT_CALL(read_event, ready()).Times(1);
   ReadyWatcher write_event;

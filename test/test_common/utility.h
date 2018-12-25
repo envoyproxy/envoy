@@ -304,6 +304,8 @@ public:
     return result;
   }
 
+  static std::tm parseTimestamp(const std::string& format, const std::string& time_str);
+
   static constexpr std::chrono::milliseconds DefaultTimeout = std::chrono::milliseconds(10000);
 
   static void renameFile(const std::string& old_name, const std::string& new_name);
@@ -312,7 +314,17 @@ public:
 };
 
 /**
- * This utility class wraps the common case of having a cross-thread "one shot" ready condition.
+ * Wraps the common case of having a cross-thread "one shot" ready condition.
+ *
+ * It functions like absl::Notification except the usage of notifyAll() appears
+ * to trigger tighter simultaneous wakeups in multiple threads, resulting in
+ * more contentions, e.g. for BM_CreateRace in
+ * ../common/stats/symbol_table_speed_test.cc.
+ *
+ * See
+ *     https://github.com/abseil/abseil-cpp/blob/master/absl/synchronization/notification.h
+ * for the absl impl, which appears to result in fewer contentions (and in
+ * tests we want contentions).
  */
 class ConditionalInitializer {
 public:
@@ -327,6 +339,13 @@ public:
    * only be called once in between a call to waitReady().
    */
   void waitReady();
+
+  /**
+   * Waits until ready; does not reset it. This variation is immune to spurious
+   * condvar wakeups, and is also suitable for having multiple threads wait on
+   * a common condition.
+   */
+  void wait();
 
 private:
   Thread::CondVar cv_;

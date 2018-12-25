@@ -6,6 +6,9 @@
 #include <vector>
 
 #include "common/common/assert.h"
+#include "common/common/logger.h"
+
+#include "absl/strings/str_cat.h"
 
 namespace Envoy {
 namespace Stats {
@@ -17,22 +20,26 @@ StatName::StatName(const StatName& src, SymbolStorage memory) : size_and_data_(m
   memcpy(memory, src.size_and_data_, src.size());
 }
 
+std::string StatName::toString(const SymbolTable& table) const {
+  return table.decode(data(), dataSize());
+}
+
 #ifndef ENVOY_CONFIG_COVERAGE
 void StatName::debugPrint() {
   if (size_and_data_ == nullptr) {
-    std::cout << "Null StatName" << std::endl << std::flush;
+    ENVOY_LOG_MISC(info, "Null StatName");
   } else {
     uint64_t nbytes = dataSize();
-    std::cout << "dataSize=" << nbytes << ":";
+    std::string msg = absl::StrCat("dataSize=", nbytes, ":");
     for (uint64_t i = 0; i < nbytes; ++i) {
-      std::cout << " " << static_cast<uint64_t>(data()[i]);
+      absl::StrAppend(&msg, " ", static_cast<uint64_t>(data()[i]));
     }
     SymbolVec encoding = SymbolEncoding::decodeSymbols(data(), dataSize());
-    std::cout << ", numSymbols=" << encoding.size() << ":";
+    absl::StrAppend(&msg, ", numSymbols=", encoding.size(), ":");
     for (Symbol symbol : encoding) {
-      std::cout << " " << symbol;
+      absl::StrAppend(&msg, " ", symbol);
     }
-    std::cout << std::endl << std::flush;
+    ENVOY_LOG_MISC(info, "{}", msg);
   }
 }
 #endif
@@ -128,8 +135,11 @@ SymbolEncoding SymbolTable::encode(const absl::string_view name) {
 
   // Now take the lock and populate the Symbol objects, which involves bumping
   // ref-counts in this.
-  for (absl::string_view token : tokens) {
-    symbols.push_back(toSymbol(token));
+  {
+    Thread::LockGuard lock(lock_);
+    for (auto& token : tokens) {
+      symbols.push_back(toSymbol(token));
+    }
   }
 
   // Now efficiently encode the array of 32-bit symbols into a uint8_t array.
@@ -139,8 +149,8 @@ SymbolEncoding SymbolTable::encode(const absl::string_view name) {
   return encoding;
 }
 
-std::string SymbolTable::toString(const StatName& stat_name) const {
-  return decodeSymbolVec(SymbolEncoding::decodeSymbols(stat_name.data(), stat_name.dataSize()));
+std::string SymbolTable::decode(const SymbolStorage symbol_array, uint64_t size) const {
+  return decodeSymbolVec(SymbolEncoding::decodeSymbols(symbol_array, size));
 }
 
 std::string SymbolTable::decodeSymbolVec(const SymbolVec& symbols) const {
@@ -148,7 +158,7 @@ std::string SymbolTable::decodeSymbolVec(const SymbolVec& symbols) const {
   name_tokens.reserve(symbols.size());
   {
     // Hold the lock only while decoding symbols.
-    absl::ReaderMutexLock lock(&lock_);
+    Thread::LockGuard lock(lock_);
     for (Symbol symbol : symbols) {
       name_tokens.push_back(fromSymbol(symbol));
     }
@@ -160,15 +170,15 @@ void SymbolTable::incRefCount(const StatName& stat_name) {
   // Before taking the lock, decode the array of symbols from the SymbolStorage.
   SymbolVec symbols = SymbolEncoding::decodeSymbols(stat_name.data(), stat_name.dataSize());
 
-  absl::ReaderMutexLock lock(&lock_);
+  Thread::LockGuard lock(lock_);
   for (Symbol symbol : symbols) {
     auto decode_search = decode_map_.find(symbol);
     ASSERT(decode_search != decode_map_.end());
 
-    auto encode_search = encode_map_.find(decode_search->second.get());
+    auto encode_search = encode_map_.find(*decode_search->second);
     ASSERT(encode_search != encode_map_.end());
 
-    ++encode_search->second->ref_count_;
+    ++encode_search->second.ref_count_;
   }
 }
 
@@ -176,19 +186,21 @@ void SymbolTable::free(const StatName& stat_name) {
   // Before taking the lock, decode the array of symbols from the SymbolStorage.
   SymbolVec symbols = SymbolEncoding::decodeSymbols(stat_name.data(), stat_name.dataSize());
 
-  absl::MutexLock lock(&lock_); // Takes write-lock as we may mutate decode_map_ and encode_map_.
+  Thread::LockGuard lock(lock_);
   for (Symbol symbol : symbols) {
     auto decode_search = decode_map_.find(symbol);
     ASSERT(decode_search != decode_map_.end());
 
-    auto encode_search = encode_map_.find(decode_search->second.get());
+    auto encode_search = encode_map_.find(*decode_search->second);
     ASSERT(encode_search != encode_map_.end());
 
-    --encode_search->second->ref_count_;
-
-    // If that was the last remaining client usage of the symbol, erase the the current
-    // mappings and add the now-unused symbol to the reuse pool.
-    if (encode_search->second->ref_count_ == 0) {
+    // If that was the last remaining client usage of the symbol, erase the the
+    // current mappings and add the now-unused symbol to the reuse pool.
+    //
+    // The "if (--EXPR.ref_count_)" pattern speeds up BM_CreateRace by 20% in
+    // symbol_table_speed_test.cc, relative to breaking out the decrement into a
+    // separate step, likely due to the non-trivial dereferences in EXPR.
+    if (--encode_search->second.ref_count_ == 0) {
       decode_map_.erase(decode_search);
       encode_map_.erase(encode_search);
       pool_.push(symbol);
@@ -197,67 +209,35 @@ void SymbolTable::free(const StatName& stat_name) {
 }
 
 Symbol SymbolTable::toSymbol(absl::string_view sv) {
-  {
-    // First try to find the symbol with just a read-lock, so concurrent
-    // lookups for an already-allocated symbol do not contend.
-    absl::ReaderMutexLock lock(&lock_);
-    auto encode_find = encode_map_.find(sv);
-    if (encode_find != encode_map_.end()) {
-      // Increment the refcount of the already existing symbol. Note that the
-      // ref_count_ is atomic to allow incrementing it under read-lock.
-      SharedSymbol& shared_symbol = *encode_find->second;
-      ++(shared_symbol.ref_count_);
-      return shared_symbol.symbol_;
-    }
-  }
-
-  // If the find() under read-lock failed, we need to release it and take a
-  // write-lock. Note that another thread may race to insert the symbol during
-  // this window of time with the lock released, so we need to check again
-  // under write-lock, which we do by proactively allocating the string and
-  // attempting to insert it into the encode_map. If that worked, we also
-  // write the decode-map, transferring the ownership of the string to the
-  // decode-map value.
-  absl::MutexLock lock(&lock_);
-
-  // If the string segment doesn't already exist, create the actual string as a
-  // nul-terminated char-array and insert into encode_map_, and then insert a
-  // string_view pointing to it in the encode_map_. This allows us to only store
-  // the string once.
-  size_t size = sv.size() + 1;
-  std::unique_ptr<char[]> str = std::make_unique<char[]>(size);
-  StringUtil::strlcpy(str.get(), sv.data(), size);
-
-  auto encode_insert =
-      encode_map_.insert({str.get(), std::make_unique<SharedSymbol>(next_symbol_)});
-  SharedSymbol& shared_symbol = *encode_insert.first->second;
-
-  if (encode_insert.second) {
-    // The insertion took place.
+  Symbol result;
+  auto encode_find = encode_map_.find(sv);
+  // If the string segment doesn't already exist,
+  if (encode_find == encode_map_.end()) {
+    // We create the actual string, place it in the decode_map_, and then insert
+    // a string_view pointing to it in the encode_map_. This allows us to only
+    // store the string once. We use unique_ptr so copies are not made as
+    // flat_hash_map moves values arond.
+    auto str = std::make_unique<std::string>(std::string(sv));
+    auto encode_insert = encode_map_.insert({*str, SharedSymbol(next_symbol_)});
+    ASSERT(encode_insert.second);
     auto decode_insert = decode_map_.insert({next_symbol_, std::move(str)});
     ASSERT(decode_insert.second);
+
+    result = next_symbol_;
     newSymbol();
   } else {
-    // If the insertion didn't take place -- due to another thread racing to
-    // insert the same symbmol after we drop the read-lock above -- we can
-    // return the shared symbol, but we must bump the refcount.
-    ++(shared_symbol.ref_count_);
-
-    // Note: this condition is hard to hit in tests as it requires a tight race
-    // between multiple threads concurrently creating the same symbol.
-    // Uncommenting this line can help rapidly determine coverage during
-    // development. StatNameTest.RacingSymbolCreation hits this occasionally
-    // when testing with optimization, and frequently with fastbuild and debug.
-    //
-    // std::cerr << "Covered insertion race" << std::endl;
+    // If the insertion didn't take place, return the actual value at that location and up the
+    // refcount at that location
+    result = encode_find->second.symbol_;
+    ++(encode_find->second.ref_count_);
   }
-  return shared_symbol.symbol_;
+  return result;
 }
 
 absl::string_view SymbolTable::fromSymbol(const Symbol symbol) const SHARED_LOCKS_REQUIRED(lock_) {
   auto search = decode_map_.find(symbol);
   RELEASE_ASSERT(search != decode_map_.end(), "no such symbol");
-  return absl::string_view(search->second.get());
+  return absl::string_view(*search->second);
 }
 
 void SymbolTable::newSymbol() EXCLUSIVE_LOCKS_REQUIRED(lock_) {
@@ -280,8 +260,9 @@ bool SymbolTable::lessThan(const StatName& a, const StatName& b) const {
   SymbolVec bv = SymbolEncoding::decodeSymbols(b.data(), b.dataSize());
   for (uint64_t i = 0, n = std::min(av.size(), bv.size()); i < n; ++i) {
     if (av[i] != bv[i]) {
-      absl::ReaderMutexLock lock(&lock_);
-      return fromSymbol(av[i]) < fromSymbol(bv[i]);
+      Thread::LockGuard lock(lock_);
+      bool ret = fromSymbol(av[i]) < fromSymbol(bv[i]);
+      return ret;
     }
   }
   return av.size() < bv.size();
@@ -289,18 +270,17 @@ bool SymbolTable::lessThan(const StatName& a, const StatName& b) const {
 
 #ifndef ENVOY_CONFIG_COVERAGE
 void SymbolTable::debugPrint() const {
-  absl::ReaderMutexLock lock(&lock_);
+  Thread::LockGuard lock(lock_);
   std::vector<Symbol> symbols;
   for (const auto& p : decode_map_) {
     symbols.push_back(p.first);
   }
   std::sort(symbols.begin(), symbols.end());
   for (Symbol symbol : symbols) {
-    const char* token = decode_map_.find(symbol)->second.get();
-    const SharedSymbol& shared_symbol = *encode_map_.find(token)->second;
-    std::cout << symbol << ": '" << token << "' (" << shared_symbol.ref_count_ << ")" << std::endl;
+    std::string& token = *decode_map_.find(symbol)->second;
+    const SharedSymbol& shared_symbol = encode_map_.find(token)->second;
+    ENVOY_LOG_MISC(info, "{}: '{}' ({})", symbol, token, shared_symbol.ref_count_);
   }
-  std::cout << std::flush;
 }
 #endif
 

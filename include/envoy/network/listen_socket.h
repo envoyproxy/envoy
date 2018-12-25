@@ -9,9 +9,14 @@
 #include "envoy/network/address.h"
 
 #include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Network {
+
+// Optional variant of setsockopt(2) optname. The idea here is that if the option is not supported
+// on a platform, we can make this the empty value. This allows us to avoid proliferation of #ifdef.
+typedef absl::optional<std::pair<int, int>> SocketOptionName;
 
 /**
  * Base class for Sockets
@@ -57,7 +62,29 @@ public:
      *        not be modified.
      */
     virtual void hashKey(std::vector<uint8_t>& key) const PURE;
+
+    /**
+     * Contains details about what this option applies to a socket.
+     */
+    struct Details {
+      SocketOptionName name_;
+      std::string value_; ///< Binary string representation of an option's value.
+
+      bool operator==(const Details& other) const {
+        return name_ == other.name_ && value_ == other.value_;
+      }
+    };
+
+    /**
+     * @param socket The socket for which we want to know the options that would be applied.
+     * @param state The state at which we would apply the options.
+     * @return What we would apply to the socket at the provided state. Empty if we'd apply nothing.
+     */
+    virtual absl::optional<Details>
+    getOptionDetails(const Socket& socket,
+                     envoy::api::v2::core::SocketOption::SocketState state) const PURE;
   };
+
   typedef std::shared_ptr<const Option> OptionConstSharedPtr;
   typedef std::vector<OptionConstSharedPtr> Options;
   typedef std::shared_ptr<Options> OptionsSharedPtr;

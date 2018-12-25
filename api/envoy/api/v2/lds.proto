@@ -86,7 +86,23 @@ message Listener {
   // Listener metadata.
   core.Metadata metadata = 6;
 
-  reserved 7;
+  // [#not-implemented-hide:]
+  message DeprecatedV1 {
+    // Whether the listener should bind to the port. A listener that doesn’t
+    // bind can only receive connections redirected from other listeners that
+    // set use_original_dst parameter to true. Default is true.
+    //
+    // [V2-API-DIFF] This is deprecated in v2, all Listeners will bind to their
+    // port. An additional filter chain must be created for every original
+    // destination port this listener may redirect to in v2, with the original
+    // port specified in the FilterChainMatch destination_port field.
+    //
+    // [#comment:TODO(PiotrSikora): Remove this once verified that we no longer need it.]
+    google.protobuf.BoolValue bind_to_port = 1;
+  }
+
+  // [#not-implemented-hide:]
+  DeprecatedV1 deprecated_v1 = 7;
 
   enum DrainType {
     // Drain in response to calling /healthcheck/fail admin endpoint (along with the health check

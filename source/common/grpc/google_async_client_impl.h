@@ -10,6 +10,7 @@
 #include "envoy/tracing/http_tracer.h"
 
 #include "common/common/linked_object.h"
+#include "common/common/thread.h"
 #include "common/common/thread_annotations.h"
 #include "common/tracing/http_tracer_impl.h"
 

@@ -133,6 +133,8 @@ public:
   SymbolTable();
   ~SymbolTable();
 
+  inline std::string toString(const StatName&) const;
+
   /**
    * Encodes a stat name using the symbol table, returning a SymbolEncoding. The
    * SymbolEncoding is not intended for long-term storage, but is used to help
@@ -154,9 +156,10 @@ public:
    * @return uint64_t the number of symbols in the symbol table.
    */
   uint64_t numSymbols() const {
-    absl::ReaderMutexLock lock(&lock_);
+    Thread::LockGuard lock(lock_);
     ASSERT(encode_map_.size() == decode_map_.size());
-    return encode_map_.size();
+    uint64_t sz = encode_map_.size();
+    return sz;
   }
 
   /**
@@ -179,11 +182,11 @@ public:
 
   /**
    * Since SymbolTable does manual reference counting, a client of SymbolTable
-   * must manually call free(symbol_vec) when it is freeing the backing store
+   * must manually call free(stat_name) when it is freeing the backing store
    * for a StatName. This way, the symbol table will grow and shrink
    * dynamically, instead of being write-only.
    *
-   * @param symbol_vec the vector of symbols to be freed.
+   * @param stat_name the stat name whose symbols should be freed.
    */
   void free(const StatName& stat_name);
 
@@ -194,7 +197,7 @@ public:
    * helps callers ensure the symbol-storage is maintained for the lifetime
    * of a reference.
    *
-   * @param symbol_vec the vector of symbols to be freed.
+   * @param stat_name the stat name whose symbols should be freed.
    */
   void incRefCount(const StatName& stat_name);
 
@@ -211,10 +214,10 @@ public:
    * should never happen, and we don't want to continue running with a corrupt
    * stats set.
    *
-   * @param stat_name symbol_vec the vector of symbols to decode.
+   * @param symbol_vec the vector of symbols to decode.
    * @return std::string the retrieved stat name.
    */
-  std::string toString(const StatName& stat_name) const;
+  std::string decode(const SymbolStorage symbol_vec, uint64_t size) const;
 
 private:
   friend class StatName;
@@ -224,12 +227,21 @@ private:
     SharedSymbol(Symbol symbol) : symbol_(symbol), ref_count_(1) {}
 
     Symbol symbol_;
-    std::atomic<uint32_t> ref_count_;
+    uint32_t ref_count_;
   };
 
   // This must be held during both encode() and free().
-  mutable absl::Mutex lock_;
+  mutable Thread::MutexBasicLockable lock_;
 
+  /**
+   * Decodes a vector of symbols back into its period-delimited stat name. If
+   * decoding fails on any part of the symbol_vec, we release_assert and crash
+   * hard, since this should never happen, and we don't want to continue running
+   * with a corrupt stats set.
+   *
+   * @param symbols the vector of symbols to decode.
+   * @return std::string the retrieved stat name.
+   */
   std::string decodeSymbolVec(const SymbolVec& symbols) const;
 
   /**
@@ -238,7 +250,7 @@ private:
    * @param sv the individual string to be encoded as a symbol.
    * @return Symbol the encoded string.
    */
-  Symbol toSymbol(absl::string_view sv);
+  Symbol toSymbol(absl::string_view sv) EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
   /**
    * Convenience function for decode(), decoding one symbol at a time.
@@ -251,24 +263,20 @@ private:
   // Stages a new symbol for use. To be called after a successful insertion.
   void newSymbol();
 
-  Symbol monotonicCounter() {
-    absl::ReaderMutexLock lock(&lock_);
-    return monotonic_counter_;
-  }
+  Symbol monotonicCounter() { return monotonic_counter_; }
 
   // Stores the symbol to be used at next insertion. This should exist ahead of insertion time so
   // that if insertion succeeds, the value written is the correct one.
   Symbol next_symbol_ GUARDED_BY(lock_);
 
   // If the free pool is exhausted, we monotonically increase this counter.
-  Symbol monotonic_counter_ GUARDED_BY(lock_);
+  Symbol monotonic_counter_;
 
   // Bimap implementation.
   // The encode map stores both the symbol and the ref count of that symbol.
   // Using absl::string_view lets us only store the complete string once, in the decode map.
-  using EncodeMap =
-      absl::flat_hash_map<absl::string_view, std::unique_ptr<SharedSymbol>, StringViewHash>;
-  using DecodeMap = absl::flat_hash_map<Symbol, std::unique_ptr<char[]>>;
+  using EncodeMap = absl::flat_hash_map<absl::string_view, SharedSymbol, StringViewHash>;
+  using DecodeMap = absl::flat_hash_map<Symbol, std::unique_ptr<std::string>>;
   EncodeMap encode_map_ GUARDED_BY(lock_);
   DecodeMap decode_map_ GUARDED_BY(lock_);
 
@@ -293,8 +301,17 @@ private:
  */
 class StatNameStorage {
 public:
+  // Basic constructor for when you have a name as a string, and need to
+  // generate symbols for it.
   StatNameStorage(absl::string_view name, SymbolTable& table);
+
+  // Move constructor; needed for using StatNameStorage as an
+  // absl::flat_hash_map value.
   StatNameStorage(StatNameStorage&& src) : bytes_(std::move(src.bytes_)) {}
+
+  // Obtains new backing storage for an already existing StatName. Used to
+  // record a computed StatName held in a temp into a more persistent data
+  // structure.
   StatNameStorage(StatName src, SymbolTable& table);
 
   /**
@@ -344,6 +361,8 @@ public:
   // for lookup in a cache, and then on a miss need to store the data directly.
   StatName(const StatName& src, SymbolStorage memory);
 
+  std::string toString(const SymbolTable& table) const;
+
   /**
    * Note that this hash function will return a different hash than that of
    * the elaborated string.
@@ -391,6 +410,9 @@ private:
 };
 
 StatName StatNameStorage::statName() const { return StatName(bytes_.get()); }
+std::string SymbolTable::toString(const StatName& stat_name) const {
+  return stat_name.toString(*this);
+}
 
 /**
  * Joins two or more StatNames. For example if we have StatNames for {"a.b",
@@ -423,12 +445,25 @@ private:
   std::unique_ptr<SymbolStorage> bytes_;
 };
 
+/**
+ * Contains the backing store for a StatName and enough context so it can
+ * self-delete through RAII. This works by augmenting StatNameStorage with a
+ * reference to the SymbolTable&, so it has an extra 8 bytes of footprint. It
+ * is intendended to be used in tests or as a scoped temp in a function, rather
+ * than stored in a larger structure such as a map, where the redundant copies
+ * of the SymbolTable& would be costly in aggregate.
+ */
 class StatNameTempStorage : public StatNameStorage {
 public:
+  // Basic constructor for when you have a name as a string, and need to
+  // generate symbols for it.
   StatNameTempStorage(absl::string_view name, SymbolTable& table)
       : StatNameStorage(name, table), symbol_table_(table) {}
+
+  // Obtains new backing storage for an already existing StatName.
   StatNameTempStorage(StatName src, SymbolTable& table)
       : StatNameStorage(src, table), symbol_table_(table) {}
+
   ~StatNameTempStorage() { free(symbol_table_); }
 
 private:
