@@ -60,6 +60,14 @@ public:
   void addSymbol(Symbol symbol);
 
   /**
+   * Encodes an entire string into the vec, on behalf of FakeSymbolTableImpl.
+   * TODO(jmarantz): delete this method when FakeSymbolTableImpl is deleted.
+   *
+   * @param str The string to encode.
+   */
+  void addStringForFakeSymbolTable(absl::string_view str);
+
+  /**
    * Decodes a uint8_t array into a SymbolVec.
    */
   static SymbolVec decodeSymbols(const SymbolStorage array, uint64_t size);
@@ -329,35 +337,6 @@ private:
 };
 
 StatName StatNameStorage::statName() const { return StatName(bytes_.get()); }
-
-/**
- * Joins two or more StatNames. For example if we have StatNames for {"a.b",
- * "c.d", "e.f"} then the joined stat-name matches "a.b.c.d.e.f". The advantage
- * of using this representation is that it avoids having to decode/encode
- * into the elaborted form, and does not require locking the SymbolTable.
- *
- * The caveat is that this representation does not bump reference counts on
- * for the referenced Symbols in the SymbolTable, so it's only valid as long
- * for the lifetime of the joined StatNames.
- *
- * This is intended for use doing cached name lookups of scoped stats, where
- * the scope prefix and the names to combine it with are already in StatName
- * form. Using this class, they can be combined without acessingm the
- * SymbolTable or, in particular, taking its lock.
- */
-class StatNameJoiner {
-public:
-  StatNameJoiner(StatName a, StatName b);
-  StatNameJoiner(const std::vector<StatName>& stat_names);
-
-  /**
-   * @return StatName a reference to the joined StatName.
-   */
-  StatName statName() const { return StatName(bytes_.get()); }
-
-private:
-  SymbolStoragePtr bytes_;
-};
 
 /**
  * Contains the backing store for a StatName and enough context so it can

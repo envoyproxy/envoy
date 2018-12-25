@@ -2,7 +2,7 @@
 
 #include "common/common/mutex_tracer_impl.h"
 #include "common/memory/stats.h"
-#include "common/stats/fake_symbol_table.h"
+#include "common/stats/fake_symbol_table_impl.h"
 #include "common/stats/symbol_table_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
@@ -15,6 +15,14 @@
 namespace Envoy {
 namespace Stats {
 
+// See comments in fake_symbol_table_impl.h: we need to test two implementations
+// of SymbolTable, which we'll do with a test parameterized on this enum.
+//
+// Note that some of the tests cover behavior that is specific to the real
+// SymbolTableImpl, and thus early-exit when the param is Fake.
+//
+// TODO(jmarantz): un-parameterize this test once SymbolTable is fully deployed
+// and FakeSymbolTableImpl can be deleted.
 enum class SymbolTableType {
   Real,
   Fake,
@@ -31,7 +39,7 @@ protected:
       break;
     }
     case SymbolTableType::Fake:
-      table_ = std::make_unique<FakeSymbolTable>();
+      table_ = std::make_unique<FakeSymbolTableImpl>();
       break;
     }
   }
@@ -77,6 +85,7 @@ TEST_P(StatNameTest, AllocFree) { encodeDecode("hello.world"); }
 TEST_P(StatNameTest, TestArbitrarySymbolRoundtrip) {
   const std::vector<std::string> stat_names = {"", " ", "  ", ",", "\t", "$", "%", "`", "."};
   for (auto stat_name : stat_names) {
+    ENVOY_LOG_MISC(error, "trying {}", stat_name);
     EXPECT_EQ(stat_name, encodeDecode(stat_name));
   }
 }
@@ -486,8 +495,10 @@ TEST_P(StatNameTest, MutexContentionOnExistingSymbols) {
   }
 }
 
-// Tests the memory savings realized from using symbol tables with 1k clusters. This
-// test shows the memory drops from almost 8M to less than 2M.
+// Tests the memory savings realized from using symbol tables with 1k
+// clusters. This test shows the memory drops from almost 8M to less than
+// 2M. Note that only SymbolTableImpl is tested for memory consumption,
+// and not FakeSymbolTableImpl.
 TEST(SymbolTableTest, Memory) {
   if (!TestUtil::hasDeterministicMallocStats()) {
     return;

@@ -26,12 +26,28 @@ namespace Envoy {
 namespace Stats {
 
 /**
- * See the documentation for SymbolTable in symbol_table_impl.h. This is a fake
- * implementation of that, which does not actually keep any tables or map,
- * intended only for transitioning the stats codebase to the SymbolTable API
- * without introducing any computational change.
+ * Implements the SymbolTable interface without taking locks or saving memory.
+ * This implementation is inteneded as a transient state for the Envoy codebase
+ * to allow incremental conversion of Envoy stats call-sites to use the
+ * SymbolTable interface, pre-allocating symbols during construction time for
+ * all stats tokens.
+ *
+ * Once all stat tokens are symbolized at construction time, this
+ * FakeSymbolTable implementation can be deleted, and real-symbol tables can be
+ * used, thereby reducing memory and improving stat construction time.
+ *
+ * Note that it is not necessary to pre-allocate all elaborated stat names
+ * because multiple StatNames can be joined together without taking locks,
+ * even in SymbolTableImpl.
+ *
+ * This implementation simply stores the characters directly in the uint8_t[]
+ * that backs each StatName, so there is no sharing or memory savings, but also
+ * no state associated with the SymbolTable, and thus no locks needed.
+ *
+ * TODO(jmarantz): delete this class once SymbolTable is fully deployed in the
+ * Envoy codebase.
  */
-class FakeSymbolTable : public SymbolTable {
+class FakeSymbolTableImpl : public SymbolTable {
 public:
   SymbolEncoding encode(absl::string_view name) override { return encodeHelper(name); }
 
@@ -65,9 +81,7 @@ public:
 private:
   SymbolEncoding encodeHelper(absl::string_view name) const {
     SymbolEncoding encoding;
-    for (char c : name) {
-      encoding.addSymbol(static_cast<Symbol>(c));
-    }
+    encoding.addStringForFakeSymbolTable(name);
     return encoding;
   }
 

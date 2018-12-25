@@ -133,8 +133,8 @@ public:
    * SymbolTable.
    *
    * The caveat is that this representation does not bump reference counts on
-   * for the referenced Symbols in the SymbolTable, so it's only valid as long
-   * for the lifetime of the joined StatNames.
+   * the referenced Symbols in the SymbolTable, so it's only valid as long for
+   * the lifetime of the joined StatNames.
    *
    * This is intended for use doing cached name lookups of scoped stats, where
    * the scope prefix and the names to combine it with are already in StatName

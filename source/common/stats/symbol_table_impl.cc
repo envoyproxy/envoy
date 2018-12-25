@@ -1,5 +1,6 @@
 #include "common/stats/symbol_table_impl.h"
 
+#include <algorithm>
 #include <memory>
 #include <unordered_map>
 #include <vector>
@@ -57,6 +58,13 @@ void SymbolEncoding::addSymbol(Symbol symbol) {
     }
     symbol >>= 7;
   } while (symbol != 0);
+}
+
+void SymbolEncoding::addStringForFakeSymbolTable(absl::string_view str) {
+  if (!str.empty()) {
+    vec_.resize(str.size());
+    memcpy(&vec_[0], str.data(), str.size());
+  }
 }
 
 SymbolVec SymbolEncoding::decodeSymbols(const SymbolStorage array, uint64_t size) {
@@ -315,7 +323,7 @@ void StatNameStorage::free(SymbolTable& table) {
 SymbolStoragePtr SymbolTableImpl::join(const StatName& a, const StatName& b) const {
   const uint64_t a_size = a.dataSize();
   const uint64_t b_size = b.dataSize();
-  auto bytes = std::make_unique<uint8_t[]>(a_size + b_size);
+  auto bytes = std::make_unique<uint8_t[]>(a_size + b_size + StatNameSizeEncodingBytes);
   uint8_t* p = saveLengthToBytesReturningNext(a_size + b_size, bytes.get());
   memcpy(p, a.data(), a_size);
   memcpy(p + a_size, b.data(), b_size);
