@@ -7,6 +7,8 @@
 #include "common/config/metadata.h"
 #include "common/config/well_known_names.h"
 #include "common/http/context_impl.h"
+#include "common/network/transport_socket_options_impl.h"
+#include "common/network/upstream_server_name.h"
 #include "common/network/utility.h"
 #include "common/router/config_impl.h"
 #include "common/router/router.h"
@@ -47,6 +49,7 @@ using testing::SaveArg;
 
 namespace Envoy {
 namespace Router {
+using ::Envoy::Network::UpstreamServerName;
 
 class TestFilter : public Filter {
 public:
@@ -577,6 +580,38 @@ TEST_F(RouterTest, AddMultipleCookies) {
   Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl{{":status", "200"}});
   response_decoder->decodeHeaders(std::move(response_headers), true);
   router_.onDestroy();
+}
+
+TEST_F(RouterTest, UpstreamServerName) {
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  stream_info.filterState().setData("envoy.network.upstream_server_name",
+                                    std::make_unique<UpstreamServerName>("www.example.com"),
+                                    StreamInfo::FilterState::StateType::ReadOnly);
+  ON_CALL(router_.downstream_connection_, streamInfo()).WillByDefault(ReturnRef(stream_info));
+  EXPECT_CALL(Const(router_.downstream_connection_), streamInfo())
+      .WillRepeatedly(ReturnRef(stream_info));
+
+  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _, _))
+      .WillOnce(Invoke([&](const std::string&, Upstream::ResourcePriority, Http::Protocol,
+                           Upstream::LoadBalancerContext*,
+                           Network::TransportSocketOptionsSharedPtr transport_socket_options)
+                           -> Http::ConnectionPool::Instance* {
+        EXPECT_NE(transport_socket_options, nullptr);
+        EXPECT_TRUE(transport_socket_options->serverNameOverride().has_value());
+        EXPECT_EQ(transport_socket_options->serverNameOverride().value(), "www.example.com");
+        return &cm_.conn_pool_;
+      }));
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
+  expectResponseTimerCreate();
+
+  Http::TestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, true);
+
+  // When the router filter gets reset we should cancel the pool request.
+  EXPECT_CALL(cancellable_, cancel());
+  router_.onDestroy();
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
 }
 
 TEST_F(RouterTest, MetadataNoOp) { EXPECT_EQ(nullptr, router_.metadataMatchCriteria()); }

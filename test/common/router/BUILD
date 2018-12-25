@@ -155,6 +155,8 @@ envoy_cc_test(
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/http:context_lib",
+        "//source/common/network:transport_socket_options_lib",
+        "//source/common/network:upstream_server_name_lib",
         "//source/common/network:utility_lib",
         "//source/common/router:router_lib",
         "//source/common/upstream:upstream_includes",
