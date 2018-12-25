@@ -20,8 +20,9 @@ namespace Envoy {
 
 class ThreadLocalStorePerf {
 public:
-  ThreadLocalStorePerf() : heap_alloc_(symbol_table_),
-                           store_(options_, heap_alloc_), api_(Api::createApiForTest(store_)) {
+  ThreadLocalStorePerf()
+      : heap_alloc_(symbol_table_), store_(options_, heap_alloc_),
+        api_(Api::createApiForTest(store_)) {
     store_.setTagProducer(std::make_unique<Stats::TagProducerImpl>(stats_config_));
 
     Stats::TestUtil::forEachSampleStat(1000, [this](absl::string_view name) {
