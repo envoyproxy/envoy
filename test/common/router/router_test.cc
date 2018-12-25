@@ -145,10 +145,11 @@ public:
           .WillByDefault(Return(nullptr));
     }
 
-    EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
-        .WillOnce(
-            Invoke([&](const std::string&, Upstream::ResourcePriority, Http::Protocol,
-                       Upstream::LoadBalancerContext* context) -> Http::ConnectionPool::Instance* {
+    EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _, _))
+        .WillOnce(Invoke(
+            [&](const std::string&, Upstream::ResourcePriority, Http::Protocol,
+                Upstream::LoadBalancerContext* context,
+                Network::TransportSocketOptionsSharedPtr) -> Http::ConnectionPool::Instance* {
               auto match = context->metadataMatchCriteria()->metadataMatchCriteria();
               EXPECT_EQ(match.size(), 2);
               auto it = match.begin();
@@ -240,7 +241,7 @@ TEST_F(RouterTest, ClusterNotFound) {
 TEST_F(RouterTest, PoolFailureWithPriority) {
   ON_CALL(callbacks_.route_->route_entry_, priority())
       .WillByDefault(Return(Upstream::ResourcePriority::High));
-  EXPECT_CALL(cm_, httpConnPoolForCluster(_, Upstream::ResourcePriority::High, _, &router_));
+  EXPECT_CALL(cm_, httpConnPoolForCluster(_, Upstream::ResourcePriority::High, _, &router_, _));
 
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](Http::StreamDecoder&, Http::ConnectionPool::Callbacks& callbacks)
@@ -270,7 +271,7 @@ TEST_F(RouterTest, PoolFailureWithPriority) {
 TEST_F(RouterTest, Http1Upstream) {
   EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, features());
 
-  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, Http::Protocol::Http11, _));
+  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, Http::Protocol::Http11, _, _));
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
   expectResponseTimerCreate();
 
@@ -292,7 +293,7 @@ TEST_F(RouterTest, Http1Upstream) {
 TEST_F(RouterTestSuppressEnvoyHeaders, Http1Upstream) {
   EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, features());
 
-  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, Http::Protocol::Http11, _));
+  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, Http::Protocol::Http11, _, _));
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
   expectResponseTimerCreate();
 
@@ -312,7 +313,7 @@ TEST_F(RouterTest, Http2Upstream) {
   EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, features())
       .WillOnce(Return(Upstream::ClusterInfo::Features::HTTP2));
 
-  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, Http::Protocol::Http2, _));
+  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, Http::Protocol::Http2, _, _));
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
   expectResponseTimerCreate();
 
@@ -332,7 +333,7 @@ TEST_F(RouterTest, UseDownstreamProtocol1) {
       .WillOnce(Return(Upstream::ClusterInfo::Features::USE_DOWNSTREAM_PROTOCOL));
   EXPECT_CALL(callbacks_.stream_info_, protocol()).WillOnce(ReturnPointee(&downstream_protocol));
 
-  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, Http::Protocol::Http11, _));
+  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, Http::Protocol::Http11, _, _));
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
   expectResponseTimerCreate();
 
@@ -352,7 +353,7 @@ TEST_F(RouterTest, UseDownstreamProtocol2) {
       .WillOnce(Return(Upstream::ClusterInfo::Features::USE_DOWNSTREAM_PROTOCOL));
   EXPECT_CALL(callbacks_.stream_info_, protocol()).WillOnce(ReturnPointee(&downstream_protocol));
 
-  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, Http::Protocol::Http2, _));
+  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, Http::Protocol::Http2, _, _));
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
   expectResponseTimerCreate();
 
@@ -371,10 +372,11 @@ TEST_F(RouterTest, HashPolicy) {
       .WillByDefault(Return(&callbacks_.route_->route_entry_.hash_policy_));
   EXPECT_CALL(callbacks_.route_->route_entry_.hash_policy_, generateHash(_, _, _))
       .WillOnce(Return(absl::optional<uint64_t>(10)));
-  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
+  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _, _))
       .WillOnce(
           Invoke([&](const std::string&, Upstream::ResourcePriority, Http::Protocol,
-                     Upstream::LoadBalancerContext* context) -> Http::ConnectionPool::Instance* {
+                     Upstream::LoadBalancerContext* context,
+                     Network::TransportSocketOptionsSharedPtr) -> Http::ConnectionPool::Instance* {
             EXPECT_EQ(10UL, context->computeHashKey().value());
             return &cm_.conn_pool_;
           }));
@@ -396,10 +398,11 @@ TEST_F(RouterTest, HashPolicyNoHash) {
       .WillByDefault(Return(&callbacks_.route_->route_entry_.hash_policy_));
   EXPECT_CALL(callbacks_.route_->route_entry_.hash_policy_, generateHash(_, _, _))
       .WillOnce(Return(absl::optional<uint64_t>()));
-  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, &router_))
+  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, &router_, _))
       .WillOnce(
           Invoke([&](const std::string&, Upstream::ResourcePriority, Http::Protocol,
-                     Upstream::LoadBalancerContext* context) -> Http::ConnectionPool::Instance* {
+                     Upstream::LoadBalancerContext* context,
+                     Network::TransportSocketOptionsSharedPtr) -> Http::ConnectionPool::Instance* {
             EXPECT_FALSE(context->computeHashKey());
             return &cm_.conn_pool_;
           }));
@@ -435,10 +438,11 @@ TEST_F(RouterTest, AddCookie) {
         return &cancellable_;
       }));
 
-  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
+  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _, _))
       .WillOnce(
           Invoke([&](const std::string&, Upstream::ResourcePriority, Http::Protocol,
-                     Upstream::LoadBalancerContext* context) -> Http::ConnectionPool::Instance* {
+                     Upstream::LoadBalancerContext* context,
+                     Network::TransportSocketOptionsSharedPtr) -> Http::ConnectionPool::Instance* {
             EXPECT_EQ(10UL, context->computeHashKey().value());
             return &cm_.conn_pool_;
           }));
@@ -482,10 +486,11 @@ TEST_F(RouterTest, AddCookieNoDuplicate) {
         return &cancellable_;
       }));
 
-  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
+  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _, _))
       .WillOnce(
           Invoke([&](const std::string&, Upstream::ResourcePriority, Http::Protocol,
-                     Upstream::LoadBalancerContext* context) -> Http::ConnectionPool::Instance* {
+                     Upstream::LoadBalancerContext* context,
+                     Network::TransportSocketOptionsSharedPtr) -> Http::ConnectionPool::Instance* {
             EXPECT_EQ(10UL, context->computeHashKey().value());
             return &cm_.conn_pool_;
           }));
@@ -529,10 +534,11 @@ TEST_F(RouterTest, AddMultipleCookies) {
         return &cancellable_;
       }));
 
-  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
+  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _, _))
       .WillOnce(
           Invoke([&](const std::string&, Upstream::ResourcePriority, Http::Protocol,
-                     Upstream::LoadBalancerContext* context) -> Http::ConnectionPool::Instance* {
+                     Upstream::LoadBalancerContext* context,
+                     Network::TransportSocketOptionsSharedPtr) -> Http::ConnectionPool::Instance* {
             EXPECT_EQ(10UL, context->computeHashKey().value());
             return &cm_.conn_pool_;
           }));
@@ -578,10 +584,11 @@ TEST_F(RouterTest, MetadataNoOp) { EXPECT_EQ(nullptr, router_.metadataMatchCrite
 TEST_F(RouterTest, MetadataMatchCriteria) {
   ON_CALL(callbacks_.route_->route_entry_, metadataMatchCriteria())
       .WillByDefault(Return(&callbacks_.route_->route_entry_.metadata_matches_criteria_));
-  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
+  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _, _))
       .WillOnce(
           Invoke([&](const std::string&, Upstream::ResourcePriority, Http::Protocol,
-                     Upstream::LoadBalancerContext* context) -> Http::ConnectionPool::Instance* {
+                     Upstream::LoadBalancerContext* context,
+                     Network::TransportSocketOptionsSharedPtr) -> Http::ConnectionPool::Instance* {
             EXPECT_EQ(context->metadataMatchCriteria(),
                       &callbacks_.route_->route_entry_.metadata_matches_criteria_);
             return &cm_.conn_pool_;
@@ -608,10 +615,11 @@ TEST_F(RouterTest, MetadataMatchCriteriaFromRequestNoRouteEntryMatch) {
 
 TEST_F(RouterTest, NoMetadataMatchCriteria) {
   ON_CALL(callbacks_.route_->route_entry_, metadataMatchCriteria()).WillByDefault(Return(nullptr));
-  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
+  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _, _))
       .WillOnce(
           Invoke([&](const std::string&, Upstream::ResourcePriority, Http::Protocol,
-                     Upstream::LoadBalancerContext* context) -> Http::ConnectionPool::Instance* {
+                     Upstream::LoadBalancerContext* context,
+                     Network::TransportSocketOptionsSharedPtr) -> Http::ConnectionPool::Instance* {
             EXPECT_EQ(context->metadataMatchCriteria(), nullptr);
             return &cm_.conn_pool_;
           }));
@@ -642,7 +650,7 @@ TEST_F(RouterTest, CancelBeforeBoundToPool) {
 }
 
 TEST_F(RouterTest, NoHost) {
-  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _)).WillOnce(Return(nullptr));
+  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _, _)).WillOnce(Return(nullptr));
 
   Http::TestHeaderMapImpl response_headers{
       {":status", "503"}, {"content-length", "19"}, {"content-type", "text/plain"}};
@@ -1239,7 +1247,7 @@ TEST_F(RouterTest, RetryNoneHealthy) {
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(503));
   encoder1.stream_.resetStream(Http::StreamResetReason::LocalReset);
 
-  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _)).WillOnce(Return(nullptr));
+  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _, _)).WillOnce(Return(nullptr));
   Http::TestHeaderMapImpl response_headers{
       {":status", "503"}, {"content-length", "19"}, {"content-type", "text/plain"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));

@@ -66,7 +66,7 @@ public:
 
   Http2ConnPoolImplTest()
       : api_(Api::createApiForTest(stats_store_)),
-        pool_(dispatcher_, host_, Upstream::ResourcePriority::Default, nullptr) {}
+        pool_(dispatcher_, host_, Upstream::ResourcePriority::Default, nullptr, nullptr) {}
 
   ~Http2ConnPoolImplTest() {
     // Make sure all gauges are 0.

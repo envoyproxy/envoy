@@ -51,9 +51,9 @@ public:
                            AccessLog::AccessLogManager& log_manager, Event::Dispatcher& dispatcher,
                            Server::Admin& admin, Api::Api& api, Http::Context& http_context);
 
-  Http::ConnectionPool::Instance* httpConnPoolForCluster(const std::string&, ResourcePriority,
-                                                         Http::Protocol,
-                                                         LoadBalancerContext*) override;
+  Http::ConnectionPool::Instance*
+  httpConnPoolForCluster(const std::string&, ResourcePriority, Http::Protocol, LoadBalancerContext*,
+                         Network::TransportSocketOptionsSharedPtr) override;
   Host::CreateConnectionData tcpConnForCluster(const std::string&, LoadBalancerContext*,
                                                Network::TransportSocketOptionsSharedPtr) override;
   Http::AsyncClient& httpAsyncClientForCluster(const std::string&) override;

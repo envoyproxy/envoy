@@ -196,10 +196,11 @@ public:
                                  const LocalInfo::LocalInfo& local_info,
                                  AccessLog::AccessLogManager& log_manager, Server::Admin& admin));
 
-  MOCK_METHOD5(allocateConnPool, Http::ConnectionPool::InstancePtr(
+  MOCK_METHOD6(allocateConnPool, Http::ConnectionPool::InstancePtr(
                                      Event::Dispatcher& dispatcher, HostConstSharedPtr host,
                                      ResourcePriority priority, Http::Protocol protocol,
-                                     const Network::ConnectionSocket::OptionsSharedPtr& options));
+                                     const Network::ConnectionSocket::OptionsSharedPtr& options,
+                                     Network::TransportSocketOptionsSharedPtr));
 
   MOCK_METHOD5(allocateTcpConnPool, Tcp::ConnectionPool::InstancePtr(
                                         Event::Dispatcher& dispatcher, HostConstSharedPtr host,
@@ -253,10 +254,11 @@ public:
   MOCK_METHOD1(setInitializedCb, void(std::function<void()>));
   MOCK_METHOD0(clusters, ClusterInfoMap());
   MOCK_METHOD1(get, ThreadLocalCluster*(const std::string& cluster));
-  MOCK_METHOD4(httpConnPoolForCluster,
-               Http::ConnectionPool::Instance*(const std::string& cluster,
-                                               ResourcePriority priority, Http::Protocol protocol,
-                                               LoadBalancerContext* context));
+  MOCK_METHOD5(httpConnPoolForCluster,
+               Http::ConnectionPool::Instance*(
+                   const std::string& cluster, ResourcePriority priority, Http::Protocol protocol,
+                   LoadBalancerContext* context,
+                   Network::TransportSocketOptionsSharedPtr transport_socket_options));
   MOCK_METHOD4(tcpConnPoolForCluster,
                Tcp::ConnectionPool::Instance*(
                    const std::string& cluster, ResourcePriority priority,

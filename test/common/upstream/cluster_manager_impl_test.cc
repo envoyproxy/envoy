@@ -68,7 +68,8 @@ public:
 
   Http::ConnectionPool::InstancePtr
   allocateConnPool(Event::Dispatcher&, HostConstSharedPtr host, ResourcePriority, Http::Protocol,
-                   const Network::ConnectionSocket::OptionsSharedPtr&) override {
+                   const Network::ConnectionSocket::OptionsSharedPtr&,
+                   Network::TransportSocketOptionsSharedPtr) override {
     return Http::ConnectionPool::InstancePtr{allocateConnPool_(host)};
   }
 
@@ -719,9 +720,11 @@ TEST_F(ClusterManagerImplTest, UnknownCluster) {
 
   create(parseBootstrapFromJson(json));
   EXPECT_EQ(nullptr, cluster_manager_->get("hello"));
-  EXPECT_EQ(nullptr, cluster_manager_->httpConnPoolForCluster("hello", ResourcePriority::Default,
-                                                              Http::Protocol::Http2, nullptr));
+
   Network::TransportSocketOptionsSharedPtr transport_socket_options;
+  EXPECT_EQ(nullptr, cluster_manager_->httpConnPoolForCluster("hello", ResourcePriority::Default,
+                                                              Http::Protocol::Http2, nullptr,
+                                                              transport_socket_options));
   EXPECT_EQ(nullptr, cluster_manager_->tcpConnPoolForCluster("hello", ResourcePriority::Default,
                                                              nullptr, transport_socket_options));
   EXPECT_THROW(cluster_manager_->tcpConnForCluster("hello", nullptr, transport_socket_options),
@@ -1108,7 +1111,7 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   Http::ConnectionPool::MockInstance* cp = new Http::ConnectionPool::MockInstance();
   EXPECT_CALL(factory_, allocateConnPool_(_)).WillOnce(Return(cp));
   EXPECT_EQ(cp, cluster_manager_->httpConnPoolForCluster("fake_cluster", ResourcePriority::Default,
-                                                         Http::Protocol::Http11, nullptr));
+                                                         Http::Protocol::Http11, nullptr, nullptr));
 
   Tcp::ConnectionPool::MockInstance* cp2 = new Tcp::ConnectionPool::MockInstance();
   EXPECT_CALL(factory_, allocateTcpConnPool_(_)).WillOnce(Return(cp2));
@@ -1215,7 +1218,7 @@ TEST_F(ClusterManagerImplTest, CloseHttpConnectionsOnHealthFailure) {
 
     EXPECT_CALL(factory_, allocateConnPool_(_)).WillOnce(Return(cp1));
     cluster_manager_->httpConnPoolForCluster("some_cluster", ResourcePriority::Default,
-                                             Http::Protocol::Http11, nullptr);
+                                             Http::Protocol::Http11, nullptr, nullptr);
 
     outlier_detector.runCallbacks(test_host);
     health_checker.runCallbacks(test_host, HealthTransition::Unchanged);
@@ -1226,7 +1229,7 @@ TEST_F(ClusterManagerImplTest, CloseHttpConnectionsOnHealthFailure) {
 
     EXPECT_CALL(factory_, allocateConnPool_(_)).WillOnce(Return(cp2));
     cluster_manager_->httpConnPoolForCluster("some_cluster", ResourcePriority::High,
-                                             Http::Protocol::Http11, nullptr);
+                                             Http::Protocol::Http11, nullptr, nullptr);
   }
 
   // Order of these calls is implementation dependent, so can't sequence them!
@@ -1460,8 +1463,9 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
   EXPECT_FALSE(cluster_manager_->get("cluster_1")->info()->addedViaApi());
 
   // Test for no hosts returning the correct values before we have hosts.
-  EXPECT_EQ(nullptr, cluster_manager_->httpConnPoolForCluster(
-                         "cluster_1", ResourcePriority::Default, Http::Protocol::Http11, nullptr));
+  EXPECT_EQ(nullptr,
+            cluster_manager_->httpConnPoolForCluster("cluster_1", ResourcePriority::Default,
+                                                     Http::Protocol::Http11, nullptr, nullptr));
   EXPECT_EQ(nullptr, cluster_manager_->tcpConnPoolForCluster("cluster_1", ResourcePriority::Default,
                                                              nullptr, nullptr));
   EXPECT_EQ(nullptr,
@@ -1487,16 +1491,16 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
   // This should provide us a CP for each of the above hosts.
   Http::ConnectionPool::MockInstance* cp1 =
       dynamic_cast<Http::ConnectionPool::MockInstance*>(cluster_manager_->httpConnPoolForCluster(
-          "cluster_1", ResourcePriority::Default, Http::Protocol::Http11, nullptr));
+          "cluster_1", ResourcePriority::Default, Http::Protocol::Http11, nullptr, nullptr));
   Http::ConnectionPool::MockInstance* cp2 =
       dynamic_cast<Http::ConnectionPool::MockInstance*>(cluster_manager_->httpConnPoolForCluster(
-          "cluster_1", ResourcePriority::Default, Http::Protocol::Http11, nullptr));
+          "cluster_1", ResourcePriority::Default, Http::Protocol::Http11, nullptr, nullptr));
   Http::ConnectionPool::MockInstance* cp1_high =
       dynamic_cast<Http::ConnectionPool::MockInstance*>(cluster_manager_->httpConnPoolForCluster(
-          "cluster_1", ResourcePriority::High, Http::Protocol::Http11, nullptr));
+          "cluster_1", ResourcePriority::High, Http::Protocol::Http11, nullptr, nullptr));
   Http::ConnectionPool::MockInstance* cp2_high =
       dynamic_cast<Http::ConnectionPool::MockInstance*>(cluster_manager_->httpConnPoolForCluster(
-          "cluster_1", ResourcePriority::High, Http::Protocol::Http11, nullptr));
+          "cluster_1", ResourcePriority::High, Http::Protocol::Http11, nullptr, nullptr));
 
   EXPECT_NE(cp1, cp2);
   EXPECT_NE(cp1_high, cp2_high);
@@ -1550,10 +1554,10 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
   // Make sure we get back the same connection pool for the 2nd host as we did before the change.
   Http::ConnectionPool::MockInstance* cp3 =
       dynamic_cast<Http::ConnectionPool::MockInstance*>(cluster_manager_->httpConnPoolForCluster(
-          "cluster_1", ResourcePriority::Default, Http::Protocol::Http11, nullptr));
+          "cluster_1", ResourcePriority::Default, Http::Protocol::Http11, nullptr, nullptr));
   Http::ConnectionPool::MockInstance* cp3_high =
       dynamic_cast<Http::ConnectionPool::MockInstance*>(cluster_manager_->httpConnPoolForCluster(
-          "cluster_1", ResourcePriority::High, Http::Protocol::Http11, nullptr));
+          "cluster_1", ResourcePriority::High, Http::Protocol::Http11, nullptr, nullptr));
   EXPECT_EQ(cp2, cp3);
   EXPECT_EQ(cp2_high, cp3_high);
 
@@ -1609,8 +1613,9 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
       new Network::TransportSocketOptionsImpl("ibm.com"));
 
   // Test for no hosts returning the correct values before we have hosts.
-  EXPECT_EQ(nullptr, cluster_manager_->httpConnPoolForCluster(
-                         "cluster_1", ResourcePriority::Default, Http::Protocol::Http11, nullptr));
+  EXPECT_EQ(nullptr,
+            cluster_manager_->httpConnPoolForCluster("cluster_1", ResourcePriority::Default,
+                                                     Http::Protocol::Http11, nullptr, nullptr));
   EXPECT_EQ(nullptr, cluster_manager_->tcpConnPoolForCluster("cluster_1", ResourcePriority::Default,
                                                              nullptr, nullptr));
   EXPECT_EQ(nullptr,
@@ -1652,16 +1657,16 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
   // This should provide us a CP for each of the above hosts.
   Http::ConnectionPool::MockInstance* cp1 =
       dynamic_cast<Http::ConnectionPool::MockInstance*>(cluster_manager_->httpConnPoolForCluster(
-          "cluster_1", ResourcePriority::Default, Http::Protocol::Http11, nullptr));
+          "cluster_1", ResourcePriority::Default, Http::Protocol::Http11, nullptr, nullptr));
   Http::ConnectionPool::MockInstance* cp2 =
       dynamic_cast<Http::ConnectionPool::MockInstance*>(cluster_manager_->httpConnPoolForCluster(
-          "cluster_1", ResourcePriority::Default, Http::Protocol::Http11, nullptr));
+          "cluster_1", ResourcePriority::Default, Http::Protocol::Http11, nullptr, nullptr));
   Http::ConnectionPool::MockInstance* cp1_high =
       dynamic_cast<Http::ConnectionPool::MockInstance*>(cluster_manager_->httpConnPoolForCluster(
-          "cluster_1", ResourcePriority::High, Http::Protocol::Http11, nullptr));
+          "cluster_1", ResourcePriority::High, Http::Protocol::Http11, nullptr, nullptr));
   Http::ConnectionPool::MockInstance* cp2_high =
       dynamic_cast<Http::ConnectionPool::MockInstance*>(cluster_manager_->httpConnPoolForCluster(
-          "cluster_1", ResourcePriority::High, Http::Protocol::Http11, nullptr));
+          "cluster_1", ResourcePriority::High, Http::Protocol::Http11, nullptr, nullptr));
 
   EXPECT_NE(cp1, cp2);
   EXPECT_NE(cp1_high, cp2_high);
@@ -1766,10 +1771,10 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
   // Make sure we get back the same connection pool for the 2nd host as we did before the change.
   Http::ConnectionPool::MockInstance* cp3 =
       dynamic_cast<Http::ConnectionPool::MockInstance*>(cluster_manager_->httpConnPoolForCluster(
-          "cluster_1", ResourcePriority::Default, Http::Protocol::Http11, nullptr));
+          "cluster_1", ResourcePriority::Default, Http::Protocol::Http11, nullptr, nullptr));
   Http::ConnectionPool::MockInstance* cp3_high =
       dynamic_cast<Http::ConnectionPool::MockInstance*>(cluster_manager_->httpConnPoolForCluster(
-          "cluster_1", ResourcePriority::High, Http::Protocol::Http11, nullptr));
+          "cluster_1", ResourcePriority::High, Http::Protocol::Http11, nullptr, nullptr));
   EXPECT_EQ(cp2, cp3);
   EXPECT_EQ(cp2_high, cp3_high);
 
@@ -1844,7 +1849,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveDefaultPriority) {
 
   Http::ConnectionPool::MockInstance* cp =
       dynamic_cast<Http::ConnectionPool::MockInstance*>(cluster_manager_->httpConnPoolForCluster(
-          "cluster_1", ResourcePriority::Default, Http::Protocol::Http11, nullptr));
+          "cluster_1", ResourcePriority::Default, Http::Protocol::Http11, nullptr, nullptr));
 
   Tcp::ConnectionPool::MockInstance* tcp =
       dynamic_cast<Tcp::ConnectionPool::MockInstance*>(cluster_manager_->tcpConnPoolForCluster(
@@ -1920,7 +1925,7 @@ TEST_F(ClusterManagerImplTest, ConnPoolDestroyWithDraining) {
 
   Http::ConnectionPool::MockInstance* cp =
       dynamic_cast<Http::ConnectionPool::MockInstance*>(cluster_manager_->httpConnPoolForCluster(
-          "cluster_1", ResourcePriority::Default, Http::Protocol::Http11, nullptr));
+          "cluster_1", ResourcePriority::Default, Http::Protocol::Http11, nullptr, nullptr));
 
   Tcp::ConnectionPool::MockInstance* tcp =
       dynamic_cast<Tcp::ConnectionPool::MockInstance*>(cluster_manager_->tcpConnPoolForCluster(
@@ -1964,8 +1969,9 @@ TEST_F(ClusterManagerImplTest, OriginalDstInitialization) {
   EXPECT_FALSE(cluster_manager_->get("cluster_1")->info()->addedViaApi());
 
   // Test for no hosts returning the correct values before we have hosts.
-  EXPECT_EQ(nullptr, cluster_manager_->httpConnPoolForCluster(
-                         "cluster_1", ResourcePriority::Default, Http::Protocol::Http11, nullptr));
+  EXPECT_EQ(nullptr,
+            cluster_manager_->httpConnPoolForCluster("cluster_1", ResourcePriority::Default,
+                                                     Http::Protocol::Http11, nullptr, nullptr));
   EXPECT_EQ(nullptr, cluster_manager_->tcpConnPoolForCluster("cluster_1", ResourcePriority::Default,
                                                              nullptr, nullptr));
   EXPECT_EQ(nullptr,

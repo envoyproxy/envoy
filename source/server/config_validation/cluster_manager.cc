@@ -46,7 +46,8 @@ ValidationClusterManager::ValidationClusterManager(
 
 Http::ConnectionPool::Instance*
 ValidationClusterManager::httpConnPoolForCluster(const std::string&, ResourcePriority,
-                                                 Http::Protocol, LoadBalancerContext*) {
+                                                 Http::Protocol, LoadBalancerContext*,
+                                                 Network::TransportSocketOptionsSharedPtr) {
   return nullptr;
 }
 

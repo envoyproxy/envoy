@@ -32,7 +32,8 @@ class ConnPoolImpl : public ConnectionPool::Instance, public ConnPoolImplBase {
 public:
   ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                Upstream::ResourcePriority priority,
-               const Network::ConnectionSocket::OptionsSharedPtr& options);
+               const Network::ConnectionSocket::OptionsSharedPtr& options,
+               Network::TransportSocketOptionsSharedPtr transport_socket_options);
 
   ~ConnPoolImpl();
 
@@ -118,6 +119,7 @@ protected:
   std::list<ActiveClientPtr> busy_clients_;
   std::list<DrainedCb> drained_callbacks_;
   const Network::ConnectionSocket::OptionsSharedPtr socket_options_;
+  Network::TransportSocketOptionsSharedPtr transport_socket_options_;
   Event::TimerPtr upstream_ready_timer_;
   bool upstream_ready_enabled_{false};
 };
@@ -129,8 +131,9 @@ class ConnPoolImplProd : public ConnPoolImpl {
 public:
   ConnPoolImplProd(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                    Upstream::ResourcePriority priority,
-                   const Network::ConnectionSocket::OptionsSharedPtr& options)
-      : ConnPoolImpl(dispatcher, host, priority, options) {}
+                   const Network::ConnectionSocket::OptionsSharedPtr& options,
+                   Network::TransportSocketOptionsSharedPtr transport_socket_options)
+      : ConnPoolImpl(dispatcher, host, priority, options, transport_socket_options) {}
 
   // ConnPoolImpl
   CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) override;

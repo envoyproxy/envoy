@@ -22,9 +22,10 @@ namespace Http1 {
 
 ConnPoolImpl::ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                            Upstream::ResourcePriority priority,
-                           const Network::ConnectionSocket::OptionsSharedPtr& options)
+                           const Network::ConnectionSocket::OptionsSharedPtr& options,
+                           Network::TransportSocketOptionsSharedPtr transport_socket_options)
     : ConnPoolImplBase(std::move(host), std::move(priority)), dispatcher_(dispatcher),
-      socket_options_(options),
+      socket_options_(options), transport_socket_options_(transport_socket_options),
       upstream_ready_timer_(dispatcher_.createTimer([this]() { onUpstreamReady(); })) {}
 
 ConnPoolImpl::~ConnPoolImpl() {
@@ -284,8 +285,8 @@ ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
 
   parent_.conn_connect_ms_ = std::make_unique<Stats::Timespan>(
       parent_.host_->cluster().stats().upstream_cx_connect_ms_, parent_.dispatcher_.timeSystem());
-  Upstream::Host::CreateConnectionData data =
-      parent_.host_->createConnection(parent_.dispatcher_, parent_.socket_options_, nullptr);
+  Upstream::Host::CreateConnectionData data = parent_.host_->createConnection(
+      parent_.dispatcher_, parent_.socket_options_, parent_.transport_socket_options_);
   real_host_description_ = data.host_description_;
   codec_client_ = parent_.createCodecClient(data);
   codec_client_->addConnectionCallbacks(*this);

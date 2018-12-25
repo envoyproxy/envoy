@@ -24,12 +24,15 @@
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
+#include "common/network/transport_socket_options_impl.h"
+#include "common/network/upstream_server_name.h"
 #include "common/router/config_impl.h"
 #include "common/router/retry_state_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 
 namespace Envoy {
 namespace Router {
+using ::Envoy::Network::UpstreamServerName;
 namespace {
 uint32_t getLength(const Buffer::Instance* instance) { return instance ? instance->length() : 0; }
 } // namespace
@@ -348,8 +351,21 @@ Http::ConnectionPool::Instance* Filter::getConnPool() {
     protocol = (features & Upstream::ClusterInfo::Features::HTTP2) ? Http::Protocol::Http2
                                                                    : Http::Protocol::Http11;
   }
+
+  Network::TransportSocketOptionsSharedPtr transport_socket_options;
+
+  if (downstreamConnection() &&
+      downstreamConnection()->streamInfo().filterState().hasData<UpstreamServerName>(
+          UpstreamServerName::key())) {
+    const auto& original_requested_server_name =
+        downstreamConnection()->streamInfo().filterState().getDataReadOnly<UpstreamServerName>(
+            UpstreamServerName::key());
+    transport_socket_options = std::make_shared<Network::TransportSocketOptionsImpl>(
+        original_requested_server_name.value());
+  }
+
   return config_.cm_.httpConnPoolForCluster(route_entry_->clusterName(), route_entry_->priority(),
-                                            protocol, this);
+                                            protocol, this, transport_socket_options);
 }
 
 void Filter::sendNoHealthyUpstreamResponse() {

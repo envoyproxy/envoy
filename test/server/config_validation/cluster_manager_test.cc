@@ -46,8 +46,9 @@ TEST(ValidationClusterManagerTest, MockedMethods) {
   const envoy::config::bootstrap::v2::Bootstrap bootstrap;
   ClusterManagerPtr cluster_manager = factory.clusterManagerFromProto(
       bootstrap, stats_store, tls, runtime, random, local_info, log_manager, admin);
-  EXPECT_EQ(nullptr, cluster_manager->httpConnPoolForCluster("cluster", ResourcePriority::Default,
-                                                             Http::Protocol::Http11, nullptr));
+  EXPECT_EQ(nullptr,
+            cluster_manager->httpConnPoolForCluster("cluster", ResourcePriority::Default,
+                                                    Http::Protocol::Http11, nullptr, nullptr));
   Host::CreateConnectionData data = cluster_manager->tcpConnForCluster("cluster", nullptr, nullptr);
   EXPECT_EQ(nullptr, data.connection_);
   EXPECT_EQ(nullptr, data.host_description_);
