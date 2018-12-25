@@ -7,3 +7,8 @@ api_proto_library_internal(
     srcs = ["capture.proto"],
     deps = ["//envoy/api/v2/core:address"],
 )
+
+api_proto_library_internal(
+    name = "http",
+    srcs = ["http.proto"],
+)

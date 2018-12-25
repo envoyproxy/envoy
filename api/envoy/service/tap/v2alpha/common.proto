@@ -1,0 +1,88 @@
+syntax = "proto3";
+
+import "envoy/api/v2/route/route.proto";
+
+import "validate/validate.proto";
+
+package envoy.service.tap.v2alpha;
+option java_package = "io.envoyproxy.envoy.service.tap.v2alpha";
+option java_multiple_files = true;
+
+// [#protodoc-title: Common tap configuration]
+
+// Tap configuration.
+message TapConfig {
+  // The match conditions. One or more match configurations can be specified. If any of them
+  // match the data source being tapped, a tap will occur, with the result written to the
+  // configured output.
+  repeated MatchConfig match_configs = 1 [(validate.rules).repeated .min_items = 1];
+
+  // The tap output configuration. If a match configuration matches a data source being tapped,
+  // a tap will occur and the data will be written to the configured output.
+  OutputConfig output_config = 2 [(validate.rules).message.required = true];
+
+  // [#comment:TODO(mattklein123): Rate limiting]
+}
+
+// Tap match configuration. Within a single match configuration, all conditions are evaluated as
+// a logical AND. Logical OR matching can be implemented via multiple match configurations in the
+// top level tap configuration.
+message MatchConfig {
+  // Match ID used for correlating tap data with the match that produced it.
+  string match_id = 1 [(validate.rules).string.min_bytes = 1];
+
+  // HTTP match configuration. Only useful for HTTP aware tap extensions such as the
+  // :ref:`HTTP tap filter <config_http_filters_tap>`.
+  HttpMatchConfig http_match_config = 2;
+}
+
+// HTTP match configuration.
+message HttpMatchConfig {
+  // HTTP request match configuration.
+  HttpRequestMatchConfig request_match_config = 1;
+
+  // HTTP response match configuration.
+  HttpResponseMatchConfig response_match_config = 2;
+}
+
+// HTTP request match configuration.
+message HttpRequestMatchConfig {
+  // HTTP request headers to match.
+  repeated api.v2.route.HeaderMatcher headers = 1;
+}
+
+// HTTP response match configuration.
+message HttpResponseMatchConfig {
+  // HTTP response headers to match.
+  repeated api.v2.route.HeaderMatcher headers = 1;
+}
+
+// Tap output configuration.
+message OutputConfig {
+  // Output sinks for tap data. Currently a single sink is allowed in the list. Once multiple
+  // sink types are supported this constraint will be relaxed.
+  repeated OutputSink sinks = 1 [(validate.rules).repeated = {min_items: 1, max_items: 1}];
+
+  // [#comment:TODO(mattklein123): Output filtering. E.g., certain headers, truncated body, etc.]
+}
+
+// Tap output sink configuration.
+message OutputSink {
+  oneof output_sink_type {
+    option (validate.required) = true;
+
+    // Tap output will be streamed out the :http:post:`/tap` admin endpoint.
+    //
+    // .. attention::
+    //
+    //   It is only allowed to specify the streaming admin output sink if the tap is being
+    //   configured from the :http:post:`/tap` admin endpoint. Thus, if an extension has
+    //   been configured to receive tap configuration from some other source (e.g., static
+    //   file, XDS, etc.) configuring the streaming admin output type will fail.
+    StreamingAdminSink streaming_admin = 1;
+  }
+}
+
+// Streaming admin sink configuration.
+message StreamingAdminSink {
+}

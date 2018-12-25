@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package envoy.data.tap.v2alpha;
+option java_package = "io.envoyproxy.envoy.data.tap.v2alpha";
+option java_multiple_files = true;
+
+// [#protodoc-title: HTTP tap data]
+
+// A fully buffered HTTP trace message.
+message HttpBufferedTrace {
+  message Header {
+    // Header key.
+    string key = 1;
+
+    // Header value.
+    string value = 2;
+  }
+
+  // The match ID specified in the :ref:`match_id
+  // <envoy_api_field_service.tap.v2alpha.MatchConfig.match_id>` field.
+  string match_id = 1;
+
+  // Request headers.
+  repeated Header request_headers = 2;
+
+  // Response headers.
+  repeated Header response_headers = 3;
+}

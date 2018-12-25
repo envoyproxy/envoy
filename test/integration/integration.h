@@ -40,6 +40,7 @@ public:
   void waitForBodyData(uint64_t size);
   void waitForEndStream();
   void waitForReset();
+  void clearBody() { body_.clear(); }
 
   // Http::StreamDecoder
   void decode100ContinueHeaders(Http::HeaderMapPtr&& headers) override;

@@ -54,6 +54,7 @@ PROTO_RST="
   /envoy/admin/v2alpha/clusters/envoy/admin/v2alpha/metrics.proto.rst
   /envoy/admin/v2alpha/mutex_stats/envoy/admin/v2alpha/mutex_stats.proto.rst
   /envoy/admin/v2alpha/server_info/envoy/admin/v2alpha/server_info.proto.rst
+  /envoy/admin/v2alpha/tap/envoy/admin/v2alpha/tap.proto.rst
   /envoy/api/v2/core/address/envoy/api/v2/core/address.proto.rst
   /envoy/api/v2/core/base/envoy/api/v2/core/base.proto.rst
   /envoy/api/v2/core/http_uri/envoy/api/v2/core/http_uri.proto.rst
@@ -95,6 +96,7 @@ PROTO_RST="
   /envoy/config/filter/http/rbac/v2/rbac/envoy/config/filter/http/rbac/v2/rbac.proto.rst
   /envoy/config/filter/http/router/v2/router/envoy/config/filter/http/router/v2/router.proto.rst
   /envoy/config/filter/http/squash/v2/squash/envoy/config/filter/http/squash/v2/squash.proto.rst
+  /envoy/config/filter/http/tap/v2alpha/tap/envoy/config/filter/http/tap/v2alpha/tap.proto.rst
   /envoy/config/filter/http/transcoder/v2/transcoder/envoy/config/filter/http/transcoder/v2/transcoder.proto.rst
   /envoy/config/filter/network/client_ssl_auth/v2/client_ssl_auth/envoy/config/filter/network/client_ssl_auth/v2/client_ssl_auth.proto.rst
   /envoy/config/filter/network/ext_authz/v2/ext_authz/envoy/config/filter/network/ext_authz/v2/ext_authz.proto.rst
@@ -117,10 +119,12 @@ PROTO_RST="
   /envoy/data/accesslog/v2/accesslog/envoy/data/accesslog/v2/accesslog.proto.rst
   /envoy/data/core/v2alpha/health_check_event/envoy/data/core/v2alpha/health_check_event.proto.rst
   /envoy/data/tap/v2alpha/capture/envoy/data/tap/v2alpha/capture.proto.rst
+  /envoy/data/tap/v2alpha/http/envoy/data/tap/v2alpha/http.proto.rst
   /envoy/service/accesslog/v2/als/envoy/service/accesslog/v2/als.proto.rst
   /envoy/service/auth/v2alpha/external_auth/envoy/service/auth/v2alpha/attribute_context.proto.rst
   /envoy/service/auth/v2alpha/external_auth/envoy/service/auth/v2alpha/external_auth.proto.rst
   /envoy/service/ratelimit/v2/rls/envoy/service/ratelimit/v2/rls.proto.rst
+  /envoy/service/tap/v2alpha/common/envoy/service/tap/v2alpha/common.proto.rst
   /envoy/type/http_status/envoy/type/http_status.proto.rst
   /envoy/type/percent/envoy/type/percent.proto.rst
   /envoy/type/range/envoy/type/range.proto.rst

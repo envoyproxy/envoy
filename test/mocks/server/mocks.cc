@@ -56,6 +56,9 @@ MockAdmin::MockAdmin() {
 }
 MockAdmin::~MockAdmin() {}
 
+MockAdminStream::MockAdminStream() {}
+MockAdminStream::~MockAdminStream() {}
+
 MockDrainManager::MockDrainManager() {
   ON_CALL(*this, startDrainSequence(_)).WillByDefault(SaveArg<0>(&drain_sequence_completion_));
 }
@@ -201,9 +204,6 @@ MockHealthCheckerFactoryContext::MockHealthCheckerFactoryContext() {
 }
 
 MockHealthCheckerFactoryContext::~MockHealthCheckerFactoryContext() {}
-
-MockAdminStream::MockAdminStream() {}
-MockAdminStream::~MockAdminStream() {}
 
 } // namespace Configuration
 } // namespace Server

@@ -40,6 +40,11 @@ public:
   virtual Http::StreamDecoderFilterCallbacks& getDecoderFilterCallbacks() const PURE;
 
   /**
+   * @return const Buffer::Instance* the fully buffered admin request if applicable.
+   */
+  virtual const Buffer::Instance* getRequestBody() const PURE;
+
+  /**
    * @return Http::HeaderMap& to be used by handler to parse header information sent with the
    * request.
    */

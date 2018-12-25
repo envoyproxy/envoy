@@ -91,12 +91,7 @@ void IntegrationStreamDecoder::decodeHeaders(Http::HeaderMapPtr&& headers, bool 
 
 void IntegrationStreamDecoder::decodeData(Buffer::Instance& data, bool end_stream) {
   saw_end_stream_ = end_stream;
-  uint64_t num_slices = data.getRawSlices(nullptr, 0);
-  STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
-  data.getRawSlices(slices.begin(), num_slices);
-  for (const Buffer::RawSlice& slice : slices) {
-    body_.append(static_cast<const char*>(slice.mem_), slice.len_);
-  }
+  body_ += data.toString();
 
   if (end_stream && waiting_for_end_stream_) {
     dispatcher_.exit();

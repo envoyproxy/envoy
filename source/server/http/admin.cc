@@ -197,7 +197,9 @@ Http::FilterDataStatus AdminFilter::decodeData(Buffer::Instance&, bool end_strea
     onComplete();
   }
 
-  return Http::FilterDataStatus::StopIterationNoBuffer;
+  // Currently we generically buffer all admin request data in case a handler wants to use it.
+  // If we ever support streaming admin requests we may need to revisit this.
+  return Http::FilterDataStatus::StopIterationAndBuffer;
 }
 
 Http::FilterTrailersStatus AdminFilter::decodeTrailers(Http::HeaderMap&) {
@@ -219,6 +221,8 @@ Http::StreamDecoderFilterCallbacks& AdminFilter::getDecoderFilterCallbacks() con
   ASSERT(callbacks_ != nullptr);
   return *callbacks_;
 }
+
+const Buffer::Instance* AdminFilter::getRequestBody() const { return callbacks_->decodingBuffer(); }
 
 const Http::HeaderMap& AdminFilter::getRequestHeaders() const {
   ASSERT(request_headers_ != nullptr);
