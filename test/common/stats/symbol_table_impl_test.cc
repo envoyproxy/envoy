@@ -30,7 +30,7 @@ enum class SymbolTableType {
 
 class StatNameTest : public testing::TestWithParam<SymbolTableType> {
 protected:
-  StatNameTest() : real_symbol_table_(nullptr) {
+  StatNameTest() {
     switch (GetParam()) {
     case SymbolTableType::Real: {
       auto table = std::make_unique<SymbolTableImpl>();
@@ -43,7 +43,7 @@ protected:
       break;
     }
   }
-  ~StatNameTest() { clearStorage(); }
+  ~StatNameTest() override { clearStorage(); }
 
   void clearStorage() {
     for (auto& stat_name_storage : stat_name_storage_) {
@@ -71,7 +71,7 @@ protected:
     return stat_name_storage_.back().statName();
   }
 
-  SymbolTableImpl* real_symbol_table_;
+  SymbolTableImpl* real_symbol_table_{nullptr};
   std::unique_ptr<SymbolTable> table_;
 
   std::vector<StatNameStorage> stat_name_storage_;
@@ -84,8 +84,7 @@ TEST_P(StatNameTest, AllocFree) { encodeDecode("hello.world"); }
 
 TEST_P(StatNameTest, TestArbitrarySymbolRoundtrip) {
   const std::vector<std::string> stat_names = {"", " ", "  ", ",", "\t", "$", "%", "`", "."};
-  for (auto stat_name : stat_names) {
-    ENVOY_LOG_MISC(error, "trying {}", stat_name);
+  for (auto& stat_name : stat_names) {
     EXPECT_EQ(stat_name, encodeDecode(stat_name));
   }
 }
@@ -100,7 +99,7 @@ TEST_P(StatNameTest, Test100KSymbolsRoundtrip) {
 TEST_P(StatNameTest, TestUnusualDelimitersRoundtrip) {
   const std::vector<std::string> stat_names = {".",    "..",    "...",    "foo",    "foo.",
                                                ".foo", ".foo.", ".foo..", "..foo.", "..foo.."};
-  for (auto stat_name : stat_names) {
+  for (auto& stat_name : stat_names) {
     EXPECT_EQ(stat_name, encodeDecode(stat_name));
   }
 }

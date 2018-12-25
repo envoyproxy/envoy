@@ -1,8 +1,10 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/common/pure.h"
 
-#include "common/common/hash.h"
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Stats {
@@ -51,7 +53,7 @@ using SymbolStoragePtr = std::unique_ptr<SymbolStorage>;
  */
 class SymbolTable {
 public:
-  virtual ~SymbolTable() {}
+  virtual ~SymbolTable() = default;
 
   /**
    * Encodes a stat name using the symbol table, returning a SymbolEncoding. The

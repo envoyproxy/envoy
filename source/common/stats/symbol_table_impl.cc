@@ -247,7 +247,7 @@ absl::string_view SymbolTableImpl::fromSymbol(const Symbol symbol) const
     SHARED_LOCKS_REQUIRED(lock_) {
   auto search = decode_map_.find(symbol);
   RELEASE_ASSERT(search != decode_map_.end(), "no such symbol");
-  return absl::string_view(*search->second);
+  return {*search->second};
 }
 
 void SymbolTableImpl::newSymbol() EXCLUSIVE_LOCKS_REQUIRED(lock_) {

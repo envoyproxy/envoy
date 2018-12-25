@@ -27,7 +27,7 @@ namespace Stats {
 
 /**
  * Implements the SymbolTable interface without taking locks or saving memory.
- * This implementation is inteneded as a transient state for the Envoy codebase
+ * This implementation is intended as a transient state for the Envoy codebase
  * to allow incremental conversion of Envoy stats call-sites to use the
  * SymbolTable interface, pre-allocating symbols during construction time for
  * all stats tokens.
@@ -86,7 +86,7 @@ private:
   }
 
   absl::string_view toStringView(const StatName& stat_name) const {
-    return absl::string_view(reinterpret_cast<const char*>(stat_name.data()), stat_name.dataSize());
+    return {reinterpret_cast<const char*>(stat_name.data()), stat_name.dataSize()};
   }
 
   SymbolStoragePtr stringToStorage(absl::string_view name) const {
