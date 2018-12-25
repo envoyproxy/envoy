@@ -22,11 +22,13 @@ void TimerImpl::enableTimer(const std::chrono::milliseconds& d) {
   if (d.count() == 0) {
     event_active(&raw_event_, EV_TIMEOUT, 0);
   } else {
-    // TODO(#4332): use duration_cast more nicely to clean up this code.
-    std::chrono::microseconds us = std::chrono::duration_cast<std::chrono::microseconds>(d);
+    auto sec = std::chrono::duration_cast<std::chrono::seconds>(d);
+    auto usec = std::chrono::duration_cast<std::chrono::microseconds>(d - sec);
+
     timeval tv;
-    tv.tv_sec = us.count() / 1000000;
-    tv.tv_usec = us.count() % 1000000;
+    tv.tv_sec = sec.count();
+    tv.tv_usec = usec.count();
+
     event_add(&raw_event_, &tv);
   }
 }
