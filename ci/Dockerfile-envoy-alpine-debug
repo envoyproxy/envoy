@@ -7,6 +7,6 @@ ADD configs/google_com_proxy.v2.yaml /etc/envoy/envoy.yaml
 
 EXPOSE 10000
 
-COPY docker-entrypoint.sh /
+COPY ci/docker-entrypoint.sh /
 ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["envoy", "--v2-config-only", "-c", "/etc/envoy/envoy.yaml"]
