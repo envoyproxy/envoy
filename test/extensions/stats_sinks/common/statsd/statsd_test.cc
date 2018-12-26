@@ -101,6 +101,26 @@ TEST_F(TcpStatsdSinkTest, BasicFlow) {
   tls_.shutdownThread();
 }
 
+// Verify that when there is no statsd host we correctly empty all output buffers so we don't
+// infinitely buffer.
+TEST_F(TcpStatsdSinkTest, NoHost) {
+  InSequence s;
+  auto counter = std::make_shared<NiceMock<Stats::MockCounter>>();
+  counter->name_ = "test_counter";
+  counter->latch_ = 1;
+  counter->used_ = true;
+  source_.counters_.push_back(counter);
+
+  Upstream::MockHost::MockCreateConnectionData conn_info;
+  EXPECT_CALL(cluster_manager_, tcpConnForCluster_("fake_cluster", _))
+      .WillOnce(Return(conn_info))
+      .WillOnce(Return(conn_info));
+  sink_->flush(source_);
+
+  // Flush again to make sure we correctly drain the buffer and the output buffer is empty.
+  sink_->flush(source_);
+}
+
 TEST_F(TcpStatsdSinkTest, WithCustomPrefix) {
   sink_ = std::make_unique<TcpStatsdSink>(
       local_info_, "fake_cluster", tls_, cluster_manager_,
@@ -135,6 +155,7 @@ TEST_F(TcpStatsdSinkTest, BufferReallocate) {
           compare += "envoy.test_counter:1|c\n";
         }
         EXPECT_EQ(compare, buffer.toString());
+        buffer.drain(buffer.length());
       }));
   sink_->flush(source_);
 }
