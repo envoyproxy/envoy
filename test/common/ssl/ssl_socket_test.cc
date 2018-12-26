@@ -1236,7 +1236,7 @@ TEST_P(SslSocketTest, FailedClientCertificateHashVerificationNoClientCertificate
       verify_certificate_hash: ")EOF",
                                                    TEST_SAN_URI_CERT_HASH, "\"");
 
-  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, GetParam());
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, false, GetParam());
   testUtil(test_options.setExpectedServerStats("ssl.fail_verify_no_cert"));
 }
 
