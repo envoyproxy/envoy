@@ -315,10 +315,6 @@ public:
     return *this;
   }
 
-  const std::string& expectedClientCertURI() const {
-    return TestUtilOptionsBase::expectedClientCertURI();
-  }
-
   TestUtilOptionsV2& setClientSession(const std::string& client_session) {
     client_session_ = client_session;
     return *this;
