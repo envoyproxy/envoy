@@ -172,7 +172,7 @@ public:
     // casting of wrong message to ResponseType may throw exception
     try {
       onReceiveMessage(std::unique_ptr<ResponseType>(dynamic_cast<ResponseType*>(message.release())));
-    } catch(const std::exception& e) {
+    } catch (const std::exception& e) {
       std::cout << "wrong message received, error: " << e.what() << std::endl;
     }
   }
