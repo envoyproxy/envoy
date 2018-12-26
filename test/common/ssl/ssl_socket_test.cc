@@ -59,7 +59,7 @@ namespace {
  */
 class TestUtilOptionsBase {
 public:
-  const std::string& expectedClientCertURI() const { return expected_client_cert_uri_; }
+  const std::string& expectedClientCertUri() const { return expected_client_cert_uri_; }
   const std::string& expectedServerStats() const { return expected_server_stats_; }
   bool expectSuccess() const { return expect_success_; }
   Network::Address::IpVersion version() const { return version_; }
@@ -70,7 +70,7 @@ protected:
       : expect_success_(expect_success), version_(version),
         expected_server_stats_(expected_server_stats) {}
 
-  void setExpectedClientCertURI(const std::string& expected_client_cert_uri) {
+  void setExpectedClientCertUri(const std::string& expected_client_cert_uri) {
     expected_client_cert_uri_ = expected_client_cert_uri;
   }
 
@@ -105,8 +105,8 @@ public:
     return *this;
   }
 
-  TestUtilOptions& setExpectedClientCertURI(const std::string& expected_client_cert_uri) {
-    TestUtilOptionsBase::setExpectedClientCertURI(expected_client_cert_uri);
+  TestUtilOptions& setExpectedClientCertUri(const std::string& expected_client_cert_uri) {
+    TestUtilOptionsBase::setExpectedClientCertUri(expected_client_cert_uri);
     return *this;
   }
 
@@ -117,12 +117,12 @@ public:
 
   const std::string& expectedDigest() const { return expected_digest_; }
 
-  TestUtilOptions& setExpectedLocalURI(const std::string& expected_local_uri) {
+  TestUtilOptions& setExpectedLocalUri(const std::string& expected_local_uri) {
     expected_local_uri_ = expected_local_uri;
     return *this;
   }
 
-  const std::string& expectedLocalURI() const { return expected_local_uri_; }
+  const std::string& expectedLocalUri() const { return expected_local_uri_; }
 
   TestUtilOptions& setExpectedSerialNumber(const std::string& expected_serial_number) {
     expected_serial_number_ = expected_serial_number;
@@ -225,9 +225,9 @@ void testUtil(const TestUtilOptions& options) {
         EXPECT_EQ(options.expectedDigest(),
                   server_connection->ssl()->sha256PeerCertificateDigest());
       }
-      EXPECT_EQ(options.expectedClientCertURI(), server_connection->ssl()->uriSanPeerCertificate());
-      if (!options.expectedLocalURI().empty()) {
-        EXPECT_EQ(options.expectedLocalURI(), server_connection->ssl()->uriSanLocalCertificate());
+      EXPECT_EQ(options.expectedClientCertUri(), server_connection->ssl()->uriSanPeerCertificate());
+      if (!options.expectedLocalUri().empty()) {
+        EXPECT_EQ(options.expectedLocalUri(), server_connection->ssl()->uriSanLocalCertificate());
       }
       EXPECT_EQ(options.expectedSerialNumber(),
                 server_connection->ssl()->serialNumberPeerCertificate());
@@ -305,8 +305,8 @@ public:
     return *this;
   }
 
-  TestUtilOptionsV2& setExpectedClientCertURI(const std::string& expected_client_cert_uri) {
-    TestUtilOptionsBase::setExpectedClientCertURI(expected_client_cert_uri);
+  TestUtilOptionsV2& setExpectedClientCertUri(const std::string& expected_client_cert_uri) {
+    TestUtilOptionsBase::setExpectedClientCertUri(expected_client_cert_uri);
     return *this;
   }
 
@@ -458,7 +458,7 @@ const std::string testUtilV2(const TestUtilOptionsV2& options) {
       if (!options.expectedALPNProtocol().empty()) {
         EXPECT_EQ(options.expectedALPNProtocol(), client_connection->nextProtocol());
       }
-      EXPECT_EQ(options.expectedClientCertURI(), server_connection->ssl()->uriSanPeerCertificate());
+      EXPECT_EQ(options.expectedClientCertUri(), server_connection->ssl()->uriSanPeerCertificate());
       const Ssl::SslSocket* ssl_socket =
           dynamic_cast<const Ssl::SslSocket*>(client_connection->ssl());
       SSL* client_ssl_socket = ssl_socket->rawSslForTest();
@@ -644,7 +644,7 @@ TEST_P(SslSocketTest, GetCertDigestInline) {
 
   TestUtilOptionsV2 test_options(listener, client_ctx, "ssl.handshake", "ssl.handshake", true,
                                  GetParam());
-  testUtilV2(test_options.setExpectedClientCertURI("spiffe://lyft.com/test-team")
+  testUtilV2(test_options.setExpectedClientCertUri("spiffe://lyft.com/test-team")
                  .setExpectedServerCertDigest(TEST_SAN_DNS_CERT_HASH));
 }
 
@@ -726,7 +726,7 @@ TEST_P(SslSocketTest, GetUriWithUriSan) {
 )EOF";
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, "ssl.handshake", true, GetParam());
-  testUtil(test_options.setExpectedClientCertURI("spiffe://lyft.com/test-team")
+  testUtil(test_options.setExpectedClientCertUri("spiffe://lyft.com/test-team")
                .setExpectedSerialNumber(TEST_SAN_URI_CERT_SERIAL));
 }
 
@@ -832,7 +832,7 @@ TEST_P(SslSocketTest, GetUriWithLocalUriSan) {
 )EOF";
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, "ssl.handshake", true, GetParam());
-  testUtil(test_options.setExpectedLocalURI("spiffe://lyft.com/test-team")
+  testUtil(test_options.setExpectedLocalUri("spiffe://lyft.com/test-team")
                .setExpectedSerialNumber(TEST_NO_SAN_CERT_SERIAL));
 }
 
@@ -1011,7 +1011,7 @@ TEST_P(SslSocketTest, FailedClientCertificateDefaultExpirationVerification) {
 
   TestUtilOptionsV2 test_options(listener, client, "ssl.fail_verify_error", "ssl.connection_error",
                                  false, GetParam());
-  testUtilV2(test_options.setExpectedClientCertURI("spiffe://lyft.com/test-team"));
+  testUtilV2(test_options.setExpectedClientCertUri("spiffe://lyft.com/test-team"));
 }
 
 // Expired certificates will not be accepted when explicitly disallowed via
@@ -1030,7 +1030,7 @@ TEST_P(SslSocketTest, FailedClientCertificateExpirationVerification) {
 
   TestUtilOptionsV2 test_options(listener, client, "ssl.fail_verify_error", "ssl.connection_error",
                                  false, GetParam());
-  testUtilV2(test_options.setExpectedClientCertURI("spiffe://lyft.com/test-team"));
+  testUtilV2(test_options.setExpectedClientCertUri("spiffe://lyft.com/test-team"));
 }
 
 // Expired certificates will be accepted when explicitly allowed via allow_expired_certificate.
@@ -1048,7 +1048,7 @@ TEST_P(SslSocketTest, ClientCertificateExpirationAllowedVerification) {
 
   TestUtilOptionsV2 test_options(listener, client, "ssl.handshake", "ssl.handshake", true,
                                  GetParam());
-  testUtilV2(test_options.setExpectedClientCertURI("spiffe://lyft.com/test-team"));
+  testUtilV2(test_options.setExpectedClientCertUri("spiffe://lyft.com/test-team"));
 }
 
 // Allow expired certificates, but add a certificate hash requirement so it still fails.
@@ -1070,7 +1070,7 @@ TEST_P(SslSocketTest, FailedClientCertAllowExpiredBadHashVerification) {
 
   TestUtilOptionsV2 test_options(listener, client, "ssl.fail_verify_cert_hash",
                                  "ssl.connection_error", false, GetParam());
-  testUtilV2(test_options.setExpectedClientCertURI("spiffe://lyft.com/test-team"));
+  testUtilV2(test_options.setExpectedClientCertUri("spiffe://lyft.com/test-team"));
 }
 
 // Allow expired certificatess, but use the wrong CA so it should fail still.
@@ -1094,7 +1094,7 @@ TEST_P(SslSocketTest, FailedClientCertAllowServerExpiredWrongCAVerification) {
 
   TestUtilOptionsV2 test_options(listener, client, "ssl.fail_verify_error", "ssl.connection_error",
                                  false, GetParam());
-  testUtilV2(test_options.setExpectedClientCertURI("spiffe://lyft.com/test-team"));
+  testUtilV2(test_options.setExpectedClientCertUri("spiffe://lyft.com/test-team"));
 }
 
 TEST_P(SslSocketTest, ClientCertificateHashVerification) {
@@ -1121,7 +1121,7 @@ TEST_P(SslSocketTest, ClientCertificateHashVerification) {
                                                    TEST_SAN_URI_CERT_HASH, "\"");
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, "ssl.handshake", true, GetParam());
-  testUtil(test_options.setExpectedClientCertURI("spiffe://lyft.com/test-team")
+  testUtil(test_options.setExpectedClientCertUri("spiffe://lyft.com/test-team")
                .setExpectedSerialNumber(TEST_SAN_URI_CERT_SERIAL));
 }
 
@@ -1147,7 +1147,7 @@ TEST_P(SslSocketTest, ClientCertificateHashVerificationNoCA) {
                                                    TEST_SAN_URI_CERT_HASH, "\"");
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, "ssl.handshake", true, GetParam());
-  testUtil(test_options.setExpectedClientCertURI("spiffe://lyft.com/test-team")
+  testUtil(test_options.setExpectedClientCertUri("spiffe://lyft.com/test-team")
                .setExpectedSerialNumber(TEST_SAN_URI_CERT_SERIAL));
 }
 
@@ -1180,7 +1180,7 @@ TEST_P(SslSocketTest, ClientCertificateHashListVerification) {
 
   TestUtilOptionsV2 test_options(listener, client, "ssl.handshake", "ssl.handshake", true,
                                  GetParam());
-  testUtilV2(test_options.setExpectedClientCertURI("spiffe://lyft.com/test-team")
+  testUtilV2(test_options.setExpectedClientCertUri("spiffe://lyft.com/test-team")
                  .setExpectedServerCertDigest(TEST_SAN_DNS_CERT_HASH));
 
   // Works even with client renegotiation.
@@ -1215,7 +1215,7 @@ TEST_P(SslSocketTest, ClientCertificateHashListVerificationNoCA) {
 
   TestUtilOptionsV2 test_options(listener, client, "ssl.handshake", "ssl.handshake", true,
                                  GetParam());
-  testUtilV2(test_options.setExpectedClientCertURI("spiffe://lyft.com/test-team")
+  testUtilV2(test_options.setExpectedClientCertUri("spiffe://lyft.com/test-team")
                  .setExpectedServerCertDigest(TEST_SAN_DNS_CERT_HASH));
 
   // Works even with client renegotiation.
@@ -1382,7 +1382,7 @@ TEST_P(SslSocketTest, CertificatesWithPassword) {
 
   TestUtilOptionsV2 test_options(listener, client, "ssl.handshake", "ssl.handshake", true,
                                  GetParam());
-  testUtilV2(test_options.setExpectedClientCertURI("spiffe://lyft.com/test-team")
+  testUtilV2(test_options.setExpectedClientCertUri("spiffe://lyft.com/test-team")
                  .setExpectedServerCertDigest(TEST_PASSWORD_PROTECTED_CERT_HASH));
   testUtilV2(test_options);
 
@@ -1419,7 +1419,7 @@ TEST_P(SslSocketTest, ClientCertificateSpkiVerification) {
 
   TestUtilOptionsV2 test_options(listener, client, "ssl.handshake", "ssl.handshake", true,
                                  GetParam());
-  testUtilV2(test_options.setExpectedClientCertURI("spiffe://lyft.com/test-team")
+  testUtilV2(test_options.setExpectedClientCertUri("spiffe://lyft.com/test-team")
                  .setExpectedServerCertDigest(TEST_SAN_DNS_CERT_HASH));
 
   // Works even with client renegotiation.
@@ -1453,7 +1453,7 @@ TEST_P(SslSocketTest, ClientCertificateSpkiVerificationNoCA) {
 
   TestUtilOptionsV2 test_options(listener, client, "ssl.handshake", "ssl.handshake", true,
                                  GetParam());
-  testUtilV2(test_options.setExpectedClientCertURI("spiffe://lyft.com/test-team")
+  testUtilV2(test_options.setExpectedClientCertUri("spiffe://lyft.com/test-team")
                  .setExpectedServerCertDigest(TEST_SAN_DNS_CERT_HASH));
 
   // Works even with client renegotiation.
@@ -1649,7 +1649,7 @@ TEST_P(SslSocketTest, ClientCertificateHashAndSpkiVerification) {
 
   TestUtilOptionsV2 test_options(listener, client, "ssl.handshake", "ssl.handshake", true,
                                  GetParam());
-  testUtilV2(test_options.setExpectedClientCertURI("spiffe://lyft.com/test-team")
+  testUtilV2(test_options.setExpectedClientCertUri("spiffe://lyft.com/test-team")
                  .setExpectedServerCertDigest(TEST_SAN_DNS_CERT_HASH));
 
   // Works even with client renegotiation.
@@ -1685,7 +1685,7 @@ TEST_P(SslSocketTest, ClientCertificateHashAndSpkiVerificationNoCA) {
 
   TestUtilOptionsV2 test_options(listener, client, "ssl.handshake", "ssl.handshake", true,
                                  GetParam());
-  testUtilV2(test_options.setExpectedClientCertURI("spiffe://lyft.com/test-team")
+  testUtilV2(test_options.setExpectedClientCertUri("spiffe://lyft.com/test-team")
                  .setExpectedServerCertDigest(TEST_SAN_DNS_CERT_HASH));
 
   // Works even with client renegotiation.
@@ -3252,7 +3252,7 @@ TEST_P(SslSocketTest, SignatureAlgorithms) {
   // Connection using defaults (client & server) succeeds.
   TestUtilOptionsV2 algorithm_test_options(listener, client, "ssl.handshake", "ssl.handshake", true,
                                            GetParam());
-  algorithm_test_options.setExpectedClientCertURI("spiffe://lyft.com/test-team");
+  algorithm_test_options.setExpectedClientCertUri("spiffe://lyft.com/test-team");
   testUtilV2(algorithm_test_options);
 
   // Connection using defaults (client & server) succeeds, even with client renegotiation.
