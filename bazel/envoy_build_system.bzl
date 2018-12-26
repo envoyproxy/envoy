@@ -58,7 +58,7 @@ def envoy_copts(repository, test = False):
                # Bazel adds an implicit -DNDEBUG for opt.
                repository + "//bazel:opt_build": [] if test else ["-ggdb3"],
                repository + "//bazel:fastbuild_build": [],
-               repository + "//bazel:dbg_build": ["-ggdb3"],
+               repository + "//bazel:dbg_build": ["-ggdb3", "-DDEBUG_TCMALLOC"],
                repository + "//bazel:windows_opt_build": [],
                repository + "//bazel:windows_fastbuild_build": [],
                repository + "//bazel:windows_dbg_build": [],
@@ -156,6 +156,7 @@ def envoy_external_dep_path(dep):
 def tcmalloc_external_dep(repository):
     return select({
         repository + "//bazel:disable_tcmalloc": None,
+        repository + "//bazel:dbg_build": envoy_external_dep_path("tcmalloc_debug"),
         "//conditions:default": envoy_external_dep_path("tcmalloc_and_profiler"),
     })
 
@@ -165,6 +166,7 @@ def tcmalloc_external_dep(repository):
 def tcmalloc_external_deps(repository):
     return select({
         repository + "//bazel:disable_tcmalloc": [],
+        repository + "//bazel:dbg_build": [envoy_external_dep_path("tcmalloc_debug")],
         "//conditions:default": [envoy_external_dep_path("tcmalloc_and_profiler")],
     })
 

@@ -2,6 +2,10 @@
 
 #include <string>
 
+#if defined(TCMALLOC) && !defined(DEBUG_TCMALLOC)
+#define PROFILER_AVAILABLE
+#endif
+
 namespace Envoy {
 namespace Profiler {
 

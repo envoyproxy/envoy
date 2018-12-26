@@ -622,21 +622,25 @@ public:
 INSTANTIATE_TEST_CASE_P(IpVersions, AdminInstanceTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
-// Can only get code coverage of AdminImpl::handlerCpuProfiler stopProfiler with
-// a real profiler linked in (successful call to startProfiler). startProfiler
-// requies tcmalloc.
-#ifdef TCMALLOC
 
 TEST_P(AdminInstanceTest, AdminProfiler) {
   Buffer::OwnedImpl data;
   Http::HeaderMapImpl header_map;
+
+  // Can only get code coverage of AdminImpl::handlerCpuProfiler stopProfiler with
+  // a real profiler linked in (successful call to startProfiler).
+#ifdef PROFILER_AVAILABLE
   EXPECT_EQ(Http::Code::OK, postCallback("/cpuprofiler?enable=y", header_map, data));
   EXPECT_TRUE(Profiler::Cpu::profilerEnabled());
+#else
+  EXPECT_EQ(Http::Code::InternalServerError,
+            postCallback("/cpuprofiler?enable=y", header_map, data));
+  EXPECT_FALSE(Profiler::Cpu::profilerEnabled());
+#endif
+
   EXPECT_EQ(Http::Code::OK, postCallback("/cpuprofiler?enable=n", header_map, data));
   EXPECT_FALSE(Profiler::Cpu::profilerEnabled());
 }
-
-#endif
 
 TEST_P(AdminInstanceTest, MutatesErrorWithGet) {
   Buffer::OwnedImpl data;
