@@ -169,7 +169,12 @@ public:
   virtual void onReceiveMessage(std::unique_ptr<ResponseType>&& message) PURE;
 
   void onReceiveMessageUntyped(ProtobufTypes::MessagePtr&& message) override {
-    onReceiveMessage(std::unique_ptr<ResponseType>(dynamic_cast<ResponseType*>(message.release())));
+    // casting of wrong message to ResponseType may throw exception
+    try {
+      onReceiveMessage(std::unique_ptr<ResponseType>(dynamic_cast<ResponseType*>(message.release())));
+    } catch(const std::exception& e) {
+      std::cout << "wrong message received, error: " << e.what() << std::endl;
+    }
   }
 };
 
