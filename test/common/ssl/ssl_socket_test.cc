@@ -97,8 +97,8 @@ public:
       : TestUtilOptionsBase(expected_server_stats, expect_success, version),
         client_ctx_yaml_(client_ctx_yaml), server_ctx_yaml_(server_ctx_yaml) {}
 
-  const std::string& clientCtxYAML() const { return client_ctx_yaml_; }
-  const std::string& serverCtxYAML() const { return server_ctx_yaml_; }
+  const std::string& clientCtxYaml() const { return client_ctx_yaml_; }
+  const std::string& serverCtxYaml() const { return server_ctx_yaml_; }
 
   TestUtilOptions& setExpectedServerStats(const std::string& expected_server_stats) {
     TestUtilOptionsBase::setExpectedServerStats(expected_server_stats);
@@ -170,7 +170,7 @@ void testUtil(const TestUtilOptions& options) {
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
 
   envoy::api::v2::auth::DownstreamTlsContext server_tls_context;
-  MessageUtil::loadFromYaml(TestEnvironment::substitute(options.serverCtxYAML()),
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(options.serverCtxYaml()),
                             server_tls_context);
   auto server_cfg = std::make_unique<ServerContextConfigImpl>(server_tls_context, factory_context);
   ContextManagerImpl manager(time_system);
@@ -188,7 +188,7 @@ void testUtil(const TestUtilOptions& options) {
   Network::ListenerPtr listener = dispatcher.createListener(socket, callbacks, true, false);
 
   envoy::api::v2::auth::UpstreamTlsContext client_tls_context;
-  MessageUtil::loadFromYaml(TestEnvironment::substitute(options.clientCtxYAML()),
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(options.clientCtxYaml()),
                             client_tls_context);
   auto client_cfg = std::make_unique<ClientContextConfigImpl>(client_tls_context, factory_context);
   Stats::IsolatedStoreImpl client_stats_store;
