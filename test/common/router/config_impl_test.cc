@@ -3957,10 +3957,12 @@ virtual_hosts:
       max_age: "test-max-age"
       allow_credentials: true
       filter_enabled:
+        runtime_key: "cors.www.enabled"
         default_value:
           numerator: 0
           denominator: "HUNDRED"
       shadow_enabled:
+        runtime_key: "cors.www.shadow_enabled"
         default_value:
           numerator: 100
           denominator: "HUNDRED"
@@ -3973,7 +3975,13 @@ virtual_hosts:
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   Runtime::MockSnapshot snapshot;
-  ON_CALL(factory_context.runtime_loader_, snapshot()).WillByDefault(ReturnRef(snapshot));
+  EXPECT_CALL(snapshot,
+              featureEnabled("cors.www.enabled", Matcher<const envoy::type::FractionalPercent&>(_)))
+      .WillOnce(Return(false));
+  EXPECT_CALL(snapshot, featureEnabled("cors.www.shadow_enabled",
+                                       Matcher<const envoy::type::FractionalPercent&>(_)))
+      .WillOnce(Return(true));
+  EXPECT_CALL(factory_context.runtime_loader_, snapshot()).WillRepeatedly(ReturnRef(snapshot));
 
   TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, false);
 
@@ -3983,14 +3991,8 @@ virtual_hosts:
           ->virtualHost()
           .corsPolicy();
 
-  envoy::api::v2::core::RuntimeFractionalPercent enabled_;
-  enabled_.mutable_default_value()->set_numerator(0);
-  enabled_.mutable_default_value()->set_denominator(envoy::type::FractionalPercent::HUNDRED);
-  EXPECT_THAT(cors_policy->enabled(), ProtoEq(enabled_));
-  envoy::api::v2::core::RuntimeFractionalPercent shadowEnabled_;
-  shadowEnabled_.mutable_default_value()->set_numerator(100);
-  shadowEnabled_.mutable_default_value()->set_denominator(envoy::type::FractionalPercent::HUNDRED);
-  EXPECT_THAT(cors_policy->shadowEnabled(), ProtoEq(shadowEnabled_));
+  EXPECT_EQ(cors_policy->enabled(), false);
+  EXPECT_EQ(cors_policy->shadowEnabled(), true);
   EXPECT_THAT(cors_policy->allowOrigins(), ElementsAreArray({"test-origin"}));
   EXPECT_EQ(cors_policy->allowMethods(), "test-methods");
   EXPECT_EQ(cors_policy->allowHeaders(), "test-headers");
@@ -4017,10 +4019,12 @@ virtual_hosts:
             max_age: "test-max-age"
             allow_credentials: true
             filter_enabled:
+              runtime_key: "cors.www.enabled"
               default_value:
                 numerator: 0
                 denominator: "HUNDRED"
             shadow_enabled:
+              runtime_key: "cors.www.shadow_enabled"
               default_value:
                 numerator: 100
                 denominator: "HUNDRED"
@@ -4028,21 +4032,21 @@ virtual_hosts:
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   Runtime::MockSnapshot snapshot;
-  ON_CALL(factory_context.runtime_loader_, snapshot()).WillByDefault(ReturnRef(snapshot));
+  EXPECT_CALL(snapshot,
+              featureEnabled("cors.www.enabled", Matcher<const envoy::type::FractionalPercent&>(_)))
+      .WillOnce(Return(false));
+  EXPECT_CALL(snapshot, featureEnabled("cors.www.shadow_enabled",
+                                       Matcher<const envoy::type::FractionalPercent&>(_)))
+      .WillOnce(Return(true));
+  EXPECT_CALL(factory_context.runtime_loader_, snapshot()).WillRepeatedly(ReturnRef(snapshot));
 
   TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, false);
 
   const Router::CorsPolicy* cors_policy =
       config.route(genHeaders("api.lyft.com", "/api", "GET"), 0)->routeEntry()->corsPolicy();
 
-  envoy::api::v2::core::RuntimeFractionalPercent enabled_;
-  enabled_.mutable_default_value()->set_numerator(0);
-  enabled_.mutable_default_value()->set_denominator(envoy::type::FractionalPercent::HUNDRED);
-  EXPECT_THAT(cors_policy->enabled(), ProtoEq(enabled_));
-  // envoy::api::v2::core::RuntimeFractionalPercent shadowEnabled_;
-  // shadowEnabled_.mutable_default_value()->set_numerator(100);
-  // shadowEnabled_.mutable_default_value()->set_denominator(envoy::type::FractionalPercent::HUNDRED);
-  // EXPECT_THAT(cors_policy->shadowEnabled(), ProtoEq(shadowEnabled_));
+  EXPECT_EQ(cors_policy->enabled(), false);
+  EXPECT_EQ(cors_policy->shadowEnabled(), true);
   EXPECT_THAT(cors_policy->allowOrigins(), ElementsAreArray({"test-origin"}));
   EXPECT_EQ(cors_policy->allowMethods(), "test-methods");
   EXPECT_EQ(cors_policy->allowHeaders(), "test-headers");
@@ -4086,14 +4090,8 @@ TEST(RoutePropertyTest, TestVHostCorsLegacyConfig) {
           ->virtualHost()
           .corsPolicy();
 
-  envoy::api::v2::core::RuntimeFractionalPercent enabled_;
-  enabled_.mutable_default_value()->set_numerator(100);
-  enabled_.mutable_default_value()->set_denominator(envoy::type::FractionalPercent::HUNDRED);
-  EXPECT_THAT(cors_policy->enabled(), ProtoEq(enabled_));
-  envoy::api::v2::core::RuntimeFractionalPercent shadowEnabled_;
-  shadowEnabled_.mutable_default_value()->set_numerator(0);
-  shadowEnabled_.mutable_default_value()->set_denominator(envoy::type::FractionalPercent::HUNDRED);
-  EXPECT_THAT(cors_policy->shadowEnabled(), ProtoEq(shadowEnabled_));
+  EXPECT_EQ(cors_policy->enabled(), true);
+  EXPECT_EQ(cors_policy->shadowEnabled(), false);
   EXPECT_THAT(cors_policy->allowOrigins(), ElementsAreArray({"test-origin"}));
   EXPECT_EQ(cors_policy->allowMethods(), "test-methods");
   EXPECT_EQ(cors_policy->allowHeaders(), "test-headers");
@@ -4134,14 +4132,8 @@ TEST(RoutePropertyTest, TestRouteCorsLegacyConfig) {
   const Router::CorsPolicy* cors_policy =
       config.route(genHeaders("api.lyft.com", "/api", "GET"), 0)->routeEntry()->corsPolicy();
 
-  envoy::api::v2::core::RuntimeFractionalPercent enabled_;
-  enabled_.mutable_default_value()->set_numerator(100);
-  enabled_.mutable_default_value()->set_denominator(envoy::type::FractionalPercent::HUNDRED);
-  EXPECT_THAT(cors_policy->enabled(), ProtoEq(enabled_));
-  envoy::api::v2::core::RuntimeFractionalPercent shadowEnabled_;
-  shadowEnabled_.mutable_default_value()->set_numerator(0);
-  shadowEnabled_.mutable_default_value()->set_denominator(envoy::type::FractionalPercent::HUNDRED);
-  EXPECT_THAT(cors_policy->shadowEnabled(), ProtoEq(shadowEnabled_));
+  EXPECT_EQ(cors_policy->enabled(), true);
+  EXPECT_EQ(cors_policy->shadowEnabled(), false);
   EXPECT_THAT(cors_policy->allowOrigins(), ElementsAreArray({"test-origin"}));
   EXPECT_EQ(cors_policy->allowMethods(), "test-methods");
   EXPECT_EQ(cors_policy->allowHeaders(), "test-headers");

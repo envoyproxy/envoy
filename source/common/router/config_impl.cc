@@ -101,7 +101,8 @@ Upstream::RetryPrioritySharedPtr RetryPolicyImpl::retryPriority() const {
   return factory.createRetryPriority(*retry_priority_config_.second, num_retries_);
 }
 
-CorsPolicyImpl::CorsPolicyImpl(const envoy::api::v2::route::CorsPolicy& config) {
+CorsPolicyImpl::CorsPolicyImpl(const envoy::api::v2::route::CorsPolicy& config,
+                               Runtime::Loader& loader) {
   for (const auto& origin : config.allow_origin()) {
     allow_origin_.push_back(origin);
   }
@@ -115,15 +116,18 @@ CorsPolicyImpl::CorsPolicyImpl(const envoy::api::v2::route::CorsPolicy& config) 
   if (config.has_allow_credentials()) {
     allow_credentials_ = PROTOBUF_GET_WRAPPED_REQUIRED(config, allow_credentials);
   }
-  bool legacy_enabled = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enabled, true);
-  if (!config.has_filter_enabled()) {
-    filter_enabled_.mutable_default_value()->set_denominator(
-        envoy::type::FractionalPercent::HUNDRED);
-    filter_enabled_.mutable_default_value()->set_numerator(100 * int(legacy_enabled));
+  if (config.has_filter_enabled()) {
+    enabled_ = loader.snapshot().featureEnabled(config.filter_enabled().runtime_key(),
+                                                config.filter_enabled().default_value());
   } else {
-    filter_enabled_ = config.filter_enabled();
+    enabled_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enabled, true);
   }
-  shadow_enabled_ = config.shadow_enabled();
+  if (config.has_shadow_enabled()) {
+    shadow_enabled_ = loader.snapshot().featureEnabled(config.shadow_enabled().runtime_key(),
+                                                       config.shadow_enabled().default_value());
+  } else {
+    shadow_enabled_ = false;
+  }
 }
 
 ShadowPolicyImpl::ShadowPolicyImpl(const envoy::api::v2::route::RouteAction& config) {
@@ -383,7 +387,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
        PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.route(), include_vh_rate_limits, false));
 
   if (route.route().has_cors()) {
-    cors_policy_ = std::make_unique<CorsPolicyImpl>(route.route().cors());
+    cors_policy_ =
+        std::make_unique<CorsPolicyImpl>(route.route().cors(), factory_context.runtime());
   }
   for (const auto upgrade_config : route.route().upgrade_configs()) {
     const bool enabled = upgrade_config.has_enabled() ? upgrade_config.enabled().value() : true;
@@ -853,7 +858,7 @@ VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::route::VirtualHost& virtu
   }
 
   if (virtual_host.has_cors()) {
-    cors_policy_ = std::make_unique<CorsPolicyImpl>(virtual_host.cors());
+    cors_policy_ = std::make_unique<CorsPolicyImpl>(virtual_host.cors(), factory_context.runtime());
   }
 }
 

@@ -1,11 +1,9 @@
-#include "common/common/empty_string.h"
 #include "common/http/header_map_impl.h"
 
 #include "extensions/filters/http/cors/cors_filter.h"
 
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/http/mocks.h"
-#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/printers.h"
 
@@ -28,8 +26,10 @@ namespace Cors {
 
 class CorsFilterTest : public testing::Test {
 public:
-  CorsFilterTest() : config_(new CorsFilterConfig("test.", stats_, runtime_)), filter_(config_) {
+  CorsFilterTest() : config_(new CorsFilterConfig("test.", stats_)), filter_(config_) {
     cors_policy_ = std::make_unique<Router::TestCorsPolicy>();
+    cors_policy_->enabled_ = true;
+    cors_policy_->shadow_enabled_ = false;
     cors_policy_->allow_origin_.emplace_back("*");
     cors_policy_->allow_methods_ = "GET";
     cors_policy_->allow_headers_ = "content-type";
@@ -42,10 +42,6 @@ public:
 
     ON_CALL(decoder_callbacks_.route_->route_entry_.virtual_host_, corsPolicy())
         .WillByDefault(Return(cors_policy_.get()));
-
-    ON_CALL(runtime_.snapshot_,
-            featureEnabled("", testing::Matcher<const envoy::type::FractionalPercent&>(_)))
-        .WillByDefault(Return(true));
 
     filter_.setDecoderFilterCallbacks(decoder_callbacks_);
     filter_.setEncoderFilterCallbacks(encoder_callbacks_);
@@ -62,7 +58,6 @@ public:
   Http::TestHeaderMapImpl request_headers_;
   std::unique_ptr<Router::TestCorsPolicy> cors_policy_;
   Router::MockDirectResponseEntry direct_response_entry_;
-  NiceMock<Runtime::MockLoader> runtime_;
 };
 
 TEST_F(CorsFilterTest, RequestWithoutOrigin) {
@@ -132,9 +127,7 @@ TEST_F(CorsFilterTest, OptionsRequestWithOrigin) {
 TEST_F(CorsFilterTest, OptionsRequestWithOriginCorsDisabled) {
   Http::TestHeaderMapImpl request_headers{{":method", "OPTIONS"}, {"origin", "localhost"}};
 
-  ON_CALL(runtime_.snapshot_,
-          featureEnabled("", testing::Matcher<const envoy::type::FractionalPercent&>(_)))
-      .WillByDefault(Return(false));
+  cors_policy_->enabled_ = false;
 
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, false)).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
@@ -152,9 +145,7 @@ TEST_F(CorsFilterTest, OptionsRequestWithOriginCorsDisabled) {
 TEST_F(CorsFilterTest, OptionsRequestWithOriginCorsDisabledShadowDisabled) {
   Http::TestHeaderMapImpl request_headers{{":method", "OPTIONS"}, {"origin", "localhost"}};
 
-  ON_CALL(runtime_.snapshot_,
-          featureEnabled("", testing::Matcher<const envoy::type::FractionalPercent&>(_)))
-      .WillByDefault(Return(false));
+  cors_policy_->enabled_ = false;
 
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, false)).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
@@ -172,15 +163,8 @@ TEST_F(CorsFilterTest, OptionsRequestWithOriginCorsDisabledShadowDisabled) {
 TEST_F(CorsFilterTest, OptionsRequestWithOriginCorsDisabledShadowEnabled) {
   Http::TestHeaderMapImpl request_headers{{":method", "OPTIONS"}, {"origin", "localhost"}};
 
-  cors_policy_->shadow_enabled_.set_runtime_key("cors.www.shadow_enabled");
-  ON_CALL(runtime_.snapshot_,
-          featureEnabled("", testing::Matcher<const envoy::type::FractionalPercent&>(_)))
-      .WillByDefault(Return(false));
-
-  ON_CALL(runtime_.snapshot_,
-          featureEnabled("cors.www.shadow_enabled",
-                         testing::Matcher<const envoy::type::FractionalPercent&>(_)))
-      .WillByDefault(Return(true));
+  cors_policy_->enabled_ = false;
+  cors_policy_->shadow_enabled_ = true;
 
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, false)).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
@@ -257,15 +241,7 @@ TEST_F(CorsFilterTest, OptionsRequestWithOriginCorsEnabledShadowDisabled) {
   Http::TestHeaderMapImpl request_headers{
       {":method", "OPTIONS"}, {"origin", "test-host"}, {"access-control-request-method", "GET"}};
 
-  cors_policy_->enabled_.set_runtime_key("cors.www.enabled");
-  ON_CALL(runtime_.snapshot_,
-          featureEnabled("", testing::Matcher<const envoy::type::FractionalPercent&>(_)))
-      .WillByDefault(Return(false));
-
-  ON_CALL(runtime_.snapshot_,
-          featureEnabled("cors.www.enabled",
-                         testing::Matcher<const envoy::type::FractionalPercent&>(_)))
-      .WillByDefault(Return(true));
+  cors_policy_->enabled_ = true;
 
   Http::TestHeaderMapImpl response_headers{
       {":status", "200"},
@@ -293,9 +269,7 @@ TEST_F(CorsFilterTest, OptionsRequestWithOriginCorsEnabledShadowEnabled) {
   Http::TestHeaderMapImpl request_headers{
       {":method", "OPTIONS"}, {"origin", "test-host"}, {"access-control-request-method", "GET"}};
 
-  ON_CALL(runtime_.snapshot_,
-          featureEnabled("", testing::Matcher<const envoy::type::FractionalPercent&>(_)))
-      .WillByDefault(Return(true));
+  cors_policy_->shadow_enabled_ = true;
 
   Http::TestHeaderMapImpl response_headers{
       {":status", "200"},
@@ -416,9 +390,8 @@ TEST_F(CorsFilterTest, ValidOptionsRequestWithAllowCredentialsFalse) {
 }
 
 TEST_F(CorsFilterTest, EncodeWithCorsDisabled) {
-  ON_CALL(runtime_.snapshot_,
-          featureEnabled("", testing::Matcher<const envoy::type::FractionalPercent&>(_)))
-      .WillByDefault(Return(false));
+  cors_policy_->enabled_ = false;
+  cors_policy_->shadow_enabled_ = false;
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));

@@ -1,6 +1,5 @@
 #include "extensions/filters/http/cors/cors_filter.h"
 
-#include "envoy/api/v2/route/route.pb.h"
 #include "envoy/http/codes.h"
 #include "envoy/stats/scope.h"
 
@@ -14,9 +13,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Cors {
 
-CorsFilterConfig::CorsFilterConfig(const std::string& stats_prefix, Stats::Scope& scope,
-                                   Runtime::Loader& runtime)
-    : stats_(generateStats(stats_prefix + "cors.", scope)), runtime_(runtime) {}
+CorsFilterConfig::CorsFilterConfig(const std::string& stats_prefix, Stats::Scope& scope)
+    : stats_(generateStats(stats_prefix + "cors.", scope)) {}
 
 CorsFilter::CorsFilter(CorsFilterConfigSharedPtr config)
     : policies_({{nullptr, nullptr}}), config_(std::move(config)) {}
@@ -208,26 +206,18 @@ bool CorsFilter::allowCredentials() {
 
 bool CorsFilter::shadowEnabled() {
   for (const auto policy : policies_) {
-    if (!policy) {
-      continue;
+    if (policy) {
+      return policy->shadowEnabled();
     }
-
-    const std::string key = policy->shadowEnabled().runtime_key();
-    return config_->runtime().snapshot().featureEnabled(key,
-                                                        policy->shadowEnabled().default_value());
   }
   return false;
 }
 
 bool CorsFilter::enabled() {
   for (const auto policy : policies_) {
-    if (!policy) {
-      continue;
+    if (policy) {
+      return policy->enabled();
     }
-
-    const std::string key = policy->enabled().runtime_key();
-    std::cout << "Default value: " << policy->enabled().default_value().numerator() << std::endl;
-    return config_->runtime().snapshot().featureEnabled(key, policy->enabled().default_value());
   }
   return false;
 }

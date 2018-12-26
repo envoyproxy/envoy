@@ -133,13 +133,13 @@ public:
   /**
    * @return bool Whether CORS is enabled for the route or virtual host.
    */
-  virtual const envoy::api::v2::core::RuntimeFractionalPercent& enabled() const PURE;
+  virtual bool enabled() const PURE;
 
   /**
    * @return envoy::api::v2::base::RuntimeFractionalPercent Whether CORS policies are evaluated when
    * filter is off.
    */
-  virtual const envoy::api::v2::core::RuntimeFractionalPercent& shadowEnabled() const PURE;
+  virtual bool shadowEnabled() const PURE;
 };
 
 /**
