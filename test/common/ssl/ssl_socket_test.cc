@@ -67,17 +67,22 @@ public:
 protected:
   TestUtilOptionsBase(const std::string& expected_server_stats, bool expect_success,
                       Network::Address::IpVersion version)
-      : expected_server_stats_(expected_server_stats), expect_success_(expect_success),
-        version_(version) {}
+      : expect_success_(expect_success), version_(version),
+        expected_server_stats_(expected_server_stats) {}
 
   void setExpectedClientCertURI(const std::string& expected_client_cert_uri) {
     expected_client_cert_uri_ = expected_client_cert_uri;
   }
 
+  void setExpectedServerStats(const std::string& expected_server_stats) {
+    expected_server_stats_ = expected_server_stats;
+  }
+
 private:
-  const std::string expected_server_stats_;
   const bool expect_success_;
   const Network::Address::IpVersion version_;
+
+  std::string expected_server_stats_;
   std::string expected_client_cert_uri_;
 };
 
@@ -94,6 +99,11 @@ public:
 
   const std::string& clientCtxYAML() const { return client_ctx_yaml_; }
   const std::string& serverCtxYAML() const { return server_ctx_yaml_; }
+
+  TestUtilOptions& setExpectedServerStats(const std::string& expected_server_stats) {
+    TestUtilOptionsBase::setExpectedServerStats(expected_server_stats);
+    return *this;
+  }
 
   TestUtilOptions& setExpectedClientCertURI(const std::string& expected_client_cert_uri) {
     TestUtilOptionsBase::setExpectedClientCertURI(expected_client_cert_uri);
@@ -290,8 +300,18 @@ public:
   }
   const std::string& expectedClientStats() const { return expected_client_stats_; }
 
+  TestUtilOptionsV2& setExpectedServerStats(const std::string& expected_server_stats) {
+    TestUtilOptionsBase::setExpectedServerStats(expected_server_stats);
+    return *this;
+  }
+
   TestUtilOptionsV2& setExpectedClientCertURI(const std::string& expected_client_cert_uri) {
     TestUtilOptionsBase::setExpectedClientCertURI(expected_client_cert_uri);
+    return *this;
+  }
+
+  TestUtilOptionsV2& setExpectedClientStats(const std::string& expected_client_stats) {
+    expected_client_stats_ = expected_client_stats;
     return *this;
   }
 
@@ -348,7 +368,7 @@ public:
 private:
   const envoy::api::v2::Listener& listener_;
   const envoy::api::v2::auth::UpstreamTlsContext& client_ctx_proto_;
-  const std::string expected_client_stats_;
+  std::string expected_client_stats_;
 
   std::string client_session_;
   std::string expected_protocol_version_;
