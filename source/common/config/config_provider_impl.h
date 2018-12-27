@@ -24,6 +24,14 @@ namespace Config {
 // framework for implementing statically defined (i.e., immutable) and dynamic (mutable via
 // subscriptions) configuration for Envoy.
 //
+// The mutability property applies to the ConfigProvider itself and _not_ the underlying config
+// proto, which is always immutable. MutableConfigProviderImplBase objects receive config proto
+// updates via xDS subscriptions, resulting in new ConfigProvider::Config objects being instantiated
+// with the corresponding change in behavior corresponding to updated config. ConfigProvider::Config
+// objects must be latched/associated with the appropriate objects in the connection and request
+// processing pipeline, such that configuration stays consistent for the lifetime of the connection
+// and/or stream/request (if required by the configuration being processed).
+//
 // Dynamic configuration is distributed via xDS APIs (see
 // https://github.com/envoyproxy/data-plane-api/blob/master/XDS_PROTOCOL.md). The framework exposed
 // by these classes simplifies creation of client xDS implementations following a shared ownership
@@ -59,6 +67,8 @@ namespace Config {
 //     - On a successful config update, checkAndApplyConfig() should be called to instantiate the
 //     new config implementation and propagate it to the shared config providers and all
 //     worker threads.
+//       - On a successful return from checkAndApplyConfig(), the config proto must be latched into
+//       this class and returned via the getConfigProto() override.
 
 class ConfigProviderManagerImplBase;
 
@@ -72,7 +82,7 @@ enum class ConfigProviderInstanceType {
   // xDS.
   Inline,
   // Configuration obtained from an xDS subscription.
-  xDS
+  Xds
 };
 
 /**
@@ -250,6 +260,16 @@ public:
     return tls_->getTyped<ThreadLocalConfig>().config_;
   }
 
+  /**
+   * Called when a new config proto is received via an xDS subscription.
+   * On successful validation of the config, must return a shared_ptr to a ConfigProvider::Config
+   * implementation that will be propagated to all mutable config providers sharing the
+   * subscription.
+   * Note that this function is called _once_ across all shared config providers per xDS
+   * subscription config update.
+   * @param config_proto supplies the configuration proto.
+   * @return ConfigConstSharedPtr the ConfigProvider::Config to share with other providers.
+   */
   virtual ConfigConstSharedPtr onConfigProtoUpdate(const Protobuf::Message& config_proto) PURE;
 
   /**
@@ -304,7 +324,8 @@ private:
  * All config processing is done on the main thread, so instantiation of *ConfigProvider* objects
  * via createStaticConfigProvider() and createXdsConfigProvider() is naturally thread safe. Care
  * must be taken with regards to destruction of these objects, since it must also happen on the main
- * thread.
+ * thread _prior_ to destruction of the ConfigProviderManagerImplBase oject from which they were
+ * created.
  *
  * This class can not be instantiated directly; instead, it provides the foundation for
  * dynamic config provider implementations which derive from it.
