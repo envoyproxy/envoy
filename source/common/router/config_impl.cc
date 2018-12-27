@@ -750,8 +750,7 @@ RouteConstSharedPtr PathRouteEntryImpl::matches(const Http::HeaderMap& headers,
 
     absl::string_view path_section(path.c_str(), compare_length);
     if (case_sensitive_) {
-      // We can use StartsWith here, since we know path_.size() == path_section.size()
-      if (absl::StartsWith(path_, path_section)) {
+      if (absl::string_view(path_) == path_section) {
         return clusterEntry(headers, random_value);
       }
     } else {
