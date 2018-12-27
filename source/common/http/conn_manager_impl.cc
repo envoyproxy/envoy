@@ -32,6 +32,8 @@
 #include "common/http/utility.h"
 #include "common/network/utility.h"
 
+#include "absl/strings/match.h"
+
 namespace Envoy {
 namespace Http {
 
@@ -585,9 +587,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
       // will be closed unless Keep-Alive is present.
       state_.saw_connection_close_ = true;
       if (request_headers_->Connection() &&
-          0 == StringUtil::caseInsensitiveCompare(
-                   request_headers_->Connection()->value().c_str(),
-                   Http::Headers::get().ConnectionValues.KeepAlive.c_str())) {
+          absl::EqualsIgnoreCase(request_headers_->Connection()->value().getStringView(),
+                                 Http::Headers::get().ConnectionValues.KeepAlive)) {
         state_.saw_connection_close_ = false;
       }
     }
@@ -633,9 +634,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   }
 
   if (protocol == Protocol::Http11 && request_headers_->Connection() &&
-      0 ==
-          StringUtil::caseInsensitiveCompare(request_headers_->Connection()->value().c_str(),
-                                             Http::Headers::get().ConnectionValues.Close.c_str())) {
+      absl::EqualsIgnoreCase(request_headers_->Connection()->value().getStringView(),
+                             Http::Headers::get().ConnectionValues.Close)) {
     state_.saw_connection_close_ = true;
   }
 
