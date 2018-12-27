@@ -247,6 +247,7 @@ private:
   HEADER_FUNC(ContentType)                                                                         \
   HEADER_FUNC(Date)                                                                                \
   HEADER_FUNC(EnvoyAttemptCount)                                                                   \
+  HEADER_FUNC(EnvoyDegraded)                                                                       \
   HEADER_FUNC(EnvoyDecoratorOperation)                                                             \
   HEADER_FUNC(EnvoyDownstreamServiceCluster)                                                       \
   HEADER_FUNC(EnvoyDownstreamServiceNode)                                                          \

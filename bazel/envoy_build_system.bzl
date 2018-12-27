@@ -41,6 +41,8 @@ def envoy_copts(repository, test = False):
 
     msvc_options = [
         "-WX",
+        "-Zc:__cplusplus",
+        "-std:c++14",
         "-DWIN32",
         "-DWIN32_LEAN_AND_MEAN",
         # need win8 for ntohll
@@ -93,6 +95,8 @@ def envoy_linkopts():
                ],
                "@envoy//bazel:windows_x86_64": [
                    "-DEFAULTLIB:advapi32.lib",
+                   "-DEFAULTLIB:ws2_32.lib",
+                   "-WX",
                ],
                "//conditions:default": [
                    "-pthread",
@@ -141,6 +145,11 @@ def envoy_test_linkopts():
             # See note here: http://luajit.org/install.html
             "-pagezero_size 10000",
             "-image_base 100000000",
+        ],
+        "@envoy//bazel:windows_x86_64": [
+            "-DEFAULTLIB:advapi32.lib",
+            "-DEFAULTLIB:ws2_32.lib",
+            "-WX",
         ],
 
         # TODO(mattklein123): It's not great that we universally link against the following libs.
