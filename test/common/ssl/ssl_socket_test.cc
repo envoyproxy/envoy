@@ -3227,7 +3227,9 @@ TEST_P(SslSocketTest, SignatureAlgorithms) {
 
   // Connection using defaults (client & server) succeeds.
   TestUtilOptionsV2 algorithm_test_options(listener, client, true, GetParam());
-  algorithm_test_options.setExpectedClientCertUri("spiffe://lyft.com/test-team");
+  algorithm_test_options.setExpectedClientCertUri("spiffe://lyft.com/test-team")
+      .setExpectedServerStats("ssl.sigalgs.rsa_pss_rsae_sha256")
+      .setExpectedClientStats("ssl.sigalgs.ecdsa_secp256r1_sha256");
   testUtilV2(algorithm_test_options);
 
   // Connection using defaults (client & server) succeeds, even with client renegotiation.
