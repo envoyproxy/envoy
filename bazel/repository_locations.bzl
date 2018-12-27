@@ -195,4 +195,9 @@ REPOSITORY_LOCATIONS = dict(
         strip_prefix = "subpar-1.3.0",
         urls = ["https://github.com/google/subpar/archive/1.3.0.tar.gz"],
     ),
+    com_google_quiche = dict(
+        # TODO: add sha256 sum
+        # Version from 2018-12-20
+        urls = ["https://quiche.googlesource.com/quiche/+archive/15fb5630803634b1988b77d876212fad71f7a2c3.tar.gz"],
+    ),
 )
