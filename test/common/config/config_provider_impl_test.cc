@@ -21,7 +21,7 @@ public:
                             Server::Configuration::FactoryContext& factory_context,
                             DummyConfigProviderManager& config_provider_manager);
 
-  ~StaticDummyConfigProvider() {}
+  ~StaticDummyConfigProvider() override = default;
 
   // Envoy::Config::ConfigProvider
   const Protobuf::Message* getConfigProto() const override { return &config_proto_; }
@@ -45,7 +45,7 @@ public:
                           Server::Configuration::FactoryContext& factory_context,
                           DummyConfigProviderManager& config_provider_manager);
 
-  ~DummyConfigSubscription() {}
+  ~DummyConfigSubscription() override = default;
 
   // Envoy::Config::ConfigSubscriptionInstanceBase
   void start() override {}
@@ -92,7 +92,7 @@ public:
     initialize(initial_config);
   }
 
-  ~DummyDynamicConfigProvider() {}
+  ~DummyDynamicConfigProvider() override = default;
 
   DummyConfigSubscription& subscription() { return *subscription_; }
 
@@ -124,7 +124,7 @@ public:
   DummyConfigProviderManager(Server::Admin& admin)
       : ConfigProviderManagerImplBase(admin, "dummy") {}
 
-  ~DummyConfigProviderManager() {}
+  ~DummyConfigProviderManager() override = default;
 
   // Envoy::Config::ConfigProviderManagerImplBase
   ProtobufTypes::MessagePtr dumpConfigs() const override {
