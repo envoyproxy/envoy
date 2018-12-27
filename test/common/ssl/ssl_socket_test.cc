@@ -1374,7 +1374,6 @@ TEST_P(SslSocketTest, CertificatesWithPassword) {
   TestUtilOptionsV2 test_options(listener, client, true, GetParam());
   testUtilV2(test_options.setExpectedClientCertUri("spiffe://lyft.com/test-team")
                  .setExpectedServerCertDigest(TEST_PASSWORD_PROTECTED_CERT_HASH));
-  testUtilV2(test_options);
 
   // Works even with client renegotiation.
   client.set_allow_renegotiation(true);
