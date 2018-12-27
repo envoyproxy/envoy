@@ -62,7 +62,7 @@ message NamedEndpoint {
 // An Endpoint that Envoy can route traffic to.
 message LbEndpoint {
   // Upstream host identifier or a named reference.
-  oneof {
+  oneof host_identifier {
     Endpoint endpoint = 1;
     NamedEndpoint named_endpoint = 5;
   }
