@@ -149,7 +149,7 @@ class Filter : Logger::Loggable<Logger::Id::router>,
                public Upstream::LoadBalancerContextBase {
 public:
   explicit Filter(FilterConfig& config);
-  ~Filter();
+  ~Filter() override;
 
   // Http::StreamFilterBase
   void onDestroy() override;

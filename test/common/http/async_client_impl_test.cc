@@ -63,6 +63,7 @@ public:
   }
 
   MessagePtr message_{new RequestMessageImpl()};
+  Stats::MockIsolatedStatsStore stats_store_;
   MockAsyncClientCallbacks callbacks_;
   MockAsyncClientStreamCallbacks stream_callbacks_;
   NiceMock<Upstream::MockClusterManager> cm_;
@@ -72,7 +73,6 @@ public:
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Runtime::MockRandomGenerator> random_;
-  Stats::MockIsolatedStatsStore stats_store_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Http::ContextImpl http_context_;
   AsyncClientImpl client_;
