@@ -50,10 +50,22 @@ message Endpoint {
   HealthCheckConfig health_check_config = 2;
 }
 
+// Named reference to an Endpoint.
+message NamedEndpoint {
+  // Identifier for this endpoint. Should be unique within a given ClusterLoadAssignment.
+  string name = 1 [(validate.rules).string.min_bytes = 1];
+
+  // Upstream host idenfier.
+  endpoint.Endpoint endpoint = 2;
+}
+
 // An Endpoint that Envoy can route traffic to.
 message LbEndpoint {
-  // Upstream host identifier
-  Endpoint endpoint = 1;
+  // Upstream host identifier or a named reference.
+  oneof {
+    Endpoint endpoint = 1;
+    NamedEndpoint named_endpoint = 5;
+  }
 
   // Optional health status when known and supplied by EDS server.
   core.HealthStatus health_status = 2;
