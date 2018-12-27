@@ -49,7 +49,7 @@ INSTANTIATE_TEST_CASE_P(IpVersions, ReverseBridgeIntegrationTest,
                         TestUtility::ipTestParamsToString);
 
 // Verifies that we don't do anything with the request when it's hitting a route that
-// doesn't enable the shim.
+// doesn't enable the bridge.
 TEST_P(ReverseBridgeIntegrationTest, EnabledRoute) {
   codec_client_ = makeHttpConnection(lookupPort("http"));
 

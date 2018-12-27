@@ -72,6 +72,32 @@ TEST_F(ReverseBridgeTest, InvalidGrcpRequest) {
   }
 }
 
+// Verifies that we do nothing to a header only request even if it looks like a gRPC request.
+TEST_F(ReverseBridgeTest, HeaderOnlyGrpcRequest) {
+  initialize();
+  decoder_callbacks_.is_grpc_request_ = true;
+
+  {
+    EXPECT_CALL(decoder_callbacks_, clearRouteCache());
+    Http::TestHeaderMapImpl headers({{"content-type", "application/grpc"},
+                                     {"content-length", "25"},
+                                     {":path", "/testing.ExampleService/SendData"}});
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
+
+    // Verify that headers are unmodified.
+    EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentType, "application/x-protobuf"));
+    EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentLength, "25"));
+    EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().Accept, "application/x-protobuf"));
+  }
+
+  // Verify no modification on encoding path as well.
+  Http::TestHeaderMapImpl headers({{"content-type", "application/grpc"}, {"content-length", "20"}});
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, true));
+  // Ensure we didn't mutate content type or length.
+  EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentType, "application/grpc"));
+  EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentLength, "20"));
+}
+
 // Tests that the filter passes a non-GRPC request through without modification.
 TEST_F(ReverseBridgeTest, NoGrpcRequest) {
   initialize();
