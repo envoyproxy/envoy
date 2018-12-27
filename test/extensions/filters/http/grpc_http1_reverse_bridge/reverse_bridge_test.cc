@@ -78,16 +78,14 @@ TEST_F(ReverseBridgeTest, HeaderOnlyGrpcRequest) {
   decoder_callbacks_.is_grpc_request_ = true;
 
   {
-    EXPECT_CALL(decoder_callbacks_, clearRouteCache());
     Http::TestHeaderMapImpl headers({{"content-type", "application/grpc"},
                                      {"content-length", "25"},
                                      {":path", "/testing.ExampleService/SendData"}});
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
 
     // Verify that headers are unmodified.
-    EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentType, "application/x-protobuf"));
+    EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentType, "application/grpc"));
     EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentLength, "25"));
-    EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().Accept, "application/x-protobuf"));
   }
 
   // Verify no modification on encoding path as well.
@@ -96,6 +94,12 @@ TEST_F(ReverseBridgeTest, HeaderOnlyGrpcRequest) {
   // Ensure we didn't mutate content type or length.
   EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentType, "application/grpc"));
   EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentLength, "20"));
+
+  // We should not drain the buffer, nor stop iteration.
+  Envoy::Buffer::OwnedImpl buffer;
+  buffer.add("abc", 3);
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(buffer, true));
+  EXPECT_EQ(3, buffer.length());
 }
 
 // Tests that the filter passes a non-GRPC request through without modification.
@@ -121,16 +125,26 @@ TEST_F(ReverseBridgeTest, NoGrpcRequest) {
   Http::TestHeaderMapImpl trailers;
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(trailers));
 
-  Http::TestHeaderMapImpl headers({{"content-type", "application/json"}, {"content-length", "20"}});
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
-  // Ensure we didn't mutate content type or length.
-  EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentType, "application/json"));
-  EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentLength, "20"));
+  {
+    Http::TestHeaderMapImpl headers(
+        {{"content-type", "application/json"}, {"content-length", "20"}});
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
+    // Ensure we didn't mutate content type or length.
+    EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentType, "application/json"));
+    EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentLength, "20"));
+  }
 
   Envoy::Buffer::OwnedImpl buffer;
   buffer.add("test", 4);
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
   EXPECT_EQ(4, buffer.length());
+
+  // Verify no modification on encoding path as well.
+  Http::TestHeaderMapImpl headers({{"content-type", "application/grpc"}, {"content-length", "20"}});
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, true));
+  // Ensure we didn't mutate content type or length.
+  EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentType, "application/grpc"));
+  EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentLength, "20"));
 }
 
 // Verifies that if we receive a gRPC request but have configured the filter to not handle the gRPC
