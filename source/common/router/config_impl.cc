@@ -33,6 +33,8 @@
 
 #include "extensions/filters/http/well_known_names.h"
 
+#include "absl/strings/match.h"
+
 namespace Envoy {
 namespace Router {
 
@@ -479,7 +481,8 @@ void RouteEntryImplBase::finalizePathHeader(Http::HeaderMap& headers,
   if (insert_envoy_original_path) {
     headers.insertEnvoyOriginalPath().value(*headers.Path());
   }
-  ASSERT(StringUtil::startsWith(path.c_str(), matched_path, case_sensitive_));
+  ASSERT(case_sensitive_ ? absl::StartsWith(path, matched_path)
+                         : absl::StartsWithIgnoreCase(path, matched_path));
   headers.Path()->value(path.replace(0, matched_path.size(), rewrite));
 }
 
@@ -713,7 +716,9 @@ void PrefixRouteEntryImpl::rewritePathHeader(Http::HeaderMap& headers,
 RouteConstSharedPtr PrefixRouteEntryImpl::matches(const Http::HeaderMap& headers,
                                                   uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(headers, random_value) &&
-      StringUtil::startsWith(headers.Path()->value().c_str(), prefix_, case_sensitive_)) {
+      (case_sensitive_
+           ? absl::StartsWith(headers.Path()->value().getStringView(), prefix_)
+           : absl::StartsWithIgnoreCase(headers.Path()->value().getStringView(), prefix_))) {
     return clusterEntry(headers, random_value);
   }
   return nullptr;
@@ -743,12 +748,13 @@ RouteConstSharedPtr PathRouteEntryImpl::matches(const Http::HeaderMap& headers,
       return nullptr;
     }
 
+    absl::string_view path_section(path.c_str(), compare_length);
     if (case_sensitive_) {
-      if (0 == strncmp(path.c_str(), path_.c_str(), compare_length)) {
+      if (absl::string_view(path_) == path_section) {
         return clusterEntry(headers, random_value);
       }
     } else {
-      if (0 == strncasecmp(path.c_str(), path_.c_str(), compare_length)) {
+      if (absl::EqualsIgnoreCase(path_, path_section)) {
         return clusterEntry(headers, random_value);
       }
     }

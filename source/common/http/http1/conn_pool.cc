@@ -16,6 +16,8 @@
 #include "common/network/utility.h"
 #include "common/upstream/upstream_impl.h"
 
+#include "absl/strings/match.h"
+
 namespace Envoy {
 namespace Http {
 namespace Http1 {
@@ -263,8 +265,8 @@ void ConnPoolImpl::StreamWrapper::onEncodeComplete() { encode_complete_ = true; 
 
 void ConnPoolImpl::StreamWrapper::decodeHeaders(HeaderMapPtr&& headers, bool end_stream) {
   if (headers->Connection() &&
-      0 == StringUtil::caseInsensitiveCompare(headers->Connection()->value().c_str(),
-                                              Headers::get().ConnectionValues.Close.c_str())) {
+      absl::EqualsIgnoreCase(headers->Connection()->value().getStringView(),
+                             Headers::get().ConnectionValues.Close)) {
     saw_close_header_ = true;
     parent_.parent_.host_->cluster().stats().upstream_cx_close_notify_.inc();
   }
