@@ -1,15 +1,97 @@
 #pragma once
 
 #include <cstdint>
+#include <deque>
 #include <string>
 
 #include "envoy/buffer/buffer.h"
 
 #include "common/common/non_copyable.h"
-#include "common/event/libevent.h"
 
 namespace Envoy {
 namespace Buffer {
+
+/**
+ * A BufferSlice manages a contiguous block of bytes.
+ * The block is arranged like this:
+ *                   |<- data_size() -->|                    |<- reservable_size() ->|
+ * +-----------------+------------------+--------------------+-----------------------+
+ * | Drained         | Data             | Reserved           | Reservable            |
+ * | Unused space    | Usable content   | Additional content | Unused space that can |
+ * | that formerly   |                  | can be added here  | can be moved into     |
+ * | was in the Data |                  |                    | the Reserved section  |
+ * | section         |                  |                    |                       |
+ * +-----------------+------------------+--------------------+-----------------------+
+ *                   ^
+ *                   |
+ *                   data()
+ */
+class BufferSlice {
+public:
+  typedef std::pair<void*, uint64_t> Reservation;
+
+  virtual ~BufferSlice() {}
+
+  /**
+   * @return a pointer to the start of the usable content.
+   */
+  virtual const void* data() const PURE;
+
+  /**
+   * @return a pointer to the start of the usable content.
+   */
+  virtual void* data() PURE;
+
+  /**
+   * @return the size in bytes of the usable content.
+   */
+  virtual uint64_t dataSize() const PURE;
+
+  /**
+   * Remove the first `size` bytes of usable content. Runs in O(1) time.
+   * @param size number of bytes to remove. If greater than data_size(), the result is undefined.
+   */
+  virtual void drain(uint64_t size) PURE;
+
+  /**
+   * @return the number of bytes available to be reserve()d.
+   * @note Read-only implementations of BufferSlice should return zero from this method.
+   */
+  virtual uint64_t reservableSize() const PURE;
+
+  /**
+   * Reserve `size` bytes that the caller can populate with content. The caller SHOULD then
+   * call commit() to add the newly populated content from the Reserved section to the Data
+   * section.
+   * @note It is valid to call reserve() multiple times without a commit in between. The
+   *       result will be a succession of contiguous, reserved spans of memory, where the
+   *       first span starts right after the Data section. These spans MUST be commit()ed
+   *       in the order in which they were reserved; the result of calling commit() out
+   *       of order is undefined.
+   * @param size the number of bytes to reserve. The BufferSlice implementation MAY reserve
+   *        fewer bytes than requested (for example, if it doesn't have enough room in the
+   *        Reservable section to fulfill the whole request).
+   * @return a tuple containing the address of the start of resulting reservation and the
+   *         reservation size in bytes. If the address is null, the reservation failed.
+   * @note Read-only implementations of BufferSlice should return {nullptr, 0} from this method.
+   */
+  virtual Reservation reserve(uint64_t size) PURE;
+
+  /**
+   * Commit a Reservation that was previously obtained from a call to reserve().
+   * The Reservation's size is added to the Data section.
+   * @param reservation a reservation obtained from a previous call to reserve().
+   *        If the reservation is not from this BufferSlice, commit() will return false.
+   * @param size the number of bytes at the start of the reservation to commit. This number
+   *             MAY be smaller than the reservation size. For example, if a caller reserve()s
+   *             4KB to do a nonblocking socket read, and the read only returns two bytes, the
+   *             caller should then invoke `commit(reservation, 2)`.
+   * @return whether the Reservation was successfully committed to the BufferSlice.
+   */
+  virtual bool commit(const Reservation& reservation, uint64_t size) PURE;
+};
+
+typedef std::unique_ptr<BufferSlice> BufferSlicePtr;
 
 /**
  * An implementation of BufferFragment where a releasor callback is called when the data is
@@ -46,28 +128,20 @@ private:
   const std::function<void(const void*, size_t, const BufferFragmentImpl*)> releasor_;
 };
 
-class LibEventInstance : public Instance {
-public:
-  // Allows access into the underlying buffer for move() optimizations.
-  virtual Event::Libevent::BufferPtr& buffer() PURE;
-  // Called after accessing the memory in buffer() directly to allow any post-processing.
-  virtual void postProcess() PURE;
-};
-
 /**
  * Wraps an allocated and owned evbuffer.
  *
- * Note that due to the internals of move() accessing buffer(), OwnedImpl is not
- * compatible with non-LibEventInstance buffers.
+ * Note that due to the internals of move(), OwnedImpl is not
+ * compatible with non-OwnedImpl buffers.
  */
-class OwnedImpl : public LibEventInstance {
+class OwnedImpl : public Instance {
 public:
   OwnedImpl();
   OwnedImpl(absl::string_view data);
   OwnedImpl(const Instance& data);
   OwnedImpl(const void* data, uint64_t size);
 
-  // LibEventInstance
+  // Buffer::Instance
   void add(const void* data, uint64_t size) override;
   void addBufferFragment(BufferFragment& fragment) override;
   void add(absl::string_view data) override;
@@ -86,13 +160,17 @@ public:
   uint64_t reserve(uint64_t length, RawSlice* iovecs, uint64_t num_iovecs) override;
   ssize_t search(const void* data, uint64_t size, size_t start) const override;
   Api::SysCallIntResult write(int fd) override;
-  void postProcess() override {}
   std::string toString() const override;
 
-  Event::Libevent::BufferPtr& buffer() override { return buffer_; }
+protected:
+  // Copy data to the end of the buffer.
+  void append(const void* data, uint64_t size);
+
+  // Called after accessing the memory in buffer() directly to allow any post-processing.
+  virtual void postProcess();
 
 private:
-  Event::Libevent::BufferPtr buffer_;
+  std::deque<BufferSlicePtr> slices_;
 };
 
 } // namespace Buffer
