@@ -12,7 +12,17 @@ namespace Envoy {
 namespace Config {
 
 /**
- * A provider for configuration obtained ether statically or dynamically via xDS APIs.
+ * A provider for configuration obtained statically (via static resources in the bootstrap config),
+ * inline with a higher level resource or dynamically via xDS APIs.
+ *
+ * The ConfigProvider is an abstraction layer which higher level components such as the
+ * HttpConnectionManager, Listener, etc can leverage to interface with Envoy's configuration
+ * mechanisms. Implementations of this interface build upon lower level abstractions such as
+ * Envoy::Config::Subscription and Envoy::Config::SubscriptionCallbacks.
+ *
+ * The interface exposed below allows xDS providers to share the underlying config protos and
+ * resulting config implementations (i.e., the ConfigProvider::Config); this enables linear memory
+ * scaling based on the size of the configuration set, regardless of the number of threads/workers.
  *
  * Use config() to obtain a shared_ptr to the implementation of the config, and configProtoInfo() to
  * obtain a reference to the underlying config proto and version (applicable only to dynamic config
