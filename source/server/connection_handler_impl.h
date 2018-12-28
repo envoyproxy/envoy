@@ -119,6 +119,10 @@ private:
     ~ActiveUdpListener();
 
     // Network::UdpListenerCallbacks
+    void onNewConnection(Network::Address::InstanceConstSharedPtr local_address,
+                         Network::Address::InstanceConstSharedPtr peer_address,
+                         Buffer::InstancePtr&& data) override;
+
     void onData(Network::Address::InstanceConstSharedPtr local_address,
                 Network::Address::InstanceConstSharedPtr peer_address,
                 Buffer::InstancePtr&& data) override;

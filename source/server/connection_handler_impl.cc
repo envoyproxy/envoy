@@ -133,7 +133,7 @@ ConnectionHandlerImpl::ActiveUdpListener::~ActiveUdpListener() {
   // TODO(conqerAtapple): Add implementation.
 }
 
-void ConnectionHandlerImpl::ActiveUdpListener::onData(
+void ConnectionHandlerImpl::ActiveUdpListener::onNewConnection(
     Network::Address::InstanceConstSharedPtr local_address,
     Network::Address::InstanceConstSharedPtr peer_address, Buffer::InstancePtr&& data) {
 
@@ -145,6 +145,19 @@ void ConnectionHandlerImpl::ActiveUdpListener::onData(
   // Likely steps:
   //  1. Create filter chain and pass in the connection information
   //  2. Add the listener to a container to keep it alive.
+}
+
+void ConnectionHandlerImpl::ActiveUdpListener::onData(
+    Network::Address::InstanceConstSharedPtr local_address,
+    Network::Address::InstanceConstSharedPtr peer_address, Buffer::InstancePtr&& data) {
+
+  (void)local_address;
+  (void)peer_address;
+  (void)data;
+
+  // TODO(conqerAtapple): Add implementation.
+  // Likely steps:
+  //  - Pass the data to the filter chain.
 }
 
 Network::Listener*

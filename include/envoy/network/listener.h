@@ -124,8 +124,22 @@ public:
   // TODO(conqerAtapple): Refactor `Connection` to accomodate UDP/QUIC.
 
   /**
-   * Called when a new connection is received.
-   * @param new_connection supplies the new connection that is moved into the callee.
+   * On first packet received on a UDP socket. This allows the callback handler
+   * to establish filter chain (or any other prepararion).
+   *
+   * @param local_address Local bound socket network address.
+   * @param peer_address Network address of the peer.
+   * @param data Data buffer received.
+   */
+  virtual void onNewConnection(Address::InstanceConstSharedPtr local_address,
+                               Address::InstanceConstSharedPtr peer_address,
+                               Buffer::InstancePtr&& data) PURE;
+  /**
+   * Called whenever data is received by the underlying Udp socket.
+   *
+   * @param local_address Local bound socket network address.
+   * @param peer_address Network address of the peer.
+   * @param data Data buffer received.
    */
   virtual void onData(Address::InstanceConstSharedPtr local_address,
                       Address::InstanceConstSharedPtr peer_address,

@@ -276,12 +276,36 @@ TEST_P(ListenerImplTest, UseActualDstUdp) {
     servaddr->sin_port = htons(server_ip->port());
   }
 
-  const std::string hello("hello udp");
+  const std::string first("first");
+  const std::string second("second");
 
-  auto send_rc = ::sendto(client_sockfd, hello.c_str(), hello.length(), MSG_CONFIRM,
+  auto send_rc = ::sendto(client_sockfd, first.c_str(), first.length(), MSG_CONFIRM,
                           reinterpret_cast<const struct sockaddr*>(&server_addr), addr_len);
 
-  ASSERT_EQ(send_rc, hello.length());
+  ASSERT_EQ(send_rc, first.length());
+
+  send_rc = ::sendto(client_sockfd, second.c_str(), second.length(), MSG_CONFIRM,
+                     reinterpret_cast<const struct sockaddr*>(&server_addr), addr_len);
+
+  ASSERT_EQ(send_rc, second.length());
+
+  EXPECT_CALL(listener_callbacks, onNewConnection_(_, _, _))
+      .WillOnce(
+          Invoke([&](Address::InstanceConstSharedPtr local_address,
+                     Address::InstanceConstSharedPtr peer_address, Buffer::Instance* data) -> void {
+            ASSERT_NE(local_address, nullptr);
+
+            ASSERT_NE(peer_address, nullptr);
+            ASSERT_NE(peer_address->ip(), nullptr);
+
+            ASSERT_EQ(local_address->asString(), server_socket->localAddress()->asString());
+
+            ASSERT_EQ(peer_address->ip()->addressAsString(),
+                      client_socket->localAddress()->ip()->addressAsString());
+
+            EXPECT_EQ(*local_address, *server_socket->localAddress());
+            ASSERT_EQ(data->toString(), first);
+          }));
 
   EXPECT_CALL(listener_callbacks, onData_(_, _, _))
       .WillOnce(
@@ -298,7 +322,7 @@ TEST_P(ListenerImplTest, UseActualDstUdp) {
                       client_socket->localAddress()->ip()->addressAsString());
 
             EXPECT_EQ(*local_address, *server_socket->localAddress());
-            ASSERT_EQ(data->toString(), hello);
+            ASSERT_EQ(data->toString(), second);
 
             dispatcher_.exit();
           }));
