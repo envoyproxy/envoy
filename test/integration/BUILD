@@ -105,13 +105,30 @@ envoy_cc_test(
 
 envoy_sh_test(
     name = "hotrestart_test",
-    srcs = envoy_select_hot_restart(["hotrestart_test.sh"]),
+    srcs = envoy_select_hot_restart([
+        "hotrestart_test.sh",
+        "test_utility.sh",
+    ]),
     data = [
         "//source/exe:envoy-static",
         "//test/common/runtime:filesystem_setup.sh",
         "//test/common/runtime:filesystem_test_data",
         "//test/config/integration:server_config_files",
         "//tools:socket_passing",
+    ],
+)
+
+envoy_sh_test(
+    name = "run_envoy_test",
+    srcs = [
+        "run_envoy_test.sh",
+        "test_utility.sh",
+    ],
+    data = [
+        "//source/exe:envoy-static",
+        "//test/common/runtime:filesystem_setup.sh",
+        "//test/common/runtime:filesystem_test_data",
+        "//test/config/integration:server_config_files",
     ],
 )
 
