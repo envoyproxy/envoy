@@ -256,23 +256,6 @@ do
   TEST_INDEX=$((TEST_INDEX+1))
 done
 
-# set -e forces the script to exit on non-zero exit codes. Set +e makes it easier to
-# catch the non-zero exit code.
-set +e
-disableHeapCheck
-
-start_test Launching envoy with no parameters. Check the exit value is 1
-${ENVOY_BIN} --base_id "${BASE_ID}"
-EXIT_CODE=$?
-# The test should fail if the Envoy binary exits with anything other than 1.
-if [[ $EXIT_CODE -ne 1 ]]; then
-    echo "Envoy exited with code: ${EXIT_CODE}"
-    exit 1
-fi
-
-enableHeapCheck
-set -e
-
 start_test disabling hot_restart by command line.
 CLI_HOT_RESTART_VERSION=$("${ENVOY_BIN}" --hot-restart-version --disable-hot-restart 2>&1)
 check [ "disabled" = "${CLI_HOT_RESTART_VERSION}" ]
