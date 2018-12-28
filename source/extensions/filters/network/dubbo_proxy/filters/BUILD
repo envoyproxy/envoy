@@ -9,6 +9,19 @@ load(
 envoy_package()
 
 envoy_cc_library(
+    name = "filter_interface",
+    hdrs = ["filter.h"],
+    deps = [
+        "//include/envoy/buffer:buffer_interface",
+        "//include/envoy/network:connection_interface",
+        "//source/extensions/filters/network/dubbo_proxy:decoder_events_lib",
+        "//source/extensions/filters/network/dubbo_proxy:deserializer_interface",
+        "//source/extensions/filters/network/dubbo_proxy:metadata_lib",
+        "//source/extensions/filters/network/dubbo_proxy:protocol_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "filter_config_interface",
     hdrs = ["filter_config.h"],
     deps = [
@@ -23,19 +36,6 @@ envoy_cc_library(
     deps = [
         ":filter_config_interface",
         "//source/common/protobuf:utility_lib",
-    ],
-)
-
-envoy_cc_library(
-    name = "filter_interface",
-    hdrs = ["filter.h"],
-    deps = [
-        "//include/envoy/buffer:buffer_interface",
-        "//include/envoy/network:connection_interface",
-        "//source/extensions/filters/network/dubbo_proxy:decoder_events_lib",
-        "//source/extensions/filters/network/dubbo_proxy:deserializer_interface",
-        "//source/extensions/filters/network/dubbo_proxy:metadata_lib",
-        "//source/extensions/filters/network/dubbo_proxy:protocol_interface",
     ],
 )
 

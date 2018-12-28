@@ -147,6 +147,7 @@ envoy_cc_library(
     hdrs = ["decoder_event_handler.h"],
     deps = [
         ":metadata_lib",
+        "//include/envoy/network:filter_interface",
         "//source/common/buffer:buffer_lib",
     ],
 )
