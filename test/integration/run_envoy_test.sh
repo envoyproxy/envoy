@@ -1,6 +1,6 @@
 #!/bin/bash
 
-source test_utility.sh
+source "$TEST_RUNDIR/test/integration/test_utility.sh"
 
 start_test Launching envoy with a bogus command line flag.
 ${ENVOY_BIN} --bogus-flag

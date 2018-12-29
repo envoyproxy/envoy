@@ -1,8 +1,6 @@
 #!/bin/bash
 
-source test_utility.sh
-
-set -e
+source "$TEST_RUNDIR/test/integration/test_utility.sh"
 
 # TODO(htuch): In this test script, we are duplicating work done in test_environment.cc via sed.
 # Instead, we can add a simple C++ binary that links against test_environment.cc and uses the
