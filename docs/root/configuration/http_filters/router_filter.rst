@@ -59,7 +59,8 @@ The supported policies are:
 
 5xx
   Envoy will attempt a retry if the upstream server responds with any 5xx response code, or does not
-  respond at all (disconnect/reset/read timeout). (Includes *connect-failure* and *refused-stream*)
+  respond at all (disconnect/reset/read timeout). (Includes *connect-failure*,
+  *connect-termination* and *refused-stream*)
 
   * **NOTE:** Envoy will not retry when a request exceeds
     :ref:`config_http_filters_router_x-envoy-upstream-rq-timeout-ms` (resulting in a 504 error
@@ -80,6 +81,10 @@ connect-failure
     include upstream request timeouts specified via
     :ref:`config_http_filters_router_x-envoy-upstream-rq-timeout-ms` or via :ref:`route
     configuration <envoy_api_field_route.RouteAction.retry_policy>`.
+
+connect-termination
+  Envoy will attempt a retry if a request is failed because the connection was terminated by the
+  upstream server. (Included in *5xx*)
 
 retriable-4xx
   Envoy will attempt a retry if the upstream server responds with a retriable 4xx response code.

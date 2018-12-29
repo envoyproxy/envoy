@@ -62,6 +62,8 @@ public:
   const absl::optional<Http::StreamResetReason> overflow_reset_{Http::StreamResetReason::Overflow};
   const absl::optional<Http::StreamResetReason> connect_failure_{
       Http::StreamResetReason::ConnectionFailure};
+  const absl::optional<Http::StreamResetReason> connect_termination_{
+      Http::StreamResetReason::ConnectionTermination};
 };
 
 TEST_F(RouterRetryStateImplTest, PolicyNoneRemoteReset) {
@@ -307,6 +309,17 @@ TEST_F(RouterRetryStateImplTest, PolicyConnectFailureResetConnectFailure) {
   retry_timer_->callback_();
 }
 
+TEST_F(RouterRetryStateImplTest, PolicyConnectFailureResetConnectTermination) {
+  Http::TestHeaderMapImpl request_headers{{"x-envoy-retry-on", "connect-termination"}};
+  setup(request_headers);
+  EXPECT_TRUE(state_->enabled());
+
+  expectTimerCreateAndEnable();
+  EXPECT_EQ(RetryStatus::Yes, state_->shouldRetry(nullptr, connect_termination_, callback_));
+  EXPECT_CALL(callback_ready_, ready());
+  retry_timer_->callback_();
+}
+
 TEST_F(RouterRetryStateImplTest, PolicyRetriable4xxRetry) {
   Http::TestHeaderMapImpl request_headers{{"x-envoy-retry-on", "retriable-4xx"}};
   setup(request_headers);
@@ -402,7 +415,7 @@ TEST_F(RouterRetryStateImplTest, RetriableStatusCodesHeader) {
   }
 }
 
-TEST_F(RouterRetryStateImplTest, RouteConfigNoHeaderConfig) {
+TEST_F(RouterRetryStateImplTest, RouteConfigNoHeaderConfigConnectFailure) {
   policy_.num_retries_ = 1;
   policy_.retry_on_ = RetryPolicy::RETRY_ON_CONNECT_FAILURE;
   Http::TestHeaderMapImpl request_headers;
@@ -411,6 +424,19 @@ TEST_F(RouterRetryStateImplTest, RouteConfigNoHeaderConfig) {
 
   expectTimerCreateAndEnable();
   EXPECT_EQ(RetryStatus::Yes, state_->shouldRetry(nullptr, connect_failure_, callback_));
+  EXPECT_CALL(callback_ready_, ready());
+  retry_timer_->callback_();
+}
+
+TEST_F(RouterRetryStateImplTest, RouteConfigNoHeaderConfigConnectTermination) {
+  policy_.num_retries_ = 1;
+  policy_.retry_on_ = RetryPolicy::RETRY_ON_CONNECT_TERMINATION;
+  Http::TestHeaderMapImpl request_headers;
+  setup(request_headers);
+  EXPECT_TRUE(state_->enabled());
+
+  expectTimerCreateAndEnable();
+  EXPECT_EQ(RetryStatus::Yes, state_->shouldRetry(nullptr, connect_termination_, callback_));
   EXPECT_CALL(callback_ready_, ready());
   retry_timer_->callback_();
 }

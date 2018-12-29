@@ -109,6 +109,8 @@ uint32_t RetryStateImpl::parseRetryOn(absl::string_view config) {
       ret |= RetryPolicy::RETRY_ON_GATEWAY_ERROR;
     } else if (retry_on == Http::Headers::get().EnvoyRetryOnValues.ConnectFailure) {
       ret |= RetryPolicy::RETRY_ON_CONNECT_FAILURE;
+    } else if (retry_on == Http::Headers::get().EnvoyRetryOnValues.ConnectTermination) {
+      ret |= RetryPolicy::RETRY_ON_CONNECT_TERMINATION;
     } else if (retry_on == Http::Headers::get().EnvoyRetryOnValues.Retriable4xx) {
       ret |= RetryPolicy::RETRY_ON_RETRIABLE_4XX;
     } else if (retry_on == Http::Headers::get().EnvoyRetryOnValues.RefusedStream) {
@@ -245,6 +247,11 @@ bool RetryStateImpl::wouldRetryFromReset(const Http::StreamResetReason& reset_re
 
   if ((retry_on_ & RetryPolicy::RETRY_ON_CONNECT_FAILURE) &&
       reset_reason == Http::StreamResetReason::ConnectionFailure) {
+    return true;
+  }
+
+  if ((retry_on_ & RetryPolicy::RETRY_ON_CONNECT_TERMINATION) &&
+      reset_reason == Http::StreamResetReason::ConnectionTermination) {
     return true;
   }
 
