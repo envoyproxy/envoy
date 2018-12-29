@@ -42,8 +42,7 @@ static_resources:
             stat_prefix: router
             filters:
             - name: health_check
-              typed_config:
-                "@type": type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
+              config:
                 endpoint: "/healthcheck"
                 pass_through_mode: false
             - name: rate_limit
@@ -76,8 +75,7 @@ static_resources:
     filter_chains:
     - filters:
       - name: envoy.http_connection_manager
-        typed_config:
-          "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
+        config:
           value:
             filters:
             - name: health_check
