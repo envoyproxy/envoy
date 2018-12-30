@@ -159,12 +159,6 @@ TEST(StringUtil, WhitespaceChars) {
   EXPECT_NE(nullptr, strchr(StringUtil::WhitespaceChars, '\r'));
 }
 
-TEST(StringUtil, caseInsensitiveCompare) {
-  EXPECT_EQ(0, StringUtil::caseInsensitiveCompare("CONTENT-LENGTH", "content-length"));
-  EXPECT_LT(0, StringUtil::caseInsensitiveCompare("CONTENT-LENGTH", "blah"));
-  EXPECT_GT(0, StringUtil::caseInsensitiveCompare("CONTENT-LENGTH", "hello"));
-}
-
 TEST(StringUtil, itoa) {
   char buf[32];
   EXPECT_THROW(StringUtil::itoa(buf, 20, 1), std::invalid_argument);
@@ -230,30 +224,6 @@ TEST(StringUtil, join) {
   EXPECT_EQ("hello,,world", StringUtil::join({"hello", "world"}, ",,"));
   EXPECT_EQ("hello", StringUtil::join({"hello"}, ",,"));
   EXPECT_EQ("", StringUtil::join({}, ",,"));
-}
-
-TEST(StringUtil, endsWith) {
-  EXPECT_TRUE(StringUtil::endsWith("test", "st"));
-  EXPECT_TRUE(StringUtil::endsWith("t", "t"));
-  EXPECT_TRUE(StringUtil::endsWith("test", ""));
-  EXPECT_TRUE(StringUtil::endsWith("", ""));
-  EXPECT_FALSE(StringUtil::endsWith("test", "ttest"));
-  EXPECT_FALSE(StringUtil::endsWith("test", "w"));
-}
-
-TEST(StringUtil, startsWith) {
-  EXPECT_TRUE(StringUtil::startsWith("Test", "Te"));
-  EXPECT_TRUE(StringUtil::startsWith("Test", "Te", false));
-  EXPECT_TRUE(StringUtil::startsWith("Test", "te", false));
-  EXPECT_TRUE(StringUtil::startsWith("", ""));
-  EXPECT_TRUE(StringUtil::startsWith("test", ""));
-  EXPECT_FALSE(StringUtil::startsWith("Test", "te"));
-  EXPECT_FALSE(StringUtil::startsWith("Test", "tE", true));
-  EXPECT_FALSE(StringUtil::startsWith("test", "boo", true));
-  EXPECT_FALSE(StringUtil::startsWith("test", "boo", false));
-  EXPECT_FALSE(StringUtil::startsWith("test", "testtest"));
-  EXPECT_FALSE(StringUtil::startsWith("test", "TESTTEST", false));
-  EXPECT_FALSE(StringUtil::startsWith("", "test"));
 }
 
 TEST(StringUtil, escape) {
