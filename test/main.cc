@@ -2,6 +2,8 @@
 #include "test/test_common/environment.h"
 #include "test/test_runner.h"
 
+#include "common/memory/mem_debug.h"
+
 #include "absl/debugging/symbolize.h"
 
 #ifdef ENVOY_HANDLE_SIGNALS
@@ -32,5 +34,8 @@ int main(int argc, char** argv) {
   // v4 and v6 addresses is desired. This feature is in progress and will be rolled out to all tests
   // in upcoming PRs.
   Envoy::TestEnvironment::setEnvVar("ENVOY_IP_TEST_VERSIONS", "all", 0);
+#ifndef NDEBUG
+  Envoy::MemDebugLoader();
+#endif
   return Envoy::TestRunner::RunTests(argc, argv);
 }

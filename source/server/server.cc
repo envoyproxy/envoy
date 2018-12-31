@@ -28,6 +28,7 @@
 #include "common/config/utility.h"
 #include "common/http/codes.h"
 #include "common/local_info/local_info_impl.h"
+#include "common/memory/mem_debug.h"
 #include "common/memory/stats.h"
 #include "common/network/address_impl.h"
 #include "common/protobuf/utility.h"
@@ -66,6 +67,10 @@ InstanceImpl::InstanceImpl(Options& options, Event::TimeSystem& time_system,
       access_log_manager_(*api_, *dispatcher_, access_log_lock), terminated_(false),
       mutex_tracer_(options.mutexTracingEnabled() ? &Envoy::MutexTracerImpl::getOrCreateTracer()
                                                   : nullptr) {
+
+#ifndef NDEBUG
+  MemDebugLoader(); // Forces source/common/memory/mem_debug.cc to be linked in.
+#endif
 
   try {
     if (!options.logPath().empty()) {

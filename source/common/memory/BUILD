@@ -9,6 +9,13 @@ load(
 envoy_package()
 
 envoy_cc_library(
+    name = "mem_debug_lib",
+    srcs = ["mem_debug.cc"],
+    hdrs = ["mem_debug.h"],
+    deps = ["//source/common/common:assert_lib"],
+)
+
+envoy_cc_library(
     name = "stats_lib",
     srcs = ["stats.cc"],
     hdrs = ["stats.h"],
