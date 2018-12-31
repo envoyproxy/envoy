@@ -3,6 +3,7 @@ Version history
 
 1.10.0 (pending)
 ================
+* redis: added :ref:`success and error stats <config_network_filters_redis_proxy_per_command_stats>` for commands.
 
 1.9.0
 ===============
