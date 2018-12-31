@@ -61,6 +61,7 @@ public:
     return createListenerFilterFactoryList_(filters, context);
   }
   Network::SocketSharedPtr createListenSocket(Network::Address::InstanceConstSharedPtr address,
+                                              Network::Address::SocketType socket_type,
                                               const Network::Socket::OptionsSharedPtr& options,
                                               bool bind_to_port) override;
   DrainManagerPtr createDrainManager(envoy::api::v2::Listener::DrainType drain_type) override;

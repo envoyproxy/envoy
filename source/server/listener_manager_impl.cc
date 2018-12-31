@@ -28,6 +28,20 @@
 
 namespace Envoy {
 namespace Server {
+namespace {
+
+std::string toString(Network::Address::SocketType socket_type) {
+  switch (socket_type) {
+  case Network::Address::SocketType::Stream:
+    return "SocketType::Stream";
+  case Network::Address::SocketType::Datagram:
+    return "SocketType::Datagram";
+  default:
+    return fmt::format("unknown ({})", static_cast<int>(socket_type));
+  }
+}
+
+} // namespace
 
 std::vector<Network::FilterFactoryCb> ProdListenerComponentFactory::createNetworkFilterFactoryList_(
     const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
@@ -84,14 +98,24 @@ ProdListenerComponentFactory::createListenerFilterFactoryList_(
 
 Network::SocketSharedPtr
 ProdListenerComponentFactory::createListenSocket(Network::Address::InstanceConstSharedPtr address,
+                                                 Network::Address::SocketType socket_type,
                                                  const Network::Socket::OptionsSharedPtr& options,
                                                  bool bind_to_port) {
   ASSERT(address->type() == Network::Address::Type::Ip ||
          address->type() == Network::Address::Type::Pipe);
+  ASSERT(socket_type == Network::Address::SocketType::Stream ||
+         socket_type == Network::Address::SocketType::Datagram);
 
   // For each listener config we share a single socket among all threaded listeners.
   // First we try to get the socket from our parent if applicable.
   if (address->type() == Network::Address::Type::Pipe) {
+    if (socket_type != Network::Address::SocketType::Stream) {
+      // This could be implemented in the future, since Unix domain sockets
+      // support SOCK_DGRAM, but there would need to be a way to specify it in
+      // envoy.api.v2.core.Pipe.
+      throw EnvoyException(
+          fmt::format("socket type {} not supported for pipes", toString(socket_type)));
+    }
     const std::string addr = fmt::format("unix://{}", address->asString());
     const int fd = server_.hotRestart().duplicateParentListenSocket(addr);
     if (fd != -1) {
@@ -101,13 +125,22 @@ ProdListenerComponentFactory::createListenSocket(Network::Address::InstanceConst
     return std::make_shared<Network::UdsListenSocket>(address);
   }
 
-  const std::string addr = fmt::format("tcp://{}", address->asString());
+  const std::string scheme = (socket_type == Network::Address::SocketType::Stream) ? "tcp" : "udp";
+  const std::string addr = fmt::format("{}://{}", scheme, address->asString());
   const int fd = server_.hotRestart().duplicateParentListenSocket(addr);
   if (fd != -1) {
     ENVOY_LOG(debug, "obtained socket for address {} from parent", addr);
-    return std::make_shared<Network::TcpListenSocket>(fd, address, options);
+    if (socket_type == Network::Address::SocketType::Stream) {
+      return std::make_shared<Network::TcpListenSocket>(fd, address, options);
+    } else {
+      return std::make_shared<Network::UdpListenSocket>(fd, address, options);
+    }
   }
-  return std::make_shared<Network::TcpListenSocket>(address, options, bind_to_port);
+  if (socket_type == Network::Address::SocketType::Stream) {
+    return std::make_shared<Network::TcpListenSocket>(address, options, bind_to_port);
+  } else {
+    return std::make_shared<Network::UdpListenSocket>(address, options, bind_to_port);
+  }
 }
 
 DrainManagerPtr
@@ -775,6 +808,7 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::api::v2::Listener& co
     new_listener->setSocket(draining_listener_socket
                                 ? draining_listener_socket
                                 : factory_.createListenSocket(new_listener->address(),
+                                                              new_listener->socketType(),
                                                               new_listener->listenSocketOptions(),
                                                               new_listener->bindToPort()));
     if (workers_started_) {
