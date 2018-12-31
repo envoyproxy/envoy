@@ -198,15 +198,6 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
   config_path_ = config_path.getValue();
   config_yaml_ = config_yaml.getValue();
 
-  // Exactly one of config_path and config_yaml should be specified.
-  if (config_path_.empty() == config_yaml_.empty()) {
-    const std::string message =
-        fmt::format("Exactly one of --config-path '{}' and --config-yaml '{}' should be non-empty",
-                    config_path_, config_yaml_);
-    std::cerr << message << std::endl;
-    throw MalformedArgvException(message);
-  }
-
   allow_unknown_fields_ = allow_unknown_fields.getValue();
   if (allow_unknown_fields_) {
     MessageUtil::proto_unknown_fields = ProtoUnknownFieldsMode::Allow;
@@ -227,6 +218,17 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
     std::cerr << hot_restart_version_cb(max_stats.getValue(), stats_options_.maxNameLength(),
                                         !hot_restart_disabled_);
     throw NoServingException();
+  }
+}
+
+void OptionsImpl::validate() {
+  // Exactly one of config_path and config_yaml should be specified.
+  if (config_path_.empty() == config_yaml_.empty()) {
+    const std::string message =
+        fmt::format("Exactly one of --config-path '{}' and --config-yaml '{}' should be non-empty",
+                    config_path_, config_yaml_);
+    std::cerr << message << std::endl;
+    throw MalformedArgvException(message);
   }
 }
 

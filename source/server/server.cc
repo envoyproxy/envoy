@@ -68,6 +68,7 @@ InstanceImpl::InstanceImpl(Options& options, Event::TimeSystem& time_system,
                                                   : nullptr) {
 
   try {
+    options.validate();
     if (!options.logPath().empty()) {
       try {
         file_logger_ = std::make_unique<Logger::FileSinkDelegate>(

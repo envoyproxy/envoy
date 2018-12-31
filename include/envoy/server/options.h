@@ -185,6 +185,12 @@ public:
    * @return CommandLineOptionsPtr the protobuf representation of the options.
    */
   virtual CommandLineOptionsPtr toCommandLineOptions() const PURE;
+
+  /**
+   * Checks that the options are in a valid state for serving traffic, throwing
+   * a MalformedArgvException if they are not.
+   */
+  virtual void validate() PURE;
 };
 
 } // namespace Server
