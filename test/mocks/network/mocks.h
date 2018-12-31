@@ -193,6 +193,7 @@ public:
 
   MOCK_CONST_METHOD0(localAddress, const Address::InstanceConstSharedPtr&());
   MOCK_CONST_METHOD0(fd, int());
+  MOCK_CONST_METHOD0(socketType, Address::SocketType());
   MOCK_METHOD0(close, void());
   MOCK_METHOD1(addOption_, void(const Socket::OptionConstSharedPtr& option));
   MOCK_METHOD1(addOptions_, void(const Socket::OptionsSharedPtr& options));
@@ -238,6 +239,7 @@ public:
   MOCK_METHOD1(addOptions_, void(const Socket::OptionsSharedPtr&));
   MOCK_CONST_METHOD0(options, const Network::ConnectionSocket::OptionsSharedPtr&());
   MOCK_CONST_METHOD0(fd, int());
+  MOCK_CONST_METHOD0(socketType, Address::SocketType());
   MOCK_METHOD0(close, void());
 
   Address::InstanceConstSharedPtr local_address_;
