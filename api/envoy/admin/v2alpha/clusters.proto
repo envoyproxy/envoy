@@ -71,6 +71,9 @@ message HostHealthStatus {
   // The host is currently considered an outlier and has been ejected.
   bool failed_outlier_check = 2;
 
+  // The host is currently being marked as degraded through active health checking.
+  bool failed_active_degraded_check = 4;
+
   // Health status as reported by EDS. Note: only HEALTHY and UNHEALTHY are currently supported
   // here.
   // TODO(mrice32): pipe through remaining EDS health status possibilities.

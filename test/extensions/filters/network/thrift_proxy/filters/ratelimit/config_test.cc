@@ -35,7 +35,7 @@ TEST(RateLimitFilterConfigTest, ValidateFail) {
 }
 
 TEST(RateLimitFilterConfigTest, RateLimitFilterCorrectProto) {
-  std::string yaml_string = R"EOF(
+  const std::string yaml_string = R"EOF(
 domain: "test"
 timeout: "1.337s"
   )EOF";

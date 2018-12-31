@@ -190,6 +190,7 @@ void TcpStatsdSink::TlsSink::endFlush(bool do_write) {
   current_slice_mem_ = nullptr;
   if (do_write) {
     write(buffer_);
+    ASSERT(buffer_.length() == 0);
   }
 }
 
@@ -235,6 +236,7 @@ void TcpStatsdSink::TlsSink::write(Buffer::Instance& buffer) {
     Upstream::Host::CreateConnectionData info =
         parent_.cluster_manager_.tcpConnForCluster(parent_.cluster_info_->name(), nullptr, nullptr);
     if (!info.connection_) {
+      buffer.drain(buffer.length());
       return;
     }
 

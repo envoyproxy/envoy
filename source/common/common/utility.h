@@ -1,7 +1,5 @@
 #pragma once
 
-#include <strings.h>
-
 #include <chrono>
 #include <cstdint>
 #include <regex>
@@ -166,16 +164,6 @@ public:
   static bool atol(const char* str, int64_t& out, int base = 10);
 
   /**
-   * Perform a case insensitive compare of 2 strings.
-   * @param lhs supplies string 1.
-   * @param rhs supplies string 2.
-   * @return < 0, 0, > 0 depending on the comparison result.
-   */
-  static int caseInsensitiveCompare(const char* lhs, const char* rhs) {
-    return strcasecmp(lhs, rhs);
-  }
-
-  /**
    * Convert an unsigned integer to a base 10 string as fast as possible.
    * @param out supplies the string to fill.
    * @param out_len supplies the length of the output buffer. Must be >= MIN_ITOA_OUT_LEN.
@@ -322,17 +310,6 @@ public:
    * @return escaped string.
    */
   static std::string escape(const std::string& source);
-
-  /**
-   * @return true if @param source ends with @param end.
-   */
-  static bool endsWith(const std::string& source, const std::string& end);
-
-  /**
-   * @param case_sensitive determines if the compare is case sensitive
-   * @return true if @param source starts with @param start and ignores cases.
-   */
-  static bool startsWith(const char* source, const std::string& start, bool case_sensitive = true);
 
   /**
    * Provide a default value for a string if empty.
