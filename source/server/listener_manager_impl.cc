@@ -96,11 +96,9 @@ ProdListenerComponentFactory::createListenerFilterFactoryList_(
   return ret;
 }
 
-Network::SocketSharedPtr
-ProdListenerComponentFactory::createListenSocket(Network::Address::InstanceConstSharedPtr address,
-                                                 Network::Address::SocketType socket_type,
-                                                 const Network::Socket::OptionsSharedPtr& options,
-                                                 bool bind_to_port) {
+Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
+    Network::Address::InstanceConstSharedPtr address, Network::Address::SocketType socket_type,
+    const Network::Socket::OptionsSharedPtr& options, bool bind_to_port) {
   ASSERT(address->type() == Network::Address::Type::Ip ||
          address->type() == Network::Address::Type::Pipe);
   ASSERT(socket_type == Network::Address::SocketType::Stream ||

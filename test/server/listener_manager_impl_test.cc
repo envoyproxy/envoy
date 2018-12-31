@@ -2658,8 +2658,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TransparentFreebindListenerDisabl
   )EOF",
                                                        Network::Address::IpVersion::v4);
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true))
-      .WillOnce(Invoke([&](Network::Address::InstanceConstSharedPtr,
-                           Network::Address::SocketType,
+      .WillOnce(Invoke([&](Network::Address::InstanceConstSharedPtr, Network::Address::SocketType,
                            const Network::Socket::OptionsSharedPtr& options,
                            bool) -> Network::SocketSharedPtr {
         EXPECT_EQ(options, nullptr);
@@ -2690,17 +2689,17 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TransparentListenerEnabled) {
                                                        Network::Address::IpVersion::v4);
   if (ENVOY_SOCKET_IP_TRANSPARENT.has_value()) {
     EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true))
-        .WillOnce(Invoke([this](Network::Address::InstanceConstSharedPtr,
-                                Network::Address::SocketType,
-                                const Network::Socket::OptionsSharedPtr& options,
-                                bool) -> Network::SocketSharedPtr {
-          EXPECT_NE(options.get(), nullptr);
-          EXPECT_EQ(options->size(), 2);
-          EXPECT_TRUE(
-              Network::Socket::applyOptions(options, *listener_factory_.socket_,
-                                            envoy::api::v2::core::SocketOption::STATE_PREBIND));
-          return listener_factory_.socket_;
-        }));
+        .WillOnce(
+            Invoke([this](Network::Address::InstanceConstSharedPtr, Network::Address::SocketType,
+                          const Network::Socket::OptionsSharedPtr& options,
+                          bool) -> Network::SocketSharedPtr {
+              EXPECT_NE(options.get(), nullptr);
+              EXPECT_EQ(options->size(), 2);
+              EXPECT_TRUE(
+                  Network::Socket::applyOptions(options, *listener_factory_.socket_,
+                                                envoy::api::v2::core::SocketOption::STATE_PREBIND));
+              return listener_factory_.socket_;
+            }));
     // Expecting the socket option to bet set twice, once pre-bind, once post-bind.
     EXPECT_CALL(os_sys_calls,
                 setsockopt_(_, ENVOY_SOCKET_IP_TRANSPARENT.value().first,
@@ -2742,17 +2741,17 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, FreebindListenerEnabled) {
                                                        Network::Address::IpVersion::v4);
   if (ENVOY_SOCKET_IP_FREEBIND.has_value()) {
     EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true))
-        .WillOnce(Invoke([this](Network::Address::InstanceConstSharedPtr,
-                                Network::Address::SocketType,
-                                const Network::Socket::OptionsSharedPtr& options,
-                                bool) -> Network::SocketSharedPtr {
-          EXPECT_NE(options.get(), nullptr);
-          EXPECT_EQ(options->size(), 1);
-          EXPECT_TRUE(
-              Network::Socket::applyOptions(options, *listener_factory_.socket_,
-                                            envoy::api::v2::core::SocketOption::STATE_PREBIND));
-          return listener_factory_.socket_;
-        }));
+        .WillOnce(
+            Invoke([this](Network::Address::InstanceConstSharedPtr, Network::Address::SocketType,
+                          const Network::Socket::OptionsSharedPtr& options,
+                          bool) -> Network::SocketSharedPtr {
+              EXPECT_NE(options.get(), nullptr);
+              EXPECT_EQ(options->size(), 1);
+              EXPECT_TRUE(
+                  Network::Socket::applyOptions(options, *listener_factory_.socket_,
+                                                envoy::api::v2::core::SocketOption::STATE_PREBIND));
+              return listener_factory_.socket_;
+            }));
     EXPECT_CALL(os_sys_calls, setsockopt_(_, ENVOY_SOCKET_IP_FREEBIND.value().first,
                                           ENVOY_SOCKET_IP_FREEBIND.value().second, _, sizeof(int)))
         .WillOnce(Invoke([](int, int, int, const void* optval, socklen_t) -> int {
@@ -2790,17 +2789,17 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, LiteralSockoptListenerEnabled) {
   )EOF",
                                                        Network::Address::IpVersion::v4);
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true))
-      .WillOnce(Invoke([this](Network::Address::InstanceConstSharedPtr,
-                              Network::Address::SocketType,
-                              const Network::Socket::OptionsSharedPtr& options,
-                              bool) -> Network::SocketSharedPtr {
-        EXPECT_NE(options.get(), nullptr);
-        EXPECT_EQ(options->size(), 3);
-        EXPECT_TRUE(
-            Network::Socket::applyOptions(options, *listener_factory_.socket_,
-                                          envoy::api::v2::core::SocketOption::STATE_PREBIND));
-        return listener_factory_.socket_;
-      }));
+      .WillOnce(
+          Invoke([this](Network::Address::InstanceConstSharedPtr, Network::Address::SocketType,
+                        const Network::Socket::OptionsSharedPtr& options,
+                        bool) -> Network::SocketSharedPtr {
+            EXPECT_NE(options.get(), nullptr);
+            EXPECT_EQ(options->size(), 3);
+            EXPECT_TRUE(
+                Network::Socket::applyOptions(options, *listener_factory_.socket_,
+                                              envoy::api::v2::core::SocketOption::STATE_PREBIND));
+            return listener_factory_.socket_;
+          }));
   EXPECT_CALL(os_sys_calls, setsockopt_(_, 1, 2, _, sizeof(int)))
       .WillOnce(Invoke([](int, int, int, const void* optval, socklen_t) -> int {
         EXPECT_EQ(3, *static_cast<const int*>(optval));
