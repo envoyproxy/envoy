@@ -37,11 +37,6 @@ public:
   OptionsImpl(const std::string& service_cluster, const std::string& service_node,
               const std::string& service_zone, spdlog::level::level_enum log_level);
 
-  // Checks the options for consistency. Note this cannot be done during
-  // population, as tests may set options programmatically. This function
-  // throws if there is a failure.
-  void validate() override;
-
   // Setters for option fields. These are not part of the Options interface.
   void setBaseId(uint64_t base_id) { base_id_ = base_id; };
   void setConcurrency(uint32_t concurrency) { concurrency_ = concurrency; }
@@ -113,6 +108,8 @@ public:
   bool signalHandlingEnabled() const override { return signal_handling_enabled_; }
   bool mutexTracingEnabled() const override { return mutex_tracing_enabled_; }
   virtual Server::CommandLineOptionsPtr toCommandLineOptions() const override;
+  void validate() override;
+
   void parseComponentLogLevels(const std::string& component_log_levels);
   uint32_t count() const;
 

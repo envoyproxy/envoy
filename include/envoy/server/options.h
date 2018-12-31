@@ -188,7 +188,8 @@ public:
 
   /**
    * Checks that the options are in a valid state for serving traffic, throwing
-   * a MalformedArgvException if they are not.
+   * a MalformedArgvException if they are not. Note this cannot be done during
+   * population, as tests may set options programmatically.
    */
   virtual void validate() PURE;
 };
