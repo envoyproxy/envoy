@@ -30,7 +30,7 @@ class BufferSlice {
 public:
   typedef std::pair<void*, uint64_t> Reservation;
 
-  virtual ~BufferSlice() {}
+  virtual ~BufferSlice() = default;
 
   /**
    * @return a pointer to the start of the usable content.
@@ -91,7 +91,7 @@ public:
   virtual bool commit(const Reservation& reservation, uint64_t size) PURE;
 };
 
-typedef std::unique_ptr<BufferSlice> BufferSlicePtr;
+using BufferSlicePtr = std::unique_ptr<BufferSlice>;
 
 /**
  * An implementation of BufferFragment where a releasor callback is called when the data is

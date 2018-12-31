@@ -467,7 +467,7 @@ Api::SysCallIntResult OwnedImpl::write(int fd) {
   return {static_cast<int>(result.rc_), result.errno_};
 }
 
-OwnedImpl::OwnedImpl() {}
+OwnedImpl::OwnedImpl() = default;
 
 OwnedImpl::OwnedImpl(absl::string_view data) : OwnedImpl() { add(data); }
 
