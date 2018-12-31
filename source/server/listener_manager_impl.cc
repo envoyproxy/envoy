@@ -119,6 +119,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
                            ListenerManagerImpl& parent, const std::string& name, bool modifiable,
                            bool workers_started, uint64_t hash)
     : parent_(parent), address_(Network::Address::resolveProtoAddress(config.address())),
+      socket_type_(Network::Utility::protobufAddressSocketType(config.address())),
       global_scope_(parent_.server_.stats().createScope("")),
       listener_scope_(
           parent_.server_.stats().createScope(fmt::format("listener.{}.", address_->asString()))),
