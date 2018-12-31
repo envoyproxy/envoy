@@ -293,6 +293,21 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SslContext) {
   EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
 }
 
+TEST_F(ListenerManagerImplWithRealFiltersTest, UdpAddress) {
+  const std::string json = R"EOF(
+  {
+    "address": "udp://127.0.0.1:1234",
+    "filters": []
+  }
+  )EOF";
+
+  EXPECT_CALL(server_.random_, uuid());
+  EXPECT_CALL(listener_factory_,
+              createListenSocket(_, Network::Address::SocketType::Datagram, _, true));
+  manager_->addOrUpdateListener(parseListenerFromJson(json), "", true);
+  EXPECT_EQ(1U, manager_->listeners().size());
+}
+
 TEST_F(ListenerManagerImplWithRealFiltersTest, BadListenerConfig) {
   const std::string json = R"EOF(
   {
