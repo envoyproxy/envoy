@@ -48,28 +48,6 @@ namespace Envoy {
   } while (false)
 #endif
 
-#ifndef NDEBUG
-#if __clang__
-#define __CLANG_PRAGMA(X) _Pragma(X)
-#else
-#define __CLANG_PRAGMA(X)
-#endif
-
-// clang-format off
-
-#define ASSERT_IGNORE_POTENTIALLY_EVALUATED(COND)                                                  \
-  do {                                                                                             \
-    __CLANG_PRAGMA("clang diagnostic push")                                                        \
-    __CLANG_PRAGMA("clang diagnostic ignored \"-Wpotentially-evaluated-expression\"")              \
-    ASSERT(COND);                                                                                  \
-    __CLANG_PRAGMA("clang diagnostic pop")                                                         \
-  } while (0)
-#else // NDEBUG
-#define ASSERT_IGNORE_POTENTIALLY_EVALUATED(COND)
-#endif
-
-// clang-format on
-
 /**
  * Indicate a panic situation and exit.
  */

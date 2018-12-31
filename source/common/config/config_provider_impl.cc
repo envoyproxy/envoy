@@ -59,12 +59,17 @@ bool ConfigSubscriptionInstanceBase::checkAndApplyConfig(const Protobuf::Message
 
 void ConfigSubscriptionInstanceBase::bindConfigProvider(MutableConfigProviderImplBase* provider) {
   // All config providers bound to a ConfigSubscriptionInstanceBase must be of the same concrete
-  // type; this is assumed by checkAndApplyConfig() and is verified by the assertion below. NOTE: a
-  // regular ASSERT() triggers a potentially evaluated expression warning from clang due to the args
-  // passed to the second typeid() call.
-  ASSERT_IGNORE_POTENTIALLY_EVALUATED(mutable_config_providers_.empty() ||
-                                      typeid(*provider) ==
-                                          typeid(**mutable_config_providers_.begin()));
+  // type; this is assumed by checkAndApplyConfig() and is verified by the assertion below.
+  // NOTE: an inlined statement ASSERT() triggers a potentially evaluated expression warning from
+  // clang due to `typeid(**mutable_config_providers_.begin())`. To avoid this, we use a lambda to
+  // separate the first mutable provider dereference from the typeid() statement.
+  ASSERT([&]() {
+    if (!mutable_config_providers_.empty()) {
+      const auto& first_provider = **mutable_config_providers_.begin();
+      return typeid(*provider) == typeid(first_provider);
+    }
+    return true;
+  }());
   mutable_config_providers_.insert(provider);
 }
 
