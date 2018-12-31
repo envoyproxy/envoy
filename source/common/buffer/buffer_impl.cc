@@ -28,7 +28,7 @@ static uint64_t SliceSize(uint64_t data_size) {
 class OwnedBufferSlice : public BufferSlice {
 public:
   OwnedBufferSlice(uint64_t size) : reserved_(0), reservable_(0), size_(SliceSize(size)) {
-    base_.reset(new uint8_t[size_]);
+    base_ = std::make_unique<uint8_t[]>(size_);
   }
 
   OwnedBufferSlice(const void* data, uint64_t size) : OwnedBufferSlice(size) {

@@ -28,7 +28,7 @@ namespace Buffer {
  */
 class BufferSlice {
 public:
-  typedef std::pair<void*, uint64_t> Reservation;
+  using Reservation = std::pair<void*, uint64_t>;
 
   virtual ~BufferSlice() = default;
 
