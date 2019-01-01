@@ -9,7 +9,7 @@ genrule(
     srcs = src_files,
     outs = ["quiche/" + f for f in src_files],
     cmd = "\n".join(
-        ["sed -e '/^#include/ s|net/http2/platform/impl/|common/quic/platform/|' $(location %s) > $(location :%s)" % (f, "quiche/" + f) for f in src_files],
+        ["sed -e '/^#include/ s|net/http2/platform/impl/|extensions/filters/datagram/quiche/platform/|' $(location %s) > $(location :%s)" % (f, "quiche/" + f) for f in src_files],
     ),
     visibility = ["//visibility:private"],
 )
@@ -36,6 +36,6 @@ cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
-        "@envoy//source/common/quic/platform:http2_platform_impl_lib",
+        "@envoy//source/extensions/filters/datagram/quiche/platform:http2_platform_impl_lib",
     ],
 )

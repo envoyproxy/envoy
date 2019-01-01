@@ -17,7 +17,7 @@ envoy_cc_test(
     srcs = ["dummy_test.cc"],
     external_deps = ["quiche_http2_platform"],
     deps = [
-        "//source/common/quic:dummy_lib",
+        "//source/extensions/filters/datagram/quiche:dummy_lib",
         "//test/test_common:utility_lib",
     ],
 )
