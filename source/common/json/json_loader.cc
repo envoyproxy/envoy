@@ -686,8 +686,8 @@ bool ObjectHandler::handleValueEvent(FieldSharedPtr ptr) {
 ObjectSharedPtr Factory::loadFromFile(const std::string& file_path) {
   try {
     const std::string contents = Filesystem::fileReadToEnd(file_path);
-    return absl::EndsWith(file_path, ".yaml") ? loadFromYamlString(contents)
-                                              : loadFromString(contents);
+    bool is_yaml = absl::EndsWith(file_path, ".yaml") || absl::EndsWith(file_path, ".yml");
+    return is_yaml ? loadFromYamlString(contents) : loadFromString(contents);
   } catch (EnvoyException& e) {
     throw Exception(e.what());
   }
