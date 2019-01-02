@@ -1,5 +1,6 @@
 // NOLINT(namespace-envoy)
 #include "test/test_common/environment.h"
+#include "test/test_common/utility.h"
 #include "test/test_runner.h"
 
 #include "absl/debugging/symbolize.h"
@@ -18,6 +19,9 @@ int main(int argc, char** argv) {
   // Enabled by default. Control with "bazel --define=signal_trace=disabled"
   Envoy::SignalAction handle_sigs;
 #endif
+
+  // Initialize the debug only, globally accessible Thread::threadFactorySingleton.
+  Envoy::Thread::initializeThreadFactorySingleton();
 
   Envoy::TestEnvironment::setEnvVar("TEST_RUNDIR",
                                     (Envoy::TestEnvironment::getCheckedEnvVar("TEST_SRCDIR") + "/" +

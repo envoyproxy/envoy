@@ -377,6 +377,14 @@ ThreadFactory& threadFactoryForTest() {
   return *thread_factory;
 }
 
+ThreadFactory* threadFactorySingleton = nullptr;
+
+void initializeThreadFactorySingleton() {
+  // threadFactoryForTest() is thread safe due to reliance on function scoped static variable
+  // initialization.
+  threadFactorySingleton = &threadFactoryForTest();
+}
+
 } // namespace Thread
 
 namespace Api {

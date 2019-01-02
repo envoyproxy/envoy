@@ -52,6 +52,15 @@ public:
 };
 
 /**
+ * A globally accessible singleton pointing to the ThreadFactory instance corresponding to the
+ * build platform.
+ *
+ * This singleton is only intended for use with debug builds. Any reference to this variable in a
+ * non debug statement will trigger an undefined reference linker warning.
+ */
+extern ThreadFactory* threadFactorySingleton;
+
+/**
  * Like the C++11 "basic lockable concept" but a pure virtual interface vs. a template, and
  * with thread annotations.
  */
