@@ -1,6 +1,8 @@
 syntax = "proto3";
 
 package envoy.api.v2.listener;
+option java_package = "io.envoyproxy.envoy.api.v2.listener";
+option java_multiple_files = true;
 option go_package = "listener";
 option csharp_namespace = "Envoy.Api.V2.ListenerNS";
 
