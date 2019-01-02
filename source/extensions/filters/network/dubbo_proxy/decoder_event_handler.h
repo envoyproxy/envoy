@@ -18,6 +18,9 @@ namespace DubboProxy {
  * This class provides the pass-through capability of the original data of
  * the Dubbo protocol to improve the forwarding efficiency
  * when no modification of the original data is required.
+ * Note: If the custom filter does not care about data transfer,
+ *       then it does not need to care about this interface,
+ *       which is currently used by router filter.
  */
 class ProtocolDataPassthroughConverter {
 public:
@@ -34,8 +37,7 @@ public:
    */
   virtual Network::FilterStatus transferHeaderTo(const Buffer::Instance& header_buf, size_t size) {
     if (buffer_ != nullptr) {
-      Buffer::OwnedImpl copy(header_buf);
-      buffer_->move(copy, size);
+      buffer_->move(header_buf, size);
     }
     return Network::FilterStatus::Continue;
   }
@@ -48,8 +50,7 @@ public:
    */
   virtual Network::FilterStatus transferBodyTo(const Buffer::Instance& body_buf, size_t size) {
     if (buffer_ != nullptr) {
-      Buffer::OwnedImpl copy(body_buf);
-      buffer_->move(copy, size);
+      buffer_->move(body_buf, size);
     }
     return Network::FilterStatus::Continue;
   }

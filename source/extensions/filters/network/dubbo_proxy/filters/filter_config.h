@@ -3,8 +3,12 @@
 #include <string>
 
 #include "envoy/common/pure.h"
+#include "envoy/server/filter_config.h"
 
+#include "common/common/macros.h"
 #include "common/protobuf/protobuf.h"
+
+#include "extensions/filters/network/dubbo_proxy/filters/filter.h"
 
 namespace Envoy {
 namespace Extensions {

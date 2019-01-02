@@ -7,6 +7,8 @@
 
 #include "common/protobuf/utility.h"
 
+#include "extensions/filters/network/dubbo_proxy/filters/filter_config.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
