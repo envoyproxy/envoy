@@ -17,12 +17,12 @@ const std::string& VersionInfo::revisionStatus() {
 }
 
 std::string VersionInfo::version() {
-  return fmt::format("{}/{}/{}/{}", revision(), BUILD_VERSION_NUMBER, revisionStatus(),
+  return fmt::format("{}/{}/{}/{}/{}", revision(), BUILD_VERSION_NUMBER, revisionStatus(),
 #ifdef NDEBUG
-                     "RELEASE"
+                     "RELEASE",
 #else
-                     "DEBUG"
+                     "DEBUG",
 #endif
-  );
+                     ENVOY_SSL_VERSION);
 }
 } // namespace Envoy

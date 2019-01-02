@@ -48,10 +48,9 @@ public:
   virtual std::string fileReadToEnd(const std::string& path) PURE;
 
   /**
-   * Create a thread.
-   * @param thread_routine supplies the function to invoke in the thread.
+   * @return a reference to the ThreadFactory
    */
-  virtual Thread::ThreadPtr createThread(std::function<void()> thread_routine) PURE;
+  virtual Thread::ThreadFactory& threadFactory() PURE;
 };
 
 typedef std::unique_ptr<Api> ApiPtr;

@@ -8,6 +8,7 @@
 #include "test/proto/bookstore.pb.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/match.h"
 #include "gtest/gtest.h"
 
 using Envoy::Protobuf::Message;
@@ -123,9 +124,11 @@ protected:
     EXPECT_TRUE(response->complete());
 
     if (response->headers().get(Http::LowerCaseString("transfer-encoding")) == nullptr ||
-        strncmp(
-            response->headers().get(Http::LowerCaseString("transfer-encoding"))->value().c_str(),
-            "chunked", strlen("chunked")) != 0) {
+        !absl::StartsWith(response->headers()
+                              .get(Http::LowerCaseString("transfer-encoding"))
+                              ->value()
+                              .getStringView(),
+                          "chunked")) {
       EXPECT_EQ(response->headers().get(Http::LowerCaseString("trailer")), nullptr);
     }
 
@@ -141,7 +144,7 @@ protected:
       if (full_response) {
         EXPECT_EQ(response_body, response->body());
       } else {
-        EXPECT_TRUE(StringUtil::startsWith(response->body().c_str(), response_body));
+        EXPECT_TRUE(absl::StartsWith(response->body(), response_body));
       }
     }
 

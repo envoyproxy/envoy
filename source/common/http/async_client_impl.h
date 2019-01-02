@@ -144,6 +144,10 @@ private:
     // Router::ShadowPolicy
     const std::string& cluster() const override { return EMPTY_STRING; }
     const std::string& runtimeKey() const override { return EMPTY_STRING; }
+    const envoy::type::FractionalPercent& defaultValue() const override { return default_value_; }
+
+  private:
+    envoy::type::FractionalPercent default_value_;
   };
 
   struct NullConfig : public Router::Config {

@@ -127,8 +127,8 @@ private:
   bool sniffing_{true};
   DubboFilterStats stats_;
 
-  ConfigProtocolType protocol_type_;
-  ConfigSerializationType serialization_type_;
+  ProtocolType protocol_type_;
+  SerializationType serialization_type_;
 
   TimeSource& time_source_;
 };

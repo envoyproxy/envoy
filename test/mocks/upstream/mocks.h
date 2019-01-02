@@ -51,27 +51,28 @@ public:
   // Upstream::HostSet
   MOCK_CONST_METHOD0(hosts, const HostVector&());
   MOCK_CONST_METHOD0(healthyHosts, const HostVector&());
+  MOCK_CONST_METHOD0(degradedHosts, const HostVector&());
   MOCK_CONST_METHOD0(hostsPerLocality, const HostsPerLocality&());
   MOCK_CONST_METHOD0(healthyHostsPerLocality, const HostsPerLocality&());
+  MOCK_CONST_METHOD0(degradedHostsPerLocality, const HostsPerLocality&());
   MOCK_CONST_METHOD0(localityWeights, LocalityWeightsConstSharedPtr());
   MOCK_METHOD0(chooseLocality, absl::optional<uint32_t>());
-  MOCK_METHOD8(updateHosts, void(std::shared_ptr<const HostVector> hosts,
-                                 std::shared_ptr<const HostVector> healthy_hosts,
-                                 HostsPerLocalityConstSharedPtr hosts_per_locality,
-                                 HostsPerLocalityConstSharedPtr healthy_hosts_per_locality,
+  MOCK_METHOD5(updateHosts, void(HostSet::UpdateHostsParams&& update_hosts_params,
                                  LocalityWeightsConstSharedPtr locality_weights,
                                  const HostVector& hosts_added, const HostVector& hosts_removed,
                                  absl::optional<uint32_t> overprovisioning_factor));
   MOCK_CONST_METHOD0(priority, uint32_t());
-  uint32_t overprovisioning_factor() const override { return overprovisioning_factor_; }
-  void set_overprovisioning_factor(const uint32_t overprovisioning_factor) {
+  uint32_t overprovisioningFactor() const override { return overprovisioning_factor_; }
+  void setOverprovisioningFactor(const uint32_t overprovisioning_factor) {
     overprovisioning_factor_ = overprovisioning_factor;
   }
 
   HostVector hosts_;
   HostVector healthy_hosts_;
+  HostVector degraded_hosts_;
   HostsPerLocalitySharedPtr hosts_per_locality_{new HostsPerLocalityImpl()};
   HostsPerLocalitySharedPtr healthy_hosts_per_locality_{new HostsPerLocalityImpl()};
+  HostsPerLocalitySharedPtr degraded_hosts_per_locality_{new HostsPerLocalityImpl()};
   LocalityWeightsConstSharedPtr locality_weights_{{}};
   Common::CallbackManager<uint32_t, const HostVector&, const HostVector&> member_update_cb_helper_;
   uint32_t priority_{};
@@ -357,27 +358,6 @@ public:
 
   MOCK_METHOD1(shouldSelectAnotherHost, bool(const Host& candidate_host));
   MOCK_METHOD1(onHostAttempted, void(HostDescriptionConstSharedPtr));
-};
-
-class MockEdsSubscriptionFactory : public EdsSubscriptionFactory {
-  MOCK_METHOD8(getOrCreateMux,
-               Config::GrpcMux&(const LocalInfo::LocalInfo& local_info,
-                                Grpc::AsyncClientPtr async_client, Event::Dispatcher& dispatcher,
-                                const Protobuf::MethodDescriptor& service_method,
-                                Runtime::RandomGenerator& random,
-                                const ::envoy::api::v2::core::ApiConfigSource& config_source,
-                                Stats::Scope& scope,
-                                const Config::RateLimitSettings& rate_limit_settings));
-
-  MOCK_METHOD9(subscriptionFromConfigSource,
-               std::unique_ptr<Config::Subscription<envoy::api::v2::ClusterLoadAssignment>>(
-                   const envoy::api::v2::core::ConfigSource& config,
-                   const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
-                   Upstream::ClusterManager& cm, Runtime::RandomGenerator& random,
-                   Stats::Scope& scope,
-                   std::function<Config::Subscription<envoy::api::v2::ClusterLoadAssignment>*()>
-                       rest_legacy_constructor,
-                   const std::string& rest_method, const std::string& grpc_method));
 };
 
 class TestRetryHostPredicateFactory : public RetryHostPredicateFactory {

@@ -3,6 +3,8 @@ syntax = "proto3";
 package envoy.config.filter.http.rate_limit.v2;
 option go_package = "v2";
 
+import "envoy/config/ratelimit/v2/rls.proto";
+
 import "google/protobuf/duration.proto";
 
 import "validate/validate.proto";
@@ -45,4 +47,11 @@ message RateLimit {
   // of the default `UNAVAILABLE` gRPC code for a rate limited gRPC call. The
   // HTTP code will be 200 for a gRPC response.
   bool rate_limited_as_resource_exhausted = 6;
+
+  // Configuration for an external rate limit service provider. If not
+  // specified, any calls to the rate limit service will immediately return
+  // success.
+  // [#comment:TODO(ramaraochavali): Make this required as part of cleanup of deprecated ratelimit
+  // service config in bootstrap.]
+  envoy.config.ratelimit.v2.RateLimitServiceConfig rate_limit_service = 7;
 }

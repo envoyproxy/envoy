@@ -38,5 +38,5 @@ message StreamTracesMessage {
   Identifier identifier = 1;
 
   // A list of Span entries
-  repeated opencensus.proto.trace.Span spans = 2;
+  repeated opencensus.proto.trace.v1.Span spans = 2;
 }

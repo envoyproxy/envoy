@@ -60,9 +60,9 @@ public:
       Configuration::ListenerFactoryContext& context) override {
     return createListenerFilterFactoryList_(filters, context);
   }
-  Network::SocketSharedPtr
-  createListenSocket(Network::Address::InstanceConstSharedPtr address,
-                     const Network::Socket::OptionsSharedPtr& options) override;
+  Network::SocketSharedPtr createListenSocket(Network::Address::InstanceConstSharedPtr address,
+                                              const Network::Socket::OptionsSharedPtr& options,
+                                              bool bind_to_port) override;
   DrainManagerPtr createDrainManager(envoy::api::v2::Listener::DrainType drain_type) override;
   uint64_t nextListenerTag() override { return next_listener_tag_++; }
 
@@ -241,10 +241,14 @@ public:
   Network::FilterChainManager& filterChainManager() override { return *this; }
   Network::FilterChainFactory& filterChainFactory() override { return *this; }
   Network::Socket& socket() override { return *socket_; }
+  const Network::Socket& socket() const override { return *socket_; }
+  bool bindToPort() override { return bind_to_port_; }
   bool handOffRestoredDestinationConnections() const override {
     return hand_off_restored_destination_connections_;
   }
-  uint32_t perConnectionBufferLimitBytes() override { return per_connection_buffer_limit_bytes_; }
+  uint32_t perConnectionBufferLimitBytes() const override {
+    return per_connection_buffer_limit_bytes_;
+  }
   std::chrono::milliseconds listenerFiltersTimeout() const override {
     return listener_filters_timeout_;
   }
@@ -290,6 +294,7 @@ public:
     ensureSocketOptions();
     Network::Socket::appendOptions(listen_socket_options_, options);
   }
+  const Network::ListenerConfig& listenerConfig() const override { return *this; }
 
   // Network::DrainDecision
   bool drainClose() const override;
@@ -384,6 +389,7 @@ private:
   Network::SocketSharedPtr socket_;
   Stats::ScopePtr global_scope_;   // Stats with global named scope, but needed for LDS cleanup.
   Stats::ScopePtr listener_scope_; // Stats with listener named scope.
+  const bool bind_to_port_;
   const bool hand_off_restored_destination_connections_;
   const uint32_t per_connection_buffer_limit_bytes_;
   const uint64_t listener_tag_;

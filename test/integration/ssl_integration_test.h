@@ -32,7 +32,9 @@ public:
 
 protected:
   bool server_tlsv1_3_{false};
+  bool server_rsa_cert_{true};
   bool server_ecdsa_cert_{false};
+  bool client_ecdsa_cert_{false};
   // Set this true to debug SSL handshake issues with openssl s_client. The
   // verbose trace will be in the logs, openssl must be installed separately.
   bool debug_with_s_client_{false};

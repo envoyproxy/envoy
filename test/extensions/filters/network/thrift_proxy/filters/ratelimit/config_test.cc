@@ -35,7 +35,7 @@ TEST(RateLimitFilterConfigTest, ValidateFail) {
 }
 
 TEST(RateLimitFilterConfigTest, RateLimitFilterCorrectProto) {
-  std::string yaml_string = R"EOF(
+  const std::string yaml_string = R"EOF(
 domain: "test"
 timeout: "1.337s"
   )EOF";
@@ -52,6 +52,11 @@ timeout: "1.337s"
       Filters::Common::RateLimit::rateLimitClientFactory(
           instance, instance.clusterManager().grpcAsyncClientManager(),
           envoy::config::bootstrap::v2::Bootstrap());
+
+  EXPECT_CALL(context.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
+      .WillOnce(Invoke([](const envoy::api::v2::core::GrpcService&, Stats::Scope&, bool) {
+        return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
+      }));
 
   RateLimitFilterConfig factory;
   auto cb = factory.createFilterFactoryFromProto(proto_config, "stats", context);

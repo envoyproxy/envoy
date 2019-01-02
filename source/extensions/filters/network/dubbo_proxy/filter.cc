@@ -13,11 +13,62 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace DubboProxy {
 
+namespace {
+
+using ConfigProtocolType =
+    envoy::extensions::filters::network::dubbo_proxy::v2alpha1::DubboProxy_ProtocolType;
+
+typedef std::map<ConfigProtocolType, ProtocolType> ProtocolTypeMap;
+
+static const ProtocolTypeMap& protocolTypeMap() {
+  CONSTRUCT_ON_FIRST_USE(
+      ProtocolTypeMap, {
+                           {ConfigProtocolType::DubboProxy_ProtocolType_Dubbo, ProtocolType::Dubbo},
+                       });
+}
+
+ProtocolType lookupProtocolType(ConfigProtocolType config_type) {
+  const auto& iter = protocolTypeMap().find(config_type);
+  if (iter == protocolTypeMap().end()) {
+    throw EnvoyException(fmt::format(
+        "unknown protocol {}",
+        envoy::extensions::filters::network::dubbo_proxy::v2alpha1::DubboProxy_ProtocolType_Name(
+            config_type)));
+  }
+  return iter->second;
+}
+
+using ConfigSerializationType =
+    envoy::extensions::filters::network::dubbo_proxy::v2alpha1::DubboProxy_SerializationType;
+
+typedef std::map<ConfigSerializationType, SerializationType> SerializationTypeMap;
+
+static const SerializationTypeMap& serializationTypeMap() {
+  CONSTRUCT_ON_FIRST_USE(SerializationTypeMap,
+                         {
+                             {ConfigSerializationType::DubboProxy_SerializationType_Hessian2,
+                              SerializationType::Hessian},
+                         });
+}
+
+SerializationType lookupSerializationType(ConfigSerializationType type) {
+  const auto& iter = serializationTypeMap().find(type);
+  if (iter == serializationTypeMap().end()) {
+    throw EnvoyException(fmt::format("unknown deserializer {}",
+                                     envoy::extensions::filters::network::dubbo_proxy::v2alpha1::
+                                         DubboProxy_SerializationType_Name(type)));
+  }
+
+  return iter->second;
+}
+
+} // namespace
+
 Filter::Filter(const std::string& stat_prefix, ConfigProtocolType protocol_type,
                ConfigSerializationType serialization_type, Stats::Scope& scope,
                TimeSource& time_source)
-    : stats_(generateStats(stat_prefix, scope)), protocol_type_(protocol_type),
-      serialization_type_(serialization_type), time_source_(time_source) {}
+    : stats_(generateStats(stat_prefix, scope)), protocol_type_(lookupProtocolType(protocol_type)),
+      serialization_type_(lookupSerializationType(serialization_type)), time_source_(time_source) {}
 
 Filter::~Filter() = default;
 
@@ -183,23 +234,11 @@ DecoderPtr Filter::createDecoder(ProtocolCallbacks& prot_callback) {
 }
 
 ProtocolPtr Filter::createProtocol(ProtocolCallbacks& callback) {
-  using Type = envoy::extensions::filters::network::dubbo_proxy::v2alpha1::DubboProxy;
-  switch (protocol_type_) {
-  case Type::Dubbo:
-    return std::make_unique<DubboProtocolImpl>(callback);
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  }
+  return NamedProtocolConfigFactory::getFactory(protocol_type_).createProtocol(callback);
 }
 
 DeserializerPtr Filter::createDeserializer() {
-  using Type = envoy::extensions::filters::network::dubbo_proxy::v2alpha1::DubboProxy;
-  switch (serialization_type_) {
-  case Type::Hessian2:
-    return std::make_unique<HessianDeserializerImpl>();
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  }
+  return NamedDeserializerConfigFactory::getFactory(serialization_type_).createDeserializer();
 }
 
 } // namespace DubboProxy
