@@ -64,7 +64,7 @@ public:
 
     const auto* config_proto = dynamic_cast<const P*>(getConfigProto());
     if (config_proto == nullptr) {
-      return {};
+      return absl::nullopt;
     }
     return ConfigProtoInfo<P>{*config_proto, getConfigVersion()};
   }
