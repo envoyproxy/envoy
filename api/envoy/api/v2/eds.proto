@@ -52,7 +52,7 @@ message ClusterLoadAssignment {
   repeated endpoint.LocalityLbEndpoints endpoints = 2 [(gogoproto.nullable) = false];
 
   // List of named endpoints that can be referenced multiple times in LocalityLbEndpoints.
-  repeated endpoint.NamedEndpoint named_endpoints = 5;
+  repeated endpoint.Endpoint named_endpoints = 5;
 
   // Load balancing policy settings.
   message Policy {
