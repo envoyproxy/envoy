@@ -185,12 +185,14 @@ message ResponseFlags {
   // Indicates if the request was deemed unauthorized and the reason for it.
   Unauthorized unauthorized_details = 13;
 
-  // [#not-implemented-hide:] Hide from docs.
   // Indicates that the request was rejected because there was an error in rate limit service.
   bool rate_limit_service_error = 14;
 
   // Indicates the stream was reset due to a downstream connection termination.
   bool downstream_connection_termination = 15;
+
+  // Indicates that the upstream retry limit was exceeded, resulting in a downstream error.
+  bool upstream_retry_limit_exceeded = 16;
 }
 
 // [#not-implemented-hide:]

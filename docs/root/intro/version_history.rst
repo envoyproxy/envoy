@@ -4,6 +4,7 @@ Version history
 1.10.0 (pending)
 ================
 * http: added new grpc_http1_reverse_bridge filter for converting gRPC requests into HTTP/1.1 requests.
+* access log: added a new flag for upstream retry count exceeded.
 
 1.9.0
 ===============

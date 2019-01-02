@@ -122,6 +122,14 @@ TEST(HessianProtocolTest, deserializeRpcResult) {
                               EnvoyException, exception_string);
   }
 }
+
+TEST(HessianProtocolTest, HessianDeserializerConfigFactory) {
+  auto deserializer =
+      NamedDeserializerConfigFactory::getFactory(SerializationType::Hessian).createDeserializer();
+  EXPECT_EQ(deserializer->name(), "hessian");
+  EXPECT_EQ(deserializer->type(), SerializationType::Hessian);
+}
+
 } // namespace DubboProxy
 } // namespace NetworkFilters
 } // namespace Extensions
