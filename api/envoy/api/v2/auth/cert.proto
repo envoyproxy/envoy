@@ -33,10 +33,10 @@ message TlsParameters {
     TLSv1_3 = 4;
   }
 
-  // Minimum TLS protocol version.
+  // Minimum TLS protocol version. By default, it's ``TLSv1_0``.
   TlsProtocol tls_minimum_protocol_version = 1 [(validate.rules).enum.defined_only = true];
 
-  // Maximum TLS protocol version.
+  // Maximum TLS protocol version. By default, it's ``TLSv1_2``.
   TlsProtocol tls_maximum_protocol_version = 2 [(validate.rules).enum.defined_only = true];
 
   // If specified, the TLS listener will only support the specified `cipher list
