@@ -447,6 +447,7 @@
   "statsd_tcp_cluster_name": "statsd",
 
   "lds": {
+    "api_type": "REST",
     "cluster": "lds"
   },
 
@@ -458,6 +459,7 @@
 
   "cluster_manager": {
     "cds": {
+      "api_type": "REST",
       "cluster": {
         "name": "cds",
         "connect_timeout_ms": 5000,
