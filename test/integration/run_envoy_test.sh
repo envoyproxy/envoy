@@ -21,9 +21,4 @@ expect_fail_with_error "PARSE ERROR: Argument: --bogus-flag" --bogus-flag
 
 start_test Launching envoy without --config-path or --config-yaml fails.
 expect_fail_with_error \
-  "Exactly one of --config-path '' and --config-yaml '' should be non-empty"
-
-start_test Launching envoy with both --config-path and --config-yaml fails.
-expect_fail_with_error \
-  "Exactly one of --config-path 'x' and --config-yaml 'y' should be non-empty" \
-  --config-path x --config-yaml y
+  "At least one of --config-path and --config-yaml should be non-empty"

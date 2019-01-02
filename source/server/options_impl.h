@@ -108,7 +108,6 @@ public:
   bool signalHandlingEnabled() const override { return signal_handling_enabled_; }
   bool mutexTracingEnabled() const override { return mutex_tracing_enabled_; }
   virtual Server::CommandLineOptionsPtr toCommandLineOptions() const override;
-  void validate() override;
 
   void parseComponentLogLevels(const std::string& component_log_levels);
   uint32_t count() const;

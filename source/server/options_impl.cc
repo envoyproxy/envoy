@@ -220,17 +220,6 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
   }
 }
 
-void OptionsImpl::validate() {
-  // Exactly one of config_path and config_yaml should be specified.
-  if (config_path_.empty() == config_yaml_.empty()) {
-    const std::string message =
-        fmt::format("Exactly one of --config-path '{}' and --config-yaml '{}' should be non-empty",
-                    config_path_, config_yaml_);
-    std::cerr << message << std::endl;
-    throw MalformedArgvException(message);
-  }
-}
-
 void OptionsImpl::parseComponentLogLevels(const std::string& component_log_levels) {
   if (component_log_levels.empty()) {
     return;
