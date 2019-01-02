@@ -69,14 +69,7 @@ message Bootstrap {
     // streamed on the ADS channel.
     envoy.api.v2.core.ApiConfigSource ads_config = 3;
 
-    // [#not-implemented-hide:] Hide from docs.
-    message DeprecatedV1 {
-      // Deprecated service discovery service config for when using API v1 REST.
-      envoy.api.v2.core.ConfigSource sds_config = 1;
-    }
-
-    // [#not-implemented-hide:] Hide from docs.
-    DeprecatedV1 deprecated_v1 = 4 [deprecated = true];
+    reserved 4;
   }
   // xDS configuration sources.
   DynamicResources dynamic_resources = 3;
