@@ -464,7 +464,7 @@ TEST_F(MongoCodecImplTest, MsgEqual) {
     auto s1 = Bson::SectionImpl::create();
     s1->payloadType(Bson::Section::PayloadType::Document);
     m1.sections().push_back(s1);
-    MsgMessageImpl m2(1, 1);
+    MsgMessageImpl m2(0, 0);
     auto s2 = Bson::SectionImpl::create();
     s2->payloadType(Bson::Section::PayloadType::Sequence);
     EXPECT_FALSE(m1 == m2);
@@ -483,12 +483,18 @@ TEST_F(MongoCodecImplTest, Msg) {
   {
     MsgMessageImpl msg(16, 26);
 
-    msg.flagBits(0);
-    auto section = Bson::SectionImpl::create();
-    section->payloadType(Bson::Section::PayloadType::Document);
-    Bson::Payload payload = Bson::DocumentImpl::create()->addString("hello", "world");
-    section->payload(std::make_shared<Bson::Payload>(payload));
-    msg.sections().push_back(section);
+    msg.flagBits(MsgMessage::FlagBits::ChecksumPresent);
+    auto section1 = Bson::SectionImpl::create();
+    section1->payloadType(Bson::Section::PayloadType::Document);
+    Bson::Payload payload1 = Bson::DocumentImpl::create()->addString("hello", "world");
+    section1->payload(std::make_shared<Bson::Payload>(payload1));
+    msg.sections().push_back(section1);
+    auto section2 = Bson::SectionImpl::create();
+    section2->payloadType(Bson::Section::PayloadType::Document);
+    Bson::Payload payload2 = Bson::DocumentImpl::create()->addString("foo", "bar");
+    section2->payload(std::make_shared<Bson::Payload>(payload2));
+    msg.sections().push_back(section2);
+    msg.checksum(1);
 
     EXPECT_NO_THROW(Json::Factory::loadFromString(msg.toString(true)));
     EXPECT_NO_THROW(Json::Factory::loadFromString(msg.toString(false)));
@@ -503,10 +509,12 @@ TEST_F(MongoCodecImplTest, Msg) {
 
     msg.flagBits(0);
     auto sequence = Bson::SequenceImpl::create();
-    auto doc = Bson::DocumentImpl::create()->addString("hello", "world");
-    sequence->size(doc->byteSize());
+    auto doc1 = Bson::DocumentImpl::create()->addString("hello", "world");
+    auto doc2 = Bson::DocumentImpl::create()->addString("foo", "bar");
+    sequence->size(doc1->byteSize() + doc2->byteSize());
     sequence->identifier("id");
-    sequence->documents().push_back(doc);
+    sequence->documents().push_back(doc1);
+    sequence->documents().push_back(doc2);
     auto section = Bson::SectionImpl::create();
     section->payloadType(Bson::Section::PayloadType::Sequence);
     Bson::Payload payload = sequence;

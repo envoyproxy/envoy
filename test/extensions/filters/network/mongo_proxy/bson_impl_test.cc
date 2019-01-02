@@ -40,6 +40,8 @@ TEST(BsonImplTest, SequenceEqual) {
   {
     auto seq1 = SequenceImpl::create();
     auto seq2 = SequenceImpl::create();
+    seq1->size(0);
+    seq2->size(0);
     seq1->identifier("id");
     seq2->identifier("id2");
     EXPECT_FALSE(*seq1 == *seq2);
@@ -48,9 +50,85 @@ TEST(BsonImplTest, SequenceEqual) {
   {
     auto seq1 = SequenceImpl::create();
     auto seq2 = SequenceImpl::create();
+    seq1->size(0);
+    seq2->size(0);
+    seq1->identifier("id");
+    seq1->identifier("id");
     seq1->documents().push_back(DocumentImpl::create());
     seq2->documents().push_back(DocumentImpl::create()->addString("hello", "world"));
     EXPECT_FALSE(*seq1 == *seq2);
+  }
+}
+
+TEST(BsonImplTest, SectionEqual) {
+  {
+    auto sec1 = SectionImpl::create();
+    auto sec2 = SectionImpl::create();
+    sec1->payloadType(Section::PayloadType::Document);
+    sec2->payloadType(Section::PayloadType::Sequence);
+    EXPECT_FALSE(*sec1 == *sec2);
+  }
+
+  {
+    auto sec1 = SectionImpl::create();
+    auto sec2 = SectionImpl::create();
+    DocumentSharedPtr doc1 = DocumentImpl::create();
+    DocumentSharedPtr doc2 = DocumentImpl::create()->addString("hello", "world");
+    sec1->payloadType(Section::PayloadType::Document);
+    sec1->payload(std::make_shared<Payload>(Payload(doc1)));
+    sec2->payloadType(Section::PayloadType::Document);
+    sec2->payload(std::make_shared<Payload>(Payload(doc2)));
+    EXPECT_FALSE(*sec1 == *sec2);
+  }
+
+  {
+    auto sec1 = SectionImpl::create();
+    auto sec2 = SectionImpl::create();
+    auto seq1 = SequenceImpl::create();
+    auto seq2 = SequenceImpl::create();
+    seq1->size(0);
+    seq2->size(1);
+    sec1->payloadType(Section::PayloadType::Sequence);
+    sec1->payload(std::make_shared<Payload>(Payload(seq1)));
+    sec2->payloadType(Section::PayloadType::Sequence);
+    sec2->payload(std::make_shared<Payload>(Payload(seq2)));
+    EXPECT_FALSE(*sec1 == *sec2);
+  }
+}
+
+TEST(BsonImplTest, InvalidSectionPayloadType) {
+  {
+    Buffer::OwnedImpl buffer;
+    BufferHelper::writeByte(buffer, 3);
+    EXPECT_THROW(Bson::SectionImpl::create(buffer), EnvoyException);
+  }
+
+  {
+    auto section = Bson::SectionImpl::create();
+    section->payloadType(3);
+    EXPECT_THROW(section->byteSize(), EnvoyException);
+  }
+
+  {
+    Buffer::OwnedImpl buffer;
+    auto section = Bson::SectionImpl::create();
+    section->payloadType(3);
+    EXPECT_THROW(section->encode(buffer), EnvoyException);
+  }
+
+  {
+    auto s1 = Bson::SectionImpl::create();
+    s1->payloadType(3);
+    auto s2 = Bson::SectionImpl::create();
+    s2->payloadType(3);
+    bool unused;
+    EXPECT_THROW(unused = (*s1 == *s2), EnvoyException);
+  }
+
+  {
+    auto section = Bson::SectionImpl::create();
+    section->payloadType(3);
+    EXPECT_THROW(section->toString(), EnvoyException);
   }
 }
 

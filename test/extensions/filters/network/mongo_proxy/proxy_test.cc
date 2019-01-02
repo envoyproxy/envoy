@@ -370,12 +370,20 @@ TEST_F(MongoProxyFilterTest, Stats) {
   }));
   filter_->onData(fake_data_, false);
 
+  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    MsgMessagePtr message(new MsgMessageImpl(0, 0));
+    message->flagBits(0);
+    filter_->callbacks_->decodeMsg(std::move(message));
+  }));
+  filter_->onData(fake_data_, false);
+
   EXPECT_EQ(1U, store_.counter("test.op_get_more").value());
   EXPECT_EQ(1U, store_.counter("test.op_insert").value());
   EXPECT_EQ(1U, store_.counter("test.op_kill_cursors").value());
   EXPECT_EQ(0U, store_.counter("test.delays_injected").value());
   EXPECT_EQ(1U, store_.counter("test.op_command").value());
   EXPECT_EQ(1U, store_.counter("test.op_command_reply").value());
+  EXPECT_EQ(1U, store_.counter("test.op_msg").value());
 }
 
 TEST_F(MongoProxyFilterTest, CommandStats) {
