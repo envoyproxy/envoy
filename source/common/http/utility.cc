@@ -20,6 +20,7 @@
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
 
+#include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 
 namespace Envoy {
@@ -192,7 +193,6 @@ uint64_t Utility::getResponseStatus(const HeaderMap& headers) {
   if (!header || !StringUtil::atoul(headers.Status()->value().c_str(), response_code)) {
     throw CodecClientException(":status must be specified and a valid unsigned long");
   }
-
   return response_code;
 }
 
@@ -211,9 +211,9 @@ bool Utility::isH2UpgradeRequest(const HeaderMap& headers) {
 }
 
 bool Utility::isWebSocketUpgradeRequest(const HeaderMap& headers) {
-  return (isUpgrade(headers) && (0 == StringUtil::caseInsensitiveCompare(
-                                          headers.Upgrade()->value().c_str(),
-                                          Http::Headers::get().UpgradeValues.WebSocket.c_str())));
+  return (isUpgrade(headers) &&
+          absl::EqualsIgnoreCase(headers.Upgrade()->value().getStringView(),
+                                 Http::Headers::get().UpgradeValues.WebSocket));
 }
 
 Http2Settings
@@ -229,6 +229,7 @@ Utility::parseHttp2Settings(const envoy::api::v2::core::Http2ProtocolOptions& co
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, initial_connection_window_size,
                                       Http::Http2Settings::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE);
   ret.allow_connect_ = config.allow_connect();
+  ret.allow_metadata_ = config.allow_metadata();
   return ret;
 }
 
@@ -242,7 +243,7 @@ Utility::parseHttp1Settings(const envoy::api::v2::core::Http1ProtocolOptions& co
 }
 
 void Utility::sendLocalReply(bool is_grpc, StreamDecoderFilterCallbacks& callbacks,
-                             const bool& is_reset, Code response_code, const std::string& body_text,
+                             const bool& is_reset, Code response_code, absl::string_view body_text,
                              const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                              bool is_head_request) {
   sendLocalReply(is_grpc,
@@ -258,7 +259,7 @@ void Utility::sendLocalReply(bool is_grpc, StreamDecoderFilterCallbacks& callbac
 void Utility::sendLocalReply(
     bool is_grpc, std::function<void(HeaderMapPtr&& headers, bool end_stream)> encode_headers,
     std::function<void(Buffer::Instance& data, bool end_stream)> encode_data, const bool& is_reset,
-    Code response_code, const std::string& body_text,
+    Code response_code, absl::string_view body_text,
     const absl::optional<Grpc::Status::GrpcStatus> grpc_status, bool is_head_request) {
   // encode_headers() may reset the stream, so the stream must not be reset before calling it.
   ASSERT(!is_reset);

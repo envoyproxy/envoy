@@ -91,6 +91,7 @@ envoy_cc_test_library(
         "//include/envoy/http:codec_interface",
         "//include/envoy/network:address_interface",
         "//source/common/api:api_lib",
+        "//source/common/common:block_memory_hash_set_lib",
         "//source/common/common:empty_string",
         "//source/common/common:thread_lib",
         "//source/common/common:utility_lib",
@@ -166,6 +167,7 @@ envoy_cc_test_library(
     hdrs = ["test_time_system.h"],
     deps = [
         "//include/envoy/event:timer_interface",
+        "//source/common/common:thread_lib",
     ],
 )
 

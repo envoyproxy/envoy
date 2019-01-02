@@ -29,6 +29,10 @@ public:
   // The common socket options don't require a hash key.
   void hashKey(std::vector<uint8_t>&) const override {}
 
+  absl::optional<Details>
+  getOptionDetails(const Socket& socket,
+                   envoy::api::v2::core::SocketOption::SocketState state) const override;
+
   /**
    * Set a socket option that applies at both IPv4 and IPv6 socket levels. When the underlying FD
    * is IPv6, this function will attempt to set at IPv6 unless the platform only supports the

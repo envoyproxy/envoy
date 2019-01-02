@@ -141,9 +141,11 @@ public:
   // Router::ShadowPolicy
   const std::string& cluster() const override { return cluster_; }
   const std::string& runtimeKey() const override { return runtime_key_; }
+  const envoy::type::FractionalPercent& defaultValue() const override { return default_value_; }
 
   std::string cluster_;
   std::string runtime_key_;
+  envoy::type::FractionalPercent default_value_;
 };
 
 class MockShadowWriter : public ShadowWriter {
@@ -259,6 +261,7 @@ public:
   MOCK_CONST_METHOD0(pathMatchCriterion, const PathMatchCriterion&());
   MOCK_CONST_METHOD1(perFilterConfig, const RouteSpecificFilterConfig*(const std::string&));
   MOCK_CONST_METHOD0(includeAttemptCount, bool());
+  MOCK_CONST_METHOD0(upgradeMap, const UpgradeMap&());
 
   std::string cluster_name_{"fake_cluster"};
   std::multimap<std::string, std::string> opaque_config_;
@@ -272,6 +275,7 @@ public:
   TestCorsPolicy cors_policy_;
   testing::NiceMock<MockPathMatchCriterion> path_match_criterion_;
   envoy::api::v2::core::Metadata metadata_;
+  UpgradeMap upgrade_map_;
 };
 
 class MockDecorator : public Decorator {

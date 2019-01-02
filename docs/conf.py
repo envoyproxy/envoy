@@ -16,8 +16,10 @@ import sphinx_rtd_theme
 import sys
 import os
 
+
 def setup(app):
   app.add_config_value('release_level', '', 'env')
+
 
 if not os.environ.get('ENVOY_DOCS_RELEASE_LEVEL'):
   raise Exception("ENVOY_DOCS_RELEASE_LEVEL env var must be defined")
@@ -39,8 +41,8 @@ release_level = os.environ['ENVOY_DOCS_RELEASE_LEVEL']
 # ones.
 extensions = ['sphinxcontrib.httpdomain', 'sphinx.ext.extlinks', 'sphinx.ext.ifconfig']
 extlinks = {
-  'repo': ('https://github.com/envoyproxy/envoy/blob/master/%s', ''),
-  'api': ('https://github.com/envoyproxy/envoy/blob/master/api/%s', ''),
+    'repo': ('https://github.com/envoyproxy/envoy/blob/master/%s', ''),
+    'api': ('https://github.com/envoyproxy/envoy/blob/master/api/%s', ''),
 }
 
 # Add any paths that contain templates here, relative to this directory.
@@ -118,7 +120,6 @@ exclude_patterns = ['_build', '_venv', 'Thumbs.db', '.DS_Store']
 
 # If true, `todo` and `todoList` produce output, else they produce nothing.
 todo_include_todos = False
-
 
 # -- Options for HTML output ----------------------------------------------
 

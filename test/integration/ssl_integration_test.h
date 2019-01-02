@@ -5,6 +5,7 @@
 
 #include "test/integration/http_integration.h"
 #include "test/integration/server.h"
+#include "test/integration/ssl_utility.h"
 #include "test/mocks/secret/mocks.h"
 
 #include "gmock/gmock.h"
@@ -15,27 +16,38 @@ using testing::NiceMock;
 namespace Envoy {
 namespace Ssl {
 
-class SslIntegrationTest : public HttpIntegrationTest,
-                           public testing::TestWithParam<Network::Address::IpVersion> {
+class SslIntegrationTestBase : public HttpIntegrationTest {
 public:
-  SslIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()) {}
+  SslIntegrationTestBase(Network::Address::IpVersion ip_version)
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ip_version, realTime()) {}
 
   void initialize() override;
 
-  void TearDown() override;
+  void TearDown();
 
-  Network::ClientConnectionPtr makeSslConn() { return makeSslClientConnection(false, false); }
-  Network::ClientConnectionPtr makeSslClientConnection(bool alpn, bool san);
+  Network::ClientConnectionPtr makeSslConn() { return makeSslClientConnection({}); }
+  virtual Network::ClientConnectionPtr
+  makeSslClientConnection(const ClientSslTransportOptions& options);
   void checkStats();
+
+protected:
+  bool server_tlsv1_3_{false};
+  bool server_rsa_cert_{true};
+  bool server_ecdsa_cert_{false};
+  bool client_ecdsa_cert_{false};
+  // Set this true to debug SSL handshake issues with openssl s_client. The
+  // verbose trace will be in the logs, openssl must be installed separately.
+  bool debug_with_s_client_{false};
 
 private:
   std::unique_ptr<ContextManager> context_manager_;
+};
 
-  Network::TransportSocketFactoryPtr client_ssl_ctx_plain_;
-  Network::TransportSocketFactoryPtr client_ssl_ctx_alpn_;
-  Network::TransportSocketFactoryPtr client_ssl_ctx_san_;
-  Network::TransportSocketFactoryPtr client_ssl_ctx_alpn_san_;
+class SslIntegrationTest : public SslIntegrationTestBase,
+                           public testing::TestWithParam<Network::Address::IpVersion> {
+public:
+  SslIntegrationTest() : SslIntegrationTestBase(GetParam()) {}
+  void TearDown() override { SslIntegrationTestBase::TearDown(); };
 };
 
 } // namespace Ssl

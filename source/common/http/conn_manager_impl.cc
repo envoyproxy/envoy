@@ -32,6 +32,8 @@
 #include "common/http/utility.h"
 #include "common/network/utility.h"
 
+#include "absl/strings/match.h"
+
 namespace Envoy {
 namespace Http {
 
@@ -57,14 +59,14 @@ ConnectionManagerImpl::generateListenerStats(const std::string& prefix, Stats::S
 ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
                                              const Network::DrainDecision& drain_close,
                                              Runtime::RandomGenerator& random_generator,
-                                             Tracing::HttpTracer& tracer, Runtime::Loader& runtime,
+                                             Http::Context& http_context, Runtime::Loader& runtime,
                                              const LocalInfo::LocalInfo& local_info,
                                              Upstream::ClusterManager& cluster_manager,
                                              Server::OverloadManager* overload_manager,
                                              Event::TimeSystem& time_system)
     : config_(config), stats_(config_.stats()),
       conn_length_(new Stats::Timespan(stats_.named_.downstream_cx_length_ms_, time_system)),
-      drain_close_(drain_close), random_generator_(random_generator), tracer_(tracer),
+      drain_close_(drain_close), random_generator_(random_generator), http_context_(http_context),
       runtime_(runtime), local_info_(local_info), cluster_manager_(cluster_manager),
       listener_stats_(config_.listenerStats()),
       overload_stop_accepting_requests_ref_(
@@ -369,6 +371,8 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
   }
   stream_info_.setDownstreamLocalAddress(
       connection_manager_.read_callbacks_->connection().localAddress());
+  stream_info_.setDownstreamDirectRemoteAddress(
+      connection_manager_.read_callbacks_->connection().remoteAddress());
   // Initially, the downstream remote address is the source address of the
   // downstream connection. That can change later in the request's lifecycle,
   // based on XFF processing, but setting the downstream remote address here
@@ -396,6 +400,12 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
 
 ConnectionManagerImpl::ActiveStream::~ActiveStream() {
   stream_info_.onRequestComplete();
+
+  // A downstream disconnect can be identified for HTTP requests when the upstream returns with a 0
+  // response code and when no other response flags are set.
+  if (!stream_info_.hasAnyResponseFlag() && !stream_info_.responseCode()) {
+    stream_info_.setResponseFlag(StreamInfo::ResponseFlag::DownstreamConnectionTermination);
+  }
 
   connection_manager_.stats_.named_.downstream_rq_active_.dec();
   for (const AccessLog::InstanceSharedPtr& access_log : connection_manager_.config_.accessLogs()) {
@@ -577,9 +587,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
       // will be closed unless Keep-Alive is present.
       state_.saw_connection_close_ = true;
       if (request_headers_->Connection() &&
-          0 == StringUtil::caseInsensitiveCompare(
-                   request_headers_->Connection()->value().c_str(),
-                   Http::Headers::get().ConnectionValues.KeepAlive.c_str())) {
+          absl::EqualsIgnoreCase(request_headers_->Connection()->value().getStringView(),
+                                 Http::Headers::get().ConnectionValues.KeepAlive)) {
         state_.saw_connection_close_ = false;
       }
     }
@@ -625,9 +634,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   }
 
   if (protocol == Protocol::Http11 && request_headers_->Connection() &&
-      0 ==
-          StringUtil::caseInsensitiveCompare(request_headers_->Connection()->value().c_str(),
-                                             Http::Headers::get().ConnectionValues.Close.c_str())) {
+      absl::EqualsIgnoreCase(request_headers_->Connection()->value().getStringView(),
+                             Http::Headers::get().ConnectionValues.Close)) {
     state_.saw_connection_close_ = true;
   }
 
@@ -692,8 +700,8 @@ void ConnectionManagerImpl::ActiveStream::traceRequest() {
   ConnectionManagerImpl::chargeTracingStats(tracing_decision.reason,
                                             connection_manager_.config_.tracingStats());
 
-  active_span_ = connection_manager_.tracer_.startSpan(*this, *request_headers_, stream_info_,
-                                                       tracing_decision);
+  active_span_ = connection_manager_.tracer().startSpan(*this, *request_headers_, stream_info_,
+                                                        tracing_decision);
 
   if (!active_span_) {
     return;
@@ -992,7 +1000,7 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
 }
 
 void ConnectionManagerImpl::ActiveStream::sendLocalReply(
-    bool is_grpc_request, Code code, const std::string& body,
+    bool is_grpc_request, Code code, absl::string_view body,
     const std::function<void(HeaderMap& headers)>& modify_headers, bool is_head_request,
     const absl::optional<Grpc::Status::GrpcStatus> grpc_status) {
   ASSERT(response_headers_ == nullptr);
@@ -1198,6 +1206,26 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
   }
 }
 
+void ConnectionManagerImpl::ActiveStream::encodeMetadata(ActiveStreamEncoderFilter* filter,
+                                                         MetadataMapPtr&& metadata_map) {
+  resetIdleTimer();
+
+  std::list<ActiveStreamEncoderFilterPtr>::iterator entry = commonEncodePrefix(filter, false);
+  for (; entry != encoder_filters_.end(); entry++) {
+    // TODO(soya3129): Add filters here.
+  }
+
+  ENVOY_STREAM_LOG(debug, "encoding metadata via codec:\n{}", *this, *metadata_map);
+
+  // Now encode metadata via the codec.
+  if (!metadata_map->empty()) {
+    MetadataMapVector metadata_map_vector;
+    metadata_map_vector.push_back(std::move(metadata_map));
+    response_encoder_->encodeMetadata(metadata_map_vector);
+  }
+  // metadata_map destroyed when function returns.
+}
+
 HeaderMap& ConnectionManagerImpl::ActiveStream::addEncodedTrailers() {
   // Trailers can only be added during the last data frame (i.e. end_stream = true).
   ASSERT(state_.filter_call_state_ & FilterCallState::LastDataFrame);
@@ -1386,8 +1414,16 @@ bool ConnectionManagerImpl::ActiveStream::createFilterChain() {
   auto upgrade = request_headers_ ? request_headers_->Upgrade() : nullptr;
   state_.created_filter_chain_ = true;
   if (upgrade != nullptr) {
+    const Router::RouteEntry::UpgradeMap* upgrade_map = nullptr;
+
+    // We must check if the 'cached_route_' optional is populated since this function can be called
+    // early via sendLocalReply(), before the cached route is populated.
+    if (cached_route_.has_value() && cached_route_.value() && cached_route_.value()->routeEntry()) {
+      upgrade_map = &cached_route_.value()->routeEntry()->upgradeMap();
+    }
+
     if (connection_manager_.config_.filterFactory().createUpgradeFilterChain(
-            upgrade->value().c_str(), *this)) {
+            upgrade->value().c_str(), upgrade_map, *this)) {
       state_.successful_upgrade_ = true;
       connection_manager_.stats_.named_.downstream_cx_upgrades_total_.inc();
       connection_manager_.stats_.named_.downstream_cx_upgrades_active_.inc();
@@ -1630,6 +1666,11 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::encodeData(Buffer::Instan
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::encodeTrailers(HeaderMapPtr&& trailers) {
   parent_.response_trailers_ = std::move(trailers);
   parent_.encodeTrailers(nullptr, *parent_.response_trailers_);
+}
+
+void ConnectionManagerImpl::ActiveStreamDecoderFilter::encodeMetadata(
+    MetadataMapPtr&& metadata_map) {
+  parent_.encodeMetadata(nullptr, std::move(metadata_map));
 }
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::

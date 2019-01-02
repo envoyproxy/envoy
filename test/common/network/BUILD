@@ -92,6 +92,7 @@ envoy_cc_test(
         "//source/common/upstream:upstream_lib",
         "//source/extensions/filters/network/ratelimit:ratelimit_lib",
         "//test/common/upstream:utility_lib",
+        "//test/extensions/filters/common/ratelimit:ratelimit_mocks",
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/ratelimit:ratelimit_mocks",
@@ -183,6 +184,20 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "socket_option_factory_test",
+    srcs = ["socket_option_factory_test.cc"],
+    deps = [
+        "//source/common/network:address_lib",
+        "//source/common/network:socket_option_factory_lib",
+        "//source/common/network:socket_option_lib",
+        "//test/mocks/api:api_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/test_common:environment_lib",
+        "//test/test_common:threadsafe_singleton_injector_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "addr_family_aware_socket_option_impl_test",
     srcs = ["addr_family_aware_socket_option_impl_test.cc"],
     deps = [
@@ -197,6 +212,7 @@ envoy_cc_test(
     deps = [
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
+        "//test/mocks/network:network_mocks",
         "//test/test_common:environment_lib",
     ],
 )

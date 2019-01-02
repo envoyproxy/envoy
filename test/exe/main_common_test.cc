@@ -104,30 +104,6 @@ TEST_P(MainCommonTest, ConstructDestructHotRestartDisabledNoInit) {
   EXPECT_TRUE(main_common.run());
 }
 
-// Ensure that existing users of main_common() can link.
-TEST_P(MainCommonTest, LegacyMain) {
-#ifdef ENVOY_HANDLE_SIGNALS
-  // Enabled by default. Control with "bazel --define=signal_trace=disabled"
-  Envoy::SignalAction handle_sigs;
-#endif
-
-  std::unique_ptr<Envoy::OptionsImpl> options;
-  int return_code = -1;
-  try {
-    initOnly();
-    options = std::make_unique<Envoy::OptionsImpl>(argc(), argv(), &MainCommon::hotRestartVersion,
-                                                   spdlog::level::info);
-  } catch (const Envoy::NoServingException& e) {
-    return_code = EXIT_SUCCESS;
-  } catch (const Envoy::MalformedArgvException& e) {
-    return_code = EXIT_FAILURE;
-  }
-  if (return_code == -1) {
-    return_code = Envoy::main_common(*options);
-  }
-  EXPECT_EQ(EXIT_SUCCESS, return_code);
-}
-
 INSTANTIATE_TEST_CASE_P(IpVersions, MainCommonTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
@@ -192,6 +168,7 @@ protected:
     return envoy_return_;
   }
 
+  Stats::IsolatedStoreImpl stats_store_;
   std::unique_ptr<Thread::Thread> envoy_thread_;
   std::unique_ptr<MainCommon> main_common_;
   absl::Notification started_;
@@ -220,6 +197,16 @@ TEST_P(AdminRequestTest, AdminRequestGetStatsAndKill) {
   started_.WaitForNotification();
   EXPECT_THAT(adminRequest("/stats", "GET"), HasSubstr("filesystem.reopen_failed"));
   kill(getpid(), SIGTERM);
+  EXPECT_TRUE(waitForEnvoyToExit());
+}
+
+// This test is the same as AdminRequestGetStatsAndQuit, except we send ourselves a SIGINT,
+// equivalent to receiving a Ctrl-C from the user.
+TEST_P(AdminRequestTest, AdminRequestGetStatsAndCtrlC) {
+  startEnvoy();
+  started_.WaitForNotification();
+  EXPECT_THAT(adminRequest("/stats", "GET"), HasSubstr("filesystem.reopen_failed"));
+  kill(getpid(), SIGINT);
   EXPECT_TRUE(waitForEnvoyToExit());
 }
 

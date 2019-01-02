@@ -26,21 +26,27 @@
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
+#include "common/common/cleanup.h"
 #include "common/common/utility.h"
 #include "common/network/address_impl.h"
 #include "common/protobuf/protobuf.h"
 
 #include "common/common/fmt.h"
 
+#include "absl/strings/match.h"
+
 namespace Envoy {
 namespace Network {
 
 const std::string Utility::TCP_SCHEME = "tcp://";
+const std::string Utility::UDP_SCHEME = "udp://";
 const std::string Utility::UNIX_SCHEME = "unix://";
 
 Address::InstanceConstSharedPtr Utility::resolveUrl(const std::string& url) {
   if (urlIsTcpScheme(url)) {
     return parseInternetAddressAndPort(url.substr(TCP_SCHEME.size()));
+  } else if (urlIsUdpScheme(url)) {
+    return parseInternetAddressAndPort(url.substr(UDP_SCHEME.size()));
   } else if (urlIsUnixScheme(url)) {
     return Address::InstanceConstSharedPtr{
         new Address::PipeInstance(url.substr(UNIX_SCHEME.size()))};
@@ -49,30 +55,36 @@ Address::InstanceConstSharedPtr Utility::resolveUrl(const std::string& url) {
   }
 }
 
-bool Utility::urlIsTcpScheme(const std::string& url) { return url.find(TCP_SCHEME) == 0; }
+bool Utility::urlIsTcpScheme(const std::string& url) { return absl::StartsWith(url, TCP_SCHEME); }
 
-bool Utility::urlIsUnixScheme(const std::string& url) { return url.find(UNIX_SCHEME) == 0; }
+bool Utility::urlIsUdpScheme(const std::string& url) { return absl::StartsWith(url, UDP_SCHEME); }
 
-std::string Utility::hostFromTcpUrl(const std::string& url) {
-  if (!urlIsTcpScheme(url)) {
-    throw EnvoyException(fmt::format("expected TCP scheme, got: {}", url));
+bool Utility::urlIsUnixScheme(const std::string& url) { return absl::StartsWith(url, UNIX_SCHEME); }
+
+namespace {
+
+std::string hostFromUrl(const std::string& url, const std::string& scheme,
+                        const std::string& scheme_name) {
+  if (url.find(scheme) != 0) {
+    throw EnvoyException(fmt::format("expected {} scheme, got: {}", scheme_name, url));
   }
 
-  size_t colon_index = url.find(':', TCP_SCHEME.size());
+  size_t colon_index = url.find(':', scheme.size());
 
   if (colon_index == std::string::npos) {
     throw EnvoyException(fmt::format("malformed url: {}", url));
   }
 
-  return url.substr(TCP_SCHEME.size(), colon_index - TCP_SCHEME.size());
+  return url.substr(scheme.size(), colon_index - scheme.size());
 }
 
-uint32_t Utility::portFromTcpUrl(const std::string& url) {
-  if (!urlIsTcpScheme(url)) {
-    throw EnvoyException(fmt::format("expected TCP scheme, got: {}", url));
+uint32_t portFromUrl(const std::string& url, const std::string& scheme,
+                     const std::string& scheme_name) {
+  if (url.find(scheme) != 0) {
+    throw EnvoyException(fmt::format("expected {} scheme, got: {}", scheme_name, url));
   }
 
-  size_t colon_index = url.find(':', TCP_SCHEME.size());
+  size_t colon_index = url.find(':', scheme.size());
 
   if (colon_index == std::string::npos) {
     throw EnvoyException(fmt::format("malformed url: {}", url));
@@ -85,6 +97,24 @@ uint32_t Utility::portFromTcpUrl(const std::string& url) {
   } catch (const std::out_of_range& e) {
     throw EnvoyException(e.what());
   }
+}
+
+} // namespace
+
+std::string Utility::hostFromTcpUrl(const std::string& url) {
+  return hostFromUrl(url, TCP_SCHEME, "TCP");
+}
+
+uint32_t Utility::portFromTcpUrl(const std::string& url) {
+  return portFromUrl(url, TCP_SCHEME, "TCP");
+}
+
+std::string Utility::hostFromUdpUrl(const std::string& url) {
+  return hostFromUrl(url, UDP_SCHEME, "UDP");
+}
+
+uint32_t Utility::portFromUdpUrl(const std::string& url) {
+  return portFromUrl(url, UDP_SCHEME, "UDP");
 }
 
 Address::InstanceConstSharedPtr Utility::parseInternetAddress(const std::string& ip_address,
@@ -206,6 +236,49 @@ Address::InstanceConstSharedPtr Utility::getLocalAddress(const Address::IpVersio
     }
   }
   return ret;
+}
+
+bool Utility::isLocalConnection(const Network::ConnectionSocket& socket) {
+  const auto& remote_address = socket.remoteAddress();
+  // Before calling getifaddrs, verify the obvious checks.
+  // Note that there are corner cases, where remote and local address will be the same
+  // while the client is not actually local. Example could be an iptables intercepted
+  // connection. However, this is a rare exception and such assumption results in big
+  // performance optimization.
+  if (remote_address->type() == Envoy::Network::Address::Type::Pipe ||
+      remote_address == socket.localAddress() || isLoopbackAddress(*remote_address)) {
+    return true;
+  }
+
+  struct ifaddrs* ifaddr;
+  const int rc = getifaddrs(&ifaddr);
+  Cleanup ifaddr_cleanup([ifaddr] {
+    if (ifaddr) {
+      freeifaddrs(ifaddr);
+    }
+  });
+  RELEASE_ASSERT(rc == 0, "");
+
+  auto af_look_up =
+      (remote_address->ip()->version() == Address::IpVersion::v4) ? AF_INET : AF_INET6;
+
+  for (struct ifaddrs* ifa = ifaddr; ifa != nullptr; ifa = ifa->ifa_next) {
+    if (ifa->ifa_addr == nullptr) {
+      continue;
+    }
+
+    if (ifa->ifa_addr->sa_family == af_look_up) {
+      const auto* addr = reinterpret_cast<const struct sockaddr_storage*>(ifa->ifa_addr);
+      auto local_address = Address::addressFromSockAddr(
+          *addr, (af_look_up == AF_INET) ? sizeof(sockaddr_in) : sizeof(sockaddr_in6));
+
+      if (remote_address == local_address) {
+        return true;
+      }
+    }
+  }
+
+  return false;
 }
 
 bool Utility::isInternalAddress(const Address::Instance& address) {

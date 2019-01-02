@@ -95,6 +95,18 @@ TEST_P(Http2IntegrationTest, RetryAttemptCount) { testRetryAttemptCountHeader();
 
 TEST_P(Http2IntegrationTest, EnvoyHandling100Continue) { testEnvoyHandling100Continue(); }
 
+TEST_P(Http2MetadataIntegrationTest, ProxyMetadataInResponse) {
+  testEnvoyProxyMetadataInResponse();
+}
+
+TEST_P(Http2MetadataIntegrationTest, ProxyMultipleMetadata) { testEnvoyProxyMultipleMetadata(); }
+
+TEST_P(Http2MetadataIntegrationTest, ProxyInvalidMetadata) { testEnvoyProxyInvalidMetadata(); }
+
+TEST_P(Http2MetadataIntegrationTest, ProxyMultipleMetadataReachSizeLimit) {
+  testEnvoyMultipleMetadataReachSizeLimit();
+}
+
 TEST_P(Http2IntegrationTest, EnvoyHandlingDuplicate100Continue) {
   testEnvoyHandling100Continue(true);
 }
@@ -490,6 +502,10 @@ void Http2RingHashIntegrationTest::createUpstreams() {
 }
 
 INSTANTIATE_TEST_CASE_P(IpVersions, Http2RingHashIntegrationTest,
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
+
+INSTANTIATE_TEST_CASE_P(IpVersions, Http2MetadataIntegrationTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 

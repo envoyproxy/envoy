@@ -284,6 +284,12 @@ public:
    *         increments.
    */
   virtual const std::string& runtimeKey() const PURE;
+
+  /**
+   * @return the default fraction of traffic the should be shadowed, if the runtime key is not
+   *         present.
+   */
+  virtual const envoy::type::FractionalPercent& defaultValue() const PURE;
 };
 
 /**
@@ -624,6 +630,12 @@ public:
    * @return bool whether x-envoy-attempt-count should be included on the upstream request.
    */
   virtual bool includeAttemptCount() const PURE;
+
+  typedef std::map<std::string, bool> UpgradeMap;
+  /**
+   * @return a map of route-specific upgrades to their enabled/disabled status.
+   */
+  virtual const UpgradeMap& upgradeMap() const PURE;
 };
 
 /**

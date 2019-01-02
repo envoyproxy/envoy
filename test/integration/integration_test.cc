@@ -209,6 +209,8 @@ TEST_P(IntegrationTest, InvalidVersion) { testInvalidVersion(); }
 
 TEST_P(IntegrationTest, Http10Disabled) { testHttp10Disabled(); }
 
+TEST_P(IntegrationTest, Http10DisabledWithUpgrade) { testHttp10DisabledWithUpgrade(); }
+
 TEST_P(IntegrationTest, Http09Enabled) { testHttp09Enabled(); }
 
 TEST_P(IntegrationTest, Http10Enabled) { testHttp10Enabled(); }
@@ -387,6 +389,7 @@ TEST_P(IntegrationTest, ViaAppendHeaderOnly) {
 // response path.
 TEST_P(IntegrationTest, ViaAppendWith100Continue) {
   config_helper_.addConfigModifier(setVia("foo"));
+  testEnvoyHandling100Continue(false, "foo");
 }
 
 // Test delayed close semantics for downstream HTTP/1.1 connections. When an early response is

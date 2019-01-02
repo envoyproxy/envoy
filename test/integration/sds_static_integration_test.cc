@@ -72,7 +72,7 @@ public:
 
     registerTestServerPorts({"http"});
 
-    client_ssl_ctx_ = createClientSslTransportSocketFactory(false, false, context_manager_);
+    client_ssl_ctx_ = createClientSslTransportSocketFactory({}, context_manager_);
   }
 
   void TearDown() override {

@@ -265,10 +265,19 @@ def envoy_dependencies(path = "@envoy_deps//", skip_targets = []):
     if "envoy_build_config" not in native.existing_rules().keys():
         _default_envoy_build_config(name = "envoy_build_config")
 
+    # Binding to an alias pointing to the selected version of BoringSSL:
+    # - BoringSSL FIPS from @boringssl_fips//:ssl,
+    # - non-FIPS BoringSSL from @boringssl//:ssl.
+    _boringssl()
+    _boringssl_fips()
+    native.bind(
+        name = "ssl",
+        actual = "@envoy//bazel:boringssl",
+    )
+
     # The long repo names (`com_github_fmtlib_fmt` instead of `fmtlib`) are
     # semi-standard in the Bazel community, intended to avoid both duplicate
     # dependencies and name conflicts.
-    _boringssl()
     _com_google_absl()
     _com_github_bombela_backward()
     _com_github_circonus_labs_libcircllhist()
@@ -300,9 +309,15 @@ def envoy_dependencies(path = "@envoy_deps//", skip_targets = []):
 
 def _boringssl():
     _repository_impl("boringssl")
-    native.bind(
-        name = "ssl",
-        actual = "@boringssl//:ssl",
+
+def _boringssl_fips():
+    location = REPOSITORY_LOCATIONS["boringssl_fips"]
+    genrule_repository(
+        name = "boringssl_fips",
+        urls = location["urls"],
+        sha256 = location["sha256"],
+        genrule_cmd_file = "@envoy//bazel/external:boringssl_fips.genrule_cmd",
+        build_file = "@envoy//bazel/external:boringssl_fips.BUILD",
     )
 
 def _com_github_bombela_backward():
@@ -588,16 +603,23 @@ def _com_github_google_jwt_verify():
 
 def _apply_dep_blacklist(ctxt, recipes):
     newlist = []
-    skip_list = dict()
+    skip_list = []
     if _is_linux_ppc(ctxt):
-        skip_list = PPC_SKIP_TARGETS
+        skip_list += PPC_SKIP_TARGETS.keys()
     for t in recipes:
-        if t not in skip_list.keys():
+        if t not in skip_list:
             newlist.append(t)
     return newlist
 
-def _is_linux_ppc(ctxt):
-    if ctxt.os.name != "linux":
-        return False
+def _is_linux(ctxt):
+    return ctxt.os.name == "linux"
+
+def _is_arch(ctxt, arch):
     res = ctxt.execute(["uname", "-m"])
-    return "ppc" in res.stdout
+    return arch in res.stdout
+
+def _is_linux_ppc(ctxt):
+    return _is_linux(ctxt) and _is_arch(ctxt, "ppc")
+
+def _is_linux_x86_64(ctxt):
+    return _is_linux(ctxt) and _is_arch(ctxt, "x86_64")

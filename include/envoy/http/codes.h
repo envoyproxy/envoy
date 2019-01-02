@@ -1,5 +1,9 @@
 #pragma once
 
+#include <chrono>
+
+#include "envoy/stats/scope.h"
+
 namespace Envoy {
 namespace Http {
 
@@ -71,6 +75,60 @@ enum class Code {
   NotExtended                   = 510,
   NetworkAuthenticationRequired = 511
   // clang-format on
+};
+
+/**
+ * Manages updating of statistics for HTTP Status Codes. Sets up string-tokens
+ * for fast combining of tokens based on scope, status-code buckets (2xx,
+ * 4xx...), and exact status code.
+ */
+class CodeStats {
+public:
+  virtual ~CodeStats() = default;
+
+  struct ResponseStatInfo {
+    Stats::Scope& global_scope_;
+    Stats::Scope& cluster_scope_;
+    const std::string& prefix_;
+    uint64_t response_status_code_;
+    bool internal_request_;
+    const std::string& request_vhost_name_;
+    const std::string& request_vcluster_name_;
+    const std::string& from_zone_;
+    const std::string& to_zone_;
+    bool upstream_canary_;
+  };
+
+  struct ResponseTimingInfo {
+    Stats::Scope& global_scope_;
+    Stats::Scope& cluster_scope_;
+    const std::string& prefix_;
+    std::chrono::milliseconds response_time_;
+    bool upstream_canary_;
+    bool internal_request_;
+    const std::string& request_vhost_name_;
+    const std::string& request_vcluster_name_;
+    const std::string& from_zone_;
+    const std::string& to_zone_;
+  };
+
+  /**
+   * Charge a simple response stat to an upstream.
+   */
+  virtual void chargeBasicResponseStat(Stats::Scope& scope, const std::string& prefix,
+                                       Code response_code) const PURE;
+
+  /**
+   * Charge a response stat to both agg counters (*xx) as well as code specific counters. This
+   * routine also looks for the x-envoy-upstream-canary header and if it is set, also charges
+   * canary stats.
+   */
+  virtual void chargeResponseStat(const ResponseStatInfo& info) const PURE;
+
+  /**
+   * Charge a response timing to the various dynamic stat postfixes.
+   */
+  virtual void chargeResponseTiming(const ResponseTimingInfo& info) const PURE;
 };
 
 } // namespace Http

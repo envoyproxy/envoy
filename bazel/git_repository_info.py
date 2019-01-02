@@ -17,4 +17,4 @@ if __name__ == '__main__':
     print 'Unknown repository: %s' % repo
     sys.exit(1)
   repoloc = repolocs.REPOSITORY_LOCATIONS[repo]
-  print '%s %s' % (repoloc['remote'], repoloc['commit']) 
+  print '%s %s' % (repoloc['remote'], repoloc['commit'])

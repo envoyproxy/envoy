@@ -1,5 +1,6 @@
 #include "common/common/thread.h"
 #include "common/event/dispatcher_impl.h"
+#include "common/stats/isolated_store_impl.h"
 #include "common/thread_local/thread_local_impl.h"
 
 #include "test/mocks/event/mocks.h"
@@ -117,8 +118,10 @@ TEST(ThreadLocalInstanceImplDispatcherTest, Dispatcher) {
   InstanceImpl tls;
 
   DangerousDeprecatedTestTime test_time;
-  Event::DispatcherImpl main_dispatcher(test_time.timeSystem());
-  Event::DispatcherImpl thread_dispatcher(test_time.timeSystem());
+  Stats::IsolatedStoreImpl stats_store;
+  Api::ApiPtr api = Api::createApiForTest(stats_store);
+  Event::DispatcherImpl main_dispatcher(test_time.timeSystem(), *api);
+  Event::DispatcherImpl thread_dispatcher(test_time.timeSystem(), *api);
 
   tls.registerThread(main_dispatcher, true);
   tls.registerThread(thread_dispatcher, false);
