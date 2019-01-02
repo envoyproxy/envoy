@@ -27,7 +27,7 @@ using testing::IsSubstring;
 namespace Envoy {
 namespace {
 
-const std::string kConfig = R"EOF(
+const char Config[] = R"EOF(
 admin:
   access_log_path: /dev/null
   address:
@@ -50,21 +50,17 @@ static_resources:
         address: 127.0.0.1
         port_value: 0
 )EOF";
-const std::string kClusterName = "cluster_0";
+const char ClusterName[] = "cluster_0";
 
 class CdsIntegrationTest : public XdsIntegrationTestBase,
                            public Grpc::GrpcClientIntegrationParamTest,
                            public Envoy::Upstream::ClusterUpdateCallbacks {
 public:
   CdsIntegrationTest()
-      : XdsIntegrationTestBase(Http::CodecClient::Type::HTTP2, ipVersion(), kConfig) {}
+      : XdsIntegrationTestBase(Http::CodecClient::Type::HTTP2, ipVersion(), Config) {}
 
   void TearDown() override {
-    AssertionResult result = xds_connection_->close();
-    RELEASE_ASSERT(result, result.message());
-    result = xds_connection_->waitForDisconnect();
-    RELEASE_ASSERT(result, result.message());
-    xds_connection_.reset();
+    cleanUpXdsConnection();
     test_server_.reset();
     fake_upstreams_.clear();
   }
@@ -177,7 +173,7 @@ public:
 
     EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}));
     sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster,
-                                                   {buildCluster(kClusterName)}, "1");
+                                                   {buildCluster(ClusterName)}, "1");
     // We can continue the test once we're sure that Envoy's ClusterManager has made use of
     // the DiscoveryResponse describing cluster_0 that we sent.
     {
@@ -186,7 +182,7 @@ public:
       mu_.Await(condition);
     }
 
-    // Manually create a listener, add it to the cluster manager, register its port in the
+    // Manually create a listener, add it to the listener manager, register its port in the
     // test framework's downstream listener port map, and finally wait for it to start listening.
     //
     // Why do all of this manually? Because it's unworkable to specify this listener statically in
@@ -199,7 +195,7 @@ public:
         [&listener_added_by_worker]() -> void { listener_added_by_worker.Notify(); });
     test_server_->server().dispatcher().post([this, &listener_added_by_manager]() -> void {
       EXPECT_TRUE(test_server_->server().listenerManager().addOrUpdateListener(
-          buildListener("http", kClusterName), "", true));
+          buildListener("http", ClusterName), "", true));
       listener_added_by_manager.Notify();
     });
     listener_added_by_worker.WaitForNotification();
@@ -211,13 +207,13 @@ public:
 
   // Upstream::ClusterUpdateCallbacks
   void onClusterAddOrUpdate(Envoy::Upstream::ThreadLocalCluster& cluster) override {
-    if (cluster.info()->name() == kClusterName) {
+    if (cluster.info()->name() == ClusterName) {
       absl::MutexLock lock(&mu_);
       cm_knows_about_cluster_ = true;
     }
   }
   void onClusterRemoval(const std::string& cluster_name) override {
-    if (cluster_name == kClusterName) {
+    if (cluster_name == ClusterName) {
       absl::MutexLock lock(&mu_);
       cm_knows_about_cluster_ = false;
       cluster_removed_.Notify();
@@ -262,7 +258,7 @@ TEST_P(CdsIntegrationTest, CdsClusterUpDownUp) {
   // Tell Envoy that cluster_0 is back.
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "42", {}));
   sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster,
-                                                 {buildCluster(kClusterName)}, "413");
+                                                 {buildCluster(ClusterName)}, "413");
 
   // We can continue the test once we're sure that Envoy's ClusterManager has made use of
   // the DiscoveryResponse describing cluster_0 that we sent.
