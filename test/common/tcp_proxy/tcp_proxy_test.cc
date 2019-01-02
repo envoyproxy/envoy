@@ -607,7 +607,8 @@ TEST_F(TcpProxyTest, ConnectAttemptsUpstreamTimeout) {
 
 // Test that only the configured number of connect attempts occur
 TEST_F(TcpProxyTest, ConnectAttemptsLimit) {
-  envoy::config::filter::network::tcp_proxy::v2::TcpProxy config = defaultConfig();
+  envoy::config::filter::network::tcp_proxy::v2::TcpProxy config =
+      accessLogConfig("%RESPONSE_FLAGS%");
   config.mutable_max_connect_attempts()->set_value(3);
   setup(3, config);
 
@@ -626,6 +627,9 @@ TEST_F(TcpProxyTest, ConnectAttemptsLimit) {
                                   Tcp::ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
   raiseEventUpstreamConnectFailed(2,
                                   Tcp::ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
+
+  filter_.reset();
+  EXPECT_EQ(access_log_data_, "UF,URX");
 }
 
 // Test that the tcp proxy sends the correct notifications to the outlier detector
@@ -711,7 +715,7 @@ TEST_F(TcpProxyTest, UpstreamConnectTimeout) {
   raiseEventUpstreamConnectFailed(0, Tcp::ConnectionPool::PoolFailureReason::Timeout);
 
   filter_.reset();
-  EXPECT_EQ(access_log_data_, "UF");
+  EXPECT_EQ(access_log_data_, "UF,URX");
 }
 
 TEST_F(TcpProxyTest, NoHost) {
@@ -786,7 +790,7 @@ TEST_F(TcpProxyTest, UpstreamConnectFailure) {
                                   Tcp::ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
 
   filter_.reset();
-  EXPECT_EQ(access_log_data_, "UF");
+  EXPECT_EQ(access_log_data_, "UF,URX");
 }
 
 TEST_F(TcpProxyTest, UpstreamConnectionLimit) {

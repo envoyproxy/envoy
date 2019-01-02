@@ -183,7 +183,8 @@ message ResponseFlagFilter {
       "RL",
       "UAEX",
       "RLSE",
-      "DC"
+      "DC",
+      "URX"
     ]
   }];
 }

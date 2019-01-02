@@ -201,7 +201,7 @@ public:
 /**
  * RetryStatus whether request should be retried or not.
  */
-enum class RetryStatus { No, NoOverflow, Yes };
+enum class RetryStatus { No, NoOverflow, NoRetryLimitExceeded, Yes };
 
 /**
  * Wraps retry state for an active routed request.
