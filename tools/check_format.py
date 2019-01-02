@@ -196,12 +196,14 @@ def hasInvalidAngleBracketDirectory(line):
   subdir = path[0:slash]
   return subdir in SUBDIR_SET
 
+
 VERSION_HISTORY_NEW_LINE_REGEX = re.compile('\* [a-z \-_]*: [a-z:`]')
 
 
 def checkVersionFileContents(file_path, error_messages):
-  file_handle = fileinput.input(file_path);
+  file_handle = fileinput.input(file_path)
   for line_number, line in enumerate(file_handle):
+
     def reportError(message):
       error_messages.append("%s:%d: %s" % (file_path, line_number + 1, message))
 
@@ -209,7 +211,7 @@ def checkVersionFileContents(file_path, error_messages):
     # to the new format.  If we get to the point a single Envoy release is more than 400 lines we'll
     # have to adjust this for it to be effective.
     if line_number > 400:
-      break;
+      break
 
     if line.startswith('*') and not VERSION_HISTORY_NEW_LINE_REGEX.match(line):
       reportError("Version history line malformed. "
