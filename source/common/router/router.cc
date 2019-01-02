@@ -503,8 +503,7 @@ void Filter::onRequestComplete() {
 }
 
 void Filter::onDestroy() {
-  if (upstream_request_ &&
-      (!upstream_request_->stream_info_.lastUpstreamRxByteReceived() || !downstream_end_stream_)) {
+  if (upstream_request_ && !attempting_internal_redirect_with_complete_stream_) {
     upstream_request_->resetStream();
   }
   cleanup();
@@ -849,6 +848,19 @@ bool Filter::setupRetry(bool end_stream) {
 bool Filter::setupRedirect(const Http::HeaderMap& headers) {
   ENVOY_STREAM_LOG(debug, "attempting internal redirect", *callbacks_);
   const Http::HeaderEntry* location = headers.Location();
+
+  // If the internal redirect succeeds, callbacks_->recreateStream() will result in the destruction
+  // of this filter before the stream is marked as complete, and onDestroy will reset the stream.
+  //
+  // Normally when a stream is complete we signal this by resetting the upstream but this cam not be
+  // done in this case because if recreateStream fails, the "failure" path continues to call code
+  // in onUpstreamHeaders which requires the upstream *not* be reset. To avoid onDestroy performing
+  // a spurious stream reset in the case recreateStream() succeeds, we explicitly track stream
+  // completion here and check it in onDestroy. This is annoyingly complicated but is better than
+  // needlessly resetting streams.
+  attempting_internal_redirect_with_complete_stream_ =
+      upstream_request_->stream_info_.lastUpstreamRxByteReceived() && downstream_end_stream_;
+
   // As with setupRetry, redirects are not supported for streaming requests yet.
   if (downstream_end_stream_ &&
       !callbacks_->decodingBuffer() && // Redirects woth body not yet supported.
@@ -859,6 +871,8 @@ bool Filter::setupRedirect(const Http::HeaderMap& headers) {
     cluster_->stats().upstream_internal_redirect_succeeded_total_.inc();
     return true;
   }
+
+  attempting_internal_redirect_with_complete_stream_ = false;
 
   ENVOY_STREAM_LOG(debug, "Internal redirect failed", *callbacks_);
   cluster_->stats().upstream_internal_redirect_failed_total_.inc();
