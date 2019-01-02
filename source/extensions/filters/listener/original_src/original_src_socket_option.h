@@ -28,6 +28,10 @@ public:
    */
   void hashKey(std::vector<uint8_t>& key) const override;
 
+  absl::optional<Details>
+  getOptionDetails(const Network::Socket& socket,
+                   envoy::api::v2::core::SocketOption::SocketState state) const;
+
   static constexpr uint8_t IPV4_KEY = 0;
   static constexpr uint8_t IPV6_KEY = 1;
 
