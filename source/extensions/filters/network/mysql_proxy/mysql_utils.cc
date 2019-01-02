@@ -8,24 +8,18 @@ namespace NetworkFilters {
 namespace MySQLProxy {
 
 void BufferHelper::addUint8(Buffer::Instance& buffer, uint8_t val) {
-  buffer.add(&val, sizeof(uint8_t));
+  buffer.writeLEInt<uint8_t>(val);
 }
 
 void BufferHelper::addUint16(Buffer::Instance& buffer, uint16_t val) {
-  buffer.add(&val, sizeof(uint16_t));
+  buffer.writeLEInt<uint16_t>(val);
 }
 
 void BufferHelper::addUint32(Buffer::Instance& buffer, uint32_t val) {
-  buffer.add(&val, sizeof(uint32_t));
+  buffer.writeLEInt<uint32_t>(val);
 }
 
 void BufferHelper::addString(Buffer::Instance& buffer, const std::string& str) { buffer.add(str); }
-
-std::string BufferHelper::toString(Buffer::Instance& buffer) {
-  char* data = static_cast<char*>(buffer.linearize(buffer.length()));
-  std::string s = std::string(data, buffer.length());
-  return s;
-}
 
 std::string BufferHelper::encodeHdr(const std::string& cmd_str, int seq) {
   MySQLCodec::MySQLHeader mysqlhdr;
@@ -35,7 +29,7 @@ std::string BufferHelper::encodeHdr(const std::string& cmd_str, int seq) {
   Buffer::OwnedImpl buffer;
   addUint32(buffer, mysqlhdr.bits_);
 
-  std::string e_string = toString(buffer);
+  std::string e_string = buffer.toString();
   e_string.append(cmd_str);
   return e_string;
 }
@@ -45,44 +39,42 @@ bool BufferHelper::endOfBuffer(Buffer::Instance& buffer, uint64_t& offset) {
 }
 
 int BufferHelper::peekUint8(Buffer::Instance& buffer, uint64_t& offset, uint8_t& val) {
-  if (buffer.length() < (offset + sizeof(uint8_t))) {
+  try {
+    val = buffer.peekLEInt<uint8_t>(offset);
+    offset += sizeof(uint8_t);
+    return MYSQL_SUCCESS;
+  } catch (EnvoyException e) {
+    // buffer underflow
     return MYSQL_FAILURE;
   }
-  buffer.copyOut(offset, sizeof(uint8_t), &val);
-  offset += sizeof(uint8_t);
-  return MYSQL_SUCCESS;
 }
 
 int BufferHelper::peekUint16(Buffer::Instance& buffer, uint64_t& offset, uint16_t& val) {
-  if (buffer.length() < (offset + sizeof(uint16_t))) {
+  try {
+    val = buffer.peekLEInt<uint16_t>(offset);
+    offset += sizeof(uint16_t);
+    return MYSQL_SUCCESS;
+  } catch (EnvoyException e) {
+    // buffer underflow
     return MYSQL_FAILURE;
   }
-  buffer.copyOut(offset, sizeof(uint16_t), &val);
-  offset += sizeof(uint16_t);
-  return MYSQL_SUCCESS;
 }
 
 int BufferHelper::peekUint32(Buffer::Instance& buffer, uint64_t& offset, uint32_t& val) {
-  if (buffer.length() < (offset + sizeof(uint32_t))) {
+  try {
+    val = buffer.peekLEInt<uint32_t>(offset);
+    offset += sizeof(uint32_t);
+    return MYSQL_SUCCESS;
+  } catch (EnvoyException e) {
+    // buffer underflow
     return MYSQL_FAILURE;
   }
-  buffer.copyOut(offset, sizeof(uint32_t), &val);
-  offset += sizeof(uint32_t);
-  return MYSQL_SUCCESS;
-}
-
-int BufferHelper::peekBySize(Buffer::Instance& buffer, uint64_t& offset, int len, int& val) {
-  if (buffer.length() < (offset + len)) {
-    return MYSQL_FAILURE;
-  }
-  buffer.copyOut(offset, len, &val);
-  offset += len;
-  return MYSQL_SUCCESS;
 }
 
 // Implementation of MySQL lenenc encoder based on
 // https://dev.mysql.com/doc/internals/en/integer.html#packet-Protocol::LengthEncodedInteger
-int BufferHelper::peekLengthEncodedInteger(Buffer::Instance& buffer, uint64_t& offset, int& val) {
+int BufferHelper::peekLengthEncodedInteger(Buffer::Instance& buffer, uint64_t& offset,
+                                           uint64_t& val) {
   uint8_t byte_val = 0;
   if (peekUint8(buffer, offset, byte_val) == MYSQL_FAILURE) {
     return MYSQL_FAILURE;
@@ -92,18 +84,25 @@ int BufferHelper::peekLengthEncodedInteger(Buffer::Instance& buffer, uint64_t& o
     return MYSQL_SUCCESS;
   }
 
-  int size = 0;
-  if (byte_val == LENENCODINT_2BYTES) {
-    size = sizeof(uint16_t);
-  } else if (byte_val == LENENCODINT_3BYTES) {
-    size = sizeof(uint8_t) * 3;
-  } else if (byte_val == LENENCODINT_8BYTES) {
-    size = sizeof(uint64_t);
-  } else {
+  try {
+    if (byte_val == LENENCODINT_2BYTES) {
+      val = buffer.peekLEInt<uint64_t, sizeof(uint16_t)>(offset);
+      offset += sizeof(uint16_t);
+    } else if (byte_val == LENENCODINT_3BYTES) {
+      val = buffer.peekLEInt<uint64_t, sizeof(uint8_t) * 3>(offset);
+      offset += sizeof(uint8_t) * 3;
+    } else if (byte_val == LENENCODINT_8BYTES) {
+      val = buffer.peekLEInt<uint64_t>(offset);
+      offset += sizeof(uint64_t);
+    } else {
+      return MYSQL_FAILURE;
+    }
+  } catch (EnvoyException e) {
+    // buffer underflow
     return MYSQL_FAILURE;
   }
 
-  return peekBySize(buffer, offset, size, val);
+  return MYSQL_SUCCESS;
 }
 
 int BufferHelper::peekBytes(Buffer::Instance& buffer, uint64_t& offset, int skip_bytes) {

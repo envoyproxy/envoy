@@ -66,7 +66,7 @@ std::string ClientLoginResponse::encode() {
   BufferHelper::addUint16(*buffer, server_status_);
   BufferHelper::addUint16(*buffer, warnings_);
 
-  std::string e_string = BufferHelper::toString(*buffer);
+  std::string e_string = buffer->toString();
   return e_string;
 }
 

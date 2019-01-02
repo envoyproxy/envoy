@@ -18,7 +18,7 @@ std::string ClientSwitchResponse::encode() {
   Buffer::InstancePtr buffer(new Buffer::OwnedImpl());
 
   BufferHelper::addString(*buffer, auth_plugin_resp_);
-  std::string e_string = BufferHelper::toString(*buffer);
+  std::string e_string = buffer->toString();
   return e_string;
 }
 

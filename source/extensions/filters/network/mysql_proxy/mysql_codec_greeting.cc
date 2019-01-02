@@ -98,7 +98,7 @@ std::string ServerGreeting::encode() {
   BufferHelper::addUint16(*buffer, server_status_);
   BufferHelper::addUint16(*buffer, ext_server_cap_);
 
-  std::string e_string = BufferHelper::toString(*buffer);
+  std::string e_string = buffer->toString();
   return e_string;
 }
 

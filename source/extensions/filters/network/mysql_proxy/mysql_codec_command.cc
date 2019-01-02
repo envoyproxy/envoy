@@ -59,7 +59,7 @@ std::string Command::encode() {
 
   BufferHelper::addUint8(*buffer, static_cast<int>(cmd_));
   BufferHelper::addString(*buffer, data_);
-  std::string e_string = BufferHelper::toString(*buffer);
+  std::string e_string = buffer->toString();
   return e_string;
 }
 

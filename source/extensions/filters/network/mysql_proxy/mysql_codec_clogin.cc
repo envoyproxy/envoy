@@ -85,7 +85,7 @@ int ClientLogin::parseMessage(Buffer::Instance& buffer, uint64_t& offset, int) {
   setUsername(username);
   std::string auth_resp;
   if (isClientAuthLenClData()) {
-    int auth_resp_len = 0;
+    uint64_t auth_resp_len = 0;
     if (BufferHelper::peekLengthEncodedInteger(buffer, offset, auth_resp_len) != MYSQL_SUCCESS) {
       ENVOY_LOG(info, "error parsing LengthEncodedInteger in mysql ClientLogin msg");
       return MYSQL_FAILURE;
@@ -147,7 +147,7 @@ std::string ClientLogin::encode() {
     BufferHelper::addUint8(*buffer, enc_end_string);
   }
 
-  std::string e_string = BufferHelper::toString(*buffer);
+  std::string e_string = buffer->toString();
   return e_string;
 }
 
