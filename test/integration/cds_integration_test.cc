@@ -54,8 +54,7 @@ static_resources:
 const char ClusterName[] = "cluster_0";
 
 class CdsIntegrationTest : public XdsIntegrationTestBase,
-                           public Grpc::GrpcClientIntegrationParamTest,
-                           public Envoy::Upstream::ClusterUpdateCallbacks {
+                           public Grpc::GrpcClientIntegrationParamTest {
 public:
   CdsIntegrationTest()
       : XdsIntegrationTestBase(Http::CodecClient::Type::HTTP2, ipVersion(), Config) {}
@@ -149,17 +148,6 @@ public:
                                                   timeSystem(), enable_half_close_));
     fake_upstreams_[1]->set_allow_unexpected_disconnects(false);
 
-    // These ClusterManager update callbacks are involved in spooky thread-local storage stuff, and
-    // therefore their installation must be scheduled by post() for some reason.
-    absl::Notification cb_added;
-    test_server_->server().dispatcher().post([this, &cb_added]() -> void {
-      // Prepare to be notified by the cluster manager that it processed our upcoming CDS response.
-      cb_handle_ =
-          test_server_->server().clusterManager().addThreadLocalClusterUpdateCallbacks(*this);
-      cb_added.Notify();
-    });
-    cb_added.WaitForNotification();
-
     // Now that the upstream has been created, process Envoy's request to discover it.
     // (First, we have to let Envoy establish its connection to the CDS server.)
     AssertionResult result = // xds_connection_ is filled with the new FakeHttpConnection.
@@ -175,11 +163,8 @@ public:
                                                    {buildCluster(ClusterName)}, "1");
     // We can continue the test once we're sure that Envoy's ClusterManager has made use of
     // the DiscoveryResponse describing cluster_0 that we sent.
-    {
-      absl::MutexLock lock(&mu_);
-      absl::Condition condition(&cm_knows_about_cluster_);
-      mu_.Await(condition);
-    }
+    // 2 because the statically specified CDS server itself counts as a cluster.
+    test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);
 
     // Manually create a listener, add it to the listener manager, register its port in the
     // test framework's downstream listener port map, and finally wait for it to start listening.
@@ -188,40 +173,15 @@ public:
     // the bootstrap config. Its route is meant to point to the regular data upstream. To specificy
     // that route statically, the regular upstream (cluster_0) would have to be specified
     // statically - but the whole point of this test is to have Envoy dynamically discover it!
-    absl::Notification listener_added_by_worker;
-    absl::Notification listener_added_by_manager;
-    test_server_->setOnWorkerListenerAddedCb(
-        [&listener_added_by_worker]() -> void { listener_added_by_worker.Notify(); });
-    test_server_->server().dispatcher().post([this, &listener_added_by_manager]() -> void {
+    test_server_->server().dispatcher().post([this]() -> void {
       EXPECT_TRUE(test_server_->server().listenerManager().addOrUpdateListener(
           buildListener("http", ClusterName), "", true));
-      listener_added_by_manager.Notify();
     });
-    listener_added_by_worker.WaitForNotification();
-    listener_added_by_manager.WaitForNotification();
+    test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
 
     registerTestServerPorts({"http"});
     test_server_->waitUntilListenersReady();
   }
-
-  // Upstream::ClusterUpdateCallbacks
-  void onClusterAddOrUpdate(Envoy::Upstream::ThreadLocalCluster& cluster) override {
-    if (cluster.info()->name() == ClusterName) {
-      absl::MutexLock lock(&mu_);
-      cm_knows_about_cluster_ = true;
-    }
-  }
-  void onClusterRemoval(const std::string& cluster_name) override {
-    if (cluster_name == ClusterName) {
-      absl::MutexLock lock(&mu_);
-      cm_knows_about_cluster_ = false;
-      cluster_removed_.Notify();
-    }
-  }
-  bool cm_knows_about_cluster_ GUARDED_BY(mu_) = false;
-  absl::Mutex mu_;
-  absl::Notification cluster_removed_;
-  Upstream::ClusterUpdateCallbacksHandlePtr cb_handle_;
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersionsClientType, CdsIntegrationTest, GRPC_CLIENT_INTEGRATION_PARAMS);
@@ -242,7 +202,7 @@ TEST_P(CdsIntegrationTest, CdsClusterUpDownUp) {
   sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster, {}, "42");
   // We can continue the test once we're sure that Envoy's ClusterManager has made use of
   // the DiscoveryResponse that says cluster_0 is gone.
-  cluster_removed_.WaitForNotification();
+  test_server_->waitForCounterGe("cluster_manager.cluster_removed", 1);
 
   // Now that cluster_0 is gone, the listener (with its routing to cluster_0) should 503.
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
@@ -260,27 +220,14 @@ TEST_P(CdsIntegrationTest, CdsClusterUpDownUp) {
                                                  {buildCluster(ClusterName)}, "413");
 
   // We can continue the test once we're sure that Envoy's ClusterManager has made use of
-  // the DiscoveryResponse describing cluster_0 that we sent.
-  // TODO(fredlas) ALSO NEED TO WAIT FOR..... something else.
-  // absl::SleepFor(absl::Seconds(1));
-  // TODO(fredlas) AH HAH!!!!!!!!!!!! [source/common/upstream/cluster_manager_impl.cc:1104] no
-  // healthy host for HTTP connection pool
-  //               is the difference between good and bad runs!!!
-  {
-    absl::MutexLock lock(&mu_);
-    absl::Condition condition(&cm_knows_about_cluster_);
-    mu_.Await(condition);
-  }
+  // the DiscoveryResponse describing cluster_0 that we sent. Again, 2 includes CDS server.
+  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);
 
   // Does *not* call our initialize().
   testRouterHeaderOnlyRequestAndResponse(true, 1);
 
   cleanupUpstreamAndDownstream();
   fake_upstream_connection_ = nullptr;
-
-  // If you leave this destruction to the text fixture dtor, there will be a segfault in the
-  // middle of the *next* parameter-run of the test. Dtor order issue with the cluster manager?
-  cb_handle_.reset();
 }
 
 } // namespace
