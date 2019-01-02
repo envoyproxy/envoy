@@ -7,6 +7,8 @@
 
 #include "common/common/utility.h"
 
+#include "absl/strings/match.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -110,7 +112,7 @@ std::string RequestParser::parseErrorType(const Json::Object& json_data) {
   }
 
   for (const std::string& supported_error_type : SUPPORTED_ERROR_TYPES) {
-    if (StringUtil::endsWith(error_type, supported_error_type)) {
+    if (absl::EndsWith(error_type, supported_error_type)) {
       return supported_error_type;
     }
   }

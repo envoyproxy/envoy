@@ -13,6 +13,7 @@
 
 #include <cstdint>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <list>
 #include <stdexcept>
@@ -226,11 +227,12 @@ void TestUtility::createSymlink(const std::string& target, const std::string& li
 // static
 std::tm TestUtility::parseTimestamp(const std::string& format, const std::string& time_str) {
   std::tm timestamp{};
-  const char* parsed_to = strptime(time_str.c_str(), format.c_str(), &timestamp);
+  std::istringstream text(time_str);
 
-  EXPECT_EQ(parsed_to, time_str.c_str() + time_str.size())
-      << " from failing to parse timestamp \"" << time_str << "\" with format string \"" << format
-      << "\"";
+  text >> std::get_time(&timestamp, format.c_str());
+
+  EXPECT_FALSE(text.fail()) << " from failing to parse timestamp \"" << time_str
+                            << "\" with format string \"" << format << "\"";
   return timestamp;
 }
 
@@ -251,6 +253,13 @@ void ConditionalInitializer::waitReady() {
   cv_.wait(mutex_);
   EXPECT_TRUE(ready_);
   ready_ = false;
+}
+
+void ConditionalInitializer::wait() {
+  Thread::LockGuard lock(mutex_);
+  while (!ready_) {
+    cv_.wait(mutex_);
+  }
 }
 
 ScopedFdCloser::ScopedFdCloser(int fd) : fd_(fd) {}
