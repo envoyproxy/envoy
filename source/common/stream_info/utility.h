@@ -30,6 +30,7 @@ private:
   const static std::string UPSTREAM_CONNECTION_FAILURE;
   const static std::string UPSTREAM_CONNECTION_TERMINATION;
   const static std::string UPSTREAM_OVERFLOW;
+  const static std::string UPSTREAM_RETRY_LIMIT_EXCEEDED;
   const static std::string NO_ROUTE_FOUND;
   const static std::string DELAY_INJECTED;
   const static std::string FAULT_INJECTED;
