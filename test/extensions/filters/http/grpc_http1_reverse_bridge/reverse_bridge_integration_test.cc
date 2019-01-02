@@ -10,6 +10,8 @@
 
 #include "gtest/gtest.h"
 
+#include "absl/strings/match.h"
+
 using Envoy::Http::HeaderValueOf;
 
 namespace Envoy {
@@ -96,7 +98,7 @@ TEST_P(ReverseBridgeIntegrationTest, EnabledRoute) {
 
   // Ensure that we restored the content-type and that we added the length prefix.
   EXPECT_EQ(response_data.length() + 5, response->body().size());
-  EXPECT_TRUE(StringUtil::endsWith(response->body(), response_data.toString()));
+  EXPECT_TRUE(absl::EndsWith(response->body(), response_data.toString()));
 
   // Comparing strings embedded zero literals is hard. Use string literal and std::equal to avoid
   // truncating the string when it's converted to const char *.
