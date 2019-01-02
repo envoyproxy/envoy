@@ -154,7 +154,13 @@ def checkJavaProtoOptions(file_path):
       java_package_correct = True
     if java_multiple_files and java_package_correct:
       return []
-  return ["Java proto options are not set correctly for file: %s" % file_path]
+
+  error_messages = []
+  if not java_multiple_files:
+    error_messages.append("Java proto option 'java_multiple_files' not set correctly for file: %s" % file_path)
+  if not java_package_correct:
+    error_messages.append("Java proto option 'java_package' not set correctly for file: %s" % file_path)
+  return error_messages
 
 
 # To avoid breaking the Lyft import, we just check for path inclusion here.
