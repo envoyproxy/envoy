@@ -20,7 +20,6 @@ Http::FilterFactoryCb BufferFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::config::filter::http::buffer::v2::Buffer& proto_config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
   ASSERT(proto_config.has_max_request_bytes());
-  ASSERT(proto_config.has_max_request_time());
 
   BufferFilterConfigSharedPtr filter_config(
       new BufferFilterConfig(proto_config, stats_prefix, context.scope()));
