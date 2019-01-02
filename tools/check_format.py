@@ -46,7 +46,6 @@ HEADER_ORDER_PATH = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), 
 SUBDIR_SET = set(common.includeDirOrder())
 INCLUDE_ANGLE = "#include <"
 INCLUDE_ANGLE_LEN = len(INCLUDE_ANGLE)
-VERSION_HISTORY_DOC = "docs/root/intro/version_history.rst"
 
 # yapf: disable
 PROTOBUF_TYPE_ERRORS = {
@@ -198,20 +197,24 @@ def hasInvalidAngleBracketDirectory(line):
 
 
 VERSION_HISTORY_NEW_LINE_REGEX = re.compile('\* [a-z \-_]*: [a-z:`]')
+VERSION_HISTORY_NEW_RELEASE_REGEX = re.compile('^====[=]+$')
 
 
-def checkVersionFileContents(file_path, error_messages):
+def checkCurrentReleaseNotes(file_path, error_messages):
+  in_current_release = False
+
   file_handle = fileinput.input(file_path)
   for line_number, line in enumerate(file_handle):
 
     def reportError(message):
       error_messages.append("%s:%d: %s" % (file_path, line_number + 1, message))
 
-    # We stop line checks at a somewhat arbitrary point to avoid rewriting very old release notes
-    # to the new format.  If we get to the point a single Envoy release is more than 400 lines we'll
-    # have to adjust this for it to be effective.
-    if line_number > 400:
-      break
+    if VERSION_HISTORY_NEW_RELEASE_REGEX.match(line):
+      # If we were in the section for the current release this means we have passed it.
+      if in_current_release:
+        break
+      # If we see a version marker we are now in the section for the current release.
+      in_current_release = True
 
     if line.startswith('*') and not VERSION_HISTORY_NEW_LINE_REGEX.match(line):
       reportError("Version history line malformed. "
@@ -222,9 +225,11 @@ def checkVersionFileContents(file_path, error_messages):
 def checkFileContents(file_path, checker):
   error_messages = []
 
-  if VERSION_HISTORY_DOC in file_path:
+  if file_path.endswith("version_history.rst"):
     # Version file checking has enough special cased logic to merit its own checks.
-    checkVersionFileContents(file_path, error_messages)
+    # This only validates entries for the current release as very old release
+    # notes have a different format.
+    checkCurrentReleaseNotes(file_path, error_messages)
 
   for line_number, line in enumerate(fileinput.input(file_path)):
 
