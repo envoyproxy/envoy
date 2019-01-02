@@ -157,9 +157,11 @@ def checkJavaProtoOptions(file_path):
 
   error_messages = []
   if not java_multiple_files:
-    error_messages.append("Java proto option 'java_multiple_files' not set correctly for file: %s" % file_path)
+    error_messages.append(
+        "Java proto option 'java_multiple_files' not set correctly for file: %s" % file_path)
   if not java_package_correct:
-    error_messages.append("Java proto option 'java_package' not set correctly for file: %s" % file_path)
+    error_messages.append(
+        "Java proto option 'java_package' not set correctly for file: %s" % file_path)
   return error_messages
 
 
