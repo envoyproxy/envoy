@@ -14,6 +14,63 @@ namespace Filters {
 namespace Common {
 namespace ExtAuthz {
 
+class Matcher;
+typedef std::shared_ptr<Matcher> MatcherSharedPtr;
+
+/**
+ *  Matchers describe the rules for matching authorization request and response headers.
+ */
+class Matcher {
+public:
+  virtual ~Matcher() {}
+
+  /**
+   * Returns whether or not the header key matches the rules of the matcher.
+   *
+   * @param key supplies the header key to be evaluated.
+   */
+  virtual bool matches(const Http::LowerCaseString& key) const PURE;
+
+  /**
+   * Returns whether or not the header key matches the rules of the matcher.
+   *
+   * @param key supplies the header key to be evaluated.
+   */
+  virtual bool matches(const Envoy::Http::HeaderString& key) const PURE;
+};
+
+class HeaderKeyMatcher : public Matcher {
+public:
+  HeaderKeyMatcher(std::vector<Matchers::StringMatcher>&& list) : matchers_(std::move(list)) {}
+
+  bool matches(const Http::LowerCaseString& key) const override {
+    return std::any_of(matchers_.begin(), matchers_.end(),
+                       [&key](auto matcher) { return matcher.match(key.get()); });
+  }
+
+  bool matches(const Envoy::Http::HeaderString& key) const override {
+    return std::any_of(matchers_.begin(), matchers_.end(),
+                       [&key](auto matcher) { return matcher.match(key.getStringView()); });
+  }
+
+private:
+  const std::vector<Matchers::StringMatcher> matchers_;
+};
+
+class NotHeaderKeyMatcher : public Matcher {
+public:
+  NotHeaderKeyMatcher(std::vector<Matchers::StringMatcher>&& list) : matcher_(std::move(list)) {}
+
+  bool matches(const Http::LowerCaseString& key) const override { return !matcher_.matches(key); }
+
+  bool matches(const Envoy::Http::HeaderString& key) const override {
+    return !matcher_.matches(key);
+  }
+
+private:
+  const HeaderKeyMatcher matcher_;
+};
+
 /**
  * HTTP client configuration for the HTTP authorization (ext_authz) filter.
  */
@@ -41,25 +98,19 @@ public:
    * @return List of matchers used for selecting headers the should be aggregated to an
    * authorization request.
    */
-  const std::vector<Matchers::StringMatcher>& requestHeaderMatchers() const {
-    return request_header_matchers_;
-  }
+  const MatcherSharedPtr& requestHeaderMatchers() const { return request_header_matchers_; }
 
   /**
    * @return List of matchers used for selecting headers the should be aggregated to an denied
    * authorization response.
    */
-  const std::vector<Matchers::StringMatcher>& clientHeaderMatchers() const {
-    return client_header_matchers_;
-  }
+  const MatcherSharedPtr& clientHeaderMatchers() const { return client_header_matchers_; }
 
   /**
    * @return List of matchers used for selecting headers the should be aggregated to an ok
    * authorization response.
    */
-  const std::vector<Matchers::StringMatcher>& upstreamHeaderMatchers() const {
-    return upstream_header_matchers_;
-  }
+  const MatcherSharedPtr& upstreamHeaderMatchers() const { return upstream_header_matchers_; }
 
   /**
    * @return List of headers that will be add to the authorization request.
@@ -67,18 +118,16 @@ public:
   const Http::LowerCaseStrPairVector& headersToAdd() const { return authorization_headers_to_add_; }
 
 private:
-  static std::vector<Matchers::StringMatcher>
-  toRequestMatchers(const envoy::type::matcher::ListStringMatcher& matcher);
-  static std::vector<Matchers::StringMatcher>
-  toClientMatchers(const envoy::type::matcher::ListStringMatcher& matcher);
-  static std::vector<Matchers::StringMatcher>
+  static MatcherSharedPtr toRequestMatchers(const envoy::type::matcher::ListStringMatcher& matcher);
+  static MatcherSharedPtr toClientMatchers(const envoy::type::matcher::ListStringMatcher& matcher);
+  static MatcherSharedPtr
   toUpstreamMatchers(const envoy::type::matcher::ListStringMatcher& matcher);
   static Http::LowerCaseStrPairVector
   toHeadersAdd(const Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValue>&);
 
-  const std::vector<Matchers::StringMatcher> request_header_matchers_;
-  const std::vector<Matchers::StringMatcher> client_header_matchers_;
-  const std::vector<Matchers::StringMatcher> upstream_header_matchers_;
+  const MatcherSharedPtr request_header_matchers_;
+  const MatcherSharedPtr client_header_matchers_;
+  const MatcherSharedPtr upstream_header_matchers_;
   const Http::LowerCaseStrPairVector authorization_headers_to_add_;
   const std::string cluster_name_;
   const std::chrono::milliseconds timeout_;
@@ -114,7 +163,6 @@ private:
   ResponsePtr toResponse(Http::MessagePtr message);
   Upstream::ClusterManager& cm_;
   ClientConfigSharedPtr config_;
-
   Http::AsyncClient::Request* request_{};
   RequestCallbacks* callbacks_{};
 };

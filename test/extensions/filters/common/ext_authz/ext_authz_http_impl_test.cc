@@ -75,6 +75,7 @@ public:
     } else {
       MessageUtil::loadFromYaml(yaml, proto_config);
     }
+
     return std::make_shared<ClientConfig>(ClientConfig{proto_config, timeout, path_prefix});
   }
 
@@ -107,12 +108,6 @@ public:
     return message_ptr;
   }
 
-  bool findMatcher(const std::vector<Matchers::StringMatcher>& list,
-                   const Http::LowerCaseString& key) {
-    return std::any_of(list.begin(), list.end(),
-                       [&key](auto matcher) { return matcher.match(key.get()); });
-  }
-
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<Http::MockAsyncClient> async_client_;
   NiceMock<Http::MockAsyncClientRequest> async_request_;
@@ -128,34 +123,31 @@ TEST_F(ExtAuthzHttpClientTest, ClientConfig) {
   const Http::LowerCaseString bar{"bar"};
 
   // Check allowed request headers.
-  EXPECT_EQ(6, config_->requestHeaderMatchers().size());
-  EXPECT_TRUE(findMatcher(config_->requestHeaderMatchers(), Http::Headers::get().Method));
-  EXPECT_TRUE(findMatcher(config_->requestHeaderMatchers(), Http::Headers::get().Host));
-  EXPECT_TRUE(findMatcher(config_->requestHeaderMatchers(), Http::Headers::get().Authorization));
-  EXPECT_FALSE(findMatcher(config_->requestHeaderMatchers(), Http::Headers::get().ContentLength));
-  EXPECT_TRUE(findMatcher(config_->requestHeaderMatchers(), baz));
+  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Method));
+  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Host));
+  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Authorization));
+  EXPECT_FALSE(config_->requestHeaderMatchers()->matches(Http::Headers::get().ContentLength));
+  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(baz));
 
-  // Check allowed client headers.
-  EXPECT_EQ(6, config_->clientHeaderMatchers().size());
-  EXPECT_TRUE(findMatcher(config_->clientHeaderMatchers(), Http::Headers::get().Status));
-  EXPECT_TRUE(findMatcher(config_->clientHeaderMatchers(), Http::Headers::get().ContentLength));
-  EXPECT_FALSE(findMatcher(config_->clientHeaderMatchers(), Http::Headers::get().Path));
-  EXPECT_FALSE(findMatcher(config_->clientHeaderMatchers(), Http::Headers::get().Host));
-  EXPECT_TRUE(findMatcher(config_->clientHeaderMatchers(), Http::Headers::get().WWWAuthenticate));
-  EXPECT_FALSE(findMatcher(config_->clientHeaderMatchers(), Http::Headers::get().Origin));
-  EXPECT_TRUE(findMatcher(config_->clientHeaderMatchers(), foo));
+  // // Check allowed client headers.
+  EXPECT_TRUE(config_->clientHeaderMatchers()->matches(Http::Headers::get().Status));
+  EXPECT_TRUE(config_->clientHeaderMatchers()->matches(Http::Headers::get().ContentLength));
+  EXPECT_FALSE(config_->clientHeaderMatchers()->matches(Http::Headers::get().Path));
+  EXPECT_FALSE(config_->clientHeaderMatchers()->matches(Http::Headers::get().Host));
+  EXPECT_TRUE(config_->clientHeaderMatchers()->matches(Http::Headers::get().WWWAuthenticate));
+  EXPECT_FALSE(config_->clientHeaderMatchers()->matches(Http::Headers::get().Origin));
+  EXPECT_TRUE(config_->clientHeaderMatchers()->matches(foo));
 
-  // Check allowed upstream headers.
-  EXPECT_EQ(config_->upstreamHeaderMatchers().size(), 2);
-  EXPECT_TRUE(findMatcher(config_->upstreamHeaderMatchers(), bar));
+  // // Check allowed upstream headers.
+  EXPECT_TRUE(config_->upstreamHeaderMatchers()->matches(bar));
 
-  // Check other attributes.
+  // // Check other attributes.
   EXPECT_EQ(config_->pathPrefix(), "/bar");
   EXPECT_EQ(config_->cluster(), "ext_authz");
   EXPECT_EQ(config_->timeout(), std::chrono::milliseconds{250});
 }
 
-// Test default allowed headers in the HTTP client.
+// // Test default allowed headers in the HTTP client.
 TEST_F(ExtAuthzHttpClientTest, TestDefaultAllowedHeaders) {
   std::string yaml = R"EOF(
   http_service:
@@ -170,20 +162,17 @@ TEST_F(ExtAuthzHttpClientTest, TestDefaultAllowedHeaders) {
   const auto key = Http::LowerCaseString{"key"};
 
   // Check allowed request headers.
-  EXPECT_EQ(config_->requestHeaderMatchers().size(), 4);
-  EXPECT_TRUE(findMatcher(config_->requestHeaderMatchers(), Http::Headers::get().Method));
-  EXPECT_TRUE(findMatcher(config_->requestHeaderMatchers(), Http::Headers::get().Host));
-  EXPECT_TRUE(findMatcher(config_->requestHeaderMatchers(), Http::Headers::get().Authorization));
-  EXPECT_FALSE(findMatcher(config_->requestHeaderMatchers(), Http::Headers::get().ContentLength));
+  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Method));
+  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Host));
+  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Authorization));
+  EXPECT_FALSE(config_->requestHeaderMatchers()->matches(Http::Headers::get().ContentLength));
 
   // Check allowed client headers.
-  EXPECT_EQ(config_->clientHeaderMatchers().size(), 1);
-  EXPECT_TRUE(findMatcher(config_->clientHeaderMatchers(), Http::Headers::get().ContentLength));
-  EXPECT_FALSE(findMatcher(config_->clientHeaderMatchers(), Http::Headers::get().Host));
+  EXPECT_TRUE(config_->clientHeaderMatchers()->matches(Http::Headers::get().ContentLength));
+  EXPECT_FALSE(config_->clientHeaderMatchers()->matches(Http::Headers::get().Host));
 
   // Check allowed upstream headers.
-  EXPECT_EQ(config_->upstreamHeaderMatchers().size(), 0);
-  EXPECT_FALSE(findMatcher(config_->upstreamHeaderMatchers(), Http::Headers::get().ContentLength));
+  EXPECT_FALSE(config_->upstreamHeaderMatchers()->matches(Http::Headers::get().ContentLength));
 }
 
 // Verify client response when the authorization server returns a 200 OK and path_prefix is

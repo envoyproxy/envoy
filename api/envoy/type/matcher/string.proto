@@ -45,13 +45,6 @@ message StringMatcher {
     // * The regex *\d{3}* does not match the value *1234*
     // * The regex *\d{3}* does not match the value *123.456*
     string regex = 4 [(validate.rules).string.max_bytes = 1024];
-
-    // The input string must match if not the one exactly specified here.
-    //
-    // Examples:
-    //
-    // * *abc* only matches if the value is not *abc*.
-    string not_exact = 5;
   }
 }
 

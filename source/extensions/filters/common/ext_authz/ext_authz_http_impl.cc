@@ -29,18 +29,17 @@ const Response& errorResponse() {
 
 // SuccessResponse used for creating either DENIED or OK authorization responses.
 struct SuccessResponse {
-  SuccessResponse(const Http::HeaderMap& headers,
-                  const std::vector<Matchers::StringMatcher>& matchers, Response&& response)
+  SuccessResponse(const Http::HeaderMap& headers, const MatcherSharedPtr& matchers,
+                  Response&& response)
       : headers_(headers), matchers_(matchers), response_(std::make_unique<Response>(response)) {
     headers_.iterate(
         [](const Http::HeaderEntry& header, void* ctx) -> Http::HeaderMap::Iterate {
           auto* context = static_cast<SuccessResponse*>(ctx);
-          for (const auto& matcher : context->matchers_) {
-            if (matcher.match(header.key().getStringView())) {
-              context->response_->headers_to_add.emplace_back(
-                  Http::LowerCaseString{header.key().c_str()}, header.value().c_str());
-              return Http::HeaderMap::Iterate::Continue;
-            }
+          // UpstreamHeaderMatcher
+          if (context->matchers_->matches(header.key())) {
+            context->response_->headers_to_add.emplace_back(
+                Http::LowerCaseString{header.key().c_str()}, header.value().c_str());
+            return Http::HeaderMap::Iterate::Continue;
           }
           return Http::HeaderMap::Iterate::Continue;
         },
@@ -48,10 +47,9 @@ struct SuccessResponse {
   }
 
   const Http::HeaderMap& headers_;
-  const std::vector<Matchers::StringMatcher>& matchers_;
+  const MatcherSharedPtr& matchers_;
   ResponsePtr response_;
 };
-
 } // namespace
 
 ClientConfig::ClientConfig(const envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz& config,
@@ -67,7 +65,7 @@ ClientConfig::ClientConfig(const envoy::config::filter::http::ext_authz::v2alpha
       cluster_name_(config.http_service().server_uri().cluster()), timeout_(timeout),
       path_prefix_(path_prefix) {}
 
-std::vector<Matchers::StringMatcher>
+MatcherSharedPtr
 ClientConfig::toRequestMatchers(const envoy::type::matcher::ListStringMatcher& list) {
   const std::vector<Http::LowerCaseString> keys{
       {Http::Headers::get().Authorization, Http::Headers::get().Method, Http::Headers::get().Path,
@@ -79,39 +77,43 @@ ClientConfig::toRequestMatchers(const envoy::type::matcher::ListStringMatcher& l
     matcher.set_exact(key.get());
     matchers.push_back(matcher);
   }
-  matchers.shrink_to_fit();
-  return matchers;
+
+  return std::make_shared<HeaderKeyMatcher>(std::move(matchers));
 }
 
-std::vector<Matchers::StringMatcher>
+MatcherSharedPtr
 ClientConfig::toClientMatchers(const envoy::type::matcher::ListStringMatcher& list) {
-  // If list is empty, all authorization response headers, except Host, should be included to
-  // the client response. If not empty, user input matchers and a default list of exact matches will
-  // be used.
   std::vector<Matchers::StringMatcher> matchers{list.patterns().begin(), list.patterns().end()};
+
+  // If list is empty, all authorization response headers, except Host, should be added to
+  // the client response.
   if (matchers.empty()) {
     envoy::type::matcher::StringMatcher matcher;
-    matcher.set_not_exact(Http::Headers::get().Host.get());
+    matcher.set_exact(Http::Headers::get().Host.get());
     matchers.push_back(matcher);
-  } else {
-    std::vector<Http::LowerCaseString> keys{
-        {Http::Headers::get().Status, Http::Headers::get().ContentLength,
-         Http::Headers::get().WWWAuthenticate, Http::Headers::get().Location}};
-    for (const auto& key : keys) {
-      envoy::type::matcher::StringMatcher matcher;
-      matcher.set_exact(key.get());
-      matchers.push_back(matcher);
-    }
+
+    return std::make_shared<NotHeaderKeyMatcher>(std::move(matchers));
   }
-  matchers.shrink_to_fit();
-  return matchers;
+
+  // If not empty, all user defined matchers and default matcher's list will
+  // be used instead.
+  std::vector<Http::LowerCaseString> keys{
+      {Http::Headers::get().Status, Http::Headers::get().ContentLength,
+       Http::Headers::get().WWWAuthenticate, Http::Headers::get().Location}};
+
+  for (const auto& key : keys) {
+    envoy::type::matcher::StringMatcher matcher;
+    matcher.set_exact(key.get());
+    matchers.push_back(matcher);
+  }
+
+  return std::make_shared<HeaderKeyMatcher>(std::move(matchers));
 }
 
-std::vector<Matchers::StringMatcher>
+MatcherSharedPtr
 ClientConfig::toUpstreamMatchers(const envoy::type::matcher::ListStringMatcher& list) {
   std::vector<Matchers::StringMatcher> matchers{list.patterns().begin(), list.patterns().end()};
-  matchers.shrink_to_fit();
-  return matchers;
+  return std::make_unique<HeaderKeyMatcher>(std::move(matchers));
 }
 
 Http::LowerCaseStrPairVector ClientConfig::toHeadersAdd(
@@ -144,10 +146,7 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
   Http::HeaderMapPtr headers = std::make_unique<Http::HeaderMapImpl>(lengthZeroHeader());
   for (const auto& header : request.attributes().request().http().headers()) {
     const Http::LowerCaseString key{header.first};
-    const bool is_match = std::any_of(config_->requestHeaderMatchers().begin(),
-                                      config_->requestHeaderMatchers().end(),
-                                      [&key](auto matcher) { return matcher.match(key.get()); });
-    if (is_match) {
+    if (config_->requestHeaderMatchers()->matches(key)) {
       if (key == Http::Headers::get().Path && !config_->pathPrefix().empty()) {
         std::string value;
         absl::StrAppend(&value, config_->pathPrefix(), header.second);
