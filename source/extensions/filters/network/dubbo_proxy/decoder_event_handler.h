@@ -35,7 +35,7 @@ public:
    * @param header_buf raw header data
    * @param size The size of the head.
    */
-  virtual Network::FilterStatus transferHeaderTo(const Buffer::Instance& header_buf, size_t size) {
+  virtual Network::FilterStatus transferHeaderTo(Buffer::Instance& header_buf, size_t size) {
     if (buffer_ != nullptr) {
       buffer_->move(header_buf, size);
     }
@@ -48,7 +48,7 @@ public:
    * @param header_buf raw body data
    * @param size The size of the body.
    */
-  virtual Network::FilterStatus transferBodyTo(const Buffer::Instance& body_buf, size_t size) {
+  virtual Network::FilterStatus transferBodyTo(Buffer::Instance& body_buf, size_t size) {
     if (buffer_ != nullptr) {
       buffer_->move(body_buf, size);
     }

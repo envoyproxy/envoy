@@ -6,6 +6,7 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
 #include "envoy/network/connection.h"
+#include "envoy/stream_info/stream_info.h"
 
 #include "extensions/filters/network/dubbo_proxy/decoder_event_handler.h"
 #include "extensions/filters/network/dubbo_proxy/deserializer.h"
