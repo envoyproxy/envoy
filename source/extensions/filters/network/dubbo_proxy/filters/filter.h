@@ -136,8 +136,6 @@ public:
  */
 class DecoderFilter : public DecoderEventHandler {
 public:
-  using MessageMetadataSharedPtr =
-      Envoy::Extensions::NetworkFilters::DubboProxy::MessageMetadataSharedPtr;
   virtual ~DecoderFilter() {}
 
   /**

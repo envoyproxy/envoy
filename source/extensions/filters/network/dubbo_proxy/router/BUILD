@@ -11,6 +11,8 @@ envoy_package()
 envoy_cc_library(
     name = "router_interface",
     hdrs = ["router.h"],
-    external_deps = ["abseil_optional"],
-    deps = [],
+    deps = [
+        "//include/envoy/router:router_interface",
+        "//source/extensions/filters/network/dubbo_proxy:metadata_lib",
+    ],
 )
