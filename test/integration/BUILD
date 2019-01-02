@@ -124,15 +124,32 @@ envoy_cc_test(
     ] + envoy_all_extensions(),
 )
 
+exports_files(["test_utility.sh"])
+
 envoy_sh_test(
     name = "hotrestart_test",
-    srcs = envoy_select_hot_restart(["hotrestart_test.sh"]),
+    srcs = envoy_select_hot_restart([
+        "hotrestart_test.sh",
+    ]),
     data = [
+        "test_utility.sh",
         "//source/exe:envoy-static",
         "//test/common/runtime:filesystem_setup.sh",
         "//test/common/runtime:filesystem_test_data",
         "//test/config/integration:server_config_files",
         "//tools:socket_passing",
+    ],
+)
+
+envoy_sh_test(
+    name = "run_envoy_test",
+    srcs = ["run_envoy_test.sh"],
+    data = [
+        "test_utility.sh",
+        "//source/exe:envoy-static",
+        "//test/common/runtime:filesystem_setup.sh",
+        "//test/common/runtime:filesystem_test_data",
+        "//test/config/integration:server_config_files",
     ],
 )
 
@@ -312,6 +329,7 @@ envoy_cc_test_library(
         "//source/common/network:filter_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/network:utility_lib",
+        "//source/common/ssl:ssl_socket_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:thread_local_store_lib",
         "//source/common/thread_local:thread_local_lib",

@@ -38,14 +38,24 @@ public:
     HostDescriptionConstSharedPtr host_description_;
   };
 
-  enum class HealthFlag {
-    // The host is currently failing active health checks.
-    FAILED_ACTIVE_HC = 0x1,
-    // The host is currently considered an outlier and has been ejected.
-    FAILED_OUTLIER_CHECK = 0x02,
-    // The host is currently marked as unhealthy by EDS.
-    FAILED_EDS_HEALTH = 0x04,
-  };
+  // We use an X-macro here to make it easier to verify that all the enum values are accounted for.
+  // clang-format off
+#define HEALTH_FLAG_ENUM_VALUES(m)                                               \
+  /* The host is currently failing active health checks. */                      \
+  m(FAILED_ACTIVE_HC, 0x1)                                                       \
+  /* The host is currently considered an outlier and has been ejected. */        \
+  m(FAILED_OUTLIER_CHECK, 0x02)                                                  \
+  /* The host is currently marked as unhealthy by EDS. */                        \
+  m(FAILED_EDS_HEALTH, 0x04)                                                     \
+  /* The host is currently marked as degraded through active health checking. */ \
+  m(DEGRADED_ACTIVE_HC, 0x08)
+  // clang-format on
+
+#define DECLARE_ENUM(name, value) name = value,
+
+  enum class HealthFlag { HEALTH_FLAG_ENUM_VALUES(DECLARE_ENUM) };
+
+#undef DECLARE_ENUM
 
   enum class ActiveHealthFailureType {
     // The failure type is unknown, all hosts' failure types are initialized as UNKNOWN

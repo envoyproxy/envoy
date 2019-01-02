@@ -54,7 +54,8 @@ protected:
   protected:
     ActiveHealthCheckSession(HealthCheckerImplBase& parent, HostSharedPtr host);
 
-    void handleSuccess();
+    void handleSuccess(bool degraded = false);
+    void handleDegraded();
     void handleFailure(envoy::data::core::v2alpha::HealthCheckFailureType type);
 
     HostSharedPtr host_;

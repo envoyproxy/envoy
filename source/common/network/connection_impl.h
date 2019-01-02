@@ -14,7 +14,6 @@
 #include "common/common/logger.h"
 #include "common/event/libevent.h"
 #include "common/network/filter_manager_impl.h"
-#include "common/ssl/ssl_socket.h"
 #include "common/stream_info/stream_info_impl.h"
 
 #include "absl/types/optional.h"

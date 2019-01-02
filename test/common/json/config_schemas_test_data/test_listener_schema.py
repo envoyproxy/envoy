@@ -12,11 +12,12 @@ LISTENER_BLOB = {
     "filters": []
 }
 
+
 def test(writer):
-    
-    writer.write_test_file(
-        'Valid',
-        schema='LISTENER_SCHEMA',
-        data=get_blob(LISTENER_BLOB),
-        throws=False,
-    )
+
+  writer.write_test_file(
+      'Valid',
+      schema='LISTENER_SCHEMA',
+      data=get_blob(LISTENER_BLOB),
+      throws=False,
+  )
