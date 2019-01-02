@@ -11,7 +11,7 @@ application layer:
 * gRPC makes use of HTTP/2 trailers to convey request status. Envoy is one of very few HTTP proxies
   that correctly supports HTTP/2 trailers and is thus one of the few proxies that can transport
   gRPC requests and responses.
-* The gRPC runtime for some languages is relatively immature. See :ref:`below <_arch_overview_grpc_bridging>`
+* The gRPC runtime for some languages is relatively immature. See :ref:`below <arch_overview_grpc_bridging>`
   for an overview of filters that can help bring gRPC to more languages.
 * gRPC-Web is supported by a :ref:`filter <config_http_filters_grpc_web>` that allows a gRPC-Web
   client to send requests to Envoy over HTTP/1.1 and get proxied to a gRPC server. It's under
@@ -21,11 +21,13 @@ application layer:
   that allows a RESTful JSON API client to send requests to Envoy over HTTP and get proxied to a
   gRPC service.
 
-.._arch_overview_grpc_bridging:
+.. _arch_overview_grpc_bridging:
 
 gRPC bridging
 -------------
+
 Envoy supports two gRPC bridges:
+
 * :ref:`grpc_http1_bridge filter <config_http_filters_grpc_bridge>` which allows gRPC requests to be sent to Envoy over
   HTTP/1.1. Envoy then translates the requests to HTTP/2 for transport to the target server. The response is translated back to HTTP/1.1.
   When installed, the bridge filter gathers per RPC statistics in addition to the standard array of global HTTP statistics.
