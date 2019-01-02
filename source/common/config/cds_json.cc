@@ -15,8 +15,6 @@ void CdsJson::translateRingHashLbConfig(
     const Json::Object& json_ring_hash_lb_config,
     envoy::api::v2::Cluster::RingHashLbConfig& ring_hash_lb_config) {
   JSON_UTIL_SET_INTEGER(json_ring_hash_lb_config, ring_hash_lb_config, minimum_ring_size);
-  JSON_UTIL_SET_BOOL(json_ring_hash_lb_config, *ring_hash_lb_config.mutable_deprecated_v1(),
-                     use_std_hash);
 }
 
 void CdsJson::translateHealthCheck(const Json::Object& json_health_check,

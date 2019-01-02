@@ -1470,9 +1470,6 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
           "minimum_ring_size" : {
             "type" : "integer",
             "minimum" : 0
-          },
-          "use_std_hash" : {
-            "type" : "boolean"
           }
         }
       },

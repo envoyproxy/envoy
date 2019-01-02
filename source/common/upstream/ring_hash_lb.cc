@@ -88,10 +88,6 @@ RingHashLoadBalancer::Ring::Ring(
   ENVOY_LOG(info, "ring hash: min_ring_size={} hashes_per_host={}", min_ring_size, hashes_per_host);
   ring_.reserve(hosts.size() * hashes_per_host);
 
-  const bool use_std_hash =
-      config ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.value().deprecated_v1(), use_std_hash, false)
-             : false;
-
   char hash_key_buffer[196];
   for (const auto& host : hosts) {
     const std::string& address_string = host->address()->asString();
@@ -114,10 +110,9 @@ RingHashLoadBalancer::Ring::Ring(
           StringUtil::itoa(hash_key_buffer + offset_start, StringUtil::MIN_ITOA_OUT_LEN, i);
       absl::string_view hash_key(hash_key_buffer, total_hash_key_len);
 
-      // Sadly std::hash provides no mechanism for hashing arbitrary bytes so we must copy here.
-      // xxHash is done wihout copies.
-      const uint64_t hash = use_std_hash ? std::hash<std::string>()(std::string(hash_key))
-                                         : HashUtil::xxHash64(hash_key);
+      // The original hasher std::hash had no mechanism for hashing arbitrary bytes so the (legacy)
+      // code does copies here.  This could be fixed as of #5379 being resolved.
+      const uint64_t hash = HashUtil::xxHash64(hash_key);
       ENVOY_LOG(trace, "ring hash: hash_key={} hash={}", hash_key.data(), hash);
       ring_.push_back({hash, host});
     }
