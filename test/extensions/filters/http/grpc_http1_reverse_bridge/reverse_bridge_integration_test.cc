@@ -8,9 +8,8 @@
 #include "test/mocks/http/mocks.h"
 #include "test/test_common/utility.h"
 
-#include "gtest/gtest.h"
-
 #include "absl/strings/match.h"
+#include "gtest/gtest.h"
 
 using Envoy::Http::HeaderValueOf;
 
