@@ -238,7 +238,7 @@ void HttpIntegrationTest::setDownstreamProtocol(Http::CodecClient::Type downstre
 
 IntegrationStreamDecoderPtr HttpIntegrationTest::sendRequestAndWaitForResponse(
     const Http::TestHeaderMapImpl& request_headers, uint32_t request_body_size,
-    const Http::TestHeaderMapImpl& response_headers, uint32_t response_size) {
+    const Http::TestHeaderMapImpl& response_headers, uint32_t response_size, int upstream_index) {
   ASSERT(codec_client_ != nullptr);
   // Send the request to Envoy.
   IntegrationStreamDecoderPtr response;
@@ -247,7 +247,7 @@ IntegrationStreamDecoderPtr HttpIntegrationTest::sendRequestAndWaitForResponse(
   } else {
     response = codec_client_->makeHeaderOnlyRequest(request_headers);
   }
-  waitForNextUpstreamRequest();
+  waitForNextUpstreamRequest(upstream_index);
   // Send response headers, and end_stream if there is no response body.
   upstream_request_->encodeHeaders(response_headers, response_size == 0);
   // Send any response data, with end_stream true.
@@ -309,11 +309,7 @@ void HttpIntegrationTest::waitForNextUpstreamRequest(uint64_t upstream_index) {
 void HttpIntegrationTest::testRouterRequestAndResponseWithBody(
     uint64_t request_size, uint64_t response_size, bool big_header,
     ConnectionCreationFunction* create_connection) {
-  // This is called multiple times per test in cds_integration_test. Only call
-  // initialize() the first time.
-  if (!initialized()) {
-    initialize();
-  }
+  initialize();
   codec_client_ = makeHttpConnection(
       create_connection ? ((*create_connection)()) : makeClientConnection((lookupPort("http"))));
   Http::TestHeaderMapImpl request_headers{
@@ -334,7 +330,7 @@ void HttpIntegrationTest::testRouterRequestAndResponseWithBody(
 }
 
 void HttpIntegrationTest::testRouterHeaderOnlyRequestAndResponse(
-    bool close_upstream, ConnectionCreationFunction* create_connection) {
+    bool leave_upstream_open, int upstream_index, ConnectionCreationFunction* create_connection) {
   // This is called multiple times per test in ads_integration_test. Only call
   // initialize() the first time.
   if (!initialized()) {
@@ -347,11 +343,12 @@ void HttpIntegrationTest::testRouterHeaderOnlyRequestAndResponse(
                                           {":scheme", "http"},
                                           {":authority", "host"},
                                           {"x-lyft-user-id", "123"}};
-  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0,
+                                                upstream_index);
 
   // The following allows us to test shutting down the server with active connection pool
   // connections.
-  if (!close_upstream) {
+  if (!leave_upstream_open) {
     fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
     test_server_.reset();
   }

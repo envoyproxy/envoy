@@ -27,6 +27,7 @@ using testing::IsSubstring;
 namespace Envoy {
 namespace {
 
+// TODO(fredlas) Move to test/config/utility.cc once there are other xDS tests that use gRPC.
 const char Config[] = R"EOF(
 admin:
   access_log_path: /dev/null
@@ -65,6 +66,7 @@ public:
     fake_upstreams_.clear();
   }
 
+  // TODO(fredlas) Move to test/config/utility.cc once there are other xDS tests that use gRPC.
   envoy::api::v2::Cluster buildCluster(const std::string& name) {
     return TestUtility::parseYaml<envoy::api::v2::Cluster>(
         fmt::format(R"EOF(
@@ -84,10 +86,11 @@ public:
       http2_protocol_options: {{}}
     )EOF",
                     name, name, Network::Test::getLoopbackAddressString(ipVersion()),
-                    // fake_upstreams_[1] is the CDS server, [0] is the regular upstream.
-                    fake_upstreams_[0]->localAddress()->ip()->port()));
+                    // fake_upstreams_[0] is the CDS server, [1] is the regular upstream.
+                    fake_upstreams_[1]->localAddress()->ip()->port()));
   }
 
+  // TODO(fredlas) Move to test/config/utility.cc once there are other xDS tests that use gRPC.
   envoy::api::v2::Listener buildListener(const std::string& name, const std::string& cluster) {
     return TestUtility::parseYaml<envoy::api::v2::Listener>(fmt::format(
         R"EOF(
@@ -142,13 +145,9 @@ public:
     // Create the regular (i.e. not an xDS server) upstream. We create it manually here after
     // initialize() because finalize() expects all fake_upstreams_ to correspond to a static
     // cluster in the bootstrap config - which we don't want since we're testing dynamic CDS!
-    // HACK: In order to use the HttpIntegrationTest cases unmodified,
-    //       HttpIntegrationTest::waitForNextUpstreamRequest() needs to find the regular upstream
-    //       in the 0th position.
-    fake_upstreams_.push_back(std::move(fake_upstreams_[0]));
-    fake_upstreams_[0] = std::make_unique<FakeUpstream>(0, FakeHttpConnection::Type::HTTP2,
-                                                        version_, timeSystem(), enable_half_close_);
-    fake_upstreams_[0]->set_allow_unexpected_disconnects(false);
+    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_,
+                                                  timeSystem(), enable_half_close_));
+    fake_upstreams_[1]->set_allow_unexpected_disconnects(false);
 
     // These ClusterManager update callbacks are involved in spooky thread-local storage stuff, and
     // therefore their installation must be scheduled by post() for some reason.
@@ -164,12 +163,12 @@ public:
     // Now that the upstream has been created, process Envoy's request to discover it.
     // (First, we have to let Envoy establish its connection to the CDS server.)
     AssertionResult result = // xds_connection_ is filled with the new FakeHttpConnection.
-        fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, xds_connection_);
+        fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, xds_connection_);
     RELEASE_ASSERT(result, result.message());
     result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
     RELEASE_ASSERT(result, result.message());
     xds_stream_->startGrpcStream();
-    fake_upstreams_[1]->set_allow_unexpected_disconnects(true);
+    fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
     EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}));
     sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster,
@@ -236,7 +235,7 @@ INSTANTIATE_TEST_CASE_P(IpVersionsClientType, CdsIntegrationTest, GRPC_CLIENT_IN
 // 7) We send Envoy a request, which we verify is properly proxied to and served by that cluster.
 TEST_P(CdsIntegrationTest, CdsClusterUpDownUp) {
   // Calls our initialize(), which includes establishing a listener, route, and cluster.
-  testRouterRequestAndResponseWithBody(1024, 512, false);
+  testRouterHeaderOnlyRequestAndResponse(true, 1);
 
   // Tell Envoy that cluster_0 is gone.
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {}));
@@ -274,7 +273,7 @@ TEST_P(CdsIntegrationTest, CdsClusterUpDownUp) {
   }
 
   // Does *not* call our initialize().
-  testRouterRequestAndResponseWithBody(1024, 512, false);
+  testRouterHeaderOnlyRequestAndResponse(true, 1);
 
   cleanupUpstreamAndDownstream();
   fake_upstream_connection_ = nullptr;
