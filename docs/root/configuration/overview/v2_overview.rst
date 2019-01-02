@@ -35,7 +35,7 @@ the :option:`-c` flag, i.e.:
 
 .. code-block:: console
 
-  ./envoy -c <path to config>.{json,yaml,pb,pb_text}
+  ./envoy -c <path to config>.{json,yaml,yml,pb,pb_text}
 
 where the extension reflects the underlying v2 config representation.
 
