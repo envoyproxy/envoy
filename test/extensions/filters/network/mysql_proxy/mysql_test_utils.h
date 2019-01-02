@@ -1,6 +1,5 @@
 #pragma once
-#include <fmt/format.h>
-#include <iostream>
+#include "fmt/format.h"
 
 namespace Envoy {
 namespace Extensions {
