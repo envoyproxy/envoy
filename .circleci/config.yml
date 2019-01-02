@@ -4,7 +4,7 @@ executors:
   ubuntu-build:
     description: "A regular build executor based on ubuntu image"
     docker:
-      - image: envoyproxy/envoy-build:78b316f48a391bdcb2961f0560a0bfea475254f6
+      - image: envoyproxy/envoy-build:a734887ad06609cf0b3c023d38239bf3e79d3717
     resource_class: xlarge
     working_directory: /source
 
@@ -37,6 +37,14 @@ jobs:
        - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
        - checkout
        - run: ci/do_circle_ci.sh bazel.tsan
+       - store_artifacts:
+           path: /build/envoy/generated/failed-testlogs
+   compile_time_options:
+     executor: ubuntu-build
+     steps:
+       - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
+       - checkout
+       - run: ci/do_circle_ci.sh bazel.compile_time_options
        - store_artifacts:
            path: /build/envoy/generated/failed-testlogs
    api:
@@ -157,6 +165,7 @@ workflows:
               only: /^v.*/
       - asan
       - tsan
+      - compile_time_options
       - api
       - filter_example_mirror
       - ipv6_tests

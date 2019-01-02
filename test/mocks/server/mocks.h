@@ -159,7 +159,7 @@ public:
   // Server::WatchDog
   MOCK_METHOD1(startWatchdog, void(Event::Dispatcher& dispatcher));
   MOCK_METHOD0(touch, void());
-  MOCK_CONST_METHOD0(threadId, int32_t());
+  MOCK_CONST_METHOD0(threadId, const Thread::ThreadId&());
   MOCK_CONST_METHOD0(lastTouchTime, MonotonicTime());
 };
 
@@ -169,7 +169,7 @@ public:
   ~MockGuardDog();
 
   // Server::GuardDog
-  MOCK_METHOD1(createWatchDog, WatchDogSharedPtr(int32_t thread_id));
+  MOCK_METHOD1(createWatchDog, WatchDogSharedPtr(Thread::ThreadIdPtr&&));
   MOCK_METHOD1(stopWatching, void(WatchDogSharedPtr wd));
 
   std::shared_ptr<MockWatchDog> watch_dog_;
@@ -417,7 +417,6 @@ public:
   MOCK_CONST_METHOD0(listenerMetadata, const envoy::api::v2::core::Metadata&());
   MOCK_METHOD0(timeSource, TimeSource&());
   Event::SimulatedTimeSystem& timeSystem() { return time_system_; }
-
   Http::Context& httpContext() override { return http_context_; }
 
   testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;

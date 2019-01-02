@@ -451,23 +451,6 @@ std::string AccessLogDateTimeFormatter::fromTime(const SystemTime& time) {
   return cached_time.formatted_time;
 }
 
-bool StringUtil::endsWith(const std::string& source, const std::string& end) {
-  if (source.length() < end.length()) {
-    return false;
-  }
-
-  size_t start_position = source.length() - end.length();
-  return std::equal(source.begin() + start_position, source.end(), end.begin());
-}
-
-bool StringUtil::startsWith(const char* source, const std::string& start, bool case_sensitive) {
-  if (case_sensitive) {
-    return strncmp(source, start.c_str(), start.size()) == 0;
-  } else {
-    return strncasecmp(source, start.c_str(), start.size()) == 0;
-  }
-}
-
 const std::string& StringUtil::nonEmptyStringOrDefault(const std::string& s,
                                                        const std::string& default_value) {
   return s.empty() ? default_value : s;

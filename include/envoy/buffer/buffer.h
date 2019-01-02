@@ -246,10 +246,14 @@ public:
     constexpr const auto most_significant_read_byte =
         Endianness == ByteOrder::BigEndian ? displacement : Size - 1;
 
+    // If Size == sizeof(T), we need to make sure we don't generate an invalid left shift
+    // (e.g. int32 << 32), even though we know that that branch of the conditional will.
+    // not be taken. Size % sizeof(T) gives us the correct left shift when Size < sizeof(T),
+    // and generates a left shift of 0 bits when Size == sizeof(T)
     const auto sign_extension_bits =
         std::is_signed<T>::value && Size < sizeof(T) && bytes[most_significant_read_byte] < 0
             ? static_cast<T>(static_cast<typename std::make_unsigned<T>::type>(all_bits_enabled)
-                             << (Size * CHAR_BIT))
+                             << ((Size % sizeof(T)) * CHAR_BIT))
             : static_cast<T>(0);
 
     return fromEndianness<Endianness>(static_cast<T>(result)) | sign_extension_bits;
