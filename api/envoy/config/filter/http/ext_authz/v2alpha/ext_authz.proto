@@ -93,11 +93,11 @@ message AuthorizationRequest {
   // *Authority*, *Method*, *Path* and *Authorization* are always dispatched to the authorization
   // server by default. The message will not contain body data and the *Content-Length* will be set
   // to zero.
-  envoy.type.matcher.ListStringMatcher allowed_headers = 2;
+  envoy.type.matcher.ListStringMatcher allowed_headers = 1;
 
   // Sets a list of headers and their values that will be added to the request to external
   // authorization server. Note that these will override the headers coming from the downstream.
-  repeated envoy.api.v2.core.HeaderValue headers_to_add = 3;
+  repeated envoy.api.v2.core.HeaderValue headers_to_add = 2;
 }
 
 message AuthorizationResponse {
