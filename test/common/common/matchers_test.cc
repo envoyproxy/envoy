@@ -81,23 +81,6 @@ TEST(MetadataTest, MatchStringExactValue) {
   EXPECT_TRUE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
 }
 
-TEST(MetadataTest, MatchStringNotExactValue) {
-  envoy::api::v2::core::Metadata metadata;
-  Envoy::Config::Metadata::mutableMetadataValue(metadata, "envoy.filter.a", "label")
-      .set_string_value("test");
-  Envoy::Config::Metadata::mutableMetadataValue(metadata, "envoy.filter.b", "label")
-      .set_string_value("prod");
-
-  envoy::type::matcher::MetadataMatcher matcher;
-  matcher.set_filter("envoy.filter.b");
-  matcher.add_path()->set_key("label");
-
-  matcher.mutable_value()->mutable_string_match()->set_not_exact("test");
-  EXPECT_TRUE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
-  matcher.mutable_value()->mutable_string_match()->set_not_exact("prod");
-  EXPECT_FALSE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
-}
-
 TEST(MetadataTest, MatchStringPrefixValue) {
   envoy::api::v2::core::Metadata metadata;
   Envoy::Config::Metadata::mutableMetadataValue(metadata, "envoy.filter.a", "label")
