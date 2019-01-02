@@ -19,6 +19,7 @@
 #include "common/http/headers.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
+#include "common/runtime/runtime_impl.h"
 #include "common/upstream/upstream_impl.h"
 
 #include "test/common/upstream/utility.h"
@@ -347,6 +348,7 @@ void HttpIntegrationTest::testRouterHeaderOnlyRequestAndResponse(
   // The following allows us to test shutting down the server with active connection pool
   // connections.
   if (!close_upstream) {
+    fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
     test_server_.reset();
   }
 
@@ -1050,7 +1052,10 @@ void HttpIntegrationTest::testEnvoyProxyMetadataInResponse() {
   const std::string key = "key";
   std::string value = std::string(80 * 1024, '1');
   Http::MetadataMap metadata_map = {{key, value}};
-  upstream_request_->encodeMetadata(metadata_map);
+  Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
+  Http::MetadataMapVector metadata_map_vector;
+  metadata_map_vector.push_back(std::move(metadata_map_ptr));
+  upstream_request_->encodeMetadata(metadata_map_vector);
   upstream_request_->encodeHeaders(default_response_headers_, false);
   upstream_request_->encodeData(12, true);
 
@@ -1067,7 +1072,10 @@ void HttpIntegrationTest::testEnvoyProxyMetadataInResponse() {
   value = std::string(10, '2');
   upstream_request_->encodeHeaders(default_response_headers_, false);
   metadata_map = {{key, value}};
-  upstream_request_->encodeMetadata(metadata_map);
+  metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
+  metadata_map_vector.erase(metadata_map_vector.begin());
+  metadata_map_vector.push_back(std::move(metadata_map_ptr));
+  upstream_request_->encodeMetadata(metadata_map_vector);
   upstream_request_->encodeData(0, true);
 
   // Verifies metadata is received by the client.
@@ -1083,7 +1091,10 @@ void HttpIntegrationTest::testEnvoyProxyMetadataInResponse() {
   value = std::string(10, '3');
   upstream_request_->encodeHeaders(default_response_headers_, false);
   metadata_map = {{key, value}};
-  upstream_request_->encodeMetadata(metadata_map);
+  metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
+  metadata_map_vector.erase(metadata_map_vector.begin());
+  metadata_map_vector.push_back(std::move(metadata_map_ptr));
+  upstream_request_->encodeMetadata(metadata_map_vector);
   upstream_request_->encodeData(10, true);
 
   // Verifies metadata is received by the client.
@@ -1100,7 +1111,10 @@ void HttpIntegrationTest::testEnvoyProxyMetadataInResponse() {
   upstream_request_->encodeHeaders(default_response_headers_, false);
   upstream_request_->encodeData(10, false);
   metadata_map = {{key, value}};
-  upstream_request_->encodeMetadata(metadata_map);
+  metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
+  metadata_map_vector.erase(metadata_map_vector.begin());
+  metadata_map_vector.push_back(std::move(metadata_map_ptr));
+  upstream_request_->encodeMetadata(metadata_map_vector);
   upstream_request_->encodeData(10, true);
 
   // Verifies metadata is received by the client.
@@ -1117,7 +1131,10 @@ void HttpIntegrationTest::testEnvoyProxyMetadataInResponse() {
   upstream_request_->encodeHeaders(default_response_headers_, false);
   upstream_request_->encodeData(10, false);
   metadata_map = {{key, value}};
-  upstream_request_->encodeMetadata(metadata_map);
+  metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
+  metadata_map_vector.erase(metadata_map_vector.begin());
+  metadata_map_vector.push_back(std::move(metadata_map_ptr));
+  upstream_request_->encodeMetadata(metadata_map_vector);
   upstream_request_->encodeData(0, true);
 
   // Verifies metadata is received by the client.
@@ -1134,7 +1151,10 @@ void HttpIntegrationTest::testEnvoyProxyMetadataInResponse() {
   upstream_request_->encodeHeaders(default_response_headers_, false);
   upstream_request_->encodeData(10, false);
   metadata_map = {{key, value}};
-  upstream_request_->encodeMetadata(metadata_map);
+  metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
+  metadata_map_vector.erase(metadata_map_vector.begin());
+  metadata_map_vector.push_back(std::move(metadata_map_ptr));
+  upstream_request_->encodeMetadata(metadata_map_vector);
   upstream_request_->encodeResetStream();
 
   // Verifies stream is reset.
@@ -1150,36 +1170,33 @@ void HttpIntegrationTest::testEnvoyProxyMultipleMetadata() {
   auto response = codec_client_->makeRequestWithBody(default_request_headers_, 10);
   waitForNextUpstreamRequest();
 
-  // Sends metadata before response header.
-  std::vector<Http::MetadataMap> metadata_map_vector = {{
-                                                            {"0", "000"},
-                                                        },
-                                                        {
-                                                            {"1", "111"},
-                                                        },
-                                                        {
-                                                            {"2", "222"},
-                                                        },
-                                                        {
-                                                            {"3", "333"},
-                                                        }};
-  upstream_request_->encodeMetadata(metadata_map_vector[0]);
-  upstream_request_->encodeMetadata(metadata_map_vector[1]);
+  const int size = 4;
+  std::vector<Http::MetadataMapVector> multiple_vecs(size);
+  for (int i = 0; i < size; i++) {
+    Runtime::RandomGeneratorImpl random;
+    int value_size = random.random() % Http::METADATA_MAX_PAYLOAD_SIZE + 1;
+    Http::MetadataMap metadata_map = {{std::string(i, 'a'), std::string(value_size, 'b')}};
+    Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
+    multiple_vecs[i].push_back(std::move(metadata_map_ptr));
+  }
+  upstream_request_->encodeMetadata(multiple_vecs[0]);
   upstream_request_->encodeHeaders(default_response_headers_, false);
-  upstream_request_->encodeMetadata(metadata_map_vector[2]);
+  upstream_request_->encodeMetadata(multiple_vecs[1]);
   upstream_request_->encodeData(12, false);
-  upstream_request_->encodeMetadata(metadata_map_vector[3]);
+  upstream_request_->encodeMetadata(multiple_vecs[2]);
+  upstream_request_->encodeData(12, false);
+  upstream_request_->encodeMetadata(multiple_vecs[3]);
   upstream_request_->encodeData(12, true);
 
   // Verifies multiple metadata are received by the client.
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  for (const auto& metadata_map : metadata_map_vector) {
-    for (const auto& metadata : metadata_map) {
+  for (int i = 0; i < size; i++) {
+    for (const auto& metadata : *multiple_vecs[i][0]) {
       EXPECT_EQ(response->metadata_map().find(metadata.first)->second, metadata.second);
     }
   }
-  EXPECT_EQ(response->metadata_map().size(), metadata_map_vector.size());
+  EXPECT_EQ(response->metadata_map().size(), multiple_vecs.size());
 }
 
 void HttpIntegrationTest::testEnvoyProxyInvalidMetadata() {
@@ -1194,11 +1211,14 @@ void HttpIntegrationTest::testEnvoyProxyInvalidMetadata() {
   const std::string key = "key";
   std::string value = std::string(1024 * 1024, 'a');
   Http::MetadataMap metadata_map = {{key, value}};
-  upstream_request_->encodeMetadata(metadata_map);
+  Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
+  Http::MetadataMapVector metadata_map_vector;
+  metadata_map_vector.push_back(std::move(metadata_map_ptr));
+  upstream_request_->encodeMetadata(metadata_map_vector);
   upstream_request_->encodeHeaders(default_response_headers_, false);
-  upstream_request_->encodeMetadata(metadata_map);
+  upstream_request_->encodeMetadata(metadata_map_vector);
   upstream_request_->encodeData(12, false);
-  upstream_request_->encodeMetadata(metadata_map);
+  upstream_request_->encodeMetadata(metadata_map_vector);
   upstream_request_->encodeData(12, true);
 
   // Verifies metadata is not received by the client.
@@ -1216,12 +1236,14 @@ void HttpIntegrationTest::testEnvoyMultipleMetadataReachSizeLimit() {
   waitForNextUpstreamRequest();
 
   // Sends multiple metadata after response header until max size limit is reached.
-  const std::string key = "key";
-  std::string value = std::string(10000, 'a');
-  Http::MetadataMap metadata_map = {{key, value}};
   upstream_request_->encodeHeaders(default_response_headers_, false);
-  for (int i = 0; i < 200; i++) {
-    upstream_request_->encodeMetadata(metadata_map);
+  const int size = 200;
+  std::vector<Http::MetadataMapVector> multiple_vecs(size);
+  for (int i = 0; i < size; i++) {
+    Http::MetadataMap metadata_map = {{"key", std::string(10000, 'a')}};
+    Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
+    multiple_vecs[i].push_back(std::move(metadata_map_ptr));
+    upstream_request_->encodeMetadata(multiple_vecs[i]);
   }
   upstream_request_->encodeData(12, true);
 
@@ -1418,7 +1440,17 @@ void HttpIntegrationTest::testIdleTimeoutWithTwoRequests() {
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_idle_timeout", 1);
 }
 
+// This is a regression for https://github.com/envoyproxy/envoy/issues/2715 and validates that a
+// pending request is not sent on a connection that has been half-closed.
 void HttpIntegrationTest::testUpstreamDisconnectWithTwoRequests() {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    auto* static_resources = bootstrap.mutable_static_resources();
+    auto* cluster = static_resources->mutable_clusters(0);
+    // Ensure we only have one connection upstream, one request active at a time.
+    cluster->mutable_max_requests_per_connection()->set_value(1);
+    auto* circuit_breakers = cluster->mutable_circuit_breakers();
+    circuit_breakers->add_thresholds()->mutable_max_connections()->set_value(1);
+  });
   initialize();
   fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
@@ -1431,6 +1463,10 @@ void HttpIntegrationTest::testUpstreamDisconnectWithTwoRequests() {
   // Request 2.
   IntegrationCodecClientPtr codec_client2 = makeHttpConnection(lookupPort("http"));
   auto response2 = codec_client2->makeRequestWithBody(default_request_headers_, 512);
+
+  // Validate one request active, the other pending.
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 1);
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_pending_active", 1);
 
   // Response 1.
   upstream_request_->encodeHeaders(default_response_headers_, false);
@@ -1535,6 +1571,14 @@ void HttpIntegrationTest::testInvalidVersion() {
   sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.01\r\nHost: host\r\n\r\n",
                                 &response);
   EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n", response);
+}
+
+void HttpIntegrationTest::testHttp10DisabledWithUpgrade() {
+  initialize();
+  std::string response;
+  sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.0\r\nUpgrade: h2c\r\n\r\n",
+                                &response, true);
+  EXPECT_TRUE(response.find("HTTP/1.1 426 Upgrade Required\r\n") == 0);
 }
 
 void HttpIntegrationTest::testHttp10Disabled() {

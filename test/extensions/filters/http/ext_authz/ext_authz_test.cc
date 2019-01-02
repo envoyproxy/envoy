@@ -8,6 +8,7 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/empty_string.h"
+#include "common/http/context_impl.h"
 #include "common/http/headers.h"
 #include "common/json/json_loader.h"
 #include "common/network/address_impl.h"
@@ -51,7 +52,7 @@ public:
     if (!yaml.empty()) {
       MessageUtil::loadFromYaml(yaml, proto_config);
     }
-    config_.reset(new FilterConfig(proto_config, local_info_, stats_store_, runtime_));
+    config_.reset(new FilterConfig(proto_config, local_info_, stats_store_, runtime_, http_context_));
     client_ = new Filters::Common::ExtAuthz::MockClient();
     filter_ = std::make_unique<Filter>(config_, Filters::Common::ExtAuthz::ClientPtr{client_});
     filter_->setDecoderFilterCallbacks(filter_callbacks_);
@@ -71,6 +72,7 @@ public:
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Network::Address::InstanceConstSharedPtr addr_;
   NiceMock<Envoy::Network::MockConnection> connection_;
+  Http::ContextImpl http_context_;
 
   void prepareCheck() {
     ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));

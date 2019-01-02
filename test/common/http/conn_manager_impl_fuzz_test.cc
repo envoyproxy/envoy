@@ -14,6 +14,7 @@
 // * Fuzz config settings
 #include "common/common/empty_string.h"
 #include "common/http/conn_manager_impl.h"
+#include "common/http/context_impl.h"
 #include "common/http/date_provider_impl.h"
 #include "common/http/exception.h"
 #include "common/network/address_impl.h"
@@ -382,7 +383,7 @@ DEFINE_PROTO_FUZZER(const test::common::http::ConnManagerImplTestCase& input) {
   FuzzConfig config;
   NiceMock<Network::MockDrainDecision> drain_close;
   NiceMock<Runtime::MockRandomGenerator> random;
-  NiceMock<Tracing::MockHttpTracer> tracer;
+  Http::ContextImpl http_context;
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   NiceMock<Upstream::MockClusterManager> cluster_manager;
@@ -399,7 +400,7 @@ DEFINE_PROTO_FUZZER(const test::common::http::ConnManagerImplTestCase& input) {
   filter_callbacks.connection_.remote_address_ =
       std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0");
 
-  ConnectionManagerImpl conn_manager(config, drain_close, random, tracer, runtime, local_info,
+  ConnectionManagerImpl conn_manager(config, drain_close, random, http_context, runtime, local_info,
                                      cluster_manager, nullptr, config.time_system_);
   conn_manager.initializeReadFilterCallbacks(filter_callbacks);
 

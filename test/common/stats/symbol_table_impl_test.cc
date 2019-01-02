@@ -1,5 +1,6 @@
 #include <string>
 
+#include "common/common/mutex_tracer_impl.h"
 #include "common/memory/stats.h"
 #include "common/stats/symbol_table_impl.h"
 
@@ -7,6 +8,7 @@
 #include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
+#include "absl/synchronization/blocking_counter.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -25,9 +27,11 @@ protected:
   }
 
   SymbolVec getSymbols(StatName stat_name) {
-    return SymbolEncoding::decodeSymbols(stat_name.data(), stat_name.numBytes());
+    return SymbolEncoding::decodeSymbols(stat_name.data(), stat_name.dataSize());
   }
-  std::string decodeSymbolVec(const SymbolVec& symbol_vec) { return table_.decode(symbol_vec); }
+  std::string decodeSymbolVec(const SymbolVec& symbol_vec) {
+    return table_.decodeSymbolVec(symbol_vec);
+  }
   Symbol monotonicCounter() { return table_.monotonicCounter(); }
   std::string encodeDecode(absl::string_view stat_name) {
     return makeStat(stat_name).toString(table_);
@@ -54,8 +58,8 @@ TEST_F(StatNameTest, TestArbitrarySymbolRoundtrip) {
   }
 }
 
-TEST_F(StatNameTest, TestMillionSymbolsRoundtrip) {
-  for (int i = 0; i < 1 * 1000 * 1000; ++i) {
+TEST_F(StatNameTest, Test100kSymbolsRoundtrip) {
+  for (int i = 0; i < 100 * 1000; ++i) {
     const std::string stat_name = absl::StrCat("symbol_", i);
     EXPECT_EQ(stat_name, encodeDecode(stat_name));
   }
@@ -312,6 +316,74 @@ TEST_F(StatNameTest, JoinAllEmpty) {
   EXPECT_EQ("", joiner.statName().toString(table_));
 }
 
+TEST_F(StatNameTest, MutexContentionOnExistingSymbols) {
+  Thread::ThreadFactory& thread_factory = Thread::threadFactoryForTest();
+  MutexTracerImpl& mutex_tracer = MutexTracerImpl::getOrCreateTracer();
+
+  // Make 100 threads, each of which will race to encode an overlapping set of
+  // symbols, triggering corner-cases in SymbolTable::toSymbol.
+  constexpr int num_threads = 100;
+  std::vector<Thread::ThreadPtr> threads;
+  threads.reserve(num_threads);
+  ConditionalInitializer creation, access, wait;
+  absl::BlockingCounter creates(num_threads), accesses(num_threads);
+  for (int i = 0; i < num_threads; ++i) {
+    threads.push_back(
+        thread_factory.createThread([this, i, &creation, &access, &wait, &creates, &accesses]() {
+          // Rotate between 20 different symbols to try to get some
+          // contention. Based on a logging print statement in
+          // SymbolTable::toSymbol(), this appears to trigger creation-races,
+          // even when compiled with optimization.
+          std::string stat_name_string = absl::StrCat("symbol", i % 20);
+
+          // Block each thread on waking up a common condition variable,
+          // so we make it likely to race on creation.
+          creation.wait();
+          StatNameTempStorage initial(stat_name_string, table_);
+          creates.DecrementCount();
+
+          access.wait();
+          StatNameTempStorage second(stat_name_string, table_);
+          accesses.DecrementCount();
+
+          wait.wait();
+        }));
+  }
+  creation.setReady();
+  creates.Wait();
+
+  int64_t create_contentions = mutex_tracer.numContentions();
+  ENVOY_LOG_MISC(info, "Number of contentions: {}", create_contentions);
+
+  // But when we access the already-existing symbols, we guarantee that no
+  // further mutex contentions occur.
+  access.setReady();
+  accesses.Wait();
+
+  // In a perfect world, we could use reader-locks in the SymbolTable
+  // implementation, and there should be zero additional contentions
+  // after latching 'create_contentions' above. And we can definitely
+  // have this world, but this slows down BM_CreateRace in
+  // symbol_table_speed_test.cc, even on a 72-core machine.
+  //
+  // Thus it is better to avoid symbol-table contention by refactoring
+  // all stat-creation code to symbolize all stat string elements at
+  // construction, as composition does not require a lock.
+  //
+  // See this commit
+  // https://github.com/envoyproxy/envoy/pull/5321/commits/ef712d0f5a11ff49831c1935e8a2ef8a0a935bc9
+  // for a working reader-lock implementation, which would pass this EXPECT:
+  //     EXPECT_EQ(create_contentions, mutex_tracer.numContentions());
+  //
+  // Note also that we cannot guarantee there *will* be contentions
+  // as a machine or OS is free to run all threads serially.
+
+  wait.setReady();
+  for (auto& thread : threads) {
+    thread->join();
+  }
+}
+
 // Tests the memory savings realized from using symbol tables with 1k clusters. This
 // test shows the memory drops from almost 8M to less than 2M.
 TEST(SymbolTableTest, Memory) {
@@ -351,15 +423,11 @@ TEST(SymbolTableTest, Memory) {
   // This test only works if Memory::Stats::totalCurrentlyAllocated() works, which
   // appears not to be the case in some tests, including asan, tsan, and mac.
   if (Memory::Stats::totalCurrentlyAllocated() == 0) {
-    std::cerr << "SymbolTableTest.Memory comparison skipped due to malloc-stats returning 0."
-              << std::endl;
+    ENVOY_LOG_MISC(info,
+                   "SymbolTableTest.Memory comparison skipped due to malloc-stats returning 0.");
   } else {
-    // In manual tests, string memory used 7759488 in this example, and
-    // symbol-table mem used 1739672. Setting the benchmark at 7759488/4 =
-    // 1939872, which should allow for some slop and platform dependence
-    // in the allocation library.
-
     EXPECT_LT(symbol_table_mem_used, string_mem_used / 4);
+    EXPECT_LT(symbol_table_mem_used, 1750000); // Dec 16, 2018: 1744280 bytes.
   }
 }
 

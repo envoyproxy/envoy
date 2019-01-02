@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <queue>
 #include <string>
 
 #include "envoy/http/codec.h"
@@ -23,20 +24,11 @@ public:
   MetadataEncoder();
 
   /**
-   * Creates wire format HTTP/2 header block from metadata_map. Only after previous payload is
-   * drained, new payload can be encoded. This limitation is caused by nghttp2 can't incrementally
-   * encode header block.
-   * @param metadata_map supplies METADATA to encode.
+   * Creates wire format HTTP/2 header block from a vector of metadata maps.
+   * @param metadata_map_vector supplies the metadata map vector to encode.
    * @return whether encoding is successful.
    */
-  bool createPayload(const MetadataMap& metadata_map);
-
-  /**
-   * Called in nghttp2 callback function after METADATA is submitted. The function releases len data
-   * in payload_.
-   * @param len supplies the size to be released.
-   */
-  void releasePayload(uint64_t len);
+  bool createPayload(const MetadataMapVector& metadata_map_vector);
 
   /**
    * @return true if there is payload to be submitted.
@@ -44,12 +36,33 @@ public:
   bool hasNextFrame();
 
   /**
-   * Returns payload to be submitted.
-   * @return the reference to payload.
+   * Creates the metadata frame payload for the next metadata frame.
+   * @param buf is the pointer to the destination memory where the payload should be copied to. len
+   * is the largest length the memory can hold.
+   * @return the size of frame payload.
    */
-  Buffer::OwnedImpl& payload() { return payload_; }
+  uint64_t packNextFramePayload(uint8_t* buf, const size_t len);
+
+  /**
+   * Returns end_metadata value for the next metadata frame.
+   * @return end_metadata value.
+   */
+  uint8_t nextEndMetadata();
+
+  /**
+   * Estimates upper bound of the number of frames the payload_ can generate.
+   * @return frame count upper bound.
+   */
+  uint64_t frameCountUpperBound();
 
 private:
+  /**
+   * Creates wire format HTTP/2 header block from metadata_map.
+   * @param metadata_map supplies METADATA to encode.
+   * @return whether encoding is successful.
+   */
+  bool createPayloadMetadataMap(const MetadataMap& metadata_map);
+
   /**
    * Creates wired format header blocks using nghttp2.
    * @param metadata_map supplies METADATA to encode.
@@ -70,6 +83,11 @@ private:
   // memory, and the caveat is encoding error on one stream can impact other streams.
   typedef CSmartPtr<nghttp2_hd_deflater, nghttp2_hd_deflate_del> Deflater;
   Deflater deflater_;
+
+  // Stores the remaining payload size of each metadata_map to be packed. The payload size is needed
+  // so that we know when END_METADATA should be set. The payload size gets updated when the payload
+  // is packed into metadata frames.
+  std::queue<uint64_t> payload_size_queue_;
 };
 
 } // namespace Http2

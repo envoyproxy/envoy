@@ -6,6 +6,7 @@ import "envoy/api/v2/core/address.proto";
 import "envoy/api/v2/core/base.proto";
 
 import "google/protobuf/duration.proto";
+import "google/protobuf/struct.proto";
 
 import "validate/validate.proto";
 import "gogoproto/gogo.proto";
@@ -56,6 +57,10 @@ message UpstreamLocalityStats {
 message UpstreamEndpointStats {
   // Upstream host address.
   core.Address address = 1;
+
+  // Opaque and implementation dependent metadata of the
+  // endpoint. Envoy will pass this directly to the management server.
+  google.protobuf.Struct metadata = 6;
 
   // The total number of requests successfully completed by the endpoint. A
   // single HTTP or gRPC request or stream is counted as one request. A TCP

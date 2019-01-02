@@ -16,7 +16,7 @@ EXCLUDED_PREFIXES = ("./generated/", "./thirdparty/", "./build", "./.git/", "./b
                      "./bazel/external", "./.cache",
                      "./source/extensions/extensions_build_config.bzl",
                      "./tools/testdata/check_format/")
-SUFFIXES = (".cc", ".h", "BUILD", ".bzl", ".md", ".rst", ".proto")
+SUFFIXES = (".cc", ".h", "BUILD", "WORKSPACE", ".bzl", ".md", ".rst", ".proto")
 DOCS_SUFFIX = (".md", ".rst")
 PROTO_SUFFIX = (".proto")
 
@@ -37,6 +37,9 @@ REAL_TIME_WHITELIST = ('./source/common/common/utility.h',
                        './test/test_common/test_time.cc', './test/test_common/test_time.h',
                        './test/test_common/utility.cc', './test/test_common/utility.h',
                        './test/integration/integration.h')
+
+# Files in these paths can use std::get_time
+GET_TIME_WHITELIST = ('./test/test_common/utility.cc')
 
 CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-7")
 BUILDIFIER_PATH = os.getenv("BUILDIFIER_BIN", "$GOPATH/bin/buildifier")
@@ -154,6 +157,10 @@ def whitelistedForRealTime(file_path):
   return file_path in REAL_TIME_WHITELIST
 
 
+def whitelistedForGetTime(file_path):
+  return file_path in GET_TIME_WHITELIST
+
+
 def findSubstringAndReturnError(pattern, file_path, error_message):
   with open(file_path) as f:
     text = f.read()
@@ -179,6 +186,10 @@ def isBuildFile(file_path):
 
 def isSkylarkFile(file_path):
   return file_path.endswith(".bzl")
+
+
+def isWorkspaceFile(file_path):
+  return os.path.basename(file_path) == "WORKSPACE"
 
 
 def hasInvalidAngleBracketDirectory(line):
@@ -269,6 +280,12 @@ def checkSourceLine(line, file_path, reportError):
        'std::chrono::system_clock::now' in line or 'std::chrono::steady_clock::now' in line or \
        'std::this_thread::sleep_for' in line or hasCondVarWaitFor(line):
       reportError("Don't reference real-world time sources from production code; use injection")
+  if not whitelistedForGetTime(file_path):
+    if "std::get_time" in line:
+      if "test/" in file_path:
+        reportError("Don't use std::get_time; use TestUtility::parseTimestamp in tests")
+      else:
+        reportError("Don't use std::get_time; use the injectable time system")
   if 'std::atomic_' in line:
     # The std::atomic_* free functions are functionally equivalent to calling
     # operations on std::atomic<T> objects, so prefer to use that instead.
@@ -294,12 +311,13 @@ def checkBuildLine(line, file_path, reportError):
   if not whitelistedForProtobufDeps(file_path) and '"protobuf"' in line:
     reportError("unexpected direct external dependency on protobuf, use "
                 "//source/common/protobuf instead.")
-  if envoy_build_rule_check and not isSkylarkFile(file_path) and '@envoy//' in line:
+  if (envoy_build_rule_check and not isSkylarkFile(file_path) and not isWorkspaceFile(file_path) and
+      '@envoy//' in line):
     reportError("Superfluous '@envoy//' prefix")
 
 
 def fixBuildLine(line, file_path):
-  if envoy_build_rule_check and not isSkylarkFile(file_path):
+  if envoy_build_rule_check and not isSkylarkFile(file_path) and not isWorkspaceFile(file_path):
     line = line.replace('@envoy//', '//')
   return line
 
@@ -310,7 +328,7 @@ def fixBuildPath(file_path):
 
   error_messages = []
   # TODO(htuch): Add API specific BUILD fixer script.
-  if not isApiFile(file_path) and not isSkylarkFile(file_path):
+  if not isApiFile(file_path) and not isSkylarkFile(file_path) and not isWorkspaceFile(file_path):
     if os.system("%s %s %s" % (ENVOY_BUILD_FIXER_PATH, file_path, file_path)) != 0:
       error_messages += ["envoy_build_fixer rewrite failed for file: %s" % file_path]
 
@@ -321,7 +339,7 @@ def fixBuildPath(file_path):
 
 def checkBuildPath(file_path):
   error_messages = []
-  if not isApiFile(file_path) and not isSkylarkFile(file_path):
+  if not isApiFile(file_path) and not isSkylarkFile(file_path) and not isWorkspaceFile(file_path):
     command = "%s %s | diff %s -" % (ENVOY_BUILD_FIXER_PATH, file_path, file_path)
     error_messages += executeCommand(command, "envoy_build_fixer check failed", file_path)
 
@@ -406,7 +424,7 @@ def checkFormat(file_path):
   # Apply fixes first, if asked, and then run checks. If we wind up attempting to fix
   # an issue, but there's still an error, that's a problem.
   try_to_fix = operation_type == "fix"
-  if isBuildFile(file_path) or isSkylarkFile(file_path):
+  if isBuildFile(file_path) or isSkylarkFile(file_path) or isWorkspaceFile(file_path):
     if try_to_fix:
       error_messages += fixBuildPath(file_path)
     error_messages += checkBuildPath(file_path)

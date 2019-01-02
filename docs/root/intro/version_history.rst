@@ -1,11 +1,22 @@
 Version history
 ---------------
 
-1.9.0 (pending)
+1.10.0 (pending)
+================
+* ext_authz: authorization request and response configuration has been separated and split into two distinct objects: :ref:`authorization request 
+  <envoy_api_field_config.filter.http.ext_authz.v2alpha.HttpService.authorization_request>` and :ref:`authorization response 
+  <envoy_api_field_config.filter.http.ext_authz.v2alpha.HttpService.authorization_response>`. In addition :ref:`client headers 
+  <envoy_api_field_config.filter.http.ext_authz.v2alpha.AuthorizationResponse.allowed_client_headers>` and :ref:`upstream headers 
+  <envoy_api_field_config.filter.http.ext_authz.v2alpha.AuthorizationResponse.allowed_upstream_headers>` which replaces the old *allowed_authorization_headers* object and also supports :ref:`string matcher <envoy_api_msg_type.matcher.StringMatcher>`.
+
+1.9.0
 ===============
 * access log: added a :ref:`JSON logging mode <config_access_log_format_dictionaries>` to output access logs in JSON format.
 * access log: added dynamic metadata to access log messages streamed over gRPC.
+* access log: added DOWNSTREAM_CONNECTION_TERMINATION.
+* admin: :http:post:`/logging` now responds with 200 while there are no params.
 * admin: added support for displaying subject alternate names in :ref:`certs<operations_admin_interface_certs>` end point.
+* admin: added host weight to the :http:get:`/clusters?format=json` end point response.
 * admin: :http:get:`/server_info` now responds with a JSON object instead of a single string.
 * admin: :http:get:`/server_info` now exposes what stage of initialization the server is currently in.
 * admin: added support for displaying command line options in :http:get:`/server_info` end point.
@@ -14,11 +25,15 @@ Version history
 * cluster: set a default of 1s for :ref:`option <envoy_api_field_Cluster.CommonLbConfig.update_merge_window>`.
 * config: removed support for the v1 API.
 * config: added support for :ref:`rate limiting<envoy_api_msg_core.RateLimitSettings>` discovery request calls.
-* cors: added :ref: `invalid/valid stats <cors-statistics>` to filter.
+* cors: added :ref:`invalid/valid stats <cors-statistics>` to filter.
 * ext-authz: added support for providing per route config - optionally disable the filter and provide context extensions.
 * fault: removed integer percentage support.
-* health check: Added :ref: 'logging health check failure events <envoy_api_field_core.HealthCheck.always_log_health_check_failures>'.
-* http: Added HTTP/2 WebSocket proxying via :ref:`extended CONNECT <envoy_api_field_core.Http2ProtocolOptions.allow_connect>`
+* grpc-json: added support for :ref:`ignoring query parameters
+  <envoy_api_field_config.filter.http.transcoder.v2.GrpcJsonTranscoder.ignored_query_parameters>`.
+* health check: added :ref:`logging health check failure events <envoy_api_field_core.HealthCheck.always_log_health_check_failures>`.
+* health check: added ability to set :ref:`authority header value
+  <envoy_api_field_core.HealthCheck.GrpcHealthCheck.authority>` for gRPC health check.
+* http: added HTTP/2 WebSocket proxying via :ref:`extended CONNECT <envoy_api_field_core.Http2ProtocolOptions.allow_connect>`.
 * http: added limits to the number and length of header modifications in all fields request_headers_to_add and response_headers_to_add. These limits are very high and should only be used as a last-resort safeguard.
 * http: added support for a :ref:`request timeout <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.request_timeout>`. The timeout is disabled by default.
 * http: no longer adding whitespace when appending X-Forwarded-For headers. **Warning**: this is not
@@ -28,6 +43,11 @@ Version history
   value to override the default HTTP to gRPC status mapping.
 * http: no longer close the TCP connection when a HTTP/1 request is retried due
   to a response with empty body.
+* http: added support for more gRPC content-type headers in :ref:`gRPC bridge filter <config_http_filters_grpc_bridge>`, like application/grpc+proto.
+* listeners: all listener filters are now governed by the :ref:`listener_filters_timeout
+  <envoy_api_field_Listener.listener_filters_timeout>` setting. The hard coded 15s timeout in
+  the :ref:`TLS inspector listener filter <config_listener_filters_tls_inspector>` is superseded by
+  this setting.
 * listeners: added the ability to match :ref:`FilterChain <envoy_api_msg_listener.FilterChain>` using :ref:`source_type <envoy_api_field_listener.FilterChainMatch.source_type>`.
 * load balancer: added a `configuration <envoy_api_msg_Cluster.LeastRequestLbConfig>` option to specify the number of choices made in P2C.
 * logging: added missing [ in log prefix.
@@ -38,6 +58,8 @@ Version history
   `UNAVAILABLE` when a gRPC call is rate limited.
 * rate-limit: removed support for the legacy ratelimit service and made the data-plane-api
   :ref:`rls.proto <envoy_api_file_envoy/service/ratelimit/v2/rls.proto>` based implementation default.
+* rate-limit: removed the deprecated cluster_name attribute in :ref:`rate limit service configuration <envoy_api_file_envoy/config/ratelimit/v2/rls.proto>`.
+* rate-limit: added :ref:`rate_limit_service <envoy_api_msg_config.filter.http.rate_limit.v2.RateLimit>` configuration to filters.
 * rbac: added dynamic metadata to the network level filter.
 * rbac: added support for permission matching by :ref:`requested server name <envoy_api_field_config.rbac.v2alpha.Permission.requested_server_name>`.
 * redis: static cluster configuration is no longer required. Redis proxy will work with clusters
@@ -48,7 +70,7 @@ Version history
 * router: added internal :ref:`grpc-retry-on <config_http_filters_router_x-envoy-retry-grpc-on>` policy.
 * router: added :ref:`scheme_redirect <envoy_api_field_route.RedirectAction.scheme_redirect>` and
   :ref:`port_redirect <envoy_api_field_route.RedirectAction.port_redirect>` to define the respective
-  scheme and port rewriting RedirectAction
+  scheme and port rewriting RedirectAction.
 * router: when :ref:`max_grpc_timeout <envoy_api_field_route.RouteAction.max_grpc_timeout>`
   is set, Envoy will now add or update the grpc-timeout header to reflect Envoy's expected timeout.
 * router: per try timeouts now starts when an upstream stream is ready instead of when the request has
@@ -56,24 +78,31 @@ Version history
 * router: added support for not retrying :ref:`rate limited requests<config_http_filters_router_x-envoy-ratelimited>`. Rate limit filter now sets the :ref:`x-envoy-ratelimited<config_http_filters_router_x-envoy-ratelimited>`
   header so the rate limited requests that may have been retried earlier will not be retried with this change.
 * router: added support for enabling upgrades on a :ref:`per-route <envoy_api_field_route.RouteAction.upgrade_configs>` basis.
+* router: support configuring a default fraction of mirror traffic via
+  :ref:`runtime_fraction <envoy_api_field_route.RouteAction.RequestMirrorPolicy.runtime_key>`.
+* sandbox: added :ref:`cors sandbox <install_sandboxes_cors>`.
+* server: added `SIGINT` (Ctrl-C) handler to gracefully shutdown Envoy like `SIGTERM`.
 * stats: added :ref:`stats_matcher <envoy_api_field_config.metrics.v2.StatsConfig.stats_matcher>` to the bootstrap config for granular control of stat instantiation.
 * stream: renamed the `RequestInfo` namespace to `StreamInfo` to better match
   its behaviour within TCP and HTTP implementations.
 * stream: renamed `perRequestState` to `filterState` in `StreamInfo`.
-* thrift_proxy: introduced thrift rate limiter filter
-* tls: add support for :ref:`client-side session resumption <envoy_api_field_auth.UpstreamTlsContext.max_session_keys>`.
-* tls: add support for CRLs in :ref:`trusted_ca <envoy_api_field_auth.CertificateValidationContext.trusted_ca>`.
+* stream: added `downstreamDirectRemoteAddress` to `StreamInfo`.
+* thrift_proxy: introduced thrift rate limiter filter.
+* tls: added ssl.curves.<curve>, ssl.sigalgs.<sigalg> and ssl.versions.<version> to
+  :ref:`listener metrics <config_listener_stats>` to track TLS algorithms and versions in use.
+* tls: added support for :ref:`client-side session resumption <envoy_api_field_auth.UpstreamTlsContext.max_session_keys>`.
+* tls: added support for CRLs in :ref:`trusted_ca <envoy_api_field_auth.CertificateValidationContext.trusted_ca>`.
+* tls: added support for :ref:`multiple server TLS certificates <arch_overview_ssl_cert_select>`.
+* tls: added support for :ref:`password encrypted private keys <envoy_api_field_auth.TlsCertificate.password>`.
+* tls: added the ability to build :ref:`BoringSSL FIPS <arch_overview_ssl_fips>` using ``--define boringssl=fips`` Bazel option.
+* tls: removed support for ECDSA certificates with curves other than P-256.
+* tls: removed support for RSA certificates with keys smaller than 2048-bits.
 * tracing: added support to the Zipkin tracer for the :ref:`b3 <config_http_conn_man_headers_b3>` single header format.
 * tracing: added support for :ref:`Datadog <arch_overview_tracing>` tracer.
 * upstream: added :ref:`scale_locality_weight<envoy_api_field_Cluster.LbSubsetConfig.scale_locality_weight>` to enable
   scaling locality weights by number of hosts removed by subset lb predicates.
 * upstream: changed how load calculation for :ref:`priority levels<arch_overview_load_balancing_priority_levels>` and :ref:`panic thresholds<arch_overview_load_balancing_panic_threshold>` interact. As long as normalized total health is 100% panic thresholds are disregarded.
 * upstream: changed the default hash for :ref:`ring hash <envoy_api_msg_Cluster.RingHashLbConfig>` from std::hash to `xxHash <https://github.com/Cyan4973/xxHash>`_.
-* ext_authz: authorization request and response configuration has been separated and split into two distinct objects: :ref:`authorization request 
-  <envoy_api_field_config.filter.http.ext_authz.v2alpha.HttpService.authorization_request>` and :ref:`authorization response 
-  <envoy_api_field_config.filter.http.ext_authz.v2alpha.HttpService.authorization_response>`. In addition :ref:`client headers 
-  <envoy_api_field_config.filter.http.ext_authz.v2alpha.AuthorizationResponse.allowed_client_headers>` and :ref:`upstream headers 
-  <envoy_api_field_config.filter.http.ext_authz.v2alpha.AuthorizationResponse.allowed_upstream_headers>` which replaces the old *allowed_authorization_headers* object and also supports :ref:`string matcher <envoy_api_msg_type.matcher.StringMatcher>`.
 * upstream: when using active health checking and STRICT_DNS with several addresses that resolve
   to the same hosts, Envoy will now health check each host independently.
 

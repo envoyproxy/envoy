@@ -38,20 +38,23 @@ class FilterConfig {
 public:
   FilterConfig(const envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz& config,
                const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
-               Runtime::Loader& runtime)
+               Runtime::Loader& runtime, Http::Context& http_context)
       : failure_mode_allow_(config.failure_mode_allow()), local_info_(local_info), scope_(scope),
-        runtime_(runtime) {}
+        runtime_(runtime), http_context_(http_context) {}
 
   bool failureModeAllow() const { return failure_mode_allow_; }
   const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
   Runtime::Loader& runtime() { return runtime_; }
   Stats::Scope& scope() { return scope_; }
 
+  Http::Context& httpContext() { return http_context_; }
+
 private:
   bool failure_mode_allow_{};
   const LocalInfo::LocalInfo& local_info_;
   Stats::Scope& scope_;
   Runtime::Loader& runtime_;
+  Http::Context& http_context_;
 };
 
 typedef std::shared_ptr<FilterConfig> FilterConfigSharedPtr;

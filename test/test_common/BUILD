@@ -167,6 +167,7 @@ envoy_cc_test_library(
     hdrs = ["test_time_system.h"],
     deps = [
         "//include/envoy/event:timer_interface",
+        "//source/common/common:thread_lib",
     ],
 )
 
