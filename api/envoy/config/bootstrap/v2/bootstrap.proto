@@ -6,6 +6,8 @@
 syntax = "proto3";
 
 package envoy.config.bootstrap.v2;
+option java_package = "io.envoyproxy.envoy.config.bootstrap.v2";
+option java_multiple_files = true;
 option go_package = "v2";
 
 import "envoy/api/v2/core/address.proto";
