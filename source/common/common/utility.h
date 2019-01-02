@@ -501,6 +501,17 @@ struct StringViewHash {
 };
 
 /**
+ * Hashing functor for use with enum class types.
+ * This is needed for GCC 5.X; newer versions of GCC, as well as clang7, provide native hashing
+ * specializations.
+ */
+struct EnumClassHash {
+  template <typename T> std::size_t operator()(T t) const {
+    return std::hash<std::size_t>()(static_cast<std::size_t>(t));
+  }
+};
+
+/**
  * Computes running standard-deviation using Welford's algorithm:
  * https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Online_algorithm
  */
