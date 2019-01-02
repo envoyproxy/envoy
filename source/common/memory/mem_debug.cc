@@ -15,14 +15,6 @@
 // bytes are used to store size of the allocation, which helps us
 // know how many bytes to scribble when we free.
 //
-// Note: this memory debugging will interfere with Valgrind's ability to
-// detect read-before-write errors, and hence should be disabled if you
-// want to run with valgrind. This can be detected automatically using
-// macros from valgrind.h, but then that would *require* valgrind be installed
-// before building mod_pagespeed. See
-//
-// http://valgrind.org/docs/manual/manual-core-adv.html#manual-core-adv.clientreq
-
 // This code was adapted from mod_pagespeed, and adapted for Envoy
 // style. Original source:
 // https://github.com/apache/incubator-pagespeed-mod/blob/master/pagespeed/kernel/base/mem_debug.cc
