@@ -23,7 +23,8 @@ namespace Upstream {
   COUNTER(passive_failure)                                                                         \
   COUNTER(network_failure)                                                                         \
   COUNTER(verify_cluster)                                                                          \
-  GAUGE  (healthy)
+  GAUGE  (healthy)                                                                                 \
+  GAUGE  (degraded)
 // clang-format on
 
 /**
@@ -110,8 +111,10 @@ private:
 
   void addHosts(const HostVector& hosts);
   void decHealthy();
+  void decDegraded();
   HealthCheckerStats generateStats(Stats::Scope& scope);
   void incHealthy();
+  void incDegraded();
   std::chrono::milliseconds interval(HealthState state, HealthTransition changed_state) const;
   void onClusterMemberUpdate(const HostVector& hosts_added, const HostVector& hosts_removed);
   void refreshHealthyStat();
@@ -130,6 +133,7 @@ private:
   const std::chrono::milliseconds healthy_edge_interval_;
   std::unordered_map<HostSharedPtr, ActiveHealthCheckSessionPtr> active_sessions_;
   uint64_t local_process_healthy_{};
+  uint64_t local_process_degraded_{};
 };
 
 class HealthCheckEventLoggerImpl : public HealthCheckEventLogger {

@@ -44,6 +44,12 @@ void HealthCheckerImplBase::decHealthy() {
   refreshHealthyStat();
 }
 
+void HealthCheckerImplBase::decDegraded() {
+  ASSERT(local_process_degraded_ > 0);
+  local_process_degraded_--;
+  refreshHealthyStat();
+}
+
 HealthCheckerStats HealthCheckerImplBase::generateStats(Stats::Scope& scope) {
   std::string prefix("health_check.");
   return {ALL_HEALTH_CHECKER_STATS(POOL_COUNTER_PREFIX(scope, prefix),
@@ -52,6 +58,11 @@ HealthCheckerStats HealthCheckerImplBase::generateStats(Stats::Scope& scope) {
 
 void HealthCheckerImplBase::incHealthy() {
   local_process_healthy_++;
+  refreshHealthyStat();
+}
+
+void HealthCheckerImplBase::incDegraded() {
+  local_process_degraded_++;
   refreshHealthyStat();
 }
 
@@ -132,6 +143,7 @@ void HealthCheckerImplBase::refreshHealthyStat() {
   // Each hot restarted process health checks independently. To make the stats easier to read,
   // we assume that both processes will converge and the last one that writes wins for the host.
   stats_.healthy_.set(local_process_healthy_);
+  stats_.degraded_.set(local_process_degraded_);
 }
 
 void HealthCheckerImplBase::runCallbacks(HostSharedPtr host, HealthTransition changed_state) {
@@ -193,11 +205,18 @@ HealthCheckerImplBase::ActiveHealthCheckSession::ActiveHealthCheckSession(
   if (!host->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
     parent.incHealthy();
   }
+
+  if (!host->healthFlagGet(Host::HealthFlag::DEGRADED_ACTIVE_HC)) {
+    parent.incDegraded(); 
+  }
 }
 
 HealthCheckerImplBase::ActiveHealthCheckSession::~ActiveHealthCheckSession() {
   if (!host_->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
     parent_.decHealthy();
+  }
+  if (!host_->healthFlagGet(Host::HealthFlag::DEGRADED_ACTIVE_HC)) {
+    parent_.decDegraded();
   }
 }
 
@@ -226,6 +245,7 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::handleSuccess(bool degrade
   if (degraded != host_->healthFlagGet(Host::HealthFlag::DEGRADED_ACTIVE_HC)) {
     if (degraded) {
       host_->healthFlagSet(Host::HealthFlag::DEGRADED_ACTIVE_HC);
+      parent_.incDegraded();
     } else {
       host_->healthFlagClear(Host::HealthFlag::DEGRADED_ACTIVE_HC);
     }
