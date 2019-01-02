@@ -188,7 +188,7 @@ TEST(UtilityTest, UnixClusterDns) {
   Stats::StatsOptionsImpl stats_options;
   EXPECT_THROW_WITH_MESSAGE(
       Config::CdsJson::translateCluster(*json_object_ptr, eds_config, cluster, stats_options),
-      EnvoyException, "unresolved URL must be TCP scheme, got: unix:///test.sock");
+      EnvoyException, "unresolved URL must be TCP or UDP scheme, got: unix:///test.sock");
 }
 
 TEST(UtilityTest, UnixClusterStatic) {
