@@ -33,6 +33,19 @@
 // production performance.
 #ifndef NDEBUG
 
+// We can't run memory debugging with tcmalloc due to conflicts with
+// overriding operator new/delete. Note tcmalloc allows installation
+// of a malloc hook (MallocHook::AddNewHook(&tcmallocHook)) with
+// tcmallocHook(const void* ptr, size_t size). I tried const_casting ptr
+// and scribbling over it, but this results in SEGV in grpc and the
+// internals of gtest.
+//
+// And in any case, you can't use the tcmalloc hooks to do free-scribbling
+// as it does not pass in the size to the free hook. See
+// gperftools/malloc_hook.h for details.
+
+#ifndef TCMALLOC
+
 #include <cstdlib>
 
 #include "common/common/assert.h"
@@ -40,6 +53,9 @@
 namespace {
 
 constexpr int32_t kLiveMarker = 0xfeedface;       // first 4 bytes after alloc
+constexpr int32_t kDeadMarker1 = 0xabacabff;      // first 4 bytes after free
+constexpr int32_t kDeadMarker2 = 0xdeadbeef;      // overwrites the 'size' field on free
+constexpr size_t kOverhead = 2 * sizeof(int32_t); // number of extra bytes to alloc
 
 void scribble(void* ptr, size_t size, int32_t scribble_word) {
   int32_t num_ints = size / sizeof(int32_t);
@@ -48,41 +64,6 @@ void scribble(void* ptr, size_t size, int32_t scribble_word) {
     *p = scribble_word;
   }
 }
-
-} // namespace
-
-// We can't run full memory debugging with tcmalloc due to conflicts with
-// overriding operator new/delete. However we *can* run the pre-allocation
-// scribbling via a hook. We can't post-allocate scribble because the
-// tcmalloc new/delete hooks do not provide the size.
-#ifdef TCMALLOC
-
-#include "gperftools/malloc_hook.h"
-
-namespace {
-
-void tcmallocScribbleHook(const void* ptr, size_t size) {
-  scribble(const_cast<void*>(ptr), size, kLiveMarker);
-}
-
-} // namespace
-
-#undef INSTALL_HOOKS
-#define INSTALL_HOOKS { \
-  static bool init = false; \
-  if (!init) { \
-    init = true; \
-    MallocHook::AddNewHook(&tcmallocScribbleHook); \
-  } \
-}
-
-#else
-
-namespace {
-
-constexpr int32_t kDeadMarker1 = 0xabacabff;      // first 4 bytes after free
-constexpr int32_t kDeadMarker2 = 0xdeadbeef;      // overwrites the 'size' field on free
-constexpr size_t kOverhead = 2 * sizeof(int32_t); // number of extra bytes to alloc
 
 size_t roundedSize(size_t size) {
   if (size == 0) {
@@ -126,29 +107,20 @@ void debugFree(void* ptr) {
 #endif
 
 void* operator new(size_t size) { return debugMalloc(size); }
-void operator delete(void* ptr) _GLIBCXX_USE_NOEXCEPT { debugFree(ptr); }
-void operator delete(void* ptr, size_t) _GLIBCXX_USE_NOEXCEPT { debugFree(ptr); }
+void operator delete(void* ptr)_GLIBCXX_USE_NOEXCEPT { debugFree(ptr); }
+void operator delete(void* ptr, size_t)_GLIBCXX_USE_NOEXCEPT { debugFree(ptr); }
 
 void* operator new[](size_t size) { return debugMalloc(size); }
 void operator delete[](void* ptr) _GLIBCXX_USE_NOEXCEPT { debugFree(ptr); }
 void operator delete[](void* ptr, size_t) _GLIBCXX_USE_NOEXCEPT { debugFree(ptr); }
 
-//void* operator new(size_t size, const std::nothrow_t&) __THROW { return debugMalloc(size); }
-//void operator delete(void* ptr) _GLIBCXX_USE_NOEXCEPT { debugFree(ptr); }
-//void operator delete(void* ptr, const std::nothrow_t&)__THROW { debugFree(ptr); }
-//void* operator new[](size_t size, const std::nothrow_t&) __THROW { return debugMalloc(size); }
-//void operator delete[](void* ptr) _GLIBCXX_USE_NOEXCEPT { debugFree(ptr); }
-//void operator delete[](void* ptr, const std::nothrow_t&) __THROW { debugFree(ptr); }
-
-#endif // TCMALLOC
+#endif // !TCMALLOC
 #endif // !NDEBUG
 
 // We provide the entry-point to be called to force-load the memory debugger
 // regardless of compilation mode.
 namespace Envoy {
 
-void MemDebugLoader() {
-  INSTALL_HOOKS
-}
+void MemDebugLoader() {}
 
 } // namespace Envoy

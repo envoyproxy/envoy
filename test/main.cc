@@ -1,8 +1,8 @@
 // NOLINT(namespace-envoy)
+#include "common/memory/mem_debug.h"
+
 #include "test/test_common/environment.h"
 #include "test/test_runner.h"
-
-#include "common/memory/mem_debug.h"
 
 #include "absl/debugging/symbolize.h"
 
