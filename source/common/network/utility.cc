@@ -505,14 +505,14 @@ Address::SocketType
 Utility::protobufAddressSocketType(const envoy::api::v2::core::Address& proto_address) {
   switch (proto_address.address_case()) {
   case envoy::api::v2::core::Address::kSocketAddress: {
-    auto p = proto_address.socket_address().protocol();
-    switch (p) {
+    auto protocol = proto_address.socket_address().protocol();
+    switch (protocol) {
     case envoy::api::v2::core::SocketAddress::TCP:
       return Address::SocketType::Stream;
     case envoy::api::v2::core::SocketAddress::UDP:
       return Address::SocketType::Datagram;
     default:
-      throw EnvoyException(fmt::format("unknown protocol value: {}", p));
+      throw EnvoyException(fmt::format("unknown protocol value: {}", protocol));
     }
   }
   case envoy::api::v2::core::Address::kPipe:

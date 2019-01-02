@@ -25,6 +25,7 @@
 #include "extensions/transport_sockets/well_known_names.h"
 
 #include "absl/strings/match.h"
+#include "absl/strings/str_cat.h"
 
 namespace Envoy {
 namespace Server {
@@ -123,8 +124,10 @@ Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
     return std::make_shared<Network::UdsListenSocket>(address);
   }
 
-  const std::string scheme = (socket_type == Network::Address::SocketType::Stream) ? "tcp" : "udp";
-  const std::string addr = fmt::format("{}://{}", scheme, address->asString());
+  const std::string scheme = (socket_type == Network::Address::SocketType::Stream)
+                                 ? Network::Utility::TCP_SCHEME
+                                 : Network::Utility::UDP_SCHEME;
+  const std::string addr = absl::StrCat(scheme, address->asString());
   const int fd = server_.hotRestart().duplicateParentListenSocket(addr);
   if (fd != -1) {
     ENVOY_LOG(debug, "obtained socket for address {} from parent", addr);
