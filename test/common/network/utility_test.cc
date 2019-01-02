@@ -230,6 +230,10 @@ TEST(NetworkUtility, LocalConnection) {
   remote_addr.reset(new Network::Address::Ipv6Instance(
       Utility::getLocalAddress(Address::IpVersion::v6)->ip()->addressAsString(), 23413));
   EXPECT_TRUE(Utility::isLocalConnection(socket));
+
+  local_addr.reset(new Network::Address::Ipv4Instance("4.4.4.4", 80));
+  remote_addr.reset(new Network::Address::Ipv6Instance("fabc::42", 23413));
+  EXPECT_FALSE(Utility::isLocalConnection(socket));
 }
 
 TEST(NetworkUtility, InternalAddress) {

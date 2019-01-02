@@ -280,6 +280,8 @@ bool Utility::isLocalConnection(const Network::ConnectionSocket& socket) {
         }
       } else {
         const auto* if_addr = reinterpret_cast<const struct sockaddr_in6*>(ifa->ifa_addr);
+        static_assert(sizeof(absl::uint128) == sizeof(if_addr->sin6_addr.s6_addr),
+                      "sizeof(absl::uint128) != sizeof(if_addr->sin6_addr.s6_addr)");
         const absl::uint128 remote_v6addr = remote_address->ip()->ipv6()->address();
         if (memcmp(&remote_v6addr, &if_addr->sin6_addr.s6_addr, sizeof(absl::uint128)) == 0) {
           return true;
@@ -343,8 +345,8 @@ bool Utility::isLoopbackAddress(const Address::Instance& address) {
 
 bool Utility::isSameIPAddress(const Address::Instance& address1,
                               const Address::Instance& address2) {
-  ASSERT(address1.type() == Address::Type::Ip);
-  if (address1.ip()->version() != address2.ip()->version()) {
+  if (address1.ip() == nullptr || address2.ip() == nullptr ||
+      address1.ip()->version() != address2.ip()->version()) {
     return false;
   }
 
