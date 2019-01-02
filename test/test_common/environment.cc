@@ -124,7 +124,7 @@ absl::optional<std::string> TestEnvironment::getOptionalEnvVar(const std::string
 
 std::string TestEnvironment::getCheckedEnvVar(const std::string& var) {
   auto optional = getOptionalEnvVar(var);
-  RELEASE_ASSERT(optional.has_value(), "");
+  RELEASE_ASSERT(optional.has_value(), var);
   return optional.value();
 }
 

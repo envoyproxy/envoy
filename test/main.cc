@@ -34,8 +34,6 @@ int main(int argc, char** argv) {
   // v4 and v6 addresses is desired. This feature is in progress and will be rolled out to all tests
   // in upcoming PRs.
   Envoy::TestEnvironment::setEnvVar("ENVOY_IP_TEST_VERSIONS", "all", 0);
-#ifndef NDEBUG
   Envoy::MemDebugLoader();
-#endif
   return Envoy::TestRunner::RunTests(argc, argv);
 }

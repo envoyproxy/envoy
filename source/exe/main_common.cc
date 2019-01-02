@@ -6,6 +6,7 @@
 #include "common/common/compiler_requirements.h"
 #include "common/common/perf_annotation.h"
 #include "common/event/libevent.h"
+#include "common/memory/mem_debug.h"
 #include "common/network/utility.h"
 #include "common/stats/thread_local_store.h"
 
@@ -46,6 +47,7 @@ MainCommonBase::MainCommonBase(OptionsImpl& options, Event::TimeSystem& time_sys
                                Thread::ThreadFactory& thread_factory)
     : options_(options), component_factory_(component_factory), thread_factory_(thread_factory) {
   ares_library_init(ARES_LIB_INIT_ALL);
+  Envoy::MemDebugLoader();
   Event::Libevent::Global::initialize();
   RELEASE_ASSERT(Envoy::Server::validateProtoDescriptors(), "");
 
