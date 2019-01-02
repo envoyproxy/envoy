@@ -41,8 +41,8 @@ void MySQLFilter::doDecode(Buffer::Instance& buffer) {
   }
 
   // Clear dynamic metadata.
-  auto& dynamic_metadata = const_cast<envoy::api::v2::core::Metadata&>(
-      read_callbacks_->connection().streamInfo().dynamicMetadata());
+  envoy::api::v2::core::Metadata& dynamic_metadata =
+      read_callbacks_->connection().streamInfo().dynamicMetadata();
   auto& metadata =
       (*dynamic_metadata.mutable_filter_metadata())[NetworkFilterNames::get().MySQLProxy];
   metadata.mutable_fields()->clear();
@@ -111,8 +111,8 @@ void MySQLFilter::onCommand(Command& command) {
   config_->stats_.queries_parsed_.inc();
 
   // Set dynamic metadata
-  auto& dynamic_metadata = const_cast<envoy::api::v2::core::Metadata&>(
-      read_callbacks_->connection().streamInfo().dynamicMetadata());
+  envoy::api::v2::core::Metadata& dynamic_metadata =
+      read_callbacks_->connection().streamInfo().dynamicMetadata();
   ProtobufWkt::Struct metadata(
       (*dynamic_metadata.mutable_filter_metadata())[NetworkFilterNames::get().MySQLProxy]);
   auto& fields = *metadata.mutable_fields();
