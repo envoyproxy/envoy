@@ -172,13 +172,23 @@ bool InstanceImpl::healthCheckFailed() { return server_stats_->live_.value() == 
 InstanceUtil::BootstrapVersion
 InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& bootstrap,
                                   Options& options) {
+  const std::string& config_path = options.configPath();
+  const std::string& config_yaml = options.configYaml();
+
+  // Exactly one of config_path and config_yaml should be specified.
+  if (config_path.empty() && config_yaml.empty()) {
+    const std::string message =
+        "At least one of --config-path and --config-yaml should be non-empty";
+    std::cerr << message << std::endl;
+    throw EnvoyException(message);
+  }
   try {
-    if (!options.configPath().empty()) {
-      MessageUtil::loadFromFile(options.configPath(), bootstrap);
+    if (!config_path.empty()) {
+      MessageUtil::loadFromFile(config_path, bootstrap);
     }
-    if (!options.configYaml().empty()) {
+    if (!config_yaml.empty()) {
       envoy::config::bootstrap::v2::Bootstrap bootstrap_override;
-      MessageUtil::loadFromYaml(options.configYaml(), bootstrap_override);
+      MessageUtil::loadFromYaml(config_yaml, bootstrap_override);
       bootstrap.MergeFrom(bootstrap_override);
     }
     MessageUtil::validate(bootstrap);
@@ -190,10 +200,10 @@ InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& boots
     // TODO(htuch): When v1 is deprecated, make this a warning encouraging config upgrade.
     ENVOY_LOG(debug, "Unable to initialize config as v2, will retry as v1: {}", e.what());
   }
-  if (!options.configYaml().empty()) {
+  if (!config_yaml.empty()) {
     throw EnvoyException("V1 config (detected) with --config-yaml is not supported");
   }
-  Json::ObjectSharedPtr config_json = Json::Factory::loadFromFile(options.configPath());
+  Json::ObjectSharedPtr config_json = Json::Factory::loadFromFile(config_path);
   Config::BootstrapJson::translateBootstrap(*config_json, bootstrap, options.statsOptions());
   MessageUtil::validate(bootstrap);
   return BootstrapVersion::V1;
