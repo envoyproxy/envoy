@@ -9,8 +9,8 @@ load(
 envoy_package()
 
 envoy_cc_test(
-    name = "thread_singleton_test",
-    srcs = ["thread_singleton_test.cc"],
+    name = "thread_factory_singleton_test",
+    srcs = ["thread_factory_singleton_test.cc"],
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/thread:thread_factory_singleton_lib",
