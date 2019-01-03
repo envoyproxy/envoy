@@ -48,9 +48,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/eile/tclap/archive/tclap-1-2-1-release-final.tar.gz"],
     ),
     com_github_fmtlib_fmt = dict(
-        sha256 = "43894ab8fe561fc9e523a8024efc23018431fa86b95d45b06dbe6ddb29ffb6cd",
-        strip_prefix = "fmt-5.2.1",
-        urls = ["https://github.com/fmtlib/fmt/releases/download/5.2.1/fmt-5.2.1.zip"],
+        sha256 = "4c0741e10183f75d7d6f730b8708a99b329b2f942dad5a9da3385ab92bb4a15c",
+        strip_prefix = "fmt-5.3.0",
+        urls = ["https://github.com/fmtlib/fmt/releases/download/5.3.0/fmt-5.3.0.zip"],
     ),
     com_github_gabime_spdlog = dict(
         sha256 = "867a4b7cedf9805e6f76d3ca41889679054f7e5a3b67722fe6d0eae41852a767",
@@ -69,15 +69,14 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/google/libprotobuf-mutator/archive/c3d2faf04a1070b0b852b0efdef81e1a81ba925e.tar.gz"],
     ),
     com_github_grpc_grpc = dict(
-        sha256 = "d99db0b39b490d2469a8ef74197d5f211fa740fc9581dccecbb76c56d080fce1",
-        strip_prefix = "grpc-1.16.0",
-        urls = ["https://github.com/grpc/grpc/archive/v1.16.0.tar.gz"],
+        sha256 = "a5342629fe1b689eceb3be4d4f167b04c70a84b9d61cf8b555e968bc500bdb5a",
+        strip_prefix = "grpc-1.16.1",
+        urls = ["https://github.com/grpc/grpc/archive/v1.16.1.tar.gz"],
     ),
     com_github_nanopb_nanopb = dict(
-        # From: https://github.com/grpc/grpc/blob/v1.14.0/bazel/grpc_deps.bzl#L123
-        sha256 = "8bbbb1e78d4ddb0a1919276924ab10d11b631df48b657d960e0c795a25515735",
-        strip_prefix = "nanopb-f8ac463766281625ad710900479130c7fcb4d63b",
-        urls = ["https://github.com/nanopb/nanopb/archive/f8ac463766281625ad710900479130c7fcb4d63b.tar.gz"],
+        sha256 = "b8dd5cb0d184d424ddfea13ddee3f7b0920354334cbb44df434d55e5f0086b12",
+        strip_prefix = "nanopb-0.3.9.2",
+        urls = ["https://github.com/nanopb/nanopb/archive/0.3.9.2.tar.gz"],
     ),
     io_opentracing_cpp = dict(
         sha256 = "4455ca507936bc4b658ded10a90d8ebbbd61c58f06207be565a4ffdc885687b5",
@@ -160,9 +159,9 @@ REPOSITORY_LOCATIONS = dict(
         strip_prefix = "protobuf-fa252ec2a54acb24ddc87d48fed1ecfd458445fd",
         # TODO(htuch): Switch back to released versions for protobuf when a release > 3.6.0 happens
         # that includes:
-        # - https://github.com/google/protobuf/commit/f35669b8d3f46f7f1236bd21f14d744bba251e60
-        # - https://github.com/google/protobuf/commit/6a4fec616ec4b20f54d5fb530808b855cb664390
-        # - https://github.com/google/protobuf/commit/fa252ec2a54acb24ddc87d48fed1ecfd458445fd
+        # - https://github.com/protocolbuffers/protobuf/commit/f35669b8d3f46f7f1236bd21f14d744bba251e60
+        # - https://github.com/protocolbuffers/protobuf/commit/6a4fec616ec4b20f54d5fb530808b855cb664390
+        # - https://github.com/protocolbuffers/protobuf/commit/fa252ec2a54acb24ddc87d48fed1ecfd458445fd
         urls = ["https://github.com/protocolbuffers/protobuf/archive/fa252ec2a54acb24ddc87d48fed1ecfd458445fd.tar.gz"],
     ),
     grpc_httpjson_transcoding = dict(
