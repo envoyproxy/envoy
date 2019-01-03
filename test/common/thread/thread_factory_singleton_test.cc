@@ -10,7 +10,11 @@ namespace Thread {
 namespace {
 
 struct ThreadFactorySingletonTest {
-  ThreadFactorySingletonTest() : run_tid_(ThreadFactorySingleton::get()->currentThreadId()) {}
+  ThreadFactorySingletonTest() {
+#ifndef NDEBUG
+    run_tid_ = Envoy::Thread::ThreadFactorySingleton::get()->currentThreadId();
+#endif
+  }
 
   void checkThreadId() const { ASSERT(run_tid_->isCurrentThreadId()); };
 
@@ -26,7 +30,8 @@ TEST(ThreadFactorySingleton, BasicDeathTest) {
   // Use std::thread instead of the ThreadFactory's createThread() to avoid the dependency on the
   // code under test.
   std::thread thread([&singleton_test]() {
-    ASSERT_DEATH(singleton_test.checkThreadId(), "assert failure: run_tid_->isCurrentThreadId()");
+    EXPECT_DEBUG_DEATH(singleton_test.checkThreadId(),
+                       "assert failure: run_tid_->isCurrentThreadId()");
   });
   thread.join();
 }
