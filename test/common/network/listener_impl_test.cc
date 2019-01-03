@@ -117,9 +117,8 @@ protected:
       return;
     }
 
-    addr.ss_family = AF_INET;
-
     if (version_ == Address::IpVersion::v4) {
+      addr.ss_family = AF_INET;
       auto const* ipv4 = ip->ipv4();
       if (!ipv4) {
         sz = 0;
@@ -132,6 +131,7 @@ protected:
 
       sz = sizeof(sockaddr_in);
     } else if (version_ == Address::IpVersion::v6) {
+      addr.ss_family = AF_INET6;
       auto const* ipv6 = ip->ipv6();
       if (!ipv6) {
         sz = 0;
@@ -242,11 +242,6 @@ TEST_P(ListenerImplTest, UseActualDstTcp) {
 }
 
 TEST_P(ListenerImplTest, UseActualDstUdp) {
-  // TODO(conqerAtapple): Add implementation for v6.
-  if (version_ == Address::IpVersion::v6) {
-    return;
-  }
-
   SocketPtr server_socket =
       getSocket(Address::SocketType::Datagram, Network::Test::getCanonicalLoopbackAddress(version_),
                 nullptr, true);
@@ -274,12 +269,15 @@ TEST_P(ListenerImplTest, UseActualDstUdp) {
   if (version_ == Address::IpVersion::v4) {
     struct sockaddr_in* servaddr = reinterpret_cast<struct sockaddr_in*>(&server_addr);
     servaddr->sin_port = htons(server_ip->port());
+  } else if (version_ == Address::IpVersion::v6) {
+    struct sockaddr_in6* servaddr = reinterpret_cast<struct sockaddr_in6*>(&server_addr);
+    servaddr->sin6_port = htons(server_ip->port());
   }
 
   const std::string first("first");
   const std::string second("second");
 
-  auto send_rc = ::sendto(client_sockfd, first.c_str(), first.length(), MSG_CONFIRM,
+  auto send_rc = ::sendto(client_sockfd, first.c_str(), first.length(), 0,
                           reinterpret_cast<const struct sockaddr*>(&server_addr), addr_len);
 
   ASSERT_EQ(send_rc, first.length());
