@@ -4,6 +4,19 @@
 
 namespace Envoy {
 
+// CONDITION_STR is needed to prevent macros in condition from being expected, which obfuscates
+// the logged failure, eg "EAGAIN" vs "11".
+#define _ASSERT_IMPL(CONDITION, CONDITION_STR, ACTION, DETAILS)                                    \
+  do {                                                                                             \
+    if (!(CONDITION)) {                                                                            \
+      const std::string& details = (DETAILS);                                                      \
+      ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::assert), critical,    \
+                          "assert failure: {}.{}{}", CONDITION_STR,                                \
+                          details.empty() ? "" : " Details: ", details);                           \
+      ACTION;                                                                                      \
+    }                                                                                              \
+  } while (false)
+
 /**
  * assert macro that uses our builtin logging which gives us thread ID and can log to various
  * sinks.
@@ -17,20 +30,18 @@ namespace Envoy {
  * RELEASE_ASSERT(foo == bar, "reason foo should actually be bar");
  * new uses of RELEASE_ASSERT should supply a verbose explanation of what went wrong.
  */
-#define RELEASE_ASSERT(X, DETAILS)                                                                 \
-  do {                                                                                             \
-    if (!(X)) {                                                                                    \
-      const std::string& details = (DETAILS);                                                      \
-      ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::assert), critical,    \
-                          "assert failure: {}.{}{}", #X,                                           \
-                          details.empty() ? "" : " Details: ", details);                           \
-      abort();                                                                                     \
-    }                                                                                              \
-  } while (false)
+#define RELEASE_ASSERT(X, DETAILS) _ASSERT_IMPL(X, #X, abort(), DETAILS)
 
-#ifndef NDEBUG
-#define _ASSERT_ORIGINAL(X) RELEASE_ASSERT(X, "")
-#define _ASSERT_VERBOSE(X, Y) RELEASE_ASSERT(X, Y)
+#if !defined(NDEBUG) || defined(ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE)
+
+#if !defined(NDEBUG)
+#define ASSERT_ACTION abort()
+#else // !defined(NDEBUG) && defined(ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE)
+#define ASSERT_ACTION ;
+#endif
+
+#define _ASSERT_ORIGINAL(X) _ASSERT_IMPL(X, #X, ASSERT_ACTION, "")
+#define _ASSERT_VERBOSE(X, Y) _ASSERT_IMPL(X, #X, ASSERT_ACTION, Y)
 #define _ASSERT_SELECTOR(_1, _2, ASSERT_MACRO, ...) ASSERT_MACRO
 
 // If ASSERT is called with one argument, the ASSERT_SELECTOR will return

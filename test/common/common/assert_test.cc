@@ -1,5 +1,7 @@
 #include "common/common/assert.h"
 
+#include "test/test_common/logging.h"
+
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -18,10 +20,15 @@ TEST(Assert, VariousLogs) {
   EXPECT_DEATH({ ASSERT(0); }, ".*assert failure: 0.*");
   EXPECT_DEATH({ ASSERT(0, ""); }, ".*assert failure: 0.*");
   EXPECT_DEATH({ ASSERT(0, "With some logs"); }, ".*assert failure: 0. Details: With some logs.*");
+#elif defined(ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE)
+  EXPECT_LOG_CONTAINS("critical", "assert failure: 0", ASSERT(0));
+  EXPECT_LOG_CONTAINS("critical", "assert failure: 0", ASSERT(0, ""));
+  EXPECT_LOG_CONTAINS("critical", "assert failure: 0. Details: With some logs",
+                      ASSERT(0, "With some logs"));
 #else
-  ASSERT(0);
-  ASSERT(0, "");
-  ASSERT(0, "With some logs");
+  EXPECT_NO_LOGS(ASSERT(0));
+  EXPECT_NO_LOGS(ASSERT(0, ""));
+  EXPECT_NO_LOGS(ASSERT(0, "With some logs"));
 #endif
 }
 
