@@ -1,4 +1,6 @@
 // NOLINT(namespace-envoy)
+#include "envoy/thread/thread.h"
+
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 #include "test/test_runner.h"
@@ -20,8 +22,7 @@ int main(int argc, char** argv) {
   Envoy::SignalAction handle_sigs;
 #endif
 
-  // Initialize the debug only, globally accessible Thread::threadFactorySingleton.
-  Envoy::Thread::initializeThreadFactorySingleton();
+  Envoy::Thread::ThreadFactorySingleton::set(&Envoy::Thread::threadFactoryForTest());
 
   Envoy::TestEnvironment::setEnvVar("TEST_RUNDIR",
                                     (Envoy::TestEnvironment::getCheckedEnvVar("TEST_SRCDIR") + "/" +

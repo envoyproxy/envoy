@@ -51,14 +51,26 @@ public:
   virtual ThreadIdPtr currentThreadId() PURE;
 };
 
+#ifndef NDEBUG
 /**
- * A globally accessible singleton pointing to the ThreadFactory instance corresponding to the
- * build platform.
+ * A debug only static singleton to the ThreadFactory corresponding to the build platform.
  *
- * This singleton is only intended for use with debug builds. Any reference to this variable in a
- * non debug statement will trigger an undefined reference linker warning.
+ * The singleton must be initialized via set() early in main() with the appropriate ThreadFactory
+ * (see source/exe/{posix,win32}/platform_impl.h).
+ *
+ * Debug only statements (such as ASSERT()) can then access the global ThreadFactory instance via
+ * get().
  */
-extern ThreadFactory* threadFactorySingleton;
+class ThreadFactorySingleton {
+public:
+  static ThreadFactory* get() { return thread_factory_; }
+
+  static void set(ThreadFactory* thread_factory) { thread_factory_ = thread_factory; }
+
+private:
+  static ThreadFactory* thread_factory_;
+};
+#endif
 
 /**
  * Like the C++11 "basic lockable concept" but a pure virtual interface vs. a template, and

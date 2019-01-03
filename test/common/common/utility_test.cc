@@ -823,30 +823,4 @@ TEST(DateFormatter, FromTimeSameWildcard) {
             DateFormatter("%Y-%m-%dT%H:%M:%S.000Z%1f%2f").fromTime(time1));
 }
 
-namespace {
-
-struct ThreadFactorySingletonTest {
-  ThreadFactorySingletonTest() : run_tid_(Thread::threadFactorySingleton->currentThreadId()) {}
-
-  void checkThreadId() const { ASSERT(run_tid_->isCurrentThreadId()); };
-
-  Thread::ThreadIdPtr run_tid_;
-};
-
-} // namespace
-
-// Verify that Thread::threadFactorySingleton is defined and initialized for tests.
-TEST(ThreadFactorySingleton, BasicDeathTest) {
-  ::testing::FLAGS_gtest_death_test_style = "threadsafe";
-
-  // Verify that an ASSERT() will trigger due to a thread ID mismatch.
-  ThreadFactorySingletonTest singleton_test;
-  // Use std::thread instead of the ThreadFactory's createThread() to avoid the depedency on the
-  // code under test.
-  std::thread thread([&singleton_test]() {
-    ASSERT_DEATH(singleton_test.checkThreadId(), "assert failure: run_tid_->isCurrentThreadId()");
-  });
-  thread.join();
-}
-
 } // namespace Envoy

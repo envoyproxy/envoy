@@ -27,14 +27,6 @@
 
 namespace Envoy {
 
-#ifndef NDEBUG
-// Define the threadFactorySingleton _only_ in debug builds. This approach enables the use of this
-// global accessor for debug only statements such as assertions. Access to the thread factory in non
-// debug statements must be accomplished via the thread factory instance passed through the
-// MainCommonBase() constructor.
-Thread::ThreadFactory* Thread::threadFactorySingleton{nullptr};
-#endif
-
 Server::DrainManagerPtr ProdComponentFactory::createDrainManager(Server::Instance& server) {
   // The global drain manager only triggers on listener modification, which effectively is
   // hot restart at the global level. The per-listener drain managers decide whether to
@@ -54,8 +46,7 @@ MainCommonBase::MainCommonBase(OptionsImpl& options, Event::TimeSystem& time_sys
                                Thread::ThreadFactory& thread_factory)
     : options_(options), component_factory_(component_factory), thread_factory_(thread_factory) {
 #ifndef NDEBUG
-  // See comment above in the variable definition for explanation regarding debug only restriction.
-  Thread::threadFactorySingleton = &thread_factory_;
+  Thread::ThreadFactorySingleton::set(&thread_factory_);
 #endif
   ares_library_init(ARES_LIB_INIT_ALL);
   Event::Libevent::Global::initialize();
@@ -101,8 +92,7 @@ MainCommonBase::MainCommonBase(OptionsImpl& options, Event::TimeSystem& time_sys
 
 MainCommonBase::~MainCommonBase() {
 #ifndef NDEBUG
-  // See comment above in the variable definition for explanation regarding debug only restriction.
-  Thread::threadFactorySingleton = nullptr;
+  Thread::ThreadFactorySingleton::set(nullptr);
 #endif
   ares_library_cleanup();
 }

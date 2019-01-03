@@ -472,14 +472,6 @@ public:
 
 namespace Thread {
 ThreadFactory& threadFactoryForTest();
-
-/**
- * Initializes the Thread::threadFactorySingleton exposed globally to debug builds.
- *
- * This function _must_ be called prior to calling static functions and/or instantiating Envoy
- * classes defined under include/ and source/.
- */
-void initializeThreadFactorySingleton();
 } // namespace Thread
 
 namespace Api {
