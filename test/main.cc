@@ -22,7 +22,10 @@ int main(int argc, char** argv) {
   Envoy::SignalAction handle_sigs;
 #endif
 
+#ifndef NDEBUG
+  // The ThreadFactorySingleton is enabled only for debug builds.
   Envoy::Thread::ThreadFactorySingleton::set(&Envoy::Thread::threadFactoryForTest());
+#endif
 
   Envoy::TestEnvironment::setEnvVar("TEST_RUNDIR",
                                     (Envoy::TestEnvironment::getCheckedEnvVar("TEST_SRCDIR") + "/" +
