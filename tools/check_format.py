@@ -38,6 +38,9 @@ REAL_TIME_WHITELIST = ('./source/common/common/utility.h',
                        './test/test_common/utility.cc', './test/test_common/utility.h',
                        './test/integration/integration.h')
 
+# Files in these paths can use std::get_time
+GET_TIME_WHITELIST = ('./test/test_common/utility.cc')
+
 CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-7")
 BUILDIFIER_PATH = os.getenv("BUILDIFIER_BIN", "$GOPATH/bin/buildifier")
 ENVOY_BUILD_FIXER_PATH = os.path.join(
@@ -141,6 +144,27 @@ def checkNamespace(file_path):
   return []
 
 
+def checkJavaProtoOptions(file_path):
+  java_multiple_files = False
+  java_package_correct = False
+  for line in fileinput.FileInput(file_path):
+    if "option java_multiple_files = true;" in line:
+      java_multiple_files = True
+    if "option java_package = \"io.envoyproxy.envoy" in line:
+      java_package_correct = True
+    if java_multiple_files and java_package_correct:
+      return []
+
+  error_messages = []
+  if not java_multiple_files:
+    error_messages.append(
+        "Java proto option 'java_multiple_files' not set correctly for file: %s" % file_path)
+  if not java_package_correct:
+    error_messages.append(
+        "Java proto option 'java_package' not set correctly for file: %s" % file_path)
+  return error_messages
+
+
 # To avoid breaking the Lyft import, we just check for path inclusion here.
 def whitelistedForProtobufDeps(file_path):
   return (file_path.endswith(PROTO_SUFFIX) or file_path.endswith(REPOSITORIES_BZL) or \
@@ -152,6 +176,10 @@ def whitelistedForProtobufDeps(file_path):
 # they need to be used, e.g. through the ServerInstance, Dispatcher, or ClusterManager.
 def whitelistedForRealTime(file_path):
   return file_path in REAL_TIME_WHITELIST
+
+
+def whitelistedForGetTime(file_path):
+  return file_path in GET_TIME_WHITELIST
 
 
 def findSubstringAndReturnError(pattern, file_path, error_message):
@@ -273,6 +301,12 @@ def checkSourceLine(line, file_path, reportError):
        'std::chrono::system_clock::now' in line or 'std::chrono::steady_clock::now' in line or \
        'std::this_thread::sleep_for' in line or hasCondVarWaitFor(line):
       reportError("Don't reference real-world time sources from production code; use injection")
+  if not whitelistedForGetTime(file_path):
+    if "std::get_time" in line:
+      if "test/" in file_path:
+        reportError("Don't use std::get_time; use TestUtility::parseTimestamp in tests")
+      else:
+        reportError("Don't use std::get_time; use the injectable time system")
   if 'std::atomic_' in line:
     # The std::atomic_* free functions are functionally equivalent to calling
     # operations on std::atomic<T> objects, so prefer to use that instead.
@@ -359,6 +393,8 @@ def checkSourcePath(file_path):
     command = ("%s %s | diff %s -" % (CLANG_FORMAT_PATH, file_path, file_path))
     error_messages += executeCommand(command, "clang-format check failed", file_path)
 
+  if file_path.endswith(PROTO_SUFFIX) and isApiFile(file_path):
+    error_messages += checkJavaProtoOptions(file_path)
   return error_messages
 
 

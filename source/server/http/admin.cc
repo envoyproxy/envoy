@@ -154,6 +154,31 @@ void populateFallbackResponseHeaders(Http::Code code, Http::HeaderMap& header_ma
   header_map.addReference(headers.XContentTypeOptions, headers.XContentTypeOptionValues.Nosniff);
 }
 
+// Helper method that ensures that we've setting flags based on all the health flag values on the
+// host.
+void setHealthFlag(Upstream::Host::HealthFlag flag, const Upstream::Host& host,
+                   envoy::admin::v2alpha::HostHealthStatus& health_status) {
+  switch (flag) {
+  case Upstream::Host::HealthFlag::FAILED_ACTIVE_HC:
+    health_status.set_failed_active_health_check(
+        host.healthFlagGet(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC));
+    break;
+  case Upstream::Host::HealthFlag::FAILED_OUTLIER_CHECK:
+    health_status.set_failed_outlier_check(
+        host.healthFlagGet(Upstream::Host::HealthFlag::FAILED_OUTLIER_CHECK));
+    break;
+  case Upstream::Host::HealthFlag::FAILED_EDS_HEALTH:
+    health_status.set_eds_health_status(
+        host.healthFlagGet(Upstream::Host::HealthFlag::FAILED_EDS_HEALTH)
+            ? envoy::api::v2::core::HealthStatus::UNHEALTHY
+            : envoy::api::v2::core::HealthStatus::HEALTHY);
+    break;
+  case Upstream::Host::HealthFlag::DEGRADED_ACTIVE_HC:
+    health_status.set_failed_active_degraded_check(
+        host.healthFlagGet(Upstream::Host::HealthFlag::DEGRADED_ACTIVE_HC));
+    break;
+  }
+}
 } // namespace
 
 AdminFilter::AdminFilter(AdminImpl& parent) : parent_(parent) {}
@@ -347,20 +372,21 @@ void AdminImpl::writeClustersAsJson(Buffer::Instance& response) {
 
         envoy::admin::v2alpha::HostHealthStatus& health_status =
             *host_status.mutable_health_status();
-        health_status.set_failed_active_health_check(
-            host->healthFlagGet(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC));
-        health_status.set_failed_outlier_check(
-            host->healthFlagGet(Upstream::Host::HealthFlag::FAILED_OUTLIER_CHECK));
-        health_status.set_eds_health_status(
-            host->healthFlagGet(Upstream::Host::HealthFlag::FAILED_EDS_HEALTH)
-                ? envoy::api::v2::core::HealthStatus::UNHEALTHY
-                : envoy::api::v2::core::HealthStatus::HEALTHY);
+
+// Invokes setHealthFlag for each health flag.
+#define SET_HEALTH_FLAG(name, notused)                                                             \
+  setHealthFlag(Upstream::Host::HealthFlag::name, *host, health_status);
+        HEALTH_FLAG_ENUM_VALUES(SET_HEALTH_FLAG)
+#undef SET_HEALTH_FLAG
+
         double success_rate = host->outlierDetector().successRate(
             Upstream::Outlier::DetectorHostMonitor::externalOrigin);
         if (success_rate >= 0.0) {
           host_status.mutable_success_rate()->set_value(success_rate);
         }
+
         host_status.set_weight(host->weight());
+
         success_rate = host->outlierDetector().successRate(
             Upstream::Outlier::DetectorHostMonitor::localOrigin);
         if (success_rate >= 0.0) {
@@ -531,7 +557,7 @@ Http::Code AdminImpl::handlerLogging(absl::string_view url, Http::HeaderMap&,
   Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
 
   Http::Code rc = Http::Code::OK;
-  if (!changeLogLevel(query_params)) {
+  if (query_params.size() > 0 && !changeLogLevel(query_params)) {
     response.add("usage: /logging?<name>=<level> (change single level)\n");
     response.add("usage: /logging?level=<level> (change all levels)\n");
     response.add("levels: ");

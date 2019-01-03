@@ -360,6 +360,7 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
 
   const uint32_t max_connect_attempts = config_->maxConnectAttempts();
   if (connect_attempts_ >= max_connect_attempts) {
+    getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamRetryLimitExceeded);
     cluster->stats().upstream_cx_connect_attempts_exceeded_.inc();
     onInitFailure(UpstreamFailureReason::CONNECT_FAILED);
     return Network::FilterStatus::StopIteration;

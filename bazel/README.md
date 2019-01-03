@@ -37,7 +37,8 @@ sudo apt-get install \
    clang-format-7 \
    automake \
    ninja-build \
-   curl
+   curl \
+   unzip
 ```
 
 On Fedora (maybe also other red hat distros), run the following:
@@ -53,6 +54,16 @@ _note_: `coreutils` is used for realpath
 
 Envoy compiles and passes tests with the version of clang installed by XCode 9.3.0:
 Apple LLVM version 9.1.0 (clang-902.0.30).
+
+In order for bazel to be aware of the tools installed by brew, the PATH
+variable must be set for bazel builds. This can be accomplished setting
+
+```
+--action_env=PATH=/usr/local/bin:/opt/local/bin:/usr/bin:/bin"
+```
+
+either on the command line when running `bazel build`/`bazel test` or
+in your `$HOME/.bazelrc` file.
 
 3. Install Golang on your machine. This is required as part of building [BoringSSL](https://boringssl.googlesource.com/boringssl/+/HEAD/BUILDING.md)
 and also for [Buildifer](https://github.com/bazelbuild/buildtools) which is used for formatting bazel BUILD files.
@@ -308,6 +319,8 @@ The following optional features can be enabled on the Bazel build command-line:
   those installed via luarocks.
 * Perf annotation with `--define perf_annotation=enabled` (see
   source/common/common/perf_annotation.h for details).
+* BoringSSL can be built in a FIPS-compliant mode with `--define boringssl=fips`
+  (see [FIPS 140-2](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/ssl.html#fips-140-2) for details).
 
 ## Disabling extensions
 
@@ -517,16 +530,4 @@ Adding the following parameter to Bazel everytime or persist them in `.bazelrc`.
 
 ```
 --remote_http_cache=http://127.0.0.1:28080/
-```
-
-## Restrict environment variables
-
-You might need the following parameters for Bazel or persist in `.bazelrc` as well to make cache
-more efficient. This will let Bazel use an environment with a static value for _PATH_ and does
-not inherit _LD_LIBRARY_PATH_ or _TMPDIR_. See
-[Bazel Command-Line References](https://docs.bazel.build/versions/master/command-line-reference.html#flag--experimental_strict_action_env)
-for more information.
-
-```
---experimental_strict_action_env
 ```

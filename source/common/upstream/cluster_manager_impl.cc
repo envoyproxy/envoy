@@ -193,10 +193,6 @@ ClusterManagerImpl::ClusterManagerImpl(
     }
   }
 
-  if (bootstrap.dynamic_resources().deprecated_v1().has_sds_config()) {
-    eds_config_ = bootstrap.dynamic_resources().deprecated_v1().sds_config();
-  }
-
   // Cluster loading happens in two phases: first all the primary clusters are loaded, and then all
   // the secondary clusters are loaded. As it currently stands all non-EDS clusters are primary and
   // only EDS clusters are secondary. This two phase loading is done because in v2 configuration
@@ -235,32 +231,6 @@ ClusterManagerImpl::ClusterManagerImpl(
 
   cm_stats_.cluster_added_.add(bootstrap.static_resources().clusters().size());
   updateGauges();
-
-  // All the static clusters have been loaded. At this point we can check for the
-  // existence of the v1 sds backing cluster, and the ads backing cluster.
-  // TODO(htuch): Add support for multiple clusters, #1170.
-  const ClusterInfoMap loaded_clusters = clusters();
-  if (bootstrap.dynamic_resources().deprecated_v1().has_sds_config()) {
-    const auto& sds_config = bootstrap.dynamic_resources().deprecated_v1().sds_config();
-    switch (sds_config.config_source_specifier_case()) {
-    case envoy::api::v2::core::ConfigSource::kPath: {
-      Config::Utility::checkFilesystemSubscriptionBackingPath(sds_config.path());
-      break;
-    }
-    case envoy::api::v2::core::ConfigSource::kApiConfigSource: {
-      Config::Utility::checkApiConfigSourceSubscriptionBackingCluster(
-          loaded_clusters, sds_config.api_config_source());
-      break;
-    }
-    case envoy::api::v2::core::ConfigSource::kAds: {
-      // Backing cluster will be checked below
-      break;
-    }
-    default:
-      // Validated by schema.
-      NOT_REACHED_GCOVR_EXCL_LINE;
-    }
-  }
 
   absl::optional<std::string> local_cluster_name;
   if (!cm_config.local_cluster_name().empty()) {
@@ -686,18 +656,25 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(const Cluster& cluster, ui
   // TODO(htuch): Can we skip these copies by exporting out const shared_ptr from HostSet?
   HostVectorConstSharedPtr hosts_copy(new HostVector(host_set->hosts()));
   HostVectorConstSharedPtr healthy_hosts_copy(new HostVector(host_set->healthyHosts()));
+  HostVectorConstSharedPtr degraded_hosts_copy(new HostVector(host_set->healthyHosts()));
   HostsPerLocalityConstSharedPtr hosts_per_locality_copy = host_set->hostsPerLocality().clone();
   HostsPerLocalityConstSharedPtr healthy_hosts_per_locality_copy =
       host_set->healthyHostsPerLocality().clone();
+  HostsPerLocalityConstSharedPtr degraded_hosts_per_locality_copy =
+      host_set->degradedHostsPerLocality().clone();
 
-  tls_->runOnAllThreads(
-      [this, name = cluster.info()->name(), priority, hosts_copy, healthy_hosts_copy,
-       hosts_per_locality_copy, healthy_hosts_per_locality_copy,
-       locality_weights = host_set->localityWeights(), hosts_added, hosts_removed]() {
-        ThreadLocalClusterManagerImpl::updateClusterMembership(
-            name, priority, hosts_copy, healthy_hosts_copy, hosts_per_locality_copy,
-            healthy_hosts_per_locality_copy, locality_weights, hosts_added, hosts_removed, *tls_);
-      });
+  tls_->runOnAllThreads([this, name = cluster.info()->name(), priority, hosts_copy,
+                         healthy_hosts_copy, degraded_hosts_copy, hosts_per_locality_copy,
+                         healthy_hosts_per_locality_copy, degraded_hosts_per_locality_copy,
+                         locality_weights = host_set->localityWeights(), hosts_added,
+                         hosts_removed]() {
+    ThreadLocalClusterManagerImpl::updateClusterMembership(
+        name, priority,
+        HostSetImpl::updateHostsParams(hosts_copy, hosts_per_locality_copy, healthy_hosts_copy,
+                                       healthy_hosts_per_locality_copy, degraded_hosts_copy,
+                                       degraded_hosts_per_locality_copy),
+        locality_weights, hosts_added, hosts_removed, *tls_);
+  });
 }
 
 void ClusterManagerImpl::postThreadLocalHealthFailure(const HostSharedPtr& host) {
@@ -939,9 +916,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::removeTcpConn(
 }
 
 void ClusterManagerImpl::ThreadLocalClusterManagerImpl::updateClusterMembership(
-    const std::string& name, uint32_t priority, HostVectorConstSharedPtr hosts,
-    HostVectorConstSharedPtr healthy_hosts, HostsPerLocalityConstSharedPtr hosts_per_locality,
-    HostsPerLocalityConstSharedPtr healthy_hosts_per_locality,
+    const std::string& name, uint32_t priority, HostSet::UpdateHostsParams&& update_hosts_params,
     LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
     const HostVector& hosts_removed, ThreadLocal::Slot& tls) {
 
@@ -952,9 +927,8 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::updateClusterMembership(
   ENVOY_LOG(debug, "membership update for TLS cluster {} added {} removed {}", name,
             hosts_added.size(), hosts_removed.size());
   cluster_entry->priority_set_.getOrCreateHostSet(priority).updateHosts(
-      std::move(hosts), std::move(healthy_hosts), std::move(hosts_per_locality),
-      std::move(healthy_hosts_per_locality), std::move(locality_weights), hosts_added,
-      hosts_removed, absl::nullopt);
+      std::move(update_hosts_params), std::move(locality_weights), hosts_added, hosts_removed,
+      absl::nullopt);
 
   // If an LB is thread aware, create a new worker local LB on membership changes.
   if (cluster_entry->lb_factory_ != nullptr) {
@@ -1211,8 +1185,7 @@ ClusterSharedPtr ProdClusterManagerFactory::clusterFromProto(
     bool added_via_api) {
   return ClusterImplBase::create(cluster, cm, stats_, tls_, dns_resolver_, ssl_context_manager_,
                                  runtime_, random_, main_thread_dispatcher_, log_manager,
-                                 local_info_, outlier_event_logger, added_via_api,
-                                 eds_subscription_factory_);
+                                 local_info_, outlier_event_logger, added_via_api);
 }
 
 CdsApiPtr ProdClusterManagerFactory::createCds(

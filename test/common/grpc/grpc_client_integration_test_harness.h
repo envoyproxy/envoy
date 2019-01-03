@@ -16,6 +16,7 @@
 #include "common/network/connection_impl.h"
 #include "common/network/raw_buffer_socket.h"
 #include "common/ssl/context_config_impl.h"
+#include "common/ssl/ssl_socket.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/common/grpc/utility.h"
@@ -216,7 +217,7 @@ class GrpcClientIntegrationTest : public GrpcClientIntegrationParamTest {
 public:
   GrpcClientIntegrationTest()
       : method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")),
-        dispatcher_(test_time_.timeSystem()), api_(Api::createApiForTest(*stats_store_)) {}
+        api_(Api::createApiForTest(*stats_store_)), dispatcher_(test_time_.timeSystem(), *api_) {}
 
   virtual void initialize() {
     if (fake_upstream_ == nullptr) {
@@ -408,10 +409,10 @@ public:
   FakeHttpConnectionPtr fake_connection_;
   std::vector<FakeStreamPtr> fake_streams_;
   const Protobuf::MethodDescriptor* method_descriptor_;
-  Event::DispatcherImpl dispatcher_;
-  DispatcherHelper dispatcher_helper_{dispatcher_};
   Stats::IsolatedStoreImpl* stats_store_ = new Stats::IsolatedStoreImpl();
   Api::ApiPtr api_;
+  Event::DispatcherImpl dispatcher_;
+  DispatcherHelper dispatcher_helper_{dispatcher_};
   Stats::ScopeSharedPtr stats_scope_{stats_store_};
   TestMetadata service_wide_initial_metadata_;
 #ifdef ENVOY_GOOGLE_GRPC

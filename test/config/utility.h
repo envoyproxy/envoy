@@ -25,6 +25,33 @@ namespace Envoy {
 
 class ConfigHelper {
 public:
+  struct ServerSslOptions {
+    ServerSslOptions& setRsaCert(bool rsa_cert) {
+      rsa_cert_ = rsa_cert;
+      return *this;
+    }
+
+    ServerSslOptions& setEcdsaCert(bool ecdsa_cert) {
+      ecdsa_cert_ = ecdsa_cert;
+      return *this;
+    }
+
+    ServerSslOptions& setTlsV13(bool tlsv1_3) {
+      tlsv1_3_ = tlsv1_3;
+      return *this;
+    }
+
+    ServerSslOptions& setExpectClientEcdsaCert(bool expect_client_ecdsa_cert) {
+      expect_client_ecdsa_cert_ = expect_client_ecdsa_cert;
+      return *this;
+    }
+
+    bool rsa_cert_{true};
+    bool ecdsa_cert_{false};
+    bool tlsv1_3_{false};
+    bool expect_client_ecdsa_cert_{false};
+  };
+
   // Set up basic config, using the specified IpVersion for all connections: listeners, upstream,
   // and admin connections.
   //
@@ -33,7 +60,7 @@ public:
   ConfigHelper(const Network::Address::IpVersion version,
                const std::string& config = HTTP_PROXY_CONFIG);
 
-  static void initializeTls(bool ecdsa_cert, bool tlsv1_3,
+  static void initializeTls(const ServerSslOptions& options,
                             envoy::api::v2::auth::CommonTlsContext& common_context);
 
   typedef std::function<void(envoy::config::bootstrap::v2::Bootstrap&)> ConfigModifierFunction;
@@ -94,7 +121,8 @@ public:
           type);
 
   // Add the default SSL configuration.
-  void addSslConfig(bool ecdsa_cert = false, bool tlsv1_3 = false);
+  void addSslConfig(const ServerSslOptions& options);
+  void addSslConfig() { addSslConfig({}); }
 
   // Renames the first listener to the name specified.
   void renameListener(const std::string& name);

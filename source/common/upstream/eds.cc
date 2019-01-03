@@ -22,22 +22,21 @@ namespace Upstream {
 EdsClusterImpl::EdsClusterImpl(
     const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
     Server::Configuration::TransportSocketFactoryContext& factory_context,
-    Stats::ScopePtr&& stats_scope, bool added_via_api,
-    EdsSubscriptionFactory& eds_subscription_factory)
+    Stats::ScopePtr&& stats_scope, bool added_via_api)
     : BaseDynamicClusterImpl(cluster, runtime, factory_context, std::move(stats_scope),
                              added_via_api),
       cm_(factory_context.clusterManager()), local_info_(factory_context.localInfo()),
       cluster_name_(cluster.eds_cluster_config().service_name().empty()
                         ? cluster.name()
-                        : cluster.eds_cluster_config().service_name()),
-      eds_subscription_factory_(eds_subscription_factory) {
+                        : cluster.eds_cluster_config().service_name()) {
   Config::Utility::checkLocalInfo("eds", local_info_);
 
   const auto& eds_config = cluster.eds_cluster_config().eds_config();
   Event::Dispatcher& dispatcher = factory_context.dispatcher();
   Runtime::RandomGenerator& random = factory_context.random();
   Upstream::ClusterManager& cm = factory_context.clusterManager();
-  subscription_ = eds_subscription_factory_.subscriptionFromConfigSource(
+  subscription_ = Config::SubscriptionFactory::subscriptionFromConfigSource<
+      envoy::api::v2::ClusterLoadAssignment>(
       eds_config, local_info_, dispatcher, cm, random, info_->statsScope(),
       [this, &eds_config, &cm, &dispatcher,
        &random]() -> Config::Subscription<envoy::api::v2::ClusterLoadAssignment>* {
@@ -147,7 +146,7 @@ bool EdsClusterImpl::updateHostsPerLocality(
   // out of the locality scheduler, we discover their new weights. We don't currently have a shared
   // object for locality weights that we can update here, we should add something like this to
   // improve performance and scalability of locality weight updates.
-  if (host_set.overprovisioning_factor() != overprovisioning_factor ||
+  if (host_set.overprovisioningFactor() != overprovisioning_factor ||
       updateDynamicHostList(new_hosts, *current_hosts_copy, hosts_added, hosts_removed,
                             updated_hosts, all_hosts_) ||
       locality_weights_map != new_locality_weights_map) {
