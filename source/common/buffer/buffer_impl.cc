@@ -13,34 +13,20 @@
 namespace Envoy {
 namespace Buffer {
 
-static uint64_t SliceSize(uint64_t data_size) {
-  uint64_t slice_size = 32;
-  while (slice_size < data_size) {
-    slice_size <<= 1;
-    if (slice_size == 0) {
-      // Integer overflow
-      return data_size;
-    }
-  }
-  return slice_size;
-}
-
 class OwnedBufferSlice : public BufferSlice {
 public:
-  OwnedBufferSlice(uint64_t size) : reserved_(0), reservable_(0), size_(SliceSize(size)) {
+  OwnedBufferSlice(uint64_t size) : reserved_(0), reservable_(0), size_(sliceSize(size)) {
     base_ = std::make_unique<uint8_t[]>(size_);
   }
 
   OwnedBufferSlice(const void* data, uint64_t size) : OwnedBufferSlice(size) {
-    memcpy(&(base_[0]), data, size);
+    memcpy(base_.get(), data, size);
     reserved_ = reservable_ = size;
   }
 
   // BufferSlice
   const void* data() const override { return &(base_[data_]); }
-
   void* data() override { return &(base_[data_]); }
-
   uint64_t dataSize() const override { return reserved_ - data_; }
 
   void drain(uint64_t size) override {
@@ -68,8 +54,7 @@ public:
   }
 
   bool commit(const Reservation& reservation, uint64_t size) override {
-    if (static_cast<const uint8_t*>(reservation.first) !=
-            static_cast<const uint8_t*>(&(base_[0])) + reserved_ ||
+    if (static_cast<const uint8_t*>(reservation.first) != base_.get() + reserved_ ||
         reserved_ + size > reservable_) {
       // The reservation is not from this OwnedBufferSlice.
       return false;
@@ -85,6 +70,23 @@ public:
   }
 
 private:
+  /**
+   * Compute a slice size big enough to hold a specified amount of data.
+   * @param data_size the minimum amount of data the slice must be able to store, in bytes.
+   * @ return a recommended slice size, in bytes.
+   */
+  static uint64_t sliceSize(uint64_t data_size) {
+    uint64_t slice_size = 32;
+    while (slice_size < data_size) {
+      slice_size <<= 1;
+      if (slice_size == 0) {
+        // Integer overflow
+        return data_size;
+      }
+    }
+    return slice_size;
+  }
+
   std::unique_ptr<uint8_t[]> base_;
 
   /** Offset in bytes from the start of the slice to the start of the Data section */
