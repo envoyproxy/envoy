@@ -36,7 +36,7 @@
 // as it does not pass in the size to the free hook. See
 // gperftools/malloc_hook.h for details.
 
-#ifndef TCMALLOC
+#if !defined(TCMALLOC) && !defined(ENVOY_DISABLE_MEMDEBUG)
 
 #include <cstdlib>
 
@@ -99,14 +99,14 @@ void debugFree(void* ptr) {
 #endif
 
 void* operator new(size_t size) { return debugMalloc(size); }
-void operator delete(void* ptr)_GLIBCXX_USE_NOEXCEPT { debugFree(ptr); }
+void operator delete(void* ptr) _GLIBCXX_USE_NOEXCEPT { debugFree(ptr); }
 void operator delete(void* ptr, size_t)_GLIBCXX_USE_NOEXCEPT { debugFree(ptr); }
 
 void* operator new[](size_t size) { return debugMalloc(size); }
 void operator delete[](void* ptr) _GLIBCXX_USE_NOEXCEPT { debugFree(ptr); }
 void operator delete[](void* ptr, size_t) _GLIBCXX_USE_NOEXCEPT { debugFree(ptr); }
 
-#endif // !TCMALLOC
+#endif // !TCMALLOC && !ENVOY_DISABLE_MEMDEBUG
 #endif // !NDEBUG
 
 // We provide the entry-point to be called to force-load the memory debugger

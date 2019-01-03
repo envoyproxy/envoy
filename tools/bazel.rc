@@ -35,6 +35,7 @@ build:clang-asan --linkopt -fuse-ld=lld
 
 # Clang 5.0 TSAN
 build:clang-tsan --define ENVOY_CONFIG_TSAN=1
+build:clang-tsan --define ENVOY_MEMDEBUG_DISABLE=1
 build:clang-tsan --copt -fsanitize=thread
 build:clang-tsan --linkopt -fsanitize=thread
 build:clang-tsan --define tcmalloc=disabled

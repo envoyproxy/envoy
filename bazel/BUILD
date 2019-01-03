@@ -90,6 +90,16 @@ config_setting(
 )
 
 config_setting(
+    name = "tsan_build",
+    values = {"define": "ENVOY_CONFIG_TSAN=1"},
+)
+
+config_setting(
+    name = "asan_build",
+    values = {"define": "ENVOY_CONFIG_ASAN=1"},
+)
+
+config_setting(
     name = "disable_tcmalloc",
     values = {"define": "tcmalloc=disabled"},
 )

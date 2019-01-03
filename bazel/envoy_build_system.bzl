@@ -68,6 +68,12 @@ def envoy_copts(repository, test = False):
                repository + "//bazel:disable_tcmalloc": ["-DABSL_MALLOC_HOOK_MMAP_DISABLE"],
                "//conditions:default": ["-DTCMALLOC"],
            }) + select({
+               repository + "//bazel:tsan_build": ["-DENVOY_DISABLE_MEMDEBUG=1"],
+               "//conditions:default": [],
+           }) + select({
+               repository + "//bazel:asan_build": ["-DENVOY_DISABLE_MEMDEBUG=1"],
+               "//conditions:default": [],
+           }) + select({
                repository + "//bazel:disable_signal_trace": [],
                "//conditions:default": ["-DENVOY_HANDLE_SIGNALS"],
            }) + select({
