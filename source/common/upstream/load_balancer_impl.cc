@@ -20,33 +20,34 @@ static const std::string RuntimeZoneEnabled = "upstream.zone_routing.enabled";
 static const std::string RuntimeMinClusterSize = "upstream.zone_routing.min_cluster_size";
 static const std::string RuntimePanicThreshold = "upstream.healthy_panic_threshold";
 
-// Distributes load between priorities based on the per priority health and the normalized total
-// health. Load is assigned to each priority according to how healthy they are, adjusted for the
-// normalized total health.
+// Distributes load between priorities based on the per priority availability and the normalized
+// total availability. Load is assigned to each priority according to how available each priority is
+// adjusted for the normalized total availability.
 //
 // @param per_priority_load vector of loads that should be populated.
-// @param per_priority_health the percentage health of each priority, used to determine how much
-// load each priority can handle.
+// @param per_priority_availability the percentage availability of each priority, used to determine
+// how much load each priority can handle.
 // @param total_load the amount of load that may be distributed. Will be updated with the amount of
 // load reminaining after distribution.
-// @param normalized_total_health the total health of all priorities, up to a max of 100. Used to
-// scale the load when priority healths are insufficient to account for the entire load.
-int32_t distributeLoad(PriorityLoad& per_priority_load,
-                       const std::vector<uint32_t>& per_priority_health, size_t& total_load,
-                       size_t normalized_total_health) {
-  int32_t first_healthy_priority = -1;
-  for (size_t i = 0; i < per_priority_health.size(); ++i) {
-    if (first_healthy_priority < 0 && per_priority_health[i] > 0) {
-      first_healthy_priority = i;
+// @param normalized_total_availability the total availability, up to a max of 100. Used to
+// scale the load when the total availability is less than 100%.
+// @return the first available priority and the remaining load
+std::pair<int32_t, size_t> distributeLoad(PriorityLoad& per_priority_load,
+                                          const std::vector<uint32_t>& per_priority_availability,
+                                          size_t total_load, size_t normalized_total_availability) {
+  int32_t first_available_priority = -1;
+  for (size_t i = 0; i < per_priority_availability.size(); ++i) {
+    if (first_available_priority < 0 && per_priority_availability[i] > 0) {
+      first_available_priority = i;
     }
     // Now assign as much load as possible to the high priority levels and cease assigning load
     // when total_load runs out.
-    per_priority_load[i] =
-        std::min<uint32_t>(total_load, per_priority_health[i] * 100 / normalized_total_health);
+    per_priority_load[i] = std::min<uint32_t>(total_load, per_priority_availability[i] * 100 /
+                                                              normalized_total_availability);
     total_load -= per_priority_load[i];
   }
 
-  return first_healthy_priority;
+  return {first_available_priority, total_load};
 }
 
 } // namespace
@@ -146,14 +147,15 @@ void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority,
   }
 
   size_t total_load = 100;
-  const auto first_healthy_priority =
+  const auto first_available_and_reminding =
       distributeLoad(per_priority_load, per_priority_health, total_load, normalized_total_health);
 
+  total_load = first_available_and_reminding.second;
   if (total_load != 0) {
-    ASSERT(first_healthy_priority != -1);
-    // Account for rounding errors by assigning it to the first healthy priority.
+    ASSERT(first_available_and_reminding.first != -1);
+    // Account for rounding errors by assigning it to the first available priority.
     ASSERT(total_load < per_priority_load.size());
-    per_priority_load[first_healthy_priority] += total_load;
+    per_priority_load[first_available_and_reminding.first] += total_load;
   }
 }
 
