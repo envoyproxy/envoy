@@ -121,7 +121,7 @@ class UdpListenerCallbacks {
 public:
   virtual ~UdpListenerCallbacks() = default;
 
-  // TODO(conqerAtapple): Refactor `Connection` to accomodate UDP/QUIC.
+  // TODO(conqerAtapple): Refactor `Connection` to accommodate UDP/QUIC.
 
   /**
    * On first packet received on a UDP socket. This allows the callback handler
