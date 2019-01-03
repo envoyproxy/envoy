@@ -412,7 +412,7 @@ TEST_P(FailoverTest, ExtendPrioritiesWithLocalPrioritySet) {
   // test, but it should at least do no harm.
   HostVectorSharedPtr hosts(new HostVector({makeTestHost(info_, "tcp://127.0.0.1:82")}));
   local_priority_set_->getOrCreateHostSet(0).updateHosts(
-      HostSetImpl::updateHostsParams(hosts, empty_locality_, hosts, empty_locality_), {},
+      HostSetImpl::updateHostsParams(hosts, HostsPerLocalityImpl::empty(), hosts, HostsPerLocalityImpl::empty()), {},
       empty_host_vector_, empty_host_vector_, absl::nullopt);
   EXPECT_EQ(tertiary_host_set_.hosts_[0], lb_->chooseHost(nullptr));
 }
