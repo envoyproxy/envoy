@@ -176,14 +176,6 @@ std::chrono::milliseconds Utility::apiConfigSourceRequestTimeout(
       PROTOBUF_GET_MS_OR_DEFAULT(api_config_source, request_timeout, 1000));
 }
 
-void Utility::translateEdsConfig(const Json::Object& json_config,
-                                 envoy::api::v2::core::ConfigSource& eds_config) {
-  translateApiConfigSource(json_config.getObject("cluster")->getString("name"),
-                           json_config.getInteger("refresh_delay_ms", 30000),
-                           json_config.getString("api_type", ApiType::get().RestLegacy),
-                           *eds_config.mutable_api_config_source());
-}
-
 void Utility::translateCdsConfig(const Json::Object& json_config,
                                  envoy::api::v2::core::ConfigSource& cds_config) {
   translateApiConfigSource(json_config.getObject("cluster")->getString("name"),

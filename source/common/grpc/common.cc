@@ -18,6 +18,8 @@
 #include "common/http/utility.h"
 #include "common/protobuf/protobuf.h"
 
+#include "absl/strings/match.h"
+
 namespace Envoy {
 namespace Grpc {
 
@@ -26,8 +28,8 @@ bool Common::hasGrpcContentType(const Http::HeaderMap& headers) {
   // Content type is gRPC if it is exactly "application/grpc" or starts with
   // "application/grpc+". Specifically, something like application/grpc-web is not gRPC.
   return content_type != nullptr &&
-         StringUtil::startsWith(content_type->value().c_str(),
-                                Http::Headers::get().ContentTypeValues.Grpc) &&
+         absl::StartsWith(content_type->value().getStringView(),
+                          Http::Headers::get().ContentTypeValues.Grpc) &&
          (content_type->value().size() == Http::Headers::get().ContentTypeValues.Grpc.size() ||
           content_type->value().c_str()[Http::Headers::get().ContentTypeValues.Grpc.size()] == '+');
 }

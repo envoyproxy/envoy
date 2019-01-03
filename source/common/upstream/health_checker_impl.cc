@@ -17,6 +17,8 @@
 // TODO(dio): Remove dependency to extension health checkers when redis_health_check is removed.
 #include "extensions/health_checkers/well_known_names.h"
 
+#include "absl/strings/match.h"
+
 namespace Envoy {
 namespace Upstream {
 
@@ -218,9 +220,8 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onResponseComplete() {
   }
 
   if ((response_headers_->Connection() &&
-       0 == StringUtil::caseInsensitiveCompare(
-                response_headers_->Connection()->value().c_str(),
-                Http::Headers::get().ConnectionValues.Close.c_str())) ||
+       absl::EqualsIgnoreCase(response_headers_->Connection()->value().getStringView(),
+                              Http::Headers::get().ConnectionValues.Close)) ||
       !parent_.reuse_connection_) {
     client_->close();
   }

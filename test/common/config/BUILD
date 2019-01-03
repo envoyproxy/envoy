@@ -5,6 +5,7 @@ load(
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
+    "envoy_proto_library",
 )
 
 envoy_package()
@@ -206,5 +207,21 @@ envoy_cc_test(
     srcs = ["filter_json_test.cc"],
     deps = [
         "//source/common/config:filter_json_lib",
+    ],
+)
+
+envoy_proto_library(
+    name = "dummy_config_proto",
+    srcs = ["dummy_config.proto"],
+)
+
+envoy_cc_test(
+    name = "config_provider_impl_test",
+    srcs = ["config_provider_impl_test.cc"],
+    deps = [
+        ":dummy_config_proto_cc",
+        "//source/common/config:config_provider_lib",
+        "//source/common/protobuf:utility_lib",
+        "//test/mocks/server:server_mocks",
     ],
 )

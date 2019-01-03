@@ -26,6 +26,7 @@
 
 #include "test/test_common/network_utility.h"
 
+#include "absl/strings/match.h"
 #include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
 
@@ -99,7 +100,7 @@ void TestEnvironment::createParentPath(const std::string& path) {
 }
 
 void TestEnvironment::removePath(const std::string& path) {
-  RELEASE_ASSERT(StringUtil::startsWith(path.c_str(), TestEnvironment::temporaryDirectory()), "");
+  RELEASE_ASSERT(absl::StartsWith(path, TestEnvironment::temporaryDirectory()), "");
 #ifdef __cpp_lib_experimental_filesystem
   // We don't want to rely on rm etc. if we can avoid it, since it might not
   // exist in some environments such as ClusterFuzz.
@@ -261,7 +262,7 @@ std::string TestEnvironment::temporaryFileSubstitute(const std::string& path,
   // Substitute paths and other common things.
   out_json_string = substitute(out_json_string, version);
 
-  const std::string extension = StringUtil::endsWith(path, ".yaml") ? ".yaml" : ".json";
+  const std::string extension = absl::EndsWith(path, ".yaml") ? ".yaml" : ".json";
   const std::string out_json_path =
       TestEnvironment::temporaryPath(path + ".with.ports" + extension);
   createParentPath(out_json_path);

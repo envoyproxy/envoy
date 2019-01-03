@@ -340,12 +340,14 @@ TEST_P(ServerInstanceImplTest, LogToFileError) {
 // When there are no bootstrap CLI options, either for content or path, we can load the server with
 // an empty config.
 TEST_P(ServerInstanceImplTest, NoOptionsPassed) {
-  EXPECT_NO_THROW(server_.reset(new InstanceImpl(
-      options_, test_time_.timeSystem(),
-      Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
-      hooks_, restart_, stats_store_, fakelock_, component_factory_,
-      std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), thread_local_,
-      Thread::threadFactoryForTest())));
+  EXPECT_THROW_WITH_MESSAGE(
+      server_.reset(new InstanceImpl(
+          options_, test_time_.timeSystem(),
+          Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
+          hooks_, restart_, stats_store_, fakelock_, component_factory_,
+          std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), thread_local_,
+          Thread::threadFactoryForTest())),
+      EnvoyException, "At least one of --config-path and --config-yaml should be non-empty");
 }
 
 // Validate that when std::exception is unexpectedly thrown, we exit safely.

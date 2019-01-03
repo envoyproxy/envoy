@@ -54,7 +54,7 @@ public:
 TEST_F(RedisCommandSplitterImplTest, InvalidRequestNotArray) {
   RespValue response;
   response.type(RespType::Error);
-  response.asString() = "invalid request";
+  response.asString() = Response::get().InvalidRequest;
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
   RespValue request;
   EXPECT_EQ(nullptr, splitter_.makeRequest(request, callbacks_));
@@ -65,7 +65,7 @@ TEST_F(RedisCommandSplitterImplTest, InvalidRequestNotArray) {
 TEST_F(RedisCommandSplitterImplTest, InvalidRequestArrayTooSmall) {
   RespValue response;
   response.type(RespType::Error);
-  response.asString() = "invalid request";
+  response.asString() = Response::get().InvalidRequest;
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
   RespValue request;
   makeBulkStringArray(request, {"incr"});
@@ -77,7 +77,7 @@ TEST_F(RedisCommandSplitterImplTest, InvalidRequestArrayTooSmall) {
 TEST_F(RedisCommandSplitterImplTest, InvalidRequestArrayNotStrings) {
   RespValue response;
   response.type(RespType::Error);
-  response.asString() = "invalid request";
+  response.asString() = Response::get().InvalidRequest;
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
   RespValue request;
   makeBulkStringArray(request, {"incr", ""});
@@ -111,7 +111,7 @@ public:
   void fail() {
     RespValue response;
     response.type(RespType::Error);
-    response.asString() = "upstream failure";
+    response.asString() = Response::get().UpstreamFailure;
     EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
     pool_callbacks_->onFailure();
   }
@@ -192,7 +192,7 @@ TEST_P(RedisSingleServerRequestTest, NoUpstream) {
   EXPECT_CALL(*conn_pool_, makeRequest("hello", Ref(request), _)).WillOnce(Return(nullptr));
   RespValue response;
   response.type(RespType::Error);
-  response.asString() = "no upstream host";
+  response.asString() = Response::get().NoUpstreamHost;
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
   handle_ = splitter_.makeRequest(request, callbacks_);
   EXPECT_EQ(nullptr, handle_);
@@ -279,7 +279,7 @@ TEST_F(RedisSingleServerRequestTest, EvalNoUpstream) {
   EXPECT_CALL(*conn_pool_, makeRequest("key", Ref(request), _)).WillOnce(Return(nullptr));
   RespValue response;
   response.type(RespType::Error);
-  response.asString() = "no upstream host";
+  response.asString() = Response::get().NoUpstreamHost;
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
   handle_ = splitter_.makeRequest(request, callbacks_);
   EXPECT_EQ(nullptr, handle_);
@@ -379,9 +379,9 @@ TEST_F(RedisMGETCommandHandlerTest, NoUpstreamHostForAll) {
   expected_response.type(RespType::Array);
   std::vector<RespValue> elements(2);
   elements[0].type(RespType::Error);
-  elements[0].asString() = "no upstream host";
+  elements[0].asString() = Response::get().NoUpstreamHost;
   elements[1].type(RespType::Error);
-  elements[1].asString() = "no upstream host";
+  elements[1].asString() = Response::get().NoUpstreamHost;
   expected_response.asArray().swap(elements);
 
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
@@ -399,9 +399,9 @@ TEST_F(RedisMGETCommandHandlerTest, NoUpstreamHostForOne) {
   expected_response.type(RespType::Array);
   std::vector<RespValue> elements(2);
   elements[0].type(RespType::Error);
-  elements[0].asString() = "no upstream host";
+  elements[0].asString() = Response::get().NoUpstreamHost;
   elements[1].type(RespType::Error);
-  elements[1].asString() = "upstream failure";
+  elements[1].asString() = Response::get().UpstreamFailure;
   expected_response.asArray().swap(elements);
 
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
@@ -420,7 +420,7 @@ TEST_F(RedisMGETCommandHandlerTest, Failure) {
   elements[0].type(RespType::BulkString);
   elements[0].asString() = "response";
   elements[1].type(RespType::Error);
-  elements[1].asString() = "upstream failure";
+  elements[1].asString() = Response::get().UpstreamFailure;
   expected_response.asArray().swap(elements);
 
   pool_callbacks_[1]->onFailure();
@@ -442,9 +442,9 @@ TEST_F(RedisMGETCommandHandlerTest, InvalidUpstreamResponse) {
   expected_response.type(RespType::Array);
   std::vector<RespValue> elements(2);
   elements[0].type(RespType::Error);
-  elements[0].asString() = "upstream protocol error";
+  elements[0].asString() = Response::get().UpstreamProtocolError;
   elements[1].type(RespType::Error);
-  elements[1].asString() = "upstream failure";
+  elements[1].asString() = Response::get().UpstreamFailure;
   expected_response.asArray().swap(elements);
 
   pool_callbacks_[1]->onFailure();
@@ -513,16 +513,16 @@ TEST_F(RedisMSETCommandHandlerTest, Normal) {
 
   RespValue expected_response;
   expected_response.type(RespType::SimpleString);
-  expected_response.asString() = "OK";
+  expected_response.asString() = Response::get().OK;
 
   RespValuePtr response2(new RespValue());
   response2->type(RespType::SimpleString);
-  response2->asString() = "OK";
+  response2->asString() = Response::get().OK;
   pool_callbacks_[1]->onResponse(std::move(response2));
 
   RespValuePtr response1(new RespValue());
   response1->type(RespType::SimpleString);
-  response1->asString() = "OK";
+  response1->asString() = Response::get().OK;
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
   pool_callbacks_[0]->onResponse(std::move(response1));
 
@@ -553,7 +553,7 @@ TEST_F(RedisMSETCommandHandlerTest, NoUpstreamHostForOne) {
 
   RespValuePtr response2(new RespValue());
   response2->type(RespType::SimpleString);
-  response2->asString() = "OK";
+  response2->asString() = Response::get().OK;
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
   pool_callbacks_[1]->onResponse(std::move(response2));
 };

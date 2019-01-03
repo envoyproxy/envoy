@@ -24,6 +24,7 @@
 #include "rapidjson/stringbuffer.h"
 #include "rapidjson/writer.h"
 
+#include "absl/strings/match.h"
 #include "yaml-cpp/yaml.h"
 
 namespace Envoy {
@@ -685,8 +686,8 @@ bool ObjectHandler::handleValueEvent(FieldSharedPtr ptr) {
 ObjectSharedPtr Factory::loadFromFile(const std::string& file_path) {
   try {
     const std::string contents = Filesystem::fileReadToEnd(file_path);
-    return StringUtil::endsWith(file_path, ".yaml") ? loadFromYamlString(contents)
-                                                    : loadFromString(contents);
+    return absl::EndsWith(file_path, ".yaml") ? loadFromYamlString(contents)
+                                              : loadFromString(contents);
   } catch (EnvoyException& e) {
     throw Exception(e.what());
   }

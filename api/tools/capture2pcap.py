@@ -34,14 +34,9 @@ def DumpEvent(direction, timestamp, data):
   dump = StringIO.StringIO()
   dump.write('%s\n' % direction)
   # Adjust to local timezone
-  adjusted_dt = timestamp.ToDatetime() - datetime.timedelta(
-      seconds=time.altzone)
+  adjusted_dt = timestamp.ToDatetime() - datetime.timedelta(seconds=time.altzone)
   dump.write('%s\n' % adjusted_dt)
-  od = sp.Popen(
-      ['od', '-Ax', '-tx1', '-v'],
-      stdout=sp.PIPE,
-      stdin=sp.PIPE,
-      stderr=sp.PIPE)
+  od = sp.Popen(['od', '-Ax', '-tx1', '-v'], stdout=sp.PIPE, stdin=sp.PIPE, stderr=sp.PIPE)
   packet_dump = od.communicate(data)[0]
   dump.write(packet_dump)
   return dump.getvalue()
