@@ -92,14 +92,16 @@ void UdpListenerImpl::readCallback(int fd, short flags, void* arg) {
 
   break;
   default:
-    ASSERT(false);
+    RELEASE_ASSERT(false, fmt::format("Unsupported address family: {}, local address: {}",
+                                      addr.ss_family, local_address->asString()));
   }
 
-  RELEASE_ASSERT(peer_address,
+  RELEASE_ASSERT((peer_address != nullptr),
                  fmt::format("Unable to get remote address for fd: {}, local address: {} ", fd,
                              local_address->asString()));
 
-  RELEASE_ASSERT(local_address, fmt::format("Unable to get local address for fd: {}", fd));
+  RELEASE_ASSERT((local_address != nullptr),
+                 fmt::format("Unable to get local address for fd: {}", fd));
 
   bool expected = true;
   if (instance->is_first_.compare_exchange_strong(expected, false)) {
