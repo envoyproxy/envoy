@@ -20,7 +20,6 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
-#include "test/test_common/utility.h"
 
 #include "absl/strings/str_replace.h"
 #include "gtest/gtest.h"
