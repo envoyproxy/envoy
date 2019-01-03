@@ -13,7 +13,11 @@ namespace OriginalSrc {
  */
 class OriginalSrcSocketOption : public Network::Socket::Option {
 public:
-  OriginalSrcSocketOption(Network::Address::InstanceConstSharedPtr src_address);
+  /**
+   * Constructs a socekt option which will set the socket to use source @c src_address, and cause it
+   * to mark all packets sent out it with value @c mark.
+   */
+  OriginalSrcSocketOption(Network::Address::InstanceConstSharedPtr src_address, uint32_t mark);
   ~OriginalSrcSocketOption() {}
 
   /**

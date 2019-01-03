@@ -20,8 +20,9 @@ Network::FilterStatus OriginalSrcFilter::onAccept(Network::ListenerFilterCallbac
   auto address = socket.remoteAddress();
   ASSERT(address);
 
-  ENVOY_LOG(trace, "Got a new connection in the original_src filter for address {}",
-            address->asString());
+  ENVOY_LOG(debug,
+            "Got a new connection in the original_src filter for address {}. Marking with {}",
+            address->asString(), config_.mark());
 
   if (address->type() != Network::Address::Type::Ip) {
     // nothing we can do with this.
@@ -31,7 +32,7 @@ Network::FilterStatus OriginalSrcFilter::onAccept(Network::ListenerFilterCallbac
   auto address_without_port = Network::Utility::getAddressWithPort(*address, 0);
 
   Network::Socket::OptionConstSharedPtr new_option =
-      std::make_shared<OriginalSrcSocketOption>(std::move(address_without_port));
+      std::make_shared<OriginalSrcSocketOption>(std::move(address_without_port), config_.mark());
   // note: we don't expect this to change the behaviour of the socket. We expect it to be copied
   // into the upstream connection later.
   socket.addOption(new_option);
