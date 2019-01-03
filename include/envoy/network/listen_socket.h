@@ -151,9 +151,6 @@ public:
    */
   virtual const Address::InstanceConstSharedPtr& remoteAddress() const PURE;
 
-  // Let the compiler know that we intend to use both.
-  using Socket::setLocalAddress;
-
   /**
    * Set the local address of the socket. On accepted sockets the local address defaults to the
    * one at which the connection was received at, which is the same as the listener's address, if
@@ -166,8 +163,8 @@ public:
    *        by iptables REDIRECT. The caller is responsible for making sure the new address is
    *        actually different when passing restored as 'true'.
    */
-  virtual void setLocalAddress(const Address::InstanceConstSharedPtr& local_address,
-                               bool restored) PURE;
+  virtual void setConnectionLocalAddress(const Address::InstanceConstSharedPtr& local_address,
+                                         bool restored) PURE;
 
   /**
    * Set the remote address of the socket.

@@ -216,7 +216,7 @@ public:
 
   MOCK_CONST_METHOD0(localAddress, const Address::InstanceConstSharedPtr&());
   MOCK_METHOD1(setLocalAddress, void(const Address::InstanceConstSharedPtr&));
-  MOCK_METHOD2(setLocalAddress, void(const Address::InstanceConstSharedPtr&, bool));
+  MOCK_METHOD2(setConnectionLocalAddress, void(const Address::InstanceConstSharedPtr&, bool));
   MOCK_CONST_METHOD0(localAddressRestored, bool());
   MOCK_METHOD1(setRemoteAddress, void(const Address::InstanceConstSharedPtr&));
   MOCK_CONST_METHOD0(remoteAddress, const Address::InstanceConstSharedPtr&());

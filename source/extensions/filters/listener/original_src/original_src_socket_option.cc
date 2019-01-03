@@ -1,7 +1,5 @@
 #include "extensions/filters/listener/original_src/original_src_socket_option.h"
 
-#include <arpa/inet.h>
-
 #include "common/common/assert.h"
 
 namespace Envoy {
