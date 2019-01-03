@@ -3,10 +3,9 @@ Version history
 
 1.10.0 (pending)
 ================
-* redis: added :ref:`success and error stats <config_network_filters_redis_proxy_per_command_stats>` for commands.
 * access log: added a new flag for upstream retry count exceeded.
-
 * config: removed deprecated_v1 sds_config from :ref:`Bootstrap config <config_overview_v2_bootstrap>`.
+* redis: added :ref:`success and error stats <config_network_filters_redis_proxy_per_command_stats>` for commands.
 
 1.9.0
 ===============
