@@ -54,6 +54,8 @@ void UdpListenerImpl::readCallback(int fd, short flags, void* arg) {
   Api::SysCallIntResult result = buffer->recvFrom(fd, read_length, addr, addr_len);
   if (result.rc_ < 0) {
     // TODO(conqerAtApple): Call error callback.
+    RELEASE_ASSERT(false, fmt::format("recvfrom returned rc: {}, error: {}", result.rc_,
+                                      strerror(result.errno_)));
   }
 
   Address::InstanceConstSharedPtr local_address = instance->socket_.localAddress();
