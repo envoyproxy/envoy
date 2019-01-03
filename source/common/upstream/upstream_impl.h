@@ -328,8 +328,9 @@ protected:
   }
 
 private:
-  // Weight for a locality taking into account health status.
-  double effectiveLocalityWeight(uint32_t index) const;
+  // Weight for a locality taking into account health status using the provided eligible hosts per
+  // locality.
+  double effectiveLocalityWeight(uint32_t index, const HostsPerLocality& eligible_hosts) const;
 
   uint32_t priority_;
   uint32_t overprovisioning_factor_;
@@ -351,6 +352,12 @@ private:
     const uint32_t index_;
     const double effective_weight_;
   };
+
+  void rebuildLocalityScheduler(std::unique_ptr<EdfScheduler<LocalityEntry>>& locality_scheduler,
+                                std::vector<std::shared_ptr<LocalityEntry>>& locality_entries,
+                                const HostsPerLocality& eligible_hosts_per_locality,
+                                const HostVector& hosts);
+
   std::vector<std::shared_ptr<LocalityEntry>> locality_entries_;
   std::unique_ptr<EdfScheduler<LocalityEntry>> locality_scheduler_;
 };

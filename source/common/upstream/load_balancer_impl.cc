@@ -19,6 +19,36 @@ namespace {
 static const std::string RuntimeZoneEnabled = "upstream.zone_routing.enabled";
 static const std::string RuntimeMinClusterSize = "upstream.zone_routing.min_cluster_size";
 static const std::string RuntimePanicThreshold = "upstream.healthy_panic_threshold";
+
+// Distributes load between priorities based on the per priority health and the normalized total
+// health. Load is assigned to each priority according to how healthy they are, adjusted for the
+// normalized total health.
+//
+// @param per_priority_load vector of loads that should be populated.
+// @param per_priority_health the percentage health of each priority, used to determine how much
+// load each priority can handle.
+// @param total_load the amount of load that may be distributed. Will be updated with the amount of
+// load reminaining after distribution.
+// @param normalized_total_health the total health of all priorities, up to a max of 100. Used to
+// scale the load when priority healths are insufficient to account for the entire load.
+int32_t distributeLoad(PriorityLoad& per_priority_load,
+                       const std::vector<uint32_t>& per_priority_health, size_t& total_load,
+                       size_t normalized_total_health) {
+  int32_t first_healthy_priority = -1;
+  for (size_t i = 0; i < per_priority_health.size(); ++i) {
+    if (first_healthy_priority < 0 && per_priority_health[i] > 0) {
+      first_healthy_priority = i;
+    }
+    // Now assign as much load as possible to the high priority levels and cease assigning load
+    // when total_load runs out.
+    per_priority_load[i] =
+        std::min<uint32_t>(total_load, per_priority_health[i] * 100 / normalized_total_health);
+    total_load -= per_priority_load[i];
+  }
+
+  return first_healthy_priority;
+}
+
 } // namespace
 
 uint32_t LoadBalancerBase::choosePriority(uint64_t hash,
@@ -116,17 +146,8 @@ void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority,
   }
 
   size_t total_load = 100;
-  int32_t first_healthy_priority = -1;
-  for (size_t i = 0; i < per_priority_health.size(); ++i) {
-    if (first_healthy_priority < 0 && per_priority_health[i] > 0) {
-      first_healthy_priority = i;
-    }
-    // Now assign as much load as possible to the high priority levels and cease assigning load
-    // when total_load runs out.
-    per_priority_load[i] =
-        std::min<uint32_t>(total_load, per_priority_health[i] * 100 / normalized_total_health);
-    total_load -= per_priority_load[i];
-  }
+  const auto first_healthy_priority =
+      distributeLoad(per_priority_load, per_priority_health, total_load, normalized_total_health);
 
   if (total_load != 0) {
     ASSERT(first_healthy_priority != -1);
