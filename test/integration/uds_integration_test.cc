@@ -83,7 +83,7 @@ TEST_P(UdsListenerIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
 
 TEST_P(UdsListenerIntegrationTest, RouterHeaderOnlyRequestAndResponse) {
   ConnectionCreationFunction creator = createConnectionFn();
-  testRouterHeaderOnlyRequestAndResponse(true, &creator);
+  testRouterHeaderOnlyRequestAndResponse(true, 0, &creator);
 }
 
 TEST_P(UdsListenerIntegrationTest, RouterListenerDisconnectBeforeResponseComplete) {
