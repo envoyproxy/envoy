@@ -62,7 +62,6 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent,
 
 void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
   if (parent_.cm_.get(parent_.remote_cluster_name_) == nullptr) {
-    std::cerr<<"onRemoteClose in init"<<std::endl;
     callbacks_.onRemoteClose(Status::GrpcStatus::Unavailable, "Cluster not available");
     http_reset_ = true;
     return;
@@ -75,7 +74,6 @@ void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
                  buffer_body_for_retry));
 
   if (stream_ == nullptr) {
-    std::cerr<<"onRemoteClose LATER in init"<<std::endl;
     callbacks_.onRemoteClose(Status::GrpcStatus::Unavailable, EMPTY_STRING);
     http_reset_ = true;
     return;
@@ -159,14 +157,12 @@ void AsyncStreamImpl::onTrailers(Http::HeaderMapPtr&& trailers) {
   if (!grpc_status) {
     grpc_status = Status::GrpcStatus::Unknown;
   }
-  std::cerr<<"onRemoteClose in onTrailers"<<std::endl;
   callbacks_.onRemoteClose(grpc_status.value(), grpc_message);
   cleanup();
 }
 
 void AsyncStreamImpl::streamError(Status::GrpcStatus grpc_status, const std::string& message) {
   callbacks_.onReceiveTrailingMetadata(std::make_unique<Http::HeaderMapImpl>());
-  std::cerr<<"onRemoteClose in streamError"<<std::endl;
   callbacks_.onRemoteClose(grpc_status, message);
   resetStream();
 }

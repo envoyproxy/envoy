@@ -99,9 +99,11 @@ protected:
   //
   // Waits for the complete downstream response before returning.
   // Requires |codec_client_| to be initialized.
-  IntegrationStreamDecoderPtr sendRequestAndWaitForResponse(
-      const Http::TestHeaderMapImpl& request_headers, uint32_t request_body_size,
-      const Http::TestHeaderMapImpl& response_headers, uint32_t response_body_size);
+  IntegrationStreamDecoderPtr
+  sendRequestAndWaitForResponse(const Http::TestHeaderMapImpl& request_headers,
+                                uint32_t request_body_size,
+                                const Http::TestHeaderMapImpl& response_headers,
+                                uint32_t response_body_size, int upstream_index = 0);
 
   // Wait for the end of stream on the next upstream stream on any of the provided fake upstreams.
   // Sets fake_upstream_connection_ to the connection and upstream_request_ to stream.
@@ -124,7 +126,7 @@ protected:
   void testRouterRequestAndResponseWithBody(uint64_t request_size, uint64_t response_size,
                                             bool big_header,
                                             ConnectionCreationFunction* creator = nullptr);
-  void testRouterHeaderOnlyRequestAndResponse(bool close_upstream,
+  void testRouterHeaderOnlyRequestAndResponse(bool leave_upstream_open, int upstream_index = 0,
                                               ConnectionCreationFunction* creator = nullptr);
   void testRouterUpstreamDisconnectBeforeRequestComplete();
   void

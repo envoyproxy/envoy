@@ -31,10 +31,10 @@ void XdsIntegrationTestBase::createXdsConnection(FakeUpstream& upstream) {
 }
 
 void XdsIntegrationTestBase::cleanUpXdsConnection() {
-  ASSERT(xds_upstream_ != nullptr);
-
   // Don't ASSERT fail if an xDS reconnect ends up unparented.
-  xds_upstream_->set_allow_unexpected_disconnects(true);
+  if (xds_upstream_) {
+    xds_upstream_->set_allow_unexpected_disconnects(true);
+  }
   AssertionResult result = xds_connection_->close();
   RELEASE_ASSERT(result, result.message());
   result = xds_connection_->waitForDisconnect();

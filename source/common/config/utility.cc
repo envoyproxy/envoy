@@ -100,14 +100,14 @@ void Utility::checkApiConfigSourceNames(
 
   if (is_grpc) {
     if (!api_config_source.cluster_names().empty()) {
-      throw EnvoyException(fmt::format(
-          "envoy::api::v2::core::ConfigSource::(INCREMENTAL_)GRPC must not have a cluster name specified: {}",
-          api_config_source.DebugString()));
+      throw EnvoyException(fmt::format("envoy::api::v2::core::ConfigSource::(INCREMENTAL_)GRPC "
+                                       "must not have a cluster name specified: {}",
+                                       api_config_source.DebugString()));
     }
     if (api_config_source.grpc_services().size() > 1) {
-      throw EnvoyException(fmt::format(
-          "envoy::api::v2::core::ConfigSource::(INCREMENTAL_)GRPC must have a single gRPC service specified: {}",
-          api_config_source.DebugString()));
+      throw EnvoyException(fmt::format("envoy::api::v2::core::ConfigSource::(INCREMENTAL_)GRPC "
+                                       "must have a single gRPC service specified: {}",
+                                       api_config_source.DebugString()));
     }
   } else {
     if (!api_config_source.grpc_services().empty()) {

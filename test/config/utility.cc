@@ -119,8 +119,8 @@ ConfigHelper::ConfigHelper(const Network::Address::IpVersion version, const std:
   RELEASE_ASSERT(!finalized_, "");
   std::string filename = TestEnvironment::writeStringToFileForTest("basic_config.yaml", config);
   MessageUtil::loadFromFile(filename, bootstrap_);
-  
-  //TODO REMOVE
+
+  // TODO REMOVE
   std::cerr << "BOOTSTRAP CONFIG:\n" << config << std::endl;
 
   // Fix up all the socket addresses with the correct version.

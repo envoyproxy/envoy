@@ -68,10 +68,10 @@ public:
   CdsApiPtr createCds(const envoy::api::v2::core::ConfigSource& cds_config,
                       const absl::optional<envoy::api::v2::core::ConfigSource>& eds_config,
                       ClusterManager& cm) override;
-  CdsApiPtr createIncrementalCds(
-      const envoy::api::v2::core::ConfigSource& cds_config,
-      const absl::optional<envoy::api::v2::core::ConfigSource>& eds_config,
-      ClusterManager& cm) override;
+  CdsApiPtr
+  createIncrementalCds(const envoy::api::v2::core::ConfigSource& cds_config,
+                       const absl::optional<envoy::api::v2::core::ConfigSource>& eds_config,
+                       ClusterManager& cm) override;
   Secret::SecretManager& secretManager() override { return secret_manager_; }
 
 protected:

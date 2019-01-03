@@ -65,8 +65,17 @@ IntegrationTestServer::create(const std::string& config_path,
       std::make_unique<IntegrationTestServerImpl>(time_system, api, config_path)};
 >>>>>>> Wire thread creation through the Api interface (#5016)
   server->start(version, pre_worker_start_test_steps, deterministic);
-  std::cerr<<"startED IntegrationTestServer"<<std::endl;
   return server;
+}
+
+void IntegrationTestServer::waitUntilListenersReady() {
+  Thread::LockGuard guard(listeners_mutex_);
+  while (pending_listeners_ != 0) {
+    // If your test is hanging forever here, you may need to create your listener manually,
+    // after BaseIntegrationTest::initialize() is done. See cds_integration_test.cc for an example.
+    listeners_cv_.wait(listeners_mutex_); // Safe since CondVar::wait won't throw.
+  }
+  ENVOY_LOG(info, "listener wait complete");
 }
 
 void IntegrationTestServer::start(const Network::Address::IpVersion version,
@@ -81,21 +90,14 @@ void IntegrationTestServer::start(const Network::Address::IpVersion version,
   if (pre_worker_start_test_steps != nullptr) {
     pre_worker_start_test_steps();
   }
-ENVOY_LOG(info,"waitReady");
+
   // Wait for the server to be created and the number of initial listeners to wait for to be set.
   server_set_.waitReady();
-ENVOY_LOG(info,"waitReady DONE");
-// TODO REMOVE RIGHT HERE!!!!!!!!! RIGHT HERE IS WHERE IT HANGS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  // Now wait for the initial listeners to actually be listening on the worker. At this point
-  // the server is up and ready for testing.
-  Thread::LockGuard guard(listeners_mutex_);
-std::cerr<<"pending_listeners_ = "<<pending_listeners_<<std::endl;
-  while (pending_listeners_ != 0) {
-    std::cerr<<"waiting for pending_listeners_: "<<pending_listeners_<<std::endl;
-    listeners_cv_.wait(listeners_mutex_); // Safe since CondVar::wait won't throw.
-  }
-  ENVOY_LOG(info, "listener wait complete");
-  std::cerr<<"waited for listeners"<<std::endl;
+
+  // Now wait for the initial listeners (if any) to actually be listening on the worker.
+  // At this point the server is up and ready for testing.
+  waitUntilListenersReady();
+
   // If we are capturing, spin up tcpdump.
   const auto capture_path = TestEnvironment::getOptionalEnvVar("CAPTURE_PATH");
   if (capture_path) {

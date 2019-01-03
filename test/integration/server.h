@@ -181,6 +181,8 @@ public:
   // destructor.
   ~IntegrationTestServer();
 
+  void waitUntilListenersReady();
+
   Server::TestDrainManager& drainManager() { return *drain_manager_; }
   void setOnWorkerListenerAddedCb(std::function<void()> on_worker_listener_added) {
     on_worker_listener_added_cb_ = on_worker_listener_added;

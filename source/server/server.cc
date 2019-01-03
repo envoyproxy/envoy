@@ -66,10 +66,8 @@ InstanceImpl::InstanceImpl(Options& options, Event::TimeSystem& time_system,
       access_log_manager_(*api_, *dispatcher_, access_log_lock), terminated_(false),
       mutex_tracer_(options.mutexTracingEnabled() ? &Envoy::MutexTracerImpl::getOrCreateTracer()
                                                   : nullptr) {
-  std::cerr<<"!?@#!?@#DOES IT GET STARTED AT ALL?"<<std::endl;
   try {
     if (!options.logPath().empty()) {
-      std::cerr<<"logPath not empty, doing something"<<std::endl;
       try {
         file_logger_ = std::make_unique<Logger::FileSinkDelegate>(
             options.logPath(), access_log_manager_, Logger::Registry::getSink());
@@ -79,11 +77,8 @@ InstanceImpl::InstanceImpl(Options& options, Event::TimeSystem& time_system,
       }
     }
 
-    std::cerr<<"initialiing restarter"<<std::endl;
     restarter_.initialize(*dispatcher_, *this);
-    std::cerr<<"creating drainManager"<<std::endl;
     drain_manager_ = component_factory.createDrainManager(*this);
-    std::cerr<<"initializing inside of server.cc InstanceImpl"<<std::endl;
     initialize(options, local_address, component_factory);
   } catch (const EnvoyException& e) {
     ENVOY_LOG(critical, "error initializing configuration '{}': {}", options.configPath(),
@@ -177,7 +172,6 @@ InstanceUtil::BootstrapVersion
 InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& bootstrap,
                                   Options& options) {
   try {
-    std::cerr << "LOADING BOOTSTRAP FROM " << options.configPath() << std::endl;
     if (!options.configPath().empty()) {
       MessageUtil::loadFromFile(options.configPath(), bootstrap);
     }
@@ -234,9 +228,7 @@ void InstanceImpl::initialize(Options& options,
                 Configuration::UpstreamTransportSocketConfigFactory>::allFactoryNames());
 
   // Handle configuration that needs to take place prior to the main configuration load.
-  std::cerr<<"starting loadBootstrapConfig"<<std::endl;
   InstanceUtil::loadBootstrapConfig(bootstrap_, options);
-  std::cerr<<"finished loadBootstrapConfig"<<std::endl;
   bootstrap_config_update_time_ = time_system_.systemTime();
 
   // Needs to happen as early as possible in the instantiation to preempt the objects that require
@@ -251,7 +243,6 @@ void InstanceImpl::initialize(Options& options,
   server_stats_->hot_restart_epoch_.set(options_.restartEpoch());
 
   failHealthcheck(false);
-  std::cerr<<"unfailed health check"<<std::endl;
 
   uint64_t version_int;
   if (!StringUtil::atoul(VersionInfo::revision().substr(0, 6).c_str(), version_int, 16)) {
@@ -265,11 +256,7 @@ void InstanceImpl::initialize(Options& options,
       bootstrap_.node(), local_address, options.serviceZone(), options.serviceClusterName(),
       options.serviceNodeName());
 
-  std::cerr<<"about to create initial_config"<<std::endl;
-  
   Configuration::InitialImpl initial_config(bootstrap_);
-  
-  std::cerr<<"got near the initial_config admin parse"<<std::endl;
 
   HotRestart::ShutdownParentAdminInfo info;
   info.original_start_time_ = original_start_time_;
@@ -287,13 +274,11 @@ void InstanceImpl::initialize(Options& options,
   } else {
     ENVOY_LOG(warn, "No admin address given, so no admin HTTP server started.");
   }
-  std::cerr<<"made admin"<<std::endl;
   config_tracker_entry_ =
       admin_->getConfigTracker().add("bootstrap", [this] { return dumpBootstrapConfig(); });
   if (initial_config.admin().address()) {
     admin_->addListenerToHandler(handler_.get());
   }
-  std::cerr<<"made admin and added listener to handler"<<std::endl;
 
   loadServerFlags(initial_config.flagsPath());
 
@@ -304,8 +289,6 @@ void InstanceImpl::initialize(Options& options,
   // Workers get created first so they register for thread local updates.
   listener_manager_ = std::make_unique<ListenerManagerImpl>(*this, listener_component_factory_,
                                                             worker_factory_, time_system_);
-  
-  std::cerr<<"made listener_manager"<<std::endl;
 
   // The main thread is also registered for thread local updates so that code that does not care
   // whether it runs on the main thread or on workers can still use TLS.
