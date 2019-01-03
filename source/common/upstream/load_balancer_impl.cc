@@ -146,16 +146,15 @@ void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority,
     return;
   }
 
-  size_t total_load = 100;
-  const auto first_available_and_reminding =
-      distributeLoad(per_priority_load, per_priority_health, total_load, normalized_total_health);
+  const auto first_available_and_remaining =
+      distributeLoad(per_priority_load, per_priority_health, 100, normalized_total_health);
 
-  total_load = first_available_and_reminding.second;
-  if (total_load != 0) {
-    ASSERT(first_available_and_reminding.first != -1);
+  const size_t remaining_load = first_available_and_remaining.second;
+  if (remaining_load != 0) {
+    ASSERT(first_available_and_remaining.first != -1);
     // Account for rounding errors by assigning it to the first available priority.
-    ASSERT(total_load < per_priority_load.size());
-    per_priority_load[first_available_and_reminding.first] += total_load;
+    ASSERT(remaining_load < per_priority_load.size());
+    per_priority_load[first_available_and_remaining.first] += remaining_load;
   }
 }
 
