@@ -99,7 +99,7 @@ void debugFree(void* ptr) {
 #endif
 
 void* operator new(size_t size) { return debugMalloc(size); }
-void operator delete(void* ptr) _GLIBCXX_USE_NOEXCEPT { debugFree(ptr); }
+void operator delete(void* ptr)_GLIBCXX_USE_NOEXCEPT { debugFree(ptr); }
 void operator delete(void* ptr, size_t)_GLIBCXX_USE_NOEXCEPT { debugFree(ptr); }
 
 void* operator new[](size_t size) { return debugMalloc(size); }
