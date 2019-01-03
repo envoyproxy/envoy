@@ -40,7 +40,7 @@ void SingleServerRequest::onResponse(RespValuePtr&& response) {
 
 void SingleServerRequest::onFailure() {
   handle_ = nullptr;
-  callbacks_.onResponse(Utility::makeError("upstream failure"));
+  callbacks_.onResponse(Utility::makeError(Response::get().UpstreamFailure));
 }
 
 void SingleServerRequest::cancel() {
@@ -56,7 +56,7 @@ SplitRequestPtr SimpleRequest::create(ConnPool::Instance& conn_pool,
   request_ptr->handle_ = conn_pool.makeRequest(incoming_request.asArray()[1].asString(),
                                                incoming_request, *request_ptr);
   if (!request_ptr->handle_) {
-    request_ptr->callbacks_.onResponse(Utility::makeError("no upstream host"));
+    request_ptr->callbacks_.onResponse(Utility::makeError(Response::get().NoUpstreamHost));
     return nullptr;
   }
 
@@ -77,7 +77,7 @@ SplitRequestPtr EvalRequest::create(ConnPool::Instance& conn_pool,
   request_ptr->handle_ = conn_pool.makeRequest(incoming_request.asArray()[3].asString(),
                                                incoming_request, *request_ptr);
   if (!request_ptr->handle_) {
-    request_ptr->callbacks_.onResponse(Utility::makeError("no upstream host"));
+    request_ptr->callbacks_.onResponse(Utility::makeError(Response::get().NoUpstreamHost));
     return nullptr;
   }
 
@@ -102,7 +102,7 @@ void FragmentedRequest::cancel() {
 }
 
 void FragmentedRequest::onChildFailure(uint32_t index) {
-  onChildResponse(Utility::makeError("upstream failure"), index);
+  onChildResponse(Utility::makeError(Response::get().UpstreamFailure), index);
 }
 
 SplitRequestPtr MGETRequest::create(ConnPool::Instance& conn_pool,
@@ -134,7 +134,7 @@ SplitRequestPtr MGETRequest::create(ConnPool::Instance& conn_pool,
     pending_request.handle_ = conn_pool.makeRequest(incoming_request.asArray()[i].asString(),
                                                     single_mget, pending_request);
     if (!pending_request.handle_) {
-      pending_request.onResponse(Utility::makeError("no upstream host"));
+      pending_request.onResponse(Utility::makeError(Response::get().NoUpstreamHost));
     }
   }
 
@@ -150,7 +150,7 @@ void MGETRequest::onChildResponse(RespValuePtr&& value, uint32_t index) {
   case RespType::Integer:
   case RespType::SimpleString: {
     pending_response_->asArray()[index].type(RespType::Error);
-    pending_response_->asArray()[index].asString() = "upstream protocol error";
+    pending_response_->asArray()[index].asString() = Response::get().UpstreamProtocolError;
     error_count_++;
     break;
   }
@@ -209,7 +209,7 @@ SplitRequestPtr MSETRequest::create(ConnPool::Instance& conn_pool,
     pending_request.handle_ = conn_pool.makeRequest(incoming_request.asArray()[i].asString(),
                                                     single_mset, pending_request);
     if (!pending_request.handle_) {
-      pending_request.onResponse(Utility::makeError("no upstream host"));
+      pending_request.onResponse(Utility::makeError(Response::get().NoUpstreamHost));
     }
   }
 
@@ -221,7 +221,7 @@ void MSETRequest::onChildResponse(RespValuePtr&& value, uint32_t index) {
 
   switch (value->type()) {
   case RespType::SimpleString: {
-    if (value->asString() == "OK") {
+    if (value->asString() == Response::get().OK) {
       break;
     }
     FALLTHRU;
@@ -235,7 +235,7 @@ void MSETRequest::onChildResponse(RespValuePtr&& value, uint32_t index) {
   ASSERT(num_pending_responses_ > 0);
   if (--num_pending_responses_ == 0) {
     if (error_count_ == 0) {
-      pending_response_->asString() = "OK";
+      pending_response_->asString() = Response::get().OK;
       callbacks_.onResponse(std::move(pending_response_));
     } else {
       callbacks_.onResponse(
@@ -273,7 +273,7 @@ SplitRequestPtr SplitKeysSumResultRequest::create(ConnPool::Instance& conn_pool,
     pending_request.handle_ = conn_pool.makeRequest(incoming_request.asArray()[i].asString(),
                                                     single_fragment, pending_request);
     if (!pending_request.handle_) {
-      pending_request.onResponse(Utility::makeError("no upstream host"));
+      pending_request.onResponse(Utility::makeError(Response::get().NoUpstreamHost));
     }
   }
 
@@ -375,7 +375,7 @@ SplitRequestPtr InstanceImpl::makeRequest(const RespValue& request, SplitCallbac
 
 void InstanceImpl::onInvalidRequest(SplitCallbacks& callbacks) {
   stats_.invalid_request_.inc();
-  callbacks.onResponse(Utility::makeError("invalid request"));
+  callbacks.onResponse(Utility::makeError(Response::get().InvalidRequest));
 }
 
 void InstanceImpl::addHandler(Stats::Scope& scope, const std::string& stat_prefix,
