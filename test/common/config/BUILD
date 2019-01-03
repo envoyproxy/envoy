@@ -11,14 +11,6 @@ load(
 envoy_package()
 
 envoy_cc_test(
-    name = "address_json_test",
-    srcs = ["address_json_test.cc"],
-    deps = [
-        "//source/common/config:address_json_lib",
-    ],
-)
-
-envoy_cc_test(
     name = "filesystem_subscription_impl_test",
     srcs = ["filesystem_subscription_impl_test.cc"],
     deps = [

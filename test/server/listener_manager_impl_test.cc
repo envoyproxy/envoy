@@ -10,6 +10,7 @@
 #include "common/network/listen_socket_impl.h"
 #include "common/network/socket_option_impl.h"
 #include "common/network/utility.h"
+#include "common/protobuf/protobuf.h"
 #include "common/ssl/ssl_socket.h"
 
 #include "server/configuration_impl.h"
@@ -294,17 +295,23 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SslContext) {
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, UdpAddress) {
-  const std::string json = R"EOF(
-  {
-    "address": "udp://127.0.0.1:1234",
-    "filters": []
-  }
+  const std::string proto_text = R"EOF(
+    address: {
+      socket_address: {
+        protocol: UDP
+        address: "127.0.0.1"
+        port_value: 1234
+      }
+    }
+    filter_chains: {}
   )EOF";
+  envoy::api::v2::Listener listener_proto;
+  EXPECT_TRUE(Protobuf::TextFormat::ParseFromString(proto_text, &listener_proto));
 
   EXPECT_CALL(server_.random_, uuid());
   EXPECT_CALL(listener_factory_,
               createListenSocket(_, Network::Address::SocketType::Datagram, _, true));
-  manager_->addOrUpdateListener(parseListenerFromJson(json), "", true);
+  manager_->addOrUpdateListener(listener_proto, "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 }
 
