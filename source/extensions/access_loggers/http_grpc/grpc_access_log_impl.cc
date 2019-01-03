@@ -87,7 +87,7 @@ void HttpGrpcAccessLog::responseFlagsToAccessLogResponseFlags(
     envoy::data::accesslog::v2::AccessLogCommon& common_access_log,
     const StreamInfo::StreamInfo& stream_info) {
 
-  static_assert(StreamInfo::ResponseFlag::LastFlag == 0x4000,
+  static_assert(StreamInfo::ResponseFlag::LastFlag == 0x8000,
                 "A flag has been added. Fix this code.");
 
   if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::FailedLocalHealthCheck)) {
@@ -150,6 +150,10 @@ void HttpGrpcAccessLog::responseFlagsToAccessLogResponseFlags(
 
   if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::DownstreamConnectionTermination)) {
     common_access_log.mutable_response_flags()->set_downstream_connection_termination(true);
+  }
+
+  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::UpstreamRetryLimitExceeded)) {
+    common_access_log.mutable_response_flags()->set_upstream_retry_limit_exceeded(true);
   }
 }
 
