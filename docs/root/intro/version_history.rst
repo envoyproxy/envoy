@@ -8,6 +8,9 @@ Version history
   <envoy_api_field_config.filter.http.ext_authz.v2alpha.HttpService.authorization_response>`. In addition :ref:`client headers 
   <envoy_api_field_config.filter.http.ext_authz.v2alpha.AuthorizationResponse.allowed_client_headers>` and :ref:`upstream headers 
   <envoy_api_field_config.filter.http.ext_authz.v2alpha.AuthorizationResponse.allowed_upstream_headers>` which replaces the old *allowed_authorization_headers* object and also supports :ref:`string matcher <envoy_api_msg_type.matcher.StringMatcher>`.
+* access log: added a new flag for upstream retry count exceeded.
+
+* config: removed deprecated_v1 sds_config from :ref:`Bootstrap config <config_overview_v2_bootstrap>`.
 
 1.9.0
 ===============
