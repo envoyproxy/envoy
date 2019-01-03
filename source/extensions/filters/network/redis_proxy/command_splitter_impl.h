@@ -223,6 +223,25 @@ private:
     std::reference_wrapper<CommandHandler> handler_;
   };
 
+  typedef std::shared_ptr<HandlerData> HandlerDataPtr;
+
+  struct HandlerEntry {
+    HandlerDataPtr handler_data_;
+    std::array<std::unique_ptr<HandlerEntry>, 256> entries_;
+  };
+
+  /**
+   * A trie used for handler lookup with lookup time at most equal to the size of the incoming
+   * string.
+   */
+  struct HandlerLookupTable {
+    HandlerLookupTable() {}
+    void add(const char* key, HandlerDataPtr handler_data);
+    HandlerDataPtr find(const char* key) const;
+
+    HandlerEntry root_;
+  };
+
   void addHandler(Stats::Scope& scope, const std::string& stat_prefix, const std::string& name,
                   CommandHandler& handler);
   void onInvalidRequest(SplitCallbacks& callbacks);
@@ -233,7 +252,7 @@ private:
   CommandHandlerFactory<MGETRequest> mget_handler_;
   CommandHandlerFactory<MSETRequest> mset_handler_;
   CommandHandlerFactory<SplitKeysSumResultRequest> split_keys_sum_result_handler_;
-  std::unordered_map<std::string, HandlerData> command_map_;
+  HandlerLookupTable handler_lookup_table_;
   InstanceStats stats_;
   const ToLowerTable to_lower_table_;
 };

@@ -306,6 +306,31 @@ void SplitKeysSumResultRequest::onChildResponse(RespValuePtr&& value, uint32_t i
   }
 }
 
+void InstanceImpl::HandlerLookupTable::add(const char* key, HandlerDataPtr handler_data) {
+  HandlerEntry* current = &root_;
+  while (uint8_t c = *key) {
+    if (!current->entries_[c]) {
+      current->entries_[c] = std::make_unique<HandlerEntry>();
+    }
+    current = current->entries_[c].get();
+    key++;
+  }
+  current->handler_data_ = handler_data;
+}
+
+InstanceImpl::HandlerDataPtr InstanceImpl::HandlerLookupTable::find(const char* key) const {
+  const HandlerEntry* current = &root_;
+  while (uint8_t c = *key) {
+    current = current->entries_[c].get();
+    if (current) {
+      key++;
+    } else {
+      return nullptr;
+    }
+  }
+  return current->handler_data_;
+}
+
 InstanceImpl::InstanceImpl(ConnPool::InstancePtr&& conn_pool, Stats::Scope& scope,
                            const std::string& stat_prefix)
     : conn_pool_(std::move(conn_pool)), simple_command_handler_(*conn_pool_),
@@ -360,8 +385,8 @@ SplitRequestPtr InstanceImpl::makeRequest(const RespValue& request, SplitCallbac
     }
   }
 
-  auto handler = command_map_.find(to_lower_string);
-  if (handler == command_map_.end()) {
+  auto handler = handler_lookup_table_.find(to_lower_string.c_str());
+  if (handler == nullptr) {
     stats_.unsupported_command_.inc();
     callbacks.onResponse(Utility::makeError(
         fmt::format("unsupported command '{}'", request.asArray()[0].asString())));
@@ -369,8 +394,9 @@ SplitRequestPtr InstanceImpl::makeRequest(const RespValue& request, SplitCallbac
   }
 
   ENVOY_LOG(debug, "redis: splitting '{}'", request.toString());
-  handler->second.total_.inc();
-  return handler->second.handler_.get().startRequest(request, callbacks);
+  handler->total_.inc();
+  ENVOY_LOG(debug, "redis: incrementing total stat '{}'", request.toString());
+  return handler->handler_.get().startRequest(request, callbacks);
 }
 
 void InstanceImpl::onInvalidRequest(SplitCallbacks& callbacks) {
@@ -382,10 +408,10 @@ void InstanceImpl::addHandler(Stats::Scope& scope, const std::string& stat_prefi
                               const std::string& name, CommandHandler& handler) {
   std::string to_lower_name(name);
   to_lower_table_.toLowerCase(to_lower_name);
-  command_map_.emplace(
-      to_lower_name,
-      HandlerData{scope.counter(fmt::format("{}command.{}.total", stat_prefix, to_lower_name)),
-                  handler});
+  handler_lookup_table_.add(
+      to_lower_name.c_str(),
+      std::make_shared<HandlerData>(HandlerData{
+          scope.counter(fmt::format("{}command.{}.total", stat_prefix, to_lower_name)), handler}));
 }
 
 } // namespace CommandSplitter
