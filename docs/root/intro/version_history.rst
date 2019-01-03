@@ -5,6 +5,8 @@ Version history
 ================
 * access log: added a new flag for upstream retry count exceeded.
 
+* config: removed deprecated_v1 sds_config from :ref:`Bootstrap config <config_overview_v2_bootstrap>`.
+
 1.9.0
 ===============
 * access log: added a :ref:`JSON logging mode <config_access_log_format_dictionaries>` to output access logs in JSON format.

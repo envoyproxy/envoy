@@ -104,46 +104,23 @@ getCertificateValidationContextConfigProvider(
 
 } // namespace
 
-const std::string ContextConfigImpl::DEFAULT_CIPHER_SUITES =
-#ifndef BORINGSSL_FIPS
-    "[ECDHE-ECDSA-AES128-GCM-SHA256|ECDHE-ECDSA-CHACHA20-POLY1305]:"
-    "[ECDHE-RSA-AES128-GCM-SHA256|ECDHE-RSA-CHACHA20-POLY1305]:"
-#else // BoringSSL FIPS
-    "ECDHE-ECDSA-AES128-GCM-SHA256:"
-    "ECDHE-RSA-AES128-GCM-SHA256:"
-#endif
-    "ECDHE-ECDSA-AES128-SHA:"
-    "ECDHE-RSA-AES128-SHA:"
-    "AES128-GCM-SHA256:"
-    "AES128-SHA:"
-    "ECDHE-ECDSA-AES256-GCM-SHA384:"
-    "ECDHE-RSA-AES256-GCM-SHA384:"
-    "ECDHE-ECDSA-AES256-SHA:"
-    "ECDHE-RSA-AES256-SHA:"
-    "AES256-GCM-SHA384:"
-    "AES256-SHA";
-
-const std::string ContextConfigImpl::DEFAULT_ECDH_CURVES =
-#ifndef BORINGSSL_FIPS
-    "X25519:"
-#endif
-    "P-256";
-
 ContextConfigImpl::ContextConfigImpl(
     const envoy::api::v2::auth::CommonTlsContext& config,
+    const unsigned default_min_protocol_version, const unsigned default_max_protocol_version,
+    const std::string& default_cipher_suites, const std::string& default_curves,
     Server::Configuration::TransportSocketFactoryContext& factory_context)
     : alpn_protocols_(RepeatedPtrUtil::join(config.alpn_protocols(), ",")),
       cipher_suites_(StringUtil::nonEmptyStringOrDefault(
-          RepeatedPtrUtil::join(config.tls_params().cipher_suites(), ":"), DEFAULT_CIPHER_SUITES)),
+          RepeatedPtrUtil::join(config.tls_params().cipher_suites(), ":"), default_cipher_suites)),
       ecdh_curves_(StringUtil::nonEmptyStringOrDefault(
-          RepeatedPtrUtil::join(config.tls_params().ecdh_curves(), ":"), DEFAULT_ECDH_CURVES)),
+          RepeatedPtrUtil::join(config.tls_params().ecdh_curves(), ":"), default_curves)),
       tls_certficate_providers_(getTlsCertificateConfigProviders(config, factory_context)),
       certficate_validation_context_provider_(
           getCertificateValidationContextConfigProvider(config, factory_context, &default_cvc_)),
-      min_protocol_version_(
-          tlsVersionFromProto(config.tls_params().tls_minimum_protocol_version(), TLS1_VERSION)),
-      max_protocol_version_(
-          tlsVersionFromProto(config.tls_params().tls_maximum_protocol_version(), TLS1_2_VERSION)) {
+      min_protocol_version_(tlsVersionFromProto(config.tls_params().tls_minimum_protocol_version(),
+                                                default_min_protocol_version)),
+      max_protocol_version_(tlsVersionFromProto(config.tls_params().tls_maximum_protocol_version(),
+                                                default_max_protocol_version)) {
   if (default_cvc_ && certficate_validation_context_provider_ != nullptr) {
     // We need to validate combined certificate validation context.
     // The default certificate validation context and dynamic certificate validation
@@ -260,10 +237,39 @@ unsigned ContextConfigImpl::tlsVersionFromProto(
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
+const unsigned ClientContextConfigImpl::DEFAULT_MIN_VERSION = TLS1_VERSION;
+const unsigned ClientContextConfigImpl::DEFAULT_MAX_VERSION = TLS1_2_VERSION;
+
+const std::string ClientContextConfigImpl::DEFAULT_CIPHER_SUITES =
+#ifndef BORINGSSL_FIPS
+    "[ECDHE-ECDSA-AES128-GCM-SHA256|ECDHE-ECDSA-CHACHA20-POLY1305]:"
+    "[ECDHE-RSA-AES128-GCM-SHA256|ECDHE-RSA-CHACHA20-POLY1305]:"
+#else // BoringSSL FIPS
+    "ECDHE-ECDSA-AES128-GCM-SHA256:"
+    "ECDHE-RSA-AES128-GCM-SHA256:"
+#endif
+    "ECDHE-ECDSA-AES128-SHA:"
+    "ECDHE-RSA-AES128-SHA:"
+    "AES128-GCM-SHA256:"
+    "AES128-SHA:"
+    "ECDHE-ECDSA-AES256-GCM-SHA384:"
+    "ECDHE-RSA-AES256-GCM-SHA384:"
+    "ECDHE-ECDSA-AES256-SHA:"
+    "ECDHE-RSA-AES256-SHA:"
+    "AES256-GCM-SHA384:"
+    "AES256-SHA";
+
+const std::string ClientContextConfigImpl::DEFAULT_CURVES =
+#ifndef BORINGSSL_FIPS
+    "X25519:"
+#endif
+    "P-256";
+
 ClientContextConfigImpl::ClientContextConfigImpl(
     const envoy::api::v2::auth::UpstreamTlsContext& config, absl::string_view sigalgs,
     Server::Configuration::TransportSocketFactoryContext& factory_context)
-    : ContextConfigImpl(config.common_tls_context(), factory_context),
+    : ContextConfigImpl(config.common_tls_context(), DEFAULT_MIN_VERSION, DEFAULT_MAX_VERSION,
+                        DEFAULT_CIPHER_SUITES, DEFAULT_CURVES, factory_context),
       server_name_indication_(config.sni()), allow_renegotiation_(config.allow_renegotiation()),
       max_session_keys_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_session_keys, 1)),
       sigalgs_(sigalgs) {
@@ -290,10 +296,39 @@ ClientContextConfigImpl::ClientContextConfigImpl(
           }(),
           factory_context) {}
 
+const unsigned ServerContextConfigImpl::DEFAULT_MIN_VERSION = TLS1_VERSION;
+const unsigned ServerContextConfigImpl::DEFAULT_MAX_VERSION = TLS1_2_VERSION;
+
+const std::string ServerContextConfigImpl::DEFAULT_CIPHER_SUITES =
+#ifndef BORINGSSL_FIPS
+    "[ECDHE-ECDSA-AES128-GCM-SHA256|ECDHE-ECDSA-CHACHA20-POLY1305]:"
+    "[ECDHE-RSA-AES128-GCM-SHA256|ECDHE-RSA-CHACHA20-POLY1305]:"
+#else // BoringSSL FIPS
+    "ECDHE-ECDSA-AES128-GCM-SHA256:"
+    "ECDHE-RSA-AES128-GCM-SHA256:"
+#endif
+    "ECDHE-ECDSA-AES128-SHA:"
+    "ECDHE-RSA-AES128-SHA:"
+    "AES128-GCM-SHA256:"
+    "AES128-SHA:"
+    "ECDHE-ECDSA-AES256-GCM-SHA384:"
+    "ECDHE-RSA-AES256-GCM-SHA384:"
+    "ECDHE-ECDSA-AES256-SHA:"
+    "ECDHE-RSA-AES256-SHA:"
+    "AES256-GCM-SHA384:"
+    "AES256-SHA";
+
+const std::string ServerContextConfigImpl::DEFAULT_CURVES =
+#ifndef BORINGSSL_FIPS
+    "X25519:"
+#endif
+    "P-256";
+
 ServerContextConfigImpl::ServerContextConfigImpl(
     const envoy::api::v2::auth::DownstreamTlsContext& config,
     Server::Configuration::TransportSocketFactoryContext& factory_context)
-    : ContextConfigImpl(config.common_tls_context(), factory_context),
+    : ContextConfigImpl(config.common_tls_context(), DEFAULT_MIN_VERSION, DEFAULT_MAX_VERSION,
+                        DEFAULT_CIPHER_SUITES, DEFAULT_CURVES, factory_context),
       require_client_certificate_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, require_client_certificate, false)),
       session_ticket_keys_([&config] {
