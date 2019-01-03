@@ -13,6 +13,6 @@ envoy_cc_test(
     srcs = ["thread_singleton_test.cc"],
     deps = [
         "//source/common/common:assert_lib",
-        "//source/common/thread:thread_singleton_lib",
+        "//source/common/thread:thread_factory_singleton_lib",
     ],
 )
