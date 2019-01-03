@@ -1,5 +1,5 @@
 py_library(
     name = "markupsafe",
-    srcs = glob(["markupsafe/**/*.py"]),
+    srcs = glob(["src/markupsafe/**/*.py"]),
     visibility = ["//visibility:public"],
 )
