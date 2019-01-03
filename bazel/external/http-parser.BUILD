@@ -4,4 +4,5 @@ cc_library(
     hdrs = ["http_parser.h"],
     includes = ["."],
     visibility = ["//visibility:public"],
+    copts = ["-DHTTP_MAX_HEADER_SIZE=61440"],
 )
