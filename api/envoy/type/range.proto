@@ -1,6 +1,8 @@
 syntax = "proto3";
 
 package envoy.type;
+option java_package = "io.envoyproxy.envoy.type";
+option java_multiple_files = true;
 option go_package = "envoy_type";
 
 import "gogoproto/gogo.proto";

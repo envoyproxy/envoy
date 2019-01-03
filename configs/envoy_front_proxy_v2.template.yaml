@@ -124,13 +124,6 @@ static_resources:
   {% for service, options in clusters.iteritems() -%}
   - {{ helper.internal_cluster_definition(service, options)|indent(2) }}
   {% endfor %}
-dynamic_resources:
-  deprecated_v1:
-    sds_config:
-      api_config_source:
-        cluster_names:
-        - sds
-        refresh_delay: 30s
 cluster_manager:
   outlier_detection:
     event_log_path: /var/log/envoy/outlier_events.log
