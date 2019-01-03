@@ -1,6 +1,8 @@
 syntax = "proto3";
 
 package envoy.service.load_stats.v2;
+option java_package = "io.envoyproxy.envoy.service.load_stats.v2";
+option java_multiple_files = true;
 option go_package = "v2";
 option java_generic_services = true;
 

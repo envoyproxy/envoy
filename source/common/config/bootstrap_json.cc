@@ -28,10 +28,6 @@ void BootstrapJson::translateClusterManagerBootstrap(
     Config::CdsJson::translateCluster(*json_sds->getObject("cluster"),
                                       absl::optional<envoy::api::v2::core::ConfigSource>(),
                                       *cluster, stats_options);
-    Config::Utility::translateEdsConfig(
-        *json_sds,
-        *bootstrap.mutable_dynamic_resources()->mutable_deprecated_v1()->mutable_sds_config());
-    eds_config = bootstrap.dynamic_resources().deprecated_v1().sds_config();
   }
 
   if (json_cluster_manager.hasObject("cds")) {
