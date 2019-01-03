@@ -4,8 +4,8 @@ Version history
 1.10.0 (pending)
 ================
 * access log: added a new flag for upstream retry count exceeded.
-
 * config: removed deprecated_v1 sds_config from :ref:`Bootstrap config <config_overview_v2_bootstrap>`.
+* tls: enabled TLS 1.3 on the server-side (non-FIPS builds).
 
 1.9.0
 ===============
