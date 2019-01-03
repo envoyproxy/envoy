@@ -23,7 +23,7 @@ TEST(ThreadFactorySingleton, BasicDeathTest) {
 
   // Verify that an ASSERT() will trigger due to a thread ID mismatch.
   ThreadFactorySingletonTest singleton_test;
-  // Use std::thread instead of the ThreadFactory's createThread() to avoid the depedency on the
+  // Use std::thread instead of the ThreadFactory's createThread() to avoid the dependency on the
   // code under test.
   std::thread thread([&singleton_test]() {
     ASSERT_DEATH(singleton_test.checkThreadId(), "assert failure: run_tid_->isCurrentThreadId()");
