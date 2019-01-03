@@ -762,12 +762,11 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilte
   for (; entry != decoder_filters_.end(); entry++) {
     ASSERT(!(state_.filter_call_state_ & FilterCallState::DecodeHeaders));
     state_.filter_call_state_ |= FilterCallState::DecodeHeaders;
-    const auto current_filter_end_stream =
+    (*entry)->end_stream_ =
         decoding_headers_only_ || (end_stream && continue_data_entry == decoder_filters_.end());
-    FilterHeadersStatus status = (*entry)->decodeHeaders(headers, current_filter_end_stream);
-    (*entry)->end_stream_ = current_filter_end_stream;
+    FilterHeadersStatus status = (*entry)->decodeHeaders(headers, (*entry)->end_stream_);
 
-    ASSERT(!(status == FilterHeadersStatus::ContinueAndEndStream && current_filter_end_stream));
+    ASSERT(!(status == FilterHeadersStatus::ContinueAndEndStream && (*entry)->end_stream_));
     state_.filter_call_state_ &= ~FilterCallState::DecodeHeaders;
     ENVOY_STREAM_LOG(trace, "decode headers called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
@@ -832,9 +831,10 @@ void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* 
   }
 
   for (; entry != decoder_filters_.end(); entry++) {
-    // if end_stream_ is called for this filter, not to call its decodeData() again
+    // If end_stream_ is marked for a filter, the data is not for this filter and filters after.
+    // Please refer to the `issue <https://github.com/envoyproxy/envoy/issues/5311>`_ for details.
     if ((*entry)->end_stream_) {
-      continue;
+      return;
     }
     ASSERT(!(state_.filter_call_state_ & FilterCallState::DecodeData));
 
@@ -845,9 +845,8 @@ void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* 
       state_.filter_call_state_ |= FilterCallState::LastDataFrame;
     }
     state_.filter_call_state_ |= FilterCallState::DecodeData;
-    const bool current_filter_end_stream = end_stream && !request_trailers_;
-    FilterDataStatus status = (*entry)->handle_->decodeData(data, current_filter_end_stream);
-    (*entry)->end_stream_ = current_filter_end_stream;
+    (*entry)->end_stream_ = end_stream && !request_trailers_;
+    FilterDataStatus status = (*entry)->handle_->decodeData(data, (*entry)->end_stream_);
     state_.filter_call_state_ &= ~FilterCallState::DecodeData;
     if (end_stream) {
       state_.filter_call_state_ &= ~FilterCallState::LastDataFrame;
@@ -1083,11 +1082,9 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
   for (; entry != encoder_filters_.end(); entry++) {
     ASSERT(!(state_.filter_call_state_ & FilterCallState::EncodeHeaders));
     state_.filter_call_state_ |= FilterCallState::EncodeHeaders;
-    const bool current_filter_end_stream =
+    (*entry)->end_stream_ =
         encoding_headers_only_ || (end_stream && continue_data_entry == encoder_filters_.end());
-    FilterHeadersStatus status =
-        (*entry)->handle_->encodeHeaders(headers, current_filter_end_stream);
-    (*entry)->end_stream_ = current_filter_end_stream;
+    FilterHeadersStatus status = (*entry)->handle_->encodeHeaders(headers, (*entry)->end_stream_);
     state_.filter_call_state_ &= ~FilterCallState::EncodeHeaders;
     ENVOY_STREAM_LOG(trace, "encode headers called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
@@ -1199,11 +1196,9 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
 
   // Now actually encode via the codec.
   stream_info_.onFirstDownstreamTxByteSent();
-  const bool encoder_end_stream =
-      encoding_headers_only_ || (end_stream && continue_data_entry == encoder_filters_.end());
-  response_encoder_->encodeHeaders(headers, encoder_end_stream);
-  response_encoder_end_stream_ = encoder_end_stream;
-
+  response_encoder_->encodeHeaders(
+      headers,
+      encoding_headers_only_ || (end_stream && continue_data_entry == encoder_filters_.end()));
   if (continue_data_entry != encoder_filters_.end()) {
     // We use the continueEncoding() code since it will correctly handle not calling
     // encodeHeaders() again. Fake setting stopped_ since the continueEncoding() code expects it.
@@ -1283,9 +1278,10 @@ void ConnectionManagerImpl::ActiveStream::encodeData(ActiveStreamEncoderFilter* 
 
   const bool trailers_exists_at_start = response_trailers_ != nullptr;
   for (; entry != encoder_filters_.end(); entry++) {
-    // if end_stream_ is called for this filter, not to call its encodeData() again
+    // If end_stream_ is marked for a filter, the data is not for this filter and filters after.
+    // Please refer to the `issue <https://github.com/envoyproxy/envoy/issues/5311>`_ for details.
     if ((*entry)->end_stream_) {
-      continue;
+      return;
     }
     ASSERT(!(state_.filter_call_state_ & FilterCallState::EncodeData));
 
@@ -1296,9 +1292,8 @@ void ConnectionManagerImpl::ActiveStream::encodeData(ActiveStreamEncoderFilter* 
     if (end_stream) {
       state_.filter_call_state_ |= FilterCallState::LastDataFrame;
     }
-    const bool current_filter_end_stream = end_stream && !response_trailers_;
-    FilterDataStatus status = (*entry)->handle_->encodeData(data, current_filter_end_stream);
-    (*entry)->end_stream_ = current_filter_end_stream;
+    (*entry)->end_stream_ = end_stream && !response_trailers_;
+    FilterDataStatus status = (*entry)->handle_->encodeData(data, (*entry)->end_stream_);
     state_.filter_call_state_ &= ~FilterCallState::EncodeData;
     if (end_stream) {
       state_.filter_call_state_ &= ~FilterCallState::LastDataFrame;
@@ -1327,11 +1322,8 @@ void ConnectionManagerImpl::ActiveStream::encodeData(ActiveStreamEncoderFilter* 
     response_encoder_->encodeData(data, false);
     encodeTrailers(trailers_added_entry->get(), *response_trailers_);
   } else {
-    if (!response_encoder_end_stream_) {
-      response_encoder_->encodeData(data, end_stream);
-      response_encoder_end_stream_ = end_stream;
-      maybeEndEncode(end_stream);
-    }
+    response_encoder_->encodeData(data, end_stream);
+    maybeEndEncode(end_stream);
   }
 }
 
@@ -1361,7 +1353,6 @@ void ConnectionManagerImpl::ActiveStream::encodeTrailers(ActiveStreamEncoderFilt
   ENVOY_STREAM_LOG(debug, "encoding trailers via codec:\n{}", *this, trailers);
 
   response_encoder_->encodeTrailers(trailers);
-  response_encoder_end_stream_ = true;
   maybeEndEncode(true);
 }
 
@@ -1789,12 +1780,10 @@ void ConnectionManagerImpl::ActiveStreamEncoderFilter::responseDataTooLarge() {
           [&](HeaderMapPtr&& response_headers, bool end_stream) -> void {
             parent_.response_headers_ = std::move(response_headers);
             parent_.response_encoder_->encodeHeaders(*parent_.response_headers_, end_stream);
-            parent_.response_encoder_end_stream_ = end_stream;
             parent_.state_.local_complete_ = end_stream;
           },
           [&](Buffer::Instance& data, bool end_stream) -> void {
             parent_.response_encoder_->encodeData(data, end_stream);
-            parent_.response_encoder_end_stream_ = end_stream;
             parent_.state_.local_complete_ = end_stream;
           },
           parent_.state_.destroyed_, Http::Code::InternalServerError,

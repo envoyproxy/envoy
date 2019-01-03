@@ -428,8 +428,6 @@ private:
     // Whether a filter has indicated that the response should be treated as a headers only
     // response.
     bool encoding_headers_only_{};
-    // If true, response_encoder is end_stream
-    bool response_encoder_end_stream_{};
   };
 
   typedef std::unique_ptr<ActiveStream> ActiveStreamPtr;

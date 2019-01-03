@@ -3121,6 +3121,39 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddBodyContinuation) {
   encoder_filters_[1]->callbacks_->continueEncoding();
 }
 
+// This test verifies proper sequences of decodeData() and encodeData() are called
+// when all filers return "CONTINUE" in following case:
+//
+// 3 decode filters:
+//
+//   filter0->decodeHeaders(_, true)
+//     return CONTINUE
+//   filter1->decodeHeaders(_, true)
+//     filter1->addDecodeData()
+//     return CONTINUE
+//   filter2->decodeHeaders(_, false)
+//     return CONTINUE
+//   filter2->decodeData(_, true)
+//     return CONTINUE
+//
+//   filter0->decodeData(, true) is NOT called.
+//   filter1->decodeData(, true) is NOT called.
+//
+// 3 encode filters:
+//
+//   filter2->encodeHeaders(_, true)
+//     return CONTINUE
+//   filter1->encodeHeaders(_, true)
+//     filter1->addEncodeData()
+//     return CONTINUE
+//   filter0->decodeHeaders(_, false)
+//     return CONTINUE
+//   filter0->decodeData(_, true)
+//     return CONTINUE
+//
+//   filter2->encodeData(, true) is NOT called.
+//   filter1->encodeData(, true) is NOT called.
+//
 TEST_F(HttpConnectionManagerImplTest, AddDataWithAllContinue) {
   InSequence s;
   setup(false, "");
@@ -3182,6 +3215,41 @@ TEST_F(HttpConnectionManagerImplTest, AddDataWithAllContinue) {
       HeaderMapPtr{new TestHeaderMapImpl{{":status", "200"}}}, true);
 }
 
+// This test verifies proper sequences of decodeData() and encodeData() are called
+// when the first filer is "stopped" and "continue" in following case:
+//
+// 3 decode filters:
+//
+//   filter0->decodeHeaders(_, true)
+//     return STOP
+//   filter0->continueDecoding()
+//   filter1->decodeHeaders(_, true)
+//     filter1->addDecodeData()
+//     return CONTINUE
+//   filter2->decodeHeaders(_, false)
+//     return CONTINUE
+//   filter2->decodeData(_, true)
+//     return CONTINUE
+//
+//   filter0->decodeData(, true) is NOT called.
+//   filter1->decodeData(, true) is NOT called.
+//
+// 3 encode filters:
+//
+//   filter2->encodeHeaders(_, true)
+//     return STOP
+//   filter2->continueEncoding()
+//   filter1->encodeHeaders(_, true)
+//     filter1->addEncodeData()
+//     return CONTINUE
+//   filter0->decodeHeaders(_, false)
+//     return CONTINUE
+//   filter0->decodeData(_, true)
+//     return CONTINUE
+//
+//   filter2->encodeData(, true) is NOT called.
+//   filter1->encodeData(, true) is NOT called.
+//
 TEST_F(HttpConnectionManagerImplTest, AddDataWithStopAndContinue) {
   InSequence s;
   setup(false, "");
