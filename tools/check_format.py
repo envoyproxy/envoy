@@ -12,8 +12,7 @@ import stat
 import sys
 import traceback
 
-EXCLUDED_PREFIXES = ("./generated/", "./thirdparty/", "./build", "./.git/", "./bazel-",
-                     "./bazel/external", "./.cache",
+EXCLUDED_PREFIXES = ("./generated/", "./thirdparty/", "./build", "./.git/", "./bazel-", "./.cache",
                      "./source/extensions/extensions_build_config.bzl",
                      "./tools/testdata/check_format/")
 SUFFIXES = (".cc", ".h", "BUILD", "WORKSPACE", ".bzl", ".md", ".rst", ".proto")
@@ -205,6 +204,10 @@ def isBuildFile(file_path):
   return False
 
 
+def isExternalBuildFile(file_path):
+  return isBuildFile(file_path) and file_path.startswith("./bazel/external/")
+
+
 def isSkylarkFile(file_path):
   return file_path.endswith(".bzl")
 
@@ -333,12 +336,13 @@ def checkBuildLine(line, file_path, reportError):
     reportError("unexpected direct external dependency on protobuf, use "
                 "//source/common/protobuf instead.")
   if (envoy_build_rule_check and not isSkylarkFile(file_path) and not isWorkspaceFile(file_path) and
-      '@envoy//' in line):
+      not isExternalBuildFile(file_path) and '@envoy//' in line):
     reportError("Superfluous '@envoy//' prefix")
 
 
 def fixBuildLine(line, file_path):
-  if envoy_build_rule_check and not isSkylarkFile(file_path) and not isWorkspaceFile(file_path):
+  if (envoy_build_rule_check and not isSkylarkFile(file_path) and not isWorkspaceFile(file_path) and
+      not isExternalBuildFile(file_path)):
     line = line.replace('@envoy//', '//')
   return line
 
