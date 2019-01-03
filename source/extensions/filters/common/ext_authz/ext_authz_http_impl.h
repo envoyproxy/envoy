@@ -41,17 +41,11 @@ public:
 
 class HeaderKeyMatcher : public Matcher {
 public:
-  HeaderKeyMatcher(std::vector<Matchers::StringMatcher>&& list) : matchers_(std::move(list)) {}
+  HeaderKeyMatcher(std::vector<Matchers::StringMatcher>&& list);
 
-  bool matches(const Http::LowerCaseString& key) const override {
-    return std::any_of(matchers_.begin(), matchers_.end(),
-                       [&key](auto matcher) { return matcher.match(key.get()); });
-  }
+  bool matches(const Http::LowerCaseString& key) const override;
 
-  bool matches(const Envoy::Http::HeaderString& key) const override {
-    return std::any_of(matchers_.begin(), matchers_.end(),
-                       [&key](auto matcher) { return matcher.match(key.getStringView()); });
-  }
+  bool matches(const Envoy::Http::HeaderString& key) const override;
 
 private:
   const std::vector<Matchers::StringMatcher> matchers_;
@@ -59,13 +53,11 @@ private:
 
 class NotHeaderKeyMatcher : public Matcher {
 public:
-  NotHeaderKeyMatcher(std::vector<Matchers::StringMatcher>&& list) : matcher_(std::move(list)) {}
+  NotHeaderKeyMatcher(std::vector<Matchers::StringMatcher>&& list);
 
-  bool matches(const Http::LowerCaseString& key) const override { return !matcher_.matches(key); }
+  bool matches(const Http::LowerCaseString& key) const override;
 
-  bool matches(const Envoy::Http::HeaderString& key) const override {
-    return !matcher_.matches(key);
-  }
+  bool matches(const Envoy::Http::HeaderString& key) const override;
 
 private:
   const HeaderKeyMatcher matcher_;
@@ -80,35 +72,35 @@ public:
                uint32_t timeout, absl::string_view path_prefix);
 
   /**
-   * @return Name of the authorization cluster.
+   * Returns the name of the authorization cluster.
    */
   const std::string& cluster() { return cluster_name_; }
 
   /**
-   * @return Authorization request path prefix.
+   * Returns the authorization request path prefix.
    */
   const std::string& pathPrefix() { return path_prefix_; }
 
   /**
-   * @return Authorization request timeout.
+   * Returns authorization request timeout.
    */
   const std::chrono::milliseconds& timeout() const { return timeout_; }
 
   /**
-   * @return List of matchers used for selecting headers the should be aggregated to an
-   * authorization request.
+   * Returns a list of matchers used for selecting the request headers that should be sent to the
+   * authorization server.
    */
   const MatcherSharedPtr& requestHeaderMatchers() const { return request_header_matchers_; }
 
   /**
-   * @return List of matchers used for selecting headers the should be aggregated to an denied
-   * authorization response.
+   * Returns a list of matchers used for selecting the the authorization response headers that
+   * should be send back to the client.
    */
   const MatcherSharedPtr& clientHeaderMatchers() const { return client_header_matchers_; }
 
   /**
-   * @return List of matchers used for selecting headers the should be aggregated to an ok
-   * authorization response.
+   *  Returns a list of matchers used for selecting the the authorization response headers that
+   * should be send to an the upstream server.
    */
   const MatcherSharedPtr& upstreamHeaderMatchers() const { return upstream_header_matchers_; }
 

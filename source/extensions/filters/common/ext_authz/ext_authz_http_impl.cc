@@ -39,7 +39,6 @@ struct SuccessResponse {
           if (context->matchers_->matches(header.key())) {
             context->response_->headers_to_add.emplace_back(
                 Http::LowerCaseString{header.key().c_str()}, header.value().c_str());
-            return Http::HeaderMap::Iterate::Continue;
           }
           return Http::HeaderMap::Iterate::Continue;
         },
@@ -52,6 +51,32 @@ struct SuccessResponse {
 };
 } // namespace
 
+// Matchers
+HeaderKeyMatcher::HeaderKeyMatcher(std::vector<Matchers::StringMatcher>&& list)
+    : matchers_(std::move(list)) {}
+
+bool HeaderKeyMatcher::matches(const Http::LowerCaseString& key) const {
+  return std::any_of(matchers_.begin(), matchers_.end(),
+                     [&key](auto matcher) { return matcher.match(key.get()); });
+}
+
+bool HeaderKeyMatcher::matches(const Envoy::Http::HeaderString& key) const {
+  return std::any_of(matchers_.begin(), matchers_.end(),
+                     [&key](auto matcher) { return matcher.match(key.getStringView()); });
+}
+
+NotHeaderKeyMatcher::NotHeaderKeyMatcher(std::vector<Matchers::StringMatcher>&& list)
+    : matcher_(std::move(list)) {}
+
+bool NotHeaderKeyMatcher::matches(const Http::LowerCaseString& key) const {
+  return !matcher_.matches(key);
+}
+
+bool NotHeaderKeyMatcher::matches(const Envoy::Http::HeaderString& key) const {
+  return !matcher_.matches(key);
+}
+
+// Config
 ClientConfig::ClientConfig(const envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz& config,
                            uint32_t timeout, absl::string_view path_prefix)
     : request_header_matchers_(
@@ -137,6 +162,7 @@ void RawHttpClientImpl::cancel() {
   callbacks_ = nullptr;
 }
 
+// Client
 void RawHttpClientImpl::check(RequestCallbacks& callbacks,
                               const envoy::service::auth::v2alpha::CheckRequest& request,
                               Tracing::Span&) {
