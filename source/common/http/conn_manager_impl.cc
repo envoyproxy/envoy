@@ -1044,6 +1044,7 @@ void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(
     state_.filter_call_state_ |= FilterCallState::Encode100ContinueHeaders;
     current_encoder_filter_ = (*entry).get();
     FilterHeadersStatus status = (*entry)->handle_->encode100ContinueHeaders(headers);
+    current_encoder_filter_ = nullptr;
     state_.filter_call_state_ &= ~FilterCallState::Encode100ContinueHeaders;
     ENVOY_STREAM_LOG(trace, "encode 100 continue headers called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
@@ -1051,7 +1052,6 @@ void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(
       return;
     }
   }
-  current_encoder_filter_ = nullptr;
 
   // Strip the T-E headers etc. Defer other header additions as well as drain-close logic to the
   // continuation headers.
@@ -1081,6 +1081,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
     FilterHeadersStatus status = (*entry)->handle_->encodeHeaders(
         headers,
         encoding_headers_only_ || (end_stream && continue_data_entry == encoder_filters_.end()));
+    current_encoder_filter_ = nullptr;
     state_.filter_call_state_ &= ~FilterCallState::EncodeHeaders;
     ENVOY_STREAM_LOG(trace, "encode headers called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
@@ -1104,7 +1105,6 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
       continue_data_entry = entry;
     }
   }
-  current_encoder_filter_ = nullptr;
 
   // Base headers.
   connection_manager_.config_.dateProvider().setDateHeader(headers);
@@ -1223,7 +1223,9 @@ void ConnectionManagerImpl::ActiveStream::encodeMetadata(ActiveStreamEncoderFilt
   std::list<ActiveStreamEncoderFilterPtr>::iterator entry =
       filter == nullptr ? encoder_filters_.begin() : std::next(filter->entry());
   for (; entry != encoder_filters_.end(); entry++) {
+    current_encoder_filter_ = (*entry).get();
     FilterMetadataStatus status = (*entry)->handle_->encodeMetadata(*metadata_map_ptr);
+    current_encoder_filter_ = nullptr;
     ENVOY_STREAM_LOG(trace, "encode metadata called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
   }
@@ -1296,6 +1298,7 @@ void ConnectionManagerImpl::ActiveStream::encodeData(ActiveStreamEncoderFilter* 
     current_encoder_filter_ = (*entry).get();
     FilterDataStatus status =
         (*entry)->handle_->encodeData(data, end_stream && !response_trailers_);
+    current_encoder_filter_ = nullptr;
     state_.filter_call_state_ &= ~FilterCallState::EncodeData;
     if (end_stream) {
       state_.filter_call_state_ &= ~FilterCallState::LastDataFrame;
@@ -1312,7 +1315,6 @@ void ConnectionManagerImpl::ActiveStream::encodeData(ActiveStreamEncoderFilter* 
       return;
     }
   }
-  current_encoder_filter_ = nullptr;
 
   ENVOY_STREAM_LOG(trace, "encoding data via codec (size={} end_stream={})", *this, data.length(),
                    end_stream);
@@ -1345,6 +1347,7 @@ void ConnectionManagerImpl::ActiveStream::encodeTrailers(ActiveStreamEncoderFilt
     state_.filter_call_state_ |= FilterCallState::EncodeTrailers;
     current_encoder_filter_ = (*entry).get();
     FilterTrailersStatus status = (*entry)->handle_->encodeTrailers(trailers);
+    current_encoder_filter_ = nullptr;
     state_.filter_call_state_ &= ~FilterCallState::EncodeTrailers;
     ENVOY_STREAM_LOG(trace, "encode trailers called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
@@ -1352,7 +1355,6 @@ void ConnectionManagerImpl::ActiveStream::encodeTrailers(ActiveStreamEncoderFilt
       return;
     }
   }
-  current_encoder_filter_ = nullptr;
 
   ENVOY_STREAM_LOG(debug, "encoding trailers via codec:\n{}", *this, trailers);
 

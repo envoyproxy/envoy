@@ -22,7 +22,10 @@ public:
     if (it != metadata_map.end()) {
       metadata_map.erase("remove");
     }
-    metadata_map.emplace("metadata", "metadata");
+    it = metadata_map.find("metadata");
+    if (it != metadata_map.end()) {
+      metadata_map.erase("metadata");
+    }
     return Http::FilterMetadataStatus::Continue;
   }
 };

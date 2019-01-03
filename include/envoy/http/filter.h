@@ -519,7 +519,7 @@ public:
 
   /**
    * Called with metadata to be encoded. New metadata can be added directly to metadata_map or
-   * through addEncodedMetadata() interface.
+   * through StreamDecoderFilterCallbacks::encodeMetadata() interface.
    *
    * @param metadata_map supplies the metadata to be encoded.
    * @return FilterMetadataStatus, which currently is always FilterMetadataStatus::Continue;

@@ -49,6 +49,13 @@ public:
     decoder_callbacks_->encodeMetadata(std::move(metadata_map_ptr));
     return Http::FilterHeadersStatus::Continue;
   }
+
+  Http::FilterMetadataStatus encodeMetadata(Http::MetadataMap&) override {
+    Http::MetadataMap metadata_map = {{"metadata", "metadata"}};
+    Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
+    decoder_callbacks_->encodeMetadata(std::move(metadata_map_ptr));
+    return Http::FilterMetadataStatus::Continue;
+  }
 };
 
 class AddMetadataInsertStreamFilterConfig
