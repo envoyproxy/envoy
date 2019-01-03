@@ -67,10 +67,7 @@ TEST_F(OriginalSrcTest, onNewConnectionIpv4AddressUsesCorrectAddress) {
   filter->onAccept(callbacks_);
   std::vector<uint8_t> key;
   option->hashKey(key);
-  std::vector<uint8_t> expected_key = {OriginalSrcSocketOption::IPV4_KEY};
-  // add the padding
-  expected_key.insert(expected_key.end(), 12, 0);
-  expected_key.insert(expected_key.end(), {1, 2, 3, 4});
+  std::vector<uint8_t> expected_key = {1, 2, 3, 4};
 
   EXPECT_EQ(key, expected_key);
 }

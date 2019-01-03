@@ -41,21 +41,11 @@ template <typename T> void addressIntoVector(std::vector<uint8_t>& vec, const T&
 }
 
 void OriginalSrcSocketOption::hashKey(std::vector<uint8_t>& key) const {
-  /* We do two things here to ensure that there isn't any ambiguity when combining the hash key with
-   * variable length options:
-   * 1. Ensure the the key is fixed length by padding ipv4 addresses up to 16 bytes with 0s.
-   * 2. Enusre that Ipv6 addresses cannot collide with padded v4 addresses by placing a unique value
-   *    before the address.
-   */
   if (src_address_->ip()->version() == Network::Address::IpVersion::v4) {
-    key.push_back(IPV4_KEY);
-    // padding
-    key.insert(key.end(), 12, 0);
     // note raw_address is already in network order
     uint32_t raw_address = src_address_->ip()->ipv4()->address();
     addressIntoVector(key, raw_address);
   } else if (src_address_->ip()->version() == Network::Address::IpVersion::v6) {
-    key.push_back(IPV6_KEY);
     // note raw_address is already in network order
     absl::uint128 raw_address = src_address_->ip()->ipv6()->address();
     addressIntoVector(key, raw_address);

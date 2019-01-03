@@ -58,11 +58,8 @@ TEST_F(OriginalSrcSocketOptionTest, TestIpv4HashKey) {
   auto option = makeOptionByAddress(address);
   option->hashKey(key_);
 
-  std::vector<uint8_t> expected_key = {OriginalSrcSocketOption::IPV4_KEY};
-  // 12 bytes of 0-padding so we have a constant size
-  expected_key.insert(expected_key.end(), 12, 0);
   // The ip address broken into big-endian octets.
-  expected_key.insert(expected_key.end(), {1, 2, 3, 4});
+  std::vector<uint8_t> expected_key = {1, 2, 3, 4};
   EXPECT_EQ(key_, expected_key);
 }
 
@@ -71,11 +68,8 @@ TEST_F(OriginalSrcSocketOptionTest, TestIpv4HashKeyOther) {
   auto option = makeOptionByAddress(address);
   option->hashKey(key_);
 
-  std::vector<uint8_t> expected_key = {OriginalSrcSocketOption::IPV4_KEY};
-  // 12 bytes of 0-padding so we have a constant size
-  expected_key.insert(expected_key.end(), 12, 0);
   // The ip address broken into big-endian octets.
-  expected_key.insert(expected_key.end(), {255, 254, 253, 0});
+  std::vector<uint8_t> expected_key = {255, 254, 253, 0};
   EXPECT_EQ(key_, expected_key);
 }
 
@@ -84,9 +78,8 @@ TEST_F(OriginalSrcSocketOptionTest, TestIpv6HashKey) {
   auto option = makeOptionByAddress(address);
   option->hashKey(key_);
 
-  std::vector<uint8_t> expected_key = {OriginalSrcSocketOption::IPV6_KEY};
-  expected_key.insert(expected_key.end(), {0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8, 0x9, 0xa, 0xb,
-                                           0xc, 0xd, 0xe, 0xf, 0x0});
+  std::vector<uint8_t> expected_key = {0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8,
+                                       0x9, 0xa, 0xb, 0xc, 0xd, 0xe, 0xf, 0x0};
   EXPECT_EQ(key_, expected_key);
 }
 
@@ -95,9 +88,8 @@ TEST_F(OriginalSrcSocketOptionTest, TestIpv6HashKeyOther) {
   auto option = makeOptionByAddress(address);
   option->hashKey(key_);
 
-  std::vector<uint8_t> expected_key = {OriginalSrcSocketOption::IPV6_KEY};
-  expected_key.insert(expected_key.end(), {0xF, 0x2, 0x3, 0x4, 0x5, 0x19, 0x7, 0x8, 0x9, 0xa, 0xb,
-                                           0xe, 0xff, 0xff, 0x0, 0x0});
+  std::vector<uint8_t> expected_key = {0xF, 0x2, 0x3, 0x4, 0x5,  0x19, 0x7, 0x8,
+                                       0x9, 0xa, 0xb, 0xe, 0xff, 0xff, 0x0, 0x0};
   EXPECT_EQ(key_, expected_key);
 }
 
