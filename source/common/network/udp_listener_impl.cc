@@ -94,8 +94,10 @@ void UdpListenerImpl::readCallback(int fd, short flags, void* arg) {
 
   break;
   default:
-    RELEASE_ASSERT(false, fmt::format("Unsupported address family: {}, local address: {}",
-                                      addr.ss_family, local_address->asString()));
+    RELEASE_ASSERT(false,
+                   fmt::format("Unsupported address family: {}, local address: {}, receive size: "
+                               "{}, address length: {}",
+                               addr.ss_family, local_address->asString(), result.rc_, addr_len));
   }
 
   RELEASE_ASSERT((peer_address != nullptr),
