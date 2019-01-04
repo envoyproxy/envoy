@@ -41,6 +41,11 @@ template <typename T> void addressIntoVector(std::vector<uint8_t>& vec, const T&
 }
 
 void OriginalSrcSocketOption::hashKey(std::vector<uint8_t>& key) const {
+
+  // Note: we're assuming that there cannot be a conflict between IPv6 addresses here. If an IPv4
+  // address is mapped into an IPv6 address using an IPv4-Mapped IPv6 Address (RFC4921), then it's
+  // possible the hashes will be different despite the IP address used by the connection being
+  // the same.
   if (src_address_->ip()->version() == Network::Address::IpVersion::v4) {
     // note raw_address is already in network order
     uint32_t raw_address = src_address_->ip()->ipv4()->address();
