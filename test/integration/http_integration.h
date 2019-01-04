@@ -126,8 +126,9 @@ protected:
   void testRouterRequestAndResponseWithBody(uint64_t request_size, uint64_t response_size,
                                             bool big_header,
                                             ConnectionCreationFunction* creator = nullptr);
-  void testRouterHeaderOnlyRequestAndResponse(bool leave_upstream_open, int upstream_index = 0,
-                                              ConnectionCreationFunction* creator = nullptr);
+  void testRouterHeaderOnlyRequestAndResponse(bool leave_upstream_open,
+                                              ConnectionCreationFunction* creator = nullptr,
+                                              int upstream_index = 0);
   void testRouterUpstreamDisconnectBeforeRequestComplete();
   void
   testRouterUpstreamDisconnectBeforeResponseComplete(ConnectionCreationFunction* creator = nullptr);

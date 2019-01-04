@@ -127,7 +127,7 @@ TEST_P(SslIntegrationTest, RouterHeaderOnlyRequestAndResponse) {
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection({});
   };
-  testRouterHeaderOnlyRequestAndResponse(true, 0, &creator);
+  testRouterHeaderOnlyRequestAndResponse(true, &creator);
   checkStats();
 }
 

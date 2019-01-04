@@ -195,7 +195,7 @@ INSTANTIATE_TEST_CASE_P(IpVersionsClientType, CdsIntegrationTest, GRPC_CLIENT_IN
 // 7) We send Envoy a request, which we verify is properly proxied to and served by that cluster.
 TEST_P(CdsIntegrationTest, CdsClusterUpDownUp) {
   // Calls our initialize(), which includes establishing a listener, route, and cluster.
-  testRouterHeaderOnlyRequestAndResponse(true, 1);
+  testRouterHeaderOnlyRequestAndResponse(true, nullptr, 1);
 
   // Tell Envoy that cluster_0 is gone.
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {}));
@@ -224,7 +224,7 @@ TEST_P(CdsIntegrationTest, CdsClusterUpDownUp) {
   test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);
 
   // Does *not* call our initialize().
-  testRouterHeaderOnlyRequestAndResponse(true, 1);
+  testRouterHeaderOnlyRequestAndResponse(true, nullptr, 1);
 
   cleanupUpstreamAndDownstream();
   fake_upstream_connection_ = nullptr;
