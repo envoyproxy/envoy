@@ -12,7 +12,7 @@
 #define IP6T_SO_ORIGINAL_DST 80
 #endif
 
-#include <netinet/ip.h>
+#include <netinet/in.h>
 #include <sys/socket.h>
 
 #include <cstdint>

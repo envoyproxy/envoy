@@ -12,6 +12,7 @@ HTTP filters
   ext_authz_filter
   fault_filter
   grpc_http1_bridge_filter
+  grpc_http1_reverse_bridge_filter
   grpc_json_transcoder_filter
   grpc_web_filter
   gzip_filter

@@ -6,6 +6,7 @@ Version history
 * access log: added a new flag for upstream retry count exceeded.
 * buffer: fix vulnerabilities when allocation fails
 * config: removed deprecated_v1 sds_config from :ref:`Bootstrap config <config_overview_v2_bootstrap>`.
+* http: added new grpc_http1_reverse_bridge filter for converting gRPC requests into HTTP/1.1 requests.
 * tls: enabled TLS 1.3 on the server-side (non-FIPS builds).
 
 1.9.0

@@ -1,8 +1,6 @@
 #pragma once
 
 #include <netinet/in.h>
-#include <netinet/ip.h>
-#include <netinet/tcp.h>
 #include <sys/socket.h>
 
 #include "envoy/api/v2/core/address.pb.h"
