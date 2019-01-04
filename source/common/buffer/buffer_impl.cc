@@ -1,7 +1,6 @@
 #include "common/buffer/buffer_impl.h"
 
 #include <cstdint>
-#include <iostream>
 #include <string>
 
 #include "common/api/os_sys_calls_impl.h"
@@ -73,7 +72,7 @@ private:
   /**
    * Compute a slice size big enough to hold a specified amount of data.
    * @param data_size the minimum amount of data the slice must be able to store, in bytes.
-   * @ return a recommended slice size, in bytes.
+   * @return a recommended slice size, in bytes.
    */
   static uint64_t sliceSize(uint64_t data_size) {
     uint64_t slice_size = 32;
@@ -107,29 +106,26 @@ private:
 
 class UnownedBufferSlice : public BufferSlice {
 public:
-  UnownedBufferSlice(BufferFragment& fragment) : fragment_(fragment), data_(0) {}
+  UnownedBufferSlice(BufferFragment& fragment) : fragment_(fragment), offset_(0) {}
   ~UnownedBufferSlice() override { fragment_.done(); }
 
   // BufferSlice
   const void* data() const override {
-    return static_cast<const uint8_t*>(fragment_.data()) + data_;
+    return static_cast<const uint8_t*>(fragment_.data()) + offset_;
   }
 
   void* data() override {
-    return static_cast<uint8_t*>(const_cast<void*>(fragment_.data())) + data_;
+    return static_cast<uint8_t*>(const_cast<void*>(fragment_.data())) + offset_;
   }
-
-  uint64_t dataSize() const override { return fragment_.size() - data_; }
 
   void drain(uint64_t size) override {
-    ASSERT(data_ + size <= fragment_.size());
-    data_ += size;
+    ASSERT(offset_ + size <= fragment_.size());
+    offset_ += size;
   }
 
+  uint64_t dataSize() const override { return fragment_.size() - offset_; }
   uint64_t reservableSize() const override { return 0; }
-
   Reservation reserve(uint64_t) override { return {nullptr, 0}; }
-
   bool commit(const Reservation&, uint64_t) override { return false; }
 
 private:
@@ -139,7 +135,7 @@ private:
    * Offset in bytes from the start of the fragment to the start of the Data section
    * (increases with each call to drain()).
    */
-  uint64_t data_;
+  uint64_t offset_;
 };
 
 void OwnedImpl::append(const void* data, uint64_t size) {
@@ -296,6 +292,7 @@ void OwnedImpl::move(Instance& rhs) {
   // We do the static cast here because in practice we only have one buffer implementation right
   // now and this is safe. This is a reasonable compromise in a high performance path where we want
   // to maintain an abstraction.
+  ASSERT(dynamic_cast<OwnedImpl*>(&rhs) != nullptr);
   OwnedImpl& other = static_cast<OwnedImpl&>(rhs);
   while (!other.slices_.empty()) {
     slices_.emplace_back(std::move(other.slices_.front()));
@@ -306,16 +303,14 @@ void OwnedImpl::move(Instance& rhs) {
 
 void OwnedImpl::move(Instance& rhs, uint64_t length) {
   // See move() above for why we do the static cast.
+  ASSERT(dynamic_cast<OwnedImpl*>(&rhs) != nullptr);
   OwnedImpl& other = static_cast<OwnedImpl&>(rhs);
-  while (!other.slices_.empty()) {
-    if (length == 0) {
-      break;
-    }
+  while (length != 0 && !other.slices_.empty()) {
     uint64_t copy_size = std::min(other.slices_.front()->dataSize(), length);
     if (copy_size == 0) {
       other.slices_.pop_front();
     } else if (copy_size < other.slices_.front()->dataSize()) {
-      // TODO add reference-counting to allow slices to share their storage
+      // TODO(brian-pane) add reference-counting to allow slices to share their storage
       // and eliminate the copy for this partial-slice case?
       append(other.slices_.front()->data(), copy_size);
       other.slices_.front()->drain(copy_size);
@@ -369,7 +364,7 @@ Api::SysCallIntResult OwnedImpl::read(int fd, uint64_t max_length) {
 }
 
 uint64_t OwnedImpl::reserve(uint64_t length, RawSlice* iovecs, uint64_t num_iovecs) {
-  // TODO support the use of space in more than one slice.
+  // TODO(brian-pane) support the use of space in more than one slice.
   if (num_iovecs == 0) {
     return 0;
   }
@@ -386,7 +381,8 @@ uint64_t OwnedImpl::reserve(uint64_t length, RawSlice* iovecs, uint64_t num_iove
 ssize_t OwnedImpl::search(const void* data, uint64_t size, size_t start) const {
   // This implementation uses the same search algorithm as evbuffer_search(), a naive
   // scan that requires O(M*N) comparisons in the worst case.
-  // TODO: replace this with a more efficient search if it shows up prominently in CPU profiling.
+  // TODO(brian-pane): replace this with a more efficient search if it shows up
+  // prominently in CPU profiling.
   if (size == 0) {
     return 0;
   }
