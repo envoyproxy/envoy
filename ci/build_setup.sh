@@ -88,7 +88,7 @@ if [ "$1" != "-nofetch" ]; then
   fi
   
   # This is the hash on https://github.com/envoyproxy/envoy-filter-example.git we pin to.
-  (cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}" && git fetch origin && git checkout -f 3e5b73305b961526ffcee7584251692a9a3ce4b3)
+  (cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}" && git fetch origin && git checkout -f 6c0625cb4cc9a21df97cef2a1d065463f2ae81ae)
   cp -f "${ENVOY_SRCDIR}"/ci/WORKSPACE.filter.example "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/WORKSPACE
 fi
 
@@ -105,8 +105,25 @@ mkdir -p "${ENVOY_DELIVERY_DIR}"
 export ENVOY_COVERAGE_DIR="${ENVOY_BUILD_DIR}"/generated/coverage
 mkdir -p "${ENVOY_COVERAGE_DIR}"
 
+# This is where we dump failed test logs for CI collection.
+export ENVOY_FAILED_TEST_LOGS="${ENVOY_BUILD_DIR}"/generated/failed-testlogs
+mkdir -p "${ENVOY_FAILED_TEST_LOGS}"
+
 # This is where we build for bazel.release* and bazel.dev.
 export ENVOY_CI_DIR="${ENVOY_SRCDIR}"/ci
+
+function cleanup() {
+  # Remove build artifacts. This doesn't mess with incremental builds as these
+  # are just symlinks.
+  rm -rf "${ENVOY_SRCDIR}"/bazel-*
+  rm -rf "${ENVOY_CI_DIR}"/bazel-*
+  rm -rf "${ENVOY_CI_DIR}"/bazel
+  rm -rf "${ENVOY_CI_DIR}"/tools
+  rm -f "${ENVOY_CI_DIR}"/.bazelrc
+}
+
+cleanup
+trap cleanup EXIT
 
 # Hack due to https://github.com/envoyproxy/envoy/issues/838 and the need to have
 # .bazelrc available for build linkstamping.
@@ -123,13 +140,3 @@ ln -sf "${ENVOY_SRCDIR}"/tools/bazel.rc "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/tools/
 ln -sf "${ENVOY_SRCDIR}"/tools/bazel.rc "${ENVOY_CI_DIR}"/tools/
 
 export BUILDIFIER_BIN="/usr/local/bin/buildifier"
-
-function cleanup() {
-  # Remove build artifacts. This doesn't mess with incremental builds as these
-  # are just symlinks.
-  rm -rf "${ENVOY_SRCDIR}"/bazel-*
-  rm -rf "${ENVOY_CI_DIR}"/bazel-*
-  rm -rf "${ENVOY_CI_DIR}"/bazel
-  rm -rf "${ENVOY_CI_DIR}"/tools
-}
-trap cleanup EXIT

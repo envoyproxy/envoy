@@ -108,9 +108,9 @@ public:
   MockHost();
   ~MockHost();
 
-  CreateConnectionData
-  createConnection(Event::Dispatcher& dispatcher,
-                   const Network::ConnectionSocket::OptionsSharedPtr& options) const override {
+  CreateConnectionData createConnection(Event::Dispatcher& dispatcher,
+                                        const Network::ConnectionSocket::OptionsSharedPtr& options,
+                                        Network::TransportSocketOptionsSharedPtr) const override {
     MockCreateConnectionData data = createConnection_(dispatcher, options);
     return {Network::ClientConnectionPtr{data.connection_}, data.host_description_};
   }
@@ -148,7 +148,7 @@ public:
   MOCK_CONST_METHOD0(getActiveHealthFailureType, ActiveHealthFailureType());
   MOCK_METHOD1(healthFlagSet, void(HealthFlag flag));
   MOCK_METHOD1(setActiveHealthFailureType, void(ActiveHealthFailureType type));
-  MOCK_CONST_METHOD0(healthy, bool());
+  MOCK_CONST_METHOD0(health, Host::Health());
   MOCK_CONST_METHOD0(hostname, const std::string&());
   MOCK_CONST_METHOD0(outlierDetector, Outlier::DetectorHostMonitor&());
   MOCK_METHOD1(setHealthChecker_, void(HealthCheckHostMonitorPtr& health_checker));

@@ -23,6 +23,36 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
+    name = "passthrough_filter_config_lib",
+    srcs = [
+        "passthrough_filter.cc",
+    ],
+    deps = [
+        ":common_lib",
+        "//include/envoy/http:filter_interface",
+        "//include/envoy/registry",
+        "//include/envoy/server:filter_config_interface",
+        "//source/extensions/filters/http/common:empty_http_filter_config_lib",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "headers_only_filter_config_lib",
+    srcs = [
+        "headers_only_filter.cc",
+    ],
+    deps = [
+        ":common_lib",
+        "//include/envoy/http:filter_interface",
+        "//include/envoy/registry",
+        "//include/envoy/server:filter_config_interface",
+        "//source/extensions/filters/http/common:empty_http_filter_config_lib",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+    ],
+)
+
+envoy_cc_test_library(
     name = "pause_filter_lib",
     srcs = [
         "pause_filter.cc",
@@ -33,6 +63,19 @@ envoy_cc_test_library(
         "//source/common/network:connection_lib",
         "//source/extensions/filters/http/common:empty_http_filter_config_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "common_lib",
+    hdrs = [
+        "common.h",
+    ],
+    deps = [
+        "//include/envoy/http:filter_interface",
+        "//include/envoy/registry",
+        "//source/extensions/filters/http/common:empty_http_filter_config_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 

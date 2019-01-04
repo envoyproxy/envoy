@@ -34,6 +34,7 @@ Configuration
   including the router filter.
 
 * :ref:`v2 API reference <envoy_api_msg_config.filter.http.fault.v2.HTTPFault>`
+* This filter should be configured with the name *envoy.fault*.
 
 Runtime
 -------

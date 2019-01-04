@@ -4,6 +4,28 @@ load("@envoy_api//bazel:api_build_system.bzl", "api_proto_library")
 def envoy_package():
     native.package(default_visibility = ["//visibility:public"])
 
+# A genrule variant that can output a directory. This is useful when doing things like
+# generating a fuzz corpus mechanically.
+def _envoy_directory_genrule_impl(ctx):
+    tree = ctx.actions.declare_directory(ctx.attr.name + ".outputs")
+    ctx.actions.run_shell(
+        inputs = ctx.files.srcs,
+        tools = ctx.files.tools,
+        outputs = [tree],
+        command = "mkdir -p " + tree.path + " && " + ctx.expand_location(ctx.attr.cmd),
+        env = {"GENRULE_OUTPUT_DIR": tree.path},
+    )
+    return [DefaultInfo(files = depset([tree]))]
+
+envoy_directory_genrule = rule(
+    implementation = _envoy_directory_genrule_impl,
+    attrs = {
+        "srcs": attr.label_list(),
+        "cmd": attr.string(),
+        "tools": attr.label_list(),
+    },
+)
+
 # Compute the final copts based on various options.
 def envoy_copts(repository, test = False):
     posix_options = [
@@ -19,6 +41,8 @@ def envoy_copts(repository, test = False):
 
     msvc_options = [
         "-WX",
+        "-Zc:__cplusplus",
+        "-std:c++14",
         "-DWIN32",
         "-DWIN32_LEAN_AND_MEAN",
         # need win8 for ntohll
@@ -56,7 +80,7 @@ def envoy_copts(repository, test = False):
 
 def envoy_static_link_libstdcpp_linkopts():
     return envoy_select_force_libcpp(
-        ["--stdlib=libc++"],
+        ["-stdlib=libc++"],
         ["-static-libstdc++", "-static-libgcc"],
     )
 
@@ -71,6 +95,8 @@ def envoy_linkopts():
                ],
                "@envoy//bazel:windows_x86_64": [
                    "-DEFAULTLIB:advapi32.lib",
+                   "-DEFAULTLIB:ws2_32.lib",
+                   "-WX",
                ],
                "//conditions:default": [
                    "-pthread",
@@ -120,6 +146,11 @@ def envoy_test_linkopts():
             "-pagezero_size 10000",
             "-image_base 100000000",
         ],
+        "@envoy//bazel:windows_x86_64": [
+            "-DEFAULTLIB:advapi32.lib",
+            "-DEFAULTLIB:ws2_32.lib",
+            "-WX",
+        ],
 
         # TODO(mattklein123): It's not great that we universally link against the following libs.
         # In particular, -latomic and -lrt are not needed on all platforms. Make this more granular.
@@ -161,6 +192,45 @@ def envoy_include_prefix(path):
 def envoy_basic_cc_library(name, **kargs):
     native.cc_library(name = name, **kargs)
 
+# Used to select a dependency that has different implementations on POSIX vs Windows.
+# The platform-specific implementations should be specified with envoy_cc_posix_library
+# and envoy_cc_win32_library respectively
+def envoy_cc_platform_dep(name):
+    return select({
+        "@envoy//bazel:windows_x86_64": [name + "_win32"],
+        "//conditions:default": [name + "_posix"],
+    })
+
+# Used to specify a library that only builds on POSIX
+def envoy_cc_posix_library(name, srcs = [], hdrs = [], **kargs):
+    envoy_cc_library(
+        name = name + "_posix",
+        srcs = select({
+            "@envoy//bazel:windows_x86_64": [],
+            "//conditions:default": srcs,
+        }),
+        hdrs = select({
+            "@envoy//bazel:windows_x86_64": [],
+            "//conditions:default": hdrs,
+        }),
+        **kargs
+    )
+
+# Used to specify a library that only builds on Windows
+def envoy_cc_win32_library(name, srcs = [], hdrs = [], **kargs):
+    envoy_cc_library(
+        name = name + "_win32",
+        srcs = select({
+            "@envoy//bazel:windows_x86_64": srcs,
+            "//conditions:default": [],
+        }),
+        hdrs = select({
+            "@envoy//bazel:windows_x86_64": hdrs,
+            "//conditions:default": [],
+        }),
+        **kargs
+    )
+
 # Envoy C++ library targets should be specified with this function.
 def envoy_cc_library(
         name,
@@ -194,7 +264,7 @@ def envoy_cc_library(
             envoy_external_dep_path("spdlog"),
             envoy_external_dep_path("fmtlib"),
         ],
-        include_prefix = envoy_include_prefix(PACKAGE_NAME),
+        include_prefix = envoy_include_prefix(native.package_name()),
         alwayslink = 1,
         linkstatic = 1,
         linkstamp = select({
@@ -298,6 +368,7 @@ def envoy_cc_test(
         deps = [],
         tags = [],
         args = [],
+        shard_count = None,
         coverage = True,
         local = False):
     test_lib_tags = []
@@ -327,6 +398,7 @@ def envoy_cc_test(
         args = args + ["--gmock_default_mock_behavior=2"],
         tags = tags + ["coverage_test"],
         local = local,
+        shard_count = shard_count,
     )
 
 # Envoy C++ test related libraries (that want gtest, gmock) should be specified
@@ -439,7 +511,7 @@ def envoy_proto_library(name, external_deps = [], **kwargs):
 # This is used for testing only.
 def envoy_proto_descriptor(name, out, srcs = [], external_deps = []):
     input_files = ["$(location " + src + ")" for src in srcs]
-    include_paths = [".", PACKAGE_NAME]
+    include_paths = [".", native.package_name()]
 
     if "api_httpbody_protos" in external_deps:
         srcs.append("@googleapis//:api_httpbody_protos_src")
@@ -499,5 +571,11 @@ def envoy_select_force_libcpp(if_libcpp, default = None):
         "@envoy//bazel:force_libcpp": if_libcpp,
         "@bazel_tools//tools/osx:darwin": [],
         "@envoy//bazel:windows_x86_64": [],
+        "//conditions:default": default or [],
+    })
+
+def envoy_select_boringssl(if_fips, default = None):
+    return select({
+        "@envoy//bazel:boringssl_fips": if_fips,
         "//conditions:default": default or [],
     })

@@ -10,4 +10,5 @@ Admin
   ../admin/v2alpha/clusters.proto
   ../admin/v2alpha/memory.proto
   ../admin/v2alpha/metrics.proto
+  ../admin/v2alpha/mutex_stats.proto
   ../admin/v2alpha/server_info.proto

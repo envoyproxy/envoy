@@ -24,3 +24,15 @@ If there is a protocol error or an unsupported address family
 (e.g. AF_UNIX) the connection will be closed and an error thrown.
 
 * :ref:`v2 API reference <envoy_api_field_listener.Filter.name>`
+* This filter should be configured with the name *envoy.listener.proxy_protocol*.
+
+Statistics
+----------
+
+This filter emits the following statistics: 
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  downstream_cx_proxy_proto_error, Counter, Total proxy protocol errors

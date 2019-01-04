@@ -7,13 +7,16 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/api.h"
 #include "envoy/buffer/buffer.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/network/address.h"
 #include "envoy/stats/stats.h"
 #include "envoy/stats/store.h"
+#include "envoy/thread/thread.h"
 
 #include "common/buffer/buffer_impl.h"
+#include "common/common/block_memory_hash_set.h"
 #include "common/common/c_smart_ptr.h"
 #include "common/common/thread.h"
 #include "common/http/header_map_impl.h"
@@ -301,6 +304,8 @@ public:
     return result;
   }
 
+  static std::tm parseTimestamp(const std::string& format, const std::string& time_str);
+
   static constexpr std::chrono::milliseconds DefaultTimeout = std::chrono::milliseconds(10000);
 
   static void renameFile(const std::string& old_name, const std::string& new_name);
@@ -309,7 +314,17 @@ public:
 };
 
 /**
- * This utility class wraps the common case of having a cross-thread "one shot" ready condition.
+ * Wraps the common case of having a cross-thread "one shot" ready condition.
+ *
+ * It functions like absl::Notification except the usage of notifyAll() appears
+ * to trigger tighter simultaneous wakeups in multiple threads, resulting in
+ * more contentions, e.g. for BM_CreateRace in
+ * ../common/stats/symbol_table_speed_test.cc.
+ *
+ * See
+ *     https://github.com/abseil/abseil-cpp/blob/master/absl/synchronization/notification.h
+ * for the absl impl, which appears to result in fewer contentions (and in
+ * tests we want contentions).
  */
 class ConditionalInitializer {
 public:
@@ -324,6 +339,13 @@ public:
    * only be called once in between a call to waitReady().
    */
   void waitReady();
+
+  /**
+   * Waits until ready; does not reset it. This variation is immune to spurious
+   * condvar wakeups, and is also suitable for having multiple threads wait on
+   * a common condition.
+   */
+  void wait();
 
 private:
   Thread::CondVar cv_;
@@ -396,60 +418,65 @@ public:
   bool has(const LowerCaseString& key);
 };
 
+// Helper method to create a header map from an initializer list. Useful due to make_unique's
+// inability to infer the initializer list type.
+inline HeaderMapPtr
+makeHeaderMap(const std::initializer_list<std::pair<std::string, std::string>>& values) {
+  return std::make_unique<TestHeaderMapImpl,
+                          const std::initializer_list<std::pair<std::string, std::string>>&>(
+      values);
+}
+
 } // namespace Http
 
 namespace Stats {
 
 /**
- * This is a heap test allocator that works similar to how the shared memory allocator works in
- * terms of reference counting, etc.
+ * Implements a RawStatDataAllocator using a contiguous block of heap-allocated
+ * memory, but is otherwise identical to the shared memory allocator in terms of
+ * reference counting, data structures, etc.
  */
 class TestAllocator : public RawStatDataAllocator {
 public:
-  TestAllocator(const StatsOptions& stats_options) : stats_options_(stats_options) {}
-  ~TestAllocator() { EXPECT_TRUE(stats_.empty()); }
-
-  RawStatData* alloc(absl::string_view name) override {
-    CSmartPtr<RawStatData, freeAdapter>& stat_ref = stats_[std::string(name)];
-    if (!stat_ref) {
-      stat_ref.reset(static_cast<RawStatData*>(
-          ::calloc(RawStatData::structSizeWithOptions(stats_options_), 1)));
-      stat_ref->initialize(name, stats_options_);
-    } else {
-      stat_ref->ref_count_++;
+  struct TestBlockMemoryHashSetOptions : public BlockMemoryHashSetOptions {
+    TestBlockMemoryHashSetOptions() {
+      capacity = 200;
+      num_slots = 131;
     }
+  };
 
-    return stat_ref.get();
-  }
-
-  void free(RawStatData& data) override {
-    if (--data.ref_count_ > 0) {
-      return;
-    }
-
-    if (stats_.erase(std::string(data.name_)) == 0) {
-      FAIL();
-    }
-  }
+  explicit TestAllocator(const StatsOptions& stats_options)
+      : RawStatDataAllocator(mutex_, hash_set_, stats_options),
+        block_memory_(std::make_unique<uint8_t[]>(
+            RawStatDataSet::numBytes(block_hash_options_, stats_options))),
+        hash_set_(block_hash_options_, true /* init */, block_memory_.get(), stats_options) {}
+  ~TestAllocator() { EXPECT_EQ(0, hash_set_.size()); }
 
 private:
-  static void freeAdapter(RawStatData* data) { ::free(data); }
-  std::unordered_map<std::string, CSmartPtr<RawStatData, freeAdapter>> stats_;
-  const StatsOptions& stats_options_;
+  Thread::MutexBasicLockable mutex_;
+  TestBlockMemoryHashSetOptions block_hash_options_;
+  std::unique_ptr<uint8_t[]> block_memory_;
+  RawStatDataSet hash_set_;
 };
 
-class MockedTestAllocator : public RawStatDataAllocator {
+class MockedTestAllocator : public TestAllocator {
 public:
   MockedTestAllocator(const StatsOptions& stats_options);
   virtual ~MockedTestAllocator();
 
   MOCK_METHOD1(alloc, RawStatData*(absl::string_view name));
   MOCK_METHOD1(free, void(RawStatData& data));
-
-  TestAllocator alloc_;
 };
 
 } // namespace Stats
+
+namespace Thread {
+ThreadFactory& threadFactoryForTest();
+} // namespace Thread
+
+namespace Api {
+ApiPtr createApiForTest(Stats::Store& stat_store);
+} // namespace Api
 
 MATCHER_P(HeaderMapEqualIgnoreOrder, rhs, "") {
   *result_listener << *rhs << " is not equal to " << *arg;

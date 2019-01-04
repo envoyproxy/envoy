@@ -56,17 +56,13 @@ public:
 
   RouteConstSharedPtr route(const Http::HeaderMap& headers, uint64_t random_value) const override {
     absl::optional<std::string> corpus_path =
-        TestEnvironment::getOptionalEnvVar("ROUTE_CORPUS_PATH");
+        TestEnvironment::getOptionalEnvVar("GENRULE_OUTPUT_DIR");
     if (corpus_path) {
       static uint32_t n;
-      const uint32_t max_test_cases =
-          std::atoi(TestEnvironment::getCheckedEnvVar("ROUTE_CORPUS_MAX").c_str());
       test::common::router::RouteTestCase route_test_case;
       route_test_case.mutable_config()->MergeFrom(config_);
       route_test_case.mutable_headers()->MergeFrom(Fuzz::toHeaders(headers));
       route_test_case.set_random_value(random_value);
-      RELEASE_ASSERT(n < max_test_cases,
-                     "ROUTE_CORPUS_MAX is too low, consider increasing in build rule");
       const std::string path = fmt::format("{}/generated_corpus_{}", corpus_path.value(), n++);
       const std::string corpus = route_test_case.DebugString();
       {
@@ -2238,6 +2234,49 @@ TEST(RouteMatcherTest, Shadow) {
                     ->routeEntry()
                     ->shadowPolicy()
                     .runtimeKey());
+}
+
+TEST(RouteConfigurationV2, RequestMirrorPolicy) {
+  const std::string yaml = R"EOF(
+name: foo
+virtual_hosts:
+  - name: mirror
+    domains: [mirror.lyft.com]
+    routes:
+      - match: { prefix: "/"}
+        route:
+          cluster: foo
+          request_mirror_policy:
+            cluster: foo_mirror
+            runtime_key: will_be_ignored
+            runtime_fraction:
+               default_value:
+                 numerator: 20
+                 denominator: HUNDRED
+               runtime_key: mirror_key
+
+  )EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, true);
+
+  EXPECT_EQ("foo_mirror", config.route(genHeaders("mirror.lyft.com", "/foo", "GET"), 0)
+                              ->routeEntry()
+                              ->shadowPolicy()
+                              .cluster());
+
+  // `runtime_fraction` takes precedence over the deprecated `runtime_key` field.
+  EXPECT_EQ("mirror_key", config.route(genHeaders("mirror.lyft.com", "/foo", "GET"), 0)
+                              ->routeEntry()
+                              ->shadowPolicy()
+                              .runtimeKey());
+
+  const auto& default_value = config.route(genHeaders("mirror.lyft.com", "/foo", "GET"), 0)
+                                  ->routeEntry()
+                                  ->shadowPolicy()
+                                  .defaultValue();
+  EXPECT_EQ(20, default_value.numerator());
+  EXPECT_EQ(envoy::type::FractionalPercent::HUNDRED, default_value.denominator());
 }
 
 TEST(RouteMatcherTest, Retry) {
@@ -5006,6 +5045,53 @@ virtual_hosts:
   const auto& retry_policy = config.route(headers, 0)->routeEntry()->retryPolicy();
   const std::vector<uint32_t> expected_codes{100, 200};
   EXPECT_EQ(expected_codes, retry_policy.retriableStatusCodes());
+}
+
+TEST(RouteConfigurationV2, UpgradeConfigs) {
+  const std::string UpgradeYaml = R"EOF(
+name: RetriableStatusCodes
+virtual_hosts:
+  - name: regex
+    domains: [idle.lyft.com]
+    routes:
+      - match: { regex: "/regex"}
+        route:
+          cluster: some-cluster
+          upgrade_configs:
+            - upgrade_type: Websocket
+            - upgrade_type: disabled
+              enabled: false
+  )EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(UpgradeYaml), factory_context, true);
+  Http::TestHeaderMapImpl headers = genRedirectHeaders("idle.lyft.com", "/regex", true, false);
+  const RouteEntry::UpgradeMap& upgrade_map = config.route(headers, 0)->routeEntry()->upgradeMap();
+  EXPECT_TRUE(upgrade_map.find("websocket")->second);
+  EXPECT_TRUE(upgrade_map.find("foo") == upgrade_map.end());
+  EXPECT_FALSE(upgrade_map.find("disabled")->second);
+}
+
+TEST(RouteConfigurationV2, DuplicateUpgradeConfigs) {
+  const std::string yaml = R"EOF(
+name: RetriableStatusCodes
+virtual_hosts:
+  - name: regex
+    domains: [idle.lyft.com]
+    routes:
+      - match: { regex: "/regex"}
+        route:
+          cluster: some-cluster
+          upgrade_configs:
+            - upgrade_type: Websocket
+            - upgrade_type: WebSocket
+              enabled: false
+  )EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context, true),
+      EnvoyException, "Duplicate upgrade WebSocket");
 }
 
 // Verifies that we're creating a new instance of the retry plugins on each call instead of always

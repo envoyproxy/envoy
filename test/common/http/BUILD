@@ -4,6 +4,7 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_fuzz_test",
     "envoy_cc_test",
+    "envoy_cc_test_binary",
     "envoy_cc_test_library",
     "envoy_package",
     "envoy_proto_library",
@@ -18,6 +19,7 @@ envoy_cc_test(
         ":common_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/http:async_client_lib",
+        "//source/common/http:context_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
         "//test/mocks:common_lib",
@@ -80,6 +82,20 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test_binary(
+    name = "codes_speed_test",
+    srcs = ["codes_speed_test.cc"],
+    external_deps = [
+        "benchmark",
+    ],
+    deps = [
+        "//source/common/common:empty_string",
+        "//source/common/http:codes_lib",
+        "//source/common/stats:isolated_store_lib",
+        "//source/common/stats:stats_lib",
+    ],
+)
+
 envoy_cc_test_library(
     name = "common_lib",
     srcs = ["common.cc"],
@@ -109,6 +125,7 @@ envoy_cc_fuzz_test(
         ":conn_manager_impl_fuzz_proto_cc",
         "//source/common/common:empty_string",
         "//source/common/http:conn_manager_lib",
+        "//source/common/http:context_lib",
         "//source/common/http:date_provider_lib",
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
@@ -140,6 +157,7 @@ envoy_cc_test(
         "//source/common/common:macros",
         "//source/common/event:dispatcher_lib",
         "//source/common/http:conn_manager_lib",
+        "//source/common/http:context_lib",
         "//source/common/http:date_provider_lib",
         "//source/common/http:exception_lib",
         "//source/common/http:header_map_lib",

@@ -96,7 +96,13 @@ public:
 
   // Http::FilterChainFactory
   void createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) override;
+  typedef std::list<Http::FilterFactoryCb> FilterFactoriesList;
+  struct FilterConfig {
+    std::unique_ptr<FilterFactoriesList> filter_factories;
+    bool allow_upgrade;
+  };
   bool createUpgradeFilterChain(absl::string_view upgrade_type,
+                                const Http::FilterChainFactory::UpgradeMap* per_route_upgrade_map,
                                 Http::FilterChainFactoryCallbacks& callbacks) override;
 
   // Http::ConnectionManagerConfig
@@ -111,6 +117,7 @@ public:
   bool generateRequestId() override { return generate_request_id_; }
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
   std::chrono::milliseconds streamIdleTimeout() const override { return stream_idle_timeout_; }
+  std::chrono::milliseconds requestTimeout() const override { return request_timeout_; }
   Router::RouteConfigProvider& routeConfigProvider() override { return *route_config_provider_; }
   const std::string& serverName() override { return server_name_; }
   Http::ConnectionManagerStats& stats() override { return stats_; }
@@ -137,7 +144,6 @@ public:
   std::chrono::milliseconds delayedCloseTimeout() const override { return delayed_close_timeout_; }
 
 private:
-  typedef std::list<Http::FilterFactoryCb> FilterFactoriesList;
   enum class CodecType { HTTP1, HTTP2, AUTO };
   void processFilter(
       const envoy::config::filter::network::http_connection_manager::v2::HttpFilter& proto_config,
@@ -145,7 +151,7 @@ private:
 
   Server::Configuration::FactoryContext& context_;
   FilterFactoriesList filter_factories_;
-  std::map<std::string, std::unique_ptr<FilterFactoriesList>> upgrade_filter_factories_;
+  std::map<std::string, FilterConfig> upgrade_filter_factories_;
   const bool reverse_encode_order_{};
   std::list<AccessLog::InstanceSharedPtr> access_logs_;
   const std::string stats_prefix_;
@@ -167,6 +173,7 @@ private:
   absl::optional<std::string> user_agent_;
   absl::optional<std::chrono::milliseconds> idle_timeout_;
   std::chrono::milliseconds stream_idle_timeout_;
+  std::chrono::milliseconds request_timeout_;
   Router::RouteConfigProviderPtr route_config_provider_;
   std::chrono::milliseconds drain_timeout_;
   bool generate_request_id_;
@@ -177,6 +184,8 @@ private:
 
   // Default idle timeout is 5 minutes if nothing is specified in the HCM config.
   static const uint64_t StreamIdleTimeoutMs = 5 * 60 * 1000;
+  // request timeout is disabled by default
+  static const uint64_t RequestTimeoutMs = 0;
 };
 
 } // namespace HttpConnectionManager

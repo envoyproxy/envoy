@@ -49,6 +49,11 @@ bool FilterUtility::shouldShadow(const ShadowPolicy& policy, Runtime::Loader& ru
     return false;
   }
 
+  if (policy.defaultValue().numerator() > 0) {
+    return runtime.snapshot().featureEnabled(policy.runtimeKey(), policy.defaultValue(),
+                                             stable_random);
+  }
+
   if (!policy.runtimeKey().empty() &&
       !runtime.snapshot().featureEnabled(policy.runtimeKey(), 0, stable_random, 10000UL)) {
     return false;
@@ -155,28 +160,29 @@ void Filter::chargeUpstreamCode(uint64_t response_status_code,
     const std::string zone_name = config_.local_info_.zoneName();
     const std::string upstream_zone = upstreamZone(upstream_host);
 
-    Http::CodeUtility::ResponseStatInfo info{config_.scope_,
-                                             cluster_->statsScope(),
-                                             EMPTY_STRING,
-                                             response_status_code,
-                                             internal_request,
-                                             route_entry_->virtualHost().name(),
-                                             request_vcluster_ ? request_vcluster_->name()
-                                                               : EMPTY_STRING,
-                                             zone_name,
-                                             upstream_zone,
-                                             is_canary};
+    Http::CodeStats::ResponseStatInfo info{config_.scope_,
+                                           cluster_->statsScope(),
+                                           EMPTY_STRING,
+                                           response_status_code,
+                                           internal_request,
+                                           route_entry_->virtualHost().name(),
+                                           request_vcluster_ ? request_vcluster_->name()
+                                                             : EMPTY_STRING,
+                                           zone_name,
+                                           upstream_zone,
+                                           is_canary};
 
-    Http::CodeUtility::chargeResponseStat(info);
+    Http::CodeStats& code_stats = httpContext().codeStats();
+    code_stats.chargeResponseStat(info);
 
     if (!alt_stat_prefix_.empty()) {
-      Http::CodeUtility::ResponseStatInfo info{config_.scope_,   cluster_->statsScope(),
-                                               alt_stat_prefix_, response_status_code,
-                                               internal_request, EMPTY_STRING,
-                                               EMPTY_STRING,     zone_name,
-                                               upstream_zone,    is_canary};
+      Http::CodeStats::ResponseStatInfo info{config_.scope_,   cluster_->statsScope(),
+                                             alt_stat_prefix_, response_status_code,
+                                             internal_request, EMPTY_STRING,
+                                             EMPTY_STRING,     zone_name,
+                                             upstream_zone,    is_canary};
 
-      Http::CodeUtility::chargeResponseStat(info);
+      code_stats.chargeResponseStat(info);
     }
 
     if (dropped) {
@@ -221,7 +227,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
                      headers.Path()->value().c_str());
 
     callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound);
-    callbacks_->sendLocalReply(Http::Code::NotFound, "", nullptr);
+    callbacks_->sendLocalReply(Http::Code::NotFound, "", nullptr, absl::nullopt);
     return Http::FilterHeadersStatus::StopIteration;
   }
 
@@ -239,7 +245,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
             response_headers.addReferenceKey(Http::Headers::get().Location, new_path);
           }
           direct_response->finalizeResponseHeaders(response_headers, callbacks_->streamInfo());
-        });
+        },
+        absl::nullopt);
     return Http::FilterHeadersStatus::StopIteration;
   }
 
@@ -251,7 +258,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
     ENVOY_STREAM_LOG(debug, "unknown cluster '{}'", *callbacks_, route_entry_->clusterName());
 
     callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound);
-    callbacks_->sendLocalReply(route_entry_->clusterNotFoundResponseCode(), "", nullptr);
+    callbacks_->sendLocalReply(route_entry_->clusterNotFoundResponseCode(), "", nullptr,
+                               absl::nullopt);
     return Http::FilterHeadersStatus::StopIteration;
   }
   cluster_ = cluster->info();
@@ -271,12 +279,14 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   if (cluster_->maintenanceMode()) {
     callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamOverflow);
     chargeUpstreamCode(Http::Code::ServiceUnavailable, nullptr, true);
-    callbacks_->sendLocalReply(
-        Http::Code::ServiceUnavailable, "maintenance mode", [this](Http::HeaderMap& headers) {
-          if (!config_.suppress_envoy_headers_) {
-            headers.insertEnvoyOverloaded().value(Http::Headers::get().EnvoyOverloadedValues.True);
-          }
-        });
+    callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "maintenance mode",
+                               [this](Http::HeaderMap& headers) {
+                                 if (!config_.suppress_envoy_headers_) {
+                                   headers.insertEnvoyOverloaded().value(
+                                       Http::Headers::get().EnvoyOverloadedValues.True);
+                                 }
+                               },
+                               absl::nullopt);
     cluster_->stats().upstream_rq_maintenance_mode_.inc();
     return Http::FilterHeadersStatus::StopIteration;
   }
@@ -345,7 +355,8 @@ Http::ConnectionPool::Instance* Filter::getConnPool() {
 void Filter::sendNoHealthyUpstreamResponse() {
   callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoHealthyUpstream);
   chargeUpstreamCode(Http::Code::ServiceUnavailable, nullptr, false);
-  callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "no healthy upstream", nullptr);
+  callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "no healthy upstream", nullptr,
+                             absl::nullopt);
 }
 
 Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
@@ -444,7 +455,6 @@ void Filter::onDestroy() {
   if (upstream_request_) {
     upstream_request_->resetStream();
   }
-  stream_destroyed_ = true;
   cleanup();
 }
 
@@ -497,6 +507,9 @@ void Filter::onUpstreamReset(UpstreamResetType type,
       return;
     } else if (retry_status == RetryStatus::NoOverflow) {
       callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamOverflow);
+    } else if (retry_status == RetryStatus::NoRetryLimitExceeded) {
+      callbacks_->streamInfo().setResponseFlag(
+          StreamInfo::ResponseFlag::UpstreamRetryLimitExceeded);
     }
   }
 
@@ -536,11 +549,14 @@ void Filter::onUpstreamReset(UpstreamResetType type,
     if (upstream_host != nullptr && !Http::CodeUtility::is5xx(enumToInt(code))) {
       upstream_host->stats().rq_error_.inc();
     }
-    callbacks_->sendLocalReply(code, body, [dropped, this](Http::HeaderMap& headers) {
-      if (dropped && !config_.suppress_envoy_headers_) {
-        headers.insertEnvoyOverloaded().value(Http::Headers::get().EnvoyOverloadedValues.True);
-      }
-    });
+    callbacks_->sendLocalReply(code, body,
+                               [dropped, this](Http::HeaderMap& headers) {
+                                 if (dropped && !config_.suppress_envoy_headers_) {
+                                   headers.insertEnvoyOverloaded().value(
+                                       Http::Headers::get().EnvoyOverloadedValues.True);
+                                 }
+                               },
+                               absl::nullopt);
   }
 }
 
@@ -617,12 +633,16 @@ void Filter::onUpstreamHeaders(const uint64_t response_code, Http::HeaderMapPtr&
     // upstream_request_.
     const auto upstream_host = upstream_request_->upstream_host_;
     if (retry_status == RetryStatus::Yes && setupRetry(end_stream)) {
-      Http::CodeUtility::chargeBasicResponseStat(cluster_->statsScope(), "retry.",
-                                                 static_cast<Http::Code>(response_code));
+      Http::CodeStats& code_stats = httpContext().codeStats();
+      code_stats.chargeBasicResponseStat(cluster_->statsScope(), "retry.",
+                                         static_cast<Http::Code>(response_code));
       upstream_host->stats().rq_error_.inc();
       return;
     } else if (retry_status == RetryStatus::NoOverflow) {
       callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamOverflow);
+    } else if (retry_status == RetryStatus::NoRetryLimitExceeded) {
+      callbacks_->streamInfo().setResponseFlag(
+          StreamInfo::ResponseFlag::UpstreamRetryLimitExceeded);
     }
 
     // Make sure any retry timers are destroyed since we may not call cleanup() if end_stream is
@@ -694,6 +714,10 @@ void Filter::onUpstreamTrailers(Http::HeaderMapPtr&& trailers) {
   callbacks_->encodeTrailers(std::move(trailers));
 }
 
+void Filter::onUpstreamMetadata(Http::MetadataMapPtr&& metadata_map) {
+  callbacks_->encodeMetadata(std::move(metadata_map));
+}
+
 void Filter::onUpstreamComplete() {
   if (!downstream_end_stream_) {
     upstream_request_->resetStream();
@@ -714,33 +738,34 @@ void Filter::onUpstreamComplete() {
     // TODO(mattklein123): Remove copy when G string compat issues are fixed.
     const std::string zone_name = config_.local_info_.zoneName();
 
-    Http::CodeUtility::ResponseTimingInfo info{config_.scope_,
+    Http::CodeStats& code_stats = httpContext().codeStats();
+    Http::CodeStats::ResponseTimingInfo info{config_.scope_,
+                                             cluster_->statsScope(),
+                                             EMPTY_STRING,
+                                             response_time,
+                                             upstream_request_->upstream_canary_,
+                                             internal_request,
+                                             route_entry_->virtualHost().name(),
+                                             request_vcluster_ ? request_vcluster_->name()
+                                                               : EMPTY_STRING,
+                                             zone_name,
+                                             upstreamZone(upstream_request_->upstream_host_)};
+
+    code_stats.chargeResponseTiming(info);
+
+    if (!alt_stat_prefix_.empty()) {
+      Http::CodeStats::ResponseTimingInfo info{config_.scope_,
                                                cluster_->statsScope(),
-                                               EMPTY_STRING,
+                                               alt_stat_prefix_,
                                                response_time,
                                                upstream_request_->upstream_canary_,
                                                internal_request,
-                                               route_entry_->virtualHost().name(),
-                                               request_vcluster_ ? request_vcluster_->name()
-                                                                 : EMPTY_STRING,
+                                               EMPTY_STRING,
+                                               EMPTY_STRING,
                                                zone_name,
                                                upstreamZone(upstream_request_->upstream_host_)};
 
-    Http::CodeUtility::chargeResponseTiming(info);
-
-    if (!alt_stat_prefix_.empty()) {
-      Http::CodeUtility::ResponseTimingInfo info{config_.scope_,
-                                                 cluster_->statsScope(),
-                                                 alt_stat_prefix_,
-                                                 response_time,
-                                                 upstream_request_->upstream_canary_,
-                                                 internal_request,
-                                                 EMPTY_STRING,
-                                                 EMPTY_STRING,
-                                                 zone_name,
-                                                 upstreamZone(upstream_request_->upstream_host_)};
-
-      Http::CodeUtility::chargeResponseTiming(info);
+      code_stats.chargeResponseTiming(info);
     }
   }
 
@@ -860,6 +885,10 @@ void Filter::UpstreamRequest::decodeTrailers(Http::HeaderMapPtr&& trailers) {
   maybeEndDecode(true);
   upstream_trailers_ = trailers.get();
   parent_.onUpstreamTrailers(std::move(trailers));
+}
+
+void Filter::UpstreamRequest::decodeMetadata(Http::MetadataMapPtr&& metadata_map) {
+  parent_.onUpstreamMetadata(std::move(metadata_map));
 }
 
 void Filter::UpstreamRequest::maybeEndDecode(bool end_stream) {

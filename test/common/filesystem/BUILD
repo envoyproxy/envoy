@@ -12,6 +12,7 @@ envoy_cc_test(
     name = "filesystem_impl_test",
     srcs = ["filesystem_impl_test.cc"],
     deps = [
+        "//source/common/api:api_lib",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:thread_lib",
         "//source/common/event:dispatcher_includes",
@@ -24,6 +25,16 @@ envoy_cc_test(
         "//test/mocks/filesystem:filesystem_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "directory_test",
+    srcs = ["directory_test.cc"],
+    deps = [
+        "//source/common/filesystem:directory_lib",
+        "//test/test_common:environment_lib",
     ],
 )
 
@@ -35,6 +46,7 @@ envoy_cc_test(
         "//source/common/event:dispatcher_includes",
         "//source/common/event:dispatcher_lib",
         "//source/common/filesystem:watcher_lib",
+        "//source/common/stats:isolated_store_lib",
         "//test/test_common:environment_lib",
         "//test/test_common:test_time_lib",
     ],

@@ -52,8 +52,12 @@ enum ResponseFlag {
   UnauthorizedExternalService = 0x1000,
   // Unable to call Ratelimit service.
   RateLimitServiceError = 0x2000,
+  // If the stream was reset due to a downstream connection termination.
+  DownstreamConnectionTermination = 0x4000,
+  // Exceeded upstream retry limit.
+  UpstreamRetryLimitExceeded = 0x8000,
   // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST FLAG.
-  LastFlag = RateLimitServiceError
+  LastFlag = UpstreamRetryLimitExceeded
 };
 
 /**
@@ -113,8 +117,8 @@ public:
 
   /**
    * @return the monotonic time that the first byte of the request was received. Duration
-  calculations should be made relative to this value.
-  */
+   * calculations should be made relative to this value.
+   */
   virtual MonotonicTime startTimeMonotonic() const PURE;
 
   /**
@@ -141,13 +145,13 @@ public:
   virtual void onFirstUpstreamTxByteSent() PURE;
 
   /**
-   * @return the duration between the last bye of the request was sent upstream and the start of the
-   * request.
+   * @return the duration between the last byte of the request was sent upstream and the start of
+   * the request.
    */
   virtual absl::optional<std::chrono::nanoseconds> lastUpstreamTxByteSent() const PURE;
 
   /**
-   * Sets the time when the last bye of the request was sent upstream.
+   * Sets the time when the last byte of the request was sent upstream.
    */
   virtual void onLastUpstreamTxByteSent() PURE;
 
@@ -158,8 +162,7 @@ public:
   virtual absl::optional<std::chrono::nanoseconds> firstUpstreamRxByteReceived() const PURE;
 
   /**
-   * Sets the time when the first byte of the response is received from
-   * upstream.
+   * Sets the time when the first byte of the response is received from upstream.
    */
   virtual void onFirstUpstreamRxByteReceived() PURE;
 
@@ -170,8 +173,7 @@ public:
   virtual absl::optional<std::chrono::nanoseconds> lastUpstreamRxByteReceived() const PURE;
 
   /**
-   * Sets the time when the last byte of the response is received from
-   * upstream.
+   * Sets the time when the last byte of the response is received from upstream.
    */
   virtual void onLastUpstreamRxByteReceived() PURE;
 
@@ -275,15 +277,29 @@ public:
   virtual const Network::Address::InstanceConstSharedPtr& downstreamLocalAddress() const PURE;
 
   /**
+   * @param downstream_direct_remote_address sets the direct physical address of downstream
+   * connection.
+   */
+  virtual void setDownstreamDirectRemoteAddress(
+      const Network::Address::InstanceConstSharedPtr& downstream_direct_remote_address) PURE;
+
+  /**
+   * @return the downstream directly connected address. This will never be nullptr. This is
+   * equivalent to the address of the physical connection.
+   */
+  virtual const Network::Address::InstanceConstSharedPtr&
+  downstreamDirectRemoteAddress() const PURE;
+
+  /**
    * @param downstream_remote_address sets the remote address of downstream connection.
    */
   virtual void setDownstreamRemoteAddress(
       const Network::Address::InstanceConstSharedPtr& downstream_remote_address) PURE;
 
   /**
-   * @return the downstream remote address. Note that this will never be nullptr. Additionally note
-   * that this may not be the address of the physical connection if for example the address was
-   * inferred from proxy proto, x-forwarded-for, etc.
+   * @return the downstream remote address. Note that this will never be nullptr. This may be
+   * equivalent to downstreamDirectRemoteAddress, unless the remote address is inferred from a
+   * proxy proto, x-forwarded-for, etc.
    */
   virtual const Network::Address::InstanceConstSharedPtr& downstreamRemoteAddress() const PURE;
 
@@ -296,33 +312,33 @@ public:
   /**
    * @return const envoy::api::v2::core::Metadata& the dynamic metadata associated with this request
    */
+  virtual envoy::api::v2::core::Metadata& dynamicMetadata() PURE;
   virtual const envoy::api::v2::core::Metadata& dynamicMetadata() const PURE;
 
   /**
    * @param name the namespace used in the metadata in reverse DNS format, for example:
-   * envoy.test.my_filter
+   * envoy.test.my_filter.
    * @param value the struct to set on the namespace. A merge will be performed with new values for
    * the same key overriding existing.
    */
   virtual void setDynamicMetadata(const std::string& name, const ProtobufWkt::Struct& value) PURE;
 
   /**
-   * Object on which filters can share data on a per-request basis.
-   * For singleton data objects, only one filter can produce a named data object.
-   * List data objects can be updated by multiple filters (append only). Both object
-   * types can be consumed by multiple filters.
+   * Object on which filters can share data on a per-request basis. For singleton data objects, only
+   * one filter can produce a named data object. List data objects can be updated by multiple
+   * filters (append only). Both object types can be consumed by multiple filters.
    * @return the filter state associated with this request.
    */
   virtual FilterState& filterState() PURE;
   virtual const FilterState& filterState() const PURE;
 
   /**
-   * @param SNI value requested
+   * @param SNI value requested.
    */
   virtual void setRequestedServerName(const absl::string_view requested_server_name) PURE;
 
   /**
-   * @return SNI value for downstream host
+   * @return SNI value for downstream host.
    */
   virtual const std::string& requestedServerName() const PURE;
 };

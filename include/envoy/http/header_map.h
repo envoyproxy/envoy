@@ -187,14 +187,16 @@ public:
   virtual const HeaderString& key() const PURE;
 
   /**
-   * Set the header value by copying data into it.
+   * Set the header value by copying data into it (deprecated, use absl::string_view variant
+   * instead).
+   * TODO(htuch): Cleanup deprecated call sites.
    */
   virtual void value(const char* value, uint32_t size) PURE;
 
   /**
    * Set the header value by copying data into it.
    */
-  virtual void value(const std::string& value) PURE;
+  virtual void value(absl::string_view value) PURE;
 
   /**
    * Set the header value by copying an integer into it.
@@ -245,6 +247,7 @@ private:
   HEADER_FUNC(ContentType)                                                                         \
   HEADER_FUNC(Date)                                                                                \
   HEADER_FUNC(EnvoyAttemptCount)                                                                   \
+  HEADER_FUNC(EnvoyDegraded)                                                                       \
   HEADER_FUNC(EnvoyDecoratorOperation)                                                             \
   HEADER_FUNC(EnvoyDownstreamServiceCluster)                                                       \
   HEADER_FUNC(EnvoyDownstreamServiceNode)                                                          \
@@ -257,6 +260,7 @@ private:
   HEADER_FUNC(EnvoyMaxRetries)                                                                     \
   HEADER_FUNC(EnvoyOriginalPath)                                                                   \
   HEADER_FUNC(EnvoyOverloaded)                                                                     \
+  HEADER_FUNC(EnvoyRateLimited)                                                                    \
   HEADER_FUNC(EnvoyRetryOn)                                                                        \
   HEADER_FUNC(EnvoyRetryGrpcOn)                                                                    \
   HEADER_FUNC(EnvoyRetriableStatusCodes)                                                           \

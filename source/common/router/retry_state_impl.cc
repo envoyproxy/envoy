@@ -160,7 +160,7 @@ RetryStatus RetryStateImpl::shouldRetry(const Http::HeaderMap* response_headers,
   resetRetry();
 
   if (retries_remaining_ == 0) {
-    return RetryStatus::No;
+    return RetryStatus::NoRetryLimitExceeded;
   }
 
   retries_remaining_--;
@@ -264,6 +264,11 @@ bool RetryStateImpl::wouldRetry(const Http::HeaderMap* response_headers,
   if (response_headers != nullptr) {
     // We never retry if the overloaded header is set.
     if (response_headers->EnvoyOverloaded() != nullptr) {
+      return false;
+    }
+
+    // We never retry if the request is rate limited.
+    if (response_headers->EnvoyRateLimited() != nullptr) {
       return false;
     }
 

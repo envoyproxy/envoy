@@ -29,8 +29,8 @@ void OwnedImpl::addBufferFragment(BufferFragment& fragment) {
       [](const void*, size_t, void* arg) { static_cast<BufferFragment*>(arg)->done(); }, &fragment);
 }
 
-void OwnedImpl::add(const std::string& data) {
-  evbuffer_add(buffer_.get(), data.c_str(), data.size());
+void OwnedImpl::add(absl::string_view data) {
+  evbuffer_add(buffer_.get(), data.data(), data.size());
 }
 
 void OwnedImpl::add(const Instance& data) {
@@ -86,7 +86,10 @@ uint64_t OwnedImpl::length() const { return evbuffer_get_length(buffer_.get()); 
 
 void* OwnedImpl::linearize(uint32_t size) {
   ASSERT(size <= length());
-  return evbuffer_pullup(buffer_.get(), size);
+  void* const ret = evbuffer_pullup(buffer_.get(), size);
+  RELEASE_ASSERT(ret != nullptr || size == 0,
+                 "Failure to linearize may result in buffer overflow by the caller.");
+  return ret;
 }
 
 void OwnedImpl::move(Instance& rhs) {
@@ -148,10 +151,11 @@ Api::SysCallIntResult OwnedImpl::read(int fd, uint64_t max_length) {
 }
 
 uint64_t OwnedImpl::reserve(uint64_t length, RawSlice* iovecs, uint64_t num_iovecs) {
-  uint64_t ret = evbuffer_reserve_space(buffer_.get(), length,
-                                        reinterpret_cast<evbuffer_iovec*>(iovecs), num_iovecs);
-  ASSERT(ret >= 1);
-  return ret;
+  int ret = evbuffer_reserve_space(buffer_.get(), length, reinterpret_cast<evbuffer_iovec*>(iovecs),
+                                   num_iovecs);
+  RELEASE_ASSERT(ret >= 1, "Failure to allocate may result in callers writing to uninitialized "
+                           "memory, buffer overflows, etc");
+  return static_cast<uint64_t>(ret);
 }
 
 ssize_t OwnedImpl::search(const void* data, uint64_t size, size_t start) const {
@@ -191,7 +195,7 @@ Api::SysCallIntResult OwnedImpl::write(int fd) {
 
 OwnedImpl::OwnedImpl() : buffer_(evbuffer_new()) {}
 
-OwnedImpl::OwnedImpl(const std::string& data) : OwnedImpl() { add(data); }
+OwnedImpl::OwnedImpl(absl::string_view data) : OwnedImpl() { add(data); }
 
 OwnedImpl::OwnedImpl(const Instance& data) : OwnedImpl() { add(data); }
 

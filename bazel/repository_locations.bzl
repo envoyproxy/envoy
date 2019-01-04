@@ -5,10 +5,15 @@ REPOSITORY_LOCATIONS = dict(
     ),
     boringssl = dict(
         # Use commits from branch "chromium-stable-with-bazel"
-        sha256 = "d1700e0455f5f918f8a85ff3ce6cd684d05c766200ba6bdb18c77d5dcadc05a1",
-        strip_prefix = "boringssl-060e9a583976e73d1ea8b2bfe8b9cab33c62fa17",
-        # chromium-70.0.3538.67
-        urls = ["https://github.com/google/boringssl/archive/060e9a583976e73d1ea8b2bfe8b9cab33c62fa17.tar.gz"],
+        sha256 = "a4a71d97b90825f509c472cc9ad2404d4100f6cce042fc159388956bc5c616fb",
+        strip_prefix = "boringssl-77e47de9e16ec8865d1bc6d614dd918141f094d2",
+        # chromium-71.0.3578.80
+        urls = ["https://github.com/google/boringssl/archive/77e47de9e16ec8865d1bc6d614dd918141f094d2.tar.gz"],
+    ),
+    boringssl_fips = dict(
+        sha256 = "b12ad676ee533824f698741bd127f6fbc82c46344398a6d78d25e62c6c418c73",
+        # fips-20180730
+        urls = ["https://commondatastorage.googleapis.com/chromium-boringssl-docs/fips/boringssl-66005f41fbc3529ffe8d007708756720529da20d.tar.xz"],
     ),
     com_google_absl = dict(
         sha256 = "e35082e88b9da04f4d68094c05ba112502a5063712f3021adfa465306d238c76",
@@ -43,9 +48,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/eile/tclap/archive/tclap-1-2-1-release-final.tar.gz"],
     ),
     com_github_fmtlib_fmt = dict(
-        sha256 = "43894ab8fe561fc9e523a8024efc23018431fa86b95d45b06dbe6ddb29ffb6cd",
-        strip_prefix = "fmt-5.2.1",
-        urls = ["https://github.com/fmtlib/fmt/releases/download/5.2.1/fmt-5.2.1.zip"],
+        sha256 = "4c0741e10183f75d7d6f730b8708a99b329b2f942dad5a9da3385ab92bb4a15c",
+        strip_prefix = "fmt-5.3.0",
+        urls = ["https://github.com/fmtlib/fmt/releases/download/5.3.0/fmt-5.3.0.zip"],
     ),
     com_github_gabime_spdlog = dict(
         sha256 = "867a4b7cedf9805e6f76d3ca41889679054f7e5a3b67722fe6d0eae41852a767",
@@ -64,15 +69,14 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/google/libprotobuf-mutator/archive/c3d2faf04a1070b0b852b0efdef81e1a81ba925e.tar.gz"],
     ),
     com_github_grpc_grpc = dict(
-        sha256 = "d99db0b39b490d2469a8ef74197d5f211fa740fc9581dccecbb76c56d080fce1",
-        strip_prefix = "grpc-1.16.0",
-        urls = ["https://github.com/grpc/grpc/archive/v1.16.0.tar.gz"],
+        sha256 = "a5342629fe1b689eceb3be4d4f167b04c70a84b9d61cf8b555e968bc500bdb5a",
+        strip_prefix = "grpc-1.16.1",
+        urls = ["https://github.com/grpc/grpc/archive/v1.16.1.tar.gz"],
     ),
     com_github_nanopb_nanopb = dict(
-        # From: https://github.com/grpc/grpc/blob/v1.14.0/bazel/grpc_deps.bzl#L123
-        sha256 = "8bbbb1e78d4ddb0a1919276924ab10d11b631df48b657d960e0c795a25515735",
-        strip_prefix = "nanopb-f8ac463766281625ad710900479130c7fcb4d63b",
-        urls = ["https://github.com/nanopb/nanopb/archive/f8ac463766281625ad710900479130c7fcb4d63b.tar.gz"],
+        sha256 = "b8dd5cb0d184d424ddfea13ddee3f7b0920354334cbb44df434d55e5f0086b12",
+        strip_prefix = "nanopb-0.3.9.2",
+        urls = ["https://github.com/nanopb/nanopb/archive/0.3.9.2.tar.gz"],
     ),
     io_opentracing_cpp = dict(
         sha256 = "4455ca507936bc4b658ded10a90d8ebbbd61c58f06207be565a4ffdc885687b5",
@@ -91,9 +95,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/googleapis/googleapis/archive/d6f78d948c53f3b400bb46996eb3084359914f9b.tar.gz"],
     ),
     com_github_datadog_dd_opentracing_cpp = dict(
-        sha256 = "733e9b698a232cfd3aa35b4e27c59641bf1fa78e52e71d29e230af4f2070cdf5",
-        strip_prefix = "dd-opentracing-cpp-0.3.5",
-        urls = ["https://github.com/DataDog/dd-opentracing-cpp/archive/v0.3.5.tar.gz"],
+        sha256 = "32967149fbc672f321ba6ce6c3e5cc299b15ab914f6f5b2993c7c9ddc1894439",
+        strip_prefix = "dd-opentracing-cpp-0.3.6",
+        urls = ["https://github.com/DataDog/dd-opentracing-cpp/archive/v0.3.6.tar.gz"],
     ),
     com_github_msgpack_msgpack_c = dict(
         sha256 = "bda49f996a73d2c6080ff0523e7b535917cd28c8a79c3a5da54fc29332d61d1e",
@@ -101,19 +105,15 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/msgpack/msgpack-c/archive/cpp-3.1.1.tar.gz"],
     ),
     com_github_google_jwt_verify = dict(
-        sha256 = "499f1e145c19f33031eb8fc6452d5d391b4cecfdeda23e2055386a3b33be4d41",
-        strip_prefix = "jwt_verify_lib-66792a057ec54e4b75c6a2eeda4e98220bd12a9a",
-        # 2018-08-16
-        urls = ["https://github.com/google/jwt_verify_lib/archive/66792a057ec54e4b75c6a2eeda4e98220bd12a9a.tar.gz"],
+        sha256 = "700be26170c1917e83d1319b88a2112dccd1179cd78c5672940483e7c45ca6ae",
+        strip_prefix = "jwt_verify_lib-85cf0edf1f1bc507ff7d96a8d6a9bc20307b0fcf",
+        # 2018-12-01
+        urls = ["https://github.com/google/jwt_verify_lib/archive/85cf0edf1f1bc507ff7d96a8d6a9bc20307b0fcf.tar.gz"],
     ),
     com_github_nodejs_http_parser = dict(
-        sha256 = "f742dc5a206958c4d0a6b2c35e3e102afb5683f55f7a7cb1eae024a03f081347",
-        strip_prefix = "http-parser-77310eeb839c4251c07184a5db8885a572a08352",
-        # 2018-07-20 snapshot to pick up:
-        # A performance fix, nodejs/http-parser PR 422.
-        # A bug fix, nodejs/http-parser PR 432.
-        # TODO(brian-pane): Upgrade to the next http-parser release once it's available
-        urls = ["https://github.com/nodejs/http-parser/archive/77310eeb839c4251c07184a5db8885a572a08352.tar.gz"],
+        sha256 = "ef26268c54c8084d17654ba2ed5140bffeffd2a040a895ffb22a6cca3f6c613f",
+        strip_prefix = "http-parser-2.9.0",
+        urls = ["https://github.com/nodejs/http-parser/archive/v2.9.0.tar.gz"],
     ),
     com_github_pallets_jinja = dict(
         sha256 = "f84be1bb0040caca4cea721fcbbbbd61f9be9464ca236387158b0feea01914a4",
@@ -121,9 +121,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/pallets/jinja/releases/download/2.10/Jinja2-2.10.tar.gz"],
     ),
     com_github_pallets_markupsafe = dict(
-        sha256 = "dc3938045d9407a73cf9fdd709e2b1defd0588d50ffc85eb0786c095ec846f15",
-        strip_prefix = "markupsafe-1.0",
-        urls = ["https://github.com/pallets/markupsafe/archive/1.0.tar.gz"],
+        sha256 = "62f6154071d1ceac8d7dfb5ed7a21dc502cc12e2348c032e5a1cedd018548381",
+        strip_prefix = "markupsafe-1.1.0/src",
+        urls = ["https://github.com/pallets/markupsafe/archive/1.1.0.tar.gz"],
     ),
     com_github_tencent_rapidjson = dict(
         sha256 = "bf7ced29704a1e696fbccf2a2b4ea068e7774fa37f6d7dd4039d0787f8bed98e",
@@ -155,16 +155,16 @@ REPOSITORY_LOCATIONS = dict(
         strip_prefix = "protobuf-fa252ec2a54acb24ddc87d48fed1ecfd458445fd",
         # TODO(htuch): Switch back to released versions for protobuf when a release > 3.6.0 happens
         # that includes:
-        # - https://github.com/google/protobuf/commit/f35669b8d3f46f7f1236bd21f14d744bba251e60
-        # - https://github.com/google/protobuf/commit/6a4fec616ec4b20f54d5fb530808b855cb664390
-        # - https://github.com/google/protobuf/commit/fa252ec2a54acb24ddc87d48fed1ecfd458445fd
+        # - https://github.com/protocolbuffers/protobuf/commit/f35669b8d3f46f7f1236bd21f14d744bba251e60
+        # - https://github.com/protocolbuffers/protobuf/commit/6a4fec616ec4b20f54d5fb530808b855cb664390
+        # - https://github.com/protocolbuffers/protobuf/commit/fa252ec2a54acb24ddc87d48fed1ecfd458445fd
         urls = ["https://github.com/protocolbuffers/protobuf/archive/fa252ec2a54acb24ddc87d48fed1ecfd458445fd.tar.gz"],
     ),
     grpc_httpjson_transcoding = dict(
-        sha256 = "9765764644d74af9a9654f7fb90cf2bc7228014664668719a589a4677967ca09",
-        strip_prefix = "grpc-httpjson-transcoding-05a15e4ecd0244a981fdf0348a76658def62fa9c",
-        # 2018-05-30
-        urls = ["https://github.com/grpc-ecosystem/grpc-httpjson-transcoding/archive/05a15e4ecd0244a981fdf0348a76658def62fa9c.tar.gz"],
+        sha256 = "dedd76b0169eb8c72e479529301a1d9b914a4ccb4d2b5ddb4ebe92d63a7b2152",
+        strip_prefix = "grpc-httpjson-transcoding-64d6ac985360b624d8e95105701b64a3814794cd",
+        # 2018-12-19
+        urls = ["https://github.com/grpc-ecosystem/grpc-httpjson-transcoding/archive/64d6ac985360b624d8e95105701b64a3814794cd.tar.gz"],
     ),
     com_github_golang_protobuf = dict(
         # TODO(sesmith177): Remove this dependency when both:
@@ -176,8 +176,8 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/golang/protobuf/archive/31e0d063dd98c052257e5b69eeb006818133f45c.tar.gz"],
     ),
     io_bazel_rules_go = dict(
-        sha256 = "ee5fe78fe417c685ecb77a0a725dc9f6040ae5beb44a0ba4ddb55453aad23a8a",
-        urls = ["https://github.com/bazelbuild/rules_go/releases/download/0.16.0/rules_go-0.16.0.tar.gz"],
+        sha256 = "7be7dc01f1e0afdba6c8eb2b43d2fa01c743be1b9273ab1eaf6c233df078d705",
+        urls = ["https://github.com/bazelbuild/rules_go/releases/download/0.16.5/rules_go-0.16.5.tar.gz"],
     ),
     six_archive = dict(
         sha256 = "105f8d68616f8248e24bf0e9372ef04d3cc10104f1980f54d57b2ce73a5ad56a",

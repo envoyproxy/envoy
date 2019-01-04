@@ -13,6 +13,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/http/async_client.h"
 #include "envoy/http/codec.h"
+#include "envoy/http/context.h"
 #include "envoy/http/header_map.h"
 #include "envoy/http/message.h"
 #include "envoy/router/router.h"
@@ -42,16 +43,15 @@ public:
   AsyncClientImpl(Upstream::ClusterInfoConstSharedPtr cluster, Stats::Store& stats_store,
                   Event::Dispatcher& dispatcher, const LocalInfo::LocalInfo& local_info,
                   Upstream::ClusterManager& cm, Runtime::Loader& runtime,
-                  Runtime::RandomGenerator& random, Router::ShadowWriterPtr&& shadow_writer);
-  ~AsyncClientImpl();
+                  Runtime::RandomGenerator& random, Router::ShadowWriterPtr&& shadow_writer,
+                  Http::Context& http_context);
+  ~AsyncClientImpl() override;
 
   // Http::AsyncClient
   Request* send(MessagePtr&& request, Callbacks& callbacks,
-                const absl::optional<std::chrono::milliseconds>& timeout) override;
+                const AsyncClient::RequestOptions& options) override;
 
-  Stream* start(StreamCallbacks& callbacks,
-                const absl::optional<std::chrono::milliseconds>& timeout,
-                bool buffer_body_for_retry) override;
+  Stream* start(StreamCallbacks& callbacks, const AsyncClient::StreamOptions& options) override;
 
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
 
@@ -76,8 +76,7 @@ class AsyncStreamImpl : public AsyncClient::Stream,
                         LinkedObject<AsyncStreamImpl> {
 public:
   AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCallbacks& callbacks,
-                  const absl::optional<std::chrono::milliseconds>& timeout,
-                  bool buffer_body_for_retry);
+                  const AsyncClient::StreamOptions& options);
 
   // Http::AsyncClient::Stream
   void sendHeaders(HeaderMap& headers, bool end_stream) override;
@@ -145,6 +144,10 @@ private:
     // Router::ShadowPolicy
     const std::string& cluster() const override { return EMPTY_STRING; }
     const std::string& runtimeKey() const override { return EMPTY_STRING; }
+    const envoy::type::FractionalPercent& defaultValue() const override { return default_value_; }
+
+  private:
+    envoy::type::FractionalPercent default_value_;
   };
 
   struct NullConfig : public Router::Config {
@@ -234,6 +237,7 @@ private:
     }
 
     bool includeAttemptCount() const override { return false; }
+    const Router::RouteEntry::UpgradeMap& upgradeMap() const override { return upgrade_map_; }
 
     static const NullRateLimitPolicy rate_limit_policy_;
     static const NullRetryPolicy retry_policy_;
@@ -245,6 +249,7 @@ private:
     static const Config::TypedMetadataImpl<Config::TypedMetadataFactory> typed_metadata_;
     static const NullPathMatchCriterion path_match_criterion_;
 
+    Router::RouteEntry::UpgradeMap upgrade_map_;
     const std::string& cluster_name_;
     absl::optional<std::chrono::milliseconds> timeout_;
   };
@@ -285,8 +290,9 @@ private:
   HeaderMap& addDecodedTrailers() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   void addDecodedData(Buffer::Instance&, bool) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   const Buffer::Instance* decodingBuffer() override { return buffered_body_.get(); }
-  void sendLocalReply(Code code, const std::string& body,
-                      std::function<void(HeaderMap& headers)> modify_headers) override {
+  void sendLocalReply(Code code, absl::string_view body,
+                      std::function<void(HeaderMap& headers)> modify_headers,
+                      const absl::optional<Grpc::Status::GrpcStatus> grpc_status) override {
     Utility::sendLocalReply(
         is_grpc_request_,
         [this, modify_headers](HeaderMapPtr&& headers, bool end_stream) -> void {
@@ -296,7 +302,7 @@ private:
           encodeHeaders(std::move(headers), end_stream);
         },
         [this](Buffer::Instance& data, bool end_stream) -> void { encodeData(data, end_stream); },
-        remote_closed_, code, body, is_head_request_);
+        remote_closed_, code, body, grpc_status, is_head_request_);
   }
   // The async client won't pause if sending an Expect: 100-Continue so simply
   // swallows any incoming encode100Continue.
@@ -304,6 +310,7 @@ private:
   void encodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void encodeTrailers(HeaderMapPtr&& trailers) override;
+  void encodeMetadata(MetadataMapPtr&&) override {}
   void onDecoderFilterAboveWriteBufferHighWatermark() override {}
   void onDecoderFilterBelowWriteBufferLowWatermark() override {}
   void addDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks&) override {}
@@ -323,6 +330,7 @@ private:
   Buffer::InstancePtr buffered_body_;
   bool is_grpc_request_{};
   bool is_head_request_{false};
+  bool send_xff_{true};
   friend class AsyncClientImpl;
 };
 
@@ -331,7 +339,7 @@ class AsyncRequestImpl final : public AsyncClient::Request,
                                AsyncClient::StreamCallbacks {
 public:
   AsyncRequestImpl(MessagePtr&& request, AsyncClientImpl& parent, AsyncClient::Callbacks& callbacks,
-                   const absl::optional<std::chrono::milliseconds>& timeout);
+                   const AsyncClient::RequestOptions& options);
 
   // AsyncClient::Request
   virtual void cancel() override;

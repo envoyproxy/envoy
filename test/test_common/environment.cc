@@ -26,6 +26,7 @@
 
 #include "test/test_common/network_utility.h"
 
+#include "absl/strings/match.h"
 #include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
 
@@ -33,15 +34,15 @@ namespace Envoy {
 namespace {
 
 std::string makeTempDir(char* name_template) {
-#if !defined(WIN32)
-  char* dirname = ::mkdtemp(name_template);
-  RELEASE_ASSERT(dirname != nullptr,
-                 fmt::format("failed to create tempdir: {} {}", dirname, strerror(errno)));
-#else
+#ifdef WIN32
   char* dirname = ::_mktemp(name_template);
   RELEASE_ASSERT(dirname != nullptr,
                  fmt::format("failed to create tempdir: {} {}", dirname, strerror(errno)));
   std::experimental::filesystem::create_directories(dirname);
+#else
+  char* dirname = ::mkdtemp(name_template);
+  RELEASE_ASSERT(dirname != nullptr,
+                 fmt::format("failed to create tempdir: {} {}", dirname, strerror(errno)));
 #endif
   return std::string(dirname);
 }
@@ -99,10 +100,13 @@ void TestEnvironment::createParentPath(const std::string& path) {
 }
 
 void TestEnvironment::removePath(const std::string& path) {
-  RELEASE_ASSERT(StringUtil::startsWith(path.c_str(), TestEnvironment::temporaryDirectory()), "");
+  RELEASE_ASSERT(absl::StartsWith(path, TestEnvironment::temporaryDirectory()), "");
 #ifdef __cpp_lib_experimental_filesystem
   // We don't want to rely on rm etc. if we can avoid it, since it might not
   // exist in some environments such as ClusterFuzz.
+  if (!std::experimental::filesystem::exists(path)) {
+    return;
+  }
   std::experimental::filesystem::remove_all(std::experimental::filesystem::path(path));
 #else
   // No support on this system for std::experimental::filesystem.
@@ -258,7 +262,7 @@ std::string TestEnvironment::temporaryFileSubstitute(const std::string& path,
   // Substitute paths and other common things.
   out_json_string = substitute(out_json_string, version);
 
-  const std::string extension = StringUtil::endsWith(path, ".yaml") ? ".yaml" : ".json";
+  const std::string extension = absl::EndsWith(path, ".yaml") ? ".yaml" : ".json";
   const std::string out_json_path =
       TestEnvironment::temporaryPath(path + ".with.ports" + extension);
   createParentPath(out_json_path);
@@ -302,10 +306,7 @@ std::string TestEnvironment::writeStringToFileForTest(const std::string& filenam
 }
 
 void TestEnvironment::setEnvVar(const std::string& name, const std::string& value, int overwrite) {
-#if !defined(WIN32)
-  const int rc = ::setenv(name.c_str(), value.c_str(), overwrite);
-  ASSERT_EQ(rc, 0);
-#else
+#ifdef WIN32
   if (!overwrite) {
     size_t requiredSize;
     const int rc = ::getenv_s(&requiredSize, NULL, 0, name.c_str());
@@ -316,6 +317,9 @@ void TestEnvironment::setEnvVar(const std::string& name, const std::string& valu
   }
   const int rc = ::_putenv_s(name.c_str(), value.c_str());
   ASSERT_EQ(0, rc);
+#else
+  const int rc = ::setenv(name.c_str(), value.c_str(), overwrite);
+  ASSERT_EQ(rc, 0);
 #endif
 }
 

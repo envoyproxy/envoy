@@ -321,14 +321,15 @@ TEST_F(EdsTest, EndpointHealthStatus) {
   auto* endpoints = cluster_load_assignment->add_endpoints();
 
   // First check that EDS is correctly mapping
-  // envoy::api::v2::core::HealthStatus values to the expected healthy() status.
-  const std::vector<std::pair<envoy::api::v2::core::HealthStatus, bool>> health_status_expected = {
-      {envoy::api::v2::core::HealthStatus::UNKNOWN, true},
-      {envoy::api::v2::core::HealthStatus::HEALTHY, true},
-      {envoy::api::v2::core::HealthStatus::UNHEALTHY, false},
-      {envoy::api::v2::core::HealthStatus::DRAINING, false},
-      {envoy::api::v2::core::HealthStatus::TIMEOUT, false},
-  };
+  // envoy::api::v2::core::HealthStatus values to the expected health() status.
+  const std::vector<std::pair<envoy::api::v2::core::HealthStatus, Host::Health>>
+      health_status_expected = {
+          {envoy::api::v2::core::HealthStatus::UNKNOWN, Host::Health::Healthy},
+          {envoy::api::v2::core::HealthStatus::HEALTHY, Host::Health::Healthy},
+          {envoy::api::v2::core::HealthStatus::UNHEALTHY, Host::Health::Unhealthy},
+          {envoy::api::v2::core::HealthStatus::DRAINING, Host::Health::Unhealthy},
+          {envoy::api::v2::core::HealthStatus::TIMEOUT, Host::Health::Unhealthy},
+      };
 
   int port = 80;
   for (auto hs : health_status_expected) {
@@ -349,7 +350,7 @@ TEST_F(EdsTest, EndpointHealthStatus) {
     EXPECT_EQ(hosts.size(), health_status_expected.size());
 
     for (uint32_t i = 0; i < hosts.size(); ++i) {
-      EXPECT_EQ(health_status_expected[i].second, hosts[i]->healthy());
+      EXPECT_EQ(health_status_expected[i].second, hosts[i]->health());
     }
   }
 
@@ -361,10 +362,10 @@ TEST_F(EdsTest, EndpointHealthStatus) {
   {
     auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
     EXPECT_EQ(hosts.size(), health_status_expected.size());
-    EXPECT_FALSE(hosts[0]->healthy());
+    EXPECT_EQ(Host::Health::Unhealthy, hosts[0]->health());
 
     for (uint32_t i = 1; i < hosts.size(); ++i) {
-      EXPECT_EQ(health_status_expected[i].second, hosts[i]->healthy());
+      EXPECT_EQ(health_status_expected[i].second, hosts[i]->health());
     }
   }
 
@@ -376,11 +377,10 @@ TEST_F(EdsTest, EndpointHealthStatus) {
   {
     auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
     EXPECT_EQ(hosts.size(), health_status_expected.size());
-    EXPECT_FALSE(hosts[0]->healthy());
-    EXPECT_TRUE(hosts[hosts.size() - 1]->healthy());
+    EXPECT_EQ(Host::Health::Healthy, hosts[hosts.size() - 1]->health());
 
     for (uint32_t i = 1; i < hosts.size() - 1; ++i) {
-      EXPECT_EQ(health_status_expected[i].second, hosts[i]->healthy());
+      EXPECT_EQ(health_status_expected[i].second, hosts[i]->health());
     }
   }
 
@@ -393,7 +393,7 @@ TEST_F(EdsTest, EndpointHealthStatus) {
   VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources, ""));
   {
     auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
-    EXPECT_FALSE(hosts[0]->healthy());
+    EXPECT_EQ(Host::Health::Unhealthy, hosts[0]->health());
   }
 
   // Now mark host 0 healthy via EDS, it should still be unhealthy due to the
@@ -403,7 +403,7 @@ TEST_F(EdsTest, EndpointHealthStatus) {
   VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources, ""));
   {
     auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
-    EXPECT_FALSE(hosts[0]->healthy());
+    EXPECT_EQ(Host::Health::Unhealthy, hosts[0]->health());
   }
 
   // Finally, mark host 0 healthy again via active health check. It should be
@@ -411,7 +411,7 @@ TEST_F(EdsTest, EndpointHealthStatus) {
   {
     auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
     hosts[0]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
-    EXPECT_TRUE(hosts[0]->healthy());
+    EXPECT_EQ(Host::Health::Healthy, hosts[0]->health());
   }
 }
 

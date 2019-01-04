@@ -59,6 +59,7 @@ public:
     InSequence s;
 
     sigterm_ = new Event::MockSignalEvent(&dispatcher_);
+    sigint_ = new Event::MockSignalEvent(&dispatcher_);
     sigusr1_ = new Event::MockSignalEvent(&dispatcher_);
     sighup_ = new Event::MockSignalEvent(&dispatcher_);
     EXPECT_CALL(cm_, setInitializedCb(_)).WillOnce(SaveArg<0>(&cm_init_callback_));
@@ -81,6 +82,7 @@ public:
   std::unique_ptr<RunHelper> helper_;
   std::function<void()> cm_init_callback_;
   Event::MockSignalEvent* sigterm_;
+  Event::MockSignalEvent* sigint_;
   Event::MockSignalEvent* sigusr1_;
   Event::MockSignalEvent* sighup_;
   bool shutdown_ = false;
@@ -126,7 +128,8 @@ protected:
         options_, test_time_.timeSystem(),
         Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
         hooks_, restart_, stats_store_, fakelock_, component_factory_,
-        std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), thread_local_);
+        std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), thread_local_,
+        Thread::threadFactoryForTest());
 
     EXPECT_TRUE(server_->api().fileExists("/dev/null"));
   }
@@ -142,10 +145,14 @@ protected:
         options_, test_time_.timeSystem(),
         Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
         hooks_, restart_, stats_store_, fakelock_, component_factory_,
-        std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), thread_local_);
+        std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), thread_local_,
+        Thread::threadFactoryForTest());
 
     EXPECT_TRUE(server_->api().fileExists("/dev/null"));
   }
+
+  // Returns the server's tracer as a pointer, for use in dynamic_cast tests.
+  Tracing::HttpTracer* tracer() { return &server_->httpContext().tracer(); };
 
   Network::Address::IpVersion version_;
   testing::NiceMock<MockOptions> options_;
@@ -333,11 +340,14 @@ TEST_P(ServerInstanceImplTest, LogToFileError) {
 // When there are no bootstrap CLI options, either for content or path, we can load the server with
 // an empty config.
 TEST_P(ServerInstanceImplTest, NoOptionsPassed) {
-  EXPECT_NO_THROW(server_.reset(new InstanceImpl(
-      options_, test_time_.timeSystem(),
-      Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
-      hooks_, restart_, stats_store_, fakelock_, component_factory_,
-      std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), thread_local_)));
+  EXPECT_THROW_WITH_MESSAGE(
+      server_.reset(new InstanceImpl(
+          options_, test_time_.timeSystem(),
+          Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
+          hooks_, restart_, stats_store_, fakelock_, component_factory_,
+          std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), thread_local_,
+          Thread::threadFactoryForTest())),
+      EnvoyException, "At least one of --config-path and --config-yaml should be non-empty");
 }
 
 // Validate that when std::exception is unexpectedly thrown, we exit safely.
@@ -366,6 +376,35 @@ TEST_P(ServerInstanceImplTest, UnknownExceptionThrowInConstructor) {
     throw(FakeException("foobar"));
   }));
   EXPECT_THROW_WITH_MESSAGE(initialize("test/server/node_bootstrap.yaml"), FakeException, "foobar");
+}
+
+TEST_P(ServerInstanceImplTest, MutexContentionEnabled) {
+  options_.service_cluster_name_ = "some_cluster_name";
+  options_.service_node_name_ = "some_node_name";
+  options_.mutex_tracing_enabled_ = true;
+  EXPECT_NO_THROW(initialize(std::string()));
+}
+
+TEST_P(ServerInstanceImplTest, NoHttpTracing) {
+  options_.service_cluster_name_ = "some_cluster_name";
+  options_.service_node_name_ = "some_node_name";
+  EXPECT_NO_THROW(initialize("test/server/empty_bootstrap.yaml"));
+  EXPECT_NE(nullptr, dynamic_cast<Tracing::HttpNullTracer*>(tracer()));
+  EXPECT_EQ(nullptr, dynamic_cast<Tracing::HttpTracerImpl*>(tracer()));
+}
+
+TEST_P(ServerInstanceImplTest, ZipkinHttpTracingEnabled) {
+  options_.service_cluster_name_ = "some_cluster_name";
+  options_.service_node_name_ = "some_node_name";
+  EXPECT_NO_THROW(initialize("test/server/zipkin_tracing.yaml"));
+  EXPECT_EQ(nullptr, dynamic_cast<Tracing::HttpNullTracer*>(tracer()));
+
+  // Note: there is no ZipkingTracerImpl object;
+  // source/extensions/tracers/zipkin/config.cc instantiates the tracer with
+  //     std::make_unique<Tracing::HttpTracerImpl>(std::move(zipkin_driver), server.localInfo());
+  // so we look for a successful dynamic cast to HttpTracerImpl, rather
+  // than HttpNullTracer.
+  EXPECT_NE(nullptr, dynamic_cast<Tracing::HttpTracerImpl*>(tracer()));
 }
 
 } // namespace Server

@@ -4,14 +4,14 @@
     "address": "tcp://{{ ip_loopback_address }}:0",
     "use_original_dst": true,
     "filters": [
-      { "type": "read", "name": "ratelimit",
+      { "name": "ratelimit",
         "config": {
           "domain": "foo",
           "descriptors": [[{"key": "foo", "value": "bar"}]],
           "stat_prefix": "name"
         }
       },
-      { "type": "read", "name": "echo", "config": {} }
+      { "name": "echo", "config": {} }
     ]
   }],
 

@@ -1,7 +1,7 @@
 .. _install_ambassador:
 
-Envoy as an API Gateway in Kubernetes
-=====================================
+Envoy as an API Gateway in Kubernetes with Ambassador
+=====================================================
 
 A common scenario for using Envoy is deploying it as an edge service (API
 Gateway) in Kubernetes. `Ambassador <https://www.getambassador.io>`_ is an open

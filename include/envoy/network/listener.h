@@ -36,6 +36,7 @@ public:
    *         different from configured if for example the configured address binds to port zero.
    */
   virtual Socket& socket() PURE;
+  virtual const Socket& socket() const PURE;
 
   /**
    * @return bool specifies whether the listener should actually listen on the port.
@@ -56,7 +57,14 @@ public:
    * @return uint32_t providing a soft limit on size of the listener's new connection read and write
    *         buffers.
    */
-  virtual uint32_t perConnectionBufferLimitBytes() PURE;
+  virtual uint32_t perConnectionBufferLimitBytes() const PURE;
+
+  /**
+   * @return std::chrono::milliseconds the time to wait for all listener filters to complete
+   *         operation. If the timeout is reached, the accepted socket is closed without a
+   *         connection being created. 0 specifies a disabled timeout.
+   */
+  virtual std::chrono::milliseconds listenerFiltersTimeout() const PURE;
 
   /**
    * @return Stats::Scope& the stats scope to use for all listener specific stats.
@@ -72,6 +80,14 @@ public:
    * @return const std::string& the listener's name.
    */
   virtual const std::string& name() const PURE;
+
+  /**
+   * @return bool indicates whether write filters should be in the reversed order of the filter
+   *         chain config.
+   */
+  // TODO(qiannawang): this method is deprecated and to be moved soon. See
+  // https://github.com/envoyproxy/envoy/pull/4889 for more details.
+  virtual bool reverseWriteFilterOrder() const PURE;
 };
 
 /**

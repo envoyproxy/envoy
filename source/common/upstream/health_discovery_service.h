@@ -71,9 +71,6 @@ protected:
   HealthCheckerSharedPtr health_checker_;
   Outlier::DetectorSharedPtr outlier_detector_;
 
-  // Creates a vector containing any healthy hosts
-  static HostVectorConstSharedPtr createHealthyHostList(const HostVector& hosts);
-
 private:
   std::function<void()> initialization_complete_callback_;
 
@@ -163,7 +160,7 @@ private:
   ClusterManager& cm_;
   const LocalInfo::LocalInfo& local_info_;
 
-  envoy::service::discovery::v2::HealthCheckRequest health_check_request_;
+  envoy::service::discovery::v2::HealthCheckRequestOrEndpointHealthResponse health_check_request_;
   std::unique_ptr<envoy::service::discovery::v2::HealthCheckSpecifier> health_check_message_;
 
   std::vector<std::string> clusters_;

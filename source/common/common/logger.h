@@ -12,6 +12,7 @@
 #include "common/common/non_copyable.h"
 
 #include "absl/strings/string_view.h"
+#include "absl/synchronization/mutex.h"
 #include "fmt/ostream.h"
 #include "spdlog/spdlog.h"
 
@@ -150,9 +151,7 @@ public:
   void set_pattern(const std::string& pattern) override {
     set_formatter(spdlog::details::make_unique<spdlog::pattern_formatter>(pattern));
   }
-  void set_formatter(std::unique_ptr<spdlog::formatter> formatter) override {
-    formatter_ = std::move(formatter);
-  }
+  void set_formatter(std::unique_ptr<spdlog::formatter> formatter) override;
 
   /**
    * @return bool whether a lock has been established.
@@ -177,7 +176,8 @@ private:
 
   SinkDelegate* sink_{nullptr};
   std::unique_ptr<StderrSinkDelegate> stderr_sink_; // Builtin sink to use as a last resort.
-  std::unique_ptr<spdlog::formatter> formatter_;
+  std::unique_ptr<spdlog::formatter> formatter_ GUARDED_BY(format_mutex_);
+  absl::Mutex format_mutex_; // direct absl reference to break build cycle.
 };
 
 /**

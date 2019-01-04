@@ -34,6 +34,7 @@ public:
   const LowerCaseString Cookie{"cookie"};
   const LowerCaseString Date{"date"};
   const LowerCaseString EnvoyAttemptCount{"x-envoy-attempt-count"};
+  const LowerCaseString EnvoyDegraded{"x-envoy-degraded"};
   const LowerCaseString EnvoyDownstreamServiceCluster{"x-envoy-downstream-service-cluster"};
   const LowerCaseString EnvoyDownstreamServiceNode{"x-envoy-downstream-service-node"};
   const LowerCaseString EnvoyExternalAddress{"x-envoy-external-address"};
@@ -45,6 +46,7 @@ public:
   const LowerCaseString EnvoyOriginalDstHost{"x-envoy-original-dst-host"};
   const LowerCaseString EnvoyOriginalPath{"x-envoy-original-path"};
   const LowerCaseString EnvoyOverloaded{"x-envoy-overloaded"};
+  const LowerCaseString EnvoyRateLimited{"x-envoy-ratelimited"};
   const LowerCaseString EnvoyRetryOn{"x-envoy-retry-on"};
   const LowerCaseString EnvoyRetryGrpcOn{"x-envoy-retry-grpc-on"};
   const LowerCaseString EnvoyRetriableStatusCodes{"x-envoy-retriable-status-codes"};
@@ -135,6 +137,10 @@ public:
   struct {
     const std::string True{"true"};
   } EnvoyOverloadedValues;
+
+  struct {
+    const std::string True{"true"};
+  } EnvoyRateLimitedValues;
 
   struct {
     const std::string _5xx{"5xx"};

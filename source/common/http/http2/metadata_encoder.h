@@ -1,11 +1,13 @@
 #pragma once
 
 #include <cstdint>
+#include <queue>
 #include <string>
+
+#include "envoy/http/codec.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/logger.h"
-#include "common/http/http2/metadata_interface.h"
 
 #include "nghttp2/nghttp2.h"
 
@@ -19,23 +21,14 @@ namespace Http2 {
  */
 class MetadataEncoder : Logger::Loggable<Logger::Id::http2> {
 public:
-  MetadataEncoder(uint64_t stream_id);
+  MetadataEncoder();
 
   /**
-   * Creates wire format HTTP/2 header block from metadata_map. Only after previous payload is
-   * drained, new payload can be encoded. This limitation is caused by nghttp2 can't incrementally
-   * encode header block.
-   * @param metadata_map supplies METADATA to encode.
+   * Creates wire format HTTP/2 header block from a vector of metadata maps.
+   * @param metadata_map_vector supplies the metadata map vector to encode.
    * @return whether encoding is successful.
    */
-  bool createPayload(MetadataMap& metadata_map);
-
-  /**
-   * Called in nghttp2 callback function after METADATA is submitted. The function releases len data
-   * in payload_.
-   * @param len supplies the size to be released.
-   */
-  void releasePayload(uint64_t len);
+  bool createPayload(const MetadataMapVector& metadata_map_vector);
 
   /**
    * @return true if there is payload to be submitted.
@@ -43,42 +36,45 @@ public:
   bool hasNextFrame();
 
   /**
-   * Returns payload to be submitted.
-   * @return the reference to payload.
+   * Creates the metadata frame payload for the next metadata frame.
+   * @param buf is the pointer to the destination memory where the payload should be copied to. len
+   * is the largest length the memory can hold.
+   * @return the size of frame payload.
    */
-  Buffer::OwnedImpl& payload() { return payload_; }
+  uint64_t packNextFramePayload(uint8_t* buf, const size_t len);
 
   /**
-   * TODO(soya3129): move those functions to MetadataHandler, since it's session level parameter.
-   * Set max payload size for METADATA frame.
-   * @param size supplies max frame size.
+   * Returns end_metadata value for the next metadata frame.
+   * @return end_metadata value.
    */
-  void setMaxMetadataSize(size_t size) { max_frame_size_ = size; }
+  uint8_t nextEndMetadata();
+
   /**
-   * Get max payload size for METADATA frame.
-   * @return max frame size.
+   * Estimates upper bound of the number of frames the payload_ can generate.
+   * @return frame count upper bound.
    */
-  uint64_t getMaxMetadataSize() { return max_frame_size_; }
+  uint64_t frameCountUpperBound();
 
 private:
+  /**
+   * Creates wire format HTTP/2 header block from metadata_map.
+   * @param metadata_map supplies METADATA to encode.
+   * @return whether encoding is successful.
+   */
+  bool createPayloadMetadataMap(const MetadataMap& metadata_map);
+
   /**
    * Creates wired format header blocks using nghttp2.
    * @param metadata_map supplies METADATA to encode.
    * @return true if the creation succeeds.
    */
-  bool createHeaderBlockUsingNghttp2(MetadataMap& metadata_map);
+  bool createHeaderBlockUsingNghttp2(const MetadataMap& metadata_map);
 
   // The METADATA payload to be sent.
   Buffer::OwnedImpl payload_;
 
-  // Max payload size for METADATA frame.
-  uint64_t max_frame_size_ = 16384;
-
   // Max payload size bound.
   const uint64_t max_payload_size_bound_ = 1024 * 1024;
-
-  // The stream id the encoder is associated with.
-  const uint64_t stream_id_;
 
   // Default HPACK table size.
   const size_t header_table_size_ = 4096;
@@ -87,6 +83,11 @@ private:
   // memory, and the caveat is encoding error on one stream can impact other streams.
   typedef CSmartPtr<nghttp2_hd_deflater, nghttp2_hd_deflate_del> Deflater;
   Deflater deflater_;
+
+  // Stores the remaining payload size of each metadata_map to be packed. The payload size is needed
+  // so that we know when END_METADATA should be set. The payload size gets updated when the payload
+  // is packed into metadata frames.
+  std::queue<uint64_t> payload_size_queue_;
 };
 
 } // namespace Http2

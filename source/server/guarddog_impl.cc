@@ -17,7 +17,7 @@ namespace Envoy {
 namespace Server {
 
 GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuration::Main& config,
-                           Event::TimeSystem& time_system)
+                           Event::TimeSystem& time_system, Api::Api& api)
     : time_system_(time_system), miss_timeout_(config.wdMissTimeout()),
       megamiss_timeout_(config.wdMegaMissTimeout()), kill_timeout_(config.wdKillTimeout()),
       multi_kill_timeout_(config.wdMultiKillTimeout()),
@@ -33,7 +33,7 @@ GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuratio
       watchdog_miss_counter_(stats_scope.counter("server.watchdog_miss")),
       watchdog_megamiss_counter_(stats_scope.counter("server.watchdog_mega_miss")),
       run_thread_(true) {
-  start();
+  start(api);
 }
 
 GuardDogImpl::~GuardDogImpl() { stop(); }
@@ -66,14 +66,14 @@ void GuardDogImpl::threadRoutine() {
       }
       if (killEnabled() && delta > kill_timeout_) {
         PANIC(fmt::format("GuardDog: one thread ({}) stuck for more than watchdog_kill_timeout",
-                          watched_dog.dog_->threadId()));
+                          watched_dog.dog_->threadId().debugString()));
       }
       if (multikillEnabled() && delta > multi_kill_timeout_) {
         if (seen_one_multi_timeout) {
 
           PANIC(fmt::format(
               "GuardDog: multiple threads ({},...) stuck for more than watchdog_multikill_timeout",
-              watched_dog.dog_->threadId()));
+              watched_dog.dog_->threadId().debugString()));
         } else {
           seen_one_multi_timeout = true;
         }
@@ -82,14 +82,14 @@ void GuardDogImpl::threadRoutine() {
   } while (waitOrDetectStop());
 }
 
-WatchDogSharedPtr GuardDogImpl::createWatchDog(int32_t thread_id) {
+WatchDogSharedPtr GuardDogImpl::createWatchDog(Thread::ThreadIdPtr&& thread_id) {
   // Timer started by WatchDog will try to fire at 1/2 of the interval of the
   // minimum timeout specified. loop_interval_ is const so all shared state
   // accessed out of the locked section below is const (time_system_ has no
   // state).
   auto wd_interval = loop_interval_ / 2;
   WatchDogSharedPtr new_watchdog =
-      std::make_shared<WatchDogImpl>(thread_id, time_system_, wd_interval);
+      std::make_shared<WatchDogImpl>(std::move(thread_id), time_system_, wd_interval);
   WatchedDog watched_dog;
   watched_dog.dog_ = new_watchdog;
   {
@@ -135,9 +135,9 @@ bool GuardDogImpl::waitOrDetectStop() {
   return run_thread_;
 }
 
-void GuardDogImpl::start() {
+void GuardDogImpl::start(Api::Api& api) {
   run_thread_ = true;
-  thread_ = std::make_unique<Thread::Thread>([this]() -> void { threadRoutine(); });
+  thread_ = api.threadFactory().createThread([this]() -> void { threadRoutine(); });
 }
 
 void GuardDogImpl::stop() {

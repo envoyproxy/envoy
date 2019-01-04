@@ -109,6 +109,13 @@ TEST(DubboProtocolImplTest, InvalidProtocol) {
   }
 }
 
+TEST(DubboProtocolImplTest, DubboProtocolConfigFactory) {
+  MockProtocolCallbacks cb;
+  auto protocol = NamedProtocolConfigFactory::getFactory(ProtocolType::Dubbo).createProtocol(cb);
+  EXPECT_EQ(protocol->name(), "dubbo");
+  EXPECT_EQ(protocol->type(), ProtocolType::Dubbo);
+}
+
 } // namespace DubboProxy
 } // namespace NetworkFilters
 } // namespace Extensions

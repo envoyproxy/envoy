@@ -7,12 +7,15 @@
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/grpc/status.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/header_map.h"
 #include "envoy/router/router.h"
 #include "envoy/ssl/connection.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/upstream.h"
+
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Http {
@@ -27,7 +30,10 @@ enum class FilterHeadersStatus {
   // Do not iterate to any of the remaining filters in the chain. Returning
   // FilterDataStatus::Continue from decodeData()/encodeData() or calling
   // continueDecoding()/continueEncoding() MUST be called if continued filter iteration is desired.
-  StopIteration
+  StopIteration,
+  // Continue iteration to remaining filters, but ignore any subsequent data or trailers. This
+  // results in creating a header only request/response.
+  ContinueAndEndStream
 };
 
 /**
@@ -158,8 +164,10 @@ public:
   /**
    * Continue iterating through the filter chain with buffered headers and body data. This routine
    * can only be called if the filter has previously returned StopIteration from decodeHeaders()
-   * AND either StopIterationAndBuffer or StopIterationNoBuffer from each previous call to
-   * decodeData(). The connection manager will dispatch headers and any buffered body data to the
+   * AND one of StopIterationAndBuffer, StopIterationAndWatermark, or StopIterationNoBuffer
+   * from each previous call to decodeData().
+   *
+   * The connection manager will dispatch headers and any buffered body data to the
    * next filter in the chain. Further note that if the request is not complete, this filter will
    * still receive decodeData() calls and must return an appropriate status code depending on what
    * the filter needs to do.
@@ -221,9 +229,11 @@ public:
    *                  type, or encoded in the grpc-message header.
    * @param modify_headers supplies an optional callback function that can modify the
    *                       response headers.
+   * @param grpc_status the gRPC status code to override the httpToGrpcStatus mapping with.
    */
-  virtual void sendLocalReply(Code response_code, const std::string& body_text,
-                              std::function<void(HeaderMap& headers)> modify_headers) PURE;
+  virtual void sendLocalReply(Code response_code, absl::string_view body_text,
+                              std::function<void(HeaderMap& headers)> modify_headers,
+                              const absl::optional<Grpc::Status::GrpcStatus> grpc_status) PURE;
 
   /**
    * Called with 100-Continue headers to be encoded.
@@ -259,6 +269,13 @@ public:
    * @param trailers supplies the trailers to encode.
    */
   virtual void encodeTrailers(HeaderMapPtr&& trailers) PURE;
+
+  /**
+   * Called with metadata to be encoded.
+   *
+   * @param metadata_map supplies the unique_ptr of the metadata to be encoded.
+   */
+  virtual void encodeMetadata(MetadataMapPtr&& metadata_map) PURE;
 
   /**
    * Called when the buffer for a decoder filter or any buffers the filter sends data to go over
@@ -374,7 +391,9 @@ public:
   /**
    * Continue iterating through the filter chain with buffered headers and body data. This routine
    * can only be called if the filter has previously returned StopIteration from encodeHeaders() AND
-   * either StopIterationAndBuffer or StopIterationNoBuffer from each previous call to encodeData().
+   * one of StopIterationAndBuffer, StopIterationAndWatermark, or StopIterationNoBuffer
+   * from each previous call to encodeData().
+   *
    * The connection manager will dispatch headers and any buffered body data to the next filter in
    * the chain. Further note that if the response is not complete, this filter will still receive
    * encodeData() calls and must return an appropriate status code depending on what the filter
@@ -572,12 +591,15 @@ public:
   /**
    * Called when a new upgrade stream is created on the connection.
    * @param upgrade supplies the upgrade header from downstream
+   * @param per_route_upgrade_map supplies the upgrade map, if any, for this route.
    * @param callbacks supplies the "sink" that is used for actually creating the filter chain. @see
    *                  FilterChainFactoryCallbacks.
    * @return true if upgrades of this type are allowed and the filter chain has been created.
    *    returns false if this upgrade type is not configured, and no filter chain is created.
    */
+  typedef std::map<std::string, bool> UpgradeMap;
   virtual bool createUpgradeFilterChain(absl::string_view upgrade,
+                                        const UpgradeMap* per_route_upgrade_map,
                                         FilterChainFactoryCallbacks& callbacks) PURE;
 };
 

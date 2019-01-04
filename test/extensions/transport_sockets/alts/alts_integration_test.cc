@@ -55,7 +55,7 @@ public:
   }
 
   void SetUp() override {
-    fake_handshaker_server_thread_ = std::make_unique<Thread::Thread>([this]() {
+    fake_handshaker_server_thread_ = api_->threadFactory().createThread([this]() {
       std::unique_ptr<grpc::Service> service = grpc::gcp::CreateFakeHandshakerService();
 
       std::string server_address = Network::Test::getLoopbackAddressUrlString(version_) + ":0";
@@ -98,7 +98,8 @@ public:
   Network::ClientConnectionPtr makeAltsConnection() {
     Network::Address::InstanceConstSharedPtr address = getAddress(version_, lookupPort("http"));
     return dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
-                                               client_alts_->createTransportSocket(), nullptr);
+                                               client_alts_->createTransportSocket(nullptr),
+                                               nullptr);
   }
 
   std::string fakeHandshakerServerAddress(bool connect_to_handshaker) {

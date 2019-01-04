@@ -84,7 +84,8 @@ public:
 
   // Http::FilterChainFactory
   void createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) override;
-  bool createUpgradeFilterChain(absl::string_view, Http::FilterChainFactoryCallbacks&) override {
+  bool createUpgradeFilterChain(absl::string_view, const Http::FilterChainFactory::UpgradeMap*,
+                                Http::FilterChainFactoryCallbacks&) override {
     return false;
   }
 
@@ -100,6 +101,7 @@ public:
   bool generateRequestId() override { return false; }
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
   std::chrono::milliseconds streamIdleTimeout() const override { return {}; }
+  std::chrono::milliseconds requestTimeout() const override { return {}; }
   std::chrono::milliseconds delayedCloseTimeout() const override { return {}; }
   Router::RouteConfigProvider& routeConfigProvider() override { return route_config_provider_; }
   const std::string& serverName() override { return Http::DefaultServerString::get(); }
@@ -203,6 +205,8 @@ private:
                              Buffer::Instance& response, AdminStream&);
   Http::Code handlerConfigDump(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                                Buffer::Instance& response, AdminStream&) const;
+  Http::Code handlerContention(absl::string_view path_and_query, Http::HeaderMap& response_headers,
+                               Buffer::Instance& response, AdminStream&);
   Http::Code handlerCpuProfiler(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                                 Buffer::Instance& response, AdminStream&);
   Http::Code handlerHealthcheckFail(absl::string_view path_and_query,
@@ -253,12 +257,17 @@ private:
     Network::FilterChainManager& filterChainManager() override { return parent_; }
     Network::FilterChainFactory& filterChainFactory() override { return parent_; }
     Network::Socket& socket() override { return parent_.mutable_socket(); }
+    const Network::Socket& socket() const override { return parent_.mutable_socket(); }
     bool bindToPort() override { return true; }
     bool handOffRestoredDestinationConnections() const override { return false; }
-    uint32_t perConnectionBufferLimitBytes() override { return 0; }
+    uint32_t perConnectionBufferLimitBytes() const override { return 0; }
+    std::chrono::milliseconds listenerFiltersTimeout() const override {
+      return std::chrono::milliseconds();
+    }
     Stats::Scope& listenerScope() override { return *scope_; }
     uint64_t listenerTag() const override { return 0; }
     const std::string& name() const override { return name_; }
+    bool reverseWriteFilterOrder() const override { return false; }
 
     AdminImpl& parent_;
     const std::string name_;

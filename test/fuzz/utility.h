@@ -2,7 +2,7 @@
 
 #include "common/network/utility.h"
 
-#include "test/common/access_log/test_util.h"
+#include "test/common/stream_info/test_util.h"
 #include "test/fuzz/common.pb.h"
 #include "test/mocks/upstream/host.h"
 #include "test/test_common/utility.h"
@@ -53,6 +53,7 @@ inline TestStreamInfo fromStreamInfo(const test::fuzz::StreamInfo& stream_info) 
   auto address = Network::Utility::resolveUrl("tcp://10.0.0.1:443");
   test_stream_info.upstream_local_address_ = address;
   test_stream_info.downstream_local_address_ = address;
+  test_stream_info.downstream_direct_remote_address_ = address;
   test_stream_info.downstream_remote_address_ = address;
   return test_stream_info;
 }

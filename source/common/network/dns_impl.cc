@@ -1,7 +1,7 @@
 #include "common/network/dns_impl.h"
 
 #include <netdb.h>
-#include <netinet/ip.h>
+#include <netinet/in.h>
 #include <sys/socket.h>
 
 #include <chrono>

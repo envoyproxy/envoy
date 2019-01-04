@@ -34,7 +34,7 @@ namespace Server {
  * the config is valid, false if invalid.
  */
 bool validateConfig(Options& options, Network::Address::InstanceConstSharedPtr local_address,
-                    ComponentFactory& component_factory);
+                    ComponentFactory& component_factory, Thread::ThreadFactory& thread_factory);
 
 /**
  * ValidationInstance does the bulk of the work for config-validation runs of Envoy. It implements
@@ -56,12 +56,12 @@ public:
   ValidationInstance(Options& options, Event::TimeSystem& time_system,
                      Network::Address::InstanceConstSharedPtr local_address,
                      Stats::IsolatedStoreImpl& store, Thread::BasicLockable& access_log_lock,
-                     ComponentFactory& component_factory);
+                     ComponentFactory& component_factory, Thread::ThreadFactory& thread_factory);
 
   // Server::Instance
   Admin& admin() override { return admin_; }
   Api::Api& api() override { return *api_; }
-  Upstream::ClusterManager& clusterManager() override { return *config_->clusterManager(); }
+  Upstream::ClusterManager& clusterManager() override { return *config_.clusterManager(); }
   Ssl::ContextManager& sslContextManager() override { return *ssl_context_manager_; }
   Event::Dispatcher& dispatcher() override { return *dispatcher_; }
   Network::DnsResolverSharedPtr dnsResolver() override {
@@ -77,10 +77,6 @@ public:
   ListenerManager& listenerManager() override { return *listener_manager_; }
   Secret::SecretManager& secretManager() override { return *secret_manager_; }
   Runtime::RandomGenerator& random() override { return random_generator_; }
-  RateLimit::ClientPtr
-  rateLimitClient(const absl::optional<std::chrono::milliseconds>& timeout) override {
-    return config_->rateLimitClientFactory().create(timeout);
-  }
   Runtime::Loader& runtime() override { return *runtime_loader_; }
   void shutdown() override;
   bool isShutdown() override { return false; }
@@ -92,13 +88,14 @@ public:
   time_t startTimeCurrentEpoch() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   time_t startTimeFirstEpoch() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   Stats::Store& stats() override { return stats_store_; }
-  Tracing::HttpTracer& httpTracer() override { return config_->httpTracer(); }
+  Http::Context& httpContext() override { return http_context_; }
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
   const LocalInfo::LocalInfo& localInfo() override { return *local_info_; }
   Event::TimeSystem& timeSystem() override { return time_system_; }
+  Envoy::MutexTracer* mutexTracer() override { return mutex_tracer_; }
 
   std::chrono::milliseconds statsFlushInterval() const override {
-    return config_->statsFlushInterval();
+    return config_.statsFlushInterval();
   }
 
   // Server::ListenerComponentFactory
@@ -150,7 +147,7 @@ private:
   Runtime::LoaderPtr runtime_loader_;
   Runtime::RandomGeneratorImpl random_generator_;
   std::unique_ptr<Ssl::ContextManagerImpl> ssl_context_manager_;
-  std::unique_ptr<Configuration::Main> config_;
+  Configuration::MainImpl config_;
   LocalInfo::LocalInfoPtr local_info_;
   AccessLog::AccessLogManagerImpl access_log_manager_;
   std::unique_ptr<Upstream::ValidationClusterManagerFactory> cluster_manager_factory_;
@@ -158,6 +155,8 @@ private:
   std::unique_ptr<ListenerManagerImpl> listener_manager_;
   std::unique_ptr<Secret::SecretManager> secret_manager_;
   std::unique_ptr<OverloadManager> overload_manager_;
+  MutexTracer* mutex_tracer_;
+  Http::ContextImpl http_context_;
 };
 
 } // namespace Server

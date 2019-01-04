@@ -119,6 +119,7 @@ public:
   void startWorkers(GuardDog& guard_dog) override;
   void stopListeners() override;
   void stopWorkers() override;
+  Http::Context& httpContext() { return server_.httpContext(); }
 
   Instance& server_;
   TimeSource& time_source_;
@@ -240,14 +241,21 @@ public:
   Network::FilterChainManager& filterChainManager() override { return *this; }
   Network::FilterChainFactory& filterChainFactory() override { return *this; }
   Network::Socket& socket() override { return *socket_; }
+  const Network::Socket& socket() const override { return *socket_; }
   bool bindToPort() override { return bind_to_port_; }
   bool handOffRestoredDestinationConnections() const override {
     return hand_off_restored_destination_connections_;
   }
-  uint32_t perConnectionBufferLimitBytes() override { return per_connection_buffer_limit_bytes_; }
+  uint32_t perConnectionBufferLimitBytes() const override {
+    return per_connection_buffer_limit_bytes_;
+  }
+  std::chrono::milliseconds listenerFiltersTimeout() const override {
+    return listener_filters_timeout_;
+  }
   Stats::Scope& listenerScope() override { return *listener_scope_; }
   uint64_t listenerTag() const override { return listener_tag_; }
   const std::string& name() const override { return name_; }
+  bool reverseWriteFilterOrder() const override { return reverse_write_filter_order_; }
 
   // Server::Configuration::ListenerFactoryContext
   AccessLog::AccessLogManager& accessLogManager() override {
@@ -257,14 +265,11 @@ public:
   Event::Dispatcher& dispatcher() override { return parent_.server_.dispatcher(); }
   Network::DrainDecision& drainDecision() override { return *this; }
   bool healthCheckFailed() override { return parent_.server_.healthCheckFailed(); }
-  Tracing::HttpTracer& httpTracer() override { return parent_.server_.httpTracer(); }
+  Tracing::HttpTracer& httpTracer() override { return httpContext().tracer(); }
+  Http::Context& httpContext() override { return parent_.server_.httpContext(); }
   Init::Manager& initManager() override;
   const LocalInfo::LocalInfo& localInfo() const override { return parent_.server_.localInfo(); }
   Envoy::Runtime::RandomGenerator& random() override { return parent_.server_.random(); }
-  RateLimit::ClientPtr
-  rateLimitClient(const absl::optional<std::chrono::milliseconds>& timeout) override {
-    return parent_.server_.rateLimitClient(timeout);
-  }
   Envoy::Runtime::Loader& runtime() override { return parent_.server_.runtime(); }
   Stats::Scope& scope() override { return *global_scope_; }
   Singleton::Manager& singletonManager() override { return parent_.server_.singletonManager(); }
@@ -289,6 +294,7 @@ public:
     ensureSocketOptions();
     Network::Socket::appendOptions(listen_socket_options_, options);
   }
+  const Network::ListenerConfig& listenerConfig() const override { return *this; }
 
   // Network::DrainDecision
   bool drainClose() const override;
@@ -305,7 +311,8 @@ public:
   SystemTime last_updated_;
 
 private:
-  typedef std::unordered_map<std::string, Network::FilterChainSharedPtr> ApplicationProtocolsMap;
+  typedef std::array<Network::FilterChainSharedPtr, 3> SourceTypesArray;
+  typedef std::unordered_map<std::string, SourceTypesArray> ApplicationProtocolsMap;
   typedef std::unordered_map<std::string, ApplicationProtocolsMap> TransportProtocolsMap;
   // Both exact server names and wildcard domains are part of the same map, in which wildcard
   // domains are prefixed with "." (i.e. ".example.com" for "*.example.com") to differentiate
@@ -318,33 +325,40 @@ private:
   typedef std::unordered_map<uint16_t, std::pair<DestinationIPsMap, DestinationIPsTriePtr>>
       DestinationPortsMap;
 
-  void addFilterChain(uint16_t destination_port, const std::vector<std::string>& destination_ips,
-                      const std::vector<std::string>& server_names,
-                      const std::string& transport_protocol,
-                      const std::vector<std::string>& application_protocols,
-                      Network::TransportSocketFactoryPtr&& transport_socket_factory,
-                      std::vector<Network::FilterFactoryCb> filters_factory);
-  void addFilterChainForDestinationPorts(DestinationPortsMap& destination_ports_map,
-                                         uint16_t destination_port,
-                                         const std::vector<std::string>& destination_ips,
-                                         const std::vector<std::string>& server_names,
-                                         const std::string& transport_protocol,
-                                         const std::vector<std::string>& application_protocols,
-                                         const Network::FilterChainSharedPtr& filter_chain);
-  void addFilterChainForDestinationIPs(DestinationIPsMap& destination_ips_map,
-                                       const std::vector<std::string>& destination_ips,
-                                       const std::vector<std::string>& server_names,
-                                       const std::string& transport_protocol,
-                                       const std::vector<std::string>& application_protocols,
-                                       const Network::FilterChainSharedPtr& filter_chain);
-  void addFilterChainForServerNames(ServerNamesMap& server_names_map,
-                                    const std::vector<std::string>& server_names,
-                                    const std::string& transport_protocol,
-                                    const std::vector<std::string>& application_protocols,
-                                    const Network::FilterChainSharedPtr& filter_chain);
-  void addFilterChainForApplicationProtocols(ApplicationProtocolsMap& application_protocol_map,
-                                             const std::vector<std::string>& application_protocols,
-                                             const Network::FilterChainSharedPtr& filter_chain);
+  void
+  addFilterChain(uint16_t destination_port, const std::vector<std::string>& destination_ips,
+                 const std::vector<std::string>& server_names,
+                 const std::string& transport_protocol,
+                 const std::vector<std::string>& application_protocols,
+                 const envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType source_type,
+                 Network::TransportSocketFactoryPtr&& transport_socket_factory,
+                 std::vector<Network::FilterFactoryCb> filters_factory);
+  void addFilterChainForDestinationPorts(
+      DestinationPortsMap& destination_ports_map, uint16_t destination_port,
+      const std::vector<std::string>& destination_ips, const std::vector<std::string>& server_names,
+      const std::string& transport_protocol, const std::vector<std::string>& application_protocols,
+      const envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType source_type,
+      const Network::FilterChainSharedPtr& filter_chain);
+  void addFilterChainForDestinationIPs(
+      DestinationIPsMap& destination_ips_map, const std::vector<std::string>& destination_ips,
+      const std::vector<std::string>& server_names, const std::string& transport_protocol,
+      const std::vector<std::string>& application_protocols,
+      const envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType source_type,
+      const Network::FilterChainSharedPtr& filter_chain);
+  void addFilterChainForServerNames(
+      ServerNamesMap& server_names_map, const std::vector<std::string>& server_names,
+      const std::string& transport_protocol, const std::vector<std::string>& application_protocols,
+      const envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType source_type,
+      const Network::FilterChainSharedPtr& filter_chain);
+  void addFilterChainForApplicationProtocols(
+      ApplicationProtocolsMap& application_protocol_map,
+      const std::vector<std::string>& application_protocols,
+      const envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType source_type,
+      const Network::FilterChainSharedPtr& filter_chain);
+  void addFilterChainForSourceTypes(
+      SourceTypesArray& source_types_array,
+      const envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType source_type,
+      const Network::FilterChainSharedPtr& filter_chain);
 
   void convertDestinationIPsMapToTrie();
 
@@ -360,6 +374,9 @@ private:
   const Network::FilterChain*
   findFilterChainForApplicationProtocols(const ApplicationProtocolsMap& application_protocols_map,
                                          const Network::ConnectionSocket& socket) const;
+  const Network::FilterChain*
+  findFilterChainForSourceTypes(const SourceTypesArray& source_types,
+                                const Network::ConnectionSocket& socket) const;
 
   static bool isWildcardServerName(const std::string& name);
 
@@ -377,6 +394,7 @@ private:
   const uint32_t per_connection_buffer_limit_bytes_;
   const uint64_t listener_tag_;
   const std::string name_;
+  const bool reverse_write_filter_order_;
   const bool modifiable_;
   const bool workers_started_;
   const uint64_t hash_;
@@ -388,6 +406,7 @@ private:
   const envoy::api::v2::Listener config_;
   const std::string version_info_;
   Network::Socket::OptionsSharedPtr listen_socket_options_;
+  const std::chrono::milliseconds listener_filters_timeout_;
 };
 
 class FilterChainImpl : public Network::FilterChain {

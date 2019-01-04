@@ -1,3 +1,4 @@
+#include "common/api/api_impl.h"
 #include "common/event/dispatcher_impl.h"
 
 #include "server/worker_impl.h"
@@ -23,21 +24,27 @@ namespace Server {
 
 class WorkerImplTest : public testing::Test {
 public:
-  WorkerImplTest() {
+  WorkerImplTest() : api_(Api::createApiForTest(stats_store_)) {
     // In the real worker the watchdog has timers that prevent exit. Here we need to prevent event
     // loop exit since we use mock timers.
     no_exit_timer_->enableTimer(std::chrono::hours(1));
   }
 
+  Stats::IsolatedStoreImpl stats_store_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   DangerousDeprecatedTestTime test_time;
-  Event::DispatcherImpl* dispatcher_ = new Event::DispatcherImpl(test_time.timeSystem());
   Network::MockConnectionHandler* handler_ = new Network::MockConnectionHandler();
   NiceMock<MockGuardDog> guard_dog_;
   NiceMock<MockOverloadManager> overload_manager_;
+  Api::ApiPtr api_;
+  Event::DispatcherImpl* dispatcher_ = new Event::DispatcherImpl(test_time.timeSystem(), *api_);
   DefaultTestHooks hooks_;
-  WorkerImpl worker_{tls_, hooks_, Event::DispatcherPtr{dispatcher_},
-                     Network::ConnectionHandlerPtr{handler_}, overload_manager_};
+  WorkerImpl worker_{tls_,
+                     hooks_,
+                     Event::DispatcherPtr{dispatcher_},
+                     Network::ConnectionHandlerPtr{handler_},
+                     overload_manager_,
+                     *api_};
   Event::TimerPtr no_exit_timer_ = dispatcher_->createTimer([]() -> void {});
 };
 

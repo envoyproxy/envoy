@@ -33,6 +33,8 @@
 
 #include "extensions/filters/http/well_known_names.h"
 
+#include "absl/strings/match.h"
+
 namespace Envoy {
 namespace Router {
 
@@ -124,7 +126,14 @@ ShadowPolicyImpl::ShadowPolicyImpl(const envoy::api::v2::route::RouteAction& con
   }
 
   cluster_ = config.request_mirror_policy().cluster();
-  runtime_key_ = config.request_mirror_policy().runtime_key();
+
+  if (config.request_mirror_policy().has_runtime_fraction()) {
+    runtime_key_ = config.request_mirror_policy().runtime_fraction().runtime_key();
+    default_value_ = config.request_mirror_policy().runtime_fraction().default_value();
+  } else {
+    runtime_key_ = config.request_mirror_policy().runtime_key();
+    default_value_.set_numerator(0);
+  }
 }
 
 class HashMethodImplBase : public HashPolicyImpl::HashMethod {
@@ -370,6 +379,17 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
   if (route.route().has_cors()) {
     cors_policy_ = std::make_unique<CorsPolicyImpl>(route.route().cors());
   }
+  for (const auto upgrade_config : route.route().upgrade_configs()) {
+    const bool enabled = upgrade_config.has_enabled() ? upgrade_config.enabled().value() : true;
+    const bool success =
+        upgrade_map_
+            .emplace(std::make_pair(
+                Envoy::Http::LowerCaseString(upgrade_config.upgrade_type()).get(), enabled))
+            .second;
+    if (!success) {
+      throw EnvoyException(fmt::format("Duplicate upgrade {}", upgrade_config.upgrade_type()));
+    }
+  }
 }
 
 bool RouteEntryImplBase::evaluateRuntimeMatch(const uint64_t random_value) const {
@@ -461,7 +481,8 @@ void RouteEntryImplBase::finalizePathHeader(Http::HeaderMap& headers,
   if (insert_envoy_original_path) {
     headers.insertEnvoyOriginalPath().value(*headers.Path());
   }
-  ASSERT(StringUtil::startsWith(path.c_str(), matched_path, case_sensitive_));
+  ASSERT(case_sensitive_ ? absl::StartsWith(path, matched_path)
+                         : absl::StartsWithIgnoreCase(path, matched_path));
   headers.Path()->value(path.replace(0, matched_path.size(), rewrite));
 }
 
@@ -695,7 +716,9 @@ void PrefixRouteEntryImpl::rewritePathHeader(Http::HeaderMap& headers,
 RouteConstSharedPtr PrefixRouteEntryImpl::matches(const Http::HeaderMap& headers,
                                                   uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(headers, random_value) &&
-      StringUtil::startsWith(headers.Path()->value().c_str(), prefix_, case_sensitive_)) {
+      (case_sensitive_
+           ? absl::StartsWith(headers.Path()->value().getStringView(), prefix_)
+           : absl::StartsWithIgnoreCase(headers.Path()->value().getStringView(), prefix_))) {
     return clusterEntry(headers, random_value);
   }
   return nullptr;
@@ -725,12 +748,13 @@ RouteConstSharedPtr PathRouteEntryImpl::matches(const Http::HeaderMap& headers,
       return nullptr;
     }
 
+    absl::string_view path_section(path.c_str(), compare_length);
     if (case_sensitive_) {
-      if (0 == strncmp(path.c_str(), path_.c_str(), compare_length)) {
+      if (absl::string_view(path_) == path_section) {
         return clusterEntry(headers, random_value);
       }
     } else {
-      if (0 == strncasecmp(path.c_str(), path_.c_str(), compare_length)) {
+      if (absl::EqualsIgnoreCase(path_, path_section)) {
         return clusterEntry(headers, random_value);
       }
     }
@@ -743,8 +767,7 @@ RegexRouteEntryImpl::RegexRouteEntryImpl(const VirtualHostImpl& vhost,
                                          const envoy::api::v2::route::Route& route,
                                          Server::Configuration::FactoryContext& factory_context)
     : RouteEntryImplBase(vhost, route, factory_context),
-      regex_(RegexUtil::parseRegex(route.match().regex().c_str())),
-      regex_str_(route.match().regex()) {}
+      regex_(RegexUtil::parseRegex(route.match().regex())), regex_str_(route.match().regex()) {}
 
 void RegexRouteEntryImpl::rewritePathHeader(Http::HeaderMap& headers,
                                             bool insert_envoy_original_path) const {

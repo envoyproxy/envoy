@@ -36,7 +36,6 @@ using testing::Return;
 using testing::SaveArg;
 using testing::Sequence;
 using testing::StrictMock;
-using testing::Test;
 
 namespace Envoy {
 namespace Network {
@@ -77,8 +76,10 @@ INSTANTIATE_TEST_CASE_P(IpVersions, ConnectionImplDeathTest,
                         TestUtility::ipTestParamsToString);
 
 TEST_P(ConnectionImplDeathTest, BadFd) {
+  Stats::IsolatedStoreImpl stats_store;
+  Api::ApiPtr api = Api::createApiForTest(stats_store);
   Event::SimulatedTimeSystem time_system;
-  Event::DispatcherImpl dispatcher(time_system);
+  Event::DispatcherImpl dispatcher(time_system, *api);
   EXPECT_DEATH_LOG_TO_STDERR(
       ConnectionImpl(dispatcher, std::make_unique<ConnectionSocketImpl>(-1, nullptr, nullptr),
                      Network::Test::createRawBufferSocket(), false),
@@ -87,9 +88,11 @@ TEST_P(ConnectionImplDeathTest, BadFd) {
 
 class ConnectionImplTest : public testing::TestWithParam<Address::IpVersion> {
 public:
+  ConnectionImplTest() : api_(Api::createApiForTest(stats_store_)) {}
+
   void setUpBasicConnection() {
     if (dispatcher_.get() == nullptr) {
-      dispatcher_ = std::make_unique<Event::DispatcherImpl>(time_system_);
+      dispatcher_ = std::make_unique<Event::DispatcherImpl>(time_system_, *api_);
     }
     listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true, false);
 
@@ -151,8 +154,8 @@ public:
     ASSERT(dispatcher_.get() == nullptr);
 
     MockBufferFactory* factory = new StrictMock<MockBufferFactory>;
-    dispatcher_ =
-        std::make_unique<Event::DispatcherImpl>(time_system_, Buffer::WatermarkFactoryPtr{factory});
+    dispatcher_ = std::make_unique<Event::DispatcherImpl>(
+        time_system_, Buffer::WatermarkFactoryPtr{factory}, *api_);
     // The first call to create a client session will get a MockBuffer.
     // Other calls for server sessions will by default get a normal OwnedImpl.
     EXPECT_CALL(*factory, create_(_, _))
@@ -201,6 +204,7 @@ protected:
   Event::SimulatedTimeSystem time_system_;
   Event::DispatcherPtr dispatcher_;
   Stats::IsolatedStoreImpl stats_store_;
+  Api::ApiPtr api_;
   Network::TcpListenSocket socket_{Network::Test::getAnyAddress(GetParam()), nullptr, true};
   Network::MockListenerCallbacks listener_callbacks_;
   Network::MockConnectionHandler connection_handler_;
@@ -262,7 +266,7 @@ TEST_P(ConnectionImplTest, CloseDuringConnectCallback) {
 }
 
 TEST_P(ConnectionImplTest, ImmediateConnectError) {
-  dispatcher_ = std::make_unique<Event::DispatcherImpl>(time_system_);
+  dispatcher_ = std::make_unique<Event::DispatcherImpl>(time_system_, *api_);
 
   // Using a broadcast/multicast address as the connection destinations address causes an
   // immediate error return from connect().
@@ -850,7 +854,7 @@ TEST_P(ConnectionImplTest, BindFailureTest) {
     source_address_ = Network::Address::InstanceConstSharedPtr{
         new Network::Address::Ipv6Instance(address_string, 0)};
   }
-  dispatcher_ = std::make_unique<Event::DispatcherImpl>(time_system_);
+  dispatcher_ = std::make_unique<Event::DispatcherImpl>(time_system_, *api_);
   listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true, false);
 
   client_connection_ = dispatcher_->createClientConnection(
@@ -1164,6 +1168,28 @@ TEST_P(ConnectionImplTest, DelayedCloseTimeoutNullStats) {
   callback();
 }
 
+class FakeReadFilter : public Network::ReadFilter {
+public:
+  FakeReadFilter() {}
+  ~FakeReadFilter() {
+    EXPECT_TRUE(callbacks_ != nullptr);
+    // The purpose is to verify that when FilterManger is destructed, ConnectionSocketImpl is not
+    // destructed, and ConnectionSocketImpl can still be accessed via ReadFilterCallbacks.
+    EXPECT_TRUE(callbacks_->connection().state() != Network::Connection::State::Open);
+  }
+
+  Network::FilterStatus onData(Buffer::Instance& data, bool) {
+    data.drain(data.length());
+    return Network::FilterStatus::Continue;
+  }
+
+  Network::FilterStatus onNewConnection() { return Network::FilterStatus::Continue; }
+
+  void initializeReadFilterCallbacks(ReadFilterCallbacks& callbacks) { callbacks_ = &callbacks; }
+
+private:
+  ReadFilterCallbacks* callbacks_{nullptr};
+};
 class MockTransportConnectionImplTest : public testing::Test {
 public:
   MockTransportConnectionImplTest() {
@@ -1205,6 +1231,21 @@ public:
   Event::FileReadyCb file_ready_cb_;
   TransportSocketCallbacks* transport_socket_callbacks_;
 };
+
+// The purpose of this case is to verify the destructor order of the object.
+// FilterManager relies on ConnectionSocketImpl, so the FilterManager can be
+// destructed after the ConnectionSocketImpl is destructed.
+//
+// Ref: https://github.com/envoyproxy/envoy/issues/5313
+TEST_F(MockTransportConnectionImplTest, ObjectDestructOrder) {
+  connection_->addReadFilter(std::make_shared<Network::FakeReadFilter>());
+  connection_->enableHalfClose(true);
+  EXPECT_CALL(*transport_socket_, doRead(_))
+      .Times(2)
+      .WillRepeatedly(Return(IoResult{PostIoAction::KeepOpen, 0, true}));
+  file_ready_cb_(Event::FileReadyType::Read);
+  file_ready_cb_(Event::FileReadyType::Read);
+}
 
 // Test that BytesSentCb is invoked at the correct times
 TEST_F(MockTransportConnectionImplTest, BytesSentCallback) {
@@ -1493,7 +1534,7 @@ class ReadBufferLimitTest : public ConnectionImplTest {
 public:
   void readBufferLimitTest(uint32_t read_buffer_limit, uint32_t expected_chunk_size) {
     const uint32_t buffer_size = 256 * 1024;
-    dispatcher_ = std::make_unique<Event::DispatcherImpl>(time_system_);
+    dispatcher_ = std::make_unique<Event::DispatcherImpl>(time_system_, *api_);
     listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true, false);
 
     client_connection_ = dispatcher_->createClientConnection(
@@ -1564,7 +1605,11 @@ TEST_P(ReadBufferLimitTest, SomeLimit) {
 
 class TcpClientConnectionImplTest : public testing::TestWithParam<Address::IpVersion> {
 protected:
-  TcpClientConnectionImplTest() : dispatcher_(time_system_) {}
+  TcpClientConnectionImplTest()
+      : api_(Api::createApiForTest(stats_store_)), dispatcher_(time_system_, *api_) {}
+
+  Stats::IsolatedStoreImpl stats_store_;
+  Api::ApiPtr api_;
   Event::SimulatedTimeSystem time_system_;
   Event::DispatcherImpl dispatcher_;
 };
@@ -1605,7 +1650,11 @@ TEST_P(TcpClientConnectionImplTest, BadConnectConnRefused) {
 
 class PipeClientConnectionImplTest : public testing::Test {
 protected:
-  PipeClientConnectionImplTest() : dispatcher_(time_system_) {}
+  PipeClientConnectionImplTest()
+      : api_(Api::createApiForTest(stats_store_)), dispatcher_(time_system_, *api_) {}
+
+  Stats::IsolatedStoreImpl stats_store_;
+  Api::ApiPtr api_;
   Event::SimulatedTimeSystem time_system_;
   Event::DispatcherImpl dispatcher_;
   const std::string path_{TestEnvironment::unixDomainSocketPath("foo")};

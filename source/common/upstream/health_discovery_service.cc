@@ -21,17 +21,19 @@ HdsDelegate::HdsDelegate(const envoy::api::v2::core::Node& node, Stats::Scope& s
       store_stats(stats), ssl_context_manager_(ssl_context_manager), random_(random),
       info_factory_(info_factory), access_log_manager_(access_log_manager), cm_(cm),
       local_info_(local_info) {
-  health_check_request_.mutable_node()->MergeFrom(node);
+  health_check_request_.mutable_health_check_request()->mutable_node()->MergeFrom(node);
   backoff_strategy_ = std::make_unique<JitteredBackOffStrategy>(RetryInitialDelayMilliseconds,
                                                                 RetryMaxDelayMilliseconds, random_);
   hds_retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
   hds_stream_response_timer_ = dispatcher.createTimer([this]() -> void { sendResponse(); });
 
   // TODO(lilika): Add support for other types of healthchecks
-  health_check_request_.mutable_capability()->add_health_check_protocols(
-      envoy::service::discovery::v2::Capability::HTTP);
-  health_check_request_.mutable_capability()->add_health_check_protocols(
-      envoy::service::discovery::v2::Capability::TCP);
+  health_check_request_.mutable_health_check_request()
+      ->mutable_capability()
+      ->add_health_check_protocols(envoy::service::discovery::v2::Capability::HTTP);
+  health_check_request_.mutable_health_check_request()
+      ->mutable_capability()
+      ->add_health_check_protocols(envoy::service::discovery::v2::Capability::TCP);
 
   establishNewStream();
 }
@@ -78,7 +80,7 @@ HdsDelegate::sendResponse() {
         Network::Utility::addressToProtobufAddress(
             *host->address(), *endpoint->mutable_endpoint()->mutable_address());
         // TODO(lilika): Add support for more granular options of envoy::api::v2::core::HealthStatus
-        if (host->healthy()) {
+        if (host->health() == Host::Health::Healthy) {
           endpoint->set_health_status(envoy::api::v2::core::HealthStatus::HEALTHY);
         } else {
           if (host->getActiveHealthFailureType() == Host::ActiveHealthFailureType::TIMEOUT) {
@@ -160,11 +162,12 @@ void HdsDelegate::onReceiveMessage(
   // Reset
   hds_clusters_.clear();
 
+  // Set response
+  server_response_ms_ = PROTOBUF_GET_MS_REQUIRED(*message, interval);
+
   // Process the HealthCheckSpecifier message
   processMessage(std::move(message));
 
-  // Set response
-  server_response_ms_ = PROTOBUF_GET_MS_REQUIRED(*message, interval);
   setHdsStreamResponseTimer();
 }
 
@@ -207,16 +210,6 @@ HdsCluster::HdsCluster(Runtime::Loader& runtime, const envoy::api::v2::Cluster& 
 
 ClusterSharedPtr HdsCluster::create() { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
-HostVectorConstSharedPtr HdsCluster::createHealthyHostList(const HostVector& hosts) {
-  HostVectorSharedPtr healthy_list(new HostVector());
-  for (const auto& host : hosts) {
-    if (host->healthy()) {
-      healthy_list->emplace_back(host);
-    }
-  }
-  return healthy_list;
-}
-
 ClusterInfoConstSharedPtr ProdClusterInfoFactory::createClusterInfo(
     Runtime::Loader& runtime, const envoy::api::v2::Cluster& cluster,
     const envoy::api::v2::core::BindConfig& bind_config, Stats::Store& stats,
@@ -255,10 +248,10 @@ void HdsCluster::initialize(std::function<void()> callback) {
   }
 
   auto& first_host_set = priority_set_.getOrCreateHostSet(0);
-  auto healthy = createHealthyHostList(*initial_hosts_);
 
-  first_host_set.updateHosts(initial_hosts_, healthy, HostsPerLocalityImpl::empty(),
-                             HostsPerLocalityImpl::empty(), {}, *initial_hosts_, {}, absl::nullopt);
+  first_host_set.updateHosts(
+      HostSetImpl::partitionHosts(initial_hosts_, HostsPerLocalityImpl::empty()), {},
+      *initial_hosts_, {}, absl::nullopt);
 }
 
 void HdsCluster::setOutlierDetector(const Outlier::DetectorSharedPtr&) {

@@ -8,9 +8,13 @@
 /*/extensions/filters/network/thrift_proxy @zuercher @brian-pane
 # jwt_authn http filter extension
 /*/extensions/filters/http/jwt_authn @qiwzhang @lizan
+# grpc_http1_reverse_bridge http filter extension
+/*/extensions/filters/http/grpc_http1_reverse_bridge @snowp
 # header_to_metadata extension
 /*/extensions/filters/http/header_to_metadata @rgs1 @zuercher
 # alts transport socket extension
 /*/extensions/transport_sockets/alts @htuch @yangminzhu
 # sni_cluster extension
 /*/extensions/filters/network/sni_cluster @rshriram @lizan
+# tracers.datadog extension
+/*/extensions/tracers/datadog @cgilmour @palazzem

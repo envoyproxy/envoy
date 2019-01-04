@@ -76,13 +76,14 @@ The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 * `bazel.asan` &mdash; build and run tests under `-c dbg --config=clang-asan` with clang.
 * `bazel.debug` &mdash; build Envoy static binary and run tests under `-c dbg`.
 * `bazel.debug.server_only` &mdash; build Envoy static binary under `-c dbg`.
-* `bazel.dev` &mdash; build Envoy static binary and run tests under `-c fastbuild` with gcc.
+* `bazel.dev` &mdash; build Envoy static binary and run tests under `-c fastbuild` with clang.
 * `bazel.release` &mdash; build Envoy static binary and run tests under `-c opt` with gcc.
 * `bazel.release <test>` &mdash; build Envoy static binary and run a specified test or test dir under `-c opt` with gcc.
 * `bazel.release.server_only` &mdash; build Envoy static binary under `-c opt` with gcc.
 * `bazel.coverage` &mdash; build and run tests under `-c dbg` with gcc, generating coverage information in `$ENVOY_DOCKER_BUILD_DIR/envoy/generated/coverage/coverage.html`.
 * `bazel.coverity` &mdash; build Envoy static binary and run Coverity Scan static analysis.
 * `bazel.tsan` &mdash; build and run tests under `-c dbg --config=clang-tsan` with clang.
+* `bazel.compile_time_options` &mdash; build Envoy and test with various compile-time options toggled to their non-default state, to ensure they still build.
 * `bazel.clang_tidy` &mdash; build and run clang-tidy over all source files.
 * `check_format`&mdash; run `clang-format-6.0` and `buildifier` on entire source tree.
 * `fix_format`&mdash; run and enforce `clang-format-6.0` and `buildifier` on entire source tree.

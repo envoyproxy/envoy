@@ -30,11 +30,12 @@ public:
   }
 
   MOCK_METHOD1(allocateDispatcher_, Event::Dispatcher*(Event::TimeSystem&));
-  MOCK_METHOD4(createFile,
+  MOCK_METHOD3(createFile,
                Filesystem::FileSharedPtr(const std::string& path, Event::Dispatcher& dispatcher,
-                                         Thread::BasicLockable& lock, Stats::Store& stats_store));
+                                         Thread::BasicLockable& lock));
   MOCK_METHOD1(fileExists, bool(const std::string& path));
   MOCK_METHOD1(fileReadToEnd, std::string(const std::string& path));
+  MOCK_METHOD0(threadFactory, Thread::ThreadFactory&());
 
   std::shared_ptr<Filesystem::MockFile> file_{new Filesystem::MockFile()};
 };

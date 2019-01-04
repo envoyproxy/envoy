@@ -14,6 +14,7 @@
 // * Fuzz config settings
 #include "common/common/empty_string.h"
 #include "common/http/conn_manager_impl.h"
+#include "common/http/context_impl.h"
 #include "common/http/date_provider_impl.h"
 #include "common/http/exception.h"
 #include "common/network/address_impl.h"
@@ -92,6 +93,7 @@ public:
   bool generateRequestId() override { return true; }
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
   std::chrono::milliseconds streamIdleTimeout() const override { return stream_idle_timeout_; }
+  std::chrono::milliseconds requestTimeout() const override { return request_timeout_; }
   std::chrono::milliseconds delayedCloseTimeout() const override { return delayed_close_timeout_; }
   Router::RouteConfigProvider& routeConfigProvider() override { return route_config_provider_; }
   const std::string& serverName() override { return server_name_; }
@@ -131,6 +133,7 @@ public:
   ConnectionManagerTracingStats tracing_stats_;
   ConnectionManagerListenerStats listener_stats_;
   std::chrono::milliseconds stream_idle_timeout_{};
+  std::chrono::milliseconds request_timeout_{};
   std::chrono::milliseconds delayed_close_timeout_{};
   bool use_remote_address_{true};
   Http::ForwardClientCertType forward_client_cert_{Http::ForwardClientCertType::Sanitize};
@@ -380,7 +383,7 @@ DEFINE_PROTO_FUZZER(const test::common::http::ConnManagerImplTestCase& input) {
   FuzzConfig config;
   NiceMock<Network::MockDrainDecision> drain_close;
   NiceMock<Runtime::MockRandomGenerator> random;
-  NiceMock<Tracing::MockHttpTracer> tracer;
+  Http::ContextImpl http_context;
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   NiceMock<Upstream::MockClusterManager> cluster_manager;
@@ -397,7 +400,7 @@ DEFINE_PROTO_FUZZER(const test::common::http::ConnManagerImplTestCase& input) {
   filter_callbacks.connection_.remote_address_ =
       std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0");
 
-  ConnectionManagerImpl conn_manager(config, drain_close, random, tracer, runtime, local_info,
+  ConnectionManagerImpl conn_manager(config, drain_close, random, http_context, runtime, local_info,
                                      cluster_manager, nullptr, config.time_system_);
   conn_manager.initializeReadFilterCallbacks(filter_callbacks);
 

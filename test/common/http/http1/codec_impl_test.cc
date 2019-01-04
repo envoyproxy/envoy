@@ -348,6 +348,27 @@ TEST_F(Http1ServerConnectionImplTest, HeaderOnlyResponse) {
   EXPECT_EQ("HTTP/1.1 200 OK\r\ncontent-length: 0\r\n\r\n", output);
 }
 
+TEST_F(Http1ServerConnectionImplTest, MetadataTest) {
+  initialize();
+
+  NiceMock<Http::MockStreamDecoder> decoder;
+  Http::StreamEncoder* response_encoder = nullptr;
+  EXPECT_CALL(callbacks_, newStream(_))
+      .WillOnce(Invoke([&](Http::StreamEncoder& encoder) -> Http::StreamDecoder& {
+        response_encoder = &encoder;
+        return decoder;
+      }));
+  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\n");
+  codec_->dispatch(buffer);
+  EXPECT_EQ(0U, buffer.length());
+
+  MetadataMap metadata_map = {{"key", "value"}};
+  MetadataMapPtr metadata_map_ptr = std::make_unique<MetadataMap>(metadata_map);
+  MetadataMapVector metadata_map_vector;
+  metadata_map_vector.push_back(std::move(metadata_map_ptr));
+  EXPECT_DEATH_LOG_TO_STDERR(response_encoder->encodeMetadata(metadata_map_vector), "");
+}
+
 TEST_F(Http1ServerConnectionImplTest, ChunkedResponse) {
   initialize();
 
@@ -682,6 +703,32 @@ TEST_F(Http1ClientConnectionImplTest, PrematureResponse) {
   EXPECT_THROW(codec_->dispatch(response), PrematureResponseException);
 }
 
+TEST_F(Http1ClientConnectionImplTest, EmptyBodyResponse503) {
+  initialize();
+
+  NiceMock<Http::MockStreamDecoder> response_decoder;
+  Http::StreamEncoder& request_encoder = codec_->newStream(response_decoder);
+  TestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+  request_encoder.encodeHeaders(headers, true);
+
+  EXPECT_CALL(response_decoder, decodeHeaders_(_, true));
+  Buffer::OwnedImpl response("HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\n\r\n");
+  codec_->dispatch(response);
+}
+
+TEST_F(Http1ClientConnectionImplTest, EmptyBodyResponse200) {
+  initialize();
+
+  NiceMock<Http::MockStreamDecoder> response_decoder;
+  Http::StreamEncoder& request_encoder = codec_->newStream(response_decoder);
+  TestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+  request_encoder.encodeHeaders(headers, true);
+
+  EXPECT_CALL(response_decoder, decodeHeaders_(_, true));
+  Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n");
+  codec_->dispatch(response);
+}
+
 TEST_F(Http1ClientConnectionImplTest, HeadRequest) {
   initialize();
 
@@ -892,7 +939,7 @@ TEST_F(Http1ClientConnectionImplTest, HighwatermarkMultipleResponses) {
   static_cast<ClientConnection*>(codec_.get())
       ->onUnderlyingConnectionAboveWriteBufferHighWatermark();
 
-  EXPECT_CALL(response_decoder, decodeHeaders_(_, false));
+  EXPECT_CALL(response_decoder, decodeHeaders_(_, true));
   Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n");
   codec_->dispatch(response);
 

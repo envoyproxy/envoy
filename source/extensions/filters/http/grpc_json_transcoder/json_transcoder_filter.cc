@@ -1,6 +1,7 @@
 #include "extensions/filters/http/grpc_json_transcoder/json_transcoder_filter.h"
 
 #include <memory>
+#include <unordered_set>
 
 #include "envoy/common/exception.h"
 #include "envoy/http/filter.h"
@@ -104,6 +105,10 @@ JsonTranscoderConfig::JsonTranscoderConfig(
   }
 
   PathMatcherBuilder<const Protobuf::MethodDescriptor*> pmb;
+  std::unordered_set<ProtobufTypes::String> ignored_query_parameters;
+  for (const auto& query_param : proto_config.ignored_query_parameters()) {
+    ignored_query_parameters.insert(query_param);
+  }
 
   for (const auto& service_name : proto_config.services()) {
     auto service = descriptor_pool_.FindServiceByName(service_name);
@@ -113,8 +118,9 @@ JsonTranscoderConfig::JsonTranscoderConfig(
     }
     for (int i = 0; i < service->method_count(); ++i) {
       auto method = service->method(i);
-      if (!PathMatcherUtility::RegisterByHttpRule(
-              pmb, method->options().GetExtension(google::api::http), method)) {
+      if (!PathMatcherUtility::RegisterByHttpRule(pmb,
+                                                  method->options().GetExtension(google::api::http),
+                                                  ignored_query_parameters, method)) {
         throw EnvoyException("transcoding_filter: Cannot register '" + method->full_name() +
                              "' to path matcher");
       }
@@ -245,8 +251,10 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::HeaderMap& h
     if (!request_status.ok()) {
       ENVOY_LOG(debug, "Transcoding request error {}", request_status.ToString());
       error_ = true;
-      decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, request_status.error_message(),
-                                         nullptr);
+      decoder_callbacks_->sendLocalReply(Http::Code::BadRequest,
+                                         absl::string_view(request_status.error_message().data(),
+                                                           request_status.error_message().size()),
+                                         nullptr, absl::nullopt);
 
       return Http::FilterHeadersStatus::StopIteration;
     }
@@ -281,8 +289,10 @@ Http::FilterDataStatus JsonTranscoderFilter::decodeData(Buffer::Instance& data, 
   if (!request_status.ok()) {
     ENVOY_LOG(debug, "Transcoding request error {}", request_status.ToString());
     error_ = true;
-    decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, request_status.error_message(),
-                                       nullptr);
+    decoder_callbacks_->sendLocalReply(Http::Code::BadRequest,
+                                       absl::string_view(request_status.error_message().data(),
+                                                         request_status.error_message().size()),
+                                       nullptr, absl::nullopt);
 
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }

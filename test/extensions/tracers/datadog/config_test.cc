@@ -32,7 +32,8 @@ TEST(DatadogTracerConfigTest, DatadogHttpTracer) {
   MessageUtil::loadFromYaml(yaml_string, configuration);
 
   DatadogTracerFactory factory;
-  Tracing::HttpTracerPtr datadog_tracer = factory.createHttpTracer(configuration, server);
+  auto message = Config::Utility::translateToFactoryConfig(configuration.http(), factory);
+  Tracing::HttpTracerPtr datadog_tracer = factory.createHttpTracer(*message, server);
   EXPECT_NE(nullptr, datadog_tracer);
 }
 
