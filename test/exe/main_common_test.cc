@@ -105,7 +105,11 @@ TEST_P(MainCommonTest, ConstructDestructHotRestartDisabledNoInit) {
 }
 
 // Test that std::set_new_handler() was called and the callback functions as expected.
+// This test fails under TSAN, so don't run it in that build:
+//   [  DEATH   ] ==845==ERROR: ThreadSanitizer: requested allocation size 0x3e800000000
+//   exceeds maximum supported size of 0x10000000000
 TEST_P(MainCommonTest, OutOfMemoryHandler) {
+#if !defined(__has_feature) || !__has_feature(thread_sanitizer)
   MainCommon main_common(argc(), argv());
   EXPECT_DEATH_LOG_TO_STDERR(
       []() {
@@ -117,6 +121,10 @@ TEST_P(MainCommonTest, OutOfMemoryHandler) {
         }
       }(),
       ".*panic: out of memory.*");
+#else
+  ENVOY_LOG_MISC(critical,
+                 "MainCommonTest::OutOfMemoryHandler not supported by this compiler configuration");
+#endif
 }
 
 INSTANTIATE_TEST_CASE_P(IpVersions, MainCommonTest,
