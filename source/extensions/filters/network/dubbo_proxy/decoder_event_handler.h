@@ -24,8 +24,8 @@ namespace DubboProxy {
  */
 class ProtocolDataPassthroughConverter {
 public:
-  ProtocolDataPassthroughConverter() {}
-  virtual ~ProtocolDataPassthroughConverter() {}
+  ProtocolDataPassthroughConverter() = default;
+  virtual ~ProtocolDataPassthroughConverter() = default;
 
   void initProtocolConverter(Buffer::Instance& buffer) { buffer_ = &buffer; }
 
@@ -61,7 +61,7 @@ protected:
 
 class DecoderEventHandler : public ProtocolDataPassthroughConverter {
 public:
-  virtual ~DecoderEventHandler() override {}
+  ~DecoderEventHandler() override = default;
 
   /**
    * Indicates the start of a Dubbo transport data was detected. Unframed transports generate
@@ -95,7 +95,7 @@ public:
 
 class DecoderCallbacks {
 public:
-  virtual ~DecoderCallbacks() {}
+  virtual ~DecoderCallbacks() = default;
 
   /**
    * @return DecoderEventHandler& a new DecoderEventHandler for a message.

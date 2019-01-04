@@ -11,7 +11,7 @@ namespace DubboProxy {
 namespace DubboFilters {
 
 /**
- * Well-known http filter names.
+ * Well-known Dubbo filter names.
  * NOTE: New filters should use the well known name: envoy.filters.dubbo.name.
  */
 class DubboFilterNameValues {

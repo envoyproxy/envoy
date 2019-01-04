@@ -19,6 +19,7 @@ envoy_cc_library(
         "//source/extensions/filters/network/dubbo_proxy:deserializer_interface",
         "//source/extensions/filters/network/dubbo_proxy:metadata_lib",
         "//source/extensions/filters/network/dubbo_proxy:protocol_interface",
+        "//source/extensions/filters/network/dubbo_proxy/router:router_interface",
     ],
 )
 

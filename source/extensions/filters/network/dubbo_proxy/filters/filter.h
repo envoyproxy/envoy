@@ -10,8 +10,10 @@
 
 #include "extensions/filters/network/dubbo_proxy/decoder_event_handler.h"
 #include "extensions/filters/network/dubbo_proxy/deserializer.h"
+#include "extensions/filters/network/dubbo_proxy/message.h"
 #include "extensions/filters/network/dubbo_proxy/metadata.h"
 #include "extensions/filters/network/dubbo_proxy/protocol.h"
+#include "extensions/filters/network/dubbo_proxy/router/router.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -27,7 +29,7 @@ enum class UpstreamResponseStatus : uint8_t {
 
 class DirectResponse {
 public:
-  virtual ~DirectResponse() {}
+  virtual ~DirectResponse() = default;
 
   enum class ResponseType : uint8_t {
     // DirectResponse encodes MessageType::Reply with success payload
@@ -59,7 +61,7 @@ typedef std::unique_ptr<DirectResponse> DirectResponsePtr;
  */
 class DecoderFilterCallbacks {
 public:
-  virtual ~DecoderFilterCallbacks() {}
+  virtual ~DecoderFilterCallbacks() = default;
 
   /**
    * @return uint64_t the ID of the originating request for logging purposes.
@@ -91,9 +93,9 @@ public:
   virtual DubboProxy::Router::RouteConstSharedPtr route() PURE;
 
   /**
-   * @return TransportType the originating transport.
+   * @return SerializationType the originating protocol.
    */
-  virtual DeserializerType downstreamDeserializerType() const PURE;
+  virtual SerializationType downstreamSerializationType() const PURE;
 
   /**
    * @return ProtocolType the originating protocol.
@@ -137,7 +139,7 @@ public:
  */
 class DecoderFilter : public DecoderEventHandler {
 public:
-  virtual ~DecoderFilter() {}
+  virtual ~DecoderFilter() = default;
 
   /**
    * This routine is called prior to a filter being destroyed. This may happen after normal stream
@@ -165,7 +167,7 @@ typedef std::shared_ptr<DecoderFilter> DecoderFilterSharedPtr;
  */
 class FilterChainFactoryCallbacks {
 public:
-  virtual ~FilterChainFactoryCallbacks() {}
+  virtual ~FilterChainFactoryCallbacks() = default;
 
   /**
    * Add a decoder filter that is used when reading connection data.
@@ -192,7 +194,7 @@ typedef std::function<void(FilterChainFactoryCallbacks& callbacks)> FilterFactor
  */
 class FilterChainFactory {
 public:
-  virtual ~FilterChainFactory() {}
+  virtual ~FilterChainFactory() = default;
 
   /**
    * Called when a new Dubbo stream is created on the connection.

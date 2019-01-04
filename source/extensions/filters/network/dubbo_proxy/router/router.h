@@ -18,7 +18,7 @@ namespace Router {
  */
 class RouteEntry {
 public:
-  virtual ~RouteEntry() {}
+  virtual ~RouteEntry() = default;
 
   /**
    * @return const std::string& the upstream cluster that owns the route.
@@ -37,7 +37,7 @@ public:
  */
 class Route {
 public:
-  virtual ~Route() {}
+  virtual ~Route() = default;
 
   /**
    * @return the route entry or nullptr if there is no matching route for the request.
@@ -52,7 +52,7 @@ typedef std::shared_ptr<const Route> RouteConstSharedPtr;
  */
 class Config {
 public:
-  virtual ~Config() {}
+  virtual ~Config() = default;
 
   /**
    * Based on the incoming Dubbo request transport and/or protocol data, determine the target

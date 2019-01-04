@@ -22,7 +22,7 @@ namespace DubboFilters {
  */
 class NamedDubboFilterConfigFactory {
 public:
-  virtual ~NamedDubboFilterConfigFactory() {}
+  virtual ~NamedDubboFilterConfigFactory() = default;
 
   /**
    * Create a particular dubbo filter factory implementation. If the implementation is unable to
@@ -33,7 +33,7 @@ public:
    * @param context supplies the filter's context.
    * @return FilterFactoryCb the factory creation function.
    */
-  virtual FilterFactoryCb
+  virtual DubboFilters::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message& config, const std::string& stat_prefix,
                                Server::Configuration::FactoryContext& context) PURE;
 
