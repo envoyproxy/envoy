@@ -40,7 +40,13 @@ protected:
             TestEnvironment::PortMap(), GetParam())),
         random_string_(fmt::format("{}", computeBaseId())),
         argv_({"envoy-static", "--base-id", random_string_.c_str(), "-c", config_file_.c_str(),
-               nullptr}) {}
+               nullptr}) {
+    // The test main() sets the ThreadFactorySingleton since it is required by all other tests not
+    // instantiating their own MainCommon.
+    // Reset the singleton to a nullptr to avoid triggering an assertion when MainCommonBase() calls
+    // set() in the tests below.
+    Thread::ThreadFactorySingleton::set(nullptr);
+  }
 
   /**
    * Computes a numeric ID to incorporate into the names of
