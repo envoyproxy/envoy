@@ -12,8 +12,6 @@ envoy_cc_library(
     name = "mem_debug_lib",
     srcs = ["mem_debug.cc"],
     hdrs = ["mem_debug.h"],
-    tcmalloc_dep = 1,
-    deps = ["//source/common/common:assert_lib"],
 )
 
 envoy_cc_library(
@@ -21,4 +19,5 @@ envoy_cc_library(
     srcs = ["stats.cc"],
     hdrs = ["stats.h"],
     tcmalloc_dep = 1,
+    deps = [":mem_debug_lib"],
 )

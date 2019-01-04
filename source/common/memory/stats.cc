@@ -45,10 +45,12 @@ uint64_t Stats::totalPageHeapUnmapped() {
 
 #else
 
+#include "common/memory/mem_debug.h"
+
 namespace Envoy {
 namespace Memory {
 
-uint64_t Stats::totalCurrentlyAllocated() { return 0; }
+uint64_t Stats::totalCurrentlyAllocated() { return MemDebugMemoryUsed(); }
 uint64_t Stats::totalThreadCacheBytes() { return 0; }
 uint64_t Stats::totalCurrentlyReserved() { return 0; }
 uint64_t Stats::totalPageHeapUnmapped() { return 0; }
