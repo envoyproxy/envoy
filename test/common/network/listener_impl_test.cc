@@ -1,5 +1,9 @@
+#include <memory>
+#include <string>
+
 #include "common/network/address_impl.h"
 #include "common/network/listener_impl.h"
+#include "common/network/udp_listener_impl.h"
 #include "common/network/utility.h"
 
 #include "test/mocks/network/mocks.h"
@@ -73,6 +77,15 @@ public:
   MOCK_METHOD1(getLocalAddress, Address::InstanceConstSharedPtr(int fd));
 };
 
+class TestUdpListenerImpl : public UdpListenerImpl {
+public:
+  TestUdpListenerImpl(Event::DispatcherImpl& dispatcher, Socket& socket, UdpListenerCallbacks& cb,
+                      bool bind_to_port)
+      : UdpListenerImpl(dispatcher, socket, cb, bind_to_port) {}
+
+  MOCK_METHOD1(getLocalAddress, Address::InstanceConstSharedPtr(int fd));
+};
+
 class ListenerImplTest : public testing::TestWithParam<Address::IpVersion> {
 protected:
   ListenerImplTest()
@@ -80,6 +93,63 @@ protected:
         alt_address_(Network::Test::findOrCheckFreePort(
             Network::Test::getCanonicalLoopbackAddress(version_), Address::SocketType::Stream)),
         api_(Api::createApiForTest(stats_store_)), dispatcher_(test_time_.timeSystem(), *api_) {}
+
+  SocketPtr getSocket(Address::SocketType type, const Address::InstanceConstSharedPtr& address,
+                      const Network::Socket::OptionsSharedPtr& options, bool bind) {
+    if (type == Address::SocketType::Stream) {
+      using NetworkSocketTraitType = NetworkSocketTrait<Address::SocketType::Stream>;
+      return std::make_unique<NetworkListenSocket<NetworkSocketTraitType>>(address, options, bind);
+    } else if (type == Address::SocketType::Datagram) {
+      using NetworkSocketTraitType = NetworkSocketTrait<Address::SocketType::Datagram>;
+      return std::make_unique<NetworkListenSocket<NetworkSocketTraitType>>(address, options, bind);
+    }
+
+    return nullptr;
+  }
+
+  // TODO(conqerAtapple): Move this to a common place(address.h?)
+  void getSocketAddressInfo(const Socket& socket, sockaddr_storage& addr, socklen_t& sz) {
+    memset(&addr, 0, sizeof(addr));
+
+    auto const* ip = socket.localAddress()->ip();
+    if (!ip) {
+      sz = 0;
+      return;
+    }
+
+    if (version_ == Address::IpVersion::v4) {
+      addr.ss_family = AF_INET;
+      auto const* ipv4 = ip->ipv4();
+      if (!ipv4) {
+        sz = 0;
+        return;
+      }
+
+      sockaddr_in* addrv4 = reinterpret_cast<sockaddr_in*>(&addr);
+      addrv4->sin_port = htons(ip->port());
+      addrv4->sin_addr.s_addr = ipv4->address();
+
+      sz = sizeof(sockaddr_in);
+    } else if (version_ == Address::IpVersion::v6) {
+      addr.ss_family = AF_INET6;
+      auto const* ipv6 = ip->ipv6();
+      if (!ipv6) {
+        sz = 0;
+        return;
+      }
+
+      sockaddr_in6* addrv6 = reinterpret_cast<sockaddr_in6*>(&addr);
+      addrv6->sin6_port = htons(ip->port());
+
+      const auto address = ipv6->address();
+      memcpy(static_cast<void*>(&addrv6->sin6_addr.s6_addr), static_cast<const void*>(&address),
+             sizeof(absl::uint128));
+
+      sz = sizeof(sockaddr_in6);
+    } else {
+      sz = 0;
+    }
+  }
 
   const Address::IpVersion version_;
   const Address::InstanceConstSharedPtr alt_address_;
@@ -134,7 +204,7 @@ TEST_P(ListenerImplTest, SetListeningSocketOptionsError) {
                                         socket.localAddress()->asString()));
 }
 
-TEST_P(ListenerImplTest, UseActualDst) {
+TEST_P(ListenerImplTest, UseActualDstTcp) {
   Stats::IsolatedStoreImpl stats_store;
   Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(version_), nullptr,
                                   true);
@@ -167,6 +237,93 @@ TEST_P(ListenerImplTest, UseActualDst) {
         conn->close(ConnectionCloseType::NoFlush);
         dispatcher_.exit();
       }));
+
+  dispatcher_.run(Event::Dispatcher::RunType::Block);
+}
+
+TEST_P(ListenerImplTest, UseActualDstUdp) {
+  SocketPtr server_socket =
+      getSocket(Address::SocketType::Datagram, Network::Test::getCanonicalLoopbackAddress(version_),
+                nullptr, true);
+
+  ASSERT_NE(server_socket, nullptr);
+
+  auto const* server_ip = server_socket->localAddress()->ip();
+  ASSERT_NE(server_ip, nullptr);
+
+  Network::MockUdpListenerCallbacks listener_callbacks;
+  Network::TestUdpListenerImpl listener(dispatcher_, *server_socket.get(), listener_callbacks,
+                                        true);
+
+  SocketPtr client_socket =
+      getSocket(Address::SocketType::Datagram, Network::Test::getCanonicalLoopbackAddress(version_),
+                nullptr, false);
+
+  const int client_sockfd = client_socket->fd();
+  sockaddr_storage server_addr;
+  socklen_t addr_len;
+
+  getSocketAddressInfo(*client_socket.get(), server_addr, addr_len);
+  ASSERT_GT(addr_len, 0);
+
+  if (version_ == Address::IpVersion::v4) {
+    struct sockaddr_in* servaddr = reinterpret_cast<struct sockaddr_in*>(&server_addr);
+    servaddr->sin_port = htons(server_ip->port());
+  } else if (version_ == Address::IpVersion::v6) {
+    struct sockaddr_in6* servaddr = reinterpret_cast<struct sockaddr_in6*>(&server_addr);
+    servaddr->sin6_port = htons(server_ip->port());
+  }
+
+  const std::string first("first");
+  const std::string second("second");
+
+  auto send_rc = ::sendto(client_sockfd, first.c_str(), first.length(), 0,
+                          reinterpret_cast<const struct sockaddr*>(&server_addr), addr_len);
+
+  ASSERT_EQ(send_rc, first.length());
+
+  send_rc = ::sendto(client_sockfd, second.c_str(), second.length(), MSG_CONFIRM,
+                     reinterpret_cast<const struct sockaddr*>(&server_addr), addr_len);
+
+  ASSERT_EQ(send_rc, second.length());
+
+  EXPECT_CALL(listener_callbacks, onNewConnection_(_, _, _))
+      .WillOnce(
+          Invoke([&](Address::InstanceConstSharedPtr local_address,
+                     Address::InstanceConstSharedPtr peer_address, Buffer::Instance* data) -> void {
+            ASSERT_NE(local_address, nullptr);
+
+            ASSERT_NE(peer_address, nullptr);
+            ASSERT_NE(peer_address->ip(), nullptr);
+
+            ASSERT_EQ(local_address->asString(), server_socket->localAddress()->asString());
+
+            ASSERT_EQ(peer_address->ip()->addressAsString(),
+                      client_socket->localAddress()->ip()->addressAsString());
+
+            EXPECT_EQ(*local_address, *server_socket->localAddress());
+            ASSERT_EQ(data->toString(), first);
+          }));
+
+  EXPECT_CALL(listener_callbacks, onData_(_, _, _))
+      .WillOnce(
+          Invoke([&](Address::InstanceConstSharedPtr local_address,
+                     Address::InstanceConstSharedPtr peer_address, Buffer::Instance* data) -> void {
+            ASSERT_NE(local_address, nullptr);
+
+            ASSERT_NE(peer_address, nullptr);
+            ASSERT_NE(peer_address->ip(), nullptr);
+
+            ASSERT_EQ(local_address->asString(), server_socket->localAddress()->asString());
+
+            ASSERT_EQ(peer_address->ip()->addressAsString(),
+                      client_socket->localAddress()->ip()->addressAsString());
+
+            EXPECT_EQ(*local_address, *server_socket->localAddress());
+            ASSERT_EQ(data->toString(), second);
+
+            dispatcher_.exit();
+          }));
 
   dispatcher_.run(Event::Dispatcher::RunType::Block);
 }

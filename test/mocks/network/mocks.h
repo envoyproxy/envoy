@@ -117,6 +117,30 @@ public:
   MOCK_METHOD1(onNewConnection_, void(ConnectionPtr& conn));
 };
 
+class MockUdpListenerCallbacks : public UdpListenerCallbacks {
+public:
+  MockUdpListenerCallbacks();
+  ~MockUdpListenerCallbacks();
+
+  void onNewConnection(Address::InstanceConstSharedPtr local_address,
+                       Address::InstanceConstSharedPtr peer_address,
+                       Buffer::InstancePtr&& data) override {
+    onNewConnection_(local_address, peer_address, data.get());
+  }
+
+  void onData(Address::InstanceConstSharedPtr local_address,
+              Address::InstanceConstSharedPtr peer_address, Buffer::InstancePtr&& data) override {
+    onData_(local_address, peer_address, data.get());
+  }
+
+  MOCK_METHOD3(onNewConnection_,
+               void(Address::InstanceConstSharedPtr local_address,
+                    Address::InstanceConstSharedPtr peer_address, Buffer::Instance* data));
+
+  MOCK_METHOD3(onData_, void(Address::InstanceConstSharedPtr local_address,
+                             Address::InstanceConstSharedPtr peer_address, Buffer::Instance* data));
+};
+
 class MockDrainDecision : public DrainDecision {
 public:
   MockDrainDecision();
@@ -295,6 +319,7 @@ public:
 
   MOCK_METHOD0(numConnections, uint64_t());
   MOCK_METHOD1(addListener, void(ListenerConfig& config));
+  MOCK_METHOD1(addUdpListener, void(ListenerConfig& config));
   MOCK_METHOD1(findListenerByAddress,
                Network::Listener*(const Network::Address::Instance& address));
   MOCK_METHOD1(removeListeners, void(uint64_t listener_tag));

@@ -168,6 +168,9 @@ public:
    */
   virtual Api::SysCallIntResult read(int fd, uint64_t max_length) PURE;
 
+  virtual Api::SysCallIntResult recvFrom(int fd, uint64_t max_length,
+                                         sockaddr_storage& peer_address,
+                                         socklen_t& sock_length) PURE;
   /**
    * Reserve space in the buffer.
    * @param length supplies the amount of space to reserve.
