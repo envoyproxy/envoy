@@ -177,7 +177,6 @@ void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority,
   // Using the remaining load after allocating load to healthy priorities, distribute it based on
   // degraded availability.
   const auto remaining_load_for_degraded = first_healthy_and_remaining.second;
-  std::cerr << "remaining: " << remaining_load_for_degraded << std::endl;
   const auto first_degraded_and_remaining =
       distributeLoad(degraded_per_priority_load, per_priority_degraded, remaining_load_for_degraded,
                      normalized_total_health);
@@ -201,8 +200,8 @@ void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority,
   }
 
   // The allocated load between healthy and degraded should be exactly 100.
-  /* ASSERT(100 == std::accumulate(per_priority_load.begin(), per_priority_load.end(), 0) +
-   * std::accumulate(per_priority_degraded.begin(), per_priority_degraded.end(), 0) ); */
+  ASSERT(100 == std::accumulate(per_priority_load.begin(), per_priority_load.end(), 0) +
+   std::accumulate(degraded_per_priority_load.begin(), degraded_per_priority_load.end(), 0));
 }
 
 // Method iterates through priority levels and turns on/off panic mode.

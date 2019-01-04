@@ -241,10 +241,9 @@ void HostSetImpl::rebuildLocalityScheduler(
     LocalityWeightsConstSharedPtr locality_weights, uint32_t overprovisioning_factor) {
   // Rebuild the locality scheduler by computing the effective weight of each
   // locality in this priority. The scheduler is reset by default, and is rebuilt only if we have
-  // locality weights (i.e. using EDS) and there is at least one healthy or degraded host in this
-  // priority.
+  // locality weights (i.e. using EDS) and there is at least one eligible host in this priority.
   //
-  // We omit building a scheduler when there are zero healthy or degrade hosts in the priority as
+  // We omit building a scheduler when there are zero degraded hosts in the priority as
   // all the localities will have zero effective weight. At selection time, we'll only ever try to
   // select a host from such a priority if all priorities have zero healthy hosts. At that point
   // we'll rely on other mechanisms such as panic mode to select a host, none of which rely on the
