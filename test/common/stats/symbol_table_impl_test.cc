@@ -437,8 +437,6 @@ TEST(SymbolTableTest, Memory) {
     // -------
     // string_mem_used:        6710912
     // symbol_table_mem_used:  1743512 (3.85x)
-    ENVOY_LOG_MISC(info, "string_mem_used: {}", string_mem_used);
-    ENVOY_LOG_MISC(info, "symbol_table_mem_used: {}", symbol_table_mem_used);
     EXPECT_LT(symbol_table_mem_used, string_mem_used / 3);
     EXPECT_LT(symbol_table_mem_used, 1750000);
   }
