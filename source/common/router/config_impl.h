@@ -106,19 +106,17 @@ public:
   const absl::optional<bool>& allowCredentials() const override { return allow_credentials_; };
   bool enabled() const override {
     if (config_.has_filter_enabled()) {
-      const auto filter_enabled = config_.filter_enabled();
-      bool value = loader_.snapshot().featureEnabled(filter_enabled.runtime_key(),
+      const auto& filter_enabled = config_.filter_enabled();
+      return loader_.snapshot().featureEnabled(filter_enabled.runtime_key(),
                                                      filter_enabled.default_value());
-      return value;
     }
     return legacy_enabled_;
   };
   bool shadowEnabled() const override {
     if (config_.has_shadow_enabled()) {
-      const auto shadow_enabled = config_.shadow_enabled();
-      bool value = loader_.snapshot().featureEnabled(shadow_enabled.runtime_key(),
+      const auto& shadow_enabled = config_.shadow_enabled();
+      return loader_.snapshot().featureEnabled(shadow_enabled.runtime_key(),
                                                      shadow_enabled.default_value());
-      return value;
     }
     return false;
   };
