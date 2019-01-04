@@ -126,7 +126,7 @@ def checkTools():
     error_messages.append(
         "Command {} not found. If you have buildifier installed, but the binary "
         "name is different or it's not available in $GOPATH/bin, please use "
-        "BUILDIFIER_BIN environment variable to specify the path. Example:"
+        "BUILDIFIER_BIN environment variable to specify the path. Example:\n"
         "    export BUILDIFIER_BIN=/opt/bin/buildifier\n"
         "If you don't have buildifier installed, you can install it by:\n"
         "    go get -u github.com/bazelbuild/buildtools/buildifier".format(BUILDIFIER_PATH))
