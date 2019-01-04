@@ -51,17 +51,17 @@ static std::atomic<int64_t> bytes_allocated(0);
 
 namespace {
 
-constexpr int32_t kLiveMarker = 0xfeedface;         // first 4 bytes after alloc
-constexpr int32_t kDeadMarker1 = 0xabacabff;        // first 4 bytes after free
-constexpr int32_t kDeadMarker2 = 0xdeadbeef;        // overwrites the 'size' field on free
+constexpr uint32_t kLiveMarker = 0xfeedface;        // first 4 bytes after alloc
+constexpr uint32_t kDeadMarker1 = 0xabacabff;       // first 4 bytes after free
+constexpr uint32_t kDeadMarker2 = 0xdeadbeef;       // overwrites the 'size' field on free
 constexpr uint64_t kOverhead = 2 * sizeof(int32_t); // number of extra bytes to alloc
 
 // Writes scribble_word over the block of memory starting at ptr and extending
 // size bytes.
-void scribble(void* ptr, uint64_t size, int32_t scribble_word) {
-  int32_t num_ints = size / sizeof(int32_t);
-  int32_t* p = static_cast<int32_t*>(ptr);
-  for (int i = 0; i < num_ints; ++i, ++p) {
+void scribble(void* ptr, uint64_t size, uint32_t scribble_word) {
+  uint32_t num_ints = size / sizeof(uint32_t);
+  uint32_t* p = static_cast<uint32_t*>(ptr);
+  for (uint32_t i = 0; i < num_ints; ++i, ++p) {
     *p = scribble_word;
   }
 }
@@ -81,14 +81,14 @@ uint64_t roundedSize(uint64_t size) {
 // malloced memory is 0 get data that, when interpreted as pointers, will SEGV,
 // and that will be easily seen in the debugger (0xfeedface pattern).
 void* debugMalloc(uint64_t size) {
+  assert(size <= 0xffffffff); // For now we store the size in a uint32_t.
   uint64_t rounded = roundedSize(size);
-  uint64_t total = rounded + kOverhead;
-  bytes_allocated += total;
-  int32_t* marker = static_cast<int32_t*>(::malloc(total));
+  bytes_allocated += rounded;
+  uint32_t* marker = static_cast<uint32_t*>(::malloc(rounded + kOverhead));
   assert(marker != NULL);
   marker[0] = kLiveMarker;
   marker[1] = size;
-  int32_t* ret = marker + 2;
+  uint32_t* ret = marker + 2;
   scribble(ret, rounded, kLiveMarker);
   return reinterpret_cast<char*>(marker) + kOverhead;
 }
@@ -99,10 +99,10 @@ void* debugMalloc(uint64_t size) {
 void debugFree(void* ptr) {
   if (ptr != NULL) {
     char* alloced_ptr = static_cast<char*>(ptr) - kOverhead;
-    int32_t* marker = reinterpret_cast<int32_t*>(alloced_ptr);
+    uint32_t* marker = reinterpret_cast<uint32_t*>(alloced_ptr);
     uint32_t size = marker[1];
     uint64_t rounded = roundedSize(size);
-    bytes_allocated -= (rounded + kOverhead);
+    bytes_allocated -= rounded;
     scribble(ptr, rounded, kDeadMarker2);
     assert(kLiveMarker == marker[0]);
     marker[0] = kDeadMarker1;
