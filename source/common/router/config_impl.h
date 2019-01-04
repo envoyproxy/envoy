@@ -108,7 +108,7 @@ public:
     if (config_.has_filter_enabled()) {
       const auto& filter_enabled = config_.filter_enabled();
       return loader_.snapshot().featureEnabled(filter_enabled.runtime_key(),
-                                                     filter_enabled.default_value());
+                                               filter_enabled.default_value());
     }
     return legacy_enabled_;
   };
@@ -116,7 +116,7 @@ public:
     if (config_.has_shadow_enabled()) {
       const auto& shadow_enabled = config_.shadow_enabled();
       return loader_.snapshot().featureEnabled(shadow_enabled.runtime_key(),
-                                                     shadow_enabled.default_value());
+                                               shadow_enabled.default_value());
     }
     return false;
   };
