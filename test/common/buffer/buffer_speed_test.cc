@@ -138,6 +138,48 @@ static void BufferReserveCommitPartial(benchmark::State& state) {
 }
 BENCHMARK(BufferReserveCommitPartial)->Arg(1)->Arg(4096)->Arg(16384)->Arg(65536);
 
+// Test buffer search, for the simple case where there are no partial matches for
+// the pattern in the buffer.
+static void BufferSearch(benchmark::State& state) {
+  const std::string Pattern(16, 'b');
+  std::string data;
+  data.reserve(state.range(0) + Pattern.length());
+  data += std::string(state.range(0), 'a');
+  data += Pattern;
+
+  const absl::string_view input(data);
+  Buffer::OwnedImpl buffer(input);
+  ssize_t result = 0;
+  for (auto _ : state) {
+    result += buffer.search(Pattern.c_str(), Pattern.length(), 0);
+  }
+  benchmark::DoNotOptimize(result);
+}
+BENCHMARK(BufferSearch)->Arg(1)->Arg(4096)->Arg(16384)->Arg(65536);
+
+// Test buffer search, for the more challenging case where there are many partial matches
+// for the pattern in the buffer.
+static void BufferSearchPartialMatch(benchmark::State& state) {
+  const std::string Pattern(16, 'b');
+  const std::string PartialMatch("babbabbbabbbbabbbbbabbbbbbabbbbbbbabbbbbbbba");
+  std::string data;
+  size_t num_partial_matches = 1 + state.range(0) / PartialMatch.length();
+  data.reserve(state.range(0) * num_partial_matches + Pattern.length());
+  for (size_t i = 0; i < num_partial_matches; i++) {
+    data += PartialMatch;
+  }
+  data += Pattern;
+
+  const absl::string_view input(data);
+  Buffer::OwnedImpl buffer(input);
+  ssize_t result = 0;
+  for (auto _ : state) {
+    result += buffer.search(Pattern.c_str(), Pattern.length(), 0);
+  }
+  benchmark::DoNotOptimize(result);
+}
+BENCHMARK(BufferSearchPartialMatch)->Arg(1)->Arg(4096)->Arg(16384)->Arg(65536);
+
 } // namespace Envoy
 
 // Boilerplate main(), which discovers benchmarks in the same file and runs them.
