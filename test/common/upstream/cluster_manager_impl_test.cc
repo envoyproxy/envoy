@@ -92,6 +92,12 @@ public:
     return CdsApiPtr{createCds_()};
   }
 
+  CdsApiPtr createIncrementalCds(const envoy::api::v2::core::ConfigSource&,
+                                 const absl::optional<envoy::api::v2::core::ConfigSource>&,
+                                 ClusterManager&) override {
+    return CdsApiPtr{createCds_()};
+  }
+
   ClusterManagerPtr
   clusterManagerFromProto(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,
                           Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,

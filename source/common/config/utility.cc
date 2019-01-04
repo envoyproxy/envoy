@@ -128,15 +128,6 @@ void Utility::validateClusterName(const Upstream::ClusterManager::ClusterInfoMap
                                   const std::string& cluster_name) {
   const auto& it = clusters.find(cluster_name);
 
-  // TODO remove
-  std::cerr << "clusters size: " << clusters.size() << std::endl;
-  if (it == clusters.end())
-    throw EnvoyException(cluster_name + "DOES NOT EXIST");
-  if (it->second.get().info()->addedViaApi())
-    throw EnvoyException("ADDED VIA API");
-  if (it->second.get().info()->type() == envoy::api::v2::Cluster::EDS)
-    throw EnvoyException("IS EDS");
-
   if (it == clusters.end() || it->second.get().info()->addedViaApi() ||
       it->second.get().info()->type() == envoy::api::v2::Cluster::EDS) {
     throw EnvoyException(fmt::format(
