@@ -17,7 +17,7 @@ static_resources:
   - name: redis_cluster
     connect_timeout: 1s
     type: strict_dns # static
-    lb_policy: round_robin
+    lb_policy: MAGLEV
     hosts:
     - socket_address:
         address: redis_server
