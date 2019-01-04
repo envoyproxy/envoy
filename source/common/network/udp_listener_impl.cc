@@ -40,7 +40,7 @@ void UdpListenerImpl::disable() { event_del(&raw_event_); }
 void UdpListenerImpl::enable() { event_add(&raw_event_, nullptr); }
 
 void UdpListenerImpl::readCallback(int fd, short flags, void* arg) {
-  (void)flags;
+  RELEASE_ASSERT((flags == EV_READ), fmt::format("Unexpected flags for callback: {}", flags));
 
   UdpListenerImpl* instance = static_cast<UdpListenerImpl*>(arg);
   ASSERT(instance);
@@ -54,13 +54,12 @@ void UdpListenerImpl::readCallback(int fd, short flags, void* arg) {
   Api::SysCallIntResult result = buffer->recvFrom(fd, read_length, addr, addr_len);
   if (result.rc_ < 0) {
     // TODO(conqerAtApple): Call error callback.
-    RELEASE_ASSERT(false, fmt::format("recvfrom returned rc: {}, error: {}", result.rc_,
-                                      strerror(result.errno_)));
   }
 
   Address::InstanceConstSharedPtr local_address = instance->socket_.localAddress();
+
   RELEASE_ASSERT(
-      addr_len,
+      addr_len > 0,
       fmt::format(
           "Unable to get remote address for fd: {}, local address: {}. address length is 0 ", fd,
           local_address->asString()));
@@ -74,6 +73,7 @@ void UdpListenerImpl::readCallback(int fd, short flags, void* arg) {
     const struct sockaddr_in* sin = reinterpret_cast<const struct sockaddr_in*>(&addr);
     ASSERT(AF_INET == sin->sin_family);
     peer_address = std::make_shared<Address::Ipv4Instance>(sin);
+
     break;
   }
   case AF_INET6: {
@@ -90,14 +90,16 @@ void UdpListenerImpl::readCallback(int fd, short flags, void* arg) {
     } else {
       peer_address = std::make_shared<Address::Ipv6Instance>(*sin6, true);
     }
+
+    break;
   }
 
-  break;
   default:
     RELEASE_ASSERT(false,
                    fmt::format("Unsupported address family: {}, local address: {}, receive size: "
                                "{}, address length: {}",
                                addr.ss_family, local_address->asString(), result.rc_, addr_len));
+    break;
   }
 
   RELEASE_ASSERT((peer_address != nullptr),

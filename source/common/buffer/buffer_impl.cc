@@ -116,7 +116,8 @@ Api::SysCallIntResult OwnedImpl::recvFrom(int fd, uint64_t max_length, sockaddr_
     return {0, 0};
   }
 
-  memset(&peer_addr, 0, sizeof(sockaddr_storage));
+  addr_len = sizeof(sockaddr_storage);
+  memset(&peer_addr, 0, addr_len);
 
   RawSlice slice;
   const uint64_t num_slices = reserve(max_length, &slice, 1);
