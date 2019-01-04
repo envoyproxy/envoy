@@ -14,6 +14,7 @@ envoy_cc_library(
     srcs = ["address_impl.cc"],
     hdrs = ["address_impl.h"],
     deps = [
+        ":io_socket_handle_lib",
         "//include/envoy/network:address_interface",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:assert_lib",
@@ -99,6 +100,12 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "io_socket_handle_lib",
+    hdrs = ["io_socket_handle_impl.h"],
+    deps = ["//include/envoy/network:io_handle_interface"],
+)
+
+envoy_cc_library(
     name = "lc_trie_lib",
     hdrs = ["lc_trie.h"],
     external_deps = ["abseil_int128"],
@@ -113,9 +120,13 @@ envoy_cc_library(
 envoy_cc_library(
     name = "listen_socket_lib",
     srcs = ["listen_socket_impl.cc"],
-    hdrs = ["listen_socket_impl.h"],
+    hdrs = [
+        "io_socket_handle_impl.h",
+        "listen_socket_impl.h",
+    ],
     deps = [
         ":address_lib",
+        ":io_socket_handle_lib",
         ":utility_lib",
         "//include/envoy/network:listen_socket_interface",
         "//source/common/common:assert_lib",
@@ -184,6 +195,7 @@ envoy_cc_library(
     external_deps = ["abseil_optional"],
     deps = [
         ":address_lib",
+        ":listen_socket_lib",
         "//include/envoy/api:os_sys_calls_interface",
         "//include/envoy/network:listen_socket_interface",
         "//source/common/api:os_sys_calls_lib",

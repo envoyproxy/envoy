@@ -1,3 +1,5 @@
+#include "common/network/io_socket_handle_impl.h"
+
 #include "extensions/filters/listener/tls_inspector/tls_inspector.h"
 
 #include "test/mocks/api/mocks.h"
@@ -32,9 +34,11 @@ public:
 
   void init() {
     filter_ = std::make_unique<Filter>(cfg_);
+    static Network::IoHandlePtr io_handle = std::make_unique<Network::IoSocketHandle>(42);
+
     EXPECT_CALL(cb_, socket()).WillRepeatedly(ReturnRef(socket_));
     EXPECT_CALL(cb_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
-    EXPECT_CALL(socket_, fd()).WillRepeatedly(Return(42));
+    EXPECT_CALL(socket_, ioHandle()).WillRepeatedly(ReturnRef(*io_handle));
 
     EXPECT_CALL(dispatcher_,
                 createFileEvent_(_, _, Event::FileTriggerType::Edge,
@@ -42,6 +46,7 @@ public:
         .WillOnce(
             DoAll(SaveArg<1>(&file_event_callback_), ReturnNew<NiceMock<Event::MockFileEvent>>()));
     filter_->onAccept(cb_);
+    io_handle->close();
   }
 
   NiceMock<Api::MockOsSysCalls> os_sys_calls_;
