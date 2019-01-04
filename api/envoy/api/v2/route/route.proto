@@ -413,16 +413,26 @@ message CorsPolicy {
 
     // Specifies if CORS is enabled.
     //
+    // More information on how this can be controlled via runtime can be found
+    // :ref:`here <cors-runtime>`.
+    //
     // .. note::
     //
-    //   This defaults to 100/:ref:`HUNDRED
+    //   This field defaults to 100/:ref:`HUNDRED
     //   <envoy_api_enum_type.FractionalPercent.DenominatorType>`.
     core.RuntimeFractionalPercent filter_enabled = 9;
   }
 
-  // Specifies if CORS policies are evaluated and tracked when filter is off.
+  // Specifies if CORS policies are evaluated and tracked when filter is off but
+  // does not enforce any policies.
   //
-  // This will not enforce any policies.
+  // More information on how this can be controlled via runtime can be found
+  // :ref:`here <cors-runtime>`.
+  //
+  // .. note::
+  //
+  //   This field defaults to 100/:ref:`HUNDRED
+  //   <envoy_api_enum_type.FractionalPercent.DenominatorType>`.
   core.RuntimeFractionalPercent shadow_enabled = 10;
 }
 

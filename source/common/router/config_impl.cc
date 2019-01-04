@@ -102,7 +102,8 @@ Upstream::RetryPrioritySharedPtr RetryPolicyImpl::retryPriority() const {
 }
 
 CorsPolicyImpl::CorsPolicyImpl(const envoy::api::v2::route::CorsPolicy& config,
-                               Runtime::Loader& loader) {
+                               Runtime::Loader& loader)
+    : config_(config), loader_(loader) {
   for (const auto& origin : config.allow_origin()) {
     allow_origin_.push_back(origin);
   }
@@ -116,18 +117,7 @@ CorsPolicyImpl::CorsPolicyImpl(const envoy::api::v2::route::CorsPolicy& config,
   if (config.has_allow_credentials()) {
     allow_credentials_ = PROTOBUF_GET_WRAPPED_REQUIRED(config, allow_credentials);
   }
-  if (config.has_filter_enabled()) {
-    enabled_ = loader.snapshot().featureEnabled(config.filter_enabled().runtime_key(),
-                                                config.filter_enabled().default_value());
-  } else {
-    enabled_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enabled, true);
-  }
-  if (config.has_shadow_enabled()) {
-    shadow_enabled_ = loader.snapshot().featureEnabled(config.shadow_enabled().runtime_key(),
-                                                       config.shadow_enabled().default_value());
-  } else {
-    shadow_enabled_ = false;
-  }
+  legacy_enabled_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enabled, true);
 }
 
 ShadowPolicyImpl::ShadowPolicyImpl(const envoy::api::v2::route::RouteAction& config) {

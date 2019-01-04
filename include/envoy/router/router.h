@@ -136,8 +136,7 @@ public:
   virtual bool enabled() const PURE;
 
   /**
-   * @return envoy::api::v2::base::RuntimeFractionalPercent Whether CORS policies are evaluated when
-   * filter is off.
+   * @return bool Whether CORS policies are evaluated when filter is off.
    */
   virtual bool shadowEnabled() const PURE;
 };
