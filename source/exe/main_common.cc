@@ -6,7 +6,6 @@
 #include "common/common/compiler_requirements.h"
 #include "common/common/perf_annotation.h"
 #include "common/event/libevent.h"
-#include "common/memory/mem_debug.h"
 #include "common/network/utility.h"
 #include "common/stats/thread_local_store.h"
 
