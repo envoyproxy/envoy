@@ -1214,6 +1214,7 @@ void ConnectionManagerImpl::ActiveStream::encodeMetadata(ActiveStreamEncoderFilt
                                                          MetadataMapPtr&& metadata_map_ptr) {
   resetIdleTimer();
 
+  ActiveStreamEncoderFilter* current_encoder_filter_save = current_encoder_filter_;
   if (current_encoder_filter_ != nullptr) {
     // current_encoder_filter_ != nullptr means new metadata is added locally by
     // current_encoder_filter_. Pass the new metadata through all downstream filters of
@@ -1229,6 +1230,7 @@ void ConnectionManagerImpl::ActiveStream::encodeMetadata(ActiveStreamEncoderFilt
     ENVOY_STREAM_LOG(trace, "encode metadata called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
   }
+  current_encoder_filter_ = current_encoder_filter_save;
   // TODO(soya3129): update stats with metadata.
 
   // Now encode metadata via the codec.
