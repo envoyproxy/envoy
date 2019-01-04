@@ -10,6 +10,7 @@
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/common/logger.h"
+#include "common/memory/align.h"
 
 #include "absl/strings/string_view.h"
 
@@ -312,13 +313,7 @@ private:
     return std::max(alignof(Cell), std::max(alignof(uint32_t), alignof(Control)));
   }
 
-  static uint64_t align(uint64_t size) {
-    const uint64_t alignment = calculateAlignment();
-    // Check that alignment is a power of 2:
-    // http://www.graphics.stanford.edu/~seander/bithacks.html#DetermineIfPowerOf2
-    RELEASE_ASSERT((alignment > 0) && ((alignment & (alignment - 1)) == 0), "");
-    return (size + alignment - 1) & ~(alignment - 1);
-  }
+  static uint64_t align(uint64_t size) { return Memory::align(size, calculateAlignment()); }
 
   /**
    * Computes the byte offset of a cell into cells_. This is not

@@ -1,3 +1,5 @@
+#include "common/memory/debug.h"
+
 #include "exe/main_common.h"
 
 #include "absl/debugging/symbolize.h"
@@ -12,6 +14,7 @@
  * after setting up command line options.
  */
 int main(int argc, char** argv) {
+  Envoy::Memory::Debug mem_debug;
 #ifndef __APPLE__
   // absl::Symbolize mostly works without this, but this improves corner case
   // handling, such as running in a chroot jail.

@@ -1,5 +1,5 @@
 // NOLINT(namespace-envoy)
-#include "common/memory/mem_debug.h"
+#include "common/memory/debug.h"
 
 #include "test/test_common/environment.h"
 #include "test/test_runner.h"
@@ -13,6 +13,7 @@
 // The main entry point (and the rest of this file) should have no logic in it,
 // this allows overriding by site specific versions of main.cc.
 int main(int argc, char** argv) {
+  Envoy::Memory::Debug mem_debug;
 #ifndef __APPLE__
   absl::InitializeSymbolizer(argv[0]);
 #endif
@@ -34,6 +35,5 @@ int main(int argc, char** argv) {
   // v4 and v6 addresses is desired. This feature is in progress and will be rolled out to all tests
   // in upcoming PRs.
   Envoy::TestEnvironment::setEnvVar("ENVOY_IP_TEST_VERSIONS", "all", 0);
-  Envoy::MemDebugLoader();
   return Envoy::TestRunner::RunTests(argc, argv);
 }

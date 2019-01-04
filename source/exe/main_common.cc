@@ -47,7 +47,6 @@ MainCommonBase::MainCommonBase(OptionsImpl& options, Event::TimeSystem& time_sys
                                Thread::ThreadFactory& thread_factory)
     : options_(options), component_factory_(component_factory), thread_factory_(thread_factory) {
   ares_library_init(ARES_LIB_INIT_ALL);
-  Envoy::MemDebugLoader();
   Event::Libevent::Global::initialize();
   RELEASE_ASSERT(Envoy::Server::validateProtoDescriptors(), "");
 

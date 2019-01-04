@@ -57,6 +57,7 @@ envoy_cc_library(
     ],
     deps = [
         ":envoy_main_common_lib",
+        "//source/common/memory:debug_lib",
     ] + envoy_cc_platform_dep("platform_impl_lib"),
 )
 

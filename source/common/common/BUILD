@@ -282,6 +282,7 @@ envoy_cc_library(
     deps = [
         ":assert_lib",
         ":logger_lib",
+        "//source/common/memory:align_lib",
         "//source/common/stats:stats_options_lib",
     ],
 )

@@ -23,9 +23,29 @@
 // work with memory debugging. Put another way, if we disable tcmalloc when
 // compiling for debug, we want the memory-debugging tests to work, otherwise we
 // can't debug them.
+#include "common/memory/debug.h"
+
 #include <atomic>
+#include <cassert> // don't use Envoy ASSERT as it may allocate memory.
+#include <cstdlib>
+
+#include "common/memory/align.h"
 
 static std::atomic<int64_t> bytes_allocated(0);
+
+namespace Envoy {
+namespace Memory {
+
+// We provide the constructor entry-point to be called to force-load the memory
+// debugger and its operator-overloads, regardless of compilation mode.
+Debug::Debug() {}
+
+// We also provide the bytes-loaded counter, though this will return 0 when
+// memory-debugging is not compiled in.
+uint64_t Debug::bytesUsed() { return uint64_t(bytes_allocated); }
+
+} // namespace Memory
+} // namespace Envoy
 
 // We don't run memory debugging for optimizd builds to avoid impacting
 // production performance.
@@ -46,9 +66,6 @@ static std::atomic<int64_t> bytes_allocated(0);
 // need to override operator new/delete.
 #if !defined(TCMALLOC) && !defined(ENVOY_DISABLE_MEMDEBUG)
 
-#include <cassert> // don't use Envoy ASSERT as it may allocate memory.
-#include <cstdlib>
-
 namespace {
 
 constexpr uint32_t kLiveMarker = 0xfeedface;        // first 4 bytes after alloc
@@ -66,23 +83,13 @@ void scribble(void* ptr, uint64_t size, uint32_t scribble_word) {
   }
 }
 
-// Returns size rounded up to the next multiple of 8.
-uint64_t roundedSize(uint64_t size) {
-  if (size == 0) {
-    size = kOverhead;
-  } else if ((size % kOverhead) != 0) {
-    size = size + kOverhead - (size % kOverhead);
-  }
-  return size;
-}
-
 // Replacement allocator, which prepends an 8-byte overhead where we write the
 // size, and scribbles over the returned payload so that callers assuming
 // malloced memory is 0 get data that, when interpreted as pointers, will SEGV,
 // and that will be easily seen in the debugger (0xfeedface pattern).
 void* debugMalloc(uint64_t size) {
+  uint64_t rounded = Envoy::Memory::align(size, kOverhead);
   assert(size <= 0xffffffff); // For now we store the size in a uint32_t.
-  uint64_t rounded = roundedSize(size);
   bytes_allocated += rounded;
   uint32_t* marker = static_cast<uint32_t*>(::malloc(rounded + kOverhead));
   assert(marker != NULL);
@@ -101,7 +108,7 @@ void debugFree(void* ptr) {
     char* alloced_ptr = static_cast<char*>(ptr) - kOverhead;
     uint32_t* marker = reinterpret_cast<uint32_t*>(alloced_ptr);
     uint32_t size = marker[1];
-    uint64_t rounded = roundedSize(size);
+    uint64_t rounded = Envoy::Memory::align(size, kOverhead);
     bytes_allocated -= rounded;
     scribble(ptr, rounded, kDeadMarker2);
     assert(kLiveMarker == marker[0]);
@@ -130,12 +137,3 @@ void operator delete[](void* ptr, size_t) _GLIBCXX_USE_NOEXCEPT { debugFree(ptr)
 
 #endif // !TCMALLOC && !ENVOY_DISABLE_MEMDEBUG
 #endif // !NDEBUG
-
-// We provide the entry-point to be called to force-load the memory debugger
-// regardless of compilation mode.
-namespace Envoy {
-
-void MemDebugLoader() {}
-uint64_t MemDebugMemoryUsed() { return uint64_t(bytes_allocated); }
-
-} // namespace Envoy
