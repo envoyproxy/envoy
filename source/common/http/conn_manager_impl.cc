@@ -806,32 +806,6 @@ void ConnectionManagerImpl::ActiveStream::decodeData(Buffer::Instance& data, boo
   decodeData(nullptr, data, end_stream);
 }
 
-bool ConnectionManagerImpl::ActiveStream::seenEndStream(ActiveStreamDecoderFilter* filter) {
-  RELEASE_ASSERT(filter, "Should be called by a valid filter");
-  std::list<ActiveStreamDecoderFilterPtr>::iterator entry;
-  entry = std::next(filter->entry());
-
-  for (; entry != decoder_filters_.end(); entry++) {
-    if ((*entry)->end_stream_) {
-      return true;
-    }
-  }
-  return false;
-}
-
-bool ConnectionManagerImpl::ActiveStream::seenEndStream(ActiveStreamEncoderFilter* filter) {
-  RELEASE_ASSERT(filter, "Should be called by a valid filter");
-  std::list<ActiveStreamEncoderFilterPtr>::iterator entry;
-  entry = std::next(filter->entry());
-
-  for (; entry != encoder_filters_.end(); entry++) {
-    if ((*entry)->end_stream_) {
-      return true;
-    }
-  }
-  return false;
-}
-
 void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* filter,
                                                      Buffer::Instance& data, bool end_stream) {
   resetIdleTimer();
@@ -857,6 +831,39 @@ void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* 
   }
 
   for (; entry != decoder_filters_.end(); entry++) {
+    // If end_stream_ is marked for a filter, the data is not for this filter and filters after.
+    //
+    // In following case, ActiveStreamFilterBase::commonContine() could be called recursively and
+    // its doData() is called with wrong data.
+    //
+    //  There are 3 decode filters and "wrapper" refers to ActiveStreamFilter object.
+    //
+    //  filter0->decodeHeaders(_, true)
+    //    return STOP
+    //  filter0->continueDecoding()
+    //    wrapper0->commonContinue()
+    //      wrapper0->decodeHeaders(_, _, true)
+    //        filter1->decodeHeaders(_, true)
+    //          filter1->addDecodeData()
+    //          return CONTINUE
+    //        filter2->decodeHeaders(_, false)
+    //          return CONTINUE
+    //        wrapper1->commonContinue() // Detects data is added.
+    //          wrapper1->doData()
+    //            wrapper1->decodeData()
+    //              filter2->decodeData(_, true)
+    //                 return CONTINUE
+    //      wrapper0->doData() // This should not be called
+    //        wrapper0->decodeData()
+    //          filter1->decodeData(_, true)  // It will cause assertions.
+    //
+    // One way to solve this problem is to mark end_stream_ for each filter.
+    // If a filter is already marked as end_stream_ when decodeData() is called, bails out the
+    // whole function. If just skip the filter, the codes after the loop will be called with
+    // wrong data. For encodeData, the response_encoder->encode() will be called.
+    if ((*entry)->end_stream_) {
+      return;
+    }
     ASSERT(!(state_.filter_call_state_ & FilterCallState::DecodeData));
 
     // We check the request_trailers_ pointer here in case addDecodedTrailers
@@ -1299,6 +1306,11 @@ void ConnectionManagerImpl::ActiveStream::encodeData(ActiveStreamEncoderFilter* 
 
   const bool trailers_exists_at_start = response_trailers_ != nullptr;
   for (; entry != encoder_filters_.end(); entry++) {
+    // If end_stream_ is marked for a filter, the data is not for this filter and filters after.
+    // For details, please see the comment in the ActiveStream::decodeData() function.
+    if ((*entry)->end_stream_) {
+      return;
+    }
     ASSERT(!(state_.filter_call_state_ & FilterCallState::EncodeData));
 
     // We check the response_trailers_ pointer here in case addEncodedTrailers
