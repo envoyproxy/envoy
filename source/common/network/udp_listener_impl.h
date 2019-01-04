@@ -1,5 +1,6 @@
 #pragma once
 
+#include "common/buffer/buffer_impl.h"
 #include "common/event/event_impl_base.h"
 
 #include "base_listener_impl.h"
@@ -17,6 +18,9 @@ public:
 
   virtual void disable() override;
   virtual void enable() override;
+
+  // Useful for testing/mocking.
+  virtual Buffer::InstancePtr getBufferImpl();
 
 protected:
   UdpListenerCallbacks& cb_;

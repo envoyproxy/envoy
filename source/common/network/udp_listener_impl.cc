@@ -7,7 +7,6 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/exception.h"
 
-#include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/common/fmt.h"
@@ -39,6 +38,10 @@ void UdpListenerImpl::disable() { event_del(&raw_event_); }
 
 void UdpListenerImpl::enable() { event_add(&raw_event_, nullptr); }
 
+Buffer::InstancePtr UdpListenerImpl::getBufferImpl() {
+  return std::make_unique<Buffer::OwnedImpl>();
+}
+
 void UdpListenerImpl::readCallback(int fd, short flags, void* arg) {
   RELEASE_ASSERT((flags == EV_READ), fmt::format("Unexpected flags for callback: {}", flags));
 
@@ -47,7 +50,9 @@ void UdpListenerImpl::readCallback(int fd, short flags, void* arg) {
 
   // TODO(conqerAtAppple): Make this configurable or get from system.
   constexpr uint64_t const read_length = 16384;
-  Buffer::InstancePtr buffer(new Buffer::OwnedImpl());
+  Buffer::InstancePtr buffer = std::move(instance->getBufferImpl());
+  ASSERT(buffer);
+
   sockaddr_storage addr;
   socklen_t addr_len;
   Api::SysCallIntResult result;
@@ -59,6 +64,7 @@ void UdpListenerImpl::readCallback(int fd, short flags, void* arg) {
         continue;
       }
       // TODO(conqerAtApple): Call error callback.
+      return;
     }
 
     break;

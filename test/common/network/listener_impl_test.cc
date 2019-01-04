@@ -77,13 +77,25 @@ public:
   MOCK_METHOD1(getLocalAddress, Address::InstanceConstSharedPtr(int fd));
 };
 
+class MockResultBufferImpl : public Buffer::OwnedImpl {
+public:
+  MockResultBufferImpl(const Api::SysCallIntResult& result) : result_(result) {}
+
+  Api::SysCallIntResult recvFrom(int, uint64_t, sockaddr_storage&, socklen_t&) override {
+    return result_;
+  }
+
+private:
+  const Api::SysCallIntResult result_;
+};
+
 class TestUdpListenerImpl : public UdpListenerImpl {
 public:
   TestUdpListenerImpl(Event::DispatcherImpl& dispatcher, Socket& socket, UdpListenerCallbacks& cb,
                       bool bind_to_port)
       : UdpListenerImpl(dispatcher, socket, cb, bind_to_port) {}
 
-  MOCK_METHOD1(getLocalAddress, Address::InstanceConstSharedPtr(int fd));
+  MOCK_METHOD0(getBufferImpl, Buffer::InstancePtr());
 };
 
 class ListenerImplTest : public testing::TestWithParam<Address::IpVersion> {
@@ -255,6 +267,10 @@ TEST_P(ListenerImplTest, UseActualDstUdp) {
   Network::TestUdpListenerImpl listener(dispatcher_, *server_socket.get(), listener_callbacks,
                                         true);
 
+  EXPECT_CALL(listener, getBufferImpl()).WillRepeatedly(Invoke([&]() {
+    return std::make_unique<Buffer::OwnedImpl>();
+  }));
+
   SocketPtr client_socket =
       getSocket(Address::SocketType::Datagram, Network::Test::getCanonicalLoopbackAddress(version_),
                 nullptr, false);
@@ -352,6 +368,10 @@ TEST_P(ListenerImplTest, UdpListenerEnableDisable) {
   Network::TestUdpListenerImpl listener(dispatcher_, *server_socket.get(), listener_callbacks,
                                         true);
 
+  EXPECT_CALL(listener, getBufferImpl()).WillRepeatedly(Invoke([&]() {
+    return std::make_unique<Buffer::OwnedImpl>();
+  }));
+
   SocketPtr client_socket =
       getSocket(Address::SocketType::Datagram, Network::Test::getCanonicalLoopbackAddress(version_),
                 nullptr, false);
@@ -432,6 +452,59 @@ TEST_P(ListenerImplTest, UdpListenerEnableDisable) {
 
             dispatcher_.exit();
           }));
+
+  dispatcher_.run(Event::Dispatcher::RunType::Block);
+}
+
+TEST_P(ListenerImplTest, UdpListenerRecvFromError) {
+  SocketPtr server_socket =
+      getSocket(Address::SocketType::Datagram, Network::Test::getCanonicalLoopbackAddress(version_),
+                nullptr, true);
+
+  ASSERT_NE(server_socket, nullptr);
+
+  auto const* server_ip = server_socket->localAddress()->ip();
+  ASSERT_NE(server_ip, nullptr);
+
+  Network::MockUdpListenerCallbacks listener_callbacks;
+  Network::TestUdpListenerImpl listener(dispatcher_, *server_socket.get(), listener_callbacks,
+                                        true);
+
+  EXPECT_CALL(listener, getBufferImpl()).WillRepeatedly(Invoke([&]() {
+    return std::make_unique<MockResultBufferImpl>(Api::SysCallIntResult{-1, -1});
+  }));
+
+  SocketPtr client_socket =
+      getSocket(Address::SocketType::Datagram, Network::Test::getCanonicalLoopbackAddress(version_),
+                nullptr, false);
+
+  const int client_sockfd = client_socket->fd();
+  sockaddr_storage server_addr;
+  socklen_t addr_len;
+
+  getSocketAddressInfo(*client_socket.get(), server_addr, addr_len);
+  ASSERT_GT(addr_len, 0);
+
+  if (version_ == Address::IpVersion::v4) {
+    struct sockaddr_in* servaddr = reinterpret_cast<struct sockaddr_in*>(&server_addr);
+    servaddr->sin_port = htons(server_ip->port());
+  } else if (version_ == Address::IpVersion::v6) {
+    struct sockaddr_in6* servaddr = reinterpret_cast<struct sockaddr_in6*>(&server_addr);
+    servaddr->sin6_port = htons(server_ip->port());
+  }
+
+  const std::string first("first");
+
+  auto send_rc = ::sendto(client_sockfd, first.c_str(), first.length(), 0,
+                          reinterpret_cast<const struct sockaddr*>(&server_addr), addr_len);
+
+  ASSERT_EQ(send_rc, first.length());
+
+  Event::TimerPtr timer = dispatcher_.createTimer([&] { dispatcher_.exit(); });
+
+  timer->enableTimer(std::chrono::milliseconds(2000));
+
+  EXPECT_CALL(listener_callbacks, onNewConnection_(_, _, _)).Times(0);
 
   dispatcher_.run(Event::Dispatcher::RunType::Block);
 }
