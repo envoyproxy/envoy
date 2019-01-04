@@ -125,9 +125,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/pallets/jinja/releases/download/2.10/Jinja2-2.10.tar.gz"],
     ),
     com_github_pallets_markupsafe = dict(
-        sha256 = "dc3938045d9407a73cf9fdd709e2b1defd0588d50ffc85eb0786c095ec846f15",
-        strip_prefix = "markupsafe-1.0",
-        urls = ["https://github.com/pallets/markupsafe/archive/1.0.tar.gz"],
+        sha256 = "62f6154071d1ceac8d7dfb5ed7a21dc502cc12e2348c032e5a1cedd018548381",
+        strip_prefix = "markupsafe-1.1.0/src",
+        urls = ["https://github.com/pallets/markupsafe/archive/1.1.0.tar.gz"],
     ),
     com_github_tencent_rapidjson = dict(
         sha256 = "bf7ced29704a1e696fbccf2a2b4ea068e7774fa37f6d7dd4039d0787f8bed98e",
