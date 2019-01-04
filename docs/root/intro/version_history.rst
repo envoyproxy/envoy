@@ -44,6 +44,7 @@ Version history
 * tracing: added support for :ref:`Datadog <arch_overview_tracing>` tracer.
 * upstream: changed how load calculation for :ref:`priority levels<arch_overview_load_balancing_priority_levels>` and :ref:`panic thresholds<arch_overview_load_balancing_panic_threshold>` interact. As long as normalized total health is 100% panic thresholds are disregarded.
 * upstream: changed the default hash for :ref:`ring hash <envoy_api_msg_Cluster.RingHashLbConfig>` from std::hash to `xxHash <https://github.com/Cyan4973/xxHash>`_.
+* upstream: add 'hash_function <envoy_api_msg_Cluster.RingHashLbConfig.hahs_function>' to specify the hash function for :ref: 'ring hash <envoy_api_msg_Cluster.RingHashLbConfig>' as either xxHash or 'murmurHash2 <https://sites.google.com/site/murmurhash>'. MurmurHash2 is compatible with std::hash.
 
 1.8.0 (Oct 4, 2018)
 ===================

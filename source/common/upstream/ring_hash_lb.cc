@@ -92,6 +92,10 @@ RingHashLoadBalancer::Ring::Ring(
       config ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.value().deprecated_v1(), use_std_hash, false)
              : false;
 
+  const HashFunction hash_function =
+      config ? config.value().hash_function()
+             : HashFunction::Cluster_RingHashLbConfig_HashFunction_XX_HASH;
+
   char hash_key_buffer[196];
   for (const auto& host : hosts) {
     const std::string& address_string = host->address()->asString();
@@ -116,8 +120,13 @@ RingHashLoadBalancer::Ring::Ring(
 
       // Sadly std::hash provides no mechanism for hashing arbitrary bytes so we must copy here.
       // xxHash is done wihout copies.
-      const uint64_t hash = use_std_hash ? std::hash<std::string>()(std::string(hash_key))
-                                         : HashUtil::xxHash64(hash_key);
+      const uint64_t hash =
+          use_std_hash
+              ? std::hash<std::string>()(std::string(hash_key))
+              : (hash_function == HashFunction::Cluster_RingHashLbConfig_HashFunction_MURMUR_HASH_2)
+                    ? HashUtil::murmurHash2_64(hash_key, HashUtil::STD_HASH_SEED)
+                    : HashUtil::xxHash64(hash_key);
+
       ENVOY_LOG(trace, "ring hash: hash_key={} hash={}", hash_key.data(), hash);
       ring_.push_back({hash, host});
     }
