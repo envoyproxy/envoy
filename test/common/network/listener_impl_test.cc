@@ -282,7 +282,7 @@ TEST_P(ListenerImplTest, UseActualDstUdp) {
 
   ASSERT_EQ(send_rc, first.length());
 
-  send_rc = ::sendto(client_sockfd, second.c_str(), second.length(), MSG_CONFIRM,
+  send_rc = ::sendto(client_sockfd, second.c_str(), second.length(), 0,
                      reinterpret_cast<const struct sockaddr*>(&server_addr), addr_len);
 
   ASSERT_EQ(send_rc, second.length());
