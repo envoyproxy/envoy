@@ -164,8 +164,10 @@ public:
   /**
    * Continue iterating through the filter chain with buffered headers and body data. This routine
    * can only be called if the filter has previously returned StopIteration from decodeHeaders()
-   * AND either StopIterationAndBuffer or StopIterationNoBuffer from each previous call to
-   * decodeData(). The connection manager will dispatch headers and any buffered body data to the
+   * AND one of StopIterationAndBuffer, StopIterationAndWatermark, or StopIterationNoBuffer
+   * from each previous call to decodeData().
+   *
+   * The connection manager will dispatch headers and any buffered body data to the
    * next filter in the chain. Further note that if the request is not complete, this filter will
    * still receive decodeData() calls and must return an appropriate status code depending on what
    * the filter needs to do.
@@ -389,7 +391,9 @@ public:
   /**
    * Continue iterating through the filter chain with buffered headers and body data. This routine
    * can only be called if the filter has previously returned StopIteration from encodeHeaders() AND
-   * either StopIterationAndBuffer or StopIterationNoBuffer from each previous call to encodeData().
+   * one of StopIterationAndBuffer, StopIterationAndWatermark, or StopIterationNoBuffer
+   * from each previous call to encodeData().
+   *
    * The connection manager will dispatch headers and any buffered body data to the next filter in
    * the chain. Further note that if the response is not complete, this filter will still receive
    * encodeData() calls and must return an appropriate status code depending on what the filter

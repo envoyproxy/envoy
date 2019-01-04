@@ -33,3 +33,23 @@ envoy_cc_library(
         "//source/common/protobuf",
     ],
 )
+
+envoy_cc_library(
+    name = "config_provider_interface",
+    hdrs = ["config_provider.h"],
+    external_deps = ["abseil_optional"],
+    deps = [
+        "//include/envoy/common:time_interface",
+        "//source/common/protobuf",
+    ],
+)
+
+envoy_cc_library(
+    name = "config_provider_manager_interface",
+    hdrs = ["config_provider_manager.h"],
+    deps = [
+        ":config_provider_interface",
+        "//include/envoy/server:filter_config_interface",
+        "//source/common/protobuf",
+    ],
+)

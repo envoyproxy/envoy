@@ -20,13 +20,25 @@ static const std::string RuntimeZoneEnabled = "upstream.zone_routing.enabled";
 static const std::string RuntimeMinClusterSize = "upstream.zone_routing.min_cluster_size";
 static const std::string RuntimePanicThreshold = "upstream.healthy_panic_threshold";
 
-int32_t distributeLoad(PriorityLoad& priority_load,
-                       const std::vector<uint32_t>& per_priority_health, size_t& total_load,
-                       size_t normalized_total_health) {
-  int32_t first_healthy_priority = -1;
-  for (size_t i = 0; i < per_priority_health.size(); ++i) {
-    if (first_healthy_priority < 0 && per_priority_health[i] > 0) {
-      first_healthy_priority = i;
+// Distributes load between priorities based on the per priority availability and the normalized
+// total availability. Load is assigned to each priority according to how available each priority is
+// adjusted for the normalized total availability.
+//
+// @param per_priority_load vector of loads that should be populated.
+// @param per_priority_availability the percentage availability of each priority, used to determine
+// how much load each priority can handle.
+// @param total_load the amount of load that may be distributed. Will be updated with the amount of
+// load reminaining after distribution.
+// @param normalized_total_availability the total availability, up to a max of 100. Used to
+// scale the load when the total availability is less than 100%.
+// @return the first available priority and the remaining load
+std::pair<int32_t, size_t> distributeLoad(PriorityLoad& per_priority_load,
+                                          const std::vector<uint32_t>& per_priority_availability,
+                                          size_t total_load, size_t normalized_total_availability) {
+  int32_t first_available_priority = -1;
+  for (size_t i = 0; i < per_priority_availability.size(); ++i) {
+    if (first_available_priority < 0 && per_priority_availability[i] > 0) {
+      first_available_priority = i;
     }
     // Now assign as much load as possible to the high priority levels and cease assigning load
     // when total_load runs out.
@@ -37,6 +49,37 @@ int32_t distributeLoad(PriorityLoad& priority_load,
 
   return first_healthy_priority;
 }
+
+} // namespace
+
+uint32_t LoadBalancerBase::choosePriority(uint64_t hash,
+                                          const std::vector<uint32_t>& per_priority_load) {
+  hash = hash % 100 + 1; // 1-100
+  uint32_t aggregate_percentage_load = 0;
+  // As with tryChooseLocalLocalityHosts, this can be refactored for efficiency
+  // but O(N) is good enough for now given the expected number of priorities is
+  // small.
+  for (size_t priority = 0; priority < per_priority_load.size(); ++priority) {
+    aggregate_percentage_load += per_priority_load[priority];
+    if (hash <= aggregate_percentage_load) {
+      return priority;
+    }
+  }
+  // The percentages should always add up to 100 but we have to have a return for the compiler.
+  NOT_REACHED_GCOVR_EXCL_LINE;
+}
+
+LoadBalancerBase::LoadBalancerBase(const PrioritySet& priority_set, ClusterStats& stats,
+                                   Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+                                   const envoy::api::v2::Cluster::CommonLbConfig& common_config)
+    : stats_(stats), runtime_(runtime), random_(random),
+      default_healthy_panic_percent_(PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
+          common_config, healthy_panic_threshold, 100, 50)),
+      priority_set_(priority_set) {
+  for (auto& host_set : priority_set_.hostSetsPerPriority()) {
+    recalculatePerPriorityState(host_set->priority(), priority_set_, per_priority_load_,
+                                per_priority_health_);
+  }
 } // namespace
 
 std::pair<uint32_t, bool>
@@ -158,20 +201,26 @@ void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority,
   // Distribute the load over healthy and degraded piorities. We start off with 100 total load, and
   // attempt to first allocate it to healthy priorities, then allocate the remaining to degraded
   // priorities.
-  size_t total_load = 100;
-  const auto first_healthy =
-      distributeLoad(per_priority_load, per_priority_health, total_load, normalized_total_health);
-  const auto first_degraded = distributeLoad(degraded_per_priority_load, per_priority_degraded,
-                                             total_load, normalized_total_health);
+  const auto first_healthy_and_remaining =
+      distributeLoad(per_priority_load, per_priority_health, 100, normalized_total_health);
 
-  if (total_load != 0) {
-    ASSERT(first_degraded != -1 || first_healthy != -1);
+  const size_t remaining_load_for_degraded = first_available_and_remaining.second;
+
+  const auto first_degraded_and_remaining = distributeLoad(degraded_per_priority_load, per_priority_degraded,
+                                             remaining_load_for_degraded, normalized_total_health);
+
+  const remaining_load = first_degraded_and_remaining.second;
+
+  if (remaining_load != 0) {
+    const auto first_healthy = first_healthy_and_remaining.first;
+    const auto first_degraded = first_degraded_and_remaining.first;
+    ASSERT(first_healthy != -1 || first_degraded.first != -1);
     // Account for rounding errors by assigning it to the first available priority.
-    ASSERT(total_load < per_priority_load.size() + per_priority_degraded.size());
+    ASSERT(remaining_load < per_priority_load.size() + per_priority_degraded.size());
     if (first_healthy != -1) {
-      per_priority_load[first_healthy] += total_load;
+      per_priority_load[first_healthy] += remaining_load;
     } else {
-      degraded_per_priority_load[first_degraded] += total_load;
+      degraded_per_priority_load[first_degraded] += remaining_load;
     }
   }
 }

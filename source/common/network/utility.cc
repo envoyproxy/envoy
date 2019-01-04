@@ -12,7 +12,7 @@
 #define IP6T_SO_ORIGINAL_DST 80
 #endif
 
-#include <netinet/ip.h>
+#include <netinet/in.h>
 #include <sys/socket.h>
 
 #include <cstdint>
@@ -32,6 +32,8 @@
 #include "common/protobuf/protobuf.h"
 
 #include "common/common/fmt.h"
+
+#include "absl/strings/match.h"
 
 namespace Envoy {
 namespace Network {
@@ -53,17 +55,11 @@ Address::InstanceConstSharedPtr Utility::resolveUrl(const std::string& url) {
   }
 }
 
-bool Utility::urlIsTcpScheme(const std::string& url) {
-  return StringUtil::startsWith(url.c_str(), TCP_SCHEME, true);
-}
+bool Utility::urlIsTcpScheme(const std::string& url) { return absl::StartsWith(url, TCP_SCHEME); }
 
-bool Utility::urlIsUdpScheme(const std::string& url) {
-  return StringUtil::startsWith(url.c_str(), UDP_SCHEME, true);
-}
+bool Utility::urlIsUdpScheme(const std::string& url) { return absl::StartsWith(url, UDP_SCHEME); }
 
-bool Utility::urlIsUnixScheme(const std::string& url) {
-  return StringUtil::startsWith(url.c_str(), UNIX_SCHEME, true);
-}
+bool Utility::urlIsUnixScheme(const std::string& url) { return absl::StartsWith(url, UNIX_SCHEME); }
 
 namespace {
 

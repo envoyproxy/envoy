@@ -10,7 +10,9 @@ maximize the chances of your PR being merged.
   changes any user-facing behavior. We will use the GitHub issue to discuss the feature and come to
   agreement. This is to prevent your time being wasted, as well as ours. The GitHub review process
   for major features is also important so that [organizations with commit access](OWNERS.md) can
-  come to agreement on design.
+  come to agreement on design. If it is appropriate to write a design document, the document must
+  be hosted either in the GitHub tracking issue, or linked to from the issue and hosted in a
+  world-readable location.
 * Specifically, if the goal is to add a new [extension](REPO_LAYOUT.md#sourceextensions-layout),
   please read the [extension policy](GOVERNANCE.md#extension-addition-policy).
 * Small patches and bug fixes don't need prior communication.
