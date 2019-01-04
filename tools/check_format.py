@@ -12,8 +12,7 @@ import stat
 import sys
 import traceback
 
-EXCLUDED_PREFIXES = ("./generated/", "./thirdparty/", "./build", "./.git/", "./bazel-",
-                     "./bazel/external", "./.cache",
+EXCLUDED_PREFIXES = ("./generated/", "./thirdparty/", "./build", "./.git/", "./bazel-", "./.cache",
                      "./source/extensions/extensions_build_config.bzl",
                      "./tools/testdata/check_format/")
 SUFFIXES = (".cc", ".h", "BUILD", "WORKSPACE", ".bzl", ".md", ".rst", ".proto")
@@ -144,6 +143,27 @@ def checkNamespace(file_path):
   return []
 
 
+def checkJavaProtoOptions(file_path):
+  java_multiple_files = False
+  java_package_correct = False
+  for line in fileinput.FileInput(file_path):
+    if "option java_multiple_files = true;" in line:
+      java_multiple_files = True
+    if "option java_package = \"io.envoyproxy.envoy" in line:
+      java_package_correct = True
+    if java_multiple_files and java_package_correct:
+      return []
+
+  error_messages = []
+  if not java_multiple_files:
+    error_messages.append(
+        "Java proto option 'java_multiple_files' not set correctly for file: %s" % file_path)
+  if not java_package_correct:
+    error_messages.append(
+        "Java proto option 'java_package' not set correctly for file: %s" % file_path)
+  return error_messages
+
+
 # To avoid breaking the Lyft import, we just check for path inclusion here.
 def whitelistedForProtobufDeps(file_path):
   return (file_path.endswith(PROTO_SUFFIX) or file_path.endswith(REPOSITORIES_BZL) or \
@@ -182,6 +202,10 @@ def isBuildFile(file_path):
   if basename in {"BUILD", "BUILD.bazel"} or basename.endswith(".BUILD"):
     return True
   return False
+
+
+def isExternalBuildFile(file_path):
+  return isBuildFile(file_path) and file_path.startswith("./bazel/external/")
 
 
 def isSkylarkFile(file_path):
@@ -312,12 +336,13 @@ def checkBuildLine(line, file_path, reportError):
     reportError("unexpected direct external dependency on protobuf, use "
                 "//source/common/protobuf instead.")
   if (envoy_build_rule_check and not isSkylarkFile(file_path) and not isWorkspaceFile(file_path) and
-      '@envoy//' in line):
+      not isExternalBuildFile(file_path) and '@envoy//' in line):
     reportError("Superfluous '@envoy//' prefix")
 
 
 def fixBuildLine(line, file_path):
-  if envoy_build_rule_check and not isSkylarkFile(file_path) and not isWorkspaceFile(file_path):
+  if (envoy_build_rule_check and not isSkylarkFile(file_path) and not isWorkspaceFile(file_path) and
+      not isExternalBuildFile(file_path)):
     line = line.replace('@envoy//', '//')
   return line
 
@@ -372,6 +397,8 @@ def checkSourcePath(file_path):
     command = ("%s %s | diff %s -" % (CLANG_FORMAT_PATH, file_path, file_path))
     error_messages += executeCommand(command, "clang-format check failed", file_path)
 
+  if file_path.endswith(PROTO_SUFFIX) and isApiFile(file_path):
+    error_messages += checkJavaProtoOptions(file_path)
   return error_messages
 
 

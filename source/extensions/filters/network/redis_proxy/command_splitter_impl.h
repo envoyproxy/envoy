@@ -9,6 +9,7 @@
 
 #include "common/common/logger.h"
 #include "common/common/to_lower_table.h"
+#include "common/singleton/const_singleton.h"
 
 #include "extensions/filters/network/redis_proxy/command_splitter.h"
 #include "extensions/filters/network/redis_proxy/conn_pool.h"
@@ -18,6 +19,16 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace RedisProxy {
 namespace CommandSplitter {
+
+struct ResponseValues {
+  const std::string OK = "OK";
+  const std::string InvalidRequest = "invalid request";
+  const std::string NoUpstreamHost = "no upstream host";
+  const std::string UpstreamFailure = "upstream failure";
+  const std::string UpstreamProtocolError = "upstream protocol error";
+};
+
+typedef ConstSingleton<ResponseValues> Response;
 
 class Utility {
 public:
