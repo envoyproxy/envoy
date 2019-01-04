@@ -1,5 +1,7 @@
 #include "test/extensions/filters/network/dubbo_proxy/mocks.h"
 
+#include <memory>
+
 #include "common/protobuf/utility.h"
 
 #include "gtest/gtest.h"
@@ -58,17 +60,15 @@ MockDirectResponse::MockDirectResponse() {}
 MockDirectResponse::~MockDirectResponse() {}
 
 MockFilterConfigFactory::MockFilterConfigFactory()
-    : MockFactoryBase("envoy.filters.dubbo.mock_filter") {
-  mock_filter_.reset(new NiceMock<MockDecoderFilter>());
-}
+    : MockFactoryBase("envoy.filters.dubbo.mock_filter"),
+      mock_filter_(std::make_unique<NiceMock<MockDecoderFilter>>()) {}
 
 MockFilterConfigFactory::~MockFilterConfigFactory() {}
 
-FilterFactoryCb MockFilterConfigFactory::createFilterFactoryFromProtoTyped(
-    const ProtobufWkt::Struct& proto_config, const std::string& stat_prefix,
-    Server::Configuration::FactoryContext& context) {
-  UNREFERENCED_PARAMETER(context);
-
+FilterFactoryCb
+MockFilterConfigFactory::createFilterFactoryFromProtoTyped(const ProtobufWkt::Struct& proto_config,
+                                                           const std::string& stat_prefix,
+                                                           Server::Configuration::FactoryContext&) {
   config_struct_ = proto_config;
   config_stat_prefix_ = stat_prefix;
 

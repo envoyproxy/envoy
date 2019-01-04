@@ -22,7 +22,6 @@ namespace DubboProxy {
 class MockDecoderEventHandler : public DecoderEventHandler {
 public:
   MockDecoderEventHandler();
-  virtual ~MockDecoderEventHandler() override {}
 
   MOCK_METHOD0(transportBegin, Network::FilterStatus());
   MOCK_METHOD0(transportEnd, Network::FilterStatus());
