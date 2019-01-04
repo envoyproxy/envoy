@@ -276,6 +276,7 @@ TEST_P(ListenerImplTest, UseActualDstUdp) {
 
   const std::string first("first");
   const std::string second("second");
+  const std::string third("third");
 
   auto send_rc = ::sendto(client_sockfd, first.c_str(), first.length(), 0,
                           reinterpret_cast<const struct sockaddr*>(&server_addr), addr_len);
@@ -287,21 +288,32 @@ TEST_P(ListenerImplTest, UseActualDstUdp) {
 
   ASSERT_EQ(send_rc, second.length());
 
+  send_rc = ::sendto(client_sockfd, third.c_str(), third.length(), 0,
+                     reinterpret_cast<const struct sockaddr*>(&server_addr), addr_len);
+
+  ASSERT_EQ(send_rc, third.length());
+
+  auto validateCallParams = [&](Address::InstanceConstSharedPtr local_address,
+                                Address::InstanceConstSharedPtr peer_address) {
+    ASSERT_NE(local_address, nullptr);
+
+    ASSERT_NE(peer_address, nullptr);
+    ASSERT_NE(peer_address->ip(), nullptr);
+
+    ASSERT_EQ(local_address->asString(), server_socket->localAddress()->asString());
+
+    ASSERT_EQ(peer_address->ip()->addressAsString(),
+              client_socket->localAddress()->ip()->addressAsString());
+
+    EXPECT_EQ(*local_address, *server_socket->localAddress());
+  };
+
   EXPECT_CALL(listener_callbacks, onNewConnection_(_, _, _))
       .WillOnce(
           Invoke([&](Address::InstanceConstSharedPtr local_address,
                      Address::InstanceConstSharedPtr peer_address, Buffer::Instance* data) -> void {
-            ASSERT_NE(local_address, nullptr);
+            validateCallParams(local_address, peer_address);
 
-            ASSERT_NE(peer_address, nullptr);
-            ASSERT_NE(peer_address->ip(), nullptr);
-
-            ASSERT_EQ(local_address->asString(), server_socket->localAddress()->asString());
-
-            ASSERT_EQ(peer_address->ip()->addressAsString(),
-                      client_socket->localAddress()->ip()->addressAsString());
-
-            EXPECT_EQ(*local_address, *server_socket->localAddress());
             ASSERT_EQ(data->toString(), first);
           }));
 
@@ -309,18 +321,114 @@ TEST_P(ListenerImplTest, UseActualDstUdp) {
       .WillOnce(
           Invoke([&](Address::InstanceConstSharedPtr local_address,
                      Address::InstanceConstSharedPtr peer_address, Buffer::Instance* data) -> void {
-            ASSERT_NE(local_address, nullptr);
+            validateCallParams(local_address, peer_address);
 
-            ASSERT_NE(peer_address, nullptr);
-            ASSERT_NE(peer_address->ip(), nullptr);
-
-            ASSERT_EQ(local_address->asString(), server_socket->localAddress()->asString());
-
-            ASSERT_EQ(peer_address->ip()->addressAsString(),
-                      client_socket->localAddress()->ip()->addressAsString());
-
-            EXPECT_EQ(*local_address, *server_socket->localAddress());
             ASSERT_EQ(data->toString(), second);
+          }))
+      .WillOnce(
+          Invoke([&](Address::InstanceConstSharedPtr local_address,
+                     Address::InstanceConstSharedPtr peer_address, Buffer::Instance* data) -> void {
+            validateCallParams(local_address, peer_address);
+
+            ASSERT_EQ(data->toString(), third);
+
+            dispatcher_.exit();
+          }));
+
+  dispatcher_.run(Event::Dispatcher::RunType::Block);
+}
+
+TEST_P(ListenerImplTest, UdpListenerEnableDisable) {
+  SocketPtr server_socket =
+      getSocket(Address::SocketType::Datagram, Network::Test::getCanonicalLoopbackAddress(version_),
+                nullptr, true);
+
+  ASSERT_NE(server_socket, nullptr);
+
+  auto const* server_ip = server_socket->localAddress()->ip();
+  ASSERT_NE(server_ip, nullptr);
+
+  Network::MockUdpListenerCallbacks listener_callbacks;
+  Network::TestUdpListenerImpl listener(dispatcher_, *server_socket.get(), listener_callbacks,
+                                        true);
+
+  SocketPtr client_socket =
+      getSocket(Address::SocketType::Datagram, Network::Test::getCanonicalLoopbackAddress(version_),
+                nullptr, false);
+
+  const int client_sockfd = client_socket->fd();
+  sockaddr_storage server_addr;
+  socklen_t addr_len;
+
+  getSocketAddressInfo(*client_socket.get(), server_addr, addr_len);
+  ASSERT_GT(addr_len, 0);
+
+  if (version_ == Address::IpVersion::v4) {
+    struct sockaddr_in* servaddr = reinterpret_cast<struct sockaddr_in*>(&server_addr);
+    servaddr->sin_port = htons(server_ip->port());
+  } else if (version_ == Address::IpVersion::v6) {
+    struct sockaddr_in6* servaddr = reinterpret_cast<struct sockaddr_in6*>(&server_addr);
+    servaddr->sin6_port = htons(server_ip->port());
+  }
+
+  const std::string first("first");
+  const std::string second("second");
+  const std::string third("third");
+
+  listener.disable();
+
+  auto send_rc = ::sendto(client_sockfd, first.c_str(), first.length(), 0,
+                          reinterpret_cast<const struct sockaddr*>(&server_addr), addr_len);
+
+  ASSERT_EQ(send_rc, first.length());
+
+  send_rc = ::sendto(client_sockfd, second.c_str(), second.length(), 0,
+                     reinterpret_cast<const struct sockaddr*>(&server_addr), addr_len);
+
+  ASSERT_EQ(send_rc, second.length());
+
+  send_rc = ::sendto(client_sockfd, third.c_str(), third.length(), 0,
+                     reinterpret_cast<const struct sockaddr*>(&server_addr), addr_len);
+
+  ASSERT_EQ(send_rc, third.length());
+
+  auto validateCallParams = [&](Address::InstanceConstSharedPtr local_address,
+                                Address::InstanceConstSharedPtr peer_address) {
+    ASSERT_NE(local_address, nullptr);
+
+    ASSERT_NE(peer_address, nullptr);
+    ASSERT_NE(peer_address->ip(), nullptr);
+
+    ASSERT_EQ(local_address->asString(), server_socket->localAddress()->asString());
+
+    ASSERT_EQ(peer_address->ip()->addressAsString(),
+              client_socket->localAddress()->ip()->addressAsString());
+
+    EXPECT_EQ(*local_address, *server_socket->localAddress());
+  };
+
+  Event::TimerPtr timer = dispatcher_.createTimer([&] { dispatcher_.exit(); });
+
+  timer->enableTimer(std::chrono::milliseconds(2000));
+
+  EXPECT_CALL(listener_callbacks, onNewConnection_(_, _, _)).Times(0);
+
+  EXPECT_CALL(listener_callbacks, onData_(_, _, _)).Times(0);
+
+  dispatcher_.run(Event::Dispatcher::RunType::Block);
+
+  listener.enable();
+
+  EXPECT_CALL(listener_callbacks, onNewConnection_(_, _, _)).Times(1);
+  EXPECT_CALL(listener_callbacks, onData_(_, _, _))
+      .Times(2)
+      .WillOnce(Return())
+      .WillOnce(
+          Invoke([&](Address::InstanceConstSharedPtr local_address,
+                     Address::InstanceConstSharedPtr peer_address, Buffer::Instance* data) -> void {
+            validateCallParams(local_address, peer_address);
+
+            ASSERT_EQ(data->toString(), third);
 
             dispatcher_.exit();
           }));
