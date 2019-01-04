@@ -66,6 +66,34 @@ static void BufferAddBuffer(benchmark::State& state) {
 }
 BENCHMARK(BufferAddBuffer)->Arg(1)->Arg(4096)->Arg(16384)->Arg(65536);
 
+static void BufferDrain(benchmark::State& state) {
+  const std::string data(state.range(0), 'a');
+  const absl::string_view input(data);
+  const Buffer::OwnedImpl to_add(data);
+  Buffer::OwnedImpl buffer(input);
+
+  // On each iteration of the benchmark, add N bytes and drain a multiple of N, as specified
+  // by DrainCycleRatios. This exercises full-slice, partial-slice, and multi-slice code paths
+  // in the Buffer's drain implementation.
+  constexpr size_t DrainCycleSize = 7;
+  constexpr double DrainCycleRatios[DrainCycleSize] = {0.0, 1.5, 1, 1.5, 0, 2.0, 1.0};
+  uint64_t drain_size[DrainCycleSize];
+  for (size_t i = 0; i < DrainCycleSize; i++) {
+    drain_size[i] = state.range(0) * DrainCycleRatios[i];
+  }
+
+  size_t drain_cycle = 0;
+  for (auto _ : state) {
+    buffer.add(to_add);
+    buffer.drain(drain_size[drain_cycle]);
+    drain_cycle++;
+    drain_cycle %= DrainCycleSize;
+  }
+  uint64_t length = buffer.length();
+  benchmark::DoNotOptimize(length);
+}
+BENCHMARK(BufferDrain)->Arg(1)->Arg(4096)->Arg(16384)->Arg(65536);
+
 // Test the moving of content from one OwnedImpl to another.
 static void BufferMove(benchmark::State& state) {
   const std::string data(state.range(0), 'a');
