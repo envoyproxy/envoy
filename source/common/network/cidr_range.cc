@@ -1,7 +1,7 @@
 #include "common/network/cidr_range.h"
 
 #include <arpa/inet.h>
-#include <netinet/ip.h>
+#include <netinet/in.h>
 #include <sys/socket.h>
 
 #include <array>
