@@ -11,7 +11,7 @@ namespace {
 
 struct ThreadFactorySingletonTest {
   ThreadFactorySingletonTest()
-      : run_tid_(Envoy::Thread::ThreadFactorySingleton::get()->currentThreadId()) {}
+      : run_tid_(Envoy::Thread::ThreadFactorySingleton::get().currentThreadId()) {}
 
   void checkThreadId() const { ASSERT(run_tid_->isCurrentThreadId()); };
 

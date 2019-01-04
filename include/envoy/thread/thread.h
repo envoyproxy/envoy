@@ -64,9 +64,16 @@ public:
  */
 class ThreadFactorySingleton {
 public:
-  static ThreadFactory* get() { return thread_factory_; }
+  /**
+   * Returns a reference to the platform dependent ThreadFactory.
+   */
+  static ThreadFactory& get() { return *thread_factory_; }
 
-  static void set(ThreadFactory* thread_factory) { thread_factory_ = thread_factory; }
+  /**
+   * Sets the singleton to the supplied thread_factory.
+   * @param thread_factory the ThreadFactory instance to be pointed to by this singleton.
+   */
+  static void set(ThreadFactory* thread_factory);
 
 private:
   static ThreadFactory* thread_factory_;

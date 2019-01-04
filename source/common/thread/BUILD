@@ -11,5 +11,8 @@ envoy_package()
 envoy_cc_library(
     name = "thread_factory_singleton_lib",
     srcs = ["thread_factory_singleton.cc"],
-    deps = ["//include/envoy/thread:thread_interface"],
+    deps = [
+        "//include/envoy/thread:thread_interface",
+        "//source/common/common:assert_lib",
+    ],
 )
