@@ -31,17 +31,28 @@ void SplitRequestBase::onWrongNumberOfArguments(SplitCallbacks& callbacks,
       fmt::format("wrong number of arguments for '{}' command", request.asArray()[0].asString())));
 }
 
+void SplitRequestBase::updateStats(const bool failure = false) {
+  if (failure) {
+    command_stats_.error_.inc();
+  } else {
+    command_stats_.success_.inc();
+  }
+  std::chrono::milliseconds latency = std::chrono::duration_cast<std::chrono::milliseconds>(
+      time_source_.monotonicTime() - start_time_);
+  command_stats_.latency_.recordValue(latency.count());
+}
+
 SingleServerRequest::~SingleServerRequest() { ASSERT(!handle_); }
 
 void SingleServerRequest::onResponse(RespValuePtr&& response) {
   handle_ = nullptr;
-  command_stats_.success_.inc();
+  updateStats();
   callbacks_.onResponse(std::move(response));
 }
 
 void SingleServerRequest::onFailure() {
   handle_ = nullptr;
-  command_stats_.error_.inc();
+  updateStats(true);
   callbacks_.onResponse(Utility::makeError(Response::get().UpstreamFailure));
 }
 
@@ -52,8 +63,9 @@ void SingleServerRequest::cancel() {
 
 SplitRequestPtr SimpleRequest::create(ConnPool::Instance& conn_pool,
                                       const RespValue& incoming_request, SplitCallbacks& callbacks,
-                                      CommandStats& command_stats) {
-  std::unique_ptr<SimpleRequest> request_ptr{new SimpleRequest(callbacks, command_stats)};
+                                      CommandStats& command_stats, TimeSource& time_source) {
+  std::unique_ptr<SimpleRequest> request_ptr{
+      new SimpleRequest(callbacks, command_stats, time_source)};
 
   request_ptr->handle_ = conn_pool.makeRequest(incoming_request.asArray()[1].asString(),
                                                incoming_request, *request_ptr);
@@ -67,7 +79,7 @@ SplitRequestPtr SimpleRequest::create(ConnPool::Instance& conn_pool,
 
 SplitRequestPtr EvalRequest::create(ConnPool::Instance& conn_pool,
                                     const RespValue& incoming_request, SplitCallbacks& callbacks,
-                                    CommandStats& command_stats) {
+                                    CommandStats& command_stats, TimeSource& time_source) {
 
   // EVAL looks like: EVAL script numkeys key [key ...] arg [arg ...]
   // Ensure there are at least three args to the command or it cannot be hashed.
@@ -77,7 +89,7 @@ SplitRequestPtr EvalRequest::create(ConnPool::Instance& conn_pool,
     return nullptr;
   }
 
-  std::unique_ptr<EvalRequest> request_ptr{new EvalRequest(callbacks, command_stats)};
+  std::unique_ptr<EvalRequest> request_ptr{new EvalRequest(callbacks, command_stats, time_source)};
   request_ptr->handle_ = conn_pool.makeRequest(incoming_request.asArray()[3].asString(),
                                                incoming_request, *request_ptr);
   if (!request_ptr->handle_) {
@@ -112,8 +124,8 @@ void FragmentedRequest::onChildFailure(uint32_t index) {
 
 SplitRequestPtr MGETRequest::create(ConnPool::Instance& conn_pool,
                                     const RespValue& incoming_request, SplitCallbacks& callbacks,
-                                    CommandStats& command_stats) {
-  std::unique_ptr<MGETRequest> request_ptr{new MGETRequest(callbacks, command_stats)};
+                                    CommandStats& command_stats, TimeSource& time_source) {
+  std::unique_ptr<MGETRequest> request_ptr{new MGETRequest(callbacks, command_stats, time_source)};
 
   request_ptr->num_pending_responses_ = incoming_request.asArray().size() - 1;
   request_ptr->pending_requests_.reserve(request_ptr->num_pending_responses_);
@@ -174,11 +186,7 @@ void MGETRequest::onChildResponse(RespValuePtr&& value, uint32_t index) {
 
   ASSERT(num_pending_responses_ > 0);
   if (--num_pending_responses_ == 0) {
-    if (error_count_ == 0) {
-      command_stats_.success_.inc();
-    } else {
-      command_stats_.error_.inc();
-    }
+    updateStats(error_count_ != 0);
     ENVOY_LOG(debug, "redis: response: '{}'", pending_response_->toString());
     callbacks_.onResponse(std::move(pending_response_));
   }
@@ -186,13 +194,13 @@ void MGETRequest::onChildResponse(RespValuePtr&& value, uint32_t index) {
 
 SplitRequestPtr MSETRequest::create(ConnPool::Instance& conn_pool,
                                     const RespValue& incoming_request, SplitCallbacks& callbacks,
-                                    CommandStats& command_stats) {
+                                    CommandStats& command_stats, TimeSource& time_source) {
   if ((incoming_request.asArray().size() - 1) % 2 != 0) {
     onWrongNumberOfArguments(callbacks, incoming_request);
     command_stats.error_.inc();
     return nullptr;
   }
-  std::unique_ptr<MSETRequest> request_ptr{new MSETRequest(callbacks, command_stats)};
+  std::unique_ptr<MSETRequest> request_ptr{new MSETRequest(callbacks, command_stats, time_source)};
 
   request_ptr->num_pending_responses_ = (incoming_request.asArray().size() - 1) / 2;
   request_ptr->pending_requests_.reserve(request_ptr->num_pending_responses_);
@@ -246,12 +254,11 @@ void MSETRequest::onChildResponse(RespValuePtr&& value, uint32_t index) {
 
   ASSERT(num_pending_responses_ > 0);
   if (--num_pending_responses_ == 0) {
+    updateStats(error_count_ != 0);
     if (error_count_ == 0) {
-      command_stats_.success_.inc();
       pending_response_->asString() = Response::get().OK;
       callbacks_.onResponse(std::move(pending_response_));
     } else {
-      command_stats_.error_.inc();
       callbacks_.onResponse(
           Utility::makeError(fmt::format("finished with {} error(s)", error_count_)));
     }
@@ -261,9 +268,10 @@ void MSETRequest::onChildResponse(RespValuePtr&& value, uint32_t index) {
 SplitRequestPtr SplitKeysSumResultRequest::create(ConnPool::Instance& conn_pool,
                                                   const RespValue& incoming_request,
                                                   SplitCallbacks& callbacks,
-                                                  CommandStats& command_stats) {
+                                                  CommandStats& command_stats,
+                                                  TimeSource& time_source) {
   std::unique_ptr<SplitKeysSumResultRequest> request_ptr{
-      new SplitKeysSumResultRequest(callbacks, command_stats)};
+      new SplitKeysSumResultRequest(callbacks, command_stats, time_source)};
 
   request_ptr->num_pending_responses_ = incoming_request.asArray().size() - 1;
   request_ptr->pending_requests_.reserve(request_ptr->num_pending_responses_);
@@ -312,12 +320,11 @@ void SplitKeysSumResultRequest::onChildResponse(RespValuePtr&& value, uint32_t i
 
   ASSERT(num_pending_responses_ > 0);
   if (--num_pending_responses_ == 0) {
+    updateStats(error_count_ != 0);
     if (error_count_ == 0) {
-      command_stats_.success_.inc();
       pending_response_->asInteger() = total_;
       callbacks_.onResponse(std::move(pending_response_));
     } else {
-      command_stats_.error_.inc();
       callbacks_.onResponse(
           Utility::makeError(fmt::format("finished with {} error(s)", error_count_)));
     }
@@ -325,11 +332,12 @@ void SplitKeysSumResultRequest::onChildResponse(RespValuePtr&& value, uint32_t i
 }
 
 InstanceImpl::InstanceImpl(ConnPool::InstancePtr&& conn_pool, Stats::Scope& scope,
-                           const std::string& stat_prefix)
+                           const std::string& stat_prefix, TimeSource& time_source)
     : conn_pool_(std::move(conn_pool)), simple_command_handler_(*conn_pool_),
       eval_command_handler_(*conn_pool_), mget_handler_(*conn_pool_), mset_handler_(*conn_pool_),
       split_keys_sum_result_handler_(*conn_pool_),
-      stats_{ALL_COMMAND_SPLITTER_STATS(POOL_COUNTER_PREFIX(scope, stat_prefix + "splitter."))} {
+      stats_{ALL_COMMAND_SPLITTER_STATS(POOL_COUNTER_PREFIX(scope, stat_prefix + "splitter."))},
+      time_source_(time_source) {
   // TODO(mattklein123) PERF: Make this a trie (like in header_map_impl).
   for (const std::string& command : SupportedCommands::simpleCommands()) {
     addHandler(scope, stat_prefix, command, simple_command_handler_);
@@ -389,7 +397,7 @@ SplitRequestPtr InstanceImpl::makeRequest(const RespValue& request, SplitCallbac
   ENVOY_LOG(debug, "redis: splitting '{}'", request.toString());
   handler->second.command_stats_.total_.inc();
   SplitRequestPtr request_ptr = handler->second.handler_.get().startRequest(
-      request, callbacks, handler->second.command_stats_);
+      request, callbacks, handler->second.command_stats_, time_source_);
   return request_ptr;
 }
 
@@ -408,7 +416,8 @@ void InstanceImpl::addHandler(Stats::Scope& scope, const std::string& stat_prefi
           CommandStats{
               scope.counter(fmt::format("{}command.{}.total", stat_prefix, to_lower_name)),
               scope.counter(fmt::format("{}command.{}.success", stat_prefix, to_lower_name)),
-              scope.counter(fmt::format("{}command.{}.error", stat_prefix, to_lower_name))},
+              scope.counter(fmt::format("{}command.{}.error", stat_prefix, to_lower_name)),
+              scope.histogram(fmt::format("{}command.{}.latency", stat_prefix, to_lower_name))},
           handler});
 }
 
