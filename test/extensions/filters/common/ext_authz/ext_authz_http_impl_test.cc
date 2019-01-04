@@ -123,23 +123,23 @@ TEST_F(ExtAuthzHttpClientTest, ClientConfig) {
   const Http::LowerCaseString bar{"bar"};
 
   // Check allowed request headers.
-  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Method));
-  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Host));
-  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Authorization));
-  EXPECT_FALSE(config_->requestHeaderMatchers()->matches(Http::Headers::get().ContentLength));
-  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(baz));
+  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Method.get()));
+  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Host.get()));
+  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Authorization.get()));
+  EXPECT_FALSE(config_->requestHeaderMatchers()->matches(Http::Headers::get().ContentLength.get()));
+  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(baz.get()));
 
   // // Check allowed client headers.
-  EXPECT_TRUE(config_->clientHeaderMatchers()->matches(Http::Headers::get().Status));
-  EXPECT_TRUE(config_->clientHeaderMatchers()->matches(Http::Headers::get().ContentLength));
-  EXPECT_FALSE(config_->clientHeaderMatchers()->matches(Http::Headers::get().Path));
-  EXPECT_FALSE(config_->clientHeaderMatchers()->matches(Http::Headers::get().Host));
-  EXPECT_TRUE(config_->clientHeaderMatchers()->matches(Http::Headers::get().WWWAuthenticate));
-  EXPECT_FALSE(config_->clientHeaderMatchers()->matches(Http::Headers::get().Origin));
-  EXPECT_TRUE(config_->clientHeaderMatchers()->matches(foo));
+  EXPECT_TRUE(config_->clientHeaderMatchers()->matches(Http::Headers::get().Status.get()));
+  EXPECT_TRUE(config_->clientHeaderMatchers()->matches(Http::Headers::get().ContentLength.get()));
+  EXPECT_FALSE(config_->clientHeaderMatchers()->matches(Http::Headers::get().Path.get()));
+  EXPECT_FALSE(config_->clientHeaderMatchers()->matches(Http::Headers::get().Host.get()));
+  EXPECT_TRUE(config_->clientHeaderMatchers()->matches(Http::Headers::get().WWWAuthenticate.get()));
+  EXPECT_FALSE(config_->clientHeaderMatchers()->matches(Http::Headers::get().Origin.get()));
+  EXPECT_TRUE(config_->clientHeaderMatchers()->matches(foo.get()));
 
   // // Check allowed upstream headers.
-  EXPECT_TRUE(config_->upstreamHeaderMatchers()->matches(bar));
+  EXPECT_TRUE(config_->upstreamHeaderMatchers()->matches(bar.get()));
 
   // // Check other attributes.
   EXPECT_EQ(config_->pathPrefix(), "/bar");
@@ -162,17 +162,18 @@ TEST_F(ExtAuthzHttpClientTest, TestDefaultAllowedHeaders) {
   const auto key = Http::LowerCaseString{"key"};
 
   // Check allowed request headers.
-  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Method));
-  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Host));
-  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Authorization));
-  EXPECT_FALSE(config_->requestHeaderMatchers()->matches(Http::Headers::get().ContentLength));
+  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Method.get()));
+  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Host.get()));
+  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Authorization.get()));
+  EXPECT_FALSE(config_->requestHeaderMatchers()->matches(Http::Headers::get().ContentLength.get()));
 
   // Check allowed client headers.
-  EXPECT_TRUE(config_->clientHeaderMatchers()->matches(Http::Headers::get().ContentLength));
-  EXPECT_FALSE(config_->clientHeaderMatchers()->matches(Http::Headers::get().Host));
+  EXPECT_TRUE(config_->clientHeaderMatchers()->matches(Http::Headers::get().ContentLength.get()));
+  EXPECT_FALSE(config_->clientHeaderMatchers()->matches(Http::Headers::get().Host.get()));
 
   // Check allowed upstream headers.
-  EXPECT_FALSE(config_->upstreamHeaderMatchers()->matches(Http::Headers::get().ContentLength));
+  EXPECT_FALSE(
+      config_->upstreamHeaderMatchers()->matches(Http::Headers::get().ContentLength.get()));
 }
 
 // Verify client response when the authorization server returns a 200 OK and path_prefix is
