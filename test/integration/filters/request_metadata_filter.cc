@@ -16,6 +16,7 @@ public:
     Http::MetadataMap metadata_map = {{"headers", "headers"}};
     Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
     decoder_callbacks_->addDecodedMetadata().emplace_back(std::move(metadata_map_ptr));
+    ENVOY_LOG_MISC(error, "++++++++++++ add headers: size: {}", decoder_callbacks_->addDecodedMetadata().size());
     return Http::FilterHeadersStatus::Continue;
   }
   Http::FilterDataStatus decodeData(Buffer::Instance&, bool) override {

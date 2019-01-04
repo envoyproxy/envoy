@@ -392,10 +392,22 @@ Http::FilterTrailersStatus Filter::decodeTrailers(Http::HeaderMap& trailers) {
 }
 
 Http::FilterMetadataStatus Filter::decodeMetadata(Http::MetadataMap& metadata_map) {
+  // change name++++++++++++++++
+  Http::MetadataMap metadata_map_local;
+  metadata_map_local.insert(metadata_map.begin(), metadata_map.end());
+  Http::MetadataMapPtr metadata_map_local_ptr =
+      std::make_unique<Http::MetadataMap>(metadata_map_local);
+
+  if (upstream_request_ == nullptr) {
+    ENVOY_STREAM_LOG(trace, "upstream_request_ not ready. Store metadata_map to encode later: {}",
+                     *callbacks_, metadata_map);
+    downstream_metadata_map_vector_.emplace_back(std::move(metadata_map_local_ptr));
+    return Http::FilterMetadataStatus::Continue;
+  }
+
   ENVOY_LOG_MISC(error, "+++++ Filter::decodeMetadata: {}", metadata_map);
-  upstream_request_->encodeMetadata(metadata_map);
+  upstream_request_->encodeMetadata(std::move(metadata_map_local_ptr));
   return Http::FilterMetadataStatus::Continue;
-  ;
 }
 
 void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
@@ -957,23 +969,16 @@ void Filter::UpstreamRequest::encodeTrailers(const Http::HeaderMap& trailers) {
   }
 }
 
-void Filter::UpstreamRequest::encodeMetadata(const Http::MetadataMap& metadata_map) {
-  Http::MetadataMap metadata_map_local;
-  metadata_map_local.insert(metadata_map.begin(), metadata_map.end());
-  Http::MetadataMapPtr metadata_map_local_ptr =
-      std::make_unique<Http::MetadataMap>(metadata_map_local);
-  // should we change MetadataMapVector to pointer instead of
-  // unique_ptr?????+++++++++++++++++ We can avoid the copy in case
-  // request_encoder_ is ready. Is that necessary?
+void Filter::UpstreamRequest::encodeMetadata(Http::MetadataMapPtr&& metadata_map_ptr) {
   if (!request_encoder_) {
-    ENVOY_STREAM_LOG(trace, "Store metadata_map to encode later: {}", *parent_.callbacks_,
-                     metadata_map);
-    parent_.downstream_metadata_map_vector_.emplace_back(std::move(metadata_map_local_ptr));
+    ENVOY_STREAM_LOG(trace, "request_encoder_ not ready. Store metadata_map to encode later: {}",
+                     *parent_.callbacks_, *metadata_map_ptr);
+    parent_.downstream_metadata_map_vector_.emplace_back(std::move(metadata_map_ptr));
   } else {
 
-    ENVOY_STREAM_LOG(trace, "Encode metadata: {}", *parent_.callbacks_, metadata_map);
+    ENVOY_STREAM_LOG(trace, "Encode metadata: {}", *parent_.callbacks_, *metadata_map_ptr);
     Http::MetadataMapVector metadata_map_vector;
-    metadata_map_vector.emplace_back(std::move(metadata_map_local_ptr));
+    metadata_map_vector.emplace_back(std::move(metadata_map_ptr));
     request_encoder_->encodeMetadata(metadata_map_vector);
   }
 }

@@ -273,7 +273,7 @@ private:
     void encodeHeaders(bool end_stream);
     void encodeData(Buffer::Instance& data, bool end_stream);
     void encodeTrailers(const Http::HeaderMap& trailers);
-    void encodeMetadata(const Http::MetadataMap& metadata_map);
+    void encodeMetadata(Http::MetadataMapPtr&& metadata_map_ptr);
 
     void resetStream();
     void setupPerTryTimeout();

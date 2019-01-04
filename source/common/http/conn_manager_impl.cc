@@ -751,18 +751,27 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilte
     entry = std::next(filter->entry());
   }
 
+  bool delay_end_stream = false;
   for (; entry != decoder_filters_.end(); entry++) {
     ASSERT(!(state_.filter_call_state_ & FilterCallState::DecodeHeaders));
     state_.filter_call_state_ |= FilterCallState::DecodeHeaders;
     const auto current_filter_end_stream =
-        decoding_headers_only_ ||
-        (end_stream && continue_data_entry == decoder_filters_.end() && request_metadata_map_vector_.empty());
-    FilterHeadersStatus status = (*entry)->decodeHeaders(headers, current_filter_end_stream);
+        decoding_headers_only_ || (end_stream && continue_data_entry == decoder_filters_.end());
+    FilterHeadersStatus status =
+        (*entry)->decodeHeaders(headers, current_filter_end_stream && !delay_end_stream);
 
     ASSERT(!(status == FilterHeadersStatus::ContinueAndEndStream && current_filter_end_stream));
     state_.filter_call_state_ &= ~FilterCallState::DecodeHeaders;
     ENVOY_STREAM_LOG(trace, "decode headers called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
+
+    if (!request_metadata_map_vector_.empty()) {
+      delay_end_stream = true;
+      for (uint64_t i = 0; i < request_metadata_map_vector_.size(); i++) {
+        decodeMetadata((*entry).get(), *(request_metadata_map_vector_[i]));
+      }
+      request_metadata_map_vector_.clear();
+    }
 
     if (!(*entry)->commonHandleAfterHeadersCallback(status, decoding_headers_only_) &&
         std::next(entry) != decoder_filters_.end()) {
@@ -779,18 +788,11 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilte
     }
   }
 
-  if (!request_metadata_map_vector_.empty()) {
-    for (uint64_t i = 0; i < request_metadata_map_vector_.size(); i++) {
-      decodeMetadata(std::move(request_metadata_map_vector_[i]));
-    }
-    request_metadata_map_vector_.clear();
-    ASSERT(request_metadata_map_vector_.empty());
-    // If end_stream is removed in headers because of new metadata added in
-    // the filters, send an empty data frame to inidicate end_stream.
-    if (end_stream && continue_data_entry == decoder_filters_.end()) {
-      Buffer::OwnedImpl empty_data("");
-      decodeData(nullptr, empty_data, true);
-    }
+  // If end_stream is removed in headers because of new metadata added in the filters, send an empty
+  // data frame to inidicate end_stream.
+  if (end_stream && continue_data_entry == decoder_filters_.end() && delay_end_stream) {
+    Buffer::OwnedImpl empty_data("");
+    decodeData(nullptr, empty_data, true);
   }
 
   if (continue_data_entry != decoder_filters_.end()) {
@@ -857,7 +859,7 @@ void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* 
 
     if (!request_metadata_map_vector_.empty()) {
       for (uint64_t i = 0; i < request_metadata_map_vector_.size(); i++) {
-        decodeMetadata(std::move(request_metadata_map_vector_[i]));
+        decodeMetadata((*entry).get(), *(request_metadata_map_vector_[i]));
       }
       request_metadata_map_vector_.clear();
     }
@@ -959,7 +961,7 @@ void ConnectionManagerImpl::ActiveStream::decodeTrailers(ActiveStreamDecoderFilt
     // ++++++++++ before return or after??
     if (!request_metadata_map_vector_.empty()) {
       for (uint64_t i = 0; i < request_metadata_map_vector_.size(); i++) {
-        decodeMetadata(std::move(request_metadata_map_vector_[i]));
+        decodeMetadata((*entry).get(), *(request_metadata_map_vector_[i]));
       }
       request_metadata_map_vector_.clear();
     }
@@ -995,6 +997,12 @@ void ConnectionManagerImpl::ActiveStream::decodeMetadata(ActiveStreamDecoderFilt
     ENVOY_STREAM_LOG(trace, "decode metadata called: filter={} status={}, metadata: {}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status),
                      metadata_map);
+    if (!request_metadata_map_vector_.empty()) {
+      for (uint64_t i = 0; i < request_metadata_map_vector_.size(); i++) {
+        decodeMetadata((*entry).get(), *(request_metadata_map_vector_[i]));
+      }
+      request_metadata_map_vector_.clear();
+    }
   }
 }
 
