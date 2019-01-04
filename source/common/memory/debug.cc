@@ -36,8 +36,10 @@ static std::atomic<int64_t> bytes_allocated(0);
 namespace Envoy {
 namespace Memory {
 
-// We provide the constructor entry-point to be called to force-load the memory
-// debugger and its operator-overloads, regardless of compilation mode.
+// We always provide the constructor entry-point to be called to force-load this
+// module, regardless of compilation mode. If the #ifdefs line as required
+// below, then it will also override operator new/delete in various flavors so
+// that we can debug memory issues.
 Debug::Debug() {}
 
 // We also provide the bytes-loaded counter, though this will return 0 when
