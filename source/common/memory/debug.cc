@@ -128,12 +128,12 @@ void debugFree(void* ptr) {
 #endif
 
 void* operator new(uint64_t size) { return debugMalloc(size); }
-void operator delete(void* ptr)_GLIBCXX_USE_NOEXCEPT { debugFree(ptr); }
-void operator delete(void* ptr, size_t)_GLIBCXX_USE_NOEXCEPT { debugFree(ptr); }
+void operator delete(void* ptr) noexcept { debugFree(ptr); }
+void operator delete(void* ptr, size_t) noexcept { debugFree(ptr); }
 
 void* operator new[](size_t size) { return debugMalloc(size); }
-void operator delete[](void* ptr) _GLIBCXX_USE_NOEXCEPT { debugFree(ptr); }
-void operator delete[](void* ptr, size_t) _GLIBCXX_USE_NOEXCEPT { debugFree(ptr); }
+void operator delete[](void* ptr) noexcept { debugFree(ptr); }
+void operator delete[](void* ptr, size_t) noexcept { debugFree(ptr); }
 
 #endif // !TCMALLOC && !ENVOY_DISABLE_MEMDEBUG
 #endif // !NDEBUG
