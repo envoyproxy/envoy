@@ -82,6 +82,7 @@ public:
      */
     struct Details {
       SocketOptionName name_;
+      absl::optional<std::string> description_;
       std::string value_; ///< Binary string representation of an option's value.
 
       bool operator==(const Details& other) const {
