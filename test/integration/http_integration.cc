@@ -330,7 +330,7 @@ void HttpIntegrationTest::testRouterRequestAndResponseWithBody(
 }
 
 void HttpIntegrationTest::testRouterHeaderOnlyRequestAndResponse(
-    bool leave_upstream_open, int upstream_index, ConnectionCreationFunction* create_connection) {
+    bool leave_upstream_open, ConnectionCreationFunction* create_connection, int upstream_index) {
   // This is called multiple times per test in ads_integration_test. Only call
   // initialize() the first time.
   if (!initialized()) {
