@@ -50,11 +50,19 @@ void UdpListenerImpl::readCallback(int fd, short flags, void* arg) {
   Buffer::InstancePtr buffer(new Buffer::OwnedImpl());
   sockaddr_storage addr;
   socklen_t addr_len;
+  Api::SysCallIntResult result;
 
-  Api::SysCallIntResult result = buffer->recvFrom(fd, read_length, addr, addr_len);
-  if (result.rc_ < 0) {
-    // TODO(conqerAtApple): Call error callback.
-  }
+  do {
+    result = buffer->recvFrom(fd, read_length, addr, addr_len);
+    if (result.rc_ < 0) {
+      if (result.rc_ == -EAGAIN) {
+        continue;
+      }
+      // TODO(conqerAtApple): Call error callback.
+    }
+
+    break;
+  } while (true);
 
   Address::InstanceConstSharedPtr local_address = instance->socket_.localAddress();
 
