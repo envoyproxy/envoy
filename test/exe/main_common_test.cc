@@ -107,7 +107,16 @@ TEST_P(MainCommonTest, ConstructDestructHotRestartDisabledNoInit) {
 // Test that std::set_new_handler() was called and the callback functions as expected.
 TEST_P(MainCommonTest, OutOfMemoryHandler) {
   MainCommon main_common(argc(), argv());
-  EXPECT_DEATH_LOG_TO_STDERR(new int[uint64_t(1) << 60], ".*panic: out of memory.*");
+  EXPECT_DEATH_LOG_TO_STDERR(
+      []() {
+        // Allocating a fixed-size large array that results in OOM on gcc
+        // results in a compile-time error on clang of "array size too big",
+        // so dynamically find a size that is too large.
+        for (uint64_t size = 1 << 30; true; size *= 1000) {
+          new int[size];
+        }
+      }(),
+      ".*panic: out of memory.*");
 }
 
 INSTANTIATE_TEST_CASE_P(IpVersions, MainCommonTest,
