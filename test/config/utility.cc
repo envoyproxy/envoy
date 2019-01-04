@@ -404,10 +404,9 @@ void ConfigHelper::initializeTls(const ServerSslOptions& options,
 
   // We'll negotiate up to TLSv1.3 for the tests that care, but it really
   // depends on what the client sets.
-  if (options.tlsv1_3_) {
-    common_tls_context.mutable_tls_params()->set_tls_maximum_protocol_version(
-        envoy::api::v2::auth::TlsParameters::TLSv1_3);
-  }
+  common_tls_context.mutable_tls_params()->set_tls_maximum_protocol_version(
+      options.tlsv1_3_ ? envoy::api::v2::auth::TlsParameters::TLSv1_3
+                       : envoy::api::v2::auth::TlsParameters::TLSv1_2);
   if (options.rsa_cert_) {
     auto* tls_certificate = common_tls_context.add_tls_certificates();
     tls_certificate->mutable_certificate_chain()->set_filename(
