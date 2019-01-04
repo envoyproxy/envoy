@@ -1,8 +1,8 @@
 #pragma once
 
-#include "common/common/logger.h"
-
 #include <functional>
+
+#include "common/common/logger.h"
 
 namespace Envoy {
 namespace Assert {
