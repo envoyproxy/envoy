@@ -2,7 +2,40 @@
 
 #include "common/common/logger.h"
 
+#include <functional>
+
 namespace Envoy {
+namespace Assert {
+
+class ActionRegistration {
+public:
+  virtual ~ActionRegistration() {}
+};
+typedef std::unique_ptr<ActionRegistration> ActionRegistrationPtr;
+
+/**
+ * Sets an action to be invoked when a debug assertion failure is detected
+ * in a release build. This action will be invoked each time an assertion
+ * failure is detected.
+ *
+ * This function is not thread-safe; concurrent calls are not allowed.
+ *
+ * This has no effect in debug builds (assertion failure aborts the process)
+ * or in release builds without ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE defined (assertion
+ * tests are compiled out).
+ *
+ * @param action The action to take when an assertion fails.
+ * @return A registration object. The registration is removed when the object is destructed.
+ */
+ActionRegistrationPtr setDebugAssertionFailureRecordAction(std::function<void()> action);
+
+/**
+ * Invokes the action set by setDebugAssertionFailureRecordAction, or does nothing if
+ * no action has been set.
+ *
+ * This should only be called by ASSERT macros in this file.
+ */
+void invokeDebugAssertionFailureRecordAction_ForAssertMacroUseOnly();
 
 // CONDITION_STR is needed to prevent macros in condition from being expected, which obfuscates
 // the logged failure, eg "EAGAIN" vs "11".
@@ -34,11 +67,11 @@ namespace Envoy {
 
 #if !defined(NDEBUG) || defined(ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE)
 
-#if !defined(NDEBUG)
+#if !defined(NDEBUG) // If this is a debug build.
 #define ASSERT_ACTION abort()
-#else // !defined(NDEBUG) && defined(ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE)
-#define ASSERT_ACTION ;
-#endif
+#else // If this is not a debug build, but ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE is defined.
+#define ASSERT_ACTION Envoy::Assert::invokeDebugAssertionFailureRecordAction_ForAssertMacroUseOnly()
+#endif // !defined(NDEBUG)
 
 #define _ASSERT_ORIGINAL(X) _ASSERT_IMPL(X, #X, ASSERT_ACTION, "")
 #define _ASSERT_VERBOSE(X, Y) _ASSERT_IMPL(X, #X, ASSERT_ACTION, Y)
@@ -57,7 +90,7 @@ namespace Envoy {
     constexpr bool __assert_dummy_variable = false && static_cast<bool>(X);                        \
     (void)__assert_dummy_variable;                                                                 \
   } while (false)
-#endif
+#endif // !defined(NDEBUG) || defined(ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE)
 
 /**
  * Indicate a panic situation and exit.
@@ -77,4 +110,5 @@ namespace Envoy {
 // after a switch (some_enum) with all enum values included in the cases. The macro name includes
 // "GCOVR_EXCL_LINE" to exclude the macro's usage from code coverage reports.
 #define NOT_REACHED_GCOVR_EXCL_LINE PANIC("not reached")
+} // namespace Assert
 } // namespace Envoy

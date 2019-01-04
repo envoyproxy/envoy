@@ -247,11 +247,16 @@ void InstanceImpl::initialize(Options& options,
   stats_store_.setTagProducer(Config::Utility::createTagProducer(bootstrap_));
   stats_store_.setStatsMatcher(Config::Utility::createStatsMatcher(bootstrap_));
 
+  const std::string server_stats_prefix = "server.";
   server_stats_ = std::make_unique<ServerStats>(
-      ServerStats{ALL_SERVER_STATS(POOL_GAUGE_PREFIX(stats_store_, "server."))});
+      ServerStats{ALL_SERVER_STATS(POOL_COUNTER_PREFIX(stats_store_, server_stats_prefix),
+                                   POOL_GAUGE_PREFIX(stats_store_, server_stats_prefix))});
 
   server_stats_->concurrency_.set(options_.concurrency());
   server_stats_->hot_restart_epoch_.set(options_.restartEpoch());
+
+  assert_action_registration_ = Assert::setDebugAssertionFailureRecordAction(
+      [this]() { server_stats_->debug_assertion_failures_.inc(); });
 
   failHealthcheck(false);
 

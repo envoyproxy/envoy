@@ -1,5 +1,6 @@
 #include <memory>
 
+#include "common/common/assert.h"
 #include "common/common/version.h"
 #include "common/network/address_impl.h"
 #include "common/thread_local/thread_local_impl.h"
@@ -198,6 +199,14 @@ TEST_P(ServerInstanceImplTest, Stats) {
   EXPECT_NE(nullptr, TestUtility::findCounter(stats_store_, "server.watchdog_miss"));
   EXPECT_EQ(2L, TestUtility::findGauge(stats_store_, "server.concurrency")->value());
   EXPECT_EQ(3L, TestUtility::findGauge(stats_store_, "server.hot_restart_epoch")->value());
+
+// This stat only works in this configuration.
+#if defined(NDEBUG) && defined(ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE)
+  ASSERT(false, "Testing debug assertion failure detection in release build.");
+  EXPECT_EQ(1L, TestUtility::findCounter(stats_store_, "server.debug_assertion_failures")->value());
+#else
+  EXPECT_EQ(0L, TestUtility::findCounter(stats_store_, "server.debug_assertion_failures")->value());
+#endif
 }
 
 // Validate server localInfo() from bootstrap Node.

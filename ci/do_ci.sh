@@ -168,8 +168,8 @@ elif [[ "$1" == "bazel.compile_time_options" ]]; then
   bazel test ${BAZEL_TEST_OPTIONS} ${COMPILE_TIME_OPTIONS} -c dbg //test/...
 
   # "--define log_debug_assert_in_release=enabled" must be tested with a release build, so run only
-  # this test under "-c opt" to save time in CI.
-  bazel test ${BAZEL_TEST_OPTIONS} ${COMPILE_TIME_OPTIONS} -c opt //test/common/common:assert_test
+  # these tests under "-c opt" to save time in CI.
+  bazel test ${BAZEL_TEST_OPTIONS} ${COMPILE_TIME_OPTIONS} -c opt //test/common/common:assert_test //test/server:server_test
   exit 0
 elif [[ "$1" == "bazel.ipv6_tests" ]]; then
   # This is around until Circle supports IPv6. We try to run a limited set of IPv6 tests as fast
