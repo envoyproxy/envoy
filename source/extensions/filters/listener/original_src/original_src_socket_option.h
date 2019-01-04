@@ -14,10 +14,9 @@ namespace OriginalSrc {
 class OriginalSrcSocketOption : public Network::Socket::Option {
 public:
   /**
-   * Constructs a socekt option which will set the socket to use source @c src_address, and cause it
-   * to mark all packets sent out it with value @c mark.
+   * Constructs a socekt option which will set the socket to use source @c src_address
    */
-  OriginalSrcSocketOption(Network::Address::InstanceConstSharedPtr src_address, uint32_t mark);
+  OriginalSrcSocketOption(Network::Address::InstanceConstSharedPtr src_address);
   ~OriginalSrcSocketOption() {}
 
   /**
@@ -36,12 +35,8 @@ public:
   getOptionDetails(const Network::Socket& socket,
                    envoy::api::v2::core::SocketOption::SocketState state) const override;
 
-  static constexpr uint8_t IPV4_KEY = 0;
-  static constexpr uint8_t IPV6_KEY = 1;
-
 private:
   Network::Address::InstanceConstSharedPtr src_address_;
-  Network::Socket::Options options_to_apply_;
 };
 
 } // namespace OriginalSrc

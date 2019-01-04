@@ -1,27 +1,18 @@
 #include "extensions/filters/listener/original_src/original_src_socket_option.h"
 
 #include "common/common/assert.h"
-#include "common/network/socket_option_factory.h"
+#include "common/common/fmt.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace ListenerFilters {
 namespace OriginalSrc {
 
-constexpr uint8_t OriginalSrcSocketOption::IPV4_KEY;
-constexpr uint8_t OriginalSrcSocketOption::IPV6_KEY;
-
 OriginalSrcSocketOption::OriginalSrcSocketOption(
-    Network::Address::InstanceConstSharedPtr src_address, uint32_t mark)
+    Network::Address::InstanceConstSharedPtr src_address)
     : src_address_(std::move(src_address)) {
   // Source transparency only works on IP connections.
   ASSERT(src_address_->type() == Network::Address::Type::Ip);
-
-  auto mark_option = Network::SocketOptionFactory::buildSocketMarkOptions(mark);
-  options_to_apply_.insert(options_to_apply_.end(), mark_option->begin(), mark_option->end());
-  auto transparent_option = Network::SocketOptionFactory::buildIpTransparentOptions();
-  options_to_apply_.insert(options_to_apply_.end(), transparent_option->begin(),
-                           transparent_option->end());
 }
 
 bool OriginalSrcSocketOption::setOption(
@@ -31,13 +22,7 @@ bool OriginalSrcSocketOption::setOption(
     socket.setLocalAddress(src_address_);
   }
 
-  // TODO(klarose): Add some UT for this and the failure case when we actually add options to this.
-  bool result = true;
-  for (const auto& option : options_to_apply_) {
-    result &= option->setOption(socket, state);
-  }
-
-  return result;
+  return true;
 }
 
 /**
@@ -65,13 +50,15 @@ void OriginalSrcSocketOption::hashKey(std::vector<uint8_t>& key) const {
   }
 }
 
-absl::optional<Network::Socket::Option::Details>
-OriginalSrcSocketOption::getOptionDetails(const Network::Socket&,
-                                          envoy::api::v2::core::SocketOption::SocketState) const {
-  // TODO(klarose): The option details stuff will likely require a bit of a rework when we actually
-  // put options in here to support multiple options at once. Sad.
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE
-  return absl::nullopt; // nothing right now.
+absl::optional<Network::Socket::Option::Details> OriginalSrcSocketOption::getOptionDetails(
+    const Network::Socket&, envoy::api::v2::core::SocketOption::SocketState state) const {
+  if (state != envoy::api::v2::core::SocketOption::STATE_PREBIND) {
+    // we only ever apply the option in the prebind state.
+    return absl::nullopt;
+  }
+  Details to_return;
+  to_return.description_ = fmt::format("OriginalSrc: '{}'", src_address_->asString());
+  return to_return;
 }
 
 } // namespace OriginalSrc

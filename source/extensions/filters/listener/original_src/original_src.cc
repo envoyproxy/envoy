@@ -4,6 +4,7 @@
 #include "envoy/network/connection.h"
 
 #include "common/common/assert.h"
+#include "common/network/socket_option_factory.h"
 #include "common/network/utility.h"
 
 #include "extensions/filters/listener/original_src/original_src_socket_option.h"
@@ -31,11 +32,18 @@ Network::FilterStatus OriginalSrcFilter::onAccept(Network::ListenerFilterCallbac
 
   auto address_without_port = Network::Utility::getAddressWithPort(*address, 0);
 
-  Network::Socket::OptionConstSharedPtr new_option =
-      std::make_shared<OriginalSrcSocketOption>(std::move(address_without_port), config_.mark());
   // note: we don't expect this to change the behaviour of the socket. We expect it to be copied
   // into the upstream connection later.
-  socket.addOption(new_option);
+  auto options_to_add = std::make_shared<Network::Socket::Options>();
+  options_to_add->emplace_back(
+      std::make_shared<OriginalSrcSocketOption>(std::move(address_without_port)));
+  auto mark_option = Network::SocketOptionFactory::buildSocketMarkOptions(config_.mark());
+  options_to_add->insert(options_to_add->end(), mark_option->begin(), mark_option->end());
+  auto transparent_option = Network::SocketOptionFactory::buildIpTransparentOptions();
+  options_to_add->insert(options_to_add->end(), transparent_option->begin(),
+                         transparent_option->end());
+
+  socket.addOptions(options_to_add);
   return Network::FilterStatus::Continue;
 }
 
