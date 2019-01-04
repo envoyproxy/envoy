@@ -1,3 +1,5 @@
+licenses(["notice"])  # Apache 2
+
 cc_library(
     name = "http_parser",
     srcs = ["http_parser.c", "http_parser.h"],

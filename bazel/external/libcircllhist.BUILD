@@ -1,3 +1,5 @@
+licenses(["notice"])  # Apache 2
+
 cc_library(
     name = "libcircllhist",
     srcs = ["src/circllhist.c"],
@@ -7,7 +9,7 @@ cc_library(
     includes = ["src"],
     visibility = ["//visibility:public"],
     copts = select({
-            "@envoy//bazel:windows_x86_64": ["-DWIN32"],
-            "//conditions:default": [],
-           }),
+        "@envoy//bazel:windows_x86_64": ["-DWIN32"],
+        "//conditions:default": [],
+    }),
 )

@@ -12,8 +12,7 @@ import stat
 import sys
 import traceback
 
-EXCLUDED_PREFIXES = ("./generated/", "./thirdparty/", "./build", "./.git/", "./bazel-",
-                     "./bazel/external", "./.cache",
+EXCLUDED_PREFIXES = ("./generated/", "./thirdparty/", "./build", "./.git/", "./bazel-", "./.cache",
                      "./source/extensions/extensions_build_config.bzl",
                      "./tools/testdata/check_format/")
 SUFFIXES = (".cc", ".h", "BUILD", "WORKSPACE", ".bzl", ".md", ".rst", ".proto")
@@ -127,7 +126,7 @@ def checkTools():
     error_messages.append(
         "Command {} not found. If you have buildifier installed, but the binary "
         "name is different or it's not available in $GOPATH/bin, please use "
-        "BUILDIFIER_BIN environment variable to specify the path. Example:"
+        "BUILDIFIER_BIN environment variable to specify the path. Example:\n"
         "    export BUILDIFIER_BIN=/opt/bin/buildifier\n"
         "If you don't have buildifier installed, you can install it by:\n"
         "    go get -u github.com/bazelbuild/buildtools/buildifier".format(BUILDIFIER_PATH))
@@ -203,6 +202,10 @@ def isBuildFile(file_path):
   if basename in {"BUILD", "BUILD.bazel"} or basename.endswith(".BUILD"):
     return True
   return False
+
+
+def isExternalBuildFile(file_path):
+  return isBuildFile(file_path) and file_path.startswith("./bazel/external/")
 
 
 def isSkylarkFile(file_path):
@@ -333,12 +336,13 @@ def checkBuildLine(line, file_path, reportError):
     reportError("unexpected direct external dependency on protobuf, use "
                 "//source/common/protobuf instead.")
   if (envoy_build_rule_check and not isSkylarkFile(file_path) and not isWorkspaceFile(file_path) and
-      '@envoy//' in line):
+      not isExternalBuildFile(file_path) and '@envoy//' in line):
     reportError("Superfluous '@envoy//' prefix")
 
 
 def fixBuildLine(line, file_path):
-  if envoy_build_rule_check and not isSkylarkFile(file_path) and not isWorkspaceFile(file_path):
+  if (envoy_build_rule_check and not isSkylarkFile(file_path) and not isWorkspaceFile(file_path) and
+      not isExternalBuildFile(file_path)):
     line = line.replace('@envoy//', '//')
   return line
 
