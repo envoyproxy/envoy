@@ -111,13 +111,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/google/jwt_verify_lib/archive/85cf0edf1f1bc507ff7d96a8d6a9bc20307b0fcf.tar.gz"],
     ),
     com_github_nodejs_http_parser = dict(
-        sha256 = "f742dc5a206958c4d0a6b2c35e3e102afb5683f55f7a7cb1eae024a03f081347",
-        strip_prefix = "http-parser-77310eeb839c4251c07184a5db8885a572a08352",
-        # 2018-07-20 snapshot to pick up:
-        # A performance fix, nodejs/http-parser PR 422.
-        # A bug fix, nodejs/http-parser PR 432.
-        # TODO(brian-pane): Upgrade to the next http-parser release once it's available
-        urls = ["https://github.com/nodejs/http-parser/archive/77310eeb839c4251c07184a5db8885a572a08352.tar.gz"],
+        sha256 = "ef26268c54c8084d17654ba2ed5140bffeffd2a040a895ffb22a6cca3f6c613f",
+        strip_prefix = "http-parser-2.9.0",
+        urls = ["https://github.com/nodejs/http-parser/archive/v2.9.0.tar.gz"],
     ),
     com_github_pallets_jinja = dict(
         sha256 = "f84be1bb0040caca4cea721fcbbbbd61f9be9464ca236387158b0feea01914a4",
