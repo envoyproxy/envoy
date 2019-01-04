@@ -119,10 +119,9 @@ public:
 
   // Network::ConnectionSocket
   const Address::InstanceConstSharedPtr& remoteAddress() const override { return remote_address_; }
-  void setConnectionLocalAddress(const Address::InstanceConstSharedPtr& local_address,
-                                 bool restored) override {
+  void restoreLocalAddress(const Address::InstanceConstSharedPtr& local_address) override {
     setLocalAddress(local_address);
-    local_address_restored_ = restored;
+    local_address_restored_ = true;
   }
   void setRemoteAddress(const Address::InstanceConstSharedPtr& remote_address) override {
     remote_address_ = remote_address;
