@@ -55,7 +55,10 @@ envoy_cc_test_library(
     external_deps = [
         "abseil_strings",
     ],
-    deps = ["//source/common/memory:stats_lib"],
+    deps = [
+        "//source/common/memory:debug_lib",
+        "//source/common/memory:stats_lib",
+    ],
 )
 
 envoy_cc_test(

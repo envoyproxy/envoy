@@ -1,5 +1,6 @@
 #include "test/common/stats/stat_test_utility.h"
 
+#include "common/memory/debug.h"
 #include "common/memory/stats.h"
 
 namespace Envoy {
@@ -9,10 +10,12 @@ namespace TestUtil {
 bool hasDeterministicMallocStats() {
   // We can only test absolute memory usage if the malloc library is a known
   // quantity. This decision is centralized here. As the preferred malloc
-  // library for Envoy is TCMALLOC that's what we test for here. If we switch
-  // to a different malloc library than we'd have to re-evaluate all the
-  // thresholds in the tests referencing hasDeterministicMallocStats().
-#if !defined(TCMALLOC) && defined(ENVOY_DISABLE_MEMDEBUG)
+  // library for Envoy is TCMALLOC that's what we test for here. We also get
+  // deterministic (though slightly diffferent) byte-counts from memory
+  // debugging so we allow that as well. If we switch to a different malloc
+  // library than we'd have to re-evaluate all the thresholds in the tests
+  // referencing hasDeterministicMallocStats().
+#if !defined(TCMALLOC) && !defined(MEMORY_DEBUG_ENABLED)
   return false;
 #else
   const size_t start_mem = Memory::Stats::totalCurrentlyAllocated();
