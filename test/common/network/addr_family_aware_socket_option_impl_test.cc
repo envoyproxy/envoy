@@ -1,4 +1,5 @@
 #include "common/network/addr_family_aware_socket_option_impl.h"
+#include "common/network/utility.h"
 
 #include "test/common/network/socket_option_test.h"
 
@@ -119,6 +120,59 @@ TEST_F(AddrFamilyAwareSocketOptionImplTest, V6Precedence) {
                              {envoy::api::v2::core::SocketOption::STATE_PREBIND});
 }
 
+// GetSocketOptionName returns the v4 information for a v4 address
+TEST_F(AddrFamilyAwareSocketOptionImplTest, V4GetSocketOptionName) {
+  socket_.local_address_ = Utility::parseInternetAddress("1.2.3.4", 5678);
+
+  AddrFamilyAwareSocketOptionImpl socket_option{envoy::api::v2::core::SocketOption::STATE_PREBIND,
+                                                Network::SocketOptionName(std::make_pair(5, 10)),
+                                                Network::SocketOptionName(std::make_pair(6, 11)),
+                                                1};
+  auto result =
+      socket_option.getOptionDetails(socket_, envoy::api::v2::core::SocketOption::STATE_PREBIND);
+  ASSERT_TRUE(result.has_value());
+  EXPECT_EQ(result.value(), makeDetails(std::make_pair(5, 10), 1));
+}
+
+// GetSocketOptionName returns the v4 information for a v6 address
+TEST_F(AddrFamilyAwareSocketOptionImplTest, V6GetSocketOptionName) {
+  socket_.local_address_ = Utility::parseInternetAddress("2::1", 5678);
+
+  AddrFamilyAwareSocketOptionImpl socket_option{envoy::api::v2::core::SocketOption::STATE_PREBIND,
+                                                Network::SocketOptionName(std::make_pair(5, 10)),
+                                                Network::SocketOptionName(std::make_pair(6, 11)),
+                                                5};
+  auto result =
+      socket_option.getOptionDetails(socket_, envoy::api::v2::core::SocketOption::STATE_PREBIND);
+  ASSERT_TRUE(result.has_value());
+  EXPECT_EQ(result.value(), makeDetails(std::make_pair(6, 11), 5));
+}
+
+// GetSocketOptionName returns nullopt if the state is wrong
+TEST_F(AddrFamilyAwareSocketOptionImplTest, GetSocketOptionWrongState) {
+  socket_.local_address_ = Utility::parseInternetAddress("2::1", 5678);
+
+  AddrFamilyAwareSocketOptionImpl socket_option{envoy::api::v2::core::SocketOption::STATE_PREBIND,
+                                                Network::SocketOptionName(std::make_pair(5, 10)),
+                                                Network::SocketOptionName(std::make_pair(6, 11)),
+                                                5};
+  auto result =
+      socket_option.getOptionDetails(socket_, envoy::api::v2::core::SocketOption::STATE_BOUND);
+  EXPECT_FALSE(result.has_value());
+}
+
+// GetSocketOptionName returns nullopt if the version could not be determined
+TEST_F(AddrFamilyAwareSocketOptionImplTest, GetSocketOptionCannotDetermineVersion) {
+  AddrFamilyAwareSocketOptionImpl socket_option{envoy::api::v2::core::SocketOption::STATE_PREBIND,
+                                                Network::SocketOptionName(std::make_pair(5, 10)),
+                                                Network::SocketOptionName(std::make_pair(6, 11)),
+                                                5};
+
+  EXPECT_CALL(socket_, fd()).WillOnce(Return(-1));
+  auto result =
+      socket_option.getOptionDetails(socket_, envoy::api::v2::core::SocketOption::STATE_PREBIND);
+  EXPECT_FALSE(result.has_value());
+}
 } // namespace
 } // namespace Network
 } // namespace Envoy

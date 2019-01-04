@@ -4,7 +4,6 @@
 TARGET_RECIPES = {
     "ares": "cares",
     "benchmark": "benchmark",
-    "boringssl_fips": "boringssl_fips",
     "event": "libevent",
     "tcmalloc_and_profiler": "gperftools",
     "luajit": "luajit",

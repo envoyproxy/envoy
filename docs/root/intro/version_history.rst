@@ -4,6 +4,7 @@ Version history
 1.10.0 (pending)
 ================
 * cors: added :ref:`filter_enabled & shadow_enabled RuntimeFractionalPercent flags <cors-runtime>` to filter.
+* access log: added a new flag for upstream retry count exceeded.
 
 1.9.0
 ===============
