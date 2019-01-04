@@ -26,6 +26,8 @@ public:
   const std::string GrpcJsonTranscoder = "envoy.grpc_json_transcoder";
   // GRPC web filter
   const std::string GrpcWeb = "envoy.grpc_web";
+  // GRPC http1 reverse bridge filter
+  const std::string GrpcHttp1ReverseBridge = "envoy.filters.http.grpc_http1_reverse_bridge";
   // Gzip filter
   const std::string EnvoyGzip = "envoy.gzip";
   // IP tagging filter
