@@ -24,6 +24,7 @@
 // compiling for debug, we want the memory-debugging tests to work, otherwise we
 // can't debug them.
 #include <atomic>
+
 static std::atomic<int64_t> bytes_allocated(0);
 
 // We don't run memory debugging for optimizd builds to avoid impacting
@@ -45,14 +46,14 @@ static std::atomic<int64_t> bytes_allocated(0);
 // need to override operator new/delete.
 #if !defined(TCMALLOC) && !defined(ENVOY_DISABLE_MEMDEBUG)
 
-#include <cassert>  // don't use Envoy ASSERT as it may allocate memory.
+#include <cassert> // don't use Envoy ASSERT as it may allocate memory.
 #include <cstdlib>
 
 namespace {
 
-constexpr int32_t kLiveMarker = 0xfeedface;       // first 4 bytes after alloc
-constexpr int32_t kDeadMarker1 = 0xabacabff;      // first 4 bytes after free
-constexpr int32_t kDeadMarker2 = 0xdeadbeef;      // overwrites the 'size' field on free
+constexpr int32_t kLiveMarker = 0xfeedface;         // first 4 bytes after alloc
+constexpr int32_t kDeadMarker1 = 0xabacabff;        // first 4 bytes after free
+constexpr int32_t kDeadMarker2 = 0xdeadbeef;        // overwrites the 'size' field on free
 constexpr uint64_t kOverhead = 2 * sizeof(int32_t); // number of extra bytes to alloc
 
 // Writes scribble_word over the block of memory starting at ptr and extending
