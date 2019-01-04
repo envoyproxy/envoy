@@ -120,9 +120,6 @@ ConfigHelper::ConfigHelper(const Network::Address::IpVersion version, const std:
   std::string filename = TestEnvironment::writeStringToFileForTest("basic_config.yaml", config);
   MessageUtil::loadFromFile(filename, bootstrap_);
 
-  // TODO REMOVE
-  std::cerr << "BOOTSTRAP CONFIG:\n" << config << std::endl;
-
   // Fix up all the socket addresses with the correct version.
   auto* admin = bootstrap_.mutable_admin();
   auto* admin_socket_addr = admin->mutable_address()->mutable_socket_address();

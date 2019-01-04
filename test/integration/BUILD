@@ -64,27 +64,6 @@ envoy_proto_library(
 )
 
 envoy_cc_test(
-    name = "cds_integration_test",
-    srcs = ["cds_integration_test.cc"],
-    data = [
-        "//test/config/integration/certs",
-    ],
-    deps = [
-        ":xds_integration_test_base",
-        "//source/common/config:protobuf_link_hacks",
-        "//source/common/config:resources_lib",
-        "//source/common/protobuf:utility_lib",
-        "//test/common/grpc:grpc_client_integration_lib",
-        "//test/mocks/runtime:runtime_mocks",
-        "//test/mocks/server:server_mocks",
-        "//test/test_common:network_utility_lib",
-        "//test/test_common:utility_lib",
-        "@envoy_api//envoy/api/v2:cds_cc",
-        "@envoy_api//envoy/api/v2:discovery_cc",
-    ],
-)
-
-envoy_cc_test(
     name = "eds_integration_test",
     srcs = ["eds_integration_test.cc"],
     deps = [
