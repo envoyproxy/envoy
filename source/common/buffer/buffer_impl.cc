@@ -53,12 +53,12 @@ public:
   }
 
   bool commit(const Reservation& reservation, uint64_t size) override {
-    if (static_cast<const uint8_t*>(reservation.first) != base_.get() + reserved_ ||
+    if (static_cast<const uint8_t*>(reservation.mem_) != base_.get() + reserved_ ||
         reserved_ + size > reservable_) {
       // The reservation is not from this OwnedBufferSlice.
       return false;
     }
-    ASSERT(size <= reservation.second);
+    ASSERT(size <= reservation.len_);
     ASSERT(num_reservations_ > 0);
     reserved_ += size;
     num_reservations_--;
@@ -145,12 +145,12 @@ void OwnedImpl::append(const void* data, uint64_t size) {
       slices_.emplace_back(std::make_unique<OwnedBufferSlice>(size));
     }
     BufferSlice::Reservation reservation = slices_.back()->reserve(size);
-    ASSERT(reservation.first != nullptr);
-    ASSERT(reservation.second != 0);
-    memcpy(reservation.first, src, reservation.second);
-    slices_.back()->commit(reservation, reservation.second);
-    src += reservation.second;
-    size -= reservation.second;
+    ASSERT(reservation.mem_ != nullptr);
+    ASSERT(reservation.len_ != 0);
+    memcpy(reservation.mem_, src, reservation.len_);
+    slices_.back()->commit(reservation, reservation.len_);
+    src += reservation.len_;
+    size -= reservation.len_;
   }
 }
 
@@ -185,8 +185,7 @@ void OwnedImpl::prepend(Instance& data) {
 }
 
 void OwnedImpl::commit(RawSlice* iovecs, uint64_t num_iovecs) {
-  int64_t i = num_iovecs;
-  i--;
+  int64_t i = static_cast<int64_t>(num_iovecs) - 1;
   for (auto iter = slices_.rbegin(); i >= 0 && iter != slices_.rend(); ++iter) {
     BufferSlice::Reservation reservation{iovecs[i].mem_, iovecs[i].len_};
     if ((*iter)->commit(reservation, iovecs[i].len_)) {
@@ -238,7 +237,7 @@ uint64_t OwnedImpl::getRawSlices(RawSlice* out, uint64_t out_size) const {
       continue;
     }
     if (i < out_size) {
-      out[i].mem_ = slice->data();
+      *(const_cast<void**>(&(out[i].mem_))) = slice->data();
       out[i].len_ = slice->dataSize();
     }
     i++;
@@ -271,9 +270,9 @@ void* OwnedImpl::linearize(uint32_t size) {
     auto new_slice = std::make_unique<OwnedBufferSlice>(linearized_size);
     uint64_t bytes_copied = 0;
     BufferSlice::Reservation reservation = new_slice->reserve(linearized_size);
-    ASSERT(reservation.first != nullptr);
-    ASSERT(reservation.second == linearized_size);
-    auto dest = static_cast<uint8_t*>(reservation.first);
+    ASSERT(reservation.mem_ != nullptr);
+    ASSERT(reservation.len_ == linearized_size);
+    auto dest = static_cast<uint8_t*>(reservation.mem_);
     do {
       uint64_t data_size = slices_.front()->dataSize();
       memcpy(dest, slices_.front()->data(), data_size);
@@ -281,7 +280,7 @@ void* OwnedImpl::linearize(uint32_t size) {
       dest += data_size;
       slices_.pop_front();
     } while (bytes_copied < linearized_size);
-    ASSERT(dest == static_cast<const uint8_t*>(reservation.first) + linearized_size);
+    ASSERT(dest == static_cast<const uint8_t*>(reservation.mem_) + linearized_size);
     new_slice->commit(reservation, linearized_size);
     slices_.emplace_front(std::move(new_slice));
   }
@@ -373,8 +372,8 @@ uint64_t OwnedImpl::reserve(uint64_t length, RawSlice* iovecs, uint64_t num_iove
   }
   ASSERT(slices_.back()->reservableSize() >= length);
   BufferSlice::Reservation reservation = slices_.back()->reserve(length);
-  iovecs[0].mem_ = reservation.first;
-  iovecs[0].len_ = reservation.second;
+  *(const_cast<void**>(&(iovecs[0].mem_))) = reservation.mem_;
+  iovecs[0].len_ = reservation.len_;
   return 1;
 }
 
