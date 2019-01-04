@@ -337,7 +337,6 @@ InstanceImpl::InstanceImpl(ConnPool::InstancePtr&& conn_pool, Stats::Scope& scop
       eval_command_handler_(*conn_pool_), mget_handler_(*conn_pool_), mset_handler_(*conn_pool_),
       split_keys_sum_result_handler_(*conn_pool_),
       stats_{ALL_COMMAND_SPLITTER_STATS(POOL_COUNTER_PREFIX(scope, stat_prefix + "splitter."))} {
-  // TODO(mattklein123) PERF: Make this a trie (like in header_map_impl).
   for (const std::string& command : SupportedCommands::simpleCommands()) {
     addHandler(scope, stat_prefix, command, simple_command_handler_);
   }
