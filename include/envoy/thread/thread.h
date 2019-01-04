@@ -51,15 +51,16 @@ public:
   virtual ThreadIdPtr currentThreadId() PURE;
 };
 
-#ifndef NDEBUG
 /**
- * A debug only static singleton to the ThreadFactory corresponding to the build platform.
+ * A static singleton to the ThreadFactory corresponding to the build platform.
  *
  * The singleton must be initialized via set() early in main() with the appropriate ThreadFactory
  * (see source/exe/{posix,win32}/platform_impl.h).
  *
- * Debug only statements (such as ASSERT()) can then access the global ThreadFactory instance via
- * get().
+ * This static singleton is an exception to Envoy's established practice for handling of singletons,
+ * which are typically registered with and accessed via the Envoy::Singleton::Manager. Reasons for
+ * the exception include drastic simplification of thread safety assertions; e.g.:
+ *   ASSERT(ThreadFactorySingleton::get()->currentThreadId() == original_thread_id_);
  */
 class ThreadFactorySingleton {
 public:
@@ -70,7 +71,6 @@ public:
 private:
   static ThreadFactory* thread_factory_;
 };
-#endif
 
 /**
  * Like the C++11 "basic lockable concept" but a pure virtual interface vs. a template, and

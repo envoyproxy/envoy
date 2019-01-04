@@ -10,11 +10,8 @@ namespace Thread {
 namespace {
 
 struct ThreadFactorySingletonTest {
-  ThreadFactorySingletonTest() {
-#ifndef NDEBUG
-    run_tid_ = Envoy::Thread::ThreadFactorySingleton::get()->currentThreadId();
-#endif
-  }
+  ThreadFactorySingletonTest()
+      : run_tid_(Envoy::Thread::ThreadFactorySingleton::get()->currentThreadId()) {}
 
   void checkThreadId() const { ASSERT(run_tid_->isCurrentThreadId()); };
 

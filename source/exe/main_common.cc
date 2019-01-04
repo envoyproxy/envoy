@@ -45,9 +45,7 @@ MainCommonBase::MainCommonBase(OptionsImpl& options, Event::TimeSystem& time_sys
                                std::unique_ptr<Runtime::RandomGenerator>&& random_generator,
                                Thread::ThreadFactory& thread_factory)
     : options_(options), component_factory_(component_factory), thread_factory_(thread_factory) {
-#ifndef NDEBUG
   Thread::ThreadFactorySingleton::set(&thread_factory_);
-#endif
   ares_library_init(ARES_LIB_INIT_ALL);
   Event::Libevent::Global::initialize();
   RELEASE_ASSERT(Envoy::Server::validateProtoDescriptors(), "");
@@ -91,9 +89,7 @@ MainCommonBase::MainCommonBase(OptionsImpl& options, Event::TimeSystem& time_sys
 }
 
 MainCommonBase::~MainCommonBase() {
-#ifndef NDEBUG
   Thread::ThreadFactorySingleton::set(nullptr);
-#endif
   ares_library_cleanup();
 }
 
