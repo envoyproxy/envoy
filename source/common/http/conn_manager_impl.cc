@@ -806,6 +806,32 @@ void ConnectionManagerImpl::ActiveStream::decodeData(Buffer::Instance& data, boo
   decodeData(nullptr, data, end_stream);
 }
 
+bool ConnectionManagerImpl::ActiveStream::seenEndStream(ActiveStreamDecoderFilter* filter) {
+  RELEASE_ASSERT(filter, "Should be called by a valid filter");
+  std::list<ActiveStreamDecoderFilterPtr>::iterator entry;
+  entry = std::next(filter->entry());
+
+  for (; entry != decoder_filters_.end(); entry++) {
+    if ((*entry)->end_stream_) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool ConnectionManagerImpl::ActiveStream::seenEndStream(ActiveStreamEncoderFilter* filter) {
+  RELEASE_ASSERT(filter, "Should be called by a valid filter");
+  std::list<ActiveStreamEncoderFilterPtr>::iterator entry;
+  entry = std::next(filter->entry());
+
+  for (; entry != encoder_filters_.end(); entry++) {
+    if ((*entry)->end_stream_) {
+      return true;
+    }
+  }
+  return false;
+}
+
 void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* filter,
                                                      Buffer::Instance& data, bool end_stream) {
   resetIdleTimer();
@@ -831,11 +857,6 @@ void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* 
   }
 
   for (; entry != decoder_filters_.end(); entry++) {
-    // If end_stream_ is marked for a filter, the data is not for this filter and filters after.
-    // Please refer to the `issue <https://github.com/envoyproxy/envoy/issues/5311>`_ for details.
-    if ((*entry)->end_stream_) {
-      return;
-    }
     ASSERT(!(state_.filter_call_state_ & FilterCallState::DecodeData));
 
     // We check the request_trailers_ pointer here in case addDecodedTrailers
@@ -1278,11 +1299,6 @@ void ConnectionManagerImpl::ActiveStream::encodeData(ActiveStreamEncoderFilter* 
 
   const bool trailers_exists_at_start = response_trailers_ != nullptr;
   for (; entry != encoder_filters_.end(); entry++) {
-    // If end_stream_ is marked for a filter, the data is not for this filter and filters after.
-    // Please refer to the `issue <https://github.com/envoyproxy/envoy/issues/5311>`_ for details.
-    if ((*entry)->end_stream_) {
-      return;
-    }
     ASSERT(!(state_.filter_call_state_ & FilterCallState::EncodeData));
 
     // We check the response_trailers_ pointer here in case addEncodedTrailers

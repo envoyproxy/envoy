@@ -163,6 +163,36 @@ private:
       parent_.decodeHeaders(this, *parent_.request_headers_, end_stream);
     }
     void doData(bool end_stream) override {
+      // In following case, ActiveStreamFilterBase::commonContine() could be called recursively and
+      // its doData() is called with wrong data.
+      //
+      //  There are 3 decode filters and "wrapper" refers to ActiveStreamFilter object.
+      //
+      //  filter0->decodeHeaders(_, true)
+      //    return STOP
+      //  filter0->continueDecoding()
+      //    wrapper0->commonContinue()
+      //      wrapper0->decodeHeaders(_, _, true)
+      //        filter1->decodeHeaders(_, true)
+      //          filter1->addDecodeData()
+      //          return CONTINUE
+      //        filter2->decodeHeaders(_, false)
+      //          return CONTINUE
+      //        wrapper1->commonContinue() // Detects data is added.
+      //          wrapper1->doData()
+      //            wrapper1->decodeData()
+      //              filter2->decodeData(_, true)
+      //                 return CONTINUE
+      //      wrapper0->doData() // This should not be called
+      //        wrapper0->decodeData()
+      //          filter1->decodeData(_, true)  // It will cause assertions.
+      //
+      // One way to solve this problem is to mark end_stream_ for each filter.
+      // Before calling doData(), if any of filters after has marked end_stream_, not to call
+      // doData().
+      if (parent_.seenEndStream(this)) {
+        return;
+      }
       parent_.decodeData(this, *parent_.buffered_request_data_, end_stream);
     }
     void doTrailers() override { parent_.decodeTrailers(this, *parent_.request_trailers_); }
@@ -234,6 +264,10 @@ private:
       parent_.encodeHeaders(this, *parent_.response_headers_, end_stream);
     }
     void doData(bool end_stream) override {
+      // Please see comment in ActiveStreamDecoderFilter::doData().
+      if (parent_.seenEndStream(this)) {
+        return;
+      }
       parent_.encodeData(this, *parent_.buffered_response_data_, end_stream);
     }
     void doTrailers() override { parent_.encodeTrailers(this, *parent_.response_trailers_); }
@@ -298,6 +332,8 @@ private:
     void encodeMetadata(ActiveStreamEncoderFilter* filter, MetadataMapPtr&& metadata_map);
     void maybeEndEncode(bool end_stream);
     uint64_t streamId() { return stream_id_; }
+    bool seenEndStream(ActiveStreamDecoderFilter* filter);
+    bool seenEndStream(ActiveStreamEncoderFilter* filter);
 
     // Http::StreamCallbacks
     void onResetStream(StreamResetReason reason) override;
