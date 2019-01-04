@@ -48,6 +48,13 @@ protected:
     Thread::ThreadFactorySingleton::set(nullptr);
   }
 
+  ~MainCommonTest() override {
+    // This is ugly, but necessary to enable a stronger ASSERT() in ThreadFactorySingleton::set().
+    // The singleton needs to be reset to a non nullptr value such that when the constructor runs
+    // again, the ThreadFactorySingleton::set(nullptr) does not trigger the assertion.
+    Thread::ThreadFactorySingleton::set(&Thread::threadFactoryForTest());
+  }
+
   /**
    * Computes a numeric ID to incorporate into the names of
    * shared-memory segments and domain sockets, to help keep them
