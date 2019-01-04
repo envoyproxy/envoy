@@ -29,23 +29,14 @@ public:
    *
    * @param key supplies the header key to be evaluated.
    */
-  virtual bool matches(const Http::LowerCaseString& key) const PURE;
-
-  /**
-   * Returns whether or not the header key matches the rules of the matcher.
-   *
-   * @param key supplies the header key to be evaluated.
-   */
-  virtual bool matches(const Envoy::Http::HeaderString& key) const PURE;
+  virtual bool matches(absl::string_view key) const PURE;
 };
 
 class HeaderKeyMatcher : public Matcher {
 public:
   HeaderKeyMatcher(std::vector<Matchers::StringMatcher>&& list);
 
-  bool matches(const Http::LowerCaseString& key) const override;
-
-  bool matches(const Envoy::Http::HeaderString& key) const override;
+  bool matches(absl::string_view key) const override;
 
 private:
   const std::vector<Matchers::StringMatcher> matchers_;
@@ -55,9 +46,7 @@ class NotHeaderKeyMatcher : public Matcher {
 public:
   NotHeaderKeyMatcher(std::vector<Matchers::StringMatcher>&& list);
 
-  bool matches(const Http::LowerCaseString& key) const override;
-
-  bool matches(const Envoy::Http::HeaderString& key) const override;
+  bool matches(absl::string_view key) const override;
 
 private:
   const HeaderKeyMatcher matcher_;

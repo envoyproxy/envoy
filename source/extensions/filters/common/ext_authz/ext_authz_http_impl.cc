@@ -36,7 +36,7 @@ struct SuccessResponse {
         [](const Http::HeaderEntry& header, void* ctx) -> Http::HeaderMap::Iterate {
           auto* context = static_cast<SuccessResponse*>(ctx);
           // UpstreamHeaderMatcher
-          if (context->matchers_->matches(header.key())) {
+          if (context->matchers_->matches(header.key().getStringView())) {
             context->response_->headers_to_add.emplace_back(
                 Http::LowerCaseString{header.key().c_str()}, header.value().c_str());
           }
@@ -55,26 +55,15 @@ struct SuccessResponse {
 HeaderKeyMatcher::HeaderKeyMatcher(std::vector<Matchers::StringMatcher>&& list)
     : matchers_(std::move(list)) {}
 
-bool HeaderKeyMatcher::matches(const Http::LowerCaseString& key) const {
+bool HeaderKeyMatcher::matches(absl::string_view key) const {
   return std::any_of(matchers_.begin(), matchers_.end(),
-                     [&key](auto matcher) { return matcher.match(key.get()); });
-}
-
-bool HeaderKeyMatcher::matches(const Envoy::Http::HeaderString& key) const {
-  return std::any_of(matchers_.begin(), matchers_.end(),
-                     [&key](auto matcher) { return matcher.match(key.getStringView()); });
+                     [&key](auto matcher) { return matcher.match(key); });
 }
 
 NotHeaderKeyMatcher::NotHeaderKeyMatcher(std::vector<Matchers::StringMatcher>&& list)
     : matcher_(std::move(list)) {}
 
-bool NotHeaderKeyMatcher::matches(const Http::LowerCaseString& key) const {
-  return !matcher_.matches(key);
-}
-
-bool NotHeaderKeyMatcher::matches(const Envoy::Http::HeaderString& key) const {
-  return !matcher_.matches(key);
-}
+bool NotHeaderKeyMatcher::matches(absl::string_view key) const { return !matcher_.matches(key); }
 
 // Config
 ClientConfig::ClientConfig(const envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz& config,
@@ -172,7 +161,7 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
   Http::HeaderMapPtr headers = std::make_unique<Http::HeaderMapImpl>(lengthZeroHeader());
   for (const auto& header : request.attributes().request().http().headers()) {
     const Http::LowerCaseString key{header.first};
-    if (config_->requestHeaderMatchers()->matches(key)) {
+    if (config_->requestHeaderMatchers()->matches(key.get())) {
       if (key == Http::Headers::get().Path && !config_->pathPrefix().empty()) {
         std::string value;
         absl::StrAppend(&value, config_->pathPrefix(), header.second);
