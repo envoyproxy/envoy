@@ -42,44 +42,14 @@ std::pair<int32_t, size_t> distributeLoad(PriorityLoad& per_priority_load,
     }
     // Now assign as much load as possible to the high priority levels and cease assigning load
     // when total_load runs out.
-    priority_load[i] =
-        std::min<uint32_t>(total_load, per_priority_health[i] * 100 / normalized_total_health);
-    total_load -= priority_load[i];
+    per_priority_load[i] = std::min<uint32_t>(total_load, per_priority_availability[i] * 100 /
+                                                              normalized_total_availability);
+    total_load -= per_priority_load[i];
   }
 
-  return first_healthy_priority;
+  return {first_available_priority, total_load};
 }
 
-} // namespace
-
-uint32_t LoadBalancerBase::choosePriority(uint64_t hash,
-                                          const std::vector<uint32_t>& per_priority_load) {
-  hash = hash % 100 + 1; // 1-100
-  uint32_t aggregate_percentage_load = 0;
-  // As with tryChooseLocalLocalityHosts, this can be refactored for efficiency
-  // but O(N) is good enough for now given the expected number of priorities is
-  // small.
-  for (size_t priority = 0; priority < per_priority_load.size(); ++priority) {
-    aggregate_percentage_load += per_priority_load[priority];
-    if (hash <= aggregate_percentage_load) {
-      return priority;
-    }
-  }
-  // The percentages should always add up to 100 but we have to have a return for the compiler.
-  NOT_REACHED_GCOVR_EXCL_LINE;
-}
-
-LoadBalancerBase::LoadBalancerBase(const PrioritySet& priority_set, ClusterStats& stats,
-                                   Runtime::Loader& runtime, Runtime::RandomGenerator& random,
-                                   const envoy::api::v2::Cluster::CommonLbConfig& common_config)
-    : stats_(stats), runtime_(runtime), random_(random),
-      default_healthy_panic_percent_(PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
-          common_config, healthy_panic_threshold, 100, 50)),
-      priority_set_(priority_set) {
-  for (auto& host_set : priority_set_.hostSetsPerPriority()) {
-    recalculatePerPriorityState(host_set->priority(), priority_set_, per_priority_load_,
-                                per_priority_health_);
-  }
 } // namespace
 
 std::pair<uint32_t, bool>
@@ -198,24 +168,30 @@ void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority,
     return;
   }
 
-  // Distribute the load over healthy and degraded piorities. We start off with 100 total load, and
-  // attempt to first allocate it to healthy priorities, then allocate the remaining to degraded
-  // priorities.
+  // We start of with a total load of 100 and distribute it between priorities based on
+  // availability. We first attempt to distribute this load to healthy priorities based on healthy
+  // availability.
   const auto first_healthy_and_remaining =
       distributeLoad(per_priority_load, per_priority_health, 100, normalized_total_health);
 
-  const size_t remaining_load_for_degraded = first_available_and_remaining.second;
+  // Using the remaining load after allocating load to healthy priorities, distribute it based on
+  // degraded availability.
+  const auto remaining_load_for_degraded = first_healthy_and_remaining.second;
+  std::cerr << "remaining: " << remaining_load_for_degraded << std::endl;
+  const auto first_degraded_and_remaining =
+      distributeLoad(degraded_per_priority_load, per_priority_degraded, remaining_load_for_degraded,
+                     normalized_total_health);
 
-  const auto first_degraded_and_remaining = distributeLoad(degraded_per_priority_load, per_priority_degraded,
-                                             remaining_load_for_degraded, normalized_total_health);
-
-  const remaining_load = first_degraded_and_remaining.second;
-
+  // Anything that remains should just be rounding errors, so allocate that to the first available
+  // priority, either as healthy or degraded.
+  const auto remaining_load = first_degraded_and_remaining.second;
   if (remaining_load != 0) {
     const auto first_healthy = first_healthy_and_remaining.first;
     const auto first_degraded = first_degraded_and_remaining.first;
-    ASSERT(first_healthy != -1 || first_degraded.first != -1);
-    // Account for rounding errors by assigning it to the first available priority.
+    ASSERT(first_healthy != -1 || first_degraded != -1);
+
+    // Attempt to allocate the remainder to the first healthy priority first. If no such priority
+    // exist, allocate to the first degraded priority.
     ASSERT(remaining_load < per_priority_load.size() + per_priority_degraded.size());
     if (first_healthy != -1) {
       per_priority_load[first_healthy] += remaining_load;
@@ -223,6 +199,10 @@ void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority,
       degraded_per_priority_load[first_degraded] += remaining_load;
     }
   }
+
+  // The allocated load between healthy and degraded should be exactly 100.
+  /* ASSERT(100 == std::accumulate(per_priority_load.begin(), per_priority_load.end(), 0) +
+   * std::accumulate(per_priority_degraded.begin(), per_priority_degraded.end(), 0) ); */
 }
 
 // Method iterates through priority levels and turns on/off panic mode.

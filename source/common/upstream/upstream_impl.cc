@@ -226,9 +226,9 @@ void HostSetImpl::updateHosts(UpdateHostsParams&& update_hosts_params,
   rebuildLocalityScheduler(locality_scheduler_, locality_entries_, *healthy_hosts_per_locality_,
                            *healthy_hosts_, hosts_per_locality_, locality_weights_,
                            overprovisioning_factor_);
-  rebuildLocalityScheduler(degraded_locality_scheduler_, degraded_locality_entries_, *degraded_hosts_per_locality_,
-                           *degraded_hosts_, hosts_per_locality_, locality_weights_,
-                           overprovisioning_factor_);
+  rebuildLocalityScheduler(degraded_locality_scheduler_, degraded_locality_entries_,
+                           *degraded_hosts_per_locality_, *degraded_hosts_, hosts_per_locality_,
+                           locality_weights_, overprovisioning_factor_);
 
   runUpdateCallbacks(hosts_added, hosts_removed);
 }
@@ -260,8 +260,10 @@ void HostSetImpl::rebuildLocalityScheduler(
       !locality_weights->empty() && !eligible_hosts.empty()) {
     locality_scheduler = std::make_unique<EdfScheduler<LocalityEntry>>();
     locality_entries.clear();
-    for (uint32_t i = 0; i < hosts_per_locality_->get().size(); ++i) {
-      const double effective_weight = effectiveLocalityWeight(i, eligible_hosts_per_locality);
+    for (uint32_t i = 0; i < all_hosts_per_locality->get().size(); ++i) {
+      const double effective_weight =
+          effectiveLocalityWeight(i, eligible_hosts_per_locality, *all_hosts_per_locality,
+                                  *locality_weights, overprovisioning_factor);
       if (effective_weight > 0) {
         locality_entries.emplace_back(std::make_shared<LocalityEntry>(i, effective_weight));
         locality_scheduler->add(effective_weight, locality_entries.back());

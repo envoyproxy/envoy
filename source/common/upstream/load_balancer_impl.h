@@ -29,9 +29,9 @@ public:
   //
   // Returns the priority, a number between 0 and per_priority_load.size()-1 as well as whether
   // it came from the degraded priority list.
-  static std::pair<uint32_t, bool>
-  choosePriority(uint64_t hash, const std::vector<uint32_t>& per_priority_load,
-                 const std::vector<uint32_t>& degraded_per_priority_load);
+  static std::pair<uint32_t, bool> choosePriority(uint64_t hash,
+                                                  const PriorityLoad& per_priority_load,
+                                                  const PriorityLoad& degraded_per_priority_load);
 
   HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
 
