@@ -24,11 +24,12 @@ bool OriginalSrcSocketOption::setOption(
     socket.setLocalAddress(src_address_);
   }
 
+  // TODO(klarose): Add some UT for this and the failure case when we actually add options to this.
   bool result = true;
-  std::for_each(options_to_apply_.begin(), options_to_apply_.end(),
-                [&socket, state](const Network::Socket::OptionConstSharedPtr& option) {
-                  option->setOption(socket, state);
-                });
+  for (const auto& option : options_to_apply_) {
+    result &= option->setOption(socket, state);
+  }
+
   return result;
 }
 
