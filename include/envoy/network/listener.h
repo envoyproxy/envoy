@@ -119,9 +119,9 @@ public:
  */
 class UdpListenerCallbacks {
 public:
-  virtual ~UdpListenerCallbacks() = default;
+  enum class ErrorCode { SYSCALL_ERROR, UNKNOWN_ERROR };
 
-  // TODO(conqerAtapple): Refactor `Connection` to accommodate UDP/QUIC.
+  virtual ~UdpListenerCallbacks() = default;
 
   /**
    * On first packet received on a UDP socket. This allows the callback handler
@@ -144,6 +144,14 @@ public:
   virtual void onData(Address::InstanceConstSharedPtr local_address,
                       Address::InstanceConstSharedPtr peer_address,
                       Buffer::InstancePtr&& data) PURE;
+
+  /**
+   * Called when there is an error event.
+   *
+   * @param error_code `ErrorCode` for tbe error event.
+   * @param errno System error number.
+   */
+  virtual void onError(const ErrorCode& err_code, int err_no) PURE;
 };
 
 /**

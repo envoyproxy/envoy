@@ -1,5 +1,7 @@
 #pragma once
 
+#include <atomic>
+
 #include "common/buffer/buffer_impl.h"
 #include "common/event/event_impl_base.h"
 

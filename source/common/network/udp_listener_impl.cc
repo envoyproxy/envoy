@@ -64,6 +64,7 @@ void UdpListenerImpl::readCallback(int fd, short flags, void* arg) {
         continue;
       }
       // TODO(conqerAtApple): Call error callback.
+      instance->cb_.onError(UdpListenerCallbacks::ErrorCode::SYSCALL_ERROR, result.errno_);
       return;
     }
 

@@ -253,7 +253,11 @@ TEST_P(ListenerImplTest, UseActualDstTcp) {
   dispatcher_.run(Event::Dispatcher::RunType::Block);
 }
 
+/**
+ * Tests UDP listener for actual destination and data.
+ */
 TEST_P(ListenerImplTest, UseActualDstUdp) {
+  // Setup server socket
   SocketPtr server_socket =
       getSocket(Address::SocketType::Datagram, Network::Test::getCanonicalLoopbackAddress(version_),
                 nullptr, true);
@@ -263,6 +267,7 @@ TEST_P(ListenerImplTest, UseActualDstUdp) {
   auto const* server_ip = server_socket->localAddress()->ip();
   ASSERT_NE(server_ip, nullptr);
 
+  // Setup callback handler and listener.
   Network::MockUdpListenerCallbacks listener_callbacks;
   Network::TestUdpListenerImpl listener(dispatcher_, *server_socket.get(), listener_callbacks,
                                         true);
@@ -271,6 +276,7 @@ TEST_P(ListenerImplTest, UseActualDstUdp) {
     return std::make_unique<Buffer::OwnedImpl>();
   }));
 
+  // Setup client socket.
   SocketPtr client_socket =
       getSocket(Address::SocketType::Datagram, Network::Test::getCanonicalLoopbackAddress(version_),
                 nullptr, false);
@@ -290,6 +296,9 @@ TEST_P(ListenerImplTest, UseActualDstUdp) {
     servaddr->sin6_port = htons(server_ip->port());
   }
 
+  // We send 3 packets
+  // - First one should invoke `onNewConnection` callback.
+  // - Second and third one should invoke `onData` callback.
   const std::string first("first");
   const std::string second("second");
   const std::string third("third");
@@ -354,7 +363,11 @@ TEST_P(ListenerImplTest, UseActualDstUdp) {
   dispatcher_.run(Event::Dispatcher::RunType::Block);
 }
 
+/**
+ * Tests UDP listener's `enable` and `disable` APIs.
+ */
 TEST_P(ListenerImplTest, UdpListenerEnableDisable) {
+  // Setup server socket
   SocketPtr server_socket =
       getSocket(Address::SocketType::Datagram, Network::Test::getCanonicalLoopbackAddress(version_),
                 nullptr, true);
@@ -364,6 +377,7 @@ TEST_P(ListenerImplTest, UdpListenerEnableDisable) {
   auto const* server_ip = server_socket->localAddress()->ip();
   ASSERT_NE(server_ip, nullptr);
 
+  // Setup callback handler and listener.
   Network::MockUdpListenerCallbacks listener_callbacks;
   Network::TestUdpListenerImpl listener(dispatcher_, *server_socket.get(), listener_callbacks,
                                         true);
@@ -372,6 +386,7 @@ TEST_P(ListenerImplTest, UdpListenerEnableDisable) {
     return std::make_unique<Buffer::OwnedImpl>();
   }));
 
+  // Setup client socket.
   SocketPtr client_socket =
       getSocket(Address::SocketType::Datagram, Network::Test::getCanonicalLoopbackAddress(version_),
                 nullptr, false);
@@ -391,6 +406,13 @@ TEST_P(ListenerImplTest, UdpListenerEnableDisable) {
     servaddr->sin6_port = htons(server_ip->port());
   }
 
+  // We first disable the listener and then send three packets.
+  // - With the listener disabled, we expect that none of the callbacks will be
+  // called.
+  // - When the listener is enabled back, we expect the callbacks to be called
+  // such that:
+  // - First one should invoke `onNewConnection` callback.
+  // - Second and third one should invoke `onData` callback.
   const std::string first("first");
   const std::string second("second");
   const std::string third("third");
@@ -456,7 +478,11 @@ TEST_P(ListenerImplTest, UdpListenerEnableDisable) {
   dispatcher_.run(Event::Dispatcher::RunType::Block);
 }
 
+/**
+ * Tests UDP listebe's error callback.
+ */
 TEST_P(ListenerImplTest, UdpListenerRecvFromError) {
+  // Setup server socket
   SocketPtr server_socket =
       getSocket(Address::SocketType::Datagram, Network::Test::getCanonicalLoopbackAddress(version_),
                 nullptr, true);
@@ -466,6 +492,7 @@ TEST_P(ListenerImplTest, UdpListenerRecvFromError) {
   auto const* server_ip = server_socket->localAddress()->ip();
   ASSERT_NE(server_ip, nullptr);
 
+  // Setup callback handler and listener.
   Network::MockUdpListenerCallbacks listener_callbacks;
   Network::TestUdpListenerImpl listener(dispatcher_, *server_socket.get(), listener_callbacks,
                                         true);
@@ -493,6 +520,8 @@ TEST_P(ListenerImplTest, UdpListenerRecvFromError) {
     servaddr->sin6_port = htons(server_ip->port());
   }
 
+  // When the `receive` system call returns an error, we expect the `onError`
+  // callback callwed with `SYSCALL_ERROR` parameter.
   const std::string first("first");
 
   auto send_rc = ::sendto(client_sockfd, first.c_str(), first.length(), 0,
@@ -500,11 +529,16 @@ TEST_P(ListenerImplTest, UdpListenerRecvFromError) {
 
   ASSERT_EQ(send_rc, first.length());
 
-  Event::TimerPtr timer = dispatcher_.createTimer([&] { dispatcher_.exit(); });
-
-  timer->enableTimer(std::chrono::milliseconds(2000));
-
   EXPECT_CALL(listener_callbacks, onNewConnection_(_, _, _)).Times(0);
+
+  EXPECT_CALL(listener_callbacks, onError_(_, _))
+      .Times(1)
+      .WillOnce(Invoke([&](const UdpListenerCallbacks::ErrorCode& err_code, int err) -> void {
+        ASSERT_EQ(err_code, UdpListenerCallbacks::ErrorCode::SYSCALL_ERROR);
+        ASSERT_EQ(err, -1);
+
+        dispatcher_.exit();
+      }));
 
   dispatcher_.run(Event::Dispatcher::RunType::Block);
 }

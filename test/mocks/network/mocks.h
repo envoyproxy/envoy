@@ -133,12 +133,16 @@ public:
     onData_(local_address, peer_address, data.get());
   }
 
+  void onError(const ErrorCode& err_code, int err) override { onError_(err_code, err); }
+
   MOCK_METHOD3(onNewConnection_,
                void(Address::InstanceConstSharedPtr local_address,
                     Address::InstanceConstSharedPtr peer_address, Buffer::Instance* data));
 
   MOCK_METHOD3(onData_, void(Address::InstanceConstSharedPtr local_address,
                              Address::InstanceConstSharedPtr peer_address, Buffer::Instance* data));
+
+  MOCK_METHOD2(onError_, void(const ErrorCode& err_code, int err));
 };
 
 class MockDrainDecision : public DrainDecision {
