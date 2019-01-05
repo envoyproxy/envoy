@@ -140,13 +140,13 @@ generate_ecdsa_key selfsigned_ecdsa_p384 secp384r1
 generate_selfsigned_x509_cert selfsigned_ecdsa_p384
 rm -f selfsigned_ecdsa_p384_cert.cfg
 
-# Generate expired_cert.pem as a self-signed, expired cert (will fail on Mac OS 10.13+ because of negative days value).
+# Generate expired_cert.pem as a self-signed, expired cert (will fail on macOS 10.13+ because of negative days value).
 cp -f selfsigned_cert.cfg expired_cert.cfg
 generate_rsa_key expired
 generate_x509_cert expired ca -365
 rm -f expired_cert.cfg
 
-# Generate expired_san_uri_cert.pem as a CA signed, expired cert (will fail on Mac OS 10.13+ because of negative days value).
+# Generate expired_san_uri_cert.pem as a CA signed, expired cert (will fail on macOS 10.13+ because of negative days value).
 cp -f san_uri_cert.cfg expired_san_uri_cert.cfg
 generate_rsa_key expired_san_uri
 generate_x509_cert expired_san_uri ca -365
