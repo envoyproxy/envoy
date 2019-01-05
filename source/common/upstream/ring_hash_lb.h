@@ -10,7 +10,7 @@
 namespace Envoy {
 namespace Upstream {
 
-typedef envoy::api::v2::Cluster_RingHashLbConfig_HashFunction HashFunction;
+using HashFunction = envoy::api::v2::Cluster_RingHashLbConfig_HashFunction;
 
 /**
  * A load balancer that implements consistent modulo hashing ("ketama"). Currently, zone aware
