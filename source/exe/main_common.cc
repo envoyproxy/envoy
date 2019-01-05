@@ -45,45 +45,53 @@ MainCommonBase::MainCommonBase(OptionsImpl& options, Event::TimeSystem& time_sys
                                std::unique_ptr<Runtime::RandomGenerator>&& random_generator,
                                Thread::ThreadFactory& thread_factory)
     : options_(options), component_factory_(component_factory), thread_factory_(thread_factory) {
-  ares_library_init(ARES_LIB_INIT_ALL);
-  Event::Libevent::Global::initialize();
-  RELEASE_ASSERT(Envoy::Server::validateProtoDescriptors(), "");
 
-  switch (options_.mode()) {
-  case Server::Mode::InitOnly:
-  case Server::Mode::Serve: {
-#ifdef ENVOY_HOT_RESTART
-    if (!options.hotRestartDisabled()) {
-      restarter_ = std::make_unique<Server::HotRestartImpl>(options_);
+  try{
+    
+    ares_library_init(ARES_LIB_INIT_ALL);
+    Event::Libevent::Global::initialize();
+    RELEASE_ASSERT(Envoy::Server::validateProtoDescriptors(), "");
+
+    switch (options_.mode()) {
+    case Server::Mode::InitOnly:
+    case Server::Mode::Serve: {
+  #ifdef ENVOY_HOT_RESTART
+      if (!options.hotRestartDisabled()) {
+        restarter_ = std::make_unique<Server::HotRestartImpl>(options_);
+      }
+  #endif
+      if (restarter_ == nullptr) {
+        restarter_ = std::make_unique<Server::HotRestartNopImpl>();
+      }
+
+      tls_ = std::make_unique<ThreadLocal::InstanceImpl>();
+      Thread::BasicLockable& log_lock = restarter_->logLock();
+      Thread::BasicLockable& access_log_lock = restarter_->accessLogLock();
+      auto local_address = Network::Utility::getLocalAddress(options_.localAddressIpVersion());
+      logging_context_ =
+          std::make_unique<Logger::Context>(options_.logLevel(), options_.logFormat(), log_lock);
+
+      configureComponentLogLevels();
+
+      stats_store_ = std::make_unique<Stats::ThreadLocalStoreImpl>(options_.statsOptions(),
+                                                                  restarter_->statsAllocator());
+
+      server_ = std::make_unique<Server::InstanceImpl>(
+          options_, time_system, local_address, test_hooks, *restarter_, *stats_store_,
+          access_log_lock, component_factory, std::move(random_generator), *tls_, thread_factory);
+
+      break;
     }
-#endif
-    if (restarter_ == nullptr) {
+    case Server::Mode::Validate:
       restarter_ = std::make_unique<Server::HotRestartNopImpl>();
+      logging_context_ = std::make_unique<Logger::Context>(options_.logLevel(), options_.logFormat(),
+                                                          restarter_->logLock());
+      break;
     }
-
-    tls_ = std::make_unique<ThreadLocal::InstanceImpl>();
-    Thread::BasicLockable& log_lock = restarter_->logLock();
-    Thread::BasicLockable& access_log_lock = restarter_->accessLogLock();
-    auto local_address = Network::Utility::getLocalAddress(options_.localAddressIpVersion());
-    logging_context_ =
-        std::make_unique<Logger::Context>(options_.logLevel(), options_.logFormat(), log_lock);
-
-    configureComponentLogLevels();
-
-    stats_store_ = std::make_unique<Stats::ThreadLocalStoreImpl>(options_.statsOptions(),
-                                                                 restarter_->statsAllocator());
-
-    server_ = std::make_unique<Server::InstanceImpl>(
-        options_, time_system, local_address, test_hooks, *restarter_, *stats_store_,
-        access_log_lock, component_factory, std::move(random_generator), *tls_, thread_factory);
-
-    break;
   }
-  case Server::Mode::Validate:
-    restarter_ = std::make_unique<Server::HotRestartNopImpl>();
-    logging_context_ = std::make_unique<Logger::Context>(options_.logLevel(), options_.logFormat(),
-                                                         restarter_->logLock());
-    break;
+  catch(const std::string message)
+  {
+    std::cerr << message << std::endl;
   }
 }
 
