@@ -51,7 +51,7 @@ Retry plugin configuration
 Normally during retries, hosts selection follows the same process as the original request. To modify 
 this behavior retry plugins can be used, which fall into two categories:
 
-* :ref:`Host Predicates <envoy_api_field_route.RouteAction.RetryPolicy.retry_host_predicate>`:
+* :ref:`Host Predicates <envoy_api_field_route.RetryPolicy.retry_host_predicate>`:
   These predicates can be used to "reject" a host, which will cause host selection to be reattempted. 
   Any number of these predicates can be specified, and the host will be rejected if any of the predicates reject the host. 
 
@@ -60,7 +60,7 @@ this behavior retry plugins can be used, which fall into two categories:
   * *envoy.retry_host_predicates.previous_hosts*: This will keep track of previously attempted hosts, and rejects
     hosts that have already been attempted.
   
-* :ref:`Priority Predicates<envoy_api_field_route.RouteAction.RetryPolicy.retry_priority>`: These predicates can
+* :ref:`Priority Predicates<envoy_api_field_route.RetryPolicy.retry_priority>`: These predicates can
   be used to adjust the priority load used when selecting a priority for a retry attempt. Only one such
   predicate may be specified.
 
@@ -70,7 +70,7 @@ this behavior retry plugins can be used, which fall into two categories:
     and adjust the priority load such that other priorites will be targeted in subsequent retry attempts.
 
 Host selection will continue until either the configured predicates accept the host or a configurable
-:ref:`max attempts <envoy_api_field_route.RouteAction.RetryPolicy.host_selection_retry_max_attempts>` has been reached. 
+:ref:`max attempts <envoy_api_field_route.RetryPolicy.host_selection_retry_max_attempts>` has been reached. 
 
 These plugins can be combined to affect both host selection and priority load. Envoy can also be extended 
 with custom retry plugins similar to how custom filters can be added.
@@ -140,7 +140,7 @@ Various configurable timeouts apply to an HTTP connection and its constituent st
 * Stream-level :ref:`per-route upstream timeout <envoy_api_field_route.RouteAction.timeout>`: this
   applies to the upstream response, i.e. a maximum bound on the time from the end of the downstream
   request until the end of the upstream response. This may also be specified at the :ref:`per-retry
-  <envoy_api_field_route.RouteAction.RetryPolicy.per_try_timeout>` granularity.
+  <envoy_api_field_route.RetryPolicy.per_try_timeout>` granularity.
 * Stream-level :ref:`per-route gRPC max timeout
   <envoy_api_field_route.RouteAction.max_grpc_timeout>`: this bounds the upstream timeout and allows
   the timeout to be overridden via the *grpc-timeout* request header.
