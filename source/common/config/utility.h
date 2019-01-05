@@ -179,14 +179,6 @@ public:
       const envoy::api::v2::core::ApiConfigSource& api_config_source);
 
   /**
-   * Convert a v1 SDS JSON config to v2 EDS envoy::api::v2::core::ConfigSource.
-   * @param json_config source v1 SDS JSON config.
-   * @param eds_config destination v2 EDS envoy::api::v2::core::ConfigSource.
-   */
-  static void translateEdsConfig(const Json::Object& json_config,
-                                 envoy::api::v2::core::ConfigSource& eds_config);
-
-  /**
    * Convert a v1 CDS JSON config to v2 CDS envoy::api::v2::core::ConfigSource.
    * @param json_config source v1 CDS JSON config.
    * @param cds_config destination v2 CDS envoy::api::v2::core::ConfigSource.

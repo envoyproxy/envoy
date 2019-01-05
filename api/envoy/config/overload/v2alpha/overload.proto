@@ -1,6 +1,8 @@
 syntax = "proto3";
 
 package envoy.config.overload.v2alpha;
+option java_package = "io.envoyproxy.envoy.config.overload.v2alpha";
+option java_multiple_files = true;
 option go_package = "v2alpha";
 
 import "google/protobuf/any.proto";
