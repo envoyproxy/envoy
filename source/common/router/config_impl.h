@@ -141,6 +141,7 @@ public:
   const Config& routeConfig() const override;
   const RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override;
   bool includeAttemptCount() const override { return include_attempt_count_; }
+  const envoy::api::v2::route::VirtualHost& config() const { return config_; }
 
 private:
   enum class SslRequirements { NONE, EXTERNAL_ONLY, ALL };
@@ -178,17 +179,19 @@ private:
   HeaderParserPtr response_headers_parser_;
   PerFilterConfigs per_filter_configs_;
   const bool include_attempt_count_;
+  const envoy::api::v2::route::VirtualHost config_;
 };
 
 typedef std::shared_ptr<VirtualHostImpl> VirtualHostSharedPtr;
 
 /**
- * Implementation of RetryPolicy that reads from the proto route config.
+ * Implementation of RetryPolicy that reads from the proto route or virtual host config.
  */
 class RetryPolicyImpl : public RetryPolicy {
 
 public:
   RetryPolicyImpl(const envoy::api::v2::route::RouteAction& config);
+  RetryPolicyImpl(const envoy::api::v2::route::VirtualHost& config);
 
   // Router::RetryPolicy
   std::chrono::milliseconds perTryTimeout() const override { return per_try_timeout_; }
@@ -202,6 +205,8 @@ public:
   }
 
 private:
+  void init(const envoy::api::v2::route::RetryPolicy& retry_policy);
+
   std::chrono::milliseconds per_try_timeout_{0};
   uint32_t num_retries_{};
   uint32_t retry_on_{};

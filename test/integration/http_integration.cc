@@ -822,7 +822,7 @@ void HttpIntegrationTest::testRetryPriority() {
 
   Registry::InjectFactory<Upstream::RetryPriorityFactory> inject_factory(factory);
 
-  envoy::api::v2::route::RouteAction::RetryPolicy retry_policy;
+  envoy::api::v2::route::RetryPolicy retry_policy;
   retry_policy.mutable_retry_priority()->set_name(factory.name());
 
   // Add route with custom retry policy
@@ -898,7 +898,7 @@ void HttpIntegrationTest::testRetryHostPredicateFilter() {
   TestHostPredicateFactory predicate_factory;
   Registry::InjectFactory<Upstream::RetryHostPredicateFactory> inject_factory(predicate_factory);
 
-  envoy::api::v2::route::RouteAction::RetryPolicy retry_policy;
+  envoy::api::v2::route::RetryPolicy retry_policy;
   retry_policy.add_retry_host_predicate()->set_name(predicate_factory.name());
 
   // Add route with custom retry policy

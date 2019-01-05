@@ -47,7 +47,18 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::route::RouteAction& confi
     return;
   }
 
-  const auto& retry_policy = config.retry_policy();
+  init(config.retry_policy());
+}
+
+RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::route::VirtualHost& config) {
+  if (!config.has_retry_policy()) {
+    return;
+  }
+
+  init(config.retry_policy());
+}
+
+void RetryPolicyImpl::init(const envoy::api::v2::route::RetryPolicy& retry_policy) {
   per_try_timeout_ =
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(retry_policy, per_try_timeout, 0));
   num_retries_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(retry_policy, num_retries, 1);
@@ -305,7 +316,9 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       path_redirect_(route.redirect().path_redirect()),
       https_redirect_(route.redirect().https_redirect()),
       prefix_rewrite_redirect_(route.redirect().prefix_rewrite()),
-      strip_query_(route.redirect().strip_query()), retry_policy_(route.route()),
+      strip_query_(route.redirect().strip_query()),
+      retry_policy_(!route.route().has_retry_policy() ? RetryPolicyImpl(vhost.config())
+                                                      : RetryPolicyImpl(route.route())),
       rate_limit_policy_(route.route().rate_limits()), shadow_policy_(route.route()),
       priority_(ConfigUtility::parsePriority(route.route().priority())),
       total_cluster_weight_(
@@ -804,7 +817,7 @@ VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::route::VirtualHost& virtu
       response_headers_parser_(HeaderParser::configure(virtual_host.response_headers_to_add(),
                                                        virtual_host.response_headers_to_remove())),
       per_filter_configs_(virtual_host.per_filter_config(), factory_context),
-      include_attempt_count_(virtual_host.include_request_attempt_count()) {
+      include_attempt_count_(virtual_host.include_request_attempt_count()), config_(virtual_host) {
   switch (virtual_host.require_tls()) {
   case envoy::api::v2::route::VirtualHost::NONE:
     ssl_requirements_ = SslRequirements::NONE;

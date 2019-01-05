@@ -97,7 +97,7 @@ refused-stream
 
 retriable-status-codes
   Envoy will attempt a retry if the upstream server responds with any response code matching one defined
-  in either :ref:`the retry policy <envoy_api_field_route.RouteAction.RetryPolicy.retriable_status_codes>`
+  in either :ref:`the retry policy <envoy_api_field_route.RetryPolicy.retriable_status_codes>`
   or in the :ref:`config_http_filters_router_x-envoy-retriable-status-codes` header.
 
 The number of retries can be controlled via the
