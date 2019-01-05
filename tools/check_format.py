@@ -493,7 +493,7 @@ def checkFormatVisitor(arg, dir_name, names):
 def checkErrorMessages(error_messages):
   if error_messages:
     for e in error_messages:
-      print "ERROR: %s" % e
+      print("ERROR: %s" % e)
     return True
   return False
 
@@ -553,8 +553,8 @@ if __name__ == "__main__":
     error_messages = sum((r.get() for r in results), [])
 
   if checkErrorMessages(error_messages):
-    print "ERROR: check format failed. run 'tools/check_format.py fix'"
+    print ("ERROR: check format failed. run 'tools/check_format.py fix'")
     sys.exit(1)
 
   if operation_type == "check":
-    print "PASS"
+    print ("PASS")
