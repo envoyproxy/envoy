@@ -7,6 +7,8 @@ Version history
 * buffer: fix vulnerabilities when allocation fails
 * config: removed deprecated_v1 sds_config from :ref:`Bootstrap config <config_overview_v2_bootstrap>`.
 * http: added new grpc_http1_reverse_bridge filter for converting gRPC requests into HTTP/1.1 requests.
+* router: added ability to configure a :ref:`retry policy <envoy_api_msg_route.RetryPolicy>` at the
+  virtual host level.
 * tls: enabled TLS 1.3 on the server-side (non-FIPS builds).
 
 1.9.0
