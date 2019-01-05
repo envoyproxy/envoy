@@ -50,7 +50,7 @@ void UdpListenerImpl::readCallback(int fd, short flags, void* arg) {
 
   // TODO(conqerAtAppple): Make this configurable or get from system.
   constexpr uint64_t const read_length = 16384;
-  Buffer::InstancePtr buffer = std::move(instance->getBufferImpl());
+  Buffer::InstancePtr buffer = instance->getBufferImpl();
   ASSERT(buffer);
 
   sockaddr_storage addr;
