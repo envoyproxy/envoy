@@ -58,9 +58,9 @@ bool MetadataDecoder::decodeMetadataPayloadUsingNghttp2(bool end_metadata) {
 
     // Feeds data to nghttp2 to decode.
     while (slice.len_ > 0) {
-      ssize_t result =
-          nghttp2_hd_inflate_hd2(inflater_.get(), &nv, &inflate_flags,
-                                 reinterpret_cast<uint8_t*>(slice.mem_) + offset, slice.len_, is_end);
+      ssize_t result = nghttp2_hd_inflate_hd2(inflater_.get(), &nv, &inflate_flags,
+                                              reinterpret_cast<uint8_t*>(slice.mem_) + offset,
+                                              slice.len_, is_end);
       if (result < 0 || (result == 0 && slice.len_ > 0)) {
         // If decoding fails, or there is data left in slice, but no data can be consumed by
         // nghttp2, return false.

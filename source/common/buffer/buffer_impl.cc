@@ -237,6 +237,10 @@ uint64_t OwnedImpl::getRawSlices(RawSlice* out, uint64_t out_size) const {
       continue;
     }
     if (i < out_size) {
+      // The cumbersome cast here allows RawSlice::mem_ to remain immutable by everything
+      // outside OwnedImpl. The comments accompanying the RawSlice declaration in
+      // include/envoy/buffer/buffer.h provide more context on why the immutability
+      // is important.
       *(const_cast<void**>(&(out[i].mem_))) = slice->data();
       out[i].len_ = slice->dataSize();
     }
@@ -372,6 +376,10 @@ uint64_t OwnedImpl::reserve(uint64_t length, RawSlice* iovecs, uint64_t num_iove
   }
   ASSERT(slices_.back()->reservableSize() >= length);
   BufferSlice::Reservation reservation = slices_.back()->reserve(length);
+  // The cumbersome cast here allows RawSlice::mem_ to remain immutable by everything
+  // outside OwnedImpl. The comments accompanying the RawSlice declaration in
+  // include/envoy/buffer/buffer.h provide more context on why the immutability
+  // is important.
   *(const_cast<void**>(&(iovecs[0].mem_))) = reservation.mem_;
   iovecs[0].len_ = reservation.len_;
   return 1;
