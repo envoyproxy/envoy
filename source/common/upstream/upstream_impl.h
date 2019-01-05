@@ -328,8 +328,13 @@ protected:
   }
 
 private:
-  // Weight for a locality taking into account health status.
-  double effectiveLocalityWeight(uint32_t index) const;
+  // Weight for a locality taking into account health status using the provided eligible hosts per
+  // locality.
+  static double effectiveLocalityWeight(uint32_t index,
+                                        const HostsPerLocality& eligible_hosts_per_locality,
+                                        const HostsPerLocality& all_hosts_per_locality,
+                                        const LocalityWeights& locality_weights,
+                                        uint32_t overprovisioning_factor);
 
   uint32_t priority_;
   uint32_t overprovisioning_factor_;
@@ -351,6 +356,27 @@ private:
     const uint32_t index_;
     const double effective_weight_;
   };
+
+  // Rebuilds the provided locality scheduler with locality entires based on the locality weights
+  // and eligible hosts.
+  //
+  // @param locality_scheduler the locality scheduler to rebuild. Will be set to nullptr if no
+  // localities are eligible.
+  // @param locality_entries the vector that holds locality entries. Will be reset and populated
+  // with entries corresponding to the new scheduler.
+  // @param eligible_hosts_per_locality eligible hosts for this scheduler grouped by locality.
+  // @param eligible_hosts all eligible hosts for this scheduler.
+  // @param all_hosts_per_locality all hosts for this HostSet grouped by locality.
+  // @param locality_weights the weighting of each locality.
+  // @param overprovisioning_factor the overprovisioning factor to use when computing the effective
+  // weight of a locality.
+  static void rebuildLocalityScheduler(
+      std::unique_ptr<EdfScheduler<LocalityEntry>>& locality_scheduler,
+      std::vector<std::shared_ptr<LocalityEntry>>& locality_entries,
+      const HostsPerLocality& eligible_hosts_per_locality, const HostVector& eligible_hosts,
+      HostsPerLocalityConstSharedPtr all_hosts_per_locality,
+      LocalityWeightsConstSharedPtr locality_weights, uint32_t overprovisioning_factor);
+
   std::vector<std::shared_ptr<LocalityEntry>> locality_entries_;
   std::unique_ptr<EdfScheduler<LocalityEntry>> locality_scheduler_;
 };

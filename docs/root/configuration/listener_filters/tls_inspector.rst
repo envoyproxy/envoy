@@ -32,7 +32,7 @@ A sample filter configuration could be:
 Statistics
 ----------
 
-This filter has statistics rooted at *tls_inspector* with the following statistics: 
+This filter has a statistics tree rooted at *tls_inspector* with the following statistics: 
 
 .. csv-table::
   :header: Name, Type, Description

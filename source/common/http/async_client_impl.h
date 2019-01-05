@@ -102,6 +102,7 @@ private:
     const std::string& maxAge() const override { return EMPTY_STRING; };
     const absl::optional<bool>& allowCredentials() const override { return allow_credentials_; };
     bool enabled() const override { return false; };
+    bool shadowEnabled() const override { return false; };
 
     static const std::list<std::string> allow_origin_;
     static const std::list<std::regex> allow_origin_regex_;
