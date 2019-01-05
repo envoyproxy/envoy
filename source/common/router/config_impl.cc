@@ -446,13 +446,16 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::HeaderMap& headers,
 
 void RouteEntryImplBase::finalizeResponseHeaders(Http::HeaderMap& headers,
                                                  const StreamInfo::StreamInfo& stream_info) const {
-  // Append user-specified response headers in the following order: route-action-level headers,
-  // route-level headers, virtual host level headers and finally global connection manager level
-  // headers.
-  route_action_response_headers_parser_->evaluateHeaders(headers, stream_info);
-  response_headers_parser_->evaluateHeaders(headers, stream_info);
-  vhost_.responseHeaderParser().evaluateHeaders(headers, stream_info);
+  // Append user-specified response headers in the following order: global connection
+  // manager level headers, virtual host level headers, route-level headers,
+  // and finally route-action-level headers.
+  //
+  // Since we are evaluating response headers they are applied in the reverse
+  // order of request headers to preserve route header values when append is false.
   vhost_.globalRouteConfig().responseHeaderParser().evaluateHeaders(headers, stream_info);
+  vhost_.responseHeaderParser().evaluateHeaders(headers, stream_info);
+  response_headers_parser_->evaluateHeaders(headers, stream_info);
+  route_action_response_headers_parser_->evaluateHeaders(headers, stream_info);
 }
 
 absl::optional<RouteEntryImplBase::RuntimeData>

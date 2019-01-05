@@ -7,6 +7,7 @@ Version history
 * buffer: fix vulnerabilities when allocation fails
 * config: removed deprecated_v1 sds_config from :ref:`Bootstrap config <config_overview_v2_bootstrap>`.
 * http: added new grpc_http1_reverse_bridge filter for converting gRPC requests into HTTP/1.1 requests.
+* router: invert appending of headers for responses. See :ref:`Custom request/response headers <config_http_conn_man_headers_custom_request_headers>` for more information.
 * tls: enabled TLS 1.3 on the server-side (non-FIPS builds).
 
 1.9.0

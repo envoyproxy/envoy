@@ -883,6 +883,7 @@ virtual_hosts:
             - header:
                 key: x-global-header1
                 value: route-override
+              append: false
             - header:
                 key: x-vhost-header1
                 value: route-override
@@ -938,8 +939,9 @@ response_headers_to_remove: ["x-global-remove"]
       const RouteEntry* route = config.route(req_headers, 0)->routeEntry();
       Http::TestHeaderMapImpl headers;
       route->finalizeResponseHeaders(headers, stream_info);
+      std::cout << headers << std::endl;
       EXPECT_EQ("route-override", headers.get_("x-global-header1"));
-      EXPECT_EQ("route-override", headers.get_("x-vhost-header1"));
+      EXPECT_EQ("vhost1-www2", headers.get_("x-vhost-header1"));
       EXPECT_EQ("route-new_endpoint", headers.get_("x-route-action-header"));
       EXPECT_EQ("route-override", headers.get_("x-route-header"));
     }
@@ -950,7 +952,7 @@ response_headers_to_remove: ["x-global-remove"]
       const RouteEntry* route = config.route(req_headers, 0)->routeEntry();
       Http::TestHeaderMapImpl headers;
       route->finalizeResponseHeaders(headers, stream_info);
-      EXPECT_EQ("vhost-override", headers.get_("x-global-header1"));
+      EXPECT_EQ("global1", headers.get_("x-global-header1"));
       EXPECT_EQ("vhost1-www2", headers.get_("x-vhost-header1"));
       EXPECT_EQ("route-allpath", headers.get_("x-route-action-header"));
     }

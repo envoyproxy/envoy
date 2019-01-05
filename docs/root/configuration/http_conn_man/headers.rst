@@ -479,8 +479,18 @@ and *:authority* headers may instead be modified via mechanisms such as
 :ref:`prefix_rewrite <envoy_api_field_route.RouteAction.prefix_rewrite>` and
 :ref:`host_rewrite <envoy_api_field_route.RouteAction.host_rewrite>`.
 
-Headers are appended to requests/responses in the following order: weighted cluster level headers,
+Headers are appended to requests in the following order: weighted cluster level headers,
 route level headers, virtual host level headers and finally global level headers.
+
+Headers are appended to responses in the following order: global level headers,
+virtual host level headers, route level headers, and finally weighted cluster
+level headers.
+The appending order is intentionally inverted to the appending ordering of request
+headers to allow for routes to specify a header that will not be appended to. This
+is particularly important for headers such as
+:ref:`X-Frame-Options <https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Frame-Options>`,
+where having multiple values is not allowed and while the virtual host specifies
+a value of ``DENY``, there could be routes that want to have a value of ``SAMEORIGIN``.
 
 Envoy supports adding dynamic values to request and response headers. The percent symbol (%) is
 used to delimit variable names.
