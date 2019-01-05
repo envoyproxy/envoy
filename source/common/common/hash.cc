@@ -14,9 +14,9 @@ static inline std::uint64_t unaligned_load(const char* p) {
 static inline std::uint64_t load_bytes(const char* p, int n) {
   std::uint64_t result = 0;
   --n;
-  do
+  do {
     result = (result << 8) + static_cast<unsigned char>(p[n]);
-  while (--n >= 0);
+  } while (--n >= 0);
   return result;
 }
 
