@@ -626,6 +626,20 @@ const std::string Json::Schema::VIRTUAL_HOST_CONFIGURATION_SCHEMA(R"EOF(
         },
         "required" : [],
         "additionalProperties" : false
+      },
+      "retry_policy" : {
+        "type" : "object",
+        "properties" : {
+          "per_try_timeout_ms" : {
+            "type" : "integer",
+            "minimum" : 0,
+            "exclusiveMinimum" : true
+          },
+          "num_retries" : {"type" : "integer"},
+          "retry_on" : {"type" : "string"}
+        },
+        "required" : ["retry_on"],
+        "additionalProperties" : false
       }
     },
     "required" : ["name", "domains", "routes"],

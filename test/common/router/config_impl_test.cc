@@ -2362,6 +2362,92 @@ TEST(RouteMatcherTest, Retry) {
                 .retryOn());
 }
 
+TEST(RouteMatcherTest, RetryVirtualHostLevel) {
+  const std::string json = R"EOF(
+{
+  "virtual_hosts": [
+    {
+      "name": "www2",
+      "domains": ["www.lyft.com"],
+      "retry_policy": {
+        "per_try_timeout_ms" : 1000,
+        "num_retries": 3,
+        "retry_on": "5xx,gateway-error,connect-failure"
+      },
+      "routes": [
+        {
+          "prefix": "/foo",
+          "cluster": "www2",
+          "retry_policy": {
+            "retry_on": "connect-failure"
+          }
+        },
+        {
+          "prefix": "/bar",
+          "cluster": "www2"
+        },
+        {
+          "prefix": "/",
+          "cluster": "www2"
+        }
+      ]
+    }
+  ]
+}
+  )EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  TestConfigImpl config(parseRouteConfigurationFromJson(json), factory_context, true);
+
+  // Route level retry policy takes precedence.
+  EXPECT_EQ(std::chrono::milliseconds(0),
+            config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+                ->routeEntry()
+                ->retryPolicy()
+                .perTryTimeout());
+  EXPECT_EQ(1U, config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+                    ->routeEntry()
+                    ->retryPolicy()
+                    .numRetries());
+  EXPECT_EQ(RetryPolicy::RETRY_ON_CONNECT_FAILURE,
+            config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+                ->routeEntry()
+                ->retryPolicy()
+                .retryOn());
+  EXPECT_EQ(std::chrono::milliseconds(0),
+            config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+                ->routeEntry()
+                ->retryPolicy()
+                .perTryTimeout());
+
+  // Virtual Host level retry policy kicks in.
+  EXPECT_EQ(3U, config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
+                    ->routeEntry()
+                    ->retryPolicy()
+                    .numRetries());
+  EXPECT_EQ(RetryPolicy::RETRY_ON_CONNECT_FAILURE | RetryPolicy::RETRY_ON_5XX |
+                RetryPolicy::RETRY_ON_GATEWAY_ERROR,
+            config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
+                ->routeEntry()
+                ->retryPolicy()
+                .retryOn());
+  EXPECT_EQ(std::chrono::milliseconds(1000),
+            config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
+                ->routeEntry()
+                ->retryPolicy()
+                .perTryTimeout());
+  EXPECT_EQ(3U, config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
+                    ->routeEntry()
+                    ->retryPolicy()
+                    .numRetries());
+  EXPECT_EQ(RetryPolicy::RETRY_ON_CONNECT_FAILURE | RetryPolicy::RETRY_ON_5XX |
+                RetryPolicy::RETRY_ON_GATEWAY_ERROR,
+            config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
+                ->routeEntry()
+                ->retryPolicy()
+                .retryOn());
+}
+
 TEST(RouteMatcherTest, GrpcRetry) {
   const std::string json = R"EOF(
 {
