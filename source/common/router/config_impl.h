@@ -94,7 +94,7 @@ private:
  */
 class CorsPolicyImpl : public CorsPolicy {
 public:
-  CorsPolicyImpl(const envoy::api::v2::route::CorsPolicy& config);
+  CorsPolicyImpl(const envoy::api::v2::route::CorsPolicy& config, Runtime::Loader& loader);
 
   // Router::CorsPolicy
   const std::list<std::string>& allowOrigins() const override { return allow_origin_; };
@@ -104,9 +104,26 @@ public:
   const std::string& exposeHeaders() const override { return expose_headers_; };
   const std::string& maxAge() const override { return max_age_; };
   const absl::optional<bool>& allowCredentials() const override { return allow_credentials_; };
-  bool enabled() const override { return enabled_; };
+  bool enabled() const override {
+    if (config_.has_filter_enabled()) {
+      const auto& filter_enabled = config_.filter_enabled();
+      return loader_.snapshot().featureEnabled(filter_enabled.runtime_key(),
+                                               filter_enabled.default_value());
+    }
+    return legacy_enabled_;
+  };
+  bool shadowEnabled() const override {
+    if (config_.has_shadow_enabled()) {
+      const auto& shadow_enabled = config_.shadow_enabled();
+      return loader_.snapshot().featureEnabled(shadow_enabled.runtime_key(),
+                                               shadow_enabled.default_value());
+    }
+    return false;
+  };
 
 private:
+  const envoy::api::v2::route::CorsPolicy config_;
+  Runtime::Loader& loader_;
   std::list<std::string> allow_origin_;
   std::list<std::regex> allow_origin_regex_;
   std::string allow_methods_;
@@ -114,7 +131,7 @@ private:
   std::string expose_headers_;
   std::string max_age_{};
   absl::optional<bool> allow_credentials_{};
-  bool enabled_;
+  bool legacy_enabled_;
 };
 
 class ConfigImpl;
