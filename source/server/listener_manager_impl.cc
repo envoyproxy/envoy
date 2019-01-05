@@ -38,7 +38,7 @@ std::string toString(Network::Address::SocketType socket_type) {
   case Network::Address::SocketType::Datagram:
     return "SocketType::Datagram";
   default:
-    return fmt::format("unknown ({})", static_cast<int>(socket_type));
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 

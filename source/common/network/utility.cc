@@ -512,7 +512,7 @@ Utility::protobufAddressSocketType(const envoy::api::v2::core::Address& proto_ad
     case envoy::api::v2::core::SocketAddress::UDP:
       return Address::SocketType::Datagram;
     default:
-      throw EnvoyException(fmt::format("unknown protocol value: {}", protocol));
+      NOT_REACHED_GCOVR_EXCL_LINE;
     }
   }
   case envoy::api::v2::core::Address::kPipe:
