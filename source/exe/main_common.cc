@@ -51,7 +51,6 @@ MainCommonBase::MainCommonBase(
       thread_factory_(thread_factory) {
 
   try {
-
     ares_library_init(ARES_LIB_INIT_ALL);
     Event::Libevent::Global::initialize();
     RELEASE_ASSERT(Envoy::Server::validateProtoDescriptors(), "");
