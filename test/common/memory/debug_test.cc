@@ -30,6 +30,19 @@ TEST(MemoryDebug, ScribbleOnNew) {
   }
 }
 
+TEST(MemoryDebug, ScribbleOnDelete) {
+  uint64_t* words;
+  {
+    auto ptr = std::make_unique<MyStruct>();
+    words = ptr->words_;
+  }
+  for (int i = 0; i < ArraySize; ++i) {
+    // This is the pattern written by tcmalloc's debug library on destruction.
+    // Note: this test cannot be run under valgrind or asan.
+    EXPECT_EQ(0xcdcdcdcdcdcdcdcd, words[i]);
+  }
+}
+
 TEST(MemoryDebug, ZeroByteAlloc) { auto ptr = std::make_unique<uint8_t[]>(0); }
 
 #endif // ENVOY_MEMORY_DEBUG_ENABLED
