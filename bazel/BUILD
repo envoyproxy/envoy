@@ -95,6 +95,11 @@ config_setting(
 )
 
 config_setting(
+    name = "debug_memory",
+    values = {"define": "debug_memory=enabled"},
+)
+
+config_setting(
     name = "disable_signal_trace",
     values = {"define": "signal_trace=disabled"},
 )
