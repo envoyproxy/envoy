@@ -309,11 +309,10 @@ private:
   };
 
   // It seems like this is an obvious constexpr, but it won't compile as one.
-  static uint64_t calculateAlignment() {
-    return std::max(alignof(Cell), std::max(alignof(uint32_t), alignof(Control)));
-  }
+  static constexpr uint64_t alignment =
+      std::max(alignof(Cell), std::max(alignof(uint32_t), alignof(Control)));
 
-  static uint64_t align(uint64_t size) { return Memory::align(size, calculateAlignment()); }
+  static uint64_t align(uint64_t size) { return Memory::align<alignment>(size); }
 
   /**
    * Computes the byte offset of a cell into cells_. This is not
@@ -334,7 +333,7 @@ private:
   Cell& getCell(uint32_t cell_index) {
     // Because the key-size is parameteriziable, an array-lookup on sizeof(Cell) does not work.
     char* ptr = reinterpret_cast<char*>(cells_) + cellOffset(cell_index, stats_options_);
-    RELEASE_ASSERT((reinterpret_cast<uint64_t>(ptr) & (calculateAlignment() - 1)) == 0, "");
+    RELEASE_ASSERT((reinterpret_cast<uint64_t>(ptr) & (alignment - 1)) == 0, "");
     return *reinterpret_cast<Cell*>(ptr);
   }
 

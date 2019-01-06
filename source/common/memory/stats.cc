@@ -2,12 +2,16 @@
 
 #include <cstdint>
 
-#ifdef TCMALLOC
+#include "common/memory/debug.h"
 
+#ifdef TCMALLOC
 #include "gperftools/malloc_extension.h"
+#endif
 
 namespace Envoy {
 namespace Memory {
+
+#ifdef TCMALLOC
 
 uint64_t Stats::totalCurrentlyAllocated() {
   size_t value = 0;
@@ -40,23 +44,22 @@ uint64_t Stats::totalPageHeapUnmapped() {
   return value;
 }
 
-} // namespace Memory
-} // namespace Envoy
-
 #else
 
-#include "common/memory/debug.h"
+uint64_t Stats::totalCurrentlyAllocated() {
+#if defined(ENVOY_MEMORY_DEBUG_ENABLED)
+  return Debug::bytesUsed();
+#else
+  return 0;
+#endif
+}
 
-namespace Envoy {
-namespace Memory {
-
-uint64_t Stats::totalCurrentlyAllocated() { return Debug::bytesUsed(); }
 uint64_t Stats::totalThreadCacheBytes() { return 0; }
 uint64_t Stats::totalCurrentlyReserved() { return 0; }
 uint64_t Stats::totalPageHeapUnmapped() { return 0; }
 uint64_t Stats::totalPageHeapFree() { return 0; }
 
+#endif // TCMALLOC
+
 } // namespace Memory
 } // namespace Envoy
-
-#endif // #ifdef TCMALLOC

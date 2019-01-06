@@ -15,7 +15,7 @@ bool hasDeterministicMallocStats() {
   // debugging so we allow that as well. If we switch to a different malloc
   // library than we'd have to re-evaluate all the thresholds in the tests
   // referencing hasDeterministicMallocStats().
-#if !defined(TCMALLOC) && !defined(MEMORY_DEBUG_ENABLED)
+#if !defined(TCMALLOC) && !defined(ENVOY_MEMORY_DEBUG_ENABLED)
   return false;
 #else
   const size_t start_mem = Memory::Stats::totalCurrentlyAllocated();

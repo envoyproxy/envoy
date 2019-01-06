@@ -5,7 +5,7 @@
 namespace Envoy {
 namespace Memory {
 
-#ifdef MEMORY_DEBUG_ENABLED
+#ifdef ENVOY_MEMORY_DEBUG_ENABLED
 
 constexpr int ArraySize = 10;
 
@@ -29,7 +29,9 @@ TEST(MemoryDebug, ScribbleOnNew) {
   }
 }
 
-#endif // MEMORY_DEBUG_ENABLED
+TEST(MemoryDebug, ZeroByteAlloc) { auto ptr = std::make_unique<uint8_t[]>(0); }
+
+#endif // ENVOY_MEMORY_DEBUG_ENABLED
 
 } // namespace Memory
 } // namespace Envoy

@@ -11,7 +11,7 @@
 // for more details.
 
 // Principle of operation: add 8 bytes to every allocation. The first
-// 4 bytes are a marker (LiveMarker1 or DeadMarker1). The next 4
+// 4 bytes are a marker (LiveMarker1 or DeadMarker). The next 4
 // bytes are used to store size of the allocation, which helps us
 // know how many bytes to scribble when we free.
 //
@@ -28,10 +28,11 @@
 #include <atomic>
 #include <cassert> // don't use Envoy ASSERT as it may allocate memory.
 #include <cstdlib>
+#include <new>
 
 #include "common/memory/align.h"
 
-static std::atomic<int64_t> bytes_allocated(0);
+static std::atomic<uint64_t> bytes_allocated(0);
 
 namespace Envoy {
 namespace Memory {
@@ -49,21 +50,51 @@ uint64_t Debug::bytesUsed() { return uint64_t(bytes_allocated); }
 } // namespace Memory
 } // namespace Envoy
 
-#ifdef MEMORY_DEBUG_ENABLED
+#ifdef ENVOY_MEMORY_DEBUG_ENABLED
+
+// Centralized ifdef logic to determine whether this compile has memory
+// debugging. This is exposed in the header file for testing.
+
+// We don't run memory debugging for optimized builds to avoid impacting
+// production performance.
+#ifdef NDEBUG
+#error Memory debugging should not be enabled for production builds
+#endif
+
+// We can't run memory debugging with tcmalloc due to conflicts with
+// overriding operator new/delete. Note tcmalloc allows installation
+// of a malloc hook (MallocHook::AddNewHook(&tcmallocHook)) e.g.
+// tcmallocHook(const void* ptr, size_t size). I tried const_casting ptr
+// and scribbling over it, but this results in a SEGV in grpc and the
+// internals of gtest.
+//
+// And in any case, you can't use the tcmalloc hooks to do free-scribbling
+// as it does not pass in the size to the corresponding free hook. See
+// gperftools/malloc_hook.h for details.
+#ifdef TCMALLOC
+#error Memory debugging cannot be enabled with tcmalloc.
+#endif
+
+#ifdef ENVOY_TSAN_BUIOD
+#error Memory debugging cannot be enabled with tsan.
+#endif
+
+#ifdef ENVOY_ASAN_BUILD
+#error Memory debugging cannot be enabled with asan.
+#endif
 
 namespace {
 
 constexpr uint32_t LiveMarker1 = 0xfeedface;         // first 4 bytes after alloc
-constexpr uint64_t LiveMarker2 = 0xfeedfacefeedface; // first 4 bytes after alloc
-constexpr uint32_t DeadMarker1 = 0xabacabff;         // first 4 bytes after free
-constexpr uint64_t DeadMarker2 = 0xdeadbeefdeadbeef; // overwrites the 'size' field on free
+constexpr uint64_t LiveMarker2 = 0xfeedfacefeedface; // pattern written into allocated memory
+constexpr uint64_t DeadMarker = 0xdeadbeefdeadbeef;  // pattern to scribble over memory before free
 constexpr uint64_t Overhead = sizeof(uint64_t);      // number of extra bytes to alloc
 
 // Writes scribble_word over the block of memory starting at ptr and extending
 // size bytes.
-inline void scribble(void* ptr, uint64_t rounded_size, uint64_t scribble_word) {
-  assert((rounded_size % Overhead) == 0);
-  uint64_t num_uint64s = rounded_size / sizeof(uint64_t);
+void scribble(void* ptr, uint64_t aligned_size, uint64_t scribble_word) {
+  assert((aligned_size % Overhead) == 0);
+  uint64_t num_uint64s = aligned_size / sizeof(uint64_t);
   uint64_t* p = static_cast<uint64_t*>(ptr);
   for (uint64_t i = 0; i < num_uint64s; ++i, ++p) {
     *p = scribble_word;
@@ -76,15 +107,15 @@ inline void scribble(void* ptr, uint64_t rounded_size, uint64_t scribble_word) {
 // and that will be easily seen in the debugger (0xfeedface pattern).
 void* debugMalloc(uint64_t size) {
   assert(size <= 0xffffffff); // For now we store the original size in a uint32_t.
-  uint64_t rounded = Envoy::Memory::align(size, Overhead);
-  bytes_allocated += rounded;
-  uint32_t* marker = static_cast<uint32_t*>(::malloc(rounded + Overhead));
+  uint64_t aligned_size = Envoy::Memory::align<Overhead>(size);
+  bytes_allocated += aligned_size;
+  uint32_t* marker = static_cast<uint32_t*>(::malloc(aligned_size + Overhead));
   assert(marker != NULL);
   marker[0] = LiveMarker1;
   marker[1] = size;
-  uint32_t* ret = marker + 2;
-  scribble(ret, rounded, LiveMarker2);
-  return reinterpret_cast<char*>(marker) + Overhead;
+  uint32_t* payload = marker + sizeof(Overhead) / sizeof(uint32_t);
+  scribble(payload, aligned_size, LiveMarker2);
+  return payload;
 }
 
 // free() implementation corresponding to debugMalloc(), which pulls out
@@ -94,25 +125,27 @@ void debugFree(void* ptr) {
   if (ptr != NULL) {
     char* alloced_ptr = static_cast<char*>(ptr) - Overhead;
     uint32_t* marker = reinterpret_cast<uint32_t*>(alloced_ptr);
-    uint32_t size = marker[1];
-    uint64_t rounded = Envoy::Memory::align(size, Overhead);
-    bytes_allocated -= rounded;
-    scribble(ptr, rounded, DeadMarker2);
     assert(LiveMarker1 == marker[0]);
-    marker[0] = DeadMarker1;
-    marker[1] = DeadMarker2 & 0xffffffff;
+    uint32_t size = marker[1];
+    uint64_t aligned_size = Envoy::Memory::align<Overhead>(size);
+    assert(bytes_allocated >= aligned_size);
+    bytes_allocated -= aligned_size;
+    scribble(marker, aligned_size + sizeof(Overhead), DeadMarker);
     ::free(marker);
   }
 }
 
 } // namespace
 
-void* operator new(uint64_t size) { return debugMalloc(size); }
+void* operator new(size_t size) { return debugMalloc(size); }
+void* operator new(size_t size, const std::nothrow_t&) noexcept { return debugMalloc(size); }
 void operator delete(void* ptr) noexcept { debugFree(ptr); }
 void operator delete(void* ptr, size_t) noexcept { debugFree(ptr); }
+void operator delete(void* ptr, std::nothrow_t const&)noexcept { debugFree(ptr); }
 
 void* operator new[](size_t size) { return debugMalloc(size); }
+void* operator new[](size_t size, const std::nothrow_t&) noexcept { return debugMalloc(size); }
 void operator delete[](void* ptr) noexcept { debugFree(ptr); }
 void operator delete[](void* ptr, size_t) noexcept { debugFree(ptr); }
 
-#endif // MEMORY_DEBUG_ENABLED
+#endif // ENVOY_MEMORY_DEBUG_ENABLED
