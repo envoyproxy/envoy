@@ -5,7 +5,7 @@ set -e
 if [[ `uname` == "Darwin" ]]
 then
   function md5sum {
-    md5
+    gmd5sum $@
   }
 fi
 

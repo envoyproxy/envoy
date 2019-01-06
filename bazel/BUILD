@@ -21,7 +21,7 @@ genrule(
     stamp = 1,
 )
 
-# For MacOS, which doesn't have GNU ld's `--build-id` flag.
+# For macOS, which doesn't have GNU ld's `--build-id` flag.
 genrule(
     name = "raw_build_id",
     outs = ["raw_build_id.ldscript"],

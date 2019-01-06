@@ -36,6 +36,11 @@ public:
   virtual int fd() const PURE;
 
   /**
+   * @return the type (stream or datagram) of the socket.
+   */
+  virtual Address::SocketType socketType() const PURE;
+
+  /**
    * Close the underlying socket.
    */
   virtual void close() PURE;

@@ -514,7 +514,7 @@ TEST_P(ConnectionImplTest, ReadDisableAfterClose) {
 
 TEST_P(ConnectionImplTest, EarlyCloseOnReadDisabledConnection) {
 #ifdef __APPLE__
-  // On our current OSX build, the client connection does not get the early
+  // On our current macOS build, the client connection does not get the early
   // close notification and instead gets the close after reading the FIN.
   return;
 #endif
