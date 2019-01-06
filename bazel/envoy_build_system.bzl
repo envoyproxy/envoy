@@ -87,7 +87,7 @@ def envoy_static_link_libstdcpp_linkopts():
 # Compute the final linkopts based on various options.
 def envoy_linkopts():
     return select({
-               # The OSX system library transitively links common libraries (e.g., pthread).
+               # The macOS system library transitively links common libraries (e.g., pthread).
                "@bazel_tools//tools/osx:darwin": [
                    # See note here: http://luajit.org/install.html
                    "-pagezero_size 10000",
@@ -115,7 +115,7 @@ def _envoy_stamped_linkopts():
         "@envoy//bazel:coverage_build": [],
         "@envoy//bazel:windows_x86_64": [],
 
-        # MacOS doesn't have an official equivalent to the `.note.gnu.build-id`
+        # macOS doesn't have an official equivalent to the `.note.gnu.build-id`
         # ELF section, so just stuff the raw ID into a new text section.
         "@bazel_tools//tools/osx:darwin": [
             "-sectcreate __TEXT __build_id",
@@ -337,7 +337,7 @@ def envoy_cc_fuzz_test(name, corpus, deps = [], tags = [], **kwargs):
         linkstatic = 1,
         args = ["$(locations %s)" % corpus_name],
         data = [corpus_name],
-        # No fuzzing on OS X.
+        # No fuzzing on macOS.
         deps = select({
             "@bazel_tools//tools/osx:darwin": ["//test:dummy_main"],
             "//conditions:default": [

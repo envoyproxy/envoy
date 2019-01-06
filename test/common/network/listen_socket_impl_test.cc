@@ -71,6 +71,7 @@ protected:
         }
         continue;
       }
+
       // TODO (conqerAtapple): This is unfortunate. We should be able to templatize this
       // instead of if block.
       if (NetworkSocketTrait<Type>::type == Address::SocketType::Stream) {
@@ -79,6 +80,7 @@ protected:
 
       EXPECT_EQ(addr->ip()->port(), socket1->localAddress()->ip()->port());
       EXPECT_EQ(addr->ip()->addressAsString(), socket1->localAddress()->ip()->addressAsString());
+      EXPECT_EQ(Type, socket1->socketType());
 
       auto option2 = std::make_unique<MockSocketOption>();
       auto options2 = std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>();
@@ -105,6 +107,7 @@ protected:
     EXPECT_EQ(version_, socket->localAddress()->ip()->version());
     EXPECT_EQ(loopback->ip()->addressAsString(), socket->localAddress()->ip()->addressAsString());
     EXPECT_GT(socket->localAddress()->ip()->port(), 0U);
+    EXPECT_EQ(Type, socket->socketType());
   }
 };
 

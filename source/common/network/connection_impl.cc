@@ -383,7 +383,7 @@ void ConnectionImpl::write(Buffer::Instance& data, bool end_stream) {
     write_buffer_->move(data);
 
     // Activating a write event before the socket is connected has the side-effect of tricking
-    // doWriteReady into thinking the socket is connected. On OS X, the underlying write may fail
+    // doWriteReady into thinking the socket is connected. On macOS, the underlying write may fail
     // with a connection error if a call to write(2) occurs before the connection is completed.
     if (!connecting_) {
       file_event_->activate(Event::FileReadyType::Write);
@@ -646,7 +646,7 @@ void ClientConnectionImpl::connect() {
       connecting_ = false;
       ENVOY_CONN_LOG(debug, "immediate connection error: {}", *this, result.errno_);
 
-      // Trigger a write event. This is needed on OSX and seems harmless on Linux.
+      // Trigger a write event. This is needed on macOS and seems harmless on Linux.
       file_event_->activate(Event::FileReadyType::Write);
     }
   }
