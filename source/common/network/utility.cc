@@ -404,7 +404,7 @@ Address::InstanceConstSharedPtr Utility::getOriginalDst(int fd) {
     return nullptr;
   }
 #else
-  // TODO(zuercher): determine if connection redirection is possible under OS X (c.f. pfctl and
+  // TODO(zuercher): determine if connection redirection is possible under macOS (c.f. pfctl and
   // divert), and whether it's possible to find the learn destination address.
   UNREFERENCED_PARAMETER(fd);
   return nullptr;

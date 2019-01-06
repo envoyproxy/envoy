@@ -54,7 +54,7 @@ files. Running certs.sh directly will cause the certificate files to be
 regenerated. So if you want to regenerate a particular file, please copy the
 corresponding commands from certs.sh and execute them in command line.
 
-Note that Mac OS is unable to generate the expired unit test cert starting
+Note that macOS is unable to generate the expired unit test cert starting
 with its switch from OpenSSL to LibreSSL in High Sierra (10.13). Specifically,
 that version of the openssl command will not accept a non-positive "-days"
 parameter.
