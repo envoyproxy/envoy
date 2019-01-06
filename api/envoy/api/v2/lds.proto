@@ -131,6 +131,12 @@ message Listener {
   // timeout. If not specified, a default timeout of 15s is used.
   google.protobuf.Duration listener_filters_timeout = 15 [(gogoproto.stdduration) = true];
 
+  // [#not-implemented-hide:]
+  // QUIC listener for handing UDP packets. Only used when :ref:`address
+  // <envoy_api_field_Listener.address>` specifies a UDP :ref:`SocketAddress
+  // <envoy_api_msg_core_SocketAddress>`.
+  listener.QuicListener quic_listener = 16;
+
   // Whether the listener should be set as a transparent socket.
   // When this flag is set to true, connections can be redirected to the listener using an
   // *iptables* *TPROXY* target, in which case the original source and destination addresses and
