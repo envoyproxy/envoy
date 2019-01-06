@@ -46,7 +46,7 @@ On Fedora (maybe also other red hat distros), run the following:
 dnf install cmake libtool libstdc++ ninja-build lld patch
 ```
 
-On OS X, you'll need to install several dependencies. This can be accomplished via [Homebrew](https://brew.sh/):
+On macOS, you'll need to install several dependencies. This can be accomplished via [Homebrew](https://brew.sh/):
 ```
 brew install coreutils wget cmake libtool go bazel automake ninja clang-format
 ```
@@ -525,7 +525,7 @@ The command above will setup a maximum 64 GiB cache at `~/bazel_cache` on port 2
 want to setup a larger cache if you run ASAN builds.
 
 NOTE: Using docker to run remote cache server described in remote cache docs will likely have
-slower cache performance on macOS due to slow disk performance for Docker on Mac.
+slower cache performance on macOS due to slow disk performance on Docker for Mac.
 
 Adding the following parameter to Bazel everytime or persist them in `.bazelrc`.
 
