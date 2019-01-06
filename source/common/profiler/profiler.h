@@ -2,7 +2,7 @@
 
 #include <string>
 
-#if defined(TCMALLOC) && !defined(DEBUG_TCMALLOC)
+#if defined(TCMALLOC) && !defined(ENVOY_MEMORY_DEBUG_ENABLED)
 #define PROFILER_AVAILABLE
 #endif
 
