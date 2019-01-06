@@ -92,6 +92,8 @@ public:
     setListenSocketOptions(options);
   }
 
+  Address::SocketType socketType() const override { return T::type; }
+
 protected:
   void setPrebindSocketOptions();
 };
@@ -106,6 +108,7 @@ class UdsListenSocket : public ListenSocketImpl {
 public:
   UdsListenSocket(const Address::InstanceConstSharedPtr& address);
   UdsListenSocket(int fd, const Address::InstanceConstSharedPtr& address);
+  Address::SocketType socketType() const override { return Address::SocketType::Stream; }
 };
 
 class ConnectionSocketImpl : public SocketImpl, public ConnectionSocket {
@@ -113,6 +116,9 @@ public:
   ConnectionSocketImpl(int fd, const Address::InstanceConstSharedPtr& local_address,
                        const Address::InstanceConstSharedPtr& remote_address)
       : SocketImpl(fd, local_address), remote_address_(remote_address) {}
+
+  // Network::Socket
+  Address::SocketType socketType() const override { return Address::SocketType::Stream; }
 
   // Network::ConnectionSocket
   const Address::InstanceConstSharedPtr& remoteAddress() const override { return remote_address_; }

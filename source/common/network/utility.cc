@@ -501,5 +501,26 @@ void Utility::addressToProtobufAddress(const Address::Instance& address,
   }
 }
 
+Address::SocketType
+Utility::protobufAddressSocketType(const envoy::api::v2::core::Address& proto_address) {
+  switch (proto_address.address_case()) {
+  case envoy::api::v2::core::Address::kSocketAddress: {
+    auto protocol = proto_address.socket_address().protocol();
+    switch (protocol) {
+    case envoy::api::v2::core::SocketAddress::TCP:
+      return Address::SocketType::Stream;
+    case envoy::api::v2::core::SocketAddress::UDP:
+      return Address::SocketType::Datagram;
+    default:
+      NOT_REACHED_GCOVR_EXCL_LINE;
+    }
+  }
+  case envoy::api::v2::core::Address::kPipe:
+    return Address::SocketType::Stream;
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
+}
+
 } // namespace Network
 } // namespace Envoy
