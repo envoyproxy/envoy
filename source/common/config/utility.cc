@@ -287,7 +287,7 @@ void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
     absl::string_view type = typed_config.type_url();
     size_t pos = type.find_last_of('/');
     if (pos != absl::string_view::npos) {
-      type = type.substr(pos);
+      type = type.substr(pos + 1);
     }
 
     // out_proto is expecting Struct, unpack directly

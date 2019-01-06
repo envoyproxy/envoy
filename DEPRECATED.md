@@ -8,8 +8,8 @@ A logged warning is expected for each deprecated item that is in deprecation win
 
 ## Version 1.10.0 (pending)
 
-* Use of google.protobuf.Struct for extension opaque configs are deprecated, use google.protobuf.Any instead. Packing
-google.protobuf.Struct in google.protobuf.Any is supported.
+* Use of google.protobuf.Struct for extension opaque configs is deprecated. Use google.protobuf.Any instead or pack
+google.protobuf.Struct in google.protobuf.Any.
 
 ## Version 1.9.0 (Dec 20, 2018)
 
