@@ -482,6 +482,11 @@ and *:authority* headers may instead be modified via mechanisms such as
 Headers are appended to requests/responses in the following order: weighted cluster level headers,
 route level headers, virtual host level headers and finally global level headers.
 
+Optionally, custom headers can specify an action to take if the key attempting to be appended
+already exists. The default action is to append the new header's value to the existing
+header's value. However, the added header can also stipulate that it will replace the
+existing value or preserve the existing value.
+
 Envoy supports adding dynamic values to request and response headers. The percent symbol (%) is
 used to delimit variable names.
 
@@ -549,4 +554,4 @@ Supported variable names are:
           - header:
               key: "x-request-start"
               value: "%START_TIME(%s.%3f)%"
-            append: true
+            action: APPEND

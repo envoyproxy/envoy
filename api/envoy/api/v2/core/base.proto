@@ -157,9 +157,31 @@ message HeaderValueOption {
   // Header name/value pair that this option applies to.
   HeaderValue header = 1 [(validate.rules).message.required = true];
 
-  // Should the value be appended? If true (default), the value is appended to
-  // existing values.
-  google.protobuf.BoolValue append = 2;
+  // Action to take when evaluating duplicate header keys.
+  enum HeaderAction {
+    option (gogoproto.goproto_enum_prefix) = false;
+    // Append new value of header to existing value.
+    APPEND = 0;
+    // Replace existing header value with new value.
+    REPLACE = 1;
+    // Ignore new header value and preserve existing value.
+    PRESERVE = 2;
+  }
+  oneof duplicate_action {
+    // Should the value be appended? If true (default), the value is appended to
+    // existing values.
+    //
+    // .. attention::
+    //
+    //   **This field is deprecated**. Set the
+    //   :ref:`action<envoy_api_field_core.HeaderValueOption.action>` field instead.
+    google.protobuf.BoolValue append = 2 [deprecated = true];
+
+    // Action to take when duplicate header values are encountered. By default,
+    // new values will be appended to the existing ones.
+    HeaderAction action = 3
+        [(validate.rules).message.required = true, (validate.rules).enum.defined_only = true];
+  }
 }
 
 // Data source consisting of either a file or an inline value.
