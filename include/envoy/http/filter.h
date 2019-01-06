@@ -451,13 +451,6 @@ public:
   virtual HeaderMap& addEncodedTrailers() PURE;
 
   /**
-   * Adds encoded metadata.
-   *
-   * @return a reference to a vector of metadata maps, where a new metadata map can be added.
-   */
-  virtual MetadataMapVector& addEncodedMetadata() PURE;
-
-  /**
    * Called when an encoder filter goes over its high watermark.
    */
   virtual void onEncoderFilterAboveWriteBufferHighWatermark() PURE;
@@ -526,7 +519,7 @@ public:
 
   /**
    * Called with metadata to be encoded. New metadata can be added directly to metadata_map or
-   * through addEncodedMetadata() interface.
+   * through StreamDecoderFilterCallbacks::encodeMetadata() interface.
    *
    * @param metadata_map supplies the metadata to be encoded.
    * @return FilterMetadataStatus, which currently is always FilterMetadataStatus::Continue;

@@ -240,7 +240,6 @@ private:
     // Http::StreamEncoderFilterCallbacks
     void addEncodedData(Buffer::Instance& data, bool streaming) override;
     HeaderMap& addEncodedTrailers() override;
-    MetadataMapVector& addEncodedMetadata() override;
     void onEncoderFilterAboveWriteBufferHighWatermark() override;
     void onEncoderFilterBelowWriteBufferLowWatermark() override;
     void setEncoderBufferLimit(uint32_t limit) override { parent_.setBufferLimit(limit); }
@@ -286,7 +285,6 @@ private:
     void maybeEndDecode(bool end_stream);
     void addEncodedData(ActiveStreamEncoderFilter& filter, Buffer::Instance& data, bool streaming);
     HeaderMap& addEncodedTrailers();
-    MetadataMapVector& addEncodedMetadata();
     void sendLocalReply(bool is_grpc_request, Code code, absl::string_view body,
                         const std::function<void(HeaderMap& headers)>& modify_headers,
                         bool is_head_request,
@@ -296,7 +294,6 @@ private:
     void encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instance& data, bool end_stream);
     void encodeTrailers(ActiveStreamEncoderFilter* filter, HeaderMap& trailers);
     void encodeMetadata(ActiveStreamEncoderFilter* filter, MetadataMapPtr&& metadata_map_ptr);
-    void drainMetadata();
     void maybeEndEncode(bool end_stream);
     uint64_t streamId() { return stream_id_; }
 
@@ -403,9 +400,9 @@ private:
     HeaderMapPtr request_headers_;
     Buffer::WatermarkBufferPtr buffered_request_data_;
     HeaderMapPtr request_trailers_;
-    MetadataMapVector response_metadata_map_vector_;
     std::list<ActiveStreamDecoderFilterPtr> decoder_filters_;
     std::list<ActiveStreamEncoderFilterPtr> encoder_filters_;
+    ActiveStreamEncoderFilter* current_encoder_filter_ = nullptr;
     std::list<AccessLog::InstanceSharedPtr> access_log_handlers_;
     Stats::TimespanPtr request_response_timespan_;
     // Per-stream idle timeout.
