@@ -7,6 +7,9 @@ The following features have been DEPRECATED and will be removed in the specified
 A logged warning is expected for each deprecated item that is in deprecation window.
 
 ## Version 1.10.0 (pending)
+* Use of `enabled` in `CorsPolicy`, found in
+  [route.proto](https://github.com/envoyproxy/envoy/blob/master/api/envoy/api/v2/route/route.proto).
+  Set the `filter_enabled` field instead.
 
 ## Version 1.9.0
 

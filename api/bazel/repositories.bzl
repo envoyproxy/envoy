@@ -1,8 +1,11 @@
-BAZEL_SKYLIB_RELEASE = "0.5.0"
-BAZEL_SKYLIB_SHA256 = "b5f6abe419da897b7901f90cbab08af958b97a8f3575b0d3dd062ac7ce78541f"
+BAZEL_SKYLIB_RELEASE = "0.6.0"
+BAZEL_SKYLIB_SHA256 = "eb5c57e4c12e68c0c20bc774bfbc60a568e800d025557bc4ea022c6479acc867"
 
 GOGOPROTO_RELEASE = "1.2.0"
 GOGOPROTO_SHA256 = "957c8f03cf595525d2a667035d9865a0930b3d446be0ab6eb76972934f925b00"
+
+OPENCENSUS_RELEASE = "0.1.0"
+OPENCENSUS_SHA256 = "4fd21cc6de63d7cb979fd749d8101ff425905aa0826fed26019d1c311fcf19a7"
 
 PGV_RELEASE = "0.0.12"
 PGV_SHA256 = "3be735345d1953d6d4c1cb89ace739cd6c98873d08b11218e181b0d3b0441627"
@@ -12,9 +15,6 @@ GOOGLEAPIS_SHA = "16f5b2e8bf1e747a32f9a62e211f8f33c94645492e9bbd72458061d9a9de1f
 
 PROMETHEUS_GIT_SHA = "99fa1f4be8e564e8a6b613da7fa6f46c9edafc6c"  # Nov 17, 2017
 PROMETHEUS_SHA = "783bdaf8ee0464b35ec0c8704871e1e72afa0005c3f3587f65d9d6694bf3911b"
-
-OPENCENSUS_GIT_SHA = "7f2434bc10da710debe5c4315ed6d4df454b4024"  # Nov 3, 2018 (tag v0.1.0)
-OPENCENSUS_SHA = "6f67ee4d5f4208f9711573423ae30860d6a7e66e9e150f97dda9d0e0665a34df"
 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
@@ -286,9 +286,9 @@ go_proto_library(
 
     http_archive(
         name = "io_opencensus_trace",
-        strip_prefix = "opencensus-proto-" + OPENCENSUS_GIT_SHA + "/src/opencensus/proto/trace/v1",
-        url = "https://github.com/census-instrumentation/opencensus-proto/archive/" + OPENCENSUS_GIT_SHA + ".tar.gz",
-        sha256 = OPENCENSUS_SHA,
+        sha256 = OPENCENSUS_SHA256,
+        strip_prefix = "opencensus-proto-" + OPENCENSUS_RELEASE + "/src/opencensus/proto/trace/v1",
+        url = "https://github.com/census-instrumentation/opencensus-proto/archive/v" + OPENCENSUS_RELEASE + ".tar.gz",
         build_file_content = """
 load("@envoy_api//bazel:api_build_system.bzl", "api_proto_library")
 load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
