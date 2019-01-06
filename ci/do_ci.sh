@@ -151,7 +151,13 @@ elif [[ "$1" == "bazel.dev" ]]; then
 elif [[ "$1" == "bazel.compile_time_options" ]]; then
   # Right now, none of the available compile-time options conflict with each other. If this
   # changes, this build type may need to be broken up.
-  COMPILE_TIME_OPTIONS="--define=signal_trace=disabled --define hot_restart=disabled --define google_grpc=disabled --define boringssl=fips"
+  COMPILE_TIME_OPTIONS=" \
+    --define=signal_trace=disabled \
+    --define=hot_restart=disabled \
+    --define=google_grpc=disabled \
+    --define=boringssl=fips \
+    --define=debug_memory=enable \
+   "
   setup_clang_toolchain
   # This doesn't go into CI but is available for developer convenience.
   echo "bazel with different compiletime options build with tests..."
