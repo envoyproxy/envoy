@@ -14,14 +14,14 @@ namespace Buffer {
 /**
  * A BufferSlice manages a contiguous block of bytes.
  * The block is arranged like this:
- *                   |<- data_size() -->|                    |<- reservable_size() ->|
- * +-----------------+------------------+--------------------+-----------------------+
- * | Drained         | Data             | Reserved           | Reservable            |
- * | Unused space    | Usable content   | Additional content | Unused space that can |
- * | that formerly   |                  | can be added here  | can be moved into     |
- * | was in the Data |                  |                    | the Reserved section  |
- * | section         |                  |                    |                       |
- * +-----------------+------------------+--------------------+-----------------------+
+ *                   |<- data_size() -->|<- reservable_size() ->|
+ * +-----------------+------------------+-----------------------+
+ * | Drained         | Data             | Reservable            |
+ * | Unused space    | Usable content   | New content can be    |
+ * | that formerly   |                  | added here with       |
+ * | was in the Data |                  | reserve()/commit()    |
+ * | section         |                  |                       |
+ * +-----------------+------------------+-----------------------+
  *                   ^
  *                   |
  *                   data()
@@ -55,6 +55,8 @@ public:
 
   /**
    * @return the number of bytes available to be reserve()d.
+   * @note If reserve() has been called without a corresponding commit(), this method
+   *       should return 0.
    * @note Read-only implementations of BufferSlice should return zero from this method.
    */
   virtual uint64_t reservableSize() const PURE;
@@ -63,11 +65,9 @@ public:
    * Reserve `size` bytes that the caller can populate with content. The caller SHOULD then
    * call commit() to add the newly populated content from the Reserved section to the Data
    * section.
-   * @note It is valid to call reserve() multiple times without a commit in between. The
-   *       result will be a succession of contiguous, reserved spans of memory, where the
-   *       first span starts right after the Data section. These spans MUST be commit()ed
-   *       in the order in which they were reserved; the result of calling commit() out
-   *       of order is undefined.
+   * @note If there is already an oustanding reservation (i.e., a reservation obtained
+   *       from reserve() that has not been released by calling commit()), this method will
+   *       return {nullptr, 0}.
    * @param size the number of bytes to reserve. The BufferSlice implementation MAY reserve
    *        fewer bytes than requested (for example, if it doesn't have enough room in the
    *        Reservable section to fulfill the whole request).

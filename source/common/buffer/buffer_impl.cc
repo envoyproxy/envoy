@@ -12,59 +12,75 @@
 namespace Envoy {
 namespace Buffer {
 
+/**
+ * Copy a Reservation to a RawSlice. The public interface of RawSlice makes specific
+ * fields immutable (the comments in the declaration of RawSlice explain why), so this
+ * is a convenience function that encapsulates the required casting.
+ * @param lhs the slice to be overwritten with a copy of rhs.
+ * @param rhs the reservation to copy.
+ */
+static inline void Copy(RawSlice& lhs, const BufferSlice::Reservation& rhs) {
+  *(const_cast<void**>(&(lhs.mem_))) = rhs.mem_;
+  lhs.len_ = rhs.len_;
+}
+
 class OwnedBufferSlice : public BufferSlice {
 public:
-  OwnedBufferSlice(uint64_t size) : reserved_(0), reservable_(0), size_(sliceSize(size)) {
+  OwnedBufferSlice(uint64_t size) : reservable_(0), size_(sliceSize(size)) {
     base_ = std::make_unique<uint8_t[]>(size_);
   }
 
   OwnedBufferSlice(const void* data, uint64_t size) : OwnedBufferSlice(size) {
     memcpy(base_.get(), data, size);
-    reserved_ = reservable_ = size;
+    reservable_ = size;
   }
 
   // BufferSlice
   const void* data() const override { return &(base_[data_]); }
   void* data() override { return &(base_[data_]); }
-  uint64_t dataSize() const override { return reserved_ - data_; }
+  uint64_t dataSize() const override { return reservable_ - data_; }
 
   void drain(uint64_t size) override {
-    ASSERT(data_ + size <= reserved_);
+    ASSERT(data_ + size <= reservable_);
     data_ += size;
-    if (data_ == reservable_) {
-      // There is no more content in the slice, and there are no outstanding reservations,
+    if (data_ == reservable_ && !reservation_outstanding_) {
+      // There is no more content in the slice, and there is no outstanding reservation,
       // so reset the Data section to the start of the slice to facilitate reuse.
-      data_ = reserved_ = reservable_ = 0;
+      data_ = reservable_ = 0;
     }
   }
 
-  uint64_t reservableSize() const override { return size_ - reservable_; }
+  uint64_t reservableSize() const override {
+    if (reservation_outstanding_) {
+      return 0;
+    }
+    return size_ - reservable_;
+  }
 
   Reservation reserve(uint64_t size) override {
+    if (reservation_outstanding_) {
+      return {nullptr, 0};
+    }
     uint64_t available_size = size_ - reservable_;
     if (available_size == 0) {
       return {nullptr, 0};
     }
     uint64_t reservation_size = std::min(size, available_size);
     void* reservation = &(base_[reservable_]);
-    reservable_ += reservation_size;
-    num_reservations_++;
+    reservation_outstanding_ = true;
     return {reservation, reservation_size};
   }
 
   bool commit(const Reservation& reservation, uint64_t size) override {
-    if (static_cast<const uint8_t*>(reservation.mem_) != base_.get() + reserved_ ||
-        reserved_ + size > reservable_) {
+    if (static_cast<const uint8_t*>(reservation.mem_) != base_.get() + reservable_ ||
+        reservable_ + size > size_ || reservable_ >= size_) {
       // The reservation is not from this OwnedBufferSlice.
       return false;
     }
     ASSERT(size <= reservation.len_);
-    ASSERT(num_reservations_ > 0);
-    reserved_ += size;
-    num_reservations_--;
-    if (num_reservations_ == 0) {
-      reservable_ = reserved_;
-    }
+    ASSERT(reservation_outstanding_);
+    reservable_ += size;
+    reservation_outstanding_ = false;
     return true;
   }
 
@@ -91,17 +107,14 @@ private:
   /** Offset in bytes from the start of the slice to the start of the Data section */
   uint64_t data_{0};
 
-  /** Offset in bytes from the start of the slice to the start of the Reserved section */
-  uint64_t reserved_;
-
   /** Offset in bytes from the start of the slice to the start of the Reservable section */
   uint64_t reservable_;
 
   /** Total number of bytes in the slice */
   uint64_t size_;
 
-  /** Number of outstanding reservations that haven't yet been committed. */
-  unsigned num_reservations_{0};
+  /** Whether reserve() has been called without a corresponding commit(). */
+  bool reservation_outstanding_{false};
 };
 
 class UnownedBufferSlice : public BufferSlice {
@@ -185,14 +198,35 @@ void OwnedImpl::prepend(Instance& data) {
 }
 
 void OwnedImpl::commit(RawSlice* iovecs, uint64_t num_iovecs) {
-  int64_t i = static_cast<int64_t>(num_iovecs) - 1;
-  for (auto iter = slices_.rbegin(); i >= 0 && iter != slices_.rend(); ++iter) {
-    BufferSlice::Reservation reservation{iovecs[i].mem_, iovecs[i].len_};
-    if ((*iter)->commit(reservation, iovecs[i].len_)) {
-      i--;
-    }
+  if (num_iovecs == 0) {
+    return;
   }
-  ASSERT(i < 0);
+  // Find the slices in the buffer that correspond to the iovecs:
+  // First, scan backward from the end of the buffer to find the last slice containing
+  // any content. Reservations are made from the end of the buffer, and out-of-order commits
+  // aren't supported, so any slices before this point cannot match the iovecs being committed.
+  auto iter = slices_.rbegin();
+  while (iter != slices_.rend() && (*iter)->dataSize() == 0) {
+    iter++;
+  }
+  if (iter == slices_.rend()) {
+    // There was no slice containing any data, so rewind the iterator at the first slice.
+    iter--;
+  }
+
+  // Next, scan forward and attempt to match the slices against iovecs.
+  uint64_t num_slices_committed = 0;
+  while (num_slices_committed < num_iovecs) {
+    if ((*iter)->commit(iovecs[num_slices_committed], iovecs[num_slices_committed].len_)) {
+      num_slices_committed++;
+    }
+    if (iter == slices_.rbegin()) {
+      break;
+    }
+    iter--;
+  }
+
+  ASSERT(num_slices_committed > 0);
 }
 
 void OwnedImpl::copyOut(size_t start, uint64_t size, void* data) const {
@@ -349,40 +383,66 @@ Api::SysCallIntResult OwnedImpl::read(int fd, uint64_t max_length) {
   const Api::SysCallSizeResult result =
       os_syscalls.readv(fd, iov.begin(), static_cast<int>(num_slices_to_read));
   if (result.rc_ < 0) {
+    for (uint64_t i = 0; i < num_slices; i++) {
+      slices[i].len_ = 0;
+    }
+    commit(slices, num_slices);
     return {static_cast<int>(result.rc_), result.errno_};
   }
-  uint64_t num_slices_to_commit = 0;
   uint64_t bytes_to_commit = result.rc_;
   ASSERT(bytes_to_commit <= max_length);
-  while (bytes_to_commit != 0) {
-    slices[num_slices_to_commit].len_ =
-        std::min(slices[num_slices_to_commit].len_, static_cast<size_t>(bytes_to_commit));
-    ASSERT(bytes_to_commit >= slices[num_slices_to_commit].len_);
-    bytes_to_commit -= slices[num_slices_to_commit].len_;
-    num_slices_to_commit++;
+  for (uint64_t i = 0; i < num_slices; i++) {
+    slices[i].len_ = std::min(slices[i].len_, static_cast<size_t>(bytes_to_commit));
+    bytes_to_commit -= slices[i].len_;
   }
-  ASSERT(num_slices_to_commit <= num_slices);
-  commit(slices, num_slices_to_commit);
+  commit(slices, num_slices);
   return {static_cast<int>(result.rc_), result.errno_};
 }
 
 uint64_t OwnedImpl::reserve(uint64_t length, RawSlice* iovecs, uint64_t num_iovecs) {
-  // TODO(brian-pane) support the use of space in more than one slice.
   if (num_iovecs == 0) {
     return 0;
   }
-  if (slices_.empty() || slices_.back()->reservableSize() < length) {
+  uint64_t reservable_size = slices_.empty() ? 0 : slices_.back()->reservableSize();
+  if (reservable_size == 0) {
+    // Special case: there is no usable space in the last slice, so allocate a
+    // new slice big enough to hold the entire reservation.
     slices_.emplace_back(std::make_unique<OwnedBufferSlice>(length));
+    Copy(iovecs[0], slices_.back()->reserve(length));
+    ASSERT(iovecs[0].len_ == length);
+    ASSERT(iovecs[0].mem_ != nullptr);
+    return 1;
+  } else if (reservable_size >= length) {
+    // Special case: there is at least enough space in the last slice to hold
+    // the reqested reservation.
+    Copy(iovecs[0], slices_.back()->reserve(length));
+    ASSERT(iovecs[0].len_ == length);
+    ASSERT(iovecs[0].mem_ != nullptr);
+    return 1;
+  } else if (num_iovecs == 1) {
+    // Special case: there is some space available in the last slice, but not
+    // enough to hold the entire reservation. And the caller has only provided one
+    // iovec,so the reservation cannot be split among multiple slices. Create a new
+    // slice big enough to hold the entire reservation (and waste the leftover space
+    // in what used to be the last slice).
+    slices_.emplace_back(std::make_unique<OwnedBufferSlice>(length));
+    Copy(iovecs[0], slices_.back()->reserve(length));
+    ASSERT(iovecs[0].len_ == length);
+    ASSERT(iovecs[0].mem_ != nullptr);
+    return 1;
+  } else {
+    // General case: the last slice has enough space to fulfill part but not all of the
+    // requested reservation, so split the reservation between that slice and a newly
+    // allocated slice.
+    Copy(iovecs[0], slices_.back()->reserve(reservable_size));
+    uint64_t remaining_size = length - reservable_size;
+    slices_.emplace_back(std::make_unique<OwnedBufferSlice>(remaining_size));
+    Copy(iovecs[1], slices_.back()->reserve(remaining_size));
+    ASSERT(iovecs[0].len_ + iovecs[1].len_ == length);
+    ASSERT(iovecs[0].mem_ != nullptr);
+    ASSERT(iovecs[1].mem_ != nullptr);
+    return 2;
   }
-  ASSERT(slices_.back()->reservableSize() >= length);
-  BufferSlice::Reservation reservation = slices_.back()->reserve(length);
-  // The cumbersome cast here allows RawSlice::mem_ to remain immutable by everything
-  // outside OwnedImpl. The comments accompanying the RawSlice declaration in
-  // include/envoy/buffer/buffer.h provide more context on why the immutability
-  // is important.
-  *(const_cast<void**>(&(iovecs[0].mem_))) = reservation.mem_;
-  iovecs[0].len_ = reservation.len_;
-  return 1;
 }
 
 ssize_t OwnedImpl::search(const void* data, uint64_t size, size_t start) const {
