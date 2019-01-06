@@ -61,7 +61,8 @@ public:
     metadata_map.emplace("keep", "keep");
     // Add new metadata by calling encodeMetadata().
     Http::MetadataMap new_metadata_map = {{"metadata", "metadata"}};
-    Http::MetadataMapPtr new_metadata_map_ptr = std::make_unique<Http::MetadataMap>(new_metadata_map);
+    Http::MetadataMapPtr new_metadata_map_ptr =
+        std::make_unique<Http::MetadataMap>(new_metadata_map);
     decoder_callbacks_->encodeMetadata(std::move(new_metadata_map_ptr));
     new_metadata_map = {{"duplicate", "duplicate"}};
     new_metadata_map_ptr = std::make_unique<Http::MetadataMap>(new_metadata_map);
