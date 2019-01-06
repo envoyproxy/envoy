@@ -4,12 +4,12 @@ Version history
 1.10.0 (pending)
 ================
 * access log: added a new flag for upstream retry count exceeded.
-* config: removed deprecated_v1 sds_config from :ref:`Bootstrap config <config_overview_v2_bootstrap>`.
 * buffer: fix vulnerabilities when allocation fails
 * config: removed deprecated_v1 sds_config from :ref:`Bootstrap config <config_overview_v2_bootstrap>`.
-* redis: added :ref:`success and error stats <config_network_filters_redis_proxy_per_command_stats>` for commands.
+* config: removed deprecated_v1 sds_config from :ref:`Bootstrap config <config_overview_v2_bootstrap>`.
 * cors: added :ref:`filter_enabled & shadow_enabled RuntimeFractionalPercent flags <cors-runtime>` to filter.
 * http: added new grpc_http1_reverse_bridge filter for converting gRPC requests into HTTP/1.1 requests.
+* redis: added :ref:`success and error stats <config_network_filters_redis_proxy_per_command_stats>` for commands.
 * tls: enabled TLS 1.3 on the server-side (non-FIPS builds).
 
 1.9.0
