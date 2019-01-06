@@ -5,6 +5,7 @@
 #include "envoy/http/header_map.h"
 
 #include "common/common/fmt.h"
+#include "common/profiler/profiler.h"
 #include "common/stats/stats_matcher_impl.h"
 
 #include "test/integration/utility.h"
