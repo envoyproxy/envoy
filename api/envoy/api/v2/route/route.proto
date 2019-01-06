@@ -377,7 +377,7 @@ message RouteMatch {
   GrpcRouteMatchOptions grpc = 8;
 }
 
-// [#comment:next free field: 9]
+// [#comment:next free field: 11]
 message CorsPolicy {
   // Specifies the origins that will be allowed to do CORS requests.
   //
@@ -404,8 +404,38 @@ message CorsPolicy {
   // Specifies whether the resource allows credentials.
   google.protobuf.BoolValue allow_credentials = 6;
 
-  // Specifies if CORS is enabled. Defaults to true. Only effective on route.
-  google.protobuf.BoolValue enabled = 7;
+  oneof enabled_specifier {
+    // Specifies if CORS is enabled. Defaults to true. Only effective on route.
+    //
+    // .. attention::
+    //
+    //   **This field is deprecated**. Set the
+    //   :ref:`filter_enabled<envoy_api_field_route.CorsPolicy.filter_enabled>` field instead.
+    google.protobuf.BoolValue enabled = 7 [deprecated = true];
+
+    // Specifies if CORS is enabled.
+    //
+    // More information on how this can be controlled via runtime can be found
+    // :ref:`here <cors-runtime>`.
+    //
+    // .. note::
+    //
+    //   This field defaults to 100/:ref:`HUNDRED
+    //   <envoy_api_enum_type.FractionalPercent.DenominatorType>`.
+    core.RuntimeFractionalPercent filter_enabled = 9;
+  }
+
+  // Specifies if CORS policies are evaluated and tracked when filter is off but
+  // does not enforce any policies.
+  //
+  // More information on how this can be controlled via runtime can be found
+  // :ref:`here <cors-runtime>`.
+  //
+  // .. note::
+  //
+  //   This field defaults to 100/:ref:`HUNDRED
+  //   <envoy_api_enum_type.FractionalPercent.DenominatorType>`.
+  core.RuntimeFractionalPercent shadow_enabled = 10;
 }
 
 // [#comment:next free field: 26]
