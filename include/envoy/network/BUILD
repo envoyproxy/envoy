@@ -85,6 +85,7 @@ envoy_cc_library(
     deps = [
         ":connection_interface",
         ":listen_socket_interface",
+        "//include/envoy/quic:listener_interface",
         "//include/envoy/stats:stats_interface",
     ],
 )

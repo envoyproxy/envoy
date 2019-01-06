@@ -7,6 +7,7 @@
 #include "envoy/common/exception.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/listen_socket.h"
+#include "envoy/quic/listener.h"
 #include "envoy/stats/scope.h"
 
 namespace Envoy {
@@ -30,6 +31,12 @@ public:
    *         connection.
    */
   virtual FilterChainFactory& filterChainFactory() PURE;
+
+  /**
+   * @return QuicListenerFactory* the factory for creating QUIC listeners, or nullptr if none is
+   *         configured.
+   */
+  virtual Quic::QuicListenerFactory* quicListenerFactory() PURE;
 
   /**
    * @return Socket& the actual listen socket. The address of this socket may be

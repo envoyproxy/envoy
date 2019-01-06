@@ -22,8 +22,6 @@ envoy_cc_library(
     name = "listener_interface",
     hdrs = ["listener.h"],
     deps = [
-        "//include/envoy/event:dispatcher_interface",
         "//include/envoy/network:listen_socket_interface",
-        "//include/envoy/network:listener_interface",
     ],
 )

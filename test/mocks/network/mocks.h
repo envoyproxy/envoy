@@ -257,6 +257,7 @@ public:
 
   MOCK_METHOD0(filterChainManager, FilterChainManager&());
   MOCK_METHOD0(filterChainFactory, FilterChainFactory&());
+  MOCK_METHOD0(quicListenerFactory, Quic::QuicListenerFactory*());
   MOCK_METHOD0(socket, Socket&());
   MOCK_CONST_METHOD0(socket, const Socket&());
   MOCK_METHOD0(bindToPort, bool());

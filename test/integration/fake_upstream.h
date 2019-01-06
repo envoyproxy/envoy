@@ -573,6 +573,7 @@ private:
     // Network::ListenerConfig
     Network::FilterChainManager& filterChainManager() override { return parent_; }
     Network::FilterChainFactory& filterChainFactory() override { return parent_; }
+    Quic::QuicListenerFactory* quicListenerFactory() override { return nullptr; }
     Network::Socket& socket() override { return *parent_.socket_; }
     const Network::Socket& socket() const override { return *parent_.socket_; }
     bool bindToPort() override { return true; }

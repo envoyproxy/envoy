@@ -242,6 +242,7 @@ public:
   // Network::ListenerConfig
   Network::FilterChainManager& filterChainManager() override { return *this; }
   Network::FilterChainFactory& filterChainFactory() override { return *this; }
+  Quic::QuicListenerFactory* quicListenerFactory() override { return nullptr; }
   Network::Socket& socket() override { return *socket_; }
   const Network::Socket& socket() const override { return *socket_; }
   bool bindToPort() override { return bind_to_port_; }

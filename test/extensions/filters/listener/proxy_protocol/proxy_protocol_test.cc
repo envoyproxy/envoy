@@ -65,6 +65,7 @@ public:
   // Network::ListenerConfig
   Network::FilterChainManager& filterChainManager() override { return *this; }
   Network::FilterChainFactory& filterChainFactory() override { return factory_; }
+  Quic::QuicListenerFactory* quicListenerFactory() override { return nullptr; }
   Network::Socket& socket() override { return socket_; }
   const Network::Socket& socket() const override { return socket_; }
   bool bindToPort() override { return true; }
@@ -895,6 +896,7 @@ public:
   // Network::ListenerConfig
   Network::FilterChainManager& filterChainManager() override { return *this; }
   Network::FilterChainFactory& filterChainFactory() override { return factory_; }
+  Quic::QuicListenerFactory* quicListenerFactory() override { return nullptr; }
   Network::Socket& socket() override { return socket_; }
   const Network::Socket& socket() const override { return socket_; }
   bool bindToPort() override { return true; }
