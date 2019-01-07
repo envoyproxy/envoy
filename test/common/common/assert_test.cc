@@ -4,7 +4,7 @@
 
 namespace Envoy {
 
-TEST(ReleaseAssert, VariousLogs) {
+TEST(ReleaseAssertDeathTest, VariousLogs) {
   Logger::StderrSinkDelegate stderr_sink(Logger::Registry::getSink()); // For coverage build.
   EXPECT_DEATH({ RELEASE_ASSERT(0, ""); }, ".*assert failure: 0.*");
   EXPECT_DEATH({ RELEASE_ASSERT(0, "With some logs"); },
@@ -13,7 +13,7 @@ TEST(ReleaseAssert, VariousLogs) {
                ".*assert failure: 0 == EAGAIN. Details: using fmt.*");
 }
 
-TEST(Assert, VariousLogs) {
+TEST(AssertDeathTest, VariousLogs) {
 #ifndef NDEBUG
   EXPECT_DEATH({ ASSERT(0); }, ".*assert failure: 0.*");
   EXPECT_DEATH({ ASSERT(0, ""); }, ".*assert failure: 0.*");
