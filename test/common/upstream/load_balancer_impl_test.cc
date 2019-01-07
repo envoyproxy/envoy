@@ -158,43 +158,48 @@ TEST_P(LoadBalancerBaseTest, PrioritySelectionFuzz) {
   TestRandomGenerator rand;
 
   // Determine total number of hosts.
-  const auto total_hosts = rand.random() % 10;
+  const auto total_hosts = 1 + (rand.random() % 10);
 
   NiceMock<Upstream::MockLoadBalancerContext> context;
 
   const auto host_set_hosts = rand.random() % total_hosts;
-  // Split hosts between priority 0 and priority 1.
-  {
+
+  if (host_set_hosts == 0) {
+    updateHostSet(host_set_, 0, 0);
+  } else {
     // We get on average 50% healthy hosts, 25% degraded hosts and 25% unhealthy hosts.
     const auto healthy_hosts = rand.random() % host_set_hosts;
-    ASSERT(healthy_hosts >= 0);
     const auto degraded_hosts = rand.random() % (host_set_hosts - healthy_hosts);
-    ASSERT(degraded_hosts >= 0);
     const auto unhealthy_hosts = host_set_hosts - healthy_hosts - degraded_hosts;
-    ASSERT(unhealthy_hosts >= 0);
 
     updateHostSet(host_set_, host_set_hosts, unhealthy_hosts, degraded_hosts);
   }
 
   const auto failover_set_hosts = total_hosts - host_set_hosts;
 
-  // We get on average 50% healthy hosts, 25% degraded hosts and 25% unhealthy hosts.
-  const auto healthy_hosts = rand.random() % failover_set_hosts;
-  ASSERT(healthy_hosts >= 0);
-  const auto degraded_hosts = rand.random() % (failover_set_hosts - healthy_hosts);
-  ASSERT(degraded_hosts >= 0);
-  const auto unhealthy_hosts = failover_set_hosts - healthy_hosts - degraded_hosts;
-  ASSERT(unhealthy_hosts >= 0);
+  if (host_set_hosts == 0) {
+    updateHostSet(failover_host_set_, 0, 0);
+  } else {
+    // We get on average 50% healthy hosts, 25% degraded hosts and 25% unhealthy hosts.
+    const auto healthy_hosts = rand.random() % failover_set_hosts;
+    const auto degraded_hosts = rand.random() % (failover_set_hosts - healthy_hosts);
+    const auto unhealthy_hosts = failover_set_hosts - healthy_hosts - degraded_hosts;
 
-  updateHostSet(failover_host_set_, failover_set_hosts, unhealthy_hosts, degraded_hosts);
+    updateHostSet(failover_host_set_, failover_set_hosts, unhealthy_hosts, degraded_hosts);
+  }
 
   EXPECT_CALL(context, determinePriorityLoad(_, _))
-      .WillRepeatedly(Invoke([](const auto&, const auto& original_load) { return original_load; }));
+      .WillRepeatedly(Invoke([](const auto&, const auto& original_load) -> const PriorityLoad& {
+        return original_load;
+      }));
 
   for (uint64_t i = 0; i < total_hosts; ++i) {
     const auto hs = lb_.chooseHostSet(&context);
     if (!hs.second) {
-      EXPECT_FALSE(hs.first.healthyHosts().empty());
+      // Either we selected one of the healthy hosts or we failed to select anything and defaulted
+      // to healthy.
+      EXPECT_TRUE(!hs.first.healthyHosts().empty() ||
+                  (hs.first.healthyHosts().size() == 0 && hs.first.degradedHosts().size() == 0));
     }
     if (hs.second) {
       EXPECT_FALSE(hs.first.degradedHosts().empty());
