@@ -77,6 +77,11 @@ EXTENSIONS = {
     "envoy.filters.network.sni_cluster":                "//source/extensions/filters/network/sni_cluster:config",
 
     #
+    # QUIC listeners
+    #
+    "envoy.quic_listeners.quiche":                      "//source/extensions/quic_listeners/quiche:config",
+
+    #
     # Resource monitors
     #
 

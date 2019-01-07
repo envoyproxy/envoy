@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package envoy.config.quic_listener.quiche.v2alpha;
+option java_package = "io.envoyproxy.envoy.config.quic_listener.quiche.v2alpha";
+option java_multiple_files = true;
+option go_package = "v2";
+
+// [#protodoc-title: QUICHE]
+
+import "validate/validate.proto";
+
+// Configuration for QUICHE-based QUIC listener. This will provide QUIC support to Envoy.
+// https://quiche.googlesource.com/quiche/
+message Quiche {
+}

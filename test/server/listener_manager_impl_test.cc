@@ -18,6 +18,7 @@
 
 #include "extensions/filters/listener/original_dst/original_dst.h"
 
+#include "test/mocks/quic/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/server/utility.h"
@@ -2998,6 +2999,40 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, VerifyIgnoreExpirationWithCA) {
                                                        Network::Address::IpVersion::v4);
 
   EXPECT_NO_THROW(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true));
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, NoQuicListener) {
+  const std::string yaml = R"EOF(
+    name: "foo"
+    address:
+      socket_address: { protocol: UDP, address: 127.0.0.1, port_value: 1234 }
+    filter_chains:
+    - filters:
+  )EOF";
+
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true));
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true));
+  EXPECT_EQ(nullptr, manager_->listeners().front().get().quicListenerFactory());
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, QuicListener) {
+  const std::string yaml = R"EOF(
+    name: "foo"
+    address:
+      socket_address: { protocol: UDP, address: 127.0.0.1, port_value: 1234 }
+    filter_chains:
+    - filters:
+    quic_listener:
+      name: "envoy.quic_listeners.quiche"
+      config: {}
+  )EOF";
+
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true));
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true));
+  auto factory = manager_->listeners().front().get().quicListenerFactory();
+  EXPECT_NE(nullptr, factory);
+  Quic::MockQuicListenerCallbacks callbacks;
+  EXPECT_NE(nullptr, factory->createQuicListener(callbacks));
 }
 
 } // namespace Server
