@@ -211,8 +211,8 @@ TEST_P(CdsIntegrationTest, CdsClusterUpDownUp) {
   EXPECT_STREQ("503", response->headers().Status()->value().c_str());
 
   cleanupUpstreamAndDownstream();
-  codec_client_->waitForDisconnect();
   fake_upstream_connection_ = nullptr;
+  codec_client_->waitForDisconnect();
 
   // Tell Envoy that cluster_0 is back.
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "42", {}));

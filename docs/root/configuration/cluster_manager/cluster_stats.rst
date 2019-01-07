@@ -10,9 +10,8 @@ General
 -------
 
 The cluster manager has a statistics tree rooted at *cluster_manager.* with the following
-statistics. Any ``:`` character in the stats name is replaced with ``_``. All stats concerning
-number of clusters (other than cluster_modified and _removed) include statically specified
-xDS servers in the count.
+statistics. Any ``:`` character in the stats name is replaced with ``_``. Some of the stats
+concerning number of clusters may include statically specified xDS servers in the count.
 
 .. csv-table::
   :header: Name, Type, Description

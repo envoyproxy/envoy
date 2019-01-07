@@ -330,7 +330,7 @@ void HttpIntegrationTest::testRouterRequestAndResponseWithBody(
 }
 
 void HttpIntegrationTest::testRouterHeaderOnlyRequestAndResponse(
-    bool leave_upstream_open, ConnectionCreationFunction* create_connection, int upstream_index) {
+    bool leave_envoy_running, ConnectionCreationFunction* create_connection, int upstream_index) {
   // This is called multiple times per test in ads_integration_test. Only call
   // initialize() the first time.
   if (!initialized()) {
@@ -348,8 +348,8 @@ void HttpIntegrationTest::testRouterHeaderOnlyRequestAndResponse(
 
   // The following allows us to test shutting down the server with active connection pool
   // connections.
-  if (!leave_upstream_open) {
-    fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+  if (!leave_envoy_running) {
+    fake_upstreams_[upstream_index]->set_allow_unexpected_disconnects(true);
     test_server_.reset();
   }
 
