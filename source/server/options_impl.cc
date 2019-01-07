@@ -142,6 +142,7 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
   auto check_numeric_arg = [](bool is_error, uint64_t value, absl::string_view pattern) {
     if (is_error) {
       const std::string message = fmt::format(std::string(pattern), value);
+      std::cerr << message << std::endl;
       throw MalformedArgvException(message);
     }
   };
@@ -176,6 +177,7 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
     mode_ = Server::Mode::InitOnly;
   } else {
     const std::string message = fmt::format("error: unknown mode '{}'", mode.getValue());
+    std::cerr << message << std::endl;
     throw MalformedArgvException(message);
   }
 
@@ -186,6 +188,7 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
   } else {
     const std::string message =
         fmt::format("error: unknown IP address version '{}'", local_address_ip_version.getValue());
+    std::cerr << message << std::endl;
     throw MalformedArgvException(message);
   }
 
@@ -251,7 +254,10 @@ void OptionsImpl::parseComponentLogLevels(const std::string& component_log_level
 
 uint32_t OptionsImpl::count() const { return count_; }
 
-void OptionsImpl::logError(const std::string& error) const { throw MalformedArgvException(error); }
+void OptionsImpl::logError(const std::string& error) const {
+  std::cerr << error << std::endl;
+  throw MalformedArgvException(error);
+}
 
 Server::CommandLineOptionsPtr OptionsImpl::toCommandLineOptions() const {
   Server::CommandLineOptionsPtr command_line_options =
