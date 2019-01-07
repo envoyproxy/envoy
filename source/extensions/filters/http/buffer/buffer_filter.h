@@ -39,7 +39,6 @@ public:
 
   bool disabled() const { return disabled_; }
   uint64_t maxRequestBytes() const { return max_request_bytes_; }
-  std::chrono::seconds maxRequestTime() const { return std::chrono::seconds(0); }
 
 private:
   bool disabled_;
@@ -84,7 +83,6 @@ public:
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
 private:
-  void onRequestTimeout();
   void resetInternalState();
   void initConfig();
 

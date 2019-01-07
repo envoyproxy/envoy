@@ -100,12 +100,6 @@ BufferFilterStats BufferFilter::generateStats(const std::string& prefix, Stats::
 
 void BufferFilter::onDestroy() { resetInternalState(); }
 
-void BufferFilter::onRequestTimeout() {
-  callbacks_->sendLocalReply(Http::Code::RequestTimeout, "buffer request timeout", nullptr,
-                             absl::nullopt);
-  config_->stats().rq_timeout_.inc();
-}
-
 void BufferFilter::resetInternalState() { request_timeout_.reset(); }
 
 void BufferFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
