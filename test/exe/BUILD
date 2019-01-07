@@ -20,7 +20,11 @@ sh_test(
 sh_test(
     name = "version_out_test",
     srcs = ["version_out_test.sh"],
-    data = ["//source/exe:envoy-static"],
+    data = [
+        "//:VERSION",
+        "//bazel:raw_build_id.ldscript",
+        "//source/exe:envoy-static",
+    ],
 )
 
 envoy_cc_test(
