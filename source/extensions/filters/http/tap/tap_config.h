@@ -35,7 +35,7 @@ public:
                      const Http::HeaderMap* response_headers) PURE;
 };
 
-typedef std::unique_ptr<HttpPerRequestTapper> HttpPerRequestTapperPtr;
+using HttpPerRequestTapperPtr = std::unique_ptr<HttpPerRequestTapper>;
 
 /**
  * Abstract HTTP tap configuration.
@@ -50,7 +50,7 @@ public:
   virtual HttpPerRequestTapperPtr newPerRequestTapper() PURE;
 };
 
-typedef std::shared_ptr<HttpTapConfig> HttpTapConfigSharedPtr;
+using HttpTapConfigSharedPtr = std::shared_ptr<HttpTapConfig>;
 
 /**
  * Configuration factory for the HTTP tap filter.
@@ -68,7 +68,7 @@ public:
                             Extensions::Common::Tap::Sink* admin_streamer) PURE;
 };
 
-typedef std::unique_ptr<HttpTapConfigFactory> HttpTapConfigFactoryPtr;
+using HttpTapConfigFactoryPtr = std::unique_ptr<HttpTapConfigFactory>;
 
 } // namespace TapFilter
 } // namespace HttpFilters

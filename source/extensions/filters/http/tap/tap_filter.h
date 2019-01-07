@@ -48,7 +48,7 @@ public:
   virtual FilterStats& stats() PURE;
 };
 
-typedef std::shared_ptr<FilterConfig> FilterConfigSharedPtr;
+using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 
 /**
  * Configuration for the tap filter.
@@ -57,11 +57,11 @@ class FilterConfigImpl : public FilterConfig,
                          public Extensions::Common::Tap::ExtensionConfig,
                          Logger::Loggable<Logger::Id::tap> {
 public:
-  FilterConfigImpl(const envoy::config::filter::http::tap::v2alpha::Tap& proto_config,
+  FilterConfigImpl(envoy::config::filter::http::tap::v2alpha::Tap proto_config,
                    const std::string& stats_prefix, HttpTapConfigFactoryPtr&& config_factory,
                    Stats::Scope& scope, Server::Admin& admin, Singleton::Manager& singleton_manager,
                    ThreadLocal::SlotAllocator& tls, Event::Dispatcher& main_thread_dispatcher);
-  ~FilterConfigImpl();
+  ~FilterConfigImpl() override;
 
   // FilterConfig
   HttpTapConfigSharedPtr currentConfig() override;
@@ -91,7 +91,7 @@ private:
 class Filter : public Http::StreamFilter, public AccessLog::Instance {
 public:
   Filter(FilterConfigSharedPtr config)
-      : config_(config),
+      : config_(std::move(config)),
         tapper_(config_->currentConfig() ? config_->currentConfig()->newPerRequestTapper()
                                          : nullptr) {}
 

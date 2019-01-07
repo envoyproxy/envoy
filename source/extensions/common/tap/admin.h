@@ -11,7 +11,7 @@ namespace Common {
 namespace Tap {
 
 class AdminHandler;
-typedef std::shared_ptr<AdminHandler> AdminHandlerSharedPtr;
+using AdminHandlerSharedPtr = std::shared_ptr<AdminHandler>;
 
 /**
  * Singleton /tap admin handler for admin management of tap configurations and output. This
@@ -24,7 +24,7 @@ class AdminHandler : public Singleton::Instance,
                      Logger::Loggable<Logger::Id::tap> {
 public:
   AdminHandler(Server::Admin& admin, Event::Dispatcher& main_thread_dispatcher);
-  ~AdminHandler();
+  ~AdminHandler() override;
 
   /**
    * Get the singleton admin handler. The handler will be created if it doesn't already exist,
@@ -54,8 +54,8 @@ public:
 
 private:
   struct AttachedRequest {
-    AttachedRequest(const std::string& config_id, Server::AdminStream* admin_stream)
-        : config_id_(config_id), admin_stream_(admin_stream) {}
+    AttachedRequest(std::string config_id, Server::AdminStream* admin_stream)
+        : config_id_(std::move(config_id)), admin_stream_(admin_stream) {}
 
     std::string config_id_;
     Server::AdminStream* admin_stream_;

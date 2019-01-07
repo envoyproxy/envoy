@@ -56,12 +56,12 @@ private:
   std::vector<MatchConfig> match_configs_;
 };
 
-typedef std::shared_ptr<HttpTapConfigImpl> HttpTapConfigImplSharedPtr;
+using HttpTapConfigImplSharedPtr = std::shared_ptr<HttpTapConfigImpl>;
 
 class HttpPerRequestTapperImpl : public HttpPerRequestTapper, Logger::Loggable<Logger::Id::tap> {
 public:
   HttpPerRequestTapperImpl(HttpTapConfigImplSharedPtr config)
-      : config_(config), statuses_(config_->configs().size()) {}
+      : config_(std::move(config)), statuses_(config_->configs().size()) {}
 
   // TapFilter::HttpPerRequestTapper
   void onRequestHeaders(const Http::HeaderMap& headers) override;

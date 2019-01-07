@@ -5,12 +5,13 @@ namespace Extensions {
 namespace HttpFilters {
 namespace TapFilter {
 
-FilterConfigImpl::FilterConfigImpl(
-    const envoy::config::filter::http::tap::v2alpha::Tap& proto_config,
-    const std::string& stats_prefix, HttpTapConfigFactoryPtr&& config_factory, Stats::Scope& scope,
-    Server::Admin& admin, Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls,
-    Event::Dispatcher& main_thread_dispatcher)
-    : proto_config_(proto_config), stats_(Filter::generateStats(stats_prefix, scope)),
+FilterConfigImpl::FilterConfigImpl(envoy::config::filter::http::tap::v2alpha::Tap proto_config,
+                                   const std::string& stats_prefix,
+                                   HttpTapConfigFactoryPtr&& config_factory, Stats::Scope& scope,
+                                   Server::Admin& admin, Singleton::Manager& singleton_manager,
+                                   ThreadLocal::SlotAllocator& tls,
+                                   Event::Dispatcher& main_thread_dispatcher)
+    : proto_config_(std::move(proto_config)), stats_(Filter::generateStats(stats_prefix, scope)),
       config_factory_(std::move(config_factory)), tls_slot_(tls.allocateSlot()) {
 
   // TODO(mattklein123): Admin is the only supported config type currently.
