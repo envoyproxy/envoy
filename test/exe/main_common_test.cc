@@ -117,6 +117,40 @@ TEST_P(MainCommonTest, ConstructDestructHotRestartDisabledNoInit) {
   EXPECT_TRUE(main_common.run());
 }
 
+// Test that std::set_new_handler() was called and the callback functions as expected.
+// This test fails under TSAN and ASAN, so don't run it in that build:
+//   [  DEATH   ] ==845==ERROR: ThreadSanitizer: requested allocation size 0x3e800000000
+//   exceeds maximum supported size of 0x10000000000
+//
+//   [  DEATH   ] ==33378==ERROR: AddressSanitizer: requested allocation size 0x3e800000000
+//   (0x3e800001000 after adjustments for alignment, red zones etc.) exceeds maximum supported size
+//   of 0x10000000000 (thread T0)
+TEST_P(MainCommonTest, OutOfMemoryHandler) {
+#if defined(__has_feature) && (__has_feature(thread_sanitizer) || __has_feature(address_sanitizer))
+  ENVOY_LOG_MISC(critical,
+                 "MainCommonTest::OutOfMemoryHandler not supported by this compiler configuration");
+#else
+  MainCommon main_common(argc(), argv());
+  EXPECT_DEATH_LOG_TO_STDERR(
+      []() {
+        // Resolving symbols for a backtrace takes longer than the timeout in coverage builds,
+        // so disable handling that signal.
+        signal(SIGABRT, SIG_DFL);
+
+        // Allocating a fixed-size large array that results in OOM on gcc
+        // results in a compile-time error on clang of "array size too big",
+        // so dynamically find a size that is too large.
+        const uint64_t initial = 1 << 30;
+        for (uint64_t size = initial;
+             size >= initial; // Disallow wraparound to avoid inifinite loops on failure.
+             size *= 1000) {
+          new int[size];
+        }
+      }(),
+      ".*panic: out of memory.*");
+#endif
+}
+
 INSTANTIATE_TEST_CASE_P(IpVersions, MainCommonTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
