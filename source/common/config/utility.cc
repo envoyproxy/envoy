@@ -277,7 +277,7 @@ envoy::api::v2::ClusterLoadAssignment Utility::translateClusterHosts(
 void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
                                     const ProtobufWkt::Struct& config,
                                     Protobuf::Message& out_proto) {
-  static const std::string struct_type =
+  static const std::string& struct_type =
       ProtobufWkt::Struct::default_instance().GetDescriptor()->full_name();
 
   if (!typed_config.value().empty()) {
