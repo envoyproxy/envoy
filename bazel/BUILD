@@ -121,6 +121,11 @@ config_setting(
 )
 
 config_setting(
+    name = "enable_log_debug_assert_in_release",
+    values = {"define": "log_debug_assert_in_release=enabled"},
+)
+
+config_setting(
     name = "enable_perf_annotation",
     values = {"define": "perf_annotation=enabled"},
 )
