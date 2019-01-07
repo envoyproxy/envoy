@@ -4,6 +4,9 @@
 
 namespace {
 
+// used by MurmurHash::murmurHash2_64
+// from
+// (https://gcc.gnu.org/git/?p=gcc.git;a=blob_plain;f=libstdc%2b%2b-v3/libsupc%2b%2b/hash_bytes.cc)
 static inline std::uint64_t unaligned_load(const char* p) {
   std::uint64_t result;
   __builtin_memcpy(&result, p, sizeof(result));
@@ -11,6 +14,9 @@ static inline std::uint64_t unaligned_load(const char* p) {
 }
 
 // Loads n bytes, where 1 <= n < 8.
+// used by MurmurHash::murmurHash2_64
+// from
+// (https://gcc.gnu.org/git/?p=gcc.git;a=blob_plain;f=libstdc%2b%2b-v3/libsupc%2b%2b/hash_bytes.cc)
 static inline std::uint64_t load_bytes(const char* p, int n) {
   std::uint64_t result = 0;
   --n;
@@ -20,13 +26,20 @@ static inline std::uint64_t load_bytes(const char* p, int n) {
   return result;
 }
 
+// used by MurmurHash::murmurHash2_64
+// from
+// (https://gcc.gnu.org/git/?p=gcc.git;a=blob_plain;f=libstdc%2b%2b-v3/libsupc%2b%2b/hash_bytes.cc)
 static inline std::uint64_t shift_mix(std::uint64_t v) { return v ^ (v >> 47); }
 
 } // namespace
 
 namespace Envoy {
 
-uint64_t HashUtil::murmurHash2_64(absl::string_view key, uint64_t seed) {
+// Computes a 64-bit murmur hash 2, only works with 64-bit platforms. Revisit if support for 32-bit
+// platforms are needed.
+// from
+// (https://gcc.gnu.org/git/?p=gcc.git;a=blob_plain;f=libstdc%2b%2b-v3/libsupc%2b%2b/hash_bytes.cc)
+uint64_t MurmurHash::murmurHash2_64(absl::string_view key, uint64_t seed) {
   static const uint64_t mul = 0xc6a4a7935bd1e995UL;
   const char* const buf = static_cast<const char*>(key.data());
   uint64_t len = key.size();

@@ -58,6 +58,7 @@ HostConstSharedPtr RingHashLoadBalancer::Ring::chooseHost(uint64_t h) const {
   }
 }
 
+using HashFunction = envoy::api::v2::Cluster_RingHashLbConfig_HashFunction;
 RingHashLoadBalancer::Ring::Ring(
     const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig>& config,
     const HostVector& hosts) {
@@ -124,7 +125,7 @@ RingHashLoadBalancer::Ring::Ring(
           use_std_hash
               ? std::hash<std::string>()(std::string(hash_key))
               : (hash_function == HashFunction::Cluster_RingHashLbConfig_HashFunction_MURMUR_HASH_2)
-                    ? HashUtil::murmurHash2_64(hash_key, HashUtil::STD_HASH_SEED)
+                    ? MurmurHash::murmurHash2_64(hash_key, MurmurHash::STD_HASH_SEED)
                     : HashUtil::xxHash64(hash_key);
 
       ENVOY_LOG(trace, "ring hash: hash_key={} hash={}", hash_key.data(), hash);

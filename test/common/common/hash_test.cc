@@ -20,21 +20,21 @@ TEST(Hash, djb2CaseInsensitiveHash) {
 }
 
 TEST(Hash, murmurHash2_64) {
-  EXPECT_EQ(9631199822919835226U, HashUtil::murmurHash2_64("foo"));
-  EXPECT_EQ(11474628671133349555U, HashUtil::murmurHash2_64("bar"));
-  EXPECT_EQ(16306510975912980159U, HashUtil::murmurHash2_64("foo\nbar"));
-  EXPECT_EQ(12847078931730529320U, HashUtil::murmurHash2_64("lyft"));
-  EXPECT_EQ(6142509188972423790U, HashUtil::murmurHash2_64(""));
+  EXPECT_EQ(9631199822919835226U, MurmurHash::murmurHash2_64("foo"));
+  EXPECT_EQ(11474628671133349555U, MurmurHash::murmurHash2_64("bar"));
+  EXPECT_EQ(16306510975912980159U, MurmurHash::murmurHash2_64("foo\nbar"));
+  EXPECT_EQ(12847078931730529320U, MurmurHash::murmurHash2_64("lyft"));
+  EXPECT_EQ(6142509188972423790U, MurmurHash::murmurHash2_64(""));
 }
 
 #ifndef __APPLE__
 TEST(Hash, stdhash) {
-  EXPECT_EQ(std::hash<std::string>()(std::string("foo")), HashUtil::murmurHash2_64("foo"));
-  EXPECT_EQ(std::hash<std::string>()(std::string("bar")), HashUtil::murmurHash2_64("bar"));
+  EXPECT_EQ(std::hash<std::string>()(std::string("foo")), MurmurHash::murmurHash2_64("foo"));
+  EXPECT_EQ(std::hash<std::string>()(std::string("bar")), MurmurHash::murmurHash2_64("bar"));
   EXPECT_EQ(std::hash<std::string>()(std::string("foo\nbar")),
-            HashUtil::murmurHash2_64("foo\nbar"));
-  EXPECT_EQ(std::hash<std::string>()(std::string("lyft")), HashUtil::murmurHash2_64("lyft"));
-  EXPECT_EQ(std::hash<std::string>()(std::string("")), HashUtil::murmurHash2_64(""));
+            MurmurHash::murmurHash2_64("foo\nbar"));
+  EXPECT_EQ(std::hash<std::string>()(std::string("lyft")), MurmurHash::murmurHash2_64("lyft"));
+  EXPECT_EQ(std::hash<std::string>()(std::string("")), MurmurHash::murmurHash2_64(""));
 }
 #endif
 

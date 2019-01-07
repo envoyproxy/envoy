@@ -14,8 +14,6 @@ namespace Envoy {
 
 class HashUtil {
 public:
-  static const uint64_t STD_HASH_SEED = 0xc70f6907UL;
-
   /**
    * Return 64-bit hash from the xxHash algorithm.
    * @param input supplies the string view to hash.
@@ -41,7 +39,11 @@ public:
     };
     return hash;
   }
+};
 
+class MurmurHash {
+public:
+  static const uint64_t STD_HASH_SEED = 0xc70f6907UL;
   /**
    * Return 64-bit hash from murmur hash2 as is implemented in std::hash<string>.
    * See
