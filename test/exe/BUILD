@@ -9,6 +9,15 @@ load(
 envoy_package()
 
 sh_test(
+    name = "build_id_test",
+    srcs = ["build_id_test.sh"],
+    data = [
+        "//bazel:raw_build_id.ldscript",
+        "//source/exe:envoy-static",
+    ],
+)
+
+sh_test(
     name = "envoy_static_test",
     srcs = ["envoy_static_test.sh"],
     data = ["//source/exe:envoy-static"],
