@@ -1,7 +1,10 @@
+#include <memory>
+
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/config/metrics/v2/stats.pb.h"
 
 #include "common/config/well_known_names.h"
+#include "common/memory/stats.h"
 
 #include "test/integration/integration.h"
 #include "test/test_common/network_utility.h"
@@ -127,6 +130,29 @@ TEST_P(StatsIntegrationTest, WithTagSpecifierWithFixedValue) {
   EXPECT_EQ(live->tags().size(), 1);
   EXPECT_EQ(live->tags()[0].name_, "test.x");
   EXPECT_EQ(live->tags()[0].value_, "xxx");
+}
+
+TEST_P(StatsIntegrationTest, MemoryLargeClusterSize) {
+  const size_t million = 1000 * 1000;
+  const size_t start_mem = Memory::Stats::totalCurrentlyAllocated();
+  if (start_mem == 0) {
+    // Skip this test for platforms where we can't measure memory.
+    return;
+  }
+
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+      for (int i = 1; i < 1001; i++) {
+        RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
+        auto* c = bootstrap.mutable_static_resources()->add_clusters();
+        c->set_name(fmt::format("cluster_{}", i));
+      }
+  });
+  initialize();
+
+  const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
+  EXPECT_LT(start_mem, end_mem);
+  EXPECT_LT(end_mem - start_mem, 57 * million); // actual value: 56635576 as of Jan 7, 2019
+  // EXPECT_EQ(end_mem, 57 * million);
 }
 
 } // namespace
