@@ -86,7 +86,10 @@ uint64_t OwnedImpl::length() const { return evbuffer_get_length(buffer_.get()); 
 
 void* OwnedImpl::linearize(uint32_t size) {
   ASSERT(size <= length());
-  return evbuffer_pullup(buffer_.get(), size);
+  void* const ret = evbuffer_pullup(buffer_.get(), size);
+  RELEASE_ASSERT(ret != nullptr || size == 0,
+                 "Failure to linearize may result in buffer overflow by the caller.");
+  return ret;
 }
 
 void OwnedImpl::move(Instance& rhs) {
@@ -148,10 +151,11 @@ Api::SysCallIntResult OwnedImpl::read(int fd, uint64_t max_length) {
 }
 
 uint64_t OwnedImpl::reserve(uint64_t length, RawSlice* iovecs, uint64_t num_iovecs) {
-  uint64_t ret = evbuffer_reserve_space(buffer_.get(), length,
-                                        reinterpret_cast<evbuffer_iovec*>(iovecs), num_iovecs);
-  ASSERT(ret >= 1);
-  return ret;
+  int ret = evbuffer_reserve_space(buffer_.get(), length, reinterpret_cast<evbuffer_iovec*>(iovecs),
+                                   num_iovecs);
+  RELEASE_ASSERT(ret >= 1, "Failure to allocate may result in callers writing to uninitialized "
+                           "memory, buffer overflows, etc");
+  return static_cast<uint64_t>(ret);
 }
 
 ssize_t OwnedImpl::search(const void* data, uint64_t size, size_t start) const {

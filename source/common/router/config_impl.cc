@@ -33,6 +33,8 @@
 
 #include "extensions/filters/http/well_known_names.h"
 
+#include "absl/strings/match.h"
+
 namespace Envoy {
 namespace Router {
 
@@ -101,7 +103,9 @@ Upstream::RetryPrioritySharedPtr RetryPolicyImpl::retryPriority() const {
   return factory.createRetryPriority(*retry_priority_config_.second, num_retries_);
 }
 
-CorsPolicyImpl::CorsPolicyImpl(const envoy::api::v2::route::CorsPolicy& config) {
+CorsPolicyImpl::CorsPolicyImpl(const envoy::api::v2::route::CorsPolicy& config,
+                               Runtime::Loader& loader)
+    : config_(config), loader_(loader) {
   for (const auto& origin : config.allow_origin()) {
     allow_origin_.push_back(origin);
   }
@@ -115,7 +119,7 @@ CorsPolicyImpl::CorsPolicyImpl(const envoy::api::v2::route::CorsPolicy& config) 
   if (config.has_allow_credentials()) {
     allow_credentials_ = PROTOBUF_GET_WRAPPED_REQUIRED(config, allow_credentials);
   }
-  enabled_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enabled, true);
+  legacy_enabled_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enabled, true);
 }
 
 ShadowPolicyImpl::ShadowPolicyImpl(const envoy::api::v2::route::RouteAction& config) {
@@ -375,7 +379,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
        PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.route(), include_vh_rate_limits, false));
 
   if (route.route().has_cors()) {
-    cors_policy_ = std::make_unique<CorsPolicyImpl>(route.route().cors());
+    cors_policy_ =
+        std::make_unique<CorsPolicyImpl>(route.route().cors(), factory_context.runtime());
   }
   for (const auto upgrade_config : route.route().upgrade_configs()) {
     const bool enabled = upgrade_config.has_enabled() ? upgrade_config.enabled().value() : true;
@@ -479,7 +484,8 @@ void RouteEntryImplBase::finalizePathHeader(Http::HeaderMap& headers,
   if (insert_envoy_original_path) {
     headers.insertEnvoyOriginalPath().value(*headers.Path());
   }
-  ASSERT(StringUtil::startsWith(path.c_str(), matched_path, case_sensitive_));
+  ASSERT(case_sensitive_ ? absl::StartsWith(path, matched_path)
+                         : absl::StartsWithIgnoreCase(path, matched_path));
   headers.Path()->value(path.replace(0, matched_path.size(), rewrite));
 }
 
@@ -713,7 +719,9 @@ void PrefixRouteEntryImpl::rewritePathHeader(Http::HeaderMap& headers,
 RouteConstSharedPtr PrefixRouteEntryImpl::matches(const Http::HeaderMap& headers,
                                                   uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(headers, random_value) &&
-      StringUtil::startsWith(headers.Path()->value().c_str(), prefix_, case_sensitive_)) {
+      (case_sensitive_
+           ? absl::StartsWith(headers.Path()->value().getStringView(), prefix_)
+           : absl::StartsWithIgnoreCase(headers.Path()->value().getStringView(), prefix_))) {
     return clusterEntry(headers, random_value);
   }
   return nullptr;
@@ -743,12 +751,13 @@ RouteConstSharedPtr PathRouteEntryImpl::matches(const Http::HeaderMap& headers,
       return nullptr;
     }
 
+    absl::string_view path_section(path.c_str(), compare_length);
     if (case_sensitive_) {
-      if (0 == strncmp(path.c_str(), path_.c_str(), compare_length)) {
+      if (absl::string_view(path_) == path_section) {
         return clusterEntry(headers, random_value);
       }
     } else {
-      if (0 == strncasecmp(path.c_str(), path_.c_str(), compare_length)) {
+      if (absl::EqualsIgnoreCase(path_, path_section)) {
         return clusterEntry(headers, random_value);
       }
     }
@@ -845,7 +854,7 @@ VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::route::VirtualHost& virtu
   }
 
   if (virtual_host.has_cors()) {
-    cors_policy_ = std::make_unique<CorsPolicyImpl>(virtual_host.cors());
+    cors_policy_ = std::make_unique<CorsPolicyImpl>(virtual_host.cors(), factory_context.runtime());
   }
 }
 

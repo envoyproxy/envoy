@@ -72,7 +72,7 @@ if [[ "$1" == "bazel.release" ]]; then
   echo "bazel release build with tests..."
   bazel_release_binary_build
 
-  if [[ $# > 1 ]]; then
+  if [[ $# -gt 1 ]]; then
     shift
     echo "Testing $* ..."
     # Run only specified tests. Argument can be a single test

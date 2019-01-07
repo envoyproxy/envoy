@@ -55,7 +55,8 @@ private:
     ~HttpActiveHealthCheckSession();
 
     void onResponseComplete();
-    bool isHealthCheckSucceeded();
+    enum class HealthCheckResult { Succeeded, Degraded, Failed };
+    HealthCheckResult healthCheckResult();
 
     // ActiveHealthCheckSession
     void onInterval() override;

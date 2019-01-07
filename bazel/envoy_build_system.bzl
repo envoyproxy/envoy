@@ -41,6 +41,8 @@ def envoy_copts(repository, test = False):
 
     msvc_options = [
         "-WX",
+        "-Zc:__cplusplus",
+        "-std:c++14",
         "-DWIN32",
         "-DWIN32_LEAN_AND_MEAN",
         # need win8 for ntohll
@@ -78,14 +80,14 @@ def envoy_copts(repository, test = False):
 
 def envoy_static_link_libstdcpp_linkopts():
     return envoy_select_force_libcpp(
-        ["--stdlib=libc++"],
+        ["-stdlib=libc++"],
         ["-static-libstdc++", "-static-libgcc"],
     )
 
 # Compute the final linkopts based on various options.
 def envoy_linkopts():
     return select({
-               # The OSX system library transitively links common libraries (e.g., pthread).
+               # The macOS system library transitively links common libraries (e.g., pthread).
                "@bazel_tools//tools/osx:darwin": [
                    # See note here: http://luajit.org/install.html
                    "-pagezero_size 10000",
@@ -93,6 +95,8 @@ def envoy_linkopts():
                ],
                "@envoy//bazel:windows_x86_64": [
                    "-DEFAULTLIB:advapi32.lib",
+                   "-DEFAULTLIB:ws2_32.lib",
+                   "-WX",
                ],
                "//conditions:default": [
                    "-pthread",
@@ -111,7 +115,7 @@ def _envoy_stamped_linkopts():
         "@envoy//bazel:coverage_build": [],
         "@envoy//bazel:windows_x86_64": [],
 
-        # MacOS doesn't have an official equivalent to the `.note.gnu.build-id`
+        # macOS doesn't have an official equivalent to the `.note.gnu.build-id`
         # ELF section, so just stuff the raw ID into a new text section.
         "@bazel_tools//tools/osx:darwin": [
             "-sectcreate __TEXT __build_id",
@@ -141,6 +145,11 @@ def envoy_test_linkopts():
             # See note here: http://luajit.org/install.html
             "-pagezero_size 10000",
             "-image_base 100000000",
+        ],
+        "@envoy//bazel:windows_x86_64": [
+            "-DEFAULTLIB:advapi32.lib",
+            "-DEFAULTLIB:ws2_32.lib",
+            "-WX",
         ],
 
         # TODO(mattklein123): It's not great that we universally link against the following libs.
@@ -328,7 +337,7 @@ def envoy_cc_fuzz_test(name, corpus, deps = [], tags = [], **kwargs):
         linkstatic = 1,
         args = ["$(locations %s)" % corpus_name],
         data = [corpus_name],
-        # No fuzzing on OS X.
+        # No fuzzing on macOS.
         deps = select({
             "@bazel_tools//tools/osx:darwin": ["//test:dummy_main"],
             "//conditions:default": [

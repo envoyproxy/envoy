@@ -21,13 +21,14 @@ genrule(
     stamp = 1,
 )
 
-# For MacOS, which doesn't have GNU ld's `--build-id` flag.
+# For macOS, which doesn't have GNU ld's `--build-id` flag.
 genrule(
     name = "raw_build_id",
     outs = ["raw_build_id.ldscript"],
     cmd = """
       grep BUILD_SCM_REVISION bazel-out/volatile-status.txt \\
     | sed 's/^BUILD_SCM_REVISION //' \\
+    | tr -d '\\n' \\
     > $@
     """,
     # Undocumented attr to depend on workspace status files.
@@ -139,12 +140,12 @@ config_setting(
 )
 
 # Alias pointing to the selected version of BoringSSL:
-# - BoringSSL FIPS from @envoy_deps//:boringssl_fips,
+# - BoringSSL FIPS from @boringssl_fips//:ssl,
 # - non-FIPS BoringSSL from @boringssl//:ssl.
 alias(
     name = "boringssl",
     actual = select({
-        "//bazel:boringssl_fips": "//external:boringssl_fips",
+        "//bazel:boringssl_fips": "@boringssl_fips//:ssl",
         "//conditions:default": "@boringssl//:ssl",
     }),
 )

@@ -16,6 +16,7 @@ TERM_WAIT_SECONDS = 30
 restart_epoch = 0
 pid_list = []
 
+
 def term_all_children():
   """ Iterate through all known child processes, send a TERM signal to each of
   them, and then wait up to TERM_WAIT_SECONDS for them to exit gracefully,
@@ -29,7 +30,7 @@ def term_all_children():
   for pid in pid_list:
     print("sending TERM to PID={}".format(pid))
     try:
-        os.kill(pid, signal.SIGTERM)
+      os.kill(pid, signal.SIGTERM)
     except OSError:
       print("error sending TERM to PID={} continuing".format(pid))
 
@@ -59,6 +60,7 @@ def term_all_children():
       print("child PID={} did not exit cleanly, killing".format(pid))
     force_kill_all_children()
     sys.exit(1)  # error status because a child did not exit cleanly
+
 
 def force_kill_all_children():
   """ Iterate through all known child processes and force kill them. Typically
@@ -101,6 +103,7 @@ def sighup_handler(signum, frame):
 
   print("got SIGHUP")
   fork_and_exec()
+
 
 def sigusr1_handler(signum, frame):
   """ Handler for SIGUSR1. Propagate SIGUSR1 to all of the child processes """
@@ -200,6 +203,7 @@ def main():
   fork_and_exec()
   while True:
     time.sleep(60)
+
 
 if __name__ == '__main__':
   main()
