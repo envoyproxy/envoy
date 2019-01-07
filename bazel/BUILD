@@ -28,6 +28,7 @@ genrule(
     cmd = """
       grep BUILD_SCM_REVISION bazel-out/volatile-status.txt \\
     | sed 's/^BUILD_SCM_REVISION //' \\
+    | tr -d '\\n' \\
     > $@
     """,
     # Undocumented attr to depend on workspace status files.
