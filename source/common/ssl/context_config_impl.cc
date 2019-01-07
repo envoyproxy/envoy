@@ -3,13 +3,13 @@
 #include <memory>
 #include <string>
 
+#include "common/certificate/certificate_validation_context_config_impl.h"
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/config/datasource.h"
 #include "common/config/tls_context_json.h"
 #include "common/protobuf/utility.h"
 #include "common/secret/sds_api.h"
-#include "common/ssl/certificate_validation_context_config_impl.h"
 
 #include "openssl/ssl.h"
 

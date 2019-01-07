@@ -3,10 +3,10 @@
 #include "envoy/api/v2/auth/cert.pb.h"
 #include "envoy/common/exception.h"
 
+#include "common/certificate/certificate_validation_context_config_impl.h"
+#include "common/certificate/tls_certificate_config_impl.h"
 #include "common/secret/sds_api.h"
 #include "common/secret/secret_manager_impl.h"
-#include "common/ssl/certificate_validation_context_config_impl.h"
-#include "common/ssl/tls_certificate_config_impl.h"
 
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"

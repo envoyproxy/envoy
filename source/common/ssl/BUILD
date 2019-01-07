@@ -39,12 +39,12 @@ envoy_cc_library(
         "ssl",
     ],
     deps = [
-        ":certificate_validation_context_config_impl_lib",
-        ":tls_certificate_config_impl_lib",
         "//include/envoy/secret:secret_callbacks_interface",
         "//include/envoy/secret:secret_provider_interface",
         "//include/envoy/server:transport_socket_config_interface",
         "//include/envoy/ssl:context_config_interface",
+        "//source/common/certificate:certificate_validation_context_config_impl_lib",
+        "//source/common/certificate:tls_certificate_config_impl_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
         "//source/common/config:datasource_lib",
@@ -83,30 +83,6 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/admin/v2alpha:certs_cc",
-    ],
-)
-
-envoy_cc_library(
-    name = "tls_certificate_config_impl_lib",
-    srcs = ["tls_certificate_config_impl.cc"],
-    hdrs = ["tls_certificate_config_impl.h"],
-    deps = [
-        "//include/envoy/ssl:tls_certificate_config_interface",
-        "//source/common/common:empty_string",
-        "//source/common/config:datasource_lib",
-        "@envoy_api//envoy/api/v2/auth:cert_cc",
-    ],
-)
-
-envoy_cc_library(
-    name = "certificate_validation_context_config_impl_lib",
-    srcs = ["certificate_validation_context_config_impl.cc"],
-    hdrs = ["certificate_validation_context_config_impl.h"],
-    deps = [
-        "//include/envoy/ssl:certificate_validation_context_config_interface",
-        "//source/common/common:empty_string",
-        "//source/common/config:datasource_lib",
-        "@envoy_api//envoy/api/v2/auth:cert_cc",
     ],
 )
 

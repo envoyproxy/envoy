@@ -1,4 +1,4 @@
-#include "common/ssl/certificate_validation_context_config_impl.h"
+#include "common/certificate/certificate_validation_context_config_impl.h"
 
 #include "envoy/common/exception.h"
 

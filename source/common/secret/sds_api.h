@@ -17,8 +17,6 @@
 
 #include "common/common/callback_impl.h"
 #include "common/common/cleanup.h"
-#include "common/ssl/certificate_validation_context_config_impl.h"
-#include "common/ssl/tls_certificate_config_impl.h"
 
 namespace Envoy {
 namespace Secret {

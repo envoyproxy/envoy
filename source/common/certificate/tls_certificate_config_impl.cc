@@ -1,4 +1,4 @@
-#include "common/ssl/tls_certificate_config_impl.h"
+#include "common/certificate/tls_certificate_config_impl.h"
 
 #include "envoy/common/exception.h"
 

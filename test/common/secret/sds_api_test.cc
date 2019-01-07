@@ -4,9 +4,9 @@
 #include "envoy/common/exception.h"
 #include "envoy/service/discovery/v2/sds.pb.h"
 
+#include "common/certificate/certificate_validation_context_config_impl.h"
+#include "common/certificate/tls_certificate_config_impl.h"
 #include "common/secret/sds_api.h"
-#include "common/ssl/certificate_validation_context_config_impl.h"
-#include "common/ssl/tls_certificate_config_impl.h"
 
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/init/mocks.h"
