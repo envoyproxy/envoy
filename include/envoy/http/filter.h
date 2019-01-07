@@ -391,10 +391,7 @@ public:
    * Called with decoded metadata.
    * @param metadata supplies the decoded metadata.
    */
-  //+++++++++++++ change to PURE; and add metadata_map.
-  virtual FilterMetadataStatus decodeMetadata(MetadataMap&) {
-    return FilterMetadataStatus::Continue;
-  }
+  virtual FilterMetadataStatus decodeMetadata(MetadataMap& metadata_map) PURE;
 
   /**
    * Called by the filter manager once to initialize the filter decoder callbacks that the

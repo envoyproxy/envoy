@@ -564,6 +564,8 @@ TEST_P(AdminFilterTest, HeaderOnly) {
 TEST_P(AdminFilterTest, Body) {
   filter_.decodeHeaders(request_headers_, false);
   Buffer::OwnedImpl data("hello");
+  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_.decodeMetadata(metadata_map));
   EXPECT_CALL(callbacks_, encodeHeaders_(_, false));
   filter_.decodeData(data, true);
 }

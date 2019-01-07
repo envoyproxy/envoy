@@ -154,6 +154,8 @@ TEST_F(GzipFilterTest, DefaultConfigValues) {
 // Acceptance Testing with default configuration.
 TEST_F(GzipFilterTest, AcceptanceGzipEncoding) {
   doRequest({{":method", "get"}, {"accept-encoding", "deflate, gzip"}}, false);
+  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->decodeMetadata(metadata_map));
   Buffer::OwnedImpl data("hello");
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
   Http::TestHeaderMapImpl trailers;
