@@ -146,9 +146,10 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://files.pythonhosted.org/packages/f9/e7/4f80d582578f8489226370762d2cf6bc9381175d1929eba1754e03f70708/twitter.common.finagle-thrift-0.3.9.tar.gz"],
     ),
     com_google_googletest = dict(
-        sha256 = "9bf1fe5182a604b4135edc1a425ae356c9ad15e9b23f9f12a02e80184c3a249c",
-        strip_prefix = "googletest-release-1.8.1",
-        urls = ["https://github.com/google/googletest/archive/release-1.8.1.tar.gz"],
+        sha256 = "ed328c14e8b2e6555ad0d4b8d205c32fbd63962941a050ee0ff797fa3ab9b77c",
+        strip_prefix = "googletest-644319b9f06f6ca9bf69fe791be399061044bc3d",
+        # 2019-01-07: attempt to workaround clang-tidy warnings.
+        urls = ["https://github.com/google/googletest/archive/644319b9f06f6ca9bf69fe791be399061044bc3d.tar.gz"],
     ),
     com_google_protobuf = dict(
         sha256 = "3d610ac90f8fa16e12490088605c248b85fdaf23114ce4b3605cdf81f7823604",
