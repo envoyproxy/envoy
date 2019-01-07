@@ -18,7 +18,10 @@ typedef std::unique_ptr<ActionRegistration> ActionRegistrationPtr;
  * in a release build. This action will be invoked each time an assertion
  * failure is detected.
  *
- * This function is not thread-safe; concurrent calls are not allowed.
+ * This function is not thread-safe; concurrent calls to set the action are not allowed.
+ *
+ * The action may be invoked concurrently if two ASSERTS in different threads fail at the
+ * same time, so the action must be thread-safe.
  *
  * This has no effect in debug builds (assertion failure aborts the process)
  * or in release builds without ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE defined (assertion
