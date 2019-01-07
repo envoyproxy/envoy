@@ -14,7 +14,7 @@ namespace OriginalSrc {
 class OriginalSrcSocketOption : public Network::Socket::Option {
 public:
   /**
-   * Constructs a socekt option which will set the socket to use source @c src_address
+   * Constructs a socket option which will set the socket to use source @c src_address
    */
   OriginalSrcSocketOption(Network::Address::InstanceConstSharedPtr src_address);
   ~OriginalSrcSocketOption() {}

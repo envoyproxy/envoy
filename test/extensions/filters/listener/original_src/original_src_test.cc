@@ -118,6 +118,11 @@ TEST_F(OriginalSrcTest, onNewConnectionIpv4AddressBleachesPort) {
 }
 
 TEST_F(OriginalSrcTest, filterAddsTransparentOption) {
+  if (!ENVOY_SOCKET_IP_TRANSPARENT.has_value()) {
+    // The option isn't supported on this platform. Just skip the test.
+    return;
+  }
+
   auto filter = makeDefaultFilter();
   Network::Socket::OptionsSharedPtr options;
   setAddressToReturn("tcp://1.2.3.4:80");
@@ -132,6 +137,11 @@ TEST_F(OriginalSrcTest, filterAddsTransparentOption) {
 }
 
 TEST_F(OriginalSrcTest, filterAddsMarkOption) {
+  if (!ENVOY_SOCKET_SO_MARK.has_value()) {
+    // The option isn't supported on this platform. Just skip the test.
+    return;
+  }
+
   auto filter = makeMarkingFilter(1234);
   Network::Socket::OptionsSharedPtr options;
   setAddressToReturn("tcp://1.2.3.4:80");
