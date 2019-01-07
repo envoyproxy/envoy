@@ -2363,41 +2363,25 @@ TEST(RouteMatcherTest, Retry) {
 }
 
 TEST(RouteMatcherTest, RetryVirtualHostLevel) {
-  const std::string json = R"EOF(
-{
-  "virtual_hosts": [
-    {
-      "name": "www2",
-      "domains": ["www.lyft.com"],
-      "retry_policy": {
-        "per_try_timeout_ms" : 1000,
-        "num_retries": 3,
-        "retry_on": "5xx,gateway-error,connect-failure"
-      },
-      "routes": [
-        {
-          "prefix": "/foo",
-          "cluster": "www2",
-          "retry_policy": {
-            "retry_on": "connect-failure"
-          }
-        },
-        {
-          "prefix": "/bar",
-          "cluster": "www2"
-        },
-        {
-          "prefix": "/",
-          "cluster": "www2"
-        }
-      ]
-    }
-  ]
-}
+  const std::string yaml = R"EOF(
+name: RetryVirtualHostLevel
+virtual_hosts:
+- domains: [www.lyft.com]
+  name: www
+  retry_policy: {num_retries: 3, per_try_timeout: 1s, retry_on: '5xx,gateway-error,connect-failure'}
+  routes:
+  - match: {prefix: /foo}
+    route:
+      cluster: www
+      retry_policy: {retry_on: connect-failure}
+  - match: {prefix: /bar}
+    route: {cluster: www}
+  - match: {prefix: /}
+    route: {cluster: www}
   )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  TestConfigImpl config(parseRouteConfigurationFromJson(json), factory_context, true);
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, true);
 
   // Route level retry policy takes precedence.
   EXPECT_EQ(std::chrono::milliseconds(0),

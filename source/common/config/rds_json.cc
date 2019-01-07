@@ -193,14 +193,6 @@ void RdsJson::translateVirtualHost(const Json::Object& json_virtual_host,
     const auto json_cors = json_virtual_host.getObject("cors");
     translateCors(*json_cors, *cors);
   }
-
-  if (json_virtual_host.hasObject("retry_policy")) {
-    auto* retry_policy = virtual_host.mutable_retry_policy();
-    const auto json_retry_policy = json_virtual_host.getObject("retry_policy");
-    JSON_UTIL_SET_STRING(*json_retry_policy, *retry_policy, retry_on);
-    JSON_UTIL_SET_INTEGER(*json_retry_policy, *retry_policy, num_retries);
-    JSON_UTIL_SET_DURATION(*json_retry_policy, *retry_policy, per_try_timeout);
-  }
 }
 
 void RdsJson::translateDecorator(const Json::Object& json_decorator,
