@@ -16,6 +16,7 @@ envoy_package()
 
 envoy_cc_library(
     name = "assert_lib",
+    srcs = ["assert.cc"],
     hdrs = ["assert.h"],
     deps = [":minimal_logger_lib"],
 )
