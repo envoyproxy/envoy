@@ -931,9 +931,10 @@ void Filter::UpstreamRequest::encodeData(Buffer::Instance& data, bool end_stream
 
     buffered_request_body_->move(data);
   } else {
-
     // Encodes metadata if exists.
     if (!parent_.downstream_metadata_map_vector_.empty()) {
+      ENVOY_STREAM_LOG(trace, "Send metadata before sending data. {}", *parent_.callbacks_,
+                       parent_.downstream_metadata_map_vector_);
       request_encoder_->encodeMetadata(parent_.downstream_metadata_map_vector_);
       parent_.downstream_metadata_map_vector_.clear();
     }
@@ -958,6 +959,8 @@ void Filter::UpstreamRequest::encodeTrailers(const Http::HeaderMap& trailers) {
   } else {
     // Encodes metadata if exists.
     if (!parent_.downstream_metadata_map_vector_.empty()) {
+      ENVOY_STREAM_LOG(trace, "Send metadata before sending trailers. {}", *parent_.callbacks_,
+                       parent_.downstream_metadata_map_vector_);
       request_encoder_->encodeMetadata(parent_.downstream_metadata_map_vector_);
       parent_.downstream_metadata_map_vector_.clear();
     }
@@ -975,7 +978,6 @@ void Filter::UpstreamRequest::encodeMetadata(Http::MetadataMapPtr&& metadata_map
                      *parent_.callbacks_, *metadata_map_ptr);
     parent_.downstream_metadata_map_vector_.emplace_back(std::move(metadata_map_ptr));
   } else {
-
     ENVOY_STREAM_LOG(trace, "Encode metadata: {}", *parent_.callbacks_, *metadata_map_ptr);
     Http::MetadataMapVector metadata_map_vector;
     metadata_map_vector.emplace_back(std::move(metadata_map_ptr));
@@ -1091,8 +1093,10 @@ void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
   if (deferred_reset_reason_) {
     onResetStream(deferred_reset_reason_.value());
   } else {
-    // Encode metadata before any other frame type.
+    // Encode metadata after headers and before any other frame type.
     if (!parent_.downstream_metadata_map_vector_.empty()) {
+      ENVOY_STREAM_LOG(trace, "Send metadata onPoolReady. {}", *parent_.callbacks_,
+                       parent_.downstream_metadata_map_vector_);
       request_encoder.encodeMetadata(parent_.downstream_metadata_map_vector_);
       parent_.downstream_metadata_map_vector_.clear();
     }
