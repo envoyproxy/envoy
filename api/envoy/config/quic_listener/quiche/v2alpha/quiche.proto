@@ -5,11 +5,23 @@ option java_package = "io.envoyproxy.envoy.config.quic_listener.quiche.v2alpha";
 option java_multiple_files = true;
 option go_package = "v2";
 
-// [#protodoc-title: QUICHE]
+import "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.proto";
 
 import "validate/validate.proto";
+import "gogoproto/gogo.proto";
+
+// [#protodoc-title: QUICHE]
 
 // Configuration for QUICHE-based QUIC listener. This will provide QUIC support to Envoy.
 // https://quiche.googlesource.com/quiche/
 message Quiche {
+
+  // HTTP-level configuration for the QUIC listener. In particular, HTTP filters to be applied to
+  // QUIC traffic should be specified in the nested :ref:`HttpConnectionManager
+  // <envoy_api_msg_config.filter.network.http_connection_manager.v2.HttpConnectionManager>` config
+  // protobuf.
+  envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager http_config = 1
+      [(validate.rules).message.required = true, (gogoproto.nullable) = false];
+
+  // QUIC-specific config will be added as fields here.
 }

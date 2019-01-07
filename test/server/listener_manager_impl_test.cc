@@ -3024,7 +3024,15 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, QuicListener) {
     - filters:
     quic_listener:
       name: "envoy.quic_listeners.quiche"
-      config: {}
+      config:
+        http_config:
+          route_config:
+            virtual_hosts:
+            - name: "some_virtual_host"
+              domains: ["some.domain"]
+              routes:
+              - match: { prefix: "/" }
+                route: { cluster: service_foo }
   )EOF";
 
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true));
