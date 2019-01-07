@@ -133,7 +133,9 @@ message VirtualHost {
   // <envoy_api_field_config.filter.http.router.v2.Router.suppress_envoy_headers>` flag.
   bool include_request_attempt_count = 14;
 
-  // Indicates the retry policy for all routes in this virtual host.
+  // Indicates the retry policy for all routes in this virtual host. Note that setting a
+  // route level entry will take precedence over this config and it'll be treated
+  // independently (e.g.: values are not inherited).
   RetryPolicy retry_policy = 16;
 }
 
