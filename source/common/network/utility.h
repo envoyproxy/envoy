@@ -239,6 +239,15 @@ public:
   static void addressToProtobufAddress(const Address::Instance& address,
                                        envoy::api::v2::core::Address& proto_address);
 
+  /**
+   * Returns socket type corresponding to SocketAddress.protocol value of the
+   * given address, or SocketType::Stream if the address is a pipe address.
+   * @param proto_address the address protobuf
+   * @return socket type
+   */
+  static Address::SocketType
+  protobufAddressSocketType(const envoy::api::v2::core::Address& proto_address);
+
 private:
   static void throwWithMalformedIp(const std::string& ip_address);
 
