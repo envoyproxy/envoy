@@ -156,7 +156,7 @@ elif [[ "$1" == "bazel.compile_time_options" ]]; then
     --define=hot_restart=disabled \
     --define=google_grpc=disabled \
     --define=boringssl=fips \
-    --define=debug_memory=enable \
+    --define=tcmalloc=debug \
    "
   setup_clang_toolchain
   # This doesn't go into CI but is available for developer convenience.

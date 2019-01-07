@@ -95,8 +95,8 @@ config_setting(
 )
 
 config_setting(
-    name = "debug_memory",
-    values = {"define": "debug_memory=enabled"},
+    name = "debug_tcmalloc",
+    values = {"define": "tcmalloc=debug"},
 )
 
 config_setting(
