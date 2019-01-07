@@ -536,7 +536,9 @@ message RouteAction {
   google.protobuf.Duration idle_timeout = 24
       [(validate.rules).duration.gt = {}, (gogoproto.stdduration) = true];
 
-  // Indicates that the route has a retry policy.
+  // Indicates that the route has a retry policy. Note that if this is set,
+  // it'll take precedence over the virtual host level retry policy entirely
+  // (e.g.: policies are not merged, most internal one becomes the enforced policy).
   RetryPolicy retry_policy = 9;
 
   // The router is capable of shadowing traffic from one cluster to another. The current
