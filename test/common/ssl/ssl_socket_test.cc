@@ -75,10 +75,11 @@ void testUtil(const std::string& client_ctx_yaml, const std::string& server_ctx_
 
   DangerousDeprecatedTestTime test_time;
   Event::DispatcherImpl dispatcher(test_time.timeSystem());
-  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(version), nullptr);
+  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(version), nullptr,
+                                  true);
   Network::MockListenerCallbacks callbacks;
   Network::MockConnectionHandler connection_handler;
-  Network::ListenerPtr listener = dispatcher.createListener(socket, callbacks, false);
+  Network::ListenerPtr listener = dispatcher.createListener(socket, callbacks, true, false);
 
   envoy::api::v2::auth::UpstreamTlsContext client_tls_context;
   MessageUtil::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml), client_tls_context);
@@ -196,10 +197,11 @@ const std::string testUtilV2(
 
   DangerousDeprecatedTestTime test_time;
   Event::DispatcherImpl dispatcher(test_time.timeSystem());
-  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(version), nullptr);
+  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(version), nullptr,
+                                  true);
   NiceMock<Network::MockListenerCallbacks> callbacks;
   Network::MockConnectionHandler connection_handler;
-  Network::ListenerPtr listener = dispatcher.createListener(socket, callbacks, false);
+  Network::ListenerPtr listener = dispatcher.createListener(socket, callbacks, true, false);
 
   auto client_cfg = std::make_unique<ClientContextConfigImpl>(client_ctx_proto, factory_context);
   Stats::IsolatedStoreImpl client_stats_store;
@@ -1643,10 +1645,11 @@ TEST_P(SslSocketTest, FlushCloseDuringHandshake) {
   Ssl::ServerSslSocketFactory server_ssl_socket_factory(
       std::move(server_cfg), manager, server_stats_store, std::vector<std::string>{});
 
-  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr);
+  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr,
+                                  true);
   Network::MockListenerCallbacks callbacks;
   Network::MockConnectionHandler connection_handler;
-  Network::ListenerPtr listener = dispatcher_->createListener(socket, callbacks, false);
+  Network::ListenerPtr listener = dispatcher_->createListener(socket, callbacks, true, false);
 
   Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
       socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
@@ -1703,10 +1706,12 @@ TEST_P(SslSocketTest, HalfClose) {
   Ssl::ServerSslSocketFactory server_ssl_socket_factory(
       std::move(server_cfg), manager, server_stats_store, std::vector<std::string>{});
 
-  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr);
+  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr,
+                                  true);
   Network::MockListenerCallbacks listener_callbacks;
   Network::MockConnectionHandler connection_handler;
-  Network::ListenerPtr listener = dispatcher_->createListener(socket, listener_callbacks, false);
+  Network::ListenerPtr listener =
+      dispatcher_->createListener(socket, listener_callbacks, true, false);
   std::shared_ptr<Network::MockReadFilter> server_read_filter(new Network::MockReadFilter());
   std::shared_ptr<Network::MockReadFilter> client_read_filter(new Network::MockReadFilter());
 
@@ -1791,10 +1796,11 @@ TEST_P(SslSocketTest, ClientAuthMultipleCAs) {
   Ssl::ServerSslSocketFactory server_ssl_socket_factory(
       std::move(server_cfg), manager, server_stats_store, std::vector<std::string>{});
 
-  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr);
+  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr,
+                                  true);
   Network::MockListenerCallbacks callbacks;
   Network::MockConnectionHandler connection_handler;
-  Network::ListenerPtr listener = dispatcher_->createListener(socket, callbacks, false);
+  Network::ListenerPtr listener = dispatcher_->createListener(socket, callbacks, true, false);
 
   const std::string client_ctx_yaml = R"EOF(
   common_tls_context:
@@ -1882,14 +1888,16 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
   Ssl::ServerSslSocketFactory server_ssl_socket_factory2(std::move(server_cfg2), manager,
                                                          server_stats_store, server_names2);
 
-  Network::TcpListenSocket socket1(Network::Test::getCanonicalLoopbackAddress(ip_version), nullptr);
-  Network::TcpListenSocket socket2(Network::Test::getCanonicalLoopbackAddress(ip_version), nullptr);
+  Network::TcpListenSocket socket1(Network::Test::getCanonicalLoopbackAddress(ip_version), nullptr,
+                                   true);
+  Network::TcpListenSocket socket2(Network::Test::getCanonicalLoopbackAddress(ip_version), nullptr,
+                                   true);
   NiceMock<Network::MockListenerCallbacks> callbacks;
   Network::MockConnectionHandler connection_handler;
   DangerousDeprecatedTestTime test_time;
   Event::DispatcherImpl dispatcher(test_time.timeSystem());
-  Network::ListenerPtr listener1 = dispatcher.createListener(socket1, callbacks, false);
-  Network::ListenerPtr listener2 = dispatcher.createListener(socket2, callbacks, false);
+  Network::ListenerPtr listener1 = dispatcher.createListener(socket1, callbacks, true, false);
+  Network::ListenerPtr listener2 = dispatcher.createListener(socket2, callbacks, true, false);
 
   envoy::api::v2::auth::UpstreamTlsContext client_tls_context;
   MessageUtil::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml), client_tls_context);
@@ -2285,12 +2293,14 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
   Ssl::ServerSslSocketFactory server2_ssl_socket_factory(
       std::move(server2_cfg), manager, server_stats_store, std::vector<std::string>{});
 
-  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr);
-  Network::TcpListenSocket socket2(Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr);
+  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr,
+                                  true);
+  Network::TcpListenSocket socket2(Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr,
+                                   true);
   Network::MockListenerCallbacks callbacks;
   Network::MockConnectionHandler connection_handler;
-  Network::ListenerPtr listener = dispatcher_->createListener(socket, callbacks, false);
-  Network::ListenerPtr listener2 = dispatcher_->createListener(socket2, callbacks, false);
+  Network::ListenerPtr listener = dispatcher_->createListener(socket, callbacks, true, false);
+  Network::ListenerPtr listener2 = dispatcher_->createListener(socket2, callbacks, true, false);
   const std::string client_ctx_yaml = R"EOF(
   common_tls_context:
     tls_certificates:
@@ -2394,11 +2404,12 @@ void testClientSessionResumption(const std::string& server_ctx_yaml,
   ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), manager,
                                                    server_stats_store, std::vector<std::string>{});
 
-  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(version), nullptr);
+  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(version), nullptr,
+                                  true);
   NiceMock<Network::MockListenerCallbacks> callbacks;
   Network::MockConnectionHandler connection_handler;
   Event::DispatcherImpl dispatcher(time_system);
-  Network::ListenerPtr listener = dispatcher.createListener(socket, callbacks, false);
+  Network::ListenerPtr listener = dispatcher.createListener(socket, callbacks, true, false);
 
   Network::ConnectionPtr server_connection;
   Network::MockConnectionCallbacks server_connection_callbacks;
@@ -2653,10 +2664,11 @@ TEST_P(SslSocketTest, SslError) {
   Ssl::ServerSslSocketFactory server_ssl_socket_factory(
       std::move(server_cfg), manager, server_stats_store, std::vector<std::string>{});
 
-  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr);
+  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr,
+                                  true);
   Network::MockListenerCallbacks callbacks;
   Network::MockConnectionHandler connection_handler;
-  Network::ListenerPtr listener = dispatcher_->createListener(socket, callbacks, false);
+  Network::ListenerPtr listener = dispatcher_->createListener(socket, callbacks, true, false);
 
   Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
       socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
@@ -2720,20 +2732,20 @@ TEST_P(SslSocketTest, ProtocolVersions) {
   // Connection using TLSv1.0 (client) and defaults (server) succeeds.
   client_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_0);
   client_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_0);
-  testUtilV2(listener, client, "", true, "TLSv1", "", "", "", "", "ssl.handshake", "ssl.handshake",
-             GetParam(), nullptr);
+  testUtilV2(listener, client, "", true, "TLSv1", "", "", "", "", "ssl.versions.TLSv1",
+             "ssl.versions.TLSv1", GetParam(), nullptr);
 
   // Connection using TLSv1.1 (client) and defaults (server) succeeds.
   client_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_1);
   client_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_1);
-  testUtilV2(listener, client, "", true, "TLSv1.1", "", "", "", "", "ssl.handshake",
-             "ssl.handshake", GetParam(), nullptr);
+  testUtilV2(listener, client, "", true, "TLSv1.1", "", "", "", "", "ssl.versions.TLSv1.1",
+             "ssl.versions.TLSv1.1", GetParam(), nullptr);
 
   // Connection using TLSv1.2 (client) and defaults (server) succeeds.
   client_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_2);
   client_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_2);
-  testUtilV2(listener, client, "", true, "TLSv1.2", "", "", "", "", "ssl.handshake",
-             "ssl.handshake", GetParam(), nullptr);
+  testUtilV2(listener, client, "", true, "TLSv1.2", "", "", "", "", "ssl.versions.TLSv1.2",
+             "ssl.versions.TLSv1.2", GetParam(), nullptr);
 
   // Connection using TLSv1.3 (client) and defaults (server) fails.
   client_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_3);
@@ -2744,28 +2756,28 @@ TEST_P(SslSocketTest, ProtocolVersions) {
   // Connection using TLSv1.3 (client) and TLSv1.0-1.3 (server) succeeds.
   server_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_0);
   server_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_3);
-  testUtilV2(listener, client, "", true, "TLSv1.3", "", "", "", "", "ssl.handshake",
-             "ssl.handshake", GetParam(), nullptr);
+  testUtilV2(listener, client, "", true, "TLSv1.3", "", "", "", "", "ssl.versions.TLSv1.3",
+             "ssl.versions.TLSv1.3", GetParam(), nullptr);
 
   // Connection using defaults (client) and TLSv1.0 (server) succeeds.
   client_params->clear_tls_minimum_protocol_version();
   client_params->clear_tls_maximum_protocol_version();
   server_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_0);
   server_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_0);
-  testUtilV2(listener, client, "", true, "TLSv1", "", "", "", "", "ssl.handshake", "ssl.handshake",
-             GetParam(), nullptr);
+  testUtilV2(listener, client, "", true, "TLSv1", "", "", "", "", "ssl.versions.TLSv1",
+             "ssl.versions.TLSv1", GetParam(), nullptr);
 
   // Connection using defaults (client) and TLSv1.1 (server) succeeds.
   server_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_1);
   server_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_1);
-  testUtilV2(listener, client, "", true, "TLSv1.1", "", "", "", "", "ssl.handshake",
-             "ssl.handshake", GetParam(), nullptr);
+  testUtilV2(listener, client, "", true, "TLSv1.1", "", "", "", "", "ssl.versions.TLSv1.1",
+             "ssl.versions.TLSv1.1", GetParam(), nullptr);
 
   // Connection using defaults (client) and TLSv1.2 (server) succeeds.
   server_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_2);
   server_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_2);
-  testUtilV2(listener, client, "", true, "TLSv1.2", "", "", "", "", "ssl.handshake",
-             "ssl.handshake", GetParam(), nullptr);
+  testUtilV2(listener, client, "", true, "TLSv1.2", "", "", "", "", "ssl.versions.TLSv1.2",
+             "ssl.versions.TLSv1.2", GetParam(), nullptr);
 
   // Connection using defaults (client) and TLSv1.3 (server) fails.
   server_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_3);
@@ -2776,21 +2788,8 @@ TEST_P(SslSocketTest, ProtocolVersions) {
   // Connection using TLSv1.0-TLSv1.3 (client) and TLSv1.3 (server) succeeds.
   client_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_0);
   client_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_3);
-  testUtilV2(listener, client, "", true, "TLSv1.3", "", "", "", "", "ssl.handshake",
-             "ssl.handshake", GetParam(), nullptr);
-
-  // Protocol version logged correctly when connecting using TLSv1.0-TLSv1.3
-  // for the client and TLSv1.3 for the server.
   testUtilV2(listener, client, "", true, "TLSv1.3", "", "", "", "", "ssl.versions.TLSv1.3",
              "ssl.versions.TLSv1.3", GetParam(), nullptr);
-
-  // Protocol version logged correctly when connecting using TLSv1.0 for both.
-  client_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_0);
-  client_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_0);
-  server_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_0);
-  server_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_0);
-  testUtilV2(listener, client, "", true, "TLSv1", "", "", "", "", "ssl.versions.TLSv1",
-             "ssl.versions.TLSv1", GetParam(), nullptr);
 }
 
 TEST_P(SslSocketTest, ALPN) {
@@ -2889,7 +2888,8 @@ TEST_P(SslSocketTest, CipherSuites) {
   client_params->add_cipher_suites("ECDHE-RSA-CHACHA20-POLY1305");
   server_params->add_cipher_suites("ECDHE-RSA-CHACHA20-POLY1305");
   server_params->add_cipher_suites("ECDHE-RSA-AES128-GCM-SHA256");
-  testUtilV2(listener, client, "", true, "", "", "", "", "", "ssl.handshake", "ssl.handshake",
+  testUtilV2(listener, client, "", true, "", "", "", "", "",
+             "ssl.ciphers.ECDHE-RSA-CHACHA20-POLY1305", "ssl.ciphers.ECDHE-RSA-CHACHA20-POLY1305",
              GetParam(), nullptr);
   client_params->clear_cipher_suites();
   server_params->clear_cipher_suites();
@@ -2901,6 +2901,18 @@ TEST_P(SslSocketTest, CipherSuites) {
              "ssl.connection_error", GetParam(), nullptr);
   client_params->clear_cipher_suites();
   server_params->clear_cipher_suites();
+
+  // Verify that ECDHE-RSA-CHACHA20-POLY1305 is not offered by default in FIPS builds.
+  client_params->add_cipher_suites("ECDHE-RSA-CHACHA20-POLY1305");
+#ifdef BORINGSSL_FIPS
+  testUtilV2(listener, client, "", false, "", "", "", "", "", "ssl.connection_error",
+             "ssl.connection_error", GetParam(), nullptr);
+#else
+  testUtilV2(listener, client, "", true, "", "", "", "", "",
+             "ssl.ciphers.ECDHE-RSA-CHACHA20-POLY1305", "ssl.ciphers.ECDHE-RSA-CHACHA20-POLY1305",
+             GetParam(), nullptr);
+#endif
+  client_params->clear_cipher_suites();
 }
 
 TEST_P(SslSocketTest, EcdhCurves) {
@@ -2934,8 +2946,8 @@ TEST_P(SslSocketTest, EcdhCurves) {
   server_params->add_ecdh_curves("X25519");
   server_params->add_ecdh_curves("P-256");
   server_params->add_cipher_suites("ECDHE-RSA-AES128-GCM-SHA256");
-  testUtilV2(listener, client, "", true, "", "", "", "", "", "ssl.handshake", "ssl.handshake",
-             GetParam(), nullptr);
+  testUtilV2(listener, client, "", true, "", "", "", "", "", "ssl.curves.X25519",
+             "ssl.curves.X25519", GetParam(), nullptr);
   client_params->clear_ecdh_curves();
   server_params->clear_ecdh_curves();
   server_params->clear_cipher_suites();
@@ -2949,6 +2961,58 @@ TEST_P(SslSocketTest, EcdhCurves) {
   client_params->clear_ecdh_curves();
   server_params->clear_ecdh_curves();
   server_params->clear_cipher_suites();
+
+  // Verify that X25519 is not offered by default in FIPS builds.
+  client_params->add_ecdh_curves("X25519");
+  server_params->add_cipher_suites("ECDHE-RSA-AES128-GCM-SHA256");
+#ifdef BORINGSSL_FIPS
+  testUtilV2(listener, client, "", false, "", "", "", "", "", "ssl.connection_error",
+             "ssl.connection_error", GetParam(), nullptr);
+#else
+  testUtilV2(listener, client, "", true, "", "", "", "", "", "ssl.curves.X25519",
+             "ssl.curves.X25519", GetParam(), nullptr);
+#endif
+  client_params->clear_ecdh_curves();
+  server_params->clear_cipher_suites();
+}
+
+TEST_P(SslSocketTest, SignatureAlgorithms) {
+  envoy::api::v2::Listener listener;
+  envoy::api::v2::listener::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::api::v2::auth::CertificateValidationContext* server_validation_ctx =
+      filter_chain->mutable_tls_context()
+          ->mutable_common_tls_context()
+          ->mutable_validation_context();
+  server_validation_ctx->mutable_trusted_ca()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"));
+  // Server ECDSA certificate.
+  envoy::api::v2::auth::TlsCertificate* server_cert =
+      filter_chain->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
+  server_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_ecdsa_p256_cert.pem"));
+  server_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_ecdsa_p256_key.pem"));
+
+  envoy::api::v2::auth::UpstreamTlsContext client;
+  // Client RSA certificate.
+  envoy::api::v2::auth::TlsCertificate* client_cert =
+      client.mutable_common_tls_context()->add_tls_certificates();
+  client_cert->mutable_certificate_chain()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_uri_cert.pem"));
+  client_cert->mutable_private_key()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_uri_key.pem"));
+
+  // Connection using defaults (client & server) succeeds.
+  testUtilV2(listener, client, "", true, "", "", "spiffe://lyft.com/test-team", "", "",
+             "ssl.sigalgs.rsa_pss_rsae_sha256", "ssl.sigalgs.ecdsa_secp256r1_sha256", GetParam(),
+             nullptr);
+
+  // Connection using defaults (client & server) succeeds, even with client renegotiation.
+  client.set_allow_renegotiation(true);
+  testUtilV2(listener, client, "", true, "", "", "spiffe://lyft.com/test-team", "", "",
+             "ssl.sigalgs.rsa_pss_rsae_sha256", "ssl.sigalgs.ecdsa_secp256r1_sha256", GetParam(),
+             nullptr);
+  client.set_allow_renegotiation(false);
 }
 
 TEST_P(SslSocketTest, RevokedCertificate) {
@@ -3182,7 +3246,7 @@ public:
     server_ssl_socket_factory_ = std::make_unique<ServerSslSocketFactory>(
         std::move(server_cfg), *manager_, server_stats_store_, std::vector<std::string>{});
 
-    listener_ = dispatcher_->createListener(socket_, listener_callbacks_, false);
+    listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true, false);
 
     MessageUtil::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml_), upstream_tls_context_);
     auto client_cfg =
@@ -3336,7 +3400,8 @@ public:
 
   Stats::IsolatedStoreImpl server_stats_store_;
   Stats::IsolatedStoreImpl client_stats_store_;
-  Network::TcpListenSocket socket_{Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr};
+  Network::TcpListenSocket socket_{Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr,
+                                   true};
   Network::MockListenerCallbacks listener_callbacks_;
   Network::MockConnectionHandler connection_handler_;
   const std::string server_ctx_yaml_ = R"EOF(

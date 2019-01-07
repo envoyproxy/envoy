@@ -36,6 +36,7 @@ using testing::AssertionSuccess;
 using testing::AtLeast;
 using testing::InSequence;
 using testing::Invoke;
+using testing::Matcher;
 using testing::MockFunction;
 using testing::NiceMock;
 using testing::Ref;
@@ -2346,6 +2347,21 @@ TEST(RouterFilterUtilityTest, ShouldShadow) {
     NiceMock<Runtime::MockLoader> runtime;
     EXPECT_CALL(runtime.snapshot_, featureEnabled("foo", 0, 5, 10000)).WillOnce(Return(true));
     EXPECT_TRUE(FilterUtility::shouldShadow(policy, runtime, 5));
+  }
+  // Use default value instead of runtime key.
+  {
+    TestShadowPolicy policy;
+    envoy::type::FractionalPercent fractional_percent;
+    fractional_percent.set_numerator(5);
+    fractional_percent.set_denominator(envoy::type::FractionalPercent::TEN_THOUSAND);
+    policy.cluster_ = "cluster";
+    policy.runtime_key_ = "foo";
+    policy.default_value_ = fractional_percent;
+    NiceMock<Runtime::MockLoader> runtime;
+    EXPECT_CALL(runtime.snapshot_,
+                featureEnabled("foo", Matcher<const envoy::type::FractionalPercent&>(_), 3))
+        .WillOnce(Return(true));
+    EXPECT_TRUE(FilterUtility::shouldShadow(policy, runtime, 3));
   }
 }
 

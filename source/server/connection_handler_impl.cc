@@ -74,10 +74,11 @@ void ConnectionHandlerImpl::ActiveListener::removeConnection(ActiveConnection& c
 
 ConnectionHandlerImpl::ActiveListener::ActiveListener(ConnectionHandlerImpl& parent,
                                                       Network::ListenerConfig& config)
-    : ActiveListener(parent,
-                     parent.dispatcher_.createListener(
-                         config.socket(), *this, config.handOffRestoredDestinationConnections()),
-                     config) {}
+    : ActiveListener(
+          parent,
+          parent.dispatcher_.createListener(config.socket(), *this, config.bindToPort(),
+                                            config.handOffRestoredDestinationConnections()),
+          config) {}
 
 ConnectionHandlerImpl::ActiveListener::ActiveListener(ConnectionHandlerImpl& parent,
                                                       Network::ListenerPtr&& listener,
