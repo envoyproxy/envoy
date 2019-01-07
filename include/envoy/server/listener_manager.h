@@ -4,6 +4,7 @@
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
+#include "envoy/quic/listener.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/server/guarddog.h"
@@ -73,6 +74,16 @@ public:
   virtual std::vector<Network::ListenerFilterFactoryCb> createListenerFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>& filters,
       Configuration::ListenerFactoryContext& context) PURE;
+
+  /**
+   * Creates a QUIC listener factory.
+   * @param listener_config supplies the QUIC listenerconfiguration.
+   * @param context supplies the factory creation context.
+   * @return Quic::QuicListenerFactoryPtr the QUIC listener factory.
+   */
+  virtual Quic::QuicListenerFactoryPtr
+  createQuicListenerFactory(const envoy::api::v2::listener::QuicListener& listener_config,
+                            Configuration::ListenerFactoryContext& context) PURE;
 
   /**
    * @return DrainManagerPtr a new drain manager.

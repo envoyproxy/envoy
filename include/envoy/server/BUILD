@@ -174,6 +174,7 @@ envoy_cc_library(
         ":guarddog_interface",
         "//include/envoy/network:filter_interface",
         "//include/envoy/network:listen_socket_interface",
+        "//include/envoy/quic:listener_interface",
         "//include/envoy/ssl:context_interface",
         "//source/common/protobuf",
         "@envoy_api//envoy/api/v2/listener:listener_cc",

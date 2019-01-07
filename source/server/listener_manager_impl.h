@@ -43,6 +43,12 @@ public:
   static std::vector<Network::ListenerFilterFactoryCb> createListenerFilterFactoryList_(
       const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>& filters,
       Configuration::ListenerFactoryContext& context);
+  /**
+   * Static worker for createQuicListenerFactory() that can be used directly in tests.
+   */
+  static Quic::QuicListenerFactoryPtr
+  createQuicListenerFactory_(const envoy::api::v2::listener::QuicListener& listener_config,
+                             Configuration::ListenerFactoryContext& context);
 
   // Server::ListenerComponentFactory
   LdsApiPtr createLdsApi(const envoy::api::v2::core::ConfigSource& lds_config) override {
@@ -60,6 +66,12 @@ public:
       Configuration::ListenerFactoryContext& context) override {
     return createListenerFilterFactoryList_(filters, context);
   }
+  Quic::QuicListenerFactoryPtr
+  createQuicListenerFactory(const envoy::api::v2::listener::QuicListener& listener_config,
+                            Configuration::ListenerFactoryContext& context) override {
+    return createQuicListenerFactory_(listener_config, context);
+  }
+
   Network::SocketSharedPtr createListenSocket(Network::Address::InstanceConstSharedPtr address,
                                               Network::Address::SocketType socket_type,
                                               const Network::Socket::OptionsSharedPtr& options,
@@ -242,7 +254,7 @@ public:
   // Network::ListenerConfig
   Network::FilterChainManager& filterChainManager() override { return *this; }
   Network::FilterChainFactory& filterChainFactory() override { return *this; }
-  Quic::QuicListenerFactory* quicListenerFactory() override { return nullptr; }
+  Quic::QuicListenerFactory* quicListenerFactory() override { return quic_listener_factory_.get(); }
   Network::Socket& socket() override { return *socket_; }
   const Network::Socket& socket() const override { return *socket_; }
   bool bindToPort() override { return bind_to_port_; }
@@ -405,6 +417,7 @@ private:
   InitManagerImpl dynamic_init_manager_;
   bool initialize_canceled_{};
   std::vector<Network::ListenerFilterFactoryCb> listener_filter_factories_;
+  Quic::QuicListenerFactoryPtr quic_listener_factory_;
   DrainManagerPtr local_drain_manager_;
   bool saw_listener_create_failure_{};
   const envoy::api::v2::Listener config_;

@@ -1,6 +1,7 @@
 #include "server/listener_manager_impl.h"
 
 #include "envoy/admin/v2alpha/config_dump.pb.h"
+#include "envoy/quic/config.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/stats/scope.h"
@@ -97,6 +98,22 @@ ProdListenerComponentFactory::createListenerFilterFactoryList_(
   return ret;
 }
 
+Quic::QuicListenerFactoryPtr ProdListenerComponentFactory::createQuicListenerFactory_(
+    const envoy::api::v2::listener::QuicListener& listener_config,
+    Configuration::ListenerFactoryContext& context) {
+  const ProtobufTypes::String string_name = listener_config.name();
+  ENVOY_LOG(debug, "QUIC listener:");
+  ENVOY_LOG(debug, "    name: {}", string_name);
+  const Json::ObjectSharedPtr json_config =
+      MessageUtil::getJsonObjectFromMessage(listener_config.config());
+  ENVOY_LOG(debug, "  config: {}", json_config->asJsonString());
+
+  // Now see if there is a factory that will accept the config.
+  auto& factory = Config::Utility::getAndCheckFactory<Quic::QuicListenerConfigFactory>(string_name);
+  auto message = Config::Utility::translateToFactoryConfig(listener_config, factory);
+  return factory.createListenerFactoryFromProto(*message, context);
+}
+
 Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
     Network::Address::InstanceConstSharedPtr address, Network::Address::SocketType socket_type,
     const Network::Socket::OptionsSharedPtr& options, bool bind_to_port) {
@@ -189,6 +206,10 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
   if (!config.listener_filters().empty()) {
     listener_filter_factories_ =
         parent_.factory_.createListenerFilterFactoryList(config.listener_filters(), *this);
+  }
+  if (config.has_quic_listener()) {
+    quic_listener_factory_ =
+        parent_.factory_.createQuicListenerFactory(config.quic_listener(), *this);
   }
   // Add original dst listener filter if 'use_original_dst' flag is set.
   if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_original_dst, false)) {

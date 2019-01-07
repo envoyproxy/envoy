@@ -220,6 +220,10 @@ public:
                std::vector<Network::ListenerFilterFactoryCb>(
                    const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>&,
                    Configuration::ListenerFactoryContext& context));
+  MOCK_METHOD2(createQuicListenerFactory,
+               Quic::QuicListenerFactoryPtr(
+                   const envoy::api::v2::listener::QuicListener&,
+                   Configuration::ListenerFactoryContext& context));
   MOCK_METHOD4(createListenSocket,
                Network::SocketSharedPtr(Network::Address::InstanceConstSharedPtr address,
                                         Network::Address::SocketType socket_type,

@@ -142,6 +142,13 @@ public:
               return ProdListenerComponentFactory::createListenerFilterFactoryList_(filters,
                                                                                     context);
             }));
+    ON_CALL(listener_factory_, createQuicListenerFactory(_, _))
+        .WillByDefault(Invoke(
+            [](const envoy::api::v2::listener::QuicListener& listener_config,
+               Configuration::ListenerFactoryContext& context) -> Quic::QuicListenerFactoryPtr {
+              return ProdListenerComponentFactory::createQuicListenerFactory_(listener_config,
+                                                                              context);
+            }));
     socket_ = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
     local_address_.reset(new Network::Address::Ipv4Instance("127.0.0.1", 1234));
     remote_address_.reset(new Network::Address::Ipv4Instance("127.0.0.1", 1234));

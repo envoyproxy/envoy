@@ -113,6 +113,12 @@ public:
       Configuration::ListenerFactoryContext& context) override {
     return ProdListenerComponentFactory::createListenerFilterFactoryList_(filters, context);
   }
+  Quic::QuicListenerFactoryPtr
+  createQuicListenerFactory(const envoy::api::v2::listener::QuicListener& listener_config,
+                            Configuration::ListenerFactoryContext& context) override {
+    return ProdListenerComponentFactory::createQuicListenerFactory_(listener_config, context);
+  }
+
   Network::SocketSharedPtr createListenSocket(Network::Address::InstanceConstSharedPtr,
                                               Network::Address::SocketType,
                                               const Network::Socket::OptionsSharedPtr&,

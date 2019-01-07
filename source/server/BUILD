@@ -205,6 +205,7 @@ envoy_cc_library(
         ":init_manager_lib",
         ":lds_api_lib",
         ":transport_socket_config_lib",
+        "//include/envoy/quic:config_interface",
         "//include/envoy/server:filter_config_interface",
         "//include/envoy/server:listener_manager_interface",
         "//include/envoy/server:transport_socket_config_interface",
