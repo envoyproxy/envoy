@@ -222,6 +222,20 @@ void HostSetImpl::updateHosts(UpdateHostsParams&& update_hosts_params,
   healthy_hosts_per_locality_ = std::move(update_hosts_params.healthy_hosts_per_locality);
   degraded_hosts_per_locality_ = std::move(update_hosts_params.degraded_hosts_per_locality);
   locality_weights_ = std::move(locality_weights);
+
+  rebuildLocalityScheduler(locality_scheduler_, locality_entries_, *healthy_hosts_per_locality_,
+                           *healthy_hosts_, hosts_per_locality_, locality_weights_,
+                           overprovisioning_factor_);
+
+  runUpdateCallbacks(hosts_added, hosts_removed);
+}
+
+void HostSetImpl::rebuildLocalityScheduler(
+    std::unique_ptr<EdfScheduler<LocalityEntry>>& locality_scheduler,
+    std::vector<std::shared_ptr<LocalityEntry>>& locality_entries,
+    const HostsPerLocality& eligible_hosts_per_locality, const HostVector& eligible_hosts,
+    HostsPerLocalityConstSharedPtr all_hosts_per_locality,
+    LocalityWeightsConstSharedPtr locality_weights, uint32_t overprovisioning_factor) {
   // Rebuild the locality scheduler by computing the effective weight of each
   // locality in this priority. The scheduler is reset by default, and is rebuilt only if we have
   // locality weights (i.e. using EDS) and there is at least one healthy host in this priority.
@@ -237,24 +251,25 @@ void HostSetImpl::updateHosts(UpdateHostsParams&& update_hosts_params,
   // could just update locality_weight_ without rebuilding. Similar to how host
   // level WRR works, we would age out the existing entries via picks and lazily
   // apply the new weights.
-  locality_scheduler_ = nullptr;
-  if (hosts_per_locality_ != nullptr && locality_weights_ != nullptr &&
-      !locality_weights_->empty() && !healthy_hosts_->empty()) {
-    locality_scheduler_ = std::make_unique<EdfScheduler<LocalityEntry>>();
-    locality_entries_.clear();
-    for (uint32_t i = 0; i < hosts_per_locality_->get().size(); ++i) {
-      const double effective_weight = effectiveLocalityWeight(i);
+  locality_scheduler = nullptr;
+  if (all_hosts_per_locality != nullptr && locality_weights != nullptr &&
+      !locality_weights->empty() && !eligible_hosts.empty()) {
+    locality_scheduler = std::make_unique<EdfScheduler<LocalityEntry>>();
+    locality_entries.clear();
+    for (uint32_t i = 0; i < all_hosts_per_locality->get().size(); ++i) {
+      const double effective_weight =
+          effectiveLocalityWeight(i, eligible_hosts_per_locality, *all_hosts_per_locality,
+                                  *locality_weights, overprovisioning_factor);
       if (effective_weight > 0) {
-        locality_entries_.emplace_back(std::make_shared<LocalityEntry>(i, effective_weight));
-        locality_scheduler_->add(effective_weight, locality_entries_.back());
+        locality_entries.emplace_back(std::make_shared<LocalityEntry>(i, effective_weight));
+        locality_scheduler->add(effective_weight, locality_entries.back());
       }
     }
     // If all effective weights were zero, reset the scheduler.
-    if (locality_scheduler_->empty()) {
-      locality_scheduler_ = nullptr;
+    if (locality_scheduler->empty()) {
+      locality_scheduler = nullptr;
     }
   }
-  runUpdateCallbacks(hosts_added, hosts_removed);
 }
 
 absl::optional<uint32_t> HostSetImpl::chooseLocality() {
@@ -317,21 +332,24 @@ HostSetImpl::partitionHosts(HostVectorConstSharedPtr hosts,
                            std::move(degraded_hosts), std::move(degraded_hosts_per_locality));
 }
 
-double HostSetImpl::effectiveLocalityWeight(uint32_t index) const {
-  ASSERT(locality_weights_ != nullptr);
-  ASSERT(hosts_per_locality_ != nullptr);
-  const auto& locality_hosts = hosts_per_locality_->get()[index];
-  const auto& locality_healthy_hosts = healthy_hosts_per_locality_->get()[index];
+double HostSetImpl::effectiveLocalityWeight(uint32_t index,
+                                            const HostsPerLocality& eligible_hosts_per_locality,
+                                            const HostsPerLocality& all_hosts_per_locality,
+                                            const LocalityWeights& locality_weights,
+                                            uint32_t overprovisioning_factor) {
+  const auto& locality_hosts = all_hosts_per_locality.get()[index];
+  const auto& locality_eligible_hosts = eligible_hosts_per_locality.get()[index];
   if (locality_hosts.empty()) {
     return 0.0;
   }
-  const double locality_healthy_ratio = 1.0 * locality_healthy_hosts.size() / locality_hosts.size();
-  const uint32_t weight = (*locality_weights_)[index];
-  // Health ranges from 0-1.0, and is the ratio of healthy hosts to total hosts, modified by the
-  // overprovisioning factor.
-  const double effective_locality_health_ratio =
-      std::min(1.0, (overprovisioningFactor() / 100.0) * locality_healthy_ratio);
-  return weight * effective_locality_health_ratio;
+  const double locality_availability_ratio =
+      1.0 * locality_eligible_hosts.size() / locality_hosts.size();
+  const uint32_t weight = locality_weights[index];
+  // Availability ranges from 0-1.0, and is the ratio of eligible hosts to total hosts, modified by
+  // the overprovisioning factor.
+  const double effective_locality_availability_ratio =
+      std::min(1.0, (overprovisioning_factor / 100.0) * locality_availability_ratio);
+  return weight * effective_locality_availability_ratio;
 }
 
 HostSet& PrioritySetImpl::getOrCreateHostSet(uint32_t priority,

@@ -762,11 +762,11 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilte
   for (; entry != decoder_filters_.end(); entry++) {
     ASSERT(!(state_.filter_call_state_ & FilterCallState::DecodeHeaders));
     state_.filter_call_state_ |= FilterCallState::DecodeHeaders;
-    const auto current_filter_end_stream =
+    (*entry)->end_stream_ =
         decoding_headers_only_ || (end_stream && continue_data_entry == decoder_filters_.end());
-    FilterHeadersStatus status = (*entry)->decodeHeaders(headers, current_filter_end_stream);
+    FilterHeadersStatus status = (*entry)->decodeHeaders(headers, (*entry)->end_stream_);
 
-    ASSERT(!(status == FilterHeadersStatus::ContinueAndEndStream && current_filter_end_stream));
+    ASSERT(!(status == FilterHeadersStatus::ContinueAndEndStream && (*entry)->end_stream_));
     state_.filter_call_state_ &= ~FilterCallState::DecodeHeaders;
     ENVOY_STREAM_LOG(trace, "decode headers called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
@@ -831,6 +831,39 @@ void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* 
   }
 
   for (; entry != decoder_filters_.end(); entry++) {
+    // If end_stream_ is marked for a filter, the data is not for this filter and filters after.
+    //
+    // In following case, ActiveStreamFilterBase::commonContine() could be called recursively and
+    // its doData() is called with wrong data.
+    //
+    //  There are 3 decode filters and "wrapper" refers to ActiveStreamFilter object.
+    //
+    //  filter0->decodeHeaders(_, true)
+    //    return STOP
+    //  filter0->continueDecoding()
+    //    wrapper0->commonContinue()
+    //      wrapper0->decodeHeaders(_, _, true)
+    //        filter1->decodeHeaders(_, true)
+    //          filter1->addDecodeData()
+    //          return CONTINUE
+    //        filter2->decodeHeaders(_, false)
+    //          return CONTINUE
+    //        wrapper1->commonContinue() // Detects data is added.
+    //          wrapper1->doData()
+    //            wrapper1->decodeData()
+    //              filter2->decodeData(_, true)
+    //                 return CONTINUE
+    //      wrapper0->doData() // This should not be called
+    //        wrapper0->decodeData()
+    //          filter1->decodeData(_, true)  // It will cause assertions.
+    //
+    // One way to solve this problem is to mark end_stream_ for each filter.
+    // If a filter is already marked as end_stream_ when decodeData() is called, bails out the
+    // whole function. If just skip the filter, the codes after the loop will be called with
+    // wrong data. For encodeData, the response_encoder->encode() will be called.
+    if ((*entry)->end_stream_) {
+      return;
+    }
     ASSERT(!(state_.filter_call_state_ & FilterCallState::DecodeData));
 
     // We check the request_trailers_ pointer here in case addDecodedTrailers
@@ -840,7 +873,8 @@ void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* 
       state_.filter_call_state_ |= FilterCallState::LastDataFrame;
     }
     state_.filter_call_state_ |= FilterCallState::DecodeData;
-    FilterDataStatus status = (*entry)->handle_->decodeData(data, end_stream && !request_trailers_);
+    (*entry)->end_stream_ = end_stream && !request_trailers_;
+    FilterDataStatus status = (*entry)->handle_->decodeData(data, (*entry)->end_stream_);
     state_.filter_call_state_ &= ~FilterCallState::DecodeData;
     if (end_stream) {
       state_.filter_call_state_ &= ~FilterCallState::LastDataFrame;
@@ -935,6 +969,7 @@ void ConnectionManagerImpl::ActiveStream::decodeTrailers(ActiveStreamDecoderFilt
     ASSERT(!(state_.filter_call_state_ & FilterCallState::DecodeTrailers));
     state_.filter_call_state_ |= FilterCallState::DecodeTrailers;
     FilterTrailersStatus status = (*entry)->handle_->decodeTrailers(trailers);
+    (*entry)->end_stream_ = true;
     state_.filter_call_state_ &= ~FilterCallState::DecodeTrailers;
     ENVOY_STREAM_LOG(trace, "decode trailers called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
@@ -1075,9 +1110,9 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
   for (; entry != encoder_filters_.end(); entry++) {
     ASSERT(!(state_.filter_call_state_ & FilterCallState::EncodeHeaders));
     state_.filter_call_state_ |= FilterCallState::EncodeHeaders;
-    FilterHeadersStatus status = (*entry)->handle_->encodeHeaders(
-        headers,
-        encoding_headers_only_ || (end_stream && continue_data_entry == encoder_filters_.end()));
+    (*entry)->end_stream_ =
+        encoding_headers_only_ || (end_stream && continue_data_entry == encoder_filters_.end());
+    FilterHeadersStatus status = (*entry)->handle_->encodeHeaders(headers, (*entry)->end_stream_);
     state_.filter_call_state_ &= ~FilterCallState::EncodeHeaders;
     ENVOY_STREAM_LOG(trace, "encode headers called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
@@ -1192,7 +1227,6 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
   response_encoder_->encodeHeaders(
       headers,
       encoding_headers_only_ || (end_stream && continue_data_entry == encoder_filters_.end()));
-
   if (continue_data_entry != encoder_filters_.end()) {
     // We use the continueEncoding() code since it will correctly handle not calling
     // encodeHeaders() again. Fake setting stopped_ since the continueEncoding() code expects it.
@@ -1272,6 +1306,11 @@ void ConnectionManagerImpl::ActiveStream::encodeData(ActiveStreamEncoderFilter* 
 
   const bool trailers_exists_at_start = response_trailers_ != nullptr;
   for (; entry != encoder_filters_.end(); entry++) {
+    // If end_stream_ is marked for a filter, the data is not for this filter and filters after.
+    // For details, please see the comment in the ActiveStream::decodeData() function.
+    if ((*entry)->end_stream_) {
+      return;
+    }
     ASSERT(!(state_.filter_call_state_ & FilterCallState::EncodeData));
 
     // We check the response_trailers_ pointer here in case addEncodedTrailers
@@ -1281,8 +1320,8 @@ void ConnectionManagerImpl::ActiveStream::encodeData(ActiveStreamEncoderFilter* 
     if (end_stream) {
       state_.filter_call_state_ |= FilterCallState::LastDataFrame;
     }
-    FilterDataStatus status =
-        (*entry)->handle_->encodeData(data, end_stream && !response_trailers_);
+    (*entry)->end_stream_ = end_stream && !response_trailers_;
+    FilterDataStatus status = (*entry)->handle_->encodeData(data, (*entry)->end_stream_);
     state_.filter_call_state_ &= ~FilterCallState::EncodeData;
     if (end_stream) {
       state_.filter_call_state_ &= ~FilterCallState::LastDataFrame;
@@ -1330,6 +1369,7 @@ void ConnectionManagerImpl::ActiveStream::encodeTrailers(ActiveStreamEncoderFilt
     ASSERT(!(state_.filter_call_state_ & FilterCallState::EncodeTrailers));
     state_.filter_call_state_ |= FilterCallState::EncodeTrailers;
     FilterTrailersStatus status = (*entry)->handle_->encodeTrailers(trailers);
+    (*entry)->end_stream_ = true;
     state_.filter_call_state_ &= ~FilterCallState::EncodeTrailers;
     ENVOY_STREAM_LOG(trace, "encode trailers called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));

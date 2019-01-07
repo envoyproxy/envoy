@@ -426,8 +426,19 @@ TEST(SymbolTableTest, Memory) {
     ENVOY_LOG_MISC(info,
                    "SymbolTableTest.Memory comparison skipped due to malloc-stats returning 0.");
   } else {
-    EXPECT_LT(symbol_table_mem_used, string_mem_used / 4);
-    EXPECT_LT(symbol_table_mem_used, 1750000); // Dec 16, 2018: 1744280 bytes.
+    // Make sure we don't regress. Data as of 2019/01/04:
+    //
+    // libstdc++:
+    // ----------
+    // string_mem_used:        7759488
+    // symbol_table_mem_used:  1744280 (4.45x)
+    //
+    // libc++:
+    // -------
+    // string_mem_used:        6710912
+    // symbol_table_mem_used:  1743512 (3.85x)
+    EXPECT_LT(symbol_table_mem_used, string_mem_used / 3);
+    EXPECT_LT(symbol_table_mem_used, 1750000);
   }
 }
 

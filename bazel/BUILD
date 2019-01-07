@@ -21,13 +21,14 @@ genrule(
     stamp = 1,
 )
 
-# For MacOS, which doesn't have GNU ld's `--build-id` flag.
+# For macOS, which doesn't have GNU ld's `--build-id` flag.
 genrule(
     name = "raw_build_id",
     outs = ["raw_build_id.ldscript"],
     cmd = """
       grep BUILD_SCM_REVISION bazel-out/volatile-status.txt \\
     | sed 's/^BUILD_SCM_REVISION //' \\
+    | tr -d '\\n' \\
     > $@
     """,
     # Undocumented attr to depend on workspace status files.
