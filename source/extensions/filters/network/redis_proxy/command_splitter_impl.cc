@@ -391,10 +391,8 @@ SplitRequestPtr InstanceImpl::makeRequest(const RespValue& request, SplitCallbac
         fmt::format("unsupported command '{}'", request.asArray()[0].asString())));
     return nullptr;
   }
-
   ENVOY_LOG(debug, "redis: splitting '{}'", request.toString());
   handler->total_.inc();
-  ENVOY_LOG(debug, "redis: incrementing total stat '{}'", request.toString());
   return handler->handler_.get().startRequest(request, callbacks);
 }
 

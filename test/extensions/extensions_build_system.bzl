@@ -1,4 +1,4 @@
-load("//bazel:envoy_build_system.bzl", "envoy_cc_mock", "envoy_cc_test", "envoy_cc_test_library")
+load("//bazel:envoy_build_system.bzl", "envoy_cc_mock", "envoy_cc_test", "envoy_cc_test_binary", "envoy_cc_test_library")
 load("@envoy_build_config//:extensions_build_config.bzl", "EXTENSIONS")
 
 # All extension tests should use this version of envoy_cc_test(). It allows compiling out
