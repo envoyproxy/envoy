@@ -248,6 +248,7 @@ TEST_P(ListenerImplTest, WildcardListenerIpv4Compat) {
   EXPECT_CALL(listener_callbacks, onNewConnection_(_))
       .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
         EXPECT_EQ(conn->localAddress()->ip()->version(), conn->remoteAddress()->ip()->version());
+        EXPECT_EQ(conn->localAddress()->asString(), local_dst_address->asString());
         EXPECT_EQ(*conn->localAddress(), *local_dst_address);
         client_connection->close(ConnectionCloseType::NoFlush);
         conn->close(ConnectionCloseType::NoFlush);

@@ -80,7 +80,7 @@ def envoy_copts(repository, test = False):
 
 def envoy_static_link_libstdcpp_linkopts():
     return envoy_select_force_libcpp(
-        ["--stdlib=libc++"],
+        ["-stdlib=libc++"],
         ["-static-libstdc++", "-static-libgcc"],
     )
 
