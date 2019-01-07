@@ -60,6 +60,8 @@ LoadBalancerBase::choosePriority(uint64_t hash, const std::vector<uint32_t>& per
   // As with tryChooseLocalLocalityHosts, this can be refactored for efficiency
   // but O(N) is good enough for now given the expected number of priorities is
   // small.
+
+  // We first attempt to select a priority based on healthy hosts.
   for (size_t priority = 0; priority < per_priority_load.size(); ++priority) {
     aggregate_percentage_load += per_priority_load[priority];
     if (hash <= aggregate_percentage_load) {
@@ -67,6 +69,7 @@ LoadBalancerBase::choosePriority(uint64_t hash, const std::vector<uint32_t>& per
     }
   }
 
+  // If no priorities were selected due to health, attempt to select a degraded one.
   for (size_t priority = 0; priority < degraded_per_priority_load.size(); ++priority) {
     aggregate_percentage_load += degraded_per_priority_load[priority];
     if (hash <= aggregate_percentage_load) {
@@ -201,7 +204,8 @@ void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority,
 
   // The allocated load between healthy and degraded should be exactly 100.
   ASSERT(100 == std::accumulate(per_priority_load.begin(), per_priority_load.end(), 0) +
-   std::accumulate(degraded_per_priority_load.begin(), degraded_per_priority_load.end(), 0));
+                    std::accumulate(degraded_per_priority_load.begin(),
+                                    degraded_per_priority_load.end(), 0));
 }
 
 // Method iterates through priority levels and turns on/off panic mode.
@@ -510,6 +514,9 @@ uint32_t ZoneAwareLoadBalancerBase::tryChooseLocalLocalityHosts(const HostSet& h
 ZoneAwareLoadBalancerBase::HostsSource
 ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context) {
   auto host_set_and_source = chooseHostSet(context);
+
+  // The second argument tells us whether or not we should be using degraded hosts from the
+  // selected host set.
   const bool degraded_hosts = host_set_and_source.second;
   auto& host_set = host_set_and_source.first;
   HostsSource hosts_source;
