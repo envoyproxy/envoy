@@ -141,11 +141,11 @@ TEST_P(StatsIntegrationTest, MemoryLargeClusterSize) {
   }
 
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
-      for (int i = 1; i < 1001; i++) {
-        RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
-        auto* c = bootstrap.mutable_static_resources()->add_clusters();
-        c->set_name(fmt::format("cluster_{}", i));
-      }
+    for (int i = 1; i < 1001; i++) {
+      RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
+      auto* c = bootstrap.mutable_static_resources()->add_clusters();
+      c->set_name(fmt::format("cluster_{}", i));
+    }
   });
   initialize();
 
