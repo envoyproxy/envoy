@@ -45,6 +45,7 @@ MainCommonBase::MainCommonBase(OptionsImpl& options, Event::TimeSystem& time_sys
                                std::unique_ptr<Runtime::RandomGenerator>&& random_generator,
                                Thread::ThreadFactory& thread_factory)
     : options_(options), component_factory_(component_factory), thread_factory_(thread_factory) {
+  Thread::ThreadFactorySingleton::set(&thread_factory_);
   ares_library_init(ARES_LIB_INIT_ALL);
   Event::Libevent::Global::initialize();
   RELEASE_ASSERT(Envoy::Server::validateProtoDescriptors(), "");
@@ -87,7 +88,10 @@ MainCommonBase::MainCommonBase(OptionsImpl& options, Event::TimeSystem& time_sys
   }
 }
 
-MainCommonBase::~MainCommonBase() { ares_library_cleanup(); }
+MainCommonBase::~MainCommonBase() {
+  Thread::ThreadFactorySingleton::set(nullptr);
+  ares_library_cleanup();
+}
 
 void MainCommonBase::configureComponentLogLevels() {
   for (auto& component_log_level : options_.componentLogLevels()) {
