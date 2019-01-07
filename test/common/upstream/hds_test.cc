@@ -61,8 +61,8 @@ public:
           return server_response_timer_;
         }));
     hds_delegate_ = std::make_unique<HdsDelegate>(
-        node_, stats_store_, Grpc::AsyncClientPtr(async_client_), dispatcher_, runtime_,
-        stats_store_, ssl_context_manager_, random_, test_factory_, log_manager_, cm_, local_info_);
+        stats_store_, Grpc::AsyncClientPtr(async_client_), dispatcher_, runtime_, stats_store_,
+        ssl_context_manager_, random_, test_factory_, log_manager_, cm_, local_info_);
   }
 
   // Creates a HealthCheckSpecifier message that contains one endpoint and one
