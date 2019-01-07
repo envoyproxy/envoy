@@ -20,6 +20,9 @@ envoy_cc_library(
 envoy_cc_library(
     name = "tap_config_base",
     hdrs = ["tap_config_base.h"],
+    deps = [
+        "@envoy_api//envoy/service/tap/v2alpha:common_cc",
+    ],
 )
 
 envoy_cc_library(

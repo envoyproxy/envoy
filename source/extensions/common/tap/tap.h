@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/common/pure.h"
 #include "envoy/service/tap/v2alpha/common.pb.h"
 
 #include "common/protobuf/protobuf.h"
