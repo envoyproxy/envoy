@@ -12,7 +12,6 @@
 #include "extensions/filters/network/redis_proxy/command_splitter_impl.h"
 #include "extensions/filters/network/redis_proxy/supported_commands.h"
 
-#include "test/extensions/filters/network/redis_proxy/mocks.h"
 #include "test/test_common/printers.h"
 
 #include "testing/base/public/benchmark.h"
@@ -30,7 +29,7 @@ public:
   void onResponse(RespValuePtr&&) override {}
 };
 
-class NoOpInstanceImpl : public ConnPool::Instance {
+class NullInstanceImpl : public ConnPool::Instance {
   ConnPool::PoolRequest* makeRequest(const std::string&, const RespValue&,
                                      ConnPool::PoolCallbacks&) override {
     return nullptr;
@@ -63,7 +62,7 @@ public:
     }
   }
 
-  ConnPool::Instance* conn_pool_{new NoOpInstanceImpl()};
+  ConnPool::Instance* conn_pool_{new NullInstanceImpl()};
   Stats::IsolatedStoreImpl store_;
   CommandSplitter::InstanceImpl splitter_{ConnPool::InstancePtr{conn_pool_}, store_, "redis.foo."};
   NoOpSplitCallbacks callbacks_;
