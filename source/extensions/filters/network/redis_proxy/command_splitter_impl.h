@@ -61,7 +61,7 @@ class SplitRequestBase : public SplitRequest {
 protected:
   static void onWrongNumberOfArguments(SplitCallbacks& callbacks, const RespValue& request);
 
-  void updateStats(const bool failure = false);
+  void updateStats(const bool success);
 
   SplitRequestBase(CommandStats& command_stats) : command_stats_(command_stats) {}
   CommandStats& command_stats_;

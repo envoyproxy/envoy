@@ -31,11 +31,11 @@ void SplitRequestBase::onWrongNumberOfArguments(SplitCallbacks& callbacks,
       fmt::format("wrong number of arguments for '{}' command", request.asArray()[0].asString())));
 }
 
-void SplitRequestBase::updateStats(const bool failure) {
-  if (failure) {
-    command_stats_.error_.inc();
-  } else {
+void SplitRequestBase::updateStats(const bool success) {
+  if (success) {
     command_stats_.success_.inc();
+  } else {
+    command_stats_.error_.inc();
   }
 }
 
@@ -43,13 +43,13 @@ SingleServerRequest::~SingleServerRequest() { ASSERT(!handle_); }
 
 void SingleServerRequest::onResponse(RespValuePtr&& response) {
   handle_ = nullptr;
-  updateStats();
+  updateStats(true);
   callbacks_.onResponse(std::move(response));
 }
 
 void SingleServerRequest::onFailure() {
   handle_ = nullptr;
-  updateStats(true);
+  updateStats(false);
   callbacks_.onResponse(Utility::makeError(Response::get().UpstreamFailure));
 }
 
@@ -182,7 +182,7 @@ void MGETRequest::onChildResponse(RespValuePtr&& value, uint32_t index) {
 
   ASSERT(num_pending_responses_ > 0);
   if (--num_pending_responses_ == 0) {
-    updateStats(error_count_ != 0);
+    updateStats(error_count_ == 0);
     ENVOY_LOG(debug, "redis: response: '{}'", pending_response_->toString());
     callbacks_.onResponse(std::move(pending_response_));
   }
@@ -250,7 +250,7 @@ void MSETRequest::onChildResponse(RespValuePtr&& value, uint32_t index) {
 
   ASSERT(num_pending_responses_ > 0);
   if (--num_pending_responses_ == 0) {
-    updateStats(error_count_ != 0);
+    updateStats(error_count_ == 0);
     if (error_count_ == 0) {
       pending_response_->asString() = Response::get().OK;
       callbacks_.onResponse(std::move(pending_response_));
@@ -315,7 +315,7 @@ void SplitKeysSumResultRequest::onChildResponse(RespValuePtr&& value, uint32_t i
 
   ASSERT(num_pending_responses_ > 0);
   if (--num_pending_responses_ == 0) {
-    updateStats(error_count_ != 0);
+    updateStats(error_count_ == 0);
     if (error_count_ == 0) {
       pending_response_->asInteger() = total_;
       callbacks_.onResponse(std::move(pending_response_));
