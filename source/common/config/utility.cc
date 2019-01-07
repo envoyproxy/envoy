@@ -264,7 +264,7 @@ envoy::api::v2::ClusterLoadAssignment Utility::translateClusterHosts(
   envoy::api::v2::ClusterLoadAssignment load_assignment;
   envoy::api::v2::endpoint::LocalityLbEndpoints* locality_lb_endpoints =
       load_assignment.add_endpoints();
-  // Since this LocalityLbEndp oints is built from hosts list, set the default weight to 1.
+  // Since this LocalityLbEndpoints is built from hosts list, set the default weight to 1.
   locality_lb_endpoints->mutable_load_balancing_weight()->set_value(1);
   for (const envoy::api::v2::core::Address& host : hosts) {
     envoy::api::v2::endpoint::LbEndpoint* lb_endpoint = locality_lb_endpoints->add_lb_endpoints();
