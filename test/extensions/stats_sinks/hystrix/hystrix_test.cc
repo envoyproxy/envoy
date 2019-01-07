@@ -519,7 +519,7 @@ TEST_F(HystrixSinkTest, HystrixEventStreamHandler) {
 
   Http::HeaderMapImpl response_headers;
 
-  NiceMock<Server::Configuration::MockAdminStream> admin_stream_mock;
+  NiceMock<Server::MockAdminStream> admin_stream_mock;
   NiceMock<Network::MockConnection> connection_mock;
 
   auto addr_instance_ = Envoy::Network::Utility::parseInternetAddress("2.3.4.5", 123, false);
