@@ -7,7 +7,7 @@ fi
 
 # We can't rely on the exit code alone, since lld fails for statically linked binaries.
 DYNLIBS=$(ldd source/exe/envoy-static 2>&1)
-if [[ $? != 0 && ! ${DYNLIBS} =~ "not a dynamic executable" ]]; then
+if [[ $? != 0 && ! "${DYNLIBS}" =~ "not a dynamic executable" ]]; then
   echo "${DYNLIBS}"
   exit 1
 fi
