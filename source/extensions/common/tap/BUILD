@@ -11,6 +11,10 @@ envoy_package()
 envoy_cc_library(
     name = "tap_interface",
     hdrs = ["tap.h"],
+    deps = [
+        "//source/common/protobuf",
+        "@envoy_api//envoy/service/tap/v2alpha:common_cc",
+    ],
 )
 
 envoy_cc_library(

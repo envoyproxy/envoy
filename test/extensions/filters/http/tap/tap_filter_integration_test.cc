@@ -18,10 +18,9 @@ public:
     initialize();
   }
 
-  const envoy::data::tap::v2alpha::HttpBufferedTrace::Header*
+  const envoy::api::v2::core::HeaderValue*
   findHeader(const std::string& key,
-             const Protobuf::RepeatedPtrField<envoy::data::tap::v2alpha::HttpBufferedTrace::Header>&
-                 headers) {
+             const Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValue>& headers) {
     for (const auto& header : headers) {
       if (header.key() == key) {
         return &header;

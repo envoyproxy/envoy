@@ -11,4 +11,5 @@ api_proto_library_internal(
 api_proto_library_internal(
     name = "http",
     srcs = ["http.proto"],
+    deps = ["//envoy/api/v2/core:base"],
 )
