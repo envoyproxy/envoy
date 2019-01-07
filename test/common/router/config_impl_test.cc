@@ -3945,6 +3945,117 @@ TEST(RoutePropertyTest, excludeVHRateLimits) {
 }
 
 TEST(RoutePropertyTest, TestVHostCorsConfig) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: "default"
+    domains: ["*"]
+    cors:
+      allow_origin: ["test-origin"]
+      allow_methods: "test-methods"
+      allow_headers: "test-headers"
+      expose_headers: "test-expose-headers"
+      max_age: "test-max-age"
+      allow_credentials: true
+      filter_enabled:
+        runtime_key: "cors.www.enabled"
+        default_value:
+          numerator: 0
+          denominator: "HUNDRED"
+      shadow_enabled:
+        runtime_key: "cors.www.shadow_enabled"
+        default_value:
+          numerator: 100
+          denominator: "HUNDRED"
+    routes:
+      - match:
+          prefix: "/api"
+        route:
+          cluster: "ats"
+)EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  Runtime::MockSnapshot snapshot;
+  EXPECT_CALL(snapshot,
+              featureEnabled("cors.www.enabled", Matcher<const envoy::type::FractionalPercent&>(_)))
+      .WillOnce(Return(false));
+  EXPECT_CALL(snapshot, featureEnabled("cors.www.shadow_enabled",
+                                       Matcher<const envoy::type::FractionalPercent&>(_)))
+      .WillOnce(Return(true));
+  EXPECT_CALL(factory_context.runtime_loader_, snapshot()).WillRepeatedly(ReturnRef(snapshot));
+
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, false);
+
+  const Router::CorsPolicy* cors_policy =
+      config.route(genHeaders("api.lyft.com", "/api", "GET"), 0)
+          ->routeEntry()
+          ->virtualHost()
+          .corsPolicy();
+
+  EXPECT_EQ(cors_policy->enabled(), false);
+  EXPECT_EQ(cors_policy->shadowEnabled(), true);
+  EXPECT_THAT(cors_policy->allowOrigins(), ElementsAreArray({"test-origin"}));
+  EXPECT_EQ(cors_policy->allowMethods(), "test-methods");
+  EXPECT_EQ(cors_policy->allowHeaders(), "test-headers");
+  EXPECT_EQ(cors_policy->exposeHeaders(), "test-expose-headers");
+  EXPECT_EQ(cors_policy->maxAge(), "test-max-age");
+  EXPECT_EQ(cors_policy->allowCredentials(), true);
+}
+
+TEST(RoutePropertyTest, TestRouteCorsConfig) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: "default"
+    domains: ["*"]
+    routes:
+      - match:
+          prefix: "/api"
+        route:
+          cluster: "ats"
+          cors:
+            allow_origin: ["test-origin"]
+            allow_methods: "test-methods"
+            allow_headers: "test-headers"
+            expose_headers: "test-expose-headers"
+            max_age: "test-max-age"
+            allow_credentials: true
+            filter_enabled:
+              runtime_key: "cors.www.enabled"
+              default_value:
+                numerator: 0
+                denominator: "HUNDRED"
+            shadow_enabled:
+              runtime_key: "cors.www.shadow_enabled"
+              default_value:
+                numerator: 100
+                denominator: "HUNDRED"
+)EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  Runtime::MockSnapshot snapshot;
+  EXPECT_CALL(snapshot,
+              featureEnabled("cors.www.enabled", Matcher<const envoy::type::FractionalPercent&>(_)))
+      .WillOnce(Return(false));
+  EXPECT_CALL(snapshot, featureEnabled("cors.www.shadow_enabled",
+                                       Matcher<const envoy::type::FractionalPercent&>(_)))
+      .WillOnce(Return(true));
+  EXPECT_CALL(factory_context.runtime_loader_, snapshot()).WillRepeatedly(ReturnRef(snapshot));
+
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, false);
+
+  const Router::CorsPolicy* cors_policy =
+      config.route(genHeaders("api.lyft.com", "/api", "GET"), 0)->routeEntry()->corsPolicy();
+
+  EXPECT_EQ(cors_policy->enabled(), false);
+  EXPECT_EQ(cors_policy->shadowEnabled(), true);
+  EXPECT_THAT(cors_policy->allowOrigins(), ElementsAreArray({"test-origin"}));
+  EXPECT_EQ(cors_policy->allowMethods(), "test-methods");
+  EXPECT_EQ(cors_policy->allowHeaders(), "test-headers");
+  EXPECT_EQ(cors_policy->exposeHeaders(), "test-expose-headers");
+  EXPECT_EQ(cors_policy->maxAge(), "test-max-age");
+  EXPECT_EQ(cors_policy->allowCredentials(), true);
+}
+
+TEST(RoutePropertyTest, TestVHostCorsLegacyConfig) {
   const std::string json = R"EOF(
 {
   "virtual_hosts": [
@@ -3980,6 +4091,7 @@ TEST(RoutePropertyTest, TestVHostCorsConfig) {
           .corsPolicy();
 
   EXPECT_EQ(cors_policy->enabled(), true);
+  EXPECT_EQ(cors_policy->shadowEnabled(), false);
   EXPECT_THAT(cors_policy->allowOrigins(), ElementsAreArray({"test-origin"}));
   EXPECT_EQ(cors_policy->allowMethods(), "test-methods");
   EXPECT_EQ(cors_policy->allowHeaders(), "test-headers");
@@ -3988,7 +4100,7 @@ TEST(RoutePropertyTest, TestVHostCorsConfig) {
   EXPECT_EQ(cors_policy->allowCredentials(), true);
 }
 
-TEST(RoutePropertyTest, TestRouteCorsConfig) {
+TEST(RoutePropertyTest, TestRouteCorsLegacyConfig) {
   const std::string json = R"EOF(
 {
   "virtual_hosts": [
@@ -4000,12 +4112,12 @@ TEST(RoutePropertyTest, TestRouteCorsConfig) {
           "prefix": "/api",
           "cluster": "ats",
           "cors" : {
-              "allow_origin": ["test-origin"],
-              "allow_methods": "test-methods",
-              "allow_headers": "test-headers",
-              "expose_headers": "test-expose-headers",
-              "max_age": "test-max-age",
-              "allow_credentials": true
+            "allow_origin": ["test-origin"],
+            "allow_methods": "test-methods",
+            "allow_headers": "test-headers",
+            "expose_headers": "test-expose-headers",
+            "max_age": "test-max-age",
+            "allow_credentials": true
           }
         }
       ]
@@ -4021,6 +4133,7 @@ TEST(RoutePropertyTest, TestRouteCorsConfig) {
       config.route(genHeaders("api.lyft.com", "/api", "GET"), 0)->routeEntry()->corsPolicy();
 
   EXPECT_EQ(cors_policy->enabled(), true);
+  EXPECT_EQ(cors_policy->shadowEnabled(), false);
   EXPECT_THAT(cors_policy->allowOrigins(), ElementsAreArray({"test-origin"}));
   EXPECT_EQ(cors_policy->allowMethods(), "test-methods");
   EXPECT_EQ(cors_policy->allowHeaders(), "test-headers");

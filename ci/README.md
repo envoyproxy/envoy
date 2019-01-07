@@ -108,11 +108,11 @@ IMAGE_NAME="envoyproxy/envoy-build-${DISTRO}" IMAGE_ID=my_tag ./ci/run_envoy_doc
 
 This build the Ubuntu based `envoyproxy/envoy-build-ubuntu` image, and the final call will run against your local copy of the build image.
 
-# MacOS Build Flow
+# macOS Build Flow
 
-The MacOS CI build is part of the [CircleCI](https://circleci.com/gh/envoyproxy/envoy) workflow.
+The macOS CI build is part of the [CircleCI](https://circleci.com/gh/envoyproxy/envoy) workflow.
 Dependencies are installed by the `ci/mac_ci_setup.sh` script, via [Homebrew](https://brew.sh),
-which is pre-installed on the CircleCI MacOS image. The dependencies are cached are re-installed
+which is pre-installed on the CircleCI macOS image. The dependencies are cached are re-installed
 on every build. The `ci/mac_ci_steps.sh` script executes the specific commands that
 build and test Envoy.
 
