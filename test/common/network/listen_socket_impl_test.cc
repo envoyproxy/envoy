@@ -128,20 +128,19 @@ TEST_P(ListenSocketImplTestTcp, BindSpecificPort) { testBindSpecificPort(); }
  */
 class TestListenSocket : public ListenSocketImpl {
 public:
-  TestListenSocket(Network::Address::InstanceConstSharedPtr address)
-      : ListenSocketImpl(-1, address) {}
+  TestListenSocket(Address::InstanceConstSharedPtr address) : ListenSocketImpl(-1, address) {}
+  Address::SocketType socketType() const override { return Address::SocketType::Stream; }
 };
 
 TEST_P(ListenSocketImplTestTcp, SetLocalAddress) {
   std::string address_str = "10.1.2.3";
-  if (version_ == Network::Address::IpVersion::v6) {
+  if (version_ == Address::IpVersion::v6) {
     address_str = "1::2";
   }
 
-  Network::Address::InstanceConstSharedPtr address =
-      Network::Utility::parseInternetAddress(address_str);
+  Address::InstanceConstSharedPtr address = Network::Utility::parseInternetAddress(address_str);
 
-  TestListenSocket socket(Network::Utility::getIpv4AnyAddress());
+  TestListenSocket socket(Utility::getIpv4AnyAddress());
 
   socket.setLocalAddress(address);
 
