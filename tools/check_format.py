@@ -142,6 +142,30 @@ def checkNamespace(file_path):
       return ["Unable to find Envoy namespace or NOLINT(namespace-envoy) for file: %s" % file_path]
   return []
 
+def fixJavaProtoOptions(file_path):
+  java_multiple_files = False
+  java_package_correct = False
+  package_name = None
+  for line in fileinput.FileInput(file_path):
+    if line.startswith("package "):
+      package_name = re.compile("package (.*);").search(line).group(1)
+    if "option java_multiple_files = true;" in line:
+      java_multiple_files = True
+    if "option java_package = \"io.envoyproxy.envoy" in line:
+      java_package_correct = True
+    if java_multiple_files and java_package_correct:
+     return
+
+  to_add = ""
+  if not java_package_correct:
+      to_add = to_add + "option java_package = \"io.envoyproxy.{}\";\n".format(package_name)
+  if not java_multiple_files:
+     to_add = to_add + "option java_multiple_files = true;\n"
+
+  for line in fileinput.FileInput(file_path, inplace=True):
+    if line.startswith("package "):
+      line = line.replace(line, line + to_add)
+    sys.stdout.write(line)
 
 def checkJavaProtoOptions(file_path):
   java_multiple_files = False
@@ -383,6 +407,8 @@ def fixSourcePath(file_path):
     if not file_path.endswith(PROTO_SUFFIX):
       error_messages += fixHeaderOrder(file_path)
     error_messages += clangFormat(file_path)
+  if file_path.endswith(PROTO_SUFFIX) and isApiFile(file_path):
+    fixJavaProtoOptions(file_path)
   return error_messages
 
 
