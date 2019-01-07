@@ -179,6 +179,7 @@ InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& boots
   if (config_path.empty() && config_yaml.empty()) {
     const std::string message =
         "At least one of --config-path and --config-yaml should be non-empty";
+    std::cerr << message << std::endl;
     throw EnvoyException(message);
   }
   try {

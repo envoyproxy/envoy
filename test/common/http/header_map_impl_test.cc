@@ -705,7 +705,7 @@ TEST(HeaderMapImplTest, TestAppendHeader) {
   }
 }
 
-TEST(HeaderMapImplTest, TestHeaderLengthChecks) {
+TEST(HeaderMapImplDeathTest, TestHeaderLengthChecks) {
   HeaderString value;
   value.setCopy("some;", 5);
   EXPECT_DEATH_LOG_TO_STDERR(value.append(nullptr, std::numeric_limits<uint32_t>::max()),
