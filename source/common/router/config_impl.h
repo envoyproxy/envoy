@@ -526,6 +526,9 @@ private:
 
   bool evaluateRuntimeMatch(const uint64_t random_value) const;
 
+  RetryPolicyImpl buildRetryPolicy(const envoy::api::v2::route::VirtualHost& vhost_config,
+                                   const envoy::api::v2::route::RouteAction& route_config) const;
+
   // Default timeout is 15s if nothing is specified in the route config.
   static const uint64_t DEFAULT_ROUTE_TIMEOUT_MS = 15000;
 

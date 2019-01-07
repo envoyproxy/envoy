@@ -317,8 +317,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       https_redirect_(route.redirect().https_redirect()),
       prefix_rewrite_redirect_(route.redirect().prefix_rewrite()),
       strip_query_(route.redirect().strip_query()),
-      retry_policy_(!route.route().has_retry_policy() ? RetryPolicyImpl(vhost.config())
-                                                      : RetryPolicyImpl(route.route())),
+      retry_policy_(buildRetryPolicy(vhost.config(), route.route())),
       rate_limit_policy_(route.route().rate_limits()), shadow_policy_(route.route()),
       priority_(ConfigUtility::parsePriority(route.route().priority())),
       total_cluster_weight_(
@@ -597,6 +596,18 @@ RouteEntryImplBase::parseOpaqueConfig(const envoy::api::v2::route::Route& route)
     }
   }
   return ret;
+}
+
+RetryPolicyImpl
+RouteEntryImplBase::buildRetryPolicy(const envoy::api::v2::route::VirtualHost& vhost_config,
+                                     const envoy::api::v2::route::RouteAction& route_config) const {
+  // Route specific policy wins, if available.
+  if (route_config.has_retry_policy()) {
+    return RetryPolicyImpl(route_config);
+  }
+
+  // If not, will fallback to the virtual host policy.
+  return RetryPolicyImpl(vhost_config);
 }
 
 DecoratorConstPtr RouteEntryImplBase::parseDecorator(const envoy::api::v2::route::Route& route) {
