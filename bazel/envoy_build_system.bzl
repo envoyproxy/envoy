@@ -68,6 +68,9 @@ def envoy_copts(repository, test = False):
                repository + "//bazel:disable_tcmalloc": ["-DABSL_MALLOC_HOOK_MMAP_DISABLE"],
                "//conditions:default": ["-DTCMALLOC"],
            }) + select({
+               repository + "//bazel:debug_tcmalloc": ["-DENVOY_MEMORY_DEBUG_ENABLED=1"],
+               "//conditions:default": [],
+           }) + select({
                repository + "//bazel:disable_signal_trace": [],
                "//conditions:default": ["-DENVOY_HANDLE_SIGNALS"],
            }) + select({
@@ -168,6 +171,7 @@ def envoy_external_dep_path(dep):
 def tcmalloc_external_dep(repository):
     return select({
         repository + "//bazel:disable_tcmalloc": None,
+        repository + "//bazel:debug_tcmalloc": envoy_external_dep_path("tcmalloc_debug"),
         "//conditions:default": envoy_external_dep_path("tcmalloc_and_profiler"),
     })
 
@@ -177,6 +181,7 @@ def tcmalloc_external_dep(repository):
 def tcmalloc_external_deps(repository):
     return select({
         repository + "//bazel:disable_tcmalloc": [],
+        repository + "//bazel:debug_tcmalloc": [envoy_external_dep_path("tcmalloc_debug")],
         "//conditions:default": [envoy_external_dep_path("tcmalloc_and_profiler")],
     })
 

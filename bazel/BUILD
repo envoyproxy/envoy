@@ -96,6 +96,11 @@ config_setting(
 )
 
 config_setting(
+    name = "debug_tcmalloc",
+    values = {"define": "tcmalloc=debug"},
+)
+
+config_setting(
     name = "disable_signal_trace",
     values = {"define": "signal_trace=disabled"},
 )
