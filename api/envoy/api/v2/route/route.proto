@@ -806,7 +806,7 @@ message RetryPolicy {
   // The maximum number of times host selection will be reattempted before giving up, at which
   // point the host that was last selected will be routed to. If unspecified, this will default to
   // retrying once.
-  int64 host_selection_retry_max_attempts = 6;
+  uint64 host_selection_retry_max_attempts = 6;
 
   // HTTP status codes that should trigger a retry in addition to those specified by retry_on.
   repeated uint32 retriable_status_codes = 7;
