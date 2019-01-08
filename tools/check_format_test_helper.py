@@ -193,6 +193,10 @@ if __name__ == "__main__":
   errors += checkUnfixableError("elvis_operator.cc", "Don't use the '?:' operator")
   errors += checkUnfixableError("testing_test.cc",
                                 "Don't use 'using testing::Test;, elaborate the type instead")
+  errors += checkUnfixableError(
+      "version_history.rst",
+      "Version history line malformed. Does not match VERSION_HISTORY_NEW_LINE_REGEX in "
+      "check_format.py")
 
   # The following files have errors that can be automatically fixed.
   errors += checkAndFixError("over_enthusiastic_spaces.cc",
