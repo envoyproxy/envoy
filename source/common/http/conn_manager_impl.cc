@@ -1042,7 +1042,6 @@ void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(
   for (; entry != encoder_filters_.end(); entry++) {
     ASSERT(!(state_.filter_call_state_ & FilterCallState::Encode100ContinueHeaders));
     state_.filter_call_state_ |= FilterCallState::Encode100ContinueHeaders;
-    ASSERT(current_encoder_filter_ == nullptr);
     current_encoder_filter_ = (*entry).get();
     FilterHeadersStatus status = (*entry)->handle_->encode100ContinueHeaders(headers);
     current_encoder_filter_ = nullptr;
@@ -1299,7 +1298,6 @@ void ConnectionManagerImpl::ActiveStream::encodeData(ActiveStreamEncoderFilter* 
     if (end_stream) {
       state_.filter_call_state_ |= FilterCallState::LastDataFrame;
     }
-    ASSERT(current_encoder_filter_ == nullptr);
     current_encoder_filter_ = (*entry).get();
     FilterDataStatus status =
         (*entry)->handle_->encodeData(data, end_stream && !response_trailers_);
@@ -1350,7 +1348,6 @@ void ConnectionManagerImpl::ActiveStream::encodeTrailers(ActiveStreamEncoderFilt
   for (; entry != encoder_filters_.end(); entry++) {
     ASSERT(!(state_.filter_call_state_ & FilterCallState::EncodeTrailers));
     state_.filter_call_state_ |= FilterCallState::EncodeTrailers;
-    ASSERT(current_encoder_filter_ == nullptr);
     current_encoder_filter_ = (*entry).get();
     FilterTrailersStatus status = (*entry)->handle_->encodeTrailers(trailers);
     current_encoder_filter_ = nullptr;

@@ -83,14 +83,6 @@ public:
   virtual ~HttpIntegrationTest();
 
 protected:
-  void initialize() override {
-    config_helper_.addConfigModifier(
-        [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
-            -> void { hcm.set_proxy_100_continue(true); });
-
-    BaseIntegrationTest::initialize();
-  }
-
   IntegrationCodecClientPtr makeHttpConnection(uint32_t port);
   // Makes a http connection object without checking its connected state.
   IntegrationCodecClientPtr makeRawHttpConnection(Network::ClientConnectionPtr&& conn);

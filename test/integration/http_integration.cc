@@ -1260,6 +1260,9 @@ void HttpIntegrationTest::testEnvoyMultipleMetadataReachSizeLimit() {
 
 void HttpIntegrationTest::testEnvoyHandling100Continue(bool additional_continue_from_upstream,
                                                        const std::string& via) {
+  config_helper_.addConfigModifier(
+      [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
+          -> void { hcm.set_proxy_100_continue(false); });
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -2144,6 +2147,9 @@ void verifyExpectedMetadata(Http::MetadataMap metadata_map, std::set<std::string
 // Adds metadata inserting filter before metadata consuming filter. Verify metadata are consumed.
 void HttpIntegrationTest::testInsertBeforeConsumeResponseMetadata() {
   addFilters({response_metadata_insert_filter, response_metadata_consume_filter});
+  config_helper_.addConfigModifier(
+      [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
+          -> void { hcm.set_proxy_100_continue(true); });
 
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -2266,6 +2272,9 @@ void HttpIntegrationTest::testInsertBeforeConsumeResponseMetadata() {
 // Adds metadata consuming filter before metadata inserting filter. Verify no metadata is consumed.
 void HttpIntegrationTest::testConsumeBeforeInsertResponseMetadata() {
   addFilters({response_metadata_consume_filter, response_metadata_insert_filter});
+  config_helper_.addConfigModifier(
+      [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
+          -> void { hcm.set_proxy_100_continue(true); });
 
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
