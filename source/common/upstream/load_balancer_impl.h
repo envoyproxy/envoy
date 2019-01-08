@@ -262,6 +262,16 @@ private:
 
   HostSet& localHostSet() const { return *local_priority_set_->hostSetsPerPriority()[0]; }
 
+  static HostsSource::SourceType localitySourceType(bool degraded) {
+    return degraded ? HostsSource::SourceType::LocalityDegradedHosts
+      : HostsSource::SourceType::LocalityHealthyHosts;
+  }
+
+  static HostsSource::SourceType sourceType(bool degraded) {
+    return degraded ? HostsSource::SourceType::DegradedHosts : HostsSource::SourceType::HealthyHosts;
+  }
+
+
   // The set of local Envoy instances which are load balancing across priority_set_.
   const PrioritySet* local_priority_set_;
 

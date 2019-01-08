@@ -50,15 +50,6 @@ std::pair<int32_t, size_t> distributeLoad(PriorityLoad& per_priority_load,
   return {first_available_priority, total_load};
 }
 
-HostsSource::SourceType localitySourceType(bool degraded) {
-  return degraded ? HostsSource::SourceType::LocalityDegradedHosts
-                  : HostsSource::SourceType::LocalityHealthyHosts;
-}
-
-HostsSource::SourceType sourceType(bool degraded) {
-  return degraded ? HostsSource::SourceType::DegradedHosts : HostsSource::SourceType::HealthyHosts;
-}
-
 } // namespace
 
 std::pair<uint32_t, bool>
@@ -544,7 +535,7 @@ ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context) {
   // If we're doing locality weighted balancing, pick locality.
   const absl::optional<uint32_t> locality = host_set.chooseLocality();
   if (locality.has_value()) {
-    hosts_source.source_type_ = localitySourceType(degraded);
+    hosts_source.source_type_ = localitySourceType(degraded_hosts);
     hosts_source.locality_index_ = locality.value();
     return hosts_source;
   }
@@ -553,13 +544,13 @@ ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context) {
   // for the selected host set.
   if (per_priority_state_[host_set.priority()]->locality_routing_state_ ==
       LocalityRoutingState::NoLocalityRouting) {
-    hosts_source.source_type_ = sourceType(degraded);
+    hosts_source.source_type_ = sourceType(degraded_hosts);
     return hosts_source;
   }
 
   // Determine if the load balancer should do zone based routing for this pick.
   if (!runtime_.snapshot().featureEnabled(RuntimeZoneEnabled, routing_enabled_)) {
-    hosts_source.source_type_ = sourceType(degraded);
+    hosts_source.source_type_ = sourceType(degraded_hosts);
     return hosts_source;
   }
 
@@ -567,11 +558,11 @@ ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context) {
     stats_.lb_local_cluster_not_ok_.inc();
     // If the local Envoy instances are in global panic, do not do locality
     // based routing.
-    hosts_source.source_type_ = sourceType(degraded);
+    hosts_source.source_type_ = sourceType(degraded_hosts);
     return hosts_source;
   }
 
-  hosts_source.source_type_ = localitySourceType(degraded);
+  hosts_source.source_type_ = localitySourceType(degraded_hosts);
   hosts_source.locality_index_ = tryChooseLocalLocalityHosts(host_set);
   return hosts_source;
 }
