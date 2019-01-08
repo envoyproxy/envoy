@@ -36,7 +36,8 @@ configuration, ``mark``. Setting this to *X* causes Envoy to *mark* all upstream
 from this listener with value *X*.
 
 We can use the following set of commands to ensure that all ipv4 and ipv6 traffic marked with *X*
-(assumed to be 123 in the example) routes correctly.
+(assumed to be 123 in the example) routes correctly. Note that this example assumes that *eth0* is
+the default outbound interface.
 
 .. code-block:: text
 
@@ -48,6 +49,7 @@ We can use the following set of commands to ensure that all ipv4 and ipv6 traffi
   ip route add local 0.0.0.0/0 dev lo table 100
   ip -6 rule add fwmark 123 lookup 100
   ip -6 route add local ::/0 dev lo table 100
+  echo 1 > /proc/sys/net/ipv4/conf/eth0/route_localnet
 
 
 Example Listener configuration
