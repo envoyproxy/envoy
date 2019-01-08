@@ -57,6 +57,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:to_lower_table_lib",
+        "//source/common/common:utility_lib",
     ],
 )
 

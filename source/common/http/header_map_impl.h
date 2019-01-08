@@ -9,6 +9,7 @@
 #include "envoy/http/header_map.h"
 
 #include "common/common/non_copyable.h"
+#include "common/common/utility.h"
 #include "common/http/headers.h"
 
 namespace Envoy {
@@ -109,12 +110,7 @@ protected:
     const LowerCaseString* key_;
   };
 
-  struct StaticLookupEntry {
-    typedef StaticLookupResponse (*EntryCb)(HeaderMapImpl&);
-
-    EntryCb cb_{};
-    std::array<std::unique_ptr<StaticLookupEntry>, 256> entries_;
-  };
+  typedef StaticLookupResponse (*EntryCb)(HeaderMapImpl&);
 
   /**
    * This is the static lookup table that is used to determine whether a header is one of the O(1)
@@ -122,10 +118,12 @@ protected:
    */
   struct StaticLookupTable {
     StaticLookupTable();
-    void add(const char* key, StaticLookupEntry::EntryCb cb);
-    StaticLookupEntry::EntryCb find(const char* key) const;
 
-    StaticLookupEntry root_;
+    void add(const char* key, EntryCb cb) { lookup_table_.add(key, cb); }
+
+    EntryCb find(const char* key) const { return lookup_table_.find(key); }
+
+    LookupTable<EntryCb> lookup_table_;
   };
 
   struct AllInlineHeaders {

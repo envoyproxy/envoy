@@ -306,31 +306,6 @@ void SplitKeysSumResultRequest::onChildResponse(RespValuePtr&& value, uint32_t i
   }
 }
 
-void InstanceImpl::HandlerLookupTable::add(const char* key, HandlerDataPtr handler_data) {
-  HandlerEntry* current = &root_;
-  while (uint8_t c = *key) {
-    if (!current->entries_[c]) {
-      current->entries_[c] = std::make_unique<HandlerEntry>();
-    }
-    current = current->entries_[c].get();
-    key++;
-  }
-  current->handler_data_ = handler_data;
-}
-
-InstanceImpl::HandlerDataPtr InstanceImpl::HandlerLookupTable::find(const char* key) const {
-  const HandlerEntry* current = &root_;
-  while (uint8_t c = *key) {
-    current = current->entries_[c].get();
-    if (current) {
-      key++;
-    } else {
-      return nullptr;
-    }
-  }
-  return current->handler_data_;
-}
-
 InstanceImpl::InstanceImpl(ConnPool::InstancePtr&& conn_pool, Stats::Scope& scope,
                            const std::string& stat_prefix)
     : conn_pool_(std::move(conn_pool)), simple_command_handler_(*conn_pool_),

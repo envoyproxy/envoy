@@ -546,4 +546,42 @@ private:
   double m2_{0};
 };
 
+template <class Value> struct LookupEntry {
+  Value value_;
+  std::array<std::unique_ptr<LookupEntry>, 256> entries_;
+};
+
+/**
+ * A trie used for faster lookup with lookup time at most equal to the size of the key.
+ */
+template <class Value> struct LookupTable {
+
+  void add(const char* key, Value value) {
+    LookupEntry<Value>* current = &root_;
+    while (uint8_t c = *key) {
+      if (!current->entries_[c]) {
+        current->entries_[c] = std::make_unique<LookupEntry<Value>>();
+      }
+      current = current->entries_[c].get();
+      key++;
+    }
+    current->value_ = value;
+  }
+
+  Value find(const char* key) const {
+    const LookupEntry<Value>* current = &root_;
+    while (uint8_t c = *key) {
+      current = current->entries_[c].get();
+      if (current) {
+        key++;
+      } else {
+        return nullptr;
+      }
+    }
+    return current->value_;
+  }
+
+  LookupEntry<Value> root_;
+};
+
 } // namespace Envoy
