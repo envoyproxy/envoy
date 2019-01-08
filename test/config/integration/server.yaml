@@ -271,7 +271,6 @@ static_resources:
                 domain: foo
             - name: buffer
               config:
-                max_request_time_s: 120
                 max_request_bytes: 5242880
             - config: {}
               name: router

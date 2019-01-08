@@ -189,6 +189,7 @@ MockTransportSocketFactoryContext::MockTransportSocketFactoryContext()
 MockTransportSocketFactoryContext::~MockTransportSocketFactoryContext() {}
 
 MockListenerFactoryContext::MockListenerFactoryContext() {}
+
 MockListenerFactoryContext::~MockListenerFactoryContext() {}
 
 MockHealthCheckerFactoryContext::MockHealthCheckerFactoryContext() {

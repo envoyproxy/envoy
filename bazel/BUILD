@@ -28,6 +28,7 @@ genrule(
     cmd = """
       grep BUILD_SCM_REVISION bazel-out/volatile-status.txt \\
     | sed 's/^BUILD_SCM_REVISION //' \\
+    | tr -d '\\n' \\
     > $@
     """,
     # Undocumented attr to depend on workspace status files.
@@ -122,6 +123,11 @@ cc_proto_library(
 config_setting(
     name = "enable_exported_symbols",
     values = {"define": "exported_symbols=enabled"},
+)
+
+config_setting(
+    name = "enable_log_debug_assert_in_release",
+    values = {"define": "log_debug_assert_in_release=enabled"},
 )
 
 config_setting(
