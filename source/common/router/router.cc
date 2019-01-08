@@ -77,7 +77,7 @@ bool convertRequestHeadersForInternalRedirect(Http::HeaderMap& downstream_header
 
   // Replace the original host, scheme and path.
   downstream_headers.insertScheme().value(std::string(absolute_url.scheme()));
-  downstream_headers.insertHost().value(std::string(absolute_url.host()));
+  downstream_headers.insertHost().value(std::string(absolute_url.host_and_port()));
   downstream_headers.insertPath().value(std::string(absolute_url.path()));
 
   return true;

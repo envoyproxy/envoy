@@ -152,11 +152,13 @@ upstream will be modified by
 2. Replacing the Authority/Host, Scheme, and Path headers with the values from the Location header
 
 The altered request headers will then have a new route selected, be sent through a new filter chain,
-and then shipped upstream with all of the normal Envoy request sanitization taking place. Note that
-HTTP connection manager sanitization such as clearing untrusted headers will only be applied once,
-per-route header modifications will be applied on both the original route and the second route, even
-if they are the same, so be mindful configuring header modification rules to avoid duplicating
-undesired header values.
+and then shipped upstream with all of the normal Envoy request sanitization taking place. 
+
+.. warning::
+  Note that HTTP connection manager sanitization such as clearing untrusted headers will only be
+  applied once, per-route header modifications will be applied on both the original route and the
+  second route, even if they are the same, so be careful configuring header modification rules to
+  avoid duplicating undesired header values.
 
 A sample redirect flow might look like this:
 

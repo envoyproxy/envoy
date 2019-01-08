@@ -507,7 +507,7 @@ void ServerConnectionImpl::handlePath(HeaderMapImpl& headers, unsigned int metho
   // request-target. A proxy that forwards such a request MUST generate a
   // new Host field-value based on the received request-target rather than
   // forward the received Host field-value.
-  headers.insertHost().value(std::string(absolute_url.host()));
+  headers.insertHost().value(std::string(absolute_url.host_and_port()));
 
   headers.insertPath().value(std::string(absolute_url.path()));
   active_request_->request_url_.clear();

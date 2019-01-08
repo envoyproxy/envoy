@@ -30,12 +30,12 @@ class Url {
 public:
   bool initialize(absl::string_view absolute_url);
   absl::string_view scheme() { return scheme_; }
-  absl::string_view host() { return host_; }
+  absl::string_view host_and_port() { return host_and_port_; }
   absl::string_view path() { return path_; }
 
 private:
   absl::string_view scheme_;
-  absl::string_view host_;
+  absl::string_view host_and_port_;
   absl::string_view path_;
 };
 

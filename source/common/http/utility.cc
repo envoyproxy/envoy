@@ -51,7 +51,8 @@ bool Utility::Url::initialize(absl::string_view absolute_url) {
   if ((u.field_set & (1 << UF_PORT)) == (1 << UF_PORT)) {
     authority_len = authority_len + u.field_data[UF_PORT].len + 1;
   }
-  host_ = absl::string_view(absolute_url.data() + u.field_data[UF_HOST].off, authority_len);
+  host_and_port_ =
+      absl::string_view(absolute_url.data() + u.field_data[UF_HOST].off, authority_len);
 
   // RFC allows the absolute-uri to not end in /, but the absolute path form
   // must start with

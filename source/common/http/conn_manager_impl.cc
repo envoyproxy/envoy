@@ -1732,14 +1732,15 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::removeDownstreamWatermark
 
 bool ConnectionManagerImpl::ActiveStreamDecoderFilter::recreateStream() {
   // Because the filter's and the HCM view of if the stream has a body and if
-  // the stream is complete may differ, re-check those values here.
+  // the stream is complete may differ, re-check bytesReceived() to make sure
+  // there was no body from the HCM's point of view.
   if (!complete() || parent_.stream_info_.bytesReceived() != 0) {
     return false;
   }
   // n.b. we do not currently change the codecs to point at the new stream
   // decoder because the decoder callbacks are complete. It would be good to
   // null out that pointer but should not be necessary.
-  HeaderMapPtr request_headers(parent_.request_headers_.release());
+  HeaderMapPtr request_headers(std::move(parent_.request_headers_));
   StreamEncoder* response_encoder = parent_.response_encoder_;
   parent_.response_encoder_ = nullptr;
   // This functionally deletes the stream (via defered delete) so do not
