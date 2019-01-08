@@ -48,9 +48,6 @@ message Endpoint {
   //   This takes into effect only for upstream clusters with
   //   :ref:`active health checking <arch_overview_health_checking>` enabled.
   HealthCheckConfig health_check_config = 2;
-
-  // Optional endpoint name. This must be unique within a given cluster load assignment.
-  string name = 3;
 }
 
 // An Endpoint that Envoy can route traffic to.
