@@ -451,6 +451,7 @@ static_resources:
 dynamic_resources:
   cds_config:
     api_config_source:
+      api_type: REST
       cluster_names:
       - cds_cluster
       refresh_delay: 30s

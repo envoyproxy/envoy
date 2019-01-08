@@ -21,8 +21,9 @@ option (gogoproto.equal_all) = true;
 message ApiConfigSource {
   // APIs may be fetched via either REST or gRPC.
   enum ApiType {
-    // REST-JSON legacy corresponds to the v1 API.
-    REST_LEGACY = 0 [deprecated = true];
+    // Ideally this would be 'reserved 0' but one can't reserve the default
+    // value. Instead we throw an exception if this is ever used.
+    UNSUPPORTED_REST_LEGACY = 0 [deprecated = true];
     // REST-JSON v2 API. The `canonical JSON encoding
     // <https://developers.google.com/protocol-buffers/docs/proto3#json>`_ for
     // the v2 protos is used.
@@ -31,7 +32,7 @@ message ApiConfigSource {
     GRPC = 2;
   }
   ApiType api_type = 1 [(validate.rules).enum.defined_only = true];
-  // Cluster names should be used only with REST_LEGACY/REST. If > 1
+  // Cluster names should be used only with REST. If > 1
   // cluster is defined, clusters will be cycled through if any kind of failure
   // occurs.
   //

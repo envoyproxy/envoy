@@ -12,7 +12,7 @@ bool hasDeterministicMallocStats() {
   // library for Envoy is TCMALLOC that's what we test for here. If we switch
   // to a different malloc library than we'd have to re-evaluate all the
   // thresholds in the tests referencing hasDeterministicMallocStats().
-#ifdef TCMALLOC
+#if defined(TCMALLOC) && !defined(ENVOY_MEMORY_DEBUG_ENABLED)
   const size_t start_mem = Memory::Stats::totalCurrentlyAllocated();
   std::unique_ptr<char[]> data(new char[10000]);
   const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
