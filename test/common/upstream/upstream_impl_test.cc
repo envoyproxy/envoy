@@ -1315,6 +1315,16 @@ TEST(StaticClusterImplTest, HealthyStat) {
   EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->degradedHosts().size());
   EXPECT_EQ(0UL, cluster.info()->stats().membership_healthy_.value());
   EXPECT_EQ(1UL, cluster.info()->stats().membership_degraded_.value());
+
+  // Mark the endpoint as unhealthy. This should decrement the degraded stat.
+  cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[1]->healthFlagSet(
+      Host::HealthFlag::FAILED_ACTIVE_HC);
+  health_checker->runCallbacks(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[1],
+                               HealthTransition::Changed);
+  EXPECT_EQ(0UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(0UL, cluster.prioritySet().hostSetsPerPriority()[0]->degradedHosts().size());
+  EXPECT_EQ(0UL, cluster.info()->stats().membership_healthy_.value());
+  EXPECT_EQ(0UL, cluster.info()->stats().membership_degraded_.value());
 }
 
 TEST(StaticClusterImplTest, UrlConfig) {
