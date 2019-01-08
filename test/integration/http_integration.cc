@@ -1260,9 +1260,6 @@ void HttpIntegrationTest::testEnvoyMultipleMetadataReachSizeLimit() {
 
 void HttpIntegrationTest::testEnvoyHandling100Continue(bool additional_continue_from_upstream,
                                                        const std::string& via) {
-  config_helper_.addConfigModifier(
-      [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
-          -> void { hcm.set_proxy_100_continue(false); });
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
