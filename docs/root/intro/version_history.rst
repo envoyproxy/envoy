@@ -115,16 +115,16 @@ Version history
 * access log: added REQUESTED_SERVER_NAME for SNI to tcp_proxy and http
 * admin: added :http:get:`/hystrix_event_stream` as an endpoint for monitoring envoy's statistics
   through `Hystrix dashboard <https://github.com/Netflix-Skunkworks/hystrix-dashboard/wiki>`_.
-* cli: Added support for :ref:`component log level <operations_cli>` command line option for configuring log levels of individual components.
+* cli: added support for :ref:`component log level <operations_cli>` command line option for configuring log levels of individual components.
 * cluster: added :ref:`option <envoy_api_field_Cluster.CommonLbConfig.update_merge_window>` to merge
   health check/weight/metadata updates within the given duration.
 * config: regex validation added to limit to a maximum of 1024 characters.
 * config: v1 disabled by default. v1 support remains available until October via flipping --v2-config-only=false.
 * config: v1 disabled by default. v1 support remains available until October via deprecated flag --allow-deprecated-v1-api.
-* config: Fixed stat inconsistency between xDS and ADS implementation. :ref:`update_failure <config_cluster_manager_cds>`
+* config: fixed stat inconsistency between xDS and ADS implementation. :ref:`update_failure <config_cluster_manager_cds>`
   stat is incremented in case of network failure and :ref:`update_rejected <config_cluster_manager_cds>` stat is incremented
   in case of schema/validation error.
-* config: Added a stat :ref:`connected_state <management_server_stats>` that indicates current connected state of Envoy with
+* config: added a stat :ref:`connected_state <management_server_stats>` that indicates current connected state of Envoy with
   management server.
 * ext_authz: added support for configuring additional :ref:`authorization headers <envoy_api_field_config.filter.http.ext_authz.v2alpha.HttpService.authorization_headers_to_add>`
   to be sent from Envoy to the authorization service.
@@ -188,7 +188,7 @@ Version history
   removed the old `name` field to give more flexibility for matching certificate identity.
 * rbac network filter: a :ref:`role-based access control network filter <config_network_filters_rbac>` has been added.
 * rest-api: added ability to set the :ref:`request timeout <envoy_api_field_core.ApiConfigSource.request_timeout>` for REST API requests.
-* route checker: Added v2 config support and removed support for v1 configs.
+* route checker: added v2 config support and removed support for v1 configs.
 * router: added ability to set request/response headers at the :ref:`envoy_api_msg_route.Route` level.
 * stats: added :ref:`option to configure the DogStatsD metric name prefix<envoy_api_field_config.metrics.v2.DogStatsdSink.prefix>` to DogStatsdSink.
 * tcp_proxy: added support for :ref:`weighted clusters <envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.weighted_clusters>`.
