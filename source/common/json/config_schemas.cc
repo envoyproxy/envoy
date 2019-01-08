@@ -933,8 +933,7 @@ const std::string Json::Schema::BUFFER_HTTP_FILTER_SCHEMA(R"EOF(
     "$schema": "http://json-schema.org/schema#",
     "type" : "object",
     "properties" : {
-      "max_request_bytes" : {"type" : "integer"},
-      "max_request_time_s" : {"type" : "integer"}
+      "max_request_bytes" : {"type" : "integer"}
     },
     "required" : ["max_request_bytes"],
     "additionalProperties" : false
