@@ -37,6 +37,9 @@ public:
   const Http::MetadataMap& metadata_map() { return *metadata_map_; }
   void waitForContinueHeaders();
   void waitForHeaders();
+  // This function waits until body_ has at least size bytes in it (it might have more). clearBody()
+  // can be used if the previous body data is not relevant and the test wants to wait for a specific
+  // amount of new data without considering the existing body size.
   void waitForBodyData(uint64_t size);
   void waitForEndStream();
   void waitForReset();
