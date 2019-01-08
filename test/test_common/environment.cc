@@ -323,4 +323,14 @@ void TestEnvironment::setEnvVar(const std::string& name, const std::string& valu
 #endif
 }
 
+void TestEnvironment::unsetEnvVar(const std::string& name) {
+#ifdef WIN32
+  const int rc = ::_putenv_s(name.c_str(), "");
+  ASSERT_EQ(0, rc);
+#else
+  const int rc = ::unsetenv(name.c_str());
+  ASSERT_EQ(rc, 0);
+#endif
+}
+
 } // namespace Envoy
