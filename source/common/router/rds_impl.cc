@@ -16,7 +16,6 @@
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/router/config_impl.h"
-#include "common/router/rds_subscription.h"
 
 namespace Envoy {
 namespace Router {
@@ -72,13 +71,6 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
       envoy::api::v2::RouteConfiguration>(
       rds.config_source(), factory_context.localInfo(), factory_context.dispatcher(),
       factory_context.clusterManager(), factory_context.random(), *scope_,
-      [this, &rds,
-       &factory_context]() -> Envoy::Config::Subscription<envoy::api::v2::RouteConfiguration>* {
-        return new RdsSubscription(Envoy::Config::Utility::generateStats(*scope_), rds,
-                                   factory_context.clusterManager(), factory_context.dispatcher(),
-                                   factory_context.random(), factory_context.localInfo(),
-                                   factory_context.scope());
-      },
       "envoy.api.v2.RouteDiscoveryService.FetchRoutes",
       "envoy.api.v2.RouteDiscoveryService.StreamRoutes");
 }

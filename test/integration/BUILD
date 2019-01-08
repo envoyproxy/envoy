@@ -75,6 +75,7 @@ envoy_cc_test(
     ],
 )
 
+<<<<<<< HEAD
 envoy_cc_test(
     name = "incremental_cds_integration_test",
     srcs = ["incremental_cds_integration_test.cc"],
@@ -124,6 +125,8 @@ envoy_cc_test(
     ] + envoy_all_extensions(),
 )
 
+=======
+>>>>>>> config: removing the legacy rest API (#5522)
 exports_files(["test_utility.sh"])
 
 envoy_sh_test(
@@ -655,7 +658,6 @@ envoy_cc_test(
         "uds_integration_test.cc",
         "uds_integration_test.h",
     ],
-    data = ["//test/config/integration:server_uds.json"],
     deps = [
         ":http_integration_lib",
         "//source/common/event:dispatcher_includes",

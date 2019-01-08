@@ -252,6 +252,7 @@ ClusterManagerImpl::ClusterManagerImpl(
 
   // We can now potentially create the CDS API once the backing cluster exists.
   if (bootstrap.dynamic_resources().has_cds_config()) {
+<<<<<<< HEAD
     const auto& cds_config = bootstrap.dynamic_resources().cds_config();
     if (cds_config.config_source_specifier_case() ==
             envoy::api::v2::core::ConfigSource::kApiConfigSource &&
@@ -261,6 +262,9 @@ ClusterManagerImpl::ClusterManagerImpl(
     } else {
       cds_api_ = factory_.createCds(cds_config, eds_config_, *this);
     }
+=======
+    cds_api_ = factory_.createCds(bootstrap.dynamic_resources().cds_config(), *this);
+>>>>>>> config: removing the legacy rest API (#5522)
     init_helper_.setCds(cds_api_.get());
   } else {
     init_helper_.setCds(nullptr);
@@ -1197,11 +1201,9 @@ ClusterSharedPtr ProdClusterManagerFactory::clusterFromProto(
                                  local_info_, outlier_event_logger, added_via_api);
 }
 
-CdsApiPtr ProdClusterManagerFactory::createCds(
-    const envoy::api::v2::core::ConfigSource& cds_config,
-    const absl::optional<envoy::api::v2::core::ConfigSource>& eds_config, ClusterManager& cm) {
-  return CdsApiImpl::create(cds_config, eds_config, cm, main_thread_dispatcher_, random_,
-                            local_info_, stats_);
+CdsApiPtr ProdClusterManagerFactory::createCds(const envoy::api::v2::core::ConfigSource& cds_config,
+                                               ClusterManager& cm) {
+  return CdsApiImpl::create(cds_config, cm, main_thread_dispatcher_, random_, local_info_, stats_);
 }
 
 CdsApiPtr ProdClusterManagerFactory::createIncrementalCds(
