@@ -26,13 +26,14 @@ private:
 
 class GoogleAsyncClientFactoryImpl : public AsyncClientFactory {
 public:
-  GoogleAsyncClientFactoryImpl(ThreadLocal::Instance& tls, ThreadLocal::Slot* google_tls_slot,
-                               Stats::Scope& scope,
+  GoogleAsyncClientFactoryImpl(Api::Api& api, ThreadLocal::Instance& tls,
+                               ThreadLocal::Slot* google_tls_slot, Stats::Scope& scope,
                                const envoy::api::v2::core::GrpcService& config);
 
   AsyncClientPtr create() override;
 
 private:
+  Api::Api& api_;
   ThreadLocal::Instance& tls_;
   ThreadLocal::Slot* google_tls_slot_;
   Stats::ScopeSharedPtr scope_;
@@ -54,6 +55,7 @@ private:
   ThreadLocal::Instance& tls_;
   ThreadLocal::SlotPtr google_tls_slot_;
   TimeSource& time_source_;
+  Api::Api& api_;
 };
 
 } // namespace Grpc

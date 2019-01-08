@@ -154,8 +154,9 @@ public:
 // Google gRPC C++ client library implementation of Grpc::AsyncClient.
 class GoogleAsyncClientImpl final : public AsyncClient, Logger::Loggable<Logger::Id::grpc> {
 public:
-  GoogleAsyncClientImpl(Event::Dispatcher& dispatcher, GoogleAsyncClientThreadLocal& tls,
-                        GoogleStubFactory& stub_factory, Stats::ScopeSharedPtr scope,
+  GoogleAsyncClientImpl(Api::Api& api, Event::Dispatcher& dispatcher,
+                        GoogleAsyncClientThreadLocal& tls, GoogleStubFactory& stub_factory,
+                        Stats::ScopeSharedPtr scope,
                         const envoy::api::v2::core::GrpcService& config);
   ~GoogleAsyncClientImpl() override;
 

@@ -1,7 +1,6 @@
 #include "common/grpc/google_grpc_creds_impl.h"
 
 #include "envoy/api/v2/core/grpc_service.pb.h"
-#include "envoy/grpc/google_grpc_creds.h"
 #include "envoy/registry/registry.h"
 
 #include "common/config/datasource.h"
@@ -112,7 +111,9 @@ class DefaultGoogleGrpcCredentialsFactory : public GoogleGrpcCredentialsFactory 
 
 public:
   std::shared_ptr<grpc::ChannelCredentials>
-  getChannelCredentials(const envoy::api::v2::core::GrpcService& grpc_service_config) override {
+  getChannelCredentials(const envoy::api::v2::core::GrpcService& grpc_service_config,
+                        GoogleGrpcCredentialsFactoryContext& context) override {
+    UNREFERENCED_PARAMETER(context);
     return CredsUtility::defaultChannelCredentials(grpc_service_config);
   }
 
@@ -126,7 +127,8 @@ static Registry::RegisterFactory<DefaultGoogleGrpcCredentialsFactory, GoogleGrpc
     default_google_grpc_credentials_registered_;
 
 std::shared_ptr<grpc::ChannelCredentials>
-getGoogleGrpcChannelCredentials(const envoy::api::v2::core::GrpcService& grpc_service) {
+getGoogleGrpcChannelCredentials(const envoy::api::v2::core::GrpcService& grpc_service,
+                                GoogleGrpcCredentialsFactoryContext& context) {
   GoogleGrpcCredentialsFactory* credentials_factory = nullptr;
   const std::string& google_grpc_credentials_factory_name =
       grpc_service.google_grpc().credentials_factory_name();
@@ -141,7 +143,7 @@ getGoogleGrpcChannelCredentials(const envoy::api::v2::core::GrpcService& grpc_se
     throw EnvoyException(fmt::format("Unknown google grpc credentials factory: {}",
                                      google_grpc_credentials_factory_name));
   }
-  return credentials_factory->getChannelCredentials(grpc_service);
+  return credentials_factory->getChannelCredentials(grpc_service, context);
 }
 
 } // namespace Grpc

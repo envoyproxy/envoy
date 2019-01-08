@@ -64,7 +64,7 @@ void GoogleAsyncClientThreadLocal::completionThread() {
   ENVOY_LOG(debug, "completionThread exiting");
 }
 
-GoogleAsyncClientImpl::GoogleAsyncClientImpl(Event::Dispatcher& dispatcher,
+GoogleAsyncClientImpl::GoogleAsyncClientImpl(Api::Api& api, Event::Dispatcher& dispatcher,
                                              GoogleAsyncClientThreadLocal& tls,
                                              GoogleStubFactory& stub_factory,
                                              Stats::ScopeSharedPtr scope,
@@ -75,7 +75,9 @@ GoogleAsyncClientImpl::GoogleAsyncClientImpl(Event::Dispatcher& dispatcher,
   // smart enough to do connection pooling and reuse with identical channel args, so this should
   // have comparable overhead to what we are doing in Grpc::AsyncClientImpl, i.e. no expensive
   // new connection implied.
-  std::shared_ptr<grpc::ChannelCredentials> creds = getGoogleGrpcChannelCredentials(config);
+  GoogleGrpcCredentialsFactoryContextImpl context(api, dispatcher.timeSystem());
+  std::shared_ptr<grpc::ChannelCredentials> creds =
+      getGoogleGrpcChannelCredentials(config, context);
   std::shared_ptr<grpc::Channel> channel = CreateChannel(config.google_grpc().target_uri(), creds);
   stub_ = stub_factory.createStub(channel);
   // Initialize client stats.

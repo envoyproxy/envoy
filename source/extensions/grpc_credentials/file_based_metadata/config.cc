@@ -17,7 +17,9 @@ namespace FileBasedMetadata {
 
 std::shared_ptr<grpc::ChannelCredentials>
 FileBasedMetadataGrpcCredentialsFactory::getChannelCredentials(
-    const envoy::api::v2::core::GrpcService& grpc_service_config) {
+    const envoy::api::v2::core::GrpcService& grpc_service_config,
+    Grpc::GoogleGrpcCredentialsFactoryContext& context) {
+  UNREFERENCED_PARAMETER(context);
   const auto& google_grpc = grpc_service_config.google_grpc();
   std::shared_ptr<grpc::ChannelCredentials> creds =
       Grpc::CredsUtility::defaultSslChannelCredentials(grpc_service_config);
