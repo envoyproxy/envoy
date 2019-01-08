@@ -17,6 +17,7 @@
 #include "envoy/tracing/http_tracer.h"
 
 #include "common/access_log/access_log_manager_impl.h"
+#include "common/common/assert.h"
 #include "common/common/logger_delegates.h"
 #include "common/grpc/async_client_manager_impl.h"
 #include "common/http/context_impl.h"
@@ -44,7 +45,7 @@ namespace Server {
  * All server wide stats. @see stats_macros.h
  */
 // clang-format off
-#define ALL_SERVER_STATS(GAUGE)                                                                    \
+#define ALL_SERVER_STATS(COUNTER, GAUGE)                                                           \
   GAUGE(uptime)                                                                                    \
   GAUGE(concurrency)                                                                               \
   GAUGE(memory_allocated)                                                                          \
@@ -54,11 +55,12 @@ namespace Server {
   GAUGE(total_connections)                                                                         \
   GAUGE(version)                                                                                   \
   GAUGE(days_until_first_cert_expiring)                                                            \
-  GAUGE(hot_restart_epoch)
+  GAUGE(hot_restart_epoch)                                                                         \
+  COUNTER(debug_assertion_failures)
 // clang-format on
 
 struct ServerStats {
-  ALL_SERVER_STATS(GENERATE_GAUGE_STRUCT)
+  ALL_SERVER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
 };
 
 /**
@@ -204,6 +206,7 @@ private:
   time_t original_start_time_;
   Stats::StoreRoot& stats_store_;
   std::unique_ptr<ServerStats> server_stats_;
+  Assert::ActionRegistrationPtr assert_action_registration_;
   ThreadLocal::Instance& thread_local_;
   Api::ApiPtr api_;
   std::unique_ptr<Secret::SecretManager> secret_manager_;
