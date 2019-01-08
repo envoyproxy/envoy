@@ -326,7 +326,6 @@ The following optional features can be enabled on the Bazel build command-line:
 * ASSERT() can be configured to log failures and increment a stat counter in a release build with
   `--define log_debug_assert_in_release=enabled`. The default behavior is to compile debug assertions out of
   release builds so that the condition is not evaluated. This option has no effect in debug builds.
-* tcmalloc can be disabled with `--define tcmalloc=disabled`
 * memory-debugging (scribbling over memory after allocation and before freeing) with
   `--define tcmalloc=debug`.
 
