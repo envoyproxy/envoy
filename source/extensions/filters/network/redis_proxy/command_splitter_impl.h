@@ -236,6 +236,7 @@ private:
 
   typedef std::shared_ptr<HandlerData> HandlerDataPtr;
 
+  // TODO(ramaraochavali): Make a single template class and reuse it with HeaderImpl.
   struct HandlerEntry {
     HandlerDataPtr handler_data_;
     std::array<std::unique_ptr<HandlerEntry>, 256> entries_;

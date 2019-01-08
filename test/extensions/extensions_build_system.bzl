@@ -30,3 +30,12 @@ def envoy_extension_cc_mock(
         return
 
     envoy_cc_mock(name, **kwargs)
+
+def envoy_extension_cc_test_binary(
+        name,
+        extension_name,
+        **kwargs):
+    if not extension_name in EXTENSIONS:
+        return
+
+    envoy_cc_test_binary(name, **kwargs)
