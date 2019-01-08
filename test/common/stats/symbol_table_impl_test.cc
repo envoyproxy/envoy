@@ -87,7 +87,9 @@ TEST_F(StatNameTest, TestSuccessfulDecode) {
   EXPECT_EQ(stat_name_1.toString(table_), stat_name);
 }
 
-TEST_F(StatNameTest, TestBadDecodes) {
+class StatNameDeathTest : public StatNameTest {};
+
+TEST_F(StatNameDeathTest, TestBadDecodes) {
   {
     // If a symbol doesn't exist, decoding it should trigger an ASSERT() and crash.
     SymbolVec bad_symbol_vec = {1}; // symbol 0 is the empty symbol.
