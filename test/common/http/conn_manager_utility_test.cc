@@ -1033,17 +1033,37 @@ TEST_F(ConnectionManagerUtilityTest, NoTraceOnBrokenUuid) {
             UuidUtils::isTraceableUuid(request_headers.get_("x-request-id")));
 }
 
+void checkHopByHop(bool has, Http::TestHeaderMapImpl& headers) {
+  EXPECT_EQ(has, headers.has("keep-alive"));
+  EXPECT_EQ(has, headers.has("proxy-connection"));
+  EXPECT_EQ(has, headers.has("TE"));
+  EXPECT_EQ(has, headers.has("transfer-encoding"));
+  EXPECT_EQ(has, headers.has("proxy-authenticate"));
+  EXPECT_EQ(has, headers.has("proxy-authorization"));
+}
+
+TEST_F(ConnectionManagerUtilityTest, RemovesProxyRequest) {
+  Http::TestHeaderMapImpl request_headers{
+      {"keep-alive", "timeout=60"},      {"TE", "te-header"},
+      {"proxy-authenticate", "p-authn"}, {"proxy-authorization", "p-authz"},
+      {"Transfer-encoding", "chunked"},  {"proxy-connection", "proxy-header"}};
+  checkHopByHop(true, request_headers);
+  callMutateRequestHeaders(request_headers, Protocol::Http2);
+  checkHopByHop(false, request_headers);
+}
+
 TEST_F(ConnectionManagerUtilityTest, RemovesProxyResponseHeaders) {
   Http::TestHeaderMapImpl request_headers{{}};
-  Http::TestHeaderMapImpl response_headers{{"keep-alive", "timeout=60"},
-                                           {"proxy-connection", "proxy-header"}};
+  Http::TestHeaderMapImpl response_headers{
+      {"keep-alive", "timeout=60"},      {"TE", "te-header"},
+      {"proxy-authenticate", "p-authn"}, {"proxy-authorization", "p-authz"},
+      {"Transfer-encoding", "chunked"},  {"proxy-connection", "proxy-header"}};
+  checkHopByHop(true, response_headers);
   ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, "");
+  checkHopByHop(false, response_headers);
 
   EXPECT_EQ(UuidTraceStatus::NoTrace,
             UuidUtils::isTraceableUuid(request_headers.get_("x-request-id")));
-
-  EXPECT_FALSE(response_headers.has("keep-alive"));
-  EXPECT_FALSE(response_headers.has("proxy-connection"));
 }
 
 } // namespace Http

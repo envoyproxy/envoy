@@ -18,6 +18,23 @@
 namespace Envoy {
 namespace Http {
 
+namespace {
+
+// Per https://tools.ietf.org/html/rfc2616#section-13.5.1   The exceptions are
+// Connection, which is removed in mutateRequest/ResponsseHeaders unless there is an Upgrade header
+// Upgrade, which is explicitly proxied through (when upgrades are configured) though the upgrade is
+// also performed.
+void removeHopByHopHeaders(Http::HeaderMap& headers) {
+  headers.removeKeepAlive();
+  headers.removeProxyAuthenticate();
+  headers.removeProxyAuthorization();
+  headers.removeProxyConnection();
+  headers.removeTransferEncoding();
+  headers.removeTE();
+}
+
+} // namespace
+
 Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequestHeaders(
     Http::HeaderMap& request_headers, Network::Connection& connection,
     ConnectionManagerConfig& config, const Router::Config& route_config,
@@ -41,11 +58,9 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
     request_headers.removeUpgrade();
   }
 
-  // Clean proxy headers.
+  removeHopByHopHeaders(request_headers);
+
   request_headers.removeEnvoyInternalRequest();
-  request_headers.removeKeepAlive();
-  request_headers.removeProxyConnection();
-  request_headers.removeTransferEncoding();
 
   // If we are "using remote address" this means that we create/append to XFF with our immediate
   // peer. Cases where we don't "use remote address" include trusted double proxy where we expect
@@ -315,15 +330,13 @@ void ConnectionManagerUtility::mutateResponseHeaders(Http::HeaderMap& response_h
   } else {
     response_headers.removeConnection();
   }
-  response_headers.removeTransferEncoding();
 
   if (request_headers != nullptr && request_headers->EnvoyForceTrace() &&
       request_headers->RequestId()) {
     response_headers.insertRequestId().value(*request_headers->RequestId());
   }
 
-  response_headers.removeKeepAlive();
-  response_headers.removeProxyConnection();
+  removeHopByHopHeaders(response_headers);
 
   if (!via.empty()) {
     Utility::appendVia(response_headers, via);

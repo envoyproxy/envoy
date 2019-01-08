@@ -81,6 +81,8 @@ public:
   const LowerCaseString OtSpanContext{"x-ot-span-context"};
   const LowerCaseString Path{":path"};
   const LowerCaseString Protocol{":protocol"};
+  const LowerCaseString ProxyAuthenticate{"proxy-authenticate"};
+  const LowerCaseString ProxyAuthorization{"proxy-authorization"};
   const LowerCaseString ProxyConnection{"proxy-connection"};
   const LowerCaseString Referer{"referer"};
   const LowerCaseString RequestId{"x-request-id"};

@@ -289,6 +289,8 @@ private:
   HEADER_FUNC(OtSpanContext)                                                                       \
   HEADER_FUNC(Path)                                                                                \
   HEADER_FUNC(Protocol)                                                                            \
+  HEADER_FUNC(ProxyAuthenticate)                                                                   \
+  HEADER_FUNC(ProxyAuthorization)                                                                  \
   HEADER_FUNC(ProxyConnection)                                                                     \
   HEADER_FUNC(Referer)                                                                             \
   HEADER_FUNC(RequestId)                                                                           \
