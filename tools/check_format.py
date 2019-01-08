@@ -227,8 +227,41 @@ def hasInvalidAngleBracketDirectory(line):
   return subdir in SUBDIR_SET
 
 
+VERSION_HISTORY_NEW_LINE_REGEX = re.compile('\* [a-z \-_]*: [a-z:`]')
+VERSION_HISTORY_NEW_RELEASE_REGEX = re.compile('^====[=]+$')
+
+
+def checkCurrentReleaseNotes(file_path, error_messages):
+  in_current_release = False
+
+  file_handle = fileinput.input(file_path)
+  for line_number, line in enumerate(file_handle):
+
+    def reportError(message):
+      error_messages.append("%s:%d: %s" % (file_path, line_number + 1, message))
+
+    if VERSION_HISTORY_NEW_RELEASE_REGEX.match(line):
+      # If we were in the section for the current release this means we have passed it.
+      if in_current_release:
+        break
+      # If we see a version marker we are now in the section for the current release.
+      in_current_release = True
+
+    if line.startswith('*') and not VERSION_HISTORY_NEW_LINE_REGEX.match(line):
+      reportError("Version history line malformed. "
+                  "Does not match VERSION_HISTORY_NEW_LINE_REGEX in check_format.py\n %s" % line)
+  file_handle.close()
+
+
 def checkFileContents(file_path, checker):
   error_messages = []
+
+  if file_path.endswith("version_history.rst"):
+    # Version file checking has enough special cased logic to merit its own checks.
+    # This only validates entries for the current release as very old release
+    # notes have a different format.
+    checkCurrentReleaseNotes(file_path, error_messages)
+
   for line_number, line in enumerate(fileinput.input(file_path)):
 
     def reportError(message):
