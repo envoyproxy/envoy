@@ -20,6 +20,7 @@ envoy_cc_library(
     name = "signer_impl_lib",
     srcs = ["signer_impl.cc"],
     hdrs = ["signer_impl.h"],
+    external_deps = ["ssl"],
     deps = [
         ":credentials_provider_lib",
         ":region_provider_lib",
