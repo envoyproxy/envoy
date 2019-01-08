@@ -1,4 +1,4 @@
-#include "common/ssl/context_impl.h"
+#include "extensions/transport_sockets/tls/context_impl.h"
 
 #include <algorithm>
 #include <memory>
@@ -14,7 +14,8 @@
 #include "common/common/hex.h"
 #include "common/common/utility.h"
 #include "common/protobuf/utility.h"
-#include "common/ssl/utility.h"
+
+#include "extensions/transport_sockets/tls/utility.h"
 
 #include "openssl/evp.h"
 #include "openssl/hmac.h"
@@ -22,7 +23,9 @@
 #include "openssl/x509v3.h"
 
 namespace Envoy {
-namespace Ssl {
+namespace Extensions {
+namespace TransportSockets {
+namespace Tls {
 
 namespace {
 
@@ -42,7 +45,8 @@ bool cbsContainsU16(CBS& cbs, uint16_t n) {
 
 } // namespace
 
-ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config, TimeSource& time_source)
+ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& config,
+                         TimeSource& time_source)
     : scope_(scope), stats_(generateStats(scope)), time_source_(time_source),
       tls_max_version_(config.maxProtocolVersion()) {
   const auto tls_certificates = config.tlsCertificates();
@@ -575,15 +579,15 @@ size_t ContextImpl::daysUntilFirstCertExpires() const {
   return daysUntilExpiration;
 }
 
-CertificateDetailsPtr ContextImpl::getCaCertInformation() const {
+Envoy::Ssl::CertificateDetailsPtr ContextImpl::getCaCertInformation() const {
   if (ca_cert_ == nullptr) {
     return nullptr;
   }
   return certificateDetails(ca_cert_.get(), getCaFileName());
 }
 
-std::vector<CertificateDetailsPtr> ContextImpl::getCertChainInformation() const {
-  std::vector<CertificateDetailsPtr> cert_details;
+std::vector<Envoy::Ssl::CertificateDetailsPtr> ContextImpl::getCertChainInformation() const {
+  std::vector<Envoy::Ssl::CertificateDetailsPtr> cert_details;
   for (const auto& ctx : tls_contexts_) {
     if (ctx.cert_chain_ == nullptr) {
       continue;
@@ -594,8 +598,9 @@ std::vector<CertificateDetailsPtr> ContextImpl::getCertChainInformation() const 
   return cert_details;
 }
 
-CertificateDetailsPtr ContextImpl::certificateDetails(X509* cert, const std::string& path) const {
-  CertificateDetailsPtr certificate_details =
+Envoy::Ssl::CertificateDetailsPtr ContextImpl::certificateDetails(X509* cert,
+                                                                  const std::string& path) const {
+  Envoy::Ssl::CertificateDetailsPtr certificate_details =
       std::make_unique<envoy::admin::v2alpha::CertificateDetails>();
   certificate_details->set_path(path);
   certificate_details->set_serial_number(Utility::getSerialNumberFromCertificate(*cert));
@@ -619,7 +624,8 @@ CertificateDetailsPtr ContextImpl::certificateDetails(X509* cert, const std::str
   return certificate_details;
 }
 
-ClientContextImpl::ClientContextImpl(Stats::Scope& scope, const ClientContextConfig& config,
+ClientContextImpl::ClientContextImpl(Stats::Scope& scope,
+                                     const Envoy::Ssl::ClientContextConfig& config,
                                      TimeSource& time_source)
     : ContextImpl(scope, config, time_source),
       server_name_indication_(config.serverNameIndication()),
@@ -729,7 +735,8 @@ uint16_t ClientContextImpl::parseSigningAlgorithmsForTest(const std::string& sig
   return 0;
 }
 
-ServerContextImpl::ServerContextImpl(Stats::Scope& scope, const ServerContextConfig& config,
+ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
+                                     const Envoy::Ssl::ServerContextConfig& config,
                                      const std::vector<std::string>& server_names,
                                      TimeSource& time_source)
     : ContextImpl(scope, config, time_source), session_ticket_keys_(config.sessionTicketKeys()) {
@@ -893,7 +900,7 @@ int ServerContextImpl::sessionTicketProcess(SSL*, uint8_t* key_name, uint8_t* iv
     // or if we allow it to be emptied, reconfigure the context so this callback
     // isn't set.
 
-    const ServerContextConfig::SessionTicketKey& key = session_ticket_keys_.front();
+    const Envoy::Ssl::ServerContextConfig::SessionTicketKey& key = session_ticket_keys_.front();
 
     static_assert(std::tuple_size<decltype(key.name_)>::value == SSL_TICKET_KEY_NAME_LEN,
                   "Expected key.name length");
@@ -917,7 +924,7 @@ int ServerContextImpl::sessionTicketProcess(SSL*, uint8_t* key_name, uint8_t* iv
   } else {
     // Decrypt
     bool is_enc_key = true; // first element is the encryption key
-    for (const ServerContextConfig::SessionTicketKey& key : session_ticket_keys_) {
+    for (const Envoy::Ssl::ServerContextConfig::SessionTicketKey& key : session_ticket_keys_) {
       static_assert(std::tuple_size<decltype(key.name_)>::value == SSL_TICKET_KEY_NAME_LEN,
                     "Expected key.name length");
       if (std::equal(key.name_.begin(), key.name_.end(), key_name)) {
@@ -1028,7 +1035,7 @@ ServerContextImpl::selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello) {
 }
 
 void ServerContextImpl::TlsContext::addClientValidationContext(
-    const CertificateValidationContextConfig& config, bool require_client_cert) {
+    const Envoy::Ssl::CertificateValidationContextConfig& config, bool require_client_cert) {
   bssl::UniquePtr<BIO> bio(
       BIO_new_mem_buf(const_cast<char*>(config.caCert().data()), config.caCert().size()));
   RELEASE_ASSERT(bio != nullptr, "");
@@ -1092,5 +1099,7 @@ bool ServerContextImpl::TlsContext::isCipherEnabled(uint16_t cipher_id, uint16_t
   return false;
 }
 
-} // namespace Ssl
+} // namespace Tls
+} // namespace TransportSockets
+} // namespace Extensions
 } // namespace Envoy
