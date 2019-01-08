@@ -132,9 +132,8 @@ TEST_P(StatsIntegrationTest, WithTagSpecifierWithFixedValue) {
   EXPECT_EQ(live->tags()[0].value_, "xxx");
 }
 
-TEST_P(StatsIntegrationTest, MemoryLargeClusterSize) {
-  const size_t million = 1000 * 1000;
-  const size_t start_mem = Memory::Stats::totalCurrentlyAllocated();
+TEST_P(StatsIntegrationTest, MemoryLargeClusterSizeWithStats) {
+  const size_t start_mem = Memory::Stats::totalCurrentlyAllocated() / 1000;
   if (start_mem == 0) {
     // Skip this test for platforms where we can't measure memory.
     return;
@@ -149,10 +148,31 @@ TEST_P(StatsIntegrationTest, MemoryLargeClusterSize) {
   });
   initialize();
 
-  const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
+  const size_t end_mem = Memory::Stats::totalCurrentlyAllocated() / 1000;
   EXPECT_LT(start_mem, end_mem);
-  EXPECT_LT(end_mem - start_mem, 57 * million); // actual value: 56635576 as of Jan 7, 2019
-  // EXPECT_EQ(end_mem, 57 * million);
+  EXPECT_LT(end_mem - start_mem, 57000); // actual value: 56635 as of Jan 7, 2019
+}
+
+TEST_P(StatsIntegrationTest, MemoryLargeClusterSizeNoStats) {
+  const size_t start_mem = Memory::Stats::totalCurrentlyAllocated() / 1000;
+  if (start_mem == 0) {
+    // Skip this test for platforms where we can't measure memory.
+    return;
+  }
+
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    for (int i = 1; i < 1001; i++) {
+      RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
+      auto* c = bootstrap.mutable_static_resources()->add_clusters();
+      c->set_name(fmt::format("cluster_{}", i));
+      bootstrap.mutable_stats_config()->mutable_use_all_default_tags()->set_value(false);
+    }
+  });
+  initialize();
+
+  const size_t end_mem = Memory::Stats::totalCurrentlyAllocated() / 1000;
+  EXPECT_LT(start_mem, end_mem);
+  EXPECT_LT(end_mem - start_mem, 49800); // actual value: 49717 as of Jan 7, 2019
 }
 
 } // namespace
