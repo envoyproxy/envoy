@@ -5,6 +5,7 @@
 #include "envoy/http/header_map.h"
 
 #include "common/common/fmt.h"
+#include "common/profiler/profiler.h"
 #include "common/stats/stats_matcher_impl.h"
 
 #include "test/integration/utility.h"
@@ -391,9 +392,6 @@ TEST_P(IntegrationAdminTest, AdminOnDestroyCallbacks) {
   EXPECT_EQ(test_server_->server().statsFlushInterval(), std::chrono::milliseconds(5000));
 }
 
-// Successful call to startProfiler requires tcmalloc.
-#ifdef TCMALLOC
-
 TEST_P(IntegrationAdminTest, AdminCpuProfilerStart) {
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
     auto* admin = bootstrap.mutable_admin();
@@ -404,14 +402,17 @@ TEST_P(IntegrationAdminTest, AdminCpuProfilerStart) {
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       lookupPort("admin"), "POST", "/cpuprofiler?enable=y", "", downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
+#ifdef PROFILER_AVAILABLE
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+#else
+  EXPECT_STREQ("500", response->headers().Status()->value().c_str());
+#endif
 
   response = IntegrationUtil::makeSingleRequest(
       lookupPort("admin"), "POST", "/cpuprofiler?enable=n", "", downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 }
-#endif
 
 class IntegrationAdminIpv4Ipv6Test : public HttpIntegrationTest, public testing::Test {
 public:
