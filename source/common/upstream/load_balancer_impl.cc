@@ -50,6 +50,15 @@ std::pair<int32_t, size_t> distributeLoad(PriorityLoad& per_priority_load,
   return {first_available_priority, total_load};
 }
 
+HostsSource::SourceType localitySourceType(bool degraded) {
+  return degraded ? HostsSource::SourceType::LocalityDegradedHosts
+                  : HostsSource::SourceType::LocalityHealthyHosts;
+}
+
+HostsSource::SourceType sourceType(bool degraded) {
+  return degraded ? HostsSource::SourceType::DegradedHosts : HostsSource::SourceType::HealthyHosts;
+}
+
 } // namespace
 
 std::pair<uint32_t, bool>
@@ -157,9 +166,12 @@ void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority,
   // load for all priority levels.
 
   //
-  // First, determine if the load needs to be scaled relative to health. For example if there are
-  // 3 host sets with 20% / 20% / 10% health they will get 40% / 40% / 20% load to ensure total load
-  // adds up to 100.
+  // First, determine if the load needs to be scaled relative to availability (healthy + degraded).
+  // For example if there are 3 host sets with 10% / 20% / 10% health and 20% / 10% / 0% degraded
+  // they will get 16% / 28% / 14% load to healthy hosts and 28% / 14% / 0% load to degraded hosts
+  // to ensure total load adds up to 100. Note the first healthy priority is receiving 2% additional
+  // load due to rounding.
+  //
   // Sum of priority levels' health values may exceed 100, so it is capped at 100 and referred as
   // normalized total health.
   const uint32_t normalized_total_health =
@@ -532,8 +544,7 @@ ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context) {
   // If we're doing locality weighted balancing, pick locality.
   const absl::optional<uint32_t> locality = host_set.chooseLocality();
   if (locality.has_value()) {
-    hosts_source.source_type_ = degraded_hosts ? HostsSource::SourceType::LocalityDegradedHosts
-                                               : HostsSource::SourceType::LocalityHealthyHosts;
+    hosts_source.source_type_ = localitySourceType(degraded);
     hosts_source.locality_index_ = locality.value();
     return hosts_source;
   }
@@ -542,15 +553,13 @@ ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context) {
   // for the selected host set.
   if (per_priority_state_[host_set.priority()]->locality_routing_state_ ==
       LocalityRoutingState::NoLocalityRouting) {
-    hosts_source.source_type_ = degraded_hosts ? HostsSource::SourceType::DegradedHosts
-                                               : HostsSource::SourceType::HealthyHosts;
+    hosts_source.source_type_ = sourceType(degraded);
     return hosts_source;
   }
 
   // Determine if the load balancer should do zone based routing for this pick.
   if (!runtime_.snapshot().featureEnabled(RuntimeZoneEnabled, routing_enabled_)) {
-    hosts_source.source_type_ = degraded_hosts ? HostsSource::SourceType::DegradedHosts
-                                               : HostsSource::SourceType::HealthyHosts;
+    hosts_source.source_type_ = sourceType(degraded);
     return hosts_source;
   }
 
@@ -558,13 +567,11 @@ ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context) {
     stats_.lb_local_cluster_not_ok_.inc();
     // If the local Envoy instances are in global panic, do not do locality
     // based routing.
-    hosts_source.source_type_ = degraded_hosts ? HostsSource::SourceType::DegradedHosts
-                                               : HostsSource::SourceType::HealthyHosts;
+    hosts_source.source_type_ = sourceType(degraded);
     return hosts_source;
   }
 
-  hosts_source.source_type_ = degraded_hosts ? HostsSource::SourceType::LocalityDegradedHosts
-                                             : HostsSource::SourceType::LocalityHealthyHosts;
+  hosts_source.source_type_ = localitySourceType(degraded);
   hosts_source.locality_index_ = tryChooseLocalLocalityHosts(host_set);
   return hosts_source;
 }
