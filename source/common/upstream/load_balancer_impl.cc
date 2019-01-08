@@ -83,11 +83,11 @@ LoadBalancerBase::LoadBalancerBase(const PrioritySet& priority_set, ClusterStats
   // Reclaculate panic mode for all levels.
   recalculatePerPriorityPanic();
 
-  priority_set_.addMemberUpdateCb([this](uint32_t priority, const HostVector&,
-                                         const HostVector&) -> void {
+  priority_set_.addPriorityUpdateCb([this](uint32_t priority, const HostVector&,
+                                           const HostVector&) -> void {
     recalculatePerPriorityState(priority, priority_set_, per_priority_load_, per_priority_health_);
   });
-  priority_set_.addMemberUpdateCb(
+  priority_set_.addPriorityUpdateCb(
       [this](uint32_t priority, const HostVector&, const HostVector&) -> void {
         UNREFERENCED_PARAMETER(priority);
         recalculatePerPriorityPanic();
@@ -206,7 +206,7 @@ ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
                                                         min_cluster_size, 6U)) {
   ASSERT(!priority_set.hostSetsPerPriority().empty());
   resizePerPriorityState();
-  priority_set_.addMemberUpdateCb(
+  priority_set_.addPriorityUpdateCb(
       [this](uint32_t priority, const HostVector&, const HostVector&) -> void {
         // Make sure per_priority_state_ is as large as priority_set_.hostSetsPerPriority()
         resizePerPriorityState();
@@ -222,7 +222,7 @@ ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
     // routing (all local Envoys fail over at the same time) and use all priorities when computing
     // the locality routing structure.
     ASSERT(local_priority_set_->hostSetsPerPriority().size() == 1);
-    local_priority_set_member_update_cb_handle_ = local_priority_set_->addMemberUpdateCb(
+    local_priority_set_member_update_cb_handle_ = local_priority_set_->addPriorityUpdateCb(
         [this](uint32_t priority, const HostVector&, const HostVector&) -> void {
           ASSERT(priority == 0);
           // If the set of local Envoys changes, regenerate routing for P=0 as it does priority
@@ -530,7 +530,7 @@ EdfLoadBalancerBase::EdfLoadBalancerBase(
   // The downside of a full recompute is that time complexity is O(n * log n),
   // so we will need to do better at delta tracking to scale (see
   // https://github.com/envoyproxy/envoy/issues/2874).
-  priority_set.addMemberUpdateCb(
+  priority_set.addPriorityUpdateCb(
       [this](uint32_t priority, const HostVector&, const HostVector&) { refresh(priority); });
 }
 

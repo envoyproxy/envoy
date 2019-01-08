@@ -74,7 +74,7 @@ public:
         ssl_context_manager_, *scope, cm, local_info_, dispatcher_, random_, stats_store_);
     cluster_.reset(
         new OriginalDstCluster(cluster_config, runtime_, factory_context, std::move(scope), false));
-    cluster_->prioritySet().addMemberUpdateCb(
+    cluster_->prioritySet().addPriorityUpdateCb(
         [&](uint32_t, const HostVector&, const HostVector&) -> void {
           membership_updated_.ready();
         });
@@ -446,7 +446,7 @@ TEST_F(OriginalDstClusterTest, MultipleClusters) {
   setupFromJson(json);
 
   PrioritySetImpl second;
-  cluster_->prioritySet().addMemberUpdateCb(
+  cluster_->prioritySet().addPriorityUpdateCb(
       [&](uint32_t, const HostVector& added, const HostVector& removed) -> void {
         // Update second hostset accordingly;
         HostVectorSharedPtr new_hosts(

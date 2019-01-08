@@ -298,9 +298,9 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
   }
 
   // Now setup for cross-thread updates.
-  cluster.prioritySet().addMemberUpdateCb([&cluster, this](uint32_t priority,
-                                                           const HostVector& hosts_added,
-                                                           const HostVector& hosts_removed) {
+  cluster.prioritySet().addPriorityUpdateCb([&cluster, this](uint32_t priority,
+                                                             const HostVector& hosts_added,
+                                                             const HostVector& hosts_removed) {
     // This fires when a cluster is about to have an updated member set. We need to send this
     // out to all of the thread local configurations.
 
@@ -1046,7 +1046,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
   }
 
   priority_set_.addMemberUpdateCb(
-      [this](uint32_t, const HostVector&, const HostVector& hosts_removed) -> void {
+      [this](const HostVector&, const HostVector& hosts_removed) -> void {
         // We need to go through and purge any connection pools for hosts that got deleted.
         // Even if two hosts actually point to the same address this will be safe, since if a
         // host is readded it will be a different physical HostSharedPtr.
