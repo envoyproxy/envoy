@@ -56,8 +56,10 @@ void IntegrationStreamDecoder::waitForHeaders() {
 
 void IntegrationStreamDecoder::waitForBodyData(uint64_t size) {
   ASSERT(body_data_waiting_length_ == 0);
-  body_data_waiting_length_ = size;
-  dispatcher_.run(Event::Dispatcher::RunType::Block);
+  if (body_.size() < size) {
+    body_data_waiting_length_ = size;
+    dispatcher_.run(Event::Dispatcher::RunType::Block);
+  }
 }
 
 void IntegrationStreamDecoder::waitForEndStream() {
