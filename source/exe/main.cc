@@ -25,10 +25,13 @@ int main(int argc, char** argv) {
   try {
     main_common = std::make_unique<Envoy::MainCommon>(argc, argv);
   } catch (const Envoy::NoServingException& e) {
+    std::cerr << e.what() << std::endl;
     return EXIT_SUCCESS;
   } catch (const Envoy::MalformedArgvException& e) {
+    std::cerr << e.what() << std::endl;
     return EXIT_FAILURE;
   } catch (const Envoy::EnvoyException& e) {
+    std::cerr << e.what() << std::endl;
     return EXIT_FAILURE;
   }
 
