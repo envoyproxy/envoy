@@ -110,14 +110,13 @@ protected:
     const LowerCaseString* key_;
   };
 
-  typedef StaticLookupResponse (*EntryCb)(HeaderMapImpl&);
-
   /**
    * This is the static lookup table that is used to determine whether a header is one of the O(1)
    * headers. This uses a trie for lookup time at most equal to the size of the incoming string.
    */
   struct StaticLookupTable {
     StaticLookupTable();
+    typedef StaticLookupResponse (*EntryCb)(HeaderMapImpl&);
 
     void add(const char* key, EntryCb cb) { lookup_table_.add(key, cb); }
 

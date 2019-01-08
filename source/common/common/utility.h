@@ -547,7 +547,7 @@ private:
 };
 
 template <class Value> struct LookupEntry {
-  Value value_;
+  Value value_{};
   std::array<std::unique_ptr<LookupEntry>, 256> entries_;
 };
 

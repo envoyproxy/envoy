@@ -335,7 +335,7 @@ bool HeaderMapImpl::operator==(const HeaderMapImpl& rhs) const {
 }
 
 void HeaderMapImpl::insertByKey(HeaderString&& key, HeaderString&& value) {
-  EntryCb cb = ConstSingleton<StaticLookupTable>::get().find(key.c_str());
+  StaticLookupTable::EntryCb cb = ConstSingleton<StaticLookupTable>::get().find(key.c_str());
   if (cb) {
     key.clear();
     StaticLookupResponse ref_lookup_response = cb(*this);
@@ -482,7 +482,7 @@ void HeaderMapImpl::iterateReverse(ConstIterateCb cb, void* context) const {
 
 HeaderMap::Lookup HeaderMapImpl::lookup(const LowerCaseString& key,
                                         const HeaderEntry** entry) const {
-  EntryCb cb = ConstSingleton<StaticLookupTable>::get().find(key.get().c_str());
+  StaticLookupTable::EntryCb cb = ConstSingleton<StaticLookupTable>::get().find(key.get().c_str());
   if (cb) {
     // The accessor callbacks for predefined inline headers take a HeaderMapImpl& as an argument;
     // even though we don't make any modifications, we need to cast_cast in order to use the
@@ -504,7 +504,7 @@ HeaderMap::Lookup HeaderMapImpl::lookup(const LowerCaseString& key,
 }
 
 void HeaderMapImpl::remove(const LowerCaseString& key) {
-  EntryCb cb = ConstSingleton<StaticLookupTable>::get().find(key.get().c_str());
+  StaticLookupTable::EntryCb cb = ConstSingleton<StaticLookupTable>::get().find(key.get().c_str());
   if (cb) {
     StaticLookupResponse ref_lookup_response = cb(*this);
     removeInline(ref_lookup_response.entry_);
@@ -525,7 +525,8 @@ void HeaderMapImpl::removePrefix(const LowerCaseString& prefix) {
     if (to_remove) {
       // If this header should be removed, make sure any references in the
       // static lookup table are cleared as well.
-      EntryCb cb = ConstSingleton<StaticLookupTable>::get().find(entry.key().c_str());
+      StaticLookupTable::EntryCb cb =
+          ConstSingleton<StaticLookupTable>::get().find(entry.key().c_str());
       if (cb) {
         StaticLookupResponse ref_lookup_response = cb(*this);
         if (ref_lookup_response.entry_) {
@@ -564,7 +565,7 @@ HeaderMapImpl::HeaderEntryImpl& HeaderMapImpl::maybeCreateInline(HeaderEntryImpl
 }
 
 HeaderMapImpl::HeaderEntryImpl* HeaderMapImpl::getExistingInline(const char* key) {
-  EntryCb cb = ConstSingleton<StaticLookupTable>::get().find(key);
+  StaticLookupTable::EntryCb cb = ConstSingleton<StaticLookupTable>::get().find(key);
   if (cb) {
     StaticLookupResponse ref_lookup_response = cb(*this);
     return *ref_lookup_response.entry_;
