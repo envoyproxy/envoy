@@ -3,7 +3,7 @@
 Listener filters
 ================
 
-Envoy has the follow builtin listener filters.
+Envoy has the following builtin listener filters.
 
 .. toctree::
   :maxdepth: 2

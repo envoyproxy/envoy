@@ -6,37 +6,37 @@ Original Source
 * :ref:`Listener filter v2 API reference <envoy_api_msg_config.filter.listener.original_src.v2alpha1.OriginalSrc>`
 * This filter should be configured with the name *envoy.listener.original_src*.
 
-The original source listener filter replicates the downstream remote address of
-the connection on the upstream side of Envoy. For example, if a downstream
-connection connects to Envoy with IP address ``10.1.2.3``, then Envoy will
-connect to the upstream with source IP ``10.1.2.3``.
+The original source listener filter replicates the downstream remote address of the connection on
+the upstream side of Envoy. For example, if a downstream connection connects to Envoy with IP
+address ``10.1.2.3``, then Envoy will connect to the upstream with source IP ``10.1.2.3``.
 
-Interfaction with Proxy Protocol
+Interaction with Proxy Protocol
 --------------------------------
 
-If the connection has not had its source address translated or proxied, then
-Envoy can simply use the existing connection information to build the correct
-downstream remote address. However, if this is not true, a
-:ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>` may be
-used to extract the downstream remote address.
+If the connection has not had its source address translated or proxied, then Envoy can simply use
+the existing connection information to build the correct downstream remote address. However, if this
+is not true, a :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>` may be used to
+extract the downstream remote address.
+
+IP Version Support
+------------------
+The filter supports both IPv4 and IPv6 as addresses. Note that the upstream connection must support
+the version used.
 
 Extra Setup
 -----------
 
-The downstream remote address used will likely be globally routable. By default,
-packets returning from the upstream host to that address will not route through
-Envoy. The network must be configured to forcefully route any traffic whose IP
-was replicated by Envoy back through the Envoy host.
+The downstream remote address used will likely be globally routable. By default, packets returning
+from the upstream host to that address will not route through Envoy. The network must be configured
+to forcefully route any traffic whose IP was replicated by Envoy back through the Envoy host.
 
-If Envoy and the upstream are on the same host -- e.g. in an sidecar deployment
---, then iptables and routing rules can be used to ensure correct behaviour.
+If Envoy and the upstream are on the same host -- e.g. in an sidecar deployment --, then iptables
+and routing rules can be used to ensure correct behaviour. The filter has an unsigned integer
+configuration, ``mark``. Setting this to *X* causes Envoy to *mark* all upstream packets originating
+from this listener with value *X*.
 
-The filter has an unsigned integer configuration, ``mark``. Setting this to *X*
-causes Envoy to *mark* all upstream packets originating from this listener with
-value *X*.
-
-We can use the following set of commands to ensure that all ipv4 and ipv6
-traffic marked with *X* (assumed to be 123 in the example) routes correctly.
+We can use the following set of commands to ensure that all ipv4 and ipv6 traffic marked with *X*
+(assumed to be 123 in the example) routes correctly.
 
 .. code-block:: text
 
@@ -53,9 +53,9 @@ traffic marked with *X* (assumed to be 123 in the example) routes correctly.
 Example Listener configuration
 ------------------------------
 
-The following example configures Envoy to use the original source for all
-connections made on port 8888. It uses Proxy Protocol to determine the
-downstream remote address. All upstream packets are marked with 123.
+The following example configures Envoy to use the original source for all connections made on port
+8888. It uses Proxy Protocol to determine the downstream remote address. All upstream packets are
+marked with 123.
 
 .. code-block:: yaml
 
