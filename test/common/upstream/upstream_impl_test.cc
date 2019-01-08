@@ -1307,6 +1307,8 @@ TEST(StaticClusterImplTest, HealthyStat) {
 
   cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[1]->healthFlagSet(
       Host::HealthFlag::DEGRADED_ACTIVE_HC);
+  cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[1]->healthFlagClear(
+      Host::HealthFlag::FAILED_ACTIVE_HC);
   health_checker->runCallbacks(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[1],
                                HealthTransition::Changed);
   EXPECT_EQ(0UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
