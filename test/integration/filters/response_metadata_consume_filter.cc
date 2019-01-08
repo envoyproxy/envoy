@@ -9,7 +9,7 @@
 
 namespace Envoy {
 
-// A filter tests response metadata consuming and proxy.
+// A filter which tests consuming and proxying metadata.
 class ResponseMetadataConsumeStreamFilter : public Http::PassThroughFilter {
 public:
   Http::FilterMetadataStatus encodeMetadata(Http::MetadataMap& metadata_map) override {

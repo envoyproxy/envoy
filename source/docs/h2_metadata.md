@@ -162,8 +162,8 @@ ConnectionManagerImpl::ActiveStream::response\_encoder\_-\>encodeMetadata(Metada
 If no filter consumes the response metadata, the response metadata is proxied to
 the downstream untouched.
 
-Envoy can also add new response metadata through filters's encoding interfaces (See section Inserting metadata for
-detailed interfaces). Filters add new
+Envoy can also add new response metadata through filters's encoding interfaces (See section
+[Inserting metadata](#inserting-metadata) for detailed interfaces). Filters add new
 metadata by calling
 StreamDecoderFilterCallbacks::encodeMetadata(MetadataMapPtr&& metadata\_map\_ptr), which triggers
 ActiveStream::encodeMetadata(ConnectionManagerImpl::ActiveStream::encodeMetadata(ActiveStreamEncoderFilter\*
@@ -183,8 +183,8 @@ ConnectionManagerImpl::ActiveStream::current\_encoder\_filter\_ right before we 
 encoding function. For example, In ConnectionManagerImpl::ActiveStream::encodeData(), we save the
 current filter right before calling the current filter's encoding data function: (\*entry)-\>handle\_-\>encodeData();
 If the encoding function generates new metadata,
-ConnectionManagerImpl::ActiveStream::encodeMetadata() will be called (see section Response metadata
-handling for details). By reading
+ConnectionManagerImpl::ActiveStream::encodeMetadata() will be called (see section
+[Response metadata handling](#response-metadata-handling) for details). By reading
 ConnectionManagerImpl::ActiveStream::current\_encoder\_filter\_ in
 ConnectionManagerImpl::ActiveStream::encodeMetadata(), we know which filter is the
 starting filter to pass the metadata to.
