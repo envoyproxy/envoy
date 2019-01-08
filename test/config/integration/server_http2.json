@@ -163,8 +163,7 @@
           },
           { "type": "decoder", "name": "buffer",
             "config": {
-              "max_request_bytes": 5242880,
-              "max_request_time_s": 120
+              "max_request_bytes": 5242880
             }
           },
           { "type": "decoder", "name": "router", "config": {} }

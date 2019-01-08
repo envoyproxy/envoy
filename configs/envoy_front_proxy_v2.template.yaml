@@ -50,7 +50,6 @@
         - name: envoy.buffer
           config:
             max_request_bytes: 5242880
-            max_request_time: 120s
         - name: envoy.rate_limit
           config:
             domain: envoy_front
