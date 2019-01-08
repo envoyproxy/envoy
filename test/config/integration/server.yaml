@@ -2,7 +2,7 @@ static_resources:
   listeners:
   - address:
       socket_address:
-        address: "{{ ip_loopback_address }}"
+        address: {{ ip_loopback_address }}
         port_value: 0
     filter_chains:
     - filters:
@@ -307,6 +307,7 @@ static_resources:
             codec_type: http1
             stat_prefix: rds_dummy
             rds:
+              api_type: REST
               route_config_name: foo
               cluster: rds
           deprecated_v1: true
@@ -390,11 +391,13 @@ static_resources:
 dynamic_resources:
   lds_config:
     api_config_source:
+      api_type: REST
       cluster_names:
       - lds
       refresh_delay: 30s
   cds_config:
     api_config_source:
+      api_type: REST
       cluster_names:
       - cds
       refresh_delay: 30s
