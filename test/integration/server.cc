@@ -45,11 +45,10 @@ OptionsImpl createTestOptionsImpl(const std::string& config_path, const std::str
 
 } // namespace Server
 
-IntegrationTestServerPtr
-IntegrationTestServer::create(const std::string& config_path,
-                              const Network::Address::IpVersion version,
-                              std::function<void()> pre_worker_start_test_steps, bool deterministic,
-                              Event::TestTimeSystem& time_system, Api::Api& api, bool defer_listener_finalization) {
+IntegrationTestServerPtr IntegrationTestServer::create(
+    const std::string& config_path, const Network::Address::IpVersion version,
+    std::function<void()> pre_worker_start_test_steps, bool deterministic,
+    Event::TestTimeSystem& time_system, Api::Api& api, bool defer_listener_finalization) {
   IntegrationTestServerPtr server{
       std::make_unique<IntegrationTestServerImpl>(time_system, api, config_path)};
   server->start(version, pre_worker_start_test_steps, deterministic, defer_listener_finalization);
