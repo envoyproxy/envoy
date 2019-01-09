@@ -6,6 +6,8 @@ load(
     "envoy_package",
 )
 
+envoy_package()
+
 envoy_cc_test(
     name = "signer_impl_test",
     srcs = ["signer_impl_test.cc"],
