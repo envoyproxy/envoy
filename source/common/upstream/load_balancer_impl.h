@@ -95,14 +95,19 @@ public:
   void recalculatePerPriorityPanic();
 
 protected:
-  // Method calculates normalized total health. Each priority level's health is ratio of
-  // healthy hosts to total number of hosts in a priority multiplied by overprovisioning factor
-  // of 1.4 and capped at 100%. Effectively each priority's health is a value between 0-100%.
-  // Calculating normalized total health starts with summarizing all priorities' health values.
-  // It can exceed 100%. For example if there are three priorities and each is 100% healthy, the
-  // total of all priorities is 300%. Normalized total health is then capped at 100%.
-  static uint32_t calcNormalizedTotalHealth(std::vector<uint32_t>& per_priority_health,
-                                            std::vector<uint32_t>& per_priority_degraded) {
+  // Method calculates normalized total availability.
+  //
+  // The availability of a priority is ratio of available (healthy/degraded) hosts over the total
+  // number of hosts multiplied by 100 and the overprovisioning factor. The total availability is
+  // the sum of the availability of each priority, up to a maximum of 100.
+  //
+  // For example, using the default overprovisioning factor of 1.4, a if priority A has 4 hosts,
+  // of which 1 is degraded and 1 is healthy, it will have availability of 2/4 * 100 * 1.4 = 70.
+  //
+  // Assuming two priorities with availability 60 and 70, the total availability would be 100.
+  static uint32_t
+  calculateNormalizedTotalAvailability(std::vector<uint32_t>& per_priority_health,
+                                       std::vector<uint32_t>& per_priority_degraded) {
     const auto health = std::accumulate(per_priority_health.begin(), per_priority_health.end(), 0);
     const auto degraded =
         std::accumulate(per_priority_degraded.begin(), per_priority_degraded.end(), 0);

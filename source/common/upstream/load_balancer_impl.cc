@@ -156,18 +156,17 @@ void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority,
   // Now that we've updated health for the changed priority level, we need to calculate percentage
   // load for all priority levels.
 
-  //
   // First, determine if the load needs to be scaled relative to availability (healthy + degraded).
   // For example if there are 3 host sets with 10% / 20% / 10% health and 20% / 10% / 0% degraded
   // they will get 16% / 28% / 14% load to healthy hosts and 28% / 14% / 0% load to degraded hosts
   // to ensure total load adds up to 100. Note the first healthy priority is receiving 2% additional
   // load due to rounding.
   //
-  // Sum of priority levels' health values may exceed 100, so it is capped at 100 and referred as
-  // normalized total health.
-  const uint32_t normalized_total_health =
-      calcNormalizedTotalHealth(per_priority_health, per_priority_degraded);
-  if (normalized_total_health == 0) {
+  // Sum of priority levels' health and degraded values may exceed 100, so it is capped at 100 and
+  // referred as normalized total availability.
+  const uint32_t normalized_total_availability =
+      calculateNormalizedTotalAvailability(per_priority_health, per_priority_degraded);
+  if (normalized_total_availability == 0) {
     // Everything is terrible. Send all load to P=0.
     // In this one case sumEntries(per_priority_load) != 100 since we sinkhole all traffic in P=0.
     per_priority_load[0] = 100;
@@ -178,14 +177,14 @@ void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority,
   // availability. We first attempt to distribute this load to healthy priorities based on healthy
   // availability.
   const auto first_healthy_and_remaining =
-      distributeLoad(per_priority_load, per_priority_health, 100, normalized_total_health);
+      distributeLoad(per_priority_load, per_priority_health, 100, normalized_total_availability);
 
   // Using the remaining load after allocating load to healthy priorities, distribute it based on
   // degraded availability.
   const auto remaining_load_for_degraded = first_healthy_and_remaining.second;
   const auto first_degraded_and_remaining =
       distributeLoad(degraded_per_priority_load, per_priority_degraded, remaining_load_for_degraded,
-                     normalized_total_health);
+                     normalized_total_availability);
 
   // Anything that remains should just be rounding errors, so allocate that to the first available
   // priority, either as healthy or degraded.
@@ -215,10 +214,14 @@ void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority,
 void LoadBalancerBase::recalculatePerPriorityPanic() {
   per_priority_panic_.resize(priority_set_.hostSetsPerPriority().size());
 
-  const uint32_t normalized_total_health =
-      calcNormalizedTotalHealth(per_priority_health_, per_priority_degraded_);
+  // TODO(snowp): Right now panic thresholds doesn't work well with degraded.
+  // The normalized_total_health takes degraded hosts into account, while
+  // the subsequent panic calculation only looks at healthy hosts. Ideally
+  // they should both take degraded into account.
+  const uint32_t normalized_total_availability =
+      calculateNormalizedTotalAvailability(per_priority_health_, per_priority_degraded_);
 
-  if (normalized_total_health == 0) {
+  if (normalized_total_availability == 0) {
     // Everything is terrible. All load should be to P=0. Turn on panic mode.
     ASSERT(per_priority_load_[0] == 100);
     per_priority_panic_[0] = true;
@@ -231,7 +234,7 @@ void LoadBalancerBase::recalculatePerPriorityPanic() {
     // healthy hosts.
     const HostSet& priority_host_set = *priority_set_.hostSetsPerPriority()[i];
     per_priority_panic_[i] =
-        (normalized_total_health == 100 ? false : isGlobalPanic(priority_host_set));
+        (normalized_total_availability == 100 ? false : isGlobalPanic(priority_host_set));
   }
 }
 
@@ -437,6 +440,7 @@ HostConstSharedPtr LoadBalancerBase::chooseHost(LoadBalancerContext* context) {
 }
 
 bool LoadBalancerBase::isGlobalPanic(const HostSet& host_set) {
+  // TODO(snowp): This should also account for degraded hosts.
   uint64_t global_panic_threshold = std::min<uint64_t>(
       100, runtime_.snapshot().getInteger(RuntimePanicThreshold, default_healthy_panic_percent_));
   double healthy_percent = host_set.hosts().size() == 0
