@@ -160,7 +160,7 @@ envoy_cc_test(
         "integration_admin_test.h",
     ],
     deps = [
-        ":http_integration_lib",
+        ":http_protocol_integration_lib",
         "//include/envoy/http:header_map_interface",
         "//source/common/stats:stats_matcher_lib",
         "//source/extensions/filters/http/buffer:config",
