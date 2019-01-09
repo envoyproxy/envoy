@@ -76,7 +76,6 @@ const std::string ConfigHelper::DEFAULT_BUFFER_FILTER =
 name: envoy.buffer
 config:
     max_request_bytes : 5242880
-    max_request_time : 120s
 )EOF";
 
 const std::string ConfigHelper::SMALL_BUFFER_FILTER =
@@ -84,7 +83,6 @@ const std::string ConfigHelper::SMALL_BUFFER_FILTER =
 name: envoy.buffer
 config:
     max_request_bytes : 1024
-    max_request_time : 5s
 )EOF";
 
 const std::string ConfigHelper::DEFAULT_HEALTH_CHECK_FILTER =

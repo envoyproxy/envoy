@@ -310,6 +310,7 @@ The following optional features can be disabled on the Bazel build command-line:
 * Hot restart with `--define hot_restart=disabled`
 * Google C++ gRPC client with `--define google_grpc=disabled`
 * Backtracing on signals with `--define signal_trace=disabled`
+* tcmalloc with `--define tcmalloc=disabled`
 
 ## Enabling optional features
 
@@ -322,6 +323,11 @@ The following optional features can be enabled on the Bazel build command-line:
   source/common/common/perf_annotation.h for details).
 * BoringSSL can be built in a FIPS-compliant mode with `--define boringssl=fips`
   (see [FIPS 140-2](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/ssl.html#fips-140-2) for details).
+* ASSERT() can be configured to log failures and increment a stat counter in a release build with
+  `--define log_debug_assert_in_release=enabled`. The default behavior is to compile debug assertions out of
+  release builds so that the condition is not evaluated. This option has no effect in debug builds.
+* memory-debugging (scribbling over memory after allocation and before freeing) with
+  `--define tcmalloc=debug`.
 
 ## Disabling extensions
 
