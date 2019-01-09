@@ -37,9 +37,9 @@
 #include "common/common/version.h"
 #include "common/html/utility.h"
 #include "common/http/codes.h"
+#include "common/http/conn_manager_utility.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
-#include "common/http/http1/codec_impl.h"
 #include "common/json/json_loader.h"
 #include "common/memory/stats.h"
 #include "common/network/listen_socket_impl.h"
@@ -192,14 +192,16 @@ Http::FilterHeadersStatus AdminFilter::decodeHeaders(Http::HeaderMap& headers, b
   return Http::FilterHeadersStatus::StopIteration;
 }
 
-Http::FilterDataStatus AdminFilter::decodeData(Buffer::Instance&, bool end_stream) {
+Http::FilterDataStatus AdminFilter::decodeData(Buffer::Instance& data, bool end_stream) {
+  // Currently we generically buffer all admin request data in case a handler wants to use it.
+  // If we ever support streaming admin requests we may need to revisit this.
+  callbacks_->addDecodedData(data, false);
+
   if (end_stream) {
     onComplete();
   }
 
-  // Currently we generically buffer all admin request data in case a handler wants to use it.
-  // If we ever support streaming admin requests we may need to revisit this.
-  return Http::FilterDataStatus::StopIterationAndBuffer;
+  return Http::FilterDataStatus::StopIterationNoBuffer;
 }
 
 Http::FilterTrailersStatus AdminFilter::decodeTrailers(Http::HeaderMap&) {
@@ -1052,11 +1054,11 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
       admin_filter_chain_(std::make_shared<AdminFilterChain>()) {}
 
 Http::ServerConnectionPtr AdminImpl::createCodec(Network::Connection& connection,
-                                                 const Buffer::Instance&,
+                                                 const Buffer::Instance& data,
                                                  Http::ServerConnectionCallbacks& callbacks) {
-  return Http::ServerConnectionPtr{
-      new Http::Http1::ServerConnectionImpl(connection, callbacks, Http::Http1Settings())};
-}
+  return Http::ConnectionManagerUtility::autoCreateCodec(
+      connection, data, callbacks, server_.stats(), Http::Http1Settings(), Http::Http2Settings());
+} // namespace Server
 
 bool AdminImpl::createNetworkFilterChain(Network::Connection& connection,
                                          const std::vector<Network::FilterFactoryCb>&) {

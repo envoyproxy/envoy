@@ -11,7 +11,11 @@ class TapIntegrationTest : public HttpIntegrationTest,
                            public testing::TestWithParam<Network::Address::IpVersion> {
 public:
   TapIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()) {}
+      // Note: This test must use HTTP/2 because of the lack of early close detection for
+      // HTTP/1 on OSX. In this test we close the admin /tap stream when we don't want any
+      // more data, and without immediate close detection we can't have a flake free test.
+      // Thus, we use HTTP/2 for everything here.
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam(), realTime()) {}
 
   void initializeFilter(const std::string& filter_config) {
     config_helper_.addFilter(filter_config);
@@ -119,7 +123,7 @@ tap_config:
   envoy::data::tap::v2alpha::HttpBufferedTrace trace;
   MessageUtil::loadFromYaml(admin_response->body(), trace);
   EXPECT_EQ("request_match_id", trace.match_id());
-  EXPECT_EQ(trace.request_headers().size(), 9);
+  EXPECT_EQ(trace.request_headers().size(), 8);
   EXPECT_EQ(trace.response_headers().size(), 5);
   admin_response->clearBody();
 
@@ -142,8 +146,8 @@ tap_config:
   admin_response->waitForBodyData(1);
   MessageUtil::loadFromYaml(admin_response->body(), trace);
   EXPECT_EQ("response_match_id", trace.match_id());
-  EXPECT_EQ(trace.request_headers().size(), 8);
-  EXPECT_EQ("0", findHeader("content-length", trace.request_headers())->value());
+  EXPECT_EQ(trace.request_headers().size(), 7);
+  EXPECT_EQ("http", findHeader("x-forwarded-proto", trace.request_headers())->value());
   EXPECT_EQ(trace.response_headers().size(), 6);
   EXPECT_NE(nullptr, findHeader("date", trace.response_headers()));
   EXPECT_EQ("baz", findHeader("bar", trace.response_headers())->value());
