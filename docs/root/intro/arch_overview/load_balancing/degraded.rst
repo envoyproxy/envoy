@@ -11,7 +11,7 @@ Routing to degraded hosts can be thought of as routing to hosts in a lower
 unhealthy, traffic spills down to lower priorities. As the amount of healthy hosts
 available is no longer sufficient to handle 100% of the load, traffic will spill over to degraded 
 hosts using the same mechanism as priority spillover for healthy hosts. This ensures that 
-gradually shift traffic to degraded hosts as they become necessary.
+traffic is gradually shifted to degraded hosts as it becomes necessary.
 
 
 +--------------------------------+------------------------------+-------------------------------+
@@ -19,9 +19,9 @@ gradually shift traffic to degraded hosts as they become necessary.
 +================================+==============================+===============================+
 | 100%/0%/0%                     | 100%                         |   0%                          |
 +--------------------------------+------------------------------+-------------------------------+
-| 71%/0%/27%                     | 100%                         |   0%                          |
+| 71%/0%/29%                     | 100%                         |   0%                          |
 +--------------------------------+------------------------------+-------------------------------+
-| 71%/27%/0%                     | 99%                          |   1%                          |
+| 71%/29%/0%                     | 99%                          |   1%                          |
 +--------------------------------+------------------------------+-------------------------------+
 | 25%/65%/10%                    | 35%                          |   65%                         |
 +--------------------------------+------------------------------+-------------------------------+

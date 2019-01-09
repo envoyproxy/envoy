@@ -61,7 +61,7 @@ LoadBalancerBase::choosePriority(uint64_t hash, const std::vector<uint32_t>& per
   // but O(N) is good enough for now given the expected number of priorities is
   // small.
 
-  // We first attempt to select a priority based on healthy hosts.
+  // We first attempt to select a priority based on healthy availability.
   for (size_t priority = 0; priority < per_priority_load.size(); ++priority) {
     aggregate_percentage_load += per_priority_load[priority];
     if (hash <= aggregate_percentage_load) {
@@ -69,7 +69,7 @@ LoadBalancerBase::choosePriority(uint64_t hash, const std::vector<uint32_t>& per
     }
   }
 
-  // If no priorities were selected due to health, attempt to select a degraded one.
+  // If no priorities were selected due to health, we'll select a priority based degraded availability.
   for (size_t priority = 0; priority < degraded_per_priority_load.size(); ++priority) {
     aggregate_percentage_load += degraded_per_priority_load[priority];
     if (hash <= aggregate_percentage_load) {
