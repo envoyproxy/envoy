@@ -423,7 +423,8 @@ message Cluster {
       // 'xxHash <https://github.com/Cyan4973/xxHash>', this is the default hash function.
       XX_HASH = 0;
       // 'Murmur hash 2 <https://sites.google.com/site/murmurhash/>', this is compatible with
-      // std:hash<string>.
+      // std:hash<string> in GNU libstdc++ 3.4.20 or above. This is typically the case when compiled
+      // on Linux and not Mac OS.
       MURMUR_HASH_2 = 1;
     }
 

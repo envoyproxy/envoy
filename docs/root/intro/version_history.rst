@@ -103,7 +103,7 @@ Version history
   scaling locality weights by number of hosts removed by subset lb predicates.
 * upstream: changed how load calculation for :ref:`priority levels<arch_overview_load_balancing_priority_levels>` and :ref:`panic thresholds<arch_overview_load_balancing_panic_threshold>` interact. As long as normalized total health is 100% panic thresholds are disregarded.
 * upstream: changed the default hash for :ref:`ring hash <envoy_api_msg_Cluster.RingHashLbConfig>` from std::hash to `xxHash <https://github.com/Cyan4973/xxHash>`_.
-* upstream: add 'hash_function <envoy_api_msg_Cluster.RingHashLbConfig.hahs_function>' to specify the hash function for :ref: 'ring hash <envoy_api_msg_Cluster.RingHashLbConfig>' as either xxHash or 'murmurHash2 <https://sites.google.com/site/murmurhash>'. MurmurHash2 is compatible with std::hash.
+* upstream: add 'hash_function <envoy_api_msg_Cluster.RingHashLbConfig.hahs_function>' to specify the hash function for :ref: 'ring hash <envoy_api_msg_Cluster.RingHashLbConfig>' as either xxHash or 'murmurHash2 <https://sites.google.com/site/murmurhash>'. MurmurHash2 is compatible with std::hash in GNU libstdc++ 3.4.20 or above. This is typically the case when compiled on Linux and not Mac OS.
 * upstream: when using active health checking and STRICT_DNS with several addresses that resolve
   to the same hosts, Envoy will now health check each host independently.
 

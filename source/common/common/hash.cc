@@ -2,37 +2,6 @@
 
 #include "absl/strings/string_view.h"
 
-namespace {
-
-// used by MurmurHash::murmurHash2_64
-// from
-// (https://gcc.gnu.org/git/?p=gcc.git;a=blob_plain;f=libstdc%2b%2b-v3/libsupc%2b%2b/hash_bytes.cc)
-static inline std::uint64_t unaligned_load(const char* p) {
-  std::uint64_t result;
-  __builtin_memcpy(&result, p, sizeof(result));
-  return result;
-}
-
-// Loads n bytes, where 1 <= n < 8.
-// used by MurmurHash::murmurHash2_64
-// from
-// (https://gcc.gnu.org/git/?p=gcc.git;a=blob_plain;f=libstdc%2b%2b-v3/libsupc%2b%2b/hash_bytes.cc)
-static inline std::uint64_t load_bytes(const char* p, int n) {
-  std::uint64_t result = 0;
-  --n;
-  do {
-    result = (result << 8) + static_cast<unsigned char>(p[n]);
-  } while (--n >= 0);
-  return result;
-}
-
-// used by MurmurHash::murmurHash2_64
-// from
-// (https://gcc.gnu.org/git/?p=gcc.git;a=blob_plain;f=libstdc%2b%2b-v3/libsupc%2b%2b/hash_bytes.cc)
-static inline std::uint64_t shift_mix(std::uint64_t v) { return v ^ (v >> 47); }
-
-} // namespace
-
 namespace Envoy {
 
 // Computes a 64-bit murmur hash 2, only works with 64-bit platforms. Revisit if support for 32-bit
