@@ -38,7 +38,7 @@ MockOptions::MockOptions(const std::string& config_path) : config_path_(config_p
     return std::make_unique<envoy::admin::v2alpha::CommandLineOptions>();
   }));
 }
-MockOptions::~MockOptions() {}
+MockOptions::~MockOptions() = default;
 
 MockConfigTracker::MockConfigTracker() {
   ON_CALL(*this, add_(_, _))
@@ -48,37 +48,40 @@ MockConfigTracker::MockConfigTracker() {
         return new MockEntryOwner();
       }));
 }
-MockConfigTracker::~MockConfigTracker() {}
+MockConfigTracker::~MockConfigTracker() = default;
 
 MockAdmin::MockAdmin() {
   ON_CALL(*this, getConfigTracker()).WillByDefault(testing::ReturnRef(config_tracker_));
 }
-MockAdmin::~MockAdmin() {}
+MockAdmin::~MockAdmin() = default;
+
+MockAdminStream::MockAdminStream() = default;
+MockAdminStream::~MockAdminStream() = default;
 
 MockDrainManager::MockDrainManager() {
   ON_CALL(*this, startDrainSequence(_)).WillByDefault(SaveArg<0>(&drain_sequence_completion_));
 }
-MockDrainManager::~MockDrainManager() {}
+MockDrainManager::~MockDrainManager() = default;
 
-MockWatchDog::MockWatchDog() {}
-MockWatchDog::~MockWatchDog() {}
+MockWatchDog::MockWatchDog() = default;
+MockWatchDog::~MockWatchDog() = default;
 
 MockGuardDog::MockGuardDog() : watch_dog_(new NiceMock<MockWatchDog>()) {
   ON_CALL(*this, createWatchDog(_)).WillByDefault(Return(watch_dog_));
 }
-MockGuardDog::~MockGuardDog() {}
+MockGuardDog::~MockGuardDog() = default;
 
 MockHotRestart::MockHotRestart() {
   ON_CALL(*this, logLock()).WillByDefault(ReturnRef(log_lock_));
   ON_CALL(*this, accessLogLock()).WillByDefault(ReturnRef(access_log_lock_));
   ON_CALL(*this, statsAllocator()).WillByDefault(ReturnRef(stats_allocator_));
 }
-MockHotRestart::~MockHotRestart() {}
+MockHotRestart::~MockHotRestart() = default;
 
 MockOverloadManager::MockOverloadManager() {
   ON_CALL(*this, getThreadLocalOverloadState()).WillByDefault(ReturnRef(overload_state_));
 }
-MockOverloadManager::~MockOverloadManager() {}
+MockOverloadManager::~MockOverloadManager() = default;
 
 MockListenerComponentFactory::MockListenerComponentFactory()
     : socket_(std::make_shared<NiceMock<Network::MockListenSocket>>()) {
@@ -93,13 +96,13 @@ MockListenerComponentFactory::MockListenerComponentFactory()
             return socket_;
           }));
 }
-MockListenerComponentFactory::~MockListenerComponentFactory() {}
+MockListenerComponentFactory::~MockListenerComponentFactory() = default;
 
-MockListenerManager::MockListenerManager() {}
-MockListenerManager::~MockListenerManager() {}
+MockListenerManager::MockListenerManager() = default;
+MockListenerManager::~MockListenerManager() = default;
 
-MockWorkerFactory::MockWorkerFactory() {}
-MockWorkerFactory::~MockWorkerFactory() {}
+MockWorkerFactory::MockWorkerFactory() = default;
+MockWorkerFactory::~MockWorkerFactory() = default;
 
 MockWorker::MockWorker() {
   ON_CALL(*this, addListener(_, _))
@@ -116,7 +119,7 @@ MockWorker::MockWorker() {
             remove_listener_completion_ = completion;
           }));
 }
-MockWorker::~MockWorker() {}
+MockWorker::~MockWorker() = default;
 
 MockInstance::MockInstance()
     : secret_manager_(new Secret::SecretManagerImpl()), cluster_manager_(timeSystem()),
@@ -146,7 +149,7 @@ MockInstance::MockInstance()
   // ON_CALL(*this, timeSystem()).WillByDefault(ReturnRef(test_time_.timeSystem()));;
 }
 
-MockInstance::~MockInstance() {}
+MockInstance::~MockInstance() = default;
 
 namespace Configuration {
 
@@ -158,7 +161,7 @@ MockMain::MockMain(int wd_miss, int wd_megamiss, int wd_kill, int wd_multikill)
   ON_CALL(*this, wdMultiKillTimeout()).WillByDefault(Return(wd_multikill_));
 }
 
-MockMain::~MockMain() {}
+MockMain::~MockMain() = default;
 
 MockFactoryContext::MockFactoryContext()
     : singleton_manager_(
@@ -180,16 +183,15 @@ MockFactoryContext::MockFactoryContext()
   ON_CALL(*this, overloadManager()).WillByDefault(ReturnRef(overload_manager_));
 }
 
-MockFactoryContext::~MockFactoryContext() {}
+MockFactoryContext::~MockFactoryContext() = default;
 
 MockTransportSocketFactoryContext::MockTransportSocketFactoryContext()
     : secret_manager_(new Secret::SecretManagerImpl()) {}
 
-MockTransportSocketFactoryContext::~MockTransportSocketFactoryContext() {}
+MockTransportSocketFactoryContext::~MockTransportSocketFactoryContext() = default;
 
-MockListenerFactoryContext::MockListenerFactoryContext() {}
-
-MockListenerFactoryContext::~MockListenerFactoryContext() {}
+MockListenerFactoryContext::MockListenerFactoryContext() = default;
+MockListenerFactoryContext::~MockListenerFactoryContext() = default;
 
 MockHealthCheckerFactoryContext::MockHealthCheckerFactoryContext() {
   event_logger_ = new NiceMock<Upstream::MockHealthCheckEventLogger>();
@@ -200,10 +202,7 @@ MockHealthCheckerFactoryContext::MockHealthCheckerFactoryContext() {
   ON_CALL(*this, eventLogger_()).WillByDefault(Return(event_logger_));
 }
 
-MockHealthCheckerFactoryContext::~MockHealthCheckerFactoryContext() {}
-
-MockAdminStream::MockAdminStream() {}
-MockAdminStream::~MockAdminStream() {}
+MockHealthCheckerFactoryContext::~MockHealthCheckerFactoryContext() = default;
 
 } // namespace Configuration
 } // namespace Server

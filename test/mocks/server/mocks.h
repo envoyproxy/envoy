@@ -136,6 +136,19 @@ public:
   NiceMock<MockConfigTracker> config_tracker_;
 };
 
+class MockAdminStream : public AdminStream {
+public:
+  MockAdminStream();
+  ~MockAdminStream();
+
+  MOCK_METHOD1(setEndStreamOnComplete, void(bool));
+  MOCK_METHOD1(addOnDestroyCallback, void(std::function<void()>));
+  MOCK_CONST_METHOD0(getRequestBody, const Buffer::Instance*());
+  MOCK_CONST_METHOD0(getRequestHeaders, Http::HeaderMap&());
+  MOCK_CONST_METHOD0(getDecoderFilterCallbacks,
+                     NiceMock<Http::MockStreamDecoderFilterCallbacks>&());
+};
+
 class MockDrainManager : public DrainManager {
 public:
   MockDrainManager();
@@ -496,18 +509,6 @@ public:
   testing::NiceMock<Envoy::Runtime::MockRandomGenerator> random_;
   testing::NiceMock<Envoy::Runtime::MockLoader> runtime_;
   testing::NiceMock<Envoy::Upstream::MockHealthCheckEventLogger>* event_logger_{};
-};
-
-class MockAdminStream : public AdminStream {
-public:
-  MockAdminStream();
-  ~MockAdminStream();
-
-  MOCK_METHOD1(setEndStreamOnComplete, void(bool));
-  MOCK_METHOD1(addOnDestroyCallback, void(std::function<void()>));
-  MOCK_CONST_METHOD0(getRequestHeaders, Http::HeaderMap&());
-  MOCK_CONST_METHOD0(getDecoderFilterCallbacks,
-                     NiceMock<Http::MockStreamDecoderFilterCallbacks>&());
 };
 
 } // namespace Configuration
