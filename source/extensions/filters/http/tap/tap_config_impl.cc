@@ -76,6 +76,17 @@ void HttpPerRequestTapperImpl::onResponseHeaders(const Http::HeaderMap& headers)
   config_->matchesResponseHeaders(headers, statuses_);
 }
 
+namespace {
+Http::HeaderMap::Iterate fillHeaderList(const Http::HeaderEntry& header, void* context) {
+  Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValue>& header_list =
+      *reinterpret_cast<Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValue>*>(context);
+  auto& new_header = *header_list.Add();
+  new_header.set_key(header.key().c_str());
+  new_header.set_value(header.value().c_str());
+  return Http::HeaderMap::Iterate::Continue;
+}
+} // namespace
+
 bool HttpPerRequestTapperImpl::onLog(const Http::HeaderMap* request_headers,
                                      const Http::HeaderMap* response_headers) {
   absl::optional<uint64_t> match_index;
@@ -93,27 +104,9 @@ bool HttpPerRequestTapperImpl::onLog(const Http::HeaderMap* request_headers,
 
   auto trace = std::make_shared<envoy::data::tap::v2alpha::HttpBufferedTrace>();
   trace->set_match_id(config_->configs()[match_index.value()].id_);
-  request_headers->iterate(
-      [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
-        envoy::data::tap::v2alpha::HttpBufferedTrace& trace =
-            *reinterpret_cast<envoy::data::tap::v2alpha::HttpBufferedTrace*>(context);
-        auto& new_header = *trace.add_request_headers();
-        new_header.set_key(header.key().c_str());
-        new_header.set_value(header.value().c_str());
-        return Http::HeaderMap::Iterate::Continue;
-      },
-      trace.get());
+  request_headers->iterate(fillHeaderList, trace->mutable_request_headers());
   if (response_headers != nullptr) {
-    response_headers->iterate(
-        [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
-          envoy::data::tap::v2alpha::HttpBufferedTrace& trace =
-              *reinterpret_cast<envoy::data::tap::v2alpha::HttpBufferedTrace*>(context);
-          auto& new_header = *trace.add_response_headers();
-          new_header.set_key(header.key().c_str());
-          new_header.set_value(header.value().c_str());
-          return Http::HeaderMap::Iterate::Continue;
-        },
-        trace.get());
+    response_headers->iterate(fillHeaderList, trace->mutable_response_headers());
   }
 
   ENVOY_LOG(debug, "submitting buffered trace sink");

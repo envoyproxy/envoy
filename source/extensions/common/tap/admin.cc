@@ -87,15 +87,12 @@ void AdminHandler::unregisterConfig(ExtensionConfig& config) {
   ASSERT(!config.adminId().empty());
   ASSERT(config_id_map_[config.adminId()].count(&config) == 1);
   config_id_map_[config.adminId()].erase(&config);
-  if (config_id_map_[config.adminId()].size() == 0) {
+  if (config_id_map_[config.adminId()].empty()) {
     config_id_map_.erase(config.adminId());
   }
 }
 
 void AdminHandler::submitBufferedTrace(std::shared_ptr<Protobuf::Message> trace) {
-  // TODO(mattklein123): The only reason this takes a shared_ptr is because currently a posted
-  // lambda cannot take a unique_ptr because we copy the lambda. If we allow posts to happen with
-  // a moved lambda we can fix this. I will fix this in a follow up.
   ENVOY_LOG(debug, "admin submitting buffered trace to main thread");
   main_thread_dispatcher_.post([this, trace]() {
     if (attached_request_.has_value()) {
