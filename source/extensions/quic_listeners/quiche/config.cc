@@ -2,10 +2,15 @@
 #include <string>
 
 #include "envoy/config/quic_listener/quiche/v2alpha/quiche.pb.h"
+#include "envoy/config/quic_listener/quiche/v2alpha/quiche.pb.validate.h"
 #include "envoy/registry/registry.h"
 #include "envoy/quic/config.h"
 
+#include "common/protobuf/utility.h"
+
 #include "extensions/quic_listeners/well_known_names.h"
+
+using QuicheConfigProto = envoy::config::quic_listener::quiche::v2alpha::Quiche;
 
 namespace Envoy {
 namespace Extensions {
@@ -32,13 +37,14 @@ class QuicheListenerConfigFactory : public Quic::QuicListenerConfigFactory {
 public:
   // QuicListenerConfigFactory
   Quic::QuicListenerFactoryPtr
-  createListenerFactoryFromProto(const Protobuf::Message&,
+  createListenerFactoryFromProto(const Protobuf::Message& proto_config,
                                  Server::Configuration::ListenerFactoryContext&) override {
+    MessageUtil::downcastAndValidate<const QuicheConfigProto&>(proto_config);
     return std::make_unique<QuicheListenerFactory>();
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<envoy::config::quic_listener::quiche::v2alpha::Quiche>();
+    return std::make_unique<QuicheConfigProto>();
   }
 
   std::string name() override { return QuicListenerNames::get().Quiche; }

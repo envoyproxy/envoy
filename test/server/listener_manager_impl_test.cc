@@ -3026,6 +3026,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, QuicListener) {
       name: "envoy.quic_listeners.quiche"
       config:
         http_config:
+          stat_prefix: "quiche"
           route_config:
             virtual_hosts:
             - name: "some_virtual_host"
@@ -3041,6 +3042,22 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, QuicListener) {
   EXPECT_NE(nullptr, factory);
   Quic::MockQuicListenerCallbacks callbacks;
   EXPECT_NE(nullptr, factory->createQuicListener(callbacks));
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, QuicListenerBadConfig) {
+  const std::string yaml = R"EOF(
+    name: "foo"
+    address:
+      socket_address: { protocol: UDP, address: 127.0.0.1, port_value: 1234 }
+    filter_chains:
+    - filters:
+    quic_listener:
+      name: "envoy.quic_listeners.quiche"
+      config: {}
+  )EOF";
+
+  EXPECT_THROW(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true),
+               ProtoValidationException);
 }
 
 } // namespace Server
