@@ -60,6 +60,17 @@ namespace Lua {
  */
 #define DECLARE_LUA_CLOSURE(Class, Name) DECLARE_LUA_FUNCTION_EX(Class, Name, lua_upvalueindex(1))
 
+template <class T> T* align(void* ptr) {
+  size_t address = size_t(ptr);
+  auto offset = address % alignof(T);
+  auto aligned_address = offset == 0 ? address : address + alignof(T) - offset;
+  return reinterpret_cast<T*>(aligned_address);
+}
+
+template <class T> size_t maximumSpaceNeededToAlign() {
+  return (alignof(T) > alignof(void*)) ? sizeof(T) : sizeof(T) + alignof(T) - 1;
+}
+
 /**
  * This is the base class for all C++ objects that we expose out to Lua. The goal is to hide as
  * much ugliness as possible. In general, to use this, do the following:
@@ -91,14 +102,16 @@ public:
   template <typename... ConstructorArgs>
   static std::pair<T*, lua_State*> create(lua_State* state, ConstructorArgs&&... args) {
     // Create a new user data and assign its metatable.
-    void* mem = lua_newuserdata(state, sizeof(T));
+    void* mem = lua_newuserdata(state, maximumSpaceNeededToAlign<T>());
+    // TODO(dio): assert mem % alignof(void*).
     luaL_getmetatable(state, typeid(T).name());
     ASSERT(lua_istable(state, -1));
     lua_setmetatable(state, -2);
 
     // Memory is allocated via Lua and it is raw. We use placement new to run the constructor.
     ENVOY_LOG(trace, "creating {} at {}", typeid(T).name(), mem);
-    return {new (mem) T(std::forward<ConstructorArgs>(args)...), state};
+    T* alignedMem = align<T>(mem);
+    return {new (alignedMem) T(std::forward<ConstructorArgs>(args)...), state};
   }
 
   /**
