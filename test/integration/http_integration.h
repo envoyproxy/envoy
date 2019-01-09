@@ -115,7 +115,14 @@ protected:
   // Close |codec_client_| and |fake_upstream_connection_| cleanly.
   void cleanupUpstreamAndDownstream();
 
+  // Check for completion of upstream_request_, and a simple "200" response.
+  void checkSimpleRequestSuccess(uint64_t expected_request_size, uint64_t expected_response_size,
+                                 IntegrationStreamDecoder* response);
+
   typedef std::function<Network::ClientConnectionPtr()> ConnectionCreationFunction;
+  // Sends a simple header-only HTTP request, and waits for a response.
+  IntegrationStreamDecoderPtr makeHeaderOnlyRequest(ConnectionCreationFunction* create_connection,
+                                                    int upstream_index);
 
   void testRouterRedirect();
   void testRouterDirectResponse();
@@ -126,9 +133,9 @@ protected:
   void testRouterRequestAndResponseWithBody(uint64_t request_size, uint64_t response_size,
                                             bool big_header,
                                             ConnectionCreationFunction* creator = nullptr);
-  void testRouterHeaderOnlyRequestAndResponse(bool leave_envoy_running,
-                                              ConnectionCreationFunction* creator = nullptr,
+  void testRouterHeaderOnlyRequestAndResponse(ConnectionCreationFunction* creator = nullptr,
                                               int upstream_index = 0);
+  void testRequestAndResponseShutdownWithActiveConnection();
   void testRouterUpstreamDisconnectBeforeRequestComplete();
   void
   testRouterUpstreamDisconnectBeforeResponseComplete(ConnectionCreationFunction* creator = nullptr);

@@ -199,7 +199,7 @@ TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutRequestAndResponse) {
 
 TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutConfiguredRequestResponse) {
   enable_request_timeout_ = true;
-  testRouterHeaderOnlyRequestAndResponse(true);
+  testRouterHeaderOnlyRequestAndResponse();
 }
 
 TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutConfiguredRequestResponseWithBody) {

@@ -306,6 +306,17 @@ void HttpIntegrationTest::waitForNextUpstreamRequest(uint64_t upstream_index) {
   waitForNextUpstreamRequest(std::vector<uint64_t>({upstream_index}));
 }
 
+void HttpIntegrationTest::checkSimpleRequestSuccess(uint64_t expected_request_size,
+                                                    uint64_t expected_response_size,
+                                                    IntegrationStreamDecoder* response) {
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(expected_request_size, upstream_request_->bodyLength());
+
+  ASSERT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_EQ(expected_response_size, response->body().size());
+}
+
 void HttpIntegrationTest::testRouterRequestAndResponseWithBody(
     uint64_t request_size, uint64_t response_size, bool big_header,
     ConnectionCreationFunction* create_connection) {
@@ -320,17 +331,12 @@ void HttpIntegrationTest::testRouterRequestAndResponseWithBody(
   }
   auto response = sendRequestAndWaitForResponse(request_headers, request_size,
                                                 default_response_headers_, response_size);
-
-  EXPECT_TRUE(upstream_request_->complete());
-  EXPECT_EQ(request_size, upstream_request_->bodyLength());
-
-  ASSERT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
-  EXPECT_EQ(response_size, response->body().size());
+  checkSimpleRequestSuccess(request_size, response_size, response.get());
 }
 
-void HttpIntegrationTest::testRouterHeaderOnlyRequestAndResponse(
-    bool leave_envoy_running, ConnectionCreationFunction* create_connection, int upstream_index) {
+IntegrationStreamDecoderPtr
+HttpIntegrationTest::makeHeaderOnlyRequest(ConnectionCreationFunction* create_connection,
+                                           int upstream_index) {
   // This is called multiple times per test in ads_integration_test. Only call
   // initialize() the first time.
   if (!initialized()) {
@@ -343,22 +349,22 @@ void HttpIntegrationTest::testRouterHeaderOnlyRequestAndResponse(
                                           {":scheme", "http"},
                                           {":authority", "host"},
                                           {"x-lyft-user-id", "123"}};
-  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0,
-                                                upstream_index);
+  return sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0,
+                                       upstream_index);
+}
 
-  // The following allows us to test shutting down the server with active connection pool
-  // connections.
-  if (!leave_envoy_running) {
-    fake_upstreams_[upstream_index]->set_allow_unexpected_disconnects(true);
-    test_server_.reset();
-  }
+void HttpIntegrationTest::testRouterHeaderOnlyRequestAndResponse(
+    ConnectionCreationFunction* create_connection, int upstream_index) {
+  auto response = makeHeaderOnlyRequest(create_connection, upstream_index);
+  checkSimpleRequestSuccess(0U, 0U, response.get());
+}
 
-  EXPECT_TRUE(upstream_request_->complete());
-  EXPECT_EQ(0U, upstream_request_->bodyLength());
-
-  EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
-  EXPECT_EQ(0U, response->body().size());
+void HttpIntegrationTest::testRequestAndResponseShutdownWithActiveConnection() {
+  auto response = makeHeaderOnlyRequest(nullptr, 0);
+  // Shut down the server with active connection pool connections.
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+  test_server_.reset();
+  checkSimpleRequestSuccess(0U, 0U, response.get());
 }
 
 // Change the default route to be restrictive, and send a request to an alternate route.

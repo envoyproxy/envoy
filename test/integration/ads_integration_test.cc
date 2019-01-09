@@ -161,7 +161,7 @@ public:
 
   void makeSingleRequest() {
     registerTestServerPorts({"http"});
-    testRouterHeaderOnlyRequestAndResponse(true);
+    testRouterHeaderOnlyRequestAndResponse();
     cleanupUpstreamAndDownstream();
     fake_upstream_connection_ = nullptr;
   }
