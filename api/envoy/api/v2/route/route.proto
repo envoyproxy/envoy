@@ -28,7 +28,7 @@ option (gogoproto.equal_all) = true;
 // host header. This allows a single listener to service multiple top level domain path trees. Once
 // a virtual host is selected based on the domain, the routes are processed in order to see which
 // upstream cluster to route to or whether to perform a redirect.
-// [#comment:next free field: 16]
+// [#comment:next free field: 17]
 message VirtualHost {
   // The logical name of the virtual host. This is used when emitting certain
   // statistics but is not relevant for routing.
@@ -132,6 +132,11 @@ message VirtualHost {
   // :ref:`suppress_envoy_headers
   // <envoy_api_field_config.filter.http.router.v2.Router.suppress_envoy_headers>` flag.
   bool include_request_attempt_count = 14;
+
+  // Indicates the retry policy for all routes in this virtual host. Note that setting a
+  // route level entry will take precedence over this config and it'll be treated
+  // independently (e.g.: values are not inherited).
+  RetryPolicy retry_policy = 16;
 }
 
 // A route is both a specification of how to match a request as well as an indication of what to do
@@ -540,71 +545,6 @@ message RouteAction {
   //   :ref:`retry overview <arch_overview_http_routing_retry>`.
   google.protobuf.Duration timeout = 8 [(gogoproto.stdduration) = true];
 
-  // HTTP retry :ref:`architecture overview <arch_overview_http_routing_retry>`.
-  message RetryPolicy {
-    // Specifies the conditions under which retry takes place. These are the same
-    // conditions documented for :ref:`config_http_filters_router_x-envoy-retry-on` and
-    // :ref:`config_http_filters_router_x-envoy-retry-grpc-on`.
-    string retry_on = 1;
-
-    // Specifies the allowed number of retries. This parameter is optional and
-    // defaults to 1. These are the same conditions documented for
-    // :ref:`config_http_filters_router_x-envoy-max-retries`.
-    google.protobuf.UInt32Value num_retries = 2;
-
-    // Specifies a non-zero upstream timeout per retry attempt. This parameter is optional. The
-    // same conditions documented for
-    // :ref:`config_http_filters_router_x-envoy-upstream-rq-per-try-timeout-ms` apply.
-    //
-    // .. note::
-    //
-    //   If left unspecified, Envoy will use the global
-    //   :ref:`route timeout <envoy_api_field_route.RouteAction.timeout>` for the request.
-    //   Consequently, when using a :ref:`5xx <config_http_filters_router_x-envoy-retry-on>` based
-    //   retry policy, a request that times out will not be retried as the total timeout budget
-    //   would have been exhausted.
-    google.protobuf.Duration per_try_timeout = 3 [(gogoproto.stdduration) = true];
-
-    message RetryPriority {
-      string name = 1 [(validate.rules).string.min_bytes = 1];
-      oneof config_type {
-        google.protobuf.Struct config = 2;
-
-        // [#not-implemented-hide:]
-        google.protobuf.Any typed_config = 3;
-      }
-    }
-
-    // Specifies an implementation of a RetryPriority which is used to determine the
-    // distribution of load across priorities used for retries. Refer to
-    // :ref:`retry plugin configuration <arch_overview_http_retry_plugins>` for more details.
-    RetryPriority retry_priority = 4;
-
-    message RetryHostPredicate {
-      string name = 1 [(validate.rules).string.min_bytes = 1];
-      oneof config_type {
-        google.protobuf.Struct config = 2;
-
-        // [#not-implemented-hide:]
-        google.protobuf.Any typed_config = 3;
-      }
-    }
-
-    // Specifies a collection of RetryHostPredicates that will be consulted when selecting a host
-    // for retries. If any of the predicates reject the host, host selection will be reattempted.
-    // Refer to :ref:`retry plugin configuration <arch_overview_http_retry_plugins>` for more
-    // details.
-    repeated RetryHostPredicate retry_host_predicate = 5;
-
-    // The maximum number of times host selection will be reattempted before giving up, at which
-    // point the host that was last selected will be routed to. If unspecified, this will default to
-    // retrying once.
-    int64 host_selection_retry_max_attempts = 6;
-
-    // HTTP status codes that should trigger a retry in addition to those specified by retry_on.
-    repeated uint32 retriable_status_codes = 7;
-  }
-
   // Specifies the idle timeout for the route. If not specified, there is no per-route idle timeout,
   // although the connection manager wide :ref:`stream_idle_timeout
   // <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.stream_idle_timeout>`
@@ -626,7 +566,9 @@ message RouteAction {
   google.protobuf.Duration idle_timeout = 24
       [(validate.rules).duration.gt = {}, (gogoproto.stdduration) = true];
 
-  // Indicates that the route has a retry policy.
+  // Indicates that the route has a retry policy. Note that if this is set,
+  // it'll take precedence over the virtual host level retry policy entirely
+  // (e.g.: policies are not merged, most internal one becomes the enforced policy).
   RetryPolicy retry_policy = 9;
 
   // The router is capable of shadowing traffic from one cluster to another. The current
@@ -833,6 +775,71 @@ message RouteAction {
     google.protobuf.BoolValue enabled = 2;
   };
   repeated UpgradeConfig upgrade_configs = 25;
+}
+
+// HTTP retry :ref:`architecture overview <arch_overview_http_routing_retry>`.
+message RetryPolicy {
+  // Specifies the conditions under which retry takes place. These are the same
+  // conditions documented for :ref:`config_http_filters_router_x-envoy-retry-on` and
+  // :ref:`config_http_filters_router_x-envoy-retry-grpc-on`.
+  string retry_on = 1;
+
+  // Specifies the allowed number of retries. This parameter is optional and
+  // defaults to 1. These are the same conditions documented for
+  // :ref:`config_http_filters_router_x-envoy-max-retries`.
+  google.protobuf.UInt32Value num_retries = 2;
+
+  // Specifies a non-zero upstream timeout per retry attempt. This parameter is optional. The
+  // same conditions documented for
+  // :ref:`config_http_filters_router_x-envoy-upstream-rq-per-try-timeout-ms` apply.
+  //
+  // .. note::
+  //
+  //   If left unspecified, Envoy will use the global
+  //   :ref:`route timeout <envoy_api_field_route.RouteAction.timeout>` for the request.
+  //   Consequently, when using a :ref:`5xx <config_http_filters_router_x-envoy-retry-on>` based
+  //   retry policy, a request that times out will not be retried as the total timeout budget
+  //   would have been exhausted.
+  google.protobuf.Duration per_try_timeout = 3 [(gogoproto.stdduration) = true];
+
+  message RetryPriority {
+    string name = 1 [(validate.rules).string.min_bytes = 1];
+    oneof config_type {
+      google.protobuf.Struct config = 2;
+
+      // [#not-implemented-hide:]
+      google.protobuf.Any typed_config = 3;
+    }
+  }
+
+  // Specifies an implementation of a RetryPriority which is used to determine the
+  // distribution of load across priorities used for retries. Refer to
+  // :ref:`retry plugin configuration <arch_overview_http_retry_plugins>` for more details.
+  RetryPriority retry_priority = 4;
+
+  message RetryHostPredicate {
+    string name = 1 [(validate.rules).string.min_bytes = 1];
+    oneof config_type {
+      google.protobuf.Struct config = 2;
+
+      // [#not-implemented-hide:]
+      google.protobuf.Any typed_config = 3;
+    }
+  }
+
+  // Specifies a collection of RetryHostPredicates that will be consulted when selecting a host
+  // for retries. If any of the predicates reject the host, host selection will be reattempted.
+  // Refer to :ref:`retry plugin configuration <arch_overview_http_retry_plugins>` for more
+  // details.
+  repeated RetryHostPredicate retry_host_predicate = 5;
+
+  // The maximum number of times host selection will be reattempted before giving up, at which
+  // point the host that was last selected will be routed to. If unspecified, this will default to
+  // retrying once.
+  int64 host_selection_retry_max_attempts = 6;
+
+  // HTTP status codes that should trigger a retry in addition to those specified by retry_on.
+  repeated uint32 retriable_status_codes = 7;
 }
 
 message RedirectAction {
