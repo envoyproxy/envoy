@@ -46,7 +46,7 @@ On Fedora (maybe also other red hat distros), run the following:
 dnf install cmake libtool libstdc++ ninja-build lld patch
 ```
 
-On OS X, you'll need to install several dependencies. This can be accomplished via [Homebrew](https://brew.sh/):
+On macOS, you'll need to install several dependencies. This can be accomplished via [Homebrew](https://brew.sh/):
 ```
 brew install coreutils wget cmake libtool go bazel automake ninja clang-format
 ```
@@ -310,6 +310,7 @@ The following optional features can be disabled on the Bazel build command-line:
 * Hot restart with `--define hot_restart=disabled`
 * Google C++ gRPC client with `--define google_grpc=disabled`
 * Backtracing on signals with `--define signal_trace=disabled`
+* tcmalloc with `--define tcmalloc=disabled`
 
 ## Enabling optional features
 
@@ -322,6 +323,11 @@ The following optional features can be enabled on the Bazel build command-line:
   source/common/common/perf_annotation.h for details).
 * BoringSSL can be built in a FIPS-compliant mode with `--define boringssl=fips`
   (see [FIPS 140-2](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/ssl.html#fips-140-2) for details).
+* ASSERT() can be configured to log failures and increment a stat counter in a release build with
+  `--define log_debug_assert_in_release=enabled`. The default behavior is to compile debug assertions out of
+  release builds so that the condition is not evaluated. This option has no effect in debug builds.
+* memory-debugging (scribbling over memory after allocation and before freeing) with
+  `--define tcmalloc=debug`.
 
 ## Disabling extensions
 
@@ -525,7 +531,7 @@ The command above will setup a maximum 64 GiB cache at `~/bazel_cache` on port 2
 want to setup a larger cache if you run ASAN builds.
 
 NOTE: Using docker to run remote cache server described in remote cache docs will likely have
-slower cache performance on macOS due to slow disk performance for Docker on Mac.
+slower cache performance on macOS due to slow disk performance on Docker for Mac.
 
 Adding the following parameter to Bazel everytime or persist them in `.bazelrc`.
 

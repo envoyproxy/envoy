@@ -16,7 +16,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace BufferFilter {
 
-TEST(BufferFilterFactoryTest, BufferFilterCorrectWithoutRequestTime) {
+TEST(BufferFilterFactoryTest, BufferFilterCorrectJson) {
   std::string json_string = R"EOF(
   {
     "max_request_bytes" : 1028
@@ -32,28 +32,11 @@ TEST(BufferFilterFactoryTest, BufferFilterCorrectWithoutRequestTime) {
   cb(filter_callback);
 }
 
-TEST(BufferFilterFactoryTest, BufferFilterCorrectJson) {
-  std::string json_string = R"EOF(
-  {
-    "max_request_bytes" : 1028,
-    "max_request_time_s" : 2
-  }
-  )EOF";
-
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  NiceMock<Server::Configuration::MockFactoryContext> context;
-  BufferFilterFactory factory;
-  Http::FilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
-  Http::MockFilterChainFactoryCallbacks filter_callback;
-  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
-  cb(filter_callback);
-}
-
 TEST(BufferFilterFactoryTest, BufferFilterIncorrectJson) {
+  // This is incorrect because the number is quote-wrapped
   std::string json_string = R"EOF(
   {
-    "max_request_bytes" : 1028,
-    "max_request_time_s" : "2"
+    "max_request_bytes" : "1028"
   }
   )EOF";
 
@@ -66,7 +49,6 @@ TEST(BufferFilterFactoryTest, BufferFilterIncorrectJson) {
 TEST(BufferFilterFactoryTest, BufferFilterCorrectProto) {
   envoy::config::filter::http::buffer::v2::Buffer config{};
   config.mutable_max_request_bytes()->set_value(1028);
-  config.mutable_max_request_time()->set_seconds(2);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   BufferFilterFactory factory;
@@ -83,7 +65,6 @@ TEST(BufferFilterFactoryTest, BufferFilterEmptyProto) {
           factory.createEmptyConfigProto().get());
 
   config.mutable_max_request_bytes()->set_value(1028);
-  config.mutable_max_request_time()->set_seconds(2);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, "stats", context);

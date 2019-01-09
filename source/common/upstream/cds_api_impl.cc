@@ -11,37 +11,26 @@
 #include "common/config/subscription_factory.h"
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
-#include "common/upstream/cds_subscription.h"
 
 namespace Envoy {
 namespace Upstream {
 
 CdsApiPtr CdsApiImpl::create(const envoy::api::v2::core::ConfigSource& cds_config,
-                             const absl::optional<envoy::api::v2::core::ConfigSource>& eds_config,
                              ClusterManager& cm, Event::Dispatcher& dispatcher,
                              Runtime::RandomGenerator& random,
                              const LocalInfo::LocalInfo& local_info, Stats::Scope& scope) {
-  return CdsApiPtr{
-      new CdsApiImpl(cds_config, eds_config, cm, dispatcher, random, local_info, scope)};
+  return CdsApiPtr{new CdsApiImpl(cds_config, cm, dispatcher, random, local_info, scope)};
 }
 
-CdsApiImpl::CdsApiImpl(const envoy::api::v2::core::ConfigSource& cds_config,
-                       const absl::optional<envoy::api::v2::core::ConfigSource>& eds_config,
-                       ClusterManager& cm, Event::Dispatcher& dispatcher,
-                       Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
-                       Stats::Scope& scope)
+CdsApiImpl::CdsApiImpl(const envoy::api::v2::core::ConfigSource& cds_config, ClusterManager& cm,
+                       Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
+                       const LocalInfo::LocalInfo& local_info, Stats::Scope& scope)
     : cm_(cm), scope_(scope.createScope("cluster_manager.cds.")) {
   Config::Utility::checkLocalInfo("cds", local_info);
 
   subscription_ =
       Config::SubscriptionFactory::subscriptionFromConfigSource<envoy::api::v2::Cluster>(
           cds_config, local_info, dispatcher, cm, random, *scope_,
-          [this, &cds_config, &eds_config, &cm, &dispatcher, &random, &local_info,
-           &scope]() -> Config::Subscription<envoy::api::v2::Cluster>* {
-            return new CdsSubscription(Config::Utility::generateStats(*scope_), cds_config,
-                                       eds_config, cm, dispatcher, random, local_info,
-                                       scope.statsOptions());
-          },
           "envoy.api.v2.ClusterDiscoveryService.FetchClusters",
           "envoy.api.v2.ClusterDiscoveryService.StreamClusters");
 }

@@ -220,8 +220,9 @@ public:
                std::vector<Network::ListenerFilterFactoryCb>(
                    const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>&,
                    Configuration::ListenerFactoryContext& context));
-  MOCK_METHOD3(createListenSocket,
+  MOCK_METHOD4(createListenSocket,
                Network::SocketSharedPtr(Network::Address::InstanceConstSharedPtr address,
+                                        Network::Address::SocketType socket_type,
                                         const Network::Socket::OptionsSharedPtr& options,
                                         bool bind_to_port));
   MOCK_METHOD1(createDrainManager_, DrainManager*(envoy::api::v2::Listener::DrainType drain_type));
@@ -393,7 +394,7 @@ public:
   std::chrono::milliseconds wd_multikill_;
 };
 
-class MockFactoryContext : public FactoryContext {
+class MockFactoryContext : public virtual FactoryContext {
 public:
   MockFactoryContext();
   ~MockFactoryContext();
@@ -459,8 +460,7 @@ public:
   std::unique_ptr<Secret::SecretManager> secret_manager_;
 };
 
-class MockListenerFactoryContext : public virtual MockFactoryContext,
-                                   public virtual ListenerFactoryContext {
+class MockListenerFactoryContext : public MockFactoryContext, public ListenerFactoryContext {
 public:
   MockListenerFactoryContext();
   ~MockListenerFactoryContext();
