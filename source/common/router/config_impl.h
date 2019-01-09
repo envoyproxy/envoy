@@ -207,8 +207,6 @@ public:
   }
 
 private:
-  void init(const envoy::api::v2::route::RetryPolicy& retry_policy);
-
   std::chrono::milliseconds per_try_timeout_{0};
   uint32_t num_retries_{};
   uint32_t retry_on_{};
