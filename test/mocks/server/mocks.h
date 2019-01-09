@@ -58,7 +58,6 @@ public:
   MOCK_CONST_METHOD0(concurrency, uint32_t());
   MOCK_CONST_METHOD0(configPath, const std::string&());
   MOCK_CONST_METHOD0(configYaml, const std::string&());
-  MOCK_CONST_METHOD0(v2ConfigOnly, bool());
   MOCK_CONST_METHOD0(adminAddressPath, const std::string&());
   MOCK_CONST_METHOD0(localAddressIpVersion, Network::Address::IpVersion());
   MOCK_CONST_METHOD0(drainTime, std::chrono::seconds());
@@ -83,7 +82,6 @@ public:
 
   std::string config_path_;
   std::string config_yaml_;
-  bool v2_config_only_{};
   std::string admin_address_path_;
   std::string service_cluster_name_;
   std::string service_node_name_;

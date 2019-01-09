@@ -57,7 +57,6 @@ TEST_F(OptionsImplTest, v1Disallowed) {
       "--service-zone zone --file-flush-interval-msec 9000 --drain-time-s 60 --log-format [%v] "
       "--parent-shutdown-time-s 90 --log-path /foo/bar --disable-hot-restart");
   EXPECT_EQ(Server::Mode::Validate, options->mode());
-  EXPECT_TRUE(options->v2ConfigOnly());
 }
 
 TEST_F(OptionsImplTest, All) {
@@ -71,7 +70,6 @@ TEST_F(OptionsImplTest, All) {
   EXPECT_EQ(Server::Mode::Validate, options->mode());
   EXPECT_EQ(2U, options->concurrency());
   EXPECT_EQ("hello", options->configPath());
-  EXPECT_TRUE(options->v2ConfigOnly());
   EXPECT_EQ("path", options->adminAddressPath());
   EXPECT_EQ(Network::Address::IpVersion::v6, options->localAddressIpVersion());
   EXPECT_EQ(1U, options->restartEpoch());
@@ -284,7 +282,6 @@ TEST_F(OptionsImplTest, SaneTestConstructor) {
   EXPECT_EQ(regular_options_impl->baseId(), test_options_impl.baseId());
   EXPECT_EQ(regular_options_impl->configPath(), test_options_impl.configPath());
   EXPECT_EQ(regular_options_impl->configYaml(), test_options_impl.configYaml());
-  EXPECT_EQ(regular_options_impl->v2ConfigOnly(), test_options_impl.v2ConfigOnly());
   EXPECT_EQ(regular_options_impl->adminAddressPath(), test_options_impl.adminAddressPath());
   EXPECT_EQ(regular_options_impl->localAddressIpVersion(),
             test_options_impl.localAddressIpVersion());
