@@ -60,14 +60,14 @@ namespace Lua {
  */
 #define DECLARE_LUA_CLOSURE(Class, Name) DECLARE_LUA_FUNCTION_EX(Class, Name, lua_upvalueindex(1))
 
-template <class T> T* align(void* ptr) {
+template <typename T> T* align(void* ptr) {
   size_t address = size_t(ptr);
   auto offset = address % alignof(T);
   auto aligned_address = offset == 0 ? address : address + alignof(T) - offset;
   return reinterpret_cast<T*>(aligned_address);
 }
 
-template <class T> size_t maximumSpaceNeededToAlign() {
+template <typename T> size_t maximumSpaceNeededToAlign() {
   return (alignof(T) > alignof(void*)) ? sizeof(T) : sizeof(T) + alignof(T) - 1;
 }
 
