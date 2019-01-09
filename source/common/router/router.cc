@@ -863,7 +863,7 @@ bool Filter::setupRedirect(const Http::HeaderMap& headers) {
 
   // As with setupRetry, redirects are not supported for streaming requests yet.
   if (downstream_end_stream_ &&
-      !callbacks_->decodingBuffer() && // Redirects woth body not yet supported.
+      !callbacks_->decodingBuffer() && // Redirects with body not yet supported.
       location != nullptr &&
       convertRequestHeadersForInternalRedirect(*downstream_headers_, *location,
                                                *callbacks_->connection()) &&
