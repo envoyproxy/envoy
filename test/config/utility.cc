@@ -329,7 +329,7 @@ void ConfigHelper::addRoute(const std::string& domains, const std::string& prefi
                             const std::string& cluster, bool validate_clusters,
                             envoy::api::v2::route::RouteAction::ClusterNotFoundResponseCode code,
                             envoy::api::v2::route::VirtualHost::TlsRequirementType type,
-                            envoy::api::v2::route::RouteAction::RetryPolicy retry_policy,
+                            envoy::api::v2::route::RetryPolicy retry_policy,
                             bool include_attempt_count_header, const absl::string_view upgrade) {
   RELEASE_ASSERT(!finalized_, "");
   envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager hcm_config;
