@@ -446,7 +446,6 @@ private:
     ActiveStreamEncoderFilter* saved_current_encoder_filter_;
   };
 
-
   typedef std::unique_ptr<ActiveStream> ActiveStreamPtr;
 
   /**
