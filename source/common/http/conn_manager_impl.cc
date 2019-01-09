@@ -1034,6 +1034,8 @@ void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(
   // Make sure commonContinue continues encode100ContinueHeaders.
   has_continue_headers_ = true;
 
+  CurrentEncoderFilterWrapper current_encoder_filter_wrapper(&current_encoder_filter_);
+
   // Similar to the block in encodeHeaders, run encode100ContinueHeaders on each
   // filter. This is simpler than that case because 100 continue implies no
   // end-stream, and because there are normal headers coming there's no need for
@@ -1215,7 +1217,7 @@ void ConnectionManagerImpl::ActiveStream::encodeMetadata(ActiveStreamEncoderFilt
                                                          MetadataMapPtr&& metadata_map_ptr) {
   resetIdleTimer();
 
-  ActiveStreamEncoderFilter* current_encoder_filter_save = current_encoder_filter_;
+  CurrentEncoderFilterWrapper current_encoder_filter_wrapper(&current_encoder_filter_);
   if (current_encoder_filter_ != nullptr) {
     // current_encoder_filter_ != nullptr means new metadata is added locally by
     // current_encoder_filter_. Pass the new metadata through all downstream filters of
@@ -1231,7 +1233,6 @@ void ConnectionManagerImpl::ActiveStream::encodeMetadata(ActiveStreamEncoderFilt
     ENVOY_STREAM_LOG(trace, "encode metadata called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
   }
-  current_encoder_filter_ = current_encoder_filter_save;
   // TODO(soya3129): update stats with metadata.
 
   // Now encode metadata via the codec.
@@ -1286,6 +1287,8 @@ void ConnectionManagerImpl::ActiveStream::encodeData(ActiveStreamEncoderFilter* 
 
   std::list<ActiveStreamEncoderFilterPtr>::iterator entry = commonEncodePrefix(filter, end_stream);
   auto trailers_added_entry = encoder_filters_.end();
+
+  CurrentEncoderFilterWrapper current_encoder_filter_wrapper(&current_encoder_filter_);
 
   const bool trailers_exists_at_start = response_trailers_ != nullptr;
   for (; entry != encoder_filters_.end(); entry++) {
@@ -1343,6 +1346,8 @@ void ConnectionManagerImpl::ActiveStream::encodeTrailers(ActiveStreamEncoderFilt
   if (encoding_headers_only_) {
     return;
   }
+
+  CurrentEncoderFilterWrapper current_encoder_filter_wrapper(&current_encoder_filter_);
 
   std::list<ActiveStreamEncoderFilterPtr>::iterator entry = commonEncodePrefix(filter, true);
   for (; entry != encoder_filters_.end(); entry++) {

@@ -429,6 +429,24 @@ private:
     bool encoding_headers_only_{};
   };
 
+  // CurrentEncoderFilterWrapper will restore the original value of *current_encoder_filter_pointer
+  // on destruction.
+  class CurrentEncoderFilterWrapper {
+  public:
+    CurrentEncoderFilterWrapper(ActiveStreamEncoderFilter** current_encoder_filter_pointer) {
+      saved_current_encoder_filter_ = *current_encoder_filter_pointer;
+      current_encoder_filter_pointer_ = current_encoder_filter_pointer;
+    }
+    ~CurrentEncoderFilterWrapper() {
+      *current_encoder_filter_pointer_ = saved_current_encoder_filter_;
+    }
+
+  private:
+    ActiveStreamEncoderFilter** current_encoder_filter_pointer_;
+    ActiveStreamEncoderFilter* saved_current_encoder_filter_;
+  };
+
+
   typedef std::unique_ptr<ActiveStream> ActiveStreamPtr;
 
   /**
