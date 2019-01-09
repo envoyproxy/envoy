@@ -103,11 +103,17 @@ IntegrationCodecClient::makeHeaderOnlyRequest(const Http::HeaderMap& headers) {
 
 IntegrationStreamDecoderPtr
 IntegrationCodecClient::makeRequestWithBody(const Http::HeaderMap& headers, uint64_t body_size) {
+  return makeRequestWithBody(headers, std::string(body_size, 'a'));
+}
+
+IntegrationStreamDecoderPtr
+IntegrationCodecClient::makeRequestWithBody(const Http::HeaderMap& headers,
+                                            const std::string& body) {
   auto response = std::make_unique<IntegrationStreamDecoder>(dispatcher_);
   Http::StreamEncoder& encoder = newStream(*response);
   encoder.getStream().addCallbacks(*response);
   encoder.encodeHeaders(headers, false);
-  Buffer::OwnedImpl data(std::string(body_size, 'a'));
+  Buffer::OwnedImpl data(body);
   encoder.encodeData(data, true);
   flushWrite();
   return response;

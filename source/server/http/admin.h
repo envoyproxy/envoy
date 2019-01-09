@@ -340,6 +340,7 @@ public:
   void setEndStreamOnComplete(bool end_stream) override { end_stream_on_complete_ = end_stream; }
   void addOnDestroyCallback(std::function<void()> cb) override;
   Http::StreamDecoderFilterCallbacks& getDecoderFilterCallbacks() const override;
+  const Buffer::Instance* getRequestBody() const override;
   const Http::HeaderMap& getRequestHeaders() const override;
 
 private:
