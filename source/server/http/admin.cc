@@ -194,7 +194,9 @@ Http::FilterHeadersStatus AdminFilter::decodeHeaders(Http::HeaderMap& headers, b
 
 Http::FilterDataStatus AdminFilter::decodeData(Buffer::Instance& data, bool end_stream) {
   // Currently we generically buffer all admin request data in case a handler wants to use it.
-  // If we ever support streaming admin requests we may need to revisit this.
+  // If we ever support streaming admin requests we may need to revisit this. Note, we must use
+  // addDecodedData() here since we might need to perform onComplete() processing if end_stream is
+  // true.
   callbacks_->addDecodedData(data, false);
 
   if (end_stream) {

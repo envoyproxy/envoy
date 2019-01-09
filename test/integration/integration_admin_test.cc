@@ -17,7 +17,9 @@
 namespace Envoy {
 
 INSTANTIATE_TEST_CASE_P(Protocols, IntegrationAdminTest,
-                        testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
+                        testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+                            {Http::CodecClient::Type::HTTP1, Http::CodecClient::Type::HTTP2},
+                            {FakeHttpConnection::Type::HTTP1})),
                         HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 TEST_P(IntegrationAdminTest, HealthCheck) {

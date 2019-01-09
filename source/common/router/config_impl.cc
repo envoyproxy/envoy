@@ -42,12 +42,7 @@ std::string SslRedirector::newPath(const Http::HeaderMap& headers) const {
   return Http::Utility::createSslRedirectPath(headers);
 }
 
-RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::route::RouteAction& config) {
-  if (!config.has_retry_policy()) {
-    return;
-  }
-
-  const auto& retry_policy = config.retry_policy();
+RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::route::RetryPolicy& retry_policy) {
   per_try_timeout_ =
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(retry_policy, per_try_timeout, 0));
   num_retries_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(retry_policy, num_retries, 1);
@@ -307,7 +302,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       path_redirect_(route.redirect().path_redirect()),
       https_redirect_(route.redirect().https_redirect()),
       prefix_rewrite_redirect_(route.redirect().prefix_rewrite()),
-      strip_query_(route.redirect().strip_query()), retry_policy_(route.route()),
+      strip_query_(route.redirect().strip_query()),
+      retry_policy_(buildRetryPolicy(vhost.retryPolicy(), route.route())),
       rate_limit_policy_(route.route().rate_limits()), shadow_policy_(route.route()),
       priority_(ConfigUtility::parsePriority(route.route().priority())),
       total_cluster_weight_(
@@ -589,6 +585,23 @@ RouteEntryImplBase::parseOpaqueConfig(const envoy::api::v2::route::Route& route)
   return ret;
 }
 
+RetryPolicyImpl RouteEntryImplBase::buildRetryPolicy(
+    const absl::optional<envoy::api::v2::route::RetryPolicy>& vhost_retry_policy,
+    const envoy::api::v2::route::RouteAction& route_config) const {
+  // Route specific policy wins, if available.
+  if (route_config.has_retry_policy()) {
+    return RetryPolicyImpl(route_config.retry_policy());
+  }
+
+  // If not, we fallback to the virtual host policy if there is one.
+  if (vhost_retry_policy) {
+    return RetryPolicyImpl(vhost_retry_policy.value());
+  }
+
+  // Otherwise, an empty policy will do.
+  return RetryPolicyImpl();
+}
+
 DecoratorConstPtr RouteEntryImplBase::parseDecorator(const envoy::api::v2::route::Route& route) {
   DecoratorConstPtr ret;
   if (route.has_decorator()) {
@@ -820,6 +833,11 @@ VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::route::VirtualHost& virtu
     break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
+  }
+
+  // Retry Policy must be set before routes, since they may use it.
+  if (virtual_host.has_retry_policy()) {
+    retry_policy_ = virtual_host.retry_policy();
   }
 
   for (const auto& route : virtual_host.routes()) {
