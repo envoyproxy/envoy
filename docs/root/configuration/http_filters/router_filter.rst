@@ -26,12 +26,12 @@ ingress/response path. They are documented in this section.
 
 x-envoy-max-retries
 ^^^^^^^^^^^^^^^^^^^
-
-If a :ref:`retry policy <envoy_api_field_route.RouteAction.retry_policy>` is in place, Envoy will default to retrying
-one time unless explicitly specified. The number of retries can be explicitly set in the route retry config or by using
-this header. If a retry policy is not configured and :ref:`config_http_filters_router_x-envoy-retry-on` or
-:ref:`config_http_filters_router_x-envoy-retry-grpc-on` headers are not specified, Envoy will not retry a failed
-request.
+If a :ref:`route config retry policy <envoy_api_field_route.RouteAction.retry_policy>` or a
+:ref:`virtual host retry policy <envoy_api_field_route.VirtualHost.retry_policy>` is in place, Envoy will default to retrying
+one time unless explicitly specified. The number of retries can be explicitly set in either the virtual host retry config,
+or the route retry config, or by using this header. If a retry policy is not configured and
+:ref:`config_http_filters_router_x-envoy-retry-on` or :ref:`config_http_filters_router_x-envoy-retry-grpc-on` headers
+are not specified, Envoy will not retry a failed request.
 
 A few notes on how Envoy does retries:
 
@@ -54,9 +54,9 @@ x-envoy-retry-on
 Setting this header on egress requests will cause Envoy to attempt to retry failed requests (number
 of retries defaults to 1 and can be controlled by :ref:`x-envoy-max-retries
 <config_http_filters_router_x-envoy-max-retries>` header or the :ref:`route config retry policy
-<envoy_api_field_route.RouteAction.retry_policy>`). The value to which the x-envoy-retry-on header is
-set indicates the retry policy. One or more policies can be specified using a ',' delimited list.
-The supported policies are:
+<envoy_api_field_route.RouteAction.retry_policy>` or the :ref:`virtual host retry policy <envoy_api_field_route.VirtualHost.retry_policy>`).
+The value to which the x-envoy-retry-on header is set indicates the retry policy. One or more policies
+can be specified using a ',' delimited list. The supported policies are:
 
 5xx
   Envoy will attempt a retry if the upstream server responds with any 5xx response code, or does not
@@ -80,7 +80,8 @@ connect-failure
   * **NOTE:** A connection failure/timeout is a the TCP level, not the request level. This does not
     include upstream request timeouts specified via
     :ref:`config_http_filters_router_x-envoy-upstream-rq-timeout-ms` or via :ref:`route
-    configuration <envoy_api_field_route.RouteAction.retry_policy>`.
+    configuration <envoy_api_field_route.RouteAction.retry_policy>` or via
+    :ref:`virtual host retry policy <envoy_api_field_route.VirtualHost.retry_policy>`.
 
 retriable-4xx
   Envoy will attempt a retry if the upstream server responds with a retriable 4xx response code.
@@ -97,15 +98,17 @@ refused-stream
 
 retriable-status-codes
   Envoy will attempt a retry if the upstream server responds with any response code matching one defined
-  in either :ref:`the retry policy <envoy_api_field_route.RouteAction.RetryPolicy.retriable_status_codes>`
+  in either :ref:`the retry policy <envoy_api_field_route.RetryPolicy.retriable_status_codes>`
   or in the :ref:`config_http_filters_router_x-envoy-retriable-status-codes` header.
 
 The number of retries can be controlled via the
 :ref:`config_http_filters_router_x-envoy-max-retries` header or via the :ref:`route
-configuration <envoy_api_field_route.RouteAction.retry_policy>`.
+configuration <envoy_api_field_route.RouteAction.retry_policy>` or via the
+:ref:`virtual host retry policy <envoy_api_field_route.VirtualHost.retry_policy>`.
 
 Note that retry policies can also be applied at the :ref:`route level
-<envoy_api_field_route.RouteAction.retry_policy>`.
+<envoy_api_field_route.RouteAction.retry_policy>` or the
+:ref:`virtual host level <envoy_api_field_route.VirtualHost.retry_policy>`.
 
 By default, Envoy will *not* perform retries unless you've configured them per above.
 
@@ -116,7 +119,8 @@ x-envoy-retry-grpc-on
 Setting this header on egress requests will cause Envoy to attempt to retry failed requests (number of
 retries defaults to 1, and can be controlled by
 :ref:`x-envoy-max-retries <config_http_filters_router_x-envoy-max-retries>`
-header or the :ref:`route config retry policy <envoy_api_field_route.RouteAction.retry_policy>`).
+header or the :ref:`route config retry policy <envoy_api_field_route.RouteAction.retry_policy>`) or the
+:ref:`virtual host retry policy <envoy_api_field_route.VirtualHost.retry_policy>`.
 gRPC retries are currently only supported for gRPC status codes in response headers. gRPC status codes in
 trailers will not trigger retry logic. One or more policies can be specified  using a ',' delimited
 list. The supported policies are:
@@ -140,7 +144,8 @@ As with the x-envoy-retry-grpc-on header, the number of retries can be controlle
 :ref:`config_http_filters_router_x-envoy-max-retries` header
 
 Note that retry policies can also be applied at the :ref:`route level
-<envoy_api_field_route.RouteAction.retry_policy>`.
+<envoy_api_field_route.RouteAction.retry_policy>` or the
+:ref:`virtual host level <envoy_api_field_route.VirtualHost.retry_policy>`.
 
 By default, Envoy will *not* perform retries unless you've configured them per above.
 
