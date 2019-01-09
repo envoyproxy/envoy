@@ -1,0 +1,32 @@
+licenses(["notice"])  # Apache 2
+
+load(
+    "//bazel:envoy_build_system.bzl",
+    "envoy_cc_library",
+    "envoy_package",
+)
+
+envoy_package()
+
+envoy_cc_library(
+    name = "http2_platform_impl_lib",
+    hdrs = [
+        "http2_arraysize_impl.h",
+        "http2_bug_tracker_impl.h",
+        "http2_containers_impl.h",
+        "http2_estimate_memory_usage_impl.h",
+        "http2_export_impl.h",
+        "http2_flag_utils_impl.h",
+        "http2_flags_impl.h",
+        "http2_macros_impl.h",
+        "http2_mock_log_impl.h",
+        "http2_optional_impl.h",
+        "http2_ptr_util_impl.h",
+        "http2_reconstruct_object_impl.h",
+        "http2_string_impl.h",
+        "http2_string_piece_impl.h",
+        "http2_string_utils_impl.h",
+        "http2_test_helpers_impl.h",
+    ],
+    visibility = ["//visibility:public"],
+)

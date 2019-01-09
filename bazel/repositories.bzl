@@ -297,6 +297,7 @@ def envoy_dependencies(path = "@envoy_deps//", skip_targets = []):
     _com_github_tencent_rapidjson()
     _com_google_googletest()
     _com_google_protobuf()
+    _com_google_quiche()
 
     # Used for bundling gcovr into a relocatable .par file.
     _repository_impl("subpar")
@@ -537,6 +538,16 @@ def _com_google_protobuf():
     native.bind(
         name = "python_headers",
         actual = "@com_google_protobuf//util/python:python_headers",
+    )
+
+def _com_google_quiche():
+    _repository_impl(
+        name = "com_google_quiche",
+        build_file = "@envoy//bazel/external:quiche.BUILD",
+    )
+    native.bind(
+        name = "quiche_http2_platform",
+        actual = "@com_google_quiche//:http2_platform",
     )
 
 def _com_github_grpc_grpc():
