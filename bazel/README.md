@@ -50,7 +50,7 @@ On macOS, you'll need to install several dependencies. This can be accomplished 
 ```
 brew install coreutils wget cmake libtool go bazel automake ninja llvm@7
 ```
-_notes_: `coreutils` is used for realpath, `llvm@7` is used for clang-format 7
+_notes_: `coreutils` is used for `realpath`, `gmd5sum` and `gsha256sum`; `llvm@7` is used for `clang-format`
 
 Envoy compiles and passes tests with the version of clang installed by XCode 9.3.0:
 Apple LLVM version 9.1.0 (clang-902.0.30).
