@@ -69,7 +69,8 @@ LoadBalancerBase::choosePriority(uint64_t hash, const std::vector<uint32_t>& per
     }
   }
 
-  // If no priorities were selected due to health, we'll select a priority based degraded availability.
+  // If no priorities were selected due to health, we'll select a priority based degraded
+  // availability.
   for (size_t priority = 0; priority < degraded_per_priority_load.size(); ++priority) {
     aggregate_percentage_load += degraded_per_priority_load[priority];
     if (hash <= aggregate_percentage_load) {
