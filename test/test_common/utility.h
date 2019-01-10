@@ -362,6 +362,16 @@ private:
   int fd_;
 };
 
+// TODO(sbelair2) Perform the fd close the close of the IoHandle
+class ScopedIoHandleCloser {
+public:
+  ScopedIoHandleCloser(Network::IoHandlePtr& io_handle);
+  ~ScopedIoHandleCloser();
+
+private:
+  Network::IoHandlePtr& io_handle_;
+};
+
 /**
  * A utility class for atomically updating a file using symbolic link swap.
  */

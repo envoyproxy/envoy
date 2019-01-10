@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/network/io_handle.h"
+
 #include "common/common/assert.h"
 
 namespace Envoy {
@@ -21,6 +22,7 @@ public:
 
   // Currently this close() is just for the IoHandle, and the close() system call
   // happens elsewhere. In coming changes, the close() syscall will be made from the IoHandle.
+  // In particular, the close should also close the fd.
   void close() override { fd_ = -1; }
 
 private:

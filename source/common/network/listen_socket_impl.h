@@ -20,6 +20,10 @@ public:
 
   // Network::Socket
   const Address::InstanceConstSharedPtr& localAddress() const override { return local_address_; }
+  void setLocalAddress(const Address::InstanceConstSharedPtr& local_address) override {
+    local_address_ = local_address;
+  }
+
   IoHandle& ioHandle() override { return *io_handle_; }
   const IoHandle& ioHandle() const override { return *io_handle_; }
   void close() override {
@@ -124,10 +128,9 @@ public:
 
   // Network::ConnectionSocket
   const Address::InstanceConstSharedPtr& remoteAddress() const override { return remote_address_; }
-  void setLocalAddress(const Address::InstanceConstSharedPtr& local_address,
-                       bool restored) override {
-    local_address_ = local_address;
-    local_address_restored_ = restored;
+  void restoreLocalAddress(const Address::InstanceConstSharedPtr& local_address) override {
+    setLocalAddress(local_address);
+    local_address_restored_ = true;
   }
   void setRemoteAddress(const Address::InstanceConstSharedPtr& remote_address) override {
     remote_address_ = remote_address;

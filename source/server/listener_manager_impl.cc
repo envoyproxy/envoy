@@ -130,13 +130,13 @@ Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
                                  : Network::Utility::UDP_SCHEME;
   const std::string addr = absl::StrCat(scheme, address->asString());
   const int fd = server_.hotRestart().duplicateParentListenSocket(addr);
-  Network::IoHandlePtr io_handle = std::make_unique<Network::IoSocketHandle>(fd);
-  if (io_handle->fd() != -1) {
+  if (fd != -1) {
     ENVOY_LOG(debug, "obtained socket for address {} from parent", addr);
+    Network::IoHandlePtr io_handle = std::make_unique<Network::IoSocketHandle>(fd);
     if (socket_type == Network::Address::SocketType::Stream) {
       return std::make_shared<Network::TcpListenSocket>(std::move(io_handle), address, options);
     } else {
-      return std::make_shared<Network::UdpListenSocket>(fd, address, options);
+      return std::make_shared<Network::UdpListenSocket>(std::move(io_handle), address, options);
     }
   }
   if (socket_type == Network::Address::SocketType::Stream) {

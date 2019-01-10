@@ -83,7 +83,9 @@ MockDrainDecision::~MockDrainDecision() {}
 MockListenerFilter::MockListenerFilter() {}
 MockListenerFilter::~MockListenerFilter() {}
 
-MockListenerFilterCallbacks::MockListenerFilterCallbacks() {}
+MockListenerFilterCallbacks::MockListenerFilterCallbacks() {
+  ON_CALL(*this, socket()).WillByDefault(ReturnRef(socket_));
+}
 MockListenerFilterCallbacks::~MockListenerFilterCallbacks() {}
 
 MockListenerFilterManager::MockListenerFilterManager() {}
@@ -106,6 +108,7 @@ MockListenSocket::MockListenSocket()
   ON_CALL(*this, localAddress()).WillByDefault(ReturnRef(local_address_));
   ON_CALL(*this, options()).WillByDefault(ReturnRef(options_));
   ON_CALL(*this, ioHandle()).WillByDefault(ReturnRef(*io_handle_));
+  ON_CALL(testing::Const(*this), ioHandle()).WillByDefault(ReturnRef(*io_handle_));
 }
 
 MockListenSocket::~MockListenSocket() { io_handle_->close(); }
@@ -122,6 +125,7 @@ MockConnectionSocket::MockConnectionSocket()
   ON_CALL(*this, localAddress()).WillByDefault(ReturnRef(local_address_));
   ON_CALL(*this, remoteAddress()).WillByDefault(ReturnRef(remote_address_));
   ON_CALL(*this, ioHandle()).WillByDefault(ReturnRef(*io_handle_));
+  ON_CALL(testing::Const(*this), ioHandle()).WillByDefault(ReturnRef(*io_handle_));
 }
 
 MockConnectionSocket::~MockConnectionSocket() { io_handle_->close(); }
