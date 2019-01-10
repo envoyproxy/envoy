@@ -348,7 +348,9 @@ TEST_F(Http1ServerConnectionImplTest, HeaderOnlyResponse) {
   EXPECT_EQ("HTTP/1.1 200 OK\r\ncontent-length: 0\r\n\r\n", output);
 }
 
-TEST_F(Http1ServerConnectionImplTest, MetadataTest) {
+class Http1ServerConnectionImplDeathTest : public Http1ServerConnectionImplTest {};
+
+TEST_F(Http1ServerConnectionImplDeathTest, MetadataTest) {
   initialize();
 
   NiceMock<Http::MockStreamDecoder> decoder;

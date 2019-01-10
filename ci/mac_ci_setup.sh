@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Installs the dependencies required for a Mac OS build via homebrew.
+# Installs the dependencies required for a macOS build via homebrew.
 # Tools are not upgraded to new versions.
 
 function is_installed {

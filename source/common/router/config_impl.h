@@ -50,7 +50,8 @@ public:
 
 class PerFilterConfigs {
 public:
-  PerFilterConfigs(const Protobuf::Map<ProtobufTypes::String, ProtobufWkt::Struct>& configs,
+  PerFilterConfigs(const Protobuf::Map<ProtobufTypes::String, ProtobufWkt::Any>& typed_configs,
+                   const Protobuf::Map<ProtobufTypes::String, ProtobufWkt::Struct>& configs,
                    Server::Configuration::FactoryContext& factory_context);
 
   const RouteSpecificFilterConfig* get(const std::string& name) const;
@@ -94,7 +95,7 @@ private:
  */
 class CorsPolicyImpl : public CorsPolicy {
 public:
-  CorsPolicyImpl(const envoy::api::v2::route::CorsPolicy& config);
+  CorsPolicyImpl(const envoy::api::v2::route::CorsPolicy& config, Runtime::Loader& loader);
 
   // Router::CorsPolicy
   const std::list<std::string>& allowOrigins() const override { return allow_origin_; };
@@ -104,9 +105,26 @@ public:
   const std::string& exposeHeaders() const override { return expose_headers_; };
   const std::string& maxAge() const override { return max_age_; };
   const absl::optional<bool>& allowCredentials() const override { return allow_credentials_; };
-  bool enabled() const override { return enabled_; };
+  bool enabled() const override {
+    if (config_.has_filter_enabled()) {
+      const auto& filter_enabled = config_.filter_enabled();
+      return loader_.snapshot().featureEnabled(filter_enabled.runtime_key(),
+                                               filter_enabled.default_value());
+    }
+    return legacy_enabled_;
+  };
+  bool shadowEnabled() const override {
+    if (config_.has_shadow_enabled()) {
+      const auto& shadow_enabled = config_.shadow_enabled();
+      return loader_.snapshot().featureEnabled(shadow_enabled.runtime_key(),
+                                               shadow_enabled.default_value());
+    }
+    return false;
+  };
 
 private:
+  const envoy::api::v2::route::CorsPolicy config_;
+  Runtime::Loader& loader_;
   std::list<std::string> allow_origin_;
   std::list<std::regex> allow_origin_regex_;
   std::string allow_methods_;
@@ -114,7 +132,7 @@ private:
   std::string expose_headers_;
   std::string max_age_{};
   absl::optional<bool> allow_credentials_{};
-  bool enabled_;
+  bool legacy_enabled_;
 };
 
 class ConfigImpl;
@@ -141,6 +159,9 @@ public:
   const Config& routeConfig() const override;
   const RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override;
   bool includeAttemptCount() const override { return include_attempt_count_; }
+  const absl::optional<envoy::api::v2::route::RetryPolicy>& retryPolicy() const {
+    return retry_policy_;
+  }
 
 private:
   enum class SslRequirements { NONE, EXTERNAL_ONLY, ALL };
@@ -178,17 +199,19 @@ private:
   HeaderParserPtr response_headers_parser_;
   PerFilterConfigs per_filter_configs_;
   const bool include_attempt_count_;
+  absl::optional<envoy::api::v2::route::RetryPolicy> retry_policy_;
 };
 
 typedef std::shared_ptr<VirtualHostImpl> VirtualHostSharedPtr;
 
 /**
- * Implementation of RetryPolicy that reads from the proto route config.
+ * Implementation of RetryPolicy that reads from the proto route or virtual host config.
  */
 class RetryPolicyImpl : public RetryPolicy {
 
 public:
-  RetryPolicyImpl(const envoy::api::v2::route::RouteAction& config);
+  RetryPolicyImpl(const envoy::api::v2::route::RetryPolicy& retry_policy);
+  RetryPolicyImpl() {}
 
   // Router::RetryPolicy
   std::chrono::milliseconds perTryTimeout() const override { return per_try_timeout_; }
@@ -526,6 +549,10 @@ private:
   static DecoratorConstPtr parseDecorator(const envoy::api::v2::route::Route& route);
 
   bool evaluateRuntimeMatch(const uint64_t random_value) const;
+
+  RetryPolicyImpl
+  buildRetryPolicy(const absl::optional<envoy::api::v2::route::RetryPolicy>& vhost_retry_policy,
+                   const envoy::api::v2::route::RouteAction& route_config) const;
 
   // Default timeout is 15s if nothing is specified in the route config.
   static const uint64_t DEFAULT_ROUTE_TIMEOUT_MS = 15000;

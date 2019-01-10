@@ -134,6 +134,11 @@ public:
    * @return bool Whether CORS is enabled for the route or virtual host.
    */
   virtual bool enabled() const PURE;
+
+  /**
+   * @return bool Whether CORS policies are evaluated when filter is off.
+   */
+  virtual bool shadowEnabled() const PURE;
 };
 
 /**
@@ -201,7 +206,7 @@ public:
 /**
  * RetryStatus whether request should be retried or not.
  */
-enum class RetryStatus { No, NoOverflow, Yes };
+enum class RetryStatus { No, NoOverflow, NoRetryLimitExceeded, Yes };
 
 /**
  * InternalRedirectAction from the route configuration.

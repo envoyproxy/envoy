@@ -1,6 +1,8 @@
 syntax = "proto3";
 
 package envoy.config.transport_socket.capture.v2alpha;
+option java_package = "io.envoyproxy.envoy.config.transport_socket.capture.v2alpha";
+option java_multiple_files = true;
 option go_package = "v2";
 
 // [#protodoc-title: Capture]

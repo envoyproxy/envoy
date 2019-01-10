@@ -5,7 +5,7 @@ namespace Envoy {
 class RedirectIntegrationTest : public HttpProtocolIntegrationTest {
 public:
   void initialize() override {
-    envoy::api::v2::route::RouteAction::RetryPolicy retry_policy;
+    envoy::api::v2::route::RetryPolicy retry_policy;
 
     config_helper_.addRoute("pass.through.internal.redirect", "/", "cluster_0", false,
                             envoy::api::v2::route::RouteAction::NOT_FOUND,

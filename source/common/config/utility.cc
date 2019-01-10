@@ -32,8 +32,9 @@ void Utility::translateApiConfigSource(const std::string& cluster, uint32_t refr
     envoy::api::v2::core::GrpcService* grpc_service = api_config_source.add_grpc_services();
     grpc_service->mutable_envoy_grpc()->set_cluster_name(cluster);
   } else {
-    if (api_type == ApiType::get().RestLegacy) {
-      api_config_source.set_api_type(envoy::api::v2::core::ApiConfigSource::REST_LEGACY);
+    if (api_type == ApiType::get().UnsupportedRestLegacy) {
+      api_config_source.set_api_type(
+          envoy::api::v2::core::ApiConfigSource::UNSUPPORTED_REST_LEGACY);
     } else if (api_type == ApiType::get().Rest) {
       api_config_source.set_api_type(envoy::api::v2::core::ApiConfigSource::REST);
     }
@@ -144,7 +145,7 @@ void Utility::checkApiConfigSourceSubscriptionBackingCluster(
       (api_config_source.api_type() == envoy::api::v2::core::ApiConfigSource::GRPC);
 
   if (!api_config_source.cluster_names().empty()) {
-    // All API configs of type REST and REST_LEGACY should have cluster names.
+    // All API configs of type REST and UNSUPPORTED_REST_LEGACY should have cluster names.
     // Additionally, some gRPC API configs might have a cluster name set instead
     // of an envoy gRPC.
     Utility::validateClusterName(clusters, api_config_source.cluster_names()[0]);
@@ -176,19 +177,11 @@ std::chrono::milliseconds Utility::apiConfigSourceRequestTimeout(
       PROTOBUF_GET_MS_OR_DEFAULT(api_config_source, request_timeout, 1000));
 }
 
-void Utility::translateEdsConfig(const Json::Object& json_config,
-                                 envoy::api::v2::core::ConfigSource& eds_config) {
-  translateApiConfigSource(json_config.getObject("cluster")->getString("name"),
-                           json_config.getInteger("refresh_delay_ms", 30000),
-                           json_config.getString("api_type", ApiType::get().RestLegacy),
-                           *eds_config.mutable_api_config_source());
-}
-
 void Utility::translateCdsConfig(const Json::Object& json_config,
                                  envoy::api::v2::core::ConfigSource& cds_config) {
   translateApiConfigSource(json_config.getObject("cluster")->getString("name"),
                            json_config.getInteger("refresh_delay_ms", 30000),
-                           json_config.getString("api_type", ApiType::get().RestLegacy),
+                           json_config.getString("api_type", ApiType::get().UnsupportedRestLegacy),
                            *cds_config.mutable_api_config_source());
 }
 
@@ -204,7 +197,7 @@ void Utility::translateRdsConfig(
 
   translateApiConfigSource(json_rds.getString("cluster"),
                            json_rds.getInteger("refresh_delay_ms", 30000),
-                           json_rds.getString("api_type", ApiType::get().RestLegacy),
+                           json_rds.getString("api_type", ApiType::get().UnsupportedRestLegacy),
                            *rds.mutable_config_source()->mutable_api_config_source());
 }
 
@@ -213,7 +206,7 @@ void Utility::translateLdsConfig(const Json::Object& json_lds,
   json_lds.validateSchema(Json::Schema::LDS_CONFIG_SCHEMA);
   translateApiConfigSource(json_lds.getString("cluster"),
                            json_lds.getInteger("refresh_delay_ms", 30000),
-                           json_lds.getString("api_type", ApiType::get().RestLegacy),
+                           json_lds.getString("api_type", ApiType::get().UnsupportedRestLegacy),
                            *lds_config.mutable_api_config_source());
 }
 
@@ -280,6 +273,37 @@ envoy::api::v2::ClusterLoadAssignment Utility::translateClusterHosts(
     lb_endpoint->mutable_load_balancing_weight()->set_value(1);
   }
   return load_assignment;
+}
+
+void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
+                                    const ProtobufWkt::Struct& config,
+                                    Protobuf::Message& out_proto) {
+  static const std::string& struct_type =
+      ProtobufWkt::Struct::default_instance().GetDescriptor()->full_name();
+
+  if (!typed_config.value().empty()) {
+
+    // Unpack methods will only use the fully qualified type name after the last '/'.
+    // https://github.com/protocolbuffers/protobuf/blob/3.6.x/src/google/protobuf/any.proto#L87
+    absl::string_view type = typed_config.type_url();
+    size_t pos = type.find_last_of('/');
+    if (pos != absl::string_view::npos) {
+      type = type.substr(pos + 1);
+    }
+
+    // out_proto is expecting Struct, unpack directly
+    if (type != struct_type || out_proto.GetDescriptor()->full_name() == struct_type) {
+      typed_config.UnpackTo(&out_proto);
+    } else {
+      ProtobufWkt::Struct struct_config;
+      typed_config.UnpackTo(&struct_config);
+      MessageUtil::jsonConvert(struct_config, out_proto);
+    }
+  }
+
+  if (!config.fields().empty()) {
+    MessageUtil::jsonConvert(config, out_proto);
+  }
 }
 
 } // namespace Config
