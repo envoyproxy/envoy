@@ -106,7 +106,7 @@ protected:
 
 // Exercises death by passing bad initialization params or by calling
 // compress before init.
-TEST_F(ZlibCompressorImplDeathTest, CompressorTestDeath) {
+TEST_F(ZlibCompressorImplDeathTest, CompressorDeathTest) {
   EXPECT_DEATH_LOG_TO_STDERR(compressorBadInitTestHelper(100, 8), "assert failure: result >= 0");
   EXPECT_DEATH_LOG_TO_STDERR(compressorBadInitTestHelper(31, 10), "assert failure: result >= 0");
   EXPECT_DEATH_LOG_TO_STDERR(uninitializedCompressorTestHelper(), "assert failure: result == Z_OK");

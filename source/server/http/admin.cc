@@ -37,9 +37,9 @@
 #include "common/common/version.h"
 #include "common/html/utility.h"
 #include "common/http/codes.h"
+#include "common/http/conn_manager_utility.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
-#include "common/http/http1/codec_impl.h"
 #include "common/json/json_loader.h"
 #include "common/memory/stats.h"
 #include "common/network/listen_socket_impl.h"
@@ -192,7 +192,13 @@ Http::FilterHeadersStatus AdminFilter::decodeHeaders(Http::HeaderMap& headers, b
   return Http::FilterHeadersStatus::StopIteration;
 }
 
-Http::FilterDataStatus AdminFilter::decodeData(Buffer::Instance&, bool end_stream) {
+Http::FilterDataStatus AdminFilter::decodeData(Buffer::Instance& data, bool end_stream) {
+  // Currently we generically buffer all admin request data in case a handler wants to use it.
+  // If we ever support streaming admin requests we may need to revisit this. Note, we must use
+  // addDecodedData() here since we might need to perform onComplete() processing if end_stream is
+  // true.
+  callbacks_->addDecodedData(data, false);
+
   if (end_stream) {
     onComplete();
   }
@@ -219,6 +225,8 @@ Http::StreamDecoderFilterCallbacks& AdminFilter::getDecoderFilterCallbacks() con
   ASSERT(callbacks_ != nullptr);
   return *callbacks_;
 }
+
+const Buffer::Instance* AdminFilter::getRequestBody() const { return callbacks_->decodingBuffer(); }
 
 const Http::HeaderMap& AdminFilter::getRequestHeaders() const {
   ASSERT(request_headers_ != nullptr);
@@ -1048,10 +1056,10 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
       admin_filter_chain_(std::make_shared<AdminFilterChain>()) {}
 
 Http::ServerConnectionPtr AdminImpl::createCodec(Network::Connection& connection,
-                                                 const Buffer::Instance&,
+                                                 const Buffer::Instance& data,
                                                  Http::ServerConnectionCallbacks& callbacks) {
-  return Http::ServerConnectionPtr{
-      new Http::Http1::ServerConnectionImpl(connection, callbacks, Http::Http1Settings())};
+  return Http::ConnectionManagerUtility::autoCreateCodec(
+      connection, data, callbacks, server_.stats(), Http::Http1Settings(), Http::Http2Settings());
 }
 
 bool AdminImpl::createNetworkFilterChain(Network::Connection& connection,

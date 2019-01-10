@@ -233,9 +233,8 @@ message Cluster {
   // for upstream connections. The key should match the extension filter name, such as
   // "envoy.filters.network.thrift_proxy". See the extension's documentation for details on
   // specific options.
-  map<string, google.protobuf.Struct> extension_protocol_options = 35;
+  map<string, google.protobuf.Struct> extension_protocol_options = 35 [deprecated = true];
 
-  // [#not-implemented-hide:]
   // The extension_protocol_options field is used to provide extension-specific protocol options
   // for upstream connections. The key should match the extension filter name, such as
   // "envoy.filters.network.thrift_proxy". See the extension's documentation for details on

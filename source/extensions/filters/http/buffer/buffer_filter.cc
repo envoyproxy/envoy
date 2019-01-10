@@ -1,7 +1,6 @@
 #include "extensions/filters/http/buffer/buffer_filter.h"
 
 #include "envoy/event/dispatcher.h"
-#include "envoy/event/timer.h"
 #include "envoy/http/codes.h"
 #include "envoy/stats/scope.h"
 
@@ -22,9 +21,7 @@ namespace BufferFilter {
 BufferFilterSettings::BufferFilterSettings(
     const envoy::config::filter::http::buffer::v2::Buffer& proto_config)
     : disabled_(false),
-      max_request_bytes_(static_cast<uint64_t>(proto_config.max_request_bytes().value())),
-      max_request_time_(std::chrono::seconds(
-          DurationUtil::durationToSeconds((proto_config).max_request_time()))) {}
+      max_request_bytes_(static_cast<uint64_t>(proto_config.max_request_bytes().value())) {}
 
 BufferFilterSettings::BufferFilterSettings(
     const envoy::config::filter::http::buffer::v2::BufferPerRoute& proto_config)
@@ -32,11 +29,7 @@ BufferFilterSettings::BufferFilterSettings(
       max_request_bytes_(
           proto_config.has_buffer()
               ? static_cast<uint64_t>(proto_config.buffer().max_request_bytes().value())
-              : 0),
-      max_request_time_(std::chrono::seconds(
-          proto_config.has_buffer()
-              ? DurationUtil::durationToSeconds(proto_config.buffer().max_request_time())
-              : 0)) {}
+              : 0) {}
 
 BufferFilterConfig::BufferFilterConfig(
     const envoy::config::filter::http::buffer::v2::Buffer& proto_config,
@@ -81,10 +74,6 @@ Http::FilterHeadersStatus BufferFilter::decodeHeaders(Http::HeaderMap&, bool end
   }
 
   callbacks_->setDecoderBufferLimit(settings_->maxRequestBytes());
-  request_timeout_ = callbacks_->dispatcher().createTimer([this]() -> void { onRequestTimeout(); });
-  if (settings_->maxRequestTime().count() != 0) {
-    request_timeout_->enableTimer(settings_->maxRequestTime());
-  }
 
   return Http::FilterHeadersStatus::StopIteration;
 }
@@ -110,12 +99,6 @@ BufferFilterStats BufferFilter::generateStats(const std::string& prefix, Stats::
 }
 
 void BufferFilter::onDestroy() { resetInternalState(); }
-
-void BufferFilter::onRequestTimeout() {
-  callbacks_->sendLocalReply(Http::Code::RequestTimeout, "buffer request timeout", nullptr,
-                             absl::nullopt);
-  config_->stats().rq_timeout_.inc();
-}
 
 void BufferFilter::resetInternalState() { request_timeout_.reset(); }
 

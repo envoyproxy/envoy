@@ -26,10 +26,10 @@ class LdsApiTest : public testing::Test {
 public:
   LdsApiTest() : request_(&cluster_manager_.async_client_) {}
 
-  void setup(bool v2_rest = false) {
-    v2_rest_ = v2_rest;
+  void setup() {
     const std::string config_json = R"EOF(
     {
+      "api_type": "REST",
       "cluster": "foo_cluster",
       "refresh_delay_ms": 1000
     }
@@ -38,10 +38,8 @@ public:
     Json::ObjectSharedPtr config = Json::Factory::loadFromString(config_json);
     envoy::api::v2::core::ConfigSource lds_config;
     Config::Utility::translateLdsConfig(*config, lds_config);
-    if (v2_rest) {
-      lds_config.mutable_api_config_source()->set_api_type(
-          envoy::api::v2::core::ApiConfigSource::REST);
-    }
+    lds_config.mutable_api_config_source()->set_api_type(
+        envoy::api::v2::core::ApiConfigSource::REST);
     Upstream::ClusterManager::ClusterInfoMap cluster_map;
     Upstream::MockCluster cluster;
     cluster_map.emplace("foo_cluster", cluster);
@@ -86,9 +84,8 @@ public:
                        const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
               EXPECT_EQ(
                   (Http::TestHeaderMapImpl{
-                      {":method", v2_rest_ ? "POST" : "GET"},
-                      {":path", v2_rest_ ? "/v2/discovery:listeners"
-                                         : "/v1/listeners/cluster_name/node_name"},
+                      {":method", "POST"},
+                      {":path", "/v2/discovery:listeners"},
                       {":authority", "foo_cluster"},
                       {"content-type", "application/json"},
                       {"content-length",
@@ -110,7 +107,6 @@ public:
     EXPECT_CALL(listener_manager_, listeners()).WillOnce(Return(refs));
   }
 
-  bool v2_rest_{};
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
   Event::MockDispatcher dispatcher_;
   NiceMock<Runtime::MockRandomGenerator> random_;
@@ -131,7 +127,7 @@ private:
 TEST_F(LdsApiTest, ValidateFail) {
   InSequence s;
 
-  setup(true);
+  setup();
 
   Protobuf::RepeatedPtrField<envoy::api::v2::Listener> listeners;
   listeners.Add();
@@ -143,6 +139,7 @@ TEST_F(LdsApiTest, ValidateFail) {
 TEST_F(LdsApiTest, UnknownCluster) {
   const std::string config_json = R"EOF(
   {
+    "api_type": "REST",
     "cluster": "foo_cluster",
     "refresh_delay_ms": 1000
   }
@@ -165,7 +162,7 @@ TEST_F(LdsApiTest, UnknownCluster) {
 TEST_F(LdsApiTest, MisconfiguredListenerNameIsPresentInException) {
   InSequence s;
 
-  setup(true);
+  setup();
 
   Protobuf::RepeatedPtrField<envoy::api::v2::Listener> listeners;
   std::vector<std::reference_wrapper<Network::ListenerConfig>> existing_listeners;
@@ -192,7 +189,7 @@ TEST_F(LdsApiTest, MisconfiguredListenerNameIsPresentInException) {
 TEST_F(LdsApiTest, ValidateDuplicateListeners) {
   InSequence s;
 
-  setup(true);
+  setup();
 
   Protobuf::RepeatedPtrField<envoy::api::v2::Listener> listeners;
   auto* listener_1 = listeners.Add();
@@ -210,6 +207,7 @@ TEST_F(LdsApiTest, BadLocalInfo) {
   interval_timer_ = new Event::MockTimer(&dispatcher_);
   const std::string config_json = R"EOF(
   {
+    "api_type": "REST",
     "cluster": "foo_cluster",
     "refresh_delay_ms": 1000
   }
@@ -240,53 +238,59 @@ TEST_F(LdsApiTest, Basic) {
   setup();
 
   const std::string response1_json = R"EOF(
-  {
-    "listeners": [
+{
+  "version_info": "0",
+  "resources": [
     {
+      "@type": "type.googleapis.com/envoy.api.v2.Listener",
       "name": "listener1",
-      "address": "tcp://0.0.0.0:1",
-      "filters": []
+      "address": { "socket_address": { "address": "tcp://0.0.0.1", "port_value": 0 } },
+      "filter_chains": [ { "filters": null } ]
     },
     {
+      "@type": "type.googleapis.com/envoy.api.v2.Listener",
       "name": "listener2",
-      "address": "tcp://0.0.0.0:2",
-      "filters": []
+      "address": { "socket_address": { "address": "tcp://0.0.0.2", "port_value": 0 } },
+      "filter_chains": [ { "filters": null } ]
     }
-    ]
-  }
-  )EOF";
+  ]
+}
+)EOF";
 
   Http::MessagePtr message(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
   message->body() = std::make_unique<Buffer::OwnedImpl>(response1_json);
 
   makeListenersAndExpectCall({});
-  expectAdd("listener1", "hash_d5b83398260abbbc", true);
-  expectAdd("listener2", "hash_d5b83398260abbbc", true);
+  expectAdd("listener1", "0", true);
+  expectAdd("listener2", "0", true);
   EXPECT_CALL(init_.initialized_, ready());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
 
-  EXPECT_EQ(Config::Utility::computeHashedVersion(response1_json).first, lds_->versionInfo());
-  EXPECT_EQ(15400115654359694268U, store_.gauge("listener_manager.lds.version").value());
+  EXPECT_EQ("0", lds_->versionInfo());
+  EXPECT_EQ(7148434200721666028U, store_.gauge("listener_manager.lds.version").value());
   expectRequest();
   interval_timer_->callback_();
 
   const std::string response2_json = R"EOF(
-  {
-    "listeners": [
+{
+  "version_info": "1",
+  "resources": [
     {
+      "@type": "type.googleapis.com/envoy.api.v2.Listener",
       "name": "listener1",
-      "address": "tcp://0.0.0.0:1",
-      "filters": []
+      "address": { "socket_address": { "address": "tcp://0.0.0.1", "port_value": 0 } },
+      "filter_chains": [ { "filters": null } ]
     },
     {
+      "@type": "type.googleapis.com/envoy.api.v2.Listener",
       "name": "listener3",
-      "address": "tcp://0.0.0.0:3",
-      "filters": []
+      "address": { "socket_address": { "address": "tcp://0.0.0.3", "port_value": 0 } },
+      "filter_chains": [ { "filters": null } ]
     }
-    ]
-  }
+  ]
+}
   )EOF";
 
   message = std::make_unique<Http::ResponseMessageImpl>(
@@ -295,15 +299,15 @@ TEST_F(LdsApiTest, Basic) {
 
   makeListenersAndExpectCall({"listener1", "listener2"});
   EXPECT_CALL(listener_manager_, removeListener("listener2")).WillOnce(Return(true));
-  expectAdd("listener1", "hash_fabfe23d041792d3", false);
-  expectAdd("listener3", "hash_fabfe23d041792d3", true);
+  expectAdd("listener1", "1", false);
+  expectAdd("listener3", "1", true);
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
-  EXPECT_EQ(Config::Utility::computeHashedVersion(response2_json).first, lds_->versionInfo());
+  EXPECT_EQ("1", lds_->versionInfo());
 
   EXPECT_EQ(2UL, store_.counter("listener_manager.lds.update_attempt").value());
   EXPECT_EQ(2UL, store_.counter("listener_manager.lds.update_success").value());
-  EXPECT_EQ(18068408981723255507U, store_.gauge("listener_manager.lds.version").value());
+  EXPECT_EQ(13237225503670494420U, store_.gauge("listener_manager.lds.version").value());
 }
 
 // Regression test issue #2188 where an empty ca_cert_file field was created and caused the LDS
@@ -314,54 +318,53 @@ TEST_F(LdsApiTest, TlsConfigWithoutCaCert) {
   setup();
 
   std::string response1_json = R"EOF(
-  {
-    "listeners": [
-    ]
-  }
+{
+  "version_info": "1",
+  "resources": [
+    {
+      "@type": "type.googleapis.com/envoy.api.v2.Listener",
+      "name": "listener0",
+      "address": { "socket_address": { "address": "tcp://0.0.0.1", "port_value": 61000 } },
+      "filter_chains": [ { "filters": null } ]
+    }
+  ]
+}
   )EOF";
 
   Http::MessagePtr message(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
   message->body() = std::make_unique<Buffer::OwnedImpl>(response1_json);
 
-  makeListenersAndExpectCall({});
+  makeListenersAndExpectCall({"listener0"});
+  expectAdd("listener0", {}, true);
   EXPECT_CALL(init_.initialized_, ready());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
 
-  EXPECT_EQ(Config::Utility::computeHashedVersion(response1_json).first, lds_->versionInfo());
   expectRequest();
   interval_timer_->callback_();
 
   std::string response2_basic = R"EOF(
-  {{
-   "listeners" : [
-         {{
-         "ssl_context" : {{
-            "cipher_suites" : "[ECDHE-RSA-AES256-GCM-SHA384|ECDHE-RSA-AES128-GCM-SHA256]",
-            "cert_chain_file" : "{}",
-            "private_key_file" : "{}"
-         }},
-         "address" : "tcp://0.0.0.0:61001",
-         "name" : "listener-8080",
-         "filters" : [
-            {{
-               "config" : {{
-                  "stat_prefix" : "ingress_tcp-9534127d-306e-49b5-5158-9688cf1cd33b",
-                  "route_config" : {{
-                     "routes" : [
-                        {{
-                           "cluster" : "0-service-cluster"
-                        }}
-                     ]
-                  }}
-               }},
-               "name" : "tcp_proxy"
+{{
+  "version_info": "1",
+  "resources": [
+    {{
+      "@type": "type.googleapis.com/envoy.api.v2.Listener",
+      "name": "listener-8080",
+      "address": {{ "socket_address": {{ "address": "tcp://0.0.0.0", "port_value": 61001 }} }},
+      "filter_chains": [ {{
+        "tls_context": {{
+           "common_tls_context": {{
+             "tls_certificates": [ {{
+               "certificate_chain": {{ "filename": "{}" }},
+               "private_key": {{ "filename": "{}" }}
+              }} ]
             }}
-         ]
-      }}
-   ]
-  }}
+        }},
+        "filters": null }} ]
+    }}
+  ]
+}}
   )EOF";
   std::string response2_json =
       fmt::format(response2_basic,
@@ -378,7 +381,6 @@ TEST_F(LdsApiTest, TlsConfigWithoutCaCert) {
   expectAdd("listener-8080", {}, true);
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   EXPECT_NO_THROW(callbacks_->onSuccess(std::move(message)));
-  EXPECT_EQ(Config::Utility::computeHashedVersion(response2_json).first, lds_->versionInfo());
 }
 
 TEST_F(LdsApiTest, Failure) {
@@ -386,10 +388,26 @@ TEST_F(LdsApiTest, Failure) {
 
   setup();
 
+  // To test the case of valid JSON with invalid config, create 2 listeners with
+  // the same name.
   const std::string response_json = R"EOF(
-  {
-    "listeners" : {}
-  }
+{
+  "version_info": "1",
+  "resources": [
+    {
+      "@type": "type.googleapis.com/envoy.api.v2.Listener",
+      "name": "listener1",
+      "address": { "socket_address": { "address": "tcp://0.0.0.1", "port_value": 0 } },
+      "filter_chains": [ { "filters": null } ]
+    },
+    {
+      "@type": "type.googleapis.com/envoy.api.v2.Listener",
+      "name": "listener1",
+      "address": { "socket_address": { "address": "tcp://0.0.0.3", "port_value": 0 } },
+      "filter_chains": [ { "filters": null } ]
+    }
+  ]
+}
   )EOF";
 
   Http::MessagePtr message(new Http::ResponseMessageImpl(
@@ -420,54 +438,60 @@ TEST_F(LdsApiTest, ReplacingListenerWithSameAddress) {
   setup();
 
   const std::string response1_json = R"EOF(
-  {
-    "listeners": [
+{
+  "version_info": "0",
+  "resources": [
     {
+      "@type": "type.googleapis.com/envoy.api.v2.Listener",
       "name": "listener1",
-      "address": "tcp://0.0.0.0:1",
-      "filters": []
+      "address": { "socket_address": { "address": "tcp://0.0.0.1", "port_value": 0 } },
+      "filter_chains": [ { "filters": null } ]
     },
     {
+      "@type": "type.googleapis.com/envoy.api.v2.Listener",
       "name": "listener2",
-      "address": "tcp://0.0.0.0:2",
-      "filters": []
+      "address": { "socket_address": { "address": "tcp://0.0.0.2", "port_value": 0 } },
+      "filter_chains": [ { "filters": null } ]
     }
-    ]
-  }
-  )EOF";
+  ]
+}
+)EOF";
 
   Http::MessagePtr message(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
   message->body() = std::make_unique<Buffer::OwnedImpl>(response1_json);
 
   makeListenersAndExpectCall({});
-  expectAdd("listener1", "hash_d5b83398260abbbc", true);
-  expectAdd("listener2", "hash_d5b83398260abbbc", true);
+  expectAdd("listener1", "0", true);
+  expectAdd("listener2", "0", true);
   EXPECT_CALL(init_.initialized_, ready());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
 
-  EXPECT_EQ(Config::Utility::computeHashedVersion(response1_json).first, lds_->versionInfo());
-  EXPECT_EQ(15400115654359694268U, store_.gauge("listener_manager.lds.version").value());
+  EXPECT_EQ("0", lds_->versionInfo());
+  EXPECT_EQ(7148434200721666028U, store_.gauge("listener_manager.lds.version").value());
   expectRequest();
   interval_timer_->callback_();
 
   const std::string response2_json = R"EOF(
-  {
-    "listeners": [
+{
+  "version_info": "1",
+  "resources": [
     {
+      "@type": "type.googleapis.com/envoy.api.v2.Listener",
       "name": "listener1",
-      "address": "tcp://0.0.0.0:1",
-      "filters": []
+      "address": { "socket_address": { "address": "tcp://0.0.0.1", "port_value": 0 } },
+      "filter_chains": [ { "filters": null } ]
     },
     {
+      "@type": "type.googleapis.com/envoy.api.v2.Listener",
       "name": "listener3",
-      "address": "tcp://0.0.0.0:2",
-      "filters": []
+      "address": { "socket_address": { "address": "tcp://0.0.0.2", "port_value": 0 } },
+      "filter_chains": [ { "filters": null } ]
     }
-    ]
-  }
-  )EOF";
+  ]
+}
+)EOF";
 
   message = std::make_unique<Http::ResponseMessageImpl>(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}});
@@ -475,15 +499,15 @@ TEST_F(LdsApiTest, ReplacingListenerWithSameAddress) {
 
   makeListenersAndExpectCall({"listener1", "listener2"});
   EXPECT_CALL(listener_manager_, removeListener("listener2")).WillOnce(Return(true));
-  expectAdd("listener1", "hash_16e261d4c65402a2", false);
-  expectAdd("listener3", "hash_16e261d4c65402a2", true);
+  expectAdd("listener1", "1", false);
+  expectAdd("listener3", "1", true);
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
 
-  EXPECT_EQ(Config::Utility::computeHashedVersion(response2_json).first, lds_->versionInfo());
+  EXPECT_EQ("1", lds_->versionInfo());
   EXPECT_EQ(2UL, store_.counter("listener_manager.lds.update_attempt").value());
   EXPECT_EQ(2UL, store_.counter("listener_manager.lds.update_success").value());
-  EXPECT_EQ(1648987980059378338U, store_.gauge("listener_manager.lds.version").value());
+  EXPECT_EQ(13237225503670494420U, store_.gauge("listener_manager.lds.version").value());
 }
 
 } // namespace Server
