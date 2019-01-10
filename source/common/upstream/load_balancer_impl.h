@@ -73,10 +73,10 @@ protected:
   std::pair<HostSet&, HostAvailability> chooseHostSet(LoadBalancerContext* context);
 
   uint32_t percentageLoad(uint32_t priority) const {
-    return healthy_per_priority_load_.get()[priority];
+    return per_priority_load_.healthy_priority_load_.get()[priority];
   }
   uint32_t percentageDegradedLoad(uint32_t priority) const {
-    return degraded_per_priority_load_.get()[priority];
+    return per_priority_load_.degraded_priority_load_.get()[priority];
   }
   bool isInPanic(uint32_t priority) const { return per_priority_panic_[priority]; }
 
@@ -92,8 +92,7 @@ public:
   // per_priority_health for that priority level, and may update per_priority_load for all
   // priority levels.
   void static recalculatePerPriorityState(uint32_t priority, const PrioritySet& priority_set,
-                                          HealthyLoad& healthy_priority_load,
-                                          DegradedLoad& degraded_priority_load,
+                                          HealthyAndDegradedLoad& priority_load,
                                           HealthyAvailability& per_priority_health,
                                           DegradedAvailability& per_priority_degraded);
   void recalculatePerPriorityPanic();
@@ -119,10 +118,9 @@ protected:
 
     return std::min<uint32_t>(health + degraded, 100);
   }
-  // The percentage load (0-100) for each priority level when targeting healthy hosts.
-  HealthyLoad healthy_per_priority_load_;
-  // The percentage load (0-100) for each priority level when targeting degraded hosts.
-  DegradedLoad degraded_per_priority_load_;
+  // The percentage load (0-100) for each priority level when targeting healthy hosts and
+  // the percentage load (0-100) for each priority level when targeting degraded hosts.
+  HealthyAndDegradedLoad per_priority_load_;
   // The health percentage (0-100) for each priority level.
   HealthyAvailability per_priority_health_;
   // The degraded percentage (0-100) for each priority level.
@@ -141,8 +139,9 @@ public:
 
   const Http::HeaderMap* downstreamHeaders() const override { return nullptr; }
 
-  const HealthyLoad& determinePriorityLoad(const PrioritySet&,
-                                           const HealthyLoad& original_priority_load) override {
+  const HealthyAndDegradedLoad&
+  determinePriorityLoad(const PrioritySet&,
+                        const HealthyAndDegradedLoad& original_priority_load) override {
     return original_priority_load;
   }
 

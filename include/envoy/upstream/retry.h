@@ -22,11 +22,13 @@ public:
    *
    * @param priority_set current priority set of cluster.
    * @param original_priority the unmodified PriorityLoad.
-   * @return a reference to the PriorityLoad to use. Return original_priority if no changes should
-   * be made.
+   * @param original_degraded_priority the unmodified PriorityLoad.
+   * @return a pair of PriorityLoads to use, health on left, degraded on right. Return
+   * a pointer to riginal_priority, original_degraded_priority if no changes should be made.
    */
-  virtual const HealthyLoad& determinePriorityLoad(const PrioritySet& priority_set,
-                                                   const HealthyLoad& original_priority) PURE;
+  virtual const HealthyAndDegradedLoad&
+  determinePriorityLoad(const PrioritySet& priority_set,
+                        const HealthyAndDegradedLoad& original_priority_load) PURE;
 
   /**
    * Called after a host has been attempted but before host selection for the next attempt has
