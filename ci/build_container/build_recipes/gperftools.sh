@@ -15,4 +15,6 @@ tar xf gperftools-"$VERSION".tar.gz
 cd gperftools-"$VERSION"
 
 LDFLAGS="-lpthread" ./configure --prefix="$THIRDPARTY_BUILD" --enable-shared=no --enable-frame-pointers --disable-libunwind
-make V=1 install
+
+# Don't build tests, since malloc_extension_c_test hardcodes -lstdc++, which breaks build when linking against libc++.
+make V=1 install-libLTLIBRARIES install-perftoolsincludeHEADERS

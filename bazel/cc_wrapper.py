@@ -26,24 +26,11 @@ def sanitize_flagfile(in_path, out_fd):
 def main():
   compiler = envoy_real_cc
 
-  # Debian's packaging of Clang requires `-no-canonical-prefixes` to print
-  # consistent include paths, but Bazel 0.10 only sets that option at compile
-  # time. We inject it here for the configuration of `@local_config_cc//`.
-  #
-  # https://github.com/bazelbuild/bazel/issues/3977
-  # https://github.com/bazelbuild/bazel/issues/4572
-  # https://bazel-review.googlesource.com/c/bazel/+/39951
-  if sys.argv[1:] == ["-E", "-xc++", "-", "-v"] and "clang" in compiler:
-    os.execv(envoy_real_cxx, [envoy_real_cxx, "-E", "-", "-v", "-no-canonical-prefixes"])
-
   # `g++` and `gcc -lstdc++` have similar behavior and Bazel treats them as
   # interchangeable, but `gcc` will ignore the `-static-libstdc++` flag.
   # This check lets Envoy statically link against libstdc++ to be more
   # portable between installed glibc versions.
-  #
-  # Similar behavior exists for Clang's `-stdlib=libc++` flag, so we handle
-  # it in the same test.
-  if "-static-libstdc++" in sys.argv[1:] or "-stdlib=libc++" in sys.argv[1:]:
+  if "-static-libstdc++" in sys.argv[1:]:
     compiler = envoy_real_cxx
     argv = []
     for arg in sys.argv[1:]:

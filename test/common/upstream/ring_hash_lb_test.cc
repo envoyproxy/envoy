@@ -177,7 +177,7 @@ TEST_P(RingHashFailoverTest, BasicFailover) {
   EXPECT_EQ(failover_host_set_.healthy_hosts_[0], lb->chooseHost(nullptr));
 }
 
-#ifndef __APPLE__
+#ifndef _LIBCPP_VERSION
 // Run similar tests with the default hash algorithm for GCC 5.
 // TODO(danielhochman): After v1 is deprecated this test can be deleted since std::hash will no
 // longer be in use.

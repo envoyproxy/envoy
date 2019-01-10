@@ -1,6 +1,7 @@
-load("@bazel_tools//tools/cpp:cc_configure.bzl", _upstream_cc_autoconf_impl = "cc_autoconf_impl")
 load("@bazel_tools//tools/cpp:lib_cc_configure.bzl", "get_cpu_value")
-load("@bazel_tools//tools/cpp:unix_cc_configure.bzl", "find_cc")
+load("@bazel_tools//tools/cpp:windows_cc_configure.bzl", "configure_windows_toolchain")
+load("@bazel_tools//tools/cpp:osx_cc_configure.bzl", "configure_osx_toolchain")
+load("//bazel:unix_cc_configure.bzl", "configure_unix_toolchain", "find_cc")
 
 # Stub for `repository_ctx.which()` that always succeeds. See comments in
 # `_find_cxx` for details.
@@ -79,7 +80,16 @@ def cc_autoconf_impl(repository_ctx):
     if _needs_envoy_cc_wrapper(repository_ctx):
         # Bazel uses "gcc" as a generic name for all C and C++ compilers.
         overriden_tools["gcc"] = _build_envoy_cc_wrapper(repository_ctx)
-    return _upstream_cc_autoconf_impl(repository_ctx, overriden_tools = overriden_tools)
+
+    # TODO(PiotrSikora): migrate back to upstream's configure_unix_toolchain once BAZEL_CXXOPTS
+    # are part of a release. See: https://github.com/bazelbuild/bazel/pull/7074
+    cpu_value = get_cpu_value(repository_ctx)
+    if cpu_value == "x64_windows":
+        configure_windows_toolchain(repository_ctx)
+    elif cpu_value == "darwin":
+        configure_osx_toolchain(repository_ctx, overriden_tools)
+    else:
+        configure_unix_toolchain(repository_ctx, cpu_value, overriden_tools)
 
 cc_autoconf = repository_rule(
     implementation = cc_autoconf_impl,
@@ -91,6 +101,8 @@ cc_autoconf = repository_rule(
         "ABI_VERSION",
         "BAZEL_COMPILER",
         "BAZEL_HOST_SYSTEM",
+        "BAZEL_CXXOPTS",
+        "BAZEL_LINKOPTS",
         "BAZEL_PYTHON",
         "BAZEL_SH",
         "BAZEL_TARGET_CPU",
