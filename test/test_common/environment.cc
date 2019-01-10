@@ -36,13 +36,13 @@ namespace {
 std::string makeTempDir(char* name_template) {
 #ifdef WIN32
   char* dirname = ::_mktemp(name_template);
-  RELEASE_ASSERT(dirname != nullptr,
-                 fmt::format("failed to create tempdir: {} {}", dirname, strerror(errno)));
+  RELEASE_ASSERT(dirname != nullptr, fmt::format("failed to create tempdir from template: {} {}",
+                                                 name_template, strerror(errno)));
   std::experimental::filesystem::create_directories(dirname);
 #else
   char* dirname = ::mkdtemp(name_template);
-  RELEASE_ASSERT(dirname != nullptr,
-                 fmt::format("failed to create tempdir: {} {}", dirname, strerror(errno)));
+  RELEASE_ASSERT(dirname != nullptr, fmt::format("failed to create tempdir from template: {} {}",
+                                                 name_template, strerror(errno)));
 #endif
   return std::string(dirname);
 }

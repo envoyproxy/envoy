@@ -47,20 +47,6 @@ private:
 };
 
 /**
- * Utilities for the HTTP connection manager that facilitate testing.
- */
-class HttpConnectionManagerConfigUtility {
-public:
-  /**
-   * Determine the next protocol to used based both on ALPN as well as protocol inspection.
-   * @param connection supplies the connection to determine a protocol for.
-   * @param data supplies the currently available read data on the connection.
-   */
-  static std::string determineNextProtocol(Network::Connection& connection,
-                                           const Buffer::Instance& data);
-};
-
-/**
  * Determines if an address is internal based on user provided config.
  */
 class InternalAddressConfig : public Http::InternalAddressConfig {

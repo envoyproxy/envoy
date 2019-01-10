@@ -31,7 +31,7 @@ namespace Config {
  */
 class ApiTypeValues {
 public:
-  const std::string RestLegacy{"REST_LEGACY"};
+  const std::string UnsupportedRestLegacy{"REST_LEGACY"};
   const std::string Rest{"REST"};
   const std::string Grpc{"GRPC"};
 };

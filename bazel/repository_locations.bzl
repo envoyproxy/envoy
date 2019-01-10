@@ -1,7 +1,7 @@
 REPOSITORY_LOCATIONS = dict(
     bazel_gazelle = dict(
-        sha256 = "6e875ab4b6bf64a38c352887760f21203ab054676d9c1b274963907e0768740d",
-        urls = ["https://github.com/bazelbuild/bazel-gazelle/releases/download/0.15.0/bazel-gazelle-0.15.0.tar.gz"],
+        sha256 = "7949fc6cc17b5b191103e97481cf8889217263acf52e00b560683413af204fcb",
+        urls = ["https://github.com/bazelbuild/bazel-gazelle/releases/download/0.16.0/bazel-gazelle-0.16.0.tar.gz"],
     ),
     boringssl = dict(
         # Use commits from branch "chromium-stable-with-bazel"
@@ -151,14 +151,15 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/google/googletest/archive/release-1.8.1.tar.gz"],
     ),
     com_google_protobuf = dict(
-        sha256 = "3d610ac90f8fa16e12490088605c248b85fdaf23114ce4b3605cdf81f7823604",
-        strip_prefix = "protobuf-fa252ec2a54acb24ddc87d48fed1ecfd458445fd",
+        sha256 = "46f1da3a6a6db66dd240cf95a5553198f7c6e98e6ac942fceb8a1cf03291d96e",
+        strip_prefix = "protobuf-7492b5681231c79f0265793fa57dc780ae2481d6",
         # TODO(htuch): Switch back to released versions for protobuf when a release > 3.6.0 happens
         # that includes:
         # - https://github.com/protocolbuffers/protobuf/commit/f35669b8d3f46f7f1236bd21f14d744bba251e60
         # - https://github.com/protocolbuffers/protobuf/commit/6a4fec616ec4b20f54d5fb530808b855cb664390
         # - https://github.com/protocolbuffers/protobuf/commit/fa252ec2a54acb24ddc87d48fed1ecfd458445fd
-        urls = ["https://github.com/protocolbuffers/protobuf/archive/fa252ec2a54acb24ddc87d48fed1ecfd458445fd.tar.gz"],
+        # - https://github.com/protocolbuffers/protobuf/commit/7492b5681231c79f0265793fa57dc780ae2481d6
+        urls = ["https://github.com/protocolbuffers/protobuf/archive/7492b5681231c79f0265793fa57dc780ae2481d6.tar.gz"],
     ),
     grpc_httpjson_transcoding = dict(
         sha256 = "dedd76b0169eb8c72e479529301a1d9b914a4ccb4d2b5ddb4ebe92d63a7b2152",

@@ -131,7 +131,7 @@ TEST_P(EchoIntegrationTest, AddRemoveListener) {
         new_listener_port, buffer,
         [&](Network::ClientConnection&, const Buffer::Instance&) -> void { FAIL(); }, version_);
     while (connection2.connecting()) {
-      // Don't busy loop, but OS X often needs a moment to decide this connection isn't happening.
+      // Don't busy loop, but macOS often needs a moment to decide this connection isn't happening.
       timeSystem().sleep(std::chrono::milliseconds(10));
 
       connection2.run(Event::Dispatcher::RunType::NonBlock);

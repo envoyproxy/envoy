@@ -134,6 +134,11 @@ public:
    * @return bool Whether CORS is enabled for the route or virtual host.
    */
   virtual bool enabled() const PURE;
+
+  /**
+   * @return bool Whether CORS policies are evaluated when filter is off.
+   */
+  virtual bool shadowEnabled() const PURE;
 };
 
 /**

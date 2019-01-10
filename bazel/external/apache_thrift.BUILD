@@ -10,7 +10,11 @@ genrule(
     srcs = src_files,
     outs = [f.replace("src/", "thrift/") for f in src_files],
     cmd = "\n".join(
-        ["mkdir -p $$(dirname $(location %s)) && cp $(location %s) $(location :%s)" % (f, f, f.replace("src/", "thrift/")) for f in src_files],
+        ["mkdir -p $$(dirname $(location %s)) && cp $(location %s) $(location :%s)" % (
+            f,
+            f,
+            f.replace("src/", "thrift/"),
+        ) for f in src_files],
     ),
     visibility = ["//visibility:private"],
 )
