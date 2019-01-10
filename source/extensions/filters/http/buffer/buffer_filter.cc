@@ -32,14 +32,11 @@ BufferFilterSettings::BufferFilterSettings(
               : 0) {}
 
 BufferFilterConfig::BufferFilterConfig(
-    const envoy::config::filter::http::buffer::v2::Buffer& proto_config,
-    const std::string& stats_prefix, Stats::Scope& scope)
-    : stats_(BufferFilter::generateStats(stats_prefix, scope)), settings_(proto_config) {}
+    const envoy::config::filter::http::buffer::v2::Buffer& proto_config)
+    : settings_(proto_config) {}
 
 BufferFilter::BufferFilter(BufferFilterConfigSharedPtr config)
     : config_(config), settings_(config->settings()) {}
-
-BufferFilter::~BufferFilter() { ASSERT(!request_timeout_); }
 
 void BufferFilter::initConfig() {
   ASSERT(!config_initialized_);
@@ -79,8 +76,7 @@ Http::FilterHeadersStatus BufferFilter::decodeHeaders(Http::HeaderMap&, bool end
 }
 
 Http::FilterDataStatus BufferFilter::decodeData(Buffer::Instance&, bool end_stream) {
-  if (end_stream) {
-    resetInternalState();
+  if (end_stream || settings_->disabled()) {
     return Http::FilterDataStatus::Continue;
   }
 
@@ -89,18 +85,8 @@ Http::FilterDataStatus BufferFilter::decodeData(Buffer::Instance&, bool end_stre
 }
 
 Http::FilterTrailersStatus BufferFilter::decodeTrailers(Http::HeaderMap&) {
-  resetInternalState();
   return Http::FilterTrailersStatus::Continue;
 }
-
-BufferFilterStats BufferFilter::generateStats(const std::string& prefix, Stats::Scope& scope) {
-  std::string final_prefix = prefix + "buffer.";
-  return {ALL_BUFFER_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
-}
-
-void BufferFilter::onDestroy() { resetInternalState(); }
-
-void BufferFilter::resetInternalState() { request_timeout_.reset(); }
 
 void BufferFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
   callbacks_ = &callbacks;

@@ -17,21 +17,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace BufferFilter {
 
-/**
- * All stats for the buffer filter. @see stats_macros.h
- */
-// clang-format off
-#define ALL_BUFFER_FILTER_STATS(COUNTER)                                                           \
-  COUNTER(rq_timeout)
-// clang-format on
-
-/**
- * Wrapper struct for buffer filter stats. @see stats_macros.h
- */
-struct BufferFilterStats {
-  ALL_BUFFER_FILTER_STATS(GENERATE_COUNTER_STRUCT)
-};
-
 class BufferFilterSettings : public Router::RouteSpecificFilterConfig {
 public:
   BufferFilterSettings(const envoy::config::filter::http::buffer::v2::Buffer&);
@@ -50,14 +35,11 @@ private:
  */
 class BufferFilterConfig {
 public:
-  BufferFilterConfig(const envoy::config::filter::http::buffer::v2::Buffer& proto_config,
-                     const std::string& stats_prefix, Stats::Scope& scope);
+  BufferFilterConfig(const envoy::config::filter::http::buffer::v2::Buffer& proto_config);
 
-  BufferFilterStats& stats() { return stats_; }
   const BufferFilterSettings* settings() const { return &settings_; }
 
 private:
-  BufferFilterStats stats_;
   const BufferFilterSettings settings_;
 };
 
@@ -69,12 +51,9 @@ typedef std::shared_ptr<BufferFilterConfig> BufferFilterConfigSharedPtr;
 class BufferFilter : public Http::StreamDecoderFilter {
 public:
   BufferFilter(BufferFilterConfigSharedPtr config);
-  ~BufferFilter();
-
-  static BufferFilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
 
   // Http::StreamFilterBase
-  void onDestroy() override;
+  void onDestroy() override {}
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
@@ -83,13 +62,11 @@ public:
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
 private:
-  void resetInternalState();
   void initConfig();
 
   BufferFilterConfigSharedPtr config_;
   const BufferFilterSettings* settings_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
-  Event::TimerPtr request_timeout_;
   bool config_initialized_{};
 };
 

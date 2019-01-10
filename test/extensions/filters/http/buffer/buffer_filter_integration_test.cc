@@ -74,6 +74,7 @@ TEST_P(BufferIntegrationTest, RouteDisabled) {
   ConfigHelper::HttpModifierFunction mod = overrideConfig(R"EOF({"disabled": true})EOF");
   config_helper_.addConfigModifier(mod);
   config_helper_.addFilter(ConfigHelper::SMALL_BUFFER_FILTER);
+  config_helper_.setBufferLimits(1024, 1024);
 
   initialize();
 
