@@ -195,7 +195,6 @@ TEST_P(CdsIntegrationTest, CdsClusterUpDownUp) {
   EXPECT_STREQ("503", response->headers().Status()->value().c_str());
 
   cleanupUpstreamAndDownstream();
-  fake_upstream_connection_ = nullptr;
   codec_client_->waitForDisconnect();
 
   // Tell Envoy that cluster_0 is back.
@@ -211,7 +210,6 @@ TEST_P(CdsIntegrationTest, CdsClusterUpDownUp) {
   testRouterHeaderOnlyRequestAndResponse(nullptr, 1);
 
   cleanupUpstreamAndDownstream();
-  fake_upstream_connection_ = nullptr;
 }
 
 } // namespace

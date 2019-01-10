@@ -163,7 +163,6 @@ public:
     registerTestServerPorts({"http"});
     testRouterHeaderOnlyRequestAndResponse();
     cleanupUpstreamAndDownstream();
-    fake_upstream_connection_ = nullptr;
   }
 
   void initialize() override { initializeAds(false); }

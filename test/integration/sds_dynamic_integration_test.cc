@@ -198,7 +198,6 @@ public:
 
     client_ssl_ctx_.reset();
     cleanupUpstreamAndDownstream();
-    fake_upstream_connection_.reset();
     codec_client_.reset();
   }
 
@@ -374,7 +373,6 @@ public:
     cleanUpSdsConnection();
 
     cleanupUpstreamAndDownstream();
-    fake_upstream_connection_.reset();
     codec_client_.reset();
 
     test_server_.reset();
