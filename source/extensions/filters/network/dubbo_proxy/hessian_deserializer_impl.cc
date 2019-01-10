@@ -85,6 +85,17 @@ RpcResultPtr HessianDeserializerImpl::deserializeRpcResult(Buffer::Instance& buf
   return result;
 }
 
+class HessianDeserializerConfigFactory : public DeserializerFactoryBase<HessianDeserializerImpl> {
+public:
+  HessianDeserializerConfigFactory() : DeserializerFactoryBase(SerializationType::Hessian) {}
+};
+
+/**
+ * Static registration for the Hessian protocol. @see RegisterFactory.
+ */
+static Registry::RegisterFactory<HessianDeserializerConfigFactory, NamedDeserializerConfigFactory>
+    register_;
+
 } // namespace DubboProxy
 } // namespace NetworkFilters
 } // namespace Extensions

@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <memory>
+#include <new>
 
 #include "common/common/compiler_requirements.h"
 #include "common/common/perf_annotation.h"
@@ -45,6 +46,7 @@ MainCommonBase::MainCommonBase(OptionsImpl& options, Event::TimeSystem& time_sys
                                std::unique_ptr<Runtime::RandomGenerator>&& random_generator,
                                Thread::ThreadFactory& thread_factory)
     : options_(options), component_factory_(component_factory), thread_factory_(thread_factory) {
+  Thread::ThreadFactorySingleton::set(&thread_factory_);
   ares_library_init(ARES_LIB_INIT_ALL);
   Event::Libevent::Global::initialize();
   RELEASE_ASSERT(Envoy::Server::validateProtoDescriptors(), "");
@@ -70,6 +72,10 @@ MainCommonBase::MainCommonBase(OptionsImpl& options, Event::TimeSystem& time_sys
 
     configureComponentLogLevels();
 
+    // Provide consistent behavior for out-of-memory, regardless of whether it occurs in a try/catch
+    // block or not.
+    std::set_new_handler([]() { PANIC("out of memory"); });
+
     stats_store_ = std::make_unique<Stats::ThreadLocalStoreImpl>(options_.statsOptions(),
                                                                  restarter_->statsAllocator());
 
@@ -87,7 +93,10 @@ MainCommonBase::MainCommonBase(OptionsImpl& options, Event::TimeSystem& time_sys
   }
 }
 
-MainCommonBase::~MainCommonBase() { ares_library_cleanup(); }
+MainCommonBase::~MainCommonBase() {
+  Thread::ThreadFactorySingleton::set(nullptr);
+  ares_library_cleanup();
+}
 
 void MainCommonBase::configureComponentLogLevels() {
   for (auto& component_log_level : options_.componentLogLevels()) {
@@ -128,7 +137,7 @@ void MainCommonBase::adminRequest(absl::string_view path_and_query, absl::string
 MainCommon::MainCommon(int argc, const char* const* argv)
     : options_(argc, argv, &MainCommon::hotRestartVersion, spdlog::level::info),
       base_(options_, real_time_system_, default_test_hooks_, prod_component_factory_,
-            std::make_unique<Runtime::RandomGeneratorImpl>(), thread_factory_) {}
+            std::make_unique<Runtime::RandomGeneratorImpl>(), platform_impl_.threadFactory()) {}
 
 std::string MainCommon::hotRestartVersion(uint64_t max_num_stats, uint64_t max_stat_name_len,
                                           bool hot_restart_enabled) {

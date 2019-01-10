@@ -4,6 +4,9 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_binary",
     "envoy_cc_library",
+    "envoy_cc_platform_dep",
+    "envoy_cc_posix_library",
+    "envoy_cc_win32_library",
     "envoy_package",
 )
 load(
@@ -54,7 +57,7 @@ envoy_cc_library(
     ],
     deps = [
         ":envoy_main_common_lib",
-    ],
+    ] + envoy_cc_platform_dep("platform_impl_lib"),
 )
 
 envoy_cc_library(
@@ -66,6 +69,7 @@ envoy_cc_library(
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:compiler_requirements_lib",
         "//source/common/common:perf_annotation_lib",
+        "//source/common/thread:thread_factory_singleton_lib",
         "//source/server:hot_restart_lib",
         "//source/server:hot_restart_nop_lib",
         "//source/server:proto_descriptors_lib",
@@ -76,7 +80,24 @@ envoy_cc_library(
             ":sigaction_lib",
             ":terminate_handler_lib",
         ],
-    }),
+    }) + envoy_cc_platform_dep("platform_impl_lib"),
+)
+
+envoy_cc_posix_library(
+    name = "platform_impl_lib",
+    hdrs = ["posix/platform_impl.h"],
+    strip_include_prefix = "posix",
+    deps = ["//source/common/common:thread_lib"],
+)
+
+envoy_cc_win32_library(
+    name = "platform_impl_lib",
+    hdrs = ["win32/platform_impl.h"],
+    strip_include_prefix = "win32",
+    deps = [
+        "//source/common/common:assert_lib",
+        "//source/common/common:thread_lib",
+    ],
 )
 
 envoy_cc_library(

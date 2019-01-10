@@ -46,14 +46,25 @@ On Fedora (maybe also other red hat distros), run the following:
 dnf install cmake libtool libstdc++ ninja-build lld patch
 ```
 
-On OS X, you'll need to install several dependencies. This can be accomplished via [Homebrew](https://brew.sh/):
+On macOS, you'll need to install several dependencies. This can be accomplished via [Homebrew](https://brew.sh/):
 ```
-brew install coreutils wget cmake libtool go bazel automake ninja clang-format
+brew install coreutils wget cmake libtool go bazel automake ninja llvm@7
 ```
-_note_: `coreutils` is used for realpath
+_notes_: `coreutils` is used for `realpath`, `gmd5sum` and `gsha256sum`; `llvm@7` is used for `clang-format`
 
 Envoy compiles and passes tests with the version of clang installed by XCode 9.3.0:
 Apple LLVM version 9.1.0 (clang-902.0.30).
+
+In order for bazel to be aware of the tools installed by brew, the PATH
+variable must be set for bazel builds. This can be accomplished by setting
+this in your `$HOME/.bazelrc` file:
+
+```
+build --action_env=PATH="/usr/local/bin:/opt/local/bin:/usr/bin:/bin"
+```
+
+Alternatively, you can pass `--action_env` on the command line when running
+`bazel build`/`bazel test`.
 
 3. Install Golang on your machine. This is required as part of building [BoringSSL](https://boringssl.googlesource.com/boringssl/+/HEAD/BUILDING.md)
 and also for [Buildifer](https://github.com/bazelbuild/buildtools) which is used for formatting bazel BUILD files.
@@ -299,6 +310,7 @@ The following optional features can be disabled on the Bazel build command-line:
 * Hot restart with `--define hot_restart=disabled`
 * Google C++ gRPC client with `--define google_grpc=disabled`
 * Backtracing on signals with `--define signal_trace=disabled`
+* tcmalloc with `--define tcmalloc=disabled`
 
 ## Enabling optional features
 
@@ -311,6 +323,11 @@ The following optional features can be enabled on the Bazel build command-line:
   source/common/common/perf_annotation.h for details).
 * BoringSSL can be built in a FIPS-compliant mode with `--define boringssl=fips`
   (see [FIPS 140-2](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/ssl.html#fips-140-2) for details).
+* ASSERT() can be configured to log failures and increment a stat counter in a release build with
+  `--define log_debug_assert_in_release=enabled`. The default behavior is to compile debug assertions out of
+  release builds so that the condition is not evaluated. This option has no effect in debug builds.
+* memory-debugging (scribbling over memory after allocation and before freeing) with
+  `--define tcmalloc=debug`.
 
 ## Disabling extensions
 
@@ -514,22 +531,10 @@ The command above will setup a maximum 64 GiB cache at `~/bazel_cache` on port 2
 want to setup a larger cache if you run ASAN builds.
 
 NOTE: Using docker to run remote cache server described in remote cache docs will likely have
-slower cache performance on macOS due to slow disk performance for Docker on Mac.
+slower cache performance on macOS due to slow disk performance on Docker for Mac.
 
 Adding the following parameter to Bazel everytime or persist them in `.bazelrc`.
 
 ```
 --remote_http_cache=http://127.0.0.1:28080/
-```
-
-## Restrict environment variables
-
-You might need the following parameters for Bazel or persist in `.bazelrc` as well to make cache
-more efficient. This will let Bazel use an environment with a static value for _PATH_ and does
-not inherit _LD_LIBRARY_PATH_ or _TMPDIR_. See
-[Bazel Command-Line References](https://docs.bazel.build/versions/master/command-line-reference.html#flag--experimental_strict_action_env)
-for more information.
-
-```
---experimental_strict_action_env
 ```

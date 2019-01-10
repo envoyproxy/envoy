@@ -57,7 +57,11 @@ void IntegrationStreamDecoder::waitForHeaders() {
 void IntegrationStreamDecoder::waitForBodyData(uint64_t size) {
   ASSERT(body_data_waiting_length_ == 0);
   body_data_waiting_length_ = size;
-  dispatcher_.run(Event::Dispatcher::RunType::Block);
+  body_data_waiting_length_ -=
+      std::min(body_data_waiting_length_, static_cast<uint64_t>(body_.size()));
+  if (body_data_waiting_length_ > 0) {
+    dispatcher_.run(Event::Dispatcher::RunType::Block);
+  }
 }
 
 void IntegrationStreamDecoder::waitForEndStream() {
@@ -91,12 +95,7 @@ void IntegrationStreamDecoder::decodeHeaders(Http::HeaderMapPtr&& headers, bool 
 
 void IntegrationStreamDecoder::decodeData(Buffer::Instance& data, bool end_stream) {
   saw_end_stream_ = end_stream;
-  uint64_t num_slices = data.getRawSlices(nullptr, 0);
-  STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
-  data.getRawSlices(slices.begin(), num_slices);
-  for (const Buffer::RawSlice& slice : slices) {
-    body_.append(static_cast<const char*>(slice.mem_), slice.len_);
-  }
+  body_ += data.toString();
 
   if (end_stream && waiting_for_end_stream_) {
     dispatcher_.exit();
@@ -223,8 +222,8 @@ BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version,
                                          TestTimeSystemPtr time_system, const std::string& config)
     : api_(Api::createApiForTest(stats_store_)),
       mock_buffer_factory_(new NiceMock<MockBufferFactory>), time_system_(std::move(time_system)),
-      dispatcher_(new Event::DispatcherImpl(*time_system_,
-                                            Buffer::WatermarkFactoryPtr{mock_buffer_factory_})),
+      dispatcher_(new Event::DispatcherImpl(
+          *time_system_, Buffer::WatermarkFactoryPtr{mock_buffer_factory_}, *api_)),
       version_(version), config_helper_(version, config),
       default_log_level_(TestEnvironment::getOptions().logLevel()) {
   // This is a hack, but there are situations where we disconnect fake upstream connections and

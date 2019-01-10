@@ -75,43 +75,32 @@ envoy_cc_test(
     ],
 )
 
-# TODO(mattklein123): This test uses extensions mixed in, so we just register all extensions.
-# This will go away when we delete v1 configuration.
-envoy_cc_test(
-    name = "legacy_json_integration_test",
-    srcs = ["legacy_json_integration_test.cc"],
-    data = [
-        "//test/config/integration:echo_server.json",
-        "//test/config/integration:server.json",
-        "//test/config/integration:server_grpc_json_transcoder.json",
-        "//test/config/integration:server_http2.json",
-        "//test/config/integration:server_http2_upstream.json",
-        "//test/config/integration:server_proxy_proto.json",
-        "//test/config/integration:server_ssl.json",
-        "//test/config/integration:server_uds.json",
-        "//test/config/integration:server_xfcc.json",
-        "//test/config/integration:tcp_proxy.json",
-        "//test/config/integration/certs",
-        "//test/proto:bookstore_proto_descriptor",
-    ],
-    deps = [
-        ":integration_lib",
-        "//source/common/http:header_map_lib",
-        "//source/common/protobuf:utility_lib",
-        "//test/test_common:network_utility_lib",
-        "//test/test_common:utility_lib",
-    ] + envoy_all_extensions(),
-)
+exports_files(["test_utility.sh"])
 
 envoy_sh_test(
     name = "hotrestart_test",
-    srcs = envoy_select_hot_restart(["hotrestart_test.sh"]),
+    srcs = envoy_select_hot_restart([
+        "hotrestart_test.sh",
+    ]),
     data = [
+        "test_utility.sh",
         "//source/exe:envoy-static",
         "//test/common/runtime:filesystem_setup.sh",
         "//test/common/runtime:filesystem_test_data",
         "//test/config/integration:server_config_files",
         "//tools:socket_passing",
+    ],
+)
+
+envoy_sh_test(
+    name = "run_envoy_test",
+    srcs = ["run_envoy_test.sh"],
+    data = [
+        "test_utility.sh",
+        "//source/exe:envoy-static",
+        "//test/common/runtime:filesystem_setup.sh",
+        "//test/common/runtime:filesystem_test_data",
+        "//test/config/integration:server_config_files",
     ],
 )
 
@@ -171,7 +160,7 @@ envoy_cc_test(
         "integration_admin_test.h",
     ],
     deps = [
-        ":http_integration_lib",
+        ":http_protocol_integration_lib",
         "//include/envoy/http:header_map_interface",
         "//source/common/stats:stats_matcher_lib",
         "//source/extensions/filters/http/buffer:config",
@@ -293,6 +282,7 @@ envoy_cc_test_library(
         "//source/common/network:filter_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/network:utility_lib",
+        "//source/common/ssl:ssl_socket_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:thread_local_store_lib",
         "//source/common/thread_local:thread_local_lib",
@@ -598,7 +588,6 @@ envoy_cc_test(
         "uds_integration_test.cc",
         "uds_integration_test.h",
     ],
-    data = ["//test/config/integration:server_uds.json"],
     deps = [
         ":http_integration_lib",
         "//source/common/event:dispatcher_includes",

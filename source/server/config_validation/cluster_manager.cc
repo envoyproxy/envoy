@@ -25,11 +25,11 @@ ClusterManagerPtr ValidationClusterManagerFactory::clusterManagerFromProto(
       main_thread_dispatcher_, admin, api_, http_context_);
 }
 
-CdsApiPtr ValidationClusterManagerFactory::createCds(
-    const envoy::api::v2::core::ConfigSource& cds_config,
-    const absl::optional<envoy::api::v2::core::ConfigSource>& eds_config, ClusterManager& cm) {
+CdsApiPtr
+ValidationClusterManagerFactory::createCds(const envoy::api::v2::core::ConfigSource& cds_config,
+                                           ClusterManager& cm) {
   // Create the CdsApiImpl...
-  ProdClusterManagerFactory::createCds(cds_config, eds_config, cm);
+  ProdClusterManagerFactory::createCds(cds_config, cm);
   // ... and then throw it away, so that we don't actually connect to it.
   return nullptr;
 }
@@ -42,7 +42,7 @@ ValidationClusterManager::ValidationClusterManager(
     Server::Admin& admin, Api::Api& api, Http::Context& http_context)
     : ClusterManagerImpl(bootstrap, factory, stats, tls, runtime, random, local_info, log_manager,
                          main_thread_dispatcher, admin, api, http_context),
-      async_client_(main_thread_dispatcher.timeSystem()) {}
+      async_client_(main_thread_dispatcher.timeSystem(), api) {}
 
 Http::ConnectionPool::Instance*
 ValidationClusterManager::httpConnPoolForCluster(const std::string&, ResourcePriority,

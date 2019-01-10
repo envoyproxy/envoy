@@ -33,7 +33,6 @@ OptionsImpl createTestOptionsImpl(const std::string& config_path, const std::str
 
   test_options.setConfigPath(config_path);
   test_options.setConfigYaml(config_yaml);
-  test_options.setV2ConfigOnly(false);
   test_options.setLocalAddressIpVersion(ip_version);
   test_options.setFileFlushIntervalMsec(std::chrono::milliseconds(50));
   test_options.setDrainTime(std::chrono::seconds(1));
@@ -61,7 +60,7 @@ void IntegrationTestServer::start(const Network::Address::IpVersion version,
                                   bool deterministic) {
   ENVOY_LOG(info, "starting integration test server");
   ASSERT(!thread_);
-  thread_ = api_.createThread(
+  thread_ = api_.threadFactory().createThread(
       [version, deterministic, this]() -> void { threadRoutine(version, deterministic); });
 
   // If any steps need to be done prior to workers starting, do them now. E.g., xDS pre-init.
