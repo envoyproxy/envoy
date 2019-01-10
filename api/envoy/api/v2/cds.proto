@@ -424,7 +424,7 @@ message Cluster {
       XX_HASH = 0;
       // 'Murmur hash 2 <https://sites.google.com/site/murmurhash/>', this is compatible with
       // std:hash<string> in GNU libstdc++ 3.4.20 or above. This is typically the case when compiled
-      // on Linux and not Mac OS.
+      // on Linux and not macOS.
       MURMUR_HASH_2 = 1;
     }
 

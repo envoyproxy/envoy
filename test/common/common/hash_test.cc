@@ -27,7 +27,7 @@ TEST(Hash, murmurHash2_64) {
   EXPECT_EQ(6142509188972423790U, MurmurHash::murmurHash2_64(""));
 }
 
-#ifndef __APPLE__
+#if __GLIBCXX__ >= 20130411 && __GLIBCXX__ <= 20180726
 TEST(Hash, stdhash) {
   EXPECT_EQ(std::hash<std::string>()(std::string("foo")), MurmurHash::murmurHash2_64("foo"));
   EXPECT_EQ(std::hash<std::string>()(std::string("bar")), MurmurHash::murmurHash2_64("bar"));
