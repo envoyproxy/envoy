@@ -321,7 +321,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       decorator_(parseDecorator(route)),
       direct_response_code_(ConfigUtility::parseDirectResponseCode(route)),
       direct_response_body_(ConfigUtility::parseDirectResponseBody(route)),
-      per_filter_configs_(route.per_filter_config(), factory_context),
+      per_filter_configs_(route.typed_per_filter_config(), route.per_filter_config(),
+                          factory_context),
       time_system_(factory_context.dispatcher().timeSystem()) {
   if (route.route().has_metadata_match()) {
     const auto filter_it = route.route().metadata_match().filter_metadata().find(
@@ -697,7 +698,8 @@ RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
                                                       cluster.request_headers_to_remove())),
       response_headers_parser_(HeaderParser::configure(cluster.response_headers_to_add(),
                                                        cluster.response_headers_to_remove())),
-      per_filter_configs_(cluster.per_filter_config(), factory_context) {
+      per_filter_configs_(cluster.typed_per_filter_config(), cluster.per_filter_config(),
+                          factory_context) {
   if (cluster.has_metadata_match()) {
     const auto filter_it = cluster.metadata_match().filter_metadata().find(
         Envoy::Config::MetadataFilters::get().ENVOY_LB);
@@ -819,7 +821,8 @@ VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::route::VirtualHost& virtu
                                                       virtual_host.request_headers_to_remove())),
       response_headers_parser_(HeaderParser::configure(virtual_host.response_headers_to_add(),
                                                        virtual_host.response_headers_to_remove())),
-      per_filter_configs_(virtual_host.per_filter_config(), factory_context),
+      per_filter_configs_(virtual_host.typed_per_filter_config(), virtual_host.per_filter_config(),
+                          factory_context),
       include_attempt_count_(virtual_host.include_request_attempt_count()) {
   switch (virtual_host.require_tls()) {
   case envoy::api::v2::route::VirtualHost::NONE:
@@ -1035,21 +1038,42 @@ ConfigImpl::ConfigImpl(const envoy::api::v2::RouteConfiguration& config,
                                                      config.response_headers_to_remove());
 }
 
+namespace {
+
+RouteSpecificFilterConfigConstSharedPtr
+createRouteSpecificFilterConfig(const std::string& name, const ProtobufWkt::Any& typed_config,
+                                const ProtobufWkt::Struct& config,
+                                Server::Configuration::FactoryContext& factory_context) {
+  auto& factory = Envoy::Config::Utility::getAndCheckFactory<
+      Server::Configuration::NamedHttpFilterConfigFactory>(name);
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
+  Envoy::Config::Utility::translateOpaqueConfig(typed_config, config, *proto_config);
+  return factory.createRouteSpecificFilterConfig(*proto_config, factory_context);
+}
+
+} // namespace
+
 PerFilterConfigs::PerFilterConfigs(
+    const Protobuf::Map<ProtobufTypes::String, ProtobufWkt::Any>& typed_configs,
     const Protobuf::Map<ProtobufTypes::String, ProtobufWkt::Struct>& configs,
     Server::Configuration::FactoryContext& factory_context) {
-  for (const auto& cfg : configs) {
-    const std::string& name = cfg.first;
-    const ProtobufWkt::Struct& struct_config = cfg.second;
+  if (!typed_configs.empty() && !configs.empty()) {
+    throw EnvoyException("Only one of typed_configs or configs can be specified");
+  }
 
-    auto& factory = Envoy::Config::Utility::getAndCheckFactory<
-        Server::Configuration::NamedHttpFilterConfigFactory>(name);
+  for (const auto& it : typed_configs) {
+    auto object = createRouteSpecificFilterConfig(
+        it.first, it.second, ProtobufWkt::Struct::default_instance(), factory_context);
+    if (object != nullptr) {
+      configs_[it.first] = std::move(object);
+    }
+  }
 
-    auto object = factory.createRouteSpecificFilterConfig(
-        *Envoy::Config::Utility::translateToFactoryRouteConfig(struct_config, factory),
-        factory_context);
-    if (object) {
-      configs_[name] = object;
+  for (const auto& it : configs) {
+    auto object = createRouteSpecificFilterConfig(it.first, ProtobufWkt::Any::default_instance(),
+                                                  it.second, factory_context);
+    if (object != nullptr) {
+      configs_[it.first] = std::move(object);
     }
   }
 }
