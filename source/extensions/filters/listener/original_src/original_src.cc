@@ -37,11 +37,11 @@ Network::FilterStatus OriginalSrcFilter::onAccept(Network::ListenerFilterCallbac
   auto options_to_add = std::make_shared<Network::Socket::Options>();
   options_to_add->emplace_back(
       std::make_shared<OriginalSrcSocketOption>(std::move(address_without_port)));
-  auto mark_option = Network::SocketOptionFactory::buildSocketMarkOptions(config_.mark());
-  options_to_add->insert(options_to_add->end(), mark_option->begin(), mark_option->end());
-  auto transparent_option = Network::SocketOptionFactory::buildIpTransparentOptions();
-  options_to_add->insert(options_to_add->end(), transparent_option->begin(),
-                         transparent_option->end());
+  auto mark_options = Network::SocketOptionFactory::buildSocketMarkOptions(config_.mark());
+  options_to_add->insert(options_to_add->end(), mark_options->begin(), mark_options->end());
+  auto transparent_options = Network::SocketOptionFactory::buildIpTransparentOptions();
+  options_to_add->insert(options_to_add->end(), transparent_options->begin(),
+                         transparent_options->end());
 
   socket.addOptions(options_to_add);
   return Network::FilterStatus::Continue;
