@@ -57,7 +57,11 @@ void IntegrationStreamDecoder::waitForHeaders() {
 void IntegrationStreamDecoder::waitForBodyData(uint64_t size) {
   ASSERT(body_data_waiting_length_ == 0);
   body_data_waiting_length_ = size;
-  dispatcher_.run(Event::Dispatcher::RunType::Block);
+  body_data_waiting_length_ -=
+      std::min(body_data_waiting_length_, static_cast<uint64_t>(body_.size()));
+  if (body_data_waiting_length_ > 0) {
+    dispatcher_.run(Event::Dispatcher::RunType::Block);
+  }
 }
 
 void IntegrationStreamDecoder::waitForEndStream() {
@@ -91,12 +95,7 @@ void IntegrationStreamDecoder::decodeHeaders(Http::HeaderMapPtr&& headers, bool 
 
 void IntegrationStreamDecoder::decodeData(Buffer::Instance& data, bool end_stream) {
   saw_end_stream_ = end_stream;
-  uint64_t num_slices = data.getRawSlices(nullptr, 0);
-  STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
-  data.getRawSlices(slices.begin(), num_slices);
-  for (const Buffer::RawSlice& slice : slices) {
-    body_.append(static_cast<const char*>(slice.mem_), slice.len_);
-  }
+  body_ += data.toString();
 
   if (end_stream && waiting_for_end_stream_) {
     dispatcher_.exit();

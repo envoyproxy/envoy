@@ -3,7 +3,9 @@ Version history
 
 1.10.0 (pending)
 ================
+* config: added support of using google.protobuf.Any in opaque configs for extensions.
 * access log: added a new flag for upstream retry count exceeded.
+* admin: the admin server can now be accessed via HTTP/2 (prior knowledge).
 * buffer: fix vulnerabilities when allocation fails
 * config: removed deprecated_v1 sds_config from :ref:`Bootstrap config <config_overview_v2_bootstrap>`.
 * config: removed deprecated_v1 sds_config from :ref:`Bootstrap config <config_overview_v2_bootstrap>`.
@@ -11,6 +13,8 @@ Version history
 * cors: added :ref:`filter_enabled & shadow_enabled RuntimeFractionalPercent flags <cors-runtime>` to filter.
 * http: added new grpc_http1_reverse_bridge filter for converting gRPC requests into HTTP/1.1 requests.
 * redis: added :ref:`success and error stats <config_network_filters_redis_proxy_per_command_stats>` for commands.
+* router: added ability to configure a :ref:`retry policy <envoy_api_msg_route.RetryPolicy>` at the
+  virtual host level.
 * tls: enabled TLS 1.3 on the server-side (non-FIPS builds).
 
 1.9.0
@@ -68,7 +72,7 @@ Version history
 * rbac: added support for permission matching by :ref:`requested server name <envoy_api_field_config.rbac.v2alpha.Permission.requested_server_name>`.
 * redis: static cluster configuration is no longer required. Redis proxy will work with clusters
   delivered via CDS.
-* router: added ability to configure arbitrary :ref:`retriable status codes. <envoy_api_field_route.RouteAction.RetryPolicy.retriable_status_codes>`
+* router: added ability to configure arbitrary :ref:`retriable status codes. <envoy_api_field_route.RetryPolicy.retriable_status_codes>`
 * router: added ability to set attempt count in upstream requests, see :ref:`virtual host's include request
   attempt count flag <envoy_api_field_route.VirtualHost.include_request_attempt_count>`.
 * router: added internal :ref:`grpc-retry-on <config_http_filters_router_x-envoy-retry-grpc-on>` policy.

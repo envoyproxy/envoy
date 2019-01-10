@@ -38,7 +38,7 @@ public:
    * @param request_headers supplies the headers from the request.
    * @param config_headers supplies the list of configured header conditions on which to match.
    * @return bool true if all the headers (and values) in the config_headers are found in the
-   *         request_headers
+   *         request_headers. If no config_headers are specified, returns true.
    */
   static bool matchHeaders(const Http::HeaderMap& request_headers,
                            const std::vector<HeaderData>& config_headers);
