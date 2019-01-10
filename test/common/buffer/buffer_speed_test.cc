@@ -6,6 +6,12 @@
 
 namespace Envoy {
 
+static constexpr uint64_t MaxBufferLength = 1024 * 1024;
+
+// No-op release callback for use in BufferFragmentImpl instances.
+static const std::function<void(const void*, size_t, const Buffer::BufferFragmentImpl*)>
+    DoNotReleaseFragment = nullptr;
+
 // Test the creation of an empty OwnedImpl.
 static void BufferCreateEmpty(benchmark::State& state) {
   uint64_t length = 0;
@@ -30,6 +36,24 @@ static void BufferCreate(benchmark::State& state) {
 }
 BENCHMARK(BufferCreate)->Arg(1)->Arg(4096)->Arg(16384)->Arg(65536);
 
+// Grow an OwnedImpl in very small amounts.
+static void BufferAddSmallIncrement(benchmark::State& state) {
+  const std::string data("a");
+  const absl::string_view input(data);
+  Buffer::OwnedImpl buffer;
+  for (auto _ : state) {
+    buffer.add(input);
+
+    // Keep the memory usage from growing too large during the test.
+    uint64_t length = buffer.length();
+    if (length >= 1024 * 1024) {
+      buffer.drain(length);
+    }
+  }
+  benchmark::DoNotOptimize(buffer.length());
+}
+BENCHMARK(BufferAddSmallIncrement)->Arg(1)->Arg(2)->Arg(3)->Arg(4)->Arg(5);
+
 // Test the appending of varying amounts of content from a string to an OwnedImpl.
 static void BufferAddString(benchmark::State& state) {
   const std::string data(state.range(0), 'a');
@@ -37,15 +61,16 @@ static void BufferAddString(benchmark::State& state) {
   Buffer::OwnedImpl buffer(input);
   for (auto _ : state) {
     buffer.add(data);
-    // Drain from the front of the Buffer to keep the test's memory usage fixed.
-    // @note Ideally we could use state.PauseTiming()/ResumeTiming() to exclude
-    // the time spent in the drain operation, but those functions themselves are
-    // heavyweight enough to cloud the measurements:
-    // https://github.com/google/benchmark/issues/179
-    buffer.drain(input.size());
+    if (buffer.length() >= MaxBufferLength) {
+      // Keep the test's memory usage from growing too large.
+      // @note Ideally we could use state.PauseTiming()/ResumeTiming() to exclude
+      // the time spent in the drain operation, but those functions themselves are
+      // heavyweight enough to cloud the measurements:
+      // https://github.com/google/benchmark/issues/179
+      buffer.drain(buffer.length());
+    }
   }
-  uint64_t length = buffer.length();
-  benchmark::DoNotOptimize(length);
+  benchmark::DoNotOptimize(buffer.length());
 }
 BENCHMARK(BufferAddString)->Arg(1)->Arg(4096)->Arg(16384)->Arg(65536);
 
@@ -58,13 +83,50 @@ static void BufferAddBuffer(benchmark::State& state) {
   Buffer::OwnedImpl buffer(input);
   for (auto _ : state) {
     buffer.add(to_add);
-    // Drain from the front of the Buffer to keep the test's memory usage fixed.
-    buffer.drain(input.size());
+    if (buffer.length() >= MaxBufferLength) {
+      buffer.drain(buffer.length());
+    }
   }
-  uint64_t length = buffer.length();
-  benchmark::DoNotOptimize(length);
+  benchmark::DoNotOptimize(buffer.length());
 }
 BENCHMARK(BufferAddBuffer)->Arg(1)->Arg(4096)->Arg(16384)->Arg(65536);
+
+// Test the prepending of varying amounts of content from a string to an OwnedImpl.
+static void BufferPrependString(benchmark::State& state) {
+  const std::string data(state.range(0), 'a');
+  const absl::string_view input(data);
+  Buffer::OwnedImpl buffer(input);
+  for (auto _ : state) {
+    buffer.prepend(data);
+    if (buffer.length() >= MaxBufferLength) {
+      buffer.drain(buffer.length());
+    }
+  }
+  benchmark::DoNotOptimize(buffer.length());
+}
+BENCHMARK(BufferPrependString)->Arg(1)->Arg(4096)->Arg(16384)->Arg(65536);
+
+// Test the prepending of one OwnedImpl to another.
+static void BufferPrependBuffer(benchmark::State& state) {
+  const std::string data(state.range(0), 'a');
+  const absl::string_view input(data);
+  Buffer::OwnedImpl buffer(input);
+  for (auto _ : state) {
+    // The prepend method removes the content from its source buffer. To populate a new source
+    // buffer every time without the overhead of a copy, we use an BufferFragment that references
+    // (and never deletes) an external string.
+    Buffer::OwnedImpl to_add;
+    Buffer::BufferFragmentImpl fragment(input.data(), input.size(), DoNotReleaseFragment);
+    to_add.addBufferFragment(fragment);
+
+    buffer.prepend(to_add);
+    if (buffer.length() >= MaxBufferLength) {
+      buffer.drain(input.size());
+    }
+  }
+  benchmark::DoNotOptimize(buffer.length());
+}
+BENCHMARK(BufferPrependBuffer)->Arg(1)->Arg(4096)->Arg(16384)->Arg(65536);
 
 static void BufferDrain(benchmark::State& state) {
   const std::string data(state.range(0), 'a');
@@ -89,10 +151,24 @@ static void BufferDrain(benchmark::State& state) {
     drain_cycle++;
     drain_cycle %= DrainCycleSize;
   }
-  uint64_t length = buffer.length();
-  benchmark::DoNotOptimize(length);
+  benchmark::DoNotOptimize(buffer.length());
 }
 BENCHMARK(BufferDrain)->Arg(1)->Arg(4096)->Arg(16384)->Arg(65536);
+
+// Drain an OwnedImpl in very small amounts.
+static void BufferDrainSmallIncrement(benchmark::State& state) {
+  const std::string data(1024 * 1024, 'a');
+  const absl::string_view input(data);
+  Buffer::OwnedImpl buffer(input);
+  for (auto _ : state) {
+    buffer.drain(state.range(0));
+    if (buffer.length() == 0) {
+      buffer.add(input);
+    }
+  }
+  benchmark::DoNotOptimize(buffer.length());
+}
+BENCHMARK(BufferDrainSmallIncrement)->Arg(1)->Arg(2)->Arg(3)->Arg(4)->Arg(5);
 
 // Test the moving of content from one OwnedImpl to another.
 static void BufferMove(benchmark::State& state) {
@@ -141,7 +217,9 @@ static void BufferReserveCommit(benchmark::State& state) {
       bytes_to_commit += static_cast<uint64_t>(slices[i].len_);
     }
     buffer.commit(slices, slices_used);
-    buffer.drain(bytes_to_commit);
+    if (buffer.length() >= MaxBufferLength) {
+      buffer.drain(buffer.length());
+    }
   }
   benchmark::DoNotOptimize(buffer.length());
 }
@@ -160,11 +238,45 @@ static void BufferReserveCommitPartial(benchmark::State& state) {
     uint64_t bytes_to_commit = 1;
     slices[0].len_ = bytes_to_commit;
     buffer.commit(slices, 1);
-    buffer.drain(bytes_to_commit);
+    if (buffer.length() >= MaxBufferLength) {
+      buffer.drain(buffer.length());
+    }
   }
   benchmark::DoNotOptimize(buffer.length());
 }
 BENCHMARK(BufferReserveCommitPartial)->Arg(1)->Arg(4096)->Arg(16384)->Arg(65536);
+
+// Test the linearization of a buffer in the best case where the data is in one slice.
+static void BufferLinearizeSimple(benchmark::State& state) {
+  const std::string data(state.range(0), 'a');
+  const absl::string_view input(data);
+  Buffer::BufferFragmentImpl fragment(input.data(), input.size(), DoNotReleaseFragment);
+  Buffer::OwnedImpl buffer;
+  for (auto _ : state) {
+    buffer.drain(buffer.length());
+    buffer.addBufferFragment(fragment);
+    benchmark::DoNotOptimize(buffer.linearize(state.range(0)));
+  }
+}
+BENCHMARK(BufferLinearizeSimple)->Arg(1)->Arg(4096)->Arg(16384)->Arg(65536);
+
+// Test the linearization of a buffer in the general case where the data is spread among
+// many slices.
+static void BufferLinearizeGeneral(benchmark::State& state) {
+  static constexpr uint64_t SliceSize = 1024;
+  const std::string data(SliceSize, 'a');
+  const absl::string_view input(data);
+  Buffer::BufferFragmentImpl fragment(input.data(), input.size(), DoNotReleaseFragment);
+  Buffer::OwnedImpl buffer;
+  for (auto _ : state) {
+    buffer.drain(buffer.length());
+    do {
+      buffer.addBufferFragment(fragment);
+    } while (buffer.length() < static_cast<uint64_t>(state.range(0)));
+    benchmark::DoNotOptimize(buffer.linearize(state.range(0)));
+  }
+}
+BENCHMARK(BufferLinearizeGeneral)->Arg(1)->Arg(4096)->Arg(16384)->Arg(65536);
 
 // Test buffer search, for the simple case where there are no partial matches for
 // the pattern in the buffer.
