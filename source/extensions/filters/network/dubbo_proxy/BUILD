@@ -141,3 +141,13 @@ envoy_cc_library(
     name = "message_lib",
     hdrs = ["message.h"],
 )
+
+envoy_cc_library(
+    name = "decoder_events_lib",
+    hdrs = ["decoder_event_handler.h"],
+    deps = [
+        ":metadata_lib",
+        "//include/envoy/network:filter_interface",
+        "//source/common/buffer:buffer_lib",
+    ],
+)
