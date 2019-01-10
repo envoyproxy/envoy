@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <cstdint>
 #include <deque>
 #include <string>
@@ -127,6 +128,17 @@ public:
     return true;
   }
 
+  uint64_t append(const void* data, uint64_t size) {
+    if (reservation_outstanding_) {
+      return 0;
+    }
+    uint64_t copy_size = std::min(size, reservableSize());
+    uint8_t* dest = base_ + reservable_;
+    reservable_ += copy_size;
+    memcpy(dest, data, copy_size);
+    return copy_size;
+  }
+
 protected:
   Slice(uint64_t data, uint64_t reservable, uint64_t size) : data_(data), reservable_(reservable), size_(size) {}
 
@@ -195,6 +207,137 @@ private:
   }
 
   uint8_t storage_[];
+};
+
+/**
+ * Queue of SlicePtr that supports efficient read and write access to both
+ * the front and the back of the queue.
+ * @note This class has similar properties to std::deque<T>. The reason for using
+ *       a custom deque implementation is that benchmark testing during development
+ *       revealed that std::deque was too slow to reach performance parity with the
+ *       prior evbuffer-based buffer implementation.
+ */
+class SliceDeque {
+public:
+  SliceDeque() :
+    ring_(inline_ring_), start_(0), size_(0), capacity_(InlineRingCapacity) {
+      /*
+      external_ring_ = std::make_unique<SlicePtr[]>(InlineRingCapacity);
+      ring_ = external_ring_.get();
+      */
+      ASSERT(nullptr == external_ring_.get());
+      for (size_t i = 0; i < InlineRingCapacity; i++) {
+        ASSERT(inline_ring_[i].get() == nullptr);
+      }
+      ASSERT(ring_ == &(inline_ring_[0]));
+    }
+
+  SliceDeque(SliceDeque&&) = delete;
+
+  SliceDeque& operator=(SliceDeque&& rhs) {
+    // This custom assignment move operator is needed so that ring_ will be updated properly.
+    std::move(rhs.inline_ring_, rhs.inline_ring_ + InlineRingCapacity, inline_ring_);
+    external_ring_ = std::move(rhs.external_ring_);
+    ring_ = (external_ring_ != nullptr) ? external_ring_.get() : inline_ring_;
+    start_ = rhs.start_;
+    size_ = rhs.size_;
+    capacity_ = rhs.capacity_;
+    return *this;
+  }
+
+  void emplace_back(SlicePtr&& slice) {
+    growRing();
+    size_t index = internalIndex(size_);
+    ring_[index] = std::move(slice);
+    size_++;
+  }
+
+  void emplace_front(SlicePtr&& slice) {
+    growRing();
+    start_ = (start_ == 0) ? capacity_ - 1 : start_ - 1;
+    ring_[start_] = std::move(slice);
+    size_++;
+  }
+
+  bool empty() const { return size() == 0; }
+  size_t size() const { return size_; }
+
+  SlicePtr& front() { return ring_[start_]; }
+  const SlicePtr& front() const { return ring_[start_]; }
+  SlicePtr& back() { return ring_[internalIndex(size_ - 1)]; }
+  const SlicePtr& back() const { return ring_[internalIndex(size_ - 1)]; }
+
+  SlicePtr& operator[](size_t i) { return ring_[internalIndex(i)]; }
+  const SlicePtr& operator[](size_t i) const { return ring_[internalIndex(i)]; }
+
+  void pop_front() {
+    if (size() == 0) {
+      return;
+    }
+    front() = SlicePtr();
+    size_--;
+    start_++;
+    if (start_ == capacity_) {
+      start_ = 0;
+    }
+  }
+
+  void pop_back() {
+    if (size() == 0) {
+      return;
+    }
+    back() = SlicePtr();
+    size_--;
+  }
+
+private:
+  constexpr static size_t InlineRingCapacity = 8;
+
+  size_t internalIndex(size_t index) const {
+#if 0
+    return (start_ + index) & (capacity_ - 1);
+#else
+    size_t internal_index = start_ + index;
+    if (internal_index >= capacity_) {
+      internal_index -= capacity_;
+      ASSERT(internal_index < capacity_);
+    }
+    return internal_index;
+#endif
+  }
+
+  void growRing() {
+    if (size_ < capacity_) {
+      return;
+    }
+    const size_t new_capacity = capacity_ * 2;
+    auto new_ring = std::make_unique<SlicePtr[]>(new_capacity);
+    for (size_t i = 0; i < new_capacity; i++) {
+      ASSERT(new_ring[i].get() == nullptr);
+    }
+    size_t src = start_;
+    size_t dst = 0;
+    for (size_t i = 0; i < size_; i++) {
+      new_ring[dst++] = std::move(ring_[src++]);
+      if (src == capacity_) {
+        src = 0;
+      }
+    }
+    for (size_t i = 0; i < capacity_; i++) {
+      ASSERT(ring_[i].get() == nullptr);
+    }
+    external_ring_.swap(new_ring);
+    ring_ = external_ring_.get();
+    start_ = 0;
+    capacity_ = new_capacity;
+  }
+
+  SlicePtr inline_ring_[InlineRingCapacity];
+  std::unique_ptr<SlicePtr[]> external_ring_;
+  SlicePtr* ring_; // points to start of either inline or external ring.
+  size_t start_;
+  size_t size_;
+  size_t capacity_;
 };
 
 class UnownedSlice : public Slice {
@@ -279,14 +422,15 @@ public:
   std::string toString() const override;
 
 protected:
-  // Copy data to the end of the buffer.
-  void append(const void* data, uint64_t size);
-
   // Called after accessing the memory in buffer() directly to allow any post-processing.
   virtual void postProcess();
 
 private:
+#if 0
   std::deque<SlicePtr> slices_;
+#else
+  SliceDeque slices_;
+#endif
 
   /** Sum of the dataSize of all slices. */
   uint64_t length_{0};

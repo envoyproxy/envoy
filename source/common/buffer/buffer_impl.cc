@@ -24,38 +24,34 @@ static inline void Copy(RawSlice& lhs, const Slice::Reservation& rhs) {
   lhs.len_ = rhs.len_;
 }
 
-void OwnedImpl::append(const void* data, uint64_t size) {
+void OwnedImpl::add(const void* data, uint64_t size) {
   const char* src = static_cast<const char*>(data);
+  bool new_slice_needed = slices_.empty();
   while (size != 0) {
-    if (slices_.empty() || slices_.back()->reservableSize() == 0) {
+    if (new_slice_needed) {
       slices_.emplace_back(OwnedSlice::create(size));
     }
-    Slice::Reservation reservation = slices_.back()->reserve(size);
-    ASSERT(reservation.mem_ != nullptr);
-    ASSERT(reservation.len_ != 0);
-    memcpy(reservation.mem_, src, reservation.len_);
-    slices_.back()->commit(reservation);
-    src += reservation.len_;
-    size -= reservation.len_;
-    length_ += reservation.len_;
+    uint64_t copy_size = slices_.back()->append(src, size);
+    src += copy_size;
+    size -= copy_size;
+    length_ += copy_size;
+    new_slice_needed = true;
   }
 }
-
-void OwnedImpl::add(const void* data, uint64_t size) { append(data, size); }
 
 void OwnedImpl::addBufferFragment(BufferFragment& fragment) {
   length_ += fragment.size();
   slices_.emplace_back(std::make_unique<UnownedSlice>(fragment));
 }
 
-void OwnedImpl::add(absl::string_view data) { append(data.data(), data.size()); }
+void OwnedImpl::add(absl::string_view data) { add(data.data(), data.size()); }
 
 void OwnedImpl::add(const Instance& data) {
   uint64_t num_slices = data.getRawSlices(nullptr, 0);
   STACK_ARRAY(slices, RawSlice, num_slices);
   data.getRawSlices(slices.begin(), num_slices);
   for (const RawSlice& slice : slices) {
-    append(slice.mem_, slice.len_);
+    add(slice.mem_, slice.len_);
   }
 }
 
@@ -84,26 +80,26 @@ void OwnedImpl::commit(RawSlice* iovecs, uint64_t num_iovecs) {
   // First, scan backward from the end of the buffer to find the last slice containing
   // any content. Reservations are made from the end of the buffer, and out-of-order commits
   // aren't supported, so any slices before this point cannot match the iovecs being committed.
-  auto iter = slices_.rbegin();
-  while (iter != slices_.rend() && (*iter)->dataSize() == 0) {
-    iter++;
+  ssize_t slice_index = static_cast<ssize_t>(slices_.size()) - 1;
+  while (slice_index >= 0 && slices_[slice_index]->dataSize() == 0) {
+    slice_index--;
   }
-  if (iter == slices_.rend()) {
+  if (slice_index < 0) {
     // There was no slice containing any data, so rewind the iterator at the first slice.
-    iter--;
+    slice_index = 0;
   }
 
   // Next, scan forward and attempt to match the slices against iovecs.
   uint64_t num_slices_committed = 0;
   while (num_slices_committed < num_iovecs) {
-    if ((*iter)->commit(iovecs[num_slices_committed])) {
+    if (slices_[slice_index]->commit(iovecs[num_slices_committed])) {
       length_ += iovecs[num_slices_committed].len_;
       num_slices_committed++;
     }
-    if (iter == slices_.rbegin()) {
+    slice_index++;
+    if (slice_index == static_cast<ssize_t>(slices_.size())) {
       break;
     }
-    iter--;
   }
 
   ASSERT(num_slices_committed > 0);
@@ -111,7 +107,8 @@ void OwnedImpl::commit(RawSlice* iovecs, uint64_t num_iovecs) {
 
 void OwnedImpl::copyOut(size_t start, uint64_t size, void* data) const {
   uint8_t* dest = static_cast<uint8_t*>(data);
-  for (const auto& slice : slices_) {
+  for (size_t slice_index = 0; slice_index < slices_.size(); slice_index++) {
+    const auto& slice = slices_[slice_index];
     if (size == 0) {
       break;
     }
@@ -149,7 +146,8 @@ void OwnedImpl::drain(uint64_t size) {
 
 uint64_t OwnedImpl::getRawSlices(RawSlice* out, uint64_t out_size) const {
   uint64_t i = 0;
-  for (const auto& slice : slices_) {
+  for (size_t slice_index = 0; slice_index < slices_.size(); slice_index++) {
+    const auto& slice = slices_[slice_index];
     if (slice->dataSize() == 0) {
       continue;
     }
@@ -186,7 +184,8 @@ void* OwnedImpl::linearize(uint32_t size) {
   }
   uint64_t linearized_size = 0;
   uint64_t num_slices_to_linearize = 0;
-  for (const auto& slice : slices_) {
+  for (size_t slice_index = 0; slice_index < slices_.size(); slice_index++) {
+    const auto& slice = slices_[slice_index];
     num_slices_to_linearize++;
     linearized_size += slice->dataSize();
     if (linearized_size >= size) {
@@ -242,7 +241,7 @@ void OwnedImpl::move(Instance& rhs, uint64_t length) {
     } else if (copy_size < slice_size) {
       // TODO(brian-pane) add reference-counting to allow slices to share their storage
       // and eliminate the copy for this partial-slice case?
-      append(other.slices_.front()->data(), copy_size);
+      add(other.slices_.front()->data(), copy_size);
       other.slices_.front()->drain(copy_size);
       other.length_ -= copy_size;
     } else {
@@ -351,14 +350,15 @@ ssize_t OwnedImpl::search(const void* data, uint64_t size, size_t start) const {
   }
   ssize_t offset = 0;
   const uint8_t* needle = static_cast<const uint8_t*>(data);
-  for (auto iter = slices_.begin(); iter != slices_.end(); ++iter) {
-    uint64_t slice_size = (*iter)->dataSize();
+  for (size_t slice_index = 0; slice_index < slices_.size(); slice_index++) {
+    const auto& slice = slices_[slice_index];
+    uint64_t slice_size = slice->dataSize();
     if (slice_size <= start) {
       start -= slice_size;
       offset += slice_size;
       continue;
     }
-    const uint8_t* slice_start = static_cast<const uint8_t*>((*iter)->data());
+    const uint8_t* slice_start = static_cast<const uint8_t*>(slice->data());
     const uint8_t* haystack = slice_start;
     const uint8_t* haystack_end = haystack + slice_size;
     haystack += start;
@@ -373,19 +373,20 @@ ssize_t OwnedImpl::search(const void* data, uint64_t size, size_t start) const {
       // bytes in the buffer match the remainder of the needle. Note that the match can span
       // two or more slices.
       size_t i = 1;
-      auto match_iter = iter;
+      size_t match_index = slice_index;
       const uint8_t* match_next = first_byte_match + 1;
       const uint8_t* match_end = haystack_end;
       for (; i < size; i++) {
         if (match_next >= match_end) {
           // We've hit the end of this slice, so continue checking against the next slice.
-          ++match_iter;
-          if (match_iter == slices_.end()) {
+          match_index++;
+          if (match_index == slices_.size()) {
             // We've hit the end of the entire buffer.
             break;
           }
-          match_next = static_cast<const uint8_t*>((*match_iter)->data());
-          match_end = match_next + (*match_iter)->dataSize();
+          const auto& match_slice = slices_[match_index];
+          match_next = static_cast<const uint8_t*>(match_slice->data());
+          match_end = match_next + match_slice->dataSize();
         }
         if (*match_next++ != needle[i]) {
           break;
