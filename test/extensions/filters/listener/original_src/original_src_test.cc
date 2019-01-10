@@ -157,8 +157,7 @@ TEST_F(OriginalSrcTest, filterAddsMarkOption) {
   ASSERT_TRUE(mark_option.has_value());
   uint32_t value = 1234;
   absl::string_view value_as_bstr(reinterpret_cast<const char*>(&value), sizeof(value));
-  std::string mark_value_as_string = std::string(value_as_bstr);
-  EXPECT_EQ(mark_value_as_string, mark_option->value_);
+  EXPECT_EQ(value_as_bstr, mark_option->value_);
 }
 } // namespace
 } // namespace OriginalSrc
