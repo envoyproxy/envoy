@@ -43,11 +43,13 @@ static void BufferAddSmallIncrement(benchmark::State& state) {
   Buffer::OwnedImpl buffer;
   for (auto _ : state) {
     buffer.add(input);
-
-    // Keep the memory usage from growing too large during the test.
-    uint64_t length = buffer.length();
-    if (length >= 1024 * 1024) {
-      buffer.drain(length);
+    if (buffer.length() >= MaxBufferLength) {
+      // Keep the test's memory usage from growing too large.
+      // @note Ideally we could use state.PauseTiming()/ResumeTiming() to exclude
+      // the time spent in the drain operation, but those functions themselves are
+      // heavyweight enough to cloud the measurements:
+      // https://github.com/google/benchmark/issues/179
+      buffer.drain(buffer.length());
     }
   }
   benchmark::DoNotOptimize(buffer.length());
@@ -62,11 +64,6 @@ static void BufferAddString(benchmark::State& state) {
   for (auto _ : state) {
     buffer.add(data);
     if (buffer.length() >= MaxBufferLength) {
-      // Keep the test's memory usage from growing too large.
-      // @note Ideally we could use state.PauseTiming()/ResumeTiming() to exclude
-      // the time spent in the drain operation, but those functions themselves are
-      // heavyweight enough to cloud the measurements:
-      // https://github.com/google/benchmark/issues/179
       buffer.drain(buffer.length());
     }
   }
