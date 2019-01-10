@@ -6,10 +6,9 @@
 
 #include "common/common/assert.h"
 
-#include "extensions/filters/network/kafka/kafka_protocol.h"
+#include "extensions/filters/network/kafka/generated/serialization_composite.h"
 #include "extensions/filters/network/kafka/parser.h"
 #include "extensions/filters/network/kafka/serialization.h"
-#include "extensions/filters/network/kafka/serialization_composite.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -43,44 +42,12 @@ struct RequestContext {
 typedef std::shared_ptr<RequestContext> RequestContextSharedPtr;
 
 /**
- * Function generating a parser with given context
- */
-typedef std::function<ParserSharedPtr(RequestContextSharedPtr)> ParserGeneratorFunction;
-
-/**
- * Structure responsible for mapping [api_key, api_version] -> ParserGeneratorFunction
- */
-typedef std::unordered_map<int16_t, std::unordered_map<int16_t, ParserGeneratorFunction>>
-    ParserGenerators;
-
-/**
- * Trivial structure specifying which parser generator function should be used
- * for which api_key & api_version
- */
-struct ParserSpec {
-  const int16_t api_key_;
-  const std::vector<int16_t> api_versions_;
-  const ParserGeneratorFunction generator_;
-};
-
-/**
  * Configuration object
  * Resolves the parser that will be responsible for consuming the request-specific data
  * In other words: provides (api_key, api_version) -> Parser function
  */
 class RequestParserResolver {
 public:
-  /**
-   * Creates a resolver that uses generator functions provided by given specifications
-   */
-  RequestParserResolver(const std::vector<ParserSpec> specs);
-
-  /**
-   * Creates a resolver that uses generator functions provided by original resolver and then
-   * expanded by specifications
-   */
-  RequestParserResolver(const RequestParserResolver& original, const std::vector<ParserSpec> specs);
-
   virtual ~RequestParserResolver() = default;
 
   /**
@@ -94,17 +61,9 @@ public:
                                        RequestContextSharedPtr context) const;
 
   /**
-   * Request versions handled by Kafka up to 0.11
+   * Request parser singleton
    */
-  static const RequestParserResolver KAFKA_0_11;
-
-  /**
-   * Request versions handled by Kafka up to 1.0
-   */
-  static const RequestParserResolver KAFKA_1_0;
-
-private:
-  ParserGenerators generators_;
+  static const RequestParserResolver INSTANCE;
 };
 
 /**
@@ -189,7 +148,8 @@ public:
       // after a successful parse, there should be nothing left - we have consumed all the bytes
       ASSERT(0 == context_->remaining_request_size_);
       RequestType request = deserializer.get();
-      request.header() = context_->request_header_;
+      const RequestHeader& parsed_header = context_->request_header_;
+      request.setMetadata(parsed_header.correlation_id_, parsed_header.client_id_);
       MessageSharedPtr msg = std::make_shared<RequestType>(request);
       return ParseResponse::parsedMessage(msg);
     } else {
@@ -203,19 +163,6 @@ protected:
 };
 
 /**
- * Helper macro defining RequestParser that uses the underlying Deserializer
- * Aware of versioning
- * Names of Deserializers/Parsers are influenced by org.apache.kafka.common.protocol.Protocol names
- * Renders class named (Request)(Version)Parser e.g. OffsetCommitRequestV0Parser
- */
-#define DEFINE_REQUEST_PARSER(REQUEST_TYPE, VERSION)                                               \
-  class REQUEST_TYPE##VERSION##Parser                                                              \
-      : public RequestParser<REQUEST_TYPE, REQUEST_TYPE##VERSION##Deserializer> {                  \
-  public:                                                                                          \
-    REQUEST_TYPE##VERSION##Parser(RequestContextSharedPtr ctx) : RequestParser{ctx} {};            \
-  };
-
-/**
  * Abstract Kafka request
  * Contains data present in every request
  * @see http://kafka.apache.org/protocol.html#protocol_messages
@@ -225,18 +172,12 @@ public:
   /**
    * Request header fields need to be initialized by user in case of newly created requests
    */
-  Request(int16_t api_key) : request_header_{api_key, 0, 0, ""} {};
+  Request(int16_t api_key, int16_t api_version) : request_header_{api_key, api_version, 0, ""} {};
 
-  Request(const RequestHeader& request_header) : request_header_{request_header} {};
-
-  RequestHeader& header() { return request_header_; }
-
-  int16_t& apiVersion() { return request_header_.api_version_; }
-  int16_t apiVersion() const { return request_header_.api_version_; }
-
-  int32_t& correlationId() { return request_header_.correlation_id_; }
-
-  NullableString& clientId() { return request_header_.client_id_; }
+  void setMetadata(const int32_t correlation_id, const NullableString& client_id) {
+    request_header_.correlation_id_ = correlation_id;
+    request_header_.client_id_ = client_id;
+  }
 
   /**
    * Encodes given request into a buffer, with any extra configuration carried by the context
@@ -268,7 +209,10 @@ protected:
  */
 class UnknownRequest : public Request {
 public:
-  UnknownRequest(const RequestHeader& request_header) : Request{request_header} {};
+  UnknownRequest(const RequestHeader& request_header)
+      : Request{request_header.api_key_, request_header.api_version_} {
+    setMetadata(request_header.correlation_id_, request_header.client_id_);
+  };
 
 protected:
   // this isn't the prettiest, as we have thrown away the data

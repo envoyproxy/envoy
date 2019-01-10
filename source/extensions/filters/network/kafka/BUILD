@@ -26,10 +26,13 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "kafka_request_lib",
-    srcs = ["kafka_request.cc"],
+    srcs = [
+        "generated/kafka_request_resolver.cc",
+        "kafka_request.cc",
+    ],
     hdrs = [
+        "generated/requests.h",
         "kafka_request.h",
-        "messages/offset_commit.h",
     ],
     deps = [
         ":parser_lib",
@@ -61,8 +64,8 @@ envoy_cc_library(
 envoy_cc_library(
     name = "serialization_lib",
     hdrs = [
+        "generated/serialization_composite.h",
         "serialization.h",
-        "serialization_composite.h",
     ],
     deps = [
         ":kafka_protocol_lib",
@@ -74,7 +77,6 @@ envoy_cc_library(
 envoy_cc_library(
     name = "kafka_protocol_lib",
     hdrs = [
-        "kafka_protocol.h",
         "kafka_types.h",
     ],
     external_deps = ["abseil_optional"],

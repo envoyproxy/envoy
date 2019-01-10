@@ -46,7 +46,7 @@ public:
    * @param parserResolver supported parser resolver
    * @param callbacks callbacks to be invoked (in order)
    */
-  RequestDecoder(const RequestParserResolver parserResolver,
+  RequestDecoder(const RequestParserResolver& parserResolver,
                  const std::vector<RequestCallbackSharedPtr> callbacks)
       : parser_resolver_{parserResolver}, callbacks_{callbacks},
         current_parser_{new RequestStartParser(parser_resolver_)} {};
@@ -62,7 +62,7 @@ public:
 private:
   void doParse(ParserSharedPtr& parser, const Buffer::RawSlice& slice);
 
-  const RequestParserResolver parser_resolver_;
+  const RequestParserResolver& parser_resolver_;
   const std::vector<RequestCallbackSharedPtr> callbacks_;
 
   ParserSharedPtr current_parser_;

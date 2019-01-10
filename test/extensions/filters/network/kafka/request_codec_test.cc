@@ -1,4 +1,4 @@
-#include "extensions/filters/network/kafka/messages/offset_commit.h"
+#include "extensions/filters/network/kafka/generated/requests.h"
 #include "extensions/filters/network/kafka/request_codec.h"
 
 #include "test/mocks/server/mocks.h"
@@ -25,12 +25,18 @@ public:
   MOCK_METHOD1(onMessage, void(MessageSharedPtr));
 };
 
+class MockRequestParserResolver : public RequestParserResolver {
+public:
+  MockRequestParserResolver() : RequestParserResolver({}){};
+  MOCK_CONST_METHOD3(createParser, ParserSharedPtr(int16_t, int16_t, RequestContextSharedPtr));
+};
+
 template <typename T> std::shared_ptr<T> RequestDecoderTest::serializeAndDeserialize(T request) {
   RequestEncoder serializer{buffer_};
   serializer.encode(request);
 
   std::shared_ptr<MockMessageListener> mock_listener = std::make_shared<MockMessageListener>();
-  RequestDecoder testee{RequestParserResolver::KAFKA_0_11, {mock_listener}};
+  RequestDecoder testee{RequestParserResolver::INSTANCE, {mock_listener}};
 
   MessageSharedPtr receivedMessage;
   EXPECT_CALL(*mock_listener, onMessage(_)).WillOnce(testing::SaveArg<0>(&receivedMessage));
@@ -40,57 +46,25 @@ template <typename T> std::shared_ptr<T> RequestDecoderTest::serializeAndDeseria
   return std::dynamic_pointer_cast<T>(receivedMessage);
 };
 
-TEST_F(RequestDecoderTest, shouldParseOffsetCommitRequestV0) {
-  // given
-  NullableArray<OffsetCommitTopic> topics{{{"topic1", {{{{0, 10, "m1"}}}}}}};
-  OffsetCommitRequest request{"group_id", topics};
-  request.apiVersion() = 0;
-  request.correlationId() = 10;
-  request.clientId() = "client-id";
-
-  // when
-  auto received = serializeAndDeserialize(request);
-
-  // then
-  ASSERT_NE(received, nullptr);
-  ASSERT_EQ(*received, request);
-}
-
-TEST_F(RequestDecoderTest, shouldParseOffsetCommitRequestV1) {
-  // given
-  // partitions have timestamp in v1 only
-  NullableArray<OffsetCommitTopic> topics{
-      {{"topic1", {{{0, 10, 100, "m1"}, {2, 20, 101, "m2"}}}}, {"topic2", {{{3, 30, 102, "m3"}}}}}};
-  OffsetCommitRequest request{"group_id",
-                              40,          // group_generation_id
-                              "member_id", // member_id
-                              topics};
-  request.apiVersion() = 1;
-  request.correlationId() = 10;
-  request.clientId() = "client-id";
-
-  // when
-  auto received = serializeAndDeserialize(request);
-
-  // then
-  ASSERT_NE(received, nullptr);
-  ASSERT_EQ(*received, request);
+ParserSharedPtr createSentinelParser(testing::Unused, testing::Unused,
+                                     RequestContextSharedPtr context) {
+  return std::make_shared<SentinelParser>(context);
 }
 
 TEST_F(RequestDecoderTest, shouldProduceAbortedMessageOnUnknownData) {
   // given
   RequestEncoder serializer{buffer_};
-  NullableArray<OffsetCommitTopic> topics{{{"topic1", {{{{0, 10, "m1"}}}}}}};
-  OffsetCommitRequest request{"group_id", topics};
-  request.apiVersion() = 1;
-  request.correlationId() = 42;
-  request.clientId() = "client-id";
+  NullableArray<OffsetCommitRequestV0Topic> topics{{{"topic1", {{{{0, 10, "m1"}}}}}}};
+  OffsetCommitRequestV0 request{"group_id", topics};
+  request.setMetadata(42, "client-id");
 
   serializer.encode(request);
 
+  MockRequestParserResolver mock_parser_resolver{};
+  EXPECT_CALL(mock_parser_resolver, createParser(_, _, _))
+      .WillOnce(testing::Invoke(createSentinelParser));
   std::shared_ptr<MockMessageListener> mock_listener = std::make_shared<MockMessageListener>();
-  RequestParserResolver parser_resolver{{}}; // we do not accept any kind of message here
-  RequestDecoder testee{parser_resolver, {mock_listener}};
+  RequestDecoder testee{mock_parser_resolver, {mock_listener}};
 
   MessageSharedPtr rev;
   EXPECT_CALL(*mock_listener, onMessage(_)).WillOnce(testing::SaveArg<0>(&rev));
@@ -99,6 +73,7 @@ TEST_F(RequestDecoderTest, shouldProduceAbortedMessageOnUnknownData) {
   testee.onData(buffer_);
 
   // then
+  ASSERT_NE(rev, nullptr);
   auto received = std::dynamic_pointer_cast<UnknownRequest>(rev);
   ASSERT_NE(received, nullptr);
 }

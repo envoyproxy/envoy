@@ -1,77 +1,12 @@
 #include "extensions/filters/network/kafka/kafka_request.h"
 
-#include "extensions/filters/network/kafka/kafka_protocol.h"
-#include "extensions/filters/network/kafka/messages/offset_commit.h"
+#include "extensions/filters/network/kafka/generated/requests.h"
 #include "extensions/filters/network/kafka/parser.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace Kafka {
-
-// helper function that generates a map from specs looking like { api_key, api_versions... }
-ParserGenerators computeGeneratorMap(const ParserGenerators& original,
-                                     const std::vector<ParserSpec> specs) {
-  ParserGenerators result{original};
-  for (auto& spec : specs) {
-    auto& generators = result[spec.api_key_];
-    for (int16_t api_version : spec.api_versions_) {
-      generators[api_version] = spec.generator_;
-    }
-  }
-
-  return result;
-}
-
-RequestParserResolver::RequestParserResolver(const std::vector<ParserSpec> specs)
-    : generators_{computeGeneratorMap({}, specs)} {};
-
-RequestParserResolver::RequestParserResolver(const RequestParserResolver& original,
-                                             const std::vector<ParserSpec> specs)
-    : generators_{computeGeneratorMap(original.generators_, specs)} {};
-
-// helper macro binding request type & api versions to Deserializers
-// the rendered function will create a new instance of (REQUEST)RequestV(Version)Parser
-// e.g. OffsetCommitRequestV0Parser
-#define PARSER_SPEC(REQUEST_NAME, PARSER_VERSION, ...)                                             \
-  ParserSpec {                                                                                     \
-    RequestType::REQUEST_NAME, {__VA_ARGS__}, [](RequestContextSharedPtr arg) -> ParserSharedPtr { \
-      return std::make_shared<REQUEST_NAME##Request##PARSER_VERSION##Parser>(arg);                 \
-    }                                                                                              \
-  }
-
-const RequestParserResolver RequestParserResolver::KAFKA_0_11{{
-    PARSER_SPEC(OffsetCommit, V0, 0), PARSER_SPEC(OffsetCommit, V1, 1),
-    // XXX(adam.kotwasinski) missing request types here
-}};
-
-const RequestParserResolver RequestParserResolver::KAFKA_1_0{
-    RequestParserResolver::KAFKA_0_11,
-    {
-        // XXX(adam.kotwasinski) missing request types & versions here
-    }};
-
-ParserSharedPtr RequestParserResolver::createParser(int16_t api_key, int16_t api_version,
-                                                    RequestContextSharedPtr context) const {
-
-  // api_key
-  const auto api_versions_ptr = generators_.find(api_key);
-  if (generators_.end() == api_versions_ptr) {
-    return std::make_shared<SentinelParser>(context);
-  }
-  const std::unordered_map<int16_t, ParserGeneratorFunction>& api_versions =
-      api_versions_ptr->second;
-
-  // api_version
-  const auto generator_ptr = api_versions.find(api_version);
-  if (api_versions.end() == generator_ptr) {
-    return std::make_shared<SentinelParser>(context);
-  }
-
-  // found matching parser generator, create parser
-  const ParserGeneratorFunction generator = generator_ptr->second;
-  return generator(context);
-}
 
 ParseResponse RequestStartParser::parse(const char*& buffer, uint64_t& remaining) {
   request_length_.feed(buffer, remaining);

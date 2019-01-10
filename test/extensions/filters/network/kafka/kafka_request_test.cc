@@ -1,7 +1,7 @@
 #include "common/common/stack_array.h"
 
+#include "extensions/filters/network/kafka/generated/requests.h"
 #include "extensions/filters/network/kafka/kafka_request.h"
-#include "extensions/filters/network/kafka/messages/offset_commit.h"
 
 #include "test/mocks/server/mocks.h"
 
@@ -16,52 +16,6 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace Kafka {
 
-TEST(RequestParserResolver, ShouldReturnSentinelIfRequestTypeIsNotRegistered) {
-  // given
-  RequestParserResolver testee{{}};
-  RequestContextSharedPtr context{new RequestContext{}};
-
-  // when
-  ParserSharedPtr result = testee.createParser(0, 1, context); // api_key = 0 was not registered
-
-  // then
-  ASSERT_NE(result, nullptr);
-  ASSERT_NE(std::dynamic_pointer_cast<SentinelParser>(result), nullptr);
-}
-
-TEST(RequestParserResolver, ShouldReturnSentinelIfRequestVersionIsNotRegistered) {
-  // given
-  ParserGeneratorFunction generator = [](RequestContextSharedPtr arg) -> ParserSharedPtr {
-    return std::make_shared<OffsetCommitRequestV0Parser>(arg);
-  };
-  RequestParserResolver testee{{{0, {0, 1}, generator}}};
-  RequestContextSharedPtr context{new RequestContext{}};
-
-  // when
-  ParserSharedPtr result =
-      testee.createParser(0, 2, context); // api_version = 2 was not registered (0 & 1 were)
-
-  // then
-  ASSERT_NE(result, nullptr);
-  ASSERT_NE(std::dynamic_pointer_cast<SentinelParser>(result), nullptr);
-}
-
-TEST(RequestParserResolver, ShouldInvokeGeneratorFunctionOnMatch) {
-  // given
-  ParserGeneratorFunction generator = [](RequestContextSharedPtr arg) -> ParserSharedPtr {
-    return std::make_shared<OffsetCommitRequestV0Parser>(arg);
-  };
-  RequestParserResolver testee{{{0, {0, 1, 2, 3}, generator}}};
-  RequestContextSharedPtr context{new RequestContext{}};
-
-  // when
-  ParserSharedPtr result = testee.createParser(0, 3, context);
-
-  // then
-  ASSERT_NE(result, nullptr);
-  ASSERT_NE(std::dynamic_pointer_cast<OffsetCommitRequestV0Parser>(result), nullptr);
-}
-
 class BufferBasedTest : public testing::Test {
 public:
   Buffer::OwnedImpl& buffer() { return buffer_; }
@@ -75,12 +29,19 @@ public:
 
 protected:
   Buffer::OwnedImpl buffer_;
-  EncodingContext encoder_{-1};
+  EncodingContext encoder_;
+};
+
+class MockRequestParserResolver : public RequestParserResolver {
+public:
+  MockRequestParserResolver(){};
+  MOCK_CONST_METHOD3(createParser, ParserSharedPtr(int16_t, int16_t, RequestContextSharedPtr));
 };
 
 TEST_F(BufferBasedTest, RequestStartParserTestShouldReturnRequestHeaderParser) {
   // given
-  RequestStartParser testee{RequestParserResolver{{}}};
+  MockRequestParserResolver resolver{};
+  RequestStartParser testee{resolver};
 
   int32_t request_len = 1234;
   encoder_.encode(request_len, buffer());
@@ -97,12 +58,6 @@ TEST_F(BufferBasedTest, RequestStartParserTestShouldReturnRequestHeaderParser) {
   ASSERT_EQ(result.message_, nullptr);
   ASSERT_EQ(testee.contextForTest()->remaining_request_size_, request_len);
 }
-
-class MockRequestParserResolver : public RequestParserResolver {
-public:
-  MockRequestParserResolver() : RequestParserResolver{{}} {};
-  MOCK_CONST_METHOD3(createParser, ParserSharedPtr(int16_t, int16_t, RequestContextSharedPtr));
-};
 
 TEST_F(BufferBasedTest, RequestHeaderParserShouldExtractHeaderDataAndResolveNextParser) {
   // given

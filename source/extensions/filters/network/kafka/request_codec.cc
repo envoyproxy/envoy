@@ -3,8 +3,6 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/stack_array.h"
 
-#include "extensions/filters/network/kafka/kafka_protocol.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -56,10 +54,7 @@ void RequestDecoder::doParse(ParserSharedPtr& parser, const Buffer::RawSlice& sl
 }
 
 void RequestEncoder::encode(const Request& message) {
-  // XXX (adam.kotwasinski) theoretically this context could be generated inside Request::encode (as
-  // the requested knows the api_version), but the serialization design is still to be discussed
-  // (explicit classes vs vectors of pointers vs templates)
-  EncodingContext encoder{message.apiVersion()};
+  EncodingContext encoder;
   Buffer::OwnedImpl data_buffer;
   // TODO (adam.kotwasinski) precompute the size instead of using temporary
   // also, when we have 'computeSize' method, then we can push encoding request's size into

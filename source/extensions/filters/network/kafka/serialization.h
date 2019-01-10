@@ -517,15 +517,9 @@ private:
  * Encodes provided argument in Kafka format
  * In case of primitive types, this is done explicitly as per spec
  * In case of composite types, this is done by calling 'encode' on provided argument
- *
- * This object also carries extra information that is used while traversing the request
- * structure-tree during encryping (currently api_version, as different request versions serialize
- * differently)
  */
 class EncodingContext {
 public:
-  EncodingContext(int16_t api_version) : api_version_{api_version} {};
-
   /**
    * Encode given reference in a buffer
    * @return bytes written
@@ -537,11 +531,6 @@ public:
    * @return bytes written
    */
   template <typename T> size_t encode(const NullableArray<T>& arg, Buffer::Instance& dst);
-
-  int16_t apiVersion() const { return api_version_; }
-
-private:
-  const int16_t api_version_;
 };
 
 /**
