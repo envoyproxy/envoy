@@ -52,7 +52,7 @@ struct SuccessResponse {
 } // namespace
 
 // Matchers
-HeaderKeyMatcher::HeaderKeyMatcher(std::vector<Matchers::StringMatcher>&& list)
+HeaderKeyMatcher::HeaderKeyMatcher(std::vector<Matchers::LowerCaseStringMatcher>&& list)
     : matchers_(std::move(list)) {}
 
 bool HeaderKeyMatcher::matches(absl::string_view key) const {
@@ -60,7 +60,7 @@ bool HeaderKeyMatcher::matches(absl::string_view key) const {
                      [&key](auto matcher) { return matcher.match(key); });
 }
 
-NotHeaderKeyMatcher::NotHeaderKeyMatcher(std::vector<Matchers::StringMatcher>&& list)
+NotHeaderKeyMatcher::NotHeaderKeyMatcher(std::vector<Matchers::LowerCaseStringMatcher>&& list)
     : matcher_(std::move(list)) {}
 
 bool NotHeaderKeyMatcher::matches(absl::string_view key) const { return !matcher_.matches(key); }
@@ -85,7 +85,8 @@ ClientConfig::toRequestMatchers(const envoy::type::matcher::ListStringMatcher& l
       {Http::Headers::get().Authorization, Http::Headers::get().Method, Http::Headers::get().Path,
        Http::Headers::get().Host}};
 
-  std::vector<Matchers::StringMatcher> matchers{list.patterns().begin(), list.patterns().end()};
+  std::vector<Matchers::LowerCaseStringMatcher> matchers{list.patterns().begin(),
+                                                         list.patterns().end()};
   for (const auto& key : keys) {
     envoy::type::matcher::StringMatcher matcher;
     matcher.set_exact(key.get());
@@ -97,7 +98,8 @@ ClientConfig::toRequestMatchers(const envoy::type::matcher::ListStringMatcher& l
 
 MatcherSharedPtr
 ClientConfig::toClientMatchers(const envoy::type::matcher::ListStringMatcher& list) {
-  std::vector<Matchers::StringMatcher> matchers{list.patterns().begin(), list.patterns().end()};
+  std::vector<Matchers::LowerCaseStringMatcher> matchers{list.patterns().begin(),
+                                                         list.patterns().end()};
 
   // If list is empty, all authorization response headers, except Host, should be added to
   // the client response.
@@ -126,7 +128,8 @@ ClientConfig::toClientMatchers(const envoy::type::matcher::ListStringMatcher& li
 
 MatcherSharedPtr
 ClientConfig::toUpstreamMatchers(const envoy::type::matcher::ListStringMatcher& list) {
-  std::vector<Matchers::StringMatcher> matchers{list.patterns().begin(), list.patterns().end()};
+  std::vector<Matchers::LowerCaseStringMatcher> matchers{list.patterns().begin(),
+                                                         list.patterns().end()};
   return std::make_unique<HeaderKeyMatcher>(std::move(matchers));
 }
 

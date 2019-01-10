@@ -34,17 +34,17 @@ public:
 
 class HeaderKeyMatcher : public Matcher {
 public:
-  HeaderKeyMatcher(std::vector<Matchers::StringMatcher>&& list);
+  HeaderKeyMatcher(std::vector<Matchers::LowerCaseStringMatcher>&& list);
 
   bool matches(absl::string_view key) const override;
 
 private:
-  const std::vector<Matchers::StringMatcher> matchers_;
+  const std::vector<Matchers::LowerCaseStringMatcher> matchers_;
 };
 
 class NotHeaderKeyMatcher : public Matcher {
 public:
-  NotHeaderKeyMatcher(std::vector<Matchers::StringMatcher>&& list);
+  NotHeaderKeyMatcher(std::vector<Matchers::LowerCaseStringMatcher>&& list);
 
   bool matches(absl::string_view key) const override;
 

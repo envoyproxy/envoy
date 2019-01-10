@@ -53,7 +53,7 @@ public:
           authorization_request: 
             allowed_headers: 
               patterns: 
-              - exact: baz
+              - exact: Baz
               - prefix: "x-"
             headers_to_add:
             - key: "x-authz-header1"
@@ -64,11 +64,11 @@ public:
           authorization_response: 
             allowed_upstream_headers: 
               patterns: 
-              - exact: bar
+              - exact: Bar
               - prefix: "x-"
             allowed_client_headers: 
               patterns: 
-              - exact: foo
+              - exact: Foo
               - prefix: "x-"
         )EOF";
       MessageUtil::loadFromYaml(default_yaml, proto_config);

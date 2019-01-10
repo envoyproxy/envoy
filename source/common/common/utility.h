@@ -328,6 +328,13 @@ public:
   static std::string toUpper(absl::string_view s);
 
   /**
+   * Convert a string to lower case.
+   * @param s string.
+   * @return std::string s converted to lower case.
+   */
+  static std::string toLower(absl::string_view s);
+
+  /**
    * Callable struct that returns the result of string comparison ignoring case.
    * @param lhs supplies the first string view.
    * @param rhs supplies the second string view.
