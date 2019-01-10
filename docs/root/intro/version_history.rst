@@ -3,11 +3,6 @@ Version history
 
 1.10.0 (pending)
 ================
-* ext_authz: authorization request and response configuration has been separated and split into two distinct objects: :ref:`authorization request 
-  <envoy_api_field_config.filter.http.ext_authz.v2alpha.HttpService.authorization_request>` and :ref:`authorization response 
-  <envoy_api_field_config.filter.http.ext_authz.v2alpha.HttpService.authorization_response>`. In addition :ref:`client headers 
-  <envoy_api_field_config.filter.http.ext_authz.v2alpha.AuthorizationResponse.allowed_client_headers>` and :ref:`upstream headers 
-  <envoy_api_field_config.filter.http.ext_authz.v2alpha.AuthorizationResponse.allowed_upstream_headers>` which replaces the old *allowed_authorization_headers* object and also supports :ref:`string matcher <envoy_api_msg_type.matcher.StringMatcher>`.
 * config: added support of using google.protobuf.Any in opaque configs for extensions.
 * access log: added a new flag for upstream retry count exceeded.
 * admin: the admin server can now be accessed via HTTP/2 (prior knowledge).
@@ -15,6 +10,12 @@ Version history
 * config: removed deprecated_v1 sds_config from :ref:`Bootstrap config <config_overview_v2_bootstrap>`.
 * config: removed REST_LEGACY as a valid :ref:`ApiType <envoy_api_field_core.ApiConfigSource.api_type>`.
 * cors: added :ref:`filter_enabled & shadow_enabled RuntimeFractionalPercent flags <cors-runtime>` to filter.
+* ext_authz: authorization request and response configuration has been separated into two distinct objects: :ref:`authorization request 
+  <envoy_api_field_config.filter.http.ext_authz.v2alpha.HttpService.authorization_request>` and :ref:`authorization response 
+  <envoy_api_field_config.filter.http.ext_authz.v2alpha.HttpService.authorization_response>`. In addition, :ref:`client headers 
+  <envoy_api_field_config.filter.http.ext_authz.v2alpha.AuthorizationResponse.allowed_client_headers>` and :ref:`upstream headers 
+  <envoy_api_field_config.filter.http.ext_authz.v2alpha.AuthorizationResponse.allowed_upstream_headers>` replaces the previous *allowed_authorization_headers* object. 
+  All the control header lists now support :ref:`string matcher <envoy_api_msg_type.matcher.StringMatcher>` instead of standard string.
 * http: added new grpc_http1_reverse_bridge filter for converting gRPC requests into HTTP/1.1 requests.
 * router: added ability to configure a :ref:`retry policy <envoy_api_msg_route.RetryPolicy>` at the
   virtual host level.
