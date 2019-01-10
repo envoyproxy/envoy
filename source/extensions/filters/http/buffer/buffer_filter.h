@@ -7,8 +7,6 @@
 
 #include "envoy/config/filter/http/buffer/v2/buffer.pb.h"
 #include "envoy/http/filter.h"
-#include "envoy/stats/scope.h"
-#include "envoy/stats/stats_macros.h"
 
 #include "common/buffer/buffer_impl.h"
 
