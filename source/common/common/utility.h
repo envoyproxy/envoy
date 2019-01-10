@@ -546,21 +546,26 @@ private:
   double m2_{0};
 };
 
-template <class Value> struct LookupEntry {
+template <class Value> struct TrieEntry {
   Value value_{};
-  std::array<std::unique_ptr<LookupEntry>, 256> entries_;
+  std::array<std::unique_ptr<TrieEntry>, 256> entries_;
 };
 
 /**
  * A trie used for faster lookup with lookup time at most equal to the size of the key.
  */
-template <class Value> struct LookupTable {
+template <class Value> struct TrieLookupTable {
 
+  /**
+   * Adds an entry to the Trie at the given Key.
+   * @param key the key used to add the entry.
+   * @param value the value to be associated with the key.
+   */
   void add(const char* key, Value value) {
-    LookupEntry<Value>* current = &root_;
+    TrieEntry<Value>* current = &root_;
     while (uint8_t c = *key) {
       if (!current->entries_[c]) {
-        current->entries_[c] = std::make_unique<LookupEntry<Value>>();
+        current->entries_[c] = std::make_unique<TrieEntry<Value>>();
       }
       current = current->entries_[c].get();
       key++;
@@ -568,8 +573,13 @@ template <class Value> struct LookupTable {
     current->value_ = value;
   }
 
+  /**
+   * Finds the entry associated with the key.
+   * @param key the key used to find.
+   * @return the value associated with the key.
+   */
   Value find(const char* key) const {
-    const LookupEntry<Value>* current = &root_;
+    const TrieEntry<Value>* current = &root_;
     while (uint8_t c = *key) {
       current = current->entries_[c].get();
       if (current) {
@@ -581,7 +591,7 @@ template <class Value> struct LookupTable {
     return current->value_;
   }
 
-  LookupEntry<Value> root_;
+  TrieEntry<Value> root_;
 };
 
 } // namespace Envoy

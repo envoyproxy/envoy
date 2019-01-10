@@ -122,7 +122,7 @@ protected:
 
     EntryCb find(const char* key) const { return lookup_table_.find(key); }
 
-    LookupTable<EntryCb> lookup_table_;
+    TrieLookupTable<EntryCb> lookup_table_;
   };
 
   struct AllInlineHeaders {
