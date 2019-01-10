@@ -111,7 +111,8 @@ def checkTools():
         "PATH, please use CLANG_FORMAT environment variable to specify the path. "
         "Examples:\n"
         "    export CLANG_FORMAT=clang-format-7.0.0\n"
-        "    export CLANG_FORMAT=/opt/bin/clang-format-7".format(CLANG_FORMAT_PATH))
+        "    export CLANG_FORMAT=/opt/bin/clang-format-7\n"
+        "    export CLANG_FORMAT=/usr/local/opt/llvm@7/bin/clang-format".format(CLANG_FORMAT_PATH))
 
   buildifier_abs_path = lookPath(BUILDIFIER_PATH)
   if buildifier_abs_path:
