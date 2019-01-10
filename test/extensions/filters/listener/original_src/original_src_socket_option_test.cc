@@ -93,25 +93,12 @@ TEST_F(OriginalSrcSocketOptionTest, TestIpv6HashKeyOther) {
   EXPECT_EQ(key_, expected_key);
 }
 
-TEST_F(OriginalSrcSocketOptionTest, TestOptionDetails) {
+TEST_F(OriginalSrcSocketOptionTest, TestOptionDetailsNotSupported) {
   const auto address = Network::Utility::parseInternetAddress("255.254.253.0");
   auto option = makeOptionByAddress(address);
 
   auto details =
       option->getOptionDetails(socket_, envoy::api::v2::core::SocketOption::STATE_PREBIND);
-
-  ASSERT_TRUE(details.has_value());
-
-  EXPECT_FALSE(details->name_.has_value());
-  EXPECT_TRUE(details->value_.empty());
-  EXPECT_EQ(details->description_, "OriginalSrc: '255.254.253.0:0'");
-}
-
-TEST_F(OriginalSrcSocketOptionTest, TestOptionDetailsWrongState) {
-  const auto address = Network::Utility::parseInternetAddress("255.254.253.0");
-  auto option = makeOptionByAddress(address);
-
-  auto details = option->getOptionDetails(socket_, envoy::api::v2::core::SocketOption::STATE_BOUND);
 
   EXPECT_FALSE(details.has_value());
 }

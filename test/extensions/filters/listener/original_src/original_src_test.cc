@@ -76,12 +76,14 @@ TEST_F(OriginalSrcTest, onNewConnectionIpv4AddressAddsOption) {
   EXPECT_CALL(callbacks_.socket_, addOptions_(_)).WillOnce(SaveArg<0>(&options));
 
   EXPECT_EQ(filter->onAccept(callbacks_), Network::FilterStatus::Continue);
+
   // not ideal -- we're assuming that the original_src option is first, but it's a fair assumption
   // for now.
   ASSERT_NE(options->at(0), nullptr);
-  auto details = options->at(0)->getOptionDetails(
-      callbacks_.socket_, envoy::api::v2::core::SocketOption::STATE_PREBIND);
-  EXPECT_EQ(details->description_, "OriginalSrc: '1.2.3.4:0'");
+
+  NiceMock<Network::MockConnectionSocket> socket;
+  EXPECT_CALL(socket, setLocalAddress(PointeesEq(callbacks_.socket_.remote_address_)));
+  options->at(0)->setOption(socket, envoy::api::v2::core::SocketOption::STATE_PREBIND);
 }
 
 TEST_F(OriginalSrcTest, onNewConnectionIpv4AddressUsesCorrectAddress) {

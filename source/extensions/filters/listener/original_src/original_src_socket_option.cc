@@ -50,15 +50,11 @@ void OriginalSrcSocketOption::hashKey(std::vector<uint8_t>& key) const {
   }
 }
 
-absl::optional<Network::Socket::Option::Details> OriginalSrcSocketOption::getOptionDetails(
-    const Network::Socket&, envoy::api::v2::core::SocketOption::SocketState state) const {
-  if (state != envoy::api::v2::core::SocketOption::STATE_PREBIND) {
-    // we only ever apply the option in the prebind state.
-    return absl::nullopt;
-  }
-  Details to_return;
-  to_return.description_ = fmt::format("OriginalSrc: '{}'", src_address_->asString());
-  return to_return;
+absl::optional<Network::Socket::Option::Details>
+OriginalSrcSocketOption::getOptionDetails(const Network::Socket&,
+                                          envoy::api::v2::core::SocketOption::SocketState) const {
+  // no details for this option.
+  return absl::nullopt;
 }
 
 } // namespace OriginalSrc
