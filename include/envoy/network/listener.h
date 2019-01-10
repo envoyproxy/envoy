@@ -115,7 +115,7 @@ public:
 };
 
 /**
- * UDP listener callbacks.
+ * Udp listener callbacks.
  */
 class UdpListenerCallbacks {
 public:
@@ -124,8 +124,8 @@ public:
   virtual ~UdpListenerCallbacks() = default;
 
   /**
-   * On first packet received on a UDP socket. This allows the callback handler
-   * to establish filter chain (or any other prepararion).
+   * On first packet received on a udp socket. This allows the callback handler
+   * to establish filter chain (or any other preparation).
    *
    * @param local_address Local bound socket network address.
    * @param peer_address Network address of the peer.
@@ -135,7 +135,7 @@ public:
                                Address::InstanceConstSharedPtr peer_address,
                                Buffer::InstancePtr&& data) PURE;
   /**
-   * Called whenever data is received by the underlying Udp socket.
+   * Called whenever data is received by the underlying udp socket.
    *
    * @param local_address Local bound socket network address.
    * @param peer_address Network address of the peer.
@@ -148,7 +148,7 @@ public:
   /**
    * Called when there is an error event.
    *
-   * @param error_code `ErrorCode` for tbe error event.
+   * @param error_code ErrorCode for the error event.
    * @param errno System error number.
    */
   virtual void onError(const ErrorCode& err_code, int err_no) PURE;

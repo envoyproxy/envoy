@@ -91,9 +91,8 @@ private:
 
 class TestUdpListenerImpl : public UdpListenerImpl {
 public:
-  TestUdpListenerImpl(Event::DispatcherImpl& dispatcher, Socket& socket, UdpListenerCallbacks& cb,
-                      bool bind_to_port)
-      : UdpListenerImpl(dispatcher, socket, cb, bind_to_port) {}
+  TestUdpListenerImpl(Event::DispatcherImpl& dispatcher, Socket& socket, UdpListenerCallbacks& cb)
+      : UdpListenerImpl(dispatcher, socket, cb) {}
 
   MOCK_METHOD0(getBufferImpl, Buffer::InstancePtr());
 };
@@ -269,8 +268,7 @@ TEST_P(ListenerImplTest, UseActualDstUdp) {
 
   // Setup callback handler and listener.
   Network::MockUdpListenerCallbacks listener_callbacks;
-  Network::TestUdpListenerImpl listener(dispatcher_, *server_socket.get(), listener_callbacks,
-                                        true);
+  Network::TestUdpListenerImpl listener(dispatcher_, *server_socket.get(), listener_callbacks);
 
   EXPECT_CALL(listener, getBufferImpl()).WillRepeatedly(Invoke([&]() {
     return std::make_unique<Buffer::OwnedImpl>();
@@ -379,8 +377,7 @@ TEST_P(ListenerImplTest, UdpListenerEnableDisable) {
 
   // Setup callback handler and listener.
   Network::MockUdpListenerCallbacks listener_callbacks;
-  Network::TestUdpListenerImpl listener(dispatcher_, *server_socket.get(), listener_callbacks,
-                                        true);
+  Network::TestUdpListenerImpl listener(dispatcher_, *server_socket.get(), listener_callbacks);
 
   EXPECT_CALL(listener, getBufferImpl()).WillRepeatedly(Invoke([&]() {
     return std::make_unique<Buffer::OwnedImpl>();
@@ -494,8 +491,7 @@ TEST_P(ListenerImplTest, UdpListenerRecvFromError) {
 
   // Setup callback handler and listener.
   Network::MockUdpListenerCallbacks listener_callbacks;
-  Network::TestUdpListenerImpl listener(dispatcher_, *server_socket.get(), listener_callbacks,
-                                        true);
+  Network::TestUdpListenerImpl listener(dispatcher_, *server_socket.get(), listener_callbacks);
 
   EXPECT_CALL(listener, getBufferImpl()).WillRepeatedly(Invoke([&]() {
     return std::make_unique<MockResultBufferImpl>(Api::SysCallIntResult{-1, -1});

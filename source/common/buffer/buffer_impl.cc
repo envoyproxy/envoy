@@ -133,7 +133,7 @@ Api::SysCallIntResult OwnedImpl::recvFrom(int fd, uint64_t max_length, sockaddr_
   slice.len_ = std::min(slice.len_, static_cast<size_t>(rc));
   commit(&slice, 1);
 
-  return {static_cast<int>(rc), errno};
+  return {static_cast<int>(rc), 0};
 }
 
 Api::SysCallIntResult OwnedImpl::read(int fd, uint64_t max_length) {

@@ -19,18 +19,16 @@ namespace Envoy {
 namespace Network {
 
 UdpListenerImpl::UdpListenerImpl(const Event::DispatcherImpl& dispatcher, Socket& socket,
-                                 UdpListenerCallbacks& cb, bool bind_to_port)
+                                 UdpListenerCallbacks& cb)
     : BaseListenerImpl(dispatcher, socket), cb_(cb), is_first_(true) {
-  if (bind_to_port) {
-    event_assign(&raw_event_, &dispatcher.base(), socket.fd(), EV_READ | EV_PERSIST, readCallback,
-                 this);
-    event_add(&raw_event_, nullptr);
+  event_assign(&raw_event_, &dispatcher.base(), socket.fd(), EV_READ | EV_WRITE | EV_PERSIST,
+               eventCallback, this);
+  event_add(&raw_event_, nullptr);
 
-    if (!Network::Socket::applyOptions(socket.options(), socket,
-                                       envoy::api::v2::core::SocketOption::STATE_BOUND)) {
-      throw CreateListenerException(fmt::format("cannot set post-bound socket option on socket: {}",
-                                                socket.localAddress()->asString()));
-    }
+  if (!Network::Socket::applyOptions(socket.options(), socket,
+                                     envoy::api::v2::core::SocketOption::STATE_BOUND)) {
+    throw CreateListenerException(fmt::format("cannot set post-bound socket option on socket: {}",
+                                              socket.localAddress()->asString()));
   }
 }
 
@@ -42,15 +40,26 @@ Buffer::InstancePtr UdpListenerImpl::getBufferImpl() {
   return std::make_unique<Buffer::OwnedImpl>();
 }
 
-void UdpListenerImpl::readCallback(int fd, short flags, void* arg) {
-  RELEASE_ASSERT((flags == EV_READ), fmt::format("Unexpected flags for callback: {}", flags));
+void UdpListenerImpl::eventCallback(int fd, short flags, void* arg) {
+  RELEASE_ASSERT((flags & (EV_READ | EV_WRITE)),
+                 fmt::format("Unexpected flags for callback: {}", flags));
 
   UdpListenerImpl* instance = static_cast<UdpListenerImpl*>(arg);
   ASSERT(instance);
 
+  if (flags & EV_READ) {
+    instance->handleReadCallback(fd);
+  }
+
+  if (flags & EV_WRITE) {
+    instance->handleWriteCallback(fd);
+  }
+}
+
+void UdpListenerImpl::handleReadCallback(int fd) {
   // TODO(conqerAtAppple): Make this configurable or get from system.
   constexpr uint64_t const read_length = 16384;
-  Buffer::InstancePtr buffer = instance->getBufferImpl();
+  Buffer::InstancePtr buffer = getBufferImpl();
   ASSERT(buffer);
 
   sockaddr_storage addr;
@@ -64,14 +73,14 @@ void UdpListenerImpl::readCallback(int fd, short flags, void* arg) {
         continue;
       }
       // TODO(conqerAtApple): Call error callback.
-      instance->cb_.onError(UdpListenerCallbacks::ErrorCode::SYSCALL_ERROR, result.errno_);
+      cb_.onError(UdpListenerCallbacks::ErrorCode::SYSCALL_ERROR, result.errno_);
       return;
     }
 
     break;
   } while (true);
 
-  Address::InstanceConstSharedPtr local_address = instance->socket_.localAddress();
+  Address::InstanceConstSharedPtr local_address = socket_.localAddress();
 
   RELEASE_ASSERT(
       addr_len > 0,
@@ -125,11 +134,15 @@ void UdpListenerImpl::readCallback(int fd, short flags, void* arg) {
                  fmt::format("Unable to get local address for fd: {}", fd));
 
   bool expected = true;
-  if (instance->is_first_.compare_exchange_strong(expected, false)) {
-    instance->cb_.onNewConnection(local_address, peer_address, std::move(buffer));
+  if (is_first_.compare_exchange_strong(expected, false)) {
+    cb_.onNewConnection(local_address, peer_address, std::move(buffer));
   } else {
-    instance->cb_.onData(local_address, peer_address, std::move(buffer));
+    cb_.onData(local_address, peer_address, std::move(buffer));
   }
+}
+
+void UdpListenerImpl::handleWriteCallback(int fd) {
+  (void)fd;
 }
 
 } // namespace Network

@@ -121,10 +121,9 @@ DispatcherImpl::createListener(Network::Socket& socket, Network::ListenerCallbac
 }
 
 Network::ListenerPtr DispatcherImpl::createUdpListener(Network::Socket& socket,
-                                                       Network::UdpListenerCallbacks& cb,
-                                                       bool bind_to_port) {
+                                                       Network::UdpListenerCallbacks& cb) {
   ASSERT(isThreadSafe());
-  return Network::ListenerPtr{new Network::UdpListenerImpl(*this, socket, cb, bind_to_port)};
+  return Network::ListenerPtr{new Network::UdpListenerImpl(*this, socket, cb)};
 }
 
 TimerPtr DispatcherImpl::createTimer(TimerCb cb) {

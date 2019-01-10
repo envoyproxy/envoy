@@ -15,8 +15,8 @@ namespace Network {
  */
 class UdpListenerImpl : public BaseListenerImpl, public Event::ImplBase {
 public:
-  UdpListenerImpl(const Event::DispatcherImpl& dispatcher, Socket& socket, UdpListenerCallbacks& cb,
-                  bool bind_to_port);
+  UdpListenerImpl(const Event::DispatcherImpl& dispatcher, Socket& socket,
+                  UdpListenerCallbacks& cb);
 
   virtual void disable() override;
   virtual void enable() override;
@@ -25,10 +25,13 @@ public:
   virtual Buffer::InstancePtr getBufferImpl();
 
 protected:
+  void handleWriteCallback(int fd);
+  void handleReadCallback(int fd);
+
   UdpListenerCallbacks& cb_;
 
 private:
-  static void readCallback(int fd, short flags, void* arg);
+  static void eventCallback(int fd, short flags, void* arg);
 
   std::atomic<bool> is_first_;
 };
