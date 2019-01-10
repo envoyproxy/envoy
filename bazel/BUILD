@@ -96,6 +96,11 @@ config_setting(
 )
 
 config_setting(
+    name = "debug_tcmalloc",
+    values = {"define": "tcmalloc=debug"},
+)
+
+config_setting(
     name = "disable_signal_trace",
     values = {"define": "signal_trace=disabled"},
 )
@@ -118,6 +123,11 @@ cc_proto_library(
 config_setting(
     name = "enable_exported_symbols",
     values = {"define": "exported_symbols=enabled"},
+)
+
+config_setting(
+    name = "enable_log_debug_assert_in_release",
+    values = {"define": "log_debug_assert_in_release=enabled"},
 )
 
 config_setting(

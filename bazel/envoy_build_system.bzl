@@ -68,8 +68,14 @@ def envoy_copts(repository, test = False):
                repository + "//bazel:disable_tcmalloc": ["-DABSL_MALLOC_HOOK_MMAP_DISABLE"],
                "//conditions:default": ["-DTCMALLOC"],
            }) + select({
+               repository + "//bazel:debug_tcmalloc": ["-DENVOY_MEMORY_DEBUG_ENABLED=1"],
+               "//conditions:default": [],
+           }) + select({
                repository + "//bazel:disable_signal_trace": [],
                "//conditions:default": ["-DENVOY_HANDLE_SIGNALS"],
+           }) + select({
+               repository + "//bazel:enable_log_debug_assert_in_release": ["-DENVOY_LOG_DEBUG_ASSERT_IN_RELEASE"],
+               "//conditions:default": [],
            }) + select({
                # TCLAP command line parser needs this to support int64_t/uint64_t
                "@bazel_tools//tools/osx:darwin": ["-DHAVE_LONG_LONG"],
@@ -165,6 +171,7 @@ def envoy_external_dep_path(dep):
 def tcmalloc_external_dep(repository):
     return select({
         repository + "//bazel:disable_tcmalloc": None,
+        repository + "//bazel:debug_tcmalloc": envoy_external_dep_path("tcmalloc_debug"),
         "//conditions:default": envoy_external_dep_path("tcmalloc_and_profiler"),
     })
 
@@ -174,6 +181,7 @@ def tcmalloc_external_dep(repository):
 def tcmalloc_external_deps(repository):
     return select({
         repository + "//bazel:disable_tcmalloc": [],
+        repository + "//bazel:debug_tcmalloc": [envoy_external_dep_path("tcmalloc_debug")],
         "//conditions:default": [envoy_external_dep_path("tcmalloc_and_profiler")],
     })
 

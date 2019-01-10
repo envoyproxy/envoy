@@ -10,8 +10,10 @@ A logged warning is expected for each deprecated item that is in deprecation win
 * Use of `enabled` in `CorsPolicy`, found in
   [route.proto](https://github.com/envoyproxy/envoy/blob/master/api/envoy/api/v2/route/route.proto).
   Set the `filter_enabled` field instead.
+* Use of google.protobuf.Struct for extension opaque configs is deprecated. Use google.protobuf.Any instead or pack
+google.protobuf.Struct in google.protobuf.Any.
 
-## Version 1.9.0
+## Version 1.9.0 (Dec 20, 2018)
 
 * Order of execution of the network write filter chain has been reversed. Prior to this release cycle it was incorrect, see [#4599](https://github.com/envoyproxy/envoy/issues/4599). In the 1.9.0 release cycle we introduced `bugfix_reverse_write_filter_order` in [lds.proto] (https://github.com/envoyproxy/envoy/blob/master/api/envoy/api/v2/lds.proto) to temporarily support both old and new behaviors. Note this boolean field is deprecated.
 * Order of execution of the HTTP encoder filter chain has been reversed. Prior to this release cycle it was incorrect, see [#4599](https://github.com/envoyproxy/envoy/issues/4599). In the 1.9.0 release cycle we introduced `bugfix_reverse_encode_order` in [http_connection_manager.proto] (https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.proto) to temporarily support both old and new behaviors. Note this boolean field is deprecated.

@@ -11,17 +11,15 @@
 #include "envoy/network/connection.h"
 #include "envoy/stats/scope.h"
 
-//#include "envoy/stats/stats_macros.h"
-
 #include "common/buffer/buffer_impl.h"
 #include "common/buffer/watermark_buffer.h"
 #include "common/common/linked_object.h"
 #include "common/common/logger.h"
 #include "common/http/codec_helper.h"
 #include "common/http/header_map_impl.h"
-#include "common/http/utility.h"
 #include "common/http/http2/metadata_decoder.h"
 #include "common/http/http2/metadata_encoder.h"
+#include "common/http/utility.h"
 
 #include "absl/types/optional.h"
 #include "nghttp2/nghttp2.h"
