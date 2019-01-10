@@ -246,50 +246,6 @@ TEST_F(HttpConnectionManagerConfigTest, SingleDateProvider) {
   Network::FilterFactoryCb cb2 = factory.createFilterFactory(*json_config, context_);
 }
 
-TEST(HttpConnectionManagerConfigUtilityTest, DetermineNextProtocol) {
-  {
-    Network::MockConnection connection;
-    EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return("hello"));
-    Buffer::OwnedImpl data("");
-    EXPECT_EQ("hello", HttpConnectionManagerConfigUtility::determineNextProtocol(connection, data));
-  }
-
-  {
-    Network::MockConnection connection;
-    EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return(""));
-    Buffer::OwnedImpl data("");
-    EXPECT_EQ("", HttpConnectionManagerConfigUtility::determineNextProtocol(connection, data));
-  }
-
-  {
-    Network::MockConnection connection;
-    EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return(""));
-    Buffer::OwnedImpl data("GET / HTTP/1.1");
-    EXPECT_EQ("", HttpConnectionManagerConfigUtility::determineNextProtocol(connection, data));
-  }
-
-  {
-    Network::MockConnection connection;
-    EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return(""));
-    Buffer::OwnedImpl data("PRI * HTTP/2.0\r\n");
-    EXPECT_EQ("h2", HttpConnectionManagerConfigUtility::determineNextProtocol(connection, data));
-  }
-
-  {
-    Network::MockConnection connection;
-    EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return(""));
-    Buffer::OwnedImpl data("PRI * HTTP/2");
-    EXPECT_EQ("h2", HttpConnectionManagerConfigUtility::determineNextProtocol(connection, data));
-  }
-
-  {
-    Network::MockConnection connection;
-    EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return(""));
-    Buffer::OwnedImpl data("PRI * HTTP/");
-    EXPECT_EQ("", HttpConnectionManagerConfigUtility::determineNextProtocol(connection, data));
-  }
-}
-
 TEST_F(HttpConnectionManagerConfigTest, BadHttpConnectionMangerConfig) {
   std::string json_string = R"EOF(
   {

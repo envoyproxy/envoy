@@ -103,11 +103,17 @@ IntegrationCodecClient::makeHeaderOnlyRequest(const Http::HeaderMap& headers) {
 
 IntegrationStreamDecoderPtr
 IntegrationCodecClient::makeRequestWithBody(const Http::HeaderMap& headers, uint64_t body_size) {
+  return makeRequestWithBody(headers, std::string(body_size, 'a'));
+}
+
+IntegrationStreamDecoderPtr
+IntegrationCodecClient::makeRequestWithBody(const Http::HeaderMap& headers,
+                                            const std::string& body) {
   auto response = std::make_unique<IntegrationStreamDecoder>(dispatcher_);
   Http::StreamEncoder& encoder = newStream(*response);
   encoder.getStream().addCallbacks(*response);
   encoder.encodeHeaders(headers, false);
-  Buffer::OwnedImpl data(std::string(body_size, 'a'));
+  Buffer::OwnedImpl data(body);
   encoder.encodeData(data, true);
   flushWrite();
   return response;
@@ -829,7 +835,7 @@ void HttpIntegrationTest::testRetryPriority() {
 
   Registry::InjectFactory<Upstream::RetryPriorityFactory> inject_factory(factory);
 
-  envoy::api::v2::route::RouteAction::RetryPolicy retry_policy;
+  envoy::api::v2::route::RetryPolicy retry_policy;
   retry_policy.mutable_retry_priority()->set_name(factory.name());
 
   // Add route with custom retry policy
@@ -905,7 +911,7 @@ void HttpIntegrationTest::testRetryHostPredicateFilter() {
   TestHostPredicateFactory predicate_factory;
   Registry::InjectFactory<Upstream::RetryHostPredicateFactory> inject_factory(predicate_factory);
 
-  envoy::api::v2::route::RouteAction::RetryPolicy retry_policy;
+  envoy::api::v2::route::RetryPolicy retry_policy;
   retry_policy.add_retry_host_predicate()->set_name(predicate_factory.name());
 
   // Add route with custom retry policy

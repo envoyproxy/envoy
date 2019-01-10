@@ -254,7 +254,7 @@ void ConfigHelper::setCaptureTransportSocket(
   file_sink->set_path_prefix(capture_path + "_" + absl::StrReplaceAll(test_id, {{"/", "_"}}));
   file_sink->set_format(envoy::config::transport_socket::capture::v2alpha::FileSink::PROTO_TEXT);
   capture_config.mutable_transport_socket()->MergeFrom(inner_transport_socket);
-  MessageUtil::jsonConvert(capture_config, *transport_socket.mutable_config());
+  transport_socket.mutable_typed_config()->PackFrom(capture_config);
 }
 
 void ConfigHelper::setSourceAddress(const std::string& address_string) {
@@ -329,7 +329,7 @@ void ConfigHelper::addRoute(const std::string& domains, const std::string& prefi
                             const std::string& cluster, bool validate_clusters,
                             envoy::api::v2::route::RouteAction::ClusterNotFoundResponseCode code,
                             envoy::api::v2::route::VirtualHost::TlsRequirementType type,
-                            envoy::api::v2::route::RouteAction::RetryPolicy retry_policy,
+                            envoy::api::v2::route::RetryPolicy retry_policy,
                             bool include_attempt_count_header, const absl::string_view upgrade) {
   RELEASE_ASSERT(!finalized_, "");
   envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager hcm_config;

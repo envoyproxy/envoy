@@ -174,7 +174,6 @@ INSTANTIATE_TEST_CASE_P(IpVersions, ServerInstanceImplTest,
 TEST_P(ServerInstanceImplTest, V2ConfigOnly) {
   options_.service_cluster_name_ = "some_cluster_name";
   options_.service_node_name_ = "some_node_name";
-  options_.v2_config_only_ = true;
   try {
     initialize(std::string());
     FAIL();
@@ -183,19 +182,12 @@ TEST_P(ServerInstanceImplTest, V2ConfigOnly) {
   }
 }
 
-TEST_P(ServerInstanceImplTest, V1ConfigFallback) {
-  options_.service_cluster_name_ = "some_cluster_name";
-  options_.service_node_name_ = "some_node_name";
-  options_.v2_config_only_ = false;
-  initialize(std::string());
-}
-
 TEST_P(ServerInstanceImplTest, Stats) {
   options_.service_cluster_name_ = "some_cluster_name";
   options_.service_node_name_ = "some_node_name";
   options_.concurrency_ = 2;
   options_.hot_restart_epoch_ = 3;
-  initialize(std::string());
+  EXPECT_NO_THROW(initialize("test/server/empty_bootstrap.yaml"));
   EXPECT_NE(nullptr, TestUtility::findCounter(stats_store_, "server.watchdog_miss"));
   EXPECT_EQ(2L, TestUtility::findGauge(stats_store_, "server.concurrency")->value());
   EXPECT_EQ(3L, TestUtility::findGauge(stats_store_, "server.hot_restart_epoch")->value());
@@ -241,7 +233,6 @@ TEST_P(ServerInstanceImplTest, BootstrapClusterManagerInitializationFail) {
 
 // Test for protoc-gen-validate constraint on invalid timeout entry of a health check config entry.
 TEST_P(ServerInstanceImplTest, BootstrapClusterHealthCheckInvalidTimeout) {
-  options_.v2_config_only_ = true;
   EXPECT_THROW_WITH_REGEX(
       initializeWithHealthCheckParams("test/server/cluster_health_check_bootstrap.yaml", 0, 0.25),
       EnvoyException,
@@ -250,7 +241,6 @@ TEST_P(ServerInstanceImplTest, BootstrapClusterHealthCheckInvalidTimeout) {
 
 // Test for protoc-gen-validate constraint on invalid interval entry of a health check config entry.
 TEST_P(ServerInstanceImplTest, BootstrapClusterHealthCheckInvalidInterval) {
-  options_.v2_config_only_ = true;
   EXPECT_THROW_WITH_REGEX(
       initializeWithHealthCheckParams("test/server/cluster_health_check_bootstrap.yaml", 0.5, 0),
       EnvoyException,
@@ -260,7 +250,6 @@ TEST_P(ServerInstanceImplTest, BootstrapClusterHealthCheckInvalidInterval) {
 // Test for protoc-gen-validate constraint on invalid timeout and interval entry of a health check
 // config entry.
 TEST_P(ServerInstanceImplTest, BootstrapClusterHealthCheckInvalidTimeoutAndInterval) {
-  options_.v2_config_only_ = true;
   EXPECT_THROW_WITH_REGEX(
       initializeWithHealthCheckParams("test/server/cluster_health_check_bootstrap.yaml", 0, 0),
       EnvoyException,
@@ -269,7 +258,6 @@ TEST_P(ServerInstanceImplTest, BootstrapClusterHealthCheckInvalidTimeoutAndInter
 
 // Test for protoc-gen-validate constraint on valid interval entry of a health check config entry.
 TEST_P(ServerInstanceImplTest, BootstrapClusterHealthCheckValidTimeoutAndInterval) {
-  options_.v2_config_only_ = true;
   EXPECT_NO_THROW(initializeWithHealthCheckParams("test/server/cluster_health_check_bootstrap.yaml",
                                                   0.25, 0.5));
 }
@@ -295,7 +283,6 @@ TEST_P(ServerInstanceImplTest, BootstrapNodeWithoutAccessLog) {
 TEST_P(ServerInstanceImplTest, EmptyBootstrap) {
   options_.service_cluster_name_ = "some_cluster_name";
   options_.service_node_name_ = "some_node_name";
-  options_.v2_config_only_ = true;
   EXPECT_NO_THROW(initialize("test/server/empty_bootstrap.yaml"));
 }
 
@@ -303,7 +290,6 @@ TEST_P(ServerInstanceImplTest, EmptyBootstrap) {
 TEST_P(ServerInstanceImplTest, ValidateFail) {
   options_.service_cluster_name_ = "some_cluster_name";
   options_.service_node_name_ = "some_node_name";
-  options_.v2_config_only_ = true;
   try {
     initialize("test/server/empty_runtime.yaml");
     FAIL();
@@ -318,7 +304,7 @@ TEST_P(ServerInstanceImplTest, LogToFile) {
   options_.log_path_ = path;
   options_.service_cluster_name_ = "some_cluster_name";
   options_.service_node_name_ = "some_node_name";
-  initialize(std::string());
+  EXPECT_NO_THROW(initialize("test/server/empty_bootstrap.yaml"));
   EXPECT_TRUE(server_->api().fileExists(path));
 
   GET_MISC_LOGGER().set_level(spdlog::level::info);
@@ -391,7 +377,7 @@ TEST_P(ServerInstanceImplTest, MutexContentionEnabled) {
   options_.service_cluster_name_ = "some_cluster_name";
   options_.service_node_name_ = "some_node_name";
   options_.mutex_tracing_enabled_ = true;
-  EXPECT_NO_THROW(initialize(std::string()));
+  EXPECT_NO_THROW(initialize("test/server/empty_bootstrap.yaml"));
 }
 
 TEST_P(ServerInstanceImplTest, NoHttpTracing) {

@@ -411,7 +411,8 @@ stats_sinks:
         address: {{ ip_loopback_address }}
         port_value: 8125
 - name: envoy.statsd
-  config:
+  typed_config:
+    "@type": type.googleapis.com/envoy.config.metrics.v2.StatsdSink
     tcp_cluster_name: statsd
 watchdog: {}
 runtime:

@@ -33,7 +33,6 @@ OptionsImpl createTestOptionsImpl(const std::string& config_path, const std::str
 
   test_options.setConfigPath(config_path);
   test_options.setConfigYaml(config_yaml);
-  test_options.setV2ConfigOnly(false);
   test_options.setLocalAddressIpVersion(ip_version);
   test_options.setFileFlushIntervalMsec(std::chrono::milliseconds(50));
   test_options.setDrainTime(std::chrono::seconds(1));

@@ -48,9 +48,9 @@ dnf install cmake libtool libstdc++ ninja-build lld patch
 
 On macOS, you'll need to install several dependencies. This can be accomplished via [Homebrew](https://brew.sh/):
 ```
-brew install coreutils wget cmake libtool go bazel automake ninja clang-format
+brew install coreutils wget cmake libtool go bazel automake ninja llvm@7
 ```
-_note_: `coreutils` is used for realpath
+_notes_: `coreutils` is used for `realpath`, `gmd5sum` and `gsha256sum`; `llvm@7` is used for `clang-format`
 
 Envoy compiles and passes tests with the version of clang installed by XCode 9.3.0:
 Apple LLVM version 9.1.0 (clang-902.0.30).
