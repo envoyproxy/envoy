@@ -487,11 +487,11 @@ The compilation database could also be used to setup editors with cross referenc
 For example, you can use [You Complete Me](https://valloric.github.io/YouCompleteMe/) or
 [cquery](https://github.com/cquery-project/cquery) with supported editors.
 
-# Running clang-tidy without docker
+# Running clang-format without docker
 
-The easiest way to run the clang-tidy check/fix commands is to run them via
+The easiest way to run the clang-format check/fix commands is to run them via
 docker, which helps ensure the right toolchain is set up. However you may prefer
-to run clang-tidy scripts on your workstation directly:
+to run clang-format scripts on your workstation directly:
  * It's possible there is a speed advantage
  * Docker itself can sometimes go awry and you then have to deal with that
  * Type-ahead doesn't always work when waiting running a command through docker
