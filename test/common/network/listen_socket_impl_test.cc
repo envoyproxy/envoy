@@ -131,7 +131,7 @@ TEST_P(ListenSocketImplTestTcp, BindSpecificPort) { testBindSpecificPort(); }
 class TestListenSocket : public ListenSocketImpl {
 public:
   TestListenSocket(Address::InstanceConstSharedPtr address)
-    : ListenSocketImpl(std::make_unique<Network::IoSocketHandle>(), address) {}     
+      : ListenSocketImpl(std::make_unique<Network::IoSocketHandle>(), address) {}
   Address::SocketType socketType() const override { return Address::SocketType::Stream; }
 };
 
