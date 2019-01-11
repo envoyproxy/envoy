@@ -35,7 +35,7 @@ namespace Envoy {
 OptionsImpl::OptionsImpl(int argc, const char* const* argv,
                          const HotRestartVersionCb& hot_restart_version_cb,
                          spdlog::level::level_enum default_log_level)
-    : v2_config_only_(true), signal_handling_enabled_(true) {
+    : signal_handling_enabled_(true) {
   std::string log_levels_string = "Log levels: ";
   for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_names); i++) {
     log_levels_string += fmt::format("[{}]", spdlog::level::level_names[i]);
@@ -142,6 +142,7 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
   auto check_numeric_arg = [](bool is_error, uint64_t value, absl::string_view pattern) {
     if (is_error) {
       const std::string message = fmt::format(std::string(pattern), value);
+      std::cerr << message << std::endl;
       throw MalformedArgvException(message);
     }
   };
@@ -176,6 +177,7 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
     mode_ = Server::Mode::InitOnly;
   } else {
     const std::string message = fmt::format("error: unknown mode '{}'", mode.getValue());
+    std::cerr << message << std::endl;
     throw MalformedArgvException(message);
   }
 
@@ -186,6 +188,7 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
   } else {
     const std::string message =
         fmt::format("error: unknown IP address version '{}'", local_address_ip_version.getValue());
+    std::cerr << message << std::endl;
     throw MalformedArgvException(message);
   }
 
@@ -251,7 +254,10 @@ void OptionsImpl::parseComponentLogLevels(const std::string& component_log_level
 
 uint32_t OptionsImpl::count() const { return count_; }
 
-void OptionsImpl::logError(const std::string& error) const { throw MalformedArgvException(error); }
+void OptionsImpl::logError(const std::string& error) const {
+  std::cerr << error << std::endl;
+  throw MalformedArgvException(error);
+}
 
 Server::CommandLineOptionsPtr OptionsImpl::toCommandLineOptions() const {
   Server::CommandLineOptionsPtr command_line_options =
@@ -299,7 +305,7 @@ Server::CommandLineOptionsPtr OptionsImpl::toCommandLineOptions() const {
 
 OptionsImpl::OptionsImpl(const std::string& service_cluster, const std::string& service_node,
                          const std::string& service_zone, spdlog::level::level_enum log_level)
-    : base_id_(0u), concurrency_(1u), config_path_(""), config_yaml_(""), v2_config_only_(true),
+    : base_id_(0u), concurrency_(1u), config_path_(""), config_yaml_(""),
       local_address_ip_version_(Network::Address::IpVersion::v4), log_level_(log_level),
       log_format_(Logger::Logger::DEFAULT_LOG_FORMAT), restart_epoch_(0u),
       service_cluster_(service_cluster), service_node_(service_node), service_zone_(service_zone),

@@ -96,8 +96,7 @@ TEST_P(BufferIntegrationTest, RouteDisabled) {
 
 TEST_P(BufferIntegrationTest, RouteOverride) {
   ConfigHelper::HttpModifierFunction mod = overrideConfig(R"EOF({"buffer": {
-    "max_request_bytes": 5242880,
-    "max_request_time": {"seconds": 120}
+    "max_request_bytes": 5242880
   }})EOF");
   config_helper_.addConfigModifier(mod);
   config_helper_.addFilter(ConfigHelper::SMALL_BUFFER_FILTER);

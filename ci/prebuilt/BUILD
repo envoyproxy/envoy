@@ -67,6 +67,13 @@ cc_library(
 )
 
 cc_library(
+    name = "tcmalloc_debug",
+    srcs = ["thirdparty_build/lib/libtcmalloc_debug.a"],
+    hdrs = glob(["thirdparty_build/include/gperftools/**/*.h"]),
+    strip_include_prefix = "thirdparty_build/include",
+)
+
+cc_library(
     name = "yaml_cpp",
     srcs = select({
         ":windows_x86_64": glob(["thirdparty_build/lib/libyaml-cpp*.lib"]),

@@ -341,10 +341,10 @@ TEST_F(ConnectionHandlerTest, NormalRedirect) {
       }));
   EXPECT_CALL(*test_filter, onAccept(_))
       .WillOnce(Invoke([&](Network::ListenerFilterCallbacks& cb) -> Network::FilterStatus {
-        cb.socket().setLocalAddress(alt_address, true);
+        cb.socket().restoreLocalAddress(alt_address);
         return Network::FilterStatus::Continue;
       }));
-  EXPECT_CALL(*accepted_socket, setLocalAddress(alt_address, true));
+  EXPECT_CALL(*accepted_socket, restoreLocalAddress(alt_address));
   EXPECT_CALL(*accepted_socket, localAddressRestored()).WillOnce(Return(true));
   EXPECT_CALL(*accepted_socket, localAddress()).WillRepeatedly(ReturnRef(alt_address));
   EXPECT_CALL(manager_, findFilterChain(_)).WillOnce(Return(filter_chain_.get()));
@@ -403,10 +403,10 @@ TEST_F(ConnectionHandlerTest, FallbackToWildcardListener) {
       new Network::Address::Ipv4Instance("127.0.0.2", 0));
   EXPECT_CALL(*test_filter, onAccept(_))
       .WillOnce(Invoke([&](Network::ListenerFilterCallbacks& cb) -> Network::FilterStatus {
-        cb.socket().setLocalAddress(alt_address, true);
+        cb.socket().restoreLocalAddress(alt_address);
         return Network::FilterStatus::Continue;
       }));
-  EXPECT_CALL(*accepted_socket, setLocalAddress(alt_address, true));
+  EXPECT_CALL(*accepted_socket, restoreLocalAddress(alt_address));
   EXPECT_CALL(*accepted_socket, localAddressRestored()).WillOnce(Return(true));
   EXPECT_CALL(*accepted_socket, localAddress()).WillRepeatedly(ReturnRef(alt_address));
   EXPECT_CALL(manager_, findFilterChain(_)).WillOnce(Return(filter_chain_.get()));
@@ -450,10 +450,10 @@ TEST_F(ConnectionHandlerTest, WildcardListenerWithOriginalDst) {
       }));
   EXPECT_CALL(*test_filter, onAccept(_))
       .WillOnce(Invoke([&](Network::ListenerFilterCallbacks& cb) -> Network::FilterStatus {
-        cb.socket().setLocalAddress(original_dst_address, true);
+        cb.socket().restoreLocalAddress(original_dst_address);
         return Network::FilterStatus::Continue;
       }));
-  EXPECT_CALL(*accepted_socket, setLocalAddress(original_dst_address, true));
+  EXPECT_CALL(*accepted_socket, restoreLocalAddress(original_dst_address));
   EXPECT_CALL(*accepted_socket, localAddressRestored()).WillOnce(Return(true));
   EXPECT_CALL(*accepted_socket, localAddress()).WillRepeatedly(ReturnRef(original_dst_address));
   EXPECT_CALL(manager_, findFilterChain(_)).WillOnce(Return(filter_chain_.get()));

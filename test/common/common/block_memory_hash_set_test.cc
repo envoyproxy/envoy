@@ -204,7 +204,9 @@ TEST_F(BlockMemoryHashSetTest, severalKeysZeroHash) {
   hash_set1.sanityCheck();
 }
 
-TEST_F(BlockMemoryHashSetTest, sanityCheckZeroedMemoryDeathTest) {
+class BlockMemoryHashSetDeathTest : public BlockMemoryHashSetTest {};
+
+TEST_F(BlockMemoryHashSetDeathTest, sanityCheckZeroedMemoryDeathTest) {
   setUp<TestValueZeroHash>();
   BlockMemoryHashSet<TestValueZeroHash> hash_set1(hash_set_options_, true, memory_.get(),
                                                   stats_options_);
