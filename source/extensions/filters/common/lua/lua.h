@@ -60,6 +60,9 @@ namespace Lua {
  */
 #define DECLARE_LUA_CLOSURE(Class, Name) DECLARE_LUA_FUNCTION_EX(Class, Name, lua_upvalueindex(1))
 
+/**
+ * Align Lua allocated memory.
+ */
 template <typename T> T* align(void* ptr) {
   size_t address = size_t(ptr);
   auto offset = address % alignof(T);
@@ -67,6 +70,9 @@ template <typename T> T* align(void* ptr) {
   return reinterpret_cast<T*>(aligned_address);
 }
 
+/**
+ * Calculate the maximum space needed to be aligned.
+ */
 template <typename T> size_t maximumSpaceNeededToAlign() {
   return (alignof(T) > alignof(void*)) ? sizeof(T) : sizeof(T) + alignof(T) - 1;
 }
@@ -132,7 +138,13 @@ public:
     // manually because the memory is raw and was allocated by Lua.
     to_register.push_back(
         {"__gc", [](lua_State* state) {
-           T* object = static_cast<T*>(luaL_checkudata(state, 1, typeid(T).name()));
+           auto mem = reinterpret_cast<std::uintptr_t>(luaL_checkudata(state, 1, typeid(T).name()));
+           // Check if the allocated memory by Lua was aligned.
+           if ((mem % std::alignment_of<T>()) != 0) {
+             mem += std::alignment_of<T>() - mem % std::alignment_of<T>();
+           }
+
+           T* object = reinterpret_cast<T*>(mem);
            ENVOY_LOG(trace, "destroying {} at {}", typeid(T).name(), static_cast<void*>(object));
            object->~T();
            return 0;
