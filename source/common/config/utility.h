@@ -259,52 +259,8 @@ public:
     // Fail in an obvious way if a plugin does not return a proto.
     RELEASE_ASSERT(config != nullptr, "");
 
-    if (enclosing_message.has_config()) {
-      MessageUtil::jsonConvert(enclosing_message.config(), *config);
-    }
+    translateOpaqueConfig(enclosing_message.typed_config(), enclosing_message.config(), *config);
 
-    return config;
-  }
-
-  /**
-   * Translate a nested config into a route-specific proto message provided by
-   * the implementation factory.
-   * @param source Protobuf::Message containing the opaque config for the given factory's
-   *        route-local configuration.
-   * @param factory Server::Configuration::NamedHttpFilterConfigFactory implementation
-   * @return ProtobufTypes::MessagePtr the translated config
-   */
-  static ProtobufTypes::MessagePtr
-  translateToFactoryRouteConfig(const Protobuf::Message& source,
-                                Server::Configuration::NamedHttpFilterConfigFactory& factory) {
-    ProtobufTypes::MessagePtr config = factory.createEmptyRouteConfigProto();
-
-    // Fail in an obvious way if a plugin does not return a proto.
-    RELEASE_ASSERT(config != nullptr, "");
-
-    MessageUtil::jsonConvert(source, *config);
-    return config;
-  }
-
-  /**
-   * Translate a nested config into a protocol-specific options proto message provided by the
-   * implementation factory.
-   * @param source Protobuf::Message containing the opaque config for the given factory's
-   *        protocol specific configuration.
-   * @param factory Server::Configuration::NamedNetworkFilterConfigFactory implementation
-   * @return ProtobufTypes::MessagePtr the translated config
-   * @throws EnvoyException if the factory does not support protocol options
-   */
-  static ProtobufTypes::MessagePtr
-  translateToFactoryProtocolOptionsConfig(const Protobuf::Message& source, const std::string& name,
-                                          Server::Configuration::ProtocolOptionsFactory& factory) {
-    ProtobufTypes::MessagePtr config = factory.createEmptyProtocolOptionsProto();
-
-    if (config == nullptr) {
-      throw EnvoyException(fmt::format("filter {} does not support protocol options", name));
-    }
-
-    MessageUtil::jsonConvert(source, *config);
     return config;
   }
 
@@ -352,6 +308,17 @@ public:
    */
   static envoy::api::v2::ClusterLoadAssignment
   translateClusterHosts(const Protobuf::RepeatedPtrField<envoy::api::v2::core::Address>& hosts);
+
+  /**
+   * Translate opaque config from google.protobuf.Any or google.protobuf.Struct to defined proto
+   * message.
+   * @param typed_config opaque config packed in google.protobuf.Any
+   * @param config the deprecated google.protobuf.Struct config, empty struct if doesn't exist.
+   * @param out_proto the proto message instantiated by extensions
+   */
+  static void translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
+                                    const ProtobufWkt::Struct& config,
+                                    Protobuf::Message& out_proto);
 };
 
 } // namespace Config

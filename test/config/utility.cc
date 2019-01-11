@@ -254,7 +254,7 @@ void ConfigHelper::setCaptureTransportSocket(
   file_sink->set_path_prefix(capture_path + "_" + absl::StrReplaceAll(test_id, {{"/", "_"}}));
   file_sink->set_format(envoy::config::transport_socket::capture::v2alpha::FileSink::PROTO_TEXT);
   capture_config.mutable_transport_socket()->MergeFrom(inner_transport_socket);
-  MessageUtil::jsonConvert(capture_config, *transport_socket.mutable_config());
+  transport_socket.mutable_typed_config()->PackFrom(capture_config);
 }
 
 void ConfigHelper::setSourceAddress(const std::string& address_string) {

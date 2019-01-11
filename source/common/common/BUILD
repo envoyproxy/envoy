@@ -82,6 +82,7 @@ envoy_basic_cc_library(
 
 envoy_cc_library(
     name = "hash_lib",
+    srcs = ["hash.cc"],
     hdrs = ["hash.h"],
     external_deps = ["xxhash"],
 )
