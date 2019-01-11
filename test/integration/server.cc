@@ -44,6 +44,7 @@ OptionsImpl createTestOptionsImpl(const std::string& config_path, const std::str
 
 } // namespace Server
 
+<<<<<<< HEAD
 IntegrationTestServerPtr
 IntegrationTestServer::create(const std::string& config_path,
                               const Network::Address::IpVersion version,
@@ -64,6 +65,15 @@ IntegrationTestServer::create(const std::string& config_path,
       std::make_unique<IntegrationTestServerImpl>(time_system, api, config_path)};
 >>>>>>> Wire thread creation through the Api interface (#5016)
   server->start(version, pre_worker_start_test_steps, deterministic);
+=======
+IntegrationTestServerPtr IntegrationTestServer::create(
+    const std::string& config_path, const Network::Address::IpVersion version,
+    std::function<void()> pre_worker_start_test_steps, bool deterministic,
+    Event::TestTimeSystem& time_system, Api::Api& api, bool defer_listener_finalization) {
+  IntegrationTestServerPtr server{
+      std::make_unique<IntegrationTestServerImpl>(time_system, api, config_path)};
+  server->start(version, pre_worker_start_test_steps, deterministic, defer_listener_finalization);
+>>>>>>> test: Add non-aggregated CDS-over-gRPC integration test (#5228)
   return server;
 }
 
@@ -79,7 +89,7 @@ void IntegrationTestServer::waitUntilListenersReady() {
 
 void IntegrationTestServer::start(const Network::Address::IpVersion version,
                                   std::function<void()> pre_worker_start_test_steps,
-                                  bool deterministic) {
+                                  bool deterministic, bool defer_listener_finalization) {
   ENVOY_LOG(info, "starting integration test server");
   ASSERT(!thread_);
   thread_ = api_.threadFactory().createThread(
@@ -93,9 +103,17 @@ void IntegrationTestServer::start(const Network::Address::IpVersion version,
   // Wait for the server to be created and the number of initial listeners to wait for to be set.
   server_set_.waitReady();
 
+<<<<<<< HEAD
   // Now wait for the initial listeners (if any) to actually be listening on the worker.
   // At this point the server is up and ready for testing.
   waitUntilListenersReady();
+=======
+  if (!defer_listener_finalization) {
+    // Now wait for the initial listeners (if any) to actually be listening on the worker.
+    // At this point the server is up and ready for testing.
+    waitUntilListenersReady();
+  }
+>>>>>>> test: Add non-aggregated CDS-over-gRPC integration test (#5228)
 
   // If we are capturing, spin up tcpdump.
   const auto capture_path = TestEnvironment::getOptionalEnvVar("CAPTURE_PATH");

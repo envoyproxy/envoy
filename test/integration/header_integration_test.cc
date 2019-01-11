@@ -175,7 +175,6 @@ public:
     }
     cleanupUpstreamAndDownstream();
     test_server_.reset();
-    fake_upstream_connection_.reset();
     fake_upstreams_.clear();
   }
 
