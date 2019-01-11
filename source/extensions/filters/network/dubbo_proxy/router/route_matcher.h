@@ -91,15 +91,16 @@ private:
 
 typedef std::shared_ptr<const RouteEntryImplBase> RouteEntryImplBaseConstSharedPtr;
 
-class ParamterRouteEntryImpl : public RouteEntryImplBase {
+class ParameterRouteEntryImpl : public RouteEntryImplBase {
 public:
-  ParamterRouteEntryImpl(const envoy::config::filter::network::dubbo_proxy::v2alpha1::Route& route);
-  ~ParamterRouteEntryImpl() override;
+  ParameterRouteEntryImpl(
+      const envoy::config::filter::network::dubbo_proxy::v2alpha1::Route& route);
+  ~ParameterRouteEntryImpl() override;
 
-  struct ParamterData {
-    using ParamterConfig =
+  struct ParameterData {
+    using ParameterConfig =
         envoy::config::filter::network::dubbo_proxy::v2alpha1::MethodMatch_Parameter;
-    ParamterData(const ParamterConfig& config);
+    ParameterData(const ParameterConfig& config);
 
     Http::HeaderUtility::HeaderMatchType match_type_;
     std::string value_;
@@ -113,10 +114,10 @@ public:
                               uint64_t random_value) const override;
 
 private:
-  bool matchParameter(const std::string& request_data, const ParamterData& config_data) const;
+  bool matchParameter(const std::string& request_data, const ParameterData& config_data) const;
 
   const std::string method_name_;
-  std::vector<ParamterData> paramter_data_list_;
+  std::vector<ParameterData> parameter_data_list_;
 };
 
 class MethodRouteEntryImpl : public RouteEntryImplBase {
@@ -133,7 +134,7 @@ public:
 private:
   const std::string method_name_;
   bool is_contain_wildcard_;
-  absl::optional<std::shared_ptr<ParamterRouteEntryImpl>> paramter_route_;
+  absl::optional<std::shared_ptr<ParameterRouteEntryImpl>> parameter_route_;
 };
 
 class RouteMatcher : public Logger::Loggable<Logger::Id::dubbo> {

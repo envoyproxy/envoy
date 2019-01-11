@@ -86,18 +86,18 @@ RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(const RouteEntryI
     : parent_(parent), cluster_name_(cluster.name()),
       cluster_weight_(PROTOBUF_GET_WRAPPED_REQUIRED(cluster, weight)) {}
 
-ParamterRouteEntryImpl::ParamterRouteEntryImpl(
+ParameterRouteEntryImpl::ParameterRouteEntryImpl(
     const envoy::config::filter::network::dubbo_proxy::v2alpha1::Route& route)
     : RouteEntryImplBase(route), method_name_(route.match().method().name()) {
   for (auto& config : route.match().method().params_match()) {
-    paramter_data_list_.emplace_back(config);
+    parameter_data_list_.emplace_back(config);
   }
 }
 
-ParamterRouteEntryImpl::~ParamterRouteEntryImpl() {}
+ParameterRouteEntryImpl::~ParameterRouteEntryImpl() {}
 
-bool ParamterRouteEntryImpl::matchParameter(const std::string& request_data,
-                                            const ParamterData& config_data) const {
+bool ParameterRouteEntryImpl::matchParameter(const std::string& request_data,
+                                             const ParameterData& config_data) const {
   switch (config_data.match_type_) {
   case Http::HeaderUtility::HeaderMatchType::Value:
     return config_data.value_.empty() || request_data == config_data.value_;
@@ -111,14 +111,14 @@ bool ParamterRouteEntryImpl::matchParameter(const std::string& request_data,
   }
 }
 
-RouteConstSharedPtr ParamterRouteEntryImpl::matches(const MessageMetadata& metadata,
-                                                    uint64_t random_value) const {
+RouteConstSharedPtr ParameterRouteEntryImpl::matches(const MessageMetadata& metadata,
+                                                     uint64_t random_value) const {
   if (!metadata.hasParameters()) {
     return nullptr;
   }
 
-  ENVOY_LOG(debug, "dubbo route matcher: paramter name match");
-  for (auto& config_data : paramter_data_list_) {
+  ENVOY_LOG(debug, "dubbo route matcher: parameter name match");
+  for (auto& config_data : parameter_data_list_) {
     const std::string& data = metadata.getParameterValue(config_data.index_);
     if (data.empty()) {
       ENVOY_LOG(debug,
@@ -138,15 +138,15 @@ RouteConstSharedPtr ParamterRouteEntryImpl::matches(const MessageMetadata& metad
   return clusterEntry(random_value);
 }
 
-ParamterRouteEntryImpl::ParamterData::ParamterData(const ParamterConfig& config) {
+ParameterRouteEntryImpl::ParameterData::ParameterData(const ParameterConfig& config) {
   index_ = config.index();
   type_ = config.type();
   switch (config.parameter_match_specifier_case()) {
-  case ParamterConfig::kExactMatch:
+  case ParameterConfig::kExactMatch:
     match_type_ = Http::HeaderUtility::HeaderMatchType::Value;
     value_ = config.exact_match();
     break;
-  case ParamterConfig::kRangeMatch:
+  case ParameterConfig::kRangeMatch:
     match_type_ = Http::HeaderUtility::HeaderMatchType::Range;
     range_.set_start(config.range_match().start());
     range_.set_end(config.range_match().end());
@@ -162,7 +162,7 @@ MethodRouteEntryImpl::MethodRouteEntryImpl(
     : RouteEntryImplBase(route), method_name_(route.match().method().name()),
       is_contain_wildcard_(Utility::isContainWildcard(method_name_)) {
   if (route.match().method().params_match_size() != 0) {
-    paramter_route_ = std::make_shared<ParamterRouteEntryImpl>(route);
+    parameter_route_ = std::make_shared<ParameterRouteEntryImpl>(route);
   }
   ENVOY_LOG(debug, "dubbo route matcher: method name {}", method_name_);
 }
@@ -203,9 +203,9 @@ RouteConstSharedPtr MethodRouteEntryImpl::matches(const MessageMetadata& metadat
     }
   }
 
-  if (paramter_route_.has_value()) {
+  if (parameter_route_.has_value()) {
     ENVOY_LOG(debug, "dubbo route matcher: parameter matching is required");
-    return paramter_route_.value()->matches(metadata, random_value);
+    return parameter_route_.value()->matches(metadata, random_value);
   }
 
   return clusterEntry(random_value);
