@@ -8,6 +8,7 @@ option go_package = "v2";
 import "envoy/api/v2/core/base.proto";
 
 import "google/protobuf/any.proto";
+import "google/protobuf/duration.proto";
 import "google/rpc/status.proto";
 import "gogoproto/gogo.proto";
 
@@ -94,6 +95,12 @@ message DiscoveryResponse {
   // DiscoveryRequest bearing the nonce. The nonce is optional and is not
   // required for non-stream based xDS implementations.
   string nonce = 5;
+
+  // Duration for which the resources received as part of this responses are
+  // valid for use. If not set, there is no time limit on use of the resources.
+  // This allows the management server to associate freshness to information
+  // sent to make sure envoys are not working with stale/incorrect information.
+  google.protobuf.Duration resources_lease_duration = 6;
 }
 
 // IncrementalDiscoveryRequest and IncrementalDiscoveryResponse are used in a
@@ -185,6 +192,12 @@ message IncrementalDiscoveryResponse {
   // The nonce provides a way for IncrementalDiscoveryRequests to uniquely
   // reference a IncrementalDiscoveryResponse. The nonce is required.
   string nonce = 5;
+
+  // Duration for which the resources received as part of this responses are
+  // valid for use. If not set, there is no time limit on use of the resources.
+  // This allows the management server to associate freshness to information
+  // sent to make sure envoys are not working with stale/incorrect information.
+  google.protobuf.Duration resources_lease_duration = 7;
 }
 
 message Resource {
