@@ -232,6 +232,57 @@ TEST_P(RingHashLoadBalancerTest, BasicWithStdHash) {
 }
 #endif
 
+TEST_P(RingHashLoadBalancerTest, BasicWithMurmur2) {
+  hostSet().hosts_ = {
+      makeTestHost(info_, "tcp://127.0.0.1:80"), makeTestHost(info_, "tcp://127.0.0.1:81"),
+      makeTestHost(info_, "tcp://127.0.0.1:82"), makeTestHost(info_, "tcp://127.0.0.1:83"),
+      makeTestHost(info_, "tcp://127.0.0.1:84"), makeTestHost(info_, "tcp://127.0.0.1:85")};
+  hostSet().healthy_hosts_ = hostSet().hosts_;
+  hostSet().runCallbacks({}, {});
+
+  config_ = (envoy::api::v2::Cluster::RingHashLbConfig());
+  config_.value().set_hash_function(envoy::api::v2::Cluster_RingHashLbConfig_HashFunction::
+                                        Cluster_RingHashLbConfig_HashFunction_MURMUR_HASH_2);
+  config_.value().mutable_minimum_ring_size()->set_value(12);
+  init();
+
+  // This is the hash ring built using murmur2 hash.
+  // ring hash: host=127.0.0.1:85 hash=1358027074129602068
+  // ring hash: host=127.0.0.1:83 hash=4361834613929391114
+  // ring hash: host=127.0.0.1:84 hash=7224494972555149682
+  // ring hash: host=127.0.0.1:81 hash=7701421856454313576
+  // ring hash: host=127.0.0.1:82 hash=8649315368077433379
+  // ring hash: host=127.0.0.1:84 hash=8739448859063030639
+  // ring hash: host=127.0.0.1:81 hash=9887544217113020895
+  // ring hash: host=127.0.0.1:82 hash=10150910876324007731
+  // ring hash: host=127.0.0.1:83 hash=15168472011420622455
+  // ring hash: host=127.0.0.1:80 hash=15427156902705414897
+  // ring hash: host=127.0.0.1:85 hash=16375050414328759093
+  // ring hash: host=127.0.0.1:80 hash=17613279263364193813
+  LoadBalancerPtr lb = lb_->factory()->create();
+  {
+    TestLoadBalancerContext context(0);
+    EXPECT_EQ(hostSet().hosts_[5], lb->chooseHost(&context));
+  }
+  {
+    TestLoadBalancerContext context(std::numeric_limits<uint64_t>::max());
+    EXPECT_EQ(hostSet().hosts_[5], lb->chooseHost(&context));
+  }
+  {
+    TestLoadBalancerContext context(1358027074129602068);
+    EXPECT_EQ(hostSet().hosts_[5], lb->chooseHost(&context));
+  }
+  {
+    TestLoadBalancerContext context(1358027074129602069);
+    EXPECT_EQ(hostSet().hosts_[3], lb->chooseHost(&context));
+  }
+  {
+    EXPECT_CALL(random_, random()).WillOnce(Return(10150910876324007730UL));
+    EXPECT_EQ(hostSet().hosts_[2], lb->chooseHost(nullptr));
+  }
+  EXPECT_EQ(0UL, stats_.lb_healthy_panic_.value());
+}
+
 TEST_P(RingHashLoadBalancerTest, UnevenHosts) {
   hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80"),
                       makeTestHost(info_, "tcp://127.0.0.1:81")};
