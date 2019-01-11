@@ -444,7 +444,7 @@ TEST_P(WebsocketIntegrationTest, BidirectionalChunkedData) {
   codec_client_->sendData(*request_encoder_, "FinalClientPayload", false);
   ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, request_payload + "FinalClientPayload"));
   upstream_request_->encodeData("FinalServerPayload", false);
-  response_->waitForBodyData(5);
+  response_->waitForBodyData(response_->body().size() + 5);
   EXPECT_EQ(response_payload + "FinalServerPayload", response_->body());
 
   // Clean up.

@@ -14,7 +14,6 @@
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/upstream/load_balancer_impl.h"
-#include "common/upstream/sds_subscription.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -38,10 +37,6 @@ EdsClusterImpl::EdsClusterImpl(
   subscription_ = Config::SubscriptionFactory::subscriptionFromConfigSource<
       envoy::api::v2::ClusterLoadAssignment>(
       eds_config, local_info_, dispatcher, cm, random, info_->statsScope(),
-      [this, &eds_config, &cm, &dispatcher,
-       &random]() -> Config::Subscription<envoy::api::v2::ClusterLoadAssignment>* {
-        return new SdsSubscription(info_->stats(), eds_config, cm, dispatcher, random);
-      },
       "envoy.api.v2.EndpointDiscoveryService.FetchEndpoints",
       "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints");
 }

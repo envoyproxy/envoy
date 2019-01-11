@@ -142,7 +142,7 @@ public:
   virtual Http::Context& httpContext() PURE;
 };
 
-class ListenerFactoryContext : public FactoryContext {
+class ListenerFactoryContext : public virtual FactoryContext {
 public:
   /**
    * Store socket options to be set on the listen socket before listening.

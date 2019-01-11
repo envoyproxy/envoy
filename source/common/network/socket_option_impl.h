@@ -61,7 +61,7 @@ namespace Network {
 #ifdef TCP_KEEPIDLE
 #define ENVOY_SOCKET_TCP_KEEPIDLE                                                                  \
   Network::SocketOptionName(std::make_pair(IPPROTO_TCP, TCP_KEEPIDLE))
-#elif TCP_KEEPALIVE // MacOS uses a different name from Linux for just this option.
+#elif TCP_KEEPALIVE // macOS uses a different name from Linux for just this option.
 #define ENVOY_SOCKET_TCP_KEEPIDLE                                                                  \
   Network::SocketOptionName(std::make_pair(IPPROTO_TCP, TCP_KEEPALIVE))
 #else

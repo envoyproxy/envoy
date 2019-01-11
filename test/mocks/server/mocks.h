@@ -58,7 +58,6 @@ public:
   MOCK_CONST_METHOD0(concurrency, uint32_t());
   MOCK_CONST_METHOD0(configPath, const std::string&());
   MOCK_CONST_METHOD0(configYaml, const std::string&());
-  MOCK_CONST_METHOD0(v2ConfigOnly, bool());
   MOCK_CONST_METHOD0(adminAddressPath, const std::string&());
   MOCK_CONST_METHOD0(localAddressIpVersion, Network::Address::IpVersion());
   MOCK_CONST_METHOD0(drainTime, std::chrono::seconds());
@@ -83,7 +82,6 @@ public:
 
   std::string config_path_;
   std::string config_yaml_;
-  bool v2_config_only_{};
   std::string admin_address_path_;
   std::string service_cluster_name_;
   std::string service_node_name_;
@@ -136,6 +134,19 @@ public:
   MOCK_METHOD1(addListenerToHandler, void(Network::ConnectionHandler* handler));
 
   NiceMock<MockConfigTracker> config_tracker_;
+};
+
+class MockAdminStream : public AdminStream {
+public:
+  MockAdminStream();
+  ~MockAdminStream();
+
+  MOCK_METHOD1(setEndStreamOnComplete, void(bool));
+  MOCK_METHOD1(addOnDestroyCallback, void(std::function<void()>));
+  MOCK_CONST_METHOD0(getRequestBody, const Buffer::Instance*());
+  MOCK_CONST_METHOD0(getRequestHeaders, Http::HeaderMap&());
+  MOCK_CONST_METHOD0(getDecoderFilterCallbacks,
+                     NiceMock<Http::MockStreamDecoderFilterCallbacks>&());
 };
 
 class MockDrainManager : public DrainManager {
@@ -220,8 +231,9 @@ public:
                std::vector<Network::ListenerFilterFactoryCb>(
                    const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>&,
                    Configuration::ListenerFactoryContext& context));
-  MOCK_METHOD3(createListenSocket,
+  MOCK_METHOD4(createListenSocket,
                Network::SocketSharedPtr(Network::Address::InstanceConstSharedPtr address,
+                                        Network::Address::SocketType socket_type,
                                         const Network::Socket::OptionsSharedPtr& options,
                                         bool bind_to_port));
   MOCK_METHOD1(createDrainManager_, DrainManager*(envoy::api::v2::Listener::DrainType drain_type));
@@ -393,7 +405,7 @@ public:
   std::chrono::milliseconds wd_multikill_;
 };
 
-class MockFactoryContext : public FactoryContext {
+class MockFactoryContext : public virtual FactoryContext {
 public:
   MockFactoryContext();
   ~MockFactoryContext();
@@ -459,8 +471,7 @@ public:
   std::unique_ptr<Secret::SecretManager> secret_manager_;
 };
 
-class MockListenerFactoryContext : public virtual MockFactoryContext,
-                                   public virtual ListenerFactoryContext {
+class MockListenerFactoryContext : public MockFactoryContext, public ListenerFactoryContext {
 public:
   MockListenerFactoryContext();
   ~MockListenerFactoryContext();
@@ -498,18 +509,6 @@ public:
   testing::NiceMock<Envoy::Runtime::MockRandomGenerator> random_;
   testing::NiceMock<Envoy::Runtime::MockLoader> runtime_;
   testing::NiceMock<Envoy::Upstream::MockHealthCheckEventLogger>* event_logger_{};
-};
-
-class MockAdminStream : public AdminStream {
-public:
-  MockAdminStream();
-  ~MockAdminStream();
-
-  MOCK_METHOD1(setEndStreamOnComplete, void(bool));
-  MOCK_METHOD1(addOnDestroyCallback, void(std::function<void()>));
-  MOCK_CONST_METHOD0(getRequestHeaders, Http::HeaderMap&());
-  MOCK_CONST_METHOD0(getDecoderFilterCallbacks,
-                     NiceMock<Http::MockStreamDecoderFilterCallbacks>&());
 };
 
 } // namespace Configuration
