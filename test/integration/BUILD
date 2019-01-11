@@ -24,7 +24,7 @@ envoy_cc_test(
         "//test/config/integration/certs",
     ],
     deps = [
-        ":http_integration_lib",
+        ":xds_integration_test_base",
         "//source/common/config:protobuf_link_hacks",
         "//source/common/config:resources_lib",
         "//source/common/protobuf:utility_lib",
@@ -61,6 +61,27 @@ envoy_proto_library(
     name = "capture_fuzz_proto",
     srcs = [":capture_fuzz.proto"],
     require_py = 1,
+)
+
+envoy_cc_test(
+    name = "cds_integration_test",
+    srcs = ["cds_integration_test.cc"],
+    data = [
+        "//test/config/integration/certs",
+    ],
+    deps = [
+        ":xds_integration_test_base",
+        "//source/common/config:protobuf_link_hacks",
+        "//source/common/config:resources_lib",
+        "//source/common/protobuf:utility_lib",
+        "//test/common/grpc:grpc_client_integration_lib",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:server_mocks",
+        "//test/test_common:network_utility_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/api/v2:cds_cc",
+        "@envoy_api//envoy/api/v2:discovery_cc",
+    ],
 )
 
 envoy_cc_test(
@@ -601,8 +622,28 @@ envoy_cc_test(
     srcs = ["xds_integration_test.cc"],
     data = ["//test/config/integration:server_xds_files"],
     deps = [
-        ":http_integration_lib",
+        ":xds_integration_test_base",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "xds_integration_test_base",
+    srcs = [
+        "xds_integration_test_base.cc",
+    ],
+    hdrs = [
+        "xds_integration_test_base.h",
+    ],
+    deps = [
+        ":http_integration_lib",
+        ":test_host_predicate_lib",
+        "//include/envoy/event:timer_interface",
+        "//source/common/common:thread_annotations",
+        "//source/extensions/filters/http/router:config",
+        "//source/extensions/filters/network/http_connection_manager:config",
+        "//test/common/upstream:utility_lib",
+        "//test/test_common:registry_lib",
     ],
 )
 
