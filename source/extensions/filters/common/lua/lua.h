@@ -63,7 +63,7 @@ namespace Lua {
 /**
  * Align Lua allocated memory.
  */
-template <typename T> T* align(void* ptr) {
+template <typename T> inline T* align(void* ptr) {
   size_t address = size_t(ptr);
   auto offset = address % alignof(T);
   auto aligned_address = offset == 0 ? address : address + alignof(T) - offset;
@@ -73,8 +73,8 @@ template <typename T> T* align(void* ptr) {
 /**
  * Calculate the maximum space needed to be aligned.
  */
-template <typename T> size_t maximumSpaceNeededToAlign() {
-  return (alignof(T) > alignof(void*)) ? sizeof(T) : sizeof(T) + alignof(T) - 1;
+template <typename T> inline size_t maximumSpaceNeededToAlign() {
+  return alignof(T) > alignof(void*) ? sizeof(T) : sizeof(T) + alignof(T) - 1;
 }
 
 /**
@@ -140,7 +140,7 @@ public:
         {"__gc", [](lua_State* state) {
            auto mem = reinterpret_cast<std::uintptr_t>(luaL_checkudata(state, 1, typeid(T).name()));
            // Check if the allocated memory by Lua was aligned.
-           if ((mem % std::alignment_of<T>()) != 0) {
+           if (mem % std::alignment_of<T>() != 0) {
              mem += std::alignment_of<T>() - mem % std::alignment_of<T>();
            }
 
