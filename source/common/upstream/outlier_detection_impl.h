@@ -263,8 +263,8 @@ private:
 
 class DetectionEventLoggerImpl : public DetectionEventLogger {
 public:
-  DetectionEventLoggerImpl(AccessLog::AccessLogManager& log_manager,
-                                  const std::string& file_name, TimeSource& time_source)
+  DetectionEventLoggerImpl(AccessLog::AccessLogManager& log_manager, const std::string& file_name,
+                           TimeSource& time_source)
       : file_(log_manager.createAccessLog(file_name)), time_source_(time_source) {}
 
   // Upstream::Outlier::DetectionEventLogger
@@ -275,9 +275,9 @@ public:
 
 private:
   int secsSinceLastAction(const absl::optional<MonotonicTime>& lastActionTime, MonotonicTime now);
-  void setCommonEventParams(envoy::data::cluster::v2alpha::OutlierDetectionEvent &event,
-                              HostDescriptionConstSharedPtr host,
-                              absl::optional <MonotonicTime> &time);
+  void setCommonEventParams(envoy::data::cluster::v2alpha::OutlierDetectionEvent& event,
+                            HostDescriptionConstSharedPtr host,
+                            absl::optional<MonotonicTime>& time);
 
   Filesystem::FileSharedPtr file_;
   TimeSource& time_source_;

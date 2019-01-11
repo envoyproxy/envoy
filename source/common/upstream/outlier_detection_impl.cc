@@ -132,8 +132,7 @@ DetectorConfig::DetectorConfig(const envoy::api::v2::cluster::OutlierDetection& 
 DetectorImpl::DetectorImpl(const Cluster& cluster,
                            const envoy::api::v2::cluster::OutlierDetection& config,
                            Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
-                           TimeSource& time_source,
-                           DetectionEventLoggerSharedPtr event_logger)
+                           TimeSource& time_source, DetectionEventLoggerSharedPtr event_logger)
     : config_(config), dispatcher_(dispatcher), runtime_(runtime), time_source_(time_source),
       stats_(generateStats(cluster.info()->statsScope())),
       interval_timer_(dispatcher.createTimer([this]() -> void { onIntervalTimer(); })),
@@ -474,14 +473,15 @@ void DetectorImpl::runCallbacks(HostSharedPtr host) {
   }
 }
 
-void DetectionEventLoggerImpl::logEject(
-    const HostDescriptionConstSharedPtr host, Detector& detector,
-    envoy::data::cluster::v2alpha::OutlierEjectionType type, bool enforced) {
+void DetectionEventLoggerImpl::logEject(const HostDescriptionConstSharedPtr host,
+                                        Detector& detector,
+                                        envoy::data::cluster::v2alpha::OutlierEjectionType type,
+                                        bool enforced) {
   envoy::data::cluster::v2alpha::OutlierDetectionEvent event;
   event.set_type(type);
 
   absl::optional<MonotonicTime> time = host->outlierDetector().lastUnejectionTime();
-    setCommonEventParams(event, host, time);
+  setCommonEventParams(event, host, time);
 
   event.set_action("eject");
 
@@ -508,7 +508,7 @@ void DetectionEventLoggerImpl::logUneject(HostDescriptionConstSharedPtr host) {
   envoy::data::cluster::v2alpha::OutlierDetectionEvent event;
 
   absl::optional<MonotonicTime> time = host->outlierDetector().lastEjectionTime();
-    setCommonEventParams(event, host, time);
+  setCommonEventParams(event, host, time);
 
   event.set_action("uneject");
 
@@ -517,9 +517,9 @@ void DetectionEventLoggerImpl::logUneject(HostDescriptionConstSharedPtr host) {
   file_->write(fmt::format("{}\n", json));
 }
 
-void DetectionEventLoggerImpl::setCommonEventParams(envoy::data::cluster::v2alpha::OutlierDetectionEvent &event,
-                                                           HostDescriptionConstSharedPtr host,
-                                                           absl::optional <MonotonicTime> &time) {
+void DetectionEventLoggerImpl::setCommonEventParams(
+    envoy::data::cluster::v2alpha::OutlierDetectionEvent& event, HostDescriptionConstSharedPtr host,
+    absl::optional<MonotonicTime>& time) {
   MonotonicTime monotonic_now = time_source_.monotonicTime();
   int secsFromLastAction = secsSinceLastAction(time, monotonic_now);
   event.set_secs_since_last_action(secsFromLastAction);

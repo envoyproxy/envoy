@@ -450,7 +450,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlowGatewayFailureAnd5xx) {
                      .value());
 }
 
-TEST_F(OutlierDetectorImplTest, BasicFlowSUCCESS_RATE) {
+TEST_F(OutlierDetectorImplTest, BasicFlowSuccessRate) {
   EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
   addHosts({
       "tcp://127.0.0.1:80",
@@ -738,7 +738,7 @@ TEST_F(OutlierDetectorImplTest, CrossThreadFailRace) {
   EXPECT_EQ(1UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
 }
 
-TEST_F(OutlierDetectorImplTest, CONSECUTIVE_5XXAlreadyEjected) {
+TEST_F(OutlierDetectorImplTest, Consecutive_5xxAlreadyEjected) {
   EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
   addHosts({"tcp://127.0.0.1:80"});
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
@@ -777,7 +777,7 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
   std::shared_ptr<MockHostDescription> host(new NiceMock<MockHostDescription>());
   ON_CALL(*host, cluster()).WillByDefault(ReturnRef(cluster));
   Event::SimulatedTimeSystem time_system;
-  // This is rendered as "2018-12-18T09:00:00Z".a
+  // This is rendered as "2018-12-18T09:00:00Z"
   time_system.setSystemTime(std::chrono::milliseconds(1545123600000));
   absl::optional<MonotonicTime> monotonic_time;
   NiceMock<MockDetector> detector;
