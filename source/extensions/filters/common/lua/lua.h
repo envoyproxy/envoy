@@ -61,20 +61,24 @@ namespace Lua {
 #define DECLARE_LUA_CLOSURE(Class, Name) DECLARE_LUA_FUNCTION_EX(Class, Name, lua_upvalueindex(1))
 
 /**
- * Align Lua allocated memory.
+ * Calculate the maximum space needed to be aligned.
  */
-template <typename T> inline T* align(void* ptr) {
-  size_t address = size_t(ptr);
-  auto offset = address % alignof(T);
-  auto aligned_address = offset == 0 ? address : address + alignof(T) - offset;
-  return reinterpret_cast<T*>(aligned_address);
+template <typename T> constexpr size_t maximumSpaceNeededToAlign() {
+  return alignof(T) > alignof(void*) ? sizeof(T) : sizeof(T) + alignof(T) - 1;
 }
 
 /**
- * Calculate the maximum space needed to be aligned.
+ * Create a new user data and assign its metatable.
  */
-template <typename T> inline size_t maximumSpaceNeededToAlign() {
-  return alignof(T) > alignof(void*) ? sizeof(T) : sizeof(T) + alignof(T) - 1;
+template <typename T> inline void* allocateLuaUserData(lua_State* state) {
+  auto space = maximumSpaceNeededToAlign<T>();
+  void* mem = lua_newuserdata(state, space);
+  luaL_getmetatable(state, typeid(T).name());
+  ASSERT(lua_istable(state, -1));
+  lua_setmetatable(state, -2);
+
+  // Align the allocated memory.
+  return std::align(std::alignment_of<T>(), sizeof(mem), mem, space);
 }
 
 /**
@@ -107,17 +111,10 @@ public:
    */
   template <typename... ConstructorArgs>
   static std::pair<T*, lua_State*> create(lua_State* state, ConstructorArgs&&... args) {
-    // Create a new user data and assign its metatable.
-    void* mem = lua_newuserdata(state, maximumSpaceNeededToAlign<T>());
-    // TODO(dio): assert mem % alignof(void*).
-    luaL_getmetatable(state, typeid(T).name());
-    ASSERT(lua_istable(state, -1));
-    lua_setmetatable(state, -2);
-
     // Memory is allocated via Lua and it is raw. We use placement new to run the constructor.
+    void* mem = allocateLuaUserData<T>(state);
     ENVOY_LOG(trace, "creating {} at {}", typeid(T).name(), mem);
-    T* alignedMem = align<T>(mem);
-    return {new (alignedMem) T(std::forward<ConstructorArgs>(args)...), state};
+    return {new (mem) T(std::forward<ConstructorArgs>(args)...), state};
   }
 
   /**
@@ -139,9 +136,11 @@ public:
     to_register.push_back(
         {"__gc", [](lua_State* state) {
            auto mem = reinterpret_cast<std::uintptr_t>(luaL_checkudata(state, 1, typeid(T).name()));
+
            // Check if the allocated memory by Lua was aligned.
-           if (mem % std::alignment_of<T>() != 0) {
-             mem += std::alignment_of<T>() - mem % std::alignment_of<T>();
+           const auto alignment = std::alignment_of<T>();
+           if (mem % alignment != 0) {
+             mem += alignment - mem % alignment;
            }
 
            T* object = reinterpret_cast<T*>(mem);
