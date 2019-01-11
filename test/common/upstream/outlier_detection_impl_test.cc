@@ -783,7 +783,7 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
   NiceMock<MockDetector> detector;
 
   EXPECT_CALL(log_manager, createAccessLog("foo")).WillOnce(Return(file));
-  OutlierDetectionEventLoggerImpl event_logger(log_manager, "foo", time_system);
+  DetectionEventLoggerImpl event_logger(log_manager, "foo", time_system);
 
   StringViewSaver log1;
   EXPECT_CALL(host->outlier_detector_, lastUnejectionTime()).WillOnce(ReturnRef(monotonic_time));

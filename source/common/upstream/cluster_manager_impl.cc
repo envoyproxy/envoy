@@ -188,7 +188,7 @@ ClusterManagerImpl::ClusterManagerImpl(
   if (cm_config.has_outlier_detection()) {
     const std::string event_log_file_path = cm_config.outlier_detection().event_log_path();
     if (!event_log_file_path.empty()) {
-      outlier_event_logger_.reset(new Outlier::OutlierDetectionEventLoggerImpl(
+      outlier_event_logger_.reset(new Outlier::DetectionEventLoggerImpl(
           log_manager, event_log_file_path, time_source_));
     }
   }
@@ -1181,7 +1181,7 @@ Tcp::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateTcpConnPool(
 
 ClusterSharedPtr ProdClusterManagerFactory::clusterFromProto(
     const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
-    Outlier::OutlierDetectionEventLoggerSharedPtr outlier_event_logger,
+    Outlier::DetectionEventLoggerSharedPtr outlier_event_logger,
     AccessLog::AccessLogManager& log_manager, bool added_via_api) {
   return ClusterImplBase::create(cluster, cm, stats_, tls_, dns_resolver_, ssl_context_manager_,
                                  runtime_, random_, main_thread_dispatcher_, log_manager,

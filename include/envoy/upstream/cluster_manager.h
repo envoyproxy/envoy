@@ -281,7 +281,7 @@ public:
    */
   virtual ClusterSharedPtr
   clusterFromProto(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
-                   Outlier::OutlierDetectionEventLoggerSharedPtr outlier_event_logger,
+                   Outlier::DetectionEventLoggerSharedPtr outlier_event_logger,
                    AccessLog::AccessLogManager& log_manager, bool added_via_api) PURE;
 
   /**

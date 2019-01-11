@@ -82,20 +82,29 @@ being ejected and for what reasons. The log is structured as JSON dumps of `Outl
 .. code-block:: json
 
   {
-    "time": "...",
+    "type": "...",
+    "timestamp": "...",
     "secs_since_last_action": "...",
-    "cluster": "...",
+    "cluster_name": "...",
     "upstream_url": "...",
     "action": "...",
-    "type": "...",
+
     "num_ejections": "...",
     "enforced": "...",
-    "host_success_rate": "...",
-    "cluster_success_rate_average": "...",
-    "cluster_success_rate_ejection_threshold": "..."
+    "eject_success_rate_event":
+      {
+        "host_success_rate": "...",
+        "cluster_average_success_rate": "...",
+        "cluster_success_rate_ejection_threshold": "..."
+      },
+    "eject_consecutive_event": "..."
   }
 
-time
+type
+  If ``action`` is ``eject``, specifies the type of ejection that took place. Currently type can
+  be one of ``5xx``, ``GatewayFailure`` or ``SuccessRate``.
+
+timestamp
   The time that the event took place.
 
 secs_since_last_action
@@ -103,7 +112,7 @@ secs_since_last_action
   took place. This value will be ``-1`` for the first ejection given there is no
   action before the first ejection.
 
-cluster
+cluster_name
   The :ref:`cluster <envoy_api_msg_Cluster>` that owns the ejected host.
 
 upstream_url
@@ -112,10 +121,6 @@ upstream_url
 action
   The action that took place. Either ``eject`` if a host was ejected or ``uneject`` if it was
   brought back into service.
-
-type
-  If ``action`` is ``eject``, specifies the type of ejection that took place. Currently type can
-  be one of ``5xx``, ``GatewayFailure`` or ``SuccessRate``.
 
 num_ejections
   If ``action`` is ``eject``, specifies the number of times the host has been ejected
@@ -130,9 +135,9 @@ host_success_rate
   If ``action`` is ``eject``, and ``type`` is ``SuccessRate``, specifies the host's success rate
   at the time of the ejection event on a ``0-100`` range.
 
-.. _arch_overview_outlier_detection_ejection_event_logging_cluster_success_rate_average:
+.. _arch_overview_outlier_detection_ejection_event_logging_cluster_average_success_rate:
 
-cluster_success_rate_average
+cluster_average_success_rate
   If ``action`` is ``eject``, and ``type`` is ``SuccessRate``, specifies the average success
   rate of the hosts in the cluster at the time of the ejection event on a ``0-100`` range.
 
