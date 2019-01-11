@@ -17,9 +17,10 @@ function setup_gcc_toolchain() {
 }
 
 function setup_clang_toolchain() {
-  export CC=clang-5.0
-  export CXX=clang++-5.0
-  export ASAN_SYMBOLIZER_PATH=/usr/lib/llvm-5.0/bin/llvm-symbolizer
+  export PATH=/usr/lib/llvm-7/bin:$PATH
+  export CC=clang
+  export CXX=clang++
+  export ASAN_SYMBOLIZER_PATH=/usr/lib/llvm-7/bin/llvm-symbolizer
   echo "$CC/$CXX toolchain configured"
 }
 
@@ -87,7 +88,7 @@ if [ "$1" != "-nofetch" ]; then
   fi
   
   # This is the hash on https://github.com/envoyproxy/envoy-filter-example.git we pin to.
-  (cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}" && git fetch origin && git checkout -f 3e5b73305b961526ffcee7584251692a9a3ce4b3)
+  (cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}" && git fetch origin && git checkout -f 6c0625cb4cc9a21df97cef2a1d065463f2ae81ae)
   cp -f "${ENVOY_SRCDIR}"/ci/WORKSPACE.filter.example "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/WORKSPACE
 fi
 
@@ -104,28 +105,38 @@ mkdir -p "${ENVOY_DELIVERY_DIR}"
 export ENVOY_COVERAGE_DIR="${ENVOY_BUILD_DIR}"/generated/coverage
 mkdir -p "${ENVOY_COVERAGE_DIR}"
 
+# This is where we dump failed test logs for CI collection.
+export ENVOY_FAILED_TEST_LOGS="${ENVOY_BUILD_DIR}"/generated/failed-testlogs
+mkdir -p "${ENVOY_FAILED_TEST_LOGS}"
+
 # This is where we build for bazel.release* and bazel.dev.
 export ENVOY_CI_DIR="${ENVOY_SRCDIR}"/ci
-
-# Hack due to https://github.com/envoyproxy/envoy/issues/838 and the need to have
-# tools and bazel.rc available for build linkstamping.
-mkdir -p "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/tools
-mkdir -p "${ENVOY_CI_DIR}"/tools
-ln -sf "${ENVOY_SRCDIR}"/tools/bazel.rc "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/tools/
-ln -sf "${ENVOY_SRCDIR}"/tools/bazel.rc "${ENVOY_CI_DIR}"/tools/
-mkdir -p "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/bazel
-mkdir -p "${ENVOY_CI_DIR}"/bazel
-ln -sf "${ENVOY_SRCDIR}"/bazel/get_workspace_status "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/bazel/
-ln -sf "${ENVOY_SRCDIR}"/bazel/get_workspace_status "${ENVOY_CI_DIR}"/bazel/
-
-export BUILDIFIER_BIN="/usr/local/bin/buildifier"
 
 function cleanup() {
   # Remove build artifacts. This doesn't mess with incremental builds as these
   # are just symlinks.
-  rm -f "${ENVOY_SRCDIR}"/bazel-*
-  rm -f "${ENVOY_CI_DIR}"/bazel-*
+  rm -rf "${ENVOY_SRCDIR}"/bazel-*
+  rm -rf "${ENVOY_CI_DIR}"/bazel-*
   rm -rf "${ENVOY_CI_DIR}"/bazel
   rm -rf "${ENVOY_CI_DIR}"/tools
+  rm -f "${ENVOY_CI_DIR}"/.bazelrc
 }
+
+cleanup
 trap cleanup EXIT
+
+# Hack due to https://github.com/envoyproxy/envoy/issues/838 and the need to have
+# .bazelrc available for build linkstamping.
+mkdir -p "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/bazel
+mkdir -p "${ENVOY_CI_DIR}"/bazel
+ln -sf "${ENVOY_SRCDIR}"/bazel/get_workspace_status "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/bazel/
+ln -sf "${ENVOY_SRCDIR}"/bazel/get_workspace_status "${ENVOY_CI_DIR}"/bazel/
+cp -f "${ENVOY_SRCDIR}"/.bazelrc "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/
+cp -f "${ENVOY_SRCDIR}"/.bazelrc "${ENVOY_CI_DIR}"/
+# TODO(PiotrSikora): remove once we deprecate tools/bazel.rc in favor of .bazelrc.
+mkdir -p "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/tools
+mkdir -p "${ENVOY_CI_DIR}"/tools
+cp -f "${ENVOY_SRCDIR}"/tools/bazel.rc "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/tools/
+cp -f "${ENVOY_SRCDIR}"/tools/bazel.rc "${ENVOY_CI_DIR}"/tools/
+
+export BUILDIFIER_BIN="/usr/local/bin/buildifier"

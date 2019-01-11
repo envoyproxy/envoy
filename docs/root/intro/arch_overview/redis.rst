@@ -41,7 +41,7 @@ For filter configuration details, see the Redis proxy filter
 :ref:`configuration reference <config_network_filters_redis_proxy>`.
 
 The corresponding cluster definition should be configured with
-:ref:`ring hash load balancing <config_cluster_manager_cluster_lb_type>`.
+:ref:`ring hash load balancing <envoy_api_field_Cluster.lb_policy>`.
 
 If :ref:`active health checking <arch_overview_health_checking>` is desired, the
 cluster should be configured with a :ref:`custom health check
@@ -49,7 +49,7 @@ cluster should be configured with a :ref:`custom health check
 :ref:`Redis health checker <config_health_checkers_redis>`.
 
 If passive healthchecking is desired, also configure
-:ref:`outlier detection <config_cluster_manager_cluster_outlier_detection_summary>`.
+:ref:`outlier detection <arch_overview_outlier_detection>`.
 
 For the purposes of passive healthchecking, connect timeouts, command timeouts, and connection
 close map to 5xx. All other responses from Redis are counted as a success.

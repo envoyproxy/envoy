@@ -1,3 +1,5 @@
+#pragma once
+
 #include "common/common/logger.h"
 #include "common/common/logger_delegates.h"
 #include "common/common/thread.h"
@@ -5,6 +7,7 @@
 
 #include "test/mocks/access_log/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/global.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -16,6 +19,10 @@ public:
     ::testing::InitGoogleMock(&argc, argv);
     Event::Libevent::Global::initialize();
 
+    // Use the recommended, but not default, "threadsafe" style for the Death Tests.
+    // See: https://github.com/google/googletest/commit/84ec2e0365d791e4ebc7ec249f09078fb5ab6caa
+    ::testing::FLAGS_gtest_death_test_style = "threadsafe";
+
     // Set gtest properties
     // (https://github.com/google/googletest/blob/master/googletest/docs/AdvancedGuide.md#logging-additional-information),
     // they are available in the test XML.
@@ -23,15 +30,12 @@ public:
     ::testing::Test::RecordProperty("TemporaryDirectory", TestEnvironment::temporaryDirectory());
     ::testing::Test::RecordProperty("RunfilesDirectory", TestEnvironment::runfilesDirectory());
 
-    if (::setenv("TEST_UDSDIR", TestEnvironment::unixDomainSocketDirectory().c_str(), 1) != 0) {
-      ::perror("Failed to set temporary UDS directory.");
-      ::exit(1);
-    }
+    TestEnvironment::setEnvVar("TEST_UDSDIR", TestEnvironment::unixDomainSocketDirectory(), 1);
 
     TestEnvironment::initializeOptions(argc, argv);
     Thread::MutexBasicLockable lock;
-    Logger::Registry::initialize(TestEnvironment::getOptions().logLevel(),
-                                 TestEnvironment::getOptions().logFormat(), lock);
+    Logger::Context logging_state(TestEnvironment::getOptions().logLevel(),
+                                  TestEnvironment::getOptions().logFormat(), lock);
 
     // Allocate fake log access manager.
     testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager;
@@ -42,7 +46,16 @@ public:
       file_logger = std::make_unique<Logger::FileSinkDelegate>(
           TestEnvironment::getOptions().logPath(), access_log_manager, Logger::Registry::getSink());
     }
-    return RUN_ALL_TESTS();
+    int exit_status = RUN_ALL_TESTS();
+
+    // Check that all singletons have been destroyed.
+    std::string active_singletons = Test::Globals::describeActiveSingletons();
+    if (!active_singletons.empty()) {
+      std::cerr << "\n\nFAIL: Active singletons exist:\n" << active_singletons << std::endl;
+      exit_status = EXIT_FAILURE;
+    }
+
+    return exit_status;
   }
 };
 } // namespace Envoy

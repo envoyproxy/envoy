@@ -19,6 +19,7 @@
 #include "envoy/server/admin.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/singleton/instance.h"
+#include "envoy/stats/scope.h"
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/common/logger.h"
@@ -134,7 +135,7 @@ private:
   RdsStats stats_;
   RouteConfigProviderManagerImpl& route_config_provider_manager_;
   const std::string manager_identifier_;
-  SystemTimeSource& time_source_;
+  TimeSource& time_source_;
   SystemTime last_updated_;
   absl::optional<LastConfigInfo> config_info_;
   envoy::api::v2::RouteConfiguration route_config_proto_;

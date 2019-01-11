@@ -18,6 +18,7 @@ envoy_cc_test(
         "//source/server/config_validation:dns_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:test_time_lib",
     ],
 )
 
@@ -27,6 +28,7 @@ envoy_cc_test(
     deps = [
         "//include/envoy/upstream:resource_manager_interface",
         "//include/envoy/upstream:upstream_interface",
+        "//source/common/api:api_lib",
         "//source/common/ssl:context_lib",
         "//source/common/stats:stats_lib",
         "//source/server/config_validation:cluster_manager_lib",
@@ -41,6 +43,7 @@ envoy_cc_test(
         "//test/mocks/server:server_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -70,19 +73,23 @@ envoy_cc_test(
     srcs = ["dispatcher_test.cc"],
     deps = [
         "//source/common/event:libevent_lib",
+        "//source/common/stats:isolated_store_lib",
         "//source/server/config_validation:api_lib",
         "//source/server/config_validation:dns_lib",
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
+        "//test/test_common:test_time_lib",
     ],
 )
 
 envoy_cc_fuzz_test(
     name = "config_fuzz_test",
     srcs = ["config_fuzz_test.cc"],
-    corpus = "config_corpus",
+    corpus = "//test/server:server_fuzz_test_corpus",
     deps = [
+        "//source/common/common:thread_lib",
         "//source/server/config_validation:server_lib",
+        "//source/server:proto_descriptors_lib",
         "//test/integration:integration_lib",
         "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",

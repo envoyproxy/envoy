@@ -1,28 +1,42 @@
+#pragma once
+
+#include "envoy/stats/scope.h"
+
+#include "common/api/api_impl.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/grpc/async_client_impl.h"
+
+#ifdef ENVOY_GOOGLE_GRPC
+#include "common/grpc/google_async_client_impl.h"
+#endif
+
 #include "common/http/async_client_impl.h"
+#include "common/http/codes.h"
 #include "common/http/http2/conn_pool.h"
 #include "common/network/connection_impl.h"
 #include "common/network/raw_buffer_socket.h"
 #include "common/ssl/context_config_impl.h"
+#include "common/ssl/ssl_socket.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/common/grpc/utility.h"
 #include "test/integration/fake_upstream.h"
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/local_info/mocks.h"
-#include "test/mocks/secret/mocks.h"
+#include "test/mocks/server/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/proto/helloworld.pb.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/test_time.h"
+#include "test/test_common/utility.h"
 
+using testing::_;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
-using testing::_;
 
 namespace Envoy {
 namespace Grpc {
@@ -118,7 +132,7 @@ public:
       reply_headers->addReference(value.first, value.second);
     }
     expectInitialMetadata(metadata);
-    fake_stream_->encodeHeaders(*reply_headers, false);
+    fake_stream_->encodeHeaders(Http::HeaderMapImpl(*reply_headers), false);
   }
 
   void sendReply() {
@@ -132,6 +146,8 @@ public:
   void expectGrpcStatus(Status::GrpcStatus grpc_status) {
     if (grpc_status == Status::GrpcStatus::InvalidCode) {
       EXPECT_CALL(*this, onRemoteClose(_, _)).WillExitIfNeeded();
+    } else if (grpc_status > Status::GrpcStatus::MaximumValid) {
+      EXPECT_CALL(*this, onRemoteClose(Status::GrpcStatus::InvalidCode, _)).WillExitIfNeeded();
     } else {
       EXPECT_CALL(*this, onRemoteClose(grpc_status, _)).WillExitIfNeeded();
     }
@@ -200,12 +216,13 @@ public:
 class GrpcClientIntegrationTest : public GrpcClientIntegrationParamTest {
 public:
   GrpcClientIntegrationTest()
-      : method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")) {}
+      : method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")),
+        api_(Api::createApiForTest(*stats_store_)), dispatcher_(test_time_.timeSystem(), *api_) {}
 
   virtual void initialize() {
     if (fake_upstream_ == nullptr) {
-      fake_upstream_ =
-          std::make_unique<FakeUpstream>(0, FakeHttpConnection::Type::HTTP2, ipVersion());
+      fake_upstream_ = std::make_unique<FakeUpstream>(0, FakeHttpConnection::Type::HTTP2,
+                                                      ipVersion(), test_time_.timeSystem());
     }
     switch (clientType()) {
     case ClientType::EnvoyGrpc:
@@ -264,15 +281,15 @@ public:
     EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
         .WillRepeatedly(Return(http_conn_pool_.get()));
     http_async_client_ = std::make_unique<Http::AsyncClientImpl>(
-        *cluster_info_ptr_, *stats_store_, dispatcher_, local_info_, cm_, runtime_, random_,
-        std::move(shadow_writer_ptr_));
+        cluster_info_ptr_, *stats_store_, dispatcher_, local_info_, cm_, runtime_, random_,
+        std::move(shadow_writer_ptr_), http_context_);
     EXPECT_CALL(cm_, httpAsyncClientForCluster(fake_cluster_name_))
         .WillRepeatedly(ReturnRef(*http_async_client_));
     EXPECT_CALL(cm_, get(fake_cluster_name_)).WillRepeatedly(Return(&thread_local_cluster_));
     envoy::api::v2::core::GrpcService config;
     config.mutable_envoy_grpc()->set_cluster_name(fake_cluster_name_);
     fillServiceWideInitialMetadata(config);
-    return std::make_unique<AsyncClientImpl>(cm_, config);
+    return std::make_unique<AsyncClientImpl>(cm_, config, dispatcher_.timeSystem());
   }
 
   virtual envoy::api::v2::core::GrpcService createGoogleGrpcConfig() {
@@ -286,7 +303,7 @@ public:
 
   AsyncClientPtr createGoogleAsyncClientImpl() {
 #ifdef ENVOY_GOOGLE_GRPC
-    google_tls_ = std::make_unique<GoogleAsyncClientThreadLocal>();
+    google_tls_ = std::make_unique<GoogleAsyncClientThreadLocal>(*api_);
     GoogleGenericStubFactory stub_factory;
     return std::make_unique<GoogleAsyncClientImpl>(dispatcher_, *google_tls_, stub_factory,
                                                    stats_scope_, createGoogleGrpcConfig());
@@ -387,13 +404,15 @@ public:
     return stream;
   }
 
+  DangerousDeprecatedTestTime test_time_;
   std::unique_ptr<FakeUpstream> fake_upstream_;
   FakeHttpConnectionPtr fake_connection_;
   std::vector<FakeStreamPtr> fake_streams_;
   const Protobuf::MethodDescriptor* method_descriptor_;
+  Stats::IsolatedStoreImpl* stats_store_ = new Stats::IsolatedStoreImpl();
+  Api::ApiPtr api_;
   Event::DispatcherImpl dispatcher_;
   DispatcherHelper dispatcher_helper_{dispatcher_};
-  Stats::IsolatedStoreImpl* stats_store_ = new Stats::IsolatedStoreImpl();
   Stats::ScopeSharedPtr stats_scope_{stats_store_};
   TestMetadata service_wide_initial_metadata_;
 #ifdef ENVOY_GOOGLE_GRPC
@@ -412,10 +431,11 @@ public:
   Upstream::MockThreadLocalCluster thread_local_cluster_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Runtime::MockLoader runtime_;
-  Ssl::ContextManagerImpl context_manager_{runtime_};
+  Ssl::ContextManagerImpl context_manager_{test_time_.timeSystem()};
   NiceMock<Runtime::MockRandomGenerator> random_;
   Http::AsyncClientPtr http_async_client_;
   Http::ConnectionPool::InstancePtr http_conn_pool_;
+  Http::ContextImpl http_context_;
   envoy::api::v2::core::Locality host_locality_;
   Upstream::MockHost* mock_host_ = new NiceMock<Upstream::MockHost>();
   Upstream::MockHostDescription* mock_host_description_ =
@@ -459,16 +479,17 @@ public:
       tls_cert->mutable_private_key()->set_filename(
           TestEnvironment::runfilesPath("test/config/integration/certs/clientkey.pem"));
     }
-    Ssl::ClientContextConfigImpl cfg(tls_context, secret_manager_);
+    auto cfg = std::make_unique<Ssl::ClientContextConfigImpl>(tls_context, factory_context_);
 
-    mock_cluster_info_->transport_socket_factory_ =
-        std::make_unique<Ssl::ClientSslSocketFactory>(cfg, context_manager_, *stats_store_);
+    mock_cluster_info_->transport_socket_factory_ = std::make_unique<Ssl::ClientSslSocketFactory>(
+        std::move(cfg), context_manager_, *stats_store_);
     ON_CALL(*mock_cluster_info_, transportSocketFactory())
         .WillByDefault(ReturnRef(*mock_cluster_info_->transport_socket_factory_));
     async_client_transport_socket_ =
-        mock_cluster_info_->transport_socket_factory_->createTransportSocket();
+        mock_cluster_info_->transport_socket_factory_->createTransportSocket(nullptr);
     fake_upstream_ = std::make_unique<FakeUpstream>(createUpstreamSslContext(), 0,
-                                                    FakeHttpConnection::Type::HTTP2, ipVersion());
+                                                    FakeHttpConnection::Type::HTTP2, ipVersion(),
+                                                    test_time_.timeSystem());
 
     GrpcClientIntegrationTest::initialize();
   }
@@ -489,15 +510,15 @@ public:
           TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
     }
 
-    Ssl::ServerContextConfigImpl cfg(tls_context, secret_manager_);
+    auto cfg = std::make_unique<Ssl::ServerContextConfigImpl>(tls_context, factory_context_);
 
     static Stats::Scope* upstream_stats_store = new Stats::IsolatedStoreImpl();
     return std::make_unique<Ssl::ServerSslSocketFactory>(
-        cfg, context_manager_, *upstream_stats_store, std::vector<std::string>{});
+        std::move(cfg), context_manager_, *upstream_stats_store, std::vector<std::string>{});
   }
 
   bool use_client_cert_{};
-  Secret::MockSecretManager secret_manager_;
+  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
 };
 
 } // namespace

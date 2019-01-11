@@ -6,10 +6,29 @@ As of release 1.3.0, Envoy will follow a
 The following features have been DEPRECATED and will be removed in the specified release cycle.
 A logged warning is expected for each deprecated item that is in deprecation window.
 
-## Version 1.8.0 (pending)
+## Version 1.10.0 (pending)
+* Use of `enabled` in `CorsPolicy`, found in
+  [route.proto](https://github.com/envoyproxy/envoy/blob/master/api/envoy/api/v2/route/route.proto).
+  Set the `filter_enabled` field instead.
+* Use of google.protobuf.Struct for extension opaque configs is deprecated. Use google.protobuf.Any instead or pack
+google.protobuf.Struct in google.protobuf.Any.
 
-* Use of the v1 API is deprecated. See envoy-announce
-  [email](https://groups.google.com/forum/#!topic/envoy-announce/oPnYMZw8H4U).
+## Version 1.9.0 (Dec 20, 2018)
+
+* Order of execution of the network write filter chain has been reversed. Prior to this release cycle it was incorrect, see [#4599](https://github.com/envoyproxy/envoy/issues/4599). In the 1.9.0 release cycle we introduced `bugfix_reverse_write_filter_order` in [lds.proto] (https://github.com/envoyproxy/envoy/blob/master/api/envoy/api/v2/lds.proto) to temporarily support both old and new behaviors. Note this boolean field is deprecated.
+* Order of execution of the HTTP encoder filter chain has been reversed. Prior to this release cycle it was incorrect, see [#4599](https://github.com/envoyproxy/envoy/issues/4599). In the 1.9.0 release cycle we introduced `bugfix_reverse_encode_order` in [http_connection_manager.proto] (https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.proto) to temporarily support both old and new behaviors. Note this boolean field is deprecated.
+* Use of the v1 REST_LEGACY ApiConfigSource is deprecated.
+* Use of std::hash in the ring hash load balancer is deprecated.
+* Use of `rate_limit_service` configuration in the [bootstrap configuration](https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/bootstrap/v2/bootstrap.proto) is deprecated.
+* Use of `runtime_key` in `RequestMirrorPolicy`, found in
+  [route.proto](https://github.com/envoyproxy/envoy/blob/master/api/envoy/api/v2/route/route.proto)
+  is deprecated. Set the `runtime_fraction` field instead.
+* Use of buffer filter `max_request_time` is deprecated in favor of the request timeout found in [HttpConnectionManager](https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.proto)
+
+## Version 1.8.0 (Oct 4, 2018)
+
+* Use of the v1 API (including `*.deprecated_v1` fields in the v2 API) is deprecated.
+  See envoy-announce [email](https://groups.google.com/forum/#!topic/envoy-announce/oPnYMZw8H4U).
 * Use of the legacy
   [ratelimit.proto](https://github.com/envoyproxy/envoy/blob/b0a518d064c8255e0e20557a8f909b6ff457558f/source/common/ratelimit/ratelimit.proto)
   is deprecated, in favor of the proto defined in
@@ -23,11 +42,19 @@ A logged warning is expected for each deprecated item that is in deprecation win
   is deprecated. Please use the new `upgrade_configs` in the
   [HttpConnectionManager](https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.proto)
   instead.
+* Use of the integer `percent` field in [FaultDelay](https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/filter/fault/v2/fault.proto)
+  and in [FaultAbort](https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/filter/http/fault/v2/fault.proto) is deprecated in favor
+  of the new `FractionalPercent` based `percentage` field.
 * Setting hosts via `hosts` field in `Cluster` is deprecated. Use `load_assignment` instead.
 * Use of `response_headers_to_*` and `request_headers_to_add` are deprecated at the `RouteAction`
   level. Please use the configuration options at the `Route` level.
+* Use of `runtime` in `RouteMatch`, found in
+  [route.proto](https://github.com/envoyproxy/envoy/blob/master/api/envoy/api/v2/route/route.proto).
+  Set the `runtime_fraction` field instead.
+* Use of the string `user` field in `Authenticated` in [rbac.proto](https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/rbac/v2alpha/rbac.proto)
+  is deprecated in favor of the new `StringMatcher` based `principal_name` field.
 
-## Version 1.7.0
+## Version 1.7.0 (Jun 21, 2018)
 
 * Admin mutations should be sent as POSTs rather than GETs. HTTP GETs will result in an error
   status code and will not have their intended effect. Prior to 1.7, GETs can be used for

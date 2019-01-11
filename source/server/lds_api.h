@@ -6,6 +6,7 @@
 #include "envoy/config/subscription.h"
 #include "envoy/init/init.h"
 #include "envoy/server/listener_manager.h"
+#include "envoy/stats/scope.h"
 
 #include "common/common/logger.h"
 

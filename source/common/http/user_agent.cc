@@ -1,10 +1,12 @@
 #include "common/http/user_agent.h"
 
 #include <cstdint>
+#include <memory>
 #include <string>
 
 #include "envoy/network/connection.h"
-#include "envoy/stats/stats.h"
+#include "envoy/stats/scope.h"
+#include "envoy/stats/timespan.h"
 
 #include "common/http/headers.h"
 
@@ -44,7 +46,8 @@ void UserAgent::initializeFromHeaders(const HeaderMap& headers, const std::strin
   }
 
   if (type_ != Type::Unknown) {
-    stats_.reset(new UserAgentStats{ALL_USER_AGENTS_STATS(POOL_COUNTER_PREFIX(scope, prefix_))});
+    stats_ = std::make_unique<UserAgentStats>(
+        UserAgentStats{ALL_USER_AGENTS_STATS(POOL_COUNTER_PREFIX(scope, prefix_))});
     stats_->downstream_cx_total_.inc();
     stats_->downstream_rq_total_.inc();
     scope_ = &scope;

@@ -3,6 +3,8 @@
 syntax = "proto3";
 
 package envoy.api.v2.core;
+option java_package = "io.envoyproxy.envoy.api.v2.core";
+option java_multiple_files = true;
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
@@ -76,6 +78,17 @@ message Http2ProtocolOptions {
   // window. Currently, this has the same minimum/maximum/default as *initial_stream_window_size*.
   google.protobuf.UInt32Value initial_connection_window_size = 4
       [(validate.rules).uint32 = {gte: 65535, lte: 2147483647}];
+
+  // Allows proxying Websocket and other upgrades over H2 connect.
+  bool allow_connect = 5;
+
+  // [#not-implemented-hide:] Hiding until envoy has full metadata support.
+  // Still under implementation. DO NOT USE.
+  //
+  // Allows metadata. See [metadata
+  // docs](https://github.com/envoyproxy/envoy/blob/master/source/docs/h2_metadata.md) for more
+  // information.
+  bool allow_metadata = 6;
 }
 
 // [#not-implemented-hide:]

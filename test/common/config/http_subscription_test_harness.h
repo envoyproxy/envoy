@@ -1,3 +1,7 @@
+#pragma once
+
+#include <memory>
+
 #include "envoy/api/v2/eds.pb.h"
 #include "envoy/http/async_client.h"
 
@@ -10,6 +14,7 @@
 #include "test/common/config/subscription_test_harness.h"
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/event/mocks.h"
+#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/utility.h"
@@ -17,9 +22,9 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::Invoke;
 using testing::Return;
-using testing::_;
 
 namespace Envoy {
 namespace Config {
@@ -33,13 +38,14 @@ public:
             "envoy.api.v2.EndpointDiscoveryService.FetchEndpoints")),
         timer_(new Event::MockTimer()), http_request_(&cm_.async_client_) {
     node_.set_id("fo0");
+    EXPECT_CALL(local_info_, node()).WillOnce(testing::ReturnRef(node_));
     EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([this](Event::TimerCb timer_cb) {
       timer_cb_ = timer_cb;
       return timer_;
     }));
-    subscription_.reset(new HttpEdsSubscriptionImpl(node_, cm_, "eds_cluster", dispatcher_,
-                                                    random_gen_, std::chrono::milliseconds(1),
-                                                    *method_descriptor_, stats_));
+    subscription_ = std::make_unique<HttpEdsSubscriptionImpl>(
+        local_info_, cm_, "eds_cluster", dispatcher_, random_gen_, std::chrono::milliseconds(1),
+        std::chrono::milliseconds(1000), *method_descriptor_, stats_);
   }
 
   ~HttpSubscriptionTestHarness() {
@@ -53,12 +59,13 @@ public:
                          const std::string& version) override {
     EXPECT_CALL(cm_, httpAsyncClientForCluster("eds_cluster"));
     EXPECT_CALL(cm_.async_client_, send_(_, _, _))
-        .WillOnce(Invoke([this, cluster_names, version](
-                             Http::MessagePtr& request, Http::AsyncClient::Callbacks& callbacks,
-                             const absl::optional<std::chrono::milliseconds>& timeout) {
+        .WillOnce(Invoke([this, cluster_names, version](Http::MessagePtr& request,
+                                                        Http::AsyncClient::Callbacks& callbacks,
+                                                        const Http::AsyncClient::RequestOptions&) {
           http_callbacks_ = &callbacks;
-          UNREFERENCED_PARAMETER(timeout);
           EXPECT_EQ("POST", std::string(request->headers().Method()->value().c_str()));
+          EXPECT_EQ(Http::Headers::get().ContentTypeValues.Json,
+                    std::string(request->headers().ContentType()->value().c_str()));
           EXPECT_EQ("eds_cluster", std::string(request->headers().Host()->value().c_str()));
           EXPECT_EQ("/v2/discovery:endpoints",
                     std::string(request->headers().Path()->value().c_str()));
@@ -73,6 +80,8 @@ public:
           }
           expected_request += "}";
           EXPECT_EQ(expected_request, request->bodyAsString());
+          EXPECT_EQ(fmt::format_int(expected_request.size()).str(),
+                    std::string(request->headers().ContentLength()->value().c_str()));
           request_in_progress_ = true;
           return &http_request_;
         }));
@@ -106,7 +115,7 @@ public:
     EXPECT_TRUE(Protobuf::util::JsonStringToMessage(response_json, &response_pb).ok());
     Http::HeaderMapPtr response_headers{new Http::TestHeaderMapImpl{{":status", "200"}}};
     Http::MessagePtr message{new Http::ResponseMessageImpl(std::move(response_headers))};
-    message->body().reset(new Buffer::OwnedImpl(response_json));
+    message->body() = std::make_unique<Buffer::OwnedImpl>(response_json);
     EXPECT_CALL(callbacks_,
                 onConfigUpdate(
                     RepeatedProtoEq(
@@ -146,6 +155,7 @@ public:
   Http::AsyncClient::Callbacks* http_callbacks_;
   Config::MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment> callbacks_;
   std::unique_ptr<HttpEdsSubscriptionImpl> subscription_;
+  NiceMock<LocalInfo::MockLocalInfo> local_info_;
 };
 
 } // namespace Config

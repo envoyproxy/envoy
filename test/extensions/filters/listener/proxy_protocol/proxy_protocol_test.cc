@@ -2,7 +2,7 @@
 #include <memory>
 #include <string>
 
-#include "envoy/stats/stats.h"
+#include "envoy/stats/scope.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/event/dispatcher_impl.h"
@@ -22,19 +22,20 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_time.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::AnyNumber;
 using testing::AtLeast;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
-using testing::_;
 
 namespace Envoy {
 namespace Extensions {
@@ -49,7 +50,8 @@ class ProxyProtocolTest : public testing::TestWithParam<Network::Address::IpVers
                           protected Logger::Loggable<Logger::Id::main> {
 public:
   ProxyProtocolTest()
-      : socket_(Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true),
+      : api_(Api::createApiForTest(stats_store_)), dispatcher_(test_time_.timeSystem(), *api_),
+        socket_(Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true),
         connection_handler_(new Server::ConnectionHandlerImpl(ENVOY_LOGGER(), dispatcher_)),
         name_("proxy"), filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()) {
 
@@ -60,16 +62,21 @@ public:
     conn_->addConnectionCallbacks(connection_callbacks_);
   }
 
-  // Listener
+  // Network::ListenerConfig
   Network::FilterChainManager& filterChainManager() override { return *this; }
   Network::FilterChainFactory& filterChainFactory() override { return factory_; }
   Network::Socket& socket() override { return socket_; }
+  const Network::Socket& socket() const override { return socket_; }
   bool bindToPort() override { return true; }
   bool handOffRestoredDestinationConnections() const override { return false; }
-  uint32_t perConnectionBufferLimitBytes() override { return 0; }
+  uint32_t perConnectionBufferLimitBytes() const override { return 0; }
+  std::chrono::milliseconds listenerFiltersTimeout() const override {
+    return std::chrono::milliseconds();
+  }
   Stats::Scope& listenerScope() override { return stats_store_; }
   uint64_t listenerTag() const override { return 1; }
   const std::string& name() const override { return name_; }
+  bool reverseWriteFilterOrder() const override { return true; }
 
   // Network::FilterChainManager
   const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&) const override {
@@ -142,9 +149,11 @@ public:
     EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto_error").value(), 1);
   }
 
+  Stats::IsolatedStoreImpl stats_store_;
+  Api::ApiPtr api_;
+  DangerousDeprecatedTestTime test_time_;
   Event::DispatcherImpl dispatcher_;
   Network::TcpListenSocket socket_;
-  Stats::IsolatedStoreImpl stats_store_;
   Network::ConnectionHandlerPtr connection_handler_;
   Network::MockFilterChainFactory factory_;
   Network::ClientConnectionPtr conn_;
@@ -257,20 +266,27 @@ TEST_P(ProxyProtocolTest, errorRecv_2) {
                                 'r',  'e',  ' ',  'd',  'a',  't',  'a'};
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
-  EXPECT_CALL(os_sys_calls, recv(_, _, _, _)).Times(AnyNumber()).WillOnce(Return((errno = 0, -1)));
+  EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
+      .Times(AnyNumber())
+      .WillOnce(Return(Api::SysCallSizeResult{-1, 0}));
   EXPECT_CALL(os_sys_calls, ioctl(_, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([](int fd, unsigned long int request, void* argp) {
-        return ::ioctl(fd, request, argp);
+        const int rc = ::ioctl(fd, request, argp);
+        return Api::SysCallIntResult{rc, errno};
       }));
   EXPECT_CALL(os_sys_calls, writev(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke(
-          [](int fd, const struct iovec* iov, int iovcnt) { return ::writev(fd, iov, iovcnt); }));
+      .WillRepeatedly(Invoke([](int fd, const struct iovec* iov, int iovcnt) {
+        const ssize_t rc = ::writev(fd, iov, iovcnt);
+        return Api::SysCallSizeResult{rc, errno};
+      }));
   EXPECT_CALL(os_sys_calls, readv(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke(
-          [](int fd, const struct iovec* iov, int iovcnt) { return ::readv(fd, iov, iovcnt); }));
+      .WillRepeatedly(Invoke([](int fd, const struct iovec* iov, int iovcnt) {
+        const ssize_t rc = ::readv(fd, iov, iovcnt);
+        return Api::SysCallSizeResult{rc, errno};
+      }));
 
   connect(false);
   write(buffer, sizeof(buffer));
@@ -287,15 +303,19 @@ TEST_P(ProxyProtocolTest, errorFIONREAD_1) {
                                 'r',  'e',  ' ',  'd',  'a',  't',  'a'};
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
-  EXPECT_CALL(os_sys_calls, ioctl(_, FIONREAD, _)).WillOnce(Return(-1));
+  EXPECT_CALL(os_sys_calls, ioctl(_, FIONREAD, _)).WillOnce(Return(Api::SysCallIntResult{-1, 0}));
   EXPECT_CALL(os_sys_calls, writev(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke(
-          [](int fd, const struct iovec* iov, int iovcnt) { return ::writev(fd, iov, iovcnt); }));
+      .WillRepeatedly(Invoke([](int fd, const struct iovec* iov, int iovcnt) {
+        const ssize_t rc = ::writev(fd, iov, iovcnt);
+        return Api::SysCallSizeResult{rc, errno};
+      }));
   EXPECT_CALL(os_sys_calls, readv(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke(
-          [](int fd, const struct iovec* iov, int iovcnt) { return ::readv(fd, iov, iovcnt); }));
+      .WillRepeatedly(Invoke([](int fd, const struct iovec* iov, int iovcnt) {
+        const ssize_t rc = ::readv(fd, iov, iovcnt);
+        return Api::SysCallSizeResult{rc, errno};
+      }));
 
   connect(false);
   write(buffer, sizeof(buffer));
@@ -441,8 +461,9 @@ TEST_P(ProxyProtocolTest, v1TooLong) {
   constexpr uint8_t buffer[] = {' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '};
   connect(false);
   write("PROXY TCP4 1.2.3.4 2.3.4.5 100 100");
-  for (size_t i = 0; i < 256; i += sizeof(buffer))
+  for (size_t i = 0; i < 256; i += sizeof(buffer)) {
     write(buffer, sizeof(buffer));
+  }
   expectProxyProtoError();
 }
 
@@ -481,25 +502,31 @@ TEST_P(ProxyProtocolTest, v2ParseExtensionsIoctlError) {
       .WillRepeatedly(Invoke([](int fd, unsigned long int request, void* argp) {
         int x = ::ioctl(fd, request, argp);
         if (x == 0 && *static_cast<int*>(argp) == sizeof(tlv)) {
-          return -1;
+          return Api::SysCallIntResult{-1, errno};
         } else {
-          return x;
+          return Api::SysCallIntResult{x, errno};
         }
       }));
 
   EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke(
-          [](int fd, void* buf, size_t len, int flags) { return ::recv(fd, buf, len, flags); }));
+      .WillRepeatedly(Invoke([](int fd, void* buf, size_t len, int flags) {
+        const ssize_t rc = ::recv(fd, buf, len, flags);
+        return Api::SysCallSizeResult{rc, errno};
+      }));
 
   EXPECT_CALL(os_sys_calls, writev(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke(
-          [](int fd, const struct iovec* iov, int iovcnt) { return ::writev(fd, iov, iovcnt); }));
+      .WillRepeatedly(Invoke([](int fd, const struct iovec* iov, int iovcnt) {
+        const ssize_t rc = ::writev(fd, iov, iovcnt);
+        return Api::SysCallSizeResult{rc, errno};
+      }));
   EXPECT_CALL(os_sys_calls, readv(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke(
-          [](int fd, const struct iovec* iov, int iovcnt) { return ::readv(fd, iov, iovcnt); }));
+      .WillRepeatedly(Invoke([](int fd, const struct iovec* iov, int iovcnt) {
+        const ssize_t rc = ::readv(fd, iov, iovcnt);
+        return Api::SysCallSizeResult{rc, errno};
+      }));
 
   connect(false);
   write(buffer, sizeof(buffer));
@@ -603,23 +630,32 @@ TEST_P(ProxyProtocolTest, v2Fragmented3Error) {
 
   EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke(
-          [](int fd, void* buf, size_t len, int flags) { return ::recv(fd, buf, len, flags); }));
-  EXPECT_CALL(os_sys_calls, recv(_, _, 1, _)).Times(AnyNumber()).WillOnce(Return(-1));
+      .WillRepeatedly(Invoke([](int fd, void* buf, size_t len, int flags) {
+        const ssize_t rc = ::recv(fd, buf, len, flags);
+        return Api::SysCallSizeResult{rc, errno};
+      }));
+  EXPECT_CALL(os_sys_calls, recv(_, _, 1, _))
+      .Times(AnyNumber())
+      .WillOnce(Return(Api::SysCallSizeResult{-1, 0}));
 
   EXPECT_CALL(os_sys_calls, ioctl(_, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([](int fd, unsigned long int request, void* argp) {
-        return ::ioctl(fd, request, argp);
+        const int rc = ::ioctl(fd, request, argp);
+        return Api::SysCallIntResult{rc, errno};
       }));
   EXPECT_CALL(os_sys_calls, writev(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke(
-          [](int fd, const struct iovec* iov, int iovcnt) { return ::writev(fd, iov, iovcnt); }));
+      .WillRepeatedly(Invoke([](int fd, const struct iovec* iov, int iovcnt) {
+        const ssize_t rc = ::writev(fd, iov, iovcnt);
+        return Api::SysCallSizeResult{rc, errno};
+      }));
   EXPECT_CALL(os_sys_calls, readv(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke(
-          [](int fd, const struct iovec* iov, int iovcnt) { return ::readv(fd, iov, iovcnt); }));
+      .WillRepeatedly(Invoke([](int fd, const struct iovec* iov, int iovcnt) {
+        const ssize_t rc = ::readv(fd, iov, iovcnt);
+        return Api::SysCallSizeResult{rc, errno};
+      }));
 
   connect(false);
   write(buffer, 17);
@@ -640,23 +676,32 @@ TEST_P(ProxyProtocolTest, v2Fragmented4Error) {
 
   EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke(
-          [](int fd, void* buf, size_t len, int flags) { return ::recv(fd, buf, len, flags); }));
-  EXPECT_CALL(os_sys_calls, recv(_, _, 4, _)).Times(AnyNumber()).WillOnce(Return(-1));
+      .WillRepeatedly(Invoke([](int fd, void* buf, size_t len, int flags) {
+        const ssize_t rc = ::recv(fd, buf, len, flags);
+        return Api::SysCallSizeResult{rc, errno};
+      }));
+  EXPECT_CALL(os_sys_calls, recv(_, _, 4, _))
+      .Times(AnyNumber())
+      .WillOnce(Return(Api::SysCallSizeResult{-1, 0}));
 
   EXPECT_CALL(os_sys_calls, ioctl(_, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([](int fd, unsigned long int request, void* argp) {
-        return ::ioctl(fd, request, argp);
+        const int rc = ::ioctl(fd, request, argp);
+        return Api::SysCallIntResult{rc, errno};
       }));
   EXPECT_CALL(os_sys_calls, writev(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke(
-          [](int fd, const struct iovec* iov, int iovcnt) { return ::writev(fd, iov, iovcnt); }));
+      .WillRepeatedly(Invoke([](int fd, const struct iovec* iov, int iovcnt) {
+        const ssize_t rc = ::writev(fd, iov, iovcnt);
+        return Api::SysCallSizeResult{rc, errno};
+      }));
   EXPECT_CALL(os_sys_calls, readv(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke(
-          [](int fd, const struct iovec* iov, int iovcnt) { return ::readv(fd, iov, iovcnt); }));
+      .WillRepeatedly(Invoke([](int fd, const struct iovec* iov, int iovcnt) {
+        const ssize_t rc = ::readv(fd, iov, iovcnt);
+        return Api::SysCallSizeResult{rc, errno};
+      }));
 
   connect(false);
   write(buffer, 10);
@@ -697,8 +742,9 @@ TEST_P(ProxyProtocolTest, v2PartialRead) {
 
   for (size_t i = 0; i < sizeof(buffer); i += 9) {
     write(&buffer[i], 9);
-    if (i == 0)
+    if (i == 0) {
       dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+    }
   }
 
   expectData("moredata");
@@ -825,7 +871,8 @@ class WildcardProxyProtocolTest : public testing::TestWithParam<Network::Address
                                   protected Logger::Loggable<Logger::Id::main> {
 public:
   WildcardProxyProtocolTest()
-      : socket_(Network::Test::getAnyAddress(GetParam()), nullptr, true),
+      : api_(Api::createApiForTest(stats_store_)), dispatcher_(test_time_.timeSystem(), *api_),
+        socket_(Network::Test::getAnyAddress(GetParam()), nullptr, true),
         local_dst_address_(Network::Utility::getAddressWithPort(
             *Network::Test::getCanonicalLoopbackAddress(GetParam()),
             socket_.localAddress()->ip()->port())),
@@ -849,12 +896,17 @@ public:
   Network::FilterChainManager& filterChainManager() override { return *this; }
   Network::FilterChainFactory& filterChainFactory() override { return factory_; }
   Network::Socket& socket() override { return socket_; }
+  const Network::Socket& socket() const override { return socket_; }
   bool bindToPort() override { return true; }
   bool handOffRestoredDestinationConnections() const override { return false; }
-  uint32_t perConnectionBufferLimitBytes() override { return 0; }
+  uint32_t perConnectionBufferLimitBytes() const override { return 0; }
+  std::chrono::milliseconds listenerFiltersTimeout() const override {
+    return std::chrono::milliseconds();
+  }
   Stats::Scope& listenerScope() override { return stats_store_; }
   uint64_t listenerTag() const override { return 1; }
   const std::string& name() const override { return name_; }
+  bool reverseWriteFilterOrder() const override { return true; }
 
   // Network::FilterChainManager
   const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&) const override {
@@ -904,10 +956,12 @@ public:
     dispatcher_.run(Event::Dispatcher::RunType::Block);
   }
 
+  Stats::IsolatedStoreImpl stats_store_;
+  Api::ApiPtr api_;
+  DangerousDeprecatedTestTime test_time_;
   Event::DispatcherImpl dispatcher_;
   Network::TcpListenSocket socket_;
   Network::Address::InstanceConstSharedPtr local_dst_address_;
-  Stats::IsolatedStoreImpl stats_store_;
   Network::ConnectionHandlerPtr connection_handler_;
   Network::MockFilterChainFactory factory_;
   Network::ClientConnectionPtr conn_;

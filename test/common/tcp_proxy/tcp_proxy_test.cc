@@ -7,6 +7,8 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/config/filter_json.h"
 #include "common/network/address_impl.h"
+#include "common/network/transport_socket_options_impl.h"
+#include "common/network/upstream_server_name.h"
 #include "common/router/metadatamatchcriteria_impl.h"
 #include "common/tcp_proxy/tcp_proxy.h"
 #include "common/upstream/upstream_impl.h"
@@ -18,6 +20,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/mocks.h"
+#include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/tcp/mocks.h"
 #include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/mocks.h"
@@ -26,17 +29,20 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::Invoke;
+using testing::InvokeWithoutArgs;
 using testing::MatchesRegex;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
 using testing::SaveArg;
-using testing::_;
 
 namespace Envoy {
 namespace TcpProxy {
+
+using ::Envoy::Network::UpstreamServerName;
 
 namespace {
 Config constructConfigFromJson(const Json::Object& json,
@@ -241,7 +247,7 @@ TEST(ConfigTest, Routes) {
   }
 
   {
-    // hit the route with all criterias present
+    // hit the route with all criteria present
     NiceMock<Network::MockConnection> connection;
     connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.0", 10000);
     connection.remote_address_ =
@@ -347,6 +353,12 @@ public:
         .WillByDefault(SaveArg<0>(&access_log_data_));
   }
 
+  ~TcpProxyTest() {
+    if (filter_ != nullptr) {
+      filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+    }
+  }
+
   void configure(const envoy::config::filter::network::tcp_proxy::v2::TcpProxy& config) {
     config_.reset(new Config(config, factory_context_));
   }
@@ -405,7 +417,8 @@ public:
     {
       testing::InSequence sequence;
       for (uint32_t i = 0; i < connections; i++) {
-        EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _))
+        EXPECT_CALL(factory_context_.cluster_manager_,
+                    tcpConnPoolForCluster("fake_cluster", _, _, _))
             .WillOnce(Return(&conn_pool_))
             .RetiresOnSaturation();
         EXPECT_CALL(conn_pool_, newConnection(_))
@@ -416,19 +429,22 @@ public:
                 }))
             .RetiresOnSaturation();
       }
-      EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _))
+      EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _, _))
           .WillRepeatedly(Return(nullptr));
     }
 
-    filter_.reset(new Filter(config_, factory_context_.cluster_manager_));
-    EXPECT_CALL(filter_callbacks_.connection_, readDisable(true));
-    EXPECT_CALL(filter_callbacks_.connection_, enableHalfClose(true));
-    filter_->initializeReadFilterCallbacks(filter_callbacks_);
-    EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
+    {
+      testing::InSequence sequence;
+      filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_, timeSystem());
+      EXPECT_CALL(filter_callbacks_.connection_, enableHalfClose(true));
+      EXPECT_CALL(filter_callbacks_.connection_, readDisable(true));
+      filter_->initializeReadFilterCallbacks(filter_callbacks_);
+      EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 
-    EXPECT_EQ(absl::optional<uint64_t>(), filter_->computeHashKey());
-    EXPECT_EQ(&filter_callbacks_.connection_, filter_->downstreamConnection());
-    EXPECT_EQ(nullptr, filter_->metadataMatchCriteria());
+      EXPECT_EQ(absl::optional<uint64_t>(), filter_->computeHashKey());
+      EXPECT_EQ(&filter_callbacks_.connection_, filter_->downstreamConnection());
+      EXPECT_EQ(nullptr, filter_->metadataMatchCriteria());
+    }
   }
 
   void setup(uint32_t connections) { setup(connections, defaultConfig()); }
@@ -454,6 +470,8 @@ public:
     conn_pool_callbacks_.at(conn_index)->onPoolFailure(reason, upstream_hosts_.at(conn_index));
   }
 
+  Event::TestTimeSystem& timeSystem() { return factory_context_.timeSystem(); }
+
   ConfigSharedPtr config_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
@@ -470,6 +488,20 @@ public:
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
   Network::Address::InstanceConstSharedPtr upstream_remote_address_;
 };
+
+TEST_F(TcpProxyTest, DefaultRoutes) {
+  envoy::config::filter::network::tcp_proxy::v2::TcpProxy config = defaultConfig();
+
+  envoy::config::filter::network::tcp_proxy::v2::TcpProxy::WeightedCluster::ClusterWeight*
+      ignored_cluster = config.mutable_weighted_clusters()->mutable_clusters()->Add();
+  ignored_cluster->set_name("ignored_cluster");
+  ignored_cluster->set_weight(10);
+
+  configure(config);
+
+  NiceMock<Network::MockConnection> connection;
+  EXPECT_EQ(std::string("fake_cluster"), config_->getRouteFromEntries(connection));
+}
 
 // Tests that half-closes are proxied and don't themselves cause any connection to be closed.
 TEST_F(TcpProxyTest, HalfCloseProxy) {
@@ -575,7 +607,8 @@ TEST_F(TcpProxyTest, ConnectAttemptsUpstreamTimeout) {
 
 // Test that only the configured number of connect attempts occur
 TEST_F(TcpProxyTest, ConnectAttemptsLimit) {
-  envoy::config::filter::network::tcp_proxy::v2::TcpProxy config = defaultConfig();
+  envoy::config::filter::network::tcp_proxy::v2::TcpProxy config =
+      accessLogConfig("%RESPONSE_FLAGS%");
   config.mutable_max_connect_attempts()->set_value(3);
   setup(3, config);
 
@@ -594,6 +627,9 @@ TEST_F(TcpProxyTest, ConnectAttemptsLimit) {
                                   Tcp::ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
   raiseEventUpstreamConnectFailed(2,
                                   Tcp::ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
+
+  filter_.reset();
+  EXPECT_EQ(access_log_data_, "UF,URX");
 }
 
 // Test that the tcp proxy sends the correct notifications to the outlier detector
@@ -679,7 +715,7 @@ TEST_F(TcpProxyTest, UpstreamConnectTimeout) {
   raiseEventUpstreamConnectFailed(0, Tcp::ConnectionPool::PoolFailureReason::Timeout);
 
   filter_.reset();
-  EXPECT_EQ(access_log_data_, "UF");
+  EXPECT_EQ(access_log_data_, "UF,URX");
 }
 
 TEST_F(TcpProxyTest, NoHost) {
@@ -711,7 +747,7 @@ TEST_F(TcpProxyTest, WithMetadataMatch) {
       {Envoy::Config::MetadataFilters::get().ENVOY_LB, metadata_struct});
 
   configure(config);
-  filter_.reset(new Filter(config_, factory_context_.cluster_manager_));
+  filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_, timeSystem());
 
   const auto& metadata_criteria = filter_->metadataMatchCriteria()->metadataMatchCriteria();
 
@@ -724,10 +760,26 @@ TEST_F(TcpProxyTest, WithMetadataMatch) {
 
 TEST_F(TcpProxyTest, DisconnectBeforeData) {
   configure(defaultConfig());
-  filter_.reset(new Filter(config_, factory_context_.cluster_manager_));
+  filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_, timeSystem());
   filter_->initializeReadFilterCallbacks(filter_callbacks_);
 
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+// Test that if the downstream connection is closed before the upstream connection
+// is established, the upstream connection is cancelled.
+TEST_F(TcpProxyTest, RemoteClosedBeforeUpstreamConnected) {
+  setup(1);
+  EXPECT_CALL(*conn_pool_handles_.at(0), cancel(Tcp::ConnectionPool::CancelPolicy::CloseExcess));
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+// Test that if the downstream connection is closed before the upstream connection
+// is established, the upstream connection is cancelled.
+TEST_F(TcpProxyTest, LocalClosetBeforeUpstreamConnected) {
+  setup(1);
+  EXPECT_CALL(*conn_pool_handles_.at(0), cancel(Tcp::ConnectionPool::CancelPolicy::CloseExcess));
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::LocalClose);
 }
 
 TEST_F(TcpProxyTest, UpstreamConnectFailure) {
@@ -738,16 +790,16 @@ TEST_F(TcpProxyTest, UpstreamConnectFailure) {
                                   Tcp::ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
 
   filter_.reset();
-  EXPECT_EQ(access_log_data_, "UF");
+  EXPECT_EQ(access_log_data_, "UF,URX");
 }
 
 TEST_F(TcpProxyTest, UpstreamConnectionLimit) {
   configure(accessLogConfig("%RESPONSE_FLAGS%"));
-  factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->resource_manager_.reset(
-      new Upstream::ResourceManagerImpl(factory_context_.runtime_loader_, "fake_key", 0, 0, 0, 0));
+  factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->resetResourceManager(
+      0, 0, 0, 0);
 
   // setup sets up expectation for tcpConnForCluster but this test is expected to NOT call that
-  filter_.reset(new Filter(config_, factory_context_.cluster_manager_));
+  filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_, timeSystem());
   // The downstream connection closes if the proxy can't make an upstream connection.
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
   filter_->initializeReadFilterCallbacks(filter_callbacks_);
@@ -816,10 +868,60 @@ TEST_F(TcpProxyTest, IdleTimerDisabledUpstreamClose) {
   upstream_callbacks_->onEvent(Network::ConnectionEvent::RemoteClose);
 }
 
+// Tests that flushing data during an idle timeout doesn't cause problems.
+TEST_F(TcpProxyTest, IdleTimeoutWithOutstandingDataFlushed) {
+  envoy::config::filter::network::tcp_proxy::v2::TcpProxy config = defaultConfig();
+  config.mutable_idle_timeout()->set_seconds(1);
+  setup(1, config);
+
+  Event::MockTimer* idle_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000)));
+  raiseEventUpstreamConnected(0);
+
+  Buffer::OwnedImpl buffer("hello");
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000)));
+  filter_->onData(buffer, false);
+
+  buffer.add("hello2");
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000)));
+  upstream_callbacks_->onUpstreamData(buffer, false);
+
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000)));
+  filter_callbacks_.connection_.raiseBytesSentCallbacks(1);
+
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000)));
+  upstream_connections_.at(0)->raiseBytesSentCallbacks(2);
+
+  // Mark the upstream connection as blocked.
+  // This should read-disable the downstream connection.
+  EXPECT_CALL(filter_callbacks_.connection_, readDisable(_));
+  upstream_connections_.at(0)->runHighWatermarkCallbacks();
+
+  // When Envoy has an idle timeout, the following happens.
+  // Envoy closes the downstream connection
+  // Envoy closes the upstream connection.
+  // When closing the upstream connection with ConnectionCloseType::NoFlush,
+  // if there is data in the buffer, Envoy does a best-effort flush.
+  // If the write succeeds, Envoy may go under the flow control limit and start
+  // the callbacks to read-enable the already-closed downstream connection.
+  //
+  // In this case we expect readDisable to not be called on the already closed
+  // connection.
+  EXPECT_CALL(filter_callbacks_.connection_, readDisable(true)).Times(0);
+  EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::NoFlush))
+      .WillOnce(InvokeWithoutArgs(
+          [&]() -> void { upstream_connections_.at(0)->runLowWatermarkCallbacks(); }));
+
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*idle_timer, disableTimer());
+  idle_timer->callback_();
+}
+
 // Test that access log fields %UPSTREAM_HOST% and %UPSTREAM_CLUSTER% are correctly logged.
 TEST_F(TcpProxyTest, AccessLogUpstreamHost) {
   setup(1, accessLogConfig("%UPSTREAM_HOST% %UPSTREAM_CLUSTER%"));
   raiseEventUpstreamConnected(0);
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
   filter_.reset();
   EXPECT_EQ(access_log_data_, "127.0.0.1:80 fake_cluster");
 }
@@ -828,6 +930,7 @@ TEST_F(TcpProxyTest, AccessLogUpstreamHost) {
 TEST_F(TcpProxyTest, AccessLogUpstreamLocalAddress) {
   setup(1, accessLogConfig("%UPSTREAM_LOCAL_ADDRESS%"));
   raiseEventUpstreamConnected(0);
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
   filter_.reset();
   EXPECT_EQ(access_log_data_, "2.2.2.2:50000");
 }
@@ -840,6 +943,7 @@ TEST_F(TcpProxyTest, AccessLogDownstreamAddress) {
   filter_callbacks_.connection_.remote_address_ =
       Network::Utility::resolveUrl("tcp://1.1.1.1:40000");
   setup(1, accessLogConfig("%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT% %DOWNSTREAM_LOCAL_ADDRESS%"));
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
   filter_.reset();
   EXPECT_EQ(access_log_data_, "1.1.1.1 1.1.1.2:20000");
 }
@@ -856,7 +960,7 @@ TEST_F(TcpProxyTest, AccessLogBytesRxTxDuration) {
   Buffer::OwnedImpl response("bb");
   upstream_callbacks_->onUpstreamData(response, false);
 
-  std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  timeSystem().sleep(std::chrono::milliseconds(1));
   upstream_callbacks_->onEvent(Network::ConnectionEvent::RemoteClose);
   filter_.reset();
 
@@ -996,9 +1100,11 @@ public:
   void setup() {
     EXPECT_CALL(filter_callbacks_, connection()).WillRepeatedly(ReturnRef(connection_));
 
-    filter_.reset(new Filter(config_, factory_context_.cluster_manager_));
+    filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_, timeSystem());
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
   }
+
+  Event::TestTimeSystem& timeSystem() { return factory_context_.timeSystem(); }
 
   ConfigSharedPtr config_;
   NiceMock<Network::MockConnection> connection_;
@@ -1022,6 +1128,9 @@ TEST_F(TcpProxyRoutingTest, NonRoutableConnection) {
 
   EXPECT_EQ(total_cx + 1, config_->stats().downstream_cx_total_.value());
   EXPECT_EQ(non_routable_cx + 1, config_->stats().downstream_cx_no_route_.value());
+
+  // Cleanup
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
 TEST_F(TcpProxyRoutingTest, RoutableConnection) {
@@ -1034,12 +1143,64 @@ TEST_F(TcpProxyRoutingTest, RoutableConnection) {
   connection_.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 9999);
 
   // Expect filter to try to open a connection to specified cluster.
-  EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _));
+  EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _, _))
+      .WillOnce(Return(nullptr));
 
   filter_->onNewConnection();
 
   EXPECT_EQ(total_cx + 1, config_->stats().downstream_cx_total_.value());
   EXPECT_EQ(non_routable_cx, config_->stats().downstream_cx_no_route_.value());
+}
+
+// Test that the tcp proxy uses the cluster from FilterState if set
+TEST_F(TcpProxyRoutingTest, UseClusterFromPerConnectionCluster) {
+  setup();
+
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  stream_info.filterState().setData("envoy.tcp_proxy.cluster",
+                                    std::make_unique<PerConnectionCluster>("filter_state_cluster"),
+                                    StreamInfo::FilterState::StateType::Mutable);
+  ON_CALL(connection_, streamInfo()).WillByDefault(ReturnRef(stream_info));
+  EXPECT_CALL(Const(connection_), streamInfo()).WillRepeatedly(ReturnRef(stream_info));
+
+  // Expect filter to try to open a connection to specified cluster.
+  EXPECT_CALL(factory_context_.cluster_manager_,
+              tcpConnPoolForCluster("filter_state_cluster", _, _, _))
+      .WillOnce(Return(nullptr));
+
+  filter_->onNewConnection();
+}
+
+// Test that the tcp proxy forwards the requested server name from FilterState if set
+TEST_F(TcpProxyRoutingTest, UpstreamServerName) {
+  setup();
+
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  stream_info.filterState().setData("envoy.network.upstream_server_name",
+                                    std::make_unique<UpstreamServerName>("www.example.com"),
+                                    StreamInfo::FilterState::StateType::ReadOnly);
+
+  ON_CALL(connection_, streamInfo()).WillByDefault(ReturnRef(stream_info));
+  EXPECT_CALL(Const(connection_), streamInfo()).WillRepeatedly(ReturnRef(stream_info));
+
+  // Expect filter to try to open a connection to a cluster with the transport socket options with
+  // override-server-name
+  EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster(_, _, _, _))
+      .WillOnce(Invoke([](const std::string& cluster, Upstream::ResourcePriority,
+                          Upstream::LoadBalancerContext*,
+                          Network::TransportSocketOptionsSharedPtr transport_socket_options)
+                           -> Tcp::ConnectionPool::Instance* {
+        EXPECT_EQ(cluster, "fake_cluster");
+        EXPECT_NE(transport_socket_options, nullptr);
+        EXPECT_TRUE(transport_socket_options->serverNameOverride().has_value());
+        EXPECT_EQ(transport_socket_options->serverNameOverride().value(), "www.example.com");
+        return nullptr;
+      }));
+
+  // Port 9999 is within the specified destination port range.
+  connection_.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 9999);
+
+  filter_->onNewConnection();
 }
 
 } // namespace TcpProxy

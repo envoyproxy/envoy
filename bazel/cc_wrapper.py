@@ -34,8 +34,7 @@ def main():
   # https://github.com/bazelbuild/bazel/issues/4572
   # https://bazel-review.googlesource.com/c/bazel/+/39951
   if sys.argv[1:] == ["-E", "-xc++", "-", "-v"] and "clang" in compiler:
-    os.execv(envoy_real_cxx,
-             [envoy_real_cxx, "-E", "-", "-v", "-no-canonical-prefixes"])
+    os.execv(envoy_real_cxx, [envoy_real_cxx, "-E", "-", "-v", "-no-canonical-prefixes"])
 
   # `g++` and `gcc -lstdc++` have similar behavior and Bazel treats them as
   # interchangeable, but `gcc` will ignore the `-static-libstdc++` flag.
@@ -55,8 +54,7 @@ def main():
         # unless the user has explicitly set environment variables
         # before starting Bazel. But here in $PWD is the Bazel sandbox,
         # which will be deleted automatically after the compiler exits.
-        (flagfile_fd, flagfile_path) = tempfile.mkstemp(
-            dir='./', suffix=".linker-params")
+        (flagfile_fd, flagfile_path) = tempfile.mkstemp(dir='./', suffix=".linker-params")
         with closing_fd(flagfile_fd):
           sanitize_flagfile(arg[len("-Wl,@"):], flagfile_fd)
         argv.append("-Wl,@" + flagfile_path)
@@ -71,6 +69,7 @@ def main():
     # See https://github.com/envoyproxy/envoy/issues/1341
     argv.append("-fno-limit-debug-info")
     argv.append("-Wthread-safety")
+    argv.append("-Wgnu-conditional-omitted-operand")
   elif "gcc" in compiler or "g++" in compiler:
     # -Wmaybe-initialized is warning about many uses of absl::optional. Disable
     # to prevent build breakage. This option does not exist in clang, so setting

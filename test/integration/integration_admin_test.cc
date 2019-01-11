@@ -1,9 +1,12 @@
 #include "test/integration/integration_admin_test.h"
 
 #include "envoy/admin/v2alpha/config_dump.pb.h"
+#include "envoy/config/metrics/v2/stats.pb.h"
 #include "envoy/http/header_map.h"
 
 #include "common/common/fmt.h"
+#include "common/profiler/profiler.h"
+#include "common/stats/stats_matcher_impl.h"
 
 #include "test/integration/utility.h"
 #include "test/test_common/utility.h"
@@ -13,9 +16,11 @@
 
 namespace Envoy {
 
-INSTANTIATE_TEST_CASE_P(IpVersions, IntegrationAdminTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_CASE_P(Protocols, IntegrationAdminTest,
+                        testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+                            {Http::CodecClient::Type::HTTP1, Http::CodecClient::Type::HTTP2},
+                            {FakeHttpConnection::Type::HTTP1})),
+                        HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 TEST_P(IntegrationAdminTest, HealthCheck) {
   initialize();
@@ -62,7 +67,7 @@ TEST_P(IntegrationAdminTest, AdminLogging) {
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       lookupPort("admin"), "POST", "/logging", "", downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("404", response->headers().Status()->value().c_str());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 
   // Bad level
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "POST", "/logging?level=blah",
@@ -144,7 +149,7 @@ TEST_P(IntegrationAdminTest, Admin) {
                                                 downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
-  EXPECT_STREQ("text/plain; charset=UTF-8", ContentType(response));
+  EXPECT_STREQ("application/json", ContentType(response));
 
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/stats", "",
                                                 downstreamProtocol(), version_);
@@ -153,6 +158,27 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_STREQ("text/plain; charset=UTF-8", ContentType(response));
 
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/stats?usedonly", "",
+                                                downstreamProtocol(), version_);
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_STREQ("text/plain; charset=UTF-8", ContentType(response));
+
+  // Testing a fitler with no matches
+  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/stats?filter=foo", "",
+                                                downstreamProtocol(), version_);
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_STREQ("text/plain; charset=UTF-8", ContentType(response));
+
+  // Testing a fitler with matches
+  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/stats?filter=server",
+                                                "", downstreamProtocol(), version_);
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_STREQ("text/plain; charset=UTF-8", ContentType(response));
+
+  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET",
+                                                "/stats?filter=server&usedonly", "",
                                                 downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
@@ -178,6 +204,39 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_STREQ("application/json", ContentType(response));
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
   validateStatsJson(response->body(), 1);
+
+  // Filtering stats by a regex with one match should return just that match.
+  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET",
+                                                "/stats?format=json&filter=^server\\.version$", "",
+                                                downstreamProtocol(), version_);
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("application/json", ContentType(response));
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  validateStatsJson(response->body(), 0);
+  EXPECT_THAT(response->body(),
+              testing::Eq("{\"stats\":[{\"name\":\"server.version\",\"value\":0}]}"));
+
+  // Filtering stats by a non-full-string regex should also return just that match.
+  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET",
+                                                "/stats?format=json&filter=server\\.version", "",
+                                                downstreamProtocol(), version_);
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("application/json", ContentType(response));
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  validateStatsJson(response->body(), 0);
+  EXPECT_THAT(response->body(),
+              testing::Eq("{\"stats\":[{\"name\":\"server.version\",\"value\":0}]}"));
+
+  // Filtering stats by a regex with no matches (".*not_intended_to_appear.*") should return a
+  // valid, empty, stats array.
+  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET",
+                                                "/stats?format=json&filter=not_intended_to_appear",
+                                                "", downstreamProtocol(), version_);
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("application/json", ContentType(response));
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  validateStatsJson(response->body(), 0);
+  EXPECT_THAT(response->body(), testing::Eq("{\"stats\":[]}"));
 
   response = IntegrationUtil::makeSingleRequest(
       lookupPort("admin"), "GET", "/stats?format=prometheus", "", downstreamProtocol(), version_);
@@ -246,7 +305,7 @@ TEST_P(IntegrationAdminTest, Admin) {
                                                 downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
-  EXPECT_STREQ("text/plain; charset=UTF-8", ContentType(response));
+  EXPECT_STREQ("application/json", ContentType(response));
 
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/runtime", "",
                                                 downstreamProtocol(), version_);
@@ -283,20 +342,25 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
   EXPECT_STREQ("application/json", ContentType(response));
   json = Json::Factory::loadFromString(response->body());
-  EXPECT_TRUE(json->getObject("configs")->hasObject("bootstrap"));
-  EXPECT_TRUE(json->getObject("configs")->hasObject("clusters"));
-  EXPECT_TRUE(json->getObject("configs")->hasObject("listeners"));
-  EXPECT_TRUE(json->getObject("configs")->hasObject("routes"));
+  size_t index = 0;
+  const std::string expected_types[] = {
+      "type.googleapis.com/envoy.admin.v2alpha.BootstrapConfigDump",
+      "type.googleapis.com/envoy.admin.v2alpha.ClustersConfigDump",
+      "type.googleapis.com/envoy.admin.v2alpha.ListenersConfigDump",
+      "type.googleapis.com/envoy.admin.v2alpha.RoutesConfigDump"};
+  for (Json::ObjectSharedPtr obj_ptr : json->getObjectArray("configs")) {
+    EXPECT_TRUE(expected_types[index].compare(obj_ptr->getString("@type")) == 0);
+    index++;
+  }
+
   // Validate we can parse as proto.
   envoy::admin::v2alpha::ConfigDump config_dump;
   MessageUtil::loadFromJson(response->body(), config_dump);
-  EXPECT_EQ(1, config_dump.configs().count("bootstrap"));
-  EXPECT_EQ(1, config_dump.configs().count("clusters"));
-  EXPECT_EQ(1, config_dump.configs().count("listeners"));
-  EXPECT_EQ(1, config_dump.configs().count("routes"));
+  EXPECT_EQ(4, config_dump.configs_size());
+
   // .. and that we can unpack one of the entries.
   envoy::admin::v2alpha::RoutesConfigDump route_config_dump;
-  config_dump.configs().at("routes").UnpackTo(&route_config_dump);
+  config_dump.configs(3).UnpackTo(&route_config_dump);
   EXPECT_EQ("route_config_0", route_config_dump.static_route_configs(0).route_config().name());
 }
 
@@ -330,9 +394,6 @@ TEST_P(IntegrationAdminTest, AdminOnDestroyCallbacks) {
   EXPECT_EQ(test_server_->server().statsFlushInterval(), std::chrono::milliseconds(5000));
 }
 
-// Successful call to startProfiler requires tcmalloc.
-#ifdef TCMALLOC
-
 TEST_P(IntegrationAdminTest, AdminCpuProfilerStart) {
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
     auto* admin = bootstrap.mutable_admin();
@@ -343,19 +404,23 @@ TEST_P(IntegrationAdminTest, AdminCpuProfilerStart) {
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       lookupPort("admin"), "POST", "/cpuprofiler?enable=y", "", downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
+#ifdef PROFILER_AVAILABLE
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+#else
+  EXPECT_STREQ("500", response->headers().Status()->value().c_str());
+#endif
 
   response = IntegrationUtil::makeSingleRequest(
       lookupPort("admin"), "POST", "/cpuprofiler?enable=n", "", downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 }
-#endif
 
 class IntegrationAdminIpv4Ipv6Test : public HttpIntegrationTest, public testing::Test {
 public:
   IntegrationAdminIpv4Ipv6Test()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, Network::Address::IpVersion::v4) {}
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, Network::Address::IpVersion::v4,
+                            realTime()) {}
 
   void initialize() override {
     config_helper_.addConfigModifier(
@@ -380,6 +445,84 @@ TEST_F(IntegrationAdminIpv4Ipv6Test, Ipv4Ipv6Listen) {
     EXPECT_TRUE(response->complete());
     EXPECT_STREQ("200", response->headers().Status()->value().c_str());
   }
+}
+
+// Testing the behavior of StatsMatcher, which allows/denies the  instantiation of stats based on
+// restrictions on their names.
+class StatsMatcherIntegrationTest
+    : public HttpIntegrationTest,
+      public testing::Test,
+      public testing::WithParamInterface<Network::Address::IpVersion> {
+public:
+  StatsMatcherIntegrationTest()
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), simTime()) {}
+
+  void initialize() override {
+    config_helper_.addConfigModifier(
+        [this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
+          *bootstrap.mutable_stats_config()->mutable_stats_matcher() = stats_matcher_;
+        });
+    HttpIntegrationTest::initialize();
+  }
+  void makeRequest() {
+    response_ = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/stats", "",
+                                                   downstreamProtocol(), version_);
+    ASSERT_TRUE(response_->complete());
+    EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
+  }
+
+  BufferingStreamDecoderPtr response_;
+  envoy::config::metrics::v2::StatsMatcher stats_matcher_;
+};
+INSTANTIATE_TEST_CASE_P(IpVersions, StatsMatcherIntegrationTest,
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
+
+// Verify that StatsMatcher prevents the printing of uninstantiated stats.
+TEST_P(StatsMatcherIntegrationTest, ExcludePrefixServerDot) {
+  stats_matcher_.mutable_exclusion_list()->add_patterns()->set_prefix("server.");
+  initialize();
+  makeRequest();
+  EXPECT_THAT(response_->body(), testing::Not(testing::HasSubstr("server.")));
+}
+
+TEST_P(StatsMatcherIntegrationTest, ExcludeRequests) {
+  stats_matcher_.mutable_exclusion_list()->add_patterns()->set_regex(".*requests.*");
+  initialize();
+  makeRequest();
+  EXPECT_THAT(response_->body(), testing::Not(testing::HasSubstr("requests")));
+}
+
+TEST_P(StatsMatcherIntegrationTest, ExcludeExact) {
+  stats_matcher_.mutable_exclusion_list()->add_patterns()->set_exact("server.concurrency");
+  initialize();
+  makeRequest();
+  EXPECT_THAT(response_->body(), testing::Not(testing::HasSubstr("server.concurrency")));
+}
+
+TEST_P(StatsMatcherIntegrationTest, ExcludeMultipleExact) {
+  stats_matcher_.mutable_exclusion_list()->add_patterns()->set_exact("server.concurrency");
+  stats_matcher_.mutable_exclusion_list()->add_patterns()->set_regex(".*live");
+  initialize();
+  makeRequest();
+  EXPECT_THAT(response_->body(), testing::Not(testing::HasSubstr("server.concurrency")));
+  EXPECT_THAT(response_->body(), testing::Not(testing::HasSubstr("server.live")));
+}
+
+// TODO(ambuc): Find a cleaner way to test this. This test has two unfortunate compromises:
+//
+// - a) `listener_manager.listener_create_success` must be instantiated, because BaseIntegrationTest
+//      blocks on its creation (see waitForCounterGe and the suite of waitFor* functions), and
+// - b) `stats.overflow` isn't blocked from instantiation, because it occurs at ThreadLocalStore
+//      construction time, before setStatsMatcher() is called.
+//
+// If either of these invariants is changed, this test must be rewritten.
+TEST_P(StatsMatcherIntegrationTest, IncludeExact) {
+  stats_matcher_.mutable_inclusion_list()->add_patterns()->set_exact(
+      "listener_manager.listener_create_success");
+  initialize();
+  makeRequest();
+  EXPECT_EQ(response_->body(), "listener_manager.listener_create_success: 1\n");
 }
 
 } // namespace Envoy

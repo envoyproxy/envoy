@@ -4,9 +4,7 @@
 
 #include "envoy/buffer/buffer.h"
 
-#include "extensions/filters/network/thrift_proxy/transport_impl.h"
-
-#include "absl/types/optional.h"
+#include "extensions/filters/network/thrift_proxy/transport.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -24,12 +22,16 @@ public:
   // Transport
   const std::string& name() const override { return TransportNames::get().UNFRAMED; }
   TransportType type() const override { return TransportType::Unframed; }
-  bool decodeFrameStart(Buffer::Instance&, absl::optional<uint32_t>& size) override {
-    size.reset();
-    return true;
+  bool decodeFrameStart(Buffer::Instance& buffer, MessageMetadata& metadata) override {
+    UNREFERENCED_PARAMETER(metadata);
+
+    // Don't start a frame if there's no data at all.
+    return buffer.length() > 0;
   }
   bool decodeFrameEnd(Buffer::Instance&) override { return true; }
-  void encodeFrame(Buffer::Instance& buffer, Buffer::Instance& message) override {
+  void encodeFrame(Buffer::Instance& buffer, const MessageMetadata& metadata,
+                   Buffer::Instance& message) override {
+    UNREFERENCED_PARAMETER(metadata);
     buffer.move(message);
   }
 };

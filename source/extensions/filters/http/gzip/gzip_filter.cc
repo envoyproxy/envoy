@@ -1,5 +1,7 @@
 #include "extensions/filters/http/gzip/gzip_filter.h"
 
+#include "envoy/stats/scope.h"
+
 #include "common/common/macros.h"
 
 #include "absl/strings/str_cat.h"

@@ -27,36 +27,44 @@ up-to-date with the latest security patches. See
 for how to update or override dependencies.
 
 1. Install the latest version of [Bazel](https://bazel.build/versions/master/docs/install.html) in your environment.
-2. Install external dependencies libtool, cmake, ninja, and realpath libraries separately.
-On Ubuntu, run the following commands:
+2. Install external dependencies libtool, cmake, ninja, realpath and curl libraries separately.
+On Ubuntu, run the following command:
 ```
- apt-get install libtool
- apt-get install cmake
- apt-get install realpath
- apt-get install clang-format-5.0
- apt-get install automake
- apt-get install ninja-build
+sudo apt-get install \
+   libtool \
+   cmake \
+   realpath \
+   clang-format-7 \
+   automake \
+   ninja-build \
+   curl \
+   unzip
 ```
 
 On Fedora (maybe also other red hat distros), run the following:
 ```
-dnf install cmake libtool libstdc++
+dnf install cmake libtool libstdc++ ninja-build lld patch
 ```
 
-On OS X, you'll need to install several dependencies. This can be accomplished via Homebrew:
+On macOS, you'll need to install several dependencies. This can be accomplished via [Homebrew](https://brew.sh/):
 ```
-brew install coreutils # for realpath
-brew install wget
-brew install cmake
-brew install libtool
-brew install go
-brew install bazel
-brew install automake
-brew install ninja
+brew install coreutils wget cmake libtool go bazel automake ninja llvm@7
 ```
+_notes_: `coreutils` is used for `realpath`, `gmd5sum` and `gsha256sum`; `llvm@7` is used for `clang-format`
 
 Envoy compiles and passes tests with the version of clang installed by XCode 9.3.0:
 Apple LLVM version 9.1.0 (clang-902.0.30).
+
+In order for bazel to be aware of the tools installed by brew, the PATH
+variable must be set for bazel builds. This can be accomplished by setting
+this in your `$HOME/.bazelrc` file:
+
+```
+build --action_env=PATH="/usr/local/bin:/opt/local/bin:/usr/bin:/bin"
+```
+
+Alternatively, you can pass `--action_env` on the command line when running
+`bazel build`/`bazel test`.
 
 3. Install Golang on your machine. This is required as part of building [BoringSSL](https://boringssl.googlesource.com/boringssl/+/HEAD/BUILDING.md)
 and also for [Buildifer](https://github.com/bazelbuild/buildtools) which is used for formatting bazel BUILD files.
@@ -91,7 +99,7 @@ known to work.
 
 By default Clang drops some debug symbols that are required for pretty printing to work correctly.
 More information can be found [here](https://bugs.llvm.org/show_bug.cgi?id=24202). The easy solution
-is to set ```--copt=-fno-limit-debug-info``` on the CLI or in your bazel.rc file.
+is to set ```--copt=-fno-limit-debug-info``` on the CLI or in your .bazelrc file.
 
 # Testing Envoy with Bazel
 
@@ -143,6 +151,9 @@ bazel test //test/... --test_env=HEAPCHECK=
 # Changes the heap checker to "minimal" mode
 bazel test //test/... --test_env=HEAPCHECK=minimal
 ```
+
+If you see a leak detected, by default the reported offsets will require `addr2line` interpretation.
+You can run under `--config=clang-asan` to have this automatically applied.
 
 Bazel will by default cache successful test results. To force it to rerun tests:
 
@@ -201,6 +212,50 @@ tools/bazel-test-gdb //test/common/http:async_client_impl_test -c dbg
 Without the `-c dbg` Bazel option at the end of the command line the test
 binaries will not include debugging symbols and GDB will not be very useful.
 
+# Running Bazel tests requiring privileges
+
+Some tests may require privileges (e.g. CAP_NET_ADMIN) in order to execute. One option is to run
+them with elevated privileges, e.g. `sudo test`. However, that may not always be possible,
+particularly if the test needs to run in a CI pipeline. `tools/bazel-test-docker.sh` may be used in
+such situations to run the tests in a privileged docker container.
+
+The script works by wrapping the test execution in the current repository's circle ci build
+container, then executing it either locally or on a remote docker container. In both cases, the
+container runs with the `--privileged` flag, allowing it to execute operations which would otherwise
+be restricted.
+
+The command line format is:
+`tools/bazel-test-docker.sh <bazel-test-target> [optional-flags-to-bazel]`
+
+The script uses two optional environment variables to control its behaviour:
+
+* `RUN_REMOTE=<yes|no>`: chooses whether to run on a remote docker server.
+* `LOCAL_MOUNT=<yes|no>`: copy/mount local libraries onto the docker container.
+
+Use `RUN_REMOTE=yes` when you don't want to run against your local docker instance. Note that you
+will need to override a few environment variables to set up the remote docker. The list of variables
+can be found in the [Documentation](https://docs.docker.com/engine/reference/commandline/cli/).
+
+Use `LOCAL_MOUNT=yes` when you are not building with the envoy build container. This will ensure
+that the libraries against which the tests dynmically link will be available and of the correct
+version.
+
+## Examples
+
+Running the http integration test in a privileged container:
+
+```bash
+tools/bazel-test-docker.sh  //test/integration:integration_test --jobs=4 -c dbg
+```
+
+Running the http integration test compiled locally against a privileged remote container:
+
+```bash
+setup_remote_docker_variables
+RUN_REMOTE=yes MOUNT_LOCAL=yes tools/bazel-test-docker.sh  //test/integration:integration_test \
+  --jobs=4 -c dbg
+```
+
 # Additional Envoy build and test options
 
 In general, there are 3 [compilation
@@ -228,9 +283,11 @@ To build and run tests with the gcc compiler's [address sanitizer
 bazel test -c dbg --config=asan //test/...
 ```
 
-The ASAN failure stack traces include line numbers as a result of running ASAN with a `dbg` build above.
+The ASAN failure stack traces include line numbers as a result of running ASAN with a `dbg` build above. If the
+stack trace is not symbolized, try setting the ASAN_SYMBOLIZER_PATH environment variable to point to the
+llvm-symbolizer binary (or make sure the llvm-symbolizer is in your $PATH).
 
-If you have clang-5.0, additional checks are provided with:
+If you have clang-5.0 or newer, additional checks are provided with:
 
 ```
 bazel test -c dbg --config=clang-asan //test/...
@@ -253,6 +310,7 @@ The following optional features can be disabled on the Bazel build command-line:
 * Hot restart with `--define hot_restart=disabled`
 * Google C++ gRPC client with `--define google_grpc=disabled`
 * Backtracing on signals with `--define signal_trace=disabled`
+* tcmalloc with `--define tcmalloc=disabled`
 
 ## Enabling optional features
 
@@ -263,6 +321,13 @@ The following optional features can be enabled on the Bazel build command-line:
   those installed via luarocks.
 * Perf annotation with `--define perf_annotation=enabled` (see
   source/common/common/perf_annotation.h for details).
+* BoringSSL can be built in a FIPS-compliant mode with `--define boringssl=fips`
+  (see [FIPS 140-2](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/ssl.html#fips-140-2) for details).
+* ASSERT() can be configured to log failures and increment a stat counter in a release build with
+  `--define log_debug_assert_in_release=enabled`. The default behavior is to compile debug assertions out of
+  release builds so that the condition is not evaluated. This option has no effect in debug builds.
+* memory-debugging (scribbling over memory after allocation and before freeing) with
+  `--define tcmalloc=debug`.
 
 ## Disabling extensions
 
@@ -326,7 +391,7 @@ They should also ignore any local `.bazelrc` for reproducibility. This can be
 achieved with:
 
 ```
-bazel --bazelrc=/dev/null build -c opt //source/exe:envoy-static.stripped.stamped
+bazel --bazelrc=/dev/null build -c opt //source/exe:envoy-static.stripped
 ```
 
 One caveat to note is that the Git SHA1 is truncated to 16 bytes today as a
@@ -411,3 +476,65 @@ bazel build --explain=file.txt --verbose_explanations //source/...
 
 Sometimes it's useful to see real system paths in bazel error message output (vs. symbolic links).
 `tools/path_fix.sh` is provided to help with this. See the comments in that file.
+
+# Compilation database
+
+Run `tools/gen_compilation_database.py` to generate
+a [JSON Compilation Database](https://clang.llvm.org/docs/JSONCompilationDatabase.html). This could be used
+with any tools (e.g. clang-tidy) compatible with the format.
+
+The compilation database could also be used to setup editors with cross reference, code completion.
+For example, you can use [You Complete Me](https://valloric.github.io/YouCompleteMe/) or
+[cquery](https://github.com/cquery-project/cquery) with supported editors.
+
+# Advanced caching setup
+
+Setting up an HTTP cache for Bazel output helps optimize Bazel performance and resource usage when
+using multiple compilation modes or multiple trees.
+
+## Setup common `envoy_deps`
+
+This step sets up the common `envoy_deps` allowing HTTP or disk cache (described below) to work
+across working trees in different paths. Also it allows new working trees to skip dependency
+compilation. The drawback is that the cached dependencies won't be updated automatically, so make
+sure all your working trees have same (or compatible) dependencies, and run this step periodically
+to update them.
+
+Make sure you don't have `--override_repository` in your `.bazelrc` when you run this step.
+
+```
+bazel fetch //test/...
+cp -LR $(bazel info output_base)/external/envoy_deps ${HOME}/envoy_deps_cache
+```
+
+Adding the following parameter to Bazel everytime or persist them in `.bazelrc`, note you will need to expand
+the environment variables for `.bazelrc`.
+
+```
+--override_repository=envoy_deps=${HOME}/envoy_deps_cache
+```
+
+## Setup local cache
+
+You may use any [Remote Caching](https://docs.bazel.build/versions/master/remote-caching.html) backend
+as an alternative to this.
+
+This requires Go 1.11+, follow the [instructions](https://golang.org/doc/install#install) to install
+if you don't have one.
+
+```
+go run github.com/buchgr/bazel-remote --dir ${HOME}/bazel_cache --host 127.0.0.1 --port 28080 --max_size 64
+```
+
+See [Bazel remote cache](github.com/buchgr/bazel-remote) for more information on the parameters.
+The command above will setup a maximum 64 GiB cache at `~/bazel_cache` on port 28080. You might
+want to setup a larger cache if you run ASAN builds.
+
+NOTE: Using docker to run remote cache server described in remote cache docs will likely have
+slower cache performance on macOS due to slow disk performance on Docker for Mac.
+
+Adding the following parameter to Bazel everytime or persist them in `.bazelrc`.
+
+```
+--remote_http_cache=http://127.0.0.1:28080/
+```

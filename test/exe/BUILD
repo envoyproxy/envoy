@@ -9,6 +9,15 @@ load(
 envoy_package()
 
 sh_test(
+    name = "build_id_test",
+    srcs = ["build_id_test.sh"],
+    data = [
+        "//bazel:raw_build_id.ldscript",
+        "//source/exe:envoy-static",
+    ],
+)
+
+sh_test(
     name = "envoy_static_test",
     srcs = ["envoy_static_test.sh"],
     data = ["//source/exe:envoy-static"],
@@ -20,7 +29,11 @@ sh_test(
 sh_test(
     name = "version_out_test",
     srcs = ["version_out_test.sh"],
-    data = ["//source/exe:envoy-static"],
+    data = [
+        "//:VERSION",
+        "//bazel:raw_build_id.ldscript",
+        "//source/exe:envoy-static",
+    ],
 )
 
 envoy_cc_test(
@@ -28,7 +41,9 @@ envoy_cc_test(
     srcs = ["main_common_test.cc"],
     data = ["//test/config/integration:google_com_proxy_port_0"],
     deps = [
+        "//source/common/api:api_lib",
         "//source/exe:envoy_main_common_lib",
+        "//test/test_common:contention_lib",
         "//test/test_common:environment_lib",
     ],
 )

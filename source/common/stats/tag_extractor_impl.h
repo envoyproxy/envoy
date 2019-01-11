@@ -4,7 +4,7 @@
 #include <regex>
 #include <string>
 
-#include "envoy/stats/stats.h"
+#include "envoy/stats/tag_extractor.h"
 
 #include "absl/strings/string_view.h"
 

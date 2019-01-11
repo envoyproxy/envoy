@@ -1,7 +1,5 @@
 #pragma once
 
-#include <strings.h>
-
 #include <chrono>
 #include <cstdint>
 #include <regex>
@@ -25,7 +23,9 @@ namespace Envoy {
  */
 class DateFormatter {
 public:
-  DateFormatter(const std::string& format_string) : format_string_(parse(format_string)) {}
+  DateFormatter(const std::string& format_string) : raw_format_string_(format_string) {
+    parse(format_string);
+  }
 
   /**
    * @return std::string representing the GMT/UTC time based on the input time.
@@ -33,22 +33,18 @@ public:
   std::string fromTime(const SystemTime& time) const;
 
   /**
-   * @return std::string representing the GMT/UTC time based on the input time.
+   * @param time_source time keeping source.
+   * @return std::string representing the GMT/UTC time of a TimeSource based on the format string.
    */
-  std::string fromTime(time_t time) const;
-
-  /**
-   * @return std::string representing the current GMT/UTC time based on the format string.
-   */
-  std::string now();
+  std::string now(TimeSource& time_source);
 
   /**
    * @return std::string the format string used.
    */
-  const std::string& formatString() const { return format_string_; }
+  const std::string& formatString() const { return raw_format_string_; }
 
 private:
-  std::string parse(const std::string& format_string);
+  void parse(const std::string& format_string);
 
   typedef std::vector<int32_t> SpecifierOffsets;
   std::string fromTimeAndPrepareSpecifierOffsets(time_t time, SpecifierOffsets& specifier_offsets,
@@ -84,7 +80,8 @@ private:
   // This holds all specifiers found in a given format string.
   std::vector<Specifier> specifiers_;
 
-  const std::string format_string_;
+  // This is the format string as supplied in configuration, e.g. "foo %3f bar".
+  const std::string raw_format_string_;
 };
 
 /**
@@ -96,25 +93,13 @@ public:
 };
 
 /**
- * Production implementation of SystemTimeSource that returns the current time.
+ * Real-world time implementation of TimeSource.
  */
-class ProdSystemTimeSource : public SystemTimeSource {
+class RealTimeSource : public TimeSource {
 public:
-  // SystemTimeSource
-  SystemTime currentTime() override { return std::chrono::system_clock::now(); }
-
-  static ProdSystemTimeSource instance_;
-};
-
-/**
- * Production implementation of MonotonicTimeSource that returns the current time.
- */
-class ProdMonotonicTimeSource : public MonotonicTimeSource {
-public:
-  // MonotonicTimeSource
-  MonotonicTime currentTime() override { return std::chrono::steady_clock::now(); }
-
-  static ProdMonotonicTimeSource instance_;
+  // TimeSource
+  SystemTime systemTime() override { return std::chrono::system_clock::now(); }
+  MonotonicTime monotonicTime() override { return std::chrono::steady_clock::now(); }
 };
 
 /**
@@ -177,16 +162,6 @@ public:
    * @param return true if successful, false otherwise.
    */
   static bool atol(const char* str, int64_t& out, int base = 10);
-
-  /**
-   * Perform a case insensitive compare of 2 strings.
-   * @param lhs supplies string 1.
-   * @param rhs supplies string 2.
-   * @return < 0, 0, > 0 depending on the comparison result.
-   */
-  static int caseInsensitiveCompare(const char* lhs, const char* rhs) {
-    return strcasecmp(lhs, rhs);
-  }
 
   /**
    * Convert an unsigned integer to a base 10 string as fast as possible.
@@ -285,7 +260,7 @@ public:
 
   /**
    * Crop characters from a string view starting at the first character of the matched
-   * delimiter string view until the begining of the source string view.
+   * delimiter string view until the beginning of the source string view.
    * @param source supplies the string view to be processed.
    * @param delimiter supplies the string view that delimits the starting point for deletion.
    * @return sub-string of the string view if any.
@@ -302,7 +277,7 @@ public:
    * @param multi-delimiter supplies chars used to split the delimiter-separated string view.
    * @param keep_empty_string result contains empty strings if the string starts or ends with
    * 'split', or if instances of 'split' are adjacent; default = false.
-   * @return true if found and false otherwise.
+   * @return vector containing views of the split strings
    */
   static std::vector<absl::string_view> splitToken(absl::string_view source,
                                                    absl::string_view delimiters,
@@ -335,17 +310,6 @@ public:
    * @return escaped string.
    */
   static std::string escape(const std::string& source);
-
-  /**
-   * @return true if @param source ends with @param end.
-   */
-  static bool endsWith(const std::string& source, const std::string& end);
-
-  /**
-   * @param case_sensitive determines if the compare is case sensitive
-   * @return true if @param source starts with @param start and ignores cases.
-   */
-  static bool startsWith(const char* source, const std::string& start, bool case_sensitive = true);
 
   /**
    * Provide a default value for a string if empty.
@@ -399,7 +363,7 @@ public:
 };
 
 /**
- * Utilities for finding primes
+ * Utilities for finding primes.
  */
 class Primes {
 public:
@@ -423,11 +387,56 @@ public:
    * Constructs a std::regex, converting any std::regex_error exception into an EnvoyException.
    * @param regex std::string containing the regular expression to parse.
    * @param flags std::regex::flag_type containing parser flags. Defaults to std::regex::optimize.
-   * @return std::regex constructed from regex and flags
+   * @return std::regex constructed from regex and flags.
    * @throw EnvoyException if the regex string is invalid.
    */
   static std::regex parseRegex(const std::string& regex,
                                std::regex::flag_type flags = std::regex::optimize);
+};
+
+/**
+ * Utilities for working with weighted clusters.
+ */
+class WeightedClusterUtil {
+public:
+  /*
+   * Returns a WeightedClusterEntry from the given weighted clusters based on
+   * the total cluster weight and a random value.
+   * @param weighted_clusters a vector of WeightedClusterEntry instances.
+   * @param total_cluster_weight the total weight of all clusters.
+   * @param random_value the random value.
+   * @param ignore_overflow whether to ignore cluster weight overflows.
+   * @return a WeightedClusterEntry.
+   */
+  template <typename WeightedClusterEntry>
+  static const WeightedClusterEntry&
+  pickCluster(const std::vector<WeightedClusterEntry>& weighted_clusters,
+              const uint64_t total_cluster_weight, const uint64_t random_value,
+              const bool ignore_overflow) {
+    uint64_t selected_value = random_value % total_cluster_weight;
+    uint64_t begin = 0;
+    uint64_t end = 0;
+
+    // Find the right cluster to route to based on the interval in which
+    // the selected value falls. The intervals are determined as
+    // [0, cluster1_weight), [cluster1_weight, cluster1_weight+cluster2_weight),..
+    for (const WeightedClusterEntry& cluster : weighted_clusters) {
+      end = begin + cluster->clusterWeight();
+      if (!ignore_overflow) {
+        // end > total_cluster_weight: This case can only occur with Runtimes,
+        // when the user specifies invalid weights such that
+        // sum(weights) > total_cluster_weight.
+        ASSERT(end <= total_cluster_weight);
+      }
+
+      if (selected_value >= begin && selected_value < end) {
+        return cluster;
+      }
+      begin = end;
+    }
+
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
 };
 
 /**
@@ -489,6 +498,17 @@ private:
  */
 struct StringViewHash {
   std::size_t operator()(const absl::string_view& k) const { return HashUtil::xxHash64(k); }
+};
+
+/**
+ * Hashing functor for use with enum class types.
+ * This is needed for GCC 5.X; newer versions of GCC, as well as clang7, provide native hashing
+ * specializations.
+ */
+struct EnumClassHash {
+  template <typename T> std::size_t operator()(T t) const {
+    return std::hash<std::size_t>()(static_cast<std::size_t>(t));
+  }
 };
 
 /**

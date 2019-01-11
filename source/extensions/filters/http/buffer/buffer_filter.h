@@ -7,6 +7,7 @@
 
 #include "envoy/config/filter/http/buffer/v2/buffer.pb.h"
 #include "envoy/http/filter.h"
+#include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -38,12 +39,10 @@ public:
 
   bool disabled() const { return disabled_; }
   uint64_t maxRequestBytes() const { return max_request_bytes_; }
-  std::chrono::seconds maxRequestTime() const { return max_request_time_; }
 
 private:
   bool disabled_;
   uint64_t max_request_bytes_;
-  std::chrono::seconds max_request_time_;
 };
 
 /**
@@ -84,7 +83,6 @@ public:
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
 private:
-  void onRequestTimeout();
   void resetInternalState();
   void initConfig();
 

@@ -13,6 +13,21 @@ namespace Tcp {
 namespace ConnectionPool {
 
 /**
+ * Controls the behavior of a canceled connection request.
+ */
+enum class CancelPolicy {
+  // By default, canceled connection requests allow a pending connection to complete and become
+  // available for a future connection request.
+  Default,
+  // When a connection request is canceled, closes a pending connection if there are more pending
+  // connections than pending connection requests. CloseExcess is useful for callers that never
+  // re-use connections (e.g. by closing rather than releasing connections). Using CloseExcess in
+  // this situation guarantees that no idle connections will be held open by the conn pool awaiting
+  // a connection request.
+  CloseExcess,
+};
+
+/**
  * Handle that allows a pending connection request to be canceled before it is completed.
  */
 class Cancellable {
@@ -20,9 +35,11 @@ public:
   virtual ~Cancellable() {}
 
   /**
-   * Cancel the pending request.
+   * Cancel the pending connection request.
+   * @param cancel_policy a CancelPolicy that controls the behavior of this connection request
+   *        cancellation.
    */
-  virtual void cancel() PURE;
+  virtual void cancel(CancelPolicy cancel_policy) PURE;
 };
 
 /**
@@ -57,6 +74,22 @@ public:
   virtual void onUpstreamData(Buffer::Instance& data, bool end_stream) PURE;
 };
 
+/**
+ * ConnectionState is a base class for connection state maintained across requests. For example, a
+ * protocol may maintain a connection-specific request sequence number or negotiate options that
+ * affect the behavior of requests for the duration of the connection. A ConnectionState subclass
+ * is assigned to the ConnectionData to track this state when the connection is returned to the
+ * pool so that the state is available when the connection is re-used for a subsequent request.
+ * The ConnectionState assigned to a connection is automatically destroyed when the connection is
+ * closed.
+ */
+class ConnectionState {
+public:
+  virtual ~ConnectionState() {}
+};
+
+typedef std::unique_ptr<ConnectionState> ConnectionStatePtr;
+
 /*
  * ConnectionData wraps a ClientConnection allocated to a caller. Open ClientConnections are
  * released back to the pool for re-use when their containing ConnectionData is destroyed.
@@ -71,12 +104,30 @@ public:
   virtual Network::ClientConnection& connection() PURE;
 
   /**
+   * Sets the ConnectionState for this connection. Any existing ConnectionState is destroyed.
+   * @param ConnectionStatePtr&& new ConnectionState for this connection.
+   */
+  virtual void setConnectionState(ConnectionStatePtr&& state) PURE;
+
+  /**
+   * @return T* the current ConnectionState or nullptr if no state is set or if the state's type
+   *            is not T.
+   */
+  template <class T> T* connectionStateTyped() { return dynamic_cast<T*>(connectionState()); }
+
+  /**
    * Sets the ConnectionPool::UpstreamCallbacks for the connection. If no callback is attached,
    * data from the upstream will cause the connection to be closed. Callbacks cease when the
    * connection is released.
    * @param callback the UpstreamCallbacks to invoke for upstream data
    */
   virtual void addUpstreamCallbacks(ConnectionPool::UpstreamCallbacks& callback) PURE;
+
+protected:
+  /**
+   * @return ConnectionState* pointer to the current ConnectionState or nullptr if not set
+   */
+  virtual ConnectionState* connectionState() PURE;
 };
 
 typedef std::unique_ptr<ConnectionData> ConnectionDataPtr;

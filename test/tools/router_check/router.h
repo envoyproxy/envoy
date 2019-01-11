@@ -45,13 +45,15 @@ private:
 class RouterCheckTool : Logger::Loggable<Logger::Id::testing> {
 public:
   /**
-   * @param router_config_json router config json file.
+   * @param router_config_file v2 router config file.
    * @return RouterCheckTool a RouterCheckTool instance with member variables set by the router
-   * config json file.
+   * config file.
    * */
-  static RouterCheckTool create(const std::string& router_config_json);
+  static RouterCheckTool create(const std::string& router_config_file);
 
   /**
+   * TODO(tonya11en): Use a YAML format for the expected routes. This will require a proto.
+   *
    * @param expected_route_json tool config json file.
    * @return bool if all routes match what is expected.
    */

@@ -1,10 +1,15 @@
 #include <functional>
 
+#include "envoy/thread/thread.h"
+
+#include "common/api/api_impl.h"
 #include "common/common/lock_guard.h"
-#include "common/common/thread.h"
 #include "common/event/dispatcher_impl.h"
+#include "common/stats/isolated_store_impl.h"
 
 #include "test/mocks/common.h"
+#include "test/test_common/test_time.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -25,7 +30,10 @@ private:
 
 TEST(DeferredDeleteTest, DeferredDelete) {
   InSequence s;
-  DispatcherImpl dispatcher;
+  Stats::IsolatedStoreImpl stats_store;
+  Api::ApiPtr api = Api::createApiForTest(stats_store);
+  DangerousDeprecatedTestTime test_time;
+  DispatcherImpl dispatcher(test_time.timeSystem(), *api);
   ReadyWatcher watcher1;
 
   dispatcher.deferredDelete(
@@ -55,8 +63,11 @@ TEST(DeferredDeleteTest, DeferredDelete) {
 
 class DispatcherImplTest : public ::testing::Test {
 protected:
-  DispatcherImplTest() : dispatcher_(std::make_unique<DispatcherImpl>()), work_finished_(false) {
-    dispatcher_thread_ = std::make_unique<Thread::Thread>([this]() {
+  DispatcherImplTest()
+      : api_(Api::createApiForTest(stat_store_)),
+        dispatcher_(std::make_unique<DispatcherImpl>(test_time_.timeSystem(), *api_)),
+        work_finished_(false) {
+    dispatcher_thread_ = api_->threadFactory().createThread([this]() {
       // Must create a keepalive timer to keep the dispatcher from exiting.
       std::chrono::milliseconds time_interval(500);
       keepalive_timer_ = dispatcher_->createTimer(
@@ -72,7 +83,11 @@ protected:
     dispatcher_thread_->join();
   }
 
-  std::unique_ptr<Thread::Thread> dispatcher_thread_;
+  DangerousDeprecatedTestTime test_time_;
+
+  Stats::IsolatedStoreImpl stat_store_;
+  Api::ApiPtr api_;
+  Thread::ThreadPtr dispatcher_thread_;
   DispatcherPtr dispatcher_;
   Thread::MutexBasicLockable mu_;
   Thread::CondVar cv_;

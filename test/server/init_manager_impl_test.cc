@@ -5,9 +5,9 @@
 
 #include "gmock/gmock.h"
 
+using testing::_;
 using testing::InSequence;
 using testing::Invoke;
-using testing::_;
 
 namespace Envoy {
 namespace Server {

@@ -11,9 +11,12 @@
 #include "envoy/event/timer.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
+#include "envoy/runtime/runtime.h"
 #include "envoy/server/filter_config.h"
+#include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/stats/timespan.h"
+#include "envoy/stream_info/filter_state.h"
 #include "envoy/tcp/conn_pool.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
@@ -22,7 +25,8 @@
 #include "common/network/cidr_range.h"
 #include "common/network/filter_impl.h"
 #include "common/network/utility.h"
-#include "common/request_info/request_info_impl.h"
+#include "common/stream_info/stream_info_impl.h"
+#include "common/upstream/load_balancer_impl.h"
 
 namespace Envoy {
 namespace TcpProxy {
@@ -98,6 +102,7 @@ public:
    * If no route applies, returns the empty string.
    */
   const std::string& getRouteFromEntries(Network::Connection& connection);
+  const std::string& getRegularRouteFromEntries(Network::Connection& connection);
 
   const TcpProxyStats& stats() { return shared_config_->stats(); }
   const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() { return access_logs_; }
@@ -123,15 +128,45 @@ private:
     std::string cluster_name_;
   };
 
+  class WeightedClusterEntry {
+  public:
+    WeightedClusterEntry(const envoy::config::filter::network::tcp_proxy::v2::TcpProxy::
+                             WeightedCluster::ClusterWeight& config);
+
+    const std::string& clusterName() const { return cluster_name_; }
+    uint64_t clusterWeight() const { return cluster_weight_; }
+
+  private:
+    const std::string cluster_name_;
+    const uint64_t cluster_weight_;
+  };
+  typedef std::unique_ptr<WeightedClusterEntry> WeightedClusterEntrySharedPtr;
+
   std::vector<Route> routes_;
+  std::vector<WeightedClusterEntrySharedPtr> weighted_clusters_;
+  uint64_t total_cluster_weight_;
   std::vector<AccessLog::InstanceSharedPtr> access_logs_;
   const uint32_t max_connect_attempts_;
   ThreadLocal::SlotPtr upstream_drain_manager_slot_;
   SharedConfigSharedPtr shared_config_;
   std::unique_ptr<const Router::MetadataMatchCriteria> cluster_metadata_match_criteria_;
+  Runtime::RandomGenerator& random_generator_;
 };
 
 typedef std::shared_ptr<Config> ConfigSharedPtr;
+
+/**
+ * Per-connection TCP Proxy Cluster configuration.
+ */
+class PerConnectionCluster : public StreamInfo::FilterState::Object {
+public:
+  PerConnectionCluster(absl::string_view cluster) : cluster_(cluster) {}
+  const std::string& value() const { return cluster_; }
+  static const std::string& key();
+
+private:
+  const std::string cluster_;
+};
 
 /**
  * An implementation of a TCP (L3/L4) proxy. This filter will instantiate a new outgoing TCP
@@ -139,11 +174,12 @@ typedef std::shared_ptr<Config> ConfigSharedPtr;
  * be proxied back and forth between the two connections.
  */
 class Filter : public Network::ReadFilter,
+               public Upstream::LoadBalancerContextBase,
                Tcp::ConnectionPool::Callbacks,
-               Upstream::LoadBalancerContext,
                protected Logger::Loggable<Logger::Id::filter> {
 public:
-  Filter(ConfigSharedPtr config, Upstream::ClusterManager& cluster_manager);
+  Filter(ConfigSharedPtr config, Upstream::ClusterManager& cluster_manager,
+         TimeSource& time_source);
   ~Filter();
 
   // Network::ReadFilter
@@ -158,7 +194,6 @@ public:
                    Upstream::HostDescriptionConstSharedPtr host) override;
 
   // Upstream::LoadBalancerContext
-  absl::optional<uint64_t> computeHashKey() override { return {}; }
   const Router::MetadataMatchCriteria* metadataMatchCriteria() override {
     return config_->metadataMatchCriteria();
   }
@@ -166,8 +201,6 @@ public:
   const Network::Connection* downstreamConnection() const override {
     return &read_callbacks_->connection();
   }
-
-  const Http::HeaderMap* downstreamHeaders() const override { return nullptr; }
 
   // These two functions allow enabling/disabling reads on the upstream and downstream connections.
   // They are called by the Downstream/Upstream Watermark callbacks to limit buffering.
@@ -229,9 +262,7 @@ protected:
     read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
   }
 
-  virtual void onConnectionSuccess() {}
-
-  virtual RequestInfo::RequestInfo& getRequestInfo() { return request_info_; }
+  virtual StreamInfo::StreamInfo& getStreamInfo() { return stream_info_; }
 
   void initialize(Network::ReadFilterCallbacks& callbacks, bool set_connection_stats);
   Network::FilterStatus initializeUpstreamConnection();
@@ -252,7 +283,7 @@ protected:
   Event::TimerPtr idle_timer_;
   std::shared_ptr<UpstreamCallbacks> upstream_callbacks_; // shared_ptr required for passing as a
                                                           // read filter.
-  RequestInfo::RequestInfoImpl request_info_;
+  StreamInfo::StreamInfoImpl stream_info_;
   uint32_t connect_attempts_{};
   bool connecting_{};
 };

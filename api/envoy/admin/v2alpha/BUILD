@@ -31,3 +31,27 @@ api_proto_library_internal(
     srcs = ["metrics.proto"],
     visibility = ["//visibility:public"],
 )
+
+api_proto_library_internal(
+    name = "memory",
+    srcs = ["memory.proto"],
+    visibility = ["//visibility:public"],
+)
+
+api_proto_library_internal(
+    name = "mutex_stats",
+    srcs = ["mutex_stats.proto"],
+    visibility = ["//visibility:public"],
+)
+
+api_proto_library_internal(
+    name = "certs",
+    srcs = ["certs.proto"],
+    visibility = ["//visibility:public"],
+)
+
+api_proto_library_internal(
+    name = "server_info",
+    srcs = ["server_info.proto"],
+    visibility = ["//visibility:public"],
+)

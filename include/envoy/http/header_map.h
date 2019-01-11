@@ -7,9 +7,12 @@
 #include <iostream>
 #include <memory>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 #include "envoy/common/pure.h"
+
+#include "common/common/hash.h"
 
 #include "absl/strings/string_view.h"
 
@@ -28,12 +31,25 @@ public:
 
   const std::string& get() const { return string_; }
   bool operator==(const LowerCaseString& rhs) const { return string_ == rhs.string_; }
+  bool operator!=(const LowerCaseString& rhs) const { return string_ != rhs.string_; }
 
 private:
   void lower() { std::transform(string_.begin(), string_.end(), string_.begin(), tolower); }
 
   std::string string_;
 };
+
+/**
+ * Lower case string hasher.
+ */
+struct LowerCaseStringHash {
+  size_t operator()(const LowerCaseString& value) const { return HashUtil::xxHash64(value.get()); }
+};
+
+/**
+ * Convenient type for unordered set of lower case string.
+ */
+typedef std::unordered_set<LowerCaseString, LowerCaseStringHash> LowerCaseStrUnorderedSet;
 
 /**
  * This is a string implementation for use in header processing. It is heavily optimized for
@@ -138,13 +154,17 @@ public:
   bool operator!=(const char* rhs) const { return 0 != strcmp(c_str(), rhs); }
 
 private:
-  union {
+  union Buffer {
+    // This should reference inline_buffer_ for Type::Inline.
     char* dynamic_;
     const char* ref_;
   } buffer_;
 
+  // Capacity in both Type::Inline and Type::Dynamic cases must be at least MinDynamicCapacity in
+  // header_map_impl.cc.
   union {
     char inline_buffer_[128];
+    // Since this is a union, this is only valid for type_ == Type::Dynamic.
     uint32_t dynamic_capacity_;
   };
 
@@ -167,14 +187,16 @@ public:
   virtual const HeaderString& key() const PURE;
 
   /**
-   * Set the header value by copying data into it.
+   * Set the header value by copying data into it (deprecated, use absl::string_view variant
+   * instead).
+   * TODO(htuch): Cleanup deprecated call sites.
    */
   virtual void value(const char* value, uint32_t size) PURE;
 
   /**
    * Set the header value by copying data into it.
    */
-  virtual void value(const std::string& value) PURE;
+  virtual void value(absl::string_view value) PURE;
 
   /**
    * Set the header value by copying an integer into it.
@@ -206,6 +228,7 @@ private:
  * O(1) access to these headers without even a hash lookup.
  */
 #define ALL_INLINE_HEADERS(HEADER_FUNC)                                                            \
+  HEADER_FUNC(Accept)                                                                              \
   HEADER_FUNC(AcceptEncoding)                                                                      \
   HEADER_FUNC(AccessControlRequestHeaders)                                                         \
   HEADER_FUNC(AccessControlRequestMethod)                                                          \
@@ -223,6 +246,8 @@ private:
   HEADER_FUNC(ContentLength)                                                                       \
   HEADER_FUNC(ContentType)                                                                         \
   HEADER_FUNC(Date)                                                                                \
+  HEADER_FUNC(EnvoyAttemptCount)                                                                   \
+  HEADER_FUNC(EnvoyDegraded)                                                                       \
   HEADER_FUNC(EnvoyDecoratorOperation)                                                             \
   HEADER_FUNC(EnvoyDownstreamServiceCluster)                                                       \
   HEADER_FUNC(EnvoyDownstreamServiceNode)                                                          \
@@ -235,8 +260,10 @@ private:
   HEADER_FUNC(EnvoyMaxRetries)                                                                     \
   HEADER_FUNC(EnvoyOriginalPath)                                                                   \
   HEADER_FUNC(EnvoyOverloaded)                                                                     \
+  HEADER_FUNC(EnvoyRateLimited)                                                                    \
   HEADER_FUNC(EnvoyRetryOn)                                                                        \
   HEADER_FUNC(EnvoyRetryGrpcOn)                                                                    \
+  HEADER_FUNC(EnvoyRetriableStatusCodes)                                                           \
   HEADER_FUNC(EnvoyUpstreamAltStatName)                                                            \
   HEADER_FUNC(EnvoyUpstreamCanary)                                                                 \
   HEADER_FUNC(EnvoyUpstreamHealthCheckedCluster)                                                   \
@@ -261,6 +288,7 @@ private:
   HEADER_FUNC(Origin)                                                                              \
   HEADER_FUNC(OtSpanContext)                                                                       \
   HEADER_FUNC(Path)                                                                                \
+  HEADER_FUNC(Protocol)                                                                            \
   HEADER_FUNC(ProxyConnection)                                                                     \
   HEADER_FUNC(Referer)                                                                             \
   HEADER_FUNC(RequestId)                                                                           \
@@ -272,12 +300,7 @@ private:
   HEADER_FUNC(Upgrade)                                                                             \
   HEADER_FUNC(UserAgent)                                                                           \
   HEADER_FUNC(Vary)                                                                                \
-  HEADER_FUNC(Via)                                                                                 \
-  HEADER_FUNC(XB3TraceId)                                                                          \
-  HEADER_FUNC(XB3SpanId)                                                                           \
-  HEADER_FUNC(XB3ParentSpanId)                                                                     \
-  HEADER_FUNC(XB3Sampled)                                                                          \
-  HEADER_FUNC(XB3Flags)
+  HEADER_FUNC(Via)
 
 /**
  * The following functions are defined for each inline header above. E.g., for ContentLength we
@@ -305,10 +328,12 @@ public:
   /**
    * Add a reference header to the map. Both key and value MUST point to data that will live beyond
    * the lifetime of any request/response using the string (since a codec may optimize for zero
-   * copy). Nothing will be copied.
+   * copy). The key will not be copied and a best effort will be made not to
+   * copy the value (but this may happen when comma concatenating, see below).
    *
-   * Calling addReference multiple times for the same header will result in multiple headers being
-   * present in the HeaderMap.
+   * Calling addReference multiple times for the same header will result in:
+   * - Comma concatenation for predefined inline headers.
+   * - Multiple headers being present in the HeaderMap for other headers.
    *
    * @param key specifies the name of the header to add; it WILL NOT be copied.
    * @param value specifies the value of the header to add; it WILL NOT be copied.
@@ -320,8 +345,9 @@ public:
    * the lifetime of any request/response using the string (since a codec may optimize for zero
    * copy). The value will be copied.
    *
-   * Calling addReferenceKey multiple times for the same header will result in multiple headers
-   * being present in the HeaderMap.
+   * Calling addReference multiple times for the same header will result in:
+   * - Comma concatenation for predefined inline headers.
+   * - Multiple headers being present in the HeaderMap for other headers.
    *
    * @param key specifies the name of the header to add; it WILL NOT be copied.
    * @param value specifies the value of the header to add; it WILL be copied.
@@ -333,8 +359,9 @@ public:
    * live beyond the lifetime of any request/response using the string (since a codec may optimize
    * for zero copy). The value will be copied.
    *
-   * Calling addReferenceKey multiple times for the same header will result in multiple headers
-   * being present in the HeaderMap.
+   * Calling addReference multiple times for the same header will result in:
+   * - Comma concatenation for predefined inline headers.
+   * - Multiple headers being present in the HeaderMap for other headers.
    *
    * @param key specifies the name of the header to add; it WILL NOT be copied.
    * @param value specifies the value of the header to add; it WILL be copied.
@@ -344,8 +371,9 @@ public:
   /**
    * Add a header by copying both the header key and the value.
    *
-   * Calling addCopy multiple times for the same header will result in multiple headers being
-   * present in the HeaderMap.
+   * Calling addCopy multiple times for the same header will result in:
+   * - Comma concatenation for predefined inline headers.
+   * - Multiple headers being present in the HeaderMap for other headers.
    *
    * @param key specifies the name of the header to add; it WILL be copied.
    * @param value specifies the value of the header to add; it WILL be copied.
@@ -355,8 +383,9 @@ public:
   /**
    * Add a header by copying both the header key and the value.
    *
-   * Calling addCopy multiple times for the same header will result in multiple headers being
-   * present in the HeaderMap.
+   * Calling addCopy multiple times for the same header will result in:
+   * - Comma concatenation for predefined inline headers.
+   * - Multiple headers being present in the HeaderMap for other headers.
    *
    * @param key specifies the name of the header to add; it WILL be copied.
    * @param value specifies the value of the header to add; it WILL be copied.

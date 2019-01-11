@@ -5,12 +5,12 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
 using testing::SaveArg;
-using testing::_;
 
 namespace Envoy {
 namespace Router {
@@ -75,6 +75,7 @@ MockRouteEntry::MockRouteEntry() {
   ON_CALL(*this, includeVirtualHostRateLimits()).WillByDefault(Return(true));
   ON_CALL(*this, pathMatchCriterion()).WillByDefault(ReturnRef(path_match_criterion_));
   ON_CALL(*this, metadata()).WillByDefault(ReturnRef(metadata_));
+  ON_CALL(*this, upgradeMap()).WillByDefault(ReturnRef(upgrade_map_));
 }
 
 MockRouteEntry::~MockRouteEntry() {}

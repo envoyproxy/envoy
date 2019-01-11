@@ -9,6 +9,7 @@
 #include "envoy/http/filter.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/stats/scope.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/assert.h"
@@ -17,6 +18,7 @@
 
 #include "extensions/filters/common/ext_authz/ext_authz.h"
 #include "extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
+#include "extensions/filters/common/ext_authz/ext_authz_http_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -35,34 +37,116 @@ class FilterConfig {
 public:
   FilterConfig(const envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz& config,
                const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
-               Runtime::Loader& runtime, Upstream::ClusterManager& cm)
+               Runtime::Loader& runtime, Upstream::ClusterManager& cm, Http::Context& http_context)
       : local_info_(local_info), scope_(scope), runtime_(runtime), cm_(cm),
         cluster_name_(config.grpc_service().envoy_grpc().cluster_name()),
-        response_headers_to_remove_(config.http_service().response_headers_to_remove().begin(),
-                                    config.http_service().response_headers_to_remove().end()),
-        failure_mode_allow_(config.failure_mode_allow()) {}
+        allowed_authorization_headers_(
+            toAuthorizationHeaders(config.http_service().allowed_authorization_headers())),
+        allowed_request_headers_(toRequestHeaders(config.http_service().allowed_request_headers())),
+        failure_mode_allow_(config.failure_mode_allow()),
+        authorization_headers_to_add_(
+            toAuthorizationHeadersToAdd(config.http_service().authorization_headers_to_add())),
+        http_context_(http_context) {}
 
   const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
   Runtime::Loader& runtime() { return runtime_; }
   Stats::Scope& scope() { return scope_; }
   std::string cluster() { return cluster_name_; }
   Upstream::ClusterManager& cm() { return cm_; }
-  const std::vector<Http::LowerCaseString>& responseHeadersToRemove() {
-    return response_headers_to_remove_;
+  const Http::LowerCaseStrUnorderedSet& allowedAuthorizationHeaders() {
+    return allowed_authorization_headers_;
   }
+  const Http::LowerCaseStrUnorderedSet& allowedRequestHeaders() { return allowed_request_headers_; }
+
   bool failureModeAllow() const { return failure_mode_allow_; }
 
+  const Filters::Common::ExtAuthz::HeaderKeyValueVector& authorizationHeadersToAdd() const {
+    return authorization_headers_to_add_;
+  }
+
+  Http::Context& httpContext() { return http_context_; }
+
 private:
+  static Http::LowerCaseStrUnorderedSet toRequestHeaders(
+      const Protobuf::RepeatedPtrField<Envoy::ProtobufTypes::String>& request_headers) {
+    Http::LowerCaseStrUnorderedSet headers;
+    headers.reserve(request_headers.size() + 3);
+    headers.emplace(Http::Headers::get().Path);
+    headers.emplace(Http::Headers::get().Method);
+    headers.emplace(Http::Headers::get().Host);
+    for (const auto& header : request_headers) {
+      headers.emplace(header);
+    }
+    return headers;
+  }
+
+  static Http::LowerCaseStrUnorderedSet toAuthorizationHeaders(
+      const Protobuf::RepeatedPtrField<Envoy::ProtobufTypes::String>& response_headers) {
+    Http::LowerCaseStrUnorderedSet headers;
+    headers.reserve(response_headers.size());
+    for (const auto& header : response_headers) {
+      headers.emplace(header);
+    }
+    return headers;
+  }
+
+  static Filters::Common::ExtAuthz::HeaderKeyValueVector toAuthorizationHeadersToAdd(
+      const Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValue>& to_add_headers) {
+    Filters::Common::ExtAuthz::HeaderKeyValueVector headers;
+    headers.reserve(to_add_headers.size());
+    for (const auto& header : to_add_headers) {
+      headers.emplace_back(
+          std::make_pair(Http::LowerCaseString(header.key()), std::string(header.value())));
+    }
+    return headers;
+  }
+
   const LocalInfo::LocalInfo& local_info_;
   Stats::Scope& scope_;
   Runtime::Loader& runtime_;
   Upstream::ClusterManager& cm_;
   std::string cluster_name_;
-  std::vector<Http::LowerCaseString> response_headers_to_remove_;
+  Http::LowerCaseStrUnorderedSet allowed_authorization_headers_;
+  Http::LowerCaseStrUnorderedSet allowed_request_headers_;
   bool failure_mode_allow_;
+  const Filters::Common::ExtAuthz::HeaderKeyValueVector authorization_headers_to_add_;
+  Http::Context& http_context_;
 };
 
 typedef std::shared_ptr<FilterConfig> FilterConfigSharedPtr;
+
+/**
+ * Per route settings for ExtAuth. Allows customizing the CheckRequest on a
+ * virtualhost\route\weighted cluster level.
+ */
+class FilterConfigPerRoute : public Router::RouteSpecificFilterConfig {
+public:
+  using ContextExtensionsMap = Protobuf::Map<ProtobufTypes::String, ProtobufTypes::String>;
+
+  FilterConfigPerRoute(
+      const envoy::config::filter::http::ext_authz::v2alpha::ExtAuthzPerRoute& config)
+      : context_extensions_(config.has_check_settings()
+                                ? config.check_settings().context_extensions()
+                                : ContextExtensionsMap()),
+        disabled_(config.disabled()) {}
+
+  void merge(const FilterConfigPerRoute& other);
+
+  /**
+   * @return Context extensions to add to the CheckRequest.
+   */
+  const ContextExtensionsMap& contextExtensions() const { return context_extensions_; }
+  // Allow moving the context extensions out of this object.
+  ContextExtensionsMap&& takeContextExtensions() { return std::move(context_extensions_); }
+
+  bool disabled() const { return disabled_; }
+
+private:
+  // We save the context extensions as a protobuf map instead of an std::map as this allows us to
+  // move it to the CheckRequest, thus avoiding a copy that would incur by converting it.
+  ContextExtensionsMap context_extensions_;
+  bool disabled_;
+};
 
 /**
  * HTTP ext_authz filter. Depending on the route configuration, this filter calls the global
@@ -98,7 +182,7 @@ private:
   // the filter chain should stop. Otherwise the filter chain can continue to the next filter.
   enum class FilterReturn { ContinueDecoding, StopDecoding };
   void initiateCall(const Http::HeaderMap& headers);
-  Http::HeaderMapPtr getHeaderMap(const Filters::Common::ExtAuthz::ResponsePtr& reponse);
+  Http::HeaderMapPtr getHeaderMap(const Filters::Common::ExtAuthz::ResponsePtr& response);
   FilterConfigSharedPtr config_;
   Filters::Common::ExtAuthz::ClientPtr client_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};

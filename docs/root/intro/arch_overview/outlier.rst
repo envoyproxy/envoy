@@ -21,13 +21,13 @@ ejection algorithm works as follows:
 #. A host is determined to be an outlier.
 #. If no hosts have been ejected, Envoy will eject the host immediately. Otherwise, it checks to make
    sure the number of ejected hosts is below the allowed threshold (specified via the
-   :ref:`outlier_detection.max_ejection_percent<config_cluster_manager_cluster_outlier_detection>`
+   :ref:`outlier_detection.max_ejection_percent<envoy_api_field_cluster.OutlierDetection.max_ejection_percent>`
    setting). If the number of ejected hosts is above the threshold, the host is not ejected.
 #. The host is ejected for some number of milliseconds. Ejection means that the host is marked
    unhealthy and will not be used during load balancing unless the load balancer is in a
    :ref:`panic <arch_overview_load_balancing_panic_threshold>` scenario. The number of milliseconds
    is equal to the :ref:`outlier_detection.base_ejection_time_ms
-   <config_cluster_manager_cluster_outlier_detection>` value
+   <envoy_api_field_cluster.OutlierDetection.base_ejection_time>` value
    multiplied by the number of times the host has been ejected. This causes hosts to get ejected
    for longer and longer periods if they continue to fail.
 #. An ejected host will automatically be brought back into service after the ejection time has
@@ -46,7 +46,7 @@ If an upstream host returns some number of consecutive 5xx, it will be ejected. 
 case a 5xx means an actual 5xx respond code, or an event that would cause the HTTP router to return
 one on the upstream's behalf (reset, connection failure, etc.). The number of consecutive 5xx
 required for ejection is controlled by the :ref:`outlier_detection.consecutive_5xx
-<config_cluster_manager_cluster_outlier_detection_consecutive_5xx>` value.
+<envoy_api_field_cluster.OutlierDetection.consecutive_5xx>` value.
 
 Consecutive Gateway Failure
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -56,7 +56,7 @@ code), it will be ejected. Note that this includes events that would cause the H
 return one of these status codes on the upstream's behalf (reset, connection failure, etc.). The
 number of consecutive gateway failures required for ejection is controlled by
 the :ref:`outlier_detection.consecutive_gateway_failure
-<config_cluster_manager_cluster_outlier_detection_consecutive_gateway_failure>` value.
+<envoy_api_field_cluster.OutlierDetection.consecutive_gateway_failure>` value.
 
 Success Rate
 ^^^^^^^^^^^^
@@ -64,10 +64,10 @@ Success Rate
 Success Rate based outlier ejection aggregates success rate data from every host in a cluster. Then at given
 intervals ejects hosts based on statistical outlier detection. Success Rate outlier ejection will not be
 calculated for a host if its request volume over the aggregation interval is less than the
-:ref:`outlier_detection.success_rate_request_volume<config_cluster_manager_cluster_outlier_detection_success_rate_request_volume>`
+:ref:`outlier_detection.success_rate_request_volume<envoy_api_field_cluster.OutlierDetection.success_rate_request_volume>`
 value. Moreover, detection will not be performed for a cluster if the number of hosts
 with the minimum required request volume in an interval is less than the
-:ref:`outlier_detection.success_rate_minimum_hosts<config_cluster_manager_cluster_outlier_detection_success_rate_minimum_hosts>`
+:ref:`outlier_detection.success_rate_minimum_hosts<envoy_api_field_cluster.OutlierDetection.success_rate_minimum_hosts>`
 value.
 
 Ejection event logging
@@ -102,7 +102,7 @@ secs_since_last_action
   action before the first ejection.
 
 cluster
-  The :ref:`cluster <config_cluster_manager_cluster>` that owns the ejected host.
+  The :ref:`cluster <envoy_api_msg_Cluster>` that owns the ejected host.
 
 upstream_url
   The URL of the ejected host. E.g., ``tcp://1.2.3.4:80``.
@@ -143,7 +143,7 @@ cluster_success_rate_ejection_threshold
 Configuration reference
 -----------------------
 
-* Cluster manager :ref:`global configuration <config_cluster_manager_outlier_detection>`
-* Per cluster :ref:`configuration <config_cluster_manager_cluster_outlier_detection>`
+* Cluster manager :ref:`global configuration <envoy_api_field_config.bootstrap.v2.ClusterManager.outlier_detection>`
+* Per cluster :ref:`configuration <envoy_api_msg_cluster.OutlierDetection>`
 * Runtime :ref:`settings <config_cluster_manager_cluster_runtime_outlier_detection>`
 * Statistics :ref:`reference <config_cluster_manager_cluster_stats_outlier_detection>`

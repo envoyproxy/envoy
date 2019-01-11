@@ -1,13 +1,17 @@
 admin:
   access_log_path: /dev/null
   address:
-    socket_address: { address: 0.0.0.0, port_value: 0 }
+    socket_address:
+      address: "{{ ip_any_address }}"
+      port_value: 0
 
 static_resources:
   listeners:
   - name: listener_0
     address:
-      socket_address: { address: 0.0.0.0, port_value: 0 }
+      socket_address:
+        address: "{{ ip_any_address }}"
+        port_value: 0
     filter_chains:
     - filters:
       - name: envoy.http_connection_manager
@@ -27,6 +31,6 @@ static_resources:
     connect_timeout: 0.25s
     type: LOGICAL_DNS
     # Comment out the following line to test on v6 networks
-    dns_lookup_family: V4_ONLY
+    dns_lookup_family: {{ dns_lookup_family }}
     lb_policy: ROUND_ROBIN
     hosts: [{ socket_address: { address: google.com, port_value: 443 }}]

@@ -26,6 +26,8 @@ MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v2alpha::Permis
     return std::make_shared<const MetadataMatcher>(permission.metadata());
   case envoy::config::rbac::v2alpha::Permission::RuleCase::kNotRule:
     return std::make_shared<const NotMatcher>(permission.not_rule());
+  case envoy::config::rbac::v2alpha::Permission::RuleCase::kRequestedServerName:
+    return std::make_shared<const RequestedServerNameMatcher>(permission.requested_server_name());
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
@@ -135,14 +137,14 @@ bool AuthenticatedMatcher::matches(const Network::Connection& connection,
   const auto* ssl = connection.ssl();
   if (!ssl) { // connection was not authenticated
     return false;
-  } else if (name_.empty()) { // matcher allows any subject
+  } else if (!matcher_.has_value()) { // matcher allows any subject
     return true;
   }
 
   std::string principal = ssl->uriSanPeerCertificate();
   principal = principal.empty() ? ssl->subjectPeerCertificate() : principal;
 
-  return principal == name_;
+  return matcher_.value().match(principal);
 }
 
 bool MetadataMatcher::matches(const Network::Connection&, const Envoy::Http::HeaderMap&,
@@ -155,6 +157,12 @@ bool PolicyMatcher::matches(const Network::Connection& connection,
                             const envoy::api::v2::core::Metadata& metadata) const {
   return permissions_.matches(connection, headers, metadata) &&
          principals_.matches(connection, headers, metadata);
+}
+
+bool RequestedServerNameMatcher::matches(const Network::Connection& connection,
+                                         const Envoy::Http::HeaderMap&,
+                                         const envoy::api::v2::core::Metadata&) const {
+  return match(connection.requestedServerName());
 }
 
 } // namespace RBAC

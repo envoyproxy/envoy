@@ -68,9 +68,10 @@ void GrpcClientImpl::onSuccess(
 void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::string&,
                                Tracing::Span&) {
   ASSERT(status != Grpc::Status::GrpcStatus::Ok);
-  ResponsePtr authz_response = std::make_unique<Response>(Response{});
-  authz_response->status = CheckStatus::Error;
-  callbacks_->onComplete(std::move(authz_response));
+  Response response{};
+  response.status = CheckStatus::Error;
+  response.status_code = Http::Code::Forbidden;
+  callbacks_->onComplete(std::make_unique<Response>(response));
   callbacks_ = nullptr;
 }
 

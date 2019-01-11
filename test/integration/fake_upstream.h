@@ -6,6 +6,7 @@
 #include <string>
 
 #include "envoy/api/api.h"
+#include "envoy/event/timer.h"
 #include "envoy/grpc/status.h"
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
@@ -13,6 +14,7 @@
 #include "envoy/network/filter.h"
 #include "envoy/server/configuration.h"
 #include "envoy/server/listener_manager.h"
+#include "envoy/stats/scope.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/buffer/zero_copy_input_stream_impl.h"
@@ -27,6 +29,7 @@
 #include "common/stats/isolated_store_impl.h"
 
 #include "test/test_common/printers.h"
+#include "test/test_common/test_time_system.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {
@@ -39,7 +42,8 @@ class FakeStream : public Http::StreamDecoder,
                    public Http::StreamCallbacks,
                    Logger::Loggable<Logger::Id::testing> {
 public:
-  FakeStream(FakeHttpConnection& parent, Http::StreamEncoder& encoder);
+  FakeStream(FakeHttpConnection& parent, Http::StreamEncoder& encoder,
+             Event::TestTimeSystem& time_system);
 
   uint64_t bodyLength() { return body_.length(); }
   Buffer::Instance& body() { return body_; }
@@ -51,8 +55,10 @@ public:
   void encodeHeaders(const Http::HeaderMapImpl& headers, bool end_stream);
   void encodeData(uint64_t size, bool end_stream);
   void encodeData(Buffer::Instance& data, bool end_stream);
+  void encodeData(absl::string_view data, bool end_stream);
   void encodeTrailers(const Http::HeaderMapImpl& trailers);
   void encodeResetStream();
+  void encodeMetadata(const Http::MetadataMapVector& metadata_map_vector);
   const Http::HeaderMap& headers() { return *headers_; }
   void setAddServedByHeader(bool add_header) { add_served_by_header_ = add_header; }
   const Http::HeaderMapPtr& trailers() { return trailers_; }
@@ -64,6 +70,11 @@ public:
   ABSL_MUST_USE_RESULT
   testing::AssertionResult
   waitForData(Event::Dispatcher& client_dispatcher, uint64_t body_length,
+              std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+
+  ABSL_MUST_USE_RESULT
+  testing::AssertionResult
+  waitForData(Event::Dispatcher& client_dispatcher, absl::string_view body,
               std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   ABSL_MUST_USE_RESULT
@@ -99,7 +110,7 @@ public:
   ABSL_MUST_USE_RESULT testing::AssertionResult
   waitForGrpcMessage(Event::Dispatcher& client_dispatcher, T& message,
                      std::chrono::milliseconds timeout = TestUtility::DefaultTimeout) {
-    auto end_time = std::chrono::steady_clock::now() + timeout;
+    auto end_time = timeSystem().monotonicTime() + timeout;
     ENVOY_LOG(debug, "Waiting for gRPC message...");
     if (!decoded_grpc_frames_.empty()) {
       decodeGrpcFrame(message);
@@ -116,8 +127,8 @@ public:
       }
     }
     if (decoded_grpc_frames_.size() < 1) {
-      timeout = std::chrono::duration_cast<std::chrono::milliseconds>(
-          end_time - std::chrono::steady_clock::now());
+      timeout = std::chrono::duration_cast<std::chrono::milliseconds>(end_time -
+                                                                      timeSystem().monotonicTime());
       if (!waitForData(client_dispatcher, grpc_decoder_.length(), timeout)) {
         return testing::AssertionFailure() << "Timed out waiting for end of gRPC message.";
       }
@@ -139,6 +150,7 @@ public:
   void decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) override;
   void decodeData(Buffer::Instance& data, bool end_stream) override;
   void decodeTrailers(Http::HeaderMapPtr&& trailers) override;
+  void decodeMetadata(Http::MetadataMapPtr&&) override {}
 
   // Http::StreamCallbacks
   void onResetStream(Http::StreamResetReason reason) override;
@@ -146,6 +158,8 @@ public:
   void onBelowWriteBufferLowWatermark() override {}
 
   virtual void setEndStream(bool end) { end_stream_ = end; }
+
+  Event::TestTimeSystem& timeSystem() { return time_system_; }
 
 protected:
   Http::HeaderMapPtr headers_;
@@ -162,6 +176,7 @@ private:
   Grpc::Decoder grpc_decoder_;
   std::vector<Grpc::Frame> decoded_grpc_frames_;
   bool add_served_by_header_{};
+  Event::TestTimeSystem& time_system_;
 };
 
 typedef std::unique_ptr<FakeStream> FakeStreamPtr;
@@ -248,7 +263,9 @@ public:
           }
           callback_ready_event.notifyOne();
         });
-    Thread::CondVar::WaitStatus status = callback_ready_event.waitFor(lock_, timeout);
+    Event::TestTimeSystem& time_system =
+        dynamic_cast<Event::TestTimeSystem&>(connection_.dispatcher().timeSystem());
+    Thread::CondVar::WaitStatus status = time_system.waitFor(lock_, callback_ready_event, timeout);
     if (status == Thread::CondVar::WaitStatus::Timeout) {
       return testing::AssertionFailure() << "Timed out while executing on dispatcher.";
     }
@@ -364,8 +381,8 @@ public:
   bool connected() const { return shared_connection_.connected(); }
 
 protected:
-  FakeConnectionBase(SharedConnectionWrapper& shared_connection)
-      : shared_connection_(shared_connection) {}
+  FakeConnectionBase(SharedConnectionWrapper& shared_connection, Event::TestTimeSystem& time_system)
+      : shared_connection_(shared_connection), time_system_(time_system) {}
 
   Common::CallbackHandle* disconnect_callback_handle_;
   SharedConnectionWrapper& shared_connection_;
@@ -373,6 +390,7 @@ protected:
   Thread::CondVar connection_event_;
   Thread::MutexBasicLockable lock_;
   bool half_closed_ GUARDED_BY(lock_){};
+  Event::TestTimeSystem& time_system_;
 };
 
 /**
@@ -382,7 +400,8 @@ class FakeHttpConnection : public Http::ServerConnectionCallbacks, public FakeCo
 public:
   enum class Type { HTTP1, HTTP2 };
 
-  FakeHttpConnection(SharedConnectionWrapper& shared_connection, Stats::Store& store, Type type);
+  FakeHttpConnection(SharedConnectionWrapper& shared_connection, Stats::Store& store, Type type,
+                     Event::TestTimeSystem& time_system);
 
   // By default waitForNewStream assumes the next event is a new stream and
   // returns AssertionFaliure if an unexpected event occurs. If a caller truly
@@ -422,8 +441,8 @@ typedef std::unique_ptr<FakeHttpConnection> FakeHttpConnectionPtr;
  */
 class FakeRawConnection : public FakeConnectionBase {
 public:
-  FakeRawConnection(SharedConnectionWrapper& shared_connection)
-      : FakeConnectionBase(shared_connection) {}
+  FakeRawConnection(SharedConnectionWrapper& shared_connection, Event::TestTimeSystem& time_system)
+      : FakeConnectionBase(shared_connection, time_system) {}
   typedef const std::function<bool(const std::string&)> ValidatorFunction;
 
   // Writes to data. If data is nullptr, discards the received data.
@@ -489,11 +508,13 @@ class FakeUpstream : Logger::Loggable<Logger::Id::testing>,
                      public Network::FilterChainManager,
                      public Network::FilterChainFactory {
 public:
-  FakeUpstream(const std::string& uds_path, FakeHttpConnection::Type type);
+  FakeUpstream(const std::string& uds_path, FakeHttpConnection::Type type,
+               Event::TestTimeSystem& time_system);
   FakeUpstream(uint32_t port, FakeHttpConnection::Type type, Network::Address::IpVersion version,
-               bool enable_half_close = false);
+               Event::TestTimeSystem& time_system, bool enable_half_close = false);
   FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory, uint32_t port,
-               FakeHttpConnection::Type type, Network::Address::IpVersion version);
+               FakeHttpConnection::Type type, Network::Address::IpVersion version,
+               Event::TestTimeSystem& time_system);
   ~FakeUpstream();
 
   FakeHttpConnection::Type httpType() { return http_type_; }
@@ -530,6 +551,8 @@ public:
   bool createListenerFilterChain(Network::ListenerFilterManager& listener) override;
   void set_allow_unexpected_disconnects(bool value) { allow_unexpected_disconnects_ = value; }
 
+  Event::TestTimeSystem& timeSystem() { return time_system_; }
+
   // Stops the dispatcher loop and joins the listening thread.
   void cleanUp();
 
@@ -540,7 +563,7 @@ protected:
 private:
   FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
                Network::SocketPtr&& connection, FakeHttpConnection::Type type,
-               bool enable_half_close);
+               Event::TestTimeSystem& time_system, bool enable_half_close);
 
   class FakeListener : public Network::ListenerConfig {
   public:
@@ -551,12 +574,17 @@ private:
     Network::FilterChainManager& filterChainManager() override { return parent_; }
     Network::FilterChainFactory& filterChainFactory() override { return parent_; }
     Network::Socket& socket() override { return *parent_.socket_; }
+    const Network::Socket& socket() const override { return *parent_.socket_; }
     bool bindToPort() override { return true; }
     bool handOffRestoredDestinationConnections() const override { return false; }
-    uint32_t perConnectionBufferLimitBytes() override { return 0; }
+    uint32_t perConnectionBufferLimitBytes() const override { return 0; }
+    std::chrono::milliseconds listenerFiltersTimeout() const override {
+      return std::chrono::milliseconds();
+    }
     Stats::Scope& listenerScope() override { return parent_.stats_store_; }
     uint64_t listenerTag() const override { return 0; }
     const std::string& name() const override { return name_; }
+    bool reverseWriteFilterOrder() const override { return true; }
 
     FakeUpstream& parent_;
     std::string name_;
@@ -573,6 +601,7 @@ private:
   Thread::ThreadPtr thread_;
   Thread::CondVar new_connection_event_;
   Api::ApiPtr api_;
+  Event::TestTimeSystem& time_system_;
   Event::DispatcherPtr dispatcher_;
   Network::ConnectionHandlerPtr handler_;
   std::list<QueuedConnectionWrapperPtr> new_connections_ GUARDED_BY(lock_);
@@ -585,4 +614,7 @@ private:
   FakeListener listener_;
   const Network::FilterChainSharedPtr filter_chain_;
 };
+
+typedef std::unique_ptr<FakeUpstream> FakeUpstreamPtr;
+
 } // namespace Envoy

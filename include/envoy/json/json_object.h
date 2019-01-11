@@ -86,6 +86,18 @@ public:
   virtual bool isNull() const PURE;
 
   /**
+   * Determine if an object has type Object.
+   * @return bool is the object an Object?
+   */
+  virtual bool isObject() const PURE;
+
+  /**
+   * Determine if an object has type Array.
+   * @return bool is the object an Array?
+   */
+  virtual bool isArray() const PURE;
+
+  /**
    * Get an array by name.
    * @param name supplies the key name.
    * @param allow_empty specifies whether to return an empty array if the key does not exist.

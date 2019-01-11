@@ -1,7 +1,5 @@
 #include <memory>
 
-#include "envoy/stats/stats.h"
-
 #include "common/access_log/access_log_manager_impl.h"
 #include "common/stats/isolated_store_impl.h"
 
@@ -13,8 +11,8 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::Return;
 using testing::_;
+using testing::Return;
 
 namespace Envoy {
 namespace AccessLog {
@@ -27,10 +25,10 @@ TEST(AccessLogManagerImpl, reopenAllFiles) {
 
   std::shared_ptr<Filesystem::MockFile> log1(new Filesystem::MockFile());
   std::shared_ptr<Filesystem::MockFile> log2(new Filesystem::MockFile());
-  AccessLogManagerImpl access_log_manager(api, dispatcher, lock, stats_store);
-  EXPECT_CALL(api, createFile("foo", _, _, _)).WillOnce(Return(log1));
+  AccessLogManagerImpl access_log_manager(api, dispatcher, lock);
+  EXPECT_CALL(api, createFile("foo", _, _)).WillOnce(Return(log1));
   access_log_manager.createAccessLog("foo");
-  EXPECT_CALL(api, createFile("bar", _, _, _)).WillOnce(Return(log2));
+  EXPECT_CALL(api, createFile("bar", _, _)).WillOnce(Return(log2));
   access_log_manager.createAccessLog("bar");
 
   // Make sure that getting the access log with the same name returns the same underlying file.

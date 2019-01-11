@@ -17,13 +17,13 @@ class CredsUtility {
 public:
   /**
    * Translation from envoy::api::v2::core::GrpcService to grpc::ChannelCredentials
-   * for SSL channel credentials.
+   * for channel credentials.
    * @param google_grpc Google gRPC config.
-   * @return std::shared_ptr<grpc::ChannelCredentials> SSL channel credentials. A nullptr
-   *         will be returned in the absence of any configured SSL in grpc_service_config.
+   * @return std::shared_ptr<grpc::ChannelCredentials> channel credentials. A nullptr
+   *         will be returned in the absence of any configured credentials.
    */
   static std::shared_ptr<grpc::ChannelCredentials>
-  sslChannelCredentials(const envoy::api::v2::core::GrpcService::GoogleGrpc& google_grpc);
+  getChannelCredentials(const envoy::api::v2::core::GrpcService::GoogleGrpc& google_grpc);
 
   /**
    * Static translation from envoy::api::v2::core::GrpcService to a vector of grpc::CallCredentials.

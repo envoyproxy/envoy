@@ -2,7 +2,12 @@
 
 #include "envoy/local_info/local_info.h"
 #include "envoy/network/connection.h"
+#include "envoy/stats/histogram.h"
+#include "envoy/stats/scope.h"
+#include "envoy/stats/sink.h"
+#include "envoy/stats/source.h"
 #include "envoy/stats/stats.h"
+#include "envoy/stats/tag.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
 

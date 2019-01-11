@@ -15,6 +15,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/network/filter_impl.h"
 #include "common/protobuf/utility.h"
+#include "common/upstream/load_balancer_impl.h"
 
 #include "extensions/filters/network/redis_proxy/codec_impl.h"
 #include "extensions/filters/network/redis_proxy/conn_pool.h"
@@ -146,29 +147,35 @@ private:
 
   typedef std::unique_ptr<ThreadLocalActiveClient> ThreadLocalActiveClientPtr;
 
-  struct ThreadLocalPool : public ThreadLocal::ThreadLocalObject {
-    ThreadLocalPool(InstanceImpl& parent, Event::Dispatcher& dispatcher,
-                    const std::string& cluster_name);
+  struct ThreadLocalPool : public ThreadLocal::ThreadLocalObject,
+                           public Upstream::ClusterUpdateCallbacks {
+    ThreadLocalPool(InstanceImpl& parent, Event::Dispatcher& dispatcher, std::string cluster_name);
     ~ThreadLocalPool();
     PoolRequest* makeRequest(const std::string& hash_key, const RespValue& request,
                              PoolCallbacks& callbacks);
+    void onClusterAddOrUpdateNonVirtual(Upstream::ThreadLocalCluster& cluster);
     void onHostsRemoved(const std::vector<Upstream::HostSharedPtr>& hosts_removed);
+
+    // Upstream::ClusterUpdateCallbacks
+    void onClusterAddOrUpdate(Upstream::ThreadLocalCluster& cluster) override {
+      onClusterAddOrUpdateNonVirtual(cluster);
+    }
+    void onClusterRemoval(const std::string& cluster_name) override;
 
     InstanceImpl& parent_;
     Event::Dispatcher& dispatcher_;
-    Upstream::ThreadLocalCluster* cluster_;
+    const std::string cluster_name_;
+    Upstream::ClusterUpdateCallbacksHandlePtr cluster_update_handle_;
+    Upstream::ThreadLocalCluster* cluster_{};
     std::unordered_map<Upstream::HostConstSharedPtr, ThreadLocalActiveClientPtr> client_map_;
-    Envoy::Common::CallbackHandle* local_host_set_member_update_cb_handle_;
+    Envoy::Common::CallbackHandle* host_set_member_update_cb_handle_{};
   };
 
-  struct LbContextImpl : public Upstream::LoadBalancerContext {
+  struct LbContextImpl : public Upstream::LoadBalancerContextBase {
     LbContextImpl(const std::string& hash_key) : hash_key_(std::hash<std::string>()(hash_key)) {}
     // TODO(danielhochman): convert to HashUtil::xxHash64 when we have a migration strategy.
     // Upstream::LoadBalancerContext
     absl::optional<uint64_t> computeHashKey() override { return hash_key_; }
-    const Router::MetadataMatchCriteria* metadataMatchCriteria() override { return nullptr; }
-    const Network::Connection* downstreamConnection() const override { return nullptr; }
-    const Http::HeaderMap* downstreamHeaders() const override { return nullptr; }
 
     const absl::optional<uint64_t> hash_key_;
   };

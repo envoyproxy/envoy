@@ -1,8 +1,10 @@
 #include <chrono>
+#include <memory>
 #include <string>
 
 #include "envoy/admin/v2alpha/config_dump.pb.h"
 #include "envoy/admin/v2alpha/config_dump.pb.validate.h"
+#include "envoy/stats/scope.h"
 
 #include "common/config/filter_json.h"
 #include "common/config/utility.h"
@@ -23,12 +25,12 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::InSequence;
 using testing::Invoke;
 using testing::Return;
 using testing::ReturnRef;
 using testing::SaveArg;
-using testing::_;
 
 namespace Envoy {
 namespace Router {
@@ -51,32 +53,34 @@ public:
   void expectRequest() {
     EXPECT_CALL(factory_context_.cluster_manager_, httpAsyncClientForCluster("foo_cluster"));
     EXPECT_CALL(factory_context_.cluster_manager_.async_client_, send_(_, _, _))
-        .WillOnce(Invoke(
-            [&](Http::MessagePtr& request, Http::AsyncClient::Callbacks& callbacks,
-                const absl::optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
-              EXPECT_EQ((Http::TestHeaderMapImpl{
-                            {":method", "GET"},
-                            {":path", "/v1/routes/foo_route_config/cluster_name/node_name"},
-                            {":authority", "foo_cluster"}}),
+        .WillOnce(
+            Invoke([&](Http::MessagePtr& request, Http::AsyncClient::Callbacks& callbacks,
+                       const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+              request->headers().removeContentLength();
+              EXPECT_EQ((Http::TestHeaderMapImpl{{":method", "POST"},
+                                                 {":path", "/v2/discovery:routes"},
+                                                 {":authority", "foo_cluster"},
+                                                 {"content-type", "application/json"}}),
                         request->headers());
               callbacks_ = &callbacks;
               return &request_;
             }));
   }
 
+  Event::SimulatedTimeSystem& timeSystem() { return factory_context_.timeSystem(); }
+
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   Http::MockAsyncClientRequest request_;
   Http::AsyncClient::Callbacks* callbacks_{};
   Event::MockTimer* interval_timer_{};
-  NiceMock<MockSystemTimeSource> system_time_source_;
 };
 
 class RdsImplTest : public RdsTestBase {
 public:
   RdsImplTest() {
     EXPECT_CALL(factory_context_.admin_.config_tracker_, add_("routes", _));
-    route_config_provider_manager_.reset(
-        new RouteConfigProviderManagerImpl(factory_context_.admin_));
+    route_config_provider_manager_ =
+        std::make_unique<RouteConfigProviderManagerImpl>(factory_context_.admin_);
   }
   ~RdsImplTest() { factory_context_.thread_local_.shutdownThread(); }
 
@@ -84,6 +88,7 @@ public:
     const std::string config_json = R"EOF(
     {
       "rds": {
+        "api_type": "REST",
         "cluster": "foo_cluster",
         "route_config_name": "foo_route_config",
         "refresh_delay_ms": 1000
@@ -209,35 +214,42 @@ TEST_F(RdsImplTest, Basic) {
 
   // Initial request.
   const std::string response1_json = R"EOF(
-  {
-    "virtual_hosts": []
-  }
-  )EOF";
+{
+  "version_info": "1",
+  "resources": [
+    {
+      "@type": "type.googleapis.com/envoy.api.v2.RouteConfiguration",
+      "name": "foo_route_config",
+      "virtual_hosts": null
+    }
+  ]
+}
+)EOF";
 
   Http::MessagePtr message(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body().reset(new Buffer::OwnedImpl(response1_json));
+  message->body() = std::make_unique<Buffer::OwnedImpl>(response1_json);
 
   EXPECT_CALL(factory_context_.init_manager_.initialized_, ready());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
   EXPECT_EQ(nullptr, rds_->config()->route(Http::TestHeaderMapImpl{{":authority", "foo"}}, 0));
-  EXPECT_EQ(1580011435426663819U,
+  EXPECT_EQ(13237225503670494420U,
             factory_context_.scope_.gauge("foo.rds.foo_route_config.version").value());
 
   expectRequest();
   interval_timer_->callback_();
 
   // 2nd request with same response. Based on hash should not reload config.
-  message.reset(new Http::ResponseMessageImpl(
-      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body().reset(new Buffer::OwnedImpl(response1_json));
+  message = std::make_unique<Http::ResponseMessageImpl>(
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}});
+  message->body() = std::make_unique<Buffer::OwnedImpl>(response1_json);
 
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
   EXPECT_EQ(nullptr, rds_->config()->route(Http::TestHeaderMapImpl{{":authority", "foo"}}, 0));
 
-  EXPECT_EQ(1580011435426663819U,
+  EXPECT_EQ(13237225503670494420U,
             factory_context_.scope_.gauge("foo.rds.foo_route_config.version").value());
 
   expectRequest();
@@ -249,29 +261,38 @@ TEST_F(RdsImplTest, Basic) {
 
   // Third request.
   const std::string response2_json = R"EOF(
-  {
-    "virtual_hosts": [
+{
+  "version_info": "2",
+  "resources": [
     {
-      "name": "local_service",
-      "domains": ["*"],
-      "routes": [
+      "@type": "type.googleapis.com/envoy.api.v2.RouteConfiguration",
+      "name": "foo_route_config",
+      "virtual_hosts": [
         {
-          "prefix": "/foo",
-          "cluster_header": ":authority"
-        },
-        {
-          "prefix": "/bar",
-          "cluster": "bar"
+          "name": "integration",
+          "domains": [
+            "*"
+          ],
+          "routes": [
+            {
+              "match": {
+                "prefix": "/foo"
+              },
+              "route": {
+                "cluster_header": ":authority"
+              }
+            }
+          ]
         }
       ]
     }
   ]
-  }
+}
   )EOF";
 
-  message.reset(new Http::ResponseMessageImpl(
-      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body().reset(new Buffer::OwnedImpl(response2_json));
+  message = std::make_unique<Http::ResponseMessageImpl>(
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}});
+  message->body() = std::make_unique<Buffer::OwnedImpl>(response2_json);
 
   // Make sure we don't lookup/verify clusters.
   EXPECT_CALL(factory_context_.cluster_manager_, get("bar")).Times(0);
@@ -282,7 +303,7 @@ TEST_F(RdsImplTest, Basic) {
                        ->routeEntry()
                        ->clusterName());
 
-  EXPECT_EQ(8808926191882896258U,
+  EXPECT_EQ(6927017134761466251U,
             factory_context_.scope_.gauge("foo.rds.foo_route_config.version").value());
 
   // Old config use count should be 1 now.
@@ -293,7 +314,7 @@ TEST_F(RdsImplTest, Basic) {
             factory_context_.scope_.counter("foo.rds.foo_route_config.update_attempt").value());
   EXPECT_EQ(3UL,
             factory_context_.scope_.counter("foo.rds.foo_route_config.update_success").value());
-  EXPECT_EQ(8808926191882896258U,
+  EXPECT_EQ(6927017134761466251U,
             factory_context_.scope_.gauge("foo.rds.foo_route_config.version").value());
 }
 
@@ -303,14 +324,21 @@ TEST_F(RdsImplTest, Failure) {
   setup();
 
   std::string response_json = R"EOF(
-  {
-    "blah": true
-  }
-  )EOF";
+{
+  "version_info": "1",
+  "resources": [
+    {
+      "@type": "type.googleapis.com/envoy.api.v2.RouteConfiguration",
+      "name": "INVALID_NAME_FOR_route_config",
+      "virtual_hosts": null
+    }
+  ]
+}
+)EOF";
 
   Http::MessagePtr message(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body().reset(new Buffer::OwnedImpl(response_json));
+  message->body() = std::make_unique<Buffer::OwnedImpl>(response_json);
 
   EXPECT_CALL(factory_context_.init_manager_.initialized_, ready());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
@@ -324,31 +352,11 @@ TEST_F(RdsImplTest, Failure) {
 
   EXPECT_EQ(2UL,
             factory_context_.scope_.counter("foo.rds.foo_route_config.update_attempt").value());
-  EXPECT_EQ(2UL,
-            factory_context_.scope_.counter("foo.rds.foo_route_config.update_failure").value());
-}
-
-TEST_F(RdsImplTest, FailureArray) {
-  InSequence s;
-
-  setup();
-
-  std::string response_json = R"EOF(
-  []
-  )EOF";
-
-  Http::MessagePtr message(new Http::ResponseMessageImpl(
-      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body().reset(new Buffer::OwnedImpl(response_json));
-
-  EXPECT_CALL(factory_context_.init_manager_.initialized_, ready());
-  EXPECT_CALL(*interval_timer_, enableTimer(_));
-  callbacks_->onSuccess(std::move(message));
-
-  EXPECT_EQ(1UL,
-            factory_context_.scope_.counter("foo.rds.foo_route_config.update_attempt").value());
   EXPECT_EQ(1UL,
             factory_context_.scope_.counter("foo.rds.foo_route_config.update_failure").value());
+  // Validate that the schema error increments update_rejected stat.
+  EXPECT_EQ(1UL,
+            factory_context_.scope_.counter("foo.rds.foo_route_config.update_rejected").value());
 }
 
 class RouteConfigProviderManagerImplTest : public RdsTestBase {
@@ -356,6 +364,7 @@ public:
   void setup() {
     std::string config_json = R"EOF(
       {
+        "api_type": "REST",
         "cluster": "foo_cluster",
         "route_config_name": "foo_route_config",
         "refresh_delay_ms": 1000
@@ -369,7 +378,6 @@ public:
     Upstream::ClusterManager::ClusterInfoMap cluster_map;
     Upstream::MockCluster cluster;
     cluster_map.emplace("foo_cluster", cluster);
-    ON_CALL(factory_context_, systemTimeSource()).WillByDefault(ReturnRef(system_time_source_));
     EXPECT_CALL(factory_context_.cluster_manager_, clusters()).WillOnce(Return(cluster_map));
     EXPECT_CALL(cluster, info()).Times(2);
     EXPECT_CALL(*cluster.info_, addedViaApi());
@@ -381,8 +389,8 @@ public:
 
   RouteConfigProviderManagerImplTest() {
     EXPECT_CALL(factory_context_.admin_.config_tracker_, add_("routes", _));
-    route_config_provider_manager_.reset(
-        new RouteConfigProviderManagerImpl(factory_context_.admin_));
+    route_config_provider_manager_ =
+        std::make_unique<RouteConfigProviderManagerImpl>(factory_context_.admin_);
   }
 
   ~RouteConfigProviderManagerImplTest() { factory_context_.thread_local_.shutdownThread(); }
@@ -424,9 +432,7 @@ virtual_hosts:
         route: { cluster: baz }
 )EOF";
 
-  EXPECT_CALL(system_time_source_, currentTime())
-      .WillRepeatedly(Return(SystemTime(std::chrono::milliseconds(1234567891234))));
-  EXPECT_CALL(factory_context_, systemTimeSource()).WillRepeatedly(ReturnRef(system_time_source_));
+  timeSystem().setSystemTime(std::chrono::milliseconds(1234567891234));
 
   // Only static route.
   RouteConfigProviderPtr static_config =
@@ -458,15 +464,23 @@ dynamic_route_configs:
   setup();
   expectRequest();
   factory_context_.init_manager_.initialize();
+
   const std::string response1_json = R"EOF(
-  {
-    "virtual_hosts": []
-  }
-  )EOF";
+{
+  "version_info": "1",
+  "resources": [
+    {
+      "@type": "type.googleapis.com/envoy.api.v2.RouteConfiguration",
+      "name": "foo_route_config",
+      "virtual_hosts": null
+    }
+  ]
+}
+)EOF";
 
   Http::MessagePtr message(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body().reset(new Buffer::OwnedImpl(response1_json));
+  message->body() = std::make_unique<Buffer::OwnedImpl>(response1_json);
   EXPECT_CALL(factory_context_.init_manager_.initialized_, ready());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
@@ -488,7 +502,7 @@ static_route_configs:
       seconds: 1234567891
       nanos: 234000000
 dynamic_route_configs:
-  - version_info: "hash_15ed54077da94d8b"
+  - version_info: "1"
     route_config:
       name: foo_route_config
       virtual_hosts:
@@ -539,6 +553,7 @@ virtual_hosts:
 
   std::string config_json2 = R"EOF(
     {
+      "api_type": "REST",
       "cluster": "bar_cluster",
       "route_config_name": "foo_route_config",
       "refresh_delay_ms": 1000

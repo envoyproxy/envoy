@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/api/v2/eds.pb.h"
 
 #include "common/common/hash.h"
@@ -10,17 +12,18 @@
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/grpc/mocks.h"
+#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::Invoke;
 using testing::Mock;
 using testing::NiceMock;
 using testing::Return;
-using testing::_;
 
 namespace Envoy {
 namespace Config {
@@ -34,13 +37,14 @@ public:
             "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints")),
         async_client_(new Grpc::MockAsyncClient()), timer_(new Event::MockTimer()) {
     node_.set_id("fo0");
+    EXPECT_CALL(local_info_, node()).WillOnce(testing::ReturnRef(node_));
     EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([this](Event::TimerCb timer_cb) {
       timer_cb_ = timer_cb;
       return timer_;
     }));
-    subscription_.reset(
-        new GrpcEdsSubscriptionImpl(node_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_),
-                                    dispatcher_, random_, *method_descriptor_, stats_));
+    subscription_ = std::make_unique<GrpcEdsSubscriptionImpl>(
+        local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_, random_,
+        *method_descriptor_, stats_, stats_store_, rate_limit_settings_);
   }
 
   ~GrpcSubscriptionTestHarness() { EXPECT_CALL(async_stream_, sendMessage(_, false)); }
@@ -138,6 +142,8 @@ public:
   std::unique_ptr<GrpcEdsSubscriptionImpl> subscription_;
   std::string last_response_nonce_;
   std::vector<std::string> last_cluster_names_;
+  NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  Envoy::Config::RateLimitSettings rate_limit_settings_;
 };
 
 // TODO(danielhochman): test with RDS and ensure version_info is same as what API returned

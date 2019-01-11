@@ -129,4 +129,4 @@ private:
   static const int MAX_STACK_DEPTH = 64;
   backward::StackTrace stack_trace_;
 };
-} // Envoy
+} // namespace Envoy

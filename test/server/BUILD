@@ -29,7 +29,9 @@ envoy_cc_test(
         "//test/config/integration/certs",
     ],
     deps = [
+        "//source/common/api:api_lib",
         "//source/common/event:dispatcher_lib",
+        "//source/common/http:context_lib",
         "//source/common/upstream:cluster_manager_lib",
         "//source/extensions/stat_sinks/statsd:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
@@ -93,12 +95,14 @@ envoy_cc_test(
     srcs = ["guarddog_impl_test.cc"],
     deps = [
         "//include/envoy/common:time_interface",
+        "//source/common/api:api_lib",
         "//source/common/common:utility_lib",
         "//source/common/stats:stats_lib",
         "//source/server:guarddog_lib",
         "//test/mocks:common_lib",
         "//test/mocks/server:server_mocks",
         "//test/mocks/stats:stats_mocks",
+        "//test/test_common:utility_lib",
     ],
 )
 
@@ -122,6 +126,7 @@ envoy_cc_test(
         "//source/extensions/resource_monitors/common:factory_base_lib",
         "//source/server:overload_manager_lib",
         "//test/mocks/event:event_mocks",
+        "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
     ],
@@ -155,6 +160,7 @@ envoy_cc_test(
         "//source/common/network:listen_socket_lib",
         "//source/common/network:socket_option_lib",
         "//source/common/network:utility_lib",
+        "//source/common/protobuf",
         "//source/common/ssl:ssl_socket_lib",
         "//source/extensions/filters/listener/original_dst:config",
         "//source/extensions/filters/listener/tls_inspector:config",
@@ -166,6 +172,7 @@ envoy_cc_test(
         "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:registry_lib",
+        "//test/test_common:simulated_time_system_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
     ],
 )
@@ -182,6 +189,7 @@ envoy_cc_fuzz_test(
         "//test/mocks/server:server_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:environment_lib",
+        "//test/test_common:test_time_lib",
     ] + envoy_all_extensions(),
 )
 
@@ -192,7 +200,11 @@ envoy_cc_test(
         ":cluster_dupe_bootstrap.yaml",
         ":cluster_health_check_bootstrap.yaml",
         ":empty_bootstrap.yaml",
+        ":empty_runtime.yaml",
         ":node_bootstrap.yaml",
+        ":node_bootstrap_no_admin_port.yaml",
+        ":node_bootstrap_without_access_log.yaml",
+        ":zipkin_tracing.yaml",
         "//test/config/integration:server.json",
         "//test/config/integration:server_config_files",
     ],
@@ -208,10 +220,12 @@ envoy_cc_test(
         "//source/extensions/filters/network/http_connection_manager:config",
         "//source/extensions/filters/network/redis_proxy:config",
         "//source/extensions/stat_sinks/statsd:config",
+        "//source/extensions/tracers/zipkin:config",
         "//source/server:server_lib",
         "//test/integration:integration_lib",
         "//test/mocks/server:server_mocks",
         "//test/mocks/stats:stats_mocks",
+        "//test/test_common:test_time_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -222,6 +236,7 @@ envoy_cc_test_library(
     deps = [
         "//source/common/config:lds_json_lib",
         "//source/common/json:json_loader_lib",
+        "//source/common/protobuf:utility_lib",
     ],
 )
 
@@ -229,11 +244,13 @@ envoy_cc_test(
     name = "worker_impl_test",
     srcs = ["worker_impl_test.cc"],
     deps = [
+        "//source/common/api:api_lib",
         "//source/common/event:dispatcher_lib",
         "//source/server:worker_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
+        "//test/test_common:test_time_lib",
         "//test/test_common:utility_lib",
     ],
 )

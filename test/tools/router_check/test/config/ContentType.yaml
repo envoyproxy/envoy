@@ -1,0 +1,16 @@
+virtual_hosts:
+- name: local_service
+  domains:
+  - '*'
+  routes:
+  - match:
+      prefix: "/"
+      headers:
+        - name: "content-type"
+          exact_match: "application/grpc"
+    route:
+      cluster: local_service_grpc
+  - match:
+      prefix: "/"
+    route:
+      cluster: local_service

@@ -132,6 +132,22 @@ statistics will be rooted at *cluster.<name>.outlier_detection.* and contain the
   ejections_total, Counter, Deprecated. Number of ejections due to any outlier type (even if unenforced)
   ejections_consecutive_5xx, Counter, Deprecated. Number of consecutive 5xx ejections (even if unenforced)
 
+.. _config_cluster_manager_cluster_stats_circuit_breakers:
+
+Circuit breakers statistics
+---------------------------
+
+Circuit breakers statistics will be rooted at *cluster.<name>.circuit_breakers.<priority>.* and contain the following:
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  cx_open, Gauge, Whether the connection circuit breaker is closed (0) or open (1)
+  rq_pending_open, Gauge, Whether the pending requests circuit breaker is closed (0) or open (1)
+  rq_open, Gauge, Whether the requests circuit breaker is closed (0) or open (1)
+  rq_retry_open, Gauge, Whether the retry circuit breaker is closed (0) or open (1)
+
 .. _config_cluster_manager_cluster_stats_dynamic_http:
 
 Dynamic HTTP statistics
@@ -146,15 +162,19 @@ are rooted at *cluster.<name>.* and contain the following statistics:
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
+  upstream_rq_completed, Counter, "Total upstream requests completed"
   upstream_rq_<\*xx>, Counter, "Aggregate HTTP response codes (e.g., 2xx, 3xx, etc.)"
   upstream_rq_<\*>, Counter, "Specific HTTP response codes (e.g., 201, 302, etc.)"
   upstream_rq_time, Histogram, Request time milliseconds
+  canary.upstream_rq_completed, Counter, "Total upstream canary requests completed"
   canary.upstream_rq_<\*xx>, Counter, Upstream canary aggregate HTTP response codes
   canary.upstream_rq_<\*>, Counter, Upstream canary specific HTTP response codes
   canary.upstream_rq_time, Histogram, Upstream canary request time milliseconds
+  internal.upstream_rq_completed, Counter, "Total internal origin requests completed"
   internal.upstream_rq_<\*xx>, Counter, Internal origin aggregate HTTP response codes
   internal.upstream_rq_<\*>, Counter, Internal origin specific HTTP response codes
   internal.upstream_rq_time, Histogram, Internal origin request time milliseconds
+  external.upstream_rq_completed, Counter, "Total external origin requests completed"
   external.upstream_rq_<\*xx>, Counter, External origin aggregate HTTP response codes
   external.upstream_rq_<\*>, Counter, External origin specific HTTP response codes
   external.upstream_rq_time, Histogram, External origin request time milliseconds
@@ -175,7 +195,7 @@ Per service zone dynamic HTTP statistics
 ----------------------------------------
 
 If the service zone is available for the local service (via :option:`--service-zone`)
-and the :ref:`upstream cluster <arch_overview_service_discovery_types_sds>`,
+and the :ref:`upstream cluster <arch_overview_service_discovery_types_eds>`,
 Envoy will track the following statistics in *cluster.<name>.zone.<from_zone>.<to_zone>.* namespace.
 
 .. csv-table::

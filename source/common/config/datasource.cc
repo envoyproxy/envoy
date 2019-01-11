@@ -25,9 +25,10 @@ std::string read(const envoy::api::v2::core::DataSource& source, bool allow_empt
   }
 }
 
-std::string getPath(const envoy::api::v2::core::DataSource& source) {
-  return source.specifier_case() == envoy::api::v2::core::DataSource::kFilename ? source.filename()
-                                                                                : "";
+absl::optional<std::string> getPath(const envoy::api::v2::core::DataSource& source) {
+  return source.specifier_case() == envoy::api::v2::core::DataSource::kFilename
+             ? absl::make_optional(source.filename())
+             : absl::nullopt;
 }
 
 } // namespace DataSource

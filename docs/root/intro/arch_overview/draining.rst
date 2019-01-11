@@ -14,7 +14,7 @@ various events. Draining occurs at the following times:
   <arch_overview_dynamic_config_lds>`.
 
 Each :ref:`configured listener <arch_overview_listeners>` has a :ref:`drain_type
-<config_listeners_drain_type>` setting which controls when draining takes place. The currently
+<envoy_api_enum_Listener.DrainType>` setting which controls when draining takes place. The currently
 supported values are:
 
 default

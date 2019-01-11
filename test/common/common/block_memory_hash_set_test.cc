@@ -4,8 +4,6 @@
 #include <memory>
 #include <string>
 
-#include "envoy/stats/stats.h"
-
 #include "common/common/block_memory_hash_set.h"
 #include "common/common/fmt.h"
 #include "common/common/hash.h"
@@ -53,7 +51,7 @@ protected:
     hash_set_options_.num_slots = 5;
     const uint32_t mem_size =
         BlockMemoryHashSet<TestValueClass>::numBytes(hash_set_options_, stats_options_);
-    memory_.reset(new uint8_t[mem_size]);
+    memory_ = std::make_unique<uint8_t[]>(mem_size);
     memset(memory_.get(), 0, mem_size);
   }
 
@@ -206,7 +204,9 @@ TEST_F(BlockMemoryHashSetTest, severalKeysZeroHash) {
   hash_set1.sanityCheck();
 }
 
-TEST_F(BlockMemoryHashSetTest, sanityCheckZeroedMemoryDeathTest) {
+class BlockMemoryHashSetDeathTest : public BlockMemoryHashSetTest {};
+
+TEST_F(BlockMemoryHashSetDeathTest, sanityCheckZeroedMemoryDeathTest) {
   setUp<TestValueZeroHash>();
   BlockMemoryHashSet<TestValueZeroHash> hash_set1(hash_set_options_, true, memory_.get(),
                                                   stats_options_);

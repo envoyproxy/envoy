@@ -41,6 +41,7 @@ envoy_cc_library(
         ":codec_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
+        "//source/common/common:stack_array",
         "//source/common/common:utility_lib",
     ],
 )
@@ -73,6 +74,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/network:filter_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/upstream:load_balancer_lib",
         "@envoy_api//envoy/config/filter/network/redis_proxy/v2:redis_proxy_cc",
     ],
 )

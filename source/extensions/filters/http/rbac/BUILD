@@ -29,6 +29,7 @@ envoy_cc_library(
         "//include/envoy/stats:stats_macros",
         "//source/common/http:utility_lib",
         "//source/extensions/filters/common/rbac:engine_lib",
+        "//source/extensions/filters/common/rbac:utility_lib",
         "//source/extensions/filters/http:well_known_names",
         "@envoy_api//envoy/config/filter/http/rbac/v2:rbac_cc",
     ],

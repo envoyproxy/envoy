@@ -1,0 +1,33 @@
+static_resources {
+  clusters {
+    name: "/"
+    type: STRICT_DNS
+    connect_timeout {
+      seconds: 539000848
+      nanos: 15
+    }
+    hosts {
+      pipe {
+        path: "4"
+      }
+    }
+    tls_context {
+      common_tls_context {
+        tls_certificate_sds_secret_configs {
+          sds_config {
+            path: "/"
+          }
+        }
+      }
+    }
+  }
+}
+tracing {
+}
+admin {
+  address {
+    pipe {
+      path: " "
+    }
+  }
+}

@@ -10,12 +10,16 @@
 
 #include "envoy/api/v2/core/base.pb.h"
 #include "envoy/common/callback.h"
+#include "envoy/config/typed_metadata.h"
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/ssl/context.h"
+#include "envoy/stats/scope.h"
+#include "envoy/stats/stats.h"
 #include "envoy/upstream/health_check_host_monitor.h"
 #include "envoy/upstream/load_balancer_type.h"
+#include "envoy/upstream/locality.h"
 #include "envoy/upstream/outlier_detection.h"
 #include "envoy/upstream/resource_manager.h"
 
@@ -34,13 +38,32 @@ public:
     HostDescriptionConstSharedPtr host_description_;
   };
 
-  enum class HealthFlag {
-    // The host is currently failing active health checks.
-    FAILED_ACTIVE_HC = 0x1,
-    // The host is currently considered an outlier and has been ejected.
-    FAILED_OUTLIER_CHECK = 0x02,
-    // The host is currently marked as unhealthy by EDS.
-    FAILED_EDS_HEALTH = 0x04,
+  // We use an X-macro here to make it easier to verify that all the enum values are accounted for.
+  // clang-format off
+#define HEALTH_FLAG_ENUM_VALUES(m)                                               \
+  /* The host is currently failing active health checks. */                      \
+  m(FAILED_ACTIVE_HC, 0x1)                                                       \
+  /* The host is currently considered an outlier and has been ejected. */        \
+  m(FAILED_OUTLIER_CHECK, 0x02)                                                  \
+  /* The host is currently marked as unhealthy by EDS. */                        \
+  m(FAILED_EDS_HEALTH, 0x04)                                                     \
+  /* The host is currently marked as degraded through active health checking. */ \
+  m(DEGRADED_ACTIVE_HC, 0x08)
+  // clang-format on
+
+#define DECLARE_ENUM(name, value) name = value,
+
+  enum class HealthFlag { HEALTH_FLAG_ENUM_VALUES(DECLARE_ENUM) };
+
+#undef DECLARE_ENUM
+
+  enum class ActiveHealthFailureType {
+    // The failure type is unknown, all hosts' failure types are initialized as UNKNOWN
+    UNKNOWN,
+    // The host is actively responding it's unhealthy
+    UNHEALTHY,
+    // The host is timing out
+    TIMEOUT,
   };
 
   /**
@@ -60,7 +83,8 @@ public:
    */
   virtual CreateConnectionData
   createConnection(Event::Dispatcher& dispatcher,
-                   const Network::ConnectionSocket::OptionsSharedPtr& options) const PURE;
+                   const Network::ConnectionSocket::OptionsSharedPtr& options,
+                   Network::TransportSocketOptionsSharedPtr transport_socket_options) const PURE;
 
   /**
    * Create a health check connection for this host.
@@ -90,11 +114,39 @@ public:
    */
   virtual void healthFlagSet(HealthFlag flag) PURE;
 
+  enum class Health {
+    /**
+     * Host is unhealthy and is not able to serve traffic. A host may be marked as unhealthy either
+     * through EDS or through active health checking.
+     */
+    Unhealthy,
+    /**
+     * Host is healthy, but degraded. It is able to serve traffic, but hosts that aren't degraded
+     * should be preferred. A host may be marked as degraded either through EDS or through active
+     * health checking.
+     */
+    Degraded,
+    /**
+     * Host is healthy and is able to serve traffic.
+     */
+    Healthy,
+  };
+
   /**
-   * @return whether in aggregate a host is healthy and routable. Multiple health flags and other
-   *         information may be considered.
+   * @return the health of the host.
    */
-  virtual bool healthy() const PURE;
+  virtual Health health() const PURE;
+
+  /**
+   * Returns the host's ActiveHealthFailureType. Types are specified in ActiveHealthFailureType.
+   */
+  virtual ActiveHealthFailureType getActiveHealthFailureType() const PURE;
+
+  /**
+   * Set the most recent health failure type for a host. Types are specified in
+   * ActiveHealthFailureType.
+   */
+  virtual void setActiveHealthFailureType(ActiveHealthFailureType flag) PURE;
 
   /**
    * Set the host's health checker monitor. Monitors are assumed to be thread safe, however
@@ -135,8 +187,14 @@ public:
 typedef std::shared_ptr<const Host> HostConstSharedPtr;
 
 typedef std::vector<HostSharedPtr> HostVector;
+typedef std::unordered_map<std::string, Upstream::HostSharedPtr> HostMap;
 typedef std::shared_ptr<HostVector> HostVectorSharedPtr;
 typedef std::shared_ptr<const HostVector> HostVectorConstSharedPtr;
+
+typedef std::unique_ptr<HostVector> HostListPtr;
+typedef std::unordered_map<envoy::api::v2::core::Locality, uint32_t, LocalityHash, LocalityEqualTo>
+    LocalityWeightsMap;
+typedef std::vector<std::pair<HostListPtr, LocalityWeightsMap>> PriorityState;
 
 /**
  * Bucket hosts by locality.
@@ -206,6 +264,14 @@ public:
   virtual const HostVector& healthyHosts() const PURE;
 
   /**
+   * @return all degraded hosts contained in the set at the current time. NOTE: This set is
+   *         eventually consistent. There is a time window where a host in this set may become
+   *         undegraded and calling degraded() on it will return false. Code should be written to
+   *         deal with this case if it matters.
+   */
+  virtual const HostVector& degradedHosts() const PURE;
+
+  /**
    * @return hosts per locality.
    */
   virtual const HostsPerLocality& hostsPerLocality() const PURE;
@@ -214,6 +280,11 @@ public:
    * @return same as hostsPerLocality but only contains healthy hosts.
    */
   virtual const HostsPerLocality& healthyHostsPerLocality() const PURE;
+
+  /**
+   * @return same as hostsPerLocality but only contains degraded hosts.
+   */
+  virtual const HostsPerLocality& degradedHostsPerLocality() const PURE;
 
   /**
    * @return weights for each locality in the host set.
@@ -226,26 +297,40 @@ public:
   virtual absl::optional<uint32_t> chooseLocality() PURE;
 
   /**
+   * Parameter class for updateHosts.
+   */
+  struct UpdateHostsParams {
+    HostVectorConstSharedPtr hosts;
+    HostVectorConstSharedPtr healthy_hosts;
+    HostVectorConstSharedPtr degraded_hosts;
+    HostsPerLocalityConstSharedPtr hosts_per_locality;
+    HostsPerLocalityConstSharedPtr healthy_hosts_per_locality;
+    HostsPerLocalityConstSharedPtr degraded_hosts_per_locality;
+  };
+
+  /**
    * Updates the hosts in a given host set.
    *
-   * @param hosts supplies the (usually new) list of hosts in the host set.
-   * @param healthy hosts supplies the subset of hosts which are healthy.
-   * @param hosts_per_locality supplies the hosts subdivided by locality.
-   * @param hosts_per_locality supplies the healthy hosts subdivided by locality.
+   * @param update_hosts_param supplies the list of hosts and hosts per localitiy.
    * @param locality_weights supplies a map from locality to associated weight.
    * @param hosts_added supplies the hosts added since the last update.
    * @param hosts_removed supplies the hosts removed since the last update.
+   * @param overprovisioning_factor if presents, overwrites the current overprovisioning_factor.
    */
-  virtual void updateHosts(HostVectorConstSharedPtr hosts, HostVectorConstSharedPtr healthy_hosts,
-                           HostsPerLocalityConstSharedPtr hosts_per_locality,
-                           HostsPerLocalityConstSharedPtr healthy_hosts_per_locality,
+  virtual void updateHosts(UpdateHostsParams&& update_host_params,
                            LocalityWeightsConstSharedPtr locality_weights,
-                           const HostVector& hosts_added, const HostVector& hosts_removed) PURE;
+                           const HostVector& hosts_added, const HostVector& hosts_removed,
+                           absl::optional<uint32_t> overprovisioning_factor) PURE;
 
   /**
    * @return uint32_t the priority of this host set.
    */
   virtual uint32_t priority() const PURE;
+
+  /**
+   * @return uint32_t the overprovisioning factor of this host set.
+   */
+  virtual uint32_t overprovisioningFactor() const PURE;
 };
 
 typedef std::unique_ptr<HostSet> HostSetPtr;
@@ -332,6 +417,7 @@ public:
   COUNTER  (upstream_cx_none_healthy)                                                              \
   COUNTER  (upstream_rq_total)                                                                     \
   GAUGE    (upstream_rq_active)                                                                    \
+  COUNTER  (upstream_rq_completed)                                                                 \
   COUNTER  (upstream_rq_pending_total)                                                             \
   COUNTER  (upstream_rq_pending_overflow)                                                          \
   COUNTER  (upstream_rq_pending_failure_eject)                                                     \
@@ -374,6 +460,17 @@ public:
 // clang-format on
 
 /**
+ * Cluster circuit breakers stats.
+ */
+// clang-format off
+#define ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(GAUGE)                                                  \
+  GAUGE (cx_open)                                                                                  \
+  GAUGE (rq_pending_open)                                                                          \
+  GAUGE (rq_open)                                                                                  \
+  GAUGE (rq_retry_open)
+// clang-format on
+
+/**
  * Struct definition for all cluster stats. @see stats_macros.h
  */
 struct ClusterStats {
@@ -386,6 +483,29 @@ struct ClusterStats {
 struct ClusterLoadReportStats {
   ALL_CLUSTER_LOAD_REPORT_STATS(GENERATE_COUNTER_STRUCT)
 };
+
+/**
+ * Struct definition for cluster circuit breakers stats. @see stats_macros.h
+ */
+struct ClusterCircuitBreakersStats {
+  ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(GENERATE_GAUGE_STRUCT)
+};
+
+/**
+ * All extension protocol specific options returned by the method at
+ *   NamedNetworkFilterConfigFactory::createProtocolOptions
+ * must be derived from this class.
+ */
+class ProtocolOptionsConfig {
+public:
+  virtual ~ProtocolOptionsConfig() {}
+};
+typedef std::shared_ptr<const ProtocolOptionsConfig> ProtocolOptionsConfigConstSharedPtr;
+
+/**
+ *  Base class for all cluster typed metadata factory.
+ */
+class ClusterTypedMetadataFactory : public Envoy::Config::TypedMetadataFactory {};
 
 /**
  * Information about a given upstream cluster.
@@ -437,6 +557,18 @@ public:
   virtual const Http::Http2Settings& http2Settings() const PURE;
 
   /**
+   * @param name std::string containing the well-known name of the extension for which protocol
+   *        options are desired
+   * @return std::shared_ptr<const Derived> where Derived is a subclass of ProtocolOptionsConfig
+   *         and contains extension-specific protocol options for upstream connections.
+   */
+  template <class Derived>
+  const std::shared_ptr<const Derived>
+  extensionProtocolOptionsTyped(const std::string& name) const {
+    return std::dynamic_pointer_cast<const Derived>(extensionProtocolOptions(name));
+  }
+
+  /**
    * @return const envoy::api::v2::Cluster::CommonLbConfig& the common configuration for all
    *         load balancers for this cluster.
    */
@@ -453,10 +585,24 @@ public:
   virtual envoy::api::v2::Cluster::DiscoveryType type() const PURE;
 
   /**
+   * @return configuration for least request load balancing, only used if LB type is least request.
+   */
+  virtual const absl::optional<envoy::api::v2::Cluster::LeastRequestLbConfig>&
+  lbLeastRequestConfig() const PURE;
+
+  /**
    * @return configuration for ring hash load balancing, only used if type is set to ring_hash_lb.
    */
   virtual const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig>&
   lbRingHashConfig() const PURE;
+
+  /**
+   * @return const absl::optional<envoy::api::v2::Cluster::OriginalDstLbConfig>& the configuration
+   *         for the Original Destination load balancing policy, only used if type is set to
+   *         ORIGINAL_DST_LB.
+   */
+  virtual const absl::optional<envoy::api::v2::Cluster::OriginalDstLbConfig>&
+  lbOriginalDstConfig() const PURE;
 
   /**
    * @return Whether the cluster is currently in maintenance mode and should not be routed to.
@@ -524,6 +670,11 @@ public:
   virtual const envoy::api::v2::core::Metadata& metadata() const PURE;
 
   /**
+   * @return const Envoy::Config::TypedMetadata&& the typed metadata for this cluster.
+   */
+  virtual const Envoy::Config::TypedMetadata& typedMetadata() const PURE;
+
+  /**
    *
    * @return const Network::ConnectionSocket::OptionsSharedPtr& socket options for all
    *         connections for this cluster.
@@ -535,6 +686,17 @@ public:
    *         after a host is removed from service discovery.
    */
   virtual bool drainConnectionsOnHostRemoval() const PURE;
+
+protected:
+  /**
+   * Invoked by extensionProtocolOptionsTyped.
+   * @param name std::string containing the well-known name of the extension for which protocol
+   *        options are desired
+   * @return ProtocolOptionsConfigConstSharedPtr with extension-specific protocol options for
+   *         upstream connections.
+   */
+  virtual ProtocolOptionsConfigConstSharedPtr
+  extensionProtocolOptions(const std::string& name) const PURE;
 };
 
 typedef std::shared_ptr<const ClusterInfo> ClusterInfoConstSharedPtr;
@@ -580,8 +742,8 @@ public:
 
   /**
    * @return the phase in which the cluster is initialized at boot. This mechanism is used such that
-   *         clusters that depend on other clusters can correctly initialize. (E.g., an SDS cluster
-   *         that depends on resolution of the SDS server itself).
+   *         clusters that depend on other clusters can correctly initialize. (E.g., an EDS cluster
+   *         that depends on resolution of the EDS server itself).
    */
   virtual InitializePhase initializePhase() const PURE;
 

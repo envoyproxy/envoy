@@ -3,9 +3,11 @@
 #include "envoy/event/file_event.h"
 
 #include "common/event/dispatcher_impl.h"
+#include "common/stats/isolated_store_impl.h"
 
 #include "test/mocks/common.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -15,6 +17,9 @@ namespace Event {
 
 class FileEventImplTest : public testing::Test {
 public:
+  FileEventImplTest()
+      : api_(Api::createApiForTest(stats_store_)), dispatcher_(test_time_.timeSystem(), *api_) {}
+
   void SetUp() override {
     int rc = socketpair(AF_UNIX, SOCK_DGRAM, 0, fds_);
     ASSERT_EQ(0, rc);
@@ -30,6 +35,10 @@ public:
 
 protected:
   int fds_[2];
+  Stats::IsolatedStoreImpl stats_store_;
+  Api::ApiPtr api_;
+  DangerousDeprecatedTestTime test_time_;
+  DispatcherImpl dispatcher_;
 };
 
 class FileEventImplActivateTest : public testing::TestWithParam<Network::Address::IpVersion> {};
@@ -47,7 +56,10 @@ TEST_P(FileEventImplActivateTest, Activate) {
   }
   ASSERT_NE(-1, fd);
 
-  DispatcherImpl dispatcher;
+  DangerousDeprecatedTestTime test_time;
+  Stats::IsolatedStoreImpl stats_store;
+  Api::ApiPtr api = Api::createApiForTest(stats_store);
+  DispatcherImpl dispatcher(test_time.timeSystem(), *api);
   ReadyWatcher read_event;
   EXPECT_CALL(read_event, ready()).Times(1);
   ReadyWatcher write_event;
@@ -79,41 +91,39 @@ TEST_P(FileEventImplActivateTest, Activate) {
 }
 
 TEST_F(FileEventImplTest, EdgeTrigger) {
-  DispatcherImpl dispatcher;
   ReadyWatcher read_event;
   EXPECT_CALL(read_event, ready()).Times(1);
   ReadyWatcher write_event;
   EXPECT_CALL(write_event, ready()).Times(1);
 
-  Event::FileEventPtr file_event =
-      dispatcher.createFileEvent(fds_[0],
-                                 [&](uint32_t events) -> void {
-                                   if (events & FileReadyType::Read) {
-                                     read_event.ready();
-                                   }
+  Event::FileEventPtr file_event = dispatcher_.createFileEvent(
+      fds_[0],
+      [&](uint32_t events) -> void {
+        if (events & FileReadyType::Read) {
+          read_event.ready();
+        }
 
-                                   if (events & FileReadyType::Write) {
-                                     write_event.ready();
-                                   }
-                                 },
-                                 FileTriggerType::Edge, FileReadyType::Read | FileReadyType::Write);
+        if (events & FileReadyType::Write) {
+          write_event.ready();
+        }
+      },
+      FileTriggerType::Edge, FileReadyType::Read | FileReadyType::Write);
 
-  dispatcher.run(Event::Dispatcher::RunType::NonBlock);
+  dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
 }
 
 TEST_F(FileEventImplTest, LevelTrigger) {
-  DispatcherImpl dispatcher;
   ReadyWatcher read_event;
   EXPECT_CALL(read_event, ready()).Times(2);
   ReadyWatcher write_event;
   EXPECT_CALL(write_event, ready()).Times(2);
 
   int count = 2;
-  Event::FileEventPtr file_event = dispatcher.createFileEvent(
+  Event::FileEventPtr file_event = dispatcher_.createFileEvent(
       fds_[0],
       [&](uint32_t events) -> void {
         if (count-- == 0) {
-          dispatcher.exit();
+          dispatcher_.exit();
           return;
         }
         if (events & FileReadyType::Read) {
@@ -126,40 +136,39 @@ TEST_F(FileEventImplTest, LevelTrigger) {
       },
       FileTriggerType::Level, FileReadyType::Read | FileReadyType::Write);
 
-  dispatcher.run(Event::Dispatcher::RunType::Block);
+  dispatcher_.run(Event::Dispatcher::RunType::Block);
 }
 
 TEST_F(FileEventImplTest, SetEnabled) {
-  DispatcherImpl dispatcher;
   ReadyWatcher read_event;
   EXPECT_CALL(read_event, ready()).Times(2);
   ReadyWatcher write_event;
   EXPECT_CALL(write_event, ready()).Times(2);
 
-  Event::FileEventPtr file_event =
-      dispatcher.createFileEvent(fds_[0],
-                                 [&](uint32_t events) -> void {
-                                   if (events & FileReadyType::Read) {
-                                     read_event.ready();
-                                   }
+  Event::FileEventPtr file_event = dispatcher_.createFileEvent(
+      fds_[0],
+      [&](uint32_t events) -> void {
+        if (events & FileReadyType::Read) {
+          read_event.ready();
+        }
 
-                                   if (events & FileReadyType::Write) {
-                                     write_event.ready();
-                                   }
-                                 },
-                                 FileTriggerType::Edge, FileReadyType::Read | FileReadyType::Write);
+        if (events & FileReadyType::Write) {
+          write_event.ready();
+        }
+      },
+      FileTriggerType::Edge, FileReadyType::Read | FileReadyType::Write);
 
   file_event->setEnabled(FileReadyType::Read);
-  dispatcher.run(Event::Dispatcher::RunType::NonBlock);
+  dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
 
   file_event->setEnabled(FileReadyType::Write);
-  dispatcher.run(Event::Dispatcher::RunType::NonBlock);
+  dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
 
   file_event->setEnabled(0);
-  dispatcher.run(Event::Dispatcher::RunType::NonBlock);
+  dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
 
   file_event->setEnabled(FileReadyType::Read | FileReadyType::Write);
-  dispatcher.run(Event::Dispatcher::RunType::NonBlock);
+  dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
 }
 
 } // namespace Event

@@ -26,14 +26,14 @@ public:
   const std::chrono::milliseconds& requestTimeout() { return request_timeout_; }
 
 private:
-  // Get the attachment body, and returns a JSON representations with envrionment variables
+  // Get the attachment body, and returns a JSON representations with environment variables
   // interpolated.
   static std::string getAttachment(const ProtobufWkt::Struct& attachment_template);
-  // Recursively interpolates envrionment variables inline in the struct.
+  // Recursively interpolates environment variables inline in the struct.
   static void updateTemplateInStruct(ProtobufWkt::Struct& attachment_template);
-  // Recursively interpolates envrionment variables inline in the value.
+  // Recursively interpolates environment variables inline in the value.
   static void updateTemplateInValue(ProtobufWkt::Value& curvalue);
-  // Interpolates envrionment variables in a string, and returns the new interpolated string.
+  // Interpolates environment variables in a string, and returns the new interpolated string.
   static std::string replaceEnv(const std::string& attachment_template);
 
   // The name of the squash server cluster.
@@ -47,7 +47,7 @@ private:
   // The timeout for individual requests to the squash server.
   std::chrono::milliseconds request_timeout_;
 
-  // Defines the pattern for interpolating envrionment variables in to the attachment.
+  // Defines the pattern for interpolating environment variables in to the attachment.
   const static std::regex ENV_REGEX;
 };
 
@@ -130,7 +130,7 @@ private:
   const static std::string SERVER_AUTHORITY;
   // The state of a debug attachment object when a debugger is successfully attached.
   const static std::string ATTACHED_STATE;
-  // The state of a debug attachment object when an error has occured.
+  // The state of a debug attachment object when an error has occurred.
   const static std::string ERROR_STATE;
 };
 

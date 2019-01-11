@@ -3,6 +3,9 @@
 #include "envoy/api/v2/core/health_check.pb.validate.h"
 #include "envoy/config/health_checker/redis/v2/redis.pb.validate.h"
 
+#include "common/protobuf/protobuf.h"
+#include "common/protobuf/utility.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HealthCheckers {

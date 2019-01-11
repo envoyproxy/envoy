@@ -1,14 +1,17 @@
+#include "common/common/thread.h"
 #include "common/event/dispatcher_impl.h"
+#include "common/stats/isolated_store_impl.h"
 #include "common/thread_local/thread_local_impl.h"
 
 #include "test/mocks/event/mocks.h"
+#include "test/test_common/test_time.h"
 
 #include "gmock/gmock.h"
 
+using testing::_;
 using testing::InSequence;
 using testing::Ref;
 using testing::ReturnPointee;
-using testing::_;
 
 namespace Envoy {
 namespace ThreadLocal {
@@ -113,8 +116,12 @@ TEST_F(ThreadLocalInstanceImplTest, RunOnAllThreads) {
 // Validate ThreadLocal::InstanceImpl's dispatcher() behavior.
 TEST(ThreadLocalInstanceImplDispatcherTest, Dispatcher) {
   InstanceImpl tls;
-  Event::DispatcherImpl main_dispatcher;
-  Event::DispatcherImpl thread_dispatcher;
+
+  DangerousDeprecatedTestTime test_time;
+  Stats::IsolatedStoreImpl stats_store;
+  Api::ApiPtr api = Api::createApiForTest(stats_store);
+  Event::DispatcherImpl main_dispatcher(test_time.timeSystem(), *api);
+  Event::DispatcherImpl thread_dispatcher(test_time.timeSystem(), *api);
 
   tls.registerThread(main_dispatcher, true);
   tls.registerThread(thread_dispatcher, false);
@@ -124,13 +131,14 @@ TEST(ThreadLocalInstanceImplDispatcherTest, Dispatcher) {
   // Verify we have the expected dispatcher for the main thread.
   EXPECT_EQ(&main_dispatcher, &tls.dispatcher());
 
-  Thread::Thread([&thread_dispatcher, &tls]() {
-    // Ensure that the dispatcher update in tls posted during the above registerThread happens.
-    thread_dispatcher.run(Event::Dispatcher::RunType::NonBlock);
-    // Verify we have the expected dispatcher for the new thread thread.
-    EXPECT_EQ(&thread_dispatcher, &tls.dispatcher());
-  })
-      .join();
+  Thread::ThreadPtr thread =
+      Thread::threadFactoryForTest().createThread([&thread_dispatcher, &tls]() {
+        // Ensure that the dispatcher update in tls posted during the above registerThread happens.
+        thread_dispatcher.run(Event::Dispatcher::RunType::NonBlock);
+        // Verify we have the expected dispatcher for the new thread thread.
+        EXPECT_EQ(&thread_dispatcher, &tls.dispatcher());
+      });
+  thread->join();
 
   // Verify we still have the expected dispatcher for the main thread.
   EXPECT_EQ(&main_dispatcher, &tls.dispatcher());

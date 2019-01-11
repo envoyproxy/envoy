@@ -15,6 +15,7 @@ envoy_cc_library(
     srcs = [
         "span_buffer.cc",
         "span_context.cc",
+        "span_context_extractor.cc",
         "tracer.cc",
         "util.cc",
         "zipkin_core_types.cc",
@@ -23,6 +24,7 @@ envoy_cc_library(
     hdrs = [
         "span_buffer.h",
         "span_context.h",
+        "span_context_extractor.h",
         "tracer.h",
         "tracer_interface.h",
         "util.h",
@@ -46,6 +48,7 @@ envoy_cc_library(
         "//source/common/common:enum_to_int",
         "//source/common/common:hex_lib",
         "//source/common/common:utility_lib",
+        "//source/common/config:utility_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:message_lib",
         "//source/common/http:utility_lib",
@@ -53,6 +56,7 @@ envoy_cc_library(
         "//source/common/network:address_lib",
         "//source/common/singleton:const_singleton",
         "//source/common/tracing:http_tracer_lib",
+        "//source/extensions/tracers:well_known_names",
     ],
 )
 
@@ -61,8 +65,8 @@ envoy_cc_library(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     deps = [
+        ":zipkin_lib",
         "//source/extensions/tracers:well_known_names",
-        "//source/extensions/tracers/zipkin:zipkin_lib",
-        "//source/server:configuration_lib",
+        "//source/extensions/tracers/common:factory_base_lib",
     ],
 )

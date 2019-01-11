@@ -1,4 +1,5 @@
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <unordered_map>
 
@@ -15,22 +16,19 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::NiceMock;
 using testing::Return;
-using testing::_;
 
 namespace Envoy {
 namespace Upstream {
 
-class TestLoadBalancerContext : public LoadBalancerContext {
+class TestLoadBalancerContext : public LoadBalancerContextBase {
 public:
   TestLoadBalancerContext(uint64_t hash_key) : hash_key_(hash_key) {}
 
   // Upstream::LoadBalancerContext
   absl::optional<uint64_t> computeHashKey() override { return hash_key_; }
-  const Router::MetadataMatchCriteria* metadataMatchCriteria() override { return nullptr; }
-  const Network::Connection* downstreamConnection() const override { return nullptr; }
-  const Http::HeaderMap* downstreamHeaders() const override { return nullptr; }
 
   absl::optional<uint64_t> hash_key_;
 };
@@ -40,12 +38,12 @@ public:
   RingHashLoadBalancerTest() : stats_(ClusterInfoImpl::generateStats(stats_store_)) {}
 
   void init() {
-    lb_.reset(new RingHashLoadBalancer(priority_set_, stats_, runtime_, random_, config_,
-                                       common_config_));
+    lb_ = std::make_unique<RingHashLoadBalancer>(priority_set_, stats_, runtime_, random_, config_,
+                                                 common_config_);
     lb_->initialize();
   }
 
-  // Run all tests aginst both priority 0 and priority 1 host sets, to ensure
+  // Run all tests against both priority 0 and priority 1 host sets, to ensure
   // all the load balancers have equivalent functonality for failover host sets.
   MockHostSet& hostSet() { return GetParam() ? host_set_ : failover_host_set_; }
 
@@ -84,7 +82,6 @@ TEST_P(RingHashLoadBalancerTest, Basic) {
 
   config_ = (envoy::api::v2::Cluster::RingHashLbConfig());
   config_.value().mutable_minimum_ring_size()->set_value(12);
-  config_.value().mutable_deprecated_v1()->mutable_use_std_hash()->set_value(false);
 
   init();
 
@@ -151,7 +148,6 @@ TEST_P(RingHashFailoverTest, BasicFailover) {
 
   config_ = (envoy::api::v2::Cluster::RingHashLbConfig());
   config_.value().mutable_minimum_ring_size()->set_value(12);
-  config_.value().mutable_deprecated_v1()->mutable_use_std_hash()->set_value(false);
   init();
 
   LoadBalancerPtr lb = lb_->factory()->create();
@@ -193,8 +189,8 @@ TEST_P(RingHashLoadBalancerTest, BasicWithStdHash) {
   hostSet().healthy_hosts_ = hostSet().hosts_;
   hostSet().runCallbacks({}, {});
 
-  // use_std_hash defaults to true so don't set it here.
   config_ = (envoy::api::v2::Cluster::RingHashLbConfig());
+  config_.value().mutable_deprecated_v1()->mutable_use_std_hash()->set_value(true);
   config_.value().mutable_minimum_ring_size()->set_value(12);
   init();
 
@@ -236,6 +232,57 @@ TEST_P(RingHashLoadBalancerTest, BasicWithStdHash) {
 }
 #endif
 
+TEST_P(RingHashLoadBalancerTest, BasicWithMurmur2) {
+  hostSet().hosts_ = {
+      makeTestHost(info_, "tcp://127.0.0.1:80"), makeTestHost(info_, "tcp://127.0.0.1:81"),
+      makeTestHost(info_, "tcp://127.0.0.1:82"), makeTestHost(info_, "tcp://127.0.0.1:83"),
+      makeTestHost(info_, "tcp://127.0.0.1:84"), makeTestHost(info_, "tcp://127.0.0.1:85")};
+  hostSet().healthy_hosts_ = hostSet().hosts_;
+  hostSet().runCallbacks({}, {});
+
+  config_ = (envoy::api::v2::Cluster::RingHashLbConfig());
+  config_.value().set_hash_function(envoy::api::v2::Cluster_RingHashLbConfig_HashFunction::
+                                        Cluster_RingHashLbConfig_HashFunction_MURMUR_HASH_2);
+  config_.value().mutable_minimum_ring_size()->set_value(12);
+  init();
+
+  // This is the hash ring built using murmur2 hash.
+  // ring hash: host=127.0.0.1:85 hash=1358027074129602068
+  // ring hash: host=127.0.0.1:83 hash=4361834613929391114
+  // ring hash: host=127.0.0.1:84 hash=7224494972555149682
+  // ring hash: host=127.0.0.1:81 hash=7701421856454313576
+  // ring hash: host=127.0.0.1:82 hash=8649315368077433379
+  // ring hash: host=127.0.0.1:84 hash=8739448859063030639
+  // ring hash: host=127.0.0.1:81 hash=9887544217113020895
+  // ring hash: host=127.0.0.1:82 hash=10150910876324007731
+  // ring hash: host=127.0.0.1:83 hash=15168472011420622455
+  // ring hash: host=127.0.0.1:80 hash=15427156902705414897
+  // ring hash: host=127.0.0.1:85 hash=16375050414328759093
+  // ring hash: host=127.0.0.1:80 hash=17613279263364193813
+  LoadBalancerPtr lb = lb_->factory()->create();
+  {
+    TestLoadBalancerContext context(0);
+    EXPECT_EQ(hostSet().hosts_[5], lb->chooseHost(&context));
+  }
+  {
+    TestLoadBalancerContext context(std::numeric_limits<uint64_t>::max());
+    EXPECT_EQ(hostSet().hosts_[5], lb->chooseHost(&context));
+  }
+  {
+    TestLoadBalancerContext context(1358027074129602068);
+    EXPECT_EQ(hostSet().hosts_[5], lb->chooseHost(&context));
+  }
+  {
+    TestLoadBalancerContext context(1358027074129602069);
+    EXPECT_EQ(hostSet().hosts_[3], lb->chooseHost(&context));
+  }
+  {
+    EXPECT_CALL(random_, random()).WillOnce(Return(10150910876324007730UL));
+    EXPECT_EQ(hostSet().hosts_[2], lb->chooseHost(nullptr));
+  }
+  EXPECT_EQ(0UL, stats_.lb_healthy_panic_.value());
+}
+
 TEST_P(RingHashLoadBalancerTest, UnevenHosts) {
   hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80"),
                       makeTestHost(info_, "tcp://127.0.0.1:81")};
@@ -244,7 +291,6 @@ TEST_P(RingHashLoadBalancerTest, UnevenHosts) {
 
   config_ = (envoy::api::v2::Cluster::RingHashLbConfig());
   config_.value().mutable_minimum_ring_size()->set_value(3);
-  config_.value().mutable_deprecated_v1()->mutable_use_std_hash()->set_value(false);
   init();
 
   // hash ring:

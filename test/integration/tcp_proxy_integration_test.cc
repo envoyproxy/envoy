@@ -1,5 +1,7 @@
 #include "test/integration/tcp_proxy_integration_test.h"
 
+#include <memory>
+
 #include "envoy/config/accesslog/v2/file.pb.h"
 #include "envoy/config/filter/network/tcp_proxy/v2/tcp_proxy.pb.validate.h"
 
@@ -12,10 +14,10 @@
 
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::Invoke;
 using testing::MatchesRegex;
 using testing::NiceMock;
-using testing::_;
 
 namespace Envoy {
 namespace {
@@ -38,6 +40,8 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamWritesFirst) {
 
   ASSERT_TRUE(fake_upstream_connection->write("hello"));
   tcp_client->waitForData("hello");
+  // Make sure inexact matches work also on data already received.
+  tcp_client->waitForData("ello", false);
 
   tcp_client->write("hello");
   ASSERT_TRUE(fake_upstream_connection->waitForData(5));
@@ -353,11 +357,15 @@ TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithLargeOutstandingData) {
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect(true));
 }
 
+INSTANTIATE_TEST_CASE_P(IpVersions, TcpProxySslIntegrationTest,
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
+
 void TcpProxySslIntegrationTest::initialize() {
   config_helper_.addSslConfig();
   TcpProxyIntegrationTest::initialize();
 
-  context_manager_.reset(new Ssl::ContextManagerImpl(runtime_));
+  context_manager_ = std::make_unique<Ssl::ContextManagerImpl>(timeSystem());
   payload_reader_.reset(new WaitForPayloadReader(*dispatcher_));
 }
 
@@ -381,11 +389,10 @@ void TcpProxySslIntegrationTest::setupConnections() {
   // Set up the SSl client.
   Network::Address::InstanceConstSharedPtr address =
       Ssl::getSslAddress(version_, lookupPort("tcp_proxy"));
-  context_ =
-      Ssl::createClientSslTransportSocketFactory(false, false, *context_manager_, secret_manager_);
+  context_ = Ssl::createClientSslTransportSocketFactory({}, *context_manager_);
   ssl_client_ =
       dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
-                                          context_->createTransportSocket(), nullptr);
+                                          context_->createTransportSocket(nullptr), nullptr);
 
   // Perform the SSL handshake. Loopback is whitelisted in tcp_proxy.json for the ssl_auth
   // filter so there will be no pause waiting on auth data.
@@ -449,6 +456,7 @@ TEST_P(TcpProxySslIntegrationTest, DownstreamHalfClose) {
 
   Buffer::OwnedImpl empty_buffer;
   ssl_client_->write(empty_buffer, true);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   ASSERT_TRUE(fake_upstream_connection_->waitForHalfClose());
 
   const std::string data("data");

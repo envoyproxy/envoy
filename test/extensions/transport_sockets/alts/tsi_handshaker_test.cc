@@ -11,12 +11,11 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Alts {
 
+using testing::_;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::SaveArg;
-using testing::Test;
-using testing::_;
 
 class MockTsiHandshakerCallbacks : public TsiHandshakerCallbacks {
 public:
@@ -33,7 +32,7 @@ public:
   }
 };
 
-class TsiHandshakerTest : public Test {
+class TsiHandshakerTest : public testing::Test {
 public:
   TsiHandshakerTest()
       : server_handshaker_({tsi_create_fake_handshaker(0)}, dispatcher_),

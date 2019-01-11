@@ -3,9 +3,15 @@
 #include <string>
 #include <unordered_map>
 
+#include "envoy/config/metrics/v2/stats.pb.h"
+
 #include "common/common/c_smart_ptr.h"
+#include "common/memory/stats.h"
+#include "common/stats/stats_matcher_impl.h"
+#include "common/stats/tag_producer_impl.h"
 #include "common/stats/thread_local_store.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/stats/mocks.h"
@@ -17,12 +23,12 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Ref;
 using testing::Return;
-using testing::_;
 
 namespace Envoy {
 namespace Stats {
@@ -45,6 +51,24 @@ public:
   std::unique_ptr<MockedTestAllocator> alloc_;
   MockSink sink_;
   std::unique_ptr<ThreadLocalStoreImpl> store_;
+};
+
+class HistogramWrapper {
+public:
+  HistogramWrapper() : histogram_(hist_alloc()) {}
+
+  ~HistogramWrapper() { hist_free(histogram_); }
+
+  const histogram_t* getHistogram() { return histogram_; }
+
+  void setHistogramValues(const std::vector<uint64_t>& values) {
+    for (uint64_t value : values) {
+      hist_insert_intscale(histogram_, value, 0, 1);
+    }
+  }
+
+private:
+  histogram_t* histogram_;
 };
 
 class HistogramTest : public testing::Test {
@@ -88,15 +112,20 @@ public:
 
     std::vector<ParentHistogramSharedPtr> histogram_list = store_->histograms();
 
-    histogram_t* hist1_cumulative = makeHistogram(h1_cumulative_values_);
-    histogram_t* hist2_cumulative = makeHistogram(h2_cumulative_values_);
-    histogram_t* hist1_interval = makeHistogram(h1_interval_values_);
-    histogram_t* hist2_interval = makeHistogram(h2_interval_values_);
+    HistogramWrapper hist1_cumulative;
+    HistogramWrapper hist2_cumulative;
+    HistogramWrapper hist1_interval;
+    HistogramWrapper hist2_interval;
 
-    HistogramStatisticsImpl h1_cumulative_statistics(hist1_cumulative);
-    HistogramStatisticsImpl h2_cumulative_statistics(hist2_cumulative);
-    HistogramStatisticsImpl h1_interval_statistics(hist1_interval);
-    HistogramStatisticsImpl h2_interval_statistics(hist2_interval);
+    hist1_cumulative.setHistogramValues(h1_cumulative_values_);
+    hist2_cumulative.setHistogramValues(h2_cumulative_values_);
+    hist1_interval.setHistogramValues(h1_interval_values_);
+    hist2_interval.setHistogramValues(h2_interval_values_);
+
+    HistogramStatisticsImpl h1_cumulative_statistics(hist1_cumulative.getHistogram());
+    HistogramStatisticsImpl h2_cumulative_statistics(hist2_cumulative.getHistogram());
+    HistogramStatisticsImpl h1_interval_statistics(hist1_interval.getHistogram());
+    HistogramStatisticsImpl h2_interval_statistics(hist2_interval.getHistogram());
 
     NameHistogramMap name_histogram_map = makeHistogramMap(histogram_list);
     const ParentHistogramSharedPtr& h1 = name_histogram_map["h1"];
@@ -108,11 +137,6 @@ public:
       EXPECT_EQ(h2->cumulativeStatistics().summary(), h2_cumulative_statistics.summary());
       EXPECT_EQ(h2->intervalStatistics().summary(), h2_interval_statistics.summary());
     }
-
-    hist_free(hist1_cumulative);
-    hist_free(hist2_cumulative);
-    hist_free(hist1_interval);
-    hist_free(hist2_interval);
 
     h1_interval_values_.clear();
     h2_interval_values_.clear();
@@ -131,14 +155,6 @@ public:
       h2_cumulative_values_.push_back(record_value);
       h2_interval_values_.push_back(record_value);
     }
-  }
-
-  histogram_t* makeHistogram(const std::vector<uint64_t>& values) {
-    histogram_t* histogram = hist_alloc();
-    for (uint64_t value : values) {
-      hist_insert_intscale(histogram, value, 0, 1);
-    }
-    return histogram;
   }
 
   MOCK_METHOD1(alloc, RawStatData*(const std::string& name));
@@ -174,10 +190,10 @@ TEST_F(StatsThreadLocalStoreTest, NoTls) {
   store_->deliverHistogramToSinks(h1, 100);
 
   EXPECT_EQ(2UL, store_->counters().size());
-  EXPECT_EQ(&c1, store_->counters().front().get());
-  EXPECT_EQ(2L, store_->counters().front().use_count());
+  EXPECT_EQ(&c1, TestUtility::findCounter(*store_, "c1").get());
+  EXPECT_EQ(2L, TestUtility::findCounter(*store_, "c1").use_count());
   EXPECT_EQ(1UL, store_->gauges().size());
-  EXPECT_EQ(&g1, store_->gauges().front().get());
+  EXPECT_EQ(&g1, store_->gauges().front().get()); // front() ok when size()==1
   EXPECT_EQ(2L, store_->gauges().front().use_count());
 
   // Includes overflow stat.
@@ -202,20 +218,20 @@ TEST_F(StatsThreadLocalStoreTest, Tls) {
   EXPECT_EQ(&h1, &store_->histogram("h1"));
 
   EXPECT_EQ(2UL, store_->counters().size());
-  EXPECT_EQ(&c1, store_->counters().front().get());
-  EXPECT_EQ(3L, store_->counters().front().use_count());
+  EXPECT_EQ(&c1, TestUtility::findCounter(*store_, "c1").get());
+  EXPECT_EQ(3L, TestUtility::findCounter(*store_, "c1").use_count());
   EXPECT_EQ(1UL, store_->gauges().size());
-  EXPECT_EQ(&g1, store_->gauges().front().get());
+  EXPECT_EQ(&g1, store_->gauges().front().get()); // front() ok when size()==1
   EXPECT_EQ(3L, store_->gauges().front().use_count());
 
   store_->shutdownThreading();
   tls_.shutdownThread();
 
   EXPECT_EQ(2UL, store_->counters().size());
-  EXPECT_EQ(&c1, store_->counters().front().get());
-  EXPECT_EQ(2L, store_->counters().front().use_count());
+  EXPECT_EQ(&c1, TestUtility::findCounter(*store_, "c1").get());
+  EXPECT_EQ(2L, TestUtility::findCounter(*store_, "c1").use_count());
   EXPECT_EQ(1UL, store_->gauges().size());
-  EXPECT_EQ(&g1, store_->gauges().front().get());
+  EXPECT_EQ(&g1, store_->gauges().front().get()); // front() ok when size()==1
   EXPECT_EQ(2L, store_->gauges().front().use_count());
 
   // Includes overflow stat.
@@ -281,9 +297,9 @@ TEST_F(StatsThreadLocalStoreTest, ScopeDelete) {
   EXPECT_CALL(*alloc_, alloc(_));
   scope1->counter("c1");
   EXPECT_EQ(2UL, store_->counters().size());
-  CounterSharedPtr c1 = store_->counters().front();
+  CounterSharedPtr c1 = TestUtility::findCounter(*store_, "scope1.c1");
   EXPECT_EQ("scope1.c1", c1->name());
-  EXPECT_EQ(store_->source().cachedCounters().front(), c1);
+  EXPECT_EQ(TestUtility::findByName(store_->source().cachedCounters(), "scope1.c1"), c1);
 
   EXPECT_CALL(main_thread_dispatcher_, post(_));
   EXPECT_CALL(tls_, runOnAllThreads(_));
@@ -450,6 +466,154 @@ TEST_F(StatsThreadLocalStoreTest, HotRestartTruncation) {
   EXPECT_CALL(*alloc_, free(_)).Times(2);
 }
 
+class StatsMatcherTLSTest : public StatsThreadLocalStoreTest {
+public:
+  StatsMatcherTLSTest() : StatsThreadLocalStoreTest() {}
+  envoy::config::metrics::v2::StatsConfig stats_config_;
+};
+
+TEST_F(StatsMatcherTLSTest, TestNoOpStatImpls) {
+  InSequence s;
+
+  EXPECT_CALL(*alloc_, alloc(_)).Times(0);
+
+  stats_config_.mutable_stats_matcher()->mutable_exclusion_list()->add_patterns()->set_prefix(
+      "noop");
+  store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config_));
+
+  // Testing No-op counters, gauges, histograms which match the prefix "noop".
+
+  // Counter
+  Counter& noop_counter = store_->counter("noop_counter");
+  EXPECT_EQ(noop_counter.name(), "");
+  EXPECT_EQ(noop_counter.value(), 0);
+  noop_counter.add(1);
+  EXPECT_EQ(noop_counter.value(), 0);
+  noop_counter.inc();
+  EXPECT_EQ(noop_counter.value(), 0);
+  noop_counter.reset();
+  EXPECT_EQ(noop_counter.value(), 0);
+  Counter& noop_counter_2 = store_->counter("noop_counter_2");
+  EXPECT_EQ(&noop_counter, &noop_counter_2);
+
+  // Gauge
+  Gauge& noop_gauge = store_->gauge("noop_gauge");
+  EXPECT_EQ(noop_gauge.name(), "");
+  EXPECT_EQ(noop_gauge.value(), 0);
+  noop_gauge.add(1);
+  EXPECT_EQ(noop_gauge.value(), 0);
+  noop_gauge.inc();
+  EXPECT_EQ(noop_gauge.value(), 0);
+  noop_gauge.dec();
+  EXPECT_EQ(noop_gauge.value(), 0);
+  noop_gauge.set(2);
+  EXPECT_EQ(noop_gauge.value(), 0);
+  noop_gauge.sub(2);
+  EXPECT_EQ(noop_gauge.value(), 0);
+  Gauge& noop_gauge_2 = store_->gauge("noop_gauge_2");
+  EXPECT_EQ(&noop_gauge, &noop_gauge_2);
+
+  // Histogram
+  Histogram& noop_histogram = store_->histogram("noop_histogram");
+  EXPECT_EQ(noop_histogram.name(), "");
+  Histogram& noop_histogram_2 = store_->histogram("noop_histogram_2");
+  EXPECT_EQ(&noop_histogram, &noop_histogram_2);
+
+  // Includes overflow stat.
+  EXPECT_CALL(*alloc_, free(_)).Times(1);
+
+  store_->shutdownThreading();
+}
+
+// We only test the exclusion list -- the inclusion list is the inverse, and both are tested in
+// test/common/stats:stats_matcher_test.
+TEST_F(StatsMatcherTLSTest, TestExclusionRegex) {
+  InSequence s;
+
+  // Expected to alloc lowercase_counter, lowercase_gauge, valid_counter, valid_gauge
+  EXPECT_CALL(*alloc_, alloc(_)).Times(4);
+
+  // Will block all stats containing any capital alphanumeric letter.
+  stats_config_.mutable_stats_matcher()->mutable_exclusion_list()->add_patterns()->set_regex(
+      ".*[A-Z].*");
+  store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config_));
+
+  // The creation of counters/gauges/histograms which have no uppercase letters should succeed.
+  Counter& lowercase_counter = store_->counter("lowercase_counter");
+  EXPECT_EQ(lowercase_counter.name(), "lowercase_counter");
+  Gauge& lowercase_gauge = store_->gauge("lowercase_gauge");
+  EXPECT_EQ(lowercase_gauge.name(), "lowercase_gauge");
+  Histogram& lowercase_histogram = store_->histogram("lowercase_histogram");
+  EXPECT_EQ(lowercase_histogram.name(), "lowercase_histogram");
+
+  // And the creation of counters/gauges/histograms which have uppercase letters should fail.
+  Counter& uppercase_counter = store_->counter("UPPERCASE_counter");
+  EXPECT_EQ(uppercase_counter.name(), "");
+  uppercase_counter.inc();
+  EXPECT_EQ(uppercase_counter.value(), 0);
+  uppercase_counter.inc();
+  EXPECT_EQ(uppercase_counter.value(), 0);
+
+  Gauge& uppercase_gauge = store_->gauge("uppercase_GAUGE");
+  EXPECT_EQ(uppercase_gauge.name(), "");
+  uppercase_gauge.inc();
+  EXPECT_EQ(uppercase_gauge.value(), 0);
+  uppercase_gauge.inc();
+  EXPECT_EQ(uppercase_gauge.value(), 0);
+
+  // Histograms are harder to query and test, so we resort to testing that name() returns the empty
+  // string.
+  Histogram& uppercase_histogram = store_->histogram("upperCASE_histogram");
+  EXPECT_EQ(uppercase_histogram.name(), "");
+
+  // Adding another exclusion rule -- now we reject not just uppercase stats but those starting with
+  // the string "invalid".
+  stats_config_.mutable_stats_matcher()->mutable_exclusion_list()->add_patterns()->set_prefix(
+      "invalid");
+  store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config_));
+
+  Counter& valid_counter = store_->counter("valid_counter");
+  valid_counter.inc();
+  EXPECT_EQ(valid_counter.value(), 1);
+
+  Counter& invalid_counter = store_->counter("invalid_counter");
+  invalid_counter.inc();
+  EXPECT_EQ(invalid_counter.value(), 0);
+
+  // But the old exclusion rule still holds.
+  Counter& invalid_counter_2 = store_->counter("also_INVALID_counter");
+  invalid_counter_2.inc();
+  EXPECT_EQ(invalid_counter_2.value(), 0);
+
+  // And we expect the same behavior from gauges and histograms.
+  Gauge& valid_gauge = store_->gauge("valid_gauge");
+  valid_gauge.set(2);
+  EXPECT_EQ(valid_gauge.value(), 2);
+
+  Gauge& invalid_gauge_1 = store_->gauge("invalid_gauge");
+  invalid_gauge_1.inc();
+  EXPECT_EQ(invalid_gauge_1.value(), 0);
+
+  Gauge& invalid_gauge_2 = store_->gauge("also_INVALID_gauge");
+  invalid_gauge_2.inc();
+  EXPECT_EQ(invalid_gauge_2.value(), 0);
+
+  Histogram& valid_histogram = store_->histogram("valid_histogram");
+  EXPECT_EQ(valid_histogram.name(), "valid_histogram");
+
+  Histogram& invalid_histogram_1 = store_->histogram("invalid_histogram");
+  EXPECT_EQ(invalid_histogram_1.name(), "");
+
+  Histogram& invalid_histogram_2 = store_->histogram("also_INVALID_histogram");
+  EXPECT_EQ(invalid_histogram_2.name(), "");
+
+  // Expected to free lowercase_counter, lowercase_gauge, valid_counter,
+  // valid_gauge, overflow.stats
+  EXPECT_CALL(*alloc_, free(_)).Times(5);
+
+  store_->shutdownThreading();
+}
+
 class HeapStatsThreadLocalStoreTest : public StatsThreadLocalStoreTest {
 public:
   void SetUp() override {
@@ -458,11 +622,43 @@ public:
     // sets up a thread_local_store with raw stat alloc.
   }
   void TearDown() override {
+    store_->shutdownThreading();
+    tls_.shutdownThread();
     store_.reset(); // delete before the allocator.
   }
 
   HeapStatDataAllocator heap_alloc_;
 };
+
+TEST_F(HeapStatsThreadLocalStoreTest, RemoveRejectedStats) {
+  Counter& counter = store_->counter("c1");
+  Gauge& gauge = store_->gauge("g1");
+  Histogram& histogram = store_->histogram("h1");
+  ASSERT_EQ(2, store_->counters().size()); // "stats.overflow" and "c1".
+  EXPECT_TRUE(&counter == store_->counters()[0].get() ||
+              &counter == store_->counters()[1].get()); // counters() order is non-deterministic.
+  ASSERT_EQ(1, store_->gauges().size());
+  EXPECT_EQ("g1", store_->gauges()[0]->name());
+  ASSERT_EQ(1, store_->histograms().size());
+  EXPECT_EQ("h1", store_->histograms()[0]->name());
+
+  // Will effectively block all stats, and remove all the non-matching stats.
+  envoy::config::metrics::v2::StatsConfig stats_config;
+  stats_config.mutable_stats_matcher()->mutable_inclusion_list()->add_patterns()->set_exact(
+      "no-such-stat");
+  store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config));
+
+  // They can no longer be found.
+  EXPECT_EQ(0, store_->counters().size());
+  EXPECT_EQ(0, store_->gauges().size());
+  EXPECT_EQ(0, store_->histograms().size());
+
+  // However, referencing the previously allocated stats will not crash.
+  counter.inc();
+  gauge.inc();
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(histogram), 42));
+  histogram.recordValue(42);
+}
 
 TEST_F(HeapStatsThreadLocalStoreTest, NonHotRestartNoTruncation) {
   InSequence s;
@@ -477,9 +673,52 @@ TEST_F(HeapStatsThreadLocalStoreTest, NonHotRestartNoTruncation) {
   // This works fine, and we can find it by its long name because heap-stats do not
   // get truncsated.
   EXPECT_NE(nullptr, TestUtility::findCounter(*store_, name_1).get());
+}
 
-  store_->shutdownThreading();
-  tls_.shutdownThread();
+// Tests how much memory is consumed allocating 100k stats.
+TEST_F(HeapStatsThreadLocalStoreTest, MemoryWithoutTls) {
+  if (!TestUtil::hasDeterministicMallocStats()) {
+    return;
+  }
+
+  // Use a tag producer that will produce tags.
+  envoy::config::metrics::v2::StatsConfig stats_config;
+  store_->setTagProducer(std::make_unique<TagProducerImpl>(stats_config));
+
+  const size_t million = 1000 * 1000;
+  const size_t start_mem = Memory::Stats::totalCurrentlyAllocated();
+  if (start_mem == 0) {
+    // Skip this test for platforms where we can't measure memory.
+    return;
+  }
+  TestUtil::forEachSampleStat(
+      1000, [this](absl::string_view name) { store_->counter(std::string(name)); });
+  const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
+  EXPECT_LT(start_mem, end_mem);
+  EXPECT_LT(end_mem - start_mem, 28 * million); // actual value: 27203216 as of Oct 29, 2018
+}
+
+TEST_F(HeapStatsThreadLocalStoreTest, MemoryWithTls) {
+  if (!TestUtil::hasDeterministicMallocStats()) {
+    return;
+  }
+
+  // Use a tag producer that will produce tags.
+  envoy::config::metrics::v2::StatsConfig stats_config;
+  store_->setTagProducer(std::make_unique<TagProducerImpl>(stats_config));
+
+  const size_t million = 1000 * 1000;
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+  const size_t start_mem = Memory::Stats::totalCurrentlyAllocated();
+  if (start_mem == 0) {
+    // Skip this test for platforms where we can't measure memory.
+    return;
+  }
+  TestUtil::forEachSampleStat(
+      1000, [this](absl::string_view name) { store_->counter(std::string(name)); });
+  const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
+  EXPECT_LT(start_mem, end_mem);
+  EXPECT_LT(end_mem - start_mem, 31 * million); // actual value: 30482576 as of Oct 29, 2018
 }
 
 TEST_F(StatsThreadLocalStoreTest, ShuttingDown) {
@@ -610,9 +849,9 @@ TEST_F(HistogramTest, BasicHistogramSummaryValidate) {
 
   const std::string h1_expected_summary =
       "P0: 1, P25: 1.025, P50: 1.05, P75: 1.075, P90: 1.09, P95: 1.095, "
-      "P99: 1.099, P99.9: 1.0999, P100: 1.1";
-  const std::string h2_expected_summary =
-      "P0: 0, P25: 25, P50: 50, P75: 75, P90: 90, P95: 95, P99: 99, P99.9: 99.9, P100: 100";
+      "P99: 1.099, P99.5: 1.0995, P99.9: 1.0999, P100: 1.1";
+  const std::string h2_expected_summary = "P0: 0, P25: 25, P50: 50, P75: 75, P90: 90, P95: 95, "
+                                          "P99: 99, P99.5: 99.5, P99.9: 99.9, P100: 100";
 
   for (size_t i = 0; i < 100; ++i) {
     expectCallAndAccumulate(h2, i);
@@ -639,8 +878,8 @@ TEST_F(HistogramTest, BasicHistogramMergeSummary) {
   }
   EXPECT_EQ(1, validateMerge());
 
-  const std::string expected_summary =
-      "P0: 0, P25: 25, P50: 50, P75: 75, P90: 90, P95: 95, P99: 99, P99.9: 99.9, P100: 100";
+  const std::string expected_summary = "P0: 0, P25: 25, P50: 50, P75: 75, P90: 90, P95: 95, P99: "
+                                       "99, P99.5: 99.5, P99.9: 99.9, P100: 100";
 
   NameHistogramMap name_histogram_map = makeHistogramMap(store_->histograms());
   EXPECT_EQ(expected_summary, name_histogram_map["h1"]->cumulativeStatistics().summary());
@@ -675,6 +914,58 @@ TEST_F(HistogramTest, BasicHistogramUsed) {
   for (const ParentHistogramSharedPtr& histogram : store_->histograms()) {
     EXPECT_TRUE(histogram->used());
   }
+}
+
+class TruncatingAllocTest : public HeapStatsThreadLocalStoreTest {
+protected:
+  TruncatingAllocTest() : test_alloc_(options_), long_name_(options_.maxNameLength() + 1, 'A') {}
+
+  void SetUp() override {
+    store_ = std::make_unique<ThreadLocalStoreImpl>(options_, test_alloc_);
+    // Do not call superclass SetUp.
+  }
+
+  TestAllocator test_alloc_;
+  std::string long_name_;
+};
+
+TEST_F(TruncatingAllocTest, CounterNotTruncated) {
+  EXPECT_NO_LOGS({
+    Counter& counter = store_->counter("simple");
+    EXPECT_EQ(&counter, &store_->counter("simple"));
+  });
+}
+
+TEST_F(TruncatingAllocTest, GaugeNotTruncated) {
+  EXPECT_NO_LOGS({
+    Gauge& gauge = store_->gauge("simple");
+    EXPECT_EQ(&gauge, &store_->gauge("simple"));
+  });
+}
+
+TEST_F(TruncatingAllocTest, CounterTruncated) {
+  Counter* counter = nullptr;
+  EXPECT_LOG_CONTAINS("warning", "is too long with", {
+    Counter& c = store_->counter(long_name_);
+    counter = &c;
+  });
+  EXPECT_NO_LOGS(EXPECT_EQ(counter, &store_->counter(long_name_)));
+}
+
+TEST_F(TruncatingAllocTest, GaugeTruncated) {
+  Gauge* gauge = nullptr;
+  EXPECT_LOG_CONTAINS("warning", "is too long with", {
+    Gauge& g = store_->gauge(long_name_);
+    gauge = &g;
+  });
+  EXPECT_NO_LOGS(EXPECT_EQ(gauge, &store_->gauge(long_name_)));
+}
+
+TEST_F(TruncatingAllocTest, HistogramWithLongNameNotTruncated) {
+  EXPECT_NO_LOGS({
+    Histogram& histogram = store_->histogram(long_name_);
+    EXPECT_EQ(&histogram, &store_->histogram(long_name_));
+  });
 }
 
 } // namespace Stats

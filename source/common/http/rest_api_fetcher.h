@@ -18,7 +18,8 @@ class RestApiFetcher : public Http::AsyncClient::Callbacks {
 protected:
   RestApiFetcher(Upstream::ClusterManager& cm, const std::string& remote_cluster_name,
                  Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
-                 std::chrono::milliseconds refresh_interval);
+                 std::chrono::milliseconds refresh_interval,
+                 std::chrono::milliseconds request_timeout);
   ~RestApiFetcher();
 
   /**
@@ -63,6 +64,7 @@ private:
 
   Runtime::RandomGenerator& random_;
   const std::chrono::milliseconds refresh_interval_;
+  const std::chrono::milliseconds request_timeout_;
   Event::TimerPtr refresh_timer_;
   Http::AsyncClient::Request* active_request_{};
 };

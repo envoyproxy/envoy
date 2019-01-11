@@ -255,7 +255,9 @@ TEST(MongoFilterConfigTest, CorrectFaultConfiguration) {
 TEST(MongoFilterConfigTest, CorrectFaultConfigurationInProto) {
   envoy::config::filter::network::mongo_proxy::v2::MongoProxy config{};
   config.set_stat_prefix("my_stat_prefix");
-  config.mutable_delay()->set_percent(50);
+  config.mutable_delay()->mutable_percentage()->set_numerator(50);
+  config.mutable_delay()->mutable_percentage()->set_denominator(
+      envoy::type::FractionalPercent::HUNDRED);
   config.mutable_delay()->mutable_fixed_delay()->set_seconds(500);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;

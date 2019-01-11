@@ -2,7 +2,7 @@
 
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/json/json_object.h"
-#include "envoy/stats/stats.h"
+#include "envoy/stats/stats_options.h"
 
 namespace Envoy {
 namespace Config {

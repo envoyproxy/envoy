@@ -9,6 +9,7 @@ namespace Server {
 
 /**
  * Implementation of Init::Manager for use during post cluster manager init / pre listening.
+ * TODO(JimmyCYJ): Move InitManagerImpl into a new subdirectory in source/ called init/.
  */
 class InitManagerImpl : public Init::Manager {
 public:
@@ -16,10 +17,9 @@ public:
 
   // Init::Manager
   void registerTarget(Init::Target& target) override;
+  State state() const override { return state_; }
 
 private:
-  enum class State { NotInitialized, Initializing, Initialized };
-
   void initializeTarget(Init::Target& target);
 
   std::list<Init::Target*> targets_;

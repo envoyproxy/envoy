@@ -176,7 +176,7 @@ void HeaderToMetadataFilter::writeHeaderToMetadata(Http::HeaderMap& headers,
   // Any matching rules?
   if (structs_by_namespace.size() > 0) {
     for (auto const& entry : structs_by_namespace) {
-      callbacks.requestInfo().setDynamicMetadata(entry.first, entry.second);
+      callbacks.streamInfo().setDynamicMetadata(entry.first, entry.second);
     }
   }
 }

@@ -16,7 +16,7 @@ proto payload in all methods. We discuss each type of subscription below.
 The simplest approach to delivering dynamic configuration is to place it at a
 well known path specified in the
 [`ConfigSource`](https://www.envoyproxy.io/docs/envoy/latest/api-v2/api/v2/core/config_source.proto#core-configsource).
-Envoy will use `inotify` (`kqueue` on Mac OS X) to monitor the file for changes
+Envoy will use `inotify` (`kqueue` on macOS) to monitor the file for changes
 and parse the `DiscoveryResponse` proto in the file on update. Binary
 protobufs, JSON, YAML and proto text are supported formats for the
 `DiscoveryResponse`.
@@ -47,6 +47,7 @@ correspondence between an xDS API and a resource type. That is:
 * [RDS: `envoy.api.v2.RouteConfiguration`](envoy/api/v2/rds.proto)
 * [CDS: `envoy.api.v2.Cluster`](envoy/api/v2/cds.proto)
 * [EDS: `envoy.api.v2.ClusterLoadAssignment`](envoy/api/v2/eds.proto)
+* [SDS: `envoy.api.v2.Auth.Secret`](envoy/api/v2/auth/cert.proto)
 
 The concept of [_type
 URLs_](https://developers.google.com/protocol-buffers/docs/proto3#any) appears
@@ -236,10 +237,10 @@ xDS updates can be pushed independently if no new clusters/routes/listeners
 are added or if it's acceptable to temporarily drop traffic during
 updates. Note that in case of LDS updates, the listeners will be warmed
 before they receive traffic, i.e. the dependent routes are fetched through
-RDS if configured. On the other hand, clusters are not warmed when
-adding/removing/updating clusters. Similarly, routes are not warmed --
-i.e., the management plane must ensure that clusters referenced by a route
-are in place, before pushing the updates for a rotue.
+RDS if configured. Clusters are warmed when adding/removing/updating
+clusters. On the other hand, routes are not warmed, i.e., the management
+plane must ensure that clusters referenced by a route are in place, before
+pushing the updates for a route.
 
 ### Aggregated Discovery Services (ADS)
 

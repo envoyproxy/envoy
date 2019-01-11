@@ -1,10 +1,14 @@
+licenses(["notice"])  # Apache 2
+
 cc_library(
     name = "fmtlib",
-    hdrs = glob([
+    srcs = glob([
         "fmt/*.cc",
-        "fmt/*.h",
+    ]),
+    hdrs = glob([
+        "include/fmt/*.h",
     ]),
     defines = ["FMT_HEADER_ONLY"],
-    includes = ["."],
+    includes = ["include"],
     visibility = ["//visibility:public"],
 )

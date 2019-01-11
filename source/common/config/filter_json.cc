@@ -1,6 +1,7 @@
 #include "common/config/filter_json.h"
 
 #include "envoy/config/accesslog/v2/file.pb.h"
+#include "envoy/stats/stats_options.h"
 
 #include "common/common/assert.h"
 #include "common/common/utility.h"
@@ -158,10 +159,10 @@ void FilterJson::translateHttpConnectionManager(
     // Translate v1 name to v2 name.
     filter->set_name(Extensions::HttpFilters::HttpFilterNames::get().v1_converter_.getV2Name(
         json_filter->getString("name")));
-    JSON_UTIL_SET_STRING(*json_filter, *filter->mutable_deprecated_v1(), type);
 
-    const std::string deprecated_config = "{\"deprecated_v1\": true, \"value\": " +
-                                          json_filter->getObject("config")->asJsonString() + "}";
+    const std::string deprecated_config =
+        "{\"deprecated_v1\": true, \"value\": " + json_filter->getObject("config")->asJsonString() +
+        "}";
 
     const auto status =
         Protobuf::util::JsonStringToMessage(deprecated_config, filter->mutable_config());
@@ -251,9 +252,11 @@ void FilterJson::translateMongoProxy(
   if (json_config.hasObject("fault")) {
     const auto json_fault = json_config.getObject("fault")->getObject("fixed_delay");
     auto* delay = proto_config.mutable_delay();
+    auto* percentage = delay->mutable_percentage();
 
     delay->set_type(envoy::config::filter::fault::v2::FaultDelay::FIXED);
-    delay->set_percent(static_cast<uint32_t>(json_fault->getInteger("percent")));
+    percentage->set_numerator(static_cast<uint32_t>(json_fault->getInteger("percent")));
+    percentage->set_denominator(envoy::type::FractionalPercent::HUNDRED);
     JSON_UTIL_SET_DURATION_FROM_FIELD(*json_fault, *delay, fixed_delay, duration);
   }
 }
@@ -268,7 +271,10 @@ void FilterJson::translateFaultFilter(
 
   if (!json_config_abort->empty()) {
     auto* abort_fault = proto_config.mutable_abort();
-    abort_fault->set_percent(static_cast<uint32_t>(json_config_abort->getInteger("abort_percent")));
+    auto* percentage = abort_fault->mutable_percentage();
+    percentage->set_numerator(
+        static_cast<uint32_t>(json_config_abort->getInteger("abort_percent")));
+    percentage->set_denominator(envoy::type::FractionalPercent::HUNDRED);
 
     // TODO(mattklein123): Throw error if invalid return code is provided
     abort_fault->set_http_status(
@@ -277,8 +283,11 @@ void FilterJson::translateFaultFilter(
 
   if (!json_config_delay->empty()) {
     auto* delay = proto_config.mutable_delay();
+    auto* percentage = delay->mutable_percentage();
     delay->set_type(envoy::config::filter::fault::v2::FaultDelay::FIXED);
-    delay->set_percent(static_cast<uint32_t>(json_config_delay->getInteger("fixed_delay_percent")));
+    percentage->set_numerator(
+        static_cast<uint32_t>(json_config_delay->getInteger("fixed_delay_percent")));
+    percentage->set_denominator(envoy::type::FractionalPercent::HUNDRED);
     JSON_UTIL_SET_DURATION_FROM_FIELD(*json_config_delay, *delay, fixed_delay, fixed_duration);
   }
 
@@ -361,7 +370,6 @@ void FilterJson::translateBufferFilter(
   json_config.validateSchema(Json::Schema::BUFFER_HTTP_FILTER_SCHEMA);
 
   JSON_UTIL_SET_INTEGER(json_config, proto_config, max_request_bytes);
-  JSON_UTIL_SET_DURATION_SECONDS(json_config, proto_config, max_request_time);
 }
 
 void FilterJson::translateLuaFilter(const Json::Object& json_config,

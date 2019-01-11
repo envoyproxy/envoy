@@ -5,6 +5,7 @@ External Authorization
 
 * External authorization :ref:`architecture overview <arch_overview_ext_authz>`
 * :ref:`Network filter v2 API reference <envoy_api_msg_config.filter.network.ext_authz.v2.ExtAuthz>`
+* This filter should be configured with the name *envoy.ext_authz*.
 
 The external authorization network filter calls an external authorization service to check if the
 incoming request is authorized or not. If the request is deemed unauthorized by the network filter
@@ -55,7 +56,7 @@ The network filter outputs statistics in the *config.ext_authz.* namespace.
   total, Counter, Total responses from the filter.
   error, Counter, Total errors contacting the external service.
   denied, Counter, Total responses from the authorizations service that were to deny the traffic. 
-  failure_mode_allow, Counter, "Total requests that were error(s) but were allowed through
+  failure_mode_allowed, Counter, "Total requests that were error(s) but were allowed through
   because of failure_mode_allow set to true."
   ok, Counter, Total responses from the authorization service that were to allow the traffic.
   cx_closed, Counter, Total connections that were closed.

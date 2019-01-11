@@ -52,7 +52,6 @@ Http::FilterFactoryCb HealthCheckFilterConfig::createFilterFactoryFromProtoTyped
     callbacks.addStreamFilter(std::make_shared<HealthCheckFilter>(context, pass_through_mode,
                                                                   cache_manager, header_match_data,
                                                                   cluster_min_healthy_percentages));
-
   };
 }
 

@@ -10,3 +10,4 @@ Extensions
   rbac/rbac
   health_checker/health_checker
   transport_socket/transport_socket
+  resource_monitor/resource_monitor

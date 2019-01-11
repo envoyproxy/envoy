@@ -20,6 +20,7 @@
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
 
+#include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 
 namespace Envoy {
@@ -30,14 +31,9 @@ void Utility::appendXff(HeaderMap& headers, const Network::Address::Instance& re
     return;
   }
 
-  // TODO(alyssawilk) move over to the append utility.
   HeaderString& header = headers.insertForwardedFor().value();
-  if (!header.empty()) {
-    header.append(", ", 2);
-  }
-
   const std::string& address_as_string = remote_address.ip()->addressAsString();
-  header.append(address_as_string.c_str(), address_as_string.size());
+  HeaderMapImpl::appendToHeader(header, address_as_string.c_str());
 }
 
 void Utility::appendVia(HeaderMap& headers, const std::string& via) {
@@ -197,7 +193,6 @@ uint64_t Utility::getResponseStatus(const HeaderMap& headers) {
   if (!header || !StringUtil::atoul(headers.Status()->value().c_str(), response_code)) {
     throw CodecClientException(":status must be specified and a valid unsigned long");
   }
-
   return response_code;
 }
 
@@ -209,10 +204,16 @@ bool Utility::isUpgrade(const HeaderMap& headers) {
                                            Http::Headers::get().ConnectionValues.Upgrade.c_str()));
 }
 
+bool Utility::isH2UpgradeRequest(const HeaderMap& headers) {
+  return headers.Method() &&
+         headers.Method()->value().c_str() == Http::Headers::get().MethodValues.Connect &&
+         headers.Protocol() && !headers.Protocol()->value().empty();
+}
+
 bool Utility::isWebSocketUpgradeRequest(const HeaderMap& headers) {
-  return (isUpgrade(headers) && (0 == StringUtil::caseInsensitiveCompare(
-                                          headers.Upgrade()->value().c_str(),
-                                          Http::Headers::get().UpgradeValues.WebSocket.c_str())));
+  return (isUpgrade(headers) &&
+          absl::EqualsIgnoreCase(headers.Upgrade()->value().getStringView(),
+                                 Http::Headers::get().UpgradeValues.WebSocket));
 }
 
 Http2Settings
@@ -227,6 +228,8 @@ Utility::parseHttp2Settings(const envoy::api::v2::core::Http2ProtocolOptions& co
   ret.initial_connection_window_size_ =
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, initial_connection_window_size,
                                       Http::Http2Settings::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE);
+  ret.allow_connect_ = config.allow_connect();
+  ret.allow_metadata_ = config.allow_metadata();
   return ret;
 }
 
@@ -240,8 +243,9 @@ Utility::parseHttp1Settings(const envoy::api::v2::core::Http1ProtocolOptions& co
 }
 
 void Utility::sendLocalReply(bool is_grpc, StreamDecoderFilterCallbacks& callbacks,
-                             const bool& is_reset, Code response_code,
-                             const std::string& body_text) {
+                             const bool& is_reset, Code response_code, absl::string_view body_text,
+                             const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                             bool is_head_request) {
   sendLocalReply(is_grpc,
                  [&](HeaderMapPtr&& headers, bool end_stream) -> void {
                    callbacks.encodeHeaders(std::move(headers), end_stream);
@@ -249,13 +253,14 @@ void Utility::sendLocalReply(bool is_grpc, StreamDecoderFilterCallbacks& callbac
                  [&](Buffer::Instance& data, bool end_stream) -> void {
                    callbacks.encodeData(data, end_stream);
                  },
-                 is_reset, response_code, body_text);
+                 is_reset, response_code, body_text, grpc_status, is_head_request);
 }
 
 void Utility::sendLocalReply(
     bool is_grpc, std::function<void(HeaderMapPtr&& headers, bool end_stream)> encode_headers,
     std::function<void(Buffer::Instance& data, bool end_stream)> encode_data, const bool& is_reset,
-    Code response_code, const std::string& body_text) {
+    Code response_code, absl::string_view body_text,
+    const absl::optional<Grpc::Status::GrpcStatus> grpc_status, bool is_head_request) {
   // encode_headers() may reset the stream, so the stream must not be reset before calling it.
   ASSERT(!is_reset);
   // Respond with a gRPC trailers-only response if the request is gRPC
@@ -264,8 +269,10 @@ void Utility::sendLocalReply(
         {Headers::get().Status, std::to_string(enumToInt(Code::OK))},
         {Headers::get().ContentType, Headers::get().ContentTypeValues.Grpc},
         {Headers::get().GrpcStatus,
-         std::to_string(enumToInt(Grpc::Utility::httpToGrpcStatus(enumToInt(response_code))))}}};
-    if (!body_text.empty()) {
+         std::to_string(
+             enumToInt(grpc_status ? grpc_status.value()
+                                   : Grpc::Utility::httpToGrpcStatus(enumToInt(response_code))))}}};
+    if (!body_text.empty() && !is_head_request) {
       // TODO: GrpcMessage should be percent-encoded
       response_headers->insertGrpcMessage().value(body_text);
     }
@@ -279,6 +286,12 @@ void Utility::sendLocalReply(
     response_headers->insertContentLength().value(body_text.size());
     response_headers->insertContentType().value(Headers::get().ContentTypeValues.Text);
   }
+
+  if (is_head_request) {
+    encode_headers(std::move(response_headers), true);
+    return;
+  }
+
   encode_headers(std::move(response_headers), body_text.empty());
   // encode_headers()) may have changed the referenced is_reset so we need to test it
   if (!body_text.empty() && !is_reset) {
@@ -295,10 +308,10 @@ Utility::getLastAddressFromXFF(const Http::HeaderMap& request_headers, uint32_t 
   }
 
   absl::string_view xff_string(xff_header->value().c_str(), xff_header->value().size());
-  static const std::string seperator(",");
+  static const std::string separator(",");
   // Ignore the last num_to_skip addresses at the end of XFF.
   for (uint32_t i = 0; i < num_to_skip; i++) {
-    std::string::size_type last_comma = xff_string.rfind(seperator);
+    std::string::size_type last_comma = xff_string.rfind(separator);
     if (last_comma == std::string::npos) {
       return {nullptr, false};
     }
@@ -306,9 +319,9 @@ Utility::getLastAddressFromXFF(const Http::HeaderMap& request_headers, uint32_t 
   }
   // The text after the last remaining comma, or the entirety of the string if there
   // is no comma, is the requested IP address.
-  std::string::size_type last_comma = xff_string.rfind(seperator);
-  if (last_comma != std::string::npos && last_comma + seperator.size() < xff_string.size()) {
-    xff_string = xff_string.substr(last_comma + seperator.size());
+  std::string::size_type last_comma = xff_string.rfind(separator);
+  if (last_comma != std::string::npos && last_comma + separator.size() < xff_string.size()) {
+    xff_string = xff_string.substr(last_comma + separator.size());
   }
 
   // Ignore the whitespace, since they are allowed in HTTP lists (see RFC7239#section-7.1).
@@ -390,6 +403,93 @@ std::string Utility::queryParamsToString(const QueryParams& params) {
     delim = "&";
   }
   return out;
+}
+
+void Utility::transformUpgradeRequestFromH1toH2(HeaderMap& headers) {
+  ASSERT(Utility::isUpgrade(headers));
+
+  const HeaderString& upgrade = headers.Upgrade()->value();
+  headers.insertMethod().value().setReference(Http::Headers::get().MethodValues.Connect);
+  headers.insertProtocol().value().setCopy(upgrade.c_str(), upgrade.size());
+  headers.removeUpgrade();
+  headers.removeConnection();
+  // nghttp2 rejects upgrade requests/responses with content length, so strip
+  // any unnecessary content length header.
+  if (headers.ContentLength() != nullptr &&
+      absl::string_view("0") == headers.ContentLength()->value().c_str()) {
+    headers.removeContentLength();
+  }
+}
+
+void Utility::transformUpgradeResponseFromH1toH2(HeaderMap& headers) {
+  if (getResponseStatus(headers) == 101) {
+    headers.insertStatus().value().setInteger(200);
+  }
+  headers.removeUpgrade();
+  headers.removeConnection();
+  if (headers.ContentLength() != nullptr &&
+      absl::string_view("0") == headers.ContentLength()->value().c_str()) {
+    headers.removeContentLength();
+  }
+}
+
+void Utility::transformUpgradeRequestFromH2toH1(HeaderMap& headers) {
+  ASSERT(Utility::isH2UpgradeRequest(headers));
+
+  const HeaderString& protocol = headers.Protocol()->value();
+  headers.insertMethod().value().setReference(Http::Headers::get().MethodValues.Get);
+  headers.insertUpgrade().value().setCopy(protocol.c_str(), protocol.size());
+  headers.insertConnection().value().setReference(Http::Headers::get().ConnectionValues.Upgrade);
+  headers.removeProtocol();
+}
+
+void Utility::transformUpgradeResponseFromH2toH1(HeaderMap& headers, absl::string_view upgrade) {
+  if (getResponseStatus(headers) == 200) {
+    headers.insertUpgrade().value().setCopy(upgrade.data(), upgrade.size());
+    headers.insertConnection().value().setReference(Http::Headers::get().ConnectionValues.Upgrade);
+    headers.insertStatus().value().setInteger(101);
+  }
+}
+
+const Router::RouteSpecificFilterConfig*
+Utility::resolveMostSpecificPerFilterConfigGeneric(const std::string& filter_name,
+                                                   const Router::RouteConstSharedPtr& route) {
+
+  const Router::RouteSpecificFilterConfig* maybe_filter_config{};
+  traversePerFilterConfigGeneric(
+      filter_name, route, [&maybe_filter_config](const Router::RouteSpecificFilterConfig& cfg) {
+        maybe_filter_config = &cfg;
+      });
+  return maybe_filter_config;
+}
+
+void Utility::traversePerFilterConfigGeneric(
+    const std::string& filter_name, const Router::RouteConstSharedPtr& route,
+    std::function<void(const Router::RouteSpecificFilterConfig&)> cb) {
+  if (!route) {
+    return;
+  }
+
+  const Router::RouteEntry* routeEntry = route->routeEntry();
+
+  if (routeEntry != nullptr) {
+    auto maybe_vhost_config = routeEntry->virtualHost().perFilterConfig(filter_name);
+    if (maybe_vhost_config != nullptr) {
+      cb(*maybe_vhost_config);
+    }
+  }
+
+  auto maybe_route_config = route->perFilterConfig(filter_name);
+  if (maybe_route_config != nullptr) {
+    cb(*maybe_route_config);
+  }
+
+  if (routeEntry != nullptr) {
+    auto maybe_weighted_cluster_config = routeEntry->perFilterConfig(filter_name);
+    if (maybe_weighted_cluster_config != nullptr) {
+      cb(*maybe_weighted_cluster_config);
+    }
+  }
 }
 
 } // namespace Http

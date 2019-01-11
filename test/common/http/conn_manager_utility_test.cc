@@ -18,14 +18,20 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::InSequence;
+using testing::Matcher;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
-using testing::_;
 
 namespace Envoy {
 namespace Http {
+
+class MockInternalAddressConfig : public Http::InternalAddressConfig {
+public:
+  MOCK_CONST_METHOD1(isInternalAddress, bool(const Network::Address::Instance&));
+};
 
 class MockConnectionManagerConfig : public ConnectionManagerConfig {
 public:
@@ -43,14 +49,21 @@ public:
   MOCK_METHOD0(dateProvider, DateProvider&());
   MOCK_METHOD0(drainTimeout, std::chrono::milliseconds());
   MOCK_METHOD0(filterFactory, FilterChainFactory&());
+  MOCK_METHOD0(reverseEncodeOrder, bool());
   MOCK_METHOD0(generateRequestId, bool());
   MOCK_CONST_METHOD0(idleTimeout, absl::optional<std::chrono::milliseconds>());
   MOCK_CONST_METHOD0(streamIdleTimeout, std::chrono::milliseconds());
+  MOCK_CONST_METHOD0(requestTimeout, std::chrono::milliseconds());
+  MOCK_CONST_METHOD0(delayedCloseTimeout, std::chrono::milliseconds());
   MOCK_METHOD0(routeConfigProvider, Router::RouteConfigProvider&());
   MOCK_METHOD0(serverName, const std::string&());
   MOCK_METHOD0(stats, ConnectionManagerStats&());
   MOCK_METHOD0(tracingStats, ConnectionManagerTracingStats&());
   MOCK_METHOD0(useRemoteAddress, bool());
+  const Http::InternalAddressConfig& internalAddressConfig() const override {
+    return *internal_address_config_;
+  }
+  MOCK_METHOD0(unixSocketInternal, bool());
   MOCK_CONST_METHOD0(xffNumTrustedHops, uint32_t());
   MOCK_CONST_METHOD0(skipXffAppend, bool());
   MOCK_CONST_METHOD0(via, const std::string&());
@@ -63,6 +76,9 @@ public:
   MOCK_METHOD0(listenerStats, ConnectionManagerListenerStats&());
   MOCK_CONST_METHOD0(proxy100Continue, bool());
   MOCK_CONST_METHOD0(http1Settings, const Http::Http1Settings&());
+
+  std::unique_ptr<Http::InternalAddressConfig> internal_address_config_ =
+      std::make_unique<DefaultInternalAddressConfig>();
 };
 
 class ConnectionManagerUtilityTest : public testing::Test {
@@ -88,11 +104,11 @@ public:
   // This is a convenience method used to call mutateRequestHeaders(). It is done in this
   // convoluted way to force tests to check both the final downstream address as well as whether
   // the request is internal/external, given the importance of these two pieces of data.
-  MutateRequestRet callMutateRequestHeaders(HeaderMap& headers, Protocol protocol) {
+  MutateRequestRet callMutateRequestHeaders(HeaderMap& headers, Protocol) {
     MutateRequestRet ret;
     ret.downstream_address_ =
-        ConnectionManagerUtility::mutateRequestHeaders(
-            headers, protocol, connection_, config_, route_config_, random_, runtime_, local_info_)
+        ConnectionManagerUtility::mutateRequestHeaders(headers, connection_, config_, route_config_,
+                                                       random_, runtime_, local_info_)
             ->asString();
     ret.internal_ = headers.EnvoyInternalRequest() != nullptr;
     return ret;
@@ -110,6 +126,51 @@ public:
   std::string empty_node_;
   std::string via_;
 };
+
+// Tests for ConnectionManagerUtility::determineNextProtocol.
+TEST_F(ConnectionManagerUtilityTest, DetermineNextProtocol) {
+  {
+    Network::MockConnection connection;
+    EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return("hello"));
+    Buffer::OwnedImpl data("");
+    EXPECT_EQ("hello", ConnectionManagerUtility::determineNextProtocol(connection, data));
+  }
+
+  {
+    Network::MockConnection connection;
+    EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return(""));
+    Buffer::OwnedImpl data("");
+    EXPECT_EQ("", ConnectionManagerUtility::determineNextProtocol(connection, data));
+  }
+
+  {
+    Network::MockConnection connection;
+    EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return(""));
+    Buffer::OwnedImpl data("GET / HTTP/1.1");
+    EXPECT_EQ("", ConnectionManagerUtility::determineNextProtocol(connection, data));
+  }
+
+  {
+    Network::MockConnection connection;
+    EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return(""));
+    Buffer::OwnedImpl data("PRI * HTTP/2.0\r\n");
+    EXPECT_EQ("h2", ConnectionManagerUtility::determineNextProtocol(connection, data));
+  }
+
+  {
+    Network::MockConnection connection;
+    EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return(""));
+    Buffer::OwnedImpl data("PRI * HTTP/2");
+    EXPECT_EQ("h2", ConnectionManagerUtility::determineNextProtocol(connection, data));
+  }
+
+  {
+    Network::MockConnection connection;
+    EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return(""));
+    Buffer::OwnedImpl data("PRI * HTTP/");
+    EXPECT_EQ("", ConnectionManagerUtility::determineNextProtocol(connection, data));
+  }
+}
 
 // Verify external request and XFF is set when we are using remote address and the address is
 // external.
@@ -148,6 +209,25 @@ TEST_F(ConnectionManagerUtilityTest, SkipXffAppendPassThruUseRemoteAddress) {
   EXPECT_EQ((MutateRequestRet{"12.12.12.12:0", false}),
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_STREQ("198.51.100.1", headers.ForwardedFor()->value().c_str());
+}
+
+// Verify internal request and XFF is set when we are using remote address and the address is
+// internal according to user configuration.
+TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWhenUserConfiguredRemoteAddress) {
+  auto config = std::make_unique<NiceMock<MockInternalAddressConfig>>();
+  ON_CALL(*config, isInternalAddress).WillByDefault(Return(true));
+  config_.internal_address_config_ = std::move(config);
+
+  Network::Address::Ipv4Instance local_address("10.3.2.1");
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  ON_CALL(config_, localAddress()).WillByDefault(ReturnRef(local_address));
+
+  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("12.12.12.12");
+
+  TestHeaderMapImpl headers;
+  EXPECT_EQ((MutateRequestRet{"12.12.12.12:0", true}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_EQ("12.12.12.12", headers.get_(Headers::get().ForwardedFor));
 }
 
 // Verify internal request and XFF is set when we are using remote address the address is internal.
@@ -293,7 +373,8 @@ TEST_F(ConnectionManagerUtilityTest, EdgeRequestRegenerateRequestIdAndWipeDownst
                               {"x-request-id", "will_be_regenerated"}};
     EXPECT_CALL(random_, uuid());
 
-    EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.client_enabled", _)).Times(0);
+    EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.client_enabled", Matcher<uint64_t>(_)))
+        .Times(0);
     EXPECT_EQ((MutateRequestRet{"34.0.0.1:0", false}),
               callMutateRequestHeaders(headers, Protocol::Http2));
     EXPECT_FALSE(headers.has(Headers::get().EnvoyDownstreamServiceCluster));
@@ -438,6 +519,7 @@ TEST_F(ConnectionManagerUtilityTest, ExternalAddressExternalRequestUseRemote) {
   route_config_.internal_only_headers_.push_back(LowerCaseString("custom_header"));
   TestHeaderMapImpl headers{{"x-envoy-decorator-operation", "foo"},
                             {"x-envoy-downstream-service-cluster", "foo"},
+                            {"x-envoy-retriable-status-codes", "123,456"},
                             {"x-envoy-retry-on", "foo"},
                             {"x-envoy-retry-grpc-on", "foo"},
                             {"x-envoy-max-retries", "foo"},
@@ -453,6 +535,7 @@ TEST_F(ConnectionManagerUtilityTest, ExternalAddressExternalRequestUseRemote) {
   EXPECT_EQ("50.0.0.1", headers.get_("x-envoy-external-address"));
   EXPECT_FALSE(headers.has("x-envoy-decorator-operation"));
   EXPECT_FALSE(headers.has("x-envoy-downstream-service-cluster"));
+  EXPECT_FALSE(headers.has("x-envoy-retriable-status-codes"));
   EXPECT_FALSE(headers.has("x-envoy-retry-on"));
   EXPECT_FALSE(headers.has("x-envoy-retry-grpc-on"));
   EXPECT_FALSE(headers.has("x-envoy-max-retries"));
@@ -498,7 +581,7 @@ TEST_F(ConnectionManagerUtilityTest, AppendInternalAddressXffNotInternalRequest)
 
   EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", false}),
             callMutateRequestHeaders(headers, Protocol::Http2));
-  EXPECT_EQ("10.0.0.2, 10.0.0.1", headers.get_("x-forwarded-for"));
+  EXPECT_EQ("10.0.0.2,10.0.0.1", headers.get_("x-forwarded-for"));
 }
 
 // A request that is from an internal address and uses remote address should be an internal request.
@@ -532,16 +615,6 @@ TEST_F(ConnectionManagerUtilityTest, RemoveConnectionUpgradeForNonWebSocketReque
 
   EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false}),
             callMutateRequestHeaders(headers, Protocol::Http11));
-  EXPECT_FALSE(headers.has("connection"));
-  EXPECT_FALSE(headers.has("upgrade"));
-}
-
-// Make sure we remove connections headers for a WS request over h2.
-TEST_F(ConnectionManagerUtilityTest, RemoveConnectionUpgradeForHttp2Requests) {
-  TestHeaderMapImpl headers{{"connection", "upgrade"}, {"upgrade", "websocket"}};
-
-  EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false}),
-            callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_FALSE(headers.has("connection"));
   EXPECT_FALSE(headers.has("upgrade"));
 }

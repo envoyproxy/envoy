@@ -1,4 +1,5 @@
 #include <chrono>
+#include <fstream>
 #include <list>
 #include <map>
 #include <memory>
@@ -17,6 +18,8 @@
 
 #include "extensions/filters/http/common/empty_http_filter_config.h"
 
+#include "test/common/router/route_fuzz.pb.h"
+#include "test/fuzz/utility.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/printers.h"
@@ -26,22 +29,60 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::ContainerEq;
 using testing::ElementsAreArray;
+using testing::Matcher;
 using testing::MockFunction;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
 using testing::StrNe;
-using testing::_;
 
 namespace Envoy {
 namespace Router {
 namespace {
 
+// Wrap ConfigImpl, the target of tests to allow us to regenerate the route_fuzz_test
+// corpus when run with:
+//   bazel run //test/common/router:config_impl_test
+//     --test_env="ROUTE_CORPUS_PATH=$PWD/test/common/router/route_corpus"
+class TestConfigImpl : public ConfigImpl {
+public:
+  TestConfigImpl(const envoy::api::v2::RouteConfiguration& config,
+                 Server::Configuration::FactoryContext& factory_context,
+                 bool validate_clusters_default)
+      : ConfigImpl(config, factory_context, validate_clusters_default), config_(config) {}
+
+  RouteConstSharedPtr route(const Http::HeaderMap& headers, uint64_t random_value) const override {
+    absl::optional<std::string> corpus_path =
+        TestEnvironment::getOptionalEnvVar("GENRULE_OUTPUT_DIR");
+    if (corpus_path) {
+      static uint32_t n;
+      test::common::router::RouteTestCase route_test_case;
+      route_test_case.mutable_config()->MergeFrom(config_);
+      route_test_case.mutable_headers()->MergeFrom(Fuzz::toHeaders(headers));
+      route_test_case.set_random_value(random_value);
+      const std::string path = fmt::format("{}/generated_corpus_{}", corpus_path.value(), n++);
+      const std::string corpus = route_test_case.DebugString();
+      {
+        std::ofstream corpus_file(path);
+        ENVOY_LOG_MISC(debug, "Writing {} to {}", corpus, path);
+        corpus_file << corpus;
+      }
+    }
+    return ConfigImpl::route(headers, random_value);
+  }
+
+  const envoy::api::v2::RouteConfiguration config_;
+};
+
 Http::TestHeaderMapImpl genHeaders(const std::string& host, const std::string& path,
                                    const std::string& method) {
-  return Http::TestHeaderMapImpl{{":authority", host}, {":path", path}, {":method", method}};
+  return Http::TestHeaderMapImpl{{":authority", host},        {":path", path},
+                                 {":method", method},         {"x-safe", "safe"},
+                                 {"x-global-nope", "global"}, {"x-vhost-nope", "vhost"},
+                                 {"x-route-nope", "route"}};
 }
 
 envoy::api::v2::RouteConfiguration parseRouteConfigurationFromJson(const std::string& json_string) {
@@ -60,7 +101,7 @@ envoy::api::v2::RouteConfiguration parseRouteConfigurationFromV2Yaml(const std::
 }
 
 TEST(RouteMatcherTest, TestRoutes) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
 {
   "virtual_hosts": [
     {
@@ -226,9 +267,9 @@ TEST(RouteMatcherTest, TestRoutes) {
 }
   )EOF";
 
-  NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  ConfigImpl config(parseRouteConfigurationFromJson(json), factory_context, true);
+  TestConfigImpl config(parseRouteConfigurationFromJson(json), factory_context, true);
 
   // Base routing testing.
   EXPECT_EQ("instant-server",
@@ -319,7 +360,7 @@ TEST(RouteMatcherTest, TestRoutes) {
     const RouteEntry* route = config.route(headers, 0)->routeEntry();
     EXPECT_EQ("www2", route->clusterName());
     EXPECT_EQ("www2", route->virtualHost().name());
-    route->finalizeRequestHeaders(headers, request_info, true);
+    route->finalizeRequestHeaders(headers, stream_info, true);
     EXPECT_EQ("/api/new_endpoint/foo", headers.get_(Http::Headers::get().Path));
     EXPECT_EQ("/new_endpoint/foo", headers.get_(Http::Headers::get().EnvoyOriginalPath));
   }
@@ -330,7 +371,7 @@ TEST(RouteMatcherTest, TestRoutes) {
     const RouteEntry* route = config.route(headers, 0)->routeEntry();
     EXPECT_EQ("www2", route->clusterName());
     EXPECT_EQ("www2", route->virtualHost().name());
-    route->finalizeRequestHeaders(headers, request_info, false);
+    route->finalizeRequestHeaders(headers, stream_info, false);
     EXPECT_EQ("/api/new_endpoint/foo", headers.get_(Http::Headers::get().Path));
     EXPECT_FALSE(headers.has(Http::Headers::get().EnvoyOriginalPath));
   }
@@ -340,14 +381,14 @@ TEST(RouteMatcherTest, TestRoutes) {
     Http::TestHeaderMapImpl headers =
         genHeaders("api.lyft.com", "/api/locations?works=true", "GET");
     const RouteEntry* route = config.route(headers, 0)->routeEntry();
-    route->finalizeRequestHeaders(headers, request_info, true);
+    route->finalizeRequestHeaders(headers, stream_info, true);
     EXPECT_EQ("/rewrote?works=true", headers.get_(Http::Headers::get().Path));
   }
 
   {
     Http::TestHeaderMapImpl headers = genHeaders("api.lyft.com", "/foo", "GET");
     const RouteEntry* route = config.route(headers, 0)->routeEntry();
-    route->finalizeRequestHeaders(headers, request_info, true);
+    route->finalizeRequestHeaders(headers, stream_info, true);
     EXPECT_EQ("/bar", headers.get_(Http::Headers::get().Path));
   }
 
@@ -355,7 +396,7 @@ TEST(RouteMatcherTest, TestRoutes) {
   {
     Http::TestHeaderMapImpl headers = genHeaders("api.lyft.com", "/host/rewrite/me", "GET");
     const RouteEntry* route = config.route(headers, 0)->routeEntry();
-    route->finalizeRequestHeaders(headers, request_info, true);
+    route->finalizeRequestHeaders(headers, stream_info, true);
     EXPECT_EQ("new_host", headers.get_(Http::Headers::get().Host));
   }
 
@@ -364,14 +405,14 @@ TEST(RouteMatcherTest, TestRoutes) {
     Http::TestHeaderMapImpl headers =
         genHeaders("api.lyft.com", "/API/locations?works=true", "GET");
     const RouteEntry* route = config.route(headers, 0)->routeEntry();
-    route->finalizeRequestHeaders(headers, request_info, true);
+    route->finalizeRequestHeaders(headers, stream_info, true);
     EXPECT_EQ("/rewrote?works=true", headers.get_(Http::Headers::get().Path));
   }
 
   {
     Http::TestHeaderMapImpl headers = genHeaders("api.lyft.com", "/fooD", "GET");
     const RouteEntry* route = config.route(headers, 0)->routeEntry();
-    route->finalizeRequestHeaders(headers, request_info, true);
+    route->finalizeRequestHeaders(headers, stream_info, true);
     EXPECT_EQ("/cAndy", headers.get_(Http::Headers::get().Path));
   }
 
@@ -379,14 +420,14 @@ TEST(RouteMatcherTest, TestRoutes) {
   {
     Http::TestHeaderMapImpl headers = genHeaders("api.lyft.com", "/FOO", "GET");
     const RouteEntry* route = config.route(headers, 0)->routeEntry();
-    route->finalizeRequestHeaders(headers, request_info, true);
+    route->finalizeRequestHeaders(headers, stream_info, true);
     EXPECT_EQ("/FOO", headers.get_(Http::Headers::get().Path));
   }
 
   {
     Http::TestHeaderMapImpl headers = genHeaders("api.lyft.com", "/ApPles", "GET");
     const RouteEntry* route = config.route(headers, 0)->routeEntry();
-    route->finalizeRequestHeaders(headers, request_info, true);
+    route->finalizeRequestHeaders(headers, stream_info, true);
     EXPECT_EQ("/ApPles", headers.get_(Http::Headers::get().Path));
   }
 
@@ -394,7 +435,7 @@ TEST(RouteMatcherTest, TestRoutes) {
   {
     Http::TestHeaderMapImpl headers = genHeaders("api.lyft.com", "/oLDhost/rewrite/me", "GET");
     const RouteEntry* route = config.route(headers, 0)->routeEntry();
-    route->finalizeRequestHeaders(headers, request_info, true);
+    route->finalizeRequestHeaders(headers, stream_info, true);
     EXPECT_EQ("api.lyft.com", headers.get_(Http::Headers::get().Host));
   }
 
@@ -402,7 +443,7 @@ TEST(RouteMatcherTest, TestRoutes) {
   {
     Http::TestHeaderMapImpl headers = genHeaders("api.lyft.com", "/Tart", "GET");
     const RouteEntry* route = config.route(headers, 0)->routeEntry();
-    route->finalizeRequestHeaders(headers, request_info, true);
+    route->finalizeRequestHeaders(headers, stream_info, true);
     EXPECT_EQ("/Tart", headers.get_(Http::Headers::get().Path));
   }
 
@@ -410,7 +451,7 @@ TEST(RouteMatcherTest, TestRoutes) {
   {
     Http::TestHeaderMapImpl headers = genHeaders("api.lyft.com", "/newhost/rewrite/me", "GET");
     const RouteEntry* route = config.route(headers, 0)->routeEntry();
-    route->finalizeRequestHeaders(headers, request_info, true);
+    route->finalizeRequestHeaders(headers, stream_info, true);
     EXPECT_EQ("new_host", headers.get_(Http::Headers::get().Host));
   }
 
@@ -418,7 +459,7 @@ TEST(RouteMatcherTest, TestRoutes) {
   {
     Http::TestHeaderMapImpl headers = genHeaders("bat.com", "/647", "GET");
     const RouteEntry* route = config.route(headers, 0)->routeEntry();
-    route->finalizeRequestHeaders(headers, request_info, true);
+    route->finalizeRequestHeaders(headers, stream_info, true);
     EXPECT_EQ("/rewrote", headers.get_(Http::Headers::get().Path));
   }
 
@@ -426,13 +467,13 @@ TEST(RouteMatcherTest, TestRoutes) {
   {
     Http::TestHeaderMapImpl headers = genHeaders("bat.com", "/970?foo=true", "GET");
     const RouteEntry* route = config.route(headers, 0)->routeEntry();
-    route->finalizeRequestHeaders(headers, request_info, true);
+    route->finalizeRequestHeaders(headers, stream_info, true);
     EXPECT_EQ("/rewrote?foo=true", headers.get_(Http::Headers::get().Path));
   }
   {
     Http::TestHeaderMapImpl headers = genHeaders("bat.com", "/foo/bar/238?bar=true", "GET");
     const RouteEntry* route = config.route(headers, 0)->routeEntry();
-    route->finalizeRequestHeaders(headers, request_info, true);
+    route->finalizeRequestHeaders(headers, stream_info, true);
     EXPECT_EQ("/rewrote?bar=true", headers.get_(Http::Headers::get().Path));
   }
 
@@ -498,6 +539,31 @@ TEST(RouteMatcherTest, TestRoutes) {
   }
 }
 
+TEST(RouteMatcherTest, TestRoutesWithWildcardAndDefaultOnly) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: wildcard
+    domains: ["*.solo.io"]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: "wildcard" }
+  - name: default
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: "default" }
+  )EOF";
+
+  const auto proto_config = parseRouteConfigurationFromV2Yaml(yaml);
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  TestConfigImpl config(proto_config, factory_context, true);
+
+  EXPECT_EQ("wildcard",
+            config.route(genHeaders("gloo.solo.io", "/", "GET"), 0)->routeEntry()->clusterName());
+  EXPECT_EQ("default",
+            config.route(genHeaders("example.com", "/", "GET"), 0)->routeEntry()->clusterName());
+}
+
 TEST(RouteMatcherTest, TestRoutesWithInvalidRegex) {
   std::string invalid_route = R"EOF(
 virtual_hosts:
@@ -521,20 +587,20 @@ virtual_hosts:
   )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
 
   EXPECT_THROW_WITH_REGEX(
-      ConfigImpl(parseRouteConfigurationFromV2Yaml(invalid_route), factory_context, true),
+      TestConfigImpl(parseRouteConfigurationFromV2Yaml(invalid_route), factory_context, true),
       EnvoyException, "Invalid regex '/\\(\\+invalid\\)':");
 
-  EXPECT_THROW_WITH_REGEX(
-      ConfigImpl(parseRouteConfigurationFromV2Yaml(invalid_virtual_cluster), factory_context, true),
-      EnvoyException, "Invalid regex '\\^/\\(\\+invalid\\)':");
+  EXPECT_THROW_WITH_REGEX(TestConfigImpl(parseRouteConfigurationFromV2Yaml(invalid_virtual_cluster),
+                                         factory_context, true),
+                          EnvoyException, "Invalid regex '\\^/\\(\\+invalid\\)':");
 }
 
 // Validates behavior of request_headers_to_add at router, vhost, and route action levels.
 TEST(RouteMatcherTest, TestAddRemoveRequestHeaders) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
 {
   "virtual_hosts": [
     {
@@ -617,16 +683,16 @@ TEST(RouteMatcherTest, TestAddRemoveRequestHeaders) {
   )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
 
-  ConfigImpl config(parseRouteConfigurationFromJson(json), factory_context, true);
+  TestConfigImpl config(parseRouteConfigurationFromJson(json), factory_context, true);
 
   // Request header manipulation testing.
   {
     {
       Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/new_endpoint/foo", "GET");
       const RouteEntry* route = config.route(headers, 0)->routeEntry();
-      route->finalizeRequestHeaders(headers, request_info, true);
+      route->finalizeRequestHeaders(headers, stream_info, true);
       EXPECT_EQ("route-override", headers.get_("x-global-header1"));
       EXPECT_EQ("route-override", headers.get_("x-vhost-header1"));
       EXPECT_EQ("route-new_endpoint", headers.get_("x-route-action-header"));
@@ -636,7 +702,7 @@ TEST(RouteMatcherTest, TestAddRemoveRequestHeaders) {
     {
       Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
       const RouteEntry* route = config.route(headers, 0)->routeEntry();
-      route->finalizeRequestHeaders(headers, request_info, true);
+      route->finalizeRequestHeaders(headers, stream_info, true);
       EXPECT_EQ("vhost-override", headers.get_("x-global-header1"));
       EXPECT_EQ("vhost1-www2", headers.get_("x-vhost-header1"));
       EXPECT_EQ("route-allpath", headers.get_("x-route-action-header"));
@@ -646,7 +712,7 @@ TEST(RouteMatcherTest, TestAddRemoveRequestHeaders) {
     {
       Http::TestHeaderMapImpl headers = genHeaders("www-staging.lyft.net", "/foo", "GET");
       const RouteEntry* route = config.route(headers, 0)->routeEntry();
-      route->finalizeRequestHeaders(headers, request_info, true);
+      route->finalizeRequestHeaders(headers, stream_info, true);
       EXPECT_EQ("global1", headers.get_("x-global-header1"));
       EXPECT_EQ("vhost1-www2_staging", headers.get_("x-vhost-header1"));
       EXPECT_EQ("route-allprefix", headers.get_("x-route-action-header"));
@@ -656,7 +722,7 @@ TEST(RouteMatcherTest, TestAddRemoveRequestHeaders) {
     {
       Http::TestHeaderMapImpl headers = genHeaders("api.lyft.com", "/", "GET");
       const RouteEntry* route = config.route(headers, 0)->routeEntry();
-      route->finalizeRequestHeaders(headers, request_info, true);
+      route->finalizeRequestHeaders(headers, stream_info, true);
       EXPECT_EQ("global1", headers.get_("x-global-header1"));
     }
   }
@@ -665,11 +731,11 @@ TEST(RouteMatcherTest, TestAddRemoveRequestHeaders) {
 // Validates behavior of request_headers_to_add at router, vhost, route, and route action levels
 // when append is disabled.
 TEST(RouteMatcherTest, TestRequestHeadersToAddWithAppendFalse) {
-  std::string yaml = R"EOF(
+  const std::string yaml = R"EOF(
 name: foo
 virtual_hosts:
   - name: www2
-    domains: ["*"]
+    domains: ["www.lyft.com"]
     request_headers_to_add:
       - header:
           key: x-global-header
@@ -679,6 +745,7 @@ virtual_hosts:
           key: x-vhost-header
           value: vhost-www2
         append: false
+    request_headers_to_remove: ["x-vhost-nope"]
     routes:
       - match: { prefix: "/endpoint" }
         request_headers_to_add:
@@ -694,6 +761,7 @@ virtual_hosts:
               key: x-route-header
               value: route-endpoint
             append: false
+        request_headers_to_remove: ["x-route-nope"]
         route:
           cluster: www2
           request_headers_to_add:
@@ -714,19 +782,25 @@ virtual_hosts:
               append: false
       - match: { prefix: "/" }
         route: { cluster: www2 }
+  - name: default
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: default }
 request_headers_to_add:
   - header:
       key: x-global-header
       value: global
     append: false
+request_headers_to_remove: ["x-global-nope"]
 )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
 
   envoy::api::v2::RouteConfiguration route_config = parseRouteConfigurationFromV2Yaml(yaml);
 
-  ConfigImpl config(route_config, factory_context, true);
+  TestConfigImpl config(route_config, factory_context, true);
 
   // Request header manipulation testing.
   {
@@ -734,20 +808,48 @@ request_headers_to_add:
     {
       Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/endpoint", "GET");
       const RouteEntry* route = config.route(headers, 0)->routeEntry();
-      route->finalizeRequestHeaders(headers, request_info, true);
+      route->finalizeRequestHeaders(headers, stream_info, true);
+      // Added headers.
       EXPECT_EQ("global", headers.get_("x-global-header"));
       EXPECT_EQ("vhost-www2", headers.get_("x-vhost-header"));
       EXPECT_EQ("route-endpoint", headers.get_("x-route-header"));
       EXPECT_EQ("route-action-endpoint", headers.get_("x-route-action-header"));
+      // Removed headers.
+      EXPECT_FALSE(headers.has("x-global-nope"));
+      EXPECT_FALSE(headers.has("x-vhost-nope"));
+      EXPECT_FALSE(headers.has("x-route-nope"));
     }
 
     // Global overrides virtual host.
     {
       Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
       const RouteEntry* route = config.route(headers, 0)->routeEntry();
-      route->finalizeRequestHeaders(headers, request_info, true);
+      route->finalizeRequestHeaders(headers, stream_info, true);
+      // Added headers.
       EXPECT_EQ("global", headers.get_("x-global-header"));
       EXPECT_EQ("vhost-www2", headers.get_("x-vhost-header"));
+      EXPECT_FALSE(headers.has("x-route-header"));
+      EXPECT_FALSE(headers.has("x-route-action-header"));
+      // Removed headers.
+      EXPECT_FALSE(headers.has("x-global-nope"));
+      EXPECT_FALSE(headers.has("x-vhost-nope"));
+      EXPECT_TRUE(headers.has("x-route-nope"));
+    }
+
+    // Global only.
+    {
+      Http::TestHeaderMapImpl headers = genHeaders("www.example.com", "/", "GET");
+      const RouteEntry* route = config.route(headers, 0)->routeEntry();
+      route->finalizeRequestHeaders(headers, stream_info, true);
+      // Added headers.
+      EXPECT_EQ("global", headers.get_("x-global-header"));
+      EXPECT_FALSE(headers.has("x-vhost-header"));
+      EXPECT_FALSE(headers.has("x-route-header"));
+      EXPECT_FALSE(headers.has("x-route-action-header"));
+      // Removed headers.
+      EXPECT_FALSE(headers.has("x-global-nope"));
+      EXPECT_TRUE(headers.has("x-vhost-nope"));
+      EXPECT_TRUE(headers.has("x-route-nope"));
     }
   }
 }
@@ -755,7 +857,7 @@ request_headers_to_add:
 // Validates behavior of response_headers_to_add and response_headers_to_remove at router, vhost,
 // route, and route action levels.
 TEST(RouteMatcherTest, TestAddRemoveResponseHeaders) {
-  std::string yaml = R"EOF(
+  const std::string yaml = R"EOF(
 name: foo
 virtual_hosts:
   - name: www2
@@ -825,9 +927,9 @@ response_headers_to_remove: ["x-global-remove"]
 )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
 
-  ConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, true);
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, true);
 
   // Response header manipulation testing.
   {
@@ -835,7 +937,7 @@ response_headers_to_remove: ["x-global-remove"]
       Http::TestHeaderMapImpl req_headers = genHeaders("www.lyft.com", "/new_endpoint/foo", "GET");
       const RouteEntry* route = config.route(req_headers, 0)->routeEntry();
       Http::TestHeaderMapImpl headers;
-      route->finalizeResponseHeaders(headers, request_info);
+      route->finalizeResponseHeaders(headers, stream_info);
       EXPECT_EQ("route-override", headers.get_("x-global-header1"));
       EXPECT_EQ("route-override", headers.get_("x-vhost-header1"));
       EXPECT_EQ("route-new_endpoint", headers.get_("x-route-action-header"));
@@ -847,7 +949,7 @@ response_headers_to_remove: ["x-global-remove"]
       Http::TestHeaderMapImpl req_headers = genHeaders("www.lyft.com", "/", "GET");
       const RouteEntry* route = config.route(req_headers, 0)->routeEntry();
       Http::TestHeaderMapImpl headers;
-      route->finalizeResponseHeaders(headers, request_info);
+      route->finalizeResponseHeaders(headers, stream_info);
       EXPECT_EQ("vhost-override", headers.get_("x-global-header1"));
       EXPECT_EQ("vhost1-www2", headers.get_("x-vhost-header1"));
       EXPECT_EQ("route-allpath", headers.get_("x-route-action-header"));
@@ -858,7 +960,7 @@ response_headers_to_remove: ["x-global-remove"]
       Http::TestHeaderMapImpl req_headers = genHeaders("www-staging.lyft.net", "/foo", "GET");
       const RouteEntry* route = config.route(req_headers, 0)->routeEntry();
       Http::TestHeaderMapImpl headers;
-      route->finalizeResponseHeaders(headers, request_info);
+      route->finalizeResponseHeaders(headers, stream_info);
       EXPECT_EQ("global1", headers.get_("x-global-header1"));
       EXPECT_EQ("vhost1-www2_staging", headers.get_("x-vhost-header1"));
       EXPECT_EQ("route-allprefix", headers.get_("x-route-action-header"));
@@ -869,7 +971,7 @@ response_headers_to_remove: ["x-global-remove"]
       Http::TestHeaderMapImpl req_headers = genHeaders("api.lyft.com", "/", "GET");
       const RouteEntry* route = config.route(req_headers, 0)->routeEntry();
       Http::TestHeaderMapImpl headers;
-      route->finalizeResponseHeaders(headers, request_info);
+      route->finalizeResponseHeaders(headers, stream_info);
       EXPECT_EQ("global1", headers.get_("x-global-header1"));
     }
   }
@@ -878,8 +980,59 @@ response_headers_to_remove: ["x-global-remove"]
               ContainerEq(config.internalOnlyHeaders()));
 }
 
+// Validate that we can't add :-prefixed request headers.
+TEST(RouteMatcherTest, TestRequestHeadersToAddNoPseudoHeader) {
+  for (const std::string& header : {":path", ":authority", ":method", ":scheme", ":status",
+                                    ":protocol", ":no-chunks", ":status"}) {
+    const std::string yaml = fmt::format(R"EOF(
+name: foo
+virtual_hosts:
+  - name: www2
+    domains: ["*"]
+    request_headers_to_add:
+      - header:
+          key: {}
+          value: vhost-www2
+        append: false
+)EOF",
+                                         header);
+
+    NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+    NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+
+    envoy::api::v2::RouteConfiguration route_config = parseRouteConfigurationFromV2Yaml(yaml);
+
+    EXPECT_THROW_WITH_MESSAGE(TestConfigImpl config(route_config, factory_context, true),
+                              EnvoyException, ":-prefixed headers may not be modified");
+  }
+}
+
+// Validate that we can't remove :-prefixed request headers.
+TEST(RouteMatcherTest, TestRequestHeadersToRemoveNoPseudoHeader) {
+  for (const std::string& header : {":path", ":authority", ":method", ":scheme", ":status",
+                                    ":protocol", ":no-chunks", ":status", "host"}) {
+    const std::string yaml = fmt::format(R"EOF(
+name: foo
+virtual_hosts:
+  - name: www2
+    domains: ["*"]
+    request_headers_to_remove:
+      - {}
+)EOF",
+                                         header);
+
+    NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+    NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+
+    envoy::api::v2::RouteConfiguration route_config = parseRouteConfigurationFromV2Yaml(yaml);
+
+    EXPECT_THROW_WITH_MESSAGE(TestConfigImpl config(route_config, factory_context, true),
+                              EnvoyException, ":-prefixed or host headers may not be removed");
+  }
+}
+
 TEST(RouteMatcherTest, Priority) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
 {
   "virtual_hosts": [
     {
@@ -904,7 +1057,7 @@ TEST(RouteMatcherTest, Priority) {
   )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  ConfigImpl config(parseRouteConfigurationFromJson(json), factory_context, true);
+  TestConfigImpl config(parseRouteConfigurationFromJson(json), factory_context, true);
 
   EXPECT_EQ(Upstream::ResourcePriority::High,
             config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)->routeEntry()->priority());
@@ -913,7 +1066,7 @@ TEST(RouteMatcherTest, Priority) {
 }
 
 TEST(RouteMatcherTest, NoHostRewriteAndAutoRewrite) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
 {
   "virtual_hosts": [
     {
@@ -933,36 +1086,12 @@ TEST(RouteMatcherTest, NoHostRewriteAndAutoRewrite) {
   )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  EXPECT_THROW(ConfigImpl(parseRouteConfigurationFromJson(json), factory_context, true),
-               EnvoyException);
-}
-
-TEST(RouteMatcherTest, NoRedirectAndWebSocket) {
-  std::string json = R"EOF(
-{
-  "virtual_hosts": [
-    {
-      "name": "local_service",
-      "domains": ["*"],
-      "routes": [
-        {
-          "prefix": "/foo",
-          "host_redirect": "new.lyft.com",
-          "use_websocket": true
-        }
-      ]
-    }
-  ]
-}
-  )EOF";
-
-  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  EXPECT_THROW(ConfigImpl(parseRouteConfigurationFromJson(json), factory_context, true),
+  EXPECT_THROW(TestConfigImpl(parseRouteConfigurationFromJson(json), factory_context, true),
                EnvoyException);
 }
 
 TEST(RouteMatcherTest, HeaderMatchedRouting) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
 {
   "virtual_hosts": [
     {
@@ -1023,7 +1152,7 @@ TEST(RouteMatcherTest, HeaderMatchedRouting) {
   )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  ConfigImpl config(parseRouteConfigurationFromJson(json), factory_context, true);
+  TestConfigImpl config(parseRouteConfigurationFromJson(json), factory_context, true);
 
   {
     EXPECT_EQ("local_service_without_headers",
@@ -1117,16 +1246,16 @@ virtual_hosts:
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
 
-  EXPECT_NO_THROW(
-      ConfigImpl(parseRouteConfigurationFromV2Yaml(value_with_regex_chars), factory_context, true));
+  EXPECT_NO_THROW(TestConfigImpl(parseRouteConfigurationFromV2Yaml(value_with_regex_chars),
+                                 factory_context, true));
 
   EXPECT_THROW_WITH_REGEX(
-      ConfigImpl(parseRouteConfigurationFromV2Yaml(invalid_regex), factory_context, true),
+      TestConfigImpl(parseRouteConfigurationFromV2Yaml(invalid_regex), factory_context, true),
       EnvoyException, "Invalid regex");
 }
 
 TEST(RouteMatcherTest, QueryParamMatchedRouting) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
 {
   "virtual_hosts": [
     {
@@ -1166,7 +1295,7 @@ TEST(RouteMatcherTest, QueryParamMatchedRouting) {
   )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  ConfigImpl config(parseRouteConfigurationFromJson(json), factory_context, true);
+  TestConfigImpl config(parseRouteConfigurationFromJson(json), factory_context, true);
 
   {
     Http::TestHeaderMapImpl headers = genHeaders("example.com", "/", "GET");
@@ -1248,11 +1377,11 @@ virtual_hosts:
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
 
-  EXPECT_NO_THROW(
-      ConfigImpl(parseRouteConfigurationFromV2Yaml(value_with_regex_chars), factory_context, true));
+  EXPECT_NO_THROW(TestConfigImpl(parseRouteConfigurationFromV2Yaml(value_with_regex_chars),
+                                 factory_context, true));
 
   EXPECT_THROW_WITH_REGEX(
-      ConfigImpl(parseRouteConfigurationFromV2Yaml(invalid_regex), factory_context, true),
+      TestConfigImpl(parseRouteConfigurationFromV2Yaml(invalid_regex), factory_context, true),
       EnvoyException, "Invalid regex");
 }
 
@@ -1261,7 +1390,7 @@ public:
   RouterMatcherHashPolicyTest()
       : add_cookie_nop_(
             [](const std::string&, const std::string&, std::chrono::seconds) { return ""; }) {
-    std::string json = R"EOF(
+    const std::string json = R"EOF(
 {
   "virtual_hosts": [
     {
@@ -1298,7 +1427,7 @@ public:
 
   ConfigImpl& config() {
     if (config_ == nullptr) {
-      config_ = std::unique_ptr<ConfigImpl>{new ConfigImpl(route_config_, factory_context_, true)};
+      config_ = std::make_unique<TestConfigImpl>(route_config_, factory_context_, true);
     }
     return *config_;
   }
@@ -1308,7 +1437,7 @@ public:
   HashPolicy::AddCookieCallback add_cookie_nop_;
 
 private:
-  std::unique_ptr<ConfigImpl> config_;
+  std::unique_ptr<TestConfigImpl> config_;
 };
 
 TEST_F(RouterMatcherHashPolicyTest, HashHeaders) {
@@ -1634,8 +1763,66 @@ TEST_F(RouterMatcherHashPolicyTest, HashMultiple) {
   EXPECT_NE(hash_h, hash_both);
 }
 
+TEST_F(RouterMatcherHashPolicyTest, HashTerminal) {
+  // Hash policy list: cookie, header [terminal=true], user_ip.
+  auto route = route_config_.mutable_virtual_hosts(0)->mutable_routes(0)->mutable_route();
+  route->add_hash_policy()->mutable_cookie()->set_name("cookie_hash");
+  auto* header_hash = route->add_hash_policy();
+  header_hash->mutable_header()->set_header_name("foo_header");
+  header_hash->set_terminal(true);
+  route->add_hash_policy()->mutable_connection_properties()->set_source_ip(true);
+  Network::Address::Ipv4Instance address1("4.3.2.1");
+  Network::Address::Ipv4Instance address2("1.2.3.4");
+
+  uint64_t hash_1, hash_2;
+  // Test terminal works when there is hash computed, the rest of the policy
+  // list is ignored.
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
+    headers.addCopy("Cookie", "cookie_hash=foo;");
+    headers.addCopy("foo_header", "bar");
+    Router::RouteConstSharedPtr route = config().route(headers, 0);
+    hash_1 = route->routeEntry()
+                 ->hashPolicy()
+                 ->generateHash(&address1, headers, add_cookie_nop_)
+                 .value();
+  }
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
+    headers.addCopy("Cookie", "cookie_hash=foo;");
+    headers.addCopy("foo_header", "bar");
+    Router::RouteConstSharedPtr route = config().route(headers, 0);
+    hash_2 = route->routeEntry()
+                 ->hashPolicy()
+                 ->generateHash(&address2, headers, add_cookie_nop_)
+                 .value();
+  }
+  EXPECT_EQ(hash_1, hash_2);
+
+  // If no hash computed after evaluating a hash policy, the rest of the policy
+  // list is evaluated.
+  {
+    // Input: {}, {}, address1. Hash on address1.
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
+    Router::RouteConstSharedPtr route = config().route(headers, 0);
+    hash_1 = route->routeEntry()
+                 ->hashPolicy()
+                 ->generateHash(&address1, headers, add_cookie_nop_)
+                 .value();
+  }
+  {
+    // Input: {}, {}, address2. Hash on address2.
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
+    Router::RouteConstSharedPtr route = config().route(headers, 0);
+    hash_2 = route->routeEntry()
+                 ->hashPolicy()
+                 ->generateHash(&address2, headers, add_cookie_nop_)
+                 .value();
+  }
+  EXPECT_NE(hash_1, hash_2);
+}
+
 TEST_F(RouterMatcherHashPolicyTest, InvalidHashPolicies) {
-  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   {
     auto hash_policy = firstRouteHashPolicy();
     EXPECT_EQ(envoy::api::v2::route::RouteAction::HashPolicy::POLICY_SPECIFIER_NOT_SET,
@@ -1654,7 +1841,7 @@ TEST_F(RouterMatcherHashPolicyTest, InvalidHashPolicies) {
 }
 
 TEST(RouteMatcherTest, ClusterHeader) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
 {
   "virtual_hosts": [
     {
@@ -1677,8 +1864,8 @@ TEST(RouteMatcherTest, ClusterHeader) {
   )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
-  ConfigImpl config(parseRouteConfigurationFromJson(json), factory_context, true);
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  TestConfigImpl config(parseRouteConfigurationFromJson(json), factory_context, true);
 
   EXPECT_EQ(
       "some_cluster",
@@ -1695,7 +1882,7 @@ TEST(RouteMatcherTest, ClusterHeader) {
 
     // Make sure things forward and don't crash.
     EXPECT_EQ(std::chrono::milliseconds(0), route->routeEntry()->timeout());
-    route->routeEntry()->finalizeRequestHeaders(headers, request_info, true);
+    route->routeEntry()->finalizeRequestHeaders(headers, stream_info, true);
     route->routeEntry()->priority();
     route->routeEntry()->rateLimitPolicy();
     route->routeEntry()->retryPolicy();
@@ -1708,7 +1895,7 @@ TEST(RouteMatcherTest, ClusterHeader) {
 }
 
 TEST(RouteMatcherTest, ContentType) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
 {
   "virtual_hosts": [
     {
@@ -1733,7 +1920,7 @@ TEST(RouteMatcherTest, ContentType) {
   )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  ConfigImpl config(parseRouteConfigurationFromJson(json), factory_context, true);
+  TestConfigImpl config(parseRouteConfigurationFromJson(json), factory_context, true);
 
   {
     EXPECT_EQ("local_service",
@@ -1753,50 +1940,50 @@ TEST(RouteMatcherTest, ContentType) {
   }
 }
 
-TEST(RouteMatcherTest, Runtime) {
-  std::string json = R"EOF(
-{
-  "virtual_hosts": [
-    {
-      "name": "www2",
-      "domains": ["www.lyft.com"],
-      "routes": [
-        {
-          "prefix": "/",
-          "cluster": "something_else",
-          "runtime": {
-            "key": "some_key",
-            "default": 50
-          }
-        },
-        {
-          "prefix": "/",
-          "cluster": "www2"
-        }
-      ]
-    }
-  ]
-}
+TEST(RouteMatcherTest, FractionalRuntime) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: "www2"
+    domains: ["www.lyft.com"]
+    routes:
+      - match:
+          prefix: "/"
+          runtime_fraction:
+            default_value:
+              numerator: 50
+              denominator: MILLION
+            runtime_key: "bogus_key"
+        route:
+          cluster: "something_else"
+      - match:
+          prefix: "/"
+        route:
+          cluster: "www2"
   )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   Runtime::MockSnapshot snapshot;
-
   ON_CALL(factory_context.runtime_loader_, snapshot()).WillByDefault(ReturnRef(snapshot));
 
-  ConfigImpl config(parseRouteConfigurationFromJson(json), factory_context, true);
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, false);
 
-  EXPECT_CALL(snapshot, featureEnabled("some_key", 50, 10)).WillOnce(Return(true));
-  EXPECT_EQ("something_else",
-            config.route(genHeaders("www.lyft.com", "/", "GET"), 10)->routeEntry()->clusterName());
+  EXPECT_CALL(snapshot,
+              featureEnabled("bogus_key", Matcher<const envoy::type::FractionalPercent&>(_), 41))
+      .WillRepeatedly(Return(true));
+  EXPECT_EQ(
+      "something_else",
+      config.route(genHeaders("www.lyft.com", "/foo", "GET"), 41)->routeEntry()->clusterName());
 
-  EXPECT_CALL(snapshot, featureEnabled("some_key", 50, 20)).WillOnce(Return(false));
-  EXPECT_EQ("www2",
-            config.route(genHeaders("www.lyft.com", "/", "GET"), 20)->routeEntry()->clusterName());
+  EXPECT_CALL(snapshot,
+              featureEnabled("bogus_key", Matcher<const envoy::type::FractionalPercent&>(_), 43))
+      .WillRepeatedly(Return(false));
+  EXPECT_EQ(
+      "www2",
+      config.route(genHeaders("www.lyft.com", "/foo", "GET"), 43)->routeEntry()->clusterName());
 }
 
 TEST(RouteMatcherTest, ShadowClusterNotFound) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
 {
   "virtual_hosts": [
     {
@@ -1822,12 +2009,12 @@ TEST(RouteMatcherTest, ShadowClusterNotFound) {
   EXPECT_CALL(factory_context.cluster_manager_, get("some_cluster"))
       .WillRepeatedly(Return(nullptr));
 
-  EXPECT_THROW(ConfigImpl(parseRouteConfigurationFromJson(json), factory_context, true),
+  EXPECT_THROW(TestConfigImpl(parseRouteConfigurationFromJson(json), factory_context, true),
                EnvoyException);
 }
 
 TEST(RouteMatcherTest, ClusterNotFound) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
 {
   "virtual_hosts": [
     {
@@ -1847,12 +2034,12 @@ TEST(RouteMatcherTest, ClusterNotFound) {
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   EXPECT_CALL(factory_context.cluster_manager_, get("www2")).WillRepeatedly(Return(nullptr));
 
-  EXPECT_THROW(ConfigImpl(parseRouteConfigurationFromJson(json), factory_context, true),
+  EXPECT_THROW(TestConfigImpl(parseRouteConfigurationFromJson(json), factory_context, true),
                EnvoyException);
 }
 
 TEST(RouteMatcherTest, ClusterNotFoundNotChecking) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
 {
   "virtual_hosts": [
     {
@@ -1872,11 +2059,11 @@ TEST(RouteMatcherTest, ClusterNotFoundNotChecking) {
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   EXPECT_CALL(factory_context.cluster_manager_, get("www2")).WillRepeatedly(Return(nullptr));
 
-  ConfigImpl(parseRouteConfigurationFromJson(json), factory_context, false);
+  TestConfigImpl(parseRouteConfigurationFromJson(json), factory_context, false);
 }
 
 TEST(RouteMatcherTest, ClusterNotFoundNotCheckingViaConfig) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
 {
   "validate_clusters": false,
   "virtual_hosts": [
@@ -1897,11 +2084,31 @@ TEST(RouteMatcherTest, ClusterNotFoundNotCheckingViaConfig) {
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   EXPECT_CALL(factory_context.cluster_manager_, get("www2")).WillRepeatedly(Return(nullptr));
 
-  ConfigImpl(parseRouteConfigurationFromJson(json), factory_context, true);
+  TestConfigImpl(parseRouteConfigurationFromJson(json), factory_context, true);
+}
+
+TEST(RouteMatcherTest, AttemptCountHeader) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: "www2"
+    domains: ["www.lyft.com"]
+    include_request_attempt_count: true
+    routes:
+      - match: { prefix: "/"}
+        route:
+          cluster: "whatever"
+  )EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, true);
+
+  EXPECT_TRUE(config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+                  ->routeEntry()
+                  ->includeAttemptCount());
 }
 
 TEST(RouteMatchTest, ClusterNotFoundResponseCode) {
-  std::string yaml = R"EOF(
+  const std::string yaml = R"EOF(
 virtual_hosts:
   - name: "www2"
     domains: ["www.lyft.com"]
@@ -1912,7 +2119,7 @@ virtual_hosts:
   )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  ConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, false);
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, false);
 
   Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
 
@@ -1922,7 +2129,7 @@ virtual_hosts:
 }
 
 TEST(RouteMatchTest, ClusterNotFoundResponseCodeConfig503) {
-  std::string yaml = R"EOF(
+  const std::string yaml = R"EOF(
 virtual_hosts:
   - name: "www2"
     domains: ["www.lyft.com"]
@@ -1934,7 +2141,7 @@ virtual_hosts:
   )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  ConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, false);
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, false);
 
   Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
 
@@ -1944,7 +2151,7 @@ virtual_hosts:
 }
 
 TEST(RouteMatchTest, ClusterNotFoundResponseCodeConfig404) {
-  std::string yaml = R"EOF(
+  const std::string yaml = R"EOF(
 virtual_hosts:
   - name: "www2"
     domains: ["www.lyft.com"]
@@ -1956,7 +2163,7 @@ virtual_hosts:
   )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  ConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, false);
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, false);
 
   Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
 
@@ -1966,7 +2173,7 @@ virtual_hosts:
 }
 
 TEST(RouteMatcherTest, Shadow) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
 {
   "virtual_hosts": [
     {
@@ -1999,7 +2206,7 @@ TEST(RouteMatcherTest, Shadow) {
   )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  ConfigImpl config(parseRouteConfigurationFromJson(json), factory_context, true);
+  TestConfigImpl config(parseRouteConfigurationFromJson(json), factory_context, true);
 
   EXPECT_EQ("some_cluster", config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
                                 ->routeEntry()
@@ -2029,8 +2236,51 @@ TEST(RouteMatcherTest, Shadow) {
                     .runtimeKey());
 }
 
+TEST(RouteConfigurationV2, RequestMirrorPolicy) {
+  const std::string yaml = R"EOF(
+name: foo
+virtual_hosts:
+  - name: mirror
+    domains: [mirror.lyft.com]
+    routes:
+      - match: { prefix: "/"}
+        route:
+          cluster: foo
+          request_mirror_policy:
+            cluster: foo_mirror
+            runtime_key: will_be_ignored
+            runtime_fraction:
+               default_value:
+                 numerator: 20
+                 denominator: HUNDRED
+               runtime_key: mirror_key
+
+  )EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, true);
+
+  EXPECT_EQ("foo_mirror", config.route(genHeaders("mirror.lyft.com", "/foo", "GET"), 0)
+                              ->routeEntry()
+                              ->shadowPolicy()
+                              .cluster());
+
+  // `runtime_fraction` takes precedence over the deprecated `runtime_key` field.
+  EXPECT_EQ("mirror_key", config.route(genHeaders("mirror.lyft.com", "/foo", "GET"), 0)
+                              ->routeEntry()
+                              ->shadowPolicy()
+                              .runtimeKey());
+
+  const auto& default_value = config.route(genHeaders("mirror.lyft.com", "/foo", "GET"), 0)
+                                  ->routeEntry()
+                                  ->shadowPolicy()
+                                  .defaultValue();
+  EXPECT_EQ(20, default_value.numerator());
+  EXPECT_EQ(envoy::type::FractionalPercent::HUNDRED, default_value.denominator());
+}
+
 TEST(RouteMatcherTest, Retry) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
 {
   "virtual_hosts": [
     {
@@ -2064,7 +2314,7 @@ TEST(RouteMatcherTest, Retry) {
   )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  ConfigImpl config(parseRouteConfigurationFromJson(json), factory_context, true);
+  TestConfigImpl config(parseRouteConfigurationFromJson(json), factory_context, true);
 
   EXPECT_EQ(std::chrono::milliseconds(0),
             config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
@@ -2112,8 +2362,78 @@ TEST(RouteMatcherTest, Retry) {
                 .retryOn());
 }
 
+TEST(RouteMatcherTest, RetryVirtualHostLevel) {
+  const std::string yaml = R"EOF(
+name: RetryVirtualHostLevel
+virtual_hosts:
+- domains: [www.lyft.com]
+  name: www
+  retry_policy: {num_retries: 3, per_try_timeout: 1s, retry_on: '5xx,gateway-error,connect-failure'}
+  routes:
+  - match: {prefix: /foo}
+    route:
+      cluster: www
+      retry_policy: {retry_on: connect-failure}
+  - match: {prefix: /bar}
+    route: {cluster: www}
+  - match: {prefix: /}
+    route: {cluster: www}
+  )EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, true);
+
+  // Route level retry policy takes precedence.
+  EXPECT_EQ(std::chrono::milliseconds(0),
+            config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+                ->routeEntry()
+                ->retryPolicy()
+                .perTryTimeout());
+  EXPECT_EQ(1U, config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+                    ->routeEntry()
+                    ->retryPolicy()
+                    .numRetries());
+  EXPECT_EQ(RetryPolicy::RETRY_ON_CONNECT_FAILURE,
+            config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+                ->routeEntry()
+                ->retryPolicy()
+                .retryOn());
+
+  // Virtual Host level retry policy kicks in.
+  EXPECT_EQ(std::chrono::milliseconds(1000),
+            config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
+                ->routeEntry()
+                ->retryPolicy()
+                .perTryTimeout());
+  EXPECT_EQ(3U, config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
+                    ->routeEntry()
+                    ->retryPolicy()
+                    .numRetries());
+  EXPECT_EQ(RetryPolicy::RETRY_ON_CONNECT_FAILURE | RetryPolicy::RETRY_ON_5XX |
+                RetryPolicy::RETRY_ON_GATEWAY_ERROR,
+            config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
+                ->routeEntry()
+                ->retryPolicy()
+                .retryOn());
+  EXPECT_EQ(std::chrono::milliseconds(1000),
+            config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
+                ->routeEntry()
+                ->retryPolicy()
+                .perTryTimeout());
+  EXPECT_EQ(3U, config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
+                    ->routeEntry()
+                    ->retryPolicy()
+                    .numRetries());
+  EXPECT_EQ(RetryPolicy::RETRY_ON_CONNECT_FAILURE | RetryPolicy::RETRY_ON_5XX |
+                RetryPolicy::RETRY_ON_GATEWAY_ERROR,
+            config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
+                ->routeEntry()
+                ->retryPolicy()
+                .retryOn());
+}
+
 TEST(RouteMatcherTest, GrpcRetry) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
 {
   "virtual_hosts": [
     {
@@ -2147,7 +2467,7 @@ TEST(RouteMatcherTest, GrpcRetry) {
   )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  ConfigImpl config(parseRouteConfigurationFromJson(json), factory_context, true);
+  TestConfigImpl config(parseRouteConfigurationFromJson(json), factory_context, true);
 
   EXPECT_EQ(std::chrono::milliseconds(0),
             config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
@@ -2196,7 +2516,7 @@ TEST(RouteMatcherTest, GrpcRetry) {
 }
 
 TEST(RouteMatcherTest, TestBadDefaultConfig) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
 {
   "virtual_hosts": [
     {
@@ -2228,12 +2548,12 @@ TEST(RouteMatcherTest, TestBadDefaultConfig) {
   )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  EXPECT_THROW(ConfigImpl config(parseRouteConfigurationFromJson(json), factory_context, true),
+  EXPECT_THROW(TestConfigImpl config(parseRouteConfigurationFromJson(json), factory_context, true),
                EnvoyException);
 }
 
 TEST(RouteMatcherTest, TestDuplicateDomainConfig) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
 {
   "virtual_hosts": [
     {
@@ -2261,7 +2581,7 @@ TEST(RouteMatcherTest, TestDuplicateDomainConfig) {
   )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  EXPECT_THROW(ConfigImpl config(parseRouteConfigurationFromJson(json), factory_context, true),
+  EXPECT_THROW(TestConfigImpl config(parseRouteConfigurationFromJson(json), factory_context, true),
                EnvoyException);
 }
 
@@ -2284,8 +2604,8 @@ virtual_hosts:
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
 
   EXPECT_THROW_WITH_MESSAGE(
-      ConfigImpl(parseRouteConfigurationFromV2Yaml(config_with_case_sensitive_domains),
-                 factory_context, true),
+      TestConfigImpl(parseRouteConfigurationFromV2Yaml(config_with_case_sensitive_domains),
+                     factory_context, true),
       EnvoyException,
       "Only unique values for domains are permitted. Duplicate entry of domain www.lyft.com");
 }
@@ -2386,6 +2706,99 @@ virtual_hosts:
         redirect: { path_redirect: /new_path, https_redirect: true }
       - match: { path: /host_path_https }
         redirect: { host_redirect: new.lyft.com, path_redirect: /new_path, https_redirect: true }
+      - match: { path: /port }
+        redirect: { port_redirect: 8080 }
+      - match: { path: /host_port }
+        redirect: { host_redirect: new.lyft.com, port_redirect: 8080 }
+      - match: { path: /scheme_host_port }
+        redirect: { scheme_redirect: ws, host_redirect: new.lyft.com, port_redirect: 8080 }
+  - name: redirect_domain_port_80
+    domains: [redirect.lyft.com:80]
+    routes:
+      - match: { path: /ws }
+        redirect: { scheme_redirect: ws }
+      - match: { path: /host_path_https }
+        redirect: { host_redirect: new.lyft.com, path_redirect: /new_path, https_redirect: true }
+      - match: { path: /scheme_host_port }
+        redirect: { scheme_redirect: ws, host_redirect: new.lyft.com, port_redirect: 8080 }
+  - name: redirect_domain_port_443
+    domains: [redirect.lyft.com:443]
+    routes:
+      - match: { path: /ws }
+        redirect: { scheme_redirect: ws }
+      - match: { path: /host_path_http }
+        redirect: { scheme_redirect: http, host_redirect: new.lyft.com, path_redirect: /new_path}
+      - match: { path: /scheme_host_port }
+        redirect: { scheme_redirect: ws, host_redirect: new.lyft.com, port_redirect: 8080 }
+  - name: redirect_domain_port_8080
+    domains: [redirect.lyft.com:8080]
+    routes:
+      - match: { path: /port }
+        redirect: { port_redirect: 8181 }
+  - name: redirect_ipv4
+    domains: [10.0.0.1]
+    routes:
+      - match: { path: /port }
+        redirect: { port_redirect: 8080 }
+      - match: { path: /host_port }
+        redirect: { host_redirect: 20.0.0.2, port_redirect: 8080 }
+      - match: { path: /scheme_host_port }
+        redirect: { scheme_redirect: ws, host_redirect: 20.0.0.2, port_redirect: 8080 }
+  - name: redirect_ipv4_port_8080
+    domains: [10.0.0.1:8080]
+    routes:
+      - match: { path: /port }
+        redirect: { port_redirect: 8181 }
+  - name: redirect_ipv4_port_80
+    domains: [10.0.0.1:80]
+    routes:
+      - match: { path: /ws }
+        redirect: { scheme_redirect: ws }
+      - match: { path: /host_path_https }
+        redirect: { host_redirect: 20.0.0.2, path_redirect: /new_path, https_redirect: true }
+      - match: { path: /scheme_host_port }
+        redirect: { scheme_redirect: ws, host_redirect: 20.0.0.2, port_redirect: 8080 }
+  - name: redirect_ipv4_port_443
+    domains: [10.0.0.1:443]
+    routes:
+      - match: { path: /ws }
+        redirect: { scheme_redirect: ws }
+      - match: { path: /host_path_http }
+        redirect: { scheme_redirect: http, host_redirect: 20.0.0.2, path_redirect: /new_path}
+      - match: { path: /scheme_host_port }
+        redirect: { scheme_redirect: ws, host_redirect: 20.0.0.2, port_redirect: 8080 }
+  - name: redirect_ipv6
+    domains: ["[fe80::1]"]
+    routes:
+      - match: { path: /port }
+        redirect: { port_redirect: 8080 }
+      - match: { path: /host_port }
+        redirect: { host_redirect: "[fe80::2]", port_redirect: 8080 }
+      - match: { path: /scheme_host_port }
+        redirect: { scheme_redirect: ws, host_redirect: "[fe80::2]", port_redirect: 8080 }
+  - name: redirect_ipv6_port_8080
+    domains: ["[fe80::1]:8080"]
+    routes:
+      - match: { path: /port }
+        redirect: { port_redirect: 8181 }
+  - name: redirect_ipv6_port_80
+    domains: ["[fe80::1]:80"]
+    routes:
+      - match: { path: /ws }
+        redirect: { scheme_redirect: ws }
+      - match: { path: /host_path_https }
+        redirect: { host_redirect: "[fe80::2]", path_redirect: /new_path, https_redirect: true }
+      - match: { path: /scheme_host_port }
+        redirect: { scheme_redirect: ws, host_redirect: "[fe80::2]", port_redirect: 8080 }
+  - name: redirect_ipv6_port_443
+    domains: ["[fe80::1]:443"]
+    routes:
+      - match: { path: /ws }
+        redirect: { scheme_redirect: ws }
+      - match: { path: /host_path_http }
+        redirect: { scheme_redirect: http, host_redirect: "[fe80::2]", path_redirect: /new_path}
+      - match: { path: /scheme_host_port }
+        redirect: { scheme_redirect: ws, host_redirect: "[fe80::2]", port_redirect: 8080 }
   - name: direct
     domains: [direct.example.com]
     routes:
@@ -2505,19 +2918,190 @@ virtual_hosts:
       EXPECT_EQ("https://new.lyft.com/new_path",
                 config.route(headers, 0)->directResponseEntry()->newPath(headers));
     }
+    {
+      Http::TestHeaderMapImpl headers =
+          genRedirectHeaders("redirect.lyft.com", "/port", false, false);
+      EXPECT_EQ("http://redirect.lyft.com:8080/port",
+                config.route(headers, 0)->directResponseEntry()->newPath(headers));
+    }
+    {
+      Http::TestHeaderMapImpl headers =
+          genRedirectHeaders("redirect.lyft.com:8080", "/port", false, false);
+      EXPECT_EQ("http://redirect.lyft.com:8181/port",
+                config.route(headers, 0)->directResponseEntry()->newPath(headers));
+    }
+    {
+      Http::TestHeaderMapImpl headers =
+          genRedirectHeaders("redirect.lyft.com", "/host_port", false, false);
+      EXPECT_EQ("http://new.lyft.com:8080/host_port",
+                config.route(headers, 0)->directResponseEntry()->newPath(headers));
+    }
+    {
+      Http::TestHeaderMapImpl headers =
+          genRedirectHeaders("redirect.lyft.com", "/scheme_host_port", false, false);
+      EXPECT_EQ("ws://new.lyft.com:8080/scheme_host_port",
+                config.route(headers, 0)->directResponseEntry()->newPath(headers));
+    }
+    {
+      Http::TestHeaderMapImpl headers =
+          genRedirectHeaders("redirect.lyft.com:80", "/ws", true, false);
+      EXPECT_EQ("ws://redirect.lyft.com:80/ws",
+                config.route(headers, 0)->directResponseEntry()->newPath(headers));
+    }
+    {
+      Http::TestHeaderMapImpl headers =
+          genRedirectHeaders("redirect.lyft.com:80", "/host_path_https", false, false);
+      EXPECT_EQ("https://new.lyft.com/new_path",
+                config.route(headers, 0)->directResponseEntry()->newPath(headers));
+    }
+    {
+      Http::TestHeaderMapImpl headers =
+          genRedirectHeaders("redirect.lyft.com:80", "/scheme_host_port", false, false);
+      EXPECT_EQ("ws://new.lyft.com:8080/scheme_host_port",
+                config.route(headers, 0)->directResponseEntry()->newPath(headers));
+    }
+    {
+      Http::TestHeaderMapImpl headers =
+          genRedirectHeaders("redirect.lyft.com:443", "/ws", false, false);
+      EXPECT_EQ("ws://redirect.lyft.com:443/ws",
+                config.route(headers, 0)->directResponseEntry()->newPath(headers));
+    }
+    {
+      Http::TestHeaderMapImpl headers =
+          genRedirectHeaders("redirect.lyft.com:443", "/host_path_http", true, false);
+      EXPECT_EQ("http://new.lyft.com/new_path",
+                config.route(headers, 0)->directResponseEntry()->newPath(headers));
+    }
+    {
+      Http::TestHeaderMapImpl headers =
+          genRedirectHeaders("redirect.lyft.com:443", "/scheme_host_port", true, false);
+      EXPECT_EQ("ws://new.lyft.com:8080/scheme_host_port",
+                config.route(headers, 0)->directResponseEntry()->newPath(headers));
+    }
+    {
+      Http::TestHeaderMapImpl headers = genRedirectHeaders("10.0.0.1", "/port", false, false);
+      EXPECT_EQ("http://10.0.0.1:8080/port",
+                config.route(headers, 0)->directResponseEntry()->newPath(headers));
+    }
+    {
+      Http::TestHeaderMapImpl headers = genRedirectHeaders("10.0.0.1:8080", "/port", false, false);
+      EXPECT_EQ("http://10.0.0.1:8181/port",
+                config.route(headers, 0)->directResponseEntry()->newPath(headers));
+    }
+    {
+      Http::TestHeaderMapImpl headers = genRedirectHeaders("10.0.0.1", "/host_port", false, false);
+      EXPECT_EQ("http://20.0.0.2:8080/host_port",
+                config.route(headers, 0)->directResponseEntry()->newPath(headers));
+    }
+    {
+      Http::TestHeaderMapImpl headers =
+          genRedirectHeaders("10.0.0.1", "/scheme_host_port", false, false);
+      EXPECT_EQ("ws://20.0.0.2:8080/scheme_host_port",
+                config.route(headers, 0)->directResponseEntry()->newPath(headers));
+    }
+    {
+      Http::TestHeaderMapImpl headers = genRedirectHeaders("10.0.0.1:80", "/ws", true, false);
+      EXPECT_EQ("ws://10.0.0.1:80/ws",
+                config.route(headers, 0)->directResponseEntry()->newPath(headers));
+    }
+    {
+      Http::TestHeaderMapImpl headers =
+          genRedirectHeaders("10.0.0.1:80", "/host_path_https", false, false);
+      EXPECT_EQ("https://20.0.0.2/new_path",
+                config.route(headers, 0)->directResponseEntry()->newPath(headers));
+    }
+    {
+      Http::TestHeaderMapImpl headers =
+          genRedirectHeaders("10.0.0.1:80", "/scheme_host_port", false, false);
+      EXPECT_EQ("ws://20.0.0.2:8080/scheme_host_port",
+                config.route(headers, 0)->directResponseEntry()->newPath(headers));
+    }
+    {
+      Http::TestHeaderMapImpl headers = genRedirectHeaders("10.0.0.1:443", "/ws", false, false);
+      EXPECT_EQ("ws://10.0.0.1:443/ws",
+                config.route(headers, 0)->directResponseEntry()->newPath(headers));
+    }
+    {
+      Http::TestHeaderMapImpl headers =
+          genRedirectHeaders("10.0.0.1:443", "/host_path_http", true, false);
+      EXPECT_EQ("http://20.0.0.2/new_path",
+                config.route(headers, 0)->directResponseEntry()->newPath(headers));
+    }
+    {
+      Http::TestHeaderMapImpl headers =
+          genRedirectHeaders("10.0.0.1:443", "/scheme_host_port", true, false);
+      EXPECT_EQ("ws://20.0.0.2:8080/scheme_host_port",
+                config.route(headers, 0)->directResponseEntry()->newPath(headers));
+    }
+    {
+      Http::TestHeaderMapImpl headers = genRedirectHeaders("[fe80::1]", "/port", false, false);
+
+      EXPECT_EQ("http://[fe80::1]:8080/port",
+                config.route(headers, 0)->directResponseEntry()->newPath(headers));
+    }
+    {
+      Http::TestHeaderMapImpl headers = genRedirectHeaders("[fe80::1]:8080", "/port", false, false);
+      EXPECT_EQ("http://[fe80::1]:8181/port",
+                config.route(headers, 0)->directResponseEntry()->newPath(headers));
+    }
+    {
+      Http::TestHeaderMapImpl headers = genRedirectHeaders("[fe80::1]", "/host_port", false, false);
+      EXPECT_EQ("http://[fe80::2]:8080/host_port",
+                config.route(headers, 0)->directResponseEntry()->newPath(headers));
+    }
+    {
+      Http::TestHeaderMapImpl headers =
+          genRedirectHeaders("[fe80::1]", "/scheme_host_port", false, false);
+      EXPECT_EQ("ws://[fe80::2]:8080/scheme_host_port",
+                config.route(headers, 0)->directResponseEntry()->newPath(headers));
+    }
+    {
+      Http::TestHeaderMapImpl headers = genRedirectHeaders("[fe80::1]:80", "/ws", true, false);
+      EXPECT_EQ("ws://[fe80::1]:80/ws",
+                config.route(headers, 0)->directResponseEntry()->newPath(headers));
+    }
+    {
+      Http::TestHeaderMapImpl headers =
+          genRedirectHeaders("[fe80::1]:80", "/host_path_https", false, false);
+      EXPECT_EQ("https://[fe80::2]/new_path",
+                config.route(headers, 0)->directResponseEntry()->newPath(headers));
+    }
+    {
+      Http::TestHeaderMapImpl headers =
+          genRedirectHeaders("[fe80::1]:80", "/scheme_host_port", false, false);
+      EXPECT_EQ("ws://[fe80::2]:8080/scheme_host_port",
+                config.route(headers, 0)->directResponseEntry()->newPath(headers));
+    }
+    {
+      Http::TestHeaderMapImpl headers = genRedirectHeaders("[fe80::1]:443", "/ws", false, false);
+      EXPECT_EQ("ws://[fe80::1]:443/ws",
+                config.route(headers, 0)->directResponseEntry()->newPath(headers));
+    }
+    {
+      Http::TestHeaderMapImpl headers =
+          genRedirectHeaders("[fe80::1]:443", "/host_path_http", true, false);
+      EXPECT_EQ("http://[fe80::2]/new_path",
+                config.route(headers, 0)->directResponseEntry()->newPath(headers));
+    }
+    {
+      Http::TestHeaderMapImpl headers =
+          genRedirectHeaders("[fe80::1]:443", "/scheme_host_port", true, false);
+      EXPECT_EQ("ws://[fe80::2]:8080/scheme_host_port",
+                config.route(headers, 0)->directResponseEntry()->newPath(headers));
+    }
   };
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
 
-  ConfigImpl v1_json_config(parseRouteConfigurationFromJson(v1_json), factory_context, true);
+  TestConfigImpl v1_json_config(parseRouteConfigurationFromJson(v1_json), factory_context, true);
   testConfig(v1_json_config);
 
-  ConfigImpl v2_yaml_config(parseRouteConfigurationFromV2Yaml(v2_yaml), factory_context, true);
+  TestConfigImpl v2_yaml_config(parseRouteConfigurationFromV2Yaml(v2_yaml), factory_context, true);
   testConfig(v2_yaml_config, true);
 }
 
 TEST(RouteMatcherTest, ExclusiveRouteEntryOrDirectResponseEntry) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
 {
   "virtual_hosts": [
     {
@@ -2545,7 +3129,7 @@ TEST(RouteMatcherTest, ExclusiveRouteEntryOrDirectResponseEntry) {
   )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  ConfigImpl config(parseRouteConfigurationFromJson(json), factory_context, true);
+  TestConfigImpl config(parseRouteConfigurationFromJson(json), factory_context, true);
 
   {
     Http::TestHeaderMapImpl headers = genRedirectHeaders("www.lyft.com", "/foo", true, true);
@@ -2561,7 +3145,7 @@ TEST(RouteMatcherTest, ExclusiveRouteEntryOrDirectResponseEntry) {
 }
 
 TEST(RouteMatcherTest, ExclusiveWeightedClustersEntryOrDirectResponseEntry) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
 {
   "virtual_hosts": [
     {
@@ -2583,6 +3167,10 @@ TEST(RouteMatcherTest, ExclusiveWeightedClustersEntryOrDirectResponseEntry) {
         {
           "prefix": "/foo",
           "host_redirect": "new.lyft.com"
+        },
+        {
+          "prefix": "/foo1",
+          "host_redirect": "[fe80::1]"
         }
       ]
     }
@@ -2591,7 +3179,7 @@ TEST(RouteMatcherTest, ExclusiveWeightedClustersEntryOrDirectResponseEntry) {
   )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  ConfigImpl config(parseRouteConfigurationFromJson(json), factory_context, true);
+  TestConfigImpl config(parseRouteConfigurationFromJson(json), factory_context, true);
 
   {
     Http::TestHeaderMapImpl headers = genRedirectHeaders("www.lyft.com", "/foo", true, true);
@@ -2607,14 +3195,32 @@ TEST(RouteMatcherTest, ExclusiveWeightedClustersEntryOrDirectResponseEntry) {
   }
 }
 
+struct Foo : public Envoy::Config::TypedMetadata::Object {};
+struct Baz : public Envoy::Config::TypedMetadata::Object {
+  Baz(std::string n) : name(n) {}
+  std::string name;
+};
+class BazFactory : public HttpRouteTypedMetadataFactory {
+public:
+  const std::string name() const { return "baz"; }
+  // Returns nullptr (conversion failure) if d is empty.
+  std::unique_ptr<const Envoy::Config::TypedMetadata::Object>
+  parse(const ProtobufWkt::Struct& d) const {
+    if (d.fields().find("name") != d.fields().end()) {
+      return std::make_unique<Baz>(d.fields().at("name").string_value());
+    }
+    throw EnvoyException("Cannot create a Baz when metadata is empty.");
+  }
+};
+
 TEST(RouteMatcherTest, WeightedClusters) {
-  std::string yaml = R"EOF(
+  const std::string yaml = R"EOF(
 virtual_hosts:
   - name: www1
     domains: ["www1.lyft.com"]
     routes:
       - match: { prefix: "/" }
-        metadata: { filter_metadata: { com.bar.foo: { baz: test_value } } }
+        metadata: { filter_metadata: { com.bar.foo: { baz: test_value }, baz: {name: meh} } }
         decorator:
           operation: hello
         route:
@@ -2671,9 +3277,11 @@ virtual_hosts:
             total_weight: 10000
   )EOF";
 
+  BazFactory baz_factory;
+  Registry::InjectFactory<HttpRouteTypedMetadataFactory> registered_factory(baz_factory);
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   auto& runtime = factory_context.runtime_loader_;
-  ConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, true);
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, true);
 
   {
     Http::TestHeaderMapImpl headers = genRedirectHeaders("www1.lyft.com", "/foo", true, true);
@@ -2696,18 +3304,19 @@ virtual_hosts:
     EXPECT_EQ(nullptr, route_entry->hashPolicy());
     EXPECT_TRUE(route_entry->opaqueConfig().empty());
     EXPECT_FALSE(route_entry->autoHostRewrite());
-    EXPECT_FALSE(route_entry->useOldStyleWebSocket());
     EXPECT_TRUE(route_entry->includeVirtualHostRateLimits());
     EXPECT_EQ(Http::Code::ServiceUnavailable, route_entry->clusterNotFoundResponseCode());
     EXPECT_EQ(nullptr, route_entry->corsPolicy());
     EXPECT_EQ("test_value",
               Envoy::Config::Metadata::metadataValue(route_entry->metadata(), "com.bar.foo", "baz")
                   .string_value());
+    EXPECT_EQ(nullptr, route_entry->typedMetadata().get<Foo>(baz_factory.name()));
+    EXPECT_EQ("meh", route_entry->typedMetadata().get<Baz>(baz_factory.name())->name);
     EXPECT_EQ("hello", route->decorator()->getOperation());
 
     Http::TestHeaderMapImpl response_headers;
-    RequestInfo::MockRequestInfo request_info;
-    route_entry->finalizeResponseHeaders(response_headers, request_info);
+    StreamInfo::MockStreamInfo stream_info;
+    route_entry->finalizeResponseHeaders(response_headers, stream_info);
     EXPECT_EQ(response_headers, Http::TestHeaderMapImpl{});
   }
 
@@ -2788,7 +3397,7 @@ virtual_hosts:
 }
 
 TEST(RouteMatcherTest, ExclusiveWeightedClustersOrClusterConfig) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
 {
   "virtual_hosts": [
     {
@@ -2813,12 +3422,12 @@ TEST(RouteMatcherTest, ExclusiveWeightedClustersOrClusterConfig) {
   )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  EXPECT_THROW(ConfigImpl(parseRouteConfigurationFromJson(json), factory_context, true),
+  EXPECT_THROW(TestConfigImpl(parseRouteConfigurationFromJson(json), factory_context, true),
                EnvoyException);
 }
 
 TEST(RouteMatcherTest, WeightedClustersMissingClusterList) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
 {
   "virtual_hosts": [
     {
@@ -2838,12 +3447,12 @@ TEST(RouteMatcherTest, WeightedClustersMissingClusterList) {
   )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  EXPECT_THROW(ConfigImpl(parseRouteConfigurationFromJson(json), factory_context, true),
+  EXPECT_THROW(TestConfigImpl(parseRouteConfigurationFromJson(json), factory_context, true),
                EnvoyException);
 }
 
 TEST(RouteMatcherTest, WeightedClustersEmptyClustersList) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
 {
   "virtual_hosts": [
     {
@@ -2864,7 +3473,7 @@ TEST(RouteMatcherTest, WeightedClustersEmptyClustersList) {
   )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  EXPECT_THROW(ConfigImpl(parseRouteConfigurationFromJson(json), factory_context, true),
+  EXPECT_THROW(TestConfigImpl(parseRouteConfigurationFromJson(json), factory_context, true),
                EnvoyException);
 }
 
@@ -2888,8 +3497,8 @@ virtual_hosts:
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   EXPECT_THROW_WITH_MESSAGE(
-      ConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context, true), EnvoyException,
-      "Sum of weights in the weighted_cluster should add up to 100");
+      TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context, true),
+      EnvoyException, "Sum of weights in the weighted_cluster should add up to 100");
 
   yaml = R"EOF(
 virtual_hosts:
@@ -2910,12 +3519,12 @@ virtual_hosts:
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
-      ConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context, true), EnvoyException,
-      "Sum of weights in the weighted_cluster should add up to 99");
+      TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context, true),
+      EnvoyException, "Sum of weights in the weighted_cluster should add up to 99");
 }
 
 TEST(RouteMatcherTest, TestWeightedClusterWithMissingWeights) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
 {
   "virtual_hosts": [
     {
@@ -2939,12 +3548,12 @@ TEST(RouteMatcherTest, TestWeightedClusterWithMissingWeights) {
   )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  EXPECT_THROW(ConfigImpl(parseRouteConfigurationFromJson(json), factory_context, true),
+  EXPECT_THROW(TestConfigImpl(parseRouteConfigurationFromJson(json), factory_context, true),
                EnvoyException);
 }
 
 TEST(RouteMatcherTest, TestWeightedClusterInvalidClusterName) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
 {
   "virtual_hosts": [
     {
@@ -2975,12 +3584,12 @@ TEST(RouteMatcherTest, TestWeightedClusterInvalidClusterName) {
   EXPECT_CALL(factory_context.cluster_manager_, get("cluster3-invalid"))
       .WillRepeatedly(Return(nullptr));
 
-  EXPECT_THROW(ConfigImpl(parseRouteConfigurationFromJson(json), factory_context, true),
+  EXPECT_THROW(TestConfigImpl(parseRouteConfigurationFromJson(json), factory_context, true),
                EnvoyException);
 }
 
 TEST(RouteMatcherTest, TestWeightedClusterHeaderManipulation) {
-  std::string yaml = R"EOF(
+  const std::string yaml = R"EOF(
 virtual_hosts:
   - name: www2
     domains: ["www.lyft.com"]
@@ -3014,8 +3623,8 @@ virtual_hosts:
   )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  ConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, true);
-  NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, true);
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
 
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
@@ -3023,10 +3632,10 @@ virtual_hosts:
     const RouteEntry* route = config.route(headers, 0)->routeEntry();
     EXPECT_EQ("cluster1", route->clusterName());
 
-    route->finalizeRequestHeaders(headers, request_info, true);
+    route->finalizeRequestHeaders(headers, stream_info, true);
     EXPECT_EQ("cluster1", headers.get_("x-req-cluster"));
 
-    route->finalizeResponseHeaders(resp_headers, request_info);
+    route->finalizeResponseHeaders(resp_headers, stream_info);
     EXPECT_EQ("cluster1", resp_headers.get_("x-resp-cluster"));
     EXPECT_FALSE(resp_headers.has("x-remove-cluster1"));
   }
@@ -3037,10 +3646,10 @@ virtual_hosts:
     const RouteEntry* route = config.route(headers, 55)->routeEntry();
     EXPECT_EQ("cluster2", route->clusterName());
 
-    route->finalizeRequestHeaders(headers, request_info, true);
+    route->finalizeRequestHeaders(headers, stream_info, true);
     EXPECT_EQ("cluster2", headers.get_("x-req-cluster"));
 
-    route->finalizeResponseHeaders(resp_headers, request_info);
+    route->finalizeResponseHeaders(resp_headers, stream_info);
     EXPECT_EQ("cluster2", resp_headers.get_("x-resp-cluster"));
     EXPECT_FALSE(resp_headers.has("x-remove-cluster2"));
   }
@@ -3055,7 +3664,7 @@ TEST(NullConfigImplTest, All) {
 }
 
 TEST(BadHttpRouteConfigurationsTest, BadRouteConfig) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "virtual_hosts": [
       {
@@ -3075,12 +3684,12 @@ TEST(BadHttpRouteConfigurationsTest, BadRouteConfig) {
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
 
-  EXPECT_THROW(ConfigImpl(parseRouteConfigurationFromJson(json), factory_context, true),
+  EXPECT_THROW(TestConfigImpl(parseRouteConfigurationFromJson(json), factory_context, true),
                EnvoyException);
 }
 
 TEST(BadHttpRouteConfigurationsTest, BadVirtualHostConfig) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "virtual_hosts": [
       {
@@ -3102,12 +3711,12 @@ TEST(BadHttpRouteConfigurationsTest, BadVirtualHostConfig) {
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
 
-  EXPECT_THROW(ConfigImpl(parseRouteConfigurationFromJson(json), factory_context, true),
+  EXPECT_THROW(TestConfigImpl(parseRouteConfigurationFromJson(json), factory_context, true),
                EnvoyException);
 }
 
 TEST(BadHttpRouteConfigurationsTest, BadRouteEntryConfig) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "virtual_hosts": [
       {
@@ -3127,12 +3736,12 @@ TEST(BadHttpRouteConfigurationsTest, BadRouteEntryConfig) {
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
 
-  EXPECT_THROW(ConfigImpl(parseRouteConfigurationFromJson(json), factory_context, true),
+  EXPECT_THROW(TestConfigImpl(parseRouteConfigurationFromJson(json), factory_context, true),
                EnvoyException);
 }
 
 TEST(BadHttpRouteConfigurationsTest, BadRouteEntryConfigPrefixAndPath) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "virtual_hosts": [
       {
@@ -3153,12 +3762,12 @@ TEST(BadHttpRouteConfigurationsTest, BadRouteEntryConfigPrefixAndPath) {
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
 
   EXPECT_THROW_WITH_MESSAGE(
-      ConfigImpl(parseRouteConfigurationFromJson(json), factory_context, true), EnvoyException,
+      TestConfigImpl(parseRouteConfigurationFromJson(json), factory_context, true), EnvoyException,
       "routes must specify one of prefix/path/regex");
 }
 
 TEST(BadHttpRouteConfigurationsTest, BadRouteEntryConfigPrefixAndRegex) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "virtual_hosts": [
       {
@@ -3179,12 +3788,12 @@ TEST(BadHttpRouteConfigurationsTest, BadRouteEntryConfigPrefixAndRegex) {
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
 
   EXPECT_THROW_WITH_MESSAGE(
-      ConfigImpl(parseRouteConfigurationFromJson(json), factory_context, true), EnvoyException,
+      TestConfigImpl(parseRouteConfigurationFromJson(json), factory_context, true), EnvoyException,
       "routes must specify one of prefix/path/regex");
 }
 
 TEST(BadHttpRouteConfigurationsTest, BadRouteEntryConfigPathAndRegex) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "virtual_hosts": [
       {
@@ -3205,13 +3814,13 @@ TEST(BadHttpRouteConfigurationsTest, BadRouteEntryConfigPathAndRegex) {
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
 
   EXPECT_THROW_WITH_MESSAGE(
-      ConfigImpl(parseRouteConfigurationFromJson(json), factory_context, true), EnvoyException,
+      TestConfigImpl(parseRouteConfigurationFromJson(json), factory_context, true), EnvoyException,
       "routes must specify one of prefix/path/regex");
   ;
 }
 
 TEST(BadHttpRouteConfigurationsTest, BadRouteEntryConfigPrefixAndPathAndRegex) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "virtual_hosts": [
       {
@@ -3233,12 +3842,12 @@ TEST(BadHttpRouteConfigurationsTest, BadRouteEntryConfigPrefixAndPathAndRegex) {
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
 
   EXPECT_THROW_WITH_MESSAGE(
-      ConfigImpl(parseRouteConfigurationFromJson(json), factory_context, true), EnvoyException,
+      TestConfigImpl(parseRouteConfigurationFromJson(json), factory_context, true), EnvoyException,
       "routes must specify one of prefix/path/regex");
 }
 
 TEST(BadHttpRouteConfigurationsTest, BadRouteEntryConfigMissingPathSpecifier) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "virtual_hosts": [
       {
@@ -3257,12 +3866,12 @@ TEST(BadHttpRouteConfigurationsTest, BadRouteEntryConfigMissingPathSpecifier) {
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
 
   EXPECT_THROW_WITH_MESSAGE(
-      ConfigImpl(parseRouteConfigurationFromJson(json), factory_context, true), EnvoyException,
+      TestConfigImpl(parseRouteConfigurationFromJson(json), factory_context, true), EnvoyException,
       "routes must specify one of prefix/path/regex");
 }
 
 TEST(BadHttpRouteConfigurationsTest, BadRouteEntryConfigNoRedirectNoClusters) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "virtual_hosts": [
       {
@@ -3281,12 +3890,12 @@ TEST(BadHttpRouteConfigurationsTest, BadRouteEntryConfigNoRedirectNoClusters) {
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
 
   EXPECT_THROW_WITH_MESSAGE(
-      ConfigImpl(parseRouteConfigurationFromJson(json), factory_context, true), EnvoyException,
+      TestConfigImpl(parseRouteConfigurationFromJson(json), factory_context, true), EnvoyException,
       "routes must have redirect or one of cluster/cluster_header/weighted_clusters")
 }
 
 TEST(RouteMatcherTest, TestOpaqueConfig) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
 {
   "virtual_hosts": [
     {
@@ -3308,7 +3917,7 @@ TEST(RouteMatcherTest, TestOpaqueConfig) {
 )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  ConfigImpl config(parseRouteConfigurationFromJson(json), factory_context, true);
+  TestConfigImpl config(parseRouteConfigurationFromJson(json), factory_context, true);
 
   const std::multimap<std::string, std::string>& opaque_config =
       config.route(genHeaders("api.lyft.com", "/api", "GET"), 0)->routeEntry()->opaqueConfig();
@@ -3339,7 +3948,8 @@ TEST(RoutePropertyTest, excludeVHRateLimits) {
   Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
   std::unique_ptr<ConfigImpl> config_ptr;
 
-  config_ptr.reset(new ConfigImpl(parseRouteConfigurationFromJson(json), factory_context, true));
+  config_ptr = std::make_unique<TestConfigImpl>(parseRouteConfigurationFromJson(json),
+                                                factory_context, true);
   EXPECT_TRUE(config_ptr->route(headers, 0)->routeEntry()->includeVirtualHostRateLimits());
 
   json = R"EOF(
@@ -3368,7 +3978,8 @@ TEST(RoutePropertyTest, excludeVHRateLimits) {
   }
   )EOF";
 
-  config_ptr.reset(new ConfigImpl(parseRouteConfigurationFromJson(json), factory_context, true));
+  config_ptr = std::make_unique<TestConfigImpl>(parseRouteConfigurationFromJson(json),
+                                                factory_context, true);
   EXPECT_FALSE(config_ptr->route(headers, 0)->routeEntry()->includeVirtualHostRateLimits());
 
   json = R"EOF(
@@ -3398,12 +4009,124 @@ TEST(RoutePropertyTest, excludeVHRateLimits) {
   }
   )EOF";
 
-  config_ptr.reset(new ConfigImpl(parseRouteConfigurationFromJson(json), factory_context, true));
+  config_ptr = std::make_unique<TestConfigImpl>(parseRouteConfigurationFromJson(json),
+                                                factory_context, true);
   EXPECT_TRUE(config_ptr->route(headers, 0)->routeEntry()->includeVirtualHostRateLimits());
 }
 
 TEST(RoutePropertyTest, TestVHostCorsConfig) {
-  std::string json = R"EOF(
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: "default"
+    domains: ["*"]
+    cors:
+      allow_origin: ["test-origin"]
+      allow_methods: "test-methods"
+      allow_headers: "test-headers"
+      expose_headers: "test-expose-headers"
+      max_age: "test-max-age"
+      allow_credentials: true
+      filter_enabled:
+        runtime_key: "cors.www.enabled"
+        default_value:
+          numerator: 0
+          denominator: "HUNDRED"
+      shadow_enabled:
+        runtime_key: "cors.www.shadow_enabled"
+        default_value:
+          numerator: 100
+          denominator: "HUNDRED"
+    routes:
+      - match:
+          prefix: "/api"
+        route:
+          cluster: "ats"
+)EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  Runtime::MockSnapshot snapshot;
+  EXPECT_CALL(snapshot,
+              featureEnabled("cors.www.enabled", Matcher<const envoy::type::FractionalPercent&>(_)))
+      .WillOnce(Return(false));
+  EXPECT_CALL(snapshot, featureEnabled("cors.www.shadow_enabled",
+                                       Matcher<const envoy::type::FractionalPercent&>(_)))
+      .WillOnce(Return(true));
+  EXPECT_CALL(factory_context.runtime_loader_, snapshot()).WillRepeatedly(ReturnRef(snapshot));
+
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, false);
+
+  const Router::CorsPolicy* cors_policy =
+      config.route(genHeaders("api.lyft.com", "/api", "GET"), 0)
+          ->routeEntry()
+          ->virtualHost()
+          .corsPolicy();
+
+  EXPECT_EQ(cors_policy->enabled(), false);
+  EXPECT_EQ(cors_policy->shadowEnabled(), true);
+  EXPECT_THAT(cors_policy->allowOrigins(), ElementsAreArray({"test-origin"}));
+  EXPECT_EQ(cors_policy->allowMethods(), "test-methods");
+  EXPECT_EQ(cors_policy->allowHeaders(), "test-headers");
+  EXPECT_EQ(cors_policy->exposeHeaders(), "test-expose-headers");
+  EXPECT_EQ(cors_policy->maxAge(), "test-max-age");
+  EXPECT_EQ(cors_policy->allowCredentials(), true);
+}
+
+TEST(RoutePropertyTest, TestRouteCorsConfig) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: "default"
+    domains: ["*"]
+    routes:
+      - match:
+          prefix: "/api"
+        route:
+          cluster: "ats"
+          cors:
+            allow_origin: ["test-origin"]
+            allow_methods: "test-methods"
+            allow_headers: "test-headers"
+            expose_headers: "test-expose-headers"
+            max_age: "test-max-age"
+            allow_credentials: true
+            filter_enabled:
+              runtime_key: "cors.www.enabled"
+              default_value:
+                numerator: 0
+                denominator: "HUNDRED"
+            shadow_enabled:
+              runtime_key: "cors.www.shadow_enabled"
+              default_value:
+                numerator: 100
+                denominator: "HUNDRED"
+)EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  Runtime::MockSnapshot snapshot;
+  EXPECT_CALL(snapshot,
+              featureEnabled("cors.www.enabled", Matcher<const envoy::type::FractionalPercent&>(_)))
+      .WillOnce(Return(false));
+  EXPECT_CALL(snapshot, featureEnabled("cors.www.shadow_enabled",
+                                       Matcher<const envoy::type::FractionalPercent&>(_)))
+      .WillOnce(Return(true));
+  EXPECT_CALL(factory_context.runtime_loader_, snapshot()).WillRepeatedly(ReturnRef(snapshot));
+
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, false);
+
+  const Router::CorsPolicy* cors_policy =
+      config.route(genHeaders("api.lyft.com", "/api", "GET"), 0)->routeEntry()->corsPolicy();
+
+  EXPECT_EQ(cors_policy->enabled(), false);
+  EXPECT_EQ(cors_policy->shadowEnabled(), true);
+  EXPECT_THAT(cors_policy->allowOrigins(), ElementsAreArray({"test-origin"}));
+  EXPECT_EQ(cors_policy->allowMethods(), "test-methods");
+  EXPECT_EQ(cors_policy->allowHeaders(), "test-headers");
+  EXPECT_EQ(cors_policy->exposeHeaders(), "test-expose-headers");
+  EXPECT_EQ(cors_policy->maxAge(), "test-max-age");
+  EXPECT_EQ(cors_policy->allowCredentials(), true);
+}
+
+TEST(RoutePropertyTest, TestVHostCorsLegacyConfig) {
+  const std::string json = R"EOF(
 {
   "virtual_hosts": [
     {
@@ -3429,7 +4152,7 @@ TEST(RoutePropertyTest, TestVHostCorsConfig) {
 )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  ConfigImpl config(parseRouteConfigurationFromJson(json), factory_context, true);
+  TestConfigImpl config(parseRouteConfigurationFromJson(json), factory_context, true);
 
   const Router::CorsPolicy* cors_policy =
       config.route(genHeaders("api.lyft.com", "/api", "GET"), 0)
@@ -3438,6 +4161,7 @@ TEST(RoutePropertyTest, TestVHostCorsConfig) {
           .corsPolicy();
 
   EXPECT_EQ(cors_policy->enabled(), true);
+  EXPECT_EQ(cors_policy->shadowEnabled(), false);
   EXPECT_THAT(cors_policy->allowOrigins(), ElementsAreArray({"test-origin"}));
   EXPECT_EQ(cors_policy->allowMethods(), "test-methods");
   EXPECT_EQ(cors_policy->allowHeaders(), "test-headers");
@@ -3446,8 +4170,8 @@ TEST(RoutePropertyTest, TestVHostCorsConfig) {
   EXPECT_EQ(cors_policy->allowCredentials(), true);
 }
 
-TEST(RoutePropertyTest, TestRouteCorsConfig) {
-  std::string json = R"EOF(
+TEST(RoutePropertyTest, TestRouteCorsLegacyConfig) {
+  const std::string json = R"EOF(
 {
   "virtual_hosts": [
     {
@@ -3458,12 +4182,12 @@ TEST(RoutePropertyTest, TestRouteCorsConfig) {
           "prefix": "/api",
           "cluster": "ats",
           "cors" : {
-              "allow_origin": ["test-origin"],
-              "allow_methods": "test-methods",
-              "allow_headers": "test-headers",
-              "expose_headers": "test-expose-headers",
-              "max_age": "test-max-age",
-              "allow_credentials": true
+            "allow_origin": ["test-origin"],
+            "allow_methods": "test-methods",
+            "allow_headers": "test-headers",
+            "expose_headers": "test-expose-headers",
+            "max_age": "test-max-age",
+            "allow_credentials": true
           }
         }
       ]
@@ -3473,12 +4197,13 @@ TEST(RoutePropertyTest, TestRouteCorsConfig) {
 )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  ConfigImpl config(parseRouteConfigurationFromJson(json), factory_context, true);
+  TestConfigImpl config(parseRouteConfigurationFromJson(json), factory_context, true);
 
   const Router::CorsPolicy* cors_policy =
       config.route(genHeaders("api.lyft.com", "/api", "GET"), 0)->routeEntry()->corsPolicy();
 
   EXPECT_EQ(cors_policy->enabled(), true);
+  EXPECT_EQ(cors_policy->shadowEnabled(), false);
   EXPECT_THAT(cors_policy->allowOrigins(), ElementsAreArray({"test-origin"}));
   EXPECT_EQ(cors_policy->allowMethods(), "test-methods");
   EXPECT_EQ(cors_policy->allowHeaders(), "test-headers");
@@ -3488,7 +4213,7 @@ TEST(RoutePropertyTest, TestRouteCorsConfig) {
 }
 
 TEST(RoutePropertyTest, TestBadCorsConfig) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
 {
   "virtual_hosts": [
     {
@@ -3511,12 +4236,12 @@ TEST(RoutePropertyTest, TestBadCorsConfig) {
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
 
-  EXPECT_THROW(ConfigImpl(parseRouteConfigurationFromJson(json), factory_context, true),
+  EXPECT_THROW(TestConfigImpl(parseRouteConfigurationFromJson(json), factory_context, true),
                EnvoyException);
 }
 
 TEST(RouterMatcherTest, Decorator) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
 {
   "virtual_hosts": [
     {
@@ -3541,7 +4266,7 @@ TEST(RouterMatcherTest, Decorator) {
   )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  ConfigImpl config(parseRouteConfigurationFromJson(json), factory_context, true);
+  TestConfigImpl config(parseRouteConfigurationFromJson(json), factory_context, true);
 
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
@@ -3600,11 +4325,11 @@ TEST(CustomRequestHeadersTest, AddNewHeader) {
   }
   )EOF";
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
-  ConfigImpl config(parseRouteConfigurationFromJson(json), factory_context, true);
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  TestConfigImpl config(parseRouteConfigurationFromJson(json), factory_context, true);
   Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/new_endpoint/foo", "GET");
   const RouteEntry* route = config.route(headers, 0)->routeEntry();
-  route->finalizeRequestHeaders(headers, request_info, true);
+  route->finalizeRequestHeaders(headers, stream_info, true);
   EXPECT_EQ("127.0.0.1", headers.get_("x-client-ip"));
 }
 
@@ -3651,9 +4376,9 @@ TEST(CustomRequestHeadersTest, CustomHeaderWrongFormat) {
   }
   )EOF";
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   EXPECT_THROW_WITH_MESSAGE(
-      ConfigImpl config(parseRouteConfigurationFromJson(json), factory_context, true),
+      TestConfigImpl config(parseRouteConfigurationFromJson(json), factory_context, true),
       EnvoyException,
       "Invalid header configuration. Un-terminated variable expression "
       "'DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT'");
@@ -3795,7 +4520,7 @@ TEST(RouteEntryMetadataMatchTest, ParsesMetadata) {
       .set_string_value("r4_value");
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  ConfigImpl config(route_config, factory_context, true);
+  TestConfigImpl config(route_config, factory_context, true);
 
   {
     Http::TestHeaderMapImpl headers = genRedirectHeaders("www.lyft.com", "/both", true, true);
@@ -3884,7 +4609,7 @@ TEST(ConfigUtility, ParseDirectResponseBody) {
 }
 
 TEST(RouteConfigurationV2, RedirectCode) {
-  std::string yaml = R"EOF(
+  const std::string yaml = R"EOF(
 name: foo
 virtual_hosts:
   - name: redirect
@@ -3896,7 +4621,7 @@ virtual_hosts:
   )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  ConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, true);
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, true);
 
   EXPECT_EQ(nullptr, config.route(genRedirectHeaders("www.foo.com", "/foo", true, true), 0));
 
@@ -3911,7 +4636,7 @@ virtual_hosts:
 
 // Test the parsing of direct response configurations within routes.
 TEST(RouteConfigurationV2, DirectResponse) {
-  std::string yaml = R"EOF(
+  const std::string yaml = R"EOF(
 name: foo
 virtual_hosts:
   - name: direct
@@ -3922,7 +4647,7 @@ virtual_hosts:
   )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  ConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, true);
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, true);
 
   const auto* direct_response =
       config.route(genHeaders("example.com", "/", "GET"), 0)->directResponseEntry();
@@ -3934,7 +4659,7 @@ virtual_hosts:
 // Test the parsing of a direct response configuration where the response body is too large.
 TEST(RouteConfigurationV2, DirectResponseTooLarge) {
   std::string response_body(4097, 'A');
-  std::string yaml = R"EOF(
+  const std::string yaml = R"EOF(
 name: foo
 virtual_hosts:
   - name: direct
@@ -3945,11 +4670,11 @@ virtual_hosts:
           status: 200
           body:
             inline_string: )EOF" +
-                     response_body + "\n";
+                           response_body + "\n";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   EXPECT_THROW_WITH_MESSAGE(
-      ConfigImpl invalid_config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, true),
+      TestConfigImpl invalid_config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, true),
       EnvoyException, "response body size is 4097 bytes; maximum is 4096");
 }
 
@@ -3963,8 +4688,29 @@ void checkPathMatchCriterion(const Route* route, const std::string& expected_mat
   EXPECT_EQ(expected_type, match_criterion.matchType());
 }
 
+// Test loading broken config throws EnvoyException.
+TEST(RouteConfigurationV2, BrokenTypedMetadata) {
+  const std::string yaml = R"EOF(
+name: foo
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/"}
+        route: { cluster: www2 }
+        metadata: { filter_metadata: { com.bar.foo: { baz: test_value },
+                                       baz: {} } }
+  )EOF";
+  BazFactory baz_factory;
+  Registry::InjectFactory<HttpRouteTypedMetadataFactory> registered_factory(baz_factory);
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, true),
+      Envoy::EnvoyException, "Cannot create a Baz when metadata is empty.");
+}
+
 TEST(RouteConfigurationV2, RouteConfigGetters) {
-  std::string yaml = R"EOF(
+  const std::string yaml = R"EOF(
 name: foo
 virtual_hosts:
   - name: bar
@@ -3976,11 +4722,12 @@ virtual_hosts:
         route: { cluster: ww2 }
       - match: { prefix: "/"}
         route: { cluster: www2 }
-        metadata: { filter_metadata: { com.bar.foo: { baz: test_value } } }
+        metadata: { filter_metadata: { com.bar.foo: { baz: test_value }, baz: {name: bluh} } }
   )EOF";
-
+  BazFactory baz_factory;
+  Registry::InjectFactory<HttpRouteTypedMetadataFactory> registered_factory(baz_factory);
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  const ConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, true);
+  const TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, true);
 
   checkPathMatchCriterion(config.route(genHeaders("www.foo.com", "/regex", "GET"), 0).get(),
                           "/rege[xy]", PathMatchType::Regex);
@@ -3991,9 +4738,13 @@ virtual_hosts:
 
   const auto route_entry = route->routeEntry();
   const auto& metadata = route_entry->metadata();
+  const auto& typed_metadata = route_entry->typedMetadata();
 
   EXPECT_EQ("test_value",
             Envoy::Config::Metadata::metadataValue(metadata, "com.bar.foo", "baz").string_value());
+  EXPECT_NE(nullptr, typed_metadata.get<Baz>(baz_factory.name()));
+  EXPECT_EQ("bluh", typed_metadata.get<Baz>(baz_factory.name())->name);
+
   EXPECT_EQ("bar", route_entry->virtualHost().name());
   EXPECT_EQ("foo", route_entry->virtualHost().routeConfig().name());
 }
@@ -4027,8 +4778,8 @@ virtual_hosts:
   )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  ConfigImpl config(parseRouteConfigurationFromV2Yaml(RedirectPrefixRewrite), factory_context,
-                    true);
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(RedirectPrefixRewrite), factory_context,
+                        true);
 
   EXPECT_EQ(nullptr, config.route(genRedirectHeaders("www.foo.com", "/foo", true, true), 0));
 
@@ -4147,7 +4898,8 @@ virtual_hosts:
   )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  ConfigImpl config(parseRouteConfigurationFromV2Yaml(RouteDynPathRedirect), factory_context, true);
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(RouteDynPathRedirect), factory_context,
+                        true);
 
   EXPECT_EQ(nullptr, config.route(genRedirectHeaders("www.foo.com", "/foo", true, true), 0));
 
@@ -4188,7 +4940,7 @@ virtual_hosts:
 }
 
 TEST(RouteMatcherTest, HeaderMatchedRoutingV2) {
-  std::string yaml = R"EOF(
+  const std::string yaml = R"EOF(
 name: foo
 virtual_hosts:
   - name: local_service
@@ -4282,7 +5034,7 @@ virtual_hosts:
   )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  ConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, true);
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, true);
 
   {
     EXPECT_EQ("local_service_without_headers",
@@ -4378,7 +5130,7 @@ virtual_hosts:
   )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  ConfigImpl config(parseRouteConfigurationFromV2Yaml(RegexRewrite), factory_context, true);
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(RegexRewrite), factory_context, true);
 
   {
     // Get our regex route entry
@@ -4390,8 +5142,8 @@ virtual_hosts:
     headers.addCopy(":path", "/not-the-original-regex");
 
     // no re-write was specified; so this should not throw
-    NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
-    EXPECT_NO_THROW(route_entry->finalizeRequestHeaders(headers, request_info, false));
+    NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+    EXPECT_NO_THROW(route_entry->finalizeRequestHeaders(headers, stream_info, false));
   }
 }
 
@@ -4408,7 +5160,7 @@ virtual_hosts:
   )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  ConfigImpl config(parseRouteConfigurationFromV2Yaml(NoIdleTimeot), factory_context, true);
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(NoIdleTimeot), factory_context, true);
   Http::TestHeaderMapImpl headers = genRedirectHeaders("idle.lyft.com", "/regex", true, false);
   const RouteEntry* route_entry = config.route(headers, 0)->routeEntry();
   EXPECT_EQ(absl::nullopt, route_entry->idleTimeout());
@@ -4428,7 +5180,7 @@ virtual_hosts:
   )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  ConfigImpl config(parseRouteConfigurationFromV2Yaml(ZeroIdleTimeot), factory_context, true);
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(ZeroIdleTimeot), factory_context, true);
   Http::TestHeaderMapImpl headers = genRedirectHeaders("idle.lyft.com", "/regex", true, false);
   const RouteEntry* route_entry = config.route(headers, 0)->routeEntry();
   EXPECT_EQ(0, route_entry->idleTimeout().value().count());
@@ -4448,10 +5200,121 @@ virtual_hosts:
   )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  ConfigImpl config(parseRouteConfigurationFromV2Yaml(ExplicitIdleTimeot), factory_context, true);
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(ExplicitIdleTimeot), factory_context,
+                        true);
   Http::TestHeaderMapImpl headers = genRedirectHeaders("idle.lyft.com", "/regex", true, false);
   const RouteEntry* route_entry = config.route(headers, 0)->routeEntry();
   EXPECT_EQ(7 * 1000, route_entry->idleTimeout().value().count());
+}
+
+TEST(RouteConfigurationV2, RetriableStatusCodes) {
+  const std::string ExplicitIdleTimeot = R"EOF(
+name: RetriableStatusCodes
+virtual_hosts:
+  - name: regex
+    domains: [idle.lyft.com]
+    routes:
+      - match: { regex: "/regex"}
+        route:
+          cluster: some-cluster
+          retry_policy:
+            retriable_status_codes: [100, 200]
+  )EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(ExplicitIdleTimeot), factory_context,
+                        true);
+  Http::TestHeaderMapImpl headers = genRedirectHeaders("idle.lyft.com", "/regex", true, false);
+  const auto& retry_policy = config.route(headers, 0)->routeEntry()->retryPolicy();
+  const std::vector<uint32_t> expected_codes{100, 200};
+  EXPECT_EQ(expected_codes, retry_policy.retriableStatusCodes());
+}
+
+TEST(RouteConfigurationV2, UpgradeConfigs) {
+  const std::string UpgradeYaml = R"EOF(
+name: RetriableStatusCodes
+virtual_hosts:
+  - name: regex
+    domains: [idle.lyft.com]
+    routes:
+      - match: { regex: "/regex"}
+        route:
+          cluster: some-cluster
+          upgrade_configs:
+            - upgrade_type: Websocket
+            - upgrade_type: disabled
+              enabled: false
+  )EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(UpgradeYaml), factory_context, true);
+  Http::TestHeaderMapImpl headers = genRedirectHeaders("idle.lyft.com", "/regex", true, false);
+  const RouteEntry::UpgradeMap& upgrade_map = config.route(headers, 0)->routeEntry()->upgradeMap();
+  EXPECT_TRUE(upgrade_map.find("websocket")->second);
+  EXPECT_TRUE(upgrade_map.find("foo") == upgrade_map.end());
+  EXPECT_FALSE(upgrade_map.find("disabled")->second);
+}
+
+TEST(RouteConfigurationV2, DuplicateUpgradeConfigs) {
+  const std::string yaml = R"EOF(
+name: RetriableStatusCodes
+virtual_hosts:
+  - name: regex
+    domains: [idle.lyft.com]
+    routes:
+      - match: { regex: "/regex"}
+        route:
+          cluster: some-cluster
+          upgrade_configs:
+            - upgrade_type: Websocket
+            - upgrade_type: WebSocket
+              enabled: false
+  )EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context, true),
+      EnvoyException, "Duplicate upgrade WebSocket");
+}
+
+// Verifies that we're creating a new instance of the retry plugins on each call instead of always
+// returning the same one.
+TEST(RouteConfigurationV2, RetryPluginsAreNotReused) {
+  const std::string ExplicitIdleTimeot = R"EOF(
+name: RetriableStatusCodes
+virtual_hosts:
+  - name: regex
+    domains: [idle.lyft.com]
+    routes:
+      - match: { regex: "/regex"}
+        route:
+          cluster: some-cluster
+          retry_policy:
+            retry_host_predicate:
+            - name: envoy.test_host_predicate
+            retry_priority:
+              name: envoy.test_retry_priority
+  )EOF";
+
+  Upstream::MockRetryPriority priority({});
+  Upstream::MockRetryPriorityFactory priority_factory(priority);
+  Registry::InjectFactory<Upstream::RetryPriorityFactory> inject_priority_factory(priority_factory);
+
+  Upstream::TestRetryHostPredicateFactory host_predicate_factory;
+  Registry::InjectFactory<Upstream::RetryHostPredicateFactory> inject_predicate_factory(
+      host_predicate_factory);
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(ExplicitIdleTimeot), factory_context,
+                        true);
+  Http::TestHeaderMapImpl headers = genRedirectHeaders("idle.lyft.com", "/regex", true, false);
+  const auto& retry_policy = config.route(headers, 0)->routeEntry()->retryPolicy();
+  const auto priority1 = retry_policy.retryPriority();
+  const auto priority2 = retry_policy.retryPriority();
+  EXPECT_NE(priority1, priority2);
+  const auto predicates1 = retry_policy.retryHostPredicates();
+  const auto predicates2 = retry_policy.retryHostPredicates();
+  EXPECT_NE(predicates1, predicates2);
 }
 
 class PerFilterConfigsTest : public testing::Test {
@@ -4490,11 +5353,14 @@ public:
                                        Server::Configuration::FactoryContext&) override {
       NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
     }
+    ProtobufTypes::MessagePtr createEmptyRouteConfigProto() override {
+      return ProtobufTypes::MessagePtr{new ProtobufWkt::Timestamp()};
+    }
   };
 
   void checkEach(const std::string& yaml, uint32_t expected_entry, uint32_t expected_route,
                  uint32_t expected_vhost) {
-    const ConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
+    const TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
 
     const auto route = config.route(genHeaders("www.foo.com", "/", "GET"), 0);
     const auto* route_entry = route->routeEntry();
@@ -4515,7 +5381,7 @@ public:
   }
 
   void checkNoPerFilterConfig(const std::string& yaml) {
-    const ConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
+    const TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
 
     const auto route = config.route(genHeaders("www.foo.com", "/", "GET"), 0);
     const auto* route_entry = route->routeEntry();
@@ -4535,8 +5401,51 @@ public:
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
 };
 
+TEST_F(PerFilterConfigsTest, TypedConfigFilterError) {
+  {
+    const std::string yaml = R"EOF(
+name: foo
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: baz }
+    per_filter_config: { unknown.filter: {} }
+    typed_per_filter_config:
+      unknown.filter:
+        "@type": type.googleapis.com/google.protobuf.Timestamp
+)EOF";
+
+    EXPECT_THROW_WITH_MESSAGE(
+        TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
+        EnvoyException, "Only one of typed_configs or configs can be specified");
+  }
+
+  {
+    const std::string yaml = R"EOF(
+name: foo
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: baz }
+        per_filter_config: { unknown.filter: {} }
+        typed_per_filter_config:
+          unknown.filter:
+            "@type": type.googleapis.com/google.protobuf.Timestamp
+)EOF";
+
+    EXPECT_THROW_WITH_MESSAGE(
+        TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
+        EnvoyException, "Only one of typed_configs or configs can be specified");
+  }
+}
+
 TEST_F(PerFilterConfigsTest, UnknownFilter) {
-  std::string yaml = R"EOF(
+  {
+    const std::string yaml = R"EOF(
 name: foo
 virtual_hosts:
   - name: bar
@@ -4547,15 +5456,13 @@ virtual_hosts:
     per_filter_config: { unknown.filter: {} }
 )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(
-      ConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true), EnvoyException,
-      "Didn't find a registered implementation for name: 'unknown.filter'");
-}
+    EXPECT_THROW_WITH_MESSAGE(
+        TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
+        EnvoyException, "Didn't find a registered implementation for name: 'unknown.filter'");
+  }
 
-// Test that a trivially specified NamedHttpFilterConfigFactory ignores per_filter_config without
-// error.
-TEST_F(PerFilterConfigsTest, DefaultFilterImplementation) {
-  std::string yaml = R"EOF(
+  {
+    const std::string yaml = R"EOF(
 name: foo
 virtual_hosts:
   - name: bar
@@ -4563,14 +5470,57 @@ virtual_hosts:
     routes:
       - match: { prefix: "/" }
         route: { cluster: baz }
-    per_filter_config: { test.default.filter: { unknown_key: 123} }
+    typed_per_filter_config:
+      unknown.filter:
+        "@type": type.googleapis.com/google.protobuf.Timestamp
 )EOF";
 
-  checkNoPerFilterConfig(yaml);
+    EXPECT_THROW_WITH_MESSAGE(
+        TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
+        EnvoyException, "Didn't find a registered implementation for name: 'unknown.filter'");
+  }
+}
+
+// Test that a trivially specified NamedHttpFilterConfigFactory ignores per_filter_config without
+// error.
+TEST_F(PerFilterConfigsTest, DefaultFilterImplementation) {
+  {
+    const std::string yaml = R"EOF(
+name: foo
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: baz }
+    per_filter_config: { test.default.filter: { seconds: 123} }
+)EOF";
+
+    checkNoPerFilterConfig(yaml);
+  }
+
+  {
+    const std::string yaml = R"EOF(
+name: foo
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: baz }
+    typed_per_filter_config:
+      test.default.filter:
+        "@type": type.googleapis.com/google.protobuf.Timestamp
+        value:
+          seconds: 123
+)EOF";
+
+    checkNoPerFilterConfig(yaml);
+  }
 }
 
 TEST_F(PerFilterConfigsTest, RouteLocalConfig) {
-  std::string yaml = R"EOF(
+  const std::string yaml = R"EOF(
 name: foo
 virtual_hosts:
   - name: bar
@@ -4585,8 +5535,32 @@ virtual_hosts:
   checkEach(yaml, 123, 123, 456);
 }
 
+TEST_F(PerFilterConfigsTest, RouteLocalTypedConfig) {
+  const std::string yaml = R"EOF(
+name: foo
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: baz }
+        typed_per_filter_config:
+          test.filter:
+            "@type": type.googleapis.com/google.protobuf.Timestamp
+            value:
+              seconds: 123
+    typed_per_filter_config:
+      test.filter:
+        "@type": type.googleapis.com/google.protobuf.Struct
+        value:
+          seconds: 456
+)EOF";
+
+  checkEach(yaml, 123, 123, 456);
+}
+
 TEST_F(PerFilterConfigsTest, WeightedClusterConfig) {
-  std::string yaml = R"EOF(
+  const std::string yaml = R"EOF(
 name: foo
 virtual_hosts:
   - name: bar
@@ -4606,7 +5580,7 @@ virtual_hosts:
 }
 
 TEST_F(PerFilterConfigsTest, WeightedClusterFallthroughConfig) {
-  std::string yaml = R"EOF(
+  const std::string yaml = R"EOF(
 name: foo
 virtual_hosts:
   - name: bar

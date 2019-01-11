@@ -7,8 +7,8 @@
 #include "common/common/logger.h"
 #include "common/grpc/codec.h"
 #include "common/http/codec_client.h"
-#include "common/request_info/request_info_impl.h"
 #include "common/router/header_parser.h"
+#include "common/stream_info/stream_info_impl.h"
 #include "common/upstream/health_checker_base_impl.h"
 
 #include "src/proto/grpc/health/v1/health.pb.h"
@@ -55,7 +55,8 @@ private:
     ~HttpActiveHealthCheckSession();
 
     void onResponseComplete();
-    bool isHealthCheckSucceeded();
+    enum class HealthCheckResult { Succeeded, Degraded, Failed };
+    HealthCheckResult healthCheckResult();
 
     // ActiveHealthCheckSession
     void onInterval() override;
@@ -70,6 +71,7 @@ private:
       }
     }
     void decodeTrailers(Http::HeaderMapPtr&&) override { onResponseComplete(); }
+    void decodeMetadata(Http::MetadataMapPtr&&) override {}
 
     // Http::StreamCallbacks
     void onResetStream(Http::StreamResetReason reason) override;
@@ -174,7 +176,7 @@ public:
  * binary block can be of arbitrary length and is just concatenated together when sent.
  *
  * On the receive side, "fuzzy" matching is performed such that each binary block must be found,
- * and in the order specified, but not necessarly contiguous. Thus, in the example above,
+ * and in the order specified, but not necessary contiguous. Thus, in the example above,
  * "FFFFFFFF" could be inserted in the response between "EEEEEEEE" and "01000000" and the check
  * would still pass.
  */
@@ -280,6 +282,7 @@ private:
     void decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) override;
     void decodeData(Buffer::Instance&, bool end_stream) override;
     void decodeTrailers(Http::HeaderMapPtr&&) override;
+    void decodeMetadata(Http::MetadataMapPtr&&) override {}
 
     // Http::StreamCallbacks
     void onResetStream(Http::StreamResetReason reason) override;
@@ -336,6 +339,7 @@ private:
 
   const Protobuf::MethodDescriptor& service_method_;
   absl::optional<std::string> service_name_;
+  absl::optional<std::string> authority_value_;
 };
 
 /**

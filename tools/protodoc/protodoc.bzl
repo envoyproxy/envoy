@@ -78,7 +78,6 @@ def _proto_doc_aspect_impl(target, ctx):
     return [OutputGroupInfo(rst = transitive_outputs)]
 
 proto_doc_aspect = aspect(
-    implementation = _proto_doc_aspect_impl,
     attr_aspects = ["deps"],
     attrs = {
         "_protoc": attr.label(
@@ -92,4 +91,5 @@ proto_doc_aspect = aspect(
             cfg = "host",
         ),
     },
+    implementation = _proto_doc_aspect_impl,
 )

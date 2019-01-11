@@ -116,7 +116,7 @@ And now you can execute it with::
 
   $ docker run -d --name envoy -p 9901:9901 -p 10000:10000 envoy:v1
 
-And finally test is using::
+And finally, test it using::
 
   $ curl -v localhost:10000
 
@@ -146,11 +146,15 @@ features. The following sandboxes are available:
 .. toctree::
     :maxdepth: 1
 
+    sandboxes/cors
+    Fault Injection <https://github.com/envoyproxy/envoy/tree/master/examples/fault-injection>
     sandboxes/front_proxy
-    sandboxes/zipkin_tracing
-    sandboxes/jaeger_tracing
-    sandboxes/jaeger_native_tracing
     sandboxes/grpc_bridge
+    sandboxes/jaeger_native_tracing
+    sandboxes/jaeger_tracing
+    Lua <https://github.com/envoyproxy/envoy/tree/master/examples/lua>
+    Redis <https://github.com/envoyproxy/envoy/tree/master/examples/redis>
+    sandboxes/zipkin_tracing
 
 Other use cases
 ---------------
@@ -162,3 +166,4 @@ source distributions that target specific use cases.
     :maxdepth: 1
 
     distro/ambassador
+    distro/gloo

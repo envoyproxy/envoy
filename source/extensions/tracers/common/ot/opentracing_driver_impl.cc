@@ -2,6 +2,8 @@
 
 #include <sstream>
 
+#include "envoy/stats/store.h"
+
 #include "common/common/assert.h"
 #include "common/common/base64.h"
 #include "common/common/utility.h"

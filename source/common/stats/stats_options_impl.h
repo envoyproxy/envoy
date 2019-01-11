@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-#include "envoy/stats/stats.h"
+#include "envoy/stats/stats_options.h"
 
 namespace Envoy {
 namespace Stats {

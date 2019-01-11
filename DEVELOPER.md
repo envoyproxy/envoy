@@ -1,6 +1,6 @@
 # Developer documentation
 
-Envoy is built using the Bazel build system. Travis CI builds, tests, and runs coverage against all pull requests and the master branch.
+Envoy is built using the Bazel build system. CircleCI builds, tests, and runs coverage against all pull requests and the master branch.
 
 To get started building Envoy locally, see the [Bazel quick start](https://github.com/envoyproxy/envoy/blob/master/bazel/README.md#quick-start-bazel-build-for-developers). To run tests, there are Bazel [targets](https://github.com/envoyproxy/envoy/blob/master/bazel/README.md#testing-envoy-with-bazel) for Google Test. To generate a coverage report, use the tooling for [gcovr](https://github.com/envoyproxy/envoy/blob/master/bazel/README.md#coverage-builds).
 
@@ -20,9 +20,13 @@ Below is a list of additional documentation to aid the development process:
 
 - [Guide to contributing to Envoy](https://github.com/envoyproxy/envoy/blob/master/CONTRIBUTING.md)
 
+- [Overview of Envoy's testing frameworks](https://github.com/envoyproxy/envoy/blob/master/test/README.md)
+
 - [Overview of how to write integration tests for new code](https://github.com/envoyproxy/envoy/blob/master/test/integration/README.md)
 
 - [Envoy filter example project (how to consume and extend Envoy as a submodule)](https://github.com/envoyproxy/envoy-filter-example)
+
+- [Performance testing Envoy with `tcmalloc`/`pprof`](https://github.com/envoyproxy/envoy/blob/master/bazel/PPROF.md)
 
 And some documents on components of Envoy architecture:
 

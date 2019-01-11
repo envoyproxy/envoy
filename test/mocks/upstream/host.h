@@ -75,6 +75,7 @@ public:
 
   MOCK_CONST_METHOD0(address, Network::Address::InstanceConstSharedPtr());
   MOCK_CONST_METHOD0(healthCheckAddress, Network::Address::InstanceConstSharedPtr());
+  MOCK_METHOD1(setHealthCheckAddress, void(Network::Address::InstanceConstSharedPtr));
   MOCK_CONST_METHOD0(canary, bool());
   MOCK_METHOD1(canary, void(bool new_canary));
   MOCK_CONST_METHOD0(metadata, const std::shared_ptr<envoy::api::v2::core::Metadata>());
@@ -85,6 +86,8 @@ public:
   MOCK_CONST_METHOD0(hostname, const std::string&());
   MOCK_CONST_METHOD0(stats, HostStats&());
   MOCK_CONST_METHOD0(locality, const envoy::api::v2::core::Locality&());
+  MOCK_CONST_METHOD0(priority, uint32_t());
+  MOCK_METHOD1(priority, void(uint32_t));
 
   std::string hostname_;
   Network::Address::InstanceConstSharedPtr address_;
@@ -105,9 +108,9 @@ public:
   MockHost();
   ~MockHost();
 
-  CreateConnectionData
-  createConnection(Event::Dispatcher& dispatcher,
-                   const Network::ConnectionSocket::OptionsSharedPtr& options) const override {
+  CreateConnectionData createConnection(Event::Dispatcher& dispatcher,
+                                        const Network::ConnectionSocket::OptionsSharedPtr& options,
+                                        Network::TransportSocketOptionsSharedPtr) const override {
     MockCreateConnectionData data = createConnection_(dispatcher, options);
     return {Network::ClientConnectionPtr{data.connection_}, data.host_description_};
   }
@@ -127,6 +130,7 @@ public:
 
   MOCK_CONST_METHOD0(address, Network::Address::InstanceConstSharedPtr());
   MOCK_CONST_METHOD0(healthCheckAddress, Network::Address::InstanceConstSharedPtr());
+  MOCK_METHOD1(setHealthCheckAddress, void(Network::Address::InstanceConstSharedPtr));
   MOCK_CONST_METHOD0(canary, bool());
   MOCK_METHOD1(canary, void(bool new_canary));
   MOCK_CONST_METHOD0(metadata, const std::shared_ptr<envoy::api::v2::core::Metadata>());
@@ -141,8 +145,10 @@ public:
   MOCK_CONST_METHOD0(healthChecker, HealthCheckHostMonitor&());
   MOCK_METHOD1(healthFlagClear, void(HealthFlag flag));
   MOCK_CONST_METHOD1(healthFlagGet, bool(HealthFlag flag));
+  MOCK_CONST_METHOD0(getActiveHealthFailureType, ActiveHealthFailureType());
   MOCK_METHOD1(healthFlagSet, void(HealthFlag flag));
-  MOCK_CONST_METHOD0(healthy, bool());
+  MOCK_METHOD1(setActiveHealthFailureType, void(ActiveHealthFailureType type));
+  MOCK_CONST_METHOD0(health, Host::Health());
   MOCK_CONST_METHOD0(hostname, const std::string&());
   MOCK_CONST_METHOD0(outlierDetector, Outlier::DetectorHostMonitor&());
   MOCK_METHOD1(setHealthChecker_, void(HealthCheckHostMonitorPtr& health_checker));
@@ -153,6 +159,8 @@ public:
   MOCK_CONST_METHOD0(used, bool());
   MOCK_METHOD1(used, void(bool new_used));
   MOCK_CONST_METHOD0(locality, const envoy::api::v2::core::Locality&());
+  MOCK_CONST_METHOD0(priority, uint32_t());
+  MOCK_METHOD1(priority, void(uint32_t));
 
   testing::NiceMock<MockClusterInfo> cluster_;
   testing::NiceMock<Outlier::MockDetectorHostMonitor> outlier_detector_;

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <netinet/ip.h>
+#include <netinet/in.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/un.h>
@@ -97,8 +97,8 @@ public:
 
   // Network::Address::Instance
   bool operator==(const Instance& rhs) const override;
-  Api::SysCallResult bind(int fd) const override;
-  Api::SysCallResult connect(int fd) const override;
+  Api::SysCallIntResult bind(int fd) const override;
+  Api::SysCallIntResult connect(int fd) const override;
   const Ip* ip() const override { return &ip_; }
   int socket(SocketType type) const override;
 
@@ -157,8 +157,8 @@ public:
 
   // Network::Address::Instance
   bool operator==(const Instance& rhs) const override;
-  Api::SysCallResult bind(int fd) const override;
-  Api::SysCallResult connect(int fd) const override;
+  Api::SysCallIntResult bind(int fd) const override;
+  Api::SysCallIntResult connect(int fd) const override;
   const Ip* ip() const override { return &ip_; }
   int socket(SocketType type) const override;
 
@@ -214,8 +214,8 @@ public:
 
   // Network::Address::Instance
   bool operator==(const Instance& rhs) const override;
-  Api::SysCallResult bind(int fd) const override;
-  Api::SysCallResult connect(int fd) const override;
+  Api::SysCallIntResult bind(int fd) const override;
+  Api::SysCallIntResult connect(int fd) const override;
   const Ip* ip() const override { return nullptr; }
   int socket(SocketType type) const override;
 

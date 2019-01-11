@@ -1,5 +1,7 @@
 // Usage: bazel run //test/common/upstream:load_balancer_benchmark
 
+#include <memory>
+
 #include "common/runtime/runtime_impl.h"
 #include "common/upstream/maglev_lb.h"
 #include "common/upstream/ring_hash_lb.h"
@@ -30,7 +32,9 @@ public:
                                    should_weight ? weight : 1));
     }
     HostVectorConstSharedPtr updated_hosts{new HostVector(hosts)};
-    host_set.updateHosts(updated_hosts, updated_hosts, nullptr, nullptr, {}, hosts, {});
+    host_set.updateHosts(
+        HostSetImpl::updateHostsParams(updated_hosts, nullptr, updated_hosts, nullptr), {}, hosts,
+        {}, absl::nullopt);
   }
 
   PrioritySetImpl priority_set_;
@@ -42,8 +46,8 @@ public:
   RingHashTester(uint64_t num_hosts, uint64_t min_ring_size) : BaseTester(num_hosts) {
     config_ = (envoy::api::v2::Cluster::RingHashLbConfig());
     config_.value().mutable_minimum_ring_size()->set_value(min_ring_size);
-    ring_hash_lb_.reset(new RingHashLoadBalancer{priority_set_, stats_, runtime_, random_, config_,
-                                                 common_config_});
+    ring_hash_lb_ = std::make_unique<RingHashLoadBalancer>(priority_set_, stats_, runtime_, random_,
+                                                           config_, common_config_);
   }
 
   Stats::IsolatedStoreImpl stats_store_;
@@ -97,13 +101,10 @@ BENCHMARK(BM_MaglevLoadBalancerBuildTable)
     ->Arg(500)
     ->Unit(benchmark::kMillisecond);
 
-class TestLoadBalancerContext : public LoadBalancerContext {
+class TestLoadBalancerContext : public LoadBalancerContextBase {
 public:
   // Upstream::LoadBalancerContext
   absl::optional<uint64_t> computeHashKey() override { return hash_key_; }
-  const Router::MetadataMatchCriteria* metadataMatchCriteria() override { return nullptr; }
-  const Network::Connection* downstreamConnection() const override { return nullptr; }
-  const Http::HeaderMap* downstreamHeaders() const override { return nullptr; }
 
   absl::optional<uint64_t> hash_key_;
 };
@@ -351,8 +352,8 @@ int main(int argc, char** argv) {
   // TODO(mattklein123): Provide a common bazel benchmark wrapper much like we do for normal tests,
   // fuzz, etc.
   Envoy::Thread::MutexBasicLockable lock;
-  Envoy::Logger::Registry::initialize(spdlog::level::warn,
-                                      Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock);
+  Envoy::Logger::Context logging_context(spdlog::level::warn,
+                                         Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock);
 
   benchmark::Initialize(&argc, argv);
   if (benchmark::ReportUnrecognizedArguments(argc, argv)) {

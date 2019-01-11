@@ -53,6 +53,7 @@ envoy_cc_library(
         ":ext_authz_interface",
         "//source/common/common:minimal_logger_lib",
         "//source/common/http:async_client_lib",
+        "//source/common/http:codes_lib",
     ],
 )
 

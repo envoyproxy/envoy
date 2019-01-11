@@ -1,6 +1,6 @@
 #include <arpa/inet.h>
 #include <fcntl.h>
-#include <netinet/ip.h>
+#include <netinet/in.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
@@ -64,7 +64,7 @@ void testSocketBindAndConnect(Network::Address::IpVersion ip_version, bool v6onl
   }
 
   // Bind the socket to the desired address and port.
-  const Api::SysCallResult result = addr_port->bind(listen_fd);
+  const Api::SysCallIntResult result = addr_port->bind(listen_fd);
   ASSERT_EQ(result.rc_, 0) << addr_port->asString() << "\nerror: " << strerror(result.errno_)
                            << "\nerrno: " << result.errno_;
 
@@ -85,7 +85,7 @@ void testSocketBindAndConnect(Network::Address::IpVersion ip_version, bool v6onl
     makeFdBlocking(client_fd);
 
     // Connect to the server.
-    const Api::SysCallResult result = addr_port->connect(client_fd);
+    const Api::SysCallIntResult result = addr_port->connect(client_fd);
     ASSERT_EQ(result.rc_, 0) << addr_port->asString() << "\nerror: " << strerror(result.errno_)
                              << "\nerrno: " << result.errno_;
   };
@@ -314,7 +314,7 @@ TEST(PipeInstanceTest, UnlinksExistingFile) {
     ASSERT_GE(listen_fd, 0) << address.asString();
     ScopedFdCloser closer(listen_fd);
 
-    const Api::SysCallResult result = address.bind(listen_fd);
+    const Api::SysCallIntResult result = address.bind(listen_fd);
     ASSERT_EQ(result.rc_, 0) << address.asString() << "\nerror: " << strerror(result.errno_)
                              << "\nerrno: " << result.errno_;
   };
@@ -324,7 +324,7 @@ TEST(PipeInstanceTest, UnlinksExistingFile) {
   bind_uds_socket(path); // after closing, second bind to the same path should succeed.
 }
 
-TEST(AddressFromSockAddr, IPv4) {
+TEST(AddressFromSockAddrDeathTest, IPv4) {
   sockaddr_storage ss;
   auto& sin = reinterpret_cast<sockaddr_in&>(ss);
 
@@ -343,7 +343,7 @@ TEST(AddressFromSockAddr, IPv4) {
   EXPECT_THROW(addressFromSockAddr(ss, sizeof(sockaddr_in)), EnvoyException);
 }
 
-TEST(AddressFromSockAddr, IPv6) {
+TEST(AddressFromSockAddrDeathTest, IPv6) {
   sockaddr_storage ss;
   auto& sin6 = reinterpret_cast<sockaddr_in6&>(ss);
 
@@ -367,7 +367,7 @@ TEST(AddressFromSockAddr, IPv6) {
             addressFromSockAddr(ss, sizeof(sockaddr_in6), true)->asString());
 }
 
-TEST(AddressFromSockAddr, Pipe) {
+TEST(AddressFromSockAddrDeathTest, Pipe) {
   sockaddr_storage ss;
   auto& sun = reinterpret_cast<sockaddr_un&>(ss);
   sun.sun_family = AF_UNIX;

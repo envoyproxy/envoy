@@ -5,6 +5,7 @@
 #include "envoy/http/header_map.h"
 #include "envoy/json/json_object.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
 #include "common/buffer/buffer_impl.h"

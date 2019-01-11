@@ -1,0 +1,37 @@
+virtual_hosts:
+- name: www2
+  domains:
+  - www.lyft.com
+  require_tls: ALL
+  routes:
+    - match:
+        prefix: /
+      route:
+        cluster: www2
+- name: api
+  domains:
+  - api.lyft.com
+  require_tls: EXTERNAL_ONLY
+  routes:
+    - match:
+        prefix: /
+      route:
+        cluster: www2
+- name: redirect
+  domains:
+  - redirect.lyft.com
+  routes:
+    - match:
+        prefix: /foo
+      redirect:
+        host_redirect: new.lyft.com
+
+    - match:
+        prefix: /bar
+      redirect:
+        path_redirect: /new_bar
+    - match:
+        prefix: /baz
+      redirect:
+        host_redirect: new.lyft.com
+        path_redirect: /new_baz

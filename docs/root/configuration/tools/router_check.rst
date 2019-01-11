@@ -8,7 +8,7 @@ The route table check tool is a standalone binary that can be used to verify Env
 file.**
 
 The following specifies input to the route table check tool. The route table check tool checks if
-the route returned by a :ref:`router <config_http_conn_man_route_table>` matches what is expected.
+the route returned by a :ref:`router <envoy_api_msg_RouteConfiguration>` matches what is expected.
 The tool can be used to check cluster name, virtual cluster name,
 virtual host name, manual path rewrite, manual host rewrite, path redirect, and
 header field matches. Extensions for other test cases can be added. Details about installing the tool

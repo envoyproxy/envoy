@@ -7,6 +7,7 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
 #include "envoy/http/header_map.h"
+#include "envoy/http/metadata_interface.h"
 #include "envoy/http/protocol.h"
 
 namespace Envoy {
@@ -28,7 +29,8 @@ public:
   virtual void encode100ContinueHeaders(const HeaderMap& headers) PURE;
 
   /**
-   * Encode headers, optionally indicating end of stream.
+   * Encode headers, optionally indicating end of stream. Response headers must
+   * have a valid :status set.
    * @param headers supplies the header map to encode.
    * @param end_stream supplies whether this is a header only request/response.
    */
@@ -51,6 +53,12 @@ public:
    * @return Stream& the backing stream.
    */
   virtual Stream& getStream() PURE;
+
+  /**
+   * Encode metadata.
+   * @param metadata_map_vector is the vector of metadata maps to encode.
+   */
+  virtual void encodeMetadata(const MetadataMapVector& metadata_map_vector) PURE;
 };
 
 /**
@@ -85,6 +93,12 @@ public:
    * @param trailers supplies the decoded trailers.
    */
   virtual void decodeTrailers(HeaderMapPtr&& trailers) PURE;
+
+  /**
+   * Called with decoded METADATA.
+   * @param decoded METADATA.
+   */
+  virtual void decodeMetadata(MetadataMapPtr&& metadata_map) PURE;
 };
 
 /**
@@ -208,6 +222,8 @@ struct Http2Settings {
   uint32_t max_concurrent_streams_{DEFAULT_MAX_CONCURRENT_STREAMS};
   uint32_t initial_stream_window_size_{DEFAULT_INITIAL_STREAM_WINDOW_SIZE};
   uint32_t initial_connection_window_size_{DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE};
+  bool allow_connect_{DEFAULT_ALLOW_CONNECT};
+  bool allow_metadata_{DEFAULT_ALLOW_METADATA};
 
   // disable HPACK compression
   static const uint32_t MIN_HPACK_TABLE_SIZE = 0;
@@ -241,6 +257,10 @@ struct Http2Settings {
   // our default connection-level window also equals to our stream-level
   static const uint32_t DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE = 256 * 1024 * 1024;
   static const uint32_t MAX_INITIAL_CONNECTION_WINDOW_SIZE = (1U << 31) - 1;
+  // By default both nghttp2 and Envoy do not allow CONNECT over H2.
+  static const bool DEFAULT_ALLOW_CONNECT = false;
+  // By default Envoy does not allow METADATA support.
+  static const bool DEFAULT_ALLOW_METADATA = false;
 };
 
 /**

@@ -8,6 +8,7 @@
 #include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
+#include "envoy/stats/scope.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -50,8 +51,8 @@ struct ProxyStats {
 class ProxyFilterConfig {
 public:
   ProxyFilterConfig(const envoy::config::filter::network::redis_proxy::v2::RedisProxy& config,
-                    Upstream::ClusterManager& cm, Stats::Scope& scope,
-                    const Network::DrainDecision& drain_decision, Runtime::Loader& runtime);
+                    Stats::Scope& scope, const Network::DrainDecision& drain_decision,
+                    Runtime::Loader& runtime);
 
   const Network::DrainDecision& drain_decision_;
   Runtime::Loader& runtime_;

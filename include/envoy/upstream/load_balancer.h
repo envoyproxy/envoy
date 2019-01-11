@@ -10,6 +10,13 @@
 namespace Envoy {
 namespace Upstream {
 
+// Mapping from a priority to how much of the total traffic load should be directed to this
+// priority. For example, {50, 30, 20} means that 50% of traffic should go to P0, 30% to P1
+// and 20% to P2.
+//
+// This should either sum to 100 or consist of all zeros.
+typedef std::vector<uint32_t> PriorityLoad;
+
 /**
  * Context information passed to a load balancer to use when choosing a host. Not all load
  * balancers make use of all context information.
@@ -43,6 +50,33 @@ public:
    * balancing.
    */
   virtual const Http::HeaderMap* downstreamHeaders() const PURE;
+
+  /**
+   * Called to retrieve a reference to the priority load data that should be used when selecting a
+   * priority. Implementations may return the provided original reference to make no changes, or
+   * return a reference to alternative PriorityLoad held internally.
+   *
+   * @param priority_state current priority state of the cluster being being load balanced.
+   * @param original_priority_load the cached priority load for the cluster being load balanced.
+   * @return a reference to the priority load data that should be used to select a priority.
+   *
+   */
+  virtual const PriorityLoad&
+  determinePriorityLoad(const PrioritySet& priority_set,
+                        const PriorityLoad& original_priority_load) PURE;
+
+  /**
+   * Called to determine whether we should reperform host selection. The load balancer
+   * will retry host selection until either this function returns true or hostSelectionRetryCount is
+   * reached.
+   */
+  virtual bool shouldSelectAnotherHost(const Host& host) PURE;
+
+  /**
+   * Called to determine how many times host selection should be retried until the filter is
+   * ignored.
+   */
+  virtual uint32_t hostSelectionRetryCount() const PURE;
 };
 
 /**

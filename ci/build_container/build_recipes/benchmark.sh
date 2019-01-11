@@ -1,13 +1,17 @@
 #!/bin/bash
 
 set -e
-export COMMIT="e1c3a83b8197cf02e794f61228461c27d4e78cfb"  # benchmark @ Jan 11, 2018
+
+# use commit where cmake 3.6 feature removed. Unblocks Ubuntu 16.xx or below builds
+# TODO (moderation) change back to tarball method on next benchmark release
+export COMMIT="505be96ab23056580a3a2315abba048f4428b04e"
 
 git clone https://github.com/google/benchmark.git
 (cd benchmark; git reset --hard "$COMMIT")
 mkdir build
 
 cd build
+
 cmake -G "Ninja" ../benchmark \
   -DCMAKE_BUILD_TYPE=RELEASE \
   -DBENCHMARK_ENABLE_GTEST_TESTS=OFF

@@ -11,15 +11,17 @@ namespace {
 // In general, below, we force execution of all paths, but because the
 // underlying grpc::{CallCredentials,ChannelCredentials} don't have any real way
 // of getting at the underlying state, we can at best just make sure we don't
-// crash, compare with nullptr and/or look at vector lengths
+// crash, compare with nullptr and/or look at vector lengths.
 
-TEST(CredsUtility, SslChannelCredentials) {
-  EXPECT_EQ(nullptr, CredsUtility::sslChannelCredentials({}));
+TEST(CredsUtility, GetChannelCredentials) {
+  EXPECT_EQ(nullptr, CredsUtility::getChannelCredentials({}));
   envoy::api::v2::core::GrpcService::GoogleGrpc config;
   auto* creds = config.mutable_channel_credentials();
-  EXPECT_EQ(nullptr, CredsUtility::sslChannelCredentials(config));
+  EXPECT_EQ(nullptr, CredsUtility::getChannelCredentials(config));
   creds->mutable_ssl_credentials();
-  EXPECT_NE(nullptr, CredsUtility::sslChannelCredentials(config));
+  EXPECT_NE(nullptr, CredsUtility::getChannelCredentials(config));
+  creds->mutable_local_credentials();
+  EXPECT_NE(nullptr, CredsUtility::getChannelCredentials(config));
 }
 
 TEST(CredsUtility, DefaultSslChannelCredentials) {

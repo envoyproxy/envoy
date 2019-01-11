@@ -58,7 +58,11 @@ public:
     EXPECT_EQ(version, stats_.version_.value());
   }
 
-  Stats::MockIsolatedStatsStore stats_store_;
+  virtual void verifyControlPlaneStats(uint32_t connected_state) {
+    EXPECT_EQ(connected_state, stats_store_.gauge("control_plane.connected_state").value());
+  }
+
+  Stats::IsolatedStoreImpl stats_store_;
   SubscriptionStats stats_;
 };
 

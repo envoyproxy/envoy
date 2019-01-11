@@ -15,7 +15,7 @@ namespace {
 class StatsIntegrationTest : public BaseIntegrationTest,
                              public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  StatsIntegrationTest() : BaseIntegrationTest(GetParam()) {}
+  StatsIntegrationTest() : BaseIntegrationTest(GetParam(), realTime()) {}
 
   void TearDown() override {
     test_server_.reset();

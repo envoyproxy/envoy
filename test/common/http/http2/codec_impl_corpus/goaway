@@ -1,0 +1,44 @@
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":method"
+        value: "GET"
+      }
+      headers {
+        key: ":path"
+        value: "/"
+      }
+      headers {
+        key: ":scheme"
+        value: "http"
+      }
+      headers {
+        key: ":authority"
+        value: "foo.com"
+      }
+    }
+  }
+}
+actions {
+  mutate {
+    buffer: 2
+    offset: 2
+    value: 8
+  }
+}
+actions {
+  mutate {
+    buffer: 2
+    offset: 3
+    value: 7
+  }
+}
+actions {
+  mutate {
+    buffer: 2
+    offset: 8
+    value: 0
+  }
+}
+actions { quiesce_drain {} }

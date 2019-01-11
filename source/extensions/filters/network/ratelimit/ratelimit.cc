@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <string>
 
+#include "envoy/stats/scope.h"
+
 #include "common/common/fmt.h"
 #include "common/tracing/http_tracer_impl.h"
 
@@ -14,8 +16,7 @@ namespace RateLimitFilter {
 Config::Config(const envoy::config::filter::network::rate_limit::v2::RateLimit& config,
                Stats::Scope& scope, Runtime::Loader& runtime)
     : domain_(config.domain()), stats_(generateStats(config.stat_prefix(), scope)),
-      runtime_(runtime) {
-
+      runtime_(runtime), failure_mode_deny_(config.failure_mode_deny()) {
   for (const auto& descriptor : config.descriptors()) {
     RateLimit::Descriptor new_descriptor;
     for (const auto& entry : descriptor.entries()) {
@@ -67,27 +68,36 @@ void Filter::onEvent(Network::ConnectionEvent event) {
   }
 }
 
-void Filter::complete(RateLimit::LimitStatus status) {
+void Filter::complete(Filters::Common::RateLimit::LimitStatus status, Http::HeaderMapPtr&&) {
   status_ = Status::Complete;
   config_->stats().active_.dec();
 
   switch (status) {
-  case RateLimit::LimitStatus::OK:
+  case Filters::Common::RateLimit::LimitStatus::OK:
     config_->stats().ok_.inc();
     break;
-  case RateLimit::LimitStatus::Error:
+  case Filters::Common::RateLimit::LimitStatus::Error:
     config_->stats().error_.inc();
     break;
-  case RateLimit::LimitStatus::OverLimit:
+  case Filters::Common::RateLimit::LimitStatus::OverLimit:
     config_->stats().over_limit_.inc();
     break;
   }
 
-  // We fail open if there is an error contacting the service.
-  if (status == RateLimit::LimitStatus::OverLimit &&
+  if (status == Filters::Common::RateLimit::LimitStatus::OverLimit &&
       config_->runtime().snapshot().featureEnabled("ratelimit.tcp_filter_enforcing", 100)) {
     config_->stats().cx_closed_.inc();
     filter_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+  } else if (status == Filters::Common::RateLimit::LimitStatus::Error) {
+    if (config_->failureModeAllow()) {
+      config_->stats().failure_mode_allowed_.inc();
+      if (!calling_limit_) {
+        filter_callbacks_->continueReading();
+      }
+    } else {
+      config_->stats().cx_closed_.inc();
+      filter_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+    }
   } else {
     // We can get completion inline, so only call continue if that isn't happening.
     if (!calling_limit_) {

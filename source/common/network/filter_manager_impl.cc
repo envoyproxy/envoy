@@ -11,7 +11,11 @@ namespace Network {
 
 void FilterManagerImpl::addWriteFilter(WriteFilterSharedPtr filter) {
   ASSERT(connection_.state() == Connection::State::Open);
-  downstream_filters_.emplace_back(filter);
+  if (connection_.reverseWriteFilterOrder()) {
+    downstream_filters_.emplace_front(filter);
+  } else {
+    downstream_filters_.emplace_back(filter);
+  }
 }
 
 void FilterManagerImpl::addFilter(FilterSharedPtr filter) {

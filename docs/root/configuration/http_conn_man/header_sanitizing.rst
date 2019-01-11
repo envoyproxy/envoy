@@ -7,8 +7,9 @@ For security reasons, Envoy will "sanitize" various incoming HTTP headers depend
 request is an internal or external request. The sanitizing action depends on the header and may
 result in addition, removal, or modification. Ultimately, whether the request is considered internal
 or external is governed by the :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`
-header (please read the linked section carefully as how Envoy populates the header is complex and
-depends on the :ref:`use_remote_address <config_http_conn_man_use_remote_address>` setting).
+header (please read the linked section carefully as how Envoy populates the header is complex and depends on the
+:ref:`use_remote_address
+<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.use_remote_address>` setting).
 
 Envoy will potentially sanitize the following headers:
 

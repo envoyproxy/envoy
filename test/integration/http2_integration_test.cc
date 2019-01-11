@@ -13,7 +13,9 @@
 
 #include "gtest/gtest.h"
 
+using ::testing::HasSubstr;
 using ::testing::MatchesRegex;
+
 namespace Envoy {
 
 INSTANTIATE_TEST_CASE_P(IpVersions, Http2IntegrationTest,
@@ -37,6 +39,8 @@ TEST_P(Http2IntegrationTest, InvalidContentLength) { testInvalidContentLength();
 TEST_P(Http2IntegrationTest, MultipleContentLengths) { testMultipleContentLengths(); }
 
 TEST_P(Http2IntegrationTest, ComputedHealthCheck) { testComputedHealthCheck(); }
+
+TEST_P(Http2IntegrationTest, AddEncodedTrailers) { testAddEncodedTrailers(); }
 
 TEST_P(Http2IntegrationTest, DrainClose) { testDrainClose(); }
 
@@ -83,9 +87,25 @@ TEST_P(Http2IntegrationTest, RouterUpstreamResponseBeforeRequestComplete) {
 
 TEST_P(Http2IntegrationTest, TwoRequests) { testTwoRequests(); }
 
+TEST_P(Http2IntegrationTest, TwoRequestsWithForcedBackup) { testTwoRequests(true); }
+
 TEST_P(Http2IntegrationTest, Retry) { testRetry(); }
 
+TEST_P(Http2IntegrationTest, RetryAttemptCount) { testRetryAttemptCountHeader(); }
+
 TEST_P(Http2IntegrationTest, EnvoyHandling100Continue) { testEnvoyHandling100Continue(); }
+
+TEST_P(Http2MetadataIntegrationTest, ProxyMetadataInResponse) {
+  testEnvoyProxyMetadataInResponse();
+}
+
+TEST_P(Http2MetadataIntegrationTest, ProxyMultipleMetadata) { testEnvoyProxyMultipleMetadata(); }
+
+TEST_P(Http2MetadataIntegrationTest, ProxyInvalidMetadata) { testEnvoyProxyInvalidMetadata(); }
+
+TEST_P(Http2MetadataIntegrationTest, ProxyMultipleMetadataReachSizeLimit) {
+  testEnvoyMultipleMetadataReachSizeLimit();
+}
 
 TEST_P(Http2IntegrationTest, EnvoyHandlingDuplicate100Continue) {
   testEnvoyHandling100Continue(true);
@@ -103,6 +123,10 @@ TEST_P(Http2IntegrationTest, HittingEncoderFilterLimit) { testHittingEncoderFilt
 
 TEST_P(Http2IntegrationTest, GrpcRouterNotFound) { testGrpcRouterNotFound(); }
 
+TEST_P(Http2IntegrationTest, RetryHostPredicateFilter) { testRetryHostPredicateFilter(); }
+
+TEST_P(Http2IntegrationTest, RetryPriority) { testRetryPriority(); }
+
 TEST_P(Http2IntegrationTest, GrpcRetry) { testGrpcRetry(); }
 
 // Send a request with overly large headers, and ensure it results in stream reset.
@@ -119,6 +143,12 @@ TEST_P(Http2IntegrationTest, MaxHeadersInCodec) {
   response->waitForReset();
   codec_client_->close();
 }
+
+TEST_P(Http2IntegrationTest, EncodingHeaderOnlyResponse) { testHeadersOnlyFilterEncoding(); }
+
+TEST_P(Http2IntegrationTest, DecodingHeaderOnlyResponse) { testHeadersOnlyFilterDecoding(); }
+
+TEST_P(Http2IntegrationTest, DecodingHeaderOnlyInterleaved) { testHeadersOnlyFilterInterleaved(); }
 
 TEST_P(Http2IntegrationTest, DownstreamResetBeforeResponseComplete) {
   testDownstreamResetBeforeResponseComplete();
@@ -382,6 +412,63 @@ TEST_P(Http2IntegrationTest, SimultaneousRequestWithBufferLimits) {
   simultaneousRequest(1024 * 32, 1024 * 16);
 }
 
+// Test downstream connection delayed close processing.
+TEST_P(Http2IntegrationTest, DelayedCloseAfterBadFrame) {
+  initialize();
+  Buffer::OwnedImpl buffer("PRI * HTTP/2.0\r\n\r\nSM\r\n\r\nhelloworldcauseanerror");
+  std::string response;
+  RawConnectionDriver connection(
+      lookupPort("http"), buffer,
+      [&](Network::ClientConnection& connection, const Buffer::Instance& data) -> void {
+        response.append(data.toString());
+        connection.dispatcher().exit();
+      },
+      version_);
+
+  connection.run();
+  EXPECT_THAT(response, HasSubstr("SETTINGS expected"));
+  // Due to the multiple dispatchers involved (one for the RawConnectionDriver and another for the
+  // Envoy server), it's possible the delayed close timer could fire and close the server socket
+  // prior to the data callback above firing. Therefore, we may either still be connected, or have
+  // received a remote close.
+  if (connection.last_connection_event() == Network::ConnectionEvent::Connected) {
+    connection.run();
+  }
+  EXPECT_EQ(connection.last_connection_event(), Network::ConnectionEvent::RemoteClose);
+  EXPECT_EQ(test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value(),
+            1);
+}
+
+// Test disablement of delayed close processing on downstream connections.
+TEST_P(Http2IntegrationTest, DelayedCloseDisabled) {
+  config_helper_.addConfigModifier(
+      [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm) {
+        hcm.mutable_delayed_close_timeout()->set_seconds(0);
+      });
+  initialize();
+  Buffer::OwnedImpl buffer("PRI * HTTP/2.0\r\n\r\nSM\r\n\r\nhelloworldcauseanerror");
+  std::string response;
+  RawConnectionDriver connection(
+      lookupPort("http"), buffer,
+      [&](Network::ClientConnection& connection, const Buffer::Instance& data) -> void {
+        response.append(data.toString());
+        connection.dispatcher().exit();
+      },
+      version_);
+
+  connection.run();
+  EXPECT_THAT(response, HasSubstr("SETTINGS expected"));
+  // Due to the multiple dispatchers involved (one for the RawConnectionDriver and another for the
+  // Envoy server), it's possible for the 'connection' to receive the data and exit the dispatcher
+  // prior to the FIN being received from the server.
+  if (connection.last_connection_event() == Network::ConnectionEvent::Connected) {
+    connection.run();
+  }
+  EXPECT_EQ(connection.last_connection_event(), Network::ConnectionEvent::RemoteClose);
+  EXPECT_EQ(test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value(),
+            0);
+}
+
 Http2RingHashIntegrationTest::Http2RingHashIntegrationTest() {
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
     auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
@@ -409,11 +496,16 @@ Http2RingHashIntegrationTest::~Http2RingHashIntegrationTest() {
 
 void Http2RingHashIntegrationTest::createUpstreams() {
   for (int i = 0; i < num_upstreams_; i++) {
-    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_));
+    fake_upstreams_.emplace_back(
+        new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_, timeSystem()));
   }
 }
 
 INSTANTIATE_TEST_CASE_P(IpVersions, Http2RingHashIntegrationTest,
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
+
+INSTANTIATE_TEST_CASE_P(IpVersions, Http2MetadataIntegrationTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 

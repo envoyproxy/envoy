@@ -8,21 +8,10 @@ load(
 envoy_package()
 
 exports_files([
-    "echo_server.json",
-    "server.json",
     "server.yaml",
+    "server.json",
     "server_ads.yaml",
-    "server_cors_filter.json",
-    "server_grpc_json_transcoder.json",
-    "server_http2.json",
-    "server_http2_upstream.json",
-    "server_proxy_proto.json",
-    "server_ssl.json",
-    "server_uds.json",
-    "server_unix_listener.json",
     "server_unix_listener.yaml",
-    "server_xfcc.json",
-    "tcp_proxy.json",
 ])
 
 filegroup(

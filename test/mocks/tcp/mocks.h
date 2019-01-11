@@ -21,7 +21,7 @@ public:
   ~MockCancellable();
 
   // Tcp::ConnectionPool::Cancellable
-  MOCK_METHOD0(cancel, void());
+  MOCK_METHOD1(cancel, void(CancelPolicy cancel_policy));
 };
 
 class MockUpstreamCallbacks : public UpstreamCallbacks {
@@ -44,6 +44,10 @@ public:
   // Tcp::ConnectionPool::ConnectionData
   MOCK_METHOD0(connection, Network::ClientConnection&());
   MOCK_METHOD1(addUpstreamCallbacks, void(ConnectionPool::UpstreamCallbacks&));
+  void setConnectionState(ConnectionStatePtr&& state) override { setConnectionState_(state); }
+  MOCK_METHOD0(connectionState, ConnectionPool::ConnectionState*());
+
+  MOCK_METHOD1(setConnectionState_, void(ConnectionPool::ConnectionStatePtr& state));
 
   // If set, invoked in ~MockConnectionData, which indicates that the connection pool
   // caller has relased a connection.

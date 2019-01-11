@@ -3,11 +3,17 @@
 #include <memory>
 #include <string>
 
+#include "envoy/router/router.h"
+
+#include "extensions/filters/network/thrift_proxy/metadata.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
 namespace Router {
+
+class RateLimitPolicy;
 
 /**
  * RouteEntry is an individual resolved route entry.
@@ -20,6 +26,17 @@ public:
    * @return const std::string& the upstream cluster that owns the route.
    */
   virtual const std::string& clusterName() const PURE;
+
+  /**
+   * @return MetadataMatchCriteria* the metadata that a subset load balancer should match when
+   * selecting an upstream host
+   */
+  virtual const Envoy::Router::MetadataMatchCriteria* metadataMatchCriteria() const PURE;
+
+  /**
+   * @return const RateLimitPolicy& the rate limit policy for the route.
+   */
+  virtual const RateLimitPolicy& rateLimitPolicy() const PURE;
 };
 
 /**
@@ -47,10 +64,12 @@ public:
   /**
    * Based on the incoming Thrift request transport and/or protocol data, determine the target
    * route for the request.
-   * @param method supplies the thrift method name
+   * @param metadata MessageMetadata for the message to route
+   * @param random_value uint64_t used to select cluster affinity
    * @return the route or nullptr if there is no matching route for the request.
    */
-  virtual RouteConstSharedPtr route(const std::string& method) const PURE;
+  virtual RouteConstSharedPtr route(const MessageMetadata& metadata,
+                                    uint64_t random_value) const PURE;
 };
 
 typedef std::shared_ptr<const Config> ConfigConstSharedPtr;

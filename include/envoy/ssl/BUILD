@@ -16,11 +16,18 @@ envoy_cc_library(
 envoy_cc_library(
     name = "context_interface",
     hdrs = ["context.h"],
+    deps = [
+        "@envoy_api//envoy/admin/v2alpha:certs_cc",
+    ],
 )
 
 envoy_cc_library(
     name = "context_config_interface",
     hdrs = ["context_config.h"],
+    deps = [
+        ":certificate_validation_context_config_interface",
+        ":tls_certificate_config_interface",
+    ],
 )
 
 envoy_cc_library(
@@ -36,4 +43,9 @@ envoy_cc_library(
 envoy_cc_library(
     name = "tls_certificate_config_interface",
     hdrs = ["tls_certificate_config.h"],
+)
+
+envoy_cc_library(
+    name = "certificate_validation_context_config_interface",
+    hdrs = ["certificate_validation_context_config.h"],
 )

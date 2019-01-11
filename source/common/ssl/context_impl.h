@@ -1,17 +1,19 @@
 #pragma once
 
+#include <deque>
+#include <functional>
 #include <string>
 #include <vector>
 
-#include "envoy/runtime/runtime.h"
 #include "envoy/ssl/context.h"
 #include "envoy/ssl/context_config.h"
-#include "envoy/stats/stats.h"
+#include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "common/ssl/context_impl.h"
 #include "common/ssl/context_manager_impl.h"
 
+#include "absl/synchronization/mutex.h"
+#include "absl/types/optional.h"
 #include "openssl/ssl.h"
 
 namespace Envoy {
@@ -42,7 +44,7 @@ struct SslStats {
 
 class ContextImpl : public virtual Context {
 public:
-  virtual bssl::UniquePtr<SSL> newSsl() const;
+  virtual bssl::UniquePtr<SSL> newSsl(absl::optional<std::string> override_server_name);
 
   /**
    * Logs successful TLS handshake and updates stats.
@@ -71,11 +73,11 @@ public:
 
   // Ssl::Context
   size_t daysUntilFirstCertExpires() const override;
-  std::string getCaCertInformation() const override;
-  std::string getCertChainInformation() const override;
+  CertificateDetailsPtr getCaCertInformation() const override;
+  std::vector<CertificateDetailsPtr> getCertChainInformation() const override;
 
 protected:
-  ContextImpl(Stats::Scope& scope, const ContextConfig& config);
+  ContextImpl(Stats::Scope& scope, const ContextConfig& config, TimeSource& time_source);
 
   /**
    * The global SSL-library index used for storing a pointer to the context
@@ -116,13 +118,31 @@ protected:
   std::vector<uint8_t> parseAlpnProtocols(const std::string& alpn_protocols);
   static SslStats generateStats(Stats::Scope& scope);
 
-  // TODO: Move helper function to the `Ssl::Utility` namespace.
-  int32_t getDaysUntilExpiration(const X509* cert) const;
-
   std::string getCaFileName() const { return ca_file_path_; };
-  std::string getCertChainFileName() const { return cert_chain_file_path_; };
 
-  bssl::UniquePtr<SSL_CTX> ctx_;
+  CertificateDetailsPtr certificateDetails(X509* cert, const std::string& path) const;
+
+  struct TlsContext {
+    // Each certificate specified for the context has its own SSL_CTX. SSL_CTXs
+    // are identical with the exception of certificate material, and can be
+    // safely substituted via SSL_set_SSL_CTX() during the
+    // SSL_CTX_set_select_certificate_cb() callback following ClientHello.
+    bssl::UniquePtr<SSL_CTX> ssl_ctx_;
+    bssl::UniquePtr<X509> cert_chain_;
+    std::string cert_chain_file_path_;
+    bool is_ecdsa_{};
+
+    std::string getCertChainFileName() const { return cert_chain_file_path_; };
+    void addClientValidationContext(const CertificateValidationContextConfig& config,
+                                    bool require_client_cert);
+    bool isCipherEnabled(uint16_t cipher_id, uint16_t client_version);
+  };
+
+  // This is always non-empty, with the first context used for all new SSL
+  // objects. For server contexts, once we have ClientHello, we
+  // potentially switch to a different CertificateContext based on certificate
+  // selection.
+  std::vector<TlsContext> tls_contexts_;
   bool verify_trusted_ca_{false};
   std::vector<std::string> verify_subject_alt_name_list_;
   std::vector<std::vector<uint8_t>> verify_certificate_hash_list_;
@@ -134,34 +154,48 @@ protected:
   bssl::UniquePtr<X509> cert_chain_;
   std::string ca_file_path_;
   std::string cert_chain_file_path_;
+  TimeSource& time_source_;
+  const unsigned tls_max_version_;
 };
 
 typedef std::shared_ptr<ContextImpl> ContextImplSharedPtr;
 
 class ClientContextImpl : public ContextImpl, public ClientContext {
 public:
-  ClientContextImpl(Stats::Scope& scope, const ClientContextConfig& config);
+  ClientContextImpl(Stats::Scope& scope, const ClientContextConfig& config,
+                    TimeSource& time_source);
 
-  bssl::UniquePtr<SSL> newSsl() const override;
+  bssl::UniquePtr<SSL> newSsl(absl::optional<std::string> override_server_name) override;
 
 private:
+  int newSessionKey(SSL_SESSION* session);
+  uint16_t parseSigningAlgorithmsForTest(const std::string& sigalgs);
+
   const std::string server_name_indication_;
   const bool allow_renegotiation_;
+  const size_t max_session_keys_;
+  absl::Mutex session_keys_mu_;
+  std::deque<bssl::UniquePtr<SSL_SESSION>> session_keys_ GUARDED_BY(session_keys_mu_);
+  bool session_keys_single_use_{false};
 };
 
 class ServerContextImpl : public ContextImpl, public ServerContext {
 public:
   ServerContextImpl(Stats::Scope& scope, const ServerContextConfig& config,
-                    const std::vector<std::string>& server_names, Runtime::Loader& runtime);
+                    const std::vector<std::string>& server_names, TimeSource& time_source);
 
 private:
   int alpnSelectCallback(const unsigned char** out, unsigned char* outlen, const unsigned char* in,
                          unsigned int inlen);
   int sessionTicketProcess(SSL* ssl, uint8_t* key_name, uint8_t* iv, EVP_CIPHER_CTX* ctx,
                            HMAC_CTX* hmac_ctx, int encrypt);
+  bool isClientEcdsaCapable(const SSL_CLIENT_HELLO* ssl_client_hello);
+  // Select the TLS certificate context in SSL_CTX_set_select_certificate_cb() callback with
+  // ClientHello details.
+  enum ssl_select_cert_result_t selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello);
+  void generateHashForSessionContexId(const std::vector<std::string>& server_names,
+                                      uint8_t* session_context_buf, unsigned& session_context_len);
 
-  Runtime::Loader& runtime_;
-  std::vector<uint8_t> parsed_alt_alpn_protocols_;
   const std::vector<ServerContextConfig::SessionTicketKey> session_ticket_keys_;
 };
 

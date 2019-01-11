@@ -15,8 +15,8 @@ namespace Fault {
 Http::FilterFactoryCb FaultFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::config::filter::http::fault::v2::HTTPFault& config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
-  FaultFilterConfigSharedPtr filter_config(
-      new FaultFilterConfig(config, context.runtime(), stats_prefix, context.scope()));
+  FaultFilterConfigSharedPtr filter_config(new FaultFilterConfig(
+      config, context.runtime(), stats_prefix, context.scope(), context.random()));
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(std::make_shared<FaultFilter>(filter_config));
   };

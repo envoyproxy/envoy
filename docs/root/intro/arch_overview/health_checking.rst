@@ -5,7 +5,7 @@ Health checking
 
 Active health checking can be :ref:`configured <config_cluster_manager_cluster_hc>` on a per
 upstream cluster basis. As described in the :ref:`service discovery
-<arch_overview_service_discovery>` section, active health checking and the SDS service discovery
+<arch_overview_service_discovery>` section, active health checking and the EDS service discovery
 type go hand in hand. However, there are other scenarios where active health checking is desired
 even when using the other service discovery types. Envoy supports three different types of health
 checking along with various settings (check interval, failures required before marking a host
@@ -22,7 +22,7 @@ unhealthy, successes required before marking a host healthy, etc.):
   failure. Optionally, Envoy can perform EXISTS on a user-specified key. If the key does not exist
   it is considered a passing healthcheck. This allows the user to mark a Redis instance for
   maintenance by setting the specified key to any value and waiting for traffic to drain. See
-  :ref:`redis_key <config_cluster_manager_cluster_hc_redis_key>`.
+  :ref:`redis_key <envoy_api_msg_config.health_checker.redis.v2.Redis>`.
 
 .. _arch_overview_per_cluster_health_check_config:
 
@@ -61,6 +61,9 @@ Health check event logging
 A per-healthchecker log of ejection and addition events can optionally be produced by Envoy by
 specifying a log file path in `the HealthCheck config <envoy_api_field_core.HealthCheck.event_log_path>`.
 The log is structured as JSON dumps of `HealthCheckEvent messages <envoy_api_msg_core.HealthCheckEvent>`.
+
+Envoy can be configured to log all health check failure events by setting the :ref:'always_log_health_check_failures 
+flag <envoy_api_field_core.HealthCheck.always_log_health_check_failures>' to true.
 
 Passive health checking
 -----------------------
@@ -137,7 +140,7 @@ is having a different HTTP health checking URL for every service type. The downs
 is that overall configuration becomes more complicated as every health check URL is fully custom.
 
 The Envoy HTTP health checker supports the :ref:`service_name
-<config_cluster_manager_cluster_hc_service_name>` option. If this option is set, the health checker
+<envoy_api_field_core.HealthCheck.HttpHealthCheck.service_name>` option. If this option is set, the health checker
 additionally compares the value of the *x-envoy-upstream-healthchecked-cluster* response header to
 *service_name*. If the values do not match, the health check does not pass. The upstream health
 check filter appends *x-envoy-upstream-healthchecked-cluster* to the response headers. The appended

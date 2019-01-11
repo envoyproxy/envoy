@@ -1,3 +1,6 @@
+#include <memory>
+
+#include "common/common/assert.h"
 #include "common/common/version.h"
 #include "common/network/address_impl.h"
 #include "common/thread_local/thread_local_impl.h"
@@ -8,18 +11,22 @@
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
+using testing::_;
+using testing::Assign;
 using testing::HasSubstr;
 using testing::InSequence;
 using testing::Invoke;
+using testing::InvokeWithoutArgs;
 using testing::Property;
 using testing::Ref;
+using testing::Return;
 using testing::SaveArg;
 using testing::StrictMock;
-using testing::_;
 
 namespace Envoy {
 namespace Server {
@@ -49,29 +56,37 @@ TEST(ServerInstanceUtil, flushHelper) {
 
 class RunHelperTest : public testing::Test {
 public:
-  RunHelperTest() {
+  RunHelperTest() : shutdown_(false) {
     InSequence s;
 
     sigterm_ = new Event::MockSignalEvent(&dispatcher_);
+    sigint_ = new Event::MockSignalEvent(&dispatcher_);
     sigusr1_ = new Event::MockSignalEvent(&dispatcher_);
     sighup_ = new Event::MockSignalEvent(&dispatcher_);
     EXPECT_CALL(cm_, setInitializedCb(_)).WillOnce(SaveArg<0>(&cm_init_callback_));
+    EXPECT_CALL(overload_manager_, start());
+    ON_CALL(server_, shutdown()).WillByDefault(Assign(&shutdown_, true));
 
-    helper_.reset(new RunHelper(dispatcher_, cm_, hot_restart_, access_log_manager_, init_manager_,
-                                [this] { start_workers_.ready(); }));
+    helper_ = std::make_unique<RunHelper>(server_, options_, dispatcher_, cm_, access_log_manager_,
+                                          init_manager_, overload_manager_,
+                                          [this] { start_workers_.ready(); });
   }
 
+  NiceMock<MockInstance> server_;
+  testing::NiceMock<MockOptions> options_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Upstream::MockClusterManager> cm_;
-  NiceMock<MockHotRestart> hot_restart_;
   NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
+  NiceMock<MockOverloadManager> overload_manager_;
   InitManagerImpl init_manager_;
   ReadyWatcher start_workers_;
   std::unique_ptr<RunHelper> helper_;
   std::function<void()> cm_init_callback_;
   Event::MockSignalEvent* sigterm_;
+  Event::MockSignalEvent* sigint_;
   Event::MockSignalEvent* sigusr1_;
   Event::MockSignalEvent* sighup_;
+  bool shutdown_ = false;
 };
 
 TEST_F(RunHelperTest, Normal) {
@@ -82,6 +97,7 @@ TEST_F(RunHelperTest, Normal) {
 TEST_F(RunHelperTest, ShutdownBeforeCmInitialize) {
   EXPECT_CALL(start_workers_, ready()).Times(0);
   sigterm_->callback_();
+  EXPECT_CALL(server_, isShutdown()).WillOnce(Return(shutdown_));
   cm_init_callback_();
 }
 
@@ -92,6 +108,7 @@ TEST_F(RunHelperTest, ShutdownBeforeInitManagerInit) {
   EXPECT_CALL(target, initialize(_));
   cm_init_callback_();
   sigterm_->callback_();
+  EXPECT_CALL(server_, isShutdown()).WillOnce(Return(shutdown_));
   target.callback_();
 }
 
@@ -108,11 +125,12 @@ protected:
       options_.config_path_ = TestEnvironment::temporaryFileSubstitute(
           bootstrap_path, {{"upstream_0", 0}, {"upstream_1", 0}}, version_);
     }
-    server_.reset(new InstanceImpl(
-        options_,
+    server_ = std::make_unique<InstanceImpl>(
+        options_, test_time_.timeSystem(),
         Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
         hooks_, restart_, stats_store_, fakelock_, component_factory_,
-        std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), thread_local_));
+        std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), thread_local_,
+        Thread::threadFactoryForTest());
 
     EXPECT_TRUE(server_->api().fileExists("/dev/null"));
   }
@@ -124,14 +142,18 @@ protected:
         {{"health_check_timeout", fmt::format("{}", timeout).c_str()},
          {"health_check_interval", fmt::format("{}", interval).c_str()}},
         TestEnvironment::PortMap{}, version_);
-    server_.reset(new InstanceImpl(
-        options_,
+    server_ = std::make_unique<InstanceImpl>(
+        options_, test_time_.timeSystem(),
         Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
         hooks_, restart_, stats_store_, fakelock_, component_factory_,
-        std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), thread_local_));
+        std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), thread_local_,
+        Thread::threadFactoryForTest());
 
     EXPECT_TRUE(server_->api().fileExists("/dev/null"));
   }
+
+  // Returns the server's tracer as a pointer, for use in dynamic_cast tests.
+  Tracing::HttpTracer* tracer() { return &server_->httpContext().tracer(); };
 
   Network::Address::IpVersion version_;
   testing::NiceMock<MockOptions> options_;
@@ -141,6 +163,7 @@ protected:
   Stats::TestIsolatedStoreImpl stats_store_;
   Thread::MutexBasicLockable fakelock_;
   TestComponentFactory component_factory_;
+  DangerousDeprecatedTestTime test_time_;
   std::unique_ptr<InstanceImpl> server_;
 };
 
@@ -151,7 +174,6 @@ INSTANTIATE_TEST_CASE_P(IpVersions, ServerInstanceImplTest,
 TEST_P(ServerInstanceImplTest, V2ConfigOnly) {
   options_.service_cluster_name_ = "some_cluster_name";
   options_.service_node_name_ = "some_node_name";
-  options_.v2_config_only_ = true;
   try {
     initialize(std::string());
     FAIL();
@@ -160,19 +182,23 @@ TEST_P(ServerInstanceImplTest, V2ConfigOnly) {
   }
 }
 
-TEST_P(ServerInstanceImplTest, V1ConfigFallback) {
-  options_.service_cluster_name_ = "some_cluster_name";
-  options_.service_node_name_ = "some_node_name";
-  options_.v2_config_only_ = false;
-  initialize(std::string());
-}
-
 TEST_P(ServerInstanceImplTest, Stats) {
   options_.service_cluster_name_ = "some_cluster_name";
   options_.service_node_name_ = "some_node_name";
-  initialize(std::string());
+  options_.concurrency_ = 2;
+  options_.hot_restart_epoch_ = 3;
+  EXPECT_NO_THROW(initialize("test/server/empty_bootstrap.yaml"));
   EXPECT_NE(nullptr, TestUtility::findCounter(stats_store_, "server.watchdog_miss"));
-  EXPECT_NE(nullptr, TestUtility::findGauge(stats_store_, "server.hot_restart_epoch"));
+  EXPECT_EQ(2L, TestUtility::findGauge(stats_store_, "server.concurrency")->value());
+  EXPECT_EQ(3L, TestUtility::findGauge(stats_store_, "server.hot_restart_epoch")->value());
+
+// This stat only works in this configuration.
+#if defined(NDEBUG) && defined(ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE)
+  ASSERT(false, "Testing debug assertion failure detection in release build.");
+  EXPECT_EQ(1L, TestUtility::findCounter(stats_store_, "server.debug_assertion_failures")->value());
+#else
+  EXPECT_EQ(0L, TestUtility::findCounter(stats_store_, "server.debug_assertion_failures")->value());
+#endif
 }
 
 // Validate server localInfo() from bootstrap Node.
@@ -207,7 +233,6 @@ TEST_P(ServerInstanceImplTest, BootstrapClusterManagerInitializationFail) {
 
 // Test for protoc-gen-validate constraint on invalid timeout entry of a health check config entry.
 TEST_P(ServerInstanceImplTest, BootstrapClusterHealthCheckInvalidTimeout) {
-  options_.v2_config_only_ = true;
   EXPECT_THROW_WITH_REGEX(
       initializeWithHealthCheckParams("test/server/cluster_health_check_bootstrap.yaml", 0, 0.25),
       EnvoyException,
@@ -216,7 +241,6 @@ TEST_P(ServerInstanceImplTest, BootstrapClusterHealthCheckInvalidTimeout) {
 
 // Test for protoc-gen-validate constraint on invalid interval entry of a health check config entry.
 TEST_P(ServerInstanceImplTest, BootstrapClusterHealthCheckInvalidInterval) {
-  options_.v2_config_only_ = true;
   EXPECT_THROW_WITH_REGEX(
       initializeWithHealthCheckParams("test/server/cluster_health_check_bootstrap.yaml", 0.5, 0),
       EnvoyException,
@@ -226,7 +250,6 @@ TEST_P(ServerInstanceImplTest, BootstrapClusterHealthCheckInvalidInterval) {
 // Test for protoc-gen-validate constraint on invalid timeout and interval entry of a health check
 // config entry.
 TEST_P(ServerInstanceImplTest, BootstrapClusterHealthCheckInvalidTimeoutAndInterval) {
-  options_.v2_config_only_ = true;
   EXPECT_THROW_WITH_REGEX(
       initializeWithHealthCheckParams("test/server/cluster_health_check_bootstrap.yaml", 0, 0),
       EnvoyException,
@@ -235,18 +258,40 @@ TEST_P(ServerInstanceImplTest, BootstrapClusterHealthCheckInvalidTimeoutAndInter
 
 // Test for protoc-gen-validate constraint on valid interval entry of a health check config entry.
 TEST_P(ServerInstanceImplTest, BootstrapClusterHealthCheckValidTimeoutAndInterval) {
-  options_.v2_config_only_ = true;
   EXPECT_NO_THROW(initializeWithHealthCheckParams("test/server/cluster_health_check_bootstrap.yaml",
                                                   0.25, 0.5));
+}
+
+// Test that a Bootstrap proto with no address specified in its Admin field can go through
+// initialization properly, but without starting an admin listener.
+TEST_P(ServerInstanceImplTest, BootstrapNodeNoAdmin) {
+  EXPECT_NO_THROW(initialize("test/server/node_bootstrap_no_admin_port.yaml"));
+  // Admin::addListenerToHandler() calls one of handler's methods after checking that the Admin
+  // has a listener. So, the fact that passing a nullptr doesn't cause a segfault establishes
+  // that there is no listener.
+  server_->admin().addListenerToHandler(/*handler=*/nullptr);
+}
+
+// Validate that an admin config with a server address but no access log path is rejected.
+TEST_P(ServerInstanceImplTest, BootstrapNodeWithoutAccessLog) {
+  EXPECT_THROW_WITH_MESSAGE(initialize("test/server/node_bootstrap_without_access_log.yaml"),
+                            EnvoyException,
+                            "An admin access log path is required for a listening server.");
+}
+
+// Empty bootstrap succeeeds.
+TEST_P(ServerInstanceImplTest, EmptyBootstrap) {
+  options_.service_cluster_name_ = "some_cluster_name";
+  options_.service_node_name_ = "some_node_name";
+  EXPECT_NO_THROW(initialize("test/server/empty_bootstrap.yaml"));
 }
 
 // Negative test for protoc-gen-validate constraints.
 TEST_P(ServerInstanceImplTest, ValidateFail) {
   options_.service_cluster_name_ = "some_cluster_name";
   options_.service_node_name_ = "some_node_name";
-  options_.v2_config_only_ = true;
   try {
-    initialize("test/server/empty_bootstrap.yaml");
+    initialize("test/server/empty_runtime.yaml");
     FAIL();
   } catch (const EnvoyException& e) {
     EXPECT_THAT(e.what(), HasSubstr("Proto constraint validation failed"));
@@ -259,7 +304,7 @@ TEST_P(ServerInstanceImplTest, LogToFile) {
   options_.log_path_ = path;
   options_.service_cluster_name_ = "some_cluster_name";
   options_.service_node_name_ = "some_node_name";
-  initialize(std::string());
+  EXPECT_NO_THROW(initialize("test/server/empty_bootstrap.yaml"));
   EXPECT_TRUE(server_->api().fileExists(path));
 
   GET_MISC_LOGGER().set_level(spdlog::level::info);
@@ -287,14 +332,74 @@ TEST_P(ServerInstanceImplTest, LogToFileError) {
   }
 }
 
+// When there are no bootstrap CLI options, either for content or path, we can load the server with
+// an empty config.
 TEST_P(ServerInstanceImplTest, NoOptionsPassed) {
   EXPECT_THROW_WITH_MESSAGE(
       server_.reset(new InstanceImpl(
-          options_,
+          options_, test_time_.timeSystem(),
           Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
           hooks_, restart_, stats_store_, fakelock_, component_factory_,
-          std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), thread_local_)),
-      EnvoyException, "unable to read file: ");
+          std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), thread_local_,
+          Thread::threadFactoryForTest())),
+      EnvoyException, "At least one of --config-path and --config-yaml should be non-empty");
+}
+
+// Validate that when std::exception is unexpectedly thrown, we exit safely.
+// This is a regression test for when we used to crash.
+TEST_P(ServerInstanceImplTest, StdExceptionThrowInConstructor) {
+  EXPECT_CALL(restart_, initialize(_, _)).WillOnce(InvokeWithoutArgs([] {
+    throw(std::runtime_error("foobar"));
+  }));
+  EXPECT_THROW_WITH_MESSAGE(initialize("test/server/node_bootstrap.yaml"), std::runtime_error,
+                            "foobar");
+}
+
+// Neither EnvoyException nor std::exception derived.
+class FakeException {
+public:
+  FakeException(const std::string& what) : what_(what) {}
+  const std::string& what() const { return what_; }
+
+  const std::string what_;
+};
+
+// Validate that when a totally unknown exception is unexpectedly thrown, we
+// exit safely. This is a regression test for when we used to crash.
+TEST_P(ServerInstanceImplTest, UnknownExceptionThrowInConstructor) {
+  EXPECT_CALL(restart_, initialize(_, _)).WillOnce(InvokeWithoutArgs([] {
+    throw(FakeException("foobar"));
+  }));
+  EXPECT_THROW_WITH_MESSAGE(initialize("test/server/node_bootstrap.yaml"), FakeException, "foobar");
+}
+
+TEST_P(ServerInstanceImplTest, MutexContentionEnabled) {
+  options_.service_cluster_name_ = "some_cluster_name";
+  options_.service_node_name_ = "some_node_name";
+  options_.mutex_tracing_enabled_ = true;
+  EXPECT_NO_THROW(initialize("test/server/empty_bootstrap.yaml"));
+}
+
+TEST_P(ServerInstanceImplTest, NoHttpTracing) {
+  options_.service_cluster_name_ = "some_cluster_name";
+  options_.service_node_name_ = "some_node_name";
+  EXPECT_NO_THROW(initialize("test/server/empty_bootstrap.yaml"));
+  EXPECT_NE(nullptr, dynamic_cast<Tracing::HttpNullTracer*>(tracer()));
+  EXPECT_EQ(nullptr, dynamic_cast<Tracing::HttpTracerImpl*>(tracer()));
+}
+
+TEST_P(ServerInstanceImplTest, ZipkinHttpTracingEnabled) {
+  options_.service_cluster_name_ = "some_cluster_name";
+  options_.service_node_name_ = "some_node_name";
+  EXPECT_NO_THROW(initialize("test/server/zipkin_tracing.yaml"));
+  EXPECT_EQ(nullptr, dynamic_cast<Tracing::HttpNullTracer*>(tracer()));
+
+  // Note: there is no ZipkingTracerImpl object;
+  // source/extensions/tracers/zipkin/config.cc instantiates the tracer with
+  //     std::make_unique<Tracing::HttpTracerImpl>(std::move(zipkin_driver), server.localInfo());
+  // so we look for a successful dynamic cast to HttpTracerImpl, rather
+  // than HttpNullTracer.
+  EXPECT_NE(nullptr, dynamic_cast<Tracing::HttpTracerImpl*>(tracer()));
 }
 
 } // namespace Server

@@ -3,8 +3,11 @@
 #include <memory>
 #include <string>
 
+#include "envoy/common/time.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/event/timer.h"
 #include "envoy/filesystem/filesystem.h"
+#include "envoy/stats/store.h"
 #include "envoy/thread/thread.h"
 
 namespace Envoy {
@@ -19,9 +22,10 @@ public:
 
   /**
    * Allocate a dispatcher.
+   * @param time_source the time source.
    * @return Event::DispatcherPtr which is owned by the caller.
    */
-  virtual Event::DispatcherPtr allocateDispatcher() PURE;
+  virtual Event::DispatcherPtr allocateDispatcher(Event::TimeSystem& time_system) PURE;
 
   /**
    * Create/open a local file that supports async appending.
@@ -31,8 +35,7 @@ public:
    */
   virtual Filesystem::FileSharedPtr createFile(const std::string& path,
                                                Event::Dispatcher& dispatcher,
-                                               Thread::BasicLockable& lock,
-                                               Stats::Store& stats_store) PURE;
+                                               Thread::BasicLockable& lock) PURE;
 
   /**
    * @return bool whether a file exists and can be opened for read on disk.
@@ -43,6 +46,11 @@ public:
    * @return file content.
    */
   virtual std::string fileReadToEnd(const std::string& path) PURE;
+
+  /**
+   * @return a reference to the ThreadFactory
+   */
+  virtual Thread::ThreadFactory& threadFactory() PURE;
 };
 
 typedef std::unique_ptr<Api> ApiPtr;

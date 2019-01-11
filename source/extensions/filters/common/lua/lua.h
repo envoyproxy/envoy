@@ -11,7 +11,7 @@
 #include "common/common/c_smart_ptr.h"
 #include "common/common/logger.h"
 
-#include "luajit-2.0/lua.hpp"
+#include "luajit-2.1/lua.hpp"
 
 namespace Envoy {
 namespace Extensions {
@@ -402,7 +402,7 @@ class LuaException : public EnvoyException {
 public:
   using EnvoyException::EnvoyException;
 };
-}
+} // namespace Lua
 } // namespace Common
 } // namespace Filters
 } // namespace Extensions
