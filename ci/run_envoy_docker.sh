@@ -16,7 +16,7 @@ USER_GROUP=root
 [[ -z "${IMAGE_ID}" ]] && IMAGE_ID="${ENVOY_BUILD_SHA}"
 [[ -z "${ENVOY_DOCKER_BUILD_DIR}" ]] && ENVOY_DOCKER_BUILD_DIR=/tmp/envoy-docker-build
 
-git rev-parse --is-inside-work-tree > /dev/null && GIT_VOLUME_OPTION="--volume=$(git rev-parse --git-common-dir):$(git rev-parse --git-common-dir)"
+[[ -f .git ]] && [[ ! -d .git ]] && GIT_VOLUME_OPTION="--volume=$(git rev-parse --git-common-dir):$(git rev-parse --git-common-dir)"
 
 mkdir -p "${ENVOY_DOCKER_BUILD_DIR}"
 # Since we specify an explicit hash, docker-run will pull from the remote repo if missing.
