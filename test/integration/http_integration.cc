@@ -274,11 +274,11 @@ void HttpIntegrationTest::cleanupUpstreamAndDownstream() {
     RELEASE_ASSERT(result, result.message());
     result = fake_upstream_connection_->waitForDisconnect();
     RELEASE_ASSERT(result, result.message());
+    fake_upstream_connection_.reset();
   }
   if (codec_client_) {
     codec_client_->close();
   }
-  fake_upstream_connection_.reset();
 }
 
 uint64_t
