@@ -8,6 +8,7 @@ load(
 load(
     "//test/extensions:extensions_build_system.bzl",
     "envoy_extension_cc_test",
+    "envoy_extension_cc_test_binary",
 )
 
 envoy_package()
@@ -90,5 +91,21 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/network/redis_proxy:config",
         "//test/mocks/server:server_mocks",
+    ],
+)
+
+envoy_extension_cc_test_binary(
+    name = "command_lookup_speed_test",
+    srcs = ["command_lookup_speed_test.cc"],
+    extension_name = "envoy.filters.network.redis_proxy",
+    external_deps = [
+        "benchmark",
+    ],
+    deps = [
+        ":redis_mocks",
+        "//source/common/stats:isolated_store_lib",
+        "//source/common/stats:stats_lib",
+        "//source/extensions/filters/network/redis_proxy:command_splitter_lib",
+        "//test/test_common:printers_lib",
     ],
 )
