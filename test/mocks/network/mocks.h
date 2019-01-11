@@ -133,6 +133,10 @@ public:
     onData_(local_address, peer_address, data.get());
   }
 
+  void onWriteReady(const Socket& socket) override {
+    onWriteReady_(socket);
+  }
+
   void onError(const ErrorCode& err_code, int err) override { onError_(err_code, err); }
 
   MOCK_METHOD3(onNewConnection_,
@@ -141,6 +145,8 @@ public:
 
   MOCK_METHOD3(onData_, void(Address::InstanceConstSharedPtr local_address,
                              Address::InstanceConstSharedPtr peer_address, Buffer::Instance* data));
+
+  MOCK_METHOD1(onWriteReady_, void(const Socket& socket));
 
   MOCK_METHOD2(onError_, void(const ErrorCode& err_code, int err));
 };

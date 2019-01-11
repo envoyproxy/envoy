@@ -57,6 +57,9 @@ void UdpListenerImpl::eventCallback(int fd, short flags, void* arg) {
 }
 
 void UdpListenerImpl::handleReadCallback(int fd) {
+  RELEASE_ASSERT(fd == socket_.fd(),
+                 fmt::format("Invalid socket descriptor received in callback {}", fd));
+
   // TODO(conqerAtAppple): Make this configurable or get from system.
   constexpr uint64_t const read_length = 16384;
   Buffer::InstancePtr buffer = getBufferImpl();
@@ -142,7 +145,10 @@ void UdpListenerImpl::handleReadCallback(int fd) {
 }
 
 void UdpListenerImpl::handleWriteCallback(int fd) {
-  (void)fd;
+  RELEASE_ASSERT(fd == socket_.fd(),
+                 fmt::format("Invalid socket descriptor received in callback {}", fd));
+
+  cb_.onWriteReady(socket_);
 }
 
 } // namespace Network

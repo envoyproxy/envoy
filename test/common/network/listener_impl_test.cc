@@ -323,9 +323,9 @@ TEST_P(ListenerImplTest, UseActualDstUdp) {
     ASSERT_NE(peer_address, nullptr);
     ASSERT_NE(peer_address->ip(), nullptr);
 
-    ASSERT_EQ(local_address->asString(), server_socket->localAddress()->asString());
+    EXPECT_EQ(local_address->asString(), server_socket->localAddress()->asString());
 
-    ASSERT_EQ(peer_address->ip()->addressAsString(),
+    EXPECT_EQ(peer_address->ip()->addressAsString(),
               client_socket->localAddress()->ip()->addressAsString());
 
     EXPECT_EQ(*local_address, *server_socket->localAddress());
@@ -337,7 +337,7 @@ TEST_P(ListenerImplTest, UseActualDstUdp) {
                      Address::InstanceConstSharedPtr peer_address, Buffer::Instance* data) -> void {
             validateCallParams(local_address, peer_address);
 
-            ASSERT_EQ(data->toString(), first);
+            EXPECT_EQ(data->toString(), first);
           }));
 
   EXPECT_CALL(listener_callbacks, onData_(_, _, _))
@@ -346,17 +346,21 @@ TEST_P(ListenerImplTest, UseActualDstUdp) {
                      Address::InstanceConstSharedPtr peer_address, Buffer::Instance* data) -> void {
             validateCallParams(local_address, peer_address);
 
-            ASSERT_EQ(data->toString(), second);
+            EXPECT_EQ(data->toString(), second);
           }))
       .WillOnce(
           Invoke([&](Address::InstanceConstSharedPtr local_address,
                      Address::InstanceConstSharedPtr peer_address, Buffer::Instance* data) -> void {
             validateCallParams(local_address, peer_address);
 
-            ASSERT_EQ(data->toString(), third);
+            EXPECT_EQ(data->toString(), third);
 
             dispatcher_.exit();
           }));
+
+  EXPECT_CALL(listener_callbacks, onWriteReady_(_))
+      .WillRepeatedly(
+          Invoke([&](const Socket& socket) { EXPECT_EQ(socket.fd(), server_socket->fd()); }));
 
   dispatcher_.run(Event::Dispatcher::RunType::Block);
 }
@@ -454,6 +458,8 @@ TEST_P(ListenerImplTest, UdpListenerEnableDisable) {
 
   EXPECT_CALL(listener_callbacks, onData_(_, _, _)).Times(0);
 
+  EXPECT_CALL(listener_callbacks, onWriteReady_(_)).Times(0);
+
   dispatcher_.run(Event::Dispatcher::RunType::Block);
 
   listener.enable();
@@ -467,10 +473,14 @@ TEST_P(ListenerImplTest, UdpListenerEnableDisable) {
                      Address::InstanceConstSharedPtr peer_address, Buffer::Instance* data) -> void {
             validateCallParams(local_address, peer_address);
 
-            ASSERT_EQ(data->toString(), third);
+            EXPECT_EQ(data->toString(), third);
 
             dispatcher_.exit();
           }));
+
+  EXPECT_CALL(listener_callbacks, onWriteReady_(_))
+      .WillRepeatedly(
+          Invoke([&](const Socket& socket) { EXPECT_EQ(socket.fd(), server_socket->fd()); }));
 
   dispatcher_.run(Event::Dispatcher::RunType::Block);
 }
@@ -526,6 +536,11 @@ TEST_P(ListenerImplTest, UdpListenerRecvFromError) {
   ASSERT_EQ(send_rc, first.length());
 
   EXPECT_CALL(listener_callbacks, onNewConnection_(_, _, _)).Times(0);
+
+  EXPECT_CALL(listener_callbacks, onWriteReady_(_))
+      .Times(1)
+      .WillRepeatedly(
+          Invoke([&](const Socket& socket) { EXPECT_EQ(socket.fd(), server_socket->fd()); }));
 
   EXPECT_CALL(listener_callbacks, onError_(_, _))
       .Times(1)

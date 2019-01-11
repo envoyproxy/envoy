@@ -145,6 +145,8 @@ public:
                       Address::InstanceConstSharedPtr peer_address,
                       Buffer::InstancePtr&& data) PURE;
 
+  virtual void onWriteReady(const Socket& socket) PURE;
+
   /**
    * Called when there is an error event.
    *
