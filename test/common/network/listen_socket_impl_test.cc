@@ -124,6 +124,32 @@ INSTANTIATE_TEST_CASE_P(IpVersions, ListenSocketImplTestUdp,
 
 TEST_P(ListenSocketImplTestTcp, BindSpecificPort) { testBindSpecificPort(); }
 
+/*
+ * A simple implementation to test some of ListenSocketImpl's accessors without requiring
+ * stack interaction.
+ */
+class TestListenSocket : public ListenSocketImpl {
+public:
+  TestListenSocket(Address::InstanceConstSharedPtr address)
+    : ListenSocketImpl(std::make_unique<Network::IoSocketHandle>(), address) {}     
+  Address::SocketType socketType() const override { return Address::SocketType::Stream; }
+};
+
+TEST_P(ListenSocketImplTestTcp, SetLocalAddress) {
+  std::string address_str = "10.1.2.3";
+  if (version_ == Address::IpVersion::v6) {
+    address_str = "1::2";
+  }
+
+  Address::InstanceConstSharedPtr address = Network::Utility::parseInternetAddress(address_str);
+
+  TestListenSocket socket(Utility::getIpv4AnyAddress());
+
+  socket.setLocalAddress(address);
+
+  EXPECT_EQ(socket.localAddress(), address);
+}
+
 TEST_P(ListenSocketImplTestUdp, BindSpecificPort) { testBindSpecificPort(); }
 
 // Validate that we get port allocation when binding to port zero.

@@ -179,6 +179,8 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
     stream.stream_idle_timer_->disableTimer();
     stream.stream_idle_timer_ = nullptr;
   }
+  stream.disarmRequestTimeout();
+
   stream.state_.destroyed_ = true;
   for (auto& filter : stream.decoder_filters_) {
     filter->handle_->onDestroy();
