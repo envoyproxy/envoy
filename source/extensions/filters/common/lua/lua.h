@@ -78,6 +78,7 @@ template <typename T> inline void* allocateLuaUserData(lua_State* state) {
   lua_setmetatable(state, -2);
 
   // Align the allocated memory.
+  // TODO(dio): should we do #ifdef for skipping aligning the memory?
   return std::align(std::alignment_of<T>(), sizeof(mem), mem, space);
 }
 
@@ -135,6 +136,7 @@ public:
     // manually because the memory is raw and was allocated by Lua.
     to_register.push_back(
         {"__gc", [](lua_State* state) {
+           // TODO(dio): should we do #ifdef for skipping alignment check?
            auto mem = reinterpret_cast<std::uintptr_t>(luaL_checkudata(state, 1, typeid(T).name()));
 
            // Check if the allocated memory by Lua was aligned.
