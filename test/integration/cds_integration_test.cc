@@ -77,6 +77,7 @@ static_resources:
               domains: "*"
 )EOF";
 const char ClusterName[] = "cluster_0";
+const int UpstreamIndex = 1;
 
 class CdsIntegrationTest : public XdsIntegrationTestBase,
                            public Grpc::GrpcClientIntegrationParamTest {
@@ -110,12 +111,11 @@ public:
       http2_protocol_options: {{}}
     )EOF",
                     name, name, Network::Test::getLoopbackAddressString(ipVersion()),
-                    // fake_upstreams_[0] is the CDS server, [1] is the regular upstream.
-                    fake_upstreams_[1]->localAddress()->ip()->port()));
+                    fake_upstreams_[UpstreamIndex]->localAddress()->ip()->port()));
   }
 
   // Overridden to insert this stuff into the initialize() at the very beginning of
-  // HttpIntegrationTest::testRouterRequestAndResponseWithBody().
+  // HttpIntegrationTest::testRouterHeaderOnlyRequestAndResponse().
   void initialize() override {
     // Controls how many fake_upstreams_.emplace_back(new FakeUpstream) will happen in
     // BaseIntegrationTest::createUpstreams() (which is part of initialize()).
@@ -141,7 +141,7 @@ public:
     // cluster in the bootstrap config - which we don't want since we're testing dynamic CDS!
     fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_,
                                                   timeSystem(), enable_half_close_));
-    fake_upstreams_[1]->set_allow_unexpected_disconnects(false);
+    fake_upstreams_[UpstreamIndex]->set_allow_unexpected_disconnects(false);
 
     // Now that the upstream has been created, process Envoy's request to discover it.
     // (First, we have to let Envoy establish its connection to the CDS server.)
@@ -179,7 +179,7 @@ INSTANTIATE_TEST_CASE_P(IpVersionsClientType, CdsIntegrationTest, GRPC_CLIENT_IN
 // 7) We send Envoy a request, which we verify is properly proxied to and served by that cluster.
 TEST_P(CdsIntegrationTest, CdsClusterUpDownUp) {
   // Calls our initialize(), which includes establishing a listener, route, and cluster.
-  testRouterHeaderOnlyRequestAndResponse(nullptr, 1);
+  testRouterHeaderOnlyRequestAndResponse(nullptr, UpstreamIndex);
 
   // Tell Envoy that cluster_0 is gone.
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {}));
@@ -207,7 +207,7 @@ TEST_P(CdsIntegrationTest, CdsClusterUpDownUp) {
   test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);
 
   // Does *not* call our initialize().
-  testRouterHeaderOnlyRequestAndResponse(nullptr, 1);
+  testRouterHeaderOnlyRequestAndResponse(nullptr, UpstreamIndex);
 
   cleanupUpstreamAndDownstream();
 }
