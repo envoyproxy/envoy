@@ -86,7 +86,7 @@ public:
  */
 class InstanceUtil : Logger::Loggable<Logger::Id::main> {
 public:
-  enum class BootstrapVersion { V1, V2 };
+  enum class BootstrapVersion { V2 };
 
   /**
    * Default implementation of runtime loader creation used in the real server and in most
