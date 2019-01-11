@@ -9,6 +9,7 @@
 
 #include "common/common/logger.h"
 #include "common/common/to_lower_table.h"
+#include "common/common/utility.h"
 #include "common/singleton/const_singleton.h"
 
 #include "extensions/filters/network/redis_proxy/command_splitter.h"
@@ -234,6 +235,8 @@ private:
     std::reference_wrapper<CommandHandler> handler_;
   };
 
+  typedef std::shared_ptr<HandlerData> HandlerDataPtr;
+
   void addHandler(Stats::Scope& scope, const std::string& stat_prefix, const std::string& name,
                   CommandHandler& handler);
   void onInvalidRequest(SplitCallbacks& callbacks);
@@ -244,7 +247,7 @@ private:
   CommandHandlerFactory<MGETRequest> mget_handler_;
   CommandHandlerFactory<MSETRequest> mset_handler_;
   CommandHandlerFactory<SplitKeysSumResultRequest> split_keys_sum_result_handler_;
-  std::unordered_map<std::string, HandlerData> command_map_;
+  TrieLookupTable<HandlerDataPtr> handler_lookup_table_;
   InstanceStats stats_;
   const ToLowerTable to_lower_table_;
 };
