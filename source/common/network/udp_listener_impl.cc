@@ -71,17 +71,12 @@ void UdpListenerImpl::handleReadCallback(int fd) {
 
   do {
     result = buffer->recvFrom(fd, read_length, addr, addr_len);
-    if (result.rc_ < 0) {
-      if (result.rc_ == -EAGAIN) {
-        continue;
-      }
-      // TODO(conqerAtApple): Call error callback.
+    if ((result.rc_ < 0) && (result.rc_ != -EAGAIN)) {
       cb_.onError(UdpListenerCallbacks::ErrorCode::SYSCALL_ERROR, result.errno_);
       return;
     }
 
-    break;
-  } while (true);
+  } while (result.rc_ == -EAGAIN);
 
   Address::InstanceConstSharedPtr local_address = socket_.localAddress();
 
