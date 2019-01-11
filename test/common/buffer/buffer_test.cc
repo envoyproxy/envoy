@@ -65,7 +65,7 @@ TEST(OwnedSliceTest, ReserveCommit) {
     ASSERT_EQ(slice->data(), reservation.mem_);
     ASSERT_EQ(10, reservation.len_);
 
-    // Request a second reservation while the first reservation remains uncommited.
+    // Request a second reservation while the first reservation remains uncommitted.
     // This should fail.
     ASSERT(slice->reservableSize() == 0);
     Slice::Reservation reservation2 = slice->reserve(1);

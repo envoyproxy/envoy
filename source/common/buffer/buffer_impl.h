@@ -80,7 +80,7 @@ public:
    * Reserve `size` bytes that the caller can populate with content. The caller SHOULD then
    * call commit() to add the newly populated content from the Reserved section to the Data
    * section.
-   * @note If there is already an oustanding reservation (i.e., a reservation obtained
+   * @note If there is already an outstanding reservation (i.e., a reservation obtained
    *       from reserve() that has not been released by calling commit()), this method will
    *       return {nullptr, 0}.
    * @param size the number of bytes to reserve. The Slice implementation MAY reserve
