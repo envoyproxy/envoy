@@ -56,8 +56,17 @@ void OwnedImpl::add(const Instance& data) {
 }
 
 void OwnedImpl::prepend(absl::string_view data) {
-  slices_.emplace_front(OwnedSlice::create(data.data(), data.size()));
-  length_ += data.size();
+  uint64_t size = data.size();
+  bool new_slice_needed = slices_.empty();
+  while (size != 0) {
+    if (new_slice_needed) {
+      slices_.emplace_front(OwnedSlice::create(size));
+    }
+    uint64_t copy_size = slices_.front()->prepend(data.data(), size);
+    size -= copy_size;
+    length_ += copy_size;
+    new_slice_needed = true;
+  }
 }
 
 void OwnedImpl::prepend(Instance& data) {

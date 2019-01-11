@@ -128,6 +128,12 @@ public:
     return true;
   }
 
+  /**
+   * Copy as much of the supplied data as possible to the end of the slice.
+   * @param data start of the data to copy.
+   * @param size number of bytes to copy.
+   * @return number of bytes copied (may be a smaller than size, may even be zero).
+   */
   uint64_t append(const void* data, uint64_t size) {
     if (reservation_outstanding_) {
       return 0;
@@ -136,6 +142,39 @@ public:
     uint8_t* dest = base_ + reservable_;
     reservable_ += copy_size;
     memcpy(dest, data, copy_size);
+    return copy_size;
+  }
+
+  /**
+   * Copy as much of the supplied data as possible to the front of the slice.
+   * If only part of the data will fit in the slice, the bytes from the _end_ are
+   * copied.
+   * @param data start of the data to copy.
+   * @param size number of bytes to copy.
+   * @return number of bytes copied (may be a smaller than size, may even be zero).
+   */
+  uint64_t prepend(const void* data, uint64_t size) {
+    if (reservation_outstanding_) {
+      return 0;
+    }
+    const uint8_t* src = static_cast<const uint8_t*>(data);
+    uint64_t copy_size;
+    if (dataSize() == 0) {
+      // There is nothing in the slice, so put the data at the very end in case the caller
+      // later tries to prepend anything else in front of it.
+      copy_size = std::min(size, reservableSize());
+      reservable_ = size_;
+      data_ = size_ - copy_size;
+    } else {
+      if (data_ == 0) {
+        // There is content in the slice, and no space in front of it to write anything.
+        return 0;
+      }
+      // Write into the space in front of the slice's current content.
+      copy_size = std::min(size, data_);
+      data_ -= copy_size;
+    }
+    memcpy(base_ + data_, src + size - copy_size, copy_size);
     return copy_size;
   }
 
@@ -180,7 +219,7 @@ private:
    return ::operator new(object_size + data_size);
   }
 
-  OwnedSlice(uint64_t size) : Slice(0, 0, sliceSize(size)) {
+  OwnedSlice(uint64_t size) : Slice(0, 0, size) {
     base_ = storage_;
   }
 
@@ -195,15 +234,9 @@ private:
    * @return a recommended slice size, in bytes.
    */
   static uint64_t sliceSize(uint64_t data_size) {
-    uint64_t slice_size = 32;
-    while (slice_size < data_size) {
-      slice_size <<= 1;
-      if (slice_size == 0) {
-        // Integer overflow
-        return data_size;
-      }
-    }
-    return slice_size;
+    static constexpr uint64_t PageSize = 4096;
+    const uint64_t num_pages = (sizeof(OwnedSlice) + data_size + PageSize - 1) / PageSize;
+    return num_pages * PageSize - sizeof(OwnedSlice);
   }
 
   uint8_t storage_[];
