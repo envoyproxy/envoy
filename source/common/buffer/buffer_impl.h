@@ -73,7 +73,7 @@ public:
     if (reservation_outstanding_) {
       return 0;
     }
-    return size_ - reservable_;
+    return capacity_ - reservable_;
   }
 
   /**
@@ -91,10 +91,10 @@ public:
    * @note Read-only implementations of Slice should return {nullptr, 0} from this method.
    */
   Reservation reserve(uint64_t size) {
-    if (reservation_outstanding_) {
+    if (reservation_outstanding_ || size == 0) {
       return {nullptr, 0};
     }
-    uint64_t available_size = size_ - reservable_;
+    uint64_t available_size = capacity_ - reservable_;
     if (available_size == 0) {
       return {nullptr, 0};
     }
@@ -118,7 +118,7 @@ public:
    */
   bool commit(const Reservation& reservation) {
     if (static_cast<const uint8_t*>(reservation.mem_) != base_ + reservable_ ||
-        reservable_ + reservation.len_ > size_ || reservable_ >= size_) {
+        reservable_ + reservation.len_ > capacity_ || reservable_ >= capacity_) {
       // The reservation is not from this OwnedSlice.
       return false;
     }
@@ -163,8 +163,8 @@ public:
       // There is nothing in the slice, so put the data at the very end in case the caller
       // later tries to prepend anything else in front of it.
       copy_size = std::min(size, reservableSize());
-      reservable_ = size_;
-      data_ = size_ - copy_size;
+      reservable_ = capacity_;
+      data_ = capacity_ - copy_size;
     } else {
       if (data_ == 0) {
         // There is content in the slice, and no space in front of it to write anything.
@@ -179,7 +179,8 @@ public:
   }
 
 protected:
-  Slice(uint64_t data, uint64_t reservable, uint64_t size) : data_(data), reservable_(reservable), size_(size) {}
+  Slice(uint64_t data, uint64_t reservable, uint64_t capacity)
+      : data_(data), reservable_(reservable), capacity_(capacity) {}
 
   /** Start of the slice - subclasses must set this */
   uint8_t* base_{nullptr};
@@ -191,7 +192,7 @@ protected:
   uint64_t reservable_;
 
   /** Total number of bytes in the slice */
-  uint64_t size_;
+  uint64_t capacity_;
 
   /** Whether reserve() has been called without a corresponding commit(). */
   bool reservation_outstanding_{false};
@@ -201,14 +202,26 @@ using SlicePtr = std::unique_ptr<Slice>;
 
 class OwnedSlice : public Slice {
 public:
-  static SlicePtr create(uint64_t size) {
-    uint64_t slice_size = sliceSize(size);
-    return SlicePtr(new (slice_size) OwnedSlice(slice_size));
+  /**
+   * Create an empty OwnedSlice.
+   * @param capacity number of bytes of space the slice should have.
+   * @return an OwnedSlice with at least the specified capacity.
+   */
+  static SlicePtr create(uint64_t capacity) {
+    uint64_t slice_capacity = sliceSize(capacity);
+    return SlicePtr(new (slice_capacity) OwnedSlice(slice_capacity));
   }
 
+  /**
+   * Create an OwnedSlice and initialize it with a copy of the supplied copy.
+   * @param data the content to copy into the slice.
+   * @param size length of the content.
+   * @return an OwnedSlice containing a copy of the content, which may (dependent on
+   *         the internal implementation) have a nonzero amount of reservable space at the end.
+   */
   static SlicePtr create(const void* data, uint64_t size) {
-    uint64_t slice_size = sliceSize(size);
-    OwnedSlice* slice = new (slice_size) OwnedSlice(slice_size);
+    uint64_t slice_capacity = sliceSize(size);
+    OwnedSlice* slice = new (slice_capacity) OwnedSlice(slice_capacity);
     memcpy(slice->base_, data, size);
     slice->reservable_ = size;
     return SlicePtr(slice);
@@ -216,17 +229,10 @@ public:
 
 private:
   void* operator new(size_t object_size, size_t data_size) {
-   return ::operator new(object_size + data_size);
+    return ::operator new(object_size + data_size);
   }
 
-  OwnedSlice(uint64_t size) : Slice(0, 0, size) {
-    base_ = storage_;
-  }
-
-  OwnedSlice(const void* data, uint64_t size) : OwnedSlice(size) {
-    memcpy(base_, data, size);
-    reservable_ = size;
-  }
+  OwnedSlice(uint64_t size) : Slice(0, 0, size) { base_ = storage_; }
 
   /**
    * Compute a slice size big enough to hold a specified amount of data.
@@ -252,20 +258,27 @@ private:
  */
 class SliceDeque {
 public:
-  SliceDeque() :
-    ring_(inline_ring_), start_(0), size_(0), capacity_(InlineRingCapacity) {
-      /*
-      external_ring_ = std::make_unique<SlicePtr[]>(InlineRingCapacity);
-      ring_ = external_ring_.get();
-      */
-      ASSERT(nullptr == external_ring_.get());
-      for (size_t i = 0; i < InlineRingCapacity; i++) {
-        ASSERT(inline_ring_[i].get() == nullptr);
-      }
-      ASSERT(ring_ == &(inline_ring_[0]));
+  SliceDeque() : ring_(inline_ring_), start_(0), size_(0), capacity_(InlineRingCapacity) {
+    /*
+    external_ring_ = std::make_unique<SlicePtr[]>(InlineRingCapacity);
+    ring_ = external_ring_.get();
+    */
+    ASSERT(nullptr == external_ring_.get());
+    for (size_t i = 0; i < InlineRingCapacity; i++) {
+      ASSERT(inline_ring_[i].get() == nullptr);
     }
+    ASSERT(ring_ == &(inline_ring_[0]));
+  }
 
-  SliceDeque(SliceDeque&&) = delete;
+  SliceDeque(SliceDeque&& rhs) {
+    // This custom move constructor is needed so that ring_ will be updated properly.
+    std::move(rhs.inline_ring_, rhs.inline_ring_ + InlineRingCapacity, inline_ring_);
+    external_ring_ = std::move(rhs.external_ring_);
+    ring_ = (external_ring_ != nullptr) ? external_ring_.get() : inline_ring_;
+    start_ = rhs.start_;
+    size_ = rhs.size_;
+    capacity_ = rhs.capacity_;
+  }
 
   SliceDeque& operator=(SliceDeque&& rhs) {
     // This custom assignment move operator is needed so that ring_ will be updated properly.
@@ -375,7 +388,8 @@ private:
 
 class UnownedSlice : public Slice {
 public:
-  UnownedSlice(BufferFragment& fragment) : Slice(0, fragment.size(), fragment.size()), fragment_(fragment) {
+  UnownedSlice(BufferFragment& fragment)
+      : Slice(0, fragment.size(), fragment.size()), fragment_(fragment) {
     base_ = static_cast<uint8_t*>(const_cast<void*>(fragment.data()));
   }
 
