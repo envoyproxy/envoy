@@ -213,33 +213,36 @@ TEST(SliceDequeTest, CreateDelete) {
     ASSERT_EQ(0, slices.size());
 
     // Append a view to the deque.
+    const std::string slice1 = "slice1";
     slices.emplace_back(
-        std::make_unique<DummySlice>("slice1", [&slice1_deleted]() { slice1_deleted = true; }));
+        std::make_unique<DummySlice>(slice1, [&slice1_deleted]() { slice1_deleted = true; }));
     ASSERT_FALSE(slices.empty());
     ASSERT_EQ(1, slices.size());
     ASSERT_FALSE(slice1_deleted);
-    ASSERT(sliceMatches(slices.front(), "slice1"));
+    ASSERT(sliceMatches(slices.front(), slice1));
 
     // Append another view to the deque, and verify that both views are accessible.
+    const std::string slice2 = "slice2";
     slices.emplace_back(
-        std::make_unique<DummySlice>("slice2", [&slice2_deleted]() { slice2_deleted = true; }));
+        std::make_unique<DummySlice>(slice2, [&slice2_deleted]() { slice2_deleted = true; }));
     ASSERT_FALSE(slices.empty());
     ASSERT_EQ(2, slices.size());
     ASSERT_FALSE(slice1_deleted);
     ASSERT_FALSE(slice2_deleted);
-    ASSERT(sliceMatches(slices.front(), "slice1"));
-    ASSERT(sliceMatches(slices.back(), "slice2"));
+    ASSERT(sliceMatches(slices.front(), slice1));
+    ASSERT(sliceMatches(slices.back(), slice2));
 
     // Prepend a view to the deque, to exercise the ring buffer wraparound case.
+    const std::string slice3 = "slice2";
     slices.emplace_front(
-        std::make_unique<DummySlice>("slice3", [&slice3_deleted]() { slice3_deleted = true; }));
+        std::make_unique<DummySlice>(slice3, [&slice3_deleted]() { slice3_deleted = true; }));
     ASSERT_FALSE(slices.empty());
     ASSERT_EQ(3, slices.size());
     ASSERT_FALSE(slice1_deleted);
     ASSERT_FALSE(slice2_deleted);
     ASSERT_FALSE(slice3_deleted);
-    ASSERT(sliceMatches(slices.front(), "slice3"));
-    ASSERT(sliceMatches(slices.back(), "slice2"));
+    ASSERT(sliceMatches(slices.front(), slice3));
+    ASSERT(sliceMatches(slices.back(), slice2));
 
     // Remove the first view from the deque, and verify that its slice is deleted.
     slices.pop_front();
@@ -248,8 +251,8 @@ TEST(SliceDequeTest, CreateDelete) {
     ASSERT_FALSE(slice1_deleted);
     ASSERT_FALSE(slice2_deleted);
     ASSERT(slice3_deleted);
-    ASSERT(sliceMatches(slices.front(), "slice1"));
-    ASSERT(sliceMatches(slices.back(), "slice2"));
+    ASSERT(sliceMatches(slices.front(), slice1));
+    ASSERT(sliceMatches(slices.back(), slice2));
   }
 
   ASSERT(slice1_deleted);
