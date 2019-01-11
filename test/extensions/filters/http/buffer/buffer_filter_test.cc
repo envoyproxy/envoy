@@ -33,7 +33,7 @@ public:
   BufferFilterConfigSharedPtr setupConfig() {
     envoy::config::filter::http::buffer::v2::Buffer proto_config;
     proto_config.mutable_max_request_bytes()->set_value(1024 * 1024);
-    return std::make_shared<BufferFilterConfig>(BufferFilterConfig(proto_config));
+    return std::make_shared<BufferFilterConfig>(proto_config);
   }
 
   BufferFilterTest() : config_(setupConfig()), filter_(config_) {
