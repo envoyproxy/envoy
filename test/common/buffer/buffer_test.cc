@@ -20,7 +20,7 @@ public:
       : Slice(0, data.size(), data.size()), deletion_callback_(deletion_callback) {
     base_ = reinterpret_cast<uint8_t*>(const_cast<char*>(data.c_str()));
   }
-  ~DummySlice() {
+  ~DummySlice() override {
     if (deletion_callback_ != nullptr) {
       deletion_callback_();
     }

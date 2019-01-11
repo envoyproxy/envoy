@@ -141,6 +141,7 @@ public:
     uint64_t copy_size = std::min(size, reservableSize());
     uint8_t* dest = base_ + reservable_;
     reservable_ += copy_size;
+    // NOLINTNEXTLINE(clang-analyzer-core.NullDereference)
     memcpy(dest, data, copy_size);
     return copy_size;
   }
@@ -221,7 +222,7 @@ public:
    */
   static SlicePtr create(const void* data, uint64_t size) {
     uint64_t slice_capacity = sliceSize(size);
-    OwnedSlice* slice = new (slice_capacity) OwnedSlice(slice_capacity);
+    auto slice = new (slice_capacity) OwnedSlice(slice_capacity);
     memcpy(slice->base_, data, size);
     slice->reservable_ = size;
     return SlicePtr(slice);
@@ -258,19 +259,16 @@ private:
  */
 class SliceDeque {
 public:
-  SliceDeque() : ring_(inline_ring_), start_(0), size_(0), capacity_(InlineRingCapacity) {
+  SliceDeque() : ring_(inline_ring_), capacity_(InlineRingCapacity) {
     /*
     external_ring_ = std::make_unique<SlicePtr[]>(InlineRingCapacity);
     ring_ = external_ring_.get();
     */
-    ASSERT(nullptr == external_ring_.get());
-    for (size_t i = 0; i < InlineRingCapacity; i++) {
-      ASSERT(inline_ring_[i].get() == nullptr);
-    }
+    ASSERT(nullptr == external_ring_);
     ASSERT(ring_ == &(inline_ring_[0]));
   }
 
-  SliceDeque(SliceDeque&& rhs) {
+  SliceDeque(SliceDeque&& rhs) noexcept {
     // This custom move constructor is needed so that ring_ will be updated properly.
     std::move(rhs.inline_ring_, rhs.inline_ring_ + InlineRingCapacity, inline_ring_);
     external_ring_ = std::move(rhs.external_ring_);
@@ -280,7 +278,7 @@ public:
     capacity_ = rhs.capacity_;
   }
 
-  SliceDeque& operator=(SliceDeque&& rhs) {
+  SliceDeque& operator=(SliceDeque&& rhs) noexcept {
     // This custom assignment move operator is needed so that ring_ will be updated properly.
     std::move(rhs.inline_ring_, rhs.inline_ring_ + InlineRingCapacity, inline_ring_);
     external_ring_ = std::move(rhs.external_ring_);
@@ -359,7 +357,7 @@ private:
     const size_t new_capacity = capacity_ * 2;
     auto new_ring = std::make_unique<SlicePtr[]>(new_capacity);
     for (size_t i = 0; i < new_capacity; i++) {
-      ASSERT(new_ring[i].get() == nullptr);
+      ASSERT(new_ring[i] == nullptr);
     }
     size_t src = start_;
     size_t dst = 0;
@@ -381,8 +379,8 @@ private:
   SlicePtr inline_ring_[InlineRingCapacity];
   std::unique_ptr<SlicePtr[]> external_ring_;
   SlicePtr* ring_; // points to start of either inline or external ring.
-  size_t start_;
-  size_t size_;
+  size_t start_{0};
+  size_t size_{0};
   size_t capacity_;
 };
 

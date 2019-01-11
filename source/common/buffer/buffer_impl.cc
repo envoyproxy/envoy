@@ -176,6 +176,7 @@ uint64_t OwnedImpl::getRawSlices(RawSlice* out, uint64_t out_size) const {
 uint64_t OwnedImpl::length() const {
   // When running in debug mode, verify that the precomputed length matches the sum
   // of the lengths of the slices.
+  // NOLINTNEXTLINE(bugprone-assert-side-effect)
   ASSERT(length_ == [this]() -> uint64_t {
     uint64_t length = 0;
     for (size_t slice_index = 0; slice_index < slices_.size(); slice_index++) {
@@ -448,6 +449,9 @@ OwnedImpl::OwnedImpl(const void* data, uint64_t size) : OwnedImpl() { add(data, 
 
 std::string OwnedImpl::toString() const {
   uint64_t num_slices = getRawSlices(nullptr, 0);
+  if (num_slices == 0) {
+    return std::string();
+  }
   STACK_ARRAY(slices, RawSlice, num_slices);
   getRawSlices(slices.begin(), num_slices);
   size_t len = 0;
