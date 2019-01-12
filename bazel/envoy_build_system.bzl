@@ -468,17 +468,17 @@ def envoy_sh_test(
         name,
         srcs = [],
         data = [],
-        exclude_from_coverage = False,
+        coverage = True,
         **kargs):
-    test_runner_cc = name + "_test_runner.cc"
-    native.genrule(
-        name = name + "_gen_test_runner",
-        srcs = srcs,
-        outs = [test_runner_cc],
-        cmd = "$(location //bazel:gen_sh_test_runner.sh) $(SRCS) >> $@",
-        tools = ["//bazel:gen_sh_test_runner.sh"],
-    )
-    if not exclude_from_coverage:
+    if coverage:
+        test_runner_cc = name + "_test_runner.cc"
+        native.genrule(
+            name = name + "_gen_test_runner",
+            srcs = srcs,
+            outs = [test_runner_cc],
+            cmd = "$(location //bazel:gen_sh_test_runner.sh) $(SRCS) >> $@",
+            tools = ["//bazel:gen_sh_test_runner.sh"],
+        )
         envoy_cc_test_library(
             name = name + "_lib",
             srcs = [test_runner_cc],
