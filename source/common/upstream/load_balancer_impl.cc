@@ -33,7 +33,7 @@ static const std::string RuntimePanicThreshold = "upstream.healthy_panic_thresho
 // scale the load when the total availability is less than 100%.
 // @return the first available priority and the remaining load
 std::pair<int32_t, size_t> distributeLoad(PriorityLoad& per_priority_load,
-                                          const std::vector<uint32_t>& per_priority_availability,
+                                          const PriorityAvailability& per_priority_availability,
                                           size_t total_load, size_t normalized_total_availability) {
   int32_t first_available_priority = -1;
   for (size_t i = 0; i < per_priority_availability.size(); ++i) {
@@ -52,8 +52,7 @@ std::pair<int32_t, size_t> distributeLoad(PriorityLoad& per_priority_load,
 
 } // namespace
 
-uint32_t LoadBalancerBase::choosePriority(uint64_t hash,
-                                          const std::vector<uint32_t>& per_priority_load) {
+uint32_t LoadBalancerBase::choosePriority(uint64_t hash, const PriorityLoad& per_priority_load) {
   hash = hash % 100 + 1; // 1-100
   uint32_t aggregate_percentage_load = 0;
   // As with tryChooseLocalLocalityHosts, this can be refactored for efficiency
@@ -109,7 +108,7 @@ LoadBalancerBase::LoadBalancerBase(const PrioritySet& priority_set, ClusterStats
 void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority,
                                                    const PrioritySet& priority_set,
                                                    PriorityLoad& per_priority_load,
-                                                   std::vector<uint32_t>& per_priority_health) {
+                                                   PriorityAvailability& per_priority_health) {
   per_priority_load.resize(priority_set.hostSetsPerPriority().size());
   per_priority_health.resize(priority_set.hostSetsPerPriority().size());
 
