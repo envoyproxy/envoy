@@ -308,11 +308,6 @@ TEST_P(ListenerImplTest, UseActualDstUdp) {
 
   ASSERT_EQ(send_rc, second.length());
 
-  send_rc = ::sendto(client_sockfd, third.c_str(), third.length(), 0,
-                     reinterpret_cast<const struct sockaddr*>(&server_addr), addr_len);
-
-  ASSERT_EQ(send_rc, third.length());
-
   auto validateCallParams = [&](Address::InstanceConstSharedPtr local_address,
                                 Address::InstanceConstSharedPtr peer_address) {
     ASSERT_NE(local_address, nullptr);
@@ -422,12 +417,23 @@ TEST_P(ListenerImplTest, UdpEcho) {
   timer->enableTimer(std::chrono::milliseconds(2000));
 
   // For unit test purposes, we assume that the data was received in order.
-
   Address::InstanceConstSharedPtr test_peer_address;
 
   std::vector<std::string> server_received_data;
 
   EXPECT_CALL(listener_callbacks, onData_(_, _, _))
+      .WillOnce(
+          Invoke([&](Address::InstanceConstSharedPtr local_address,
+                     Address::InstanceConstSharedPtr peer_address, Buffer::Instance* data) -> void {
+            validateCallParams(local_address, peer_address);
+
+            test_peer_address = peer_address;
+
+            const std::string data_str = data->toString();
+            EXPECT_EQ(data_str, first);
+
+            server_received_data.push_back(data_str);
+          }))
       .WillOnce(
           Invoke([&](Address::InstanceConstSharedPtr local_address,
                      Address::InstanceConstSharedPtr peer_address, Buffer::Instance* data) -> void {
@@ -445,6 +451,8 @@ TEST_P(ListenerImplTest, UdpEcho) {
 
         sockaddr_storage client_addr;
         socklen_t client_addr_len;
+
+        ASSERT_NE(test_peer_address, nullptr);
         const uint32_t peer_port = test_peer_address->ip()->port();
 
         getSocketAddressInfo(test_peer_address, peer_port, client_addr, client_addr_len);
