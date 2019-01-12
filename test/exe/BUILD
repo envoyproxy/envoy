@@ -16,12 +16,14 @@ envoy_sh_test(
         "//bazel:raw_build_id.ldscript",
         "//source/exe:envoy-static",
     ],
+    exclude_from_coverage = True,
 )
 
 envoy_sh_test(
     name = "envoy_static_test",
     srcs = ["envoy_static_test.sh"],
     data = ["//source/exe:envoy-static"],
+    exclude_from_coverage = True,
     # NOTE: In some environments, ASAN causes dynamic linking no matter what, so don't run this
     # test when doing ASAN.
     tags = ["no_asan"],
@@ -35,6 +37,7 @@ envoy_sh_test(
         "//bazel:raw_build_id.ldscript",
         "//source/exe:envoy-static",
     ],
+    exclude_from_coverage = True,
 )
 
 envoy_cc_test(
