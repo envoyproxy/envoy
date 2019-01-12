@@ -316,7 +316,7 @@ public:
                                   envoy::data::core::v2alpha::HealthCheckFailureType, bool));
   MOCK_METHOD2(logDegraded, void(envoy::data::core::v2alpha::HealthCheckerType,
                                  const HostDescriptionConstSharedPtr&));
-  MOCK_METHOD2(logNoMoreDegraded, void(envoy::data::core::v2alpha::HealthCheckerType,
+  MOCK_METHOD2(logNoLongerDegraded, void(envoy::data::core::v2alpha::HealthCheckerType,
                                        const HostDescriptionConstSharedPtr&));
 };
 
