@@ -36,8 +36,30 @@ void UdpListenerImpl::disable() { event_del(&raw_event_); }
 
 void UdpListenerImpl::enable() { event_add(&raw_event_, nullptr); }
 
-Buffer::InstancePtr UdpListenerImpl::getBufferImpl() {
-  return std::make_unique<Buffer::OwnedImpl>();
+UdpListenerImpl::ReceiveResult UdpListenerImpl::doRecvFrom(sockaddr_storage& peer_addr,
+                                                           socklen_t& addr_len) {
+  constexpr uint64_t const read_length = 16384;
+
+  Buffer::InstancePtr buffer = std::make_unique<Buffer::OwnedImpl>();
+
+  addr_len = sizeof(sockaddr_storage);
+  memset(&peer_addr, 0, addr_len);
+
+  Buffer::RawSlice slice;
+  const uint64_t num_slices = buffer->reserve(read_length, &slice, 1);
+
+  ASSERT(num_slices == 1);
+  // TODO(conqerAtapple): Use os_syscalls
+  const ssize_t rc = ::recvfrom(socket_.fd(), slice.mem_, read_length, 0,
+                                reinterpret_cast<struct sockaddr*>(&peer_addr), &addr_len);
+  if (rc < 0) {
+    return ReceiveResult{Api::SysCallIntResult{static_cast<int>(rc), errno}, nullptr};
+  }
+
+  slice.len_ = std::min(slice.len_, static_cast<size_t>(rc));
+  buffer->commit(&slice, 1);
+
+  return ReceiveResult{Api::SysCallIntResult{static_cast<int>(rc), 0}, std::move(buffer)};
 }
 
 void UdpListenerImpl::eventCallback(int fd, short flags, void* arg) {
@@ -60,23 +82,18 @@ void UdpListenerImpl::handleReadCallback(int fd) {
   RELEASE_ASSERT(fd == socket_.fd(),
                  fmt::format("Invalid socket descriptor received in callback {}", fd));
 
-  // TODO(conqerAtAppple): Make this configurable or get from system.
-  constexpr uint64_t const read_length = 16384;
-  Buffer::InstancePtr buffer = getBufferImpl();
-  ASSERT(buffer);
-
   sockaddr_storage addr;
   socklen_t addr_len;
-  Api::SysCallIntResult result;
+  ReceiveResult recv_result;
 
   do {
-    result = buffer->recvFrom(fd, read_length, addr, addr_len);
-    if ((result.rc_ < 0) && (result.rc_ != -EAGAIN)) {
-      cb_.onError(UdpListenerCallbacks::ErrorCode::SYSCALL_ERROR, result.errno_);
+    recv_result = doRecvFrom(addr, addr_len);
+    if ((recv_result.result_.rc_ < 0) && (recv_result.result_.rc_ != -EAGAIN)) {
+      cb_.onError(UdpListenerCallbacks::ErrorCode::SYSCALL_ERROR, recv_result.result_.errno_);
       return;
     }
 
-  } while (result.rc_ == -EAGAIN);
+  } while (recv_result.result_.rc_ == -EAGAIN);
 
   Address::InstanceConstSharedPtr local_address = socket_.localAddress();
 
@@ -120,7 +137,8 @@ void UdpListenerImpl::handleReadCallback(int fd) {
     RELEASE_ASSERT(false,
                    fmt::format("Unsupported address family: {}, local address: {}, receive size: "
                                "{}, address length: {}",
-                               addr.ss_family, local_address->asString(), result.rc_, addr_len));
+                               addr.ss_family, local_address->asString(), recv_result.result_.rc_,
+                               addr_len));
     break;
   }
 
@@ -133,9 +151,9 @@ void UdpListenerImpl::handleReadCallback(int fd) {
 
   bool expected = true;
   if (is_first_.compare_exchange_strong(expected, false)) {
-    cb_.onNewConnection(local_address, peer_address, std::move(buffer));
+    cb_.onNewConnection(local_address, peer_address, std::move(recv_result.buffer_));
   } else {
-    cb_.onData(local_address, peer_address, std::move(buffer));
+    cb_.onData(local_address, peer_address, std::move(recv_result.buffer_));
   }
 }
 

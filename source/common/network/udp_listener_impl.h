@@ -21,8 +21,13 @@ public:
   virtual void disable() override;
   virtual void enable() override;
 
+  struct ReceiveResult {
+    Api::SysCallIntResult result_;
+    Buffer::InstancePtr buffer_;
+  };
+
   // Useful for testing/mocking.
-  virtual Buffer::InstancePtr getBufferImpl();
+  virtual ReceiveResult doRecvFrom(sockaddr_storage& peer_addr, socklen_t& addr_len);
 
 protected:
   void handleWriteCallback(int fd);

@@ -79,24 +79,16 @@ public:
   MOCK_METHOD1(getLocalAddress, Address::InstanceConstSharedPtr(int fd));
 };
 
-class MockResultBufferImpl : public Buffer::OwnedImpl {
-public:
-  MockResultBufferImpl(const Api::SysCallIntResult& result) : result_(result) {}
-
-  Api::SysCallIntResult recvFrom(int, uint64_t, sockaddr_storage&, socklen_t&) override {
-    return result_;
-  }
-
-private:
-  const Api::SysCallIntResult result_;
-};
-
 class TestUdpListenerImpl : public UdpListenerImpl {
 public:
   TestUdpListenerImpl(Event::DispatcherImpl& dispatcher, Socket& socket, UdpListenerCallbacks& cb)
       : UdpListenerImpl(dispatcher, socket, cb) {}
 
-  MOCK_METHOD0(getBufferImpl, Buffer::InstancePtr());
+  MOCK_METHOD2(doRecvFrom, UdpListenerImpl::ReceiveResult(sockaddr_storage& peer_addr, socklen_t& addr_len));
+
+  UdpListenerImpl::ReceiveResult doRecvFrom_(sockaddr_storage& peer_addr, socklen_t& addr_len) {
+    return UdpListenerImpl::doRecvFrom(peer_addr, addr_len);
+  }
 };
 
 class ListenerImplTest : public testing::TestWithParam<Address::IpVersion> {
@@ -284,9 +276,10 @@ TEST_P(ListenerImplTest, UseActualDstUdp) {
   Network::MockUdpListenerCallbacks listener_callbacks;
   Network::TestUdpListenerImpl listener(dispatcher_, *server_socket.get(), listener_callbacks);
 
-  EXPECT_CALL(listener, getBufferImpl()).WillRepeatedly(Invoke([&]() {
-    return std::make_unique<Buffer::OwnedImpl>();
-  }));
+  EXPECT_CALL(listener, doRecvFrom(_, _))
+      .WillRepeatedly(Invoke([&](sockaddr_storage& peer_addr, socklen_t& addr_len) {
+        return listener.doRecvFrom_(peer_addr, addr_len);
+      }));
 
   // Setup client socket.
   SocketPtr client_socket =
@@ -389,9 +382,10 @@ TEST_P(ListenerImplTest, UdpEcho) {
   Network::MockUdpListenerCallbacks listener_callbacks;
   Network::TestUdpListenerImpl listener(dispatcher_, *server_socket.get(), listener_callbacks);
 
-  EXPECT_CALL(listener, getBufferImpl()).WillRepeatedly(Invoke([&]() {
-    return std::make_unique<Buffer::OwnedImpl>();
-  }));
+  EXPECT_CALL(listener, doRecvFrom(_, _))
+      .WillRepeatedly(Invoke([&](sockaddr_storage& peer_addr, socklen_t& addr_len) {
+        return listener.doRecvFrom_(peer_addr, addr_len);
+      }));
 
   // Setup client socket.
   SocketPtr client_socket =
@@ -544,9 +538,10 @@ TEST_P(ListenerImplTest, UdpListenerEnableDisable) {
   Network::MockUdpListenerCallbacks listener_callbacks;
   Network::TestUdpListenerImpl listener(dispatcher_, *server_socket.get(), listener_callbacks);
 
-  EXPECT_CALL(listener, getBufferImpl()).WillRepeatedly(Invoke([&]() {
-    return std::make_unique<Buffer::OwnedImpl>();
-  }));
+  EXPECT_CALL(listener, doRecvFrom(_, _))
+      .WillRepeatedly(Invoke([&](sockaddr_storage& peer_addr, socklen_t& addr_len) {
+        return listener.doRecvFrom_(peer_addr, addr_len);
+      }));
 
   // Setup client socket.
   SocketPtr client_socket =
@@ -656,9 +651,10 @@ TEST_P(ListenerImplTest, UdpListenerRecvFromError) {
   Network::MockUdpListenerCallbacks listener_callbacks;
   Network::TestUdpListenerImpl listener(dispatcher_, *server_socket.get(), listener_callbacks);
 
-  EXPECT_CALL(listener, getBufferImpl()).WillRepeatedly(Invoke([&]() {
-    return std::make_unique<MockResultBufferImpl>(Api::SysCallIntResult{-1, -1});
-  }));
+  EXPECT_CALL(listener, doRecvFrom(_, _))
+      .WillRepeatedly(Invoke([&](sockaddr_storage&, socklen_t&) {
+        return UdpListenerImpl::ReceiveResult{{-1, -1}, nullptr};
+      }));
 
   SocketPtr client_socket =
       getSocket(Address::SocketType::Datagram, Network::Test::getCanonicalLoopbackAddress(version_),
