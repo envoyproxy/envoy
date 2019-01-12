@@ -66,10 +66,10 @@ TEST(UtilityTest, TestDaysUntilExpiration) {
   time_source.setSystemTime(std::chrono::system_clock::from_time_t(known_date_time));
 
   // Get expiration time from the certificate info.
-  std::tm expiration =
-      TestUtility::parseTimestamp("%b %e %H:%M:%S %Y GMT", TEST_SAN_DNS_CERT_NOT_AFTER);
+  const absl::Time expiration =
+      TestUtility::parseTime(TEST_SAN_DNS_CERT_NOT_AFTER, "%b %e %H:%M:%S %Y GMT");
 
-  int days = std::difftime(std::mktime(&expiration), known_date_time) / (60 * 60 * 24);
+  int days = std::difftime(absl::ToTimeT(expiration), known_date_time) / (60 * 60 * 24);
   EXPECT_EQ(days, Utility::getDaysUntilExpiration(cert.get(), time_source));
 }
 
