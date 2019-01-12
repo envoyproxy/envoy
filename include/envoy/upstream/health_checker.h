@@ -112,8 +112,9 @@ public:
    * @param health_checker_type supplies the type of health checker that generated the event.
    * @param host supplies the host that generated the event.
    */
-  virtual void logNoLongerDegraded(envoy::data::core::v2alpha::HealthCheckerType health_checker_type,
-                                 const HostDescriptionConstSharedPtr& host) PURE;
+  virtual void
+  logNoLongerDegraded(envoy::data::core::v2alpha::HealthCheckerType health_checker_type,
+                      const HostDescriptionConstSharedPtr& host) PURE;
 };
 
 typedef std::unique_ptr<HealthCheckEventLogger> HealthCheckEventLoggerPtr;

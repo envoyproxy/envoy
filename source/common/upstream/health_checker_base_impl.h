@@ -154,7 +154,7 @@ public:
   void logDegraded(envoy::data::core::v2alpha::HealthCheckerType health_checker_type,
                    const HostDescriptionConstSharedPtr& host) override;
   void logNoLongerDegraded(envoy::data::core::v2alpha::HealthCheckerType health_checker_type,
-                         const HostDescriptionConstSharedPtr& host) override;
+                           const HostDescriptionConstSharedPtr& host) override;
 
 private:
   void createHealthCheckEvent(
