@@ -20,7 +20,7 @@ namespace Network {
 
 UdpListenerImpl::UdpListenerImpl(const Event::DispatcherImpl& dispatcher, Socket& socket,
                                  UdpListenerCallbacks& cb)
-    : BaseListenerImpl(dispatcher, socket), cb_(cb), is_first_(true) {
+    : BaseListenerImpl(dispatcher, socket), cb_(cb) {
   event_assign(&raw_event_, &dispatcher.base(), socket.fd(), EV_READ | EV_WRITE | EV_PERSIST,
                eventCallback, this);
   event_add(&raw_event_, nullptr);
@@ -149,12 +149,7 @@ void UdpListenerImpl::handleReadCallback(int fd) {
   RELEASE_ASSERT((local_address != nullptr),
                  fmt::format("Unable to get local address for fd: {}", fd));
 
-  bool expected = true;
-  if (is_first_.compare_exchange_strong(expected, false)) {
-    cb_.onNewConnection(local_address, peer_address, std::move(recv_result.buffer_));
-  } else {
-    cb_.onData(local_address, peer_address, std::move(recv_result.buffer_));
-  }
+  cb_.onData(local_address, peer_address, std::move(recv_result.buffer_));
 }
 
 void UdpListenerImpl::handleWriteCallback(int fd) {

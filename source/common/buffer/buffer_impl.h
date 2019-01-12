@@ -83,8 +83,6 @@ public:
   void move(Instance& rhs) override;
   void move(Instance& rhs, uint64_t length) override;
   Api::SysCallIntResult read(int fd, uint64_t max_length) override;
-  Api::SysCallIntResult recvFrom(int fd, uint64_t max_length, sockaddr_storage& peer_address,
-                                 socklen_t& sock_length) override;
   uint64_t reserve(uint64_t length, RawSlice* iovecs, uint64_t num_iovecs) override;
   ssize_t search(const void* data, uint64_t size, size_t start) const override;
   Api::SysCallIntResult write(int fd) override;

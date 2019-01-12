@@ -110,32 +110,6 @@ void OwnedImpl::move(Instance& rhs, uint64_t length) {
   static_cast<LibEventInstance&>(rhs).postProcess();
 }
 
-Api::SysCallIntResult OwnedImpl::recvFrom(int fd, uint64_t max_length, sockaddr_storage& peer_addr,
-                                          socklen_t& addr_len) {
-  if (max_length == 0) {
-    return {0, 0};
-  }
-
-  addr_len = sizeof(sockaddr_storage);
-  memset(&peer_addr, 0, addr_len);
-
-  RawSlice slice;
-  const uint64_t num_slices = reserve(max_length, &slice, 1);
-
-  ASSERT(num_slices == 1);
-  // TODO(conqerAtapple): Use os_syscalls
-  const ssize_t rc = ::recvfrom(fd, slice.mem_, max_length, 0,
-                                reinterpret_cast<struct sockaddr*>(&peer_addr), &addr_len);
-  if (rc < 0) {
-    return {static_cast<int>(rc), errno};
-  }
-
-  slice.len_ = std::min(slice.len_, static_cast<size_t>(rc));
-  commit(&slice, 1);
-
-  return {static_cast<int>(rc), 0};
-}
-
 Api::SysCallIntResult OwnedImpl::read(int fd, uint64_t max_length) {
   if (max_length == 0) {
     return {0, 0};

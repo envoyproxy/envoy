@@ -124,17 +124,6 @@ public:
   virtual ~UdpListenerCallbacks() = default;
 
   /**
-   * On first packet received on a udp socket. This allows the callback handler
-   * to establish filter chain (or any other preparation).
-   *
-   * @param local_address Local bound socket network address.
-   * @param peer_address Network address of the peer.
-   * @param data Data buffer received.
-   */
-  virtual void onNewConnection(Address::InstanceConstSharedPtr local_address,
-                               Address::InstanceConstSharedPtr peer_address,
-                               Buffer::InstancePtr&& data) PURE;
-  /**
    * Called whenever data is received by the underlying udp socket.
    *
    * @param local_address Local bound socket network address.
@@ -145,6 +134,11 @@ public:
                       Address::InstanceConstSharedPtr peer_address,
                       Buffer::InstancePtr&& data) PURE;
 
+  /**
+   * Called when the underlying socket is ready for write.
+   *
+   * @param socket Underlying server socket for the listener.
+   */
   virtual void onWriteReady(const Socket& socket) PURE;
 
   /**

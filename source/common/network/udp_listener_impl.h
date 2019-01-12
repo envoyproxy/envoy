@@ -37,8 +37,6 @@ protected:
 
 private:
   static void eventCallback(int fd, short flags, void* arg);
-
-  std::atomic<bool> is_first_;
 };
 
 } // namespace Network
