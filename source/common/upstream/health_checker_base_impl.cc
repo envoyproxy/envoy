@@ -250,7 +250,7 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::handleSuccess(bool degrade
       }
     } else {
       if (parent_.event_logger_) {
-        parent_.event_logger_->logNoMoreDegraded(parent_.healthCheckerType(), host_);
+        parent_.event_logger_->logNoLongerDegraded(parent_.healthCheckerType(), host_);
       }
       host_->healthFlagClear(Host::HealthFlag::DEGRADED_ACTIVE_HC);
     }
@@ -358,11 +358,11 @@ void HealthCheckEventLoggerImpl::logDegraded(
                          [](auto& event) { event.mutable_degraded_healthy_host(); });
 }
 
-void HealthCheckEventLoggerImpl::logNoMoreDegraded(
+void HealthCheckEventLoggerImpl::logNoLongerDegraded(
     envoy::data::core::v2alpha::HealthCheckerType health_checker_type,
     const HostDescriptionConstSharedPtr& host) {
   createHealthCheckEvent(health_checker_type, *host,
-                         [](auto& event) { event.mutable_not_degraded_healthy_host(); });
+                         [](auto& event) { event.mutable_no_longer_degraded_host(); });
 }
 
 void HealthCheckEventLoggerImpl::createHealthCheckEvent(
