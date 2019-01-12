@@ -207,7 +207,7 @@ HealthCheckerImplBase::ActiveHealthCheckSession::ActiveHealthCheckSession(
   }
 
   if (host->healthFlagGet(Host::HealthFlag::DEGRADED_ACTIVE_HC)) {
-    parent.incDegraded(); 
+    parent.incDegraded();
   }
 }
 
@@ -328,84 +328,58 @@ void HealthCheckEventLoggerImpl::logEjectUnhealthy(
     envoy::data::core::v2alpha::HealthCheckerType health_checker_type,
     const HostDescriptionConstSharedPtr& host,
     envoy::data::core::v2alpha::HealthCheckFailureType failure_type) {
-  envoy::data::core::v2alpha::HealthCheckEvent event;
-  event.set_health_checker_type(health_checker_type);
-  envoy::api::v2::core::Address address;
-  Network::Utility::addressToProtobufAddress(*host->address(), address);
-  *event.mutable_host() = std::move(address);
-  event.set_cluster_name(host->cluster().name());
-  event.mutable_eject_unhealthy_event()->set_failure_type(failure_type);
-  TimestampUtil::systemClockToTimestamp(time_source_.systemTime(), *event.mutable_timestamp());
-  // Make sure the type enums make it into the JSON
-  const auto json = MessageUtil::getJsonStringFromMessage(event, /* pretty_print */ false,
-                                                          /* always_print_primitive_fields */ true);
-  file_->write(fmt::format("{}\n", json));
+  createHealthCheckEvent(health_checker_type, *host, [&failure_type](auto& event) {
+    event.mutable_eject_unhealthy_event()->set_failure_type(failure_type);
+  });
 }
 
 void HealthCheckEventLoggerImpl::logUnhealthy(
     envoy::data::core::v2alpha::HealthCheckerType health_checker_type,
     const HostDescriptionConstSharedPtr& host,
     envoy::data::core::v2alpha::HealthCheckFailureType failure_type, bool first_check) {
-  envoy::data::core::v2alpha::HealthCheckEvent event;
-  event.set_health_checker_type(health_checker_type);
-  envoy::api::v2::core::Address address;
-  Network::Utility::addressToProtobufAddress(*host->address(), address);
-  *event.mutable_host() = std::move(address);
-  event.set_cluster_name(host->cluster().name());
-  event.mutable_health_check_failure_event()->set_failure_type(failure_type);
-  event.mutable_health_check_failure_event()->set_first_check(first_check);
-  TimestampUtil::systemClockToTimestamp(time_source_.systemTime(), *event.mutable_timestamp());
-  // Make sure the type enums make it into the JSON
-  const auto json = MessageUtil::getJsonStringFromMessage(event, /* pretty_print */ false,
-                                                          /* always_print_primitive_fields */ true);
-  file_->write(fmt::format("{}\n", json));
+  createHealthCheckEvent(health_checker_type, *host, [&first_check, &failure_type](auto& event) {
+    event.mutable_health_check_failure_event()->set_failure_type(failure_type);
+    event.mutable_health_check_failure_event()->set_first_check(first_check);
+  });
 }
 
 void HealthCheckEventLoggerImpl::logAddHealthy(
     envoy::data::core::v2alpha::HealthCheckerType health_checker_type,
     const HostDescriptionConstSharedPtr& host, bool first_check) {
-  envoy::data::core::v2alpha::HealthCheckEvent event;
-  event.set_health_checker_type(health_checker_type);
-  envoy::api::v2::core::Address address;
-  Network::Utility::addressToProtobufAddress(*host->address(), address);
-  *event.mutable_host() = std::move(address);
-  event.set_cluster_name(host->cluster().name());
-  event.mutable_add_healthy_event()->set_first_check(first_check);
-  TimestampUtil::systemClockToTimestamp(time_source_.systemTime(), *event.mutable_timestamp());
-  // Make sure the type enums make it into the JSON
-  const auto json = MessageUtil::getJsonStringFromMessage(event, /* pretty_print */ false,
-                                                          /* always_print_primitive_fields */ true);
-  file_->write(fmt::format("{}\n", json));
+  createHealthCheckEvent(health_checker_type, *host, [&first_check](auto& event) {
+    event.mutable_add_healthy_event()->set_first_check(first_check);
+  });
 }
 
 void HealthCheckEventLoggerImpl::logDegraded(
     envoy::data::core::v2alpha::HealthCheckerType health_checker_type,
     const HostDescriptionConstSharedPtr& host) {
-  envoy::data::core::v2alpha::HealthCheckEvent event;
-  event.set_health_checker_type(health_checker_type);
-  envoy::api::v2::core::Address address;
-  Network::Utility::addressToProtobufAddress(*host->address(), address);
-  *event.mutable_host() = std::move(address);
-  event.set_cluster_name(host->cluster().name());
-  event.mutable_degraded_healthy_host();
-  TimestampUtil::systemClockToTimestamp(time_source_.systemTime(), *event.mutable_timestamp());
-  // Make sure the type enums make it into the JSON
-  const auto json = MessageUtil::getJsonStringFromMessage(event, /* pretty_print */ false,
-                                                          /* always_print_primitive_fields */ true);
-  file_->write(fmt::format("{}\n", json));
+  createHealthCheckEvent(health_checker_type, *host,
+                         [](auto& event) { event.mutable_degraded_healthy_host(); });
 }
 
 void HealthCheckEventLoggerImpl::logNoMoreDegraded(
     envoy::data::core::v2alpha::HealthCheckerType health_checker_type,
     const HostDescriptionConstSharedPtr& host) {
+  createHealthCheckEvent(health_checker_type, *host,
+                         [](auto& event) { event.mutable_not_degraded_healthy_host(); });
+}
+
+void HealthCheckEventLoggerImpl::createHealthCheckEvent(
+    envoy::data::core::v2alpha::HealthCheckerType health_checker_type, const HostDescription& host,
+    std::function<void(envoy::data::core::v2alpha::HealthCheckEvent&)> callback) const {
   envoy::data::core::v2alpha::HealthCheckEvent event;
+  event.set_cluster_name(host.cluster().name());
   event.set_health_checker_type(health_checker_type);
+
   envoy::api::v2::core::Address address;
-  Network::Utility::addressToProtobufAddress(*host->address(), address);
+  Network::Utility::addressToProtobufAddress(*host.address(), address);
   *event.mutable_host() = std::move(address);
-  event.set_cluster_name(host->cluster().name());
-  event.mutable_not_degraded_healthy_host();
+
   TimestampUtil::systemClockToTimestamp(time_source_.systemTime(), *event.mutable_timestamp());
+
+  callback(event);
+
   // Make sure the type enums make it into the JSON
   const auto json = MessageUtil::getJsonStringFromMessage(event, /* pretty_print */ false,
                                                           /* always_print_primitive_fields */ true);

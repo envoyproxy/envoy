@@ -152,12 +152,15 @@ public:
                     envoy::data::core::v2alpha::HealthCheckFailureType failure_type,
                     bool first_check) override;
   void logDegraded(envoy::data::core::v2alpha::HealthCheckerType health_checker_type,
-                    const HostDescriptionConstSharedPtr& host) override;
+                   const HostDescriptionConstSharedPtr& host) override;
   void logNoMoreDegraded(envoy::data::core::v2alpha::HealthCheckerType health_checker_type,
-                    const HostDescriptionConstSharedPtr& host) override;
-
+                         const HostDescriptionConstSharedPtr& host) override;
 
 private:
+  void createHealthCheckEvent(
+      envoy::data::core::v2alpha::HealthCheckerType health_checker_type,
+      const HostDescription& host,
+      std::function<void(envoy::data::core::v2alpha::HealthCheckEvent&)> callback) const;
   TimeSource& time_source_;
   Filesystem::FileSharedPtr file_;
 };
