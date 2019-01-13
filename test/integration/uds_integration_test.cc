@@ -23,7 +23,7 @@ TEST_P(UdsUpstreamIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
 }
 
 TEST_P(UdsUpstreamIntegrationTest, RouterHeaderOnlyRequestAndResponse) {
-  testRouterHeaderOnlyRequestAndResponse(true);
+  testRouterHeaderOnlyRequestAndResponse();
 }
 
 TEST_P(UdsUpstreamIntegrationTest, RouterUpstreamDisconnectBeforeResponseComplete) {
@@ -83,7 +83,7 @@ TEST_P(UdsListenerIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
 
 TEST_P(UdsListenerIntegrationTest, RouterHeaderOnlyRequestAndResponse) {
   ConnectionCreationFunction creator = createConnectionFn();
-  testRouterHeaderOnlyRequestAndResponse(true, &creator);
+  testRouterHeaderOnlyRequestAndResponse(&creator);
 }
 
 TEST_P(UdsListenerIntegrationTest, RouterListenerDisconnectBeforeResponseComplete) {
