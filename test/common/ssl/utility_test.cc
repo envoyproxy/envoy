@@ -82,16 +82,16 @@ TEST(UtilityTest, TestDaysUntilExpirationWithNull) {
 TEST(UtilityTest, TestValidFrom) {
   bssl::UniquePtr<X509> cert = readCertFromFile(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem"));
-  const absl::Time valid_from = absl::FromChrono(Utility::getValidFrom(*cert));
-  const std::string formatted = TestUtility::formatTime(valid_from, "%b %e %H:%M:%S %Y GMT");
+  const std::string formatted =
+      TestUtility::formatTime(Utility::getValidFrom(*cert), "%b %e %H:%M:%S %Y GMT");
   EXPECT_EQ(TEST_SAN_DNS_CERT_NOT_BEFORE, formatted);
 }
 
 TEST(UtilityTest, TestExpirationTime) {
   bssl::UniquePtr<X509> cert = readCertFromFile(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem"));
-  const absl::Time expiration = absl::FromChrono(Utility::getExpirationTime(*cert));
-  const std::string formatted = TestUtility::formatTime(expiration, "%b %e %H:%M:%S %Y GMT");
+  const std::string formatted =
+      TestUtility::formatTime(Utility::getExpirationTime(*cert), "%b %e %H:%M:%S %Y GMT");
   EXPECT_EQ(TEST_SAN_DNS_CERT_NOT_AFTER, formatted);
 }
 } // namespace Ssl

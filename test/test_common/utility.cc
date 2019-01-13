@@ -235,9 +235,14 @@ absl::Time TestUtility::parseTime(const std::string& input, const std::string& i
 }
 
 // static
-std::string TestUtility::formatTime(const absl::Time& input, const std::string& output_format) {
+std::string TestUtility::formatTime(const absl::Time input, const std::string& output_format) {
   static const absl::TimeZone utc = absl::UTCTimeZone();
   return absl::FormatTime(output_format, input, utc);
+}
+
+// static
+std::string TestUtility::formatTime(const SystemTime input, const std::string& output_format) {
+  return TestUtility::formatTime(absl::FromChrono(input), output_format);
 }
 
 // static

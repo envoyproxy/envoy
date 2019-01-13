@@ -306,7 +306,8 @@ public:
   }
 
   static absl::Time parseTime(const std::string& input, const std::string& input_format);
-  static std::string formatTime(const absl::Time& input, const std::string& output_format);
+  static std::string formatTime(const absl::Time input, const std::string& output_format);
+  static std::string formatTime(const SystemTime input, const std::string& output_format);
   static std::string convertTime(const std::string& input, const std::string& input_format,
                                  const std::string& output_format);
 
