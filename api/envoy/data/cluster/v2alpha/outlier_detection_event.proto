@@ -24,7 +24,7 @@ message OutlierDetectionEvent {
   // URL of the ejected host
   string upstream_url = 5 [(validate.rules).string.min_bytes = 1];
   // Indicates whether eject or uneject took place
-  string action = 6 [(validate.rules).string = {pattern: "eject|uneject"}];
+  Action action = 6 [(validate.rules).enum.defined_only = true];
   // In case of eject action represents the number of times host has been ejected
   int32 num_ejections = 7 [(validate.rules).int32.gte = 0];
   // True if ejection happened
@@ -41,6 +41,11 @@ enum OutlierEjectionType {
   CONSECUTIVE_5XX = 0;
   CONSECUTIVE_GATEWAY_FAILURE = 1;
   SUCCESS_RATE = 2;
+}
+
+enum Action {
+  EJECT = 0;
+  UNEJECT = 1;
 }
 
 message OutlierEjectSuccessRate {

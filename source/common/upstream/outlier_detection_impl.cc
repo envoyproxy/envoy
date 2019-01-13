@@ -483,7 +483,7 @@ void DetectionEventLoggerImpl::logEject(const HostDescriptionConstSharedPtr host
   absl::optional<MonotonicTime> time = host->outlierDetector().lastUnejectionTime();
   setCommonEventParams(event, host, time);
 
-  event.set_action("eject");
+  event.set_action(envoy::data::cluster::v2alpha::Action::EJECT);
 
   event.set_enforced(enforced);
 
@@ -510,7 +510,7 @@ void DetectionEventLoggerImpl::logUneject(HostDescriptionConstSharedPtr host) {
   absl::optional<MonotonicTime> time = host->outlierDetector().lastEjectionTime();
   setCommonEventParams(event, host, time);
 
-  event.set_action("uneject");
+  event.set_action(envoy::data::cluster::v2alpha::Action::UNEJECT);
 
   const auto json = MessageUtil::getJsonStringFromMessage(event, /* pretty_print */ false,
                                                           /* always_print_primitive_fields */ true);

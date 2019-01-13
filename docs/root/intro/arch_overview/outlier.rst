@@ -77,7 +77,7 @@ Ejection event logging
 
 A log of outlier ejection events can optionally be produced by Envoy. This is extremely useful
 during daily operations since global stats do not provide enough information on which hosts are
-being ejected and for what reasons. The log is structured as JSON dumps of `OutlierDetectionEvent messages <envoy_api_msg_cluster.OutlierDetectionEvent>`
+being ejected and for what reasons. The log is structured as protobuf-based dumps of `OutlierDetectionEvent messages <envoy_api_msg_cluster.OutlierDetectionEvent>`
 
 .. code-block:: json
 
@@ -88,7 +88,6 @@ being ejected and for what reasons. The log is structured as JSON dumps of `Outl
     "cluster_name": "...",
     "upstream_url": "...",
     "action": "...",
-
     "num_ejections": "...",
     "enforced": "...",
     "eject_success_rate_event":

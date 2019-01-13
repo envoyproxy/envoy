@@ -791,7 +791,7 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
   EXPECT_CALL(*file,
               write(absl::string_view("{\"type\":\"CONSECUTIVE_5XX\",\"secs_since_last_action\":"
                                       "\"-1\",\"cluster_name\":\"fake_cluster\",\"upstream_url\":"
-                                      "\"10.0.0.1:443\",\"action\":\"eject\",\"num_ejections\":0,"
+                                      "\"10.0.0.1:443\",\"action\":\"EJECT\",\"num_ejections\":0,"
                                       "\"enforced\":true,\"eject_consecutive_event\":{},"
                                       "\"timestamp\":\"2018-12-18T09:00:00Z\"}\n")))
       .WillOnce(SaveArg<0>(&log1));
@@ -806,7 +806,7 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
   EXPECT_CALL(*file, write(absl::string_view("{\"type\":\"CONSECUTIVE_5XX\",\"secs_since_last_"
                                              "action\":\"-1\",\"cluster_name\":\"fake_cluster\","
                                              "\"upstream_url\":\"10.0.0.1:443\",\"action\":"
-                                             "\"uneject\",\"num_ejections\":0,\"enforced\":false,"
+                                             "\"UNEJECT\",\"num_ejections\":0,\"enforced\":false,"
                                              "\"timestamp\":\"2018-12-18T09:00:00Z\"}\n")))
       .WillOnce(SaveArg<0>(&log2));
 
@@ -824,7 +824,7 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
   EXPECT_CALL(*file,
               write(absl::string_view(
                   "{\"type\":\"SUCCESS_RATE\",\"secs_since_last_action\":\"30\",\"cluster_name\":"
-                  "\"fake_cluster\",\"upstream_url\":\"10.0.0.1:443\",\"action\":\"eject\","
+                  "\"fake_cluster\",\"upstream_url\":\"10.0.0.1:443\",\"action\":\"EJECT\","
                   "\"num_ejections\":0,\"enforced\":false,\"eject_success_rate_event\":"
                   "{\"host_success_rate\":-1,\"cluster_average_success_rate\":-1,"
                   "\"cluster_success_rate_ejection_threshold\":-1},\"timestamp\":\"2018-12-18T09:"
@@ -839,7 +839,7 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
   EXPECT_CALL(*file, write(absl::string_view(
                          "{\"type\":\"CONSECUTIVE_5XX\",\"secs_since_last_action\":\"30\","
                          "\"cluster_name\":\"fake_cluster\",\"upstream_url\":\"10.0.0.1:443\","
-                         "\"action\":\"uneject\",\"num_ejections\":0,\"enforced\":false,"
+                         "\"action\":\"UNEJECT\",\"num_ejections\":0,\"enforced\":false,"
                          "\"timestamp\":\"2018-12-18T09:00:00Z\"}\n")))
       .WillOnce(SaveArg<0>(&log4));
   event_logger.logUneject(host);
