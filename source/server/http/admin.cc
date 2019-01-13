@@ -671,7 +671,7 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
 Http::Code AdminImpl::handlerPrometheusStats(absl::string_view, Http::HeaderMap&,
                                              Buffer::Instance& response, AdminStream&) {
   PrometheusStatsFormatter::statsAsPrometheus(server_.stats().counters(), server_.stats().gauges(),
-                                              response);
+                                              server_.stats().histograms(), response);
   return Http::Code::OK;
 }
 
@@ -701,11 +701,10 @@ std::string PrometheusStatsFormatter::metricName(const std::string& extractedNam
   return sanitizeName(fmt::format("envoy_{0}", extractedName));
 }
 
-// TODO(ramaraochavali): Add summary histogram output for Prometheus.
-uint64_t
-PrometheusStatsFormatter::statsAsPrometheus(const std::vector<Stats::CounterSharedPtr>& counters,
-                                            const std::vector<Stats::GaugeSharedPtr>& gauges,
-                                            Buffer::Instance& response) {
+uint64_t PrometheusStatsFormatter::statsAsPrometheus(
+    const std::vector<Stats::CounterSharedPtr>& counters,
+    const std::vector<Stats::GaugeSharedPtr>& gauges,
+    const std::vector<Stats::ParentHistogramSharedPtr>& histograms, Buffer::Instance& response) {
   std::unordered_set<std::string> metric_type_tracker;
   for (const auto& counter : counters) {
     const std::string tags = formattedTags(counter->tags());
@@ -726,6 +725,27 @@ PrometheusStatsFormatter::statsAsPrometheus(const std::vector<Stats::CounterShar
     }
     response.add(fmt::format("{0}{{{1}}} {2}\n", metric_name, tags, gauge->value()));
   }
+
+  for (const auto& histogram : histograms) {
+    const std::string tags = formattedTags(histogram->tags());
+    const std::string metric_name = metricName(histogram->tagExtractedName());
+    if (metric_type_tracker.find(metric_name) == metric_type_tracker.end()) {
+      metric_type_tracker.insert(metric_name);
+      response.add(fmt::format("# TYPE {0} histogram\n", metric_name));
+    }
+
+    const Stats::HistogramStatistics& stats = histogram->cumulativeStatistics();
+    const std::vector<double>& supported_buckets_ref = stats.supportedBuckets();
+    for (size_t i = 0; i < supported_buckets_ref.size(); ++i) {
+      double bucket = supported_buckets_ref[i];
+      double value = stats.computedBuckets()[i];
+      response.add(fmt::format("{0}{{{1}},le=\"{2}\"} {3}\n", metric_name, tags, bucket, value));
+    }
+    response.add(fmt::format("{0}{{{1}},le=\"+Inf\"} {2}\n", metric_name, tags, stats.sampleSum()));
+    response.add(fmt::format("{0}_sum{{{1}}} {2}\n", metric_name, tags, stats.sampleSum()));
+    response.add(fmt::format("{0}_count{{{1}}} {2}\n", metric_name, tags, stats.sampleCount()));
+  }
+
   return metric_type_tracker.size();
 }
 

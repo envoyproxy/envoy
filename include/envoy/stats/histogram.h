@@ -31,6 +31,26 @@ public:
    * Returns computed quantile values during the period.
    */
   virtual const std::vector<double>& computedQuantiles() const PURE;
+
+  /**
+   * Returns supported buckets.
+   */
+  virtual const std::vector<double>& supportedBuckets() const PURE;
+
+  /**
+   * Returns computed bucket values during the period.
+   */
+  virtual const std::vector<double>& computedBuckets() const PURE;
+
+  /**
+   * Returns number of values during the period.
+   */
+  virtual double sampleCount() const PURE;
+
+  /**
+   * Returns sum of all values during the period.
+   */
+  virtual double sampleSum() const PURE;
 };
 
 /**
