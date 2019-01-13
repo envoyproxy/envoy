@@ -388,8 +388,8 @@ SplitRequestPtr InstanceImpl::makeRequest(const RespValue& request, SplitCallbac
   }
   ENVOY_LOG(debug, "redis: splitting '{}'", request.toString());
   handler->command_stats_.total_.inc();
-  SplitRequestPtr request_ptr = handler->handler_.get().startRequest(
-      request, callbacks, handler->command_stats_);
+  SplitRequestPtr request_ptr =
+      handler->handler_.get().startRequest(request, callbacks, handler->command_stats_);
   return request_ptr;
 }
 
