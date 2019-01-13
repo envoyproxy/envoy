@@ -468,22 +468,24 @@ def envoy_sh_test(
         name,
         srcs = [],
         data = [],
+        coverage = True,
         **kargs):
-    test_runner_cc = name + "_test_runner.cc"
-    native.genrule(
-        name = name + "_gen_test_runner",
-        srcs = srcs,
-        outs = [test_runner_cc],
-        cmd = "$(location //bazel:gen_sh_test_runner.sh) $(SRCS) >> $@",
-        tools = ["//bazel:gen_sh_test_runner.sh"],
-    )
-    envoy_cc_test_library(
-        name = name + "_lib",
-        srcs = [test_runner_cc],
-        data = srcs + data,
-        tags = ["coverage_test_lib"],
-        deps = ["//test/test_common:environment_lib"],
-    )
+    if coverage:
+        test_runner_cc = name + "_test_runner.cc"
+        native.genrule(
+            name = name + "_gen_test_runner",
+            srcs = srcs,
+            outs = [test_runner_cc],
+            cmd = "$(location //bazel:gen_sh_test_runner.sh) $(SRCS) >> $@",
+            tools = ["//bazel:gen_sh_test_runner.sh"],
+        )
+        envoy_cc_test_library(
+            name = name + "_lib",
+            srcs = [test_runner_cc],
+            data = srcs + data,
+            tags = ["coverage_test_lib"],
+            deps = ["//test/test_common:environment_lib"],
+        )
     native.sh_test(
         name = name,
         srcs = ["//bazel:sh_test_wrapper.sh"],
