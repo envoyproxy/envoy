@@ -99,6 +99,7 @@ public:
 private:
   envoy::type::matcher::StringMatcher
   toLowerCase(const envoy::type::matcher::StringMatcher& matcher);
+  
   const StringMatcher matcher_;
 };
 
