@@ -9,6 +9,7 @@
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
+#include "absl/time/time.h"
 #include "gtest/gtest.h"
 #include "openssl/x509v3.h"
 
@@ -81,21 +82,17 @@ TEST(UtilityTest, TestDaysUntilExpirationWithNull) {
 TEST(UtilityTest, TestValidFrom) {
   bssl::UniquePtr<X509> cert = readCertFromFile(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem"));
-  const time_t valid_from = std::chrono::system_clock::to_time_t(Utility::getValidFrom(*cert));
-  char buffer[25];
-  size_t len = strftime(buffer, sizeof(buffer), "%b %e %H:%M:%S %Y GMT", localtime(&valid_from));
-  ASSERT(len == sizeof(buffer) - 1);
-  EXPECT_EQ(TEST_SAN_DNS_CERT_NOT_BEFORE, std::string(buffer));
+  const absl::Time valid_from = absl::FromChrono(Utility::getValidFrom(*cert));
+  const std::string formatted = TestUtility::formatTime(valid_from, "%b %e %H:%M:%S %Y GMT");
+  EXPECT_EQ(TEST_SAN_DNS_CERT_NOT_BEFORE, formatted);
 }
 
 TEST(UtilityTest, TestExpirationTime) {
   bssl::UniquePtr<X509> cert = readCertFromFile(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem"));
-  const time_t expiration = std::chrono::system_clock::to_time_t(Utility::getExpirationTime(*cert));
-  char buffer[25];
-  size_t len = strftime(buffer, sizeof(buffer), "%b %e %H:%M:%S %Y GMT", localtime(&expiration));
-  ASSERT(len == sizeof(buffer) - 1);
-  EXPECT_EQ(TEST_SAN_DNS_CERT_NOT_AFTER, std::string(buffer));
+  const absl::Time expiration = absl::FromChrono(Utility::getExpirationTime(*cert));
+  const std::string formatted = TestUtility::formatTime(expiration, "%b %e %H:%M:%S %Y GMT");
+  EXPECT_EQ(TEST_SAN_DNS_CERT_NOT_AFTER, formatted);
 }
 } // namespace Ssl
 } // namespace Envoy
