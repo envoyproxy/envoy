@@ -111,10 +111,11 @@ TEST(PhantomTest, TypeBehavior) {
 
     const auto inner = PhantomVector::create();
 
-    static_assert(!std::__invokable<decltype(base), decltype(inner)>::value,
-                  "cannot pass inner to parent func");
-    static_assert(!std::__invokable<decltype(baseRef), decltype(inner)>::value,
-                  "cannot pass inner to parent func");
+    // TODO(snowp): Need C++17 for these, but would be nice to have.
+    // static_assert(!std::is_invokable<decltype(base), decltype(inner)>::value,
+    //   "cannot pass inner to parent func");
+    //static_assert(!std::is_invokable<decltype(baseRef), decltype(inner)>::value,
+    //  "cannot pass inner to parent func");
   }
 
   // Verify that default initialization works.
