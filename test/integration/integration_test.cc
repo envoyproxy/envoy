@@ -80,11 +80,11 @@ TEST_P(IntegrationTest, RouterRequestAndResponseLargeHeaderNoBuffer) {
 }
 
 TEST_P(IntegrationTest, RouterHeaderOnlyRequestAndResponseNoBuffer) {
-  testRouterHeaderOnlyRequestAndResponse(true);
+  testRouterHeaderOnlyRequestAndResponse();
 }
 
 TEST_P(IntegrationTest, ShutdownWithActiveConnPoolConnections) {
-  testRouterHeaderOnlyRequestAndResponse(false);
+  testRequestAndResponseShutdownWithActiveConnection();
 }
 
 TEST_P(IntegrationTest, RouterUpstreamDisconnectBeforeRequestcomplete) {

@@ -41,6 +41,42 @@ public:
   }
 };
 
+/**
+ * From
+ * (https://gcc.gnu.org/git/?p=gcc.git;a=blob_plain;f=libstdc%2b%2b-v3/libsupc%2b%2b/hash_bytes.cc).
+ * Which is based on (https://sites.google.com/site/murmurhash/).
+ */
+class MurmurHash {
+public:
+  static const uint64_t STD_HASH_SEED = 0xc70f6907UL;
+  /**
+   * Return 64-bit hash from murmur hash2 as is implemented in std::hash<string>.
+   * @param key supplies the string view
+   * @param seed the seed to use for the hash
+   * @return 64-bit hash representation of the supplied string view
+   */
+  static uint64_t murmurHash2_64(absl::string_view key, uint64_t seed = STD_HASH_SEED);
+
+private:
+  static inline uint64_t unaligned_load(const char* p) {
+    uint64_t result;
+    __builtin_memcpy(&result, p, sizeof(result));
+    return result;
+  }
+
+  // Loads n bytes, where 1 <= n < 8.
+  static inline uint64_t load_bytes(const char* p, int n) {
+    uint64_t result = 0;
+    --n;
+    do {
+      result = (result << 8) + static_cast<unsigned char>(p[n]);
+    } while (--n >= 0);
+    return result;
+  }
+
+  static inline uint64_t shift_mix(uint64_t v) { return v ^ (v >> 47); }
+};
+
 struct CharStarHash {
   size_t operator()(const char* a) const { return HashUtil::xxHash64(a); }
 };

@@ -312,7 +312,6 @@ InstanceImpl::InstanceImpl(ConnPool::InstancePtr&& conn_pool, Stats::Scope& scop
       eval_command_handler_(*conn_pool_), mget_handler_(*conn_pool_), mset_handler_(*conn_pool_),
       split_keys_sum_result_handler_(*conn_pool_),
       stats_{ALL_COMMAND_SPLITTER_STATS(POOL_COUNTER_PREFIX(scope, stat_prefix + "splitter."))} {
-  // TODO(mattklein123) PERF: Make this a trie (like in header_map_impl).
   for (const std::string& command : SupportedCommands::simpleCommands()) {
     addHandler(scope, stat_prefix, command, simple_command_handler_);
   }
@@ -360,17 +359,16 @@ SplitRequestPtr InstanceImpl::makeRequest(const RespValue& request, SplitCallbac
     }
   }
 
-  auto handler = command_map_.find(to_lower_string);
-  if (handler == command_map_.end()) {
+  auto handler = handler_lookup_table_.find(to_lower_string.c_str());
+  if (handler == nullptr) {
     stats_.unsupported_command_.inc();
     callbacks.onResponse(Utility::makeError(
         fmt::format("unsupported command '{}'", request.asArray()[0].asString())));
     return nullptr;
   }
-
   ENVOY_LOG(debug, "redis: splitting '{}'", request.toString());
-  handler->second.total_.inc();
-  return handler->second.handler_.get().startRequest(request, callbacks);
+  handler->total_.inc();
+  return handler->handler_.get().startRequest(request, callbacks);
 }
 
 void InstanceImpl::onInvalidRequest(SplitCallbacks& callbacks) {
@@ -382,10 +380,10 @@ void InstanceImpl::addHandler(Stats::Scope& scope, const std::string& stat_prefi
                               const std::string& name, CommandHandler& handler) {
   std::string to_lower_name(name);
   to_lower_table_.toLowerCase(to_lower_name);
-  command_map_.emplace(
-      to_lower_name,
-      HandlerData{scope.counter(fmt::format("{}command.{}.total", stat_prefix, to_lower_name)),
-                  handler});
+  handler_lookup_table_.add(
+      to_lower_name.c_str(),
+      std::make_shared<HandlerData>(HandlerData{
+          scope.counter(fmt::format("{}command.{}.total", stat_prefix, to_lower_name)), handler}));
 }
 
 } // namespace CommandSplitter

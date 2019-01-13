@@ -176,10 +176,12 @@ public:
                                          const Network::Address::IpVersion version,
                                          std::function<void()> pre_worker_start_test_steps,
                                          bool deterministic, Event::TestTimeSystem& time_system,
-                                         Api::Api& api);
+                                         Api::Api& api, bool defer_listener_finalization = false);
   // Note that the derived class is responsible for tearing down the server in its
   // destructor.
   ~IntegrationTestServer();
+
+  void waitUntilListenersReady();
 
   Server::TestDrainManager& drainManager() { return *drain_manager_; }
   void setOnWorkerListenerAddedCb(std::function<void()> on_worker_listener_added) {
@@ -189,7 +191,8 @@ public:
     on_worker_listener_removed_cb_ = on_worker_listener_removed;
   }
   void start(const Network::Address::IpVersion version,
-             std::function<void()> pre_worker_start_test_steps, bool deterministic);
+             std::function<void()> pre_worker_start_test_steps, bool deterministic,
+             bool defer_listener_finalization);
 
   void waitForCounterGe(const std::string& name, uint64_t value) override {
     while (counter(name) == nullptr || counter(name)->value() < value) {
