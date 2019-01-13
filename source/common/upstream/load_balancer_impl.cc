@@ -524,7 +524,7 @@ ZoneAwareLoadBalancerBase::HostsSource
 ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context) {
   auto host_set_and_source = chooseHostSet(context);
 
-  // The second argument tells us which availabilty we should target from the selected host set.
+  // The second argument tells us which availability we should target from the selected host set.
   const auto host_availability = host_set_and_source.second;
   auto& host_set = host_set_and_source.first;
   HostsSource hosts_source;
