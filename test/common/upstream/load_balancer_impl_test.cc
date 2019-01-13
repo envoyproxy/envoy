@@ -107,7 +107,7 @@ TEST_P(LoadBalancerBaseTest, PrioritySelection) {
   updateHostSet(host_set_, 1 /* num_hosts */, 0 /* num_healthy_hosts */);
   updateHostSet(failover_host_set_, 1, 0);
 
-  auto priority_load = PriorityLoad({100u, 0u});
+  PriorityLoad priority_load({100u, 0u});
   EXPECT_CALL(context, determinePriorityLoad(_, _)).WillRepeatedly(ReturnRef(priority_load));
   // With both the primary and failover hosts unhealthy, we should select an
   // unhealthy primary host.
