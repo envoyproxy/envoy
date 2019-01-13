@@ -1,6 +1,6 @@
 #include <arpa/inet.h>
 #include <fcntl.h>
-#include <netinet/ip.h>
+#include <netinet/in.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
@@ -324,7 +324,7 @@ TEST(PipeInstanceTest, UnlinksExistingFile) {
   bind_uds_socket(path); // after closing, second bind to the same path should succeed.
 }
 
-TEST(AddressFromSockAddr, IPv4) {
+TEST(AddressFromSockAddrDeathTest, IPv4) {
   sockaddr_storage ss;
   auto& sin = reinterpret_cast<sockaddr_in&>(ss);
 
@@ -343,7 +343,7 @@ TEST(AddressFromSockAddr, IPv4) {
   EXPECT_THROW(addressFromSockAddr(ss, sizeof(sockaddr_in)), EnvoyException);
 }
 
-TEST(AddressFromSockAddr, IPv6) {
+TEST(AddressFromSockAddrDeathTest, IPv6) {
   sockaddr_storage ss;
   auto& sin6 = reinterpret_cast<sockaddr_in6&>(ss);
 
@@ -367,7 +367,7 @@ TEST(AddressFromSockAddr, IPv6) {
             addressFromSockAddr(ss, sizeof(sockaddr_in6), true)->asString());
 }
 
-TEST(AddressFromSockAddr, Pipe) {
+TEST(AddressFromSockAddrDeathTest, Pipe) {
   sockaddr_storage ss;
   auto& sun = reinterpret_cast<sockaddr_un&>(ss);
   sun.sun_family = AF_UNIX;

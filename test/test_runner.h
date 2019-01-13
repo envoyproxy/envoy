@@ -19,6 +19,10 @@ public:
     ::testing::InitGoogleMock(&argc, argv);
     Event::Libevent::Global::initialize();
 
+    // Use the recommended, but not default, "threadsafe" style for the Death Tests.
+    // See: https://github.com/google/googletest/commit/84ec2e0365d791e4ebc7ec249f09078fb5ab6caa
+    ::testing::FLAGS_gtest_death_test_style = "threadsafe";
+
     // Set gtest properties
     // (https://github.com/google/googletest/blob/master/googletest/docs/AdvancedGuide.md#logging-additional-information),
     // they are available in the test XML.

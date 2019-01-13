@@ -33,7 +33,6 @@ void SdsApi::initialize(std::function<void()> callback) {
   subscription_ = Envoy::Config::SubscriptionFactory::subscriptionFromConfigSource<
       envoy::api::v2::auth::Secret>(
       sds_config_, local_info_, dispatcher_, cluster_manager_, random_, stats_,
-      /* rest_legacy_constructor */ nullptr,
       "envoy.service.discovery.v2.SecretDiscoveryService.FetchSecrets",
       "envoy.service.discovery.v2.SecretDiscoveryService.StreamSecrets");
 

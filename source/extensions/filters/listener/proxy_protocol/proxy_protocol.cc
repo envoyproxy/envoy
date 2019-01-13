@@ -84,7 +84,7 @@ void Filter::onReadWorker() {
 
     // Only set the local address if it really changed, and mark it as address being restored.
     if (*proxy_protocol_header_.value().local_address_ != *socket.localAddress()) {
-      socket.setLocalAddress(proxy_protocol_header_.value().local_address_, true);
+      socket.restoreLocalAddress(proxy_protocol_header_.value().local_address_);
     }
     socket.setRemoteAddress(proxy_protocol_header_.value().remote_address_);
   }
