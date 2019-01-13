@@ -52,7 +52,7 @@ std::pair<int32_t, size_t> distributeLoad(PriorityLoad& per_priority_load,
 
 } // namespace
 
-std::pair<uint32_t, bool>
+std::pair<uint32_t, LoadBalancerBase::HostAvailability>
 LoadBalancerBase::choosePriority(uint64_t hash, const std::vector<uint32_t>& per_priority_load,
                                  const std::vector<uint32_t>& degraded_per_priority_load) {
   hash = hash % 100 + 1; // 1-100
@@ -65,7 +65,7 @@ LoadBalancerBase::choosePriority(uint64_t hash, const std::vector<uint32_t>& per
   for (size_t priority = 0; priority < per_priority_load.size(); ++priority) {
     aggregate_percentage_load += per_priority_load[priority];
     if (hash <= aggregate_percentage_load) {
-      return {priority, false};
+      return {priority, HostAvailability::Healthy};
     }
   }
 
@@ -74,7 +74,7 @@ LoadBalancerBase::choosePriority(uint64_t hash, const std::vector<uint32_t>& per
   for (size_t priority = 0; priority < degraded_per_priority_load.size(); ++priority) {
     aggregate_percentage_load += degraded_per_priority_load[priority];
     if (hash <= aggregate_percentage_load) {
-      return {priority, true};
+      return {priority, HostAvailability::Degraded};
     }
   }
 
@@ -239,7 +239,8 @@ void LoadBalancerBase::recalculatePerPriorityPanic() {
   }
 }
 
-std::pair<HostSet&, bool> LoadBalancerBase::chooseHostSet(LoadBalancerContext* context) {
+std::pair<HostSet&, LoadBalancerBase::HostAvailability>
+LoadBalancerBase::chooseHostSet(LoadBalancerContext* context) {
   if (context) {
     const auto& per_priority_load =
         context->determinePriorityLoad(priority_set_, per_priority_load_);
@@ -523,9 +524,8 @@ ZoneAwareLoadBalancerBase::HostsSource
 ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context) {
   auto host_set_and_source = chooseHostSet(context);
 
-  // The second argument tells us whether or not we should be using degraded hosts from the
-  // selected host set.
-  const bool degraded_hosts = host_set_and_source.second;
+  // The second argument tells us which availabilty we should target from the selected host set.
+  const auto host_availability = host_set_and_source.second;
   auto& host_set = host_set_and_source.first;
   HostsSource hosts_source;
   hosts_source.priority_ = host_set.priority();
@@ -540,7 +540,7 @@ ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context) {
   // If we're doing locality weighted balancing, pick locality.
   const absl::optional<uint32_t> locality = host_set.chooseLocality();
   if (locality.has_value()) {
-    hosts_source.source_type_ = localitySourceType(degraded_hosts);
+    hosts_source.source_type_ = localitySourceType(host_availability);
     hosts_source.locality_index_ = locality.value();
     return hosts_source;
   }
@@ -549,13 +549,13 @@ ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context) {
   // for the selected host set.
   if (per_priority_state_[host_set.priority()]->locality_routing_state_ ==
       LocalityRoutingState::NoLocalityRouting) {
-    hosts_source.source_type_ = sourceType(degraded_hosts);
+    hosts_source.source_type_ = sourceType(host_availability);
     return hosts_source;
   }
 
   // Determine if the load balancer should do zone based routing for this pick.
   if (!runtime_.snapshot().featureEnabled(RuntimeZoneEnabled, routing_enabled_)) {
-    hosts_source.source_type_ = sourceType(degraded_hosts);
+    hosts_source.source_type_ = sourceType(host_availability);
     return hosts_source;
   }
 
@@ -563,11 +563,11 @@ ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context) {
     stats_.lb_local_cluster_not_ok_.inc();
     // If the local Envoy instances are in global panic, do not do locality
     // based routing.
-    hosts_source.source_type_ = sourceType(degraded_hosts);
+    hosts_source.source_type_ = sourceType(host_availability);
     return hosts_source;
   }
 
-  hosts_source.source_type_ = localitySourceType(degraded_hosts);
+  hosts_source.source_type_ = localitySourceType(host_availability);
   hosts_source.locality_index_ = tryChooseLocalLocalityHosts(host_set);
   return hosts_source;
 }

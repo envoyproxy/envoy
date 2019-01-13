@@ -24,14 +24,16 @@ static constexpr uint32_t kDefaultOverProvisioningFactor = 140;
  */
 class LoadBalancerBase : public LoadBalancer {
 public:
+  enum class HostAvailability { Healthy, Degraded };
+
   // A utility function to chose a priority level based on a precomputed hash and
   // a priority vector in the style of per_priority_load_
   //
-  // Returns the priority, a number between 0 and per_priority_load.size()-1 as well as whether
-  // it came from the degraded priority list.
-  static std::pair<uint32_t, bool> choosePriority(uint64_t hash,
-                                                  const PriorityLoad& per_priority_load,
-                                                  const PriorityLoad& degraded_per_priority_load);
+  // Returns the priority, a number between 0 and per_priority_load.size()-1 as well as which host
+  // availability level was chosen.
+  static std::pair<uint32_t, HostAvailability>
+  choosePriority(uint64_t hash, const PriorityLoad& per_priority_load,
+                 const PriorityLoad& degraded_per_priority_load);
 
   HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
 
@@ -67,8 +69,8 @@ protected:
   // necessary. When a host set is selected based on degraded_per_priority_load_, only degraded
   // hosts should be selected from that host set.
   //
-  // @return host set to use and whether to use degraded hosts.
-  std::pair<HostSet&, bool> chooseHostSet(LoadBalancerContext* context);
+  // @return host set to use and which availability to target.
+  std::pair<HostSet&, HostAvailability> chooseHostSet(LoadBalancerContext* context);
 
   uint32_t percentageLoad(uint32_t priority) const { return per_priority_load_[priority]; }
   uint32_t percentageDegradedLoad(uint32_t priority) const {
@@ -267,14 +269,22 @@ private:
 
   HostSet& localHostSet() const { return *local_priority_set_->hostSetsPerPriority()[0]; }
 
-  static HostsSource::SourceType localitySourceType(bool degraded) {
-    return degraded ? HostsSource::SourceType::LocalityDegradedHosts
-                    : HostsSource::SourceType::LocalityHealthyHosts;
+  static HostsSource::SourceType localitySourceType(HostAvailability host_availability) {
+    switch (host_availability) {
+    case HostAvailability::Healthy:
+      return HostsSource::SourceType::LocalityHealthyHosts;
+    case HostAvailability::Degraded:
+      return HostsSource::SourceType::LocalityDegradedHosts;
+    }
   }
 
-  static HostsSource::SourceType sourceType(bool degraded) {
-    return degraded ? HostsSource::SourceType::DegradedHosts
-                    : HostsSource::SourceType::HealthyHosts;
+  static HostsSource::SourceType sourceType(HostAvailability host_availability) {
+    switch (host_availability) {
+    case HostAvailability::Healthy:
+      return HostsSource::SourceType::HealthyHosts;
+    case HostAvailability::Degraded:
+      return HostsSource::SourceType::DegradedHosts;
+    }
   }
 
   // The set of local Envoy instances which are load balancing across priority_set_.
