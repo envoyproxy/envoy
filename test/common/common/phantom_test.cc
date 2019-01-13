@@ -26,20 +26,31 @@ struct PhantomB {
   uint32_t x_;
 };
 
-// Helper functions for testing type interaction with nested phantoms.
-void parent(Phantom<std::vector<uint32_t>, struct PhantomTest>) {}
-void parentRef(const Phantom<std::vector<uint32_t>, struct PhantomTest>&) {}
+// Empty types to use as phantom type.
+struct PhantomTest {};
+struct PhantomTest2 {};
 
-void base(Phantom<Phantom<std::vector<uint32_t>, struct PhantomTest>, struct PhantomTest2>) {}
-void baseRef(
-    const Phantom<Phantom<std::vector<uint32_t>, struct PhantomTest>, struct PhantomTest2>&) {}
+typedef Phantom<PhantomA, PhantomTest> PhantomATest;
+typedef Phantom<PhantomA, PhantomTest2> PhantomATest2;
+typedef Phantom<PhantomB, PhantomTest> PhantomBTest;
+typedef Phantom<PhantomB, PhantomTest2> PhantomBTest2;
+
+typedef Phantom<std::vector<uint32_t>, PhantomTest> PhantomVector;
+typedef Phantom<PhantomVector, PhantomTest> NestedPhantomVector;
+
+// Helper functions for testing type interaction with nested phantoms.
+void parent(PhantomVector) {}
+void parentRef(const PhantomVector&) {}
+
+void base(NestedPhantomVector) {}
+void baseRef(const NestedPhantomVector&) {}
 
 // Verify that a phantom type can be constructed using the inner
 // type's constructors
 TEST(PhantomTest, TypeBehavior) {
   {
-    const auto x = Phantom<PhantomA, struct PhantomTest>::create(4);
-    const auto y = Phantom<PhantomA, struct PhantomTest>::create(4);
+    const auto x = PhantomATest::create(4);
+    const auto y = PhantomATest::create(4);
     /* Phantom<PhantomA, struct PhantomTest> x{4}; */
     /* Phantom<PhantomA, struct PhantomTest> y{4}; */
 
@@ -50,8 +61,8 @@ TEST(PhantomTest, TypeBehavior) {
   }
 
   {
-    const auto x = Phantom<PhantomB, struct PhantomTest>::create(4);
-    const auto y = Phantom<PhantomB, struct PhantomTest>::create(4);
+    const auto x = PhantomBTest::create(4);
+    const auto y = PhantomBTest::create(4);
 
     // Equality is provided by the super class.
     EXPECT_EQ(x, y);
@@ -60,8 +71,8 @@ TEST(PhantomTest, TypeBehavior) {
   }
 
   {
-    auto x = Phantom<PhantomA, struct PhantomTest>::create(4);
-    const auto y = Phantom<PhantomA, struct PhantomTest2>::create(4);
+    auto x = PhantomATest::create(4);
+    const auto y = PhantomATest2::create(4);
 
     // Should not be possible to convert x to y directly.
     static_assert(!std::is_convertible<decltype(x), decltype(y)>::value, "not convertible");
@@ -73,31 +84,20 @@ TEST(PhantomTest, TypeBehavior) {
 
   {
     // Verify initializer list initialization of a vector.
-    /* Phantom<std::vector<uint32_t>, struct PhantomTest2> v({1u, 2u, 3u, 4u}); */
-    /* Phantom<std::vector<uint32_t>, struct PhantomTest2> v2{1u, 2u, 3u, 4u}; */
-    const auto v = Phantom<std::vector<uint32_t>, struct PhantomTest>::create({1u, 2u, 3u, 4u});
-    const auto v2 = Phantom<std::vector<uint32_t>, struct PhantomTest>::create({1u, 2u, 3u, 4u});
+    const auto v = PhantomVector::create({1u, 2u, 3u, 4u});
+  }
+
+  {
+    // Verify that initializer syntax is preferred over size_t, const T& ctor.
+    const auto v = PhantomVector::create({1u, 2u});
+    const auto v2 = PhantomVector::create(std::vector<uint32_t>({1u, 2u}));
 
     EXPECT_EQ(v, v2);
   }
 
   {
-    // Verify that initializer syntax is preferred over size_t, const T& ctor
-    /* Phantom<std::vector<uint32_t>, struct PhantomTest2> v{1u, 2u}; */
-    /* Phantom<std::vector<uint32_t>, struct PhantomTest2> v2({1u, 2u}); */
-    const auto v = Phantom<std::vector<uint32_t>, struct PhantomTest>::create({1u, 2u});
-    const auto v2 = Phantom<std::vector<uint32_t>, struct PhantomTest>::create({1u, 2u});
-
-    EXPECT_EQ(v, v2);
-  }
-
-  {
-    const auto nested =
-        Phantom<Phantom<std::vector<uint32_t>, struct PhantomTest>, struct PhantomTest2>::create(
-            {1u, 2u});
-    const auto nested2 =
-        Phantom<Phantom<std::vector<uint32_t>, struct PhantomTest>, struct PhantomTest2>::create(
-            {1u, 2u});
+    const auto nested = NestedPhantomVector::create({1u, 2u});
+    const auto nested2 = NestedPhantomVector::create({1u, 2u});
 
     EXPECT_EQ(nested, nested2);
 
@@ -109,13 +109,16 @@ TEST(PhantomTest, TypeBehavior) {
     base(nested);
     baseRef(nested);
 
-    const auto inner = Phantom<std::vector<uint32_t>, struct PhantomTest>::create();
+    const auto inner = PhantomVector::create();
 
     static_assert(!std::__invokable<decltype(base), decltype(inner)>::value,
                   "cannot pass inner to parent func");
     static_assert(!std::__invokable<decltype(baseRef), decltype(inner)>::value,
                   "cannot pass inner to parent func");
   }
+
+  // Verify that default initialization works.
+  NestedPhantomVector v;
 }
 
 } // namespace Envoy
