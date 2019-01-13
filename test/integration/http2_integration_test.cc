@@ -54,7 +54,7 @@ TEST_P(Http2IntegrationTest, FlowControlOnAndGiantBody) {
 }
 
 TEST_P(Http2IntegrationTest, RouterHeaderOnlyRequestAndResponseNoBuffer) {
-  testRouterHeaderOnlyRequestAndResponse(true);
+  testRouterHeaderOnlyRequestAndResponse();
 }
 
 TEST_P(Http2IntegrationTest, RouterRequestAndResponseLargeHeaderNoBuffer) {
@@ -62,7 +62,7 @@ TEST_P(Http2IntegrationTest, RouterRequestAndResponseLargeHeaderNoBuffer) {
 }
 
 TEST_P(Http2IntegrationTest, ShutdownWithActiveConnPoolConnections) {
-  testRouterHeaderOnlyRequestAndResponse(false);
+  testRequestAndResponseShutdownWithActiveConnection();
 }
 
 TEST_P(Http2IntegrationTest, RouterUpstreamDisconnectBeforeRequestcomplete) {

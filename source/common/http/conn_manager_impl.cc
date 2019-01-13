@@ -179,6 +179,8 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
     stream.stream_idle_timer_->disableTimer();
     stream.stream_idle_timer_ = nullptr;
   }
+  stream.disarmRequestTimeout();
+
   stream.state_.destroyed_ = true;
   for (auto& filter : stream.decoder_filters_) {
     filter->handle_->onDestroy();
@@ -1440,6 +1442,7 @@ void ConnectionManagerImpl::ActiveStream::callLowWatermarkCallbacks() {
 }
 
 void ConnectionManagerImpl::ActiveStream::setBufferLimit(uint32_t new_limit) {
+  ENVOY_STREAM_LOG(debug, "setting buffer limit to {}", *this, new_limit);
   buffer_limit_ = new_limit;
   if (buffered_request_data_) {
     buffered_request_data_->setWatermarks(buffer_limit_);
