@@ -122,17 +122,13 @@ public:
   MockUdpListenerCallbacks();
   ~MockUdpListenerCallbacks();
 
-  void onData(Address::InstanceConstSharedPtr local_address,
-              Address::InstanceConstSharedPtr peer_address, Buffer::InstancePtr&& data) override {
-    onData_(local_address, peer_address, data.get());
-  }
+  void onData(const UdpData& data) override { onData_(data); }
 
   void onWriteReady(const Socket& socket) override { onWriteReady_(socket); }
 
   void onError(const ErrorCode& err_code, int err) override { onError_(err_code, err); }
 
-  MOCK_METHOD3(onData_, void(Address::InstanceConstSharedPtr local_address,
-                             Address::InstanceConstSharedPtr peer_address, Buffer::Instance* data));
+  MOCK_METHOD1(onData_, void(const UdpData& data));
 
   MOCK_METHOD1(onWriteReady_, void(const Socket& socket));
 

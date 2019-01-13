@@ -323,23 +323,19 @@ TEST_P(ListenerImplTest, UseActualDstUdp) {
     EXPECT_EQ(*local_address, *server_socket->localAddress());
   };
 
-  EXPECT_CALL(listener_callbacks, onData_(_, _, _))
-      .WillOnce(
-          Invoke([&](Address::InstanceConstSharedPtr local_address,
-                     Address::InstanceConstSharedPtr peer_address, Buffer::Instance* data) -> void {
-            validateCallParams(local_address, peer_address);
+  EXPECT_CALL(listener_callbacks, onData_(_))
+      .WillOnce(Invoke([&](const UdpData& data) -> void {
+        validateCallParams(data.local_address_, data.peer_address_);
 
-            EXPECT_EQ(data->toString(), first);
-          }))
-      .WillOnce(
-          Invoke([&](Address::InstanceConstSharedPtr local_address,
-                     Address::InstanceConstSharedPtr peer_address, Buffer::Instance* data) -> void {
-            validateCallParams(local_address, peer_address);
+        EXPECT_EQ(data.buffer_->toString(), first);
+      }))
+      .WillOnce(Invoke([&](const UdpData& data) -> void {
+        validateCallParams(data.local_address_, data.peer_address_);
 
-            EXPECT_EQ(data->toString(), second);
+        EXPECT_EQ(data.buffer_->toString(), second);
 
-            dispatcher_.exit();
-          }));
+        dispatcher_.exit();
+      }));
 
   EXPECT_CALL(listener_callbacks, onWriteReady_(_))
       .WillRepeatedly(
@@ -421,29 +417,25 @@ TEST_P(ListenerImplTest, UdpEcho) {
 
   std::vector<std::string> server_received_data;
 
-  EXPECT_CALL(listener_callbacks, onData_(_, _, _))
-      .WillOnce(
-          Invoke([&](Address::InstanceConstSharedPtr local_address,
-                     Address::InstanceConstSharedPtr peer_address, Buffer::Instance* data) -> void {
-            validateCallParams(local_address, peer_address);
+  EXPECT_CALL(listener_callbacks, onData_(_))
+      .WillOnce(Invoke([&](const UdpData& data) -> void {
+        validateCallParams(data.local_address_, data.peer_address_);
 
-            test_peer_address = peer_address;
+        test_peer_address = data.peer_address_;
 
-            const std::string data_str = data->toString();
-            EXPECT_EQ(data_str, first);
+        const std::string data_str = data.buffer_->toString();
+        EXPECT_EQ(data_str, first);
 
-            server_received_data.push_back(data_str);
-          }))
-      .WillOnce(
-          Invoke([&](Address::InstanceConstSharedPtr local_address,
-                     Address::InstanceConstSharedPtr peer_address, Buffer::Instance* data) -> void {
-            validateCallParams(local_address, peer_address);
+        server_received_data.push_back(data_str);
+      }))
+      .WillOnce(Invoke([&](const UdpData& data) -> void {
+        validateCallParams(data.local_address_, data.peer_address_);
 
-            const std::string data_str = data->toString();
-            EXPECT_EQ(data_str, second);
+        const std::string data_str = data.buffer_->toString();
+        EXPECT_EQ(data_str, second);
 
-            server_received_data.push_back(data_str);
-          }));
+        server_received_data.push_back(data_str);
+      }));
 
   EXPECT_CALL(listener_callbacks, onWriteReady_(_))
       .WillRepeatedly(Invoke([&](const Socket& socket) {
@@ -576,7 +568,7 @@ TEST_P(ListenerImplTest, UdpListenerEnableDisable) {
 
   timer->enableTimer(std::chrono::milliseconds(2000));
 
-  EXPECT_CALL(listener_callbacks, onData_(_, _, _)).Times(0);
+  EXPECT_CALL(listener_callbacks, onData_(_)).Times(0);
 
   EXPECT_CALL(listener_callbacks, onWriteReady_(_)).Times(0);
 
@@ -584,18 +576,16 @@ TEST_P(ListenerImplTest, UdpListenerEnableDisable) {
 
   listener.enable();
 
-  EXPECT_CALL(listener_callbacks, onData_(_, _, _))
+  EXPECT_CALL(listener_callbacks, onData_(_))
       .Times(2)
       .WillOnce(Return())
-      .WillOnce(
-          Invoke([&](Address::InstanceConstSharedPtr local_address,
-                     Address::InstanceConstSharedPtr peer_address, Buffer::Instance* data) -> void {
-            validateCallParams(local_address, peer_address);
+      .WillOnce(Invoke([&](const UdpData& data) -> void {
+        validateCallParams(data.local_address_, data.peer_address_);
 
-            EXPECT_EQ(data->toString(), second);
+        EXPECT_EQ(data.buffer_->toString(), second);
 
-            dispatcher_.exit();
-          }));
+        dispatcher_.exit();
+      }));
 
   EXPECT_CALL(listener_callbacks, onWriteReady_(_))
       .WillRepeatedly(
@@ -646,7 +636,7 @@ TEST_P(ListenerImplTest, UdpListenerRecvFromError) {
 
   ASSERT_EQ(send_rc, first.length());
 
-  EXPECT_CALL(listener_callbacks, onData_(_, _, _)).Times(0);
+  EXPECT_CALL(listener_callbacks, onData_(_)).Times(0);
 
   EXPECT_CALL(listener_callbacks, onWriteReady_(_))
       .Times(1)

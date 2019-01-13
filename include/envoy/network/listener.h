@@ -115,6 +115,19 @@ public:
 };
 
 /**
+ * Utility struct that encapsulates the information from a udp socket's
+ * recvfrom/recvmmdg call.
+ *
+ * TODO (conqerAtapple): Maybe this belongs inside the UdpListenerCallbacks
+ * class.
+ */
+struct UdpData {
+  Address::InstanceConstSharedPtr local_address_;
+  Address::InstanceConstSharedPtr peer_address_;
+  Buffer::InstancePtr buffer_;
+};
+
+/**
  * Udp listener callbacks.
  */
 class UdpListenerCallbacks {
@@ -126,13 +139,9 @@ public:
   /**
    * Called whenever data is received by the underlying udp socket.
    *
-   * @param local_address Local bound socket network address.
-   * @param peer_address Network address of the peer.
-   * @param data Data buffer received.
+   * @param data UdpData from the underlying socket.
    */
-  virtual void onData(Address::InstanceConstSharedPtr local_address,
-                      Address::InstanceConstSharedPtr peer_address,
-                      Buffer::InstancePtr&& data) PURE;
+  virtual void onData(const UdpData& data) PURE;
 
   /**
    * Called when the underlying socket is ready for write.

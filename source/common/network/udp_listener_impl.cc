@@ -149,7 +149,7 @@ void UdpListenerImpl::handleReadCallback(int fd) {
   RELEASE_ASSERT((local_address != nullptr),
                  fmt::format("Unable to get local address for fd: {}", fd));
 
-  cb_.onData(local_address, peer_address, std::move(recv_result.buffer_));
+  cb_.onData(UdpData{local_address, peer_address, std::move(recv_result.buffer_)});
 }
 
 void UdpListenerImpl::handleWriteCallback(int fd) {
