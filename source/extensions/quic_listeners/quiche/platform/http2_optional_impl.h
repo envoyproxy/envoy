@@ -1,8 +1,9 @@
 #pragma once
 
+// NOLINT(namespace-envoy)
+
 namespace http2 {
 
-template <typename T>
-class Http2OptionalImpl {};
+template <typename T> class Http2OptionalImpl {};
 
-}  // namespace http2
+} // namespace http2

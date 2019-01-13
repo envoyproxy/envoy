@@ -8,8 +8,8 @@ load(
 
 envoy_package()
 
-// Placeholder library to verify/illustrate depending on a QUICHE build target.
-// TODO(mpwarres): remove once real build rules added here.
+# Placeholder library to verify/illustrate depending on a QUICHE build target.
+# TODO(mpwarres): remove once real build rules added here.
 envoy_cc_library(
     name = "dummy_lib",
     srcs = ["dummy.cc"],

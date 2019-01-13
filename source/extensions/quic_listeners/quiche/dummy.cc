@@ -7,9 +7,7 @@ namespace Extensions {
 namespace QuicListeners {
 namespace Quiche {
 
-Http2String moreCowbell(const Http2String& s) {
-  return s + " cowbell";
-}
+Http2String moreCowbell(const Http2String& s) { return s + " cowbell"; }
 
 } // namespace Quiche
 } // namespace QuicListeners

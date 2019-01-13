@@ -1,3 +1,5 @@
+licenses(["notice"])  # Apache 2
+
 # Transformations to QUICHE tarball:
 # - Move subtree under quiche/ base dir, for clarity in #include statements.
 # - Rewrite include directives for platform/impl files.
@@ -9,14 +11,23 @@
 # QUICHE platform APIs in //source/extensions/quic_listeners/quiche/platform/,
 # should remain the same.
 
-src_files = glob(["**/*.h", "**/*.c", "**/*.cc", "**/*.inc", "**/*.proto"])
+src_files = glob([
+    "**/*.h",
+    "**/*.c",
+    "**/*.cc",
+    "**/*.inc",
+    "**/*.proto",
+])
 
 genrule(
     name = "quiche_files",
     srcs = src_files,
     outs = ["quiche/" + f for f in src_files],
     cmd = "\n".join(
-        ["sed -e '/^#include/ s!net/\(http2\|quic\|spdy\)/platform/impl/!extensions/quic_listeners/quiche/platform/!' $(location %s) > $(location :%s)" % (f, "quiche/" + f) for f in src_files],
+        ["sed -e '/^#include/ s!net/\(http2\|quic\|spdy\)/platform/impl/!extensions/quic_listeners/quiche/platform/!' $(location %s) > $(location :%s)" % (
+            f,
+            "quiche/" + f,
+        ) for f in src_files],
     ),
     visibility = ["//visibility:private"],
 )
@@ -29,8 +40,8 @@ cc_library(
         "quiche/http2/platform/api/http2_containers.h",
         "quiche/http2/platform/api/http2_estimate_memory_usage.h",
         "quiche/http2/platform/api/http2_export.h",
-        "quiche/http2/platform/api/http2_flags.h",
         "quiche/http2/platform/api/http2_flag_utils.h",
+        "quiche/http2/platform/api/http2_flags.h",
         "quiche/http2/platform/api/http2_macros.h",
         "quiche/http2/platform/api/http2_mock_log.h",
         "quiche/http2/platform/api/http2_optional.h",
