@@ -38,8 +38,10 @@ void baseRef(
 // type's constructors
 TEST(PhantomTest, TypeBehavior) {
   {
-    Phantom<PhantomA, struct PhantomTest> x{4};
-    Phantom<PhantomA, struct PhantomTest> y{4};
+    const auto x = Phantom<PhantomA, struct PhantomTest>::create(4);
+    const auto y = Phantom<PhantomA, struct PhantomTest>::create(4);
+    /* Phantom<PhantomA, struct PhantomTest> x{4}; */
+    /* Phantom<PhantomA, struct PhantomTest> y{4}; */
 
     // Equality is provided by the super class.
     EXPECT_EQ(x, y);
@@ -48,8 +50,8 @@ TEST(PhantomTest, TypeBehavior) {
   }
 
   {
-    Phantom<PhantomB, struct PhantomTest> x{4};
-    Phantom<PhantomB, struct PhantomTest> y{4};
+    const auto x = Phantom<PhantomB, struct PhantomTest>::create(4);
+    const auto y = Phantom<PhantomB, struct PhantomTest>::create(4);
 
     // Equality is provided by the super class.
     EXPECT_EQ(x, y);
@@ -58,36 +60,44 @@ TEST(PhantomTest, TypeBehavior) {
   }
 
   {
-    Phantom<PhantomB, struct PhantomTest> x{4};
-    Phantom<PhantomB, struct PhantomTest2> y{4};
+    auto x = Phantom<PhantomA, struct PhantomTest>::create(4);
+    const auto y = Phantom<PhantomA, struct PhantomTest2>::create(4);
 
     // Should not be possible to convert x to y directly.
     static_assert(!std::is_convertible<decltype(x), decltype(y)>::value, "not convertible");
+    static_assert(!std::is_assignable<decltype(x), decltype(y)>::value, "not assignable");
 
     // Explicit conversion should be possible.
-    x = Phantom<PhantomB, struct PhantomTest>(y);
+    x = Phantom<PhantomA, struct PhantomTest>::create(y);
   }
 
   {
     // Verify initializer list initialization of a vector.
-    Phantom<std::vector<uint32_t>, struct PhantomTest2> v({1u, 2u, 3u, 4u});
-    Phantom<std::vector<uint32_t>, struct PhantomTest2> v2{1u, 2u, 3u, 4u};
+    /* Phantom<std::vector<uint32_t>, struct PhantomTest2> v({1u, 2u, 3u, 4u}); */
+    /* Phantom<std::vector<uint32_t>, struct PhantomTest2> v2{1u, 2u, 3u, 4u}; */
+    const auto v = Phantom<std::vector<uint32_t>, struct PhantomTest>::create({1u, 2u, 3u, 4u});
+    const auto v2 = Phantom<std::vector<uint32_t>, struct PhantomTest>::create({1u, 2u, 3u, 4u});
 
     EXPECT_EQ(v, v2);
   }
 
   {
     // Verify that initializer syntax is preferred over size_t, const T& ctor
-    Phantom<std::vector<uint32_t>, struct PhantomTest2> v{1u, 2u};
-    Phantom<std::vector<uint32_t>, struct PhantomTest2> v2({1u, 2u});
+    /* Phantom<std::vector<uint32_t>, struct PhantomTest2> v{1u, 2u}; */
+    /* Phantom<std::vector<uint32_t>, struct PhantomTest2> v2({1u, 2u}); */
+    const auto v = Phantom<std::vector<uint32_t>, struct PhantomTest>::create({1u, 2u});
+    const auto v2 = Phantom<std::vector<uint32_t>, struct PhantomTest>::create({1u, 2u});
 
     EXPECT_EQ(v, v2);
   }
 
   {
-    Phantom<Phantom<std::vector<uint32_t>, struct PhantomTest>, struct PhantomTest2> nested{1u, 2u};
-    Phantom<Phantom<std::vector<uint32_t>, struct PhantomTest>, struct PhantomTest2> nested2{1u,
-                                                                                             2u};
+    const auto nested =
+        Phantom<Phantom<std::vector<uint32_t>, struct PhantomTest>, struct PhantomTest2>::create(
+            {1u, 2u});
+    const auto nested2 =
+        Phantom<Phantom<std::vector<uint32_t>, struct PhantomTest>, struct PhantomTest2>::create(
+            {1u, 2u});
 
     EXPECT_EQ(nested, nested2);
 
@@ -99,7 +109,7 @@ TEST(PhantomTest, TypeBehavior) {
     base(nested);
     baseRef(nested);
 
-    Phantom<std::vector<uint32_t>, struct PhantomTest> inner;
+    const auto inner = Phantom<std::vector<uint32_t>, struct PhantomTest>::create();
 
     static_assert(!std::__invokable<decltype(base), decltype(inner)>::value,
                   "cannot pass inner to parent func");
