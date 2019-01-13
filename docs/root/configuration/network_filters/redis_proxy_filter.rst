@@ -56,7 +56,7 @@ The Redis filter will gather statistics for commands in the
 
   total, Counter, Number of commands
   success, Counter, Number of commands that were successful
-  error, Counter, Number of commands that have resulted in errors
+  error, Counter, Number of commands that returned a partial or complete error response
 
 .. _config_network_filters_redis_proxy_per_command_stats:
 

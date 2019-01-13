@@ -416,6 +416,20 @@ message Cluster {
     // Deprecated settings from v1 config.
     // [#not-implemented-hide:] Hide from docs.
     DeprecatedV1 deprecated_v1 = 2 [deprecated = true];
+
+    // The hash function used to hash hosts onto the ketama ring.
+    enum HashFunction {
+      // Use `xxHash <https://github.com/Cyan4973/xxHash>`_, this is the default hash function.
+      XX_HASH = 0;
+      // Use `MurmurHash2 <https://sites.google.com/site/murmurhash/>`_, this is compatible with
+      // std:hash<string> in GNU libstdc++ 3.4.20 or above. This is typically the case when compiled
+      // on Linux and not macOS.
+      MURMUR_HASH_2 = 1;
+    }
+
+    // The hash function used to hash hosts onto the ketama ring. The value defaults to
+    // :ref:`XX_HASH<envoy_api_enum_value_Cluster.RingHashLbConfig.HashFunction.XX_HASH>`.
+    HashFunction hash_function = 3 [(validate.rules).enum.defined_only = true];
   }
 
   // Specific configuration for the
