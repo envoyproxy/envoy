@@ -62,7 +62,7 @@ protected:
   // Choose host set randomly, based on the per_priority_load_;
   HostSet& chooseHostSet(LoadBalancerContext* context);
 
-  uint32_t percentageLoad(uint32_t priority) const { return per_priority_load_[priority]; }
+  uint32_t percentageLoad(uint32_t priority) const { return per_priority_load_.get()[priority]; }
   bool isInPanic(uint32_t priority) const { return per_priority_panic_[priority]; }
 
   ClusterStats& stats_;
@@ -90,7 +90,8 @@ protected:
   // total of all priorities is 300%. Normalized total health is then capped at 100%.
   static uint32_t calcNormalizedTotalHealth(PriorityAvailability& per_priority_health) {
     return std::min<uint32_t>(
-        std::accumulate(per_priority_health.begin(), per_priority_health.end(), 0), 100);
+        std::accumulate(per_priority_health.get().begin(), per_priority_health.get().end(), 0),
+        100);
   }
   // The percentage load (0-100) for each priority level
   PriorityLoad per_priority_load_;
