@@ -4,7 +4,7 @@
 
 namespace Envoy {
 
-// A phantom type allows wrapping a common type with addtional type information in order to allow
+// A phantom type allows wrapping a common type with additional type information in order to allow
 // additional compile time safety when passing it around.
 template <class InnerT, class TagT> struct Phantom {
   Phantom() = default;
