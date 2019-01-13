@@ -1,9 +1,10 @@
 #pragma once
 
-#include "common/common/phantom.h"
+#include <stdint.h>
 
 #include <vector>
-#include <stdint.h>
+
+#include "common/common/phantom.h"
 
 namespace Envoy {
 namespace Upstream {
