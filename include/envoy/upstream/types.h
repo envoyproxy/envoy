@@ -4,7 +4,7 @@
 
 namespace Envoy {
 namespace Upstream {
- 
+
 // Phantom type indicating that the type is related to load.
 struct Load {};
 
@@ -18,9 +18,9 @@ typedef Phantom<std::vector<uint32_t>, Load> PriorityLoad;
 // Phantom type indicating that the type is related to host availability.
 struct Availability {};
 
-
-// Mapping from a priority how available the given priority is, eg. the ratio of healthy host to total hosts.
+// Mapping from a priority how available the given priority is, eg. the ratio of healthy host to
+// total hosts.
 typedef Phantom<std::vector<uint32_t>, Availability> PriorityAvailability;
 
-}
-}
+} // namespace Upstream
+} // namespace Envoy
