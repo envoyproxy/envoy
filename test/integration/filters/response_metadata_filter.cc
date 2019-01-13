@@ -81,8 +81,7 @@ public:
 class AddMetadataStreamFilterConfig
     : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
 public:
-  AddMetadataStreamFilterConfig()
-      : EmptyHttpFilterConfig("response-metadata-filter") {}
+  AddMetadataStreamFilterConfig() : EmptyHttpFilterConfig("response-metadata-filter") {}
 
   Http::FilterFactoryCb createFilter(const std::string&, Server::Configuration::FactoryContext&) {
     return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
