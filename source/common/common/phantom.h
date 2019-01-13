@@ -38,8 +38,6 @@ template <class I, class M, class S> struct constructibleFromList<Phantom<I, M>,
  * This template currently only works for non-primitive types due to its reliance on subclassing.
  */
 template <class I, class M> struct Phantom : I {
-  // We force construction through this method because interaction with initializer lists is not
-  // intuitive when interacting directly with the constructor.
   template <class... Args> static Phantom<I, M> create(Args&&... args) {
     return Phantom<I, M>(std::forward<Args>(args)...);
   }
@@ -62,9 +60,23 @@ template <class I, class M> struct Phantom : I {
   Phantom() : I() {}
 
 protected:
-  // This allows invoking any of the ctors of the inner class, based on the inferred type
-  // arguments to the Phantom ctor. This has consequences for how overload resolution works compared
-  // to the inner type, so we restrict direct access to the constructor to avoid confusion.
+  // This allows invoking any of the ctors of the inner class. Since this has consequences for how
+  // the initializer list works with overload resolution, we restrict access to this ctor to avoid
+  // confusion.
+  //
+  // For posterity's sake: the issue is that the initializer list is not forwarded even with perfect
+  // forwarding. The initializer list is inferred to a set of parameter types before forwarding,
+  // and there seems to be a difference in how the generic varags ctor is inferred vs the regular
+  // ctor. For example:
+  //
+  // This resolves to int&&, int&&, invokes size_t, const uint32_t& ctor:
+  // Phantom<std::vector<uint32_t>> p{1,2};
+  //
+  // This resolves to std::initializer_list<int, int>, invokes initalizer ctor:
+  // std::vector<uint32_t> v{1,2};
+  //
+  // This resolves to std::initializer_list<unsigned int, unsigned int>, invokes initalizer ctor:
+  // Phantom<std::vector<uint32_t>> p{1u,2u};
   //
   // To ensure that the phantom type is not implictly created from the ctors of the inner type,
   // these ctors are marked explicit.
