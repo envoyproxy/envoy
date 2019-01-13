@@ -522,8 +522,8 @@ public:
   virtual FilterTrailersStatus encodeTrailers(HeaderMap& trailers) PURE;
 
   /**
-   * Called with metadata to be encoded. New metadata can be added directly to metadata_map or
-   * through StreamDecoderFilterCallbacks::encodeMetadata() interface.
+   * Called with metadata to be encoded. New metadata should be added directly to metadata_map. DO
+   * NOT call StreamDecoderFilterCallbacks::encodeMetadata() interface to add new metadata.
    *
    * @param metadata_map supplies the metadata to be encoded.
    * @return FilterMetadataStatus, which currently is always FilterMetadataStatus::Continue;

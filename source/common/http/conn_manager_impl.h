@@ -404,7 +404,6 @@ private:
     HeaderMapPtr request_trailers_;
     std::list<ActiveStreamDecoderFilterPtr> decoder_filters_;
     std::list<ActiveStreamEncoderFilterPtr> encoder_filters_;
-    ActiveStreamEncoderFilter* current_encoder_filter_ = nullptr;
     std::list<AccessLog::InstanceSharedPtr> access_log_handlers_;
     Stats::TimespanPtr request_response_timespan_;
     // Per-stream idle timeout.
@@ -429,23 +428,6 @@ private:
     // Whether a filter has indicated that the response should be treated as a headers only
     // response.
     bool encoding_headers_only_{};
-  };
-
-  // CurrentEncoderFilterWrapper will restore the original value of *current_encoder_filter_pointer
-  // on destruction.
-  class CurrentEncoderFilterWrapper {
-  public:
-    CurrentEncoderFilterWrapper(ActiveStreamEncoderFilter** current_encoder_filter_pointer) {
-      saved_current_encoder_filter_ = *current_encoder_filter_pointer;
-      current_encoder_filter_pointer_ = current_encoder_filter_pointer;
-    }
-    ~CurrentEncoderFilterWrapper() {
-      *current_encoder_filter_pointer_ = saved_current_encoder_filter_;
-    }
-
-  private:
-    ActiveStreamEncoderFilter** current_encoder_filter_pointer_;
-    ActiveStreamEncoderFilter* saved_current_encoder_filter_;
   };
 
   typedef std::unique_ptr<ActiveStream> ActiveStreamPtr;

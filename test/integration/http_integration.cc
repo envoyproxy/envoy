@@ -2129,13 +2129,8 @@ void HttpIntegrationTest::testTrailers(uint64_t request_size, uint64_t response_
   }
 }
 
-static std::string response_metadata_insert_filter = R"EOF(
-name: response-metadata-insert-filter
-config: {}
-)EOF";
-
-static std::string response_metadata_consume_filter = R"EOF(
-name: response-metadata-consume-filter
+static std::string response_metadata_filter = R"EOF(
+name: response-metadata-filter
 config: {}
 )EOF";
 
@@ -2147,9 +2142,8 @@ void verifyExpectedMetadata(Http::MetadataMap metadata_map, std::set<std::string
   EXPECT_EQ(metadata_map.size(), keys.size());
 }
 
-// Adds metadata inserting filter before metadata consuming filter. Verify metadata are consumed.
-void HttpIntegrationTest::testInsertBeforeConsumeResponseMetadata() {
-  addFilters({response_metadata_insert_filter, response_metadata_consume_filter});
+void HttpIntegrationTest::testResponseMetadata() {
+  addFilters({response_metadata_filter});
   config_helper_.addConfigModifier(
       [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
           -> void { hcm.set_proxy_100_continue(true); });
@@ -2164,8 +2158,8 @@ void HttpIntegrationTest::testInsertBeforeConsumeResponseMetadata() {
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  // Verify metadata added in encodeHeaders(): "headers" and "duplicate".
-  std::set<std::string> expected_metadata_keys = {"headers", "duplicate"};
+  // Verify metadata added in encodeHeaders(): "headers", "duplicate" and "keep".
+  std::set<std::string> expected_metadata_keys = {"headers", "duplicate", "keep"};
   verifyExpectedMetadata(response->metadata_map(), expected_metadata_keys);
 
   // Upstream responds with headers and data.
@@ -2177,11 +2171,12 @@ void HttpIntegrationTest::testInsertBeforeConsumeResponseMetadata() {
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
   // Verify metadata added in encodeHeaders(): "headers" and "duplicate" and metadata added in
-  // encodeData(): "data" and "duplicate" are received by the client. Note that "remove" is consumed
-  // by response-metadata-consume-filter.
+  // encodeData(): "data" and "duplicate" are received by the client. Note that "remove" is
+  // consumed.
   expected_metadata_keys.insert("data");
   verifyExpectedMetadata(response->metadata_map(), expected_metadata_keys);
   EXPECT_EQ(response->keyCount("duplicate"), 2);
+  EXPECT_EQ(response->keyCount("keep"), 2);
 
   // Upstream responds with headers, data and trailers.
   response = codec_client_->makeRequestWithBody(default_request_headers_, 10);
@@ -2195,11 +2190,11 @@ void HttpIntegrationTest::testInsertBeforeConsumeResponseMetadata() {
   ASSERT_TRUE(response->complete());
   // Verify metadata added in encodeHeaders(): "headers" and "duplicate", and metadata added in
   // encodeData(): "data" and "duplicate", and metadata added in encodeTrailer(): "trailers" and
-  // "duplicate" are received by the client. Note that "remove" is consumed by
-  // response-metadata-consume-filter.
+  // "duplicate" are received by the client. Note that "remove" is consumed.
   expected_metadata_keys.insert("trailers");
   verifyExpectedMetadata(response->metadata_map(), expected_metadata_keys);
   EXPECT_EQ(response->keyCount("duplicate"), 3);
+  EXPECT_EQ(response->keyCount("keep"), 4);
 
   // Upstream responds with headers, 100-continue and data.
   response = codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "GET"},
@@ -2219,12 +2214,12 @@ void HttpIntegrationTest::testInsertBeforeConsumeResponseMetadata() {
   ASSERT_TRUE(response->complete());
   // Verify metadata added in encodeHeaders: "headers" and "duplicate", and metadata added in
   // encodeData(): "data" and "duplicate", and metadata added in encode100Continue(): "100-continue"
-  // and "duplicate" are received by the client. Note that "remove" is consumed by
-  // response-metadata-consume-filter.
+  // and "duplicate" are received by the client. Note that "remove" is consumed.
   expected_metadata_keys.erase("trailers");
   expected_metadata_keys.insert("100-continue");
   verifyExpectedMetadata(response->metadata_map(), expected_metadata_keys);
   EXPECT_EQ(response->keyCount("duplicate"), 4);
+  EXPECT_EQ(response->keyCount("keep"), 4);
 
   // Upstream responds with headers and metadata that will not be consumed.
   response = codec_client_->makeRequestWithBody(default_request_headers_, 10);
@@ -2240,13 +2235,12 @@ void HttpIntegrationTest::testInsertBeforeConsumeResponseMetadata() {
   ASSERT_TRUE(response->complete());
   // Verify metadata added in encodeHeaders(): "headers" and "duplicate", and metadata added in
   // encodeMetadata(): "aaa", "keep" and "duplicate" are received by the client. Note that "remove"
-  // is consumed by response-metadata-consume-filter.
+  // is consumed.
   expected_metadata_keys.erase("data");
   expected_metadata_keys.erase("100-continue");
-  expected_metadata_keys.insert("keep");
   expected_metadata_keys.insert("aaa");
   verifyExpectedMetadata(response->metadata_map(), expected_metadata_keys);
-  EXPECT_EQ(response->keyCount("duplicate"), 2);
+  EXPECT_EQ(response->keyCount("keep"), 2);
 
   // Upstream responds with headers, data and metadata that will be consumed.
   response = codec_client_->makeRequestWithBody(default_request_headers_, 10);
@@ -2263,140 +2257,13 @@ void HttpIntegrationTest::testInsertBeforeConsumeResponseMetadata() {
   ASSERT_TRUE(response->complete());
   // Verify metadata added in encodeHeaders(): "headers" and "duplicate", and metadata added in
   // encodeData(): "data", "duplicate", and metadata added in encodeMetadata(): "keep", "duplicate",
-  // "replace" are received by the client. Note that key "remove" and "consume" are consumed by
-  // response-metadata-consume-filter.
+  // "replace" are received by the client. Note that key "remove" and "consume" are consumed.
   expected_metadata_keys.erase("aaa");
   expected_metadata_keys.insert("data");
   expected_metadata_keys.insert("replace");
   verifyExpectedMetadata(response->metadata_map(), expected_metadata_keys);
-  EXPECT_EQ(response->keyCount("duplicate"), 3);
-}
-
-// Adds metadata consuming filter before metadata inserting filter. Verify no metadata is consumed.
-void HttpIntegrationTest::testConsumeBeforeInsertResponseMetadata() {
-  addFilters({response_metadata_consume_filter, response_metadata_insert_filter});
-  config_helper_.addConfigModifier(
-      [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
-          -> void { hcm.set_proxy_100_continue(true); });
-
-  initialize();
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  // Upstream responds with headers.
-  auto response = codec_client_->makeRequestWithBody(default_request_headers_, 10);
-  waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(default_response_headers_, true);
-
-  response->waitForEndStream();
-  ASSERT_TRUE(response->complete());
-  // Verify metadata added in encodeHeaders(): "headers", "duplicate" and "remove" are received by
-  // the client.
-  std::set<std::string> expected_metadata_keys = {"headers", "duplicate", "remove"};
-  verifyExpectedMetadata(response->metadata_map(), expected_metadata_keys);
-
-  // Upstream responds with headers and data.
-  response = codec_client_->makeRequestWithBody(default_request_headers_, 10);
-  waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(default_response_headers_, false);
-  upstream_request_->encodeData(100, true);
-
-  response->waitForEndStream();
-  ASSERT_TRUE(response->complete());
-  // Verify metadata added in encodeHeaders(): "headers", "duplicate" and "remove", and metadata
-  // added in encodeData(): "data", "duplicate" and "remove" are received by the client.
-  expected_metadata_keys.insert("data");
-  verifyExpectedMetadata(response->metadata_map(), expected_metadata_keys);
   EXPECT_EQ(response->keyCount("duplicate"), 2);
-  EXPECT_EQ(response->keyCount("remove"), 2);
-
-  // Upstream responds with headers, data and trailers.
-  response = codec_client_->makeRequestWithBody(default_request_headers_, 10);
-  waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(default_response_headers_, false);
-  upstream_request_->encodeData(10, false);
-  Http::TestHeaderMapImpl response_trailers{{"response", "trailer"}};
-  upstream_request_->encodeTrailers(response_trailers);
-
-  response->waitForEndStream();
-  ASSERT_TRUE(response->complete());
-  // Verify metadata added in encodeHeaders(): "headers", "duplicate" and "remove", and metadata
-  // added in encodeData(): "data", "duplicate" and "remove", and metadata added  in encodeTrailer()
-  // : "trailers", "duplicate", "remove" are received by the client.
-  expected_metadata_keys.insert("trailers");
-  verifyExpectedMetadata(response->metadata_map(), expected_metadata_keys);
-  EXPECT_EQ(response->keyCount("duplicate"), 3);
-  EXPECT_EQ(response->keyCount("remove"), 3);
-
-  // Upstream responds with headers, 100-continue and data.
-  response = codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "GET"},
-                                                                        {":path", "/dynamo/url"},
-                                                                        {":scheme", "http"},
-                                                                        {":authority", "host"},
-                                                                        {"expect", "100-continue"}},
-                                                10);
-
-  waitForNextUpstreamRequest();
-  upstream_request_->encode100ContinueHeaders(Http::TestHeaderMapImpl{{":status", "100"}});
-  response->waitForContinueHeaders();
-  upstream_request_->encodeHeaders(default_response_headers_, false);
-  upstream_request_->encodeData(100, true);
-
-  response->waitForEndStream();
-  ASSERT_TRUE(response->complete());
-  // Verify metadata added in encodeHeaders(): "headers", "duplicate", "remove", and metadata added
-  // in encodeData(): "data", "duplicate", "remove", and metadata added in encode100Continue():
-  // "100-continue", "duplicate", "remove" are received by the client.
-  expected_metadata_keys.erase("trailers");
-  expected_metadata_keys.insert("100-continue");
-  verifyExpectedMetadata(response->metadata_map(), expected_metadata_keys);
-  EXPECT_EQ(response->keyCount("duplicate"), 4);
-  EXPECT_EQ(response->keyCount("remove"), 3);
-
-  // Upstream responds with headers and  metadata that will not be consumed.
-  response = codec_client_->makeRequestWithBody(default_request_headers_, 10);
-  waitForNextUpstreamRequest();
-  Http::MetadataMap metadata_map = {{"aaa", "aaa"}};
-  Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
-  Http::MetadataMapVector metadata_map_vector;
-  metadata_map_vector.push_back(std::move(metadata_map_ptr));
-  upstream_request_->encodeMetadata(metadata_map_vector);
-  upstream_request_->encodeHeaders(default_response_headers_, true);
-
-  response->waitForEndStream();
-  ASSERT_TRUE(response->complete());
-  // Verify metadata added in encodeHeaders(): "headers", "duplicate" and "remove", and metadata
-  // added in encodeMetadata(): "aaa", "keep", "duplicate" and "metadata" are received by the
-  // client.
-  expected_metadata_keys.erase("data");
-  expected_metadata_keys.erase("100-continue");
-  expected_metadata_keys.insert("keep");
-  expected_metadata_keys.insert("metadata");
-  expected_metadata_keys.insert("aaa");
-  verifyExpectedMetadata(response->metadata_map(), expected_metadata_keys);
-  EXPECT_EQ(response->keyCount("duplicate"), 2);
-
-  // Upstream responds with headers, data and  metadata that will be consumed.
-  response = codec_client_->makeRequestWithBody(default_request_headers_, 10);
-  waitForNextUpstreamRequest();
-  metadata_map = {{"consume", "consume"}, {"remove", "remove"}};
-  metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
-  metadata_map_vector.clear();
-  metadata_map_vector.push_back(std::move(metadata_map_ptr));
-  upstream_request_->encodeMetadata(metadata_map_vector);
-  upstream_request_->encodeHeaders(default_response_headers_, false);
-  upstream_request_->encodeData(100, true);
-
-  response->waitForEndStream();
-  ASSERT_TRUE(response->complete());
-  // Verify metadata added in encodeHeaders():  "headers", "duplicate" and "remove", and metadata
-  // added in encodeData(): "data", "duplicate" and "remove", and metadata added in encodeMetadata()
-  // :"keep", "duplicate", "replace" are received by the client.
-  expected_metadata_keys.erase("aaa");
-  expected_metadata_keys.insert("data");
-  expected_metadata_keys.insert("replace");
-  verifyExpectedMetadata(response->metadata_map(), expected_metadata_keys);
-  EXPECT_EQ(response->keyCount("duplicate"), 3);
-  EXPECT_EQ(response->keyCount("remove"), 2);
+  EXPECT_EQ(response->keyCount("keep"), 3);
 }
 
 std::string HttpIntegrationTest::listenerStatPrefix(const std::string& stat_name) {

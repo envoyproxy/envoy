@@ -9,9 +9,10 @@
 
 namespace Envoy {
 
-// A filter tests response metadata inserting. The filter inserts new
-// metadata when encodeHeaders/Data/Trailers/100ContinueHeaders/Metadata() are called.
-class ResponseMetadataInsertStreamFilter : public Http::PassThroughFilter {
+// A filter tests response metadata process. The filter inserts new
+// metadata when encodeHeaders/Data/Trailers/100ContinueHeaders/Metadata() are called, and consumes
+// metadata in encodeMetadata().
+class ResponseMetadataStreamFilter : public Http::PassThroughFilter {
 public:
   // Inserts one new metadata_map.
   Http::FilterHeadersStatus encodeHeaders(Http::HeaderMap&, bool) override {
@@ -54,38 +55,44 @@ public:
     return Http::FilterHeadersStatus::Continue;
   }
 
-  // Uses two ways to insert new metadata: (1) add new metadata to metadata_map directly. (2) add
-  // new metadata by calling decoder_callbacks_->encodeMetadata() twice.
+  // Adds new metadata to metadata_map directly, and consumes metadata when the keys are equal to
+  // remove and metadata. If the key is equal to consume, replaces it with replace.
   Http::FilterMetadataStatus encodeMetadata(Http::MetadataMap& metadata_map) override {
-    // Add new metadata to metadata_map directly.
+    // Adds new metadata to metadata_map directly.
     metadata_map.emplace("keep", "keep");
-    // Add new metadata by calling encodeMetadata().
-    Http::MetadataMap new_metadata_map = {{"metadata", "metadata"}};
-    Http::MetadataMapPtr new_metadata_map_ptr =
-        std::make_unique<Http::MetadataMap>(new_metadata_map);
-    decoder_callbacks_->encodeMetadata(std::move(new_metadata_map_ptr));
-    new_metadata_map = {{"duplicate", "duplicate"}};
-    new_metadata_map_ptr = std::make_unique<Http::MetadataMap>(new_metadata_map);
-    decoder_callbacks_->encodeMetadata(std::move(new_metadata_map_ptr));
+    // Consumes metadata.
+    auto it = metadata_map.find("consume");
+    if (it != metadata_map.end()) {
+      metadata_map.erase("consume");
+      metadata_map.emplace("replace", "replace");
+    }
+    it = metadata_map.find("remove");
+    if (it != metadata_map.end()) {
+      metadata_map.erase("remove");
+    }
+    it = metadata_map.find("metadata");
+    if (it != metadata_map.end()) {
+      metadata_map.erase("metadata");
+    }
     return Http::FilterMetadataStatus::Continue;
   }
 };
 
-class AddMetadataInsertStreamFilterConfig
+class AddMetadataStreamFilterConfig
     : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
 public:
-  AddMetadataInsertStreamFilterConfig()
-      : EmptyHttpFilterConfig("response-metadata-insert-filter") {}
+  AddMetadataStreamFilterConfig()
+      : EmptyHttpFilterConfig("response-metadata-filter") {}
 
   Http::FilterFactoryCb createFilter(const std::string&, Server::Configuration::FactoryContext&) {
     return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-      callbacks.addStreamFilter(std::make_shared<::Envoy::ResponseMetadataInsertStreamFilter>());
+      callbacks.addStreamFilter(std::make_shared<::Envoy::ResponseMetadataStreamFilter>());
     };
   }
 };
 
 // perform static registration
-static Registry::RegisterFactory<AddMetadataInsertStreamFilterConfig,
+static Registry::RegisterFactory<AddMetadataStreamFilterConfig,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
     register_;
 
