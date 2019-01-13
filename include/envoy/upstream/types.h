@@ -2,6 +2,9 @@
 
 #include "common/common/phantom.h"
 
+#include <vector>
+#include <stdint.h>
+
 namespace Envoy {
 namespace Upstream {
 
