@@ -25,6 +25,7 @@
 
 #include "test/test_common/printers.h"
 
+#include "absl/time/time.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -256,9 +257,9 @@ public:
   /**
    * Returns a "novel" IPv4 loopback address, if available.
    * For many tests, we want a loopback address other than 127.0.0.1 where possible. For some
-   * platforms such as OSX, only 127.0.0.1 is available for IPv4 loopback.
+   * platforms such as macOS, only 127.0.0.1 is available for IPv4 loopback.
    *
-   * @return string 127.0.0.x , where x is "1" for OSX and "9" otherwise.
+   * @return string 127.0.0.x , where x is "1" for macOS and "9" otherwise.
    */
   static std::string getIpv4Loopback() {
 #ifdef __APPLE__
@@ -304,7 +305,11 @@ public:
     return result;
   }
 
-  static std::tm parseTimestamp(const std::string& format, const std::string& time_str);
+  static absl::Time parseTime(const std::string& input, const std::string& input_format);
+  static std::string formatTime(const absl::Time input, const std::string& output_format);
+  static std::string formatTime(const SystemTime input, const std::string& output_format);
+  static std::string convertTime(const std::string& input, const std::string& input_format,
+                                 const std::string& output_format);
 
   static constexpr std::chrono::milliseconds DefaultTimeout = std::chrono::milliseconds(10000);
 

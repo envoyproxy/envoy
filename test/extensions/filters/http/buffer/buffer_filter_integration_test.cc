@@ -21,7 +21,7 @@ TEST_P(BufferIntegrationTest, RouterRequestAndResponseWithGiantBodyBuffer) {
 
 TEST_P(BufferIntegrationTest, RouterHeaderOnlyRequestAndResponseBuffer) {
   config_helper_.addFilter(ConfigHelper::DEFAULT_BUFFER_FILTER);
-  testRouterHeaderOnlyRequestAndResponse(true);
+  testRouterHeaderOnlyRequestAndResponse();
 }
 
 TEST_P(BufferIntegrationTest, RouterRequestAndResponseWithBodyBuffer) {
@@ -74,6 +74,7 @@ TEST_P(BufferIntegrationTest, RouteDisabled) {
   ConfigHelper::HttpModifierFunction mod = overrideConfig(R"EOF({"disabled": true})EOF");
   config_helper_.addConfigModifier(mod);
   config_helper_.addFilter(ConfigHelper::SMALL_BUFFER_FILTER);
+  config_helper_.setBufferLimits(1024, 1024);
 
   initialize();
 
@@ -96,8 +97,7 @@ TEST_P(BufferIntegrationTest, RouteDisabled) {
 
 TEST_P(BufferIntegrationTest, RouteOverride) {
   ConfigHelper::HttpModifierFunction mod = overrideConfig(R"EOF({"buffer": {
-    "max_request_bytes": 5242880,
-    "max_request_time": {"seconds": 120}
+    "max_request_bytes": 5242880
   }})EOF");
   config_helper_.addConfigModifier(mod);
   config_helper_.addFilter(ConfigHelper::SMALL_BUFFER_FILTER);

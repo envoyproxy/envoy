@@ -73,7 +73,6 @@ envoy_cc_library(
     hdrs = ["rds_impl.h"],
     deps = [
         ":config_lib",
-        ":rds_subscription_lib",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/http:codes_interface",
         "//include/envoy/init:init_interface",
@@ -91,23 +90,6 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/admin/v2alpha:config_dump_cc",
         "@envoy_api//envoy/api/v2:rds_cc",
-        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:http_connection_manager_cc",
-    ],
-)
-
-envoy_cc_library(
-    name = "rds_subscription_lib",
-    srcs = ["rds_subscription.cc"],
-    hdrs = ["rds_subscription.h"],
-    deps = [
-        "//include/envoy/config:subscription_interface",
-        "//include/envoy/stats:stats_interface",
-        "//source/common/common:assert_lib",
-        "//source/common/config:rds_json_lib",
-        "//source/common/config:utility_lib",
-        "//source/common/http:headers_lib",
-        "//source/common/http:rest_api_fetcher_lib",
-        "//source/common/json:json_loader_lib",
         "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:http_connection_manager_cc",
     ],
 )

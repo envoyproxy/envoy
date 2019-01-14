@@ -31,11 +31,11 @@ void SplitRequestBase::onWrongNumberOfArguments(SplitCallbacks& callbacks,
       fmt::format("wrong number of arguments for '{}' command", request.asArray()[0].asString())));
 }
 
-void SplitRequestBase::updateStats(const bool failure = false) {
-  if (failure) {
-    command_stats_.error_.inc();
-  } else {
+void SplitRequestBase::updateStats(const bool success) {
+  if (success) {
     command_stats_.success_.inc();
+  } else {
+    command_stats_.error_.inc();
   }
   std::chrono::milliseconds latency = std::chrono::duration_cast<std::chrono::milliseconds>(
       time_source_.monotonicTime() - start_time_);
@@ -46,13 +46,13 @@ SingleServerRequest::~SingleServerRequest() { ASSERT(!handle_); }
 
 void SingleServerRequest::onResponse(RespValuePtr&& response) {
   handle_ = nullptr;
-  updateStats();
+  updateStats(true);
   callbacks_.onResponse(std::move(response));
 }
 
 void SingleServerRequest::onFailure() {
   handle_ = nullptr;
-  updateStats(true);
+  updateStats(false);
   callbacks_.onResponse(Utility::makeError(Response::get().UpstreamFailure));
 }
 
@@ -186,7 +186,7 @@ void MGETRequest::onChildResponse(RespValuePtr&& value, uint32_t index) {
 
   ASSERT(num_pending_responses_ > 0);
   if (--num_pending_responses_ == 0) {
-    updateStats(error_count_ != 0);
+    updateStats(error_count_ == 0);
     ENVOY_LOG(debug, "redis: response: '{}'", pending_response_->toString());
     callbacks_.onResponse(std::move(pending_response_));
   }
@@ -254,7 +254,7 @@ void MSETRequest::onChildResponse(RespValuePtr&& value, uint32_t index) {
 
   ASSERT(num_pending_responses_ > 0);
   if (--num_pending_responses_ == 0) {
-    updateStats(error_count_ != 0);
+    updateStats(error_count_ == 0);
     if (error_count_ == 0) {
       pending_response_->asString() = Response::get().OK;
       callbacks_.onResponse(std::move(pending_response_));
@@ -320,7 +320,7 @@ void SplitKeysSumResultRequest::onChildResponse(RespValuePtr&& value, uint32_t i
 
   ASSERT(num_pending_responses_ > 0);
   if (--num_pending_responses_ == 0) {
-    updateStats(error_count_ != 0);
+    updateStats(error_count_ == 0);
     if (error_count_ == 0) {
       pending_response_->asInteger() = total_;
       callbacks_.onResponse(std::move(pending_response_));
@@ -338,7 +338,6 @@ InstanceImpl::InstanceImpl(ConnPool::InstancePtr&& conn_pool, Stats::Scope& scop
       split_keys_sum_result_handler_(*conn_pool_),
       stats_{ALL_COMMAND_SPLITTER_STATS(POOL_COUNTER_PREFIX(scope, stat_prefix + "splitter."))},
       time_source_(time_source) {
-  // TODO(mattklein123) PERF: Make this a trie (like in header_map_impl).
   for (const std::string& command : SupportedCommands::simpleCommands()) {
     addHandler(scope, stat_prefix, command, simple_command_handler_);
   }
@@ -386,18 +385,17 @@ SplitRequestPtr InstanceImpl::makeRequest(const RespValue& request, SplitCallbac
     }
   }
 
-  auto handler = command_map_.find(to_lower_string);
-  if (handler == command_map_.end()) {
+  auto handler = handler_lookup_table_.find(to_lower_string.c_str());
+  if (handler == nullptr) {
     stats_.unsupported_command_.inc();
     callbacks.onResponse(Utility::makeError(
         fmt::format("unsupported command '{}'", request.asArray()[0].asString())));
     return nullptr;
   }
-
   ENVOY_LOG(debug, "redis: splitting '{}'", request.toString());
-  handler->second.command_stats_.total_.inc();
-  SplitRequestPtr request_ptr = handler->second.handler_.get().startRequest(
-      request, callbacks, handler->second.command_stats_, time_source_);
+   handler->command_stats_.total_.inc();
+  SplitRequestPtr request_ptr = handler->handler_.get().startRequest(
+      request, callbacks, handler->command_stats_, time_source_);
   return request_ptr;
 }
 
@@ -410,15 +408,15 @@ void InstanceImpl::addHandler(Stats::Scope& scope, const std::string& stat_prefi
                               const std::string& name, CommandHandler& handler) {
   std::string to_lower_name(name);
   to_lower_table_.toLowerCase(to_lower_name);
-  command_map_.emplace(
-      to_lower_name,
-      HandlerData{
+    handler_lookup_table_.add(
+      to_lower_name.c_str(),
+      std::make_shared<HandlerData>(HandlerData{
           CommandStats{
               scope.counter(fmt::format("{}command.{}.total", stat_prefix, to_lower_name)),
               scope.counter(fmt::format("{}command.{}.success", stat_prefix, to_lower_name)),
               scope.counter(fmt::format("{}command.{}.error", stat_prefix, to_lower_name)),
               scope.histogram(fmt::format("{}command.{}.latency", stat_prefix, to_lower_name))},
-          handler});
+          handler}));
 }
 
 } // namespace CommandSplitter
