@@ -8,8 +8,8 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace MySQLProxy {
 
-void ClientSwitchResponse::setAuthPluginResp(std::string& auth_plugin_resp_) {
-  auth_plugin_resp_.assign(auth_plugin_resp_);
+void ClientSwitchResponse::setAuthPluginResp(std::string& auth_plugin_resp) {
+  auth_plugin_resp_.assign(auth_plugin_resp);
 }
 
 int ClientSwitchResponse::parseMessage(Buffer::Instance&, uint64_t&, int) { return MYSQL_SUCCESS; }
@@ -18,8 +18,7 @@ std::string ClientSwitchResponse::encode() {
   Buffer::InstancePtr buffer(new Buffer::OwnedImpl());
 
   BufferHelper::addString(*buffer, auth_plugin_resp_);
-  std::string e_string = buffer->toString();
-  return e_string;
+  return buffer->toString();
 }
 
 } // namespace MySQLProxy

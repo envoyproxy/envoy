@@ -17,7 +17,7 @@ void DecoderImpl::parseMessage(Buffer::Instance& message, uint64_t& offset, int 
 
   // Expect Server Challenge packet
   case MySQLSession::State::MYSQL_INIT: {
-    ServerGreeting greeting{};
+    ServerGreeting greeting;
     greeting.decode(message, offset, seq, len);
     callbacks_.onServerGreeting(greeting);
 
@@ -98,12 +98,11 @@ void DecoderImpl::parseMessage(Buffer::Instance& message, uint64_t& offset, int 
     // re-sync to MYSQL_REQ state
     // expected seq check succeeded, no need to verify
     session_.setState(MySQLSession::State::MYSQL_REQ);
-    goto mysql_request_state;
+    FALLTHRU;
   }
 
   // Process Command
   case MySQLSession::State::MYSQL_REQ: {
-  mysql_request_state:
     Command command{};
     command.decode(message, offset, seq, len);
     callbacks_.onCommand(command);

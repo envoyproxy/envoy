@@ -61,7 +61,7 @@ void MySQLFilter::doDecode(Buffer::Instance& buffer) {
 }
 
 DecoderPtr MySQLFilter::createDecoder(DecoderCallbacks& callbacks) {
-  return DecoderPtr{new DecoderImpl(callbacks)};
+  return std::make_unique<DecoderImpl>(callbacks);
 }
 
 void MySQLFilter::onProtocolError() { config_->stats_.protocol_errors_.inc(); }
