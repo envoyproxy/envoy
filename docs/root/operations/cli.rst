@@ -31,11 +31,6 @@ following are the command line options that Envoy supports.
 
       ./envoy -c bootstrap.yaml --config-yaml "node: {id: 'node1'}"
 
-.. option:: --v2-config-only
-
-  *(deprecated)* This flag used to allow opting into only using a
-  :ref:`v2 bootstrap configuration file <config_overview_v2_bootstrap>`. This is now set by default.
-
 .. option:: --mode <string>
 
   *(optional)* One of the operating modes for Envoy:
