@@ -225,15 +225,30 @@ void TestUtility::createSymlink(const std::string& target, const std::string& li
 }
 
 // static
-std::tm TestUtility::parseTimestamp(const std::string& format, const std::string& time_str) {
-  std::tm timestamp{};
-  std::istringstream text(time_str);
+absl::Time TestUtility::parseTime(const std::string& input, const std::string& input_format) {
+  absl::Time time;
+  std::string error;
+  EXPECT_TRUE(absl::ParseTime(input_format, input, &time, &error))
+      << " error \"" << error << "\" from failing to parse timestamp \"" << input
+      << "\" with format string \"" << input_format << "\"";
+  return time;
+}
 
-  text >> std::get_time(&timestamp, format.c_str());
+// static
+std::string TestUtility::formatTime(const absl::Time input, const std::string& output_format) {
+  static const absl::TimeZone utc = absl::UTCTimeZone();
+  return absl::FormatTime(output_format, input, utc);
+}
 
-  EXPECT_FALSE(text.fail()) << " from failing to parse timestamp \"" << time_str
-                            << "\" with format string \"" << format << "\"";
-  return timestamp;
+// static
+std::string TestUtility::formatTime(const SystemTime input, const std::string& output_format) {
+  return TestUtility::formatTime(absl::FromChrono(input), output_format);
+}
+
+// static
+std::string TestUtility::convertTime(const std::string& input, const std::string& input_format,
+                                     const std::string& output_format) {
+  return TestUtility::formatTime(TestUtility::parseTime(input, input_format), output_format);
 }
 
 void ConditionalInitializer::setReady() {

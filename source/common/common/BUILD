@@ -165,6 +165,11 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "phantom",
+    hdrs = ["phantom.h"],
+)
+
+envoy_cc_library(
     name = "stl_helpers",
     hdrs = ["stl_helpers.h"],
 )

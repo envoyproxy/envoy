@@ -51,9 +51,12 @@ envoy_cc_library(
     deps = [
         ":check_request_utils_lib",
         ":ext_authz_interface",
+        "//include/envoy/upstream:cluster_manager_interface",
+        "//source/common/common:matchers_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/http:async_client_lib",
         "//source/common/http:codes_lib",
+        "@envoy_api//envoy/config/filter/http/ext_authz/v2alpha:ext_authz_cc",
     ],
 )
 
