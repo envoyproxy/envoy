@@ -22,19 +22,13 @@ namespace NetworkFilters {
 namespace DubboProxy {
 namespace Router {
 
-class Utility {
-public:
-  static bool isContainWildcard(const std::string& input);
-  static bool wildcardMatch(const char* input, const char* pattern);
-};
-
 class RouteEntryImplBase : public RouteEntry,
                            public Route,
                            public std::enable_shared_from_this<RouteEntryImplBase>,
                            public Logger::Loggable<Logger::Id::dubbo> {
 public:
   RouteEntryImplBase(const envoy::config::filter::network::dubbo_proxy::v2alpha1::Route& route);
-  virtual ~RouteEntryImplBase() {}
+  virtual ~RouteEntryImplBase() = default;
 
   // Router::RouteEntry
   const std::string& clusterName() const override;
@@ -106,7 +100,6 @@ public:
     std::string value_;
     envoy::type::Int64Range range_;
     uint32_t index_;
-    std::string type_;
   };
 
   // RoutEntryImplBase
@@ -146,7 +139,7 @@ public:
 
 private:
   std::vector<RouteEntryImplBaseConstSharedPtr> routes_;
-  const std::string interface_name_;
+  const std::string service_name_;
   const absl::optional<std::string> group_;
   const absl::optional<std::string> version_;
 };

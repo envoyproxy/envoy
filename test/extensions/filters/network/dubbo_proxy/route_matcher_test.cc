@@ -6,6 +6,7 @@
 #include "common/protobuf/protobuf.h"
 
 #include "extensions/filters/network/dubbo_proxy/router/route_matcher.h"
+#include "extensions/filters/network/dubbo_proxy/utility.h"
 
 #include "gtest/gtest.h"
 
@@ -261,7 +262,6 @@ routes:
         name: add
         params_match:
         - index: 0
-          type: int
           range_match:
             start: 100
             end: 200
@@ -290,7 +290,6 @@ routes:
         name: add
         params_match:
         - index: 1
-          type: string
           exact_match: "user_id:94562"
     route:
         cluster: user_service_dubbo_server
@@ -360,7 +359,6 @@ route_config:
             name: add
             params_match:
             - index: 1
-              type: string
               exact_match: "user_id"
         route:
             cluster: user_service_dubbo_server

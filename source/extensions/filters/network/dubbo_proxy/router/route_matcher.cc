@@ -4,50 +4,19 @@
 
 #include "common/protobuf/utility.h"
 
+#include "extensions/filters/network/dubbo_proxy/utility.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace DubboProxy {
 namespace Router {
 
-bool Utility::isContainWildcard(const std::string& input) {
-  return (input.find('*') != std::string::npos) || (input.find('?') != std::string::npos);
-}
-
-bool Utility::wildcardMatch(const char* input, const char* pattern) {
-  while (*pattern) {
-    if (*pattern == '?') {
-      if (!*input) {
-        return false;
-      }
-
-      ++input;
-      ++pattern;
-    } else if (*pattern == '*') {
-      if (wildcardMatch(input, pattern + 1)) {
-        return true;
-      }
-
-      if (*input && wildcardMatch(input + 1, pattern)) {
-        return true;
-      }
-
-      return false;
-    } else {
-      if (*input++ != *pattern++) {
-        return false;
-      }
-    }
-  }
-
-  return !*input && !*pattern;
-}
-
 RouteEntryImplBase::RouteEntryImplBase(
     const envoy::config::filter::network::dubbo_proxy::v2alpha1::Route& route)
     : cluster_name_(route.route().cluster()) {
   for (const auto& header_map : route.match().headers()) {
-    config_headers_.push_back(header_map);
+    config_headers_.emplace_back(header_map);
   }
 
   if (route.route().cluster_specifier_case() ==
@@ -140,7 +109,6 @@ RouteConstSharedPtr ParameterRouteEntryImpl::matches(const MessageMetadata& meta
 
 ParameterRouteEntryImpl::ParameterData::ParameterData(const ParameterConfig& config) {
   index_ = config.index();
-  type_ = config.type();
   switch (config.parameter_match_specifier_case()) {
   case ParameterConfig::kExactMatch:
     match_type_ = Http::HeaderUtility::HeaderMatchType::Value;
@@ -212,7 +180,7 @@ RouteConstSharedPtr MethodRouteEntryImpl::matches(const MessageMetadata& metadat
 }
 
 RouteMatcher::RouteMatcher(const RouteConfig& config)
-    : interface_name_(config.interface()), group_(config.group()), version_(config.version()) {
+    : service_name_(config.interface()), group_(config.group()), version_(config.version()) {
   using envoy::config::filter::network::dubbo_proxy::v2alpha1::RouteMatch;
 
   for (const auto& route : config.routes()) {
@@ -230,7 +198,7 @@ RouteMatcher::RouteMatcher(const RouteConfig& config)
 
 RouteConstSharedPtr RouteMatcher::route(const MessageMetadata& metadata,
                                         uint64_t random_value) const {
-  if (interface_name_ == metadata.service_name() &&
+  if (service_name_ == metadata.service_name() &&
       (group_.value().empty() ||
        (metadata.service_group().has_value() && metadata.service_group().value() == group_)) &&
       (version_.value().empty() || (metadata.service_version().has_value() &&
@@ -259,7 +227,6 @@ MultiRouteMatcher::MultiRouteMatcher(const RouteConfigList& route_config_list) {
 RouteConstSharedPtr MultiRouteMatcher::route(const MessageMetadata& metadata,
                                              uint64_t random_value) const {
   for (const auto& route_matcher : route_matcher_list_) {
-    ENVOY_LOG(debug, "dubbo route matcher: route matching failed");
     auto route = route_matcher->route(metadata, random_value);
     if (nullptr != route) {
       return route;

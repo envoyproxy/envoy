@@ -161,3 +161,9 @@ envoy_cc_library(
         "//include/envoy/stats:stats_macros",
     ],
 )
+
+envoy_cc_library(
+    name = "utility_lib",
+    srcs = ["utility.cc"],
+    hdrs = ["utility.h"],
+)
