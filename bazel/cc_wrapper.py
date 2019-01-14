@@ -35,6 +35,16 @@ def main():
   if envoy_cxxflags and sys.argv[1:5] == ["-E", "-xc++", "-", "-v"]:
     os.execv(compiler, [compiler] + sys.argv[1:] + envoy_cxxflags.split(" "))
 
+  # `g++` and `gcc -lstdc++` have similar behavior and Bazel treats them as
+  # interchangeable, but `gcc` will ignore the `-static-libstdc++` flag.
+  # This check lets Envoy statically link against libstdc++ to be more
+  # portable between installed glibc versions.
+  #
+  # Similar behavior exists for Clang's `-stdlib=libc++` flag, so we handle
+  # it in the same test.
+  if "-static-libstdc++" in sys.argv[1:] or "-stdlib=libc++" in sys.argv[1:]:
+    compiler = envoy_real_cxx
+
   # Append CXXFLAGS to all C++ targets (this is mostly for dependencies).
   if envoy_cxxflags and "-std=c++" in str(sys.argv[1:]):
     argv = envoy_cxxflags.split(" ")
@@ -72,13 +82,7 @@ def main():
     argv.append("-fno-limit-debug-info")
     argv.append("-Wthread-safety")
     argv.append("-Wgnu-conditional-omitted-operand")
-  elif "gcc" in compiler:
-    # `g++` and `gcc -lstdc++` have similar behavior and Bazel treats them as
-    # interchangeable, but `gcc` will ignore the `-static-libstdc++` flag.
-    # This check lets Envoy statically link against libstdc++ to be more
-    # portable between installed glibc versions.
-    if "-static-libstdc++" in sys.argv[1:]:
-      compiler = envoy_real_cxx
+  elif "gcc" in compiler or "g++" in compiler:
     # -Wmaybe-initialized is warning about many uses of absl::optional. Disable
     # to prevent build breakage. This option does not exist in clang, so setting
     # it in clang builds causes a build error because of unknown command line
