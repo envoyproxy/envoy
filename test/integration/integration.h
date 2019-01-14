@@ -238,6 +238,10 @@ protected:
   // True if test will use a fixed RNG value.
   bool deterministic_{};
 
+  // Set true when your test will itself take care of ensuring listeners are up, and registering
+  // them in the port_map_.
+  bool defer_listener_finalization_{false};
+
 private:
   // The type for the Envoy-to-backend connection
   FakeHttpConnection::Type upstream_protocol_{FakeHttpConnection::Type::HTTP1};
