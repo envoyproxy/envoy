@@ -1,7 +1,6 @@
+load("@bazel_tools//tools/cpp:cc_configure.bzl", _upstream_cc_autoconf_impl = "cc_autoconf_impl")
 load("@bazel_tools//tools/cpp:lib_cc_configure.bzl", "get_cpu_value")
-load("@bazel_tools//tools/cpp:windows_cc_configure.bzl", "configure_windows_toolchain")
-load("@bazel_tools//tools/cpp:osx_cc_configure.bzl", "configure_osx_toolchain")
-load("//bazel:unix_cc_configure.bzl", "configure_unix_toolchain", "find_cc")
+load("@bazel_tools//tools/cpp:unix_cc_configure.bzl", "find_cc")
 
 # Stub for `repository_ctx.which()` that always succeeds. See comments in
 # `_find_cxx` for details.
@@ -80,16 +79,7 @@ def cc_autoconf_impl(repository_ctx):
     if _needs_envoy_cc_wrapper(repository_ctx):
         # Bazel uses "gcc" as a generic name for all C and C++ compilers.
         overriden_tools["gcc"] = _build_envoy_cc_wrapper(repository_ctx)
-
-    # TODO(PiotrSikora): migrate back to upstream's configure_unix_toolchain once BAZEL_CXXOPTS
-    # are part of a release. See: https://github.com/bazelbuild/bazel/pull/7074
-    cpu_value = get_cpu_value(repository_ctx)
-    if cpu_value == "x64_windows":
-        configure_windows_toolchain(repository_ctx)
-    elif cpu_value == "darwin":
-        configure_osx_toolchain(repository_ctx, overriden_tools)
-    else:
-        configure_unix_toolchain(repository_ctx, cpu_value, overriden_tools)
+    return _upstream_cc_autoconf_impl(repository_ctx, overriden_tools = overriden_tools)
 
 cc_autoconf = repository_rule(
     implementation = cc_autoconf_impl,
@@ -101,7 +91,6 @@ cc_autoconf = repository_rule(
         "ABI_VERSION",
         "BAZEL_COMPILER",
         "BAZEL_HOST_SYSTEM",
-        "BAZEL_CXXOPTS",
         "BAZEL_LINKOPTS",
         "BAZEL_PYTHON",
         "BAZEL_SH",
@@ -109,19 +98,20 @@ cc_autoconf = repository_rule(
         "BAZEL_TARGET_LIBC",
         "BAZEL_TARGET_SYSTEM",
         "BAZEL_USE_CPP_ONLY_TOOLCHAIN",
+        "BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN",
+        "BAZEL_USE_LLVM_NATIVE_COVERAGE",
         "BAZEL_VC",
         "BAZEL_VS",
+        "BAZEL_LLVM",
+        "USE_CLANG_CL",
         "CC",
         "CXX",
+        "CXXFLAGS",
         "CC_CONFIGURE_DEBUG",
         "CC_TOOLCHAIN_NAME",
         "CPLUS_INCLUDE_PATH",
-        "CUDA_COMPUTE_CAPABILITIES",
-        "CUDA_PATH",
+        "GCOV",
         "HOMEBREW_RUBY_PATH",
-        "NO_WHOLE_ARCHIVE_OPTION",
-        "USE_DYNAMIC_CRT",
-        "USE_MSVC_WRAPPER",
         "SYSTEMROOT",
         "VS90COMNTOOLS",
         "VS100COMNTOOLS",
