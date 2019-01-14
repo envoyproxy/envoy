@@ -45,16 +45,15 @@ def main():
   if "-static-libstdc++" in sys.argv[1:] or "-stdlib=libc++" in sys.argv[1:]:
     compiler = envoy_real_cxx
 
-  # Append CXXFLAGS to all C++ targets (this is mostly for dependencies).
-  if envoy_cxxflags and "-std=c++" in str(sys.argv[1:]):
-    argv = envoy_cxxflags.split(" ")
-  else:
-    argv = []
-
   # Either:
   # a) remove all occurrences of -lstdc++ (when statically linking against libstdc++),
   # b) replace all occurrences of -lstdc++ with -lc++ (when linking against libc++).
   if "-static-libstdc++" in sys.argv[1:] or "-stdlib=libc++" in envoy_cxxflags:
+    # Append CXXFLAGS to all C++ targets (this is mostly for dependencies).
+    if envoy_cxxflags and "-std=c++" in str(sys.argv[1:]):
+      argv = envoy_cxxflags.split(" ")
+    else:
+      argv = []
     for arg in sys.argv[1:]:
       if arg == "-lstdc++":
         if "-stdlib=libc++" in envoy_cxxflags:
