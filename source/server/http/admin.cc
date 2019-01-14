@@ -658,7 +658,7 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
     std::multimap<std::string, std::string> all_histograms;
     for (const Stats::ParentHistogramSharedPtr& histogram : server_.stats().histograms()) {
       if (shouldShowMetric(histogram, used_only, regex)) {
-        all_histograms.emplace(histogram->name(), histogram->summary());
+        all_histograms.emplace(histogram->name(), histogram->quantileSummary());
       }
     }
     for (auto histogram : all_histograms) {

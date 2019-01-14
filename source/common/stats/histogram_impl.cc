@@ -37,7 +37,7 @@ const std::vector<double>& HistogramStatisticsImpl::supportedBuckets() const {
   return supported_buckets;
 }
 
-std::string HistogramStatisticsImpl::summary() const {
+std::string HistogramStatisticsImpl::quantileSummary() const {
   std::vector<std::string> summary;
   const std::vector<double>& supported_quantiles_ref = supportedQuantiles();
   summary.reserve(supported_quantiles_ref.size());
@@ -46,6 +46,16 @@ std::string HistogramStatisticsImpl::summary() const {
         fmt::format("P{}: {}", 100 * supported_quantiles_ref[i], computed_quantiles_[i]));
   }
   return absl::StrJoin(summary, ", ");
+}
+
+std::string HistogramStatisticsImpl::bucketSummary() const {
+  std::vector<std::string> bucketSummary;
+  const std::vector<double>& supported_buckets_ref = supportedBuckets();
+  bucketSummary.reserve(supported_buckets_ref.size());
+  for (size_t i = 0; i < supported_buckets_ref.size(); ++i) {
+    bucketSummary.push_back(fmt::format("B{}: {}", supported_buckets_ref[i], computed_buckets_[i]));
+  }
+  return absl::StrJoin(bucketSummary, ", ");
 }
 
 /**

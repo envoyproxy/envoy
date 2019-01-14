@@ -1218,6 +1218,7 @@ protected:
   Stats::HeapStatDataAllocator alloc_;
   std::vector<Stats::CounterSharedPtr> counters_;
   std::vector<Stats::GaugeSharedPtr> gauges_;
+  std::vector<Stats::ParentHistogramSharedPtr> histograms_;
 };
 
 TEST_F(PrometheusStatsFormatterTest, MetricName) {
@@ -1267,7 +1268,8 @@ TEST_F(PrometheusStatsFormatterTest, MetricNameCollison) {
            {{"another_tag_name_4", "another_tag_4-value"}});
 
   Buffer::OwnedImpl response;
-  EXPECT_EQ(2UL, PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, response));
+  EXPECT_EQ(2UL,
+            PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, response));
 }
 
 TEST_F(PrometheusStatsFormatterTest, UniqueMetricName) {
@@ -1285,7 +1287,8 @@ TEST_F(PrometheusStatsFormatterTest, UniqueMetricName) {
            {{"another_tag_name_4", "another_tag_4-value"}});
 
   Buffer::OwnedImpl response;
-  EXPECT_EQ(4UL, PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, response));
+  EXPECT_EQ(4UL,
+            PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, response));
 }
 
 } // namespace Server
