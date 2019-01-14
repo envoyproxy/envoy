@@ -26,6 +26,22 @@ public:
   }
 
   void initialize() override { BaseIntegrationTest::initialize(); }
+
+  uint64_t memoryConsumedWithClusters(int num_clusters, bool allow_stats) {
+    config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+      if (!allow_stats) {
+        bootstrap.mutable_stats_config()->mutable_stats_matcher()->set_reject_all(true);
+      }
+      for (int i = 1; i < num_clusters; i++) {
+        auto* c = bootstrap.mutable_static_resources()->add_clusters();
+        c->set_name(fmt::format("cluster_{}", i));
+      }
+    });
+    initialize();
+
+    uint64_t end_mem = Memory::Stats::totalCurrentlyAllocated();
+    return end_mem;
+  };
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, StatsIntegrationTest,
@@ -139,18 +155,12 @@ TEST_P(StatsIntegrationTest, MemoryLargeClusterSizeWithStats) {
     return;
   }
 
-  config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
-    for (int i = 1; i < 1001; i++) {
-      RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
-      auto* c = bootstrap.mutable_static_resources()->add_clusters();
-      c->set_name(fmt::format("cluster_{}", i));
-    }
-  });
-  initialize();
+  uint64_t m1 = memoryConsumedWithClusters(1, true);
+  uint64_t m1001 = memoryConsumedWithClusters(2, false);
+  uint64_t m_per_cluster = (m1001 - m1) / 1000;
 
-  const size_t end_mem = Memory::Stats::totalCurrentlyAllocated() / 1000;
-  EXPECT_LT(start_mem, end_mem);
-  EXPECT_LT(end_mem - start_mem, 57000); // actual value: 56635 as of Jan 7, 2019
+  EXPECT_LT(start_mem, m_per_cluster);
+  EXPECT_LT(m1001 / 1000, 57000); // actual value: 56635 as of Jan 7, 2019
 }
 
 TEST_P(StatsIntegrationTest, MemoryLargeClusterSizeNoStats) {
@@ -160,19 +170,12 @@ TEST_P(StatsIntegrationTest, MemoryLargeClusterSizeNoStats) {
     return;
   }
 
-  config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
-    for (int i = 1; i < 1001; i++) {
-      RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
-      auto* c = bootstrap.mutable_static_resources()->add_clusters();
-      c->set_name(fmt::format("cluster_{}", i));
-      bootstrap.mutable_stats_config()->mutable_use_all_default_tags()->set_value(false);
-    }
-  });
-  initialize();
+  uint64_t m1 = memoryConsumedWithClusters(1, false);
+  uint64_t m1001 = memoryConsumedWithClusters(1001, false);
+  uint64_t m_per_cluster = (m1001 - m1) / 1000;
 
-  const size_t end_mem = Memory::Stats::totalCurrentlyAllocated() / 1000;
-  EXPECT_LT(start_mem, end_mem);
-  EXPECT_LT(end_mem - start_mem, 49800); // actual value: 49717 as of Jan 7, 2019
+  EXPECT_LT(start_mem, m_per_cluster);
+  EXPECT_LT(m_per_cluster / 1000, 57000); // actual value: 56635 as of Jan 7, 2019
 }
 
 } // namespace
