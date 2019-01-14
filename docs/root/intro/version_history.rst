@@ -3,10 +3,10 @@ Version history
 
 1.10.0 (pending)
 ================
-* config: added support of using google.protobuf.Any in opaque configs for extensions.
 * access log: added a new flag for upstream retry count exceeded.
 * admin: the admin server can now be accessed via HTTP/2 (prior knowledge).
-* buffer: fix vulnerabilities when allocation fails
+* buffer: fix vulnerabilities when allocation fails.
+* config: added support of using google.protobuf.Any in opaque configs for extensions.
 * config: removed deprecated_v1 sds_config from :ref:`Bootstrap config <config_overview_v2_bootstrap>`.
 * config: removed REST_LEGACY as a valid :ref:`ApiType <envoy_api_field_core.ApiConfigSource.api_type>`.
 * cors: added :ref:`filter_enabled & shadow_enabled RuntimeFractionalPercent flags <cors-runtime>` to filter.
@@ -20,7 +20,7 @@ Version history
 * redis: added :ref:`success and error stats <config_network_filters_redis_proxy_per_command_stats>` for commands.
 * router: added ability to configure a :ref:`retry policy <envoy_api_msg_route.RetryPolicy>` at the
   virtual host level.
-* tap: added new :ref:`HTTP tap filter <config_http_filters_tap>`.
+* tap: added new alpha :ref:`HTTP tap filter <config_http_filters_tap>`.
 * tls: enabled TLS 1.3 on the server-side (non-FIPS builds).
 * upstream: add hash_function to specify the hash function for :ref:`ring hash<envoy_api_msg_Cluster.RingHashLbConfig>` as either xxHash or `murmurHash2 <https://sites.google.com/site/murmurhash>`_. MurmurHash2 is compatible with std::hash in GNU libstdc++ 3.4.20 or above. This is typically the case when compiled on Linux and not macOS.
 
