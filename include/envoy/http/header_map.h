@@ -32,6 +32,7 @@ public:
   const std::string& get() const { return string_; }
   bool operator==(const LowerCaseString& rhs) const { return string_ == rhs.string_; }
   bool operator!=(const LowerCaseString& rhs) const { return string_ != rhs.string_; }
+  bool operator<(const LowerCaseString& rhs) const { return string_.compare(rhs.string_) < 0; }
 
 private:
   void lower() { std::transform(string_.begin(), string_.end(), string_.begin(), tolower); }
@@ -50,6 +51,12 @@ struct LowerCaseStringHash {
  * Convenient type for unordered set of lower case string.
  */
 typedef std::unordered_set<LowerCaseString, LowerCaseStringHash> LowerCaseStrUnorderedSet;
+
+/**
+ * Convenient type for a vector of lower case string and string pair.
+ */
+typedef std::vector<std::pair<const Http::LowerCaseString, const std::string>>
+    LowerCaseStrPairVector;
 
 /**
  * This is a string implementation for use in header processing. It is heavily optimized for

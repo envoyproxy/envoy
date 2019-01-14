@@ -121,7 +121,7 @@ gRPC or RESTful JSON requests to localhost:51051.
             - name: envoy.grpc_json_transcoder
               config:
                 proto_descriptor: "/tmp/envoy/proto.pb"
-                services: ["HelloWorld"]
+                services: ["helloworld.Greeter"]
                 print_options:
                   add_whitespace: true
                   always_print_primitive_fields: true

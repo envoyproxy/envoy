@@ -341,7 +341,7 @@ def checkSourceLine(line, file_path, reportError):
   if not whitelistedForGetTime(file_path):
     if "std::get_time" in line:
       if "test/" in file_path:
-        reportError("Don't use std::get_time; use TestUtility::parseTimestamp in tests")
+        reportError("Don't use std::get_time; use TestUtility::parseTime in tests")
       else:
         reportError("Don't use std::get_time; use the injectable time system")
   if 'std::atomic_' in line:

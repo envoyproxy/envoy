@@ -43,7 +43,7 @@ private:
   std::vector<uint32_t> attempted_priorities_;
   std::vector<bool> excluded_priorities_;
   Upstream::PriorityLoad per_priority_load_;
-  std::vector<uint32_t> per_priority_health_;
+  Upstream::PriorityAvailability per_priority_health_;
 };
 
 } // namespace Priority

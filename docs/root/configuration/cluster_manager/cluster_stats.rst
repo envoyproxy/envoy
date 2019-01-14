@@ -10,7 +10,9 @@ General
 -------
 
 The cluster manager has a statistics tree rooted at *cluster_manager.* with the following
-statistics. Any ``:`` character in the stats name is replaced with ``_``.
+statistics. Any ``:`` character in the stats name is replaced with ``_``. Stats include
+all clusters managed by the cluster manager, including both clusters used for data plane
+upstreams and control plane xDS clusters.
 
 .. csv-table::
   :header: Name, Type, Description

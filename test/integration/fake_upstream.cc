@@ -405,7 +405,6 @@ bool FakeUpstream::createListenerFilterChain(Network::ListenerFilterManager&) { 
 
 void FakeUpstream::threadRoutine() {
   handler_->addListener(listener_);
-
   server_initialized_.setReady();
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   handler_.reset();

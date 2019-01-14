@@ -27,8 +27,10 @@ int main(int argc, char** argv) {
   } catch (const Envoy::NoServingException& e) {
     return EXIT_SUCCESS;
   } catch (const Envoy::MalformedArgvException& e) {
+    std::cerr << e.what() << std::endl;
     return EXIT_FAILURE;
   } catch (const Envoy::EnvoyException& e) {
+    std::cerr << e.what() << std::endl;
     return EXIT_FAILURE;
   }
 

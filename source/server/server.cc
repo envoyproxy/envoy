@@ -179,7 +179,6 @@ InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& boots
   if (config_path.empty() && config_yaml.empty()) {
     const std::string message =
         "At least one of --config-path and --config-yaml should be non-empty";
-    std::cerr << message << std::endl;
     throw EnvoyException(message);
   }
 
@@ -328,7 +327,7 @@ void InstanceImpl::initialize(Options& options,
     async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(
         clusterManager(), thread_local_, time_system_, api());
     hds_delegate_ = std::make_unique<Upstream::HdsDelegate>(
-        bootstrap_.node(), stats(),
+        stats(),
         Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, hds_config, stats())
             ->create(),
         dispatcher(), runtime(), stats(), sslContextManager(), random(), info_factory_,
