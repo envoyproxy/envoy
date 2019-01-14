@@ -22,6 +22,7 @@ using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
+using testing::ReturnRef;
 
 using ::testing::AtLeast;
 
@@ -44,7 +45,7 @@ public:
   HdsTest()
       : retry_timer_(new Event::MockTimer()), server_response_timer_(new Event::MockTimer()),
         async_client_(new Grpc::MockAsyncClient()) {
-    node_.set_id("foo");
+    node_.set_id("hds-node");
   }
 
   // Creates an HdsDelegate
@@ -118,6 +119,21 @@ public:
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
 };
+
+// Test that HdsDelegate builds and sends initial message correctly
+TEST_F(HdsTest, HealthCheckRequest) {
+  envoy::service::discovery::v2::HealthCheckRequestOrEndpointHealthResponse request;
+  request.mutable_health_check_request()->mutable_node()->set_id("hds-node");
+  request.mutable_health_check_request()->mutable_capability()->add_health_check_protocols(
+      envoy::service::discovery::v2::Capability::HTTP);
+  request.mutable_health_check_request()->mutable_capability()->add_health_check_protocols(
+      envoy::service::discovery::v2::Capability::TCP);
+
+  EXPECT_CALL(local_info_, node()).WillOnce(ReturnRef(node));
+  EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(async_stream_, sendMessage(ProtoEq(request), false));
+  createHdsDelegate();
+}
 
 // Test if processMessage processes endpoints from a HealthCheckSpecifier
 // message correctly
