@@ -7,3 +7,4 @@ use("github.com/repokitteh/modules/circleci.star", secret_token=get_secret('circ
 
 alias('retest', 'retry-circle')
 
+enable('cancel-circle')
