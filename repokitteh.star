@@ -1,4 +1,4 @@
-#pin('github.com/repokitteh/modules', 'gf')
+pin('github.com/repokitteh/modules', 'gf')
 
 use("github.com/repokitteh/modules/assign.star")
 use("github.com/repokitteh/modules/review.star")
