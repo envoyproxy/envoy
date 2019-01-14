@@ -129,7 +129,7 @@ TEST_F(HdsTest, HealthCheckRequest) {
   request.mutable_health_check_request()->mutable_capability()->add_health_check_protocols(
       envoy::service::discovery::v2::Capability::TCP);
 
-  EXPECT_CALL(local_info_, node()).WillOnce(ReturnRef(node));
+  EXPECT_CALL(local_info_, node()).WillOnce(ReturnRef(node_));
   EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
   EXPECT_CALL(async_stream_, sendMessage(ProtoEq(request), false));
   createHdsDelegate();
