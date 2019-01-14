@@ -107,7 +107,7 @@ TEST_P(LoadBalancerBaseTest, PrioritySelection) {
   updateHostSet(host_set_, 1 /* num_hosts */, 0 /* num_healthy_hosts */);
   updateHostSet(failover_host_set_, 1, 0);
 
-  PriorityLoad priority_load = {100, 0};
+  PriorityLoad priority_load({100u, 0u});
   EXPECT_CALL(context, determinePriorityLoad(_, _)).WillRepeatedly(ReturnRef(priority_load));
   // With both the primary and failover hosts unhealthy, we should select an
   // unhealthy primary host.
@@ -122,7 +122,7 @@ TEST_P(LoadBalancerBaseTest, PrioritySelection) {
   EXPECT_EQ(0, lb_.percentageLoad(0));
   EXPECT_EQ(0, lb_.percentageLoad(1));
   EXPECT_EQ(100, lb_.percentageLoad(2));
-  priority_load = {0, 0, 100};
+  priority_load = PriorityLoad({0u, 0u, 100u});
   EXPECT_EQ(&tertiary_host_set_, &lb_.chooseHostSet(&context));
 
   // Now add a healthy host in P=0 and make sure it is immediately selected.
@@ -131,14 +131,14 @@ TEST_P(LoadBalancerBaseTest, PrioritySelection) {
   host_set_.runCallbacks({}, {});
   EXPECT_EQ(100, lb_.percentageLoad(0));
   EXPECT_EQ(0, lb_.percentageLoad(2));
-  priority_load = {100, 0, 0};
+  priority_load = PriorityLoad({100u, 0u, 0u});
   EXPECT_EQ(&host_set_, &lb_.chooseHostSet(&context));
 
   // Remove the healthy host and ensure we fail back over to tertiary_host_set_
   updateHostSet(host_set_, 1 /* num_hosts */, 0 /* num_healthy_hosts */);
   EXPECT_EQ(0, lb_.percentageLoad(0));
   EXPECT_EQ(100, lb_.percentageLoad(2));
-  priority_load = {0, 0, 100};
+  priority_load = PriorityLoad({0u, 0u, 100u});
   EXPECT_EQ(&tertiary_host_set_, &lb_.chooseHostSet(&context));
 }
 
@@ -146,7 +146,7 @@ TEST_P(LoadBalancerBaseTest, PrioritySelection) {
 TEST_P(LoadBalancerBaseTest, PrioritySelectionWithFilter) {
   NiceMock<Upstream::MockLoadBalancerContext> context;
 
-  PriorityLoad priority_load = {0, 100};
+  PriorityLoad priority_load = PriorityLoad({0u, 100u});
   // return a filter that excludes priority 0
   EXPECT_CALL(context, determinePriorityLoad(_, _)).WillOnce(ReturnRef(priority_load));
 
@@ -614,9 +614,9 @@ TEST_P(RoundRobinLoadBalancerTest, HostSelectionWithFilter) {
   PriorityLoad priority_load;
 
   if (GetParam()) {
-    priority_load = {100, 0};
+    priority_load = PriorityLoad({100u, 0u});
   } else {
-    priority_load = {0, 100};
+    priority_load = PriorityLoad({0u, 100u});
   }
   EXPECT_CALL(context, determinePriorityLoad(_, _)).WillRepeatedly(ReturnRef(priority_load));
   EXPECT_CALL(context, hostSelectionRetryCount()).WillRepeatedly(Return(2));

@@ -236,11 +236,7 @@ TEST_F(SslContextImplTest, TestGetCertInformationWithSAN) {
 }
 
 std::string convertTimeCertInfoToCertDetails(std::string cert_info_time) {
-  std::tm expiration = TestUtility::parseTimestamp("%b %e %H:%M:%S %Y GMT", cert_info_time);
-  char buffer[21];
-  size_t len = strftime(buffer, sizeof(buffer), "%Y-%m-%dT%H:%M:%SZ", &expiration);
-  ASSERT(len == sizeof(buffer) - 1);
-  return std::string(buffer);
+  return TestUtility::convertTime(cert_info_time, "%b %e %H:%M:%S %Y GMT", "%Y-%m-%dT%H:%M:%SZ");
 }
 
 TEST_F(SslContextImplTest, TestGetCertInformationWithExpiration) {

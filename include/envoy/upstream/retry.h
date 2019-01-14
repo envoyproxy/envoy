@@ -1,12 +1,10 @@
 #pragma once
 
+#include "envoy/upstream/types.h"
 #include "envoy/upstream/upstream.h"
 
 namespace Envoy {
 namespace Upstream {
-
-// Redeclare this here in order to get around cyclical dependencies.
-typedef std::vector<uint32_t> PriorityLoad;
 
 /**
  * Used to optionally modify the PriorityLoad when selecting a priority for

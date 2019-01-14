@@ -44,20 +44,29 @@ OptionsImpl createTestOptionsImpl(const std::string& config_path, const std::str
 
 } // namespace Server
 
-IntegrationTestServerPtr
-IntegrationTestServer::create(const std::string& config_path,
-                              const Network::Address::IpVersion version,
-                              std::function<void()> pre_worker_start_test_steps, bool deterministic,
-                              Event::TestTimeSystem& time_system, Api::Api& api) {
+IntegrationTestServerPtr IntegrationTestServer::create(
+    const std::string& config_path, const Network::Address::IpVersion version,
+    std::function<void()> pre_worker_start_test_steps, bool deterministic,
+    Event::TestTimeSystem& time_system, Api::Api& api, bool defer_listener_finalization) {
   IntegrationTestServerPtr server{
       std::make_unique<IntegrationTestServerImpl>(time_system, api, config_path)};
-  server->start(version, pre_worker_start_test_steps, deterministic);
+  server->start(version, pre_worker_start_test_steps, deterministic, defer_listener_finalization);
   return server;
+}
+
+void IntegrationTestServer::waitUntilListenersReady() {
+  Thread::LockGuard guard(listeners_mutex_);
+  while (pending_listeners_ != 0) {
+    // If your test is hanging forever here, you may need to create your listener manually,
+    // after BaseIntegrationTest::initialize() is done. See cds_integration_test.cc for an example.
+    listeners_cv_.wait(listeners_mutex_); // Safe since CondVar::wait won't throw.
+  }
+  ENVOY_LOG(info, "listener wait complete");
 }
 
 void IntegrationTestServer::start(const Network::Address::IpVersion version,
                                   std::function<void()> pre_worker_start_test_steps,
-                                  bool deterministic) {
+                                  bool deterministic, bool defer_listener_finalization) {
   ENVOY_LOG(info, "starting integration test server");
   ASSERT(!thread_);
   thread_ = api_.threadFactory().createThread(
@@ -71,13 +80,11 @@ void IntegrationTestServer::start(const Network::Address::IpVersion version,
   // Wait for the server to be created and the number of initial listeners to wait for to be set.
   server_set_.waitReady();
 
-  // Now wait for the initial listeners to actually be listening on the worker. At this point
-  // the server is up and ready for testing.
-  Thread::LockGuard guard(listeners_mutex_);
-  while (pending_listeners_ != 0) {
-    listeners_cv_.wait(listeners_mutex_); // Safe since CondVar::wait won't throw.
+  if (!defer_listener_finalization) {
+    // Now wait for the initial listeners (if any) to actually be listening on the worker.
+    // At this point the server is up and ready for testing.
+    waitUntilListenersReady();
   }
-  ENVOY_LOG(info, "listener wait complete");
 
   // If we are capturing, spin up tcpdump.
   const auto capture_path = TestEnvironment::getOptionalEnvVar("CAPTURE_PATH");
