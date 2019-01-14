@@ -24,7 +24,7 @@ genrule(
     srcs = src_files,
     outs = ["quiche/" + f for f in src_files],
     cmd = "\n".join(
-        ["sed -e '/^#include/ s!net/\(http2\|quic\|spdy\)/platform/impl/!extensions/quic_listeners/quiche/platform/!' $(location %s) > $(location :%s)" % (
+        ["sed -e '/^#include/ s!net/[^/]*/platform/impl/!extensions/quic_listeners/quiche/platform/!' $(location %s) > $(location :%s)" % (
             f,
             "quiche/" + f,
         ) for f in src_files],
