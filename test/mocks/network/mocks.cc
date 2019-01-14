@@ -83,7 +83,9 @@ MockDrainDecision::~MockDrainDecision() {}
 MockListenerFilter::MockListenerFilter() {}
 MockListenerFilter::~MockListenerFilter() {}
 
-MockListenerFilterCallbacks::MockListenerFilterCallbacks() {}
+MockListenerFilterCallbacks::MockListenerFilterCallbacks() {
+  ON_CALL(*this, socket()).WillByDefault(ReturnRef(socket_));
+}
 MockListenerFilterCallbacks::~MockListenerFilterCallbacks() {}
 
 MockListenerFilterManager::MockListenerFilterManager() {}

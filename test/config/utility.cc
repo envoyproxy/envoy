@@ -76,7 +76,6 @@ const std::string ConfigHelper::DEFAULT_BUFFER_FILTER =
 name: envoy.buffer
 config:
     max_request_bytes : 5242880
-    max_request_time : 120s
 )EOF";
 
 const std::string ConfigHelper::SMALL_BUFFER_FILTER =
@@ -84,7 +83,6 @@ const std::string ConfigHelper::SMALL_BUFFER_FILTER =
 name: envoy.buffer
 config:
     max_request_bytes : 1024
-    max_request_time : 5s
 )EOF";
 
 const std::string ConfigHelper::DEFAULT_HEALTH_CHECK_FILTER =
@@ -256,7 +254,7 @@ void ConfigHelper::setCaptureTransportSocket(
   file_sink->set_path_prefix(capture_path + "_" + absl::StrReplaceAll(test_id, {{"/", "_"}}));
   file_sink->set_format(envoy::config::transport_socket::capture::v2alpha::FileSink::PROTO_TEXT);
   capture_config.mutable_transport_socket()->MergeFrom(inner_transport_socket);
-  MessageUtil::jsonConvert(capture_config, *transport_socket.mutable_config());
+  transport_socket.mutable_typed_config()->PackFrom(capture_config);
 }
 
 void ConfigHelper::setSourceAddress(const std::string& address_string) {
@@ -331,7 +329,7 @@ void ConfigHelper::addRoute(const std::string& domains, const std::string& prefi
                             const std::string& cluster, bool validate_clusters,
                             envoy::api::v2::route::RouteAction::ClusterNotFoundResponseCode code,
                             envoy::api::v2::route::VirtualHost::TlsRequirementType type,
-                            envoy::api::v2::route::RouteAction::RetryPolicy retry_policy,
+                            envoy::api::v2::route::RetryPolicy retry_policy,
                             bool include_attempt_count_header, const absl::string_view upgrade) {
   RELEASE_ASSERT(!finalized_, "");
   envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager hcm_config;
@@ -404,10 +402,9 @@ void ConfigHelper::initializeTls(const ServerSslOptions& options,
 
   // We'll negotiate up to TLSv1.3 for the tests that care, but it really
   // depends on what the client sets.
-  if (options.tlsv1_3_) {
-    common_tls_context.mutable_tls_params()->set_tls_maximum_protocol_version(
-        envoy::api::v2::auth::TlsParameters::TLSv1_3);
-  }
+  common_tls_context.mutable_tls_params()->set_tls_maximum_protocol_version(
+      options.tlsv1_3_ ? envoy::api::v2::auth::TlsParameters::TLSv1_3
+                       : envoy::api::v2::auth::TlsParameters::TLSv1_2);
   if (options.rsa_cert_) {
     auto* tls_certificate = common_tls_context.add_tls_certificates();
     tls_certificate->mutable_certificate_chain()->set_filename(

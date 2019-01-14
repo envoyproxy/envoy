@@ -40,7 +40,20 @@ protected:
             TestEnvironment::PortMap(), GetParam())),
         random_string_(fmt::format("{}", computeBaseId())),
         argv_({"envoy-static", "--base-id", random_string_.c_str(), "-c", config_file_.c_str(),
-               nullptr}) {}
+               nullptr}) {
+    // The test main() sets the ThreadFactorySingleton since it is required by all other tests not
+    // instantiating their own MainCommon.
+    // Reset the singleton to a nullptr to avoid triggering an assertion when MainCommonBase() calls
+    // set() in the tests below.
+    Thread::ThreadFactorySingleton::set(nullptr);
+  }
+
+  ~MainCommonTest() override {
+    // This is ugly, but necessary to enable a stronger ASSERT() in ThreadFactorySingleton::set().
+    // The singleton needs to be reset to a non nullptr value such that when the constructor runs
+    // again, the ThreadFactorySingleton::set(nullptr) does not trigger the assertion.
+    Thread::ThreadFactorySingleton::set(&Thread::threadFactoryForTest());
+  }
 
   /**
    * Computes a numeric ID to incorporate into the names of
@@ -102,6 +115,43 @@ TEST_P(MainCommonTest, ConstructDestructHotRestartDisabledNoInit) {
   initOnly();
   MainCommon main_common(argc(), argv());
   EXPECT_TRUE(main_common.run());
+}
+
+// Test that std::set_new_handler() was called and the callback functions as expected.
+// This test fails under TSAN and ASAN, so don't run it in that build:
+//   [  DEATH   ] ==845==ERROR: ThreadSanitizer: requested allocation size 0x3e800000000
+//   exceeds maximum supported size of 0x10000000000
+//
+//   [  DEATH   ] ==33378==ERROR: AddressSanitizer: requested allocation size 0x3e800000000
+//   (0x3e800001000 after adjustments for alignment, red zones etc.) exceeds maximum supported size
+//   of 0x10000000000 (thread T0)
+
+class MainCommonDeathTest : public MainCommonTest {};
+
+TEST_P(MainCommonDeathTest, OutOfMemoryHandler) {
+#if defined(__has_feature) && (__has_feature(thread_sanitizer) || __has_feature(address_sanitizer))
+  ENVOY_LOG_MISC(critical,
+                 "MainCommonTest::OutOfMemoryHandler not supported by this compiler configuration");
+#else
+  MainCommon main_common(argc(), argv());
+  EXPECT_DEATH_LOG_TO_STDERR(
+      []() {
+        // Resolving symbols for a backtrace takes longer than the timeout in coverage builds,
+        // so disable handling that signal.
+        signal(SIGABRT, SIG_DFL);
+
+        // Allocating a fixed-size large array that results in OOM on gcc
+        // results in a compile-time error on clang of "array size too big",
+        // so dynamically find a size that is too large.
+        const uint64_t initial = 1 << 30;
+        for (uint64_t size = initial;
+             size >= initial; // Disallow wraparound to avoid inifinite loops on failure.
+             size *= 1000) {
+          new int[size];
+        }
+      }(),
+      ".*panic: out of memory.*");
+#endif
 }
 
 INSTANTIATE_TEST_CASE_P(IpVersions, MainCommonTest,

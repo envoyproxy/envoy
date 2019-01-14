@@ -40,7 +40,7 @@ void SingleServerRequest::onResponse(RespValuePtr&& response) {
 
 void SingleServerRequest::onFailure() {
   handle_ = nullptr;
-  callbacks_.onResponse(Utility::makeError("upstream failure"));
+  callbacks_.onResponse(Utility::makeError(Response::get().UpstreamFailure));
 }
 
 void SingleServerRequest::cancel() {
@@ -56,7 +56,7 @@ SplitRequestPtr SimpleRequest::create(ConnPool::Instance& conn_pool,
   request_ptr->handle_ = conn_pool.makeRequest(incoming_request.asArray()[1].asString(),
                                                incoming_request, *request_ptr);
   if (!request_ptr->handle_) {
-    request_ptr->callbacks_.onResponse(Utility::makeError("no upstream host"));
+    request_ptr->callbacks_.onResponse(Utility::makeError(Response::get().NoUpstreamHost));
     return nullptr;
   }
 
@@ -77,7 +77,7 @@ SplitRequestPtr EvalRequest::create(ConnPool::Instance& conn_pool,
   request_ptr->handle_ = conn_pool.makeRequest(incoming_request.asArray()[3].asString(),
                                                incoming_request, *request_ptr);
   if (!request_ptr->handle_) {
-    request_ptr->callbacks_.onResponse(Utility::makeError("no upstream host"));
+    request_ptr->callbacks_.onResponse(Utility::makeError(Response::get().NoUpstreamHost));
     return nullptr;
   }
 
@@ -102,7 +102,7 @@ void FragmentedRequest::cancel() {
 }
 
 void FragmentedRequest::onChildFailure(uint32_t index) {
-  onChildResponse(Utility::makeError("upstream failure"), index);
+  onChildResponse(Utility::makeError(Response::get().UpstreamFailure), index);
 }
 
 SplitRequestPtr MGETRequest::create(ConnPool::Instance& conn_pool,
@@ -134,7 +134,7 @@ SplitRequestPtr MGETRequest::create(ConnPool::Instance& conn_pool,
     pending_request.handle_ = conn_pool.makeRequest(incoming_request.asArray()[i].asString(),
                                                     single_mget, pending_request);
     if (!pending_request.handle_) {
-      pending_request.onResponse(Utility::makeError("no upstream host"));
+      pending_request.onResponse(Utility::makeError(Response::get().NoUpstreamHost));
     }
   }
 
@@ -150,7 +150,7 @@ void MGETRequest::onChildResponse(RespValuePtr&& value, uint32_t index) {
   case RespType::Integer:
   case RespType::SimpleString: {
     pending_response_->asArray()[index].type(RespType::Error);
-    pending_response_->asArray()[index].asString() = "upstream protocol error";
+    pending_response_->asArray()[index].asString() = Response::get().UpstreamProtocolError;
     error_count_++;
     break;
   }
@@ -209,7 +209,7 @@ SplitRequestPtr MSETRequest::create(ConnPool::Instance& conn_pool,
     pending_request.handle_ = conn_pool.makeRequest(incoming_request.asArray()[i].asString(),
                                                     single_mset, pending_request);
     if (!pending_request.handle_) {
-      pending_request.onResponse(Utility::makeError("no upstream host"));
+      pending_request.onResponse(Utility::makeError(Response::get().NoUpstreamHost));
     }
   }
 
@@ -221,7 +221,7 @@ void MSETRequest::onChildResponse(RespValuePtr&& value, uint32_t index) {
 
   switch (value->type()) {
   case RespType::SimpleString: {
-    if (value->asString() == "OK") {
+    if (value->asString() == Response::get().OK) {
       break;
     }
     FALLTHRU;
@@ -235,7 +235,7 @@ void MSETRequest::onChildResponse(RespValuePtr&& value, uint32_t index) {
   ASSERT(num_pending_responses_ > 0);
   if (--num_pending_responses_ == 0) {
     if (error_count_ == 0) {
-      pending_response_->asString() = "OK";
+      pending_response_->asString() = Response::get().OK;
       callbacks_.onResponse(std::move(pending_response_));
     } else {
       callbacks_.onResponse(
@@ -273,7 +273,7 @@ SplitRequestPtr SplitKeysSumResultRequest::create(ConnPool::Instance& conn_pool,
     pending_request.handle_ = conn_pool.makeRequest(incoming_request.asArray()[i].asString(),
                                                     single_fragment, pending_request);
     if (!pending_request.handle_) {
-      pending_request.onResponse(Utility::makeError("no upstream host"));
+      pending_request.onResponse(Utility::makeError(Response::get().NoUpstreamHost));
     }
   }
 
@@ -312,7 +312,6 @@ InstanceImpl::InstanceImpl(ConnPool::InstancePtr&& conn_pool, Stats::Scope& scop
       eval_command_handler_(*conn_pool_), mget_handler_(*conn_pool_), mset_handler_(*conn_pool_),
       split_keys_sum_result_handler_(*conn_pool_),
       stats_{ALL_COMMAND_SPLITTER_STATS(POOL_COUNTER_PREFIX(scope, stat_prefix + "splitter."))} {
-  // TODO(mattklein123) PERF: Make this a trie (like in header_map_impl).
   for (const std::string& command : SupportedCommands::simpleCommands()) {
     addHandler(scope, stat_prefix, command, simple_command_handler_);
   }
@@ -360,32 +359,31 @@ SplitRequestPtr InstanceImpl::makeRequest(const RespValue& request, SplitCallbac
     }
   }
 
-  auto handler = command_map_.find(to_lower_string);
-  if (handler == command_map_.end()) {
+  auto handler = handler_lookup_table_.find(to_lower_string.c_str());
+  if (handler == nullptr) {
     stats_.unsupported_command_.inc();
     callbacks.onResponse(Utility::makeError(
         fmt::format("unsupported command '{}'", request.asArray()[0].asString())));
     return nullptr;
   }
-
   ENVOY_LOG(debug, "redis: splitting '{}'", request.toString());
-  handler->second.total_.inc();
-  return handler->second.handler_.get().startRequest(request, callbacks);
+  handler->total_.inc();
+  return handler->handler_.get().startRequest(request, callbacks);
 }
 
 void InstanceImpl::onInvalidRequest(SplitCallbacks& callbacks) {
   stats_.invalid_request_.inc();
-  callbacks.onResponse(Utility::makeError("invalid request"));
+  callbacks.onResponse(Utility::makeError(Response::get().InvalidRequest));
 }
 
 void InstanceImpl::addHandler(Stats::Scope& scope, const std::string& stat_prefix,
                               const std::string& name, CommandHandler& handler) {
   std::string to_lower_name(name);
   to_lower_table_.toLowerCase(to_lower_name);
-  command_map_.emplace(
-      to_lower_name,
-      HandlerData{scope.counter(fmt::format("{}command.{}.total", stat_prefix, to_lower_name)),
-                  handler});
+  handler_lookup_table_.add(
+      to_lower_name.c_str(),
+      std::make_shared<HandlerData>(HandlerData{
+          scope.counter(fmt::format("{}command.{}.total", stat_prefix, to_lower_name)), handler}));
 }
 
 } // namespace CommandSplitter

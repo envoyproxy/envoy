@@ -12,8 +12,6 @@
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
 
-#include "server/lds_subscription.h"
-
 namespace Envoy {
 namespace Server {
 
@@ -26,11 +24,6 @@ LdsApiImpl::LdsApiImpl(const envoy::api::v2::core::ConfigSource& lds_config,
   subscription_ =
       Envoy::Config::SubscriptionFactory::subscriptionFromConfigSource<envoy::api::v2::Listener>(
           lds_config, local_info, dispatcher, cm, random, *scope_,
-          [this, &lds_config, &cm, &dispatcher, &random, &local_info,
-           &scope]() -> Config::Subscription<envoy::api::v2::Listener>* {
-            return new LdsSubscription(Config::Utility::generateStats(*scope_), lds_config, cm,
-                                       dispatcher, random, local_info, scope.statsOptions());
-          },
           "envoy.api.v2.ListenerDiscoveryService.FetchListeners",
           "envoy.api.v2.ListenerDiscoveryService.StreamListeners");
   Config::Utility::checkLocalInfo("lds", local_info);

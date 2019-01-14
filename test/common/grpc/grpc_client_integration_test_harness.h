@@ -16,6 +16,7 @@
 #include "common/network/connection_impl.h"
 #include "common/network/raw_buffer_socket.h"
 #include "common/ssl/context_config_impl.h"
+#include "common/ssl/ssl_socket.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/common/grpc/utility.h"
