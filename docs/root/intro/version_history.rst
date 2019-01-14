@@ -14,7 +14,6 @@ Version history
 * router: added ability to configure a :ref:`retry policy <envoy_api_msg_route.RetryPolicy>` at the
   virtual host level.
 * tls: enabled TLS 1.3 on the server-side (non-FIPS builds).
-
 * router: added per-route configuration of :ref:`internal redirects <envoy_api_field_route.RouteAction.internal_redirect_action>`.
 
 1.9.0
