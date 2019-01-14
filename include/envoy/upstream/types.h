@@ -46,7 +46,5 @@ struct HealthyAvailability : PriorityAvailability {
   using PriorityAvailability::PriorityAvailability;
 };
 
-static_assert(!std::is_convertible<HealthyAvailability, DegradedAvailability>::value, "");
-
 } // namespace Upstream
 } // namespace Envoy
