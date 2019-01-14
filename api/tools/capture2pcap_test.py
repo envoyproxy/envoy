@@ -1,4 +1,5 @@
 """Tests for capture2pcap."""
+from __future__ import print_function
 
 import os
 import subprocess as sp
@@ -20,7 +21,7 @@ if __name__ == '__main__':
   with open(expected_path, 'r') as f:
     expected_output = f.read()
   if actual_output != expected_output:
-    print 'Mismatch'
-    print 'Expected: %s' % expected_output
-    print 'Actual: %s' % actual_output
+    print('Mismatch')
+    print('Expected: %s' % expected_output)
+    print('Actual: %s' % actual_output)
     sys.exit(1)
