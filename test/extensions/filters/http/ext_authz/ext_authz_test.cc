@@ -45,8 +45,81 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExtAuthz {
 
+template <class T> class HttpFilterTestBase : public T {
+public:
+  void initialize(std::string&& yaml) {
+    envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz proto_config{};
+    if (!yaml.empty()) {
+      MessageUtil::loadFromYaml(yaml, proto_config);
+    }
+    config_.reset(
+        new FilterConfig(proto_config, local_info_, stats_store_, runtime_, http_context_));
+    client_ = new Filters::Common::ExtAuthz::MockClient();
+    filter_ = std::make_unique<Filter>(config_, Filters::Common::ExtAuthz::ClientPtr{client_});
+    filter_->setDecoderFilterCallbacks(filter_callbacks_);
+    addr_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 1111);
+  }
+
+  FilterConfigSharedPtr config_;
+  Filters::Common::ExtAuthz::MockClient* client_;
+  std::unique_ptr<Filter> filter_;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks_;
+  Filters::Common::ExtAuthz::RequestCallbacks* request_callbacks_{};
+  Http::TestHeaderMapImpl request_headers_;
+  Buffer::OwnedImpl data_;
+  Stats::IsolatedStoreImpl stats_store_;
+  NiceMock<Runtime::MockLoader> runtime_;
+  NiceMock<Upstream::MockClusterManager> cm_;
+  NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  Network::Address::InstanceConstSharedPtr addr_;
+  NiceMock<Envoy::Network::MockConnection> connection_;
+  Http::ContextImpl http_context_;
+
+  void prepareCheck() {
+    ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
+    EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
+    EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
+  }
+};
+
+class HttpFilterTest : public HttpFilterTestBase<testing::Test> {};
+
+typedef envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz CreateFilterConfigFunc();
+
+class HttpFilterTestParam
+    : public HttpFilterTestBase<testing::TestWithParam<CreateFilterConfigFunc*>> {
+public:
+  virtual void SetUp() override { initialize(""); }
+};
+
+template <bool failure_mode_allow_value, bool http_client>
+envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz GetFilterConfig() {
+  const std::string http_config = R"EOF(
+  http_service:
+    server_uri:
+      uri: "ext_authz:9000"
+      cluster: "ext_authz"
+      timeout: 0.25s
+  )EOF";
+
+  const std::string grpc_config = R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  )EOF";
+
+  envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz proto_config{};
+  MessageUtil::loadFromYaml(http_client ? http_config : grpc_config, proto_config);
+  proto_config.set_failure_mode_allow(failure_mode_allow_value);
+  return proto_config;
+}
+
+INSTANTIATE_TEST_CASE_P(ParameterizedFilterConfig, HttpFilterTestParam,
+                        Values(&GetFilterConfig<true, true>, &GetFilterConfig<false, false>,
+                               &GetFilterConfig<true, false>, &GetFilterConfig<false, true>));
+
 // Test that the per route config is properly merged: more specific keys override previous keys.
-TEST(HttpExtAuthzFilterConfigPerRouteTest, MergeConfig) {
+TEST_F(HttpFilterTest, MergeConfig) {
   envoy::config::filter::http::ext_authz::v2alpha::ExtAuthzPerRoute settings;
   auto&& extensions = settings.mutable_check_settings()->mutable_context_extensions();
 
@@ -80,121 +153,121 @@ TEST(HttpExtAuthzFilterConfigPerRouteTest, MergeConfig) {
   EXPECT_EQ("value", merged_extensions.at("key"));
 }
 
-class HttpExtAuthzFilterTestBase {
-public:
-  HttpExtAuthzFilterTestBase() {}
+// Test when failure_mode_allow is NOT set and the response from the authorization service is Error
+// that the request is not allowed to continue.
+TEST_F(HttpFilterTest, ErrorFailClose) {
+  InSequence s;
 
-  void initConfig(envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz& proto_config) {
-    config_ = std::make_unique<FilterConfig>(proto_config, local_info_, stats_store_, runtime_, cm_,
-                                             http_context_);
-  }
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  failure_mode_allow: false
+  )EOF");
 
-  FilterConfigSharedPtr config_;
-  Filters::Common::ExtAuthz::MockClient* client_;
-  std::unique_ptr<Filter> filter_;
-  NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks_;
-  Filters::Common::ExtAuthz::RequestCallbacks* request_callbacks_{};
-  Http::TestHeaderMapImpl request_headers_;
-  Buffer::OwnedImpl data_;
-  Stats::IsolatedStoreImpl stats_store_;
-  NiceMock<Runtime::MockLoader> runtime_;
-  NiceMock<Upstream::MockClusterManager> cm_;
-  NiceMock<LocalInfo::MockLocalInfo> local_info_;
-  Network::Address::InstanceConstSharedPtr addr_;
-  NiceMock<Envoy::Network::MockConnection> connection_;
-  Http::ContextImpl http_context_;
+  ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
+  EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
+  EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
+  EXPECT_CALL(*client_, check(_, _, _))
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
+            request_callbacks_ = &callbacks;
+          })));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+  EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
 
-  void prepareCheck() {
-    ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
-    EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
-    EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
-  }
-};
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::Error;
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.error").value());
+}
 
-class HttpExtAuthzFilterTest : public testing::Test, public HttpExtAuthzFilterTestBase {
-public:
-  HttpExtAuthzFilterTest() {}
+// Test when failure_mode_allow is set and the response from the authorization service is Error that
+// the request is allowed to continue.
+TEST_F(HttpFilterTest, ErrorOpen) {
+  InSequence s;
 
-  void initialize(const std::string yaml) {
-    envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz proto_config{};
-    MessageUtil::loadFromYaml(yaml, proto_config);
-    initConfig(proto_config);
-
-    client_ = new Filters::Common::ExtAuthz::MockClient();
-    filter_ = std::make_unique<Filter>(config_, Filters::Common::ExtAuthz::ClientPtr{client_});
-    filter_->setDecoderFilterCallbacks(filter_callbacks_);
-    addr_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 1111);
-  }
-
-  const std::string filter_config_ = R"EOF(
+  initialize(R"EOF(
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
   failure_mode_allow: true
-  )EOF";
-};
+  )EOF");
 
-typedef envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz CreateFilterConfigFunc();
+  ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
+  EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
+  EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
+  EXPECT_CALL(*client_, check(_, _, _))
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
+            request_callbacks_ = &callbacks;
+          })));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+  EXPECT_CALL(filter_callbacks_, continueDecoding());
 
-class HttpExtAuthzFilterParamTest : public TestWithParam<CreateFilterConfigFunc*>,
-                                    public HttpExtAuthzFilterTestBase {
-public:
-  virtual void SetUp() override {
-    envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz proto_config = (*GetParam())();
-    initConfig(proto_config);
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::Error;
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.error").value());
+}
 
-    client_ = new Filters::Common::ExtAuthz::MockClient();
-    filter_ = std::make_unique<Filter>(config_, Filters::Common::ExtAuthz::ClientPtr{client_});
-    filter_->setDecoderFilterCallbacks(filter_callbacks_);
-    addr_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 1111);
-  }
-};
+// Test when failure_mode_allow is set and the response from the authorization service is an
+// immediate Error that the request is allowed to continue.
+TEST_F(HttpFilterTest, ImmediateErrorOpen) {
+  InSequence s;
 
-template <bool failure_mode_allow_value>
-envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz GetFilterConfig() {
-  const std::string yaml = R"EOF(
+  initialize(R"EOF(
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
+  failure_mode_allow: true
+  )EOF");
+
+  ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
+  EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
+  EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::Error;
+  EXPECT_CALL(*client_, check(_, _, _))
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
+            callbacks.onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+          })));
+
+  EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.error").value());
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()
+                    ->statsScope()
+                    .counter("ext_authz.failure_mode_allowed")
+                    .value());
+}
+
+// Check a bad configuration results in validation exception.
+TEST_F(HttpFilterTest, BadConfig) {
+  const std::string filter_config = R"EOF(
+  grpc_service:
+    envoy_grpc: {}
+  failure_mode_allow: true
   )EOF";
   envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz proto_config{};
-  MessageUtil::loadFromYaml(yaml, proto_config);
-  proto_config.set_failure_mode_allow(failure_mode_allow_value);
-  return proto_config;
+  MessageUtil::loadFromYaml(filter_config, proto_config);
+  EXPECT_THROW(MessageUtil::downcastAndValidate<
+                   const envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz&>(proto_config),
+               ProtoValidationException);
 }
 
-INSTANTIATE_TEST_CASE_P(ParameterizedFilterConfig, HttpExtAuthzFilterParamTest,
-                        Values(&GetFilterConfig<true>, &GetFilterConfig<false>));
-
-// Test allowed request headers values in the HTTP client.
-TEST_F(HttpExtAuthzFilterTest, TestAllowedRequestHeaders) {
-  const std::string config = R"EOF(
-  http_service:
-    server_uri:
-      uri: "ext_authz:9000"
-      cluster: "ext_authz"
-      timeout: 0.25s
-    allowed_authorization_headers:
-      - foo_header_key
-    allowed_request_headers:
-      - bar_header_key
-  )EOF";
-
-  initialize(config);
-  EXPECT_EQ(config_->allowedRequestHeaders().size(), 4);
-  EXPECT_EQ(config_->allowedRequestHeaders().count(Http::Headers::get().Path), 1);
-  EXPECT_EQ(config_->allowedRequestHeaders().count(Http::Headers::get().Method), 1);
-  EXPECT_EQ(config_->allowedRequestHeaders().count(Http::Headers::get().Host), 1);
-  EXPECT_EQ(config_->allowedRequestHeaders().count(Http::LowerCaseString{"bar_header_key"}), 1);
-  EXPECT_EQ(config_->allowedAuthorizationHeaders().size(), 1);
-  EXPECT_EQ(config_->allowedAuthorizationHeaders().count(Http::LowerCaseString{"foo_header_key"}),
-            1);
-}
+// -------------------
+// Parameterized Tests
+// -------------------
 
 // Test that context extensions make it into the check request.
-TEST_F(HttpExtAuthzFilterTest, ContextExtensions) {
-  initialize(filter_config_);
-
+TEST_F(HttpFilterTestParam, ContextExtensions) {
   // Place something in the context extensions on the virtualhost.
   envoy::config::filter::http::ext_authz::v2alpha::ExtAuthzPerRoute settingsvhost;
   (*settingsvhost.mutable_check_settings()->mutable_context_extensions())["key_vhost"] =
@@ -236,7 +309,7 @@ TEST_F(HttpExtAuthzFilterTest, ContextExtensions) {
 }
 
 // Test that filter can be disabled with route config.
-TEST_F(HttpExtAuthzFilterTest, DisabledOnRoute) {
+TEST_F(HttpFilterTestParam, DisabledOnRoute) {
   envoy::config::filter::http::ext_authz::v2alpha::ExtAuthzPerRoute settings;
   FilterConfigPerRoute auth_per_route(settings);
 
@@ -248,7 +321,7 @@ TEST_F(HttpExtAuthzFilterTest, DisabledOnRoute) {
       .WillByDefault(Return(&auth_per_route));
 
   auto test_disable = [&](bool disabled) {
-    initialize(filter_config_);
+    initialize("");
     // Set disabled
     settings.set_disabled(disabled);
     // Initialize the route's per filter config.
@@ -271,27 +344,23 @@ TEST_F(HttpExtAuthzFilterTest, DisabledOnRoute) {
 }
 
 // Test that the request continues when the filter_callbacks has no route.
-TEST_P(HttpExtAuthzFilterParamTest, NoRoute) {
-
+TEST_F(HttpFilterTestParam, NoRoute) {
   EXPECT_CALL(*filter_callbacks_.route_, routeEntry()).WillOnce(Return(nullptr));
-
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
 }
 
 // Test that the request continues when the authorization service cluster is not present.
-TEST_P(HttpExtAuthzFilterParamTest, NoCluster) {
-
+TEST_F(HttpFilterTestParam, NoCluster) {
   EXPECT_CALL(filter_callbacks_, clusterInfo()).WillOnce(Return(nullptr));
-
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
 }
 
 // Test that the request is stopped till there is an OK response back after which it continues on.
-TEST_P(HttpExtAuthzFilterParamTest, OkResponse) {
+TEST_F(HttpFilterTestParam, OkResponse) {
   InSequence s;
 
   prepareCheck();
@@ -301,12 +370,10 @@ TEST_P(HttpExtAuthzFilterParamTest, OkResponse) {
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
             request_callbacks_ = &callbacks;
           })));
-
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_headers_));
-
   EXPECT_CALL(filter_callbacks_, continueDecoding());
   EXPECT_CALL(filter_callbacks_.stream_info_,
               setResponseFlag(Envoy::StreamInfo::ResponseFlag::UnauthorizedExternalService))
@@ -315,13 +382,12 @@ TEST_P(HttpExtAuthzFilterParamTest, OkResponse) {
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
-
   EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.ok").value());
 }
 
 // Test that an synchronous OK response from the authorization service, on the call stack, results
 // in request continuing on.
-TEST_P(HttpExtAuthzFilterParamTest, ImmediateOkResponse) {
+TEST_F(HttpFilterTestParam, ImmediateOkResponse) {
   InSequence s;
 
   prepareCheck();
@@ -334,18 +400,16 @@ TEST_P(HttpExtAuthzFilterParamTest, ImmediateOkResponse) {
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
             callbacks.onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
           })));
-
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
-
   EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.ok").value());
 }
 
 // Test that an synchronous denied response from the authorization service passing additional HTTP
 // attributes to the downstream.
-TEST_P(HttpExtAuthzFilterParamTest, ImmediateDeniedResponseWithHttpAttributes) {
+TEST_F(HttpFilterTestParam, ImmediateDeniedResponseWithHttpAttributes) {
   InSequence s;
 
   prepareCheck();
@@ -363,7 +427,6 @@ TEST_P(HttpExtAuthzFilterParamTest, ImmediateDeniedResponseWithHttpAttributes) {
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
             callbacks.onComplete(std::move(response_ptr));
           })));
-
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
@@ -374,7 +437,7 @@ TEST_P(HttpExtAuthzFilterParamTest, ImmediateDeniedResponseWithHttpAttributes) {
 
 // Test that an synchronous ok response from the authorization service passing additional HTTP
 // attributes to the upstream.
-TEST_P(HttpExtAuthzFilterParamTest, ImmediateOkResponseWithHttpAttributes) {
+TEST_F(HttpFilterTestParam, ImmediateOkResponseWithHttpAttributes) {
   InSequence s;
 
   // `bar` will be appended to this header.
@@ -402,7 +465,6 @@ TEST_P(HttpExtAuthzFilterParamTest, ImmediateOkResponseWithHttpAttributes) {
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
             callbacks.onComplete(std::move(response_ptr));
           })));
-
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
@@ -415,7 +477,7 @@ TEST_P(HttpExtAuthzFilterParamTest, ImmediateOkResponseWithHttpAttributes) {
 
 // Test that an synchronous denied response from the authorization service, on the call stack,
 // results in request not continuing.
-TEST_P(HttpExtAuthzFilterParamTest, ImmediateDeniedResponse) {
+TEST_F(HttpFilterTestParam, ImmediateDeniedResponse) {
   InSequence s;
 
   prepareCheck();
@@ -427,18 +489,16 @@ TEST_P(HttpExtAuthzFilterParamTest, ImmediateDeniedResponse) {
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
             callbacks.onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
           })));
-
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_headers_));
-
   EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.denied").value());
 }
 
 // Test that a denied response results in the connection closing with a 401 response to the client.
-TEST_P(HttpExtAuthzFilterParamTest, DeniedResponseWith401) {
+TEST_F(HttpFilterTestParam, DeniedResponseWith401) {
   InSequence s;
 
   prepareCheck();
@@ -447,14 +507,11 @@ TEST_P(HttpExtAuthzFilterParamTest, DeniedResponseWith401) {
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
             request_callbacks_ = &callbacks;
           })));
-
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
 
   Http::TestHeaderMapImpl response_headers{{":status", "401"}};
-
   EXPECT_CALL(filter_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
-
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
   EXPECT_CALL(filter_callbacks_.stream_info_,
               setResponseFlag(Envoy::StreamInfo::ResponseFlag::UnauthorizedExternalService));
@@ -463,13 +520,12 @@ TEST_P(HttpExtAuthzFilterParamTest, DeniedResponseWith401) {
   response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
   response.status_code = Http::Code::Unauthorized;
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
-
   EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.denied").value());
   EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("upstream_rq_4xx").value());
 }
 
 // Test that a denied response results in the connection closing with a 403 response to the client.
-TEST_P(HttpExtAuthzFilterParamTest, DeniedResponseWith403) {
+TEST_F(HttpFilterTestParam, DeniedResponseWith403) {
   InSequence s;
 
   prepareCheck();
@@ -482,7 +538,6 @@ TEST_P(HttpExtAuthzFilterParamTest, DeniedResponseWith403) {
             filter_->decodeHeaders(request_headers_, false));
 
   Http::TestHeaderMapImpl response_headers{{":status", "403"}};
-
   EXPECT_CALL(filter_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
   EXPECT_CALL(filter_callbacks_.stream_info_,
@@ -492,14 +547,13 @@ TEST_P(HttpExtAuthzFilterParamTest, DeniedResponseWith403) {
   response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
   response.status_code = Http::Code::Forbidden;
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
-
   EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.denied").value());
   EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("upstream_rq_4xx").value());
   EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("upstream_rq_403").value());
 }
 
 // Verify that authz response memory is not used after free.
-TEST_P(HttpExtAuthzFilterParamTest, DestroyResponseBeforeSendLocalReply) {
+TEST_F(HttpFilterTestParam, DestroyResponseBeforeSendLocalReply) {
   InSequence s;
 
   Filters::Common::ExtAuthz::Response response{};
@@ -525,11 +579,9 @@ TEST_P(HttpExtAuthzFilterParamTest, DestroyResponseBeforeSendLocalReply) {
                                            {"content-type", "text/plain"},
                                            {"foo", "bar"},
                                            {"bar", "foo"}};
-
   Http::HeaderMap* saved_headers;
   EXPECT_CALL(filter_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false))
       .WillOnce(Invoke([&](Http::HeaderMap& headers, bool) { saved_headers = &headers; }));
-
   EXPECT_CALL(filter_callbacks_, encodeData(_, true))
       .WillOnce(Invoke([&](Buffer::Instance& data, bool) {
         response_ptr.reset();
@@ -540,14 +592,13 @@ TEST_P(HttpExtAuthzFilterParamTest, DestroyResponseBeforeSendLocalReply) {
       }));
 
   request_callbacks_->onComplete(std::move(response_ptr));
-
   EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.denied").value());
   EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("upstream_rq_4xx").value());
   EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("upstream_rq_403").value());
 }
 
 // Verify that authz denied response headers overrides the existing encoding headers.
-TEST_P(HttpExtAuthzFilterParamTest, OverrideEncodingHeaders) {
+TEST_F(HttpFilterTestParam, OverrideEncodingHeaders) {
   InSequence s;
 
   Filters::Common::ExtAuthz::Response response{};
@@ -573,7 +624,6 @@ TEST_P(HttpExtAuthzFilterParamTest, OverrideEncodingHeaders) {
                                            {"content-type", "text/plain"},
                                            {"foo", "bar"},
                                            {"bar", "foo"}};
-
   Http::HeaderMap* saved_headers;
   EXPECT_CALL(filter_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false))
       .WillOnce(Invoke([&](Http::HeaderMap& headers, bool) {
@@ -581,7 +631,6 @@ TEST_P(HttpExtAuthzFilterParamTest, OverrideEncodingHeaders) {
         headers.addCopy(Http::LowerCaseString{"foobar"}, std::string{"DO_NOT_OVERRIDE"});
         saved_headers = &headers;
       }));
-
   EXPECT_CALL(filter_callbacks_, encodeData(_, true))
       .WillOnce(Invoke([&](Buffer::Instance& data, bool) {
         response_ptr.reset();
@@ -593,7 +642,6 @@ TEST_P(HttpExtAuthzFilterParamTest, OverrideEncodingHeaders) {
       }));
 
   request_callbacks_->onComplete(std::move(response_ptr));
-
   EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.denied").value());
   EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("upstream_rq_4xx").value());
   EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("upstream_rq_403").value());
@@ -601,7 +649,7 @@ TEST_P(HttpExtAuthzFilterParamTest, OverrideEncodingHeaders) {
 
 // Test that when a connection awaiting a authorization response is canceled then the
 // authorization call is closed.
-TEST_P(HttpExtAuthzFilterParamTest, ResetDuringCall) {
+TEST_F(HttpFilterTestParam, ResetDuringCall) {
   InSequence s;
 
   prepareCheck();
@@ -610,107 +658,10 @@ TEST_P(HttpExtAuthzFilterParamTest, ResetDuringCall) {
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
             request_callbacks_ = &callbacks;
           })));
-
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
-
   EXPECT_CALL(*client_, cancel());
   filter_->onDestroy();
-}
-
-// Check a bad configuration results in validation exception.
-TEST_F(HttpExtAuthzFilterTest, BadConfig) {
-  const std::string filter_config = R"EOF(
-  failure_mode_allow: true
-  grpc_service: {}
-  )EOF";
-
-  envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz proto_config{};
-  MessageUtil::loadFromYaml(filter_config, proto_config);
-
-  EXPECT_THROW(MessageUtil::downcastAndValidate<
-                   const envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz&>(proto_config),
-               ProtoValidationException);
-}
-
-// Test when failure_mode_allow is NOT set and the response from the authorization service is Error
-// that the request is not allowed to continue.
-TEST_F(HttpExtAuthzFilterTest, ErrorFailClose) {
-  const std::string fail_close_config = R"EOF(
-  grpc_service:
-    envoy_grpc:
-      cluster_name: "ext_authz_server"
-  failure_mode_allow: false
-  )EOF";
-  initialize(fail_close_config);
-  InSequence s;
-
-  prepareCheck();
-  EXPECT_CALL(*client_, check(_, _, _))
-      .WillOnce(
-          WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
-            request_callbacks_ = &callbacks;
-          })));
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
-            filter_->decodeHeaders(request_headers_, false));
-  EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
-
-  Filters::Common::ExtAuthz::Response response{};
-  response.status = Filters::Common::ExtAuthz::CheckStatus::Error;
-  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
-
-  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.error").value());
-}
-
-// Test when failure_mode_allow is set and the response from the authorization service is Error that
-// the request is allowed to continue.
-TEST_F(HttpExtAuthzFilterTest, ErrorOpen) {
-  initialize(filter_config_);
-  InSequence s;
-
-  prepareCheck();
-  EXPECT_CALL(*client_, check(_, _, _))
-      .WillOnce(
-          WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
-            request_callbacks_ = &callbacks;
-          })));
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
-            filter_->decodeHeaders(request_headers_, false));
-  EXPECT_CALL(filter_callbacks_, continueDecoding());
-
-  Filters::Common::ExtAuthz::Response response{};
-  response.status = Filters::Common::ExtAuthz::CheckStatus::Error;
-  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
-
-  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.error").value());
-}
-
-// Test when failure_mode_allow is set and the response from the authorization service is an
-// immediate Error that the request is allowed to continue.
-TEST_F(HttpExtAuthzFilterTest, ImmediateErrorOpen) {
-  initialize(filter_config_);
-  InSequence s;
-
-  prepareCheck();
-
-  Filters::Common::ExtAuthz::Response response{};
-  response.status = Filters::Common::ExtAuthz::CheckStatus::Error;
-  EXPECT_CALL(*client_, check(_, _, _))
-      .WillOnce(
-          WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
-            callbacks.onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
-          })));
-
-  EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
-  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
-  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
-
-  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.error").value());
-  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()
-                    ->statsScope()
-                    .counter("ext_authz.failure_mode_allowed")
-                    .value());
 }
 
 } // namespace ExtAuthz

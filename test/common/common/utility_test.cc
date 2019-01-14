@@ -240,6 +240,13 @@ TEST(StringUtil, toUpper) {
   EXPECT_EQ(StringUtil::toUpper("X asdf aAf"), "X ASDF AAF");
 }
 
+TEST(StringUtil, toLower) {
+  EXPECT_EQ(StringUtil::toLower(""), "");
+  EXPECT_EQ(StringUtil::toLower("a"), "a");
+  EXPECT_EQ(StringUtil::toLower("Ba"), "ba");
+  EXPECT_EQ(StringUtil::toLower("X asdf aAf"), "x asdf aaf");
+}
+
 TEST(StringUtil, StringViewLtrim) {
   EXPECT_EQ("", StringUtil::ltrim("     "));
   EXPECT_EQ("hello \t\f\v\n\r", StringUtil::ltrim("   hello \t\f\v\n\r"));

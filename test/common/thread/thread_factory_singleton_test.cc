@@ -19,9 +19,7 @@ struct ThreadFactorySingletonTest {
 };
 
 // Verify that Thread::threadFactorySingleton is defined and initialized for tests.
-TEST(ThreadFactorySingleton, BasicDeathTest) {
-  ::testing::FLAGS_gtest_death_test_style = "threadsafe";
-
+TEST(ThreadFactorySingletonDeathTest, BasicDeathTest) {
   // Verify that an ASSERT() will trigger due to a thread ID mismatch.
   ThreadFactorySingletonTest singleton_test;
   // Use std::thread instead of the ThreadFactory's createThread() to avoid the dependency on the
