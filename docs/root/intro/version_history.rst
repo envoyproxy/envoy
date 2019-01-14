@@ -10,6 +10,12 @@ Version history
 * config: removed deprecated_v1 sds_config from :ref:`Bootstrap config <config_overview_v2_bootstrap>`.
 * config: removed REST_LEGACY as a valid :ref:`ApiType <envoy_api_field_core.ApiConfigSource.api_type>`.
 * cors: added :ref:`filter_enabled & shadow_enabled RuntimeFractionalPercent flags <cors-runtime>` to filter.
+* ext_authz: authorization request and response configuration has been separated into two distinct objects: :ref:`authorization request 
+  <envoy_api_field_config.filter.http.ext_authz.v2alpha.HttpService.authorization_request>` and :ref:`authorization response 
+  <envoy_api_field_config.filter.http.ext_authz.v2alpha.HttpService.authorization_response>`. In addition, :ref:`client headers 
+  <envoy_api_field_config.filter.http.ext_authz.v2alpha.AuthorizationResponse.allowed_client_headers>` and :ref:`upstream headers 
+  <envoy_api_field_config.filter.http.ext_authz.v2alpha.AuthorizationResponse.allowed_upstream_headers>` replaces the previous *allowed_authorization_headers* object. 
+  All the control header lists now support :ref:`string matcher <envoy_api_msg_type.matcher.StringMatcher>` instead of standard string.
 * http: added new grpc_http1_reverse_bridge filter for converting gRPC requests into HTTP/1.1 requests.
 * redis: added :ref:`success and error stats <config_network_filters_redis_proxy_per_command_stats>` for commands.
 * router: added ability to configure a :ref:`retry policy <envoy_api_msg_route.RetryPolicy>` at the
@@ -133,7 +139,7 @@ Version history
   in case of schema/validation error.
 * config: added a stat :ref:`connected_state <management_server_stats>` that indicates current connected state of Envoy with
   management server.
-* ext_authz: added support for configuring additional :ref:`authorization headers <envoy_api_field_config.filter.http.ext_authz.v2alpha.HttpService.authorization_headers_to_add>`
+* ext_authz: added support for configuring additional :ref:`authorization headers <envoy_api_field_config.filter.http.ext_authz.v2alpha.AuthorizationRequest.headers_to_add>`
   to be sent from Envoy to the authorization service.
 * fault: added support for fractional percentages in :ref:`FaultDelay <envoy_api_field_config.filter.fault.v2.FaultDelay.percentage>`
   and in :ref:`FaultAbort <envoy_api_field_config.filter.http.fault.v2.FaultAbort.percentage>`.
