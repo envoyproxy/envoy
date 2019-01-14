@@ -25,11 +25,8 @@ function setup_clang_toolchain() {
 }
 
 function setup_libcpp() {
-  # Force recipe-based dependencies to link against libc++.
+  # Force cc_wrapper and recipe-based dependencies to link against libc++.
   export CXXFLAGS="-stdlib=libc++"
-  # Force Bazel to configure @local_config_cc//:CROSSTOOL using libc++.
-  export BAZEL_CXXOPTS="-std=c++14:-stdlib=libc++"
-  export BAZEL_LINKOPTS="-lc++:-lm" 
   # Force Bazel to link using lld, since GNU ld has trouble linking against libc++fs.
   export BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --linkopt -fuse-ld=lld"
   export BAZEL_TEST_OPTIONS="${BAZEL_TEST_OPTIONS} --linkopt -fuse-ld=lld"

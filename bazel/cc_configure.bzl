@@ -64,6 +64,7 @@ def _build_envoy_cc_wrapper(repository_ctx):
     repository_ctx.template("extra_tools/envoy_cc_wrapper", repository_ctx.attr._envoy_cc_wrapper, {
         "{ENVOY_REAL_CC}": repr(str(real_cc)),
         "{ENVOY_REAL_CXX}": repr(str(real_cxx)),
+        "{ENVOY_CXXFLAGS}": repr(str(repository_ctx.os.environ.get("CXXFLAGS", ""))),
     })
     return repository_ctx.path("extra_tools/envoy_cc_wrapper")
 
