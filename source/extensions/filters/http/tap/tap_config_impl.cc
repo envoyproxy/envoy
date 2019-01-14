@@ -64,7 +64,7 @@ void HttpTapConfigImpl::matchesResponseHeaders(const Http::HeaderMap& headers,
   }
 }
 
-HttpPerRequestTapperPtr HttpTapConfigImpl::newPerRequestTapper() {
+HttpPerRequestTapperPtr HttpTapConfigImpl::createPerRequestTapper() {
   return std::make_unique<HttpPerRequestTapperImpl>(shared_from_this());
 }
 
@@ -87,8 +87,8 @@ Http::HeaderMap::Iterate fillHeaderList(const Http::HeaderEntry& header, void* c
 }
 } // namespace
 
-bool HttpPerRequestTapperImpl::onLog(const Http::HeaderMap* request_headers,
-                                     const Http::HeaderMap* response_headers) {
+bool HttpPerRequestTapperImpl::onDestroyLog(const Http::HeaderMap* request_headers,
+                                            const Http::HeaderMap* response_headers) {
   absl::optional<uint64_t> match_index;
   for (uint64_t i = 0; i < statuses_.size(); i++) {
     const auto& status = statuses_[i];

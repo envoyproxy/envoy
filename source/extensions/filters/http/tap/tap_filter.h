@@ -92,7 +92,7 @@ class Filter : public Http::StreamFilter, public AccessLog::Instance {
 public:
   Filter(FilterConfigSharedPtr config)
       : config_(std::move(config)),
-        tapper_(config_->currentConfig() ? config_->currentConfig()->newPerRequestTapper()
+        tapper_(config_->currentConfig() ? config_->currentConfig()->createPerRequestTapper()
                                          : nullptr) {}
 
   static FilterStats generateStats(const std::string& prefix, Stats::Scope& scope);

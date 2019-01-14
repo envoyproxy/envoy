@@ -57,8 +57,8 @@ private:
     AttachedRequest(std::string config_id, Server::AdminStream* admin_stream)
         : config_id_(std::move(config_id)), admin_stream_(admin_stream) {}
 
-    std::string config_id_;
-    Server::AdminStream* admin_stream_;
+    const std::string config_id_;
+    const Server::AdminStream* admin_stream_;
   };
 
   Http::Code handler(absl::string_view path_and_query, Http::HeaderMap& response_headers,

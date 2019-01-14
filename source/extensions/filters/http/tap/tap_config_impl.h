@@ -49,7 +49,7 @@ public:
   }
 
   // TapFilter::HttpTapConfig
-  HttpPerRequestTapperPtr newPerRequestTapper() override;
+  HttpPerRequestTapperPtr createPerRequestTapper() override;
 
 private:
   Extensions::Common::Tap::Sink* admin_streamer_;
@@ -66,8 +66,8 @@ public:
   // TapFilter::HttpPerRequestTapper
   void onRequestHeaders(const Http::HeaderMap& headers) override;
   void onResponseHeaders(const Http::HeaderMap& headers) override;
-  bool onLog(const Http::HeaderMap* request_headers,
-             const Http::HeaderMap* response_headers) override;
+  bool onDestroyLog(const Http::HeaderMap* request_headers,
+                    const Http::HeaderMap* response_headers) override;
 
 private:
   HttpTapConfigImplSharedPtr config_;

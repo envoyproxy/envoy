@@ -12,15 +12,16 @@ Tap
   very limited set of match conditions, output configuration, output sinks, etc. Capabilities will
   be expanded over time and the configuration structures are likely to change.
 
-The HTTP tap filter is used to tap HTTP traffic. At a high level, the configuration is composed of
-two pieces:
+The HTTP tap filter is used to interpose on and record HTTP traffic. At a high level, the
+configuration is composed of two pieces:
 
-1. Match configuration: a list of conditions under which the filter will match an HTTP request
-   and begin a tap session.
-2. Output configuration: a list of output sinks that the filter will write the matched and tapped
-   data to.
+1. :ref:`Match configuration <envoy_api_msg_service.tap.v2alpha.MatchConfig>`: a list of conditions
+   under which the filter will match an HTTP request and begin a tap session.
+2. :ref:`Output configuration <envoy_api_msg_service.tap.v2alpha.OutputConfig>`: a list of output
+   sinks that the filter will write the matched and tapped data to.
 
-Each of these concepts will be covered in the following example configuration section.
+Each of these concepts will be covered incrementally over the course of several example 
+configurations in the following section.
 
 Example configuration
 ---------------------

@@ -76,7 +76,7 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::HeaderMap& headers, bool) 
 
 void Filter::log(const Http::HeaderMap* request_headers, const Http::HeaderMap* response_headers,
                  const Http::HeaderMap*, const StreamInfo::StreamInfo&) {
-  if (tapper_ != nullptr && tapper_->onLog(request_headers, response_headers)) {
+  if (tapper_ != nullptr && tapper_->onDestroyLog(request_headers, response_headers)) {
     config_->stats().rq_tapped_.inc();
   }
 }

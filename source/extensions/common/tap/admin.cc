@@ -24,19 +24,21 @@ AdminHandlerSharedPtr AdminHandler::getSingleton(Server::Admin& admin,
 
 AdminHandler::AdminHandler(Server::Admin& admin, Event::Dispatcher& main_thread_dispatcher)
     : admin_(admin), main_thread_dispatcher_(main_thread_dispatcher) {
-  bool rc =
+  const bool rc =
       admin_.addHandler("/tap", "tap filter control", MAKE_ADMIN_HANDLER(handler), true, true);
   RELEASE_ASSERT(rc, "/tap admin endpoint is taken");
 }
 
 AdminHandler::~AdminHandler() {
-  bool rc = admin_.removeHandler("/tap");
+  const bool rc = admin_.removeHandler("/tap");
   ASSERT(rc);
 }
 
 Http::Code AdminHandler::handler(absl::string_view, Http::HeaderMap&, Buffer::Instance& response,
                                  Server::AdminStream& admin_stream) {
   if (attached_request_.has_value()) {
+    // TODO(mattlklein123): Consider supporting concurrent admin /tap streams. Right now we support
+    // a single stream as a simplification.
     response.add("An attached /tap admin stream already exists. Detach it.");
     return Http::Code::BadRequest;
   }
