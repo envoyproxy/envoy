@@ -42,9 +42,9 @@ def main():
     argv = []
 
   # Either:
-  # a) remove all occurences of -lstdc++ (when statically linking against libstdc++),
-  # b) replace all occurences of -lstdc++ with -lc++ (when linking against libc++).
   if "-static-libstdc++" in sys.argv[1:] or "-stdlib=libc++" in envoy_cxxflags:
+  # a) remove all occurrences of -lstdc++ (when statically linking against libstdc++),
+  # b) replace all occurrences of -lstdc++ with -lc++ (when linking against libc++).
     for arg in sys.argv[1:]:
       if arg == "-lstdc++":
         if "-stdlib=libc++" in envoy_cxxflags:
