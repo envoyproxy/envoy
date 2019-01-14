@@ -8,6 +8,9 @@ load(
 
 envoy_package()
 
+# TODO: add build targets for quic_platform_impl_lib and spdy_platform_impl_lib,
+#   as _impl.* files for those are added.
+
 envoy_cc_library(
     name = "http2_platform_impl_lib",
     hdrs = [
@@ -28,5 +31,10 @@ envoy_cc_library(
         "http2_string_utils_impl.h",
         "http2_test_helpers_impl.h",
     ],
+    external_deps = [
+        "abseil_base",
+        "abseil_optional",
+    ],
     visibility = ["//visibility:public"],
+    deps = ["//source/common/common:assert_lib"],
 )

@@ -7,6 +7,8 @@ namespace Extensions {
 namespace QuicListeners {
 namespace Quiche {
 
+// Placeholder use of a QUICHE platform type.
+// TODO(mpwarres): remove once real uses of QUICHE platform added.
 Http2String moreCowbell(const Http2String& s) { return s + " cowbell"; }
 
 } // namespace Quiche

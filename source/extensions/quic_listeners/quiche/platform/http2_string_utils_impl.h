@@ -14,6 +14,8 @@
 
 // NOLINT(namespace-envoy)
 
+// TODO: implement
+
 namespace http2 {
 
 template <typename... Args> inline Http2StringImpl Http2StrCatImpl(const Args&... /*args*/) {
