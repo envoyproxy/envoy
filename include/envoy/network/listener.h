@@ -125,6 +125,10 @@ struct UdpData {
   Address::InstanceConstSharedPtr local_address_;
   Address::InstanceConstSharedPtr peer_address_;
   Buffer::InstancePtr buffer_;
+  // TODO (conquerAtapple):
+  // Add UdpReader here so that the callback handler can
+  // then use the reader to do multiple reads(recvmmsg) once the OS notifies it
+  // has data.
 };
 
 /**
@@ -147,6 +151,8 @@ public:
    * Called when the underlying socket is ready for write.
    *
    * @param socket Underlying server socket for the listener.
+   *
+   * TODO (conqerAtapple): Maybe we need a UdpWriter here instead of Socket.
    */
   virtual void onWriteReady(const Socket& socket) PURE;
 
