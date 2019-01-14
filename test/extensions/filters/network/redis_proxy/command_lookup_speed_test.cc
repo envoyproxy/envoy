@@ -66,7 +66,8 @@ public:
   ConnPool::Instance* conn_pool_{new NullInstanceImpl()};
   Stats::IsolatedStoreImpl store_;
   Event::SimulatedTimeSystem time_system_;
-  CommandSplitter::InstanceImpl splitter_{ConnPool::InstancePtr{conn_pool_}, store_, "redis.foo.", time_system_};
+  CommandSplitter::InstanceImpl splitter_{ConnPool::InstancePtr{conn_pool_}, store_, "redis.foo.",
+                                          time_system_};
   NoOpSplitCallbacks callbacks_;
   CommandSplitter::SplitRequestPtr handle_;
 };
