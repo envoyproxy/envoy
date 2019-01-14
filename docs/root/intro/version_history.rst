@@ -5,11 +5,6 @@ Version history
 ================
 * config: added support of using google.protobuf.Any in opaque configs for extensions.
 * access log: added a new flag for upstream retry count exceeded.
-* config: removed deprecated_v1 sds_config from :ref:`Bootstrap config <config_overview_v2_bootstrap>`.
-* buffer: fix vulnerabilities when allocation fails
-* config: removed deprecated_v1 sds_config from :ref:`Bootstrap config <config_overview_v2_bootstrap>`.
-* redis: added :ref:`success and error stats <config_network_filters_redis_proxy_per_command_stats>` for commands.
-* redis: added :ref:`latency stats <config_network_filters_redis_proxy_per_command_stats>` for commands.
 * admin: the admin server can now be accessed via HTTP/2 (prior knowledge).
 * buffer: fix vulnerabilities when allocation fails
 * config: removed deprecated_v1 sds_config from :ref:`Bootstrap config <config_overview_v2_bootstrap>`.
