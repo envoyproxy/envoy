@@ -29,11 +29,9 @@ def sanitize_flagfile(in_path, out_fd):
 
 
 def main():
-  compiler = envoy_real_cc
-
   # Append CXXFLAGS to correctly detect include paths for either libstdc++ or libc++.
-  if envoy_cxxflags and sys.argv[1:5] == ["-E", "-xc++", "-", "-v"]:
-    os.execv(compiler, [compiler] + sys.argv[1:] + envoy_cxxflags.split(" "))
+  if sys.argv[1:5] == ["-E", "-xc++", "-", "-v"]:
+    os.execv(envoy_real_cxx, [envoy_real_cxx] + sys.argv[1:] + envoy_cxxflags.split(" "))
 
   # `g++` and `gcc -lstdc++` have similar behavior and Bazel treats them as
   # interchangeable, but `gcc` will ignore the `-static-libstdc++` flag.
@@ -44,6 +42,8 @@ def main():
   # it in the same test.
   if "-static-libstdc++" in sys.argv[1:] or "-stdlib=libc++" in sys.argv[1:]:
     compiler = envoy_real_cxx
+  else:
+    compiler = envoy_real_cc
 
   # Either:
   # a) remove all occurrences of -lstdc++ (when statically linking against libstdc++),
