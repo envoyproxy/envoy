@@ -1,15 +1,32 @@
 licenses(["notice"])  # Apache 2
 
-# Transformations to QUICHE tarball:
+# QUICHE is Google's implementation of QUIC and related protocols. It is the
+# same code used in Chromium and Google's servers, but packaged in a form that
+# is intended to be easier to incorporate into third-party projects.
+#
+# QUICHE code falls into three groups:
+# 1. Platform-independent code. Most QUICHE code is in this category.
+# 2. APIs and type aliases to platform-dependent code/types, referenced by code
+#    in group 1. This group is called the "Platform API".
+# 3. Definitions of types declared in group 2. This group is called the
+#    "Platform impl", and must be provided by the codebase that embeds QUICHE.
+#
+# Concretely, header files in group 2 (the Platform API) #include header and
+# source files in group 3 (the Platform impl). Unfortunately, QUICHE does not
+# yet provide a built-in way to customize this dependency, e.g. to override the
+# directory or namespace in which Platform impl types are defined. Hence the
+# gross hacks in this file.
+#
+# Transformations to QUICHE tarball performed here:
 # - Move subtree under quiche/ base dir, for clarity in #include statements.
 # - Rewrite include directives for platform/impl files.
 #
-# The mechanics of this are likely to change as QUICHE evolves, supplies its own
-# Bazel buildfiles, and perhaps provides a more graceful way to override
-# platform impl directory location. However, the end result (QUICHE files placed
-# under quiche/{http2,quic,spdy}/, with the Envoy-specific implementation of the
+# The mechanics of this will change as QUICHE evolves, supplies its own Bazel
+# buildfiles, and provides a built-in way to override platform impl directory
+# location. However, the end result (QUICHE files placed under
+# quiche/{http2,quic,spdy}/, with the Envoy-specific implementation of the
 # QUICHE platform APIs in //source/extensions/quic_listeners/quiche/platform/,
-# should remain the same.
+# should remain largely the same.
 
 src_files = glob([
     "**/*.h",
@@ -19,6 +36,8 @@ src_files = glob([
     "**/*.proto",
 ])
 
+# TODO(mpwarres): remove use of sed once QUICHE provides a cleaner way to
+#   override platform impl directory location.
 genrule(
     name = "quiche_files",
     srcs = src_files,

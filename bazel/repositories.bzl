@@ -545,6 +545,9 @@ def _com_googlesource_quiche():
         name = "com_googlesource_quiche",
         build_file = "@envoy//bazel/external:quiche.BUILD",
     )
+
+    # TODO: add bindings for quiche_quic_platform and quiche_spdy_platform once
+    #   those build targets have been defined.
     native.bind(
         name = "quiche_http2_platform",
         actual = "@com_googlesource_quiche//:http2_platform",
