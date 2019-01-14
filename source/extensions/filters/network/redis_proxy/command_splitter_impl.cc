@@ -393,7 +393,7 @@ SplitRequestPtr InstanceImpl::makeRequest(const RespValue& request, SplitCallbac
     return nullptr;
   }
   ENVOY_LOG(debug, "redis: splitting '{}'", request.toString());
-   handler->command_stats_.total_.inc();
+  handler->command_stats_.total_.inc();
   SplitRequestPtr request_ptr = handler->handler_.get().startRequest(
       request, callbacks, handler->command_stats_, time_source_);
   return request_ptr;
@@ -408,7 +408,7 @@ void InstanceImpl::addHandler(Stats::Scope& scope, const std::string& stat_prefi
                               const std::string& name, CommandHandler& handler) {
   std::string to_lower_name(name);
   to_lower_table_.toLowerCase(to_lower_name);
-    handler_lookup_table_.add(
+  handler_lookup_table_.add(
       to_lower_name.c_str(),
       std::make_shared<HandlerData>(HandlerData{
           CommandStats{
