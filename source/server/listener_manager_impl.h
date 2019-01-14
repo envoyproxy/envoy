@@ -61,6 +61,7 @@ public:
     return createListenerFilterFactoryList_(filters, context);
   }
   Network::SocketSharedPtr createListenSocket(Network::Address::InstanceConstSharedPtr address,
+                                              Network::Address::SocketType socket_type,
                                               const Network::Socket::OptionsSharedPtr& options,
                                               bool bind_to_port) override;
   DrainManagerPtr createDrainManager(envoy::api::v2::Listener::DrainType drain_type) override;
@@ -227,6 +228,7 @@ public:
   }
 
   Network::Address::InstanceConstSharedPtr address() const { return address_; }
+  Network::Address::SocketType socketType() const { return socket_type_; }
   const envoy::api::v2::Listener& config() { return config_; }
   const Network::SocketSharedPtr& getSocket() const { return socket_; }
   void debugLog(const std::string& message);
@@ -386,6 +388,7 @@ private:
 
   ListenerManagerImpl& parent_;
   Network::Address::InstanceConstSharedPtr address_;
+  Network::Address::SocketType socket_type_;
   Network::SocketSharedPtr socket_;
   Stats::ScopePtr global_scope_;   // Stats with global named scope, but needed for LDS cleanup.
   Stats::ScopePtr listener_scope_; // Stats with listener named scope.

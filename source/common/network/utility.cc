@@ -404,7 +404,7 @@ Address::InstanceConstSharedPtr Utility::getOriginalDst(int fd) {
     return nullptr;
   }
 #else
-  // TODO(zuercher): determine if connection redirection is possible under OS X (c.f. pfctl and
+  // TODO(zuercher): determine if connection redirection is possible under macOS (c.f. pfctl and
   // divert), and whether it's possible to find the learn destination address.
   UNREFERENCED_PARAMETER(fd);
   return nullptr;
@@ -498,6 +498,27 @@ void Utility::addressToProtobufAddress(const Address::Instance& address,
     auto* socket_address = proto_address.mutable_socket_address();
     socket_address->set_address(address.ip()->addressAsString());
     socket_address->set_port_value(address.ip()->port());
+  }
+}
+
+Address::SocketType
+Utility::protobufAddressSocketType(const envoy::api::v2::core::Address& proto_address) {
+  switch (proto_address.address_case()) {
+  case envoy::api::v2::core::Address::kSocketAddress: {
+    auto protocol = proto_address.socket_address().protocol();
+    switch (protocol) {
+    case envoy::api::v2::core::SocketAddress::TCP:
+      return Address::SocketType::Stream;
+    case envoy::api::v2::core::SocketAddress::UDP:
+      return Address::SocketType::Datagram;
+    default:
+      NOT_REACHED_GCOVR_EXCL_LINE;
+    }
+  }
+  case envoy::api::v2::core::Address::kPipe:
+    return Address::SocketType::Stream;
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 

@@ -72,7 +72,7 @@ protected:
   // @return host set to use and which availability to target.
   std::pair<HostSet&, HostAvailability> chooseHostSet(LoadBalancerContext* context);
 
-  uint32_t percentageLoad(uint32_t priority) const { return per_priority_load_[priority]; }
+  uint32_t percentageLoad(uint32_t priority) const { return per_priority_load_.get()[priority]; }
   uint32_t percentageDegradedLoad(uint32_t priority) const {
     return degraded_per_priority_load_[priority];
   }
@@ -92,7 +92,7 @@ public:
   void static recalculatePerPriorityState(uint32_t priority, const PrioritySet& priority_set,
                                           PriorityLoad& priority_load,
                                           PriorityLoad& degraded_priority_load,
-                                          std::vector<uint32_t>& per_priority_health,
+                                          PriorityAvailability& per_priority_health,
                                           std::vector<uint32_t>& per_priority_degraded);
   void recalculatePerPriorityPanic();
 
@@ -110,9 +110,9 @@ protected:
   static uint32_t
   calculateNormalizedTotalAvailability(std::vector<uint32_t>& per_priority_health,
                                        std::vector<uint32_t>& per_priority_degraded) {
-    const auto health = std::accumulate(per_priority_health.begin(), per_priority_health.end(), 0);
+    const auto health = std::accumulate(per_priority_health.get().begin(), per_priority_health.get().end(), 0);
     const auto degraded =
-        std::accumulate(per_priority_degraded.begin(), per_priority_degraded.end(), 0);
+        std::accumulate(per_priority_degraded.get().begin(), per_priority_degraded.get().end(), 0);
 
     return std::min<uint32_t>(health + degraded, 100);
   }
@@ -121,7 +121,7 @@ protected:
   // The percentage load (0-100) for each priority level when targeting degraded hosts.
   PriorityLoad degraded_per_priority_load_;
   // The health percentage (0-100) for each priority level.
-  std::vector<uint32_t> per_priority_health_;
+  PriorityAvailability per_priority_health_;
   // The degraded percentage (0-100) for each priority level.
   std::vector<uint32_t> per_priority_degraded_;
   // Levels which are in panic

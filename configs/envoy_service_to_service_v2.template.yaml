@@ -41,7 +41,6 @@
         - name: envoy.buffer
           config:
            max_request_bytes: 5242880
-           max_request_time: 120s
         - name: envoy.router
           config: {}
         access_log:
@@ -452,6 +451,7 @@ static_resources:
 dynamic_resources:
   cds_config:
     api_config_source:
+      api_type: REST
       cluster_names:
       - cds_cluster
       refresh_delay: 30s

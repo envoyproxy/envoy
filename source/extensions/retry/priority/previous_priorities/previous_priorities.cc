@@ -59,7 +59,7 @@ bool PreviousPrioritiesRetryPriority::adjustForAttemptedPriorities(
     return false;
   }
 
-  std::fill(per_priority_load_.begin(), per_priority_load_.end(), 0);
+  std::fill(per_priority_load_.get().begin(), per_priority_load_.get().end(), 0);
   // We then adjust the load by rebalancing priorities with the adjusted health values.
   size_t total_load = 100;
   // The outer loop is used to eliminate rounding errors: any remaining load will be assigned to the
@@ -70,7 +70,7 @@ bool PreviousPrioritiesRetryPriority::adjustForAttemptedPriorities(
       // when total_load runs out.
       auto delta =
           std::min<uint32_t>(total_load, adjusted_per_priority_health[i] * 100 / total_health);
-      per_priority_load_[i] += delta;
+      per_priority_load_.get()[i] += delta;
       total_load -= delta;
     }
   }
@@ -82,12 +82,12 @@ std::pair<std::vector<uint32_t>, uint32_t> PreviousPrioritiesRetryPriority::adju
   // Create an adjusted health view of the priorities, where attempted priorities are
   // given a zero weight.
   uint32_t total_health = 0;
-  std::vector<uint32_t> adjusted_per_priority_health(per_priority_health_.size(), 0);
+  std::vector<uint32_t> adjusted_per_priority_health(per_priority_health_.get().size(), 0);
 
-  for (size_t i = 0; i < per_priority_health_.size(); ++i) {
+  for (size_t i = 0; i < per_priority_health_.get().size(); ++i) {
     if (!excluded_priorities_[i]) {
-      adjusted_per_priority_health[i] = per_priority_health_[i];
-      total_health += per_priority_health_[i];
+      adjusted_per_priority_health[i] = per_priority_health_.get()[i];
+      total_health += per_priority_health_.get()[i];
     }
   }
 

@@ -1699,6 +1699,42 @@ TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForUnknownFilter) {
       "Didn't find a registered network or http filter implementation for name: 'no_such_filter'");
 }
 
+TEST_F(ClusterInfoImplTest, TypedExtensionProtocolOptionsForUnknownFilter) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    hosts: [{ socket_address: { address: foo.bar.com, port_value: 443 }}]
+    typed_extension_protocol_options:
+      no_such_filter:
+        "@type": type.googleapis.com/google.protobuf.Struct
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      makeCluster(yaml), EnvoyException,
+      "Didn't find a registered network or http filter implementation for name: 'no_such_filter'");
+}
+
+TEST_F(ClusterInfoImplTest, OneofExtensionProtocolOptionsForUnknownFilter) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    hosts: [{ socket_address: { address: foo.bar.com, port_value: 443 }}]
+    extension_protocol_options:
+      no_such_filter: { option: value }
+    typed_extension_protocol_options:
+      no_such_filter:
+        "@type": type.googleapis.com/google.protobuf.Struct
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml), EnvoyException,
+                            "Only one of typed_extension_protocol_options or "
+                            "extension_protocol_options can be specified");
+}
+
 class TestFilterConfigFactoryBase {
 public:
   TestFilterConfigFactoryBase(
@@ -1814,6 +1850,37 @@ TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForFilterWithoutOptions) {
   }
 }
 
+TEST_F(ClusterInfoImplTest, TypedExtensionProtocolOptionsForFilterWithoutOptions) {
+  TestFilterConfigFactoryBase factoryBase(
+      []() -> ProtobufTypes::MessagePtr { return nullptr; },
+      [](const Protobuf::Message&) -> Upstream::ProtocolOptionsConfigConstSharedPtr {
+        return nullptr;
+      });
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    hosts: [{ socket_address: { address: foo.bar.com, port_value: 443 }}]
+    typed_extension_protocol_options:
+      envoy.test.filter: { "@type": type.googleapis.com/google.protobuf.Struct }
+  )EOF";
+
+  {
+    TestNetworkFilterConfigFactory factory(factoryBase);
+    Registry::InjectFactory<Server::Configuration::NamedNetworkFilterConfigFactory> registry(
+        factory);
+    EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml), EnvoyException,
+                              "filter envoy.test.filter does not support protocol options");
+  }
+  {
+    TestHttpFilterConfigFactory factory(factoryBase);
+    Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> registry(factory);
+    EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml), EnvoyException,
+                              "filter envoy.test.filter does not support protocol options");
+  }
+}
+
 // Cluster retrieval of typed extension protocol options.
 TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForFilterWithOptions) {
   auto protocol_options = std::make_shared<TestFilterProtocolOptionsConfig>();
@@ -1837,6 +1904,19 @@ TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForFilterWithOptions) {
       envoy.test.filter: { option: "value" }
   )EOF";
 
+  const std::string typed_yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    hosts: [{ socket_address: { address: foo.bar.com, port_value: 443 }}]
+    typed_extension_protocol_options:
+      envoy.test.filter:
+        "@type": type.googleapis.com/google.protobuf.Struct
+        value:
+          option: "value"
+  )EOF";
+
   // This vector is used to gather clusters with extension_protocol_options from the different
   // types of extension factories (network, http).
   std::vector<std::unique_ptr<StrictDnsClusterImpl>> clusters;
@@ -1853,6 +1933,19 @@ TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForFilterWithOptions) {
     TestHttpFilterConfigFactory factory(factoryBase);
     Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> registry(factory);
     clusters.push_back(makeCluster(yaml));
+  }
+  {
+    // Get the cluster with extension_protocol_options for a network filter factory.
+    TestNetworkFilterConfigFactory factory(factoryBase);
+    Registry::InjectFactory<Server::Configuration::NamedNetworkFilterConfigFactory> registry(
+        factory);
+    clusters.push_back(makeCluster(typed_yaml));
+  }
+  {
+    // Get the cluster with extension_protocol_options for an http filter factory.
+    TestHttpFilterConfigFactory factory(factoryBase);
+    Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> registry(factory);
+    clusters.push_back(makeCluster(typed_yaml));
   }
 
   // Make sure that the clusters created from both factories are as expected.

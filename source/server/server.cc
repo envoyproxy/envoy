@@ -179,34 +179,19 @@ InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& boots
   if (config_path.empty() && config_yaml.empty()) {
     const std::string message =
         "At least one of --config-path and --config-yaml should be non-empty";
-    std::cerr << message << std::endl;
     throw EnvoyException(message);
   }
-  try {
-    if (!config_path.empty()) {
-      MessageUtil::loadFromFile(config_path, bootstrap);
-    }
-    if (!config_yaml.empty()) {
-      envoy::config::bootstrap::v2::Bootstrap bootstrap_override;
-      MessageUtil::loadFromYaml(config_yaml, bootstrap_override);
-      bootstrap.MergeFrom(bootstrap_override);
-    }
-    MessageUtil::validate(bootstrap);
-    return BootstrapVersion::V2;
-  } catch (const EnvoyException& e) {
-    if (options.v2ConfigOnly()) {
-      throw;
-    }
-    // TODO(htuch): When v1 is deprecated, make this a warning encouraging config upgrade.
-    ENVOY_LOG(debug, "Unable to initialize config as v2, will retry as v1: {}", e.what());
+
+  if (!config_path.empty()) {
+    MessageUtil::loadFromFile(config_path, bootstrap);
   }
   if (!config_yaml.empty()) {
-    throw EnvoyException("V1 config (detected) with --config-yaml is not supported");
+    envoy::config::bootstrap::v2::Bootstrap bootstrap_override;
+    MessageUtil::loadFromYaml(config_yaml, bootstrap_override);
+    bootstrap.MergeFrom(bootstrap_override);
   }
-  Json::ObjectSharedPtr config_json = Json::Factory::loadFromFile(config_path);
-  Config::BootstrapJson::translateBootstrap(*config_json, bootstrap, options.statsOptions());
   MessageUtil::validate(bootstrap);
-  return BootstrapVersion::V1;
+  return BootstrapVersion::V2;
 }
 
 void InstanceImpl::initialize(Options& options,
@@ -247,11 +232,16 @@ void InstanceImpl::initialize(Options& options,
   stats_store_.setTagProducer(Config::Utility::createTagProducer(bootstrap_));
   stats_store_.setStatsMatcher(Config::Utility::createStatsMatcher(bootstrap_));
 
+  const std::string server_stats_prefix = "server.";
   server_stats_ = std::make_unique<ServerStats>(
-      ServerStats{ALL_SERVER_STATS(POOL_GAUGE_PREFIX(stats_store_, "server."))});
+      ServerStats{ALL_SERVER_STATS(POOL_COUNTER_PREFIX(stats_store_, server_stats_prefix),
+                                   POOL_GAUGE_PREFIX(stats_store_, server_stats_prefix))});
 
   server_stats_->concurrency_.set(options_.concurrency());
   server_stats_->hot_restart_epoch_.set(options_.restartEpoch());
+
+  assert_action_registration_ = Assert::setDebugAssertionFailureRecordAction(
+      [this]() { server_stats_->debug_assertion_failures_.inc(); });
 
   failHealthcheck(false);
 

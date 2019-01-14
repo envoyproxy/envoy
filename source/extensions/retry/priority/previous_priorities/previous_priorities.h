@@ -45,7 +45,7 @@ private:
   std::vector<bool> excluded_priorities_;
   Upstream::PriorityLoad per_priority_load_;
   Upstream::PriorityLoad degraded_per_priority_load_;
-  std::vector<uint32_t> per_priority_health_;
+  Upstream::PriorityAvailability per_priority_health_;
   std::vector<uint32_t> per_priority_degraded_;
 };
 

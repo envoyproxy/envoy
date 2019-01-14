@@ -17,13 +17,23 @@ static_resources:
           route_config:
             name: local_route
             virtual_hosts:
-            - name: services
+            - name: www
               domains:
               - "*"
               cors:
                 allow_origin:
                 - "*"
                 allow_methods: "GET"
+                filter_enabled:
+                  default_value:
+                    numerator: 100
+                    denominator: HUNDRED
+                  runtime_key: cors.www.enabled
+                shadow_enabled:
+                  default_value:
+                    numerator: 0
+                    denominator: HUNDRED
+                  runtime_key: cors.www.shadow_enabled
               routes:
               - match:
                   prefix: "/cors/open"
@@ -34,7 +44,10 @@ static_resources:
                 route:
                   cluster: backend_service
                   cors:
-                    enabled: false
+                    filter_enabled:
+                      default_value:
+                        numerator: 0
+                        denominator: HUNDRED
               - match:
                   prefix: "/cors/restricted"
                 route:

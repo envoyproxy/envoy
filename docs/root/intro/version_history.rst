@@ -3,11 +3,25 @@ Version history
 
 1.10.0 (pending)
 ================
+* config: added support of using google.protobuf.Any in opaque configs for extensions.
 * access log: added a new flag for upstream retry count exceeded.
+* admin: the admin server can now be accessed via HTTP/2 (prior knowledge).
 * buffer: fix vulnerabilities when allocation fails
 * config: removed deprecated_v1 sds_config from :ref:`Bootstrap config <config_overview_v2_bootstrap>`.
+* config: removed REST_LEGACY as a valid :ref:`ApiType <envoy_api_field_core.ApiConfigSource.api_type>`.
+* cors: added :ref:`filter_enabled & shadow_enabled RuntimeFractionalPercent flags <cors-runtime>` to filter.
+* ext_authz: authorization request and response configuration has been separated into two distinct objects: :ref:`authorization request 
+  <envoy_api_field_config.filter.http.ext_authz.v2alpha.HttpService.authorization_request>` and :ref:`authorization response 
+  <envoy_api_field_config.filter.http.ext_authz.v2alpha.HttpService.authorization_response>`. In addition, :ref:`client headers 
+  <envoy_api_field_config.filter.http.ext_authz.v2alpha.AuthorizationResponse.allowed_client_headers>` and :ref:`upstream headers 
+  <envoy_api_field_config.filter.http.ext_authz.v2alpha.AuthorizationResponse.allowed_upstream_headers>` replaces the previous *allowed_authorization_headers* object. 
+  All the control header lists now support :ref:`string matcher <envoy_api_msg_type.matcher.StringMatcher>` instead of standard string.
 * http: added new grpc_http1_reverse_bridge filter for converting gRPC requests into HTTP/1.1 requests.
+* redis: added :ref:`success and error stats <config_network_filters_redis_proxy_per_command_stats>` for commands.
+* router: added ability to configure a :ref:`retry policy <envoy_api_msg_route.RetryPolicy>` at the
+  virtual host level.
 * tls: enabled TLS 1.3 on the server-side (non-FIPS builds).
+* upstream: add hash_function to specify the hash function for :ref:`ring hash<envoy_api_msg_Cluster.RingHashLbConfig>` as either xxHash or `murmurHash2 <https://sites.google.com/site/murmurhash>`_. MurmurHash2 is compatible with std::hash in GNU libstdc++ 3.4.20 or above. This is typically the case when compiled on Linux and not macOS.
 
 1.9.0
 ===============
@@ -64,7 +78,7 @@ Version history
 * rbac: added support for permission matching by :ref:`requested server name <envoy_api_field_config.rbac.v2alpha.Permission.requested_server_name>`.
 * redis: static cluster configuration is no longer required. Redis proxy will work with clusters
   delivered via CDS.
-* router: added ability to configure arbitrary :ref:`retriable status codes. <envoy_api_field_route.RouteAction.RetryPolicy.retriable_status_codes>`
+* router: added ability to configure arbitrary :ref:`retriable status codes. <envoy_api_field_route.RetryPolicy.retriable_status_codes>`
 * router: added ability to set attempt count in upstream requests, see :ref:`virtual host's include request
   attempt count flag <envoy_api_field_route.VirtualHost.include_request_attempt_count>`.
 * router: added internal :ref:`grpc-retry-on <config_http_filters_router_x-envoy-retry-grpc-on>` policy.
@@ -114,18 +128,18 @@ Version history
 * access log: added REQUESTED_SERVER_NAME for SNI to tcp_proxy and http
 * admin: added :http:get:`/hystrix_event_stream` as an endpoint for monitoring envoy's statistics
   through `Hystrix dashboard <https://github.com/Netflix-Skunkworks/hystrix-dashboard/wiki>`_.
-* cli: Added support for :ref:`component log level <operations_cli>` command line option for configuring log levels of individual components.
+* cli: added support for :ref:`component log level <operations_cli>` command line option for configuring log levels of individual components.
 * cluster: added :ref:`option <envoy_api_field_Cluster.CommonLbConfig.update_merge_window>` to merge
   health check/weight/metadata updates within the given duration.
 * config: regex validation added to limit to a maximum of 1024 characters.
 * config: v1 disabled by default. v1 support remains available until October via flipping --v2-config-only=false.
 * config: v1 disabled by default. v1 support remains available until October via deprecated flag --allow-deprecated-v1-api.
-* config: Fixed stat inconsistency between xDS and ADS implementation. :ref:`update_failure <config_cluster_manager_cds>`
+* config: fixed stat inconsistency between xDS and ADS implementation. :ref:`update_failure <config_cluster_manager_cds>`
   stat is incremented in case of network failure and :ref:`update_rejected <config_cluster_manager_cds>` stat is incremented
   in case of schema/validation error.
-* config: Added a stat :ref:`connected_state <management_server_stats>` that indicates current connected state of Envoy with
+* config: added a stat :ref:`connected_state <management_server_stats>` that indicates current connected state of Envoy with
   management server.
-* ext_authz: added support for configuring additional :ref:`authorization headers <envoy_api_field_config.filter.http.ext_authz.v2alpha.HttpService.authorization_headers_to_add>`
+* ext_authz: added support for configuring additional :ref:`authorization headers <envoy_api_field_config.filter.http.ext_authz.v2alpha.AuthorizationRequest.headers_to_add>`
   to be sent from Envoy to the authorization service.
 * fault: added support for fractional percentages in :ref:`FaultDelay <envoy_api_field_config.filter.fault.v2.FaultDelay.percentage>`
   and in :ref:`FaultAbort <envoy_api_field_config.filter.http.fault.v2.FaultAbort.percentage>`.
@@ -187,7 +201,7 @@ Version history
   removed the old `name` field to give more flexibility for matching certificate identity.
 * rbac network filter: a :ref:`role-based access control network filter <config_network_filters_rbac>` has been added.
 * rest-api: added ability to set the :ref:`request timeout <envoy_api_field_core.ApiConfigSource.request_timeout>` for REST API requests.
-* route checker: Added v2 config support and removed support for v1 configs.
+* route checker: added v2 config support and removed support for v1 configs.
 * router: added ability to set request/response headers at the :ref:`envoy_api_msg_route.Route` level.
 * stats: added :ref:`option to configure the DogStatsD metric name prefix<envoy_api_field_config.metrics.v2.DogStatsdSink.prefix>` to DogStatsdSink.
 * tcp_proxy: added support for :ref:`weighted clusters <envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.weighted_clusters>`.

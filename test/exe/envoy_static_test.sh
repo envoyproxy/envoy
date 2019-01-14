@@ -1,8 +1,27 @@
 #!/bin/bash
-#
 
-set -e
+ENVOY_BIN=${TEST_RUNDIR}/source/exe/envoy-static
 
-# Validate we statically link libstdc++ and libgcc.
-DYNDEPS=$(ldd source/exe/envoy-static | grep "libstdc++\|libgcc"; echo)
-[[ -z "$DYNDEPS" ]] || (echo "libstdc++ or libgcc dynamically linked: ${DYNDEPS}"; exit 1)
+if [[ `uname` == "Darwin" ]]; then
+  echo "macOS doesn't support statically linked binaries, skipping."
+  exit 0
+fi
+
+# We can't rely on the exit code alone, since lld fails for statically linked binaries.
+DYNLIBS=$(ldd ${ENVOY_BIN} 2>&1)
+if [[ $? != 0 && ! "${DYNLIBS}" =~ "not a dynamic executable" ]]; then
+  echo "${DYNLIBS}"
+  exit 1
+fi
+
+if [[ ${DYNLIBS} =~ "libc++" ]]; then
+  echo "libc++ is dynamically linked:"
+  echo "${DYNLIBS}"
+  exit 1
+fi
+
+if [[ ${DYNLIBS} =~ "libstdc++" || ${DYNLIBS} =~ "libgcc" ]]; then
+  echo "libstdc++ and/or libgcc are dynamically linked:"
+  echo "${DYNLIBS}"
+  exit 1
+fi

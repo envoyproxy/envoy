@@ -68,8 +68,14 @@ def envoy_copts(repository, test = False):
                repository + "//bazel:disable_tcmalloc": ["-DABSL_MALLOC_HOOK_MMAP_DISABLE"],
                "//conditions:default": ["-DTCMALLOC"],
            }) + select({
+               repository + "//bazel:debug_tcmalloc": ["-DENVOY_MEMORY_DEBUG_ENABLED=1"],
+               "//conditions:default": [],
+           }) + select({
                repository + "//bazel:disable_signal_trace": [],
                "//conditions:default": ["-DENVOY_HANDLE_SIGNALS"],
+           }) + select({
+               repository + "//bazel:enable_log_debug_assert_in_release": ["-DENVOY_LOG_DEBUG_ASSERT_IN_RELEASE"],
+               "//conditions:default": [],
            }) + select({
                # TCLAP command line parser needs this to support int64_t/uint64_t
                "@bazel_tools//tools/osx:darwin": ["-DHAVE_LONG_LONG"],
@@ -87,7 +93,7 @@ def envoy_static_link_libstdcpp_linkopts():
 # Compute the final linkopts based on various options.
 def envoy_linkopts():
     return select({
-               # The OSX system library transitively links common libraries (e.g., pthread).
+               # The macOS system library transitively links common libraries (e.g., pthread).
                "@bazel_tools//tools/osx:darwin": [
                    # See note here: http://luajit.org/install.html
                    "-pagezero_size 10000",
@@ -115,7 +121,7 @@ def _envoy_stamped_linkopts():
         "@envoy//bazel:coverage_build": [],
         "@envoy//bazel:windows_x86_64": [],
 
-        # MacOS doesn't have an official equivalent to the `.note.gnu.build-id`
+        # macOS doesn't have an official equivalent to the `.note.gnu.build-id`
         # ELF section, so just stuff the raw ID into a new text section.
         "@bazel_tools//tools/osx:darwin": [
             "-sectcreate __TEXT __build_id",
@@ -165,6 +171,7 @@ def envoy_external_dep_path(dep):
 def tcmalloc_external_dep(repository):
     return select({
         repository + "//bazel:disable_tcmalloc": None,
+        repository + "//bazel:debug_tcmalloc": envoy_external_dep_path("tcmalloc_debug"),
         "//conditions:default": envoy_external_dep_path("tcmalloc_and_profiler"),
     })
 
@@ -174,6 +181,7 @@ def tcmalloc_external_dep(repository):
 def tcmalloc_external_deps(repository):
     return select({
         repository + "//bazel:disable_tcmalloc": [],
+        repository + "//bazel:debug_tcmalloc": [envoy_external_dep_path("tcmalloc_debug")],
         "//conditions:default": [envoy_external_dep_path("tcmalloc_and_profiler")],
     })
 
@@ -337,7 +345,7 @@ def envoy_cc_fuzz_test(name, corpus, deps = [], tags = [], **kwargs):
         linkstatic = 1,
         args = ["$(locations %s)" % corpus_name],
         data = [corpus_name],
-        # No fuzzing on OS X.
+        # No fuzzing on macOS.
         deps = select({
             "@bazel_tools//tools/osx:darwin": ["//test:dummy_main"],
             "//conditions:default": [
@@ -460,22 +468,24 @@ def envoy_sh_test(
         name,
         srcs = [],
         data = [],
+        coverage = True,
         **kargs):
-    test_runner_cc = name + "_test_runner.cc"
-    native.genrule(
-        name = name + "_gen_test_runner",
-        srcs = srcs,
-        outs = [test_runner_cc],
-        cmd = "$(location //bazel:gen_sh_test_runner.sh) $(SRCS) >> $@",
-        tools = ["//bazel:gen_sh_test_runner.sh"],
-    )
-    envoy_cc_test_library(
-        name = name + "_lib",
-        srcs = [test_runner_cc],
-        data = srcs + data,
-        tags = ["coverage_test_lib"],
-        deps = ["//test/test_common:environment_lib"],
-    )
+    if coverage:
+        test_runner_cc = name + "_test_runner.cc"
+        native.genrule(
+            name = name + "_gen_test_runner",
+            srcs = srcs,
+            outs = [test_runner_cc],
+            cmd = "$(location //bazel:gen_sh_test_runner.sh) $(SRCS) >> $@",
+            tools = ["//bazel:gen_sh_test_runner.sh"],
+        )
+        envoy_cc_test_library(
+            name = name + "_lib",
+            srcs = [test_runner_cc],
+            data = srcs + data,
+            tags = ["coverage_test_lib"],
+            deps = ["//test/test_common:environment_lib"],
+        )
     native.sh_test(
         name = name,
         srcs = ["//bazel:sh_test_wrapper.sh"],

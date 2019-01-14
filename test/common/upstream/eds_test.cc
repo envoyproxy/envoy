@@ -39,6 +39,7 @@ protected:
         service_name: fare
         eds_config:
           api_config_source:
+            api_type: REST
             cluster_names:
             - eds
             refresh_delay: 1s
@@ -124,6 +125,7 @@ protected:
         service_name: fare
         eds_config:
           api_config_source:
+            api_type: REST
             cluster_names:
             - eds
             refresh_delay: 1s
@@ -222,6 +224,7 @@ TEST_F(EdsTest, NoServiceNameOnSuccessConfigUpdate) {
       eds_cluster_config:
         eds_config:
           api_config_source:
+            api_type: REST
             cluster_names:
             - eds
             refresh_delay: 1s
@@ -428,6 +431,7 @@ TEST_F(EdsTest, EndpointRemoval) {
         service_name: fare
         eds_config:
           api_config_source:
+            api_type: REST
             cluster_names:
             - eds
             refresh_delay: 1s
@@ -493,6 +497,7 @@ TEST_F(EdsTest, EndpointMovedToNewPriority) {
         service_name: fare
         eds_config:
           api_config_source:
+            api_type: REST
             cluster_names:
             - eds
             refresh_delay: 1s
@@ -580,6 +585,7 @@ TEST_F(EdsTest, EndpointMoved) {
         service_name: fare
         eds_config:
           api_config_source:
+            api_type: REST
             cluster_names:
             - eds
             refresh_delay: 1s
@@ -755,6 +761,7 @@ TEST_F(EdsTest, EndpointLocalityWeights) {
         service_name: fare
         eds_config:
           api_config_source:
+            api_type: REST
             cluster_names:
             - eds
             refresh_delay: 1s
@@ -1243,6 +1250,7 @@ TEST_F(EdsTest, PriorityAndLocalityWeighted) {
         service_name: fare
         eds_config:
           api_config_source:
+            api_type: REST
             cluster_names:
             - eds
             refresh_delay: 1s

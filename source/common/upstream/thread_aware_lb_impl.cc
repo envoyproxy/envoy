@@ -21,7 +21,7 @@ void ThreadAwareLoadBalancerBase::initialize() {
 void ThreadAwareLoadBalancerBase::refresh() {
   auto per_priority_state_vector = std::make_shared<std::vector<PerPriorityStatePtr>>(
       priority_set_.hostSetsPerPriority().size());
-  auto per_priority_load = std::make_shared<std::vector<uint32_t>>(per_priority_load_);
+  auto per_priority_load = std::make_shared<std::vector<uint32_t>>(PriorityLoad(per_priority_load_));
   auto degraded_per_priority_load =
       std::make_shared<std::vector<uint32_t>>(degraded_per_priority_load_);
 
