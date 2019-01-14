@@ -133,16 +133,6 @@ public:
   MOCK_METHOD1(onAccept, Network::FilterStatus(Network::ListenerFilterCallbacks&));
 };
 
-class MockListenerFilterCallbacks : public ListenerFilterCallbacks {
-public:
-  MockListenerFilterCallbacks();
-  ~MockListenerFilterCallbacks();
-
-  MOCK_METHOD0(socket, ConnectionSocket&());
-  MOCK_METHOD0(dispatcher, Event::Dispatcher&());
-  MOCK_METHOD1(continueFilterChain, void(bool));
-};
-
 class MockListenerFilterManager : public ListenerFilterManager {
 public:
   MockListenerFilterManager();
@@ -192,7 +182,9 @@ public:
   void addOptions(const Socket::OptionsSharedPtr& options) override { addOptions_(options); }
 
   MOCK_CONST_METHOD0(localAddress, const Address::InstanceConstSharedPtr&());
+  MOCK_METHOD1(setLocalAddress, void(const Address::InstanceConstSharedPtr&));
   MOCK_CONST_METHOD0(fd, int());
+  MOCK_CONST_METHOD0(socketType, Address::SocketType());
   MOCK_METHOD0(close, void());
   MOCK_METHOD1(addOption_, void(const Socket::OptionConstSharedPtr& option));
   MOCK_METHOD1(addOptions_, void(const Socket::OptionsSharedPtr& options));
@@ -224,7 +216,8 @@ public:
   void addOptions(const Socket::OptionsSharedPtr& options) override { addOptions_(options); }
 
   MOCK_CONST_METHOD0(localAddress, const Address::InstanceConstSharedPtr&());
-  MOCK_METHOD2(setLocalAddress, void(const Address::InstanceConstSharedPtr&, bool));
+  MOCK_METHOD1(setLocalAddress, void(const Address::InstanceConstSharedPtr&));
+  MOCK_METHOD1(restoreLocalAddress, void(const Address::InstanceConstSharedPtr&));
   MOCK_CONST_METHOD0(localAddressRestored, bool());
   MOCK_METHOD1(setRemoteAddress, void(const Address::InstanceConstSharedPtr&));
   MOCK_CONST_METHOD0(remoteAddress, const Address::InstanceConstSharedPtr&());
@@ -238,10 +231,23 @@ public:
   MOCK_METHOD1(addOptions_, void(const Socket::OptionsSharedPtr&));
   MOCK_CONST_METHOD0(options, const Network::ConnectionSocket::OptionsSharedPtr&());
   MOCK_CONST_METHOD0(fd, int());
+  MOCK_CONST_METHOD0(socketType, Address::SocketType());
   MOCK_METHOD0(close, void());
 
   Address::InstanceConstSharedPtr local_address_;
   Address::InstanceConstSharedPtr remote_address_;
+};
+
+class MockListenerFilterCallbacks : public ListenerFilterCallbacks {
+public:
+  MockListenerFilterCallbacks();
+  ~MockListenerFilterCallbacks();
+
+  MOCK_METHOD0(socket, ConnectionSocket&());
+  MOCK_METHOD0(dispatcher, Event::Dispatcher&());
+  MOCK_METHOD1(continueFilterChain, void(bool));
+
+  NiceMock<MockConnectionSocket> socket_;
 };
 
 class MockListenerConfig : public ListenerConfig {

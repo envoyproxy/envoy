@@ -1,6 +1,8 @@
 syntax = "proto3";
 
 package envoy.config.filter.network.mongo_proxy.v2;
+option java_package = "io.envoyproxy.envoy.config.filter.network.mongo_proxy.v2";
+option java_multiple_files = true;
 option go_package = "v2";
 
 import "envoy/config/filter/fault/v2/fault.proto";

@@ -44,12 +44,14 @@ public:
   /**
    * Creates a socket.
    * @param address supplies the socket's address.
+   * @param socket_type the type of socket (stream or datagram) to create.
    * @param options to be set on the created socket just before calling 'bind()'.
    * @param bind_to_port supplies whether to actually bind the socket.
    * @return Network::SocketSharedPtr an initialized and potentially bound socket.
    */
   virtual Network::SocketSharedPtr
   createListenSocket(Network::Address::InstanceConstSharedPtr address,
+                     Network::Address::SocketType socket_type,
                      const Network::Socket::OptionsSharedPtr& options, bool bind_to_port) PURE;
 
   /**

@@ -20,6 +20,7 @@
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
 
+#include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 
 namespace Envoy {
@@ -210,9 +211,9 @@ bool Utility::isH2UpgradeRequest(const HeaderMap& headers) {
 }
 
 bool Utility::isWebSocketUpgradeRequest(const HeaderMap& headers) {
-  return (isUpgrade(headers) && (0 == StringUtil::caseInsensitiveCompare(
-                                          headers.Upgrade()->value().c_str(),
-                                          Http::Headers::get().UpgradeValues.WebSocket.c_str())));
+  return (isUpgrade(headers) &&
+          absl::EqualsIgnoreCase(headers.Upgrade()->value().getStringView(),
+                                 Http::Headers::get().UpgradeValues.WebSocket));
 }
 
 Http2Settings

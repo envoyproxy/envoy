@@ -12,7 +12,7 @@
 #define IP6T_SO_ORIGINAL_DST 80
 #endif
 
-#include <netinet/ip.h>
+#include <netinet/in.h>
 #include <sys/socket.h>
 
 #include <cstdint>
@@ -32,6 +32,8 @@
 #include "common/protobuf/protobuf.h"
 
 #include "common/common/fmt.h"
+
+#include "absl/strings/match.h"
 
 namespace Envoy {
 namespace Network {
@@ -53,17 +55,11 @@ Address::InstanceConstSharedPtr Utility::resolveUrl(const std::string& url) {
   }
 }
 
-bool Utility::urlIsTcpScheme(const std::string& url) {
-  return StringUtil::startsWith(url.c_str(), TCP_SCHEME, true);
-}
+bool Utility::urlIsTcpScheme(const std::string& url) { return absl::StartsWith(url, TCP_SCHEME); }
 
-bool Utility::urlIsUdpScheme(const std::string& url) {
-  return StringUtil::startsWith(url.c_str(), UDP_SCHEME, true);
-}
+bool Utility::urlIsUdpScheme(const std::string& url) { return absl::StartsWith(url, UDP_SCHEME); }
 
-bool Utility::urlIsUnixScheme(const std::string& url) {
-  return StringUtil::startsWith(url.c_str(), UNIX_SCHEME, true);
-}
+bool Utility::urlIsUnixScheme(const std::string& url) { return absl::StartsWith(url, UNIX_SCHEME); }
 
 namespace {
 
@@ -408,7 +404,7 @@ Address::InstanceConstSharedPtr Utility::getOriginalDst(int fd) {
     return nullptr;
   }
 #else
-  // TODO(zuercher): determine if connection redirection is possible under OS X (c.f. pfctl and
+  // TODO(zuercher): determine if connection redirection is possible under macOS (c.f. pfctl and
   // divert), and whether it's possible to find the learn destination address.
   UNREFERENCED_PARAMETER(fd);
   return nullptr;
@@ -502,6 +498,27 @@ void Utility::addressToProtobufAddress(const Address::Instance& address,
     auto* socket_address = proto_address.mutable_socket_address();
     socket_address->set_address(address.ip()->addressAsString());
     socket_address->set_port_value(address.ip()->port());
+  }
+}
+
+Address::SocketType
+Utility::protobufAddressSocketType(const envoy::api::v2::core::Address& proto_address) {
+  switch (proto_address.address_case()) {
+  case envoy::api::v2::core::Address::kSocketAddress: {
+    auto protocol = proto_address.socket_address().protocol();
+    switch (protocol) {
+    case envoy::api::v2::core::SocketAddress::TCP:
+      return Address::SocketType::Stream;
+    case envoy::api::v2::core::SocketAddress::UDP:
+      return Address::SocketType::Datagram;
+    default:
+      NOT_REACHED_GCOVR_EXCL_LINE;
+    }
+  }
+  case envoy::api::v2::core::Address::kPipe:
+    return Address::SocketType::Stream;
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 

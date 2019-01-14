@@ -12,8 +12,7 @@ import stat
 import sys
 import traceback
 
-EXCLUDED_PREFIXES = ("./generated/", "./thirdparty/", "./build", "./.git/", "./bazel-",
-                     "./bazel/external", "./.cache",
+EXCLUDED_PREFIXES = ("./generated/", "./thirdparty/", "./build", "./.git/", "./bazel-", "./.cache",
                      "./source/extensions/extensions_build_config.bzl",
                      "./tools/testdata/check_format/")
 SUFFIXES = (".cc", ".h", "BUILD", "WORKSPACE", ".bzl", ".md", ".rst", ".proto")
@@ -112,7 +111,8 @@ def checkTools():
         "PATH, please use CLANG_FORMAT environment variable to specify the path. "
         "Examples:\n"
         "    export CLANG_FORMAT=clang-format-7.0.0\n"
-        "    export CLANG_FORMAT=/opt/bin/clang-format-7".format(CLANG_FORMAT_PATH))
+        "    export CLANG_FORMAT=/opt/bin/clang-format-7\n"
+        "    export CLANG_FORMAT=/usr/local/opt/llvm@7/bin/clang-format".format(CLANG_FORMAT_PATH))
 
   buildifier_abs_path = lookPath(BUILDIFIER_PATH)
   if buildifier_abs_path:
@@ -127,7 +127,7 @@ def checkTools():
     error_messages.append(
         "Command {} not found. If you have buildifier installed, but the binary "
         "name is different or it's not available in $GOPATH/bin, please use "
-        "BUILDIFIER_BIN environment variable to specify the path. Example:"
+        "BUILDIFIER_BIN environment variable to specify the path. Example:\n"
         "    export BUILDIFIER_BIN=/opt/bin/buildifier\n"
         "If you don't have buildifier installed, you can install it by:\n"
         "    go get -u github.com/bazelbuild/buildtools/buildifier".format(BUILDIFIER_PATH))
@@ -142,6 +142,27 @@ def checkNamespace(file_path):
        not 'NOLINT(namespace-envoy)' in text:
       return ["Unable to find Envoy namespace or NOLINT(namespace-envoy) for file: %s" % file_path]
   return []
+
+
+def checkJavaProtoOptions(file_path):
+  java_multiple_files = False
+  java_package_correct = False
+  for line in fileinput.FileInput(file_path):
+    if "option java_multiple_files = true;" in line:
+      java_multiple_files = True
+    if "option java_package = \"io.envoyproxy.envoy" in line:
+      java_package_correct = True
+    if java_multiple_files and java_package_correct:
+      return []
+
+  error_messages = []
+  if not java_multiple_files:
+    error_messages.append(
+        "Java proto option 'java_multiple_files' not set correctly for file: %s" % file_path)
+  if not java_package_correct:
+    error_messages.append(
+        "Java proto option 'java_package' not set correctly for file: %s" % file_path)
+  return error_messages
 
 
 # To avoid breaking the Lyft import, we just check for path inclusion here.
@@ -184,6 +205,10 @@ def isBuildFile(file_path):
   return False
 
 
+def isExternalBuildFile(file_path):
+  return isBuildFile(file_path) and file_path.startswith("./bazel/external/")
+
+
 def isSkylarkFile(file_path):
   return file_path.endswith(".bzl")
 
@@ -203,8 +228,41 @@ def hasInvalidAngleBracketDirectory(line):
   return subdir in SUBDIR_SET
 
 
+VERSION_HISTORY_NEW_LINE_REGEX = re.compile('\* [a-z \-_]*: [a-z:`]')
+VERSION_HISTORY_NEW_RELEASE_REGEX = re.compile('^====[=]+$')
+
+
+def checkCurrentReleaseNotes(file_path, error_messages):
+  in_current_release = False
+
+  file_handle = fileinput.input(file_path)
+  for line_number, line in enumerate(file_handle):
+
+    def reportError(message):
+      error_messages.append("%s:%d: %s" % (file_path, line_number + 1, message))
+
+    if VERSION_HISTORY_NEW_RELEASE_REGEX.match(line):
+      # If we were in the section for the current release this means we have passed it.
+      if in_current_release:
+        break
+      # If we see a version marker we are now in the section for the current release.
+      in_current_release = True
+
+    if line.startswith('*') and not VERSION_HISTORY_NEW_LINE_REGEX.match(line):
+      reportError("Version history line malformed. "
+                  "Does not match VERSION_HISTORY_NEW_LINE_REGEX in check_format.py\n %s" % line)
+  file_handle.close()
+
+
 def checkFileContents(file_path, checker):
   error_messages = []
+
+  if file_path.endswith("version_history.rst"):
+    # Version file checking has enough special cased logic to merit its own checks.
+    # This only validates entries for the current release as very old release
+    # notes have a different format.
+    checkCurrentReleaseNotes(file_path, error_messages)
+
   for line_number, line in enumerate(fileinput.input(file_path)):
 
     def reportError(message):
@@ -283,7 +341,7 @@ def checkSourceLine(line, file_path, reportError):
   if not whitelistedForGetTime(file_path):
     if "std::get_time" in line:
       if "test/" in file_path:
-        reportError("Don't use std::get_time; use TestUtility::parseTimestamp in tests")
+        reportError("Don't use std::get_time; use TestUtility::parseTime in tests")
       else:
         reportError("Don't use std::get_time; use the injectable time system")
   if 'std::atomic_' in line:
@@ -312,12 +370,13 @@ def checkBuildLine(line, file_path, reportError):
     reportError("unexpected direct external dependency on protobuf, use "
                 "//source/common/protobuf instead.")
   if (envoy_build_rule_check and not isSkylarkFile(file_path) and not isWorkspaceFile(file_path) and
-      '@envoy//' in line):
+      not isExternalBuildFile(file_path) and '@envoy//' in line):
     reportError("Superfluous '@envoy//' prefix")
 
 
 def fixBuildLine(line, file_path):
-  if envoy_build_rule_check and not isSkylarkFile(file_path) and not isWorkspaceFile(file_path):
+  if (envoy_build_rule_check and not isSkylarkFile(file_path) and not isWorkspaceFile(file_path) and
+      not isExternalBuildFile(file_path)):
     line = line.replace('@envoy//', '//')
   return line
 
@@ -372,6 +431,8 @@ def checkSourcePath(file_path):
     command = ("%s %s | diff %s -" % (CLANG_FORMAT_PATH, file_path, file_path))
     error_messages += executeCommand(command, "clang-format check failed", file_path)
 
+  if file_path.endswith(PROTO_SUFFIX) and isApiFile(file_path):
+    error_messages += checkJavaProtoOptions(file_path)
   return error_messages
 
 

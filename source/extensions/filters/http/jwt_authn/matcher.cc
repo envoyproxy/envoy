@@ -2,6 +2,8 @@
 
 #include "common/router/config_impl.h"
 
+#include "absl/strings/match.h"
+
 using ::envoy::api::v2::route::RouteMatch;
 using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtProvider;
 using ::envoy::config::filter::http::jwt_authn::v2alpha::RequirementRule;
@@ -71,7 +73,9 @@ public:
 
   bool matches(const Http::HeaderMap& headers) const override {
     if (BaseMatcherImpl::matchRoute(headers) &&
-        StringUtil::startsWith(headers.Path()->value().c_str(), prefix_, case_sensitive_)) {
+        (case_sensitive_
+             ? absl::StartsWith(headers.Path()->value().getStringView(), prefix_)
+             : absl::StartsWithIgnoreCase(headers.Path()->value().getStringView(), prefix_))) {
       ENVOY_LOG(debug, "Prefix requirement '{}' matched.", prefix_);
       return true;
     }

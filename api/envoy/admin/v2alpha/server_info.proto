@@ -1,6 +1,8 @@
 syntax = "proto3";
 
 package envoy.admin.v2alpha;
+option java_package = "io.envoyproxy.envoy.admin.v2alpha";
+option java_multiple_files = true;
 
 import "google/protobuf/duration.proto";
 

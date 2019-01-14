@@ -24,7 +24,7 @@ envoy_cc_test(
         "//test/config/integration/certs",
     ],
     deps = [
-        ":http_integration_lib",
+        ":xds_integration_test_base",
         "//source/common/config:protobuf_link_hacks",
         "//source/common/config:resources_lib",
         "//source/common/protobuf:utility_lib",
@@ -64,6 +64,27 @@ envoy_proto_library(
 )
 
 envoy_cc_test(
+    name = "cds_integration_test",
+    srcs = ["cds_integration_test.cc"],
+    data = [
+        "//test/config/integration/certs",
+    ],
+    deps = [
+        ":xds_integration_test_base",
+        "//source/common/config:protobuf_link_hacks",
+        "//source/common/config:resources_lib",
+        "//source/common/protobuf:utility_lib",
+        "//test/common/grpc:grpc_client_integration_lib",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:server_mocks",
+        "//test/test_common:network_utility_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/api/v2:cds_cc",
+        "@envoy_api//envoy/api/v2:discovery_cc",
+    ],
+)
+
+envoy_cc_test(
     name = "eds_integration_test",
     srcs = ["eds_integration_test.cc"],
     deps = [
@@ -75,43 +96,32 @@ envoy_cc_test(
     ],
 )
 
-# TODO(mattklein123): This test uses extensions mixed in, so we just register all extensions.
-# This will go away when we delete v1 configuration.
-envoy_cc_test(
-    name = "legacy_json_integration_test",
-    srcs = ["legacy_json_integration_test.cc"],
-    data = [
-        "//test/config/integration:echo_server.json",
-        "//test/config/integration:server.json",
-        "//test/config/integration:server_grpc_json_transcoder.json",
-        "//test/config/integration:server_http2.json",
-        "//test/config/integration:server_http2_upstream.json",
-        "//test/config/integration:server_proxy_proto.json",
-        "//test/config/integration:server_ssl.json",
-        "//test/config/integration:server_uds.json",
-        "//test/config/integration:server_xfcc.json",
-        "//test/config/integration:tcp_proxy.json",
-        "//test/config/integration/certs",
-        "//test/proto:bookstore_proto_descriptor",
-    ],
-    deps = [
-        ":integration_lib",
-        "//source/common/http:header_map_lib",
-        "//source/common/protobuf:utility_lib",
-        "//test/test_common:network_utility_lib",
-        "//test/test_common:utility_lib",
-    ] + envoy_all_extensions(),
-)
+exports_files(["test_utility.sh"])
 
 envoy_sh_test(
     name = "hotrestart_test",
-    srcs = envoy_select_hot_restart(["hotrestart_test.sh"]),
+    srcs = envoy_select_hot_restart([
+        "hotrestart_test.sh",
+    ]),
     data = [
+        "test_utility.sh",
         "//source/exe:envoy-static",
         "//test/common/runtime:filesystem_setup.sh",
         "//test/common/runtime:filesystem_test_data",
         "//test/config/integration:server_config_files",
         "//tools:socket_passing",
+    ],
+)
+
+envoy_sh_test(
+    name = "run_envoy_test",
+    srcs = ["run_envoy_test.sh"],
+    data = [
+        "test_utility.sh",
+        "//source/exe:envoy-static",
+        "//test/common/runtime:filesystem_setup.sh",
+        "//test/common/runtime:filesystem_test_data",
+        "//test/config/integration:server_config_files",
     ],
 )
 
@@ -171,7 +181,7 @@ envoy_cc_test(
         "integration_admin_test.h",
     ],
     deps = [
-        ":http_integration_lib",
+        ":http_protocol_integration_lib",
         "//include/envoy/http:header_map_interface",
         "//source/common/stats:stats_matcher_lib",
         "//source/extensions/filters/http/buffer:config",
@@ -597,7 +607,6 @@ envoy_cc_test(
         "uds_integration_test.cc",
         "uds_integration_test.h",
     ],
-    data = ["//test/config/integration:server_uds.json"],
     deps = [
         ":http_integration_lib",
         "//source/common/event:dispatcher_includes",
@@ -613,8 +622,28 @@ envoy_cc_test(
     srcs = ["xds_integration_test.cc"],
     data = ["//test/config/integration:server_xds_files"],
     deps = [
-        ":http_integration_lib",
+        ":xds_integration_test_base",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "xds_integration_test_base",
+    srcs = [
+        "xds_integration_test_base.cc",
+    ],
+    hdrs = [
+        "xds_integration_test_base.h",
+    ],
+    deps = [
+        ":http_integration_lib",
+        ":test_host_predicate_lib",
+        "//include/envoy/event:timer_interface",
+        "//source/common/common:thread_annotations",
+        "//source/extensions/filters/http/router:config",
+        "//source/extensions/filters/network/http_connection_manager:config",
+        "//test/common/upstream:utility_lib",
+        "//test/test_common:registry_lib",
     ],
 )
 
