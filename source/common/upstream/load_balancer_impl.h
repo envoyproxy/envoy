@@ -32,8 +32,8 @@ public:
   // Returns the priority, a number between 0 and per_priority_load.size()-1 as well as which host
   // availability level was chosen.
   static std::pair<uint32_t, HostAvailability>
-  choosePriority(uint64_t hash, const PriorityLoad& per_priority_load,
-                 const PriorityLoad& degraded_per_priority_load);
+  choosePriority(uint64_t hash, const HealthyLoad& per_priority_load,
+                 const DegradedLoad& degraded_per_priority_load);
 
   HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
 
@@ -74,7 +74,7 @@ protected:
 
   uint32_t percentageLoad(uint32_t priority) const { return per_priority_load_.get()[priority]; }
   uint32_t percentageDegradedLoad(uint32_t priority) const {
-    return degraded_per_priority_load_[priority];
+    return degraded_per_priority_load_.get()[priority];
   }
   bool isInPanic(uint32_t priority) const { return per_priority_panic_[priority]; }
 
@@ -90,10 +90,10 @@ public:
   // per_priority_health for that priority level, and may update per_priority_load for all
   // priority levels.
   void static recalculatePerPriorityState(uint32_t priority, const PrioritySet& priority_set,
-                                          PriorityLoad& priority_load,
-                                          PriorityLoad& degraded_priority_load,
-                                          PriorityAvailability& per_priority_health,
-                                          std::vector<uint32_t>& per_priority_degraded);
+                                          HealthyLoad& priority_load,
+                                          DegradedLoad& degraded_priority_load,
+                                          HealthyAvailability& per_priority_health,
+                                          DegradedAvailability& per_priority_degraded);
   void recalculatePerPriorityPanic();
 
 protected:
@@ -108,22 +108,23 @@ protected:
   //
   // Assuming two priorities with availability 60 and 70, the total availability would be 100.
   static uint32_t
-  calculateNormalizedTotalAvailability(std::vector<uint32_t>& per_priority_health,
-                                       std::vector<uint32_t>& per_priority_degraded) {
-    const auto health = std::accumulate(per_priority_health.get().begin(), per_priority_health.get().end(), 0);
+  calculateNormalizedTotalAvailability(HealthyAvailability& per_priority_health,
+                                       DegradedAvailability& per_priority_degraded) {
+    const auto health =
+        std::accumulate(per_priority_health.get().begin(), per_priority_health.get().end(), 0);
     const auto degraded =
         std::accumulate(per_priority_degraded.get().begin(), per_priority_degraded.get().end(), 0);
 
     return std::min<uint32_t>(health + degraded, 100);
   }
   // The percentage load (0-100) for each priority level when targeting healthy hosts.
-  PriorityLoad per_priority_load_;
+  HealthyLoad per_priority_load_;
   // The percentage load (0-100) for each priority level when targeting degraded hosts.
-  PriorityLoad degraded_per_priority_load_;
+  DegradedLoad degraded_per_priority_load_;
   // The health percentage (0-100) for each priority level.
-  PriorityAvailability per_priority_health_;
+  HealthyAvailability per_priority_health_;
   // The degraded percentage (0-100) for each priority level.
-  std::vector<uint32_t> per_priority_degraded_;
+  DegradedAvailability per_priority_degraded_;
   // Levels which are in panic
   std::vector<bool> per_priority_panic_;
 };
@@ -138,8 +139,8 @@ public:
 
   const Http::HeaderMap* downstreamHeaders() const override { return nullptr; }
 
-  const PriorityLoad& determinePriorityLoad(const PrioritySet&,
-                                            const PriorityLoad& original_priority_load) override {
+  const HealthyLoad& determinePriorityLoad(const PrioritySet&,
+                                           const HealthyLoad& original_priority_load) override {
     return original_priority_load;
   }
 

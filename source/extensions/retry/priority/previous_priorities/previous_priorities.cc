@@ -4,9 +4,9 @@ namespace Envoy {
 namespace Extensions {
 namespace Retry {
 namespace Priority {
-const Upstream::PriorityLoad& PreviousPrioritiesRetryPriority::determinePriorityLoad(
+const Upstream::HealthyLoad& PreviousPrioritiesRetryPriority::determinePriorityLoad(
     const Upstream::PrioritySet& priority_set,
-    const Upstream::PriorityLoad& original_priority_load) {
+    const Upstream::HealthyLoad& original_priority_load) {
   // If we've not seen enough retries to modify the priority load, just
   // return the original.
   // If this retry should trigger an update, recalculate the priority load by excluding attempted

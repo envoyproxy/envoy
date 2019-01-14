@@ -16,9 +16,9 @@ public:
     attempted_priorities_.reserve(max_retries);
   }
 
-  const Upstream::PriorityLoad&
+  const Upstream::HealthyLoad&
   determinePriorityLoad(const Upstream::PrioritySet& priority_set,
-                        const Upstream::PriorityLoad& original_priority) override;
+                        const Upstream::HealthyLoad& original_priority) override;
 
   void onHostAttempted(Upstream::HostDescriptionConstSharedPtr attempted_host) override {
     attempted_priorities_.emplace_back(attempted_host->priority());
@@ -43,10 +43,10 @@ private:
   const uint32_t update_frequency_;
   std::vector<uint32_t> attempted_priorities_;
   std::vector<bool> excluded_priorities_;
-  Upstream::PriorityLoad per_priority_load_;
-  Upstream::PriorityLoad degraded_per_priority_load_;
-  Upstream::PriorityAvailability per_priority_health_;
-  std::vector<uint32_t> per_priority_degraded_;
+  Upstream::HealthyLoad per_priority_load_;
+  Upstream::DegradedLoad degraded_per_priority_load_;
+  Upstream::HealthyAvailability per_priority_health_;
+  Upstream::DegradedAvailability per_priority_degraded_;
 };
 
 } // namespace Priority

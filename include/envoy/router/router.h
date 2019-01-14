@@ -258,9 +258,9 @@ public:
    * @param priority_load original priority load.
    * @return PriorityLoad that should be used to select a priority for the next retry.
    */
-  virtual const Upstream::PriorityLoad&
+  virtual const Upstream::HealthyLoad&
   priorityLoadForRetry(const Upstream::PrioritySet& priority_set,
-                       const Upstream::PriorityLoad& priority_load) PURE;
+                       const Upstream::HealthyLoad& priority_load) PURE;
   /**
    * return how many times host selection should be reattempted during host selection.
    */

@@ -54,9 +54,9 @@ public:
         [&host](auto predicate) { return predicate->shouldSelectAnotherHost(host); });
   }
 
-  const Upstream::PriorityLoad&
+  const Upstream::HealthyLoad&
   priorityLoadForRetry(const Upstream::PrioritySet& priority_set,
-                       const Upstream::PriorityLoad& priority_load) override {
+                       const Upstream::HealthyLoad& priority_load) override {
     if (!retry_priority_) {
       return priority_load;
     }

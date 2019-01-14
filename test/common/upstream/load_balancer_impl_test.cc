@@ -118,7 +118,7 @@ TEST_P(LoadBalancerBaseTest, PrioritySelection) {
   updateHostSet(host_set_, 1 /* num_hosts */, 0 /* num_healthy_hosts */);
   updateHostSet(failover_host_set_, 1, 0);
 
-  PriorityLoad priority_load({100u, 0u});
+  HealthyLoad priority_load({100u, 0u});
   EXPECT_CALL(context, determinePriorityLoad(_, _)).WillRepeatedly(ReturnRef(priority_load));
   // With both the primary and failover hosts unhealthy, we should select an
   // unhealthy primary host.
@@ -133,7 +133,7 @@ TEST_P(LoadBalancerBaseTest, PrioritySelection) {
   EXPECT_EQ(0, lb_.percentageLoad(0));
   EXPECT_EQ(0, lb_.percentageLoad(1));
   EXPECT_EQ(100, lb_.percentageLoad(2));
-  priority_load = PriorityLoad({0u, 0u, 100u});
+  priority_load = HealthyLoad({0u, 0u, 100u});
   EXPECT_EQ(&tertiary_host_set_, &lb_.chooseHostSet(&context).first);
 
   // Now add a healthy host in P=0 and make sure it is immediately selected.
@@ -142,14 +142,14 @@ TEST_P(LoadBalancerBaseTest, PrioritySelection) {
   host_set_.runCallbacks({}, {});
   EXPECT_EQ(100, lb_.percentageLoad(0));
   EXPECT_EQ(0, lb_.percentageLoad(2));
-  priority_load = PriorityLoad({100u, 0u, 0u});
+  priority_load = HealthyLoad({100u, 0u, 0u});
   EXPECT_EQ(&host_set_, &lb_.chooseHostSet(&context).first);
 
   // Remove the healthy host and ensure we fail back over to tertiary_host_set_
   updateHostSet(host_set_, 1 /* num_hosts */, 0 /* num_healthy_hosts */);
   EXPECT_EQ(0, lb_.percentageLoad(0));
   EXPECT_EQ(100, lb_.percentageLoad(2));
-  priority_load = PriorityLoad({0, 0, 100});
+  priority_load = HealthyLoad({0, 0, 100});
   EXPECT_EQ(&tertiary_host_set_, &lb_.chooseHostSet(&context).first);
 }
 
@@ -189,7 +189,7 @@ TEST_P(LoadBalancerBaseTest, PrioritySelectionFuzz) {
   }
 
   EXPECT_CALL(context, determinePriorityLoad(_, _))
-      .WillRepeatedly(Invoke([](const auto&, const auto& original_load) -> const PriorityLoad& {
+      .WillRepeatedly(Invoke([](const auto&, const auto& original_load) -> const HealthyLoad& {
         return original_load;
       }));
 
@@ -213,7 +213,7 @@ TEST_P(LoadBalancerBaseTest, PrioritySelectionFuzz) {
 TEST_P(LoadBalancerBaseTest, PrioritySelectionWithFilter) {
   NiceMock<Upstream::MockLoadBalancerContext> context;
 
-  PriorityLoad priority_load = PriorityLoad({0u, 100u});
+  HealthyLoad priority_load({0u, 100u});
   // return a filter that excludes priority 0
   EXPECT_CALL(context, determinePriorityLoad(_, _)).WillOnce(ReturnRef(priority_load));
 
@@ -727,12 +727,12 @@ TEST_P(RoundRobinLoadBalancerTest, HostSelectionWithFilter) {
       .WillRepeatedly(Invoke([&](const Host& host) -> bool {
         return host.address()->asString() != hostSet().hosts_[0]->address()->asString();
       }));
-  PriorityLoad priority_load;
+  HealthyLoad priority_load;
 
   if (GetParam()) {
-    priority_load = PriorityLoad({100u, 0u});
+    priority_load = HealthyLoad({100u, 0u});
   } else {
-    priority_load = PriorityLoad({0u, 100u});
+    priority_load = HealthyLoad({0u, 100u});
   }
   EXPECT_CALL(context, determinePriorityLoad(_, _)).WillRepeatedly(ReturnRef(priority_load));
   EXPECT_CALL(context, hostSelectionRetryCount()).WillRepeatedly(Return(2));

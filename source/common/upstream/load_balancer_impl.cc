@@ -53,8 +53,8 @@ std::pair<int32_t, size_t> distributeLoad(PriorityLoad& per_priority_load,
 } // namespace
 
 std::pair<uint32_t, LoadBalancerBase::HostAvailability>
-LoadBalancerBase::choosePriority(uint64_t hash, const PriorityLoad& per_priority_load,
-                                 const std::vector<uint32_t>& degraded_per_priority_load) {
+LoadBalancerBase::choosePriority(uint64_t hash, const HealthyLoad& per_priority_load,
+                                 const DegradedLoad& degraded_per_priority_load) {
   hash = hash % 100 + 1; // 1-100
   uint32_t aggregate_percentage_load = 0;
   // As with tryChooseLocalLocalityHosts, this can be refactored for efficiency
@@ -71,8 +71,8 @@ LoadBalancerBase::choosePriority(uint64_t hash, const PriorityLoad& per_priority
 
   // If no priorities were selected due to health, we'll select a priority based degraded
   // availability.
-  for (size_t priority = 0; priority < degraded_per_priority_load.size(); ++priority) {
-    aggregate_percentage_load += degraded_per_priority_load[priority];
+  for (size_t priority = 0; priority < degraded_per_priority_load.get().size(); ++priority) {
+    aggregate_percentage_load += degraded_per_priority_load.get()[priority];
     if (hash <= aggregate_percentage_load) {
       return {priority, HostAvailability::Degraded};
     }
@@ -124,14 +124,14 @@ LoadBalancerBase::LoadBalancerBase(const PrioritySet& priority_set, ClusterStats
 
 void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority,
                                                    const PrioritySet& priority_set,
-                                                   PriorityLoad& per_priority_load,
-                                                   PriorityLoad& degraded_per_priority_load,
-                                                   PriorityAvailability& per_priority_health,
-                                                   std::vector<uint32_t>& per_priority_degraded) {
+                                                   HealthyLoad& per_priority_load,
+                                                   DegradedLoad& degraded_per_priority_load,
+                                                   HealthyAvailability& per_priority_health,
+                                                   DegradedAvailability& per_priority_degraded) {
   per_priority_load.get().resize(priority_set.hostSetsPerPriority().size());
-  degraded_per_priority_load.resize(priority_set.hostSetsPerPriority().size());
+  degraded_per_priority_load.get().resize(priority_set.hostSetsPerPriority().size());
   per_priority_health.get().resize(priority_set.hostSetsPerPriority().size());
-  per_priority_degraded.resize(priority_set.hostSetsPerPriority().size());
+  per_priority_degraded.get().resize(priority_set.hostSetsPerPriority().size());
 
   // Determine the health of the newly modified priority level.
   // Health ranges from 0-100, and is the ratio of healthy/degraded hosts to total hosts, modified
@@ -149,7 +149,7 @@ void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority,
                                  host_set.healthyHosts().size() / host_set.hosts().size()));
 
     // We perform the same computation for degraded hosts.
-    per_priority_degraded[priority] =
+    per_priority_degraded.get()[priority] =
         std::min<uint32_t>(100, (host_set.overprovisioningFactor() *
                                  host_set.degradedHosts().size() / host_set.hosts().size()));
   }
@@ -197,18 +197,18 @@ void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority,
 
     // Attempt to allocate the remainder to the first healthy priority first. If no such priority
     // exist, allocate to the first degraded priority.
-    ASSERT(remaining_load < per_priority_load.get().size() + per_priority_degraded.size());
+    ASSERT(remaining_load < per_priority_load.get().size() + per_priority_degraded.get().size());
     if (first_healthy != -1) {
       per_priority_load.get()[first_healthy] += remaining_load;
     } else {
-      degraded_per_priority_load[first_degraded] += remaining_load;
+      degraded_per_priority_load.get()[first_degraded] += remaining_load;
     }
   }
 
   // The allocated load between healthy and degraded should be exactly 100.
-  ASSERT(100 == std::accumulate(per_priority_load.begin(), per_priority_load.end(), 0) +
-                    std::accumulate(degraded_per_priority_load.begin(),
-                                    degraded_per_priority_load.end(), 0));
+  ASSERT(100 == std::accumulate(per_priority_load.get().begin(), per_priority_load.get().end(), 0) +
+                    std::accumulate(degraded_per_priority_load.get().begin(),
+                                    degraded_per_priority_load.get().end(), 0));
 }
 
 // Method iterates through priority levels and turns on/off panic mode.
