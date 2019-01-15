@@ -31,7 +31,7 @@ public:
   MOCK_METHOD1(successRate, void(double new_success_rate));
 };
 
-class MockEventLogger : public DetectionEventLogger {
+class MockEventLogger : public EventLogger {
 public:
   MockEventLogger();
   ~MockEventLogger();

@@ -209,7 +209,7 @@ public:
 
   MOCK_METHOD5(clusterFromProto,
                ClusterSharedPtr(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
-                                Outlier::DetectionEventLoggerSharedPtr outlier_event_logger,
+                                Outlier::EventLoggerSharedPtr outlier_event_logger,
                                 AccessLog::AccessLogManager& log_manager, bool added_via_api));
 
   MOCK_METHOD2(createCds,

@@ -49,7 +49,7 @@ public:
   static DetectorSharedPtr createForCluster(Cluster& cluster,
                                             const envoy::api::v2::Cluster& cluster_config,
                                             Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
-                                            DetectionEventLoggerSharedPtr event_logger);
+                                            EventLoggerSharedPtr event_logger);
 };
 
 /**
@@ -214,7 +214,7 @@ public:
   static std::shared_ptr<DetectorImpl>
   create(const Cluster& cluster, const envoy::api::v2::cluster::OutlierDetection& config,
          Event::Dispatcher& dispatcher, Runtime::Loader& runtime, TimeSource& time_source,
-         DetectionEventLoggerSharedPtr event_logger);
+         EventLoggerSharedPtr event_logger);
   ~DetectorImpl();
 
   void onConsecutive5xx(HostSharedPtr host);
@@ -230,7 +230,7 @@ public:
 private:
   DetectorImpl(const Cluster& cluster, const envoy::api::v2::cluster::OutlierDetection& config,
                Event::Dispatcher& dispatcher, Runtime::Loader& runtime, TimeSource& time_source,
-               DetectionEventLoggerSharedPtr event_logger);
+               EventLoggerSharedPtr event_logger);
 
   void addHostMonitor(HostSharedPtr host);
   void armIntervalTimer();
@@ -256,18 +256,18 @@ private:
   Event::TimerPtr interval_timer_;
   std::list<ChangeStateCb> callbacks_;
   std::unordered_map<HostSharedPtr, DetectorHostMonitorImpl*> host_monitors_;
-  DetectionEventLoggerSharedPtr event_logger_;
+  EventLoggerSharedPtr event_logger_;
   double success_rate_average_;
   double success_rate_ejection_threshold_;
 };
 
-class DetectionEventLoggerImpl : public DetectionEventLogger {
+class EventLoggerImpl : public EventLogger {
 public:
-  DetectionEventLoggerImpl(AccessLog::AccessLogManager& log_manager, const std::string& file_name,
-                           TimeSource& time_source)
+  EventLoggerImpl(AccessLog::AccessLogManager& log_manager, const std::string& file_name,
+                  TimeSource& time_source)
       : file_(log_manager.createAccessLog(file_name)), time_source_(time_source) {}
 
-  // Upstream::Outlier::DetectionEventLogger
+  // Upstream::Outlier::EventLogger
   void logEject(HostDescriptionConstSharedPtr host, Detector& detector,
                 envoy::data::cluster::v2alpha::OutlierEjectionType type, bool enforced) override;
 

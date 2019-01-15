@@ -130,9 +130,9 @@ enum class EjectionType { Consecutive5xx, SuccessRate, ConsecutiveGatewayFailure
 /**
  * Sink for outlier detection event logs.
  */
-class DetectionEventLogger {
+class EventLogger {
 public:
-  virtual ~DetectionEventLogger() {}
+  virtual ~EventLogger() {}
 
   /**
    * Log an ejection event.
@@ -152,7 +152,7 @@ public:
   virtual void logUneject(const HostDescriptionConstSharedPtr host) PURE;
 };
 
-typedef std::shared_ptr<DetectionEventLogger> DetectionEventLoggerSharedPtr;
+typedef std::shared_ptr<EventLogger> EventLoggerSharedPtr;
 
 } // namespace Outlier
 } // namespace Upstream

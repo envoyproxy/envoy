@@ -23,7 +23,7 @@ namespace Outlier {
 
 DetectorSharedPtr DetectorImplFactory::createForCluster(
     Cluster& cluster, const envoy::api::v2::Cluster& cluster_config, Event::Dispatcher& dispatcher,
-    Runtime::Loader& runtime, DetectionEventLoggerSharedPtr event_logger) {
+    Runtime::Loader& runtime, EventLoggerSharedPtr event_logger) {
   if (cluster_config.has_outlier_detection()) {
 
     return DetectorImpl::create(cluster, cluster_config.outlier_detection(), dispatcher, runtime,
@@ -132,7 +132,7 @@ DetectorConfig::DetectorConfig(const envoy::api::v2::cluster::OutlierDetection& 
 DetectorImpl::DetectorImpl(const Cluster& cluster,
                            const envoy::api::v2::cluster::OutlierDetection& config,
                            Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
-                           TimeSource& time_source, DetectionEventLoggerSharedPtr event_logger)
+                           TimeSource& time_source, EventLoggerSharedPtr event_logger)
     : config_(config), dispatcher_(dispatcher), runtime_(runtime), time_source_(time_source),
       stats_(generateStats(cluster.info()->statsScope())),
       interval_timer_(dispatcher.createTimer([this]() -> void { onIntervalTimer(); })),
@@ -152,7 +152,7 @@ std::shared_ptr<DetectorImpl>
 DetectorImpl::create(const Cluster& cluster,
                      const envoy::api::v2::cluster::OutlierDetection& config,
                      Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
-                     TimeSource& time_source, DetectionEventLoggerSharedPtr event_logger) {
+                     TimeSource& time_source, EventLoggerSharedPtr event_logger) {
   std::shared_ptr<DetectorImpl> detector(
       new DetectorImpl(cluster, config, dispatcher, runtime, time_source, event_logger));
   detector->initialize(cluster);
@@ -473,10 +473,9 @@ void DetectorImpl::runCallbacks(HostSharedPtr host) {
   }
 }
 
-void DetectionEventLoggerImpl::logEject(const HostDescriptionConstSharedPtr host,
-                                        Detector& detector,
-                                        envoy::data::cluster::v2alpha::OutlierEjectionType type,
-                                        bool enforced) {
+void EventLoggerImpl::logEject(const HostDescriptionConstSharedPtr host, Detector& detector,
+                               envoy::data::cluster::v2alpha::OutlierEjectionType type,
+                               bool enforced) {
   envoy::data::cluster::v2alpha::OutlierDetectionEvent event;
   event.set_type(type);
 
@@ -504,7 +503,7 @@ void DetectionEventLoggerImpl::logEject(const HostDescriptionConstSharedPtr host
   file_->write(fmt::format("{}\n", json));
 }
 
-void DetectionEventLoggerImpl::logUneject(HostDescriptionConstSharedPtr host) {
+void EventLoggerImpl::logUneject(HostDescriptionConstSharedPtr host) {
   envoy::data::cluster::v2alpha::OutlierDetectionEvent event;
 
   absl::optional<MonotonicTime> time = host->outlierDetector().lastEjectionTime();
@@ -517,7 +516,7 @@ void DetectionEventLoggerImpl::logUneject(HostDescriptionConstSharedPtr host) {
   file_->write(fmt::format("{}\n", json));
 }
 
-void DetectionEventLoggerImpl::setCommonEventParams(
+void EventLoggerImpl::setCommonEventParams(
     envoy::data::cluster::v2alpha::OutlierDetectionEvent& event, HostDescriptionConstSharedPtr host,
     absl::optional<MonotonicTime>& time) {
   MonotonicTime monotonic_now = time_source_.monotonicTime();
@@ -529,8 +528,8 @@ void DetectionEventLoggerImpl::setCommonEventParams(
   TimestampUtil::systemClockToTimestamp(time_source_.systemTime(), *event.mutable_timestamp());
 }
 
-int DetectionEventLoggerImpl::secsSinceLastAction(
-    const absl::optional<MonotonicTime>& lastActionTime, MonotonicTime now) {
+int EventLoggerImpl::secsSinceLastAction(const absl::optional<MonotonicTime>& lastActionTime,
+                                         MonotonicTime now) {
   if (lastActionTime) {
     return std::chrono::duration_cast<std::chrono::seconds>(now - lastActionTime.value()).count();
   }
