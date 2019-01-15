@@ -33,7 +33,7 @@ RoleBasedAccessControlFilterConfigFactory::createRouteSpecificFilterConfigTyped(
  */
 static Registry::RegisterFactory<RoleBasedAccessControlFilterConfigFactory,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
-    register_;
+    register_; // NOLINT(fuchsia-statically-constructed-objects)
 
 } // namespace RBACFilter
 } // namespace HttpFilters

@@ -57,7 +57,7 @@ RateLimitFilterConfig::createFilterFactory(const Json::Object& json_config,
  */
 static Registry::RegisterFactory<RateLimitFilterConfig,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
-    register_;
+    register_; // NOLINT(fuchsia-statically-constructed-objects)
 
 } // namespace RateLimitFilter
 } // namespace HttpFilters

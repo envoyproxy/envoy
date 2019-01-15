@@ -35,7 +35,7 @@ Tracing::HttpTracerPtr LightstepTracerFactory::createHttpTracerTyped(
  * Static registration for the lightstep tracer. @see RegisterFactory.
  */
 static Registry::RegisterFactory<LightstepTracerFactory, Server::Configuration::TracerFactory>
-    register_;
+    register_; // NOLINT(fuchsia-statically-constructed-objects)
 
 } // namespace Lightstep
 } // namespace Tracers

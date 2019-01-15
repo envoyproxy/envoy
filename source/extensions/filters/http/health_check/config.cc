@@ -69,7 +69,7 @@ HealthCheckFilterConfig::createFilterFactory(const Json::Object& json_config,
  */
 static Registry::RegisterFactory<HealthCheckFilterConfig,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
-    register_;
+    register_; // NOLINT(fuchsia-statically-constructed-objects)
 
 } // namespace HealthCheck
 } // namespace HttpFilters

@@ -51,7 +51,7 @@ std::string HttpGrpcAccessLogFactory::name() const { return AccessLogNames::get(
  */
 static Registry::RegisterFactory<HttpGrpcAccessLogFactory,
                                  Server::Configuration::AccessLogInstanceFactory>
-    register_;
+    register_; // NOLINT(fuchsia-statically-constructed-objects)
 
 } // namespace HttpGrpc
 } // namespace AccessLoggers

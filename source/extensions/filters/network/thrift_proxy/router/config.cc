@@ -25,7 +25,7 @@ ThriftFilters::FilterFactoryCb RouterFilterConfig::createFilterFactoryFromProtoT
  * Static registration for the router filter. @see RegisterFactory.
  */
 static Registry::RegisterFactory<RouterFilterConfig, ThriftFilters::NamedThriftFilterConfigFactory>
-    register_;
+    register_; // NOLINT(fuchsia-statically-constructed-objects)
 
 } // namespace Router
 } // namespace ThriftProxy

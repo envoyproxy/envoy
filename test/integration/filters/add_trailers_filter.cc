@@ -44,6 +44,6 @@ public:
 // perform static registration
 static Registry::RegisterFactory<AddTrailersStreamFilterConfig,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
-    register_;
+    register_; // NOLINT(fuchsia-statically-constructed-objects)
 
 } // namespace Envoy

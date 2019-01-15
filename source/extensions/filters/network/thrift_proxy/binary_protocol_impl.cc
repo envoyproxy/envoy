@@ -408,7 +408,8 @@ public:
 /**
  * Static registration for the binary protocol. @see RegisterFactory.
  */
-static Registry::RegisterFactory<BinaryProtocolConfigFactory, NamedProtocolConfigFactory> register_;
+static Registry::RegisterFactory<BinaryProtocolConfigFactory, NamedProtocolConfigFactory>
+    register_; // NOLINT(fuchsia-statically-constructed-objects)
 
 class LaxBinaryProtocolConfigFactory : public ProtocolFactoryBase<LaxBinaryProtocolImpl> {
 public:

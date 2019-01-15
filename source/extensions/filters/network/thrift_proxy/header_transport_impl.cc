@@ -313,7 +313,7 @@ public:
  * Static registration for the header transport. @see RegisterFactory.
  */
 static Registry::RegisterFactory<HeaderTransportConfigFactory, NamedTransportConfigFactory>
-    register_;
+    register_; // NOLINT(fuchsia-statically-constructed-objects)
 
 } // namespace ThriftProxy
 } // namespace NetworkFilters

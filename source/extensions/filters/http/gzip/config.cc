@@ -25,7 +25,7 @@ Http::FilterFactoryCb GzipFilterFactory::createFilterFactoryFromProtoTyped(
  */
 static Registry::RegisterFactory<GzipFilterFactory,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
-    register_;
+    register_; // NOLINT(fuchsia-statically-constructed-objects)
 
 } // namespace Gzip
 } // namespace HttpFilters

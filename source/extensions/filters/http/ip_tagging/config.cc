@@ -29,7 +29,7 @@ Http::FilterFactoryCb IpTaggingFilterFactory::createFilterFactoryFromProtoTyped(
  */
 static Registry::RegisterFactory<IpTaggingFilterFactory,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
-    register_;
+    register_; // NOLINT(fuchsia-statically-constructed-objects)
 
 } // namespace IpTagging
 } // namespace HttpFilters

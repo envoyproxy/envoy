@@ -67,6 +67,6 @@ public:
 // perform static registration
 static Registry::RegisterFactory<RandomPauseFilterConfig,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
-    register_;
+    register_; // NOLINT(fuchsia-statically-constructed-objects)
 
 } // namespace Envoy

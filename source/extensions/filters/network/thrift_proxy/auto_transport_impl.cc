@@ -82,7 +82,8 @@ public:
 /**
  * Static registration for the auto transport. @see RegisterFactory.
  */
-static Registry::RegisterFactory<AutoTransportConfigFactory, NamedTransportConfigFactory> register_;
+static Registry::RegisterFactory<AutoTransportConfigFactory, NamedTransportConfigFactory>
+    register_; // NOLINT(fuchsia-statically-constructed-objects)
 
 } // namespace ThriftProxy
 } // namespace NetworkFilters

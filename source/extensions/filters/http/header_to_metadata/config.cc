@@ -30,7 +30,7 @@ Http::FilterFactoryCb HeaderToMetadataConfig::createFilterFactoryFromProtoTyped(
  */
 static Registry::RegisterFactory<HeaderToMetadataConfig,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
-    register_;
+    register_; // NOLINT(fuchsia-statically-constructed-objects)
 
 } // namespace HeaderToMetadataFilter
 } // namespace HttpFilters

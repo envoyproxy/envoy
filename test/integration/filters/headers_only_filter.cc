@@ -23,7 +23,7 @@ public:
 constexpr char HeaderOnlyDecoderFilter::name[];
 static Registry::RegisterFactory<SimpleFilterConfig<HeaderOnlyDecoderFilter>,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
-    decoder_register_;
+    decoder_register_; // NOLINT(fuchsia-statically-constructed-objects)
 
 class HeaderOnlyEncoderFilter : public Http::PassThroughFilter {
 public:
@@ -38,5 +38,5 @@ constexpr char HeaderOnlyEncoderFilter::name[];
 
 static Registry::RegisterFactory<SimpleFilterConfig<HeaderOnlyEncoderFilter>,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
-    encoder_register_;
+    encoder_register_; // NOLINT(fuchsia-statically-constructed-objects)
 } // namespace Envoy

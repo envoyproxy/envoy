@@ -1159,7 +1159,7 @@ public:
  * Static registration for the Twitter protocol. @see RegisterFactory.
  */
 static Registry::RegisterFactory<TwitterProtocolConfigFactory, NamedProtocolConfigFactory>
-    register_;
+    register_; // NOLINT(fuchsia-statically-constructed-objects)
 
 } // namespace ThriftProxy
 } // namespace NetworkFilters

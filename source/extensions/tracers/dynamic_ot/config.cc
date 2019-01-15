@@ -30,7 +30,7 @@ Tracing::HttpTracerPtr DynamicOpenTracingTracerFactory::createHttpTracerTyped(
  */
 static Registry::RegisterFactory<DynamicOpenTracingTracerFactory,
                                  Server::Configuration::TracerFactory>
-    register_;
+    register_; // NOLINT(fuchsia-statically-constructed-objects)
 
 } // namespace DynamicOt
 } // namespace Tracers

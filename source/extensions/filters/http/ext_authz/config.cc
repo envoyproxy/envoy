@@ -69,7 +69,7 @@ ExtAuthzFilterConfig::createRouteSpecificFilterConfigTyped(
  */
 static Registry::RegisterFactory<ExtAuthzFilterConfig,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
-    register_;
+    register_; // NOLINT(fuchsia-statically-constructed-objects)
 
 } // namespace ExtAuthz
 } // namespace HttpFilters

@@ -21,7 +21,7 @@ PreviousPrioritiesRetryPriorityFactory::createRetryPriority(const Protobuf::Mess
 
 static Registry::RegisterFactory<PreviousPrioritiesRetryPriorityFactory,
                                  Upstream::RetryPriorityFactory>
-    register_;
+    register_; // NOLINT(fuchsia-statically-constructed-objects)
 
 } // namespace Priority
 } // namespace Retry

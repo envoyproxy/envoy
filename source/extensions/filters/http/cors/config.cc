@@ -24,7 +24,7 @@ CorsFilterFactory::createFilter(const std::string& stats_prefix,
  */
 static Registry::RegisterFactory<CorsFilterFactory,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
-    register_;
+    register_; // NOLINT(fuchsia-statically-constructed-objects)
 
 } // namespace Cors
 } // namespace HttpFilters

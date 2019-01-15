@@ -29,7 +29,7 @@ Tracing::HttpTracerPtr DatadogTracerFactory::createHttpTracerTyped(
  * Static registration for the Datadog tracer. @see RegisterFactory.
  */
 static Registry::RegisterFactory<DatadogTracerFactory, Server::Configuration::TracerFactory>
-    register_;
+    register_; // NOLINT(fuchsia-statically-constructed-objects)
 
 } // namespace Datadog
 } // namespace Tracers

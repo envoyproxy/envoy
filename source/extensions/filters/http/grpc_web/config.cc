@@ -21,7 +21,7 @@ Http::FilterFactoryCb GrpcWebFilterConfig::createFilter(const std::string&,
  */
 static Registry::RegisterFactory<GrpcWebFilterConfig,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
-    register_;
+    register_; // NOLINT(fuchsia-statically-constructed-objects)
 
 } // namespace GrpcWeb
 } // namespace HttpFilters

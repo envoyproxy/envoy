@@ -10,7 +10,7 @@ namespace Host {
 
 static Registry::RegisterFactory<PreviousHostsRetryPredicateFactory,
                                  Upstream::RetryHostPredicateFactory>
-    register_;
+    register_; // NOLINT(fuchsia-statically-constructed-objects)
 }
 } // namespace Retry
 } // namespace Extensions

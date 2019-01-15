@@ -33,7 +33,7 @@ std::string HystrixSinkFactory::name() { return StatsSinkNames::get().Hystrix; }
  * Static registration for the statsd sink factory. @see RegisterFactory.
  */
 static Registry::RegisterFactory<HystrixSinkFactory, Server::Configuration::StatsSinkFactory>
-    register_;
+    register_; // NOLINT(fuchsia-statically-constructed-objects)
 
 } // namespace Hystrix
 } // namespace StatSinks

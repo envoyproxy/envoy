@@ -43,7 +43,7 @@ Http::FilterFactoryCb SquashFilterConfigFactory::createFilterFactoryFromProtoTyp
  */
 static Envoy::Registry::RegisterFactory<SquashFilterConfigFactory,
                                         Server::Configuration::NamedHttpFilterConfigFactory>
-    register_;
+    register_; // NOLINT(fuchsia-statically-constructed-objects)
 
 } // namespace Squash
 } // namespace HttpFilters

@@ -43,7 +43,7 @@ FaultFilterFactory::createRouteSpecificFilterConfigTyped(
  */
 static Registry::RegisterFactory<FaultFilterFactory,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
-    register_;
+    register_; // NOLINT(fuchsia-statically-constructed-objects)
 
 } // namespace Fault
 } // namespace HttpFilters

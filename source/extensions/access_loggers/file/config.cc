@@ -71,7 +71,7 @@ FileAccessLogFactory::convertJsonFormatToMap(ProtobufWkt::Struct json_format) {
  */
 static Registry::RegisterFactory<FileAccessLogFactory,
                                  Server::Configuration::AccessLogInstanceFactory>
-    register_;
+    register_; // NOLINT(fuchsia-statically-constructed-objects)
 
 } // namespace File
 } // namespace AccessLoggers

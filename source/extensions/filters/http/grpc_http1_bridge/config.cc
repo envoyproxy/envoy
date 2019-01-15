@@ -22,7 +22,7 @@ GrpcHttp1BridgeFilterConfig::createFilter(const std::string&,
  */
 static Registry::RegisterFactory<GrpcHttp1BridgeFilterConfig,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
-    register_;
+    register_; // NOLINT(fuchsia-statically-constructed-objects)
 
 } // namespace GrpcHttp1Bridge
 } // namespace HttpFilters
