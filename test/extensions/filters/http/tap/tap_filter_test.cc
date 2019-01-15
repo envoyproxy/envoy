@@ -85,6 +85,8 @@ TEST_F(TapFilterTest, NoConfig) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_body, false));
   Http::TestHeaderMapImpl response_trailers;
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers));
+  Http::MetadataMap metadata;
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->encodeMetadata(metadata));
 
   filter_->log(&request_headers, &response_headers, &response_trailers, stream_info_);
 }
