@@ -9,8 +9,8 @@ namespace Envoy {
 namespace Thread {
 namespace {
 
-class ThreadFactorySingletonTest: public testing::Test {
- protected:
+class ThreadFactorySingletonTest : public testing::Test {
+protected:
   ThreadFactorySingletonTest()
       : run_tid_(Envoy::Thread::ThreadFactorySingleton::get().currentThreadId()) {}
 
