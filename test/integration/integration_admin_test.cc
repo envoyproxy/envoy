@@ -96,7 +96,7 @@ TEST_P(IntegrationAdminTest, AdminLogging) {
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
   EXPECT_EQ(spdlog::level::trace, Logger::Registry::getLog(Logger::Id::assert).level());
 
-  const char* level_name = spdlog::level::level_names[default_log_level_];
+  spdlog::string_view_t level_name = spdlog::level::level_string_views[default_log_level_];
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "POST",
                                                 fmt::format("/logging?level={}", level_name), "",
                                                 downstreamProtocol(), version_);
