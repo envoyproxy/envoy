@@ -325,12 +325,13 @@ void ConfigHelper::setConnectTimeout(std::chrono::milliseconds timeout) {
   connect_timeout_set_ = true;
 }
 
-void ConfigHelper::addRoute(const std::string& domains, const std::string& prefix,
-                            const std::string& cluster, bool validate_clusters,
-                            envoy::api::v2::route::RouteAction::ClusterNotFoundResponseCode code,
-                            envoy::api::v2::route::VirtualHost::TlsRequirementType type,
-                            envoy::api::v2::route::RetryPolicy retry_policy,
-                            bool include_attempt_count_header, const absl::string_view upgrade) {
+void ConfigHelper::addRoute(
+    const std::string& domains, const std::string& prefix, const std::string& cluster,
+    bool validate_clusters, envoy::api::v2::route::RouteAction::ClusterNotFoundResponseCode code,
+    envoy::api::v2::route::VirtualHost::TlsRequirementType type,
+    envoy::api::v2::route::RetryPolicy retry_policy, bool include_attempt_count_header,
+    const absl::string_view upgrade,
+    envoy::api::v2::route::RouteAction::InternalRedirectAction internal_redirect_action) {
   RELEASE_ASSERT(!finalized_, "");
   envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager hcm_config;
   loadHttpConnectionManager(hcm_config);
@@ -349,6 +350,7 @@ void ConfigHelper::addRoute(const std::string& domains, const std::string& prefi
   if (!upgrade.empty()) {
     route->add_upgrade_configs()->set_upgrade_type(std::string(upgrade));
   }
+  route->set_internal_redirect_action(internal_redirect_action);
   virtual_host->set_require_tls(type);
 
   storeHttpConnectionManager(hcm_config);

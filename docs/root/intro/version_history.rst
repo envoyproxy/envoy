@@ -3,6 +3,8 @@ Version history
 
 1.10.0 (pending)
 ================
+* config: added support of using google.protobuf.Any in opaque configs for extensions.
+* config: removed deprecated --v2-config-only from command line config.
 * access log: added a new flag for upstream retry count exceeded.
 * admin: the admin server can now be accessed via HTTP/2 (prior knowledge).
 * buffer: fix vulnerabilities when allocation fails.
@@ -22,6 +24,7 @@ Version history
   virtual host level.
 * tap: added new alpha :ref:`HTTP tap filter <config_http_filters_tap>`.
 * tls: enabled TLS 1.3 on the server-side (non-FIPS builds).
+* router: added per-route configuration of :ref:`internal redirects <envoy_api_field_route.RouteAction.internal_redirect_action>`.
 * upstream: add hash_function to specify the hash function for :ref:`ring hash<envoy_api_msg_Cluster.RingHashLbConfig>` as either xxHash or `murmurHash2 <https://sites.google.com/site/murmurhash>`_. MurmurHash2 is compatible with std::hash in GNU libstdc++ 3.4.20 or above. This is typically the case when compiled on Linux and not macOS.
 
 1.9.0
@@ -501,7 +504,7 @@ Version history
   endpoint. Histograms are not currently output.
 * admin: added ``version_info`` to the :ref:`/clusters admin endpoint<operations_admin_interface_clusters>`.
 * config: the :ref:`v2 API <config_overview_v2>` is now considered production ready.
-* config: added :option:`--v2-config-only` CLI flag.
+* config: added --v2-config-only CLI flag.
 * cors: added :ref:`CORS filter <config_http_filters_cors>`.
 * health check: added :ref:`x-envoy-immediate-health-check-fail
   <config_http_filters_router_x-envoy-immediate-health-check-fail>` header support.

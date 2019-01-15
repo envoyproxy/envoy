@@ -222,6 +222,7 @@ envoy_cc_test_library(
         "//test/integration/filters:headers_only_filter_config_lib",
         "//test/integration/filters:passthrough_filter_config_lib",
         "//test/integration/filters:pause_filter_lib",
+        "//test/integration/filters:response_metadata_filter_config_lib",
         "//test/test_common:registry_lib",
     ],
 )
@@ -344,6 +345,18 @@ envoy_cc_test(
         "//source/extensions/filters/http/grpc_http1_bridge:config",
         "//source/extensions/filters/http/health_check:config",
         "//test/mocks/http:http_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "redirect_integration_test",
+    srcs = [
+        "redirect_integration_test.cc",
+    ],
+    deps = [
+        ":http_protocol_integration_lib",
+        "//source/common/http:header_map_lib",
         "//test/test_common:utility_lib",
     ],
 )

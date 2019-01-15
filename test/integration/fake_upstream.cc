@@ -244,7 +244,7 @@ AssertionResult FakeConnectionBase::enableHalfClose(bool enable,
       [enable](Network::Connection& connection) { connection.enableHalfClose(enable); }, timeout);
 }
 
-Http::StreamDecoder& FakeHttpConnection::newStream(Http::StreamEncoder& encoder) {
+Http::StreamDecoder& FakeHttpConnection::newStream(Http::StreamEncoder& encoder, bool) {
   Thread::LockGuard lock(lock_);
   new_streams_.emplace_back(new FakeStream(*this, encoder, time_system_));
   connection_event_.notifyOne();
