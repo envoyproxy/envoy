@@ -51,6 +51,13 @@ genrule(
     visibility = ["//visibility:private"],
 )
 
+# Note: in dependencies below that reference Envoy build targets in the main
+# repository (particularly for QUICHE platform libs), use '@' instead of
+# '@envoy' as the repository identifier. Otherwise, Bazel generates duplicate
+# object files for the same build target (one under
+# bazel-out/.../bin/external/, and one under bazel-out/.../bin/), eventually
+# resulting in link-time errors.
+
 cc_library(
     name = "http2_platform",
     hdrs = [
@@ -73,6 +80,6 @@ cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
-        "@envoy//source/extensions/quic_listeners/quiche/platform:http2_platform_impl_lib",
+        "@//source/extensions/quic_listeners/quiche/platform:http2_platform_impl_lib",
     ],
 )
