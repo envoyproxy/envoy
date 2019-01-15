@@ -44,6 +44,21 @@ TEST_F(MySQLFilterTest, NewSessionStatsTest) {
   EXPECT_EQ(SESSIONS, config_->stats().sessions_.value());
 }
 
+// Test that the filter falls back to tcp proxy if it cant decode
+TEST_F(MySQLFilterTest, MySqlFallbackToTcpProxy) {
+  initialize();
+
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onNewConnection());
+  EXPECT_EQ(1UL, config_->stats().sessions_.value());
+
+  Buffer::InstancePtr greet_data(new Buffer::OwnedImpl("scooby doo - part 1!"));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*greet_data, false));
+  EXPECT_EQ(1UL, config_->stats().decoder_errors_.value());
+
+  Buffer::InstancePtr more_data(new Buffer::OwnedImpl("scooby doo - part 2!"));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*more_data, false));
+}
+
 /**
  * Test MySQL Handshake with protocol version 41
  * SM: greeting(p=10) -> challenge-req(v41) -> serv-resp-ok
