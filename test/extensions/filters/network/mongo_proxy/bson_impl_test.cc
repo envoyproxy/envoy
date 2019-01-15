@@ -121,8 +121,7 @@ TEST(BsonImplTest, InvalidSectionPayloadType) {
     s1->payloadType(3);
     auto s2 = Bson::SectionImpl::create();
     s2->payloadType(3);
-    bool unused;
-    EXPECT_THROW(unused = (*s1 == *s2), EnvoyException);
+    EXPECT_THROW(*s1 == *s2, EnvoyException);
   }
 
   {
