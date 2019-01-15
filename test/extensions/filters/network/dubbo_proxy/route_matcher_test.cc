@@ -252,6 +252,36 @@ routes:
   EXPECT_EQ("user_service_dubbo_server", matcher.route(metadata, 0)->routeEntry()->clusterName());
 }
 
+TEST(RouteMatcherTest, RouteByMethodWithMultiWildcard) {
+  const std::string yaml = R"EOF(
+name: local_route
+interface: org.apache.dubbo.demo.DemoService
+routes:
+  - match:
+      method:
+        name: "*d?test"
+    route:
+        cluster: user_service_dubbo_server
+)EOF";
+
+  envoy::config::filter::network::dubbo_proxy::v2alpha1::RouteConfiguration config =
+      parseRouteConfigurationFromV2Yaml(yaml);
+  MessageMetadata metadata;
+  metadata.setServiceName("org.apache.dubbo.demo.DemoService");
+
+  RouteMatcher matcher(config);
+  EXPECT_EQ(nullptr, matcher.route(metadata, 0));
+
+  metadata.setMethodName("ab12test");
+  EXPECT_EQ(nullptr, matcher.route(metadata, 0));
+
+  metadata.setMethodName("test12d2test");
+  EXPECT_EQ("user_service_dubbo_server", matcher.route(metadata, 0)->routeEntry()->clusterName());
+
+  metadata.setMethodName("datest");
+  EXPECT_EQ("user_service_dubbo_server", matcher.route(metadata, 0)->routeEntry()->clusterName());
+}
+
 TEST(RouteMatcherTest, RouteByParameterWithRangeMatch) {
   const std::string yaml = R"EOF(
 name: local_route

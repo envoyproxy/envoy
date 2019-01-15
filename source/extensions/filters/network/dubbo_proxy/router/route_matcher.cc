@@ -23,7 +23,7 @@ RouteEntryImplBase::RouteEntryImplBase(
       envoy::config::filter::network::dubbo_proxy::v2alpha1::RouteAction::kWeightedClusters) {
     total_cluster_weight_ = 0UL;
     for (const auto& cluster : route.route().weighted_clusters().clusters()) {
-      weighted_clusters_.emplace_back(new WeightedClusterEntry(*this, cluster));
+      weighted_clusters_.emplace_back(std::make_shared<WeightedClusterEntry>(*this, cluster));
       total_cluster_weight_ += weighted_clusters_.back()->clusterWeight();
     }
     ENVOY_LOG(debug, "dubbo route matcher: weighted_clusters_size {}", weighted_clusters_.size());
@@ -186,7 +186,7 @@ RouteMatcher::RouteMatcher(const RouteConfig& config)
   for (const auto& route : config.routes()) {
     switch (route.match().match_specifier_case()) {
     case RouteMatch::MatchSpecifierCase::kMethod:
-      routes_.emplace_back(new MethodRouteEntryImpl(route));
+      routes_.emplace_back(std::make_shared<MethodRouteEntryImpl>(route));
       ENVOY_LOG(debug, "dubbo route matcher: create the method route entry");
       break;
     default:
@@ -213,7 +213,6 @@ RouteConstSharedPtr RouteMatcher::route(const MessageMetadata& metadata,
     ENVOY_LOG(debug, "dubbo route matcher: interface matching failed");
   }
 
-  ENVOY_LOG(debug, "dubbo route matcher: route matching failed");
   return nullptr;
 }
 
