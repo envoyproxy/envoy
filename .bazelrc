@@ -22,7 +22,7 @@ build:asan --test_env=ASAN_SYMBOLIZER_PATH
 build:clang-asan --config=asan
 build:clang-asan --linkopt -fuse-ld=lld
 
-# Mac ASAN/UBSAN
+# macOS ASAN/UBSAN
 build:mac-asan --config=asan
 # Workaround, see https://github.com/bazelbuild/bazel/issues/6932
 build:mac-asan --copt -Wno-macro-redefined
@@ -43,7 +43,6 @@ build:clang-msan --linkopt -fsanitize=memory
 build:clang-msan --define tcmalloc=disabled
 build:clang-msan --copt -fsanitize-memory-track-origins=2
 build:clang-msan --linkopt -fuse-ld=lld
-
 
 # Test options
 test --test_env=HEAPCHECK=normal --test_env=PPROF_PATH
