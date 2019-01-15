@@ -528,6 +528,7 @@ TEST_F(ConnectionManagerUtilityTest, ExternalAddressExternalRequestUseRemote) {
                             {"x-envoy-upstream-rq-timeout-ms", "foo"},
                             {"x-envoy-expected-rq-timeout-ms", "10"},
                             {"x-envoy-ip-tags", "bar"},
+                            {"x-envoy-original-url", "my_url"},
                             {"custom_header", "foo"}};
 
   EXPECT_EQ((MutateRequestRet{"50.0.0.1:0", false}),
@@ -544,6 +545,7 @@ TEST_F(ConnectionManagerUtilityTest, ExternalAddressExternalRequestUseRemote) {
   EXPECT_FALSE(headers.has("x-envoy-upstream-rq-timeout-ms"));
   EXPECT_FALSE(headers.has("x-envoy-expected-rq-timeout-ms"));
   EXPECT_FALSE(headers.has("x-envoy-ip-tags"));
+  EXPECT_FALSE(headers.has("x-envoy-original-url"));
   EXPECT_FALSE(headers.has("custom_header"));
 }
 

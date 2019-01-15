@@ -5,17 +5,11 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/router/router.h"
+#include "envoy/upstream/types.h"
 #include "envoy/upstream/upstream.h"
 
 namespace Envoy {
 namespace Upstream {
-
-// Mapping from a priority to how much of the total traffic load should be directed to this
-// priority. For example, {50, 30, 20} means that 50% of traffic should go to P0, 30% to P1
-// and 20% to P2.
-//
-// This should either sum to 100 or consist of all zeros.
-typedef std::vector<uint32_t> PriorityLoad;
 
 /**
  * Context information passed to a load balancer to use when choosing a host. Not all load

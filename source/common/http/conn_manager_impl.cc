@@ -142,7 +142,12 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream) {
   // must be done after deleting the stream since the stream refers to the connection and must be
   // deleted first.
   bool reset_stream = false;
-  if (!stream.state_.remote_complete_ || !stream.state_.local_complete_) {
+  // If the response encoder is still associated with the stream, reset the stream. The exception
+  // here is when Envoy "ends" the stream by calling recreateStream at which point recreateStream
+  // explicitly nulls out response_encoder to avoid the downstream being notified of the
+  // Envoy-internal stream instance being ended.
+  if (stream.response_encoder_ != nullptr &&
+      (!stream.state_.remote_complete_ || !stream.state_.local_complete_)) {
     // Indicate local is complete at this point so that if we reset during a continuation, we don't
     // raise further data or trailers.
     stream.state_.local_complete_ = true;
@@ -196,13 +201,15 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
   read_callbacks_->connection().dispatcher().deferredDelete(stream.removeFromList(streams_));
 }
 
-StreamDecoder& ConnectionManagerImpl::newStream(StreamEncoder& response_encoder) {
+StreamDecoder& ConnectionManagerImpl::newStream(StreamEncoder& response_encoder,
+                                                bool is_internally_created) {
   if (connection_idle_timer_) {
     connection_idle_timer_->disableTimer();
   }
 
   ENVOY_CONN_LOG(debug, "new stream", read_callbacks_->connection());
   ActiveStreamPtr new_stream(new ActiveStream(*this));
+  new_stream->state_.is_internally_created_ = is_internally_created;
   new_stream->response_encoder_ = &response_encoder;
   new_stream->response_encoder_->getStream().addCallbacks(*new_stream);
   new_stream->buffer_limit_ = new_stream->response_encoder_->getStream().bufferLimit();
@@ -641,11 +648,13 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     state_.saw_connection_close_ = true;
   }
 
-  // Modify the downstream remote address depending on configuration and headers.
-  stream_info_.setDownstreamRemoteAddress(ConnectionManagerUtility::mutateRequestHeaders(
-      *request_headers_, connection_manager_.read_callbacks_->connection(),
-      connection_manager_.config_, *snapped_route_config_, connection_manager_.random_generator_,
-      connection_manager_.runtime_, connection_manager_.local_info_));
+  if (!state_.is_internally_created_) { // Only sanitize headers on first pass.
+    // Modify the downstream remote address depending on configuration and headers.
+    stream_info_.setDownstreamRemoteAddress(ConnectionManagerUtility::mutateRequestHeaders(
+        *request_headers_, connection_manager_.read_callbacks_->connection(),
+        connection_manager_.config_, *snapped_route_config_, connection_manager_.random_generator_,
+        connection_manager_.runtime_, connection_manager_.local_info_));
+  }
   ASSERT(stream_info_.downstreamRemoteAddress() != nullptr);
 
   ASSERT(!cached_route_);
@@ -1762,6 +1771,28 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::removeDownstreamWatermark
     DownstreamWatermarkCallbacks& watermark_callbacks) {
   ASSERT(parent_.watermark_callbacks_ == &watermark_callbacks);
   parent_.watermark_callbacks_ = nullptr;
+}
+
+bool ConnectionManagerImpl::ActiveStreamDecoderFilter::recreateStream() {
+  // Because the filter's and the HCM view of if the stream has a body and if
+  // the stream is complete may differ, re-check bytesReceived() to make sure
+  // there was no body from the HCM's point of view.
+  if (!complete() || parent_.stream_info_.bytesReceived() != 0) {
+    return false;
+  }
+  // n.b. we do not currently change the codecs to point at the new stream
+  // decoder because the decoder callbacks are complete. It would be good to
+  // null out that pointer but should not be necessary.
+  HeaderMapPtr request_headers(std::move(parent_.request_headers_));
+  StreamEncoder* response_encoder = parent_.response_encoder_;
+  parent_.response_encoder_ = nullptr;
+  // This functionally deletes the stream (via defered delete) so do not
+  // reference anything beyond this point.
+  parent_.connection_manager_.doEndStream(this->parent_);
+
+  StreamDecoder& new_stream = parent_.connection_manager_.newStream(*response_encoder, true);
+  new_stream.decodeHeaders(std::move(request_headers), true);
+  return true;
 }
 
 Buffer::WatermarkBufferPtr ConnectionManagerImpl::ActiveStreamEncoderFilter::createBuffer() {

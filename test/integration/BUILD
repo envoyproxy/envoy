@@ -349,6 +349,18 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "redirect_integration_test",
+    srcs = [
+        "redirect_integration_test.cc",
+    ],
+    deps = [
+        ":http_protocol_integration_lib",
+        "//source/common/http:header_map_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "websocket_integration_test",
     srcs = [
         "websocket_integration_test.cc",

@@ -33,18 +33,18 @@ static const std::string RuntimePanicThreshold = "upstream.healthy_panic_thresho
 // scale the load when the total availability is less than 100%.
 // @return the first available priority and the remaining load
 std::pair<int32_t, size_t> distributeLoad(PriorityLoad& per_priority_load,
-                                          const std::vector<uint32_t>& per_priority_availability,
+                                          const PriorityAvailability& per_priority_availability,
                                           size_t total_load, size_t normalized_total_availability) {
   int32_t first_available_priority = -1;
-  for (size_t i = 0; i < per_priority_availability.size(); ++i) {
-    if (first_available_priority < 0 && per_priority_availability[i] > 0) {
+  for (size_t i = 0; i < per_priority_availability.get().size(); ++i) {
+    if (first_available_priority < 0 && per_priority_availability.get()[i] > 0) {
       first_available_priority = i;
     }
     // Now assign as much load as possible to the high priority levels and cease assigning load
     // when total_load runs out.
-    per_priority_load[i] = std::min<uint32_t>(total_load, per_priority_availability[i] * 100 /
-                                                              normalized_total_availability);
-    total_load -= per_priority_load[i];
+    per_priority_load.get()[i] = std::min<uint32_t>(
+        total_load, per_priority_availability.get()[i] * 100 / normalized_total_availability);
+    total_load -= per_priority_load.get()[i];
   }
 
   return {first_available_priority, total_load};
@@ -52,15 +52,14 @@ std::pair<int32_t, size_t> distributeLoad(PriorityLoad& per_priority_load,
 
 } // namespace
 
-uint32_t LoadBalancerBase::choosePriority(uint64_t hash,
-                                          const std::vector<uint32_t>& per_priority_load) {
+uint32_t LoadBalancerBase::choosePriority(uint64_t hash, const PriorityLoad& per_priority_load) {
   hash = hash % 100 + 1; // 1-100
   uint32_t aggregate_percentage_load = 0;
   // As with tryChooseLocalLocalityHosts, this can be refactored for efficiency
   // but O(N) is good enough for now given the expected number of priorities is
   // small.
-  for (size_t priority = 0; priority < per_priority_load.size(); ++priority) {
-    aggregate_percentage_load += per_priority_load[priority];
+  for (size_t priority = 0; priority < per_priority_load.get().size(); ++priority) {
+    aggregate_percentage_load += per_priority_load.get()[priority];
     if (hash <= aggregate_percentage_load) {
       return priority;
     }
@@ -109,22 +108,22 @@ LoadBalancerBase::LoadBalancerBase(const PrioritySet& priority_set, ClusterStats
 void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority,
                                                    const PrioritySet& priority_set,
                                                    PriorityLoad& per_priority_load,
-                                                   std::vector<uint32_t>& per_priority_health) {
-  per_priority_load.resize(priority_set.hostSetsPerPriority().size());
-  per_priority_health.resize(priority_set.hostSetsPerPriority().size());
+                                                   PriorityAvailability& per_priority_health) {
+  per_priority_load.get().resize(priority_set.hostSetsPerPriority().size());
+  per_priority_health.get().resize(priority_set.hostSetsPerPriority().size());
 
   // Determine the health of the newly modified priority level.
   // Health ranges from 0-100, and is the ratio of healthy hosts to total hosts, modified by the
   // overprovisioning factor.
   HostSet& host_set = *priority_set.hostSetsPerPriority()[priority];
-  per_priority_health[priority] = 0;
+  per_priority_health.get()[priority] = 0;
   if (host_set.hosts().size() > 0) {
     // Each priority level's health is ratio of healthy hosts to total number of hosts in a priority
     // multiplied by overprovisioning factor of 1.4 and capped at 100%. It means that if all
     // hosts are healthy that priority's health is 100%*1.4=140% and is capped at 100% which results
     // in 100%. If 80% of hosts are healty, that priority's health is still 100% (80%*1.4=112% and
     // capped at 100%).
-    per_priority_health[priority] =
+    per_priority_health.get()[priority] =
         std::min<uint32_t>(100, (host_set.overprovisioningFactor() *
                                  host_set.healthyHosts().size() / host_set.hosts().size()));
   }
@@ -142,7 +141,7 @@ void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority,
   if (normalized_total_health == 0) {
     // Everything is terrible. Send all load to P=0.
     // In this one case sumEntries(per_priority_load) != 100 since we sinkhole all traffic in P=0.
-    per_priority_load[0] = 100;
+    per_priority_load.get()[0] = 100;
     return;
   }
 
@@ -153,8 +152,8 @@ void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority,
   if (remaining_load != 0) {
     ASSERT(first_available_and_remaining.first != -1);
     // Account for rounding errors by assigning it to the first available priority.
-    ASSERT(remaining_load < per_priority_load.size());
-    per_priority_load[first_available_and_remaining.first] += remaining_load;
+    ASSERT(remaining_load < per_priority_load.get().size());
+    per_priority_load.get()[first_available_and_remaining.first] += remaining_load;
   }
 }
 
@@ -166,12 +165,12 @@ void LoadBalancerBase::recalculatePerPriorityPanic() {
 
   if (normalized_total_health == 0) {
     // Everything is terrible. All load should be to P=0. Turn on panic mode.
-    ASSERT(per_priority_load_[0] == 100);
+    ASSERT(per_priority_load_.get()[0] == 100);
     per_priority_panic_[0] = true;
     return;
   }
 
-  for (size_t i = 0; i < per_priority_health_.size(); ++i) {
+  for (size_t i = 0; i < per_priority_health_.get().size(); ++i) {
     // For each level check if it should run in panic mode. Never set panic mode if
     // normalized total health is 100%, even when individual priority level has very low # of
     // healthy hosts.
