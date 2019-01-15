@@ -82,7 +82,7 @@ message HealthCheck {
     }
   }
 
-  // [#comment:next free field: 9]
+  // [#comment:next free field: 10]
   message HttpHealthCheck {
     // The value of the host header in the HTTP health check request. If
     // left empty (default value), the name of the cluster this health check is associated
@@ -104,16 +104,34 @@ message HealthCheck {
     // <arch_overview_health_checking_identity>` for more information.
     string service_name = 5;
 
+    // Specifies a list of HTTP headers that should be added to/removed from each request
+    // that is sent to the health checked cluster. For more information, including details
+    // on header value syntax, see the documentation on :ref:`custom request headers
+    // <config_http_conn_man_headers_custom_request_headers>`.
+    core.CustomHeaders request_headers = 9;
+
     // Specifies a list of HTTP headers that should be added to each request that is sent to the
     // health checked cluster. For more information, including details on header value syntax, see
     // the documentation on :ref:`custom request headers
     // <config_http_conn_man_headers_custom_request_headers>`.
+    //
+    // .. attention::
+    //
+    //    **This field is deprecated**. Set the
+    //    :ref:`envoy_api_field_core.HealthCheck.HttpHealthCheck.request_headers`
+    //    field instead.
     repeated core.HeaderValueOption request_headers_to_add = 6
-        [(validate.rules).repeated .max_items = 1000];
+        [(validate.rules).repeated .max_items = 1000, deprecated = true];
 
     // Specifies a list of HTTP headers that should be removed from each request that is sent to the
     // health checked cluster.
-    repeated string request_headers_to_remove = 8;
+    //
+    // .. attention::
+    //
+    //    **This field is deprecated**. Set the
+    //    :ref:`envoy_api_field_core.HealthCheck.HttpHealthCheck.request_headers`
+    //    field instead.
+    repeated string request_headers_to_remove = 8 [deprecated = true];
 
     // If set, health checks will be made using http/2.
     bool use_http2 = 7;

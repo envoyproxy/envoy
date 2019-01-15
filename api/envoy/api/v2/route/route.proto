@@ -28,7 +28,7 @@ option (gogoproto.equal_all) = true;
 // host header. This allows a single listener to service multiple top level domain path trees. Once
 // a virtual host is selected based on the domain, the routes are processed in order to see which
 // upstream cluster to route to or whether to perform a redirect.
-// [#comment:next free field: 16]
+// [#comment:next free field: 18]
 message VirtualHost {
   // The logical name of the virtual host. This is used when emitting certain
   // statistics but is not relevant for routing.
@@ -77,18 +77,44 @@ message VirtualHost {
   // virtual host.
   repeated RateLimit rate_limits = 6;
 
+  // Specifies a list of HTTP headers that should be added/removed to each
+  // request routed by this virtual host. Headers specified at this level are applied
+  // after headers from enclosed :ref:`envoy_api_msg_route.Route` and before headers
+  // from the enclosing :ref:`envoy_api_msg_RouteConfiguration`. For more information,
+  // including details on header value syntax, see the documentation on
+  // :ref:`custom request headers<config_http_conn_man_headers_custom_request_headers>`.
+  core.CustomHeaders request_headers = 16;
+
   // Specifies a list of HTTP headers that should be added to each request
   // handled by this virtual host. Headers specified at this level are applied
   // after headers from enclosed :ref:`envoy_api_msg_route.Route` and before headers from the
   // enclosing :ref:`envoy_api_msg_RouteConfiguration`. For more information, including
   // details on header value syntax, see the documentation on :ref:`custom request headers
   // <config_http_conn_man_headers_custom_request_headers>`.
+  //
+  // .. attention::
+  //
+  //    **This field is deprecated**. Set the
+  //    :ref:`envoy_api_msg_route.VirtualHost.request_headers` field instead.
   repeated core.HeaderValueOption request_headers_to_add = 7
-      [(validate.rules).repeated .max_items = 1000];
+      [(validate.rules).repeated .max_items = 1000, deprecated = true];
 
   // Specifies a list of HTTP headers that should be removed from each request
   // handled by this virtual host.
-  repeated string request_headers_to_remove = 13;
+  //
+  // .. attention::
+  //
+  //    **This field is deprecated**. Set the
+  //    :ref:`envoy_api_msg_route.VirtualHost.request_headers` field instead.
+  repeated string request_headers_to_remove = 13 [deprecated = true];
+
+  // Specifies a list of HTTP headers that should be added/removed to each
+  // response routed by this virtual host. Headers specified at this level are applied
+  // after headers from enclosed :ref:`envoy_api_msg_route.Route` and before headers
+  // from the enclosing :ref:`envoy_api_msg_RouteConfiguration`. For more information,
+  // including details on header value syntax, see the documentation on
+  // :ref:`custom request headers<config_http_conn_man_headers_custom_request_headers>`.
+  core.CustomHeaders response_headers = 17;
 
   // Specifies a list of HTTP headers that should be added to each response
   // handled by this virtual host. Headers specified at this level are applied
@@ -96,12 +122,22 @@ message VirtualHost {
   // enclosing :ref:`envoy_api_msg_RouteConfiguration`. For more information, including
   // details on header value syntax, see the documentation on :ref:`custom request headers
   // <config_http_conn_man_headers_custom_request_headers>`.
+  //
+  // .. attention::
+  //
+  //    **This field is deprecated**. Set the
+  //    :ref:`envoy_api_msg_route.VirtualHost.response_headers` field instead.
   repeated core.HeaderValueOption response_headers_to_add = 10
-      [(validate.rules).repeated .max_items = 1000];
+      [(validate.rules).repeated .max_items = 1000, deprecated = true];
 
   // Specifies a list of HTTP headers that should be removed from each response
   // handled by this virtual host.
-  repeated string response_headers_to_remove = 11;
+  //
+  // .. attention::
+  //
+  //    **This field is deprecated**. Set the
+  //    :ref:`envoy_api_msg_route.VirtualHost.response_headers` field instead.
+  repeated string response_headers_to_remove = 11 [deprecated = true];
 
   // Indicates that the virtual host has a CORS policy.
   CorsPolicy cors = 8;
@@ -141,7 +177,7 @@ message VirtualHost {
 //
 //   Envoy supports routing on HTTP method via :ref:`header matching
 //   <envoy_api_msg_route.HeaderMatcher>`.
-// [#comment:next free field: 14]
+// [#comment:next free field: 16]
 message Route {
   // Route matching parameters.
   RouteMatch match = 1 [(validate.rules).message.required = true, (gogoproto.nullable) = false];
@@ -186,18 +222,44 @@ message Route {
   // if and how it is utilized.
   map<string, google.protobuf.Any> typed_per_filter_config = 13;
 
+  // Specifies a list of HTTP headers that should be added/removed to each
+  // request matching this route. Headers specified at this level are applied
+  // before headers from the enclosing :ref:`envoy_api_msg_route.VirtualHost` and
+  // :ref:`envoy_api_msg_RouteConfiguration`. For more information, including details
+  // on header value syntax, see the documentation on
+  // :ref:`custom request headers<config_http_conn_man_headers_custom_request_headers>`.
+  core.CustomHeaders request_headers = 14;
+
   // Specifies a set of headers that will be added to requests matching this
   // route. Headers specified at this level are applied before headers from the
   // enclosing :ref:`envoy_api_msg_route.VirtualHost` and
   // :ref:`envoy_api_msg_RouteConfiguration`. For more information, including details on
   // header value syntax, see the documentation on :ref:`custom request headers
   // <config_http_conn_man_headers_custom_request_headers>`.
+  //
+  // .. attention::
+  //
+  //    **This field is deprecated**. Set the
+  //    :ref:`envoy_api_msg_route.Route.request_headers` field instead.
   repeated core.HeaderValueOption request_headers_to_add = 9
-      [(validate.rules).repeated .max_items = 1000];
+      [(validate.rules).repeated .max_items = 1000, deprecated = true];
 
   // Specifies a list of HTTP headers that should be removed from each request
   // matching this route.
-  repeated string request_headers_to_remove = 12;
+  //
+  // .. attention::
+  //
+  //    **This field is deprecated**. Set the
+  //    :ref:`envoy_api_msg_route.Route.request_headers` field instead.
+  repeated string request_headers_to_remove = 12 [deprecated = true];
+
+  // Specifies a list of HTTP headers that should be added/removed to each
+  // response matching this route. Headers specified at this level are applied before
+  // headers from the enclosing :ref:`envoy_api_msg_route.VirtualHost` and
+  // :ref:`envoy_api_msg_RouteConfiguration`. For more information, including
+  // details on header value syntax, see the documentation on
+  // :ref:`custom request headers <config_http_conn_man_headers_custom_request_headers>`.
+  core.CustomHeaders response_headers = 15;
 
   // Specifies a set of headers that will be added to responses to requests
   // matching this route. Headers specified at this level are applied before
@@ -205,12 +267,22 @@ message Route {
   // :ref:`envoy_api_msg_RouteConfiguration`. For more information, including
   // details on header value syntax, see the documentation on
   // :ref:`custom request headers <config_http_conn_man_headers_custom_request_headers>`.
+  //
+  // .. attention::
+  //
+  //    **This field is deprecated**. Set the
+  //    :ref:`envoy_api_msg_route.Route.response_headers` field instead.
   repeated core.HeaderValueOption response_headers_to_add = 10
-      [(validate.rules).repeated .max_items = 1000];
+      [(validate.rules).repeated .max_items = 1000, deprecated = true];
 
   // Specifies a list of HTTP headers that should be removed from each response
   // to requests matching this route.
-  repeated string response_headers_to_remove = 11;
+  //
+  // .. attention::
+  //
+  //    **This field is deprecated**. Set the
+  //    :ref:`envoy_api_msg_route.Route.response_headers` field instead.
+  repeated string response_headers_to_remove = 11 [deprecated = true];
 }
 
 // Compared to the :ref:`cluster <envoy_api_field_route.RouteAction.cluster>` field that specifies a
@@ -219,7 +291,7 @@ message Route {
 // multiple upstream clusters along with weights that indicate the percentage of
 // traffic to be forwarded to each cluster. The router selects an upstream cluster based on the
 // weights.
-// [#comment:next free field: 11]
+// [#comment:next free field: 13]
 message WeightedCluster {
   message ClusterWeight {
     // Name of the upstream cluster. The cluster must exist in the
@@ -239,6 +311,15 @@ message WeightedCluster {
     // here taking precedence. The filter name should be specified as *envoy.lb*.
     core.Metadata metadata_match = 3;
 
+    // Specifies a list of HTTP headers that should be added/removed to each
+    // request when this cluster is selected through the enclosing
+    // :ref:`envoy_api_msg_route.RouteAction`. Headers specified at this level are applied
+    // before headers from the enclosing :ref:`envoy_api_msg_route.Route`,
+    // :ref:`envoy_api_msg_route.VirtualHost`, and :ref:`envoy_api_msg_RouteConfiguration`.
+    // For more information, including details on header value syntax, see the documentation
+    // on :ref:`custom request headers<config_http_conn_man_headers_custom_request_headers>`.
+    core.CustomHeaders request_headers = 11;
+
     // Specifies a list of headers to be added to requests when this cluster is selected
     // through the enclosing :ref:`envoy_api_msg_route.RouteAction`.
     // Headers specified at this level are applied before headers from the enclosing
@@ -246,12 +327,31 @@ message WeightedCluster {
     // :ref:`envoy_api_msg_RouteConfiguration`. For more information, including details on
     // header value syntax, see the documentation on :ref:`custom request headers
     // <config_http_conn_man_headers_custom_request_headers>`.
+    //
+    // .. attention::
+    //
+    //    **This field is deprecated**. Set the
+    //    :ref:`envoy_api_msg_route.WeightedCluster.request_headers` field instead.
     repeated core.HeaderValueOption request_headers_to_add = 4
-        [(validate.rules).repeated .max_items = 1000];
+        [(validate.rules).repeated .max_items = 1000, deprecated = true];
 
     // Specifies a list of HTTP headers that should be removed from each request when
     // this cluster is selected through the enclosing :ref:`envoy_api_msg_route.RouteAction`.
-    repeated string request_headers_to_remove = 9;
+    //
+    // .. attention::
+    //
+    //    **This field is deprecated**. Set the
+    //    :ref:`envoy_api_msg_route.WeightedCluster.request_headers` field instead.
+    repeated string request_headers_to_remove = 9 [deprecated = true];
+
+    // Specifies a list of HTTP headers that should be added/removed to each
+    // response when this cluster is selected through the enclosing
+    // :ref:`envoy_api_msg_route.RouteAction`. Headers specified at this level are applied
+    // before headers from the enclosing :ref:`envoy_api_msg_route.Route`,
+    // :ref:`envoy_api_msg_route.VirtualHost`, and :ref:`envoy_api_msg_RouteConfiguration`.
+    // For more information, including details on header value syntax, see the documentation
+    // on :ref:`custom request headers<config_http_conn_man_headers_custom_request_headers>`.
+    core.CustomHeaders response_headers = 12;
 
     // Specifies a list of headers to be added to responses when this cluster is selected
     // through the enclosing :ref:`envoy_api_msg_route.RouteAction`.
@@ -260,12 +360,22 @@ message WeightedCluster {
     // :ref:`envoy_api_msg_RouteConfiguration`. For more information, including details on
     // header value syntax, see the documentation on :ref:`custom request headers
     // <config_http_conn_man_headers_custom_request_headers>`.
+    //
+    // .. attention::
+    //
+    //    **This field is deprecated**. Set the
+    //    :ref:`envoy_api_msg_route.WeightedCluster.response_headers` field instead.
     repeated core.HeaderValueOption response_headers_to_add = 5
-        [(validate.rules).repeated .max_items = 1000];
+        [(validate.rules).repeated .max_items = 1000, deprecated = true];
 
     // Specifies a list of headers to be removed from responses when this cluster is selected
     // through the enclosing :ref:`envoy_api_msg_route.RouteAction`.
-    repeated string response_headers_to_remove = 6;
+    //
+    // .. attention::
+    //
+    //    **This field is deprecated**. Set the
+    //    :ref:`envoy_api_msg_route.WeightedCluster.response_headers` field instead.
+    repeated string response_headers_to_remove = 6 [deprecated = true];
 
     reserved 7;
 
@@ -902,7 +1012,7 @@ message DirectResponseAction {
   //
   // .. note::
   //
-  //   Headers can be specified using *response_headers_to_add* in the enclosing
+  //   Headers can be specified using *response_headers* in the enclosing
   //   :ref:`envoy_api_msg_route.Route`, :ref:`envoy_api_msg_RouteConfiguration` or
   //   :ref:`envoy_api_msg_route.VirtualHost`.
   core.DataSource body = 2;

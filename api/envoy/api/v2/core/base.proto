@@ -177,11 +177,36 @@ message HeaderValueOption {
     //   :ref:`action<envoy_api_field_core.HeaderValueOption.action>` field instead.
     google.protobuf.BoolValue append = 2 [deprecated = true];
 
-    // Action to take when duplicate header values are encountered. By default,
+    // Action to take when duplicate header keys are encountered. By default,
     // new values will be appended to the existing ones.
-    HeaderAction action = 3
-        [(validate.rules).message.required = true, (validate.rules).enum.defined_only = true];
+    // TODO: Make this field required when not using oneof.
+    HeaderAction action = 3 [(validate.rules).enum.defined_only = true];
   }
+}
+
+message HeaderOption {
+  // Header value that this option applies to.
+  string header = 1 [(validate.rules).string = {min_bytes: 1, max_bytes: 16384}];
+
+  // Action to take when evaluating duplicate header keys.
+  enum HeaderAction {
+    option (gogoproto.goproto_enum_prefix) = false;
+    // Remove the existing header if present.
+    REMOVE = 0;
+    // Ignore subsequent header key additions and preserve removal.
+    PRESERVE = 1;
+  }
+  // Action to take when duplicate header keys are encountered. By default,
+  // key will be removed once and subsequent additions will add the header back.
+  HeaderAction action = 2
+      [(validate.rules).message.required = true, (validate.rules).enum.defined_only = true];
+}
+
+// Custom headers to add/remove.
+message CustomHeaders {
+  repeated HeaderValueOption add = 1 [(validate.rules).repeated .max_items = 1000];
+
+  repeated HeaderOption remove = 2;
 }
 
 // Data source consisting of either a file or an inline value.
