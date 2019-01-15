@@ -828,4 +828,21 @@ TEST(DateFormatter, FromTimeSameWildcard) {
             DateFormatter("%Y-%m-%dT%H:%M:%S.000Z%1f%2f").fromTime(time1));
 }
 
+TEST(TrieLookupTable, LongestPrefix) {
+  TrieLookupTable<const char*> trie;
+  trie.add("foo", "a");
+  trie.add("bar", "b");
+  trie.add("baro", "c");
+
+  EXPECT_EQ("a", trie.find("foo"));
+  EXPECT_EQ("a", trie.findPrefix("foosball"));
+
+  EXPECT_EQ("b", trie.find("bar"));
+  EXPECT_EQ("b", trie.findPrefix("baritone"));
+  EXPECT_EQ("c", trie.findPrefix("barometer"));
+
+  EXPECT_EQ(nullptr, trie.find("toto"));
+  EXPECT_EQ(nullptr, trie.findPrefix("toto"));
+}
+
 } // namespace Envoy

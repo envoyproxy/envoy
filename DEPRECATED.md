@@ -13,6 +13,7 @@ A logged warning is expected for each deprecated item that is in deprecation win
   Set the `filter_enabled` field instead.
 * Use of google.protobuf.Struct for extension opaque configs is deprecated. Use google.protobuf.Any instead or pack
 google.protobuf.Struct in google.protobuf.Any.
+* Use of `cluster` and `settings`, found in [redis-proxy.proto](https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/filter/network/redis_proxy/v2/redis_proxy.proto). Set a `catch_all` route instead.
 
 ## Version 1.9.0 (Dec 20, 2018)
 

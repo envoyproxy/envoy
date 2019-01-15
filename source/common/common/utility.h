@@ -599,6 +599,32 @@ template <class Value> struct TrieLookupTable {
     return current->value_;
   }
 
+  /**
+   * Finds the entry associated with the longest prefix. Complexity is O(min(longest key prefix, key
+   * length))
+   * @param key the key used to find.
+   * @return the value matching the longest prefix based on the key.
+   */
+  Value findPrefix(const char* key) const {
+    const TrieEntry<Value>* current = &root_;
+    const TrieEntry<Value>* result = nullptr;
+    while (uint8_t c = *key) {
+      if (current->value_) {
+        result = current;
+      }
+
+      // TODO(maximebedard): this could be optimized
+      // https://github.com/facebook/mcrouter/blob/master/mcrouter/lib/fbi/cpp/Trie-inl.h#L126-L143
+      current = current->entries_[c].get();
+      if (current == nullptr) {
+        break;
+      }
+
+      key++;
+    }
+    return result ? result->value_ : nullptr;
+  }
+
   TrieEntry<Value> root_;
 };
 
