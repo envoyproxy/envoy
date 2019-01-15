@@ -14,9 +14,8 @@ envoy_cc_mock(
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
     deps = [
-        "//source/extensions/filters/http/common/aws:credentials_provider_lib",
-        "//source/extensions/filters/http/common/aws:region_provider_lib",
-        "//source/extensions/filters/http/common/aws:signer_lib",
+        "//source/extensions/filters/http/common/aws:credentials_provider_interface",
+        "//source/extensions/filters/http/common/aws:signer_interface",
     ],
 )
 
@@ -29,6 +28,15 @@ envoy_cc_test(
         "//source/extensions/filters/http/common/aws:signer_impl_lib",
         "//test/extensions/filters/http/common/aws:aws_mocks",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "utility_test",
+    srcs = ["utility_test.cc"],
+    deps = [
+        "//source/extensions/filters/http/common/aws:utility_lib",
         "//test/test_common:utility_lib",
     ],
 )

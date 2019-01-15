@@ -4,6 +4,7 @@
 
 #include "envoy/common/pure.h"
 
+#include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 
 namespace Envoy {
@@ -16,31 +17,17 @@ class Credentials {
 public:
   Credentials() = default;
 
-  ~Credentials() = default;
-
-  Credentials(const std::string& access_key_id, const std::string& secret_access_key)
+  Credentials(absl::string_view access_key_id, absl::string_view secret_access_key)
       : access_key_id_(access_key_id), secret_access_key_(secret_access_key) {}
 
-  Credentials(const std::string& access_key_id, const std::string& secret_access_key,
-              const std::string& session_token)
+  Credentials(absl::string_view access_key_id, absl::string_view secret_access_key,
+              absl::string_view session_token)
       : access_key_id_(access_key_id), secret_access_key_(secret_access_key),
         session_token_(session_token) {}
 
-  void setAccessKeyId(const std::string& access_key_id) {
-    access_key_id_ = absl::optional<std::string>(access_key_id);
-  }
-
   const absl::optional<std::string>& accessKeyId() const { return access_key_id_; }
 
-  void setSecretAccessKey(const std::string& secret_key) {
-    secret_access_key_ = absl::optional<std::string>(secret_key);
-  }
-
   const absl::optional<std::string>& secretAccessKey() const { return secret_access_key_; }
-
-  void setSessionToken(const std::string& session_token) {
-    session_token_ = absl::optional<std::string>(session_token);
-  }
 
   const absl::optional<std::string>& sessionToken() const { return session_token_; }
 

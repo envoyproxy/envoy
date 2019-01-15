@@ -2,9 +2,9 @@
 
 #include "common/common/logger.h"
 #include "common/common/utility.h"
+#include "common/singleton/const_singleton.h"
 
 #include "extensions/filters/http/common/aws/credentials_provider.h"
-#include "extensions/filters/http/common/aws/region_provider.h"
 #include "extensions/filters/http/common/aws/signer.h"
 
 namespace Envoy {
@@ -13,62 +13,78 @@ namespace HttpFilters {
 namespace Common {
 namespace Aws {
 
+class SignatureHeaderValues {
+public:
+  const Http::LowerCaseString ContentSha256{"x-amz-content-sha256"};
+  const Http::LowerCaseString Date{"x-amz-date"};
+  const Http::LowerCaseString SecurityToken{"x-amz-security-token"};
+};
+
+typedef ConstSingleton<SignatureHeaderValues> SignatureHeaders;
+
+class SignatureConstantValues {
+public:
+  const std::string Aws4Request{"aws4_request"};
+  const std::string AuthorizationHeaderFormat{
+      "AWS4-HMAC-SHA256 Credential={}/{}, SignedHeaders={}, Signature={}"};
+  const std::string CredentialScopeFormat{"{}/{}/{}/aws4_request"};
+  const std::string HashedEmptyString{
+      "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"};
+  const std::string SignatureVersion{"AWS4"};
+  const std::string StringToSignFormat{"AWS4-HMAC-SHA256\n{}\n{}\n{}"};
+
+  const std::string LongDateFormat{"%Y%m%dT%H%M00Z"};
+  const std::string ShortDateFormat{"%Y%m%d"};
+};
+
+typedef ConstSingleton<SignatureConstantValues> SignatureConstants;
+
 /**
  * Implementation of the Signature V4 signing process.
  * See https://docs.aws.amazon.com/general/latest/gr/signature-version-4.html
  */
 class SignerImpl : public Signer, public Logger::Loggable<Logger::Id::aws> {
 public:
-  SignerImpl(const std::string& service_name,
-             const CredentialsProviderSharedPtr& credentials_provider,
-             const RegionProviderSharedPtr& region_provider, TimeSource& time_source)
-      : service_name_(service_name), credentials_provider_(credentials_provider),
-        region_provider_(region_provider), time_source_(time_source) {}
+  SignerImpl(absl::string_view service_name, absl::string_view region,
+             const CredentialsProviderSharedPtr& credentials_provider, TimeSource& time_source)
+      : service_name_(service_name), region_(region), credentials_provider_(credentials_provider),
+        time_source_(time_source), long_date_formatter_(SignatureConstants::get().LongDateFormat),
+        short_date_formatter_(SignatureConstants::get().ShortDateFormat) {}
 
-  void sign(Http::Message& message) const override;
-
-  static const Http::LowerCaseString X_AMZ_SECURITY_TOKEN;
-  static const Http::LowerCaseString X_AMZ_DATE;
-  static const Http::LowerCaseString X_AMZ_CONTENT_SHA256;
+  void sign(Http::Message& message) override;
 
 private:
   friend class SignerImplTest;
 
-  static DateFormatter LONG_DATE_FORMATTER;
-  static DateFormatter SHORT_DATE_FORMATTER;
   const std::string service_name_;
+  const std::string region_;
   CredentialsProviderSharedPtr credentials_provider_;
-  RegionProviderSharedPtr region_provider_;
   TimeSource& time_source_;
+  DateFormatter long_date_formatter_;
+  DateFormatter short_date_formatter_;
 
   std::string createContentHash(Http::Message& message) const;
 
   std::string createCanonicalRequest(Http::Message& message,
                                      const std::map<std::string, std::string>& canonical_headers,
-                                     const std::string& signing_headers,
-                                     const std::string& content_hash) const;
+                                     absl::string_view signing_headers,
+                                     absl::string_view content_hash) const;
 
   std::string
   createSigningHeaders(const std::map<std::string, std::string>& canonical_headers) const;
 
-  std::string createCredentialScope(const std::string& short_date, const std::string& region) const;
+  std::string createCredentialScope(absl::string_view short_date) const;
 
-  std::string createStringToSign(const std::string& canonical_request, const std::string& long_date,
-                                 const std::string& credential_scope) const;
+  std::string createStringToSign(absl::string_view canonical_request, absl::string_view long_date,
+                                 absl::string_view credential_scope) const;
 
-  std::string createSignature(const std::string& secret_access_key, const std::string& short_date,
-                              const std::string& region, const std::string& string_to_sign) const;
+  std::string createSignature(absl::string_view secret_access_key, absl::string_view short_date,
+                              absl::string_view string_to_sign) const;
 
-  std::string createAuthorizationHeader(const std::string& access_key_id,
-                                        const std::string& credential_scope,
-                                        const std::string& signing_headers,
-                                        const std::string& signature) const;
-
-  std::map<std::string, std::string> canonicalizeHeaders(const Http::HeaderMap& headers) const;
-
-  std::vector<uint8_t> hash(const Buffer::Instance& buffer) const;
-
-  std::vector<uint8_t> hmac(const std::vector<uint8_t>& key, const std::string& string) const;
+  std::string createAuthorizationHeader(absl::string_view access_key_id,
+                                        absl::string_view credential_scope,
+                                        absl::string_view signing_headers,
+                                        absl::string_view signature) const;
 };
 
 } // namespace Aws

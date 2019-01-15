@@ -10,10 +10,6 @@ MockCredentialsProvider::MockCredentialsProvider() {}
 
 MockCredentialsProvider::~MockCredentialsProvider() {}
 
-MockRegionProvider::MockRegionProvider() {}
-
-MockRegionProvider::~MockRegionProvider() {}
-
 MockSigner::MockSigner() {}
 
 MockSigner::~MockSigner() {}

@@ -9,18 +9,19 @@ namespace HttpFilters {
 namespace Common {
 namespace Aws {
 
+// TODO(lavignes): Move this interface to include/envoy if this is needed elsewhere
 class Signer {
 public:
   virtual ~Signer() = default;
 
   /**
    * Sign an AWS request.
-   * @param message an
+   * @param message an AWS API request message.
    */
-  virtual void sign(Http::Message& message) const PURE;
+  virtual void sign(Http::Message& message) PURE;
 };
 
-typedef std::shared_ptr<Signer> SignerSharedPtr;
+typedef std::unique_ptr<Signer> SignerPtr;
 
 } // namespace Aws
 } // namespace Common
