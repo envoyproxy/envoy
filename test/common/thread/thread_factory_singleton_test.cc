@@ -27,7 +27,7 @@ TEST_F(ThreadFactorySingletonTest, IsCurrentThread) {
   EXPECT_TRUE(is_current);
   std::thread thread([this, &is_current]() { is_current = checkThreadId(); });
   thread.join();
-  EXPECT_FALSE(is_current) << "assert failure: run_tid_->isCurrentThreadId()";
+  EXPECT_FALSE(is_current) << "run_tid_->isCurrentThreadId() from inside another thread";
 }
 
 } // namespace

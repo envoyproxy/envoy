@@ -26,6 +26,7 @@
 #include "common/api/api_impl.h"
 #include "common/common/empty_string.h"
 #include "common/common/fmt.h"
+#include "common/common/google_string_hack.h"
 #include "common/common/lock_guard.h"
 #include "common/common/stack_array.h"
 #include "common/common/thread_impl.h"
@@ -227,9 +228,9 @@ void TestUtility::createSymlink(const std::string& target, const std::string& li
 // static
 absl::Time TestUtility::parseTime(const std::string& input, const std::string& input_format) {
   absl::Time time;
-  std::string absl_string_error; // Name triggers Google import process to sed to a 'string'.
-  EXPECT_TRUE(absl::ParseTime(input_format, input, &time, &absl_string_error))
-      << " error \"" << absl_string_error << "\" from failing to parse timestamp \"" << input
+  GoogleStringHack error;
+  EXPECT_TRUE(absl::ParseTime(input_format, input, &time, &error))
+      << " error \"" << error << "\" from failing to parse timestamp \"" << input
       << "\" with format string \"" << input_format << "\"";
   return time;
 }

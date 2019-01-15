@@ -81,6 +81,11 @@ envoy_basic_cc_library(
 )
 
 envoy_cc_library(
+    name = "google_string_hack_lib",
+    hdrs = ["google_string_hack.h"],
+)
+
+envoy_cc_library(
     name = "hash_lib",
     srcs = ["hash.cc"],
     hdrs = ["hash.h"],
