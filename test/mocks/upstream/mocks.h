@@ -212,10 +212,8 @@ public:
                                 Outlier::EventLoggerSharedPtr outlier_event_logger,
                                 AccessLog::AccessLogManager& log_manager, bool added_via_api));
 
-  MOCK_METHOD3(createCds,
-               CdsApiPtr(const envoy::api::v2::core::ConfigSource& cds_config,
-                         const absl::optional<envoy::api::v2::core::ConfigSource>& eds_config,
-                         ClusterManager& cm));
+  MOCK_METHOD2(createCds,
+               CdsApiPtr(const envoy::api::v2::core::ConfigSource& cds_config, ClusterManager& cm));
 
 private:
   NiceMock<Secret::MockSecretManager> secret_manager_;
@@ -314,6 +312,10 @@ public:
   MOCK_METHOD4(logUnhealthy, void(envoy::data::core::v2alpha::HealthCheckerType,
                                   const HostDescriptionConstSharedPtr&,
                                   envoy::data::core::v2alpha::HealthCheckFailureType, bool));
+  MOCK_METHOD2(logDegraded, void(envoy::data::core::v2alpha::HealthCheckerType,
+                                 const HostDescriptionConstSharedPtr&));
+  MOCK_METHOD2(logNoLongerDegraded, void(envoy::data::core::v2alpha::HealthCheckerType,
+                                         const HostDescriptionConstSharedPtr&));
 };
 
 class MockCdsApi : public CdsApi {

@@ -282,9 +282,9 @@ TEST_F(RouterUpstreamLogTest, LogTimestampsAndDurations) {
   std::smatch matches;
   EXPECT_TRUE(std::regex_match(output_.front(), matches, log_regex));
 
-  std::tm timestamp = TestUtility::parseTimestamp("%Y-%m-%dT%H:%M:%S", matches[1].str());
+  const absl::Time timestamp = TestUtility::parseTime(matches[1].str(), "%Y-%m-%dT%H:%M:%S");
 
-  std::time_t log_time = std::mktime(&timestamp);
+  std::time_t log_time = absl::ToTimeT(timestamp);
   std::time_t now = std::time(nullptr);
 
   // Check that timestamp is close enough.

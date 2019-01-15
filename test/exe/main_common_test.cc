@@ -125,7 +125,10 @@ TEST_P(MainCommonTest, ConstructDestructHotRestartDisabledNoInit) {
 //   [  DEATH   ] ==33378==ERROR: AddressSanitizer: requested allocation size 0x3e800000000
 //   (0x3e800001000 after adjustments for alignment, red zones etc.) exceeds maximum supported size
 //   of 0x10000000000 (thread T0)
-TEST_P(MainCommonTest, OutOfMemoryHandler) {
+
+class MainCommonDeathTest : public MainCommonTest {};
+
+TEST_P(MainCommonDeathTest, OutOfMemoryHandler) {
 #if defined(__has_feature) && (__has_feature(thread_sanitizer) || __has_feature(address_sanitizer))
   ENVOY_LOG_MISC(critical,
                  "MainCommonTest::OutOfMemoryHandler not supported by this compiler configuration");
@@ -371,7 +374,7 @@ TEST_P(MainCommonTest, ConstructDestructLogger) {
   VERBOSE_EXPECT_NO_THROW(MainCommon main_common(argc(), argv()));
 
   const std::string logger_name = "logger";
-  spdlog::details::log_msg log_msg(&logger_name, spdlog::level::level_enum::err);
+  spdlog::details::log_msg log_msg(&logger_name, spdlog::level::level_enum::err, "error");
   Logger::Registry::getSink()->log(log_msg);
 }
 

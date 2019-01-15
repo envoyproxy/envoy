@@ -33,7 +33,7 @@ public:
   BufferFilterConfigSharedPtr setupConfig() {
     envoy::config::filter::http::buffer::v2::Buffer proto_config;
     proto_config.mutable_max_request_bytes()->set_value(1024 * 1024);
-    return std::make_shared<BufferFilterConfig>(BufferFilterConfig(proto_config, "test", store_));
+    return std::make_shared<BufferFilterConfig>(proto_config);
   }
 
   BufferFilterTest() : config_(setupConfig()), filter_(config_) {
@@ -50,7 +50,6 @@ public:
   }
 
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
-  Stats::IsolatedStoreImpl store_;
   BufferFilterConfigSharedPtr config_;
   BufferFilter filter_;
 };
@@ -130,6 +129,9 @@ TEST_F(BufferFilterTest, RouteDisabledConfigOverride) {
 
   Http::TestHeaderMapImpl headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers, false));
+  Buffer::OwnedImpl data1("hello");
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data1, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data1, true));
 }
 
 } // namespace BufferFilter

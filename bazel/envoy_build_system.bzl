@@ -68,6 +68,9 @@ def envoy_copts(repository, test = False):
                repository + "//bazel:disable_tcmalloc": ["-DABSL_MALLOC_HOOK_MMAP_DISABLE"],
                "//conditions:default": ["-DTCMALLOC"],
            }) + select({
+               repository + "//bazel:debug_tcmalloc": ["-DENVOY_MEMORY_DEBUG_ENABLED=1"],
+               "//conditions:default": [],
+           }) + select({
                repository + "//bazel:disable_signal_trace": [],
                "//conditions:default": ["-DENVOY_HANDLE_SIGNALS"],
            }) + select({
@@ -168,6 +171,7 @@ def envoy_external_dep_path(dep):
 def tcmalloc_external_dep(repository):
     return select({
         repository + "//bazel:disable_tcmalloc": None,
+        repository + "//bazel:debug_tcmalloc": envoy_external_dep_path("tcmalloc_debug"),
         "//conditions:default": envoy_external_dep_path("tcmalloc_and_profiler"),
     })
 
@@ -177,6 +181,7 @@ def tcmalloc_external_dep(repository):
 def tcmalloc_external_deps(repository):
     return select({
         repository + "//bazel:disable_tcmalloc": [],
+        repository + "//bazel:debug_tcmalloc": [envoy_external_dep_path("tcmalloc_debug")],
         "//conditions:default": [envoy_external_dep_path("tcmalloc_and_profiler")],
     })
 
@@ -463,22 +468,24 @@ def envoy_sh_test(
         name,
         srcs = [],
         data = [],
+        coverage = True,
         **kargs):
-    test_runner_cc = name + "_test_runner.cc"
-    native.genrule(
-        name = name + "_gen_test_runner",
-        srcs = srcs,
-        outs = [test_runner_cc],
-        cmd = "$(location //bazel:gen_sh_test_runner.sh) $(SRCS) >> $@",
-        tools = ["//bazel:gen_sh_test_runner.sh"],
-    )
-    envoy_cc_test_library(
-        name = name + "_lib",
-        srcs = [test_runner_cc],
-        data = srcs + data,
-        tags = ["coverage_test_lib"],
-        deps = ["//test/test_common:environment_lib"],
-    )
+    if coverage:
+        test_runner_cc = name + "_test_runner.cc"
+        native.genrule(
+            name = name + "_gen_test_runner",
+            srcs = srcs,
+            outs = [test_runner_cc],
+            cmd = "$(location //bazel:gen_sh_test_runner.sh) $(SRCS) >> $@",
+            tools = ["//bazel:gen_sh_test_runner.sh"],
+        )
+        envoy_cc_test_library(
+            name = name + "_lib",
+            srcs = [test_runner_cc],
+            data = srcs + data,
+            tags = ["coverage_test_lib"],
+            deps = ["//test/test_common:environment_lib"],
+        )
     native.sh_test(
         name = name,
         srcs = ["//bazel:sh_test_wrapper.sh"],

@@ -94,6 +94,11 @@ Http::MessagePtr TestCommon::makeMessageResponse(const HeaderValueOptionVector& 
   return response;
 };
 
+bool TestCommon::CompareHeaderVector(const Http::HeaderVector& lhs, const Http::HeaderVector& rhs) {
+  return std::set<std::pair<Http::LowerCaseString, std::string>>(lhs.begin(), lhs.end()) ==
+         std::set<std::pair<Http::LowerCaseString, std::string>>(rhs.begin(), rhs.end());
+}
+
 } // namespace ExtAuthz
 } // namespace Common
 } // namespace Filters

@@ -54,8 +54,11 @@ message Endpoint {
 
 // An Endpoint that Envoy can route traffic to.
 message LbEndpoint {
-  // Upstream host identifier
-  Endpoint endpoint = 1;
+  // Upstream host identifier or a named reference.
+  oneof host_identifier {
+    Endpoint endpoint = 1;
+    string endpoint_name = 5;
+  }
 
   // Optional health status when known and supplied by EDS server.
   core.HealthStatus health_status = 2;
