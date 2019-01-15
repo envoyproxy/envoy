@@ -246,15 +246,15 @@ LoadBalancerBase::chooseHostSet(LoadBalancerContext* context) {
         context->determinePriorityLoad(priority_set_, per_priority_load_);
 
     // TODO(snowp): pass degraded priority load to plugin.
-    const auto priorityAndSource =
+    const auto priority_and_source =
         choosePriority(random_.random(), per_priority_load, degraded_per_priority_load_);
-    return {*priority_set_.hostSetsPerPriority()[priorityAndSource.first],
-            priorityAndSource.second};
+    return {*priority_set_.hostSetsPerPriority()[priority_and_source.first],
+            priority_and_source.second};
   }
 
-  const auto priorityAndSource =
+  const auto priority_and_source =
       choosePriority(random_.random(), per_priority_load_, degraded_per_priority_load_);
-  return {*priority_set_.hostSetsPerPriority()[priorityAndSource.first], priorityAndSource.second};
+  return {*priority_set_.hostSetsPerPriority()[priority_and_source.first], priority_and_source.second};
 }
 
 ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
