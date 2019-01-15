@@ -32,8 +32,10 @@ to forcefully route any traffic whose IP was replicated by Envoy back through th
 
 If Envoy and the upstream are on the same host -- e.g. in an sidecar deployment --, then iptables
 and routing rules can be used to ensure correct behaviour. The filter has an unsigned integer
-configuration, ``mark``. Setting this to *X* causes Envoy to *mark* all upstream packets originating
-from this listener with value *X*.
+configuration,
+:ref:`mark <envoy_api_field_config.filter.listener.original_src.v2alpha1.OriginalSrc.mark>`. Setting
+this to *X* causes Envoy to *mark* all upstream packets originating from this listener with value
+*X*.
 
 We can use the following set of commands to ensure that all ipv4 and ipv6 traffic marked with *X*
 (assumed to be 123 in the example) routes correctly. Note that this example assumes that *eth0* is

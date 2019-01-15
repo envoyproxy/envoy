@@ -40,8 +40,9 @@ Proxy Protocol
 protocol for communicating metadata about a connection over TCP, prior to the main TCP stream. This
 metadata includes the source IP. Envoy supports consuming this information using
 :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>`, which may be used to recover
-the downstream remote address for propagation into an x-forwarded-for header. It can also be used
-in conjunction with the
+the downstream remote address for propagation into an
+:ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>` header. It can also be used in
+conjunction with the
 :ref:`Original Src Listener Filter <arch_overview_ip_transparency_original_src_listener>`.
 
 Some drawbacks to Proxy Protocol:
