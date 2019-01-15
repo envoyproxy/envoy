@@ -457,7 +457,7 @@ static bool hasAddress(const std::list<Address::InstanceConstSharedPtr>& results
 }
 
 // Parameterize the DNS test server socket address.
-INSTANTIATE_TEST_CASE_P(IpVersions, DnsImplTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, DnsImplTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 
@@ -761,7 +761,7 @@ protected:
 };
 
 // Parameterize the DNS test server socket address.
-INSTANTIATE_TEST_CASE_P(IpVersions, DnsImplZeroTimeoutTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, DnsImplZeroTimeoutTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 

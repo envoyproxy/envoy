@@ -119,7 +119,7 @@ const std::string SquashFilterIntegrationTest::SQUASH_CREATE_DEFAULT =
     "\"image\":\"debug\",\"node\":\"debug-node\"},"
     "\"status\":{\"state\":\"none\"}}";
 
-INSTANTIATE_TEST_CASE_P(IpVersions, SquashFilterIntegrationTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, SquashFilterIntegrationTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 

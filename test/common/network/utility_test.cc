@@ -156,7 +156,7 @@ TEST(NetworkUtility, ParseInternetAddressAndPort) {
 
 class NetworkUtilityGetLocalAddress : public testing::TestWithParam<Address::IpVersion> {};
 
-INSTANTIATE_TEST_CASE_P(IpVersions, NetworkUtilityGetLocalAddress,
+INSTANTIATE_TEST_SUITE_P(IpVersions, NetworkUtilityGetLocalAddress,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 

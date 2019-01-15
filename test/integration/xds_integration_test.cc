@@ -28,7 +28,7 @@ public:
   }
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, XdsIntegrationTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, XdsIntegrationTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 

@@ -165,7 +165,7 @@ paramToString(const TestParamInfo<std::tuple<TransportType, ProtocolType, bool>>
   return fmt::format("{}{}", transport_name, protocol_name);
 }
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     TransportAndProtocol, ThriftConnManagerIntegrationTest,
     Combine(Values(TransportType::Framed, TransportType::Unframed, TransportType::Header),
             Values(ProtocolType::Binary, ProtocolType::Compact), Values(false, true)),
@@ -364,7 +364,7 @@ TEST_P(ThriftConnManagerIntegrationTest, OnewayEarlyClosePartialRequest) {
 
 class ThriftTwitterConnManagerIntegrationTest : public ThriftConnManagerIntegrationTest {};
 
-INSTANTIATE_TEST_CASE_P(FramedTwitter, ThriftTwitterConnManagerIntegrationTest,
+INSTANTIATE_TEST_SUITE_P(FramedTwitter, ThriftTwitterConnManagerIntegrationTest,
                         Combine(Values(TransportType::Framed), Values(ProtocolType::Twitter),
                                 Values(false, true)),
                         paramToString);

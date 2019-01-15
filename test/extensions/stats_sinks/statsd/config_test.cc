@@ -48,7 +48,7 @@ TEST(StatsConfigTest, ValidTcpStatsd) {
 
 class StatsConfigParameterizedTest : public testing::TestWithParam<Network::Address::IpVersion> {};
 
-INSTANTIATE_TEST_CASE_P(IpVersions, StatsConfigParameterizedTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, StatsConfigParameterizedTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 
@@ -164,7 +164,7 @@ TEST(StatsConfigTest, TcpSinkCustomPrefix) {
 }
 
 class StatsConfigLoopbackTest : public testing::TestWithParam<Network::Address::IpVersion> {};
-INSTANTIATE_TEST_CASE_P(IpVersions, StatsConfigLoopbackTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, StatsConfigLoopbackTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 

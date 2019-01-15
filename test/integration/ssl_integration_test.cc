@@ -75,7 +75,7 @@ void SslIntegrationTestBase::checkStats() {
   counter->reset();
 }
 
-INSTANTIATE_TEST_CASE_P(IpVersions, SslIntegrationTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, SslIntegrationTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 
@@ -220,7 +220,7 @@ public:
   const envoy::api::v2::auth::TlsParameters_TlsProtocol tls_version_{std::get<1>(GetParam())};
 };
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     IpVersionsClientVersions, SslCertficateIntegrationTest,
     testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                      testing::Values(envoy::api::v2::auth::TlsParameters::TLSv1_2,
@@ -367,7 +367,7 @@ public:
   bool text_format_{};
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, SslCaptureIntegrationTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, SslCaptureIntegrationTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 

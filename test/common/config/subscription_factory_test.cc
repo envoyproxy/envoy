@@ -302,7 +302,7 @@ TEST_F(SubscriptionFactoryTest, GrpcSubscription) {
   subscriptionFromConfigSource(config)->start({"static_cluster"}, callbacks_);
 }
 
-INSTANTIATE_TEST_CASE_P(SubscriptionFactoryTestApiConfigSource,
+INSTANTIATE_TEST_SUITE_P(SubscriptionFactoryTestApiConfigSource,
                         SubscriptionFactoryTestApiConfigSource,
                         ::testing::Values(envoy::api::v2::core::ApiConfigSource::REST,
                                           envoy::api::v2::core::ApiConfigSource::GRPC));

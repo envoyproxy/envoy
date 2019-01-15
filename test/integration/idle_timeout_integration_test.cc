@@ -78,7 +78,7 @@ public:
   DangerousDeprecatedTestTime test_time_;
 };
 
-INSTANTIATE_TEST_CASE_P(Protocols, IdleTimeoutIntegrationTest,
+INSTANTIATE_TEST_SUITE_P(Protocols, IdleTimeoutIntegrationTest,
                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
                         HttpProtocolIntegrationTest::protocolTestParamsToString);
 

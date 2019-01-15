@@ -29,7 +29,7 @@ public:
 };
 
 class UdpStatsdSinkTest : public testing::TestWithParam<Network::Address::IpVersion> {};
-INSTANTIATE_TEST_CASE_P(IpVersions, UdpStatsdSinkTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, UdpStatsdSinkTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 
@@ -73,7 +73,7 @@ TEST_P(UdpStatsdSinkTest, InitWithIpAddress) {
 }
 
 class UdpStatsdSinkWithTagsTest : public testing::TestWithParam<Network::Address::IpVersion> {};
-INSTANTIATE_TEST_CASE_P(IpVersions, UdpStatsdSinkWithTagsTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, UdpStatsdSinkWithTagsTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 

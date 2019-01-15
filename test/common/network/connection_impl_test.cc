@@ -72,7 +72,7 @@ TEST(ConnectionImplUtility, updateBufferStats) {
 }
 
 class ConnectionImplDeathTest : public testing::TestWithParam<Address::IpVersion> {};
-INSTANTIATE_TEST_CASE_P(IpVersions, ConnectionImplDeathTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, ConnectionImplDeathTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 
@@ -221,7 +221,7 @@ protected:
   Socket::OptionsSharedPtr socket_options_;
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, ConnectionImplTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, ConnectionImplTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 
@@ -1618,7 +1618,7 @@ public:
   }
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, ReadBufferLimitTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, ReadBufferLimitTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 
@@ -1642,7 +1642,7 @@ protected:
   Event::SimulatedTimeSystem time_system_;
   Event::DispatcherImpl dispatcher_;
 };
-INSTANTIATE_TEST_CASE_P(IpVersions, TcpClientConnectionImplTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, TcpClientConnectionImplTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 

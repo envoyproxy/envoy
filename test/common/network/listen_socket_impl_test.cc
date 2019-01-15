@@ -112,11 +112,11 @@ protected:
 using ListenSocketImplTestTcp = ListenSocketImplTest<Network::Address::SocketType::Stream>;
 using ListenSocketImplTestUdp = ListenSocketImplTest<Network::Address::SocketType::Datagram>;
 
-INSTANTIATE_TEST_CASE_P(IpVersions, ListenSocketImplTestTcp,
+INSTANTIATE_TEST_SUITE_P(IpVersions, ListenSocketImplTestTcp,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 
-INSTANTIATE_TEST_CASE_P(IpVersions, ListenSocketImplTestUdp,
+INSTANTIATE_TEST_SUITE_P(IpVersions, ListenSocketImplTestUdp,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 

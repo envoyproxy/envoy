@@ -196,7 +196,7 @@ static std::string protoStateParamToString(const TestParamInfo<ProtocolState>& p
   return ProtocolStateNameValues::name(params.param);
 }
 
-INSTANTIATE_TEST_CASE_P(NonValueProtocolStates, DecoderStateMachineNonValueTest,
+INSTANTIATE_TEST_SUITE_P(NonValueProtocolStates, DecoderStateMachineNonValueTest,
                         Values(ProtocolState::MessageBegin, ProtocolState::MessageEnd,
                                ProtocolState::StructBegin, ProtocolState::StructEnd,
                                ProtocolState::FieldBegin, ProtocolState::FieldEnd,
@@ -210,7 +210,7 @@ class DecoderStateMachineTest : public DecoderStateMachineTestBase, public testi
 class DecoderStateMachineValueTest : public DecoderStateMachineTestBase,
                                      public TestWithParam<FieldType> {};
 
-INSTANTIATE_TEST_CASE_P(PrimitiveFieldTypes, DecoderStateMachineValueTest,
+INSTANTIATE_TEST_SUITE_P(PrimitiveFieldTypes, DecoderStateMachineValueTest,
                         Values(FieldType::Bool, FieldType::Byte, FieldType::Double, FieldType::I16,
                                FieldType::I32, FieldType::I64, FieldType::String),
                         fieldTypeParamToString);
@@ -227,7 +227,7 @@ static std::string nestedFieldTypesParamToString(
                      fieldTypeToString(inner_type), fieldTypeToString(value_type));
 }
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     NestedTypes, DecoderStateMachineNestingTest,
     Combine(Values(FieldType::Struct, FieldType::List, FieldType::Map, FieldType::Set),
             Values(FieldType::Struct, FieldType::List, FieldType::Map, FieldType::Set),

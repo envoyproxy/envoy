@@ -92,7 +92,7 @@ public:
   FakeStreamPtr lua_request_;
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, LuaIntegrationTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, LuaIntegrationTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 

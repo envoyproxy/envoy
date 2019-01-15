@@ -337,7 +337,7 @@ class ThriftRouterFieldTypeTest : public ThriftRouterTestBase, public TestWithPa
 public:
 };
 
-INSTANTIATE_TEST_CASE_P(PrimitiveFieldTypes, ThriftRouterFieldTypeTest,
+INSTANTIATE_TEST_SUITE_P(PrimitiveFieldTypes, ThriftRouterFieldTypeTest,
                         Values(FieldType::Bool, FieldType::Byte, FieldType::I16, FieldType::I32,
                                FieldType::I64, FieldType::Double, FieldType::String),
                         fieldTypeParamToString);
@@ -346,7 +346,7 @@ class ThriftRouterContainerTest : public ThriftRouterTestBase, public TestWithPa
 public:
 };
 
-INSTANTIATE_TEST_CASE_P(ContainerFieldTypes, ThriftRouterContainerTest,
+INSTANTIATE_TEST_SUITE_P(ContainerFieldTypes, ThriftRouterContainerTest,
                         Values(FieldType::Map, FieldType::List, FieldType::Set),
                         fieldTypeParamToString);
 

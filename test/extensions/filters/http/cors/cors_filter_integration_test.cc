@@ -108,7 +108,7 @@ protected:
   }
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, CorsFilterIntegrationTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, CorsFilterIntegrationTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 

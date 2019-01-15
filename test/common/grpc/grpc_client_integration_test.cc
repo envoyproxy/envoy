@@ -12,7 +12,7 @@ namespace Grpc {
 namespace {
 
 // Parameterize the loopback test server socket address and gRPC client type.
-INSTANTIATE_TEST_CASE_P(IpVersionsClientType, GrpcClientIntegrationTest,
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, GrpcClientIntegrationTest,
                         GRPC_CLIENT_INTEGRATION_PARAMS,
                         GrpcClientIntegrationParamTest::protocolTestParamsToString);
 
@@ -348,7 +348,7 @@ TEST_P(GrpcClientIntegrationTest, CancelRequest) {
 }
 
 // Parameterize the loopback test server socket address and gRPC client type.
-INSTANTIATE_TEST_CASE_P(SslIpVersionsClientType, GrpcSslClientIntegrationTest,
+INSTANTIATE_TEST_SUITE_P(SslIpVersionsClientType, GrpcSslClientIntegrationTest,
                         GRPC_CLIENT_INTEGRATION_PARAMS,
                         GrpcClientIntegrationParamTest::protocolTestParamsToString);
 
@@ -411,7 +411,7 @@ public:
 };
 
 // Parameterize the loopback test server socket address and gRPC client type.
-INSTANTIATE_TEST_CASE_P(SslIpVersionsClientType, GrpcAccessTokenClientIntegrationTest,
+INSTANTIATE_TEST_SUITE_P(SslIpVersionsClientType, GrpcAccessTokenClientIntegrationTest,
                         GRPC_CLIENT_INTEGRATION_PARAMS,
                         GrpcClientIntegrationParamTest::protocolTestParamsToString);
 

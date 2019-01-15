@@ -212,7 +212,7 @@ protected:
   Network::TransportSocketFactoryPtr client_ssl_ctx_;
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersionsClientType, SdsDynamicDownstreamIntegrationTest,
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, SdsDynamicDownstreamIntegrationTest,
                         GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // A test that SDS server send a good server secret for a static listener.
@@ -309,7 +309,7 @@ private:
   bool use_combined_validation_context_;
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersionsClientType, SdsDynamicDownstreamCertValidationContextTest,
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, SdsDynamicDownstreamCertValidationContextTest,
                         GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // A test that SDS server send a good certificate validation context for a static listener.
@@ -390,7 +390,7 @@ public:
   }
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, SdsDynamicUpstreamIntegrationTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, SdsDynamicUpstreamIntegrationTest,
                         GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // To test a static cluster with sds. SDS send a good client secret first.

@@ -42,7 +42,7 @@ public:
   }
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, EchoIntegrationTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, EchoIntegrationTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 

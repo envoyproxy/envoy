@@ -52,7 +52,7 @@ protected:
   AtomicFileUpdater file_updater_;
 };
 
-INSTANTIATE_TEST_CASE_P(Protocols, OverloadIntegrationTest,
+INSTANTIATE_TEST_SUITE_P(Protocols, OverloadIntegrationTest,
                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
                         HttpProtocolIntegrationTest::protocolTestParamsToString);
 

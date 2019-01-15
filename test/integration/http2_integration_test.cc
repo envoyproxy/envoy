@@ -18,7 +18,7 @@ using ::testing::MatchesRegex;
 
 namespace Envoy {
 
-INSTANTIATE_TEST_CASE_P(IpVersions, Http2IntegrationTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, Http2IntegrationTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 
@@ -501,11 +501,11 @@ void Http2RingHashIntegrationTest::createUpstreams() {
   }
 }
 
-INSTANTIATE_TEST_CASE_P(IpVersions, Http2RingHashIntegrationTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, Http2RingHashIntegrationTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 
-INSTANTIATE_TEST_CASE_P(IpVersions, Http2MetadataIntegrationTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, Http2MetadataIntegrationTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 

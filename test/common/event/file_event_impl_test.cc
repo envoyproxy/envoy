@@ -43,7 +43,7 @@ protected:
 
 class FileEventImplActivateTest : public testing::TestWithParam<Network::Address::IpVersion> {};
 
-INSTANTIATE_TEST_CASE_P(IpVersions, FileEventImplActivateTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, FileEventImplActivateTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 

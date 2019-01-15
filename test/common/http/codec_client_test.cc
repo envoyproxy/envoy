@@ -424,7 +424,7 @@ TEST_P(CodecNetworkTest, SendHeadersAndCloseUnderReadDisable) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
-INSTANTIATE_TEST_CASE_P(IpVersions, CodecNetworkTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, CodecNetworkTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 

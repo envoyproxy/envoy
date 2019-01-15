@@ -100,7 +100,7 @@ TEST_P(RedirectIntegrationTest, InvalidRedirect) {
       test_server_->counter("cluster.cluster_0.upstream_internal_redirect_failed_total")->value());
 }
 
-INSTANTIATE_TEST_CASE_P(Protocols, RedirectIntegrationTest,
+INSTANTIATE_TEST_SUITE_P(Protocols, RedirectIntegrationTest,
                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
                         HttpProtocolIntegrationTest::protocolTestParamsToString);
 

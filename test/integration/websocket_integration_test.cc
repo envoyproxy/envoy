@@ -107,7 +107,7 @@ void WebsocketIntegrationTest::commonValidate(Http::HeaderMap& proxied_headers,
   }
 }
 
-INSTANTIATE_TEST_CASE_P(Protocols, WebsocketIntegrationTest,
+INSTANTIATE_TEST_SUITE_P(Protocols, WebsocketIntegrationTest,
                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
                         HttpProtocolIntegrationTest::protocolTestParamsToString);
 

@@ -14,7 +14,7 @@ namespace TcpProxy {
 
 class RouteIpListConfigTest : public ::testing::TestWithParam<std::string> {};
 
-INSTANTIATE_TEST_CASE_P(IpList, RouteIpListConfigTest,
+INSTANTIATE_TEST_SUITE_P(IpList, RouteIpListConfigTest,
                         ::testing::Values(R"EOF("destination_ip_list": [
                                                   "192.168.1.1/32",
                                                   "192.168.1.0/24"

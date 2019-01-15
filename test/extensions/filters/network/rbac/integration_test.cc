@@ -59,7 +59,7 @@ public:
   }
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, RoleBasedAccessControlNetworkFilterIntegrationTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, RoleBasedAccessControlNetworkFilterIntegrationTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 

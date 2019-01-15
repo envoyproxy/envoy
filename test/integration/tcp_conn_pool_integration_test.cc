@@ -142,7 +142,7 @@ private:
   Registry::InjectFactory<Server::Configuration::NamedNetworkFilterConfigFactory> filter_resolver_;
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, TcpConnPoolIntegrationTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, TcpConnPoolIntegrationTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 

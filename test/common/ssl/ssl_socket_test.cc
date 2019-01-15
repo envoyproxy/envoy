@@ -582,7 +582,7 @@ protected:
   std::unique_ptr<Event::DispatcherImpl> dispatcher_;
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, SslSocketTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, SslSocketTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 
@@ -3736,7 +3736,7 @@ public:
   Network::Address::InstanceConstSharedPtr source_address_;
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, SslReadBufferLimitTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, SslReadBufferLimitTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 

@@ -11,7 +11,7 @@
 
 namespace Envoy {
 
-INSTANTIATE_TEST_CASE_P(IpVersions, ProxyProtoIntegrationTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, ProxyProtoIntegrationTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 

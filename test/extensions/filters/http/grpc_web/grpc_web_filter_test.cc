@@ -344,7 +344,7 @@ TEST_P(GrpcWebFilterTest, Unary) {
   }
 }
 
-INSTANTIATE_TEST_CASE_P(Unary, GrpcWebFilterTest,
+INSTANTIATE_TEST_SUITE_P(Unary, GrpcWebFilterTest,
                         Combine(Values(Http::Headers::get().ContentTypeValues.GrpcWeb,
                                        Http::Headers::get().ContentTypeValues.GrpcWebProto,
                                        Http::Headers::get().ContentTypeValues.GrpcWebText,

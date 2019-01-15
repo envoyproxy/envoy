@@ -77,7 +77,7 @@ secret_data:
 };
 
 // Parameterize the loopback test server socket address and gRPC client type.
-INSTANTIATE_TEST_CASE_P(SslIpVersionsClientType, GrpcFileBasedMetadataClientIntegrationTest,
+INSTANTIATE_TEST_SUITE_P(SslIpVersionsClientType, GrpcFileBasedMetadataClientIntegrationTest,
                         GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // Validate that a simple request-reply unary RPC works with FileBasedMetadata auth.

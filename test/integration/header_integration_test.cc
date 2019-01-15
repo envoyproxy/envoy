@@ -419,7 +419,7 @@ protected:
   FakeStreamPtr eds_stream_;
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersionsSuppressEnvoyHeaders, HeaderIntegrationTest,
+INSTANTIATE_TEST_SUITE_P(IpVersionsSuppressEnvoyHeaders, HeaderIntegrationTest,
                         testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                                          testing::Bool()),
                         ipSuppressEnvoyHeadersTestParamsToString);

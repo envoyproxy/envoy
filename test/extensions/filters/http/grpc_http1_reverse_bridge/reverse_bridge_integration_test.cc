@@ -45,7 +45,7 @@ config:
   }
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, ReverseBridgeIntegrationTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, ReverseBridgeIntegrationTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 

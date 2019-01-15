@@ -104,7 +104,7 @@ void testSocketBindAndConnect(Network::Address::IpVersion ip_version, bool v6onl
 } // namespace
 
 class AddressImplSocketTest : public testing::TestWithParam<IpVersion> {};
-INSTANTIATE_TEST_CASE_P(IpVersions, AddressImplSocketTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, AddressImplSocketTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 
@@ -451,7 +451,7 @@ struct TestCase test_cases[] = {
     {TestCase::Ipv6, "01:023::00ef", 2},    {TestCase::Ipv6, "01:023::00ed", 1},
     {TestCase::Pipe, "/path/to/pipe/1", 0}, {TestCase::Pipe, "/path/to/pipe/2", 0}};
 
-INSTANTIATE_TEST_CASE_P(AddressCrossProduct, MixedAddressTest,
+INSTANTIATE_TEST_SUITE_P(AddressCrossProduct, MixedAddressTest,
                         ::testing::Combine(::testing::ValuesIn(test_cases),
                                            ::testing::ValuesIn(test_cases)));
 

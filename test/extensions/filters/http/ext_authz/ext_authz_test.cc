@@ -114,7 +114,7 @@ envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz GetFilterConfig() {
   return proto_config;
 }
 
-INSTANTIATE_TEST_CASE_P(ParameterizedFilterConfig, HttpFilterTestParam,
+INSTANTIATE_TEST_SUITE_P(ParameterizedFilterConfig, HttpFilterTestParam,
                         Values(&GetFilterConfig<true, true>, &GetFilterConfig<false, false>,
                                &GetFilterConfig<true, false>, &GetFilterConfig<false, true>));
 

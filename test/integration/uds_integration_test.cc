@@ -9,7 +9,7 @@
 
 namespace Envoy {
 
-INSTANTIATE_TEST_CASE_P(TestParameters, UdsUpstreamIntegrationTest,
+INSTANTIATE_TEST_SUITE_P(TestParameters, UdsUpstreamIntegrationTest,
                         testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
 #if defined(__linux__)
                                          testing::Values(false, true)
@@ -38,7 +38,7 @@ TEST_P(UdsUpstreamIntegrationTest, RouterDownstreamDisconnectBeforeResponseCompl
   testRouterDownstreamDisconnectBeforeResponseComplete();
 }
 
-INSTANTIATE_TEST_CASE_P(TestParameters, UdsListenerIntegrationTest,
+INSTANTIATE_TEST_SUITE_P(TestParameters, UdsListenerIntegrationTest,
                         testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
 #if defined(__linux__)
                                          testing::Values(false, true)

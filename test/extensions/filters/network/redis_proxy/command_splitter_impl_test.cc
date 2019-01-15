@@ -209,10 +209,10 @@ TEST_P(RedisSingleServerRequestTest, NoUpstream) {
   EXPECT_EQ(nullptr, handle_);
 };
 
-INSTANTIATE_TEST_CASE_P(RedisSingleServerRequestTest, RedisSingleServerRequestTest,
+INSTANTIATE_TEST_SUITE_P(RedisSingleServerRequestTest, RedisSingleServerRequestTest,
                         testing::ValuesIn(SupportedCommands::simpleCommands()));
 
-INSTANTIATE_TEST_CASE_P(RedisSimpleRequestCommandHandlerMixedCaseTests,
+INSTANTIATE_TEST_SUITE_P(RedisSimpleRequestCommandHandlerMixedCaseTests,
                         RedisSingleServerRequestTest, testing::Values("INCR", "inCrBY"));
 
 TEST_F(RedisSingleServerRequestTest, PingSuccess) {
@@ -715,7 +715,7 @@ TEST_P(RedisSplitKeysSumResultHandlerTest, NoUpstreamHostForAll) {
   EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".error").value());
 };
 
-INSTANTIATE_TEST_CASE_P(RedisSplitKeysSumResultHandlerTest, RedisSplitKeysSumResultHandlerTest,
+INSTANTIATE_TEST_SUITE_P(RedisSplitKeysSumResultHandlerTest, RedisSplitKeysSumResultHandlerTest,
                         testing::ValuesIn(SupportedCommands::hashMultipleSumResultCommands()));
 
 } // namespace CommandSplitter

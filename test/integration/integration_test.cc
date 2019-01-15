@@ -27,7 +27,7 @@ using testing::Not;
 
 namespace Envoy {
 
-INSTANTIATE_TEST_CASE_P(IpVersions, IntegrationTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, IntegrationTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 

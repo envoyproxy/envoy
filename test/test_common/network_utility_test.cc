@@ -15,7 +15,7 @@ protected:
   const Address::IpVersion version_;
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, NetworkUtilityTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, NetworkUtilityTest,
                         testing::ValuesIn(TestEnvironment::getIpTestParameters()));
 
 // This validates Network::Test::bindFreeLoopbackPort behaves as desired, i.e. that we don't have

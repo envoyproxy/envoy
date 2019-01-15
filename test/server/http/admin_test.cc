@@ -86,7 +86,7 @@ public:
   Http::TestHeaderMapImpl request_headers_;
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, AdminStatsTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, AdminStatsTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 
@@ -552,7 +552,7 @@ TEST_P(AdminStatsTest, UsedOnlyStatsAsJsonFilterString) {
   store_->shutdownThreading();
 }
 
-INSTANTIATE_TEST_CASE_P(IpVersions, AdminFilterTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, AdminFilterTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 
@@ -630,7 +630,7 @@ public:
   Server::AdminFilter admin_filter_;
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, AdminInstanceTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, AdminInstanceTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 

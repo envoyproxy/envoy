@@ -19,7 +19,7 @@ namespace ClientSslAuth {
 
 class IpWhiteListConfigTest : public ::testing::TestWithParam<std::string> {};
 
-INSTANTIATE_TEST_CASE_P(IpList, IpWhiteListConfigTest,
+INSTANTIATE_TEST_SUITE_P(IpList, IpWhiteListConfigTest,
                         ::testing::Values(R"EOF(["192.168.3.0/24"])EOF",
                                           R"EOF(["2001:abcd::/64"])EOF"));
 

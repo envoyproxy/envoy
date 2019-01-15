@@ -244,7 +244,7 @@ TEST_P(HotRestartImplAlignmentTest, objectOverlap) {
   }
 }
 
-INSTANTIATE_TEST_CASE_P(HotRestartImplAlignmentTest, HotRestartImplAlignmentTest,
+INSTANTIATE_TEST_SUITE_P(HotRestartImplAlignmentTest, HotRestartImplAlignmentTest,
                         testing::Range(0UL, alignof(Stats::RawStatData) + 1));
 
 } // namespace Server

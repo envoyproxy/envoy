@@ -74,7 +74,7 @@ class ThriftFilterTransportConfigTest
       public testing::TestWithParam<
           envoy::config::filter::network::thrift_proxy::v2alpha1::TransportType> {};
 
-INSTANTIATE_TEST_CASE_P(TransportTypes, ThriftFilterTransportConfigTest,
+INSTANTIATE_TEST_SUITE_P(TransportTypes, ThriftFilterTransportConfigTest,
                         testing::ValuesIn(getTransportTypes()));
 
 class ThriftFilterProtocolConfigTest
@@ -82,7 +82,7 @@ class ThriftFilterProtocolConfigTest
       public testing::TestWithParam<
           envoy::config::filter::network::thrift_proxy::v2alpha1::ProtocolType> {};
 
-INSTANTIATE_TEST_CASE_P(ProtocolTypes, ThriftFilterProtocolConfigTest,
+INSTANTIATE_TEST_SUITE_P(ProtocolTypes, ThriftFilterProtocolConfigTest,
                         testing::ValuesIn(getProtocolTypes()));
 
 TEST_F(ThriftFilterConfigTest, ValidateFail) {

@@ -164,7 +164,7 @@ void XfccIntegrationTest::testRequestAndResponseWithXfccHeader(std::string previ
   EXPECT_TRUE(response->complete());
 }
 
-INSTANTIATE_TEST_CASE_P(IpVersions, XfccIntegrationTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, XfccIntegrationTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 

@@ -94,7 +94,7 @@ private:
   Network::TransportSocketFactoryPtr client_ssl_ctx_;
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, SdsStaticDownstreamIntegrationTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, SdsStaticDownstreamIntegrationTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 
@@ -153,7 +153,7 @@ private:
   Ssl::ContextManagerImpl context_manager_{timeSystem()};
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, SdsStaticUpstreamIntegrationTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, SdsStaticUpstreamIntegrationTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 

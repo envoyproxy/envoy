@@ -37,7 +37,7 @@ TEST_P(FuzzerCorpusTest, RunOneCorpusFile) {
   LLVMFuzzerTestOneInput(reinterpret_cast<const uint8_t*>(buf.c_str()), buf.size());
 }
 
-INSTANTIATE_TEST_CASE_P(CorpusExamples, FuzzerCorpusTest, testing::ValuesIn(test_corpus_));
+INSTANTIATE_TEST_SUITE_P(CorpusExamples, FuzzerCorpusTest, testing::ValuesIn(test_corpus_));
 
 } // namespace
 } // namespace Envoy

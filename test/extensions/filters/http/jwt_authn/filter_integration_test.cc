@@ -33,7 +33,7 @@ std::string getFilterConfig(bool use_local_jwks) {
 
 typedef HttpProtocolIntegrationTest LocalJwksIntegrationTest;
 
-INSTANTIATE_TEST_CASE_P(Protocols, LocalJwksIntegrationTest,
+INSTANTIATE_TEST_SUITE_P(Protocols, LocalJwksIntegrationTest,
                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
                         HttpProtocolIntegrationTest::protocolTestParamsToString);
 
@@ -185,7 +185,7 @@ public:
   FakeStreamPtr jwks_request_{};
 };
 
-INSTANTIATE_TEST_CASE_P(Protocols, RemoteJwksIntegrationTest,
+INSTANTIATE_TEST_SUITE_P(Protocols, RemoteJwksIntegrationTest,
                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
                         HttpProtocolIntegrationTest::protocolTestParamsToString);
 

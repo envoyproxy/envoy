@@ -56,7 +56,7 @@ static void errorCallbackTest(Address::IpVersion version) {
 }
 
 class ListenerImplDeathTest : public testing::TestWithParam<Address::IpVersion> {};
-INSTANTIATE_TEST_CASE_P(IpVersions, ListenerImplDeathTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, ListenerImplDeathTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 TEST_P(ListenerImplDeathTest, ErrorCallback) {
@@ -88,7 +88,7 @@ protected:
   DangerousDeprecatedTestTime test_time_;
   Event::DispatcherImpl dispatcher_;
 };
-INSTANTIATE_TEST_CASE_P(IpVersions, ListenerImplTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, ListenerImplTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 

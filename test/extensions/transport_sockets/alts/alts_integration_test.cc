@@ -140,7 +140,7 @@ public:
                                 /* client_connect_handshaker */ true) {}
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, AltsIntegrationTestValidPeer,
+INSTANTIATE_TEST_SUITE_P(IpVersions, AltsIntegrationTestValidPeer,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 
@@ -161,7 +161,7 @@ public:
                                 /* client_connect_handshaker */ true) {}
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, AltsIntegrationTestEmptyPeer,
+INSTANTIATE_TEST_SUITE_P(IpVersions, AltsIntegrationTestEmptyPeer,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 
@@ -182,7 +182,7 @@ public:
                                 /* client_connect_handshaker */ true) {}
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, AltsIntegrationTestClientInvalidPeer,
+INSTANTIATE_TEST_SUITE_P(IpVersions, AltsIntegrationTestClientInvalidPeer,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 
@@ -202,7 +202,7 @@ public:
                                 /* client_connect_handshaker */ true) {}
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, AltsIntegrationTestServerInvalidPeer,
+INSTANTIATE_TEST_SUITE_P(IpVersions, AltsIntegrationTestServerInvalidPeer,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 
@@ -230,7 +230,7 @@ public:
                                 /* client_connect_handshaker */ false) {}
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, AltsIntegrationTestClientWrongHandshaker,
+INSTANTIATE_TEST_SUITE_P(IpVersions, AltsIntegrationTestClientWrongHandshaker,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 

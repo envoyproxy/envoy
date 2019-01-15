@@ -108,7 +108,7 @@ static std::string paramToString(
                      protocolNameForTest(upstream_protocol));
 }
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     TransportsAndProtocols, ThriftTranslationIntegrationTest,
     Combine(Values(TransportType::Framed, TransportType::Unframed, TransportType::Header),
             Values(ProtocolType::Binary, ProtocolType::Compact),

@@ -167,7 +167,7 @@ protected:
   std::unique_ptr<InstanceImpl> server_;
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, ServerInstanceImplTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, ServerInstanceImplTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 

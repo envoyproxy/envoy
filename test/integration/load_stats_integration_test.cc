@@ -336,7 +336,7 @@ public:
   const uint32_t load_report_interval_ms_ = 500;
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, LoadStatsIntegrationTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, LoadStatsIntegrationTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 
