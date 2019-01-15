@@ -21,6 +21,7 @@ Server::ResourceMonitorPtr InjectedResourceMonitorFactory::createResourceMonitor
 /**
  * Static registration for the injected resource monitor factory. @see RegistryFactory.
  */
+// NOLINTNEXTLINE(fuchsia-statically-constructed-objects)
 static Registry::RegisterFactory<InjectedResourceMonitorFactory,
                                  Server::Configuration::ResourceMonitorFactory>
     registered_;

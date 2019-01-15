@@ -27,6 +27,7 @@ ProtobufTypes::MessagePtr UpstreamSslSocketFactory::createEmptyConfigProto() {
   return std::make_unique<envoy::api::v2::auth::UpstreamTlsContext>();
 }
 
+// NOLINTNEXTLINE(fuchsia-statically-constructed-objects)
 static Registry::RegisterFactory<UpstreamSslSocketFactory,
                                  Server::Configuration::UpstreamTransportSocketConfigFactory>
     upstream_registered_;
@@ -45,6 +46,7 @@ ProtobufTypes::MessagePtr DownstreamSslSocketFactory::createEmptyConfigProto() {
   return std::make_unique<envoy::api::v2::auth::DownstreamTlsContext>();
 }
 
+// NOLINTNEXTLINE(fuchsia-statically-constructed-objects)
 static Registry::RegisterFactory<DownstreamSslSocketFactory,
                                  Server::Configuration::DownstreamTransportSocketConfigFactory>
     downstream_registered_;

@@ -51,6 +51,7 @@ RedisProxyFilterConfigFactory::createFilterFactory(const Json::Object& json_conf
 /**
  * Static registration for the redis filter. @see RegisterFactory.
  */
+// NOLINTNEXTLINE(fuchsia-statically-constructed-objects)
 static Registry::RegisterFactory<RedisProxyFilterConfigFactory,
                                  Server::Configuration::NamedNetworkFilterConfigFactory>
     registered_;

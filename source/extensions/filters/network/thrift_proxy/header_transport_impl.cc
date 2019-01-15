@@ -312,8 +312,9 @@ public:
 /**
  * Static registration for the header transport. @see RegisterFactory.
  */
+// NOLINTNEXTLINE(fuchsia-statically-constructed-objects)
 static Registry::RegisterFactory<HeaderTransportConfigFactory, NamedTransportConfigFactory>
-    register_; // NOLINT(fuchsia-statically-constructed-objects)
+    register_;
 
 } // namespace ThriftProxy
 } // namespace NetworkFilters

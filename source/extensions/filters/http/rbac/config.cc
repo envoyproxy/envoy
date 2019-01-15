@@ -31,9 +31,10 @@ RoleBasedAccessControlFilterConfigFactory::createRouteSpecificFilterConfigTyped(
 /**
  * Static registration for the RBAC filter. @see RegisterFactory
  */
+// NOLINTNEXTLINE(fuchsia-statically-constructed-objects)
 static Registry::RegisterFactory<RoleBasedAccessControlFilterConfigFactory,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
-    register_; // NOLINT(fuchsia-statically-constructed-objects)
+    register_;
 
 } // namespace RBACFilter
 } // namespace HttpFilters

@@ -116,6 +116,7 @@ Network::FilterFactoryCb ThriftProxyFilterConfigFactory::createFilterFactoryFrom
 /**
  * Static registration for the thrift filter. @see RegisterFactory.
  */
+// NOLINTNEXTLINE(fuchsia-statically-constructed-objects)
 static Registry::RegisterFactory<ThriftProxyFilterConfigFactory,
                                  Server::Configuration::NamedNetworkFilterConfigFactory>
     registered_;

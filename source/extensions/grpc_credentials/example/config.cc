@@ -57,6 +57,7 @@ StaticHeaderAuthenticator::GetMetadata(grpc::string_ref, grpc::string_ref, const
 /**
  * Static registration for the static header Google gRPC credentials factory. @see RegisterFactory.
  */
+// NOLINTNEXTLINE(fuchsia-statically-constructed-objects)
 static Registry::RegisterFactory<AccessTokenExampleGrpcCredentialsFactory,
                                  Grpc::GoogleGrpcCredentialsFactory>
     access_token_google_grpc_credentials_registered_;

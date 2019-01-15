@@ -37,6 +37,7 @@ Network::FilterFactoryCb ClientSslAuthConfigFactory::createFilterFactoryFromProt
 /**
  * Static registration for the client SSL auth filter. @see RegisterFactory.
  */
+// NOLINTNEXTLINE(fuchsia-statically-constructed-objects)
 static Registry::RegisterFactory<ClientSslAuthConfigFactory,
                                  Server::Configuration::NamedNetworkFilterConfigFactory>
     registered_;

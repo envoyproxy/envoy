@@ -53,8 +53,9 @@ FilterFactory::createFilterFactoryFromProtoTyped(const JwtAuthentication& proto_
 /**
  * Static registration for this jwt_authn filter. @see RegisterFactory.
  */
+// NOLINTNEXTLINE(fuchsia-statically-constructed-objects)
 static Registry::RegisterFactory<FilterFactory, Server::Configuration::NamedHttpFilterConfigFactory>
-    register_; // NOLINT(fuchsia-statically-constructed-objects)
+    register_;
 
 } // namespace JwtAuthn
 } // namespace HttpFilters

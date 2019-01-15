@@ -408,8 +408,8 @@ public:
 /**
  * Static registration for the binary protocol. @see RegisterFactory.
  */
-static Registry::RegisterFactory<BinaryProtocolConfigFactory, NamedProtocolConfigFactory>
-    register_; // NOLINT(fuchsia-statically-constructed-objects)
+// NOLINTNEXTLINE(fuchsia-statically-constructed-objects)
+static Registry::RegisterFactory<BinaryProtocolConfigFactory, NamedProtocolConfigFactory> register_;
 
 class LaxBinaryProtocolConfigFactory : public ProtocolFactoryBase<LaxBinaryProtocolImpl> {
 public:
@@ -419,6 +419,7 @@ public:
 /**
  * Static registration for the auto protocol. @see RegisterFactory.
  */
+// NOLINTNEXTLINE(fuchsia-statically-constructed-objects)
 static Registry::RegisterFactory<LaxBinaryProtocolConfigFactory, NamedProtocolConfigFactory>
     register_lax_;
 

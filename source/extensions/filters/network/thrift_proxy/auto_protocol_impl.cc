@@ -84,8 +84,8 @@ public:
 /**
  * Static registration for the auto protocol. @see RegisterFactory.
  */
-static Registry::RegisterFactory<AutoProtocolConfigFactory, NamedProtocolConfigFactory>
-    register_; // NOLINT(fuchsia-statically-constructed-objects)
+// NOLINTNEXTLINE(fuchsia-statically-constructed-objects)
+static Registry::RegisterFactory<AutoProtocolConfigFactory, NamedProtocolConfigFactory> register_;
 
 } // namespace ThriftProxy
 } // namespace NetworkFilters

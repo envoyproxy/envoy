@@ -55,6 +55,7 @@ MongoProxyFilterConfigFactory::createFilterFactory(const Json::Object& json_conf
 /**
  * Static registration for the mongo filter. @see RegisterFactory.
  */
+// NOLINTNEXTLINE(fuchsia-statically-constructed-objects)
 static Registry::RegisterFactory<MongoProxyFilterConfigFactory,
                                  Server::Configuration::NamedNetworkFilterConfigFactory>
     registered_;

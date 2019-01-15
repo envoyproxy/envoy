@@ -625,8 +625,9 @@ public:
 /**
  * Static registration for the binary protocol. @see RegisterFactory.
  */
+// NOLINTNEXTLINE(fuchsia-statically-constructed-objects)
 static Registry::RegisterFactory<CompactProtocolConfigFactory, NamedProtocolConfigFactory>
-    register_; // NOLINT(fuchsia-statically-constructed-objects)
+    register_;
 
 } // namespace ThriftProxy
 } // namespace NetworkFilters

@@ -20,6 +20,7 @@ Server::ResourceMonitorPtr FixedHeapMonitorFactory::createResourceMonitorFromPro
 /**
  * Static registration for the fixed heap resource monitor factory. @see RegistryFactory.
  */
+// NOLINTNEXTLINE(fuchsia-statically-constructed-objects)
 static Registry::RegisterFactory<FixedHeapMonitorFactory,
                                  Server::Configuration::ResourceMonitorFactory>
     registered_;

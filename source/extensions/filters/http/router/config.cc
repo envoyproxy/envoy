@@ -37,9 +37,10 @@ RouterFilterConfig::createFilterFactory(const Json::Object& json_config,
 /**
  * Static registration for the router filter. @see RegisterFactory.
  */
+// NOLINTNEXTLINE(fuchsia-statically-constructed-objects)
 static Registry::RegisterFactory<RouterFilterConfig,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
-    register_; // NOLINT(fuchsia-statically-constructed-objects)
+    register_;
 
 } // namespace RouterFilter
 } // namespace HttpFilters

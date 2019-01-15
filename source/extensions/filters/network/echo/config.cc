@@ -40,6 +40,7 @@ public:
 /**
  * Static registration for the echo filter. @see RegisterFactory.
  */
+// NOLINTNEXTLINE(fuchsia-statically-constructed-objects)
 static Registry::RegisterFactory<EchoConfigFactory,
                                  Server::Configuration::NamedNetworkFilterConfigFactory>
     registered_;

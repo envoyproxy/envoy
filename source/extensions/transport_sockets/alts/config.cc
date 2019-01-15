@@ -119,10 +119,12 @@ DownstreamAltsTransportSocketConfigFactory::createTransportSocketFactory(
   return createTransportSocketFactoryHelper(message, /* is_upstream */ false);
 }
 
+// NOLINTNEXTLINE(fuchsia-statically-constructed-objects)
 static Registry::RegisterFactory<UpstreamAltsTransportSocketConfigFactory,
                                  Server::Configuration::UpstreamTransportSocketConfigFactory>
     upstream_registered_;
 
+// NOLINTNEXTLINE(fuchsia-statically-constructed-objects)
 static Registry::RegisterFactory<DownstreamAltsTransportSocketConfigFactory,
                                  Server::Configuration::DownstreamTransportSocketConfigFactory>
     downstream_registered_;

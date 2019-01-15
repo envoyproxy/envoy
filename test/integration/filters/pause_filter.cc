@@ -78,8 +78,9 @@ public:
 };
 
 // perform static registration
+// NOLINTNEXTLINE(fuchsia-statically-constructed-objects)
 static Registry::RegisterFactory<TestPauseFilterConfig,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
-    register_; // NOLINT(fuchsia-statically-constructed-objects)
+    register_;
 
 } // namespace Envoy

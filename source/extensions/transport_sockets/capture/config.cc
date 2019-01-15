@@ -53,10 +53,12 @@ ProtobufTypes::MessagePtr CaptureSocketConfigFactory::createEmptyConfigProto() {
   return std::make_unique<envoy::config::transport_socket::capture::v2alpha::Capture>();
 }
 
+// NOLINTNEXTLINE(fuchsia-statically-constructed-objects)
 static Registry::RegisterFactory<UpstreamCaptureSocketConfigFactory,
                                  Server::Configuration::UpstreamTransportSocketConfigFactory>
     upstream_registered_;
 
+// NOLINTNEXTLINE(fuchsia-statically-constructed-objects)
 static Registry::RegisterFactory<DownstreamCaptureSocketConfigFactory,
                                  Server::Configuration::DownstreamTransportSocketConfigFactory>
     downstream_registered_;

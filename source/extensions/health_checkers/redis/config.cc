@@ -23,6 +23,7 @@ Upstream::HealthCheckerSharedPtr RedisHealthCheckerFactory::createCustomHealthCh
 /**
  * Static registration for the redis custom health checker. @see RegisterFactory.
  */
+// NOLINTNEXTLINE(fuchsia-statically-constructed-objects)
 static Registry::RegisterFactory<RedisHealthCheckerFactory,
                                  Server::Configuration::CustomHealthCheckerFactory>
     registered_;

@@ -23,9 +23,10 @@ DynamoFilterConfig::createFilter(const std::string& stat_prefix,
 /**
  * Static registration for the http dynamodb filter. @see RegisterFactory.
  */
+// NOLINTNEXTLINE(fuchsia-statically-constructed-objects)
 static Registry::RegisterFactory<DynamoFilterConfig,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
-    register_; // NOLINT(fuchsia-statically-constructed-objects)
+    register_;
 
 } // namespace Dynamo
 } // namespace HttpFilters

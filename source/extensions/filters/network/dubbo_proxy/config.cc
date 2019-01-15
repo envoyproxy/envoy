@@ -26,6 +26,7 @@ Network::FilterFactoryCb DubboProxyFilterConfigFactory::createFilterFactoryFromP
 /**
  * Static registration for the dubbo filter. @see RegisterFactory.
  */
+// NOLINTNEXTLINE(fuchsia-statically-constructed-objects)
 static Registry::RegisterFactory<DubboProxyFilterConfigFactory,
                                  Server::Configuration::NamedNetworkFilterConfigFactory>
     registered_;

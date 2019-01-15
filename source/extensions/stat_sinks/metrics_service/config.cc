@@ -42,8 +42,9 @@ std::string MetricsServiceSinkFactory::name() { return StatsSinkNames::get().Met
 /**
  * Static registration for the this sink factory. @see RegisterFactory.
  */
+// NOLINTNEXTLINE(fuchsia-statically-constructed-objects)
 static Registry::RegisterFactory<MetricsServiceSinkFactory, Server::Configuration::StatsSinkFactory>
-    register_; // NOLINT(fuchsia-statically-constructed-objects)
+    register_;
 
 } // namespace MetricsService
 } // namespace StatSinks

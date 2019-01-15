@@ -20,9 +20,10 @@ GrpcHttp1BridgeFilterConfig::createFilter(const std::string&,
 /**
  * Static registration for the grpc HTTP1 bridge filter. @see RegisterFactory.
  */
+// NOLINTNEXTLINE(fuchsia-statically-constructed-objects)
 static Registry::RegisterFactory<GrpcHttp1BridgeFilterConfig,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
-    register_; // NOLINT(fuchsia-statically-constructed-objects)
+    register_;
 
 } // namespace GrpcHttp1Bridge
 } // namespace HttpFilters

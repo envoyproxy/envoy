@@ -23,7 +23,7 @@ Http::FilterFactoryCb Config::createFilterFactoryFromProtoTyped(
  * Static registration for the grpc http1 reverse bridge filter. @see RegisterFactory.
  */
 static Envoy::Registry::RegisterFactory<Config, Server::Configuration::NamedHttpFilterConfigFactory>
-    register_; // NOLINT(fuchsia-statically-constructed-objects)
+    register_;
 } // namespace GrpcHttp1ReverseBridge
 } // namespace HttpFilters
 } // namespace Extensions

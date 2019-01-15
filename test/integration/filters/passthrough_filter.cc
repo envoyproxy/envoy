@@ -15,8 +15,9 @@ public:
 };
 
 constexpr char TestPassThroughFilter::name[];
+// NOLINTNEXTLINE(fuchsia-statically-constructed-objects)
 static Registry::RegisterFactory<SimpleFilterConfig<TestPassThroughFilter>,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
-    register_; // NOLINT(fuchsia-statically-constructed-objects)
+    register_;
 
 } // namespace Envoy

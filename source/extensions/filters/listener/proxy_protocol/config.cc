@@ -34,6 +34,7 @@ public:
 /**
  * Static registration for the proxy protocol filter. @see RegisterFactory.
  */
+// NOLINTNEXTLINE(fuchsia-statically-constructed-objects)
 static Registry::RegisterFactory<ProxyProtocolConfigFactory,
                                  Server::Configuration::NamedListenerFilterConfigFactory>
     registered_;

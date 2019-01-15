@@ -37,6 +37,7 @@ Network::FilterFactoryCb ConfigFactory::createFilterFactoryFromProtoTyped(
 /**
  * Static registration for the tcp_proxy filter. @see RegisterFactory.
  */
+// NOLINTNEXTLINE(fuchsia-statically-constructed-objects)
 static Registry::RegisterFactory<ConfigFactory,
                                  Server::Configuration::NamedNetworkFilterConfigFactory>
     registered_;

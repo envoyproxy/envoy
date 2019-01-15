@@ -19,9 +19,10 @@ Http::FilterFactoryCb GrpcWebFilterConfig::createFilter(const std::string&,
 /**
  * Static registration for the gRPC-Web filter. @see RegisterFactory.
  */
+// NOLINTNEXTLINE(fuchsia-statically-constructed-objects)
 static Registry::RegisterFactory<GrpcWebFilterConfig,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
-    register_; // NOLINT(fuchsia-statically-constructed-objects)
+    register_;
 
 } // namespace GrpcWeb
 } // namespace HttpFilters

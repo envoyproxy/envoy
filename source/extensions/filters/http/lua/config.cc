@@ -34,9 +34,10 @@ LuaFilterConfig::createFilterFactory(const Json::Object& json_config,
 /**
  * Static registration for the Lua filter. @see RegisterFactory.
  */
+// NOLINTNEXTLINE(fuchsia-statically-constructed-objects)
 static Registry::RegisterFactory<LuaFilterConfig,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
-    register_; // NOLINT(fuchsia-statically-constructed-objects)
+    register_;
 
 } // namespace Lua
 } // namespace HttpFilters

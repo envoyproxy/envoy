@@ -24,10 +24,12 @@ ProtobufTypes::MessagePtr RawBufferSocketFactory::createEmptyConfigProto() {
   return std::make_unique<ProtobufWkt::Empty>();
 }
 
+// NOLINTNEXTLINE(fuchsia-statically-constructed-objects)
 static Registry::RegisterFactory<UpstreamRawBufferSocketFactory,
                                  Server::Configuration::UpstreamTransportSocketConfigFactory>
     upstream_registered_;
 
+// NOLINTNEXTLINE(fuchsia-statically-constructed-objects)
 static Registry::RegisterFactory<DownstreamRawBufferSocketFactory,
                                  Server::Configuration::DownstreamTransportSocketConfigFactory>
     downstream_registered_;
