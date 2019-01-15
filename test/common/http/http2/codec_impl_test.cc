@@ -804,13 +804,13 @@ TEST_P(Http2CodecImplStreamLimitTest, MaxClientStreams) {
 
 // Deferred reset tests use only small windows so that we can test certain conditions.
 INSTANTIATE_TEST_SUITE_P(Http2CodecImplDeferredResetTest, Http2CodecImplDeferredResetTest,
-                        ::testing::Combine(HTTP2SETTINGS_SMALL_WINDOW_COMBINE,
-                                           HTTP2SETTINGS_SMALL_WINDOW_COMBINE));
+                         ::testing::Combine(HTTP2SETTINGS_SMALL_WINDOW_COMBINE,
+                                            HTTP2SETTINGS_SMALL_WINDOW_COMBINE));
 
 // Flow control tests only use only small windows so that we can test certain conditions.
 INSTANTIATE_TEST_SUITE_P(Http2CodecImplFlowControlTest, Http2CodecImplFlowControlTest,
-                        ::testing::Combine(HTTP2SETTINGS_SMALL_WINDOW_COMBINE,
-                                           HTTP2SETTINGS_SMALL_WINDOW_COMBINE));
+                         ::testing::Combine(HTTP2SETTINGS_SMALL_WINDOW_COMBINE,
+                                            HTTP2SETTINGS_SMALL_WINDOW_COMBINE));
 
 // we separate default/edge cases here to avoid combinatorial explosion
 #define HTTP2SETTINGS_DEFAULT_COMBINE                                                              \
@@ -822,12 +822,12 @@ INSTANTIATE_TEST_SUITE_P(Http2CodecImplFlowControlTest, Http2CodecImplFlowContro
 // Stream limit test only uses the default values because not all combinations of
 // edge settings allow for the number of streams needed by the test.
 INSTANTIATE_TEST_SUITE_P(Http2CodecImplStreamLimitTest, Http2CodecImplStreamLimitTest,
-                        ::testing::Combine(HTTP2SETTINGS_DEFAULT_COMBINE,
-                                           HTTP2SETTINGS_DEFAULT_COMBINE));
+                         ::testing::Combine(HTTP2SETTINGS_DEFAULT_COMBINE,
+                                            HTTP2SETTINGS_DEFAULT_COMBINE));
 
 INSTANTIATE_TEST_SUITE_P(Http2CodecImplTestDefaultSettings, Http2CodecImplTest,
-                        ::testing::Combine(HTTP2SETTINGS_DEFAULT_COMBINE,
-                                           HTTP2SETTINGS_DEFAULT_COMBINE));
+                         ::testing::Combine(HTTP2SETTINGS_DEFAULT_COMBINE,
+                                            HTTP2SETTINGS_DEFAULT_COMBINE));
 
 #define HTTP2SETTINGS_EDGE_COMBINE                                                                 \
   ::testing::Combine(                                                                              \
@@ -840,7 +840,8 @@ INSTANTIATE_TEST_SUITE_P(Http2CodecImplTestDefaultSettings, Http2CodecImplTest,
                         Http2Settings::MAX_INITIAL_CONNECTION_WINDOW_SIZE))
 
 INSTANTIATE_TEST_SUITE_P(Http2CodecImplTestEdgeSettings, Http2CodecImplTest,
-                        ::testing::Combine(HTTP2SETTINGS_EDGE_COMBINE, HTTP2SETTINGS_EDGE_COMBINE));
+                         ::testing::Combine(HTTP2SETTINGS_EDGE_COMBINE,
+                                            HTTP2SETTINGS_EDGE_COMBINE));
 
 TEST(Http2CodecUtility, reconstituteCrumbledCookies) {
   {

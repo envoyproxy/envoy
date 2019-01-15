@@ -28,8 +28,8 @@ namespace DogStatsd {
 
 class DogStatsdConfigLoopbackTest : public testing::TestWithParam<Network::Address::IpVersion> {};
 INSTANTIATE_TEST_SUITE_P(IpVersions, DogStatsdConfigLoopbackTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(DogStatsdConfigLoopbackTest, ValidUdpIp) {
   const std::string name = StatsSinkNames::get().DogStatsd;

@@ -303,9 +303,9 @@ TEST_F(SubscriptionFactoryTest, GrpcSubscription) {
 }
 
 INSTANTIATE_TEST_SUITE_P(SubscriptionFactoryTestApiConfigSource,
-                        SubscriptionFactoryTestApiConfigSource,
-                        ::testing::Values(envoy::api::v2::core::ApiConfigSource::REST,
-                                          envoy::api::v2::core::ApiConfigSource::GRPC));
+                         SubscriptionFactoryTestApiConfigSource,
+                         ::testing::Values(envoy::api::v2::core::ApiConfigSource::REST,
+                                           envoy::api::v2::core::ApiConfigSource::GRPC));
 
 TEST_P(SubscriptionFactoryTestApiConfigSource, NonExistentCluster) {
   envoy::api::v2::core::ConfigSource config;

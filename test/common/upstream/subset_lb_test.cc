@@ -1542,7 +1542,7 @@ TEST_P(SubsetLoadBalancerTest, GaugesUpdatedOnDestroy) {
 }
 
 INSTANTIATE_TEST_SUITE_P(UpdateOrderings, SubsetLoadBalancerTest,
-                        testing::ValuesIn({REMOVES_FIRST, SIMULTANEOUS}));
+                         testing::ValuesIn({REMOVES_FIRST, SIMULTANEOUS}));
 
 } // namespace SubsetLoadBalancerTest
 } // namespace Upstream

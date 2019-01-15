@@ -53,8 +53,8 @@ protected:
 };
 
 INSTANTIATE_TEST_SUITE_P(Protocols, OverloadIntegrationTest,
-                        testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
-                        HttpProtocolIntegrationTest::protocolTestParamsToString);
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 TEST_P(OverloadIntegrationTest, CloseStreamsWhenOverloaded) {
   initialize();

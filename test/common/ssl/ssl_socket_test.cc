@@ -583,8 +583,8 @@ protected:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, SslSocketTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(SslSocketTest, GetCertDigest) {
   const std::string client_ctx_yaml = R"EOF(
@@ -3737,8 +3737,8 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, SslReadBufferLimitTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(SslReadBufferLimitTest, NoLimit) {
   readBufferLimitTest(0, 256 * 1024, 256 * 1024, 1, false);

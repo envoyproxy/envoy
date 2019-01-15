@@ -62,7 +62,7 @@ TEST_F(ConfigValidation, SharedDnsResolver) {
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ConfigValidation,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 } // namespace Envoy

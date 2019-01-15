@@ -113,12 +113,12 @@ using ListenSocketImplTestTcp = ListenSocketImplTest<Network::Address::SocketTyp
 using ListenSocketImplTestUdp = ListenSocketImplTest<Network::Address::SocketType::Datagram>;
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ListenSocketImplTestTcp,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ListenSocketImplTestUdp,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(ListenSocketImplTestTcp, BindSpecificPort) { testBindSpecificPort(); }
 

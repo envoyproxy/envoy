@@ -58,8 +58,8 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(SubscriptionImplTest, SubscriptionImplTest,
-                        testing::ValuesIn({SubscriptionType::Grpc, SubscriptionType::Http,
-                                           SubscriptionType::Filesystem}));
+                         testing::ValuesIn({SubscriptionType::Grpc, SubscriptionType::Http,
+                                            SubscriptionType::Filesystem}));
 
 // Validate basic request-response succeeds.
 TEST_P(SubscriptionImplTest, InitialRequestResponse) {

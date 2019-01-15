@@ -141,8 +141,8 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, AltsIntegrationTestValidPeer,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 // Verifies that when received peer service account passes validation, the alts
 // handshake succeeds.
@@ -162,8 +162,8 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, AltsIntegrationTestEmptyPeer,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 // Verifies that when peer service account is not set into config, the alts
 // handshake succeeds.
@@ -183,8 +183,8 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, AltsIntegrationTestClientInvalidPeer,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 // Verifies that when client receives peer service account which does not match
 // any account in config, the handshake will fail and client closes connection.
@@ -203,8 +203,8 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, AltsIntegrationTestServerInvalidPeer,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 // Verifies that when Envoy receives peer service account which does not match
 // any account in config, the handshake will fail and Envoy closes connection.
@@ -231,8 +231,8 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, AltsIntegrationTestClientWrongHandshaker,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 // Verifies that when client connects to a wrong handshakerserver, handshake fails
 // and connection closes.

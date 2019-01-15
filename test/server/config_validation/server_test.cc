@@ -58,10 +58,10 @@ TEST_P(ValidationServerTest, Validate) {
 // the filesystem for TLS certs, etc. In the meantime, these are the example configs that work
 // as-is.
 INSTANTIATE_TEST_SUITE_P(ValidConfigs, ValidationServerTest,
-                        ::testing::Values("front-proxy_front-envoy.yaml",
-                                          "google_com_proxy.v2.yaml",
-                                          "grpc-bridge_config_s2s-grpc-envoy.yaml",
-                                          "front-proxy_service-envoy.yaml"));
+                         ::testing::Values("front-proxy_front-envoy.yaml",
+                                           "google_com_proxy.v2.yaml",
+                                           "grpc-bridge_config_s2s-grpc-envoy.yaml",
+                                           "front-proxy_service-envoy.yaml"));
 
 // Just make sure that all configs can be ingested without a crash. Processing of config files
 // may not be successful, but there should be no crash.
@@ -72,6 +72,6 @@ TEST_P(ValidationServerTest_1, RunWithoutCrash) {
 }
 
 INSTANTIATE_TEST_SUITE_P(AllConfigs, ValidationServerTest_1,
-                        ::testing::ValuesIn(ValidationServerTest_1::GetAllConfigFiles()));
+                         ::testing::ValuesIn(ValidationServerTest_1::GetAllConfigFiles()));
 } // namespace Server
 } // namespace Envoy

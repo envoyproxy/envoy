@@ -197,13 +197,13 @@ static std::string protoStateParamToString(const TestParamInfo<ProtocolState>& p
 }
 
 INSTANTIATE_TEST_SUITE_P(NonValueProtocolStates, DecoderStateMachineNonValueTest,
-                        Values(ProtocolState::MessageBegin, ProtocolState::MessageEnd,
-                               ProtocolState::StructBegin, ProtocolState::StructEnd,
-                               ProtocolState::FieldBegin, ProtocolState::FieldEnd,
-                               ProtocolState::MapBegin, ProtocolState::MapEnd,
-                               ProtocolState::ListBegin, ProtocolState::ListEnd,
-                               ProtocolState::SetBegin, ProtocolState::SetEnd),
-                        protoStateParamToString);
+                         Values(ProtocolState::MessageBegin, ProtocolState::MessageEnd,
+                                ProtocolState::StructBegin, ProtocolState::StructEnd,
+                                ProtocolState::FieldBegin, ProtocolState::FieldEnd,
+                                ProtocolState::MapBegin, ProtocolState::MapEnd,
+                                ProtocolState::ListBegin, ProtocolState::ListEnd,
+                                ProtocolState::SetBegin, ProtocolState::SetEnd),
+                         protoStateParamToString);
 
 class DecoderStateMachineTest : public DecoderStateMachineTestBase, public testing::Test {};
 
@@ -211,9 +211,9 @@ class DecoderStateMachineValueTest : public DecoderStateMachineTestBase,
                                      public TestWithParam<FieldType> {};
 
 INSTANTIATE_TEST_SUITE_P(PrimitiveFieldTypes, DecoderStateMachineValueTest,
-                        Values(FieldType::Bool, FieldType::Byte, FieldType::Double, FieldType::I16,
-                               FieldType::I32, FieldType::I64, FieldType::String),
-                        fieldTypeParamToString);
+                         Values(FieldType::Bool, FieldType::Byte, FieldType::Double, FieldType::I16,
+                                FieldType::I32, FieldType::I64, FieldType::String),
+                         fieldTypeParamToString);
 
 class DecoderStateMachineNestingTest
     : public DecoderStateMachineTestBase,

@@ -64,7 +64,7 @@ public:
 typedef RingHashLoadBalancerTest RingHashFailoverTest;
 
 INSTANTIATE_TEST_SUITE_P(RingHashPrimaryOrFailover, RingHashLoadBalancerTest,
-                        ::testing::Values(true, false));
+                         ::testing::Values(true, false));
 INSTANTIATE_TEST_SUITE_P(RingHashPrimaryOrFailover, RingHashFailoverTest, ::testing::Values(true));
 
 TEST_P(RingHashLoadBalancerTest, NoHost) {

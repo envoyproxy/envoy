@@ -155,8 +155,8 @@ TEST_P(MainCommonDeathTest, OutOfMemoryHandler) {
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, MainCommonTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 class AdminRequestTest : public MainCommonTest {
 protected:
@@ -379,7 +379,7 @@ TEST_P(MainCommonTest, ConstructDestructLogger) {
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, AdminRequestTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 } // namespace Envoy

@@ -975,7 +975,7 @@ TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareRoutingNoLocalLocality) {
 }
 
 INSTANTIATE_TEST_SUITE_P(PrimaryOrFailover, RoundRobinLoadBalancerTest,
-                        ::testing::Values(true, false));
+                         ::testing::Values(true, false));
 
 class LeastRequestLoadBalancerTest : public LoadBalancerTestBase {
 public:
@@ -1154,7 +1154,7 @@ TEST_P(LeastRequestLoadBalancerTest, WeightImbalanceCallbacks) {
 }
 
 INSTANTIATE_TEST_SUITE_P(PrimaryOrFailover, LeastRequestLoadBalancerTest,
-                        ::testing::Values(true, false));
+                         ::testing::Values(true, false));
 
 class RandomLoadBalancerTest : public LoadBalancerTestBase {
 public:

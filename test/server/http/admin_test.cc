@@ -87,8 +87,8 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, AdminStatsTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(AdminStatsTest, StatsAsJson) {
   InSequence s;
@@ -553,8 +553,8 @@ TEST_P(AdminStatsTest, UsedOnlyStatsAsJsonFilterString) {
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, AdminFilterTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(AdminFilterTest, HeaderOnly) {
   EXPECT_CALL(callbacks_, encodeHeaders_(_, false));
@@ -631,8 +631,8 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, AdminInstanceTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(AdminInstanceTest, AdminProfiler) {
   Buffer::OwnedImpl data;

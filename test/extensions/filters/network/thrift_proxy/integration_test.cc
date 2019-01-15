@@ -365,9 +365,9 @@ TEST_P(ThriftConnManagerIntegrationTest, OnewayEarlyClosePartialRequest) {
 class ThriftTwitterConnManagerIntegrationTest : public ThriftConnManagerIntegrationTest {};
 
 INSTANTIATE_TEST_SUITE_P(FramedTwitter, ThriftTwitterConnManagerIntegrationTest,
-                        Combine(Values(TransportType::Framed), Values(ProtocolType::Twitter),
-                                Values(false, true)),
-                        paramToString);
+                         Combine(Values(TransportType::Framed), Values(ProtocolType::Twitter),
+                                 Values(false, true)),
+                         paramToString);
 
 // Because of the protocol upgrade requests and the difficulty of separating them, we test this
 // protocol independently.

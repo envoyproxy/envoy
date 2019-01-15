@@ -93,8 +93,8 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, LuaIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 // Basic request and response.
 TEST_P(LuaIntegrationTest, RequestAndResponse) {

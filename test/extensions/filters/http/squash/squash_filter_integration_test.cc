@@ -120,8 +120,8 @@ const std::string SquashFilterIntegrationTest::SQUASH_CREATE_DEFAULT =
     "\"status\":{\"state\":\"none\"}}";
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, SquashFilterIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(SquashFilterIntegrationTest, TestHappyPath) {
   auto response = sendDebugRequest(codec_client_);

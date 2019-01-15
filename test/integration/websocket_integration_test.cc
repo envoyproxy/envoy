@@ -108,8 +108,8 @@ void WebsocketIntegrationTest::commonValidate(Http::HeaderMap& proxied_headers,
 }
 
 INSTANTIATE_TEST_SUITE_P(Protocols, WebsocketIntegrationTest,
-                        testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
-                        HttpProtocolIntegrationTest::protocolTestParamsToString);
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 ConfigHelper::HttpModifierFunction setRouteUsingWebsocket() {
   return

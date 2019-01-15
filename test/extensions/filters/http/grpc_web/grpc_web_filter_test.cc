@@ -345,14 +345,14 @@ TEST_P(GrpcWebFilterTest, Unary) {
 }
 
 INSTANTIATE_TEST_SUITE_P(Unary, GrpcWebFilterTest,
-                        Combine(Values(Http::Headers::get().ContentTypeValues.GrpcWeb,
-                                       Http::Headers::get().ContentTypeValues.GrpcWebProto,
-                                       Http::Headers::get().ContentTypeValues.GrpcWebText,
-                                       Http::Headers::get().ContentTypeValues.GrpcWebTextProto),
-                                Values(Http::Headers::get().ContentTypeValues.GrpcWeb,
-                                       Http::Headers::get().ContentTypeValues.GrpcWebProto,
-                                       Http::Headers::get().ContentTypeValues.GrpcWebText,
-                                       Http::Headers::get().ContentTypeValues.GrpcWebTextProto)));
+                         Combine(Values(Http::Headers::get().ContentTypeValues.GrpcWeb,
+                                        Http::Headers::get().ContentTypeValues.GrpcWebProto,
+                                        Http::Headers::get().ContentTypeValues.GrpcWebText,
+                                        Http::Headers::get().ContentTypeValues.GrpcWebTextProto),
+                                 Values(Http::Headers::get().ContentTypeValues.GrpcWeb,
+                                        Http::Headers::get().ContentTypeValues.GrpcWebProto,
+                                        Http::Headers::get().ContentTypeValues.GrpcWebText,
+                                        Http::Headers::get().ContentTypeValues.GrpcWebTextProto)));
 
 } // namespace GrpcWeb
 } // namespace HttpFilters

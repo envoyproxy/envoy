@@ -59,7 +59,7 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, EdsIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
 // Validate that health status updates are consumed from EDS.
 TEST_P(EdsIntegrationTest, HealthUpdate) {

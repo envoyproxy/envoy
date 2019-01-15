@@ -130,7 +130,7 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, MetricsServiceIntegrationTest,
-                        GRPC_CLIENT_INTEGRATION_PARAMS);
+                         GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // Test a basic metric service flow.
 TEST_P(MetricsServiceIntegrationTest, BasicFlow) {

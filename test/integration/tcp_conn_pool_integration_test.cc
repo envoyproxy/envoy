@@ -143,8 +143,8 @@ private:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, TcpConnPoolIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(TcpConnPoolIntegrationTest, SingleRequest) {
   std::string request("request");

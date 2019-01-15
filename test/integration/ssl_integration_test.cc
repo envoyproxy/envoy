@@ -76,8 +76,8 @@ void SslIntegrationTestBase::checkStats() {
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, SslIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(SslIntegrationTest, RouterRequestAndResponseWithGiantBodyBuffer) {
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
@@ -368,8 +368,8 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, SslCaptureIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 // Validate two back-to-back requests with binary proto output.
 TEST_P(SslCaptureIntegrationTest, TwoRequestsWithBinaryProto) {

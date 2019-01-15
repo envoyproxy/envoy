@@ -167,8 +167,8 @@ public:
 
 // Parameterize the listener socket address version.
 INSTANTIATE_TEST_SUITE_P(IpVersions, ProxyProtocolTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(ProxyProtocolTest, v1Basic) {
   connect();
@@ -975,8 +975,8 @@ public:
 
 // Parameterize the listener socket address version.
 INSTANTIATE_TEST_SUITE_P(IpVersions, WildcardProxyProtocolTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(WildcardProxyProtocolTest, Basic) {
   connect();

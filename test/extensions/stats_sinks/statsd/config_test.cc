@@ -49,8 +49,8 @@ TEST(StatsConfigTest, ValidTcpStatsd) {
 class StatsConfigParameterizedTest : public testing::TestWithParam<Network::Address::IpVersion> {};
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, StatsConfigParameterizedTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(StatsConfigParameterizedTest, UdpSinkDefaultPrefix) {
   const std::string name = StatsSinkNames::get().Statsd;
@@ -165,8 +165,8 @@ TEST(StatsConfigTest, TcpSinkCustomPrefix) {
 
 class StatsConfigLoopbackTest : public testing::TestWithParam<Network::Address::IpVersion> {};
 INSTANTIATE_TEST_SUITE_P(IpVersions, StatsConfigLoopbackTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(StatsConfigLoopbackTest, ValidUdpIpStatsd) {
   const std::string name = StatsSinkNames::get().Statsd;

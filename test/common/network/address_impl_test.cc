@@ -105,8 +105,8 @@ void testSocketBindAndConnect(Network::Address::IpVersion ip_version, bool v6onl
 
 class AddressImplSocketTest : public testing::TestWithParam<IpVersion> {};
 INSTANTIATE_TEST_SUITE_P(IpVersions, AddressImplSocketTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(AddressImplSocketTest, SocketBindAndConnect) {
   // Test listening on and connecting to an unused port with an IP loopback address.
@@ -452,8 +452,8 @@ struct TestCase test_cases[] = {
     {TestCase::Pipe, "/path/to/pipe/1", 0}, {TestCase::Pipe, "/path/to/pipe/2", 0}};
 
 INSTANTIATE_TEST_SUITE_P(AddressCrossProduct, MixedAddressTest,
-                        ::testing::Combine(::testing::ValuesIn(test_cases),
-                                           ::testing::ValuesIn(test_cases)));
+                         ::testing::Combine(::testing::ValuesIn(test_cases),
+                                            ::testing::ValuesIn(test_cases)));
 
 } // namespace Address
 } // namespace Network

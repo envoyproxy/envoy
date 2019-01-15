@@ -17,10 +17,10 @@
 namespace Envoy {
 
 INSTANTIATE_TEST_SUITE_P(Protocols, IntegrationAdminTest,
-                        testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
-                            {Http::CodecClient::Type::HTTP1, Http::CodecClient::Type::HTTP2},
-                            {FakeHttpConnection::Type::HTTP1})),
-                        HttpProtocolIntegrationTest::protocolTestParamsToString);
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+                             {Http::CodecClient::Type::HTTP1, Http::CodecClient::Type::HTTP2},
+                             {FakeHttpConnection::Type::HTTP1})),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 TEST_P(IntegrationAdminTest, HealthCheck) {
   initialize();
@@ -475,8 +475,8 @@ public:
   envoy::config::metrics::v2::StatsMatcher stats_matcher_;
 };
 INSTANTIATE_TEST_SUITE_P(IpVersions, StatsMatcherIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 // Verify that StatsMatcher prevents the printing of uninstantiated stats.
 TEST_P(StatsMatcherIntegrationTest, ExcludePrefixServerDot) {

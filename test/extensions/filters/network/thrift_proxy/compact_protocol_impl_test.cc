@@ -1033,7 +1033,7 @@ TEST_P(CompactProtocolFieldTypeTest, ConvertsToFieldType) {
 }
 
 INSTANTIATE_TEST_SUITE_P(CompactFieldTypes, CompactProtocolFieldTypeTest,
-                        Values(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12));
+                         Values(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12));
 
 TEST_F(CompactProtocolTest, WriteMessageBegin) {
   CompactProtocolImpl proto;

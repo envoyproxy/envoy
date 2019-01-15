@@ -210,10 +210,10 @@ TEST_P(RedisSingleServerRequestTest, NoUpstream) {
 };
 
 INSTANTIATE_TEST_SUITE_P(RedisSingleServerRequestTest, RedisSingleServerRequestTest,
-                        testing::ValuesIn(SupportedCommands::simpleCommands()));
+                         testing::ValuesIn(SupportedCommands::simpleCommands()));
 
 INSTANTIATE_TEST_SUITE_P(RedisSimpleRequestCommandHandlerMixedCaseTests,
-                        RedisSingleServerRequestTest, testing::Values("INCR", "inCrBY"));
+                         RedisSingleServerRequestTest, testing::Values("INCR", "inCrBY"));
 
 TEST_F(RedisSingleServerRequestTest, PingSuccess) {
   InSequence s;
@@ -716,7 +716,7 @@ TEST_P(RedisSplitKeysSumResultHandlerTest, NoUpstreamHostForAll) {
 };
 
 INSTANTIATE_TEST_SUITE_P(RedisSplitKeysSumResultHandlerTest, RedisSplitKeysSumResultHandlerTest,
-                        testing::ValuesIn(SupportedCommands::hashMultipleSumResultCommands()));
+                         testing::ValuesIn(SupportedCommands::hashMultipleSumResultCommands()));
 
 } // namespace CommandSplitter
 } // namespace RedisProxy

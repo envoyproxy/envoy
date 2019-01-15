@@ -87,8 +87,8 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, GzipIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 /**
  * Exercises gzip compression with default configuration.

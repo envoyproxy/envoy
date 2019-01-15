@@ -109,8 +109,8 @@ protected:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, CorsFilterIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(CorsFilterIntegrationTest, TestVHostConfigSuccess) {
   testPreflight(

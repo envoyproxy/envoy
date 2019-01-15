@@ -337,8 +337,8 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, LoadStatsIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 // Validate the load reports for successful requests as cluster membership
 // changes.
