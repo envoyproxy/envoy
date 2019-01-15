@@ -3,12 +3,11 @@ Version history
 
 1.10.0 (pending)
 ================
-* config: added support of using google.protobuf.Any in opaque configs for extensions.
-* config: removed deprecated --v2-config-only from command line config.
 * access log: added a new flag for upstream retry count exceeded.
 * admin: the admin server can now be accessed via HTTP/2 (prior knowledge).
 * buffer: fix vulnerabilities when allocation fails.
 * config: added support of using google.protobuf.Any in opaque configs for extensions.
+* config: removed deprecated --v2-config-only from command line config.
 * config: removed deprecated_v1 sds_config from :ref:`Bootstrap config <config_overview_v2_bootstrap>`.
 * config: removed REST_LEGACY as a valid :ref:`ApiType <envoy_api_field_core.ApiConfigSource.api_type>`.
 * cors: added :ref:`filter_enabled & shadow_enabled RuntimeFractionalPercent flags <cors-runtime>` to filter.
