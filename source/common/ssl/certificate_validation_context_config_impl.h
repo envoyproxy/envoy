@@ -3,6 +3,7 @@
 #include <string>
 
 #include "envoy/api/v2/auth/cert.pb.h"
+#include "envoy/filesystem/filesystem.h"
 #include "envoy/ssl/certificate_validation_context_config.h"
 
 namespace Envoy {
@@ -11,7 +12,8 @@ namespace Ssl {
 class CertificateValidationContextConfigImpl : public CertificateValidationContextConfig {
 public:
   CertificateValidationContextConfigImpl(
-      const envoy::api::v2::auth::CertificateValidationContext& config);
+      const envoy::api::v2::auth::CertificateValidationContext& config,
+      Filesystem::Instance& file_system);
 
   const std::string& caCert() const override { return ca_cert_; }
   const std::string& caCertPath() const override { return ca_cert_path_; }

@@ -5,7 +5,6 @@
 #include "envoy/config/accesslog/v2/file.pb.h"
 #include "envoy/config/filter/network/tcp_proxy/v2/tcp_proxy.pb.validate.h"
 
-#include "common/filesystem/filesystem_impl.h"
 #include "common/network/utility.h"
 #include "common/ssl/context_manager_impl.h"
 
@@ -259,7 +258,7 @@ TEST_P(TcpProxyIntegrationTest, AccessLog) {
   std::string log_result;
   // Access logs only get flushed to disk periodically, so poll until the log is non-empty
   do {
-    log_result = Filesystem::fileReadToEnd(access_log_path);
+    log_result = Filesystem::fileSystemForTest().fileReadToEnd(access_log_path);
   } while (log_result.empty());
 
   // Regex matching localhost:port

@@ -44,7 +44,7 @@ class HdsTest : public testing::Test {
 public:
   HdsTest()
       : retry_timer_(new Event::MockTimer()), server_response_timer_(new Event::MockTimer()),
-        async_client_(new Grpc::MockAsyncClient()) {
+        async_client_(new Grpc::MockAsyncClient()), file_system_(Filesystem::fileSystemForTest()) {
     node_.set_id("hds-node");
   }
 
@@ -63,7 +63,7 @@ public:
         }));
     hds_delegate_ = std::make_unique<HdsDelegate>(
         stats_store_, Grpc::AsyncClientPtr(async_client_), dispatcher_, runtime_, stats_store_,
-        ssl_context_manager_, random_, test_factory_, log_manager_, cm_, local_info_);
+        ssl_context_manager_, random_, test_factory_, log_manager_, cm_, local_info_, file_system_);
   }
 
   // Creates a HealthCheckSpecifier message that contains one endpoint and one
@@ -118,6 +118,7 @@ public:
   NiceMock<Envoy::AccessLog::MockAccessLogManager> log_manager_;
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  Filesystem::Instance& file_system_;
 };
 
 // Test that HdsDelegate builds and sends initial message correctly
@@ -159,7 +160,7 @@ TEST_F(HdsTest, TestProcessMessageEndpoints) {
   }
 
   // Process message
-  EXPECT_CALL(test_factory_, createClusterInfo(_, _, _, _, _, _, _, _, _, _)).Times(2);
+  EXPECT_CALL(test_factory_, _createClusterInfo(_, _, _, _, _, _, _, _, _, _)).Times(2);
   hds_delegate_friend_.processPrivateMessage(*hds_delegate_, std::move(message));
 
   // Check Correctness
@@ -202,7 +203,7 @@ TEST_F(HdsTest, TestProcessMessageHealthChecks) {
   }
 
   // Process message
-  EXPECT_CALL(test_factory_, createClusterInfo(_, _, _, _, _, _, _, _, _, _))
+  EXPECT_CALL(test_factory_, _createClusterInfo(_, _, _, _, _, _, _, _, _, _))
       .WillRepeatedly(Return(cluster_info_));
 
   hds_delegate_friend_.processPrivateMessage(*hds_delegate_, std::move(message));
@@ -290,7 +291,7 @@ TEST_F(HdsTest, TestSendResponseOneEndpointTimeout) {
   EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _)).WillRepeatedly(Return(connection_));
   EXPECT_CALL(*server_response_timer_, enableTimer(_)).Times(2);
   EXPECT_CALL(async_stream_, sendMessage(_, false));
-  EXPECT_CALL(test_factory_, createClusterInfo(_, _, _, _, _, _, _, _, _, _))
+  EXPECT_CALL(test_factory_, _createClusterInfo(_, _, _, _, _, _, _, _, _, _))
       .WillOnce(Return(cluster_info_));
   EXPECT_CALL(*connection_, setBufferLimits(_));
   EXPECT_CALL(dispatcher_, deferredDelete_(_));

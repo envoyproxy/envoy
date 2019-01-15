@@ -8,7 +8,7 @@
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/thread/thread.h"
 
-#include "common/filesystem/filesystem_impl.h"
+#include "common/filesystem/stats_instance_impl.h"
 
 namespace Envoy {
 namespace Api {
@@ -19,20 +19,16 @@ namespace Api {
 class Impl : public Api::Api {
 public:
   Impl(std::chrono::milliseconds file_flush_interval_msec, Thread::ThreadFactory& thread_factory,
-       Stats::Store& stats_store);
+       Stats::Store& stats_store, Filesystem::Instance& file_system);
 
   // Api::Api
   Event::DispatcherPtr allocateDispatcher(Event::TimeSystem& time_system) override;
-  Filesystem::FileSharedPtr createFile(const std::string& path, Event::Dispatcher& dispatcher,
-                                       Thread::BasicLockable& lock) override;
-  bool fileExists(const std::string& path) override;
-  std::string fileReadToEnd(const std::string& path) override;
   Thread::ThreadFactory& threadFactory() override;
-  Filesystem::Instance& fileSystem() { return file_system_; }
+  Filesystem::StatsInstance& fileSystem() override;
 
 private:
   Thread::ThreadFactory& thread_factory_;
-  Filesystem::Instance file_system_;
+  Filesystem::StatsInstanceImpl file_system_;
 };
 
 } // namespace Api

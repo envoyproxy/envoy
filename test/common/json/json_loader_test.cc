@@ -11,7 +11,7 @@ namespace Envoy {
 namespace Json {
 
 TEST(JsonLoaderTest, Basic) {
-  EXPECT_THROW(Factory::loadFromFile("bad_file"), Exception);
+  EXPECT_THROW(Factory::loadFromFile("bad_file", Filesystem::fileSystemForTest()), Exception);
   EXPECT_THROW(Factory::loadFromString("{"), Exception);
 
   {

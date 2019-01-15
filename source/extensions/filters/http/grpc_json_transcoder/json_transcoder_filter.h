@@ -49,7 +49,8 @@ public:
    * and construct a path matcher for HTTP path bindings.
    */
   JsonTranscoderConfig(
-      const envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder& proto_config);
+      const envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder& proto_config,
+      Filesystem::Instance& file_system);
 
   /**
    * Create an instance of Transcoder interface based on incoming request

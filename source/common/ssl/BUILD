@@ -41,6 +41,7 @@ envoy_cc_library(
     deps = [
         ":certificate_validation_context_config_impl_lib",
         ":tls_certificate_config_impl_lib",
+        "//include/envoy/filesystem:filesystem_interface",
         "//include/envoy/secret:secret_callbacks_interface",
         "//include/envoy/secret:secret_provider_interface",
         "//include/envoy/server:transport_socket_config_interface",
@@ -103,6 +104,7 @@ envoy_cc_library(
     srcs = ["certificate_validation_context_config_impl.cc"],
     hdrs = ["certificate_validation_context_config_impl.h"],
     deps = [
+        "//include/envoy/filesystem:filesystem_interface",
         "//include/envoy/ssl:certificate_validation_context_config_interface",
         "//source/common/common:empty_string",
         "//source/common/config:datasource_lib",

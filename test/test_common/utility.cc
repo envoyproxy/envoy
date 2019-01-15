@@ -36,6 +36,7 @@
 #include "common/network/utility.h"
 #include "common/stats/stats_options_impl.h"
 #include "common/filesystem/directory.h"
+#include "common/filesystem/filesystem_impl.h"
 
 #include "test/test_common/printers.h"
 
@@ -394,11 +395,25 @@ ThreadFactory& threadFactoryForTest() {
 
 } // namespace Thread
 
+namespace Filesystem {
+
+// TODO(sesmith177) Tests should get the Filesystem from the same location as the main code
+Instance& fileSystemForTest() {
+#ifdef WIN32
+  static InstanceImplWin32* file_system = new InstanceImplWin32();
+#else
+  static InstanceImplPosix* file_system = new InstanceImplPosix();
+#endif
+  return *file_system;
+}
+
+} // namespace Filesystem
+
 namespace Api {
 
 ApiPtr createApiForTest(Stats::Store& stat_store) {
   return std::make_unique<Impl>(std::chrono::milliseconds(1000), Thread::threadFactoryForTest(),
-                                stat_store);
+                                stat_store, Filesystem::fileSystemForTest());
 }
 
 } // namespace Api

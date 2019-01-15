@@ -1,5 +1,6 @@
 #include "extensions/tracers/lightstep/config.h"
 
+#include "test/mocks/filesystem/mocks.h"
 #include "test/mocks/server/mocks.h"
 
 #include "gmock/gmock.h"
@@ -8,6 +9,7 @@
 using testing::_;
 using testing::NiceMock;
 using testing::Return;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {
@@ -16,10 +18,12 @@ namespace Lightstep {
 
 TEST(LightstepTracerConfigTest, LightstepHttpTracer) {
   NiceMock<Server::MockInstance> server;
+  NiceMock<Filesystem::MockStatsInstance> file_system;
   EXPECT_CALL(server.cluster_manager_, get("fake_cluster"))
       .WillRepeatedly(Return(&server.cluster_manager_.thread_local_cluster_));
   ON_CALL(*server.cluster_manager_.thread_local_cluster_.cluster_.info_, features())
       .WillByDefault(Return(Upstream::ClusterInfo::Features::HTTP2));
+  ON_CALL(server.api_, fileSystem()).WillByDefault(ReturnRef(file_system));
 
   const std::string yaml_string = R"EOF(
   http:

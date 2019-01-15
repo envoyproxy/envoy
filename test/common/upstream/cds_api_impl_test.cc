@@ -28,7 +28,7 @@ namespace Upstream {
 
 class CdsApiImplTest : public testing::Test {
 public:
-  CdsApiImplTest() : request_(&cm_.async_client_) {}
+  CdsApiImplTest() : request_(&cm_.async_client_), file_system_(Filesystem::fileSystemForTest()) {}
 
   void setup() {
     const std::string config_json = R"EOF(
@@ -52,7 +52,8 @@ public:
     EXPECT_CALL(*cluster.info_, addedViaApi());
     EXPECT_CALL(cluster, info());
     EXPECT_CALL(*cluster.info_, type());
-    cds_ = CdsApiImpl::create(cds_config, cm_, dispatcher_, random_, local_info_, store_);
+    cds_ = CdsApiImpl::create(cds_config, cm_, dispatcher_, random_, local_info_, store_,
+                              file_system_);
     cds_->setInitializedCb([this]() -> void { initialized_.ready(); });
 
     expectRequest();
@@ -106,6 +107,7 @@ public:
   Event::MockTimer* interval_timer_;
   Http::AsyncClient::Callbacks* callbacks_{};
   ReadyWatcher initialized_;
+  Filesystem::Instance& file_system_;
 };
 
 // Negative test for protoc-gen-validate constraints.
@@ -154,8 +156,9 @@ TEST_F(CdsApiImplTest, InvalidOptions) {
   local_info_.node_.set_id("");
   envoy::api::v2::core::ConfigSource cds_config;
   Config::Utility::translateCdsConfig(*config, cds_config);
-  EXPECT_THROW(CdsApiImpl::create(cds_config, cm_, dispatcher_, random_, local_info_, store_),
-               EnvoyException);
+  EXPECT_THROW(
+      CdsApiImpl::create(cds_config, cm_, dispatcher_, random_, local_info_, store_, file_system_),
+      EnvoyException);
 }
 
 TEST_F(CdsApiImplTest, Basic) {

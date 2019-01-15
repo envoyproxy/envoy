@@ -4,6 +4,7 @@
 
 #include "envoy/api/v2/core/grpc_service.pb.h"
 #include "envoy/common/pure.h"
+#include "envoy/filesystem/filesystem.h"
 
 #include "grpcpp/grpcpp.h"
 
@@ -25,11 +26,13 @@ public:
    * CompositeCallCredentials to combine multiple credentials.
    *
    * @param grpc_service_config contains configuration options
+   * @param file_system contains the Filesystem::Instance reference
    * @return std::shared_ptr<grpc::ChannelCredentials> to be used to authenticate a Google gRPC
    * channel.
    */
   virtual std::shared_ptr<grpc::ChannelCredentials>
-  getChannelCredentials(const envoy::api::v2::core::GrpcService& grpc_service_config) PURE;
+  getChannelCredentials(const envoy::api::v2::core::GrpcService& grpc_service_config,
+                        Filesystem::Instance& file_system) PURE;
 
   /**
    * @return std::string the identifying name for a particular implementation of

@@ -24,8 +24,9 @@ class FilesystemSubscriptionImpl : public Config::Subscription<ResourceType>,
                                    Logger::Loggable<Logger::Id::config> {
 public:
   FilesystemSubscriptionImpl(Event::Dispatcher& dispatcher, const std::string& path,
-                             SubscriptionStats stats)
-      : path_(path), watcher_(dispatcher.createFilesystemWatcher()), stats_(stats) {
+                             SubscriptionStats stats, Filesystem::Instance& file_system)
+      : path_(path), watcher_(dispatcher.createFilesystemWatcher()), stats_(stats),
+        file_system_(file_system) {
     watcher_->addWatch(path_, Filesystem::Watcher::Events::MovedTo, [this](uint32_t events) {
       UNREFERENCED_PARAMETER(events);
       if (started_) {
@@ -59,7 +60,7 @@ private:
     bool config_update_available = false;
     try {
       envoy::api::v2::DiscoveryResponse message;
-      MessageUtil::loadFromFile(path_, message);
+      MessageUtil::loadFromFile(path_, message, file_system_);
       const auto typed_resources = Config::Utility::getTypedResources<ResourceType>(message);
       config_update_available = true;
       callbacks_->onConfigUpdate(typed_resources, message.version_info());
@@ -84,6 +85,7 @@ private:
   std::unique_ptr<Filesystem::Watcher> watcher_;
   SubscriptionCallbacks<ResourceType>* callbacks_{};
   SubscriptionStats stats_;
+  Filesystem::Instance& file_system_;
 };
 
 } // namespace Config

@@ -7,6 +7,7 @@
 
 #include "envoy/config/overload/v2alpha/overload.pb.validate.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/filesystem/filesystem.h"
 #include "envoy/server/overload_manager.h"
 #include "envoy/server/resource_monitor.h"
 #include "envoy/stats/scope.h"
@@ -52,7 +53,8 @@ class OverloadManagerImpl : Logger::Loggable<Logger::Id::main>, public OverloadM
 public:
   OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::Scope& stats_scope,
                       ThreadLocal::SlotAllocator& slot_allocator,
-                      const envoy::config::overload::v2alpha::OverloadManager& config);
+                      const envoy::config::overload::v2alpha::OverloadManager& config,
+                      Filesystem::Instance& file_system);
 
   // Server::OverloadManager
   void start() override;

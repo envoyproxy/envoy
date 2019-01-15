@@ -2,7 +2,6 @@
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
-#include "common/filesystem/filesystem_impl.h"
 #include "common/json/json_loader.h"
 #include "common/protobuf/protobuf.h"
 
@@ -80,8 +79,9 @@ void MessageUtil::loadFromYaml(const std::string& yaml, Protobuf::Message& messa
   throw EnvoyException("Unable to convert YAML as JSON: " + yaml);
 }
 
-void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& message) {
-  const std::string contents = Filesystem::fileReadToEnd(path);
+void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& message,
+                               Filesystem::Instance& file_system) {
+  const std::string contents = file_system.fileReadToEnd(path);
   // If the filename ends with .pb, attempt to parse it as a binary proto.
   if (absl::EndsWith(path, ".pb")) {
     // Attempt to parse the binary format.

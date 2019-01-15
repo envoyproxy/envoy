@@ -3,6 +3,7 @@
 #include <string>
 
 #include "envoy/api/v2/auth/cert.pb.h"
+#include "envoy/filesystem/filesystem.h"
 #include "envoy/ssl/tls_certificate_config.h"
 
 namespace Envoy {
@@ -10,7 +11,8 @@ namespace Ssl {
 
 class TlsCertificateConfigImpl : public TlsCertificateConfig {
 public:
-  TlsCertificateConfigImpl(const envoy::api::v2::auth::TlsCertificate& config);
+  TlsCertificateConfigImpl(const envoy::api::v2::auth::TlsCertificate& config,
+                           Filesystem::Instance& file_system);
 
   const std::string& certificateChain() const override { return certificate_chain_; }
   const std::string& certificateChainPath() const override { return certificate_chain_path_; }

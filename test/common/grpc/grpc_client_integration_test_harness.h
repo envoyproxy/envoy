@@ -306,7 +306,8 @@ public:
     google_tls_ = std::make_unique<GoogleAsyncClientThreadLocal>(*api_);
     GoogleGenericStubFactory stub_factory;
     return std::make_unique<GoogleAsyncClientImpl>(dispatcher_, *google_tls_, stub_factory,
-                                                   stats_scope_, createGoogleGrpcConfig());
+                                                   stats_scope_, createGoogleGrpcConfig(),
+                                                   api_->fileSystem());
 #else
     NOT_REACHED_GCOVR_EXCL_LINE;
 #endif

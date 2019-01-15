@@ -35,6 +35,8 @@ enum class ConfigType { V2_YAML, V1_JSON };
 
 class LogicalDnsClusterTest : public testing::Test {
 public:
+  LogicalDnsClusterTest() : file_system_(Filesystem::fileSystemForTest()) {}
+
   void setupFromV1Json(const std::string& json) {
     resolve_timer_ = new Event::MockTimer(&dispatcher_);
     NiceMock<MockClusterManager> cm;
@@ -43,7 +45,8 @@ public:
         "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                               : cluster_config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-        ssl_context_manager_, *scope, cm, local_info_, dispatcher_, random_, stats_store_);
+        ssl_context_manager_, *scope, cm, local_info_, dispatcher_, random_, stats_store_,
+        file_system_);
     cluster_.reset(new LogicalDnsCluster(cluster_config, runtime_, dns_resolver_, tls_,
                                          factory_context, std::move(scope), false));
     cluster_->prioritySet().addMemberUpdateCb(
@@ -61,7 +64,8 @@ public:
         "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                               : cluster_config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-        ssl_context_manager_, *scope, cm, local_info_, dispatcher_, random_, stats_store_);
+        ssl_context_manager_, *scope, cm, local_info_, dispatcher_, random_, stats_store_,
+        file_system_);
     cluster_.reset(new LogicalDnsCluster(cluster_config, runtime_, dns_resolver_, tls_,
                                          factory_context, std::move(scope), false));
     cluster_->prioritySet().addMemberUpdateCb(
@@ -206,6 +210,7 @@ public:
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  Filesystem::Instance& file_system_;
 };
 
 typedef std::tuple<std::string, Network::DnsLookupFamily, std::list<std::string>>

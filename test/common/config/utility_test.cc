@@ -208,11 +208,12 @@ TEST(UtilityTest, UnixClusterStatic) {
 }
 
 TEST(UtilityTest, CheckFilesystemSubscriptionBackingPath) {
+  Filesystem::Instance& file_system = Filesystem::fileSystemForTest();
   EXPECT_THROW_WITH_MESSAGE(
-      Utility::checkFilesystemSubscriptionBackingPath("foo"), EnvoyException,
+      Utility::checkFilesystemSubscriptionBackingPath("foo", file_system), EnvoyException,
       "envoy::api::v2::Path must refer to an existing path in the system: 'foo' does not exist");
   std::string test_path = TestEnvironment::temporaryDirectory();
-  Utility::checkFilesystemSubscriptionBackingPath(test_path);
+  Utility::checkFilesystemSubscriptionBackingPath(test_path, file_system);
 }
 
 TEST(UtilityTest, ParseDefaultRateLimitSettings) {

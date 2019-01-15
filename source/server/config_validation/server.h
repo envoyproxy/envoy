@@ -3,6 +3,7 @@
 #include <iostream>
 
 #include "envoy/event/timer.h"
+#include "envoy/filesystem/filesystem.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/instance.h"
 #include "envoy/ssl/context_manager.h"
@@ -34,7 +35,8 @@ namespace Server {
  * the config is valid, false if invalid.
  */
 bool validateConfig(Options& options, Network::Address::InstanceConstSharedPtr local_address,
-                    ComponentFactory& component_factory, Thread::ThreadFactory& thread_factory);
+                    ComponentFactory& component_factory, Thread::ThreadFactory& thread_factory,
+                    Filesystem::Instance& file_system);
 
 /**
  * ValidationInstance does the bulk of the work for config-validation runs of Envoy. It implements
@@ -56,7 +58,8 @@ public:
   ValidationInstance(Options& options, Event::TimeSystem& time_system,
                      Network::Address::InstanceConstSharedPtr local_address,
                      Stats::IsolatedStoreImpl& store, Thread::BasicLockable& access_log_lock,
-                     ComponentFactory& component_factory, Thread::ThreadFactory& thread_factory);
+                     ComponentFactory& component_factory, Thread::ThreadFactory& thread_factory,
+                     Filesystem::Instance& file_system);
 
   // Server::Instance
   Admin& admin() override { return admin_; }
@@ -101,7 +104,8 @@ public:
   // Server::ListenerComponentFactory
   LdsApiPtr createLdsApi(const envoy::api::v2::core::ConfigSource& lds_config) override {
     return std::make_unique<LdsApiImpl>(lds_config, clusterManager(), dispatcher(), random(),
-                                        initManager(), localInfo(), stats(), listenerManager());
+                                        initManager(), localInfo(), stats(), listenerManager(),
+                                        api().fileSystem());
   }
   std::vector<Network::FilterFactoryCb> createNetworkFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,

@@ -156,7 +156,8 @@ class GoogleAsyncClientImpl final : public AsyncClient, Logger::Loggable<Logger:
 public:
   GoogleAsyncClientImpl(Event::Dispatcher& dispatcher, GoogleAsyncClientThreadLocal& tls,
                         GoogleStubFactory& stub_factory, Stats::ScopeSharedPtr scope,
-                        const envoy::api::v2::core::GrpcService& config);
+                        const envoy::api::v2::core::GrpcService& config,
+                        Filesystem::Instance& file_system);
   ~GoogleAsyncClientImpl() override;
 
   // Grpc::AsyncClient

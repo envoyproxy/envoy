@@ -335,6 +335,7 @@ TEST_P(SslCertficateIntegrationTest, ServerRsaEcdsaClientEcdsaOnly) {
 
 class SslCaptureIntegrationTest : public SslIntegrationTest {
 public:
+  SslCaptureIntegrationTest() : file_system_(Filesystem::fileSystemForTest()) {}
   void initialize() override {
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
       auto* filter_chain =
@@ -365,6 +366,7 @@ public:
 
   std::string path_prefix_ = TestEnvironment::temporaryPath("ssl_trace");
   bool text_format_{};
+  Filesystem::Instance& file_system_;
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, SslCaptureIntegrationTest,
@@ -401,7 +403,7 @@ TEST_P(SslCaptureIntegrationTest, TwoRequestsWithBinaryProto) {
   codec_client_->close();
   test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
   envoy::data::tap::v2alpha::Trace trace;
-  MessageUtil::loadFromFile(fmt::format("{}_{}.pb", path_prefix_, first_id), trace);
+  MessageUtil::loadFromFile(fmt::format("{}_{}.pb", path_prefix_, first_id), trace, file_system_);
   // Validate general expected properties in the trace.
   EXPECT_EQ(first_id, trace.connection().id());
   EXPECT_THAT(expected_local_address, ProtoEq(trace.connection().local_address()));
@@ -426,7 +428,7 @@ TEST_P(SslCaptureIntegrationTest, TwoRequestsWithBinaryProto) {
   checkStats();
   codec_client_->close();
   test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 2);
-  MessageUtil::loadFromFile(fmt::format("{}_{}.pb", path_prefix_, second_id), trace);
+  MessageUtil::loadFromFile(fmt::format("{}_{}.pb", path_prefix_, second_id), trace, file_system_);
   // Validate second connection ID.
   EXPECT_EQ(second_id, trace.connection().id());
   ASSERT_GE(trace.events().size(), 2);
@@ -446,7 +448,7 @@ TEST_P(SslCaptureIntegrationTest, RequestWithTextProto) {
   codec_client_->close();
   test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
   envoy::data::tap::v2alpha::Trace trace;
-  MessageUtil::loadFromFile(fmt::format("{}_{}.pb_text", path_prefix_, id), trace);
+  MessageUtil::loadFromFile(fmt::format("{}_{}.pb_text", path_prefix_, id), trace, file_system_);
   // Test some obvious properties.
   EXPECT_TRUE(absl::StartsWith(trace.events(0).read().data(), "POST /test/long/url HTTP/1.1"));
   EXPECT_TRUE(absl::StartsWith(trace.events(1).write().data(), "HTTP/1.1 200 OK"));

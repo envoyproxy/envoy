@@ -12,15 +12,15 @@ namespace Ssl {
 static const std::string INLINE_STRING = "<inline>";
 
 TlsCertificateConfigImpl::TlsCertificateConfigImpl(
-    const envoy::api::v2::auth::TlsCertificate& config)
-    : certificate_chain_(Config::DataSource::read(config.certificate_chain(), true)),
+    const envoy::api::v2::auth::TlsCertificate& config, Filesystem::Instance& file_system)
+    : certificate_chain_(Config::DataSource::read(config.certificate_chain(), true, file_system)),
       certificate_chain_path_(
           Config::DataSource::getPath(config.certificate_chain())
               .value_or(certificate_chain_.empty() ? EMPTY_STRING : INLINE_STRING)),
-      private_key_(Config::DataSource::read(config.private_key(), true)),
+      private_key_(Config::DataSource::read(config.private_key(), true, file_system)),
       private_key_path_(Config::DataSource::getPath(config.private_key())
                             .value_or(private_key_.empty() ? EMPTY_STRING : INLINE_STRING)),
-      password_(Config::DataSource::read(config.password(), true)),
+      password_(Config::DataSource::read(config.password(), true, file_system)),
       password_path_(Config::DataSource::getPath(config.password())
                          .value_or(password_.empty() ? EMPTY_STRING : INLINE_STRING)) {
 

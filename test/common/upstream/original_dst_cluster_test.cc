@@ -60,7 +60,9 @@ public:
   // cleanup timer must be created before the cluster (in setup()), so that we can set expectations
   // on it. Ownership is transferred to the cluster at the cluster constructor, so the cluster will
   // take care of destructing it!
-  OriginalDstClusterTest() : cleanup_timer_(new Event::MockTimer(&dispatcher_)) {}
+  OriginalDstClusterTest()
+      : cleanup_timer_(new Event::MockTimer(&dispatcher_)),
+        file_system_(Filesystem::fileSystemForTest()) {}
 
   void setupFromJson(const std::string& json) { setup(parseClusterFromJson(json)); }
   void setupFromYaml(const std::string& yaml) { setup(parseClusterFromV2Yaml(yaml)); }
@@ -71,7 +73,8 @@ public:
         "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                               : cluster_config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-        ssl_context_manager_, *scope, cm, local_info_, dispatcher_, random_, stats_store_);
+        ssl_context_manager_, *scope, cm, local_info_, dispatcher_, random_, stats_store_,
+        file_system_);
     cluster_.reset(
         new OriginalDstCluster(cluster_config, runtime_, factory_context, std::move(scope), false));
     cluster_->prioritySet().addMemberUpdateCb(
@@ -91,6 +94,7 @@ public:
   Event::MockTimer* cleanup_timer_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  Filesystem::Instance& file_system_;
 };
 
 TEST(OriginalDstClusterConfigTest, BadConfig) {

@@ -27,7 +27,8 @@ constexpr int PubkeyCacheExpirationSec = 600;
 
 class JwksDataImpl : public JwksCache::JwksData, public Logger::Loggable<Logger::Id::filter> {
 public:
-  JwksDataImpl(const JwtProvider& jwt_provider, TimeSource& time_source)
+  JwksDataImpl(const JwtProvider& jwt_provider, TimeSource& time_source,
+               Filesystem::Instance& file_system)
       : jwt_provider_(jwt_provider), time_source_(time_source) {
     std::vector<std::string> audiences;
     for (const auto& aud : jwt_provider_.audiences()) {
@@ -35,7 +36,8 @@ public:
     }
     audiences_ = std::make_unique<::google::jwt_verify::CheckAudience>(audiences);
 
-    const auto inline_jwks = Config::DataSource::read(jwt_provider_.local_jwks(), true);
+    const auto inline_jwks =
+        Config::DataSource::read(jwt_provider_.local_jwks(), true, file_system);
     if (!inline_jwks.empty()) {
       auto ptr = setKey(
           ::google::jwt_verify::Jwks::createFrom(inline_jwks, ::google::jwt_verify::Jwks::JWKS),
@@ -96,10 +98,11 @@ private:
 class JwksCacheImpl : public JwksCache {
 public:
   // Load the config from envoy config.
-  JwksCacheImpl(const JwtAuthentication& config, TimeSource& time_source) {
+  JwksCacheImpl(const JwtAuthentication& config, TimeSource& time_source,
+                Filesystem::Instance& file_system) {
     for (const auto& it : config.providers()) {
       const auto& provider = it.second;
-      jwks_data_map_.emplace(it.first, JwksDataImpl(provider, time_source));
+      jwks_data_map_.emplace(it.first, JwksDataImpl(provider, time_source, file_system));
       if (issuer_ptr_map_.find(provider.issuer()) == issuer_ptr_map_.end()) {
         issuer_ptr_map_.emplace(provider.issuer(), findByProvider(it.first));
       }
@@ -133,8 +136,8 @@ private:
 
 JwksCachePtr JwksCache::create(
     const ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication& config,
-    TimeSource& time_source) {
-  return JwksCachePtr(new JwksCacheImpl(config, time_source));
+    TimeSource& time_source, Filesystem::Instance& file_system) {
+  return JwksCachePtr(new JwksCacheImpl(config, time_source, file_system));
 }
 
 } // namespace JwtAuthn

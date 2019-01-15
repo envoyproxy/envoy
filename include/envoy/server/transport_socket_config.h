@@ -3,6 +3,7 @@
 #include <string>
 
 #include "envoy/event/dispatcher.h"
+#include "envoy/filesystem/filesystem.h"
 #include "envoy/init/init.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/network/transport_socket.h"
@@ -76,6 +77,11 @@ public:
    * if not set.
    */
   virtual Init::Manager* initManager() PURE;
+
+  /**
+   * @return the Filesystem::Instance reference
+   */
+  virtual Filesystem::Instance& fileSystem() PURE;
 };
 
 class TransportSocketConfigFactory {

@@ -17,7 +17,7 @@ envoy_cc_library(
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:thread_lib",
         "//source/common/event:dispatcher_lib",
-        "//source/common/filesystem:filesystem_lib",
+        "//source/common/filesystem:stats_instance_lib",
     ],
 )
 

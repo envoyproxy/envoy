@@ -15,6 +15,8 @@
 #include "common/protobuf/utility.h"
 #include "common/stats/stats_options_impl.h"
 
+#include "exe/platform_impl.h"
+
 // NOLINT(namespace-envoy)
 int main(int argc, char** argv) {
   if (argc != 2) {
@@ -22,8 +24,9 @@ int main(int argc, char** argv) {
     return EXIT_FAILURE;
   }
 
+  Envoy::PlatformImpl platform_impl;
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
-  auto config_json = Envoy::Json::Factory::loadFromFile(argv[1]);
+  auto config_json = Envoy::Json::Factory::loadFromFile(argv[1], platform_impl.fileSystem());
   Envoy::Stats::StatsOptionsImpl stats_options;
   Envoy::Config::BootstrapJson::translateBootstrap(*config_json, bootstrap, stats_options);
   Envoy::MessageUtil::validate(bootstrap);

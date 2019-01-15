@@ -54,15 +54,16 @@ namespace {
 // the expectations when needed.
 class TestClusterManagerFactory : public ClusterManagerFactory {
 public:
-  TestClusterManagerFactory() {
+  TestClusterManagerFactory() : file_system_(Filesystem::fileSystemForTest()) {
     ON_CALL(*this, clusterFromProto_(_, _, _, _, _))
         .WillByDefault(Invoke([&](const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
                                   Outlier::EventLoggerSharedPtr outlier_event_logger,
                                   AccessLog::AccessLogManager& log_manager,
                                   bool added_via_api) -> ClusterSharedPtr {
-          return ClusterImplBase::create(
-              cluster, cm, stats_, tls_, dns_resolver_, ssl_context_manager_, runtime_, random_,
-              dispatcher_, log_manager, local_info_, outlier_event_logger, added_via_api);
+          return ClusterImplBase::create(cluster, cm, stats_, tls_, dns_resolver_,
+                                         ssl_context_manager_, runtime_, random_, dispatcher_,
+                                         log_manager, local_info_, outlier_event_logger,
+                                         added_via_api, file_system_);
         }));
   }
 
@@ -125,6 +126,7 @@ public:
   Ssl::ContextManagerImpl ssl_context_manager_{dispatcher_.timeSystem()};
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Secret::MockSecretManager> secret_manager_;
+  Filesystem::Instance& file_system_;
 };
 
 // Helper to intercept calls to postThreadLocalClusterUpdate.

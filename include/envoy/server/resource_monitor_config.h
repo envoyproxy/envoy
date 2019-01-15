@@ -2,6 +2,7 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/filesystem/filesystem.h"
 #include "envoy/server/resource_monitor.h"
 
 #include "common/protobuf/protobuf.h"
@@ -19,6 +20,11 @@ public:
    *         for all singleton processing.
    */
   virtual Event::Dispatcher& dispatcher() PURE;
+
+  /**
+   * @return the Filesystem::Instance reference
+   */
+  virtual Filesystem::Instance& fileSystem() PURE;
 };
 
 /**

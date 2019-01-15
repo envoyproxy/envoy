@@ -320,7 +320,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       match_grpc_(route.match().has_grpc()), opaque_config_(parseOpaqueConfig(route)),
       decorator_(parseDecorator(route)),
       direct_response_code_(ConfigUtility::parseDirectResponseCode(route)),
-      direct_response_body_(ConfigUtility::parseDirectResponseBody(route)),
+      direct_response_body_(
+          ConfigUtility::parseDirectResponseBody(route, factory_context.fileSystem())),
       per_filter_configs_(route.typed_per_filter_config(), route.per_filter_config(),
                           factory_context),
       time_system_(factory_context.dispatcher().timeSystem()) {

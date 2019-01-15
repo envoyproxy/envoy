@@ -140,6 +140,11 @@ public:
    * @return Http::Context& a reference to the http context.
    */
   virtual Http::Context& httpContext() PURE;
+
+  /**
+   * @return Filesystem::Instance& a reference to the filesystem instance
+   */
+  virtual Filesystem::Instance& fileSystem() PURE;
 };
 
 class ListenerFactoryContext : public virtual FactoryContext {

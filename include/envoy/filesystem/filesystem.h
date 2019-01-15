@@ -1,11 +1,12 @@
 #pragma once
 
-#include <cstdint>
-#include <functional>
 #include <memory>
 #include <string>
 
+#include "envoy/common/platform.h"
 #include "envoy/common/pure.h"
+#include "envoy/event/dispatcher.h"
+#include "envoy/thread/thread.h"
 
 #include "absl/strings/string_view.h"
 
@@ -13,11 +14,92 @@ namespace Envoy {
 namespace Filesystem {
 
 /**
- * Abstraction for a file on disk.
+ * Abstraction for a basic file on disk.
  */
 class File {
 public:
   virtual ~File() {}
+
+  /**
+   * Open the file with O_RDWR | O_APPEND | O_CREAT
+   * The file will be closed when this object is destructed
+   */
+  virtual void open() PURE;
+
+  /**
+   * Write len bytes from buffer to the file
+   */
+  virtual Api::SysCallSizeResult write(const void* buffer, size_t len) PURE;
+
+  /**
+   * Close the file.
+   */
+  virtual void close() PURE;
+
+  /**
+   * @return bool whether the file is open
+   */
+  virtual bool isOpen() PURE;
+};
+
+typedef std::unique_ptr<File> FilePtr;
+
+/**
+ * Wrapper for platform specific filesystem methods
+ */
+class Instance {
+public:
+  virtual ~Instance() {}
+
+  /**
+   * @return bool whether a file exists on disk and can be opened for read.
+   */
+  virtual bool fileExists(const std::string& path) PURE;
+
+  /**
+   * @return bool whether a directory exists on disk and can be opened for read.
+   */
+  virtual bool directoryExists(const std::string& path) PURE;
+
+  /**
+   * @return ssize_t the size in bytes of the specified file, or -1 if the file size
+   *                 cannot be determined for any reason, including without limitation
+   *                 the non-existence of the file.
+   */
+  virtual ssize_t fileSize(const std::string& path) PURE;
+
+  /**
+   * @return full file content as a string.
+   * @throw EnvoyException if the file cannot be read.
+   * Be aware, this is not most highly performing file reading method.
+   */
+  virtual std::string fileReadToEnd(const std::string& path) PURE;
+
+  /**
+   * Determine if the path is on a list of paths Envoy will refuse to access. This
+   * is a basic sanity check for users, blacklisting some clearly bad paths. Paths
+   * may still be problematic (e.g. indirectly leading to /dev/mem) even if this
+   * returns false, it is up to the user to validate that supplied paths are
+   * valid.
+   * @param path some filesystem path.
+   * @return is the path on the blacklist?
+   */
+  virtual bool illegalPath(const std::string& path) PURE;
+
+  /**
+   * Creates a basic file.
+   *
+   * @param path The path of the file to open.
+   */
+  virtual FilePtr createFile(const std::string& path) PURE;
+};
+
+/**
+ * Abstraction for a file on disk that adds stats collection and periodic flushing.
+ */
+class StatsFile {
+public:
+  virtual ~StatsFile() {}
 
   /**
    * Write data to the file.
@@ -35,31 +117,35 @@ public:
   virtual void flush() PURE;
 };
 
-typedef std::shared_ptr<File> FileSharedPtr;
+typedef std::shared_ptr<StatsFile> StatsFileSharedPtr;
 
-/**
- * Abstraction for a file watcher.
- */
-class Watcher {
+class StatsInstance : public Instance {
 public:
-  typedef std::function<void(uint32_t events)> OnChangedCb;
-
-  struct Events {
-    static const uint32_t MovedTo = 0x1;
-  };
-
-  virtual ~Watcher() {}
+  virtual ~StatsInstance() {}
 
   /**
-   * Add a file watch.
-   * @param path supplies the path to watch.
-   * @param events supplies the events to watch.
-   * @param cb supplies the callback to invoke when a change occurs.
+   * Creates a file, overriding the flush-interval set in the class.
+   *
+   * @param path The path of the file to open.
+   * @param dispatcher The dispatcher used for set up timers to run flush().
+   * @param lock The lock.
+   * @param file_flush_interval_msec Number of milliseconds to delay before flushing.
    */
-  virtual void addWatch(const std::string& path, uint32_t events, OnChangedCb cb) PURE;
-};
+  virtual StatsFileSharedPtr
+  createStatsFile(const std::string& path, Event::Dispatcher& dispatcher,
+                  Thread::BasicLockable& lock,
+                  std::chrono::milliseconds file_flush_interval_msec) PURE;
 
-typedef std::unique_ptr<Watcher> WatcherPtr;
+  /**
+   * Creates a file, using the default flush-interval for the class.
+   *
+   * @param path The path of the file to open.
+   * @param dispatcher The dispatcher used for set up timers to run flush().
+   * @param lock The lock.
+   */
+  virtual StatsFileSharedPtr createStatsFile(const std::string& path, Event::Dispatcher& dispatcher,
+                                             Thread::BasicLockable& lock) PURE;
+};
 
 enum class FileType { Regular, Directory, Other };
 

@@ -31,7 +31,7 @@ public:
   void flush() override;
 
 private:
-  Filesystem::FileSharedPtr log_file_;
+  Filesystem::StatsFileSharedPtr log_file_;
 };
 
 } // namespace Logger

@@ -520,13 +520,16 @@ Network::TransportSocketFactoryPtr createTransportSocketFactory(
   return config_factory.createTransportSocketFactory(*message, factory_context);
 }
 
-ClusterSharedPtr ClusterImplBase::create(
-    const envoy::api::v2::Cluster& cluster, ClusterManager& cm, Stats::Store& stats,
-    ThreadLocal::Instance& tls, Network::DnsResolverSharedPtr dns_resolver,
-    Ssl::ContextManager& ssl_context_manager, Runtime::Loader& runtime,
-    Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
-    AccessLog::AccessLogManager& log_manager, const LocalInfo::LocalInfo& local_info,
-    Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) {
+ClusterSharedPtr ClusterImplBase::create(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
+                                         Stats::Store& stats, ThreadLocal::Instance& tls,
+                                         Network::DnsResolverSharedPtr dns_resolver,
+                                         Ssl::ContextManager& ssl_context_manager,
+                                         Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+                                         Event::Dispatcher& dispatcher,
+                                         AccessLog::AccessLogManager& log_manager,
+                                         const LocalInfo::LocalInfo& local_info,
+                                         Outlier::EventLoggerSharedPtr outlier_event_logger,
+                                         bool added_via_api, Filesystem::Instance& file_system) {
   std::unique_ptr<ClusterImplBase> new_cluster;
 
   // We make this a shared pointer to deal with the distinct ownership
@@ -548,7 +551,7 @@ ClusterSharedPtr ClusterImplBase::create(
 
   auto stats_scope = generateStatsScope(cluster, stats);
   Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-      ssl_context_manager, *stats_scope, cm, local_info, dispatcher, random, stats);
+      ssl_context_manager, *stats_scope, cm, local_info, dispatcher, random, stats, file_system);
 
   switch (cluster.type()) {
   case envoy::api::v2::Cluster::STATIC:

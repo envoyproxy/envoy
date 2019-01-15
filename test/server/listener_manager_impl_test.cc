@@ -125,7 +125,7 @@ public:
 
 class ListenerManagerImplWithRealFiltersTest : public ListenerManagerImplTest {
 public:
-  ListenerManagerImplWithRealFiltersTest() {
+  ListenerManagerImplWithRealFiltersTest() : api_(Api::createApiForTest(stats_store_)) {
     // Use real filter loading by default.
     ON_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))
         .WillByDefault(Invoke(
@@ -142,6 +142,9 @@ public:
               return ProdListenerComponentFactory::createListenerFilterFactoryList_(filters,
                                                                                     context);
             }));
+    ON_CALL(server_.api_, fileSystem()).WillByDefault(Invoke([&]() -> Filesystem::StatsInstance& {
+      return api_->fileSystem();
+    }));
     socket_ = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
     local_address_.reset(new Network::Address::Ipv4Instance("127.0.0.1", 1234));
     remote_address_.reset(new Network::Address::Ipv4Instance("127.0.0.1", 1234));
@@ -216,6 +219,8 @@ private:
   std::unique_ptr<Network::MockConnectionSocket> socket_;
   Network::Address::InstanceConstSharedPtr local_address_;
   Network::Address::InstanceConstSharedPtr remote_address_;
+  Stats::IsolatedStoreImpl stats_store_;
+  Api::ApiPtr api_;
 };
 
 class MockLdsApi : public LdsApi {

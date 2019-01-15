@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/filesystem/filesystem.h"
 #include "envoy/http/async_client.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/health_checker.h"
@@ -340,7 +341,21 @@ public:
   MockClusterInfoFactory();
   ~MockClusterInfoFactory();
 
-  MOCK_METHOD10(createClusterInfo,
+  // googlemock only generates macros up to MOCK_METHOD10, so we need a wrapper function
+  // At this time, there are no assertions being made on the file_system parameter
+  ClusterInfoConstSharedPtr
+  createClusterInfo(Runtime::Loader& runtime, const envoy::api::v2::Cluster& cluster,
+                    const envoy::api::v2::core::BindConfig& bind_config, Stats::Store& stats,
+                    Ssl::ContextManager& ssl_context_manager, bool added_via_api,
+                    ClusterManager& cm, const LocalInfo::LocalInfo& local_info,
+                    Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
+                    Filesystem::Instance&) override {
+
+    return _createClusterInfo(runtime, cluster, bind_config, stats, ssl_context_manager,
+                              added_via_api, cm, local_info, dispatcher, random);
+  }
+
+  MOCK_METHOD10(_createClusterInfo,
                 ClusterInfoConstSharedPtr(
                     Runtime::Loader& runtime, const envoy::api::v2::Cluster& cluster,
                     const envoy::api::v2::core::BindConfig& bind_config, Stats::Store& stats,

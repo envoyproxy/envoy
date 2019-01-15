@@ -67,7 +67,7 @@ public:
 private:
   RouterCheckTool(
       std::unique_ptr<NiceMock<Server::Configuration::MockFactoryContext>> factory_context,
-      std::unique_ptr<Router::ConfigImpl> config);
+      std::unique_ptr<Router::ConfigImpl> config, Filesystem::Instance& file_system);
   bool compareCluster(ToolConfig& tool_config, const std::string& expected);
   bool compareVirtualCluster(ToolConfig& tool_config, const std::string& expected);
   bool compareVirtualHost(ToolConfig& tool_config, const std::string& expected);
@@ -93,5 +93,6 @@ private:
   // TODO(hennna): Switch away from mocks following work done by @rlazarus in github issue #499.
   std::unique_ptr<NiceMock<Server::Configuration::MockFactoryContext>> factory_context_;
   std::unique_ptr<Router::ConfigImpl> config_;
+  Filesystem::Instance& file_system_;
 };
 } // namespace Envoy

@@ -14,6 +14,8 @@
 #include "common/common/assert.h"
 #include "common/protobuf/utility.h"
 
+#include "exe/platform_impl.h"
+
 // NOLINT(namespace-envoy)
 int main(int argc, char** argv) {
   if (argc != 3) {
@@ -21,8 +23,9 @@ int main(int argc, char** argv) {
               << std::endl;
     return EXIT_FAILURE;
   }
+  Envoy::PlatformImpl platform_impl;
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
-  Envoy::MessageUtil::loadFromFile(argv[1], bootstrap);
+  Envoy::MessageUtil::loadFromFile(argv[1], bootstrap, platform_impl.fileSystem());
   std::ofstream bootstrap_file(argv[2]);
   bootstrap_file << bootstrap.DebugString();
   return EXIT_SUCCESS;

@@ -3,6 +3,7 @@
 #include "common/router/config_impl.h"
 
 #include "test/test_common/printers.h"
+#include "test/test_common/utility.h"
 
 #include "tclap/CmdLine.h"
 
@@ -46,7 +47,8 @@ Options::Options(int argc, char** argv) {
 }
 
 void Validator::validate(const std::string& json_path, Schema::Type schema_type) {
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromFile(json_path);
+  Json::ObjectSharedPtr loader =
+      Json::Factory::loadFromFile(json_path, Filesystem::fileSystemForTest());
 
   switch (schema_type) {
   case Schema::Type::Route: {

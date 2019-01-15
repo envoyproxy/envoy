@@ -24,7 +24,7 @@ public:
   LdsApiImpl(const envoy::api::v2::core::ConfigSource& lds_config, Upstream::ClusterManager& cm,
              Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
              Init::Manager& init_manager, const LocalInfo::LocalInfo& local_info,
-             Stats::Scope& scope, ListenerManager& lm);
+             Stats::Scope& scope, ListenerManager& lm, Filesystem::Instance& file_system);
 
   // Server::LdsApi
   std::string versionInfo() const override { return version_info_; }

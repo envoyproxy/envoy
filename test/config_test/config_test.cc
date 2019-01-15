@@ -5,7 +5,6 @@
 #include <string>
 
 #include "common/common/fmt.h"
-#include "common/filesystem/filesystem_impl.h"
 #include "common/protobuf/utility.h"
 
 #include "server/config_validation/server.h"
@@ -26,6 +25,8 @@ using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
+using testing::StrEq;
+using testing::StrNe;
 
 namespace Envoy {
 namespace ConfigTest {
@@ -34,8 +35,9 @@ namespace {
 
 // asConfigYaml returns a new config that empties the configPath() and populates configYaml()
 OptionsImpl asConfigYaml(const OptionsImpl& src) {
-  return Envoy::Server::createTestOptionsImpl("", Filesystem::fileReadToEnd(src.configPath()),
-                                              src.localAddressIpVersion());
+  return Envoy::Server::createTestOptionsImpl(
+      "", Filesystem::fileSystemForTest().fileReadToEnd(src.configPath()),
+      src.localAddressIpVersion());
 }
 
 } // namespace
@@ -43,15 +45,21 @@ OptionsImpl asConfigYaml(const OptionsImpl& src) {
 class ConfigTest {
 public:
   ConfigTest(const OptionsImpl& options)
-      : api_(Api::createApiForTest(stats_store_)), options_(options) {
+      : api_(Api::createApiForTest(stats_store_)), options_(options),
+        file_system_(api_->fileSystem()) {
     ON_CALL(server_, options()).WillByDefault(ReturnRef(options_));
     ON_CALL(server_, random()).WillByDefault(ReturnRef(random_));
     ON_CALL(server_, sslContextManager()).WillByDefault(ReturnRef(ssl_context_manager_));
-    ON_CALL(server_.api_, fileReadToEnd("lightstep_access_token"))
+    ON_CALL(server_.api_, fileSystem()).WillByDefault(ReturnRef(mock_file_system_));
+    ON_CALL(mock_file_system_, fileReadToEnd(StrEq("/etc/envoy/lightstep_access_token")))
         .WillByDefault(Return("access_token"));
+    ON_CALL(mock_file_system_, fileReadToEnd(StrNe("/etc/envoy/lightstep_access_token")))
+        .WillByDefault(Invoke([&](const std::string& file) -> std::string {
+          return file_system_.fileReadToEnd(file);
+        }));
 
     envoy::config::bootstrap::v2::Bootstrap bootstrap;
-    Server::InstanceUtil::loadBootstrapConfig(bootstrap, options_);
+    Server::InstanceUtil::loadBootstrapConfig(bootstrap, options_, file_system_);
     Server::Configuration::InitialImpl initial_config(bootstrap);
     Server::Configuration::MainImpl main_config;
 
@@ -104,6 +112,8 @@ public:
   Runtime::RandomGeneratorImpl random_;
   NiceMock<Api::MockOsSysCalls> os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls_};
+  NiceMock<Filesystem::MockStatsInstance> mock_file_system_;
+  Filesystem::Instance& file_system_;
 };
 
 void testMerge() {
@@ -111,7 +121,7 @@ void testMerge() {
   OptionsImpl options(Server::createTestOptionsImpl("google_com_proxy.v2.yaml", overlay,
                                                     Network::Address::IpVersion::v6));
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
-  Server::InstanceUtil::loadBootstrapConfig(bootstrap, options);
+  Server::InstanceUtil::loadBootstrapConfig(bootstrap, options, Filesystem::fileSystemForTest());
   EXPECT_EQ(2, bootstrap.static_resources().clusters_size());
 }
 
@@ -123,7 +133,8 @@ uint32_t run(const std::string& directory) {
         Envoy::Server::createTestOptionsImpl(filename, "", Network::Address::IpVersion::v6));
     ConfigTest test1(options);
     envoy::config::bootstrap::v2::Bootstrap bootstrap;
-    if (Server::InstanceUtil::loadBootstrapConfig(bootstrap, options) ==
+    if (Server::InstanceUtil::loadBootstrapConfig(bootstrap, options,
+                                                  Filesystem::fileSystemForTest()) ==
         Server::InstanceUtil::BootstrapVersion::V2) {
       ENVOY_LOG_MISC(info, "testing {} as yaml.", filename);
       ConfigTest test2(asConfigYaml(options));

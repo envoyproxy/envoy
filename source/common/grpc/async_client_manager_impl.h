@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/api/api.h"
+#include "envoy/filesystem/filesystem.h"
 #include "envoy/grpc/async_client_manager.h"
 #include "envoy/singleton/manager.h"
 #include "envoy/stats/scope.h"
@@ -27,8 +28,8 @@ private:
 class GoogleAsyncClientFactoryImpl : public AsyncClientFactory {
 public:
   GoogleAsyncClientFactoryImpl(ThreadLocal::Instance& tls, ThreadLocal::Slot* google_tls_slot,
-                               Stats::Scope& scope,
-                               const envoy::api::v2::core::GrpcService& config);
+                               Stats::Scope& scope, const envoy::api::v2::core::GrpcService& config,
+                               Filesystem::Instance& file_system);
 
   AsyncClientPtr create() override;
 
@@ -37,6 +38,7 @@ private:
   ThreadLocal::Slot* google_tls_slot_;
   Stats::ScopeSharedPtr scope_;
   const envoy::api::v2::core::GrpcService config_;
+  Filesystem::Instance& file_system_;
 };
 
 class AsyncClientManagerImpl : public AsyncClientManager {
@@ -54,6 +56,7 @@ private:
   ThreadLocal::Instance& tls_;
   ThreadLocal::SlotPtr google_tls_slot_;
   TimeSource& time_source_;
+  Filesystem::Instance& file_system_;
 };
 
 } // namespace Grpc

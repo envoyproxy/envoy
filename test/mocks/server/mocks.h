@@ -430,6 +430,7 @@ public:
   MOCK_METHOD0(timeSource, TimeSource&());
   Event::SimulatedTimeSystem& timeSystem() { return time_system_; }
   Http::Context& httpContext() override { return http_context_; }
+  Filesystem::Instance& fileSystem() override { return file_system_; }
 
   testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
@@ -449,6 +450,7 @@ public:
   testing::NiceMock<MockOverloadManager> overload_manager_;
   Tracing::HttpNullTracer null_tracer_;
   Http::ContextImpl http_context_;
+  Filesystem::Instance& file_system_;
 };
 
 class MockTransportSocketFactoryContext : public TransportSocketFactoryContext {
@@ -467,8 +469,10 @@ public:
   MOCK_METHOD0(stats, Stats::Store&());
   MOCK_METHOD1(setInitManager, void(Init::Manager&));
   MOCK_METHOD0(initManager, Init::Manager*());
+  Filesystem::Instance& fileSystem() override { return file_system_; }
 
   std::unique_ptr<Secret::SecretManager> secret_manager_;
+  Filesystem::Instance& file_system_;
 };
 
 class MockListenerFactoryContext : public MockFactoryContext, public ListenerFactoryContext {

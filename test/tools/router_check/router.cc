@@ -10,6 +10,7 @@
 #include "common/stream_info/stream_info_impl.h"
 
 #include "test/test_common/printers.h"
+#include "test/test_common/utility.h"
 
 namespace Envoy {
 // static
@@ -44,21 +45,23 @@ ToolConfig::ToolConfig(std::unique_ptr<Http::TestHeaderMapImpl> headers, int ran
 RouterCheckTool RouterCheckTool::create(const std::string& router_config_file) {
   // TODO(hennna): Allow users to load a full config and extract the route configuration from it.
   envoy::api::v2::RouteConfiguration route_config;
-  MessageUtil::loadFromFile(router_config_file, route_config);
+  auto& file_system = Filesystem::fileSystemForTest();
+  MessageUtil::loadFromFile(router_config_file, route_config, file_system);
 
   auto factory_context = std::make_unique<NiceMock<Server::Configuration::MockFactoryContext>>();
   auto config = std::make_unique<Router::ConfigImpl>(route_config, *factory_context, false);
 
-  return RouterCheckTool(std::move(factory_context), std::move(config));
+  return RouterCheckTool(std::move(factory_context), std::move(config), file_system);
 }
 
 RouterCheckTool::RouterCheckTool(
     std::unique_ptr<NiceMock<Server::Configuration::MockFactoryContext>> factory_context,
-    std::unique_ptr<Router::ConfigImpl> config)
-    : factory_context_(std::move(factory_context)), config_(std::move(config)) {}
+    std::unique_ptr<Router::ConfigImpl> config, Filesystem::Instance& file_system)
+    : factory_context_(std::move(factory_context)), config_(std::move(config)),
+      file_system_(file_system) {}
 
 bool RouterCheckTool::compareEntriesInJson(const std::string& expected_route_json) {
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromFile(expected_route_json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromFile(expected_route_json, file_system_);
   loader->validateSchema(Json::ToolSchema::routerCheckSchema());
 
   bool no_failures = true;

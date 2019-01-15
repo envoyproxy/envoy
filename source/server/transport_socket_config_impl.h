@@ -16,9 +16,11 @@ public:
                                     Upstream::ClusterManager& cm,
                                     const LocalInfo::LocalInfo& local_info,
                                     Event::Dispatcher& dispatcher,
-                                    Envoy::Runtime::RandomGenerator& random, Stats::Store& stats)
+                                    Envoy::Runtime::RandomGenerator& random, Stats::Store& stats,
+                                    Filesystem::Instance& file_system)
       : context_manager_(context_manager), stats_scope_(stats_scope), cluster_manager_(cm),
-        local_info_(local_info), dispatcher_(dispatcher), random_(random), stats_(stats) {}
+        local_info_(local_info), dispatcher_(dispatcher), random_(random), stats_(stats),
+        file_system_(file_system) {}
 
   Ssl::ContextManager& sslContextManager() override { return context_manager_; }
 
@@ -42,6 +44,8 @@ public:
 
   Init::Manager* initManager() override { return init_manager_; }
 
+  Filesystem::Instance& fileSystem() override { return file_system_; }
+
 private:
   Ssl::ContextManager& context_manager_;
   Stats::Scope& stats_scope_;
@@ -51,6 +55,7 @@ private:
   Envoy::Runtime::RandomGenerator& random_;
   Stats::Store& stats_;
   Init::Manager* init_manager_{};
+  Filesystem::Instance& file_system_;
 };
 
 } // namespace Configuration

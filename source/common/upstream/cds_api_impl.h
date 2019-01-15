@@ -23,7 +23,8 @@ class CdsApiImpl : public CdsApi,
 public:
   static CdsApiPtr create(const envoy::api::v2::core::ConfigSource& cds_config, ClusterManager& cm,
                           Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
-                          const LocalInfo::LocalInfo& local_info, Stats::Scope& scope);
+                          const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
+                          Filesystem::Instance& file_system);
 
   // Upstream::CdsApi
   void initialize() override { subscription_->start({}, *this); }
@@ -42,7 +43,8 @@ public:
 private:
   CdsApiImpl(const envoy::api::v2::core::ConfigSource& cds_config, ClusterManager& cm,
              Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
-             const LocalInfo::LocalInfo& local_info, Stats::Scope& scope);
+             const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
+             Filesystem::Instance& file_system);
   void runInitializeCallbackIfAny();
 
   ClusterManager& cm_;

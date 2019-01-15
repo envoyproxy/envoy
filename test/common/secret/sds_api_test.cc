@@ -26,7 +26,12 @@ namespace Envoy {
 namespace Secret {
 namespace {
 
-class SdsApiTest : public testing::Test {};
+class SdsApiTest : public testing::Test {
+public:
+  SdsApiTest() : file_system_(Filesystem::fileSystemForTest()) {}
+
+  Filesystem::Instance& file_system_;
+};
 
 // Validate that SdsApi object is created and initialized successfully.
 TEST_F(SdsApiTest, BasicTest) {
@@ -45,7 +50,7 @@ TEST_F(SdsApiTest, BasicTest) {
   google_grpc->set_stat_prefix("test");
   TlsCertificateSdsApi sds_api(server.localInfo(), server.dispatcher(), server.random(),
                                server.stats(), server.clusterManager(), init_manager, config_source,
-                               "abc.com", []() {});
+                               "abc.com", []() {}, file_system_);
 
   NiceMock<Grpc::MockAsyncClient>* grpc_client{new NiceMock<Grpc::MockAsyncClient>()};
   NiceMock<Grpc::MockAsyncClientFactory>* factory{new NiceMock<Grpc::MockAsyncClientFactory>()};
@@ -68,7 +73,7 @@ TEST_F(SdsApiTest, DynamicTlsCertificateUpdateSuccess) {
   envoy::api::v2::core::ConfigSource config_source;
   TlsCertificateSdsApi sds_api(server.localInfo(), server.dispatcher(), server.random(),
                                server.stats(), server.clusterManager(), init_manager, config_source,
-                               "abc.com", []() {});
+                               "abc.com", []() {}, file_system_);
 
   NiceMock<Secret::MockSecretCallbacks> secret_callback;
   auto handle =
@@ -90,7 +95,7 @@ TEST_F(SdsApiTest, DynamicTlsCertificateUpdateSuccess) {
   EXPECT_CALL(secret_callback, onAddOrUpdateSecret());
   sds_api.onConfigUpdate(secret_resources, "");
 
-  Ssl::TlsCertificateConfigImpl tls_config(*sds_api.secret());
+  Ssl::TlsCertificateConfigImpl tls_config(*sds_api.secret(), file_system_);
   const std::string cert_pem = "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(cert_pem)),
             tls_config.certificateChain());
@@ -110,7 +115,7 @@ TEST_F(SdsApiTest, DynamicCertificateValidationContextUpdateSuccess) {
   envoy::api::v2::core::ConfigSource config_source;
   CertificateValidationContextSdsApi sds_api(
       server.localInfo(), server.dispatcher(), server.random(), server.stats(),
-      server.clusterManager(), init_manager, config_source, "abc.com", []() {});
+      server.clusterManager(), init_manager, config_source, "abc.com", []() {}, file_system_);
 
   NiceMock<Secret::MockSecretCallbacks> secret_callback;
   auto handle =
@@ -130,7 +135,7 @@ TEST_F(SdsApiTest, DynamicCertificateValidationContextUpdateSuccess) {
   EXPECT_CALL(secret_callback, onAddOrUpdateSecret());
   sds_api.onConfigUpdate(secret_resources, "");
 
-  Ssl::CertificateValidationContextConfigImpl cvc_config(*sds_api.secret());
+  Ssl::CertificateValidationContextConfigImpl cvc_config(*sds_api.secret(), file_system_);
   const std::string ca_cert = "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(ca_cert)),
             cvc_config.caCert());
@@ -160,7 +165,7 @@ TEST_F(SdsApiTest, DefaultCertificateValidationContextTest) {
   envoy::api::v2::core::ConfigSource config_source;
   CertificateValidationContextSdsApi sds_api(
       server.localInfo(), server.dispatcher(), server.random(), server.stats(),
-      server.clusterManager(), init_manager, config_source, "abc.com", []() {});
+      server.clusterManager(), init_manager, config_source, "abc.com", []() {}, file_system_);
 
   NiceMock<Secret::MockSecretCallbacks> secret_callback;
   auto handle =
@@ -195,7 +200,7 @@ TEST_F(SdsApiTest, DefaultCertificateValidationContextTest) {
   default_cvc.add_verify_certificate_hash(default_verify_certificate_hash);
   envoy::api::v2::auth::CertificateValidationContext merged_cvc = default_cvc;
   merged_cvc.MergeFrom(*sds_api.secret());
-  Ssl::CertificateValidationContextConfigImpl cvc_config(merged_cvc);
+  Ssl::CertificateValidationContextConfigImpl cvc_config(merged_cvc, file_system_);
   // Verify that merging CertificateValidationContext applies logical OR to bool
   // field.
   EXPECT_TRUE(cvc_config.allowExpiredCertificate());
@@ -227,7 +232,7 @@ TEST_F(SdsApiTest, EmptyResource) {
   envoy::api::v2::core::ConfigSource config_source;
   TlsCertificateSdsApi sds_api(server.localInfo(), server.dispatcher(), server.random(),
                                server.stats(), server.clusterManager(), init_manager, config_source,
-                               "abc.com", []() {});
+                               "abc.com", []() {}, file_system_);
 
   Protobuf::RepeatedPtrField<envoy::api::v2::auth::Secret> secret_resources;
 
@@ -242,7 +247,7 @@ TEST_F(SdsApiTest, SecretUpdateWrongSize) {
   envoy::api::v2::core::ConfigSource config_source;
   TlsCertificateSdsApi sds_api(server.localInfo(), server.dispatcher(), server.random(),
                                server.stats(), server.clusterManager(), init_manager, config_source,
-                               "abc.com", []() {});
+                               "abc.com", []() {}, file_system_);
 
   std::string yaml =
       R"EOF(
@@ -272,7 +277,7 @@ TEST_F(SdsApiTest, SecretUpdateWrongSecretName) {
   envoy::api::v2::core::ConfigSource config_source;
   TlsCertificateSdsApi sds_api(server.localInfo(), server.dispatcher(), server.random(),
                                server.stats(), server.clusterManager(), init_manager, config_source,
-                               "abc.com", []() {});
+                               "abc.com", []() {}, file_system_);
 
   std::string yaml =
       R"EOF(

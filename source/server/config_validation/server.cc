@@ -18,14 +18,15 @@ namespace Envoy {
 namespace Server {
 
 bool validateConfig(Options& options, Network::Address::InstanceConstSharedPtr local_address,
-                    ComponentFactory& component_factory, Thread::ThreadFactory& thread_factory) {
+                    ComponentFactory& component_factory, Thread::ThreadFactory& thread_factory,
+                    Filesystem::Instance& file_system) {
   Thread::MutexBasicLockable access_log_lock;
   Stats::IsolatedStoreImpl stats_store;
 
   try {
     Event::RealTimeSystem time_system;
     ValidationInstance server(options, time_system, local_address, stats_store, access_log_lock,
-                              component_factory, thread_factory);
+                              component_factory, thread_factory, file_system);
     std::cout << "configuration '" << options.configPath() << "' OK" << std::endl;
     server.shutdown();
     return true;
@@ -39,9 +40,11 @@ ValidationInstance::ValidationInstance(Options& options, Event::TimeSystem& time
                                        Stats::IsolatedStoreImpl& store,
                                        Thread::BasicLockable& access_log_lock,
                                        ComponentFactory& component_factory,
-                                       Thread::ThreadFactory& thread_factory)
+                                       Thread::ThreadFactory& thread_factory,
+                                       Filesystem::Instance& file_system)
     : options_(options), time_system_(time_system), stats_store_(store),
-      api_(new Api::ValidationImpl(options.fileFlushIntervalMsec(), thread_factory, store)),
+      api_(new Api::ValidationImpl(options.fileFlushIntervalMsec(), thread_factory, store,
+                                   file_system)),
       dispatcher_(api_->allocateDispatcher(time_system)),
       singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory().currentThreadId())),
       access_log_manager_(*api_, *dispatcher_, access_log_lock), mutex_tracer_(nullptr) {
@@ -69,7 +72,7 @@ void ValidationInstance::initialize(Options& options,
   // be ready to serve, then the config has passed validation.
   // Handle configuration that needs to take place prior to the main configuration load.
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
-  InstanceUtil::loadBootstrapConfig(bootstrap, options);
+  InstanceUtil::loadBootstrapConfig(bootstrap, options, api_->fileSystem());
 
   Config::Utility::createTagProducer(bootstrap);
 
@@ -80,8 +83,8 @@ void ValidationInstance::initialize(Options& options,
       options.serviceNodeName());
 
   Configuration::InitialImpl initial_config(bootstrap);
-  overload_manager_ = std::make_unique<OverloadManagerImpl>(dispatcher(), stats(), threadLocal(),
-                                                            bootstrap.overload_manager());
+  overload_manager_ = std::make_unique<OverloadManagerImpl>(
+      dispatcher(), stats(), threadLocal(), bootstrap.overload_manager(), api_->fileSystem());
   listener_manager_ = std::make_unique<ListenerManagerImpl>(*this, *this, *this, time_system_);
   thread_local_.registerThread(*dispatcher_, true);
   runtime_loader_ = component_factory.createRuntime(*this, initial_config);

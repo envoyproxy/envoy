@@ -110,7 +110,7 @@ public:
    * @return BootstrapVersion to indicate which version of the API was parsed.
    */
   static BootstrapVersion loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& bootstrap,
-                                              Options& options);
+                                              Options& options, Filesystem::Instance& file_system);
 };
 
 /**
@@ -144,7 +144,7 @@ public:
                HotRestart& restarter, Stats::StoreRoot& store,
                Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
                Runtime::RandomGeneratorPtr&& random_generator, ThreadLocal::Instance& tls,
-               Thread::ThreadFactory& thread_factory);
+               Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system);
 
   ~InstanceImpl() override;
 

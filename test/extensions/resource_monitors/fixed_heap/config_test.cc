@@ -6,6 +6,7 @@
 #include "extensions/resource_monitors/fixed_heap/config.h"
 
 #include "test/mocks/event/mocks.h"
+#include "test/mocks/filesystem/mocks.h"
 
 #include "gtest/gtest.h"
 
@@ -23,7 +24,8 @@ TEST(FixedHeapMonitorFactoryTest, CreateMonitor) {
   envoy::config::resource_monitor::fixed_heap::v2alpha::FixedHeapConfig config;
   config.set_max_heap_size_bytes(std::numeric_limits<uint64_t>::max());
   Event::MockDispatcher dispatcher;
-  Server::Configuration::ResourceMonitorFactoryContextImpl context(dispatcher);
+  Filesystem::MockInstance file_system;
+  Server::Configuration::ResourceMonitorFactoryContextImpl context(dispatcher, file_system);
   auto monitor = factory->createResourceMonitor(config, context);
   EXPECT_NE(monitor, nullptr);
 }

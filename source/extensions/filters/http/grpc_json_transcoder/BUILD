@@ -25,6 +25,7 @@ envoy_cc_library(
     deps = [
         ":transcoder_input_stream_lib",
         "//include/envoy/http:filter_interface",
+        "//source/common/buffer:buffer_lib",
         "//source/common/grpc:codec_lib",
         "//source/common/grpc:common_lib",
         "//source/common/http:headers_lib",

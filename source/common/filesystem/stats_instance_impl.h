@@ -6,8 +6,6 @@
 #include <cstdlib>
 #include <string>
 
-#include "envoy/api/api.h"
-#include "envoy/api/os_sys_calls.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/stats/stats_macros.h"
@@ -35,81 +33,33 @@ namespace Filesystem {
 /**
  * Captures state, properties, and stats of a file-system.
  */
-class Instance {
+class StatsInstanceImpl : public StatsInstance {
 public:
-  Instance(std::chrono::milliseconds file_flush_interval_msec,
-           Thread::ThreadFactory& thread_factory, Stats::Store& store);
+  StatsInstanceImpl(std::chrono::milliseconds file_flush_interval_msec,
+                    Thread::ThreadFactory& thread_factory, Stats::Store& store,
+                    Instance& file_system);
 
-  /**
-   * Creates a file, overriding the flush-interval set in the class.
-   *
-   * @param path The path of the file to open.
-   * @param dispatcher The dispatcher used for set up timers to run flush().
-   * @param lock The lock.
-   * @param file_flush_interval_msec Number of milliseconds to delay before flushing.
-   */
-  FileSharedPtr createFile(const std::string& path, Event::Dispatcher& dispatcher,
-                           Thread::BasicLockable& lock,
-                           std::chrono::milliseconds file_flush_interval_msec);
+  // Filesystem::StatsInstance
+  StatsFileSharedPtr createStatsFile(const std::string& path, Event::Dispatcher& dispatcher,
+                                     Thread::BasicLockable& lock,
+                                     std::chrono::milliseconds file_flush_interval_msec) override;
+  StatsFileSharedPtr createStatsFile(const std::string& path, Event::Dispatcher& dispatcher,
+                                     Thread::BasicLockable& lock) override;
 
-  /**
-   * Creates a file, using the default flush-interval for the class.
-   *
-   * @param path The path of the file to open.
-   * @param dispatcher The dispatcher used for set up timers to run flush().
-   * @param lock The lock.
-   */
-  FileSharedPtr createFile(const std::string& path, Event::Dispatcher& dispatcher,
-                           Thread::BasicLockable& lock) {
-    return createFile(path, dispatcher, lock, file_flush_interval_msec_);
-  }
+  // Filesystem::Instance
+  bool fileExists(const std::string& path) override;
+  bool directoryExists(const std::string& path) override;
+  ssize_t fileSize(const std::string& path) override;
+  std::string fileReadToEnd(const std::string& path) override;
+  bool illegalPath(const std::string& path) override;
+  FilePtr createFile(const std::string& path) override;
 
 private:
   const std::chrono::milliseconds file_flush_interval_msec_;
   FileSystemStats file_stats_;
   Thread::ThreadFactory& thread_factory_;
+  Instance& file_system_;
 };
-
-/**
- * @return bool whether a file exists on disk and can be opened for read.
- */
-bool fileExists(const std::string& path);
-
-/**
- * @return bool whether a directory exists on disk and can be opened for read.
- */
-bool directoryExists(const std::string& path);
-
-/**
- * @return ssize_t the size in bytes of the specified file, or -1 if the file size
- *                 cannot be determined for any reason, including without limitation
- *                 the non-existence of the file.
- */
-ssize_t fileSize(const std::string& path);
-
-/**
- * @return full file content as a string.
- * @throw EnvoyException if the file cannot be read.
- * Be aware, this is not most highly performing file reading method.
- */
-std::string fileReadToEnd(const std::string& path);
-
-/**
- * @param path some filesystem path.
- * @return std::string the canonical path (see realpath(3)).
- */
-std::string canonicalPath(const std::string& path);
-
-/**
- * Determine if the path is on a list of paths Envoy will refuse to access. This
- * is a basic sanity check for users, blacklisting some clearly bad paths. Paths
- * may still be problematic (e.g. indirectly leading to /dev/mem) even if this
- * returns false, it is up to the user to validate that supplied paths are
- * valid.
- * @param path some filesystem path.
- * @return is the path on the blacklist?
- */
-bool illegalPath(const std::string& path);
 
 /**
  * This is a file implementation geared for writing out access logs. It turn out that in certain
@@ -118,14 +68,14 @@ bool illegalPath(const std::string& path);
  * files. If this turns out to be a good implementation we can potentially have a single flush
  * thread that flushes all files, but we will start with this.
  */
-class FileImpl : public File {
+class StatsFileImpl : public StatsFile {
 public:
-  FileImpl(const std::string& path, Event::Dispatcher& dispatcher, Thread::BasicLockable& lock,
-           FileSystemStats& stats_, std::chrono::milliseconds flush_interval_msec,
-           Thread::ThreadFactory& thread_factory);
-  ~FileImpl();
+  StatsFileImpl(const std::string& path, Event::Dispatcher& dispatcher, Thread::BasicLockable& lock,
+                FileSystemStats& stats_, std::chrono::milliseconds flush_interval_msec,
+                Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system);
+  ~StatsFileImpl();
 
-  // Filesystem::File
+  // Filesystem::StatsFile
   void write(absl::string_view data) override;
 
   /**
@@ -142,14 +92,10 @@ public:
 private:
   void doWrite(Buffer::Instance& buffer);
   void flushThreadFunc();
-  void open();
   void createFlushStructures();
 
   // Minimum size before the flush thread will be told to flush.
   static const uint64_t MIN_FLUSH_SIZE = 1024 * 64;
-
-  int fd_;
-  std::string path_;
 
   // These locks are always acquired in the following order if multiple locks are held:
   //    1) write_lock_
@@ -185,12 +131,12 @@ private:
                                             // continue to fill. This buffer is then used for the
                                             // final write to disk.
   Event::TimerPtr flush_timer_;
-  Api::OsSysCalls& os_sys_calls_;
   Thread::ThreadFactory& thread_factory_;
   const std::chrono::milliseconds flush_interval_msec_; // Time interval buffer gets flushed no
                                                         // matter if it reached the MIN_FLUSH_SIZE
                                                         // or not.
   FileSystemStats& stats_;
+  FilePtr file_;
 };
 
 } // namespace Filesystem

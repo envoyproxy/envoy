@@ -274,7 +274,7 @@ private:
   std::string typeToString(EjectionType type);
   int secsSinceLastAction(const absl::optional<MonotonicTime>& lastActionTime, MonotonicTime now);
 
-  Filesystem::FileSharedPtr file_;
+  Filesystem::StatsFileSharedPtr file_;
   TimeSource& time_source_;
 };
 

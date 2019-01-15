@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/api/v2/core/grpc_service.pb.h"
+#include "envoy/filesystem/filesystem.h"
 
 #include "grpcpp/grpcpp.h"
 
@@ -11,7 +12,8 @@ grpc::SslCredentialsOptions buildSslOptionsFromConfig(
     const envoy::api::v2::core::GrpcService::GoogleGrpc::SslCredentials& ssl_config);
 
 std::shared_ptr<grpc::ChannelCredentials>
-getGoogleGrpcChannelCredentials(const envoy::api::v2::core::GrpcService& grpc_service);
+getGoogleGrpcChannelCredentials(const envoy::api::v2::core::GrpcService& grpc_service,
+                                Filesystem::Instance& file_system);
 
 class CredsUtility {
 public:
@@ -23,7 +25,8 @@ public:
    *         will be returned in the absence of any configured credentials.
    */
   static std::shared_ptr<grpc::ChannelCredentials>
-  getChannelCredentials(const envoy::api::v2::core::GrpcService::GoogleGrpc& google_grpc);
+  getChannelCredentials(const envoy::api::v2::core::GrpcService::GoogleGrpc& google_grpc,
+                        Filesystem::Instance& file_system);
 
   /**
    * Static translation from envoy::api::v2::core::GrpcService to a vector of grpc::CallCredentials.
@@ -43,7 +46,8 @@ public:
    *         forcing the channel to SSL.
    */
   static std::shared_ptr<grpc::ChannelCredentials>
-  defaultSslChannelCredentials(const envoy::api::v2::core::GrpcService& grpc_service_config);
+  defaultSslChannelCredentials(const envoy::api::v2::core::GrpcService& grpc_service_config,
+                               Filesystem::Instance& file_system);
 
   /**
    * Default static translation from envoy::api::v2::core::GrpcService to grpc::ChannelCredentials
@@ -54,7 +58,8 @@ public:
    *         channel to SSL.
    */
   static std::shared_ptr<grpc::ChannelCredentials>
-  defaultChannelCredentials(const envoy::api::v2::core::GrpcService& grpc_service_config);
+  defaultChannelCredentials(const envoy::api::v2::core::GrpcService& grpc_service_config,
+                            Filesystem::Instance& file_system);
 };
 
 } // namespace Grpc

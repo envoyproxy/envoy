@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "envoy/api/v2/route/route.pb.h"
+#include "envoy/filesystem/filesystem.h"
 #include "envoy/http/codes.h"
 #include "envoy/json/json_object.h"
 #include "envoy/upstream/resource_manager.h"
@@ -90,12 +91,14 @@ public:
   /**
    * Returns the content of the response body to send with direct responses from a route.
    * @param route supplies the Route configuration.
+   * @param file_system supplies the Filesystem::Instance reference
    * @return absl::optional<std::string> the response body provided inline in the route's
    *         direct_response if specified, or the contents of the file named in the
    *         route's direct_response if specified, or an empty string otherwise.
    * @throw EnvoyException if the route configuration contains an error.
    */
-  static std::string parseDirectResponseBody(const envoy::api::v2::route::Route& route);
+  static std::string parseDirectResponseBody(const envoy::api::v2::route::Route& route,
+                                             Filesystem::Instance& file_system);
 
   /**
    * Returns the HTTP Status Code enum parsed from proto.

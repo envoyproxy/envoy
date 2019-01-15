@@ -115,7 +115,7 @@ public:
   NiceMock<TestStatStore> store_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Event::MockDispatcher> dispatcher_;
-  std::shared_ptr<Filesystem::MockFile> file_{new NiceMock<Filesystem::MockFile>()};
+  std::shared_ptr<Filesystem::MockStatsFile> file_{new NiceMock<Filesystem::MockStatsFile>()};
   AccessLogSharedPtr access_log_;
   FaultConfigSharedPtr fault_config_;
   std::unique_ptr<TestProxyFilter> filter_;

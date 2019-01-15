@@ -35,6 +35,7 @@ private:
   Filesystem::WatcherPtr watcher_;
   absl::optional<double> pressure_;
   absl::optional<EnvoyException> error_;
+  Filesystem::Instance& file_system_;
 };
 
 } // namespace InjectedResourceMonitor

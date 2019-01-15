@@ -211,6 +211,7 @@ envoy_cc_library(
     deps = [
         ":resource_monitor_interface",
         "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/filesystem:filesystem_interface",
     ],
 )
 

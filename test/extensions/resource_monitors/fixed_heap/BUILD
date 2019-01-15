@@ -30,6 +30,7 @@ envoy_extension_cc_test(
         "//source/extensions/resource_monitors/fixed_heap:config",
         "//source/server:resource_monitor_config_lib",
         "//test/mocks/event:event_mocks",
+        "//test/mocks/filesystem:filesystem_mocks",
         "@envoy_api//envoy/config/resource_monitor/fixed_heap/v2alpha:fixed_heap_cc",
     ],
 )

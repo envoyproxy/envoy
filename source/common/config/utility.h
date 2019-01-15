@@ -5,6 +5,7 @@
 #include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
+#include "envoy/filesystem/filesystem.h"
 #include "envoy/json/json_object.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/registry/registry.h"
@@ -148,7 +149,8 @@ public:
    * Check the existence of a path for a filesystem subscription. Throws on error.
    * @param path the path to validate.
    */
-  static void checkFilesystemSubscriptionBackingPath(const std::string& path);
+  static void checkFilesystemSubscriptionBackingPath(const std::string& path,
+                                                     Filesystem::Instance& file_system);
 
   /**
    * Check the grpc_services and cluster_names for API config sanity. Throws on error.

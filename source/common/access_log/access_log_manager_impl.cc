@@ -11,12 +11,12 @@ void AccessLogManagerImpl::reopen() {
   }
 }
 
-Filesystem::FileSharedPtr AccessLogManagerImpl::createAccessLog(const std::string& file_name) {
+Filesystem::StatsFileSharedPtr AccessLogManagerImpl::createAccessLog(const std::string& file_name) {
   if (access_logs_.count(file_name)) {
     return access_logs_[file_name];
   }
 
-  access_logs_[file_name] = api_.createFile(file_name, dispatcher_, lock_);
+  access_logs_[file_name] = api_.fileSystem().createStatsFile(file_name, dispatcher_, lock_);
   return access_logs_[file_name];
 }
 

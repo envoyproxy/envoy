@@ -87,11 +87,12 @@ bool OverloadAction::isActive() const { return !fired_triggers_.empty(); }
 OverloadManagerImpl::OverloadManagerImpl(
     Event::Dispatcher& dispatcher, Stats::Scope& stats_scope,
     ThreadLocal::SlotAllocator& slot_allocator,
-    const envoy::config::overload::v2alpha::OverloadManager& config)
+    const envoy::config::overload::v2alpha::OverloadManager& config,
+    Filesystem::Instance& file_system)
     : started_(false), dispatcher_(dispatcher), tls_(slot_allocator.allocateSlot()),
       refresh_interval_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, refresh_interval, 1000))) {
-  Configuration::ResourceMonitorFactoryContextImpl context(dispatcher);
+  Configuration::ResourceMonitorFactoryContextImpl context(dispatcher, file_system);
   for (const auto& resource : config.resource_monitors()) {
     const auto& name = resource.name();
     ENVOY_LOG(debug, "Adding resource monitor for {}", name);

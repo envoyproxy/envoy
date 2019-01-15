@@ -17,7 +17,10 @@ envoy_cc_mock(
         "//include/envoy/api:os_sys_calls_interface",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:assert_lib",
+        "//source/common/filesystem:stats_instance_lib",
+        "//source/common/stats:isolated_store_lib",
         "//test/mocks/filesystem:filesystem_mocks",
         "//test/test_common:test_time_system_interface",
+        "//test/test_common:utility_lib",
     ],
 )

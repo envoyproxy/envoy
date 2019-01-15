@@ -4592,20 +4592,21 @@ TEST(ConfigUtility, ParseResponseCode) {
 }
 
 TEST(ConfigUtility, ParseDirectResponseBody) {
+  Filesystem::Instance& file_system = Filesystem::fileSystemForTest();
   envoy::api::v2::route::Route route;
-  EXPECT_EQ(EMPTY_STRING, ConfigUtility::parseDirectResponseBody(route));
+  EXPECT_EQ(EMPTY_STRING, ConfigUtility::parseDirectResponseBody(route, file_system));
 
   route.mutable_direct_response()->mutable_body()->set_filename("missing_file");
-  EXPECT_THROW_WITH_MESSAGE(ConfigUtility::parseDirectResponseBody(route), EnvoyException,
-                            "response body file missing_file does not exist");
+  EXPECT_THROW_WITH_MESSAGE(ConfigUtility::parseDirectResponseBody(route, file_system),
+                            EnvoyException, "response body file missing_file does not exist");
 
   std::string body(4097, '*');
   auto filename = TestEnvironment::writeStringToFileForTest("body", body);
   route.mutable_direct_response()->mutable_body()->set_filename(filename);
   std::string expected_message("response body file " + filename +
                                " size is 4097 bytes; maximum is 4096");
-  EXPECT_THROW_WITH_MESSAGE(ConfigUtility::parseDirectResponseBody(route), EnvoyException,
-                            expected_message);
+  EXPECT_THROW_WITH_MESSAGE(ConfigUtility::parseDirectResponseBody(route, file_system),
+                            EnvoyException, expected_message);
 }
 
 TEST(RouteConfigurationV2, RedirectCode) {

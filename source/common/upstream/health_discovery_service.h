@@ -29,7 +29,8 @@ public:
                     const envoy::api::v2::core::BindConfig& bind_config, Stats::Store& stats,
                     Ssl::ContextManager& ssl_context_manager, bool added_via_api,
                     ClusterManager& cm, const LocalInfo::LocalInfo& local_info,
-                    Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random) override;
+                    Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
+                    Filesystem::Instance& file_system) override;
 };
 
 // TODO(lilika): Add HdsClusters to the /clusters endpoint to get detailed stats about each HC host.
@@ -46,7 +47,7 @@ public:
              Ssl::ContextManager& ssl_context_manager, bool added_via_api,
              ClusterInfoFactory& info_factory, ClusterManager& cm,
              const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
-             Runtime::RandomGenerator& random);
+             Runtime::RandomGenerator& random, Filesystem::Instance& file_system);
 
   // From Upstream::Cluster
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
@@ -119,7 +120,8 @@ public:
               Runtime::Loader& runtime, Envoy::Stats::Store& stats,
               Ssl::ContextManager& ssl_context_manager, Runtime::RandomGenerator& random,
               ClusterInfoFactory& info_factory, AccessLog::AccessLogManager& access_log_manager,
-              ClusterManager& cm, const LocalInfo::LocalInfo& local_info);
+              ClusterManager& cm, const LocalInfo::LocalInfo& local_info,
+              Filesystem::Instance& file_system);
 
   // Grpc::TypedAsyncStreamCallbacks
   void onCreateInitialMetadata(Http::HeaderMap& metadata) override;
@@ -188,6 +190,7 @@ private:
 
   // How often envoy reports the healthcheck results to the server
   uint32_t server_response_ms_ = 0;
+  Filesystem::Instance& file_system_;
 };
 
 typedef std::unique_ptr<HdsDelegate> HdsDelegatePtr;
