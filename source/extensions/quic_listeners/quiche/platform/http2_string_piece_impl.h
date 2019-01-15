@@ -6,6 +6,6 @@
 
 namespace http2 {
 
-class Http2StringPieceImpl = absl::string_view;
+using Http2StringPieceImpl = absl::string_view;
 
 } // namespace http2
