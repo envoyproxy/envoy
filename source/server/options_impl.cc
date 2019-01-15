@@ -37,11 +37,11 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
                          spdlog::level::level_enum default_log_level)
     : signal_handling_enabled_(true) {
   std::string log_levels_string = "Log levels: ";
-  for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_names); i++) {
-    log_levels_string += fmt::format("[{}]", spdlog::level::level_names[i]);
+  for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_string_views); i++) {
+    log_levels_string += fmt::format("[{}]", spdlog::level::level_string_views[i]);
   }
   log_levels_string +=
-      fmt::format("\nDefault is [{}]", spdlog::level::level_names[default_log_level]);
+      fmt::format("\nDefault is [{}]", spdlog::level::level_string_views[default_log_level]);
 
   const std::string component_log_level_string =
       "Comma separated list of component log levels. For example upstream:debug,config:trace";
@@ -72,9 +72,9 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
                                                         "The local "
                                                         "IP address version (v4 or v6).",
                                                         false, "v4", "string", cmd);
-  TCLAP::ValueArg<std::string> log_level("l", "log-level", log_levels_string, false,
-                                         spdlog::level::level_names[default_log_level], "string",
-                                         cmd);
+  TCLAP::ValueArg<std::string> log_level(
+      "l", "log-level", log_levels_string, false,
+      spdlog::level::level_string_views[default_log_level].data(), "string", cmd);
   TCLAP::ValueArg<std::string> component_log_level(
       "", "component-log-level", component_log_level_string, false, "", "string", cmd);
   TCLAP::ValueArg<std::string> log_format("", "log-format", log_format_string, false,
@@ -155,8 +155,8 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
   mutex_tracing_enabled_ = enable_mutex_tracing.getValue();
 
   log_level_ = default_log_level;
-  for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_names); i++) {
-    if (log_level.getValue() == spdlog::level::level_names[i]) {
+  for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_string_views); i++) {
+    if (log_level.getValue() == spdlog::level::level_string_views[i]) {
       log_level_ = static_cast<spdlog::level::level_enum>(i);
     }
   }
@@ -228,8 +228,8 @@ void OptionsImpl::parseComponentLogLevels(const std::string& component_log_level
     std::string log_name = log_name_level[0];
     std::string log_level = log_name_level[1];
     size_t level_to_use = std::numeric_limits<size_t>::max();
-    for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_names); i++) {
-      if (log_level == spdlog::level::level_names[i]) {
+    for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_string_views); i++) {
+      if (log_level == spdlog::level::level_string_views[i]) {
         level_to_use = i;
         break;
       }
@@ -260,7 +260,8 @@ Server::CommandLineOptionsPtr OptionsImpl::toCommandLineOptions() const {
   command_line_options->set_allow_unknown_fields(allow_unknown_fields_);
   command_line_options->set_admin_address_path(adminAddressPath());
   command_line_options->set_component_log_level(component_log_level_str_);
-  command_line_options->set_log_level(spdlog::level::to_c_str(logLevel()));
+  command_line_options->set_log_level(spdlog::level::to_string_view(logLevel()).data(),
+                                      spdlog::level::to_string_view(logLevel()).size());
   command_line_options->set_log_format(logFormat());
   command_line_options->set_log_path(logPath());
   command_line_options->set_service_cluster(serviceClusterName());
