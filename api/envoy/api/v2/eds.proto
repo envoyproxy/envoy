@@ -53,6 +53,9 @@ message ClusterLoadAssignment {
   // List of endpoints to load balance to.
   repeated endpoint.LocalityLbEndpoints endpoints = 2 [(gogoproto.nullable) = false];
 
+  // Map of named endpoints that can be referenced in LocalityLbEndpoints.
+  map<string, endpoint.Endpoint> named_endpoints = 5;
+
   // Load balancing policy settings.
   message Policy {
     reserved 1;
