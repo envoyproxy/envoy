@@ -1,4 +1,6 @@
 #!/usr/bin/python
+# flake8: noqa
+
 import contextlib
 import os
 import shlex

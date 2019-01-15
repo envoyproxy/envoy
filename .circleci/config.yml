@@ -133,6 +133,21 @@ jobs:
        - checkout
        - setup_remote_docker
        - run: ci/build_container/docker_push.sh
+   build_image_python3:
+     docker:
+       - image: circleci/python:3.7
+         environment:
+           # See comment in do_circle_ci.sh for why we do this.
+           NUM_CPUS: 8
+     resource_class: xlarge
+     steps:
+       - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
+       - checkout
+       - run: pip install --user flake8  # Flag all Python syntax errors or undefined names
+       - run: python -m flake8 . --select=E901,E999,F821,F822,F823 --show-source --statistics
+       - setup_remote_docker
+       # Comment out the next line for now so "ci/circleci: release" does not fail
+       # - run: ci/build_container/docker_push.sh
    docs:
      executor: ubuntu-build
      steps:
@@ -173,6 +188,7 @@ workflows:
       - format
       - clang_tidy
       - build_image
+      - build_image_python3
       - docs:
           filters:
             tags:
