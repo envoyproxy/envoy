@@ -79,21 +79,22 @@ int BufferHelper::peekLengthEncodedInteger(Buffer::Instance& buffer, uint64_t& o
   if (peekUint8(buffer, offset, byte_val) == MYSQL_FAILURE) {
     return MYSQL_FAILURE;
   }
-  if (val < LENENCODINT_1BYTE) {
+  if (byte_val < LENENCODINT_1BYTE) {
     val = byte_val;
     return MYSQL_SUCCESS;
   }
 
   try {
+    uint64_t peek_offset = offset + sizeof(uint8_t);
     if (byte_val == LENENCODINT_2BYTES) {
-      val = buffer.peekLEInt<uint64_t, sizeof(uint16_t)>(offset);
-      offset += sizeof(uint16_t);
+      val = buffer.peekLEInt<uint64_t, sizeof(uint16_t)>(peek_offset);
+      offset = peek_offset + sizeof(uint16_t);
     } else if (byte_val == LENENCODINT_3BYTES) {
-      val = buffer.peekLEInt<uint64_t, sizeof(uint8_t) * 3>(offset);
-      offset += sizeof(uint8_t) * 3;
+      val = buffer.peekLEInt<uint64_t, sizeof(uint8_t) * 3>(peek_offset);
+      offset = peek_offset + sizeof(uint8_t) * 3;
     } else if (byte_val == LENENCODINT_8BYTES) {
-      val = buffer.peekLEInt<uint64_t>(offset);
-      offset += sizeof(uint64_t);
+      val = buffer.peekLEInt<uint64_t>(peek_offset);
+      offset = peek_offset + sizeof(uint64_t);
     } else {
       return MYSQL_FAILURE;
     }

@@ -147,8 +147,7 @@ std::string ClientLogin::encode() {
     BufferHelper::addUint8(*buffer, enc_end_string);
   }
 
-  std::string e_string = buffer->toString();
-  return e_string;
+  return buffer->toString();
 }
 
 } // namespace MySQLProxy

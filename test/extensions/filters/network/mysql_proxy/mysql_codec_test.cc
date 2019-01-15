@@ -389,8 +389,8 @@ TEST_F(MySQLCodecTest, MySQLClientLogin320EncDec) {
   mysql_clogin_encode.setUsername(user);
   std::string passwd = MySQLTestUtils::getAuthResp();
   mysql_clogin_encode.setAuthResp(passwd);
-  std::string data = mysql_clogin_encode.encode();
 
+  std::string data = mysql_clogin_encode.encode();
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(data));
   ClientLogin mysql_clogin_decode{};
   mysql_clogin_decode.decode(*decode_data, offset_, CHALLENGE_SEQ_NUM, decode_data->length());
@@ -401,6 +401,18 @@ TEST_F(MySQLCodecTest, MySQLClientLogin320EncDec) {
   EXPECT_EQ(mysql_clogin_decode.getCharset(), mysql_clogin_encode.getCharset());
   EXPECT_EQ(mysql_clogin_decode.getUsername(), mysql_clogin_encode.getUsername());
   EXPECT_EQ(mysql_clogin_decode.getAuthResp(), mysql_clogin_encode.getAuthResp());
+}
+
+TEST_F(MySQLCodecTest, MySQLParseLengthEncodedInteger) {
+  Buffer::InstancePtr buffer(new Buffer::OwnedImpl());
+
+  uint64_t offset = 0;
+  uint64_t input_val = (1 << 16) - 1; // < 2^16
+  uint64_t output_val = 0;
+  BufferHelper::addUint8(*buffer, 0xfc);
+  BufferHelper::addUint16(*buffer, input_val);
+  EXPECT_EQ(BufferHelper::peekLengthEncodedInteger(*buffer, offset, output_val), MYSQL_SUCCESS);
+  EXPECT_EQ(input_val, output_val);
 }
 
 /*
