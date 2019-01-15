@@ -334,20 +334,46 @@ public:
     size_--;
   }
 
+  /**
+   * Forward const iterator for SliceDeque.
+   * @note this implementation currently supports the minimum functionality needed to support
+   *       the `for (const auto& slice : slice_deque)` idiom.
+   */
+  class ConstIterator {
+  public:
+    const SlicePtr& operator*() { return deque_[index_]; }
+
+    ConstIterator operator++() {
+      index_++;
+      return *this;
+    }
+
+    bool operator!=(const ConstIterator& rhs) const {
+      return &deque_ != &rhs.deque_ || index_ != rhs.index_;
+    }
+
+    friend class SliceDeque;
+
+  private:
+    ConstIterator(const SliceDeque& deque, size_t index) : deque_(deque), index_(index) {}
+    const SliceDeque& deque_;
+    size_t index_;
+  };
+
+  ConstIterator begin() const noexcept { return ConstIterator(*this, 0); }
+
+  ConstIterator end() const noexcept { return ConstIterator(*this, size_); }
+
 private:
   constexpr static size_t InlineRingCapacity = 8;
 
   size_t internalIndex(size_t index) const {
-#if 0
-    return (start_ + index) & (capacity_ - 1);
-#else
     size_t internal_index = start_ + index;
     if (internal_index >= capacity_) {
       internal_index -= capacity_;
       ASSERT(internal_index < capacity_);
     }
     return internal_index;
-#endif
   }
 
   void growRing() {
@@ -471,11 +497,7 @@ protected:
   virtual void postProcess();
 
 private:
-#if 0
-  std::deque<SlicePtr> slices_;
-#else
   SliceDeque slices_;
-#endif
 
   /** Sum of the dataSize of all slices. */
   uint64_t length_{0};

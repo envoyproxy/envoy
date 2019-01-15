@@ -3607,14 +3607,11 @@ public:
 
       // Incredibly contrived way of making sure that the write buffer has an empty chain in it.
       if (reserve_write_space) {
-        Buffer::RawSlice iovec1[1];
-        Buffer::RawSlice iovec2[1];
-        EXPECT_EQ(1UL, data.reserve(16384, iovec1, 1));
-        EXPECT_EQ(1UL, data.reserve(16384, iovec2, 1));
-        iovec1[0].len_ = 0;
-        data.commit(iovec1, 1);
-        iovec2[0].len_ = 0;
-        data.commit(iovec2, 1);
+        Buffer::RawSlice iovecs[2];
+        EXPECT_EQ(2UL, data.reserve(16384, iovecs, 2));
+        iovecs[0].len_ = 0;
+        iovecs[1].len_ = 0;
+        data.commit(iovecs, 2);
       }
 
       client_connection_->write(data, false);

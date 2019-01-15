@@ -116,8 +116,7 @@ void OwnedImpl::commit(RawSlice* iovecs, uint64_t num_iovecs) {
 
 void OwnedImpl::copyOut(size_t start, uint64_t size, void* data) const {
   uint8_t* dest = static_cast<uint8_t*>(data);
-  for (size_t slice_index = 0; slice_index < slices_.size(); slice_index++) {
-    const auto& slice = slices_[slice_index];
+  for (const auto& slice : slices_) {
     if (size == 0) {
       break;
     }
@@ -155,8 +154,7 @@ void OwnedImpl::drain(uint64_t size) {
 
 uint64_t OwnedImpl::getRawSlices(RawSlice* out, uint64_t out_size) const {
   uint64_t i = 0;
-  for (size_t slice_index = 0; slice_index < slices_.size(); slice_index++) {
-    const auto& slice = slices_[slice_index];
+  for (const auto& slice : slices_) {
     if (slice->dataSize() == 0) {
       continue;
     }
@@ -174,16 +172,15 @@ uint64_t OwnedImpl::getRawSlices(RawSlice* out, uint64_t out_size) const {
 }
 
 uint64_t OwnedImpl::length() const {
+#ifndef NDEBUG
   // When running in debug mode, verify that the precomputed length matches the sum
   // of the lengths of the slices.
-  // NOLINTNEXTLINE(bugprone-assert-side-effect)
-  ASSERT(length_ == [this]() -> uint64_t {
-    uint64_t length = 0;
-    for (size_t slice_index = 0; slice_index < slices_.size(); slice_index++) {
-      length += slices_[slice_index]->dataSize();
-    }
-    return length;
-  }());
+  uint64_t length = 0;
+  for (const auto& slice : slices_) {
+    length += slice->dataSize();
+  }
+  ASSERT(length == length_);
+#endif
 
   return length_;
 }
@@ -194,8 +191,7 @@ void* OwnedImpl::linearize(uint32_t size) {
   }
   uint64_t linearized_size = 0;
   uint64_t num_slices_to_linearize = 0;
-  for (size_t slice_index = 0; slice_index < slices_.size(); slice_index++) {
-    const auto& slice = slices_[slice_index];
+  for (const auto& slice : slices_) {
     num_slices_to_linearize++;
     linearized_size += slice->dataSize();
     if (linearized_size >= size) {
@@ -305,49 +301,55 @@ Api::SysCallIntResult OwnedImpl::read(int fd, uint64_t max_length) {
 }
 
 uint64_t OwnedImpl::reserve(uint64_t length, RawSlice* iovecs, uint64_t num_iovecs) {
-  if (num_iovecs == 0) {
+  if (num_iovecs == 0 || length == 0) {
     return 0;
   }
-  uint64_t reservable_size = slices_.empty() ? 0 : slices_.back()->reservableSize();
-  if (reservable_size == 0) {
-    // Special case: there is no usable space in the last slice, so allocate a
-    // new slice big enough to hold the entire reservation.
-    slices_.emplace_back(OwnedSlice::create(length));
-    Copy(iovecs[0], slices_.back()->reserve(length));
-    ASSERT(iovecs[0].len_ == length);
-    ASSERT(iovecs[0].mem_ != nullptr);
-    return 1;
-  } else if (reservable_size >= length) {
-    // Special case: there is at least enough space in the last slice to hold
-    // the reqested reservation.
-    Copy(iovecs[0], slices_.back()->reserve(length));
-    ASSERT(iovecs[0].len_ == length);
-    ASSERT(iovecs[0].mem_ != nullptr);
-    return 1;
-  } else if (num_iovecs == 1) {
-    // Special case: there is some space available in the last slice, but not
-    // enough to hold the entire reservation. And the caller has only provided one
-    // iovec,so the reservation cannot be split among multiple slices. Create a new
-    // slice big enough to hold the entire reservation (and waste the leftover space
-    // in what used to be the last slice).
-    slices_.emplace_back(OwnedSlice::create(length));
-    Copy(iovecs[0], slices_.back()->reserve(length));
-    ASSERT(iovecs[0].len_ == length);
-    ASSERT(iovecs[0].mem_ != nullptr);
-    return 1;
-  } else {
-    // General case: the last slice has enough space to fulfill part but not all of the
-    // requested reservation, so split the reservation between that slice and a newly
-    // allocated slice.
-    Copy(iovecs[0], slices_.back()->reserve(reservable_size));
-    uint64_t remaining_size = length - reservable_size;
-    slices_.emplace_back(OwnedSlice::create(remaining_size));
-    Copy(iovecs[1], slices_.back()->reserve(remaining_size));
-    ASSERT(iovecs[0].len_ + iovecs[1].len_ == length);
-    ASSERT(iovecs[0].mem_ != nullptr);
-    ASSERT(iovecs[1].mem_ != nullptr);
-    return 2;
+
+  // Check whether there are any empty slices with reservable space at the end of the buffer.
+  size_t first_reservable_slice = slices_.size();
+  while (first_reservable_slice > 0) {
+    if (slices_[first_reservable_slice - 1]->reservableSize() == 0) {
+      break;
+    }
+    first_reservable_slice--;
+    if (slices_[first_reservable_slice]->dataSize() != 0) {
+      // There is some content in this slice, so anything in front of it is nonreservable.
+      break;
+    }
   }
+
+  // Having found the sequence of reservable slices at the back of the buffer, reserve
+  // as much space as possible from each one.
+  uint64_t num_slices_used = 0;
+  uint64_t bytes_remaining = length;
+  size_t slice_index = first_reservable_slice;
+  while (slice_index < slices_.size() && bytes_remaining != 0 && num_slices_used < num_iovecs) {
+    auto& slice = slices_[slice_index];
+    const uint64_t reservation_size = std::min(slice->reservableSize(), bytes_remaining);
+    if (num_slices_used + 1 == num_iovecs && reservation_size < bytes_remaining) {
+      // There is only one iovec left, and this next slice does not have enough space to
+      // complete the reservation. Stop iterating, with last one iovec still unpopulated,
+      // so the code following this loop can allocate a new slice to hold the rest of the
+      // reservation.
+      break;
+    }
+    Copy(iovecs[num_slices_used], slice->reserve(reservation_size));
+    bytes_remaining -= iovecs[num_slices_used].len_;
+    num_slices_used++;
+    slice_index++;
+  }
+
+  // If needed, allocate one more slice at the end to provide the remainder of the reservation.
+  if (bytes_remaining != 0) {
+    slices_.emplace_back(OwnedSlice::create(bytes_remaining));
+    Copy(iovecs[num_slices_used], slices_.back()->reserve(bytes_remaining));
+    bytes_remaining -= iovecs[num_slices_used].len_;
+    num_slices_used++;
+  }
+
+  ASSERT(num_slices_used <= num_iovecs);
+  ASSERT(bytes_remaining == 0);
+  return num_slices_used;
 }
 
 ssize_t OwnedImpl::search(const void* data, uint64_t size, size_t start) const {

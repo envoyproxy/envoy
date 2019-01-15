@@ -30,12 +30,37 @@ private:
   const std::function<void()> deletion_callback_;
 };
 
+class OwnedSliceTest : public testing::Test {
+protected:
+  static void expectReservationSuccess(const Slice::Reservation& reservation, const Slice& slice,
+                                       uint64_t reservation_size) {
+    EXPECT_NE(nullptr, reservation.mem_);
+    EXPECT_EQ(static_cast<const uint8_t*>(slice.data()) + slice.dataSize(), reservation.mem_);
+    EXPECT_EQ(reservation_size, reservation.len_);
+    EXPECT_EQ(0, slice.reservableSize());
+  }
+
+  static void expectReservationFailure(const Slice::Reservation& reservation, const Slice& slice,
+                                       uint64_t reservable_size) {
+    EXPECT_EQ(nullptr, reservation.mem_);
+    EXPECT_EQ(0, reservation.mem_);
+    EXPECT_EQ(reservable_size, slice.reservableSize());
+  }
+
+  static void expectCommitSuccess(bool committed, const Slice& slice, uint64_t data_size,
+                                  uint64_t reservable_size) {
+    EXPECT_TRUE(committed);
+    EXPECT_EQ(data_size, slice.dataSize());
+    EXPECT_EQ(reservable_size, slice.reservableSize());
+  }
+};
+
 bool sliceMatches(const SlicePtr& slice, const std::string& expected) {
   return slice != nullptr && slice->dataSize() == expected.size() &&
          memcmp(slice->data(), expected.c_str(), expected.size()) == 0;
 }
 
-TEST(OwnedSliceTest, Create) {
+TEST_F(OwnedSliceTest, Create) {
   static std::vector<uint64_t> Sizes = {0, 1, 64, 4096 - sizeof(OwnedSlice), 65535};
   for (const auto size : Sizes) {
     auto slice = OwnedSlice::create(size);
@@ -45,7 +70,7 @@ TEST(OwnedSliceTest, Create) {
   }
 }
 
-TEST(OwnedSliceTest, ReserveCommit) {
+TEST_F(OwnedSliceTest, ReserveCommit) {
   auto slice = OwnedSlice::create(100);
   const uint64_t initial_capacity = slice->reservableSize();
   EXPECT_LE(100, initial_capacity);
@@ -53,135 +78,118 @@ TEST(OwnedSliceTest, ReserveCommit) {
   {
     // Verify that a zero-byte reservation is rejected.
     Slice::Reservation reservation = slice->reserve(0);
-    ASSERT_EQ(nullptr, reservation.mem_);
-    ASSERT_EQ(0, reservation.len_);
-    ASSERT_EQ(initial_capacity, slice->reservableSize());
+    expectReservationFailure(reservation, *slice, initial_capacity);
   }
 
   {
     // Create a reservation smaller than the reservable size.
     // It should reserve the exact number of bytes requested.
     Slice::Reservation reservation = slice->reserve(10);
-    ASSERT_EQ(slice->data(), reservation.mem_);
-    ASSERT_EQ(10, reservation.len_);
+    expectReservationSuccess(reservation, *slice, 10);
 
     // Request a second reservation while the first reservation remains uncommitted.
     // This should fail.
-    ASSERT(slice->reservableSize() == 0);
+    EXPECT_EQ(0, slice->reservableSize());
     Slice::Reservation reservation2 = slice->reserve(1);
-    ASSERT_EQ(nullptr, reservation2.mem_);
-    ASSERT_EQ(0, reservation2.len_);
+    expectReservationFailure(reservation2, *slice, 0);
 
     // Commit the entire reserved size.
     bool committed = slice->commit(reservation);
-    ASSERT(committed);
-    ASSERT_EQ(10, slice->dataSize());
-    ASSERT_EQ(initial_capacity - 10, slice->reservableSize());
+    expectCommitSuccess(committed, *slice, 10, initial_capacity - 10);
 
     // Verify that a reservation can only be committed once.
-    ASSERT_FALSE(slice->commit(reservation));
+    EXPECT_FALSE(slice->commit(reservation));
   }
 
   {
     // Request another reservation, and commit only part of it.
     Slice::Reservation reservation = slice->reserve(10);
-    ASSERT_EQ(static_cast<const uint8_t*>(slice->data()) + slice->dataSize(), reservation.mem_);
-    ASSERT_EQ(10, reservation.len_);
-    ASSERT(slice->reservableSize() == 0);
+    expectReservationSuccess(reservation, *slice, 10);
     reservation.len_ = 5;
     bool committed = slice->commit(reservation);
-    ASSERT(committed);
-    ASSERT_EQ(15, slice->dataSize());
-    ASSERT_EQ(initial_capacity - 15, slice->reservableSize());
+    expectCommitSuccess(committed, *slice, 15, initial_capacity - 15);
   }
 
   {
     // Request another reservation, and commit only part of it.
     Slice::Reservation reservation = slice->reserve(10);
-    ASSERT_EQ(static_cast<const uint8_t*>(slice->data()) + slice->dataSize(), reservation.mem_);
-    ASSERT_EQ(10, reservation.len_);
-    ASSERT(slice->reservableSize() == 0);
+    expectReservationSuccess(reservation, *slice, 10);
     reservation.len_ = 5;
     bool committed = slice->commit(reservation);
-    ASSERT(committed);
-    ASSERT_EQ(20, slice->dataSize());
-    ASSERT_EQ(initial_capacity - 20, slice->reservableSize());
+    expectCommitSuccess(committed, *slice, 20, initial_capacity - 20);
   }
 
   {
     // Request another reservation, and commit zero bytes of it.
     // This should clear the reservation.
     Slice::Reservation reservation = slice->reserve(10);
-    ASSERT_EQ(static_cast<const uint8_t*>(slice->data()) + slice->dataSize(), reservation.mem_);
-    ASSERT_EQ(10, reservation.len_);
-    ASSERT(slice->reservableSize() == 0);
+    expectReservationSuccess(reservation, *slice, 10);
     reservation.len_ = 0;
     bool committed = slice->commit(reservation);
-    ASSERT(committed);
-    ASSERT_EQ(20, slice->dataSize());
-    ASSERT_EQ(initial_capacity - 20, slice->reservableSize());
+    expectCommitSuccess(committed, *slice, 20, initial_capacity - 20);
   }
 
   {
     // Try to commit a reservation from the wrong slice, and verify that the slice rejects it.
     Slice::Reservation reservation = slice->reserve(10);
+    expectReservationSuccess(reservation, *slice, 10);
     auto other_slice = OwnedSlice::create(100);
     Slice::Reservation other_reservation = other_slice->reserve(10);
-    ASSERT_FALSE(slice->commit(other_reservation));
-    ASSERT_FALSE(other_slice->commit(reservation));
+    expectReservationSuccess(other_reservation, *other_slice, 10);
+    EXPECT_FALSE(slice->commit(other_reservation));
+    EXPECT_FALSE(other_slice->commit(reservation));
+
+    // Commit the reservations to the proper slices to clear them.
     reservation.len_ = 0;
     bool committed = slice->commit(reservation);
-    ASSERT(committed);
+    EXPECT_TRUE(committed);
     other_reservation.len_ = 0;
-    ASSERT(other_slice->commit(other_reservation));
+    committed = other_slice->commit(other_reservation);
+    EXPECT_TRUE(committed);
   }
 
   {
-    // Try to reserve more space than is available in the slice->
-    uint32_t reservable_size = slice->reservableSize();
+    // Try to reserve more space than is available in the slice.
+    uint64_t reservable_size = slice->reservableSize();
     Slice::Reservation reservation = slice->reserve(reservable_size + 1);
-    ASSERT_EQ(static_cast<const uint8_t*>(slice->data()) + slice->dataSize(), reservation.mem_);
-    ASSERT_EQ(reservable_size, reservation.len_);
-    ASSERT(slice->reservableSize() == 0);
+    expectReservationSuccess(reservation, *slice, reservable_size);
     bool committed = slice->commit(reservation);
-    ASSERT(committed);
-    ASSERT(slice->reservableSize() == 0);
+    expectCommitSuccess(committed, *slice, initial_capacity, 0);
   }
 
   {
     // Now that the view has no more reservable space, verify that it rejects
     // subsequent reservation requests.
     Slice::Reservation reservation = slice->reserve(1);
-    ASSERT_EQ(nullptr, reservation.mem_);
-    ASSERT_EQ(0, reservation.len_);
+    expectReservationFailure(reservation, *slice, 0);
   }
 }
 
-TEST(OwnedSliceTest, Drain) {
+TEST_F(OwnedSliceTest, Drain) {
   // Create a slice and commit all the available space.
   auto slice = OwnedSlice::create(100);
   Slice::Reservation reservation = slice->reserve(slice->reservableSize());
   bool committed = slice->commit(reservation);
-  ASSERT(committed);
-  ASSERT_EQ(0, slice->reservableSize());
+  EXPECT_TRUE(committed);
+  EXPECT_EQ(0, slice->reservableSize());
 
   // Drain some data from the front of the view and verify that the data start moves accordingly.
   const uint8_t* original_data = static_cast<const uint8_t*>(slice->data());
   uint64_t original_size = slice->dataSize();
   slice->drain(0);
-  ASSERT_EQ(original_data, slice->data());
-  ASSERT_EQ(original_size, slice->dataSize());
+  EXPECT_EQ(original_data, slice->data());
+  EXPECT_EQ(original_size, slice->dataSize());
   slice->drain(10);
-  ASSERT_EQ(original_data + 10, slice->data());
-  ASSERT_EQ(original_size - 10, slice->dataSize());
+  EXPECT_EQ(original_data + 10, slice->data());
+  EXPECT_EQ(original_size - 10, slice->dataSize());
   slice->drain(50);
-  ASSERT_EQ(original_data + 60, slice->data());
-  ASSERT_EQ(original_size - 60, slice->dataSize());
+  EXPECT_EQ(original_data + 60, slice->data());
+  EXPECT_EQ(original_size - 60, slice->dataSize());
 
   // Drain all the remaining data.
   slice->drain(slice->dataSize());
-  ASSERT_EQ(0, slice->dataSize());
-  ASSERT_EQ(original_size, slice->reservableSize());
+  EXPECT_EQ(0, slice->dataSize());
+  EXPECT_EQ(original_size, slice->reservableSize());
 }
 
 TEST(UnownedSliceTest, CreateDelete) {
@@ -209,55 +217,55 @@ TEST(SliceDequeTest, CreateDelete) {
   {
     // Create an empty deque.
     SliceDeque slices;
-    ASSERT(slices.empty());
-    ASSERT_EQ(0, slices.size());
+    EXPECT_TRUE(slices.empty());
+    EXPECT_EQ(0, slices.size());
 
     // Append a view to the deque.
     const std::string slice1 = "slice1";
     slices.emplace_back(
         std::make_unique<DummySlice>(slice1, [&slice1_deleted]() { slice1_deleted = true; }));
-    ASSERT_FALSE(slices.empty());
-    ASSERT_EQ(1, slices.size());
-    ASSERT_FALSE(slice1_deleted);
-    ASSERT(sliceMatches(slices.front(), slice1));
+    EXPECT_FALSE(slices.empty());
+    EXPECT_EQ(1, slices.size());
+    EXPECT_FALSE(slice1_deleted);
+    EXPECT_TRUE(sliceMatches(slices.front(), slice1));
 
     // Append another view to the deque, and verify that both views are accessible.
     const std::string slice2 = "slice2";
     slices.emplace_back(
         std::make_unique<DummySlice>(slice2, [&slice2_deleted]() { slice2_deleted = true; }));
-    ASSERT_FALSE(slices.empty());
-    ASSERT_EQ(2, slices.size());
-    ASSERT_FALSE(slice1_deleted);
-    ASSERT_FALSE(slice2_deleted);
-    ASSERT(sliceMatches(slices.front(), slice1));
-    ASSERT(sliceMatches(slices.back(), slice2));
+    EXPECT_FALSE(slices.empty());
+    EXPECT_EQ(2, slices.size());
+    EXPECT_FALSE(slice1_deleted);
+    EXPECT_FALSE(slice2_deleted);
+    EXPECT_TRUE(sliceMatches(slices.front(), slice1));
+    EXPECT_TRUE(sliceMatches(slices.back(), slice2));
 
     // Prepend a view to the deque, to exercise the ring buffer wraparound case.
     const std::string slice3 = "slice2";
     slices.emplace_front(
         std::make_unique<DummySlice>(slice3, [&slice3_deleted]() { slice3_deleted = true; }));
-    ASSERT_FALSE(slices.empty());
-    ASSERT_EQ(3, slices.size());
-    ASSERT_FALSE(slice1_deleted);
-    ASSERT_FALSE(slice2_deleted);
-    ASSERT_FALSE(slice3_deleted);
-    ASSERT(sliceMatches(slices.front(), slice3));
-    ASSERT(sliceMatches(slices.back(), slice2));
+    EXPECT_FALSE(slices.empty());
+    EXPECT_EQ(3, slices.size());
+    EXPECT_FALSE(slice1_deleted);
+    EXPECT_FALSE(slice2_deleted);
+    EXPECT_FALSE(slice3_deleted);
+    EXPECT_TRUE(sliceMatches(slices.front(), slice3));
+    EXPECT_TRUE(sliceMatches(slices.back(), slice2));
 
     // Remove the first view from the deque, and verify that its slice is deleted.
     slices.pop_front();
-    ASSERT_FALSE(slices.empty());
-    ASSERT_EQ(2, slices.size());
-    ASSERT_FALSE(slice1_deleted);
-    ASSERT_FALSE(slice2_deleted);
-    ASSERT(slice3_deleted);
-    ASSERT(sliceMatches(slices.front(), slice1));
-    ASSERT(sliceMatches(slices.back(), slice2));
+    EXPECT_FALSE(slices.empty());
+    EXPECT_EQ(2, slices.size());
+    EXPECT_FALSE(slice1_deleted);
+    EXPECT_FALSE(slice2_deleted);
+    EXPECT_TRUE(slice3_deleted);
+    EXPECT_TRUE(sliceMatches(slices.front(), slice1));
+    EXPECT_TRUE(sliceMatches(slices.back(), slice2));
   }
 
-  ASSERT(slice1_deleted);
-  ASSERT(slice2_deleted);
-  ASSERT(slice3_deleted);
+  EXPECT_TRUE(slice1_deleted);
+  EXPECT_TRUE(slice2_deleted);
+  EXPECT_TRUE(slice3_deleted);
 }
 
 TEST(BufferHelperTest, PeekI8) {
