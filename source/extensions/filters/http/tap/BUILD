@@ -27,7 +27,6 @@ envoy_cc_library(
     hdrs = ["tap_config_impl.h"],
     deps = [
         ":tap_config_interface",
-        "//source/common/http:header_utility_lib",
         "//source/extensions/common/tap:tap_config_base",
         "@envoy_api//envoy/data/tap/v2alpha:http_cc",
     ],

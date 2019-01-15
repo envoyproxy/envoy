@@ -39,28 +39,25 @@ Http::Code AdminHandler::handler(absl::string_view, Http::HeaderMap&, Buffer::In
   if (attached_request_.has_value()) {
     // TODO(mattlklein123): Consider supporting concurrent admin /tap streams. Right now we support
     // a single stream as a simplification.
-    response.add("An attached /tap admin stream already exists. Detach it.");
-    return Http::Code::BadRequest;
+    return badRequest(response, "An attached /tap admin stream already exists. Detach it.");
   }
 
   if (admin_stream.getRequestBody() == nullptr) {
-    response.add("/tap requires a JSON/YAML body");
-    return Http::Code::BadRequest;
+    return badRequest(response, "/tap requires a JSON/YAML body");
   }
 
   envoy::admin::v2alpha::TapRequest tap_request;
   try {
     MessageUtil::loadFromYamlAndValidate(admin_stream.getRequestBody()->toString(), tap_request);
   } catch (EnvoyException& e) {
-    response.add(e.what());
-    return Http::Code::BadRequest;
+    return badRequest(response, e.what());
   }
 
   ENVOY_LOG(debug, "tap admin request for config_id={}", tap_request.config_id());
   if (config_id_map_.count(tap_request.config_id()) == 0) {
-    response.add(fmt::format("Unknown config id '{}'. No extension has registered with this id.",
-                             tap_request.config_id()));
-    return Http::Code::BadRequest;
+    return badRequest(
+        response, fmt::format("Unknown config id '{}'. No extension has registered with this id.",
+                              tap_request.config_id()));
   }
   for (auto config : config_id_map_[tap_request.config_id()]) {
     config->newTapConfig(std::move(*tap_request.mutable_tap_config()), this);
@@ -77,6 +74,12 @@ Http::Code AdminHandler::handler(absl::string_view, Http::HeaderMap&, Buffer::In
   });
   attached_request_.emplace(tap_request.config_id(), &admin_stream);
   return Http::Code::OK;
+}
+
+Http::Code AdminHandler::badRequest(Buffer::Instance& response, absl::string_view error) {
+  ENVOY_LOG(debug, "handler bad request: {}", error);
+  response.add(error);
+  return Http::Code::BadRequest;
 }
 
 void AdminHandler::registerConfig(ExtensionConfig& config, const std::string& config_id) {

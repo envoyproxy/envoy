@@ -12,6 +12,7 @@ envoy_cc_library(
     name = "tap_interface",
     hdrs = ["tap.h"],
     deps = [
+        "//include/envoy/http:header_map_interface",
         "//source/common/protobuf",
         "@envoy_api//envoy/service/tap/v2alpha:common_cc",
     ],
@@ -19,9 +20,22 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "tap_config_base",
+    srcs = ["tap_config_base.cc"],
     hdrs = ["tap_config_base.h"],
     deps = [
-        "@envoy_api//envoy/service/tap/v2alpha:common_cc",
+        ":tap_interface",
+        ":tap_matcher",
+        "//source/common/common:assert_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "tap_matcher",
+    srcs = ["tap_matcher.cc"],
+    hdrs = ["tap_matcher.h"],
+    deps = [
+        ":tap_interface",
+        "//source/common/http:header_utility_lib",
     ],
 )
 

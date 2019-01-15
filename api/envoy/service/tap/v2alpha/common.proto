@@ -12,10 +12,9 @@ option java_multiple_files = true;
 
 // Tap configuration.
 message TapConfig {
-  // The match conditions. One or more match configurations can be specified. If any of them
-  // match the data source being tapped, a tap will occur, with the result written to the
-  // configured output.
-  repeated MatchConfig match_configs = 1 [(validate.rules).repeated .min_items = 1];
+  // The match configuration. If the configuration matches the data source being tapped, a tap will
+  // occur, with the result written to the configured output.
+  MatchConfig match_config = 1 [(validate.rules).message.required = true];
 
   // The tap output configuration. If a match configuration matches a data source being tapped,
   // a tap will occur and the data will be written to the configured output.
@@ -24,35 +23,49 @@ message TapConfig {
   // [#comment:TODO(mattklein123): Rate limiting]
 }
 
-// Tap match configuration. Within a single match configuration, all conditions are evaluated as
-// a logical AND. Logical OR matching can be implemented via multiple match configurations in the
-// top level tap configuration.
+// Tap match configuration. This is a recursive structure which allows complex nested match
+// configurations to be built using various logical operators.
 message MatchConfig {
-  // Match ID used for correlating tap data with the match that produced it.
-  string match_id = 1 [(validate.rules).string.min_bytes = 1];
+  // A set of match configurations used for logical operations.
+  message Set {
+    // The list of rules that make up the set.
+    repeated MatchConfig rules = 1 [(validate.rules).repeated .min_items = 2];
+  }
 
-  // HTTP match configuration. Only useful for HTTP aware tap extensions such as the
-  // :ref:`HTTP tap filter <config_http_filters_tap>`.
-  HttpMatchConfig http_match_config = 2;
-}
+  oneof rule {
+    option (validate.required) = true;
 
-// HTTP match configuration.
-message HttpMatchConfig {
-  // HTTP request match configuration.
-  HttpRequestMatchConfig request_match_config = 1;
+    // A set that describes a logical OR. If any member of the set matches, the match configuration
+    // matches.
+    Set or_match = 1;
 
-  // HTTP response match configuration.
-  HttpResponseMatchConfig response_match_config = 2;
+    // A set that describes a logical AND. If all members of the set match, the match configuration
+    // matches.
+    Set and_match = 2;
+
+    // A negation match. The match configuration will match if the negated match condition does not
+    // match.
+    MatchConfig not_match = 3;
+
+    // The match configuration will always match.
+    bool any_match = 4 [(validate.rules).bool.const = true];
+
+    // HTTP request match configuration.
+    HttpRequestMatch http_request_match = 5;
+
+    // HTTP response match configuration.
+    HttpResponseMatch http_response_match = 6;
+  }
 }
 
 // HTTP request match configuration.
-message HttpRequestMatchConfig {
+message HttpRequestMatch {
   // HTTP request headers to match.
   repeated api.v2.route.HeaderMatcher headers = 1;
 }
 
 // HTTP response match configuration.
-message HttpResponseMatchConfig {
+message HttpResponseMatch {
   // HTTP response headers to match.
   repeated api.v2.route.HeaderMatcher headers = 1;
 }

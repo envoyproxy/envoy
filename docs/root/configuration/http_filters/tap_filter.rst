@@ -20,7 +20,7 @@ configuration is composed of two pieces:
 2. :ref:`Output configuration <envoy_api_msg_service.tap.v2alpha.OutputConfig>`: a list of output
    sinks that the filter will write the matched and tapped data to.
 
-Each of these concepts will be covered incrementally over the course of several example 
+Each of these concepts will be covered incrementally over the course of several example
 configurations in the following section.
 
 Example configuration
@@ -61,24 +61,24 @@ An example POST body:
 
   config_id: test_config_id
   tap_config:
-    match_configs:
-      - match_id: foo_match_id
-        http_match_config:
-          request_match_config:
-            headers:
-              - name: foo
-                exact_match: bar
-          response_match_config:
-            headers:
-              - name: bar
-                exact_match: baz
+    match_config:
+      and_match:
+        rules:
+          - http_request_match:
+              headers:
+                - name: foo
+                  exact_match: bar
+          - http_response_match:
+              headers:
+                - name: bar
+                  exact_match: baz
     output_config:
       sinks:
         - streaming_admin: {}
 
-The configuration instructs the tap filter to match any HTTP requests in which a request header
-``foo: bar`` is present AND a response header ``bar: baz`` is present. If both of these conditions
-are met, the request will be tapped and streamed out the admin endpoint.
+The preceding configuration instructs the tap filter to match any HTTP requests in which a request
+header ``foo: bar`` is present AND a response header ``bar: baz`` is present. If both of these
+conditions are met, the request will be tapped and streamed out the admin endpoint.
 
 Another example POST body:
 
@@ -86,28 +86,39 @@ Another example POST body:
 
   config_id: test_config_id
   tap_config:
-    match_configs:
-      - match_id: request_match_id
-        http_match_config:
-          request_match_config:
-            headers:
-              - name: foo
-                exact_match: bar
-      - match_id: response_match_id
-        http_match_config:
-          response_match_config:
-            headers:
-              - name: bar
-                exact_match: baz
+    match_config:
+      or_match:
+        rules:
+          - http_request_match:
+              headers:
+                - name: foo
+                  exact_match: bar
+          - http_response_match:
+              headers:
+                - name: bar
+                  exact_match: baz
     output_config:
       sinks:
         - streaming_admin: {}
 
-The configuration instructs the tap filter to match any HTTP requests in which a request header
-``foo: bar`` is present OR a response header ``bar: baz`` is present. If either of these conditions
-are met, the request will be tapped and streamed out the admin endpoint. The difference between
-the first example and the second is the use of multiple top level match configurations to produce
-a logical OR.
+The preceding configuration instructs the tap filter to match any HTTP requests in which a request
+header ``foo: bar`` is present OR a response header ``bar: baz`` is present. If either of these
+conditions are met, the request will be tapped and streamed out the admin endpoint.
+
+Another example POST body:
+
+.. code-block:: yaml
+
+  config_id: test_config_id
+  tap_config:
+    match_config:
+      any_match: true
+    output_config:
+      sinks:
+        - streaming_admin: {}
+
+The preceding configuration instructs the tap filter to match any HTTP requests. All requests will
+be tapped and streamed out the admin endpoint.
 
 Statistics
 ----------

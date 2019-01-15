@@ -10,10 +10,6 @@ import "envoy/api/v2/core/base.proto";
 
 // A fully buffered HTTP trace message.
 message HttpBufferedTrace {
-  // The match ID specified in the :ref:`match_id
-  // <envoy_api_field_service.tap.v2alpha.MatchConfig.match_id>` field.
-  string match_id = 1;
-
   // Request headers.
   repeated api.v2.core.HeaderValue request_headers = 2;
 

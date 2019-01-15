@@ -44,8 +44,8 @@ public:
       R"EOF(
 config_id: test_config_id
 tap_config:
-  match_configs:
-    - match_id: foo_match_id
+  match_config:
+    any_match: true
   output_config:
     sinks:
       - streaming_admin: {}

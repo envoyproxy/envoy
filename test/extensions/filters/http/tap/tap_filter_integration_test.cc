@@ -68,19 +68,17 @@ config:
       R"EOF(
 config_id: test_config_id
 tap_config:
-  match_configs:
-    - match_id: request_match_id
-      http_match_config:
-        request_match_config:
-          headers:
-            - name: foo
-              exact_match: bar
-    - match_id: response_match_id
-      http_match_config:
-        response_match_config:
-          headers:
-            - name: bar
-              exact_match: baz
+  match_config:
+    or_match:
+      rules:
+        - http_request_match:
+            headers:
+              - name: foo
+                exact_match: bar
+        - http_response_match:
+            headers:
+              - name: bar
+                exact_match: baz
   output_config:
     sinks:
       - streaming_admin: {}
@@ -122,7 +120,6 @@ tap_config:
   admin_response->waitForBodyData(1);
   envoy::data::tap::v2alpha::HttpBufferedTrace trace;
   MessageUtil::loadFromYaml(admin_response->body(), trace);
-  EXPECT_EQ("request_match_id", trace.match_id());
   EXPECT_EQ(trace.request_headers().size(), 8);
   EXPECT_EQ(trace.response_headers().size(), 5);
   admin_response->clearBody();
@@ -145,7 +142,6 @@ tap_config:
   // Wait for the tap message.
   admin_response->waitForBodyData(1);
   MessageUtil::loadFromYaml(admin_response->body(), trace);
-  EXPECT_EQ("response_match_id", trace.match_id());
   EXPECT_EQ(trace.request_headers().size(), 7);
   EXPECT_EQ("http", findHeader("x-forwarded-proto", trace.request_headers())->value());
   EXPECT_EQ(trace.response_headers().size(), 6);
@@ -160,17 +156,17 @@ tap_config:
       R"EOF(
 config_id: test_config_id
 tap_config:
-  match_configs:
-    - match_id: both_match_id
-      http_match_config:
-        request_match_config:
-          headers:
-            - name: foo
-              exact_match: bar
-        response_match_config:
-          headers:
-            - name: bar
-              exact_match: baz
+  match_config:
+    and_match:
+      rules:
+        - http_request_match:
+            headers:
+              - name: foo
+                exact_match: bar
+        - http_response_match:
+            headers:
+              - name: bar
+                exact_match: baz
   output_config:
     sinks:
       - streaming_admin: {}
@@ -203,7 +199,6 @@ tap_config:
   // Wait for the tap message.
   admin_response->waitForBodyData(1);
   MessageUtil::loadFromYaml(admin_response->body(), trace);
-  EXPECT_EQ("both_match_id", trace.match_id());
 
   admin_client_->close();
   EXPECT_EQ(3UL, test_server_->counter("http.config_test.tap.rq_tapped")->value());

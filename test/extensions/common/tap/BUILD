@@ -16,3 +16,11 @@ envoy_cc_test(
         "//test/mocks/server:server_mocks",
     ],
 )
+
+envoy_cc_test(
+    name = "tap_matcher_test",
+    srcs = ["tap_matcher_test.cc"],
+    deps = [
+        "//source/extensions/common/tap:tap_matcher",
+    ],
+)
