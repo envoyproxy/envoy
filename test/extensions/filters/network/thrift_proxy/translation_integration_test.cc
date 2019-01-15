@@ -22,7 +22,7 @@ class ThriftTranslationIntegrationTest
     : public BaseThriftIntegrationTest,
       public TestWithParam<std::tuple<TransportType, ProtocolType, TransportType, ProtocolType>> {
 public:
-  static void SetUpTestCase() {
+  static void SetUpTestSuite() {
     thrift_config_ = ConfigHelper::BASE_CONFIG + R"EOF(
     filter_chains:
       filters:

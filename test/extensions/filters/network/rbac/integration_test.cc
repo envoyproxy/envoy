@@ -21,7 +21,7 @@ public:
   RoleBasedAccessControlNetworkFilterIntegrationTest()
       : BaseIntegrationTest(GetParam(), realTime(), rbac_config) {}
 
-  static void SetUpTestCase() {
+  static void SetUpTestSuite() {
     rbac_config = ConfigHelper::BASE_CONFIG + R"EOF(
     filter_chains:
       filters:

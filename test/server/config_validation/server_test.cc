@@ -19,7 +19,7 @@ public:
     directory_ = TestEnvironment::temporaryDirectory() + "/test/config_test/";
   }
 
-  static void SetUpTestCase() { SetupTestDirectory(); }
+  static void SetUpTestSuite() { SetupTestDirectory(); }
 
 protected:
   ValidationServerTest() : options_(directory_ + GetParam()) {}

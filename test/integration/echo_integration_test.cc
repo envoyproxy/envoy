@@ -13,7 +13,7 @@ public:
   EchoIntegrationTest() : BaseIntegrationTest(GetParam(), realTime(), echo_config) {}
 
   // Called once by the gtest framework before any EchoIntegrationTests are run.
-  static void SetUpTestCase() {
+  static void SetUpTestSuite() {
     echo_config = ConfigHelper::BASE_CONFIG + R"EOF(
     filter_chains:
       filters:

@@ -20,7 +20,7 @@ class ThriftConnManagerIntegrationTest
     : public BaseThriftIntegrationTest,
       public TestWithParam<std::tuple<TransportType, ProtocolType, bool>> {
 public:
-  static void SetUpTestCase() {
+  static void SetUpTestSuite() {
     thrift_config_ = ConfigHelper::BASE_CONFIG + R"EOF(
     filter_chains:
       filters:
