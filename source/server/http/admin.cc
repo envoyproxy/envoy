@@ -739,9 +739,9 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheus(
     for (size_t i = 0; i < supported_buckets_ref.size(); ++i) {
       double bucket = supported_buckets_ref[i];
       double value = stats.computedBuckets()[i];
-      response.add(fmt::format("{0}{{{1}},le=\"{2}\"} {3}\n", metric_name, tags, bucket, value));
+      response.add(fmt::format("{0}{{{1},le=\"{2}\"}} {3}\n", metric_name, tags, bucket, value));
     }
-    response.add(fmt::format("{0}{{{1}},le=\"+Inf\"} {2}\n", metric_name, tags, stats.sampleSum()));
+    response.add(fmt::format("{0}{{{1},le=\"+Inf\"}} {2}\n", metric_name, tags, stats.sampleSum()));
     response.add(fmt::format("{0}_sum{{{1}}} {2}\n", metric_name, tags, stats.sampleSum()));
     response.add(fmt::format("{0}_count{{{1}}} {2}\n", metric_name, tags, stats.sampleCount()));
   }
