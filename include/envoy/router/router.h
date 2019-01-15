@@ -209,6 +209,11 @@ public:
 enum class RetryStatus { No, NoOverflow, NoRetryLimitExceeded, Yes };
 
 /**
+ * InternalRedirectAction from the route configuration.
+ */
+enum class InternalRedirectAction { PassThrough, Handle };
+
+/**
  * Wraps retry state for an active routed request.
  */
 class RetryState {
@@ -641,6 +646,11 @@ public:
    * @return a map of route-specific upgrades to their enabled/disabled status.
    */
   virtual const UpgradeMap& upgradeMap() const PURE;
+
+  /**
+   * @returns the internal redirect action which should be taken on this route.
+   */
+  virtual InternalRedirectAction internalRedirectAction() const PURE;
 };
 
 /**

@@ -78,6 +78,8 @@ Every cluster has a statistics tree rooted at *cluster.<name>.* with the followi
   upstream_flow_control_resumed_reading_total, Counter, Total number of times flow control resumed reading from upstream
   upstream_flow_control_backed_up_total, Counter, Total number of times the upstream connection backed up and paused reads from downstream
   upstream_flow_control_drained_total, Counter, Total number of times the upstream connection drained and resumed reads from downstream
+  upstream_internal_redirect_failed_total, Counter, Total number of times failed internal redirects resulted in redirects being passed downstream.
+  upstream_internal_redirect_succeed_total, Counter, Total number of times internal redirects resulted in a second upstream request.
   membership_change, Counter, Total cluster membership changes
   membership_healthy, Gauge, Current cluster healthy total (inclusive of both health checking and outlier detection)
   membership_total, Gauge, Current cluster membership total

@@ -54,7 +54,8 @@ public:
   ~MockServerConnectionCallbacks();
 
   // Http::ServerConnectionCallbacks
-  MOCK_METHOD1(newStream, StreamDecoder&(StreamEncoder& response_encoder));
+  MOCK_METHOD2(newStream,
+               StreamDecoder&(StreamEncoder& response_encoder, bool is_internally_created));
 };
 
 class MockStreamCallbacks : public StreamCallbacks {
@@ -146,6 +147,7 @@ public:
   MOCK_METHOD1(removeDownstreamWatermarkCallbacks, void(DownstreamWatermarkCallbacks&));
   MOCK_METHOD1(setDecoderBufferLimit, void(uint32_t));
   MOCK_METHOD0(decoderBufferLimit, uint32_t());
+  MOCK_METHOD0(recreateStream, bool());
 
   // Http::StreamDecoderFilterCallbacks
   void sendLocalReply(Code code, absl::string_view body,

@@ -66,7 +66,8 @@ AutonomousHttpConnection::AutonomousHttpConnection(SharedConnectionWrapper& shar
     : FakeHttpConnection(shared_connection, store, type, upstream.timeSystem()),
       upstream_(upstream) {}
 
-Http::StreamDecoder& AutonomousHttpConnection::newStream(Http::StreamEncoder& response_encoder) {
+Http::StreamDecoder& AutonomousHttpConnection::newStream(Http::StreamEncoder& response_encoder,
+                                                         bool) {
   auto stream = new AutonomousStream(*this, response_encoder, upstream_);
   streams_.push_back(FakeStreamPtr{stream});
   return *(stream);
