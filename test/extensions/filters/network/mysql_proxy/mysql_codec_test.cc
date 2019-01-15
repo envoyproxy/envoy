@@ -404,15 +404,54 @@ TEST_F(MySQLCodecTest, MySQLClientLogin320EncDec) {
 }
 
 TEST_F(MySQLCodecTest, MySQLParseLengthEncodedInteger) {
-  Buffer::InstancePtr buffer(new Buffer::OwnedImpl());
+  {
+    // encode 2 byte value
+    Buffer::InstancePtr buffer(new Buffer::OwnedImpl());
+    uint64_t offset = 0;
+    uint64_t input_val = 5;
+    uint64_t output_val = 0;
+    BufferHelper::addUint8(*buffer, LENENCODINT_2BYTES);
+    BufferHelper::addUint16(*buffer, input_val);
+    EXPECT_EQ(BufferHelper::peekLengthEncodedInteger(*buffer, offset, output_val), MYSQL_SUCCESS);
+    EXPECT_EQ(input_val, output_val);
+  }
 
-  uint64_t offset = 0;
-  uint64_t input_val = (1 << 16) - 1; // < 2^16
-  uint64_t output_val = 0;
-  BufferHelper::addUint8(*buffer, 0xfc);
-  BufferHelper::addUint16(*buffer, input_val);
-  EXPECT_EQ(BufferHelper::peekLengthEncodedInteger(*buffer, offset, output_val), MYSQL_SUCCESS);
-  EXPECT_EQ(input_val, output_val);
+  {
+    // encode 3 byte value
+    Buffer::InstancePtr buffer(new Buffer::OwnedImpl());
+    uint64_t offset = 0;
+    uint64_t input_val = 5;
+    uint64_t output_val = 0;
+    BufferHelper::addUint8(*buffer, LENENCODINT_3BYTES);
+    BufferHelper::addUint16(*buffer, input_val);
+    BufferHelper::addUint8(*buffer, 0);
+    EXPECT_EQ(BufferHelper::peekLengthEncodedInteger(*buffer, offset, output_val), MYSQL_SUCCESS);
+    EXPECT_EQ(input_val, output_val);
+  }
+
+  {
+    // encode 8 byte value
+    Buffer::InstancePtr buffer(new Buffer::OwnedImpl());
+    uint64_t offset = 0;
+    uint64_t input_val = 5;
+    uint64_t output_val = 0;
+    BufferHelper::addUint8(*buffer, LENENCODINT_8BYTES);
+    BufferHelper::addUint32(*buffer, input_val);
+    BufferHelper::addUint32(*buffer, 0);
+    EXPECT_EQ(BufferHelper::peekLengthEncodedInteger(*buffer, offset, output_val), MYSQL_SUCCESS);
+    EXPECT_EQ(input_val, output_val);
+  }
+
+  {
+    // encode invalid length header
+    Buffer::InstancePtr buffer(new Buffer::OwnedImpl());
+    uint64_t offset = 0;
+    uint64_t input_val = 5;
+    uint64_t output_val = 0;
+    BufferHelper::addUint8(*buffer, 0xff);
+    BufferHelper::addUint32(*buffer, input_val);
+    EXPECT_EQ(BufferHelper::peekLengthEncodedInteger(*buffer, offset, output_val), MYSQL_FAILURE);
+  }
 }
 
 /*
