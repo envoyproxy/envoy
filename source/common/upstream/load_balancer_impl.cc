@@ -254,7 +254,8 @@ LoadBalancerBase::chooseHostSet(LoadBalancerContext* context) {
 
   const auto priority_and_source =
       choosePriority(random_.random(), per_priority_load_, degraded_per_priority_load_);
-  return {*priority_set_.hostSetsPerPriority()[priority_and_source.first], priority_and_source.second};
+  return {*priority_set_.hostSetsPerPriority()[priority_and_source.first],
+          priority_and_source.second};
 }
 
 ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
