@@ -13,21 +13,21 @@ import "gogoproto/gogo.proto";
 // :ref:`Outlier detection logging <arch_overview_outlier_detection_logging>`.
 
 message OutlierDetectionEvent {
-  // In case of eject represents type of ejection that took place
+  // In case of eject represents type of ejection that took place.
   OutlierEjectionType type = 1 [(validate.rules).enum.defined_only = true];
   // Timestamp for event.
   google.protobuf.Timestamp timestamp = 2 [(gogoproto.stdtime) = true];
-  // Time in seconds since the last action happened
+  // Time in seconds since the last action happened.
   int64 secs_since_last_action = 3 [(validate.rules).int64.gte = 0];
-  // Cluster that owns the ejected host
+  // Cluster that owns the ejected host.
   string cluster_name = 4 [(validate.rules).string.min_bytes = 1];
-  // URL of the ejected host
+  // URL of the ejected host.
   string upstream_url = 5 [(validate.rules).string.min_bytes = 1];
-  // Indicates whether eject or uneject took place
+  // Indicates whether eject or uneject took place.
   Action action = 6 [(validate.rules).enum.defined_only = true];
-  // In case of eject action represents the number of times host has been ejected
+  // In case of eject action represents the number of times host has been ejected.
   int32 num_ejections = 7 [(validate.rules).int32.gte = 0];
-  // True if ejection happened
+  // True if ejection happened.
   bool enforced = 8;
 
   oneof event {
@@ -49,9 +49,9 @@ enum Action {
 }
 
 message OutlierEjectSuccessRate {
-  // Host’s success rate at the time of the ejection event on a 0-100 range
+  // Host’s success rate at the time of the ejection event on a 0-100 range.
   int32 host_success_rate = 1 [(validate.rules).int32.lte = 100];
-  // Average success rate of the hosts in the cluster at the time of the ejection event on a 0-100
+  // Average success rate of the hosts in the cluster at the time of the ejection event on a 0-100.
   // range
   int32 cluster_average_success_rate = 2 [(validate.rules).int32.lte = 100];
   // Success rate ejection threshold at the time of the ejection event.
