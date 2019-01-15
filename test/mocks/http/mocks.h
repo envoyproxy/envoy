@@ -257,6 +257,7 @@ public:
   MOCK_METHOD2(encodeHeaders, FilterHeadersStatus(HeaderMap& headers, bool end_stream));
   MOCK_METHOD2(encodeData, FilterDataStatus(Buffer::Instance& data, bool end_stream));
   MOCK_METHOD1(encodeTrailers, FilterTrailersStatus(HeaderMap& trailers));
+  MOCK_METHOD1(encodeMetadata, FilterMetadataStatus(MetadataMap& metadata_map));
   MOCK_METHOD1(setEncoderFilterCallbacks, void(StreamEncoderFilterCallbacks& callbacks));
 
   Http::StreamEncoderFilterCallbacks* callbacks_{};
@@ -281,6 +282,7 @@ public:
   MOCK_METHOD2(encodeHeaders, FilterHeadersStatus(HeaderMap& headers, bool end_stream));
   MOCK_METHOD2(encodeData, FilterDataStatus(Buffer::Instance& data, bool end_stream));
   MOCK_METHOD1(encodeTrailers, FilterTrailersStatus(HeaderMap& trailers));
+  MOCK_METHOD1(encodeMetadata, FilterMetadataStatus(MetadataMap& metadata_map));
   MOCK_METHOD1(setEncoderFilterCallbacks, void(StreamEncoderFilterCallbacks& callbacks));
 
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
