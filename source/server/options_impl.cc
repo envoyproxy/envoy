@@ -63,9 +63,6 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
       "", "config-yaml", "Inline YAML configuration, merges with the contents of --config-path",
       false, "", "string", cmd);
 
-  // Deprecated and unused.
-  TCLAP::SwitchArg v2_config_only("", "v2-config-only", "deprecated", cmd, true);
-
   TCLAP::SwitchArg allow_unknown_fields("", "allow-unknown-fields",
                                         "allow unknown fields in the configuration", cmd, false);
 

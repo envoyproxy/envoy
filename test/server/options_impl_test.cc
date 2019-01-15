@@ -66,7 +66,7 @@ TEST_F(OptionsImplTest, All) {
       "--service-cluster cluster --service-node node --service-zone zone "
       "--file-flush-interval-msec 9000 "
       "--drain-time-s 60 --log-format [%v] --parent-shutdown-time-s 90 --log-path /foo/bar "
-      "--v2-config-only --disable-hot-restart");
+      "--disable-hot-restart");
   EXPECT_EQ(Server::Mode::Validate, options->mode());
   EXPECT_EQ(2U, options->concurrency());
   EXPECT_EQ("hello", options->configPath());
@@ -198,12 +198,11 @@ TEST_F(OptionsImplTest, OptionsAreInSyncWithProto) {
   Server::CommandLineOptionsPtr command_line_options = options->toCommandLineOptions();
   // Failure of this condition indicates that the server_info proto is not in sync with the options.
   // If an option is added/removed, please update server_info proto as well to keep it in sync.
-  // Currently the following 4 options are not defined in proto, hence the count differs by 4.
-  // 1. v2-config-only - being deprecated.
+  // Currently the following 3 options are not defined in proto, hence the count differs by 3.
   // 2. version        - default TCLAP argument.
   // 3. help           - default TCLAP argument.
   // 4. ignore_rest    - default TCLAP argument.
-  EXPECT_EQ(options->count() - 4, command_line_options->GetDescriptor()->field_count());
+  EXPECT_EQ(options->count() - 3, command_line_options->GetDescriptor()->field_count());
 }
 
 TEST_F(OptionsImplTest, BadCliOption) {
