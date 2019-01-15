@@ -153,7 +153,7 @@ TEST_F(OptionsImplTest, SetAll) {
   EXPECT_EQ(envoy::admin::v2alpha::CommandLineOptions::v6,
             command_line_options->local_address_ip_version());
   EXPECT_EQ(options->drainTime().count(), command_line_options->drain_time().seconds());
-  EXPECT_EQ(spdlog::level::to_c_str(options->logLevel()), command_line_options->log_level());
+  EXPECT_EQ(spdlog::level::to_string_view(options->logLevel()), command_line_options->log_level());
   EXPECT_EQ(options->logFormat(), command_line_options->log_format());
   EXPECT_EQ(options->logPath(), command_line_options->log_path());
   EXPECT_EQ(options->parentShutdownTime().count(),
