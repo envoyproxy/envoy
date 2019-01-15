@@ -10,8 +10,9 @@
 namespace Envoy {
 namespace Stats {
 
-HistogramStatisticsImpl::HistogramStatisticsImpl(const histogram_t* histogram_ptr) {
-  computed_quantiles_ = std::vector<double>(supportedQuantiles().size(), 0.0);
+HistogramStatisticsImpl::HistogramStatisticsImpl(const histogram_t* histogram_ptr)
+    : computed_quantiles_(supportedQuantiles().size(), 0.0),
+      computed_buckets_(supportedBuckets().size(), 0.0) {
   hist_approx_quantile(histogram_ptr, supportedQuantiles().data(), supportedQuantiles().size(),
                        computed_quantiles_.data());
 
@@ -19,7 +20,6 @@ HistogramStatisticsImpl::HistogramStatisticsImpl(const histogram_t* histogram_pt
   sample_sum_ = hist_approx_sum(histogram_ptr);
 
   const std::vector<double>& supported_buckets_ref = supportedBuckets();
-  computed_buckets_ = std::vector<double>(supported_buckets_ref.size(), 0.0);
   for (size_t i = 0; i < supported_buckets_ref.size(); ++i) {
     computed_buckets_[i] = hist_approx_count_below(histogram_ptr, supported_buckets_ref[i]);
   }
@@ -49,13 +49,14 @@ std::string HistogramStatisticsImpl::quantileSummary() const {
 }
 
 std::string HistogramStatisticsImpl::bucketSummary() const {
-  std::vector<std::string> bucketSummary;
+  std::vector<std::string> bucket_summary;
   const std::vector<double>& supported_buckets_ref = supportedBuckets();
-  bucketSummary.reserve(supported_buckets_ref.size());
+  bucket_summary.reserve(supported_buckets_ref.size());
   for (size_t i = 0; i < supported_buckets_ref.size(); ++i) {
-    bucketSummary.push_back(fmt::format("B{}: {}", supported_buckets_ref[i], computed_buckets_[i]));
+    bucket_summary.push_back(
+        fmt::format("B{}: {}", supported_buckets_ref[i], computed_buckets_[i]));
   }
-  return absl::StrJoin(bucketSummary, ", ");
+  return absl::StrJoin(bucket_summary, ", ");
 }
 
 /**
@@ -71,6 +72,7 @@ void HistogramStatisticsImpl::refresh(const histogram_t* new_histogram_ptr) {
   sample_sum_ = hist_approx_sum(new_histogram_ptr);
 
   std::fill(computed_buckets_.begin(), computed_buckets_.end(), 0.0);
+  ASSERT(supportedBuckets().size() == computed_buckets_.size());
   const std::vector<double>& supported_buckets_ref = supportedBuckets();
   for (size_t i = 0; i < supported_buckets_ref.size(); ++i) {
     computed_buckets_[i] = hist_approx_count_below(new_histogram_ptr, supported_buckets_ref[i]);
