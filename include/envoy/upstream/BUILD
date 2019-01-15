@@ -63,6 +63,7 @@ envoy_cc_library(
     deps = [
         ":upstream_interface",
         "//include/envoy/router:router_interface",
+        "//include/envoy/upstream:types_interface",
     ],
 )
 
@@ -98,6 +99,7 @@ envoy_cc_library(
     name = "retry_interface",
     hdrs = ["retry.h"],
     deps = [
+        "//include/envoy/upstream:types_interface",
         "//include/envoy/upstream:upstream_interface",
     ],
 )
@@ -113,6 +115,14 @@ envoy_cc_library(
     deps = [
         ":load_balancer_interface",
         ":upstream_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "types_interface",
+    hdrs = ["types.h"],
+    deps = [
+        "//source/common/common:phantom",
     ],
 )
 

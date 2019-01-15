@@ -142,6 +142,8 @@ TEST_P(RedisSingleServerRequestTest, Success) {
   table.toLowerCase(lower_command);
 
   EXPECT_EQ(1UL, store_.counter(fmt::format("redis.foo.command.{}.total", lower_command)).value());
+  EXPECT_EQ(1UL,
+            store_.counter(fmt::format("redis.foo.command.{}.success", lower_command)).value());
 };
 
 TEST_P(RedisSingleServerRequestTest, SuccessMultipleArgs) {
@@ -159,6 +161,8 @@ TEST_P(RedisSingleServerRequestTest, SuccessMultipleArgs) {
   table.toLowerCase(lower_command);
 
   EXPECT_EQ(1UL, store_.counter(fmt::format("redis.foo.command.{}.total", lower_command)).value());
+  EXPECT_EQ(1UL,
+            store_.counter(fmt::format("redis.foo.command.{}.success", lower_command)).value());
 };
 
 TEST_P(RedisSingleServerRequestTest, Fail) {
@@ -170,6 +174,13 @@ TEST_P(RedisSingleServerRequestTest, Fail) {
   EXPECT_NE(nullptr, handle_);
 
   fail();
+
+  ToLowerTable table;
+  std::string lower_command(GetParam());
+  table.toLowerCase(lower_command);
+
+  EXPECT_EQ(1UL, store_.counter(fmt::format("redis.foo.command.{}.total", lower_command)).value());
+  EXPECT_EQ(1UL, store_.counter(fmt::format("redis.foo.command.{}.error", lower_command)).value());
 };
 
 TEST_P(RedisSingleServerRequestTest, Cancel) {
@@ -234,6 +245,8 @@ TEST_F(RedisSingleServerRequestTest, EvalSuccess) {
   table.toLowerCase(lower_command);
 
   EXPECT_EQ(1UL, store_.counter(fmt::format("redis.foo.command.{}.total", lower_command)).value());
+  EXPECT_EQ(1UL,
+            store_.counter(fmt::format("redis.foo.command.{}.success", lower_command)).value());
 };
 
 TEST_F(RedisSingleServerRequestTest, EvalShaSuccess) {
@@ -251,6 +264,8 @@ TEST_F(RedisSingleServerRequestTest, EvalShaSuccess) {
   table.toLowerCase(lower_command);
 
   EXPECT_EQ(1UL, store_.counter(fmt::format("redis.foo.command.{}.total", lower_command)).value());
+  EXPECT_EQ(1UL,
+            store_.counter(fmt::format("redis.foo.command.{}.success", lower_command)).value());
 };
 
 TEST_F(RedisSingleServerRequestTest, EvalWrongNumberOfArgs) {
@@ -283,6 +298,9 @@ TEST_F(RedisSingleServerRequestTest, EvalNoUpstream) {
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
   handle_ = splitter_.makeRequest(request, callbacks_);
   EXPECT_EQ(nullptr, handle_);
+
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.eval.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.eval.error").value());
 };
 
 class RedisMGETCommandHandlerTest : public RedisCommandSplitterImplTest {
@@ -347,6 +365,7 @@ TEST_F(RedisMGETCommandHandlerTest, Normal) {
   pool_callbacks_[0]->onResponse(std::move(response1));
 
   EXPECT_EQ(1UL, store_.counter("redis.foo.command.mget.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.mget.success").value());
 };
 
 TEST_F(RedisMGETCommandHandlerTest, NormalWithNull) {
@@ -387,6 +406,8 @@ TEST_F(RedisMGETCommandHandlerTest, NoUpstreamHostForAll) {
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
   setup(2, {0, 1});
   EXPECT_EQ(nullptr, handle_);
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.mget.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.mget.error").value());
 };
 
 TEST_F(RedisMGETCommandHandlerTest, NoUpstreamHostForOne) {
@@ -406,6 +427,8 @@ TEST_F(RedisMGETCommandHandlerTest, NoUpstreamHostForOne) {
 
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
   pool_callbacks_[1]->onFailure();
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.mget.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.mget.error").value());
 };
 
 TEST_F(RedisMGETCommandHandlerTest, Failure) {
@@ -430,6 +453,8 @@ TEST_F(RedisMGETCommandHandlerTest, Failure) {
   response1->asString() = "response";
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
   pool_callbacks_[0]->onResponse(std::move(response1));
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.mget.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.mget.error").value());
 };
 
 TEST_F(RedisMGETCommandHandlerTest, InvalidUpstreamResponse) {
@@ -454,6 +479,8 @@ TEST_F(RedisMGETCommandHandlerTest, InvalidUpstreamResponse) {
   response1->asInteger() = 5;
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
   pool_callbacks_[0]->onResponse(std::move(response1));
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.mget.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.mget.error").value());
 };
 
 TEST_F(RedisMGETCommandHandlerTest, Cancel) {
@@ -527,6 +554,7 @@ TEST_F(RedisMSETCommandHandlerTest, Normal) {
   pool_callbacks_[0]->onResponse(std::move(response1));
 
   EXPECT_EQ(1UL, store_.counter("redis.foo.command.mset.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.mset.success").value());
 };
 
 TEST_F(RedisMSETCommandHandlerTest, NoUpstreamHostForAll) {
@@ -539,6 +567,8 @@ TEST_F(RedisMSETCommandHandlerTest, NoUpstreamHostForAll) {
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
   setup(2, {0, 1});
   EXPECT_EQ(nullptr, handle_);
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.mset.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.mset.error").value());
 };
 
 TEST_F(RedisMSETCommandHandlerTest, NoUpstreamHostForOne) {
@@ -556,6 +586,8 @@ TEST_F(RedisMSETCommandHandlerTest, NoUpstreamHostForOne) {
   response2->asString() = Response::get().OK;
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
   pool_callbacks_[1]->onResponse(std::move(response2));
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.mset.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.mset.error").value());
 };
 
 TEST_F(RedisMSETCommandHandlerTest, Cancel) {
@@ -579,6 +611,8 @@ TEST_F(RedisMSETCommandHandlerTest, WrongNumberOfArgs) {
   RespValue request;
   makeBulkStringArray(request, {"mset", "foo", "bar", "fizz"});
   EXPECT_EQ(nullptr, splitter_.makeRequest(request, callbacks_));
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.mset.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.mset.error").value());
 };
 
 class RedisSplitKeysSumResultHandlerTest : public RedisCommandSplitterImplTest,
@@ -639,6 +673,7 @@ TEST_P(RedisSplitKeysSumResultHandlerTest, Normal) {
   pool_callbacks_[0]->onResponse(std::move(response1));
 
   EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".success").value());
 };
 
 TEST_P(RedisSplitKeysSumResultHandlerTest, NormalOneZero) {
@@ -663,6 +698,7 @@ TEST_P(RedisSplitKeysSumResultHandlerTest, NormalOneZero) {
   pool_callbacks_[0]->onResponse(std::move(response1));
 
   EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".success").value());
 };
 
 TEST_P(RedisSplitKeysSumResultHandlerTest, NoUpstreamHostForAll) {
@@ -675,6 +711,8 @@ TEST_P(RedisSplitKeysSumResultHandlerTest, NoUpstreamHostForAll) {
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
   setup(2, {0, 1});
   EXPECT_EQ(nullptr, handle_);
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".error").value());
 };
 
 INSTANTIATE_TEST_CASE_P(RedisSplitKeysSumResultHandlerTest, RedisSplitKeysSumResultHandlerTest,

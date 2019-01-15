@@ -28,7 +28,7 @@ public:
   // a priority vector in the style of per_priority_load_
   //
   // Returns the priority, a number between 0 and per_priority_load.size()-1
-  static uint32_t choosePriority(uint64_t hash, const std::vector<uint32_t>& per_priority_load);
+  static uint32_t choosePriority(uint64_t hash, const PriorityLoad& per_priority_load);
 
   HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
 
@@ -62,7 +62,7 @@ protected:
   // Choose host set randomly, based on the per_priority_load_;
   HostSet& chooseHostSet(LoadBalancerContext* context);
 
-  uint32_t percentageLoad(uint32_t priority) const { return per_priority_load_[priority]; }
+  uint32_t percentageLoad(uint32_t priority) const { return per_priority_load_.get()[priority]; }
   bool isInPanic(uint32_t priority) const { return per_priority_panic_[priority]; }
 
   ClusterStats& stats_;
@@ -78,7 +78,7 @@ public:
   // priority levels.
   void static recalculatePerPriorityState(uint32_t priority, const PrioritySet& priority_set,
                                           PriorityLoad& priority_load,
-                                          std::vector<uint32_t>& per_priority_health);
+                                          PriorityAvailability& per_priority_health);
   void recalculatePerPriorityPanic();
 
 protected:
@@ -88,14 +88,15 @@ protected:
   // Calculating normalized total health starts with summarizing all priorities' health values.
   // It can exceed 100%. For example if there are three priorities and each is 100% healthy, the
   // total of all priorities is 300%. Normalized total health is then capped at 100%.
-  static uint32_t calcNormalizedTotalHealth(std::vector<uint32_t>& per_priority_health) {
+  static uint32_t calcNormalizedTotalHealth(PriorityAvailability& per_priority_health) {
     return std::min<uint32_t>(
-        std::accumulate(per_priority_health.begin(), per_priority_health.end(), 0), 100);
+        std::accumulate(per_priority_health.get().begin(), per_priority_health.get().end(), 0),
+        100);
   }
   // The percentage load (0-100) for each priority level
-  std::vector<uint32_t> per_priority_load_;
+  PriorityLoad per_priority_load_;
   // The health (0-100) for each priority level.
-  std::vector<uint32_t> per_priority_health_;
+  PriorityAvailability per_priority_health_;
   // Levels which are in panic
   std::vector<bool> per_priority_panic_;
 };
