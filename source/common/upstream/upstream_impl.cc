@@ -625,13 +625,16 @@ ClusterImplBase::ClusterImplBase(
         }
 
         uint32_t healthy_hosts = 0;
+        uint32_t degraded_hosts = 0;
         uint32_t hosts = 0;
         for (const auto& host_set : prioritySet().hostSetsPerPriority()) {
           hosts += host_set->hosts().size();
           healthy_hosts += host_set->healthyHosts().size();
+          degraded_hosts += host_set->degradedHosts().size();
         }
         info_->stats().membership_total_.set(hosts);
         info_->stats().membership_healthy_.set(healthy_hosts);
+        info_->stats().membership_degraded_.set(degraded_hosts);
       });
 }
 
