@@ -1,7 +1,7 @@
 REPOSITORY_LOCATIONS = dict(
     bazel_gazelle = dict(
-        sha256 = "6e875ab4b6bf64a38c352887760f21203ab054676d9c1b274963907e0768740d",
-        urls = ["https://github.com/bazelbuild/bazel-gazelle/releases/download/0.15.0/bazel-gazelle-0.15.0.tar.gz"],
+        sha256 = "7949fc6cc17b5b191103e97481cf8889217263acf52e00b560683413af204fcb",
+        urls = ["https://github.com/bazelbuild/bazel-gazelle/releases/download/0.16.0/bazel-gazelle-0.16.0.tar.gz"],
     ),
     boringssl = dict(
         # Use commits from branch "chromium-stable-with-bazel"
@@ -111,13 +111,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/google/jwt_verify_lib/archive/85cf0edf1f1bc507ff7d96a8d6a9bc20307b0fcf.tar.gz"],
     ),
     com_github_nodejs_http_parser = dict(
-        sha256 = "f742dc5a206958c4d0a6b2c35e3e102afb5683f55f7a7cb1eae024a03f081347",
-        strip_prefix = "http-parser-77310eeb839c4251c07184a5db8885a572a08352",
-        # 2018-07-20 snapshot to pick up:
-        # A performance fix, nodejs/http-parser PR 422.
-        # A bug fix, nodejs/http-parser PR 432.
-        # TODO(brian-pane): Upgrade to the next http-parser release once it's available
-        urls = ["https://github.com/nodejs/http-parser/archive/77310eeb839c4251c07184a5db8885a572a08352.tar.gz"],
+        sha256 = "ef26268c54c8084d17654ba2ed5140bffeffd2a040a895ffb22a6cca3f6c613f",
+        strip_prefix = "http-parser-2.9.0",
+        urls = ["https://github.com/nodejs/http-parser/archive/v2.9.0.tar.gz"],
     ),
     com_github_pallets_jinja = dict(
         sha256 = "f84be1bb0040caca4cea721fcbbbbd61f9be9464ca236387158b0feea01914a4",
@@ -125,9 +121,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/pallets/jinja/releases/download/2.10/Jinja2-2.10.tar.gz"],
     ),
     com_github_pallets_markupsafe = dict(
-        sha256 = "dc3938045d9407a73cf9fdd709e2b1defd0588d50ffc85eb0786c095ec846f15",
-        strip_prefix = "markupsafe-1.0",
-        urls = ["https://github.com/pallets/markupsafe/archive/1.0.tar.gz"],
+        sha256 = "62f6154071d1ceac8d7dfb5ed7a21dc502cc12e2348c032e5a1cedd018548381",
+        strip_prefix = "markupsafe-1.1.0/src",
+        urls = ["https://github.com/pallets/markupsafe/archive/1.1.0.tar.gz"],
     ),
     com_github_tencent_rapidjson = dict(
         sha256 = "bf7ced29704a1e696fbccf2a2b4ea068e7774fa37f6d7dd4039d0787f8bed98e",
@@ -155,14 +151,15 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/google/googletest/archive/release-1.8.1.tar.gz"],
     ),
     com_google_protobuf = dict(
-        sha256 = "3d610ac90f8fa16e12490088605c248b85fdaf23114ce4b3605cdf81f7823604",
-        strip_prefix = "protobuf-fa252ec2a54acb24ddc87d48fed1ecfd458445fd",
+        sha256 = "46f1da3a6a6db66dd240cf95a5553198f7c6e98e6ac942fceb8a1cf03291d96e",
+        strip_prefix = "protobuf-7492b5681231c79f0265793fa57dc780ae2481d6",
         # TODO(htuch): Switch back to released versions for protobuf when a release > 3.6.0 happens
         # that includes:
         # - https://github.com/protocolbuffers/protobuf/commit/f35669b8d3f46f7f1236bd21f14d744bba251e60
         # - https://github.com/protocolbuffers/protobuf/commit/6a4fec616ec4b20f54d5fb530808b855cb664390
         # - https://github.com/protocolbuffers/protobuf/commit/fa252ec2a54acb24ddc87d48fed1ecfd458445fd
-        urls = ["https://github.com/protocolbuffers/protobuf/archive/fa252ec2a54acb24ddc87d48fed1ecfd458445fd.tar.gz"],
+        # - https://github.com/protocolbuffers/protobuf/commit/7492b5681231c79f0265793fa57dc780ae2481d6
+        urls = ["https://github.com/protocolbuffers/protobuf/archive/7492b5681231c79f0265793fa57dc780ae2481d6.tar.gz"],
     ),
     grpc_httpjson_transcoding = dict(
         sha256 = "dedd76b0169eb8c72e479529301a1d9b914a4ccb4d2b5ddb4ebe92d63a7b2152",

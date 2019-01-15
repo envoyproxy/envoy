@@ -103,11 +103,17 @@ IntegrationCodecClient::makeHeaderOnlyRequest(const Http::HeaderMap& headers) {
 
 IntegrationStreamDecoderPtr
 IntegrationCodecClient::makeRequestWithBody(const Http::HeaderMap& headers, uint64_t body_size) {
+  return makeRequestWithBody(headers, std::string(body_size, 'a'));
+}
+
+IntegrationStreamDecoderPtr
+IntegrationCodecClient::makeRequestWithBody(const Http::HeaderMap& headers,
+                                            const std::string& body) {
   auto response = std::make_unique<IntegrationStreamDecoder>(dispatcher_);
   Http::StreamEncoder& encoder = newStream(*response);
   encoder.getStream().addCallbacks(*response);
   encoder.encodeHeaders(headers, false);
-  Buffer::OwnedImpl data(std::string(body_size, 'a'));
+  Buffer::OwnedImpl data(body);
   encoder.encodeData(data, true);
   flushWrite();
   return response;
@@ -227,7 +233,6 @@ HttpIntegrationTest::HttpIntegrationTest(Http::CodecClient::Type downstream_prot
 HttpIntegrationTest::~HttpIntegrationTest() {
   cleanupUpstreamAndDownstream();
   test_server_.reset();
-  fake_upstream_connection_.reset();
   fake_upstreams_.clear();
 }
 
@@ -238,7 +243,7 @@ void HttpIntegrationTest::setDownstreamProtocol(Http::CodecClient::Type downstre
 
 IntegrationStreamDecoderPtr HttpIntegrationTest::sendRequestAndWaitForResponse(
     const Http::TestHeaderMapImpl& request_headers, uint32_t request_body_size,
-    const Http::TestHeaderMapImpl& response_headers, uint32_t response_size) {
+    const Http::TestHeaderMapImpl& response_headers, uint32_t response_size, int upstream_index) {
   ASSERT(codec_client_ != nullptr);
   // Send the request to Envoy.
   IntegrationStreamDecoderPtr response;
@@ -247,7 +252,7 @@ IntegrationStreamDecoderPtr HttpIntegrationTest::sendRequestAndWaitForResponse(
   } else {
     response = codec_client_->makeHeaderOnlyRequest(request_headers);
   }
-  waitForNextUpstreamRequest();
+  waitForNextUpstreamRequest(upstream_index);
   // Send response headers, and end_stream if there is no response body.
   upstream_request_->encodeHeaders(response_headers, response_size == 0);
   // Send any response data, with end_stream true.
@@ -269,6 +274,7 @@ void HttpIntegrationTest::cleanupUpstreamAndDownstream() {
     RELEASE_ASSERT(result, result.message());
     result = fake_upstream_connection_->waitForDisconnect();
     RELEASE_ASSERT(result, result.message());
+    fake_upstream_connection_.reset();
   }
   if (codec_client_) {
     codec_client_->close();
@@ -306,6 +312,17 @@ void HttpIntegrationTest::waitForNextUpstreamRequest(uint64_t upstream_index) {
   waitForNextUpstreamRequest(std::vector<uint64_t>({upstream_index}));
 }
 
+void HttpIntegrationTest::checkSimpleRequestSuccess(uint64_t expected_request_size,
+                                                    uint64_t expected_response_size,
+                                                    IntegrationStreamDecoder* response) {
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(expected_request_size, upstream_request_->bodyLength());
+
+  ASSERT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_EQ(expected_response_size, response->body().size());
+}
+
 void HttpIntegrationTest::testRouterRequestAndResponseWithBody(
     uint64_t request_size, uint64_t response_size, bool big_header,
     ConnectionCreationFunction* create_connection) {
@@ -320,17 +337,12 @@ void HttpIntegrationTest::testRouterRequestAndResponseWithBody(
   }
   auto response = sendRequestAndWaitForResponse(request_headers, request_size,
                                                 default_response_headers_, response_size);
-
-  EXPECT_TRUE(upstream_request_->complete());
-  EXPECT_EQ(request_size, upstream_request_->bodyLength());
-
-  ASSERT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
-  EXPECT_EQ(response_size, response->body().size());
+  checkSimpleRequestSuccess(request_size, response_size, response.get());
 }
 
-void HttpIntegrationTest::testRouterHeaderOnlyRequestAndResponse(
-    bool close_upstream, ConnectionCreationFunction* create_connection) {
+IntegrationStreamDecoderPtr
+HttpIntegrationTest::makeHeaderOnlyRequest(ConnectionCreationFunction* create_connection,
+                                           int upstream_index) {
   // This is called multiple times per test in ads_integration_test. Only call
   // initialize() the first time.
   if (!initialized()) {
@@ -343,21 +355,22 @@ void HttpIntegrationTest::testRouterHeaderOnlyRequestAndResponse(
                                           {":scheme", "http"},
                                           {":authority", "host"},
                                           {"x-lyft-user-id", "123"}};
-  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+  return sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0,
+                                       upstream_index);
+}
 
-  // The following allows us to test shutting down the server with active connection pool
-  // connections.
-  if (!close_upstream) {
-    fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
-    test_server_.reset();
-  }
+void HttpIntegrationTest::testRouterHeaderOnlyRequestAndResponse(
+    ConnectionCreationFunction* create_connection, int upstream_index) {
+  auto response = makeHeaderOnlyRequest(create_connection, upstream_index);
+  checkSimpleRequestSuccess(0U, 0U, response.get());
+}
 
-  EXPECT_TRUE(upstream_request_->complete());
-  EXPECT_EQ(0U, upstream_request_->bodyLength());
-
-  EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
-  EXPECT_EQ(0U, response->body().size());
+void HttpIntegrationTest::testRequestAndResponseShutdownWithActiveConnection() {
+  auto response = makeHeaderOnlyRequest(nullptr, 0);
+  // Shut down the server with active connection pool connections.
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+  test_server_.reset();
+  checkSimpleRequestSuccess(0U, 0U, response.get());
 }
 
 // Change the default route to be restrictive, and send a request to an alternate route.
@@ -613,7 +626,7 @@ void HttpIntegrationTest::testRouterDownstreamDisconnectBeforeRequestComplete(
 void HttpIntegrationTest::testRouterDownstreamDisconnectBeforeResponseComplete(
     ConnectionCreationFunction* create_connection) {
 #ifdef __APPLE__
-  // Skip this test on OS X: we can't detect the early close on OS X, and we
+  // Skip this test on macOS: we can't detect the early close on macOS, and we
   // won't clean up the upstream connection until it times out. See #4294.
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
     return;
@@ -816,13 +829,13 @@ void HttpIntegrationTest::testGrpcRetry() {
 // The retry priority will always target P1, which would otherwise never be hit due to P0 being
 // healthy.
 void HttpIntegrationTest::testRetryPriority() {
-  const Upstream::PriorityLoad priority_load{0, 100};
+  const auto priority_load = Upstream::PriorityLoad({0u, 100u});
   NiceMock<Upstream::MockRetryPriority> retry_priority(priority_load);
   Upstream::MockRetryPriorityFactory factory(retry_priority);
 
   Registry::InjectFactory<Upstream::RetryPriorityFactory> inject_factory(factory);
 
-  envoy::api::v2::route::RouteAction::RetryPolicy retry_policy;
+  envoy::api::v2::route::RetryPolicy retry_policy;
   retry_policy.mutable_retry_priority()->set_name(factory.name());
 
   // Add route with custom retry policy
@@ -898,7 +911,7 @@ void HttpIntegrationTest::testRetryHostPredicateFilter() {
   TestHostPredicateFactory predicate_factory;
   Registry::InjectFactory<Upstream::RetryHostPredicateFactory> inject_factory(predicate_factory);
 
-  envoy::api::v2::route::RouteAction::RetryPolicy retry_policy;
+  envoy::api::v2::route::RetryPolicy retry_policy;
   retry_policy.add_retry_host_predicate()->set_name(predicate_factory.name());
 
   // Add route with custom retry policy

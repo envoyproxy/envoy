@@ -66,7 +66,7 @@ HeaderUtility::HeaderData::HeaderData(const Json::Object& config)
 
 bool HeaderUtility::matchHeaders(const Http::HeaderMap& request_headers,
                                  const std::vector<HeaderData>& config_headers) {
-  // TODO (rodaine): Should this really allow empty headers to always match?
+  // No headers to match is considered a match.
   if (!config_headers.empty()) {
     for (const HeaderData& cfg_header_data : config_headers) {
       if (!matchHeaders(request_headers, cfg_header_data)) {

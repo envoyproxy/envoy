@@ -5,6 +5,7 @@
 #include <string>
 
 #include "envoy/common/pure.h"
+#include "envoy/registry/registry.h"
 #include "envoy/singleton/instance.h"
 
 namespace Envoy {

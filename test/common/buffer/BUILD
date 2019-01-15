@@ -3,6 +3,7 @@ licenses(["notice"])  # Apache 2
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
+    "envoy_cc_test_binary",
     "envoy_cc_test_library",
     "envoy_package",
 )
@@ -53,5 +54,16 @@ envoy_cc_test(
     srcs = ["zero_copy_input_stream_test.cc"],
     deps = [
         "//source/common/buffer:zero_copy_input_stream_lib",
+    ],
+)
+
+envoy_cc_test_binary(
+    name = "buffer_speed_test",
+    srcs = ["buffer_speed_test.cc"],
+    external_deps = [
+        "benchmark",
+    ],
+    deps = [
+        "//source/common/buffer:buffer_lib",
     ],
 )
