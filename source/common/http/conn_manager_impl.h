@@ -186,7 +186,7 @@ private:
     void encodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
     void encodeData(Buffer::Instance& data, bool end_stream) override;
     void encodeTrailers(HeaderMapPtr&& trailers) override;
-    void encodeMetadata(MetadataMapPtr&& metadata_map) override;
+    void encodeMetadata(MetadataMapPtr&& metadata_map_ptr) override;
     void onDecoderFilterAboveWriteBufferHighWatermark() override;
     void onDecoderFilterBelowWriteBufferLowWatermark() override;
     void
@@ -297,7 +297,7 @@ private:
     void encodeHeaders(ActiveStreamEncoderFilter* filter, HeaderMap& headers, bool end_stream);
     void encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instance& data, bool end_stream);
     void encodeTrailers(ActiveStreamEncoderFilter* filter, HeaderMap& trailers);
-    void encodeMetadata(ActiveStreamEncoderFilter* filter, MetadataMapPtr&& metadata_map);
+    void encodeMetadata(ActiveStreamEncoderFilter* filter, MetadataMapPtr&& metadata_map_ptr);
     void maybeEndEncode(bool end_stream);
     uint64_t streamId() { return stream_id_; }
 
