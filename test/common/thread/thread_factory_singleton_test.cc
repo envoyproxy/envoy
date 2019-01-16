@@ -9,26 +9,25 @@ namespace Envoy {
 namespace Thread {
 namespace {
 
-struct ThreadFactorySingletonTest {
+class ThreadFactorySingletonTest : public testing::Test {
+protected:
   ThreadFactorySingletonTest()
       : run_tid_(Envoy::Thread::ThreadFactorySingleton::get().currentThreadId()) {}
 
-  void checkThreadId() const { ASSERT(run_tid_->isCurrentThreadId()); };
+  bool checkThreadId() const { return run_tid_->isCurrentThreadId(); };
 
   ThreadIdPtr run_tid_;
 };
 
 // Verify that Thread::threadFactorySingleton is defined and initialized for tests.
-TEST(ThreadFactorySingletonDeathTest, BasicDeathTest) {
-  // Verify that an ASSERT() will trigger due to a thread ID mismatch.
-  ThreadFactorySingletonTest singleton_test;
+TEST_F(ThreadFactorySingletonTest, IsCurrentThread) {
   // Use std::thread instead of the ThreadFactory's createThread() to avoid the dependency on the
   // code under test.
-  std::thread thread([&singleton_test]() {
-    EXPECT_DEBUG_DEATH(singleton_test.checkThreadId(),
-                       "assert failure: run_tid_->isCurrentThreadId()");
-  });
+  bool is_current = checkThreadId();
+  EXPECT_TRUE(is_current);
+  std::thread thread([this, &is_current]() { is_current = checkThreadId(); });
   thread.join();
+  EXPECT_FALSE(is_current) << "run_tid_->isCurrentThreadId() from inside another thread";
 }
 
 } // namespace
