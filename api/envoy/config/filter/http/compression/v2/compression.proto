@@ -1,0 +1,115 @@
+syntax = "proto3";
+
+package envoy.config.filter.http.compression.v2alpha;
+option java_package = "io.envoyproxy.envoy.config.filter.http.compression.v2alpha";
+option java_multiple_files = true;
+option go_package = "v2alpha";
+
+import "google/protobuf/wrappers.proto";
+
+import "validate/validate.proto";
+import "gogoproto/gogo.proto";
+
+// [#protodoc-title: Compression]
+
+// Compression and decompression settings for filter decoder data.
+message FilterDecoder {
+  // Deflate stream decode data.
+  Deflate deflate = 1;
+
+  // Inflate decode data.
+  Inflate inflate = 2;
+}
+
+// Compression and decompression settings for filter encoder data. 
+message FilterEncoder {
+  // Deflate stream encode data.
+  Deflate deflate = 1;
+
+  // Inflate stream encode data.
+  Inflate inflate = 2;
+}
+
+message Inflate {
+  repeated HeaderMatcher headers = 1;
+
+  // Gzip decompression.
+  Gzip gzip = 2;
+}
+
+message Deflate {
+  repeated HeaderMatcher headers = 1;
+
+  // This will only match if Content-Length header is supplied in the message.
+  envoy.type.matcher.UIntMatcher length = 2;
+
+  // Strip off Accept-Enconding from the client headers.
+  bool remove_accept_encoding_header = 3;
+
+  // If true, disables compression when the response contains an etag header. When it is false, the
+  // filter will preserve weak etags and remove the ones that require strong validation.
+  bool disable_on_etag_header = 4;
+
+  // Gzip compression.
+  Gzip gzip = 5;
+}
+
+message Gzip {
+  // Value from 1 to 9 that controls the amount of internal memory used by zlib. Higher values
+  // use more memory, but are faster and produce better compression results. The default value is 5.
+  google.protobuf.UInt32Value memory_level = 1 [(validate.rules).uint32 = {gte: 1, lte: 9}];
+  
+  message CompressionLevel {
+    enum Enum {
+      DEFAULT = 0;
+      BEST = 1;
+      SPEED = 2;
+    }
+  }
+
+  // A value used for selecting the zlib compression level. This setting will affect speed and
+  // amount of compression applied to the content. "BEST" provides higher compression at the cost of
+  // higher latency, "SPEED" provides lower compression with minimum impact on response time.
+  // "DEFAULT" provides an optimal result between speed and compression. This field will be set to
+  // "DEFAULT" if not specified.
+  CompressionLevel.Enum compression_level = 2 [(validate.rules).enum.defined_only = true];
+
+  message CompressionStrategy {
+    enum Enum {
+      DEFAULT = 0;
+      FILTERED = 1;
+      HUFFMAN = 2;
+      RLE = 3;
+    }
+  }
+
+  // A value used for selecting the zlib compression strategy which is directly related to the
+  // characteristics of the content. Most of the time "DEFAULT" will be the best choice, though
+  // there are situations which changing this parameter might produce better results. For example,
+  // run-length encoding (RLE) is typically used when the content is known for having sequences
+  // which same data occurs many consecutive times. For more information about each strategy, please
+  // refer to zlib manual.
+  CompressionStrategy compression_strategy = 3 [(validate.rules).enum.defined_only = true];
+
+  // Value from 9 to 15 that represents the base two logarithmic of the compressor's window size.
+  // Larger window results in better compression at the expense of memory usage. The default is 12
+  // which will produce a 4096 bytes window. For more details about this parameter, please refer to
+  // zlib manual > deflateInit2.
+  uint32 window_bits = 4 [(validate.rules).uint32 = {gte: 9, lte: 15}];
+}
+
+message HeaderMatcher {
+  // Header key.
+  envoy.type.matcher.StringMatcher key = 1 [(validate.rules).string.min_bytes = 1];
+
+  // Header value. When any is 
+  oneof values {
+    option (validate.required) = true;
+    
+    // Match any key of type string.
+    envoy.type.matcher.StringMatcher value = 2 [(validate.rules).string.min_bytes = 1];
+
+    // When true, matches any value in the key.
+    bool match_key = 3; 
+  }
+}

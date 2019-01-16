@@ -21,6 +21,17 @@ message Int64Range {
   int64 end = 2;
 }
 
+
+// Specifies the uint64 start and end of the range using half-open interval semantics [start,
+// end).
+message UInt64Range {
+  // start of the range (inclusive)
+  uint64 start = 1;
+
+  // end of the range (exclusive)
+  uint64 end = 2;
+}
+
 // Specifies the double start and end of the range using half-open interval semantics [start,
 // end).
 message DoubleRange {
