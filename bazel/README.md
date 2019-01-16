@@ -82,6 +82,17 @@ Bazel can also be built with the Docker image used for CI, by installing Docker 
 See also the [documentation](https://github.com/envoyproxy/envoy/tree/master/ci) for developer use of the
 CI Docker image.
 
+## Linking against libc++ on Linux
+
+To link Envoy against libc++, use the following commands:
+```
+export CC="clang"
+export CXX="clang++"
+export CXXFLAGS="-stdlib=libc++"
+bazel build --define force_libcpp=enabled --linkopt -fuse-ld=lld //source/exe:envoy-static
+```
+Note: this requires both: clang compiler and libc++ library to be installed in the system.
+
 ## Using a compiler toolchain in a non-standard location
 
 By setting the `CC` and `LD_LIBRARY_PATH` in the environment that Bazel executes from as
