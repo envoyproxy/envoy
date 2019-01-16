@@ -8,7 +8,9 @@
 #include "openssl/ssl.h"
 
 namespace Envoy {
-namespace Ssl {
+namespace Extensions {
+namespace TransportSockets {
+namespace Tls {
 namespace Utility {
 
 /**
@@ -57,5 +59,7 @@ SystemTime getValidFrom(const X509& cert);
 SystemTime getExpirationTime(const X509& cert);
 
 } // namespace Utility
-} // namespace Ssl
+} // namespace Tls
+} // namespace TransportSockets
+} // namespace Extensions
 } // namespace Envoy

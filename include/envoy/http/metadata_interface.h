@@ -45,8 +45,8 @@ public:
 
   friend std::ostream& operator<<(std::ostream& out, const MetadataMapVector& metadata_map_vector) {
     out << "metadata_map_vector:\n";
-    for (uint64_t i = 0; i < metadata_map_vector.size(); i++) {
-      out << *metadata_map_vector[i];
+    for (const auto& metadata_map : metadata_map_vector) {
+      out << *metadata_map;
     }
     return out;
   }

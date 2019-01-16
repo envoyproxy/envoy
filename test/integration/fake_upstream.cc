@@ -17,9 +17,10 @@
 #include "common/network/listen_socket_impl.h"
 #include "common/network/raw_buffer_socket.h"
 #include "common/network/utility.h"
-#include "common/ssl/ssl_socket.h"
 
 #include "server/connection_handler_impl.h"
+
+#include "extensions/transport_sockets/tls/ssl_socket.h"
 
 #include "test/integration/utility.h"
 #include "test/test_common/network_utility.h"
@@ -251,7 +252,7 @@ AssertionResult FakeConnectionBase::enableHalfClose(bool enable,
       [enable](Network::Connection& connection) { connection.enableHalfClose(enable); }, timeout);
 }
 
-Http::StreamDecoder& FakeHttpConnection::newStream(Http::StreamEncoder& encoder) {
+Http::StreamDecoder& FakeHttpConnection::newStream(Http::StreamEncoder& encoder, bool) {
   Thread::LockGuard lock(lock_);
   new_streams_.emplace_back(new FakeStream(*this, encoder, time_system_));
   connection_event_.notifyOne();

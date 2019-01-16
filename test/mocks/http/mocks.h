@@ -54,7 +54,8 @@ public:
   ~MockServerConnectionCallbacks();
 
   // Http::ServerConnectionCallbacks
-  MOCK_METHOD1(newStream, StreamDecoder&(StreamEncoder& response_encoder));
+  MOCK_METHOD2(newStream,
+               StreamDecoder&(StreamEncoder& response_encoder, bool is_internally_created));
 };
 
 class MockStreamCallbacks : public StreamCallbacks {
@@ -146,6 +147,7 @@ public:
   MOCK_METHOD1(removeDownstreamWatermarkCallbacks, void(DownstreamWatermarkCallbacks&));
   MOCK_METHOD1(setDecoderBufferLimit, void(uint32_t));
   MOCK_METHOD0(decoderBufferLimit, uint32_t());
+  MOCK_METHOD0(recreateStream, bool());
 
   // Http::StreamDecoderFilterCallbacks
   void sendLocalReply(Code code, absl::string_view body,
@@ -257,6 +259,7 @@ public:
   MOCK_METHOD2(encodeHeaders, FilterHeadersStatus(HeaderMap& headers, bool end_stream));
   MOCK_METHOD2(encodeData, FilterDataStatus(Buffer::Instance& data, bool end_stream));
   MOCK_METHOD1(encodeTrailers, FilterTrailersStatus(HeaderMap& trailers));
+  MOCK_METHOD1(encodeMetadata, FilterMetadataStatus(MetadataMap& metadata_map));
   MOCK_METHOD1(setEncoderFilterCallbacks, void(StreamEncoderFilterCallbacks& callbacks));
 
   Http::StreamEncoderFilterCallbacks* callbacks_{};
@@ -282,6 +285,7 @@ public:
   MOCK_METHOD2(encodeHeaders, FilterHeadersStatus(HeaderMap& headers, bool end_stream));
   MOCK_METHOD2(encodeData, FilterDataStatus(Buffer::Instance& data, bool end_stream));
   MOCK_METHOD1(encodeTrailers, FilterTrailersStatus(HeaderMap& trailers));
+  MOCK_METHOD1(encodeMetadata, FilterMetadataStatus(MetadataMap& metadata_map));
   MOCK_METHOD1(setEncoderFilterCallbacks, void(StreamEncoderFilterCallbacks& callbacks));
 
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};

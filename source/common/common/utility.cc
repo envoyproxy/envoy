@@ -463,6 +463,13 @@ std::string StringUtil::toUpper(absl::string_view s) {
   return upper_s;
 }
 
+std::string StringUtil::toLower(absl::string_view s) {
+  std::string lower_s;
+  lower_s.reserve(s.size());
+  std::transform(s.cbegin(), s.cend(), std::back_inserter(lower_s), absl::ascii_tolower);
+  return lower_s;
+}
+
 bool StringUtil::CaseInsensitiveCompare::operator()(absl::string_view lhs,
                                                     absl::string_view rhs) const {
   return StringUtil::caseCompare(lhs, rhs);

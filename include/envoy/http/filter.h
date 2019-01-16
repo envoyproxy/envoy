@@ -341,6 +341,20 @@ public:
    * @return the buffer limit the filter should apply.
    */
   virtual uint32_t decoderBufferLimit() PURE;
+
+  // Takes a stream, and acts as if the headers are newly arrived.
+  // On success, this will result in a creating a new filter chain and likely upstream request
+  // associated with the original downstream stream.
+  // On failure, if the preconditions outlined below are not met, the caller is
+  // responsible for handling or terminating the original stream.
+  //
+  // This is currently limited to
+  //   - streams which are completely read
+  //   - streams which do not have a request body.
+  //
+  // Note that HttpConnectionManager sanitization will *not* be performed on the
+  // recreated stream, as it is assumed that sanitization has already been done.
+  virtual bool recreateStream() PURE;
 };
 
 /**
@@ -533,6 +547,15 @@ public:
    * @param trailers supplies the trailers to be encoded.
    */
   virtual FilterTrailersStatus encodeTrailers(HeaderMap& trailers) PURE;
+
+  /**
+   * Called with metadata to be encoded. New metadata should be added directly to metadata_map. DO
+   * NOT call StreamDecoderFilterCallbacks::encodeMetadata() interface to add new metadata.
+   *
+   * @param metadata_map supplies the metadata to be encoded.
+   * @return FilterMetadataStatus, which currently is always FilterMetadataStatus::Continue;
+   */
+  virtual FilterMetadataStatus encodeMetadata(MetadataMap& metadata_map) PURE;
 
   /**
    * Called by the filter manager once to initialize the filter callbacks that the filter should
