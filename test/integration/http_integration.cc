@@ -829,7 +829,7 @@ void HttpIntegrationTest::testGrpcRetry() {
 // The retry priority will always target P1, which would otherwise never be hit due to P0 being
 // healthy.
 void HttpIntegrationTest::testRetryPriority() {
-  const Upstream::HealthyLoad priority_load({0u, 100u});
+  const Upstream::HealthyLoad healthy_priority_load({0u, 100u});
   NiceMock<Upstream::MockRetryPriority> retry_priority(priority_load);
   Upstream::MockRetryPriorityFactory factory(retry_priority);
 

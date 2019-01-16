@@ -27,12 +27,12 @@ public:
   enum class HostAvailability { Healthy, Degraded };
 
   // A utility function to chose a priority level based on a precomputed hash and
-  // a priority vector in the style of per_priority_load_
+  // two PriorityLoad vectors, one for healthy load and one for degraded.
   //
   // Returns the priority, a number between 0 and per_priority_load.size()-1 as well as which host
   // availability level was chosen.
   static std::pair<uint32_t, HostAvailability>
-  choosePriority(uint64_t hash, const HealthyLoad& per_priority_load,
+  choosePriority(uint64_t hash, const HealthyLoad& healthy_per_priority_load,
                  const DegradedLoad& degraded_per_priority_load);
 
   HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
@@ -64,15 +64,17 @@ protected:
                    Runtime::RandomGenerator& random,
                    const envoy::api::v2::Cluster::CommonLbConfig& common_config);
 
-  // Choose host set randomly, based on the per_priority_load_ and degraded_per_priority_load_.
-  // per_priority_load_ is consulted first, spilling over to degraded_per_priority_load_ if
-  // necessary. When a host set is selected based on degraded_per_priority_load_, only degraded
-  // hosts should be selected from that host set.
+  // Choose host set randomly, based on the healthy_per_priority_load_ and
+  // degraded_per_priority_load_. per_priority_load_ is consulted first, spilling over to
+  // degraded_per_priority_load_ if necessary. When a host set is selected based on
+  // degraded_per_priority_load_, only degraded hosts should be selected from that host set.
   //
   // @return host set to use and which availability to target.
   std::pair<HostSet&, HostAvailability> chooseHostSet(LoadBalancerContext* context);
 
-  uint32_t percentageLoad(uint32_t priority) const { return per_priority_load_.get()[priority]; }
+  uint32_t percentageLoad(uint32_t priority) const {
+    return healthy_per_priority_load_.get()[priority];
+  }
   uint32_t percentageDegradedLoad(uint32_t priority) const {
     return degraded_per_priority_load_.get()[priority];
   }
@@ -90,7 +92,7 @@ public:
   // per_priority_health for that priority level, and may update per_priority_load for all
   // priority levels.
   void static recalculatePerPriorityState(uint32_t priority, const PrioritySet& priority_set,
-                                          HealthyLoad& priority_load,
+                                          HealthyLoad& healthy_priority_load,
                                           DegradedLoad& degraded_priority_load,
                                           HealthyAvailability& per_priority_health,
                                           DegradedAvailability& per_priority_degraded);
@@ -118,7 +120,7 @@ protected:
     return std::min<uint32_t>(health + degraded, 100);
   }
   // The percentage load (0-100) for each priority level when targeting healthy hosts.
-  HealthyLoad per_priority_load_;
+  HealthyLoad healthy_per_priority_load_;
   // The percentage load (0-100) for each priority level when targeting degraded hosts.
   DegradedLoad degraded_per_priority_load_;
   // The health percentage (0-100) for each priority level.

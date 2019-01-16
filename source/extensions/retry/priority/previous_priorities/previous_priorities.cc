@@ -27,7 +27,7 @@ const Upstream::HealthyLoad& PreviousPrioritiesRetryPriority::determinePriorityL
     }
   }
 
-  return per_priority_load_;
+  return healthy_per_priority_load_;
 }
 
 bool PreviousPrioritiesRetryPriority::adjustForAttemptedPriorities(
@@ -59,7 +59,7 @@ bool PreviousPrioritiesRetryPriority::adjustForAttemptedPriorities(
     return false;
   }
 
-  std::fill(per_priority_load_.get().begin(), per_priority_load_.get().end(), 0);
+  std::fill(healthy_per_priority_load_.get().begin(), healthy_per_priority_load_.get().end(), 0);
   // We then adjust the load by rebalancing priorities with the adjusted health values.
   size_t total_load = 100;
   // The outer loop is used to eliminate rounding errors: any remaining load will be assigned to the
@@ -70,7 +70,7 @@ bool PreviousPrioritiesRetryPriority::adjustForAttemptedPriorities(
       // when total_load runs out.
       auto delta =
           std::min<uint32_t>(total_load, adjusted_per_priority_health[i] * 100 / total_health);
-      per_priority_load_.get()[i] += delta;
+      healthy_per_priority_load_.get()[i] += delta;
       total_load -= delta;
     }
   }
