@@ -38,17 +38,23 @@ public:
   virtual const std::vector<double>& computedQuantiles() const PURE;
 
   /**
-   * Returns supported buckets.
+   * Returns supported buckets. Each value is the upper bound of the bucket
+   * with 0 as the implicit lower bound. For timers, these bucket thresholds
+   * are in milliseconds but the thresholds are applicable to all types of data.
    */
   virtual const std::vector<double>& supportedBuckets() const PURE;
 
   /**
-   * Returns computed bucket values during the period.
+   * Returns computed bucket values during the period. The vector contains an appoximation
+   * of samples below each quantile bucket defined in supportedBuckets(). This vector is
+   * guaranteed to be the same length as supportedBuckets().
    */
   virtual const std::vector<double>& computedBuckets() const PURE;
 
   /**
-   * Returns number of values during the period.
+   * Returns number of values during the period. This number may be an approximation
+   * of the number of samples in the histogram, it is not guaranteed that this will be
+   * 100% the number of samples observed.
    */
   virtual double sampleCount() const PURE;
 

@@ -19,9 +19,9 @@ HistogramStatisticsImpl::HistogramStatisticsImpl(const histogram_t* histogram_pt
   sample_count_ = hist_sample_count(histogram_ptr);
   sample_sum_ = hist_approx_sum(histogram_ptr);
 
-  const std::vector<double>& supported_buckets_ref = supportedBuckets();
-  for (size_t i = 0; i < supported_buckets_ref.size(); ++i) {
-    computed_buckets_[i] = hist_approx_count_below(histogram_ptr, supported_buckets_ref[i]);
+  const std::vector<double>& supported_buckets = supportedBuckets();
+  for (size_t i = 0; i < supported_buckets.size(); ++i) {
+    computed_buckets_[i] = hist_approx_count_below(histogram_ptr, supported_buckets[i]);
   }
 }
 
@@ -32,29 +32,28 @@ const std::vector<double>& HistogramStatisticsImpl::supportedQuantiles() const {
 }
 
 const std::vector<double>& HistogramStatisticsImpl::supportedBuckets() const {
-  static const std::vector<double> supported_buckets = {0.005, 0.01, 0.025, 0.05, 0.1, 0.25,
-                                                        0.5,   1.0,  2.5,   5,    10};
+  static const std::vector<double> supported_buckets = {
+      0.5,  1,    5,     10,    25,    50,     100,    250,     500,    1000,
+      2500, 5000, 10000, 30000, 60000, 300000, 600000, 1800000, 3600000};
   return supported_buckets;
 }
 
 std::string HistogramStatisticsImpl::quantileSummary() const {
   std::vector<std::string> summary;
-  const std::vector<double>& supported_quantiles_ref = supportedQuantiles();
-  summary.reserve(supported_quantiles_ref.size());
-  for (size_t i = 0; i < supported_quantiles_ref.size(); ++i) {
-    summary.push_back(
-        fmt::format("P{}: {}", 100 * supported_quantiles_ref[i], computed_quantiles_[i]));
+  const std::vector<double>& supported_quantiles = supportedQuantiles();
+  summary.reserve(supported_quantiles.size());
+  for (size_t i = 0; i < supported_quantiles.size(); ++i) {
+    summary.push_back(fmt::format("P{}: {}", 100 * supported_quantiles[i], computed_quantiles_[i]));
   }
   return absl::StrJoin(summary, ", ");
 }
 
 std::string HistogramStatisticsImpl::bucketSummary() const {
   std::vector<std::string> bucket_summary;
-  const std::vector<double>& supported_buckets_ref = supportedBuckets();
-  bucket_summary.reserve(supported_buckets_ref.size());
-  for (size_t i = 0; i < supported_buckets_ref.size(); ++i) {
-    bucket_summary.push_back(
-        fmt::format("B{}: {}", supported_buckets_ref[i], computed_buckets_[i]));
+  const std::vector<double>& supported_buckets = supportedBuckets();
+  bucket_summary.reserve(supported_buckets.size());
+  for (size_t i = 0; i < supported_buckets.size(); ++i) {
+    bucket_summary.push_back(fmt::format("B{}: {}", supported_buckets[i], computed_buckets_[i]));
   }
   return absl::StrJoin(bucket_summary, ", ");
 }
@@ -73,9 +72,9 @@ void HistogramStatisticsImpl::refresh(const histogram_t* new_histogram_ptr) {
 
   std::fill(computed_buckets_.begin(), computed_buckets_.end(), 0.0);
   ASSERT(supportedBuckets().size() == computed_buckets_.size());
-  const std::vector<double>& supported_buckets_ref = supportedBuckets();
-  for (size_t i = 0; i < supported_buckets_ref.size(); ++i) {
-    computed_buckets_[i] = hist_approx_count_below(new_histogram_ptr, supported_buckets_ref[i]);
+  const std::vector<double>& supported_buckets = supportedBuckets();
+  for (size_t i = 0; i < supported_buckets.size(); ++i) {
+    computed_buckets_[i] = hist_approx_count_below(new_histogram_ptr, supported_buckets[i]);
   }
 }
 

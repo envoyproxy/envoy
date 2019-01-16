@@ -522,10 +522,10 @@ const std::string ParentHistogramImpl::quantileSummary() const {
 const std::string ParentHistogramImpl::bucketSummary() const {
   if (used()) {
     std::vector<std::string> bucket_summary;
-    const std::vector<double>& supported_buckets_ref = interval_statistics_.supportedBuckets();
-    bucket_summary.reserve(supported_buckets_ref.size());
-    for (size_t i = 0; i < supported_buckets_ref.size(); ++i) {
-      bucket_summary.push_back(fmt::format("B{}({},{})", supported_buckets_ref[i],
+    const std::vector<double>& supported_buckets = interval_statistics_.supportedBuckets();
+    bucket_summary.reserve(supported_buckets.size());
+    for (size_t i = 0; i < supported_buckets.size(); ++i) {
+      bucket_summary.push_back(fmt::format("B{}({},{})", supported_buckets[i],
                                            interval_statistics_.computedBuckets()[i],
                                            cumulative_statistics_.computedBuckets()[i]));
     }

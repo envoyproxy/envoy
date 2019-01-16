@@ -863,11 +863,13 @@ TEST_F(HistogramTest, BasicHistogramSummaryValidate) {
       "P99.5: 99.5, P99.9: 99.9, P100: 100";
 
   const std::string h1_expected_buckets =
-      "B0.005: 0, B0.01: 0, B0.025: 0, B0.05: 0, B0.1: 0, B0.25: 0, "
-      "B0.5: 0, B1: 0, B2.5: 1, B5: 1, B10: 1";
+      "B0.5: 0, B1: 0, B5: 1, B10: 1, B25: 1, B50: 1, B100: 1, B250: 1, "
+      "B500: 1, B1000: 1, B2500: 1, B5000: 1, B10000: 1, B30000: 1, B60000: 1, "
+      "B300000: 1, B600000: 1, B1.8e+06: 1, B3.6e+06: 1";
   const std::string h2_expected_buckets =
-      "B0.005: 1, B0.01: 1, B0.025: 1, B0.05: 1, B0.1: 1, B0.25: 1, "
-      "B0.5: 1, B1: 1, B2.5: 3, B5: 5, B10: 10";
+      "B0.5: 1, B1: 1, B5: 5, B10: 10, B25: 25, B50: 50, B100: 100, B250: 100, "
+      "B500: 100, B1000: 100, B2500: 100, B5000: 100, B10000: 100, B30000: 100, "
+      "B60000: 100, B300000: 100, B600000: 100, B1.8e+06: 100, B3.6e+06: 100";
 
   for (size_t i = 0; i < 100; ++i) {
     expectCallAndAccumulate(h2, i);
@@ -901,8 +903,9 @@ TEST_F(HistogramTest, BasicHistogramMergeSummary) {
   const std::string expected_summary = "P0: 0, P25: 25, P50: 50, P75: 75, P90: 90, P95: 95, P99: "
                                        "99, P99.5: 99.5, P99.9: 99.9, P100: 100";
   const std::string expected_bucket_summary =
-      "B0.005: 1, B0.01: 1, B0.025: 1, B0.05: 1, B0.1: 1, B0.25: 1, "
-      "B0.5: 1, B1: 1, B2.5: 3, B5: 5, B10: 10";
+      "B0.5: 1, B1: 1, B5: 5, B10: 10, B25: 25, B50: 50, B100: 100, B250: 100, "
+      "B500: 100, B1000: 100, B2500: 100, B5000: 100, B10000: 100, B30000: 100, "
+      "B60000: 100, B300000: 100, B600000: 100, B1.8e+06: 100, B3.6e+06: 100";
 
   NameHistogramMap name_histogram_map = makeHistogramMap(store_->histograms());
   EXPECT_EQ(expected_summary, name_histogram_map["h1"]->cumulativeStatistics().quantileSummary());
