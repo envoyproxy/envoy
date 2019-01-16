@@ -1252,23 +1252,26 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
 }
 
 void ConnectionManagerImpl::ActiveStream::encodeMetadata(ActiveStreamEncoderFilter* filter,
-                                                         MetadataMapPtr&& metadata_map) {
+                                                         MetadataMapPtr&& metadata_map_ptr) {
   resetIdleTimer();
 
-  std::list<ActiveStreamEncoderFilterPtr>::iterator entry = commonEncodePrefix(filter, false);
+  // Metadata currently go through all filters.
+  ASSERT(filter == nullptr);
+  std::list<ActiveStreamEncoderFilterPtr>::iterator entry = encoder_filters_.begin();
   for (; entry != encoder_filters_.end(); entry++) {
-    // TODO(soya3129): Add filters here.
+    FilterMetadataStatus status = (*entry)->handle_->encodeMetadata(*metadata_map_ptr);
+    ENVOY_STREAM_LOG(trace, "encode metadata called: filter={} status={}", *this,
+                     static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
   }
-
-  ENVOY_STREAM_LOG(debug, "encoding metadata via codec:\n{}", *this, *metadata_map);
+  // TODO(soya3129): update stats with metadata.
 
   // Now encode metadata via the codec.
-  if (!metadata_map->empty()) {
+  if (!metadata_map_ptr->empty()) {
+    ENVOY_STREAM_LOG(debug, "encoding metadata via codec:\n{}", *this, *metadata_map_ptr);
     MetadataMapVector metadata_map_vector;
-    metadata_map_vector.push_back(std::move(metadata_map));
+    metadata_map_vector.emplace_back(std::move(metadata_map_ptr));
     response_encoder_->encodeMetadata(metadata_map_vector);
   }
-  // metadata_map destroyed when function returns.
 }
 
 HeaderMap& ConnectionManagerImpl::ActiveStream::addEncodedTrailers() {
@@ -1721,8 +1724,8 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::encodeTrailers(HeaderMapP
 }
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::encodeMetadata(
-    MetadataMapPtr&& metadata_map) {
-  parent_.encodeMetadata(nullptr, std::move(metadata_map));
+    MetadataMapPtr&& metadata_map_ptr) {
+  parent_.encodeMetadata(nullptr, std::move(metadata_map_ptr));
 }
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::
