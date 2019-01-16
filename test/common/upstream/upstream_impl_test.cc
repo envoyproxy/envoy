@@ -1929,6 +1929,25 @@ TEST(HostsPerLocalityImpl, Filter) {
   }
 }
 
+TEST(HostSetImplTest, UpdateCallbacks) {
+  std::shared_ptr<MockClusterInfo> info{new NiceMock<MockClusterInfo>()};
+  HostSetImpl host_set{0, kDefaultOverProvisioningFactor};
+
+  ReadyWatcher membership_updated;
+  host_set.addPriorityUpdateCb(
+      [&](uint32_t, const HostVector&, const HostVector&) -> void { membership_updated.ready(); });
+
+  HostVector hosts{
+      makeTestHost(info, "tcp://127.0.0.1:80"), makeTestHost(info, "tcp://127.0.0.1:81"),
+      makeTestHost(info, "tcp://127.0.0.1:82"), makeTestHost(info, "tcp://127.0.0.1:83"),
+      makeTestHost(info, "tcp://127.0.0.1:84"), makeTestHost(info, "tcp://127.0.0.1:85")};
+
+  EXPECT_CALL(membership_updated, ready());
+  host_set.updateHosts(HostSetImpl::updateHostsParams(std::make_shared<const HostVector>(hosts),
+                                                      HostsPerLocalityImpl::empty()),
+                       nullptr, hosts, {}, {});
+}
+
 class HostSetImplLocalityTest : public ::testing::Test {
 public:
   LocalityWeightsConstSharedPtr locality_weights_;
