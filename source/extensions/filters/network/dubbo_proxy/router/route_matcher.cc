@@ -59,7 +59,7 @@ ParameterRouteEntryImpl::ParameterRouteEntryImpl(
     const envoy::config::filter::network::dubbo_proxy::v2alpha1::Route& route)
     : RouteEntryImplBase(route), method_name_(route.match().method().name()) {
   for (auto& config : route.match().method().params_match()) {
-    parameter_data_list_.emplace_back(config);
+    parameter_data_list_.emplace_back(config.first, config.second);
   }
 }
 
@@ -107,14 +107,15 @@ RouteConstSharedPtr ParameterRouteEntryImpl::matches(const MessageMetadata& meta
   return clusterEntry(random_value);
 }
 
-ParameterRouteEntryImpl::ParameterData::ParameterData(const ParameterConfig& config) {
-  index_ = config.index();
+ParameterRouteEntryImpl::ParameterData::ParameterData(uint32_t index,
+                                                      const ParameterMatchSpecifier& config) {
+  index_ = index;
   switch (config.parameter_match_specifier_case()) {
-  case ParameterConfig::kExactMatch:
+  case ParameterMatchSpecifier::kExactMatch:
     match_type_ = Http::HeaderUtility::HeaderMatchType::Value;
     value_ = config.exact_match();
     break;
-  case ParameterConfig::kRangeMatch:
+  case ParameterMatchSpecifier::kRangeMatch:
     match_type_ = Http::HeaderUtility::HeaderMatchType::Range;
     range_.set_start(config.range_match().start());
     range_.set_end(config.range_match().end());
@@ -184,14 +185,7 @@ RouteMatcher::RouteMatcher(const RouteConfig& config)
   using envoy::config::filter::network::dubbo_proxy::v2alpha1::RouteMatch;
 
   for (const auto& route : config.routes()) {
-    switch (route.match().match_specifier_case()) {
-    case RouteMatch::MatchSpecifierCase::kMethod:
-      routes_.emplace_back(std::make_shared<MethodRouteEntryImpl>(route));
-      ENVOY_LOG(debug, "dubbo route matcher: create the method route entry");
-      break;
-    default:
-      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-    }
+    routes_.emplace_back(std::make_shared<MethodRouteEntryImpl>(route));
   }
   ENVOY_LOG(debug, "dubbo route matcher: routes list size {}", routes_.size());
 }

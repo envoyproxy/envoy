@@ -49,8 +49,7 @@ protected:
 private:
   class WeightedClusterEntry : public RouteEntry, public Route {
   public:
-    using WeightedCluster =
-        envoy::config::filter::network::dubbo_proxy::v2alpha1::WeightedCluster_ClusterWeight;
+    using WeightedCluster = envoy::api::v2::route::WeightedCluster_ClusterWeight;
     WeightedClusterEntry(const RouteEntryImplBase& parent, const WeightedCluster& cluster);
 
     uint64_t clusterWeight() const { return cluster_weight_; }
@@ -92,9 +91,9 @@ public:
   ~ParameterRouteEntryImpl() override;
 
   struct ParameterData {
-    using ParameterConfig =
-        envoy::config::filter::network::dubbo_proxy::v2alpha1::MethodMatch_Parameter;
-    ParameterData(const ParameterConfig& config);
+    using ParameterMatchSpecifier =
+        envoy::config::filter::network::dubbo_proxy::v2alpha1::MethodMatch_ParameterMatchSpecifier;
+    ParameterData(uint32_t index, const ParameterMatchSpecifier& config);
 
     Http::HeaderUtility::HeaderMatchType match_type_;
     std::string value_;

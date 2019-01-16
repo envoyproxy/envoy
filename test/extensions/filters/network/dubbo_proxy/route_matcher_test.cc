@@ -291,10 +291,10 @@ routes:
       method:
         name: add
         params_match:
-        - index: 0
-          range_match:
-            start: 100
-            end: 200
+          0:
+            range_match:
+              start: 100
+              end: 200
     route:
         cluster: user_service_dubbo_server
 )EOF";
@@ -319,8 +319,8 @@ routes:
       method:
         name: add
         params_match:
-        - index: 1
-          exact_match: "user_id:94562"
+          1:
+            exact_match: "user_id:94562"
     route:
         cluster: user_service_dubbo_server
 )EOF";
@@ -388,8 +388,8 @@ route_config:
           method:
             name: add
             params_match:
-            - index: 1
-              exact_match: "user_id"
+              1:
+                exact_match: "user_id"
         route:
             cluster: user_service_dubbo_server
   - name: test2

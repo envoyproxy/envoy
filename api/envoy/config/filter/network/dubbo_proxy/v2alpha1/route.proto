@@ -42,13 +42,18 @@ message Route {
 }
 
 message MethodMatch {
-  // The name of the method.
+  // The name of the method. wildcard names are supported in the form of ``*Add`` or
+  // ``*cluster?Name``.
+  //
+  // .. note::
+  //
+  //   e.g. ``*AddOrderNumber`` will match ``bizAddOrderNumber`` or ``AddOrderNumber``.
+  //        ``*AddOrder?`` will match ``bizAddOrderA`` but not ``bizAddOrderAB``.
+  //   Additionally, a special entry ``*`` is allowed which will match any name.
   string name = 1;
 
-  message Parameter {
-    // Parameter index, starting from 0.
-    uint32 index = 1;
-
+  // The parameter matching type.
+  message ParameterMatchSpecifier {
     oneof parameter_match_specifier {
       // If specified, header match will be performed based on the value of the header.
       string exact_match = 3;
@@ -70,15 +75,14 @@ message MethodMatch {
   }
 
   // Method parameter definition.
-  repeated Parameter params_match = 2;
+  // The key is the parameter index, starting from 0.
+  // The value is the parameter matching type.
+  map<uint32, ParameterMatchSpecifier> params_match = 2;
 }
 
 message RouteMatch {
-  oneof match_specifier {
-    // If specified, the route must exactly match the request method name. As a special case, an
-    // empty string matches any request method name.
-    MethodMatch method = 1;
-  }
+  // Method level routing matching.
+  MethodMatch method = 1;
 
   // Specifies a set of headers that the route should match on. The router will check the request’s
   // headers against all the specified headers in the route config. A match will happen if all the
@@ -98,24 +102,9 @@ message RouteAction {
     // Multiple upstream clusters can be specified for a given route. The
     // request is routed to one of the upstream clusters based on weights
     // assigned to each cluster.
-    WeightedCluster weighted_clusters = 2;
+    //
+    // .. note::
+    // Currently ClusterWeight only supports the name and weight fields.
+    envoy.api.v2.route.WeightedCluster weighted_clusters = 2;
   }
-}
-
-// Allows for specification of multiple upstream clusters along with weights that indicate the
-// percentage of traffic to be forwarded to each cluster. The router selects an upstream cluster
-// based on these weights.
-message WeightedCluster {
-  message ClusterWeight {
-    // Name of the upstream cluster.
-    string name = 1 [(validate.rules).string.min_bytes = 1];
-
-    // When a request matches the route, the choice of an upstream cluster is determined by its
-    // weight. The sum of weights across all entries in the clusters array determines the total
-    // weight.
-    google.protobuf.UInt32Value weight = 2 [(validate.rules).uint32.gte = 1];
-  }
-
-  // Specifies one or more upstream clusters associated with the route.
-  repeated ClusterWeight clusters = 1 [(validate.rules).repeated .min_items = 1];
 }

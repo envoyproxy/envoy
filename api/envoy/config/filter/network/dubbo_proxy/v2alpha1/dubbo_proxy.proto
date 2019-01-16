@@ -6,7 +6,7 @@ option go_package = "v2";
 
 import "envoy/config/filter/network/dubbo_proxy/v2alpha1/route.proto";
 
-import "google/protobuf/struct.proto";
+import "google/protobuf/any.proto";
 
 import "validate/validate.proto";
 import "gogoproto/gogo.proto";
@@ -50,5 +50,5 @@ message DubboFilter {
 
   // Filter specific configuration which depends on the filter being
   // instantiated. See the supported filters for further documentation.
-  google.protobuf.Struct config = 2;
+  google.protobuf.Any config = 2;
 }
