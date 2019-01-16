@@ -742,7 +742,7 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheus(
     const std::vector<double>& computed_buckets = stats.computedBuckets();
     for (size_t i = 0; i < supported_buckets.size(); ++i) {
       double bucket = supported_buckets[i];
-      double value = computed_buckets[i];
+      int value = computed_buckets[i];
       response.add(
           fmt::format("{0}{{{1}le=\"{2}\"}} {3}\n", metric_name, hist_tags, bucket, value));
     }
