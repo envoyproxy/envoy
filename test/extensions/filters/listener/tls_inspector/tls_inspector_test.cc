@@ -48,6 +48,7 @@ public:
         .WillOnce(
             DoAll(SaveArg<1>(&file_event_callback_), ReturnNew<NiceMock<Event::MockFileEvent>>()));
     filter_->onAccept(cb_);
+    io_handle->close();
   }
 
   NiceMock<Api::MockOsSysCalls> os_sys_calls_;
