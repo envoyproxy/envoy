@@ -2,6 +2,8 @@
 
 # Enforce license headers on Envoy BUILD files (maybe more later?)
 
+from __future__ import print_function
+
 import sys
 
 LICENSE_STRING = 'licenses(["notice"])  # Apache 2\n'
@@ -63,5 +65,5 @@ if __name__ == '__main__':
     with open(sys.argv[2], 'w') as f:
       f.write(reorderd_source)
     sys.exit(0)
-  print 'Usage: %s <source file path> [<destination file path>]' % sys.argv[0]
+  print('Usage: %s <source file path> [<destination file path>]' % sys.argv[0])
   sys.exit(1)

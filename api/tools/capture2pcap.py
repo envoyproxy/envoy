@@ -17,6 +17,7 @@ issue.
 TODO(htuch):
 - Figure out IPv6 PCAP issue above, or file a bug once the root cause is clear.
 """
+from __future__ import print_function
 
 import datetime
 import socket
@@ -81,6 +82,6 @@ def Capture2Pcap(capture_path, pcap_path):
 
 if __name__ == '__main__':
   if len(sys.argv) != 3:
-    print 'Usage: %s <capture .pb/.pb_text> <pcap path>' % sys.argv[0]
+    print('Usage: %s <capture .pb/.pb_text> <pcap path>' % sys.argv[0])
     sys.exit(1)
   Capture2Pcap(sys.argv[1], sys.argv[2])
