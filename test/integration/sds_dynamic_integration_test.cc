@@ -7,8 +7,9 @@
 #include "common/event/dispatcher_impl.h"
 #include "common/network/connection_impl.h"
 #include "common/network/utility.h"
-#include "common/ssl/context_config_impl.h"
-#include "common/ssl/context_manager_impl.h"
+
+#include "extensions/transport_sockets/tls/context_config_impl.h"
+#include "extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/config/integration/certs/clientcert_hash.h"
@@ -148,7 +149,7 @@ protected:
   const std::string server_cert_;
   const std::string validation_secret_;
   const std::string client_cert_;
-  Ssl::ContextManagerImpl context_manager_{timeSystem()};
+  Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{timeSystem()};
   FakeHttpConnectionPtr sds_connection_;
   FakeUpstream* sds_upstream_{};
   FakeStreamPtr sds_stream_;
@@ -198,7 +199,6 @@ public:
 
     client_ssl_ctx_.reset();
     cleanupUpstreamAndDownstream();
-    fake_upstream_connection_.reset();
     codec_client_.reset();
   }
 
@@ -228,7 +228,7 @@ TEST_P(SdsDynamicDownstreamIntegrationTest, BasicSuccess) {
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection();
   };
-  testRouterHeaderOnlyRequestAndResponse(true, &creator);
+  testRouterHeaderOnlyRequestAndResponse(&creator);
 }
 
 // A test that SDS server send a bad secret for a static listener,
@@ -255,7 +255,7 @@ TEST_P(SdsDynamicDownstreamIntegrationTest, WrongSecretFirst) {
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection();
   };
-  testRouterHeaderOnlyRequestAndResponse(true, &creator);
+  testRouterHeaderOnlyRequestAndResponse(&creator);
 }
 
 class SdsDynamicDownstreamCertValidationContextTest : public SdsDynamicDownstreamIntegrationTest {
@@ -325,7 +325,7 @@ TEST_P(SdsDynamicDownstreamCertValidationContextTest, BasicSuccess) {
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection();
   };
-  testRouterHeaderOnlyRequestAndResponse(true, &creator);
+  testRouterHeaderOnlyRequestAndResponse(&creator);
 }
 
 // A test that SDS server sends a certificate validation context for a static listener.
@@ -342,7 +342,7 @@ TEST_P(SdsDynamicDownstreamCertValidationContextTest, CombinedCertValidationCont
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection();
   };
-  testRouterHeaderOnlyRequestAndResponse(true, &creator);
+  testRouterHeaderOnlyRequestAndResponse(&creator);
 }
 
 // Upstream SDS integration test: a static cluster has ssl cert from SDS.
@@ -374,7 +374,6 @@ public:
     cleanUpSdsConnection();
 
     cleanupUpstreamAndDownstream();
-    fake_upstream_connection_.reset();
     codec_client_.reset();
 
     test_server_.reset();
@@ -416,7 +415,7 @@ TEST_P(SdsDynamicUpstreamIntegrationTest, BasicSuccess) {
   test_server_->waitForCounterGe(
       "cluster.cluster_0.client_ssl_socket_factory.ssl_context_update_by_sds", 1);
 
-  testRouterHeaderOnlyRequestAndResponse(true);
+  testRouterHeaderOnlyRequestAndResponse();
 }
 
 // To test a static cluster with sds. SDS send a bad client secret first.
@@ -445,7 +444,7 @@ TEST_P(SdsDynamicUpstreamIntegrationTest, WrongSecretFirst) {
   test_server_->waitForCounterGe(
       "cluster.cluster_0.client_ssl_socket_factory.ssl_context_update_by_sds", 1);
 
-  testRouterHeaderOnlyRequestAndResponse(true);
+  testRouterHeaderOnlyRequestAndResponse();
 }
 
 } // namespace Ssl

@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+from __future__ import print_function
+
 import argparse
 import common
 import fileinput
@@ -111,7 +113,8 @@ def checkTools():
         "PATH, please use CLANG_FORMAT environment variable to specify the path. "
         "Examples:\n"
         "    export CLANG_FORMAT=clang-format-7.0.0\n"
-        "    export CLANG_FORMAT=/opt/bin/clang-format-7".format(CLANG_FORMAT_PATH))
+        "    export CLANG_FORMAT=/opt/bin/clang-format-7\n"
+        "    export CLANG_FORMAT=/usr/local/opt/llvm@7/bin/clang-format".format(CLANG_FORMAT_PATH))
 
   buildifier_abs_path = lookPath(BUILDIFIER_PATH)
   if buildifier_abs_path:
@@ -340,7 +343,7 @@ def checkSourceLine(line, file_path, reportError):
   if not whitelistedForGetTime(file_path):
     if "std::get_time" in line:
       if "test/" in file_path:
-        reportError("Don't use std::get_time; use TestUtility::parseTimestamp in tests")
+        reportError("Don't use std::get_time; use TestUtility::parseTime in tests")
       else:
         reportError("Don't use std::get_time; use the injectable time system")
   if 'std::atomic_' in line:
@@ -530,7 +533,7 @@ def checkFormatVisitor(arg, dir_name, names):
 def checkErrorMessages(error_messages):
   if error_messages:
     for e in error_messages:
-      print "ERROR: %s" % e
+      print("ERROR: %s" % e)
     return True
   return False
 
@@ -590,8 +593,8 @@ if __name__ == "__main__":
     error_messages = sum((r.get() for r in results), [])
 
   if checkErrorMessages(error_messages):
-    print "ERROR: check format failed. run 'tools/check_format.py fix'"
+    print("ERROR: check format failed. run 'tools/check_format.py fix'")
     sys.exit(1)
 
   if operation_type == "check":
-    print "PASS"
+    print("PASS")

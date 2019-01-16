@@ -54,7 +54,7 @@ TEST_P(Http2IntegrationTest, FlowControlOnAndGiantBody) {
 }
 
 TEST_P(Http2IntegrationTest, RouterHeaderOnlyRequestAndResponseNoBuffer) {
-  testRouterHeaderOnlyRequestAndResponse(true);
+  testRouterHeaderOnlyRequestAndResponse();
 }
 
 TEST_P(Http2IntegrationTest, RouterRequestAndResponseLargeHeaderNoBuffer) {
@@ -62,7 +62,7 @@ TEST_P(Http2IntegrationTest, RouterRequestAndResponseLargeHeaderNoBuffer) {
 }
 
 TEST_P(Http2IntegrationTest, ShutdownWithActiveConnPoolConnections) {
-  testRouterHeaderOnlyRequestAndResponse(false);
+  testRequestAndResponseShutdownWithActiveConnection();
 }
 
 TEST_P(Http2IntegrationTest, RouterUpstreamDisconnectBeforeRequestcomplete) {
@@ -102,6 +102,8 @@ TEST_P(Http2MetadataIntegrationTest, ProxyMetadataInResponse) {
 TEST_P(Http2MetadataIntegrationTest, ProxyMultipleMetadata) { testEnvoyProxyMultipleMetadata(); }
 
 TEST_P(Http2MetadataIntegrationTest, ProxyInvalidMetadata) { testEnvoyProxyInvalidMetadata(); }
+
+TEST_P(Http2MetadataIntegrationTest, TestResponseMetadata) { testResponseMetadata(); }
 
 TEST_P(Http2MetadataIntegrationTest, ProxyMultipleMetadataReachSizeLimit) {
   testEnvoyMultipleMetadataReachSizeLimit();

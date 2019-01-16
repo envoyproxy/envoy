@@ -1,4 +1,4 @@
-#include "test/integration/http_integration.h"
+#include "test/integration/xds_integration_test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -7,11 +7,10 @@ namespace Envoy {
 namespace {
 
 // This is a minimal litmus test for the v2 xDS APIs.
-class XdsIntegrationTest : public HttpIntegrationTest,
+class XdsIntegrationTest : public XdsIntegrationTestBase,
                            public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  XdsIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam(), realTime()) {
+  XdsIntegrationTest() : XdsIntegrationTestBase(Http::CodecClient::Type::HTTP2, GetParam()) {
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
   }
 

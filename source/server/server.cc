@@ -179,34 +179,19 @@ InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& boots
   if (config_path.empty() && config_yaml.empty()) {
     const std::string message =
         "At least one of --config-path and --config-yaml should be non-empty";
-    std::cerr << message << std::endl;
     throw EnvoyException(message);
   }
-  try {
-    if (!config_path.empty()) {
-      MessageUtil::loadFromFile(config_path, bootstrap);
-    }
-    if (!config_yaml.empty()) {
-      envoy::config::bootstrap::v2::Bootstrap bootstrap_override;
-      MessageUtil::loadFromYaml(config_yaml, bootstrap_override);
-      bootstrap.MergeFrom(bootstrap_override);
-    }
-    MessageUtil::validate(bootstrap);
-    return BootstrapVersion::V2;
-  } catch (const EnvoyException& e) {
-    if (options.v2ConfigOnly()) {
-      throw;
-    }
-    // TODO(htuch): When v1 is deprecated, make this a warning encouraging config upgrade.
-    ENVOY_LOG(debug, "Unable to initialize config as v2, will retry as v1: {}", e.what());
+
+  if (!config_path.empty()) {
+    MessageUtil::loadFromFile(config_path, bootstrap);
   }
   if (!config_yaml.empty()) {
-    throw EnvoyException("V1 config (detected) with --config-yaml is not supported");
+    envoy::config::bootstrap::v2::Bootstrap bootstrap_override;
+    MessageUtil::loadFromYaml(config_yaml, bootstrap_override);
+    bootstrap.MergeFrom(bootstrap_override);
   }
-  Json::ObjectSharedPtr config_json = Json::Factory::loadFromFile(config_path);
-  Config::BootstrapJson::translateBootstrap(*config_json, bootstrap, options.statsOptions());
   MessageUtil::validate(bootstrap);
-  return BootstrapVersion::V1;
+  return BootstrapVersion::V2;
 }
 
 void InstanceImpl::initialize(Options& options,
@@ -318,7 +303,8 @@ void InstanceImpl::initialize(Options& options,
   runtime_loader_ = component_factory.createRuntime(*this, initial_config);
 
   // Once we have runtime we can initialize the SSL context manager.
-  ssl_context_manager_ = std::make_unique<Ssl::ContextManagerImpl>(time_system_);
+  ssl_context_manager_ =
+      std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(time_system_);
 
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
       runtime(), stats(), threadLocal(), random(), dnsResolver(), sslContextManager(), dispatcher(),
@@ -342,7 +328,7 @@ void InstanceImpl::initialize(Options& options,
     async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(
         clusterManager(), thread_local_, time_system_, api());
     hds_delegate_ = std::make_unique<Upstream::HdsDelegate>(
-        bootstrap_.node(), stats(),
+        stats(),
         Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, hds_config, stats())
             ->create(),
         dispatcher(), runtime(), stats(), sslContextManager(), random(), info_factory_,

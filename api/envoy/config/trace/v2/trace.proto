@@ -41,9 +41,8 @@ message Tracing {
     // - :ref:`DynamicOtConfig <envoy_api_msg_config.trace.v2.DynamicOtConfig>`
     // - :ref:`DatadogConfig <envoy_api_msg_config.trace.v2.DatadogConfig>`
     oneof config_type {
-      google.protobuf.Struct config = 2;
+      google.protobuf.Struct config = 2 [deprecated = true];
 
-      // [#not-implemented-hide:]
       google.protobuf.Any typed_config = 3;
     }
   }

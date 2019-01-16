@@ -44,6 +44,12 @@ void HealthCheckerImplBase::decHealthy() {
   refreshHealthyStat();
 }
 
+void HealthCheckerImplBase::decDegraded() {
+  ASSERT(local_process_degraded_ > 0);
+  local_process_degraded_--;
+  refreshHealthyStat();
+}
+
 HealthCheckerStats HealthCheckerImplBase::generateStats(Stats::Scope& scope) {
   std::string prefix("health_check.");
   return {ALL_HEALTH_CHECKER_STATS(POOL_COUNTER_PREFIX(scope, prefix),
@@ -52,6 +58,11 @@ HealthCheckerStats HealthCheckerImplBase::generateStats(Stats::Scope& scope) {
 
 void HealthCheckerImplBase::incHealthy() {
   local_process_healthy_++;
+  refreshHealthyStat();
+}
+
+void HealthCheckerImplBase::incDegraded() {
+  local_process_degraded_++;
   refreshHealthyStat();
 }
 
@@ -132,6 +143,7 @@ void HealthCheckerImplBase::refreshHealthyStat() {
   // Each hot restarted process health checks independently. To make the stats easier to read,
   // we assume that both processes will converge and the last one that writes wins for the host.
   stats_.healthy_.set(local_process_healthy_);
+  stats_.degraded_.set(local_process_degraded_);
 }
 
 void HealthCheckerImplBase::runCallbacks(HostSharedPtr host, HealthTransition changed_state) {
@@ -193,11 +205,18 @@ HealthCheckerImplBase::ActiveHealthCheckSession::ActiveHealthCheckSession(
   if (!host->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
     parent.incHealthy();
   }
+
+  if (host->healthFlagGet(Host::HealthFlag::DEGRADED_ACTIVE_HC)) {
+    parent.incDegraded();
+  }
 }
 
 HealthCheckerImplBase::ActiveHealthCheckSession::~ActiveHealthCheckSession() {
   if (!host_->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
     parent_.decHealthy();
+  }
+  if (host_->healthFlagGet(Host::HealthFlag::DEGRADED_ACTIVE_HC)) {
+    parent_.decDegraded();
   }
 }
 
@@ -222,11 +241,17 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::handleSuccess(bool degrade
     }
   }
 
-  // TODO(snowp): stats and event logger.
   if (degraded != host_->healthFlagGet(Host::HealthFlag::DEGRADED_ACTIVE_HC)) {
     if (degraded) {
       host_->healthFlagSet(Host::HealthFlag::DEGRADED_ACTIVE_HC);
+      parent_.incDegraded();
+      if (parent_.event_logger_) {
+        parent_.event_logger_->logDegraded(parent_.healthCheckerType(), host_);
+      }
     } else {
+      if (parent_.event_logger_) {
+        parent_.event_logger_->logNoLongerDegraded(parent_.healthCheckerType(), host_);
+      }
       host_->healthFlagClear(Host::HealthFlag::DEGRADED_ACTIVE_HC);
     }
 
@@ -303,55 +328,62 @@ void HealthCheckEventLoggerImpl::logEjectUnhealthy(
     envoy::data::core::v2alpha::HealthCheckerType health_checker_type,
     const HostDescriptionConstSharedPtr& host,
     envoy::data::core::v2alpha::HealthCheckFailureType failure_type) {
-  envoy::data::core::v2alpha::HealthCheckEvent event;
-  event.set_health_checker_type(health_checker_type);
-  envoy::api::v2::core::Address address;
-  Network::Utility::addressToProtobufAddress(*host->address(), address);
-  *event.mutable_host() = std::move(address);
-  event.set_cluster_name(host->cluster().name());
-  event.mutable_eject_unhealthy_event()->set_failure_type(failure_type);
-  TimestampUtil::systemClockToTimestamp(time_source_.systemTime(), *event.mutable_timestamp());
-  // Make sure the type enums make it into the JSON
-  const auto json = MessageUtil::getJsonStringFromMessage(event, /* pretty_print */ false,
-                                                          /* always_print_primitive_fields */ true);
-  file_->write(fmt::format("{}\n", json));
+  createHealthCheckEvent(health_checker_type, *host, [&failure_type](auto& event) {
+    event.mutable_eject_unhealthy_event()->set_failure_type(failure_type);
+  });
 }
 
 void HealthCheckEventLoggerImpl::logUnhealthy(
     envoy::data::core::v2alpha::HealthCheckerType health_checker_type,
     const HostDescriptionConstSharedPtr& host,
     envoy::data::core::v2alpha::HealthCheckFailureType failure_type, bool first_check) {
-  envoy::data::core::v2alpha::HealthCheckEvent event;
-  event.set_health_checker_type(health_checker_type);
-  envoy::api::v2::core::Address address;
-  Network::Utility::addressToProtobufAddress(*host->address(), address);
-  *event.mutable_host() = std::move(address);
-  event.set_cluster_name(host->cluster().name());
-  event.mutable_health_check_failure_event()->set_failure_type(failure_type);
-  event.mutable_health_check_failure_event()->set_first_check(first_check);
-  TimestampUtil::systemClockToTimestamp(time_source_.systemTime(), *event.mutable_timestamp());
-  // Make sure the type enums make it into the JSON
-  const auto json = MessageUtil::getJsonStringFromMessage(event, /* pretty_print */ false,
-                                                          /* always_print_primitive_fields */ true);
-  file_->write(fmt::format("{}\n", json));
+  createHealthCheckEvent(health_checker_type, *host, [&first_check, &failure_type](auto& event) {
+    event.mutable_health_check_failure_event()->set_failure_type(failure_type);
+    event.mutable_health_check_failure_event()->set_first_check(first_check);
+  });
 }
 
 void HealthCheckEventLoggerImpl::logAddHealthy(
     envoy::data::core::v2alpha::HealthCheckerType health_checker_type,
     const HostDescriptionConstSharedPtr& host, bool first_check) {
+  createHealthCheckEvent(health_checker_type, *host, [&first_check](auto& event) {
+    event.mutable_add_healthy_event()->set_first_check(first_check);
+  });
+}
+
+void HealthCheckEventLoggerImpl::logDegraded(
+    envoy::data::core::v2alpha::HealthCheckerType health_checker_type,
+    const HostDescriptionConstSharedPtr& host) {
+  createHealthCheckEvent(health_checker_type, *host,
+                         [](auto& event) { event.mutable_degraded_healthy_host(); });
+}
+
+void HealthCheckEventLoggerImpl::logNoLongerDegraded(
+    envoy::data::core::v2alpha::HealthCheckerType health_checker_type,
+    const HostDescriptionConstSharedPtr& host) {
+  createHealthCheckEvent(health_checker_type, *host,
+                         [](auto& event) { event.mutable_no_longer_degraded_host(); });
+}
+
+void HealthCheckEventLoggerImpl::createHealthCheckEvent(
+    envoy::data::core::v2alpha::HealthCheckerType health_checker_type, const HostDescription& host,
+    std::function<void(envoy::data::core::v2alpha::HealthCheckEvent&)> callback) const {
   envoy::data::core::v2alpha::HealthCheckEvent event;
+  event.set_cluster_name(host.cluster().name());
   event.set_health_checker_type(health_checker_type);
+
   envoy::api::v2::core::Address address;
-  Network::Utility::addressToProtobufAddress(*host->address(), address);
+  Network::Utility::addressToProtobufAddress(*host.address(), address);
   *event.mutable_host() = std::move(address);
-  event.set_cluster_name(host->cluster().name());
-  event.mutable_add_healthy_event()->set_first_check(first_check);
+
   TimestampUtil::systemClockToTimestamp(time_source_.systemTime(), *event.mutable_timestamp());
+
+  callback(event);
+
   // Make sure the type enums make it into the JSON
   const auto json = MessageUtil::getJsonStringFromMessage(event, /* pretty_print */ false,
                                                           /* always_print_primitive_fields */ true);
   file_->write(fmt::format("{}\n", json));
 }
-
 } // namespace Upstream
 } // namespace Envoy
