@@ -91,7 +91,9 @@ export CXX="clang++"
 export CXXFLAGS="-stdlib=libc++"
 bazel build --define force_libcpp=enabled --linkopt -fuse-ld=lld //source/exe:envoy-static
 ```
-Note: this requires both: clang compiler and libc++ library to be installed in the system.
+Note: this assumes that both: clang compiler and libc++ library are installed in the system,
+and that `clang` is available in `$PATH`. On some systems, this might need to be changed to
+`CC="clang-7"` and `CXX="clang++-7"`.
 
 ## Using a compiler toolchain in a non-standard location
 
