@@ -13,9 +13,6 @@
 #include "common/config/resources.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
-#include "common/ssl/context_config_impl.h"
-#include "common/ssl/context_manager_impl.h"
-#include "common/ssl/ssl_socket.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"
@@ -305,7 +302,7 @@ public:
     return dynamic_cast<const envoy::admin::v2alpha::RoutesConfigDump&>(*message_ptr);
   }
 
-  Ssl::ContextManagerImpl context_manager_{timeSystem()};
+  Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{timeSystem()};
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersionsClientType, AdsIntegrationTest, GRPC_CLIENT_INTEGRATION_PARAMS);

@@ -435,10 +435,13 @@ public:
   COUNTER  (upstream_flow_control_resumed_reading_total)                                           \
   COUNTER  (upstream_flow_control_backed_up_total)                                                 \
   COUNTER  (upstream_flow_control_drained_total)                                                   \
+  COUNTER  (upstream_internal_redirect_failed_total)                                               \
+  COUNTER  (upstream_internal_redirect_succeeded_total)                                            \
   COUNTER  (bind_errors)                                                                           \
   GAUGE    (max_host_weight)                                                                       \
   COUNTER  (membership_change)                                                                     \
   GAUGE    (membership_healthy)                                                                    \
+  GAUGE    (membership_degraded)                                                                   \
   GAUGE    (membership_total)                                                                      \
   COUNTER  (retry_or_shadow_abandoned)                                                             \
   COUNTER  (update_attempt)                                                                        \

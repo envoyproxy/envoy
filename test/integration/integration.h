@@ -36,6 +36,7 @@ public:
   const Http::HeaderMap& headers() { return *headers_; }
   const Http::HeaderMapPtr& trailers() { return trailers_; }
   const Http::MetadataMap& metadata_map() { return *metadata_map_; }
+  uint64_t keyCount(std::string key) { return duplicated_metadata_key_count_[key]; }
   void waitForContinueHeaders();
   void waitForHeaders();
   // This function waits until body_ has at least size bytes in it (it might have more). clearBody()
@@ -64,6 +65,7 @@ private:
   Http::HeaderMapPtr headers_;
   Http::HeaderMapPtr trailers_;
   Http::MetadataMapPtr metadata_map_{new Http::MetadataMap()};
+  std::unordered_map<std::string, uint64_t> duplicated_metadata_key_count_;
   bool waiting_for_end_stream_{};
   bool saw_end_stream_{};
   std::string body_;
@@ -270,7 +272,7 @@ protected:
   FakeHttpConnectionPtr xds_connection_;
   FakeStreamPtr xds_stream_;
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
-  Ssl::ContextManagerImpl context_manager_{timeSystem()};
+  Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{timeSystem()};
   bool create_xds_upstream_{false}; // TODO(alyssawilk) true by default.
   bool tls_xds_upstream_{false};
 

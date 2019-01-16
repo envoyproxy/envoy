@@ -5,6 +5,8 @@
 # docker. Normally this is run via check_format_test.sh, which
 # executes it in under docker.
 
+from __future__ import print_function
+
 import argparse
 import os
 import shutil
@@ -69,12 +71,12 @@ def fixFileHelper(filename):
 def fixFileExpectingSuccess(file):
   command, infile, outfile, status, stdout = fixFileHelper(file)
   if status != 0:
-    print "FAILED:"
+    print("FAILED:")
     emitStdoutAsError(stdout)
     return 1
   status, stdout = runCommand('diff ' + outfile + ' ' + infile + '.gold')
   if status != 0:
-    print "FAILED:"
+    print("FAILED:")
     emitStdoutAsError(stdout)
     return 1
   return 0

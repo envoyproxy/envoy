@@ -21,7 +21,8 @@ void ThreadAwareLoadBalancerBase::initialize() {
 void ThreadAwareLoadBalancerBase::refresh() {
   auto per_priority_state_vector = std::make_shared<std::vector<PerPriorityStatePtr>>(
       priority_set_.hostSetsPerPriority().size());
-  auto per_priority_load = std::make_shared<PriorityLoad>(PriorityLoad(per_priority_load_));
+  auto healthy_per_priority_load = std::make_shared<HealthyLoad>(healthy_per_priority_load_);
+  auto degraded_per_priority_load = std::make_shared<DegradedLoad>(degraded_per_priority_load_);
 
   for (const auto& host_set : priority_set_.hostSetsPerPriority()) {
     const uint32_t priority = host_set->priority();
@@ -36,7 +37,8 @@ void ThreadAwareLoadBalancerBase::refresh() {
 
   {
     absl::WriterMutexLock lock(&factory_->mutex_);
-    factory_->per_priority_load_ = per_priority_load;
+    factory_->healthy_per_priority_load_ = healthy_per_priority_load;
+    factory_->degraded_per_priority_load_ = degraded_per_priority_load;
     factory_->per_priority_state_ = per_priority_state_vector;
   }
 }
@@ -57,7 +59,9 @@ ThreadAwareLoadBalancerBase::LoadBalancerImpl::chooseHost(LoadBalancerContext* c
   }
   const uint64_t h = hash ? hash.value() : random_.random();
 
-  const uint32_t priority = LoadBalancerBase::choosePriority(h, *per_priority_load_);
+  const uint32_t priority =
+      LoadBalancerBase::choosePriority(h, *healthy_per_priority_load_, *degraded_per_priority_load_)
+          .first;
   const auto& per_priority_state = (*per_priority_state_)[priority];
   if (per_priority_state->global_panic_) {
     stats_.lb_healthy_panic_.inc();
@@ -71,7 +75,8 @@ LoadBalancerPtr ThreadAwareLoadBalancerBase::LoadBalancerFactoryImpl::create() {
   // We must protect current_lb_ via a RW lock since it is accessed and written to by multiple
   // threads. All complex processing has already been precalculated however.
   absl::ReaderMutexLock lock(&mutex_);
-  lb->per_priority_load_ = per_priority_load_;
+  lb->healthy_per_priority_load_ = healthy_per_priority_load_;
+  lb->degraded_per_priority_load_ = degraded_per_priority_load_;
   lb->per_priority_state_ = per_priority_state_;
 
   return std::move(lb);

@@ -20,10 +20,11 @@
 #include "common/event/libevent.h"
 #include "common/network/connection_impl.h"
 #include "common/network/utility.h"
-#include "common/ssl/context_config_impl.h"
-#include "common/ssl/context_manager_impl.h"
-#include "common/ssl/ssl_socket.h"
 #include "common/upstream/upstream_impl.h"
+
+#include "extensions/transport_sockets/tls/context_config_impl.h"
+#include "extensions/transport_sockets/tls/context_manager_impl.h"
+#include "extensions/transport_sockets/tls/ssl_socket.h"
 
 #include "test/integration/autonomous_upstream.h"
 #include "test/integration/utility.h"
@@ -125,6 +126,7 @@ void IntegrationStreamDecoder::decodeTrailers(Http::HeaderMapPtr&& trailers) {
 void IntegrationStreamDecoder::decodeMetadata(Http::MetadataMapPtr&& metadata_map) {
   // Combines newly received metadata with the existing metadata.
   for (const auto metadata : *metadata_map) {
+    duplicated_metadata_key_count_[metadata.first]++;
     metadata_map_->insert(metadata);
   }
 }
@@ -443,10 +445,11 @@ void BaseIntegrationTest::createXdsUpstream() {
         TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcert.pem"));
     tls_cert->mutable_private_key()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/upstreamkey.pem"));
-    auto cfg = std::make_unique<Ssl::ServerContextConfigImpl>(tls_context, factory_context_);
+    auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
+        tls_context, factory_context_);
 
     static Stats::Scope* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
-    auto context = std::make_unique<Ssl::ServerSslSocketFactory>(
+    auto context = std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
         std::move(cfg), context_manager_, *upstream_stats_store, std::vector<std::string>{});
     fake_upstreams_.emplace_back(new FakeUpstream(
         std::move(context), 0, FakeHttpConnection::Type::HTTP2, version_, timeSystem()));
