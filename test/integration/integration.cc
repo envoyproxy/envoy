@@ -262,6 +262,7 @@ void BaseIntegrationTest::initialize() {
   initialized_ = true;
 
   createUpstreams();
+  createXdsUpstream();
   createEnvoy();
 }
 
@@ -426,41 +427,41 @@ BaseIntegrationTest::createIntegrationTestServer(const std::string& bootstrap_pa
                                        defer_listener_finalization_);
 }
 
-void BaseIntegrationTest::createXdsUpstream(bool tls) {
-  if (tls == false) {
-    fake_upstreams_.emplace_back(
-        new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_, timeSystem()));
+void BaseIntegrationTest::createXdsUpstream() {
+  if (create_xds_upstream_ == false) {
     return;
   }
+  if (tls_xds_upstream_ == false) {
+    fake_upstreams_.emplace_back(
+        new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_, timeSystem()));
+  } else {
+    envoy::api::v2::auth::DownstreamTlsContext tls_context;
+    auto* common_tls_context = tls_context.mutable_common_tls_context();
+    common_tls_context->add_alpn_protocols("h2");
+    auto* tls_cert = common_tls_context->add_tls_certificates();
+    tls_cert->mutable_certificate_chain()->set_filename(
+        TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcert.pem"));
+    tls_cert->mutable_private_key()->set_filename(
+        TestEnvironment::runfilesPath("test/config/integration/certs/upstreamkey.pem"));
+    auto cfg = std::make_unique<Ssl::ServerContextConfigImpl>(tls_context, factory_context_);
 
-  envoy::api::v2::auth::DownstreamTlsContext tls_context;
-  auto* common_tls_context = tls_context.mutable_common_tls_context();
-  common_tls_context->add_alpn_protocols("h2");
-  auto* tls_cert = common_tls_context->add_tls_certificates();
-  tls_cert->mutable_certificate_chain()->set_filename(
-      TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcert.pem"));
-  tls_cert->mutable_private_key()->set_filename(
-      TestEnvironment::runfilesPath("test/config/integration/certs/upstreamkey.pem"));
-  auto cfg = std::make_unique<Ssl::ServerContextConfigImpl>(tls_context, factory_context_);
-
-  static Stats::Scope* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
-  auto context = std::make_unique<Ssl::ServerSslSocketFactory>(
-      std::move(cfg), context_manager_, *upstream_stats_store, std::vector<std::string>{});
-  fake_upstreams_.emplace_back(new FakeUpstream(
-      std::move(context), 0, FakeHttpConnection::Type::HTTP2, version_, timeSystem()));
+    static Stats::Scope* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
+    auto context = std::make_unique<Ssl::ServerSslSocketFactory>(
+        std::move(cfg), context_manager_, *upstream_stats_store, std::vector<std::string>{});
+    fake_upstreams_.emplace_back(new FakeUpstream(
+        std::move(context), 0, FakeHttpConnection::Type::HTTP2, version_, timeSystem()));
+  }
+  xds_upstream_ = fake_upstreams_[1].get();
+  // Don't ASSERT fail if an xDS reconnect ends up unparented.
+  xds_upstream_->set_allow_unexpected_disconnects(true);
 }
 
-void BaseIntegrationTest::createXdsConnection(FakeUpstream& upstream) {
-  xds_upstream_ = &upstream;
+void BaseIntegrationTest::createXdsConnection() {
   AssertionResult result = xds_upstream_->waitForHttpConnection(*dispatcher_, xds_connection_);
   RELEASE_ASSERT(result, result.message());
 }
 
 void BaseIntegrationTest::cleanUpXdsConnection() {
-  // Don't ASSERT fail if an xDS reconnect ends up unparented.
-  if (xds_upstream_) {
-    xds_upstream_->set_allow_unexpected_disconnects(true);
-  }
   AssertionResult result = xds_connection_->close();
   RELEASE_ASSERT(result, result.message());
   result = xds_connection_->waitForDisconnect();

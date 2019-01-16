@@ -187,8 +187,8 @@ public:
   MockBufferFactory* mock_buffer_factory_; // Will point to the dispatcher's factory.
 
   // Functions for testing reloadable config (xDS)
-  void createXdsUpstream(bool tls = false);
-  void createXdsConnection(FakeUpstream& upstream);
+  void createXdsUpstream();
+  void createXdsConnection();
   void cleanUpXdsConnection();
   AssertionResult
   compareDiscoveryRequest(const std::string& expected_type_url, const std::string& expected_version,
@@ -271,6 +271,8 @@ protected:
   FakeStreamPtr xds_stream_;
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
   Ssl::ContextManagerImpl context_manager_{timeSystem()};
+  bool create_xds_upstream_{false}; // TODO(alyssawilk) true by default.
+  bool tls_xds_upstream_{false};
 
 private:
   // The type for the Envoy-to-backend connection
