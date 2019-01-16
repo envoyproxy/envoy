@@ -96,7 +96,6 @@ envoy_cc_test_library(
         "//source/common/api:api_lib",
         "//source/common/common:block_memory_hash_set_lib",
         "//source/common/common:empty_string",
-        "//source/common/common:google_string_hack_lib",
         "//source/common/common:thread_lib",
         "//source/common/common:utility_lib",
         "//source/common/config:bootstrap_json_lib",
