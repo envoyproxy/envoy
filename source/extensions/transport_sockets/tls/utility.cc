@@ -1,4 +1,4 @@
-#include "common/ssl/utility.h"
+#include "extensions/transport_sockets/tls/utility.h"
 
 #include "common/common/assert.h"
 
@@ -6,7 +6,9 @@
 #include "openssl/x509v3.h"
 
 namespace Envoy {
-namespace Ssl {
+namespace Extensions {
+namespace TransportSockets {
+namespace Tls {
 
 const ASN1_TIME& epochASN1_Time() {
   static ASN1_TIME* e = []() -> ASN1_TIME* {
@@ -101,5 +103,7 @@ SystemTime Utility::getExpirationTime(const X509& cert) {
   return std::chrono::system_clock::from_time_t(days * 24 * 60 * 60 + seconds);
 }
 
-} // namespace Ssl
+} // namespace Tls
+} // namespace TransportSockets
+} // namespace Extensions
 } // namespace Envoy
