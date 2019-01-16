@@ -14,7 +14,7 @@ namespace Tap {
  * up recursively building many matchers, which will all be added to the passed in vector
  * of matchers. See the comments in tap.h for the general structure of how tap matchers work.
  */
-void buildMatcher(const envoy::service::tap::v2alpha::MatchConfig& match_config,
+void buildMatcher(const envoy::service::tap::v2alpha::MatchPredicate& match_config,
                   std::vector<MatcherPtr>& matchers);
 
 /**
@@ -24,7 +24,7 @@ class SetLogicMatcher : public Matcher {
 public:
   enum class Type { And, Or };
 
-  SetLogicMatcher(const envoy::service::tap::v2alpha::MatchConfig::Set& configs,
+  SetLogicMatcher(const envoy::service::tap::v2alpha::MatchPredicate::MatchSet& configs,
                   std::vector<MatcherPtr>& matchers, Type type);
 
   // Extensions::Common::Tap::Matcher
@@ -43,7 +43,7 @@ private:
  */
 class NotMatcher : public Matcher {
 public:
-  NotMatcher(const envoy::service::tap::v2alpha::MatchConfig& config,
+  NotMatcher(const envoy::service::tap::v2alpha::MatchPredicate& config,
              std::vector<MatcherPtr>& matchers);
 
   // Extensions::Common::Tap::Matcher

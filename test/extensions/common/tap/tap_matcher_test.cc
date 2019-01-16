@@ -14,7 +14,7 @@ class TapMatcherTest : public testing::Test {
 public:
   std::vector<MatcherPtr> matchers_;
   std::vector<bool> statuses_;
-  envoy::service::tap::v2alpha::MatchConfig config_;
+  envoy::service::tap::v2alpha::MatchPredicate config_;
 };
 
 TEST_F(TapMatcherTest, Any) {

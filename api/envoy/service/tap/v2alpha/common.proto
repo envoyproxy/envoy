@@ -14,7 +14,7 @@ option java_multiple_files = true;
 message TapConfig {
   // The match configuration. If the configuration matches the data source being tapped, a tap will
   // occur, with the result written to the configured output.
-  MatchConfig match_config = 1 [(validate.rules).message.required = true];
+  MatchPredicate match_config = 1 [(validate.rules).message.required = true];
 
   // The tap output configuration. If a match configuration matches a data source being tapped,
   // a tap will occur and the data will be written to the configured output.
@@ -25,11 +25,11 @@ message TapConfig {
 
 // Tap match configuration. This is a recursive structure which allows complex nested match
 // configurations to be built using various logical operators.
-message MatchConfig {
+message MatchPredicate {
   // A set of match configurations used for logical operations.
-  message Set {
+  message MatchSet {
     // The list of rules that make up the set.
-    repeated MatchConfig rules = 1 [(validate.rules).repeated .min_items = 2];
+    repeated MatchPredicate rules = 1 [(validate.rules).repeated .min_items = 2];
   }
 
   oneof rule {
@@ -37,15 +37,14 @@ message MatchConfig {
 
     // A set that describes a logical OR. If any member of the set matches, the match configuration
     // matches.
-    Set or_match = 1;
+    MatchSet or_match = 1;
 
     // A set that describes a logical AND. If all members of the set match, the match configuration
     // matches.
-    Set and_match = 2;
+    MatchSet and_match = 2;
 
-    // A negation match. The match configuration will match if the negated match condition does not
-    // match.
-    MatchConfig not_match = 3;
+    // A negation match. The match configuration will match if the negated match condition matches.
+    MatchPredicate not_match = 3;
 
     // The match configuration will always match.
     bool any_match = 4 [(validate.rules).bool.const = true];

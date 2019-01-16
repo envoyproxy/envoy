@@ -56,6 +56,8 @@ void FilterConfigImpl::newTapConfig(envoy::service::tap::v2alpha::TapConfig&& pr
 }
 
 FilterStats Filter::generateStats(const std::string& prefix, Stats::Scope& scope) {
+  // TODO(mattklein123): Consider whether we want to additionally namespace the stats on the
+  // filter's configured opaque ID.
   std::string final_prefix = prefix + "tap.";
   return {ALL_TAP_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
 }

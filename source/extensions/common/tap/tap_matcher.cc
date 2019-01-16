@@ -7,7 +7,7 @@ namespace Extensions {
 namespace Common {
 namespace Tap {
 
-void buildMatcher(const envoy::service::tap::v2alpha::MatchConfig& match_config,
+void buildMatcher(const envoy::service::tap::v2alpha::MatchPredicate& match_config,
                   std::vector<MatcherPtr>& matchers) {
   // In order to store indexes and build our matcher tree inline, we must reserve a slot where
   // the matcher we are about to create will go. This allows us to know its future index and still
@@ -18,24 +18,24 @@ void buildMatcher(const envoy::service::tap::v2alpha::MatchConfig& match_config,
 
   MatcherPtr new_matcher;
   switch (match_config.rule_case()) {
-  case envoy::service::tap::v2alpha::MatchConfig::kOrMatch:
+  case envoy::service::tap::v2alpha::MatchPredicate::kOrMatch:
     new_matcher = std::make_unique<SetLogicMatcher>(match_config.or_match(), matchers,
                                                     SetLogicMatcher::Type::Or);
     break;
-  case envoy::service::tap::v2alpha::MatchConfig::kAndMatch:
+  case envoy::service::tap::v2alpha::MatchPredicate::kAndMatch:
     new_matcher = std::make_unique<SetLogicMatcher>(match_config.and_match(), matchers,
                                                     SetLogicMatcher::Type::And);
     break;
-  case envoy::service::tap::v2alpha::MatchConfig::kNotMatch:
+  case envoy::service::tap::v2alpha::MatchPredicate::kNotMatch:
     new_matcher = std::make_unique<NotMatcher>(match_config.not_match(), matchers);
     break;
-  case envoy::service::tap::v2alpha::MatchConfig::kAnyMatch:
+  case envoy::service::tap::v2alpha::MatchPredicate::kAnyMatch:
     new_matcher = std::make_unique<AnyMatcher>(matchers);
     break;
-  case envoy::service::tap::v2alpha::MatchConfig::kHttpRequestMatch:
+  case envoy::service::tap::v2alpha::MatchPredicate::kHttpRequestMatch:
     new_matcher = std::make_unique<HttpRequestMatcher>(match_config.http_request_match(), matchers);
     break;
-  case envoy::service::tap::v2alpha::MatchConfig::kHttpResponseMatch:
+  case envoy::service::tap::v2alpha::MatchPredicate::kHttpResponseMatch:
     new_matcher =
         std::make_unique<HttpResponseMatcher>(match_config.http_response_match(), matchers);
     break;
@@ -47,8 +47,9 @@ void buildMatcher(const envoy::service::tap::v2alpha::MatchConfig& match_config,
   matchers[new_matcher->index()] = std::move(new_matcher);
 }
 
-SetLogicMatcher::SetLogicMatcher(const envoy::service::tap::v2alpha::MatchConfig::Set& configs,
-                                 std::vector<MatcherPtr>& matchers, Type type)
+SetLogicMatcher::SetLogicMatcher(
+    const envoy::service::tap::v2alpha::MatchPredicate::MatchSet& configs,
+    std::vector<MatcherPtr>& matchers, Type type)
     : Matcher(matchers), matchers_(matchers), type_(type) {
   for (const auto& config : configs.rules()) {
     indexes_.push_back(matchers_.size());
@@ -75,7 +76,7 @@ bool SetLogicMatcher::updateMatchStatus(const Http::HeaderMap* request_headers,
   return statuses[my_index_];
 }
 
-NotMatcher::NotMatcher(const envoy::service::tap::v2alpha::MatchConfig& config,
+NotMatcher::NotMatcher(const envoy::service::tap::v2alpha::MatchPredicate& config,
                        std::vector<MatcherPtr>& matchers)
     : Matcher(matchers), matchers_(matchers), not_index_(matchers.size()) {
   buildMatcher(config, matchers);
