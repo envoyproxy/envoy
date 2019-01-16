@@ -121,6 +121,7 @@ PROTO_RST="
   /envoy/data/core/v2alpha/health_check_event/envoy/data/core/v2alpha/health_check_event.proto.rst
   /envoy/data/tap/v2alpha/capture/envoy/data/tap/v2alpha/capture.proto.rst
   /envoy/data/tap/v2alpha/http/envoy/data/tap/v2alpha/http.proto.rst
+  /envoy/data/tap/v2alpha/wrapper/envoy/data/tap/v2alpha/wrapper.proto.rst
   /envoy/service/accesslog/v2/als/envoy/service/accesslog/v2/als.proto.rst
   /envoy/service/auth/v2alpha/external_auth/envoy/service/auth/v2alpha/attribute_context.proto.rst
   /envoy/service/auth/v2alpha/external_auth/envoy/service/auth/v2alpha/external_auth.proto.rst

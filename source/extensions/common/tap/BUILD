@@ -13,7 +13,7 @@ envoy_cc_library(
     hdrs = ["tap.h"],
     deps = [
         "//include/envoy/http:header_map_interface",
-        "//source/common/protobuf",
+        "@envoy_api//envoy/data/tap/v2alpha:wrapper_cc",
         "@envoy_api//envoy/service/tap/v2alpha:common_cc",
     ],
 )

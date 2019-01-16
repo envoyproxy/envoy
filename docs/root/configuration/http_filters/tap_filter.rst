@@ -15,8 +15,8 @@ Tap
 The HTTP tap filter is used to interpose on and record HTTP traffic. At a high level, the
 configuration is composed of two pieces:
 
-1. :ref:`Match configuration <envoy_api_msg_service.tap.v2alpha.MatchConfig>`: a list of conditions
-   under which the filter will match an HTTP request and begin a tap session.
+1. :ref:`Match configuration <envoy_api_msg_service.tap.v2alpha.MatchPredicate>`: a list of
+   conditions under which the filter will match an HTTP request and begin a tap session.
 2. :ref:`Output configuration <envoy_api_msg_service.tap.v2alpha.OutputConfig>`: a list of output
    sinks that the filter will write the matched and tapped data to.
 

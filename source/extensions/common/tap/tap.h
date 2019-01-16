@@ -1,10 +1,9 @@
 #pragma once
 
 #include "envoy/common/pure.h"
+#include "envoy/data/tap/v2alpha/wrapper.pb.h"
 #include "envoy/http/header_map.h"
 #include "envoy/service/tap/v2alpha/common.pb.h"
-
-#include "common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -20,11 +19,11 @@ public:
 
   /**
    * Send a fully buffered trace to the sink.
-   * @param trace supplies the trace to send. The trace message is opaque and is assumed to be a
-   *        discrete trace message (as opposed to a portion of a larger trace that should be
-   *        aggregated).
+   * @param trace supplies the trace to send. The trace message is a discrete trace message (as
+   *        opposed to a portion of a larger trace that should be aggregated).
    */
-  virtual void submitBufferedTrace(std::shared_ptr<Protobuf::Message> trace) PURE;
+  virtual void
+  submitBufferedTrace(std::shared_ptr<envoy::data::tap::v2alpha::BufferedTraceWrapper> trace) PURE;
 };
 
 /**

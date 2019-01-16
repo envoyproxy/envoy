@@ -1,4 +1,4 @@
-#include "envoy/data/tap/v2alpha/http.pb.h"
+#include "envoy/data/tap/v2alpha/wrapper.pb.h"
 
 #include "test/integration/http_integration.h"
 
@@ -118,10 +118,10 @@ tap_config:
 
   // Wait for the tap message.
   admin_response->waitForBodyData(1);
-  envoy::data::tap::v2alpha::HttpBufferedTrace trace;
+  envoy::data::tap::v2alpha::BufferedTraceWrapper trace;
   MessageUtil::loadFromYaml(admin_response->body(), trace);
-  EXPECT_EQ(trace.request_headers().size(), 8);
-  EXPECT_EQ(trace.response_headers().size(), 5);
+  EXPECT_EQ(trace.http_buffered_trace().request_headers().size(), 8);
+  EXPECT_EQ(trace.http_buffered_trace().response_headers().size(), 5);
   admin_response->clearBody();
 
   // Do a request which should not tap.
@@ -142,11 +142,13 @@ tap_config:
   // Wait for the tap message.
   admin_response->waitForBodyData(1);
   MessageUtil::loadFromYaml(admin_response->body(), trace);
-  EXPECT_EQ(trace.request_headers().size(), 7);
-  EXPECT_EQ("http", findHeader("x-forwarded-proto", trace.request_headers())->value());
-  EXPECT_EQ(trace.response_headers().size(), 6);
-  EXPECT_NE(nullptr, findHeader("date", trace.response_headers()));
-  EXPECT_EQ("baz", findHeader("bar", trace.response_headers())->value());
+  EXPECT_EQ(trace.http_buffered_trace().request_headers().size(), 7);
+  EXPECT_EQ(
+      "http",
+      findHeader("x-forwarded-proto", trace.http_buffered_trace().request_headers())->value());
+  EXPECT_EQ(trace.http_buffered_trace().response_headers().size(), 6);
+  EXPECT_NE(nullptr, findHeader("date", trace.http_buffered_trace().response_headers()));
+  EXPECT_EQ("baz", findHeader("bar", trace.http_buffered_trace().response_headers())->value());
 
   admin_client_->close();
   test_server_->waitForGaugeEq("http.admin.downstream_rq_active", 0);

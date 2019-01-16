@@ -13,3 +13,9 @@ api_proto_library_internal(
     srcs = ["http.proto"],
     deps = ["//envoy/api/v2/core:base"],
 )
+
+api_proto_library_internal(
+    name = "wrapper",
+    srcs = ["wrapper.proto"],
+    deps = [":http"],
+)

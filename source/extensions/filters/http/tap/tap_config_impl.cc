@@ -3,6 +3,7 @@
 #include "envoy/data/tap/v2alpha/http.pb.h"
 
 #include "common/common/assert.h"
+#include "common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -42,10 +43,11 @@ bool HttpPerRequestTapperImpl::onDestroyLog(const Http::HeaderMap* request_heade
     return false;
   }
 
-  auto trace = std::make_shared<envoy::data::tap::v2alpha::HttpBufferedTrace>();
-  request_headers->iterate(fillHeaderList, trace->mutable_request_headers());
+  auto trace = std::make_shared<envoy::data::tap::v2alpha::BufferedTraceWrapper>();
+  auto& http_trace = *trace->mutable_http_buffered_trace();
+  request_headers->iterate(fillHeaderList, http_trace.mutable_request_headers());
   if (response_headers != nullptr) {
-    response_headers->iterate(fillHeaderList, trace->mutable_response_headers());
+    response_headers->iterate(fillHeaderList, http_trace.mutable_response_headers());
   }
 
   ENVOY_LOG(debug, "submitting buffered trace sink");

@@ -75,6 +75,7 @@ proto_library(
         "//envoy/data/core/v2alpha:health_check_event",
         "//envoy/data/tap/v2alpha:capture",
         "//envoy/data/tap/v2alpha:http",
+        "//envoy/data/tap/v2alpha:wrapper",
         "//envoy/service/accesslog/v2:als",
         "//envoy/service/auth/v2alpha:attribute_context",
         "//envoy/service/auth/v2alpha:external_auth",
