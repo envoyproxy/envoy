@@ -87,6 +87,15 @@ enum class FilterTrailersStatus {
 };
 
 /**
+ * Return codes for encode metadata filter invocations. Metadata currently can not stop filter
+ * iteration.
+ */
+enum class FilterMetadataStatus {
+  // Continue filter chain iteration.
+  Continue,
+};
+
+/**
  * The stream filter callbacks are passed to all filters to use for writing response data and
  * interacting with the underlying stream in general.
  */
@@ -525,6 +534,15 @@ public:
    * @param trailers supplies the trailers to be encoded.
    */
   virtual FilterTrailersStatus encodeTrailers(HeaderMap& trailers) PURE;
+
+  /**
+   * Called with metadata to be encoded. New metadata should be added directly to metadata_map. DO
+   * NOT call StreamDecoderFilterCallbacks::encodeMetadata() interface to add new metadata.
+   *
+   * @param metadata_map supplies the metadata to be encoded.
+   * @return FilterMetadataStatus, which currently is always FilterMetadataStatus::Continue;
+   */
+  virtual FilterMetadataStatus encodeMetadata(MetadataMap& metadata_map) PURE;
 
   /**
    * Called by the filter manager once to initialize the filter callbacks that the filter should

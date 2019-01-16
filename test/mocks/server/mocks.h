@@ -23,7 +23,8 @@
 
 #include "common/http/context_impl.h"
 #include "common/secret/secret_manager_impl.h"
-#include "common/ssl/context_manager_impl.h"
+
+#include "extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/api/mocks.h"
@@ -367,7 +368,7 @@ public:
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
   Thread::MutexBasicLockable access_log_lock_;
   testing::NiceMock<Runtime::MockLoader> runtime_loader_;
-  Ssl::ContextManagerImpl ssl_context_manager_;
+  Extensions::TransportSockets::Tls::ContextManagerImpl ssl_context_manager_;
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
   testing::NiceMock<MockDrainManager> drain_manager_;
   testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;

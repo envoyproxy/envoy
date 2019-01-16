@@ -9,8 +9,9 @@
 #include "common/event/dispatcher_impl.h"
 #include "common/network/connection_impl.h"
 #include "common/network/utility.h"
-#include "common/ssl/context_config_impl.h"
-#include "common/ssl/context_manager_impl.h"
+
+#include "extensions/transport_sockets/tls/context_config_impl.h"
+#include "extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"
@@ -34,7 +35,8 @@ void SslIntegrationTestBase::initialize() {
                                   .setExpectClientEcdsaCert(client_ecdsa_cert_));
   HttpIntegrationTest::initialize();
 
-  context_manager_ = std::make_unique<ContextManagerImpl>(timeSystem());
+  context_manager_ =
+      std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(timeSystem());
 
   registerTestServerPorts({"http"});
 }

@@ -353,6 +353,9 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPost) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue,
             filter_.encode100ContinueHeaders(continue_headers));
 
+  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_.encodeMetadata(metadata_map));
+
   Http::TestHeaderMapImpl response_headers{{"content-type", "application/grpc"},
                                            {":status", "200"}};
 
