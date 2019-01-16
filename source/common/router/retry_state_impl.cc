@@ -160,7 +160,7 @@ RetryStatus RetryStateImpl::shouldRetry(const Http::HeaderMap* response_headers,
   resetRetry();
 
   if (retries_remaining_ == 0) {
-    return RetryStatus::No;
+    return RetryStatus::NoRetryLimitExceeded;
   }
 
   retries_remaining_--;

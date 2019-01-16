@@ -1,5 +1,6 @@
 #include "envoy/config/filter/thrift/rate_limit/v2alpha1/rate_limit.pb.validate.h"
 
+#include "extensions/filters/common/ratelimit/ratelimit_registration.h"
 #include "extensions/filters/network/thrift_proxy/filters/ratelimit/config.h"
 
 #include "test/extensions/filters/network/thrift_proxy/mocks.h"
@@ -9,6 +10,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {
@@ -33,7 +35,7 @@ TEST(RateLimitFilterConfigTest, ValidateFail) {
 }
 
 TEST(RateLimitFilterConfigTest, RateLimitFilterCorrectProto) {
-  std::string yaml_string = R"EOF(
+  const std::string yaml_string = R"EOF(
 domain: "test"
 timeout: "1.337s"
   )EOF";
@@ -41,6 +43,21 @@ timeout: "1.337s"
   auto proto_config = parseRateLimitFromV2Yaml(yaml_string);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::MockInstance> instance;
+
+  // Return the same singleton manager as instance so that config can be found there.
+  EXPECT_CALL(context, singletonManager()).WillOnce(ReturnRef(instance.singletonManager()));
+
+  Filters::Common::RateLimit::ClientFactoryPtr client_factory =
+      Filters::Common::RateLimit::rateLimitClientFactory(
+          instance, instance.clusterManager().grpcAsyncClientManager(),
+          envoy::config::bootstrap::v2::Bootstrap());
+
+  EXPECT_CALL(context.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
+      .WillOnce(Invoke([](const envoy::api::v2::core::GrpcService&, Stats::Scope&, bool) {
+        return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
+      }));
+
   RateLimitFilterConfig factory;
   auto cb = factory.createFilterFactoryFromProto(proto_config, "stats", context);
   NetworkFilters::ThriftProxy::ThriftFilters::MockFilterChainFactoryCallbacks filter_callback;

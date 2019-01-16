@@ -58,7 +58,7 @@ public:
     cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
         server_.runtime(), server_.stats(), server_.threadLocal(), server_.random(),
         server_.dnsResolver(), ssl_context_manager_, server_.dispatcher(), server_.localInfo(),
-        server_.secretManager(), *api_);
+        server_.secretManager(), *api_, server_.httpContext());
 
     ON_CALL(server_, clusterManager()).WillByDefault(Invoke([&]() -> Upstream::ClusterManager& {
       return *main_config.clusterManager();
@@ -115,26 +115,17 @@ void testMerge() {
   EXPECT_EQ(2, bootstrap.static_resources().clusters_size());
 }
 
-void testIncompatibleMerge() {
-  const std::string overlay = "static_resources: { clusters: [{name: 'foo'}]}";
-  OptionsImpl options(Server::createTestOptionsImpl("google_com_proxy.v1.yaml", overlay,
-                                                    Network::Address::IpVersion::v6));
-  envoy::config::bootstrap::v2::Bootstrap bootstrap;
-  EXPECT_THROW_WITH_MESSAGE(Server::InstanceUtil::loadBootstrapConfig(bootstrap, options),
-                            EnvoyException,
-                            "V1 config (detected) with --config-yaml is not supported");
-}
-
 uint32_t run(const std::string& directory) {
   uint32_t num_tested = 0;
   for (const std::string& filename : TestUtility::listFiles(directory, false)) {
+    ENVOY_LOG_MISC(info, "testing {}.\n", filename);
     OptionsImpl options(
         Envoy::Server::createTestOptionsImpl(filename, "", Network::Address::IpVersion::v6));
     ConfigTest test1(options);
-    // Config flag --config-yaml is only supported for v2 configs.
     envoy::config::bootstrap::v2::Bootstrap bootstrap;
     if (Server::InstanceUtil::loadBootstrapConfig(bootstrap, options) ==
         Server::InstanceUtil::BootstrapVersion::V2) {
+      ENVOY_LOG_MISC(info, "testing {} as yaml.", filename);
       ConfigTest test2(asConfigYaml(options));
     }
     num_tested++;

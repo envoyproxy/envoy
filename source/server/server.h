@@ -8,7 +8,6 @@
 #include <string>
 
 #include "envoy/event/timer.h"
-#include "envoy/server/configuration.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/guarddog.h"
 #include "envoy/server/instance.h"
@@ -18,19 +17,24 @@
 #include "envoy/tracing/http_tracer.h"
 
 #include "common/access_log/access_log_manager_impl.h"
+#include "common/common/assert.h"
 #include "common/common/logger_delegates.h"
 #include "common/grpc/async_client_manager_impl.h"
+#include "common/http/context_impl.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/secret/secret_manager_impl.h"
 #include "common/ssl/context_manager_impl.h"
 #include "common/upstream/health_discovery_service.h"
 
+#include "server/configuration_impl.h"
 #include "server/http/admin.h"
 #include "server/init_manager_impl.h"
 #include "server/listener_manager_impl.h"
 #include "server/overload_manager_impl.h"
 #include "server/test_hooks.h"
 #include "server/worker_impl.h"
+
+#include "extensions/filters/common/ratelimit/ratelimit_registration.h"
 
 #include "absl/types/optional.h"
 
@@ -41,7 +45,7 @@ namespace Server {
  * All server wide stats. @see stats_macros.h
  */
 // clang-format off
-#define ALL_SERVER_STATS(GAUGE)                                                                    \
+#define ALL_SERVER_STATS(COUNTER, GAUGE)                                                           \
   GAUGE(uptime)                                                                                    \
   GAUGE(concurrency)                                                                               \
   GAUGE(memory_allocated)                                                                          \
@@ -51,11 +55,12 @@ namespace Server {
   GAUGE(total_connections)                                                                         \
   GAUGE(version)                                                                                   \
   GAUGE(days_until_first_cert_expiring)                                                            \
-  GAUGE(hot_restart_epoch)
+  GAUGE(hot_restart_epoch)                                                                         \
+  COUNTER(debug_assertion_failures)
 // clang-format on
 
 struct ServerStats {
-  ALL_SERVER_STATS(GENERATE_GAUGE_STRUCT)
+  ALL_SERVER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
 };
 
 /**
@@ -81,7 +86,7 @@ public:
  */
 class InstanceUtil : Logger::Loggable<Logger::Id::main> {
 public:
-  enum class BootstrapVersion { V1, V2 };
+  enum class BootstrapVersion { V2 };
 
   /**
    * Default implementation of runtime loader creation used in the real server and in most
@@ -121,6 +126,7 @@ public:
 
 private:
   Event::SignalEventPtr sigterm_;
+  Event::SignalEventPtr sigint_;
   Event::SignalEventPtr sig_usr_1_;
   Event::SignalEventPtr sig_hup_;
 };
@@ -163,10 +169,6 @@ public:
   Envoy::MutexTracer* mutexTracer() override { return mutex_tracer_; }
   OverloadManager& overloadManager() override { return *overload_manager_; }
   Runtime::RandomGenerator& random() override { return *random_generator_; }
-  RateLimit::ClientPtr
-  rateLimitClient(const absl::optional<std::chrono::milliseconds>& timeout) override {
-    return config_->rateLimitClientFactory().create(timeout);
-  }
   Runtime::Loader& runtime() override;
   void shutdown() override;
   bool isShutdown() override final { return shutdown_; }
@@ -177,13 +179,13 @@ public:
   time_t startTimeCurrentEpoch() override { return start_time_; }
   time_t startTimeFirstEpoch() override { return original_start_time_; }
   Stats::Store& stats() override { return stats_store_; }
-  Tracing::HttpTracer& httpTracer() override;
+  Http::Context& httpContext() override { return http_context_; }
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
   const LocalInfo::LocalInfo& localInfo() override { return *local_info_; }
   Event::TimeSystem& timeSystem() override { return time_system_; }
 
   std::chrono::milliseconds statsFlushInterval() const override {
-    return config_->statsFlushInterval();
+    return config_.statsFlushInterval();
   }
 
 private:
@@ -204,6 +206,7 @@ private:
   time_t original_start_time_;
   Stats::StoreRoot& stats_store_;
   std::unique_ptr<ServerStats> server_stats_;
+  Assert::ActionRegistrationPtr assert_action_registration_;
   ThreadLocal::Instance& thread_local_;
   Api::ApiPtr api_;
   std::unique_ptr<Secret::SecretManager> secret_manager_;
@@ -217,7 +220,7 @@ private:
   ProdListenerComponentFactory listener_component_factory_;
   ProdWorkerFactory worker_factory_;
   std::unique_ptr<ListenerManager> listener_manager_;
-  std::unique_ptr<Configuration::Main> config_;
+  Configuration::MainImpl config_;
   Network::DnsResolverSharedPtr dns_resolver_;
   Event::TimerPtr stat_flush_timer_;
   LocalInfo::LocalInfoPtr local_info_;
@@ -237,6 +240,7 @@ private:
   std::unique_ptr<OverloadManagerImpl> overload_manager_;
   std::unique_ptr<RunHelper> run_helper_;
   Envoy::MutexTracer* mutex_tracer_;
+  Http::ContextImpl http_context_;
 };
 
 } // namespace Server

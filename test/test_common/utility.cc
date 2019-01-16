@@ -1,6 +1,6 @@
 #include "utility.h"
 
-#if defined(WIN32)
+#ifdef WIN32
 #include <windows.h>
 // <windows.h> uses macros to #define a ton of symbols, two of which (DELETE and GetMessage)
 // interfere with our code. DELETE shows up in the base.pb.h header generated from
@@ -13,6 +13,7 @@
 
 #include <cstdint>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <list>
 #include <stdexcept>
@@ -27,7 +28,7 @@
 #include "common/common/fmt.h"
 #include "common/common/lock_guard.h"
 #include "common/common/stack_array.h"
-#include "common/common/thread.h"
+#include "common/common/thread_impl.h"
 #include "common/common/utility.h"
 #include "common/config/bootstrap_json.h"
 #include "common/json/json_loader.h"
@@ -187,30 +188,27 @@ std::vector<std::string> TestUtility::split(const std::string& source, const std
 }
 
 void TestUtility::renameFile(const std::string& old_name, const std::string& new_name) {
-#if !defined(WIN32)
-  const int rc = ::rename(old_name.c_str(), new_name.c_str());
-  ASSERT_EQ(0, rc);
-#else
+#ifdef WIN32
   // use MoveFileEx, since ::rename will not overwrite an existing file. See
   // https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/rename-wrename?view=vs-2017
   const BOOL rc = ::MoveFileEx(old_name.c_str(), new_name.c_str(), MOVEFILE_REPLACE_EXISTING);
   ASSERT_NE(0, rc);
+#else
+  const int rc = ::rename(old_name.c_str(), new_name.c_str());
+  ASSERT_EQ(0, rc);
 #endif
 };
 
 void TestUtility::createDirectory(const std::string& name) {
-#if !defined(WIN32)
-  ::mkdir(name.c_str(), S_IRWXU);
-#else
+#ifdef WIN32
   ::_mkdir(name.c_str());
+#else
+  ::mkdir(name.c_str(), S_IRWXU);
 #endif
 }
 
 void TestUtility::createSymlink(const std::string& target, const std::string& link) {
-#if !defined(WIN32)
-  const int rc = ::symlink(target.c_str(), link.c_str());
-  ASSERT_EQ(rc, 0);
-#else
+#ifdef WIN32
   const DWORD attributes = ::GetFileAttributes(target.c_str());
   ASSERT_NE(attributes, INVALID_FILE_ATTRIBUTES);
   int flags = SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE;
@@ -220,8 +218,39 @@ void TestUtility::createSymlink(const std::string& target, const std::string& li
 
   const BOOLEAN rc = ::CreateSymbolicLink(link.c_str(), target.c_str(), flags);
   ASSERT_NE(rc, 0);
+#else
+  const int rc = ::symlink(target.c_str(), link.c_str());
+  ASSERT_EQ(rc, 0);
 #endif
 }
+
+// static
+absl::Time TestUtility::parseTime(const std::string& input, const std::string& input_format) {
+  absl::Time time;
+  std::string error;
+  EXPECT_TRUE(absl::ParseTime(input_format, input, &time, &error))
+      << " error \"" << error << "\" from failing to parse timestamp \"" << input
+      << "\" with format string \"" << input_format << "\"";
+  return time;
+}
+
+// static
+std::string TestUtility::formatTime(const absl::Time input, const std::string& output_format) {
+  static const absl::TimeZone utc = absl::UTCTimeZone();
+  return absl::FormatTime(output_format, input, utc);
+}
+
+// static
+std::string TestUtility::formatTime(const SystemTime input, const std::string& output_format) {
+  return TestUtility::formatTime(absl::FromChrono(input), output_format);
+}
+
+// static
+std::string TestUtility::convertTime(const std::string& input, const std::string& input_format,
+                                     const std::string& output_format) {
+  return TestUtility::formatTime(TestUtility::parseTime(input, input_format), output_format);
+}
+
 void ConditionalInitializer::setReady() {
   Thread::LockGuard lock(mutex_);
   EXPECT_FALSE(ready_);
@@ -239,6 +268,13 @@ void ConditionalInitializer::waitReady() {
   cv_.wait(mutex_);
   EXPECT_TRUE(ready_);
   ready_ = false;
+}
+
+void ConditionalInitializer::wait() {
+  Thread::LockGuard lock(mutex_);
+  while (!ready_) {
+    cv_.wait(mutex_);
+  }
 }
 
 ScopedFdCloser::ScopedFdCloser(int fd) : fd_(fd) {}
@@ -346,8 +382,13 @@ MockedTestAllocator::~MockedTestAllocator() {}
 
 namespace Thread {
 
+// TODO(sesmith177) Tests should get the ThreadFactory from the same location as the main code
 ThreadFactory& threadFactoryForTest() {
-  static ThreadFactoryImpl* thread_factory = new ThreadFactoryImpl();
+#ifdef WIN32
+  static ThreadFactoryImplWin32* thread_factory = new ThreadFactoryImplWin32();
+#else
+  static ThreadFactoryImplPosix* thread_factory = new ThreadFactoryImplPosix();
+#endif
   return *thread_factory;
 }
 

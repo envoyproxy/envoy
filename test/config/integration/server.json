@@ -397,8 +397,7 @@
           },
           { "type": "decoder", "name": "buffer",
             "config": {
-              "max_request_bytes": 5242880,
-              "max_request_time_s": 120
+              "max_request_bytes": 5242880
             }
           },
           { "type": "decoder", "name": "router", "config": {} }
@@ -447,6 +446,7 @@
   "statsd_tcp_cluster_name": "statsd",
 
   "lds": {
+    "api_type": "REST",
     "cluster": "lds"
   },
 
@@ -458,6 +458,7 @@
 
   "cluster_manager": {
     "cds": {
+      "api_type": "REST",
       "cluster": {
         "name": "cds",
         "connect_timeout_ms": 5000,

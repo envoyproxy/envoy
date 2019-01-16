@@ -169,9 +169,9 @@ address of the nearest client to the XFF list before proxying the request. Some 
 
 Envoy will only append to XFF if the :ref:`use_remote_address
 <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.use_remote_address>`
-HTTP connection manager option is set to true and the `skip_xff_append
+HTTP connection manager option is set to true and the :ref:`skip_xff_append
 <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.skip_xff_append>`
-is set false: This means that if *use_remote_address* is false (which is the default) or
+is set false. This means that if *use_remote_address* is false (which is the default) or
 *skip_xff_append* is true, the connection manager operates in a transparent mode where it does not
 modify XFF.
 
@@ -474,7 +474,7 @@ Custom request/response headers can be added to a request/response at the weight
 route, virtual host, and/or global route configuration level. See the
 :ref:`v2 <envoy_api_msg_RouteConfiguration>` API documentation.
 
-No *:*-prefixed pseudo-header may be modified via this mechanism. The *:path*
+No *:-prefixed* pseudo-header may be modified via this mechanism. The *:path*
 and *:authority* headers may instead be modified via mechanisms such as
 :ref:`prefix_rewrite <envoy_api_field_route.RouteAction.prefix_rewrite>` and
 :ref:`host_rewrite <envoy_api_field_route.RouteAction.host_rewrite>`.
@@ -533,7 +533,7 @@ Supported variable names are:
     Populates the header with values set on the stream info filterState() object. To be
     usable in custom request/response headers, these values must be of type
     Envoy::Router::StringAccessor. These values should be named in standard reverse DNS style,
-    identifying the organization that created the value and ending in a unique name for the data. 
+    identifying the organization that created the value and ending in a unique name for the data.
 
 %START_TIME%
     Request start time. START_TIME can be customized with specifiers as specified in

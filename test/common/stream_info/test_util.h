@@ -14,7 +14,7 @@ public:
   TestStreamInfo() {
     tm fake_time;
     memset(&fake_time, 0, sizeof(fake_time));
-    fake_time.tm_year = 99; // tm < 1901-12-13 20:45:52 is not valid on osx
+    fake_time.tm_year = 99; // tm < 1901-12-13 20:45:52 is not valid on macOS
     fake_time.tm_mday = 1;
     start_time_ = std::chrono::system_clock::from_time_t(timegm(&fake_time));
 
@@ -63,6 +63,13 @@ public:
   }
   const Network::Address::InstanceConstSharedPtr& downstreamLocalAddress() const override {
     return downstream_local_address_;
+  }
+  void setDownstreamDirectRemoteAddress(
+      const Network::Address::InstanceConstSharedPtr& downstream_direct_remote_address) override {
+    downstream_direct_remote_address_ = downstream_direct_remote_address;
+  }
+  const Network::Address::InstanceConstSharedPtr& downstreamDirectRemoteAddress() const override {
+    return downstream_direct_remote_address_;
   }
   void setDownstreamRemoteAddress(
       const Network::Address::InstanceConstSharedPtr& downstream_remote_address) override {
@@ -190,6 +197,7 @@ public:
   bool hc_request_{};
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
   Network::Address::InstanceConstSharedPtr downstream_local_address_;
+  Network::Address::InstanceConstSharedPtr downstream_direct_remote_address_;
   Network::Address::InstanceConstSharedPtr downstream_remote_address_;
   const Router::RouteEntry* route_entry_{};
   envoy::api::v2::core::Metadata metadata_{};

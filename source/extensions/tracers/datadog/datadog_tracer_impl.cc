@@ -71,7 +71,12 @@ TraceReporter::TraceReporter(TraceEncoderSharedPtr encoder, Driver& driver,
   enableTimer();
 }
 
-void TraceReporter::enableTimer() { flush_timer_->enableTimer(std::chrono::milliseconds(1000U)); }
+void TraceReporter::enableTimer() {
+  // The duration for this timer should not be a factor of the
+  // datadog-agent's read timer of 5000ms.
+  // Further details in https://github.com/envoyproxy/envoy/pull/5358
+  flush_timer_->enableTimer(std::chrono::milliseconds(900U));
+}
 
 void TraceReporter::flushTraces() {
   auto pendingTraces = encoder_->pendingTraces();
@@ -110,6 +115,7 @@ void TraceReporter::onFailure(Http::AsyncClient::FailureReason) {
 void TraceReporter::onSuccess(Http::MessagePtr&& http_response) {
   uint64_t responseStatus = Http::Utility::getResponseStatus(http_response->headers());
   if (responseStatus != enumToInt(Http::Code::OK)) {
+    // TODO: Consider adding retries for failed submissions.
     ENVOY_LOG(debug, "unexpected HTTP response code from datadog agent: {}", responseStatus);
     driver_.tracerStats().reports_dropped_.inc();
   } else {

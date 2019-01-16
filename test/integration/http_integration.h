@@ -25,6 +25,8 @@ public:
   IntegrationStreamDecoderPtr makeHeaderOnlyRequest(const Http::HeaderMap& headers);
   IntegrationStreamDecoderPtr makeRequestWithBody(const Http::HeaderMap& headers,
                                                   uint64_t body_size);
+  IntegrationStreamDecoderPtr makeRequestWithBody(const Http::HeaderMap& headers,
+                                                  const std::string& body);
   bool sawGoAway() const { return saw_goaway_; }
   bool connected() const { return connected_; }
   void sendData(Http::StreamEncoder& encoder, absl::string_view data, bool end_stream);
@@ -102,9 +104,11 @@ protected:
   //
   // Waits for the complete downstream response before returning.
   // Requires |codec_client_| to be initialized.
-  IntegrationStreamDecoderPtr sendRequestAndWaitForResponse(
-      const Http::TestHeaderMapImpl& request_headers, uint32_t request_body_size,
-      const Http::TestHeaderMapImpl& response_headers, uint32_t response_body_size);
+  IntegrationStreamDecoderPtr
+  sendRequestAndWaitForResponse(const Http::TestHeaderMapImpl& request_headers,
+                                uint32_t request_body_size,
+                                const Http::TestHeaderMapImpl& response_headers,
+                                uint32_t response_body_size, int upstream_index = 0);
 
   // Wait for the end of stream on the next upstream stream on any of the provided fake upstreams.
   // Sets fake_upstream_connection_ to the connection and upstream_request_ to stream.
@@ -116,7 +120,14 @@ protected:
   // Close |codec_client_| and |fake_upstream_connection_| cleanly.
   void cleanupUpstreamAndDownstream();
 
+  // Check for completion of upstream_request_, and a simple "200" response.
+  void checkSimpleRequestSuccess(uint64_t expected_request_size, uint64_t expected_response_size,
+                                 IntegrationStreamDecoder* response);
+
   typedef std::function<Network::ClientConnectionPtr()> ConnectionCreationFunction;
+  // Sends a simple header-only HTTP request, and waits for a response.
+  IntegrationStreamDecoderPtr makeHeaderOnlyRequest(ConnectionCreationFunction* create_connection,
+                                                    int upstream_index);
 
   void testRouterRedirect();
   void testRouterDirectResponse();
@@ -127,8 +138,9 @@ protected:
   void testRouterRequestAndResponseWithBody(uint64_t request_size, uint64_t response_size,
                                             bool big_header,
                                             ConnectionCreationFunction* creator = nullptr);
-  void testRouterHeaderOnlyRequestAndResponse(bool close_upstream,
-                                              ConnectionCreationFunction* creator = nullptr);
+  void testRouterHeaderOnlyRequestAndResponse(ConnectionCreationFunction* creator = nullptr,
+                                              int upstream_index = 0);
+  void testRequestAndResponseShutdownWithActiveConnection();
   void testRouterUpstreamDisconnectBeforeRequestComplete();
   void
   testRouterUpstreamDisconnectBeforeResponseComplete(ConnectionCreationFunction* creator = nullptr);
@@ -154,6 +166,7 @@ protected:
   void testInvalidCharacterInFirstline();
   void testInvalidVersion();
   void testHttp10Disabled();
+  void testHttp10DisabledWithUpgrade();
   void testHttp09Enabled();
   void testHttp10Enabled();
   void testHttp10WithHostAndKeepAlive();

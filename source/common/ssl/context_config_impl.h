@@ -57,15 +57,15 @@ public:
 
 protected:
   ContextConfigImpl(const envoy::api::v2::auth::CommonTlsContext& config,
+                    const unsigned default_min_protocol_version,
+                    const unsigned default_max_protocol_version,
+                    const std::string& default_cipher_suites, const std::string& default_curves,
                     Server::Configuration::TransportSocketFactoryContext& factory_context);
 
 private:
   static unsigned
   tlsVersionFromProto(const envoy::api::v2::auth::TlsParameters_TlsProtocol& version,
                       unsigned default_version);
-
-  static const std::string DEFAULT_CIPHER_SUITES;
-  static const std::string DEFAULT_ECDH_CURVES;
 
   const std::string alpn_protocols_;
   const std::string cipher_suites_;
@@ -91,10 +91,14 @@ private:
 
 class ClientContextConfigImpl : public ContextConfigImpl, public ClientContextConfig {
 public:
-  explicit ClientContextConfigImpl(
-      const envoy::api::v2::auth::UpstreamTlsContext& config,
+  ClientContextConfigImpl(
+      const envoy::api::v2::auth::UpstreamTlsContext& config, absl::string_view sigalgs,
       Server::Configuration::TransportSocketFactoryContext& secret_provider_context);
-  explicit ClientContextConfigImpl(
+  ClientContextConfigImpl(
+      const envoy::api::v2::auth::UpstreamTlsContext& config,
+      Server::Configuration::TransportSocketFactoryContext& secret_provider_context)
+      : ClientContextConfigImpl(config, "", secret_provider_context) {}
+  ClientContextConfigImpl(
       const Json::Object& config,
       Server::Configuration::TransportSocketFactoryContext& secret_provider_context);
 
@@ -102,19 +106,26 @@ public:
   const std::string& serverNameIndication() const override { return server_name_indication_; }
   bool allowRenegotiation() const override { return allow_renegotiation_; }
   size_t maxSessionKeys() const override { return max_session_keys_; }
+  const std::string& signingAlgorithmsForTest() const override { return sigalgs_; }
 
 private:
+  static const unsigned DEFAULT_MIN_VERSION;
+  static const unsigned DEFAULT_MAX_VERSION;
+  static const std::string DEFAULT_CIPHER_SUITES;
+  static const std::string DEFAULT_CURVES;
+
   const std::string server_name_indication_;
   const bool allow_renegotiation_;
   const size_t max_session_keys_;
+  const std::string sigalgs_;
 };
 
 class ServerContextConfigImpl : public ContextConfigImpl, public ServerContextConfig {
 public:
-  explicit ServerContextConfigImpl(
+  ServerContextConfigImpl(
       const envoy::api::v2::auth::DownstreamTlsContext& config,
       Server::Configuration::TransportSocketFactoryContext& secret_provider_context);
-  explicit ServerContextConfigImpl(
+  ServerContextConfigImpl(
       const Json::Object& config,
       Server::Configuration::TransportSocketFactoryContext& secret_provider_context);
 
@@ -125,6 +136,11 @@ public:
   }
 
 private:
+  static const unsigned DEFAULT_MIN_VERSION;
+  static const unsigned DEFAULT_MAX_VERSION;
+  static const std::string DEFAULT_CIPHER_SUITES;
+  static const std::string DEFAULT_CURVES;
+
   const bool require_client_certificate_;
   const std::vector<SessionTicketKey> session_ticket_keys_;
 

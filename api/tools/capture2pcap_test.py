@@ -16,8 +16,7 @@ if __name__ == '__main__':
   pcap_path = os.path.join(os.getenv('TEST_TMPDIR'), 'generated.pcap')
 
   capture2pcap.Capture2Pcap(capture_path, pcap_path)
-  actual_output = sp.check_output(
-      ['tshark', '-r', pcap_path, '-d', 'tcp.port==10000,http2', '-P'])
+  actual_output = sp.check_output(['tshark', '-r', pcap_path, '-d', 'tcp.port==10000,http2', '-P'])
   with open(expected_path, 'r') as f:
     expected_output = f.read()
   if actual_output != expected_output:

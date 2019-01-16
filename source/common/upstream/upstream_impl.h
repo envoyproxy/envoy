@@ -36,7 +36,6 @@
 #include "common/config/well_known_names.h"
 #include "common/network/utility.h"
 #include "common/stats/isolated_store_impl.h"
-#include "common/upstream/eds_subscription_factory.h"
 #include "common/upstream/load_balancer_impl.h"
 #include "common/upstream/outlier_detection_impl.h"
 #include "common/upstream/resource_manager_impl.h"
@@ -194,7 +193,23 @@ public:
   void setOutlierDetector(Outlier::DetectorHostMonitorPtr&& outlier_detector) override {
     outlier_detector_ = std::move(outlier_detector);
   }
-  bool healthy() const override { return !health_flags_; }
+  Host::Health health() const override {
+    if (!health_flags_) {
+      return Host::Health::Healthy;
+    }
+
+    // If any of the unhealthy flags are set, host is unhealthy.
+    if (healthFlagGet(HealthFlag::FAILED_ACTIVE_HC) ||
+        healthFlagGet(HealthFlag::FAILED_OUTLIER_CHECK) ||
+        healthFlagGet(HealthFlag::FAILED_EDS_HEALTH)) {
+      return Host::Health::Unhealthy;
+    }
+
+    // Only possible option at this point is that the host is degraded.
+    ASSERT(health_flags_ == static_cast<uint32_t>(HealthFlag::DEGRADED_ACTIVE_HC));
+    return Host::Health::Degraded;
+  }
+
   uint32_t weight() const override { return weight_; }
   void weight(uint32_t new_weight) override;
   bool used() const override { return used_; }
@@ -253,11 +268,10 @@ public:
       : priority_(priority), overprovisioning_factor_(overprovisioning_factor.has_value()
                                                           ? overprovisioning_factor.value()
                                                           : kDefaultOverProvisioningFactor),
-        hosts_(new HostVector()), healthy_hosts_(new HostVector()) {}
+        hosts_(new HostVector()), healthy_hosts_(new HostVector()),
+        degraded_hosts_(new HostVector()) {}
 
-  void updateHosts(HostVectorConstSharedPtr hosts, HostVectorConstSharedPtr healthy_hosts,
-                   HostsPerLocalityConstSharedPtr hosts_per_locality,
-                   HostsPerLocalityConstSharedPtr healthy_hosts_per_locality,
+  void updateHosts(UpdateHostsParams&& update_hosts_params,
                    LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
                    const HostVector& hosts_removed,
                    absl::optional<uint32_t> overprovisioning_factor = absl::nullopt) override;
@@ -277,14 +291,36 @@ public:
   // Upstream::HostSet
   const HostVector& hosts() const override { return *hosts_; }
   const HostVector& healthyHosts() const override { return *healthy_hosts_; }
+  const HostVector& degradedHosts() const override { return *degraded_hosts_; }
   const HostsPerLocality& hostsPerLocality() const override { return *hosts_per_locality_; }
   const HostsPerLocality& healthyHostsPerLocality() const override {
     return *healthy_hosts_per_locality_;
   }
+  const HostsPerLocality& degradedHostsPerLocality() const override {
+    return *degraded_hosts_per_locality_;
+  }
   LocalityWeightsConstSharedPtr localityWeights() const override { return locality_weights_; }
   absl::optional<uint32_t> chooseLocality() override;
   uint32_t priority() const override { return priority_; }
-  uint32_t overprovisioning_factor() const override { return overprovisioning_factor_; }
+  uint32_t overprovisioningFactor() const override { return overprovisioning_factor_; }
+
+  // Utility methods for creating UpdateHostsParams.
+  static UpdateHostsParams updateHostsParams(HostVectorConstSharedPtr hosts,
+                                             HostsPerLocalityConstSharedPtr hosts_per_locality);
+  static UpdateHostsParams
+  updateHostsParams(HostVectorConstSharedPtr hosts,
+                    HostsPerLocalityConstSharedPtr hosts_per_locality,
+                    HostVectorConstSharedPtr healthy_hosts,
+                    HostsPerLocalityConstSharedPtr healthy_hosts_per_locality);
+  static UpdateHostsParams
+  updateHostsParams(HostVectorConstSharedPtr hosts,
+                    HostsPerLocalityConstSharedPtr hosts_per_locality,
+                    HostVectorConstSharedPtr healthy_hosts,
+                    HostsPerLocalityConstSharedPtr healthy_hosts_per_locality,
+                    HostVectorConstSharedPtr degraded_hosts,
+                    HostsPerLocalityConstSharedPtr degraded_hosts_per_locality);
+  static UpdateHostsParams partitionHosts(HostVectorConstSharedPtr hosts,
+                                          HostsPerLocalityConstSharedPtr hosts_per_locality);
 
 protected:
   virtual void runUpdateCallbacks(const HostVector& hosts_added, const HostVector& hosts_removed) {
@@ -292,15 +328,22 @@ protected:
   }
 
 private:
-  // Weight for a locality taking into account health status.
-  double effectiveLocalityWeight(uint32_t index) const;
+  // Weight for a locality taking into account health status using the provided eligible hosts per
+  // locality.
+  static double effectiveLocalityWeight(uint32_t index,
+                                        const HostsPerLocality& eligible_hosts_per_locality,
+                                        const HostsPerLocality& all_hosts_per_locality,
+                                        const LocalityWeights& locality_weights,
+                                        uint32_t overprovisioning_factor);
 
   uint32_t priority_;
   uint32_t overprovisioning_factor_;
   HostVectorConstSharedPtr hosts_;
   HostVectorConstSharedPtr healthy_hosts_;
+  HostVectorConstSharedPtr degraded_hosts_;
   HostsPerLocalityConstSharedPtr hosts_per_locality_{HostsPerLocalityImpl::empty()};
   HostsPerLocalityConstSharedPtr healthy_hosts_per_locality_{HostsPerLocalityImpl::empty()};
+  HostsPerLocalityConstSharedPtr degraded_hosts_per_locality_{HostsPerLocalityImpl::empty()};
   // TODO(mattklein123): Remove mutable.
   mutable Common::CallbackManager<uint32_t, const HostVector&, const HostVector&>
       member_update_cb_helper_;
@@ -313,6 +356,27 @@ private:
     const uint32_t index_;
     const double effective_weight_;
   };
+
+  // Rebuilds the provided locality scheduler with locality entires based on the locality weights
+  // and eligible hosts.
+  //
+  // @param locality_scheduler the locality scheduler to rebuild. Will be set to nullptr if no
+  // localities are eligible.
+  // @param locality_entries the vector that holds locality entries. Will be reset and populated
+  // with entries corresponding to the new scheduler.
+  // @param eligible_hosts_per_locality eligible hosts for this scheduler grouped by locality.
+  // @param eligible_hosts all eligible hosts for this scheduler.
+  // @param all_hosts_per_locality all hosts for this HostSet grouped by locality.
+  // @param locality_weights the weighting of each locality.
+  // @param overprovisioning_factor the overprovisioning factor to use when computing the effective
+  // weight of a locality.
+  static void rebuildLocalityScheduler(
+      std::unique_ptr<EdfScheduler<LocalityEntry>>& locality_scheduler,
+      std::vector<std::shared_ptr<LocalityEntry>>& locality_entries,
+      const HostsPerLocality& eligible_hosts_per_locality, const HostVector& eligible_hosts,
+      HostsPerLocalityConstSharedPtr all_hosts_per_locality,
+      LocalityWeightsConstSharedPtr locality_weights, uint32_t overprovisioning_factor);
+
   std::vector<std::shared_ptr<LocalityEntry>> locality_entries_;
   std::unique_ptr<EdfScheduler<LocalityEntry>> locality_scheduler_;
 };
@@ -491,8 +555,7 @@ public:
          Ssl::ContextManager& ssl_context_manager, Runtime::Loader& runtime,
          Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
          AccessLog::AccessLogManager& log_manager, const LocalInfo::LocalInfo& local_info,
-         Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api,
-         Upstream::EdsSubscriptionFactory& eds_subscription_factory);
+         Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api);
   // From Upstream::Cluster
   virtual PrioritySet& prioritySet() override { return priority_set_; }
   virtual const PrioritySet& prioritySet() const override { return priority_set_; }
@@ -519,8 +582,9 @@ public:
   const Network::Address::InstanceConstSharedPtr
   resolveProtoAddress(const envoy::api::v2::core::Address& address);
 
-  static HostVectorConstSharedPtr createHealthyHostList(const HostVector& hosts);
-  static HostsPerLocalityConstSharedPtr createHealthyHostLists(const HostsPerLocality& hosts);
+  static HostVectorConstSharedPtr createHostList(const HostVector& hosts, Host::Health health);
+  static HostsPerLocalityConstSharedPtr createHostLists(const HostsPerLocality& hosts,
+                                                        Host::Health);
 
   // Upstream::Cluster
   HealthChecker* healthChecker() override { return health_checker_.get(); }
@@ -643,6 +707,7 @@ private:
   void startPreInit() override;
 
   PriorityStateManagerPtr priority_state_manager_;
+  uint32_t overprovisioning_factor_;
 };
 
 /**
@@ -720,6 +785,7 @@ private:
   std::list<ResolveTargetPtr> resolve_targets_;
   const std::chrono::milliseconds dns_refresh_rate_ms_;
   Network::DnsLookupFamily dns_lookup_family_;
+  uint32_t overprovisioning_factor_;
 };
 
 } // namespace Upstream

@@ -53,6 +53,7 @@ public:
   const std::string& maxAge() const override { return max_age_; };
   const absl::optional<bool>& allowCredentials() const override { return allow_credentials_; };
   bool enabled() const override { return enabled_; };
+  bool shadowEnabled() const override { return shadow_enabled_; };
 
   std::list<std::string> allow_origin_{};
   std::list<std::regex> allow_origin_regex_{};
@@ -61,7 +62,8 @@ public:
   std::string expose_headers_{};
   std::string max_age_{};
   absl::optional<bool> allow_credentials_{};
-  bool enabled_{false};
+  bool enabled_{};
+  bool shadow_enabled_{};
 };
 
 class TestRetryPolicy : public RetryPolicy {
@@ -141,9 +143,11 @@ public:
   // Router::ShadowPolicy
   const std::string& cluster() const override { return cluster_; }
   const std::string& runtimeKey() const override { return runtime_key_; }
+  const envoy::type::FractionalPercent& defaultValue() const override { return default_value_; }
 
   std::string cluster_;
   std::string runtime_key_;
+  envoy::type::FractionalPercent default_value_;
 };
 
 class MockShadowWriter : public ShadowWriter {

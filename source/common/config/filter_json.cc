@@ -370,7 +370,6 @@ void FilterJson::translateBufferFilter(
   json_config.validateSchema(Json::Schema::BUFFER_HTTP_FILTER_SCHEMA);
 
   JSON_UTIL_SET_INTEGER(json_config, proto_config, max_request_bytes);
-  JSON_UTIL_SET_DURATION_SECONDS(json_config, proto_config, max_request_time);
 }
 
 void FilterJson::translateLuaFilter(const Json::Object& json_config,

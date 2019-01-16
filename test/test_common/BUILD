@@ -14,6 +14,9 @@ envoy_package()
 envoy_basic_cc_library(
     name = "printers_includes",
     hdrs = ["printers.h"],
+    deps = [
+        "//include/envoy/network:address_interface",
+    ],
 )
 
 envoy_cc_test_library(
@@ -167,6 +170,7 @@ envoy_cc_test_library(
     hdrs = ["test_time_system.h"],
     deps = [
         "//include/envoy/event:timer_interface",
+        "//source/common/common:thread_lib",
     ],
 )
 

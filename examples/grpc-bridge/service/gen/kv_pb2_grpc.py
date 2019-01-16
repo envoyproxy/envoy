@@ -18,12 +18,12 @@ class KVStub(object):
         '/kv.KV/Get',
         request_serializer=kv__pb2.GetRequest.SerializeToString,
         response_deserializer=kv__pb2.GetResponse.FromString,
-        )
+    )
     self.Set = channel.unary_unary(
         '/kv.KV/Set',
         request_serializer=kv__pb2.SetRequest.SerializeToString,
         response_deserializer=kv__pb2.SetResponse.FromString,
-        )
+    )
 
 
 class KVServicer(object):
@@ -47,17 +47,18 @@ class KVServicer(object):
 
 def add_KVServicer_to_server(servicer, server):
   rpc_method_handlers = {
-      'Get': grpc.unary_unary_rpc_method_handler(
+      'Get':
+      grpc.unary_unary_rpc_method_handler(
           servicer.Get,
           request_deserializer=kv__pb2.GetRequest.FromString,
           response_serializer=kv__pb2.GetResponse.SerializeToString,
       ),
-      'Set': grpc.unary_unary_rpc_method_handler(
+      'Set':
+      grpc.unary_unary_rpc_method_handler(
           servicer.Set,
           request_deserializer=kv__pb2.SetRequest.FromString,
           response_serializer=kv__pb2.SetResponse.SerializeToString,
       ),
   }
-  generic_handler = grpc.method_handlers_generic_handler(
-      'kv.KV', rpc_method_handlers)
+  generic_handler = grpc.method_handlers_generic_handler('kv.KV', rpc_method_handlers)
   server.add_generic_rpc_handlers((generic_handler,))

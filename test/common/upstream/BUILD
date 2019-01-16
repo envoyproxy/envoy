@@ -85,19 +85,6 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "eds_subscription_factory_test",
-    srcs = ["eds_subscription_factory_test.cc"],
-    deps = [
-        "//source/common/upstream:eds_subscription_factory_lib",
-        "//test/mocks/config:config_mocks",
-        "//test/mocks/local_info:local_info_mocks",
-        "//test/mocks/runtime:runtime_mocks",
-        "//test/mocks/stats:stats_mocks",
-        "//test/mocks/upstream:upstream_mocks",
-    ],
-)
-
-envoy_cc_test(
     name = "health_checker_impl_test",
     srcs = ["health_checker_impl_test.cc"],
     deps = [
@@ -312,29 +299,6 @@ envoy_cc_binary(
         "//test/common/upstream:utility_lib",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:printers_lib",
-    ],
-)
-
-envoy_cc_test(
-    name = "sds_test",
-    srcs = ["sds_test.cc"],
-    data = glob(["test_data/**"]),
-    deps = [
-        ":utility_lib",
-        "//source/common/config:utility_lib",
-        "//source/common/filesystem:filesystem_lib",
-        "//source/common/http:message_lib",
-        "//source/common/network:utility_lib",
-        "//source/common/upstream:eds_lib",
-        "//source/extensions/transport_sockets/raw_buffer:config",
-        "//source/server:transport_socket_config_lib",
-        "//test/mocks/local_info:local_info_mocks",
-        "//test/mocks/runtime:runtime_mocks",
-        "//test/mocks/ssl:ssl_mocks",
-        "//test/mocks/upstream:upstream_mocks",
-        "//test/test_common:environment_lib",
-        "//test/test_common:utility_lib",
-        "@envoy_api//envoy/api/v2/core:base_cc",
     ],
 )
 

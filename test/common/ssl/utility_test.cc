@@ -4,10 +4,12 @@
 #include "common/ssl/utility.h"
 
 #include "test/common/ssl/ssl_test_utility.h"
+#include "test/common/ssl/test_data/san_dns_cert_info.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
+#include "absl/time/time.h"
 #include "gtest/gtest.h"
 #include "openssl/x509v3.h"
 
@@ -53,17 +55,23 @@ TEST(UtilityTest, TestGetSubject) {
 TEST(UtilityTest, TestGetSerialNumber) {
   bssl::UniquePtr<X509> cert = readCertFromFile(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem"));
-  EXPECT_EQ("f3828eb24fd779d0", Utility::getSerialNumberFromCertificate(*cert));
+  EXPECT_EQ(TEST_SAN_DNS_CERT_SERIAL, Utility::getSerialNumberFromCertificate(*cert));
 }
 
 TEST(UtilityTest, TestDaysUntilExpiration) {
   bssl::UniquePtr<X509> cert = readCertFromFile(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem"));
-  // Set a known date (10/21/2018 00:00:00) so that we get fixed output from this test.
-  const long known_date_time = 1540080000;
+  // Set a known date (2033-05-18 03:33:20 UTC) so that we get fixed output from this test.
+  const time_t known_date_time = 2000000000;
   Event::SimulatedTimeSystem time_source;
   time_source.setSystemTime(std::chrono::system_clock::from_time_t(known_date_time));
-  EXPECT_EQ(261, Utility::getDaysUntilExpiration(cert.get(), time_source));
+
+  // Get expiration time from the certificate info.
+  const absl::Time expiration =
+      TestUtility::parseTime(TEST_SAN_DNS_CERT_NOT_AFTER, "%b %e %H:%M:%S %Y GMT");
+
+  int days = std::difftime(absl::ToTimeT(expiration), known_date_time) / (60 * 60 * 24);
+  EXPECT_EQ(days, Utility::getDaysUntilExpiration(cert.get(), time_source));
 }
 
 TEST(UtilityTest, TestDaysUntilExpirationWithNull) {
@@ -73,17 +81,18 @@ TEST(UtilityTest, TestDaysUntilExpirationWithNull) {
 
 TEST(UtilityTest, TestValidFrom) {
   bssl::UniquePtr<X509> cert = readCertFromFile(
-      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert3.pem"));
-  const time_t valid_from = std::chrono::system_clock::to_time_t(Utility::getValidFrom(*cert));
-  EXPECT_EQ("Mon Jan 15 22:40:27 2018\n", std::string(ctime(&valid_from)));
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem"));
+  const std::string formatted =
+      TestUtility::formatTime(Utility::getValidFrom(*cert), "%b %e %H:%M:%S %Y GMT");
+  EXPECT_EQ(TEST_SAN_DNS_CERT_NOT_BEFORE, formatted);
 }
 
-TEST(UtilityTest, TestExpirationTimeWithExpiredCert) {
+TEST(UtilityTest, TestExpirationTime) {
   bssl::UniquePtr<X509> cert = readCertFromFile(
-      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert3.pem"));
-  const time_t expiration_time =
-      std::chrono::system_clock::to_time_t(Utility::getExpirationTime(*cert));
-  EXPECT_EQ("Wed Jan 15 22:40:27 2020\n", std::string(ctime(&expiration_time)));
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem"));
+  const std::string formatted =
+      TestUtility::formatTime(Utility::getExpirationTime(*cert), "%b %e %H:%M:%S %Y GMT");
+  EXPECT_EQ(TEST_SAN_DNS_CERT_NOT_AFTER, formatted);
 }
 } // namespace Ssl
 } // namespace Envoy

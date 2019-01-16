@@ -1,6 +1,8 @@
 syntax = "proto3";
 
 package envoy.api.v2.core;
+option java_package = "io.envoyproxy.envoy.api.v2.core";
+option java_multiple_files = true;
 
 import "envoy/api/v2/core/base.proto";
 
@@ -146,6 +148,11 @@ message HealthCheck {
     // message. See `gRPC health-checking overview
     // <https://github.com/grpc/grpc/blob/master/doc/health-checking.md>`_ for more information.
     string service_name = 1;
+
+    // The value of the :authority header in the gRPC health check request. If
+    // left empty (default value), the name of the cluster this health check is associated
+    // with will be used.
+    string authority = 2;
   }
 
   // Custom health check.
@@ -156,9 +163,8 @@ message HealthCheck {
     // A custom health checker specific configuration which depends on the custom health checker
     // being instantiated. See :api:`envoy/config/health_checker` for reference.
     oneof config_type {
-      google.protobuf.Struct config = 2;
+      google.protobuf.Struct config = 2 [deprecated = true];
 
-      // [#not-implemented-hide:]
       google.protobuf.Any typed_config = 3;
     }
   }

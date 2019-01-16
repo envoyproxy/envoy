@@ -28,10 +28,6 @@ void BootstrapJson::translateClusterManagerBootstrap(
     Config::CdsJson::translateCluster(*json_sds->getObject("cluster"),
                                       absl::optional<envoy::api::v2::core::ConfigSource>(),
                                       *cluster, stats_options);
-    Config::Utility::translateEdsConfig(
-        *json_sds,
-        *bootstrap.mutable_dynamic_resources()->mutable_deprecated_v1()->mutable_sds_config());
-    eds_config = bootstrap.dynamic_resources().deprecated_v1().sds_config();
   }
 
   if (json_cluster_manager.hasObject("cds")) {
@@ -114,10 +110,7 @@ void BootstrapJson::translateBootstrap(const Json::Object& json_config,
 
   if (json_config.hasObject("rate_limit_service")) {
     const auto json_rate_limit_service = json_config.getObject("rate_limit_service");
-    auto* rate_limit_service = bootstrap.mutable_rate_limit_service();
     ASSERT(json_rate_limit_service->getString("type") == "grpc_service");
-    JSON_UTIL_SET_STRING(*json_rate_limit_service->getObject("config"), *rate_limit_service,
-                         cluster_name);
   }
 
   const auto json_admin = json_config.getObject("admin");

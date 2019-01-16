@@ -2,6 +2,8 @@
 
 #include "envoy/event/timer.h"
 
+#include "common/common/thread.h"
+
 namespace Envoy {
 namespace Event {
 

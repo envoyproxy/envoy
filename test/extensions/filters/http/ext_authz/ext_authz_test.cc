@@ -8,6 +8,7 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/empty_string.h"
+#include "common/http/context_impl.h"
 #include "common/http/headers.h"
 #include "common/json/json_loader.h"
 #include "common/network/address_impl.h"
@@ -83,6 +84,11 @@ class HttpExtAuthzFilterTestBase {
 public:
   HttpExtAuthzFilterTestBase() {}
 
+  void initConfig(envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz& proto_config) {
+    config_ = std::make_unique<FilterConfig>(proto_config, local_info_, stats_store_, runtime_, cm_,
+                                             http_context_);
+  }
+
   FilterConfigSharedPtr config_;
   Filters::Common::ExtAuthz::MockClient* client_;
   std::unique_ptr<Filter> filter_;
@@ -96,6 +102,7 @@ public:
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Network::Address::InstanceConstSharedPtr addr_;
   NiceMock<Envoy::Network::MockConnection> connection_;
+  Http::ContextImpl http_context_;
 
   void prepareCheck() {
     ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
@@ -111,7 +118,7 @@ public:
   void initialize(const std::string yaml) {
     envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz proto_config{};
     MessageUtil::loadFromYaml(yaml, proto_config);
-    config_.reset(new FilterConfig(proto_config, local_info_, stats_store_, runtime_, cm_));
+    initConfig(proto_config);
 
     client_ = new Filters::Common::ExtAuthz::MockClient();
     filter_ = std::make_unique<Filter>(config_, Filters::Common::ExtAuthz::ClientPtr{client_});
@@ -134,7 +141,7 @@ class HttpExtAuthzFilterParamTest : public TestWithParam<CreateFilterConfigFunc*
 public:
   virtual void SetUp() override {
     envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz proto_config = (*GetParam())();
-    config_.reset(new FilterConfig(proto_config, local_info_, stats_store_, runtime_, cm_));
+    initConfig(proto_config);
 
     client_ = new Filters::Common::ExtAuthz::MockClient();
     filter_ = std::make_unique<Filter>(config_, Filters::Common::ExtAuthz::ClientPtr{client_});

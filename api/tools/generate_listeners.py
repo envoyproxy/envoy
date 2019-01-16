@@ -32,8 +32,7 @@ def ProtoToStruct(proto):
 def ParseProto(path, filter_name):
   # We only know about some filter config protos ahead of time.
   KNOWN_FILTERS = {
-      'http_connection_manager':
-          lambda: http_connection_manager_pb2.HttpConnectionManager()
+      'http_connection_manager': lambda: http_connection_manager_pb2.HttpConnectionManager()
   }
   filter_config = KNOWN_FILTERS[filter_name]()
   with open(path, 'r') as f:
@@ -41,8 +40,7 @@ def ParseProto(path, filter_name):
   return filter_config
 
 
-def GenerateListeners(listeners_pb_path, output_pb_path, output_json_path,
-                      fragments):
+def GenerateListeners(listeners_pb_path, output_pb_path, output_json_path, fragments):
   listener = lds_pb2.Listener()
   with open(listeners_pb_path, 'r') as f:
     text_format.Merge(f.read(), listener)

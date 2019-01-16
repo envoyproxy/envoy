@@ -72,7 +72,7 @@ if [[ "$1" == "bazel.release" ]]; then
   echo "bazel release build with tests..."
   bazel_release_binary_build
 
-  if [[ $# > 1 ]]; then
+  if [[ $# -gt 1 ]]; then
     shift
     echo "Testing $* ..."
     # Run only specified tests. Argument can be a single test
@@ -147,6 +147,30 @@ elif [[ "$1" == "bazel.dev" ]]; then
     "${ENVOY_DELIVERY_DIR}"/envoy-fastbuild
   echo "Building and testing..."
   bazel test ${BAZEL_TEST_OPTIONS} -c fastbuild //test/...
+  exit 0
+elif [[ "$1" == "bazel.compile_time_options" ]]; then
+  # Right now, none of the available compile-time options conflict with each other. If this
+  # changes, this build type may need to be broken up.
+  COMPILE_TIME_OPTIONS="\
+    --define signal_trace=disabled \
+    --define hot_restart=disabled \
+    --define google_grpc=disabled \
+    --define boringssl=fips \
+    --define log_debug_assert_in_release=enabled \
+    --define=tcmalloc=debug \
+  "
+  setup_clang_toolchain
+  # This doesn't go into CI but is available for developer convenience.
+  echo "bazel with different compiletime options build with tests..."
+  cd "${ENVOY_CI_DIR}"
+  echo "Building..."
+  bazel build ${BAZEL_BUILD_OPTIONS} ${COMPILE_TIME_OPTIONS} -c dbg //source/exe:envoy-static
+  echo "Building and testing..."
+  bazel test ${BAZEL_TEST_OPTIONS} ${COMPILE_TIME_OPTIONS} -c dbg //test/...
+
+  # "--define log_debug_assert_in_release=enabled" must be tested with a release build, so run only
+  # these tests under "-c opt" to save time in CI.
+  bazel test ${BAZEL_TEST_OPTIONS} ${COMPILE_TIME_OPTIONS} -c opt //test/common/common:assert_test //test/server:server_test
   exit 0
 elif [[ "$1" == "bazel.ipv6_tests" ]]; then
   # This is around until Circle supports IPv6. We try to run a limited set of IPv6 tests as fast

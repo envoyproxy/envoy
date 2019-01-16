@@ -19,14 +19,34 @@ struct ClientSslTransportOptions {
     return *this;
   }
 
+  ClientSslTransportOptions& setClientEcdsaCert(bool client_ecdsa_cert) {
+    client_ecdsa_cert_ = client_ecdsa_cert;
+    return *this;
+  }
+
   ClientSslTransportOptions& setCipherSuites(const std::vector<std::string>& cipher_suites) {
     cipher_suites_ = cipher_suites;
     return *this;
   }
 
+  ClientSslTransportOptions& setSigningAlgorithmsForTest(const std::string& sigalgs) {
+    sigalgs_ = sigalgs;
+    return *this;
+  }
+
+  ClientSslTransportOptions&
+  setTlsVersion(envoy::api::v2::auth::TlsParameters_TlsProtocol tls_version) {
+    tls_version_ = tls_version;
+    return *this;
+  }
+
   bool alpn_{};
   bool san_{};
+  bool client_ecdsa_cert_{};
   std::vector<std::string> cipher_suites_{};
+  std::string sigalgs_;
+  envoy::api::v2::auth::TlsParameters_TlsProtocol tls_version_{
+      envoy::api::v2::auth::TlsParameters::TLS_AUTO};
 };
 
 Network::TransportSocketFactoryPtr
