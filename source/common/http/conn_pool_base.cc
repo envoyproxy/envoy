@@ -42,6 +42,7 @@ void ConnPoolImplBase::onPendingRequestCancel(PendingRequest& request) {
   request.removeFromList(pending_requests_);
   host_->cluster().stats().upstream_rq_cancelled_.inc();
   checkForDrained();
+  checkForIdle();
 }
 
 } // namespace Http

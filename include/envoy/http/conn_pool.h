@@ -81,6 +81,13 @@ public:
   typedef std::function<void()> DrainedCb;
 
   /**
+   * Called when a connection pool is not processing any active requests and has no pending
+   * requests. This differs from a @c DrainedCb in that its intention is simply to indicate that a
+   * pool is safe to clean up, rather than be involved in a drain workflow.
+   */
+  typedef std::function<void()> IdleCb;
+
+  /**
    * Register a callback that gets called when the connection pool is fully drained. No actual
    * draining is done. The owner of the connection pool is responsible for not creating any
    * new streams.
@@ -94,6 +101,14 @@ public:
    * occurs.
    */
   virtual void drainConnections() PURE;
+
+  /**
+   * Register a callback to be invoked when the connection pool is idle. A connection pool is idle
+   * if it has neither pending nor active requests. The callback will be invoked if the pool
+   * transitions from non-idle to idle, or if the pool is idle when the callback is registered. It
+   * may be called even if the pool is idle; callbacks must handle this.
+   */
+  virtual void addIdleCallback(IdleCb db) PURE;
 
   /**
    * Create a new stream on the pool.

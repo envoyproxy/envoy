@@ -725,6 +725,118 @@ TEST_F(Http1ConnPoolImplTest, RemoteCloseToCompleteResponse) {
   dispatcher_.clearDeferredDeleteList();
 }
 
+TEST_F(Http1ConnPoolImplTest, EmptyPoolIsIdle) {
+  ReadyWatcher idled;
+
+  EXPECT_CALL(idled, ready());
+  conn_pool_.addIdleCallback([&]() -> void { idled.ready(); });
+}
+
+TEST_F(Http1ConnPoolImplTest, CanHandleMultipleIdleCallbacks) {
+  ReadyWatcher idle1;
+  ReadyWatcher idle2;
+
+  EXPECT_CALL(idle1, ready()).Times(2);
+  EXPECT_CALL(idle2, ready());
+  conn_pool_.addIdleCallback([&]() -> void { idle1.ready(); });
+  conn_pool_.addIdleCallback([&]() -> void { idle2.ready(); });
+}
+/**
+ * Test cancelling before the request is bound to a connection.
+ */
+TEST_F(Http1ConnPoolImplTest, CancelPendingLeadsToIdle) {
+  InSequence s;
+
+  // Request 1 should kick off a new connection.
+  NiceMock<Http::MockStreamDecoder> outer_decoder;
+  ConnPoolCallbacks callbacks;
+  conn_pool_.expectClientCreate();
+  ConnectionPool::Cancellable* handle = conn_pool_.newStream(outer_decoder, callbacks);
+  ReadyWatcher idle;
+  conn_pool_.addIdleCallback([&]() -> void { idle.ready(); });
+  EXPECT_CALL(idle, ready());
+  handle->cancel();
+  // We need to blow away the connection -- otherwise we still have a busy connection kicking around
+  EXPECT_CALL(conn_pool_, onClientDestroy());
+  conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  dispatcher_.clearDeferredDeleteList();
+}
+
+TEST_F(Http1ConnPoolImplTest, RequestCompleteLeadsToIdle) {
+  InSequence s;
+
+  NiceMock<Http::MockStreamDecoder> outer_decoder;
+  ConnPoolCallbacks callbacks;
+  conn_pool_.expectClientCreate();
+  conn_pool_.newStream(outer_decoder, callbacks);
+  ReadyWatcher idle;
+  conn_pool_.addIdleCallback([&]() -> void { idle.ready(); });
+
+  NiceMock<Http::MockStreamEncoder> request_encoder;
+  Http::StreamDecoder* inner_decoder;
+  EXPECT_CALL(*conn_pool_.test_clients_[0].codec_, newStream(_))
+      .WillOnce(DoAll(SaveArgAddress(&inner_decoder), ReturnRef(request_encoder)));
+  EXPECT_CALL(callbacks.pool_ready_, ready());
+  conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);
+
+  // we'll get two calls -- one when it finishes, then...
+  EXPECT_CALL(idle, ready()).Times(1);
+  callbacks.outer_encoder_->encodeHeaders(TestHeaderMapImpl{}, true);
+  inner_decoder->decodeHeaders(HeaderMapPtr{new HeaderMapImpl{}}, true);
+
+  // ...one more call when the connection is closed.
+  EXPECT_CALL(idle, ready()).Times(1);
+  EXPECT_CALL(conn_pool_, onClientDestroy());
+  conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  dispatcher_.clearDeferredDeleteList();
+}
+
+TEST_F(Http1ConnPoolImplTest, RequestCompleteWithPendingIsNotIdle) {
+  InSequence s;
+
+  NiceMock<Http::MockStreamDecoder> outer_decoder1;
+  ConnPoolCallbacks callbacks;
+  conn_pool_.expectClientCreate();
+  conn_pool_.newStream(outer_decoder1, callbacks);
+
+  ReadyWatcher idle;
+  EXPECT_CALL(idle, ready()).Times(0);
+  conn_pool_.addIdleCallback([&]() -> void { idle.ready(); });
+
+  // Request 2 should not kick off a new connection.
+  NiceMock<Http::MockStreamDecoder> outer_decoder2;
+  ConnPoolCallbacks callbacks2;
+  conn_pool_.newStream(outer_decoder2, callbacks2);
+
+  // Connect event will bind to request 1.
+  NiceMock<Http::MockStreamEncoder> request_encoder;
+  Http::StreamDecoder* inner_decoder;
+  EXPECT_CALL(*conn_pool_.test_clients_[0].codec_, newStream(_))
+      .WillOnce(DoAll(SaveArgAddress(&inner_decoder), ReturnRef(request_encoder)));
+  EXPECT_CALL(callbacks.pool_ready_, ready());
+
+  conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);
+
+  // Finishing request 1 will immediately bind to request 2.
+  conn_pool_.expectEnableUpstreamReady();
+  EXPECT_CALL(*conn_pool_.test_clients_[0].codec_, newStream(_))
+      .WillOnce(DoAll(SaveArgAddress(&inner_decoder), ReturnRef(request_encoder)));
+  EXPECT_CALL(callbacks2.pool_ready_, ready());
+
+  callbacks.outer_encoder_->encodeHeaders(TestHeaderMapImpl{}, true);
+  inner_decoder->decodeHeaders(HeaderMapPtr{new HeaderMapImpl{}}, true);
+
+  conn_pool_.expectAndRunUpstreamReady();
+
+  // When the connection fails, the pool should go idle, since the running request will be killed.
+  EXPECT_CALL(idle, ready()).Times(1);
+
+  // Cause the connection to go away with the second request still in flight.
+  EXPECT_CALL(conn_pool_, onClientDestroy());
+  conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  dispatcher_.clearDeferredDeleteList();
+}
+
 } // namespace Http1
 } // namespace Http
 } // namespace Envoy

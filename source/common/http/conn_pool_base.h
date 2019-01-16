@@ -42,6 +42,9 @@ protected:
   // Must be implemented by sub class. Attempts to drain inactive clients.
   virtual void checkForDrained() PURE;
 
+  // Must be implemented by sub class. Called when a pool might be idle.
+  virtual void checkForIdle() PURE;
+
   const Upstream::HostConstSharedPtr host_;
   const Upstream::ResourcePriority priority_;
   std::list<PendingRequestPtr> pending_requests_;

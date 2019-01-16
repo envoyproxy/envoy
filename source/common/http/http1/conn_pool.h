@@ -40,11 +40,13 @@ public:
   Http::Protocol protocol() const override { return Http::Protocol::Http11; }
   void addDrainedCallback(DrainedCb cb) override;
   void drainConnections() override;
+  void addIdleCallback(IdleCb cb) override;
   ConnectionPool::Cancellable* newStream(StreamDecoder& response_decoder,
                                          ConnectionPool::Callbacks& callbacks) override;
 
   // ConnPoolImplBase
   void checkForDrained() override;
+  void checkForIdle() override;
 
 protected:
   struct ActiveClient;
@@ -117,6 +119,7 @@ protected:
   std::list<ActiveClientPtr> ready_clients_;
   std::list<ActiveClientPtr> busy_clients_;
   std::list<DrainedCb> drained_callbacks_;
+  std::list<IdleCb> idle_callbacks_;
   const Network::ConnectionSocket::OptionsSharedPtr socket_options_;
   Event::TimerPtr upstream_ready_timer_;
   bool upstream_ready_enabled_{false};

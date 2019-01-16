@@ -59,6 +59,11 @@ void ConnPoolImpl::addDrainedCallback(DrainedCb cb) {
   checkForDrained();
 }
 
+void ConnPoolImpl::addIdleCallback(IdleCb cb) {
+  idle_callbacks_.push_back(cb);
+  checkForIdle();
+}
+
 void ConnPoolImpl::attachRequestToClient(ActiveClient& client, StreamDecoder& response_decoder,
                                          ConnectionPool::Callbacks& callbacks) {
   ASSERT(!client.stream_wrapper_);
@@ -75,6 +80,17 @@ void ConnPoolImpl::checkForDrained() {
     for (const DrainedCb& cb : drained_callbacks_) {
       cb();
     }
+  }
+}
+
+void ConnPoolImpl::checkForIdle() {
+  if (!pending_requests_.empty() || !busy_clients_.empty()) {
+    return;
+  }
+
+  ENVOY_LOG(debug, "Pool is idle");
+  for (const IdleCb& cb : idle_callbacks_) {
+    cb();
   }
 }
 
@@ -167,6 +183,8 @@ void ConnPoolImpl::onConnectionEvent(ActiveClient& client, Network::ConnectionEv
     if (check_for_drained) {
       checkForDrained();
     }
+
+    checkForIdle();
   }
 
   if (client.connect_timer_) {
@@ -243,8 +261,8 @@ void ConnPoolImpl::processIdleClient(ActiveClient& client, bool delay) {
     upstream_ready_enabled_ = true;
     upstream_ready_timer_->enableTimer(std::chrono::milliseconds(0));
   }
-
   checkForDrained();
+  checkForIdle();
 }
 
 ConnPoolImpl::StreamWrapper::StreamWrapper(StreamDecoder& response_decoder, ActiveClient& parent)
