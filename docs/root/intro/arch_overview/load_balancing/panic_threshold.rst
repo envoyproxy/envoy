@@ -23,7 +23,7 @@ available hosts across all priority levels. It continues to distribute traffic l
 but if a given priority level's availability is below the panic threshold, traffic will go to all hosts
 in that priority level regardless of their availability.
 
-The following examples explain the relationship between normalized total availablity and panic threshold.
+The following examples explain the relationship between normalized total availability and panic threshold.
 It is assumed that the default value of 50% is used for the panic threshold.
 
 Assume a simple set-up with 2 priority levels, P=1 100% healthy. In this scenario normalized total
