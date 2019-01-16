@@ -162,7 +162,7 @@ public:
    * @param error_code ErrorCode for the error event.
    * @param errno System error number.
    */
-  virtual void onError(const ErrorCode& err_code, int err_no) PURE;
+  virtual void onError(const ErrorCode& error_code, int error_no) PURE;
 };
 
 /**
