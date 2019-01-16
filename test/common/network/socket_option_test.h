@@ -21,7 +21,11 @@ namespace {
 
 class SocketOptionTest : public testing::Test {
 public:
-  SocketOptionTest() { socket_.local_address_.reset(); }
+  SocketOptionTest() {
+    socket_.local_address_.reset();
+    IoHandle& io_handle = socket_.ioHandle();
+    ON_CALL(socket_, ioHandle()).WillByDefault(testing::ReturnRef(io_handle));
+  }
 
   NiceMock<MockListenSocket> socket_;
   Api::MockOsSysCalls os_sys_calls_;

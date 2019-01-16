@@ -117,9 +117,10 @@ Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
     }
     const std::string addr = fmt::format("unix://{}", address->asString());
     const int fd = server_.hotRestart().duplicateParentListenSocket(addr);
-    if (fd != -1) {
+    Network::IoHandlePtr io_handle = std::make_unique<Network::IoSocketHandle>(fd);
+    if (io_handle->fd() != -1) {
       ENVOY_LOG(debug, "obtained socket for address {} from parent", addr);
-      return std::make_shared<Network::UdsListenSocket>(fd, address);
+      return std::make_shared<Network::UdsListenSocket>(std::move(io_handle), address);
     }
     return std::make_shared<Network::UdsListenSocket>(address);
   }
@@ -131,10 +132,11 @@ Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
   const int fd = server_.hotRestart().duplicateParentListenSocket(addr);
   if (fd != -1) {
     ENVOY_LOG(debug, "obtained socket for address {} from parent", addr);
+    Network::IoHandlePtr io_handle = std::make_unique<Network::IoSocketHandle>(fd);
     if (socket_type == Network::Address::SocketType::Stream) {
-      return std::make_shared<Network::TcpListenSocket>(fd, address, options);
+      return std::make_shared<Network::TcpListenSocket>(std::move(io_handle), address, options);
     } else {
-      return std::make_shared<Network::UdpListenSocket>(fd, address, options);
+      return std::make_shared<Network::UdpListenSocket>(std::move(io_handle), address, options);
     }
   }
   if (socket_type == Network::Address::SocketType::Stream) {
