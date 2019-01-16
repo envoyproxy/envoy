@@ -9,7 +9,8 @@ namespace Envoy {
 class SslCertsTest : public testing::Test {
 public:
   static void SetUpTestCase() {
-    TestEnvironment::exec({TestEnvironment::runfilesPath("test/common/ssl/gen_unittest_certs.sh")});
+    TestEnvironment::exec({TestEnvironment::runfilesPath(
+        "test/extensions/transport_sockets/tls/gen_unittest_certs.sh")});
   }
 
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;

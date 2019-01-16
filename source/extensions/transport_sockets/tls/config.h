@@ -7,7 +7,7 @@
 namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
-namespace SslTransport {
+namespace Tls {
 
 /**
  * Config registration for the BoringSSL transport socket factory.
@@ -39,7 +39,7 @@ public:
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
 };
 
-} // namespace SslTransport
+} // namespace Tls
 } // namespace TransportSockets
 } // namespace Extensions
 } // namespace Envoy

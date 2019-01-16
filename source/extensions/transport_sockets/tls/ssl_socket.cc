@@ -1,4 +1,4 @@
-#include "common/ssl/ssl_socket.h"
+#include "extensions/transport_sockets/tls/ssl_socket.h"
 
 #include "envoy/stats/scope.h"
 
@@ -6,7 +6,8 @@
 #include "common/common/empty_string.h"
 #include "common/common/hex.h"
 #include "common/http/headers.h"
-#include "common/ssl/utility.h"
+
+#include "extensions/transport_sockets/tls/utility.h"
 
 #include "absl/strings/str_replace.h"
 #include "openssl/err.h"
@@ -15,7 +16,9 @@
 using Envoy::Network::PostIoAction;
 
 namespace Envoy {
-namespace Ssl {
+namespace Extensions {
+namespace TransportSockets {
+namespace Tls {
 
 namespace {
 // This SslSocket will be used when SSL secret is not fetched from SDS server.
@@ -35,7 +38,7 @@ public:
 };
 } // namespace
 
-SslSocket::SslSocket(ContextSharedPtr ctx, InitialState state,
+SslSocket::SslSocket(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
                      Network::TransportSocketOptionsSharedPtr transport_socket_options)
     : ctx_(std::dynamic_pointer_cast<ContextImpl>(ctx)),
       ssl_(ctx_->newSsl(transport_socket_options != nullptr
@@ -365,8 +368,8 @@ SslSocketFactoryStats generateStats(const std::string& prefix, Stats::Scope& sto
 }
 } // namespace
 
-ClientSslSocketFactory::ClientSslSocketFactory(ClientContextConfigPtr config,
-                                               Ssl::ContextManager& manager,
+ClientSslSocketFactory::ClientSslSocketFactory(Envoy::Ssl::ClientContextConfigPtr config,
+                                               Envoy::Ssl::ContextManager& manager,
                                                Stats::Scope& stats_scope)
     : manager_(manager), stats_scope_(stats_scope), stats_(generateStats("client", stats_scope)),
       config_(std::move(config)),
@@ -379,14 +382,14 @@ Network::TransportSocketPtr ClientSslSocketFactory::createTransportSocket(
   // onAddOrUpdateSecret() could be invoked in the middle of checking the existence of ssl_ctx and
   // creating SslSocket using ssl_ctx. Capture ssl_ctx_ into a local variable so that we check and
   // use the same ssl_ctx to create SslSocket.
-  ClientContextSharedPtr ssl_ctx;
+  Envoy::Ssl::ClientContextSharedPtr ssl_ctx;
   {
     absl::ReaderMutexLock l(&ssl_ctx_mu_);
     ssl_ctx = ssl_ctx_;
   }
   if (ssl_ctx) {
-    return std::make_unique<Ssl::SslSocket>(std::move(ssl_ctx), Ssl::InitialState::Client,
-                                            transport_socket_options);
+    return std::make_unique<SslSocket>(std::move(ssl_ctx), InitialState::Client,
+                                       transport_socket_options);
   } else {
     ENVOY_LOG(debug, "Create NotReadySslSocket");
     stats_.upstream_context_secrets_not_ready_.inc();
@@ -405,8 +408,8 @@ void ClientSslSocketFactory::onAddOrUpdateSecret() {
   stats_.ssl_context_update_by_sds_.inc();
 }
 
-ServerSslSocketFactory::ServerSslSocketFactory(ServerContextConfigPtr config,
-                                               Ssl::ContextManager& manager,
+ServerSslSocketFactory::ServerSslSocketFactory(Envoy::Ssl::ServerContextConfigPtr config,
+                                               Envoy::Ssl::ContextManager& manager,
                                                Stats::Scope& stats_scope,
                                                const std::vector<std::string>& server_names)
     : manager_(manager), stats_scope_(stats_scope), stats_(generateStats("server", stats_scope)),
@@ -420,13 +423,13 @@ ServerSslSocketFactory::createTransportSocket(Network::TransportSocketOptionsSha
   // onAddOrUpdateSecret() could be invoked in the middle of checking the existence of ssl_ctx and
   // creating SslSocket using ssl_ctx. Capture ssl_ctx_ into a local variable so that we check and
   // use the same ssl_ctx to create SslSocket.
-  ServerContextSharedPtr ssl_ctx;
+  Envoy::Ssl::ServerContextSharedPtr ssl_ctx;
   {
     absl::ReaderMutexLock l(&ssl_ctx_mu_);
     ssl_ctx = ssl_ctx_;
   }
   if (ssl_ctx) {
-    return std::make_unique<Ssl::SslSocket>(std::move(ssl_ctx), Ssl::InitialState::Server, nullptr);
+    return std::make_unique<SslSocket>(std::move(ssl_ctx), InitialState::Server, nullptr);
   } else {
     ENVOY_LOG(debug, "Create NotReadySslSocket");
     stats_.downstream_context_secrets_not_ready_.inc();
@@ -445,5 +448,7 @@ void ServerSslSocketFactory::onAddOrUpdateSecret() {
   stats_.ssl_context_update_by_sds_.inc();
 }
 
-} // namespace Ssl
+} // namespace Tls
+} // namespace TransportSockets
+} // namespace Extensions
 } // namespace Envoy

@@ -53,6 +53,7 @@ public:
       : LoadBalancerBase(priority_set, stats, runtime, random, common_config) {}
   using LoadBalancerBase::chooseHostSet;
   using LoadBalancerBase::isInPanic;
+  using LoadBalancerBase::percentageDegradedLoad;
   using LoadBalancerBase::percentageLoad;
 
   HostConstSharedPtr chooseHostOnce(LoadBalancerContext*) override {
@@ -62,16 +63,22 @@ public:
 
 class LoadBalancerBaseTest : public LoadBalancerTestBase {
 public:
-  void updateHostSet(MockHostSet& host_set, uint32_t num_hosts, uint32_t num_healthy_hosts) {
-    ASSERT(num_healthy_hosts <= num_hosts);
+  void updateHostSet(MockHostSet& host_set, uint32_t num_hosts, uint32_t num_healthy_hosts,
+                     uint32_t num_degraded_hosts = 0) {
+    ASSERT(num_healthy_hosts + num_degraded_hosts <= num_hosts);
 
     host_set.hosts_.clear();
     host_set.healthy_hosts_.clear();
+    host_set.degraded_hosts_.clear();
     for (uint32_t i = 0; i < num_hosts; ++i) {
       host_set.hosts_.push_back(makeTestHost(info_, "tcp://127.0.0.1:80"));
     }
-    for (uint32_t i = 0; i < num_healthy_hosts; ++i) {
+    uint32_t i = 0;
+    for (; i < num_healthy_hosts; ++i) {
       host_set.healthy_hosts_.push_back(host_set.hosts_[i]);
+    }
+    for (; i < num_degraded_hosts; ++i) {
+      host_set.degraded_hosts_.push_back(host_set.hosts_[i]);
     }
     host_set.runCallbacks({}, {});
   }
@@ -91,6 +98,10 @@ public:
     return aggregatePrioritySetsValues<uint32_t>(lb_, &TestLb::percentageLoad);
   }
 
+  std::vector<uint32_t> getDegradedLoadPercentage() {
+    return aggregatePrioritySetsValues<uint32_t>(lb_, &TestLb::percentageDegradedLoad);
+  }
+
   std::vector<bool> getPanic() {
     return aggregatePrioritySetsValues<bool>(lb_, &TestLb::isInPanic);
   }
@@ -107,13 +118,14 @@ TEST_P(LoadBalancerBaseTest, PrioritySelection) {
   updateHostSet(host_set_, 1 /* num_hosts */, 0 /* num_healthy_hosts */);
   updateHostSet(failover_host_set_, 1, 0);
 
-  PriorityLoad priority_load({100u, 0u});
-  EXPECT_CALL(context, determinePriorityLoad(_, _)).WillRepeatedly(ReturnRef(priority_load));
+  HealthyLoad healthy_priority_load({100u, 0u});
+  EXPECT_CALL(context, determinePriorityLoad(_, _))
+      .WillRepeatedly(ReturnRef(healthy_priority_load));
   // With both the primary and failover hosts unhealthy, we should select an
   // unhealthy primary host.
   EXPECT_EQ(100, lb_.percentageLoad(0));
   EXPECT_EQ(0, lb_.percentageLoad(1));
-  EXPECT_EQ(&host_set_, &lb_.chooseHostSet(&context));
+  EXPECT_EQ(&host_set_, &lb_.chooseHostSet(&context).first);
 
   // Update the priority set with a new priority level P=2 and ensure the host
   // is chosen
@@ -122,8 +134,8 @@ TEST_P(LoadBalancerBaseTest, PrioritySelection) {
   EXPECT_EQ(0, lb_.percentageLoad(0));
   EXPECT_EQ(0, lb_.percentageLoad(1));
   EXPECT_EQ(100, lb_.percentageLoad(2));
-  priority_load = PriorityLoad({0u, 0u, 100u});
-  EXPECT_EQ(&tertiary_host_set_, &lb_.chooseHostSet(&context));
+  healthy_priority_load = HealthyLoad({0u, 0u, 100u});
+  EXPECT_EQ(&tertiary_host_set_, &lb_.chooseHostSet(&context).first);
 
   // Now add a healthy host in P=0 and make sure it is immediately selected.
   updateHostSet(host_set_, 1 /* num_hosts */, 1 /* num_healthy_hosts */);
@@ -131,30 +143,86 @@ TEST_P(LoadBalancerBaseTest, PrioritySelection) {
   host_set_.runCallbacks({}, {});
   EXPECT_EQ(100, lb_.percentageLoad(0));
   EXPECT_EQ(0, lb_.percentageLoad(2));
-  priority_load = PriorityLoad({100u, 0u, 0u});
-  EXPECT_EQ(&host_set_, &lb_.chooseHostSet(&context));
+  healthy_priority_load = HealthyLoad({100u, 0u, 0u});
+  EXPECT_EQ(&host_set_, &lb_.chooseHostSet(&context).first);
 
   // Remove the healthy host and ensure we fail back over to tertiary_host_set_
   updateHostSet(host_set_, 1 /* num_hosts */, 0 /* num_healthy_hosts */);
   EXPECT_EQ(0, lb_.percentageLoad(0));
   EXPECT_EQ(100, lb_.percentageLoad(2));
-  priority_load = PriorityLoad({0u, 0u, 100u});
-  EXPECT_EQ(&tertiary_host_set_, &lb_.chooseHostSet(&context));
+  healthy_priority_load = HealthyLoad({0, 0, 100});
+  EXPECT_EQ(&tertiary_host_set_, &lb_.chooseHostSet(&context).first);
+}
+
+// Tests host selection with a randomized number of healthy, degraded and unhealthy hosts.
+TEST_P(LoadBalancerBaseTest, PrioritySelectionFuzz) {
+  TestRandomGenerator rand;
+
+  // Determine total number of hosts.
+  const auto total_hosts = 1 + (rand.random() % 10);
+
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+
+  const auto host_set_hosts = rand.random() % total_hosts;
+
+  if (host_set_hosts == 0) {
+    updateHostSet(host_set_, 0, 0);
+  } else {
+    // We get on average 50% healthy hosts, 25% degraded hosts and 25% unhealthy hosts.
+    const auto healthy_hosts = rand.random() % host_set_hosts;
+    const auto degraded_hosts = rand.random() % (host_set_hosts - healthy_hosts);
+    const auto unhealthy_hosts = host_set_hosts - healthy_hosts - degraded_hosts;
+
+    updateHostSet(host_set_, host_set_hosts, unhealthy_hosts, degraded_hosts);
+  }
+
+  const auto failover_set_hosts = total_hosts - host_set_hosts;
+
+  if (host_set_hosts == 0) {
+    updateHostSet(failover_host_set_, 0, 0);
+  } else {
+    // We get on average 50% healthy hosts, 25% degraded hosts and 25% unhealthy hosts.
+    const auto healthy_hosts = rand.random() % failover_set_hosts;
+    const auto degraded_hosts = rand.random() % (failover_set_hosts - healthy_hosts);
+    const auto unhealthy_hosts = failover_set_hosts - healthy_hosts - degraded_hosts;
+
+    updateHostSet(failover_host_set_, failover_set_hosts, unhealthy_hosts, degraded_hosts);
+  }
+
+  EXPECT_CALL(context, determinePriorityLoad(_, _))
+      .WillRepeatedly(Invoke([](const auto&, const auto& original_load) -> const HealthyLoad& {
+        return original_load;
+      }));
+
+  for (uint64_t i = 0; i < total_hosts; ++i) {
+    const auto hs = lb_.chooseHostSet(&context);
+    switch (hs.second) {
+    case LoadBalancerBase::HostAvailability::Healthy:
+      // Either we selected one of the healthy hosts or we failed to select anything and defaulted
+      // to healthy.
+      EXPECT_TRUE(!hs.first.healthyHosts().empty() ||
+                  (hs.first.healthyHosts().size() == 0 && hs.first.degradedHosts().size() == 0));
+      break;
+    case LoadBalancerBase::HostAvailability::Degraded:
+      EXPECT_FALSE(hs.first.degradedHosts().empty());
+      break;
+    }
+  }
 }
 
 // Test of host set selection with priority filter
 TEST_P(LoadBalancerBaseTest, PrioritySelectionWithFilter) {
   NiceMock<Upstream::MockLoadBalancerContext> context;
 
-  PriorityLoad priority_load = PriorityLoad({0u, 100u});
+  HealthyLoad healthy_priority_load({0u, 100u});
   // return a filter that excludes priority 0
-  EXPECT_CALL(context, determinePriorityLoad(_, _)).WillOnce(ReturnRef(priority_load));
+  EXPECT_CALL(context, determinePriorityLoad(_, _)).WillOnce(ReturnRef(healthy_priority_load));
 
   updateHostSet(host_set_, 1 /* num_hosts */, 1 /* num_healthy_hosts */);
   updateHostSet(failover_host_set_, 1, 1);
 
   // Since we've excluded P0, we should pick the failover host set
-  EXPECT_EQ(failover_host_set_.priority(), lb_.chooseHostSet(&context).priority());
+  EXPECT_EQ(failover_host_set_.priority(), lb_.chooseHostSet(&context).first.priority());
 }
 
 TEST_P(LoadBalancerBaseTest, OverProvisioningFactor) {
@@ -218,12 +286,14 @@ TEST_P(LoadBalancerBaseTest, GentleFailoverWithExtraLevels) {
   updateHostSet(failover_host_set_, 2 /* num_hosts */, 1 /* num_healthy_hosts */);
   updateHostSet(tertiary_host_set_, 2 /* num_hosts */, 1 /* num_healthy_hosts */);
   ASSERT_THAT(getLoadPercentage(), ElementsAre(70, 30, 0));
+  ASSERT_THAT(getDegradedLoadPercentage(), ElementsAre(0, 0, 0));
 
   // Health P=0 == 25*1.4 == 35   P=1 is healthy so takes all spillover.
   updateHostSet(host_set_, 4 /* num_hosts */, 1 /* num_healthy_hosts */);
   updateHostSet(failover_host_set_, 2 /* num_hosts */, 2 /* num_healthy_hosts */);
   updateHostSet(tertiary_host_set_, 2 /* num_hosts */, 1 /* num_healthy_hosts */);
   ASSERT_THAT(getLoadPercentage(), ElementsAre(35, 65, 0));
+  ASSERT_THAT(getDegradedLoadPercentage(), ElementsAre(0, 0, 0));
 
   // This is the first test where health (P=0 + P=1 < 100)
   // Health P=0 == 25*1.4 == 35   P=1 == 35  P=2 == 35
@@ -231,6 +301,7 @@ TEST_P(LoadBalancerBaseTest, GentleFailoverWithExtraLevels) {
   updateHostSet(failover_host_set_, 4 /* num_hosts */, 1 /* num_healthy_hosts */);
   updateHostSet(tertiary_host_set_, 4 /* num_hosts */, 1 /* num_healthy_hosts */);
   ASSERT_THAT(getLoadPercentage(), ElementsAre(35, 35, 30));
+  ASSERT_THAT(getDegradedLoadPercentage(), ElementsAre(0, 0, 0));
 
   // This is the first test where (health P=0 + P=1 < 100)
   // Health P=0 == 25*1.4 == 35   P=1 == 35  P=2 == 35
@@ -238,6 +309,7 @@ TEST_P(LoadBalancerBaseTest, GentleFailoverWithExtraLevels) {
   updateHostSet(failover_host_set_, 4 /* num_hosts */, 1 /* num_healthy_hosts */);
   updateHostSet(tertiary_host_set_, 4 /* num_hosts */, 1 /* num_healthy_hosts */);
   ASSERT_THAT(getLoadPercentage(), ElementsAre(35, 35, 30));
+  ASSERT_THAT(getDegradedLoadPercentage(), ElementsAre(0, 0, 0));
 
   // Now all health is (20% * 1.5 == 28). 28 * 3 < 100 so we have to scale.
   // Each Priority level gets 33% of the load, with P=0 picking up the rounding error.
@@ -245,6 +317,7 @@ TEST_P(LoadBalancerBaseTest, GentleFailoverWithExtraLevels) {
   updateHostSet(failover_host_set_, 5 /* num_hosts */, 1 /* num_healthy_hosts */);
   updateHostSet(tertiary_host_set_, 5 /* num_hosts */, 1 /* num_healthy_hosts */);
   ASSERT_THAT(getLoadPercentage(), ElementsAre(34, 33, 33));
+  ASSERT_THAT(getDegradedLoadPercentage(), ElementsAre(0, 0, 0));
   ASSERT_THAT(getPanic(), ElementsAre(true, true, true));
 
   // Levels P=0 and P=1 are totally down. P=2 is totally healthy.
@@ -254,6 +327,7 @@ TEST_P(LoadBalancerBaseTest, GentleFailoverWithExtraLevels) {
   updateHostSet(failover_host_set_, 5 /* num_hosts */, 0 /* num_healthy_hosts */);
   updateHostSet(tertiary_host_set_, 5 /* num_hosts */, 5 /* num_healthy_hosts */);
   ASSERT_THAT(getLoadPercentage(), ElementsAre(0, 0, 100));
+  ASSERT_THAT(getDegradedLoadPercentage(), ElementsAre(0, 0, 0));
   ASSERT_THAT(getPanic(), ElementsAre(false, false, false));
 
   // Levels P=0 and P=1 are totally down. P=2 is 80*1.4 >= 100% healthy.
@@ -263,6 +337,7 @@ TEST_P(LoadBalancerBaseTest, GentleFailoverWithExtraLevels) {
   updateHostSet(failover_host_set_, 5 /* num_hosts */, 0 /* num_healthy_hosts */);
   updateHostSet(tertiary_host_set_, 5 /* num_hosts */, 4 /* num_healthy_hosts */);
   ASSERT_THAT(getLoadPercentage(), ElementsAre(0, 0, 100));
+  ASSERT_THAT(getDegradedLoadPercentage(), ElementsAre(0, 0, 0));
   ASSERT_THAT(getPanic(), ElementsAre(false, false, false));
 
   // Levels P=0 and P=1 are totally down. P=2 is 40*1.4=56%% healthy.
@@ -272,6 +347,7 @@ TEST_P(LoadBalancerBaseTest, GentleFailoverWithExtraLevels) {
   updateHostSet(failover_host_set_, 5 /* num_hosts */, 0 /* num_healthy_hosts */);
   updateHostSet(tertiary_host_set_, 5 /* num_hosts */, 2 /* num_healthy_hosts */);
   ASSERT_THAT(getLoadPercentage(), ElementsAre(0, 0, 100));
+  ASSERT_THAT(getDegradedLoadPercentage(), ElementsAre(0, 0, 0));
   ASSERT_THAT(getPanic(), ElementsAre(true, true, true));
 
   // All levels are completely down. 100% of traffic should go to P=0
@@ -280,6 +356,7 @@ TEST_P(LoadBalancerBaseTest, GentleFailoverWithExtraLevels) {
   updateHostSet(failover_host_set_, 5 /* num_hosts */, 0 /* num_healthy_hosts */);
   updateHostSet(tertiary_host_set_, 5 /* num_hosts */, 0 /* num_healthy_hosts */);
   ASSERT_THAT(getLoadPercentage(), ElementsAre(100, _, _));
+  ASSERT_THAT(getDegradedLoadPercentage(), ElementsAre(0, 0, 0));
   ASSERT_THAT(getPanic(), ElementsAre(true, _, _));
 
   // Rounding errors should be picked up by the first healthy priority.
@@ -287,6 +364,26 @@ TEST_P(LoadBalancerBaseTest, GentleFailoverWithExtraLevels) {
   updateHostSet(failover_host_set_, 5 /* num_hosts */, 2 /* num_healthy_hosts */);
   updateHostSet(tertiary_host_set_, 5 /* num_hosts */, 1 /* num_healthy_hosts */);
   ASSERT_THAT(getLoadPercentage(), ElementsAre(0, 67, 33));
+  ASSERT_THAT(getDegradedLoadPercentage(), ElementsAre(0, 0, 0));
+
+  // Load should spill over into degraded.
+  updateHostSet(host_set_, 5 /* num_hosts */, 0 /* num_healthy_hosts */,
+                1 /* num_degraded_hosts */);
+  updateHostSet(failover_host_set_, 5 /* num_hosts */, 0 /* num_healthy_hosts */,
+                5 /* num_degraded_hosts */);
+  updateHostSet(tertiary_host_set_, 5 /* num_hosts */, 1 /* num_healthy_hosts */);
+  ASSERT_THAT(getLoadPercentage(), ElementsAre(0, 0, 28));
+  ASSERT_THAT(getDegradedLoadPercentage(), ElementsAre(28, 44, 0));
+
+  // Rounding errors should be picked up by the first priority with degraded hosts when
+  // there are no healthy priorities.
+  updateHostSet(host_set_, 5 /* num_hosts */, 0 /* num_healthy_hosts */);
+  updateHostSet(failover_host_set_, 5 /* num_hosts */, 0 /* num_healthy_hosts */,
+                2 /* num_degraded_hosts */);
+  updateHostSet(tertiary_host_set_, 5 /* num_hosts */, 0 /* num_healthy_hosts */,
+                1 /* num_degraded_hosts */);
+  ASSERT_THAT(getLoadPercentage(), ElementsAre(0, 0, 0));
+  ASSERT_THAT(getDegradedLoadPercentage(), ElementsAre(0, 67, 33));
 }
 
 TEST_P(LoadBalancerBaseTest, BoundaryConditions) {
@@ -326,6 +423,26 @@ typedef RoundRobinLoadBalancerTest FailoverTest;
 // Ensure if all the hosts with priority 0 unhealthy, the next priority hosts are used.
 TEST_P(FailoverTest, BasicFailover) {
   host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80")};
+  failover_host_set_.healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:82")};
+  failover_host_set_.hosts_ = failover_host_set_.healthy_hosts_;
+  init(false);
+  EXPECT_EQ(failover_host_set_.healthy_hosts_[0], lb_->chooseHost(nullptr));
+}
+
+// Ensure if all the hosts with priority 0 degraded, the first priority degraded hosts are used.
+TEST_P(FailoverTest, BasicDegradedHosts) {
+  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80")};
+  host_set_.degraded_hosts_ = host_set_.hosts_;
+  failover_host_set_.hosts_ = failover_host_set_.healthy_hosts_;
+  init(false);
+  EXPECT_EQ(host_set_.degraded_hosts_[0], lb_->chooseHost(nullptr));
+}
+
+// Ensure if all the hosts with priority 0 degraded, but healthy hosts in the failover, the healthy
+// hosts in the second priority are used.
+TEST_P(FailoverTest, BasicFailoverDegradedHosts) {
+  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80")};
+  host_set_.degraded_hosts_ = host_set_.hosts_;
   failover_host_set_.healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:82")};
   failover_host_set_.hosts_ = failover_host_set_.healthy_hosts_;
   init(false);
@@ -611,14 +728,15 @@ TEST_P(RoundRobinLoadBalancerTest, HostSelectionWithFilter) {
       .WillRepeatedly(Invoke([&](const Host& host) -> bool {
         return host.address()->asString() != hostSet().hosts_[0]->address()->asString();
       }));
-  PriorityLoad priority_load;
+  HealthyLoad healthy_priority_load;
 
   if (GetParam()) {
-    priority_load = PriorityLoad({100u, 0u});
+    healthy_priority_load = HealthyLoad({100u, 0u});
   } else {
-    priority_load = PriorityLoad({0u, 100u});
+    healthy_priority_load = HealthyLoad({0u, 100u});
   }
-  EXPECT_CALL(context, determinePriorityLoad(_, _)).WillRepeatedly(ReturnRef(priority_load));
+  EXPECT_CALL(context, determinePriorityLoad(_, _))
+      .WillRepeatedly(ReturnRef(healthy_priority_load));
   EXPECT_CALL(context, hostSelectionRetryCount()).WillRepeatedly(Return(2));
 
   // Calling chooseHost multiple times always returns host one, since the filter will reject

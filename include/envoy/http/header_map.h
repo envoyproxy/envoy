@@ -266,6 +266,7 @@ private:
   HEADER_FUNC(EnvoyIpTags)                                                                         \
   HEADER_FUNC(EnvoyMaxRetries)                                                                     \
   HEADER_FUNC(EnvoyOriginalPath)                                                                   \
+  HEADER_FUNC(EnvoyOriginalUrl)                                                                    \
   HEADER_FUNC(EnvoyOverloaded)                                                                     \
   HEADER_FUNC(EnvoyRateLimited)                                                                    \
   HEADER_FUNC(EnvoyRetryOn)                                                                        \
@@ -290,6 +291,7 @@ private:
   HEADER_FUNC(Host)                                                                                \
   HEADER_FUNC(KeepAlive)                                                                           \
   HEADER_FUNC(LastModified)                                                                        \
+  HEADER_FUNC(Location)                                                                            \
   HEADER_FUNC(Method)                                                                              \
   HEADER_FUNC(NoChunks)                                                                            \
   HEADER_FUNC(Origin)                                                                              \

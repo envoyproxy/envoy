@@ -1,4 +1,4 @@
-#include "common/ssl/context_config_impl.h"
+#include "extensions/transport_sockets/tls/context_config_impl.h"
 
 #include <memory>
 #include <string>
@@ -14,7 +14,9 @@
 #include "openssl/ssl.h"
 
 namespace Envoy {
-namespace Ssl {
+namespace Extensions {
+namespace TransportSockets {
+namespace Tls {
 
 namespace {
 
@@ -157,7 +159,7 @@ Ssl::CertificateValidationContextConfigPtr ContextConfigImpl::getCombinedValidat
     const envoy::api::v2::auth::CertificateValidationContext& dynamic_cvc) {
   envoy::api::v2::auth::CertificateValidationContext combined_cvc = *default_cvc_;
   combined_cvc.MergeFrom(dynamic_cvc);
-  return std::make_unique<CertificateValidationContextConfigImpl>(combined_cvc);
+  return std::make_unique<Envoy::Ssl::CertificateValidationContextConfigImpl>(combined_cvc);
 }
 
 void ContextConfigImpl::setSecretUpdateCallback(std::function<void()> callback) {
@@ -404,5 +406,7 @@ void ServerContextConfigImpl::validateAndAppendKey(
   ASSERT(key_data.begin() + pos == key_data.end());
 }
 
-} // namespace Ssl
+} // namespace Tls
+} // namespace TransportSockets
+} // namespace Extensions
 } // namespace Envoy
