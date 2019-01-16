@@ -379,6 +379,8 @@ private:
 
   std::vector<std::shared_ptr<LocalityEntry>> locality_entries_;
   std::unique_ptr<EdfScheduler<LocalityEntry>> locality_scheduler_;
+  std::vector<std::shared_ptr<LocalityEntry>> degraded_locality_entries_;
+  std::unique_ptr<EdfScheduler<LocalityEntry>> degraded_locality_scheduler_;
 };
 
 typedef std::unique_ptr<HostSetImpl> HostSetImplPtr;

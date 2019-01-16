@@ -10,7 +10,9 @@
 #include "openssl/x509v3.h"
 
 namespace Envoy {
-namespace Ssl {
+namespace Extensions {
+namespace TransportSockets {
+namespace Tls {
 
 inline bssl::UniquePtr<X509> readCertFromFile(const std::string& path) {
   const std::string& file_content = TestEnvironment::readFileToStringForTest(path);
@@ -20,5 +22,7 @@ inline bssl::UniquePtr<X509> readCertFromFile(const std::string& path) {
   return cert;
 }
 
-} // namespace Ssl
+} // namespace Tls
+} // namespace TransportSockets
+} // namespace Extensions
 } // namespace Envoy

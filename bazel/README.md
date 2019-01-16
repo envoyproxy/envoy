@@ -380,7 +380,7 @@ overridden at compile-time by defining `ENVOY_DEFAULT_MAX_STATS` and
 value. For example:
 
 ```
-bazel build --copts=-DENVOY_DEFAULT_MAX_STATS=32768 --copts=-DENVOY_DEFAULT_MAX_OBJ_NAME_LENGTH=150 //source/exe:envoy-static
+bazel build --copt=-DENVOY_DEFAULT_MAX_STATS=32768 --copt=-DENVOY_DEFAULT_MAX_OBJ_NAME_LENGTH=150 //source/exe:envoy-static
 ```
 
 # Release builds

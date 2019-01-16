@@ -252,6 +252,9 @@ void HostSetImpl::updateHosts(UpdateHostsParams&& update_hosts_params,
   rebuildLocalityScheduler(locality_scheduler_, locality_entries_, *healthy_hosts_per_locality_,
                            *healthy_hosts_, hosts_per_locality_, locality_weights_,
                            overprovisioning_factor_);
+  rebuildLocalityScheduler(degraded_locality_scheduler_, degraded_locality_entries_,
+                           *degraded_hosts_per_locality_, *degraded_hosts_, hosts_per_locality_,
+                           locality_weights_, overprovisioning_factor_);
 
   runUpdateCallbacks(hosts_added, hosts_removed);
 }
@@ -264,16 +267,16 @@ void HostSetImpl::rebuildLocalityScheduler(
     LocalityWeightsConstSharedPtr locality_weights, uint32_t overprovisioning_factor) {
   // Rebuild the locality scheduler by computing the effective weight of each
   // locality in this priority. The scheduler is reset by default, and is rebuilt only if we have
-  // locality weights (i.e. using EDS) and there is at least one healthy host in this priority.
+  // locality weights (i.e. using EDS) and there is at least one eligible host in this priority.
   //
-  // We omit building a scheduler when there are zero healthy hosts in the priority as all
-  // the localities will have zero effective weight. At selection time, we'll only ever try
-  // to select a host from such a priority if all priorities have zero healthy hosts. At
-  // that point we'll rely on other mechanisms such as panic mode to select a host,
-  // none of which rely on the scheduler.
+  // We omit building a scheduler when there are zero eligible hosts in the priority as
+  // all the localities will have zero effective weight. At selection time, we'll either select
+  // from a different scheduler or there will be no available hosts in the priority. At that point
+  // we'll rely on other mechanisms such as panic mode to select a host, none of which rely on the
+  // scheduler.
   //
   // TODO(htuch): if the underlying locality index ->
-  // envoy::api::v2::core::Locality hasn't changed in hosts_/healthy_hosts_, we
+  // envoy::api::v2::core::Locality hasn't changed in hosts_/healthy_hosts_/degraded_hosts_, we
   // could just update locality_weight_ without rebuilding. Similar to how host
   // level WRR works, we would age out the existing entries via picks and lazily
   // apply the new weights.

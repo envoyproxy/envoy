@@ -49,7 +49,7 @@ public:
 TEST_F(RetryPriorityTest, DefaultFrequency) {
   initialize();
 
-  const Upstream::PriorityLoad original_priority_load({100u, 0u});
+  const Upstream::HealthyLoad original_priority_load({100u, 0u});
   addHosts(0, 2, 2);
   addHosts(1, 2, 2);
 
@@ -63,7 +63,7 @@ TEST_F(RetryPriorityTest, DefaultFrequency) {
   ASSERT_EQ(original_priority_load,
             retry_priority_->determinePriorityLoad(priority_set_, original_priority_load));
 
-  const Upstream::PriorityLoad expected_priority_load({0u, 100u});
+  const Upstream::HealthyLoad expected_priority_load({0u, 100u});
   // After attempting a host in P0, P1 should receive all the load.
   retry_priority_->onHostAttempted(host1);
   ASSERT_EQ(expected_priority_load,
@@ -80,7 +80,7 @@ TEST_F(RetryPriorityTest, DefaultFrequency) {
 TEST_F(RetryPriorityTest, NoHealthyUpstreams) {
   initialize();
 
-  const Upstream::PriorityLoad original_priority_load({0u, 0u, 0u});
+  const Upstream::HealthyLoad original_priority_load({0u, 0u, 0u});
   addHosts(0, 10, 0);
   addHosts(1, 10, 0);
   addHosts(2, 10, 0);
@@ -100,7 +100,7 @@ TEST_F(RetryPriorityTest, NoHealthyUpstreams) {
 
   {
     // After attempting a host in P0, load should remain unchanged.
-    const Upstream::PriorityLoad expected_priority_load({0u, 0u, 0u});
+    const Upstream::HealthyLoad expected_priority_load({0u, 0u, 0u});
     retry_priority_->onHostAttempted(host1);
     ASSERT_EQ(expected_priority_load,
               retry_priority_->determinePriorityLoad(priority_set_, original_priority_load));
@@ -111,7 +111,7 @@ TEST_F(RetryPriorityTest, NoHealthyUpstreams) {
 TEST_F(RetryPriorityTest, DefaultFrequencyDegradedPriorities) {
   initialize();
 
-  const Upstream::PriorityLoad original_priority_load({42u, 28u, 30u});
+  const Upstream::HealthyLoad original_priority_load({42u, 28u, 30u});
   addHosts(0, 10, 3);
   addHosts(1, 10, 2);
   addHosts(2, 10, 10);
@@ -131,14 +131,14 @@ TEST_F(RetryPriorityTest, DefaultFrequencyDegradedPriorities) {
 
   {
     // After attempting a host in P0, load should be split between P1 and P2 since P1 is degraded.
-    const Upstream::PriorityLoad expected_priority_load({0u, 28u, 72u});
+    const Upstream::HealthyLoad expected_priority_load({0u, 28u, 72u});
     retry_priority_->onHostAttempted(host1);
     ASSERT_EQ(expected_priority_load,
               retry_priority_->determinePriorityLoad(priority_set_, original_priority_load));
   }
 
   // After we've tried host2, everything should go to P2.
-  const Upstream::PriorityLoad expected_priority_load({0u, 0u, 100u});
+  const Upstream::HealthyLoad expected_priority_load({0u, 0u, 100u});
   retry_priority_->onHostAttempted(host2);
   ASSERT_EQ(expected_priority_load,
             retry_priority_->determinePriorityLoad(priority_set_, original_priority_load));
@@ -155,7 +155,7 @@ TEST_F(RetryPriorityTest, OverridenFrequency) {
   update_frequency_ = 2;
   initialize();
 
-  const Upstream::PriorityLoad original_priority_load({100u, 0u});
+  const Upstream::HealthyLoad original_priority_load({100u, 0u});
   addHosts(0, 2, 2);
   addHosts(1, 2, 2);
 
@@ -175,7 +175,7 @@ TEST_F(RetryPriorityTest, OverridenFrequency) {
             retry_priority_->determinePriorityLoad(priority_set_, original_priority_load));
 
   // After a second attempt, the prioity load should change.
-  const Upstream::PriorityLoad expected_priority_load({0u, 100u});
+  const Upstream::HealthyLoad expected_priority_load({0u, 100u});
   retry_priority_->onHostAttempted(host1);
   ASSERT_EQ(expected_priority_load,
             retry_priority_->determinePriorityLoad(priority_set_, original_priority_load));
