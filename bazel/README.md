@@ -86,14 +86,10 @@ CI Docker image.
 
 To link Envoy against libc++, use the following commands:
 ```
-export CC="clang"
-export CXX="clang++"
-export CXXFLAGS="-stdlib=libc++"
-bazel build --define force_libcpp=enabled --linkopt -fuse-ld=lld //source/exe:envoy-static
+bazel build --config=libc++ //source/exe:envoy-static
 ```
 Note: this assumes that both: clang compiler and libc++ library are installed in the system,
-and that `clang` is available in `$PATH`. On some systems, this might need to be changed to
-`CC="clang-7"` and `CXX="clang++-7"`.
+and that `clang-7` and `clang++-7` are available in `$PATH`.
 
 ## Using a compiler toolchain in a non-standard location
 

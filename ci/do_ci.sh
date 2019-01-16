@@ -152,16 +152,15 @@ elif [[ "$1" == "bazel.compile_time_options" ]]; then
   # Right now, none of the available compile-time options conflict with each other. If this
   # changes, this build type may need to be broken up.
   COMPILE_TIME_OPTIONS="\
+    --config libc++ \
     --define signal_trace=disabled \
     --define hot_restart=disabled \
     --define google_grpc=disabled \
     --define boringssl=fips \
     --define log_debug_assert_in_release=enabled \
     --define tcmalloc=debug \
-    --define force_libcpp=enabled \
   "
   setup_clang_toolchain
-  setup_libcpp
   # This doesn't go into CI but is available for developer convenience.
   echo "bazel with different compiletime options build with tests..."
   # Building all the dependencies from scratch to link them against libc++.

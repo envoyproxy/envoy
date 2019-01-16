@@ -24,15 +24,6 @@ function setup_clang_toolchain() {
   echo "$CC/$CXX toolchain configured"
 }
 
-function setup_libcpp() {
-  # Force cc_wrapper and recipe-based dependencies to link against libc++.
-  export CXXFLAGS="-stdlib=libc++"
-  # Force Bazel to link using lld, since GNU ld has trouble linking against libc++fs.
-  export BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --linkopt -fuse-ld=lld"
-  export BAZEL_TEST_OPTIONS="${BAZEL_TEST_OPTIONS} --linkopt -fuse-ld=lld"
-  echo "libc++ configured"
-}
-
 # Create a fake home. Python site libs tries to do getpwuid(3) if we don't and the CI
 # Docker image gets confused as it has no passwd entry when running non-root
 # unless we do this.
