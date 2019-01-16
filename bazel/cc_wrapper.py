@@ -24,8 +24,6 @@ def sanitize_flagfile(in_path, out_fd):
         os.write(out_fd, line)
       elif "-stdlib=libc++" in envoy_cxxflags:
         os.write(out_fd, "-lc++\n")
-      else:
-        pass
 
 
 def main():
@@ -58,8 +56,6 @@ def main():
       if arg == "-lstdc++":
         if "-stdlib=libc++" in envoy_cxxflags:
           arg.append("-lc++")
-        else:
-          pass
       elif arg.startswith("-Wl,@"):
         # tempfile.mkstemp will write to the out-of-sandbox tempdir
         # unless the user has explicitly set environment variables
