@@ -23,7 +23,6 @@
 #include "common/http/context_impl.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/secret/secret_manager_impl.h"
-#include "common/ssl/context_manager_impl.h"
 #include "common/upstream/health_discovery_service.h"
 
 #include "server/configuration_impl.h"
@@ -35,6 +34,7 @@
 #include "server/worker_impl.h"
 
 #include "extensions/filters/common/ratelimit/ratelimit_registration.h"
+#include "extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "absl/types/optional.h"
 
@@ -216,7 +216,7 @@ private:
   Network::ConnectionHandlerPtr handler_;
   Runtime::RandomGeneratorPtr random_generator_;
   Runtime::LoaderPtr runtime_loader_;
-  std::unique_ptr<Ssl::ContextManagerImpl> ssl_context_manager_;
+  std::unique_ptr<Extensions::TransportSockets::Tls::ContextManagerImpl> ssl_context_manager_;
   ProdListenerComponentFactory listener_component_factory_;
   ProdWorkerFactory worker_factory_;
   std::unique_ptr<ListenerManager> listener_manager_;

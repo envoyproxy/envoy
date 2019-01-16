@@ -1,4 +1,4 @@
-#include "test/test_common/tls_utility.h"
+#include "test/extensions/filters/listener/tls_inspector/tls_utility.h"
 
 #include "common/common/assert.h"
 
