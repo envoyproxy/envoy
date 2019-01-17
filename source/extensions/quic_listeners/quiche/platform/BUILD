@@ -8,6 +8,12 @@ load(
 
 envoy_package()
 
+# Build targets in this package are part of the QUICHE platform implementation,
+# are are not to be consumed or referenced directly by other Envoy code. The
+# only consumers should be build rules under @com_googlesource_quiche//..., and
+# tests. In a monorepo, this would be enforced via visibility attribute, but
+# Bazel does not support limiting visibility to specific external dependencies.
+
 # TODO: add build targets for quic_platform_impl_lib and spdy_platform_impl_lib,
 #   as _impl.* files for those are added.
 
