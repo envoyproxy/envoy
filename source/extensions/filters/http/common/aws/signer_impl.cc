@@ -7,8 +7,8 @@
 #include "common/common/hex.h"
 #include "common/http/headers.h"
 
-#include "extensions/filters/http/common/aws/utility.h"
 #include "extensions/common/crypto/utility.h"
+#include "extensions/filters/http/common/aws/utility.h"
 
 #include "absl/strings/str_join.h"
 

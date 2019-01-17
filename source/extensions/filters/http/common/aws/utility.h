@@ -37,7 +37,8 @@ public:
    * @param canonical_headers the pre-canonicalized request headers.
    * @return the header names as a semicolon-delimited string.
    */
-  static std::string joinCanonicalHeaderNames(const std::map<std::string, std::string>& canonical_headers);
+  static std::string
+  joinCanonicalHeaderNames(const std::map<std::string, std::string>& canonical_headers);
 };
 
 } // namespace Aws
