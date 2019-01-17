@@ -128,7 +128,9 @@ struct UdpData {
   // TODO (conquerAtapple):
   // Add UdpReader here so that the callback handler can
   // then use the reader to do multiple reads(recvmmsg) once the OS notifies it
-  // has data.
+  // has data. We could also just return a `ReaderFactory` that returns either a
+  // `recvfrom` reader (with peer information) or a `read/recvmmsg` reader. This
+  // is still being flushed out (Jan, 2019).
 };
 
 /**
