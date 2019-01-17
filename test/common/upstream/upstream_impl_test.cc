@@ -1588,12 +1588,16 @@ TEST(PrioritySet, Extend) {
   PrioritySetImpl priority_set;
   priority_set.getOrCreateHostSet(0);
 
-  uint32_t changes = 0;
+  uint32_t priority_changes = 0;
+  uint32_t membership_changes = 0;
   uint32_t last_priority = 0;
   priority_set.addPriorityUpdateCb([&](uint32_t priority, const HostVector&,
                                        const HostVector&) -> void {
     last_priority = priority;
-    ++changes;
+    ++priority_changes;
+  });
+  priority_set.addMemberUpdateCb([&](const HostVector&, const HostVector&) -> void {
+    ++membership_changes;
   });
 
   // The initial priority set starts with priority level 0..
@@ -1603,11 +1607,13 @@ TEST(PrioritySet, Extend) {
 
   // Add priorities 1 and 2, ensure the callback is called, and that the new
   // host sets are created with the correct priority.
-  EXPECT_EQ(0, changes);
+  EXPECT_EQ(0, priority_changes);
+  EXPECT_EQ(0, membership_changes);
   EXPECT_EQ(0, priority_set.getOrCreateHostSet(2).hosts().size());
   EXPECT_EQ(3, priority_set.hostSetsPerPriority().size());
   // No-op host set creation does not trigger callbacks.
-  EXPECT_EQ(0, changes);
+  EXPECT_EQ(0, priority_changes);
+  EXPECT_EQ(0, membership_changes);
   EXPECT_EQ(last_priority, 0);
   EXPECT_EQ(1, priority_set.hostSetsPerPriority()[1]->priority());
   EXPECT_EQ(2, priority_set.hostSetsPerPriority()[2]->priority());
@@ -1622,7 +1628,8 @@ TEST(PrioritySet, Extend) {
   priority_set.hostSetsPerPriority()[1]->updateHosts(
       HostSetImpl::updateHostsParams(hosts, hosts_per_locality, hosts, hosts_per_locality), {},
       hosts_added, hosts_removed, absl::nullopt);
-  EXPECT_EQ(1, changes);
+  EXPECT_EQ(1, priority_changes);
+  EXPECT_EQ(1, membership_changes);
   EXPECT_EQ(last_priority, 1);
   EXPECT_EQ(1, priority_set.hostSetsPerPriority()[1]->hosts().size());
 
@@ -2068,25 +2075,6 @@ TEST(HostsPerLocalityImpl, Filter) {
     const std::vector<HostVector> expected_locality_hosts = {{}, {host_1}};
     EXPECT_EQ(expected_locality_hosts, filtered->get());
   }
-}
-
-TEST(HostSetImplTest, UpdateCallbacks) {
-  std::shared_ptr<MockClusterInfo> info{new NiceMock<MockClusterInfo>()};
-  HostSetImpl host_set{0, kDefaultOverProvisioningFactor};
-
-  ReadyWatcher membership_updated;
-  host_set.addPriorityUpdateCb(
-      [&](uint32_t, const HostVector&, const HostVector&) -> void { membership_updated.ready(); });
-
-  HostVector hosts{
-      makeTestHost(info, "tcp://127.0.0.1:80"), makeTestHost(info, "tcp://127.0.0.1:81"),
-      makeTestHost(info, "tcp://127.0.0.1:82"), makeTestHost(info, "tcp://127.0.0.1:83"),
-      makeTestHost(info, "tcp://127.0.0.1:84"), makeTestHost(info, "tcp://127.0.0.1:85")};
-
-  EXPECT_CALL(membership_updated, ready());
-  host_set.updateHosts(HostSetImpl::updateHostsParams(std::make_shared<const HostVector>(hosts),
-                                                      HostsPerLocalityImpl::empty()),
-                       nullptr, hosts, {}, {});
 }
 
 class HostSetImplLocalityTest : public ::testing::Test {
