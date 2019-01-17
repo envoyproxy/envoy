@@ -3595,5 +3595,31 @@ TEST_F(HttpConnectionManagerImplTest, DisableKeepAliveWhenOverloaded) {
   EXPECT_EQ(1U, stats_.named_.downstream_cx_overload_disable_keepalive_.value());
 }
 
+TEST_F(HttpConnectionManagerImplTest, OverlyLongHeadersRejected) {
+  setup(false, "");
+
+  std::string response_code;
+  std::string response_body;
+  EXPECT_CALL(*codec_, dispatch(_)).Times(1).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
+    HeaderMapPtr headers{
+        new TestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+    headers->addCopy(LowerCaseString("Foo"), std::string(60 * 1024, 'a'));
+
+    EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
+        .WillOnce(Invoke([&response_code](const HeaderMap& headers, bool) -> void {
+          response_code = headers.Status()->value().c_str();
+        }));
+    decoder->decodeHeaders(std::move(headers), true);
+    conn_manager_->newStream(response_encoder_);
+  }));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false); // kick off request
+
+  EXPECT_EQ("431", response_code);
+  EXPECT_EQ("", response_body);
+}
+
 } // namespace Http
 } // namespace Envoy
