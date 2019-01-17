@@ -11,6 +11,7 @@
 #include "envoy/stats/timespan.h"
 #include "envoy/upstream/upstream.h"
 
+#include "common/common/callback_impl.h"
 #include "common/common/linked_object.h"
 #include "common/http/codec_client.h"
 #include "common/http/codec_wrappers.h"
@@ -119,7 +120,7 @@ protected:
   std::list<ActiveClientPtr> ready_clients_;
   std::list<ActiveClientPtr> busy_clients_;
   std::list<DrainedCb> drained_callbacks_;
-  std::list<IdleCb> idle_callbacks_;
+  Common::CallbackManager<> idle_callbacks_;
   const Network::ConnectionSocket::OptionsSharedPtr socket_options_;
   Event::TimerPtr upstream_ready_timer_;
   bool upstream_ready_enabled_{false};

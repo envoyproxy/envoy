@@ -60,7 +60,7 @@ void ConnPoolImpl::addDrainedCallback(DrainedCb cb) {
 }
 
 void ConnPoolImpl::addIdleCallback(IdleCb cb) {
-  idle_callbacks_.push_back(cb);
+  idle_callbacks_.add(std::move(cb));
   checkForIdle();
 }
 
@@ -89,9 +89,7 @@ void ConnPoolImpl::checkForIdle() {
   }
 
   ENVOY_LOG(debug, "Pool is idle");
-  for (const IdleCb& cb : idle_callbacks_) {
-    cb();
-  }
+  idle_callbacks_.runCallbacks();
 }
 
 void ConnPoolImpl::createNewConnection() {
