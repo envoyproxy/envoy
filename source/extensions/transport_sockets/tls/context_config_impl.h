@@ -14,7 +14,9 @@
 #include "common/ssl/tls_certificate_config_impl.h"
 
 namespace Envoy {
-namespace Ssl {
+namespace Extensions {
+namespace TransportSockets {
+namespace Tls {
 
 static const std::string INLINE_STRING = "<inline>";
 
@@ -27,14 +29,16 @@ public:
   const std::string& cipherSuites() const override { return cipher_suites_; }
   const std::string& ecdhCurves() const override { return ecdh_curves_; }
   // TODO(htuch): This needs to be made const again and/or zero copy and/or callers fixed.
-  std::vector<std::reference_wrapper<const TlsCertificateConfig>> tlsCertificates() const override {
-    std::vector<std::reference_wrapper<const TlsCertificateConfig>> configs;
+  std::vector<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>>
+  tlsCertificates() const override {
+    std::vector<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>> configs;
     for (const auto& config : tls_certificate_configs_) {
       configs.push_back(config);
     }
     return configs;
   }
-  const CertificateValidationContextConfig* certificateValidationContext() const override {
+  const Envoy::Ssl::CertificateValidationContextConfig*
+  certificateValidationContext() const override {
     return validation_context_config_.get();
   }
   unsigned minProtocolVersion() const override { return min_protocol_version_; };
@@ -89,7 +93,7 @@ private:
   const unsigned max_protocol_version_;
 };
 
-class ClientContextConfigImpl : public ContextConfigImpl, public ClientContextConfig {
+class ClientContextConfigImpl : public ContextConfigImpl, public Envoy::Ssl::ClientContextConfig {
 public:
   ClientContextConfigImpl(
       const envoy::api::v2::auth::UpstreamTlsContext& config, absl::string_view sigalgs,
@@ -120,7 +124,7 @@ private:
   const std::string sigalgs_;
 };
 
-class ServerContextConfigImpl : public ContextConfigImpl, public ServerContextConfig {
+class ServerContextConfigImpl : public ContextConfigImpl, public Envoy::Ssl::ServerContextConfig {
 public:
   ServerContextConfigImpl(
       const envoy::api::v2::auth::DownstreamTlsContext& config,
@@ -148,5 +152,7 @@ private:
                                    const std::string& key_data);
 };
 
-} // namespace Ssl
+} // namespace Tls
+} // namespace TransportSockets
+} // namespace Extensions
 } // namespace Envoy
