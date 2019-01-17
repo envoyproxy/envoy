@@ -281,10 +281,7 @@ public:
    * @param callback supplies the callback to invoke.
    * @return Common::CallbackHandle* the callback handle.
    */
-  typedef std::function<void(uint32_t priority, const HostVector& hosts_added,
-                             const HostVector& hosts_removed)>
-      MemberUpdateCb;
-  Common::CallbackHandle* addMemberUpdateCb(MemberUpdateCb callback) const {
+  Common::CallbackHandle* addPriorityUpdateCb(PrioritySet::PriorityUpdateCb callback) const {
     return member_update_cb_helper_.add(callback);
   }
 
@@ -395,6 +392,9 @@ public:
   Common::CallbackHandle* addMemberUpdateCb(MemberUpdateCb callback) const override {
     return member_update_cb_helper_.add(callback);
   }
+  Common::CallbackHandle* addPriorityUpdateCb(PriorityUpdateCb callback) const override {
+    return priority_update_cb_helper_.add(callback);
+  }
   const std::vector<std::unique_ptr<HostSet>>& hostSetsPerPriority() const override {
     return host_sets_;
   }
@@ -411,17 +411,21 @@ protected:
   }
 
 private:
-  virtual void runUpdateCallbacks(uint32_t priority, const HostVector& hosts_added,
-                                  const HostVector& hosts_removed) {
-    member_update_cb_helper_.runCallbacks(priority, hosts_added, hosts_removed);
+  virtual void runUpdateCallbacks(const HostVector& hosts_added, const HostVector& hosts_removed) {
+    member_update_cb_helper_.runCallbacks(hosts_added, hosts_removed);
+  }
+  virtual void runReferenceUpdateCallbacks(uint32_t priority, const HostVector& hosts_added,
+                                           const HostVector& hosts_removed) {
+    priority_update_cb_helper_.runCallbacks(priority, hosts_added, hosts_removed);
   }
   // This vector will generally have at least one member, for priority level 0.
   // It will expand as host sets are added but currently does not shrink to
   // avoid any potential lifetime issues.
   std::vector<std::unique_ptr<HostSet>> host_sets_;
   // TODO(mattklein123): Remove mutable.
+  mutable Common::CallbackManager<const HostVector&, const HostVector&> member_update_cb_helper_;
   mutable Common::CallbackManager<uint32_t, const HostVector&, const HostVector&>
-      member_update_cb_helper_;
+      priority_update_cb_helper_;
 };
 
 /**
