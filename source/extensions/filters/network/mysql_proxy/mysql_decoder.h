@@ -25,15 +25,15 @@ class DecoderCallbacks {
 public:
   virtual ~DecoderCallbacks() {}
 
-  virtual void onProtocolError(){};
-  virtual void onNewMessage(MySQLSession::State){};
-  virtual void onServerGreeting(ServerGreeting&){};
-  virtual void onClientLogin(ClientLogin&){};
-  virtual void onClientLoginResponse(ClientLoginResponse&){};
-  virtual void onClientSwitchResponse(ClientSwitchResponse&){};
-  virtual void onMoreClientLoginResponse(ClientLoginResponse&){};
-  virtual void onCommand(Command&){};
-  virtual void onCommandResponse(CommandResponse&){};
+  virtual void onProtocolError() PURE;
+  virtual void onNewMessage(MySQLSession::State) PURE;
+  virtual void onServerGreeting(ServerGreeting&) PURE;
+  virtual void onClientLogin(ClientLogin&) PURE;
+  virtual void onClientLoginResponse(ClientLoginResponse&) PURE;
+  virtual void onClientSwitchResponse(ClientSwitchResponse&) PURE;
+  virtual void onMoreClientLoginResponse(ClientLoginResponse&) PURE;
+  virtual void onCommand(Command&) PURE;
+  virtual void onCommandResponse(CommandResponse&) PURE;
 };
 
 /**
