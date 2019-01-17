@@ -36,5 +36,4 @@ envoy_cc_library(
         "abseil_optional",
     ],
     visibility = ["//visibility:public"],
-    deps = ["//source/common/common:assert_lib"],
 )

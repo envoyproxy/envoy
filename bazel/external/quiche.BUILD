@@ -80,6 +80,6 @@ cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
-        "@//source/extensions/quic_listeners/quiche/platform:http2_platform_impl_lib",
+        "@envoy//source/extensions/quic_listeners/quiche/platform:http2_platform_impl_lib",
     ],
 )
