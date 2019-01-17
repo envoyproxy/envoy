@@ -33,7 +33,7 @@ public:
   Http::Protocol protocol() const override { return Http::Protocol::Http2; }
   void addDrainedCallback(DrainedCb cb) override;
   void drainConnections() override;
-  void addIdleCallback(IdleCb) override { /* TODO(klarose): implement*/
+  void addIdleCallback(IdleCb) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; /* TODO(klarose): implement*/
   }
   ConnectionPool::Cancellable* newStream(Http::StreamDecoder& response_decoder,
                                          ConnectionPool::Callbacks& callbacks) override;
@@ -78,7 +78,7 @@ protected:
 
   // Http::ConnPoolImplBase
   void checkForDrained() override;
-  void checkForIdle() override { /* TODO(klarose): implement */
+  void checkForIdle() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; /* TODO(klarose): implement */
   }
 
   virtual CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) PURE;
