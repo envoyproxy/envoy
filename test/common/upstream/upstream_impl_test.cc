@@ -1591,7 +1591,7 @@ TEST(PrioritySet, Extend) {
   uint32_t changes = 0;
   uint32_t last_priority = 0;
   priority_set.addPriorityUpdateCb([&](uint32_t priority, const HostVector&,
-                                       const HostVector&) -> void { // fIXME
+                                       const HostVector&) -> void {
     last_priority = priority;
     ++changes;
   });
