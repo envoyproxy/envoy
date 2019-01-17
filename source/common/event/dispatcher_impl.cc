@@ -173,15 +173,13 @@ void DispatcherImpl::runPostCallbacks() {
     // re-assigned, which happens while holding the lock. This can lead to a deadlock (via
     // recursive mutex acquisition) if destroying the callback runs a destructor, which through some
     // callstack calls post() on this dispatcher.
+    Thread::LockGuard lock(post_lock_);
     std::function<void()> callback;
-    {
-      Thread::LockGuard lock(post_lock_);
-      if (post_callbacks_.empty()) {
-        return;
-      }
-      callback = post_callbacks_.front();
-      post_callbacks_.pop_front();
+    if (post_callbacks_.empty()) {
+      return;
     }
+    callback = post_callbacks_.front();
+    post_callbacks_.pop_front();
     callback();
   }
 }
