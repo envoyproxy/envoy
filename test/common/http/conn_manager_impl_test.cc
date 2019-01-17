@@ -3595,7 +3595,7 @@ TEST_F(HttpConnectionManagerImplTest, DisableKeepAliveWhenOverloaded) {
   EXPECT_EQ(1U, stats_.named_.downstream_cx_overload_disable_keepalive_.value());
 }
 
-TEST_F(HttpConnectionManagerImplTest, LargeRequestRejected) {
+TEST_F(HttpConnectionManagerImplTest, OverlyLongHeadersRejected) {
   setup(false, "");
 
   std::string response_code;
