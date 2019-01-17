@@ -1,6 +1,6 @@
 licenses(["notice"])  # Apache 2
 
-# MySQL proxy L4 network filter (observability and fault injection).
+# MySQL proxy L7 network filter.
 # Public docs: docs/root/configuration/network_filters/mysql_proxy_filter.rst
 
 load(

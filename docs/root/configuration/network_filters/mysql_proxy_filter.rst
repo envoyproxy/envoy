@@ -9,6 +9,26 @@ The decoded info is emitted as dynamic metadata that can be combined with
 access log filters to get detailed information on tables accessed as well
 as operations performed on each table.
 
+.. _config_network_filters_mysql_proxy_config:
+
+Configuration
+-------------
+
+The MySQL proxy filter should be chained with the TCP proxy filter as shown
+in the configuration snippet below:
+
+.. code-block:: yaml
+  filter_chains:
+  - filters:
+    - name: envoy.filters.network.mysql_proxy
+      config:
+        stat_prefix: mysql
+    - name: envoy.tcp_proxy
+      config:
+        stat_prefix: tcp
+        cluster: ...
+
+
 .. _config_network_filters_mysql_proxy_stats:
 
 Statistics
@@ -44,3 +64,45 @@ The MySQL filter emits the following dynamic metadata for each SQL query parsed:
 
   <table.db>, string, The resource name in *table.db* format. The resource name defaults to the table being accessed if the database cannot be inferred.
   [], list, A list of strings representing the operations executed on the resource. Operations can be one of insert/update/select/drop/delete/create/alter/show.
+
+.. _config_network_filters_mysql_proxy_rbac:
+
+RBAC Enforcement on Table Accesses
+----------------------------------
+
+The dynamic metadata emitted by the MySQL filter can be used in conjunction
+with the RBAC filter to control accesses to individual tables in a
+database. The following configuration snippet shows an example RBAC filter
+configuration that denies SQL queries with _update_ statements to the _catalog_
+table in the _productdb_ database.
+
+.. code-block:: yaml
+  filter_chains:
+  - filters:
+    - name: envoy.filters.network.mysql_proxy
+      config:
+        stat_prefix: mysql
+    - name: envoy.filters.network.rbac
+      config:
+        stat_prefix: rbac
+        rules:
+          action: DENY
+          policies:
+            "product-viewer":
+              permissions:
+              - metadata:
+                  filter: envoy.filters.network.mysql_proxy
+                  path:
+                  - key: catalog.productdb
+                  value:
+                    list_match:
+                      one_of:
+                        string_match:
+                          exact: update
+              principals:
+              - any: true
+    - name: envoy.tcp_proxy
+      config:
+        stat_prefix: tcp
+        cluster: mysql
+
