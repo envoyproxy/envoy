@@ -499,6 +499,35 @@ The compilation database could also be used to setup editors with cross referenc
 For example, you can use [You Complete Me](https://valloric.github.io/YouCompleteMe/) or
 [cquery](https://github.com/cquery-project/cquery) with supported editors.
 
+# Running clang-format without docker
+
+The easiest way to run the clang-format check/fix commands is to run them via
+docker, which helps ensure the right toolchain is set up. However you may prefer
+to run clang-format scripts on your workstation directly:
+ * It's possible there is a speed advantage
+ * Docker itself can sometimes go awry and you then have to deal with that
+ * Type-ahead doesn't always work when waiting running a command through docker
+To run the tools directly, you must install the correct version of clang. This
+may change over time but as of January 2019,
+[clang+llvm-7.0.0](http://releases.llvm.org/download.html) works well. You must
+also have 'buildifier' installed from the bazel distribution.
+
+Edit the paths shown here to reflect the installation locations on your system:
+
+```shell
+export CLANG_FORMAT="$HOME/ext/clang+llvm-7.0.0-x86_64-linux-gnu-ubuntu-16.04/bin/clang-format"
+export BUILDIFIER_BIN="/usr/bin/buildifier"
+```
+
+Once this is set up, you can run clang-tidy without docker:
+
+```shell
+./tools/check_format.py check
+./tools/check_spelling.sh check
+./tools/check_format.py fix
+./tools/check_spelling.sh fix
+```
+
 # Advanced caching setup
 
 Setting up an HTTP cache for Bazel output helps optimize Bazel performance and resource usage when
