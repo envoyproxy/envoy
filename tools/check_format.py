@@ -48,6 +48,7 @@ HEADER_ORDER_PATH = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), 
 SUBDIR_SET = set(common.includeDirOrder())
 INCLUDE_ANGLE = "#include <"
 INCLUDE_ANGLE_LEN = len(INCLUDE_ANGLE)
+PROTO_PACKAGE_REGEX = re.compile("package (.*);")
 
 # yapf: disable
 PROTOBUF_TYPE_ERRORS = {
@@ -149,7 +150,7 @@ def fixJavaProtoOptions(file_path):
   package_name = None
   for line in fileinput.FileInput(file_path):
     if line.startswith("package "):
-      package_name = re.compile("package (.*);").search(line).group(1)
+      package_name = PROTO_PACKAGE_REGEX.search(line).group(1)
     if "option java_multiple_files = true;" in line:
       java_multiple_files = True
     if "option java_package = \"io.envoyproxy.envoy" in line:

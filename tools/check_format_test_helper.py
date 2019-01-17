@@ -62,8 +62,6 @@ def getInputFile(filename):
 def fixFileHelper(filename):
   infile = os.path.join(src, filename)
   directory = os.path.dirname(filename)
-  if not directory == '' and not os.path.isdir(directory):
-    os.makedirs(directory)
 
   shutil.copyfile(infile, filename)
   command, status, stdout = runCheckFormat("fix", getInputFile(filename))
