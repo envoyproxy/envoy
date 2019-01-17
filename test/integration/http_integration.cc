@@ -2395,11 +2395,7 @@ config: {}
   ASSERT_TRUE(response->complete());
   // Verifies a headers metadata added.
   EXPECT_EQ(upstream_request_->metadata_map().find("headers")->second, "headers");
-  // Envoy adds an empty data frame to inidicate end_stream. Verifies data metadata is also added.
-  EXPECT_EQ(upstream_request_->metadata_map().find("data")->second, "data");
-  //EXPECT_EQ(upstream_request_->metadata_map().find("metadata")->second, "metadata");
-  EXPECT_EQ(upstream_request_->metadata_map().size(), 2);
-  //EXPECT_EQ(upstream_request_->duplicated_metadata_key_count().find("metadata")->second, 2);
+  EXPECT_EQ(upstream_request_->metadata_map().size(), 1);
 
   // Sends a headers only request with metadata. An empty data frame carries end_stream.
   auto encoder_decoder = codec_client_->startRequest(default_request_headers_);

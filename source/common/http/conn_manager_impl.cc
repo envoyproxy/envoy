@@ -770,14 +770,12 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilte
     entry = std::next(filter->entry());
   }
 
-  bool delay_end_stream = false;
   for (; entry != decoder_filters_.end(); entry++) {
     ASSERT(!(state_.filter_call_state_ & FilterCallState::DecodeHeaders));
     state_.filter_call_state_ |= FilterCallState::DecodeHeaders;
     (*entry)->end_stream_ =
         decoding_headers_only_ || (end_stream && continue_data_entry == decoder_filters_.end());
-    FilterHeadersStatus status = (*entry)->decodeHeaders(
-        headers, (*entry)->end_stream_ && !delay_end_stream);
+    FilterHeadersStatus status = (*entry)->decodeHeaders(headers, (*entry)->end_stream_);
 
     ASSERT(!(status == FilterHeadersStatus::ContinueAndEndStream && (*entry)->end_stream_));
     state_.filter_call_state_ &= ~FilterCallState::DecodeHeaders;
@@ -785,10 +783,11 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilte
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
 
     if (!request_metadata_map_vector_.empty()) {
-      delay_end_stream = true;
       for (uint64_t i = 0; i < request_metadata_map_vector_.size(); i++) {
         decodeMetadata((*entry).get(), *(request_metadata_map_vector_[i]));
       }
+      Buffer::OwnedImpl empty_data("");
+      addDecodedData(*((*entry).get()), empty_data, true);
       request_metadata_map_vector_.clear();
     }
 
@@ -805,13 +804,6 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilte
     if (end_stream && buffered_request_data_ && continue_data_entry == decoder_filters_.end()) {
       continue_data_entry = entry;
     }
-  }
-
-  // If end_stream is removed in headers because of new metadata added in the filters, send an empty
-  // data frame to inidicate end_stream.
-  if (end_stream && continue_data_entry == decoder_filters_.end() && delay_end_stream) {
-    Buffer::OwnedImpl empty_data("");
-    decodeData(nullptr, empty_data, true);
   }
 
   if (continue_data_entry != decoder_filters_.end()) {
