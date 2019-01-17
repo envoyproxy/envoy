@@ -35,10 +35,10 @@ CdsIncremental::CdsIncremental(const envoy::api::v2::core::ConfigSource& cds_con
           "envoy.api.v2.ClusterDiscoveryService.IncrementalClusters");
 }
 
-void CdsIncremental::onIncrementalConfig(
+void CdsIncremental::onConfigUpdate(
     const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-    const std::string& version_info) {
+    const std::string& system_version_info) {
   cm_.adsMux().pause(Config::TypeUrl::get().ClusterLoadAssignment);
   Cleanup eds_resume([this] { cm_.adsMux().resume(Config::TypeUrl::get().ClusterLoadAssignment); });
 
@@ -56,11 +56,11 @@ void CdsIncremental::onIncrementalConfig(
     }
   }
 
-  version_info_ = version_info;
+  system_version_info_ = system_version_info;
   runInitializeCallbackIfAny();
 }
 
-void CdsIncremental::onIncrementalConfigFailed(const EnvoyException*) {
+void CdsIncremental::onConfigUpdateFailed(const EnvoyException*) {
   // We need to allow server startup to continue, even if we have a bad config.
   runInitializeCallbackIfAny();
 }

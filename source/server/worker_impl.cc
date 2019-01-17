@@ -43,9 +43,7 @@ void WorkerImpl::addListener(Network::ListenerConfig& listener, AddListenerCompl
     try {
       ENVOY_LOG(info, "adding a listener...");
       handler_->addListener(listener);
-      ENVOY_LOG(info, "added a listener...");
       hooks_.onWorkerListenerAdded();
-      ENVOY_LOG(info, "called onWorkerListenerAdded.");
       completion(true);
     } catch (const Network::CreateListenerException& e) {
       completion(false);

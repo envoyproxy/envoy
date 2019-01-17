@@ -22,22 +22,22 @@ public:
    * Called when an incremental configuration update is received.
    * @param added_resources resources newly added since the previous fetch.
    * @param removed_resources names of resources that this fetch instructed to be removed.
-   * @param version_info update version.
+   * @param system_version_info aggregate response data "version", for debugging.
    * @throw EnvoyException with reason if the incremental config changes are rejected. Otherwise the
    *        changes are accepted. Accepted changes have their version_info reflected in subsequent
    *        requests.
    */
   virtual void
-  onIncrementalConfig(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
-                      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-                      const std::string& version_info) PURE;
+  onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
+                 const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                 const std::string& system_version_info) PURE;
 
   /**
    * Called when either the IncrementalSubscription is unable to fetch a config update or when
-   * onIncrementalConfig invokes an exception.
+   * onConfigUpdate invokes an exception.
    * @param e supplies any exception data on why the fetch failed. May be nullptr.
    */
-  virtual void onIncrementalConfigFailed(const EnvoyException* e) PURE;
+  virtual void onConfigUpdateFailed(const EnvoyException* e) PURE;
 
   /**
    * Obtain the "name" of a v2 API resource in a google.protobuf.Any, e.g. the route config name for

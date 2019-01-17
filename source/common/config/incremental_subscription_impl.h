@@ -65,7 +65,7 @@ public:
     stream_ = async_client_->start(service_method_, *this);
     if (stream_ == nullptr) {
       ENVOY_LOG(warn, "Unable to establish new stream");
-      onIncrementalConfigFailed(nullptr);
+      onConfigUpdateFailed(nullptr);
       setRetryTimer();
       return;
     }
@@ -190,11 +190,10 @@ public:
 
   // Config::IncrementalSubscription....Callbacks? these are just meant as wrappers. Not sure if
   // this class would have these called on it, but perhaps.
-  void
-  onIncrementalConfig(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
+  void onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
                       const Protobuf::RepeatedPtrField<std::string>& removed_resources,
                       const std::string& version_info) {
-    callbacks_->onIncrementalConfig(added_resources, removed_resources, version_info);
+    callbacks_->onConfigUpdate(added_resources, removed_resources, version_info);
     // TODO update versions of added_resources and removed_resources into resources_.... well,
     // i guess removed_resources just get removed? since there's no provision for "it got removed"
     // to have a version associated here; it's just a list of string resource names.
@@ -204,7 +203,7 @@ public:
     ENVOY_LOG(debug, "Incremental config for {} accepted with {} resources added, {} removed",
               type_url_, added_resources.size(), removed_resources.size());
   }
-  void onIncrementalConfigFailed(const EnvoyException* e) {
+  void onConfigUpdateFailed(const EnvoyException* e) {
     // TODO(htuch): Less fragile signal that this is failure vs. reject.
     if (e == nullptr) {
       stats_.update_failure_.inc();
@@ -215,7 +214,7 @@ public:
     }
     stats_.update_attempt_.inc();
     if (callbacks_) {
-      callbacks_->onIncrementalConfigFailed(e);
+      callbacks_->onConfigUpdateFailed(e);
     }
   }
 
@@ -237,10 +236,10 @@ public:
     request_.set_response_nonce(message->nonce());
 
     try {
-      onIncrementalConfig(message->resources(), message->removed_resources(),
-                          message->system_version_info());
+      onConfigUpdate(message->resources(), message->removed_resources(),
+                     message->system_version_info());
     } catch (const EnvoyException& e) {
-      onIncrementalConfigFailed(&e);
+      onConfigUpdateFailed(&e);
       ::google::rpc::Status* error_detail = request_.mutable_error_detail();
       error_detail->set_code(Grpc::Status::GrpcStatus::Internal);
       error_detail->set_message(e.what());
