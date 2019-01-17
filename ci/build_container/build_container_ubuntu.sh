@@ -28,6 +28,6 @@ chmod 750 /usr/sbin/tcpdump
 setcap cap_net_raw,cap_net_admin=eip /usr/sbin/tcpdump
 
 # virtualenv
-pip install virtualenv
+pip3 install virtualenv
 
 EXPECTED_CXX_VERSION="g++ (Ubuntu 5.4.0-6ubuntu1~16.04.11) 5.4.0 20160609" ./build_container_common.sh
