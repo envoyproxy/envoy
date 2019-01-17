@@ -102,7 +102,10 @@ envoy_cc_library(
 envoy_cc_library(
     name = "io_socket_handle_lib",
     hdrs = ["io_socket_handle_impl.h"],
-    deps = ["//include/envoy/network:io_handle_interface"],
+    deps = [
+        "//include/envoy/network:io_handle_interface",
+        "//source/common/common:assert_lib",
+    ],
 )
 
 envoy_cc_library(
