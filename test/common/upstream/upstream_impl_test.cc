@@ -284,7 +284,7 @@ TEST(StrictDnsClusterImplTest, Basic) {
   EXPECT_FALSE(cluster.info()->maintenanceMode());
 
   ReadyWatcher membership_updated;
-  cluster.prioritySet().addMemberUpdateCb(
+  cluster.prioritySet().addPriorityUpdateCb(
       [&](uint32_t, const HostVector&, const HostVector&) -> void { membership_updated.ready(); });
 
   cluster.initialize([] {});
@@ -517,7 +517,7 @@ TEST(StrictDnsClusterImplTest, LoadAssignmentBasic) {
   EXPECT_FALSE(cluster.info()->maintenanceMode());
 
   ReadyWatcher membership_updated;
-  cluster.prioritySet().addMemberUpdateCb(
+  cluster.prioritySet().addPriorityUpdateCb(
       [&](uint32_t, const HostVector&, const HostVector&) -> void { membership_updated.ready(); });
 
   cluster.initialize([] {});
@@ -621,7 +621,7 @@ TEST(StrictDnsClusterImplTest, LoadAssignmentBasic) {
   // Remove the duplicated hosts from both resolve targets and ensure that we don't see the same
   // host multiple times.
   std::unordered_set<HostSharedPtr> removed_hosts;
-  cluster.prioritySet().addMemberUpdateCb(
+  cluster.prioritySet().addPriorityUpdateCb(
       [&](uint32_t, const HostVector&, const HostVector& hosts_removed) -> void {
         for (const auto& host : hosts_removed) {
           EXPECT_EQ(removed_hosts.end(), removed_hosts.find(host));
@@ -716,7 +716,7 @@ TEST(StrictDnsClusterImplTest, LoadAssignmentBasicMultiplePriorities) {
   StrictDnsClusterImpl cluster(cluster_config, runtime, dns_resolver, factory_context,
                                std::move(scope), false);
   ReadyWatcher membership_updated;
-  cluster.prioritySet().addMemberUpdateCb(
+  cluster.prioritySet().addPriorityUpdateCb(
       [&](uint32_t, const HostVector&, const HostVector&) -> void { membership_updated.ready(); });
 
   cluster.initialize([] {});
@@ -1588,13 +1588,16 @@ TEST(PrioritySet, Extend) {
   PrioritySetImpl priority_set;
   priority_set.getOrCreateHostSet(0);
 
-  uint32_t changes = 0;
+  uint32_t priority_changes = 0;
+  uint32_t membership_changes = 0;
   uint32_t last_priority = 0;
-  priority_set.addMemberUpdateCb([&](uint32_t priority, const HostVector&,
-                                     const HostVector&) -> void { // fIXME
-    last_priority = priority;
-    ++changes;
-  });
+  priority_set.addPriorityUpdateCb(
+      [&](uint32_t priority, const HostVector&, const HostVector&) -> void {
+        last_priority = priority;
+        ++priority_changes;
+      });
+  priority_set.addMemberUpdateCb(
+      [&](const HostVector&, const HostVector&) -> void { ++membership_changes; });
 
   // The initial priority set starts with priority level 0..
   EXPECT_EQ(1, priority_set.hostSetsPerPriority().size());
@@ -1603,11 +1606,13 @@ TEST(PrioritySet, Extend) {
 
   // Add priorities 1 and 2, ensure the callback is called, and that the new
   // host sets are created with the correct priority.
-  EXPECT_EQ(0, changes);
+  EXPECT_EQ(0, priority_changes);
+  EXPECT_EQ(0, membership_changes);
   EXPECT_EQ(0, priority_set.getOrCreateHostSet(2).hosts().size());
   EXPECT_EQ(3, priority_set.hostSetsPerPriority().size());
   // No-op host set creation does not trigger callbacks.
-  EXPECT_EQ(0, changes);
+  EXPECT_EQ(0, priority_changes);
+  EXPECT_EQ(0, membership_changes);
   EXPECT_EQ(last_priority, 0);
   EXPECT_EQ(1, priority_set.hostSetsPerPriority()[1]->priority());
   EXPECT_EQ(2, priority_set.hostSetsPerPriority()[2]->priority());
@@ -1622,7 +1627,8 @@ TEST(PrioritySet, Extend) {
   priority_set.hostSetsPerPriority()[1]->updateHosts(
       HostSetImpl::updateHostsParams(hosts, hosts_per_locality, hosts, hosts_per_locality), {},
       hosts_added, hosts_removed, absl::nullopt);
-  EXPECT_EQ(1, changes);
+  EXPECT_EQ(1, priority_changes);
+  EXPECT_EQ(1, membership_changes);
   EXPECT_EQ(last_priority, 1);
   EXPECT_EQ(1, priority_set.hostSetsPerPriority()[1]->hosts().size());
 

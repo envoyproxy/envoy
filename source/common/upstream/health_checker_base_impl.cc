@@ -33,7 +33,7 @@ HealthCheckerImplBase::HealthCheckerImplBase(const Cluster& cluster,
       healthy_edge_interval_(
           PROTOBUF_GET_MS_OR_DEFAULT(config, healthy_edge_interval, interval_.count())) {
   cluster_.prioritySet().addMemberUpdateCb(
-      [this](uint32_t, const HostVector& hosts_added, const HostVector& hosts_removed) -> void {
+      [this](const HostVector& hosts_added, const HostVector& hosts_removed) -> void {
         onClusterMemberUpdate(hosts_added, hosts_removed);
       });
 }

@@ -46,7 +46,7 @@ public:
         ssl_context_manager_, *scope, cm, local_info_, dispatcher_, random_, stats_store_);
     cluster_.reset(new LogicalDnsCluster(cluster_config, runtime_, dns_resolver_, tls_,
                                          factory_context, std::move(scope), false));
-    cluster_->prioritySet().addMemberUpdateCb(
+    cluster_->prioritySet().addPriorityUpdateCb(
         [&](uint32_t, const HostVector&, const HostVector&) -> void {
           membership_updated_.ready();
         });
@@ -64,7 +64,7 @@ public:
         ssl_context_manager_, *scope, cm, local_info_, dispatcher_, random_, stats_store_);
     cluster_.reset(new LogicalDnsCluster(cluster_config, runtime_, dns_resolver_, tls_,
                                          factory_context, std::move(scope), false));
-    cluster_->prioritySet().addMemberUpdateCb(
+    cluster_->prioritySet().addPriorityUpdateCb(
         [&](uint32_t, const HostVector&, const HostVector&) -> void {
           membership_updated_.ready();
         });
