@@ -154,7 +154,7 @@ def fixJavaProtoOptions(file_path):
       if result is None or len(result.groups()) != 1:
         continue
 
-      package_name = PROTO_PACKAGE_REGEX.search(line).group(1)
+      package_name = result.group(1)
     if "option java_multiple_files = true;" in line:
       java_multiple_files = True
     if "option java_package = \"io.envoyproxy.envoy" in line:
