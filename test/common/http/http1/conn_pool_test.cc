@@ -818,9 +818,11 @@ TEST_F(Http1ConnPoolImplTest, RequestCompleteWithPendingIsNotIdle) {
   conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);
 
   // Finishing request 1 will immediately bind to request 2.
+  NiceMock<Http::MockStreamEncoder> request_encoder2;
+  Http::StreamDecoder* inner_decoder2;
   conn_pool_.expectEnableUpstreamReady();
   EXPECT_CALL(*conn_pool_.test_clients_[0].codec_, newStream(_))
-      .WillOnce(DoAll(SaveArgAddress(&inner_decoder), ReturnRef(request_encoder)));
+      .WillOnce(DoAll(SaveArgAddress(&inner_decoder2), ReturnRef(request_encoder2)));
   EXPECT_CALL(callbacks2.pool_ready_, ready());
 
   callbacks.outer_encoder_->encodeHeaders(TestHeaderMapImpl{}, true);
