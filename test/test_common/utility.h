@@ -25,6 +25,7 @@
 
 #include "test/test_common/printers.h"
 
+#include "absl/time/time.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -304,13 +305,50 @@ public:
     return result;
   }
 
-  static std::tm parseTimestamp(const std::string& format, const std::string& time_str);
+  static absl::Time parseTime(const std::string& input, const std::string& input_format);
+  static std::string formatTime(const absl::Time input, const std::string& output_format);
+  static std::string formatTime(const SystemTime input, const std::string& output_format);
+  static std::string convertTime(const std::string& input, const std::string& input_format,
+                                 const std::string& output_format);
 
   static constexpr std::chrono::milliseconds DefaultTimeout = std::chrono::milliseconds(10000);
 
   static void renameFile(const std::string& old_name, const std::string& new_name);
   static void createDirectory(const std::string& name);
   static void createSymlink(const std::string& target, const std::string& link);
+
+  /**
+   * Return a prefix string matcher.
+   * @param string prefix.
+   * @return Object StringMatcher.
+   */
+  static const envoy::type::matcher::StringMatcher createPrefixMatcher(std::string str) {
+    envoy::type::matcher::StringMatcher matcher;
+    matcher.set_prefix(str);
+    return matcher;
+  }
+
+  /**
+   * Return an exact string matcher.
+   * @param string exact.
+   * @return Object StringMatcher.
+   */
+  static const envoy::type::matcher::StringMatcher createExactMatcher(std::string str) {
+    envoy::type::matcher::StringMatcher matcher;
+    matcher.set_exact(str);
+    return matcher;
+  }
+
+  /**
+   * Return a regex string matcher.
+   * @param string exact.
+   * @return Object StringMatcher.
+   */
+  static const envoy::type::matcher::StringMatcher createRegexMatcher(std::string str) {
+    envoy::type::matcher::StringMatcher matcher;
+    matcher.set_regex(str);
+    return matcher;
+  }
 };
 
 /**

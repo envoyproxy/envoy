@@ -239,7 +239,7 @@ void InstanceImpl::ThreadLocalPool::onClusterAddOrUpdateNonVirtual(
   cluster_ = &cluster;
   ASSERT(host_set_member_update_cb_handle_ == nullptr);
   host_set_member_update_cb_handle_ = cluster_->prioritySet().addMemberUpdateCb(
-      [this](uint32_t, const std::vector<Upstream::HostSharedPtr>&,
+      [this](const std::vector<Upstream::HostSharedPtr>&,
              const std::vector<Upstream::HostSharedPtr>& hosts_removed) -> void {
         onHostsRemoved(hosts_removed);
       });

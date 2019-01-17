@@ -440,7 +440,7 @@ message CorsPolicy {
   core.RuntimeFractionalPercent shadow_enabled = 10;
 }
 
-// [#comment:next free field: 26]
+// [#comment:next free field: 27]
 message RouteAction {
   oneof cluster_specifier {
     option (validate.required) = true;
@@ -772,6 +772,13 @@ message RouteAction {
     google.protobuf.BoolValue enabled = 2;
   };
   repeated UpgradeConfig upgrade_configs = 25;
+
+  // Configures :ref:`internal redirect <arch_overview_internal_redirects>` behavior.
+  enum InternalRedirectAction {
+    PASS_THROUGH_INTERNAL_REDIRECT = 0;
+    HANDLE_INTERNAL_REDIRECT = 1;
+  }
+  InternalRedirectAction internal_redirect_action = 26;
 }
 
 // HTTP retry :ref:`architecture overview <arch_overview_http_routing_retry>`.

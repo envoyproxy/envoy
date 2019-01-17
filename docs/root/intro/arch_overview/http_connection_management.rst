@@ -121,6 +121,56 @@ previously attempted priorities.
       config:
         update_frequency: 2
 
+.. _arch_overview_internal_redirects:
+
+Internal redirects
+--------------------------
+
+Envoy supports handling 302 redirects internally, that is capturing a 302 redirect response,
+synthesizing a new request, sending it to the upstream specified by the new route match, and
+returning the redirected response as the response to the original request.
+
+Internal redirects are configured via the ref:`redirect action
+<envoy_api_field_route.RouteAction.redirect_action>` field in
+route configuration. When redirect handling is on, any 302 response from upstream is
+subject to the redirect being handled by Envoy.
+
+For a redirect to be handled successfully it must pass the following checks:
+
+1. Be a 302 response.
+2. Have a *location* header with a valid, fully qualified URL matching the scheme of the original request.
+3. The request must have been fully processed by Envoy.
+4. The request must not have a body.
+5. The request must have not been previously redirected, as determined by the presence of an x-envoy-original-url header.
+
+Any failure will result in redirect being passed downstream instead.
+
+Once the redirect has passed these checks, the request headers which were shipped to the original
+upstream will be modified by:
+
+1. Putting the fully qualified original request URL in the x-envoy-original-url header.
+2. Replacing the Authority/Host, Scheme, and Path headers with the values from the Location header.
+
+The altered request headers will then have a new route selected, be sent through a new filter chain,
+and then shipped upstream with all of the normal Envoy request sanitization taking place. 
+
+.. warning::
+  Note that HTTP connection manager sanitization such as clearing untrusted headers will only be
+  applied once. Per-route header modifications will be applied on both the original route and the
+  second route, even if they are the same, so be careful configuring header modification rules to
+  avoid duplicating undesired header values.
+
+A sample redirect flow might look like this:
+
+1. Client sends a GET request for *\http://foo.com/bar*
+2. Upstream 1 sends a 302 with  *"location: \http://baz.com/eep"*
+3. Envoy is configured to allow redirects on the original route, and sends a new GET request to
+   Upstream 2, to fetch *\http://baz.com/eep* with the additional request header
+   *"x-envoy-original-url: \http://foo.com/bar"*
+4. Envoy proxies the response data for *\http://baz.com/eep* to the client as the response to the original
+   request.
+
+
 Timeouts
 --------
 

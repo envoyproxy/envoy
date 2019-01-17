@@ -243,8 +243,8 @@ bool AdminImpl::changeLogLevel(const Http::Utility::QueryParams& params) {
 
   // First see if the level is valid.
   size_t level_to_use = std::numeric_limits<size_t>::max();
-  for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_names); i++) {
-    if (level == spdlog::level::level_names[i]) {
+  for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_string_views); i++) {
+    if (level == spdlog::level::level_string_views[i]) {
       level_to_use = i;
       break;
     }
@@ -538,8 +538,8 @@ Http::Code AdminImpl::handlerLogging(absl::string_view url, Http::HeaderMap&,
     response.add("usage: /logging?<name>=<level> (change single level)\n");
     response.add("usage: /logging?level=<level> (change all levels)\n");
     response.add("levels: ");
-    for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_names); i++) {
-      response.add(fmt::format("{} ", spdlog::level::level_names[i]));
+    for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_string_views); i++) {
+      response.add(fmt::format("{} ", spdlog::level::level_string_views[i]));
     }
 
     response.add("\n");

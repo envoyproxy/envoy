@@ -29,7 +29,7 @@ OriginalDstCluster::LoadBalancer::LoadBalancer(
       info_(parent->info()), use_http_header_(config ? config.value().use_http_header() : false) {
   // priority_set_ is initially empty.
   priority_set_.addMemberUpdateCb(
-      [this](uint32_t, const HostVector& hosts_added, const HostVector& hosts_removed) -> void {
+      [this](const HostVector& hosts_added, const HostVector& hosts_removed) -> void {
         // Update the hosts map
         // TODO(ramaraochavali): use cluster stats and move the log lines to debug.
         for (const HostSharedPtr& host : hosts_removed) {
