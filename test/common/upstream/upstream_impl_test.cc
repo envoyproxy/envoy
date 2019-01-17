@@ -1591,14 +1591,13 @@ TEST(PrioritySet, Extend) {
   uint32_t priority_changes = 0;
   uint32_t membership_changes = 0;
   uint32_t last_priority = 0;
-  priority_set.addPriorityUpdateCb([&](uint32_t priority, const HostVector&,
-                                       const HostVector&) -> void {
-    last_priority = priority;
-    ++priority_changes;
-  });
-  priority_set.addMemberUpdateCb([&](const HostVector&, const HostVector&) -> void {
-    ++membership_changes;
-  });
+  priority_set.addPriorityUpdateCb(
+      [&](uint32_t priority, const HostVector&, const HostVector&) -> void {
+        last_priority = priority;
+        ++priority_changes;
+      });
+  priority_set.addMemberUpdateCb(
+      [&](const HostVector&, const HostVector&) -> void { ++membership_changes; });
 
   // The initial priority set starts with priority level 0..
   EXPECT_EQ(1, priority_set.hostSetsPerPriority().size());
