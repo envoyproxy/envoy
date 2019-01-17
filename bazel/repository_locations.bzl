@@ -42,6 +42,11 @@ REPOSITORY_LOCATIONS = dict(
         strip_prefix = "xxHash-0.6.5",
         urls = ["https://github.com/Cyan4973/xxHash/archive/v0.6.5.tar.gz"],
     ),
+    com_github_envoyproxy_sqlparser = dict(
+        sha256 = "425dfee0c4fe9aff8acf2365cde3dd2ba7fb878d2ba37562d33920e34c40c05e",
+        strip_prefix = "sql-parser-5f50c68bdf5f107692bb027d1c568f67597f4d7f",
+        urls = ["https://github.com/envoyproxy/sql-parser/archive/5f50c68bdf5f107692bb027d1c568f67597f4d7f.tar.gz"],
+    ),
     com_github_eile_tclap = dict(
         sha256 = "f0ede0721dddbb5eba3a47385a6e8681b14f155e1129dd39d1a959411935098f",
         strip_prefix = "tclap-tclap-1-2-1-release-final",
