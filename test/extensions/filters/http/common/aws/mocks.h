@@ -24,7 +24,7 @@ public:
   MockSigner();
   ~MockSigner();
 
-  MOCK_METHOD1(sign, void(Http::Message&));
+  MOCK_METHOD2(sign, void(Http::Message&,bool));
 };
 
 } // namespace Aws

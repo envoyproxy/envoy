@@ -17,8 +17,10 @@ public:
   /**
    * Sign an AWS request.
    * @param message an AWS API request message.
+   * @param sign_body include the message body in the signature. The body must be fully buffered.
+   * @throws EnvoyException if the request cannot be signed.
    */
-  virtual void sign(Http::Message& message) PURE;
+  virtual void sign(Http::Message& message, bool sign_body) PURE;
 };
 
 typedef std::unique_ptr<Signer> SignerPtr;

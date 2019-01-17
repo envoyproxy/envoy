@@ -6,9 +6,9 @@
 #include "common/common/fmt.h"
 #include "common/common/hex.h"
 #include "common/http/headers.h"
-#include "common/ssl/utility.h"
 
 #include "extensions/filters/http/common/aws/utility.h"
+#include "extensions/common/crypto/utility.h"
 
 #include "absl/strings/str_join.h"
 
@@ -18,7 +18,7 @@ namespace HttpFilters {
 namespace Common {
 namespace Aws {
 
-void SignerImpl::sign(Http::Message& message) {
+void SignerImpl::sign(Http::Message& message, bool sign_body) {
   const auto& credentials = credentials_provider_->getCredentials();
   if (!credentials.accessKeyId() || !credentials.secretAccessKey()) {
     // Empty or "anonymous" credentials are a valid use-case for non-production environments.
@@ -26,19 +26,26 @@ void SignerImpl::sign(Http::Message& message) {
     return;
   }
   auto& headers = message.headers();
+  const auto* method_header = headers.Method();
+  if (method_header == nullptr) {
+    throw EnvoyException("Message is missing :method header");
+  }
+  const auto* path_header = headers.Path();
+  if (path_header == nullptr) {
+    throw EnvoyException("Message is missing :path header");
+  }
   if (credentials.sessionToken()) {
     headers.addCopy(SignatureHeaders::get().SecurityToken, credentials.sessionToken().value());
   }
   const auto long_date = long_date_formatter_.now(time_source_);
   const auto short_date = short_date_formatter_.now(time_source_);
   headers.addCopy(SignatureHeaders::get().Date, long_date);
-  const auto content_hash = createContentHash(message);
-  headers.addCopy(SignatureHeaders::get().ContentSha256, content_hash);
+  const auto content_hash = createContentHash(message, sign_body);
   // Phase 1: Create a canonical request
   const auto canonical_headers = Utility::canonicalizeHeaders(headers);
-  const auto signing_headers = createSigningHeaders(canonical_headers);
-  const auto canonical_request =
-      createCanonicalRequest(message, canonical_headers, signing_headers, content_hash);
+  const auto canonical_request = Utility::createCanonicalRequest(
+      method_header->value().getStringView(), path_header->value().getStringView(),
+      canonical_headers, content_hash);
   ENVOY_LOG(debug, "Canonical request:\n{}", canonical_request);
   // Phase 2: Create a string to sign
   const auto credential_scope = createCredentialScope(short_date);
@@ -49,58 +56,21 @@ void SignerImpl::sign(Http::Message& message) {
       createSignature(credentials.secretAccessKey().value(), short_date, string_to_sign);
   // Phase 4: Sign request
   const auto authorization_header = createAuthorizationHeader(
-      credentials.accessKeyId().value(), credential_scope, signing_headers, signature);
+      credentials.accessKeyId().value(), credential_scope, canonical_headers, signature);
   ENVOY_LOG(debug, "Signing request with: {}", authorization_header);
   headers.addCopy(Http::Headers::get().Authorization, authorization_header);
 }
 
-std::string SignerImpl::createContentHash(Http::Message& message) const {
-  if (!message.body()) {
+std::string SignerImpl::createContentHash(Http::Message& message, bool sign_body) const {
+  if (!sign_body) {
     return SignatureConstants::get().HashedEmptyString;
   }
-  return Hex::encode(Ssl::Utility::getSha256Digest(*message.body()));
-}
-
-std::string SignerImpl::createCanonicalRequest(
-    Http::Message& message, const std::map<std::string, std::string>& canonical_headers,
-    absl::string_view signing_headers, absl::string_view content_hash) const {
-  std::vector<absl::string_view> parts;
-  const auto* method_header = message.headers().Method();
-  if (method_header == nullptr || method_header->value().empty()) {
-    throw EnvoyException("Message is missing :method header");
-  }
-  parts.emplace_back(method_header->value().getStringView());
-  const auto* path_header = message.headers().Path();
-  if (path_header == nullptr || path_header->value().empty()) {
-    throw EnvoyException("Message is missing :path header");
-  }
-  // don't include the query part of the path
-  const auto path = StringUtil::cropRight(path_header->value().getStringView(), "?");
-  parts.emplace_back(path.empty() ? "/" : path);
-  const auto query = StringUtil::cropLeft(path_header->value().getStringView(), "?");
-  // if query == path, then there is no query
-  parts.emplace_back(query == path ? "" : query);
-  std::vector<std::string> formatted_headers;
-  formatted_headers.reserve(canonical_headers.size());
-  for (const auto& header : canonical_headers) {
-    formatted_headers.emplace_back(fmt::format("{}:{}", header.first, header.second));
-    parts.emplace_back(formatted_headers.back());
-  }
-  // need an extra blank space after the canonical headers
-  parts.emplace_back("");
-  parts.emplace_back(signing_headers);
-  parts.emplace_back(content_hash);
-  return absl::StrJoin(parts, "\n");
-}
-
-std::string SignerImpl::createSigningHeaders(
-    const std::map<std::string, std::string>& canonical_headers) const {
-  std::vector<absl::string_view> keys;
-  keys.reserve(canonical_headers.size());
-  for (const auto& header : canonical_headers) {
-    keys.emplace_back(header.first);
-  }
-  return absl::StrJoin(keys, ";");
+  const auto content_hash =
+      message.body()
+          ? Hex::encode(Extensions::Common::Crypto::Utility::getSha256Digest(*message.body()))
+          : SignatureConstants::get().HashedEmptyString;
+  message.headers().addCopy(SignatureHeaders::get().ContentSha256, content_hash);
+  return content_hash;
 }
 
 std::string SignerImpl::createCredentialScope(absl::string_view short_date) const {
@@ -111,9 +81,9 @@ std::string SignerImpl::createCredentialScope(absl::string_view short_date) cons
 std::string SignerImpl::createStringToSign(absl::string_view canonical_request,
                                            absl::string_view long_date,
                                            absl::string_view credential_scope) const {
-  return fmt::format(
-      SignatureConstants::get().StringToSignFormat, long_date, credential_scope,
-      Hex::encode(Ssl::Utility::getSha256Digest(Buffer::OwnedImpl(canonical_request))));
+  return fmt::format(SignatureConstants::get().StringToSignFormat, long_date, credential_scope,
+                     Hex::encode(Extensions::Common::Crypto::Utility::getSha256Digest(
+                         Buffer::OwnedImpl(canonical_request))));
 }
 
 std::string SignerImpl::createSignature(absl::string_view secret_access_key,
@@ -121,21 +91,25 @@ std::string SignerImpl::createSignature(absl::string_view secret_access_key,
                                         absl::string_view string_to_sign) const {
   const auto secret_key =
       absl::StrCat(SignatureConstants::get().SignatureVersion, secret_access_key);
-  const auto date_key = Ssl::Utility::getSha256Hmac(
+  const auto date_key = Extensions::Common::Crypto::Utility::getSha256Hmac(
       std::vector<uint8_t>(secret_key.begin(), secret_key.end()), short_date);
-  const auto region_key = Ssl::Utility::getSha256Hmac(date_key, region_);
-  const auto service_key = Ssl::Utility::getSha256Hmac(region_key, service_name_);
-  const auto signing_key =
-      Ssl::Utility::getSha256Hmac(service_key, SignatureConstants::get().Aws4Request);
-  return Hex::encode(Ssl::Utility::getSha256Hmac(signing_key, string_to_sign));
+  const auto region_key = Extensions::Common::Crypto::Utility::getSha256Hmac(date_key, region_);
+  const auto service_key =
+      Extensions::Common::Crypto::Utility::getSha256Hmac(region_key, service_name_);
+  const auto signing_key = Extensions::Common::Crypto::Utility::getSha256Hmac(
+      service_key, SignatureConstants::get().Aws4Request);
+  return Hex::encode(
+      Extensions::Common::Crypto::Utility::getSha256Hmac(signing_key, string_to_sign));
 }
 
-std::string SignerImpl::createAuthorizationHeader(absl::string_view access_key_id,
-                                                  absl::string_view credential_scope,
-                                                  absl::string_view signing_headers,
-                                                  absl::string_view signature) const {
+std::string
+SignerImpl::createAuthorizationHeader(absl::string_view access_key_id,
+                                      absl::string_view credential_scope,
+                                      const std::map<std::string, std::string>& canonical_headers,
+                                      absl::string_view signature) const {
+  const auto signed_headers = Utility::joinCanonicalHeaderNames(canonical_headers);
   return fmt::format(SignatureConstants::get().AuthorizationHeaderFormat, access_key_id,
-                     credential_scope, signing_headers, signature);
+                     credential_scope, signed_headers, signature);
 }
 
 } // namespace Aws

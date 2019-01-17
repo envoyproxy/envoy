@@ -72,14 +72,78 @@ TEST(UtilityTest, CanonicalizeHeadersRemovingDefaultPortsFromHost) {
 
 // Whitespace is trimmed from headers
 TEST(UtilityTest, CanonicalizeHeadersTrimmingWhitespace) {
-  Http::TestHeaderMapImpl headers{{"leading", "    leading value"},
-                                  {"trailing", "trailing value    "},
-                                  {"internal", "internal    value"},
-                                  {"all", "    all    value    "}};
+  Http::TestHeaderMapImpl headers{
+      {"leading", "    leading value"},
+      {"trailing", "trailing value    "},
+      {"internal", "internal    value"},
+      {"all", "    all    value    "},
+  };
   const auto map = Utility::canonicalizeHeaders(headers);
   EXPECT_THAT(map,
               ElementsAre(Pair("all", "all value"), Pair("internal", "internal value"),
                           Pair("leading", "leading value"), Pair("trailing", "trailing value")));
+}
+
+// Verify the format of a minimalist canonical request
+TEST(UtilityTest, MinimalCanonicalRequest) {
+  std::map<std::string, std::string> headers;
+  const auto request = Utility::createCanonicalRequest("GET", "", headers, "content-hash");
+  EXPECT_EQ(R"(GET
+/
+
+
+
+content-hash)",
+            request);
+}
+
+TEST(UtilityTest, CanonicalRequestWithQueryString) {
+  const std::map<std::string, std::string> headers;
+  const auto request = Utility::createCanonicalRequest("GET", "?query", headers, "content-hash");
+  EXPECT_EQ(R"(GET
+/
+query
+
+
+content-hash)",
+            request);
+}
+
+TEST(UtilityTest, CanonicalRequestWithHeaders) {
+  const std::map<std::string, std::string> headers = {
+      {"header1", "value1"},
+      {"header2", "value2"},
+      {"header3", "value3"},
+  };
+  const auto request = Utility::createCanonicalRequest("GET", "", headers, "content-hash");
+  EXPECT_EQ(R"(GET
+/
+
+header1:value1
+header2:value2
+header3:value3
+
+header1;header2;header3
+content-hash)",
+            request);
+}
+
+// Verify headers are joined with ";"
+TEST(UtilityTest, JoinCanonicalHeaderNames) {
+  std::map<std::string, std::string> headers = {
+      {"header1", "value1"},
+      {"header2", "value2"},
+      {"header3", "value3"},
+  };
+  const auto names = Utility::joinCanonicalHeaderNames(headers);
+  EXPECT_EQ("header1;header2;header3", names);
+}
+
+// Verify we return "" when there are no headers
+TEST(UtilityTest, JoinCanonicalHeaderNamesWithEmptyMap) {
+  std::map<std::string, std::string> headers;
+  const auto names = Utility::joinCanonicalHeaderNames(headers);
+  EXPECT_EQ("", names);
 }
 
 } // namespace Aws

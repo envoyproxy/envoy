@@ -30,7 +30,7 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/singleton:const_singleton",
-        "//source/common/ssl:utility_lib",
+        "//source/extensions/common/crypto:utility_lib",
     ],
 )
 

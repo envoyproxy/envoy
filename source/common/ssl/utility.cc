@@ -1,12 +1,8 @@
 #include "common/ssl/utility.h"
 
 #include "common/common/assert.h"
-#include "common/common/stack_array.h"
 
 #include "absl/strings/str_join.h"
-#include "openssl/evp.h"
-#include "openssl/hmac.h"
-#include "openssl/sha.h"
 #include "openssl/x509v3.h"
 
 namespace Envoy {
@@ -103,44 +99,6 @@ SystemTime Utility::getExpirationTime(const X509& cert) {
   int rc = ASN1_TIME_diff(&days, &seconds, &epochASN1_Time(), X509_get0_notAfter(&cert));
   ASSERT(rc == 1);
   return std::chrono::system_clock::from_time_t(days * 24 * 60 * 60 + seconds);
-}
-
-std::vector<uint8_t> Utility::getSha256Digest(const Buffer::Instance& buffer) {
-  std::vector<uint8_t> digest(SHA256_DIGEST_LENGTH);
-  EVP_MD_CTX ctx;
-  auto rc = EVP_DigestInit(&ctx, EVP_sha256());
-  RELEASE_ASSERT(rc == 1, "Failed to init digest context");
-  const auto num_slices = buffer.getRawSlices(nullptr, 0);
-  STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
-  buffer.getRawSlices(slices.begin(), num_slices);
-  for (const auto& slice : slices) {
-    rc = EVP_DigestUpdate(&ctx, slice.mem_, slice.len_);
-    RELEASE_ASSERT(rc == 1, "Failed to update digest");
-  }
-  unsigned int digest_length;
-  rc = EVP_DigestFinal(&ctx, digest.data(), &digest_length);
-  RELEASE_ASSERT(rc == 1, "Failed to finalize digest");
-  RELEASE_ASSERT(digest_length == SHA256_DIGEST_LENGTH, "Digest length mismatch");
-  return digest;
-}
-
-std::vector<uint8_t> Utility::getSha256Hmac(const std::vector<uint8_t>& key,
-                                            absl::string_view string) {
-  std::vector<uint8_t> mac(EVP_MAX_MD_SIZE);
-  HMAC_CTX ctx;
-  RELEASE_ASSERT(key.size() < std::numeric_limits<int>::max(), "HMAC key is too long");
-  HMAC_CTX_init(&ctx);
-  auto rc = HMAC_Init_ex(&ctx, key.data(), static_cast<int>(key.size()), EVP_sha256(), nullptr);
-  RELEASE_ASSERT(rc == 1, "Failed to init HMAC context");
-  rc = HMAC_Update(&ctx, reinterpret_cast<const uint8_t*>(string.data()), string.size());
-  RELEASE_ASSERT(rc == 1, "Failed to update HMAC");
-  unsigned int len;
-  rc = HMAC_Final(&ctx, mac.data(), &len);
-  RELEASE_ASSERT(rc == 1, "Failed to finalize HMAC");
-  RELEASE_ASSERT(len <= EVP_MAX_MD_SIZE, "HMAC length too large");
-  HMAC_CTX_cleanup(&ctx);
-  mac.resize(len);
-  return mac;
 }
 
 } // namespace Ssl

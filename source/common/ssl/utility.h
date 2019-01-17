@@ -3,8 +3,6 @@
 #include <string>
 #include <vector>
 
-#include "envoy/buffer/buffer.h"
-
 #include "common/common/utility.h"
 
 #include "openssl/ssl.h"
@@ -57,21 +55,6 @@ SystemTime getValidFrom(const X509& cert);
  * @return time after which the certificate expires.
  */
 SystemTime getExpirationTime(const X509& cert);
-
-/**
- * Computes the SHA-256 digest of a buffer.
- * @param buffer the buffer.
- * @return a vector of bytes for the computed digest.
- */
-std::vector<uint8_t> getSha256Digest(const Buffer::Instance& buffer);
-
-/**
- * Computes the SHA-256 HMAC for a given key and data.
- * @param key the HMAC function key.
- * @param string string data for the HMAC function.
- * @return a vector of bytes for the computed HMAC.
- */
-std::vector<uint8_t> getSha256Hmac(const std::vector<uint8_t>& key, absl::string_view string);
 
 } // namespace Utility
 } // namespace Ssl

@@ -43,7 +43,7 @@ typedef ConstSingleton<SignatureConstantValues> SignatureConstants;
  * Implementation of the Signature V4 signing process.
  * See https://docs.aws.amazon.com/general/latest/gr/signature-version-4.html
  */
-class SignerImpl : public Signer, public Logger::Loggable<Logger::Id::aws> {
+class SignerImpl : public Signer, public Logger::Loggable<Logger::Id::http> {
 public:
   SignerImpl(absl::string_view service_name, absl::string_view region,
              const CredentialsProviderSharedPtr& credentials_provider, TimeSource& time_source)
@@ -51,27 +51,10 @@ public:
         time_source_(time_source), long_date_formatter_(SignatureConstants::get().LongDateFormat),
         short_date_formatter_(SignatureConstants::get().ShortDateFormat) {}
 
-  void sign(Http::Message& message) override;
+  void sign(Http::Message& message, bool sign_body = false) override;
 
 private:
-  friend class SignerImplTest;
-
-  const std::string service_name_;
-  const std::string region_;
-  CredentialsProviderSharedPtr credentials_provider_;
-  TimeSource& time_source_;
-  DateFormatter long_date_formatter_;
-  DateFormatter short_date_formatter_;
-
-  std::string createContentHash(Http::Message& message) const;
-
-  std::string createCanonicalRequest(Http::Message& message,
-                                     const std::map<std::string, std::string>& canonical_headers,
-                                     absl::string_view signing_headers,
-                                     absl::string_view content_hash) const;
-
-  std::string
-  createSigningHeaders(const std::map<std::string, std::string>& canonical_headers) const;
+  std::string createContentHash(Http::Message& message, bool sign_body) const;
 
   std::string createCredentialScope(absl::string_view short_date) const;
 
@@ -83,8 +66,15 @@ private:
 
   std::string createAuthorizationHeader(absl::string_view access_key_id,
                                         absl::string_view credential_scope,
-                                        absl::string_view signing_headers,
+                                        const std::map<std::string, std::string>& canonical_headers,
                                         absl::string_view signature) const;
+
+  const std::string service_name_;
+  const std::string region_;
+  CredentialsProviderSharedPtr credentials_provider_;
+  TimeSource& time_source_;
+  DateFormatter long_date_formatter_;
+  DateFormatter short_date_formatter_;
 };
 
 } // namespace Aws

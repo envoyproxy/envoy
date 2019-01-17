@@ -22,7 +22,6 @@ namespace Logger {
 // clang-format off
 #define ALL_LOGGER_IDS(FUNCTION) \
   FUNCTION(admin)                \
-  FUNCTION(aws)                  \
   FUNCTION(assert)               \
   FUNCTION(backtrace)            \
   FUNCTION(client)               \
