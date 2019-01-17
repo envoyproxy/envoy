@@ -5,8 +5,8 @@ set -e
 # Setup basic requirements and install them.
 apt-get update
 export DEBIAN_FRONTEND=noninteractive
-apt-get install -y wget software-properties-common make cmake git python python-pip unzip \
-  bc libtool ninja-build automake zip time golang g++ gdb strace wireshark tshark tcpdump
+apt-get install -y wget software-properties-common make cmake git python python-pip python3 python3-pip \
+  unzip bc libtool ninja-build automake zip time golang g++ gdb strace wireshark tshark tcpdump
 # clang 7.
 wget -O - http://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add -
 apt-add-repository "deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-7 main"
@@ -27,7 +27,7 @@ chmod 750 /usr/sbin/tcpdump
 setcap cap_net_raw,cap_net_admin=eip /usr/sbin/tcpdump
 
 # virtualenv
-pip install virtualenv
+pip3 install virtualenv
 
 EXPECTED_CXX_VERSION="g++ (Ubuntu 5.4.0-6ubuntu1~16.04.11) 5.4.0 20160609" ./build_container_common.sh
 
