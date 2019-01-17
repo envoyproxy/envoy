@@ -65,7 +65,8 @@ interface: org.apache.dubbo.demo.DemoService
 routes:
   - match:
       method:
-        name: "*"
+        name:
+          regex: "(.*?)"
     route:
         cluster: user_service_dubbo_server
 )EOF";
@@ -108,7 +109,8 @@ group: test
 routes:
   - match:
       method:
-        name: "*"
+        name:
+          regex: "(.*?)"
     route:
         cluster: user_service_dubbo_server
 )EOF";
@@ -138,7 +140,8 @@ version: 1.0.0
 routes:
   - match:
       method:
-        name: "*"
+        name:
+          regex: "(.*?)"
     route:
         cluster: user_service_dubbo_server
 )EOF";
@@ -173,7 +176,8 @@ group: HSF
 routes:
   - match:
       method:
-        name: "*"
+        name:
+          regex: "(.*?)"
     route:
         cluster: user_service_dubbo_server
 )EOF";
@@ -198,14 +202,15 @@ routes:
   }
 }
 
-TEST(RouteMatcherTest, RouteByMethod) {
+TEST(RouteMatcherTest, RouteByMethodWithExactMatch) {
   const std::string yaml = R"EOF(
 name: local_route
 interface: org.apache.dubbo.demo.DemoService
 routes:
   - match:
       method:
-        name: add
+        name:
+          exact: "add"
     route:
         cluster: user_service_dubbo_server
 )EOF";
@@ -225,14 +230,15 @@ routes:
   EXPECT_EQ("user_service_dubbo_server", matcher.route(metadata, 0)->routeEntry()->clusterName());
 }
 
-TEST(RouteMatcherTest, RouteByMethodWithWildcard) {
+TEST(RouteMatcherTest, RouteByMethodWithSuffixMatch) {
   const std::string yaml = R"EOF(
 name: local_route
 interface: org.apache.dubbo.demo.DemoService
 routes:
   - match:
       method:
-        name: add*test
+        name:
+          suffix: "test"
     route:
         cluster: user_service_dubbo_server
 )EOF";
@@ -252,14 +258,15 @@ routes:
   EXPECT_EQ("user_service_dubbo_server", matcher.route(metadata, 0)->routeEntry()->clusterName());
 }
 
-TEST(RouteMatcherTest, RouteByMethodWithMultiWildcard) {
+TEST(RouteMatcherTest, RouteByMethodWithPrefixMatch) {
   const std::string yaml = R"EOF(
 name: local_route
 interface: org.apache.dubbo.demo.DemoService
 routes:
   - match:
       method:
-        name: "*d?test"
+        name:
+          prefix: "test"
     route:
         cluster: user_service_dubbo_server
 )EOF";
@@ -278,8 +285,39 @@ routes:
   metadata.setMethodName("test12d2test");
   EXPECT_EQ("user_service_dubbo_server", matcher.route(metadata, 0)->routeEntry()->clusterName());
 
-  metadata.setMethodName("datest");
+  metadata.setMethodName("testme");
   EXPECT_EQ("user_service_dubbo_server", matcher.route(metadata, 0)->routeEntry()->clusterName());
+}
+
+TEST(RouteMatcherTest, RouteByMethodWithRegexMatch) {
+  const std::string yaml = R"EOF(
+name: local_route
+interface: org.apache.dubbo.demo.DemoService
+routes:
+  - match:
+      method:
+        name:
+          regex: "\\d{3}test"
+    route:
+        cluster: user_service_dubbo_server
+)EOF";
+
+  envoy::config::filter::network::dubbo_proxy::v2alpha1::RouteConfiguration config =
+      parseRouteConfigurationFromV2Yaml(yaml);
+  MessageMetadata metadata;
+  metadata.setServiceName("org.apache.dubbo.demo.DemoService");
+
+  RouteMatcher matcher(config);
+  EXPECT_EQ(nullptr, matcher.route(metadata, 0));
+
+  metadata.setMethodName("12test");
+  EXPECT_EQ(nullptr, matcher.route(metadata, 0));
+
+  metadata.setMethodName("456test");
+  EXPECT_EQ("user_service_dubbo_server", matcher.route(metadata, 0)->routeEntry()->clusterName());
+
+  metadata.setMethodName("4567test");
+  EXPECT_EQ(nullptr, matcher.route(metadata, 0));
 }
 
 TEST(RouteMatcherTest, RouteByParameterWithRangeMatch) {
@@ -289,7 +327,8 @@ interface: org.apache.dubbo.demo.DemoService
 routes:
   - match:
       method:
-        name: add
+        name:
+          exact: "add"
         params_match:
           0:
             range_match:
@@ -317,7 +356,8 @@ interface: org.apache.dubbo.demo.DemoService
 routes:
   - match:
       method:
-        name: add
+        name:
+          exact: "add"
         params_match:
           1:
             exact_match: "user_id:94562"
@@ -343,7 +383,8 @@ interface: org.apache.dubbo.demo.DemoService
 routes:
   - match:
       method:
-        name: add
+        name:
+          exact: "add"
       headers:
       - name: custom
         exact_match: "123"
@@ -386,7 +427,8 @@ route_config:
     routes:
       - match:
           method:
-            name: add
+            name:
+              exact: "add"
             params_match:
               1:
                 exact_match: "user_id"
@@ -397,7 +439,8 @@ route_config:
     routes:
       - match:
           method:
-            name: format
+            name:
+              exact: "format"
         route:
             cluster: format_service
 )EOF";

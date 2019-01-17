@@ -25,6 +25,7 @@ envoy_cc_library(
         ":router_interface",
         "//include/envoy/router:router_interface",
         "//source/common/common:logger_lib",
+        "//source/common/common:matchers_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/network/dubbo_proxy:metadata_lib",

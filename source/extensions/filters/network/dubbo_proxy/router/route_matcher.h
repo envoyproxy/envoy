@@ -8,6 +8,7 @@
 #include "envoy/config/filter/network/dubbo_proxy/v2alpha1/route.pb.h"
 
 #include "common/common/logger.h"
+#include "common/common/matchers.h"
 #include "common/http/header_utility.h"
 #include "common/protobuf/protobuf.h"
 
@@ -108,7 +109,6 @@ public:
 private:
   bool matchParameter(const std::string& request_data, const ParameterData& config_data) const;
 
-  const std::string method_name_;
   std::vector<ParameterData> parameter_data_list_;
 };
 
@@ -117,15 +117,12 @@ public:
   MethodRouteEntryImpl(const envoy::config::filter::network::dubbo_proxy::v2alpha1::Route& route);
   ~MethodRouteEntryImpl() override;
 
-  const std::string& methodName() const { return method_name_; }
-
   // RoutEntryImplBase
   RouteConstSharedPtr matches(const MessageMetadata& metadata,
                               uint64_t random_value) const override;
 
 private:
-  const std::string method_name_;
-  bool is_contain_wildcard_;
+  const Matchers::StringMatcher method_name_;
   absl::optional<std::shared_ptr<ParameterRouteEntryImpl>> parameter_route_;
 };
 

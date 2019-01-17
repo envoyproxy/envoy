@@ -12,5 +12,6 @@ api_proto_library(
         "//envoy/api/v2/core:base",
         "//envoy/api/v2/route",
         "//envoy/type:range",
+        "//envoy/type/matcher:string",
     ],
 )

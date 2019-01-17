@@ -57,7 +57,7 @@ RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(const RouteEntryI
 
 ParameterRouteEntryImpl::ParameterRouteEntryImpl(
     const envoy::config::filter::network::dubbo_proxy::v2alpha1::Route& route)
-    : RouteEntryImplBase(route), method_name_(route.match().method().name()) {
+    : RouteEntryImplBase(route) {
   for (auto& config : route.match().method().params_match()) {
     parameter_data_list_.emplace_back(config.first, config.second);
   }
@@ -128,12 +128,10 @@ ParameterRouteEntryImpl::ParameterData::ParameterData(uint32_t index,
 
 MethodRouteEntryImpl::MethodRouteEntryImpl(
     const envoy::config::filter::network::dubbo_proxy::v2alpha1::Route& route)
-    : RouteEntryImplBase(route), method_name_(route.match().method().name()),
-      is_contain_wildcard_(Utility::isContainWildcard(method_name_)) {
+    : RouteEntryImplBase(route), method_name_(route.match().method().name()) {
   if (route.match().method().params_match_size() != 0) {
     parameter_route_ = std::make_shared<ParameterRouteEntryImpl>(route);
   }
-  ENVOY_LOG(debug, "dubbo route matcher: method name {}", method_name_);
 }
 
 MethodRouteEntryImpl::~MethodRouteEntryImpl() {}
@@ -144,32 +142,16 @@ RouteConstSharedPtr MethodRouteEntryImpl::matches(const MessageMetadata& metadat
     ENVOY_LOG(error, "dubbo route matcher: headers not match");
     return nullptr;
   }
-  ENVOY_LOG(debug, "dubbo route matcher: method name match");
+
   if (!metadata.method_name().has_value()) {
     ENVOY_LOG(error, "dubbo route matcher: there is no method name in the metadata");
     return nullptr;
   }
 
-  if (method_name_ == "*") {
-    return clusterEntry(random_value);
-  }
-
-  if (is_contain_wildcard_) {
-    if (!Utility::wildcardMatch(metadata.method_name().value().c_str(), method_name_.c_str())) {
-      ENVOY_LOG(
-          debug,
-          "dubbo route matcher: method matching failed, origin method '{}', input method '{}'",
-          method_name_, metadata.method_name().value());
-      return nullptr;
-    }
-  } else {
-    if (metadata.method_name() != method_name_) {
-      ENVOY_LOG(
-          debug,
-          "dubbo route matcher: method matching failed, origin method '{}', input method '{}'",
-          method_name_, metadata.method_name().value());
-      return nullptr;
-    }
+  if (!method_name_.match(metadata.method_name().value())) {
+    ENVOY_LOG(debug, "dubbo route matcher: method matching failed, input method '{}'",
+              metadata.method_name().value());
+    return nullptr;
   }
 
   if (parameter_route_.has_value()) {
