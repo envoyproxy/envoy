@@ -79,7 +79,8 @@ protected:
 
   // Http::ConnPoolImplBase
   void checkForDrained() override;
-  void checkForIdle() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; /* TODO(klarose): implement */ }
+  void checkForIdle() override { /* TODO(klarose): implement */
+  }
 
   virtual CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) PURE;
   virtual uint32_t maxTotalStreams() PURE;
