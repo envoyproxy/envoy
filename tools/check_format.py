@@ -150,13 +150,20 @@ def fixJavaProtoOptions(file_path):
   package_name = None
   for line in fileinput.FileInput(file_path):
     if line.startswith("package "):
+      result = PROTO_PACKAGE_REGEX.search(line)
+      if result is None or len(result.groups()) != 1:
+        continue
+
       package_name = PROTO_PACKAGE_REGEX.search(line).group(1)
     if "option java_multiple_files = true;" in line:
       java_multiple_files = True
     if "option java_package = \"io.envoyproxy.envoy" in line:
       java_package_correct = True
     if java_multiple_files and java_package_correct:
-      return
+      return []
+
+  if package_name is None:
+    return ["Unable to find package name for proto file: %s" % file_path]
 
   to_add = ""
   if not java_package_correct:
@@ -168,6 +175,8 @@ def fixJavaProtoOptions(file_path):
     if line.startswith("package "):
       line = line.replace(line, line + to_add)
     sys.stdout.write(line)
+
+  return []
 
 
 def checkJavaProtoOptions(file_path):
@@ -411,7 +420,7 @@ def fixSourcePath(file_path):
       error_messages += fixHeaderOrder(file_path)
     error_messages += clangFormat(file_path)
   if file_path.endswith(PROTO_SUFFIX) and isApiFile(file_path):
-    fixJavaProtoOptions(file_path)
+    error_messages += fixJavaProtoOptions(file_path)
   return error_messages
 
 

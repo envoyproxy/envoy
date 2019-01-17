@@ -62,6 +62,8 @@ def getInputFile(filename):
 def fixFileHelper(filename):
   infile = os.path.join(src, filename)
   directory = os.path.dirname(filename)
+  if not directory == '' and not os.path.isdir(directory):
+    os.makedirs(directory)
 
   shutil.copyfile(infile, filename)
   command, status, stdout = runCheckFormat("fix", getInputFile(filename))
@@ -198,6 +200,10 @@ if __name__ == "__main__":
   errors += checkUnfixableError("elvis_operator.cc", "Don't use the '?:' operator")
   errors += checkUnfixableError("testing_test.cc",
                                 "Don't use 'using testing::Test;, elaborate the type instead")
+
+  errors += fixFileExpectingFailure(
+      "api/missing_package.proto",
+      "Unable to find package name for proto file: ./api/missing_package.proto")
 
   # The following files have errors that can be automatically fixed.
   errors += checkAndFixError("over_enthusiastic_spaces.cc",
