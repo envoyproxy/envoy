@@ -67,10 +67,15 @@ public:
                                     bool added_via_api) override;
   CdsApiPtr createCds(const envoy::api::v2::core::ConfigSource& cds_config,
                       ClusterManager& cm) override;
+<<<<<<< HEAD
   CdsApiPtr
   createIncrementalCds(const envoy::api::v2::core::ConfigSource& cds_config,
                        const absl::optional<envoy::api::v2::core::ConfigSource>& eds_config,
                        ClusterManager& cm) override;
+=======
+  CdsApiPtr createIncrementalCds(const envoy::api::v2::core::ConfigSource& cds_config,
+                                 ClusterManager& cm) override;
+>>>>>>> bring in final touches from CDS integration test PR
   Secret::SecretManager& secretManager() override { return secret_manager_; }
 
 protected:

@@ -50,8 +50,34 @@ static_resources:
       socket_address:
         address: 127.0.0.1
         port_value: 0
+  listeners:
+    name: http
+    address:
+      socket_address:
+        address: 127.0.0.1
+        port_value: 0
+    filter_chains:
+      filters:
+        name: envoy.http_connection_manager
+        config:
+          stat_prefix: config_test
+          http_filters:
+            name: envoy.router
+          codec_type: HTTP2
+          route_config:
+            name: route_config_0
+            validate_clusters: false
+            virtual_hosts:
+              name: integration
+              routes:
+              - route:
+                  cluster: cluster_0
+                match:
+                  prefix: "/"
+              domains: "*"
 )EOF";
 const char ClusterName[] = "cluster_0";
+const int UpstreamIndex = 1;
 
 class CdsIntegrationTest : public IncrementalXdsIntegrationTestBase,
                            public Grpc::GrpcClientIntegrationParamTest {
@@ -85,39 +111,7 @@ public:
       http2_protocol_options: {{}}
     )EOF",
                     name, name, Network::Test::getLoopbackAddressString(ipVersion()),
-                    // fake_upstreams_[0] is the CDS server, [1] is the regular upstream.
-                    fake_upstreams_[1]->localAddress()->ip()->port()));
-  }
-
-  // TODO(fredlas) Move to test/config/utility.cc once there are other xDS tests that use gRPC.
-  envoy::api::v2::Listener buildListener(const std::string& name, const std::string& cluster) {
-    return TestUtility::parseYaml<envoy::api::v2::Listener>(fmt::format(
-        R"EOF(
-      name: {}
-      address:
-        socket_address:
-          address: {}
-          port_value: 0
-      filter_chains:
-        filters:
-          name: envoy.http_connection_manager
-          config:
-            stat_prefix: config_test
-            http_filters:
-              name: envoy.router
-            codec_type: HTTP2
-            route_config:
-              virtual_hosts:
-                name: integration
-                routes:
-                - route:
-                    cluster: {}
-                  match:
-                    prefix: "/"
-                domains: "*"
-              name: route_config_0
-    )EOF",
-        name, Network::Test::getLoopbackAddressString(ipVersion()), cluster));
+                    fake_upstreams_[UpstreamIndex]->localAddress()->ip()->port()));
   }
 
   // Overridden to insert this stuff into the initialize() at the very beginning of
@@ -139,6 +133,7 @@ public:
     // 4) Bringing up the server usually entails waiting to ensure that any listeners specified in
     //    the bootstrap config have come up, and registering them in a port map (see lookupPort()).
     //    However, this test needs to defer all of that to later.
+    defer_listener_finalization_ = true;
     IncrementalXdsIntegrationTestBase::initialize();
 
     // Create the regular (i.e. not an xDS server) upstream. We create it manually here after
@@ -146,7 +141,7 @@ public:
     // cluster in the bootstrap config - which we don't want since we're testing dynamic CDS!
     fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_,
                                                   timeSystem(), enable_half_close_));
-    fake_upstreams_[1]->set_allow_unexpected_disconnects(false);
+    fake_upstreams_[UpstreamIndex]->set_allow_unexpected_disconnects(false);
 
     // Now that the upstream has been created, process Envoy's request to discover it.
     // (First, we have to let Envoy establish its connection to the CDS server.)
@@ -165,21 +160,10 @@ public:
     // 2 because the statically specified CDS server itself counts as a cluster.
     test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);
 
-    // Manually create a listener, add it to the listener manager, register its port in the
-    // test framework's downstream listener port map, and finally wait for it to start listening.
-    //
-    // Why do all of this manually? Because it's unworkable to specify this listener statically in
-    // the bootstrap config. Its route is meant to point to the regular data upstream. To specificy
-    // that route statically, the regular upstream (cluster_0) would have to be specified
-    // statically - but the whole point of this test is to have Envoy dynamically discover it!
-    test_server_->server().dispatcher().post([this]() -> void {
-      EXPECT_TRUE(test_server_->server().listenerManager().addOrUpdateListener(
-          buildListener("http", ClusterName), "", true));
-    });
-    test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
-
-    registerTestServerPorts({"http"});
+    // Wait for our statically specified listener to become ready, and register its port in the
+    // test framework's downstream listener port map.
     test_server_->waitUntilListenersReady();
+    registerTestServerPorts({"http"});
   }
 };
 
@@ -194,7 +178,11 @@ INSTANTIATE_TEST_CASE_P(IpVersionsClientType, CdsIntegrationTest, GRPC_CLIENT_IN
 // 7) We send Envoy a request, which we verify is properly proxied to and served by that cluster.
 TEST_P(CdsIntegrationTest, CdsClusterUpDownUp) {
   // Calls our initialize(), which includes establishing a listener, route, and cluster.
+<<<<<<< HEAD
   testRouterHeaderOnlyRequestAndResponse(true, nullptr, 1);
+=======
+  testRouterHeaderOnlyRequestAndResponse(nullptr, UpstreamIndex);
+>>>>>>> bring in final touches from CDS integration test PR
 
   // Tell Envoy that cluster_0 is gone.
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, {}, {}));
@@ -211,7 +199,6 @@ TEST_P(CdsIntegrationTest, CdsClusterUpDownUp) {
 
   cleanupUpstreamAndDownstream();
   codec_client_->waitForDisconnect();
-  fake_upstream_connection_ = nullptr;
 
   // Tell Envoy that cluster_0 is back.
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, {}, {}));
@@ -222,10 +209,13 @@ TEST_P(CdsIntegrationTest, CdsClusterUpDownUp) {
   test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);
 
   // Does *not* call our initialize().
+<<<<<<< HEAD
   testRouterHeaderOnlyRequestAndResponse(true, nullptr, 1);
+=======
+  testRouterHeaderOnlyRequestAndResponse(nullptr, UpstreamIndex);
+>>>>>>> bring in final touches from CDS integration test PR
 
   cleanupUpstreamAndDownstream();
-  fake_upstream_connection_ = nullptr;
 }
 
 } // namespace

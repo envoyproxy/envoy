@@ -21,11 +21,17 @@ class CdsIncremental : public CdsApi,
                        Config::IncrementalSubscriptionCallbacks<envoy::api::v2::Cluster>,
                        Logger::Loggable<Logger::Id::upstream> {
 public:
+<<<<<<< HEAD
   static CdsApiPtr create(const envoy::api::v2::core::ConfigSource& cds_config,
                           const absl::optional<envoy::api::v2::core::ConfigSource>&,
                           ClusterManager& cm, Event::Dispatcher& dispatcher,
                           Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
                           Stats::Scope& scope);
+=======
+  static CdsApiPtr create(const envoy::api::v2::core::ConfigSource& cds_config, ClusterManager& cm,
+                          Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
+                          const LocalInfo::LocalInfo& local_info, Stats::Scope& scope);
+>>>>>>> bring in final touches from CDS integration test PR
 
   // Upstream::CdsApi
   void initialize() override { subscription_->start({}, *this); }

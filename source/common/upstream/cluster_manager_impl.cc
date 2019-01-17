@@ -1207,10 +1207,16 @@ CdsApiPtr ProdClusterManagerFactory::createCds(const envoy::api::v2::core::Confi
 }
 
 CdsApiPtr ProdClusterManagerFactory::createIncrementalCds(
+<<<<<<< HEAD
     const envoy::api::v2::core::ConfigSource& cds_config,
     const absl::optional<envoy::api::v2::core::ConfigSource>& eds_config, ClusterManager& cm) {
   return CdsIncremental::create(cds_config, eds_config, cm, main_thread_dispatcher_, random_,
                                 local_info_, stats_);
+=======
+    const envoy::api::v2::core::ConfigSource& cds_config, ClusterManager& cm) {
+  return CdsIncremental::create(cds_config, cm, main_thread_dispatcher_, random_, local_info_,
+                                stats_);
+>>>>>>> bring in final touches from CDS integration test PR
 }
 
 } // namespace Upstream
