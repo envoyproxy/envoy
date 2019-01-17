@@ -9,7 +9,6 @@
 #include "envoy/http/header_map.h"
 
 #include "common/common/non_copyable.h"
-#include "common/common/utility.h"
 #include "common/http/headers.h"
 
 namespace Envoy {
@@ -116,9 +115,7 @@ protected:
    * This is the static lookup table that is used to determine whether a header is one of the O(1)
    * headers. This uses a trie for lookup time at most equal to the size of the incoming string.
    */
-  struct StaticLookupTable : public TrieLookupTable<EntryCb> {
-    StaticLookupTable();
-  };
+  struct StaticLookupTable; // Defined in header_map_impl.cc.
 
   struct AllInlineHeaders {
     ALL_INLINE_HEADERS(DEFINE_INLINE_HEADER_STRUCT)

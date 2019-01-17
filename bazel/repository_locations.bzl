@@ -79,9 +79,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/nanopb/nanopb/archive/0.3.9.2.tar.gz"],
     ),
     io_opentracing_cpp = dict(
-        sha256 = "4455ca507936bc4b658ded10a90d8ebbbd61c58f06207be565a4ffdc885687b5",
-        strip_prefix = "opentracing-cpp-1.5.0",
-        urls = ["https://github.com/opentracing/opentracing-cpp/archive/v1.5.0.tar.gz"],
+        sha256 = "015c4187f7a6426a2b5196f0ccd982aa87f010cf61f507ae3ce5c90523f92301",
+        strip_prefix = "opentracing-cpp-1.5.1",
+        urls = ["https://github.com/opentracing/opentracing-cpp/archive/v1.5.1.tar.gz"],
     ),
     com_lightstep_tracer_cpp = dict(
         sha256 = "defbf471facfebde6523ca1177529b63784893662d4ef2c60db074be8aef0634",

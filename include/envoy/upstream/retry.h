@@ -25,8 +25,8 @@ public:
    * @return a reference to the PriorityLoad to use. Return original_priority if no changes should
    * be made.
    */
-  virtual const PriorityLoad& determinePriorityLoad(const PrioritySet& priority_set,
-                                                    const PriorityLoad& original_priority) PURE;
+  virtual const HealthyLoad& determinePriorityLoad(const PrioritySet& priority_set,
+                                                   const HealthyLoad& original_priority) PURE;
 
   /**
    * Called after a host has been attempted but before host selection for the next attempt has
