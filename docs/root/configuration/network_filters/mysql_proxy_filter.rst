@@ -9,6 +9,12 @@ The decoded info is emitted as dynamic metadata that can be combined with
 access log filters to get detailed information on tables accessed as well
 as operations performed on each table.
 
+.. attention::
+
+   The mysql_proxy filter is experimental and is currently under active
+   development. Capabilities will be expanded over time and the
+   configuration structures are likely to change.
+
 .. _config_network_filters_mysql_proxy_config:
 
 Configuration
@@ -18,6 +24,7 @@ The MySQL proxy filter should be chained with the TCP proxy filter as shown
 in the configuration snippet below:
 
 .. code-block:: yaml
+
   filter_chains:
   - filters:
     - name: envoy.filters.network.mysql_proxy
@@ -73,10 +80,11 @@ RBAC Enforcement on Table Accesses
 The dynamic metadata emitted by the MySQL filter can be used in conjunction
 with the RBAC filter to control accesses to individual tables in a
 database. The following configuration snippet shows an example RBAC filter
-configuration that denies SQL queries with _update_ statements to the _catalog_
-table in the _productdb_ database.
+configuration that denies SQL queries with _update_ statements to the
+_catalog_ table in the _productdb_ database.
 
 .. code-block:: yaml
+
   filter_chains:
   - filters:
     - name: envoy.filters.network.mysql_proxy
@@ -105,4 +113,3 @@ table in the _productdb_ database.
       config:
         stat_prefix: tcp
         cluster: mysql
-
