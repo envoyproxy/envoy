@@ -173,24 +173,11 @@ def fixJavaProtoOptions(file_path):
 
 
 def checkJavaProtoOptions(file_path):
-  java_multiple_files = False
-  java_package_correct = False
   for line in fileinput.FileInput(file_path):
-    if "option java_multiple_files = true;" in line:
-      java_multiple_files = True
     if "option java_package = \"io.envoyproxy.envoy" in line:
-      java_package_correct = True
-    if java_multiple_files and java_package_correct:
       return []
 
-  error_messages = []
-  if not java_multiple_files:
-    error_messages.append(
-        "Java proto option 'java_multiple_files' not set correctly for file: %s" % file_path)
-  if not java_package_correct:
-    error_messages.append(
-        "Java proto option 'java_package' not set correctly for file: %s" % file_path)
-  return error_messages
+  return ["Java proto option 'java_package' not set correctly for file: %s" % file_path]
 
 
 # To avoid breaking the Lyft import, we just check for path inclusion here.
