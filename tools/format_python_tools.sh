@@ -18,5 +18,5 @@ echo "Running Python format check..."
 python format_python_tools.py $1
 
 echo "Running Python flake8 check..."
-pip3 install --upgrade flake8
+python3 -m pip install --upgrade flake8
 python3 -m flake8 . --count --select=E901,E999,F821,F822,F823 --show-source --statistics
