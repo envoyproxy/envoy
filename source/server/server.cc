@@ -131,6 +131,7 @@ void InstanceImpl::failHealthcheck(bool fail) {
 
 void InstanceUtil::flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks,
                                        Stats::Source& source) {
+  ENVOY_LOG(debug, "flushing metrics");
   for (const auto& sink : sinks) {
     sink->flush(source);
   }
