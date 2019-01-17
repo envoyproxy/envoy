@@ -39,13 +39,13 @@ struct SslSocketFactoryStats {
 enum class InitialState { Client, Server };
 
 class SslSocket : public Network::TransportSocket,
-                  public Envoy::Ssl::Connection,
+                  public Envoy::Tls::Connection,
                   protected Logger::Loggable<Logger::Id::connection> {
 public:
-  SslSocket(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
+  SslSocket(Envoy::Tls::ContextSharedPtr ctx, InitialState state,
             Network::TransportSocketOptionsSharedPtr transport_socket_options);
 
-  // Ssl::Connection
+  // Tls::Connection
   bool peerCertificatePresented() const override;
   std::string uriSanLocalCertificate() const override;
   const std::string& sha256PeerCertificateDigest() const override;
@@ -65,7 +65,7 @@ public:
   Network::IoResult doRead(Buffer::Instance& read_buffer) override;
   Network::IoResult doWrite(Buffer::Instance& write_buffer, bool end_stream) override;
   void onConnected() override;
-  const Ssl::Connection* ssl() const override { return this; }
+  const Envoy::Tls::Connection* ssl() const override { return this; }
 
   SSL* rawSslForTest() const { return ssl_.get(); }
 
@@ -88,8 +88,8 @@ class ClientSslSocketFactory : public Network::TransportSocketFactory,
                                public Secret::SecretCallbacks,
                                Logger::Loggable<Logger::Id::config> {
 public:
-  ClientSslSocketFactory(Envoy::Ssl::ClientContextConfigPtr config,
-                         Envoy::Ssl::ContextManager& manager, Stats::Scope& stats_scope);
+  ClientSslSocketFactory(Envoy::Tls::ClientContextConfigPtr config,
+                         Envoy::Tls::ContextManager& manager, Stats::Scope& stats_scope);
 
   Network::TransportSocketPtr
   createTransportSocket(Network::TransportSocketOptionsSharedPtr options) const override;
@@ -99,20 +99,20 @@ public:
   void onAddOrUpdateSecret() override;
 
 private:
-  Envoy::Ssl::ContextManager& manager_;
+  Envoy::Tls::ContextManager& manager_;
   Stats::Scope& stats_scope_;
   SslSocketFactoryStats stats_;
-  Envoy::Ssl::ClientContextConfigPtr config_;
+  Envoy::Tls::ClientContextConfigPtr config_;
   mutable absl::Mutex ssl_ctx_mu_;
-  Envoy::Ssl::ClientContextSharedPtr ssl_ctx_ GUARDED_BY(ssl_ctx_mu_);
+  Envoy::Tls::ClientContextSharedPtr ssl_ctx_ GUARDED_BY(ssl_ctx_mu_);
 };
 
 class ServerSslSocketFactory : public Network::TransportSocketFactory,
                                public Secret::SecretCallbacks,
                                Logger::Loggable<Logger::Id::config> {
 public:
-  ServerSslSocketFactory(Envoy::Ssl::ServerContextConfigPtr config,
-                         Envoy::Ssl::ContextManager& manager, Stats::Scope& stats_scope,
+  ServerSslSocketFactory(Envoy::Tls::ServerContextConfigPtr config,
+                         Envoy::Tls::ContextManager& manager, Stats::Scope& stats_scope,
                          const std::vector<std::string>& server_names);
 
   Network::TransportSocketPtr
@@ -123,13 +123,13 @@ public:
   void onAddOrUpdateSecret() override;
 
 private:
-  Ssl::ContextManager& manager_;
+  Envoy::Tls::ContextManager& manager_;
   Stats::Scope& stats_scope_;
   SslSocketFactoryStats stats_;
-  Envoy::Ssl::ServerContextConfigPtr config_;
+  Envoy::Tls::ServerContextConfigPtr config_;
   const std::vector<std::string> server_names_;
   mutable absl::Mutex ssl_ctx_mu_;
-  Envoy::Ssl::ServerContextSharedPtr ssl_ctx_ GUARDED_BY(ssl_ctx_mu_);
+  Envoy::Tls::ServerContextSharedPtr ssl_ctx_ GUARDED_BY(ssl_ctx_mu_);
 };
 
 } // namespace Tls

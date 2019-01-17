@@ -16,8 +16,8 @@
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
-#include "test/mocks/ssl/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
+#include "test/mocks/tls/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/utility.h"
 
@@ -192,7 +192,7 @@ public:
   }
 
   Stats::IsolatedStoreImpl stats_store_;
-  Ssl::MockContextManager ssl_context_manager_;
+  Tls::MockContextManager ssl_context_manager_;
   std::shared_ptr<NiceMock<Network::MockDnsResolver>> dns_resolver_{
       new NiceMock<Network::MockDnsResolver>};
   Network::MockActiveDnsQuery active_dns_query_;

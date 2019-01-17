@@ -12,7 +12,7 @@ namespace Configuration {
  */
 class TransportSocketFactoryContextImpl : public TransportSocketFactoryContext {
 public:
-  TransportSocketFactoryContextImpl(Ssl::ContextManager& context_manager, Stats::Scope& stats_scope,
+  TransportSocketFactoryContextImpl(Tls::ContextManager& context_manager, Stats::Scope& stats_scope,
                                     Upstream::ClusterManager& cm,
                                     const LocalInfo::LocalInfo& local_info,
                                     Event::Dispatcher& dispatcher,
@@ -20,7 +20,7 @@ public:
       : context_manager_(context_manager), stats_scope_(stats_scope), cluster_manager_(cm),
         local_info_(local_info), dispatcher_(dispatcher), random_(random), stats_(stats) {}
 
-  Ssl::ContextManager& sslContextManager() override { return context_manager_; }
+  Tls::ContextManager& sslContextManager() override { return context_manager_; }
 
   Stats::Scope& statsScope() const override { return stats_scope_; }
 
@@ -43,7 +43,7 @@ public:
   Init::Manager* initManager() override { return init_manager_; }
 
 private:
-  Ssl::ContextManager& context_manager_;
+  Tls::ContextManager& context_manager_;
   Stats::Scope& stats_scope_;
   Upstream::ClusterManager& cluster_manager_;
   const LocalInfo::LocalInfo& local_info_;

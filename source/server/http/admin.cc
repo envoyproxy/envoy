@@ -845,7 +845,7 @@ Http::Code AdminImpl::handlerCerts(absl::string_view, Http::HeaderMap& response_
   response_headers.insertContentType().value().setReference(
       Http::Headers::get().ContentTypeValues.Json);
   envoy::admin::v2alpha::Certificates certificates;
-  server_.sslContextManager().iterateContexts([&](const Ssl::Context& context) -> void {
+  server_.sslContextManager().iterateContexts([&](const Tls::Context& context) -> void {
     envoy::admin::v2alpha::Certificate& certificate = *certificates.add_certificates();
     if (context.getCaCertInformation() != nullptr) {
       envoy::admin::v2alpha::CertificateDetails* ca_certificate = certificate.add_ca_cert();

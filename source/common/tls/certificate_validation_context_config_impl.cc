@@ -1,4 +1,4 @@
-#include "common/ssl/certificate_validation_context_config_impl.h"
+#include "common/tls/certificate_validation_context_config_impl.h"
 
 #include "envoy/common/exception.h"
 
@@ -7,7 +7,7 @@
 #include "common/config/datasource.h"
 
 namespace Envoy {
-namespace Ssl {
+namespace Tls {
 
 static const std::string INLINE_STRING = "<inline>";
 
@@ -43,5 +43,5 @@ CertificateValidationContextConfigImpl::CertificateValidationContextConfigImpl(
   }
 }
 
-} // namespace Ssl
+} // namespace Tls
 } // namespace Envoy

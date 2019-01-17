@@ -22,7 +22,7 @@ envoy_cc_mock(
         "//include/envoy/network:connection_interface",
         "//include/envoy/network:dns_interface",
         "//include/envoy/network:listener_interface",
-        "//include/envoy/ssl:context_interface",
+        "//include/envoy/tls:context_interface",
         "//test/mocks/buffer:buffer_mocks",
         "//test/test_common:test_time_lib",
     ],

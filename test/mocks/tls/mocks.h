@@ -3,18 +3,18 @@
 #include <functional>
 #include <string>
 
-#include "envoy/ssl/connection.h"
-#include "envoy/ssl/context.h"
-#include "envoy/ssl/context_config.h"
-#include "envoy/ssl/context_manager.h"
 #include "envoy/stats/scope.h"
+#include "envoy/tls/connection.h"
+#include "envoy/tls/context.h"
+#include "envoy/tls/context_config.h"
+#include "envoy/tls/context_manager.h"
 
 #include "test/mocks/secret/mocks.h"
 
 #include "gmock/gmock.h"
 
 namespace Envoy {
-namespace Ssl {
+namespace Tls {
 
 class MockContextManager : public ContextManager {
 public:
@@ -57,5 +57,5 @@ public:
   MOCK_CONST_METHOD0(getCertChainInformation, std::vector<CertificateDetailsPtr>());
 };
 
-} // namespace Ssl
+} // namespace Tls
 } // namespace Envoy

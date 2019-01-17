@@ -3,7 +3,7 @@
 #include "extensions/filters/common/rbac/engine_impl.h"
 
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/ssl/mocks.h"
+#include "test/mocks/tls/mocks.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

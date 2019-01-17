@@ -15,7 +15,7 @@
 #include "envoy/network/dns.h"
 #include "envoy/network/listener.h"
 #include "envoy/network/transport_socket.h"
-#include "envoy/ssl/context.h"
+#include "envoy/tls/context.h"
 
 #include "test/mocks/buffer/mocks.h"
 #include "test/test_common/test_time.h"

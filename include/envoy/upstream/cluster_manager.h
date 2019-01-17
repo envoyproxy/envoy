@@ -17,9 +17,9 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/secret/secret_manager.h"
 #include "envoy/server/admin.h"
-#include "envoy/ssl/context_manager.h"
 #include "envoy/stats/store.h"
 #include "envoy/tcp/conn_pool.h"
+#include "envoy/tls/context_manager.h"
 #include "envoy/upstream/health_checker.h"
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/thread_local_cluster.h"
@@ -319,7 +319,7 @@ public:
   virtual Upstream::ClusterInfoConstSharedPtr
   createClusterInfo(Runtime::Loader& runtime, const envoy::api::v2::Cluster& cluster,
                     const envoy::api::v2::core::BindConfig& bind_config, Stats::Store& stats,
-                    Ssl::ContextManager& ssl_context_manager, bool added_via_api,
+                    Tls::ContextManager& ssl_context_manager, bool added_via_api,
                     ClusterManager& cm, const LocalInfo::LocalInfo& local_info,
                     Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random) PURE;
 };

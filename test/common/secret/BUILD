@@ -17,8 +17,8 @@ envoy_cc_test(
     deps = [
         "//source/common/secret:sds_api_lib",
         "//source/common/secret:secret_manager_impl_lib",
-        "//source/common/ssl:certificate_validation_context_config_impl_lib",
-        "//source/common/ssl:tls_certificate_config_impl_lib",
+        "//source/common/tls:certificate_validation_context_config_impl_lib",
+        "//source/common/tls:tls_certificate_config_impl_lib",
         "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:registry_lib",
@@ -34,8 +34,8 @@ envoy_cc_test(
     ],
     deps = [
         "//source/common/secret:sds_api_lib",
-        "//source/common/ssl:certificate_validation_context_config_impl_lib",
-        "//source/common/ssl:tls_certificate_config_impl_lib",
+        "//source/common/tls:certificate_validation_context_config_impl_lib",
+        "//source/common/tls:tls_certificate_config_impl_lib",
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/init:init_mocks",
         "//test/mocks/secret:secret_mocks",

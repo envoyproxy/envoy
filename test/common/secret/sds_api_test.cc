@@ -5,8 +5,8 @@
 #include "envoy/service/discovery/v2/sds.pb.h"
 
 #include "common/secret/sds_api.h"
-#include "common/ssl/certificate_validation_context_config_impl.h"
-#include "common/ssl/tls_certificate_config_impl.h"
+#include "common/tls/certificate_validation_context_config_impl.h"
+#include "common/tls/tls_certificate_config_impl.h"
 
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/init/mocks.h"
@@ -90,7 +90,7 @@ TEST_F(SdsApiTest, DynamicTlsCertificateUpdateSuccess) {
   EXPECT_CALL(secret_callback, onAddOrUpdateSecret());
   sds_api.onConfigUpdate(secret_resources, "");
 
-  Ssl::TlsCertificateConfigImpl tls_config(*sds_api.secret());
+  Tls::TlsCertificateConfigImpl tls_config(*sds_api.secret());
   const std::string cert_pem =
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_cert.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(cert_pem)),
@@ -132,7 +132,7 @@ TEST_F(SdsApiTest, DynamicCertificateValidationContextUpdateSuccess) {
   EXPECT_CALL(secret_callback, onAddOrUpdateSecret());
   sds_api.onConfigUpdate(secret_resources, "");
 
-  Ssl::CertificateValidationContextConfigImpl cvc_config(*sds_api.secret());
+  Tls::CertificateValidationContextConfigImpl cvc_config(*sds_api.secret());
   const std::string ca_cert =
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(ca_cert)),
@@ -198,7 +198,7 @@ TEST_F(SdsApiTest, DefaultCertificateValidationContextTest) {
   default_cvc.add_verify_certificate_hash(default_verify_certificate_hash);
   envoy::api::v2::auth::CertificateValidationContext merged_cvc = default_cvc;
   merged_cvc.MergeFrom(*sds_api.secret());
-  Ssl::CertificateValidationContextConfigImpl cvc_config(merged_cvc);
+  Tls::CertificateValidationContextConfigImpl cvc_config(merged_cvc);
   // Verify that merging CertificateValidationContext applies logical OR to bool
   // field.
   EXPECT_TRUE(cvc_config.allowExpiredCertificate());

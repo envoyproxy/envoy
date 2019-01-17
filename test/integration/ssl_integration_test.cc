@@ -25,7 +25,7 @@
 using testing::Return;
 
 namespace Envoy {
-namespace Ssl {
+namespace Tls {
 
 void SslIntegrationTestBase::initialize() {
   config_helper_.addSslConfig(ConfigHelper::ServerSslOptions()
@@ -454,5 +454,5 @@ TEST_P(SslCaptureIntegrationTest, RequestWithTextProto) {
   EXPECT_TRUE(absl::StartsWith(trace.events(1).write().data(), "HTTP/1.1 200 OK"));
 }
 
-} // namespace Ssl
+} // namespace Tls
 } // namespace Envoy

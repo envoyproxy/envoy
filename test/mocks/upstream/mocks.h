@@ -350,7 +350,7 @@ public:
                 ClusterInfoConstSharedPtr(
                     Runtime::Loader& runtime, const envoy::api::v2::Cluster& cluster,
                     const envoy::api::v2::core::BindConfig& bind_config, Stats::Store& stats,
-                    Ssl::ContextManager& ssl_context_manager, bool added_via_api,
+                    Tls::ContextManager& ssl_context_manager, bool added_via_api,
                     ClusterManager& cm, const LocalInfo::LocalInfo& local_info,
                     Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random));
 };

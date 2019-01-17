@@ -90,7 +90,7 @@ envoy_cc_library(
         ":dns_lib",
         "//include/envoy/server:drain_manager_interface",
         "//include/envoy/server:instance_interface",
-        "//include/envoy/ssl:context_manager_interface",
+        "//include/envoy/tls:context_manager_interface",
         "//include/envoy/tracing:http_tracer_interface",
         "//source/common/access_log:access_log_manager_lib",
         "//source/common/common:assert_lib",

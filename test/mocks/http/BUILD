@@ -38,7 +38,7 @@ envoy_cc_mock(
         "//include/envoy/http:codec_interface",
         "//include/envoy/http:conn_pool_interface",
         "//include/envoy/http:filter_interface",
-        "//include/envoy/ssl:connection_interface",
+        "//include/envoy/tls:connection_interface",
         "//include/envoy/tracing:http_tracer_interface",
         "//source/common/http:header_map_lib",
         "//test/mocks/event:event_mocks",

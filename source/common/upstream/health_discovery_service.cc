@@ -9,7 +9,7 @@ namespace Upstream {
 
 HdsDelegate::HdsDelegate(Stats::Scope& scope, Grpc::AsyncClientPtr async_client,
                          Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
-                         Envoy::Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
+                         Envoy::Stats::Store& stats, Tls::ContextManager& ssl_context_manager,
                          Runtime::RandomGenerator& random, ClusterInfoFactory& info_factory,
                          AccessLog::AccessLogManager& access_log_manager, ClusterManager& cm,
                          const LocalInfo::LocalInfo& local_info)
@@ -184,7 +184,7 @@ void HdsDelegate::onRemoteClose(Grpc::Status::GrpcStatus status, const std::stri
 
 HdsCluster::HdsCluster(Runtime::Loader& runtime, const envoy::api::v2::Cluster& cluster,
                        const envoy::api::v2::core::BindConfig& bind_config, Stats::Store& stats,
-                       Ssl::ContextManager& ssl_context_manager, bool added_via_api,
+                       Tls::ContextManager& ssl_context_manager, bool added_via_api,
                        ClusterInfoFactory& info_factory, ClusterManager& cm,
                        const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
                        Runtime::RandomGenerator& random)
@@ -213,7 +213,7 @@ ClusterSharedPtr HdsCluster::create() { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 ClusterInfoConstSharedPtr ProdClusterInfoFactory::createClusterInfo(
     Runtime::Loader& runtime, const envoy::api::v2::Cluster& cluster,
     const envoy::api::v2::core::BindConfig& bind_config, Stats::Store& stats,
-    Ssl::ContextManager& ssl_context_manager, bool added_via_api, ClusterManager& cm,
+    Tls::ContextManager& ssl_context_manager, bool added_via_api, ClusterManager& cm,
     const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
     Runtime::RandomGenerator& random) {
 

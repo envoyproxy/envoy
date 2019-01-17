@@ -5,11 +5,11 @@
 #include <vector>
 
 #include "envoy/common/pure.h"
-#include "envoy/ssl/certificate_validation_context_config.h"
-#include "envoy/ssl/tls_certificate_config.h"
+#include "envoy/tls/certificate_validation_context_config.h"
+#include "envoy/tls/tls_certificate_config.h"
 
 namespace Envoy {
-namespace Ssl {
+namespace Tls {
 
 /**
  * Supplies the configuration for an SSL context.
@@ -123,5 +123,5 @@ public:
 
 typedef std::unique_ptr<ServerContextConfig> ServerContextConfigPtr;
 
-} // namespace Ssl
+} // namespace Tls
 } // namespace Envoy

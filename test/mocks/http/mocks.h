@@ -12,7 +12,7 @@
 #include "envoy/http/codec.h"
 #include "envoy/http/conn_pool.h"
 #include "envoy/http/filter.h"
-#include "envoy/ssl/connection.h"
+#include "envoy/tls/connection.h"
 
 #include "common/http/header_map_impl.h"
 #include "common/http/utility.h"

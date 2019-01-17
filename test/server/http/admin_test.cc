@@ -870,7 +870,7 @@ TEST_P(AdminInstanceTest, ContextThatReturnsNullCertDetails) {
   Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString("{}");
   Extensions::TransportSockets::Tls::ClientContextConfigImpl cfg(*loader, factory_context);
   Stats::IsolatedStoreImpl store;
-  Envoy::Ssl::ClientContextSharedPtr client_ctx(
+  Envoy::Tls::ClientContextSharedPtr client_ctx(
       server_.sslContextManager().createSslClientContext(store, cfg));
 
   const std::string expected_empty_json = R"EOF({

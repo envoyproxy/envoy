@@ -7,7 +7,7 @@
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
-#include "envoy/ssl/context.h"
+#include "envoy/tls/context.h"
 
 namespace Envoy {
 namespace Network {

@@ -15,9 +15,9 @@
 #include "envoy/local_info/local_info.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/secret/secret_manager.h"
-#include "envoy/ssl/context_manager.h"
 #include "envoy/stats/scope.h"
 #include "envoy/thread_local/thread_local.h"
+#include "envoy/tls/context_manager.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/config/grpc_mux_impl.h"
@@ -36,7 +36,7 @@ public:
   ProdClusterManagerFactory(Runtime::Loader& runtime, Stats::Store& stats,
                             ThreadLocal::Instance& tls, Runtime::RandomGenerator& random,
                             Network::DnsResolverSharedPtr dns_resolver,
-                            Ssl::ContextManager& ssl_context_manager,
+                            Tls::ContextManager& ssl_context_manager,
                             Event::Dispatcher& main_thread_dispatcher,
                             const LocalInfo::LocalInfo& local_info,
                             Secret::SecretManager& secret_manager, Api::Api& api,
@@ -80,7 +80,7 @@ private:
   ThreadLocal::Instance& tls_;
   Runtime::RandomGenerator& random_;
   Network::DnsResolverSharedPtr dns_resolver_;
-  Ssl::ContextManager& ssl_context_manager_;
+  Tls::ContextManager& ssl_context_manager_;
   const LocalInfo::LocalInfo& local_info_;
   Secret::SecretManager& secret_manager_;
 };

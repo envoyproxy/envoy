@@ -20,8 +20,8 @@
 #include "envoy/server/listener_manager.h"
 #include "envoy/server/options.h"
 #include "envoy/server/overload_manager.h"
-#include "envoy/ssl/context_manager.h"
 #include "envoy/thread_local/thread_local.h"
+#include "envoy/tls/context_manager.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -51,9 +51,9 @@ public:
   virtual Upstream::ClusterManager& clusterManager() PURE;
 
   /**
-   * @return Ssl::ContextManager& singleton for use by the entire server.
+   * @return Tls::ContextManager& singleton for use by the entire server.
    */
-  virtual Ssl::ContextManager& sslContextManager() PURE;
+  virtual Tls::ContextManager& sslContextManager() PURE;
 
   /**
    * @return Event::Dispatcher& the main thread's dispatcher. This dispatcher should be used

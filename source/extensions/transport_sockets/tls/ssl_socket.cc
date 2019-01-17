@@ -34,11 +34,11 @@ public:
     return {PostIoAction::Close, 0, false};
   }
   void onConnected() override {}
-  const Ssl::Connection* ssl() const override { return nullptr; }
+  const Envoy::Tls::Connection* ssl() const override { return nullptr; }
 };
 } // namespace
 
-SslSocket::SslSocket(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
+SslSocket::SslSocket(Envoy::Tls::ContextSharedPtr ctx, InitialState state,
                      Network::TransportSocketOptionsSharedPtr transport_socket_options)
     : ctx_(std::dynamic_pointer_cast<ContextImpl>(ctx)),
       ssl_(ctx_->newSsl(transport_socket_options != nullptr
@@ -368,8 +368,8 @@ SslSocketFactoryStats generateStats(const std::string& prefix, Stats::Scope& sto
 }
 } // namespace
 
-ClientSslSocketFactory::ClientSslSocketFactory(Envoy::Ssl::ClientContextConfigPtr config,
-                                               Envoy::Ssl::ContextManager& manager,
+ClientSslSocketFactory::ClientSslSocketFactory(Envoy::Tls::ClientContextConfigPtr config,
+                                               Envoy::Tls::ContextManager& manager,
                                                Stats::Scope& stats_scope)
     : manager_(manager), stats_scope_(stats_scope), stats_(generateStats("client", stats_scope)),
       config_(std::move(config)),
@@ -382,7 +382,7 @@ Network::TransportSocketPtr ClientSslSocketFactory::createTransportSocket(
   // onAddOrUpdateSecret() could be invoked in the middle of checking the existence of ssl_ctx and
   // creating SslSocket using ssl_ctx. Capture ssl_ctx_ into a local variable so that we check and
   // use the same ssl_ctx to create SslSocket.
-  Envoy::Ssl::ClientContextSharedPtr ssl_ctx;
+  Envoy::Tls::ClientContextSharedPtr ssl_ctx;
   {
     absl::ReaderMutexLock l(&ssl_ctx_mu_);
     ssl_ctx = ssl_ctx_;
@@ -408,8 +408,8 @@ void ClientSslSocketFactory::onAddOrUpdateSecret() {
   stats_.ssl_context_update_by_sds_.inc();
 }
 
-ServerSslSocketFactory::ServerSslSocketFactory(Envoy::Ssl::ServerContextConfigPtr config,
-                                               Envoy::Ssl::ContextManager& manager,
+ServerSslSocketFactory::ServerSslSocketFactory(Envoy::Tls::ServerContextConfigPtr config,
+                                               Envoy::Tls::ContextManager& manager,
                                                Stats::Scope& stats_scope,
                                                const std::vector<std::string>& server_names)
     : manager_(manager), stats_scope_(stats_scope), stats_(generateStats("server", stats_scope)),
@@ -423,7 +423,7 @@ ServerSslSocketFactory::createTransportSocket(Network::TransportSocketOptionsSha
   // onAddOrUpdateSecret() could be invoked in the middle of checking the existence of ssl_ctx and
   // creating SslSocket using ssl_ctx. Capture ssl_ctx_ into a local variable so that we check and
   // use the same ssl_ctx to create SslSocket.
-  Envoy::Ssl::ServerContextSharedPtr ssl_ctx;
+  Envoy::Tls::ServerContextSharedPtr ssl_ctx;
   {
     absl::ReaderMutexLock l(&ssl_ctx_mu_);
     ssl_ctx = ssl_ctx_;

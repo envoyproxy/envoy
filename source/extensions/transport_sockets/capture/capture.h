@@ -26,7 +26,7 @@ public:
   Network::IoResult doRead(Buffer::Instance& buffer) override;
   Network::IoResult doWrite(Buffer::Instance& buffer, bool end_stream) override;
   void onConnected() override;
-  const Ssl::Connection* ssl() const override;
+  const Tls::Connection* ssl() const override;
 
 private:
   const std::string& path_prefix_;

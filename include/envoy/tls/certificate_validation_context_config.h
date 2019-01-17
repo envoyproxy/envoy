@@ -7,7 +7,7 @@
 #include "envoy/common/pure.h"
 
 namespace Envoy {
-namespace Ssl {
+namespace Tls {
 
 class CertificateValidationContextConfig {
 public:
@@ -58,5 +58,5 @@ public:
 
 typedef std::unique_ptr<CertificateValidationContextConfig> CertificateValidationContextConfigPtr;
 
-} // namespace Ssl
+} // namespace Tls
 } // namespace Envoy

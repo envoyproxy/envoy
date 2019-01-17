@@ -33,7 +33,7 @@ using testing::NiceMock;
 using testing::Return;
 
 namespace Envoy {
-namespace Ssl {
+namespace Tls {
 
 // Hack to force linking of the service: https://github.com/google/protobuf/issues/4221.
 const envoy::service::discovery::v2::SdsDummy _sds_dummy;
@@ -447,5 +447,5 @@ TEST_P(SdsDynamicUpstreamIntegrationTest, WrongSecretFirst) {
   testRouterHeaderOnlyRequestAndResponse();
 }
 
-} // namespace Ssl
+} // namespace Tls
 } // namespace Envoy

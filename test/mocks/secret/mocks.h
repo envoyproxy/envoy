@@ -3,7 +3,7 @@
 #include "envoy/secret/secret_callbacks.h"
 #include "envoy/secret/secret_manager.h"
 #include "envoy/server/transport_socket_config.h"
-#include "envoy/ssl/tls_certificate_config.h"
+#include "envoy/tls/tls_certificate_config.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

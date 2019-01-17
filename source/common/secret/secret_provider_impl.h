@@ -4,8 +4,8 @@
 
 #include "envoy/api/v2/auth/cert.pb.h"
 #include "envoy/secret/secret_provider.h"
-#include "envoy/ssl/certificate_validation_context_config.h"
-#include "envoy/ssl/tls_certificate_config.h"
+#include "envoy/tls/certificate_validation_context_config.h"
+#include "envoy/tls/tls_certificate_config.h"
 
 namespace Envoy {
 namespace Secret {

@@ -3,8 +3,8 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/service/discovery/v2/hds.pb.h"
-#include "envoy/ssl/context_manager.h"
 #include "envoy/stats/stats_macros.h"
+#include "envoy/tls/context_manager.h"
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/backoff_strategy.h"
@@ -27,7 +27,7 @@ public:
   ClusterInfoConstSharedPtr
   createClusterInfo(Runtime::Loader& runtime, const envoy::api::v2::Cluster& cluster,
                     const envoy::api::v2::core::BindConfig& bind_config, Stats::Store& stats,
-                    Ssl::ContextManager& ssl_context_manager, bool added_via_api,
+                    Tls::ContextManager& ssl_context_manager, bool added_via_api,
                     ClusterManager& cm, const LocalInfo::LocalInfo& local_info,
                     Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random) override;
 };
@@ -43,7 +43,7 @@ public:
   static ClusterSharedPtr create();
   HdsCluster(Runtime::Loader& runtime, const envoy::api::v2::Cluster& cluster,
              const envoy::api::v2::core::BindConfig& bind_config, Stats::Store& stats,
-             Ssl::ContextManager& ssl_context_manager, bool added_via_api,
+             Tls::ContextManager& ssl_context_manager, bool added_via_api,
              ClusterInfoFactory& info_factory, ClusterManager& cm,
              const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
              Runtime::RandomGenerator& random);
@@ -77,7 +77,7 @@ private:
   const envoy::api::v2::Cluster& cluster_;
   const envoy::api::v2::core::BindConfig& bind_config_;
   Stats::Store& stats_;
-  Ssl::ContextManager& ssl_context_manager_;
+  Tls::ContextManager& ssl_context_manager_;
   bool added_via_api_;
 
   HostVectorSharedPtr initial_hosts_;
@@ -117,7 +117,7 @@ class HdsDelegate
 public:
   HdsDelegate(Stats::Scope& scope, Grpc::AsyncClientPtr async_client, Event::Dispatcher& dispatcher,
               Runtime::Loader& runtime, Envoy::Stats::Store& stats,
-              Ssl::ContextManager& ssl_context_manager, Runtime::RandomGenerator& random,
+              Tls::ContextManager& ssl_context_manager, Runtime::RandomGenerator& random,
               ClusterInfoFactory& info_factory, AccessLog::AccessLogManager& access_log_manager,
               ClusterManager& cm, const LocalInfo::LocalInfo& local_info);
 
@@ -151,7 +151,7 @@ private:
   Event::Dispatcher& dispatcher_;
   Runtime::Loader& runtime_;
   Envoy::Stats::Store& store_stats;
-  Ssl::ContextManager& ssl_context_manager_;
+  Tls::ContextManager& ssl_context_manager_;
   Runtime::RandomGenerator& random_;
   ClusterInfoFactory& info_factory_;
   AccessLog::AccessLogManager& access_log_manager_;

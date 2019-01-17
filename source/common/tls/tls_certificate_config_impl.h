@@ -3,10 +3,10 @@
 #include <string>
 
 #include "envoy/api/v2/auth/cert.pb.h"
-#include "envoy/ssl/tls_certificate_config.h"
+#include "envoy/tls/tls_certificate_config.h"
 
 namespace Envoy {
-namespace Ssl {
+namespace Tls {
 
 class TlsCertificateConfigImpl : public TlsCertificateConfig {
 public:
@@ -28,5 +28,5 @@ private:
   const std::string password_path_;
 };
 
-} // namespace Ssl
+} // namespace Tls
 } // namespace Envoy

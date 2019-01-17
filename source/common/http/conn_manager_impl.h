@@ -20,9 +20,9 @@
 #include "envoy/router/rds.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/overload_manager.h"
-#include "envoy/ssl/connection.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
+#include "envoy/tls/connection.h"
 #include "envoy/upstream/upstream.h"
 
 #include "common/buffer/watermark_buffer.h"

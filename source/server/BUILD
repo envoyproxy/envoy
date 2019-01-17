@@ -33,7 +33,7 @@ envoy_cc_library(
         "//include/envoy/server:filter_config_interface",
         "//include/envoy/server:instance_interface",
         "//include/envoy/server:tracer_config_interface",
-        "//include/envoy/ssl:context_manager_interface",
+        "//include/envoy/tls:context_manager_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:utility_lib",

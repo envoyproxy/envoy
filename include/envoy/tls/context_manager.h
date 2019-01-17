@@ -2,12 +2,12 @@
 
 #include <functional>
 
-#include "envoy/ssl/context.h"
-#include "envoy/ssl/context_config.h"
 #include "envoy/stats/scope.h"
+#include "envoy/tls/context.h"
+#include "envoy/tls/context_config.h"
 
 namespace Envoy {
-namespace Ssl {
+namespace Tls {
 
 /**
  * Manages all of the SSL contexts in the process
@@ -40,5 +40,5 @@ public:
   virtual void iterateContexts(std::function<void(const Context&)> callback) PURE;
 };
 
-} // namespace Ssl
+} // namespace Tls
 } // namespace Envoy

@@ -45,7 +45,7 @@ bool cbsContainsU16(CBS& cbs, uint16_t n) {
 
 } // namespace
 
-ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& config,
+ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Tls::ContextConfig& config,
                          TimeSource& time_source)
     : scope_(scope), stats_(generateStats(scope)), time_source_(time_source),
       tls_max_version_(config.maxProtocolVersion()) {
@@ -579,15 +579,15 @@ size_t ContextImpl::daysUntilFirstCertExpires() const {
   return daysUntilExpiration;
 }
 
-Envoy::Ssl::CertificateDetailsPtr ContextImpl::getCaCertInformation() const {
+Envoy::Tls::CertificateDetailsPtr ContextImpl::getCaCertInformation() const {
   if (ca_cert_ == nullptr) {
     return nullptr;
   }
   return certificateDetails(ca_cert_.get(), getCaFileName());
 }
 
-std::vector<Envoy::Ssl::CertificateDetailsPtr> ContextImpl::getCertChainInformation() const {
-  std::vector<Envoy::Ssl::CertificateDetailsPtr> cert_details;
+std::vector<Envoy::Tls::CertificateDetailsPtr> ContextImpl::getCertChainInformation() const {
+  std::vector<Envoy::Tls::CertificateDetailsPtr> cert_details;
   for (const auto& ctx : tls_contexts_) {
     if (ctx.cert_chain_ == nullptr) {
       continue;
@@ -598,9 +598,9 @@ std::vector<Envoy::Ssl::CertificateDetailsPtr> ContextImpl::getCertChainInformat
   return cert_details;
 }
 
-Envoy::Ssl::CertificateDetailsPtr ContextImpl::certificateDetails(X509* cert,
+Envoy::Tls::CertificateDetailsPtr ContextImpl::certificateDetails(X509* cert,
                                                                   const std::string& path) const {
-  Envoy::Ssl::CertificateDetailsPtr certificate_details =
+  Envoy::Tls::CertificateDetailsPtr certificate_details =
       std::make_unique<envoy::admin::v2alpha::CertificateDetails>();
   certificate_details->set_path(path);
   certificate_details->set_serial_number(Utility::getSerialNumberFromCertificate(*cert));
@@ -625,7 +625,7 @@ Envoy::Ssl::CertificateDetailsPtr ContextImpl::certificateDetails(X509* cert,
 }
 
 ClientContextImpl::ClientContextImpl(Stats::Scope& scope,
-                                     const Envoy::Ssl::ClientContextConfig& config,
+                                     const Envoy::Tls::ClientContextConfig& config,
                                      TimeSource& time_source)
     : ContextImpl(scope, config, time_source),
       server_name_indication_(config.serverNameIndication()),
@@ -736,7 +736,7 @@ uint16_t ClientContextImpl::parseSigningAlgorithmsForTest(const std::string& sig
 }
 
 ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
-                                     const Envoy::Ssl::ServerContextConfig& config,
+                                     const Envoy::Tls::ServerContextConfig& config,
                                      const std::vector<std::string>& server_names,
                                      TimeSource& time_source)
     : ContextImpl(scope, config, time_source), session_ticket_keys_(config.sessionTicketKeys()) {
@@ -900,7 +900,7 @@ int ServerContextImpl::sessionTicketProcess(SSL*, uint8_t* key_name, uint8_t* iv
     // or if we allow it to be emptied, reconfigure the context so this callback
     // isn't set.
 
-    const Envoy::Ssl::ServerContextConfig::SessionTicketKey& key = session_ticket_keys_.front();
+    const Envoy::Tls::ServerContextConfig::SessionTicketKey& key = session_ticket_keys_.front();
 
     static_assert(std::tuple_size<decltype(key.name_)>::value == SSL_TICKET_KEY_NAME_LEN,
                   "Expected key.name length");
@@ -924,7 +924,7 @@ int ServerContextImpl::sessionTicketProcess(SSL*, uint8_t* key_name, uint8_t* iv
   } else {
     // Decrypt
     bool is_enc_key = true; // first element is the encryption key
-    for (const Envoy::Ssl::ServerContextConfig::SessionTicketKey& key : session_ticket_keys_) {
+    for (const Envoy::Tls::ServerContextConfig::SessionTicketKey& key : session_ticket_keys_) {
       static_assert(std::tuple_size<decltype(key.name_)>::value == SSL_TICKET_KEY_NAME_LEN,
                     "Expected key.name length");
       if (std::equal(key.name_.begin(), key.name_.end(), key_name)) {
@@ -1035,7 +1035,7 @@ ServerContextImpl::selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello) {
 }
 
 void ServerContextImpl::TlsContext::addClientValidationContext(
-    const Envoy::Ssl::CertificateValidationContextConfig& config, bool require_client_cert) {
+    const Envoy::Tls::CertificateValidationContextConfig& config, bool require_client_cert) {
   bssl::UniquePtr<BIO> bio(
       BIO_new_mem_buf(const_cast<char*>(config.caCert().data()), config.caCert().size()));
   RELEASE_ASSERT(bio != nullptr, "");

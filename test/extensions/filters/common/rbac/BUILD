@@ -19,7 +19,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/common/rbac:matchers_lib",
         "//test/mocks/network:network_mocks",
-        "//test/mocks/ssl:ssl_mocks",
+        "//test/mocks/tls:ssl_mocks",
         "//test/test_common:utility_lib",
     ],
 )
@@ -31,7 +31,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/common/rbac:engine_lib",
         "//test/mocks/network:network_mocks",
-        "//test/mocks/ssl:ssl_mocks",
+        "//test/mocks/tls:ssl_mocks",
         "//test/test_common:utility_lib",
     ],
 )

@@ -3735,7 +3735,7 @@ public:
   Network::TransportSocketFactoryPtr server_ssl_socket_factory_;
   Network::ListenerPtr listener_;
   envoy::api::v2::auth::UpstreamTlsContext upstream_tls_context_;
-  Envoy::Ssl::ClientContextSharedPtr client_ctx_;
+  Envoy::Tls::ClientContextSharedPtr client_ctx_;
   Network::TransportSocketFactoryPtr client_ssl_socket_factory_;
   Network::ClientConnectionPtr client_connection_;
   Network::ConnectionPtr server_connection_;

@@ -5,8 +5,8 @@
 #include "envoy/secret/secret_manager.h"
 #include "envoy/secret/secret_provider.h"
 #include "envoy/server/transport_socket_config.h"
-#include "envoy/ssl/certificate_validation_context_config.h"
-#include "envoy/ssl/tls_certificate_config.h"
+#include "envoy/tls/certificate_validation_context_config.h"
+#include "envoy/tls/tls_certificate_config.h"
 
 #include "common/common/logger.h"
 #include "common/secret/sds_api.h"

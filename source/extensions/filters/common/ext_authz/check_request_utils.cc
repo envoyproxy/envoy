@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-#include "envoy/ssl/connection.h"
+#include "envoy/tls/connection.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
@@ -40,7 +40,7 @@ void CheckRequestUtils::setAttrContextPeer(
   // Set the principal
   // Preferably the SAN from the peer's cert or
   // Subject from the peer's cert.
-  Ssl::Connection* ssl = const_cast<Ssl::Connection*>(connection.ssl());
+  Tls::Connection* ssl = const_cast<Tls::Connection*>(connection.ssl());
   if (ssl != nullptr) {
     if (local) {
       peer.set_principal(ssl->uriSanLocalCertificate());

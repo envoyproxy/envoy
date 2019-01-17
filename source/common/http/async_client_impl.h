@@ -20,7 +20,7 @@
 #include "envoy/router/router_ratelimit.h"
 #include "envoy/router/shadow_writer.h"
 #include "envoy/server/filter_config.h"
-#include "envoy/ssl/connection.h"
+#include "envoy/tls/connection.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"

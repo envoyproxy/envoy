@@ -4,8 +4,8 @@
 #include <list>
 
 #include "envoy/common/time.h"
-#include "envoy/ssl/context_manager.h"
 #include "envoy/stats/scope.h"
+#include "envoy/tls/context_manager.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -19,25 +19,25 @@ namespace Tls {
  * be released from any thread). Context allocation/free is a very uncommon thing so we just do a
  * global lock to protect it all.
  */
-class ContextManagerImpl final : public Envoy::Ssl::ContextManager {
+class ContextManagerImpl final : public Envoy::Tls::ContextManager {
 public:
   ContextManagerImpl(TimeSource& time_source) : time_source_(time_source) {}
   ~ContextManagerImpl();
 
-  // Ssl::ContextManager
-  Ssl::ClientContextSharedPtr
+  // Tls::ContextManager
+  Envoy::Tls::ClientContextSharedPtr
   createSslClientContext(Stats::Scope& scope,
-                         const Envoy::Ssl::ClientContextConfig& config) override;
-  Ssl::ServerContextSharedPtr
-  createSslServerContext(Stats::Scope& scope, const Envoy::Ssl::ServerContextConfig& config,
+                         const Envoy::Tls::ClientContextConfig& config) override;
+  Envoy::Tls::ServerContextSharedPtr
+  createSslServerContext(Stats::Scope& scope, const Envoy::Tls::ServerContextConfig& config,
                          const std::vector<std::string>& server_names) override;
   size_t daysUntilFirstCertExpires() const override;
-  void iterateContexts(std::function<void(const Envoy::Ssl::Context&)> callback) override;
+  void iterateContexts(std::function<void(const Envoy::Tls::Context&)> callback) override;
 
 private:
   void removeEmptyContexts();
   TimeSource& time_source_;
-  std::list<std::weak_ptr<Envoy::Ssl::Context>> contexts_;
+  std::list<std::weak_ptr<Envoy::Tls::Context>> contexts_;
 };
 
 } // namespace Tls

@@ -19,8 +19,8 @@ envoy_cc_library(
     deps = [
         ":secret_callbacks_interface",
         "//include/envoy/common:callback",
-        "//include/envoy/ssl:certificate_validation_context_config_interface",
-        "//include/envoy/ssl:tls_certificate_config_interface",
+        "//include/envoy/tls:certificate_validation_context_config_interface",
+        "//include/envoy/tls:tls_certificate_config_interface",
         "@envoy_api//envoy/api/v2/auth:cert_cc",
     ],
 )

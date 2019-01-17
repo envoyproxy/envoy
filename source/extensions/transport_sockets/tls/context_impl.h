@@ -5,10 +5,10 @@
 #include <string>
 #include <vector>
 
-#include "envoy/ssl/context.h"
-#include "envoy/ssl/context_config.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
+#include "envoy/tls/context.h"
+#include "envoy/tls/context_config.h"
 
 #include "extensions/transport_sockets/tls/context_manager_impl.h"
 
@@ -44,7 +44,7 @@ struct SslStats {
   ALL_SSL_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT)
 };
 
-class ContextImpl : public virtual Envoy::Ssl::Context {
+class ContextImpl : public virtual Envoy::Tls::Context {
 public:
   virtual bssl::UniquePtr<SSL> newSsl(absl::optional<std::string> override_server_name);
 
@@ -73,13 +73,13 @@ public:
 
   SslStats& stats() { return stats_; }
 
-  // Ssl::Context
+  // Tls::Context
   size_t daysUntilFirstCertExpires() const override;
-  Envoy::Ssl::CertificateDetailsPtr getCaCertInformation() const override;
-  std::vector<Envoy::Ssl::CertificateDetailsPtr> getCertChainInformation() const override;
+  Envoy::Tls::CertificateDetailsPtr getCaCertInformation() const override;
+  std::vector<Envoy::Tls::CertificateDetailsPtr> getCertChainInformation() const override;
 
 protected:
-  ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& config,
+  ContextImpl(Stats::Scope& scope, const Envoy::Tls::ContextConfig& config,
               TimeSource& time_source);
 
   /**
@@ -123,7 +123,7 @@ protected:
 
   std::string getCaFileName() const { return ca_file_path_; };
 
-  Envoy::Ssl::CertificateDetailsPtr certificateDetails(X509* cert, const std::string& path) const;
+  Envoy::Tls::CertificateDetailsPtr certificateDetails(X509* cert, const std::string& path) const;
 
   struct TlsContext {
     // Each certificate specified for the context has its own SSL_CTX. SSL_CTXs
@@ -136,7 +136,7 @@ protected:
     bool is_ecdsa_{};
 
     std::string getCertChainFileName() const { return cert_chain_file_path_; };
-    void addClientValidationContext(const Envoy::Ssl::CertificateValidationContextConfig& config,
+    void addClientValidationContext(const Envoy::Tls::CertificateValidationContextConfig& config,
                                     bool require_client_cert);
     bool isCipherEnabled(uint16_t cipher_id, uint16_t client_version);
   };
@@ -163,9 +163,9 @@ protected:
 
 typedef std::shared_ptr<ContextImpl> ContextImplSharedPtr;
 
-class ClientContextImpl : public ContextImpl, public Envoy::Ssl::ClientContext {
+class ClientContextImpl : public ContextImpl, public Envoy::Tls::ClientContext {
 public:
-  ClientContextImpl(Stats::Scope& scope, const Envoy::Ssl::ClientContextConfig& config,
+  ClientContextImpl(Stats::Scope& scope, const Envoy::Tls::ClientContextConfig& config,
                     TimeSource& time_source);
 
   bssl::UniquePtr<SSL> newSsl(absl::optional<std::string> override_server_name) override;
@@ -182,9 +182,9 @@ private:
   bool session_keys_single_use_{false};
 };
 
-class ServerContextImpl : public ContextImpl, public Envoy::Ssl::ServerContext {
+class ServerContextImpl : public ContextImpl, public Envoy::Tls::ServerContext {
 public:
-  ServerContextImpl(Stats::Scope& scope, const Envoy::Ssl::ServerContextConfig& config,
+  ServerContextImpl(Stats::Scope& scope, const Envoy::Tls::ServerContextConfig& config,
                     const std::vector<std::string>& server_names, TimeSource& time_source);
 
 private:
@@ -199,7 +199,7 @@ private:
   void generateHashForSessionContexId(const std::vector<std::string>& server_names,
                                       uint8_t* session_context_buf, unsigned& session_context_len);
 
-  const std::vector<Envoy::Ssl::ServerContextConfig::SessionTicketKey> session_ticket_keys_;
+  const std::vector<Envoy::Tls::ServerContextConfig::SessionTicketKey> session_ticket_keys_;
 };
 
 } // namespace Tls

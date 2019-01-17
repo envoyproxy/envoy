@@ -7,11 +7,11 @@
 #include "envoy/secret/secret_callbacks.h"
 #include "envoy/secret/secret_provider.h"
 #include "envoy/server/transport_socket_config.h"
-#include "envoy/ssl/context_config.h"
+#include "envoy/tls/context_config.h"
 
 #include "common/common/empty_string.h"
 #include "common/json/json_loader.h"
-#include "common/ssl/tls_certificate_config_impl.h"
+#include "common/tls/tls_certificate_config_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -20,24 +20,24 @@ namespace Tls {
 
 static const std::string INLINE_STRING = "<inline>";
 
-class ContextConfigImpl : public virtual Ssl::ContextConfig {
+class ContextConfigImpl : public virtual Envoy::Tls::ContextConfig {
 public:
   ~ContextConfigImpl() override;
 
-  // Ssl::ContextConfig
+  // Tls::ContextConfig
   const std::string& alpnProtocols() const override { return alpn_protocols_; }
   const std::string& cipherSuites() const override { return cipher_suites_; }
   const std::string& ecdhCurves() const override { return ecdh_curves_; }
   // TODO(htuch): This needs to be made const again and/or zero copy and/or callers fixed.
-  std::vector<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>>
+  std::vector<std::reference_wrapper<const Envoy::Tls::TlsCertificateConfig>>
   tlsCertificates() const override {
-    std::vector<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>> configs;
+    std::vector<std::reference_wrapper<const Envoy::Tls::TlsCertificateConfig>> configs;
     for (const auto& config : tls_certificate_configs_) {
       configs.push_back(config);
     }
     return configs;
   }
-  const Envoy::Ssl::CertificateValidationContextConfig*
+  const Envoy::Tls::CertificateValidationContextConfig*
   certificateValidationContext() const override {
     return validation_context_config_.get();
   }
@@ -56,7 +56,7 @@ public:
 
   void setSecretUpdateCallback(std::function<void()> callback) override;
 
-  Ssl::CertificateValidationContextConfigPtr getCombinedValidationContextConfig(
+  Envoy::Tls::CertificateValidationContextConfigPtr getCombinedValidationContextConfig(
       const envoy::api::v2::auth::CertificateValidationContext& dynamic_cvc);
 
 protected:
@@ -75,8 +75,8 @@ private:
   const std::string cipher_suites_;
   const std::string ecdh_curves_;
 
-  std::vector<Ssl::TlsCertificateConfigImpl> tls_certificate_configs_;
-  Ssl::CertificateValidationContextConfigPtr validation_context_config_;
+  std::vector<Envoy::Tls::TlsCertificateConfigImpl> tls_certificate_configs_;
+  Envoy::Tls::CertificateValidationContextConfigPtr validation_context_config_;
   // If certificate validation context type is combined_validation_context. default_cvc_
   // holds a copy of CombinedCertificateValidationContext::default_validation_context.
   // Otherwise, default_cvc_ is nullptr.
@@ -93,7 +93,7 @@ private:
   const unsigned max_protocol_version_;
 };
 
-class ClientContextConfigImpl : public ContextConfigImpl, public Envoy::Ssl::ClientContextConfig {
+class ClientContextConfigImpl : public ContextConfigImpl, public Envoy::Tls::ClientContextConfig {
 public:
   ClientContextConfigImpl(
       const envoy::api::v2::auth::UpstreamTlsContext& config, absl::string_view sigalgs,
@@ -106,7 +106,7 @@ public:
       const Json::Object& config,
       Server::Configuration::TransportSocketFactoryContext& secret_provider_context);
 
-  // Ssl::ClientContextConfig
+  // Tls::ClientContextConfig
   const std::string& serverNameIndication() const override { return server_name_indication_; }
   bool allowRenegotiation() const override { return allow_renegotiation_; }
   size_t maxSessionKeys() const override { return max_session_keys_; }
@@ -124,7 +124,7 @@ private:
   const std::string sigalgs_;
 };
 
-class ServerContextConfigImpl : public ContextConfigImpl, public Envoy::Ssl::ServerContextConfig {
+class ServerContextConfigImpl : public ContextConfigImpl, public Envoy::Tls::ServerContextConfig {
 public:
   ServerContextConfigImpl(
       const envoy::api::v2::auth::DownstreamTlsContext& config,
@@ -133,7 +133,7 @@ public:
       const Json::Object& config,
       Server::Configuration::TransportSocketFactoryContext& secret_provider_context);
 
-  // Ssl::ServerContextConfig
+  // Tls::ServerContextConfig
   bool requireClientCertificate() const override { return require_client_certificate_; }
   const std::vector<SessionTicketKey>& sessionTicketKeys() const override {
     return session_ticket_keys_;

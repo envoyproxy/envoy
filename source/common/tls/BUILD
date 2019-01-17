@@ -13,7 +13,7 @@ envoy_cc_library(
     srcs = ["tls_certificate_config_impl.cc"],
     hdrs = ["tls_certificate_config_impl.h"],
     deps = [
-        "//include/envoy/ssl:tls_certificate_config_interface",
+        "//include/envoy/tls:tls_certificate_config_interface",
         "//source/common/common:empty_string",
         "//source/common/config:datasource_lib",
         "@envoy_api//envoy/api/v2/auth:cert_cc",
@@ -25,7 +25,7 @@ envoy_cc_library(
     srcs = ["certificate_validation_context_config_impl.cc"],
     hdrs = ["certificate_validation_context_config_impl.h"],
     deps = [
-        "//include/envoy/ssl:certificate_validation_context_config_interface",
+        "//include/envoy/tls:certificate_validation_context_config_interface",
         "//source/common/common:empty_string",
         "//source/common/config:datasource_lib",
         "@envoy_api//envoy/api/v2/auth:cert_cc",

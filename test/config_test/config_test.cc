@@ -14,7 +14,7 @@
 
 #include "test/integration/server.h"
 #include "test/mocks/server/mocks.h"
-#include "test/mocks/ssl/mocks.h"
+#include "test/mocks/tls/mocks.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
@@ -94,7 +94,7 @@ public:
   Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
   NiceMock<Server::MockInstance> server_;
-  NiceMock<Ssl::MockContextManager> ssl_context_manager_;
+  NiceMock<Tls::MockContextManager> ssl_context_manager_;
   OptionsImpl options_;
   std::unique_ptr<Upstream::ProdClusterManagerFactory> cluster_manager_factory_;
   NiceMock<Server::MockListenerComponentFactory> component_factory_;

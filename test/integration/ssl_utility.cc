@@ -14,7 +14,7 @@
 #include "test/test_common/network_utility.h"
 
 namespace Envoy {
-namespace Ssl {
+namespace Tls {
 
 Network::TransportSocketFactoryPtr
 createClientSslTransportSocketFactory(const ClientSslTransportOptions& options,
@@ -91,5 +91,5 @@ Network::Address::InstanceConstSharedPtr getSslAddress(const Network::Address::I
   return Network::Utility::resolveUrl(url);
 }
 
-} // namespace Ssl
+} // namespace Tls
 } // namespace Envoy

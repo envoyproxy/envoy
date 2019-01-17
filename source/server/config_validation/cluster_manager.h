@@ -20,7 +20,7 @@ public:
   ValidationClusterManagerFactory(Runtime::Loader& runtime, Stats::Store& stats,
                                   ThreadLocal::Instance& tls, Runtime::RandomGenerator& random,
                                   Network::DnsResolverSharedPtr dns_resolver,
-                                  Ssl::ContextManager& ssl_context_manager,
+                                  Tls::ContextManager& ssl_context_manager,
                                   Event::Dispatcher& main_thread_dispatcher,
                                   const LocalInfo::LocalInfo& local_info,
                                   Secret::SecretManager& secret_manager, Api::Api& api,

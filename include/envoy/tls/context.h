@@ -7,7 +7,7 @@
 #include "envoy/common/pure.h"
 
 namespace Envoy {
-namespace Ssl {
+namespace Tls {
 
 typedef std::unique_ptr<envoy::admin::v2alpha::CertificateDetails> CertificateDetailsPtr;
 
@@ -41,5 +41,5 @@ typedef std::shared_ptr<ClientContext> ClientContextSharedPtr;
 class ServerContext : public virtual Context {};
 typedef std::shared_ptr<ServerContext> ServerContextSharedPtr;
 
-} // namespace Ssl
+} // namespace Tls
 } // namespace Envoy

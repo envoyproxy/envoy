@@ -3,10 +3,10 @@
 #include <string>
 
 #include "envoy/api/v2/auth/cert.pb.h"
-#include "envoy/ssl/certificate_validation_context_config.h"
+#include "envoy/tls/certificate_validation_context_config.h"
 
 namespace Envoy {
-namespace Ssl {
+namespace Tls {
 
 class CertificateValidationContextConfigImpl : public CertificateValidationContextConfig {
 public:
@@ -43,5 +43,5 @@ private:
   const bool allow_expired_certificate_;
 };
 
-} // namespace Ssl
+} // namespace Tls
 } // namespace Envoy

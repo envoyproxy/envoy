@@ -1,8 +1,8 @@
 #include "common/secret/secret_provider_impl.h"
 
 #include "common/common/assert.h"
-#include "common/ssl/certificate_validation_context_config_impl.h"
-#include "common/ssl/tls_certificate_config_impl.h"
+#include "common/tls/certificate_validation_context_config_impl.h"
+#include "common/tls/tls_certificate_config_impl.h"
 
 namespace Envoy {
 namespace Secret {

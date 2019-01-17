@@ -349,7 +349,7 @@ public:
   MOCK_METHOD1(doRead, IoResult(Buffer::Instance& buffer));
   MOCK_METHOD2(doWrite, IoResult(Buffer::Instance& buffer, bool end_stream));
   MOCK_METHOD0(onConnected, void());
-  MOCK_CONST_METHOD0(ssl, const Ssl::Connection*());
+  MOCK_CONST_METHOD0(ssl, const Tls::Connection*());
 
   TransportSocketCallbacks* callbacks_{};
 };

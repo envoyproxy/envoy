@@ -140,7 +140,7 @@ envoy_cc_library(
         "//include/envoy/network:connection_interface",
         "//include/envoy/network:transport_socket_interface",
         "//include/envoy/runtime:runtime_interface",
-        "//include/envoy/ssl:context_interface",
-        "//include/envoy/ssl:context_manager_interface",
+        "//include/envoy/tls:context_interface",
+        "//include/envoy/tls:context_manager_interface",
     ],
 )

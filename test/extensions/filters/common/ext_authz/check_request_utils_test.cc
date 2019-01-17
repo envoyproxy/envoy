@@ -4,8 +4,8 @@
 #include "extensions/filters/common/ext_authz/check_request_utils.h"
 
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
+#include "test/mocks/tls/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 
 #include "gmock/gmock.h"
@@ -34,7 +34,7 @@ public:
   NiceMock<Envoy::Http::MockStreamDecoderFilterCallbacks> callbacks_;
   NiceMock<Envoy::Network::MockReadFilterCallbacks> net_callbacks_;
   NiceMock<Envoy::Network::MockConnection> connection_;
-  NiceMock<Envoy::Ssl::MockConnection> ssl_;
+  NiceMock<Envoy::Tls::MockConnection> ssl_;
   NiceMock<Envoy::StreamInfo::MockStreamInfo> req_info_;
 };
 

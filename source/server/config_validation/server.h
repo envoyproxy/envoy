@@ -5,7 +5,7 @@
 #include "envoy/event/timer.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/instance.h"
-#include "envoy/ssl/context_manager.h"
+#include "envoy/tls/context_manager.h"
 #include "envoy/tracing/http_tracer.h"
 
 #include "common/access_log/access_log_manager_impl.h"
@@ -63,7 +63,7 @@ public:
   Admin& admin() override { return admin_; }
   Api::Api& api() override { return *api_; }
   Upstream::ClusterManager& clusterManager() override { return *config_.clusterManager(); }
-  Ssl::ContextManager& sslContextManager() override { return *ssl_context_manager_; }
+  Tls::ContextManager& sslContextManager() override { return *ssl_context_manager_; }
   Event::Dispatcher& dispatcher() override { return *dispatcher_; }
   Network::DnsResolverSharedPtr dnsResolver() override {
     return dispatcher().createDnsResolver({});

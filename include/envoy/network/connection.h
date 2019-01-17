@@ -10,8 +10,8 @@
 #include "envoy/network/address.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
-#include "envoy/ssl/connection.h"
 #include "envoy/stream_info/stream_info.h"
+#include "envoy/tls/connection.h"
 
 namespace Envoy {
 namespace Event {
@@ -184,7 +184,7 @@ public:
   /**
    * @return the const SSL connection data if this is an SSL connection, or nullptr if it is not.
    */
-  virtual const Ssl::Connection* ssl() const PURE;
+  virtual const Tls::Connection* ssl() const PURE;
 
   /**
    * @return requested server name (e.g. SNI in TLS), if any.

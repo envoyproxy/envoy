@@ -9,7 +9,7 @@
 #include "common/config/tls_context_json.h"
 #include "common/protobuf/utility.h"
 #include "common/secret/sds_api.h"
-#include "common/ssl/certificate_validation_context_config_impl.h"
+#include "common/tls/certificate_validation_context_config_impl.h"
 
 #include "openssl/ssl.h"
 
@@ -150,16 +150,18 @@ ContextConfigImpl::ContextConfigImpl(
   // Load inline or static secret into validation_context_config_.
   if (certficate_validation_context_provider_ != nullptr &&
       certficate_validation_context_provider_->secret() != nullptr) {
-    validation_context_config_ = std::make_unique<Ssl::CertificateValidationContextConfigImpl>(
-        *certficate_validation_context_provider_->secret());
+    validation_context_config_ =
+        std::make_unique<Envoy::Tls::CertificateValidationContextConfigImpl>(
+            *certficate_validation_context_provider_->secret());
   }
 }
 
-Ssl::CertificateValidationContextConfigPtr ContextConfigImpl::getCombinedValidationContextConfig(
+Envoy::Tls::CertificateValidationContextConfigPtr
+ContextConfigImpl::getCombinedValidationContextConfig(
     const envoy::api::v2::auth::CertificateValidationContext& dynamic_cvc) {
   envoy::api::v2::auth::CertificateValidationContext combined_cvc = *default_cvc_;
   combined_cvc.MergeFrom(dynamic_cvc);
-  return std::make_unique<Envoy::Ssl::CertificateValidationContextConfigImpl>(combined_cvc);
+  return std::make_unique<Envoy::Tls::CertificateValidationContextConfigImpl>(combined_cvc);
 }
 
 void ContextConfigImpl::setSecretUpdateCallback(std::function<void()> callback) {
@@ -199,7 +201,7 @@ void ContextConfigImpl::setSecretUpdateCallback(std::function<void()> callback) 
       cvc_update_callback_handle_ =
           certficate_validation_context_provider_->addUpdateCallback([this, callback]() {
             validation_context_config_ =
-                std::make_unique<Ssl::CertificateValidationContextConfigImpl>(
+                std::make_unique<Envoy::Tls::CertificateValidationContextConfigImpl>(
                     *certficate_validation_context_provider_->secret());
             callback();
           });

@@ -23,7 +23,7 @@
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
-#include "test/mocks/ssl/mocks.h"
+#include "test/mocks/tls/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
@@ -121,7 +121,7 @@ INSTANTIATE_TEST_CASE_P(DnsParam, StrictDnsParamTest, testing::ValuesIn(generate
 
 TEST_P(StrictDnsParamTest, ImmediateResolve) {
   Stats::IsolatedStoreImpl stats;
-  Ssl::MockContextManager ssl_context_manager;
+  Tls::MockContextManager ssl_context_manager;
   auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
   NiceMock<Event::MockDispatcher> dispatcher;
   NiceMock<Runtime::MockLoader> runtime;
@@ -164,7 +164,7 @@ TEST_P(StrictDnsParamTest, ImmediateResolve) {
 // Resolve zero hosts, while using health checking.
 TEST(StrictDnsClusterImplTest, ZeroHostsHealthChecker) {
   Stats::IsolatedStoreImpl stats;
-  Ssl::MockContextManager ssl_context_manager;
+  Tls::MockContextManager ssl_context_manager;
   auto dns_resolver = std::make_shared<Network::MockDnsResolver>();
   NiceMock<Event::MockDispatcher> dispatcher;
   NiceMock<Runtime::MockLoader> runtime;
@@ -206,7 +206,7 @@ TEST(StrictDnsClusterImplTest, ZeroHostsHealthChecker) {
 
 TEST(StrictDnsClusterImplTest, Basic) {
   Stats::IsolatedStoreImpl stats;
-  Ssl::MockContextManager ssl_context_manager;
+  Tls::MockContextManager ssl_context_manager;
   auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
   NiceMock<Event::MockDispatcher> dispatcher;
   NiceMock<Runtime::MockLoader> runtime;
@@ -354,7 +354,7 @@ TEST(StrictDnsClusterImplTest, Basic) {
 // but the cluster is configured to always remove hosts
 TEST(StrictDnsClusterImplTest, HostRemovalActiveHealthSkipped) {
   Stats::IsolatedStoreImpl stats;
-  Ssl::MockContextManager ssl_context_manager;
+  Tls::MockContextManager ssl_context_manager;
   auto dns_resolver = std::make_shared<Network::MockDnsResolver>();
   NiceMock<Event::MockDispatcher> dispatcher;
   NiceMock<Runtime::MockLoader> runtime;
@@ -412,7 +412,7 @@ TEST(StrictDnsClusterImplTest, HostRemovalActiveHealthSkipped) {
 
 TEST(StrictDnsClusterImplTest, LoadAssignmentBasic) {
   Stats::IsolatedStoreImpl stats;
-  Ssl::MockContextManager ssl_context_manager;
+  Tls::MockContextManager ssl_context_manager;
   auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
   NiceMock<Event::MockDispatcher> dispatcher;
   NiceMock<Runtime::MockLoader> runtime;
@@ -655,7 +655,7 @@ TEST(StrictDnsClusterImplTest, LoadAssignmentBasic) {
 
 TEST(StrictDnsClusterImplTest, LoadAssignmentBasicMultiplePriorities) {
   Stats::IsolatedStoreImpl stats;
-  Ssl::MockContextManager ssl_context_manager;
+  Tls::MockContextManager ssl_context_manager;
   auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
   NiceMock<Event::MockDispatcher> dispatcher;
   NiceMock<Runtime::MockLoader> runtime;
@@ -864,7 +864,7 @@ TEST(HostImplTest, HealthFlags) {
 
 TEST(StaticClusterImplTest, InitialHosts) {
   Stats::IsolatedStoreImpl stats;
-  Ssl::MockContextManager ssl_context_manager;
+  Tls::MockContextManager ssl_context_manager;
   NiceMock<Event::MockDispatcher> dispatcher;
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
@@ -898,7 +898,7 @@ TEST(StaticClusterImplTest, InitialHosts) {
 
 TEST(StaticClusterImplTest, EmptyHostname) {
   Stats::IsolatedStoreImpl stats;
-  Ssl::MockContextManager ssl_context_manager;
+  Tls::MockContextManager ssl_context_manager;
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   NiceMock<Event::MockDispatcher> dispatcher;
@@ -931,7 +931,7 @@ TEST(StaticClusterImplTest, EmptyHostname) {
 
 TEST(StaticClusterImplTest, LoadAssignmentEmptyHostname) {
   Stats::IsolatedStoreImpl stats;
-  Ssl::MockContextManager ssl_context_manager;
+  Tls::MockContextManager ssl_context_manager;
   NiceMock<Event::MockDispatcher> dispatcher;
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
@@ -973,7 +973,7 @@ TEST(StaticClusterImplTest, LoadAssignmentEmptyHostname) {
 
 TEST(StaticClusterImplTest, LoadAssignmentMultiplePriorities) {
   Stats::IsolatedStoreImpl stats;
-  Ssl::MockContextManager ssl_context_manager;
+  Tls::MockContextManager ssl_context_manager;
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   NiceMock<Event::MockDispatcher> dispatcher;
@@ -1032,7 +1032,7 @@ TEST(StaticClusterImplTest, LoadAssignmentMultiplePriorities) {
 
 TEST(StaticClusterImplTest, LoadAssignmentLocality) {
   Stats::IsolatedStoreImpl stats;
-  Ssl::MockContextManager ssl_context_manager;
+  Tls::MockContextManager ssl_context_manager;
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   NiceMock<Event::MockDispatcher> dispatcher;
@@ -1090,7 +1090,7 @@ TEST(StaticClusterImplTest, LoadAssignmentLocality) {
 
 TEST(StaticClusterImplTest, AltStatName) {
   Stats::IsolatedStoreImpl stats;
-  Ssl::MockContextManager ssl_context_manager;
+  Tls::MockContextManager ssl_context_manager;
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   NiceMock<Runtime::MockRandomGenerator> random;
@@ -1121,7 +1121,7 @@ TEST(StaticClusterImplTest, AltStatName) {
 
 TEST(StaticClusterImplTest, RingHash) {
   Stats::IsolatedStoreImpl stats;
-  Ssl::MockContextManager ssl_context_manager;
+  Tls::MockContextManager ssl_context_manager;
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   NiceMock<Event::MockDispatcher> dispatcher;
@@ -1154,7 +1154,7 @@ TEST(StaticClusterImplTest, RingHash) {
 
 TEST(StaticClusterImplTest, OutlierDetector) {
   Stats::IsolatedStoreImpl stats;
-  Ssl::MockContextManager ssl_context_manager;
+  Tls::MockContextManager ssl_context_manager;
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   NiceMock<Runtime::MockRandomGenerator> random;
@@ -1210,7 +1210,7 @@ TEST(StaticClusterImplTest, OutlierDetector) {
 
 TEST(StaticClusterImplTest, HealthyStat) {
   Stats::IsolatedStoreImpl stats;
-  Ssl::MockContextManager ssl_context_manager;
+  Tls::MockContextManager ssl_context_manager;
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   NiceMock<Event::MockDispatcher> dispatcher;
@@ -1349,7 +1349,7 @@ TEST(StaticClusterImplTest, HealthyStat) {
 
 TEST(StaticClusterImplTest, UrlConfig) {
   Stats::IsolatedStoreImpl stats;
-  Ssl::MockContextManager ssl_context_manager;
+  Tls::MockContextManager ssl_context_manager;
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   NiceMock<Event::MockDispatcher> dispatcher;
@@ -1401,7 +1401,7 @@ TEST(StaticClusterImplTest, UrlConfig) {
 
 TEST(StaticClusterImplTest, UnsupportedLBType) {
   Stats::IsolatedStoreImpl stats;
-  Ssl::MockContextManager ssl_context_manager;
+  Tls::MockContextManager ssl_context_manager;
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<MockClusterManager> cm;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
@@ -1439,7 +1439,7 @@ TEST(StaticClusterImplTest, UnsupportedLBType) {
 
 TEST(StaticClusterImplTest, MalformedHostIP) {
   Stats::IsolatedStoreImpl stats;
-  Ssl::MockContextManager ssl_context_manager;
+  Tls::MockContextManager ssl_context_manager;
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   NiceMock<Event::MockDispatcher> dispatcher;
@@ -1501,7 +1501,7 @@ TEST(ClusterDefinitionTest, BadDnsClusterConfig) {
 
 TEST(StaticClusterImplTest, SourceAddressPriority) {
   Stats::IsolatedStoreImpl stats;
-  Ssl::MockContextManager ssl_context_manager;
+  Tls::MockContextManager ssl_context_manager;
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   NiceMock<Event::MockDispatcher> dispatcher;
@@ -1553,7 +1553,7 @@ TEST(StaticClusterImplTest, SourceAddressPriority) {
 // configured.
 TEST(ClusterImplTest, CloseConnectionsOnHostHealthFailure) {
   Stats::IsolatedStoreImpl stats;
-  Ssl::MockContextManager ssl_context_manager;
+  Tls::MockContextManager ssl_context_manager;
   auto dns_resolver = std::make_shared<Network::MockDnsResolver>();
   NiceMock<Event::MockDispatcher> dispatcher;
   NiceMock<Runtime::MockLoader> runtime;
@@ -1648,7 +1648,7 @@ public:
   }
 
   Stats::IsolatedStoreImpl stats_;
-  Ssl::MockContextManager ssl_context_manager_;
+  Tls::MockContextManager ssl_context_manager_;
   std::shared_ptr<Network::MockDnsResolver> dns_resolver_{new NiceMock<Network::MockDnsResolver>()};
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Runtime::MockLoader> runtime_;

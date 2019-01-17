@@ -24,8 +24,8 @@ envoy_cc_library(
         ":listen_socket_interface",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/event:deferred_deletable",
-        "//include/envoy/ssl:connection_interface",
         "//include/envoy/stream_info:stream_info_interface",
+        "//include/envoy/tls:connection_interface",
     ],
 )
 
@@ -35,7 +35,7 @@ envoy_cc_library(
     deps = [
         ":listen_socket_interface",
         ":listener_interface",
-        "//include/envoy/ssl:context_interface",
+        "//include/envoy/tls:context_interface",
     ],
 )
 
@@ -75,7 +75,7 @@ envoy_cc_library(
     hdrs = ["transport_socket.h"],
     deps = [
         "//include/envoy/buffer:buffer_interface",
-        "//include/envoy/ssl:connection_interface",
+        "//include/envoy/tls:connection_interface",
     ],
 )
 

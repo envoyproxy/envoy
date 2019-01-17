@@ -8,8 +8,8 @@
 #include "envoy/network/transport_socket.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/secret/secret_manager.h"
-#include "envoy/ssl/context_manager.h"
 #include "envoy/stats/scope.h"
+#include "envoy/tls/context_manager.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/protobuf/protobuf.h"
@@ -26,9 +26,9 @@ public:
   virtual ~TransportSocketFactoryContext() {}
 
   /**
-   * @return Ssl::ContextManager& the SSL context manager.
+   * @return Tls::ContextManager& the SSL context manager.
    */
-  virtual Ssl::ContextManager& sslContextManager() PURE;
+  virtual Tls::ContextManager& sslContextManager() PURE;
 
   /**
    * @return Stats::Scope& the transport socket's stats scope.

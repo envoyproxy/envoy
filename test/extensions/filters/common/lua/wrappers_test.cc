@@ -4,7 +4,7 @@
 
 #include "test/extensions/filters/common/lua/lua_wrappers.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/ssl/mocks.h"
+#include "test/mocks/tls/mocks.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {
@@ -62,7 +62,7 @@ protected:
   }
 
   NiceMock<Envoy::Network::MockConnection> connection_;
-  NiceMock<Envoy::Ssl::MockConnection> ssl_;
+  NiceMock<Envoy::Tls::MockConnection> ssl_;
 };
 
 // Basic buffer wrapper methods test.

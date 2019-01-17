@@ -29,8 +29,8 @@ envoy_cc_library(
     hdrs = ["secret_provider_impl.h"],
     deps = [
         "//include/envoy/secret:secret_provider_interface",
-        "//source/common/ssl:certificate_validation_context_config_impl_lib",
-        "//source/common/ssl:tls_certificate_config_impl_lib",
+        "//source/common/tls:certificate_validation_context_config_impl_lib",
+        "//source/common/tls:tls_certificate_config_impl_lib",
         "@envoy_api//envoy/api/v2/auth:cert_cc",
     ],
 )
@@ -53,7 +53,7 @@ envoy_cc_library(
         "//source/common/config:resources_lib",
         "//source/common/config:subscription_factory_lib",
         "//source/common/protobuf:utility_lib",
-        "//source/common/ssl:certificate_validation_context_config_impl_lib",
-        "//source/common/ssl:tls_certificate_config_impl_lib",
+        "//source/common/tls:certificate_validation_context_config_impl_lib",
+        "//source/common/tls:tls_certificate_config_impl_lib",
     ],
 )

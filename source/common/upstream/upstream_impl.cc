@@ -14,8 +14,8 @@
 #include "envoy/secret/secret_manager.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/server/transport_socket_config.h"
-#include "envoy/ssl/context_manager.h"
 #include "envoy/stats/scope.h"
+#include "envoy/tls/context_manager.h"
 #include "envoy/upstream/health_checker.h"
 
 #include "common/common/enum_to_int.h"
@@ -526,7 +526,7 @@ Network::TransportSocketFactoryPtr createTransportSocketFactory(
 ClusterSharedPtr ClusterImplBase::create(
     const envoy::api::v2::Cluster& cluster, ClusterManager& cm, Stats::Store& stats,
     ThreadLocal::Instance& tls, Network::DnsResolverSharedPtr dns_resolver,
-    Ssl::ContextManager& ssl_context_manager, Runtime::Loader& runtime,
+    Tls::ContextManager& ssl_context_manager, Runtime::Loader& runtime,
     Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
     AccessLog::AccessLogManager& log_manager, const LocalInfo::LocalInfo& local_info,
     Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) {

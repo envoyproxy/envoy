@@ -6,7 +6,7 @@
 #include "envoy/common/pure.h"
 
 namespace Envoy {
-namespace Ssl {
+namespace Tls {
 
 /**
  * Base connection interface for all SSL connections.
@@ -75,5 +75,5 @@ public:
   virtual std::vector<std::string> dnsSansLocalCertificate() const PURE;
 };
 
-} // namespace Ssl
+} // namespace Tls
 } // namespace Envoy
