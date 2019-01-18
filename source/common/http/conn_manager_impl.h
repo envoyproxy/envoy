@@ -426,8 +426,6 @@ private:
     absl::optional<Router::RouteConstSharedPtr> cached_route_;
     absl::optional<Upstream::ClusterInfoConstSharedPtr> cached_cluster_info_;
     DownstreamWatermarkCallbacks* watermark_callbacks_{nullptr};
-    // +++++++++++++++move this to a better location. And lazy creation.
-    // ++++++++++ does it need to be a vector?
     MetadataMapVector request_metadata_map_vector_;
     uint32_t buffer_limit_{0};
     uint32_t high_watermark_count_{0};

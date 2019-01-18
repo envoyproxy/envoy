@@ -16,21 +16,23 @@ public:
     Http::MetadataMap metadata_map = {{"headers", "headers"}};
     Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
     decoder_callbacks_->addDecodedMetadata().emplace_back(std::move(metadata_map_ptr));
-    ENVOY_LOG_MISC(error, "++++++++++++ add headers: size: {}", decoder_callbacks_->addDecodedMetadata().size());
     return Http::FilterHeadersStatus::Continue;
   }
+
   Http::FilterDataStatus decodeData(Buffer::Instance&, bool) override {
     Http::MetadataMap metadata_map = {{"data", "data"}};
     Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
     decoder_callbacks_->addDecodedMetadata().emplace_back(std::move(metadata_map_ptr));
     return Http::FilterDataStatus::Continue;
   }
+
   Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap&) override {
     Http::MetadataMap metadata_map = {{"trailers", "trailers"}};
     Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
     decoder_callbacks_->addDecodedMetadata().emplace_back(std::move(metadata_map_ptr));
     return Http::FilterTrailersStatus::Continue;
   }
+
   // If metadata_map contains key "consume", consumes the metadata, and replace it with a new one.
   // The function also adds a new metadata using addDecodedMetadata().
   Http::FilterMetadataStatus decodeMetadata(Http::MetadataMap& metadata_map) override {
@@ -43,6 +45,7 @@ public:
     return Http::FilterMetadataStatus::Continue;
   }
 };
+
 class AddRequestMetadataStreamFilterConfig
     : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
 public:
@@ -53,8 +56,8 @@ public:
     };
   }
 };
+
 // perform static registration
 static Registry::RegisterFactory<AddRequestMetadataStreamFilterConfig,
-                                 Server::Configuration::NamedHttpFilterConfigFactory>
-    register_;
+                                 Server::Configuration::NamedHttpFilterConfigFactory> register_;
 } // namespace Envoy

@@ -449,21 +449,18 @@ Http::FilterTrailersStatus Filter::decodeTrailers(Http::HeaderMap& trailers) {
 }
 
 Http::FilterMetadataStatus Filter::decodeMetadata(Http::MetadataMap& metadata_map) {
-  // change name++++++++++++++++
-  Http::MetadataMap metadata_map_local;
-  metadata_map_local.insert(metadata_map.begin(), metadata_map.end());
-  Http::MetadataMapPtr metadata_map_local_ptr =
-      std::make_unique<Http::MetadataMap>(metadata_map_local);
+  Http::MetadataMap metadata;
+  metadata.insert(metadata_map.begin(), metadata_map.end());
+  Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata);
 
   if (upstream_request_ == nullptr) {
     ENVOY_STREAM_LOG(trace, "upstream_request_ not ready. Store metadata_map to encode later: {}",
                      *callbacks_, metadata_map);
-    downstream_metadata_map_vector_.emplace_back(std::move(metadata_map_local_ptr));
+    downstream_metadata_map_vector_.emplace_back(std::move(metadata_map_ptr));
     return Http::FilterMetadataStatus::Continue;
   }
 
-  ENVOY_LOG_MISC(error, "+++++ Filter::decodeMetadata: {}", metadata_map);
-  upstream_request_->encodeMetadata(std::move(metadata_map_local_ptr));
+  upstream_request_->encodeMetadata(std::move(metadata_map_ptr));
   return Http::FilterMetadataStatus::Continue;
 }
 

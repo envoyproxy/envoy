@@ -2151,11 +2151,17 @@ name: response-metadata-filter
 config: {}
 )EOF";
 
+static std::string request_metadata_filter =R"EOF(
+name: request-metadata-filter
+config: {}
+)EOF";
+
 void verifyExpectedMetadata(Http::MetadataMap metadata_map, std::set<std::string> keys) {
   for (const auto key : keys) {
     // keys are the same as their corresponding values.
     EXPECT_EQ(metadata_map.find(key)->second, key);
   }
+  ENVOY_LOG_MISC(error, "+++++++++++++ {}", metadata_map);
   EXPECT_EQ(metadata_map.size(), keys.size());
 }
 
@@ -2290,7 +2296,7 @@ std::string HttpIntegrationTest::listenerStatPrefix(const std::string& stat_name
   return "listener.[__1]_0." + stat_name;
 }
 
-// Verifies small metadata can be sent at different locations of the responses.
+// Verifies small metadata can be sent at different locations of a request.
 void HttpIntegrationTest::testEnvoyProxySmallMetadataInRequest() {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -2309,7 +2315,7 @@ void HttpIntegrationTest::testEnvoyProxySmallMetadataInRequest() {
 
   waitForNextUpstreamRequest();
 
-  // Verifies metadata is received by the client.
+  // Verifies metadata is received by upstream.
   upstream_request_->encodeHeaders(default_response_headers_, true);
   EXPECT_EQ(upstream_request_->metadata_map().find("key")->second, "value");
   EXPECT_EQ(upstream_request_->metadata_map().size(), 1);
@@ -2319,7 +2325,7 @@ void HttpIntegrationTest::testEnvoyProxySmallMetadataInRequest() {
   ASSERT_TRUE(response->complete());
 }
 
-// Verifies large metadata can be sent at different locations of the responses.
+// Verifies large metadata can be sent at different locations of a request.
 void HttpIntegrationTest::testEnvoyProxyLargeMetadataInRequest() {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -2339,7 +2345,7 @@ void HttpIntegrationTest::testEnvoyProxyLargeMetadataInRequest() {
 
   waitForNextUpstreamRequest();
 
-  // Verifies metadata is received by the client.
+  // Verifies metadata is received upstream.
   upstream_request_->encodeHeaders(default_response_headers_, true);
   EXPECT_EQ(upstream_request_->metadata_map().find("key")->second, value);
   EXPECT_EQ(upstream_request_->metadata_map().size(), 1);
@@ -2376,14 +2382,12 @@ void HttpIntegrationTest::testEnvoyRequestMetadataReachSizeLimit() {
 }
 
 void HttpIntegrationTest::testConsumeAndInsertRequestMetadata() {
-  config_helper_.addFilter(R"EOF(
-name: request-metadata-filter
-config: {}
-)EOF");
-   config_helper_.addConfigModifier(
-      [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
-          -> void { hcm.set_proxy_100_continue(true); });
-   initialize();
+  addFilters({request_metadata_filter});
+  config_helper_.addConfigModifier(
+     [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
+         -> void { hcm.set_proxy_100_continue(true); });
+
+  initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   // Sends a headers only request.
@@ -2394,8 +2398,8 @@ config: {}
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
   // Verifies a headers metadata added.
-  EXPECT_EQ(upstream_request_->metadata_map().find("headers")->second, "headers");
-  EXPECT_EQ(upstream_request_->metadata_map().size(), 1);
+  std::set<std::string> expected_metadata_keys = {"headers"};
+  verifyExpectedMetadata(upstream_request_->metadata_map(), expected_metadata_keys);
 
   // Sends a headers only request with metadata. An empty data frame carries end_stream.
   auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
@@ -2409,11 +2413,10 @@ config: {}
   upstream_request_->encodeHeaders(default_response_headers_, true);
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_EQ(upstream_request_->metadata_map().find("headers")->second, "headers");
-  EXPECT_EQ(upstream_request_->metadata_map().find("data")->second, "data");
-  EXPECT_EQ(upstream_request_->metadata_map().find("metadata")->second, "metadata");
-  EXPECT_EQ(upstream_request_->metadata_map().find("replace")->second, "replace");
-  EXPECT_EQ(upstream_request_->metadata_map().size(), 4);
+  expected_metadata_keys.insert("data");
+  expected_metadata_keys.insert("metadata");
+  expected_metadata_keys.insert("replace");
+  verifyExpectedMetadata(upstream_request_->metadata_map(), expected_metadata_keys);
 
   // Sends headers, data, metadata and trailer.
   encoder_decoder = codec_client_->startRequest(default_request_headers_);
@@ -2429,12 +2432,8 @@ config: {}
   upstream_request_->encodeHeaders(default_response_headers_, true);
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_EQ(upstream_request_->metadata_map().find("headers")->second, "headers");
-  EXPECT_EQ(upstream_request_->metadata_map().find("data")->second, "data");
-  EXPECT_EQ(upstream_request_->metadata_map().find("metadata")->second, "metadata");
-  EXPECT_EQ(upstream_request_->metadata_map().find("replace")->second, "replace");
-  EXPECT_EQ(upstream_request_->metadata_map().find("trailers")->second, "trailers");
-  EXPECT_EQ(upstream_request_->metadata_map().size(), 5);
+  expected_metadata_keys.insert("trailers");
+  verifyExpectedMetadata(upstream_request_->metadata_map(), expected_metadata_keys);
 
   // Sends headers, large data, metadata. Large data triggers decodeData() multiple times, and each
   // time, a "data" metadata is added.
@@ -2449,21 +2448,19 @@ config: {}
   upstream_request_->encodeHeaders(default_response_headers_, true);
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_EQ(upstream_request_->metadata_map().find("headers")->second, "headers");
-  EXPECT_EQ(upstream_request_->metadata_map().find("data")->second, "data");
-  EXPECT_EQ(upstream_request_->metadata_map().find("metadata")->second, "metadata");
-  EXPECT_EQ(upstream_request_->metadata_map().find("replace")->second, "replace");
-  EXPECT_EQ(upstream_request_->metadata_map().size(), 4);
+
+  expected_metadata_keys.erase("trailers");
+  verifyExpectedMetadata(upstream_request_->metadata_map(), expected_metadata_keys);
   EXPECT_GE(upstream_request_->duplicated_metadata_key_count().find("data")->second, 2);
 
   // Sends multiple metadata.
   encoder_decoder = codec_client_->startRequest(default_request_headers_);
   request_encoder_ = &encoder_decoder.first;
   response = std::move(encoder_decoder.second);
-  metadata_map = {{"metadata1", "value"}};
+  metadata_map = {{"metadata1", "metadata1"}};
   codec_client_->sendMetadata(*request_encoder_, metadata_map);
   codec_client_->sendData(*request_encoder_, 10, false);
-  metadata_map = {{"metadata2", "value"}};
+  metadata_map = {{"metadata2", "metadata2"}};
   codec_client_->sendMetadata(*request_encoder_, metadata_map);
   metadata_map = {{"consume", "consume"}};
   codec_client_->sendMetadata(*request_encoder_, metadata_map);
@@ -2473,14 +2470,9 @@ config: {}
   upstream_request_->encodeHeaders(default_response_headers_, true);
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_EQ(upstream_request_->metadata_map().find("headers")->second, "headers");
-  EXPECT_EQ(upstream_request_->metadata_map().find("data")->second, "data");
-  EXPECT_EQ(upstream_request_->metadata_map().find("metadata")->second, "metadata");
-  EXPECT_EQ(upstream_request_->metadata_map().find("replace")->second, "replace");
-  EXPECT_EQ(upstream_request_->metadata_map().find("metadata1")->second, "value");
-  EXPECT_EQ(upstream_request_->metadata_map().find("metadata2")->second, "value");
-  EXPECT_EQ(upstream_request_->metadata_map().find("trailers")->second, "trailers");
-  EXPECT_EQ(upstream_request_->metadata_map().size(), 7);
+  expected_metadata_keys.insert("metadata1");
+  expected_metadata_keys.insert("metadata2");
+  expected_metadata_keys.insert("trailers");
   EXPECT_EQ(upstream_request_->duplicated_metadata_key_count().find("metadata")->second, 3);
 }
 

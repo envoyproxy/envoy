@@ -783,11 +783,15 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilte
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
 
     if (!request_metadata_map_vector_.empty()) {
-      for (uint64_t i = 0; i < request_metadata_map_vector_.size(); i++) {
-        decodeMetadata((*entry).get(), *(request_metadata_map_vector_[i]));
+      for (const auto& metadata_map : request_metadata_map_vector_) {
+        decodeMetadata((*entry).get(), *metadata_map);
       }
-      Buffer::OwnedImpl empty_data("");
-      addDecodedData(*((*entry).get()), empty_data, true);
+      // If metadata is added to a header only request, we should add an empty data frame to
+      // indicate the end of the stream.
+      if ((*entry)->end_stream_) {
+        Buffer::OwnedImpl empty_data("");
+        addDecodedData(*((*entry).get()), empty_data, true);
+      }
       request_metadata_map_vector_.clear();
     }
 
@@ -903,8 +907,8 @@ void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* 
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
 
     if (!request_metadata_map_vector_.empty()) {
-      for (uint64_t i = 0; i < request_metadata_map_vector_.size(); i++) {
-        decodeMetadata((*entry).get(), *(request_metadata_map_vector_[i]));
+      for (const auto& metadata_map : request_metadata_map_vector_) {
+        decodeMetadata((*entry).get(), *metadata_map);
       }
       request_metadata_map_vector_.clear();
     }
@@ -1004,10 +1008,9 @@ void ConnectionManagerImpl::ActiveStream::decodeTrailers(ActiveStreamDecoderFilt
     state_.filter_call_state_ &= ~FilterCallState::DecodeTrailers;
     ENVOY_STREAM_LOG(trace, "decode trailers called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
-    // ++++++++++ before return or after??
     if (!request_metadata_map_vector_.empty()) {
-      for (uint64_t i = 0; i < request_metadata_map_vector_.size(); i++) {
-        decodeMetadata((*entry).get(), *(request_metadata_map_vector_[i]));
+      for (const auto& metadata_map : request_metadata_map_vector_) {
+        decodeMetadata((*entry).get(), *metadata_map);
       }
       request_metadata_map_vector_.clear();
     }
@@ -1020,9 +1023,6 @@ void ConnectionManagerImpl::ActiveStream::decodeTrailers(ActiveStreamDecoderFilt
 
 void ConnectionManagerImpl::ActiveStream::decodeMetadata(MetadataMapPtr&& metadata_map) {
   resetIdleTimer();
-  // Add check if header has not received, bail out!!! ++++++++++++++++++
-  // Maybe no need to check because if nghttp2 allows it, why we kill it?
-  // change doc++++++++++++++=
   // After going through filters, the ownership of metadata_map will be passed to router filter.
   // Router filter may encode metadata_map to the next hop immediately or store metadata_map and
   // encode later when connection pool is ready.
@@ -1044,8 +1044,8 @@ void ConnectionManagerImpl::ActiveStream::decodeMetadata(ActiveStreamDecoderFilt
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status),
                      metadata_map);
     if (!request_metadata_map_vector_.empty()) {
-      for (uint64_t i = 0; i < request_metadata_map_vector_.size(); i++) {
-        decodeMetadata((*entry).get(), *(request_metadata_map_vector_[i]));
+      for (const auto& metadata_map : request_metadata_map_vector_) {
+        decodeMetadata((*entry).get(), *metadata_map);
       }
       request_metadata_map_vector_.clear();
     }
