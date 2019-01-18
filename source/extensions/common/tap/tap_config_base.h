@@ -3,6 +3,7 @@
 #include "envoy/service/tap/v2alpha/common.pb.h"
 
 #include "extensions/common/tap/tap.h"
+#include "extensions/common/tap/tap_matcher.h"
 
 namespace Envoy {
 namespace Extensions {

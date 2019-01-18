@@ -120,6 +120,20 @@ Another example POST body:
 The preceding configuration instructs the tap filter to match any HTTP requests. All requests will
 be tapped and streamed out the admin endpoint.
 
+Streaming matching
+------------------
+
+The tap filter supports "streaming matching." This means that instead of waiting until the end of
+the request/response sequence, the filter will match incrementally as the request proceeds. I.e.,
+first the request headers will be matched, then the request body if present, then the request
+trailers if present, then the response headers if present, etc.
+
+In the future, the filter will support streaming output. Currently only :ref:`fully buffered output
+<envoy_api_msg_data.tap.v2alpha.HttpBufferedTrace>` is implemented. However, even in the current
+implementation, if a tap is configured to match request headers and the request headers match,
+even if there is no response (upstream failure, etc.) the request will still be tapped and sent
+to the configured output.
+
 Statistics
 ----------
 
