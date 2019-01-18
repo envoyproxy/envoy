@@ -28,6 +28,22 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "conn_pool_map",
+    hdrs = ["conn_pool_map.h"],
+    deps = [
+        "//include/envoy/event:dispatcher_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "conn_pool_map_impl_lib",
+    hdrs = ["conn_pool_map_impl.h"],
+    deps = [
+        ":conn_pool_map",
+    ],
+)
+
+envoy_cc_library(
     name = "cluster_manager_lib",
     srcs = ["cluster_manager_impl.cc"],
     hdrs = ["cluster_manager_impl.h"],
