@@ -6,7 +6,6 @@ syntax = "proto3";
 
 package envoy.data.tap.v2alpha;
 option java_package = "io.envoyproxy.envoy.data.tap.v2alpha";
-option java_multiple_files = true;
 option go_package = "v2";
 
 import "envoy/api/v2/core/address.proto";

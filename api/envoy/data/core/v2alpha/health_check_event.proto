@@ -2,7 +2,6 @@ syntax = "proto3";
 
 package envoy.data.core.v2alpha;
 option java_package = "io.envoyproxy.envoy.data.core.v2alpha";
-option java_multiple_files = true;
 
 import "envoy/api/v2/core/address.proto";
 
@@ -32,6 +31,12 @@ message HealthCheckEvent {
 
     // Host failure.
     HealthCheckFailure health_check_failure_event = 7;
+
+    // Healthy host became degraded.
+    DegradedHealthyHost degraded_healthy_host = 8;
+
+    // A degraded host returned to being healthy.
+    NoLongerDegradedHost no_longer_degraded_host = 9;
   }
 
   // Timestamp for event.
@@ -68,4 +73,10 @@ message HealthCheckFailure {
   HealthCheckFailureType failure_type = 1 [(validate.rules).enum.defined_only = true];
   // Whether this event is the result of the first ever health check on a host.
   bool first_check = 2;
+}
+
+message DegradedHealthyHost {
+}
+
+message NoLongerDegradedHost {
 }

@@ -39,7 +39,7 @@ SubsetLoadBalancer::SubsetLoadBalancer(
   refreshSubsets();
 
   // Configure future updates.
-  original_priority_set_callback_handle_ = priority_set.addMemberUpdateCb(
+  original_priority_set_callback_handle_ = priority_set.addPriorityUpdateCb(
       [this](uint32_t priority, const HostVector& hosts_added, const HostVector& hosts_removed) {
         if (!hosts_added.size() && !hosts_removed.size()) {
           // It's possible that metadata changed, without hosts being added nor removed.

@@ -2,8 +2,9 @@
 
 #include "envoy/service/discovery/v2/hds.pb.h"
 
-#include "common/ssl/context_manager_impl.h"
 #include "common/upstream/health_discovery_service.h"
+
+#include "extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/event/mocks.h"
@@ -113,7 +114,7 @@ public:
   Grpc::MockAsyncClient* async_client_;
   Runtime::MockLoader runtime_;
   Event::SimulatedTimeSystem time_system_;
-  Ssl::ContextManagerImpl ssl_context_manager_{time_system_};
+  Extensions::TransportSockets::Tls::ContextManagerImpl ssl_context_manager_{time_system_};
   NiceMock<Runtime::MockRandomGenerator> random_;
   NiceMock<Envoy::AccessLog::MockAccessLogManager> log_manager_;
   NiceMock<Upstream::MockClusterManager> cm_;

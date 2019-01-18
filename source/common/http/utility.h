@@ -23,6 +23,23 @@ namespace Http {
 namespace Utility {
 
 /**
+ * Given a fully qualified URL, splits the string_view provided into scheme,
+ * host and path components.
+ */
+class Url {
+public:
+  bool initialize(absl::string_view absolute_url);
+  absl::string_view scheme() { return scheme_; }
+  absl::string_view host_and_port() { return host_and_port_; }
+  absl::string_view path() { return path_; }
+
+private:
+  absl::string_view scheme_;
+  absl::string_view host_and_port_;
+  absl::string_view path_;
+};
+
+/**
  * Append to x-forwarded-for header.
  * @param headers supplies the headers to append to.
  * @param remote_address supplies the remote address to append.

@@ -1,0 +1,2 @@
+package envoy.foo;
+option java_package = "io.envoyproxy.envoy.foo";

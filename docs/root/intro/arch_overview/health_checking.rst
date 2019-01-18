@@ -146,3 +146,13 @@ additionally compares the value of the *x-envoy-upstream-healthchecked-cluster* 
 *service_name*. If the values do not match, the health check does not pass. The upstream health
 check filter appends *x-envoy-upstream-healthchecked-cluster* to the response headers. The appended
 value is determined by the :option:`--service-cluster` command line option.
+
+.. _arch_overview_health_checking_degraded:
+
+Degraded health
+---------------
+When using the HTTP health checker, an upstream host can return ``x-envoy-degraded`` to inform the
+health checker that the host is degraded. See :ref:`here <arch_overview_load_balancing_degraded>` for
+how this affects load balancing.
+
+

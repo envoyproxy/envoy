@@ -14,7 +14,7 @@ public:
   MOCK_METHOD0(metadataMatchCriteria, Router::MetadataMatchCriteria*());
   MOCK_CONST_METHOD0(downstreamConnection, const Network::Connection*());
   MOCK_CONST_METHOD0(downstreamHeaders, const Http::HeaderMap*());
-  MOCK_METHOD2(determinePriorityLoad, const PriorityLoad&(const PrioritySet&, const PriorityLoad&));
+  MOCK_METHOD2(determinePriorityLoad, const HealthyLoad&(const PrioritySet&, const HealthyLoad&));
   MOCK_METHOD1(shouldSelectAnotherHost, bool(const Host&));
   MOCK_CONST_METHOD0(hostSelectionRetryCount, uint32_t());
 };
