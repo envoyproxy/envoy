@@ -95,7 +95,8 @@ message VirtualHost {
   // .. attention::
   //
   //    **This field is deprecated**. Set the
-  //    :ref:`envoy_api_msg_route.VirtualHost.request_headers` field instead.
+  //    :ref:`request_headers<envoy_api_field_route.VirtualHost.request_headers>`
+  //    field instead.
   repeated core.HeaderValueOption request_headers_to_add = 7
       [(validate.rules).repeated .max_items = 1000, deprecated = true];
 
@@ -105,7 +106,8 @@ message VirtualHost {
   // .. attention::
   //
   //    **This field is deprecated**. Set the
-  //    :ref:`envoy_api_msg_route.VirtualHost.request_headers` field instead.
+  //    :ref:`request_headers<envoy_api_field_route.VirtualHost.request_headers>`
+  //    field instead.
   repeated string request_headers_to_remove = 13 [deprecated = true];
 
   // Specifies a list of HTTP headers that should be added/removed to each
@@ -126,7 +128,8 @@ message VirtualHost {
   // .. attention::
   //
   //    **This field is deprecated**. Set the
-  //    :ref:`envoy_api_msg_route.VirtualHost.response_headers` field instead.
+  //    :ref:`response_headers<envoy_api_field_route.VirtualHost.response_headers>`
+  //    field instead.
   repeated core.HeaderValueOption response_headers_to_add = 10
       [(validate.rules).repeated .max_items = 1000, deprecated = true];
 
@@ -136,7 +139,8 @@ message VirtualHost {
   // .. attention::
   //
   //    **This field is deprecated**. Set the
-  //    :ref:`envoy_api_msg_route.VirtualHost.response_headers` field instead.
+  //    :ref:`response_headers<envoy_api_field_route.VirtualHost.response_headers>`
+  //    field instead.
   repeated string response_headers_to_remove = 11 [deprecated = true];
 
   // Indicates that the virtual host has a CORS policy.
@@ -240,7 +244,7 @@ message Route {
   // .. attention::
   //
   //    **This field is deprecated**. Set the
-  //    :ref:`envoy_api_msg_route.Route.request_headers` field instead.
+  //    :ref:`request_headers<envoy_api_field_route.Route.request_headers>` field instead.
   repeated core.HeaderValueOption request_headers_to_add = 9
       [(validate.rules).repeated .max_items = 1000, deprecated = true];
 
@@ -250,7 +254,7 @@ message Route {
   // .. attention::
   //
   //    **This field is deprecated**. Set the
-  //    :ref:`envoy_api_msg_route.Route.request_headers` field instead.
+  //    :ref:`request_headers<envoy_api_field_route.Route.request_headers>` field instead.
   repeated string request_headers_to_remove = 12 [deprecated = true];
 
   // Specifies a list of HTTP headers that should be added/removed to each
@@ -271,7 +275,7 @@ message Route {
   // .. attention::
   //
   //    **This field is deprecated**. Set the
-  //    :ref:`envoy_api_msg_route.Route.response_headers` field instead.
+  //    :ref:`response_headers<envoy_api_field_route.Route.response_headers>` field instead.
   repeated core.HeaderValueOption response_headers_to_add = 10
       [(validate.rules).repeated .max_items = 1000, deprecated = true];
 
@@ -281,7 +285,7 @@ message Route {
   // .. attention::
   //
   //    **This field is deprecated**. Set the
-  //    :ref:`envoy_api_msg_route.Route.response_headers` field instead.
+  //    :ref:`response_headers<envoy_api_field_route.Route.response_headers>` field instead.
   repeated string response_headers_to_remove = 11 [deprecated = true];
 }
 
@@ -331,7 +335,8 @@ message WeightedCluster {
     // .. attention::
     //
     //    **This field is deprecated**. Set the
-    //    :ref:`envoy_api_msg_route.WeightedCluster.request_headers` field instead.
+    //    :ref:`request_headers<envoy_api_field_route.weightedcluster.clusterweight.request_headers>`
+    //    field instead.
     repeated core.HeaderValueOption request_headers_to_add = 4
         [(validate.rules).repeated .max_items = 1000, deprecated = true];
 
@@ -341,7 +346,8 @@ message WeightedCluster {
     // .. attention::
     //
     //    **This field is deprecated**. Set the
-    //    :ref:`envoy_api_msg_route.WeightedCluster.request_headers` field instead.
+    //    :ref:`request_headers<envoy_api_field_route.weightedcluster.clusterweight.request_headers>`
+    //    field instead.
     repeated string request_headers_to_remove = 9 [deprecated = true];
 
     // Specifies a list of HTTP headers that should be added/removed to each
@@ -364,7 +370,8 @@ message WeightedCluster {
     // .. attention::
     //
     //    **This field is deprecated**. Set the
-    //    :ref:`envoy_api_msg_route.WeightedCluster.response_headers` field instead.
+    //    :ref:`response_headers<envoy_api_field_route.weightedcluster.clusterweight.response_headers>`
+    //    field instead.
     repeated core.HeaderValueOption response_headers_to_add = 5
         [(validate.rules).repeated .max_items = 1000, deprecated = true];
 
@@ -374,7 +381,8 @@ message WeightedCluster {
     // .. attention::
     //
     //    **This field is deprecated**. Set the
-    //    :ref:`envoy_api_msg_route.WeightedCluster.response_headers` field instead.
+    //    :ref:`response_headers<envoy_api_field_route.weightedcluster.clusterweight.response_headers>`
+    //    field instead.
     repeated string response_headers_to_remove = 6 [deprecated = true];
 
     reserved 7;

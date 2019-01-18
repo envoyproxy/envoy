@@ -118,7 +118,7 @@ message HealthCheck {
     // .. attention::
     //
     //    **This field is deprecated**. Set the
-    //    :ref:`envoy_api_field_core.HealthCheck.HttpHealthCheck.request_headers`
+    //    :ref:`request_headers<envoy_api_field_core.HealthCheck.HttpHealthCheck.request_headers>`
     //    field instead.
     repeated core.HeaderValueOption request_headers_to_add = 6
         [(validate.rules).repeated .max_items = 1000, deprecated = true];
@@ -129,7 +129,7 @@ message HealthCheck {
     // .. attention::
     //
     //    **This field is deprecated**. Set the
-    //    :ref:`envoy_api_field_core.HealthCheck.HttpHealthCheck.request_headers`
+    //    :ref:`request_headers<envoy_api_field_core.HealthCheck.HttpHealthCheck.request_headers>`
     //    field instead.
     repeated string request_headers_to_remove = 8 [deprecated = true];
 

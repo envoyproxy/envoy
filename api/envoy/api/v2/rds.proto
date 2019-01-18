@@ -79,7 +79,8 @@ message RouteConfiguration {
   // .. attention::
   //
   //    **This field is deprecated**. Set the
-  //    :ref:`envoy_api_msg_RouteConfiguration.response_headers` field instead.
+  //    :ref:`response_headers<envoy_api_field_RouteConfiguration.response_headers>`
+  //    field instead.
   repeated core.HeaderValueOption response_headers_to_add = 4
       [(validate.rules).repeated .max_items = 1000, deprecated = true];
 
@@ -89,7 +90,8 @@ message RouteConfiguration {
   // .. attention::
   //
   //    **This field is deprecated**. Set the
-  //    :ref:`envoy_api_msg_RouteConfiguration.response_headers` field instead.
+  //    :ref:`response_headers<envoy_api_field_RouteConfiguration.response_headers>`
+  //    field instead.
   repeated string response_headers_to_remove = 5 [deprecated = true];
 
   // Specifies a list of HTTP headers that should be added/removed to each
@@ -110,7 +112,8 @@ message RouteConfiguration {
   // .. attention::
   //
   //    **This field is deprecated**. Set the
-  //    :ref:`envoy_api_msg_RouteConfiguration.request_headers` field instead.
+  //    :ref:`request_headers<envoy_api_field_RouteConfiguration.request_headers>`
+  //    field instead.
   repeated core.HeaderValueOption request_headers_to_add = 6
       [(validate.rules).repeated .max_items = 1000, deprecated = true];
 
@@ -120,7 +123,8 @@ message RouteConfiguration {
   // .. attention::
   //
   //    **This field is deprecated**. Set the
-  //    :ref:`envoy_api_msg_RouteConfiguration.request_headers` field instead.
+  //    :ref:`request_headers<envoy_api_field_RouteConfiguration.request_headers>`
+  //    field instead.
   repeated string request_headers_to_remove = 8 [deprecated = true];
 
   // An optional boolean that specifies whether the clusters that the route
