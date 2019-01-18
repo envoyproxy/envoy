@@ -12,8 +12,9 @@
 #include "common/network/socket_option_impl.h"
 #include "common/network/transport_socket_options_impl.h"
 #include "common/network/utility.h"
-#include "common/ssl/context_manager_impl.h"
 #include "common/upstream/cluster_manager_impl.h"
+
+#include "extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/access_log/mocks.h"
@@ -122,7 +123,8 @@ public:
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   NiceMock<Event::MockDispatcher> dispatcher_;
-  Ssl::ContextManagerImpl ssl_context_manager_{dispatcher_.timeSystem()};
+  Extensions::TransportSockets::Tls::ContextManagerImpl ssl_context_manager_{
+      dispatcher_.timeSystem()};
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Secret::MockSecretManager> secret_manager_;
 };
@@ -983,7 +985,7 @@ TEST_F(ClusterManagerImplTest, DynamicRemoveWithLocalCluster) {
 
   // Add another update callback on foo so we make sure callbacks keep working.
   ReadyWatcher membership_updated;
-  foo->prioritySet().addMemberUpdateCb(
+  foo->prioritySet().addPriorityUpdateCb(
       [&membership_updated](uint32_t, const HostVector&, const HostVector&) -> void {
         membership_updated.ready();
       });

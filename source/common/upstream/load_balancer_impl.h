@@ -24,11 +24,16 @@ static constexpr uint32_t kDefaultOverProvisioningFactor = 140;
  */
 class LoadBalancerBase : public LoadBalancer {
 public:
+  enum class HostAvailability { Healthy, Degraded };
+
   // A utility function to chose a priority level based on a precomputed hash and
-  // a priority vector in the style of per_priority_load_
+  // two PriorityLoad vectors, one for healthy load and one for degraded.
   //
-  // Returns the priority, a number between 0 and per_priority_load.size()-1
-  static uint32_t choosePriority(uint64_t hash, const PriorityLoad& per_priority_load);
+  // Returns the priority, a number between 0 and per_priority_load.size()-1 as well as which host
+  // availability level was chosen.
+  static std::pair<uint32_t, HostAvailability>
+  choosePriority(uint64_t hash, const HealthyLoad& healthy_per_priority_load,
+                 const DegradedLoad& degraded_per_priority_load);
 
   HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
 
@@ -59,10 +64,20 @@ protected:
                    Runtime::RandomGenerator& random,
                    const envoy::api::v2::Cluster::CommonLbConfig& common_config);
 
-  // Choose host set randomly, based on the per_priority_load_;
-  HostSet& chooseHostSet(LoadBalancerContext* context);
+  // Choose host set randomly, based on the healthy_per_priority_load_ and
+  // degraded_per_priority_load_. per_priority_load_ is consulted first, spilling over to
+  // degraded_per_priority_load_ if necessary. When a host set is selected based on
+  // degraded_per_priority_load_, only degraded hosts should be selected from that host set.
+  //
+  // @return host set to use and which availability to target.
+  std::pair<HostSet&, HostAvailability> chooseHostSet(LoadBalancerContext* context);
 
-  uint32_t percentageLoad(uint32_t priority) const { return per_priority_load_.get()[priority]; }
+  uint32_t percentageLoad(uint32_t priority) const {
+    return healthy_per_priority_load_.get()[priority];
+  }
+  uint32_t percentageDegradedLoad(uint32_t priority) const {
+    return degraded_per_priority_load_.get()[priority];
+  }
   bool isInPanic(uint32_t priority) const { return per_priority_panic_[priority]; }
 
   ClusterStats& stats_;
@@ -77,26 +92,41 @@ public:
   // per_priority_health for that priority level, and may update per_priority_load for all
   // priority levels.
   void static recalculatePerPriorityState(uint32_t priority, const PrioritySet& priority_set,
-                                          PriorityLoad& priority_load,
-                                          PriorityAvailability& per_priority_health);
+                                          HealthyLoad& healthy_priority_load,
+                                          DegradedLoad& degraded_priority_load,
+                                          HealthyAvailability& per_priority_health,
+                                          DegradedAvailability& per_priority_degraded);
   void recalculatePerPriorityPanic();
 
 protected:
-  // Method calculates normalized total health. Each priority level's health is ratio of
-  // healthy hosts to total number of hosts in a priority multiplied by overprovisioning factor
-  // of 1.4 and capped at 100%. Effectively each priority's health is a value between 0-100%.
-  // Calculating normalized total health starts with summarizing all priorities' health values.
-  // It can exceed 100%. For example if there are three priorities and each is 100% healthy, the
-  // total of all priorities is 300%. Normalized total health is then capped at 100%.
-  static uint32_t calcNormalizedTotalHealth(PriorityAvailability& per_priority_health) {
-    return std::min<uint32_t>(
-        std::accumulate(per_priority_health.get().begin(), per_priority_health.get().end(), 0),
-        100);
+  // Method calculates normalized total availability.
+  //
+  // The availability of a priority is ratio of available (healthy/degraded) hosts over the total
+  // number of hosts multiplied by 100 and the overprovisioning factor. The total availability is
+  // the sum of the availability of each priority, up to a maximum of 100.
+  //
+  // For example, using the default overprovisioning factor of 1.4, a if priority A has 4 hosts,
+  // of which 1 is degraded and 1 is healthy, it will have availability of 2/4 * 100 * 1.4 = 70.
+  //
+  // Assuming two priorities with availability 60 and 70, the total availability would be 100.
+  static uint32_t
+  calculateNormalizedTotalAvailability(HealthyAvailability& per_priority_health,
+                                       DegradedAvailability& per_priority_degraded) {
+    const auto health =
+        std::accumulate(per_priority_health.get().begin(), per_priority_health.get().end(), 0);
+    const auto degraded =
+        std::accumulate(per_priority_degraded.get().begin(), per_priority_degraded.get().end(), 0);
+
+    return std::min<uint32_t>(health + degraded, 100);
   }
-  // The percentage load (0-100) for each priority level
-  PriorityLoad per_priority_load_;
-  // The health (0-100) for each priority level.
-  PriorityAvailability per_priority_health_;
+  // The percentage load (0-100) for each priority level when targeting healthy hosts.
+  HealthyLoad healthy_per_priority_load_;
+  // The percentage load (0-100) for each priority level when targeting degraded hosts.
+  DegradedLoad degraded_per_priority_load_;
+  // The health percentage (0-100) for each priority level.
+  HealthyAvailability per_priority_health_;
+  // The degraded percentage (0-100) for each priority level.
+  DegradedAvailability per_priority_degraded_;
   // Levels which are in panic
   std::vector<bool> per_priority_panic_;
 };
@@ -111,8 +141,8 @@ public:
 
   const Http::HeaderMap* downstreamHeaders() const override { return nullptr; }
 
-  const PriorityLoad& determinePriorityLoad(const PrioritySet&,
-                                            const PriorityLoad& original_priority_load) override {
+  const HealthyLoad& determinePriorityLoad(const PrioritySet&,
+                                           const HealthyLoad& original_priority_load) override {
     return original_priority_load;
   }
 
@@ -143,20 +173,26 @@ protected:
       AllHosts,
       // All healthy hosts in the host set.
       HealthyHosts,
+      // All degraded hosts in the host set.
+      DegradedHosts,
       // Healthy hosts for locality @ locality_index.
       LocalityHealthyHosts,
+      // Degraded hosts for locality @ locality_index.
+      LocalityDegradedHosts,
     };
 
     HostsSource() {}
 
     HostsSource(uint32_t priority, SourceType source_type)
         : priority_(priority), source_type_(source_type) {
-      ASSERT(source_type == SourceType::AllHosts || source_type == SourceType::HealthyHosts);
+      ASSERT(source_type == SourceType::AllHosts || source_type == SourceType::HealthyHosts ||
+             source_type == SourceType::DegradedHosts);
     }
 
     HostsSource(uint32_t priority, SourceType source_type, uint32_t locality_index)
         : priority_(priority), source_type_(source_type), locality_index_(locality_index) {
-      ASSERT(source_type == SourceType::LocalityHealthyHosts);
+      ASSERT(source_type == SourceType::LocalityHealthyHosts ||
+             source_type == SourceType::LocalityDegradedHosts);
     }
 
     // Priority in PrioritySet.
@@ -235,6 +271,28 @@ private:
   void regenerateLocalityRoutingStructures();
 
   HostSet& localHostSet() const { return *local_priority_set_->hostSetsPerPriority()[0]; }
+
+  static HostsSource::SourceType localitySourceType(HostAvailability host_availability) {
+    switch (host_availability) {
+    case HostAvailability::Healthy:
+      return HostsSource::SourceType::LocalityHealthyHosts;
+    case HostAvailability::Degraded:
+      return HostsSource::SourceType::LocalityDegradedHosts;
+    default:
+      NOT_REACHED_GCOVR_EXCL_LINE;
+    }
+  }
+
+  static HostsSource::SourceType sourceType(HostAvailability host_availability) {
+    switch (host_availability) {
+    case HostAvailability::Healthy:
+      return HostsSource::SourceType::HealthyHosts;
+    case HostAvailability::Degraded:
+      return HostsSource::SourceType::DegradedHosts;
+    default:
+      NOT_REACHED_GCOVR_EXCL_LINE;
+    }
+  }
 
   // The set of local Envoy instances which are load balancing across priority_set_.
   const PrioritySet* local_priority_set_;

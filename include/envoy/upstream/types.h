@@ -19,12 +19,32 @@ struct Load {};
 // This should either sum to 100 or consist of all zeros.
 typedef Phantom<std::vector<uint32_t>, Load> PriorityLoad;
 
+// PriorityLoad specific to degraded hosts.
+struct DegradedLoad : PriorityLoad {
+  using PriorityLoad::PriorityLoad;
+};
+
+// PriorityLoad specific to healthy hosts.
+struct HealthyLoad : PriorityLoad {
+  using PriorityLoad::PriorityLoad;
+};
+
 // Phantom type indicating that the type is related to host availability.
 struct Availability {};
 
 // Mapping from a priority how available the given priority is, eg. the ratio of healthy host to
 // total hosts.
 typedef Phantom<std::vector<uint32_t>, Availability> PriorityAvailability;
+
+// Availability specific to degraded hosts.
+struct DegradedAvailability : PriorityAvailability {
+  using PriorityAvailability::PriorityAvailability;
+};
+
+// Availability specific to healthy hosts.
+struct HealthyAvailability : PriorityAvailability {
+  using PriorityAvailability::PriorityAvailability;
+};
 
 } // namespace Upstream
 } // namespace Envoy

@@ -4,11 +4,11 @@
 
 #include "extensions/filters/listener/tls_inspector/tls_inspector.h"
 
+#include "test/extensions/filters/listener/tls_inspector/tls_utility.h"
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
-#include "test/test_common/tls_utility.h"
 
 #include "gtest/gtest.h"
 #include "openssl/ssl.h"

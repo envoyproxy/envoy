@@ -149,7 +149,8 @@ class Filter : Logger::Loggable<Logger::Id::router>,
 public:
   Filter(FilterConfig& config)
       : config_(config), downstream_response_started_(false), downstream_end_stream_(false),
-        do_shadowing_(false), is_retry_(false) {}
+        do_shadowing_(false), is_retry_(false),
+        attempting_internal_redirect_with_complete_stream_(false) {}
 
   ~Filter();
 
@@ -217,9 +218,9 @@ public:
     return retry_state_->shouldSelectAnotherHost(host);
   }
 
-  const Upstream::PriorityLoad&
+  const Upstream::HealthyLoad&
   determinePriorityLoad(const Upstream::PrioritySet& priority_set,
-                        const Upstream::PriorityLoad& original_priority_load) override {
+                        const Upstream::HealthyLoad& original_priority_load) override {
     // We only modify the priority load on retries.
     if (!is_retry_) {
       return original_priority_load;
@@ -380,6 +381,7 @@ private:
                        const absl::optional<Http::StreamResetReason>& reset_reason);
   void sendNoHealthyUpstreamResponse();
   bool setupRetry(bool end_stream);
+  bool setupRedirect(const Http::HeaderMap& headers);
   void doRetry();
   // Called immediately after a non-5xx header is received from upstream, performs stats accounting
   // and handle difference between gRPC and non-gRPC requests.
@@ -413,6 +415,7 @@ private:
   bool do_shadowing_ : 1;
   bool is_retry_ : 1;
   bool include_attempt_count_ : 1;
+  bool attempting_internal_redirect_with_complete_stream_ : 1;
   uint32_t attempt_count_{1};
 };
 

@@ -96,6 +96,7 @@ PROTO_RST="
   /envoy/config/filter/http/router/v2/router/envoy/config/filter/http/router/v2/router.proto.rst
   /envoy/config/filter/http/squash/v2/squash/envoy/config/filter/http/squash/v2/squash.proto.rst
   /envoy/config/filter/http/transcoder/v2/transcoder/envoy/config/filter/http/transcoder/v2/transcoder.proto.rst
+  /envoy/config/filter/listener/original_src/v2alpha1/original_src/envoy/config/filter/listener/original_src/v2alpha1/original_src.proto.rst
   /envoy/config/filter/network/client_ssl_auth/v2/client_ssl_auth/envoy/config/filter/network/client_ssl_auth/v2/client_ssl_auth.proto.rst
   /envoy/config/filter/network/ext_authz/v2/ext_authz/envoy/config/filter/network/ext_authz/v2/ext_authz.proto.rst
   /envoy/config/filter/network/http_connection_manager/v2/http_connection_manager/envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.proto.rst

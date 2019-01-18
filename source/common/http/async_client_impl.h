@@ -239,6 +239,9 @@ private:
 
     bool includeAttemptCount() const override { return false; }
     const Router::RouteEntry::UpgradeMap& upgradeMap() const override { return upgrade_map_; }
+    Router::InternalRedirectAction internalRedirectAction() const override {
+      return Router::InternalRedirectAction::PassThrough;
+    }
 
     static const NullRateLimitPolicy rate_limit_policy_;
     static const NullRetryPolicy retry_policy_;
@@ -318,6 +321,7 @@ private:
   void removeDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks&) override {}
   void setDecoderBufferLimit(uint32_t) override {}
   uint32_t decoderBufferLimit() override { return 0; }
+  bool recreateStream() override { return false; }
 
   AsyncClient::StreamCallbacks& stream_callbacks_;
   const uint64_t stream_id_;

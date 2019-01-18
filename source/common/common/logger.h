@@ -77,7 +77,9 @@ public:
     off = spdlog::level::off
   } levels;
 
-  std::string levelString() const { return spdlog::level::level_names[logger_->level()]; }
+  spdlog::string_view_t levelString() const {
+    return spdlog::level::level_string_views[logger_->level()];
+  }
   std::string name() const { return logger_->name(); }
   void setLevel(spdlog::level::level_enum level) { logger_->set_level(level); }
   spdlog::level::level_enum level() const { return logger_->level(); }
