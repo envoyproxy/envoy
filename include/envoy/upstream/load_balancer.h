@@ -55,8 +55,9 @@ public:
    * @return a reference to the priority load data that should be used to select a priority.
    *
    */
-  virtual const HealthyLoad& determinePriorityLoad(const PrioritySet& priority_set,
-                                                   const HealthyLoad& original_priority_load) PURE;
+  virtual const HealthyAndDegradedLoad&
+  determinePriorityLoad(const PrioritySet& priority_set,
+                        const HealthyAndDegradedLoad& original_priority_load) PURE;
 
   /**
    * Called to determine whether we should reperform host selection. The load balancer
