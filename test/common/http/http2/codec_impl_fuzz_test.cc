@@ -291,8 +291,8 @@ DEFINE_PROTO_FUZZER(const test::common::http::http2::CodecImplFuzzTestCase& inpu
   // For new streams when we aren't expecting one (e.g. as a result of a mutation).
   NiceMock<MockStreamDecoder> orphan_request_decoder;
 
-  ON_CALL(server_callbacks, newStream(_))
-      .WillByDefault(Invoke([&](StreamEncoder& encoder) -> StreamDecoder& {
+  ON_CALL(server_callbacks, newStream(_, _))
+      .WillByDefault(Invoke([&](StreamEncoder& encoder, bool) -> StreamDecoder& {
         if (pending_streams.empty()) {
           return orphan_request_decoder;
         }

@@ -4,6 +4,8 @@
 syntax = "proto3";
 
 package envoy.config.trace.v2;
+option java_package = "io.envoyproxy.envoy.config.trace.v2";
+option java_multiple_files = true;
 option go_package = "v2";
 
 import "envoy/api/v2/core/grpc_service.proto";
@@ -42,9 +44,8 @@ message Tracing {
     // - :ref:`DatadogConfig <envoy_api_msg_config.trace.v2.DatadogConfig>`
     // - :ref:`OpenCensusConfig <envoy_api_msg_config.trace.v2.OpenCensusConfig>`
     oneof config_type {
-      google.protobuf.Struct config = 2;
+      google.protobuf.Struct config = 2 [deprecated = true];
 
-      // [#not-implemented-hide:]
       google.protobuf.Any typed_config = 3;
     }
   }

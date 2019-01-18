@@ -25,6 +25,7 @@
 
 #include "test/test_common/printers.h"
 
+#include "absl/time/time.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -256,9 +257,9 @@ public:
   /**
    * Returns a "novel" IPv4 loopback address, if available.
    * For many tests, we want a loopback address other than 127.0.0.1 where possible. For some
-   * platforms such as OSX, only 127.0.0.1 is available for IPv4 loopback.
+   * platforms such as macOS, only 127.0.0.1 is available for IPv4 loopback.
    *
-   * @return string 127.0.0.x , where x is "1" for OSX and "9" otherwise.
+   * @return string 127.0.0.x , where x is "1" for macOS and "9" otherwise.
    */
   static std::string getIpv4Loopback() {
 #ifdef __APPLE__
@@ -304,17 +305,64 @@ public:
     return result;
   }
 
-  static std::tm parseTimestamp(const std::string& format, const std::string& time_str);
+  static absl::Time parseTime(const std::string& input, const std::string& input_format);
+  static std::string formatTime(const absl::Time input, const std::string& output_format);
+  static std::string formatTime(const SystemTime input, const std::string& output_format);
+  static std::string convertTime(const std::string& input, const std::string& input_format,
+                                 const std::string& output_format);
 
   static constexpr std::chrono::milliseconds DefaultTimeout = std::chrono::milliseconds(10000);
 
   static void renameFile(const std::string& old_name, const std::string& new_name);
   static void createDirectory(const std::string& name);
   static void createSymlink(const std::string& target, const std::string& link);
+
+  /**
+   * Return a prefix string matcher.
+   * @param string prefix.
+   * @return Object StringMatcher.
+   */
+  static const envoy::type::matcher::StringMatcher createPrefixMatcher(std::string str) {
+    envoy::type::matcher::StringMatcher matcher;
+    matcher.set_prefix(str);
+    return matcher;
+  }
+
+  /**
+   * Return an exact string matcher.
+   * @param string exact.
+   * @return Object StringMatcher.
+   */
+  static const envoy::type::matcher::StringMatcher createExactMatcher(std::string str) {
+    envoy::type::matcher::StringMatcher matcher;
+    matcher.set_exact(str);
+    return matcher;
+  }
+
+  /**
+   * Return a regex string matcher.
+   * @param string exact.
+   * @return Object StringMatcher.
+   */
+  static const envoy::type::matcher::StringMatcher createRegexMatcher(std::string str) {
+    envoy::type::matcher::StringMatcher matcher;
+    matcher.set_regex(str);
+    return matcher;
+  }
 };
 
 /**
- * This utility class wraps the common case of having a cross-thread "one shot" ready condition.
+ * Wraps the common case of having a cross-thread "one shot" ready condition.
+ *
+ * It functions like absl::Notification except the usage of notifyAll() appears
+ * to trigger tighter simultaneous wakeups in multiple threads, resulting in
+ * more contentions, e.g. for BM_CreateRace in
+ * ../common/stats/symbol_table_speed_test.cc.
+ *
+ * See
+ *     https://github.com/abseil/abseil-cpp/blob/master/absl/synchronization/notification.h
+ * for the absl impl, which appears to result in fewer contentions (and in
+ * tests we want contentions).
  */
 class ConditionalInitializer {
 public:
@@ -329,6 +377,13 @@ public:
    * only be called once in between a call to waitReady().
    */
   void waitReady();
+
+  /**
+   * Waits until ready; does not reset it. This variation is immune to spurious
+   * condvar wakeups, and is also suitable for having multiple threads wait on
+   * a common condition.
+   */
+  void wait();
 
 private:
   Thread::CondVar cv_;

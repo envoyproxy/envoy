@@ -9,8 +9,9 @@
 #include "common/event/dispatcher_impl.h"
 #include "common/network/connection_impl.h"
 #include "common/network/utility.h"
-#include "common/ssl/context_config_impl.h"
-#include "common/ssl/context_manager_impl.h"
+
+#include "extensions/transport_sockets/tls/context_config_impl.h"
+#include "extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"
@@ -34,7 +35,8 @@ void SslIntegrationTestBase::initialize() {
                                   .setExpectClientEcdsaCert(client_ecdsa_cert_));
   HttpIntegrationTest::initialize();
 
-  context_manager_ = std::make_unique<ContextManagerImpl>(timeSystem());
+  context_manager_ =
+      std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(timeSystem());
 
   registerTestServerPorts({"http"});
 }
@@ -127,7 +129,7 @@ TEST_P(SslIntegrationTest, RouterHeaderOnlyRequestAndResponse) {
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection({});
   };
-  testRouterHeaderOnlyRequestAndResponse(true, &creator);
+  testRouterHeaderOnlyRequestAndResponse(&creator);
   checkStats();
 }
 
@@ -149,7 +151,7 @@ TEST_P(SslIntegrationTest, RouterDownstreamDisconnectBeforeRequestComplete) {
 
 TEST_P(SslIntegrationTest, RouterDownstreamDisconnectBeforeResponseComplete) {
 #ifdef __APPLE__
-  // Skip this test on OS X: we can't detect the early close on OS X, and we
+  // Skip this test on macOS: we can't detect the early close on macOS, and we
   // won't clean up the upstream connection until it times out. See #4294.
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
     return;

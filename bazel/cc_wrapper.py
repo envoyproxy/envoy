@@ -1,11 +1,13 @@
 #!/usr/bin/python
 import contextlib
 import os
+import shlex
 import sys
 import tempfile
 
 envoy_real_cc = {ENVOY_REAL_CC}
 envoy_real_cxx = {ENVOY_REAL_CXX}
+envoy_cxxflags = {ENVOY_CXXFLAGS}
 
 
 @contextlib.contextmanager
@@ -21,21 +23,14 @@ def sanitize_flagfile(in_path, out_fd):
     for line in in_fp:
       if line != "-lstdc++\n":
         os.write(out_fd, line)
+      elif "-stdlib=libc++" in envoy_cxxflags:
+        os.write(out_fd, "-lc++\n")
 
 
 def main():
-  compiler = envoy_real_cc
-
-  # Debian's packaging of Clang requires `-no-canonical-prefixes` to print
-  # consistent include paths, but Bazel 0.10 only sets that option at compile
-  # time. We inject it here for the configuration of `@local_config_cc//`.
-  #
-  # https://github.com/bazelbuild/bazel/issues/3977
-  # https://github.com/bazelbuild/bazel/issues/4572
-  # https://bazel-review.googlesource.com/c/bazel/+/39951
-  if sys.argv[1:] == ["-E", "-xc++", "-", "-v"] and "clang" in compiler:
-    os.execv(envoy_real_cxx,
-             [envoy_real_cxx, "-E", "-", "-v", "-no-canonical-prefixes"])
+  # Append CXXFLAGS to correctly detect include paths for either libstdc++ or libc++.
+  if sys.argv[1:5] == ["-E", "-xc++", "-", "-v"]:
+    os.execv(envoy_real_cxx, [envoy_real_cxx] + sys.argv[1:] + shlex.split(envoy_cxxflags))
 
   # `g++` and `gcc -lstdc++` have similar behavior and Bazel treats them as
   # interchangeable, but `gcc` will ignore the `-static-libstdc++` flag.
@@ -46,17 +41,28 @@ def main():
   # it in the same test.
   if "-static-libstdc++" in sys.argv[1:] or "-stdlib=libc++" in sys.argv[1:]:
     compiler = envoy_real_cxx
-    argv = []
+  else:
+    compiler = envoy_real_cc
+
+  # Either:
+  # a) remove all occurrences of -lstdc++ (when statically linking against libstdc++),
+  # b) replace all occurrences of -lstdc++ with -lc++ (when linking against libc++).
+  if "-static-libstdc++" in sys.argv[1:] or "-stdlib=libc++" in envoy_cxxflags:
+    # Append CXXFLAGS to all C++ targets (this is mostly for dependencies).
+    if envoy_cxxflags and "-std=c++" in str(sys.argv[1:]):
+      argv = shlex.split(envoy_cxxflags)
+    else:
+      argv = []
     for arg in sys.argv[1:]:
       if arg == "-lstdc++":
-        pass
+        if "-stdlib=libc++" in envoy_cxxflags:
+          arg.append("-lc++")
       elif arg.startswith("-Wl,@"):
         # tempfile.mkstemp will write to the out-of-sandbox tempdir
         # unless the user has explicitly set environment variables
         # before starting Bazel. But here in $PWD is the Bazel sandbox,
         # which will be deleted automatically after the compiler exits.
-        (flagfile_fd, flagfile_path) = tempfile.mkstemp(
-            dir='./', suffix=".linker-params")
+        (flagfile_fd, flagfile_path) = tempfile.mkstemp(dir='./', suffix=".linker-params")
         with closing_fd(flagfile_fd):
           sanitize_flagfile(arg[len("-Wl,@"):], flagfile_fd)
         argv.append("-Wl,@" + flagfile_path)

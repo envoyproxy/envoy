@@ -172,31 +172,26 @@ bool InstanceImpl::healthCheckFailed() { return server_stats_->live_.value() == 
 InstanceUtil::BootstrapVersion
 InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& bootstrap,
                                   Options& options) {
-  try {
-    if (!options.configPath().empty()) {
-      MessageUtil::loadFromFile(options.configPath(), bootstrap);
-    }
-    if (!options.configYaml().empty()) {
-      envoy::config::bootstrap::v2::Bootstrap bootstrap_override;
-      MessageUtil::loadFromYaml(options.configYaml(), bootstrap_override);
-      bootstrap.MergeFrom(bootstrap_override);
-    }
-    MessageUtil::validate(bootstrap);
-    return BootstrapVersion::V2;
-  } catch (const EnvoyException& e) {
-    if (options.v2ConfigOnly()) {
-      throw;
-    }
-    // TODO(htuch): When v1 is deprecated, make this a warning encouraging config upgrade.
-    ENVOY_LOG(debug, "Unable to initialize config as v2, will retry as v1: {}", e.what());
+  const std::string& config_path = options.configPath();
+  const std::string& config_yaml = options.configYaml();
+
+  // Exactly one of config_path and config_yaml should be specified.
+  if (config_path.empty() && config_yaml.empty()) {
+    const std::string message =
+        "At least one of --config-path and --config-yaml should be non-empty";
+    throw EnvoyException(message);
   }
-  if (!options.configYaml().empty()) {
-    throw EnvoyException("V1 config (detected) with --config-yaml is not supported");
+
+  if (!config_path.empty()) {
+    MessageUtil::loadFromFile(config_path, bootstrap);
   }
-  Json::ObjectSharedPtr config_json = Json::Factory::loadFromFile(options.configPath());
-  Config::BootstrapJson::translateBootstrap(*config_json, bootstrap, options.statsOptions());
+  if (!config_yaml.empty()) {
+    envoy::config::bootstrap::v2::Bootstrap bootstrap_override;
+    MessageUtil::loadFromYaml(config_yaml, bootstrap_override);
+    bootstrap.MergeFrom(bootstrap_override);
+  }
   MessageUtil::validate(bootstrap);
-  return BootstrapVersion::V1;
+  return BootstrapVersion::V2;
 }
 
 void InstanceImpl::initialize(Options& options,
@@ -237,11 +232,16 @@ void InstanceImpl::initialize(Options& options,
   stats_store_.setTagProducer(Config::Utility::createTagProducer(bootstrap_));
   stats_store_.setStatsMatcher(Config::Utility::createStatsMatcher(bootstrap_));
 
+  const std::string server_stats_prefix = "server.";
   server_stats_ = std::make_unique<ServerStats>(
-      ServerStats{ALL_SERVER_STATS(POOL_GAUGE_PREFIX(stats_store_, "server."))});
+      ServerStats{ALL_SERVER_STATS(POOL_COUNTER_PREFIX(stats_store_, server_stats_prefix),
+                                   POOL_GAUGE_PREFIX(stats_store_, server_stats_prefix))});
 
   server_stats_->concurrency_.set(options_.concurrency());
   server_stats_->hot_restart_epoch_.set(options_.restartEpoch());
+
+  assert_action_registration_ = Assert::setDebugAssertionFailureRecordAction(
+      [this]() { server_stats_->debug_assertion_failures_.inc(); });
 
   failHealthcheck(false);
 
@@ -303,7 +303,8 @@ void InstanceImpl::initialize(Options& options,
   runtime_loader_ = component_factory.createRuntime(*this, initial_config);
 
   // Once we have runtime we can initialize the SSL context manager.
-  ssl_context_manager_ = std::make_unique<Ssl::ContextManagerImpl>(time_system_);
+  ssl_context_manager_ =
+      std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(time_system_);
 
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
       runtime(), stats(), threadLocal(), random(), dnsResolver(), sslContextManager(), dispatcher(),
@@ -327,7 +328,7 @@ void InstanceImpl::initialize(Options& options,
     async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(
         clusterManager(), thread_local_, time_system_, api());
     hds_delegate_ = std::make_unique<Upstream::HdsDelegate>(
-        bootstrap_.node(), stats(),
+        stats(),
         Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, hds_config, stats())
             ->create(),
         dispatcher(), runtime(), stats(), sslContextManager(), random(), info_factory_,

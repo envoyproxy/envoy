@@ -31,11 +31,6 @@ following are the command line options that Envoy supports.
 
       ./envoy -c bootstrap.yaml --config-yaml "node: {id: 'node1'}"
 
-.. option:: --v2-config-only
-
-  *(deprecated)* This flag used to allow opting into only using a
-  :ref:`v2 bootstrap configuration file <config_overview_v2_bootstrap>`. This is now set by default.
-
 .. option:: --mode <string>
 
   *(optional)* One of the operating modes for Envoy:
@@ -79,7 +74,7 @@ following are the command line options that Envoy supports.
   *(optional)* The comma separated list of logging level per component. Non developers should generally 
   never set this option. For example, if you want `upstream` component to run at `debug` level and 
   `connection` component to run at `trace` level, you should pass ``upstream:debug,connection:trace`` to 
-  this flag.
+  this flag. See ``ALL_LOGGER_IDS`` in :repo:`/source/common/common/logger.h` for a list of components.
 
 .. option:: --log-path <path string>
 

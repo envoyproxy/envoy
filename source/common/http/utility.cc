@@ -1,5 +1,7 @@
 #include "common/http/utility.h"
 
+#include <http_parser.h>
+
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -20,10 +22,48 @@
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
 
+#include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 
 namespace Envoy {
 namespace Http {
+
+static const char kDefaultPath[] = "/";
+
+bool Utility::Url::initialize(absl::string_view absolute_url) {
+  struct http_parser_url u;
+  const bool is_connect = false;
+  http_parser_url_init(&u);
+  const int result =
+      http_parser_parse_url(absolute_url.data(), absolute_url.length(), is_connect, &u);
+
+  if (result != 0) {
+    return false;
+  }
+  if ((u.field_set & (1 << UF_HOST)) != (1 << UF_HOST) &&
+      (u.field_set & (1 << UF_SCHEMA)) != (1 << UF_SCHEMA)) {
+    return false;
+  }
+  scheme_ = absl::string_view(absolute_url.data() + u.field_data[UF_SCHEMA].off,
+                              u.field_data[UF_SCHEMA].len);
+
+  uint16_t authority_len = u.field_data[UF_HOST].len;
+  if ((u.field_set & (1 << UF_PORT)) == (1 << UF_PORT)) {
+    authority_len = authority_len + u.field_data[UF_PORT].len + 1;
+  }
+  host_and_port_ =
+      absl::string_view(absolute_url.data() + u.field_data[UF_HOST].off, authority_len);
+
+  // RFC allows the absolute-uri to not end in /, but the absolute path form
+  // must start with
+  if ((u.field_set & (1 << UF_PATH)) == (1 << UF_PATH) && u.field_data[UF_PATH].len > 0) {
+    path_ = absl::string_view(absolute_url.data() + u.field_data[UF_PATH].off,
+                              u.field_data[UF_PATH].len);
+  } else {
+    path_ = absl::string_view(kDefaultPath, 1);
+  }
+  return true;
+}
 
 void Utility::appendXff(HeaderMap& headers, const Network::Address::Instance& remote_address) {
   if (remote_address.type() != Network::Address::Type::Ip) {
@@ -210,9 +250,9 @@ bool Utility::isH2UpgradeRequest(const HeaderMap& headers) {
 }
 
 bool Utility::isWebSocketUpgradeRequest(const HeaderMap& headers) {
-  return (isUpgrade(headers) && (0 == StringUtil::caseInsensitiveCompare(
-                                          headers.Upgrade()->value().c_str(),
-                                          Http::Headers::get().UpgradeValues.WebSocket.c_str())));
+  return (isUpgrade(headers) &&
+          absl::EqualsIgnoreCase(headers.Upgrade()->value().getStringView(),
+                                 Http::Headers::get().UpgradeValues.WebSocket));
 }
 
 Http2Settings

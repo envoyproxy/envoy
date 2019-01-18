@@ -9,6 +9,8 @@
 
 #include "common/common/logger.h"
 #include "common/common/to_lower_table.h"
+#include "common/common/utility.h"
+#include "common/singleton/const_singleton.h"
 
 #include "extensions/filters/network/redis_proxy/command_splitter.h"
 #include "extensions/filters/network/redis_proxy/conn_pool.h"
@@ -19,16 +21,34 @@ namespace NetworkFilters {
 namespace RedisProxy {
 namespace CommandSplitter {
 
+struct ResponseValues {
+  const std::string OK = "OK";
+  const std::string InvalidRequest = "invalid request";
+  const std::string NoUpstreamHost = "no upstream host";
+  const std::string UpstreamFailure = "upstream failure";
+  const std::string UpstreamProtocolError = "upstream protocol error";
+};
+
+typedef ConstSingleton<ResponseValues> Response;
+
 class Utility {
 public:
   static RespValuePtr makeError(const std::string& error);
+};
+
+class CommandStats {
+public:
+  Stats::Counter& total_;
+  Stats::Counter& success_;
+  Stats::Counter& error_;
 };
 
 class CommandHandler {
 public:
   virtual ~CommandHandler() {}
 
-  virtual SplitRequestPtr startRequest(const RespValue& request, SplitCallbacks& callbacks) PURE;
+  virtual SplitRequestPtr startRequest(const RespValue& request, SplitCallbacks& callbacks,
+                                       CommandStats& command_stats) PURE;
 };
 
 class CommandHandlerBase {
@@ -41,6 +61,11 @@ protected:
 class SplitRequestBase : public SplitRequest {
 protected:
   static void onWrongNumberOfArguments(SplitCallbacks& callbacks, const RespValue& request);
+
+  void updateStats(const bool success);
+
+  SplitRequestBase(CommandStats& command_stats) : command_stats_(command_stats) {}
+  CommandStats& command_stats_;
 };
 
 /**
@@ -58,7 +83,8 @@ public:
   void cancel() override;
 
 protected:
-  SingleServerRequest(SplitCallbacks& callbacks) : callbacks_(callbacks) {}
+  SingleServerRequest(SplitCallbacks& callbacks, CommandStats& command_stats)
+      : SplitRequestBase(command_stats), callbacks_(callbacks) {}
 
   SplitCallbacks& callbacks_;
   ConnPool::PoolRequest* handle_{};
@@ -70,10 +96,11 @@ protected:
 class SimpleRequest : public SingleServerRequest {
 public:
   static SplitRequestPtr create(ConnPool::Instance& conn_pool, const RespValue& incoming_request,
-                                SplitCallbacks& callbacks);
+                                SplitCallbacks& callbacks, CommandStats& command_stats);
 
 private:
-  SimpleRequest(SplitCallbacks& callbacks) : SingleServerRequest(callbacks) {}
+  SimpleRequest(SplitCallbacks& callbacks, CommandStats& command_stats)
+      : SingleServerRequest(callbacks, command_stats) {}
 };
 
 /**
@@ -82,10 +109,11 @@ private:
 class EvalRequest : public SingleServerRequest {
 public:
   static SplitRequestPtr create(ConnPool::Instance& conn_pool, const RespValue& incoming_request,
-                                SplitCallbacks& callbacks);
+                                SplitCallbacks& callbacks, CommandStats& command_stats);
 
 private:
-  EvalRequest(SplitCallbacks& callbacks) : SingleServerRequest(callbacks) {}
+  EvalRequest(SplitCallbacks& callbacks, CommandStats& command_stats)
+      : SingleServerRequest(callbacks, command_stats) {}
 };
 
 /**
@@ -101,7 +129,8 @@ public:
   void cancel() override;
 
 protected:
-  FragmentedRequest(SplitCallbacks& callbacks) : callbacks_(callbacks) {}
+  FragmentedRequest(SplitCallbacks& callbacks, CommandStats& command_stats)
+      : SplitRequestBase(command_stats), callbacks_(callbacks) {}
 
   struct PendingRequest : public ConnPool::PoolCallbacks {
     PendingRequest(FragmentedRequest& parent, uint32_t index) : parent_(parent), index_(index) {}
@@ -134,10 +163,11 @@ protected:
 class MGETRequest : public FragmentedRequest, Logger::Loggable<Logger::Id::redis> {
 public:
   static SplitRequestPtr create(ConnPool::Instance& conn_pool, const RespValue& incoming_request,
-                                SplitCallbacks& callbacks);
+                                SplitCallbacks& callbacks, CommandStats& command_stats);
 
 private:
-  MGETRequest(SplitCallbacks& callbacks) : FragmentedRequest(callbacks) {}
+  MGETRequest(SplitCallbacks& callbacks, CommandStats& command_stats)
+      : FragmentedRequest(callbacks, command_stats) {}
 
   // RedisProxy::CommandSplitter::FragmentedRequest
   void onChildResponse(RespValuePtr&& value, uint32_t index) override;
@@ -152,10 +182,11 @@ private:
 class SplitKeysSumResultRequest : public FragmentedRequest, Logger::Loggable<Logger::Id::redis> {
 public:
   static SplitRequestPtr create(ConnPool::Instance& conn_pool, const RespValue& incoming_request,
-                                SplitCallbacks& callbacks);
+                                SplitCallbacks& callbacks, CommandStats& command_stats);
 
 private:
-  SplitKeysSumResultRequest(SplitCallbacks& callbacks) : FragmentedRequest(callbacks) {}
+  SplitKeysSumResultRequest(SplitCallbacks& callbacks, CommandStats& command_stats)
+      : FragmentedRequest(callbacks, command_stats) {}
 
   // RedisProxy::CommandSplitter::FragmentedRequest
   void onChildResponse(RespValuePtr&& value, uint32_t index) override;
@@ -171,10 +202,11 @@ private:
 class MSETRequest : public FragmentedRequest, Logger::Loggable<Logger::Id::redis> {
 public:
   static SplitRequestPtr create(ConnPool::Instance& conn_pool, const RespValue& incoming_request,
-                                SplitCallbacks& callbacks);
+                                SplitCallbacks& callbacks, CommandStats& command_stats);
 
 private:
-  MSETRequest(SplitCallbacks& callbacks) : FragmentedRequest(callbacks) {}
+  MSETRequest(SplitCallbacks& callbacks, CommandStats& command_stats)
+      : FragmentedRequest(callbacks, command_stats) {}
 
   // RedisProxy::CommandSplitter::FragmentedRequest
   void onChildResponse(RespValuePtr&& value, uint32_t index) override;
@@ -188,8 +220,9 @@ template <class RequestClass>
 class CommandHandlerFactory : public CommandHandler, CommandHandlerBase {
 public:
   CommandHandlerFactory(ConnPool::Instance& conn_pool) : CommandHandlerBase(conn_pool) {}
-  SplitRequestPtr startRequest(const RespValue& request, SplitCallbacks& callbacks) {
-    return RequestClass::create(conn_pool_, request, callbacks);
+  SplitRequestPtr startRequest(const RespValue& request, SplitCallbacks& callbacks,
+                               CommandStats& command_stats) {
+    return RequestClass::create(conn_pool_, request, callbacks, command_stats);
   }
 };
 
@@ -219,9 +252,11 @@ public:
 
 private:
   struct HandlerData {
-    Stats::Counter& total_;
+    CommandStats command_stats_;
     std::reference_wrapper<CommandHandler> handler_;
   };
+
+  typedef std::shared_ptr<HandlerData> HandlerDataPtr;
 
   void addHandler(Stats::Scope& scope, const std::string& stat_prefix, const std::string& name,
                   CommandHandler& handler);
@@ -233,7 +268,7 @@ private:
   CommandHandlerFactory<MGETRequest> mget_handler_;
   CommandHandlerFactory<MSETRequest> mset_handler_;
   CommandHandlerFactory<SplitKeysSumResultRequest> split_keys_sum_result_handler_;
-  std::unordered_map<std::string, HandlerData> command_map_;
+  TrieLookupTable<HandlerDataPtr> handler_lookup_table_;
   InstanceStats stats_;
   const ToLowerTable to_lower_table_;
 };

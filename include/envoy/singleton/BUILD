@@ -18,5 +18,6 @@ envoy_cc_library(
     hdrs = ["manager.h"],
     deps = [
         ":instance_interface",
+        "//include/envoy/registry",
     ],
 )

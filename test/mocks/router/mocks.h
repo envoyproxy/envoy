@@ -53,6 +53,7 @@ public:
   const std::string& maxAge() const override { return max_age_; };
   const absl::optional<bool>& allowCredentials() const override { return allow_credentials_; };
   bool enabled() const override { return enabled_; };
+  bool shadowEnabled() const override { return shadow_enabled_; };
 
   std::list<std::string> allow_origin_{};
   std::list<std::regex> allow_origin_regex_{};
@@ -61,7 +62,8 @@ public:
   std::string expose_headers_{};
   std::string max_age_{};
   absl::optional<bool> allow_credentials_{};
-  bool enabled_{false};
+  bool enabled_{};
+  bool shadow_enabled_{};
 };
 
 class TestRetryPolicy : public RetryPolicy {
@@ -97,8 +99,8 @@ public:
                                         DoRetryCallback callback));
   MOCK_METHOD1(onHostAttempted, void(Upstream::HostDescriptionConstSharedPtr));
   MOCK_METHOD1(shouldSelectAnotherHost, bool(const Upstream::Host& host));
-  MOCK_METHOD2(priorityLoadForRetry, Upstream::PriorityLoad&(const Upstream::PrioritySet&,
-                                                             const Upstream::PriorityLoad&));
+  MOCK_METHOD2(priorityLoadForRetry,
+               Upstream::HealthyLoad&(const Upstream::PrioritySet&, const Upstream::HealthyLoad&));
   MOCK_CONST_METHOD0(hostSelectionMaxAttempts, uint32_t());
 
   DoRetryCallback callback_;
@@ -262,6 +264,7 @@ public:
   MOCK_CONST_METHOD1(perFilterConfig, const RouteSpecificFilterConfig*(const std::string&));
   MOCK_CONST_METHOD0(includeAttemptCount, bool());
   MOCK_CONST_METHOD0(upgradeMap, const UpgradeMap&());
+  MOCK_CONST_METHOD0(internalRedirectAction, InternalRedirectAction());
 
   std::string cluster_name_{"fake_cluster"};
   std::multimap<std::string, std::string> opaque_config_;

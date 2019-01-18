@@ -87,6 +87,15 @@ enum class FilterTrailersStatus {
 };
 
 /**
+ * Return codes for encode metadata filter invocations. Metadata currently can not stop filter
+ * iteration.
+ */
+enum class FilterMetadataStatus {
+  // Continue filter chain iteration.
+  Continue,
+};
+
+/**
  * The stream filter callbacks are passed to all filters to use for writing response data and
  * interacting with the underlying stream in general.
  */
@@ -164,8 +173,10 @@ public:
   /**
    * Continue iterating through the filter chain with buffered headers and body data. This routine
    * can only be called if the filter has previously returned StopIteration from decodeHeaders()
-   * AND either StopIterationAndBuffer or StopIterationNoBuffer from each previous call to
-   * decodeData(). The connection manager will dispatch headers and any buffered body data to the
+   * AND one of StopIterationAndBuffer, StopIterationAndWatermark, or StopIterationNoBuffer
+   * from each previous call to decodeData().
+   *
+   * The connection manager will dispatch headers and any buffered body data to the
    * next filter in the chain. Further note that if the request is not complete, this filter will
    * still receive decodeData() calls and must return an appropriate status code depending on what
    * the filter needs to do.
@@ -323,6 +334,20 @@ public:
    * @return the buffer limit the filter should apply.
    */
   virtual uint32_t decoderBufferLimit() PURE;
+
+  // Takes a stream, and acts as if the headers are newly arrived.
+  // On success, this will result in a creating a new filter chain and likely upstream request
+  // associated with the original downstream stream.
+  // On failure, if the preconditions outlined below are not met, the caller is
+  // responsible for handling or terminating the original stream.
+  //
+  // This is currently limited to
+  //   - streams which are completely read
+  //   - streams which do not have a request body.
+  //
+  // Note that HttpConnectionManager sanitization will *not* be performed on the
+  // recreated stream, as it is assumed that sanitization has already been done.
+  virtual bool recreateStream() PURE;
 };
 
 /**
@@ -389,7 +414,9 @@ public:
   /**
    * Continue iterating through the filter chain with buffered headers and body data. This routine
    * can only be called if the filter has previously returned StopIteration from encodeHeaders() AND
-   * either StopIterationAndBuffer or StopIterationNoBuffer from each previous call to encodeData().
+   * one of StopIterationAndBuffer, StopIterationAndWatermark, or StopIterationNoBuffer
+   * from each previous call to encodeData().
+   *
    * The connection manager will dispatch headers and any buffered body data to the next filter in
    * the chain. Further note that if the response is not complete, this filter will still receive
    * encodeData() calls and must return an appropriate status code depending on what the filter
@@ -507,6 +534,15 @@ public:
    * @param trailers supplies the trailers to be encoded.
    */
   virtual FilterTrailersStatus encodeTrailers(HeaderMap& trailers) PURE;
+
+  /**
+   * Called with metadata to be encoded. New metadata should be added directly to metadata_map. DO
+   * NOT call StreamDecoderFilterCallbacks::encodeMetadata() interface to add new metadata.
+   *
+   * @param metadata_map supplies the metadata to be encoded.
+   * @return FilterMetadataStatus, which currently is always FilterMetadataStatus::Continue;
+   */
+  virtual FilterMetadataStatus encodeMetadata(MetadataMap& metadata_map) PURE;
 
   /**
    * Called by the filter manager once to initialize the filter callbacks that the filter should

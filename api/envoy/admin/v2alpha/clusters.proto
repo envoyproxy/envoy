@@ -1,6 +1,8 @@
 syntax = "proto3";
 
 package envoy.admin.v2alpha;
+option java_package = "io.envoyproxy.envoy.admin.v2alpha";
+option java_multiple_files = true;
 
 import "envoy/admin/v2alpha/metrics.proto";
 import "envoy/api/v2/core/address.proto";
@@ -70,6 +72,9 @@ message HostHealthStatus {
 
   // The host is currently considered an outlier and has been ejected.
   bool failed_outlier_check = 2;
+
+  // The host is currently being marked as degraded through active health checking.
+  bool failed_active_degraded_check = 4;
 
   // Health status as reported by EDS. Note: only HEALTHY and UNHEALTHY are currently supported
   // here.

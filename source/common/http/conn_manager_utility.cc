@@ -8,6 +8,8 @@
 #include "common/common/empty_string.h"
 #include "common/common/utility.h"
 #include "common/http/headers.h"
+#include "common/http/http1/codec_impl.h"
+#include "common/http/http2/codec_impl.h"
 #include "common/http/utility.h"
 #include "common/network/utility.h"
 #include "common/runtime/uuid_util.h"
@@ -18,10 +20,40 @@
 namespace Envoy {
 namespace Http {
 
+std::string ConnectionManagerUtility::determineNextProtocol(Network::Connection& connection,
+                                                            const Buffer::Instance& data) {
+  if (!connection.nextProtocol().empty()) {
+    return connection.nextProtocol();
+  }
+
+  // See if the data we have so far shows the HTTP/2 prefix. We ignore the case where someone sends
+  // us the first few bytes of the HTTP/2 prefix since in all public cases we use SSL/ALPN. For
+  // internal cases this should practically never happen.
+  if (-1 != data.search(Http2::CLIENT_MAGIC_PREFIX.c_str(), Http2::CLIENT_MAGIC_PREFIX.size(), 0)) {
+    return Http2::ALPN_STRING;
+  }
+
+  return "";
+}
+
+ServerConnectionPtr ConnectionManagerUtility::autoCreateCodec(Network::Connection& connection,
+                                                              const Buffer::Instance& data,
+                                                              ServerConnectionCallbacks& callbacks,
+                                                              Stats::Scope& scope,
+                                                              const Http1Settings& http1_settings,
+                                                              const Http2Settings& http2_settings) {
+  if (determineNextProtocol(connection, data) == Http2::ALPN_STRING) {
+    return ServerConnectionPtr{
+        new Http2::ServerConnectionImpl(connection, callbacks, scope, http2_settings)};
+  } else {
+    return ServerConnectionPtr{
+        new Http1::ServerConnectionImpl(connection, callbacks, http1_settings)};
+  }
+}
+
 Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequestHeaders(
-    Http::HeaderMap& request_headers, Network::Connection& connection,
-    ConnectionManagerConfig& config, const Router::Config& route_config,
-    Runtime::RandomGenerator& random, Runtime::Loader& runtime,
+    HeaderMap& request_headers, Network::Connection& connection, ConnectionManagerConfig& config,
+    const Router::Config& route_config, Runtime::RandomGenerator& random, Runtime::Loader& runtime,
     const LocalInfo::LocalInfo& local_info) {
   // If this is a Upgrade request, do not remove the Connection and Upgrade headers,
   // as we forward them verbatim to the upstream hosts.
@@ -138,8 +170,9 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
     request_headers.removeEnvoyExpectedRequestTimeoutMs();
     request_headers.removeEnvoyForceTrace();
     request_headers.removeEnvoyIpTags();
+    request_headers.removeEnvoyOriginalUrl();
 
-    for (const Http::LowerCaseString& header : route_config.internalOnlyHeaders()) {
+    for (const LowerCaseString& header : route_config.internalOnlyHeaders()) {
       request_headers.remove(header);
     }
   }
@@ -184,7 +217,7 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
   return final_remote_address;
 }
 
-void ConnectionManagerUtility::mutateTracingRequestHeader(Http::HeaderMap& request_headers,
+void ConnectionManagerUtility::mutateTracingRequestHeader(HeaderMap& request_headers,
                                                           Runtime::Loader& runtime,
                                                           ConnectionManagerConfig& config) {
   if (!config.tracingConfig() || !request_headers.RequestId()) {
@@ -221,22 +254,22 @@ void ConnectionManagerUtility::mutateTracingRequestHeader(Http::HeaderMap& reque
   request_headers.RequestId()->value(x_request_id);
 }
 
-void ConnectionManagerUtility::mutateXfccRequestHeader(Http::HeaderMap& request_headers,
+void ConnectionManagerUtility::mutateXfccRequestHeader(HeaderMap& request_headers,
                                                        Network::Connection& connection,
                                                        ConnectionManagerConfig& config) {
   // When AlwaysForwardOnly is set, always forward the XFCC header without modification.
-  if (config.forwardClientCert() == Http::ForwardClientCertType::AlwaysForwardOnly) {
+  if (config.forwardClientCert() == ForwardClientCertType::AlwaysForwardOnly) {
     return;
   }
   // When Sanitize is set, or the connection is not mutual TLS, remove the XFCC header.
-  if (config.forwardClientCert() == Http::ForwardClientCertType::Sanitize ||
+  if (config.forwardClientCert() == ForwardClientCertType::Sanitize ||
       !(connection.ssl() && connection.ssl()->peerCertificatePresented())) {
     request_headers.removeForwardedClientCert();
     return;
   }
 
   // When ForwardOnly is set, always forward the XFCC header without modification.
-  if (config.forwardClientCert() == Http::ForwardClientCertType::ForwardOnly) {
+  if (config.forwardClientCert() == ForwardClientCertType::ForwardOnly) {
     return;
   }
 
@@ -246,8 +279,8 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(Http::HeaderMap& request_
   std::vector<std::string> client_cert_details;
   // When AppendForward or SanitizeSet is set, the client certificate information should be set into
   // the XFCC header.
-  if (config.forwardClientCert() == Http::ForwardClientCertType::AppendForward ||
-      config.forwardClientCert() == Http::ForwardClientCertType::SanitizeSet) {
+  if (config.forwardClientCert() == ForwardClientCertType::AppendForward ||
+      config.forwardClientCert() == ForwardClientCertType::SanitizeSet) {
     const std::string uri_san_local_cert = connection.ssl()->uriSanLocalCertificate();
     if (!uri_san_local_cert.empty()) {
       client_cert_details.push_back("By=" + uri_san_local_cert);
@@ -258,23 +291,23 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(Http::HeaderMap& request_
     }
     for (const auto& detail : config.setCurrentClientCertDetails()) {
       switch (detail) {
-      case Http::ClientCertDetailsType::Cert: {
+      case ClientCertDetailsType::Cert: {
         const std::string peer_cert = connection.ssl()->urlEncodedPemEncodedPeerCertificate();
         if (!peer_cert.empty()) {
           client_cert_details.push_back("Cert=\"" + peer_cert + "\"");
         }
         break;
       }
-      case Http::ClientCertDetailsType::Subject:
+      case ClientCertDetailsType::Subject:
         // The "Subject" key still exists even if the subject is empty.
         client_cert_details.push_back("Subject=\"" + connection.ssl()->subjectPeerCertificate() +
                                       "\"");
         break;
-      case Http::ClientCertDetailsType::URI:
+      case ClientCertDetailsType::URI:
         // The "URI" key still exists even if the URI is empty.
         client_cert_details.push_back("URI=" + connection.ssl()->uriSanPeerCertificate());
         break;
-      case Http::ClientCertDetailsType::DNS: {
+      case ClientCertDetailsType::DNS: {
         const std::vector<std::string> dns_sans = connection.ssl()->dnsSansPeerCertificate();
         if (!dns_sans.empty()) {
           for (const std::string& dns : dns_sans) {
@@ -288,18 +321,18 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(Http::HeaderMap& request_
   }
 
   const std::string client_cert_details_str = absl::StrJoin(client_cert_details, ";");
-  if (config.forwardClientCert() == Http::ForwardClientCertType::AppendForward) {
+  if (config.forwardClientCert() == ForwardClientCertType::AppendForward) {
     HeaderMapImpl::appendToHeader(request_headers.insertForwardedClientCert().value(),
                                   client_cert_details_str);
-  } else if (config.forwardClientCert() == Http::ForwardClientCertType::SanitizeSet) {
+  } else if (config.forwardClientCert() == ForwardClientCertType::SanitizeSet) {
     request_headers.insertForwardedClientCert().value(client_cert_details_str);
   } else {
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
-void ConnectionManagerUtility::mutateResponseHeaders(Http::HeaderMap& response_headers,
-                                                     const Http::HeaderMap* request_headers,
+void ConnectionManagerUtility::mutateResponseHeaders(HeaderMap& response_headers,
+                                                     const HeaderMap* request_headers,
                                                      const std::string& via) {
   if (request_headers != nullptr && Utility::isUpgrade(*request_headers) &&
       Utility::isUpgrade(response_headers)) {

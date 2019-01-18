@@ -28,26 +28,6 @@ cc_library(
 )
 
 cc_library(
-    name = "boringcrypto_fips",
-    srcs = [
-        "thirdparty_build/lib/libcrypto.a",
-    ],
-    hdrs = glob(["thirdparty_build/include/openssl/**/*.h"]),
-    defines = ["BORINGSSL_FIPS"],
-    includes = ["thirdparty_build/include"],
-)
-
-cc_library(
-    name = "boringssl_fips",
-    srcs = [
-        "thirdparty_build/lib/libssl.a",
-    ],
-    hdrs = glob(["thirdparty_build/include/openssl/**/*.h"]),
-    includes = ["thirdparty_build/include"],
-    deps = [":boringcrypto_fips"],
-)
-
-cc_library(
     name = "event",
     srcs = select({
         ":windows_x86_64": ["thirdparty_build/lib/event.lib"],
@@ -82,6 +62,13 @@ cc_library(
 cc_library(
     name = "tcmalloc_and_profiler",
     srcs = ["thirdparty_build/lib/libtcmalloc_and_profiler.a"],
+    hdrs = glob(["thirdparty_build/include/gperftools/**/*.h"]),
+    strip_include_prefix = "thirdparty_build/include",
+)
+
+cc_library(
+    name = "tcmalloc_debug",
+    srcs = ["thirdparty_build/lib/libtcmalloc_debug.a"],
     hdrs = glob(["thirdparty_build/include/gperftools/**/*.h"]),
     strip_include_prefix = "thirdparty_build/include",
 )

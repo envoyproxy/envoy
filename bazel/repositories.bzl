@@ -11,7 +11,6 @@ load("@bazel_tools//tools/cpp:lib_cc_configure.bzl", "get_env_var")
 
 # dict of {build recipe name: longform extension name,}
 PPC_SKIP_TARGETS = {"luajit": "envoy.filters.http.lua"}
-NO_BORINGSSL_FIPS = "boringssl_fips"
 
 # go version for rules_go
 GO_VERSION = "1.10.4"
@@ -261,21 +260,24 @@ def envoy_dependencies(path = "@envoy_deps//", skip_targets = []):
                 actual = path + ":" + t,
             )
 
-    # Binding for //external:ssl pointing to the selected version of BoringSSL.
-    native.bind(
-        name = "ssl",
-        actual = "@envoy//bazel:boringssl",
-    )
-
     # Treat Envoy's overall build config as an external repo, so projects that
     # build Envoy as a subcomponent can easily override the config.
     if "envoy_build_config" not in native.existing_rules().keys():
         _default_envoy_build_config(name = "envoy_build_config")
 
+    # Binding to an alias pointing to the selected version of BoringSSL:
+    # - BoringSSL FIPS from @boringssl_fips//:ssl,
+    # - non-FIPS BoringSSL from @boringssl//:ssl.
+    _boringssl()
+    _boringssl_fips()
+    native.bind(
+        name = "ssl",
+        actual = "@envoy//bazel:boringssl",
+    )
+
     # The long repo names (`com_github_fmtlib_fmt` instead of `fmtlib`) are
     # semi-standard in the Bazel community, intended to avoid both duplicate
     # dependencies and name conflicts.
-    _boringssl()
     _com_google_absl()
     _com_github_bombela_backward()
     _com_github_circonus_labs_libcircllhist()
@@ -297,6 +299,7 @@ def envoy_dependencies(path = "@envoy_deps//", skip_targets = []):
     _com_google_protobuf()
     _io_opencensus_cpp()
     _com_github_curl()
+    _com_github_envoyproxy_sqlparser()
 
     # Used for bundling gcovr into a relocatable .par file.
     _repository_impl("subpar")
@@ -308,6 +311,16 @@ def envoy_dependencies(path = "@envoy_deps//", skip_targets = []):
 
 def _boringssl():
     _repository_impl("boringssl")
+
+def _boringssl_fips():
+    location = REPOSITORY_LOCATIONS["boringssl_fips"]
+    genrule_repository(
+        name = "boringssl_fips",
+        urls = location["urls"],
+        sha256 = location["sha256"],
+        genrule_cmd_file = "@envoy//bazel/external:boringssl_fips.genrule_cmd",
+        build_file = "@envoy//bazel/external:boringssl_fips.BUILD",
+    )
 
 def _com_github_bombela_backward():
     _repository_impl(
@@ -337,6 +350,16 @@ def _com_github_cyan4973_xxhash():
     native.bind(
         name = "xxhash",
         actual = "@com_github_cyan4973_xxhash//:xxhash",
+    )
+
+def _com_github_envoyproxy_sqlparser():
+    _repository_impl(
+        name = "com_github_envoyproxy_sqlparser",
+        build_file = "@envoy//bazel/external:sqlparser.BUILD",
+    )
+    native.bind(
+        name = "sqlparser",
+        actual = "@com_github_envoyproxy_sqlparser//:sqlparser",
     )
 
 def _com_github_eile_tclap():
@@ -615,8 +638,6 @@ def _apply_dep_blacklist(ctxt, recipes):
     skip_list = []
     if _is_linux_ppc(ctxt):
         skip_list += PPC_SKIP_TARGETS.keys()
-    if not _is_linux_x86_64(ctxt):
-        skip_list.append(NO_BORINGSSL_FIPS)
     for t in recipes:
         if t not in skip_list:
             newlist.append(t)

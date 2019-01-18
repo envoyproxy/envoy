@@ -1,4 +1,5 @@
 """Tests for capture2pcap."""
+from __future__ import print_function
 
 import os
 import subprocess as sp
@@ -16,12 +17,11 @@ if __name__ == '__main__':
   pcap_path = os.path.join(os.getenv('TEST_TMPDIR'), 'generated.pcap')
 
   capture2pcap.Capture2Pcap(capture_path, pcap_path)
-  actual_output = sp.check_output(
-      ['tshark', '-r', pcap_path, '-d', 'tcp.port==10000,http2', '-P'])
+  actual_output = sp.check_output(['tshark', '-r', pcap_path, '-d', 'tcp.port==10000,http2', '-P'])
   with open(expected_path, 'r') as f:
     expected_output = f.read()
   if actual_output != expected_output:
-    print 'Mismatch'
-    print 'Expected: %s' % expected_output
-    print 'Actual: %s' % actual_output
+    print('Mismatch')
+    print('Expected: %s' % expected_output)
+    print('Actual: %s' % actual_output)
     sys.exit(1)

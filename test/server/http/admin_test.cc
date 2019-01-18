@@ -14,10 +14,11 @@
 #include "common/profiler/profiler.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
-#include "common/ssl/context_config_impl.h"
 #include "common/stats/thread_local_store.h"
 
 #include "server/http/admin.h"
+
+#include "extensions/transport_sockets/tls/context_config_impl.h"
 
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/mocks.h"
@@ -558,22 +559,33 @@ INSTANTIATE_TEST_CASE_P(IpVersions, AdminFilterTest,
 
 TEST_P(AdminFilterTest, HeaderOnly) {
   EXPECT_CALL(callbacks_, encodeHeaders_(_, false));
-  filter_.decodeHeaders(request_headers_, true);
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_.decodeHeaders(request_headers_, true));
 }
 
 TEST_P(AdminFilterTest, Body) {
-  filter_.decodeHeaders(request_headers_, false);
+  InSequence s;
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_.decodeHeaders(request_headers_, false));
   Buffer::OwnedImpl data("hello");
+  EXPECT_CALL(callbacks_, addDecodedData(_, false));
   EXPECT_CALL(callbacks_, encodeHeaders_(_, false));
-  filter_.decodeData(data, true);
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_.decodeData(data, true));
 }
 
 TEST_P(AdminFilterTest, Trailers) {
-  filter_.decodeHeaders(request_headers_, false);
+  InSequence s;
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_.decodeHeaders(request_headers_, false));
   Buffer::OwnedImpl data("hello");
-  filter_.decodeData(data, false);
+  EXPECT_CALL(callbacks_, addDecodedData(_, false));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_.decodeData(data, false));
+  EXPECT_CALL(callbacks_, decodingBuffer());
+  filter_.getRequestBody();
   EXPECT_CALL(callbacks_, encodeHeaders_(_, false));
-  filter_.decodeTrailers(request_headers_);
+  EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_.decodeTrailers(request_headers_));
 }
 
 class AdminInstanceTest : public testing::TestWithParam<Network::Address::IpVersion> {
@@ -622,21 +634,25 @@ public:
 INSTANTIATE_TEST_CASE_P(IpVersions, AdminInstanceTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
-// Can only get code coverage of AdminImpl::handlerCpuProfiler stopProfiler with
-// a real profiler linked in (successful call to startProfiler). startProfiler
-// requies tcmalloc.
-#ifdef TCMALLOC
 
 TEST_P(AdminInstanceTest, AdminProfiler) {
   Buffer::OwnedImpl data;
   Http::HeaderMapImpl header_map;
+
+  // Can only get code coverage of AdminImpl::handlerCpuProfiler stopProfiler with
+  // a real profiler linked in (successful call to startProfiler).
+#ifdef PROFILER_AVAILABLE
   EXPECT_EQ(Http::Code::OK, postCallback("/cpuprofiler?enable=y", header_map, data));
   EXPECT_TRUE(Profiler::Cpu::profilerEnabled());
+#else
+  EXPECT_EQ(Http::Code::InternalServerError,
+            postCallback("/cpuprofiler?enable=y", header_map, data));
+  EXPECT_FALSE(Profiler::Cpu::profilerEnabled());
+#endif
+
   EXPECT_EQ(Http::Code::OK, postCallback("/cpuprofiler?enable=n", header_map, data));
   EXPECT_FALSE(Profiler::Cpu::profilerEnabled());
 }
-
-#endif
 
 TEST_P(AdminInstanceTest, MutatesErrorWithGet) {
   Buffer::OwnedImpl data;
@@ -852,9 +868,9 @@ TEST_P(AdminInstanceTest, ContextThatReturnsNullCertDetails) {
   // Setup a context that returns null cert details.
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
   Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString("{}");
-  Ssl::ClientContextConfigImpl cfg(*loader, factory_context);
+  Extensions::TransportSockets::Tls::ClientContextConfigImpl cfg(*loader, factory_context);
   Stats::IsolatedStoreImpl store;
-  Ssl::ClientContextSharedPtr client_ctx(
+  Envoy::Ssl::ClientContextSharedPtr client_ctx(
       server_.sslContextManager().createSslClientContext(store, cfg));
 
   const std::string expected_empty_json = R"EOF({
@@ -1015,6 +1031,8 @@ TEST_P(AdminInstanceTest, ClustersJson) {
       .WillByDefault(Return(true));
   ON_CALL(*host, healthFlagGet(Upstream::Host::HealthFlag::FAILED_EDS_HEALTH))
       .WillByDefault(Return(false));
+  ON_CALL(*host, healthFlagGet(Upstream::Host::HealthFlag::DEGRADED_ACTIVE_HC))
+      .WillByDefault(Return(true));
 
   ON_CALL(host->outlier_detector_, successRate()).WillByDefault(Return(43.2));
   ON_CALL(*host, weight()).WillByDefault(Return(5));
@@ -1073,7 +1091,8 @@ TEST_P(AdminInstanceTest, ClustersJson) {
      "health_status": {
       "eds_health_status": "HEALTHY",
       "failed_active_health_check": true,
-      "failed_outlier_check": true
+      "failed_outlier_check": true,
+      "failed_active_degraded_check": true
      },
      "success_rate": {
       "value": 43.2

@@ -16,7 +16,7 @@ routing PRs, questions, etc. to the right place.
     connections, etc.).
 * Stephan Zuercher ([zuercher](https://github.com/zuercher)) (zuercher@gmail.com)
   * Load balancing, upstream clusters and cluster manager, logging, complex HTTP routing
-    (metadata, etc.), and OSX build.
+    (metadata, etc.), and macOS build.
 * Greg Greenway ([ggreenway](https://github.com/ggreenway)) (ggreenway@apple.com)
   * TCP proxy, TLS, logging, and core networking (listeners, connections, etc.).
 

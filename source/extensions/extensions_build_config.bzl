@@ -31,6 +31,7 @@ EXTENSIONS = {
     "envoy.filters.http.grpc_http1_bridge":             "//source/extensions/filters/http/grpc_http1_bridge:config",
     "envoy.filters.http.grpc_json_transcoder":          "//source/extensions/filters/http/grpc_json_transcoder:config",
     "envoy.filters.http.grpc_web":                      "//source/extensions/filters/http/grpc_web:config",
+    "envoy.filters.http.grpc_http1_reverse_bridge":     "//source/extensions/filters/http/grpc_http1_reverse_bridge:config",
     "envoy.filters.http.gzip":                          "//source/extensions/filters/http/gzip:config",
     "envoy.filters.http.header_to_metadata":            "//source/extensions/filters/http/header_to_metadata:config",
     "envoy.filters.http.health_check":                  "//source/extensions/filters/http/health_check:config",
@@ -54,6 +55,8 @@ EXTENSIONS = {
     #       configured on the listener. Do not remove it in that case or configs will fail to load.
     "envoy.filters.listener.original_dst":              "//source/extensions/filters/listener/original_dst:config",
 
+    "envoy.filters.listener.original_src":               "//source/extensions/filters/listener/original_src:config",
+
     "envoy.filters.listener.tls_inspector":             "//source/extensions/filters/listener/tls_inspector:config",
 
     #
@@ -66,6 +69,7 @@ EXTENSIONS = {
     "envoy.filters.network.ext_authz":                  "//source/extensions/filters/network/ext_authz:config",
     "envoy.filters.network.http_connection_manager":    "//source/extensions/filters/network/http_connection_manager:config",
     "envoy.filters.network.mongo_proxy":                "//source/extensions/filters/network/mongo_proxy:config",
+    "envoy.filters.network.mysql_proxy":                "//source/extensions/filters/network/mysql_proxy:config",
     "envoy.filters.network.ratelimit":                  "//source/extensions/filters/network/ratelimit:config",
     "envoy.filters.network.rbac":                       "//source/extensions/filters/network/rbac:config",
     "envoy.filters.network.redis_proxy":                "//source/extensions/filters/network/redis_proxy:config",
@@ -184,6 +188,7 @@ WINDOWS_EXTENSIONS = {
     #"envoy.filters.network.ext_authz":                  "//source/extensions/filters/network/ext_authz:config",
     #"envoy.filters.network.http_connection_manager":    "//source/extensions/filters/network/http_connection_manager:config",
     #"envoy.filters.network.mongo_proxy":                "//source/extensions/filters/network/mongo_proxy:config",
+    #"envoy.filters.network.mysql_proxy":                "//source/extensions/filters/network/mysql_proxy:config",
     #"envoy.filters.network.redis_proxy":                "//source/extensions/filters/network/redis_proxy:config",
     #"envoy.filters.network.ratelimit":                  "//source/extensions/filters/network/ratelimit:config",
     "envoy.filters.network.tcp_proxy":                  "//source/extensions/filters/network/tcp_proxy:config",

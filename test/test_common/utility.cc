@@ -13,6 +13,7 @@
 
 #include <cstdint>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <list>
 #include <stdexcept>
@@ -224,14 +225,30 @@ void TestUtility::createSymlink(const std::string& target, const std::string& li
 }
 
 // static
-std::tm TestUtility::parseTimestamp(const std::string& format, const std::string& time_str) {
-  std::tm timestamp{};
-  const char* parsed_to = strptime(time_str.c_str(), format.c_str(), &timestamp);
+absl::Time TestUtility::parseTime(const std::string& input, const std::string& input_format) {
+  absl::Time time;
+  std::string parse_error;
+  EXPECT_TRUE(absl::ParseTime(input_format, input, &time, &parse_error))
+      << " error \"" << parse_error << "\" from failing to parse timestamp \"" << input
+      << "\" with format string \"" << input_format << "\"";
+  return time;
+}
 
-  EXPECT_EQ(parsed_to, time_str.c_str() + time_str.size())
-      << " from failing to parse timestamp \"" << time_str << "\" with format string \"" << format
-      << "\"";
-  return timestamp;
+// static
+std::string TestUtility::formatTime(const absl::Time input, const std::string& output_format) {
+  static const absl::TimeZone utc = absl::UTCTimeZone();
+  return absl::FormatTime(output_format, input, utc);
+}
+
+// static
+std::string TestUtility::formatTime(const SystemTime input, const std::string& output_format) {
+  return TestUtility::formatTime(absl::FromChrono(input), output_format);
+}
+
+// static
+std::string TestUtility::convertTime(const std::string& input, const std::string& input_format,
+                                     const std::string& output_format) {
+  return TestUtility::formatTime(TestUtility::parseTime(input, input_format), output_format);
 }
 
 void ConditionalInitializer::setReady() {
@@ -251,6 +268,13 @@ void ConditionalInitializer::waitReady() {
   cv_.wait(mutex_);
   EXPECT_TRUE(ready_);
   ready_ = false;
+}
+
+void ConditionalInitializer::wait() {
+  Thread::LockGuard lock(mutex_);
+  while (!ready_) {
+    cv_.wait(mutex_);
+  }
 }
 
 ScopedFdCloser::ScopedFdCloser(int fd) : fd_(fd) {}

@@ -59,11 +59,12 @@ Health check event logging
 --------------------------
 
 A per-healthchecker log of ejection and addition events can optionally be produced by Envoy by
-specifying a log file path in `the HealthCheck config <envoy_api_field_core.HealthCheck.event_log_path>`.
-The log is structured as JSON dumps of `HealthCheckEvent messages <envoy_api_msg_core.HealthCheckEvent>`.
+specifying a log file path in :ref:`the HealthCheck config <envoy_api_field_core.HealthCheck.event_log_path>`.
+The log is structured as JSON dumps of
+:ref:`HealthCheckEvent messages <envoy_api_msg_data.core.v2alpha.HealthCheckEvent>`.
 
-Envoy can be configured to log all health check failure events by setting the :ref:'always_log_health_check_failures 
-flag <envoy_api_field_core.HealthCheck.always_log_health_check_failures>' to true.
+Envoy can be configured to log all health check failure events by setting the :ref:`always_log_health_check_failures
+flag <envoy_api_field_core.HealthCheck.always_log_health_check_failures>` to true.
 
 Passive health checking
 -----------------------
@@ -145,3 +146,13 @@ additionally compares the value of the *x-envoy-upstream-healthchecked-cluster* 
 *service_name*. If the values do not match, the health check does not pass. The upstream health
 check filter appends *x-envoy-upstream-healthchecked-cluster* to the response headers. The appended
 value is determined by the :option:`--service-cluster` command line option.
+
+.. _arch_overview_health_checking_degraded:
+
+Degraded health
+---------------
+When using the HTTP health checker, an upstream host can return ``x-envoy-degraded`` to inform the
+health checker that the host is degraded. See :ref:`here <arch_overview_load_balancing_degraded>` for
+how this affects load balancing.
+
+

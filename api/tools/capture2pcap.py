@@ -17,6 +17,7 @@ issue.
 TODO(htuch):
 - Figure out IPv6 PCAP issue above, or file a bug once the root cause is clear.
 """
+from __future__ import print_function
 
 import datetime
 import socket
@@ -34,14 +35,9 @@ def DumpEvent(direction, timestamp, data):
   dump = StringIO.StringIO()
   dump.write('%s\n' % direction)
   # Adjust to local timezone
-  adjusted_dt = timestamp.ToDatetime() - datetime.timedelta(
-      seconds=time.altzone)
+  adjusted_dt = timestamp.ToDatetime() - datetime.timedelta(seconds=time.altzone)
   dump.write('%s\n' % adjusted_dt)
-  od = sp.Popen(
-      ['od', '-Ax', '-tx1', '-v'],
-      stdout=sp.PIPE,
-      stdin=sp.PIPE,
-      stderr=sp.PIPE)
+  od = sp.Popen(['od', '-Ax', '-tx1', '-v'], stdout=sp.PIPE, stdin=sp.PIPE, stderr=sp.PIPE)
   packet_dump = od.communicate(data)[0]
   dump.write(packet_dump)
   return dump.getvalue()
@@ -86,6 +82,6 @@ def Capture2Pcap(capture_path, pcap_path):
 
 if __name__ == '__main__':
   if len(sys.argv) != 3:
-    print 'Usage: %s <capture .pb/.pb_text> <pcap path>' % sys.argv[0]
+    print('Usage: %s <capture .pb/.pb_text> <pcap path>' % sys.argv[0])
     sys.exit(1)
   Capture2Pcap(sys.argv[1], sys.argv[2])
