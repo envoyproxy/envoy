@@ -31,7 +31,7 @@ TEST(HttpExtAuthzConfigTest, CorrectProtoGrpc) {
 
   testing::StrictMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_CALL(context, localInfo()).Times(1);
-  EXPECT_CALL(context, clusterManager()).Times(2);
+  EXPECT_CALL(context, clusterManager()).Times(1);
   EXPECT_CALL(context, runtime()).Times(1);
   EXPECT_CALL(context, scope()).Times(2);
   EXPECT_CALL(context.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
@@ -51,11 +51,30 @@ TEST(HttpExtAuthzConfigTest, CorrectProtoHttp) {
       uri: "ext_authz:9000"
       cluster: "ext_authz"
       timeout: 0.25s
-    path_prefix: "/test"
-    allowed_authorization_headers:
-      - foo_header_key
-    allowed_request_headers:
-      - bar_header_key
+   
+    authorization_request: 
+      allowed_headers: 
+        patterns: 
+        - exact: baz
+        - prefix: x-
+      headers_to_add:
+      - key: foo
+        value: bar
+      - key: bar
+        value: foo
+    
+    authorization_response: 
+      allowed_upstream_headers: 
+        patterns: 
+        - exact: baz
+        - prefix: x-success
+      allowed_client_headers: 
+        patterns: 
+        - exact: baz
+        - prefix: x-fail
+
+    path_prefix: /extauth
+    
   failure_mode_allow: true
   )EOF";
 

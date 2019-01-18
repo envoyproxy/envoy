@@ -7,8 +7,9 @@
 #include "common/event/dispatcher_impl.h"
 #include "common/network/connection_impl.h"
 #include "common/network/utility.h"
-#include "common/ssl/context_config_impl.h"
-#include "common/ssl/context_manager_impl.h"
+
+#include "extensions/transport_sockets/tls/context_config_impl.h"
+#include "extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/config/integration/certs/clientcert_hash.h"
@@ -148,7 +149,7 @@ protected:
   const std::string server_cert_;
   const std::string validation_secret_;
   const std::string client_cert_;
-  Ssl::ContextManagerImpl context_manager_{timeSystem()};
+  Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{timeSystem()};
   FakeHttpConnectionPtr sds_connection_;
   FakeUpstream* sds_upstream_{};
   FakeStreamPtr sds_stream_;

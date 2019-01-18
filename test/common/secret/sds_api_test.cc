@@ -79,9 +79,9 @@ TEST_F(SdsApiTest, DynamicTlsCertificateUpdateSuccess) {
   name: "abc.com"
   tls_certificate:
     certificate_chain:
-      filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert.pem"
+      filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_cert.pem"
     private_key:
-      filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key.pem"
+      filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_key.pem"
     )EOF";
 
   Protobuf::RepeatedPtrField<envoy::api::v2::auth::Secret> secret_resources;
@@ -91,11 +91,13 @@ TEST_F(SdsApiTest, DynamicTlsCertificateUpdateSuccess) {
   sds_api.onConfigUpdate(secret_resources, "");
 
   Ssl::TlsCertificateConfigImpl tls_config(*sds_api.secret());
-  const std::string cert_pem = "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert.pem";
+  const std::string cert_pem =
+      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_cert.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(cert_pem)),
             tls_config.certificateChain());
 
-  const std::string key_pem = "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key.pem";
+  const std::string key_pem =
+      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_key.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(key_pem)),
             tls_config.privateKey());
 
@@ -120,7 +122,7 @@ TEST_F(SdsApiTest, DynamicCertificateValidationContextUpdateSuccess) {
       R"EOF(
   name: "abc.com"
   validation_context:
-    trusted_ca: { filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem" }
+    trusted_ca: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem" }
     allow_expired_certificate: true
   )EOF";
 
@@ -131,7 +133,8 @@ TEST_F(SdsApiTest, DynamicCertificateValidationContextUpdateSuccess) {
   sds_api.onConfigUpdate(secret_resources, "");
 
   Ssl::CertificateValidationContextConfigImpl cvc_config(*sds_api.secret());
-  const std::string ca_cert = "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem";
+  const std::string ca_cert =
+      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(ca_cert)),
             cvc_config.caCert());
 
@@ -176,8 +179,8 @@ TEST_F(SdsApiTest, DefaultCertificateValidationContextTest) {
   secret_config->set_name("abc.com");
   auto* dynamic_cvc = secret_config->mutable_validation_context();
   dynamic_cvc->set_allow_expired_certificate(false);
-  dynamic_cvc->mutable_trusted_ca()->set_filename(
-      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"));
+  dynamic_cvc->mutable_trusted_ca()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"));
   dynamic_cvc->add_verify_subject_alt_name("second san");
   const std::string dynamic_verify_certificate_spki =
       "QGJRPdmx/r5EGOFLb2MTiZp2isyC0Whht7iazhzXaCM=";
@@ -200,7 +203,8 @@ TEST_F(SdsApiTest, DefaultCertificateValidationContextTest) {
   // field.
   EXPECT_TRUE(cvc_config.allowExpiredCertificate());
   // Verify that singular fields are overwritten.
-  const std::string ca_cert = "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem";
+  const std::string ca_cert =
+      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(ca_cert)),
             cvc_config.caCert());
   // Verify that repeated fields are concatenated.
@@ -249,9 +253,9 @@ TEST_F(SdsApiTest, SecretUpdateWrongSize) {
     name: "abc.com"
     tls_certificate:
       certificate_chain:
-        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert.pem"
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_cert.pem"
       private_key:
-        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key.pem"
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_key.pem"
       )EOF";
 
   Protobuf::RepeatedPtrField<envoy::api::v2::auth::Secret> secret_resources;
@@ -279,9 +283,9 @@ TEST_F(SdsApiTest, SecretUpdateWrongSecretName) {
       name: "wrong.name.com"
       tls_certificate:
         certificate_chain:
-          filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert.pem"
+          filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_cert.pem"
         private_key:
-          filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key.pem"
+          filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_key.pem"
         )EOF";
 
   Protobuf::RepeatedPtrField<envoy::api::v2::auth::Secret> secret_resources;
