@@ -82,9 +82,10 @@ TEST(UtilityTest, ApiConfigSourceRequestTimeout) {
 
 TEST(UtilityTest, TranslateApiConfigSource) {
   envoy::api::v2::core::ApiConfigSource api_config_source_rest_legacy;
-  Utility::translateApiConfigSource("test_rest_legacy_cluster", 10000, ApiType::get().RestLegacy,
+  Utility::translateApiConfigSource("test_rest_legacy_cluster", 10000,
+                                    ApiType::get().UnsupportedRestLegacy,
                                     api_config_source_rest_legacy);
-  EXPECT_EQ(envoy::api::v2::core::ApiConfigSource::REST_LEGACY,
+  EXPECT_EQ(envoy::api::v2::core::ApiConfigSource::UNSUPPORTED_REST_LEGACY,
             api_config_source_rest_legacy.api_type());
   EXPECT_EQ(10000,
             DurationUtil::durationToMilliseconds(api_config_source_rest_legacy.refresh_delay()));

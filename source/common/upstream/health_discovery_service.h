@@ -38,7 +38,6 @@ public:
  * Implementation of Upstream::Cluster for hds clusters, clusters that are used
  * by HdsDelegates
  */
-
 class HdsCluster : public Cluster, Logger::Loggable<Logger::Id::upstream> {
 public:
   static ClusterSharedPtr create();
@@ -116,8 +115,7 @@ class HdsDelegate
     : Grpc::TypedAsyncStreamCallbacks<envoy::service::discovery::v2::HealthCheckSpecifier>,
       Logger::Loggable<Logger::Id::upstream> {
 public:
-  HdsDelegate(const envoy::api::v2::core::Node& node, Stats::Scope& scope,
-              Grpc::AsyncClientPtr async_client, Event::Dispatcher& dispatcher,
+  HdsDelegate(Stats::Scope& scope, Grpc::AsyncClientPtr async_client, Event::Dispatcher& dispatcher,
               Runtime::Loader& runtime, Envoy::Stats::Store& stats,
               Ssl::ContextManager& ssl_context_manager, Runtime::RandomGenerator& random,
               ClusterInfoFactory& info_factory, AccessLog::AccessLogManager& access_log_manager,

@@ -612,11 +612,15 @@ ClientConnectionImpl::ClientConnectionImpl(
       file_event_->activate(Event::FileReadyType::Write);
       return;
     }
+    const Network::Address::Instance* source_to_use = source_address.get();
+    if (socket_->localAddress()) {
+      source_to_use = socket_->localAddress().get();
+    }
 
-    if (source_address != nullptr) {
-      const Api::SysCallIntResult result = source_address->bind(fd());
+    if (source_to_use != nullptr) {
+      const Api::SysCallIntResult result = source_to_use->bind(fd());
       if (result.rc_ < 0) {
-        ENVOY_LOG_MISC(debug, "Bind failure. Failed to bind to {}: {}", source_address->asString(),
+        ENVOY_LOG_MISC(debug, "Bind failure. Failed to bind to {}: {}", source_to_use->asString(),
                        strerror(result.errno_));
         bind_error_ = true;
         // Set a special error state to ensure asynchronous close to give the owner of the
@@ -654,7 +658,7 @@ void ClientConnectionImpl::connect() {
   // The local address can only be retrieved for IP connections. Other
   // types, such as UDS, don't have a notion of a local address.
   if (socket_->remoteAddress()->type() == Address::Type::Ip) {
-    socket_->setLocalAddress(Address::addressFromFd(fd()), false);
+    socket_->setLocalAddress(Address::addressFromFd(fd()));
   }
 }
 

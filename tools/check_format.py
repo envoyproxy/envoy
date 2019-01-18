@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+from __future__ import print_function
+
 import argparse
 import common
 import fileinput
@@ -48,6 +50,7 @@ HEADER_ORDER_PATH = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), 
 SUBDIR_SET = set(common.includeDirOrder())
 INCLUDE_ANGLE = "#include <"
 INCLUDE_ANGLE_LEN = len(INCLUDE_ANGLE)
+PROTO_PACKAGE_REGEX = re.compile("package (.*);")
 
 # yapf: disable
 PROTOBUF_TYPE_ERRORS = {
@@ -111,7 +114,8 @@ def checkTools():
         "PATH, please use CLANG_FORMAT environment variable to specify the path. "
         "Examples:\n"
         "    export CLANG_FORMAT=clang-format-7.0.0\n"
-        "    export CLANG_FORMAT=/opt/bin/clang-format-7".format(CLANG_FORMAT_PATH))
+        "    export CLANG_FORMAT=/opt/bin/clang-format-7\n"
+        "    export CLANG_FORMAT=/usr/local/opt/llvm@7/bin/clang-format".format(CLANG_FORMAT_PATH))
 
   buildifier_abs_path = lookPath(BUILDIFIER_PATH)
   if buildifier_abs_path:
@@ -140,6 +144,41 @@ def checkNamespace(file_path):
     if not re.search('^\s*namespace\s+Envoy\s*{', text, re.MULTILINE) and \
        not 'NOLINT(namespace-envoy)' in text:
       return ["Unable to find Envoy namespace or NOLINT(namespace-envoy) for file: %s" % file_path]
+  return []
+
+
+def fixJavaProtoOptions(file_path):
+  java_multiple_files = False
+  java_package_correct = False
+  package_name = None
+  for line in fileinput.FileInput(file_path):
+    if line.startswith("package "):
+      result = PROTO_PACKAGE_REGEX.search(line)
+      if result is None or len(result.groups()) != 1:
+        continue
+
+      package_name = result.group(1)
+    if "option java_multiple_files = true;" in line:
+      java_multiple_files = True
+    if "option java_package = \"io.envoyproxy.envoy" in line:
+      java_package_correct = True
+    if java_multiple_files and java_package_correct:
+      return []
+
+  if package_name is None:
+    return ["Unable to find package name for proto file: %s" % file_path]
+
+  to_add = ""
+  if not java_package_correct:
+    to_add = to_add + "option java_package = \"io.envoyproxy.{}\";\n".format(package_name)
+  if not java_multiple_files:
+    to_add = to_add + "option java_multiple_files = true;\n"
+
+  for line in fileinput.FileInput(file_path, inplace=True):
+    if line.startswith("package "):
+      line = line.replace(line, line + to_add)
+    sys.stdout.write(line)
+
   return []
 
 
@@ -227,8 +266,41 @@ def hasInvalidAngleBracketDirectory(line):
   return subdir in SUBDIR_SET
 
 
+VERSION_HISTORY_NEW_LINE_REGEX = re.compile('\* [a-z \-_]*: [a-z:`]')
+VERSION_HISTORY_NEW_RELEASE_REGEX = re.compile('^====[=]+$')
+
+
+def checkCurrentReleaseNotes(file_path, error_messages):
+  in_current_release = False
+
+  file_handle = fileinput.input(file_path)
+  for line_number, line in enumerate(file_handle):
+
+    def reportError(message):
+      error_messages.append("%s:%d: %s" % (file_path, line_number + 1, message))
+
+    if VERSION_HISTORY_NEW_RELEASE_REGEX.match(line):
+      # If we were in the section for the current release this means we have passed it.
+      if in_current_release:
+        break
+      # If we see a version marker we are now in the section for the current release.
+      in_current_release = True
+
+    if line.startswith('*') and not VERSION_HISTORY_NEW_LINE_REGEX.match(line):
+      reportError("Version history line malformed. "
+                  "Does not match VERSION_HISTORY_NEW_LINE_REGEX in check_format.py\n %s" % line)
+  file_handle.close()
+
+
 def checkFileContents(file_path, checker):
   error_messages = []
+
+  if file_path.endswith("version_history.rst"):
+    # Version file checking has enough special cased logic to merit its own checks.
+    # This only validates entries for the current release as very old release
+    # notes have a different format.
+    checkCurrentReleaseNotes(file_path, error_messages)
+
   for line_number, line in enumerate(fileinput.input(file_path)):
 
     def reportError(message):
@@ -307,7 +379,7 @@ def checkSourceLine(line, file_path, reportError):
   if not whitelistedForGetTime(file_path):
     if "std::get_time" in line:
       if "test/" in file_path:
-        reportError("Don't use std::get_time; use TestUtility::parseTimestamp in tests")
+        reportError("Don't use std::get_time; use TestUtility::parseTime in tests")
       else:
         reportError("Don't use std::get_time; use the injectable time system")
   if 'std::atomic_' in line:
@@ -383,6 +455,8 @@ def fixSourcePath(file_path):
     if not file_path.endswith(PROTO_SUFFIX):
       error_messages += fixHeaderOrder(file_path)
     error_messages += clangFormat(file_path)
+  if file_path.endswith(PROTO_SUFFIX) and isApiFile(file_path):
+    error_messages += fixJavaProtoOptions(file_path)
   return error_messages
 
 
@@ -497,7 +571,7 @@ def checkFormatVisitor(arg, dir_name, names):
 def checkErrorMessages(error_messages):
   if error_messages:
     for e in error_messages:
-      print "ERROR: %s" % e
+      print("ERROR: %s" % e)
     return True
   return False
 
@@ -557,8 +631,8 @@ if __name__ == "__main__":
     error_messages = sum((r.get() for r in results), [])
 
   if checkErrorMessages(error_messages):
-    print "ERROR: check format failed. run 'tools/check_format.py fix'"
+    print("ERROR: check format failed. run 'tools/check_format.py fix'")
     sys.exit(1)
 
   if operation_type == "check":
-    print "PASS"
+    print("PASS")

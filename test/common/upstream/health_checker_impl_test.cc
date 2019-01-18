@@ -591,6 +591,7 @@ TEST_F(HttpHealthCheckerImplTest, Degraded) {
   // We start off as healthy, and should go degraded after receiving the degraded health response.
   EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  EXPECT_CALL(*event_logger_, logDegraded(_, _));
   respond(0, "200", false, true, false, {}, true);
   EXPECT_EQ(Host::Health::Degraded, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 
@@ -601,6 +602,7 @@ TEST_F(HttpHealthCheckerImplTest, Degraded) {
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
   test_sessions_[0]->interval_timer_->callback_();
   EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_));
+  EXPECT_CALL(*event_logger_, logNoLongerDegraded(_, _));
   respond(0, "200", false, true, false, {}, false);
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 }
@@ -3546,6 +3548,22 @@ TEST(HealthCheckEventLoggerImplTest, All) {
                          "\"timestamp\":\"2009-02-13T23:31:31.234Z\"}\n"}));
   event_logger.logUnhealthy(envoy::data::core::v2alpha::HealthCheckerType::HTTP, host,
                             envoy::data::core::v2alpha::HealthCheckFailureType::ACTIVE, false);
+
+  EXPECT_CALL(*file, write(absl::string_view{
+                         "{\"health_checker_type\":\"HTTP\",\"host\":{\"socket_address\":{"
+                         "\"protocol\":\"TCP\",\"address\":\"10.0.0.1\",\"resolver_name\":\"\","
+                         "\"ipv4_compat\":false,\"port_value\":443}},\"cluster_name\":\"fake_"
+                         "cluster\",\"degraded_healthy_host\":{},"
+                         "\"timestamp\":\"2009-02-13T23:31:31.234Z\"}\n"}));
+  event_logger.logDegraded(envoy::data::core::v2alpha::HealthCheckerType::HTTP, host);
+
+  EXPECT_CALL(*file, write(absl::string_view{
+                         "{\"health_checker_type\":\"HTTP\",\"host\":{\"socket_address\":{"
+                         "\"protocol\":\"TCP\",\"address\":\"10.0.0.1\",\"resolver_name\":\"\","
+                         "\"ipv4_compat\":false,\"port_value\":443}},\"cluster_name\":\"fake_"
+                         "cluster\",\"no_longer_degraded_host\":{},"
+                         "\"timestamp\":\"2009-02-13T23:31:31.234Z\"}\n"}));
+  event_logger.logNoLongerDegraded(envoy::data::core::v2alpha::HealthCheckerType::HTTP, host);
 }
 
 // Validate that the proto constraints don't allow zero length edge durations.

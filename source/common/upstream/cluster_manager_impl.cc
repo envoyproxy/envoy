@@ -251,7 +251,7 @@ ClusterManagerImpl::ClusterManagerImpl(
 
   // We can now potentially create the CDS API once the backing cluster exists.
   if (bootstrap.dynamic_resources().has_cds_config()) {
-    cds_api_ = factory_.createCds(bootstrap.dynamic_resources().cds_config(), eds_config_, *this);
+    cds_api_ = factory_.createCds(bootstrap.dynamic_resources().cds_config(), *this);
     init_helper_.setCds(cds_api_.get());
   } else {
     init_helper_.setCds(nullptr);
@@ -298,9 +298,9 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
   }
 
   // Now setup for cross-thread updates.
-  cluster.prioritySet().addMemberUpdateCb([&cluster, this](uint32_t priority,
-                                                           const HostVector& hosts_added,
-                                                           const HostVector& hosts_removed) {
+  cluster.prioritySet().addPriorityUpdateCb([&cluster, this](uint32_t priority,
+                                                             const HostVector& hosts_added,
+                                                             const HostVector& hosts_removed) {
     // This fires when a cluster is about to have an updated member set. We need to send this
     // out to all of the thread local configurations.
 
@@ -1046,7 +1046,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
   }
 
   priority_set_.addMemberUpdateCb(
-      [this](uint32_t, const HostVector&, const HostVector& hosts_removed) -> void {
+      [this](const HostVector&, const HostVector& hosts_removed) -> void {
         // We need to go through and purge any connection pools for hosts that got deleted.
         // Even if two hosts actually point to the same address this will be safe, since if a
         // host is readded it will be a different physical HostSharedPtr.
@@ -1188,11 +1188,9 @@ ClusterSharedPtr ProdClusterManagerFactory::clusterFromProto(
                                  local_info_, outlier_event_logger, added_via_api);
 }
 
-CdsApiPtr ProdClusterManagerFactory::createCds(
-    const envoy::api::v2::core::ConfigSource& cds_config,
-    const absl::optional<envoy::api::v2::core::ConfigSource>& eds_config, ClusterManager& cm) {
-  return CdsApiImpl::create(cds_config, eds_config, cm, main_thread_dispatcher_, random_,
-                            local_info_, stats_);
+CdsApiPtr ProdClusterManagerFactory::createCds(const envoy::api::v2::core::ConfigSource& cds_config,
+                                               ClusterManager& cm) {
+  return CdsApiImpl::create(cds_config, cm, main_thread_dispatcher_, random_, local_info_, stats_);
 }
 
 } // namespace Upstream

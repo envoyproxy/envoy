@@ -113,31 +113,57 @@ parseClusterSocketOptions(const envoy::api::v2::Cluster& config,
   return cluster_options;
 }
 
+ProtocolOptionsConfigConstSharedPtr
+createProtocolOptionsConfig(const std::string& name, const ProtobufWkt::Any& typed_config,
+                            const ProtobufWkt::Struct& config) {
+  Server::Configuration::ProtocolOptionsFactory* factory =
+      Registry::FactoryRegistry<Server::Configuration::NamedNetworkFilterConfigFactory>::getFactory(
+          name);
+  if (factory == nullptr) {
+    factory =
+        Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::getFactory(
+            name);
+  }
+
+  if (factory == nullptr) {
+    throw EnvoyException(fmt::format(
+        "Didn't find a registered network or http filter implementation for name: '{}'", name));
+  }
+
+  ProtobufTypes::MessagePtr proto_config = factory->createEmptyProtocolOptionsProto();
+
+  if (proto_config == nullptr) {
+    throw EnvoyException(fmt::format("filter {} does not support protocol options", name));
+  }
+
+  Envoy::Config::Utility::translateOpaqueConfig(typed_config, config, *proto_config);
+
+  return factory->createProtocolOptionsConfig(*proto_config);
+}
+
 std::map<std::string, ProtocolOptionsConfigConstSharedPtr>
 parseExtensionProtocolOptions(const envoy::api::v2::Cluster& config) {
+  if (!config.typed_extension_protocol_options().empty() &&
+      !config.extension_protocol_options().empty()) {
+    throw EnvoyException("Only one of typed_extension_protocol_options or "
+                         "extension_protocol_options can be specified");
+  }
+
   std::map<std::string, ProtocolOptionsConfigConstSharedPtr> options;
-  for (const auto& iter : config.extension_protocol_options()) {
-    const std::string& name = iter.first;
-    const ProtobufWkt::Struct& config_struct = iter.second;
-    Server::Configuration::ProtocolOptionsFactory* factory = nullptr;
 
-    factory = Registry::FactoryRegistry<
-        Server::Configuration::NamedNetworkFilterConfigFactory>::getFactory(name);
-    if (factory == nullptr) {
-      factory = Registry::FactoryRegistry<
-          Server::Configuration::NamedHttpFilterConfigFactory>::getFactory(name);
+  for (const auto& it : config.typed_extension_protocol_options()) {
+    auto object =
+        createProtocolOptionsConfig(it.first, it.second, ProtobufWkt::Struct::default_instance());
+    if (object != nullptr) {
+      options[it.first] = std::move(object);
     }
+  }
 
-    if (factory == nullptr) {
-      throw EnvoyException(fmt::format(
-          "Didn't find a registered network or http filter implementation for name: '{}'", name));
-    }
-
-    auto object = factory->createProtocolOptionsConfig(
-        *Envoy::Config::Utility::translateToFactoryProtocolOptionsConfig(config_struct, name,
-                                                                         *factory));
-    if (object) {
-      options[name] = object;
+  for (const auto& it : config.extension_protocol_options()) {
+    auto object =
+        createProtocolOptionsConfig(it.first, ProtobufWkt::Any::default_instance(), it.second);
+    if (object != nullptr) {
+      options[it.first] = std::move(object);
     }
   }
 
@@ -226,6 +252,9 @@ void HostSetImpl::updateHosts(UpdateHostsParams&& update_hosts_params,
   rebuildLocalityScheduler(locality_scheduler_, locality_entries_, *healthy_hosts_per_locality_,
                            *healthy_hosts_, hosts_per_locality_, locality_weights_,
                            overprovisioning_factor_);
+  rebuildLocalityScheduler(degraded_locality_scheduler_, degraded_locality_entries_,
+                           *degraded_hosts_per_locality_, *degraded_hosts_, hosts_per_locality_,
+                           locality_weights_, overprovisioning_factor_);
 
   runUpdateCallbacks(hosts_added, hosts_removed);
 }
@@ -238,16 +267,16 @@ void HostSetImpl::rebuildLocalityScheduler(
     LocalityWeightsConstSharedPtr locality_weights, uint32_t overprovisioning_factor) {
   // Rebuild the locality scheduler by computing the effective weight of each
   // locality in this priority. The scheduler is reset by default, and is rebuilt only if we have
-  // locality weights (i.e. using EDS) and there is at least one healthy host in this priority.
+  // locality weights (i.e. using EDS) and there is at least one eligible host in this priority.
   //
-  // We omit building a scheduler when there are zero healthy hosts in the priority as all
-  // the localities will have zero effective weight. At selection time, we'll only ever try
-  // to select a host from such a priority if all priorities have zero healthy hosts. At
-  // that point we'll rely on other mechanisms such as panic mode to select a host,
-  // none of which rely on the scheduler.
+  // We omit building a scheduler when there are zero eligible hosts in the priority as
+  // all the localities will have zero effective weight. At selection time, we'll either select
+  // from a different scheduler or there will be no available hosts in the priority. At that point
+  // we'll rely on other mechanisms such as panic mode to select a host, none of which rely on the
+  // scheduler.
   //
   // TODO(htuch): if the underlying locality index ->
-  // envoy::api::v2::core::Locality hasn't changed in hosts_/healthy_hosts_, we
+  // envoy::api::v2::core::Locality hasn't changed in hosts_/healthy_hosts_/degraded_hosts_, we
   // could just update locality_weight_ without rebuilding. Similar to how host
   // level WRR works, we would age out the existing entries via picks and lazily
   // apply the new weights.
@@ -357,9 +386,10 @@ HostSet& PrioritySetImpl::getOrCreateHostSet(uint32_t priority,
   if (host_sets_.size() < priority + 1) {
     for (size_t i = host_sets_.size(); i <= priority; ++i) {
       HostSetImplPtr host_set = createHostSet(i, overprovisioning_factor);
-      host_set->addMemberUpdateCb([this](uint32_t priority, const HostVector& hosts_added,
-                                         const HostVector& hosts_removed) {
-        runUpdateCallbacks(priority, hosts_added, hosts_removed);
+      host_set->addPriorityUpdateCb([this](uint32_t priority, const HostVector& hosts_added,
+                                           const HostVector& hosts_removed) {
+        runUpdateCallbacks(hosts_added, hosts_removed);
+        runReferenceUpdateCallbacks(priority, hosts_added, hosts_removed);
       });
       host_sets_.push_back(std::move(host_set));
     }
@@ -592,20 +622,23 @@ ClusterImplBase::ClusterImplBase(
   // Create the default (empty) priority set before registering callbacks to
   // avoid getting an update the first time it is accessed.
   priority_set_.getOrCreateHostSet(0);
-  priority_set_.addMemberUpdateCb(
+  priority_set_.addPriorityUpdateCb(
       [this](uint32_t, const HostVector& hosts_added, const HostVector& hosts_removed) {
         if (!hosts_added.empty() || !hosts_removed.empty()) {
           info_->stats().membership_change_.inc();
         }
 
         uint32_t healthy_hosts = 0;
+        uint32_t degraded_hosts = 0;
         uint32_t hosts = 0;
         for (const auto& host_set : prioritySet().hostSetsPerPriority()) {
           hosts += host_set->hosts().size();
           healthy_hosts += host_set->healthyHosts().size();
+          degraded_hosts += host_set->degradedHosts().size();
         }
         info_->stats().membership_total_.set(hosts);
         info_->stats().membership_healthy_.set(healthy_hosts);
+        info_->stats().membership_degraded_.set(degraded_hosts);
       });
 }
 
