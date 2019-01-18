@@ -463,6 +463,7 @@ TEST(StrictDnsClusterImplTest, LoadAssignmentBasic) {
                 port_value: 11001
             health_check_config:
               port_value: 8000
+          health_status: DEGRADED
         - endpoint:
             address:
               socket_address:
@@ -532,6 +533,10 @@ TEST(StrictDnsClusterImplTest, LoadAssignmentBasic) {
   EXPECT_EQ("localhost1", cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->hostname());
   EXPECT_EQ("localhost1", cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[1]->hostname());
   EXPECT_EQ(100, cluster.prioritySet().hostSetsPerPriority()[0]->overprovisioningFactor());
+  EXPECT_EQ(Host::Health::Degraded,
+            cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->health());
+  EXPECT_EQ(Host::Health::Degraded,
+            cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[1]->health());
 
   // This is the first time we receveived an update for localhost1, we expect to rebuild.
   EXPECT_EQ(0UL, stats.counter("cluster.name.update_no_rebuild").value());
@@ -590,7 +595,8 @@ TEST(StrictDnsClusterImplTest, LoadAssignmentBasic) {
       std::list<std::string>({"127.0.0.3:11001", "10.0.0.1:11002"}),
       ContainerEq(hostListToAddresses(cluster.prioritySet().hostSetsPerPriority()[0]->hosts())));
 
-  EXPECT_EQ(2UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->degradedHosts().size());
   EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->hostsPerLocality().get().size());
   EXPECT_EQ(1UL,
             cluster.prioritySet().hostSetsPerPriority()[0]->healthyHostsPerLocality().get().size());
@@ -604,7 +610,8 @@ TEST(StrictDnsClusterImplTest, LoadAssignmentBasic) {
   EXPECT_THAT(std::list<std::string>({"127.0.0.3:11001", "10.0.0.1:11002", "10.0.0.1:11002"}),
               ContainerEq(hostListToAddresses(hosts)));
 
-  EXPECT_EQ(3UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(2UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->degradedHosts().size());
   EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->hostsPerLocality().get().size());
   EXPECT_EQ(1UL,
             cluster.prioritySet().hostSetsPerPriority()[0]->healthyHostsPerLocality().get().size());
@@ -860,6 +867,18 @@ TEST(HostImplTest, HealthFlags) {
   // If the degraded flag is the only thing set, host is degraded.
   host->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
   EXPECT_EQ(Host::Health::Degraded, host->health());
+
+  // If the EDS and active degraded flag is set, host is degraded.
+  host->healthFlagSet(Host::HealthFlag::DEGRADED_EDS_HEALTH);
+  EXPECT_EQ(Host::Health::Degraded, host->health());
+
+  // If only the EDS degraded is set, host is degraded.
+  host->healthFlagClear(Host::HealthFlag::DEGRADED_ACTIVE_HC);
+  EXPECT_EQ(Host::Health::Degraded, host->health());
+
+  // If EDS and failed active hc is set, host is unhealthy.
+  host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+  EXPECT_EQ(Host::Health::Unhealthy, host->health());
 }
 
 TEST(StaticClusterImplTest, InitialHosts) {
@@ -1086,6 +1105,48 @@ TEST(StaticClusterImplTest, LoadAssignmentLocality) {
   }
   EXPECT_EQ(nullptr, cluster.prioritySet().hostSetsPerPriority()[0]->localityWeights());
   EXPECT_FALSE(cluster.info()->addedViaApi());
+}
+
+TEST(StaticClusterImplTest, LoadAssignmentEdsHealth) {
+  Stats::IsolatedStoreImpl stats;
+  Ssl::MockContextManager ssl_context_manager;
+  NiceMock<Event::MockDispatcher> dispatcher;
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+  NiceMock<Runtime::MockRandomGenerator> random;
+  const std::string yaml = R"EOF(
+    name: staticcluster
+    connect_timeout: 0.25s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      policy:
+        overprovisioning_factor: 100
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 10.0.0.1
+                port_value: 443
+            health_check_config:
+              port_value: 8000
+          health_status: DEGRADED
+  )EOF";
+
+  NiceMock<MockClusterManager> cm;
+  envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
+  Envoy::Stats::ScopePtr scope = stats.createScope(fmt::format(
+      "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
+                                                            : cluster_config.alt_stat_name()));
+  Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+      ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats);
+  StaticClusterImpl cluster(cluster_config, runtime, factory_context, std::move(scope), false);
+  cluster.initialize([] {});
+
+  EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->degradedHosts().size());
+  EXPECT_EQ(Host::Health::Degraded,
+            cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->health());
 }
 
 TEST(StaticClusterImplTest, AltStatName) {

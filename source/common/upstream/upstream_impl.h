@@ -206,7 +206,8 @@ public:
     }
 
     // Only possible option at this point is that the host is degraded.
-    ASSERT(health_flags_ == static_cast<uint32_t>(HealthFlag::DEGRADED_ACTIVE_HC));
+    ASSERT(healthFlagGet(HealthFlag::DEGRADED_ACTIVE_HC) ||
+           healthFlagGet(HealthFlag::DEGRADED_EDS_HEALTH));
     return Host::Health::Degraded;
   }
 
@@ -665,14 +666,12 @@ public:
   registerHostForPriority(const std::string& hostname,
                           Network::Address::InstanceConstSharedPtr address,
                           const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint,
-                          const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint,
-                          const absl::optional<Upstream::Host::HealthFlag> health_checker_flag);
+                          const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint);
 
   void
   registerHostForPriority(const HostSharedPtr& host,
                           const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint,
-                          const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint,
-                          const absl::optional<Upstream::Host::HealthFlag> health_checker_flag);
+                          const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint);
 
   void
   updateClusterPrioritySet(const uint32_t priority, HostVectorSharedPtr&& current_hosts,

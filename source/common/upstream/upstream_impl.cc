@@ -170,6 +170,46 @@ parseExtensionProtocolOptions(const envoy::api::v2::Cluster& config) {
   return options;
 }
 
+// Updates the health flags for an existing host to match the new host.
+// @param updated_host the new host to read health flag values from.
+// @param existing_host the host to update.
+// @param flag the health flag to update.
+// @return bool whether the flag update caused the host health to change.
+bool updateHealthFlags(const Host& updated_host, Host& existing_host, Host::HealthFlag flag) {
+  // Check if the health flag has changed.
+  if (existing_host.healthFlagGet(flag) != updated_host.healthFlagGet(flag)) {
+    // Keep track of the previous health value of the host.
+    const auto previous_health = existing_host.health();
+
+    if (updated_host.healthFlagGet(flag)) {
+      existing_host.healthFlagSet(flag);
+    } else {
+      existing_host.healthFlagClear(flag);
+    }
+
+    // Rebuild if changing the flag affected the host health.
+    return previous_health != existing_host.health();
+  }
+
+  return false;
+}
+
+void setEdsHealthFlag(Host& host, envoy::api::v2::core::HealthStatus health_status) {
+  switch (health_status) {
+  case envoy::api::v2::core::HealthStatus::UNHEALTHY:
+  case envoy::api::v2::core::HealthStatus::DRAINING:
+  case envoy::api::v2::core::HealthStatus::TIMEOUT:
+    host.healthFlagSet(Host::HealthFlag::FAILED_EDS_HEALTH);
+    break;
+  case envoy::api::v2::core::HealthStatus::DEGRADED:
+    host.healthFlagSet(Host::HealthFlag::DEGRADED_EDS_HEALTH);
+    break;
+  default:;
+    break;
+    // No health flags should be set.
+  }
+}
+
 } // namespace
 
 Host::CreateConnectionData HostImpl::createConnection(
@@ -861,32 +901,24 @@ void PriorityStateManager::initializePriorityFor(
 void PriorityStateManager::registerHostForPriority(
     const std::string& hostname, Network::Address::InstanceConstSharedPtr address,
     const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint,
-    const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint,
-    const absl::optional<Upstream::Host::HealthFlag> health_checker_flag) {
+    const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint) {
   const HostSharedPtr host(
       new HostImpl(parent_.info(), hostname, address, lb_endpoint.metadata(),
                    lb_endpoint.load_balancing_weight().value(), locality_lb_endpoint.locality(),
                    lb_endpoint.endpoint().health_check_config(), locality_lb_endpoint.priority()));
-  registerHostForPriority(host, locality_lb_endpoint, lb_endpoint, health_checker_flag);
+  registerHostForPriority(host, locality_lb_endpoint, lb_endpoint);
 }
 
 void PriorityStateManager::registerHostForPriority(
     const HostSharedPtr& host,
     const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint,
-    const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint,
-    const absl::optional<Upstream::Host::HealthFlag> health_checker_flag) {
+    const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint) {
   const uint32_t priority = locality_lb_endpoint.priority();
   // Should be called after initializePriorityFor.
   ASSERT(priority_state_[priority].first);
   priority_state_[priority].first->emplace_back(host);
-  if (health_checker_flag.has_value()) {
-    const auto& health_status = lb_endpoint.health_status();
-    if (health_status == envoy::api::v2::core::HealthStatus::UNHEALTHY ||
-        health_status == envoy::api::v2::core::HealthStatus::DRAINING ||
-        health_status == envoy::api::v2::core::HealthStatus::TIMEOUT) {
-      priority_state_[priority].first->back()->healthFlagSet(health_checker_flag.value());
-    }
-  }
+
+  setEdsHealthFlag(*priority_state_[priority].first->back(), lb_endpoint.health_status());
 }
 
 void PriorityStateManager::updateClusterPrioritySet(
@@ -980,7 +1012,7 @@ StaticClusterImpl::StaticClusterImpl(
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
       priority_state_manager_->registerHostForPriority(
           "", resolveProtoAddress(lb_endpoint.endpoint().address()), locality_lb_endpoint,
-          lb_endpoint, absl::nullopt);
+          lb_endpoint);
     }
   }
 }
@@ -1067,24 +1099,10 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
         max_host_weight = host->weight();
       }
 
-      if (existing_host->second->healthFlagGet(Host::HealthFlag::FAILED_EDS_HEALTH) !=
-          host->healthFlagGet(Host::HealthFlag::FAILED_EDS_HEALTH)) {
-        // TODO(snowp): To accommodate degraded, this bit should be checking for any changes
-        // to the health flag, not just healthy vs not healthy.
-        const bool previously_healthy = existing_host->second->health() == Host::Health::Healthy;
-        if (host->healthFlagGet(Host::HealthFlag::FAILED_EDS_HEALTH)) {
-          existing_host->second->healthFlagSet(Host::HealthFlag::FAILED_EDS_HEALTH);
-          // If the host was previously healthy and we're now unhealthy, we need to
-          // rebuild.
-          hosts_changed |= previously_healthy;
-        } else {
-          existing_host->second->healthFlagClear(Host::HealthFlag::FAILED_EDS_HEALTH);
-          // If the host was previously unhealthy and now healthy, we need to
-          // rebuild.
-          hosts_changed |=
-              !previously_healthy && existing_host->second->health() == Host::Health::Healthy;
-        }
-      }
+      hosts_changed |=
+          updateHealthFlags(*host, *existing_host->second, Host::HealthFlag::FAILED_EDS_HEALTH);
+      hosts_changed |=
+          updateHealthFlags(*host, *existing_host->second, Host::HealthFlag::DEGRADED_EDS_HEALTH);
 
       // Did metadata change?
       const bool metadata_changed = !Protobuf::util::MessageDifferencer::Equivalent(
@@ -1258,7 +1276,7 @@ void StrictDnsClusterImpl::updateAllHosts(const HostVector& hosts_added,
     for (const HostSharedPtr& host : target->hosts_) {
       if (target->locality_lb_endpoint_.priority() == current_priority) {
         priority_state_manager.registerHostForPriority(host, target->locality_lb_endpoint_,
-                                                       target->lb_endpoint_, absl::nullopt);
+                                                       target->lb_endpoint_);
       }
     }
   }
@@ -1308,6 +1326,7 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
               lb_endpoint_.metadata(), lb_endpoint_.load_balancing_weight().value(),
               locality_lb_endpoint_.locality(), lb_endpoint_.endpoint().health_check_config(),
               locality_lb_endpoint_.priority()));
+          setEdsHealthFlag(*new_hosts.back(), lb_endpoint_.health_status());
         }
 
         HostVector hosts_added;
