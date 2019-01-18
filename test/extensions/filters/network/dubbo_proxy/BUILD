@@ -113,7 +113,6 @@ envoy_extension_cc_test(
     extension_name = "envoy.filters.network.dubbo_proxy",
     deps = [
         "//source/extensions/filters/network/dubbo_proxy:metadata_lib",
-        "//source/extensions/filters/network/dubbo_proxy:utility_lib",
         "//source/extensions/filters/network/dubbo_proxy/router:router_matcher",
         "//test/mocks/server:server_mocks",
         "@envoy_api//envoy/config/filter/network/dubbo_proxy/v2alpha1:dubbo_proxy_cc",

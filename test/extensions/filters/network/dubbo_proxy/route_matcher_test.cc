@@ -6,7 +6,6 @@
 #include "common/protobuf/protobuf.h"
 
 #include "extensions/filters/network/dubbo_proxy/router/route_matcher.h"
-#include "extensions/filters/network/dubbo_proxy/utility.h"
 
 #include "gtest/gtest.h"
 
@@ -35,27 +34,6 @@ parseDubboProxyFromV2Yaml(const std::string& yaml) {
 }
 
 } // namespace
-
-TEST(RouteMatcherTest, WildcardMatchTest) {
-  std::string input("add123");
-  std::string pattern("add*");
-  EXPECT_EQ(true, Utility::wildcardMatch(input.c_str(), pattern.c_str()));
-
-  input = "add123test";
-  pattern = "add*test";
-  EXPECT_EQ(true, Utility::wildcardMatch(input.c_str(), pattern.c_str()));
-
-  input = "123testadd";
-  pattern = "*test*";
-  EXPECT_EQ(true, Utility::wildcardMatch(input.c_str(), pattern.c_str()));
-
-  input = "123testadd";
-  pattern = "*test";
-  EXPECT_EQ(false, Utility::wildcardMatch(input.c_str(), pattern.c_str()));
-
-  pattern = "test*";
-  EXPECT_EQ(false, Utility::wildcardMatch(input.c_str(), pattern.c_str()));
-}
 
 TEST(RouteMatcherTest, RouteByServiceNameWithAnyMethod) {
   {

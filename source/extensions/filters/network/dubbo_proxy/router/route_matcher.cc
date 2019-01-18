@@ -1,10 +1,9 @@
 #include "extensions/filters/network/dubbo_proxy/router/route_matcher.h"
 
 #include "envoy/config/filter/network/dubbo_proxy/v2alpha1/dubbo_proxy.pb.h"
+#include "envoy/config/filter/network/dubbo_proxy/v2alpha1/route.pb.validate.h"
 
 #include "common/protobuf/utility.h"
-
-#include "extensions/filters/network/dubbo_proxy/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -165,6 +164,9 @@ RouteConstSharedPtr MethodRouteEntryImpl::matches(const MessageMetadata& metadat
 RouteMatcher::RouteMatcher(const RouteConfig& config)
     : service_name_(config.interface()), group_(config.group()), version_(config.version()) {
   using envoy::config::filter::network::dubbo_proxy::v2alpha1::RouteMatch;
+
+  // Verify configuration rules.
+  MessageUtil::validate(config);
 
   for (const auto& route : config.routes()) {
     routes_.emplace_back(std::make_shared<MethodRouteEntryImpl>(route));
