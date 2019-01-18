@@ -2151,7 +2151,7 @@ name: response-metadata-filter
 config: {}
 )EOF";
 
-static std::string request_metadata_filter =R"EOF(
+static std::string request_metadata_filter = R"EOF(
 name: request-metadata-filter
 config: {}
 )EOF";
@@ -2161,7 +2161,6 @@ void verifyExpectedMetadata(Http::MetadataMap metadata_map, std::set<std::string
     // keys are the same as their corresponding values.
     EXPECT_EQ(metadata_map.find(key)->second, key);
   }
-  ENVOY_LOG_MISC(error, "+++++++++++++ {}", metadata_map);
   EXPECT_EQ(metadata_map.size(), keys.size());
 }
 
@@ -2384,8 +2383,8 @@ void HttpIntegrationTest::testEnvoyRequestMetadataReachSizeLimit() {
 void HttpIntegrationTest::testConsumeAndInsertRequestMetadata() {
   addFilters({request_metadata_filter});
   config_helper_.addConfigModifier(
-     [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
-         -> void { hcm.set_proxy_100_continue(true); });
+      [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
+          -> void { hcm.set_proxy_100_continue(true); });
 
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
