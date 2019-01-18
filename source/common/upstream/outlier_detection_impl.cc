@@ -164,7 +164,7 @@ void DetectorImpl::initialize(const Cluster& cluster) {
     }
   }
   cluster.prioritySet().addMemberUpdateCb(
-      [this](uint32_t, const HostVector& hosts_added, const HostVector& hosts_removed) -> void {
+      [this](const HostVector& hosts_added, const HostVector& hosts_removed) -> void {
         for (const HostSharedPtr& host : hosts_added) {
           addHostMonitor(host);
         }

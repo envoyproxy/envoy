@@ -22,6 +22,8 @@ public:
   const std::string HttpConnectionManager = "envoy.http_connection_manager";
   // Mongo proxy filter
   const std::string MongoProxy = "envoy.mongo_proxy";
+  // MySQL proxy filter
+  const std::string MySQLProxy = "envoy.filters.network.mysql_proxy";
   // Rate limit filter
   const std::string RateLimit = "envoy.ratelimit";
   // Redis proxy filter

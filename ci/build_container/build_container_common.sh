@@ -10,11 +10,6 @@ curl --location --output /usr/local/bin/buildifier https://github.com/bazelbuild
 # GCC for everything.
 export CC=gcc
 export CXX=g++
-CXX_VERSION="$(${CXX} --version | grep ^g++)"
-if [[ "${CXX_VERSION}" != "${EXPECTED_CXX_VERSION}" ]]; then
-  echo "Unexpected compiler version: ${CXX_VERSION}"
-  exit 1
-fi
 
 export THIRDPARTY_DEPS=/tmp
 export THIRDPARTY_SRC=/thirdparty

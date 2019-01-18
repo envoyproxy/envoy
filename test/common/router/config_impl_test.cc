@@ -5296,7 +5296,7 @@ virtual_hosts:
               name: envoy.test_retry_priority
   )EOF";
 
-  Upstream::MockRetryPriority priority({});
+  Upstream::MockRetryPriority priority{{}, {}};
   Upstream::MockRetryPriorityFactory priority_factory(priority);
   Registry::InjectFactory<Upstream::RetryPriorityFactory> inject_priority_factory(priority_factory);
 

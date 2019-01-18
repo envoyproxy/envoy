@@ -42,6 +42,11 @@ REPOSITORY_LOCATIONS = dict(
         strip_prefix = "xxHash-0.6.5",
         urls = ["https://github.com/Cyan4973/xxHash/archive/v0.6.5.tar.gz"],
     ),
+    com_github_envoyproxy_sqlparser = dict(
+        sha256 = "425dfee0c4fe9aff8acf2365cde3dd2ba7fb878d2ba37562d33920e34c40c05e",
+        strip_prefix = "sql-parser-5f50c68bdf5f107692bb027d1c568f67597f4d7f",
+        urls = ["https://github.com/envoyproxy/sql-parser/archive/5f50c68bdf5f107692bb027d1c568f67597f4d7f.tar.gz"],
+    ),
     com_github_eile_tclap = dict(
         sha256 = "f0ede0721dddbb5eba3a47385a6e8681b14f155e1129dd39d1a959411935098f",
         strip_prefix = "tclap-tclap-1-2-1-release-final",
@@ -79,9 +84,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/nanopb/nanopb/archive/0.3.9.2.tar.gz"],
     ),
     io_opentracing_cpp = dict(
-        sha256 = "4455ca507936bc4b658ded10a90d8ebbbd61c58f06207be565a4ffdc885687b5",
-        strip_prefix = "opentracing-cpp-1.5.0",
-        urls = ["https://github.com/opentracing/opentracing-cpp/archive/v1.5.0.tar.gz"],
+        sha256 = "015c4187f7a6426a2b5196f0ccd982aa87f010cf61f507ae3ce5c90523f92301",
+        strip_prefix = "opentracing-cpp-1.5.1",
+        urls = ["https://github.com/opentracing/opentracing-cpp/archive/v1.5.1.tar.gz"],
     ),
     com_lightstep_tracer_cpp = dict(
         sha256 = "defbf471facfebde6523ca1177529b63784893662d4ef2c60db074be8aef0634",
