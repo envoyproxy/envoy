@@ -20,7 +20,7 @@ public:
   ~OriginalSrcSocketOption() {}
 
   /**
-   * Updates the source address of the socket to match @c src_address_.
+   * Updates the source address of the socket to match `src_address_`.
    * Adds socket options to the socket to allow this to work.
    */
   bool setOption(Network::Socket& socket,

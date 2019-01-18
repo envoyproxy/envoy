@@ -1,7 +1,6 @@
 #include "extensions/filters/listener/original_src/original_src_socket_option.h"
 
 #include "common/common/assert.h"
-#include "common/common/fmt.h"
 
 namespace Envoy {
 namespace Extensions {
