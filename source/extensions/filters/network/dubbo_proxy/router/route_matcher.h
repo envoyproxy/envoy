@@ -123,7 +123,7 @@ public:
 
 private:
   const Matchers::StringMatcher method_name_;
-  absl::optional<std::shared_ptr<ParameterRouteEntryImpl>> parameter_route_;
+  std::shared_ptr<ParameterRouteEntryImpl> parameter_route_;
 };
 
 class RouteMatcher : public Logger::Loggable<Logger::Id::dubbo> {

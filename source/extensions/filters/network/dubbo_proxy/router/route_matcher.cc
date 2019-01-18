@@ -153,9 +153,9 @@ RouteConstSharedPtr MethodRouteEntryImpl::matches(const MessageMetadata& metadat
     return nullptr;
   }
 
-  if (parameter_route_.has_value()) {
+  if (parameter_route_) {
     ENVOY_LOG(debug, "dubbo route matcher: parameter matching is required");
-    return parameter_route_.value()->matches(metadata, random_value);
+    return parameter_route_->matches(metadata, random_value);
   }
 
   return clusterEntry(random_value);
@@ -164,9 +164,6 @@ RouteConstSharedPtr MethodRouteEntryImpl::matches(const MessageMetadata& metadat
 RouteMatcher::RouteMatcher(const RouteConfig& config)
     : service_name_(config.interface()), group_(config.group()), version_(config.version()) {
   using envoy::config::filter::network::dubbo_proxy::v2alpha1::RouteMatch;
-
-  // Verify configuration rules.
-  MessageUtil::validate(config);
 
   for (const auto& route : config.routes()) {
     routes_.emplace_back(std::make_shared<MethodRouteEntryImpl>(route));
