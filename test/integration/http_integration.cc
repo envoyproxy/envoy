@@ -2418,9 +2418,9 @@ void HttpIntegrationTest::testConsumeAndInsertRequestMetadata() {
   verifyExpectedMetadata(upstream_request_->metadata_map(), expected_metadata_keys);
 
   // Sends headers, data, metadata and trailer.
-  encoder_decoder = codec_client_->startRequest(default_request_headers_);
-  request_encoder_ = &encoder_decoder.first;
-  response = std::move(encoder_decoder.second);
+  auto encoder_decoder_2 = codec_client_->startRequest(default_request_headers_);
+  request_encoder_ = &encoder_decoder_2.first;
+  response = std::move(encoder_decoder_2.second);
   codec_client_->sendData(*request_encoder_, 10, false);
   metadata_map = {{"consume", "consume"}};
   codec_client_->sendMetadata(*request_encoder_, metadata_map);
@@ -2436,9 +2436,9 @@ void HttpIntegrationTest::testConsumeAndInsertRequestMetadata() {
 
   // Sends headers, large data, metadata. Large data triggers decodeData() multiple times, and each
   // time, a "data" metadata is added.
-  encoder_decoder = codec_client_->startRequest(default_request_headers_);
-  request_encoder_ = &encoder_decoder.first;
-  response = std::move(encoder_decoder.second);
+  auto encoder_decoder_3 = codec_client_->startRequest(default_request_headers_);
+  request_encoder_ = &encoder_decoder_3.first;
+  response = std::move(encoder_decoder_3.second);
   codec_client_->sendData(*request_encoder_, 100000, false);
   codec_client_->sendMetadata(*request_encoder_, metadata_map);
   codec_client_->sendData(*request_encoder_, 100000, true);
@@ -2453,9 +2453,9 @@ void HttpIntegrationTest::testConsumeAndInsertRequestMetadata() {
   EXPECT_GE(upstream_request_->duplicated_metadata_key_count().find("data")->second, 2);
 
   // Sends multiple metadata.
-  encoder_decoder = codec_client_->startRequest(default_request_headers_);
-  request_encoder_ = &encoder_decoder.first;
-  response = std::move(encoder_decoder.second);
+  auto encoder_decoder_4 = codec_client_->startRequest(default_request_headers_);
+  request_encoder_ = &encoder_decoder_4.first;
+  response = std::move(encoder_decoder_4.second);
   metadata_map = {{"metadata1", "metadata1"}};
   codec_client_->sendMetadata(*request_encoder_, metadata_map);
   codec_client_->sendData(*request_encoder_, 10, false);
