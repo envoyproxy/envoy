@@ -237,7 +237,9 @@ TEST_P(IntegrationTest, InvalidContentLength) { testInvalidContentLength(); }
 
 TEST_P(IntegrationTest, MultipleContentLengths) { testMultipleContentLengths(); }
 
-TEST_P(IntegrationTest, OverlyLongHeaders) { testOverlyLongHeaders(); }
+TEST_P(IntegrationTest, LargeHeadersRejected) { testLargeRequestHeaders(60, 60); }
+
+TEST_P(IntegrationTest, LargeHeadersAccepted) { testLargeRequestHeaders(60, 62); }
 
 TEST_P(IntegrationTest, UpstreamProtocolError) { testUpstreamProtocolError(); }
 

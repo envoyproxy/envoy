@@ -64,6 +64,7 @@ namespace Http {
   COUNTER  (downstream_rq_overload_close)                                                          \
   COUNTER  (downstream_rq_timeout)                                                            \
   COUNTER  (rs_too_large)
+// Do I need a stat addition for this new feature?
 // clang-format on
 
 /**
@@ -227,6 +228,11 @@ public:
    * @return optional idle timeout for incoming connection manager connections.
    */
   virtual absl::optional<std::chrono::milliseconds> idleTimeout() const PURE;
+
+  /**
+   * @return maximum size in kb for request headers sent to the connection manager
+   */
+  virtual uint32_t maxRequestHeadersSize() const PURE;
 
   /**
    * @return per-stream idle timeout for incoming connection manager connections. Zero indicates a
