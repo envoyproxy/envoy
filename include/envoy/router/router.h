@@ -260,12 +260,12 @@ public:
   /**
    * Returns a reference to the PriorityLoad that should be used for the next retry.
    * @param priority_set current priority set.
-   * @param healthy_priority_load original priority load.
-   * @return PriorityLoad that should be used to select a priority for the next retry.
+   * @param original_priority_load original priority load.
+   * @return HealthyAndDegradedLoad that should be used to select a priority for the next retry.
    */
-  virtual const Upstream::HealthyLoad&
+  virtual const Upstream::HealthyAndDegradedLoad&
   priorityLoadForRetry(const Upstream::PrioritySet& priority_set,
-                       const Upstream::HealthyLoad& healthy_priority_load) PURE;
+                       const Upstream::HealthyAndDegradedLoad& original_priority_load) PURE;
   /**
    * return how many times host selection should be reattempted during host selection.
    */
