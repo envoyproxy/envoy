@@ -297,7 +297,7 @@ streamInfo()
 
   streamInfo = handle:streamInfo()
 
-Returns :repo:`information <include/stream_info/stream_info.h>` related to the current request.
+Returns :repo:`information <include/envoy/stream_info/stream_info.h>` related to the current request.
 
 Returns a :ref:`stream info object <config_http_filters_lua_stream_info_wrapper>`.
 

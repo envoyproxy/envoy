@@ -24,14 +24,14 @@ envoy_cc_test(
         "//test/config/integration/certs",
     ],
     deps = [
-        ":http_integration_lib",
+        ":xds_integration_test_base",
         "//source/common/config:protobuf_link_hacks",
         "//source/common/config:resources_lib",
         "//source/common/protobuf:utility_lib",
-        "//source/common/ssl:context_config_lib",
-        "//source/common/ssl:context_lib",
-        "//source/common/ssl:ssl_socket_lib",
-        "//source/extensions/transport_sockets/ssl:config",
+        "//source/extensions/transport_sockets/tls:config",
+        "//source/extensions/transport_sockets/tls:context_config_lib",
+        "//source/extensions/transport_sockets/tls:context_lib",
+        "//source/extensions/transport_sockets/tls:ssl_socket_lib",
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:server_mocks",
@@ -61,6 +61,27 @@ envoy_proto_library(
     name = "capture_fuzz_proto",
     srcs = [":capture_fuzz.proto"],
     require_py = 1,
+)
+
+envoy_cc_test(
+    name = "cds_integration_test",
+    srcs = ["cds_integration_test.cc"],
+    data = [
+        "//test/config/integration/certs",
+    ],
+    deps = [
+        ":xds_integration_test_base",
+        "//source/common/config:protobuf_link_hacks",
+        "//source/common/config:resources_lib",
+        "//source/common/protobuf:utility_lib",
+        "//test/common/grpc:grpc_client_integration_lib",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:server_mocks",
+        "//test/test_common:network_utility_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/api/v2:cds_cc",
+        "@envoy_api//envoy/api/v2:discovery_cc",
+    ],
 )
 
 envoy_cc_test(
@@ -201,6 +222,7 @@ envoy_cc_test_library(
         "//test/integration/filters:headers_only_filter_config_lib",
         "//test/integration/filters:passthrough_filter_config_lib",
         "//test/integration/filters:pause_filter_lib",
+        "//test/integration/filters:response_metadata_filter_config_lib",
         "//test/test_common:registry_lib",
     ],
 )
@@ -280,7 +302,6 @@ envoy_cc_test_library(
         "//source/common/network:filter_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/network:utility_lib",
-        "//source/common/ssl:ssl_socket_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:thread_local_store_lib",
         "//source/common/thread_local:thread_local_lib",
@@ -288,6 +309,7 @@ envoy_cc_test_library(
         "//source/common/upstream:upstream_lib",
         "//source/extensions/transport_sockets/capture:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
+        "//source/extensions/transport_sockets/tls:ssl_socket_lib",
         "//source/server:connection_handler_lib",
         "//source/server:hot_restart_nop_lib",
         "//source/server:server_lib",
@@ -323,6 +345,18 @@ envoy_cc_test(
         "//source/extensions/filters/http/grpc_http1_bridge:config",
         "//source/extensions/filters/http/health_check:config",
         "//test/mocks/http:http_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "redirect_integration_test",
+    srcs = [
+        "redirect_integration_test.cc",
+    ],
+    deps = [
+        ":http_protocol_integration_lib",
+        "//source/common/http:header_map_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -464,10 +498,10 @@ envoy_cc_test(
         "//source/common/event:dispatcher_lib",
         "//source/common/network:connection_lib",
         "//source/common/network:utility_lib",
-        "//source/common/ssl:context_config_lib",
-        "//source/common/ssl:context_lib",
         "//source/extensions/filters/listener/tls_inspector:config",
-        "//source/extensions/transport_sockets/ssl:config",
+        "//source/extensions/transport_sockets/tls:config",
+        "//source/extensions/transport_sockets/tls:context_config_lib",
+        "//source/extensions/transport_sockets/tls:context_lib",
         "//test/mocks/secret:secret_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/transport_socket/capture/v2alpha:capture_cc",
@@ -491,10 +525,10 @@ envoy_cc_test(
         "//source/common/event:dispatcher_lib",
         "//source/common/network:connection_lib",
         "//source/common/network:utility_lib",
-        "//source/common/ssl:context_config_lib",
-        "//source/common/ssl:context_lib",
         "//source/extensions/filters/listener/tls_inspector:config",
-        "//source/extensions/transport_sockets/ssl:config",
+        "//source/extensions/transport_sockets/tls:config",
+        "//source/extensions/transport_sockets/tls:context_config_lib",
+        "//source/extensions/transport_sockets/tls:context_lib",
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/secret:secret_mocks",
@@ -519,10 +553,10 @@ envoy_cc_test(
         "//source/common/event:dispatcher_lib",
         "//source/common/network:connection_lib",
         "//source/common/network:utility_lib",
-        "//source/common/ssl:context_config_lib",
-        "//source/common/ssl:context_lib",
         "//source/extensions/filters/listener/tls_inspector:config",
-        "//source/extensions/transport_sockets/ssl:config",
+        "//source/extensions/transport_sockets/tls:config",
+        "//source/extensions/transport_sockets/tls:context_config_lib",
+        "//source/extensions/transport_sockets/tls:context_lib",
         "//test/mocks/secret:secret_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/transport_socket/capture/v2alpha:capture_cc",
@@ -544,11 +578,11 @@ envoy_cc_test(
         "//source/common/event:dispatcher_includes",
         "//source/common/event:dispatcher_lib",
         "//source/common/network:utility_lib",
-        "//source/common/ssl:context_config_lib",
-        "//source/common/ssl:context_lib",
         "//source/extensions/access_loggers/file:config",
         "//source/extensions/filters/network/tcp_proxy:config",
-        "//source/extensions/transport_sockets/ssl:config",
+        "//source/extensions/transport_sockets/tls:config",
+        "//source/extensions/transport_sockets/tls:context_config_lib",
+        "//source/extensions/transport_sockets/tls:context_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/secret:secret_mocks",
         "//test/test_common:utility_lib",
@@ -601,8 +635,28 @@ envoy_cc_test(
     srcs = ["xds_integration_test.cc"],
     data = ["//test/config/integration:server_xds_files"],
     deps = [
-        ":http_integration_lib",
+        ":xds_integration_test_base",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "xds_integration_test_base",
+    srcs = [
+        "xds_integration_test_base.cc",
+    ],
+    hdrs = [
+        "xds_integration_test_base.h",
+    ],
+    deps = [
+        ":http_integration_lib",
+        ":test_host_predicate_lib",
+        "//include/envoy/event:timer_interface",
+        "//source/common/common:thread_annotations",
+        "//source/extensions/filters/http/router:config",
+        "//source/extensions/filters/network/http_connection_manager:config",
+        "//test/common/upstream:utility_lib",
+        "//test/test_common:registry_lib",
     ],
 )
 
@@ -620,7 +674,7 @@ envoy_cc_test(
         ":http_integration_lib",
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/listener/tls_inspector:config",
-        "//source/extensions/transport_sockets/ssl:config",
+        "//source/extensions/transport_sockets/tls:config",
         "//test/mocks/server:server_mocks",
         "//test/test_common:utility_lib",
     ],

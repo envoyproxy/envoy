@@ -21,6 +21,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
         "//source/common/common:enum_to_int",
+        "//source/common/common:matchers_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/http:codes_lib",
         "//source/common/router:config_lib",

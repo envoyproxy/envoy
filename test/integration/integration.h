@@ -35,6 +35,7 @@ public:
   const Http::HeaderMap& headers() { return *headers_; }
   const Http::HeaderMapPtr& trailers() { return trailers_; }
   const Http::MetadataMap& metadata_map() { return *metadata_map_; }
+  uint64_t keyCount(std::string key) { return duplicated_metadata_key_count_[key]; }
   void waitForContinueHeaders();
   void waitForHeaders();
   // This function waits until body_ has at least size bytes in it (it might have more). clearBody()
@@ -63,6 +64,7 @@ private:
   Http::HeaderMapPtr headers_;
   Http::HeaderMapPtr trailers_;
   Http::MetadataMapPtr metadata_map_{new Http::MetadataMap()};
+  std::unordered_map<std::string, uint64_t> duplicated_metadata_key_count_;
   bool waiting_for_end_stream_{};
   bool saw_end_stream_{};
   std::string body_;
@@ -237,6 +239,10 @@ protected:
 
   // True if test will use a fixed RNG value.
   bool deterministic_{};
+
+  // Set true when your test will itself take care of ensuring listeners are up, and registering
+  // them in the port_map_.
+  bool defer_listener_finalization_{false};
 
 private:
   // The type for the Envoy-to-backend connection
