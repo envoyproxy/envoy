@@ -81,7 +81,8 @@ Http::FilterHeadersStatus HealthCheckFilter::encodeHeaders(Http::HeaderMap& head
   if (health_check_request_) {
     if (cache_manager_) {
       cache_manager_->setCachedResponseCode(
-          static_cast<Http::Code>(Http::Utility::getResponseStatus(headers)));
+          static_cast<Http::Code>(Http::Utility::getResponseStatus(headers)),
+            headers.EnvoyDegraded() != nullptr);
     }
 
     headers.insertEnvoyUpstreamHealthCheckedCluster().value(context_.localInfo().clusterName());
@@ -96,12 +97,15 @@ Http::FilterHeadersStatus HealthCheckFilter::encodeHeaders(Http::HeaderMap& head
 void HealthCheckFilter::onComplete() {
   ASSERT(handling_);
   Http::Code final_status = Http::Code::OK;
+  bool degraded = false;
   if (context_.healthCheckFailed()) {
     callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::FailedLocalHealthCheck);
     final_status = Http::Code::ServiceUnavailable;
   } else {
     if (cache_manager_) {
-      final_status = cache_manager_->getCachedResponseCode();
+      const auto status_and_degraded = cache_manager_->getCachedResponseCode();
+      final_status = status_and_degraded.first;
+      degraded = status_and_degraded.second;
     } else if (cluster_min_healthy_percentages_ != nullptr &&
                !cluster_min_healthy_percentages_->empty()) {
       // Check the status of the specified upstream cluster(s) to determine the right response.
@@ -143,7 +147,11 @@ void HealthCheckFilter::onComplete() {
     }
   }
 
-  callbacks_->sendLocalReply(final_status, "", nullptr, absl::nullopt);
+  callbacks_->sendLocalReply(final_status, "", [degraded](auto& headers) {
+      if (degraded) {
+      headers.insertEnvoyDegraded();
+      }
+      }, absl::nullopt);
 }
 
 } // namespace HealthCheck

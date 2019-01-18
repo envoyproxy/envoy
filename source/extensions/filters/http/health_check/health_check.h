@@ -27,9 +27,10 @@ class HealthCheckCacheManager {
 public:
   HealthCheckCacheManager(Event::Dispatcher& dispatcher, std::chrono::milliseconds timeout);
 
-  Http::Code getCachedResponseCode() { return last_response_code_; }
-  void setCachedResponseCode(Http::Code code) {
+  std::pair<Http::Code, bool> getCachedResponseCode() { return {last_response_code_, last_response_degraded_}; }
+  void setCachedResponseCode(Http::Code code, bool degraded) {
     last_response_code_ = code;
+    last_response_degraded_ = degraded;
     use_cached_response_code_ = true;
   }
   bool useCachedResponseCode() { return use_cached_response_code_; }
@@ -41,6 +42,7 @@ private:
   const std::chrono::milliseconds timeout_;
   std::atomic<bool> use_cached_response_code_{};
   std::atomic<Http::Code> last_response_code_{};
+  std::atomic<bool> last_response_degraded_{};
 };
 
 typedef std::shared_ptr<HealthCheckCacheManager> HealthCheckCacheManagerSharedPtr;
