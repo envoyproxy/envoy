@@ -67,8 +67,7 @@ protected:
 
   SplitRequestBase(CommandStats& command_stats, TimeSource& time_source)
       : command_stats_(command_stats) {
-  command_latency_ms_ = std::make_unique<Stats::Timespan>(
-      command_stats_.latency_, time_source);
+    command_latency_ms_ = std::make_unique<Stats::Timespan>(command_stats_.latency_, time_source);
   }
   CommandStats& command_stats_;
   Stats::TimespanPtr command_latency_ms_;
