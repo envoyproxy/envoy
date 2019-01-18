@@ -316,6 +316,39 @@ public:
   static void renameFile(const std::string& old_name, const std::string& new_name);
   static void createDirectory(const std::string& name);
   static void createSymlink(const std::string& target, const std::string& link);
+
+  /**
+   * Return a prefix string matcher.
+   * @param string prefix.
+   * @return Object StringMatcher.
+   */
+  static const envoy::type::matcher::StringMatcher createPrefixMatcher(std::string str) {
+    envoy::type::matcher::StringMatcher matcher;
+    matcher.set_prefix(str);
+    return matcher;
+  }
+
+  /**
+   * Return an exact string matcher.
+   * @param string exact.
+   * @return Object StringMatcher.
+   */
+  static const envoy::type::matcher::StringMatcher createExactMatcher(std::string str) {
+    envoy::type::matcher::StringMatcher matcher;
+    matcher.set_exact(str);
+    return matcher;
+  }
+
+  /**
+   * Return a regex string matcher.
+   * @param string exact.
+   * @return Object StringMatcher.
+   */
+  static const envoy::type::matcher::StringMatcher createRegexMatcher(std::string str) {
+    envoy::type::matcher::StringMatcher matcher;
+    matcher.set_regex(str);
+    return matcher;
+  }
 };
 
 /**

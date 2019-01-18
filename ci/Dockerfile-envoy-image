@@ -17,4 +17,4 @@ EXPOSE 10000
 
 COPY ci/docker-entrypoint.sh /
 ENTRYPOINT ["/docker-entrypoint.sh"]
-CMD ["envoy", "--v2-config-only", "-c", "/etc/envoy/envoy.yaml"]
+CMD ["envoy", "-c", "/etc/envoy/envoy.yaml"]

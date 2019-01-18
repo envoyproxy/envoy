@@ -62,6 +62,12 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "phantom_test",
+    srcs = ["phantom_test.cc"],
+    deps = ["//source/common/common:phantom"],
+)
+
+envoy_cc_test(
     name = "fmt_test",
     srcs = ["fmt_test.cc"],
     deps = [

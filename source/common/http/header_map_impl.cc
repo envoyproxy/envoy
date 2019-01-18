@@ -271,14 +271,20 @@ void HeaderMapImpl::HeaderEntryImpl::value(const HeaderEntry& header) {
     return {&h.inline_headers_.name##_, &Headers::get().name};                                     \
   });
 
-HeaderMapImpl::StaticLookupTable::StaticLookupTable() {
-  ALL_INLINE_HEADERS(INLINE_HEADER_STATIC_MAP_ENTRY)
+/**
+ * This is the static lookup table that is used to determine whether a header is one of the O(1)
+ * headers. This uses a trie for lookup time at most equal to the size of the incoming string.
+ */
+struct HeaderMapImpl::StaticLookupTable : public TrieLookupTable<EntryCb> {
+  StaticLookupTable() {
+    ALL_INLINE_HEADERS(INLINE_HEADER_STATIC_MAP_ENTRY)
 
-  // Special case where we map a legacy host header to :authority.
-  add(Headers::get().HostLegacy.get().c_str(), [](HeaderMapImpl& h) -> StaticLookupResponse {
-    return {&h.inline_headers_.Host_, &Headers::get().Host};
-  });
-}
+    // Special case where we map a legacy host header to :authority.
+    add(Headers::get().HostLegacy.get().c_str(), [](HeaderMapImpl& h) -> StaticLookupResponse {
+      return {&h.inline_headers_.Host_, &Headers::get().Host};
+    });
+  }
+};
 
 void HeaderMapImpl::appendToHeader(HeaderString& header, absl::string_view data) {
   if (data.empty()) {
