@@ -26,7 +26,7 @@ public:
   virtual ~TransportSocketFactoryContext() {}
 
   /**
-   * @return Tls::ContextManager& the SSL context manager.
+   * @return Tls::ContextManager& the TLS context manager.
    */
   virtual Tls::ContextManager& sslContextManager() PURE;
 

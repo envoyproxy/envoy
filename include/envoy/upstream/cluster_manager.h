@@ -311,7 +311,7 @@ public:
    * @param cluster supplies the owning cluster.
    * @param bind_config supplies information on binding newly established connections.
    * @param stats supplies a store for all known counters, gauges, and timers.
-   * @param ssl_context_manager supplies a manager for all SSL contexts.
+   * @param ssl_context_manager supplies a manager for all TLS contexts.
    * @param secret_manager supplies a manager for static secrets.
    * @param added_via_api denotes whether this was added via API.
    * @return Upstream::ClusterInfoConstSharedPtr

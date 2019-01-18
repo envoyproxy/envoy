@@ -38,7 +38,7 @@ namespace Tls {
 // clang-format on
 
 /**
- * Wrapper struct for SSL stats. @see stats_macros.h
+ * Wrapper struct for TLS stats. @see stats_macros.h
  */
 struct SslStats {
   ALL_SSL_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT)

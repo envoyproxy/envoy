@@ -12,7 +12,7 @@ namespace Tls {
 typedef std::unique_ptr<envoy::admin::v2alpha::CertificateDetails> CertificateDetailsPtr;
 
 /**
- * SSL Context is used as a template for SSL connection configuration.
+ * TLS Context is used as a template for TLS connection configuration.
  */
 class Context {
 public:

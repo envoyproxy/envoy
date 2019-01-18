@@ -13,7 +13,7 @@ namespace TransportSockets {
 namespace Tls {
 
 /**
- * The SSL context manager has the following threading model:
+ * The TLS context manager has the following threading model:
  * Contexts can be allocated via any thread (through in practice they are only allocated on the main
  * thread). They can be released from any thread (and in practice are since cluster information can
  * be released from any thread). Context allocation/free is a very uncommon thing so we just do a

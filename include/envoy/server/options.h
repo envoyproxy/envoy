@@ -36,7 +36,7 @@ enum class Mode {
   InitOnly,
 
   // TODO(rlazarus): Add a fourth option for "light validation": Mock out access to the filesystem.
-  // Perform no validation of files referenced in the config, such as runtime configs, SSL certs,
+  // Perform no validation of files referenced in the config, such as runtime configs, TLS certs,
   // etc. Validation will pass even if those files are malformed or don't exist, allowing the config
   // to be validated in a non-prod environment.
 };

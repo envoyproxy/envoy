@@ -9,7 +9,7 @@ namespace Envoy {
 namespace Tls {
 
 /**
- * Base connection interface for all SSL connections.
+ * Base connection interface for all TLS connections.
  */
 class Connection {
 public:

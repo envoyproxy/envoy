@@ -10,7 +10,7 @@ namespace Envoy {
 namespace Tls {
 
 /**
- * Manages all of the SSL contexts in the process
+ * Manages all of the TLS contexts in the process
  */
 class ContextManager {
 public:

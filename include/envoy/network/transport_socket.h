@@ -131,7 +131,7 @@ public:
   virtual void onConnected() PURE;
 
   /**
-   * @return the const SSL connection data if this is an SSL connection, or nullptr if it is not.
+   * @return the const TLS connection data if this is an TLS connection, or nullptr if it is not.
    */
   virtual const Tls::Connection* ssl() const PURE;
 };
@@ -147,7 +147,7 @@ public:
 
   /**
    * @return the const optional server name to set in the transport socket, for example SNI for
-   *         SSL, regardless of the upstream cluster configuration. Filters that influence
+   *         TLS, regardless of the upstream cluster configuration. Filters that influence
    *         upstream connection selection, such as tcp_proxy, should take this option into account
    *         and should pass it through to the connection pool to ensure the correct endpoints are
    *         selected and the upstream connection is set up accordingly.

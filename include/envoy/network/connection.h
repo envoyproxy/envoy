@@ -182,7 +182,7 @@ public:
   virtual void setConnectionStats(const ConnectionStats& stats) PURE;
 
   /**
-   * @return the const SSL connection data if this is an SSL connection, or nullptr if it is not.
+   * @return the const TLS connection data if this is an TLS connection, or nullptr if it is not.
    */
   virtual const Tls::Connection* ssl() const PURE;
 
