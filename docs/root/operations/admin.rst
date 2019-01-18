@@ -146,6 +146,12 @@ modify different aspects of the server:
   down or doing a full restart. Invoking this command will universally fail health check requests
   regardless of how the filter is configured (pass through, etc.).
 
+  This also makes :ref:`router filter <config_http_filters_router>` respond the
+  :ref:`x-envoy-immediate-health-check-fail<config_http_filters_router_x-envoy-immediate-health-check-fail>` header.
+  If this header is set by an upstream host, Envoy will immediately mark the host as being failed for active health
+  check. Note that this only occurs if the host's cluster has active health checking 
+  :ref:`configured<config_cluster_manager_cluster_hc>`.
+
 .. _operations_admin_interface_healthcheck_ok:
 
 .. http:post:: /healthcheck/ok
