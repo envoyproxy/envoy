@@ -37,9 +37,7 @@ void SplitRequestBase::updateStats(const bool success) {
   } else {
     command_stats_.error_.inc();
   }
-  std::chrono::milliseconds latency = std::chrono::duration_cast<std::chrono::milliseconds>(
-      time_source_.monotonicTime() - start_time_);
-  command_stats_.latency_.recordValue(latency.count());
+  command_latency_ms_->complete();
 }
 
 SingleServerRequest::~SingleServerRequest() { ASSERT(!handle_); }

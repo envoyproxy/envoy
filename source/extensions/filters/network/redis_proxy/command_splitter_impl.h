@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "envoy/stats/scope.h"
+#include "envoy/stats/timespan.h"
 
 #include "common/common/logger.h"
 #include "common/common/to_lower_table.h"
@@ -65,11 +66,12 @@ protected:
   void updateStats(const bool success);
 
   SplitRequestBase(CommandStats& command_stats, TimeSource& time_source)
-      : command_stats_(command_stats), time_source_(time_source),
-        start_time_(time_source_.monotonicTime()) {}
+      : command_stats_(command_stats) {
+  command_latency_ms_ = std::make_unique<Stats::Timespan>(
+      command_stats_.latency_, time_source);
+  }
   CommandStats& command_stats_;
-  TimeSource& time_source_;
-  MonotonicTime start_time_;
+  Stats::TimespanPtr command_latency_ms_;
 };
 
 /**
