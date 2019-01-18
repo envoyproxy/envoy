@@ -339,7 +339,8 @@ TEST_F(HealthCheckFilterCachingTest, DegradedHeader) {
 
   // Verify that the first request goes through.
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, true));
-  Http::TestHeaderMapImpl service_response_headers{{":status", "503"}, {"x-envoy-degraded", "true"}};
+  Http::TestHeaderMapImpl service_response_headers{{":status", "503"},
+                                                   {"x-envoy-degraded", "true"}};
   Http::TestHeaderMapImpl health_check_response{{":status", "503"}, {"x-envoy-degraded", ""}};
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue,

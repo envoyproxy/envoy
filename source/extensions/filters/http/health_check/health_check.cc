@@ -82,7 +82,7 @@ Http::FilterHeadersStatus HealthCheckFilter::encodeHeaders(Http::HeaderMap& head
     if (cache_manager_) {
       cache_manager_->setCachedResponseCode(
           static_cast<Http::Code>(Http::Utility::getResponseStatus(headers)),
-            headers.EnvoyDegraded() != nullptr);
+          headers.EnvoyDegraded() != nullptr);
     }
 
     headers.insertEnvoyUpstreamHealthCheckedCluster().value(context_.localInfo().clusterName());
@@ -147,11 +147,13 @@ void HealthCheckFilter::onComplete() {
     }
   }
 
-  callbacks_->sendLocalReply(final_status, "", [degraded](auto& headers) {
-      if (degraded) {
-      headers.insertEnvoyDegraded();
-      }
-      }, absl::nullopt);
+  callbacks_->sendLocalReply(final_status, "",
+                             [degraded](auto& headers) {
+                               if (degraded) {
+                                 headers.insertEnvoyDegraded();
+                               }
+                             },
+                             absl::nullopt);
 }
 
 } // namespace HealthCheck

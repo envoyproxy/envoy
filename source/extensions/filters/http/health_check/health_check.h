@@ -27,7 +27,9 @@ class HealthCheckCacheManager {
 public:
   HealthCheckCacheManager(Event::Dispatcher& dispatcher, std::chrono::milliseconds timeout);
 
-  std::pair<Http::Code, bool> getCachedResponseCode() { return {last_response_code_, last_response_degraded_}; }
+  std::pair<Http::Code, bool> getCachedResponseCode() {
+    return {last_response_code_, last_response_degraded_};
+  }
   void setCachedResponseCode(Http::Code code, bool degraded) {
     last_response_code_ = code;
     last_response_degraded_ = degraded;
