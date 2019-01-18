@@ -103,7 +103,7 @@ struct ListenerManagerStats {
 class ListenerManagerImpl : public ListenerManager, Logger::Loggable<Logger::Id::config> {
 public:
   ListenerManagerImpl(Instance& server, ListenerComponentFactory& listener_factory,
-                      WorkerFactory& worker_factory, TimeSource& time_source);
+                      WorkerFactory& worker_factory);
 
   void onListenerWarmed(ListenerImpl& listener);
 
@@ -123,7 +123,6 @@ public:
   Http::Context& httpContext() { return server_.httpContext(); }
 
   Instance& server_;
-  TimeSource& time_source_;
   ListenerComponentFactory& factory_;
 
 private:
@@ -281,7 +280,8 @@ public:
   const envoy::api::v2::core::Metadata& listenerMetadata() const override {
     return config_.metadata();
   };
-  TimeSource& timeSource() override { return parent_.time_source_; }
+  Api::Api& api() override { return parent_.server_.api(); }
+  TimeSource& timeSource() override { return api().timeSystem(); }
   void ensureSocketOptions() {
     if (!listen_socket_options_) {
       listen_socket_options_ =

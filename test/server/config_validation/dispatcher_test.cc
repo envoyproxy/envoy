@@ -24,9 +24,10 @@ public:
   ConfigValidation() {
     Event::Libevent::Global::initialize();
 
-    validation_ = std::make_unique<Api::ValidationImpl>(
-        std::chrono::milliseconds(1000), Thread::threadFactoryForTest(), stats_store_);
-    dispatcher_ = validation_->allocateDispatcher(test_time_.timeSystem());
+    validation_ = std::make_unique<Api::ValidationImpl>(std::chrono::milliseconds(1000),
+                                                        Thread::threadFactoryForTest(),
+                                                        stats_store_, test_time_.timeSystem());
+    dispatcher_ = validation_->allocateDispatcher();
   }
 
   DangerousDeprecatedTestTime test_time_;

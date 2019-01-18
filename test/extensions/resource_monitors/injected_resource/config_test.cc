@@ -28,8 +28,8 @@ TEST(InjectedResourceMonitorFactoryTest, CreateMonitor) {
   envoy::config::resource_monitor::injected_resource::v2alpha::InjectedResourceConfig config;
   config.set_filename(TestEnvironment::temporaryPath("injected_resource"));
   Stats::IsolatedStoreImpl stats_store;
-  Api::ApiPtr api = Api::createApiForTest(stats_store);
   DangerousDeprecatedTestTime test_time;
+  Api::ApiPtr api = Api::createApiForTest(stats_store, test_time.timeSystem());
   Event::DispatcherImpl dispatcher(test_time.timeSystem(), *api);
   Server::Configuration::ResourceMonitorFactoryContextImpl context(dispatcher);
   Server::ResourceMonitorPtr monitor = factory->createResourceMonitor(config, context);

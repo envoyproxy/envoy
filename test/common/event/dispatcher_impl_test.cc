@@ -31,8 +31,8 @@ private:
 TEST(DeferredDeleteTest, DeferredDelete) {
   InSequence s;
   Stats::IsolatedStoreImpl stats_store;
-  Api::ApiPtr api = Api::createApiForTest(stats_store);
   DangerousDeprecatedTestTime test_time;
+  Api::ApiPtr api = Api::createApiForTest(stats_store, test_time.timeSystem());
   DispatcherImpl dispatcher(test_time.timeSystem(), *api);
   ReadyWatcher watcher1;
 
@@ -64,7 +64,7 @@ TEST(DeferredDeleteTest, DeferredDelete) {
 class DispatcherImplTest : public ::testing::Test {
 protected:
   DispatcherImplTest()
-      : api_(Api::createApiForTest(stat_store_)),
+      : api_(Api::createApiForTest(stat_store_, test_time_.timeSystem())),
         dispatcher_(std::make_unique<DispatcherImpl>(test_time_.timeSystem(), *api_)),
         work_finished_(false) {
     dispatcher_thread_ = api_->threadFactory().createThread([this]() {

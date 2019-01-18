@@ -396,9 +396,9 @@ ThreadFactory& threadFactoryForTest() {
 
 namespace Api {
 
-ApiPtr createApiForTest(Stats::Store& stat_store) {
+ApiPtr createApiForTest(Stats::Store& stat_store, Event::TimeSystem& time_system) {
   return std::make_unique<Impl>(std::chrono::milliseconds(1000), Thread::threadFactoryForTest(),
-                                stat_store);
+                                stat_store, time_system);
 }
 
 } // namespace Api

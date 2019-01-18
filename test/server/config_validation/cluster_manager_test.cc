@@ -26,9 +26,9 @@ namespace Upstream {
 
 TEST(ValidationClusterManagerTest, MockedMethods) {
   Stats::IsolatedStoreImpl stats_store;
-  Api::ApiPtr api(Api::createApiForTest(stats_store));
-  NiceMock<Runtime::MockLoader> runtime;
   Event::SimulatedTimeSystem time_system;
+  Api::ApiPtr api(Api::createApiForTest(stats_store, time_system));
+  NiceMock<Runtime::MockLoader> runtime;
   NiceMock<ThreadLocal::MockInstance> tls;
   NiceMock<Runtime::MockRandomGenerator> random;
   testing::NiceMock<Secret::MockSecretManager> secret_manager;

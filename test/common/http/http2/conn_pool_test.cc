@@ -65,7 +65,7 @@ public:
   };
 
   Http2ConnPoolImplTest()
-      : api_(Api::createApiForTest(stats_store_)),
+      : api_(Api::createApiForTest(stats_store_, test_time_.timeSystem())),
         pool_(dispatcher_, host_, Upstream::ResourcePriority::Default, nullptr) {}
 
   ~Http2ConnPoolImplTest() {
@@ -119,8 +119,8 @@ public:
   MOCK_METHOD0(onClientDestroy, void());
 
   Stats::IsolatedStoreImpl stats_store_;
-  Api::ApiPtr api_;
   DangerousDeprecatedTestTime test_time_;
+  Api::ApiPtr api_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
   Upstream::HostSharedPtr host_{Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:80")};

@@ -18,8 +18,8 @@ namespace Envoy {
 namespace AccessLog {
 
 TEST(AccessLogManagerImpl, reopenAllFiles) {
-  Api::MockApi api;
   Event::MockDispatcher dispatcher;
+  Api::MockApi api(dispatcher.timeSystem());
   Thread::MutexBasicLockable lock;
   Stats::IsolatedStoreImpl stats_store;
 

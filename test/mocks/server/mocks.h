@@ -319,12 +319,13 @@ public:
 class MockInstance : public Instance {
 public:
   MockInstance();
+  explicit MockInstance(DangerousDeprecatedTestTime* test_time);
+  explicit MockInstance(Event::TimeSystem& time_system);
   ~MockInstance();
 
   Secret::SecretManager& secretManager() override { return *(secret_manager_.get()); }
 
   MOCK_METHOD0(admin, Admin&());
-  MOCK_METHOD0(api, Api::Api&());
   MOCK_METHOD0(clusterManager, Upstream::ClusterManager&());
   MOCK_METHOD0(sslContextManager, Ssl::ContextManager&());
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
@@ -355,16 +356,19 @@ public:
   MOCK_METHOD0(localInfo, const LocalInfo::LocalInfo&());
   MOCK_CONST_METHOD0(statsFlushInterval, std::chrono::milliseconds());
 
-  Event::TestTimeSystem& timeSystem() override { return test_time_.timeSystem(); }
+  // Event::TestTimeSystem& timeSystem() override { return test_time_.timeSystem(); }
+  Event::TimeSystem& timeSystem() override { return time_system_; }
+  Api::Api& api() override { return api_; }
 
+  std::unique_ptr<DangerousDeprecatedTestTime> test_time_;
+  Event::TimeSystem& time_system_;
   std::unique_ptr<Secret::SecretManager> secret_manager_;
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
   Stats::IsolatedStoreImpl stats_store_;
   std::shared_ptr<testing::NiceMock<Network::MockDnsResolver>> dns_resolver_{
       new testing::NiceMock<Network::MockDnsResolver>()};
-  testing::NiceMock<Api::MockApi> api_;
   testing::NiceMock<MockAdmin> admin_;
-  DangerousDeprecatedTestTime test_time_;
+  testing::NiceMock<Api::MockApi> api_;
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
   Thread::MutexBasicLockable access_log_lock_;
   testing::NiceMock<Runtime::MockLoader> runtime_loader_;
@@ -412,6 +416,7 @@ public:
   ~MockFactoryContext();
 
   MOCK_METHOD0(accessLogManager, AccessLog::AccessLogManager&());
+  MOCK_METHOD0(api, Api::Api&());
   MOCK_METHOD0(clusterManager, Upstream::ClusterManager&());
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
   MOCK_METHOD0(drainDecision, const Network::DrainDecision&());
@@ -447,6 +452,7 @@ public:
   testing::NiceMock<MockAdmin> admin_;
   Stats::IsolatedStoreImpl listener_scope_;
   Event::SimulatedTimeSystem time_system_;
+  Api::MockApi api_;
   testing::NiceMock<MockOverloadManager> overload_manager_;
   Tracing::HttpNullTracer null_tracer_;
   Http::ContextImpl http_context_;

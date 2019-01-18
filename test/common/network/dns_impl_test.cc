@@ -326,11 +326,12 @@ private:
 class DnsImplConstructor : public testing::Test {
 protected:
   DnsImplConstructor()
-      : api_(Api::createApiForTest(stats_store_)), dispatcher_(test_time_.timeSystem(), *api_) {}
+      : api_(Api::createApiForTest(stats_store_, test_time_.timeSystem())),
+        dispatcher_(test_time_.timeSystem(), *api_) {}
 
   Stats::IsolatedStoreImpl stats_store_;
-  Api::ApiPtr api_;
   DangerousDeprecatedTestTime test_time_;
+  Api::ApiPtr api_;
   Event::DispatcherImpl dispatcher_;
 };
 
@@ -408,7 +409,8 @@ TEST_F(DnsImplConstructor, BadCustomResolvers) {
 class DnsImplTest : public testing::TestWithParam<Address::IpVersion> {
 public:
   DnsImplTest()
-      : api_(Api::createApiForTest(stats_store_)), dispatcher_(test_time_.timeSystem(), *api_) {}
+      : api_(Api::createApiForTest(stats_store_, test_time_.timeSystem())),
+        dispatcher_(test_time_.timeSystem(), *api_) {}
 
   void SetUp() override {
     resolver_ = dispatcher_.createDnsResolver({});
@@ -440,8 +442,8 @@ protected:
   Network::TcpListenSocketPtr socket_;
   Stats::IsolatedStoreImpl stats_store_;
   std::unique_ptr<Network::Listener> listener_;
-  Api::ApiPtr api_;
   DangerousDeprecatedTestTime test_time_;
+  Api::ApiPtr api_;
   Event::DispatcherImpl dispatcher_;
   DnsResolverSharedPtr resolver_;
 };

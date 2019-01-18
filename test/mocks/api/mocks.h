@@ -21,23 +21,25 @@ namespace Api {
 
 class MockApi : public Api {
 public:
-  MockApi();
+  explicit MockApi(Event::TimeSystem& time_system);
   ~MockApi();
 
   // Api::Api
-  Event::DispatcherPtr allocateDispatcher(Event::TimeSystem& time_system) override {
-    return Event::DispatcherPtr{allocateDispatcher_(time_system)};
+  Event::DispatcherPtr allocateDispatcher() override {
+    return Event::DispatcherPtr{allocateDispatcher_()};
   }
 
-  MOCK_METHOD1(allocateDispatcher_, Event::Dispatcher*(Event::TimeSystem&));
+  MOCK_METHOD0(allocateDispatcher_, Event::Dispatcher*());
   MOCK_METHOD3(createFile,
                Filesystem::FileSharedPtr(const std::string& path, Event::Dispatcher& dispatcher,
                                          Thread::BasicLockable& lock));
   MOCK_METHOD1(fileExists, bool(const std::string& path));
   MOCK_METHOD1(fileReadToEnd, std::string(const std::string& path));
   MOCK_METHOD0(threadFactory, Thread::ThreadFactory&());
+  Event::TimeSystem& timeSystem() override { return time_system_; }
 
   std::shared_ptr<Filesystem::MockFile> file_{new Filesystem::MockFile()};
+  Event::TimeSystem& time_system_;
 };
 
 class MockOsSysCalls : public OsSysCallsImpl {

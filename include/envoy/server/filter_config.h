@@ -3,6 +3,7 @@
 #include <functional>
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/api/api.h"
 #include "envoy/api/v2/core/base.pb.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/context.h"
@@ -125,6 +126,11 @@ public:
    * listener.
    */
   virtual const envoy::api::v2::core::Metadata& listenerMetadata() const PURE;
+
+  /**
+   * @return Api::Api& a reference to the API.
+   */
+  virtual Api::Api& api() PURE;
 
   /**
    * @return TimeSource& a reference to the time source.

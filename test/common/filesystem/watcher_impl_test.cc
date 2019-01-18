@@ -19,11 +19,12 @@ namespace Filesystem {
 class WatcherImplTest : public testing::Test {
 protected:
   WatcherImplTest()
-      : api_(Api::createApiForTest(stats_store_)), dispatcher_(test_time_.timeSystem(), *api_) {}
+      : api_(Api::createApiForTest(stats_store_, test_time_.timeSystem())),
+        dispatcher_(test_time_.timeSystem(), *api_) {}
 
   Stats::IsolatedStoreImpl stats_store_;
-  Api::ApiPtr api_;
   DangerousDeprecatedTestTime test_time_;
+  Api::ApiPtr api_;
   Event::DispatcherImpl dispatcher_;
 };
 

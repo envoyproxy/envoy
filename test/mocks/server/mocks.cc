@@ -121,15 +121,22 @@ MockWorker::MockWorker() {
 }
 MockWorker::~MockWorker() = default;
 
-MockInstance::MockInstance()
-    : secret_manager_(new Secret::SecretManagerImpl()), cluster_manager_(timeSystem()),
-      ssl_context_manager_(timeSystem()), singleton_manager_(new Singleton::ManagerImpl(
-                                              Thread::threadFactoryForTest().currentThreadId())) {
+MockInstance::MockInstance() : MockInstance(new DangerousDeprecatedTestTime) {}
+
+MockInstance::MockInstance(DangerousDeprecatedTestTime* test_time)
+    : MockInstance(test_time->timeSystem()) {
+  test_time_.reset(test_time);
+}
+
+MockInstance::MockInstance(Event::TimeSystem& time_system)
+    : time_system_(time_system), secret_manager_(new Secret::SecretManagerImpl()),
+      api_(timeSystem()), cluster_manager_(timeSystem()), ssl_context_manager_(timeSystem()),
+      singleton_manager_(
+          new Singleton::ManagerImpl(Thread::threadFactoryForTest().currentThreadId())) {
   ON_CALL(*this, threadLocal()).WillByDefault(ReturnRef(thread_local_));
   ON_CALL(*this, stats()).WillByDefault(ReturnRef(stats_store_));
   ON_CALL(*this, httpContext()).WillByDefault(ReturnRef(http_context_));
   ON_CALL(*this, dnsResolver()).WillByDefault(Return(dns_resolver_));
-  ON_CALL(*this, api()).WillByDefault(ReturnRef(api_));
   ON_CALL(*this, admin()).WillByDefault(ReturnRef(admin_));
   ON_CALL(*this, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
   ON_CALL(*this, sslContextManager()).WillByDefault(ReturnRef(ssl_context_manager_));
@@ -146,7 +153,6 @@ MockInstance::MockInstance()
   ON_CALL(*this, mutexTracer()).WillByDefault(Return(nullptr));
   ON_CALL(*this, singletonManager()).WillByDefault(ReturnRef(*singleton_manager_));
   ON_CALL(*this, overloadManager()).WillByDefault(ReturnRef(overload_manager_));
-  // ON_CALL(*this, timeSystem()).WillByDefault(ReturnRef(test_time_.timeSystem()));;
 }
 
 MockInstance::~MockInstance() = default;
@@ -165,8 +171,10 @@ MockMain::~MockMain() = default;
 
 MockFactoryContext::MockFactoryContext()
     : singleton_manager_(
-          new Singleton::ManagerImpl(Thread::threadFactoryForTest().currentThreadId())) {
+          new Singleton::ManagerImpl(Thread::threadFactoryForTest().currentThreadId())),
+      api_(timeSystem()) {
   ON_CALL(*this, accessLogManager()).WillByDefault(ReturnRef(access_log_manager_));
+  ON_CALL(*this, api()).WillByDefault(ReturnRef(api_));
   ON_CALL(*this, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
   ON_CALL(*this, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
   ON_CALL(*this, drainDecision()).WillByDefault(ReturnRef(drain_manager_));

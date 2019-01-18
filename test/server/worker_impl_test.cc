@@ -24,7 +24,7 @@ namespace Server {
 
 class WorkerImplTest : public testing::Test {
 public:
-  WorkerImplTest() : api_(Api::createApiForTest(stats_store_)) {
+  WorkerImplTest() : api_(Api::createApiForTest(stats_store_, test_time_.timeSystem())) {
     // In the real worker the watchdog has timers that prevent exit. Here we need to prevent event
     // loop exit since we use mock timers.
     no_exit_timer_->enableTimer(std::chrono::hours(1));
@@ -32,12 +32,12 @@ public:
 
   Stats::IsolatedStoreImpl stats_store_;
   NiceMock<ThreadLocal::MockInstance> tls_;
-  DangerousDeprecatedTestTime test_time;
+  DangerousDeprecatedTestTime test_time_;
   Network::MockConnectionHandler* handler_ = new Network::MockConnectionHandler();
   NiceMock<MockGuardDog> guard_dog_;
   NiceMock<MockOverloadManager> overload_manager_;
   Api::ApiPtr api_;
-  Event::DispatcherImpl* dispatcher_ = new Event::DispatcherImpl(test_time.timeSystem(), *api_);
+  Event::DispatcherImpl* dispatcher_ = new Event::DispatcherImpl(test_time_.timeSystem(), *api_);
   DefaultTestHooks hooks_;
   WorkerImpl worker_{tls_,
                      hooks_,

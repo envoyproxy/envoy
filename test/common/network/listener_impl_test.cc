@@ -23,8 +23,8 @@ static void errorCallbackTest(Address::IpVersion version) {
   // Force the error callback to fire by closing the socket under the listener. We run this entire
   // test in the forked process to avoid confusion when the fork happens.
   Stats::IsolatedStoreImpl stats_store;
-  Api::ApiPtr api = Api::createApiForTest(stats_store);
   DangerousDeprecatedTestTime test_time;
+  Api::ApiPtr api = Api::createApiForTest(stats_store, test_time.timeSystem());
   Event::DispatcherImpl dispatcher(test_time.timeSystem(), *api);
 
   Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(version), nullptr,
@@ -79,13 +79,14 @@ protected:
       : version_(GetParam()),
         alt_address_(Network::Test::findOrCheckFreePort(
             Network::Test::getCanonicalLoopbackAddress(version_), Address::SocketType::Stream)),
-        api_(Api::createApiForTest(stats_store_)), dispatcher_(test_time_.timeSystem(), *api_) {}
+        api_(Api::createApiForTest(stats_store_, test_time_.timeSystem())),
+        dispatcher_(test_time_.timeSystem(), *api_) {}
 
   const Address::IpVersion version_;
   const Address::InstanceConstSharedPtr alt_address_;
   Stats::IsolatedStoreImpl stats_store_;
-  Api::ApiPtr api_;
   DangerousDeprecatedTestTime test_time_;
+  Api::ApiPtr api_;
   Event::DispatcherImpl dispatcher_;
 };
 INSTANTIATE_TEST_CASE_P(IpVersions, ListenerImplTest,

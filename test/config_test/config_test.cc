@@ -42,12 +42,11 @@ OptionsImpl asConfigYaml(const OptionsImpl& src) {
 
 class ConfigTest {
 public:
-  ConfigTest(const OptionsImpl& options)
-      : api_(Api::createApiForTest(stats_store_)), options_(options) {
+  ConfigTest(const OptionsImpl& options) : options_(options) {
     ON_CALL(server_, options()).WillByDefault(ReturnRef(options_));
     ON_CALL(server_, random()).WillByDefault(ReturnRef(random_));
     ON_CALL(server_, sslContextManager()).WillByDefault(ReturnRef(ssl_context_manager_));
-    ON_CALL(server_.api_, fileReadToEnd("lightstep_access_token"))
+    ON_CALL(server_.api(), fileReadToEnd("lightstep_access_token"))
         .WillByDefault(Return("access_token"));
 
     envoy::config::bootstrap::v2::Bootstrap bootstrap;
@@ -58,7 +57,7 @@ public:
     cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
         server_.runtime(), server_.stats(), server_.threadLocal(), server_.random(),
         server_.dnsResolver(), ssl_context_manager_, server_.dispatcher(), server_.localInfo(),
-        server_.secretManager(), *api_, server_.httpContext());
+        server_.secretManager(), server_.api(), server_.httpContext());
 
     ON_CALL(server_, clusterManager()).WillByDefault(Invoke([&]() -> Upstream::ClusterManager& {
       return *main_config.clusterManager();
@@ -92,15 +91,14 @@ public:
   }
 
   Stats::IsolatedStoreImpl stats_store_;
-  Api::ApiPtr api_;
+  Event::SimulatedTimeSystem time_system_;
   NiceMock<Server::MockInstance> server_;
   NiceMock<Ssl::MockContextManager> ssl_context_manager_;
   OptionsImpl options_;
   std::unique_ptr<Upstream::ProdClusterManagerFactory> cluster_manager_factory_;
   NiceMock<Server::MockListenerComponentFactory> component_factory_;
   NiceMock<Server::MockWorkerFactory> worker_factory_;
-  Server::ListenerManagerImpl listener_manager_{server_, component_factory_, worker_factory_,
-                                                server_.timeSystem()};
+  Server::ListenerManagerImpl listener_manager_{server_, component_factory_, worker_factory_};
   Runtime::RandomGeneratorImpl random_;
   NiceMock<Api::MockOsSysCalls> os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls_};

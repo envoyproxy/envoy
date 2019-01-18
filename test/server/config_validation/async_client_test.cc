@@ -18,7 +18,7 @@ TEST(ValidationAsyncClientTest, MockedMethods) {
 
   DangerousDeprecatedTestTime test_time;
   Stats::IsolatedStoreImpl stats_store;
-  Api::ApiPtr api = Api::createApiForTest(stats_store);
+  Api::ApiPtr api = Api::createApiForTest(stats_store, test_time.timeSystem());
   ValidationAsyncClient client(test_time.timeSystem(), *api);
   EXPECT_EQ(nullptr, client.send(std::move(message), callbacks, AsyncClient::RequestOptions()));
   EXPECT_EQ(nullptr, client.start(stream_callbacks, AsyncClient::StreamOptions()));
