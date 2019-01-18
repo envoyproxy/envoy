@@ -53,7 +53,11 @@ SharedMemory& SharedMemory::initialize(uint64_t stats_set_size, Options& options
 
     // If we are meant to be first, attempt to unlink a previous shared memory instance. If this
     // is a clean restart this should then allow the shm_open() call below to succeed.
-    os_sys_calls.shmUnlink(shmem_name.c_str());
+    const Api::SysCallIntResult result = os_sys_calls.shmUnlink(shmem_name.c_str());
+    if (result.rc_ == -1) {
+      PANIC(fmt::format("cannot close shared memory region {} check user permissions. Error: {}",
+                        shmem_name, strerror(result.errno_)));
+    }
   }
 
   const Api::SysCallIntResult result =
