@@ -48,6 +48,10 @@ MockPrioritySet::MockPrioritySet() {
       .WillByDefault(Invoke([this](PrioritySet::MemberUpdateCb cb) -> Common::CallbackHandle* {
         return member_update_cb_helper_.add(cb);
       }));
+  ON_CALL(*this, addPriorityUpdateCb(_))
+      .WillByDefault(Invoke([this](PrioritySet::PriorityUpdateCb cb) -> Common::CallbackHandle* {
+        return priority_update_cb_helper_.add(cb);
+      }));
 }
 
 MockPrioritySet::~MockPrioritySet() = default;
@@ -67,7 +71,8 @@ HostSet& MockPrioritySet::getHostSet(uint32_t priority) {
 }
 void MockPrioritySet::runUpdateCallbacks(uint32_t priority, const HostVector& hosts_added,
                                          const HostVector& hosts_removed) {
-  member_update_cb_helper_.runCallbacks(priority, hosts_added, hosts_removed);
+  member_update_cb_helper_.runCallbacks(hosts_added, hosts_removed);
+  priority_update_cb_helper_.runCallbacks(priority, hosts_added, hosts_removed);
 }
 
 MockRetryPriority::~MockRetryPriority() = default;

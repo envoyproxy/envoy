@@ -1873,7 +1873,6 @@ void HttpIntegrationTest::testOverlyLongHeaders() {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  std::string long_value(7500, 'x');
   auto encoder_decoder = codec_client_->startRequest(big_headers);
   auto response = std::move(encoder_decoder.second);
 
