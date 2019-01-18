@@ -118,14 +118,14 @@ public:
  * Utility struct that encapsulates the information from a udp socket's
  * recvfrom/recvmmdg call.
  *
- * TODO (conqerAtapple): Maybe this belongs inside the UdpListenerCallbacks
+ * TODO(conqerAtapple): Maybe this belongs inside the UdpListenerCallbacks
  * class.
  */
 struct UdpData {
   Address::InstanceConstSharedPtr local_address_;
-  Address::InstanceConstSharedPtr peer_address_;
+  Address::InstanceConstSharedPtr peer_address_; // TODO(conquerAtapple): Fix ownership semantics.
   Buffer::InstancePtr buffer_;
-  // TODO (conquerAtapple):
+  // TODO(conquerAtapple):
   // Add UdpReader here so that the callback handler can
   // then use the reader to do multiple reads(recvmmsg) once the OS notifies it
   // has data. We could also just return a `ReaderFactory` that returns either a
@@ -154,7 +154,7 @@ public:
    *
    * @param socket Underlying server socket for the listener.
    *
-   * TODO (conqerAtapple): Maybe we need a UdpWriter here instead of Socket.
+   * TODO(conqerAtapple): Maybe we need a UdpWriter here instead of Socket.
    */
   virtual void onWriteReady(const Socket& socket) PURE;
 
