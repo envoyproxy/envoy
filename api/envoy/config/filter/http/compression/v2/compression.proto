@@ -21,7 +21,7 @@ message FilterDecoder {
   Inflate inflate = 2;
 }
 
-// Compression and decompression settings for filter encoder data. 
+// Compression and decompression settings for filter encoder data.
 message FilterEncoder {
   // Deflate stream encode data.
   Deflate deflate = 1;
@@ -58,7 +58,7 @@ message Gzip {
   // Value from 1 to 9 that controls the amount of internal memory used by zlib. Higher values
   // use more memory, but are faster and produce better compression results. The default value is 5.
   google.protobuf.UInt32Value memory_level = 1 [(validate.rules).uint32 = {gte: 1, lte: 9}];
-  
+
   message CompressionLevel {
     enum Enum {
       DEFAULT = 0;
@@ -102,14 +102,14 @@ message HeaderMatcher {
   // Header key.
   envoy.type.matcher.StringMatcher key = 1 [(validate.rules).string.min_bytes = 1];
 
-  // Header value. When any is 
+  // Header value. When any is
   oneof values {
     option (validate.required) = true;
-    
+
     // Match any key of type string.
     envoy.type.matcher.StringMatcher value = 2 [(validate.rules).string.min_bytes = 1];
 
     // When true, matches any value in the key.
-    bool match_key = 3; 
+    bool match_key = 3;
   }
 }
