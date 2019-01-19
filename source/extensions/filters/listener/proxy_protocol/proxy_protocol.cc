@@ -131,7 +131,7 @@ void Filter::parseV2Header(char* buf) {
 
   // Only do connections on behalf of another user, not internally-driven health-checks. If
   // its not on behalf of someone, or its not AF_INET{6} / STREAM/DGRAM, ignore and
-  /// use the real-remote info
+  // use the real-remote info
   if ((ver_cmd & 0xf) == PROXY_PROTO_V2_ONBEHALF_OF) {
     uint8_t proto_family = buf[PROXY_PROTO_V2_SIGNATURE_LEN + 1];
     if (((proto_family & 0x0f) == PROXY_PROTO_V2_TRANSPORT_STREAM) ||
