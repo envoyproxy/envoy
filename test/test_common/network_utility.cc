@@ -27,6 +27,7 @@ Address::InstanceConstSharedPtr findOrCheckFreePort(Address::InstanceConstShared
     return nullptr;
   }
   IoHandlePtr io_handle = addr_port->socket(type);
+  // TODO(sbelair2) Remove ScopedFdCloser when IoHandle close() closes the fd as well
   ScopedFdCloser fd_closer(io_handle->fd());
   ScopedIoHandleCloser io_handle_closer(io_handle);
   // Not setting REUSEADDR, therefore if the address has been recently used we won't reuse it here.

@@ -7,8 +7,6 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Alts {
 
-using Envoy::Network::IoHandle;
-
 /**
  * A TransportSocketCallbacks for wrapped TransportSocket object. Some
  * TransportSocket implementation wraps another socket which does actual I/O.

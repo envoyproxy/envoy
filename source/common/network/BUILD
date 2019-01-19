@@ -12,7 +12,10 @@ envoy_package()
 envoy_cc_library(
     name = "address_lib",
     srcs = ["address_impl.cc"],
-    hdrs = ["address_impl.h"],
+    hdrs = [
+        "address_impl.h",
+        "io_socket_handle_impl.h",
+    ],
     deps = [
         ":io_socket_handle_lib",
         "//include/envoy/network:address_interface",
@@ -123,10 +126,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "listen_socket_lib",
     srcs = ["listen_socket_impl.cc"],
-    hdrs = [
-        "io_socket_handle_impl.h",
-        "listen_socket_impl.h",
-    ],
+    hdrs = ["listen_socket_impl.h"],
     deps = [
         ":address_lib",
         ":io_socket_handle_lib",
@@ -141,11 +141,10 @@ envoy_cc_library(
     srcs = [
         "listener_impl.cc",
     ],
-    hdrs = [
-        "listener_impl.h",
-    ],
+    hdrs = ["listener_impl.h"],
     deps = [
         ":address_lib",
+        ":io_socket_handle_lib",
         ":listen_socket_lib",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:file_event_interface",

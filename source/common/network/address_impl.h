@@ -10,7 +10,6 @@
 #include <string>
 
 #include "envoy/network/address.h"
-#include "envoy/network/io_handle.h"
 
 #include "common/network/io_socket_handle_impl.h"
 
