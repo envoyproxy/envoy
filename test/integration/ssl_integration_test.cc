@@ -3,8 +3,8 @@
 #include <memory>
 #include <string>
 
-#include "envoy/config/transport_socket/capture/v2alpha/capture.pb.h"
-#include "envoy/data/tap/v2alpha/capture.pb.h"
+#include "envoy/config/transport_socket/tap/v2alpha/tap.pb.h"
+#include "envoy/data/tap/v2alpha/transport.pb.h"
 
 #include "common/event/dispatcher_impl.h"
 #include "common/network/connection_impl.h"
@@ -337,7 +337,7 @@ TEST_P(SslCertficateIntegrationTest, ServerRsaEcdsaClientEcdsaOnly) {
   checkStats();
 }
 
-class SslCaptureIntegrationTest : public SslIntegrationTest {
+class SslTapIntegrationTest : public SslIntegrationTest {
 public:
   void initialize() override {
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
@@ -347,17 +347,17 @@ public:
       envoy::api::v2::core::TransportSocket ssl_transport_socket;
       ssl_transport_socket.set_name("tls");
       MessageUtil::jsonConvert(filter_chain->tls_context(), *ssl_transport_socket.mutable_config());
-      // Configure outer capture transport socket.
+      // Configure outer tap transport socket.
       auto* transport_socket = filter_chain->mutable_transport_socket();
-      transport_socket->set_name("envoy.transport_sockets.capture");
-      envoy::config::transport_socket::capture::v2alpha::Capture capture_config;
-      auto* file_sink = capture_config.mutable_file_sink();
+      transport_socket->set_name("envoy.transport_sockets.tap");
+      envoy::config::transport_socket::tap::v2alpha::Tap tap_config;
+      auto* file_sink = tap_config.mutable_file_sink();
       file_sink->set_path_prefix(path_prefix_);
       file_sink->set_format(
-          text_format_ ? envoy::config::transport_socket::capture::v2alpha::FileSink::PROTO_TEXT
-                       : envoy::config::transport_socket::capture::v2alpha::FileSink::PROTO_BINARY);
-      capture_config.mutable_transport_socket()->MergeFrom(ssl_transport_socket);
-      MessageUtil::jsonConvert(capture_config, *transport_socket->mutable_config());
+          text_format_ ? envoy::config::transport_socket::tap::v2alpha::FileSink::PROTO_TEXT
+                       : envoy::config::transport_socket::tap::v2alpha::FileSink::PROTO_BINARY);
+      tap_config.mutable_transport_socket()->MergeFrom(ssl_transport_socket);
+      MessageUtil::jsonConvert(tap_config, *transport_socket->mutable_config());
       // Nuke TLS context from legacy location.
       filter_chain->clear_tls_context();
       // Rest of TLS initialization.
@@ -371,12 +371,12 @@ public:
   bool text_format_{};
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, SslCaptureIntegrationTest,
+INSTANTIATE_TEST_CASE_P(IpVersions, SslTapIntegrationTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 
 // Validate two back-to-back requests with binary proto output.
-TEST_P(SslCaptureIntegrationTest, TwoRequestsWithBinaryProto) {
+TEST_P(SslTapIntegrationTest, TwoRequestsWithBinaryProto) {
   initialize();
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection({});
@@ -439,7 +439,7 @@ TEST_P(SslCaptureIntegrationTest, TwoRequestsWithBinaryProto) {
 }
 
 // Validate a single request with text proto output.
-TEST_P(SslCaptureIntegrationTest, RequestWithTextProto) {
+TEST_P(SslTapIntegrationTest, RequestWithTextProto) {
   text_format_ = true;
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection({});

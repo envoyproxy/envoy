@@ -2,21 +2,21 @@
 
 #include <fstream>
 
-#include "envoy/config/transport_socket/capture/v2alpha/capture.pb.h"
-#include "envoy/data/tap/v2alpha/capture.pb.h"
+#include "envoy/config/transport_socket/tap/v2alpha/tap.pb.h"
+#include "envoy/data/tap/v2alpha/transport.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/network/transport_socket.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
-namespace Capture {
+namespace Tap {
 
-class CaptureSocket : public Network::TransportSocket {
+class TapSocket : public Network::TransportSocket {
 public:
-  CaptureSocket(const std::string& path_prefix,
-                envoy::config::transport_socket::capture::v2alpha::FileSink::Format format,
-                Network::TransportSocketPtr&& transport_socket, Event::TimeSystem& time_system);
+  TapSocket(const std::string& path_prefix,
+            envoy::config::transport_socket::tap::v2alpha::FileSink::Format format,
+            Network::TransportSocketPtr&& transport_socket, Event::TimeSystem& time_system);
 
   // Network::TransportSocket
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override;
@@ -30,9 +30,9 @@ public:
 
 private:
   const std::string& path_prefix_;
-  const envoy::config::transport_socket::capture::v2alpha::FileSink::Format format_;
+  const envoy::config::transport_socket::tap::v2alpha::FileSink::Format format_;
   // TODO(htuch): Buffering the entire trace until socket close won't scale to
-  // long lived connections or large transfers. We could emit multiple capture
+  // long lived connections or large transfers. We could emit multiple tap
   // files with bounded size, with identical connection ID to allow later
   // reassembly.
   envoy::data::tap::v2alpha::Trace trace_;
@@ -41,12 +41,12 @@ private:
   Event::TimeSystem& time_system_;
 };
 
-class CaptureSocketFactory : public Network::TransportSocketFactory {
+class TapSocketFactory : public Network::TransportSocketFactory {
 public:
-  CaptureSocketFactory(const std::string& path_prefix,
-                       envoy::config::transport_socket::capture::v2alpha::FileSink::Format format,
-                       Network::TransportSocketFactoryPtr&& transport_socket_factory,
-                       Event::TimeSystem& time_system);
+  TapSocketFactory(const std::string& path_prefix,
+                   envoy::config::transport_socket::tap::v2alpha::FileSink::Format format,
+                   Network::TransportSocketFactoryPtr&& transport_socket_factory,
+                   Event::TimeSystem& time_system);
 
   // Network::TransportSocketFactory
   Network::TransportSocketPtr
@@ -55,12 +55,12 @@ public:
 
 private:
   const std::string path_prefix_;
-  const envoy::config::transport_socket::capture::v2alpha::FileSink::Format format_;
+  const envoy::config::transport_socket::tap::v2alpha::FileSink::Format format_;
   Network::TransportSocketFactoryPtr transport_socket_factory_;
   Event::TimeSystem& time_system_;
 };
 
-} // namespace Capture
+} // namespace Tap
 } // namespace TransportSockets
 } // namespace Extensions
 } // namespace Envoy
