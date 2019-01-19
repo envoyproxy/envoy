@@ -25,7 +25,7 @@ static void errorCallbackTest(Address::IpVersion version) {
   Stats::IsolatedStoreImpl stats_store;
   DangerousDeprecatedTestTime test_time;
   Api::ApiPtr api = Api::createApiForTest(stats_store, test_time.timeSystem());
-  Event::DispatcherImpl dispatcher(test_time.timeSystem(), *api);
+  Event::DispatcherImpl dispatcher(*api);
 
   Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(version), nullptr,
                                   true);
@@ -79,8 +79,7 @@ protected:
       : version_(GetParam()),
         alt_address_(Network::Test::findOrCheckFreePort(
             Network::Test::getCanonicalLoopbackAddress(version_), Address::SocketType::Stream)),
-        api_(Api::createApiForTest(stats_store_, test_time_.timeSystem())),
-        dispatcher_(test_time_.timeSystem(), *api_) {}
+        api_(Api::createApiForTest(stats_store_, test_time_.timeSystem())), dispatcher_(*api_) {}
 
   const Address::IpVersion version_;
   const Address::InstanceConstSharedPtr alt_address_;

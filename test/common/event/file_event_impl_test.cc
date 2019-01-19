@@ -18,8 +18,7 @@ namespace Event {
 class FileEventImplTest : public testing::Test {
 public:
   FileEventImplTest()
-      : api_(Api::createApiForTest(stats_store_, test_time_.timeSystem())),
-        dispatcher_(test_time_.timeSystem(), *api_) {}
+      : api_(Api::createApiForTest(stats_store_, test_time_.timeSystem())), dispatcher_(*api_) {}
 
   void SetUp() override {
     int rc = socketpair(AF_UNIX, SOCK_DGRAM, 0, fds_);
@@ -60,7 +59,7 @@ TEST_P(FileEventImplActivateTest, Activate) {
   DangerousDeprecatedTestTime test_time;
   Stats::IsolatedStoreImpl stats_store;
   Api::ApiPtr api = Api::createApiForTest(stats_store, test_time.timeSystem());
-  DispatcherImpl dispatcher(test_time.timeSystem(), *api);
+  DispatcherImpl dispatcher(*api);
   ReadyWatcher read_event;
   EXPECT_CALL(read_event, ready()).Times(1);
   ReadyWatcher write_event;

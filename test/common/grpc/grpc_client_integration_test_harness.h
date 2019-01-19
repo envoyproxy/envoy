@@ -218,8 +218,8 @@ class GrpcClientIntegrationTest : public GrpcClientIntegrationParamTest {
 public:
   GrpcClientIntegrationTest()
       : method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")),
-        api_(Api::createApiForTest(*stats_store_, test_time_.timeSystem())),
-        dispatcher_(test_time_.timeSystem(), *api_) {}
+        api_(Api::createApiForTest(*stats_store_, test_time_.timeSystem())), dispatcher_(*api_),
+        context_manager_(test_time_.timeSystem()) {}
 
   virtual void initialize() {
     if (fake_upstream_ == nullptr) {
@@ -433,7 +433,7 @@ public:
   Upstream::MockThreadLocalCluster thread_local_cluster_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Runtime::MockLoader runtime_;
-  Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{test_time_.timeSystem()};
+  Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   Http::AsyncClientPtr http_async_client_;
   Http::ConnectionPool::InstancePtr http_conn_pool_;

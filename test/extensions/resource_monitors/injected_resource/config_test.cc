@@ -30,7 +30,7 @@ TEST(InjectedResourceMonitorFactoryTest, CreateMonitor) {
   Stats::IsolatedStoreImpl stats_store;
   DangerousDeprecatedTestTime test_time;
   Api::ApiPtr api = Api::createApiForTest(stats_store, test_time.timeSystem());
-  Event::DispatcherImpl dispatcher(test_time.timeSystem(), *api);
+  Event::DispatcherImpl dispatcher(*api);
   Server::Configuration::ResourceMonitorFactoryContextImpl context(dispatcher);
   Server::ResourceMonitorPtr monitor = factory->createResourceMonitor(config, context);
   EXPECT_NE(monitor, nullptr);

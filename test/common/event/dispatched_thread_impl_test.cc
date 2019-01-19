@@ -25,8 +25,7 @@ class DispatchedThreadTest : public testing::Test {
 protected:
   DispatchedThreadTest()
       : config_(1000, 1000, 1000, 1000),
-        api_(Api::createApiForTest(fakestats_, test_time_.timeSystem())),
-        thread_(*api_, test_time_.timeSystem()),
+        api_(Api::createApiForTest(fakestats_, test_time_.timeSystem())), thread_(*api_),
         guard_dog_(fakestats_, config_, test_time_.timeSystem(), *api_) {}
 
   void SetUp() { thread_.start(guard_dog_); }

@@ -185,7 +185,7 @@ void testUtil(const TestUtilOptions& options) {
 
   DangerousDeprecatedTestTime test_time;
   Api::ApiPtr api = Api::createApiForTest(server_stats_store, test_time.timeSystem());
-  Event::DispatcherImpl dispatcher(test_time.timeSystem(), *api);
+  Event::DispatcherImpl dispatcher(*api);
   Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(options.version()),
                                   nullptr, true);
   Network::MockListenerCallbacks callbacks;
@@ -402,7 +402,7 @@ const std::string testUtilV2(const TestUtilOptionsV2& options) {
 
   DangerousDeprecatedTestTime test_time;
   Api::ApiPtr api = Api::createApiForTest(server_stats_store, test_time.timeSystem());
-  Event::DispatcherImpl dispatcher(test_time.timeSystem(), *api);
+  Event::DispatcherImpl dispatcher(*api);
   Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(options.version()),
                                   nullptr, true);
   NiceMock<Network::MockListenerCallbacks> callbacks;
@@ -574,7 +574,7 @@ class SslSocketTest : public SslCertsTest,
 protected:
   SslSocketTest()
       : api_(Api::createApiForTest(stats_store_, test_time_.timeSystem())),
-        dispatcher_(std::make_unique<Event::DispatcherImpl>(test_time_.timeSystem(), *api_)) {}
+        dispatcher_(std::make_unique<Event::DispatcherImpl>(*api_)) {}
 
   Stats::IsolatedStoreImpl stats_store_;
   DangerousDeprecatedTestTime test_time_;
@@ -2118,7 +2118,7 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
   Network::MockConnectionHandler connection_handler;
   DangerousDeprecatedTestTime test_time;
   Api::ApiPtr api = Api::createApiForTest(server_stats_store, test_time.timeSystem());
-  Event::DispatcherImpl dispatcher(test_time.timeSystem(), *api);
+  Event::DispatcherImpl dispatcher(*api);
   Network::ListenerPtr listener1 = dispatcher.createListener(socket1, callbacks, true, false);
   Network::ListenerPtr listener2 = dispatcher.createListener(socket2, callbacks, true, false);
 
@@ -2630,7 +2630,7 @@ void testClientSessionResumption(const std::string& server_ctx_yaml,
   NiceMock<Network::MockListenerCallbacks> callbacks;
   Network::MockConnectionHandler connection_handler;
   Api::ApiPtr api = Api::createApiForTest(server_stats_store, time_system);
-  Event::DispatcherImpl dispatcher(time_system, *api);
+  Event::DispatcherImpl dispatcher(*api);
   Network::ListenerPtr listener = dispatcher.createListener(socket, callbacks, true, false);
 
   Network::ConnectionPtr server_connection;
@@ -3635,8 +3635,8 @@ public:
   void singleWriteTest(uint32_t read_buffer_limit, uint32_t bytes_to_write) {
     MockWatermarkBuffer* client_write_buffer = nullptr;
     MockBufferFactory* factory = new StrictMock<MockBufferFactory>;
-    dispatcher_ = std::make_unique<Event::DispatcherImpl>(
-        test_time_.timeSystem(), Buffer::WatermarkFactoryPtr{factory}, *api_);
+    dispatcher_ =
+        std::make_unique<Event::DispatcherImpl>(Buffer::WatermarkFactoryPtr{factory}, *api_);
 
     // By default, expect 4 buffers to be created - the client and server read and write buffers.
     EXPECT_CALL(*factory, create_(_, _))

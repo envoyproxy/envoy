@@ -37,7 +37,7 @@ public:
   NiceMock<MockGuardDog> guard_dog_;
   NiceMock<MockOverloadManager> overload_manager_;
   Api::ApiPtr api_;
-  Event::DispatcherImpl* dispatcher_ = new Event::DispatcherImpl(test_time_.timeSystem(), *api_);
+  Event::DispatcherImpl* dispatcher_ = new Event::DispatcherImpl(*api_);
   DefaultTestHooks hooks_;
   WorkerImpl worker_{tls_,
                      hooks_,

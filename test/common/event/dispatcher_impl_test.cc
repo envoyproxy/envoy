@@ -33,7 +33,7 @@ TEST(DeferredDeleteTest, DeferredDelete) {
   Stats::IsolatedStoreImpl stats_store;
   DangerousDeprecatedTestTime test_time;
   Api::ApiPtr api = Api::createApiForTest(stats_store, test_time.timeSystem());
-  DispatcherImpl dispatcher(test_time.timeSystem(), *api);
+  DispatcherImpl dispatcher(*api);
   ReadyWatcher watcher1;
 
   dispatcher.deferredDelete(
@@ -65,8 +65,7 @@ class DispatcherImplTest : public ::testing::Test {
 protected:
   DispatcherImplTest()
       : api_(Api::createApiForTest(stat_store_, test_time_.timeSystem())),
-        dispatcher_(std::make_unique<DispatcherImpl>(test_time_.timeSystem(), *api_)),
-        work_finished_(false) {
+        dispatcher_(std::make_unique<DispatcherImpl>(*api_)), work_finished_(false) {
     dispatcher_thread_ = api_->threadFactory().createThread([this]() {
       // Must create a keepalive timer to keep the dispatcher from exiting.
       std::chrono::milliseconds time_interval(500);

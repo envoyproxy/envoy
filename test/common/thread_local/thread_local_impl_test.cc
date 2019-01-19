@@ -120,8 +120,8 @@ TEST(ThreadLocalInstanceImplDispatcherTest, Dispatcher) {
   DangerousDeprecatedTestTime test_time;
   Stats::IsolatedStoreImpl stats_store;
   Api::ApiPtr api = Api::createApiForTest(stats_store, test_time.timeSystem());
-  Event::DispatcherImpl main_dispatcher(test_time.timeSystem(), *api);
-  Event::DispatcherImpl thread_dispatcher(test_time.timeSystem(), *api);
+  Event::DispatcherImpl main_dispatcher(*api);
+  Event::DispatcherImpl thread_dispatcher(*api);
 
   tls.registerThread(main_dispatcher, true);
   tls.registerThread(thread_dispatcher, false);

@@ -18,7 +18,7 @@ Impl::Impl(std::chrono::milliseconds file_flush_interval_msec,
       time_system_(time_system) {}
 
 Event::DispatcherPtr Impl::allocateDispatcher() {
-  return std::make_unique<Event::DispatcherImpl>(time_system_, *this);
+  return std::make_unique<Event::DispatcherImpl>(*this);
 }
 
 Filesystem::FileSharedPtr Impl::createFile(const std::string& path, Event::Dispatcher& dispatcher,

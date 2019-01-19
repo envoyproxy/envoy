@@ -11,7 +11,7 @@ ValidationImpl::ValidationImpl(std::chrono::milliseconds file_flush_interval_mse
     : Impl(file_flush_interval_msec, thread_factory, stats_store, time_system) {}
 
 Event::DispatcherPtr ValidationImpl::allocateDispatcher() {
-  return Event::DispatcherPtr{new Event::ValidationDispatcher(timeSystem(), *this)};
+  return Event::DispatcherPtr{new Event::ValidationDispatcher(*this)};
 }
 
 } // namespace Api

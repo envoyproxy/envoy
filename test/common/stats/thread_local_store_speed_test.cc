@@ -38,7 +38,7 @@ public:
   }
 
   void initThreading() {
-    dispatcher_ = std::make_unique<Event::DispatcherImpl>(time_system_, *api_);
+    dispatcher_ = std::make_unique<Event::DispatcherImpl>(*api_);
     tls_ = std::make_unique<ThreadLocal::InstanceImpl>();
     store_.initializeThreading(*dispatcher_, *tls_);
   }

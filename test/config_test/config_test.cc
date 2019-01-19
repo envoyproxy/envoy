@@ -42,11 +42,12 @@ OptionsImpl asConfigYaml(const OptionsImpl& src) {
 
 class ConfigTest {
 public:
-  ConfigTest(const OptionsImpl& options) : options_(options) {
+  ConfigTest(const OptionsImpl& options, Event::SimulatedTimeSystem& time_system)
+      : server_(time_system), options_(options) {
     ON_CALL(server_, options()).WillByDefault(ReturnRef(options_));
     ON_CALL(server_, random()).WillByDefault(ReturnRef(random_));
     ON_CALL(server_, sslContextManager()).WillByDefault(ReturnRef(ssl_context_manager_));
-    ON_CALL(server_.api(), fileReadToEnd("lightstep_access_token"))
+    ON_CALL(server_.api_, fileReadToEnd("lightstep_access_token"))
         .WillByDefault(Return("access_token"));
 
     envoy::config::bootstrap::v2::Bootstrap bootstrap;
@@ -91,7 +92,6 @@ public:
   }
 
   Stats::IsolatedStoreImpl stats_store_;
-  Event::SimulatedTimeSystem time_system_;
   NiceMock<Server::MockInstance> server_;
   NiceMock<Ssl::MockContextManager> ssl_context_manager_;
   OptionsImpl options_;
@@ -115,16 +115,17 @@ void testMerge() {
 
 uint32_t run(const std::string& directory) {
   uint32_t num_tested = 0;
+  Event::SimulatedTimeSystem time_system;
   for (const std::string& filename : TestUtility::listFiles(directory, false)) {
     ENVOY_LOG_MISC(info, "testing {}.\n", filename);
     OptionsImpl options(
         Envoy::Server::createTestOptionsImpl(filename, "", Network::Address::IpVersion::v6));
-    ConfigTest test1(options);
+    ConfigTest test1(options, time_system);
     envoy::config::bootstrap::v2::Bootstrap bootstrap;
     if (Server::InstanceUtil::loadBootstrapConfig(bootstrap, options) ==
         Server::InstanceUtil::BootstrapVersion::V2) {
       ENVOY_LOG_MISC(info, "testing {} as yaml.", filename);
-      ConfigTest test2(asConfigYaml(options));
+      ConfigTest test2(asConfigYaml(options), time_system);
     }
     num_tested++;
   }

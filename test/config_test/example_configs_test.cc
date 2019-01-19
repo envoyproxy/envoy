@@ -11,7 +11,7 @@ TEST(ExampleConfigsTest, All) {
 
   // Change working directory, otherwise we won't be able to read files using relative paths.
   char cwd[PATH_MAX];
-  const std::string& directory = TestEnvironment::temporaryDirectory() + "/test/config_test";
+  const std::string directory = TestEnvironment::temporaryDirectory() + "/test/config_test";
   RELEASE_ASSERT(::getcwd(cwd, PATH_MAX) != nullptr, "");
   RELEASE_ASSERT(::chdir(directory.c_str()) == 0, "");
 

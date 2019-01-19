@@ -356,7 +356,6 @@ public:
   MOCK_METHOD0(localInfo, const LocalInfo::LocalInfo&());
   MOCK_CONST_METHOD0(statsFlushInterval, std::chrono::milliseconds());
 
-  // Event::TestTimeSystem& timeSystem() override { return test_time_.timeSystem(); }
   Event::TimeSystem& timeSystem() override { return time_system_; }
   Api::Api& api() override { return api_; }
 
