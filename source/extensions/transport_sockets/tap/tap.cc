@@ -11,15 +11,61 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Tap {
 
-TapSocket::TapSocket(const std::string& path_prefix,
-                     envoy::config::transport_socket::tap::v2alpha::FileSink::Format format,
-                     Network::TransportSocketPtr&& transport_socket, Event::TimeSystem& time_system)
-    : path_prefix_(path_prefix), format_(format), transport_socket_(std::move(transport_socket)),
-      time_system_(time_system) {}
+PerSocketTapperImpl::PerSocketTapperImpl(SocketTapConfigImplSharedPtr config,
+                                         const Network::Connection& connection)
+    : config_(std::move(config)), connection_(connection), statuses_(config_->numMatchers()),
+      trace_(std::make_shared<envoy::data::tap::v2alpha::BufferedTraceWrapper>()) {
+  config_->rootMatcher().onNewStream(statuses_);
+}
+
+void PerSocketTapperImpl::closeSocket(Network::ConnectionEvent) {
+  if (!config_->rootMatcher().matches(statuses_)) {
+    return;
+  }
+
+  auto* connection = trace_->mutable_socket_buffered_trace()->mutable_connection();
+  connection->set_id(connection_.id());
+  Network::Utility::addressToProtobufAddress(*connection_.localAddress(),
+                                             *connection->mutable_local_address());
+  Network::Utility::addressToProtobufAddress(*connection_.remoteAddress(),
+                                             *connection->mutable_remote_address());
+  config_->sink().submitBufferedTrace(trace_, connection_.id());
+}
+
+void PerSocketTapperImpl::onRead(absl::string_view data) {
+  if (!config_->rootMatcher().matches(statuses_)) {
+    return;
+  }
+
+  auto* event = trace_->mutable_socket_buffered_trace()->add_events();
+  event->mutable_timestamp()->MergeFrom(Protobuf::util::TimeUtil::NanosecondsToTimestamp(
+      std::chrono::duration_cast<std::chrono::nanoseconds>(
+          config_->time_system_.systemTime().time_since_epoch())
+          .count()));
+  event->mutable_read()->set_data(data.data(), data.size());
+}
+
+void PerSocketTapperImpl::onWrite(absl::string_view data, bool end_stream) {
+  if (!config_->rootMatcher().matches(statuses_)) {
+    return;
+  }
+
+  auto* event = trace_->mutable_socket_buffered_trace()->add_events();
+  event->mutable_timestamp()->MergeFrom(Protobuf::util::TimeUtil::NanosecondsToTimestamp(
+      std::chrono::duration_cast<std::chrono::nanoseconds>(
+          config_->time_system_.systemTime().time_since_epoch())
+          .count()));
+  event->mutable_write()->set_data(data.data(), data.size());
+  event->mutable_write()->set_end_stream(end_stream);
+}
+
+TapSocket::TapSocket(SocketTapConfigSharedPtr config,
+                     Network::TransportSocketPtr&& transport_socket)
+    : config_(config), transport_socket_(std::move(transport_socket)) {}
 
 void TapSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) {
-  callbacks_ = &callbacks;
   transport_socket_->setTransportSocketCallbacks(callbacks);
+  tapper_ = config_ ? config_->createPerSocketTapper(callbacks.connection()) : nullptr;
 }
 
 std::string TapSocket::protocol() const { return transport_socket_->protocol(); }
@@ -27,43 +73,20 @@ std::string TapSocket::protocol() const { return transport_socket_->protocol(); 
 bool TapSocket::canFlushClose() { return transport_socket_->canFlushClose(); }
 
 void TapSocket::closeSocket(Network::ConnectionEvent event) {
-  // The caller should have invoked setTransportSocketCallbacks() prior to this.
-  ASSERT(callbacks_ != nullptr);
-  auto* connection = trace_.mutable_connection();
-  connection->set_id(callbacks_->connection().id());
-  Network::Utility::addressToProtobufAddress(*callbacks_->connection().localAddress(),
-                                             *connection->mutable_local_address());
-  Network::Utility::addressToProtobufAddress(*callbacks_->connection().remoteAddress(),
-                                             *connection->mutable_remote_address());
-  const bool text_format =
-      format_ == envoy::config::transport_socket::tap::v2alpha::FileSink::PROTO_TEXT;
-  const std::string path = fmt::format("{}_{}.{}", path_prefix_, callbacks_->connection().id(),
-                                       text_format ? "pb_text" : "pb");
-  ENVOY_LOG_MISC(debug, "Writing socket trace for [C{}] to {}", callbacks_->connection().id(),
-                 path);
-  ENVOY_LOG_MISC(trace, "Socket trace for [C{}]: {}", callbacks_->connection().id(),
-                 trace_.DebugString());
-  std::ofstream proto_stream(path);
-  if (text_format) {
-    proto_stream << trace_.DebugString();
-  } else {
-    trace_.SerializeToOstream(&proto_stream);
+  if (tapper_ != nullptr) {
+    tapper_->closeSocket(event);
   }
+
   transport_socket_->closeSocket(event);
 }
 
 Network::IoResult TapSocket::doRead(Buffer::Instance& buffer) {
   Network::IoResult result = transport_socket_->doRead(buffer);
-  if (result.bytes_processed_ > 0) {
+  if (tapper_ != nullptr && result.bytes_processed_ > 0) {
     // TODO(htuch): avoid linearizing
-    char* data = static_cast<char*>(buffer.linearize(buffer.length())) +
-                 (buffer.length() - result.bytes_processed_);
-    auto* event = trace_.add_events();
-    event->mutable_timestamp()->MergeFrom(Protobuf::util::TimeUtil::NanosecondsToTimestamp(
-        std::chrono::duration_cast<std::chrono::nanoseconds>(
-            time_system_.systemTime().time_since_epoch())
-            .count()));
-    event->mutable_read()->set_data(data, result.bytes_processed_);
+    const char* data = static_cast<const char*>(buffer.linearize(buffer.length())) +
+                       (buffer.length() - result.bytes_processed_);
+    tapper_->onRead(absl::string_view(data, result.bytes_processed_));
   }
 
   return result;
@@ -73,16 +96,10 @@ Network::IoResult TapSocket::doWrite(Buffer::Instance& buffer, bool end_stream) 
   // TODO(htuch): avoid copy.
   Buffer::OwnedImpl copy(buffer);
   Network::IoResult result = transport_socket_->doWrite(buffer, end_stream);
-  if (result.bytes_processed_ > 0) {
+  if (tapper_ != nullptr && result.bytes_processed_ > 0) {
     // TODO(htuch): avoid linearizing.
-    char* data = static_cast<char*>(copy.linearize(result.bytes_processed_));
-    auto* event = trace_.add_events();
-    event->mutable_timestamp()->MergeFrom(Protobuf::util::TimeUtil::NanosecondsToTimestamp(
-        std::chrono::duration_cast<std::chrono::nanoseconds>(
-            time_system_.systemTime().time_since_epoch())
-            .count()));
-    event->mutable_write()->set_data(data, result.bytes_processed_);
-    event->mutable_write()->set_end_stream(end_stream);
+    const char* data = static_cast<const char*>(copy.linearize(result.bytes_processed_));
+    tapper_->onWrite(absl::string_view(data, result.bytes_processed_), end_stream);
   }
   return result;
 }
@@ -92,17 +109,19 @@ void TapSocket::onConnected() { transport_socket_->onConnected(); }
 const Ssl::Connection* TapSocket::ssl() const { return transport_socket_->ssl(); }
 
 TapSocketFactory::TapSocketFactory(
-    const std::string& path_prefix,
-    envoy::config::transport_socket::tap::v2alpha::FileSink::Format format,
-    Network::TransportSocketFactoryPtr&& transport_socket_factory, Event::TimeSystem& time_system)
-    : path_prefix_(path_prefix), format_(format),
-      transport_socket_factory_(std::move(transport_socket_factory)), time_system_(time_system) {}
+    const envoy::config::transport_socket::tap::v2alpha::Tap& proto_config,
+    Common::Tap::TapConfigFactoryPtr&& config_factory, Server::Admin& admin,
+    Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls,
+    Event::Dispatcher& main_thread_dispatcher,
+    Network::TransportSocketFactoryPtr&& transport_socket_factory)
+    : ExtensionConfigBase(proto_config.common_config(), std::move(config_factory), admin,
+                          singleton_manager, tls, main_thread_dispatcher),
+      transport_socket_factory_(std::move(transport_socket_factory)) {}
 
 Network::TransportSocketPtr
 TapSocketFactory::createTransportSocket(Network::TransportSocketOptionsSharedPtr) const {
-  return std::make_unique<TapSocket>(path_prefix_, format_,
-                                     transport_socket_factory_->createTransportSocket(nullptr),
-                                     time_system_);
+  return std::make_unique<TapSocket>(currentConfigHelper<SocketTapConfig>(),
+                                     transport_socket_factory_->createTransportSocket(nullptr));
 }
 
 bool TapSocketFactory::implementsSecureTransport() const {
