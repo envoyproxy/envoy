@@ -44,7 +44,7 @@ public:
     member_update_cb_helper_.runCallbacks(priority(), added, removed);
   }
 
-  Common::CallbackHandle* addMemberUpdateCb(PrioritySet::MemberUpdateCb callback) {
+  Common::CallbackHandle* addMemberUpdateCb(PrioritySet::PriorityUpdateCb callback) {
     return member_update_cb_helper_.add(callback);
   }
 
@@ -90,6 +90,7 @@ public:
                           const HostVector& hosts_removed);
 
   MOCK_CONST_METHOD1(addMemberUpdateCb, Common::CallbackHandle*(MemberUpdateCb callback));
+  MOCK_CONST_METHOD1(addPriorityUpdateCb, Common::CallbackHandle*(PriorityUpdateCb callback));
   MOCK_CONST_METHOD0(hostSetsPerPriority, const std::vector<HostSetPtr>&());
   MOCK_METHOD0(hostSetsPerPriority, std::vector<HostSetPtr>&());
 
@@ -99,25 +100,28 @@ public:
   }
 
   std::vector<HostSetPtr> host_sets_;
-  Common::CallbackManager<uint32_t, const HostVector&, const HostVector&> member_update_cb_helper_;
+  Common::CallbackManager<const HostVector&, const HostVector&> member_update_cb_helper_;
+  Common::CallbackManager<uint32_t, const HostVector&, const HostVector&>
+      priority_update_cb_helper_;
 };
 
 class MockRetryPriority : public RetryPriority {
 public:
-  MockRetryPriority(const HealthyLoad& healthy_priority_load)
-      : healthy_priority_load_(healthy_priority_load) {}
-  MockRetryPriority(const MockRetryPriority& other)
-      : healthy_priority_load_(other.healthy_priority_load_) {}
+  MockRetryPriority(const HealthyLoad& healthy_priority_load,
+                    const DegradedLoad& degraded_priority_load)
+      : priority_load_({healthy_priority_load, degraded_priority_load}) {}
+  MockRetryPriority(const MockRetryPriority& other) : priority_load_(other.priority_load_) {}
   ~MockRetryPriority();
 
-  const HealthyLoad& determinePriorityLoad(const PrioritySet&, const HealthyLoad&) {
-    return healthy_priority_load_;
+  const HealthyAndDegradedLoad& determinePriorityLoad(const PrioritySet&,
+                                                      const HealthyAndDegradedLoad&) {
+    return priority_load_;
   }
 
   MOCK_METHOD1(onHostAttempted, void(HostDescriptionConstSharedPtr));
 
 private:
-  const HealthyLoad& healthy_priority_load_;
+  const HealthyAndDegradedLoad priority_load_;
 };
 
 class MockRetryPriorityFactory : public RetryPriorityFactory {

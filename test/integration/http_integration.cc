@@ -836,7 +836,9 @@ void HttpIntegrationTest::testGrpcRetry() {
 // healthy.
 void HttpIntegrationTest::testRetryPriority() {
   const Upstream::HealthyLoad healthy_priority_load({0u, 100u});
-  NiceMock<Upstream::MockRetryPriority> retry_priority(healthy_priority_load);
+  const Upstream::DegradedLoad degraded_priority_load({0u, 100u});
+  NiceMock<Upstream::MockRetryPriority> retry_priority(healthy_priority_load,
+                                                       degraded_priority_load);
   Upstream::MockRetryPriorityFactory factory(retry_priority);
 
   Registry::InjectFactory<Upstream::RetryPriorityFactory> inject_factory(factory);
@@ -1873,7 +1875,6 @@ void HttpIntegrationTest::testOverlyLongHeaders() {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  std::string long_value(7500, 'x');
   auto encoder_decoder = codec_client_->startRequest(big_headers);
   auto response = std::move(encoder_decoder.second);
 

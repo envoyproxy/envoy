@@ -9,8 +9,8 @@ CC ?= gcc
 CXX ?= g++
 
 # Common compiler flags
-CXXFLAGS ?= -ggdb3 -fno-omit-frame-pointer -O2
-CFLAGS ?= -ggdb3 -fno-omit-frame-pointer -O2
+CXXFLAGS += -ggdb3 -fno-omit-frame-pointer -O2
+CFLAGS += -ggdb3 -fno-omit-frame-pointer -O2
 CPPFLAGS ?= -DNDEBUG
 
 # Keep track of the env vars we depend upon for $(THIRDPARTY_DEPS)/%.dep.env. If the list (captured

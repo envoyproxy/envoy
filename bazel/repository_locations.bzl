@@ -42,6 +42,11 @@ REPOSITORY_LOCATIONS = dict(
         strip_prefix = "xxHash-0.6.5",
         urls = ["https://github.com/Cyan4973/xxHash/archive/v0.6.5.tar.gz"],
     ),
+    com_github_envoyproxy_sqlparser = dict(
+        sha256 = "425dfee0c4fe9aff8acf2365cde3dd2ba7fb878d2ba37562d33920e34c40c05e",
+        strip_prefix = "sql-parser-5f50c68bdf5f107692bb027d1c568f67597f4d7f",
+        urls = ["https://github.com/envoyproxy/sql-parser/archive/5f50c68bdf5f107692bb027d1c568f67597f4d7f.tar.gz"],
+    ),
     com_github_eile_tclap = dict(
         sha256 = "f0ede0721dddbb5eba3a47385a6e8681b14f155e1129dd39d1a959411935098f",
         strip_prefix = "tclap-tclap-1-2-1-release-final",
@@ -190,5 +195,10 @@ REPOSITORY_LOCATIONS = dict(
         sha256 = "eddbfc920e9cd565500370114316757848b672deba06dc2336acfa81b4ac0e6d",
         strip_prefix = "subpar-1.3.0",
         urls = ["https://github.com/google/subpar/archive/1.3.0.tar.gz"],
+    ),
+    com_googlesource_quiche = dict(
+        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/c9b2cecd1d005893114a03c101532017ddfa12cb.tar.gz
+        sha256 = "c8faea835132103d574cc2769a58e244bee3de02669471330a174f2ffae6fcc3",
+        urls = ["https://storage.googleapis.com/quiche-envoy-integration/c9b2cecd1d005893114a03c101532017ddfa12cb.tar.gz"],
     ),
 )

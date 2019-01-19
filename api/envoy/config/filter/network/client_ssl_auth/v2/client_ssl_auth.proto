@@ -2,7 +2,6 @@ syntax = "proto3";
 
 package envoy.config.filter.network.client_ssl_auth.v2;
 option java_package = "io.envoyproxy.envoy.config.filter.network.client_ssl_auth.v2";
-option java_multiple_files = true;
 option go_package = "v2";
 
 import "envoy/api/v2/core/address.proto";
