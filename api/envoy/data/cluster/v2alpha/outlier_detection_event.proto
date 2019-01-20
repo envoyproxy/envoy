@@ -9,25 +9,33 @@ import "google/protobuf/timestamp.proto";
 import "validate/validate.proto";
 import "gogoproto/gogo.proto";
 
+option (gogoproto.equal_all) = true;
+
 // [#protodoc-title: Outlier detection logging events]
 // :ref:`Outlier detection logging <arch_overview_outlier_detection_logging>`.
 
 message OutlierDetectionEvent {
-  // In case of eject represents type of ejection that took place.
+  // In case of eject represents type of ejection that took place. Currently type can be one of
+  // ``5xx``, ``GatewayFailure`` or ``SuccessRate``
   OutlierEjectionType type = 1 [(validate.rules).enum.defined_only = true];
   // Timestamp for event.
   google.protobuf.Timestamp timestamp = 2 [(gogoproto.stdtime) = true];
-  // Time in seconds since the last action happened.
+  // The time in seconds since the last action (either an ejection or unejection) took place. This
+  // value will be ``-1`` for the first ejection given there is no action before the first ejection.
   int64 secs_since_last_action = 3 [(validate.rules).int64.gte = 0];
-  // Cluster that owns the ejected host.
+  // The :ref:`cluster <envoy_api_msg_Cluster>` that owns the ejected host.
   string cluster_name = 4 [(validate.rules).string.min_bytes = 1];
-  // URL of the ejected host.
+  // The URL of the ejected host. E.g., ``tcp://1.2.3.4:80``.
   string upstream_url = 5 [(validate.rules).string.min_bytes = 1];
-  // Indicates whether eject or uneject took place.
+  // The action that took place. Either ``eject`` if a host was ejected or ``uneject`` if it was
+  // brought back into service.
   Action action = 6 [(validate.rules).enum.defined_only = true];
-  // In case of eject action represents the number of times host has been ejected.
+  // If ``action`` is ``eject``, specifies the number of times the host has been ejected (local to
+  // that Envoy and gets reset if the host gets removed from the upstream cluster for any reason and
+  // then re-added).
   int32 num_ejections = 7 [(validate.rules).int32.gte = 0];
-  // True if ejection happened.
+  // If ``action`` is ``eject``, specifies if the ejection was enforced. ``true`` means the host was
+  // ejected. ``false`` means the event was logged but the host was not actually ejected.
   bool enforced = 8;
 
   oneof event {
