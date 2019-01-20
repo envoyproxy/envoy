@@ -1,5 +1,8 @@
 #include "common/grpc/status.h"
 
+#include <string>
+#include <unordered_map>
+
 namespace Envoy {
 namespace Grpc {
 
@@ -82,6 +85,35 @@ uint64_t Utility::grpcToHttpStatus(Status::GrpcStatus grpc_status) {
   default:
     // Internal server error.
     return 500;
+  }
+}
+
+absl::optional<Status::GrpcStatus> Utility::nameToGrpcStatus(const std::string& grpc_status_name) {
+  const static std::unordered_map<std::string, Status::GrpcStatus> status_map({
+      {"ok", Status::GrpcStatus::Ok},
+      {"canceled", Status::GrpcStatus::Canceled},
+      {"unknown", Status::GrpcStatus::Unknown},
+      {"invalid_argument", Status::GrpcStatus::InvalidArgument},
+      {"deadline_exceeded", Status::GrpcStatus::DeadlineExceeded},
+      {"not_found", Status::GrpcStatus::NotFound},
+      {"already_exists", Status::GrpcStatus::AlreadyExists},
+      {"permission_denied", Status::GrpcStatus::PermissionDenied},
+      {"resource_exhausted", Status::GrpcStatus::ResourceExhausted},
+      {"failed_precondition", Status::GrpcStatus::FailedPrecondition},
+      {"aborted", Status::GrpcStatus::Aborted},
+      {"out_of_range", Status::GrpcStatus::OutOfRange},
+      {"unimplemented", Status::GrpcStatus::Unimplemented},
+      {"internal", Status::GrpcStatus::Internal},
+      {"unavailable", Status::GrpcStatus::Unavailable},
+      {"data_loss", Status::GrpcStatus::DataLoss},
+      {"unauthenticated", Status::GrpcStatus::Unauthenticated},
+  });
+
+  const auto it = status_map.find(grpc_status_name);
+  if (it == status_map.end()) {
+    return absl::optional<Status::GrpcStatus>();
+  } else {
+    return absl::optional<Status::GrpcStatus>(it->second);
   }
 }
 

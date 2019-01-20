@@ -4,6 +4,8 @@
 
 #include "envoy/grpc/status.h"
 
+#include "absl/types/optional.h"
+
 namespace Envoy {
 namespace Grpc {
 
@@ -26,6 +28,13 @@ public:
    * @return uint64_t the canonical HTTP status code corresponding to a gRPC status code.
    */
   static uint64_t grpcToHttpStatus(Status::GrpcStatus grpc_status);
+
+  /**
+   * Returns the gRPC status code from its name, as represented by a snake_case string.
+   * @param grpc_status_name The name of the gRPC status.
+   * @return absl::optional<Status::GrpcStatus> The corresponding gRPC status code, if one exists.
+   */
+  static absl::optional<Status::GrpcStatus> nameToGrpcStatus(const std::string& grpc_status_name);
 };
 
 } // namespace Grpc
