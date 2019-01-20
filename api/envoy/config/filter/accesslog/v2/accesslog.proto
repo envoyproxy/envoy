@@ -70,6 +70,9 @@ message AccessLogFilter {
 
     // Response flag filter.
     ResponseFlagFilter response_flag_filter = 9;
+
+    // gRPC status filter.
+    GrpcStatusFilter grpc_status_filter = 10;
   }
 }
 
@@ -185,6 +188,30 @@ message ResponseFlagFilter {
       "RLSE",
       "DC",
       "URX"
+    ]
+  }];
+}
+
+message GrpcStatusFilter {
+  repeated string statuses = 1 [(validate.rules).repeated .items.string = {
+    in: [
+      "ok",
+      "canceled",
+      "unknown",
+      "invalid_argument",
+      "deadline_exceeded",
+      "not_found",
+      "already_exists",
+      "permission_denied",
+      "resource_exhausted",
+      "failed_precondition",
+      "aborted",
+      "out_of_range",
+      "unimplemented",
+      "internal",
+      "unavailable",
+      "data_loss",
+      "unauthenticated"
     ]
   }];
 }
