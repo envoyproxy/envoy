@@ -151,5 +151,33 @@ TEST_F(ConnPoolMapImplTest, CallbacksCachedAndPassedOnCreation) {
   cb2();
 }
 
+// Tests that if we drain connections on an empty map, nothing happens.
+TEST_F(ConnPoolMapImplTest, EmptyMapDrainConnectionsNop) {
+  TestMapPtr test_map = makeTestMap();
+  test_map->drainConnections();
+}
+
+// Tests that we forward drainConnections to the pools.
+TEST_F(ConnPoolMapImplTest, DrainConnectionsForwarded) {
+  TestMapPtr test_map = makeTestMap();
+
+  test_map->getPool(1, getBasicFactory());
+  test_map->getPool(2, getBasicFactory());
+  EXPECT_CALL(*mock_pools_[0], drainConnections());
+  EXPECT_CALL(*mock_pools_[1], drainConnections());
+
+  test_map->drainConnections();
+}
+
+TEST_F(ConnPoolMapImplTest, ClearDefersDelete) {
+  TestMapPtr test_map = makeTestMap();
+
+  test_map->getPool(1, getBasicFactory());
+  test_map->getPool(2, getBasicFactory());
+  test_map->clear();
+
+  EXPECT_EQ(dispatcher_.to_delete_.size(), 2);
+}
+// TODO(klarose): Test that clear does a deferred delete
 } // namespace Upstream
 } // namespace Envoy

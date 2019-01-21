@@ -10,6 +10,9 @@ ConnPoolMap<KEY_TYPE, POOL_TYPE>::ConnPoolMap(Envoy::Event::Dispatcher& dispatch
     : thread_local_dispatcher_(dispatcher) {}
 
 template <typename KEY_TYPE, typename POOL_TYPE>
+ConnPoolMap<KEY_TYPE, POOL_TYPE>::~ConnPoolMap() = default;
+
+template <typename KEY_TYPE, typename POOL_TYPE>
 absl::optional<POOL_TYPE*> ConnPoolMap<KEY_TYPE, POOL_TYPE>::getPool(KEY_TYPE key,
                                                                      PoolFactory factory) {
   // TODO(klarose): Consider how we will change the connection pool's configuration in the future.
@@ -50,5 +53,11 @@ void ConnPoolMap<KEY_TYPE, POOL_TYPE>::addDrainedCallback(DrainedCb cb) {
   cached_callbacks_.emplace_back(std::move(cb));
 }
 
+template <typename KEY_TYPE, typename POOL_TYPE>
+void ConnPoolMap<KEY_TYPE, POOL_TYPE>::drainConnections() {
+  for (auto& pool_pair : active_pools_) {
+    pool_pair.second->drainConnections();
+  }
+}
 } // namespace Upstream
 } // namespace Envoy

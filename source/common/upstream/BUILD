@@ -28,22 +28,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "conn_pool_map",
-    hdrs = ["conn_pool_map.h"],
-    deps = [
-        "//include/envoy/event:dispatcher_interface",
-    ],
-)
-
-envoy_cc_library(
-    name = "conn_pool_map_impl_lib",
-    hdrs = ["conn_pool_map_impl.h"],
-    deps = [
-        ":conn_pool_map",
-    ],
-)
-
-envoy_cc_library(
     name = "cluster_manager_lib",
     srcs = ["cluster_manager_impl.cc"],
     hdrs = ["cluster_manager_impl.h"],
@@ -77,9 +61,27 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/router:shadow_writer_lib",
         "//source/common/tcp:conn_pool_lib",
+        "//source/common/upstream:conn_pool_map",
+        "//source/common/upstream:conn_pool_map_impl_lib",
         "//source/common/upstream:upstream_lib",
         "@envoy_api//envoy/admin/v2alpha:config_dump_cc",
         "@envoy_api//envoy/api/v2/core:base_cc",
+    ],
+)
+
+envoy_cc_library(
+    name = "conn_pool_map",
+    hdrs = ["conn_pool_map.h"],
+    deps = [
+        "//include/envoy/event:dispatcher_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "conn_pool_map_impl_lib",
+    hdrs = ["conn_pool_map_impl.h"],
+    deps = [
+        ":conn_pool_map",
     ],
 )
 

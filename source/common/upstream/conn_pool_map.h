@@ -18,6 +18,7 @@ public:
   using DrainedCb = std::function<void()>;
 
   ConnPoolMap(Event::Dispatcher& dispatcher);
+  ~ConnPoolMap();
   /**
    * Returns an existing pool for @c key, or creates a new one using @c factory. Note that it is
    * possible for this to fail if a limit on the number of pools allowed is reached.
@@ -40,6 +41,11 @@ public:
    * automatically added.
    */
   void addDrainedCallback(DrainedCb cb);
+
+  /**
+   * Instructs each connection pool to drain its connections
+   */
+  void drainConnections();
 
 private:
   std::map<KEY_TYPE, std::unique_ptr<POOL_TYPE>> active_pools_;

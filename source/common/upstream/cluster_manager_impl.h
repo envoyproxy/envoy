@@ -22,6 +22,7 @@
 
 #include "common/config/grpc_mux_impl.h"
 #include "common/http/async_client_impl.h"
+#include "common/upstream/conn_pool_map.h"
 #include "common/upstream/load_stats_reporter.h"
 #include "common/upstream/upstream_impl.h"
 
@@ -232,9 +233,13 @@ private:
    */
   struct ThreadLocalClusterManagerImpl : public ThreadLocal::ThreadLocalObject {
     struct ConnPoolsContainer {
-      typedef std::map<std::vector<uint8_t>, Http::ConnectionPool::InstancePtr> ConnPools;
+      ConnPoolsContainer(Event::Dispatcher& dispatcher)
+          : pools_{std::make_shared<ConnPools>(dispatcher)} {}
 
-      ConnPools pools_;
+      typedef ConnPoolMap<std::vector<uint8_t>, Http::ConnectionPool::Instance> ConnPools;
+
+      // this is a shared_ptr so we can keep it alive while cleaning up
+      std::shared_ptr<ConnPools> pools_;
       uint64_t drains_remaining_{};
     };
 
@@ -316,6 +321,9 @@ private:
                                         const HostVector& hosts_added,
                                         const HostVector& hosts_removed, ThreadLocal::Slot& tls);
     static void onHostHealthFailure(const HostSharedPtr& host, ThreadLocal::Slot& tls);
+
+    ConnPoolsContainer& getOrAllocateHttpConnPoolsContainer(const HostConstSharedPtr& host);
+    ConnPoolsContainer* getHttpConnPoolsContainer(const HostConstSharedPtr& host);
 
     ClusterManagerImpl& parent_;
     Event::Dispatcher& thread_local_dispatcher_;
