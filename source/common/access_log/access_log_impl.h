@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 #include "envoy/access_log/access_log.h"
@@ -178,6 +179,21 @@ public:
 
 private:
   uint64_t configured_flags_{};
+};
+
+/**
+ * Filters requests that have a response with a gRPC status.
+ */
+class GrpcStatusFilter : public Filter {
+public:
+  GrpcStatusFilter(const envoy::config::filter::accesslog::v2::GrpcStatusFilter& config);
+
+  // AccessLog::Filter
+  bool evaluate(const StreamInfo::StreamInfo& info,
+                const Http::HeaderMap& request_headers) override;
+
+private:
+  std::unordered_set<Envoy::Grpc::Status::GrpcStatus> statuses_;
 };
 
 /**

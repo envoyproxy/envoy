@@ -74,6 +74,8 @@ FilterFactory::fromProto(const envoy::config::filter::accesslog::v2::AccessLogFi
   case envoy::config::filter::accesslog::v2::AccessLogFilter::kResponseFlagFilter:
     MessageUtil::validate(config);
     return FilterPtr{new ResponseFlagFilter(config.response_flag_filter())};
+  case envoy::config::filter::accesslog::v2::AccessLogFilter::kGrpcStatusFilter:
+    return FilterPtr{new GrpcStatusFilter(config.grpc_status_filter())};
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
@@ -195,6 +197,32 @@ bool ResponseFlagFilter::evaluate(const StreamInfo::StreamInfo& info, const Http
     return info.intersectResponseFlags(configured_flags_);
   }
   return info.hasAnyResponseFlag();
+}
+
+GrpcStatusFilter::GrpcStatusFilter(
+    const envoy::config::filter::accesslog::v2::GrpcStatusFilter& config) {
+  for (int i = 0; i < config.statuses_size(); i++) {
+    absl::optional<Grpc::Status::GrpcStatus> grpc_status =
+        Grpc::Utility::nameToGrpcStatus(config.statuses(i));
+    // Like with ResponseFlagFilter, the grpc_status will be valid because of config validation.
+    ASSERT(grpc_status.has_value());
+    statuses_.insert(grpc_status.value());
+  }
+}
+
+bool GrpcStatusFilter::evaluate(const StreamInfo::StreamInfo& info,
+                                const Http::HeaderMap& request_headers) {
+  const Http::HeaderEntry* entry = request_headers.GrpcStatus();
+  Grpc::Status::GrpcStatus request_status;
+  if (entry) {
+    request_status = static_cast<Grpc::Status::GrpcStatus>(atoi(entry->value().c_str()));
+  } else if (info.responseCode()) {
+    request_status = Grpc::Utility::httpToGrpcStatus(info.responseCode().value());
+  } else {
+    request_status = Grpc::Status::GrpcStatus::Unknown;
+  }
+
+  return statuses_.find(request_status) != statuses_.end();
 }
 
 InstanceSharedPtr
