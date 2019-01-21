@@ -23,23 +23,3 @@ message DoubleMatcher {
     double exact = 2;
   }
 }
-
-// Specifies the way to match a integer value.
-message UIntMatcher {
-  oneof match_pattern {
-    option (validate.required) = true;
-
-    // If specified, the input integer value must be in the range specified here.
-    // Note: The range is using half-open interval semantics [start, end).
-    envoy.type.UInt64Range range = 1;
-
-    // If specified, the input int64 value must be greater or equal to the value specified here.
-    int64 greater_equal = 2;
-
-    // If specified, the input int64 value must be less or equal to the value specified here.
-    int64 less_equal = 3;
-
-    // If specified, the input int64 value must be equal to the value specified here.
-    int64 exact = 4;
-  }
-}
