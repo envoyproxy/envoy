@@ -1,3 +1,2 @@
 package envoy.foo;
 option java_package = "io.envoyproxy.envoy.foo";
-option java_multiple_files = true;

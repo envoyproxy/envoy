@@ -47,6 +47,7 @@ namespace Logger {
   FUNCTION(runtime)              \
   FUNCTION(stats)                \
   FUNCTION(secret)               \
+  FUNCTION(tap)                  \
   FUNCTION(testing)              \
   FUNCTION(thrift)               \
   FUNCTION(tracing)              \
