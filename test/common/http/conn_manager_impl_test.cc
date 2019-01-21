@@ -255,9 +255,9 @@ public:
   ConnectionManagerListenerStats& listenerStats() override { return listener_stats_; }
   bool proxy100Continue() const override { return proxy_100_continue_; }
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
-  Event::TimeSystem& timeSystem() { return factory_context_.timeSystem(); }
+  Event::TimeSystem& timeSystem() { return *time_system_; }
 
-  NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
+  Event::TestTime<Event::SimulatedTimeSystem> time_system_;
   RouteConfigProvider route_config_provider_;
   NiceMock<Tracing::MockHttpTracer> tracer_;
   Http::ContextImpl http_context_;

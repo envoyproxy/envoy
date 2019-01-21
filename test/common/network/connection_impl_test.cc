@@ -79,7 +79,6 @@ INSTANTIATE_TEST_CASE_P(IpVersions, ConnectionImplDeathTest,
 
 TEST_P(ConnectionImplDeathTest, BadFd) {
   Stats::IsolatedStoreImpl stats_store;
-  Event::TestTime<Event::SimulatedTimeSystem> time_system;
   Api::ApiPtr api = Api::createApiForTest(stats_store);
   Event::DispatcherImpl dispatcher(*api);
   EXPECT_DEATH_LOG_TO_STDERR(
