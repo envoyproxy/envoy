@@ -1,6 +1,7 @@
 #include <chrono>
 #include <cstdint>
 #include <memory>
+#include <sstream>
 #include <string>
 
 #include "envoy/upstream/cluster_manager.h"
@@ -916,6 +917,71 @@ typed_config:
       "\"UT\" \"LR\" \"UR\" \"UF\" \"UC\" \"UO\" \"NR\" \"DI\" \"FI\" \"RL\" \"UAEX\" \"RLSE\" "
       "\"DC\" \"URX\"]]): "
       "response_flag_filter {\n  flags: \"UnsupportedFlag\"\n}\n");
+}
+
+TEST_F(AccessLogImplTest, GrpcStatusFilterValues) {
+  const std::vector<std::string> valid_statuses({
+      "ok",
+      "canceled",
+      "unknown",
+      "invalid_argument",
+      "deadline_exceeded",
+      "not_found",
+      "already_exists",
+      "permission_denied",
+      "resource_exhausted",
+      "failed_precondition",
+      "aborted",
+      "out_of_range",
+      "unimplemented",
+      "internal",
+      "unavailable",
+      "data_loss",
+      "unauthenticated",
+  });
+
+  std::ostringstream out;
+  out << R"EOF(
+name: envoy.file_access_log
+filter:
+  grpc_status_filter:
+    statuses:
+)EOF";
+
+  for (const auto& valid_status : valid_statuses) {
+    out << "      - " << valid_status << std::endl;
+  }
+
+  out << R"EOF(config:
+  path: /dev/null
+  )EOF";
+
+  // We expect that if any of the statuses in valid_statuses are invalid, that this line will throw
+  // an error.
+  AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(out.str()), context_);
+}
+
+TEST_F(AccessLogImplTest, GrpcStatusFilterUnsupportedValue) {
+  const std::string yaml = R"EOF(
+name: envoy.file_access_log
+filter:
+  grpc_status_filter:
+    statuses:
+      - not_a_valid_code
+config:
+  path: /dev/null
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_),
+      ProtoValidationException,
+      "Proto constraint validation failed (AccessLogFilterValidationError.GrpcStatusFilter: "
+      "[\"embedded message failed validation\"] | caused by "
+      "GrpcStatusFilterValidationError.Statuses[i]: [\"value must be in list \" [\"ok\" "
+      "\"canceled\" \"unknown\" \"invalid_argument\" \"deadline_exceeded\" \"not_found\" "
+      "\"already_exists\" \"permission_denied\" \"resource_exhausted\" \"failed_precondition\" "
+      "\"aborted\" \"out_of_range\" \"unimplemented\" \"internal\" \"unavailable\" \"data_loss\" "
+      "\"unauthenticated\"]]): grpc_status_filter {\n  statuses: \"not_a_valid_code\"\n}\n");
 }
 
 } // namespace
