@@ -75,6 +75,7 @@ FilterFactory::fromProto(const envoy::config::filter::accesslog::v2::AccessLogFi
     MessageUtil::validate(config);
     return FilterPtr{new ResponseFlagFilter(config.response_flag_filter())};
   case envoy::config::filter::accesslog::v2::AccessLogFilter::kGrpcStatusFilter:
+    MessageUtil::validate(config);
     return FilterPtr{new GrpcStatusFilter(config.grpc_status_filter())};
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
