@@ -28,7 +28,7 @@ message ExtAuthz {
 
   //  Setting for bypassin the authorization process.
   //
-  //  1. When true, the filter will allow trafic if communication between Envoy and the
+  //  1. When true, the filter will allow traffic if communication between Envoy and the
   //  authorization service failed, or if any of HTTP 5xx error occurs.
   //  2. When false, if an HTTP error or a communication failure occurs, the filter will respond
   //  with *Forbidden* status and it will *not* allow the request to proceed.
@@ -53,7 +53,7 @@ message ExtAuthz {
 // details.
 //
 // On authorization response status HTTP 200 Ok, the filter will allow traffic to the upstream and
-// addional headers metadata maybe added to the original client request. See
+// additional headers metadata maybe added to the original client request. See
 // :ref:`allowed_upstream_headers
 // <envoy_api_field_config.filter.http.ext_authz.v2.AuthorizationResponse.allowed_upstream_headers>`
 // for details.
@@ -83,9 +83,9 @@ message HttpService {
 }
 
 message AuthorizationRequest {
-  // All client request headers that are a match in the supplied :ref:`list
-  // <envoy_api_msg_type.matcher.ListStringMatcher>` will be included to the authorization request.
-  // In addition to the supplied matchers:
+  // Authorization request will include the client request headers that have a correspondent match
+  // in the :ref:`list <envoy_api_msg_type.matcher.ListStringMatcher>`. Note that in addition to the
+  // user's supplied matchers:
   //
   // 1. *Host*, *Method*, *Path* and *Content-Length* are automatically included to the list.
   //
@@ -100,17 +100,17 @@ message AuthorizationRequest {
 }
 
 message AuthorizationResponse {
-  // Sets a list of matchers that are used to determine which authorization response headers should
-  // be forwarded *from the filter* to the upstream service only when the HTTP status is a 200 OK.
-  // Note that these headers will override that the original request headers when respectively
-  // matched.
+
+  // When this :ref:`list <envoy_api_msg_type.matcher.ListStringMatcher>`. is set, authorization
+  // response headers that have a correspondent match will be added to the original client request.
+  // Note that coexistent headers will be overriden.
   envoy.type.matcher.ListStringMatcher allowed_upstream_headers = 1;
 
-  // Sets a list of keys that are used to determine which authorization response headers should
-  // be forwarded *from the filter* to the client when the HTTP status is *NOT* a 200 OK. Note that
-  // when this list is empty, all the authorization response headers, except *Authority* will be
-  // sent to the client (default). When a header is included in this list, *Path*, *Status*,
-  // *Content-Length*, *WWWAuthenticate* and *Location* are automatically added.
+  // When this :ref:`list <envoy_api_msg_type.matcher.ListStringMatcher>`. is set, authorization
+  // response headers that have a correspondent match will be added to the client's response. Note
+  // that when this list is *not* set, all the authorization response headers, except *Authority
+  // (Host)* will be in the response to the client. When a header is included in this list, *Path*,
+  // *Status*, *Content-Length*, *WWWAuthenticate* and *Location* are automatically added.
   envoy.type.matcher.ListStringMatcher allowed_client_headers = 2;
 }
 
@@ -129,11 +129,10 @@ message ExtAuthzPerRoute {
 }
 
 // Extra settings for the check request. You can use this to provide extra context for the
-// ext-authz server on specific virtual hosts \ routes. For example, adding a context extension on
-// the virtual host level can give the ext-authz server information on what virtual host is used
-// without needing to parse the host header.
-// If CheckSettings is specified in multiple per-filter-configs, they will be merged in order,
-// and the result will be be used.
+// external authorization server on specific virtual hosts \ routes. For example, adding a context
+// extension on the virtual host level can give the ext-authz server information on what virtual
+// host is used without needing to parse the host header. If CheckSettings is specified in multiple
+// per-filter-configs, they will be merged in order, and the result will be be used.
 message CheckSettings {
   // Context extensions to set on the CheckRequest's
   // :ref:`AttributeContext.context_extensions<envoy_api_field_service.auth.v2.AttributeContext.context_extensions>`
