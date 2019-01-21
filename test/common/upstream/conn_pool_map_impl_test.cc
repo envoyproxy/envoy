@@ -31,7 +31,7 @@ public:
     return [&]() {
       auto pool = std::make_unique<NiceMock<Http::ConnectionPool::MockInstance>>();
       mock_pools_.push_back(pool.get());
-      return std::move(pool);
+      return pool;
     };
   }
 
@@ -40,7 +40,7 @@ public:
       auto pool = std::make_unique<NiceMock<Http::ConnectionPool::MockInstance>>();
       EXPECT_CALL(*pool, addDrainedCallback(_)).WillOnce(SaveArg<0>(cb));
       mock_pools_.push_back(pool.get());
-      return std::move(pool);
+      return pool;
     };
   }
 
@@ -108,8 +108,8 @@ TEST_F(ConnPoolMapImplTest, TestEmptyClerWorks) {
 TEST_F(ConnPoolMapImplTest, TestClearEmptiesOutMap) {
   TestMapPtr test_map = makeTestMap();
 
-  absl::optional<Http::ConnectionPool::Instance*> pool1 = test_map->getPool(1, getBasicFactory());
-  absl::optional<Http::ConnectionPool::Instance*> pool2 = test_map->getPool(2, getBasicFactory());
+  test_map->getPool(1, getBasicFactory());
+  test_map->getPool(2, getBasicFactory());
 
   test_map->clear();
   EXPECT_EQ(test_map->size(), 0);
