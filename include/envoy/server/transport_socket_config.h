@@ -26,6 +26,11 @@ public:
   virtual ~TransportSocketFactoryContext() {}
 
   /**
+   * @return Server::Admin& the server's admin interface.
+   */
+  virtual Server::Admin& admin() PURE;
+
+  /**
    * @return Ssl::ContextManager& the SSL context manager.
    */
   virtual Ssl::ContextManager& sslContextManager() PURE;

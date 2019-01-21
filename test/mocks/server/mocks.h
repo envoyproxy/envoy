@@ -459,6 +459,7 @@ public:
 
   Secret::SecretManager& secretManager() override { return *(secret_manager_.get()); }
 
+  MOCK_METHOD0(admin, Server::Admin&());
   MOCK_METHOD0(sslContextManager, Ssl::ContextManager&());
   MOCK_CONST_METHOD0(statsScope, Stats::Scope&());
   MOCK_METHOD0(clusterManager, Upstream::ClusterManager&());
