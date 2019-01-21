@@ -984,6 +984,46 @@ config:
       "\"unauthenticated\"]]): grpc_status_filter {\n  statuses: \"not_a_valid_code\"\n}\n");
 }
 
+TEST_F(AccessLogImplTest, GrpcStatusFilterPass) {
+  const std::string yaml = R"EOF(
+name: envoy.file_access_log
+filter:
+  grpc_status_filter:
+    statuses:
+      - ok
+config:
+  path: /dev/null
+  )EOF";
+
+  const InstanceSharedPtr log =
+      AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+
+  request_headers_.addCopy(Http::Headers::get().GrpcStatus, "0");
+
+  EXPECT_CALL(*file_, write(_));
+  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+}
+
+TEST_F(AccessLogImplTest, GrpcStatusFilterBlock) {
+  const std::string yaml = R"EOF(
+name: envoy.file_access_log
+filter:
+  grpc_status_filter:
+    statuses:
+      - ok
+config:
+  path: /dev/null
+  )EOF";
+
+  const InstanceSharedPtr log =
+      AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+
+  request_headers_.addCopy(Http::Headers::get().GrpcStatus, "1");
+
+  EXPECT_CALL(*file_, write(_)).Times(0);
+  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+}
+
 } // namespace
 } // namespace AccessLog
 } // namespace Envoy
