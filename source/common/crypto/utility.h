@@ -3,7 +3,6 @@
 #include "envoy/buffer/buffer.h"
 
 namespace Envoy {
-namespace Extensions {
 namespace Common {
 namespace Crypto {
 
@@ -28,5 +27,4 @@ public:
 
 } // namespace Crypto
 } // namespace Common
-} // namespace Extensions
 } // namespace Envoy

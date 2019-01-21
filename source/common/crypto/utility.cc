@@ -1,4 +1,4 @@
-#include "extensions/common/crypto/utility.h"
+#include "common/crypto/utility.h"
 
 #include "common/common/assert.h"
 #include "common/common/stack_array.h"
@@ -8,7 +8,6 @@
 #include "openssl/sha.h"
 
 namespace Envoy {
-namespace Extensions {
 namespace Common {
 namespace Crypto {
 
@@ -34,7 +33,7 @@ std::vector<uint8_t> Utility::getSha256Hmac(const std::vector<uint8_t>& key,
                                             absl::string_view message) {
   std::vector<uint8_t> hmac(SHA256_DIGEST_LENGTH);
   unsigned int len;
-  auto ret =
+  const auto ret =
       HMAC(EVP_sha256(), key.data(), key.size(), reinterpret_cast<const uint8_t*>(message.data()),
            message.size(), hmac.data(), &len);
   RELEASE_ASSERT(ret != nullptr, "Failed to create HMAC");
@@ -43,5 +42,4 @@ std::vector<uint8_t> Utility::getSha256Hmac(const std::vector<uint8_t>& key,
 
 } // namespace Crypto
 } // namespace Common
-} // namespace Extensions
 } // namespace Envoy

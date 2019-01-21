@@ -1,12 +1,10 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/hex.h"
-
-#include "extensions/common/crypto/utility.h"
+#include "common/crypto/utility.h"
 
 #include "gtest/gtest.h"
 
 namespace Envoy {
-namespace Extensions {
 namespace Common {
 namespace Crypto {
 
@@ -53,5 +51,4 @@ TEST(UtilityTest, TestSha256HmacWithEmptyArguments) {
 
 } // namespace Crypto
 } // namespace Common
-} // namespace Extensions
 } // namespace Envoy
