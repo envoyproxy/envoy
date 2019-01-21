@@ -22,6 +22,35 @@ namespace Address {
 
 namespace {
 
+/**
+ * Convert an IPv4 address to canonical string format.
+ * @note This works similarly to inet_ntop() but is faster.
+ * @param addr address to format.
+ * @return the address in dotted-decimal string format.
+ */
+static std::string Ipv4ToString(const sockaddr_in& addr) {
+  static constexpr size_t BufferSize = 16; // enough space to hold an IPv4 address in string form
+  char str[BufferSize];
+  // Write backwards from the end of the buffer for simplicity.
+  char* start = str + BufferSize;
+  uint32_t ipv4_addr = ntohl(addr.sin_addr.s_addr);
+  for (unsigned i = 4; i != 0; i--, ipv4_addr >>= 8) {
+    uint32_t octet = ipv4_addr & 0xff;
+    if (octet == 0) {
+      *--start = '0';
+    } else {
+      do {
+        *--start = '0' + (octet % 10);
+        octet /= 10;
+      } while (octet != 0);
+    }
+    if (i != 1) {
+      *--start = '.';
+    }
+  }
+  return std::string(start, str + BufferSize - start);
+}
+
 // Validate that IPv4 is supported on this platform, raise an exception for the
 // given address if not.
 void validateIpv4Supported(const std::string& address) {
@@ -172,10 +201,12 @@ int InstanceBase::socketFromSocketType(SocketType socketType) const {
 
 Ipv4Instance::Ipv4Instance(const sockaddr_in* address) : InstanceBase(Type::Ip) {
   ip_.ipv4_.address_ = *address;
-  char str[INET_ADDRSTRLEN];
-  inet_ntop(AF_INET, &address->sin_addr, str, INET_ADDRSTRLEN);
-  friendly_name_ = fmt::format("{}:{}", str, ntohs(address->sin_port));
-  ip_.friendly_address_ = str;
+  std::string friendly_address = Ipv4ToString(*address);
+  ip_.friendly_address_ = friendly_address;
+  fmt::format_int port(ntohs(address->sin_port));
+  friendly_name_ = friendly_address;
+  friendly_name_.push_back(':');
+  friendly_name_.append(port.data(), port.size());
   validateIpv4Supported(friendly_name_);
 }
 
