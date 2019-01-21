@@ -1181,8 +1181,8 @@ TEST_F(ClusterManagerImplTest, addOrUpdateClusterStaticExists) {
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
 }
 
-// Verifies that when a host is updated to be degraded, this is propagated to the TLS cluster.
-TEST_F(ClusterManagerImplTest, DegradedHostPostedToThreadLocal) {
+// Verifies that we correctly propagate the host_set state to the TLS clusters.
+TEST_F(ClusterManagerImplTest, HostsPostedToTlsCluster) {
   const std::string json =
       fmt::sprintf("{%s}", clustersJson({defaultStaticClusterJson("fake_cluster")}));
   std::shared_ptr<MockCluster> cluster1(new NiceMock<MockCluster>());
@@ -1210,6 +1210,9 @@ TEST_F(ClusterManagerImplTest, DegradedHostPostedToThreadLocal) {
   auto hosts_ptr = std::make_shared<HostVector>(hosts);
 
   cluster1->priority_set_.host_sets_[0] = std::make_unique<HostSetImpl>(0, absl::nullopt);
+  cluster1->priority_set_.host_sets_[0]->updateHosts(
+      HostSetImpl::partitionHosts(hosts_ptr, HostsPerLocalityImpl::empty()), nullptr, hosts, {},
+      {});
 
   // Trigger a per thread cluster update. Normally this is called whenever the HostSet is modified,
   // but since we mock out PrioritySet the callbacks aren't wired up.
