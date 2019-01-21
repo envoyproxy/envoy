@@ -18,7 +18,6 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -60,7 +59,6 @@ public:
 
   ~CodecClientTest() { EXPECT_EQ(0U, client_->numActiveRequests()); }
 
-  DangerousDeprecatedTestTime test_time_;
   Event::MockDispatcher dispatcher_;
   Network::MockClientConnection* connection_;
   Http::MockClientConnection* codec_;
@@ -261,7 +259,7 @@ TEST_F(CodecClientTest, WatermarkPassthrough) {
 // Test the codec getting input from a real TCP connection.
 class CodecNetworkTest : public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  CodecNetworkTest() : api_(Api::createApiForTest(stats_store_, test_time_.timeSystem())) {
+  CodecNetworkTest() : api_(Api::createApiForTest(stats_store_)) {
     dispatcher_ = std::make_unique<Event::DispatcherImpl>(*api_);
     upstream_listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true, false);
     Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
@@ -329,7 +327,6 @@ public:
 
 protected:
   Stats::IsolatedStoreImpl stats_store_;
-  DangerousDeprecatedTestTime test_time_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   Network::ListenerPtr upstream_listener_;

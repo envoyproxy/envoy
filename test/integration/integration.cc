@@ -220,7 +220,7 @@ void IntegrationTcpClient::ConnectionCallbacks::onEvent(Network::ConnectionEvent
 
 BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version,
                                          const std::string& config)
-    : api_(Api::createApiForTest(stats_store_, timeSystem())),
+    : api_(Api::createApiForTest(stats_store_)),
       mock_buffer_factory_(new NiceMock<MockBufferFactory>),
       dispatcher_(
           new Event::DispatcherImpl(Buffer::WatermarkFactoryPtr{mock_buffer_factory_}, *api_)),

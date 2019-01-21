@@ -15,7 +15,6 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_time.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -65,7 +64,7 @@ public:
   };
 
   Http2ConnPoolImplTest()
-      : api_(Api::createApiForTest(stats_store_, test_time_.timeSystem())),
+      : api_(Api::createApiForTest(stats_store_)),
         pool_(dispatcher_, host_, Upstream::ResourcePriority::Default, nullptr) {}
 
   ~Http2ConnPoolImplTest() {
@@ -118,7 +117,6 @@ public:
   MOCK_METHOD0(onClientDestroy, void());
 
   Stats::IsolatedStoreImpl stats_store_;
-  DangerousDeprecatedTestTime test_time_;
   Api::ApiPtr api_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};

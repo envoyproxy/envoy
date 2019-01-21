@@ -25,13 +25,14 @@ class DispatchedThreadTest : public testing::Test {
 protected:
   DispatchedThreadTest()
       : config_(1000, 1000, 1000, 1000),
-        api_(Api::createApiForTest(fakestats_, test_time_.timeSystem())), thread_(*api_),
-        guard_dog_(fakestats_, config_, test_time_.timeSystem(), *api_) {}
+        api_(Api::createApiForTest(fakestats_)), thread_(*api_),
+        guard_dog_(fakestats_, config_, *time_system_, *api_) {}
 
-  void SetUp() { thread_.start(guard_dog_); }
+  void SetUp() override { thread_.start(guard_dog_); }
+
+  Event::TestTime<Event::SimulatedTimeSystem> time_system_;
   NiceMock<Server::Configuration::MockMain> config_;
   Stats::IsolatedStoreImpl fakestats_;
-  DangerousDeprecatedTestTime test_time_;
   Api::ApiPtr api_;
   DispatchedThreadImpl thread_;
   Envoy::Server::GuardDogImpl guard_dog_;

@@ -218,13 +218,13 @@ class GrpcClientIntegrationTest : public GrpcClientIntegrationParamTest {
 public:
   GrpcClientIntegrationTest()
       : method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")),
-        api_(Api::createApiForTest(*stats_store_, test_time_.timeSystem())), dispatcher_(*api_),
-        context_manager_(test_time_.timeSystem()) {}
+        api_(Api::createApiForTest(*stats_store_)), dispatcher_(*api_),
+        context_manager_(api_->timeSystem()) {}
 
   virtual void initialize() {
     if (fake_upstream_ == nullptr) {
       fake_upstream_ = std::make_unique<FakeUpstream>(0, FakeHttpConnection::Type::HTTP2,
-                                                      ipVersion(), test_time_.timeSystem());
+                                                      ipVersion(), **time_system_);
     }
     switch (clientType()) {
     case ClientType::EnvoyGrpc:
@@ -406,12 +406,12 @@ public:
     return stream;
   }
 
-  DangerousDeprecatedTestTime test_time_;
   std::unique_ptr<FakeUpstream> fake_upstream_;
   FakeHttpConnectionPtr fake_connection_;
   std::vector<FakeStreamPtr> fake_streams_;
   const Protobuf::MethodDescriptor* method_descriptor_;
   Stats::IsolatedStoreImpl* stats_store_ = new Stats::IsolatedStoreImpl();
+  Event::GlobalTimeSystem time_system_;
   Api::ApiPtr api_;
   Event::DispatcherImpl dispatcher_;
   DispatcherHelper dispatcher_helper_{dispatcher_};
@@ -493,7 +493,7 @@ public:
         mock_cluster_info_->transport_socket_factory_->createTransportSocket(nullptr);
     fake_upstream_ = std::make_unique<FakeUpstream>(createUpstreamSslContext(), 0,
                                                     FakeHttpConnection::Type::HTTP2, ipVersion(),
-                                                    test_time_.timeSystem());
+                                                    **time_system_);
 
     GrpcClientIntegrationTest::initialize();
   }

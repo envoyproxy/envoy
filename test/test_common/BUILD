@@ -107,6 +107,7 @@ envoy_cc_test_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/stats:stats_lib",
         "//source/common/stats:stats_options_lib",
+        "//test/test_common:test_time_lib",
         "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
     ],
 )

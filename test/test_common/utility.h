@@ -514,7 +514,7 @@ ThreadFactory& threadFactoryForTest();
 } // namespace Thread
 
 namespace Api {
-ApiPtr createApiForTest(Stats::Store& stat_store, Event::TimeSystem& time_system);
+ApiPtr createApiForTest(Stats::Store& stat_store);
 } // namespace Api
 
 MATCHER_P(HeaderMapEqualIgnoreOrder, rhs, "") {

@@ -26,7 +26,6 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
 #include "ares.h"
@@ -326,10 +325,9 @@ private:
 class DnsImplConstructor : public testing::Test {
 protected:
   DnsImplConstructor()
-      : api_(Api::createApiForTest(stats_store_, test_time_.timeSystem())), dispatcher_(*api_) {}
+      : api_(Api::createApiForTest(stats_store_)), dispatcher_(*api_) {}
 
   Stats::IsolatedStoreImpl stats_store_;
-  DangerousDeprecatedTestTime test_time_;
   Api::ApiPtr api_;
   Event::DispatcherImpl dispatcher_;
 };
@@ -408,7 +406,7 @@ TEST_F(DnsImplConstructor, BadCustomResolvers) {
 class DnsImplTest : public testing::TestWithParam<Address::IpVersion> {
 public:
   DnsImplTest()
-      : api_(Api::createApiForTest(stats_store_, test_time_.timeSystem())), dispatcher_(*api_) {}
+      : api_(Api::createApiForTest(stats_store_)), dispatcher_(*api_) {}
 
   void SetUp() override {
     resolver_ = dispatcher_.createDnsResolver({});
@@ -440,7 +438,6 @@ protected:
   Network::TcpListenSocketPtr socket_;
   Stats::IsolatedStoreImpl stats_store_;
   std::unique_ptr<Network::Listener> listener_;
-  DangerousDeprecatedTestTime test_time_;
   Api::ApiPtr api_;
   Event::DispatcherImpl dispatcher_;
   DnsResolverSharedPtr resolver_;

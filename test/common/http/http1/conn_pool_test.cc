@@ -17,7 +17,6 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -47,7 +46,7 @@ public:
                       NiceMock<Event::MockTimer>* upstream_ready_timer)
       : ConnPoolImpl(dispatcher, Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"),
                      Upstream::ResourcePriority::Default, nullptr),
-        api_(Api::createApiForTest(stats_store_, dispatcher.timeSystem())),
+        api_(Api::createApiForTest(stats_store_)),
         mock_dispatcher_(dispatcher), mock_upstream_ready_timer_(upstream_ready_timer) {}
 
   ~ConnPoolImplForTest() {
@@ -114,7 +113,6 @@ public:
 
   Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
-  DangerousDeprecatedTestTime test_time_;
   Event::MockDispatcher& mock_dispatcher_;
   NiceMock<Event::MockTimer>* mock_upstream_ready_timer_;
   std::vector<TestCodecClient> test_clients_;

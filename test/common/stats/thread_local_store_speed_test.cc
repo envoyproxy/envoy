@@ -12,6 +12,7 @@
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
 #include "testing/base/public/benchmark.h"
@@ -21,7 +22,7 @@ namespace Envoy {
 class ThreadLocalStorePerf {
 public:
   ThreadLocalStorePerf()
-      : store_(options_, heap_alloc_), api_(Api::createApiForTest(store_, time_system_)) {
+      : store_(options_, heap_alloc_), api_(Api::createApiForTest(store_)) {
     store_.setTagProducer(std::make_unique<Stats::TagProducerImpl>(stats_config_));
   }
 
@@ -44,10 +45,10 @@ public:
   }
 
 private:
+  Event::TestTime<Event::SimulatedTimeSystem> time_system_;
   Stats::StatsOptionsImpl options_;
   Stats::HeapStatDataAllocator heap_alloc_;
   Stats::ThreadLocalStoreImpl store_;
-  Event::SimulatedTimeSystem time_system_;
   Api::ApiPtr api_;
   std::unique_ptr<Event::DispatcherImpl> dispatcher_;
   std::unique_ptr<ThreadLocal::InstanceImpl> tls_;

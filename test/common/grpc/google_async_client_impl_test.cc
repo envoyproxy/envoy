@@ -8,7 +8,6 @@
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/proto/helloworld.pb.h"
-#include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -48,7 +47,7 @@ class EnvoyGoogleAsyncClientImplTest : public testing::Test {
 public:
   EnvoyGoogleAsyncClientImplTest()
       : stats_store_(new Stats::IsolatedStoreImpl),
-        api_(Api::createApiForTest(*stats_store_, test_time_.timeSystem())), dispatcher_(*api_),
+        api_(Api::createApiForTest(*stats_store_)), dispatcher_(*api_),
         scope_(stats_store_),
         method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")) {
     envoy::api::v2::core::GrpcService config;
@@ -60,7 +59,6 @@ public:
         std::make_unique<GoogleAsyncClientImpl>(dispatcher_, *tls_, stub_factory_, scope_, config);
   }
 
-  DangerousDeprecatedTestTime test_time_;
   Stats::IsolatedStoreImpl* stats_store_; // Ownership transerred to scope_.
   Api::ApiPtr api_;
   Event::DispatcherImpl dispatcher_;

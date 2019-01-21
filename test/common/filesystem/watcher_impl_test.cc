@@ -7,7 +7,6 @@
 #include "common/stats/isolated_store_impl.h"
 
 #include "test/test_common/environment.h"
-#include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -19,10 +18,9 @@ namespace Filesystem {
 class WatcherImplTest : public testing::Test {
 protected:
   WatcherImplTest()
-      : api_(Api::createApiForTest(stats_store_, test_time_.timeSystem())), dispatcher_(*api_) {}
+      : api_(Api::createApiForTest(stats_store_)), dispatcher_(*api_) {}
 
   Stats::IsolatedStoreImpl stats_store_;
-  DangerousDeprecatedTestTime test_time_;
   Api::ApiPtr api_;
   Event::DispatcherImpl dispatcher_;
 };

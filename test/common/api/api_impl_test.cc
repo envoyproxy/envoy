@@ -5,7 +5,6 @@
 #include "common/stats/isolated_store_impl.h"
 
 #include "test/test_common/environment.h"
-#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -15,9 +14,8 @@ namespace Api {
 
 class ApiImplTest : public testing::Test {
 protected:
-  ApiImplTest() : api_(createApiForTest(store_, time_system_)) {}
+  ApiImplTest() : api_(createApiForTest(store_)) {}
 
-  Event::SimulatedTimeSystem time_system_;
   Stats::IsolatedStoreImpl store_;
   ApiPtr api_;
 };

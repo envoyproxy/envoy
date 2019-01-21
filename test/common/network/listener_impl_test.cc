@@ -6,7 +6,6 @@
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
-#include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -23,8 +22,7 @@ static void errorCallbackTest(Address::IpVersion version) {
   // Force the error callback to fire by closing the socket under the listener. We run this entire
   // test in the forked process to avoid confusion when the fork happens.
   Stats::IsolatedStoreImpl stats_store;
-  DangerousDeprecatedTestTime test_time;
-  Api::ApiPtr api = Api::createApiForTest(stats_store, test_time.timeSystem());
+  Api::ApiPtr api = Api::createApiForTest(stats_store);
   Event::DispatcherImpl dispatcher(*api);
 
   Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(version), nullptr,
@@ -79,12 +77,11 @@ protected:
       : version_(GetParam()),
         alt_address_(Network::Test::findOrCheckFreePort(
             Network::Test::getCanonicalLoopbackAddress(version_), Address::SocketType::Stream)),
-        api_(Api::createApiForTest(stats_store_, test_time_.timeSystem())), dispatcher_(*api_) {}
+        api_(Api::createApiForTest(stats_store_)), dispatcher_(*api_) {}
 
   const Address::IpVersion version_;
   const Address::InstanceConstSharedPtr alt_address_;
   Stats::IsolatedStoreImpl stats_store_;
-  DangerousDeprecatedTestTime test_time_;
   Api::ApiPtr api_;
   Event::DispatcherImpl dispatcher_;
 };

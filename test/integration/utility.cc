@@ -54,8 +54,6 @@ void BufferingStreamDecoder::onComplete() {
 
 void BufferingStreamDecoder::onResetStream(Http::StreamResetReason) { ADD_FAILURE(); }
 
-DangerousDeprecatedTestTime IntegrationUtil::evil_singleton_test_time_;
-
 BufferingStreamDecoderPtr
 IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPtr& addr,
                                    const std::string& method, const std::string& url,
@@ -113,9 +111,7 @@ IntegrationUtil::makeSingleRequest(uint32_t port, const std::string& method, con
 RawConnectionDriver::RawConnectionDriver(uint32_t port, Buffer::Instance& initial_data,
                                          ReadCallback data_callback,
                                          Network::Address::IpVersion version) {
-  Event::GlobalTimeSystem time_system;
-  //Event::TimeSystem& time_system = IntegrationUtil::evil_singleton_test_time_.timeSystem();
-  api_ = Api::createApiForTest(stats_store_, **time_system);
+  api_ = Api::createApiForTest(stats_store_);
   dispatcher_ = api_->allocateDispatcher();
   callbacks_ = std::make_unique<ConnectionCallbacks>();
   client_ = dispatcher_->createClientConnection(

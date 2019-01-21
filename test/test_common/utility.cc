@@ -38,6 +38,7 @@
 #include "common/filesystem/directory.h"
 
 #include "test/test_common/printers.h"
+#include "test/test_common/test_time.h"
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
@@ -396,9 +397,21 @@ ThreadFactory& threadFactoryForTest() {
 
 namespace Api {
 
-ApiPtr createApiForTest(Stats::Store& stat_store, Event::TimeSystem& time_system) {
-  return std::make_unique<Impl>(std::chrono::milliseconds(1000), Thread::threadFactoryForTest(),
-                                stat_store, time_system);
+class TimeSystemProvider {
+ protected:
+  Event::GlobalTimeSystem global_time_system_;
+};
+
+class TestImpl : public TimeSystemProvider, public Impl {
+ public:
+  TestImpl(std::chrono::milliseconds file_flush_interval_msec, Thread::ThreadFactory& thread_factory,
+           Stats::Store& stats_store)
+      : Impl(file_flush_interval_msec, thread_factory, stats_store, **global_time_system_) {}
+};
+
+ApiPtr createApiForTest(Stats::Store& stat_store) {
+  return std::make_unique<TestImpl>(std::chrono::milliseconds(1000), Thread::threadFactoryForTest(),
+                                    stat_store);
 }
 
 } // namespace Api

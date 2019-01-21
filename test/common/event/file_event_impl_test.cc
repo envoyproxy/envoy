@@ -7,7 +7,6 @@
 
 #include "test/mocks/common.h"
 #include "test/test_common/environment.h"
-#include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -18,7 +17,7 @@ namespace Event {
 class FileEventImplTest : public testing::Test {
 public:
   FileEventImplTest()
-      : api_(Api::createApiForTest(stats_store_, test_time_.timeSystem())), dispatcher_(*api_) {}
+      : api_(Api::createApiForTest(stats_store_)), dispatcher_(*api_) {}
 
   void SetUp() override {
     int rc = socketpair(AF_UNIX, SOCK_DGRAM, 0, fds_);
@@ -36,7 +35,6 @@ public:
 protected:
   int fds_[2];
   Stats::IsolatedStoreImpl stats_store_;
-  DangerousDeprecatedTestTime test_time_;
   Api::ApiPtr api_;
   DispatcherImpl dispatcher_;
 };
@@ -56,9 +54,8 @@ TEST_P(FileEventImplActivateTest, Activate) {
   }
   ASSERT_NE(-1, fd);
 
-  DangerousDeprecatedTestTime test_time;
   Stats::IsolatedStoreImpl stats_store;
-  Api::ApiPtr api = Api::createApiForTest(stats_store, test_time.timeSystem());
+  Api::ApiPtr api = Api::createApiForTest(stats_store);
   DispatcherImpl dispatcher(*api);
   ReadyWatcher read_event;
   EXPECT_CALL(read_event, ready()).Times(1);
