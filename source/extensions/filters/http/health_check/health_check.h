@@ -27,22 +27,22 @@ class HealthCheckCacheManager {
 public:
   HealthCheckCacheManager(Event::Dispatcher& dispatcher, std::chrono::milliseconds timeout);
 
-  std::pair<Http::Code, bool> getCachedResponseCode() {
+  std::pair<Http::Code, bool> getCachedResponse() {
     return {last_response_code_, last_response_degraded_};
   }
-  void setCachedResponseCode(Http::Code code, bool degraded) {
+  void setCachedResponse(Http::Code code, bool degraded) {
     last_response_code_ = code;
     last_response_degraded_ = degraded;
-    use_cached_response_code_ = true;
+    use_cached_response_ = true;
   }
-  bool useCachedResponseCode() { return use_cached_response_code_; }
+  bool useCachedResponse() { return use_cached_response_; }
 
 private:
   void onTimer();
 
   Event::TimerPtr clear_cache_timer_;
   const std::chrono::milliseconds timeout_;
-  std::atomic<bool> use_cached_response_code_{};
+  std::atomic<bool> use_cached_response_{};
   std::atomic<Http::Code> last_response_code_{};
   std::atomic<bool> last_response_degraded_{};
 };
