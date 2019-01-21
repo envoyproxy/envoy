@@ -20,9 +20,9 @@ public:
   ConnPoolMap(Event::Dispatcher& dispatcher);
   ~ConnPoolMap();
   /**
-   * Returns an existing pool for @c key, or creates a new one using @c factory. Note that it is
+   * Returns an existing pool for `key`, or creates a new one using `factory`. Note that it is
    * possible for this to fail if a limit on the number of pools allowed is reached.
-   * @return The pool corresponding to @c key, or @c absl::nullopt
+   * @return The pool corresponding to `key`, or `absl::nullopt`
    */
   absl::optional<POOL_TYPE*> getPool(KEY_TYPE key, PoolFactory factory);
 

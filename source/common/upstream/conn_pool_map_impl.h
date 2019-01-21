@@ -20,7 +20,7 @@ absl::optional<POOL_TYPE*> ConnPoolMap<KEY_TYPE, POOL_TYPE>::getPool(KEY_TYPE ke
   // here. Maybe we'll pass them to the factory function?
   auto inserted = active_pools_.emplace(key, nullptr);
 
-  // if we inserted a new element, create a pool and assign it to the iterator. Tell is about any
+  // If we inserted a new element, create a pool and assign it to the iterator. Tell it about any
   // cached callbacks.
   if (inserted.second) {
     inserted.first->second = factory();

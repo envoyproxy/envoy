@@ -66,10 +66,9 @@ envoy_cc_test(
     deps = [
         "//include/envoy/http:conn_pool_interface",
         "//source/common/upstream:conn_pool_map_impl_lib",
+        "//test/mocks:common_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/http:conn_pool_mocks",
-        "//test/mocks:common_lib",
-        #"//test/test_common:utility_lib",
     ],
 )
 
