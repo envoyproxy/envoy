@@ -36,7 +36,7 @@ public:
   }
 
   TestMap::PoolFactory getFactoryExpectDrainedCb(Http::ConnectionPool::Instance::DrainedCb* cb) {
-    return [&]() {
+    return [this, cb]() {
       auto pool = std::make_unique<NiceMock<Http::ConnectionPool::MockInstance>>();
       EXPECT_CALL(*pool, addDrainedCallback(_)).WillOnce(SaveArg<0>(cb));
       mock_pools_.push_back(pool.get());
