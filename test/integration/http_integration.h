@@ -80,8 +80,7 @@ typedef std::unique_ptr<IntegrationCodecClient> IntegrationCodecClientPtr;
 class HttpIntegrationTest : public BaseIntegrationTest {
 public:
   HttpIntegrationTest(Http::CodecClient::Type downstream_protocol,
-                      Network::Address::IpVersion version,
-                      TestTimeSystemPtr,
+                      Network::Address::IpVersion version, TestTimeSystemPtr,
                       const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG)
       : HttpIntegrationTest(downstream_protocol, version, config) {}
   HttpIntegrationTest(Http::CodecClient::Type downstream_protocol,

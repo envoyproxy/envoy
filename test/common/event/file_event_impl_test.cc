@@ -16,8 +16,7 @@ namespace Event {
 
 class FileEventImplTest : public testing::Test {
 public:
-  FileEventImplTest()
-      : api_(Api::createApiForTest(stats_store_)), dispatcher_(*api_) {}
+  FileEventImplTest() : api_(Api::createApiForTest(stats_store_)), dispatcher_(*api_) {}
 
   void SetUp() override {
     int rc = socketpair(AF_UNIX, SOCK_DGRAM, 0, fds_);

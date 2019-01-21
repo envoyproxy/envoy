@@ -324,8 +324,7 @@ private:
 
 class DnsImplConstructor : public testing::Test {
 protected:
-  DnsImplConstructor()
-      : api_(Api::createApiForTest(stats_store_)), dispatcher_(*api_) {}
+  DnsImplConstructor() : api_(Api::createApiForTest(stats_store_)), dispatcher_(*api_) {}
 
   Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
@@ -405,8 +404,7 @@ TEST_F(DnsImplConstructor, BadCustomResolvers) {
 
 class DnsImplTest : public testing::TestWithParam<Address::IpVersion> {
 public:
-  DnsImplTest()
-      : api_(Api::createApiForTest(stats_store_)), dispatcher_(*api_) {}
+  DnsImplTest() : api_(Api::createApiForTest(stats_store_)), dispatcher_(*api_) {}
 
   void SetUp() override {
     resolver_ = dispatcher_.createDnsResolver({});

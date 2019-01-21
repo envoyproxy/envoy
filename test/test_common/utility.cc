@@ -398,14 +398,14 @@ ThreadFactory& threadFactoryForTest() {
 namespace Api {
 
 class TimeSystemProvider {
- protected:
+protected:
   Event::GlobalTimeSystem global_time_system_;
 };
 
 class TestImpl : public TimeSystemProvider, public Impl {
- public:
-  TestImpl(std::chrono::milliseconds file_flush_interval_msec, Thread::ThreadFactory& thread_factory,
-           Stats::Store& stats_store)
+public:
+  TestImpl(std::chrono::milliseconds file_flush_interval_msec,
+           Thread::ThreadFactory& thread_factory, Stats::Store& stats_store)
       : Impl(file_flush_interval_msec, thread_factory, stats_store, **global_time_system_) {}
 };
 

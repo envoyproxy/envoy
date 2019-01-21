@@ -1,9 +1,9 @@
 #include "test/test_common/test_time.h"
 
+#include "common/common/utility.h"
+
 #include "test/test_common/global.h"
 #include "test/test_common/simulated_time_system.h"
-
-#include "common/common/utility.h"
 
 namespace Envoy {
 
@@ -44,7 +44,7 @@ void MockTimeSystem::sleep(const Duration& duration) { real_time_system_.sleep(d
 
 Thread::CondVar::WaitStatus
 MockTimeSystem::waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
-        const Duration& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) {
+                        const Duration& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) {
   return real_time_system_.waitFor(mutex, condvar, duration);
 }
 

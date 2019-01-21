@@ -178,10 +178,10 @@ public:
 
   Event::TestTimeSystem& timeSystem() { return **time_system_; }
 
- private:
+private:
   Event::GlobalTimeSystem time_system_;
- public:
 
+public:
   Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
   MockBufferFactory* mock_buffer_factory_; // Will point to the dispatcher's factory.

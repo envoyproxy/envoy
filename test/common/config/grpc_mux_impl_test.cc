@@ -100,9 +100,7 @@ public:
   Envoy::Config::RateLimitSettings rate_limit_settings_;
 };
 
-
-class GrpcMuxImplTest : public SimTimeBase, public GrpcMuxImplTestBase {
-};
+class GrpcMuxImplTest : public SimTimeBase, public GrpcMuxImplTestBase {};
 
 // Validate behavior when multiple type URL watches are maintained, watches are created/destroyed
 // (via RAII).
@@ -337,8 +335,7 @@ TEST_F(GrpcMuxImplTest, WatchDemux) {
 
 // Exactly one test requires a mock time system to provoke behavior that cannot
 // easily be achieved with a SimulatedTimeSystem.
-class GrpcMuxImplTestWithMockTimeSystem : public MockTimeBase, public GrpcMuxImplTestBase  {
-};
+class GrpcMuxImplTestWithMockTimeSystem : public MockTimeBase, public GrpcMuxImplTestBase {};
 
 //  Verifies that rate limiting is not enforced with defaults.
 TEST_F(GrpcMuxImplTestWithMockTimeSystem, TooManyRequestsWithDefaultSettings) {

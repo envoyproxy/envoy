@@ -24,7 +24,7 @@ public:
   }
 
   // TimeSource
-  SystemTime systemTime() override ;
+  SystemTime systemTime() override;
   MonotonicTime monotonicTime() override;
 
 private:
@@ -54,7 +54,7 @@ public:
 
 // Ensures that only one type of time-system is instantiated at a time.
 class SingletonTimeSystemHelper {
- public:
+public:
   explicit SingletonTimeSystemHelper() : time_system_(nullptr) {}
   void set(TestTimeSystem* time_system) {
     if (time_system_ == nullptr) {
@@ -75,19 +75,19 @@ class SingletonTimeSystemHelper {
   TestTimeSystem& operator*() { return *lazyInit(); }
   TestTimeSystem* operator->() { return lazyInit(); }
 
- private:
+private:
   TestTimeSystem* time_system_;
   std::unique_ptr<Test::Global<TestRealTimeSystem>> default_time_system_;
 };
 using GlobalTimeSystem = Test::Global<SingletonTimeSystemHelper>;
 
 template <class Type> class TestTime {
- public:
+public:
   TestTime() { global_time_system_->set(&(time_system_.get())); }
   Type& operator*() { return *time_system_; }
   Type* operator->() { return &(time_system_.get()); }
 
- private:
+private:
   Test::Global<Type> time_system_;
   GlobalTimeSystem global_time_system_;
 };

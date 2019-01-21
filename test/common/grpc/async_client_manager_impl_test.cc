@@ -18,8 +18,7 @@ namespace {
 
 class AsyncClientManagerImplTest : public testing::Test {
 public:
-  AsyncClientManagerImplTest()
-      : api_(Api::createApiForTest(api_stats_store_)) {}
+  AsyncClientManagerImplTest() : api_(Api::createApiForTest(api_stats_store_)) {}
 
   Event::TestTime<Event::SimulatedTimeSystem> time_system_;
   Upstream::MockClusterManager cm_;

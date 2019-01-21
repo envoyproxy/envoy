@@ -21,8 +21,7 @@ namespace Envoy {
 
 class ThreadLocalStorePerf {
 public:
-  ThreadLocalStorePerf()
-      : store_(options_, heap_alloc_), api_(Api::createApiForTest(store_)) {
+  ThreadLocalStorePerf() : store_(options_, heap_alloc_), api_(Api::createApiForTest(store_)) {
     store_.setTagProducer(std::make_unique<Stats::TagProducerImpl>(stats_config_));
   }
 

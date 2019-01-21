@@ -86,8 +86,8 @@ public:
                "",
                fake_stats_},
         tracing_stats_{CONN_MAN_TRACING_STATS(POOL_COUNTER(fake_stats_))},
-        date_provider_(timeSystem()),
-        listener_stats_{CONN_MAN_LISTENER_STATS(POOL_COUNTER(fake_listener_stats_))} {
+        date_provider_(timeSystem()), listener_stats_{CONN_MAN_LISTENER_STATS(
+                                          POOL_COUNTER(fake_listener_stats_))} {
     http_context_.setTracer(tracer_);
 
     // response_encoder_ is not a NiceMock on purpose. This prevents complaining about this

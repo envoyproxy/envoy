@@ -21,8 +21,8 @@
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/simulated_time_system.h"
-#include "test/test_common/utility.h"
 #include "test/test_common/test_time.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -1635,8 +1635,7 @@ TEST_P(ReadBufferLimitTest, SomeLimit) {
 
 class TcpClientConnectionImplTest : public testing::TestWithParam<Address::IpVersion> {
 protected:
-  TcpClientConnectionImplTest()
-      : api_(Api::createApiForTest(stats_store_)), dispatcher_(*api_) {}
+  TcpClientConnectionImplTest() : api_(Api::createApiForTest(stats_store_)), dispatcher_(*api_) {}
 
   Stats::IsolatedStoreImpl stats_store_;
   Event::TestTime<Event::SimulatedTimeSystem> time_system_;
@@ -1680,8 +1679,7 @@ TEST_P(TcpClientConnectionImplTest, BadConnectConnRefused) {
 
 class PipeClientConnectionImplTest : public testing::Test {
 protected:
-  PipeClientConnectionImplTest()
-      : api_(Api::createApiForTest(stats_store_)), dispatcher_(*api_) {}
+  PipeClientConnectionImplTest() : api_(Api::createApiForTest(stats_store_)), dispatcher_(*api_) {}
 
   Stats::IsolatedStoreImpl stats_store_;
   Event::TestTime<Event::SimulatedTimeSystem> time_system_;
