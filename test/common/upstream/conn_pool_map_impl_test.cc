@@ -178,6 +178,6 @@ TEST_F(ConnPoolMapImplTest, ClearDefersDelete) {
 
   EXPECT_EQ(dispatcher_.to_delete_.size(), 2);
 }
-// TODO(klarose): Test that clear does a deferred delete
+
 } // namespace Upstream
 } // namespace Envoy
