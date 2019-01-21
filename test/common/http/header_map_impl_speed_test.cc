@@ -98,6 +98,88 @@ static void HeaderMapImplSetInline(benchmark::State& state) {
 }
 BENCHMARK(HeaderMapImplSetInline)->Arg(0)->Arg(1)->Arg(10)->Arg(50);
 
+/** Measure the speed of the byteSize() estimation method. */
+static void HeaderMapImplGetByteSize(benchmark::State& state) {
+  HeaderMapImpl headers;
+  addDummyHeaders(headers, state.range(0));
+  uint64_t size = 0;
+  for (auto _ : state) {
+    size += headers.byteSize();
+  }
+  benchmark::DoNotOptimize(size);
+}
+BENCHMARK(HeaderMapImplGetByteSize)->Arg(0)->Arg(1)->Arg(10)->Arg(50);
+
+/** Callback function for use in testing HeaderMap::iterate(). */
+static HeaderMap::Iterate CountingCallback(const HeaderEntry&, void* context) {
+  (*static_cast<size_t*>(context))++;
+  return HeaderMap::Iterate::Continue;
+}
+
+/** Measure the speed of iteration with a lightweight callback. */
+static void HeaderMapImplIterate(benchmark::State& state) {
+  HeaderMapImpl headers;
+  size_t num_callbacks = 0;
+  addDummyHeaders(headers, state.range(0));
+  for (auto _ : state) {
+    headers.iterate(CountingCallback, &num_callbacks);
+  }
+  benchmark::DoNotOptimize(num_callbacks);
+}
+BENCHMARK(HeaderMapImplIterate)->Arg(0)->Arg(1)->Arg(10)->Arg(50);
+
+/** Measure the speed of the HeaderMapImpl lookup() method. */
+static void HeaderMapImplLookup(benchmark::State& state) {
+  const LowerCaseString key("connection");
+  const std::string value("01234567890123456789");
+  HeaderMapImpl headers;
+  addDummyHeaders(headers, state.range(0));
+  headers.addReference(key, value);
+  for (auto _ : state) {
+    const HeaderEntry* entry = nullptr;
+    auto result = headers.lookup(key, &entry);
+    benchmark::DoNotOptimize(result);
+  }
+}
+BENCHMARK(HeaderMapImplLookup)->Arg(0)->Arg(1)->Arg(10)->Arg(50);
+
+/**
+ * Measure the speed of removing a header by key name.
+ * @note The measured time for each iteration includes the time needed to add
+ *       one copy of the header.
+ */
+static void HeaderMapImplRemove(benchmark::State& state) {
+  const LowerCaseString key("example-key");
+  const std::string value("01234567890123456789");
+  HeaderMapImpl headers;
+  addDummyHeaders(headers, state.range(0));
+  for (auto _ : state) {
+    headers.addReference(key, value);
+    headers.remove(key);
+  }
+  benchmark::DoNotOptimize(headers.size());
+}
+BENCHMARK(HeaderMapImplRemove)->Arg(0)->Arg(1)->Arg(10)->Arg(50);
+
+/**
+ * Measure the speed of removing a header by key name, for the special case of
+ * a key for which HeaderMapImpl is expected to provide special optimization.
+ * @note The measured time for each iteration includes the time needed to add
+ *       one copy of the header.
+ */
+static void HeaderMapImplRemoveInline(benchmark::State& state) {
+  const LowerCaseString key("connection");
+  const std::string value("01234567890123456789");
+  HeaderMapImpl headers;
+  addDummyHeaders(headers, state.range(0));
+  for (auto _ : state) {
+    headers.addReference(key, value);
+    headers.remove(key);
+  }
+  benchmark::DoNotOptimize(headers.size());
+}
+BENCHMARK(HeaderMapImplRemoveInline)->Arg(0)->Arg(1)->Arg(10)->Arg(50);
+
 } // namespace Http
 } // namespace Envoy
 
