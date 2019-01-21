@@ -6,7 +6,6 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
-#include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -24,7 +23,7 @@ namespace Server {
 
 class WorkerImplTest : public testing::Test {
 public:
-  WorkerImplTest() : api_(Api::createApiForTest(stats_store_, test_time_.timeSystem())) {
+  WorkerImplTest() : api_(Api::createApiForTest(stats_store_)) {
     // In the real worker the watchdog has timers that prevent exit. Here we need to prevent event
     // loop exit since we use mock timers.
     no_exit_timer_->enableTimer(std::chrono::hours(1));
@@ -32,7 +31,6 @@ public:
 
   Stats::IsolatedStoreImpl stats_store_;
   NiceMock<ThreadLocal::MockInstance> tls_;
-  DangerousDeprecatedTestTime test_time_;
   Network::MockConnectionHandler* handler_ = new Network::MockConnectionHandler();
   NiceMock<MockGuardDog> guard_dog_;
   NiceMock<MockOverloadManager> overload_manager_;

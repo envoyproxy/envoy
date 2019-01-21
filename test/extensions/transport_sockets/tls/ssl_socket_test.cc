@@ -183,7 +183,7 @@ void testUtil(const TestUtilOptions& options) {
   ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), manager,
                                                    server_stats_store, std::vector<std::string>{});
 
-  Api::ApiPtr api = Api::createApiForTest(server_stats_store, *time_system);
+  Api::ApiPtr api = Api::createApiForTest(server_stats_store);
   Event::DispatcherImpl dispatcher(*api);
   Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(options.version()),
                                   nullptr, true);
@@ -399,7 +399,7 @@ const std::string testUtilV2(const TestUtilOptionsV2& options) {
   ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), manager,
                                                    server_stats_store, server_names);
 
-  Api::ApiPtr api = Api::createApiForTest(server_stats_store, *time_system);
+  Api::ApiPtr api = Api::createApiForTest(server_stats_store);
   Event::DispatcherImpl dispatcher(*api);
   Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(options.version()),
                                   nullptr, true);
@@ -571,7 +571,7 @@ class SslSocketTest : public SslCertsTest,
                       public testing::WithParamInterface<Network::Address::IpVersion> {
 protected:
   SslSocketTest()
-      : api_(Api::createApiForTest(stats_store_, *time_system_)),
+      : api_(Api::createApiForTest(stats_store_)),
         dispatcher_(std::make_unique<Event::DispatcherImpl>(*api_)) {}
 
   Stats::IsolatedStoreImpl stats_store_;
@@ -2114,7 +2114,7 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
                                    true);
   NiceMock<Network::MockListenerCallbacks> callbacks;
   Network::MockConnectionHandler connection_handler;
-  Api::ApiPtr api = Api::createApiForTest(server_stats_store, *time_system);
+  Api::ApiPtr api = Api::createApiForTest(server_stats_store);
   Event::DispatcherImpl dispatcher(*api);
   Network::ListenerPtr listener1 = dispatcher.createListener(socket1, callbacks, true, false);
   Network::ListenerPtr listener2 = dispatcher.createListener(socket2, callbacks, true, false);
@@ -2626,7 +2626,7 @@ void testClientSessionResumption(const std::string& server_ctx_yaml,
                                   true);
   NiceMock<Network::MockListenerCallbacks> callbacks;
   Network::MockConnectionHandler connection_handler;
-  Api::ApiPtr api = Api::createApiForTest(server_stats_store, *time_system);
+  Api::ApiPtr api = Api::createApiForTest(server_stats_store);
   Event::DispatcherImpl dispatcher(*api);
   Network::ListenerPtr listener = dispatcher.createListener(socket, callbacks, true, false);
 

@@ -21,7 +21,6 @@ envoy_cc_test(
         "//source/extensions/resource_monitors/injected_resource:injected_resource_monitor",
         "//source/server:resource_monitor_config_lib",
         "//test/test_common:environment_lib",
-        "//test/test_common:test_time_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -37,7 +36,6 @@ envoy_extension_cc_test(
         "//source/extensions/resource_monitors/injected_resource:config",
         "//source/server:resource_monitor_config_lib",
         "//test/test_common:environment_lib",
-        "//test/test_common:test_time_lib",
         "@envoy_api//envoy/config/resource_monitor/injected_resource/v2alpha:injected_resource_cc",
     ],
 )
