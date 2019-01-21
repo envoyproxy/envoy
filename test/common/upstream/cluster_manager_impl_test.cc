@@ -29,6 +29,7 @@
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_time.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
@@ -169,9 +170,7 @@ envoy::config::bootstrap::v2::Bootstrap parseBootstrapFromV2Yaml(const std::stri
 
 class ClusterManagerImplTest : public testing::Test {
 public:
-  ClusterManagerImplTest() : api_(Api::createApiForTest(stats_store_, time_system_)) {
-    factory_.dispatcher_.setTimeSystem(time_system_);
-  }
+  ClusterManagerImplTest() : api_(Api::createApiForTest(stats_store_, *time_system_)) {}
 
   void create(const envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
     cluster_manager_ = std::make_unique<ClusterManagerImpl>(
@@ -246,7 +245,7 @@ public:
   }
 
   Stats::IsolatedStoreImpl stats_store_;
-  Event::SimulatedTimeSystem time_system_;
+  Event::TestTime<Event::SimulatedTimeSystem> time_system_;
   Api::ApiPtr api_;
   NiceMock<TestClusterManagerFactory> factory_;
   std::unique_ptr<ClusterManagerImpl> cluster_manager_;
@@ -303,7 +302,7 @@ TEST_F(ClusterManagerImplTest, MultipleHealthCheckFail) {
 }
 
 TEST_F(ClusterManagerImplTest, MultipleProtocolCluster) {
-  time_system_.setSystemTime(std::chrono::milliseconds(1234567891234));
+  time_system_->setSystemTime(std::chrono::milliseconds(1234567891234));
 
   const std::string yaml = R"EOF(
   static_resources:
@@ -789,7 +788,7 @@ TEST_F(ClusterManagerImplTest, ShutdownOrder) {
 }
 
 TEST_F(ClusterManagerImplTest, InitializeOrder) {
-  time_system_.setSystemTime(std::chrono::milliseconds(1234567891234));
+  time_system_->setSystemTime(std::chrono::milliseconds(1234567891234));
 
   const std::string json = fmt::sprintf(
       R"EOF(
@@ -1007,7 +1006,7 @@ TEST_F(ClusterManagerImplTest, DynamicRemoveWithLocalCluster) {
 }
 
 TEST_F(ClusterManagerImplTest, RemoveWarmingCluster) {
-  time_system_.setSystemTime(std::chrono::milliseconds(1234567891234));
+  time_system_->setSystemTime(std::chrono::milliseconds(1234567891234));
 
   const std::string json = R"EOF(
   {
@@ -2118,7 +2117,7 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesOutOfWindow) {
   // The first update should be applied immediately, because even though it's mergeable
   // it's outside the default merge window of 3 seconds (found in debugger as value of
   // cluster.info()->lbConfig().update_merge_window() in ClusterManagerImpl::scheduleUpdate.
-  time_system_.sleep(std::chrono::seconds(60));
+  time_system_->sleep(std::chrono::seconds(60));
   cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
       HostSetImpl::updateHostsParams(hosts, hosts_per_locality, hosts, hosts_per_locality), {},
       hosts_added, hosts_removed, absl::nullopt);
@@ -2143,7 +2142,7 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesInsideWindow) {
   // 3 seconds (found in debugger as value of cluster.info()->lbConfig().update_merge_window()
   // in ClusterManagerImpl::scheduleUpdate. Note that initially the update-time is
   // default-initialized to a monotonic time of 0, as is SimulatedTimeSystem::monotonic_time_.
-  time_system_.sleep(std::chrono::seconds(2));
+  time_system_->sleep(std::chrono::seconds(2));
   cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
       HostSetImpl::updateHostsParams(hosts, hosts_per_locality, hosts, hosts_per_locality), {},
       hosts_added, hosts_removed, absl::nullopt);

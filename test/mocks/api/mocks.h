@@ -12,7 +12,7 @@
 #include "common/api/os_sys_calls_impl.h"
 
 #include "test/mocks/filesystem/mocks.h"
-#include "test/test_common/test_time_system.h"
+#include "test/test_common/test_time.h"
 
 #include "gmock/gmock.h"
 
@@ -21,7 +21,7 @@ namespace Api {
 
 class MockApi : public Api {
 public:
-  explicit MockApi(Event::TimeSystem& time_system);
+  MockApi();
   ~MockApi();
 
   // Api::Api
@@ -36,10 +36,10 @@ public:
   MOCK_METHOD1(fileExists, bool(const std::string& path));
   MOCK_METHOD1(fileReadToEnd, std::string(const std::string& path));
   MOCK_METHOD0(threadFactory, Thread::ThreadFactory&());
-  Event::TimeSystem& timeSystem() override { return time_system_; }
+  Event::TimeSystem& timeSystem() override { return **time_system_; }
 
   std::shared_ptr<Filesystem::MockFile> file_{new Filesystem::MockFile()};
-  Event::TimeSystem& time_system_;
+  Event::GlobalTimeSystem time_system_;
 };
 
 class MockOsSysCalls : public OsSysCallsImpl {

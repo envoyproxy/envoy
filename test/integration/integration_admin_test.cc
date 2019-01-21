@@ -450,12 +450,13 @@ TEST_F(IntegrationAdminIpv4Ipv6Test, Ipv4Ipv6Listen) {
 // Testing the behavior of StatsMatcher, which allows/denies the  instantiation of stats based on
 // restrictions on their names.
 class StatsMatcherIntegrationTest
-    : public HttpIntegrationTest,
+    : public Event::TestTime<Event::SimulatedTimeSystem>,
+      public HttpIntegrationTest,
       public testing::Test,
       public testing::WithParamInterface<Network::Address::IpVersion> {
 public:
   StatsMatcherIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), simTime()) {}
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
 
   void initialize() override {
     config_helper_.addConfigModifier(

@@ -19,7 +19,7 @@ namespace AccessLog {
 
 TEST(AccessLogManagerImpl, reopenAllFiles) {
   Event::MockDispatcher dispatcher;
-  Api::MockApi api(dispatcher.timeSystem());
+  Api::MockApi api;
   Thread::MutexBasicLockable lock;
   Stats::IsolatedStoreImpl stats_store;
 

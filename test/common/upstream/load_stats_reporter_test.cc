@@ -31,7 +31,6 @@ public:
   LoadStatsReporterTest()
       : retry_timer_(new Event::MockTimer()), response_timer_(new Event::MockTimer()),
         async_client_(new Grpc::MockAsyncClient()) {
-    dispatcher_.setTimeSystem(time_system_);
   }
 
   void createLoadStatsReporter() {
@@ -68,6 +67,7 @@ public:
     load_stats_reporter_->onReceiveMessage(std::move(response));
   }
 
+  Event::TestTime<Event::SimulatedTimeSystem> time_system_;
   NiceMock<Upstream::MockClusterManager> cm_;
   Event::MockDispatcher dispatcher_;
   Stats::IsolatedStoreImpl stats_store_;
@@ -78,7 +78,6 @@ public:
   Event::TimerCb response_timer_cb_;
   Grpc::MockAsyncStream async_stream_;
   Grpc::MockAsyncClient* async_client_;
-  Event::SimulatedTimeSystem time_system_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
 };
 
@@ -115,7 +114,7 @@ TEST_F(LoadStatsReporterTest, ExistingClusters) {
   // Initially, we have no clusters to report on.
   expectSendMessage({});
   createLoadStatsReporter();
-  time_system_.setMonotonicTime(std::chrono::microseconds(3));
+  time_system_->setMonotonicTime(std::chrono::microseconds(3));
   // Start reporting on foo.
   NiceMock<MockCluster> foo_cluster;
   foo_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(2);
@@ -125,7 +124,7 @@ TEST_F(LoadStatsReporterTest, ExistingClusters) {
   deliverLoadStatsResponse({"foo"});
   // Initial stats report for foo on timer tick.
   foo_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(5);
-  time_system_.setMonotonicTime(std::chrono::microseconds(4));
+  time_system_->setMonotonicTime(std::chrono::microseconds(4));
   {
     envoy::api::v2::endpoint::ClusterStats foo_cluster_stats;
     foo_cluster_stats.set_cluster_name("foo");
@@ -142,12 +141,12 @@ TEST_F(LoadStatsReporterTest, ExistingClusters) {
   bar_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(1);
 
   // Start reporting on bar.
-  time_system_.setMonotonicTime(std::chrono::microseconds(6));
+  time_system_->setMonotonicTime(std::chrono::microseconds(6));
   deliverLoadStatsResponse({"foo", "bar"});
   // Stats report foo/bar on timer tick.
   foo_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(1);
   bar_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(1);
-  time_system_.setMonotonicTime(std::chrono::microseconds(28));
+  time_system_->setMonotonicTime(std::chrono::microseconds(28));
   {
     envoy::api::v2::endpoint::ClusterStats foo_cluster_stats;
     foo_cluster_stats.set_cluster_name("foo");
@@ -173,7 +172,7 @@ TEST_F(LoadStatsReporterTest, ExistingClusters) {
   // Stats report for bar on timer tick.
   foo_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(5);
   bar_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(5);
-  time_system_.setMonotonicTime(std::chrono::microseconds(33));
+  time_system_->setMonotonicTime(std::chrono::microseconds(33));
   {
     envoy::api::v2::endpoint::ClusterStats bar_cluster_stats;
     bar_cluster_stats.set_cluster_name("bar");
@@ -190,12 +189,12 @@ TEST_F(LoadStatsReporterTest, ExistingClusters) {
   bar_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(1);
 
   // Start tracking foo again, we should forget earlier history for foo.
-  time_system_.setMonotonicTime(std::chrono::microseconds(43));
+  time_system_->setMonotonicTime(std::chrono::microseconds(43));
   deliverLoadStatsResponse({"foo", "bar"});
   // Stats report foo/bar on timer tick.
   foo_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(1);
   bar_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(1);
-  time_system_.setMonotonicTime(std::chrono::microseconds(47));
+  time_system_->setMonotonicTime(std::chrono::microseconds(47));
   {
     envoy::api::v2::endpoint::ClusterStats foo_cluster_stats;
     foo_cluster_stats.set_cluster_name("foo");

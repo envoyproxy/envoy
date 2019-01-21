@@ -319,8 +319,6 @@ public:
 class MockInstance : public Instance {
 public:
   MockInstance();
-  explicit MockInstance(DangerousDeprecatedTestTime* test_time);
-  explicit MockInstance(Event::TimeSystem& time_system);
   ~MockInstance();
 
   Secret::SecretManager& secretManager() override { return *(secret_manager_.get()); }
@@ -356,11 +354,10 @@ public:
   MOCK_METHOD0(localInfo, const LocalInfo::LocalInfo&());
   MOCK_CONST_METHOD0(statsFlushInterval, std::chrono::milliseconds());
 
-  Event::TimeSystem& timeSystem() override { return time_system_; }
+  Event::TestTimeSystem& timeSystem() override { return **time_system_; }
   Api::Api& api() override { return api_; }
 
-  std::unique_ptr<DangerousDeprecatedTestTime> test_time_;
-  Event::TimeSystem& time_system_;
+  Event::GlobalTimeSystem time_system_;
   std::unique_ptr<Secret::SecretManager> secret_manager_;
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
   Stats::IsolatedStoreImpl stats_store_;
@@ -433,9 +430,10 @@ public:
   MOCK_CONST_METHOD0(localInfo, const LocalInfo::LocalInfo&());
   MOCK_CONST_METHOD0(listenerMetadata, const envoy::api::v2::core::Metadata&());
   MOCK_METHOD0(timeSource, TimeSource&());
-  Event::SimulatedTimeSystem& timeSystem() { return time_system_; }
+  Event::TestTimeSystem& timeSystem() { return **time_system_; }
   Http::Context& httpContext() override { return http_context_; }
 
+  Event::GlobalTimeSystem time_system_;
   testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
@@ -450,7 +448,6 @@ public:
   Singleton::ManagerPtr singleton_manager_;
   testing::NiceMock<MockAdmin> admin_;
   Stats::IsolatedStoreImpl listener_scope_;
-  Event::SimulatedTimeSystem time_system_;
   Api::MockApi api_;
   testing::NiceMock<MockOverloadManager> overload_manager_;
   Tracing::HttpNullTracer null_tracer_;

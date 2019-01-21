@@ -3,6 +3,7 @@
 #include "common/common/assert.h"
 #include "common/common/lock_guard.h"
 
+#include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -15,7 +16,7 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Api {
 
-MockApi::MockApi(Event::TimeSystem& time_system) : time_system_(time_system) {
+MockApi::MockApi() {
   ON_CALL(*this, createFile(_, _, _)).WillByDefault(Return(file_));
   ON_CALL(*this, threadFactory()).WillByDefault(ReturnRef(Thread::threadFactoryForTest()));
 }

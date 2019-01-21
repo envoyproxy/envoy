@@ -67,8 +67,9 @@ public:
             }));
   }
 
-  Event::SimulatedTimeSystem& timeSystem() { return factory_context_.timeSystem(); }
+  Event::SimulatedTimeSystem& timeSystem() { return *time_system_; }
 
+  Event::TestTime<Event::SimulatedTimeSystem> time_system_;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   Http::MockAsyncClientRequest request_;
   Http::AsyncClient::Callbacks* callbacks_{};

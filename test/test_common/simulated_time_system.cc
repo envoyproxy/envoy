@@ -134,6 +134,8 @@ SimulatedTimeSystem::SimulatedTimeSystem()
 
 SimulatedTimeSystem::~SimulatedTimeSystem() { --instance_count; }
 
+bool SimulatedTimeSystem::hasInstance() { return instance_count > 0; }
+
 SystemTime SimulatedTimeSystem::systemTime() {
   Thread::LockGuard lock(mutex_);
   return system_time_;

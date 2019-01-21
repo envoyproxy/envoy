@@ -59,6 +59,8 @@ public:
     setSystemTime(SystemTime(duration));
   }
 
+  static bool hasInstance();
+
 private:
   class SimulatedScheduler;
   class Alarm;

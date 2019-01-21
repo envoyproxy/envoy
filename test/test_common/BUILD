@@ -160,8 +160,11 @@ envoy_cc_test_library(
     srcs = ["test_time.cc"],
     hdrs = ["test_time.h"],
     deps = [
+        ":global_lib",
+        ":simulated_time_system_lib",
         ":test_time_system_interface",
         "//source/common/event:real_time_system_lib",
+        "//test/mocks:common_lib",
     ],
 )
 

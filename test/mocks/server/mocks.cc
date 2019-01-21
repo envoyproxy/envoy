@@ -4,6 +4,8 @@
 
 #include "common/singleton/manager_impl.h"
 
+#include "test/test_common/test_time.h"
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -121,17 +123,9 @@ MockWorker::MockWorker() {
 }
 MockWorker::~MockWorker() = default;
 
-MockInstance::MockInstance() : MockInstance(new DangerousDeprecatedTestTime) {}
-
-MockInstance::MockInstance(DangerousDeprecatedTestTime* test_time)
-    : MockInstance(test_time->timeSystem()) {
-  test_time_.reset(test_time);
-}
-
-MockInstance::MockInstance(Event::TimeSystem& time_system)
-    : time_system_(time_system), secret_manager_(new Secret::SecretManagerImpl()),
-      api_(timeSystem()), cluster_manager_(timeSystem()), ssl_context_manager_(timeSystem()),
-      singleton_manager_(
+MockInstance::MockInstance()
+    : secret_manager_(new Secret::SecretManagerImpl()),
+      cluster_manager_(timeSystem()), ssl_context_manager_(timeSystem()), singleton_manager_(
           new Singleton::ManagerImpl(Thread::threadFactoryForTest().currentThreadId())) {
   ON_CALL(*this, threadLocal()).WillByDefault(ReturnRef(thread_local_));
   ON_CALL(*this, stats()).WillByDefault(ReturnRef(stats_store_));
@@ -171,8 +165,7 @@ MockMain::~MockMain() = default;
 
 MockFactoryContext::MockFactoryContext()
     : singleton_manager_(
-          new Singleton::ManagerImpl(Thread::threadFactoryForTest().currentThreadId())),
-      api_(timeSystem()) {
+          new Singleton::ManagerImpl(Thread::threadFactoryForTest().currentThreadId())) {
   ON_CALL(*this, accessLogManager()).WillByDefault(ReturnRef(access_log_manager_));
   ON_CALL(*this, api()).WillByDefault(ReturnRef(api_));
   ON_CALL(*this, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
@@ -187,7 +180,7 @@ MockFactoryContext::MockFactoryContext()
   ON_CALL(*this, threadLocal()).WillByDefault(ReturnRef(thread_local_));
   ON_CALL(*this, admin()).WillByDefault(ReturnRef(admin_));
   ON_CALL(*this, listenerScope()).WillByDefault(ReturnRef(listener_scope_));
-  ON_CALL(*this, timeSource()).WillByDefault(ReturnRef(time_system_));
+  ON_CALL(*this, timeSource()).WillByDefault(ReturnRef(**time_system_));
   ON_CALL(*this, overloadManager()).WillByDefault(ReturnRef(overload_manager_));
 }
 

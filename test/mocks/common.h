@@ -4,11 +4,8 @@
 
 #include "envoy/common/time.h"
 #include "envoy/common/token_bucket.h"
-#include "envoy/event/timer.h"
 
 #include "common/common/logger.h"
-
-#include "test/test_common/test_time.h"
 
 #include "absl/strings/string_view.h"
 #include "gmock/gmock.h"
@@ -36,31 +33,6 @@ public:
   ~ReadyWatcher();
 
   MOCK_METHOD0(ready, void());
-};
-
-// TODO(jmarantz): get rid of this and use SimulatedTimeSystem in its place.
-class MockTimeSystem : public Event::TestTimeSystem {
-public:
-  MockTimeSystem();
-  ~MockTimeSystem();
-
-  // TODO(#4160): Eliminate all uses of MockTimeSystem, replacing with SimulatedTimeSystem,
-  // where timer callbacks are triggered by the advancement of time. This implementation
-  // matches recent behavior, where real-time timers were created directly in libevent
-  // by dispatcher_impl.cc.
-  Event::SchedulerPtr createScheduler(Event::Libevent::BasePtr& base) override {
-    return test_time_.timeSystem().createScheduler(base);
-  }
-  void sleep(const Duration& duration) override { test_time_.timeSystem().sleep(duration); }
-  Thread::CondVar::WaitStatus
-  waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
-          const Duration& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) override {
-    return test_time_.timeSystem().waitFor(mutex, condvar, duration);
-  }
-  MOCK_METHOD0(systemTime, SystemTime());
-  MOCK_METHOD0(monotonicTime, MonotonicTime());
-
-  DangerousDeprecatedTestTime test_time_;
 };
 
 class MockTokenBucket : public TokenBucket {

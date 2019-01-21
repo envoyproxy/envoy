@@ -19,6 +19,7 @@
 #include "common/common/block_memory_hash_set.h"
 #include "common/common/c_smart_ptr.h"
 #include "common/common/thread.h"
+#include "common/event/real_time_system.h"
 #include "common/http/header_map_impl.h"
 #include "common/protobuf/utility.h"
 #include "common/stats/raw_stat_data.h"

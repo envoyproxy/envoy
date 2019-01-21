@@ -75,7 +75,7 @@ public:
   };
 
   HttpConnectionManagerImplTest()
-      : route_config_provider_(test_time_.timeSystem()), access_log_path_("dummy_path"),
+      : route_config_provider_(timeSystem()), access_log_path_("dummy_path"),
         access_logs_{
             AccessLog::InstanceSharedPtr{new Extensions::AccessLoggers::File::FileAccessLog(
                 access_log_path_, {}, AccessLog::AccessLogFormatUtils::defaultAccessLogFormatter(),
@@ -86,8 +86,8 @@ public:
                "",
                fake_stats_},
         tracing_stats_{CONN_MAN_TRACING_STATS(POOL_COUNTER(fake_stats_))},
+        date_provider_(timeSystem()),
         listener_stats_{CONN_MAN_LISTENER_STATS(POOL_COUNTER(fake_listener_stats_))} {
-
     http_context_.setTracer(tracer_);
 
     // response_encoder_ is not a NiceMock on purpose. This prevents complaining about this
@@ -114,7 +114,7 @@ public:
         std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0");
     conn_manager_ = std::make_unique<ConnectionManagerImpl>(
         *this, drain_close_, random_, http_context_, runtime_, local_info_, cluster_manager_,
-        &overload_manager_, test_time_.timeSystem());
+        &overload_manager_, timeSystem());
     conn_manager_->initializeReadFilterCallbacks(filter_callbacks_);
 
     if (tracing) {
@@ -255,8 +255,9 @@ public:
   ConnectionManagerListenerStats& listenerStats() override { return listener_stats_; }
   bool proxy100Continue() const override { return proxy_100_continue_; }
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
+  Event::TimeSystem& timeSystem() { return factory_context_.timeSystem(); }
 
-  DangerousDeprecatedTestTime test_time_;
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   RouteConfigProvider route_config_provider_;
   NiceMock<Tracing::MockHttpTracer> tracer_;
   Http::ContextImpl http_context_;
@@ -286,10 +287,9 @@ public:
   std::chrono::milliseconds delayed_close_timeout_{};
   NiceMock<Runtime::MockRandomGenerator> random_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
-  NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   std::unique_ptr<Ssl::MockConnection> ssl_connection_;
   TracingConnectionManagerConfigPtr tracing_config_;
-  SlowDateProviderImpl date_provider_{test_time_.timeSystem()};
+  SlowDateProviderImpl date_provider_;
   MockStream stream_;
   Http::StreamCallbacks* stream_callbacks_{nullptr};
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
