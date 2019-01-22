@@ -121,11 +121,11 @@ TEST(Ipv4CompatAddressImplSocktTest, SocketBindAndConnect) {
 }
 
 TEST(Ipv4InstanceTest, SockaddrToString) {
-  // Test addresses from various RF 5735 reserved ranges
+  // Test addresses from various RFC 5735 reserved ranges
   static const char* addresses[] = {"0.0.0.0",        "0.0.0.255",       "0.0.255.255",
                                     "0.255.255.255",  "192.0.2.0",       "198.151.100.1",
                                     "198.151.100.10", "198.151.100.100", "10.0.0.1",
-                                    "10.0.20.1",      "10.3.201.1"};
+                                    "10.0.20.1",      "10.3.201.1",      "255.255.255.255"};
 
   for (const auto address : addresses) {
     sockaddr_in addr4;
