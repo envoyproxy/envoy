@@ -10,6 +10,8 @@
 namespace Envoy {
 namespace Config {
 
+// Oversees communication for gRPC-using xDS: reestablishes the gRPC channel when necessary, and
+// provides rate limiting of requests.
 template <class RequestProto, class ResponseProto>
 class DiscoveryGrpcStream : public Grpc::TypedAsyncStreamCallbacks<ResponseProto>,
                             Logger::Loggable<Logger::Id::upstream> {
