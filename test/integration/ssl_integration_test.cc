@@ -280,8 +280,9 @@ TEST_P(SslCertficateIntegrationTest, ServerEcdsaClientRsaOnly) {
   initialize();
   auto codec_client = makeRawHttpConnection(makeSslClientConnection(rsaOnlyClientOptions()));
   EXPECT_FALSE(codec_client->connected());
-  Stats::CounterSharedPtr counter =
-      test_server_->counter(listenerStatPrefix("ssl.connection_error"));
+  const std::string counter_name = listenerStatPrefix("ssl.connection_error");
+  Stats::CounterSharedPtr counter = test_server_->counter(counter_name);
+  test_server_->waitForCounterGe(counter_name, 1);
   EXPECT_EQ(1U, counter->value());
   counter->reset();
 }
@@ -305,8 +306,9 @@ TEST_P(SslCertficateIntegrationTest, ServerRsaClientEcdsaOnly) {
   initialize();
   EXPECT_FALSE(
       makeRawHttpConnection(makeSslClientConnection(ecdsaOnlyClientOptions()))->connected());
-  Stats::CounterSharedPtr counter =
-      test_server_->counter(listenerStatPrefix("ssl.connection_error"));
+  const std::string counter_name = listenerStatPrefix("ssl.connection_error");
+  Stats::CounterSharedPtr counter = test_server_->counter(counter_name);
+  test_server_->waitForCounterGe(counter_name, 1);
   EXPECT_EQ(1U, counter->value());
   counter->reset();
 }

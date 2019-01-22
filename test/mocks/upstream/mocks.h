@@ -107,20 +107,21 @@ public:
 
 class MockRetryPriority : public RetryPriority {
 public:
-  MockRetryPriority(const HealthyLoad& healthy_priority_load)
-      : healthy_priority_load_(healthy_priority_load) {}
-  MockRetryPriority(const MockRetryPriority& other)
-      : healthy_priority_load_(other.healthy_priority_load_) {}
+  MockRetryPriority(const HealthyLoad& healthy_priority_load,
+                    const DegradedLoad& degraded_priority_load)
+      : priority_load_({healthy_priority_load, degraded_priority_load}) {}
+  MockRetryPriority(const MockRetryPriority& other) : priority_load_(other.priority_load_) {}
   ~MockRetryPriority();
 
-  const HealthyLoad& determinePriorityLoad(const PrioritySet&, const HealthyLoad&) {
-    return healthy_priority_load_;
+  const HealthyAndDegradedLoad& determinePriorityLoad(const PrioritySet&,
+                                                      const HealthyAndDegradedLoad&) {
+    return priority_load_;
   }
 
   MOCK_METHOD1(onHostAttempted, void(HostDescriptionConstSharedPtr));
 
 private:
-  const HealthyLoad& healthy_priority_load_;
+  const HealthyAndDegradedLoad priority_load_;
 };
 
 class MockRetryPriorityFactory : public RetryPriorityFactory {

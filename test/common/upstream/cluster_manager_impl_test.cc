@@ -1181,6 +1181,57 @@ TEST_F(ClusterManagerImplTest, addOrUpdateClusterStaticExists) {
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
 }
 
+// Verifies that we correctly propagate the host_set state to the TLS clusters.
+TEST_F(ClusterManagerImplTest, HostsPostedToTlsCluster) {
+  const std::string json =
+      fmt::sprintf("{%s}", clustersJson({defaultStaticClusterJson("fake_cluster")}));
+  std::shared_ptr<MockCluster> cluster1(new NiceMock<MockCluster>());
+  InSequence s;
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _, _)).WillOnce(Return(cluster1));
+  ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
+  EXPECT_CALL(*cluster1, initialize(_));
+
+  create(parseBootstrapFromJson(json));
+
+  ReadyWatcher initialized;
+  cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
+
+  EXPECT_CALL(initialized, ready());
+  cluster1->initialize_callback_();
+
+  // Set up the HostSet with 1 healthy, 1 degraded and 1 unhealthy.
+  HostSharedPtr host1 = makeTestHost(cluster1->info_, "tcp://127.0.0.1:80");
+  host1->healthFlagSet(HostImpl::HealthFlag::DEGRADED_ACTIVE_HC);
+  HostSharedPtr host2 = makeTestHost(cluster1->info_, "tcp://127.0.0.1:80");
+  host2->healthFlagSet(HostImpl::HealthFlag::FAILED_ACTIVE_HC);
+  HostSharedPtr host3 = makeTestHost(cluster1->info_, "tcp://127.0.0.1:80");
+
+  HostVector hosts{host1, host2, host3};
+  auto hosts_ptr = std::make_shared<HostVector>(hosts);
+
+  cluster1->priority_set_.host_sets_[0] = std::make_unique<HostSetImpl>(0, absl::nullopt);
+  cluster1->priority_set_.host_sets_[0]->updateHosts(
+      HostSetImpl::partitionHosts(hosts_ptr, HostsPerLocalityImpl::empty()), nullptr, hosts, {},
+      {});
+
+  // Trigger a per thread cluster update. Normally this is called whenever the HostSet is modified,
+  // but since we mock out PrioritySet the callbacks aren't wired up.
+  cluster1->priority_set_.runUpdateCallbacks(0, hosts, {});
+
+  auto* tls_cluster = cluster_manager_->get(cluster1->info_->name());
+
+  EXPECT_EQ(1, tls_cluster->prioritySet().hostSetsPerPriority().size());
+  EXPECT_EQ(1, tls_cluster->prioritySet().hostSetsPerPriority()[0]->degradedHosts().size());
+  EXPECT_EQ(host1, tls_cluster->prioritySet().hostSetsPerPriority()[0]->degradedHosts()[0]);
+  EXPECT_EQ(1, tls_cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(host3, tls_cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts()[0]);
+  EXPECT_EQ(3, tls_cluster->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+
+  factory_.tls_.shutdownThread();
+
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
+}
+
 // Test that we close all HTTP connection pool connections when there is a host health failure.
 TEST_F(ClusterManagerImplTest, CloseHttpConnectionsOnHealthFailure) {
   const std::string json =
