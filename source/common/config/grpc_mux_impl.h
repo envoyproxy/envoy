@@ -21,8 +21,8 @@ namespace Config {
  * ADS API implementation that fetches via gRPC.
  */
 class GrpcMuxImpl : public GrpcMux,
-                    Grpc::TypedAsyncStreamCallbacks<envoy::api::v2::DiscoveryResponse>,
-                    Logger::Loggable<Logger::Id::upstream> {
+                    public DiscoveryGrpcStream<envoy::api::v2::DiscoveryRequest,
+                                               envoy::api::v2::DiscoveryResponse> {
 public:
   GrpcMuxImpl(const LocalInfo::LocalInfo& local_info, Grpc::AsyncClientPtr async_client,
               Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method,
@@ -36,27 +36,14 @@ public:
   void pause(const std::string& type_url) override;
   void resume(const std::string& type_url) override;
 
-  // Grpc::AsyncStreamCallbacks (passthroughs to DiscoveryGrpcStream)
-  void onCreateInitialMetadata(Http::HeaderMap& metadata) override {
-    discovery_grpc_stream_.onCreateInitialMetadata(metadata);
-  }
-  void onReceiveInitialMetadata(Http::HeaderMapPtr&& metadata) override {
-    discovery_grpc_stream_.onReceiveInitialMetadata(std::move(metadata));
-  }
-  void onReceiveMessage(std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message) override {
-    discovery_grpc_stream_.onReceiveMessage(std::move(message));
-  }
-  void onReceiveTrailingMetadata(Http::HeaderMapPtr&& metadata) override {
-    discovery_grpc_stream_.onReceiveTrailingMetadata(std::move(metadata));
-  }
-  void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override {
-    discovery_grpc_stream_.onRemoteClose(status, message);
-  }
+  // DiscoveryGrpcStream
+  void handleResponse(std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message) override;
+  void handleStreamEstablished() override;
+  void handleEstablishmentFailure() override;
+  void handleDrainReady() override;
 
 private:
-  void handleMessage(std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message);
   void setRetryTimer();
-  void establishNewStream();
   // Returns whether the request was actually sent (and so can leave the queue).
   bool sendDiscoveryRequest(const std::string& type_url);
   void queueDiscoveryRequest(const std::string& type_url);
@@ -105,8 +92,6 @@ private:
   // Envoy's dependendency ordering.
   std::list<std::string> subscriptions_;
   std::queue<std::string> request_queue_;
-  DiscoveryGrpcStream<envoy::api::v2::DiscoveryRequest, envoy::api::v2::DiscoveryResponse>
-      discovery_grpc_stream_;
 };
 
 class NullGrpcMuxImpl : public GrpcMux {

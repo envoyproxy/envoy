@@ -13,29 +13,9 @@ GrpcMuxImpl::GrpcMuxImpl(const LocalInfo::LocalInfo& local_info, Grpc::AsyncClie
                          const Protobuf::MethodDescriptor& service_method,
                          Runtime::RandomGenerator& random, Stats::Scope& scope,
                          const RateLimitSettings& rate_limit_settings)
-    : local_info_(local_info),
-      discovery_grpc_stream_(std::move(async_client), service_method, random, dispatcher, scope,
-                             rate_limit_settings,
-                             // on_receive_message
-                             [this](std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message) {
-                               handleMessage(std::move(message));
-                             },
-                             // on_stream_established
-                             [this]() {
-                               for (const auto type_url : subscriptions_) {
-                                 queueDiscoveryRequest(type_url);
-                               }
-                             },
-                             // on_establishment_failure
-                             [this]() {
-                               for (const auto& api_state : api_state_) {
-                                 for (auto watch : api_state.second.watches_) {
-                                   watch->callbacks_.onConfigUpdateFailed(nullptr);
-                                 }
-                               }
-                             },
-                             // drainer_callback
-                             [this]() -> void { drainRequests(); }) {
+    : DiscoveryGrpcStream<envoy::api::v2::DiscoveryRequest, envoy::api::v2::DiscoveryResponse>(
+          std::move(async_client), service_method, random, dispatcher, scope, rate_limit_settings),
+      local_info_(local_info) {
   Config::Utility::checkLocalInfo("ads", local_info);
 }
 
@@ -47,12 +27,11 @@ GrpcMuxImpl::~GrpcMuxImpl() {
   }
 }
 
-void GrpcMuxImpl::start() { discovery_grpc_stream_.establishNewStream(); }
+void GrpcMuxImpl::start() { establishNewStream(); }
 
 void GrpcMuxImpl::drainRequests() {
   ENVOY_LOG(trace, "draining discovery requests {}", request_queue_.size());
-  while (!request_queue_.empty() &&
-         discovery_grpc_stream_.checkRateLimitAllowsDrain(request_queue_.size())) {
+  while (!request_queue_.empty() && checkRateLimitAllowsDrain(request_queue_.size())) {
     // Process the request, if rate limiting is not enabled at all or if it is under rate limit.
     if (sendDiscoveryRequest(request_queue_.front())) {
       request_queue_.pop();
@@ -68,7 +47,7 @@ void GrpcMuxImpl::queueDiscoveryRequest(const std::string& type_url) {
 }
 
 bool GrpcMuxImpl::sendDiscoveryRequest(const std::string& type_url) {
-  if (!discovery_grpc_stream_.available()) {
+  if (!grpcStreamAvailable()) {
     ENVOY_LOG(debug, "No stream available to sendDiscoveryRequest for {}", type_url);
     return true; // TODO(fredlas) 'true' is the original behavior; should it be changed?
   }
@@ -95,7 +74,7 @@ bool GrpcMuxImpl::sendDiscoveryRequest(const std::string& type_url) {
   }
 
   ENVOY_LOG(trace, "Sending DiscoveryRequest for {}: {}", type_url, request.DebugString());
-  discovery_grpc_stream_.sendMessage(request);
+  sendMessage(request);
 
   // clear error_detail after the request is sent if it exists.
   if (api_state_[type_url].request_.has_error_detail()) {
@@ -152,7 +131,7 @@ void GrpcMuxImpl::resume(const std::string& type_url) {
   }
 }
 
-void GrpcMuxImpl::handleMessage(std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message) {
+void GrpcMuxImpl::handleResponse(std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message) {
   const std::string& type_url = message->type_url();
   ENVOY_LOG(debug, "Received gRPC message for {} at version {}", type_url, message->version_info());
   if (api_state_.count(type_url) == 0) {
@@ -223,6 +202,19 @@ void GrpcMuxImpl::handleMessage(std::unique_ptr<envoy::api::v2::DiscoveryRespons
   api_state_[type_url].request_.set_response_nonce(message->nonce());
   queueDiscoveryRequest(type_url);
 }
+void GrpcMuxImpl::handleStreamEstablished() {
+  for (const auto type_url : subscriptions_) {
+    queueDiscoveryRequest(type_url);
+  }
+}
+void GrpcMuxImpl::handleEstablishmentFailure() {
+  for (const auto& api_state : api_state_) {
+    for (auto watch : api_state.second.watches_) {
+      watch->callbacks_.onConfigUpdateFailed(nullptr);
+    }
+  }
+}
+void GrpcMuxImpl::handleDrainReady() { drainRequests(); }
 
 } // namespace Config
 } // namespace Envoy
