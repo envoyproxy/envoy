@@ -161,7 +161,7 @@ public:
 
   // AccessLog::Filter
   bool evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap& request_headers,
-                const Http::HeaderMap& respone_trailers) override;
+                const Http::HeaderMap& response_trailers) override;
 
 private:
   std::vector<Http::HeaderUtility::HeaderData> header_data_;
@@ -183,7 +183,9 @@ private:
 };
 
 /**
- * Filters requests that have a response with a gRPC status.
+ * Filters requests that have a response with a gRPC status. Because the gRPC protocol does not
+ * guarantee a gRPC status code, it will infer the gRPC status code from HTTP status code if
+ * available.
  */
 class GrpcStatusFilter : public Filter {
 public:

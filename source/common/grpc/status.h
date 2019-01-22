@@ -30,7 +30,8 @@ public:
   static uint64_t grpcToHttpStatus(Status::GrpcStatus grpc_status);
 
   /**
-   * Returns the gRPC status code from its name, as represented by a snake_case string.
+   * Returns the gRPC status code from its name, as represented by a CAPS_SNAKE_CASE string. For
+   * example, INVALID_ARGUMENT.
    * @param grpc_status_name The name of the gRPC status.
    * @return absl::optional<Status::GrpcStatus> The corresponding gRPC status code, if one exists.
    */

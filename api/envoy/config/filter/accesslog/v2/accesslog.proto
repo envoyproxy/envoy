@@ -198,23 +198,23 @@ message GrpcStatusFilter {
   // Logs only responses that have any one of the gRPC statuses in this field.
   repeated string statuses = 1 [(validate.rules).repeated .items.string = {
     in: [
-      "ok",
-      "canceled",
-      "unknown",
-      "invalid_argument",
-      "deadline_exceeded",
-      "not_found",
-      "already_exists",
-      "permission_denied",
-      "resource_exhausted",
-      "failed_precondition",
-      "aborted",
-      "out_of_range",
-      "unimplemented",
-      "internal",
-      "unavailable",
-      "data_loss",
-      "unauthenticated"
+      "OK",
+      "CANCELED",
+      "UNKNOWN",
+      "INVALID_ARGUMENT",
+      "DEADLINE_EXCEEDED",
+      "NOT_FOUND",
+      "ALREADY_EXISTS",
+      "PERMISSION_DENIED",
+      "RESOURCE_EXHAUSTED",
+      "FAILED_PRECONDITION",
+      "ABORTED",
+      "OUT_OF_RANGE",
+      "UNIMPLEMENTED",
+      "INTERNAL",
+      "UNAVAILABLE",
+      "DATA_LOSS",
+      "UNAUTHENTICATED"
     ]
   }];
 }

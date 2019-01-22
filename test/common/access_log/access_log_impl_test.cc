@@ -923,23 +923,23 @@ typed_config:
 
 TEST_F(AccessLogImplTest, GrpcStatusFilterValues) {
   const std::vector<std::string> valid_statuses({
-      "ok",
-      "canceled",
-      "unknown",
-      "invalid_argument",
-      "deadline_exceeded",
-      "not_found",
-      "already_exists",
-      "permission_denied",
-      "resource_exhausted",
-      "failed_precondition",
-      "aborted",
-      "out_of_range",
-      "unimplemented",
-      "internal",
-      "unavailable",
-      "data_loss",
-      "unauthenticated",
+      "OK",
+      "CANCELED",
+      "UNKNOWN",
+      "INVALID_ARGUMENT",
+      "DEADLINE_EXCEEDED",
+      "NOT_FOUND",
+      "ALREADY_EXISTS",
+      "PERMISSION_DENIED",
+      "RESOURCE_EXHAUSTED",
+      "FAILED_PRECONDITION",
+      "ABORTED",
+      "OUT_OF_RANGE",
+      "UNIMPLEMENTED",
+      "INTERNAL",
+      "UNAVAILABLE",
+      "DATA_LOSS",
+      "UNAUTHENTICATED",
   });
 
   std::ostringstream out;
@@ -969,7 +969,7 @@ name: envoy.file_access_log
 filter:
   grpc_status_filter:
     statuses:
-      - not_a_valid_code
+      - NOT_A_VALID_CODE
 config:
   path: /dev/null
   )EOF";
@@ -979,11 +979,11 @@ config:
       ProtoValidationException,
       "Proto constraint validation failed (AccessLogFilterValidationError.GrpcStatusFilter: "
       "[\"embedded message failed validation\"] | caused by "
-      "GrpcStatusFilterValidationError.Statuses[i]: [\"value must be in list \" [\"ok\" "
-      "\"canceled\" \"unknown\" \"invalid_argument\" \"deadline_exceeded\" \"not_found\" "
-      "\"already_exists\" \"permission_denied\" \"resource_exhausted\" \"failed_precondition\" "
-      "\"aborted\" \"out_of_range\" \"unimplemented\" \"internal\" \"unavailable\" \"data_loss\" "
-      "\"unauthenticated\"]]): grpc_status_filter {\n  statuses: \"not_a_valid_code\"\n}\n");
+      "GrpcStatusFilterValidationError.Statuses[i]: [\"value must be in list \" [\"OK\" "
+      "\"CANCELED\" \"UNKNOWN\" \"INVALID_ARGUMENT\" \"DEADLINE_EXCEEDED\" \"NOT_FOUND\" "
+      "\"ALREADY_EXISTS\" \"PERMISSION_DENIED\" \"RESOURCE_EXHAUSTED\" \"FAILED_PRECONDITION\" "
+      "\"ABORTED\" \"OUT_OF_RANGE\" \"UNIMPLEMENTED\" \"INTERNAL\" \"UNAVAILABLE\" \"DATA_LOSS\" "
+      "\"UNAUTHENTICATED\"]]): grpc_status_filter {\n  statuses: \"NOT_A_VALID_CODE\"\n}\n");
 }
 
 TEST_F(AccessLogImplTest, GrpcStatusFilterPass) {
@@ -992,7 +992,7 @@ name: envoy.file_access_log
 filter:
   grpc_status_filter:
     statuses:
-      - ok
+      - OK
 config:
   path: /dev/null
   )EOF";
@@ -1012,7 +1012,7 @@ name: envoy.file_access_log
 filter:
   grpc_status_filter:
     statuses:
-      - ok
+      - OK
 config:
   path: /dev/null
   )EOF";
