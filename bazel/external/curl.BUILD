@@ -1,3 +1,5 @@
+licenses(["notice"])  # Apache 2
+
 load("@io_opencensus_cpp//opencensus:curl.bzl", "CURL_COPTS")
 
 package(features = ["no_copts_tokenization"])

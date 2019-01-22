@@ -12,8 +12,7 @@ namespace Extensions {
 namespace Tracers {
 namespace OpenCensus {
 
-OpenCensusTracerFactory::OpenCensusTracerFactory() : FactoryBase(TracerNames::get().OpenCensus) {
-}
+OpenCensusTracerFactory::OpenCensusTracerFactory() : FactoryBase(TracerNames::get().OpenCensus) {}
 
 Tracing::HttpTracerPtr OpenCensusTracerFactory::createHttpTracerTyped(
     const envoy::config::trace::v2::OpenCensusConfig& proto_config, Server::Instance& server) {
