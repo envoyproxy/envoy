@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-// [#protodoc-title: Common TAP]
+// [#protodoc-title: Common tap]
 // Trace capture format for the capture transport socket extension. This dumps plain text read/write
 // sequences on a socket.
 
