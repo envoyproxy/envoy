@@ -549,23 +549,24 @@ TEST(AccessLogFilterTest, DurationWithRuntimeKey) {
   Config::FilterJson::translateAccessLogFilter(*filter_object, config);
   DurationFilter filter(config.duration_filter(), runtime);
   Http::TestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
+  Http::TestHeaderMapImpl response_trailers;
   TestStreamInfo stream_info;
 
   stream_info.end_time_ = stream_info.startTimeMonotonic() + std::chrono::microseconds(100000);
   EXPECT_CALL(runtime.snapshot_, getInteger("key", 1000000)).WillOnce(Return(1));
-  EXPECT_TRUE(filter.evaluate(stream_info, request_headers));
+  EXPECT_TRUE(filter.evaluate(stream_info, request_headers, response_trailers));
 
   EXPECT_CALL(runtime.snapshot_, getInteger("key", 1000000)).WillOnce(Return(1000));
-  EXPECT_FALSE(filter.evaluate(stream_info, request_headers));
+  EXPECT_FALSE(filter.evaluate(stream_info, request_headers, response_trailers));
 
   stream_info.end_time_ =
       stream_info.startTimeMonotonic() + std::chrono::microseconds(100000001000);
   EXPECT_CALL(runtime.snapshot_, getInteger("key", 1000000)).WillOnce(Return(100000000));
-  EXPECT_TRUE(filter.evaluate(stream_info, request_headers));
+  EXPECT_TRUE(filter.evaluate(stream_info, request_headers, response_trailers));
 
   stream_info.end_time_ = stream_info.startTimeMonotonic() + std::chrono::microseconds(10000);
   EXPECT_CALL(runtime.snapshot_, getInteger("key", 1000000)).WillOnce(Return(100000000));
-  EXPECT_FALSE(filter.evaluate(stream_info, request_headers));
+  EXPECT_FALSE(filter.evaluate(stream_info, request_headers, response_trailers));
 }
 
 TEST(AccessLogFilterTest, StatusCodeWithRuntimeKey) {
@@ -584,14 +585,15 @@ TEST(AccessLogFilterTest, StatusCodeWithRuntimeKey) {
   StatusCodeFilter filter(config.status_code_filter(), runtime);
 
   Http::TestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
+  Http::TestHeaderMapImpl response_trailers;
   TestStreamInfo info;
 
   info.response_code_ = 400;
   EXPECT_CALL(runtime.snapshot_, getInteger("key", 300)).WillOnce(Return(350));
-  EXPECT_TRUE(filter.evaluate(info, request_headers));
+  EXPECT_TRUE(filter.evaluate(info, request_headers, response_trailers));
 
   EXPECT_CALL(runtime.snapshot_, getInteger("key", 300)).WillOnce(Return(500));
-  EXPECT_FALSE(filter.evaluate(info, request_headers));
+  EXPECT_FALSE(filter.evaluate(info, request_headers, response_trailers));
 }
 
 TEST_F(AccessLogImplTest, StatusCodeLessThan) {
@@ -998,7 +1000,7 @@ config:
   const InstanceSharedPtr log =
       AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
 
-  request_headers_.addCopy(Http::Headers::get().GrpcStatus, "0");
+  response_trailers_.addCopy(Http::Headers::get().GrpcStatus, "0");
 
   EXPECT_CALL(*file_, write(_));
   log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
@@ -1018,7 +1020,7 @@ config:
   const InstanceSharedPtr log =
       AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
 
-  request_headers_.addCopy(Http::Headers::get().GrpcStatus, "1");
+  response_trailers_.addCopy(Http::Headers::get().GrpcStatus, "1");
 
   EXPECT_CALL(*file_, write(_)).Times(0);
   log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);

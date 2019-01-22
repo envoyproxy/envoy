@@ -83,13 +83,15 @@ FilterFactory::fromProto(const envoy::config::filter::accesslog::v2::AccessLogFi
 }
 
 bool TraceableRequestFilter::evaluate(const StreamInfo::StreamInfo& info,
-                                      const Http::HeaderMap& request_headers) {
+                                      const Http::HeaderMap& request_headers,
+                                      const Http::HeaderMap&) {
   Tracing::Decision decision = Tracing::HttpTracerUtility::isTracing(info, request_headers);
 
   return decision.traced && decision.reason == Tracing::Reason::ServiceForced;
 }
 
-bool StatusCodeFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap&) {
+bool StatusCodeFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap&,
+                                const Http::HeaderMap&) {
   if (!info.responseCode()) {
     return compareAgainstValue(0ULL);
   }
@@ -97,7 +99,8 @@ bool StatusCodeFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::
   return compareAgainstValue(info.responseCode().value());
 }
 
-bool DurationFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap&) {
+bool DurationFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap&,
+                              const Http::HeaderMap&) {
   absl::optional<std::chrono::nanoseconds> final = info.requestComplete();
   ASSERT(final);
 
@@ -111,7 +114,8 @@ RuntimeFilter::RuntimeFilter(const envoy::config::filter::accesslog::v2::Runtime
       percent_(config.percent_sampled()),
       use_independent_randomness_(config.use_independent_randomness()) {}
 
-bool RuntimeFilter::evaluate(const StreamInfo::StreamInfo&, const Http::HeaderMap& request_header) {
+bool RuntimeFilter::evaluate(const StreamInfo::StreamInfo&, const Http::HeaderMap& request_header,
+                             const Http::HeaderMap&) {
   const Http::HeaderEntry* uuid = request_header.RequestId();
   uint64_t random_value;
   if (use_independent_randomness_ || uuid == nullptr ||
@@ -142,11 +146,11 @@ AndFilter::AndFilter(const envoy::config::filter::accesslog::v2::AndFilter& conf
                      Runtime::Loader& runtime, Runtime::RandomGenerator& random)
     : OperatorFilter(config.filters(), runtime, random) {}
 
-bool OrFilter::evaluate(const StreamInfo::StreamInfo& info,
-                        const Http::HeaderMap& request_headers) {
+bool OrFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap& request_headers,
+                        const Http::HeaderMap& response_trailers) {
   bool result = false;
   for (auto& filter : filters_) {
-    result |= filter->evaluate(info, request_headers);
+    result |= filter->evaluate(info, request_headers, response_trailers);
 
     if (result) {
       break;
@@ -156,11 +160,11 @@ bool OrFilter::evaluate(const StreamInfo::StreamInfo& info,
   return result;
 }
 
-bool AndFilter::evaluate(const StreamInfo::StreamInfo& info,
-                         const Http::HeaderMap& request_headers) {
+bool AndFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap& request_headers,
+                         const Http::HeaderMap& response_trailers) {
   bool result = true;
   for (auto& filter : filters_) {
-    result &= filter->evaluate(info, request_headers);
+    result &= filter->evaluate(info, request_headers, response_trailers);
 
     if (!result) {
       break;
@@ -170,7 +174,8 @@ bool AndFilter::evaluate(const StreamInfo::StreamInfo& info,
   return result;
 }
 
-bool NotHealthCheckFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap&) {
+bool NotHealthCheckFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap&,
+                                    const Http::HeaderMap&) {
   return !info.healthCheck();
 }
 
@@ -178,7 +183,8 @@ HeaderFilter::HeaderFilter(const envoy::config::filter::accesslog::v2::HeaderFil
   header_data_.push_back(Http::HeaderUtility::HeaderData(config.header()));
 }
 
-bool HeaderFilter::evaluate(const StreamInfo::StreamInfo&, const Http::HeaderMap& request_headers) {
+bool HeaderFilter::evaluate(const StreamInfo::StreamInfo&, const Http::HeaderMap& request_headers,
+                            const Http::HeaderMap&) {
   return Http::HeaderUtility::matchHeaders(request_headers, header_data_);
 }
 
@@ -193,7 +199,8 @@ ResponseFlagFilter::ResponseFlagFilter(
   }
 }
 
-bool ResponseFlagFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap&) {
+bool ResponseFlagFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap&,
+                                  const Http::HeaderMap&) {
   if (configured_flags_ != 0) {
     return info.intersectResponseFlags(configured_flags_);
   }
@@ -211,9 +218,11 @@ GrpcStatusFilter::GrpcStatusFilter(
   }
 }
 
-bool GrpcStatusFilter::evaluate(const StreamInfo::StreamInfo& info,
-                                const Http::HeaderMap& request_headers) {
-  const Http::HeaderEntry* entry = request_headers.GrpcStatus();
+bool GrpcStatusFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap&,
+                                const Http::HeaderMap& response_trailers) {
+  // The gRPC spec does not guarantee that a gRPC status will be returned from a gRPC request, so
+  // if there is no grpc-status, we must construct one from the HTTP response code.
+  const Http::HeaderEntry* entry = response_trailers.GrpcStatus();
   Grpc::Status::GrpcStatus request_status;
   if (entry) {
     request_status = static_cast<Grpc::Status::GrpcStatus>(atoi(entry->value().c_str()));
