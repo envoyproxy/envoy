@@ -4,16 +4,15 @@
 #include <unordered_map>
 
 #include "envoy/common/time.h"
-#include "envoy/common/token_bucket.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
 #include "envoy/event/dispatcher.h"
-#include "envoy/grpc/async_client.h"
 #include "envoy/grpc/status.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/backoff_strategy.h"
 #include "common/common/logger.h"
+#include "common/config/discovery_grpc_stream.h"
 #include "common/config/utility.h"
 
 namespace Envoy {
@@ -38,29 +37,31 @@ public:
   void pause(const std::string& type_url) override;
   void resume(const std::string& type_url) override;
 
-  // Grpc::AsyncStreamCallbacks
-  void onCreateInitialMetadata(Http::HeaderMap& metadata) override;
-  void onReceiveInitialMetadata(Http::HeaderMapPtr&& metadata) override;
-  void onReceiveMessage(std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message) override;
-  void onReceiveTrailingMetadata(Http::HeaderMapPtr&& metadata) override;
-  void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override;
-
-  // TODO(htuch): Make this configurable or some static.
-  const uint32_t RETRY_INITIAL_DELAY_MS = 500;
-  const uint32_t RETRY_MAX_DELAY_MS = 30000; // Do not cross more than 30s
+  // Grpc::AsyncStreamCallbacks (passthroughs to DiscoveryGrpcStream)
+  void onCreateInitialMetadata(Http::HeaderMap& metadata) override {
+    discovery_grpc_stream_.onCreateInitialMetadata(metadata);
+  }
+  void onReceiveInitialMetadata(Http::HeaderMapPtr&& metadata) override {
+    discovery_grpc_stream_.onReceiveInitialMetadata(std::move(metadata));
+  }
+  void onReceiveMessage(std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message) override {
+    discovery_grpc_stream_.onReceiveMessage(std::move(message));
+  }
+  void onReceiveTrailingMetadata(Http::HeaderMapPtr&& metadata) override {
+    discovery_grpc_stream_.onReceiveTrailingMetadata(std::move(metadata));
+  }
+  void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override {
+    discovery_grpc_stream_.onRemoteClose(status, message);
+  }
 
 private:
+  void handleMessage(std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message);
   void setRetryTimer();
   void establishNewStream();
-  void sendDiscoveryRequest(const std::string& type_url);
-  void handleFailure();
+  // Returns whether the request was actually sent (and so can leave the queue).
+  bool sendDiscoveryRequest(const std::string& type_url);
   void queueDiscoveryRequest(const std::string& type_url);
   void drainRequests();
-  ControlPlaneStats generateControlPlaneStats(Stats::Scope& scope) {
-    const std::string control_plane_prefix = "control_plane.";
-    return {ALL_CONTROL_PLANE_STATS(POOL_COUNTER_PREFIX(scope, control_plane_prefix),
-                                    POOL_GAUGE_PREFIX(scope, control_plane_prefix))};
-  }
 
   struct GrpcMuxWatchImpl : public GrpcMuxWatch {
     GrpcMuxWatchImpl(const std::vector<std::string>& resources, GrpcMuxCallbacks& callbacks,
@@ -101,22 +102,12 @@ private:
   };
 
   const LocalInfo::LocalInfo& local_info_;
-  Grpc::AsyncClientPtr async_client_;
-  Grpc::AsyncStream* stream_{};
-  const Protobuf::MethodDescriptor& service_method_;
   std::unordered_map<std::string, ApiState> api_state_;
   // Envoy's dependendency ordering.
   std::list<std::string> subscriptions_;
-  Event::TimerPtr retry_timer_;
-  Runtime::RandomGenerator& random_;
-  TimeSource& time_source_;
-  BackOffStrategyPtr backoff_strategy_;
-  ControlPlaneStats control_plane_stats_;
-  // Detects when Envoy is making too many requests.
-  TokenBucketPtr limit_request_;
   std::queue<std::string> request_queue_;
-  Event::TimerPtr drain_request_timer_;
-  const bool rate_limiting_enabled_;
+  DiscoveryGrpcStream<envoy::api::v2::DiscoveryRequest, envoy::api::v2::DiscoveryResponse>
+      discovery_grpc_stream_;
 };
 
 class NullGrpcMuxImpl : public GrpcMux {
