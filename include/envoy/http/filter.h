@@ -127,12 +127,14 @@ public:
    */
   virtual Router::RouteConstSharedPtr route() PURE;
 
-  /**
-   * Returns the clusterInfo for the cached route.
-   * This method is to avoid multiple look ups in the filter chain, it also provides a consistent
-   * view of clusterInfo after a route is picked/repicked.
-   * NOTE: Cached clusterInfo and route will be updated the same time.
-   */
+  virtual bool requestRouteConfigUpdate(std::function<void()> cb) PURE;
+
+    /**
+     * Returns the clusterInfo for the cached route.
+     * This method is to avoid multiple look ups in the filter chain, it also provides a consistent
+     * view of clusterInfo after a route is picked/repicked.
+     * NOTE: Cached clusterInfo and route will be updated the same time.
+     */
   virtual Upstream::ClusterInfoConstSharedPtr clusterInfo() PURE;
 
   /**

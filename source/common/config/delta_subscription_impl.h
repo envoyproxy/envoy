@@ -77,6 +77,8 @@ public:
       return; // The unpause will send this request.
     }
 
+    request_.set_type_url(type_url_);
+    request_.mutable_node()->MergeFrom(local_info_.node());
     request_.clear_resource_names_subscribe();
     request_.clear_resource_names_unsubscribe();
     std::copy(diff.added_.begin(), diff.added_.end(),
@@ -212,6 +214,14 @@ public:
 
   void updateResources(const std::vector<std::string>& resources) override {
     subscribe(resources);
+    stats_.update_attempt_.inc();
+  }
+
+  void updateResourcesViaAliases(const std::vector<std::string>& aliases) override {
+    ResourceNameDiff diff;
+    std::copy(aliases.begin(), aliases.end(), std::inserter(diff.added_, diff.added_.begin()));
+    queueDiscoveryRequest(diff);
+    //sendDiscoveryRequest(diff);
     stats_.update_attempt_.inc();
   }
 

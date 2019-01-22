@@ -78,6 +78,8 @@ public:
   AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCallbacks& callbacks,
                   const AsyncClient::StreamOptions& options);
 
+  bool requestRouteConfigUpdate(std::function<void()>) override { return false; }
+
   // Http::AsyncClient::Stream
   void sendHeaders(HeaderMap& headers, bool end_stream) override;
   void sendData(Buffer::Instance& data, bool end_stream) override;
@@ -172,6 +174,7 @@ private:
     }
 
     const std::string& name() const override { return EMPTY_STRING; }
+    bool usesVhds() const { return false; }
 
     static const std::list<LowerCaseString> internal_only_headers_;
   };
@@ -369,6 +372,8 @@ class AsyncRequestImpl final : public AsyncClient::Request,
 public:
   AsyncRequestImpl(MessagePtr&& request, AsyncClientImpl& parent, AsyncClient::Callbacks& callbacks,
                    const AsyncClient::RequestOptions& options);
+
+  bool requestRouteConfigUpdate(std::function<void()>) override { return false; }
 
   // AsyncClient::Request
   virtual void cancel() override;

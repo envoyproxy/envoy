@@ -70,7 +70,8 @@ message RouteConfiguration {
   string name = 1;
 
   // An array of virtual hosts that make up the route table.
-  repeated route.VirtualHost virtual_hosts = 2 [(gogoproto.nullable) = false];
+  repeated route.VirtualHost virtual_hosts = 2; // [(gogoproto.nullable) = false];
+  Vhds vhds = 9;
 
   // An array of virtual hosts will be dynamically loaded via the VHDS API.
   // Both *virtual_hosts* and *vhds* fields will be used when present. *virtual_hosts* can be used

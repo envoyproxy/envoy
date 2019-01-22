@@ -6,6 +6,7 @@
 #include "common/config/filter_json.h"
 #include "common/json/config_schemas.h"
 #include "common/router/router.h"
+#include "common/router/on_demand_update.h"
 #include "common/router/shadow_writer_impl.h"
 
 namespace Envoy {
@@ -21,6 +22,7 @@ Http::FilterFactoryCb RouterFilterConfig::createFilterFactoryFromProtoTyped(
       proto_config));
 
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addStreamDecoderFilter(std::make_shared<Router::OnDemandRouteUpdate>());
     callbacks.addStreamDecoderFilter(std::make_shared<Router::ProdFilter>(*filter_config));
   };
 }

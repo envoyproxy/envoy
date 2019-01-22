@@ -9,6 +9,7 @@
 #include "envoy/stats/stats_macros.h"
 
 #include "common/protobuf/protobuf.h"
+#include "common/common/assert.h"
 
 namespace Envoy {
 namespace Config {
@@ -81,6 +82,8 @@ public:
    * @param resources vector of resource names to fetch.
    */
   virtual void updateResources(const std::vector<std::string>& resources) PURE;
+
+  virtual void updateResourcesViaAliases(const std::vector<std::string>&) { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 };
 
 /**

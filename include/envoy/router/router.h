@@ -786,6 +786,8 @@ public:
    * @return const std::string the RouteConfiguration name.
    */
   virtual const std::string& name() const PURE;
+
+  virtual bool usesVhds() const PURE;
 };
 
 typedef std::shared_ptr<const Config> ConfigConstSharedPtr;
