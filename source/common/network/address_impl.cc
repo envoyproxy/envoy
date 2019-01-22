@@ -17,7 +17,6 @@
 #include "common/common/utility.h"
 #include "common/network/io_socket_handle_impl.h"
 
-
 namespace Envoy {
 namespace Network {
 namespace Address {
