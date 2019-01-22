@@ -39,6 +39,7 @@ TEST_F(GrpcSubscriptionImplTest, RemoteStreamClose) {
   verifyStats(1, 0, 0, 0, 0);
   Http::HeaderMapPtr trailers{new Http::TestHeaderMapImpl{}};
   subscription_->grpcMux().onReceiveTrailingMetadata(std::move(trailers));
+  EXPECT_CALL(callbacks_, onConfigUpdateFailed(_));
   EXPECT_CALL(*timer_, enableTimer(_));
   EXPECT_CALL(random_, random());
   subscription_->grpcMux().onRemoteClose(Grpc::Status::GrpcStatus::Canceled, "");
