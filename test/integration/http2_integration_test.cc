@@ -375,6 +375,11 @@ TEST_P(Http2IntegrationTest, RequestMirrorWithBody) {
   EXPECT_EQ("hello", upstream_request2->body().toString());
   EXPECT_EQ("host-shadow", upstream_request2->headers().Host()->value().getStringView());
 
+  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
+  upstream_request2->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
+  request->waitForEndStream();
+  EXPECT_EQ("200", request->headers().Status()->value().getStringView());
+
   // Cleanup.
   ASSERT_TRUE(fake_upstream_connection2->close());
   ASSERT_TRUE(fake_upstream_connection2->waitForDisconnect());
