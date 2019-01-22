@@ -257,8 +257,9 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::handleSuccess(bool degrade
 
     // This check ensures that we honor the decision made about Changed vs ChangePending in the
     // above block.
+    // TODO(snowp): should there be degraded_threshold?
     if (changed_state == HealthTransition::Unchanged) {
-      changed_state = HealthTransition::ChangePending;
+      changed_state = HealthTransition::Changed;
     }
   }
 

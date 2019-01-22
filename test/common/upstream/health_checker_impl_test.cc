@@ -574,7 +574,7 @@ TEST_F(HttpHealthCheckerImplTest, Success) {
 
 TEST_F(HttpHealthCheckerImplTest, Degraded) {
   setupNoServiceValidationHC();
-  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::ChangePending)).Times(2);
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed)).Times(2);
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
