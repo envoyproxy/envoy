@@ -9,6 +9,7 @@ option java_package = "io.envoyproxy.envoy.api.v2";
 option java_generic_services = true;
 
 import "envoy/api/v2/core/base.proto";
+import "envoy/api/v2/core/config_source.proto";
 import "envoy/api/v2/discovery.proto";
 import "envoy/api/v2/route/route.proto";
 
@@ -44,7 +45,23 @@ service RouteDiscoveryService {
   }
 }
 
-// [#comment:next free field: 9]
+// Virtual Host Discovery Service (VHDS) is used to dynamically update the list of virtual hosts for
+// a given RouteConfiguration. If VHDS is configured a virtual host list update will be triggerred
+// during the processing of an HTTP request if a route for the request cannot be resolved. The
+// :ref:`resource_names_subscribe <envoy_api_msg_DeltaDiscoveryRequest.resource_names_subscribe>`
+// field contains a list of virtual host names or aliases to track. The contents of an alias would
+// be the contents of a *host* or *authority* header used to make an http request. An xDS server
+// will match an alias to a virtual host based on the content of :ref:`domains'
+// <envoy_api_msg_route.VirtualHost.domains>` field. The *resource_names_unsubscribe* field contains
+// a list of virtual host names that have been `unsubscribed
+// <https://github.com/envoyproxy/envoy/blob/master/api/XDS_PROTOCOL.md#unsubscribing-from-resources>`_
+// from the routing table associated with the RouteConfiguration.
+service VirtualHostDiscoveryService {
+  rpc DeltaVirtualHosts(stream DeltaDiscoveryRequest) returns (stream DeltaDiscoveryResponse) {
+  }
+}
+
+// [#comment:next free field: 10]
 message RouteConfiguration {
   // The name of the route configuration. For example, it might match
   // :ref:`route_config_name
@@ -54,6 +71,15 @@ message RouteConfiguration {
 
   // An array of virtual hosts that make up the route table.
   repeated route.VirtualHost virtual_hosts = 2 [(gogoproto.nullable) = false];
+
+  // An array of virtual hosts will be dynamically loaded via the VHDS API.
+  // Both *virtual_hosts* and *vhds* fields will be used when present. *virtual_hosts* can be used
+  // for a base routing table or for infrequently changing virtual hosts. *vhds* is used for
+  // on-demand discovery of virtual hosts. The contents of these two fields will be merged to
+  // generate a routing table for a given RouteConfiguration, with *vhds* derived configuration
+  // taking precedence.
+  // [#not-implemented-hide:]
+  Vhds vhds = 9;
 
   // Optionally specifies a list of HTTP headers that the connection manager
   // will consider to be internal only. If they are found on external requests they will be cleaned
@@ -101,4 +127,11 @@ message RouteConfiguration {
   // option. Users may which to override the default behavior in certain cases (for example when
   // using CDS with a static route table).
   google.protobuf.BoolValue validate_clusters = 7;
+}
+
+// [#not-implemented-hide:]
+message Vhds {
+  // Configuration source specifier for VHDS.
+  envoy.api.v2.core.ConfigSource config_source = 1
+      [(validate.rules).message.required = true, (gogoproto.nullable) = false];
 }
