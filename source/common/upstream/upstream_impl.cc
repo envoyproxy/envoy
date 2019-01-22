@@ -175,7 +175,7 @@ parseExtensionProtocolOptions(const envoy::api::v2::Cluster& config) {
 // @param existing_host the host to update.
 // @param flag the health flag to update.
 // @return bool whether the flag update caused the host health to change.
-bool updateHealthFlags(const Host& updated_host, Host& existing_host, Host::HealthFlag flag) {
+bool updateHealthFlag(const Host& updated_host, Host& existing_host, Host::HealthFlag flag) {
   // Check if the health flag has changed.
   if (existing_host.healthFlagGet(flag) != updated_host.healthFlagGet(flag)) {
     // Keep track of the previous health value of the host.
@@ -1100,9 +1100,9 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
       }
 
       hosts_changed |=
-          updateHealthFlags(*host, *existing_host->second, Host::HealthFlag::FAILED_EDS_HEALTH);
+          updateHealthFlag(*host, *existing_host->second, Host::HealthFlag::FAILED_EDS_HEALTH);
       hosts_changed |=
-          updateHealthFlags(*host, *existing_host->second, Host::HealthFlag::DEGRADED_EDS_HEALTH);
+          updateHealthFlag(*host, *existing_host->second, Host::HealthFlag::DEGRADED_EDS_HEALTH);
 
       // Did metadata change?
       const bool metadata_changed = !Protobuf::util::MessageDifferencer::Equivalent(

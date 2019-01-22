@@ -418,7 +418,7 @@ TEST_F(EdsTest, EndpointHealthStatus) {
     EXPECT_EQ(Host::Health::Healthy, hosts[0]->health());
   }
 
-  const auto rebuild_conter = stats_.counter("cluster.name.update_no_rebuild").value();
+  const auto rebuild_container = stats_.counter("cluster.name.update_no_rebuild").value();
   // Now mark host 0 degraded via EDS, it should be degraded.
   endpoints->mutable_lb_endpoints(0)->set_health_status(
       envoy::api::v2::core::HealthStatus::DEGRADED);
@@ -428,10 +428,8 @@ TEST_F(EdsTest, EndpointHealthStatus) {
     EXPECT_EQ(Host::Health::Degraded, hosts[0]->health());
   }
 
-  std::cerr << cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size() << std::endl;
-
   // We should rebuild the cluster since we went from healthy -> degraded.
-  EXPECT_EQ(rebuild_conter, stats_.counter("cluster.name.update_no_rebuild").value());
+  EXPECT_EQ(rebuild_container, stats_.counter("cluster.name.update_no_rebuild").value());
 
   // Now mark the host as having been degraded through active hc.
   cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthFlagSet(
@@ -447,7 +445,7 @@ TEST_F(EdsTest, EndpointHealthStatus) {
   }
 
   // Since the host health didn't change, expect no rebuild.
-  EXPECT_EQ(rebuild_conter + 1, stats_.counter("cluster.name.update_no_rebuild").value());
+  EXPECT_EQ(rebuild_container + 1, stats_.counter("cluster.name.update_no_rebuild").value());
 }
 
 // Validate that onConfigUpdate() removes endpoints that are marked as healthy
