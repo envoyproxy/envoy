@@ -141,7 +141,8 @@ message TcpProxy {
   //   Using this field will lead to `problems loading the configuration
   //   <https://github.com/envoyproxy/envoy/issues/2441>`_. If you want to configure the filter
   //   using v1 config structure, please make this field a boolean with value ``true`` and configure
-  //   via the opaque ``value`` field like is suggested in :api:`envoy/config/filter/README.md`.
+  //   via the opaque ``value`` field like is suggested in
+  //   :api:`envoy/config/filter/network/tcp_proxy/v2/README.md`.
   DeprecatedV1 deprecated_v1 = 6 [deprecated = true];
 
   // The maximum number of unsuccessful connection attempts that will be made before
