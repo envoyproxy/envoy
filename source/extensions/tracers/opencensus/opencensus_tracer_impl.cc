@@ -111,7 +111,9 @@ void Span::setSampled(bool sampled) { span_.AddAnnotation("setSampled", {{"sampl
 
 Driver::Driver(const envoy::config::trace::v2::OpenCensusConfig& oc_config)
     : oc_config_(oc_config) {
-  ApplyTraceConfig(oc_config.trace_config());
+  if (oc_config.has_trace_config()) {
+    ApplyTraceConfig(oc_config.trace_config());
+  }
   if (oc_config.stdout_exporter_enabled()) {
     ::opencensus::exporters::trace::StdoutExporter::Register();
   }
