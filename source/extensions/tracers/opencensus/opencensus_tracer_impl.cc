@@ -144,6 +144,7 @@ void Driver::ApplyTraceConfig(const opencensus::proto::trace::v1::TraceConfig& c
     break;
   case SamplerCase::kRateLimitingSampler:
     ENVOY_LOG(error, "RateLimitingSampler is not supported.");
+    break;
   case SamplerCase::SAMPLER_NOT_SET:
     break; // Keep default.
   default:
