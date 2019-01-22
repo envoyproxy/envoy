@@ -15,6 +15,7 @@
 #include "common/network/socket_option_factory.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
+#include "common/network/io_socket_handle_impl.h"
 
 #include "server/configuration_impl.h"
 #include "server/drain_manager_impl.h"

@@ -10,6 +10,7 @@
 #include "common/event/dispatcher_impl.h"
 #include "common/event/file_event_impl.h"
 #include "common/network/address_impl.h"
+#include "common/network/io_socket_handle_impl.h"
 
 #include "event2/listener.h"
 
