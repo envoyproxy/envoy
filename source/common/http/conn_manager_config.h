@@ -64,7 +64,6 @@ namespace Http {
   COUNTER  (downstream_rq_overload_close)                                                          \
   COUNTER  (downstream_rq_timeout)                                                            \
   COUNTER  (rs_too_large)
-// Do I need a stat addition for this new feature?
 // clang-format on
 
 /**
