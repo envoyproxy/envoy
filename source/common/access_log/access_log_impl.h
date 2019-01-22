@@ -10,6 +10,7 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/access_log_config.h"
 
+#include "common/grpc/status.h"
 #include "common/http/header_utility.h"
 #include "common/protobuf/protobuf.h"
 
@@ -193,7 +194,7 @@ public:
                 const Http::HeaderMap& response_trailers) override;
 
 private:
-  std::unordered_set<Envoy::Grpc::Status::GrpcStatus> statuses_;
+  std::unordered_set<Grpc::Status::GrpcStatus, Grpc::GrpcStatusHash> statuses_;
 };
 
 /**

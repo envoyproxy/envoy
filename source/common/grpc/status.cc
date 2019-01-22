@@ -117,5 +117,9 @@ absl::optional<Status::GrpcStatus> Utility::nameToGrpcStatus(const std::string& 
   }
 }
 
+size_t GrpcStatusHash::operator()(const Status::GrpcStatus status) const {
+  return static_cast<size_t>(status);
+}
+
 } // namespace Grpc
 } // namespace Envoy
