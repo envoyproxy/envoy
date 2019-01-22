@@ -172,10 +172,10 @@ int InstanceBase::socketFromSocketType(SocketType socketType) const {
 
 Ipv4Instance::Ipv4Instance(const sockaddr_in* address) : InstanceBase(Type::Ip) {
   ip_.ipv4_.address_ = *address;
-  std::string friendly_address = sockaddrToString(*address);
-  ip_.friendly_address_ = friendly_address;
+  ip_.friendly_address_ = sockaddrToString(*address);
   fmt::format_int port(ntohs(address->sin_port));
-  friendly_name_ = friendly_address;
+  friendly_name_.reserve(ip_.friendly_address_.size() + 1 + port.size());
+  friendly_name_.append(ip_.friendly_address_);
   friendly_name_.push_back(':');
   friendly_name_.append(port.data(), port.size());
   validateIpv4Supported(friendly_name_);
