@@ -4,6 +4,7 @@
 
 #include "envoy/grpc/async_client.h"
 
+#include "common/common/backoff_strategy.h"
 #include "common/common/token_bucket_impl.h"
 #include "common/config/utility.h"
 

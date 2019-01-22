@@ -10,7 +10,6 @@
 #include "envoy/grpc/status.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/common/backoff_strategy.h"
 #include "common/common/logger.h"
 #include "common/config/discovery_grpc_stream.h"
 #include "common/config/utility.h"
