@@ -272,6 +272,20 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   // Determine if there is a route entry or a direct response for the request.
   route_ = callbacks_->route();
   if (!route_) {
+    /*
+        attempting_internal_redirect_with_complete_stream_ = true;
+               // upstream_request_->upstream_timing_.last_upstream_rx_byte_received_ &&
+       downstream_end_stream_;
+
+        if (//downstream_end_stream_ &&
+            !callbacks_->decodingBuffer() && // Redirects with body not yet supported.
+            callbacks_->recreateStream()) {
+          //cluster_->stats().upstream_internal_redirect_succeeded_total_.inc();
+          return Http::FilterHeadersStatus::StopIteration;
+        }
+
+        attempting_internal_redirect_with_complete_stream_ = false;
+    */
     config_.stats_.no_route_.inc();
     ENVOY_STREAM_LOG(debug, "no cluster match for URL '{}'", *callbacks_,
                      headers.Path()->value().c_str());

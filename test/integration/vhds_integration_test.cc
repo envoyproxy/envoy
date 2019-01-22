@@ -240,8 +240,17 @@ TEST_P(VhdsIntegrationTest, VhdsVirtualHostAddUpdateRemove) {
                                           {":authority", "vhost.first"},
                                           {"x-lyft-user-id", "123"}};
   IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {"vhost.first"}, {},
+                                           vhds_stream_));
+  sendDeltaDiscoveryResponse<envoy::api::v2::route::VirtualHost>({buildVirtualHost2()}, {}, "4",
+                                                                 vhds_stream_);
+
+  waitForNextUpstreamRequest(1);
+  // Send response headers, and end_stream if there is no response body.
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
   response->waitForHeaders();
-  EXPECT_STREQ("404", response->headers().Status()->value().c_str());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 
   cleanupUpstreamAndDownstream();
 }
@@ -288,8 +297,17 @@ TEST_P(VhdsIntegrationTest, RdsWithVirtualHostsVhdsVirtualHostAddUpdateRemove) {
                                           {":authority", "vhost.first"},
                                           {"x-lyft-user-id", "123"}};
   IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {"vhost.first"}, {},
+                                           vhds_stream_));
+  sendDeltaDiscoveryResponse<envoy::api::v2::route::VirtualHost>({buildVirtualHost2()}, {}, "4",
+                                                                 vhds_stream_);
+
+  waitForNextUpstreamRequest(1);
+  // Send response headers, and end_stream if there is no response body.
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
   response->waitForHeaders();
-  EXPECT_STREQ("404", response->headers().Status()->value().c_str());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 
   cleanupUpstreamAndDownstream();
 }

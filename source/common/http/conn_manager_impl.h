@@ -121,6 +121,7 @@ private:
     Event::Dispatcher& dispatcher() override;
     void resetStream() override;
     Router::RouteConstSharedPtr route() override;
+    bool requestRouteConfigUpdate(std::function<void()> cb) override;
     Upstream::ClusterInfoConstSharedPtr clusterInfo() override;
     void clearRouteCache() override;
     uint64_t streamId() override;
@@ -271,6 +272,7 @@ private:
 
     void responseDataTooLarge();
     void responseDataDrained();
+    bool requestRouteConfigUpdate(std::function<void()>) { return false; }
 
     StreamEncoderFilterSharedPtr handle_;
   };
@@ -351,6 +353,7 @@ private:
     void traceRequest();
 
     void refreshCachedRoute();
+    bool requestRouteConfigUpdate(std::function<void()> cb);
 
     // Pass on watermark callbacks to watermark subscribers. This boils down to passing watermark
     // events for this stream and the downstream connection to the router filter.
@@ -420,6 +423,7 @@ private:
     void onRequestTimeout();
 
     ConnectionManagerImpl& connection_manager_;
+    Router::RouteConfigProvider& route_config_provider_;
     Router::ConfigConstSharedPtr snapped_route_config_;
     Tracing::SpanPtr active_span_;
     const uint64_t stream_id_;

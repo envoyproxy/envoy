@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <queue>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -14,8 +15,8 @@
 #include "envoy/http/codes.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/router/rds.h"
-#include "envoy/router/route_config_update_info.h"
 #include "envoy/router/route_config_provider_manager.h"
+#include "envoy/router/route_config_update_info.h"
 #include "envoy/server/admin.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/singleton/instance.h"
@@ -66,6 +67,7 @@ public:
   }
   SystemTime lastUpdated() const override { return last_updated_; }
   void onConfigUpdate() override {}
+  bool requestConfigUpdate(const std::string, std::function<void()>) override { return false; }
 
 private:
   ConfigConstSharedPtr config_;
@@ -146,6 +148,7 @@ public:
     return MessageUtil::anyConvert<envoy::api::v2::RouteConfiguration>(resource).name();
   }
   absl::optional<LastConfigInfo> configInfo() const { return config_update_info_->configInfo(); }
+  void ondemandUpdate(const std::vector<std::string>& aliases);
   envoy::api::v2::RouteConfiguration& routeConfiguration() {
     return config_update_info_->routeConfiguration();
   }
@@ -181,6 +184,10 @@ private:
 
 using RdsRouteConfigSubscriptionSharedPtr = std::shared_ptr<RdsRouteConfigSubscription>;
 
+struct ThreadLocalCallbacks : public ThreadLocal::ThreadLocalObject {
+  std::queue<std::function<void()>> callbacks_;
+};
+
 /**
  * Implementation of RouteConfigProvider that fetches the route configuration dynamically using
  * the subscription.
@@ -191,12 +198,13 @@ public:
   ~RdsRouteConfigProviderImpl();
 
   RdsRouteConfigSubscription& subscription() { return *subscription_; }
-  void onConfigUpdate();
+  void onConfigUpdate() override;
 
   // Router::RouteConfigProvider
   Router::ConfigConstSharedPtr config() override;
   absl::optional<ConfigInfo> configInfo() const override;
   SystemTime lastUpdated() const override { return subscription_->lastUpdated(); }
+  bool requestConfigUpdate(const std::string for_domain, std::function<void()> cb) override;
 
 private:
   struct ThreadLocalConfig : public ThreadLocal::ThreadLocalObject {
@@ -207,10 +215,13 @@ private:
   RdsRouteConfigProviderImpl(RdsRouteConfigSubscriptionSharedPtr&& subscription,
                              Server::Configuration::FactoryContext& factory_context);
 
+  void addConfigUpdateCallback(std::function<void()> cb);
+
   RdsRouteConfigSubscriptionSharedPtr subscription_;
   Server::Configuration::FactoryContext& factory_context_;
   SystemTime last_updated_;
   ThreadLocal::SlotPtr tls_;
+  ThreadLocal::SlotPtr config_update_callbacks_;
 
   friend class RouteConfigProviderManagerImpl;
 };

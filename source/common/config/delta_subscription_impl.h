@@ -215,6 +215,14 @@ public:
     stats_.update_attempt_.inc();
   }
 
+  void updateResourcesViaAliases(const std::vector<std::string>& aliases) override {
+    ResourceNameDiff diff;
+    std::copy(aliases.begin(), aliases.end(), std::inserter(diff.added_, diff.added_.begin()));
+    queueDiscoveryRequest(diff);
+    // sendDiscoveryRequest(diff);
+    stats_.update_attempt_.inc();
+  }
+
 private:
   void disableInitFetchTimeoutTimer() {
     if (init_fetch_timeout_timer_) {

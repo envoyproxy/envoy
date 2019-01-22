@@ -45,6 +45,7 @@ public:
   virtual SystemTime lastUpdated() const PURE;
 
   virtual void onConfigUpdate() PURE;
+  virtual bool requestConfigUpdate(const std::string for_domain, std::function<void()> cb) PURE;
 };
 
 typedef std::unique_ptr<RouteConfigProvider> RouteConfigProviderPtr;

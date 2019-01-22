@@ -39,9 +39,9 @@ struct VhdsStats {
 };
 
 typedef std::unique_ptr<Envoy::Config::Subscription> (*SubscriptionFactoryFunction)(
-        const envoy::api::v2::core::ConfigSource&, const LocalInfo::LocalInfo&, Event::Dispatcher&,
-        Upstream::ClusterManager&, Envoy::Runtime::RandomGenerator&, Stats::Scope&, const std::string&,
-        const std::string&, absl::string_view, Api::Api&);
+    const envoy::api::v2::core::ConfigSource&, const LocalInfo::LocalInfo&, Event::Dispatcher&,
+    Upstream::ClusterManager&, Envoy::Runtime::RandomGenerator&, Stats::Scope&, const std::string&,
+    const std::string&, absl::string_view, Api::Api&);
 
 class VhdsSubscription : Envoy::Config::SubscriptionCallbacks,
                          Logger::Loggable<Logger::Id::router>,
@@ -52,7 +52,7 @@ public:
                    const std::string& stat_prefix,
                    std::unordered_set<RouteConfigProvider*>& route_config_providers,
                    SubscriptionFactoryFunction factory_function =
-                   Envoy::Config::SubscriptionFactory::subscriptionFromConfigSource);
+                       Envoy::Config::SubscriptionFactory::subscriptionFromConfigSource);
   ~VhdsSubscription() override { init_target_.ready(); }
 
   // Config::SubscriptionCallbacks
@@ -75,8 +75,9 @@ public:
   void updateVhosts(std::unordered_map<std::string, envoy::api::v2::route::VirtualHost>& vhosts,
                     const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources);
   void rebuildRouteConfig(
-          const std::unordered_map<std::string, envoy::api::v2::route::VirtualHost>& vhosts,
-          envoy::api::v2::RouteConfiguration& route_config);
+      const std::unordered_map<std::string, envoy::api::v2::route::VirtualHost>& vhosts,
+      envoy::api::v2::RouteConfiguration& route_config);
+  void ondemandUpdate(const std::vector<std::string>& aliases);
   absl::optional<LastConfigInfo> configInfo() const override { return config_info_; }
   envoy::api::v2::RouteConfiguration& routeConfiguration() override { return route_config_proto_; }
   SystemTime lastUpdated() const override { return last_updated_; }

@@ -12,7 +12,6 @@ struct LastConfigInfo {
   std::string last_config_version_;
 };
 
-
 class RouteConfigUpdateInfo {
 public:
   virtual ~RouteConfigUpdateInfo() = default;

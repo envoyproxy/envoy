@@ -397,6 +397,7 @@ void ConnectionManagerImpl::chargeTracingStats(const Tracing::Reason& tracing_re
 
 ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connection_manager)
     : connection_manager_(connection_manager),
+      route_config_provider_(connection_manager.config_.routeConfigProvider()),
       snapped_route_config_(connection_manager.config_.routeConfigProvider().config()),
       stream_id_(connection_manager.random_generator_.random()),
       request_response_timespan_(new Stats::Timespan(
@@ -1064,6 +1065,7 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
   Router::RouteConstSharedPtr route;
   if (request_headers_ != nullptr) {
     route = snapped_route_config_->route(*request_headers_, stream_id_);
+    // route = route_config_provider_.config()->route(*request_headers_, stream_id_);
   }
   stream_info_.route_entry_ = route ? route->routeEntry() : nullptr;
   cached_route_ = std::move(route);
@@ -1074,6 +1076,12 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
         connection_manager_.cluster_manager_.get(stream_info_.route_entry_->clusterName());
     cached_cluster_info_ = (nullptr == local_cluster) ? nullptr : local_cluster->info();
   }
+}
+
+bool ConnectionManagerImpl::ActiveStream::requestRouteConfigUpdate(std::function<void()> cb) {
+  // TODO check for an empty header?
+  auto host_header = Http::LowerCaseString(request_headers_->Host()->value().c_str()).get();
+  return route_config_provider_.requestConfigUpdate(host_header, cb);
 }
 
 void ConnectionManagerImpl::ActiveStream::sendLocalReply(
@@ -1710,11 +1718,16 @@ Upstream::ClusterInfoConstSharedPtr ConnectionManagerImpl::ActiveStreamFilterBas
 }
 
 Router::RouteConstSharedPtr ConnectionManagerImpl::ActiveStreamFilterBase::route() {
-  if (!parent_.cached_route_.has_value()) {
+  if (!parent_.cached_route_.has_value() || parent_.cached_route_.value() == nullptr) {
     parent_.refreshCachedRoute();
   }
 
   return parent_.cached_route_.value();
+}
+
+bool ConnectionManagerImpl::ActiveStreamFilterBase::requestRouteConfigUpdate(
+    std::function<void()> cb) {
+  return parent_.requestRouteConfigUpdate(cb);
 }
 
 void ConnectionManagerImpl::ActiveStreamFilterBase::clearRouteCache() {

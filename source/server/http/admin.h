@@ -154,6 +154,7 @@ private:
     absl::optional<ConfigInfo> configInfo() const override { return {}; }
     SystemTime lastUpdated() const override { return time_source_.systemTime(); }
     void onConfigUpdate() override {}
+    bool requestConfigUpdate(const std::string, std::function<void()>) { return false; }
 
     Router::ConfigConstSharedPtr config_;
     TimeSource& time_source_;

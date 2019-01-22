@@ -127,6 +127,8 @@ public:
    */
   virtual Router::RouteConstSharedPtr route() PURE;
 
+  virtual bool requestRouteConfigUpdate(std::function<void()> cb) PURE;
+
   /**
    * Returns the clusterInfo for the cached route.
    * This method is to avoid multiple look ups in the filter chain, it also provides a consistent

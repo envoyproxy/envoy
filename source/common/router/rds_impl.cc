@@ -145,11 +145,18 @@ void RdsRouteConfigSubscription::onConfigUpdateFailed(const EnvoyException*) {
   init_target_.ready();
 }
 
+void RdsRouteConfigSubscription::ondemandUpdate(const std::vector<std::string>& aliases) {
+  if (vhds_subscription_.get() == nullptr)
+    return;
+  vhds_subscription_->ondemandUpdate(aliases);
+}
+
 RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
     RdsRouteConfigSubscriptionSharedPtr&& subscription,
     Server::Configuration::FactoryContext& factory_context)
     : subscription_(std::move(subscription)), factory_context_(factory_context),
-      tls_(factory_context.threadLocal().allocateSlot()) {
+      tls_(factory_context.threadLocal().allocateSlot()),
+      config_update_callbacks_(factory_context.threadLocal().allocateSlot()) {
   ConfigConstSharedPtr initial_config;
   if (subscription_->configInfo().has_value()) {
     initial_config =
@@ -159,6 +166,9 @@ RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
   }
   tls_->set([initial_config](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<ThreadLocalConfig>(initial_config);
+  });
+  config_update_callbacks_->set([](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+    return std::make_shared<ThreadLocalCallbacks>();
   });
   subscription_->route_config_providers_.insert(this);
 }
@@ -183,8 +193,28 @@ absl::optional<RouteConfigProvider::ConfigInfo> RdsRouteConfigProviderImpl::conf
 void RdsRouteConfigProviderImpl::onConfigUpdate() {
   ConfigConstSharedPtr new_config(
       new ConfigImpl(subscription_->routeConfiguration(), factory_context_, false));
-  tls_->runOnAllThreads(
-      [this, new_config]() -> void { tls_->getTyped<ThreadLocalConfig>().config_ = new_config; });
+  tls_->runOnAllThreads([this, new_config]() -> void {
+    tls_->getTyped<ThreadLocalConfig>().config_ = new_config;
+    auto callbacks = config_update_callbacks_->getTyped<ThreadLocalCallbacks>().callbacks_;
+    if (!callbacks.empty()) {
+      auto cb = callbacks.front();
+      callbacks.pop();
+      cb();
+    }
+  });
+}
+
+bool RdsRouteConfigProviderImpl::requestConfigUpdate(const std::string for_domain,
+                                                     std::function<void()> cb) {
+  if (!config()->usesVhds()) {
+    return false;
+  }
+  // TODO check for an empty header?
+  factory_context_.dispatcher().post(
+      [this, for_domain]() -> void { subscription_->ondemandUpdate({for_domain}); });
+  config_update_callbacks_->getTyped<ThreadLocalCallbacks>().callbacks_.push(cb);
+
+  return true;
 }
 
 RouteConfigProviderManagerImpl::RouteConfigProviderManagerImpl(Server::Admin& admin) {
