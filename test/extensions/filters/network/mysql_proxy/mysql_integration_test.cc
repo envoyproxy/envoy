@@ -61,7 +61,7 @@ int mysqlGetCounterValueFromStats(const std::string& msg, const std::string& mys
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, MySQLIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
 /**
  * NewSession Test:
