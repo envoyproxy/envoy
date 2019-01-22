@@ -79,7 +79,10 @@ users get a reference to a vector of metadata map associated with the request st
 insert new metadata map to the metadata map vector, and Envoy will proxy the new metadata
 map to the upstream. StreamDecoderFilterCallbacks::addDecodedMetadata() can be called in
 StreamDecoderFilter::decodeHeaders(), StreamDecoderFilter::decodeData() and
-StreamDecoderFilter::decodeTrailers().
+StreamDecoderFilter::decodeTrailers(). Do not call
+StreamDecoderFilterCallbacks::addDecodedMetadata() in
+StreamDecoderFilter::decodeMetadata(MetadataMap metadata\_map). New metadata can
+be added directly to metadata\_map.
 
 If users need to add new metadata for a response to downstream, a
 StreamFilter should be created. Users pass the metadata to be added to
@@ -193,8 +196,7 @@ metadata to ActiveStream::request\_metadata\_map\_vector\_ by calling
 StreamDecoderFilterCallbacks::addDecodedMetadata(). After calling each filter's decoding function,
 Envoy checks if new metadata is added to ActiveStream::request\_metadata\_map\_vector\_. If so,
 then Envoy calls ConnectionManagerImpl::ActiveStream::decodeMetadata(ActiveStreamEncoderFilter\* filter,
-MetadataMapPtr&& metadata\_map) to go through all the downstream filters of the filter that adds
-the new metadata.
+MetadataMapPtr&& metadata\_map) to go through all the filters.
 
 Note that, because metadata frames do not carry end\_stream, if new metadata is added to a headers
 only request, Envoy moves end\_stream from headers to an empty data frame which is sent after the new

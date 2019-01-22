@@ -784,7 +784,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilte
 
     if (!request_metadata_map_vector_.empty()) {
       for (const auto& metadata_map : request_metadata_map_vector_) {
-        decodeMetadata((*entry).get(), *metadata_map);
+        decodeMetadata(nullptr, *metadata_map);
       }
       // If metadata is added to a header only request, we should add an empty data frame to
       // indicate the end of the stream.
@@ -908,7 +908,7 @@ void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* 
 
     if (!request_metadata_map_vector_.empty()) {
       for (const auto& metadata_map : request_metadata_map_vector_) {
-        decodeMetadata((*entry).get(), *metadata_map);
+        decodeMetadata(nullptr, *metadata_map);
       }
       request_metadata_map_vector_.clear();
     }
@@ -1010,7 +1010,7 @@ void ConnectionManagerImpl::ActiveStream::decodeTrailers(ActiveStreamDecoderFilt
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
     if (!request_metadata_map_vector_.empty()) {
       for (const auto& metadata_map : request_metadata_map_vector_) {
-        decodeMetadata((*entry).get(), *metadata_map);
+        decodeMetadata(nullptr, *metadata_map);
       }
       request_metadata_map_vector_.clear();
     }
@@ -1043,12 +1043,6 @@ void ConnectionManagerImpl::ActiveStream::decodeMetadata(ActiveStreamDecoderFilt
     ENVOY_STREAM_LOG(trace, "decode metadata called: filter={} status={}, metadata: {}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status),
                      metadata_map);
-    if (!request_metadata_map_vector_.empty()) {
-      for (const auto& metadata_map : request_metadata_map_vector_) {
-        decodeMetadata((*entry).get(), *metadata_map);
-      }
-      request_metadata_map_vector_.clear();
-    }
   }
 }
 

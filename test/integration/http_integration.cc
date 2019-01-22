@@ -2398,6 +2398,7 @@ void HttpIntegrationTest::testConsumeAndInsertRequestMetadata() {
   ASSERT_TRUE(response->complete());
   // Verifies a headers metadata added.
   std::set<std::string> expected_metadata_keys = {"headers"};
+  expected_metadata_keys.insert("metadata");
   verifyExpectedMetadata(upstream_request_->metadata_map(), expected_metadata_keys);
 
   // Sends a headers only request with metadata. An empty data frame carries end_stream.
@@ -2416,6 +2417,7 @@ void HttpIntegrationTest::testConsumeAndInsertRequestMetadata() {
   expected_metadata_keys.insert("metadata");
   expected_metadata_keys.insert("replace");
   verifyExpectedMetadata(upstream_request_->metadata_map(), expected_metadata_keys);
+  EXPECT_EQ(upstream_request_->duplicated_metadata_key_count().find("metadata")->second, 3);
 
   // Sends headers, data, metadata and trailer.
   auto encoder_decoder_2 = codec_client_->startRequest(default_request_headers_);
@@ -2433,6 +2435,7 @@ void HttpIntegrationTest::testConsumeAndInsertRequestMetadata() {
   ASSERT_TRUE(response->complete());
   expected_metadata_keys.insert("trailers");
   verifyExpectedMetadata(upstream_request_->metadata_map(), expected_metadata_keys);
+  EXPECT_EQ(upstream_request_->duplicated_metadata_key_count().find("metadata")->second, 4);
 
   // Sends headers, large data, metadata. Large data triggers decodeData() multiple times, and each
   // time, a "data" metadata is added.
@@ -2451,6 +2454,7 @@ void HttpIntegrationTest::testConsumeAndInsertRequestMetadata() {
   expected_metadata_keys.erase("trailers");
   verifyExpectedMetadata(upstream_request_->metadata_map(), expected_metadata_keys);
   EXPECT_GE(upstream_request_->duplicated_metadata_key_count().find("data")->second, 2);
+  EXPECT_GE(upstream_request_->duplicated_metadata_key_count().find("metadata")->second, 3);
 
   // Sends multiple metadata.
   auto encoder_decoder_4 = codec_client_->startRequest(default_request_headers_);
@@ -2472,7 +2476,7 @@ void HttpIntegrationTest::testConsumeAndInsertRequestMetadata() {
   expected_metadata_keys.insert("metadata1");
   expected_metadata_keys.insert("metadata2");
   expected_metadata_keys.insert("trailers");
-  EXPECT_EQ(upstream_request_->duplicated_metadata_key_count().find("metadata")->second, 3);
+  EXPECT_EQ(upstream_request_->duplicated_metadata_key_count().find("metadata")->second, 6);
 }
 
 } // namespace Envoy

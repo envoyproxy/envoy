@@ -228,7 +228,9 @@ public:
   virtual HeaderMap& addDecodedTrailers() PURE;
 
   /**
-   * Adds decoded metadata.
+   * Adds decoded metadata. This function can only be called in
+   * StreamDecoderFilter::decodeHeaders/Data/Trailers(). Do not call in
+   * StreamDecoderFilter::decodeMetadata().
    *
    * @return a reference to metadata map vector, where new metadata map can be added.
    */
@@ -404,7 +406,9 @@ public:
   virtual FilterTrailersStatus decodeTrailers(HeaderMap& trailers) PURE;
 
   /**
-   * Called with decoded metadata.
+   * Called with decoded metadata. Add new metadata to metadata_map directly. Do not call
+   * StreamDecoderFilterCallbacks::addDecodedMetadata() to add new metadata.
+   *
    * @param metadata supplies the decoded metadata.
    */
   virtual FilterMetadataStatus decodeMetadata(MetadataMap& metadata_map) PURE;
