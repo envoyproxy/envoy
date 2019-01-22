@@ -292,7 +292,11 @@ private:
   const Tracing::Config& tracingConfig() override { return tracing_config_; }
   void continueDecoding() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   HeaderMap& addDecodedTrailers() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-  void addDecodedData(Buffer::Instance&, bool) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  void addDecodedData(Buffer::Instance&, bool) override {
+    // This should only be called if the user has setup buffering. The request is already fully
+    // buffered.
+    ASSERT(buffered_body_ != nullptr);
+  }
   const Buffer::Instance* decodingBuffer() override { return buffered_body_.get(); }
   void sendLocalReply(Code code, absl::string_view body,
                       std::function<void(HeaderMap& headers)> modify_headers,
@@ -360,6 +364,9 @@ private:
   void onReset() override;
 
   // Http::StreamDecoderFilterCallbacks
+  void addDecodedData(Buffer::Instance&, bool) override {
+    // The request is already fully buffered.
+  }
   const Buffer::Instance* decodingBuffer() override { return request_->body().get(); }
 
   MessagePtr request_;
