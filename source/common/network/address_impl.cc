@@ -22,35 +22,6 @@ namespace Address {
 
 namespace {
 
-/**
- * Convert an IPv4 address to canonical string format.
- * @note This works similarly to inet_ntop() but is faster.
- * @param addr address to format.
- * @return the address in dotted-decimal string format.
- */
-static std::string Ipv4ToString(const sockaddr_in& addr) {
-  static constexpr size_t BufferSize = 16; // enough space to hold an IPv4 address in string form
-  char str[BufferSize];
-  // Write backwards from the end of the buffer for simplicity.
-  char* start = str + BufferSize;
-  uint32_t ipv4_addr = ntohl(addr.sin_addr.s_addr);
-  for (unsigned i = 4; i != 0; i--, ipv4_addr >>= 8) {
-    uint32_t octet = ipv4_addr & 0xff;
-    if (octet == 0) {
-      *--start = '0';
-    } else {
-      do {
-        *--start = '0' + (octet % 10);
-        octet /= 10;
-      } while (octet != 0);
-    }
-    if (i != 1) {
-      *--start = '.';
-    }
-  }
-  return std::string(start, str + BufferSize - start);
-}
-
 // Validate that IPv4 is supported on this platform, raise an exception for the
 // given address if not.
 void validateIpv4Supported(const std::string& address) {
@@ -201,7 +172,7 @@ int InstanceBase::socketFromSocketType(SocketType socketType) const {
 
 Ipv4Instance::Ipv4Instance(const sockaddr_in* address) : InstanceBase(Type::Ip) {
   ip_.ipv4_.address_ = *address;
-  std::string friendly_address = Ipv4ToString(*address);
+  std::string friendly_address = sockaddrToString(*address);
   ip_.friendly_address_ = friendly_address;
   fmt::format_int port(ntohs(address->sin_port));
   friendly_name_ = friendly_address;
@@ -255,6 +226,32 @@ Api::SysCallIntResult Ipv4Instance::connect(int fd) const {
 }
 
 int Ipv4Instance::socket(SocketType type) const { return socketFromSocketType(type); }
+
+std::string Ipv4Instance::sockaddrToString(const sockaddr_in& addr) {
+  static constexpr size_t BufferSize = 16; // enough space to hold an IPv4 address in string form
+  char str[BufferSize];
+  // Write backwards from the end of the buffer for simplicity.
+  char* start = str + BufferSize;
+  uint32_t ipv4_addr = ntohl(addr.sin_addr.s_addr);
+  for (unsigned i = 4; i != 0; i--, ipv4_addr >>= 8) {
+    uint32_t octet = ipv4_addr & 0xff;
+    if (octet == 0) {
+      ASSERT(start > str);
+      *--start = '0';
+    } else {
+      do {
+        ASSERT(start > str);
+        *--start = '0' + (octet % 10);
+        octet /= 10;
+      } while (octet != 0);
+    }
+    if (i != 1) {
+      ASSERT(start > str);
+      *--start = '.';
+    }
+  }
+  return std::string(start, str + BufferSize - start);
+}
 
 absl::uint128 Ipv6Instance::Ipv6Helper::address() const {
   absl::uint128 result{0};
