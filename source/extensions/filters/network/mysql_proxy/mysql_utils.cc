@@ -43,7 +43,7 @@ int BufferHelper::peekUint8(Buffer::Instance& buffer, uint64_t& offset, uint8_t&
     val = buffer.peekLEInt<uint8_t>(offset);
     offset += sizeof(uint8_t);
     return MYSQL_SUCCESS;
-  } catch (EnvoyException e) {
+  } catch (EnvoyException& e) {
     // buffer underflow
     return MYSQL_FAILURE;
   }
@@ -54,7 +54,7 @@ int BufferHelper::peekUint16(Buffer::Instance& buffer, uint64_t& offset, uint16_
     val = buffer.peekLEInt<uint16_t>(offset);
     offset += sizeof(uint16_t);
     return MYSQL_SUCCESS;
-  } catch (EnvoyException e) {
+  } catch (EnvoyException& e) {
     // buffer underflow
     return MYSQL_FAILURE;
   }
@@ -65,7 +65,7 @@ int BufferHelper::peekUint32(Buffer::Instance& buffer, uint64_t& offset, uint32_
     val = buffer.peekLEInt<uint32_t>(offset);
     offset += sizeof(uint32_t);
     return MYSQL_SUCCESS;
-  } catch (EnvoyException e) {
+  } catch (EnvoyException& e) {
     // buffer underflow
     return MYSQL_FAILURE;
   }
@@ -97,7 +97,7 @@ int BufferHelper::peekLengthEncodedInteger(Buffer::Instance& buffer, uint64_t& o
     } else {
       return MYSQL_FAILURE;
     }
-  } catch (EnvoyException e) {
+  } catch (EnvoyException& e) {
     // buffer underflow
     return MYSQL_FAILURE;
   }

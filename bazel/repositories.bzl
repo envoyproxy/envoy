@@ -300,6 +300,7 @@ def envoy_dependencies(path = "@envoy_deps//", skip_targets = []):
     _io_opencensus_cpp()
     _com_github_curl()
     _com_github_envoyproxy_sqlparser()
+    _com_googlesource_quiche()
 
     # Used for bundling gcovr into a relocatable .par file.
     _repository_impl("subpar")
@@ -580,6 +581,18 @@ def _com_github_curl():
     _repository_impl(
         "com_github_curl",
         build_file = "@envoy//bazel/external:curl.BUILD",
+
+def _com_googlesource_quiche():
+    _repository_impl(
+        name = "com_googlesource_quiche",
+        build_file = "@envoy//bazel/external:quiche.BUILD",
+    )
+
+    # TODO: add bindings for quiche_quic_platform and quiche_spdy_platform once
+    #   those build targets have been defined.
+    native.bind(
+        name = "quiche_http2_platform",
+        actual = "@com_googlesource_quiche//:http2_platform",
     )
 
 def _com_github_grpc_grpc():
