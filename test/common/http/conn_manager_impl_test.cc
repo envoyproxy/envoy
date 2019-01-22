@@ -3633,6 +3633,7 @@ TEST_F(HttpConnectionManagerImplTest, OverlyLongHeadersAcceptedIfConfigured) {
         new TestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
     headers->addCopy(LowerCaseString("Foo"), std::string(60 * 1024, 'a'));
 
+    EXPECT_CALL(response_encoder_, encodeHeaders(_, _)).Times(0);
     decoder->decodeHeaders(std::move(headers), true);
     conn_manager_->newStream(response_encoder_);
   }));
