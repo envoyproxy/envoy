@@ -70,7 +70,7 @@ public:
   /**
    * Decodes a uint8_t array into a SymbolVec.
    */
-  static SymbolVec decodeSymbols(const SymbolStorage array, uint64_t size);
+  static SymbolVec decodeSymbols(const SymbolTable::Storage array, uint64_t size);
 
   /**
    * Returns the number of bytes required to represent StatName as a uint8_t
@@ -90,7 +90,7 @@ public:
    * @param array destination memory to receive the encoded bytes.
    * @return uint64_t the number of bytes transferred.
    */
-  uint64_t moveToStorage(SymbolStorage array);
+  uint64_t moveToStorage(SymbolTable::Storage array);
 
   void swap(SymbolEncoding& src) { vec_.swap(src.vec_); }
 
@@ -139,8 +139,8 @@ public:
   bool lessThan(const StatName& a, const StatName& b) const override;
   void free(const StatName& stat_name) override;
   void incRefCount(const StatName& stat_name) override;
-  SymbolStoragePtr join(const StatName& a, const StatName& b) const override;
-  SymbolStoragePtr join(const std::vector<StatName>& stat_names) const override;
+  SymbolTable::StoragePtr join(const StatName& a, const StatName& b) const override;
+  SymbolTable::StoragePtr join(const std::vector<StatName>& stat_names) const override;
 #ifndef ENVOY_CONFIG_COVERAGE
   void debugPrint() const override;
 #endif
@@ -263,7 +263,7 @@ public:
   inline StatName statName() const;
 
 private:
-  SymbolStoragePtr bytes_;
+  SymbolTable::StoragePtr bytes_;
 };
 
 /**
@@ -280,7 +280,7 @@ class StatName {
 public:
   // Constructs a StatName object directly referencing the storage of another
   // StatName.
-  explicit StatName(const SymbolStorage size_and_data) : size_and_data_(size_and_data) {}
+  explicit StatName(const SymbolTable::Storage size_and_data) : size_and_data_(size_and_data) {}
 
   // Constructs an empty StatName object.
   StatName() : size_and_data_(nullptr) {}
@@ -288,7 +288,7 @@ public:
   // Constructs a StatName object with new storage, which must be of size
   // src.size(). This is used in the a flow where we first construct a StatName
   // for lookup in a cache, and then on a miss need to store the data directly.
-  StatName(const StatName& src, SymbolStorage memory);
+  StatName(const StatName& src, SymbolTable::Storage memory);
 
   /**
    * Note that this hash function will return a different hash than that of
@@ -321,7 +321,7 @@ public:
    */
   uint64_t size() const { return dataSize() + StatNameSizeEncodingBytes; }
 
-  void copyToStorage(SymbolStorage storage) { memcpy(storage, size_and_data_, size()); }
+  void copyToStorage(SymbolTable::Storage storage) { memcpy(storage, size_and_data_, size()); }
 
 #ifndef ENVOY_CONFIG_COVERAGE
   void debugPrint();

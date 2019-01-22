@@ -271,7 +271,7 @@ TEST_P(StatNameTest, StoringWithoutStatNameStorage) {
   SymbolEncoding goodbye_encoding = table_->encode("goodbye.world");
   size_t size = hello_encoding.bytesRequired() + goodbye_encoding.bytesRequired();
   size_t goodbye_offset = hello_encoding.bytesRequired();
-  std::unique_ptr<SymbolStorage> storage(new uint8_t[size]);
+  std::unique_ptr<SymbolTable::Storage> storage(new uint8_t[size]);
   hello_encoding.moveToStorage(storage.get());
   goodbye_encoding.moveToStorage(storage.get() + goodbye_offset);
 
@@ -316,47 +316,48 @@ TEST_P(StatNameTest, Sort) {
 }
 
 TEST_P(StatNameTest, Concat2) {
-  SymbolStoragePtr joined = table_->join(makeStat("a.b"), makeStat("c.d"));
+  SymbolTable::StoragePtr joined = table_->join(makeStat("a.b"), makeStat("c.d"));
   EXPECT_EQ("a.b.c.d", table_->toString(StatName(joined.get())));
 }
 
 TEST_P(StatNameTest, ConcatFirstEmpty) {
-  SymbolStoragePtr joined = table_->join(makeStat(""), makeStat("c.d"));
+  SymbolTable::StoragePtr joined = table_->join(makeStat(""), makeStat("c.d"));
   EXPECT_EQ("c.d", table_->toString(StatName(joined.get())));
 }
 
 TEST_P(StatNameTest, ConcatSecondEmpty) {
-  SymbolStoragePtr joined = table_->join(makeStat("a.b"), makeStat(""));
+  SymbolTable::StoragePtr joined = table_->join(makeStat("a.b"), makeStat(""));
   EXPECT_EQ("a.b", table_->toString(StatName(joined.get())));
 }
 
 TEST_P(StatNameTest, ConcatAllEmpty) {
-  SymbolStoragePtr joined = table_->join(makeStat(""), makeStat(""));
+  SymbolTable::StoragePtr joined = table_->join(makeStat(""), makeStat(""));
   EXPECT_EQ("", table_->toString(StatName(joined.get())));
 }
 
 TEST_P(StatNameTest, Join3) {
-  SymbolStoragePtr joined = table_->join({makeStat("a.b"), makeStat("c.d"), makeStat("e.f")});
+  SymbolTable::StoragePtr joined =
+      table_->join({makeStat("a.b"), makeStat("c.d"), makeStat("e.f")});
   EXPECT_EQ("a.b.c.d.e.f", table_->toString(StatName(joined.get())));
 }
 
 TEST_P(StatNameTest, Join3FirstEmpty) {
-  SymbolStoragePtr joined = table_->join({makeStat(""), makeStat("c.d"), makeStat("e.f")});
+  SymbolTable::StoragePtr joined = table_->join({makeStat(""), makeStat("c.d"), makeStat("e.f")});
   EXPECT_EQ("c.d.e.f", table_->toString(StatName(joined.get())));
 }
 
 TEST_P(StatNameTest, Join3SecondEmpty) {
-  SymbolStoragePtr joined = table_->join({makeStat("a.b"), makeStat(""), makeStat("e.f")});
+  SymbolTable::StoragePtr joined = table_->join({makeStat("a.b"), makeStat(""), makeStat("e.f")});
   EXPECT_EQ("a.b.e.f", table_->toString(StatName(joined.get())));
 }
 
 TEST_P(StatNameTest, Join3ThirdEmpty) {
-  SymbolStoragePtr joined = table_->join({makeStat("a.b"), makeStat("c.d"), makeStat("")});
+  SymbolTable::StoragePtr joined = table_->join({makeStat("a.b"), makeStat("c.d"), makeStat("")});
   EXPECT_EQ("a.b.c.d", table_->toString(StatName(joined.get())));
 }
 
 TEST_P(StatNameTest, JoinAllEmpty) {
-  SymbolStoragePtr joined = table_->join({makeStat(""), makeStat(""), makeStat("")});
+  SymbolTable::StoragePtr joined = table_->join({makeStat(""), makeStat(""), makeStat("")});
   EXPECT_EQ("", table_->toString(StatName(joined.get())));
 }
 

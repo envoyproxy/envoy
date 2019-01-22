@@ -60,10 +60,10 @@ public:
   }
   void free(const StatName&) override {}
   void incRefCount(const StatName&) override {}
-  SymbolStoragePtr join(const StatName& a, const StatName& b) const override {
+  SymbolTable::StoragePtr join(const StatName& a, const StatName& b) const override {
     return join({a, b});
   }
-  SymbolStoragePtr join(const std::vector<StatName>& names) const override {
+  SymbolTable::StoragePtr join(const std::vector<StatName>& names) const override {
     std::vector<absl::string_view> strings;
     for (StatName name : names) {
       absl::string_view str = toStringView(name);
@@ -89,7 +89,7 @@ private:
     return {reinterpret_cast<const char*>(stat_name.data()), stat_name.dataSize()};
   }
 
-  SymbolStoragePtr stringToStorage(absl::string_view name) const {
+  SymbolTable::StoragePtr stringToStorage(absl::string_view name) const {
     SymbolEncoding encoding = encodeHelper(name);
     auto bytes = std::make_unique<uint8_t[]>(encoding.bytesRequired());
     encoding.moveToStorage(bytes.get());

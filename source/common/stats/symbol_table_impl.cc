@@ -16,7 +16,7 @@ namespace Stats {
 static const uint32_t SpilloverMask = 0x80;
 static const uint32_t Low7Bits = 0x7f;
 
-StatName::StatName(const StatName& src, SymbolStorage memory) : size_and_data_(memory) {
+StatName::StatName(const StatName& src, SymbolTable::Storage memory) : size_and_data_(memory) {
   memcpy(memory, src.size_and_data_, src.size());
 }
 
@@ -67,7 +67,7 @@ void SymbolEncoding::addStringForFakeSymbolTable(absl::string_view str) {
   }
 }
 
-SymbolVec SymbolEncoding::decodeSymbols(const SymbolStorage array, uint64_t size) {
+SymbolVec SymbolEncoding::decodeSymbols(const SymbolTable::Storage array, uint64_t size) {
   SymbolVec symbol_vec;
   Symbol symbol = 0;
   for (uint32_t shift = 0; size > 0; --size, ++array) {
@@ -98,7 +98,7 @@ static inline uint8_t* saveLengthToBytesReturningNext(uint64_t length, uint8_t* 
   return bytes;
 }
 
-uint64_t SymbolEncoding::moveToStorage(SymbolStorage symbol_array) {
+uint64_t SymbolEncoding::moveToStorage(SymbolTable::Storage symbol_array) {
   uint64_t sz = size();
   symbol_array = saveLengthToBytesReturningNext(sz, symbol_array);
   if (sz != 0) {
@@ -177,7 +177,7 @@ std::string SymbolTableImpl::decodeSymbolVec(const SymbolVec& symbols) const {
 }
 
 void SymbolTableImpl::incRefCount(const StatName& stat_name) {
-  // Before taking the lock, decode the array of symbols from the SymbolStorage.
+  // Before taking the lock, decode the array of symbols from the SymbolTable::Storage.
   SymbolVec symbols = SymbolEncoding::decodeSymbols(stat_name.data(), stat_name.dataSize());
 
   Thread::LockGuard lock(lock_);
@@ -193,7 +193,7 @@ void SymbolTableImpl::incRefCount(const StatName& stat_name) {
 }
 
 void SymbolTableImpl::free(const StatName& stat_name) {
-  // Before taking the lock, decode the array of symbols from the SymbolStorage.
+  // Before taking the lock, decode the array of symbols from the SymbolTable::Storage.
   SymbolVec symbols = SymbolEncoding::decodeSymbols(stat_name.data(), stat_name.dataSize());
 
   Thread::LockGuard lock(lock_);
@@ -320,7 +320,7 @@ void StatNameStorage::free(SymbolTable& table) {
   bytes_.reset();
 }
 
-SymbolStoragePtr SymbolTableImpl::join(const StatName& a, const StatName& b) const {
+SymbolTable::StoragePtr SymbolTableImpl::join(const StatName& a, const StatName& b) const {
   const uint64_t a_size = a.dataSize();
   const uint64_t b_size = b.dataSize();
   auto bytes = std::make_unique<uint8_t[]>(a_size + b_size + StatNameSizeEncodingBytes);
@@ -330,7 +330,7 @@ SymbolStoragePtr SymbolTableImpl::join(const StatName& a, const StatName& b) con
   return bytes;
 }
 
-SymbolStoragePtr SymbolTableImpl::join(const std::vector<StatName>& stat_names) const {
+SymbolTable::StoragePtr SymbolTableImpl::join(const std::vector<StatName>& stat_names) const {
   uint64_t num_bytes = 0;
   for (StatName stat_name : stat_names) {
     num_bytes += stat_name.dataSize();
