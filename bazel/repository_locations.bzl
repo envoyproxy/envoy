@@ -205,6 +205,7 @@ REPOSITORY_LOCATIONS = dict(
         sha256 = "d483b89062832e211c887d7cf1b65c902d591b48c11fe7d174af781681580b41",
         strip_prefix = "curl-7.63.0",
         urls = ["https://github.com/curl/curl/releases/download/curl-7_63_0/curl-7.63.0.tar.gz"],
+    ),
     com_googlesource_quiche = dict(
         # Static snapshot of https://quiche.googlesource.com/quiche/+archive/c9b2cecd1d005893114a03c101532017ddfa12cb.tar.gz
         sha256 = "c8faea835132103d574cc2769a58e244bee3de02669471330a174f2ffae6fcc3",

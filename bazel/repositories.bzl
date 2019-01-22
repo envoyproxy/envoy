@@ -581,6 +581,7 @@ def _com_github_curl():
     _repository_impl(
         "com_github_curl",
         build_file = "@envoy//bazel/external:curl.BUILD",
+    )
 
 def _com_googlesource_quiche():
     _repository_impl(
