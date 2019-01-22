@@ -12,7 +12,6 @@
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/config/rds_json.h"
-#include "common/config/subscription_factory.h"
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/router/config_impl.h"
@@ -53,20 +52,19 @@ StaticRouteConfigProviderImpl::~StaticRouteConfigProviderImpl() {
 }
 
 // TODO(htuch): If support for multiple clusters is added per #1170 cluster_name_
-// initialization needs to be fixed.
 RdsRouteConfigSubscription::RdsRouteConfigSubscription(
     const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
     const uint64_t manager_identifier, Server::Configuration::FactoryContext& factory_context,
     const std::string& stat_prefix,
     Envoy::Router::RouteConfigProviderManagerImpl& route_config_provider_manager)
-    : route_config_name_(rds.route_config_name()),
+    : factory_context_(factory_context), route_config_name_(rds.route_config_name()),
       init_target_(fmt::format("RdsRouteConfigSubscription {}", route_config_name_),
                    [this]() { subscription_->start({route_config_name_}, *this); }),
       scope_(factory_context.scope().createScope(stat_prefix + "rds." + route_config_name_ + ".")),
-      stats_({ALL_RDS_STATS(POOL_COUNTER(*scope_))}),
+      stat_prefix_(stat_prefix), stats_({ALL_RDS_STATS(POOL_COUNTER(*scope_))}),
       route_config_provider_manager_(route_config_provider_manager),
       manager_identifier_(manager_identifier), time_source_(factory_context.timeSource()),
-      last_updated_(factory_context.timeSource().systemTime()) {
+      last_updated_(factory_context.timeSource().systemTime()), uses_vhds_(false) {
   Envoy::Config::Utility::checkLocalInfo("rds", factory_context.localInfo());
 
   subscription_ = Envoy::Config::SubscriptionFactory::subscriptionFromConfigSource(
@@ -116,10 +114,19 @@ void RdsRouteConfigSubscription::onConfigUpdate(
     config_info_ = {new_hash, version_info};
     route_config_proto_ = route_config;
     stats_.config_reload_.inc();
-    ENVOY_LOG(debug, "rds: loading new configuration: config_name={} hash={}", route_config_name_,
-              new_hash);
-    for (auto* provider : route_config_providers_) {
-      provider->onConfigUpdate();
+
+    uses_vhds_ = route_config_proto_.has_vhds();
+    if (!uses_vhds_) {
+      ENVOY_LOG(debug, "rds: loading new configuration: config_name={} hash={}", route_config_name_,
+                new_hash);
+      for (auto* provider : route_config_providers_) {
+        provider->onConfigUpdate();
+      }
+      vhds_subscription_.release();
+    } else {
+      auto s = new VhdsSubscription(route_config_proto_, factory_context_, stat_prefix_, this);
+      s->registerInitTargetWithInitManager(factory_context_.initManager());
+      vhds_subscription_.reset(s);
     }
   }
 
@@ -132,15 +139,27 @@ void RdsRouteConfigSubscription::onConfigUpdateFailed(const EnvoyException*) {
   init_target_.ready();
 }
 
+absl::optional<LastConfigInfo> RdsRouteConfigSubscription::configInfo() const {
+  return (uses_vhds_ ? vhds_subscription_->configInfo() : config_info_);
+}
+
+envoy::api::v2::RouteConfiguration& RdsRouteConfigSubscription::routeConfiguration() {
+  return (uses_vhds_ ? vhds_subscription_->routeConfiguration() : route_config_proto_);
+}
+
+SystemTime RdsRouteConfigSubscription::lastUpdated() const {
+  return (uses_vhds_ ? vhds_subscription_->lastUpdated() : last_updated_);
+}
+
 RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
     RdsRouteConfigSubscriptionSharedPtr&& subscription,
     Server::Configuration::FactoryContext& factory_context)
     : subscription_(std::move(subscription)), factory_context_(factory_context),
       tls_(factory_context.threadLocal().allocateSlot()) {
   ConfigConstSharedPtr initial_config;
-  if (subscription_->config_info_.has_value()) {
+  if (subscription_->configInfo().has_value()) {
     initial_config =
-        std::make_shared<ConfigImpl>(subscription_->route_config_proto_, factory_context_, false);
+        std::make_shared<ConfigImpl>(subscription_->routeConfiguration(), factory_context_, false);
   } else {
     initial_config = std::make_shared<NullConfigImpl>();
   }
@@ -159,19 +178,115 @@ Router::ConfigConstSharedPtr RdsRouteConfigProviderImpl::config() {
 }
 
 absl::optional<RouteConfigProvider::ConfigInfo> RdsRouteConfigProviderImpl::configInfo() const {
-  if (!subscription_->config_info_) {
+  if (!subscription_->configInfo()) {
     return {};
   } else {
-    return ConfigInfo{subscription_->route_config_proto_,
-                      subscription_->config_info_.value().last_config_version_};
+    return ConfigInfo{subscription_->routeConfiguration(),
+                      subscription_->configInfo().value().last_config_version_};
   }
 }
 
 void RdsRouteConfigProviderImpl::onConfigUpdate() {
   ConfigConstSharedPtr new_config(
-      new ConfigImpl(subscription_->route_config_proto_, factory_context_, false));
+      new ConfigImpl(subscription_->routeConfiguration(), factory_context_, false));
   tls_->runOnAllThreads(
       [this, new_config]() -> void { tls_->getTyped<ThreadLocalConfig>().config_ = new_config; });
+}
+
+VhdsSubscription::VhdsSubscription(const envoy::api::v2::RouteConfiguration& route_configuration,
+                                   Server::Configuration::FactoryContext& factory_context,
+                                   const std::string& stat_prefix,
+                                   RdsRouteConfigSubscription* rds_subscription,
+                                   SubscriptionFactoryFunction factory_function)
+    : route_config_proto_(route_configuration), route_config_name_(route_configuration.name()),
+      init_target_(fmt::format("VhdsConfigSubscription {}", route_config_name_),
+                   [this]() { subscription_->start({}, *this); }),
+      scope_(factory_context.scope().createScope(stat_prefix + "vhds." + route_config_name_ + ".")),
+      stats_({ALL_VHDS_STATS(POOL_COUNTER(*scope_))}), time_source_(factory_context.timeSource()),
+      last_updated_(factory_context.timeSource().systemTime()),
+      rds_subscription_(rds_subscription) {
+  Envoy::Config::Utility::checkLocalInfo("vhds", factory_context.localInfo());
+  const auto& config_source =
+      route_configuration.vhds().config_source().api_config_source().api_type();
+  if (config_source != envoy::api::v2::core::ApiConfigSource::DELTA_GRPC) {
+    throw EnvoyException("vhds: only 'DELTA_GRPC' is supported as an api_type.");
+  }
+
+  initializeVhosts(route_config_proto_);
+  subscription_ = factory_function(
+      route_configuration.vhds().config_source(), factory_context.localInfo(),
+      factory_context.dispatcher(), factory_context.clusterManager(), factory_context.random(),
+      *scope_, "none", "envoy.api.v2.VirtualHostDiscoveryService.DeltaVirtualHosts",
+      Grpc::Common::typeUrl(envoy::api::v2::route::VirtualHost().GetDescriptor()->full_name()),
+      factory_context.api());
+}
+
+void VhdsSubscription::onConfigUpdateFailed(const EnvoyException*) {
+  // We need to allow server startup to continue, even if we have a bad
+  // config.
+  init_target_.ready();
+}
+
+void VhdsSubscription::onConfigUpdate(
+    const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
+    const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+    const std::string& version_info) {
+  last_updated_ = time_source_.systemTime();
+  removeVhosts(virtual_hosts_, removed_resources);
+  updateVhosts(virtual_hosts_, added_resources);
+  rebuildRouteConfig(virtual_hosts_, route_config_proto_);
+
+  const uint64_t new_hash = MessageUtil::hash(route_config_proto_);
+  if (!config_info_ || new_hash != config_info_.value().last_config_hash_) {
+    config_info_ = {new_hash, version_info};
+    stats_.config_reload_.inc();
+    ENVOY_LOG(debug, "vhds: loading new configuration: config_name={} hash={}", route_config_name_,
+              new_hash);
+    for (auto* provider : rds_subscription_->route_config_providers()) {
+      provider->onConfigUpdate();
+    }
+  }
+
+  init_target_.ready();
+}
+
+void VhdsSubscription::initializeVhosts(
+    const envoy::api::v2::RouteConfiguration& route_configuration) {
+  if (route_configuration.virtual_hosts_size() <= 0) {
+    return;
+  }
+  for (const auto& vhost : route_configuration.virtual_hosts()) {
+    virtual_hosts_.emplace(vhost.name(), vhost);
+  }
+}
+
+void VhdsSubscription::removeVhosts(
+    std::unordered_map<std::string, envoy::api::v2::route::VirtualHost>& vhosts,
+    const Protobuf::RepeatedPtrField<std::string>& removed_vhost_names) {
+  for (const auto vhost_name : removed_vhost_names) {
+    vhosts.erase(vhost_name);
+  }
+}
+
+void VhdsSubscription::updateVhosts(
+    std::unordered_map<std::string, envoy::api::v2::route::VirtualHost>& vhosts,
+    const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources) {
+  // TODO validate aaded_resources
+  for (const auto& resource : added_resources) {
+    envoy::api::v2::route::VirtualHost vhost =
+        MessageUtil::anyConvert<envoy::api::v2::route::VirtualHost>(resource.resource());
+    vhosts.emplace(vhost.name(), vhost);
+  }
+}
+
+void VhdsSubscription::rebuildRouteConfig(
+    const std::unordered_map<std::string, envoy::api::v2::route::VirtualHost>& vhosts,
+    envoy::api::v2::RouteConfiguration& route_config) {
+
+  route_config.clear_virtual_hosts();
+  for (const auto& vhost : vhosts) {
+    route_config.mutable_virtual_hosts()->Add()->CopyFrom(vhost.second);
+  }
 }
 
 RouteConfigProviderManagerImpl::RouteConfigProviderManagerImpl(Server::Admin& admin) {

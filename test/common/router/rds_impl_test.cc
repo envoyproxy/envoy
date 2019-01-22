@@ -375,6 +375,59 @@ TEST_F(RdsImplTest, Failure) {
             factory_context_.scope_.counter("foo.rds.foo_route_config.update_rejected").value());
 }
 
+TEST_F(RdsImplTest, VhdsInstantiationShouldSucceedWithDELTA_GRPC) {
+  void* subscription;
+  const auto route_config = TestUtility::parseYaml<envoy::api::v2::RouteConfiguration>(R"EOF(
+name: my_route
+vhds:
+  config_source:
+    api_config_source:
+      api_type: DELTA_GRPC
+      grpc_services:
+        envoy_grpc:
+          cluster_name: xds_cluster
+  )EOF");
+  const std::string context("vhds_test");
+
+  Envoy::Router::SubscriptionFactoryFunction factory_function = {
+      [](const envoy::api::v2::core::ConfigSource&, const LocalInfo::LocalInfo&, Event::Dispatcher&,
+         Upstream::ClusterManager&, Envoy::Runtime::RandomGenerator&, Stats::Scope&,
+         const std::string&, const std::string&, absl::string_view,
+         Api::Api&) -> std::unique_ptr<Envoy::Config::Subscription> {
+        return std::unique_ptr<Envoy::Config::MockSubscription>();
+      }};
+  EXPECT_NO_THROW(VhdsSubscription(route_config, factory_context_, context,
+                                   static_cast<RdsRouteConfigSubscription*>(subscription),
+                                   factory_function));
+}
+
+TEST_F(RdsImplTest, VhdsInstantiationShouldFailWithoutDELTA_GRPC) {
+  void* subscription;
+  const auto route_config = TestUtility::parseYaml<envoy::api::v2::RouteConfiguration>(R"EOF(
+name: my_route
+vhds:
+  config_source:
+    api_config_source:
+      api_type: GRPC
+      grpc_services:
+        envoy_grpc:
+          cluster_name: xds_cluster
+  )EOF");
+  const std::string context("vhds_test");
+
+  Envoy::Router::SubscriptionFactoryFunction factory_function = {
+      [](const envoy::api::v2::core::ConfigSource&, const LocalInfo::LocalInfo&, Event::Dispatcher&,
+         Upstream::ClusterManager&, Envoy::Runtime::RandomGenerator&, Stats::Scope&,
+         const std::string&, const std::string&, absl::string_view,
+         Api::Api&) -> std::unique_ptr<Envoy::Config::Subscription> {
+        return std::unique_ptr<Envoy::Config::MockSubscription>();
+      }};
+  EXPECT_THROW(VhdsSubscription(route_config, factory_context_, context,
+                                static_cast<RdsRouteConfigSubscription*>(subscription),
+                                factory_function),
+               EnvoyException);
+}
+
 class RouteConfigProviderManagerImplTest : public RdsTestBase {
 public:
   void setup() {
