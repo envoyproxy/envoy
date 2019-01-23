@@ -12,6 +12,7 @@
 #include "test/integration/server.h"
 #include "test/integration/utility.h"
 #include "test/mocks/buffer/mocks.h"
+#include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/simulated_time_system.h"
@@ -186,6 +187,28 @@ public:
   Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
   MockBufferFactory* mock_buffer_factory_; // Will point to the dispatcher's factory.
+
+  // Functions for testing reloadable config (xDS)
+  void createXdsUpstream();
+  void createXdsConnection();
+  void cleanUpXdsConnection();
+  AssertionResult
+  compareDiscoveryRequest(const std::string& expected_type_url, const std::string& expected_version,
+                          const std::vector<std::string>& expected_resource_names,
+                          const Protobuf::int32 expected_error_code = Grpc::Status::GrpcStatus::Ok,
+                          const std::string& expected_error_message = "");
+  template <class T>
+  void sendDiscoveryResponse(const std::string& type_url, const std::vector<T>& messages,
+                             const std::string& version) {
+    envoy::api::v2::DiscoveryResponse discovery_response;
+    discovery_response.set_version_info(version);
+    discovery_response.set_type_url(type_url);
+    for (const auto& message : messages) {
+      discovery_response.add_resources()->PackFrom(message);
+    }
+    xds_stream_->sendGrpcMessage(discovery_response);
+  }
+
 private:
   TestTimeSystemPtr time_system_;
 
@@ -243,6 +266,15 @@ protected:
   // Set true when your test will itself take care of ensuring listeners are up, and registering
   // them in the port_map_.
   bool defer_listener_finalization_{false};
+
+  // Member variables for xDS testing.
+  FakeUpstream* xds_upstream_{};
+  FakeHttpConnectionPtr xds_connection_;
+  FakeStreamPtr xds_stream_;
+  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
+  Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{timeSystem()};
+  bool create_xds_upstream_{false}; // TODO(alyssawilk) true by default.
+  bool tls_xds_upstream_{false};
 
 private:
   // The type for the Envoy-to-backend connection
