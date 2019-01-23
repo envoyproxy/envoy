@@ -5117,7 +5117,7 @@ virtual_hosts:
 
 TEST(RouteConfigurationV2, RegexPrefixWithNoRewriteWorksWhenPathChanged) {
 
-  // setup regex route entry. the regex is trivial, thats ok as we only want to test that
+  // Setup regex route entry. the regex is trivial, that's ok as we only want to test that
   // path change works.
   std::string RegexRewrite = R"EOF(
 name: RegexNoMatch

@@ -1,13 +1,13 @@
 syntax = "proto3";
 
-package envoy.service.auth.v2alpha;
-option java_package = "io.envoyproxy.envoy.service.auth.v2alpha";
-option go_package = "v2alpha";
+package envoy.service.auth.v2;
+option java_package = "io.envoyproxy.envoy.service.auth.v2";
+option go_package = "v2";
 option java_generic_services = true;
 
 import "envoy/api/v2/core/base.proto";
 import "envoy/type/http_status.proto";
-import "envoy/service/auth/v2alpha/attribute_context.proto";
+import "envoy/service/auth/v2/attribute_context.proto";
 
 import "google/rpc/status.proto";
 import "validate/validate.proto";

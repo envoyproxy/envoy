@@ -234,7 +234,7 @@ INSTANTIATE_TEST_CASE_P(IpVersions, AltsIntegrationTestClientWrongHandshaker,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 
-// Verifies that when client connects to a wrong handshakerserver, handshake fails
+// Verifies that when client connects to the wrong handshaker server, handshake fails
 // and connection closes.
 TEST_P(AltsIntegrationTestClientWrongHandshaker, ConnectToWrongHandshakerAddress) {
   initialize();

@@ -186,11 +186,13 @@ void GrpcMuxImpl::handleResponse(std::unique_ptr<envoy::api::v2::DiscoveryRespon
   api_state_[type_url].request_.set_response_nonce(message->nonce());
   queueDiscoveryRequest(type_url);
 }
+
 void GrpcMuxImpl::handleStreamEstablished() {
   for (const auto type_url : subscriptions_) {
     queueDiscoveryRequest(type_url);
   }
 }
+
 void GrpcMuxImpl::handleEstablishmentFailure() {
   for (const auto& api_state : api_state_) {
     for (auto watch : api_state.second.watches_) {

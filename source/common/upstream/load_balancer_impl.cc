@@ -28,7 +28,7 @@ static const std::string RuntimePanicThreshold = "upstream.healthy_panic_thresho
 // @param per_priority_availability the percentage availability of each priority, used to determine
 // how much load each priority can handle.
 // @param total_load the amount of load that may be distributed. Will be updated with the amount of
-// load reminaining after distribution.
+// load remaining after distribution.
 // @param normalized_total_availability the total availability, up to a max of 100. Used to
 // scale the load when the total availability is less than 100%.
 // @return the first available priority and the remaining load
@@ -93,7 +93,7 @@ LoadBalancerBase::LoadBalancerBase(const PrioritySet& priority_set, ClusterStats
     recalculatePerPriorityState(host_set->priority(), priority_set_, per_priority_load_,
                                 per_priority_health_, per_priority_degraded_);
   }
-  // Reclaculate panic mode for all levels.
+  // Recalculate panic mode for all levels.
   recalculatePerPriorityPanic();
 
   priority_set_.addPriorityUpdateCb(
@@ -116,7 +116,7 @@ LoadBalancerBase::LoadBalancerBase(const PrioritySet& priority_set, ClusterStats
 //   Do not enter panic mode, even if a specific priority has low number of healthy hosts.
 // - normalized total health is < 100%. There are not enough healthy hosts to handle the load.
 // Continue
-//   distibuting the load among priority sets, but turn on panic mode for a given priority
+//   distributing the load among priority sets, but turn on panic mode for a given priority
 //   if # of healthy hosts in priority set is low.
 // - normalized total health is 0%. All hosts are down. Redirect 100% of traffic to P=0 and enable
 // panic mode.
@@ -140,7 +140,7 @@ void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority,
     // Each priority level's health is ratio of healthy hosts to total number of hosts in a priority
     // multiplied by overprovisioning factor of 1.4 and capped at 100%. It means that if all
     // hosts are healthy that priority's health is 100%*1.4=140% and is capped at 100% which results
-    // in 100%. If 80% of hosts are healty, that priority's health is still 100% (80%*1.4=112% and
+    // in 100%. If 80% of hosts are healthy, that priority's health is still 100% (80%*1.4=112% and
     // capped at 100%).
     per_priority_health.get()[priority] =
         std::min<uint32_t>(100, (host_set.overprovisioningFactor() *
@@ -330,7 +330,7 @@ void ZoneAwareLoadBalancerBase::regenerateLocalityRoutingStructures() {
   // half the hosts in all host sets go unhealthy, this priority set will
   // still send half of the incoming load to the local locality and 80% to residual.
   //
-  // Basically, fariness across localities within a priority is guaranteed. Fairness across
+  // Basically, fairness across localities within a priority is guaranteed. Fairness across
   // localities across priorities is not.
   STACK_ARRAY(local_percentage, uint64_t, num_localities);
   calculateLocalityPercentage(localHostSet().healthyHostsPerLocality(), local_percentage.begin());
@@ -439,7 +439,7 @@ HostConstSharedPtr LoadBalancerBase::chooseHost(LoadBalancerContext* context) {
     }
   }
 
-  // If we didnt find anything, return the last host.
+  // If we didn't find anything, return the last host.
   return host;
 }
 

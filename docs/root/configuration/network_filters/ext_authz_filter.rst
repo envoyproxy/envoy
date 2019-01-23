@@ -16,7 +16,7 @@ then the connection will be closed.
   authorized prior to rest of the filters processing the request.
 
 The content of the request that are passed to an authorization service is specified by
-:ref:`CheckRequest <envoy_api_msg_service.auth.v2alpha.CheckRequest>`.
+:ref:`CheckRequest <envoy_api_msg_service.auth.v2.CheckRequest>`.
 
 .. _config_network_filters_ext_authz_network_configuration:
 

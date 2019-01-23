@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/config/filter/http/ext_authz/v2alpha/ext_authz.pb.h"
+#include "envoy/config/filter/http/ext_authz/v2/ext_authz.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/logger.h"
@@ -57,8 +57,8 @@ private:
  */
 class ClientConfig {
 public:
-  ClientConfig(const envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz& config,
-               uint32_t timeout, absl::string_view path_prefix);
+  ClientConfig(const envoy::config::filter::http::ext_authz::v2::ExtAuthz& config, uint32_t timeout,
+               absl::string_view path_prefix);
 
   /**
    * Returns the name of the authorization cluster.
@@ -133,8 +133,8 @@ public:
 
   // ExtAuthz::Client
   void cancel() override;
-  void check(RequestCallbacks& callbacks,
-             const envoy::service::auth::v2alpha::CheckRequest& request, Tracing::Span&) override;
+  void check(RequestCallbacks& callbacks, const envoy::service::auth::v2::CheckRequest& request,
+             Tracing::Span&) override;
 
   // Http::AsyncClient::Callbacks
   void onSuccess(Http::MessagePtr&& message) override;

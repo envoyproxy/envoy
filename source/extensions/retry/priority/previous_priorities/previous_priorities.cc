@@ -56,7 +56,7 @@ bool PreviousPrioritiesRetryPriority::adjustForAttemptedPriorities(
   }
 
   // If total availability is still zero at this point, it must mean that all clusters are
-  // completely unavailable. If so, fall back to using the original priority loads. This mantains
+  // completely unavailable. If so, fall back to using the original priority loads. This maintains
   // whatever handling the default LB uses when all priorities are unavailable.
   if (total_availability == 0) {
     return false;
