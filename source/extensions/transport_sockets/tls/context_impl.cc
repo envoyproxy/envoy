@@ -953,7 +953,7 @@ bool ServerContextImpl::isClientEcdsaCapable(const SSL_CLIENT_HELLO* ssl_client_
   CBS_init(&client_hello, ssl_client_hello->client_hello, ssl_client_hello->client_hello_len);
 
   // This is the TLSv1.3 case (TLSv1.2 on the wire and the supported_versions extensions present).
-  // We just need to loook at signature algorithms.
+  // We just need to look at signature algorithms.
   const uint16_t client_version = ssl_client_hello->version;
   if (client_version == TLS1_2_VERSION && tls_max_version_ == TLS1_3_VERSION) {
     // If the supported_versions extension is found then we assume that the client is competent

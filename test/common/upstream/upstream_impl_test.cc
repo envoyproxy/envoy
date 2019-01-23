@@ -243,7 +243,7 @@ TEST(StrictDnsClusterImplTest, Basic) {
      },
     "hosts": [{"url": "tcp://localhost1:11001"},
               {"url": "tcp://localhost2:11002"}]
-              
+
   }
   )EOF";
 
@@ -533,7 +533,7 @@ TEST(StrictDnsClusterImplTest, LoadAssignmentBasic) {
   EXPECT_EQ("localhost1", cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[1]->hostname());
   EXPECT_EQ(100, cluster.prioritySet().hostSetsPerPriority()[0]->overprovisioningFactor());
 
-  // This is the first time we receveived an update for localhost1, we expect to rebuild.
+  // This is the first time we received an update for localhost1, we expect to rebuild.
   EXPECT_EQ(0UL, stats.counter("cluster.name.update_no_rebuild").value());
 
   resolver1.expectResolve(*dns_resolver);
