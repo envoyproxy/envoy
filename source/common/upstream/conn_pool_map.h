@@ -38,7 +38,9 @@ public:
 
   /**
    * Adds a drain callback to all mapped pools. Any future mapped pools with have the callback
-   * automatically added.
+   * automatically added. Be careful with the callback. If it itself calls into `this`, modifying
+   * the state of `this`, there is a good chance it will cause corruption due to the callback firing
+   * immediately.
    */
   void addDrainedCallback(DrainedCb cb);
 

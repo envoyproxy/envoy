@@ -840,7 +840,6 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools(
 
   // make a copy to protect against the erase in the callback
   auto pools = container.pools_;
-
   pools->addDrainedCallback([this, old_host]() -> void {
     if (destroying_) {
       // It is possible for a connection pool to fire drain callbacks during destruction. Instead
@@ -850,20 +849,30 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools(
       return;
     }
 
-    ConnPoolsContainer* container = getHttpConnPoolsContainer(old_host);
-    if (container == nullptr) {
+    ConnPoolsContainer* to_clear = getHttpConnPoolsContainer(old_host);
+    if (to_clear == nullptr) {
       // This could happen if we have cleaned out the host before iterating through every connection
       // pool. Handle it by just continuing
       return;
     }
 
-    ASSERT(container->drains_remaining_ > 0);
-    container->drains_remaining_--;
-    if (container->drains_remaining_ == 0) {
-      container->pools_->clear();
-      host_http_conn_pool_map_.erase(old_host);
+    ASSERT(to_clear->drains_remaining_ > 0);
+    to_clear->drains_remaining_--;
+    if (to_clear->drains_remaining_ == 0 && to_clear->ready_to_drain_) {
+      clearContainer(old_host, *to_clear);
     }
   });
+
+  container.ready_to_drain_ = true;
+  if (container.drains_remaining_ == 0) {
+    clearContainer(old_host, container);
+  }
+}
+
+void ClusterManagerImpl::ThreadLocalClusterManagerImpl::clearContainer(
+    HostSharedPtr old_host, ConnPoolsContainer& container) {
+  container.pools_->clear();
+  host_http_conn_pool_map_.erase(old_host);
 }
 
 void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainTcpConnPools(

@@ -50,6 +50,7 @@ void ConnPoolMap<KEY_TYPE, POOL_TYPE>::addDrainedCallback(DrainedCb cb) {
   for (auto& pool_pair : active_pools_) {
     pool_pair.second->addDrainedCallback(cb);
   }
+
   cached_callbacks_.emplace_back(std::move(cb));
 }
 
