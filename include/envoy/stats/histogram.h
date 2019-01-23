@@ -49,7 +49,7 @@ public:
    * of samples below each quantile bucket defined in supportedBuckets(). This vector is
    * guaranteed to be the same length as supportedBuckets().
    */
-  virtual const std::vector<double>& computedBuckets() const PURE;
+  virtual const std::vector<uint64_t>& computedBuckets() const PURE;
 
   /**
    * Returns number of values during the period. This number may be an approximation

@@ -739,16 +739,16 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheus(
 
     const Stats::HistogramStatistics& stats = histogram->cumulativeStatistics();
     const std::vector<double>& supported_buckets = stats.supportedBuckets();
-    const std::vector<double>& computed_buckets = stats.computedBuckets();
+    const std::vector<uint64_t>& computed_buckets = stats.computedBuckets();
     for (size_t i = 0; i < supported_buckets.size(); ++i) {
       double bucket = supported_buckets[i];
-      int value = computed_buckets[i];
-      response.add(
-          fmt::format("{0}{{{1}le=\"{2}\"}} {3}\n", metric_name, hist_tags, bucket, value));
+      uint64_t value = computed_buckets[i];
+      response.add(fmt::format("{0}_bucket{{{1}le=\"{2:.12g}\"}} {3}\n", metric_name, hist_tags,
+                               bucket, value));
     }
 
-    response.add(
-        fmt::format("{0}{{{1}le=\"+Inf\"}} {2}\n", metric_name, hist_tags, stats.sampleCount()));
+    response.add(fmt::format("{0}_bucket{{{1}le=\"+Inf\"}} {2}\n", metric_name, hist_tags,
+                             stats.sampleCount()));
     response.add(fmt::format("{0}_sum{{{1}}} {2}\n", metric_name, tags, stats.sampleSum()));
     response.add(fmt::format("{0}_count{{{1}}} {2}\n", metric_name, tags, stats.sampleCount()));
   }
