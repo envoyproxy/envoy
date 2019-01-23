@@ -229,9 +229,9 @@ public:
   virtual absl::optional<std::chrono::milliseconds> idleTimeout() const PURE;
 
   /**
-   * @return maximum size in kb for request headers sent to the connection manager
+   * @return maximum request headers size the connection manager will accept.
    */
-  virtual uint32_t maxRequestHeadersSize() const PURE;
+  virtual uint32_t maxRequestHeadersSizeKb() const PURE;
 
   /**
    * @return per-stream idle timeout for incoming connection manager connections. Zero indicates a
