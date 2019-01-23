@@ -1026,6 +1026,45 @@ config:
   log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
 }
 
+TEST_F(AccessLogImplTest, GrpcStatusFilterHttpCodes) {
+  const std::string yamlPrefix = R"EOF(
+name: envoy.file_access_log
+filter:
+  grpc_status_filter:
+    statuses:
+)EOF";
+
+  const std::string yamlSuffix = R"EOF(
+config:
+  path: /dev/null
+  )EOF";
+
+  // This mapping includes UNKNOWN <-> 200 because we expect that gRPC should provide an explicit
+  // status code for successes. In general, the only status codes that receive an HTTP mapping are
+  // those enumerated below with a non-UNKNOWN mapping. See: //source/common/grpc/status.cc and
+  // https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md.
+  const std::vector<std::tuple<std::string, uint64_t>> statusMapping({{"UNKNOWN", 200},
+                                                                      {"INTERNAL", 400},
+                                                                      {"UNAUTHENTICATED", 401},
+                                                                      {"PERMISSION_DENIED", 403},
+                                                                      {"UNIMPLEMENTED", 404},
+                                                                      {"UNAVAILABLE", 504}});
+
+  std::ostringstream out;
+  for (const auto& pair : statusMapping) {
+    out << yamlPrefix << "      - " << std::get<0>(pair) << yamlSuffix;
+    stream_info_.response_code_ = std::get<1>(pair);
+
+    const InstanceSharedPtr log =
+        AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(out.str()), context_);
+
+    EXPECT_CALL(*file_, write(_));
+    log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+
+    out.clear();
+  }
+}
+
 } // namespace
 } // namespace AccessLog
 } // namespace Envoy
