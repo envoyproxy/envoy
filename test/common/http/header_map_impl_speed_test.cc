@@ -178,6 +178,33 @@ static void HeaderMapImplRemoveInline(benchmark::State& state) {
 }
 BENCHMARK(HeaderMapImplRemoveInline)->Arg(0)->Arg(1)->Arg(10)->Arg(50);
 
+/**
+ * Measure the speed of creating a HeaderMapImpl and populating it with a realistic
+ * set of response headers.
+ */
+static void HeaderMapImplPopulate(benchmark::State& state) {
+  const std::pair<LowerCaseString, std::string> headers_to_add[] = {
+      {LowerCaseString("cache-control"), "max-age=0, private, must-revalidate"},
+      {LowerCaseString("content-encoding"), "gzip"},
+      {LowerCaseString("content-type"), "text/html; charset=utf-8"},
+      {LowerCaseString("date"), "Wed, 23 Jan 2019 04:00:00 GMT"},
+      {LowerCaseString("server"), "envoy"},
+      {LowerCaseString("x-custom-header-1"), "example 1"},
+      {LowerCaseString("x-custom-header-2"), "example 2"},
+      {LowerCaseString("x-custom-header-3"), "example 3"},
+      {LowerCaseString("set-cookie"), "_cookie1=12345678; path = /; secure"},
+      {LowerCaseString("set-cookie"), "_cookie2=12345678; path = /; secure"},
+  };
+  for (auto _ : state) {
+    HeaderMapImpl headers;
+    for (const auto& key_value : headers_to_add) {
+      headers.addReference(key_value.first, key_value.second);
+    }
+    benchmark::DoNotOptimize(headers.size());
+  }
+}
+BENCHMARK(HeaderMapImplPopulate);
+
 } // namespace Http
 } // namespace Envoy
 
