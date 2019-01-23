@@ -1,0 +1,51 @@
+licenses(["notice"])  # Apache 2
+
+load(
+    "//bazel:envoy_build_system.bzl",
+    "envoy_cc_library",
+    "envoy_package",
+)
+
+envoy_package()
+
+envoy_cc_library(
+    name = "signer_interface",
+    hdrs = ["signer.h"],
+    deps = [
+        "//include/envoy/http:message_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "signer_impl_lib",
+    srcs = ["signer_impl.cc"],
+    hdrs = ["signer_impl.h"],
+    deps = [
+        ":credentials_provider_interface",
+        ":signer_interface",
+        ":utility_lib",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:hex_lib",
+        "//source/common/common:logger_lib",
+        "//source/common/common:utility_lib",
+        "//source/common/crypto:utility_lib",
+        "//source/common/http:headers_lib",
+        "//source/common/singleton:const_singleton",
+    ],
+)
+
+envoy_cc_library(
+    name = "credentials_provider_interface",
+    hdrs = ["credentials_provider.h"],
+    external_deps = ["abseil_optional"],
+)
+
+envoy_cc_library(
+    name = "utility_lib",
+    srcs = ["utility.cc"],
+    hdrs = ["utility.h"],
+    deps = [
+        "//source/common/common:utility_lib",
+        "//source/common/http:headers_lib",
+    ],
+)
