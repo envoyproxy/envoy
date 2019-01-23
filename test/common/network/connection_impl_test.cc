@@ -8,6 +8,7 @@
 #include "common/event/dispatcher_impl.h"
 #include "common/network/address_impl.h"
 #include "common/network/connection_impl.h"
+#include "common/network/io_socket_handle_impl.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/utility.h"
 #include "common/runtime/runtime_impl.h"

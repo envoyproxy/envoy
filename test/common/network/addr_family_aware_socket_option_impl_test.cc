@@ -1,4 +1,5 @@
 #include "common/network/addr_family_aware_socket_option_impl.h"
+#include "common/network/io_socket_handle_impl.h"
 #include "common/network/utility.h"
 
 #include "test/common/network/socket_option_test.h"
@@ -175,7 +176,6 @@ TEST_F(AddrFamilyAwareSocketOptionImplTest, GetSocketOptionCannotDetermineVersio
                                                 5};
 
   IoHandlePtr io_handle = std::make_unique<IoSocketHandle>();
-  ScopedIoHandleCloser closer(io_handle);
   EXPECT_CALL(testing::Const(socket_), ioHandle()).WillOnce(testing::ReturnRef(*io_handle));
   auto result =
       socket_option.getOptionDetails(socket_, envoy::api::v2::core::SocketOption::STATE_PREBIND);
