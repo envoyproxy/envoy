@@ -6,7 +6,5 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
-// TODO: implement
-
-#define GetHttp2ReloadableFlagImpl(flag) 0
-#define SetHttp2ReloadableFlagImpl(flag, value) 0
+#define SPDY_EXPORT
+#define SPDY_EXPORT_PRIVATE
