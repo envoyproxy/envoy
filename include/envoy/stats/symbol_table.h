@@ -13,42 +13,28 @@ class StatName;
 class SymbolEncoding;
 
 /**
- * SymbolTable manages a namespace optimized for stats, which are typically
- * composed of arrays of "."-separated tokens, with a significant overlap
- * between the tokens. Each token is mapped to a Symbol (uint32_t) and
- * reference-counted so that no-longer-used symbols can be reclaimed.
- *
- * We use a uint8_t array to encode a "."-deliminated stat-name into arrays of
- * symbols in order to conserve space, as in practice the majority of token
- * instances in stat names draw from a fairly small set of common names,
- * typically less than 100. The format is somewhat similar to UTF-8, with a
- * variable-length array of uint8_t. See the implementation for details.
- *
- * StatNameStorage can be used to manage memory for the byte-encoding. Not all
- * StatNames are backed by StatNameStorage -- the storage may be inlined into
- * another object such as HeapStatData. StaNameStorage is not fully RAII --
- * instead the owner must call free(SymbolTable&) explicitly before
- * StatNameStorage is destructed. This saves 8 bytes of storage per stat,
- * relative to holding a SymbolTable& in each StatNameStorage object.
- *
- * A StatName is a copyable and assignable reference to this storage. It does
- * not own the storage or keep it alive via reference counts; the owner must
- * ensure the backing store lives as long as the StatName.
- *
- * The underlying Symbol / SymbolVec data structures are private to the
- * impl. One side effect of the non-monotonically-increasing symbol counter is
- * that if a string is encoded, the resulting stat is destroyed, and then that
- * same string is re-encoded, it may or may not encode to the same underlying
- * symbol.
+ * SymbolTable manages a namespace optimized for stat names, exploiting their
+ * typical composition from "."-separated tokens, with a significant overlap
+ * between the tokens. The interface is designed to balance optimal storage
+ * at scale with hiding details from users. We seek to provide the most abstract
+ * interface possible that avoids adding per-stat overhead or taking locks in
+ * the hot path.
  */
 class SymbolTable {
-public:
+ public:
   /**
-   * Efficient byte-encoded storage of an array of tokens. The most common tokens
-   * are typically < 127, and are represented directly. tokens >= 128 spill into
-   * the next byte, allowing for tokens of arbitrary numeric value to be stored.
-   * As long as the most common tokens are low-valued, the representation is
-   * space-efficient. This scheme is similar to UTF-8.
+   * Efficient byte-encoded storage of an array of tokens. The most common
+   * tokens are typically < 127, and are represented directly. tokens >= 128
+   * spill into the next byte, allowing for tokens of arbitrary numeric value to
+   * be stored.  As long as the most common tokens are low-valued, the
+   * representation is space-efficient. This scheme is similar to UTF-8. The
+   * token ordering is dependent on the order in which stat-names are encoded
+   * into the SymbolTable, which will not be optimal, but in practice appears
+   * to be pretty good.
+   *
+   * This is exposed in the interface for the benefit of join(), which which is
+   * used in the hot-path to append two stat-names into a temp without taking
+   * locks.
    */
   using Storage = uint8_t[];
   using StoragePtr = std::unique_ptr<Storage>;

@@ -99,16 +99,17 @@ private:
 };
 
 /**
- * SymbolTable manages a namespace optimized for stats, which are typically
+ * SymbolTableImpl manages a namespace optimized for stats, which are typically
  * composed of arrays of "."-separated tokens, with a significant overlap
  * between the tokens. Each token is mapped to a Symbol (uint32_t) and
  * reference-counted so that no-longer-used symbols can be reclaimed.
  *
- * We use a uint8_t array to encode arrays of symbols in order to conserve
- * space, as in practice the majority of token instances in stat names draw from
- * a fairly small set of common names, typically less than 100. The format is
- * somewhat similar to UTF-8, with a variable-length array of uint8_t. See the
- * implementation for details.
+ * We use a uint8_t array to encode a "."-deliminated stat-name into arrays of
+ * integer symbol symbol IDs in order to conserve space, as in practice the
+ * majority of token instances in stat names draw from a fairly small set of
+ * common names, typically less than 100. The format is somewhat similar to
+ * UTF-8, with a variable-length array of uint8_t. See the implementation for
+ * details.
  *
  * StatNameStorage can be used to manage memory for the byte-encoding. Not all
  * StatNames are backed by StatNameStorage -- the storage may be inlined into
