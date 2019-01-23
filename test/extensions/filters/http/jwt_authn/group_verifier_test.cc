@@ -128,7 +128,7 @@ public:
   }
 
   JwtAuthentication proto_config_;
-  VerifierPtr verifier_;
+  VerifierConstPtr verifier_;
   MockVerifierCallbacks mock_cb_;
   std::unordered_map<std::string, std::unique_ptr<MockAuthenticator>> mock_auths_;
   NiceMock<MockAuthFactory> mock_factory_;

@@ -84,7 +84,7 @@ PROTO_RST="
   /envoy/config/filter/accesslog/v2/accesslog/envoy/config/filter/accesslog/v2/accesslog.proto.rst
   /envoy/config/filter/fault/v2/fault/envoy/config/filter/fault/v2/fault.proto.rst
   /envoy/config/filter/http/buffer/v2/buffer/envoy/config/filter/http/buffer/v2/buffer.proto.rst
-  /envoy/config/filter/http/ext_authz/v2alpha/ext_authz/envoy/config/filter/http/ext_authz/v2alpha/ext_authz.proto.rst
+  /envoy/config/filter/http/ext_authz/v2/ext_authz/envoy/config/filter/http/ext_authz/v2/ext_authz.proto.rst
   /envoy/config/filter/http/fault/v2/fault/envoy/config/filter/http/fault/v2/fault.proto.rst
   /envoy/config/filter/http/gzip/v2/gzip/envoy/config/filter/http/gzip/v2/gzip.proto.rst
   /envoy/config/filter/http/health_check/v2/health_check/envoy/config/filter/http/health_check/v2/health_check.proto.rst
@@ -123,8 +123,8 @@ PROTO_RST="
   /envoy/data/tap/v2alpha/http/envoy/data/tap/v2alpha/http.proto.rst
   /envoy/data/tap/v2alpha/wrapper/envoy/data/tap/v2alpha/wrapper.proto.rst
   /envoy/service/accesslog/v2/als/envoy/service/accesslog/v2/als.proto.rst
-  /envoy/service/auth/v2alpha/external_auth/envoy/service/auth/v2alpha/attribute_context.proto.rst
-  /envoy/service/auth/v2alpha/external_auth/envoy/service/auth/v2alpha/external_auth.proto.rst
+  /envoy/service/auth/v2/external_auth/envoy/service/auth/v2/attribute_context.proto.rst
+  /envoy/service/auth/v2/external_auth/envoy/service/auth/v2/external_auth.proto.rst
   /envoy/service/ratelimit/v2/rls/envoy/service/ratelimit/v2/rls.proto.rst
   /envoy/service/tap/v2alpha/common/envoy/service/tap/v2alpha/common.proto.rst
   /envoy/type/http_status/envoy/type/http_status.proto.rst
