@@ -38,8 +38,7 @@ public:
   void pause(const std::string& type_url) override;
   void resume(const std::string& type_url) override;
 
-  // queue_item is a resource type URL.
-  void sendDiscoveryRequest(const std::string& queue_item) override;
+  void sendDiscoveryRequest(const std::string& type_url) override;
 
   // GrpcStream
   void handleResponse(std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message) override;
