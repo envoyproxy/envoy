@@ -119,11 +119,11 @@ elif [[ "$1" == "bazel.asan" ]]; then
   mkdir -p "${TAP_TMP}"
   bazel_with_collection test ${BAZEL_TEST_OPTIONS} -c dbg --config=clang-asan \
     @envoy//test/integration:ssl_integration_test \
-    --test_env=TAP_PATH="${TAP_TMP}"
+    --test_env=TAP_PATH="${TAP_TMP}/tap"
   # Verify that some pb_text files have been created. We can't check for pcap,
   # since tcpdump is not available in general due to CircleCI lack of support
   # for privileged Docker executors.
-  ls -l "${TAP_TMP}"/*.pb_text > /dev/null
+  ls -l "${TAP_TMP}"/tap_*.pb_text > /dev/null
   exit 0
 elif [[ "$1" == "bazel.tsan" ]]; then
   setup_clang_toolchain
