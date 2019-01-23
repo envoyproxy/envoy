@@ -216,6 +216,13 @@ elif [[ "$1" == "bazel.coverage" ]]; then
   export GCOVR_DIR="${ENVOY_BUILD_DIR}/bazel-envoy"
   export TESTLOGS_DIR="${ENVOY_BUILD_DIR}/bazel-testlogs"
   export WORKSPACE=ci
+
+  # Reduce the amount of memory Bazel tries to use to prevent it from launching
+  # too many subprocesses. This should prevent the system from running out of
+  # memory and killing compilation tasks. See discussion on
+  # https://github.com/envoyproxy/envoy/pull/5611.
+  export BAZEL_TEST_OPTIONS="--ram_utilization_factor 50"
+
   # There is a bug in gcovr 3.3, where it takes the -r path,
   # in our case /source, and does a regex replacement of various
   # source file paths during HTML generation. It attempts to strip
