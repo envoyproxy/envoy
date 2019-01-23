@@ -22,7 +22,6 @@ namespace JwtAuthn {
 class MockMatcher : public Matcher {
 public:
   MOCK_CONST_METHOD1(matches, bool(const Http::HeaderMap& headers));
-  MOCK_CONST_METHOD0(verifier, const VerifierPtr&());
 };
 
 class MockFilterConfig : public FilterConfig {
@@ -31,7 +30,7 @@ public:
       const ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication& proto_config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context)
       : FilterConfig(proto_config, stats_prefix, context) {}
-  MOCK_CONST_METHOD1(findMatcher, const MatcherConstSharedPtr(const Http::HeaderMap& headers));
+  MOCK_CONST_METHOD1(findVerifier, const Verifier*(const Http::HeaderMap& headers));
 };
 
 class FilterTest : public ::testing::Test {
@@ -40,22 +39,13 @@ public:
     mock_config_ = ::std::make_shared<MockFilterConfig>(proto_config_, "", mock_context_);
 
     mock_verifier_ = std::make_unique<MockVerifier>();
-    raw_mock_verifier_ = static_cast<MockVerifier*>(mock_verifier_.get());
-
     filter_ = std::make_unique<Filter>(mock_config_);
     filter_->setDecoderFilterCallbacks(filter_callbacks_);
   }
 
   void setupMockConfig() {
-    EXPECT_CALL(*mock_config_.get(), findMatcher(_)).WillOnce(Invoke([&](const Http::HeaderMap&) {
-      auto mock_matcher = std::make_shared<NiceMock<MockMatcher>>();
-      ON_CALL(*mock_matcher.get(), matches(_)).WillByDefault(Invoke([](const Http::HeaderMap&) {
-        return true;
-      }));
-      ON_CALL(*mock_matcher.get(), verifier()).WillByDefault(Invoke([&]() -> const VerifierPtr& {
-        return mock_verifier_;
-      }));
-      return mock_matcher;
+    EXPECT_CALL(*mock_config_.get(), findVerifier(_)).WillOnce(Invoke([&](const Http::HeaderMap&) {
+      return mock_verifier_.get();
     }));
   }
 
@@ -64,8 +54,7 @@ public:
   std::shared_ptr<MockFilterConfig> mock_config_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks_;
   std::unique_ptr<Filter> filter_;
-  VerifierPtr mock_verifier_;
-  MockVerifier* raw_mock_verifier_;
+  std::unique_ptr<MockVerifier> mock_verifier_;
   NiceMock<MockVerifierCallbacks> verifier_callback_;
 };
 
@@ -74,7 +63,7 @@ public:
 TEST_F(FilterTest, InlineOK) {
   setupMockConfig();
   // A successful authentication completed inline: callback is called inside verify().
-  EXPECT_CALL(*raw_mock_verifier_, verify(_)).WillOnce(Invoke([](ContextSharedPtr context) {
+  EXPECT_CALL(*mock_verifier_, verify(_)).WillOnce(Invoke([](ContextSharedPtr context) {
     context->callback()->onComplete(Status::Ok);
   }));
 
@@ -92,7 +81,7 @@ TEST_F(FilterTest, TestSetPayloadCall) {
   setupMockConfig();
   ProtobufWkt::Struct payload;
   // A successful authentication completed inline: callback is called inside verify().
-  EXPECT_CALL(*raw_mock_verifier_, verify(_)).WillOnce(Invoke([&payload](ContextSharedPtr context) {
+  EXPECT_CALL(*mock_verifier_, verify(_)).WillOnce(Invoke([&payload](ContextSharedPtr context) {
     context->callback()->setPayload(payload);
     context->callback()->onComplete(Status::Ok);
   }));
@@ -117,7 +106,7 @@ TEST_F(FilterTest, TestSetPayloadCall) {
 TEST_F(FilterTest, InlineFailure) {
   setupMockConfig();
   // A failed authentication completed inline: callback is called inside verify().
-  EXPECT_CALL(*raw_mock_verifier_, verify(_)).WillOnce(Invoke([](ContextSharedPtr context) {
+  EXPECT_CALL(*mock_verifier_, verify(_)).WillOnce(Invoke([](ContextSharedPtr context) {
     context->callback()->onComplete(Status::JwtBadFormat);
   }));
 
@@ -135,7 +124,7 @@ TEST_F(FilterTest, OutBoundOK) {
   setupMockConfig();
   Verifier::Callbacks* m_cb;
   // callback is saved, not called right
-  EXPECT_CALL(*raw_mock_verifier_, verify(_)).WillOnce(Invoke([&m_cb](ContextSharedPtr context) {
+  EXPECT_CALL(*mock_verifier_, verify(_)).WillOnce(Invoke([&m_cb](ContextSharedPtr context) {
     m_cb = context->callback();
   }));
 
@@ -160,7 +149,7 @@ TEST_F(FilterTest, OutBoundFailure) {
   setupMockConfig();
   Verifier::Callbacks* m_cb;
   // callback is saved, not called right
-  EXPECT_CALL(*raw_mock_verifier_, verify(_)).WillOnce(Invoke([&m_cb](ContextSharedPtr context) {
+  EXPECT_CALL(*mock_verifier_, verify(_)).WillOnce(Invoke([&m_cb](ContextSharedPtr context) {
     m_cb = context->callback();
   }));
 
@@ -185,7 +174,7 @@ TEST_F(FilterTest, OutBoundFailure) {
 
 // Test verifies that if no route matched requirement, then request is allowed.
 TEST_F(FilterTest, TestNoRouteMatched) {
-  EXPECT_CALL(*mock_config_.get(), findMatcher(_)).WillOnce(Invoke([&](const Http::HeaderMap&) {
+  EXPECT_CALL(*mock_config_.get(), findVerifier(_)).WillOnce(Invoke([&](const Http::HeaderMap&) {
     return nullptr;
   }));
 

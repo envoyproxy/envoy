@@ -6,6 +6,7 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "extensions/filters/http/jwt_authn/matcher.h"
+#include "extensions/filters/http/jwt_authn/verifier.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -71,8 +72,9 @@ public:
     extractor_ = Extractor::create(proto_config_);
 
     for (const auto& rule : proto_config_.rules()) {
-      rule_matchers_.push_back(
-          Matcher::create(rule, proto_config_.providers(), *this, getExtractor()));
+      rule_pairs_.emplace_back(
+          Matcher::create(rule),
+          Verifier::create(rule.requires(), proto_config_.providers(), *this, getExtractor()));
     }
   }
 
@@ -94,10 +96,10 @@ public:
   const Extractor& getExtractor() const { return *extractor_; }
 
   // Finds the matcher that matched the header
-  virtual const MatcherConstSharedPtr findMatcher(const Http::HeaderMap& headers) const {
-    for (const auto& matcher : rule_matchers_) {
-      if (matcher->matches(headers)) {
-        return matcher;
+  virtual const Verifier* findVerifier(const Http::HeaderMap& headers) const {
+    for (const auto& pair : rule_pairs_) {
+      if (pair.matcher_->matches(headers)) {
+        return pair.verifier_.get();
       }
     }
     return nullptr;
@@ -117,6 +119,13 @@ private:
     return {ALL_JWT_AUTHN_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
   }
 
+  struct MatcherVerifierPair {
+    MatcherVerifierPair(MatcherConstPtr matcher, VerifierConstPtr verifier)
+        : matcher_(std::move(matcher)), verifier_(std::move(verifier)) {}
+    MatcherConstPtr matcher_;
+    VerifierConstPtr verifier_;
+  };
+
   // The proto config.
   ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication proto_config_;
   // The stats for the filter.
@@ -128,7 +137,7 @@ private:
   // The object to extract tokens.
   ExtractorConstPtr extractor_;
   // The list of rule matchers.
-  std::vector<MatcherConstSharedPtr> rule_matchers_;
+  std::vector<MatcherVerifierPair> rule_pairs_;
   TimeSource& time_source_;
 };
 typedef std::shared_ptr<FilterConfig> FilterConfigSharedPtr;
