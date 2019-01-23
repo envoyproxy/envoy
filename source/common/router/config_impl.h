@@ -50,7 +50,8 @@ public:
 
 class PerFilterConfigs {
 public:
-  PerFilterConfigs(const Protobuf::Map<ProtobufTypes::String, ProtobufWkt::Struct>& configs,
+  PerFilterConfigs(const Protobuf::Map<ProtobufTypes::String, ProtobufWkt::Any>& typed_configs,
+                   const Protobuf::Map<ProtobufTypes::String, ProtobufWkt::Struct>& configs,
                    Server::Configuration::FactoryContext& factory_context);
 
   const RouteSpecificFilterConfig* get(const std::string& name) const;
@@ -158,6 +159,9 @@ public:
   const Config& routeConfig() const override;
   const RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override;
   bool includeAttemptCount() const override { return include_attempt_count_; }
+  const absl::optional<envoy::api::v2::route::RetryPolicy>& retryPolicy() const {
+    return retry_policy_;
+  }
 
 private:
   enum class SslRequirements { NONE, EXTERNAL_ONLY, ALL };
@@ -195,17 +199,19 @@ private:
   HeaderParserPtr response_headers_parser_;
   PerFilterConfigs per_filter_configs_;
   const bool include_attempt_count_;
+  absl::optional<envoy::api::v2::route::RetryPolicy> retry_policy_;
 };
 
 typedef std::shared_ptr<VirtualHostImpl> VirtualHostSharedPtr;
 
 /**
- * Implementation of RetryPolicy that reads from the proto route config.
+ * Implementation of RetryPolicy that reads from the proto route or virtual host config.
  */
 class RetryPolicyImpl : public RetryPolicy {
 
 public:
-  RetryPolicyImpl(const envoy::api::v2::route::RouteAction& config);
+  RetryPolicyImpl(const envoy::api::v2::route::RetryPolicy& retry_policy);
+  RetryPolicyImpl() {}
 
   // Router::RetryPolicy
   std::chrono::milliseconds perTryTimeout() const override { return per_try_timeout_; }
@@ -366,6 +372,9 @@ public:
   const PathMatchCriterion& pathMatchCriterion() const override { return *this; }
   bool includeAttemptCount() const override { return vhost_.includeAttemptCount(); }
   const UpgradeMap& upgradeMap() const override { return upgrade_map_; }
+  InternalRedirectAction internalRedirectAction() const override {
+    return internal_redirect_action_;
+  }
 
   // Router::DirectResponseEntry
   std::string newPath(const Http::HeaderMap& headers) const override;
@@ -466,6 +475,9 @@ private:
 
     bool includeAttemptCount() const override { return parent_->includeAttemptCount(); }
     const UpgradeMap& upgradeMap() const override { return parent_->upgradeMap(); }
+    InternalRedirectAction internalRedirectAction() const override {
+      return parent_->internalRedirectAction();
+    }
 
     // Router::Route
     const DirectResponseEntry* directResponseEntry() const override { return nullptr; }
@@ -538,6 +550,10 @@ private:
 
   bool evaluateRuntimeMatch(const uint64_t random_value) const;
 
+  RetryPolicyImpl
+  buildRetryPolicy(const absl::optional<envoy::api::v2::route::RetryPolicy>& vhost_retry_policy,
+                   const envoy::api::v2::route::RouteAction& route_config) const;
+
   // Default timeout is 15s if nothing is specified in the route config.
   static const uint64_t DEFAULT_ROUTE_TIMEOUT_MS = 15000;
 
@@ -588,6 +604,7 @@ private:
   std::string direct_response_body_;
   PerFilterConfigs per_filter_configs_;
   Event::TimeSystem& time_system_;
+  InternalRedirectAction internal_redirect_action_;
 };
 
 /**

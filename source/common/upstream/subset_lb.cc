@@ -39,7 +39,7 @@ SubsetLoadBalancer::SubsetLoadBalancer(
   refreshSubsets();
 
   // Configure future updates.
-  original_priority_set_callback_handle_ = priority_set.addMemberUpdateCb(
+  original_priority_set_callback_handle_ = priority_set.addPriorityUpdateCb(
       [this](uint32_t priority, const HostVector& hosts_added, const HostVector& hosts_removed) {
         if (!hosts_added.size() && !hosts_removed.size()) {
           // It's possible that metadata changed, without hosts being added nor removed.
@@ -125,7 +125,7 @@ HostConstSharedPtr SubsetLoadBalancer::tryChooseHostFromContext(LoadBalancerCont
 }
 
 // Iterates over the given metadata match criteria (which must be lexically sorted by key) and find
-// a matching LbSubsetEnryPtr, if any.
+// a matching LbSubsetEntryPtr, if any.
 SubsetLoadBalancer::LbSubsetEntryPtr SubsetLoadBalancer::findSubset(
     const std::vector<Router::MetadataMatchCriterionConstSharedPtr>& match_criteria) {
   const LbSubsetMap* subsets = &subsets_;

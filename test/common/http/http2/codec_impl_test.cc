@@ -80,8 +80,8 @@ public:
     request_encoder_ = &client_->newStream(response_decoder_);
     setupDefaultConnectionMocks();
 
-    EXPECT_CALL(server_callbacks_, newStream(_))
-        .WillOnce(Invoke([&](StreamEncoder& encoder) -> StreamDecoder& {
+    EXPECT_CALL(server_callbacks_, newStream(_, _))
+        .WillOnce(Invoke([&](StreamEncoder& encoder, bool) -> StreamDecoder& {
           response_encoder_ = &encoder;
           encoder.getStream().addCallbacks(server_stream_callbacks_);
           return request_decoder_;
@@ -598,8 +598,8 @@ TEST_P(Http2CodecImplFlowControlTest, TestFlowControlInPendingSendData) {
   // underlying connection. Pretend it is overrun.
   EXPECT_CALL(server_connection_, aboveHighWatermark()).WillOnce(Return(true));
   EXPECT_CALL(server_stream_callbacks2, onAboveWriteBufferHighWatermark());
-  EXPECT_CALL(server_callbacks_, newStream(_))
-      .WillOnce(Invoke([&](StreamEncoder& encoder) -> StreamDecoder& {
+  EXPECT_CALL(server_callbacks_, newStream(_, _))
+      .WillOnce(Invoke([&](StreamEncoder& encoder, bool) -> StreamDecoder& {
         response_encoder2 = &encoder;
         encoder.getStream().addCallbacks(server_stream_callbacks2);
         return request_decoder2;
@@ -782,8 +782,8 @@ TEST_P(Http2CodecImplStreamLimitTest, MaxClientStreams) {
   for (int i = 0; i < 101; ++i) {
     request_encoder_ = &client_->newStream(response_decoder_);
     setupDefaultConnectionMocks();
-    EXPECT_CALL(server_callbacks_, newStream(_))
-        .WillOnce(Invoke([&](StreamEncoder& encoder) -> StreamDecoder& {
+    EXPECT_CALL(server_callbacks_, newStream(_, _))
+        .WillOnce(Invoke([&](StreamEncoder& encoder, bool) -> StreamDecoder& {
           response_encoder_ = &encoder;
           encoder.getStream().addCallbacks(server_stream_callbacks_);
           return request_decoder_;

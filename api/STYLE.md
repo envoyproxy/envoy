@@ -71,6 +71,16 @@ In addition, the following conventions should be followed:
 
 * Always use plural field names for `repeated` fields, such as `filters`.
 
+* Due to the fact that we consider JSON/YAML to be first class inputs, we cannot easily change a
+  a singular field to a repeated field (both due to JSON/YAML array structural differences as well
+  as singular vs. plural field naming). If there is a reasonable expectation that a field may need
+  to be repeated in the future, but we don't need it to be repeated right away, consider making it
+  repeated now but using constraints to enforce a maximum repeated size of 1. E.g.:
+
+  ```proto
+  repeated OutputSink sinks = 1 [(validate.rules).repeated = {min_items: 1, max_items: 1}];
+  ```
+
 * Always use upper camel case names for message types and enum types without embedded
   acronyms, such as `HttpRequest`.
 

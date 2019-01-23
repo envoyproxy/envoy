@@ -5,7 +5,7 @@
 set -e
 
 build_setup_args=""
-if [[ "$1" == "fix_format" || "$1" == "check_format" || "$1" == "check_repositories" || "$1" == "check_spelling" || "$1" == "fix_spelling" ]]; then
+if [[ "$1" == "fix_format" || "$1" == "check_format" || "$1" == "check_repositories" || "$1" == "check_spelling" || "$1" == "fix_spelling" || "$1" == "bazel.clang_tidy" ]]; then
   build_setup_args="-nofetch"
 fi
 
@@ -111,19 +111,19 @@ elif [[ "$1" == "bazel.asan" ]]; then
   echo "Building and testing..."
   bazel_with_collection test ${BAZEL_TEST_OPTIONS} -c dbg --config=clang-asan @envoy//test/... \
     //:echo2_integration_test //:envoy_binary_test
-  # Also validate that integration test traffic capture (useful when debugging etc.)
-  # works. This requires that we set CAPTURE_ENV. We do this under bazel.asan to
+  # Also validate that integration test traffic tapping (useful when debugging etc.)
+  # works. This requires that we set TAP_PATH. We do this under bazel.asan to
   # ensure a debug build in CI.
-  CAPTURE_TMP=/tmp/capture/
-  rm -rf "${CAPTURE_TMP}"
-  mkdir -p "${CAPTURE_TMP}"
+  TAP_TMP=/tmp/tap/
+  rm -rf "${TAP_TMP}"
+  mkdir -p "${TAP_TMP}"
   bazel_with_collection test ${BAZEL_TEST_OPTIONS} -c dbg --config=clang-asan \
     @envoy//test/integration:ssl_integration_test \
-    --test_env=CAPTURE_PATH="${CAPTURE_TMP}/capture"
+    --test_env=TAP_PATH="${TAP_TMP}/tap"
   # Verify that some pb_text files have been created. We can't check for pcap,
   # since tcpdump is not available in general due to CircleCI lack of support
   # for privileged Docker executors.
-  ls -l "${CAPTURE_TMP}"/*.pb_text > /dev/null
+  ls -l "${TAP_TMP}"/tap_*.pb_text > /dev/null
   exit 0
 elif [[ "$1" == "bazel.tsan" ]]; then
   setup_clang_toolchain
@@ -152,17 +152,19 @@ elif [[ "$1" == "bazel.compile_time_options" ]]; then
   # Right now, none of the available compile-time options conflict with each other. If this
   # changes, this build type may need to be broken up.
   COMPILE_TIME_OPTIONS="\
+    --config libc++ \
     --define signal_trace=disabled \
     --define hot_restart=disabled \
     --define google_grpc=disabled \
     --define boringssl=fips \
     --define log_debug_assert_in_release=enabled \
-    --define=tcmalloc=debug \
+    --define tcmalloc=debug \
   "
   setup_clang_toolchain
   # This doesn't go into CI but is available for developer convenience.
   echo "bazel with different compiletime options build with tests..."
-  cd "${ENVOY_CI_DIR}"
+  # Building all the dependencies from scratch to link them against libc++.
+  cd "${ENVOY_SRCDIR}"
   echo "Building..."
   bazel build ${BAZEL_BUILD_OPTIONS} ${COMPILE_TIME_OPTIONS} -c dbg //source/exe:envoy-static
   echo "Building and testing..."
@@ -199,7 +201,7 @@ elif [[ "$1" == "bazel.api" ]]; then
   bazel build ${BAZEL_BUILD_OPTIONS} -c fastbuild @envoy_api//envoy/...
   echo "Testing API..."
   bazel_with_collection test ${BAZEL_TEST_OPTIONS} -c fastbuild @envoy_api//test/... @envoy_api//tools/... \
-    @envoy_api//tools:capture2pcap_test
+    @envoy_api//tools:tap2pcap_test
   exit 0
 elif [[ "$1" == "bazel.coverage" ]]; then
   setup_gcc_toolchain

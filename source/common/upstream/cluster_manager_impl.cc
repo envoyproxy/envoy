@@ -298,9 +298,9 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
   }
 
   // Now setup for cross-thread updates.
-  cluster.prioritySet().addMemberUpdateCb([&cluster, this](uint32_t priority,
-                                                           const HostVector& hosts_added,
-                                                           const HostVector& hosts_removed) {
+  cluster.prioritySet().addPriorityUpdateCb([&cluster, this](uint32_t priority,
+                                                             const HostVector& hosts_added,
+                                                             const HostVector& hosts_removed) {
     // This fires when a cluster is about to have an updated member set. We need to send this
     // out to all of the thread local configurations.
 
@@ -656,7 +656,7 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(const Cluster& cluster, ui
   // TODO(htuch): Can we skip these copies by exporting out const shared_ptr from HostSet?
   HostVectorConstSharedPtr hosts_copy(new HostVector(host_set->hosts()));
   HostVectorConstSharedPtr healthy_hosts_copy(new HostVector(host_set->healthyHosts()));
-  HostVectorConstSharedPtr degraded_hosts_copy(new HostVector(host_set->healthyHosts()));
+  HostVectorConstSharedPtr degraded_hosts_copy(new HostVector(host_set->degradedHosts()));
   HostsPerLocalityConstSharedPtr hosts_per_locality_copy = host_set->hostsPerLocality().clone();
   HostsPerLocalityConstSharedPtr healthy_hosts_per_locality_copy =
       host_set->healthyHostsPerLocality().clone();
@@ -1046,7 +1046,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
   }
 
   priority_set_.addMemberUpdateCb(
-      [this](uint32_t, const HostVector&, const HostVector& hosts_removed) -> void {
+      [this](const HostVector&, const HostVector& hosts_removed) -> void {
         // We need to go through and purge any connection pools for hosts that got deleted.
         // Even if two hosts actually point to the same address this will be safe, since if a
         // host is readded it will be a different physical HostSharedPtr.

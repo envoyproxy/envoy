@@ -2,7 +2,6 @@ syntax = "proto3";
 
 package envoy.config.filter.accesslog.v2;
 option java_package = "io.envoyproxy.envoy.config.filter.accesslog.v2";
-option java_multiple_files = true;
 option go_package = "v2";
 
 import "envoy/api/v2/core/base.proto";
@@ -35,9 +34,8 @@ message AccessLog {
   // #. "envoy.http_grpc_access_log": :ref:`HttpGrpcAccessLogConfig
   //    <envoy_api_msg_config.accesslog.v2.HttpGrpcAccessLogConfig>`
   oneof config_type {
-    google.protobuf.Struct config = 3;
+    google.protobuf.Struct config = 3 [deprecated = true];
 
-    // [#not-implemented-hide:]
     google.protobuf.Any typed_config = 4;
   }
 }

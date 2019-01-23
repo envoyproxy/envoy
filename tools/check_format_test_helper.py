@@ -5,6 +5,8 @@
 # docker. Normally this is run via check_format_test.sh, which
 # executes it in under docker.
 
+from __future__ import print_function
+
 import argparse
 import os
 import shutil
@@ -49,6 +51,9 @@ def runCheckFormat(operation, filename):
 
 def getInputFile(filename):
   infile = os.path.join(src, filename)
+  directory = os.path.dirname(filename)
+  if not directory == '' and not os.path.isdir(directory):
+    os.makedirs(directory)
   shutil.copyfile(infile, filename)
   return filename
 
@@ -58,6 +63,10 @@ def getInputFile(filename):
 # code.
 def fixFileHelper(filename):
   infile = os.path.join(src, filename)
+  directory = os.path.dirname(filename)
+  if not directory == '' and not os.path.isdir(directory):
+    os.makedirs(directory)
+
   shutil.copyfile(infile, filename)
   command, status, stdout = runCheckFormat("fix", getInputFile(filename))
   return (command, infile, filename, status, stdout)
@@ -69,12 +78,12 @@ def fixFileHelper(filename):
 def fixFileExpectingSuccess(file):
   command, infile, outfile, status, stdout = fixFileHelper(file)
   if status != 0:
-    print "FAILED:"
+    print("FAILED:")
     emitStdoutAsError(stdout)
     return 1
   status, stdout = runCommand('diff ' + outfile + ' ' + infile + '.gold')
   if status != 0:
-    print "FAILED:"
+    print("FAILED:")
     emitStdoutAsError(stdout)
     return 1
   return 0
@@ -198,6 +207,10 @@ if __name__ == "__main__":
       "Version history line malformed. Does not match VERSION_HISTORY_NEW_LINE_REGEX in "
       "check_format.py")
 
+  errors += fixFileExpectingFailure(
+      "api/missing_package.proto",
+      "Unable to find package name for proto file: ./api/missing_package.proto")
+
   # The following files have errors that can be automatically fixed.
   errors += checkAndFixError("over_enthusiastic_spaces.cc",
                              "./over_enthusiastic_spaces.cc:3: over-enthusiastic spaces")
@@ -211,6 +224,7 @@ if __name__ == "__main__":
   errors += checkAndFixError("license.BUILD", "envoy_build_fixer check failed")
   errors += checkAndFixError("bad_envoy_build_sys_ref.BUILD", "Superfluous '@envoy//' prefix")
   errors += checkAndFixError("proto_format.proto", "clang-format check failed")
+  errors += checkAndFixError("api/java_options.proto", "Java proto option")
 
   errors += checkFileExpectingOK("real_time_source_override.cc")
   errors += checkFileExpectingOK("time_system_wait_for.cc")

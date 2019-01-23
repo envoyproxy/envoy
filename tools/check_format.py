@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+from __future__ import print_function
+
 import argparse
 import common
 import fileinput
@@ -48,6 +50,7 @@ HEADER_ORDER_PATH = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), 
 SUBDIR_SET = set(common.includeDirOrder())
 INCLUDE_ANGLE = "#include <"
 INCLUDE_ANGLE_LEN = len(INCLUDE_ANGLE)
+PROTO_PACKAGE_REGEX = re.compile("package (.*);")
 
 # yapf: disable
 PROTOBUF_TYPE_ERRORS = {
@@ -111,7 +114,8 @@ def checkTools():
         "PATH, please use CLANG_FORMAT environment variable to specify the path. "
         "Examples:\n"
         "    export CLANG_FORMAT=clang-format-7.0.0\n"
-        "    export CLANG_FORMAT=/opt/bin/clang-format-7".format(CLANG_FORMAT_PATH))
+        "    export CLANG_FORMAT=/opt/bin/clang-format-7\n"
+        "    export CLANG_FORMAT=/usr/local/opt/llvm@7/bin/clang-format".format(CLANG_FORMAT_PATH))
 
   buildifier_abs_path = lookPath(BUILDIFIER_PATH)
   if buildifier_abs_path:
@@ -143,25 +147,37 @@ def checkNamespace(file_path):
   return []
 
 
-def checkJavaProtoOptions(file_path):
-  java_multiple_files = False
-  java_package_correct = False
+def fixJavaProtoOptions(file_path):
+  package_name = None
   for line in fileinput.FileInput(file_path):
-    if "option java_multiple_files = true;" in line:
-      java_multiple_files = True
+    if line.startswith("package "):
+      result = PROTO_PACKAGE_REGEX.search(line)
+      if result is None or len(result.groups()) != 1:
+        continue
+
+      package_name = result.group(1)
     if "option java_package = \"io.envoyproxy.envoy" in line:
-      java_package_correct = True
-    if java_multiple_files and java_package_correct:
       return []
 
-  error_messages = []
-  if not java_multiple_files:
-    error_messages.append(
-        "Java proto option 'java_multiple_files' not set correctly for file: %s" % file_path)
-  if not java_package_correct:
-    error_messages.append(
-        "Java proto option 'java_package' not set correctly for file: %s" % file_path)
-  return error_messages
+  if package_name is None:
+    return ["Unable to find package name for proto file: %s" % file_path]
+
+  to_add = "option java_package = \"io.envoyproxy.{}\";\n".format(package_name)
+
+  for line in fileinput.FileInput(file_path, inplace=True):
+    if line.startswith("package "):
+      line = line.replace(line, line + to_add)
+    sys.stdout.write(line)
+
+  return []
+
+
+def checkJavaProtoOptions(file_path):
+  for line in fileinput.FileInput(file_path):
+    if "option java_package = \"io.envoyproxy.envoy" in line:
+      return []
+
+  return ["Java proto option 'java_package' not set correctly for file: %s" % file_path]
 
 
 # To avoid breaking the Lyft import, we just check for path inclusion here.
@@ -340,7 +356,7 @@ def checkSourceLine(line, file_path, reportError):
   if not whitelistedForGetTime(file_path):
     if "std::get_time" in line:
       if "test/" in file_path:
-        reportError("Don't use std::get_time; use TestUtility::parseTimestamp in tests")
+        reportError("Don't use std::get_time; use TestUtility::parseTime in tests")
       else:
         reportError("Don't use std::get_time; use the injectable time system")
   if 'std::atomic_' in line:
@@ -416,6 +432,8 @@ def fixSourcePath(file_path):
     if not file_path.endswith(PROTO_SUFFIX):
       error_messages += fixHeaderOrder(file_path)
     error_messages += clangFormat(file_path)
+  if file_path.endswith(PROTO_SUFFIX) and isApiFile(file_path):
+    error_messages += fixJavaProtoOptions(file_path)
   return error_messages
 
 
@@ -530,7 +548,7 @@ def checkFormatVisitor(arg, dir_name, names):
 def checkErrorMessages(error_messages):
   if error_messages:
     for e in error_messages:
-      print "ERROR: %s" % e
+      print("ERROR: %s" % e)
     return True
   return False
 
@@ -590,8 +608,8 @@ if __name__ == "__main__":
     error_messages = sum((r.get() for r in results), [])
 
   if checkErrorMessages(error_messages):
-    print "ERROR: check format failed. run 'tools/check_format.py fix'"
+    print("ERROR: check format failed. run 'tools/check_format.py fix'")
     sys.exit(1)
 
   if operation_type == "check":
-    print "PASS"
+    print("PASS")

@@ -7,7 +7,8 @@
 
 #include "common/filesystem/filesystem_impl.h"
 #include "common/network/utility.h"
-#include "common/ssl/context_manager_impl.h"
+
+#include "extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "test/integration/ssl_utility.h"
 #include "test/integration/utility.h"
@@ -365,7 +366,8 @@ void TcpProxySslIntegrationTest::initialize() {
   config_helper_.addSslConfig();
   TcpProxyIntegrationTest::initialize();
 
-  context_manager_ = std::make_unique<Ssl::ContextManagerImpl>(timeSystem());
+  context_manager_ =
+      std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(timeSystem());
   payload_reader_.reset(new WaitForPayloadReader(*dispatcher_));
 }
 
@@ -386,7 +388,7 @@ void TcpProxySslIntegrationTest::setupConnections() {
             .WillByDefault(Invoke(client_write_buffer_, &MockWatermarkBuffer::trackDrains));
         return client_write_buffer_;
       }));
-  // Set up the SSl client.
+  // Set up the SSL client.
   Network::Address::InstanceConstSharedPtr address =
       Ssl::getSslAddress(version_, lookupPort("tcp_proxy"));
   context_ = Ssl::createClientSslTransportSocketFactory({}, *context_manager_);

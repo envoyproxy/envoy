@@ -353,6 +353,9 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPost) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue,
             filter_.encode100ContinueHeaders(continue_headers));
 
+  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_.encodeMetadata(metadata_map));
+
   Http::TestHeaderMapImpl response_headers{{"content-type", "application/grpc"},
                                            {":status", "200"}};
 
@@ -650,7 +653,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryWithHttpBodyAsOutputAndSpli
 
   auto response_data = Grpc::Common::serializeBody(response);
 
-  // Firstly, the response data buffer is splitted into two parts.
+  // Firstly, the response data buffer is split into two parts.
   Buffer::OwnedImpl response_data_first_part;
   response_data_first_part.move(*response_data, response_data->length() / 2);
 

@@ -145,7 +145,7 @@ TEST_P(MainCommonDeathTest, OutOfMemoryHandler) {
         // so dynamically find a size that is too large.
         const uint64_t initial = 1 << 30;
         for (uint64_t size = initial;
-             size >= initial; // Disallow wraparound to avoid inifinite loops on failure.
+             size >= initial; // Disallow wraparound to avoid infinite loops on failure.
              size *= 1000) {
           new int[size];
         }
@@ -374,7 +374,7 @@ TEST_P(MainCommonTest, ConstructDestructLogger) {
   VERBOSE_EXPECT_NO_THROW(MainCommon main_common(argc(), argv()));
 
   const std::string logger_name = "logger";
-  spdlog::details::log_msg log_msg(&logger_name, spdlog::level::level_enum::err);
+  spdlog::details::log_msg log_msg(&logger_name, spdlog::level::level_enum::err, "error");
   Logger::Registry::getSink()->log(log_msg);
 }
 

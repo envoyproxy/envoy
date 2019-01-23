@@ -297,6 +297,8 @@ def envoy_dependencies(path = "@envoy_deps//", skip_targets = []):
     _com_github_tencent_rapidjson()
     _com_google_googletest()
     _com_google_protobuf()
+    _com_github_envoyproxy_sqlparser()
+    _com_googlesource_quiche()
 
     # Used for bundling gcovr into a relocatable .par file.
     _repository_impl("subpar")
@@ -347,6 +349,16 @@ def _com_github_cyan4973_xxhash():
     native.bind(
         name = "xxhash",
         actual = "@com_github_cyan4973_xxhash//:xxhash",
+    )
+
+def _com_github_envoyproxy_sqlparser():
+    _repository_impl(
+        name = "com_github_envoyproxy_sqlparser",
+        build_file = "@envoy//bazel/external:sqlparser.BUILD",
+    )
+    native.bind(
+        name = "sqlparser",
+        actual = "@com_github_envoyproxy_sqlparser//:sqlparser",
     )
 
 def _com_github_eile_tclap():
@@ -478,6 +490,26 @@ def _com_google_absl():
         actual = "@com_google_absl//absl/container:flat_hash_set",
     )
     native.bind(
+        name = "abseil_hash",
+        actual = "@com_google_absl//absl/hash:hash",
+    )
+    native.bind(
+        name = "abseil_inlined_vector",
+        actual = "@com_google_absl//absl/container:inlined_vector",
+    )
+    native.bind(
+        name = "abseil_memory",
+        actual = "@com_google_absl//absl/memory:memory",
+    )
+    native.bind(
+        name = "abseil_node_hash_map",
+        actual = "@com_google_absl//absl/container:node_hash_map",
+    )
+    native.bind(
+        name = "abseil_node_hash_set",
+        actual = "@com_google_absl//absl/container:node_hash_set",
+    )
+    native.bind(
         name = "abseil_strings",
         actual = "@com_google_absl//absl/strings:strings",
     )
@@ -537,6 +569,25 @@ def _com_google_protobuf():
     native.bind(
         name = "python_headers",
         actual = "@com_google_protobuf//util/python:python_headers",
+    )
+
+def _com_googlesource_quiche():
+    _repository_impl(
+        name = "com_googlesource_quiche",
+        build_file = "@envoy//bazel/external:quiche.BUILD",
+    )
+
+    native.bind(
+        name = "quiche_http2_platform",
+        actual = "@com_googlesource_quiche//:http2_platform",
+    )
+    native.bind(
+        name = "quiche_spdy_platform",
+        actual = "@com_googlesource_quiche//:spdy_platform",
+    )
+    native.bind(
+        name = "quiche_quic_platform",
+        actual = "@com_googlesource_quiche//:quic_platform",
     )
 
 def _com_github_grpc_grpc():
