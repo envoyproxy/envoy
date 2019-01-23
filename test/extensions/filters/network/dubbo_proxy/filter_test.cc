@@ -21,7 +21,9 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace DubboProxy {
 
-using ConfigDubboProxy = envoy::extensions::filters::network::dubbo_proxy::v2alpha1::DubboProxy;
+using ConfigProtocolType = envoy::config::filter::network::dubbo_proxy::v2alpha1::ProtocolType;
+using ConfigSerializationType =
+    envoy::config::filter::network::dubbo_proxy::v2alpha1::SerializationType;
 
 class DubboFilterTest : public testing::Test {
 public:
@@ -34,8 +36,8 @@ public:
       counter->reset();
     }
 
-    filter_ = std::make_unique<Filter>("test.", ConfigDubboProxy::Dubbo, ConfigDubboProxy::Hessian2,
-                                       store_, timeSystem());
+    filter_ = std::make_unique<Filter>("test.", ConfigProtocolType::Dubbo,
+                                       ConfigSerializationType::Hessian2, store_, timeSystem());
     filter_->initializeReadFilterCallbacks(read_filter_callbacks_);
     filter_->onNewConnection();
 
