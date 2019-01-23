@@ -338,7 +338,7 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gauge(const std::string& name) {
   // Note that we can do map.find(final_name.c_str()), but we cannot do
   // map[final_name.c_str()] as the char*-keyed maps would then save the pointer to
   // a temporary, and address sanitization errors would follow. Instead we must
-  // do a find() first, using tha if it succeeds. If it fails, then after we
+  // do a find() first, using that if it succeeds. If it fails, then after we
   // construct the stat we can insert it into the required maps.
   std::string final_name = prefix_ + name;
   if (parent_.rejects(final_name)) {
@@ -366,7 +366,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(const std::string& name) {
   // Note that we can do map.find(final_name.c_str()), but we cannot do
   // map[final_name.c_str()] as the char*-keyed maps would then save the pointer to
   // a temporary, and address sanitization errors would follow. Instead we must
-  // do a find() first, using tha if it succeeds. If it fails, then after we
+  // do a find() first, using that if it succeeds. If it fails, then after we
   // construct the stat we can insert it into the required maps.
   std::string final_name = prefix_ + name;
   if (parent_.rejects(final_name)) {

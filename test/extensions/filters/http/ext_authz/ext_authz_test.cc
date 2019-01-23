@@ -123,7 +123,7 @@ TEST_F(HttpFilterTest, MergeConfig) {
   envoy::config::filter::http::ext_authz::v2alpha::ExtAuthzPerRoute settings;
   auto&& extensions = settings.mutable_check_settings()->mutable_context_extensions();
 
-  // First config base config with one base value, and one value to be overriden.
+  // First config base config with one base value, and one value to be overridden.
   (*extensions)["base_key"] = "base_value";
   (*extensions)["merged_key"] = "base_value";
   FilterConfigPerRoute base_config(settings);
@@ -272,7 +272,7 @@ TEST_F(HttpFilterTestParam, ContextExtensions) {
   envoy::config::filter::http::ext_authz::v2alpha::ExtAuthzPerRoute settingsvhost;
   (*settingsvhost.mutable_check_settings()->mutable_context_extensions())["key_vhost"] =
       "value_vhost";
-  // add a default route value to see it overriden
+  // add a default route value to see it overridden
   (*settingsvhost.mutable_check_settings()->mutable_context_extensions())["key_route"] =
       "default_route_value";
   // Initialize the virtual host's per filter config.

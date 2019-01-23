@@ -21,7 +21,7 @@ public:
   LoadStatsIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()) {
     // We rely on some fairly specific load balancing picks in this test, so
-    // determinizie the schedule.
+    // determinize the schedule.
     setDeterministic();
   }
 
