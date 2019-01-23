@@ -179,10 +179,10 @@ private:
   const Extractor& extractor_;
 };
 
-VerifierPtr innerCreate(const JwtRequirement& requirement,
-                        const Protobuf::Map<ProtobufTypes::String, JwtProvider>& providers,
-                        const AuthFactory& factory, const Extractor& extractor,
-                        const BaseVerifierImpl* parent);
+VerifierConstPtr innerCreate(const JwtRequirement& requirement,
+                             const Protobuf::Map<ProtobufTypes::String, JwtProvider>& providers,
+                             const AuthFactory& factory, const Extractor& extractor,
+                             const BaseVerifierImpl* parent);
 
 // Base verifier for requires all or any.
 class BaseGroupVerifierImpl : public BaseVerifierImpl {
@@ -201,7 +201,7 @@ public:
 
 protected:
   // The list of requirement verifiers
-  std::vector<VerifierPtr> verifiers_;
+  std::vector<VerifierConstPtr> verifiers_;
 };
 
 // Requires any verifier.
@@ -264,10 +264,10 @@ public:
   }
 };
 
-VerifierPtr innerCreate(const JwtRequirement& requirement,
-                        const Protobuf::Map<ProtobufTypes::String, JwtProvider>& providers,
-                        const AuthFactory& factory, const Extractor& extractor_for_allow_fail,
-                        const BaseVerifierImpl* parent) {
+VerifierConstPtr innerCreate(const JwtRequirement& requirement,
+                             const Protobuf::Map<ProtobufTypes::String, JwtProvider>& providers,
+                             const AuthFactory& factory, const Extractor& extractor_for_allow_fail,
+                             const BaseVerifierImpl* parent) {
   std::string provider_name;
   std::vector<std::string> audiences;
   switch (requirement.requires_type_case()) {
@@ -311,10 +311,10 @@ ContextSharedPtr Verifier::createContext(Http::HeaderMap& headers, Callbacks* ca
   return std::make_shared<ContextImpl>(headers, callback);
 }
 
-VerifierPtr Verifier::create(const JwtRequirement& requirement,
-                             const Protobuf::Map<ProtobufTypes::String, JwtProvider>& providers,
-                             const AuthFactory& factory,
-                             const Extractor& extractor_for_allow_fail) {
+VerifierConstPtr
+Verifier::create(const JwtRequirement& requirement,
+                 const Protobuf::Map<ProtobufTypes::String, JwtProvider>& providers,
+                 const AuthFactory& factory, const Extractor& extractor_for_allow_fail) {
   return innerCreate(requirement, providers, factory, extractor_for_allow_fail, nullptr);
 }
 
