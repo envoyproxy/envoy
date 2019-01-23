@@ -293,8 +293,9 @@ private:
   void continueDecoding() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   HeaderMap& addDecodedTrailers() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   void addDecodedData(Buffer::Instance&, bool) override {
-    // This should only be called if the user has setup buffering. The request is already fully
-    // buffered.
+    // This should only be called if the user has set up buffering. The request is already fully
+    // buffered. Note that this is only called via the async client's internal use of the router
+    // filter which uses this function for buffering.
     ASSERT(buffered_body_ != nullptr);
   }
   const Buffer::Instance* decodingBuffer() override { return buffered_body_.get(); }
@@ -365,7 +366,8 @@ private:
 
   // Http::StreamDecoderFilterCallbacks
   void addDecodedData(Buffer::Instance&, bool) override {
-    // The request is already fully buffered.
+    // The request is already fully buffered. Note that this is only called via the async client's
+    // internal use of the router filter which uses this function for buffering.
   }
   const Buffer::Instance* decodingBuffer() override { return request_->body().get(); }
 
