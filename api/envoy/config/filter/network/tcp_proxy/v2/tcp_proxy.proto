@@ -161,8 +161,7 @@ message TcpProxy {
   //   Using the deprecated V1 configuration excludes the use of any V2 configuration options. Only
   //   the V1 configuration is used. All available fields are shown in the example, although the
   //   access log configuration is omitted for simplicity. The access log configuration uses the
-  //   `deprecated V1 access log configuration
-  //   <https://github.com/envoyproxy/envoy/blob/master/source/common/json/config_schemas.cc>`_.
+  //   :repo:`deprecated V1 access log configuration<source/common/json/config_schemas.cc>`.
   //
   // .. attention::
   //
