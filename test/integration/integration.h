@@ -176,7 +176,7 @@ public:
   void createApiTestServer(const ApiFilesystemConfig& api_filesystem_config,
                            const std::vector<std::string>& port_names);
 
-  Event::TestTimeSystem& timeSystem() { return **time_system_; }
+  Event::TestTimeSystem& timeSystem() { return time_system_; }
 
 private:
   Event::GlobalTimeSystem time_system_;

@@ -36,7 +36,7 @@ public:
   MOCK_METHOD1(fileExists, bool(const std::string& path));
   MOCK_METHOD1(fileReadToEnd, std::string(const std::string& path));
   MOCK_METHOD0(threadFactory, Thread::ThreadFactory&());
-  Event::TimeSystem& timeSystem() override { return **time_system_; }
+  Event::TimeSystem& timeSystem() override { return time_system_; }
 
   std::shared_ptr<Filesystem::MockFile> file_{new Filesystem::MockFile()};
   Event::GlobalTimeSystem time_system_;

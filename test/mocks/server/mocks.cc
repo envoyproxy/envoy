@@ -180,7 +180,7 @@ MockFactoryContext::MockFactoryContext()
   ON_CALL(*this, threadLocal()).WillByDefault(ReturnRef(thread_local_));
   ON_CALL(*this, admin()).WillByDefault(ReturnRef(admin_));
   ON_CALL(*this, listenerScope()).WillByDefault(ReturnRef(listener_scope_));
-  ON_CALL(*this, timeSource()).WillByDefault(ReturnRef(**time_system_));
+  ON_CALL(*this, timeSource()).WillByDefault(ReturnRef(time_system_));
   ON_CALL(*this, overloadManager()).WillByDefault(ReturnRef(overload_manager_));
 }
 

@@ -64,28 +64,60 @@ public:
     }
   }
 
-  TestTimeSystem* lazyInit() {
+  TestTimeSystem& lazyInit() {
     if (time_system_ == nullptr) {
       default_time_system_ = std::make_unique<Test::Global<TestRealTimeSystem>>();
       time_system_ = &(default_time_system_->get());
     }
-    return time_system_;
+    return *time_system_;
   }
 
-  TestTimeSystem& operator*() { return *lazyInit(); }
-  TestTimeSystem* operator->() { return lazyInit(); }
+  //TestTimeSystem& operator*() { return *lazyInit(); }
+  //TestTimeSystem* operator->() { return lazyInit(); }
 
 private:
   TestTimeSystem* time_system_;
   std::unique_ptr<Test::Global<TestRealTimeSystem>> default_time_system_;
 };
-using GlobalTimeSystem = Test::Global<SingletonTimeSystemHelper>;
 
-template <class Type> class TestTime {
+class GlobalTimeSystem : public TestTimeSystem {
+ public:
+  void sleep(const Duration& duration) override { singleton_->lazyInit().sleep(duration); }
+  Thread::CondVar::WaitStatus waitFor(
+      Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
+      const Duration& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) override {
+    return singleton_->lazyInit().waitFor(mutex, condvar, duration);
+  }
+  SchedulerPtr createScheduler(Libevent::BasePtr& base_ptr) override {
+    return singleton_->lazyInit().createScheduler(base_ptr);
+  }
+  SystemTime systemTime() override { return singleton_->lazyInit().systemTime(); }
+  MonotonicTime monotonicTime() override { return singleton_->lazyInit().monotonicTime(); }
+
+  void set(TestTimeSystem* time_system) { singleton_->set(time_system); }
+
+ private:
+  Test::Global<SingletonTimeSystemHelper> singleton_;
+};
+
+template <class Type> class TestTime : public TestTimeSystem {
 public:
-  TestTime() { global_time_system_->set(&(time_system_.get())); }
+  TestTime() { global_time_system_.set(&(time_system_.get())); }
+
+  void sleep(const Duration& duration) override { time_system_->sleep(duration); }
+  Thread::CondVar::WaitStatus waitFor(
+      Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
+      const Duration& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) override {
+    return time_system_->waitFor(mutex, condvar, duration);
+  }
+  SchedulerPtr createScheduler(Libevent::BasePtr& base_ptr) override {
+    return time_system_->createScheduler(base_ptr);
+  }
+  SystemTime systemTime() override { return time_system_->systemTime(); }
+  MonotonicTime monotonicTime() override { return time_system_->monotonicTime(); }
+
+  Type* operator->() { return &(*time_system_); }
   Type& operator*() { return *time_system_; }
-  Type* operator->() { return &(time_system_.get()); }
 
 private:
   Test::Global<Type> time_system_;

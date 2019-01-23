@@ -354,7 +354,7 @@ public:
   MOCK_METHOD0(localInfo, const LocalInfo::LocalInfo&());
   MOCK_CONST_METHOD0(statsFlushInterval, std::chrono::milliseconds());
 
-  Event::TestTimeSystem& timeSystem() override { return **time_system_; }
+  Event::TestTimeSystem& timeSystem() override { return time_system_; }
   Api::Api& api() override { return api_; }
 
   Event::GlobalTimeSystem time_system_;
@@ -430,7 +430,7 @@ public:
   MOCK_CONST_METHOD0(localInfo, const LocalInfo::LocalInfo&());
   MOCK_CONST_METHOD0(listenerMetadata, const envoy::api::v2::core::Metadata&());
   MOCK_METHOD0(timeSource, TimeSource&());
-  Event::TestTimeSystem& timeSystem() { return **time_system_; }
+  Event::TestTimeSystem& timeSystem() { return time_system_; }
   Http::Context& httpContext() override { return http_context_; }
 
   Event::GlobalTimeSystem time_system_;

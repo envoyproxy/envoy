@@ -2117,7 +2117,7 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesOutOfWindow) {
   // The first update should be applied immediately, because even though it's mergeable
   // it's outside the default merge window of 3 seconds (found in debugger as value of
   // cluster.info()->lbConfig().update_merge_window() in ClusterManagerImpl::scheduleUpdate.
-  time_system_->sleep(std::chrono::seconds(60));
+  time_system_.sleep(std::chrono::seconds(60));
   cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
       HostSetImpl::updateHostsParams(hosts, hosts_per_locality, hosts, hosts_per_locality), {},
       hosts_added, hosts_removed, absl::nullopt);
@@ -2142,7 +2142,7 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesInsideWindow) {
   // 3 seconds (found in debugger as value of cluster.info()->lbConfig().update_merge_window()
   // in ClusterManagerImpl::scheduleUpdate. Note that initially the update-time is
   // default-initialized to a monotonic time of 0, as is SimulatedTimeSystem::monotonic_time_.
-  time_system_->sleep(std::chrono::seconds(2));
+  time_system_.sleep(std::chrono::seconds(2));
   cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
       HostSetImpl::updateHostsParams(hosts, hosts_per_locality, hosts, hosts_per_locality), {},
       hosts_added, hosts_removed, absl::nullopt);

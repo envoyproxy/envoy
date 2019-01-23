@@ -224,7 +224,7 @@ public:
   virtual void initialize() {
     if (fake_upstream_ == nullptr) {
       fake_upstream_ = std::make_unique<FakeUpstream>(0, FakeHttpConnection::Type::HTTP2,
-                                                      ipVersion(), **time_system_);
+                                                      ipVersion(), time_system_);
     }
     switch (clientType()) {
     case ClientType::EnvoyGrpc:
@@ -493,7 +493,7 @@ public:
         mock_cluster_info_->transport_socket_factory_->createTransportSocket(nullptr);
     fake_upstream_ = std::make_unique<FakeUpstream>(createUpstreamSslContext(), 0,
                                                     FakeHttpConnection::Type::HTTP2, ipVersion(),
-                                                    **time_system_);
+                                                    time_system_);
 
     GrpcClientIntegrationTest::initialize();
   }
