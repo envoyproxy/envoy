@@ -110,19 +110,17 @@ static void HeaderMapImplGetByteSize(benchmark::State& state) {
 }
 BENCHMARK(HeaderMapImplGetByteSize)->Arg(0)->Arg(1)->Arg(10)->Arg(50);
 
-/** Callback function for use in testing HeaderMap::iterate(). */
-static HeaderMap::Iterate CountingCallback(const HeaderEntry&, void* context) {
-  (*static_cast<size_t*>(context))++;
-  return HeaderMap::Iterate::Continue;
-}
-
 /** Measure the speed of iteration with a lightweight callback. */
 static void HeaderMapImplIterate(benchmark::State& state) {
   HeaderMapImpl headers;
   size_t num_callbacks = 0;
   addDummyHeaders(headers, state.range(0));
+  auto counting_callback = [](const HeaderEntry&, void* context) -> HeaderMap::Iterate {
+    (*static_cast<size_t*>(context))++;
+    return HeaderMap::Iterate::Continue;
+  };
   for (auto _ : state) {
-    headers.iterate(CountingCallback, &num_callbacks);
+    headers.iterate(counting_callback, &num_callbacks);
   }
   benchmark::DoNotOptimize(num_callbacks);
 }
