@@ -221,7 +221,7 @@ elif [[ "$1" == "bazel.coverage" ]]; then
   # too many subprocesses. This should prevent the system from running out of
   # memory and killing compilation tasks. See discussion on
   # https://github.com/envoyproxy/envoy/pull/5611.
-  export BAZEL_TEST_OPTIONS="${BAZEL_TEST_OPTIONS} --ram_utilization_factor=50"
+  export BAZEL_TEST_OPTIONS="${BAZEL_TEST_OPTIONS} --ram_utilization_factor=40"
 
   # There is a bug in gcovr 3.3, where it takes the -r path,
   # in our case /source, and does a regex replacement of various
