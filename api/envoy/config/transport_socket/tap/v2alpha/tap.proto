@@ -1,10 +1,10 @@
 syntax = "proto3";
 
-package envoy.config.transport_socket.capture.v2alpha;
-option java_package = "io.envoyproxy.envoy.config.transport_socket.capture.v2alpha";
+package envoy.config.transport_socket.tap.v2alpha;
+option java_package = "io.envoyproxy.envoy.config.transport_socket.tap.v2alpha";
 option go_package = "v2";
 
-// [#protodoc-title: Capture]
+// [#protodoc-title: Tap]
 
 import "envoy/api/v2/core/base.proto";
 
@@ -33,9 +33,9 @@ message FileSink {
   Format format = 2;
 }
 
-// Configuration for capture transport socket. This wraps another transport socket, providing the
+// Configuration for tap transport socket. This wraps another transport socket, providing the
 // ability to interpose and record in plain text any traffic that is surfaced to Envoy.
-message Capture {
+message Tap {
   oneof sink_selector {
     // Trace is to be written to a file sink.
     FileSink file_sink = 1;

@@ -7,32 +7,31 @@
 namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
-namespace Capture {
+namespace Tap {
 
 /**
- * Config registration for the capture wrapper for transport socket factory.
+ * Config registration for the tap wrapper for transport socket factory.
  * @see TransportSocketConfigFactory.
  */
-class CaptureSocketConfigFactory
-    : public virtual Server::Configuration::TransportSocketConfigFactory {
+class TapSocketConfigFactory : public virtual Server::Configuration::TransportSocketConfigFactory {
 public:
-  virtual ~CaptureSocketConfigFactory() {}
-  std::string name() const override { return TransportSocketNames::get().Capture; }
+  virtual ~TapSocketConfigFactory() {}
+  std::string name() const override { return TransportSocketNames::get().Tap; }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
 };
 
-class UpstreamCaptureSocketConfigFactory
+class UpstreamTapSocketConfigFactory
     : public Server::Configuration::UpstreamTransportSocketConfigFactory,
-      public CaptureSocketConfigFactory {
+      public TapSocketConfigFactory {
 public:
   Network::TransportSocketFactoryPtr createTransportSocketFactory(
       const Protobuf::Message& config,
       Server::Configuration::TransportSocketFactoryContext& context) override;
 };
 
-class DownstreamCaptureSocketConfigFactory
+class DownstreamTapSocketConfigFactory
     : public Server::Configuration::DownstreamTransportSocketConfigFactory,
-      public CaptureSocketConfigFactory {
+      public TapSocketConfigFactory {
 public:
   Network::TransportSocketFactoryPtr
   createTransportSocketFactory(const Protobuf::Message& config,
@@ -40,7 +39,7 @@ public:
                                const std::vector<std::string>& server_names) override;
 };
 
-} // namespace Capture
+} // namespace Tap
 } // namespace TransportSockets
 } // namespace Extensions
 } // namespace Envoy

@@ -1,7 +1,7 @@
 syntax = "proto3";
 
-// [#protodoc-title: Common tap]
-// Trace capture format for the capture transport socket extension. This dumps plain text read/write
+// [#protodoc-title: Transport tap data]
+// Trace format for the tap transport socket extension. This dumps plain text read/write
 // sequences on a socket.
 
 package envoy.data.tap.v2alpha;
@@ -23,7 +23,7 @@ message Connection {
   envoy.api.v2.core.Address remote_address = 3;
 }
 
-// Event in a capture trace.
+// Event in a trace.
 message Event {
   // Timestamp for event.
   google.protobuf.Timestamp timestamp = 1;
@@ -47,7 +47,7 @@ message Event {
   }
 }
 
-// Sequence of read/write events that constitute a captured trace on a socket.
+// Sequence of read/write events that constitute a trace on a socket.
 // Multiple Trace messages might be emitted for a given connection ID, with the
 // sink (e.g. file set, network) responsible for later reassembly.
 message Trace {
