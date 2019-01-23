@@ -53,7 +53,7 @@ py_binary(
     visibility = ["//visibility:public"],
     deps = [
         ":capture_fuzz_proto_py",
-        "@envoy_api//envoy/data/tap/v2alpha:capture_py",
+        "@envoy_api//envoy/data/tap/v2alpha:transport_py",
     ],
 )
 
@@ -307,8 +307,8 @@ envoy_cc_test_library(
         "//source/common/thread_local:thread_local_lib",
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
-        "//source/extensions/transport_sockets/capture:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
+        "//source/extensions/transport_sockets/tap:config",
         "//source/extensions/transport_sockets/tls:ssl_socket_lib",
         "//source/server:connection_handler_lib",
         "//source/server:hot_restart_nop_lib",
@@ -504,8 +504,6 @@ envoy_cc_test(
         "//source/extensions/transport_sockets/tls:context_lib",
         "//test/mocks/secret:secret_mocks",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/transport_socket/capture/v2alpha:capture_cc",
-        "@envoy_api//envoy/data/tap/v2alpha:capture_cc",
     ],
 )
 
@@ -533,8 +531,6 @@ envoy_cc_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/secret:secret_mocks",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/transport_socket/capture/v2alpha:capture_cc",
-        "@envoy_api//envoy/data/tap/v2alpha:capture_cc",
     ],
 )
 
@@ -559,8 +555,8 @@ envoy_cc_test(
         "//source/extensions/transport_sockets/tls:context_lib",
         "//test/mocks/secret:secret_mocks",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/transport_socket/capture/v2alpha:capture_cc",
-        "@envoy_api//envoy/data/tap/v2alpha:capture_cc",
+        "@envoy_api//envoy/config/transport_socket/tap/v2alpha:tap_cc",
+        "@envoy_api//envoy/data/tap/v2alpha:transport_cc",
     ],
 )
 

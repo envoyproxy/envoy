@@ -11,7 +11,9 @@
 
 #include "test/extensions/filters/network/redis_proxy/mocks.h"
 #include "test/mocks/common.h"
+#include "test/mocks/stats/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/simulated_time_system.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -21,6 +23,8 @@ using testing::ByRef;
 using testing::DoAll;
 using testing::Eq;
 using testing::InSequence;
+using testing::NiceMock;
+using testing::Property;
 using testing::Ref;
 using testing::Return;
 using testing::WithArg;
@@ -45,8 +49,9 @@ public:
   }
 
   ConnPool::MockInstance* conn_pool_{new ConnPool::MockInstance()};
-  Stats::IsolatedStoreImpl store_;
-  InstanceImpl splitter_{ConnPool::InstancePtr{conn_pool_}, store_, "redis.foo."};
+  NiceMock<Stats::MockIsolatedStatsStore> store_;
+  Event::SimulatedTimeSystem time_system_;
+  InstanceImpl splitter_{ConnPool::InstancePtr{conn_pool_}, store_, "redis.foo.", time_system_};
   MockSplitCallbacks callbacks_;
   SplitRequestPtr handle_;
 };
@@ -130,16 +135,21 @@ public:
 TEST_P(RedisSingleServerRequestTest, Success) {
   InSequence s;
 
+  ToLowerTable table;
+  std::string lower_command(GetParam());
+  table.toLowerCase(lower_command);
+
   RespValue request;
   makeBulkStringArray(request, {GetParam(), "hello"});
   makeRequest("hello", request);
   EXPECT_NE(nullptr, handle_);
 
+  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  EXPECT_CALL(store_, deliverHistogramToSinks(
+                          Property(&Stats::Metric::name,
+                                   fmt::format("redis.foo.command.{}.latency", lower_command)),
+                          10));
   respond();
-
-  ToLowerTable table;
-  std::string lower_command(GetParam());
-  table.toLowerCase(lower_command);
 
   EXPECT_EQ(1UL, store_.counter(fmt::format("redis.foo.command.{}.total", lower_command)).value());
   EXPECT_EQ(1UL,
@@ -154,11 +164,16 @@ TEST_P(RedisSingleServerRequestTest, SuccessMultipleArgs) {
   makeRequest("hello", request);
   EXPECT_NE(nullptr, handle_);
 
-  respond();
-
   ToLowerTable table;
   std::string lower_command(GetParam());
   table.toLowerCase(lower_command);
+
+  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  EXPECT_CALL(store_, deliverHistogramToSinks(
+                          Property(&Stats::Metric::name,
+                                   fmt::format("redis.foo.command.{}.latency", lower_command)),
+                          10));
+  respond();
 
   EXPECT_EQ(1UL, store_.counter(fmt::format("redis.foo.command.{}.total", lower_command)).value());
   EXPECT_EQ(1UL,
@@ -173,11 +188,16 @@ TEST_P(RedisSingleServerRequestTest, Fail) {
   makeRequest("hello", request);
   EXPECT_NE(nullptr, handle_);
 
-  fail();
-
   ToLowerTable table;
   std::string lower_command(GetParam());
   table.toLowerCase(lower_command);
+
+  time_system_.setMonotonicTime(std::chrono::milliseconds(5));
+  EXPECT_CALL(store_, deliverHistogramToSinks(
+                          Property(&Stats::Metric::name,
+                                   fmt::format("redis.foo.command.{}.latency", lower_command)),
+                          5));
+  fail();
 
   EXPECT_EQ(1UL, store_.counter(fmt::format("redis.foo.command.{}.total", lower_command)).value());
   EXPECT_EQ(1UL, store_.counter(fmt::format("redis.foo.command.{}.error", lower_command)).value());
@@ -238,11 +258,16 @@ TEST_F(RedisSingleServerRequestTest, EvalSuccess) {
   makeRequest("key", request);
   EXPECT_NE(nullptr, handle_);
 
-  respond();
-
   ToLowerTable table;
   std::string lower_command("eval");
   table.toLowerCase(lower_command);
+
+  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  EXPECT_CALL(store_, deliverHistogramToSinks(
+                          Property(&Stats::Metric::name,
+                                   fmt::format("redis.foo.command.{}.latency", lower_command)),
+                          10));
+  respond();
 
   EXPECT_EQ(1UL, store_.counter(fmt::format("redis.foo.command.{}.total", lower_command)).value());
   EXPECT_EQ(1UL,
@@ -257,11 +282,16 @@ TEST_F(RedisSingleServerRequestTest, EvalShaSuccess) {
   makeRequest("keykey", request);
   EXPECT_NE(nullptr, handle_);
 
-  respond();
-
   ToLowerTable table;
   std::string lower_command("evalsha");
   table.toLowerCase(lower_command);
+
+  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  EXPECT_CALL(store_, deliverHistogramToSinks(
+                          Property(&Stats::Metric::name,
+                                   fmt::format("redis.foo.command.{}.latency", lower_command)),
+                          10));
+  respond();
 
   EXPECT_EQ(1UL, store_.counter(fmt::format("redis.foo.command.{}.total", lower_command)).value());
   EXPECT_EQ(1UL,
@@ -361,6 +391,9 @@ TEST_F(RedisMGETCommandHandlerTest, Normal) {
   RespValuePtr response1(new RespValue());
   response1->type(RespType::BulkString);
   response1->asString() = "response";
+  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  EXPECT_CALL(store_, deliverHistogramToSinks(
+                          Property(&Stats::Metric::name, "redis.foo.command.mget.latency"), 10));
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
   pool_callbacks_[0]->onResponse(std::move(response1));
 
@@ -451,6 +484,9 @@ TEST_F(RedisMGETCommandHandlerTest, Failure) {
   RespValuePtr response1(new RespValue());
   response1->type(RespType::BulkString);
   response1->asString() = "response";
+  time_system_.setMonotonicTime(std::chrono::milliseconds(5));
+  EXPECT_CALL(store_, deliverHistogramToSinks(
+                          Property(&Stats::Metric::name, "redis.foo.command.mget.latency"), 5));
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
   pool_callbacks_[0]->onResponse(std::move(response1));
   EXPECT_EQ(1UL, store_.counter("redis.foo.command.mget.total").value());
@@ -477,6 +513,9 @@ TEST_F(RedisMGETCommandHandlerTest, InvalidUpstreamResponse) {
   RespValuePtr response1(new RespValue());
   response1->type(RespType::Integer);
   response1->asInteger() = 5;
+  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  EXPECT_CALL(store_, deliverHistogramToSinks(
+                          Property(&Stats::Metric::name, "redis.foo.command.mget.latency"), 10));
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
   pool_callbacks_[0]->onResponse(std::move(response1));
   EXPECT_EQ(1UL, store_.counter("redis.foo.command.mget.total").value());
@@ -550,6 +589,10 @@ TEST_F(RedisMSETCommandHandlerTest, Normal) {
   RespValuePtr response1(new RespValue());
   response1->type(RespType::SimpleString);
   response1->asString() = Response::get().OK;
+
+  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  EXPECT_CALL(store_, deliverHistogramToSinks(
+                          Property(&Stats::Metric::name, "redis.foo.command.mset.latency"), 10));
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
   pool_callbacks_[0]->onResponse(std::move(response1));
 
@@ -669,6 +712,11 @@ TEST_P(RedisSplitKeysSumResultHandlerTest, Normal) {
   RespValuePtr response1(new RespValue());
   response1->type(RespType::Integer);
   response1->asInteger() = 1;
+  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  EXPECT_CALL(
+      store_,
+      deliverHistogramToSinks(
+          Property(&Stats::Metric::name, "redis.foo.command." + GetParam() + ".latency"), 10));
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
   pool_callbacks_[0]->onResponse(std::move(response1));
 

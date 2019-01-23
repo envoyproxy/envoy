@@ -28,7 +28,7 @@ static const std::string RuntimePanicThreshold = "upstream.healthy_panic_thresho
 // @param per_priority_availability the percentage availability of each priority, used to determine
 // how much load each priority can handle.
 // @param total_load the amount of load that may be distributed. Will be updated with the amount of
-// load reminaining after distribution.
+// load remaining after distribution.
 // @param normalized_total_availability the total availability, up to a max of 100. Used to
 // scale the load when the total availability is less than 100%.
 // @return the first available priority and the remaining load
@@ -90,18 +90,16 @@ LoadBalancerBase::LoadBalancerBase(const PrioritySet& priority_set, ClusterStats
           common_config, healthy_panic_threshold, 100, 50)),
       priority_set_(priority_set) {
   for (auto& host_set : priority_set_.hostSetsPerPriority()) {
-    recalculatePerPriorityState(host_set->priority(), priority_set_, healthy_per_priority_load_,
-                                degraded_per_priority_load_, per_priority_health_,
-                                per_priority_degraded_);
+    recalculatePerPriorityState(host_set->priority(), priority_set_, per_priority_load_,
+                                per_priority_health_, per_priority_degraded_);
   }
-  // Reclaculate panic mode for all levels.
+  // Recalculate panic mode for all levels.
   recalculatePerPriorityPanic();
 
   priority_set_.addPriorityUpdateCb(
       [this](uint32_t priority, const HostVector&, const HostVector&) -> void {
-        recalculatePerPriorityState(priority, priority_set_, healthy_per_priority_load_,
-                                    degraded_per_priority_load_, per_priority_health_,
-                                    per_priority_degraded_);
+        recalculatePerPriorityState(priority, priority_set_, per_priority_load_,
+                                    per_priority_health_, per_priority_degraded_);
       });
 
   priority_set_.addPriorityUpdateCb(
@@ -118,19 +116,18 @@ LoadBalancerBase::LoadBalancerBase(const PrioritySet& priority_set, ClusterStats
 //   Do not enter panic mode, even if a specific priority has low number of healthy hosts.
 // - normalized total health is < 100%. There are not enough healthy hosts to handle the load.
 // Continue
-//   distibuting the load among priority sets, but turn on panic mode for a given priority
+//   distributing the load among priority sets, but turn on panic mode for a given priority
 //   if # of healthy hosts in priority set is low.
 // - normalized total health is 0%. All hosts are down. Redirect 100% of traffic to P=0 and enable
 // panic mode.
 
 void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority,
                                                    const PrioritySet& priority_set,
-                                                   HealthyLoad& healthy_per_priority_load,
-                                                   DegradedLoad& degraded_per_priority_load,
+                                                   HealthyAndDegradedLoad& per_priority_load,
                                                    HealthyAvailability& per_priority_health,
                                                    DegradedAvailability& per_priority_degraded) {
-  healthy_per_priority_load.get().resize(priority_set.hostSetsPerPriority().size());
-  degraded_per_priority_load.get().resize(priority_set.hostSetsPerPriority().size());
+  per_priority_load.healthy_priority_load_.get().resize(priority_set.hostSetsPerPriority().size());
+  per_priority_load.degraded_priority_load_.get().resize(priority_set.hostSetsPerPriority().size());
   per_priority_health.get().resize(priority_set.hostSetsPerPriority().size());
   per_priority_degraded.get().resize(priority_set.hostSetsPerPriority().size());
 
@@ -143,7 +140,7 @@ void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority,
     // Each priority level's health is ratio of healthy hosts to total number of hosts in a priority
     // multiplied by overprovisioning factor of 1.4 and capped at 100%. It means that if all
     // hosts are healthy that priority's health is 100%*1.4=140% and is capped at 100% which results
-    // in 100%. If 80% of hosts are healty, that priority's health is still 100% (80%*1.4=112% and
+    // in 100%. If 80% of hosts are healthy, that priority's health is still 100% (80%*1.4=112% and
     // capped at 100%).
     per_priority_health.get()[priority] =
         std::min<uint32_t>(100, (host_set.overprovisioningFactor() *
@@ -171,22 +168,23 @@ void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority,
   if (normalized_total_availability == 0) {
     // Everything is terrible. Send all load to P=0.
     // In this one case sumEntries(per_priority_load) != 100 since we sinkhole all traffic in P=0.
-    healthy_per_priority_load.get()[0] = 100;
+    per_priority_load.healthy_priority_load_.get()[0] = 100;
     return;
   }
 
   // We start of with a total load of 100 and distribute it between priorities based on
   // availability. We first attempt to distribute this load to healthy priorities based on healthy
   // availability.
-  const auto first_healthy_and_remaining = distributeLoad(
-      healthy_per_priority_load, per_priority_health, 100, normalized_total_availability);
+  const auto first_healthy_and_remaining =
+      distributeLoad(per_priority_load.healthy_priority_load_, per_priority_health, 100,
+                     normalized_total_availability);
 
   // Using the remaining load after allocating load to healthy priorities, distribute it based on
   // degraded availability.
   const auto remaining_load_for_degraded = first_healthy_and_remaining.second;
   const auto first_degraded_and_remaining =
-      distributeLoad(degraded_per_priority_load, per_priority_degraded, remaining_load_for_degraded,
-                     normalized_total_availability);
+      distributeLoad(per_priority_load.degraded_priority_load_, per_priority_degraded,
+                     remaining_load_for_degraded, normalized_total_availability);
 
   // Anything that remains should just be rounding errors, so allocate that to the first available
   // priority, either as healthy or degraded.
@@ -198,20 +196,20 @@ void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority,
 
     // Attempt to allocate the remainder to the first healthy priority first. If no such priority
     // exist, allocate to the first degraded priority.
-    ASSERT(remaining_load <
-           healthy_per_priority_load.get().size() + per_priority_degraded.get().size());
+    ASSERT(remaining_load < per_priority_load.healthy_priority_load_.get().size() +
+                                per_priority_load.degraded_priority_load_.get().size());
     if (first_healthy != -1) {
-      healthy_per_priority_load.get()[first_healthy] += remaining_load;
+      per_priority_load.healthy_priority_load_.get()[first_healthy] += remaining_load;
     } else {
-      degraded_per_priority_load.get()[first_degraded] += remaining_load;
+      per_priority_load.degraded_priority_load_.get()[first_degraded] += remaining_load;
     }
   }
 
   // The allocated load between healthy and degraded should be exactly 100.
-  ASSERT(100 == std::accumulate(healthy_per_priority_load.get().begin(),
-                                healthy_per_priority_load.get().end(), 0) +
-                    std::accumulate(degraded_per_priority_load.get().begin(),
-                                    degraded_per_priority_load.get().end(), 0));
+  ASSERT(100 == std::accumulate(per_priority_load.healthy_priority_load_.get().begin(),
+                                per_priority_load.healthy_priority_load_.get().end(), 0) +
+                    std::accumulate(per_priority_load.degraded_priority_load_.get().begin(),
+                                    per_priority_load.degraded_priority_load_.get().end(), 0));
 }
 
 // Method iterates through priority levels and turns on/off panic mode.
@@ -227,7 +225,7 @@ void LoadBalancerBase::recalculatePerPriorityPanic() {
 
   if (normalized_total_availability == 0) {
     // Everything is terrible. All load should be to P=0. Turn on panic mode.
-    ASSERT(healthy_per_priority_load_.get()[0] == 100);
+    ASSERT(per_priority_load_.healthy_priority_load_.get()[0] == 100);
     per_priority_panic_[0] = true;
     return;
   }
@@ -245,18 +243,18 @@ void LoadBalancerBase::recalculatePerPriorityPanic() {
 std::pair<HostSet&, LoadBalancerBase::HostAvailability>
 LoadBalancerBase::chooseHostSet(LoadBalancerContext* context) {
   if (context) {
-    const auto& healthy_per_priority_load =
-        context->determinePriorityLoad(priority_set_, healthy_per_priority_load_);
+    const auto priority_loads = context->determinePriorityLoad(priority_set_, per_priority_load_);
 
-    // TODO(snowp): pass degraded priority load to plugin.
     const auto priority_and_source =
-        choosePriority(random_.random(), healthy_per_priority_load, degraded_per_priority_load_);
+        choosePriority(random_.random(), priority_loads.healthy_priority_load_,
+                       priority_loads.degraded_priority_load_);
     return {*priority_set_.hostSetsPerPriority()[priority_and_source.first],
             priority_and_source.second};
   }
 
   const auto priority_and_source =
-      choosePriority(random_.random(), healthy_per_priority_load_, degraded_per_priority_load_);
+      choosePriority(random_.random(), per_priority_load_.healthy_priority_load_,
+                     per_priority_load_.degraded_priority_load_);
   return {*priority_set_.hostSetsPerPriority()[priority_and_source.first],
           priority_and_source.second};
 }
@@ -332,7 +330,7 @@ void ZoneAwareLoadBalancerBase::regenerateLocalityRoutingStructures() {
   // half the hosts in all host sets go unhealthy, this priority set will
   // still send half of the incoming load to the local locality and 80% to residual.
   //
-  // Basically, fariness across localities within a priority is guaranteed. Fairness across
+  // Basically, fairness across localities within a priority is guaranteed. Fairness across
   // localities across priorities is not.
   STACK_ARRAY(local_percentage, uint64_t, num_localities);
   calculateLocalityPercentage(localHostSet().healthyHostsPerLocality(), local_percentage.begin());
@@ -441,7 +439,7 @@ HostConstSharedPtr LoadBalancerBase::chooseHost(LoadBalancerContext* context) {
     }
   }
 
-  // If we didnt find anything, return the last host.
+  // If we didn't find anything, return the last host.
   return host;
 }
 

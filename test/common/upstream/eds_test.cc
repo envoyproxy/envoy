@@ -881,7 +881,7 @@ TEST_F(EdsTest, RemoveUnreferencedLocalities) {
     EXPECT_EQ(2, hosts_per_locality.size());
   }
 
-  // Reset the ClusterLoadAssingment to only contain one of the locality per priority.
+  // Reset the ClusterLoadAssignment to only contain one of the locality per priority.
   // This should leave us with only one locality.
   cluster_load_assignment->clear_endpoints();
   add_hosts_to_locality("oceania", "koala", "ingsoc", 4, 0);
