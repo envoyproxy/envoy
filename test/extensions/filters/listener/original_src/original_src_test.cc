@@ -159,6 +159,25 @@ TEST_F(OriginalSrcTest, filterAddsMarkOption) {
   absl::string_view value_as_bstr(reinterpret_cast<const char*>(&value), sizeof(value));
   EXPECT_EQ(value_as_bstr, mark_option->value_);
 }
+
+TEST_F(OriginalSrcTest, Mark0NotAdded) {
+  if (!ENVOY_SOCKET_SO_MARK.has_value()) {
+    // The option isn't supported on this platform. Just skip the test.
+    return;
+  }
+
+  auto filter = makeMarkingFilter(0);
+  Network::Socket::OptionsSharedPtr options;
+  setAddressToReturn("tcp://1.2.3.4:80");
+  EXPECT_CALL(callbacks_.socket_, addOptions_(_)).WillOnce(SaveArg<0>(&options));
+
+  filter->onAccept(callbacks_);
+
+  auto mark_option = findOptionDetails(*options, ENVOY_SOCKET_SO_MARK,
+                                       envoy::api::v2::core::SocketOption::STATE_PREBIND);
+
+  ASSERT_FALSE(mark_option.has_value());
+}
 } // namespace
 } // namespace OriginalSrc
 } // namespace ListenerFilters
