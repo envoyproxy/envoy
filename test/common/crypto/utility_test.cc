@@ -8,21 +8,21 @@ namespace Envoy {
 namespace Common {
 namespace Crypto {
 
-TEST(UtilityTest, TestSha256Disgest) {
+TEST(UtilityTest, TestSha256Digest) {
   const Buffer::OwnedImpl buffer("test data");
   const auto digest = Utility::getSha256Digest(buffer);
   EXPECT_EQ("916f0027a575074ce72a331777c3478d6513f786a591bd892da1a577bf2335f9",
             Hex::encode(digest));
 }
 
-TEST(UtilityTest, TestSha256DisgestWithEmptyBuffer) {
+TEST(UtilityTest, TestSha256DigestWithEmptyBuffer) {
   const Buffer::OwnedImpl buffer;
   const auto digest = Utility::getSha256Digest(buffer);
   EXPECT_EQ("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
             Hex::encode(digest));
 }
 
-TEST(UtilityTest, TestSha256DisgestGrowingBuffer) {
+TEST(UtilityTest, TestSha256DigestGrowingBuffer) {
   // Adding multiple slices to the buffer
   Buffer::OwnedImpl buffer("slice 1");
   auto digest = Utility::getSha256Digest(buffer);
