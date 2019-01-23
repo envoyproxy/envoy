@@ -48,11 +48,11 @@ public:
           server_uri:
             uri: "ext_authz:9000"
             cluster: "ext_authz"
-            timeout: 0.25s  
+            timeout: 0.25s
 
-          authorization_request: 
-            allowed_headers: 
-              patterns: 
+          authorization_request:
+            allowed_headers:
+              patterns:
               - exact: Baz
               - prefix: "x-"
             headers_to_add:
@@ -61,13 +61,13 @@ public:
             - key: "x-authz-header2"
               value: "value"
 
-          authorization_response: 
-            allowed_upstream_headers: 
-              patterns: 
+          authorization_response:
+            allowed_upstream_headers:
+              patterns:
               - exact: Bar
               - prefix: "x-"
-            allowed_client_headers: 
-              patterns: 
+            allowed_client_headers:
+              patterns:
               - exact: Foo
               - prefix: "x-"
         )EOF";
@@ -309,7 +309,7 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationDeniedWithAllAttributes) {
   client_.onSuccess(TestCommon::makeMessageResponse(expected_headers, expected_body));
 }
 
-// Verify client response headers whe the authorization server denies the request and
+// Verify client response headers when the authorization server denies the request and
 // allowed_client_headers is configured.
 TEST_F(ExtAuthzHttpClientTest, AuthorizationDeniedAndAllowedClientHeaders) {
   const auto expected_body = std::string{"test"};

@@ -186,7 +186,7 @@ void ConnectionHandlerImpl::ActiveSocket::continueFilterChain(bool success) {
     }
     if (new_listener != nullptr) {
       // Hands off connections redirected by iptables to the listener associated with the
-      // original destination address. Pass 'hand_off_restored_destionations' as false to
+      // original destination address. Pass 'hand_off_restored_destination_connections' as false to
       // prevent further redirection.
       new_listener->onAccept(std::move(socket_), false);
     } else {

@@ -112,7 +112,7 @@ public:
 
   void resetStream() { request_.stream_state_ = response_.stream_state_ = StreamState::Closed; }
 
-  // Some stream action applied in either the request or resposne direction.
+  // Some stream action applied in either the request or response direction.
   void directionalAction(DirectionalState& state,
                          const test::common::http::http2::DirectionalAction& directional_action) {
     const bool end_stream = directional_action.end_stream();

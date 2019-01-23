@@ -1075,7 +1075,7 @@ TEST_P(SslSocketTest, FailedClientCertAllowExpiredBadHashVerification) {
                  .setExpectedClientCertUri("spiffe://lyft.com/test-team"));
 }
 
-// Allow expired certificatess, but use the wrong CA so it should fail still.
+// Allow expired certificates, but use the wrong CA so it should fail still.
 TEST_P(SslSocketTest, FailedClientCertAllowServerExpiredWrongCAVerification) {
   envoy::api::v2::Listener listener;
   envoy::api::v2::auth::UpstreamTlsContext client;
