@@ -22,6 +22,10 @@
 #include "common/network/utility.h"
 #include "common/upstream/upstream_impl.h"
 
+#include "extensions/transport_sockets/tls/context_config_impl.h"
+#include "extensions/transport_sockets/tls/context_manager_impl.h"
+#include "extensions/transport_sockets/tls/ssl_socket.h"
+
 #include "test/integration/autonomous_upstream.h"
 #include "test/integration/utility.h"
 #include "test/test_common/environment.h"
@@ -31,8 +35,12 @@
 
 using testing::_;
 using testing::AnyNumber;
+using testing::AssertionFailure;
+using testing::AssertionResult;
+using testing::AssertionSuccess;
 using testing::AtLeast;
 using testing::Invoke;
+using testing::IsSubstring;
 using testing::NiceMock;
 
 namespace Envoy {
@@ -256,6 +264,7 @@ void BaseIntegrationTest::initialize() {
   initialized_ = true;
 
   createUpstreams();
+  createXdsUpstream();
   createEnvoy();
 }
 
@@ -420,4 +429,87 @@ BaseIntegrationTest::createIntegrationTestServer(const std::string& bootstrap_pa
                                        defer_listener_finalization_);
 }
 
+void BaseIntegrationTest::createXdsUpstream() {
+  if (create_xds_upstream_ == false) {
+    return;
+  }
+  if (tls_xds_upstream_ == false) {
+    fake_upstreams_.emplace_back(
+        new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_, timeSystem()));
+  } else {
+    envoy::api::v2::auth::DownstreamTlsContext tls_context;
+    auto* common_tls_context = tls_context.mutable_common_tls_context();
+    common_tls_context->add_alpn_protocols("h2");
+    auto* tls_cert = common_tls_context->add_tls_certificates();
+    tls_cert->mutable_certificate_chain()->set_filename(
+        TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcert.pem"));
+    tls_cert->mutable_private_key()->set_filename(
+        TestEnvironment::runfilesPath("test/config/integration/certs/upstreamkey.pem"));
+    auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
+        tls_context, factory_context_);
+
+    static Stats::Scope* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
+    auto context = std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
+        std::move(cfg), context_manager_, *upstream_stats_store, std::vector<std::string>{});
+    fake_upstreams_.emplace_back(new FakeUpstream(
+        std::move(context), 0, FakeHttpConnection::Type::HTTP2, version_, timeSystem()));
+  }
+  xds_upstream_ = fake_upstreams_[1].get();
+  // Don't ASSERT fail if an xDS reconnect ends up unparented.
+  xds_upstream_->set_allow_unexpected_disconnects(true);
+}
+
+void BaseIntegrationTest::createXdsConnection() {
+  AssertionResult result = xds_upstream_->waitForHttpConnection(*dispatcher_, xds_connection_);
+  RELEASE_ASSERT(result, result.message());
+}
+
+void BaseIntegrationTest::cleanUpXdsConnection() {
+  AssertionResult result = xds_connection_->close();
+  RELEASE_ASSERT(result, result.message());
+  result = xds_connection_->waitForDisconnect();
+  RELEASE_ASSERT(result, result.message());
+  xds_connection_.reset();
+}
+
+AssertionResult BaseIntegrationTest::compareDiscoveryRequest(
+    const std::string& expected_type_url, const std::string& expected_version,
+    const std::vector<std::string>& expected_resource_names,
+    const Protobuf::int32 expected_error_code, const std::string& expected_error_message) {
+  envoy::api::v2::DiscoveryRequest discovery_request;
+  VERIFY_ASSERTION(xds_stream_->waitForGrpcMessage(*dispatcher_, discovery_request));
+
+  EXPECT_TRUE(discovery_request.has_node());
+  EXPECT_FALSE(discovery_request.node().id().empty());
+  EXPECT_FALSE(discovery_request.node().cluster().empty());
+
+  // TODO(PiotrSikora): Remove this hack once fixed internally.
+  if (!(expected_type_url == discovery_request.type_url())) {
+    return AssertionFailure() << fmt::format("type_url {} does not match expected {}",
+                                             discovery_request.type_url(), expected_type_url);
+  }
+  if (!(expected_error_code == discovery_request.error_detail().code())) {
+    return AssertionFailure() << fmt::format("error_code {} does not match expected {}",
+                                             discovery_request.error_detail().code(),
+                                             expected_error_code);
+  }
+  EXPECT_TRUE(
+      IsSubstring("", "", expected_error_message, discovery_request.error_detail().message()));
+  const std::vector<std::string> resource_names(discovery_request.resource_names().cbegin(),
+                                                discovery_request.resource_names().cend());
+  if (expected_resource_names != resource_names) {
+    return AssertionFailure() << fmt::format(
+               "resources {} do not match expected {} in {}",
+               fmt::join(resource_names.begin(), resource_names.end(), ","),
+               fmt::join(expected_resource_names.begin(), expected_resource_names.end(), ","),
+               discovery_request.DebugString());
+  }
+  // TODO(PiotrSikora): Remove this hack once fixed internally.
+  if (!(expected_version == discovery_request.version_info())) {
+    return AssertionFailure() << fmt::format("version {} does not match expected {} in {}",
+                                             discovery_request.version_info(), expected_version,
+                                             discovery_request.DebugString());
+  }
+  return AssertionSuccess();
+}
 } // namespace Envoy
