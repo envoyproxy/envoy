@@ -13,9 +13,8 @@ GrpcMuxImpl::GrpcMuxImpl(const LocalInfo::LocalInfo& local_info, Grpc::AsyncClie
                          const Protobuf::MethodDescriptor& service_method,
                          Runtime::RandomGenerator& random, Stats::Scope& scope,
                          const RateLimitSettings& rate_limit_settings)
-    : DiscoveryGrpcStream<envoy::api::v2::DiscoveryRequest, envoy::api::v2::DiscoveryResponse,
-                          std::string>(std::move(async_client), service_method, random, dispatcher,
-                                       scope, rate_limit_settings),
+    : GrpcStream<envoy::api::v2::DiscoveryRequest, envoy::api::v2::DiscoveryResponse, std::string>(
+          std::move(async_client), service_method, random, dispatcher, scope, rate_limit_settings),
       local_info_(local_info) {
   Config::Utility::checkLocalInfo("ads", local_info);
 }
@@ -30,17 +29,17 @@ GrpcMuxImpl::~GrpcMuxImpl() {
 
 void GrpcMuxImpl::start() { establishNewStream(); }
 
-bool GrpcMuxImpl::sendDiscoveryRequest(const std::string& type_url) {
+void GrpcMuxImpl::sendDiscoveryRequest(const std::string& type_url) {
   if (!grpcStreamAvailable()) {
     ENVOY_LOG(debug, "No stream available to sendDiscoveryRequest for {}", type_url);
-    return true;
+    return; // Drop this request; the reconnect will enqueue a new one.
   }
 
   ApiState& api_state = api_state_[type_url];
   if (api_state.paused_) {
     ENVOY_LOG(trace, "API {} paused during sendDiscoveryRequest(), setting pending.", type_url);
     api_state.pending_ = true;
-    return true;
+    return; // Drop this request; the unpause will enqueue a new one.
   }
 
   auto& request = api_state.request_;
@@ -64,7 +63,6 @@ bool GrpcMuxImpl::sendDiscoveryRequest(const std::string& type_url) {
   if (api_state_[type_url].request_.has_error_detail()) {
     api_state_[type_url].request_.clear_error_detail();
   }
-  return true;
 }
 
 GrpcMuxWatchPtr GrpcMuxImpl::subscribe(const std::string& type_url,

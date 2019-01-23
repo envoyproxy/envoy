@@ -11,7 +11,7 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/logger.h"
-#include "common/config/discovery_grpc_stream.h"
+#include "common/config/grpc_stream.h"
 #include "common/config/utility.h"
 
 namespace Envoy {
@@ -20,10 +20,10 @@ namespace Config {
 /**
  * ADS API implementation that fetches via gRPC.
  */
-class GrpcMuxImpl : public GrpcMux,
-                    public DiscoveryGrpcStream<envoy::api::v2::DiscoveryRequest,
-                                               envoy::api::v2::DiscoveryResponse,
-                                               std::string> // this string is a type URL
+class GrpcMuxImpl
+    : public GrpcMux,
+      public GrpcStream<envoy::api::v2::DiscoveryRequest, envoy::api::v2::DiscoveryResponse,
+                        std::string> // this string is a type URL
 {
 public:
   GrpcMuxImpl(const LocalInfo::LocalInfo& local_info, Grpc::AsyncClientPtr async_client,
@@ -39,9 +39,9 @@ public:
   void resume(const std::string& type_url) override;
 
   // queue_item is a resource type URL.
-  bool sendDiscoveryRequest(const std::string& queue_item) override;
+  void sendDiscoveryRequest(const std::string& queue_item) override;
 
-  // DiscoveryGrpcStream
+  // GrpcStream
   void handleResponse(std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message) override;
   void handleStreamEstablished() override;
   void handleEstablishmentFailure() override;

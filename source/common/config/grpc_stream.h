@@ -15,13 +15,12 @@ namespace Config {
 // xDS variants). Reestablishes the gRPC channel when necessary, and provides rate limiting of
 // requests.
 template <class RequestProto, class ResponseProto, class RequestQueueItem>
-class DiscoveryGrpcStream : public Grpc::TypedAsyncStreamCallbacks<ResponseProto>,
-                            public Logger::Loggable<Logger::Id::config> {
+class GrpcStream : public Grpc::TypedAsyncStreamCallbacks<ResponseProto>,
+                   public Logger::Loggable<Logger::Id::config> {
 public:
-  DiscoveryGrpcStream(Grpc::AsyncClientPtr async_client,
-                      const Protobuf::MethodDescriptor& service_method,
-                      Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
-                      Stats::Scope& scope, const RateLimitSettings& rate_limit_settings)
+  GrpcStream(Grpc::AsyncClientPtr async_client, const Protobuf::MethodDescriptor& service_method,
+             Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher, Stats::Scope& scope,
+             const RateLimitSettings& rate_limit_settings)
       : async_client_(std::move(async_client)), service_method_(service_method),
         control_plane_stats_(generateControlPlaneStats(scope)), random_(random),
         time_source_(dispatcher.timeSystem()),
@@ -42,7 +41,7 @@ public:
   virtual void handleEstablishmentFailure() PURE;
 
   // Returns whether the request was actually sent (and so can leave the queue).
-  virtual bool sendDiscoveryRequest(const RequestQueueItem& queue_item) PURE;
+  virtual void sendDiscoveryRequest(const RequestQueueItem& queue_item) PURE;
 
   void queueDiscoveryRequest(const RequestQueueItem& queue_item) {
     request_queue_.push(queue_item);
@@ -111,11 +110,8 @@ private:
     ENVOY_LOG(trace, "draining discovery requests {}", request_queue_.size());
     while (!request_queue_.empty() && checkRateLimitAllowsDrain(request_queue_.size())) {
       // Process the request, if rate limiting is not enabled at all or if it is under rate limit.
-      if (sendDiscoveryRequest(request_queue_.front())) {
-        request_queue_.pop();
-      } else {
-        break;
-      }
+      sendDiscoveryRequest(request_queue_.front());
+      request_queue_.pop();
     }
   }
 

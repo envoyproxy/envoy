@@ -98,8 +98,8 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "discovery_grpc_stream_lib",
-    hdrs = ["discovery_grpc_stream.h"],
+    name = "grpc_stream_lib",
+    hdrs = ["grpc_stream.h"],
     deps = [
         ":utility_lib",
         "//include/envoy/config:grpc_mux_interface",
@@ -156,7 +156,7 @@ envoy_cc_library(
     srcs = ["grpc_mux_impl.cc"],
     hdrs = ["grpc_mux_impl.h"],
     deps = [
-        ":discovery_grpc_stream_lib",
+        ":grpc_stream_lib",
         ":utility_lib",
         "//include/envoy/config:grpc_mux_interface",
         "//include/envoy/config:subscription_interface",
