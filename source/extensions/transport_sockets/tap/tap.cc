@@ -1,4 +1,4 @@
-#include "extensions/transport_sockets/capture/capture.h"
+#include "extensions/transport_sockets/tap/tap.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
@@ -9,25 +9,24 @@
 namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
-namespace Capture {
+namespace Tap {
 
-CaptureSocket::CaptureSocket(
-    const std::string& path_prefix,
-    envoy::config::transport_socket::capture::v2alpha::FileSink::Format format,
-    Network::TransportSocketPtr&& transport_socket, Event::TimeSystem& time_system)
+TapSocket::TapSocket(const std::string& path_prefix,
+                     envoy::config::transport_socket::tap::v2alpha::FileSink::Format format,
+                     Network::TransportSocketPtr&& transport_socket, Event::TimeSystem& time_system)
     : path_prefix_(path_prefix), format_(format), transport_socket_(std::move(transport_socket)),
       time_system_(time_system) {}
 
-void CaptureSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) {
+void TapSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) {
   callbacks_ = &callbacks;
   transport_socket_->setTransportSocketCallbacks(callbacks);
 }
 
-std::string CaptureSocket::protocol() const { return transport_socket_->protocol(); }
+std::string TapSocket::protocol() const { return transport_socket_->protocol(); }
 
-bool CaptureSocket::canFlushClose() { return transport_socket_->canFlushClose(); }
+bool TapSocket::canFlushClose() { return transport_socket_->canFlushClose(); }
 
-void CaptureSocket::closeSocket(Network::ConnectionEvent event) {
+void TapSocket::closeSocket(Network::ConnectionEvent event) {
   // The caller should have invoked setTransportSocketCallbacks() prior to this.
   ASSERT(callbacks_ != nullptr);
   auto* connection = trace_.mutable_connection();
@@ -37,7 +36,7 @@ void CaptureSocket::closeSocket(Network::ConnectionEvent event) {
   Network::Utility::addressToProtobufAddress(*callbacks_->connection().remoteAddress(),
                                              *connection->mutable_remote_address());
   const bool text_format =
-      format_ == envoy::config::transport_socket::capture::v2alpha::FileSink::PROTO_TEXT;
+      format_ == envoy::config::transport_socket::tap::v2alpha::FileSink::PROTO_TEXT;
   const std::string path = fmt::format("{}_{}.{}", path_prefix_, callbacks_->connection().id(),
                                        text_format ? "pb_text" : "pb");
   ENVOY_LOG_MISC(debug, "Writing socket trace for [C{}] to {}", callbacks_->connection().id(),
@@ -53,7 +52,7 @@ void CaptureSocket::closeSocket(Network::ConnectionEvent event) {
   transport_socket_->closeSocket(event);
 }
 
-Network::IoResult CaptureSocket::doRead(Buffer::Instance& buffer) {
+Network::IoResult TapSocket::doRead(Buffer::Instance& buffer) {
   Network::IoResult result = transport_socket_->doRead(buffer);
   if (result.bytes_processed_ > 0) {
     // TODO(htuch): avoid linearizing
@@ -70,7 +69,7 @@ Network::IoResult CaptureSocket::doRead(Buffer::Instance& buffer) {
   return result;
 }
 
-Network::IoResult CaptureSocket::doWrite(Buffer::Instance& buffer, bool end_stream) {
+Network::IoResult TapSocket::doWrite(Buffer::Instance& buffer, bool end_stream) {
   // TODO(htuch): avoid copy.
   Buffer::OwnedImpl copy(buffer);
   Network::IoResult result = transport_socket_->doWrite(buffer, end_stream);
@@ -88,29 +87,29 @@ Network::IoResult CaptureSocket::doWrite(Buffer::Instance& buffer, bool end_stre
   return result;
 }
 
-void CaptureSocket::onConnected() { transport_socket_->onConnected(); }
+void TapSocket::onConnected() { transport_socket_->onConnected(); }
 
-const Ssl::Connection* CaptureSocket::ssl() const { return transport_socket_->ssl(); }
+const Ssl::Connection* TapSocket::ssl() const { return transport_socket_->ssl(); }
 
-CaptureSocketFactory::CaptureSocketFactory(
+TapSocketFactory::TapSocketFactory(
     const std::string& path_prefix,
-    envoy::config::transport_socket::capture::v2alpha::FileSink::Format format,
+    envoy::config::transport_socket::tap::v2alpha::FileSink::Format format,
     Network::TransportSocketFactoryPtr&& transport_socket_factory, Event::TimeSystem& time_system)
     : path_prefix_(path_prefix), format_(format),
       transport_socket_factory_(std::move(transport_socket_factory)), time_system_(time_system) {}
 
 Network::TransportSocketPtr
-CaptureSocketFactory::createTransportSocket(Network::TransportSocketOptionsSharedPtr) const {
-  return std::make_unique<CaptureSocket>(path_prefix_, format_,
-                                         transport_socket_factory_->createTransportSocket(nullptr),
-                                         time_system_);
+TapSocketFactory::createTransportSocket(Network::TransportSocketOptionsSharedPtr) const {
+  return std::make_unique<TapSocket>(path_prefix_, format_,
+                                     transport_socket_factory_->createTransportSocket(nullptr),
+                                     time_system_);
 }
 
-bool CaptureSocketFactory::implementsSecureTransport() const {
+bool TapSocketFactory::implementsSecureTransport() const {
   return transport_socket_factory_->implementsSecureTransport();
 }
 
-} // namespace Capture
+} // namespace Tap
 } // namespace TransportSockets
 } // namespace Extensions
 } // namespace Envoy

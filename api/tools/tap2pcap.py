@@ -1,14 +1,14 @@
-"""Tool to convert Envoy capture trace format to PCAP.
+"""Tool to convert Envoy tap trace format to PCAP.
 
 Uses od and text2pcap (part of Wireshark) utilities to translate the Envoy
-capture trace proto format to a PCAP file suitable for consuming in Wireshark
+tap trace proto format to a PCAP file suitable for consuming in Wireshark
 and other tools in the PCAP ecosystem. The TCP stream in the output PCAP is
 synthesized based on the known IP/port/timestamps that Envoy produces in its
-capture files; it is not a literal wire capture.
+tap files; it is not a literal wire tap.
 
 Usage:
 
-bazel run @envoy_api//tools:capture2pcap <capture .pb/.pb_text> <pcap path>
+bazel run @envoy_api//tools:tap2pcap <tap .pb/.pb_text> <pcap path>
 
 Known issues:
 - IPv6 PCAP generation has malformed TCP packets. This appears to be a text2pcap
@@ -28,7 +28,7 @@ import time
 
 from google.protobuf import text_format
 
-from envoy.data.tap.v2alpha import capture_pb2
+from envoy.data.tap.v2alpha import transport_pb2
 
 
 def DumpEvent(direction, timestamp, data):
@@ -43,13 +43,13 @@ def DumpEvent(direction, timestamp, data):
   return dump.getvalue()
 
 
-def Capture2Pcap(capture_path, pcap_path):
-  trace = capture_pb2.Trace()
-  if capture_path.endswith('.pb_text'):
-    with open(capture_path, 'r') as f:
+def Tap2Pcap(tap_path, pcap_path):
+  trace = transport_pb2.Trace()
+  if tap_path.endswith('.pb_text'):
+    with open(tap_path, 'r') as f:
       text_format.Merge(f.read(), trace)
   else:
-    with open(capture_path, 'r') as f:
+    with open(tap_path, 'r') as f:
       trace.ParseFromString(f.read())
 
   local_address = trace.connection.local_address.socket_address.address
@@ -82,6 +82,6 @@ def Capture2Pcap(capture_path, pcap_path):
 
 if __name__ == '__main__':
   if len(sys.argv) != 3:
-    print('Usage: %s <capture .pb/.pb_text> <pcap path>' % sys.argv[0])
+    print('Usage: %s <tap .pb/.pb_text> <pcap path>' % sys.argv[0])
     sys.exit(1)
-  Capture2Pcap(sys.argv[1], sys.argv[2])
+  Tap2Pcap(sys.argv[1], sys.argv[2])
