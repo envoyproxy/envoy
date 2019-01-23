@@ -563,7 +563,7 @@ TEST_F(MySQLFilterTest, MySqlHandshake41OkOOOFullLoginTest) {
  * Negative sequence
  * Test MySQL Handshake with protocol version 41
  * - send greeting messages followed by login ok
- * -> expect filte to ignore serverOK, because it has not
+ * -> expect filter to ignore serverOK, because it has not
  *    processed Challenge message
  */
 TEST_F(MySQLFilterTest, MySqlHandshake41OkGreetingLoginOKTest) {

@@ -399,3 +399,11 @@ explanation of the output.
     set to '0'.
   * Latency information represents data since last flush.
     Mean latency is currently not available.
+
+.. http:post:: /tap
+
+  This endpoint is used for configuring an active tap session. It is only
+  available if a valid tap extension has been configured, and that extension has
+  been configured to accept admin configuration. See:
+
+  * :ref:`HTTP tap filter configuration <config_http_filters_tap_admin_handler>`

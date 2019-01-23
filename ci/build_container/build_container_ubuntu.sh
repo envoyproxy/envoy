@@ -13,7 +13,7 @@ apt-add-repository "deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-7 main
 apt-get update
 apt-get install -y clang-7 clang-format-7 clang-tidy-7 lld-7 libc++-7-dev libc++abi-7-dev
 # gcc-7
-add-apt-repository ppa:ubuntu-toolchain-r/test
+add-apt-repository -y ppa:ubuntu-toolchain-r/test
 apt update
 apt install -y g++-7
 update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-7 1000

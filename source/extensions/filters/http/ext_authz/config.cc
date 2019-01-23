@@ -3,7 +3,7 @@
 #include <chrono>
 #include <string>
 
-#include "envoy/config/filter/http/ext_authz/v2alpha/ext_authz.pb.validate.h"
+#include "envoy/config/filter/http/ext_authz/v2/ext_authz.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "common/protobuf/utility.h"
@@ -18,8 +18,8 @@ namespace HttpFilters {
 namespace ExtAuthz {
 
 Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
-    const envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz& proto_config,
-    const std::string&, Server::Configuration::FactoryContext& context) {
+    const envoy::config::filter::http::ext_authz::v2::ExtAuthz& proto_config, const std::string&,
+    Server::Configuration::FactoryContext& context) {
   const auto filter_config = std::make_shared<FilterConfig>(
       proto_config, context.localInfo(), context.scope(), context.runtime(), context.httpContext());
   Http::FilterFactoryCb callback;
@@ -59,7 +59,7 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
 
 Router::RouteSpecificFilterConfigConstSharedPtr
 ExtAuthzFilterConfig::createRouteSpecificFilterConfigTyped(
-    const envoy::config::filter::http::ext_authz::v2alpha::ExtAuthzPerRoute& proto_config,
+    const envoy::config::filter::http::ext_authz::v2::ExtAuthzPerRoute& proto_config,
     Server::Configuration::FactoryContext&) {
   return std::make_shared<FilterConfigPerRoute>(proto_config);
 }

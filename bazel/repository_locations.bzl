@@ -100,9 +100,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/googleapis/googleapis/archive/d6f78d948c53f3b400bb46996eb3084359914f9b.tar.gz"],
     ),
     com_github_datadog_dd_opentracing_cpp = dict(
-        sha256 = "32967149fbc672f321ba6ce6c3e5cc299b15ab914f6f5b2993c7c9ddc1894439",
-        strip_prefix = "dd-opentracing-cpp-0.3.6",
-        urls = ["https://github.com/DataDog/dd-opentracing-cpp/archive/v0.3.6.tar.gz"],
+        sha256 = "1798ce816e389ad89c379cb734487ed8b7db3d909be0c8548bd96538f78639b7",
+        strip_prefix = "dd-opentracing-cpp-0.4.1",
+        urls = ["https://github.com/DataDog/dd-opentracing-cpp/archive/v0.4.1.tar.gz"],
     ),
     com_github_msgpack_msgpack_c = dict(
         sha256 = "bda49f996a73d2c6080ff0523e7b535917cd28c8a79c3a5da54fc29332d61d1e",
@@ -195,5 +195,10 @@ REPOSITORY_LOCATIONS = dict(
         sha256 = "eddbfc920e9cd565500370114316757848b672deba06dc2336acfa81b4ac0e6d",
         strip_prefix = "subpar-1.3.0",
         urls = ["https://github.com/google/subpar/archive/1.3.0.tar.gz"],
+    ),
+    com_googlesource_quiche = dict(
+        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/c9b2cecd1d005893114a03c101532017ddfa12cb.tar.gz
+        sha256 = "c8faea835132103d574cc2769a58e244bee3de02669471330a174f2ffae6fcc3",
+        urls = ["https://storage.googleapis.com/quiche-envoy-integration/c9b2cecd1d005893114a03c101532017ddfa12cb.tar.gz"],
     ),
 )
