@@ -63,8 +63,7 @@ protected:
    */
   void SetupForMultiDeath() {
     InSequence s;
-    guard_dog_ =
-        std::make_unique<GuardDogImpl>(fakestats_, config_multikill_, time_system_, *api_);
+    guard_dog_ = std::make_unique<GuardDogImpl>(fakestats_, config_multikill_, time_system_, *api_);
     auto unpet_dog_ = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId());
     guard_dog_->forceCheckForTest();
     auto second_dog_ = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId());

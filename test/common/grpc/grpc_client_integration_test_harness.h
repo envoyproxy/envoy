@@ -491,9 +491,8 @@ public:
         .WillByDefault(ReturnRef(*mock_cluster_info_->transport_socket_factory_));
     async_client_transport_socket_ =
         mock_cluster_info_->transport_socket_factory_->createTransportSocket(nullptr);
-    fake_upstream_ = std::make_unique<FakeUpstream>(createUpstreamSslContext(), 0,
-                                                    FakeHttpConnection::Type::HTTP2, ipVersion(),
-                                                    time_system_);
+    fake_upstream_ = std::make_unique<FakeUpstream>(
+        createUpstreamSslContext(), 0, FakeHttpConnection::Type::HTTP2, ipVersion(), time_system_);
 
     GrpcClientIntegrationTest::initialize();
   }

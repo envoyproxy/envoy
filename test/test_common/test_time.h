@@ -72,8 +72,8 @@ public:
     return *time_system_;
   }
 
-  //TestTimeSystem& operator*() { return *lazyInit(); }
-  //TestTimeSystem* operator->() { return lazyInit(); }
+  // TestTimeSystem& operator*() { return *lazyInit(); }
+  // TestTimeSystem* operator->() { return lazyInit(); }
 
 private:
   TestTimeSystem* time_system_;
@@ -81,11 +81,11 @@ private:
 };
 
 class GlobalTimeSystem : public TestTimeSystem {
- public:
+public:
   void sleep(const Duration& duration) override { singleton_->lazyInit().sleep(duration); }
-  Thread::CondVar::WaitStatus waitFor(
-      Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
-      const Duration& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) override {
+  Thread::CondVar::WaitStatus
+  waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
+          const Duration& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) override {
     return singleton_->lazyInit().waitFor(mutex, condvar, duration);
   }
   SchedulerPtr createScheduler(Libevent::BasePtr& base_ptr) override {
@@ -96,7 +96,7 @@ class GlobalTimeSystem : public TestTimeSystem {
 
   void set(TestTimeSystem* time_system) { singleton_->set(time_system); }
 
- private:
+private:
   Test::Global<SingletonTimeSystemHelper> singleton_;
 };
 
@@ -105,9 +105,9 @@ public:
   TestTime() { global_time_system_.set(&(time_system_.get())); }
 
   void sleep(const Duration& duration) override { time_system_->sleep(duration); }
-  Thread::CondVar::WaitStatus waitFor(
-      Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
-      const Duration& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) override {
+  Thread::CondVar::WaitStatus
+  waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
+          const Duration& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) override {
     return time_system_->waitFor(mutex, condvar, duration);
   }
   SchedulerPtr createScheduler(Libevent::BasePtr& base_ptr) override {
