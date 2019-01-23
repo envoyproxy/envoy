@@ -279,7 +279,7 @@ TEST_P(ServerInstanceImplTest, BootstrapNodeWithoutAccessLog) {
                             "An admin access log path is required for a listening server.");
 }
 
-// Empty bootstrap succeeeds.
+// Empty bootstrap succeeds.
 TEST_P(ServerInstanceImplTest, EmptyBootstrap) {
   options_.service_cluster_name_ = "some_cluster_name";
   options_.service_node_name_ = "some_node_name";
@@ -394,7 +394,7 @@ TEST_P(ServerInstanceImplTest, ZipkinHttpTracingEnabled) {
   EXPECT_NO_THROW(initialize("test/server/zipkin_tracing.yaml"));
   EXPECT_EQ(nullptr, dynamic_cast<Tracing::HttpNullTracer*>(tracer()));
 
-  // Note: there is no ZipkingTracerImpl object;
+  // Note: there is no ZipkinTracerImpl object;
   // source/extensions/tracers/zipkin/config.cc instantiates the tracer with
   //     std::make_unique<Tracing::HttpTracerImpl>(std::move(zipkin_driver), server.localInfo());
   // so we look for a successful dynamic cast to HttpTracerImpl, rather

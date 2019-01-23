@@ -406,10 +406,10 @@ TEST_P(SdsDynamicUpstreamIntegrationTest, BasicSuccess) {
   fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
   // There is a race condition here; there are two static clusters:
-  // backend cluster_0 with sds and sds_cluser. cluster_0 is created first, its init_manager
+  // backend cluster_0 with sds and sds_cluster. cluster_0 is created first, its init_manager
   // is called so it issues a sds call, but fail since sds_cluster is not added yet.
   // so cluster_0 is initialized with an empty secret. initialize() will not wait and will return.
-  // the testing request will be called, even though in the pre_workder_function, a good sds is
+  // the testing request will be called, even though in the pre_worker_function, a good sds is
   // send, the cluster will be updated with good secret, the testing request may fail if it is
   // before context is updated. Hence, need to wait for context_update counter.
   test_server_->waitForCounterGe(

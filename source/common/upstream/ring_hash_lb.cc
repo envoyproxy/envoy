@@ -120,7 +120,7 @@ RingHashLoadBalancer::Ring::Ring(
       absl::string_view hash_key(hash_key_buffer, total_hash_key_len);
 
       // Sadly std::hash provides no mechanism for hashing arbitrary bytes so we must copy here.
-      // xxHash is done wihout copies.
+      // xxHash is done without copies.
       const uint64_t hash =
           use_std_hash
               ? std::hash<std::string>()(std::string(hash_key))

@@ -111,19 +111,19 @@ elif [[ "$1" == "bazel.asan" ]]; then
   echo "Building and testing..."
   bazel_with_collection test ${BAZEL_TEST_OPTIONS} -c dbg --config=clang-asan @envoy//test/... \
     //:echo2_integration_test //:envoy_binary_test
-  # Also validate that integration test traffic capture (useful when debugging etc.)
-  # works. This requires that we set CAPTURE_ENV. We do this under bazel.asan to
+  # Also validate that integration test traffic tapping (useful when debugging etc.)
+  # works. This requires that we set TAP_PATH. We do this under bazel.asan to
   # ensure a debug build in CI.
-  CAPTURE_TMP=/tmp/capture/
-  rm -rf "${CAPTURE_TMP}"
-  mkdir -p "${CAPTURE_TMP}"
+  TAP_TMP=/tmp/tap/
+  rm -rf "${TAP_TMP}"
+  mkdir -p "${TAP_TMP}"
   bazel_with_collection test ${BAZEL_TEST_OPTIONS} -c dbg --config=clang-asan \
     @envoy//test/integration:ssl_integration_test \
-    --test_env=CAPTURE_PATH="${CAPTURE_TMP}/capture"
+    --test_env=TAP_PATH="${TAP_TMP}/tap"
   # Verify that some pb_text files have been created. We can't check for pcap,
   # since tcpdump is not available in general due to CircleCI lack of support
   # for privileged Docker executors.
-  ls -l "${CAPTURE_TMP}"/*.pb_text > /dev/null
+  ls -l "${TAP_TMP}"/tap_*.pb_text > /dev/null
   exit 0
 elif [[ "$1" == "bazel.tsan" ]]; then
   setup_clang_toolchain
@@ -201,7 +201,7 @@ elif [[ "$1" == "bazel.api" ]]; then
   bazel build ${BAZEL_BUILD_OPTIONS} -c fastbuild @envoy_api//envoy/...
   echo "Testing API..."
   bazel_with_collection test ${BAZEL_TEST_OPTIONS} -c fastbuild @envoy_api//test/... @envoy_api//tools/... \
-    @envoy_api//tools:capture2pcap_test
+    @envoy_api//tools:tap2pcap_test
   exit 0
 elif [[ "$1" == "bazel.coverage" ]]; then
   setup_gcc_toolchain

@@ -14,7 +14,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/http:codes_interface",
         "//source/common/tracing:http_tracer_lib",
-        "@envoy_api//envoy/service/auth/v2alpha:external_auth_cc",
+        "@envoy_api//envoy/service/auth/v2:external_auth_cc",
     ],
 )
 
@@ -56,7 +56,7 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/common/http:async_client_lib",
         "//source/common/http:codes_lib",
-        "@envoy_api//envoy/config/filter/http/ext_authz/v2alpha:ext_authz_cc",
+        "@envoy_api//envoy/config/filter/http/ext_authz/v2:ext_authz_cc",
     ],
 )
 
@@ -70,6 +70,6 @@ envoy_cc_library(
         "//include/envoy/http:filter_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/grpc:async_client_lib",
-        "@envoy_api//envoy/service/auth/v2alpha:external_auth_cc",
+        "@envoy_api//envoy/service/auth/v2:external_auth_cc",
     ],
 )

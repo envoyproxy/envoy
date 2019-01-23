@@ -499,7 +499,7 @@ TEST_F(ClusterManagerImplTest, OriginalDstLbRestriction2) {
 
   EXPECT_THROW_WITH_MESSAGE(
       create(parseBootstrapFromJson(json)), EnvoyException,
-      "cluster: LB type 'original_dst_lb' may only be used with cluser type 'original_dst'");
+      "cluster: LB type 'original_dst_lb' may only be used with cluster type 'original_dst'");
 }
 
 TEST_F(ClusterManagerImplTest, SubsetLoadBalancerInitialization) {
@@ -2044,7 +2044,7 @@ TEST_F(ClusterManagerImplTest, MergedUpdates) {
       }))
       .WillOnce(Invoke([](uint32_t priority, const HostVector& hosts_added,
                           const HostVector& hosts_removed) -> void {
-        // Triggerd by the 2 HC updates, it's a merged update so no added/removed
+        // Triggered by the 2 HC updates, it's a merged update so no added/removed
         // hosts.
         EXPECT_EQ(0, priority);
         EXPECT_EQ(0, hosts_added.size());

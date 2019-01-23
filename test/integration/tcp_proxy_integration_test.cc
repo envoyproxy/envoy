@@ -388,7 +388,7 @@ void TcpProxySslIntegrationTest::setupConnections() {
             .WillByDefault(Invoke(client_write_buffer_, &MockWatermarkBuffer::trackDrains));
         return client_write_buffer_;
       }));
-  // Set up the SSl client.
+  // Set up the SSL client.
   Network::Address::InstanceConstSharedPtr address =
       Ssl::getSslAddress(version_, lookupPort("tcp_proxy"));
   context_ = Ssl::createClientSslTransportSocketFactory({}, *context_manager_);

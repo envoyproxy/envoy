@@ -587,7 +587,7 @@ TEST_P(SubsetLoadBalancerTest, UpdateFailover) {
   EXPECT_CALL(subset_info_, subsetKeys()).WillRepeatedly(ReturnRef(subset_keys));
   TestLoadBalancerContext context_10({{"version", "1.0"}});
 
-  // Start with an empty lb. Chosing a host should result in failure.
+  // Start with an empty lb. Choosing a host should result in failure.
   init({});
   EXPECT_TRUE(nullptr == lb_->chooseHost(&context_10).get());
 

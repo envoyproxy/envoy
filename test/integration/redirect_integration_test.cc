@@ -89,7 +89,7 @@ TEST_P(RedirectIntegrationTest, InvalidRedirect) {
 
   redirect_response_.insertLocation().value("invalid_url", 11);
 
-  // Send the same rquest as above, only send an invalid URL as the response.
+  // Send the same request as above, only send an invalid URL as the response.
   // The request should not be redirected.
   codec_client_ = makeHttpConnection(lookupPort("http"));
   default_request_headers_.insertHost().value("handle.internal.redirect", 24);

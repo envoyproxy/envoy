@@ -1700,7 +1700,8 @@ TEST_F(RouterTest, RetryUpstream5xxNotComplete) {
 
   Buffer::InstancePtr body_data(new Buffer::OwnedImpl("hello"));
   EXPECT_CALL(*router_.retry_state_, enabled()).WillOnce(Return(true));
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, router_.decodeData(*body_data, false));
+  EXPECT_CALL(callbacks_, addDecodedData(_, true));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, router_.decodeData(*body_data, false));
 
   Http::TestHeaderMapImpl trailers{{"some", "trailer"}};
   router_.decodeTrailers(trailers);
@@ -1826,7 +1827,8 @@ TEST_F(RouterTest, RetryRespsectsMaxHostSelectionCount) {
 
   Buffer::InstancePtr body_data(new Buffer::OwnedImpl("hello"));
   EXPECT_CALL(*router_.retry_state_, enabled()).WillOnce(Return(true));
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, router_.decodeData(*body_data, false));
+  EXPECT_CALL(callbacks_, addDecodedData(_, true));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, router_.decodeData(*body_data, false));
 
   Http::TestHeaderMapImpl trailers{{"some", "trailer"}};
   router_.decodeTrailers(trailers);
@@ -1892,7 +1894,8 @@ TEST_F(RouterTest, RetryRespectsRetryHostPredicate) {
 
   Buffer::InstancePtr body_data(new Buffer::OwnedImpl("hello"));
   EXPECT_CALL(*router_.retry_state_, enabled()).WillOnce(Return(true));
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, router_.decodeData(*body_data, false));
+  EXPECT_CALL(callbacks_, addDecodedData(_, true));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, router_.decodeData(*body_data, false));
 
   Http::TestHeaderMapImpl trailers{{"some", "trailer"}};
   router_.decodeTrailers(trailers);
@@ -2086,7 +2089,8 @@ TEST_F(RouterTest, Shadow) {
   router_.decodeHeaders(headers, false);
 
   Buffer::InstancePtr body_data(new Buffer::OwnedImpl("hello"));
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, router_.decodeData(*body_data, false));
+  EXPECT_CALL(callbacks_, addDecodedData(_, true));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, router_.decodeData(*body_data, false));
 
   Http::TestHeaderMapImpl trailers{{"some", "trailer"}};
   EXPECT_CALL(callbacks_, decodingBuffer())

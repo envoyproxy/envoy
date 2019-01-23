@@ -1,5 +1,5 @@
 // This is an Envoy test driver for fuzz tests. Unlike regular Envoy tests, we
-// operate in a more restricted environment, comparable to what oss-fuz uses. We
+// operate in a more restricted environment, comparable to what oss-fuzz uses. We
 // use the same Envoy::Fuzz::Runner library that oss-fuzz
 // (https://github.com/google/oss-fuzz) links against, providing the ability to
 // develop tests purely inside the Envoy repository and also to regression test
@@ -54,7 +54,7 @@ int main(int argc, char** argv) {
     }
     ++input_args;
     // Outputs from envoy_directory_genrule might be directories or we might
-    // have artisinal files.
+    // have artisanal files.
     if (Envoy::Filesystem::directoryExists(arg)) {
       const auto paths = Envoy::TestUtility::listFiles(arg, true);
       Envoy::test_corpus_.insert(Envoy::test_corpus_.begin(), paths.begin(), paths.end());

@@ -537,7 +537,7 @@ TEST_P(ProxyProtocolTest, v2ParseExtensionsIoctlError) {
 }
 
 TEST_P(ProxyProtocolTest, v2ParseExtensionsFrag) {
-  // A well-formed ipv4/tcp header with 2 TLV/extenions, these are fragmented on delivery
+  // A well-formed ipv4/tcp header with 2 TLV/extensions, these are fragmented on delivery
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
                                 0x54, 0x0a, 0x21, 0x11, 0x00, 0x14, 0x01, 0x02, 0x03, 0x04,
                                 0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02};

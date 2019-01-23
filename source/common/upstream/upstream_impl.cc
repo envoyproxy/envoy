@@ -451,7 +451,7 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
   case envoy::api::v2::Cluster::ORIGINAL_DST_LB:
     if (config.type() != envoy::api::v2::Cluster::ORIGINAL_DST) {
       throw EnvoyException(fmt::format(
-          "cluster: LB type 'original_dst_lb' may only be used with cluser type 'original_dst'"));
+          "cluster: LB type 'original_dst_lb' may only be used with cluster type 'original_dst'"));
     }
     lb_type_ = LoadBalancerType::OriginalDst;
     break;

@@ -653,7 +653,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryWithHttpBodyAsOutputAndSpli
 
   auto response_data = Grpc::Common::serializeBody(response);
 
-  // Firstly, the response data buffer is splitted into two parts.
+  // Firstly, the response data buffer is split into two parts.
   Buffer::OwnedImpl response_data_first_part;
   response_data_first_part.move(*response_data, response_data->length() / 2);
 

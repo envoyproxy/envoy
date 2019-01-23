@@ -254,7 +254,7 @@ bool RetryStateImpl::wouldRetryFromReset(const Http::StreamResetReason& reset_re
 bool RetryStateImpl::wouldRetry(const Http::HeaderMap* response_headers,
                                 const absl::optional<Http::StreamResetReason>& reset_reason) {
   // First check "never retry" conditions so we can short circuit, then delegate to
-  // helper methods for checks dependant on retry policy.
+  // helper methods for checks dependent on retry policy.
 
   // we never retry if the reset reason is overflow.
   if (reset_reason && reset_reason.value() == Http::StreamResetReason::Overflow) {
