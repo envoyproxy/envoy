@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <queue>
 
 #include "envoy/grpc/async_client.h"
 

@@ -1,6 +1,5 @@
 #pragma once
 
-#include <queue>
 #include <unordered_map>
 
 #include "envoy/common/time.h"
