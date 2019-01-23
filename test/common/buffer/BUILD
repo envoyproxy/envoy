@@ -34,6 +34,7 @@ envoy_cc_test(
     name = "owned_impl_test",
     srcs = ["owned_impl_test.cc"],
     deps = [
+        ":utility_lib",
         "//source/common/buffer:buffer_lib",
         "//test/mocks/api:api_mocks",
         "//test/test_common:threadsafe_singleton_injector_lib",
@@ -44,6 +45,7 @@ envoy_cc_test(
     name = "watermark_buffer_test",
     srcs = ["watermark_buffer_test.cc"],
     deps = [
+        ":utility_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/buffer:watermark_buffer_lib",
     ],
@@ -53,6 +55,7 @@ envoy_cc_test(
     name = "zero_copy_input_stream_test",
     srcs = ["zero_copy_input_stream_test.cc"],
     deps = [
+        ":utility_lib",
         "//source/common/buffer:zero_copy_input_stream_lib",
     ],
 )

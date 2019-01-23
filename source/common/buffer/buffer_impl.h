@@ -9,6 +9,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/non_copyable.h"
+#include "common/event/libevent.h"
 
 namespace Envoy {
 namespace Buffer {
@@ -458,13 +459,21 @@ private:
   const std::function<void(const void*, size_t, const BufferFragmentImpl*)> releasor_;
 };
 
+class LibEventInstance : public Instance {
+public:
+  // Allows access into the underlying buffer for move() optimizations.
+  virtual Event::Libevent::BufferPtr& buffer() PURE;
+  // Called after accessing the memory in buffer() directly to allow any post-processing.
+  virtual void postProcess() PURE;
+};
+
 /**
- * Wraps an allocated and owned evbuffer.
+ * Wraps an allocated and owned buffer.
  *
  * Note that due to the internals of move(), OwnedImpl is not
  * compatible with non-OwnedImpl buffers.
  */
-class OwnedImpl : public Instance {
+class OwnedImpl : public LibEventInstance {
 public:
   OwnedImpl();
   OwnedImpl(absl::string_view data);
@@ -492,15 +501,30 @@ public:
   Api::SysCallIntResult write(int fd) override;
   std::string toString() const override;
 
-protected:
-  // Called after accessing the memory in buffer() directly to allow any post-processing.
-  virtual void postProcess();
+  // LibEventInstance
+  Event::Libevent::BufferPtr& buffer() override { return buffer_; }
+  virtual void postProcess() override;
+
+  bool usesOldImpl() const { return old_impl_; }
+  static void useOldImplForTest(bool use_old_impl) { use_old_impl_for_test_ = use_old_impl; }
 
 private:
+  static bool shouldUseOldImpl();
+
+  /** Whether to use the old evbuffer implementation when constructing new OwnedImpl objects. */
+  static bool use_old_impl_for_test_;
+
+  /** Whether this buffer uses the old evbuffer implementation. */
+  bool old_impl_;
+
+  /** Ring buffer of slices. */
   SliceDeque slices_;
 
   /** Sum of the dataSize of all slices. */
   uint64_t length_{0};
+
+  /** Used when use_old_impl_==true */
+  Event::Libevent::BufferPtr buffer_;
 };
 
 } // namespace Buffer

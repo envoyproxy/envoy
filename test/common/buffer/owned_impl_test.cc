@@ -1,6 +1,7 @@
 #include "common/api/os_sys_calls_impl.h"
 #include "common/buffer/buffer_impl.h"
 
+#include "test/common/buffer/utility.h"
 #include "test/mocks/api/mocks.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
@@ -15,7 +16,7 @@ namespace Envoy {
 namespace Buffer {
 namespace {
 
-class OwnedImplTest : public testing::Test {
+class OwnedImplTest : public BufferImplementationParamTest {
 public:
   OwnedImplTest() {}
 
@@ -34,10 +35,14 @@ protected:
   }
 };
 
-TEST_F(OwnedImplTest, AddBufferFragmentNoCleanup) {
+INSTANTIATE_TEST_CASE_P(OwnedImplTest, OwnedImplTest,
+                        testing::ValuesIn({BufferImplementation::Old, BufferImplementation::New}));
+
+TEST_P(OwnedImplTest, AddBufferFragmentNoCleanup) {
   char input[] = "hello world";
   BufferFragmentImpl frag(input, 11, nullptr);
   Buffer::OwnedImpl buffer;
+  verifyImplementation(buffer);
   buffer.addBufferFragment(frag);
   EXPECT_EQ(11, buffer.length());
 
@@ -45,12 +50,13 @@ TEST_F(OwnedImplTest, AddBufferFragmentNoCleanup) {
   EXPECT_EQ(0, buffer.length());
 }
 
-TEST_F(OwnedImplTest, AddBufferFragmentWithCleanup) {
+TEST_P(OwnedImplTest, AddBufferFragmentWithCleanup) {
   char input[] = "hello world";
   BufferFragmentImpl frag(input, 11, [this](const void*, size_t, const BufferFragmentImpl*) {
     release_callback_called_ = true;
   });
   Buffer::OwnedImpl buffer;
+  verifyImplementation(buffer);
   buffer.addBufferFragment(frag);
   EXPECT_EQ(11, buffer.length());
 
@@ -63,7 +69,7 @@ TEST_F(OwnedImplTest, AddBufferFragmentWithCleanup) {
   EXPECT_TRUE(release_callback_called_);
 }
 
-TEST_F(OwnedImplTest, AddBufferFragmentDynamicAllocation) {
+TEST_P(OwnedImplTest, AddBufferFragmentDynamicAllocation) {
   char input_stack[] = "hello world";
   char* input = new char[11];
   std::copy(input_stack, input_stack + 11, input);
@@ -76,6 +82,7 @@ TEST_F(OwnedImplTest, AddBufferFragmentDynamicAllocation) {
       });
 
   Buffer::OwnedImpl buffer;
+  verifyImplementation(buffer);
   buffer.addBufferFragment(*frag);
   EXPECT_EQ(11, buffer.length());
 
@@ -88,9 +95,10 @@ TEST_F(OwnedImplTest, AddBufferFragmentDynamicAllocation) {
   EXPECT_TRUE(release_callback_called_);
 }
 
-TEST_F(OwnedImplTest, Add) {
+TEST_P(OwnedImplTest, Add) {
   const std::string string1 = "Hello, ", string2 = "World!";
   Buffer::OwnedImpl buffer;
+  verifyImplementation(buffer);
 
   buffer.add(string1);
   EXPECT_EQ(string1.size(), buffer.length());
@@ -113,9 +121,10 @@ TEST_F(OwnedImplTest, Add) {
   EXPECT_EQ(string1 + string2 + big_suffix, buffer.toString());
 }
 
-TEST_F(OwnedImplTest, Prepend) {
+TEST_P(OwnedImplTest, Prepend) {
   const std::string suffix = "World!", prefix = "Hello, ";
   Buffer::OwnedImpl buffer;
+  verifyImplementation(buffer);
   buffer.add(suffix);
   buffer.prepend(prefix);
 
@@ -135,9 +144,10 @@ TEST_F(OwnedImplTest, Prepend) {
   EXPECT_EQ(big_prefix + prefix + suffix, buffer.toString());
 }
 
-TEST_F(OwnedImplTest, PrependToEmptyBuffer) {
+TEST_P(OwnedImplTest, PrependToEmptyBuffer) {
   std::string data = "Hello, World!";
   Buffer::OwnedImpl buffer;
+  verifyImplementation(buffer);
   buffer.prepend(data);
 
   EXPECT_EQ(data.size(), buffer.length());
@@ -149,11 +159,13 @@ TEST_F(OwnedImplTest, PrependToEmptyBuffer) {
   EXPECT_EQ(data, buffer.toString());
 }
 
-TEST_F(OwnedImplTest, PrependBuffer) {
+TEST_P(OwnedImplTest, PrependBuffer) {
   std::string suffix = "World!", prefix = "Hello, ";
   Buffer::OwnedImpl buffer;
+  verifyImplementation(buffer);
   buffer.add(suffix);
   Buffer::OwnedImpl prefixBuffer;
+  verifyImplementation(buffer);
   prefixBuffer.add(prefix);
 
   buffer.prepend(prefixBuffer);
@@ -163,11 +175,12 @@ TEST_F(OwnedImplTest, PrependBuffer) {
   EXPECT_EQ(0, prefixBuffer.length());
 }
 
-TEST_F(OwnedImplTest, Write) {
+TEST_P(OwnedImplTest, Write) {
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
   Buffer::OwnedImpl buffer;
+  verifyImplementation(buffer);
   buffer.add("example");
   EXPECT_CALL(os_sys_calls, writev(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{7, 0}));
   Api::SysCallIntResult result = buffer.write(-1);
@@ -201,11 +214,12 @@ TEST_F(OwnedImplTest, Write) {
   EXPECT_EQ(0, buffer.length());
 }
 
-TEST_F(OwnedImplTest, Read) {
+TEST_P(OwnedImplTest, Read) {
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
   Buffer::OwnedImpl buffer;
+  verifyImplementation(buffer);
   EXPECT_CALL(os_sys_calls, readv(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{0, 0}));
   Api::SysCallIntResult result = buffer.read(-1, 100);
   EXPECT_EQ(0, result.rc_);
@@ -222,7 +236,7 @@ TEST_F(OwnedImplTest, Read) {
   EXPECT_EQ(0, buffer.length());
 }
 
-TEST_F(OwnedImplTest, ReserveCommit) {
+TEST_P(OwnedImplTest, ReserveCommit) {
   // This fragment will later be added to the buffer. It is declared in an enclosing scope to
   // ensure it is not destructed until after the buffer is.
   const std::string input = "Hello, world";
@@ -230,6 +244,7 @@ TEST_F(OwnedImplTest, ReserveCommit) {
 
   {
     Buffer::OwnedImpl buffer;
+    verifyImplementation(buffer);
 
     // A zero-byte reservation should fail.
     static constexpr uint64_t NumIovecs = 16;
@@ -242,12 +257,23 @@ TEST_F(OwnedImplTest, ReserveCommit) {
     // Test and commit a small reservation. This should succeed.
     num_reserved = buffer.reserve(1, iovecs, NumIovecs);
     EXPECT_EQ(1, num_reserved);
+    // The implementation might provide a bigger reservation than requested.
+    EXPECT_LE(1, iovecs[0].len_);
+    iovecs[0].len_ = 1;
     commitReservation(iovecs, num_reserved, buffer);
     EXPECT_EQ(1, buffer.length());
+
+    // The remaining tests validate internal optimizations of the new deque-of-slices
+    // implementation, so they're not valid for the old evbuffer implementation.
+    if (buffer.usesOldImpl()) {
+      return;
+    }
 
     // Request a reservation that fits in the remaining space at the end of the last slice.
     num_reserved = buffer.reserve(1, iovecs, NumIovecs);
     EXPECT_EQ(1, num_reserved);
+    EXPECT_LE(1, iovecs[0].len_);
+    iovecs[0].len_ = 1;
     const void* slice1 = iovecs[0].mem_;
     clearReservation(iovecs, num_reserved, buffer);
 
@@ -292,8 +318,9 @@ TEST_F(OwnedImplTest, ReserveCommit) {
   }
 }
 
-TEST_F(OwnedImplTest, ToString) {
+TEST_P(OwnedImplTest, ToString) {
   Buffer::OwnedImpl buffer;
+  verifyImplementation(buffer);
   EXPECT_EQ("", buffer.toString());
   auto append = [&buffer](absl::string_view str) { buffer.add(str.data(), str.size()); };
   append("Hello, ");
