@@ -13,8 +13,9 @@ GrpcMuxImpl::GrpcMuxImpl(const LocalInfo::LocalInfo& local_info, Grpc::AsyncClie
                          const Protobuf::MethodDescriptor& service_method,
                          Runtime::RandomGenerator& random, Stats::Scope& scope,
                          const RateLimitSettings& rate_limit_settings)
-    : DiscoveryGrpcStream<envoy::api::v2::DiscoveryRequest, envoy::api::v2::DiscoveryResponse>(
-          std::move(async_client), service_method, random, dispatcher, scope, rate_limit_settings),
+    : DiscoveryGrpcStream<envoy::api::v2::DiscoveryRequest, envoy::api::v2::DiscoveryResponse,
+                          std::string>(std::move(async_client), service_method, random, dispatcher,
+                                       scope, rate_limit_settings),
       local_info_(local_info) {
   Config::Utility::checkLocalInfo("ads", local_info);
 }
@@ -29,34 +30,17 @@ GrpcMuxImpl::~GrpcMuxImpl() {
 
 void GrpcMuxImpl::start() { establishNewStream(); }
 
-void GrpcMuxImpl::drainRequests() {
-  ENVOY_LOG(trace, "draining discovery requests {}", request_queue_.size());
-  while (!request_queue_.empty() && checkRateLimitAllowsDrain(request_queue_.size())) {
-    // Process the request, if rate limiting is not enabled at all or if it is under rate limit.
-    if (sendDiscoveryRequest(request_queue_.front())) {
-      request_queue_.pop();
-    } else {
-      break;
-    }
-  }
-}
-
-void GrpcMuxImpl::queueDiscoveryRequest(const std::string& type_url) {
-  request_queue_.push(type_url);
-  drainRequests();
-}
-
 bool GrpcMuxImpl::sendDiscoveryRequest(const std::string& type_url) {
   if (!grpcStreamAvailable()) {
     ENVOY_LOG(debug, "No stream available to sendDiscoveryRequest for {}", type_url);
-    return true; // TODO(fredlas) 'true' is the original behavior; should it be changed?
+    return true;
   }
 
   ApiState& api_state = api_state_[type_url];
   if (api_state.paused_) {
     ENVOY_LOG(trace, "API {} paused during sendDiscoveryRequest(), setting pending.", type_url);
     api_state.pending_ = true;
-    return true; // TODO(fredlas) 'true' is the original behavior; should it be changed?
+    return true;
   }
 
   auto& request = api_state.request_;
@@ -214,7 +198,6 @@ void GrpcMuxImpl::handleEstablishmentFailure() {
     }
   }
 }
-void GrpcMuxImpl::handleDrainReady() { drainRequests(); }
 
 } // namespace Config
 } // namespace Envoy

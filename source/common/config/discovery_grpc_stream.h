@@ -11,11 +11,12 @@
 namespace Envoy {
 namespace Config {
 
-// Oversees communication for gRPC-using xDS: reestablishes the gRPC channel when necessary, and
-// provides rate limiting of requests.
-template <class RequestProto, class ResponseProto>
+// Oversees communication for gRPC xDS implementations (parent to both regular xDS and incremental
+// xDS variants). Reestablishes the gRPC channel when necessary, and provides rate limiting of
+// requests.
+template <class RequestProto, class ResponseProto, class RequestQueueItem>
 class DiscoveryGrpcStream : public Grpc::TypedAsyncStreamCallbacks<ResponseProto>,
-                            public Logger::Loggable<Logger::Id::upstream> {
+                            public Logger::Loggable<Logger::Id::config> {
 public:
   DiscoveryGrpcStream(Grpc::AsyncClientPtr async_client,
                       const Protobuf::MethodDescriptor& service_method,
@@ -30,7 +31,7 @@ public:
       // Default Bucket contains 100 tokens maximum and refills at 10 tokens/sec.
       limit_request_ = std::make_unique<TokenBucketImpl>(
           rate_limit_settings.max_tokens_, time_source_, rate_limit_settings.fill_rate_);
-      drain_request_timer_ = dispatcher.createTimer([this]() { handleDrainReady(); });
+      drain_request_timer_ = dispatcher.createTimer([this]() { drainRequests(); });
     }
     backoff_strategy_ = std::make_unique<JitteredBackOffStrategy>(RETRY_INITIAL_DELAY_MS,
                                                                   RETRY_MAX_DELAY_MS, random_);
@@ -39,7 +40,14 @@ public:
   virtual void handleResponse(std::unique_ptr<ResponseProto>&& message) PURE;
   virtual void handleStreamEstablished() PURE;
   virtual void handleEstablishmentFailure() PURE;
-  virtual void handleDrainReady() PURE;
+
+  // Returns whether the request was actually sent (and so can leave the queue).
+  virtual bool sendDiscoveryRequest(const RequestQueueItem& queue_item) PURE;
+
+  void queueDiscoveryRequest(const RequestQueueItem& queue_item) {
+    request_queue_.push(queue_item);
+    drainRequests();
+  }
 
   void establishNewStream() {
     ENVOY_LOG(debug, "Establishing new gRPC bidi stream for {}", service_method_.DebugString());
@@ -98,6 +106,18 @@ public:
   }
 
 private:
+  void drainRequests() {
+    ENVOY_LOG(trace, "draining discovery requests {}", request_queue_.size());
+    while (!request_queue_.empty() && checkRateLimitAllowsDrain(request_queue_.size())) {
+      // Process the request, if rate limiting is not enabled at all or if it is under rate limit.
+      if (sendDiscoveryRequest(request_queue_.front())) {
+        request_queue_.pop();
+      } else {
+        break;
+      }
+    }
+  }
+
   void setRetryTimer() {
     retry_timer_->enableTimer(std::chrono::milliseconds(backoff_strategy_->nextBackOffMs()));
   }
@@ -111,6 +131,8 @@ private:
   // TODO(htuch): Make this configurable or some static.
   const uint32_t RETRY_INITIAL_DELAY_MS = 500;
   const uint32_t RETRY_MAX_DELAY_MS = 30000; // Do not cross more than 30s
+
+  std::queue<RequestQueueItem> request_queue_;
 
   Grpc::AsyncClientPtr async_client_;
   Grpc::AsyncStream* stream_{};

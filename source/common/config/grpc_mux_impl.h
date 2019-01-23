@@ -22,7 +22,9 @@ namespace Config {
  */
 class GrpcMuxImpl : public GrpcMux,
                     public DiscoveryGrpcStream<envoy::api::v2::DiscoveryRequest,
-                                               envoy::api::v2::DiscoveryResponse> {
+                                               envoy::api::v2::DiscoveryResponse,
+                                               std::string> // this string is a type URL
+{
 public:
   GrpcMuxImpl(const LocalInfo::LocalInfo& local_info, Grpc::AsyncClientPtr async_client,
               Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method,
@@ -36,18 +38,16 @@ public:
   void pause(const std::string& type_url) override;
   void resume(const std::string& type_url) override;
 
+  // queue_item is a resource type URL.
+  bool sendDiscoveryRequest(const std::string& queue_item) override;
+
   // DiscoveryGrpcStream
   void handleResponse(std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message) override;
   void handleStreamEstablished() override;
   void handleEstablishmentFailure() override;
-  void handleDrainReady() override;
 
 private:
   void setRetryTimer();
-  // Returns whether the request was actually sent (and so can leave the queue).
-  bool sendDiscoveryRequest(const std::string& type_url);
-  void queueDiscoveryRequest(const std::string& type_url);
-  void drainRequests();
 
   struct GrpcMuxWatchImpl : public GrpcMuxWatch {
     GrpcMuxWatchImpl(const std::vector<std::string>& resources, GrpcMuxCallbacks& callbacks,
@@ -91,7 +91,6 @@ private:
   std::unordered_map<std::string, ApiState> api_state_;
   // Envoy's dependendency ordering.
   std::list<std::string> subscriptions_;
-  std::queue<std::string> request_queue_;
 };
 
 class NullGrpcMuxImpl : public GrpcMux {
