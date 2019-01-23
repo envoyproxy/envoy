@@ -342,7 +342,7 @@ Version history
   header generation.
 * router: added 'unavailable' to the retriable gRPC status codes that can be specified
   through :ref:`x-envoy-retry-grpc-on <config_http_filters_router_x-envoy-retry-grpc-on>`.
-* sockets: added :ref:`capture transport socket extension <operations_traffic_capture>` to support
+* sockets: added :ref:`tap transport socket extension <operations_traffic_tapping>` to support
   recording plain text traffic and PCAP generation.
 * sockets: added `IP_FREEBIND` socket option support for :ref:`listeners
   <envoy_api_field_Listener.freebind>` and upstream connections via
