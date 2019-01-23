@@ -671,7 +671,7 @@ TEST_F(HeapStatsThreadLocalStoreTest, NonHotRestartNoTruncation) {
   store_->counter(name_1);
 
   // This works fine, and we can find it by its long name because heap-stats do not
-  // get truncsated.
+  // get truncated.
   EXPECT_NE(nullptr, TestUtility::findCounter(*store_, name_1).get());
 }
 
