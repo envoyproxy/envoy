@@ -182,7 +182,7 @@ private:
  * Custom stream to allow access to the line number for each object.
  */
 class LineCountingStringStream : public rapidjson::StringStream {
-  // Ch is typdef in parent class to handle character encoding.
+  // Ch is typedef in parent class to handle character encoding.
 public:
   LineCountingStringStream(const Ch* src) : rapidjson::StringStream(src), line_number_(1) {}
   Ch Take() {

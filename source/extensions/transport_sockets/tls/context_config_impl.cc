@@ -116,14 +116,14 @@ ContextConfigImpl::ContextConfigImpl(
           RepeatedPtrUtil::join(config.tls_params().cipher_suites(), ":"), default_cipher_suites)),
       ecdh_curves_(StringUtil::nonEmptyStringOrDefault(
           RepeatedPtrUtil::join(config.tls_params().ecdh_curves(), ":"), default_curves)),
-      tls_certficate_providers_(getTlsCertificateConfigProviders(config, factory_context)),
-      certficate_validation_context_provider_(
+      tls_certificate_providers_(getTlsCertificateConfigProviders(config, factory_context)),
+      certificate_validation_context_provider_(
           getCertificateValidationContextConfigProvider(config, factory_context, &default_cvc_)),
       min_protocol_version_(tlsVersionFromProto(config.tls_params().tls_minimum_protocol_version(),
                                                 default_min_protocol_version)),
       max_protocol_version_(tlsVersionFromProto(config.tls_params().tls_maximum_protocol_version(),
                                                 default_max_protocol_version)) {
-  if (default_cvc_ && certficate_validation_context_provider_ != nullptr) {
+  if (default_cvc_ && certificate_validation_context_provider_ != nullptr) {
     // We need to validate combined certificate validation context.
     // The default certificate validation context and dynamic certificate validation
     // context could only contain partial fields, which is okay to fail the validation.
@@ -133,25 +133,25 @@ ContextConfigImpl::ContextConfigImpl(
     // get updated.
     cvc_validation_callback_handle_ =
         dynamic_cast<Secret::CertificateValidationContextSdsApi*>(
-            certficate_validation_context_provider_.get())
+            certificate_validation_context_provider_.get())
             ->addValidationCallback(
                 [this](const envoy::api::v2::auth::CertificateValidationContext& dynamic_cvc) {
                   getCombinedValidationContextConfig(dynamic_cvc);
                 });
   }
   // Load inline or static secret into tls_certificate_config_.
-  if (!tls_certficate_providers_.empty()) {
-    for (auto& provider : tls_certficate_providers_) {
+  if (!tls_certificate_providers_.empty()) {
+    for (auto& provider : tls_certificate_providers_) {
       if (provider->secret() != nullptr) {
         tls_certificate_configs_.emplace_back(*provider->secret());
       }
     }
   }
   // Load inline or static secret into validation_context_config_.
-  if (certficate_validation_context_provider_ != nullptr &&
-      certficate_validation_context_provider_->secret() != nullptr) {
+  if (certificate_validation_context_provider_ != nullptr &&
+      certificate_validation_context_provider_->secret() != nullptr) {
     validation_context_config_ = std::make_unique<Ssl::CertificateValidationContextConfigImpl>(
-        *certficate_validation_context_provider_->secret());
+        *certificate_validation_context_provider_->secret());
   }
 }
 
@@ -163,44 +163,44 @@ Ssl::CertificateValidationContextConfigPtr ContextConfigImpl::getCombinedValidat
 }
 
 void ContextConfigImpl::setSecretUpdateCallback(std::function<void()> callback) {
-  if (!tls_certficate_providers_.empty()) {
+  if (!tls_certificate_providers_.empty()) {
     if (tc_update_callback_handle_) {
       tc_update_callback_handle_->remove();
     }
     // Once tls_certificate_config_ receives new secret, this callback updates
     // ContextConfigImpl::tls_certificate_config_ with new secret.
     tc_update_callback_handle_ =
-        tls_certficate_providers_[0]->addUpdateCallback([this, callback]() {
+        tls_certificate_providers_[0]->addUpdateCallback([this, callback]() {
           // This breaks multiple certificate support, but today SDS is only single cert.
           // TODO(htuch): Fix this when SDS goes multi-cert.
           tls_certificate_configs_.clear();
-          tls_certificate_configs_.emplace_back(*tls_certficate_providers_[0]->secret());
+          tls_certificate_configs_.emplace_back(*tls_certificate_providers_[0]->secret());
           callback();
         });
   }
-  if (certficate_validation_context_provider_) {
+  if (certificate_validation_context_provider_) {
     if (cvc_update_callback_handle_) {
       cvc_update_callback_handle_->remove();
     }
     if (default_cvc_) {
-      // Once certficate_validation_context_provider_ receives new secret, this callback updates
+      // Once certificate_validation_context_provider_ receives new secret, this callback updates
       // ContextConfigImpl::validation_context_config_ with a combined certificate validation
       // context. The combined certificate validation context is created by merging new secret into
       // default_cvc_.
       cvc_update_callback_handle_ =
-          certficate_validation_context_provider_->addUpdateCallback([this, callback]() {
+          certificate_validation_context_provider_->addUpdateCallback([this, callback]() {
             validation_context_config_ = getCombinedValidationContextConfig(
-                *certficate_validation_context_provider_->secret());
+                *certificate_validation_context_provider_->secret());
             callback();
           });
     } else {
-      // Once certficate_validation_context_provider_ receives new secret, this callback updates
+      // Once certificate_validation_context_provider_ receives new secret, this callback updates
       // ContextConfigImpl::validation_context_config_ with new secret.
       cvc_update_callback_handle_ =
-          certficate_validation_context_provider_->addUpdateCallback([this, callback]() {
+          certificate_validation_context_provider_->addUpdateCallback([this, callback]() {
             validation_context_config_ =
                 std::make_unique<Ssl::CertificateValidationContextConfigImpl>(
-                    *certficate_validation_context_provider_->secret());
+                    *certificate_validation_context_provider_->secret());
             callback();
           });
     }

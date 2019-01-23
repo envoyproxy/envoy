@@ -113,7 +113,7 @@ TEST_F(FilterTest, TestSetPayloadCall) {
 }
 
 // This test verifies Verifier::Callback is called inline with a failure status.
-// All functions should return Continue except decodeHeaders(), it returns StopIteraton.
+// All functions should return Continue except decodeHeaders(), it returns StopIteration.
 TEST_F(FilterTest, InlineFailure) {
   setupMockConfig();
   // A failed authentication completed inline: callback is called inside verify().

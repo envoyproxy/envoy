@@ -118,12 +118,12 @@ TEST_F(JwksCacheTest, TestAudiences) {
   // incoming has http://, config doesn't
   EXPECT_TRUE(jwks->areAudiencesAllowed({"http://example_service/"}));
 
-  // incomding has https://, config is http://
+  // incoming has https://, config is http://
   // incoming has tailing slash, config has not tailing slash
   EXPECT_TRUE(jwks->areAudiencesAllowed({"https://example_service1/"}));
 
   // incoming without tailing slash, config has tailing slash
-  // incomding has http://, config is https://
+  // incoming has http://, config is https://
   EXPECT_TRUE(jwks->areAudiencesAllowed({"http://example_service2"}));
 
   // Multiple audiences: a good one and a wrong one
