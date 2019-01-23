@@ -16,7 +16,6 @@ import "validate/validate.proto";
 // [#protodoc-title: External Authorization]
 // ExtAuthz :ref:`configuration overview <config_http_filters_ext_authz>`.
 message ExtAuthz {
-
   // External authorization service configuration.
   oneof services {
     // gRPC service configuration (default timeout: 200ms).
@@ -26,15 +25,18 @@ message ExtAuthz {
     HttpService http_service = 3;
   }
 
-  //  Setting for bypassin the authorization process.
+  //  Changes filter's behaviour on errors:
   //
-  //  1. When true, the filter will allow traffic if communication between Envoy and the
-  //  authorization service failed, or if any of HTTP 5xx error occurs.
-  //  2. When false, if an HTTP error or a communication failure occurs, the filter will respond
-  //  with *Forbidden* status and it will *not* allow the request to proceed.
+  //  1. When set to true, the filter will *accept* client request even if the communication with
+  //  the authorization service has failed, or if the authorization service has returned a HTTP 5xx
+  //  error.
   //
-  // Note that filter will produce stats on error. See *Statistics* at :ref:`configuration overview
-  // <config_http_filters_ext_authz>`.
+  //  2. When set to false, ext-authz will *reject* client requests and return a *Forbidden*
+  //  response if the communication with the authorization service has failed, or if the
+  //  authorization service has returned a HTTP 5xx error.
+  //
+  // Note that errors can be *always* tracked in the :ref:`stats
+  // <config_http_filters_ext_authz_stats>`.
   bool failure_mode_allow = 2;
 }
 
@@ -47,20 +49,19 @@ message ExtAuthz {
 // *On authorization request*, a list of allowed request headers may be supplied. See
 // :ref:`allowed_headers
 // <envoy_api_field_config.filter.http.ext_authz.v2.AuthorizationRequest.allowed_headers>`
-// for details. Additional headers metadata maybe added to the authorization resquest. See
+// for details. Additional headers metadata may be added to the authorization resquest. See
 // :ref:`headers_to_add
 // <envoy_api_field_config.filter.http.ext_authz.v2.AuthorizationRequest.headers_to_add>` for
 // details.
 //
-// On authorization response status HTTP 200 Ok, the filter will allow traffic to the upstream and
-// additional headers metadata maybe added to the original client request. See
+// On authorization response status HTTP 200 OK, the filter will allow traffic to the upstream and
+// additional headers metadata may be added to the original client request. See
 // :ref:`allowed_upstream_headers
 // <envoy_api_field_config.filter.http.ext_authz.v2.AuthorizationResponse.allowed_upstream_headers>`
 // for details.
 //
-// On other authorization response statuses, the filter will respond
-// with HTTP 403 Forbidden status by default. Additional headers metadata as well as body maybe
-// added to the client's response. See :ref:`allowed_client_headers
+// On other authorization response statuses, the filter will not allow traffic. Additional headers
+// metadata as well as body may be added to the client's response. See :ref:`allowed_client_headers
 // <envoy_api_field_config.filter.http.ext_authz.v2.AuthorizationResponse.allowed_client_headers>`
 // for details.
 message HttpService {
@@ -100,8 +101,7 @@ message AuthorizationRequest {
 }
 
 message AuthorizationResponse {
-
-  // When this :ref:`list <envoy_api_msg_type.matcher.ListStringMatcher>`. is set, authorization
+  // When this :ref:`list <envoy_api_msg_type.matcher.ListStringMatcher>` is set, authorization
   // response headers that have a correspondent match will be added to the original client request.
   // Note that coexistent headers will be overriden.
   envoy.type.matcher.ListStringMatcher allowed_upstream_headers = 1;
