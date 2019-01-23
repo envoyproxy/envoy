@@ -406,14 +406,12 @@ void InstanceImpl::addHandler(Stats::Scope& scope, const std::string& stat_prefi
                               const std::string& name, CommandHandler& handler) {
   std::string to_lower_name(name);
   to_lower_table_.toLowerCase(to_lower_name);
+  std::string command_stat_prefix = fmt::format("{}command.{}.", stat_prefix, to_lower_name);
   handler_lookup_table_.add(
       to_lower_name.c_str(),
       std::make_shared<HandlerData>(HandlerData{
-          CommandStats{
-              scope.counter(fmt::format("{}command.{}.total", stat_prefix, to_lower_name)),
-              scope.counter(fmt::format("{}command.{}.success", stat_prefix, to_lower_name)),
-              scope.counter(fmt::format("{}command.{}.error", stat_prefix, to_lower_name)),
-              scope.histogram(fmt::format("{}command.{}.latency", stat_prefix, to_lower_name))},
+          CommandStats{ALL_COMMAND_STATS(POOL_COUNTER_PREFIX(scope, command_stat_prefix),
+                                         POOL_HISTOGRAM_PREFIX(scope, command_stat_prefix))},
           handler}));
 }
 

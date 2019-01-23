@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "envoy/stats/scope.h"
+#include "envoy/stats/stats_macros.h"
 #include "envoy/stats/timespan.h"
 
 #include "common/common/logger.h"
@@ -37,12 +38,22 @@ public:
   static RespValuePtr makeError(const std::string& error);
 };
 
-class CommandStats {
-public:
-  Stats::Counter& total_;
-  Stats::Counter& success_;
-  Stats::Counter& error_;
-  Stats::Histogram& latency_;
+/**
+ * All command level stats. @see stats_macros.h
+ */
+// clang-format off
+#define ALL_COMMAND_STATS(COUNTER, HISTOGRAM)                                                      \
+  COUNTER(total)                                                                                   \
+  COUNTER(success)                                                                                 \
+  COUNTER(error)                                                                                   \
+  HISTOGRAM(latency)                                                                               \
+// clang-format on
+
+/**
+ * Struct definition for all command stats. @see stats_macros.h
+ */
+struct CommandStats {
+  ALL_COMMAND_STATS(GENERATE_COUNTER_STRUCT,GENERATE_HISTOGRAM_STRUCT)
 };
 
 class CommandHandler {
