@@ -281,7 +281,7 @@ public:
   Http::ForwardClientCertType forward_client_cert_{Http::ForwardClientCertType::Sanitize};
   std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;
   absl::optional<std::string> user_agent_;
-  uint32_t max_request_headers_size_{60};
+  uint32_t max_request_headers_size_{Http::DEFAULT_MAX_REQUEST_HEADERS_SIZE_KB};
   absl::optional<std::chrono::milliseconds> idle_timeout_;
   std::chrono::milliseconds stream_idle_timeout_{};
   std::chrono::milliseconds request_timeout_{};

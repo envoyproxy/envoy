@@ -13,6 +13,9 @@
 namespace Envoy {
 namespace Http {
 
+// Based on the default limit in nghttp2.
+static const uint32_t DEFAULT_MAX_REQUEST_HEADERS_SIZE_KB = 60;
+
 class Stream;
 
 /**
