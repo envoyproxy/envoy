@@ -22,7 +22,7 @@ struct KeyValueOption {
 
 typedef std::vector<KeyValueOption> KeyValueOptionVector;
 typedef std::vector<envoy::api::v2::core::HeaderValueOption> HeaderValueOptionVector;
-typedef std::unique_ptr<envoy::service::auth::v2alpha::CheckResponse> CheckResponsePtr;
+typedef std::unique_ptr<envoy::service::auth::v2::CheckResponse> CheckResponsePtr;
 
 class TestCommon {
 public:

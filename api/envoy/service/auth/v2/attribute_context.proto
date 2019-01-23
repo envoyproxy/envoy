@@ -1,7 +1,7 @@
 syntax = "proto3";
 
-package envoy.service.auth.v2alpha;
-option java_package = "io.envoyproxy.envoy.service.auth.v2alpha";
+package envoy.service.auth.v2;
+option java_package = "io.envoyproxy.envoy.service.auth.v2";
 
 import "envoy/api/v2/core/address.proto";
 
