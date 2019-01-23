@@ -173,6 +173,8 @@ int InstanceBase::socketFromSocketType(SocketType socketType) const {
 Ipv4Instance::Ipv4Instance(const sockaddr_in* address) : InstanceBase(Type::Ip) {
   ip_.ipv4_.address_ = *address;
   ip_.friendly_address_ = sockaddrToString(*address);
+
+  // Based on benchmark testing, this reserve+append implementation runs faster than absl::StrCat.
   fmt::format_int port(ntohs(address->sin_port));
   friendly_name_.reserve(ip_.friendly_address_.size() + 1 + port.size());
   friendly_name_.append(ip_.friendly_address_);

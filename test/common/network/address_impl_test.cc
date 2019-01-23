@@ -132,7 +132,7 @@ TEST(Ipv4InstanceTest, SockaddrToString) {
     addr4.sin_family = AF_INET;
     EXPECT_EQ(1, inet_pton(AF_INET, address, &addr4.sin_addr));
     addr4.sin_port = 0;
-    EXPECT_EQ(address, Ipv4Instance::sockaddrToString(addr4));
+    EXPECT_STREQ(address, Ipv4Instance::sockaddrToString(addr4).c_str());
   }
 }
 
