@@ -1,4 +1,5 @@
 # Envoy specific Bazel build/test options.
+startup --host_jvm_args=-Xmx2048m
 
 build --workspace_status_command=bazel/get_workspace_status
 
