@@ -192,8 +192,8 @@ message ResponseFlagFilter {
   }];
 }
 
-// Filters gRPC requests based on their respone status. If a gRPC status is not provided, the filter
-// will infer the status from the HTTP status code.
+// Filters gRPC requests based on their response status. If a gRPC status is not provided, the
+// filter will infer the status from the HTTP status code.
 message GrpcStatusFilter {
   // Logs only responses that have any one of the gRPC statuses in this field.
   repeated string statuses = 1 [(validate.rules).repeated .items.string = {
