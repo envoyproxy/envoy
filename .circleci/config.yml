@@ -145,8 +145,8 @@ jobs:
        - checkout
        - run: pip install --user flake8  # Flag all Python syntax errors or undefined names
        - run: python -m flake8 . --select=E901,E999,F821,F822,F823 --show-source --statistics
-       - setup_remote_docker
-       # Comment out the next line for now so "ci/circleci: release" does not fail
+       # Comment out the next two lines for now so "ci/circleci: release" does not fail
+       # - setup_remote_docker
        # - run: ci/build_container/docker_push.sh
    docs:
      executor: ubuntu-build
