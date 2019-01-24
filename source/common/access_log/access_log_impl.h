@@ -184,8 +184,8 @@ private:
 
 /**
  * Filters requests that have a response with a gRPC status. Because the gRPC protocol does not
- * guarantee a gRPC status code, it will infer the gRPC status code from HTTP status code if
- * available.
+ * guarantee a gRPC status code, if a gRPC status code is not available, then the filter will infer
+ * infer the gRPC status code if an HTTP status code if available.
  */
 class GrpcStatusFilter : public Filter {
 public:
