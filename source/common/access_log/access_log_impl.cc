@@ -84,14 +84,14 @@ FilterFactory::fromProto(const envoy::config::filter::accesslog::v2::AccessLogFi
 
 bool TraceableRequestFilter::evaluate(const StreamInfo::StreamInfo& info,
                                       const Http::HeaderMap& request_headers,
-                                      const Http::HeaderMap&) {
+                                      const Http::HeaderMap&, const Http::HeaderMap&) {
   Tracing::Decision decision = Tracing::HttpTracerUtility::isTracing(info, request_headers);
 
   return decision.traced && decision.reason == Tracing::Reason::ServiceForced;
 }
 
 bool StatusCodeFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap&,
-                                const Http::HeaderMap&) {
+                                const Http::HeaderMap&, const Http::HeaderMap&) {
   if (!info.responseCode()) {
     return compareAgainstValue(0ULL);
   }
@@ -100,7 +100,7 @@ bool StatusCodeFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::
 }
 
 bool DurationFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap&,
-                              const Http::HeaderMap&) {
+                              const Http::HeaderMap&, const Http::HeaderMap&) {
   absl::optional<std::chrono::nanoseconds> final = info.requestComplete();
   ASSERT(final);
 
@@ -115,7 +115,7 @@ RuntimeFilter::RuntimeFilter(const envoy::config::filter::accesslog::v2::Runtime
       use_independent_randomness_(config.use_independent_randomness()) {}
 
 bool RuntimeFilter::evaluate(const StreamInfo::StreamInfo&, const Http::HeaderMap& request_header,
-                             const Http::HeaderMap&) {
+                             const Http::HeaderMap&, const Http::HeaderMap&) {
   const Http::HeaderEntry* uuid = request_header.RequestId();
   uint64_t random_value;
   if (use_independent_randomness_ || uuid == nullptr ||
@@ -147,10 +147,11 @@ AndFilter::AndFilter(const envoy::config::filter::accesslog::v2::AndFilter& conf
     : OperatorFilter(config.filters(), runtime, random) {}
 
 bool OrFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap& request_headers,
+                        const Http::HeaderMap& response_headers,
                         const Http::HeaderMap& response_trailers) {
   bool result = false;
   for (auto& filter : filters_) {
-    result |= filter->evaluate(info, request_headers, response_trailers);
+    result |= filter->evaluate(info, request_headers, response_headers, response_trailers);
 
     if (result) {
       break;
@@ -161,10 +162,11 @@ bool OrFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMa
 }
 
 bool AndFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap& request_headers,
+                         const Http::HeaderMap& response_headers,
                          const Http::HeaderMap& response_trailers) {
   bool result = true;
   for (auto& filter : filters_) {
-    result &= filter->evaluate(info, request_headers, response_trailers);
+    result &= filter->evaluate(info, request_headers, response_headers, response_trailers);
 
     if (!result) {
       break;
@@ -175,7 +177,7 @@ bool AndFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderM
 }
 
 bool NotHealthCheckFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap&,
-                                    const Http::HeaderMap&) {
+                                    const Http::HeaderMap&, const Http::HeaderMap&) {
   return !info.healthCheck();
 }
 
@@ -184,7 +186,7 @@ HeaderFilter::HeaderFilter(const envoy::config::filter::accesslog::v2::HeaderFil
 }
 
 bool HeaderFilter::evaluate(const StreamInfo::StreamInfo&, const Http::HeaderMap& request_headers,
-                            const Http::HeaderMap&) {
+                            const Http::HeaderMap&, const Http::HeaderMap&) {
   return Http::HeaderUtility::matchHeaders(request_headers, header_data_);
 }
 
@@ -200,7 +202,7 @@ ResponseFlagFilter::ResponseFlagFilter(
 }
 
 bool ResponseFlagFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap&,
-                                  const Http::HeaderMap&) {
+                                  const Http::HeaderMap&, const Http::HeaderMap&) {
   if (configured_flags_ != 0) {
     return info.intersectResponseFlags(configured_flags_);
   }
@@ -221,20 +223,32 @@ GrpcStatusFilter::GrpcStatusFilter(
 }
 
 bool GrpcStatusFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap&,
+                                const Http::HeaderMap& response_headers,
                                 const Http::HeaderMap& response_trailers) {
-  // The gRPC spec does not guarantee that a gRPC status will be returned from a gRPC request, so
-  // if there is no grpc-status, we must construct one from the HTTP response code.
-  const Http::HeaderEntry* entry = response_trailers.GrpcStatus();
-  Grpc::Status::GrpcStatus request_status;
-  if (entry) {
-    request_status = static_cast<Grpc::Status::GrpcStatus>(atoi(entry->value().c_str()));
-  } else if (info.responseCode()) {
-    request_status = Grpc::Utility::httpToGrpcStatus(info.responseCode().value());
-  } else {
-    request_status = Grpc::Status::GrpcStatus::Unknown;
+  // The gRPC specification does not guarantee a gRPC status code will be returned from a gRPC
+  // request. When it is returned, it will be in the response trailers. With that said, Envoy will
+  // treat a trailers-only response as a headers-only response, so we have to check the following
+  // in order:
+  //   1. response_trailers gRPC status, if it exists.
+  //   2. response_headers gRPC status, if it exists.
+  //   3. Inferred from info HTTP status, if it exists.
+  //   4. Grpc::Status::GrpcStatus::Unknown
+  const std::vector<absl::optional<Grpc::Status::GrpcStatus>> optional_statuses = {
+      Grpc::Common::getGrpcStatus(response_trailers),
+      Grpc::Common::getGrpcStatus(response_headers),
+      info.responseCode() ? absl::optional<Grpc::Status::GrpcStatus>(
+                                Grpc::Utility::httpToGrpcStatus(info.responseCode().value()))
+                          : absl::nullopt,
+  };
+
+  Grpc::Status::GrpcStatus status = Grpc::Status::GrpcStatus::Unknown;
+  for (const auto& optional_status : optional_statuses) {
+    if (optional_status.has_value()) {
+      status = optional_status.value();
+    }
   }
 
-  bool found = statuses_.find(request_status) != statuses_.end();
+  const bool found = statuses_.find(status) != statuses_.end();
   return exclude_ ? !found : found;
 }
 

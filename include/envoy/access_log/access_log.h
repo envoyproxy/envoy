@@ -42,6 +42,7 @@ public:
    * @return TRUE if the log should be written.
    */
   virtual bool evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap& request_headers,
+                        const Http::HeaderMap& response_headers,
                         const Http::HeaderMap& response_trailers) PURE;
 };
 

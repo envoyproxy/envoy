@@ -54,6 +54,7 @@ public:
 
   // AccessLog::Filter
   bool evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap& request_headers,
+                const Http::HeaderMap& response_headers,
                 const Http::HeaderMap& response_trailers) override;
 };
 
@@ -68,6 +69,7 @@ public:
 
   // AccessLog::Filter
   bool evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap& request_headers,
+                const Http::HeaderMap& response_headers,
                 const Http::HeaderMap& response_trailers) override;
 };
 
@@ -94,6 +96,7 @@ public:
 
   // AccessLog::Filter
   bool evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap& request_headers,
+                const Http::HeaderMap& response_headers,
                 const Http::HeaderMap& response_trailers) override;
 };
 
@@ -107,6 +110,7 @@ public:
 
   // AccessLog::Filter
   bool evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap& request_headers,
+                const Http::HeaderMap& response_headers,
                 const Http::HeaderMap& response_trailers) override;
 };
 
@@ -119,6 +123,7 @@ public:
 
   // AccessLog::Filter
   bool evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap& request_headers,
+                const Http::HeaderMap& response_headers,
                 const Http::HeaderMap& response_trailers) override;
 };
 
@@ -129,6 +134,7 @@ class TraceableRequestFilter : public Filter {
 public:
   // AccessLog::Filter
   bool evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap& request_headers,
+                const Http::HeaderMap& response_headers,
                 const Http::HeaderMap& response_trailers) override;
 };
 
@@ -142,6 +148,7 @@ public:
 
   // AccessLog::Filter
   bool evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap& request_headers,
+                const Http::HeaderMap& response_headers,
                 const Http::HeaderMap& response_trailers) override;
 
 private:
@@ -161,6 +168,7 @@ public:
 
   // AccessLog::Filter
   bool evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap& request_headers,
+                const Http::HeaderMap& response_headers,
                 const Http::HeaderMap& response_trailers) override;
 
 private:
@@ -176,6 +184,7 @@ public:
 
   // AccessLog::Filter
   bool evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap& request_headers,
+                const Http::HeaderMap& response_headers,
                 const Http::HeaderMap& response_trailers) override;
 
 private:
@@ -193,6 +202,7 @@ public:
 
   // AccessLog::Filter
   bool evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap& request_headers,
+                const Http::HeaderMap& response_headers,
                 const Http::HeaderMap& response_trailers) override;
 
 private:
