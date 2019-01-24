@@ -16,9 +16,9 @@ public:
     attempted_priorities_.reserve(max_retries);
   }
 
-  const Upstream::HealthyLoad&
+  const Upstream::HealthyAndDegradedLoad&
   determinePriorityLoad(const Upstream::PrioritySet& priority_set,
-                        const Upstream::HealthyLoad& original_priority) override;
+                        const Upstream::HealthyAndDegradedLoad& original_priority_load) override;
 
   void onHostAttempted(Upstream::HostDescriptionConstSharedPtr attempted_host) override {
     attempted_priorities_.emplace_back(attempted_host->priority());
@@ -28,11 +28,11 @@ private:
   void recalculatePerPriorityState(uint32_t priority, const Upstream::PrioritySet& priority_set) {
     // Recalcuate health and priority the same way the load balancer does it.
     Upstream::LoadBalancerBase::recalculatePerPriorityState(
-        priority, priority_set, healthy_per_priority_load_, degraded_per_priority_load_,
-        per_priority_health_, per_priority_degraded_);
+        priority, priority_set, per_priority_load_, per_priority_health_, per_priority_degraded_);
   }
 
-  std::pair<std::vector<uint32_t>, uint32_t> adjustedHealth() const;
+  uint32_t adjustedAvailability(std::vector<uint32_t>& per_priority_health,
+                                std::vector<uint32_t>& per_priority_degraded) const;
 
   // Distributes priority load between priorities that should be considered after
   // excluding attempted priorities.
@@ -43,8 +43,7 @@ private:
   const uint32_t update_frequency_;
   std::vector<uint32_t> attempted_priorities_;
   std::vector<bool> excluded_priorities_;
-  Upstream::HealthyLoad healthy_per_priority_load_;
-  Upstream::DegradedLoad degraded_per_priority_load_;
+  Upstream::HealthyAndDegradedLoad per_priority_load_;
   Upstream::HealthyAvailability per_priority_health_;
   Upstream::DegradedAvailability per_priority_degraded_;
 };

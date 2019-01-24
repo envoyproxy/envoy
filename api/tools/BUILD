@@ -1,27 +1,27 @@
 licenses(["notice"])  # Apache 2
 
 py_binary(
-    name = "capture2pcap",
-    srcs = ["capture2pcap.py"],
+    name = "tap2pcap",
+    srcs = ["tap2pcap.py"],
     licenses = ["notice"],  # Apache 2
     visibility = ["//visibility:public"],
     deps = [
-        "//envoy/data/tap/v2alpha:capture_py",
+        "//envoy/data/tap/v2alpha:transport_py",
     ],
 )
 
 py_test(
-    name = "capture2pcap_test",
-    srcs = ["capture2pcap_test.py"],
+    name = "tap2pcap_test",
+    srcs = ["tap2pcap_test.py"],
     data = [
-        "data/capture2pcap_h2_ipv4.pb_text",
-        "data/capture2pcap_h2_ipv4.txt",
+        "data/tap2pcap_h2_ipv4.pb_text",
+        "data/tap2pcap_h2_ipv4.txt",
     ],
     # Don't run this by default, since we don't want to force local dependency on Wireshark/tshark,
     # will explicitly invoke in CI.
     tags = ["manual"],
     visibility = ["//visibility:public"],
-    deps = [":capture2pcap"],
+    deps = [":tap2pcap"],
 )
 
 py_binary(

@@ -101,7 +101,7 @@ void WebsocketIntegrationTest::commonValidate(Http::HeaderMap& proxied_headers,
       proxied_headers.Connection()->value() == "upgrade" &&
       original_headers.Connection() != nullptr &&
       original_headers.Connection()->value() == "keep-alive, upgrade") {
-    // The keep-alive is implicit for HTTP/1.1, so Enovy only sets the upgrade
+    // The keep-alive is implicit for HTTP/1.1, so Envoy only sets the upgrade
     // header when converting from HTTP/1.1 to H2
     proxied_headers.Connection()->value().setCopy("keep-alive, upgrade", 19);
   }
@@ -282,7 +282,7 @@ TEST_P(WebsocketIntegrationTest, WebSocketConnectionIdleTimeout) {
   ASSERT_TRUE(waitForUpstreamDisconnectOrReset());
 }
 
-// Technically not a websocket tests, but verfies normal upgrades have parity
+// Technically not a websocket tests, but verifies normal upgrades have parity
 // with websocket upgrades
 TEST_P(WebsocketIntegrationTest, NonWebsocketUpgrade) {
   config_helper_.addConfigModifier(

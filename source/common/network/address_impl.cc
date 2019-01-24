@@ -290,7 +290,7 @@ Api::SysCallIntResult Ipv6Instance::connect(int fd) const {
 
 int Ipv6Instance::socket(SocketType type) const {
   const int fd = socketFromSocketType(type);
-  // Setting IPV6_V6ONLY resticts the IPv6 socket to IPv6 connections only.
+  // Setting IPV6_V6ONLY restricts the IPv6 socket to IPv6 connections only.
   const int v6only = ip_.v6only_;
   RELEASE_ASSERT(::setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, &v6only, sizeof(v6only)) != -1, "");
   return fd;

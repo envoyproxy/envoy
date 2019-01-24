@@ -60,7 +60,7 @@ public:
   }
 
   DangerousDeprecatedTestTime test_time_;
-  Stats::IsolatedStoreImpl* stats_store_; // Ownership transerred to scope_.
+  Stats::IsolatedStoreImpl* stats_store_; // Ownership transferred to scope_.
   Api::ApiPtr api_;
   Event::DispatcherImpl dispatcher_;
   Stats::ScopeSharedPtr scope_;

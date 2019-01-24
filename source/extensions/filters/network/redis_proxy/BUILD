@@ -54,6 +54,8 @@ envoy_cc_library(
         ":command_splitter_interface",
         ":conn_pool_interface",
         ":supported_commands_lib",
+        "//include/envoy/stats:stats_macros",
+        "//include/envoy/stats:timespan",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:to_lower_table_lib",

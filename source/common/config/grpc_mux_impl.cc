@@ -268,7 +268,7 @@ void GrpcMuxImpl::onRemoteClose(Grpc::Status::GrpcStatus status, const std::stri
   ENVOY_LOG(warn, "gRPC config stream closed: {}, {}", status, message);
   stream_ = nullptr;
   control_plane_stats_.connected_state_.set(0);
-  setRetryTimer();
+  handleFailure();
 }
 
 } // namespace Config

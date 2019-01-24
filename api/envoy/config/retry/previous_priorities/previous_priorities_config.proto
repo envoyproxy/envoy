@@ -2,7 +2,6 @@ syntax = "proto3";
 
 package envoy.config.retry.previous_priorities;
 option java_package = "io.envoyproxy.envoy.config.retry.previous_priorities";
-option java_multiple_files = true;
 
 // A retry host selector that attempts to spread retries between priorities, even if certain
 // priorities would not normally be attempted due to higher priorities being available.

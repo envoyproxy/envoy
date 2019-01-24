@@ -36,6 +36,8 @@ envoy_extension_cc_test(
         "//source/common/stats:stats_lib",
         "//source/extensions/filters/network/redis_proxy:command_splitter_lib",
         "//test/mocks:common_lib",
+        "//test/mocks/stats:stats_mocks",
+        "//test/test_common:simulated_time_system_lib",
     ],
 )
 
@@ -107,5 +109,6 @@ envoy_extension_cc_test_binary(
         "//source/common/stats:stats_lib",
         "//source/extensions/filters/network/redis_proxy:command_splitter_lib",
         "//test/test_common:printers_lib",
+        "//test/test_common:simulated_time_system_lib",
     ],
 )
