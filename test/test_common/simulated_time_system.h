@@ -4,7 +4,6 @@
 
 #include "common/common/lock_guard.h"
 #include "common/common/thread.h"
-//#include "common/common/utility.h"
 #include "common/common/utility.h"
 
 #include "test/test_common/test_time_system.h"
@@ -119,43 +118,5 @@ class SimulatedTimeProvider {
   SimulatedTimeSystem time_system_;
 };
 
-/*
-class SimulatedTimeSystem : public TestTimeSystem {
- public:
-  SimulatedTimeSystem();
-
-  SimulatedTimeSystemHelper& operator*() { return *time_system_; }
-  SimulatedTimeSystemHelper* operator->() { return time_system_; }
-
-  void sleep(const Duration& duration) override { time_system_->sleep(duration); }
-  Thread::CondVar::WaitStatus
-  waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
-          const Duration& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) override {
-    return time_system_->waitFor(mutex, condvar, duration);
-  }
-
-  SchedulerPtr createScheduler(Libevent::BasePtr& base_ptr) override {
-    return time_system_->createScheduler(base_ptr);
-  }
-  SystemTime systemTime() override { return time_system_->systemTime(); }
-  MonotonicTime monotonicTime() override { return time_system_->monotonicTime(); }
-
-  void setMonotonicTime(const MonotonicTime& monotonic_time) {
-    time_system_->setMonotonicTime(monotonic_time);
-  }
-  void setSystemTime(const SystemTime& system_time) { time_system_->setSystemTime(system_time); }
-
-  template <class Duration> void setMonotonicTime(const Duration& duration) {
-    setMonotonicTime(MonotonicTime(duration));
-  }
-  template <class Duration> void setSystemTime(const Duration& duration) {
-    setSystemTime(SystemTime(duration));
-  }
-
- private:
-  Test::Global<SingletonTimeSystemHelper> singleton_;
-  SimulatedTimeSystemHelper* time_system_;
-};
-*/
 } // namespace Event
 } // namespace Envoy

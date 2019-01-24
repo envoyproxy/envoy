@@ -67,8 +67,7 @@ public:
   }
 };
 
-template<class TimeSystemVariant>
-class DelegatingTestTimeSystem : public TestTimeSystem {
+template<class TimeSystemVariant> class DelegatingTestTimeSystem : public TestTimeSystem {
  public:
   DelegatingTestTimeSystem() {
     TestTimeSystem* time_system = singleton_->timeSystem();

@@ -45,6 +45,7 @@ public:
 
   TestTimeSystem& lazyInit() {
     if (singleton_->timeSystem() == nullptr) {
+      // TODO(jmarantz): Switch default to SimulatedTimeSystem.
       singleton_->set(new TestRealTimeSystem);
     }
     return *singleton_->timeSystem();
@@ -53,32 +54,6 @@ public:
 private:
   Test::Global<SingletonTimeSystemHelper> singleton_;
 };
-
-/*
-template <class Type> class TestTime : public TestTimeSystem {
-public:
-  TestTime() { global_time_system_.set(&(time_system_.get())); }
-
-  void sleep(const Duration& duration) override { time_system_->sleep(duration); }
-  Thread::CondVar::WaitStatus
-  waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
-          const Duration& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) override {
-    return time_system_->waitFor(mutex, condvar, duration);
-  }
-  SchedulerPtr createScheduler(Libevent::BasePtr& base_ptr) override {
-    return time_system_->createScheduler(base_ptr);
-  }
-  SystemTime systemTime() override { return time_system_->systemTime(); }
-  MonotonicTime monotonicTime() override { return time_system_->monotonicTime(); }
-
-  Type* operator->() { return &(*time_system_); }
-  Type& operator*() { return *time_system_; }
-
-private:
-  Test::Global<Type> time_system_;
-  GlobalTimeSystem global_time_system_;
-};
-*/
 
 } // namespace Event
 
