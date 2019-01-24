@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 from __future__ import print_function
 
@@ -472,7 +472,7 @@ def executeCommand(command,
     # In case we can't find any line numbers, record an error message first.
     error_messages = ["%s for file: %s" % (error_message, file_path)]
     for line in e.output.splitlines():
-      for num in regex.findall(line):
+      for num in regex.findall(str(line)):
         error_messages.append("  %s:%s" % (file_path, num))
     return error_messages
 
