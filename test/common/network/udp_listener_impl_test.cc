@@ -504,7 +504,7 @@ TEST_P(ListenerImplTest, UdpListenerRecvFromError) {
   ASSERT_GT(addr_len, 0);
 
   // When the `receive` system call returns an error, we expect the `onError`
-  // callback callwed with `SYSCALL_ERROR` parameter.
+  // callback callwed with `SyscallError` parameter.
   const std::string first("first");
 
   auto send_rc = ::sendto(client_sockfd, first.c_str(), first.length(), 0,
@@ -522,7 +522,7 @@ TEST_P(ListenerImplTest, UdpListenerRecvFromError) {
   EXPECT_CALL(listener_callbacks, onError_(_, _))
       .Times(1)
       .WillOnce(Invoke([&](const UdpListenerCallbacks::ErrorCode& err_code, int err) -> void {
-        ASSERT_EQ(err_code, UdpListenerCallbacks::ErrorCode::SYSCALL_ERROR);
+        ASSERT_EQ(err_code, UdpListenerCallbacks::ErrorCode::SyscallError);
         ASSERT_EQ(err, -1);
 
         dispatcher_.exit();

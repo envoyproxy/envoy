@@ -138,7 +138,7 @@ struct UdpData {
  */
 class UdpListenerCallbacks {
 public:
-  enum class ErrorCode { SYSCALL_ERROR, UNKNOWN_ERROR };
+  enum class ErrorCode { SyscallError, UnknownError };
 
   virtual ~UdpListenerCallbacks() = default;
 

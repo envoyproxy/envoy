@@ -89,7 +89,7 @@ void UdpListenerImpl::handleReadCallback(int fd) {
   do {
     recv_result = doRecvFrom(addr, addr_len);
     if ((recv_result.result_.rc_ < 0) && (recv_result.result_.rc_ != -EAGAIN)) {
-      cb_.onError(UdpListenerCallbacks::ErrorCode::SYSCALL_ERROR, recv_result.result_.errno_);
+      cb_.onError(UdpListenerCallbacks::ErrorCode::SyscallError, recv_result.result_.errno_);
       return;
     }
 
