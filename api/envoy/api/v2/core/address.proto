@@ -60,7 +60,6 @@ message SocketAddress {
   // <https://tools.ietf.org/html/rfc3493#page-11>`_. Binding to ``::`` will
   // allow both IPv4 and IPv6 connections, with peer IPv4 addresses mapped into
   // IPv6 space as ``::FFFF:<IPv4-address>``.
-
   bool ipv4_clompat = 6;
 }
 
