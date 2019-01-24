@@ -54,12 +54,16 @@ void MainImpl::initialize(const envoy::config::bootstrap::v2::Bootstrap& bootstr
   }
 
   ENVOY_LOG(info, "loading {} cluster(s)", bootstrap.static_resources().clusters().size());
+<<<<<<< HEAD
   cluster_manager_ = cluster_manager_factory.clusterManagerFromProto(
       bootstrap, server.stats(), server.threadLocal(), server.runtime(), server.random(),
       server.localInfo(), server.accessLogManager(), server.admin());
 <<<<<<< HEAD
   std::cerr<<"done building CM"<<std::endl;//TODO REMOVE
 =======
+=======
+  cluster_manager_ = cluster_manager_factory.clusterManagerFromProto(bootstrap);
+>>>>>>> transport socket: add admin to the factory (#5696)
 
   // TODO(ramaraochavali): remove this dependency on extension when rate limit service config is
   // deprecated and removed from bootstrap. For now, just call in to extensions to register the rate

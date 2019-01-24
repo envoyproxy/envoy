@@ -16,6 +16,7 @@
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
@@ -43,7 +44,7 @@ public:
         "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                               : cluster_config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-        ssl_context_manager_, *scope, cm, local_info_, dispatcher_, random_, stats_store_);
+        admin_, ssl_context_manager_, *scope, cm, local_info_, dispatcher_, random_, stats_store_);
     cluster_.reset(new LogicalDnsCluster(cluster_config, runtime_, dns_resolver_, tls_,
                                          factory_context, std::move(scope), false));
     cluster_->prioritySet().addPriorityUpdateCb(
@@ -61,7 +62,7 @@ public:
         "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                               : cluster_config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-        ssl_context_manager_, *scope, cm, local_info_, dispatcher_, random_, stats_store_);
+        admin_, ssl_context_manager_, *scope, cm, local_info_, dispatcher_, random_, stats_store_);
     cluster_.reset(new LogicalDnsCluster(cluster_config, runtime_, dns_resolver_, tls_,
                                          factory_context, std::move(scope), false));
     cluster_->prioritySet().addPriorityUpdateCb(
@@ -206,6 +207,7 @@ public:
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  NiceMock<Server::MockAdmin> admin_;
 };
 
 typedef std::tuple<std::string, Network::DnsLookupFamily, std::list<std::string>>
