@@ -99,11 +99,11 @@ private:
 };
 
 class SimulatedTimeSystem : public DelegatingTestTimeSystem<SimulatedTimeSystemHelper> {
- public:
+public:
   void setMonotonicTime(const MonotonicTime& monotonic_time) {
-    time_system_->setMonotonicTime(monotonic_time);
+    timeSystem().setMonotonicTime(monotonic_time);
   }
-  void setSystemTime(const SystemTime& system_time) { time_system_->setSystemTime(system_time); }
+  void setSystemTime(const SystemTime& system_time) { timeSystem().setSystemTime(system_time); }
 
   template <class Duration> void setMonotonicTime(const Duration& duration) {
     setMonotonicTime(MonotonicTime(duration));
@@ -114,7 +114,7 @@ class SimulatedTimeSystem : public DelegatingTestTimeSystem<SimulatedTimeSystemH
 };
 
 class SimulatedTimeProvider {
- public:
+public:
   SimulatedTimeSystem time_system_;
 };
 

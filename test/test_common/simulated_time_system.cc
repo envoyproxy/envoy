@@ -64,8 +64,7 @@ private:
 
 // Compare two alarms, based on wakeup time and insertion order. Returns true if
 // a comes before b.
-bool SimulatedTimeSystemHelper::CompareAlarms::operator()(
-    const Alarm* a, const Alarm* b) const {
+bool SimulatedTimeSystemHelper::CompareAlarms::operator()(const Alarm* a, const Alarm* b) const {
   if (a != b) {
     if (a->time() < b->time()) {
       return true;
@@ -106,7 +105,8 @@ void SimulatedTimeSystemHelper::Alarm::Alarm::disableTimer() {
   }
 }
 
-void SimulatedTimeSystemHelper::Alarm::Alarm::enableTimer(const std::chrono::milliseconds& duration) {
+void SimulatedTimeSystemHelper::Alarm::Alarm::enableTimer(
+    const std::chrono::milliseconds& duration) {
   disableTimer();
   armed_ = true;
   if (duration.count() == 0) {
@@ -155,8 +155,8 @@ void SimulatedTimeSystemHelper::sleep(const Duration& duration) {
 }
 
 Thread::CondVar::WaitStatus SimulatedTimeSystemHelper::waitFor(Thread::MutexBasicLockable& mutex,
-                                                         Thread::CondVar& condvar,
-                                                         const Duration& duration) noexcept {
+                                                               Thread::CondVar& condvar,
+                                                               const Duration& duration) noexcept {
   const Duration real_time_poll_delay(std::chrono::milliseconds(50));
   const MonotonicTime end_time = monotonicTime() + duration;
 

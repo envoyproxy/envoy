@@ -19,12 +19,12 @@ Thread::CondVar::WaitStatus TestRealTimeSystem::waitFor(Thread::MutexBasicLockab
 }
 
 SystemTime TestRealTimeSystem::systemTime() {
-  //ASSERT(!SimulatedTimeSystem::hasInstance());
+  // ASSERT(!SimulatedTimeSystem::hasInstance());
   return real_time_system_.systemTime();
 }
 
 MonotonicTime TestRealTimeSystem::monotonicTime() {
-  //ASSERT(!SimulatedTimeSystem::hasInstance());
+  // ASSERT(!SimulatedTimeSystem::hasInstance());
   return real_time_system_.monotonicTime();
 }
 

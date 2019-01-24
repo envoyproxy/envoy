@@ -67,8 +67,30 @@ public:
   }
 };
 
-template<class TimeSystemVariant> class DelegatingTestTimeSystem : public TestTimeSystem {
- public:
+template <class TimeSystemVariant> class DelegatingTestTimeSystemBase : public TestTimeSystem {
+public:
+  void sleep(const Duration& duration) override { timeSystem().sleep(duration); }
+
+  Thread::CondVar::WaitStatus
+  waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
+          const Duration& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) override {
+    return timeSystem().waitFor(mutex, condvar, duration);
+  }
+
+  SchedulerPtr createScheduler(Libevent::BasePtr& base_ptr) override {
+    return timeSystem().createScheduler(base_ptr);
+  }
+  SystemTime systemTime() override { return timeSystem().systemTime(); }
+  MonotonicTime monotonicTime() override { return timeSystem().monotonicTime(); }
+
+  TimeSystemVariant& operator*() { return timeSystem(); }
+
+  virtual TimeSystemVariant& timeSystem() PURE;
+};
+
+template <class TimeSystemVariant>
+class DelegatingTestTimeSystem : public DelegatingTestTimeSystemBase<TimeSystemVariant> {
+public:
   DelegatingTestTimeSystem() {
     TestTimeSystem* time_system = singleton_->timeSystem();
     if (time_system == nullptr) {
@@ -80,26 +102,10 @@ template<class TimeSystemVariant> class DelegatingTestTimeSystem : public TestTi
     }
   }
 
-  void sleep(const Duration& duration) override { time_system_->sleep(duration); }
+  TimeSystemVariant& timeSystem() override { return *time_system_; }
 
-  Thread::CondVar::WaitStatus
-  waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
-          const Duration& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) override {
-    return time_system_->waitFor(mutex, condvar, duration);
-  }
-
-  SchedulerPtr createScheduler(Libevent::BasePtr& base_ptr) override {
-    return time_system_->createScheduler(base_ptr);
-  }
-  SystemTime systemTime() override { return time_system_->systemTime(); }
-  MonotonicTime monotonicTime() override { return time_system_->monotonicTime(); }
-
-  TimeSystemVariant& operator*() { return *time_system_; }
-
- protected:
+private:
   TimeSystemVariant* time_system_;
-
- private:
   Test::Global<SingletonTimeSystemHelper> singleton_;
 };
 
