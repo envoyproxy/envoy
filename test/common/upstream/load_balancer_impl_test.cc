@@ -363,6 +363,18 @@ TEST_P(LoadBalancerBaseTest, GentleFailoverWithExtraLevels) {
   ASSERT_THAT(getDegradedLoadPercentage(), ElementsAre(0, 0, 0));
   ASSERT_THAT(getPanic(), ElementsAre(true, true, true));
 
+  // Level P=0 is totally degraded. P=1 is 40*1.4=56% healthy and 40*1.4=56% degraded. P=2 is
+  // 40*1.4=56%% healthy. 100% of the traffic should go to P=2. No priorities should be in panic
+  // mode.
+  updateHostSet(host_set_, 5 /* num_hosts */, 0 /* num_healthy_hosts */,
+                5 /* num_degraded_hosts */);
+  updateHostSet(failover_host_set_, 5 /* num_hosts */, 2 /* num_healthy_hosts */,
+                2 /* num_degraded_hosts */);
+  updateHostSet(tertiary_host_set_, 5 /* num_hosts */, 2 /* num_healthy_hosts */);
+  ASSERT_THAT(getLoadPercentage(), ElementsAre(0, 56, 44));
+  ASSERT_THAT(getDegradedLoadPercentage(), ElementsAre(0, 0, 0));
+  ASSERT_THAT(getPanic(), ElementsAre(false, false, false));
+
   // All levels are completely down. 100% of traffic should go to P=0
   // and P=0 should be in panic mode
   updateHostSet(host_set_, 5 /* num_hosts */, 0 /* num_healthy_hosts */);
