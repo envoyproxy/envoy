@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# Extracts comments from C++ source code and protobuf definitions. Converts all words to
+# lowercase and returns a list of potentially misspelled words, in increasing order of
+# frequency. (Low frequency words are more likely to be misspelled.)
+
 TOOLS_DIR=$(cd `dirname $0`; pwd)
 ROOT=$(cd "${TOOLS_DIR}/.."; pwd)
 

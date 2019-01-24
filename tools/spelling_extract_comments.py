@@ -1,5 +1,8 @@
 #!/usr/bin/env python
 
+# Extract C-style comments from files passed on the command line. Strips Envoy-style TODOs,
+# and long hex/base64 strings. Splits camel case words.
+
 import sys
 import re
 import codecs
