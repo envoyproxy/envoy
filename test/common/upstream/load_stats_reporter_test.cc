@@ -26,7 +26,7 @@ using testing::Return;
 namespace Envoy {
 namespace Upstream {
 
-class LoadStatsReporterTest : public Event::SimulatedTimeProvider, public testing::Test {
+class LoadStatsReporterTest : public testing::Test {
 public:
   LoadStatsReporterTest()
       : retry_timer_(new Event::MockTimer()), response_timer_(new Event::MockTimer()),
@@ -66,6 +66,7 @@ public:
     load_stats_reporter_->onReceiveMessage(std::move(response));
   }
 
+  Event::SimulatedTimeSystem time_system_;
   NiceMock<Upstream::MockClusterManager> cm_;
   Event::MockDispatcher dispatcher_;
   Stats::IsolatedStoreImpl stats_store_;
