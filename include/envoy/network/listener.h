@@ -162,9 +162,9 @@ public:
    * Called when there is an error event.
    *
    * @param error_code ErrorCode for the error event.
-   * @param errno System error number.
+   * @param error_number System error number.
    */
-  virtual void onError(const ErrorCode& error_code, int error_no) PURE;
+  virtual void onError(const ErrorCode& error_code, int error_number) PURE;
 };
 
 /**
