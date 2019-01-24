@@ -36,10 +36,6 @@ namespace Envoy {
 namespace Config {
 namespace {
 
-struct MockTimeProvider {
-  Event::DelegatingTestTimeSystem<MockTimeSystem> mock_time_system_;
-};
-
 // We test some mux specific stuff below, other unit test coverage for singleton use of GrpcMuxImpl
 // is provided in [grpc_]subscription_impl_test.cc.
 class GrpcMuxImplTestBase : public testing::Test {
@@ -96,7 +92,10 @@ public:
   Envoy::Config::RateLimitSettings rate_limit_settings_;
 };
 
-class GrpcMuxImplTest : public Event::SimulatedTimeProvider, public GrpcMuxImplTestBase {};
+class GrpcMuxImplTest : public GrpcMuxImplTestBase {
+public:
+  Event::SimulatedTimeSystem time_system_;
+};
 
 // Validate behavior when multiple type URL watches are maintained, watches are created/destroyed
 // (via RAII).
@@ -332,7 +331,10 @@ TEST_F(GrpcMuxImplTest, WatchDemux) {
 
 // Exactly one test requires a mock time system to provoke behavior that cannot
 // easily be achieved with a SimulatedTimeSystem.
-class GrpcMuxImplTestWithMockTimeSystem : public MockTimeProvider, public GrpcMuxImplTestBase {};
+class GrpcMuxImplTestWithMockTimeSystem : public GrpcMuxImplTestBase {
+public:
+  Event::DelegatingTestTimeSystem<MockTimeSystem> mock_time_system_;
+};
 
 //  Verifies that rate limiting is not enforced with defaults.
 TEST_F(GrpcMuxImplTestWithMockTimeSystem, TooManyRequestsWithDefaultSettings) {

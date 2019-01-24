@@ -113,10 +113,5 @@ public:
   }
 };
 
-class SimulatedTimeProvider {
-public:
-  SimulatedTimeSystem time_system_;
-};
-
 } // namespace Event
 } // namespace Envoy
