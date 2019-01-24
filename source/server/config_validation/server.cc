@@ -90,7 +90,8 @@ void ValidationInstance::initialize(Options& options,
       std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(time_system_);
   cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
       admin(), runtime(), stats(), threadLocal(), random(), dnsResolver(), sslContextManager(),
-      dispatcher(), localInfo(), *secret_manager_, api(), http_context_, accessLogManager());
+      dispatcher(), localInfo(), *secret_manager_, api(), http_context_, accessLogManager(),
+      singletonManager());
   config_.initialize(bootstrap, *this, *cluster_manager_factory_);
   http_context_.setTracer(config_.httpTracer());
   clusterManager().setInitializedCb(

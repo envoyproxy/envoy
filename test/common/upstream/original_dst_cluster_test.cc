@@ -8,6 +8,7 @@
 
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
+#include "common/singleton/manager_impl.h"
 #include "common/upstream/original_dst_cluster.h"
 #include "common/upstream/upstream_impl.h"
 
@@ -72,7 +73,8 @@ public:
         "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                               : cluster_config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-        admin_, ssl_context_manager_, *scope, cm, local_info_, dispatcher_, random_, stats_store_);
+        admin_, ssl_context_manager_, *scope, cm, local_info_, dispatcher_, random_, stats_store_,
+        singleton_manager_, tls_);
     cluster_.reset(
         new OriginalDstCluster(cluster_config, runtime_, factory_context, std::move(scope), false));
     cluster_->prioritySet().addPriorityUpdateCb(
@@ -93,6 +95,8 @@ public:
   NiceMock<Runtime::MockRandomGenerator> random_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Server::MockAdmin> admin_;
+  Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest().currentThreadId()};
+  NiceMock<ThreadLocal::MockInstance> tls_;
 };
 
 TEST(OriginalDstClusterConfigTest, BadConfig) {

@@ -7,6 +7,7 @@
 #include "envoy/stats/scope.h"
 
 #include "common/network/utility.h"
+#include "common/singleton/manager_impl.h"
 #include "common/upstream/logical_dns_cluster.h"
 
 #include "server/transport_socket_config_impl.h"
@@ -44,7 +45,8 @@ public:
         "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                               : cluster_config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-        admin_, ssl_context_manager_, *scope, cm, local_info_, dispatcher_, random_, stats_store_);
+        admin_, ssl_context_manager_, *scope, cm, local_info_, dispatcher_, random_, stats_store_,
+        singleton_manager_, tls_);
     cluster_.reset(new LogicalDnsCluster(cluster_config, runtime_, dns_resolver_, tls_,
                                          factory_context, std::move(scope), false));
     cluster_->prioritySet().addPriorityUpdateCb(
@@ -62,7 +64,8 @@ public:
         "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                               : cluster_config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-        admin_, ssl_context_manager_, *scope, cm, local_info_, dispatcher_, random_, stats_store_);
+        admin_, ssl_context_manager_, *scope, cm, local_info_, dispatcher_, random_, stats_store_,
+        singleton_manager_, tls_);
     cluster_.reset(new LogicalDnsCluster(cluster_config, runtime_, dns_resolver_, tls_,
                                          factory_context, std::move(scope), false));
     cluster_->prioritySet().addPriorityUpdateCb(
@@ -208,6 +211,7 @@ public:
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Server::MockAdmin> admin_;
+  Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest().currentThreadId()};
 };
 
 typedef std::tuple<std::string, Network::DnsLookupFamily, std::list<std::string>>
