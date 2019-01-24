@@ -245,6 +245,7 @@ bool GrpcStatusFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::
   for (const auto& optional_status : optional_statuses) {
     if (optional_status.has_value()) {
       status = optional_status.value();
+      break;
     }
   }
 
