@@ -1107,6 +1107,27 @@ config:
   }
 }
 
+TEST_F(AccessLogImplTest, GrpcStatusFilterExcludeFalse) {
+  const std::string yaml = R"EOF(
+name: envoy.file_access_log
+filter:
+  grpc_status_filter:
+    exclude: false
+    statuses:
+      - OK
+config:
+  path: /dev/null
+  )EOF";
+
+  const InstanceSharedPtr log =
+      AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+
+  response_trailers_.addCopy(Http::Headers::get().GrpcStatus, "0");
+
+  EXPECT_CALL(*file_, write(_));
+  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+}
+
 TEST_F(AccessLogImplTest, GrpcStatusFilterHeader) {
   const std::string yaml = R"EOF(
 name: envoy.file_access_log
