@@ -65,7 +65,7 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
     PostIoAction action = doHandshake();
     if (action == PostIoAction::Close || !handshake_complete_) {
       // end_stream is false because either a hard error occurred (action == Close) or
-      // the handhshake isn't complete, so a half-close cannot occur yet.
+      // the handshake isn't complete, so a half-close cannot occur yet.
       return {action, 0, false};
     }
   }

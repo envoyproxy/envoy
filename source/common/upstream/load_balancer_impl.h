@@ -369,7 +369,7 @@ private:
 };
 
 /**
- * A round roubin load balancer. When in weighted mode, EDF scheduling is used. When in not
+ * A round robin load balancer. When in weighted mode, EDF scheduling is used. When in not
  * weighted mode, simple RR index selection is used.
  */
 class RoundRobinLoadBalancer : public EdfLoadBalancerBase {

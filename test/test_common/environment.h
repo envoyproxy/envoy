@@ -120,7 +120,7 @@ public:
              Network::Address::IpVersion version = Network::Address::IpVersion::v4);
 
   /**
-   * Substitute ports, paths, and IP loopback addressses in a JSON file in the
+   * Substitute ports, paths, and IP loopback addresses in a JSON file in the
    * private writable test temporary directory.
    * @param path path prefix for the input file with port and path templates.
    * @param port_map map from port name to port number.
@@ -130,7 +130,7 @@ public:
   static std::string temporaryFileSubstitute(const std::string& path, const PortMap& port_map,
                                              Network::Address::IpVersion version);
   /**
-   * Substitute ports, paths, and IP loopback addressses in a JSON file in the
+   * Substitute ports, paths, and IP loopback addresses in a JSON file in the
    * private writable test temporary directory.
    * @param path path prefix for the input file with port and path templates.
    * @param param_map map from parameter name to values.

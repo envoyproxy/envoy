@@ -5,6 +5,7 @@
 #include <sys/un.h>
 #include <unistd.h>
 
+#include <iostream>
 #include <memory>
 #include <string>
 
@@ -116,6 +117,22 @@ TEST_P(AddressImplSocketTest, SocketBindAndConnect) {
 TEST(Ipv4CompatAddressImplSocktTest, SocketBindAndConnect) {
   if (TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v6)) {
     testSocketBindAndConnect(Network::Address::IpVersion::v6, false);
+  }
+}
+
+TEST(Ipv4InstanceTest, SockaddrToString) {
+  // Test addresses from various RFC 5735 reserved ranges
+  static const char* addresses[] = {"0.0.0.0",        "0.0.0.255",       "0.0.255.255",
+                                    "0.255.255.255",  "192.0.2.0",       "198.151.100.1",
+                                    "198.151.100.10", "198.151.100.100", "10.0.0.1",
+                                    "10.0.20.1",      "10.3.201.1",      "255.255.255.255"};
+
+  for (const auto address : addresses) {
+    sockaddr_in addr4;
+    addr4.sin_family = AF_INET;
+    EXPECT_EQ(1, inet_pton(AF_INET, address, &addr4.sin_addr));
+    addr4.sin_port = 0;
+    EXPECT_STREQ(address, Ipv4Instance::sockaddrToString(addr4).c_str());
   }
 }
 

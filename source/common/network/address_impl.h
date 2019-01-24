@@ -102,6 +102,14 @@ public:
   const Ip* ip() const override { return &ip_; }
   int socket(SocketType type) const override;
 
+  /**
+   * Convenience function to convert an IPv4 address to canonical string format.
+   * @note This works similarly to inet_ntop() but is faster.
+   * @param addr address to format.
+   * @return the address in dotted-decimal string format.
+   */
+  static std::string sockaddrToString(const sockaddr_in& addr);
+
 private:
   struct Ipv4Helper : public Ipv4 {
     uint32_t address() const override { return address_.sin_addr.s_addr; }

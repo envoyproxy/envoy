@@ -215,7 +215,7 @@ Symbol SymbolTable::toSymbol(absl::string_view sv) {
     // We create the actual string, place it in the decode_map_, and then insert
     // a string_view pointing to it in the encode_map_. This allows us to only
     // store the string once. We use unique_ptr so copies are not made as
-    // flat_hash_map moves values arond.
+    // flat_hash_map moves values around.
     auto str = std::make_unique<std::string>(std::string(sv));
     auto encode_insert = encode_map_.insert({*str, SharedSymbol(next_symbol_)});
     ASSERT(encode_insert.second);

@@ -105,7 +105,7 @@ void MetricsServiceSink::flush(Stats::Source& source) {
   }
 
   grpc_metrics_streamer_->send(message_);
-  // for perf reasons, clear the identifer after the first flush.
+  // for perf reasons, clear the identifier after the first flush.
   if (message_.has_identifier()) {
     message_.clear_identifier();
   }

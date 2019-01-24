@@ -252,10 +252,7 @@ public:
    * Allocate a cluster manager from configuration proto.
    */
   virtual ClusterManagerPtr
-  clusterManagerFromProto(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,
-                          Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,
-                          Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
-                          AccessLog::AccessLogManager& log_manager, Server::Admin& admin) PURE;
+  clusterManagerFromProto(const envoy::config::bootstrap::v2::Bootstrap& bootstrap) PURE;
 
   /**
    * Allocate an HTTP connection pool for the host. Pools are separated by 'priority',
@@ -282,7 +279,6 @@ public:
   virtual ClusterSharedPtr clusterFromProto(const envoy::api::v2::Cluster& cluster,
                                             ClusterManager& cm,
                                             Outlier::EventLoggerSharedPtr outlier_event_logger,
-                                            AccessLog::AccessLogManager& log_manager,
                                             bool added_via_api) PURE;
 
   /**
@@ -305,23 +301,27 @@ public:
   virtual ~ClusterInfoFactory() {}
 
   /**
-   * This method returns a Upstream::ClusterInfoConstSharedPtr
-   *
-   * @param runtime supplies the runtime loader.
-   * @param cluster supplies the owning cluster.
-   * @param bind_config supplies information on binding newly established connections.
-   * @param stats supplies a store for all known counters, gauges, and timers.
-   * @param ssl_context_manager supplies a manager for all SSL contexts.
-   * @param secret_manager supplies a manager for static secrets.
-   * @param added_via_api denotes whether this was added via API.
-   * @return Upstream::ClusterInfoConstSharedPtr
+   * Parameters for createClusterInfo().
+   */
+  struct CreateClusterInfoParams {
+    Server::Admin& admin_;
+    Runtime::Loader& runtime_;
+    const envoy::api::v2::Cluster& cluster_;
+    const envoy::api::v2::core::BindConfig& bind_config_;
+    Stats::Store& stats_;
+    Ssl::ContextManager& ssl_context_manager_;
+    const bool added_via_api_;
+    ClusterManager& cm_;
+    const LocalInfo::LocalInfo& local_info_;
+    Event::Dispatcher& dispatcher_;
+    Runtime::RandomGenerator& random_;
+  };
+
+  /**
+   * This method returns a Upstream::ClusterInfoConstSharedPtr given construction parameters.
    */
   virtual Upstream::ClusterInfoConstSharedPtr
-  createClusterInfo(Runtime::Loader& runtime, const envoy::api::v2::Cluster& cluster,
-                    const envoy::api::v2::core::BindConfig& bind_config, Stats::Store& stats,
-                    Ssl::ContextManager& ssl_context_manager, bool added_via_api,
-                    ClusterManager& cm, const LocalInfo::LocalInfo& local_info,
-                    Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random) PURE;
+  createClusterInfo(const CreateClusterInfoParams& params) PURE;
 };
 
 } // namespace Upstream
