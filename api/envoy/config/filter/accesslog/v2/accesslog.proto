@@ -217,4 +217,8 @@ message GrpcStatusFilter {
       "UNAUTHENTICATED"
     ]
   }];
+
+  // If included and set to true, the filter will instead block all responses with a gRPC status or
+  // inferred gRPC status enumerated in statuses, and allow all other responses.
+  bool exclude = 2;
 }

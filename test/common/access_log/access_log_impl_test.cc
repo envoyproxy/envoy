@@ -1081,6 +1081,30 @@ config:
   log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
 }
 
+TEST_F(AccessLogImplTest, GrpcStatusFilterExclude) {
+  const std::string yaml = R"EOF(
+name: envoy.file_access_log
+filter:
+  grpc_status_filter:
+    exclude: true
+    statuses:
+      - OK
+config:
+  path: /dev/null
+  )EOF";
+
+  const InstanceSharedPtr log =
+      AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+
+  for (int i = 0; i <= static_cast<int>(Grpc::Status::GrpcStatus::MaximumValid); i++) {
+    EXPECT_CALL(*file_, write(_)).Times(i == 0 ? 0 : 1);
+
+    response_trailers_.addCopy(Http::Headers::get().GrpcStatus, std::to_string(i));
+    log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+    response_trailers_.remove(Http::Headers::get().GrpcStatus);
+  }
+}
+
 } // namespace
 } // namespace AccessLog
 } // namespace Envoy

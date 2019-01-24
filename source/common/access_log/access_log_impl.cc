@@ -216,6 +216,8 @@ GrpcStatusFilter::GrpcStatusFilter(
     ASSERT(grpc_status.has_value());
     statuses_.insert(grpc_status.value());
   }
+
+  exclude_ = config.exclude();
 }
 
 bool GrpcStatusFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap&,
@@ -232,7 +234,8 @@ bool GrpcStatusFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::
     request_status = Grpc::Status::GrpcStatus::Unknown;
   }
 
-  return statuses_.find(request_status) != statuses_.end();
+  bool found = statuses_.find(request_status) != statuses_.end();
+  return exclude_ ? !found : found;
 }
 
 InstanceSharedPtr

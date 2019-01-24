@@ -197,6 +197,7 @@ public:
 
 private:
   std::unordered_set<Grpc::Status::GrpcStatus, Grpc::GrpcStatusHash> statuses_;
+  bool exclude_;
 };
 
 /**
