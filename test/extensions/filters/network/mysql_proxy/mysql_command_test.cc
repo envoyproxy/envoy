@@ -218,6 +218,9 @@ int readStatement(hsql::SQLParserResult& result, std::string& exp_cmd, std::stri
         exp_cmd = *ot;
         if (exp_cmd != "unknown") { // Skip unknown results.
           exp_table = it->first;
+          // TODO(rshriram): should we be appending *all* the results into a
+          // comma-separated report, rather than just grabbing the first one
+          // we see?
           return MYSQL_SUCCESS;
         }
       }
