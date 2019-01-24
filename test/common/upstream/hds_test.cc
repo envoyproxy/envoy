@@ -2,6 +2,7 @@
 
 #include "envoy/service/discovery/v2/hds.pb.h"
 
+#include "common/singleton/manager_impl.h"
 #include "common/upstream/health_discovery_service.h"
 
 #include "extensions/transport_sockets/tls/context_manager_impl.h"
@@ -64,7 +65,8 @@ public:
         }));
     hds_delegate_ = std::make_unique<HdsDelegate>(
         stats_store_, Grpc::AsyncClientPtr(async_client_), dispatcher_, runtime_, stats_store_,
-        ssl_context_manager_, random_, test_factory_, log_manager_, cm_, local_info_, admin_);
+        ssl_context_manager_, random_, test_factory_, log_manager_, cm_, local_info_, admin_,
+        singleton_manager_, tls_);
   }
 
   // Creates a HealthCheckSpecifier message that contains one endpoint and one
@@ -120,6 +122,8 @@ public:
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Server::MockAdmin> admin_;
+  Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest().currentThreadId()};
+  NiceMock<ThreadLocal::MockInstance> tls_;
 };
 
 // Test that HdsDelegate builds and sends initial message correctly

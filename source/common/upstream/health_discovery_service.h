@@ -41,7 +41,8 @@ public:
              Ssl::ContextManager& ssl_context_manager, bool added_via_api,
              ClusterInfoFactory& info_factory, ClusterManager& cm,
              const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
-             Runtime::RandomGenerator& random);
+             Runtime::RandomGenerator& random, Singleton::Manager& singleton_manager,
+             ThreadLocal::SlotAllocator& tls);
 
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
@@ -114,7 +115,8 @@ public:
               Runtime::Loader& runtime, Envoy::Stats::Store& stats,
               Ssl::ContextManager& ssl_context_manager, Runtime::RandomGenerator& random,
               ClusterInfoFactory& info_factory, AccessLog::AccessLogManager& access_log_manager,
-              ClusterManager& cm, const LocalInfo::LocalInfo& local_info, Server::Admin& admin);
+              ClusterManager& cm, const LocalInfo::LocalInfo& local_info, Server::Admin& admin,
+              Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls);
 
   // Grpc::TypedAsyncStreamCallbacks
   void onCreateInitialMetadata(Http::HeaderMap& metadata) override;
@@ -153,6 +155,8 @@ private:
   ClusterManager& cm_;
   const LocalInfo::LocalInfo& local_info_;
   Server::Admin& admin_;
+  Singleton::Manager& singleton_manager_;
+  ThreadLocal::SlotAllocator& tls_;
 
   envoy::service::discovery::v2::HealthCheckRequestOrEndpointHealthResponse health_check_request_;
   std::unique_ptr<envoy::service::discovery::v2::HealthCheckSpecifier> health_check_message_;
