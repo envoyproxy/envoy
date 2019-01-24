@@ -4,13 +4,13 @@
 
 #include "envoy/api/v2/discovery.pb.h"
 #include "envoy/common/token_bucket.h"
-#include "envoy/config/grpc_mux.h" // for ControlPlaneStats
 #include "envoy/config/subscription.h"
 
 #include "common/common/assert.h"
 #include "common/common/backoff_strategy.h"
 #include "common/common/logger.h"
 #include "common/common/token_bucket_impl.h"
+#include "common/config/grpc_stream.h"
 #include "common/config/utility.h"
 #include "common/grpc/common.h"
 #include "common/protobuf/protobuf.h"
@@ -19,95 +19,39 @@
 namespace Envoy {
 namespace Config {
 
+struct ResourceNameDiff {
+  std::vector<std::string> added_;
+  std::vector<std::string> removed_;
+};
+
 /**
  * TODO SOMETHING SOMETHING subscription. Also handles per-xDS API stats/logging.
  */
 template <class ResourceType>
 class IncrementalSubscriptionImpl
     : public IncrementalSubscription<ResourceType>,
-      Grpc::TypedAsyncStreamCallbacks<envoy::api::v2::IncrementalDiscoveryResponse>,
-      Logger::Loggable<Logger::Id::config> {
+      public GrpcStream<envoy::api::v2::IncrementalDiscoveryRequest,
+                        envoy::api::v2::IncrementalDiscoveryResponse, ResourceNameDiff> {
 public:
   IncrementalSubscriptionImpl(const LocalInfo::LocalInfo& local_info,
                               Grpc::AsyncClientPtr async_client, Event::Dispatcher& dispatcher,
                               const Protobuf::MethodDescriptor& service_method,
-                              Runtime::RandomGenerator& random,
+                              Runtime::RandomGenerator& random, Stats::Scope& scope,
                               const RateLimitSettings& rate_limit_settings,
-                              IncrementalSubscriptionStats stats,
-                              ControlPlaneStats control_plane_stats)
-      : type_url_(Grpc::Common::typeUrl(ResourceType().GetDescriptor()->full_name())),
-        local_info_(local_info), async_client_(std::move(async_client)),
-        service_method_(service_method), rate_limiting_enabled_(rate_limit_settings.enabled_),
-        stats_(stats), control_plane_stats_(control_plane_stats) {
-    retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
-    if (rate_limiting_enabled_) {
-      // Default Bucket contains 100 tokens maximum and refills at 10 tokens/sec.
-      limit_request_ = std::make_unique<TokenBucketImpl>(
-          rate_limit_settings.max_tokens_, dispatcher.timeSystem(), rate_limit_settings.fill_rate_);
-      drain_request_timer_ = dispatcher.createTimer([this]() -> void { drainRequests(); });
-    }
-    backoff_strategy_ =
-        std::make_unique<JitteredBackOffStrategy>(50,    // TODO RETRY_INITIAL_DELAY_MS,
-                                                  30000, // TODO RETRY_MAX_DELAY_MS,
-                                                  random);
+                              IncrementalSubscriptionStats stats)
+      : GrpcStream<envoy::api::v2::IncrementalDiscoveryRequest,
+                   envoy::api::v2::IncrementalDiscoveryResponse, ResourceNameDiff>(
+            std::move(async_client), service_method, random, dispatcher, scope,
+            rate_limit_settings),
+        type_url_(Grpc::Common::typeUrl(ResourceType().GetDescriptor()->full_name())),
+        local_info_(local_info), stats_(stats) {
     establishNewStream();
-  }
-
-  // GRPC ACTUAL STREAM HANDLING STUFF
-  //  void start() { establishNewStream(); }
-
-  void setRetryTimer() {
-    retry_timer_->enableTimer(std::chrono::milliseconds(backoff_strategy_->nextBackOffMs()));
-  }
-
-  void establishNewStream() {
-    ENVOY_LOG(debug, "Establishing new gRPC bidi stream for {}", service_method_.DebugString());
-    stream_ = async_client_->start(service_method_, *this);
-    if (stream_ == nullptr) {
-      ENVOY_LOG(warn, "Unable to establish new stream");
-      onConfigUpdateFailed(nullptr);
-      setRetryTimer();
-      return;
-    }
-
-    // "must be populated for first request in a stream"
-    request_.clear_initial_resource_versions();
-    for (auto const& resource : resources_) {
-      (*request_.mutable_initial_resource_versions())[resource.first] = resource.second;
-    }
-
-    control_plane_stats_.connected_state_.set(1);
-    queueDiscoveryRequest();
-  }
-
-  void drainRequests() {
-    ENVOY_LOG(trace, "draining discovery requests {}", request_queue_.size());
-    while (!request_queue_.empty()) {
-      // Process the request, if rate limiting is not enabled at all or if it is under rate limit.
-      if (!rate_limiting_enabled_ || limit_request_->consume()) {
-        sendDiscoveryRequest();
-      } else {
-        ASSERT(rate_limiting_enabled_);
-        ASSERT(drain_request_timer_ != nullptr);
-        control_plane_stats_.rate_limit_enforced_.inc();
-        control_plane_stats_.pending_requests_.set(request_queue_.size());
-        drain_request_timer_->enableTimer(
-            std::chrono::milliseconds(limit_request_->nextTokenAvailableMs()));
-        break;
-      }
-    }
-  }
-
-  // Enqueues and attempts to send a discovery request with no change to subscribed resources.
-  void queueDiscoveryRequest() {
-    request_queue_.emplace();
-    drainRequests();
   }
 
   // Enqueues and attempts to send a discovery request, (un)subscribing to resources missing from /
   // added to the passed 'resources' argument, relative to resources_. Updates resources_ to
   // 'resources'.
-  void queueDiscoveryRequest(const std::vector<std::string>& resources) {
+  void buildAndQueueDiscoveryRequest(const std::vector<std::string>& resources) {
     ResourceNameDiff diff;
     for (const auto& resource : resources) {
       if (resources_.find(resource) == resources_.end()) {
@@ -132,11 +76,11 @@ public:
     for (const auto& removed : diff.removed_) {
       resources_.erase(removed);
     }
-    drainRequests();
+    queueDiscoveryRequest(diff);
   }
 
-  void sendDiscoveryRequest() {
-    if (stream_ == nullptr) {
+  void sendDiscoveryRequest(const ResourceNameDiff& diff) override {
+    if (!grpcStreamAvailable()) {
       // Don't immediately try to reconnect: we rely on retry_timer_ for that.
       ENVOY_LOG(debug, "No stream available to sendDiscoveryRequest for {}", type_url_);
       return;
@@ -148,17 +92,15 @@ public:
 
     request_.clear_resource_names_subscribe();
     request_.clear_resource_names_unsubscribe();
-    const ResourceNameDiff& diff = request_queue_.front();
     std::copy(diff.added_.begin(), diff.added_.end(),
               request_.mutable_resource_names_subscribe()->begin());
     std::copy(diff.removed_.begin(), diff.removed_.end(),
               request_.mutable_resource_names_unsubscribe()->begin());
 
     ENVOY_LOG(trace, "Sending DiscoveryRequest for {}: {}", type_url_, request_.DebugString());
-    stream_->sendMessage(request_, false);
+    sendMessage(request_);
     request_.clear_error_detail();
     request_.clear_initial_resource_versions();
-    request_queue_.pop();
   }
 
   void subscribe(const std::vector<std::string>& resources) {
@@ -172,7 +114,7 @@ public:
       request_.mutable_node()->MergeFrom(local_info_.node());
       subscribed_ = true;
     }
-    queueDiscoveryRequest(resources);
+    buildAndQueueDiscoveryRequest(resources);
   }
 
   void pause() {
@@ -185,7 +127,6 @@ public:
     ENVOY_LOG(debug, "Resuming discovery requests for {}", type_url_);
     ASSERT(paused_);
     paused_ = false;
-    drainRequests();
   }
 
   // Config::IncrementalSubscription....Callbacks? these are just meant as wrappers. Not sure if
@@ -203,33 +144,9 @@ public:
     ENVOY_LOG(debug, "Incremental config for {} accepted with {} resources added, {} removed",
               type_url_, added_resources.size(), removed_resources.size());
   }
-  void onConfigUpdateFailed(const EnvoyException* e) {
-    // TODO(htuch): Less fragile signal that this is failure vs. reject.
-    if (e == nullptr) {
-      stats_.update_failure_.inc();
-      ENVOY_LOG(debug, "incremental update for {} failed", type_url_);
-    } else {
-      stats_.update_rejected_.inc();
-      ENVOY_LOG(warn, "incremental config for {} rejected: {}", type_url_, e->what());
-    }
-    stats_.update_attempt_.inc();
-    if (callbacks_) {
-      callbacks_->onConfigUpdateFailed(e);
-    }
-  }
 
-  // Grpc::TypedAsyncStreamCallbacks
-  void onCreateInitialMetadata(Http::HeaderMap& metadata) override {
-    UNREFERENCED_PARAMETER(metadata);
-  }
-  void onReceiveInitialMetadata(Http::HeaderMapPtr&& metadata) override {
-    UNREFERENCED_PARAMETER(metadata);
-  }
-  void onReceiveMessage(
-      std::unique_ptr<envoy::api::v2::IncrementalDiscoveryResponse>&& message) override {
-    // Reset here so that it starts with fresh backoff interval on next disconnect.
-    backoff_strategy_->reset();
-
+  void
+  handleResponse(std::unique_ptr<envoy::api::v2::IncrementalDiscoveryResponse>&& message) override {
     ENVOY_LOG(debug, "Received gRPC message for {} at version {}", type_url_,
               message->system_version_info());
 
@@ -239,21 +156,36 @@ public:
       onConfigUpdate(message->resources(), message->removed_resources(),
                      message->system_version_info());
     } catch (const EnvoyException& e) {
-      onConfigUpdateFailed(&e);
+      stats_.update_rejected_.inc();
+      ENVOY_LOG(warn, "incremental config for {} rejected: {}", type_url_, e.what());
+      stats_.update_attempt_.inc();
+      if (callbacks_) {
+        callbacks_->onConfigUpdateFailed(&e);
+      }
       ::google::rpc::Status* error_detail = request_.mutable_error_detail();
       error_detail->set_code(Grpc::Status::GrpcStatus::Internal);
       error_detail->set_message(e.what());
     }
-    queueDiscoveryRequest();
+    queueDiscoveryRequest(ResourceNameDiff()); // no change to subscribed resources
   }
-  void onReceiveTrailingMetadata(Http::HeaderMapPtr&& metadata) override {
-    UNREFERENCED_PARAMETER(metadata);
+
+  void handleStreamEstablished() override {
+    // TODO need something like this? to guarantee this initial version'd request_ is what gets
+    // sent? request_queue_.clear(); "must be populated for first request in a stream"
+    request_.clear_initial_resource_versions();
+    for (auto const& resource : resources_) {
+      (*request_.mutable_initial_resource_versions())[resource.first] = resource.second;
+    }
+    queueDiscoveryRequest(ResourceNameDiff()); // no change to subscribed resources
   }
-  void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override {
-    ENVOY_LOG(warn, "incremental config stream closed: {}, {}", status, message);
-    stream_ = nullptr;
-    control_plane_stats_.connected_state_.set(0);
-    setRetryTimer();
+
+  void handleEstablishmentFailure() override {
+    stats_.update_failure_.inc();
+    ENVOY_LOG(debug, "incremental update for {} failed", type_url_);
+    stats_.update_attempt_.inc();
+    if (callbacks_) {
+      callbacks_->onConfigUpdateFailed(nullptr);
+    }
   }
 
   // Config::IncrementalSubscription
@@ -287,24 +219,11 @@ private:
   bool subscribed_{};
 
   const LocalInfo::LocalInfo& local_info_;
-  Grpc::AsyncClientPtr async_client_;
-  Grpc::AsyncStream* stream_{};
-  const Protobuf::MethodDescriptor& service_method_;
 
-  struct ResourceNameDiff {
-    std::vector<std::string> added_;
-    std::vector<std::string> removed_;
-  };
   std::queue<ResourceNameDiff> request_queue_;
   // Detects when Envoy is making too many requests.
-  TokenBucketPtr limit_request_;
-  Event::TimerPtr drain_request_timer_;
-  Event::TimerPtr retry_timer_;
-  BackOffStrategyPtr backoff_strategy_;
-  const bool rate_limiting_enabled_;
 
-  IncrementalSubscriptionStats stats_;
-  ControlPlaneStats control_plane_stats_;
+  IncrementalSubscriptionStats stats_; // TODO trim?
 };
 
 } // namespace Config

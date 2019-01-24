@@ -44,7 +44,6 @@ public:
     }
 
     IncrementalSubscriptionStats stats = Utility::generateIncrementalStats(scope);
-    ControlPlaneStats control_plane_stats = Utility::generateControlPlaneStats(scope);
     Utility::checkApiConfigSourceSubscriptionBackingCluster(cm.clusters(),
                                                             config.api_config_source());
     return std::make_unique<IncrementalSubscriptionImpl<ResourceType>>(
@@ -53,8 +52,7 @@ public:
                                                        config.api_config_source(), scope)
             ->create(),
         dispatcher, *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(grpc_method),
-        random, Utility::parseRateLimitSettings(config.api_config_source()), stats,
-        control_plane_stats);
+        random, scope, Utility::parseRateLimitSettings(config.api_config_source()), stats);
   }
 };
 
