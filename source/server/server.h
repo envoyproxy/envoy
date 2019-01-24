@@ -139,7 +139,7 @@ public:
   /**
    * @throw EnvoyException if initialization fails.
    */
-  InstanceImpl(Options& options, Event::TimeSystem& time_system,
+  InstanceImpl(const Options& options, Event::TimeSystem& time_system,
                Network::Address::InstanceConstSharedPtr local_address, TestHooks& hooks,
                HotRestart& restarter, Stats::StoreRoot& store,
                Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
@@ -175,7 +175,7 @@ public:
   void shutdownAdmin() override;
   Singleton::Manager& singletonManager() override { return *singleton_manager_; }
   bool healthCheckFailed() override;
-  Options& options() override { return options_; }
+  const Options& options() override { return options_; }
   time_t startTimeCurrentEpoch() override { return start_time_; }
   time_t startTimeFirstEpoch() override { return original_start_time_; }
   Stats::Store& stats() override { return stats_store_; }
