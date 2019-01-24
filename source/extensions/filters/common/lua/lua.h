@@ -295,7 +295,7 @@ public:
 };
 
 /**
- * This is a wraper for a Lua coroutine. Lua intermixes coroutine and "thread." Lua does not have
+ * This is a wrapper for a Lua coroutine. Lua intermixes coroutine and "thread." Lua does not have
  * real threads, only cooperatively scheduled coroutines.
  */
 class Coroutine : Logger::Loggable<Logger::Id::lua> {

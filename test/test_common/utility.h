@@ -109,9 +109,9 @@ class TestUtility {
 public:
   /**
    * Compare 2 HeaderMaps.
-   * @param lhs supplies HeaderMaps 1.
-   * @param rhs supplies HeaderMaps 2.
-   * @return TRUE if the HeaderMapss are equal, ignoring the order of the
+   * @param lhs supplies HeaderMap 1.
+   * @param rhs supplies HeaderMap 2.
+   * @return TRUE if the HeaderMaps are equal, ignoring the order of the
    * headers, false if not.
    */
   static bool headerMapEqualIgnoreOrder(const Http::HeaderMap& lhs, const Http::HeaderMap& rhs);
@@ -128,7 +128,7 @@ public:
    * Feed a buffer with random characters.
    * @param buffer supplies the buffer to be fed.
    * @param n_char number of characters that should be added to the supplied buffer.
-   * @param seed seeds pseudo-random number genarator (default = 0).
+   * @param seed seeds pseudo-random number generator (default = 0).
    */
   static void feedBufferWithRandomCharacters(Buffer::Instance& buffer, uint64_t n_char,
                                              uint64_t seed = 0);

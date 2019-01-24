@@ -145,7 +145,7 @@ private:
   // Load the first HCM struct from the first listener into a parsed proto.
   bool loadHttpConnectionManager(
       envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm);
-  // Stick the contents of the procided HCM proto and stuff them into the first HCM
+  // Take the contents of the provided HCM proto and stuff them into the first HCM
   // struct of the first listener.
   void storeHttpConnectionManager(
       const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&

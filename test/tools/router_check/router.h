@@ -79,7 +79,7 @@ private:
   bool compareCustomHeaderField(ToolConfig& tool_config, const std::string& field,
                                 const std::string& expected);
   /**
-   * Compare the expected and acutal route parameter values. Print out match details if details_
+   * Compare the expected and actual route parameter values. Print out match details if details_
    * flag is set.
    * @param actual holds the actual route returned by the router.
    * @param expected holds the expected parameter value of the route.

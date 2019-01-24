@@ -354,7 +354,7 @@ private:
     const double effective_weight_;
   };
 
-  // Rebuilds the provided locality scheduler with locality entires based on the locality weights
+  // Rebuilds the provided locality scheduler with locality entries based on the locality weights
   // and eligible hosts.
   //
   // @param locality_scheduler the locality scheduler to rebuild. Will be set to nullptr if no
