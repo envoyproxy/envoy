@@ -922,7 +922,7 @@ typed_config:
 }
 
 TEST_F(AccessLogImplTest, GrpcStatusFilterValues) {
-  const std::vector<std::string> valid_statuses({
+  const std::vector<std::string> valid_statuses = {
       "OK",
       "CANCELED",
       "UNKNOWN",
@@ -940,7 +940,7 @@ TEST_F(AccessLogImplTest, GrpcStatusFilterValues) {
       "UNAVAILABLE",
       "DATA_LOSS",
       "UNAUTHENTICATED",
-  });
+  };
 
   std::ostringstream out;
   out << R"EOF(
@@ -1043,17 +1043,15 @@ config:
   // status code for successes. In general, the only status codes that receive an HTTP mapping are
   // those enumerated below with a non-UNKNOWN mapping. See: //source/common/grpc/status.cc and
   // https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md.
-  const std::vector<std::tuple<std::string, uint64_t>> statusMapping({{"UNKNOWN", 200},
-                                                                      {"INTERNAL", 400},
-                                                                      {"UNAUTHENTICATED", 401},
-                                                                      {"PERMISSION_DENIED", 403},
-                                                                      {"UNIMPLEMENTED", 404},
-                                                                      {"UNAVAILABLE", 504}});
+  const std::vector<std::pair<std::string, uint64_t>> statusMapping = {
+      {"UNKNOWN", 200},           {"INTERNAL", 400},    {"UNAUTHENTICATED", 401},
+      {"PERMISSION_DENIED", 403}, {"UNAVAILABLE", 429}, {"UNIMPLEMENTED", 404},
+      {"UNAVAILABLE", 502},       {"UNAVAILABLE", 503}, {"UNAVAILABLE", 504}};
 
   std::ostringstream out;
   for (const auto& pair : statusMapping) {
-    out << yamlPrefix << "      - " << std::get<0>(pair) << yamlSuffix;
-    stream_info_.response_code_ = std::get<1>(pair);
+    out << yamlPrefix << "      - " << pair.first << yamlSuffix;
+    stream_info_.response_code_ = pair.second;
 
     const InstanceSharedPtr log =
         AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(out.str()), context_);
