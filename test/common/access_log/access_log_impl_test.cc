@@ -1063,6 +1063,24 @@ config:
   }
 }
 
+TEST_F(AccessLogImplTest, GrpcStatusFilterNoCode) {
+  const std::string yaml = R"EOF(
+name: envoy.file_access_log
+filter:
+  grpc_status_filter:
+    statuses:
+      - UNKNOWN
+config:
+  path: /dev/null
+  )EOF";
+
+  const InstanceSharedPtr log =
+      AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+
+  EXPECT_CALL(*file_, write(_));
+  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+}
+
 } // namespace
 } // namespace AccessLog
 } // namespace Envoy
