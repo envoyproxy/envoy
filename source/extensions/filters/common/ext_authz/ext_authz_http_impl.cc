@@ -66,7 +66,7 @@ NotHeaderKeyMatcher::NotHeaderKeyMatcher(std::vector<Matchers::LowerCaseStringMa
 bool NotHeaderKeyMatcher::matches(absl::string_view key) const { return !matcher_.matches(key); }
 
 // Config
-ClientConfig::ClientConfig(const envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz& config,
+ClientConfig::ClientConfig(const envoy::config::filter::http::ext_authz::v2::ExtAuthz& config,
                            uint32_t timeout, absl::string_view path_prefix)
     : request_header_matchers_(
           toRequestMatchers(config.http_service().authorization_request().allowed_headers())),
@@ -156,7 +156,7 @@ void RawHttpClientImpl::cancel() {
 
 // Client
 void RawHttpClientImpl::check(RequestCallbacks& callbacks,
-                              const envoy::service::auth::v2alpha::CheckRequest& request,
+                              const envoy::service::auth::v2::CheckRequest& request,
                               Tracing::Span&) {
   ASSERT(callbacks_ == nullptr);
   callbacks_ = &callbacks;

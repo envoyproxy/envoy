@@ -490,6 +490,26 @@ def _com_google_absl():
         actual = "@com_google_absl//absl/container:flat_hash_set",
     )
     native.bind(
+        name = "abseil_hash",
+        actual = "@com_google_absl//absl/hash:hash",
+    )
+    native.bind(
+        name = "abseil_inlined_vector",
+        actual = "@com_google_absl//absl/container:inlined_vector",
+    )
+    native.bind(
+        name = "abseil_memory",
+        actual = "@com_google_absl//absl/memory:memory",
+    )
+    native.bind(
+        name = "abseil_node_hash_map",
+        actual = "@com_google_absl//absl/container:node_hash_map",
+    )
+    native.bind(
+        name = "abseil_node_hash_set",
+        actual = "@com_google_absl//absl/container:node_hash_set",
+    )
+    native.bind(
         name = "abseil_strings",
         actual = "@com_google_absl//absl/strings:strings",
     )
@@ -557,11 +577,17 @@ def _com_googlesource_quiche():
         build_file = "@envoy//bazel/external:quiche.BUILD",
     )
 
-    # TODO: add bindings for quiche_quic_platform and quiche_spdy_platform once
-    #   those build targets have been defined.
     native.bind(
         name = "quiche_http2_platform",
         actual = "@com_googlesource_quiche//:http2_platform",
+    )
+    native.bind(
+        name = "quiche_spdy_platform",
+        actual = "@com_googlesource_quiche//:spdy_platform",
+    )
+    native.bind(
+        name = "quiche_quic_platform",
+        actual = "@com_googlesource_quiche//:quic_platform",
     )
 
 def _com_github_grpc_grpc():

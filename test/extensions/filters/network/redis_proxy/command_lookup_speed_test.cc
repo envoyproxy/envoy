@@ -13,6 +13,7 @@
 #include "extensions/filters/network/redis_proxy/supported_commands.h"
 
 #include "test/test_common/printers.h"
+#include "test/test_common/simulated_time_system.h"
 
 #include "testing/base/public/benchmark.h"
 
@@ -64,7 +65,9 @@ public:
 
   ConnPool::Instance* conn_pool_{new NullInstanceImpl()};
   Stats::IsolatedStoreImpl store_;
-  CommandSplitter::InstanceImpl splitter_{ConnPool::InstancePtr{conn_pool_}, store_, "redis.foo."};
+  Event::SimulatedTimeSystem time_system_;
+  CommandSplitter::InstanceImpl splitter_{ConnPool::InstancePtr{conn_pool_}, store_, "redis.foo.",
+                                          time_system_};
   NoOpSplitCallbacks callbacks_;
   CommandSplitter::SplitRequestPtr handle_;
 };

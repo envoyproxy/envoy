@@ -15,16 +15,14 @@ namespace DubboProxy {
 
 namespace {
 
-using ConfigProtocolType =
-    envoy::extensions::filters::network::dubbo_proxy::v2alpha1::DubboProxy_ProtocolType;
+using ConfigProtocolType = envoy::config::filter::network::dubbo_proxy::v2alpha1::ProtocolType;
 
 typedef std::map<ConfigProtocolType, ProtocolType> ProtocolTypeMap;
 
 static const ProtocolTypeMap& protocolTypeMap() {
-  CONSTRUCT_ON_FIRST_USE(
-      ProtocolTypeMap, {
-                           {ConfigProtocolType::DubboProxy_ProtocolType_Dubbo, ProtocolType::Dubbo},
-                       });
+  CONSTRUCT_ON_FIRST_USE(ProtocolTypeMap, {
+                                              {ConfigProtocolType::Dubbo, ProtocolType::Dubbo},
+                                          });
 }
 
 ProtocolType lookupProtocolType(ConfigProtocolType config_type) {
@@ -32,31 +30,29 @@ ProtocolType lookupProtocolType(ConfigProtocolType config_type) {
   if (iter == protocolTypeMap().end()) {
     throw EnvoyException(fmt::format(
         "unknown protocol {}",
-        envoy::extensions::filters::network::dubbo_proxy::v2alpha1::DubboProxy_ProtocolType_Name(
-            config_type)));
+        envoy::config::filter::network::dubbo_proxy::v2alpha1::ProtocolType_Name(config_type)));
   }
   return iter->second;
 }
 
 using ConfigSerializationType =
-    envoy::extensions::filters::network::dubbo_proxy::v2alpha1::DubboProxy_SerializationType;
+    envoy::config::filter::network::dubbo_proxy::v2alpha1::SerializationType;
 
 typedef std::map<ConfigSerializationType, SerializationType> SerializationTypeMap;
 
 static const SerializationTypeMap& serializationTypeMap() {
   CONSTRUCT_ON_FIRST_USE(SerializationTypeMap,
                          {
-                             {ConfigSerializationType::DubboProxy_SerializationType_Hessian2,
-                              SerializationType::Hessian},
+                             {ConfigSerializationType::Hessian2, SerializationType::Hessian},
                          });
 }
 
 SerializationType lookupSerializationType(ConfigSerializationType type) {
   const auto& iter = serializationTypeMap().find(type);
   if (iter == serializationTypeMap().end()) {
-    throw EnvoyException(fmt::format("unknown deserializer {}",
-                                     envoy::extensions::filters::network::dubbo_proxy::v2alpha1::
-                                         DubboProxy_SerializationType_Name(type)));
+    throw EnvoyException(fmt::format(
+        "unknown deserializer {}",
+        envoy::config::filter::network::dubbo_proxy::v2alpha1::SerializationType_Name(type)));
   }
 
   return iter->second;
@@ -67,7 +63,8 @@ SerializationType lookupSerializationType(ConfigSerializationType type) {
 Filter::Filter(const std::string& stat_prefix, ConfigProtocolType protocol_type,
                ConfigSerializationType serialization_type, Stats::Scope& scope,
                TimeSource& time_source)
-    : stats_(generateStats(stat_prefix, scope)), protocol_type_(lookupProtocolType(protocol_type)),
+    : stats_(DubboFilterStats::generateStats(stat_prefix, scope)),
+      protocol_type_(lookupProtocolType(protocol_type)),
       serialization_type_(lookupSerializationType(serialization_type)), time_source_(time_source) {}
 
 Filter::~Filter() = default;
@@ -219,12 +216,6 @@ void Filter::onRpcResult(RpcResultPtr&& res) {
   if (res->hasException()) {
     stats_.response_exception_.inc();
   }
-}
-
-DubboFilterStats Filter::generateStats(const std::string& prefix, Stats::Scope& scope) {
-  return DubboFilterStats{ALL_DUBBO_FILTER_STATS(POOL_COUNTER_PREFIX(scope, prefix),
-                                                 POOL_GAUGE_PREFIX(scope, prefix),
-                                                 POOL_HISTOGRAM_PREFIX(scope, prefix))};
 }
 
 DecoderPtr Filter::createDecoder(ProtocolCallbacks& prot_callback) {

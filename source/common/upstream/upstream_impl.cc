@@ -530,6 +530,7 @@ ClusterSharedPtr ClusterImplBase::create(
     Ssl::ContextManager& ssl_context_manager, Runtime::Loader& runtime,
     Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
     AccessLog::AccessLogManager& log_manager, const LocalInfo::LocalInfo& local_info,
+    Server::Admin& admin, Singleton::Manager& singleton_manager,
     Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) {
   std::unique_ptr<ClusterImplBase> new_cluster;
 
@@ -552,7 +553,8 @@ ClusterSharedPtr ClusterImplBase::create(
 
   auto stats_scope = generateStatsScope(cluster, stats);
   Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-      ssl_context_manager, *stats_scope, cm, local_info, dispatcher, random, stats);
+      admin, ssl_context_manager, *stats_scope, cm, local_info, dispatcher, random, stats,
+      singleton_manager, tls);
 
   switch (cluster.type()) {
   case envoy::api::v2::Cluster::STATIC:

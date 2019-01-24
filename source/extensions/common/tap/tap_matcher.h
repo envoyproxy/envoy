@@ -23,7 +23,7 @@ using MatcherPtr = std::unique_ptr<Matcher>;
  * - A per-stream/request matching status must be kept in order to compute interim match status.
  * - In order to make this computationally efficient, the matching tree is kept in a vector, with
  *   all references to other matchers implemented using an index into the vector. The vector is
- *   effectively a flattened N-ary tree.
+ *   effectively a preorder traversal flattened N-ary tree.
  * - The previous point allows the creation of a per-stream/request vector of booleans of the same
  *   size as the matcher vector. Then, when match status is updated given new information, the
  *   vector of booleans can be easily updated using the same indexes as in the constant match
@@ -46,6 +46,11 @@ public:
    * @param response_headers supplies the response headers, if available.
    * @param statuses supplies the per-stream-request match status vector which must be the same
    *                 size as the match tree vector (see above).
+   *
+   * TODO(mattklein123): Currently, this performs a recursive updateMatchStatus() call on any
+   * child match nodes. It's possible that we can short circuit this in certain cases but this
+   * needs more thinking (e.g., if an OR matcher already has one match and it's not possible for
+   * a matcher to flip from true to false).
    */
   virtual bool updateMatchStatus(const Http::HeaderMap* request_headers,
                                  const Http::HeaderMap* response_headers,

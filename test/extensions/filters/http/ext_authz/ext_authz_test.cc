@@ -2,8 +2,8 @@
 #include <string>
 #include <vector>
 
-#include "envoy/config/filter/http/ext_authz/v2alpha/ext_authz.pb.h"
-#include "envoy/config/filter/http/ext_authz/v2alpha/ext_authz.pb.validate.h"
+#include "envoy/config/filter/http/ext_authz/v2/ext_authz.pb.h"
+#include "envoy/config/filter/http/ext_authz/v2/ext_authz.pb.validate.h"
 #include "envoy/http/codes.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -48,7 +48,7 @@ namespace ExtAuthz {
 template <class T> class HttpFilterTestBase : public T {
 public:
   void initialize(std::string&& yaml) {
-    envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz proto_config{};
+    envoy::config::filter::http::ext_authz::v2::ExtAuthz proto_config{};
     if (!yaml.empty()) {
       MessageUtil::loadFromYaml(yaml, proto_config);
     }
@@ -84,7 +84,7 @@ public:
 
 class HttpFilterTest : public HttpFilterTestBase<testing::Test> {};
 
-typedef envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz CreateFilterConfigFunc();
+typedef envoy::config::filter::http::ext_authz::v2::ExtAuthz CreateFilterConfigFunc();
 
 class HttpFilterTestParam
     : public HttpFilterTestBase<testing::TestWithParam<CreateFilterConfigFunc*>> {
@@ -93,7 +93,7 @@ public:
 };
 
 template <bool failure_mode_allow_value, bool http_client>
-envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz GetFilterConfig() {
+envoy::config::filter::http::ext_authz::v2::ExtAuthz GetFilterConfig() {
   const std::string http_config = R"EOF(
   http_service:
     server_uri:
@@ -108,7 +108,7 @@ envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz GetFilterConfig() {
       cluster_name: "ext_authz_server"
   )EOF";
 
-  envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz proto_config{};
+  envoy::config::filter::http::ext_authz::v2::ExtAuthz proto_config{};
   MessageUtil::loadFromYaml(http_client ? http_config : grpc_config, proto_config);
   proto_config.set_failure_mode_allow(failure_mode_allow_value);
   return proto_config;
@@ -120,7 +120,7 @@ INSTANTIATE_TEST_CASE_P(ParameterizedFilterConfig, HttpFilterTestParam,
 
 // Test that the per route config is properly merged: more specific keys override previous keys.
 TEST_F(HttpFilterTest, MergeConfig) {
-  envoy::config::filter::http::ext_authz::v2alpha::ExtAuthzPerRoute settings;
+  envoy::config::filter::http::ext_authz::v2::ExtAuthzPerRoute settings;
   auto&& extensions = settings.mutable_check_settings()->mutable_context_extensions();
 
   // First config base config with one base value, and one value to be overridden.
@@ -255,11 +255,12 @@ TEST_F(HttpFilterTest, BadConfig) {
     envoy_grpc: {}
   failure_mode_allow: true
   )EOF";
-  envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz proto_config{};
+  envoy::config::filter::http::ext_authz::v2::ExtAuthz proto_config{};
   MessageUtil::loadFromYaml(filter_config, proto_config);
-  EXPECT_THROW(MessageUtil::downcastAndValidate<
-                   const envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz&>(proto_config),
-               ProtoValidationException);
+  EXPECT_THROW(
+      MessageUtil::downcastAndValidate<const envoy::config::filter::http::ext_authz::v2::ExtAuthz&>(
+          proto_config),
+      ProtoValidationException);
 }
 
 // -------------------
@@ -269,7 +270,7 @@ TEST_F(HttpFilterTest, BadConfig) {
 // Test that context extensions make it into the check request.
 TEST_F(HttpFilterTestParam, ContextExtensions) {
   // Place something in the context extensions on the virtualhost.
-  envoy::config::filter::http::ext_authz::v2alpha::ExtAuthzPerRoute settingsvhost;
+  envoy::config::filter::http::ext_authz::v2::ExtAuthzPerRoute settingsvhost;
   (*settingsvhost.mutable_check_settings()->mutable_context_extensions())["key_vhost"] =
       "value_vhost";
   // add a default route value to see it overridden
@@ -282,7 +283,7 @@ TEST_F(HttpFilterTestParam, ContextExtensions) {
       .WillByDefault(Return(&auth_per_vhost));
 
   // Place something in the context extensions on the route.
-  envoy::config::filter::http::ext_authz::v2alpha::ExtAuthzPerRoute settingsroute;
+  envoy::config::filter::http::ext_authz::v2::ExtAuthzPerRoute settingsroute;
   (*settingsroute.mutable_check_settings()->mutable_context_extensions())["key_route"] =
       "value_route";
   // Initialize the route's per filter config.
@@ -293,12 +294,10 @@ TEST_F(HttpFilterTestParam, ContextExtensions) {
   prepareCheck();
 
   // Save the check request from the check call.
-  envoy::service::auth::v2alpha::CheckRequest check_request;
+  envoy::service::auth::v2::CheckRequest check_request;
   EXPECT_CALL(*client_, check(_, _, _))
-      .WillOnce(WithArgs<1>(
-          Invoke([&](const envoy::service::auth::v2alpha::CheckRequest& check_param) -> void {
-            check_request = check_param;
-          })));
+      .WillOnce(WithArgs<1>(Invoke([&](const envoy::service::auth::v2::CheckRequest& check_param)
+                                       -> void { check_request = check_param; })));
 
   // Engage the filter so that check is called.
   filter_->decodeHeaders(request_headers_, false);
@@ -310,7 +309,7 @@ TEST_F(HttpFilterTestParam, ContextExtensions) {
 
 // Test that filter can be disabled with route config.
 TEST_F(HttpFilterTestParam, DisabledOnRoute) {
-  envoy::config::filter::http::ext_authz::v2alpha::ExtAuthzPerRoute settings;
+  envoy::config::filter::http::ext_authz::v2::ExtAuthzPerRoute settings;
   FilterConfigPerRoute auth_per_route(settings);
 
   ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
