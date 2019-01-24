@@ -8,8 +8,12 @@
 
 namespace quic {
 
-inline void QuicPrefetchT0Impl(const void* addr) {
-  // TODO(wub): Implement.
-}
+#if defined(__GNUC__)
+// See __builtin_prefetch in:
+// https://gcc.gnu.org/onlinedocs/gcc/Other-Builtins.html.
+inline void QuicPrefetchT0Impl(const void* addr) { __builtin_prefetch(addr, 0, 3); }
+#else
+inline void QuicPrefetchT0Impl(const void*) {}
+#endif
 
 } // namespace quic
