@@ -53,7 +53,6 @@ void testSocketBindAndConnect(Network::Address::IpVersion ip_version, bool v6onl
   // Create a socket on which we'll listen for connections from clients.
   IoHandlePtr io_handle = addr_port->socket(SocketType::Stream);
   ASSERT_GE(io_handle->fd(), 0) << addr_port->asString();
-  // TODO(sbelair2) Remove ScopedFdCloser when IoHandle close() closes the fd as well
   ScopedFdCloser fd_closer1(io_handle->fd());
   ScopedIoHandleCloser io_handle_closer1(io_handle);
 
@@ -79,7 +78,6 @@ void testSocketBindAndConnect(Network::Address::IpVersion ip_version, bool v6onl
     // Create a client socket and connect to the server.
     IoHandlePtr client_handle = addr_port->socket(SocketType::Stream);
     ASSERT_GE(client_handle->fd(), 0) << addr_port->asString();
-    // TODO(sbelair2) Remove ScopedFdCloser when IoHandle close() closes the fd as well
     ScopedFdCloser fd_closer2(client_handle->fd());
     ScopedIoHandleCloser io_handle_closer2(client_handle);
 
@@ -317,7 +315,6 @@ TEST(PipeInstanceTest, UnlinksExistingFile) {
     PipeInstance address(path);
     IoHandlePtr io_handle = address.socket(SocketType::Stream);
     ASSERT_GE(io_handle->fd(), 0) << address.asString();
-    // TODO(sbelair2) Remove ScopedFdCloser when IoHandle close() closes the fd as well
     ScopedFdCloser fd_closer(io_handle->fd());
     ScopedIoHandleCloser io_handle_closer(io_handle);
 
