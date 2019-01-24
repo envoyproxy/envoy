@@ -418,6 +418,9 @@ RunHelper::RunHelper(Instance& instance, Options& options, Event::Dispatcher& di
     });
   }
 
+  // Start overload manager before workers.
+  overload_manager.start();
+
   // Register for cluster manager init notification. We don't start serving worker traffic until
   // upstream clusters are initialized which may involve running the event loop. Note however that
   // this can fire immediately if all clusters have already initialized. Also note that we need
@@ -449,8 +452,6 @@ RunHelper::RunHelper(Instance& instance, Options& options, Event::Dispatcher& di
     // as we've subscribed to all the statically defined RDS resources.
     cm.adsMux().resume(Config::TypeUrl::get().RouteConfiguration);
   });
-
-  overload_manager.start();
 }
 
 void InstanceImpl::run() {
