@@ -144,9 +144,7 @@ TEST_P(Http2IntegrationTest, LargeHeadersInvokeResetStream) {
   codec_client_->close();
 }
 
-TEST_P(Http2IntegrationTest, LargeHeadersAcceptedIfConfigured) {
-  testLargeRequestHeaders(62, 63);
-}
+TEST_P(Http2IntegrationTest, LargeHeadersAcceptedIfConfigured) { testLargeRequestHeaders(62, 63); }
 
 TEST_P(Http2IntegrationTest, EncodingHeaderOnlyResponse) { testHeadersOnlyFilterEncoding(); }
 
