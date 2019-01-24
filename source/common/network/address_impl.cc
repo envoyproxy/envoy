@@ -172,10 +172,14 @@ int InstanceBase::socketFromSocketType(SocketType socketType) const {
 
 Ipv4Instance::Ipv4Instance(const sockaddr_in* address) : InstanceBase(Type::Ip) {
   ip_.ipv4_.address_ = *address;
-  char str[INET_ADDRSTRLEN];
-  inet_ntop(AF_INET, &address->sin_addr, str, INET_ADDRSTRLEN);
-  friendly_name_ = fmt::format("{}:{}", str, ntohs(address->sin_port));
-  ip_.friendly_address_ = str;
+  ip_.friendly_address_ = sockaddrToString(*address);
+
+  // Based on benchmark testing, this reserve+append implementation runs faster than absl::StrCat.
+  fmt::format_int port(ntohs(address->sin_port));
+  friendly_name_.reserve(ip_.friendly_address_.size() + 1 + port.size());
+  friendly_name_.append(ip_.friendly_address_);
+  friendly_name_.push_back(':');
+  friendly_name_.append(port.data(), port.size());
   validateIpv4Supported(friendly_name_);
 }
 
@@ -224,6 +228,32 @@ Api::SysCallIntResult Ipv4Instance::connect(int fd) const {
 }
 
 int Ipv4Instance::socket(SocketType type) const { return socketFromSocketType(type); }
+
+std::string Ipv4Instance::sockaddrToString(const sockaddr_in& addr) {
+  static constexpr size_t BufferSize = 16; // enough space to hold an IPv4 address in string form
+  char str[BufferSize];
+  // Write backwards from the end of the buffer for simplicity.
+  char* start = str + BufferSize;
+  uint32_t ipv4_addr = ntohl(addr.sin_addr.s_addr);
+  for (unsigned i = 4; i != 0; i--, ipv4_addr >>= 8) {
+    uint32_t octet = ipv4_addr & 0xff;
+    if (octet == 0) {
+      ASSERT(start > str);
+      *--start = '0';
+    } else {
+      do {
+        ASSERT(start > str);
+        *--start = '0' + (octet % 10);
+        octet /= 10;
+      } while (octet != 0);
+    }
+    if (i != 1) {
+      ASSERT(start > str);
+      *--start = '.';
+    }
+  }
+  return std::string(start, str + BufferSize - start);
+}
 
 absl::uint128 Ipv6Instance::Ipv6Helper::address() const {
   absl::uint128 result{0};
