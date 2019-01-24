@@ -2,7 +2,6 @@
 
 #include <unordered_set>
 
-#include "common/common/token_bucket_impl.h"
 #include "common/config/utility.h"
 #include "common/protobuf/protobuf.h"
 
@@ -14,20 +13,10 @@ GrpcMuxImpl::GrpcMuxImpl(const LocalInfo::LocalInfo& local_info, Grpc::AsyncClie
                          const Protobuf::MethodDescriptor& service_method,
                          Runtime::RandomGenerator& random, Stats::Scope& scope,
                          const RateLimitSettings& rate_limit_settings)
-    : local_info_(local_info), async_client_(std::move(async_client)),
-      service_method_(service_method), random_(random), time_source_(dispatcher.timeSystem()),
-      control_plane_stats_(generateControlPlaneStats(scope)),
-      rate_limiting_enabled_(rate_limit_settings.enabled_) {
+    : GrpcStream<envoy::api::v2::DiscoveryRequest, envoy::api::v2::DiscoveryResponse, std::string>(
+          std::move(async_client), service_method, random, dispatcher, scope, rate_limit_settings),
+      local_info_(local_info) {
   Config::Utility::checkLocalInfo("ads", local_info);
-  retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
-  if (rate_limiting_enabled_) {
-    // Default Bucket contains 100 tokens maximum and refills at 10 tokens/sec.
-    limit_request_ = std::make_unique<TokenBucketImpl>(
-        rate_limit_settings.max_tokens_, time_source_, rate_limit_settings.fill_rate_);
-    drain_request_timer_ = dispatcher.createTimer([this]() -> void { drainRequests(); });
-  }
-  backoff_strategy_ = std::make_unique<JitteredBackOffStrategy>(RETRY_INITIAL_DELAY_MS,
-                                                                RETRY_MAX_DELAY_MS, random_);
 }
 
 GrpcMuxImpl::~GrpcMuxImpl() {
@@ -40,61 +29,17 @@ GrpcMuxImpl::~GrpcMuxImpl() {
 
 void GrpcMuxImpl::start() { establishNewStream(); }
 
-void GrpcMuxImpl::setRetryTimer() {
-  retry_timer_->enableTimer(std::chrono::milliseconds(backoff_strategy_->nextBackOffMs()));
-}
-
-void GrpcMuxImpl::establishNewStream() {
-  ENVOY_LOG(debug, "Establishing new gRPC bidi stream for {}", service_method_.DebugString());
-  stream_ = async_client_->start(service_method_, *this);
-  if (stream_ == nullptr) {
-    ENVOY_LOG(warn, "Unable to establish new stream");
-    handleFailure();
-    return;
-  }
-
-  control_plane_stats_.connected_state_.set(1);
-  for (const auto type_url : subscriptions_) {
-    queueDiscoveryRequest(type_url);
-  }
-}
-
-void GrpcMuxImpl::drainRequests() {
-  ENVOY_LOG(trace, "draining discovery requests {}", request_queue_.size());
-  while (!request_queue_.empty()) {
-    // Process the request, if rate limiting is not enabled at all or if it is under rate limit.
-    if (!rate_limiting_enabled_ || limit_request_->consume()) {
-      sendDiscoveryRequest(request_queue_.front());
-      request_queue_.pop();
-    } else {
-      ASSERT(rate_limiting_enabled_);
-      ASSERT(drain_request_timer_ != nullptr);
-      control_plane_stats_.rate_limit_enforced_.inc();
-      control_plane_stats_.pending_requests_.set(request_queue_.size());
-      // Enable the drain request timer.
-      drain_request_timer_->enableTimer(
-          std::chrono::milliseconds(limit_request_->nextTokenAvailableMs()));
-      break;
-    }
-  }
-}
-
-void GrpcMuxImpl::queueDiscoveryRequest(const std::string& type_url) {
-  request_queue_.push(type_url);
-  drainRequests();
-}
-
 void GrpcMuxImpl::sendDiscoveryRequest(const std::string& type_url) {
-  if (stream_ == nullptr) {
+  if (!grpcStreamAvailable()) {
     ENVOY_LOG(debug, "No stream available to sendDiscoveryRequest for {}", type_url);
-    return;
+    return; // Drop this request; the reconnect will enqueue a new one.
   }
 
   ApiState& api_state = api_state_[type_url];
   if (api_state.paused_) {
     ENVOY_LOG(trace, "API {} paused during sendDiscoveryRequest(), setting pending.", type_url);
     api_state.pending_ = true;
-    return;
+    return; // Drop this request; the unpause will enqueue a new one.
   }
 
   auto& request = api_state.request_;
@@ -112,21 +57,12 @@ void GrpcMuxImpl::sendDiscoveryRequest(const std::string& type_url) {
   }
 
   ENVOY_LOG(trace, "Sending DiscoveryRequest for {}: {}", type_url, request.DebugString());
-  stream_->sendMessage(request, false);
+  sendMessage(request);
 
   // clear error_detail after the request is sent if it exists.
   if (api_state_[type_url].request_.has_error_detail()) {
     api_state_[type_url].request_.clear_error_detail();
   }
-}
-
-void GrpcMuxImpl::handleFailure() {
-  for (const auto& api_state : api_state_) {
-    for (auto watch : api_state.second.watches_) {
-      watch->callbacks_.onConfigUpdateFailed(nullptr);
-    }
-  }
-  setRetryTimer();
 }
 
 GrpcMuxWatchPtr GrpcMuxImpl::subscribe(const std::string& type_url,
@@ -177,18 +113,7 @@ void GrpcMuxImpl::resume(const std::string& type_url) {
   }
 }
 
-void GrpcMuxImpl::onCreateInitialMetadata(Http::HeaderMap& metadata) {
-  UNREFERENCED_PARAMETER(metadata);
-}
-
-void GrpcMuxImpl::onReceiveInitialMetadata(Http::HeaderMapPtr&& metadata) {
-  UNREFERENCED_PARAMETER(metadata);
-}
-
-void GrpcMuxImpl::onReceiveMessage(std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message) {
-  // Reset here so that it starts with fresh backoff interval on next disconnect.
-  backoff_strategy_->reset();
-
+void GrpcMuxImpl::handleResponse(std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message) {
   const std::string& type_url = message->type_url();
   ENVOY_LOG(debug, "Received gRPC message for {} at version {}", type_url, message->version_info());
   if (api_state_.count(type_url) == 0) {
@@ -260,15 +185,18 @@ void GrpcMuxImpl::onReceiveMessage(std::unique_ptr<envoy::api::v2::DiscoveryResp
   queueDiscoveryRequest(type_url);
 }
 
-void GrpcMuxImpl::onReceiveTrailingMetadata(Http::HeaderMapPtr&& metadata) {
-  UNREFERENCED_PARAMETER(metadata);
+void GrpcMuxImpl::handleStreamEstablished() {
+  for (const auto type_url : subscriptions_) {
+    queueDiscoveryRequest(type_url);
+  }
 }
 
-void GrpcMuxImpl::onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) {
-  ENVOY_LOG(warn, "gRPC config stream closed: {}, {}", status, message);
-  stream_ = nullptr;
-  control_plane_stats_.connected_state_.set(0);
-  handleFailure();
+void GrpcMuxImpl::handleEstablishmentFailure() {
+  for (const auto& api_state : api_state_) {
+    for (auto watch : api_state.second.watches_) {
+      watch->callbacks_.onConfigUpdateFailed(nullptr);
+    }
+  }
 }
 
 } // namespace Config
