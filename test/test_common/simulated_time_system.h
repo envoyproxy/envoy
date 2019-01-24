@@ -1,7 +1,10 @@
 #pragma once
 
+#include "envoy/event/timer.h"
+
 #include "common/common/lock_guard.h"
 #include "common/common/thread.h"
+//#include "common/common/utility.h"
 #include "common/common/utility.h"
 
 #include "test/test_common/test_time_system.h"
@@ -13,10 +16,10 @@ namespace Event {
 // sleep(), setSystemTime(), or setMonotonicTime(). systemTime() and
 // monotonicTime() are maintained in the class, and alarms are fired in response
 // to adjustments in time.
-class SimulatedTimeSystem : public TestTimeSystem {
+class SimulatedTimeSystemHelper : public TestTimeSystem {
 public:
-  SimulatedTimeSystem();
-  ~SimulatedTimeSystem();
+  SimulatedTimeSystemHelper();
+  ~SimulatedTimeSystemHelper() override;
 
   // TimeSystem
   SchedulerPtr createScheduler(Libevent::BasePtr&) override;
@@ -43,9 +46,6 @@ public:
     mutex_.lock();
     setMonotonicTimeAndUnlock(monotonic_time);
   }
-  template <class Duration> void setMonotonicTime(const Duration& duration) {
-    setMonotonicTime(MonotonicTime(duration));
-  }
 
   /**
    * Sets the system-time, whether forward or backward. If time moves forward,
@@ -55,9 +55,8 @@ public:
    * @param system_time The desired new system time.
    */
   void setSystemTime(const SystemTime& system_time);
-  template <class Duration> void setSystemTime(const Duration& duration) {
-    setSystemTime(SystemTime(duration));
-  }
+
+  static bool hasInstance();
 
 private:
   class SimulatedScheduler;
@@ -100,5 +99,63 @@ private:
   std::atomic<uint32_t> pending_alarms_;
 };
 
+class SimulatedTimeSystem : public DelegatingTestTimeSystem<SimulatedTimeSystemHelper> {
+ public:
+  void setMonotonicTime(const MonotonicTime& monotonic_time) {
+    time_system_->setMonotonicTime(monotonic_time);
+  }
+  void setSystemTime(const SystemTime& system_time) { time_system_->setSystemTime(system_time); }
+
+  template <class Duration> void setMonotonicTime(const Duration& duration) {
+    setMonotonicTime(MonotonicTime(duration));
+  }
+  template <class Duration> void setSystemTime(const Duration& duration) {
+    setSystemTime(SystemTime(duration));
+  }
+};
+
+class SimulatedTimeProvider {
+ public:
+  SimulatedTimeSystem time_system_;
+};
+
+/*
+class SimulatedTimeSystem : public TestTimeSystem {
+ public:
+  SimulatedTimeSystem();
+
+  SimulatedTimeSystemHelper& operator*() { return *time_system_; }
+  SimulatedTimeSystemHelper* operator->() { return time_system_; }
+
+  void sleep(const Duration& duration) override { time_system_->sleep(duration); }
+  Thread::CondVar::WaitStatus
+  waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
+          const Duration& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) override {
+    return time_system_->waitFor(mutex, condvar, duration);
+  }
+
+  SchedulerPtr createScheduler(Libevent::BasePtr& base_ptr) override {
+    return time_system_->createScheduler(base_ptr);
+  }
+  SystemTime systemTime() override { return time_system_->systemTime(); }
+  MonotonicTime monotonicTime() override { return time_system_->monotonicTime(); }
+
+  void setMonotonicTime(const MonotonicTime& monotonic_time) {
+    time_system_->setMonotonicTime(monotonic_time);
+  }
+  void setSystemTime(const SystemTime& system_time) { time_system_->setSystemTime(system_time); }
+
+  template <class Duration> void setMonotonicTime(const Duration& duration) {
+    setMonotonicTime(MonotonicTime(duration));
+  }
+  template <class Duration> void setSystemTime(const Duration& duration) {
+    setSystemTime(SystemTime(duration));
+  }
+
+ private:
+  Test::Global<SingletonTimeSystemHelper> singleton_;
+  SimulatedTimeSystemHelper* time_system_;
+};
+*/
 } // namespace Event
 } // namespace Envoy

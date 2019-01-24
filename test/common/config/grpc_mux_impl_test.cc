@@ -18,6 +18,7 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -35,13 +36,15 @@ namespace Envoy {
 namespace Config {
 namespace {
 
+struct MockTimeProvider {
+  Event::DelegatingTestTimeSystem<MockTimeSystem> mock_time_system_;
+};
+
 // We test some mux specific stuff below, other unit test coverage for singleton use of GrpcMuxImpl
 // is provided in [grpc_]subscription_impl_test.cc.
-class GrpcMuxImplTest : public testing::Test {
+class GrpcMuxImplTestBase : public testing::Test {
 public:
-  GrpcMuxImplTest() : async_client_(new Grpc::MockAsyncClient()) {
-    dispatcher_.setTimeSystem(time_system_);
-  }
+  GrpcMuxImplTestBase() : async_client_(new Grpc::MockAsyncClient()) {}
 
   void setup() {
     grpc_mux_ = std::make_unique<GrpcMuxImpl>(
@@ -88,11 +91,12 @@ public:
   Grpc::MockAsyncStream async_stream_;
   std::unique_ptr<GrpcMuxImpl> grpc_mux_;
   NiceMock<MockGrpcMuxCallbacks> callbacks_;
-  Event::SimulatedTimeSystem time_system_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Stats::IsolatedStoreImpl stats_;
   Envoy::Config::RateLimitSettings rate_limit_settings_;
 };
+
+class GrpcMuxImplTest : public Event::SimulatedTimeProvider, public GrpcMuxImplTestBase {};
 
 // Validate behavior when multiple type URL watches are maintained, watches are created/destroyed
 // (via RAII).
@@ -327,12 +331,7 @@ TEST_F(GrpcMuxImplTest, WatchDemux) {
 
 // Exactly one test requires a mock time system to provoke behavior that cannot
 // easily be achieved with a SimulatedTimeSystem.
-class GrpcMuxImplTestWithMockTimeSystem : public GrpcMuxImplTest {
-protected:
-  GrpcMuxImplTestWithMockTimeSystem() { dispatcher_.setTimeSystem(mock_time_system_); }
-
-  MockTimeSystem mock_time_system_;
-};
+class GrpcMuxImplTestWithMockTimeSystem : public MockTimeProvider, public GrpcMuxImplTestBase {};
 
 //  Verifies that rate limiting is not enforced with defaults.
 TEST_F(GrpcMuxImplTestWithMockTimeSystem, TooManyRequestsWithDefaultSettings) {
@@ -347,7 +346,7 @@ TEST_F(GrpcMuxImplTestWithMockTimeSystem, TooManyRequestsWithDefaultSettings) {
   }));
 
   // Validate that rate limiter is not created.
-  EXPECT_CALL(mock_time_system_, monotonicTime()).Times(0);
+  EXPECT_CALL(*mock_time_system_, monotonicTime()).Times(0);
 
   setup();
 
@@ -397,7 +396,7 @@ TEST_F(GrpcMuxImplTestWithMockTimeSystem, TooManyRequestsWithEmptyRateLimitSetti
         drain_request_timer = new Event::MockTimer();
         return drain_request_timer;
       }));
-  EXPECT_CALL(mock_time_system_, monotonicTime())
+  EXPECT_CALL(*mock_time_system_, monotonicTime())
       .WillRepeatedly(Return(std::chrono::steady_clock::time_point{}));
 
   RateLimitSettings custom_rate_limit_settings;

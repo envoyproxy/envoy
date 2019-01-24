@@ -2,6 +2,7 @@
 
 #include "common/event/real_time_system.h"
 
+#include "test/test_common/global.h"
 #include "test/test_common/test_time_system.h"
 
 namespace Envoy {
@@ -21,12 +22,63 @@ public:
   }
 
   // TimeSource
-  SystemTime systemTime() override { return real_time_system_.systemTime(); }
-  MonotonicTime monotonicTime() override { return real_time_system_.monotonicTime(); }
+  SystemTime systemTime() override;
+  MonotonicTime monotonicTime() override;
 
 private:
   Event::RealTimeSystem real_time_system_;
 };
+
+class GlobalTimeSystem : public TestTimeSystem {
+public:
+  void sleep(const Duration& duration) override { lazyInit().sleep(duration); }
+  Thread::CondVar::WaitStatus
+  waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
+          const Duration& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) override {
+    return lazyInit().waitFor(mutex, condvar, duration);
+  }
+  SchedulerPtr createScheduler(Libevent::BasePtr& base_ptr) override {
+    return lazyInit().createScheduler(base_ptr);
+  }
+  SystemTime systemTime() override { return lazyInit().systemTime(); }
+  MonotonicTime monotonicTime() override { return lazyInit().monotonicTime(); }
+
+  TestTimeSystem& lazyInit() {
+    if (singleton_->timeSystem() == nullptr) {
+      singleton_->set(new TestRealTimeSystem);
+    }
+    return *singleton_->timeSystem();
+  }
+
+private:
+  Test::Global<SingletonTimeSystemHelper> singleton_;
+};
+
+/*
+template <class Type> class TestTime : public TestTimeSystem {
+public:
+  TestTime() { global_time_system_.set(&(time_system_.get())); }
+
+  void sleep(const Duration& duration) override { time_system_->sleep(duration); }
+  Thread::CondVar::WaitStatus
+  waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
+          const Duration& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) override {
+    return time_system_->waitFor(mutex, condvar, duration);
+  }
+  SchedulerPtr createScheduler(Libevent::BasePtr& base_ptr) override {
+    return time_system_->createScheduler(base_ptr);
+  }
+  SystemTime systemTime() override { return time_system_->systemTime(); }
+  MonotonicTime monotonicTime() override { return time_system_->monotonicTime(); }
+
+  Type* operator->() { return &(*time_system_); }
+  Type& operator*() { return *time_system_; }
+
+private:
+  Test::Global<Type> time_system_;
+  GlobalTimeSystem global_time_system_;
+};
+*/
 
 } // namespace Event
 

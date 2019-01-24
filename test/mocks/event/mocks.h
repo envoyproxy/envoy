@@ -30,10 +30,10 @@ public:
   MockDispatcher();
   ~MockDispatcher();
 
-  void setTimeSystem(TimeSystem& time_system) { time_system_ = &time_system; }
+  //void setTimeSystem(TimeSystem& time_system) { time_system_ = &time_system; }
 
   // Dispatcher
-  TimeSystem& timeSystem() override { return *time_system_; }
+  TimeSystem& timeSystem() override { return time_system_; }
   Network::ConnectionPtr
   createServerConnection(Network::ConnectionSocketPtr&& socket,
                          Network::TransportSocketPtr&& transport_socket) override {
@@ -110,8 +110,9 @@ public:
   Buffer::WatermarkFactory& getWatermarkFactory() override { return buffer_factory_; }
 
   // TODO(jmarantz): Switch these to using mock-time.
-  DangerousDeprecatedTestTime test_time_;
-  TimeSystem* time_system_;
+  //DangerousDeprecatedTestTime test_time_;
+  //TimeSystem* time_system_;
+  GlobalTimeSystem time_system_;
 
   std::list<DeferredDeletablePtr> to_delete_;
   MockBufferFactory buffer_factory_;
