@@ -17,9 +17,11 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/secret/secret_manager.h"
 #include "envoy/server/admin.h"
+#include "envoy/singleton/manager.h"
 #include "envoy/ssl/context_manager.h"
 #include "envoy/stats/store.h"
 #include "envoy/tcp/conn_pool.h"
+#include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/health_checker.h"
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/thread_local_cluster.h"
@@ -315,6 +317,8 @@ public:
     const LocalInfo::LocalInfo& local_info_;
     Event::Dispatcher& dispatcher_;
     Runtime::RandomGenerator& random_;
+    Singleton::Manager& singleton_manager_;
+    ThreadLocal::SlotAllocator& tls_;
   };
 
   /**
