@@ -1,3 +1,5 @@
+#include "common/common/assert.h"
+
 #include "extensions/filters/network/mysql_proxy/mysql_codec.h"
 #include "extensions/filters/network/mysql_proxy/mysql_codec_clogin.h"
 #include "extensions/filters/network/mysql_proxy/mysql_codec_clogin_resp.h"
@@ -202,14 +204,26 @@ int readStatement(hsql::SQLParserResult& result, std::string& exp_cmd, std::stri
   for (auto i = 0u; i < result.size(); ++i) {
     hsql::TableAccessMap table_access_map;
     result.getStatement(i)->tablesAccessed(table_access_map);
-    for (auto it = table_access_map.begin(); it != table_access_map.end(); ++it) {
+    std::vector<std::string> keys;
+    for (auto iter : table_access_map) {
+      keys.push_back(iter.first);
+    }
+
+    // table_access_map is unordered; sort it to get deterministic test behavior.
+    std::sort(keys.begin(), keys.end());
+    for (const std::string& key : keys) {
+      auto it = table_access_map.find(key);
+      ASSERT(it != table_access_map.end());
       for (auto ot = it->second.begin(); ot != it->second.end(); ++ot) {
         exp_cmd = *ot;
-        exp_table = it->first;
+        if (exp_cmd != "unknown") { // Skip unknown results.
+          exp_table = it->first;
+          return MYSQL_SUCCESS;
+        }
       }
     }
   }
-  return MYSQL_SUCCESS;
+  return MYSQL_FAILURE;
 }
 
 /*
@@ -973,8 +987,8 @@ TEST_F(MySQLCommandTest, MySQLTest45) {
   std::string exp_cmd;
   std::string exp_table;
   EXPECT_EQ(MYSQL_SUCCESS, readStatement(result, exp_cmd, exp_table));
-  EXPECT_EQ(exp_cmd, "select");
-  EXPECT_EQ(exp_table, table2);
+  EXPECT_EQ(exp_cmd, "update");
+  EXPECT_EQ(exp_table, table1);
 }
 
 /*
