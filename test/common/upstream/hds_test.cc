@@ -11,6 +11,7 @@
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/server/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
@@ -19,13 +20,12 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::AtLeast;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
-
-using ::testing::AtLeast;
 
 namespace Envoy {
 namespace Upstream {
@@ -64,7 +64,7 @@ public:
         }));
     hds_delegate_ = std::make_unique<HdsDelegate>(
         stats_store_, Grpc::AsyncClientPtr(async_client_), dispatcher_, runtime_, stats_store_,
-        ssl_context_manager_, random_, test_factory_, log_manager_, cm_, local_info_);
+        ssl_context_manager_, random_, test_factory_, log_manager_, cm_, local_info_, admin_);
   }
 
   // Creates a HealthCheckSpecifier message that contains one endpoint and one
@@ -119,6 +119,7 @@ public:
   NiceMock<Envoy::AccessLog::MockAccessLogManager> log_manager_;
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  NiceMock<Server::MockAdmin> admin_;
 };
 
 // Test that HdsDelegate builds and sends initial message correctly
@@ -160,7 +161,7 @@ TEST_F(HdsTest, TestProcessMessageEndpoints) {
   }
 
   // Process message
-  EXPECT_CALL(test_factory_, createClusterInfo(_, _, _, _, _, _, _, _, _, _)).Times(2);
+  EXPECT_CALL(test_factory_, createClusterInfo(_)).Times(2);
   hds_delegate_friend_.processPrivateMessage(*hds_delegate_, std::move(message));
 
   // Check Correctness
@@ -203,8 +204,7 @@ TEST_F(HdsTest, TestProcessMessageHealthChecks) {
   }
 
   // Process message
-  EXPECT_CALL(test_factory_, createClusterInfo(_, _, _, _, _, _, _, _, _, _))
-      .WillRepeatedly(Return(cluster_info_));
+  EXPECT_CALL(test_factory_, createClusterInfo(_)).WillRepeatedly(Return(cluster_info_));
 
   hds_delegate_friend_.processPrivateMessage(*hds_delegate_, std::move(message));
 
@@ -291,8 +291,7 @@ TEST_F(HdsTest, TestSendResponseOneEndpointTimeout) {
   EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _)).WillRepeatedly(Return(connection_));
   EXPECT_CALL(*server_response_timer_, enableTimer(_)).Times(2);
   EXPECT_CALL(async_stream_, sendMessage(_, false));
-  EXPECT_CALL(test_factory_, createClusterInfo(_, _, _, _, _, _, _, _, _, _))
-      .WillOnce(Return(cluster_info_));
+  EXPECT_CALL(test_factory_, createClusterInfo(_)).WillOnce(Return(cluster_info_));
   EXPECT_CALL(*connection_, setBufferLimits(_));
   EXPECT_CALL(dispatcher_, deferredDelete_(_));
   // Process message

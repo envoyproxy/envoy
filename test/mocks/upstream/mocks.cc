@@ -147,5 +147,8 @@ MockClusterInfoFactory::~MockClusterInfoFactory() = default;
 MockRetryHostPredicate::MockRetryHostPredicate() = default;
 MockRetryHostPredicate::~MockRetryHostPredicate() = default;
 
+MockClusterManagerFactory::MockClusterManagerFactory() = default;
+MockClusterManagerFactory::~MockClusterManagerFactory() = default;
+
 } // namespace Upstream
 } // namespace Envoy
