@@ -487,11 +487,12 @@ void EventLoggerImpl::logEject(const HostDescriptionConstSharedPtr host, Detecto
   event.set_enforced(enforced);
 
   if (type == envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE) {
-    event.mutable_eject_success_rate_event()->set_cluster_average_success_rate(
+    event.mutable_eject_success_rate_event()->mutable_cluster_average_success_rate()->set_value(
         detector.successRateAverage());
-    event.mutable_eject_success_rate_event()->set_cluster_success_rate_ejection_threshold(
-        detector.successRateEjectionThreshold());
-    event.mutable_eject_success_rate_event()->set_host_success_rate(
+    event.mutable_eject_success_rate_event()
+        ->mutable_cluster_success_rate_ejection_threshold()
+        ->set_value(detector.successRateEjectionThreshold());
+    event.mutable_eject_success_rate_event()->mutable_host_success_rate()->set_value(
         host->outlierDetector().successRate());
   } else {
     event.mutable_eject_consecutive_event();
@@ -499,7 +500,6 @@ void EventLoggerImpl::logEject(const HostDescriptionConstSharedPtr host, Detecto
 
   const auto json = MessageUtil::getJsonStringFromMessage(event, /* pretty_print */ false,
                                                           /* always_print_primitive_fields */ true);
-
   file_->write(fmt::format("{}\n", json));
 }
 
@@ -520,20 +520,15 @@ void EventLoggerImpl::setCommonEventParams(
     envoy::data::cluster::v2alpha::OutlierDetectionEvent& event, HostDescriptionConstSharedPtr host,
     absl::optional<MonotonicTime>& time) {
   MonotonicTime monotonic_now = time_source_.monotonicTime();
-  int secsFromLastAction = secsSinceLastAction(time, monotonic_now);
-  event.set_secs_since_last_action(secsFromLastAction);
+  if (time) {
+    int secsFromLastAction =
+        std::chrono::duration_cast<std::chrono::seconds>(monotonic_now - time.value()).count();
+    event.mutable_secs_since_last_action()->set_value(secsFromLastAction);
+  }
   event.set_cluster_name(host->cluster().name());
   event.set_upstream_url(host->address()->asString());
-  event.set_num_ejections(host->outlierDetector().numEjections());
+  event.mutable_num_ejections()->set_value(host->outlierDetector().numEjections());
   TimestampUtil::systemClockToTimestamp(time_source_.systemTime(), *event.mutable_timestamp());
-}
-
-int EventLoggerImpl::secsSinceLastAction(const absl::optional<MonotonicTime>& lastActionTime,
-                                         MonotonicTime now) {
-  if (lastActionTime) {
-    return std::chrono::duration_cast<std::chrono::seconds>(now - lastActionTime.value()).count();
-  }
-  return -1;
 }
 
 SuccessRateAccumulatorBucket* SuccessRateAccumulator::updateCurrentWriter() {

@@ -274,7 +274,6 @@ public:
   void logUneject(HostDescriptionConstSharedPtr host) override;
 
 private:
-  int secsSinceLastAction(const absl::optional<MonotonicTime>& lastActionTime, MonotonicTime now);
   void setCommonEventParams(envoy::data::cluster::v2alpha::OutlierDetectionEvent& event,
                             HostDescriptionConstSharedPtr host,
                             absl::optional<MonotonicTime>& time);
