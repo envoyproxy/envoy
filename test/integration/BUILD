@@ -70,7 +70,7 @@ envoy_cc_test(
         "//test/config/integration/certs",
     ],
     deps = [
-        ":http_integration_lib",
+        ":incremental_xds_integration_test_base",
         "//source/common/config:protobuf_link_hacks",
         "//source/common/config:resources_lib",
         "//source/common/protobuf:utility_lib",
@@ -96,6 +96,7 @@ envoy_cc_test(
     ],
 )
 
+<<<<<<< HEAD
 <<<<<<< HEAD
 envoy_cc_test(
     name = "incremental_cds_integration_test",
@@ -148,6 +149,8 @@ envoy_cc_test(
 
 =======
 >>>>>>> config: removing the legacy rest API (#5522)
+=======
+>>>>>>> snapshot
 exports_files(["test_utility.sh"])
 
 envoy_sh_test(

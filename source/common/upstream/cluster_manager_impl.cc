@@ -1215,6 +1215,7 @@ CdsApiPtr ProdClusterManagerFactory::createIncrementalCds(
                                 local_info_, stats_);
 =======
     const envoy::api::v2::core::ConfigSource& cds_config, ClusterManager& cm) {
+<<<<<<< HEAD
   return CdsIncremental::create(cds_config, cm, main_thread_dispatcher_, random_, local_info_,
                                 stats_);
 >>>>>>> bring in final touches from CDS integration test PR
@@ -1226,6 +1227,10 @@ CdsApiPtr ProdClusterManagerFactory::createIncrementalCds(
              : CdsApiImpl::create(cds_config, cm, main_thread_dispatcher_, random_, local_info_,
                                   stats_);
 >>>>>>> address comments, undo xds as incremental xds wrapper
+=======
+  return CdsApiIncrementalImpl::create(cds_config, cm, main_thread_dispatcher_, random_,
+                                       local_info_, stats_);
+>>>>>>> snapshot
 }
 
 } // namespace Upstream

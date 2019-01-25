@@ -43,9 +43,16 @@ public:
             std::move(async_client), service_method, random, dispatcher, scope,
             rate_limit_settings),
         type_url_(Grpc::Common::typeUrl(ResourceType().GetDescriptor()->full_name())),
+<<<<<<< HEAD
         local_info_(local_info), stats_(stats) {
     request_.set_type_url(type_url_);
     request_.mutable_node()->MergeFrom(local_info_.node());
+=======
+        stats_(stats) {
+    request_.set_type_url(type_url_);
+    request_.mutable_node()->MergeFrom(local_info.node());
+    establishNewStream();
+>>>>>>> snapshot
   }
 
   // Enqueues and attempts to send a discovery request, (un)subscribing to resources missing from /
@@ -93,6 +100,7 @@ public:
     request_.clear_initial_resource_versions();
   }
 
+<<<<<<< HEAD
   void subscribe(const std::vector<std::string>& resources) {
     ENVOY_LOG(debug, "incremental subscribe for " + type_url_);
 
@@ -106,6 +114,8 @@ public:
     buildAndQueueDiscoveryRequest(resources);
   }
 
+=======
+>>>>>>> snapshot
   void pause() {
     ENVOY_LOG(debug, "Pausing discovery requests for {}", type_url_);
     ASSERT(!paused_);
@@ -122,7 +132,7 @@ public:
   void onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
                       const Protobuf::RepeatedPtrField<std::string>& removed_resources,
                       const std::string& version_info) {
-    callbacks_->onConfigUpdate(added_resources, removed_resources, version_info);
+    callbacks_->onIncrementalConfigUpdate(added_resources, removed_resources, version_info);
     // TODO update versions of added_resources and removed_resources into resources_.... well,
     // i guess removed_resources just get removed? since there's no provision for "it got removed"
     // to have a version associated here; it's just a list of string resource names.
@@ -148,7 +158,7 @@ public:
       ENVOY_LOG(warn, "incremental config for {} rejected: {}", type_url_, e.what());
       stats_.update_attempt_.inc();
       if (callbacks_) {
-        callbacks_->onConfigUpdateFailed(&e);
+        callbacks_->onIncrementalConfigUpdateFailed(&e);
       }
       ::google::rpc::Status* error_detail = request_.mutable_error_detail();
       error_detail->set_code(Grpc::Status::GrpcStatus::Internal);
@@ -176,7 +186,7 @@ public:
     ENVOY_LOG(debug, "incremental update for {} failed", type_url_);
     stats_.update_attempt_.inc();
     if (callbacks_) {
-      callbacks_->onConfigUpdateFailed(nullptr);
+      callbacks_->onIncrementalConfigUpdateFailed(nullptr);
     }
   }
 
@@ -184,8 +194,13 @@ public:
   void start(const std::vector<std::string>& resources,
              SubscriptionCallbacks<ResourceType>& callbacks) override {
     callbacks_ = &callbacks;
+<<<<<<< HEAD
     establishNewStream();
     subscribe(resources);
+=======
+
+    buildAndQueueDiscoveryRequest(resources);
+>>>>>>> snapshot
     // The attempt stat here is maintained for the purposes of having consistency between ADS and
     // individual IncrementalSubscriptions. Since ADS is push based and muxed, the notion of an
     // "attempt" for a given xDS API combined by ADS is not really that meaningful.
@@ -193,7 +208,7 @@ public:
   }
 
   void updateResources(const std::vector<std::string>& resources) override {
-    subscribe(resources);
+    buildAndQueueDiscoveryRequest(resources);
     stats_.update_attempt_.inc();
   }
 
@@ -208,15 +223,15 @@ private:
   envoy::api::v2::IncrementalDiscoveryRequest request_;
   // Paused via pause()?
   bool paused_{};
-  // Has this API been tracked in subscriptions_?
-  bool subscribed_{};
-
-  const LocalInfo::LocalInfo& local_info_;
 
   std::queue<ResourceNameDiff> request_queue_;
   // Detects when Envoy is making too many requests.
 
+<<<<<<< HEAD
   SubscriptionStats stats_;
+=======
+  IncrementalSubscriptionStats stats_;
+>>>>>>> snapshot
 };
 
 } // namespace Config

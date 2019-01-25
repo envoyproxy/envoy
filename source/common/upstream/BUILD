@@ -14,6 +14,7 @@ envoy_cc_library(
     srcs = ["cds_api_impl.cc"],
     hdrs = ["cds_api_impl.h"],
     deps = [
+        ":cds_api_incremental_lib",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/local_info:local_info_interface",
@@ -30,6 +31,7 @@ envoy_cc_library(
 envoy_cc_library(
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
     name = "cds_incremental_lib",
     srcs = ["cds_incremental.cc"],
     hdrs = ["cds_incremental.h"],
@@ -38,6 +40,11 @@ envoy_cc_library(
     srcs = ["cds_api_incremental_impl.cc"],
     hdrs = ["cds_api_incremental_impl.h"],
 >>>>>>> address comments, undo xds as incremental xds wrapper
+=======
+    name = "cds_api_incremental_lib",
+    srcs = ["cds_api_incremental_impl.cc"],
+    hdrs = ["cds_api_incremental_impl.h"],
+>>>>>>> snapshot
     deps = [
         "//include/envoy/config:subscription_interface",
         "//include/envoy/event:dispatcher_interface",
