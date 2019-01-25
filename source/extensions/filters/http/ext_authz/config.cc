@@ -67,9 +67,7 @@ ExtAuthzFilterConfig::createRouteSpecificFilterConfigTyped(
 /**
  * Static registration for the external authorization filter. @see RegisterFactory.
  */
-static Registry::RegisterFactory<ExtAuthzFilterConfig,
-                                 Server::Configuration::NamedHttpFilterConfigFactory>
-    register_;
+REGISTER_FACTORY(ExtAuthzFilterConfig, Server::Configuration::NamedHttpFilterConfigFactory);
 
 } // namespace ExtAuthz
 } // namespace HttpFilters

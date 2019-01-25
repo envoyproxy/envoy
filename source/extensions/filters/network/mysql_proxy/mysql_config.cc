@@ -37,9 +37,7 @@ NetworkFilters::MySQLProxy::MySQLConfigFactory::createFilterFactoryFromProtoType
 /**
  * Static registration for the MySQL proxy filter. @see RegisterFactory.
  */
-static Registry::RegisterFactory<MySQLConfigFactory,
-                                 Server::Configuration::NamedNetworkFilterConfigFactory>
-    registered_;
+REGISTER_FACTORY(MySQLConfigFactory, Server::Configuration::NamedNetworkFilterConfigFactory);
 
 } // namespace MySQLProxy
 } // namespace NetworkFilters
