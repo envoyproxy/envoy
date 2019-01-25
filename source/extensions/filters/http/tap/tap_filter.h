@@ -6,7 +6,7 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/thread_local/thread_local.h"
-
+#include "absl/strings/string_view.h"
 #include "extensions/common/tap/admin.h"
 #include "extensions/filters/http/tap/tap_config.h"
 
@@ -69,7 +69,7 @@ public:
 
   // Extensions::Common::Tap::ExtensionConfig
   void clearTapConfig() override;
-  const std::string& adminId() override;
+  const absl::string_view adminId() override;
   void newTapConfig(envoy::service::tap::v2alpha::TapConfig&& proto_config,
                     Extensions::Common::Tap::Sink* admin_streamer) override;
 

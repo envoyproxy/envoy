@@ -3,6 +3,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/data/tap/v2alpha/wrapper.pb.h"
 #include "envoy/http/header_map.h"
+#include "absl/strings/string_view.h"
 #include "envoy/service/tap/v2alpha/common.pb.h"
 
 namespace Envoy {
@@ -36,7 +37,7 @@ public:
   /**
    * @return the ID to use for admin extension configuration tracking (if applicable).
    */
-  virtual const std::string& adminId() PURE;
+  virtual const absl::string_view adminId() PURE;
 
   /**
    * Clear any active tap configuration.

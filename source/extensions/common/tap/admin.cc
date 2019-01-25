@@ -90,10 +90,11 @@ void AdminHandler::registerConfig(ExtensionConfig& config, const std::string& co
 
 void AdminHandler::unregisterConfig(ExtensionConfig& config) {
   ASSERT(!config.adminId().empty());
-  ASSERT(config_id_map_[config.adminId()].count(&config) == 1);
-  config_id_map_[config.adminId()].erase(&config);
-  if (config_id_map_[config.adminId()].empty()) {
-    config_id_map_.erase(config.adminId());
+  std::string admin_id(config.adminId());
+  ASSERT(config_id_map_[admin_id].count(&config) == 1);
+  config_id_map_[admin_id].erase(&config);
+  if (config_id_map_[admin_id].empty()) {
+    config_id_map_.erase(admin_id);
   }
 }
 
