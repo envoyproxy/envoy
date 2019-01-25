@@ -12,25 +12,6 @@ namespace Event {
 
 class TestTimeSystem;
 
-// Ensures that only one type of time-system is instantiated at a time.
-class SingletonTimeSystemHelper {
-public:
-  explicit SingletonTimeSystemHelper() : time_system_(nullptr) {}
-
-  void set(TestTimeSystem* time_system) {
-    if (time_system_ == nullptr) {
-      time_system_.reset(time_system);
-    } else {
-      ASSERT(time_system_.get() == time_system);
-    }
-  }
-
-  TestTimeSystem* timeSystem() { return time_system_.get(); }
-
-private:
-  std::unique_ptr<TestTimeSystem> time_system_;
-};
-
 // Adds sleep() and waitFor() interfaces to Event::TimeSystem.
 class TestTimeSystem : public Event::TimeSystem {
 public:
@@ -67,6 +48,33 @@ public:
   }
 };
 
+// There should only be one instance of any time-system resident in a test
+// process at once. This helper class is used with Test::Global to help enforce
+// that with an ASSERT. Each time-system derivation should have a helper
+// implementation which is referenced from a delegate (see
+// DelegatingTestTimeSystemBase). In each delegate, a SingletonTimeSystemHelper
+// should be instantiated via Test::Global<SingletonTimeSystemHelper>. Only one
+// instance of SingletonTimeSystemHelper per process, at a time. When all
+// references to the delegates are destructed, the singleton will be destroyed
+// as well, so each test-method will get a fresh start.
+class SingletonTimeSystemHelper {
+public:
+  SingletonTimeSystemHelper() : time_system_(nullptr) {}
+
+  void set(TestTimeSystem* time_system) {
+    ASSERT(time_system_ == nullptr);
+    time_system_.reset(time_system);
+  }
+
+  TestTimeSystem* timeSystem() { return time_system_.get(); }
+
+private:
+  std::unique_ptr<TestTimeSystem> time_system_;
+};
+
+// Implements the TestTimeSystem interface, delegating implementation of all
+// methods to a TestTimeSystem reference supplied by a timeSystem() method in a
+// subclass.
 template <class TimeSystemVariant> class DelegatingTestTimeSystemBase : public TestTimeSystem {
 public:
   void sleep(const Duration& duration) override { timeSystem().sleep(duration); }
@@ -88,6 +96,13 @@ public:
   virtual TimeSystemVariant& timeSystem() PURE;
 };
 
+// Wraps a concrete time-system in a delegate that ensures thare is only one
+// time-system of any variant resident in a process at a time. Attempts to
+// instantiate multiple instances of the same type of time-system will simply
+// reference the same shared delegate, which will be deleted when the last one
+// goes out of scope. Attempts to instantiate different types of type-systems
+// will result in a RELEASE_ASSERT. See the testcases in
+// test_time_system_test.cc to understand the allowable sequences.
 template <class TimeSystemVariant>
 class DelegatingTestTimeSystem : public DelegatingTestTimeSystemBase<TimeSystemVariant> {
 public:
@@ -98,7 +113,7 @@ public:
       singleton_->set(time_system_);
     } else {
       time_system_ = dynamic_cast<TimeSystemVariant*>(time_system);
-      ASSERT(time_system_);
+      RELEASE_ASSERT(time_system_, "Two different types of time-systems allocated");
     }
   }
 

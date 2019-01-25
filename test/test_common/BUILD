@@ -191,6 +191,15 @@ envoy_cc_test(
     srcs = ["simulated_time_system_test.cc"],
     deps = [
         ":simulated_time_system_lib",
-        "//test/test_common:utility_lib",
+        ":utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "test_time_system_test",
+    srcs = ["test_time_system_test.cc"],
+    deps = [
+        ":simulated_time_system_lib",
+        ":test_time_lib",
     ],
 )
