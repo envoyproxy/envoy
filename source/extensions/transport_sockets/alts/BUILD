@@ -84,6 +84,7 @@ envoy_cc_library(
         ":noop_transport_socket_callbacks_lib",
         ":tsi_frame_protector",
         ":tsi_handshaker",
+        "//include/envoy/network:io_handle_interface",
         "//include/envoy/network:transport_socket_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:cleanup_lib",
@@ -97,5 +98,8 @@ envoy_cc_library(
 envoy_cc_library(
     name = "noop_transport_socket_callbacks_lib",
     hdrs = ["noop_transport_socket_callbacks.h"],
-    deps = ["//include/envoy/network:transport_socket_interface"],
+    deps = [
+        "//include/envoy/network:io_handle_interface",
+        "//include/envoy/network:transport_socket_interface",
+    ],
 )

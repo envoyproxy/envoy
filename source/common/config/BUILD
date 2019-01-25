@@ -98,6 +98,22 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "grpc_stream_lib",
+    hdrs = ["grpc_stream.h"],
+    deps = [
+        ":utility_lib",
+        "//include/envoy/config:grpc_mux_interface",
+        "//include/envoy/config:subscription_interface",
+        "//include/envoy/grpc:async_client_interface",
+        "//include/envoy/upstream:cluster_manager_interface",
+        "//source/common/common:backoff_lib",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/common:token_bucket_impl_lib",
+        "//source/common/protobuf",
+    ],
+)
+
+envoy_cc_library(
     name = "filter_json_lib",
     srcs = ["filter_json.cc"],
     hdrs = ["filter_json.h"],
@@ -140,14 +156,12 @@ envoy_cc_library(
     srcs = ["grpc_mux_impl.cc"],
     hdrs = ["grpc_mux_impl.h"],
     deps = [
+        ":grpc_stream_lib",
         ":utility_lib",
         "//include/envoy/config:grpc_mux_interface",
         "//include/envoy/config:subscription_interface",
-        "//include/envoy/grpc:async_client_interface",
         "//include/envoy/upstream:cluster_manager_interface",
-        "//source/common/common:backoff_lib",
         "//source/common/common:minimal_logger_lib",
-        "//source/common/common:token_bucket_impl_lib",
         "//source/common/protobuf",
     ],
 )
