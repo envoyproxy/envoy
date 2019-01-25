@@ -169,9 +169,9 @@ void XfccIntegrationTest::testRequestAndResponseWithXfccHeader(std::string previ
   EXPECT_TRUE(response->complete());
 }
 
-INSTANTIATE_TEST_CASE_P(IpVersions, XfccIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, XfccIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(XfccIntegrationTest, MtlsForwardOnly) {
   fcc_ = envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::

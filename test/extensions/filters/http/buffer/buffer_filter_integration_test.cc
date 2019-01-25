@@ -5,9 +5,9 @@ namespace {
 
 typedef HttpProtocolIntegrationTest BufferIntegrationTest;
 
-INSTANTIATE_TEST_CASE_P(Protocols, BufferIntegrationTest,
-                        testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
-                        HttpProtocolIntegrationTest::protocolTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(Protocols, BufferIntegrationTest,
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 TEST_P(BufferIntegrationTest, RouterNotFoundBodyBuffer) {
   config_helper_.addFilter(ConfigHelper::DEFAULT_BUFFER_FILTER);

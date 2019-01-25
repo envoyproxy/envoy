@@ -77,9 +77,9 @@ void SslIntegrationTestBase::checkStats() {
   counter->reset();
 }
 
-INSTANTIATE_TEST_CASE_P(IpVersions, SslIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, SslIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(SslIntegrationTest, RouterRequestAndResponseWithGiantBodyBuffer) {
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
@@ -222,7 +222,7 @@ public:
   const envoy::api::v2::auth::TlsParameters_TlsProtocol tls_version_{std::get<1>(GetParam())};
 };
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     IpVersionsClientVersions, SslCertficateIntegrationTest,
     testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                      testing::Values(envoy::api::v2::auth::TlsParameters::TLSv1_2,
@@ -371,9 +371,9 @@ public:
   bool text_format_{};
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, SslTapIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, SslTapIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 // Validate two back-to-back requests with binary proto output.
 TEST_P(SslTapIntegrationTest, TwoRequestsWithBinaryProto) {

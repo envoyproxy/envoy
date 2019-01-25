@@ -56,9 +56,9 @@ static void errorCallbackTest(Address::IpVersion version) {
 }
 
 class ListenerImplDeathTest : public testing::TestWithParam<Address::IpVersion> {};
-INSTANTIATE_TEST_CASE_P(IpVersions, ListenerImplDeathTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, ListenerImplDeathTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 TEST_P(ListenerImplDeathTest, ErrorCallback) {
   EXPECT_DEATH_LOG_TO_STDERR(errorCallbackTest(GetParam()), ".*listener accept failure.*");
 }
@@ -88,9 +88,9 @@ protected:
   DangerousDeprecatedTestTime test_time_;
   Event::DispatcherImpl dispatcher_;
 };
-INSTANTIATE_TEST_CASE_P(IpVersions, ListenerImplTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, ListenerImplTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 // Test that socket options are set after the listener is setup.
 TEST_P(ListenerImplTest, SetListeningSocketOptionsSuccess) {
