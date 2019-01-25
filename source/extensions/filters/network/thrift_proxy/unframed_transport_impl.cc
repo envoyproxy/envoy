@@ -13,9 +13,7 @@ public:
 /**
  * Static registration for the unframed transport. @see RegisterFactory.
  */
-// NOLINTNEXTLINE(fuchsia-statically-constructed-objects)
-static Registry::RegisterFactory<UnframedTransportConfigFactory, NamedTransportConfigFactory>
-    register_;
+REGISTER_FACTORY(UnframedTransportConfigFactory, NamedTransportConfigFactory);
 
 } // namespace ThriftProxy
 } // namespace NetworkFilters

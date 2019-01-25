@@ -8,11 +8,9 @@ namespace Extensions {
 namespace Retry {
 namespace Host {
 
-// NOLINTNEXTLINE(fuchsia-statically-constructed-objects)
-static Registry::RegisterFactory<PreviousHostsRetryPredicateFactory,
-                                 Upstream::RetryHostPredicateFactory>
-    register_;
-} // namespace Host
+REGISTER_FACTORY(PreviousHostsRetryPredicateFactory, Upstream::RetryHostPredicateFactory);
+
+}
 } // namespace Retry
 } // namespace Extensions
 } // namespace Envoy

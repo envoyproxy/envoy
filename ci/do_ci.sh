@@ -82,6 +82,16 @@ if [[ "$1" == "bazel.release" ]]; then
     echo "Testing..."
     # We have various test binaries in the test directory such as tools, benchmarks, etc. We
     # run a build pass to make sure they compile.
+
+    # Reduce the amount of memory and number of cores Bazel tries to use to
+    # prevent it from launching too many subprocesses. This should prevent the
+    # system from running out of memory and killing tasks. See discussion on
+    # https://github.com/envoyproxy/envoy/pull/5611.
+    # TODO(akonradi): use --local_cpu_resources flag once Bazel has a release
+    # after 0.21.
+    export BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --local_resources=12288,6,1"
+    export BAZEL_TEST_OPTIONS="${BAZEL_TEST_OPTIONS} --local_resources=12288,6,1"
+
     bazel build ${BAZEL_BUILD_OPTIONS} -c opt //include/... //source/... //test/...
     # Now run all of the tests which should already be compiled.
     bazel_with_collection test ${BAZEL_TEST_OPTIONS} -c opt //test/...
@@ -111,19 +121,19 @@ elif [[ "$1" == "bazel.asan" ]]; then
   echo "Building and testing..."
   bazel_with_collection test ${BAZEL_TEST_OPTIONS} -c dbg --config=clang-asan @envoy//test/... \
     //:echo2_integration_test //:envoy_binary_test
-  # Also validate that integration test traffic capture (useful when debugging etc.)
-  # works. This requires that we set CAPTURE_ENV. We do this under bazel.asan to
+  # Also validate that integration test traffic tapping (useful when debugging etc.)
+  # works. This requires that we set TAP_PATH. We do this under bazel.asan to
   # ensure a debug build in CI.
-  CAPTURE_TMP=/tmp/capture/
-  rm -rf "${CAPTURE_TMP}"
-  mkdir -p "${CAPTURE_TMP}"
+  TAP_TMP=/tmp/tap/
+  rm -rf "${TAP_TMP}"
+  mkdir -p "${TAP_TMP}"
   bazel_with_collection test ${BAZEL_TEST_OPTIONS} -c dbg --config=clang-asan \
     @envoy//test/integration:ssl_integration_test \
-    --test_env=CAPTURE_PATH="${CAPTURE_TMP}/capture"
+    --test_env=TAP_PATH="${TAP_TMP}/tap"
   # Verify that some pb_text files have been created. We can't check for pcap,
   # since tcpdump is not available in general due to CircleCI lack of support
   # for privileged Docker executors.
-  ls -l "${CAPTURE_TMP}"/*.pb_text > /dev/null
+  ls -l "${TAP_TMP}"/tap_*.pb_text > /dev/null
   exit 0
 elif [[ "$1" == "bazel.tsan" ]]; then
   setup_clang_toolchain
@@ -152,17 +162,19 @@ elif [[ "$1" == "bazel.compile_time_options" ]]; then
   # Right now, none of the available compile-time options conflict with each other. If this
   # changes, this build type may need to be broken up.
   COMPILE_TIME_OPTIONS="\
+    --config libc++ \
     --define signal_trace=disabled \
     --define hot_restart=disabled \
     --define google_grpc=disabled \
     --define boringssl=fips \
     --define log_debug_assert_in_release=enabled \
-    --define=tcmalloc=debug \
+    --define tcmalloc=debug \
   "
   setup_clang_toolchain
   # This doesn't go into CI but is available for developer convenience.
   echo "bazel with different compiletime options build with tests..."
-  cd "${ENVOY_CI_DIR}"
+  # Building all the dependencies from scratch to link them against libc++.
+  cd "${ENVOY_SRCDIR}"
   echo "Building..."
   bazel build ${BAZEL_BUILD_OPTIONS} ${COMPILE_TIME_OPTIONS} -c dbg //source/exe:envoy-static
   echo "Building and testing..."
@@ -199,7 +211,7 @@ elif [[ "$1" == "bazel.api" ]]; then
   bazel build ${BAZEL_BUILD_OPTIONS} -c fastbuild @envoy_api//envoy/...
   echo "Testing API..."
   bazel_with_collection test ${BAZEL_TEST_OPTIONS} -c fastbuild @envoy_api//test/... @envoy_api//tools/... \
-    @envoy_api//tools:capture2pcap_test
+    @envoy_api//tools:tap2pcap_test
   exit 0
 elif [[ "$1" == "bazel.coverage" ]]; then
   setup_gcc_toolchain
@@ -214,6 +226,15 @@ elif [[ "$1" == "bazel.coverage" ]]; then
   export GCOVR_DIR="${ENVOY_BUILD_DIR}/bazel-envoy"
   export TESTLOGS_DIR="${ENVOY_BUILD_DIR}/bazel-testlogs"
   export WORKSPACE=ci
+
+  # Reduce the amount of memory and number of cores Bazel tries to use to
+  # prevent it from launching too many subprocesses. This should prevent the
+  # system from running out of memory and killing tasks. See discussion on
+  # https://github.com/envoyproxy/envoy/pull/5611.
+  # TODO(akonradi): use --local_cpu_resources flag once Bazel has a release
+  # after 0.21.
+  export BAZEL_TEST_OPTIONS="${BAZEL_TEST_OPTIONS} --local_resources=12288,6,1"
+
   # There is a bug in gcovr 3.3, where it takes the -r path,
   # in our case /source, and does a regex replacement of various
   # source file paths during HTML generation. It attempts to strip

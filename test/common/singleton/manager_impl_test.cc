@@ -22,7 +22,6 @@ TEST(SingletonManagerImplDeathTest, NotRegistered) {
 }
 
 static constexpr char test_singleton_name[] = "test_singleton";
-// NOLINTNEXTLINE(fuchsia-statically-constructed-objects)
 static Registry::RegisterFactory<Singleton::RegistrationImpl<test_singleton_name>,
                                  Singleton::Registration>
     test_singleton_registered_;

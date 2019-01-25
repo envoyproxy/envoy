@@ -42,6 +42,11 @@ REPOSITORY_LOCATIONS = dict(
         strip_prefix = "xxHash-0.6.5",
         urls = ["https://github.com/Cyan4973/xxHash/archive/v0.6.5.tar.gz"],
     ),
+    com_github_envoyproxy_sqlparser = dict(
+        sha256 = "425dfee0c4fe9aff8acf2365cde3dd2ba7fb878d2ba37562d33920e34c40c05e",
+        strip_prefix = "sql-parser-5f50c68bdf5f107692bb027d1c568f67597f4d7f",
+        urls = ["https://github.com/envoyproxy/sql-parser/archive/5f50c68bdf5f107692bb027d1c568f67597f4d7f.tar.gz"],
+    ),
     com_github_eile_tclap = dict(
         sha256 = "f0ede0721dddbb5eba3a47385a6e8681b14f155e1129dd39d1a959411935098f",
         strip_prefix = "tclap-tclap-1-2-1-release-final",
@@ -53,9 +58,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/fmtlib/fmt/releases/download/5.3.0/fmt-5.3.0.zip"],
     ),
     com_github_gabime_spdlog = dict(
-        sha256 = "867a4b7cedf9805e6f76d3ca41889679054f7e5a3b67722fe6d0eae41852a767",
-        strip_prefix = "spdlog-1.2.1",
-        urls = ["https://github.com/gabime/spdlog/archive/v1.2.1.tar.gz"],
+        sha256 = "78786c641ca278388107e30f1f0fa0307e7e98e1c5279c3d29f71a143f9176b6",
+        strip_prefix = "spdlog-1.3.0",
+        urls = ["https://github.com/gabime/spdlog/archive/v1.3.0.tar.gz"],
     ),
     com_github_gcovr_gcovr = dict(
         sha256 = "8a60ba6242d67a58320e9e16630d80448ef6d5284fda5fb3eff927b63c8b04a2",
@@ -79,9 +84,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/nanopb/nanopb/archive/0.3.9.2.tar.gz"],
     ),
     io_opentracing_cpp = dict(
-        sha256 = "4455ca507936bc4b658ded10a90d8ebbbd61c58f06207be565a4ffdc885687b5",
-        strip_prefix = "opentracing-cpp-1.5.0",
-        urls = ["https://github.com/opentracing/opentracing-cpp/archive/v1.5.0.tar.gz"],
+        sha256 = "015c4187f7a6426a2b5196f0ccd982aa87f010cf61f507ae3ce5c90523f92301",
+        strip_prefix = "opentracing-cpp-1.5.1",
+        urls = ["https://github.com/opentracing/opentracing-cpp/archive/v1.5.1.tar.gz"],
     ),
     com_lightstep_tracer_cpp = dict(
         sha256 = "defbf471facfebde6523ca1177529b63784893662d4ef2c60db074be8aef0634",
@@ -95,9 +100,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/googleapis/googleapis/archive/d6f78d948c53f3b400bb46996eb3084359914f9b.tar.gz"],
     ),
     com_github_datadog_dd_opentracing_cpp = dict(
-        sha256 = "32967149fbc672f321ba6ce6c3e5cc299b15ab914f6f5b2993c7c9ddc1894439",
-        strip_prefix = "dd-opentracing-cpp-0.3.6",
-        urls = ["https://github.com/DataDog/dd-opentracing-cpp/archive/v0.3.6.tar.gz"],
+        sha256 = "1798ce816e389ad89c379cb734487ed8b7db3d909be0c8548bd96538f78639b7",
+        strip_prefix = "dd-opentracing-cpp-0.4.1",
+        urls = ["https://github.com/DataDog/dd-opentracing-cpp/archive/v0.4.1.tar.gz"],
     ),
     com_github_msgpack_msgpack_c = dict(
         sha256 = "bda49f996a73d2c6080ff0523e7b535917cd28c8a79c3a5da54fc29332d61d1e",
@@ -146,9 +151,11 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://files.pythonhosted.org/packages/f9/e7/4f80d582578f8489226370762d2cf6bc9381175d1929eba1754e03f70708/twitter.common.finagle-thrift-0.3.9.tar.gz"],
     ),
     com_google_googletest = dict(
-        sha256 = "9bf1fe5182a604b4135edc1a425ae356c9ad15e9b23f9f12a02e80184c3a249c",
-        strip_prefix = "googletest-release-1.8.1",
-        urls = ["https://github.com/google/googletest/archive/release-1.8.1.tar.gz"],
+        sha256 = "a4cb4b0c3ebb191b798594aca674ad47eee255dcb4c26885cf7f49777703484f",
+        strip_prefix = "googletest-eb9225ce361affe561592e0912320b9db84985d0",
+        # TODO(akonradi): Switch this back to a released version later than 1.8.1 once there is
+        # one available.
+        urls = ["https://github.com/google/googletest/archive/eb9225ce361affe561592e0912320b9db84985d0.tar.gz"],
     ),
     com_google_protobuf = dict(
         sha256 = "46f1da3a6a6db66dd240cf95a5553198f7c6e98e6ac942fceb8a1cf03291d96e",
@@ -190,5 +197,10 @@ REPOSITORY_LOCATIONS = dict(
         sha256 = "eddbfc920e9cd565500370114316757848b672deba06dc2336acfa81b4ac0e6d",
         strip_prefix = "subpar-1.3.0",
         urls = ["https://github.com/google/subpar/archive/1.3.0.tar.gz"],
+    ),
+    com_googlesource_quiche = dict(
+        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/c9b2cecd1d005893114a03c101532017ddfa12cb.tar.gz
+        sha256 = "c8faea835132103d574cc2769a58e244bee3de02669471330a174f2ffae6fcc3",
+        urls = ["https://storage.googleapis.com/quiche-envoy-integration/c9b2cecd1d005893114a03c101532017ddfa12cb.tar.gz"],
     ),
 )

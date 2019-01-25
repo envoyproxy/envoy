@@ -192,13 +192,3 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
-
-envoy_cc_library(
-    name = "tls_utility_lib",
-    srcs = ["tls_utility.cc"],
-    hdrs = ["tls_utility.h"],
-    external_deps = ["ssl"],
-    deps = [
-        "//source/common/common:assert_lib",
-    ],
-)

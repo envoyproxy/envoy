@@ -303,11 +303,13 @@ void InstanceImpl::initialize(Options& options,
   runtime_loader_ = component_factory.createRuntime(*this, initial_config);
 
   // Once we have runtime we can initialize the SSL context manager.
-  ssl_context_manager_ = std::make_unique<Ssl::ContextManagerImpl>(time_system_);
+  ssl_context_manager_ =
+      std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(time_system_);
 
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
-      runtime(), stats(), threadLocal(), random(), dnsResolver(), sslContextManager(), dispatcher(),
-      localInfo(), secretManager(), api(), http_context_);
+      admin(), runtime(), stats(), threadLocal(), random(), dnsResolver(), sslContextManager(),
+      dispatcher(), localInfo(), secretManager(), api(), http_context_, accessLogManager(),
+      singletonManager());
 
   // Now the configuration gets parsed. The configuration may start setting
   // thread local data per above. See MainImpl::initialize() for why ConfigImpl
@@ -331,7 +333,8 @@ void InstanceImpl::initialize(Options& options,
         Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, hds_config, stats())
             ->create(),
         dispatcher(), runtime(), stats(), sslContextManager(), random(), info_factory_,
-        access_log_manager_, clusterManager(), localInfo());
+        access_log_manager_, clusterManager(), localInfo(), admin(), singletonManager(),
+        threadLocal());
   }
 
   for (Stats::SinkPtr& sink : config_.statsSinks()) {
@@ -417,6 +420,9 @@ RunHelper::RunHelper(Instance& instance, Options& options, Event::Dispatcher& di
     });
   }
 
+  // Start overload manager before workers.
+  overload_manager.start();
+
   // Register for cluster manager init notification. We don't start serving worker traffic until
   // upstream clusters are initialized which may involve running the event loop. Note however that
   // this can fire immediately if all clusters have already initialized. Also note that we need
@@ -434,7 +440,7 @@ RunHelper::RunHelper(Instance& instance, Options& options, Event::Dispatcher& di
 
     ENVOY_LOG(info, "all clusters initialized. initializing init manager");
 
-    // Note: the lamda below should not capture "this" since the RunHelper object may
+    // Note: the lambda below should not capture "this" since the RunHelper object may
     // have been destructed by the time it gets executed.
     init_manager.initialize([&instance, workers_start_cb]() {
       if (instance.isShutdown()) {
@@ -448,8 +454,6 @@ RunHelper::RunHelper(Instance& instance, Options& options, Event::Dispatcher& di
     // as we've subscribed to all the statically defined RDS resources.
     cm.adsMux().resume(Config::TypeUrl::get().RouteConfiguration);
   });
-
-  overload_manager.start();
 }
 
 void InstanceImpl::run() {

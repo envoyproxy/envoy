@@ -32,6 +32,57 @@ namespace Envoy {
 namespace Router {
 namespace {
 uint32_t getLength(const Buffer::Instance* instance) { return instance ? instance->length() : 0; }
+
+bool schemeIsHttp(const Http::HeaderMap& downstream_headers,
+                  const Network::Connection& connection) {
+  if (downstream_headers.ForwardedProto() && downstream_headers.ForwardedProto()->value().c_str() ==
+                                                 Http::Headers::get().SchemeValues.Http) {
+    return true;
+  }
+  if (!connection.ssl()) {
+    return true;
+  }
+  return false;
+}
+
+bool convertRequestHeadersForInternalRedirect(Http::HeaderMap& downstream_headers,
+                                              const Http::HeaderEntry& internal_redirect,
+                                              const Network::Connection& connection) {
+  // Envoy does not currently support multiple rounds of redirects.
+  if (downstream_headers.EnvoyOriginalUrl()) {
+    return false;
+  }
+  // Make sure the redirect response contains a URL to redirect to.
+  if (internal_redirect.value().getStringView().length() == 0) {
+    return false;
+  }
+
+  Http::Utility::Url absolute_url;
+  if (!absolute_url.initialize(internal_redirect.value().getStringView())) {
+    return false;
+  }
+
+  bool scheme_is_http = schemeIsHttp(downstream_headers, connection);
+  if (scheme_is_http && absolute_url.scheme() == Http::Headers::get().SchemeValues.Https) {
+    // Don't allow serving TLS responses over plaintext.
+    return false;
+  }
+
+  // Preserve the original request URL for the second pass.
+  downstream_headers.insertEnvoyOriginalUrl().value(
+      absl::StrCat(scheme_is_http ? Http::Headers::get().SchemeValues.Http
+                                  : Http::Headers::get().SchemeValues.Https,
+                   "://", downstream_headers.Host()->value().getStringView(),
+                   downstream_headers.Path()->value().getStringView()));
+
+  // Replace the original host, scheme and path.
+  downstream_headers.insertScheme().value(std::string(absolute_url.scheme()));
+  downstream_headers.insertHost().value(std::string(absolute_url.host_and_port()));
+  downstream_headers.insertPath().value(std::string(absolute_url.path()));
+
+  return true;
+}
+
 } // namespace
 
 void FilterUtility::setUpstreamScheme(Http::HeaderMap& headers,
@@ -312,6 +363,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
     headers.insertEnvoyAttemptCount().value(attempt_count_);
   }
 
+  // Inject the active span's tracing context into the request headers.
+  callbacks_->activeSpan().injectContext(headers);
+
   route_entry_->finalizeRequestHeaders(headers, callbacks_->streamInfo(),
                                        !config_.suppress_envoy_headers_);
   FilterUtility::setUpstreamScheme(headers, *cluster_);
@@ -370,11 +424,18 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
     do_shadowing_ = false;
   }
 
-  // If we are going to buffer for retries or shadowing, we need to make a copy before encoding
-  // since it's all moves from here on.
   if (buffering) {
+    // If we are going to buffer for retries or shadowing, we need to make a copy before encoding
+    // since it's all moves from here on.
     Buffer::OwnedImpl copy(data);
     upstream_request_->encodeData(copy, end_stream);
+
+    // If we are potentially going to retry or shadow this request we need to buffer.
+    // This will not cause the connection manager to 413 because before we hit the
+    // buffer limit we give up on retries and buffering. We must buffer using addDecodedData()
+    // so that all buffered data is available by the time we do request complete processing and
+    // potentially shadow.
+    callbacks_->addDecodedData(data, true);
   } else {
     upstream_request_->encodeData(data, end_stream);
   }
@@ -383,11 +444,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
     onRequestComplete();
   }
 
-  // If we are potentially going to retry or shadow this request we need to buffer.
-  // This will not cause the connection manager to 413 because before we hit the
-  // buffer limit we give up on retries and buffering.
-  return buffering ? Http::FilterDataStatus::StopIterationAndBuffer
-                   : Http::FilterDataStatus::StopIterationNoBuffer;
+  return Http::FilterDataStatus::StopIterationNoBuffer;
 }
 
 Http::FilterTrailersStatus Filter::decodeTrailers(Http::HeaderMap& trailers) {
@@ -452,7 +509,7 @@ void Filter::onRequestComplete() {
 }
 
 void Filter::onDestroy() {
-  if (upstream_request_) {
+  if (upstream_request_ && !attempting_internal_redirect_with_complete_stream_) {
     upstream_request_->resetStream();
   }
   cleanup();
@@ -650,6 +707,14 @@ void Filter::onUpstreamHeaders(const uint64_t response_code, Http::HeaderMapPtr&
     retry_state_.reset();
   }
 
+  if (static_cast<Http::Code>(response_code) == Http::Code::Found &&
+      route_entry_->internalRedirectAction() == InternalRedirectAction::Handle &&
+      setupRedirect(*headers)) {
+    return;
+    // If the redirect could not be handled, fail open and let it pass to the
+    // next downstream.
+  }
+
   // Only send upstream service time if we received the complete request and this is not a
   // premature response.
   if (DateUtil::timePointValid(downstream_request_complete_time_)) {
@@ -790,6 +855,40 @@ bool Filter::setupRetry(bool end_stream) {
   upstream_request_.reset();
   callbacks_->streamInfo().resetUpstreamTimings();
   return true;
+}
+
+bool Filter::setupRedirect(const Http::HeaderMap& headers) {
+  ENVOY_STREAM_LOG(debug, "attempting internal redirect", *callbacks_);
+  const Http::HeaderEntry* location = headers.Location();
+
+  // If the internal redirect succeeds, callbacks_->recreateStream() will result in the destruction
+  // of this filter before the stream is marked as complete, and onDestroy will reset the stream.
+  //
+  // Normally when a stream is complete we signal this by resetting the upstream but this cam not be
+  // done in this case because if recreateStream fails, the "failure" path continues to call code
+  // in onUpstreamHeaders which requires the upstream *not* be reset. To avoid onDestroy performing
+  // a spurious stream reset in the case recreateStream() succeeds, we explicitly track stream
+  // completion here and check it in onDestroy. This is annoyingly complicated but is better than
+  // needlessly resetting streams.
+  attempting_internal_redirect_with_complete_stream_ =
+      upstream_request_->stream_info_.lastUpstreamRxByteReceived() && downstream_end_stream_;
+
+  // As with setupRetry, redirects are not supported for streaming requests yet.
+  if (downstream_end_stream_ &&
+      !callbacks_->decodingBuffer() && // Redirects with body not yet supported.
+      location != nullptr &&
+      convertRequestHeadersForInternalRedirect(*downstream_headers_, *location,
+                                               *callbacks_->connection()) &&
+      callbacks_->recreateStream()) {
+    cluster_->stats().upstream_internal_redirect_succeeded_total_.inc();
+    return true;
+  }
+
+  attempting_internal_redirect_with_complete_stream_ = false;
+
+  ENVOY_STREAM_LOG(debug, "Internal redirect failed", *callbacks_);
+  cluster_->stats().upstream_internal_redirect_failed_total_.inc();
+  return false;
 }
 
 void Filter::doRetry() {

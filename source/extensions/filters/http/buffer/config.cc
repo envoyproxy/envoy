@@ -46,10 +46,7 @@ BufferFilterFactory::createRouteSpecificFilterConfigTyped(
 /**
  * Static registration for the buffer filter. @see RegisterFactory.
  */
-// NOLINTNEXTLINE(fuchsia-statically-constructed-objects)
-static Registry::RegisterFactory<BufferFilterFactory,
-                                 Server::Configuration::NamedHttpFilterConfigFactory>
-    register_;
+REGISTER_FACTORY(BufferFilterFactory, Server::Configuration::NamedHttpFilterConfigFactory);
 
 } // namespace BufferFilter
 } // namespace HttpFilters

@@ -123,8 +123,7 @@ public:
 /**
  * Static registration for the Dubbo protocol. @see RegisterFactory.
  */
-// NOLINTNEXTLINE(fuchsia-statically-constructed-objects)
-static Registry::RegisterFactory<DubboProtocolConfigFactory, NamedProtocolConfigFactory> register_;
+REGISTER_FACTORY(DubboProtocolConfigFactory, NamedProtocolConfigFactory);
 
 } // namespace DubboProxy
 } // namespace NetworkFilters

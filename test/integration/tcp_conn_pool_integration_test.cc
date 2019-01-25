@@ -119,7 +119,7 @@ public:
         filter_resolver_(config_factory_) {}
 
   // Called once by the gtest framework before any tests are run.
-  static void SetUpTestCase() {
+  static void SetUpTestSuite() {
     tcp_conn_pool_config = ConfigHelper::BASE_CONFIG + R"EOF(
     filter_chains:
       - filters:
@@ -142,9 +142,9 @@ private:
   Registry::InjectFactory<Server::Configuration::NamedNetworkFilterConfigFactory> filter_resolver_;
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, TcpConnPoolIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, TcpConnPoolIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(TcpConnPoolIntegrationTest, SingleRequest) {
   std::string request("request");

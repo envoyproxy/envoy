@@ -5117,7 +5117,7 @@ virtual_hosts:
 
 TEST(RouteConfigurationV2, RegexPrefixWithNoRewriteWorksWhenPathChanged) {
 
-  // setup regex route entry. the regex is trivial, thats ok as we only want to test that
+  // Setup regex route entry. the regex is trivial, that's ok as we only want to test that
   // path change works.
   std::string RegexRewrite = R"EOF(
 name: RegexNoMatch
@@ -5296,7 +5296,7 @@ virtual_hosts:
               name: envoy.test_retry_priority
   )EOF";
 
-  Upstream::MockRetryPriority priority({});
+  Upstream::MockRetryPriority priority{{}, {}};
   Upstream::MockRetryPriorityFactory priority_factory(priority);
   Registry::InjectFactory<Upstream::RetryPriorityFactory> inject_priority_factory(priority_factory);
 

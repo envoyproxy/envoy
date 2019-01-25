@@ -49,10 +49,7 @@ std::string HttpGrpcAccessLogFactory::name() const { return AccessLogNames::get(
 /**
  * Static registration for the HTTP gRPC access log. @see RegisterFactory.
  */
-// NOLINTNEXTLINE(fuchsia-statically-constructed-objects)
-static Registry::RegisterFactory<HttpGrpcAccessLogFactory,
-                                 Server::Configuration::AccessLogInstanceFactory>
-    register_;
+REGISTER_FACTORY(HttpGrpcAccessLogFactory, Server::Configuration::AccessLogInstanceFactory);
 
 } // namespace HttpGrpc
 } // namespace AccessLoggers

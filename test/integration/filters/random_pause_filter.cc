@@ -65,7 +65,6 @@ public:
 };
 
 // perform static registration
-// NOLINTNEXTLINE(fuchsia-statically-constructed-objects)
 static Registry::RegisterFactory<RandomPauseFilterConfig,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
     register_;

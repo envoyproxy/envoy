@@ -93,9 +93,7 @@ public:
 /**
  * Static registration for the Hessian protocol. @see RegisterFactory.
  */
-// NOLINTNEXTLINE(fuchsia-statically-constructed-objects)
-static Registry::RegisterFactory<HessianDeserializerConfigFactory, NamedDeserializerConfigFactory>
-    register_;
+REGISTER_FACTORY(HessianDeserializerConfigFactory, NamedDeserializerConfigFactory);
 
 } // namespace DubboProxy
 } // namespace NetworkFilters

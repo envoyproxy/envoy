@@ -18,3 +18,5 @@
 /*/extensions/filters/network/sni_cluster @rshriram @lizan
 # tracers.datadog extension
 /*/extensions/tracers/datadog @cgilmour @palazzem
+# mysql_proxy extension
+/*/extensions/filters/network/mysql_proxy @rshriram @venilnoronha @mattklein123

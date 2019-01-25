@@ -122,7 +122,6 @@ public:
 /**
  * Static registration for the default Google gRPC credentials factory. @see RegisterFactory.
  */
-// NOLINTNEXTLINE(fuchsia-statically-constructed-objects)
 static Registry::RegisterFactory<DefaultGoogleGrpcCredentialsFactory, GoogleGrpcCredentialsFactory>
     default_google_grpc_credentials_registered_;
 

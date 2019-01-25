@@ -24,15 +24,11 @@ ProtobufTypes::MessagePtr RawBufferSocketFactory::createEmptyConfigProto() {
   return std::make_unique<ProtobufWkt::Empty>();
 }
 
-// NOLINTNEXTLINE(fuchsia-statically-constructed-objects)
-static Registry::RegisterFactory<UpstreamRawBufferSocketFactory,
-                                 Server::Configuration::UpstreamTransportSocketConfigFactory>
-    upstream_registered_;
+REGISTER_FACTORY(UpstreamRawBufferSocketFactory,
+                 Server::Configuration::UpstreamTransportSocketConfigFactory);
 
-// NOLINTNEXTLINE(fuchsia-statically-constructed-objects)
-static Registry::RegisterFactory<DownstreamRawBufferSocketFactory,
-                                 Server::Configuration::DownstreamTransportSocketConfigFactory>
-    downstream_registered_;
+REGISTER_FACTORY(DownstreamRawBufferSocketFactory,
+                 Server::Configuration::DownstreamTransportSocketConfigFactory);
 
 } // namespace RawBuffer
 } // namespace TransportSockets

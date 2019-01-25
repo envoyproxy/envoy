@@ -27,9 +27,7 @@ Tracing::HttpTracerPtr ZipkinTracerFactory::createHttpTracerTyped(
 /**
  * Static registration for the lightstep tracer. @see RegisterFactory.
  */
-// NOLINTNEXTLINE(fuchsia-statically-constructed-objects)
-static Registry::RegisterFactory<ZipkinTracerFactory, Server::Configuration::TracerFactory>
-    register_;
+REGISTER_FACTORY(ZipkinTracerFactory, Server::Configuration::TracerFactory);
 
 } // namespace Zipkin
 } // namespace Tracers

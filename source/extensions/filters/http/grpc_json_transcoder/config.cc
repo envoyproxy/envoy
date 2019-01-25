@@ -35,10 +35,8 @@ Http::FilterFactoryCb GrpcJsonTranscoderFilterConfig::createFilterFactory(
 /**
  * Static registration for the grpc transcoding filter. @see RegisterNamedHttpFilterConfigFactory.
  */
-// NOLINTNEXTLINE(fuchsia-statically-constructed-objects)
-static Registry::RegisterFactory<GrpcJsonTranscoderFilterConfig,
-                                 Server::Configuration::NamedHttpFilterConfigFactory>
-    register_;
+REGISTER_FACTORY(GrpcJsonTranscoderFilterConfig,
+                 Server::Configuration::NamedHttpFilterConfigFactory);
 
 } // namespace GrpcJsonTranscoder
 } // namespace HttpFilters

@@ -48,10 +48,7 @@ RateLimitFilterConfig::createFilterFactoryFromProtoTyped(
 /**
  * Static registration for the rate limit filter. @see RegisterFactory.
  */
-// NOLINTNEXTLINE(fuchsia-statically-constructed-objects)
-static Registry::RegisterFactory<RateLimitFilterConfig,
-                                 ThriftProxy::ThriftFilters::NamedThriftFilterConfigFactory>
-    register_;
+REGISTER_FACTORY(RateLimitFilterConfig, ThriftProxy::ThriftFilters::NamedThriftFilterConfigFactory);
 
 } // namespace RateLimitFilter
 } // namespace ThriftFilters

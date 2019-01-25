@@ -112,7 +112,7 @@ public:
 
   void resetStream() { request_.stream_state_ = response_.stream_state_ = StreamState::Closed; }
 
-  // Some stream action applied in either the request or resposne direction.
+  // Some stream action applied in either the request or response direction.
   void directionalAction(DirectionalState& state,
                          const test::common::http::http2::DirectionalAction& directional_action) {
     const bool end_stream = directional_action.end_stream();
@@ -291,8 +291,8 @@ DEFINE_PROTO_FUZZER(const test::common::http::http2::CodecImplFuzzTestCase& inpu
   // For new streams when we aren't expecting one (e.g. as a result of a mutation).
   NiceMock<MockStreamDecoder> orphan_request_decoder;
 
-  ON_CALL(server_callbacks, newStream(_))
-      .WillByDefault(Invoke([&](StreamEncoder& encoder) -> StreamDecoder& {
+  ON_CALL(server_callbacks, newStream(_, _))
+      .WillByDefault(Invoke([&](StreamEncoder& encoder, bool) -> StreamDecoder& {
         if (pending_streams.empty()) {
           return orphan_request_decoder;
         }

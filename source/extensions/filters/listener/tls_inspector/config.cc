@@ -36,10 +36,8 @@ public:
 /**
  * Static registration for the TLS inspector filter. @see RegisterFactory.
  */
-// NOLINTNEXTLINE(fuchsia-statically-constructed-objects)
-static Registry::RegisterFactory<TlsInspectorConfigFactory,
-                                 Server::Configuration::NamedListenerFilterConfigFactory>
-    registered_;
+REGISTER_FACTORY(TlsInspectorConfigFactory,
+                 Server::Configuration::NamedListenerFilterConfigFactory);
 
 } // namespace TlsInspector
 } // namespace ListenerFilters

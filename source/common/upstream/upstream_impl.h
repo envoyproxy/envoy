@@ -281,10 +281,7 @@ public:
    * @param callback supplies the callback to invoke.
    * @return Common::CallbackHandle* the callback handle.
    */
-  typedef std::function<void(uint32_t priority, const HostVector& hosts_added,
-                             const HostVector& hosts_removed)>
-      MemberUpdateCb;
-  Common::CallbackHandle* addMemberUpdateCb(MemberUpdateCb callback) const {
+  Common::CallbackHandle* addPriorityUpdateCb(PrioritySet::PriorityUpdateCb callback) const {
     return member_update_cb_helper_.add(callback);
   }
 
@@ -379,6 +376,8 @@ private:
 
   std::vector<std::shared_ptr<LocalityEntry>> locality_entries_;
   std::unique_ptr<EdfScheduler<LocalityEntry>> locality_scheduler_;
+  std::vector<std::shared_ptr<LocalityEntry>> degraded_locality_entries_;
+  std::unique_ptr<EdfScheduler<LocalityEntry>> degraded_locality_scheduler_;
 };
 
 typedef std::unique_ptr<HostSetImpl> HostSetImplPtr;
@@ -392,6 +391,9 @@ public:
   // From PrioritySet
   Common::CallbackHandle* addMemberUpdateCb(MemberUpdateCb callback) const override {
     return member_update_cb_helper_.add(callback);
+  }
+  Common::CallbackHandle* addPriorityUpdateCb(PriorityUpdateCb callback) const override {
+    return priority_update_cb_helper_.add(callback);
   }
   const std::vector<std::unique_ptr<HostSet>>& hostSetsPerPriority() const override {
     return host_sets_;
@@ -409,17 +411,21 @@ protected:
   }
 
 private:
-  virtual void runUpdateCallbacks(uint32_t priority, const HostVector& hosts_added,
-                                  const HostVector& hosts_removed) {
-    member_update_cb_helper_.runCallbacks(priority, hosts_added, hosts_removed);
+  virtual void runUpdateCallbacks(const HostVector& hosts_added, const HostVector& hosts_removed) {
+    member_update_cb_helper_.runCallbacks(hosts_added, hosts_removed);
+  }
+  virtual void runReferenceUpdateCallbacks(uint32_t priority, const HostVector& hosts_added,
+                                           const HostVector& hosts_removed) {
+    priority_update_cb_helper_.runCallbacks(priority, hosts_added, hosts_removed);
   }
   // This vector will generally have at least one member, for priority level 0.
   // It will expand as host sets are added but currently does not shrink to
   // avoid any potential lifetime issues.
   std::vector<std::unique_ptr<HostSet>> host_sets_;
   // TODO(mattklein123): Remove mutable.
+  mutable Common::CallbackManager<const HostVector&, const HostVector&> member_update_cb_helper_;
   mutable Common::CallbackManager<uint32_t, const HostVector&, const HostVector&>
-      member_update_cb_helper_;
+      priority_update_cb_helper_;
 };
 
 /**
@@ -555,10 +561,11 @@ public:
          Ssl::ContextManager& ssl_context_manager, Runtime::Loader& runtime,
          Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
          AccessLog::AccessLogManager& log_manager, const LocalInfo::LocalInfo& local_info,
+         Server::Admin& admin, Singleton::Manager& singleton_manager,
          Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api);
-  // From Upstream::Cluster
-  virtual PrioritySet& prioritySet() override { return priority_set_; }
-  virtual const PrioritySet& prioritySet() const override { return priority_set_; }
+  // Upstream::Cluster
+  PrioritySet& prioritySet() override { return priority_set_; }
+  const PrioritySet& prioritySet() const override { return priority_set_; }
 
   /**
    * Optionally set the health checker for the primary cluster. This is done after cluster

@@ -49,9 +49,7 @@ std::string StatsdSinkFactory::name() { return StatsSinkNames::get().Statsd; }
 /**
  * Static registration for the statsd sink factory. @see RegisterFactory.
  */
-// NOLINTNEXTLINE(fuchsia-statically-constructed-objects)
-static Registry::RegisterFactory<StatsdSinkFactory, Server::Configuration::StatsSinkFactory>
-    register_;
+REGISTER_FACTORY(StatsdSinkFactory, Server::Configuration::StatsSinkFactory);
 
 } // namespace Statsd
 } // namespace StatSinks

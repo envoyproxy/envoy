@@ -23,10 +23,7 @@ Http::FilterFactoryCb GzipFilterFactory::createFilterFactoryFromProtoTyped(
 /**
  * Static registration for the gzip filter. @see NamedHttpFilterConfigFactory.
  */
-// NOLINTNEXTLINE(fuchsia-statically-constructed-objects)
-static Registry::RegisterFactory<GzipFilterFactory,
-                                 Server::Configuration::NamedHttpFilterConfigFactory>
-    register_;
+REGISTER_FACTORY(GzipFilterFactory, Server::Configuration::NamedHttpFilterConfigFactory);
 
 } // namespace Gzip
 } // namespace HttpFilters

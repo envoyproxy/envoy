@@ -31,10 +31,8 @@ ProtobufTypes::MessagePtr SniClusterNetworkFilterConfigFactory::createEmptyConfi
 /**
  * Static registration for the sni_cluster filter. @see RegisterFactory.
  */
-// NOLINTNEXTLINE(fuchsia-statically-constructed-objects)
-static Registry::RegisterFactory<SniClusterNetworkFilterConfigFactory,
-                                 Server::Configuration::NamedNetworkFilterConfigFactory>
-    registered_;
+REGISTER_FACTORY(SniClusterNetworkFilterConfigFactory,
+                 Server::Configuration::NamedNetworkFilterConfigFactory);
 
 } // namespace SniCluster
 } // namespace NetworkFilters

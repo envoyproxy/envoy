@@ -41,7 +41,6 @@ public:
 /**
  * Static registration for the IP resolver. @see RegisterFactory.
  */
-// NOLINTNEXTLINE(fuchsia-statically-constructed-objects)
 static Registry::RegisterFactory<IpResolver, Resolver> ip_registered_;
 
 InstanceConstSharedPtr resolveProtoAddress(const envoy::api::v2::core::Address& address) {

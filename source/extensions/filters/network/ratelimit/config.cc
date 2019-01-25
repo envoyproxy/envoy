@@ -58,10 +58,7 @@ RateLimitConfigFactory::createFilterFactory(const Json::Object& json_config,
 /**
  * Static registration for the rate limit filter. @see RegisterFactory.
  */
-// NOLINTNEXTLINE(fuchsia-statically-constructed-objects)
-static Registry::RegisterFactory<RateLimitConfigFactory,
-                                 Server::Configuration::NamedNetworkFilterConfigFactory>
-    registered_;
+REGISTER_FACTORY(RateLimitConfigFactory, Server::Configuration::NamedNetworkFilterConfigFactory);
 
 } // namespace RateLimitFilter
 } // namespace NetworkFilters

@@ -50,6 +50,8 @@ public:
   const std::string JwtAuthn = "envoy.filters.http.jwt_authn";
   // Header to metadata filter
   const std::string HeaderToMetadata = "envoy.filters.http.header_to_metadata";
+  // Tap filter
+  const std::string Tap = "envoy.filters.http.tap";
 
   // Converts names from v1 to v2
   const Config::V1Converter v1_converter_;

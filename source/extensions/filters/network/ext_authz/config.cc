@@ -40,10 +40,7 @@ Network::FilterFactoryCb ExtAuthzConfigFactory::createFilterFactoryFromProtoType
 /**
  * Static registration for the external authorization filter. @see RegisterFactory.
  */
-// NOLINTNEXTLINE(fuchsia-statically-constructed-objects)
-static Registry::RegisterFactory<ExtAuthzConfigFactory,
-                                 Server::Configuration::NamedNetworkFilterConfigFactory>
-    registered_;
+REGISTER_FACTORY(ExtAuthzConfigFactory, Server::Configuration::NamedNetworkFilterConfigFactory);
 
 } // namespace ExtAuthz
 } // namespace NetworkFilters

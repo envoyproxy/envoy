@@ -15,7 +15,6 @@ public:
 };
 
 constexpr char TestPassThroughFilter::name[];
-// NOLINTNEXTLINE(fuchsia-statically-constructed-objects)
 static Registry::RegisterFactory<SimpleFilterConfig<TestPassThroughFilter>,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
     register_;

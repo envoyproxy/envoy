@@ -8,6 +8,7 @@
 
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
+#include "common/singleton/manager_impl.h"
 #include "common/upstream/original_dst_cluster.h"
 #include "common/upstream/upstream_impl.h"
 
@@ -18,6 +19,7 @@
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/utility.h"
@@ -71,10 +73,11 @@ public:
         "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                               : cluster_config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-        ssl_context_manager_, *scope, cm, local_info_, dispatcher_, random_, stats_store_);
+        admin_, ssl_context_manager_, *scope, cm, local_info_, dispatcher_, random_, stats_store_,
+        singleton_manager_, tls_);
     cluster_.reset(
         new OriginalDstCluster(cluster_config, runtime_, factory_context, std::move(scope), false));
-    cluster_->prioritySet().addMemberUpdateCb(
+    cluster_->prioritySet().addPriorityUpdateCb(
         [&](uint32_t, const HostVector&, const HostVector&) -> void {
           membership_updated_.ready();
         });
@@ -91,6 +94,9 @@ public:
   Event::MockTimer* cleanup_timer_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  NiceMock<Server::MockAdmin> admin_;
+  Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest().currentThreadId()};
+  NiceMock<ThreadLocal::MockInstance> tls_;
 };
 
 TEST(OriginalDstClusterConfigTest, BadConfig) {
@@ -446,7 +452,7 @@ TEST_F(OriginalDstClusterTest, MultipleClusters) {
   setupFromJson(json);
 
   PrioritySetImpl second;
-  cluster_->prioritySet().addMemberUpdateCb(
+  cluster_->prioritySet().addPriorityUpdateCb(
       [&](uint32_t, const HostVector& added, const HostVector& removed) -> void {
         // Update second hostset accordingly;
         HostVectorSharedPtr new_hosts(

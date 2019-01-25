@@ -41,7 +41,7 @@ TEST(HeaderStringTest, All) {
     EXPECT_EQ(5U, string.size());
   }
 
-  // Static move contructor
+  // Static move constructor
   {
     std::string static_string("HELLO");
     HeaderString string1(static_string);

@@ -19,10 +19,7 @@ PreviousPrioritiesRetryPriorityFactory::createRetryPriority(const Protobuf::Mess
       max_retries);
 }
 
-// NOLINTNEXTLINE(fuchsia-statically-constructed-objects)
-static Registry::RegisterFactory<PreviousPrioritiesRetryPriorityFactory,
-                                 Upstream::RetryPriorityFactory>
-    register_;
+REGISTER_FACTORY(PreviousPrioritiesRetryPriorityFactory, Upstream::RetryPriorityFactory);
 
 } // namespace Priority
 } // namespace Retry

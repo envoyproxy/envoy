@@ -41,10 +41,7 @@ FaultFilterFactory::createRouteSpecificFilterConfigTyped(
 /**
  * Static registration for the fault filter. @see RegisterFactory.
  */
-// NOLINTNEXTLINE(fuchsia-statically-constructed-objects)
-static Registry::RegisterFactory<FaultFilterFactory,
-                                 Server::Configuration::NamedHttpFilterConfigFactory>
-    register_;
+REGISTER_FACTORY(FaultFilterFactory, Server::Configuration::NamedHttpFilterConfigFactory);
 
 } // namespace Fault
 } // namespace HttpFilters

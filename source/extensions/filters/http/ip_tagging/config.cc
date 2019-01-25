@@ -27,10 +27,7 @@ Http::FilterFactoryCb IpTaggingFilterFactory::createFilterFactoryFromProtoTyped(
 /**
  * Static registration for the ip tagging filter. @see RegisterFactory.
  */
-// NOLINTNEXTLINE(fuchsia-statically-constructed-objects)
-static Registry::RegisterFactory<IpTaggingFilterFactory,
-                                 Server::Configuration::NamedHttpFilterConfigFactory>
-    register_;
+REGISTER_FACTORY(IpTaggingFilterFactory, Server::Configuration::NamedHttpFilterConfigFactory);
 
 } // namespace IpTagging
 } // namespace HttpFilters

@@ -227,9 +227,9 @@ void TestUtility::createSymlink(const std::string& target, const std::string& li
 // static
 absl::Time TestUtility::parseTime(const std::string& input, const std::string& input_format) {
   absl::Time time;
-  std::string error;
-  EXPECT_TRUE(absl::ParseTime(input_format, input, &time, &error))
-      << " error \"" << error << "\" from failing to parse timestamp \"" << input
+  std::string parse_error;
+  EXPECT_TRUE(absl::ParseTime(input_format, input, &time, &parse_error))
+      << " error \"" << parse_error << "\" from failing to parse timestamp \"" << input
       << "\" with format string \"" << input_format << "\"";
   return time;
 }
@@ -279,6 +279,10 @@ void ConditionalInitializer::wait() {
 
 ScopedFdCloser::ScopedFdCloser(int fd) : fd_(fd) {}
 ScopedFdCloser::~ScopedFdCloser() { ::close(fd_); }
+
+ScopedIoHandleCloser::ScopedIoHandleCloser(Network::IoHandlePtr& io_handle)
+    : io_handle_(io_handle) {}
+ScopedIoHandleCloser::~ScopedIoHandleCloser() { io_handle_->close(); }
 
 AtomicFileUpdater::AtomicFileUpdater(const std::string& filename)
     : link_(filename), new_link_(absl::StrCat(filename, ".new")),
