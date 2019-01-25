@@ -10,7 +10,7 @@
 #include "envoy/event/file_event.h"
 #include "envoy/event/signal.h"
 #include "envoy/event/timer.h"
-#include "envoy/filesystem/filesystem.h"
+#include "envoy/filesystem/watcher.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/connection_handler.h"
 #include "envoy/network/dns.h"

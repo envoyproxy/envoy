@@ -5,14 +5,22 @@
 
 #include "gtest/gtest.h"
 
+using testing::ReturnRef;
+
 namespace Envoy {
 class SslCertsTest : public testing::Test {
 public:
+  SslCertsTest() : api_(Api::createApiForTest(store_)) {
+    ON_CALL(factory_context_, api()).WillByDefault(ReturnRef(*api_));
+  }
+
   static void SetUpTestCase() {
     TestEnvironment::exec({TestEnvironment::runfilesPath(
         "test/extensions/transport_sockets/tls/gen_unittest_certs.sh")});
   }
 
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
+  Stats::IsolatedStoreImpl store_;
+  Api::ApiPtr api_;
 };
 } // namespace Envoy

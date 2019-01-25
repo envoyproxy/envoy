@@ -107,10 +107,11 @@ public:
    * @param bootstrap supplies the bootstrap to fill.
    * @param config_path supplies the config path.
    * @param v2_only supplies whether to attempt v1 fallback.
+   * @param api reference to the Api object
    * @return BootstrapVersion to indicate which version of the API was parsed.
    */
   static BootstrapVersion loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& bootstrap,
-                                              Options& options);
+                                              Options& options, Api::Api& api);
 };
 
 /**

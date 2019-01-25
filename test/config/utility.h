@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/api.h"
 #include "envoy/api/v2/cds.pb.h"
 #include "envoy/api/v2/core/base.pb.h"
 #include "envoy/api/v2/core/protocol.pb.h"
@@ -57,7 +58,7 @@ public:
   //
   // By default, this runs with an L7 proxy config, but config can be set to TCP_PROXY_CONFIG
   // to test L4 proxying.
-  ConfigHelper(const Network::Address::IpVersion version,
+  ConfigHelper(const Network::Address::IpVersion version, Api::Api& api,
                const std::string& config = HTTP_PROXY_CONFIG);
 
   static void initializeTls(const ServerSslOptions& options,

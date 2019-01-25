@@ -14,6 +14,7 @@
 #include "gtest/gtest.h"
 
 using testing::NiceMock;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Xfcc {
@@ -35,7 +36,9 @@ public:
   const std::string client_dns_san_ = "DNS=lyft.com;DNS=www.lyft.com";
 
   XfccIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()) {}
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()) {
+    ON_CALL(factory_context_, api()).WillByDefault(ReturnRef(*api_));
+  }
 
   void initialize() override;
   void createUpstreams() override;

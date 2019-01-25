@@ -212,6 +212,7 @@ envoy_cc_library(
     hdrs = ["resource_monitor_config.h"],
     deps = [
         ":resource_monitor_interface",
+        "//include/envoy/api:api_interface",
         "//include/envoy/event:dispatcher_interface",
     ],
 )

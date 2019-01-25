@@ -171,7 +171,7 @@ bool InstanceImpl::healthCheckFailed() { return server_stats_->live_.value() == 
 
 InstanceUtil::BootstrapVersion
 InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& bootstrap,
-                                  Options& options) {
+                                  Options& options, Api::Api& api) {
   const std::string& config_path = options.configPath();
   const std::string& config_yaml = options.configYaml();
 
@@ -183,7 +183,7 @@ InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& boots
   }
 
   if (!config_path.empty()) {
-    MessageUtil::loadFromFile(config_path, bootstrap);
+    MessageUtil::loadFromFile(config_path, bootstrap, api);
   }
   if (!config_yaml.empty()) {
     envoy::config::bootstrap::v2::Bootstrap bootstrap_override;
@@ -224,7 +224,7 @@ void InstanceImpl::initialize(Options& options,
                 Configuration::UpstreamTransportSocketConfigFactory>::allFactoryNames());
 
   // Handle configuration that needs to take place prior to the main configuration load.
-  InstanceUtil::loadBootstrapConfig(bootstrap_, options);
+  InstanceUtil::loadBootstrapConfig(bootstrap_, options, api());
   bootstrap_config_update_time_ = time_system_.systemTime();
 
   // Needs to happen as early as possible in the instantiation to preempt the objects that require
@@ -285,7 +285,7 @@ void InstanceImpl::initialize(Options& options,
 
   // Initialize the overload manager early so other modules can register for actions.
   overload_manager_ = std::make_unique<OverloadManagerImpl>(dispatcher(), stats(), threadLocal(),
-                                                            bootstrap_.overload_manager());
+                                                            bootstrap_.overload_manager(), api());
 
   // Workers get created first so they register for thread local updates.
   listener_manager_ = std::make_unique<ListenerManagerImpl>(*this, listener_component_factory_,
@@ -334,7 +334,7 @@ void InstanceImpl::initialize(Options& options,
             ->create(),
         dispatcher(), runtime(), stats(), sslContextManager(), random(), info_factory_,
         access_log_manager_, clusterManager(), localInfo(), admin(), singletonManager(),
-        threadLocal());
+        threadLocal(), api());
   }
 
   for (Stats::SinkPtr& sink : config_.statsSinks()) {
@@ -372,7 +372,8 @@ Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,
 
     return std::make_unique<Runtime::DiskBackedLoaderImpl>(
         server.dispatcher(), server.threadLocal(), config.runtime()->symlinkRoot(),
-        config.runtime()->subdirectory(), override_subdirectory, server.stats(), server.random());
+        config.runtime()->subdirectory(), override_subdirectory, server.stats(), server.random(),
+        server.api());
   } else {
     return std::make_unique<Runtime::LoaderImpl>(server.random(), server.stats(),
                                                  server.threadLocal());
@@ -385,7 +386,7 @@ void InstanceImpl::loadServerFlags(const absl::optional<std::string>& flags_path
   }
 
   ENVOY_LOG(info, "server flags path: {}", flags_path.value());
-  if (api_->fileExists(flags_path.value() + "/drain")) {
+  if (api_->fileSystem().fileExists(flags_path.value() + "/drain")) {
     ENVOY_LOG(info, "starting server in drain mode");
     failHealthcheck(true);
   }
