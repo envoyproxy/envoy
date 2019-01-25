@@ -721,7 +721,7 @@ TEST_P(GrpcJsonTranscoderFilterPrintTest, PrintOptions) {
   EXPECT_EQ(GetParam().expected_response_, response_json);
 }
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     GrpcJsonTranscoderFilterPrintOptions, GrpcJsonTranscoderFilterPrintTest,
     ::testing::Values(
         GrpcJsonTranscoderFilterPrintTestParam{
