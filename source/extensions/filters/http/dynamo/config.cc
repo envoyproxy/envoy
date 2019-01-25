@@ -23,9 +23,7 @@ DynamoFilterConfig::createFilter(const std::string& stat_prefix,
 /**
  * Static registration for the http dynamodb filter. @see RegisterFactory.
  */
-static Registry::RegisterFactory<DynamoFilterConfig,
-                                 Server::Configuration::NamedHttpFilterConfigFactory>
-    register_;
+REGISTER_FACTORY(DynamoFilterConfig, Server::Configuration::NamedHttpFilterConfigFactory);
 
 } // namespace Dynamo
 } // namespace HttpFilters

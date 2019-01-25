@@ -123,7 +123,7 @@ public:
 /**
  * Static registration for the Dubbo protocol. @see RegisterFactory.
  */
-static Registry::RegisterFactory<DubboProtocolConfigFactory, NamedProtocolConfigFactory> register_;
+REGISTER_FACTORY(DubboProtocolConfigFactory, NamedProtocolConfigFactory);
 
 } // namespace DubboProxy
 } // namespace NetworkFilters
