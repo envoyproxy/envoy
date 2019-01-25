@@ -599,7 +599,7 @@ if __name__ == "__main__":
     results = []
     # For each file in target_path, start a new task in the pool and collect the
     # results (results is passed by reference, and is used as an output).
-    os.path.walk(target_path, checkFormatVisitor, (pool, results))
+    os.walk(target_path, checkFormatVisitor, (pool, results))
 
     # Close the pool to new tasks, wait for all of the running tasks to finish,
     # then collect the error messages.
