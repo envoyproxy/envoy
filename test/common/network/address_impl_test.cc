@@ -52,41 +52,44 @@ void testSocketBindAndConnect(Network::Address::IpVersion ip_version, bool v6onl
   ASSERT_NE(addr_port->ip(), nullptr);
 
   // Create a socket on which we'll listen for connections from clients.
-  const int listen_fd = addr_port->socket(SocketType::Stream);
-  ASSERT_GE(listen_fd, 0) << addr_port->asString();
-  ScopedFdCloser closer1(listen_fd);
+  IoHandlePtr io_handle = addr_port->socket(SocketType::Stream);
+  ASSERT_GE(io_handle->fd(), 0) << addr_port->asString();
+  ScopedFdCloser fd_closer1(io_handle->fd());
+  ScopedIoHandleCloser io_handle_closer1(io_handle);
 
   // Check that IPv6 sockets accept IPv6 connections only.
   if (addr_port->ip()->version() == IpVersion::v6) {
     int socket_v6only = 0;
     socklen_t size_int = sizeof(socket_v6only);
-    ASSERT_GE(::getsockopt(listen_fd, IPPROTO_IPV6, IPV6_V6ONLY, &socket_v6only, &size_int), 0);
+    ASSERT_GE(::getsockopt(io_handle->fd(), IPPROTO_IPV6, IPV6_V6ONLY, &socket_v6only, &size_int),
+              0);
     EXPECT_EQ(v6only, socket_v6only);
   }
 
   // Bind the socket to the desired address and port.
-  const Api::SysCallIntResult result = addr_port->bind(listen_fd);
+  const Api::SysCallIntResult result = addr_port->bind(io_handle->fd());
   ASSERT_EQ(result.rc_, 0) << addr_port->asString() << "\nerror: " << strerror(result.errno_)
                            << "\nerrno: " << result.errno_;
 
   // Do a bare listen syscall. Not bothering to accept connections as that would
   // require another thread.
-  ASSERT_EQ(::listen(listen_fd, 128), 0);
+  ASSERT_EQ(::listen(io_handle->fd(), 128), 0);
 
   auto client_connect = [](Address::InstanceConstSharedPtr addr_port) {
     // Create a client socket and connect to the server.
-    const int client_fd = addr_port->socket(SocketType::Stream);
-    ASSERT_GE(client_fd, 0) << addr_port->asString();
-    ScopedFdCloser closer2(client_fd);
+    IoHandlePtr client_handle = addr_port->socket(SocketType::Stream);
+    ASSERT_GE(client_handle->fd(), 0) << addr_port->asString();
+    ScopedFdCloser fd_closer2(client_handle->fd());
+    ScopedIoHandleCloser io_handle_closer2(client_handle);
 
     // Instance::socket creates a non-blocking socket, which that extends all the way to the
     // operation of ::connect(), so connect returns with errno==EWOULDBLOCK before the tcp
     // handshake can complete. For testing convenience, re-enable blocking on the socket
     // so that connect will wait for the handshake to complete.
-    makeFdBlocking(client_fd);
+    makeFdBlocking(client_handle->fd());
 
     // Connect to the server.
-    const Api::SysCallIntResult result = addr_port->connect(client_fd);
+    const Api::SysCallIntResult result = addr_port->connect(client_handle->fd());
     ASSERT_EQ(result.rc_, 0) << addr_port->asString() << "\nerror: " << strerror(result.errno_)
                              << "\nerrno: " << result.errno_;
   };
@@ -327,11 +330,12 @@ TEST(PipeInstanceTest, BadAddress) {
 TEST(PipeInstanceTest, UnlinksExistingFile) {
   const auto bind_uds_socket = [](const std::string& path) {
     PipeInstance address(path);
-    const int listen_fd = address.socket(SocketType::Stream);
-    ASSERT_GE(listen_fd, 0) << address.asString();
-    ScopedFdCloser closer(listen_fd);
+    IoHandlePtr io_handle = address.socket(SocketType::Stream);
+    ASSERT_GE(io_handle->fd(), 0) << address.asString();
+    ScopedFdCloser fd_closer(io_handle->fd());
+    ScopedIoHandleCloser io_handle_closer(io_handle);
 
-    const Api::SysCallIntResult result = address.bind(listen_fd);
+    const Api::SysCallIntResult result = address.bind(io_handle->fd());
     ASSERT_EQ(result.rc_, 0) << address.asString() << "\nerror: " << strerror(result.errno_)
                              << "\nerrno: " << result.errno_;
   };

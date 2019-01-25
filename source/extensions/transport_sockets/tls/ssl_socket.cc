@@ -56,7 +56,7 @@ void SslSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& c
   ASSERT(!callbacks_);
   callbacks_ = &callbacks;
 
-  BIO* bio = BIO_new_socket(callbacks_->fd(), 0);
+  BIO* bio = BIO_new_socket(callbacks_->ioHandle().fd(), 0);
   SSL_set_bio(ssl_.get(), bio, bio);
 }
 
