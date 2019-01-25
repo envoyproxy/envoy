@@ -139,7 +139,8 @@ def checkTools():
 
 
 def checkNamespace(file_path):
-  with open(file_path) as f:
+  # http://python-notes.curiousefficiency.org/en/latest/python3/text_file_processing.html
+  with open(file_path, encoding="latin-1") as f:
     text = f.read()
     if not re.search('^\s*namespace\s+Envoy\s*{', text, re.MULTILINE) and \
        not 'NOLINT(namespace-envoy)' in text:
@@ -198,7 +199,8 @@ def whitelistedForGetTime(file_path):
 
 
 def findSubstringAndReturnError(pattern, file_path, error_message):
-  with open(file_path) as f:
+  # http://python-notes.curiousefficiency.org/en/latest/python3/text_file_processing.html
+  with open(file_path, encoding="latin-1") as f:
     text = f.read()
     if pattern in text:
       error_messages = [file_path + ': ' + error_message]
