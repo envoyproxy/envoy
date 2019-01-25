@@ -124,7 +124,7 @@ jobs:
        - run: ci/do_circle_ci.sh check_spelling
    build_image:
      docker:
-       - image: circleci/python:2.7
+       - image: circleci/python:3.7
          environment:
            # See comment in do_circle_ci.sh for why we do this.
            NUM_CPUS: 8
