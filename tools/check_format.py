@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 
 from __future__ import print_function
 
@@ -472,7 +472,7 @@ def executeCommand(command,
     # In case we can't find any line numbers, record an error message first.
     error_messages = ["%s for file: %s" % (error_message, file_path)]
     for line in e.output.splitlines():
-      for num in regex.findall(str(line)):
+      for num in regex.findall(line):
         error_messages.append("  %s:%s" % (file_path, num))
     return error_messages
 
@@ -599,7 +599,7 @@ if __name__ == "__main__":
     results = []
     # For each file in target_path, start a new task in the pool and collect the
     # results (results is passed by reference, and is used as an output).
-    os.walk(target_path, checkFormatVisitor, (pool, results))
+    os.path.walk(target_path, checkFormatVisitor, (pool, results))
 
     # Close the pool to new tasks, wait for all of the running tasks to finish,
     # then collect the error messages.

@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 
 # Tests check_format.py. This must be run in a context where the clang
 # version and settings are compatible with the one in the Envoy
@@ -31,7 +31,7 @@ def runCommand(command):
   try:
     out = subprocess.check_output(command, shell=True, stderr=subprocess.STDOUT).strip()
     if out:
-      stdout = str(out).splitlines()
+      stdout = out.split("\n")
   except subprocess.CalledProcessError as e:
     status = e.returncode
     for line in e.output.splitlines():
@@ -101,7 +101,7 @@ def fixFileExpectingNoChange(file):
 
 
 def emitStdoutAsError(stdout):
-  logging.error("\n".join(str(line) for line in stdout))
+  logging.error("\n".join(stdout))
 
 
 def expectError(status, stdout, expected_substring):
@@ -109,7 +109,7 @@ def expectError(status, stdout, expected_substring):
     logging.error("Expected failure `%s`, but succeeded" % expected_substring)
     return 1
   for line in stdout:
-    if expected_substring in str(line):
+    if expected_substring in line:
       return 0
   logging.error("Could not find '%s' in:\n" % expected_substring)
   emitStdoutAsError(stdout)
