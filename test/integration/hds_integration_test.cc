@@ -229,9 +229,9 @@ public:
   envoy::service::discovery::v2::HealthCheckSpecifier server_health_check_specifier_;
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, HdsIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, HdsIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 // Tests Envoy HTTP health checking a single healthy endpoint and reporting that it is
 // indeed healthy to the server.

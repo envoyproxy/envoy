@@ -248,8 +248,8 @@ std::vector<LogicalDnsConfigTuple> generateLogicalDnsParams() {
 class LogicalDnsParamTest : public LogicalDnsClusterTest,
                             public testing::WithParamInterface<LogicalDnsConfigTuple> {};
 
-INSTANTIATE_TEST_CASE_P(DnsParam, LogicalDnsParamTest,
-                        testing::ValuesIn(generateLogicalDnsParams()));
+INSTANTIATE_TEST_SUITE_P(DnsParam, LogicalDnsParamTest,
+                         testing::ValuesIn(generateLogicalDnsParams()));
 
 // Validate that if the DNS resolves immediately, during the LogicalDnsCluster
 // constructor, we have the expected host state and initialization callback

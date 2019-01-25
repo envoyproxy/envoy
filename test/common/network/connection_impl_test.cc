@@ -73,9 +73,9 @@ TEST(ConnectionImplUtility, updateBufferStats) {
 }
 
 class ConnectionImplDeathTest : public testing::TestWithParam<Address::IpVersion> {};
-INSTANTIATE_TEST_CASE_P(IpVersions, ConnectionImplDeathTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, ConnectionImplDeathTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(ConnectionImplDeathTest, BadFd) {
   Stats::IsolatedStoreImpl stats_store;
@@ -224,9 +224,9 @@ protected:
   Socket::OptionsSharedPtr socket_options_;
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, ConnectionImplTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, ConnectionImplTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(ConnectionImplTest, UniqueId) {
   setUpBasicConnection();
@@ -1629,9 +1629,9 @@ public:
   }
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, ReadBufferLimitTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, ReadBufferLimitTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(ReadBufferLimitTest, NoLimit) { readBufferLimitTest(0, 256 * 1024); }
 
@@ -1653,9 +1653,9 @@ protected:
   Event::SimulatedTimeSystem time_system_;
   Event::DispatcherImpl dispatcher_;
 };
-INSTANTIATE_TEST_CASE_P(IpVersions, TcpClientConnectionImplTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, TcpClientConnectionImplTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(TcpClientConnectionImplTest, BadConnectNotConnRefused) {
   Address::InstanceConstSharedPtr address;

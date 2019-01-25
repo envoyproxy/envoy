@@ -119,7 +119,8 @@ std::vector<StrictDnsConfigTuple> generateStrictDnsParams() {
 
 class StrictDnsParamTest : public testing::TestWithParam<StrictDnsConfigTuple> {};
 
-INSTANTIATE_TEST_CASE_P(DnsParam, StrictDnsParamTest, testing::ValuesIn(generateStrictDnsParams()));
+INSTANTIATE_TEST_SUITE_P(DnsParam, StrictDnsParamTest,
+                         testing::ValuesIn(generateStrictDnsParams()));
 
 TEST_P(StrictDnsParamTest, ImmediateResolve) {
   Stats::IsolatedStoreImpl stats;

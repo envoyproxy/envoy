@@ -58,8 +58,8 @@ public:
   EdsHelper eds_helper_;
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, EdsIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+INSTANTIATE_TEST_SUITE_P(IpVersions, EdsIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
 // Validate that health status updates are consumed from EDS.
 TEST_P(EdsIntegrationTest, HealthUpdate) {
