@@ -505,14 +505,33 @@ public:
   Event::Libevent::BufferPtr& buffer() override { return buffer_; }
   virtual void postProcess() override;
 
+  // Support for choosing the buffer implementation at runtime.
+  // TODO(brian-pane) remove this once the new implementation has been
+  // running in production for a while.
+
+  /** @return whether this buffer uses the old evbuffer-based implementation. */
   bool usesOldImpl() const { return old_impl_; }
-  static void useOldImplForTest(bool use_old_impl) { use_old_impl_for_test_ = use_old_impl; }
+
+  /**
+   * @param use_old_impl whether to use the evbuffer-based implementation for new buffers
+   * @warning This method may be called at most once; it will terminate the program if called
+   *          twice. It should be called before any OwnedImpl objects are created. The reason
+   *          is that it is unsafe to mix and match buffers with different implementations.
+   *          The move() method, in particular, only works if the source and destination
+   *          objects are using the same destination.
+   */
+  static void useOldImpl(bool use_old_impl);
+
+  /**
+   * Variant of useOldImpl that may be called repeatedly to switch between the
+   * old and new implementations (for use in test code only).
+   * @param use_old_impl whether to use the evbuffer-based implementation for new buffers.
+   */
+  static void useOldImplForTest(bool use_old_impl);
 
 private:
-  static bool shouldUseOldImpl();
-
   /** Whether to use the old evbuffer implementation when constructing new OwnedImpl objects. */
-  static bool use_old_impl_for_test_;
+  static bool use_old_impl_;
 
   /** Whether this buffer uses the old evbuffer implementation. */
   bool old_impl_;
@@ -523,7 +542,7 @@ private:
   /** Sum of the dataSize of all slices. */
   uint64_t length_{0};
 
-  /** Used when use_old_impl_==true */
+  /** Used when old_impl_==true */
   Event::Libevent::BufferPtr buffer_;
 };
 

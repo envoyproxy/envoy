@@ -198,12 +198,13 @@ TEST_F(OptionsImplTest, OptionsAreInSyncWithProto) {
   Server::CommandLineOptionsPtr command_line_options = options->toCommandLineOptions();
   // Failure of this condition indicates that the server_info proto is not in sync with the options.
   // If an option is added/removed, please update server_info proto as well to keep it in sync.
-  // Currently the following 4 options are not defined in proto, hence the count differs by 4.
+  // Currently the following 5 options are not defined in proto, hence the count differs by 5.
   // 1. v2-config-only - being deprecated.
   // 2. version        - default TCLAP argument.
   // 3. help           - default TCLAP argument.
   // 4. ignore_rest    - default TCLAP argument.
-  EXPECT_EQ(options->count() - 4, command_line_options->GetDescriptor()->field_count());
+  // 5. use-libevent-buffers  - short-term override for rollout of new buffer implementation.
+  EXPECT_EQ(options->count() - 5, command_line_options->GetDescriptor()->field_count());
 }
 
 TEST_F(OptionsImplTest, BadCliOption) {

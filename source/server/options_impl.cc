@@ -121,6 +121,9 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
   TCLAP::SwitchArg enable_mutex_tracing(
       "", "enable-mutex-tracing", "Enable mutex contention tracing functionality", cmd, false);
 
+  TCLAP::SwitchArg use_libevent_buffer(
+      "", "use-libevent-buffers", "Use the original libevent buffer implementation", cmd, false);
+
   cmd.setExceptionHandling(false);
   try {
     cmd.parse(argc, argv);
@@ -157,6 +160,8 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
   hot_restart_disabled_ = disable_hot_restart.getValue();
 
   mutex_tracing_enabled_ = enable_mutex_tracing.getValue();
+
+  libevent_buffer_enabled_ = use_libevent_buffer.getValue();
 
   log_level_ = default_log_level;
   for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_names); i++) {

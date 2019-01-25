@@ -625,7 +625,7 @@ Api::SysCallIntResult OwnedImpl::write(int fd) {
   }
 }
 
-OwnedImpl::OwnedImpl() : old_impl_(shouldUseOldImpl()) {
+OwnedImpl::OwnedImpl() : old_impl_(use_old_impl_) {
   if (old_impl_) {
     buffer_ = evbuffer_new();
   }
@@ -676,15 +676,19 @@ std::string OwnedImpl::toString() const {
 
 void OwnedImpl::postProcess() {}
 
-bool OwnedImpl::shouldUseOldImpl() {
-  if (use_old_impl_for_test_) {
-    return true;
+void OwnedImpl::useOldImpl(bool use_old_impl) {
+  static bool called_already = false;
+  if (use_old_impl != use_old_impl_) {
+    RELEASE_ASSERT(!called_already,
+                   "It is unsafe to change the buffer implementation without a restart");
+    use_old_impl_ = use_old_impl;
   }
-  // TODO determine whether to use the old impl based on a runtime flag.
-  return false;
+  called_already = true;
 }
 
-bool OwnedImpl::use_old_impl_for_test_ = false;
+void OwnedImpl::useOldImplForTest(bool use_old_impl) { use_old_impl_ = use_old_impl; }
+
+bool OwnedImpl::use_old_impl_ = false;
 
 } // namespace Buffer
 } // namespace Envoy

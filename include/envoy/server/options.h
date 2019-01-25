@@ -175,6 +175,11 @@ public:
   virtual bool mutexTracingEnabled() const PURE;
 
   /**
+   * @return whether to use the old libevent evbuffer-based Buffer implementation.
+   */
+  virtual bool libeventBufferEnabled() const PURE;
+
+  /**
    * Converts the Options in to CommandLineOptions proto message defined in server_info.proto.
    * @return CommandLineOptionsPtr the protobuf representation of the options.
    */

@@ -20,6 +20,7 @@
 
 #include "common/api/api_impl.h"
 #include "common/api/os_sys_calls_impl.h"
+#include "common/buffer/buffer_impl.h"
 #include "common/common/mutex_tracer_impl.h"
 #include "common/common/utility.h"
 #include "common/common/version.h"
@@ -223,6 +224,12 @@ void InstanceImpl::initialize(Options& options,
   ENVOY_LOG(info, "  transport_sockets.upstream: {}",
             Registry::FactoryRegistry<
                 Configuration::UpstreamTransportSocketConfigFactory>::allFactoryNames());
+
+  // If the old buffer implementation has been specified via command-line arg, switch it on
+  // early in the initialization, before any buffers can be created.
+  if (options.libeventBufferEnabled()) {
+    Buffer::OwnedImpl::useOldImpl(true);
+  }
 
   // Handle configuration that needs to take place prior to the main configuration load.
   InstanceUtil::loadBootstrapConfig(bootstrap_, options);
