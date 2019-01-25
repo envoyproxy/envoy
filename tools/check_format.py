@@ -524,25 +524,6 @@ def checkFormatReturnTraceOnError(file_path):
     return traceback.format_exc().split("\n")
 
 
-def checkFormatVisitor(arg, dir_name, names):
-  """Run checkFormat in parallel for the given files.
-
-  Args:
-    arg: a tuple (pool, result_list) for starting tasks asynchronously.
-    dir_name: the parent directory of the given files.
-    names: a list of file names.
-  """
-
-  # Unpack the multiprocessing.Pool process pool and list of results. Since
-  # python lists are passed as references, this is used to collect the list of
-  # async results (futures) from running checkFormat and passing them back to
-  # the caller.
-  pool, result_list = arg
-  for file_name in names:
-    result = pool.apply_async(checkFormatReturnTraceOnError, args=(dir_name + "/" + file_name,))
-    result_list.append(result)
-
-
 # checkErrorMessages iterates over the list with error messages and prints
 # errors and returns a bool based on whether there were any errors.
 def checkErrorMessages(error_messages):
@@ -599,7 +580,10 @@ if __name__ == "__main__":
     results = []
     # For each file in target_path, start a new task in the pool and collect the
     # results (results is passed by reference, and is used as an output).
-    os.walk(target_path, checkFormatVisitor, (pool, results))
+    for root, dirs, files in os.walk(target_path):
+      for file in files:
+        result = pool.apply_async(checkFormatReturnTraceOnError, args=(os.path.join(root, file),))
+        results.append(result)
 
     # Close the pool to new tasks, wait for all of the running tasks to finish,
     # then collect the error messages.
