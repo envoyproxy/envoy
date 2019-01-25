@@ -11,10 +11,11 @@
 namespace Envoy {
 namespace Event {
 
-// Represents a simulated time system, where time is advanced by calling
-// sleep(), setSystemTime(), or setMonotonicTime(). systemTime() and
-// monotonicTime() are maintained in the class, and alarms are fired in response
-// to adjustments in time.
+// Implements a simulated time system including a scheduler for timers. This is
+// designed to be used as as the exclusive time-system resident in a process at
+// any particular time, and as such should not be instantiated directly by
+// tests. Instead it should be instantied via SimulatedTimeSystem, declared
+// below.
 class SimulatedTimeSystemHelper : public TestTimeSystem {
 public:
   SimulatedTimeSystemHelper();
@@ -98,6 +99,10 @@ private:
   std::atomic<uint32_t> pending_alarms_;
 };
 
+// Represents a simulated time system, where time is advanced by calling
+// sleep(), setSystemTime(), or setMonotonicTime(). systemTime() and
+// monotonicTime() are maintained in the class, and alarms are fired in response
+// to adjustments in time.
 class SimulatedTimeSystem : public DelegatingTestTimeSystem<SimulatedTimeSystemHelper> {
 public:
   void setMonotonicTime(const MonotonicTime& monotonic_time) {
