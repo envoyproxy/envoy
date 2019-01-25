@@ -62,7 +62,7 @@ export BAZEL="bazel"
 # Not sandboxing, since non-privileged Docker can't do nested namespaces.
 BAZEL_OPTIONS="--package_path %workspace%:${ENVOY_SRCDIR}"
 export BAZEL_QUERY_OPTIONS="${BAZEL_OPTIONS}"
-export BAZEL_BUILD_OPTIONS="--action_env=/bin:/usr/bin:/usr/lib/llvm-7/bin --linkopt=-fuse-ld=lld \
+export BAZEL_BUILD_OPTIONS="--action_env=PATH=/bin:/usr/bin:/usr/lib/llvm-7/bin --linkopt=-fuse-ld=lld \
   --strategy=Genrule=standalone --spawn_strategy=standalone \
   --verbose_failures ${BAZEL_OPTIONS} --action_env=HOME --action_env=PYTHONUSERBASE \
   --jobs=${NUM_CPUS} --show_task_finish ${BAZEL_BUILD_EXTRA_OPTIONS}"
