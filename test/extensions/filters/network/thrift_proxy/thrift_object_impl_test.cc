@@ -165,10 +165,10 @@ TEST_F(ThriftObjectImplTest, ParseEmptyStruct) {
 class ThriftObjectImplValueTest : public ThriftObjectImplTestBase,
                                   public TestWithParam<FieldType> {};
 
-INSTANTIATE_TEST_CASE_P(PrimitiveFieldTypes, ThriftObjectImplValueTest,
-                        Values(FieldType::Bool, FieldType::Byte, FieldType::Double, FieldType::I16,
-                               FieldType::I32, FieldType::I64, FieldType::String),
-                        fieldTypeParamToString);
+INSTANTIATE_TEST_SUITE_P(PrimitiveFieldTypes, ThriftObjectImplValueTest,
+                         Values(FieldType::Bool, FieldType::Byte, FieldType::Double, FieldType::I16,
+                                FieldType::I32, FieldType::I64, FieldType::String),
+                         fieldTypeParamToString);
 
 // Test parsing a struct with a single field with a simple value.
 TEST_P(ThriftObjectImplValueTest, ParseSingleValueStruct) {
