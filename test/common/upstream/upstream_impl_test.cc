@@ -14,6 +14,7 @@
 #include "common/json/config_schemas.h"
 #include "common/json/json_loader.h"
 #include "common/network/utility.h"
+#include "common/singleton/manager_impl.h"
 #include "common/upstream/upstream_impl.h"
 
 #include "server/transport_socket_config_impl.h"
@@ -130,6 +131,8 @@ TEST_P(StrictDnsParamTest, ImmediateResolve) {
   ReadyWatcher initialized;
   NiceMock<Runtime::MockRandomGenerator> random;
   NiceMock<Server::MockAdmin> admin;
+  Singleton::ManagerImpl singleton_manager{Thread::threadFactoryForTest().currentThreadId()};
+  NiceMock<ThreadLocal::MockInstance> tls;
   const std::string json = R"EOF(
   {
     "name": "name",
@@ -154,7 +157,8 @@ TEST_P(StrictDnsParamTest, ImmediateResolve) {
       "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                             : cluster_config.alt_stat_name()));
   Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-      admin, ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats);
+      admin, ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats,
+      singleton_manager, tls);
 
   StrictDnsClusterImpl cluster(cluster_config, runtime, dns_resolver, factory_context,
                                std::move(scope), false);
@@ -173,6 +177,8 @@ public:
   NiceMock<Runtime::MockRandomGenerator> random;
   NiceMock<Server::MockAdmin> admin;
   NiceMock<Event::MockDispatcher> dispatcher;
+  Singleton::ManagerImpl singleton_manager{Thread::threadFactoryForTest().currentThreadId()};
+  NiceMock<ThreadLocal::MockInstance> tls;
   std::shared_ptr<Network::MockDnsResolver> dns_resolver =
       std::make_shared<Network::MockDnsResolver>();
 };
@@ -195,7 +201,8 @@ TEST_F(StrictDnsClusterImplTest, ZeroHostsHealthChecker) {
       "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                             : cluster_config.alt_stat_name()));
   Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-      admin, ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats);
+      admin, ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats,
+      singleton_manager, tls);
   StrictDnsClusterImpl cluster(cluster_config, runtime, dns_resolver, factory_context,
                                std::move(scope), false);
   std::shared_ptr<MockHealthChecker> health_checker(new MockHealthChecker());
@@ -253,7 +260,8 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
       "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                             : cluster_config.alt_stat_name()));
   Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-      admin, ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats);
+      admin, ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats,
+      singleton_manager, tls);
   StrictDnsClusterImpl cluster(cluster_config, runtime, dns_resolver, factory_context,
                                std::move(scope), false);
   EXPECT_CALL(runtime.snapshot_, getInteger("circuit_breakers.name.default.max_connections", 43));
@@ -368,7 +376,8 @@ TEST_F(StrictDnsClusterImplTest, HostRemovalActiveHealthSkipped) {
       "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                             : cluster_config.alt_stat_name()));
   Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-      admin, ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats);
+      admin, ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats,
+      singleton_manager, tls);
   StrictDnsClusterImpl cluster(cluster_config, runtime, dns_resolver, factory_context,
                                std::move(scope), false);
   std::shared_ptr<MockHealthChecker> health_checker(new MockHealthChecker());
@@ -468,7 +477,8 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
       "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                             : cluster_config.alt_stat_name()));
   Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-      admin, ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats);
+      admin, ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats,
+      singleton_manager, tls);
   StrictDnsClusterImpl cluster(cluster_config, runtime, dns_resolver, factory_context,
                                std::move(scope), false);
 
@@ -687,7 +697,8 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasicMultiplePriorities) {
       "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                             : cluster_config.alt_stat_name()));
   Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-      admin, ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats);
+      admin, ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats,
+      singleton_manager, tls);
   StrictDnsClusterImpl cluster(cluster_config, runtime, dns_resolver, factory_context,
                                std::move(scope), false);
   ReadyWatcher membership_updated;
@@ -847,6 +858,8 @@ public:
   NiceMock<Runtime::MockRandomGenerator> random;
   NiceMock<Server::MockAdmin> admin;
   NiceMock<MockClusterManager> cm;
+  Singleton::ManagerImpl singleton_manager{Thread::threadFactoryForTest().currentThreadId()};
+  NiceMock<ThreadLocal::MockInstance> tls;
 };
 
 TEST_F(StaticClusterImplTest, InitialHosts) {
@@ -866,7 +879,8 @@ TEST_F(StaticClusterImplTest, InitialHosts) {
       "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                             : cluster_config.alt_stat_name()));
   Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-      admin, ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats);
+      admin, ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats,
+      singleton_manager, tls);
   StaticClusterImpl cluster(cluster_config, runtime, factory_context, std::move(scope), false);
   cluster.initialize([] {});
 
@@ -891,7 +905,8 @@ TEST_F(StaticClusterImplTest, EmptyHostname) {
       "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                             : cluster_config.alt_stat_name()));
   Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-      admin, ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats);
+      admin, ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats,
+      singleton_manager, tls);
   StaticClusterImpl cluster(cluster_config, runtime, factory_context, std::move(scope), false);
   cluster.initialize([] {});
 
@@ -925,7 +940,8 @@ TEST_F(StaticClusterImplTest, LoadAssignmentEmptyHostname) {
       "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                             : cluster_config.alt_stat_name()));
   Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-      admin, ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats);
+      admin, ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats,
+      singleton_manager, tls);
   StaticClusterImpl cluster(cluster_config, runtime, factory_context, std::move(scope), false);
   cluster.initialize([] {});
 
@@ -976,7 +992,8 @@ TEST_F(StaticClusterImplTest, LoadAssignmentMultiplePriorities) {
       "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                             : cluster_config.alt_stat_name()));
   Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-      admin, ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats);
+      admin, ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats,
+      singleton_manager, tls);
   StaticClusterImpl cluster(cluster_config, runtime, factory_context, std::move(scope), false);
   cluster.initialize([] {});
 
@@ -1020,7 +1037,8 @@ TEST_F(StaticClusterImplTest, LoadAssignmentLocality) {
       "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                             : cluster_config.alt_stat_name()));
   Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-      admin, ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats);
+      admin, ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats,
+      singleton_manager, tls);
   StaticClusterImpl cluster(cluster_config, runtime, factory_context, std::move(scope), false);
   cluster.initialize([] {});
 
@@ -1051,7 +1069,8 @@ TEST_F(StaticClusterImplTest, AltStatName) {
       "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                             : cluster_config.alt_stat_name()));
   Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-      admin, ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats);
+      admin, ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats,
+      singleton_manager, tls);
   StaticClusterImpl cluster(cluster_config, runtime, factory_context, std::move(scope), false);
   cluster.initialize([] {});
   // Increment a stat and verify it is emitted with alt_stat_name
@@ -1075,7 +1094,8 @@ TEST_F(StaticClusterImplTest, RingHash) {
       "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                             : cluster_config.alt_stat_name()));
   Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-      admin, ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats);
+      admin, ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats,
+      singleton_manager, tls);
   StaticClusterImpl cluster(cluster_config, runtime, factory_context, std::move(scope), true);
   cluster.initialize([] {});
 
@@ -1101,7 +1121,8 @@ TEST_F(StaticClusterImplTest, OutlierDetector) {
       "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                             : cluster_config.alt_stat_name()));
   Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-      admin, ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats);
+      admin, ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats,
+      singleton_manager, tls);
   StaticClusterImpl cluster(cluster_config, runtime, factory_context, std::move(scope), false);
 
   Outlier::MockDetector* detector = new Outlier::MockDetector();
@@ -1149,7 +1170,8 @@ TEST_F(StaticClusterImplTest, HealthyStat) {
       "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                             : cluster_config.alt_stat_name()));
   Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-      admin, ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats);
+      admin, ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats,
+      singleton_manager, tls);
   StaticClusterImpl cluster(cluster_config, runtime, factory_context, std::move(scope), false);
 
   Outlier::MockDetector* outlier_detector = new NiceMock<Outlier::MockDetector>();
@@ -1280,7 +1302,8 @@ TEST_F(StaticClusterImplTest, UrlConfig) {
       "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                             : cluster_config.alt_stat_name()));
   Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-      admin, ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats);
+      admin, ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats,
+      singleton_manager, tls);
   StaticClusterImpl cluster(cluster_config, runtime, factory_context, std::move(scope), false);
   cluster.initialize([] {});
 
@@ -1327,7 +1350,8 @@ TEST_F(StaticClusterImplTest, UnsupportedLBType) {
                                                              ? cluster_config.name()
                                                              : cluster_config.alt_stat_name()));
         Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-            admin, ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats);
+            admin, ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats,
+            singleton_manager, tls);
         StaticClusterImpl(cluster_config, runtime, factory_context, std::move(scope), false);
       },
       EnvoyException,
@@ -1351,7 +1375,8 @@ TEST_F(StaticClusterImplTest, MalformedHostIP) {
       "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                             : cluster_config.alt_stat_name()));
   Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-      admin, ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats);
+      admin, ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats,
+      singleton_manager, tls);
   EXPECT_THROW_WITH_MESSAGE(
       StaticClusterImpl(cluster_config, runtime, factory_context, std::move(scope), false),
       EnvoyException,
@@ -1402,7 +1427,8 @@ TEST_F(StaticClusterImplTest, SourceAddressPriority) {
     Envoy::Stats::ScopePtr scope = stats.createScope(fmt::format(
         "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-        admin, ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats);
+        admin, ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats,
+        singleton_manager, tls);
     StaticClusterImpl cluster(config, runtime, factory_context, std::move(scope), false);
     EXPECT_EQ("1.2.3.5:0", cluster.info()->sourceAddress()->asString());
   }
@@ -1414,7 +1440,8 @@ TEST_F(StaticClusterImplTest, SourceAddressPriority) {
     Envoy::Stats::ScopePtr scope = stats.createScope(fmt::format(
         "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-        admin, ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats);
+        admin, ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats,
+        singleton_manager, tls);
     StaticClusterImpl cluster(config, runtime, factory_context, std::move(scope), false);
     EXPECT_EQ(cluster_address, cluster.info()->sourceAddress()->ip()->addressAsString());
   }
@@ -1425,7 +1452,8 @@ TEST_F(StaticClusterImplTest, SourceAddressPriority) {
     Envoy::Stats::ScopePtr scope = stats.createScope(fmt::format(
         "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-        admin, ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats);
+        admin, ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats,
+        singleton_manager, tls);
     StaticClusterImpl cluster(config, runtime, factory_context, std::move(scope), false);
     EXPECT_EQ(cluster_address, cluster.info()->sourceAddress()->ip()->addressAsString());
   }
@@ -1443,6 +1471,8 @@ TEST(ClusterImplTest, CloseConnectionsOnHostHealthFailure) {
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   NiceMock<Runtime::MockRandomGenerator> random;
   NiceMock<Server::MockAdmin> admin;
+  Singleton::ManagerImpl singleton_manager{Thread::threadFactoryForTest().currentThreadId()};
+  NiceMock<ThreadLocal::MockInstance> tls;
   ReadyWatcher initialized;
 
   const std::string yaml = R"EOF(
@@ -1458,7 +1488,8 @@ TEST(ClusterImplTest, CloseConnectionsOnHostHealthFailure) {
       "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                             : cluster_config.alt_stat_name()));
   Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-      admin, ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats);
+      admin, ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats,
+      singleton_manager, tls);
 
   StrictDnsClusterImpl cluster(cluster_config, runtime, dns_resolver, factory_context,
                                std::move(scope), false);
@@ -1530,7 +1561,8 @@ public:
                                                                ? cluster_config_.name()
                                                                : cluster_config_.alt_stat_name()));
     factory_context_ = std::make_unique<Server::Configuration::TransportSocketFactoryContextImpl>(
-        admin_, ssl_context_manager_, *scope_, cm_, local_info_, dispatcher_, random_, stats_);
+        admin_, ssl_context_manager_, *scope_, cm_, local_info_, dispatcher_, random_, stats_,
+        singleton_manager_, tls_);
 
     return std::make_unique<StrictDnsClusterImpl>(cluster_config_, runtime_, dns_resolver_,
                                                   *factory_context_, std::move(scope_), false);
@@ -1545,6 +1577,8 @@ public:
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   NiceMock<Server::MockAdmin> admin_;
+  Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest().currentThreadId()};
+  NiceMock<ThreadLocal::MockInstance> tls_;
   ReadyWatcher initialized_;
   envoy::api::v2::Cluster cluster_config_;
   Envoy::Stats::ScopePtr scope_;

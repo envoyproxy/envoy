@@ -197,7 +197,7 @@ public:
   void expectStatementTypeAndTableAccessMap(const hsql::SQLParserResult& result,
                                             hsql::StatementType statement_type,
                                             const hsql::TableAccessMap& expected_table_access_map) {
-    EXPECT_EQ(true, result.isValid());
+    EXPECT_TRUE(result.isValid());
     EXPECT_EQ(1UL, result.size());
     EXPECT_EQ(statement_type, result.getStatement(0)->type());
     hsql::TableAccessMap table_access_map;

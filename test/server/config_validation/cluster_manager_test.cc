@@ -3,6 +3,7 @@
 
 #include "common/api/api_impl.h"
 #include "common/http/context_impl.h"
+#include "common/singleton/manager_impl.h"
 
 #include "server/config_validation/cluster_manager.h"
 
@@ -39,10 +40,11 @@ TEST(ValidationClusterManagerTest, MockedMethods) {
   NiceMock<Server::MockAdmin> admin;
   Http::ContextImpl http_context;
   AccessLog::MockAccessLogManager log_manager;
+  Singleton::ManagerImpl singleton_manager{Thread::threadFactoryForTest().currentThreadId()};
 
-  ValidationClusterManagerFactory factory(admin, runtime, stats_store, tls, random, dns_resolver,
-                                          ssl_context_manager, dispatcher, local_info,
-                                          secret_manager, *api, http_context, log_manager);
+  ValidationClusterManagerFactory factory(
+      admin, runtime, stats_store, tls, random, dns_resolver, ssl_context_manager, dispatcher,
+      local_info, secret_manager, *api, http_context, log_manager, singleton_manager);
 
   const envoy::config::bootstrap::v2::Bootstrap bootstrap;
   ClusterManagerPtr cluster_manager = factory.clusterManagerFromProto(bootstrap);
