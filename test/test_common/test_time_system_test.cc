@@ -36,7 +36,7 @@ TEST_F(TestTimeSystemTest, SimThenRealSerial) {
 
 TEST_F(TestTimeSystemTest, RealThenSim) {
   DangerousDeprecatedTestTime t1;
-  EXPECT_DEATH_LOG_TO_STDERR( { SimulatedTimeSystem t2; },
+  EXPECT_DEATH_LOG_TO_STDERR({ SimulatedTimeSystem t2; },
                              ".*Two different types of time-systems allocated.*");
 }
 
