@@ -15,6 +15,7 @@
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
+#include "common/network/io_socket_handle_impl.h"
 
 namespace Envoy {
 namespace Network {
@@ -132,7 +133,7 @@ InstanceConstSharedPtr peerAddressFromFd(int fd) {
   return addressFromSockAddr(ss, ss_len);
 }
 
-int InstanceBase::socketFromSocketType(SocketType socketType) const {
+IoHandlePtr InstanceBase::socketFromSocketType(SocketType socketType) const {
 #if defined(__APPLE__)
   int flags = 0;
 #else
@@ -159,15 +160,15 @@ int InstanceBase::socketFromSocketType(SocketType socketType) const {
     domain = AF_UNIX;
   }
 
-  int fd = ::socket(domain, flags, 0);
-  RELEASE_ASSERT(fd != -1, "");
+  IoHandlePtr io_handle = std::make_unique<IoSocketHandle>(::socket(domain, flags, 0));
+  RELEASE_ASSERT(io_handle->fd() != -1, "");
 
 #ifdef __APPLE__
   // Cannot set SOCK_NONBLOCK as a ::socket flag.
-  RELEASE_ASSERT(fcntl(fd, F_SETFL, O_NONBLOCK) != -1, "");
+  RELEASE_ASSERT(fcntl(io_handle->fd(), F_SETFL, O_NONBLOCK) != -1, "");
 #endif
 
-  return fd;
+  return io_handle;
 }
 
 Ipv4Instance::Ipv4Instance(const sockaddr_in* address) : InstanceBase(Type::Ip) {
@@ -227,7 +228,7 @@ Api::SysCallIntResult Ipv4Instance::connect(int fd) const {
   return {rc, errno};
 }
 
-int Ipv4Instance::socket(SocketType type) const { return socketFromSocketType(type); }
+IoHandlePtr Ipv4Instance::socket(SocketType type) const { return socketFromSocketType(type); }
 
 std::string Ipv4Instance::sockaddrToString(const sockaddr_in& addr) {
   static constexpr size_t BufferSize = 16; // enough space to hold an IPv4 address in string form
@@ -318,12 +319,13 @@ Api::SysCallIntResult Ipv6Instance::connect(int fd) const {
   return {rc, errno};
 }
 
-int Ipv6Instance::socket(SocketType type) const {
-  const int fd = socketFromSocketType(type);
-  // Setting IPV6_V6ONLY restricts the IPv6 socket to IPv6 connections only.
+IoHandlePtr Ipv6Instance::socket(SocketType type) const {
+  IoHandlePtr io_handle = socketFromSocketType(type);
+  // Setting IPV6_V6ONLY resticts the IPv6 socket to IPv6 connections only.
   const int v6only = ip_.v6only_;
-  RELEASE_ASSERT(::setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, &v6only, sizeof(v6only)) != -1, "");
-  return fd;
+  RELEASE_ASSERT(
+      ::setsockopt(io_handle->fd(), IPPROTO_IPV6, IPV6_V6ONLY, &v6only, sizeof(v6only)) != -1, "");
+  return io_handle;
 }
 
 PipeInstance::PipeInstance(const sockaddr_un* address, socklen_t ss_len)
@@ -389,7 +391,7 @@ Api::SysCallIntResult PipeInstance::connect(int fd) const {
   return {rc, errno};
 }
 
-int PipeInstance::socket(SocketType type) const { return socketFromSocketType(type); }
+IoHandlePtr PipeInstance::socket(SocketType type) const { return socketFromSocketType(type); }
 
 } // namespace Address
 } // namespace Network

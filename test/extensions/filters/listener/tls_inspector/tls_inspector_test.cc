@@ -1,3 +1,5 @@
+#include "common/network/io_socket_handle_impl.h"
+
 #include "extensions/filters/listener/tls_inspector/tls_inspector.h"
 
 #include "test/extensions/filters/listener/tls_inspector/tls_utility.h"
@@ -28,13 +30,17 @@ namespace TlsInspector {
 
 class TlsInspectorTest : public testing::Test {
 public:
-  TlsInspectorTest() : cfg_(std::make_shared<Config>(store_)) {}
+  TlsInspectorTest()
+      : cfg_(std::make_shared<Config>(store_)),
+        io_handle_(std::make_unique<Network::IoSocketHandle>(42)) {}
+  ~TlsInspectorTest() { io_handle_->close(); }
 
   void init() {
     filter_ = std::make_unique<Filter>(cfg_);
+
     EXPECT_CALL(cb_, socket()).WillRepeatedly(ReturnRef(socket_));
     EXPECT_CALL(cb_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
-    EXPECT_CALL(socket_, fd()).WillRepeatedly(Return(42));
+    EXPECT_CALL(socket_, ioHandle()).WillRepeatedly(ReturnRef(*io_handle_));
 
     EXPECT_CALL(dispatcher_,
                 createFileEvent_(_, _, Event::FileTriggerType::Edge,
@@ -53,6 +59,7 @@ public:
   Network::MockConnectionSocket socket_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   Event::FileReadyCb file_event_callback_;
+  Network::IoHandlePtr io_handle_;
 };
 
 // Test that an exception is thrown for an invalid value for max_client_hello_size
