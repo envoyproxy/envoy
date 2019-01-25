@@ -6,9 +6,11 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/thread_local/thread_local.h"
-#include "absl/strings/string_view.h"
+
 #include "extensions/common/tap/admin.h"
 #include "extensions/filters/http/tap/tap_config.h"
+
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Extensions {

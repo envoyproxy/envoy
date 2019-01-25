@@ -1,5 +1,7 @@
 #pragma once
 
+#include <vector>
+
 #include "envoy/buffer/buffer.h"
 
 namespace Envoy {

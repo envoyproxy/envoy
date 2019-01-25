@@ -3,8 +3,9 @@
 #include "envoy/common/pure.h"
 #include "envoy/data/tap/v2alpha/wrapper.pb.h"
 #include "envoy/http/header_map.h"
-#include "absl/strings/string_view.h"
 #include "envoy/service/tap/v2alpha/common.pb.h"
+
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Extensions {
