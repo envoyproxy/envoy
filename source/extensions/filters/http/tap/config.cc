@@ -35,9 +35,7 @@ Http::FilterFactoryCb TapFilterFactory::createFilterFactoryFromProtoTyped(
 /**
  * Static registration for the tap filter. @see RegisterFactory.
  */
-static Registry::RegisterFactory<TapFilterFactory,
-                                 Server::Configuration::NamedHttpFilterConfigFactory>
-    register_;
+REGISTER_FACTORY(TapFilterFactory, Server::Configuration::NamedHttpFilterConfigFactory);
 
 } // namespace TapFilter
 } // namespace HttpFilters

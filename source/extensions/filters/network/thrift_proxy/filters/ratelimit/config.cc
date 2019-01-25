@@ -48,9 +48,7 @@ RateLimitFilterConfig::createFilterFactoryFromProtoTyped(
 /**
  * Static registration for the rate limit filter. @see RegisterFactory.
  */
-static Registry::RegisterFactory<RateLimitFilterConfig,
-                                 ThriftProxy::ThriftFilters::NamedThriftFilterConfigFactory>
-    register_;
+REGISTER_FACTORY(RateLimitFilterConfig, ThriftProxy::ThriftFilters::NamedThriftFilterConfigFactory);
 
 } // namespace RateLimitFilter
 } // namespace ThriftFilters
