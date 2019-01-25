@@ -121,6 +121,8 @@ cc_library(
         "quiche/quic/platform/api/quic_iovec.h",
         "quiche/quic/platform/api/quic_string.h",
         "quiche/quic/platform/api/quic_string_piece.h",
+        "quiche/quic/platform/api/quic_str_cat.h",
+        "quiche/quic/platform/api/quic_string_utils.h",
         # TODO: uncomment the following files as implementations are added.
         # "quiche/quic/platform/api/quic_bug_tracker.h",
         # "quiche/quic/platform/api/quic_client_stats.h",
@@ -152,8 +154,6 @@ cc_library(
         # "quiche/quic/platform/api/quic_sleep.h",
         # "quiche/quic/platform/api/quic_socket_address.h",
         # "quiche/quic/platform/api/quic_stack_trace.h",
-        # "quiche/quic/platform/api/quic_str_cat.h",
-        # "quiche/quic/platform/api/quic_string_utils.h",
         # "quiche/quic/platform/api/quic_test.h",
         # "quiche/quic/platform/api/quic_test_loopback.h",
         # "quiche/quic/platform/api/quic_test_mem_slice_vector.h",
