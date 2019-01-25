@@ -469,6 +469,8 @@ public:
   MOCK_METHOD0(stats, Stats::Store&());
   MOCK_METHOD1(setInitManager, void(Init::Manager&));
   MOCK_METHOD0(initManager, Init::Manager*());
+  MOCK_METHOD0(singletonManager, Singleton::Manager&());
+  MOCK_METHOD0(threadLocal, ThreadLocal::SlotAllocator&());
 
   std::unique_ptr<Secret::SecretManager> secret_manager_;
 };

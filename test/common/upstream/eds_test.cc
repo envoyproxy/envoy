@@ -4,6 +4,7 @@
 #include "envoy/stats/scope.h"
 
 #include "common/config/utility.h"
+#include "common/singleton/manager_impl.h"
 #include "common/upstream/eds.h"
 
 #include "server/transport_socket_config_impl.h"
@@ -60,7 +61,8 @@ protected:
         "cluster.{}.",
         eds_cluster_.alt_stat_name().empty() ? eds_cluster_.name() : eds_cluster_.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-        admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, random_, stats_);
+        admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, random_, stats_,
+        singleton_manager_, tls_);
     cluster_.reset(
         new EdsClusterImpl(eds_cluster_, runtime_, factory_context, std::move(scope), false));
     EXPECT_EQ(Cluster::InitializePhase::Secondary, cluster_->initializePhase());
@@ -76,6 +78,8 @@ protected:
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Server::MockAdmin> admin_;
+  Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest().currentThreadId()};
+  NiceMock<ThreadLocal::MockInstance> tls_;
 };
 
 class EdsWithHealthCheckUpdateTest : public EdsTest {
