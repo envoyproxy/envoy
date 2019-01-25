@@ -201,5 +201,6 @@ envoy_cc_test(
     deps = [
         ":simulated_time_system_lib",
         ":test_time_lib",
+        ":utility_lib",
     ],
 )

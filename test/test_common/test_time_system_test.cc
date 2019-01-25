@@ -1,6 +1,7 @@
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/test_time_system.h"
+#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
@@ -24,7 +25,8 @@ TEST_F(TestTimeSystemTest, TwoRealsSameReference) {
 
 TEST_F(TestTimeSystemTest, SimThenRealConflict) {
   SimulatedTimeSystem t1;
-  EXPECT_DEATH({ DangerousDeprecatedTestTime t2; }, "");
+  EXPECT_DEATH_LOG_TO_STDERR({ DangerousDeprecatedTestTime t2; },
+                             ".*Two different types of time-systems allocated.*");
 }
 
 TEST_F(TestTimeSystemTest, SimThenRealSerial) {
@@ -34,7 +36,8 @@ TEST_F(TestTimeSystemTest, SimThenRealSerial) {
 
 TEST_F(TestTimeSystemTest, RealThenSim) {
   DangerousDeprecatedTestTime t1;
-  EXPECT_DEATH({ SimulatedTimeSystem t2; }, "");
+  EXPECT_DEATH_LOG_TO_STDERR( { SimulatedTimeSystem t2; },
+                             ".*Two different types of time-systems allocated.*");
 }
 
 TEST_F(TestTimeSystemTest, RealThenSimSerial) {
