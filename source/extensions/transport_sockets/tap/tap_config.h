@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/network/connection.h"
+
 #include "extensions/common/tap/tap.h"
 
 namespace Envoy {
