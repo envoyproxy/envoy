@@ -24,8 +24,7 @@ TEST_F(TestTimeSystemTest, TwoRealsSameReference) {
 
 TEST_F(TestTimeSystemTest, SimThenRealConflict) {
   SimulatedTimeSystem t1;
-  EXPECT_DEATH({ DangerousDeprecatedTestTime t2; },
-               ".*Two different types of time-systems allocated");
+  EXPECT_DEATH({ DangerousDeprecatedTestTime t2; }, "");
 }
 
 TEST_F(TestTimeSystemTest, SimThenRealSerial) {
@@ -35,7 +34,7 @@ TEST_F(TestTimeSystemTest, SimThenRealSerial) {
 
 TEST_F(TestTimeSystemTest, RealThenSim) {
   DangerousDeprecatedTestTime t1;
-  EXPECT_DEATH({ SimulatedTimeSystem t2; }, ".*Two different types of time-systems allocated");
+  EXPECT_DEATH({ SimulatedTimeSystem t2; }, "");
 }
 
 TEST_F(TestTimeSystemTest, RealThenSimSerial) {
