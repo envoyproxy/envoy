@@ -208,6 +208,12 @@ public:
 private:
   std::unordered_set<Grpc::Status::GrpcStatus, Grpc::GrpcStatusHash> statuses_;
   bool exclude_;
+
+  /**
+   * Converts between the config version of gRPC code and the code version of a gRPC code.
+   */
+  Grpc::Status::GrpcStatus
+  cfgToGrpcStatus(envoy::config::filter::accesslog::v2::GrpcStatusFilter_Status status) const;
 };
 
 /**

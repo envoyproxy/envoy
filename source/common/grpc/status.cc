@@ -88,37 +88,6 @@ uint64_t Utility::grpcToHttpStatus(Status::GrpcStatus grpc_status) {
   }
 }
 
-absl::optional<Status::GrpcStatus> Utility::nameToGrpcStatus(const std::string& grpc_status_name) {
-  // If the enum located in //include/envoy/grpc/status.h is changed, then this enum must also be
-  // updated.
-  const static std::unordered_map<std::string, Status::GrpcStatus> status_map({
-      {"OK", Status::GrpcStatus::Ok},
-      {"CANCELED", Status::GrpcStatus::Canceled},
-      {"UNKNOWN", Status::GrpcStatus::Unknown},
-      {"INVALID_ARGUMENT", Status::GrpcStatus::InvalidArgument},
-      {"DEADLINE_EXCEEDED", Status::GrpcStatus::DeadlineExceeded},
-      {"NOT_FOUND", Status::GrpcStatus::NotFound},
-      {"ALREADY_EXISTS", Status::GrpcStatus::AlreadyExists},
-      {"PERMISSION_DENIED", Status::GrpcStatus::PermissionDenied},
-      {"RESOURCE_EXHAUSTED", Status::GrpcStatus::ResourceExhausted},
-      {"FAILED_PRECONDITION", Status::GrpcStatus::FailedPrecondition},
-      {"ABORTED", Status::GrpcStatus::Aborted},
-      {"OUT_OF_RANGE", Status::GrpcStatus::OutOfRange},
-      {"UNIMPLEMENTED", Status::GrpcStatus::Unimplemented},
-      {"INTERNAL", Status::GrpcStatus::Internal},
-      {"UNAVAILABLE", Status::GrpcStatus::Unavailable},
-      {"DATA_LOSS", Status::GrpcStatus::DataLoss},
-      {"UNAUTHENTICATED", Status::GrpcStatus::Unauthenticated},
-  });
-
-  const auto it = status_map.find(grpc_status_name);
-  if (it == status_map.end()) {
-    return absl::nullopt;
-  } else {
-    return absl::optional<Status::GrpcStatus>(it->second);
-  }
-}
-
 size_t GrpcStatusHash::operator()(const Status::GrpcStatus status) const {
   return static_cast<size_t>(status);
 }

@@ -131,12 +131,3 @@ envoy_cc_test_library(
         "@envoy_api//envoy/api/v2/core:grpc_service_cc",
     ],
 )
-
-envoy_cc_test(
-    name = "status_test",
-    srcs = ["status_test.cc"],
-    deps = [
-        "//include/envoy/grpc:status",
-        "//source/common/grpc:status_lib",
-    ],
-)

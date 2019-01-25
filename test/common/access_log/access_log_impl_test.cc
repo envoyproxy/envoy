@@ -924,6 +924,18 @@ typed_config:
 }
 
 TEST_F(AccessLogImplTest, GrpcStatusFilterValues) {
+  const std::string yaml_prefix = R"EOF(
+name: envoy.file_access_log
+filter:
+  grpc_status_filter:
+    statuses:
+      - )EOF";
+
+  const std::string yaml_suffix = R"EOF(
+config:
+  path: /dev/null
+  )EOF";
+
   const std::vector<std::string> valid_statuses = {
       "OK",
       "CANCELED",
@@ -944,25 +956,25 @@ TEST_F(AccessLogImplTest, GrpcStatusFilterValues) {
       "UNAUTHENTICATED",
   };
 
-  std::ostringstream out;
-  out << R"EOF(
-name: envoy.file_access_log
-filter:
-  grpc_status_filter:
-    statuses:
-)EOF";
-
-  for (const auto& valid_status : valid_statuses) {
-    out << "      - " << valid_status << std::endl;
+  const size_t maxValid = static_cast<size_t>(Grpc::Status::GrpcStatus::MaximumValid);
+  if (maxValid != valid_statuses.size() - 1) {
+    FAIL() << "Mismatch in number of gRPC statuses, GrpcStatus has " << (maxValid + 1)
+           << ", valid_statuses has " << valid_statuses.size() << ".";
   }
 
-  out << R"EOF(config:
-  path: /dev/null
-  )EOF";
+  std::ostringstream out;
+  for (size_t i = 0; i < valid_statuses.size(); i++) {
+    out << yaml_prefix << valid_statuses[i] << yaml_suffix;
 
-  // We expect that if any of the statuses in valid_statuses are invalid, that this line will throw
-  // an error.
-  AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(out.str()), context_);
+    EXPECT_CALL(*file_, write(_));
+
+    InstanceSharedPtr log =
+        AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(out.str()), context_);
+
+    response_trailers_.addCopy(Http::Headers::get().GrpcStatus, std::to_string(i));
+    log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+    response_trailers_.remove(Http::Headers::get().GrpcStatus);
+  }
 }
 
 TEST_F(AccessLogImplTest, GrpcStatusFilterUnsupportedValue) {
@@ -977,35 +989,12 @@ config:
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
-      AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_),
-      ProtoValidationException,
-      "Proto constraint validation failed (AccessLogFilterValidationError.GrpcStatusFilter: "
-      "[\"embedded message failed validation\"] | caused by "
-      "GrpcStatusFilterValidationError.Statuses[i]: [\"value must be in list \" [\"OK\" "
-      "\"CANCELED\" \"UNKNOWN\" \"INVALID_ARGUMENT\" \"DEADLINE_EXCEEDED\" \"NOT_FOUND\" "
-      "\"ALREADY_EXISTS\" \"PERMISSION_DENIED\" \"RESOURCE_EXHAUSTED\" \"FAILED_PRECONDITION\" "
-      "\"ABORTED\" \"OUT_OF_RANGE\" \"UNIMPLEMENTED\" \"INTERNAL\" \"UNAVAILABLE\" \"DATA_LOSS\" "
-      "\"UNAUTHENTICATED\"]]): grpc_status_filter {\n  statuses: \"NOT_A_VALID_CODE\"\n}\n");
-}
-
-TEST_F(AccessLogImplTest, GrpcStatusFilterPass) {
-  const std::string yaml = R"EOF(
-name: envoy.file_access_log
-filter:
-  grpc_status_filter:
-    statuses:
-      - OK
-config:
-  path: /dev/null
-  )EOF";
-
-  const InstanceSharedPtr log =
-      AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
-
-  response_trailers_.addCopy(Http::Headers::get().GrpcStatus, "0");
-
-  EXPECT_CALL(*file_, write(_));
-  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+      AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_), EnvoyException,
+      "Unable to parse JSON as proto (INVALID_ARGUMENT:(filter.grpc_status_filter.statuses[0]): "
+      "invalid value \"NOT_A_VALID_CODE\" for type TYPE_ENUM): "
+      "{\"config\":{\"path\":\"/dev/"
+      "null\"},\"filter\":{\"grpc_status_filter\":{\"statuses\":[\"NOT_A_VALID_CODE\"]}},\"name\":"
+      "\"envoy.file_access_log\"}");
 }
 
 TEST_F(AccessLogImplTest, GrpcStatusFilterBlock) {

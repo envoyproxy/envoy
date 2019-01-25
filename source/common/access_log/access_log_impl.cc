@@ -212,11 +212,7 @@ bool ResponseFlagFilter::evaluate(const StreamInfo::StreamInfo& info, const Http
 GrpcStatusFilter::GrpcStatusFilter(
     const envoy::config::filter::accesslog::v2::GrpcStatusFilter& config) {
   for (int i = 0; i < config.statuses_size(); i++) {
-    absl::optional<Grpc::Status::GrpcStatus> grpc_status =
-        Grpc::Utility::nameToGrpcStatus(config.statuses(i));
-    // Like with ResponseFlagFilter, the grpc_status will be valid because of config validation.
-    ASSERT(grpc_status.has_value());
-    statuses_.insert(grpc_status.value());
+    statuses_.insert(cfgToGrpcStatus(config.statuses(i)));
   }
 
   exclude_ = config.exclude();
@@ -251,6 +247,11 @@ bool GrpcStatusFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::
 
   const bool found = statuses_.find(status) != statuses_.end();
   return exclude_ ? !found : found;
+}
+
+Grpc::Status::GrpcStatus GrpcStatusFilter::cfgToGrpcStatus(
+    envoy::config::filter::accesslog::v2::GrpcStatusFilter_Status status) const {
+  return static_cast<Grpc::Status::GrpcStatus>(status);
 }
 
 InstanceSharedPtr
