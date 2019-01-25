@@ -49,11 +49,18 @@ envoy_cc_library(
         "quic_fallthrough_impl.h",
         "quic_flag_utils_impl.h",
         "quic_iovec_impl.h",
+<<<<<<< HEAD
         "quic_prefetch_impl.h",
         "quic_ptr_util_impl.h",
         "quic_string_impl.h",
         "quic_string_piece_impl.h",
         "quic_uint128_impl.h",
+=======
+        "quic_str_cat_impl.h",
+        "quic_string_impl.h",
+        "quic_string_piece_impl.h",
+        "quic_string_utils_impl.h",
+>>>>>>> quic_string_utils_impl and quic_str_cat
     ],
     external_deps = [
         "abseil_base",
