@@ -187,23 +187,7 @@ Envoy can produce backtraces on demand and from assertions and other fatal
 actions like segfaults. Where supported, stack traces will contain resolved
 symbols, though not include line numbers. On systems where absl::Symbolization is
 not supported, the stack traces written in the log or to stderr contain addresses rather
-than resolved symbols. The `tools/stack_decode.py` script exists to process the output
-and do symbol resolution including line numbers, to make the stack traces useful.
-Any log lines not relevant to the backtrace capability
-are passed through the script unchanged (it acts like a filter).
-
-The script runs in one of two modes. If passed no arguments it anticipates
-Envoy (or test) output on stdin. You can postprocess a log or pipe the output of
-an Envoy process. If passed some arguments it runs the arguments as a child
-process. This enables you to run a test with backtrace post processing. Bazel
-sandboxing must be disabled by specifying standalone execution. Example
-command line:
-
-```
-bazel test -c dbg //test/server:backtrace_test
---run_under=`pwd`/tools/stack_decode.py --strategy=TestRunner=standalone
---cache_test_results=no --test_output=all
-```
+than resolved symbols.
 
 You will need to use either a `dbg` build type or the `opt` build type to get symbol
 information in the binaries.
