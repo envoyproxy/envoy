@@ -259,18 +259,5 @@ void SimulatedTimeSystemHelper::setSystemTime(const SystemTime& system_time) {
   }
 }
 
-/*
-SimulatedTimeSystem::SimulatedTimeSystem() {
-  TestTimeSystem* time_system = singleton_->timeSystem();
-  if (time_system == nullptr) {
-    time_system_ = new SimulatedTimeSystemHelper;
-    singleton_->set(time_system_);
-  } else {
-    time_system_ = dynamic_cast<SimulatedTimeSystemHelper*>(time_system);
-    ASSERT(time_system_);
-  }
-}
-*/
-
 } // namespace Event
 } // namespace Envoy

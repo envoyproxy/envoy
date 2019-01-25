@@ -7,7 +7,6 @@ namespace Thread {
 namespace TestUtil {
 
 void ContentionGenerator::generateContention(MutexTracerImpl& tracer) {
-  DangerousDeprecatedTestTime test_time;
   Envoy::Thread::ThreadPtr t1 = launchThread(tracer);
   Envoy::Thread::ThreadPtr t2 = launchThread(tracer);
   t1->join();
