@@ -10,6 +10,8 @@
 #include "extensions/common/tap/admin.h"
 #include "extensions/filters/http/tap/tap_config.h"
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -69,7 +71,7 @@ public:
 
   // Extensions::Common::Tap::ExtensionConfig
   void clearTapConfig() override;
-  const std::string& adminId() override;
+  const absl::string_view adminId() override;
   void newTapConfig(envoy::service::tap::v2alpha::TapConfig&& proto_config,
                     Extensions::Common::Tap::Sink* admin_streamer) override;
 

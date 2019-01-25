@@ -28,9 +28,8 @@ ProtobufTypes::MessagePtr UpstreamSslSocketFactory::createEmptyConfigProto() {
   return std::make_unique<envoy::api::v2::auth::UpstreamTlsContext>();
 }
 
-static Registry::RegisterFactory<UpstreamSslSocketFactory,
-                                 Server::Configuration::UpstreamTransportSocketConfigFactory>
-    upstream_registered_;
+REGISTER_FACTORY(UpstreamSslSocketFactory,
+                 Server::Configuration::UpstreamTransportSocketConfigFactory);
 
 Network::TransportSocketFactoryPtr DownstreamSslSocketFactory::createTransportSocketFactory(
     const Protobuf::Message& message, Server::Configuration::TransportSocketFactoryContext& context,
@@ -46,9 +45,8 @@ ProtobufTypes::MessagePtr DownstreamSslSocketFactory::createEmptyConfigProto() {
   return std::make_unique<envoy::api::v2::auth::DownstreamTlsContext>();
 }
 
-static Registry::RegisterFactory<DownstreamSslSocketFactory,
-                                 Server::Configuration::DownstreamTransportSocketConfigFactory>
-    downstream_registered_;
+REGISTER_FACTORY(DownstreamSslSocketFactory,
+                 Server::Configuration::DownstreamTransportSocketConfigFactory);
 
 } // namespace Tls
 } // namespace TransportSockets

@@ -119,13 +119,11 @@ DownstreamAltsTransportSocketConfigFactory::createTransportSocketFactory(
   return createTransportSocketFactoryHelper(message, /* is_upstream */ false);
 }
 
-static Registry::RegisterFactory<UpstreamAltsTransportSocketConfigFactory,
-                                 Server::Configuration::UpstreamTransportSocketConfigFactory>
-    upstream_registered_;
+REGISTER_FACTORY(UpstreamAltsTransportSocketConfigFactory,
+                 Server::Configuration::UpstreamTransportSocketConfigFactory);
 
-static Registry::RegisterFactory<DownstreamAltsTransportSocketConfigFactory,
-                                 Server::Configuration::DownstreamTransportSocketConfigFactory>
-    downstream_registered_;
+REGISTER_FACTORY(DownstreamAltsTransportSocketConfigFactory,
+                 Server::Configuration::DownstreamTransportSocketConfigFactory);
 
 } // namespace Alts
 } // namespace TransportSockets
