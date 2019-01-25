@@ -1,9 +1,9 @@
 #pragma once
 
-#include "absl/memory/memory.h"
-
 #include <memory>
 #include <utility>
+
+#include "absl/memory/memory.h"
 
 // NOLINT(namespace-envoy)
 
@@ -13,14 +13,12 @@
 
 namespace quic {
 
-template <typename T, typename... Args>
-std::unique_ptr<T> QuicMakeUniqueImpl(Args&&... args) {
+template <typename T, typename... Args> std::unique_ptr<T> QuicMakeUniqueImpl(Args&&... args) {
   return absl::make_unique<T>(std::forward<Args>(args)...);
 }
 
-template <typename T>
-std::unique_ptr<T> QuicWrapUniqueImpl(T* ptr) {
+template <typename T> std::unique_ptr<T> QuicWrapUniqueImpl(T* ptr) {
   return absl::WrapUnique<T>(ptr);
 }
 
-}  // namespace quic
+} // namespace quic
