@@ -14,8 +14,8 @@ echo "ENVOY_SRCDIR=${ENVOY_SRCDIR}"
 function setup_gcc_toolchain() {
   export CC=gcc
   export CXX=g++
-  [ -z "$CIRCLECI" ] || export BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --copt=--param=ggc-min-expand=10 --copt=--param=ggc-min-heapsize=2048"
-  [ -z "$CIRCLECI" ] || export BAZEL_TEST_OPTIONS="${BAZEL_TEST_OPTIONS} --copt=--param=ggc-min-expand=10 --copt=--param=ggc-min-heapsize=2048"
+  [ -z "$CIRCLECI" ] || export BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --copt=--param=ggc-min-expand=30"
+  [ -z "$CIRCLECI" ] || export BAZEL_TEST_OPTIONS="${BAZEL_TEST_OPTIONS} --copt=--param=ggc-min-expand=30"
   echo "$CC/$CXX toolchain configured"
 }
 
