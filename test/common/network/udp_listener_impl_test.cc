@@ -163,7 +163,7 @@ TEST_P(ListenerImplTest, UseActualDstUdp) {
       getSocket(Address::SocketType::Datagram, Network::Test::getCanonicalLoopbackAddress(version_),
                 nullptr, false);
 
-  const int client_sockfd = client_socket->fd();
+  const int client_sockfd = client_socket->ioHandle().fd();
   sockaddr_storage server_addr;
   socklen_t addr_len;
 
@@ -214,8 +214,9 @@ TEST_P(ListenerImplTest, UseActualDstUdp) {
       }));
 
   EXPECT_CALL(listener_callbacks, onWriteReady_(_))
-      .WillRepeatedly(
-          Invoke([&](const Socket& socket) { EXPECT_EQ(socket.fd(), server_socket->fd()); }));
+      .WillRepeatedly(Invoke([&](const Socket& socket) {
+        EXPECT_EQ(socket.ioHandle().fd(), server_socket->ioHandle().fd());
+      }));
 
   dispatcher_.run(Event::Dispatcher::RunType::Block);
 }
@@ -248,7 +249,7 @@ TEST_P(ListenerImplTest, UdpEcho) {
       getSocket(Address::SocketType::Datagram, Network::Test::getCanonicalLoopbackAddress(version_),
                 nullptr, false);
 
-  const int client_sockfd = client_socket->fd();
+  const int client_sockfd = client_socket->ioHandle().fd();
   sockaddr_storage server_addr;
   socklen_t addr_len;
 
@@ -315,7 +316,7 @@ TEST_P(ListenerImplTest, UdpEcho) {
 
   EXPECT_CALL(listener_callbacks, onWriteReady_(_))
       .WillRepeatedly(Invoke([&](const Socket& socket) {
-        EXPECT_EQ(socket.fd(), server_socket->fd());
+        EXPECT_EQ(socket.ioHandle().fd(), server_socket->ioHandle().fd());
 
         sockaddr_storage client_addr;
         socklen_t client_addr_len;
@@ -331,9 +332,9 @@ TEST_P(ListenerImplTest, UdpEcho) {
           uint64_t total_sent = 0;
 
           do {
-            auto send_rc =
-                ::sendto(socket.fd(), data.c_str() + total_sent, data_size - total_sent, 0,
-                         reinterpret_cast<const struct sockaddr*>(&client_addr), client_addr_len);
+            auto send_rc = ::sendto(
+                socket.ioHandle().fd(), data.c_str() + total_sent, data_size - total_sent, 0,
+                reinterpret_cast<const struct sockaddr*>(&client_addr), client_addr_len);
 
             if (send_rc > 0) {
               total_sent += send_rc;
@@ -355,7 +356,7 @@ TEST_P(ListenerImplTest, UdpEcho) {
     const std::string::size_type data_size = data.length() + 1;
     std::string::size_type remaining = data_size;
     do {
-      result = client_buffer.read(client_socket->fd(), remaining);
+      result = client_buffer.read(client_socket->ioHandle().fd(), remaining);
       if (result.rc_ > 0) {
         remaining -= result.rc_;
       } else if (result.rc_ != -EAGAIN) {
@@ -399,7 +400,7 @@ TEST_P(ListenerImplTest, UdpListenerEnableDisable) {
       getSocket(Address::SocketType::Datagram, Network::Test::getCanonicalLoopbackAddress(version_),
                 nullptr, false);
 
-  const int client_sockfd = client_socket->fd();
+  const int client_sockfd = client_socket->ioHandle().fd();
   sockaddr_storage server_addr;
   socklen_t addr_len;
 
@@ -464,8 +465,9 @@ TEST_P(ListenerImplTest, UdpListenerEnableDisable) {
       }));
 
   EXPECT_CALL(listener_callbacks, onWriteReady_(_))
-      .WillRepeatedly(
-          Invoke([&](const Socket& socket) { EXPECT_EQ(socket.fd(), server_socket->fd()); }));
+      .WillRepeatedly(Invoke([&](const Socket& socket) {
+        EXPECT_EQ(socket.ioHandle().fd(), server_socket->ioHandle().fd());
+      }));
 
   dispatcher_.run(Event::Dispatcher::RunType::Block);
 }
@@ -496,7 +498,7 @@ TEST_P(ListenerImplTest, UdpListenerRecvFromError) {
       getSocket(Address::SocketType::Datagram, Network::Test::getCanonicalLoopbackAddress(version_),
                 nullptr, false);
 
-  const int client_sockfd = client_socket->fd();
+  const int client_sockfd = client_socket->ioHandle().fd();
   sockaddr_storage server_addr;
   socklen_t addr_len;
 
@@ -516,8 +518,9 @@ TEST_P(ListenerImplTest, UdpListenerRecvFromError) {
 
   EXPECT_CALL(listener_callbacks, onWriteReady_(_))
       .Times(1)
-      .WillRepeatedly(
-          Invoke([&](const Socket& socket) { EXPECT_EQ(socket.fd(), server_socket->fd()); }));
+      .WillRepeatedly(Invoke([&](const Socket& socket) {
+        EXPECT_EQ(socket.ioHandle().fd(), server_socket->ioHandle().fd());
+      }));
 
   EXPECT_CALL(listener_callbacks, onError_(_, _))
       .Times(1)

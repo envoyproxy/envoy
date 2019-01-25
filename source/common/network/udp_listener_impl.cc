@@ -21,8 +21,8 @@ namespace Network {
 UdpListenerImpl::UdpListenerImpl(const Event::DispatcherImpl& dispatcher, Socket& socket,
                                  UdpListenerCallbacks& cb)
     : BaseListenerImpl(dispatcher, socket), cb_(cb) {
-  event_assign(&raw_event_, &dispatcher.base(), socket.fd(), EV_READ | EV_WRITE | EV_PERSIST,
-               eventCallback, this);
+  event_assign(&raw_event_, &dispatcher.base(), socket.ioHandle().fd(),
+               EV_READ | EV_WRITE | EV_PERSIST, eventCallback, this);
   event_add(&raw_event_, nullptr);
 
   if (!Network::Socket::applyOptions(socket.options(), socket,
@@ -50,7 +50,7 @@ UdpListenerImpl::ReceiveResult UdpListenerImpl::doRecvFrom(sockaddr_storage& pee
 
   ASSERT(num_slices == 1);
   // TODO(conqerAtapple): Use os_syscalls
-  const ssize_t rc = ::recvfrom(socket_.fd(), slice.mem_, read_length, 0,
+  const ssize_t rc = ::recvfrom(socket_.ioHandle().fd(), slice.mem_, read_length, 0,
                                 reinterpret_cast<struct sockaddr*>(&peer_addr), &addr_len);
   if (rc < 0) {
     return ReceiveResult{Api::SysCallIntResult{static_cast<int>(rc), errno}, nullptr};
@@ -79,7 +79,7 @@ void UdpListenerImpl::eventCallback(int fd, short flags, void* arg) {
 }
 
 void UdpListenerImpl::handleReadCallback(int fd) {
-  RELEASE_ASSERT(fd == socket_.fd(),
+  RELEASE_ASSERT(fd == socket_.ioHandle().fd(),
                  fmt::format("Invalid socket descriptor received in callback {}", fd));
 
   sockaddr_storage addr;
@@ -153,7 +153,7 @@ void UdpListenerImpl::handleReadCallback(int fd) {
 }
 
 void UdpListenerImpl::handleWriteCallback(int fd) {
-  RELEASE_ASSERT(fd == socket_.fd(),
+  RELEASE_ASSERT(fd == socket_.ioHandle().fd(),
                  fmt::format("Invalid socket descriptor received in callback {}", fd));
 
   cb_.onWriteReady(socket_);
