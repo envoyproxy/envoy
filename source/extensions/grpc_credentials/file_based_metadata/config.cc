@@ -72,9 +72,7 @@ FileBasedMetadataAuthenticator::GetMetadata(grpc::string_ref, grpc::string_ref,
  * Static registration for the file based metadata Google gRPC credentials factory. @see
  * RegisterFactory.
  */
-static Registry::RegisterFactory<FileBasedMetadataGrpcCredentialsFactory,
-                                 Grpc::GoogleGrpcCredentialsFactory>
-    file_based_metadata_google_grpc_credentials_registered_;
+REGISTER_FACTORY(FileBasedMetadataGrpcCredentialsFactory, Grpc::GoogleGrpcCredentialsFactory);
 
 } // namespace FileBasedMetadata
 } // namespace GrpcCredentials

@@ -54,13 +54,11 @@ ProtobufTypes::MessagePtr TapSocketConfigFactory::createEmptyConfigProto() {
   return std::make_unique<envoy::config::transport_socket::tap::v2alpha::Tap>();
 }
 
-static Registry::RegisterFactory<UpstreamTapSocketConfigFactory,
-                                 Server::Configuration::UpstreamTransportSocketConfigFactory>
-    upstream_registered_;
+REGISTER_FACTORY(UpstreamTapSocketConfigFactory,
+                 Server::Configuration::UpstreamTransportSocketConfigFactory);
 
-static Registry::RegisterFactory<DownstreamTapSocketConfigFactory,
-                                 Server::Configuration::DownstreamTransportSocketConfigFactory>
-    downstream_registered_;
+REGISTER_FACTORY(DownstreamTapSocketConfigFactory,
+                 Server::Configuration::DownstreamTransportSocketConfigFactory);
 
 } // namespace Tap
 } // namespace TransportSockets

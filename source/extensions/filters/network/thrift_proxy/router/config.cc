@@ -24,8 +24,7 @@ ThriftFilters::FilterFactoryCb RouterFilterConfig::createFilterFactoryFromProtoT
 /**
  * Static registration for the router filter. @see RegisterFactory.
  */
-static Registry::RegisterFactory<RouterFilterConfig, ThriftFilters::NamedThriftFilterConfigFactory>
-    register_;
+REGISTER_FACTORY(RouterFilterConfig, ThriftFilters::NamedThriftFilterConfigFactory);
 
 } // namespace Router
 } // namespace ThriftProxy

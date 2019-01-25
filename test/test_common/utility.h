@@ -391,6 +391,19 @@ private:
   bool ready_{false};
 };
 
+// TODO(sbelair2) Perform the fd close in the close of the IoHandle-
+// i.e., ScopedIoHandleCloser should incorporate the ScopedFdCloser
+class ScopedIoHandleCloser {
+public:
+  ScopedIoHandleCloser(Network::IoHandlePtr& io_handle);
+  ~ScopedIoHandleCloser();
+
+private:
+  Network::IoHandlePtr& io_handle_;
+};
+
+// TODO(sbelair2) Clean up ScopedFdCloser everywhere IOHandle is used-
+// ScopedFdCloser should no longer be needed.
 class ScopedFdCloser {
 public:
   ScopedFdCloser(int fd);
