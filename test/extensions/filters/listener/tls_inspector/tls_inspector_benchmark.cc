@@ -1,5 +1,6 @@
 #include <vector>
 
+#include "common/network/io_socket_handle_impl.h"
 #include "common/network/listen_socket_impl.h"
 
 #include "extensions/filters/listener/tls_inspector/tls_inspector.h"
@@ -77,7 +78,8 @@ static void BM_TlsInspector(benchmark::State& state) {
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls};
   NiceMock<Stats::MockStore> store;
   ConfigSharedPtr cfg(std::make_shared<Config>(store));
-  Network::ConnectionSocketImpl socket(-1, nullptr, nullptr);
+  Network::IoHandlePtr io_handle = std::make_unique<Network::IoSocketHandle>();
+  Network::ConnectionSocketImpl socket(std::move(io_handle), nullptr, nullptr);
   NiceMock<FastMockDispatcher> dispatcher;
   FastMockListenerFilterCallbacks cb(socket, dispatcher);
 

@@ -8,8 +8,10 @@
 #include "envoy/network/transport_socket.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/secret/secret_manager.h"
+#include "envoy/singleton/manager.h"
 #include "envoy/ssl/context_manager.h"
 #include "envoy/stats/scope.h"
+#include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/protobuf/protobuf.h"
@@ -81,6 +83,16 @@ public:
    * if not set.
    */
   virtual Init::Manager* initManager() PURE;
+
+  /**
+   * @return the server's singleton manager.
+   */
+  virtual Singleton::Manager& singletonManager() PURE;
+
+  /**
+   * @return the server's TLS slot allocator.
+   */
+  virtual ThreadLocal::SlotAllocator& threadLocal() PURE;
 };
 
 class TransportSocketConfigFactory {
