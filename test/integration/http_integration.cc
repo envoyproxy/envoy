@@ -886,7 +886,7 @@ void HttpIntegrationTest::testRetryPriority() {
                                                                  {"x-envoy-retry-on", "5xx"}},
                                          1024);
 
-  // Note how we're exepcting each upstream request to hit the same upstream.
+  // Note how we're expecting each upstream request to hit the same upstream.
   waitForNextUpstreamRequest(0);
   upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "503"}}, false);
 
@@ -944,7 +944,7 @@ void HttpIntegrationTest::testRetryHostPredicateFilter() {
                                                                  {"x-envoy-retry-on", "5xx"}},
                                          1024);
 
-  // Note how we're exepcting each upstream request to hit the same upstream.
+  // Note how we're expecting each upstream request to hit the same upstream.
   auto upstream_idx = waitForNextUpstreamRequest({0, 1});
   upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "503"}}, false);
 
@@ -1761,7 +1761,7 @@ void HttpIntegrationTest::testEquivalent(const std::string& request) {
     cloned_listener->CopyFrom(*old_listener);
     old_listener->set_name("http_forward");
   });
-  // Set the first listener to allow absoute URLs.
+  // Set the first listener to allow absolute URLs.
   config_helper_.addConfigModifier(&setAllowAbsoluteUrl);
   initialize();
 

@@ -30,7 +30,3 @@ traffic is gradually shifted to degraded hosts as it becomes necessary.
 
 Endpoints can be marked as degraded by using active health checking and having the upstream host
 return a :ref:`special header <arch_overview_health_checking_degraded>`.
-
-Note: Degraded endpoints are considered unhealthy when computing panic thresholds. This means that
-the number of unhealthy hosts plus the number of degraded hosts is above the panic threshold, the
-containing priority will enter panic mode.

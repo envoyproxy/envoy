@@ -100,9 +100,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/googleapis/googleapis/archive/d6f78d948c53f3b400bb46996eb3084359914f9b.tar.gz"],
     ),
     com_github_datadog_dd_opentracing_cpp = dict(
-        sha256 = "32967149fbc672f321ba6ce6c3e5cc299b15ab914f6f5b2993c7c9ddc1894439",
-        strip_prefix = "dd-opentracing-cpp-0.3.6",
-        urls = ["https://github.com/DataDog/dd-opentracing-cpp/archive/v0.3.6.tar.gz"],
+        sha256 = "1798ce816e389ad89c379cb734487ed8b7db3d909be0c8548bd96538f78639b7",
+        strip_prefix = "dd-opentracing-cpp-0.4.1",
+        urls = ["https://github.com/DataDog/dd-opentracing-cpp/archive/v0.4.1.tar.gz"],
     ),
     com_github_msgpack_msgpack_c = dict(
         sha256 = "bda49f996a73d2c6080ff0523e7b535917cd28c8a79c3a5da54fc29332d61d1e",
@@ -151,9 +151,11 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://files.pythonhosted.org/packages/f9/e7/4f80d582578f8489226370762d2cf6bc9381175d1929eba1754e03f70708/twitter.common.finagle-thrift-0.3.9.tar.gz"],
     ),
     com_google_googletest = dict(
-        sha256 = "9bf1fe5182a604b4135edc1a425ae356c9ad15e9b23f9f12a02e80184c3a249c",
-        strip_prefix = "googletest-release-1.8.1",
-        urls = ["https://github.com/google/googletest/archive/release-1.8.1.tar.gz"],
+        sha256 = "a4cb4b0c3ebb191b798594aca674ad47eee255dcb4c26885cf7f49777703484f",
+        strip_prefix = "googletest-eb9225ce361affe561592e0912320b9db84985d0",
+        # TODO(akonradi): Switch this back to a released version later than 1.8.1 once there is
+        # one available.
+        urls = ["https://github.com/google/googletest/archive/eb9225ce361affe561592e0912320b9db84985d0.tar.gz"],
     ),
     com_google_protobuf = dict(
         sha256 = "46f1da3a6a6db66dd240cf95a5553198f7c6e98e6ac942fceb8a1cf03291d96e",

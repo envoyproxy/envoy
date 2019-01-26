@@ -216,14 +216,14 @@ public:
   }
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersionsClientType, RatelimitIntegrationTest,
-                        GRPC_CLIENT_INTEGRATION_PARAMS);
-INSTANTIATE_TEST_CASE_P(IpVersionsClientType, RatelimitFailureModeIntegrationTest,
-                        GRPC_CLIENT_INTEGRATION_PARAMS);
-INSTANTIATE_TEST_CASE_P(IpVersionsClientType, RatelimitBootStrapOnlyIntegrationTest,
-                        GRPC_CLIENT_INTEGRATION_PARAMS);
-INSTANTIATE_TEST_CASE_P(IpVersionsClientType, RatelimitBootStrapIntegrationTest,
-                        GRPC_CLIENT_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, RatelimitIntegrationTest,
+                         GRPC_CLIENT_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, RatelimitFailureModeIntegrationTest,
+                         GRPC_CLIENT_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, RatelimitBootStrapOnlyIntegrationTest,
+                         GRPC_CLIENT_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, RatelimitBootStrapIntegrationTest,
+                         GRPC_CLIENT_INTEGRATION_PARAMS);
 
 TEST_P(RatelimitBootStrapOnlyIntegrationTest, Ok) { basicFlow(); }
 

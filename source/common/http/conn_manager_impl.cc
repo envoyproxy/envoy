@@ -841,7 +841,7 @@ void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* 
   for (; entry != decoder_filters_.end(); entry++) {
     // If end_stream_ is marked for a filter, the data is not for this filter and filters after.
     //
-    // In following case, ActiveStreamFilterBase::commonContine() could be called recursively and
+    // In following case, ActiveStreamFilterBase::commonContinue() could be called recursively and
     // its doData() is called with wrong data.
     //
     //  There are 3 decode filters and "wrapper" refers to ActiveStreamFilter object.
@@ -1786,7 +1786,7 @@ bool ConnectionManagerImpl::ActiveStreamDecoderFilter::recreateStream() {
   HeaderMapPtr request_headers(std::move(parent_.request_headers_));
   StreamEncoder* response_encoder = parent_.response_encoder_;
   parent_.response_encoder_ = nullptr;
-  // This functionally deletes the stream (via defered delete) so do not
+  // This functionally deletes the stream (via deferred delete) so do not
   // reference anything beyond this point.
   parent_.connection_manager_.doEndStream(this->parent_);
 

@@ -259,7 +259,7 @@ TEST_F(AuthenticatorTest, TestPubkeyFetchFail) {
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "401"}}}));
 }
 
-// This test verifies when a Jwks fetching is not completed yet, but onDestory() is called,
+// This test verifies when a Jwks fetching is not completed yet, but onDestroy() is called,
 // onComplete() callback should not be called, but internal request->cancel() should be called.
 // Most importantly, no crash.
 TEST_F(AuthenticatorTest, TestOnDestroy) {
@@ -278,7 +278,7 @@ TEST_F(AuthenticatorTest, TestOnDestroy) {
   auth_->onDestroy();
 }
 
-// This test verifies if "forward_playload_header" is empty, payload is not forwarded.
+// This test verifies if "forward_payload_header" is empty, payload is not forwarded.
 TEST_F(AuthenticatorTest, TestNoForwardPayloadHeader) {
   // In this config, there is no forward_payload_header
   auto& provider0 = (*proto_config_.mutable_providers())[std::string(ProviderName)];
