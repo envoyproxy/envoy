@@ -51,6 +51,7 @@ void FakeStream::decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
 }
 
 void FakeStream::decodeData(Buffer::Instance& data, bool end_stream) {
+  received_data_ = true;
   Thread::LockGuard lock(lock_);
   body_.add(data);
   setEndStream(end_stream);

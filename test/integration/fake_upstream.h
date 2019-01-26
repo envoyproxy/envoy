@@ -62,6 +62,7 @@ public:
   const Http::HeaderMap& headers() { return *headers_; }
   void setAddServedByHeader(bool add_header) { add_served_by_header_ = add_header; }
   const Http::HeaderMapPtr& trailers() { return trailers_; }
+  bool receivedData() { return received_data_; }
 
   ABSL_MUST_USE_RESULT
   testing::AssertionResult
@@ -184,6 +185,7 @@ private:
   Event::TestTimeSystem& time_system_;
   Http::MetadataMap metadata_map_;
   std::unordered_map<std::string, uint64_t> duplicated_metadata_key_count_;
+  bool received_data_{false};
 };
 
 typedef std::unique_ptr<FakeStream> FakeStreamPtr;

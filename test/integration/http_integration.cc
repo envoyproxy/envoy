@@ -2156,6 +2156,11 @@ name: request-metadata-filter
 config: {}
 )EOF";
 
+static std::string decode_headers_only = R"EOF(
+name: decode-headers-only
+config: {}
+)EOF";
+
 void verifyExpectedMetadata(Http::MetadataMap metadata_map, std::set<std::string> keys) {
   for (const auto key : keys) {
     // keys are the same as their corresponding values.
@@ -2418,6 +2423,10 @@ void HttpIntegrationTest::testConsumeAndInsertRequestMetadata() {
   expected_metadata_keys.insert("replace");
   verifyExpectedMetadata(upstream_request_->metadata_map(), expected_metadata_keys);
   EXPECT_EQ(upstream_request_->duplicated_metadata_key_count().find("metadata")->second, 3);
+  // Verifies zero length data received, and end_stream is true.
+  EXPECT_EQ(true, upstream_request_->receivedData());
+  EXPECT_EQ(0, upstream_request_->bodyLength());
+  EXPECT_EQ(true, upstream_request_->complete());
 
   // Sends headers, data, metadata and trailer.
   auto encoder_decoder_2 = codec_client_->startRequest(default_request_headers_);
@@ -2477,6 +2486,38 @@ void HttpIntegrationTest::testConsumeAndInsertRequestMetadata() {
   expected_metadata_keys.insert("metadata2");
   expected_metadata_keys.insert("trailers");
   EXPECT_EQ(upstream_request_->duplicated_metadata_key_count().find("metadata")->second, 6);
+}
+
+void HttpIntegrationTest::testHeaderOnlyRequestWithRequestMetadata() {
+  addFilters({request_metadata_filter, decode_headers_only});
+  config_helper_.addConfigModifier(
+      [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
+          -> void { hcm.set_proxy_100_continue(true); });
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Sends a request with body. Only headers will pass through filters.
+  auto response =
+      codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "POST"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "host"}},
+                                         128);
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+  // Verifies a headers metadata added.
+  std::set<std::string> expected_metadata_keys = {"headers"};
+  expected_metadata_keys.insert("metadata");
+  verifyExpectedMetadata(upstream_request_->metadata_map(), expected_metadata_keys);
+
+  // Verifies zero length data received, and end_stream is true.
+  EXPECT_EQ(true, upstream_request_->receivedData());
+  EXPECT_EQ(0, upstream_request_->bodyLength());
+  EXPECT_EQ(true, upstream_request_->complete());
 }
 
 } // namespace Envoy

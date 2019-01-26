@@ -783,16 +783,22 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilte
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
 
     if (!request_metadata_map_vector_.empty()) {
-      for (const auto& metadata_map : request_metadata_map_vector_) {
-        decodeMetadata(nullptr, *metadata_map);
-      }
-      // If metadata is added to a header only request, we should add an empty data frame to
-      // indicate the end of the stream.
-      if ((*entry)->end_stream_) {
-        Buffer::OwnedImpl empty_data("");
-        addDecodedData(*((*entry).get()), empty_data, true);
-      }
-      request_metadata_map_vector_.clear();
+      insert_new_metadata_in_headers_ = true;
+    }
+
+    processNewlyAddedMetadata();
+
+    // If end_stream is set in headers, and a filter adds new metadata, we need to delay end_stream
+    // in headers by inserting an empty data frame with end_stream set. The empty data frame is sent
+    // after the new metadata.
+    if ((*entry)->end_stream_ && insert_new_metadata_in_headers_ && !empty_data_end_stream_sent_) {
+      Buffer::OwnedImpl empty_data("");
+      ENVOY_STREAM_LOG(trace,
+                       "inserts an empty data frame to carry end_stream instead of headers "
+                       "because new metadata is added in headers.",
+                       *this);
+      addDecodedData(*((*entry).get()), empty_data, true);
+      empty_data_end_stream_sent_ = true;
     }
 
     if (!(*entry)->commonHandleAfterHeadersCallback(status, decoding_headers_only_) &&
@@ -811,6 +817,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilte
   }
 
   if (continue_data_entry != decoder_filters_.end()) {
+
     // We use the continueDecoding() code since it will correctly handle not calling
     // decodeHeaders() again. Fake setting stopped_ since the continueDecoding() code expects it.
     ASSERT(buffered_request_data_);
@@ -906,12 +913,7 @@ void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* 
     ENVOY_STREAM_LOG(trace, "decode data called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
 
-    if (!request_metadata_map_vector_.empty()) {
-      for (const auto& metadata_map : request_metadata_map_vector_) {
-        decodeMetadata(nullptr, *metadata_map);
-      }
-      request_metadata_map_vector_.clear();
-    }
+    processNewlyAddedMetadata();
 
     if (!trailers_exists_at_start && request_trailers_ &&
         trailers_added_entry == decoder_filters_.end()) {
@@ -1008,12 +1010,9 @@ void ConnectionManagerImpl::ActiveStream::decodeTrailers(ActiveStreamDecoderFilt
     state_.filter_call_state_ &= ~FilterCallState::DecodeTrailers;
     ENVOY_STREAM_LOG(trace, "decode trailers called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
-    if (!request_metadata_map_vector_.empty()) {
-      for (const auto& metadata_map : request_metadata_map_vector_) {
-        decodeMetadata(nullptr, *metadata_map);
-      }
-      request_metadata_map_vector_.clear();
-    }
+
+    processNewlyAddedMetadata();
+
     if (!(*entry)->commonHandleAfterTrailersCallback(status)) {
       return;
     }
@@ -1458,6 +1457,15 @@ void ConnectionManagerImpl::ActiveStream::maybeEndEncode(bool end_stream) {
     stream_info_.onLastDownstreamTxByteSent();
     request_response_timespan_->complete();
     connection_manager_.doEndStream(*this);
+  }
+}
+
+void ConnectionManagerImpl::ActiveStream::processNewlyAddedMetadata() {
+  if (!request_metadata_map_vector_.empty()) {
+    for (const auto& metadata_map : request_metadata_map_vector_) {
+      decodeMetadata(nullptr, *metadata_map);
+    }
+    request_metadata_map_vector_.clear();
   }
 }
 

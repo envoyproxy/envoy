@@ -454,7 +454,7 @@ Http::FilterMetadataStatus Filter::decodeMetadata(Http::MetadataMap& metadata_ma
   Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata);
 
   if (upstream_request_ == nullptr) {
-    ENVOY_STREAM_LOG(trace, "upstream_request_ not ready. Store metadata_map to encode later: {}",
+    ENVOY_STREAM_LOG(trace, "upstream_request_ not ready. Storing metadata_map to encode later: {}",
                      *callbacks_, metadata_map);
     downstream_metadata_map_vector_.emplace_back(std::move(metadata_map_ptr));
     return Http::FilterMetadataStatus::Continue;
@@ -1185,8 +1185,12 @@ void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
 
   stream_info_.onFirstUpstreamTxByteSent();
   parent_.callbacks_->streamInfo().onFirstUpstreamTxByteSent();
+  bool end_stream = !buffered_request_body_ && encode_complete_ && !encode_trailers_;
+  // If end_stream is set in headers, and there are metadata to send, delays end_stream. The case
+  // only happens when decoding headers filters return ContinueAndEndStream.
+  bool delay_headers_end_stream = end_stream && !parent_.downstream_metadata_map_vector_.empty();
   request_encoder.encodeHeaders(*parent_.downstream_headers_,
-                                !buffered_request_body_ && encode_complete_ && !encode_trailers_);
+                                end_stream && !delay_headers_end_stream);
   calling_encode_headers_ = false;
 
   // It is possible to get reset in the middle of an encodeHeaders() call. This happens for example
@@ -1203,6 +1207,10 @@ void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
                        parent_.downstream_metadata_map_vector_);
       request_encoder.encodeMetadata(parent_.downstream_metadata_map_vector_);
       parent_.downstream_metadata_map_vector_.clear();
+      if (delay_headers_end_stream) {
+        Buffer::OwnedImpl empty_data("");
+        request_encoder.encodeData(empty_data, true);
+      }
     }
 
     if (buffered_request_body_) {

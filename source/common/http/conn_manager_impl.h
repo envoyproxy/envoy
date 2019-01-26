@@ -302,6 +302,7 @@ private:
     void encodeTrailers(ActiveStreamEncoderFilter* filter, HeaderMap& trailers);
     void encodeMetadata(ActiveStreamEncoderFilter* filter, MetadataMapPtr&& metadata_map_ptr);
     void maybeEndEncode(bool end_stream);
+    void processNewlyAddedMetadata();
     uint64_t streamId() { return stream_id_; }
 
     // Http::StreamCallbacks
@@ -426,6 +427,8 @@ private:
     absl::optional<Router::RouteConstSharedPtr> cached_route_;
     absl::optional<Upstream::ClusterInfoConstSharedPtr> cached_cluster_info_;
     DownstreamWatermarkCallbacks* watermark_callbacks_{nullptr};
+    // Stores metadata added in the decoding filter that is being processed. Will be cleared before
+    // processing the next filter.
     MetadataMapVector request_metadata_map_vector_;
     uint32_t buffer_limit_{0};
     uint32_t high_watermark_count_{0};
@@ -439,6 +442,10 @@ private:
     // Whether a filter has indicated that the response should be treated as a headers only
     // response.
     bool encoding_headers_only_{};
+    // Whether new metadata is inserted in headers decoding.
+    bool insert_new_metadata_in_headers_{false};
+    // If an empty data frame with end_stream true is sent.
+    bool empty_data_end_stream_sent_{false};
   };
 
   typedef std::unique_ptr<ActiveStream> ActiveStreamPtr;
