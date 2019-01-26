@@ -108,10 +108,10 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance&, bool end_stream) {
       if (config_->allowPartialMessage()) {
         const auto* buffer = callbacks_->decodingBuffer();
         if (buffer != nullptr && buffer->length() < config_->maxRequestBytes()) {
-          return Http::FilterDataStatus::StopIterationAndBuffer;  
+          return Http::FilterDataStatus::StopIterationAndWatermark;  
         }
       } else {
-        return Http::FilterDataStatus::StopIterationAndBuffer;  
+        return Http::FilterDataStatus::StopIterationAndBuffer;
       }
     }
   
