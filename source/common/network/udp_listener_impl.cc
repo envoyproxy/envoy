@@ -83,17 +83,15 @@ void UdpListenerImpl::handleReadCallback(int fd) {
                  fmt::format("Invalid socket descriptor received in callback {}", fd));
 
   sockaddr_storage addr;
-  socklen_t addr_len;
-  ReceiveResult recv_result;
+  socklen_t addr_len = 0;
 
-  do {
-    recv_result = doRecvFrom(addr, addr_len);
-    if ((recv_result.result_.rc_ < 0) && (recv_result.result_.rc_ != -EAGAIN)) {
+  ReceiveResult recv_result = doRecvFrom(addr, addr_len);
+  if ((recv_result.result_.rc_ < 0)) {
+    if (recv_result.result_.rc_ != -EAGAIN) {
       cb_.onError(UdpListenerCallbacks::ErrorCode::SyscallError, recv_result.result_.errno_);
-      return;
     }
-
-  } while (recv_result.result_.rc_ == -EAGAIN);
+    return;
+  }
 
   Address::InstanceConstSharedPtr local_address = socket_.localAddress();
 
