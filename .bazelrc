@@ -1,6 +1,6 @@
 # Envoy specific Bazel build/test options.
 startup --host_jvm_args=-Xmx2048m
-
+build --experimental_local_memory_estimates
 build --workspace_status_command=bazel/get_workspace_status
 
 # Basic ASAN/UBSAN that works for gcc
