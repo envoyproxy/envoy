@@ -936,40 +936,22 @@ config:
   path: /dev/null
   )EOF";
 
-  const std::vector<std::string> valid_statuses = {
-      "OK",
-      "CANCELED",
-      "UNKNOWN",
-      "INVALID_ARGUMENT",
-      "DEADLINE_EXCEEDED",
-      "NOT_FOUND",
-      "ALREADY_EXISTS",
-      "PERMISSION_DENIED",
-      "RESOURCE_EXHAUSTED",
-      "FAILED_PRECONDITION",
-      "ABORTED",
-      "OUT_OF_RANGE",
-      "UNIMPLEMENTED",
-      "INTERNAL",
-      "UNAVAILABLE",
-      "DATA_LOSS",
-      "UNAUTHENTICATED",
-  };
-
-  const size_t maxValid = static_cast<size_t>(Grpc::Status::GrpcStatus::MaximumValid);
-  if (maxValid != valid_statuses.size() - 1) {
-    FAIL() << "Mismatch in number of gRPC statuses, GrpcStatus has " << (maxValid + 1)
-           << ", valid_statuses has " << valid_statuses.size() << ".";
+  const auto desc = envoy::config::filter::accesslog::v2::GrpcStatusFilter_Status_descriptor();
+  const int grpcStatuses = static_cast<int>(Grpc::Status::GrpcStatus::MaximumValid) + 1;
+  if (desc->value_count() != grpcStatuses) {
+    FAIL() << "Mismatch in number of gRPC statuses, GrpcStatus has " << grpcStatuses
+           << ", GrpcStatusFilter_Status has " << desc->value_count() << ".";
   }
 
   std::ostringstream out;
-  for (size_t i = 0; i < valid_statuses.size(); i++) {
-    out << yaml_prefix << valid_statuses[i] << yaml_suffix;
-
-    EXPECT_CALL(*file_, write(_));
+  for (int i = 0; i < desc->value_count(); i++) {
+    out << yaml_prefix << desc->value(i)->name() << yaml_suffix;
+    std::cerr << out.str() << std::endl;
 
     InstanceSharedPtr log =
         AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(out.str()), context_);
+
+    EXPECT_CALL(*file_, write(_));
 
     response_trailers_.addCopy(Http::Headers::get().GrpcStatus, std::to_string(i));
     log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
