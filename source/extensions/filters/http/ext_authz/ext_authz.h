@@ -39,18 +39,31 @@ public:
   FilterConfig(const envoy::config::filter::http::ext_authz::v2::ExtAuthz& config,
                const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
                Runtime::Loader& runtime, Http::Context& http_context)
-      : failure_mode_allow_(config.failure_mode_allow()), local_info_(local_info), scope_(scope),
-        runtime_(runtime), http_context_(http_context) {}
+      : allow_partial_message_(config.with_request_data().allow_partial_message()),
+        failure_mode_allow_(config.failure_mode_allow()),
+        max_request_bytes_(config.with_request_data().max_request_bytes()), local_info_(local_info),
+        scope_(scope), runtime_(runtime), http_context_(http_context) {}
+
+  bool allowPartialMessage() const { return allow_partial_message_; }
+
+  bool withRequestData() const { return max_request_bytes_ > 0; }
+
+  uint32_t maxRequestBytes() const { return max_request_bytes_; }
 
   bool failureModeAllow() const { return failure_mode_allow_; }
+
   const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
+
   Runtime::Loader& runtime() { return runtime_; }
+
   Stats::Scope& scope() { return scope_; }
 
   Http::Context& httpContext() { return http_context_; }
 
 private:
-  bool failure_mode_allow_{};
+  const bool allow_partial_message_;
+  const bool failure_mode_allow_;
+  const uint32_t max_request_bytes_;
   const LocalInfo::LocalInfo& local_info_;
   Stats::Scope& scope_;
   Runtime::Loader& runtime_;
@@ -139,6 +152,7 @@ private:
 
   // Used to identify if the callback to onComplete() is synchronous (on the stack) or asynchronous.
   bool initiating_call_{};
+  bool buffer_data_{};
   envoy::service::auth::v2::CheckRequest check_request_{};
 };
 

@@ -38,6 +38,20 @@ message ExtAuthz {
   // Note that errors can be *always* tracked in the :ref:`stats
   // <config_http_filters_ext_authz_stats>`.
   bool failure_mode_allow = 2;
+
+  // Enables filter to buffer the message request body and to dispatch it over the external
+  // authorization server for further validation.
+  BufferSettings with_request_data = 4;
+}
+
+// Configuration for enabling the filter's buffering mechenism.
+message BufferSettings {
+  // Sets the maximum size of a request message that the filter will hold in memory.
+  uint32 max_request_bytes = 1 [(validate.rules).uint32.gt = 0];
+
+  // When set to true, filter buffers the request body until *max_request_bytes* is reached.
+  // (ELABORATE IT)
+  bool allow_partial_message = 2;
 }
 
 // HttpService is used for raw HTTP comunication between the filter and the authorization service.
