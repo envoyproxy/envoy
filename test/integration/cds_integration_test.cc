@@ -9,8 +9,8 @@
 #include "common/protobuf/utility.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
+#include "test/integration/http_integration.h"
 #include "test/integration/utility.h"
-#include "test/integration/xds_integration_test_base.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/simulated_time_system.h"
@@ -79,11 +79,10 @@ static_resources:
 const char ClusterName[] = "cluster_0";
 const int UpstreamIndex = 1;
 
-class CdsIntegrationTest : public XdsIntegrationTestBase,
-                           public Grpc::GrpcClientIntegrationParamTest {
+class CdsIntegrationTest : public HttpIntegrationTest, public Grpc::GrpcClientIntegrationParamTest {
 public:
   CdsIntegrationTest()
-      : XdsIntegrationTestBase(Http::CodecClient::Type::HTTP2, ipVersion(), Config) {}
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), realTime(), Config) {}
 
   void TearDown() override {
     cleanUpXdsConnection();
@@ -124,7 +123,7 @@ public:
     setUpstreamCount(1);                                  // the CDS cluster
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP2); // CDS uses gRPC uses HTTP2.
 
-    // BaseIntegrationTest::initialize() does many things:
+    // HttpIntegrationTest::initialize() does many things:
     // 1) It appends to fake_upstreams_ as many as you asked for via setUpstreamCount().
     // 2) It updates your bootstrap config with the ports your fake upstreams are actually listening
     //    on (since you're supposed to leave them as 0).
@@ -134,7 +133,7 @@ public:
     //    the bootstrap config have come up, and registering them in a port map (see lookupPort()).
     //    However, this test needs to defer all of that to later.
     defer_listener_finalization_ = true;
-    XdsIntegrationTestBase::initialize();
+    HttpIntegrationTest::initialize();
 
     // Create the regular (i.e. not an xDS server) upstream. We create it manually here after
     // initialize() because finalize() expects all fake_upstreams_ to correspond to a static
@@ -168,7 +167,7 @@ public:
   }
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersionsClientType, CdsIntegrationTest, GRPC_CLIENT_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, CdsIntegrationTest, GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // 1) Envoy starts up with no static clusters (other than the CDS-over-gRPC server).
 // 2) Envoy is told of a cluster via CDS.

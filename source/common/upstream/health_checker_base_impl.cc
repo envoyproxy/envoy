@@ -33,7 +33,7 @@ HealthCheckerImplBase::HealthCheckerImplBase(const Cluster& cluster,
       healthy_edge_interval_(
           PROTOBUF_GET_MS_OR_DEFAULT(config, healthy_edge_interval, interval_.count())) {
   cluster_.prioritySet().addMemberUpdateCb(
-      [this](uint32_t, const HostVector& hosts_added, const HostVector& hosts_removed) -> void {
+      [this](const HostVector& hosts_added, const HostVector& hosts_removed) -> void {
         onClusterMemberUpdate(hosts_added, hosts_removed);
       });
 }
@@ -257,8 +257,9 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::handleSuccess(bool degrade
 
     // This check ensures that we honor the decision made about Changed vs ChangePending in the
     // above block.
+    // TODO(snowp): should there be degraded_threshold?
     if (changed_state == HealthTransition::Unchanged) {
-      changed_state = HealthTransition::ChangePending;
+      changed_state = HealthTransition::Changed;
     }
   }
 

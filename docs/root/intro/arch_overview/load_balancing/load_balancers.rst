@@ -8,14 +8,15 @@ uses a load balancing policy to determine which host is selected. The load balan
 pluggable and are specified on a per upstream cluster basis in the :ref:`configuration
 <envoy_api_msg_Cluster>`. Note that if no active health checking policy is :ref:`configured
 <config_cluster_manager_cluster_hc>` for a cluster, all upstream cluster members are considered
-healthy.
+healthy, unless otherwise specified through
+:ref:`health_status <envoy_api_field_endpoint.LbEndpoint.health_status>`.
 
 .. _arch_overview_load_balancing_types_round_robin:
 
 Weighted round robin
 ^^^^^^^^^^^^^^^^^^^^
 
-This is a simple policy in which each healthy upstream host is selected in round
+This is a simple policy in which each available upstream host is selected in round
 robin order. If :ref:`weights
 <envoy_api_field_endpoint.LbEndpoint.load_balancing_weight>` are assigned to
 endpoints in a locality, then a weighted round robin schedule is used, where
@@ -30,7 +31,7 @@ Weighted least request
 The least request load balancer uses different algorithms depending on whether any of the hosts have
 weight greater than 1.
 
-* *all weights 1*: An O(1) algorithm which selects N random healthy hosts as specified in the
+* *all weights 1*: An O(1) algorithm which selects N random available hosts as specified in the
   :ref:`configuration <envoy_api_msg_Cluster.LeastRequestLbConfig>` (2 by default) and picks the
   host which has the fewest active requests (`Research
   <http://www.eecs.harvard.edu/~michaelm/postscripts/handbook2001.pdf>`_ has shown that this
@@ -99,7 +100,7 @@ versus Maglev with different parameters.
 Random
 ^^^^^^
 
-The random load balancer selects a random healthy host. The random load balancer generally performs
+The random load balancer selects a random available host. The random load balancer generally performs
 better than round robin if no health checking policy is configured. Random selection avoids bias
 towards the host in the set that comes after a failed host.
 

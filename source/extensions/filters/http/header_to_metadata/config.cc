@@ -28,9 +28,7 @@ Http::FilterFactoryCb HeaderToMetadataConfig::createFilterFactoryFromProtoTyped(
 /**
  * Static registration for the header-to-metadata filter. @see RegisterFactory.
  */
-static Registry::RegisterFactory<HeaderToMetadataConfig,
-                                 Server::Configuration::NamedHttpFilterConfigFactory>
-    register_;
+REGISTER_FACTORY(HeaderToMetadataConfig, Server::Configuration::NamedHttpFilterConfigFactory);
 
 } // namespace HeaderToMetadataFilter
 } // namespace HttpFilters

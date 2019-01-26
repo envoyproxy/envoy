@@ -197,7 +197,7 @@ FilterStatus Router::transportEnd() {
 
 FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
   // TODO(zuercher): route stats (e.g., no_route, no_cluster, upstream_rq_maintenance_mode, no
-  // healtthy upstream)
+  // healthy upstream)
 
   route_ = callbacks_->route();
   if (!route_) {

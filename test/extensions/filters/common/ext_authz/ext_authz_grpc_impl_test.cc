@@ -41,7 +41,7 @@ public:
   MockRequestCallbacks request_callbacks_;
   Tracing::MockSpan span_;
 
-  void expectCallSend(envoy::service::auth::v2alpha::CheckRequest& request) {
+  void expectCallSend(envoy::service::auth::v2::CheckRequest& request) {
     EXPECT_CALL(*async_client_, send(_, ProtoEq(request), Ref(client_), _, _))
         .WillOnce(Invoke(
             [this](
@@ -49,7 +49,7 @@ public:
                 Grpc::AsyncRequestCallbacks&, Tracing::Span&,
                 const absl::optional<std::chrono::milliseconds>& timeout) -> Grpc::AsyncRequest* {
               // TODO(dio): Use a defined constant value.
-              EXPECT_EQ("envoy.service.auth.v2alpha.Authorization",
+              EXPECT_EQ("envoy.service.auth.v2.Authorization",
                         service_method.service()->full_name());
               EXPECT_EQ("Check", service_method.name());
               EXPECT_EQ(timeout_->count(), timeout->count());
@@ -60,13 +60,13 @@ public:
 
 // Test the client when an ok response is received.
 TEST_F(ExtAuthzGrpcClientTest, AuthorizationOk) {
-  auto check_response = std::make_unique<envoy::service::auth::v2alpha::CheckResponse>();
+  auto check_response = std::make_unique<envoy::service::auth::v2::CheckResponse>();
   auto status = check_response->mutable_status();
   status->set_code(Grpc::Status::GrpcStatus::Ok);
   auto authz_response = Response{};
   authz_response.status = CheckStatus::OK;
 
-  envoy::service::auth::v2alpha::CheckRequest request;
+  envoy::service::auth::v2::CheckRequest request;
   expectCallSend(request);
   client_.check(request_callbacks_, request, Tracing::NullSpan::instance());
 
@@ -88,7 +88,7 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationOkWithAllAtributes) {
   auto authz_response =
       TestCommon::makeAuthzResponse(CheckStatus::OK, Http::Code::OK, empty_body, expected_headers);
 
-  envoy::service::auth::v2alpha::CheckRequest request;
+  envoy::service::auth::v2::CheckRequest request;
   expectCallSend(request);
   client_.check(request_callbacks_, request, Tracing::NullSpan::instance());
 
@@ -103,13 +103,13 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationOkWithAllAtributes) {
 
 // Test the client when a denied response is received.
 TEST_F(ExtAuthzGrpcClientTest, AuthorizationDenied) {
-  auto check_response = std::make_unique<envoy::service::auth::v2alpha::CheckResponse>();
+  auto check_response = std::make_unique<envoy::service::auth::v2::CheckResponse>();
   auto status = check_response->mutable_status();
   status->set_code(Grpc::Status::GrpcStatus::PermissionDenied);
   auto authz_response = Response{};
   authz_response.status = CheckStatus::Denied;
 
-  envoy::service::auth::v2alpha::CheckRequest request;
+  envoy::service::auth::v2::CheckRequest request;
   expectCallSend(request);
   client_.check(request_callbacks_, request, Tracing::NullSpan::instance());
 
@@ -134,7 +134,7 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationDeniedWithAllAttributes) {
   auto authz_response = TestCommon::makeAuthzResponse(CheckStatus::Denied, Http::Code::Unauthorized,
                                                       expected_body, expected_headers);
 
-  envoy::service::auth::v2alpha::CheckRequest request;
+  envoy::service::auth::v2::CheckRequest request;
   expectCallSend(request);
   client_.check(request_callbacks_, request, Tracing::NullSpan::instance());
 
@@ -150,7 +150,7 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationDeniedWithAllAttributes) {
 
 // Test the client when an unknown error occurs.
 TEST_F(ExtAuthzGrpcClientTest, UnknownError) {
-  envoy::service::auth::v2alpha::CheckRequest request;
+  envoy::service::auth::v2::CheckRequest request;
   expectCallSend(request);
   client_.check(request_callbacks_, request, Tracing::NullSpan::instance());
 
@@ -161,7 +161,7 @@ TEST_F(ExtAuthzGrpcClientTest, UnknownError) {
 
 // Test the client when the request is canceled.
 TEST_F(ExtAuthzGrpcClientTest, CancelledAuthorizationRequest) {
-  envoy::service::auth::v2alpha::CheckRequest request;
+  envoy::service::auth::v2::CheckRequest request;
   EXPECT_CALL(*async_client_, send(_, _, _, _, _)).WillOnce(Return(&async_request_));
   client_.check(request_callbacks_, request, Tracing::NullSpan::instance());
 
@@ -171,7 +171,7 @@ TEST_F(ExtAuthzGrpcClientTest, CancelledAuthorizationRequest) {
 
 // Test the client when the request times out.
 TEST_F(ExtAuthzGrpcClientTest, AuthorizationRequestTimeout) {
-  envoy::service::auth::v2alpha::CheckRequest request;
+  envoy::service::auth::v2::CheckRequest request;
   expectCallSend(request);
   client_.check(request_callbacks_, request, Tracing::NullSpan::instance());
 
