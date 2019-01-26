@@ -63,8 +63,7 @@ UdpListenerImpl::ReceiveResult UdpListenerImpl::doRecvFrom(sockaddr_storage& pee
 }
 
 void UdpListenerImpl::eventCallback(int fd, short flags, void* arg) {
-  RELEASE_ASSERT((flags & (EV_READ | EV_WRITE)),
-                 fmt::format("Unexpected flags for callback: {}", flags));
+  ASSERT((flags & (EV_READ | EV_WRITE)));
 
   UdpListenerImpl* instance = static_cast<UdpListenerImpl*>(arg);
   ASSERT(instance);
@@ -79,8 +78,7 @@ void UdpListenerImpl::eventCallback(int fd, short flags, void* arg) {
 }
 
 void UdpListenerImpl::handleReadCallback(int fd) {
-  RELEASE_ASSERT(fd == socket_.ioHandle().fd(),
-                 fmt::format("Invalid socket descriptor received in callback {}", fd));
+  ASSERT(fd == socket_.ioHandle().fd());
 
   sockaddr_storage addr;
   socklen_t addr_len = 0;
@@ -151,8 +149,7 @@ void UdpListenerImpl::handleReadCallback(int fd) {
 }
 
 void UdpListenerImpl::handleWriteCallback(int fd) {
-  RELEASE_ASSERT(fd == socket_.ioHandle().fd(),
-                 fmt::format("Invalid socket descriptor received in callback {}", fd));
+  ASSERT(fd == socket_.ioHandle().fd());
 
   cb_.onWriteReady(socket_);
 }
