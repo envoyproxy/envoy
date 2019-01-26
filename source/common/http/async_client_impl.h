@@ -298,7 +298,6 @@ private:
     // filter which uses this function for buffering.
     ASSERT(buffered_body_ != nullptr);
   }
-  void addDecodedData(Buffer::Instance&, bool) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   MetadataMapVector& addDecodedMetadata() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   const Buffer::Instance* decodingBuffer() override { return buffered_body_.get(); }
   void sendLocalReply(Code code, absl::string_view body,
