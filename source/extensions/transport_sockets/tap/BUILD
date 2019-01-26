@@ -14,6 +14,7 @@ envoy_cc_library(
     name = "tap_config_interface",
     hdrs = ["tap_config.h"],
     deps = [
+        "//include/envoy/network:connection_interface",
         "//source/extensions/common/tap:tap_interface",
     ],
 )
