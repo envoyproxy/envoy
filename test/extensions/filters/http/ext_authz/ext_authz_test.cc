@@ -114,9 +114,9 @@ envoy::config::filter::http::ext_authz::v2::ExtAuthz GetFilterConfig() {
   return proto_config;
 }
 
-INSTANTIATE_TEST_CASE_P(ParameterizedFilterConfig, HttpFilterTestParam,
-                        Values(&GetFilterConfig<true, true>, &GetFilterConfig<false, false>,
-                               &GetFilterConfig<true, false>, &GetFilterConfig<false, true>));
+INSTANTIATE_TEST_SUITE_P(ParameterizedFilterConfig, HttpFilterTestParam,
+                         Values(&GetFilterConfig<true, true>, &GetFilterConfig<false, false>,
+                                &GetFilterConfig<true, false>, &GetFilterConfig<false, true>));
 
 // Test that the per route config is properly merged: more specific keys override previous keys.
 TEST_F(HttpFilterTest, MergeConfig) {

@@ -625,8 +625,7 @@ public:
 /**
  * Static registration for the binary protocol. @see RegisterFactory.
  */
-static Registry::RegisterFactory<CompactProtocolConfigFactory, NamedProtocolConfigFactory>
-    register_;
+REGISTER_FACTORY(CompactProtocolConfigFactory, NamedProtocolConfigFactory);
 
 } // namespace ThriftProxy
 } // namespace NetworkFilters

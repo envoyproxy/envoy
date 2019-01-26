@@ -38,7 +38,7 @@ HttpTapConfigSharedPtr FilterConfigImpl::currentConfig() {
   return tls_slot_->getTyped<TlsFilterConfig>().config_;
 }
 
-const std::string& FilterConfigImpl::adminId() {
+const absl::string_view FilterConfigImpl::adminId() {
   ASSERT(proto_config_.has_admin_config());
   return proto_config_.admin_config().config_id();
 }

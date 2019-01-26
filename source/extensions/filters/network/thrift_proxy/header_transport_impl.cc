@@ -312,8 +312,7 @@ public:
 /**
  * Static registration for the header transport. @see RegisterFactory.
  */
-static Registry::RegisterFactory<HeaderTransportConfigFactory, NamedTransportConfigFactory>
-    register_;
+REGISTER_FACTORY(HeaderTransportConfigFactory, NamedTransportConfigFactory);
 
 } // namespace ThriftProxy
 } // namespace NetworkFilters

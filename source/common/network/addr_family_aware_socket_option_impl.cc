@@ -21,7 +21,7 @@ absl::optional<Address::IpVersion> getVersionFromSocket(const Socket& socket) {
       return absl::optional<Address::IpVersion>(socket.localAddress()->ip()->version());
     } else {
       return absl::optional<Address::IpVersion>(
-          Address::addressFromFd(socket.fd())->ip()->version());
+          Address::addressFromFd(socket.ioHandle().fd())->ip()->version());
     }
   } catch (const EnvoyException&) {
     // Ignore, we get here because we failed in getsockname().
