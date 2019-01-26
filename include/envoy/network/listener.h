@@ -116,7 +116,7 @@ public:
 
 /**
  * Utility struct that encapsulates the information from a udp socket's
- * recvfrom/recvmmdg call.
+ * recvfrom/recvmmsg call.
  *
  * TODO(conqerAtapple): Maybe this belongs inside the UdpListenerCallbacks
  * class.
