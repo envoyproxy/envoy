@@ -210,10 +210,10 @@ private:
   bool exclude_;
 
   /**
-   * Converts between the config version of gRPC code and the code version of a gRPC code.
+   * Converts between the protobuf version of gRPC code and the code version of a gRPC code.
    */
   Grpc::Status::GrpcStatus
-  cfgToGrpcStatus(envoy::config::filter::accesslog::v2::GrpcStatusFilter_Status status) const;
+  protoToGrpcStatus(envoy::config::filter::accesslog::v2::GrpcStatusFilter_Status status) const;
 };
 
 /**

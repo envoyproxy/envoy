@@ -212,7 +212,7 @@ bool ResponseFlagFilter::evaluate(const StreamInfo::StreamInfo& info, const Http
 GrpcStatusFilter::GrpcStatusFilter(
     const envoy::config::filter::accesslog::v2::GrpcStatusFilter& config) {
   for (int i = 0; i < config.statuses_size(); i++) {
-    statuses_.insert(cfgToGrpcStatus(config.statuses(i)));
+    statuses_.insert(protoToGrpcStatus(config.statuses(i)));
   }
 
   exclude_ = config.exclude();
@@ -249,7 +249,7 @@ bool GrpcStatusFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::
   return exclude_ ? !found : found;
 }
 
-Grpc::Status::GrpcStatus GrpcStatusFilter::cfgToGrpcStatus(
+Grpc::Status::GrpcStatus GrpcStatusFilter::protoToGrpcStatus(
     envoy::config::filter::accesslog::v2::GrpcStatusFilter_Status status) const {
   return static_cast<Grpc::Status::GrpcStatus>(status);
 }

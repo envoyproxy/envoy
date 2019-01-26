@@ -946,7 +946,6 @@ config:
   std::ostringstream out;
   for (int i = 0; i < desc->value_count(); i++) {
     out << yaml_prefix << desc->value(i)->name() << yaml_suffix;
-    std::cerr << out.str() << std::endl;
 
     InstanceSharedPtr log =
         AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(out.str()), context_);
