@@ -2488,7 +2488,7 @@ void HttpIntegrationTest::testConsumeAndInsertRequestMetadata() {
   EXPECT_EQ(upstream_request_->duplicated_metadata_key_count().find("metadata")->second, 6);
 }
 
-void HttpIntegrationTest::testHeaderOnlyRequestWithRequestMetadata() {
+void HttpIntegrationTest::testDecodeHeaderOnlyRequestWithRequestMetadata() {
   addFilters({request_metadata_filter, decode_headers_only});
   config_helper_.addConfigModifier(
       [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)

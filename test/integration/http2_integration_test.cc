@@ -125,8 +125,8 @@ TEST_P(Http2MetadataIntegrationTest, ConsumeAndInsertRequestMetadata) {
   testConsumeAndInsertRequestMetadata();
 }
 
-TEST_P(Http2MetadataIntegrationTest, HeaderOnlyRequestWithRequestMetadata) {
-  testHeaderOnlyRequestWithRequestMetadata();
+TEST_P(Http2MetadataIntegrationTest, DecodeHeaderOnlyRequestWithRequestMetadata) {
+  testDecodeHeaderOnlyRequestWithRequestMetadata();
 }
 
 TEST_P(Http2IntegrationTest, EnvoyHandlingDuplicate100Continue) {
