@@ -6,6 +6,7 @@ Version history
 * access log: added a new flag for upstream retry count exceeded.
 * admin: the admin server can now be accessed via HTTP/2 (prior knowledge).
 * buffer: fix vulnerabilities when allocation fails.
+* build: releases are now built with GCC-7 and linked with LLD.
 * config: added support of using google.protobuf.Any in opaque configs for extensions.
 * config: removed deprecated --v2-config-only from command line config.
 * config: removed deprecated_v1 sds_config from :ref:`Bootstrap config <config_overview_v2_bootstrap>`.
