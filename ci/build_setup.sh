@@ -13,8 +13,8 @@ echo "ENVOY_SRCDIR=${ENVOY_SRCDIR}"
 function setup_gcc_toolchain() {
   export CC=gcc
   export CXX=g++
-  [ -z "$CIRCLECI" ] || export BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --copt=--param=ggc-min-expand=50"
-  [ -z "$CIRCLECI" ] || export BAZEL_TEST_OPTIONS="${BAZEL_TEST_OPTIONS} --copt=--param=ggc-min-expand=50"
+  [ -z "$CIRCLECI" ] || export BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --copt=--param=ggc-min-expand=40"
+  [ -z "$CIRCLECI" ] || export BAZEL_TEST_OPTIONS="${BAZEL_TEST_OPTIONS} --copt=--param=ggc-min-expand=40"
   echo "$CC/$CXX toolchain configured"
 }
 
@@ -89,7 +89,7 @@ if [ "$1" != "-nofetch" ]; then
   then
     git clone https://github.com/envoyproxy/envoy-filter-example.git "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
   fi
-  
+
   # This is the hash on https://github.com/envoyproxy/envoy-filter-example.git we pin to.
   (cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}" && git fetch origin && git checkout -f 6c0625cb4cc9a21df97cef2a1d065463f2ae81ae)
   cp -f "${ENVOY_SRCDIR}"/ci/WORKSPACE.filter.example "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/WORKSPACE
