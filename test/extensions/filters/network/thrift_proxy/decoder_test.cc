@@ -196,24 +196,24 @@ static std::string protoStateParamToString(const TestParamInfo<ProtocolState>& p
   return ProtocolStateNameValues::name(params.param);
 }
 
-INSTANTIATE_TEST_CASE_P(NonValueProtocolStates, DecoderStateMachineNonValueTest,
-                        Values(ProtocolState::MessageBegin, ProtocolState::MessageEnd,
-                               ProtocolState::StructBegin, ProtocolState::StructEnd,
-                               ProtocolState::FieldBegin, ProtocolState::FieldEnd,
-                               ProtocolState::MapBegin, ProtocolState::MapEnd,
-                               ProtocolState::ListBegin, ProtocolState::ListEnd,
-                               ProtocolState::SetBegin, ProtocolState::SetEnd),
-                        protoStateParamToString);
+INSTANTIATE_TEST_SUITE_P(NonValueProtocolStates, DecoderStateMachineNonValueTest,
+                         Values(ProtocolState::MessageBegin, ProtocolState::MessageEnd,
+                                ProtocolState::StructBegin, ProtocolState::StructEnd,
+                                ProtocolState::FieldBegin, ProtocolState::FieldEnd,
+                                ProtocolState::MapBegin, ProtocolState::MapEnd,
+                                ProtocolState::ListBegin, ProtocolState::ListEnd,
+                                ProtocolState::SetBegin, ProtocolState::SetEnd),
+                         protoStateParamToString);
 
 class DecoderStateMachineTest : public DecoderStateMachineTestBase, public testing::Test {};
 
 class DecoderStateMachineValueTest : public DecoderStateMachineTestBase,
                                      public TestWithParam<FieldType> {};
 
-INSTANTIATE_TEST_CASE_P(PrimitiveFieldTypes, DecoderStateMachineValueTest,
-                        Values(FieldType::Bool, FieldType::Byte, FieldType::Double, FieldType::I16,
-                               FieldType::I32, FieldType::I64, FieldType::String),
-                        fieldTypeParamToString);
+INSTANTIATE_TEST_SUITE_P(PrimitiveFieldTypes, DecoderStateMachineValueTest,
+                         Values(FieldType::Bool, FieldType::Byte, FieldType::Double, FieldType::I16,
+                                FieldType::I32, FieldType::I64, FieldType::String),
+                         fieldTypeParamToString);
 
 class DecoderStateMachineNestingTest
     : public DecoderStateMachineTestBase,
@@ -227,7 +227,7 @@ static std::string nestedFieldTypesParamToString(
                      fieldTypeToString(inner_type), fieldTypeToString(value_type));
 }
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     NestedTypes, DecoderStateMachineNestingTest,
     Combine(Values(FieldType::Struct, FieldType::List, FieldType::Map, FieldType::Set),
             Values(FieldType::Struct, FieldType::List, FieldType::Map, FieldType::Set),
