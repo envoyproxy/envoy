@@ -47,8 +47,9 @@ typedef ConstSingleton<ConstantValues> Constants;
  */
 class GrpcClientImpl : public Client, public ExtAuthzAsyncCallbacks {
 public:
+  // TODO(gsagula): remove `use_alpha` param when V2Alpha gets deprecated.
   GrpcClientImpl(Grpc::AsyncClientPtr&& async_client,
-                 const absl::optional<std::chrono::milliseconds>& timeout);
+                 const absl::optional<std::chrono::milliseconds>& timeout, bool use_alpha);
   ~GrpcClientImpl();
 
   // ExtAuthz::Client
