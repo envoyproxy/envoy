@@ -865,7 +865,7 @@ TEST_F(MySQLCommandTest, MySQLTest39) {
 }
 
 /*
- * Negative Test query: INSERT, Wrong SELECR
+ * Negative Test query: INSERT, Wrong SELECT
  */
 TEST_F(MySQLCommandTest, MySQLTest40) {
   std::string table1 = "table1";

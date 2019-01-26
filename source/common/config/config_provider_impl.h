@@ -42,7 +42,7 @@ namespace Config {
 // This approach enables linear memory scalability based primarily on the size of the configuration
 // set.
 //
-// A blueprint to follow for implementing {im,}mutable config providers is as follows:
+// A blueprint to follow for implementing mutable or immutable config providers is as follows:
 //
 // For both:
 //   1) Create a class derived from ConfigProviderManagerImplBase and implement the required

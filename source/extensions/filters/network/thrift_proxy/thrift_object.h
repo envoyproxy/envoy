@@ -223,7 +223,7 @@ public:
 };
 
 /**
- * ThriftObject is a ThrfitStructValue that can be read from a Buffer::Instance.
+ * ThriftObject is a ThriftStructValue that can be read from a Buffer::Instance.
  */
 class ThriftObject : public ThriftStructValue {
 public:

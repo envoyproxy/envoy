@@ -70,7 +70,7 @@ namespace Envoy {
 /*
   Macro to use instead of EXPECT_DEATH when stderr is produced by a logger.
   It temporarily installs stderr sink and restores the original logger sink after the test
-  completes and sdterr_sink object goes of of scope.
+  completes and stderr_sink object goes of of scope.
   EXPECT_DEATH(statement, regex) test passes when statement causes crash and produces error message
   matching regex. Test fails when statement does not crash or it crashes but message does not
   match regex. If a message produced during crash is redirected away from strerr, the test fails.

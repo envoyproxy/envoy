@@ -289,7 +289,7 @@ private:
 
     std::string asString() { return fmt::format("{}/{}", toString(ip_), length_); }
 
-    // The address represented either in Ipv4(uint32_t) or Ipv6(asbl::uint128).
+    // The address represented either in Ipv4(uint32_t) or Ipv6(absl::uint128).
     IpType ip_{0};
     // Length of the cidr range.
     uint32_t length_{0};

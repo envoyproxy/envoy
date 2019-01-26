@@ -337,7 +337,7 @@ private:
    * Returns a reference to a Cell at the specified index.
    */
   Cell& getCell(uint32_t cell_index) {
-    // Because the key-size is parameteriziable, an array-lookup on sizeof(Cell) does not work.
+    // Because the key-size is parameterizable, an array-lookup on sizeof(Cell) does not work.
     char* ptr = reinterpret_cast<char*>(cells_) + cellOffset(cell_index, stats_options_);
     RELEASE_ASSERT((reinterpret_cast<uint64_t>(ptr) & (calculateAlignment() - 1)) == 0, "");
     return *reinterpret_cast<Cell*>(ptr);

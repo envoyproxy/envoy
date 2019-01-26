@@ -2733,7 +2733,7 @@ public:
         .WillOnce(Return(45000));
     expectHealthcheckStop(0, 45000);
 
-    // Host state should not be changed (remains healhty).
+    // Host state should not be changed (remains healthy).
     EXPECT_CALL(*this, onHostStatus(cluster_->prioritySet().getMockHostSet(0)->hosts_[0],
                                     HealthTransition::Unchanged));
     respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::SERVING);

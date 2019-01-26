@@ -151,7 +151,7 @@ bool SnapshotImpl::featureEnabled(const std::string& key, uint64_t default_value
 }
 
 bool SnapshotImpl::featureEnabled(const std::string& key, uint64_t default_value) const {
-  // Avoid PNRG if we know we don't need it.
+  // Avoid PRNG if we know we don't need it.
   uint64_t cutoff = std::min(getInteger(key, default_value), static_cast<uint64_t>(100));
   if (cutoff == 0) {
     return false;

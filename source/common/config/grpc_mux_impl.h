@@ -105,7 +105,7 @@ private:
   Grpc::AsyncStream* stream_{};
   const Protobuf::MethodDescriptor& service_method_;
   std::unordered_map<std::string, ApiState> api_state_;
-  // Envoy's dependendency ordering.
+  // Envoy's dependency ordering.
   std::list<std::string> subscriptions_;
   Event::TimerPtr retry_timer_;
   Runtime::RandomGenerator& random_;
