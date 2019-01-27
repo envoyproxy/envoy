@@ -32,6 +32,8 @@ jobs:
      docker:
        - image: docker
      steps:
+       - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
+       - checkout
        - attach_workspace:
            at: .
        - setup_remote_docker
