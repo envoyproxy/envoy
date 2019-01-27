@@ -47,6 +47,8 @@ namespace ExtAuthz {
 
 template <class T> class HttpFilterTestBase : public T {
 public:
+  HttpFilterTestBase() : http_context_(stats_store_.symbolTable()) {}
+
   void initialize(std::string&& yaml) {
     envoy::config::filter::http::ext_authz::v2::ExtAuthz proto_config{};
     if (!yaml.empty()) {
@@ -82,7 +84,10 @@ public:
   }
 };
 
-class HttpFilterTest : public HttpFilterTestBase<testing::Test> {};
+class HttpFilterTest : public HttpFilterTestBase<testing::Test> {
+ public:
+  HttpFilterTest() = default;
+};
 
 typedef envoy::config::filter::http::ext_authz::v2::ExtAuthz CreateFilterConfigFunc();
 
@@ -157,8 +162,8 @@ class HttpExtAuthzFilterTestBase {
 public:
   HttpExtAuthzFilterTestBase() : http_context_(stats_store_.symbolTable()) {}
 
-  void initConfig(envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz& proto_config) {
-    config_ = std::make_unique<FilterConfig>(proto_config, local_info_, stats_store_, runtime_, cm_,
+  void initConfig(envoy::config::filter::http::ext_authz::v2::ExtAuthz& proto_config) {
+    config_ = std::make_unique<FilterConfig>(proto_config, local_info_, stats_store_, runtime_,
                                              http_context_);
   }
 
@@ -177,18 +182,20 @@ public:
   NiceMock<Envoy::Network::MockConnection> connection_;
   Http::ContextImpl http_context_;
 
+  /*
   initialize(R"EOF(
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
   failure_mode_allow: false
   )EOF");
+  */
 };
 
 class HttpExtAuthzFilterTest : public testing::Test, public HttpExtAuthzFilterTestBase {
 public:
   void initialize(const std::string yaml) {
-    envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz proto_config{};
+    envoy::config::filter::http::ext_authz::v2::ExtAuthz proto_config{};
     MessageUtil::loadFromYaml(yaml, proto_config);
     initConfig(proto_config);
   }
