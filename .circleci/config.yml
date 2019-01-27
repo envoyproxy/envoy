@@ -20,12 +20,22 @@ jobs:
            command:
              ci/do_circle_ci.sh bazel.release
            no_output_timeout: 60m
-       - setup_remote_docker
-       - run: ci/docker_push.sh
-       - run: ci/docker_tag.sh
+       - persist_to_workspace:
+           root: .
+           paths:
+             - build_release
+             - build_release_stripped
        - store_artifacts:
            path: /build/envoy/generated
            destination: /
+   docker:
+     executor: ubuntu-build
+     steps:
+       - attach_workspace:
+           at: .
+       - setup_remote_docker
+       - run: ci/docker_push.sh
+       - run: ci/docker_tag.sh
    asan:
      executor: ubuntu-build
      steps:
@@ -181,6 +191,8 @@ workflows:
           filters:
             tags:
               only: /^v.*/
+      - docker:
+          requires: [release]
       - asan
       - tsan
       - compile_time_options
