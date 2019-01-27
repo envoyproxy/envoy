@@ -364,6 +364,52 @@ private:
   SymbolTable& symbol_table_;
 };
 
+// Represenets an ordered container of StatNames. The encoding for each StatName
+// is byte-packed together, so this carries less overhead than allocating the
+// storage separately. The tradeoff is there is no random access; you can only
+// itereate through the StatNames.
+class StatNameList {
+public:
+  ~StatNameList();
+
+  /**
+   * Populates the StatNameList from a list of encodings. This is not done at
+   * construction time to enable StatNameList to be instantiated directly in
+   * a class that doesn't have a live SymbolTable when it is constructed.
+   *
+   * @param encodings The list names to encode.
+   * @param symbol_table The symbol table in which to encode the names.
+   */
+  void populate(const std::vector<absl::string_view>& encodings, SymbolTable& symbol_table);
+
+  /**
+   * @return true if populate() has been called on this list.
+   */
+  bool populated() const { return storage_ != nullptr; }
+
+  /**
+   * Iterates over each StatName in the list, calling f(StatName). f() should
+   * return true to keep iterating, or false to end the iteration.
+   *
+   * @param f The function to call on each stat.
+   */
+  void foreach (const std::function<bool(StatName)>& f) const;
+
+  /**
+   * Frees each StatName in the list. Failure to call this before destruction
+   * results in an ASSERT at destruction of the list and the SymbolTable.
+   *
+   * This is not done as part of destruction as the SymbolTable may already
+   * be destroyed.
+   *
+   * @param symbol_table the symbol table.
+   */
+  void clear(SymbolTable& symbol_table);
+
+private:
+  std::unique_ptr<uint8_t[]> storage_;
+};
+
 // Helper class for constructing hash-tables with StatName keys.
 struct StatNameHash {
   size_t operator()(const StatName& a) const { return a.hash(); }

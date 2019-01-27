@@ -345,5 +345,54 @@ SymbolTable::StoragePtr SymbolTableImpl::join(const std::vector<StatName>& stat_
   return bytes;
 }
 
+StatNameList::~StatNameList() { ASSERT(!populated()); }
+
+void StatNameList::populate(const std::vector<absl::string_view>& names,
+                            SymbolTable& symbol_table) {
+  ASSERT(names.size() < 256);
+
+  // First encode all the names.
+  size_t total_size_bytes = 1; /* one byte for holding the number of names */
+  std::vector<SymbolEncoding> encodings;
+  encodings.resize(names.size());
+  int index = 0;
+  for (auto& name : names) {
+    SymbolEncoding encoding = symbol_table.encode(name);
+    total_size_bytes += encoding.bytesRequired();
+    encodings[index++].swap(encoding);
+  }
+
+  // Now allocate the exact number of bytes required and move the encodings
+  // into storage.
+  storage_ = std::make_unique<uint8_t[]>(total_size_bytes);
+  uint8_t* p = &storage_[0];
+  *p++ = encodings.size();
+  for (auto& encoding : encodings) {
+    p += encoding.moveToStorage(p);
+  }
+  ASSERT(p == &storage_[0] + total_size_bytes);
+}
+
+void StatNameList::foreach (const std::function<bool(StatName)>& f) const {
+  uint8_t* p = &storage_[0];
+  uint32_t num_elements = *p++;
+  for (uint32_t i = 0; i < num_elements; ++i) {
+    StatName stat_name(p);
+    p += stat_name.size();
+    if (!f(stat_name)) {
+      break;
+    }
+  }
+}
+
+void StatNameList::clear(SymbolTable& symbol_table) {
+  foreach ([&symbol_table](StatName stat_name) -> bool {
+    symbol_table.free(stat_name);
+    return true;
+  })
+    ;
+  storage_.reset();
+}
+
 } // namespace Stats
 } // namespace Envoy

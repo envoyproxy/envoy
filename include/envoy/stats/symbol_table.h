@@ -9,7 +9,23 @@
 namespace Envoy {
 namespace Stats {
 
+/**
+ * Runtime representation of an encoded stat name. This is predeclared only in
+ * the interface without abstract methods, because (a) the underlying class
+ * representation is common to both implementations of SymbolTable, and (b)
+ * we do not want or need the overhead of a vptr per StatName. The common
+ * declaration for StatName is in source/common/stats/symbol_table_impl.h
+ */
 class StatName;
+
+/**
+ * Intermediate representation for a stat-name. This helps store multiple names
+ * in a single packed allocation. First we encode each desired name, then sum
+ * their sizes for the single packed allocation. This is used to store
+ * MetricImpl's tags and tagExtractedName. Like StatName, we don't want to pay
+ * a vptr overhead per object, and the representation is shared between the
+ * SymbolTable implementations, so this is just a pre-declare.
+ */
 class SymbolEncoding;
 
 /**
@@ -21,12 +37,12 @@ class SymbolEncoding;
  * the hot path.
  */
 class SymbolTable {
- public:
+public:
   /**
    * Efficient byte-encoded storage of an array of tokens. The most common
    * tokens are typically < 127, and are represented directly. tokens >= 128
    * spill into the next byte, allowing for tokens of arbitrary numeric value to
-   * be stored.  As long as the most common tokens are low-valued, the
+   * be stored. As long as the most common tokens are low-valued, the
    * representation is space-efficient. This scheme is similar to UTF-8. The
    * token ordering is dependent on the order in which stat-names are encoded
    * into the SymbolTable, which will not be optimal, but in practice appears
@@ -34,7 +50,8 @@ class SymbolTable {
    *
    * This is exposed in the interface for the benefit of join(), which which is
    * used in the hot-path to append two stat-names into a temp without taking
-   * locks.
+   * locks. This is used then in thread-local cache lookup, so that once warm,
+   * no locks are taken when looking up stats.
    */
   using Storage = uint8_t[];
   using StoragePtr = std::unique_ptr<Storage>;
@@ -44,14 +61,13 @@ class SymbolTable {
   /**
    * Encodes a stat name using the symbol table, returning a SymbolEncoding. The
    * SymbolEncoding is not intended for long-term storage, but is used to help
-   * allocate and StatName with the correct amount of storage.
+   * allocate a StatName with the correct amount of storage.
    *
    * When a name is encoded, it bumps reference counts held in the table for
    * each symbol. The caller is responsible for creating a StatName using this
    * SymbolEncoding and ultimately disposing of it by calling
-   * StatName::free(). Otherwise the symbols will leak for the lifetime of the
-   * table, though they won't show up as a C++ leaks as the memory is still
-   * reachable from the SymolTable.
+   * SymbolTable::free(). Users are protected from leaking symbols into the pool
+   * by ASSERTions in the SymbolTable destructor.
    *
    * @param name The name to encode.
    * @return SymbolEncoding the encoded symbols.
@@ -65,8 +81,8 @@ class SymbolTable {
 
   /**
    * Decodes a vector of symbols back into its period-delimited stat name. If
-   * decoding fails on any part of the symbol_vec, we release_assert and crash
-   * hard, since this should never happen, and we don't want to continue running
+   * decoding fails on any part of the symbol_vec, we release_assert and crash,
+   * since this should never happen, and we don't want to continue running
    * with a corrupt stats set.
    *
    * @param stat_name the stat name.
@@ -93,31 +109,10 @@ class SymbolTable {
   virtual bool lessThan(const StatName& a, const StatName& b) const PURE;
 
   /**
-   * Since SymbolTable does manual reference counting, a client of SymbolTable
-   * must manually call free(symbol_vec) when it is freeing the backing store
-   * for a StatName. This way, the symbol table will grow and shrink
-   * dynamically, instead of being write-only.
-   *
-   * @param symbol_vec the vector of symbols to be freed.
-   */
-  virtual void free(const StatName& stat_name) PURE;
-
-  /**
-   * StatName backing-store can be managed by callers in a variety of ways
-   * to minimize overhead. But any persistent reference to a StatName needs
-   * to hold onto its own reference-counts for all symbols. This method
-   * helps callers ensure the symbol-storage is maintained for the lifetime
-   * of a reference.
-   *
-   * @param symbol_vec the vector of symbols to be freed.
-   */
-  virtual void incRefCount(const StatName& stat_name) PURE;
-
-  /**
    * Joins two or more StatNames. For example if we have StatNames for {"a.b",
    * "c.d", "e.f"} then the joined stat-name matches "a.b.c.d.e.f". The
    * advantage of using this representation is that it avoids having to
-   * decode/encode into the elaborted form, and does not require locking the
+   * decode/encode into the elaborated form, and does not require locking the
    * SymbolTable.
    *
    * The caveat is that this representation does not bump reference counts on
@@ -135,6 +130,31 @@ class SymbolTable {
 #ifndef ENVOY_CONFIG_COVERAGE
   virtual void debugPrint() const PURE;
 #endif
+
+private:
+  friend class StatNameStorage;
+  friend class StatNameList;
+
+  /**
+   * Since SymbolTable does manual reference counting, a client of SymbolTable
+   * must manually call free(symbol_vec) when it is freeing the backing store
+   * for a StatName. This way, the symbol table will grow and shrink
+   * dynamically, instead of being write-only.
+   *
+   * @param symbol_vec the vector of symbols.
+   */
+  virtual void free(const StatName& stat_name) PURE;
+
+  /**
+   * StatName backing-store can be managed by callers in a variety of ways
+   * to minimize overhead. But any persistent reference to a StatName needs
+   * to hold onto its own reference-counts for all symbols. This method
+   * helps callers ensure the symbol-storage is maintained for the lifetime
+   * of a reference.
+   *
+   * @param symbol_vec the vector of symbols.
+   */
+  virtual void incRefCount(const StatName& stat_name) PURE;
 };
 
 using SharedSymbolTable = std::shared_ptr<SymbolTable>;

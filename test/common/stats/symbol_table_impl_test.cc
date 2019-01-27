@@ -265,26 +265,32 @@ TEST_P(StatNameTest, TestShrinkingExpectation) {
 // you may want to store bytes in a larger structure. For example, you might
 // want to allocate two different StatName objects in contiguous memory. The
 // safety-net here in terms of leaks is that SymbolTable will assert-fail if
-// you don't free all the StatNames you've allocated bytes for.
-TEST_P(StatNameTest, StoringWithoutStatNameStorage) {
-  SymbolEncoding hello_encoding = table_->encode("hello.world");
-  SymbolEncoding goodbye_encoding = table_->encode("goodbye.world");
-  size_t size = hello_encoding.bytesRequired() + goodbye_encoding.bytesRequired();
-  size_t goodbye_offset = hello_encoding.bytesRequired();
-  std::unique_ptr<SymbolTable::Storage> storage(new uint8_t[size]);
-  hello_encoding.moveToStorage(storage.get());
-  goodbye_encoding.moveToStorage(storage.get() + goodbye_offset);
+// you don't free all the StatNames you've allocated bytes for. StatNameList
+// provides this capability.
+TEST_P(StatNameTest, List) {
+  std::vector<absl::string_view> names{"hello.world", "goodbye.world"};
+  StatNameList name_list;
+  EXPECT_FALSE(name_list.populated());
+  name_list.populate(names, *table_);
+  EXPECT_TRUE(name_list.populated());
 
-  StatName hello(storage.get());
-  StatName goodbye(storage.get() + goodbye_offset);
+  // First, decode only the first name.
+  name_list.foreach ([this](StatName stat_name) -> bool {
+    EXPECT_EQ("hello.world", table_->toString(stat_name));
+    return false;
+  });
 
-  EXPECT_EQ("hello.world", table_->toString(hello));
-  EXPECT_EQ("goodbye.world", table_->toString(goodbye));
-
-  // If we don't explicitly call free() on the the StatName objects the
-  // SymbolTable will assert on destruction.
-  table_->free(hello);
-  table_->free(goodbye);
+  // Decode all the names.
+  std::vector<std::string> decoded_strings;
+  name_list.foreach ([this, &decoded_strings](StatName stat_name) -> bool {
+    decoded_strings.push_back(table_->toString(stat_name));
+    return true;
+  });
+  ASSERT_EQ(2, decoded_strings.size());
+  EXPECT_EQ("hello.world", decoded_strings[0]);
+  EXPECT_EQ("goodbye.world", decoded_strings[1]);
+  name_list.clear(*table_);
+  EXPECT_FALSE(name_list.populated());
 }
 
 TEST_P(StatNameTest, HashTable) {
