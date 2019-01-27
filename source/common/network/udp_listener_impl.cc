@@ -94,7 +94,8 @@ void UdpListenerImpl::handleReadCallback() {
       return;
     }
 
-    if ((recv_result.result_.rc_ == 0)) {
+    if (recv_result.result_.rc_ == 0) {
+      // TODO(conqerAtapple): Is zero length packet interesting?
       return;
     }
 
