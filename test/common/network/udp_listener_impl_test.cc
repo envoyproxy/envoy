@@ -338,36 +338,19 @@ TEST_P(ListenerImplTest, UdpEcho) {
 
             if (send_rc > 0) {
               total_sent += send_rc;
-            } else if (send_rc != -EAGAIN) {
+              if (total_sent >= data_size) {
+                break;
+              }
+            } else if (errno != EAGAIN) {
               break;
             }
-          } while ((send_rc == -EAGAIN) || (total_sent < data_size));
+          } while (((send_rc < 0) && (errno == EAGAIN)) || (total_sent < data_size));
 
           EXPECT_EQ(total_sent, data_size);
         }
 
         server_received_data.clear();
       }));
-
-  Buffer::OwnedImpl client_buffer;
-  Api::SysCallIntResult result;
-
-  for (const auto& data : server_received_data) {
-    const std::string::size_type data_size = data.length() + 1;
-    std::string::size_type remaining = data_size;
-    do {
-      result = client_buffer.read(client_socket->ioHandle().fd(), remaining);
-      if (result.rc_ > 0) {
-        remaining -= result.rc_;
-      } else if (result.rc_ != -EAGAIN) {
-        break;
-      }
-    } while ((result.rc_ == -EAGAIN) || (remaining));
-
-    EXPECT_EQ(remaining, 0);
-
-    EXPECT_EQ(client_buffer.toString(), data);
-  }
 
   dispatcher_.run(Event::Dispatcher::RunType::Block);
 }

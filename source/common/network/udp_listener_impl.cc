@@ -2,8 +2,6 @@
 
 #include <sys/un.h>
 
-#include <cassert>
-
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/exception.h"
 
@@ -21,9 +19,11 @@ namespace Network {
 UdpListenerImpl::UdpListenerImpl(const Event::DispatcherImpl& dispatcher, Socket& socket,
                                  UdpListenerCallbacks& cb)
     : BaseListenerImpl(dispatcher, socket), cb_(cb) {
-  event_assign(&raw_event_, &dispatcher.base(), socket.ioHandle().fd(),
-               EV_READ | EV_WRITE | EV_PERSIST, eventCallback, this);
-  event_add(&raw_event_, nullptr);
+  file_event_ = dispatcher_.createFileEvent(
+      socket.ioHandle().fd(), [this](uint32_t events) -> void { onSocketEvent(events); },
+      Event::FileTriggerType::Edge, Event::FileReadyType::Read | Event::FileReadyType::Write);
+
+  ASSERT(file_event_);
 
   if (!Network::Socket::applyOptions(socket.options(), socket,
                                      envoy::api::v2::core::SocketOption::STATE_BOUND)) {
@@ -32,9 +32,16 @@ UdpListenerImpl::UdpListenerImpl(const Event::DispatcherImpl& dispatcher, Socket
   }
 }
 
-void UdpListenerImpl::disable() { event_del(&raw_event_); }
+UdpListenerImpl::~UdpListenerImpl() {
+  disable();
+  file_event_.reset();
+}
 
-void UdpListenerImpl::enable() { event_add(&raw_event_, nullptr); }
+void UdpListenerImpl::disable() { file_event_->setEnabled(0); }
+
+void UdpListenerImpl::enable() {
+  file_event_->setEnabled(Event::FileReadyType::Read | Event::FileReadyType::Write);
+}
 
 UdpListenerImpl::ReceiveResult UdpListenerImpl::doRecvFrom(sockaddr_storage& peer_addr,
                                                            socklen_t& addr_len) {
@@ -62,97 +69,95 @@ UdpListenerImpl::ReceiveResult UdpListenerImpl::doRecvFrom(sockaddr_storage& pee
   return ReceiveResult{Api::SysCallIntResult{static_cast<int>(rc), 0}, std::move(buffer)};
 }
 
-void UdpListenerImpl::eventCallback(int fd, short flags, void* arg) {
-  ASSERT((flags & (EV_READ | EV_WRITE)));
+void UdpListenerImpl::onSocketEvent(short flags) {
+  ASSERT((flags & (Event::FileReadyType::Read | Event::FileReadyType::Write)));
 
-  UdpListenerImpl* instance = static_cast<UdpListenerImpl*>(arg);
-  ASSERT(instance);
-
-  if (flags & EV_READ) {
-    instance->handleReadCallback(fd);
+  if (flags & Event::FileReadyType::Read) {
+    handleReadCallback();
   }
 
-  if (flags & EV_WRITE) {
-    instance->handleWriteCallback(fd);
+  if (flags & Event::FileReadyType::Write) {
+    handleWriteCallback();
   }
 }
 
-void UdpListenerImpl::handleReadCallback(int fd) {
-  ASSERT(fd == socket_.ioHandle().fd());
-
+void UdpListenerImpl::handleReadCallback() {
   sockaddr_storage addr;
   socklen_t addr_len = 0;
 
-  ReceiveResult recv_result = doRecvFrom(addr, addr_len);
-  if ((recv_result.result_.rc_ < 0)) {
-    if (recv_result.result_.rc_ != -EAGAIN) {
-      cb_.onError(UdpListenerCallbacks::ErrorCode::SyscallError, recv_result.result_.errno_);
+  do {
+    ReceiveResult recv_result = doRecvFrom(addr, addr_len);
+    if ((recv_result.result_.rc_ < 0)) {
+      if (recv_result.result_.errno_ != EAGAIN) {
+        cb_.onError(UdpListenerCallbacks::ErrorCode::SyscallError, recv_result.result_.errno_);
+      }
+      return;
     }
-    return;
-  }
 
-  Address::InstanceConstSharedPtr local_address = socket_.localAddress();
+    if ((recv_result.result_.rc_ == 0)) {
+      return;
+    }
 
-  RELEASE_ASSERT(
-      addr_len > 0,
-      fmt::format(
-          "Unable to get remote address for fd: {}, local address: {}. address length is 0 ", fd,
-          local_address->asString()));
+    Address::InstanceConstSharedPtr local_address = socket_.localAddress();
 
-  Address::InstanceConstSharedPtr peer_address;
+    RELEASE_ASSERT(
+        addr_len > 0,
+        fmt::format(
+            "Unable to get remote address for fd: {}, local address: {}. address length is 0 ",
+            socket_.ioHandle().fd(), local_address->asString()));
 
-  // TODO(conqerAtApple): Current implementation of Address::addressFromSockAddr
-  // cannot be used here unfortunately. This should belong in Address namespace.
-  switch (addr.ss_family) {
-  case AF_INET: {
-    const struct sockaddr_in* sin = reinterpret_cast<const struct sockaddr_in*>(&addr);
-    ASSERT(AF_INET == sin->sin_family);
-    peer_address = std::make_shared<Address::Ipv4Instance>(sin);
+    Address::InstanceConstSharedPtr peer_address;
 
-    break;
-  }
-  case AF_INET6: {
-    const struct sockaddr_in6* sin6 = reinterpret_cast<const struct sockaddr_in6*>(&addr);
-    ASSERT(AF_INET6 == sin6->sin6_family);
-    if (IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr)) {
+    // TODO(conqerAtApple): Current implementation of Address::addressFromSockAddr
+    // cannot be used here unfortunately. This should belong in Address namespace.
+    switch (addr.ss_family) {
+    case AF_INET: {
+      const struct sockaddr_in* sin = reinterpret_cast<const struct sockaddr_in*>(&addr);
+      ASSERT(AF_INET == sin->sin_family);
+      peer_address = std::make_shared<Address::Ipv4Instance>(sin);
+
+      break;
+    }
+    case AF_INET6: {
+      const struct sockaddr_in6* sin6 = reinterpret_cast<const struct sockaddr_in6*>(&addr);
+      ASSERT(AF_INET6 == sin6->sin6_family);
+      if (IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr)) {
 #if defined(__APPLE__)
-      struct sockaddr_in sin = {
-          {}, AF_INET, sin6->sin6_port, {sin6->sin6_addr.__u6_addr.__u6_addr32[3]}, {}};
+        struct sockaddr_in sin = {
+            {}, AF_INET, sin6->sin6_port, {sin6->sin6_addr.__u6_addr.__u6_addr32[3]}, {}};
 #else
-      struct sockaddr_in sin = {AF_INET, sin6->sin6_port, {sin6->sin6_addr.s6_addr32[3]}, {}};
+        struct sockaddr_in sin = {AF_INET, sin6->sin6_port, {sin6->sin6_addr.s6_addr32[3]}, {}};
 #endif
-      peer_address = std::make_shared<Address::Ipv4Instance>(&sin);
-    } else {
-      peer_address = std::make_shared<Address::Ipv6Instance>(*sin6, true);
+        peer_address = std::make_shared<Address::Ipv4Instance>(&sin);
+      } else {
+        peer_address = std::make_shared<Address::Ipv6Instance>(*sin6, true);
+      }
+
+      break;
     }
 
-    break;
-  }
+    default:
+      RELEASE_ASSERT(false,
+                     fmt::format("Unsupported address family: {}, local address: {}, receive size: "
+                                 "{}, address length: {}",
+                                 addr.ss_family, local_address->asString(), recv_result.result_.rc_,
+                                 addr_len));
+      break;
+    }
 
-  default:
-    RELEASE_ASSERT(false,
-                   fmt::format("Unsupported address family: {}, local address: {}, receive size: "
-                               "{}, address length: {}",
-                               addr.ss_family, local_address->asString(), recv_result.result_.rc_,
-                               addr_len));
-    break;
-  }
+    RELEASE_ASSERT((peer_address != nullptr),
+                   fmt::format("Unable to get remote address for fd: {}, local address: {} ",
+                               socket_.ioHandle().fd(), local_address->asString()));
 
-  RELEASE_ASSERT((peer_address != nullptr),
-                 fmt::format("Unable to get remote address for fd: {}, local address: {} ", fd,
-                             local_address->asString()));
+    RELEASE_ASSERT((local_address != nullptr),
+                   fmt::format("Unable to get local address for fd: {}", socket_.ioHandle().fd()));
 
-  RELEASE_ASSERT((local_address != nullptr),
-                 fmt::format("Unable to get local address for fd: {}", fd));
+    cb_.onData(UdpData{local_address, peer_address, std::move(recv_result.buffer_)});
 
-  cb_.onData(UdpData{local_address, peer_address, std::move(recv_result.buffer_)});
+  } while (true);
 }
 
-void UdpListenerImpl::handleWriteCallback(int fd) {
-  ASSERT(fd == socket_.ioHandle().fd());
-
-  cb_.onWriteReady(socket_);
-}
+void UdpListenerImpl::handleWriteCallback() { cb_.onWriteReady(socket_); }
 
 } // namespace Network
 } // namespace Envoy

@@ -46,7 +46,7 @@ public:
   Network::DnsResolverSharedPtr createDnsResolver(
       const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers) override;
   FileEventPtr createFileEvent(int fd, FileReadyCb cb, FileTriggerType trigger,
-                               uint32_t events) override;
+                               uint32_t events) const override;
   Filesystem::WatcherPtr createFilesystemWatcher() override;
   Network::ListenerPtr createListener(Network::Socket& socket, Network::ListenerCallbacks& cb,
                                       bool bind_to_port,

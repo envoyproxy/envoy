@@ -90,7 +90,7 @@ public:
    *               initially listen on.
    */
   virtual FileEventPtr createFileEvent(int fd, FileReadyCb cb, FileTriggerType trigger,
-                                       uint32_t events) PURE;
+                                       uint32_t events) const PURE;
 
   /**
    * @return Filesystem::WatcherPtr a filesystem watcher owned by the caller.

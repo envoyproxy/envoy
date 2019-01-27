@@ -4,6 +4,7 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/event/event_impl_base.h"
+#include "common/event/file_event_impl.h"
 
 #include "base_listener_impl.h"
 
@@ -13,10 +14,12 @@ namespace Network {
 /**
  * libevent implementation of Network::Listener for UDP.
  */
-class UdpListenerImpl : public BaseListenerImpl, public Event::ImplBase {
+class UdpListenerImpl : public BaseListenerImpl {
 public:
   UdpListenerImpl(const Event::DispatcherImpl& dispatcher, Socket& socket,
                   UdpListenerCallbacks& cb);
+
+  ~UdpListenerImpl();
 
   virtual void disable() override;
   virtual void enable() override;
@@ -30,13 +33,14 @@ public:
   virtual ReceiveResult doRecvFrom(sockaddr_storage& peer_addr, socklen_t& addr_len);
 
 protected:
-  void handleWriteCallback(int fd);
-  void handleReadCallback(int fd);
+  void handleWriteCallback();
+  void handleReadCallback();
 
   UdpListenerCallbacks& cb_;
 
 private:
-  static void eventCallback(int fd, short flags, void* arg);
+  void onSocketEvent(short flags);
+  Event::FileEventPtr file_event_;
 };
 
 } // namespace Network
