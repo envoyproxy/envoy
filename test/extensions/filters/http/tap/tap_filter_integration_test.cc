@@ -42,7 +42,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, TapIntegrationTest,
 
 // Verify a static configuration with an any matcher, writing to a file per tap sink.
 TEST_P(TapIntegrationTest, StaticFilePerTap) {
-  const std::string FILTER_CONFIG =
+  const std::string filter_config =
       R"EOF(
 name: envoy.filters.http.tap
 config:
@@ -57,7 +57,7 @@ config:
 )EOF";
 
   const std::string path_prefix = TestEnvironment::temporaryPath("");
-  initializeFilter(fmt::format(FILTER_CONFIG, path_prefix));
+  initializeFilter(fmt::format(filter_config, path_prefix));
 
   // Initial request/response with tap.
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
@@ -79,7 +79,7 @@ config:
   auto files = TestUtility::listFiles(path_prefix, false);
   auto pb_file = std::find_if(files.begin(), files.end(),
                               [](const std::string& s) { return absl::EndsWith(s, ".pb"); });
-  ASSERT_TRUE(pb_file != files.end());
+  ASSERT_NE(pb_file, files.end());
 
   envoy::data::tap::v2alpha::BufferedTraceWrapper trace;
   MessageUtil::loadFromFile(*pb_file, trace);
@@ -88,7 +88,7 @@ config:
 
 // Verify a basic tap flow using the admin handler.
 TEST_P(TapIntegrationTest, AdminBasicFlow) {
-  const std::string FILTER_CONFIG =
+  const std::string filter_config =
       R"EOF(
 name: envoy.filters.http.tap
 config:
@@ -97,7 +97,7 @@ config:
       config_id: test_config_id
 )EOF";
 
-  initializeFilter(FILTER_CONFIG);
+  initializeFilter(filter_config);
 
   // Initial request/response with no tap.
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));

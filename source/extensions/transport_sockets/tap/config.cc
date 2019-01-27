@@ -8,6 +8,7 @@
 #include "common/protobuf/utility.h"
 
 #include "extensions/transport_sockets/tap/tap.h"
+#include "extensions/transport_sockets/tap/tap_config_impl.h"
 
 namespace Envoy {
 namespace Extensions {

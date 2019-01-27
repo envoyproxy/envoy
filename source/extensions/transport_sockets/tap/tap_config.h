@@ -26,15 +26,18 @@ public:
   /**
    * Called when data is read from the underlying transport.
    * @param data supplies the read data.
+   * @param bytes_read supplies the number of bytes read (data might already have bytes in it).
    */
-  virtual void onRead(absl::string_view data) PURE;
+  virtual void onRead(const Buffer::Instance& data, uint32_t bytes_read) PURE;
 
   /**
    * Called when data is written to the underlying transport.
    * @param data supplies the written data.
+   * @param bytes_written supplies the number of bytes written (data might not have been fully
+   *                      written).
    * @param end_stream supplies whether this is the end of socket writes.
    */
-  virtual void onWrite(absl::string_view data, bool end_stream) PURE;
+  virtual void onWrite(const Buffer::Instance& data, uint32_t bytes_written, bool end_stream) PURE;
 };
 
 using PerSocketTapperPtr = std::unique_ptr<PerSocketTapper>;
