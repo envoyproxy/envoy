@@ -174,9 +174,8 @@ ClusterManagerImpl::ClusterManagerImpl(
     AccessLog::AccessLogManager& log_manager, Event::Dispatcher& main_thread_dispatcher,
     Server::Admin& admin, Api::Api& api, Http::Context& http_context)
     : factory_(factory), runtime_(runtime), stats_(stats), tls_(tls.allocateSlot()),
-      random_(random), log_manager_(log_manager),
-      bind_config_(bootstrap.cluster_manager().upstream_bind_config()), local_info_(local_info),
-      cm_stats_(generateStats(stats)),
+      random_(random), bind_config_(bootstrap.cluster_manager().upstream_bind_config()),
+      local_info_(local_info), cm_stats_(generateStats(stats)),
       init_helper_([this](Cluster& cluster) { onClusterInit(cluster); }),
       config_tracker_entry_(
           admin.getConfigTracker().add("clusters", [this] { return dumpClusterConfigs(); })),
@@ -191,10 +190,6 @@ ClusterManagerImpl::ClusterManagerImpl(
       outlier_event_logger_.reset(
           new Outlier::EventLoggerImpl(log_manager, event_log_file_path, time_source_));
     }
-  }
-
-  if (bootstrap.dynamic_resources().deprecated_v1().has_sds_config()) {
-    eds_config_ = bootstrap.dynamic_resources().deprecated_v1().sds_config();
   }
 
   // Cluster loading happens in two phases: first all the primary clusters are loaded, and then all
@@ -236,32 +231,6 @@ ClusterManagerImpl::ClusterManagerImpl(
   cm_stats_.cluster_added_.add(bootstrap.static_resources().clusters().size());
   updateGauges();
 
-  // All the static clusters have been loaded. At this point we can check for the
-  // existence of the v1 sds backing cluster, and the ads backing cluster.
-  // TODO(htuch): Add support for multiple clusters, #1170.
-  const ClusterInfoMap loaded_clusters = clusters();
-  if (bootstrap.dynamic_resources().deprecated_v1().has_sds_config()) {
-    const auto& sds_config = bootstrap.dynamic_resources().deprecated_v1().sds_config();
-    switch (sds_config.config_source_specifier_case()) {
-    case envoy::api::v2::core::ConfigSource::kPath: {
-      Config::Utility::checkFilesystemSubscriptionBackingPath(sds_config.path());
-      break;
-    }
-    case envoy::api::v2::core::ConfigSource::kApiConfigSource: {
-      Config::Utility::checkApiConfigSourceSubscriptionBackingCluster(
-          loaded_clusters, sds_config.api_config_source());
-      break;
-    }
-    case envoy::api::v2::core::ConfigSource::kAds: {
-      // Backing cluster will be checked below
-      break;
-    }
-    default:
-      // Validated by schema.
-      NOT_REACHED_GCOVR_EXCL_LINE;
-    }
-  }
-
   absl::optional<std::string> local_cluster_name;
   if (!cm_config.local_cluster_name().empty()) {
     local_cluster_name_ = cm_config.local_cluster_name();
@@ -281,7 +250,7 @@ ClusterManagerImpl::ClusterManagerImpl(
 
   // We can now potentially create the CDS API once the backing cluster exists.
   if (bootstrap.dynamic_resources().has_cds_config()) {
-    cds_api_ = factory_.createCds(bootstrap.dynamic_resources().cds_config(), eds_config_, *this);
+    cds_api_ = factory_.createCds(bootstrap.dynamic_resources().cds_config(), *this);
     init_helper_.setCds(cds_api_.get());
   } else {
     init_helper_.setCds(nullptr);
@@ -328,9 +297,9 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
   }
 
   // Now setup for cross-thread updates.
-  cluster.prioritySet().addMemberUpdateCb([&cluster, this](uint32_t priority,
-                                                           const HostVector& hosts_added,
-                                                           const HostVector& hosts_removed) {
+  cluster.prioritySet().addPriorityUpdateCb([&cluster, this](uint32_t priority,
+                                                             const HostVector& hosts_added,
+                                                             const HostVector& hosts_removed) {
     // This fires when a cluster is about to have an updated member set. We need to send this
     // out to all of the thread local configurations.
 
@@ -587,7 +556,7 @@ void ClusterManagerImpl::loadCluster(const envoy::api::v2::Cluster& cluster,
                                      const std::string& version_info, bool added_via_api,
                                      ClusterMap& cluster_map) {
   ClusterSharedPtr new_cluster =
-      factory_.clusterFromProto(cluster, *this, outlier_event_logger_, log_manager_, added_via_api);
+      factory_.clusterFromProto(cluster, *this, outlier_event_logger_, added_via_api);
 
   if (!added_via_api) {
     if (cluster_map.find(new_cluster->info()->name()) != cluster_map.end()) {
@@ -686,7 +655,7 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(const Cluster& cluster, ui
   // TODO(htuch): Can we skip these copies by exporting out const shared_ptr from HostSet?
   HostVectorConstSharedPtr hosts_copy(new HostVector(host_set->hosts()));
   HostVectorConstSharedPtr healthy_hosts_copy(new HostVector(host_set->healthyHosts()));
-  HostVectorConstSharedPtr degraded_hosts_copy(new HostVector(host_set->healthyHosts()));
+  HostVectorConstSharedPtr degraded_hosts_copy(new HostVector(host_set->degradedHosts()));
   HostsPerLocalityConstSharedPtr hosts_per_locality_copy = host_set->hostsPerLocality().clone();
   HostsPerLocalityConstSharedPtr healthy_hosts_per_locality_copy =
       host_set->healthyHostsPerLocality().clone();
@@ -1076,7 +1045,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
   }
 
   priority_set_.addMemberUpdateCb(
-      [this](uint32_t, const HostVector&, const HostVector& hosts_removed) -> void {
+      [this](const HostVector&, const HostVector& hosts_removed) -> void {
         // We need to go through and purge any connection pools for hosts that got deleted.
         // Even if two hosts actually point to the same address this will be safe, since if a
         // host is readded it will be a different physical HostSharedPtr.
@@ -1179,13 +1148,10 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
 }
 
 ClusterManagerPtr ProdClusterManagerFactory::clusterManagerFromProto(
-    const envoy::config::bootstrap::v2::Bootstrap& bootstrap, Stats::Store& stats,
-    ThreadLocal::Instance& tls, Runtime::Loader& runtime, Runtime::RandomGenerator& random,
-    const LocalInfo::LocalInfo& local_info, AccessLog::AccessLogManager& log_manager,
-    Server::Admin& admin) {
-  return ClusterManagerPtr{new ClusterManagerImpl(bootstrap, *this, stats, tls, runtime, random,
-                                                  local_info, log_manager, main_thread_dispatcher_,
-                                                  admin, api_, http_context_)};
+    const envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+  return ClusterManagerPtr{
+      new ClusterManagerImpl(bootstrap, *this, stats_, tls_, runtime_, random_, local_info_,
+                             log_manager_, main_thread_dispatcher_, admin_, api_, http_context_)};
 }
 
 Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
@@ -1211,18 +1177,16 @@ Tcp::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateTcpConnPool(
 
 ClusterSharedPtr ProdClusterManagerFactory::clusterFromProto(
     const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
-    Outlier::EventLoggerSharedPtr outlier_event_logger, AccessLog::AccessLogManager& log_manager,
-    bool added_via_api) {
+    Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) {
   return ClusterImplBase::create(cluster, cm, stats_, tls_, dns_resolver_, ssl_context_manager_,
-                                 runtime_, random_, main_thread_dispatcher_, log_manager,
-                                 local_info_, outlier_event_logger, added_via_api);
+                                 runtime_, random_, main_thread_dispatcher_, log_manager_,
+                                 local_info_, admin_, singleton_manager_, outlier_event_logger,
+                                 added_via_api);
 }
 
-CdsApiPtr ProdClusterManagerFactory::createCds(
-    const envoy::api::v2::core::ConfigSource& cds_config,
-    const absl::optional<envoy::api::v2::core::ConfigSource>& eds_config, ClusterManager& cm) {
-  return CdsApiImpl::create(cds_config, eds_config, cm, main_thread_dispatcher_, random_,
-                            local_info_, stats_);
+CdsApiPtr ProdClusterManagerFactory::createCds(const envoy::api::v2::core::ConfigSource& cds_config,
+                                               ClusterManager& cm) {
+  return CdsApiImpl::create(cds_config, cm, main_thread_dispatcher_, random_, local_info_, stats_);
 }
 
 } // namespace Upstream

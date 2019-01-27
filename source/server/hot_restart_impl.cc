@@ -337,7 +337,7 @@ void HotRestartImpl::onGetListenSocket(RpcGetListenSocketRequest& rpc) {
       Network::Utility::resolveUrl(std::string(rpc.address_));
   for (const auto& listener : server_->listenerManager().listeners()) {
     if (*listener.get().socket().localAddress() == *addr) {
-      reply.fd_ = listener.get().socket().fd();
+      reply.fd_ = listener.get().socket().ioHandle().fd();
       break;
     }
   }

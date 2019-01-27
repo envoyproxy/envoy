@@ -105,8 +105,7 @@ void WorkerImpl::threadRoutine(GuardDog& guard_dog) {
 
   // We must close all active connections before we actually exit the thread. This prevents any
   // destructors from running on the main thread which might reference thread locals. Destroying
-  // the handler does this as well as destroying the dispatcher which purges the delayed deletion
-  // list.
+  // the handler does this which additionally purges the dispatcher delayed deletion list.
   handler_.reset();
   tls_.shutdownThread();
   watchdog.reset();

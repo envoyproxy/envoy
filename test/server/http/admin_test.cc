@@ -14,10 +14,11 @@
 #include "common/profiler/profiler.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
-#include "common/ssl/context_config_impl.h"
 #include "common/stats/thread_local_store.h"
 
 #include "server/http/admin.h"
+
+#include "extensions/transport_sockets/tls/context_config_impl.h"
 
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/mocks.h"
@@ -87,9 +88,9 @@ public:
   Http::TestHeaderMapImpl request_headers_;
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, AdminStatsTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, AdminStatsTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(AdminStatsTest, StatsAsJson) {
   InSequence s;
@@ -553,28 +554,39 @@ TEST_P(AdminStatsTest, UsedOnlyStatsAsJsonFilterString) {
   store_->shutdownThreading();
 }
 
-INSTANTIATE_TEST_CASE_P(IpVersions, AdminFilterTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, AdminFilterTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(AdminFilterTest, HeaderOnly) {
   EXPECT_CALL(callbacks_, encodeHeaders_(_, false));
-  filter_.decodeHeaders(request_headers_, true);
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_.decodeHeaders(request_headers_, true));
 }
 
 TEST_P(AdminFilterTest, Body) {
-  filter_.decodeHeaders(request_headers_, false);
+  InSequence s;
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_.decodeHeaders(request_headers_, false));
   Buffer::OwnedImpl data("hello");
+  EXPECT_CALL(callbacks_, addDecodedData(_, false));
   EXPECT_CALL(callbacks_, encodeHeaders_(_, false));
-  filter_.decodeData(data, true);
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_.decodeData(data, true));
 }
 
 TEST_P(AdminFilterTest, Trailers) {
-  filter_.decodeHeaders(request_headers_, false);
+  InSequence s;
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_.decodeHeaders(request_headers_, false));
   Buffer::OwnedImpl data("hello");
-  filter_.decodeData(data, false);
+  EXPECT_CALL(callbacks_, addDecodedData(_, false));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_.decodeData(data, false));
+  EXPECT_CALL(callbacks_, decodingBuffer());
+  filter_.getRequestBody();
   EXPECT_CALL(callbacks_, encodeHeaders_(_, false));
-  filter_.decodeTrailers(request_headers_);
+  EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_.decodeTrailers(request_headers_));
 }
 
 class AdminInstanceTest : public testing::TestWithParam<Network::Address::IpVersion> {
@@ -620,31 +632,35 @@ public:
   Server::AdminFilter admin_filter_;
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, AdminInstanceTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
-// Can only get code coverage of AdminImpl::handlerCpuProfiler stopProfiler with
-// a real profiler linked in (successful call to startProfiler). startProfiler
-// requies tcmalloc.
-#ifdef TCMALLOC
+INSTANTIATE_TEST_SUITE_P(IpVersions, AdminInstanceTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(AdminInstanceTest, AdminProfiler) {
   Buffer::OwnedImpl data;
   Http::HeaderMapImpl header_map;
+
+  // Can only get code coverage of AdminImpl::handlerCpuProfiler stopProfiler with
+  // a real profiler linked in (successful call to startProfiler).
+#ifdef PROFILER_AVAILABLE
   EXPECT_EQ(Http::Code::OK, postCallback("/cpuprofiler?enable=y", header_map, data));
   EXPECT_TRUE(Profiler::Cpu::profilerEnabled());
+#else
+  EXPECT_EQ(Http::Code::InternalServerError,
+            postCallback("/cpuprofiler?enable=y", header_map, data));
+  EXPECT_FALSE(Profiler::Cpu::profilerEnabled());
+#endif
+
   EXPECT_EQ(Http::Code::OK, postCallback("/cpuprofiler?enable=n", header_map, data));
   EXPECT_FALSE(Profiler::Cpu::profilerEnabled());
 }
-
-#endif
 
 TEST_P(AdminInstanceTest, MutatesErrorWithGet) {
   Buffer::OwnedImpl data;
   Http::HeaderMapImpl header_map;
   const std::string path("/healthcheck/fail");
   // TODO(jmarantz): the call to getCallback should be made to fail, but as an interim we will
-  // just issue a warning, so that scripts using curl GET comamnds to mutate state can be fixed.
+  // just issue a warning, so that scripts using curl GET commands to mutate state can be fixed.
   EXPECT_LOG_CONTAINS("error",
                       "admin path \"" + path + "\" mutates state, method=GET rather than POST",
                       EXPECT_EQ(Http::Code::BadRequest, getCallback(path, header_map, data)));
@@ -853,9 +869,9 @@ TEST_P(AdminInstanceTest, ContextThatReturnsNullCertDetails) {
   // Setup a context that returns null cert details.
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
   Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString("{}");
-  Ssl::ClientContextConfigImpl cfg(*loader, factory_context);
+  Extensions::TransportSockets::Tls::ClientContextConfigImpl cfg(*loader, factory_context);
   Stats::IsolatedStoreImpl store;
-  Ssl::ClientContextSharedPtr client_ctx(
+  Envoy::Ssl::ClientContextSharedPtr client_ctx(
       server_.sslContextManager().createSslClientContext(store, cfg));
 
   const std::string expected_empty_json = R"EOF({

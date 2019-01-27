@@ -5,7 +5,7 @@ set -x
 
 if [[ `uname` == "Darwin" ]]; then
   function sha256sum {
-    gsha256sum
+    gsha256sum $@
   }
 fi
 

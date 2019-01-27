@@ -1,6 +1,7 @@
 syntax = "proto3";
 
 package envoy.config.filter.http.lua.v2;
+option java_package = "io.envoyproxy.envoy.config.filter.http.lua.v2";
 option go_package = "v2";
 
 import "validate/validate.proto";

@@ -17,12 +17,12 @@
 #include "envoy/tracing/http_tracer.h"
 
 #include "common/access_log/access_log_manager_impl.h"
+#include "common/common/assert.h"
 #include "common/common/logger_delegates.h"
 #include "common/grpc/async_client_manager_impl.h"
 #include "common/http/context_impl.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/secret/secret_manager_impl.h"
-#include "common/ssl/context_manager_impl.h"
 #include "common/upstream/health_discovery_service.h"
 
 #include "server/configuration_impl.h"
@@ -34,6 +34,7 @@
 #include "server/worker_impl.h"
 
 #include "extensions/filters/common/ratelimit/ratelimit_registration.h"
+#include "extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "absl/types/optional.h"
 
@@ -44,7 +45,7 @@ namespace Server {
  * All server wide stats. @see stats_macros.h
  */
 // clang-format off
-#define ALL_SERVER_STATS(GAUGE)                                                                    \
+#define ALL_SERVER_STATS(COUNTER, GAUGE)                                                           \
   GAUGE(uptime)                                                                                    \
   GAUGE(concurrency)                                                                               \
   GAUGE(memory_allocated)                                                                          \
@@ -54,11 +55,12 @@ namespace Server {
   GAUGE(total_connections)                                                                         \
   GAUGE(version)                                                                                   \
   GAUGE(days_until_first_cert_expiring)                                                            \
-  GAUGE(hot_restart_epoch)
+  GAUGE(hot_restart_epoch)                                                                         \
+  COUNTER(debug_assertion_failures)
 // clang-format on
 
 struct ServerStats {
-  ALL_SERVER_STATS(GENERATE_GAUGE_STRUCT)
+  ALL_SERVER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
 };
 
 /**
@@ -84,7 +86,7 @@ public:
  */
 class InstanceUtil : Logger::Loggable<Logger::Id::main> {
 public:
-  enum class BootstrapVersion { V1, V2 };
+  enum class BootstrapVersion { V2 };
 
   /**
    * Default implementation of runtime loader creation used in the real server and in most
@@ -206,6 +208,7 @@ private:
   time_t original_start_time_;
   Stats::StoreRoot& stats_store_;
   std::unique_ptr<ServerStats> server_stats_;
+  Assert::ActionRegistrationPtr assert_action_registration_;
   ThreadLocal::Instance& thread_local_;
   Api::ApiPtr api_;
   std::unique_ptr<Secret::SecretManager> secret_manager_;
@@ -215,7 +218,7 @@ private:
   Network::ConnectionHandlerPtr handler_;
   Runtime::RandomGeneratorPtr random_generator_;
   Runtime::LoaderPtr runtime_loader_;
-  std::unique_ptr<Ssl::ContextManagerImpl> ssl_context_manager_;
+  std::unique_ptr<Extensions::TransportSockets::Tls::ContextManagerImpl> ssl_context_manager_;
   ProdListenerComponentFactory listener_component_factory_;
   ProdWorkerFactory worker_factory_;
   std::unique_ptr<ListenerManager> listener_manager_;

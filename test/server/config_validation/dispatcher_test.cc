@@ -61,8 +61,8 @@ TEST_F(ConfigValidation, SharedDnsResolver) {
   EXPECT_EQ(use_count + 1, dns2.use_count()); // Each call causes ++ in use_count.
 }
 
-INSTANTIATE_TEST_CASE_P(IpVersions, ConfigValidation,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, ConfigValidation,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 } // namespace Envoy

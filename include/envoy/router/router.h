@@ -134,6 +134,11 @@ public:
    * @return bool Whether CORS is enabled for the route or virtual host.
    */
   virtual bool enabled() const PURE;
+
+  /**
+   * @return bool Whether CORS policies are evaluated when filter is off.
+   */
+  virtual bool shadowEnabled() const PURE;
 };
 
 /**
@@ -201,7 +206,12 @@ public:
 /**
  * RetryStatus whether request should be retried or not.
  */
-enum class RetryStatus { No, NoOverflow, Yes };
+enum class RetryStatus { No, NoOverflow, NoRetryLimitExceeded, Yes };
+
+/**
+ * InternalRedirectAction from the route configuration.
+ */
+enum class InternalRedirectAction { PassThrough, Handle };
 
 /**
  * Wraps retry state for an active routed request.
@@ -250,12 +260,12 @@ public:
   /**
    * Returns a reference to the PriorityLoad that should be used for the next retry.
    * @param priority_set current priority set.
-   * @param priority_load original priority load.
-   * @return PriorityLoad that should be used to select a priority for the next retry.
+   * @param original_priority_load original priority load.
+   * @return HealthyAndDegradedLoad that should be used to select a priority for the next retry.
    */
-  virtual const Upstream::PriorityLoad&
+  virtual const Upstream::HealthyAndDegradedLoad&
   priorityLoadForRetry(const Upstream::PrioritySet& priority_set,
-                       const Upstream::PriorityLoad& priority_load) PURE;
+                       const Upstream::HealthyAndDegradedLoad& original_priority_load) PURE;
   /**
    * return how many times host selection should be reattempted during host selection.
    */
@@ -636,6 +646,11 @@ public:
    * @return a map of route-specific upgrades to their enabled/disabled status.
    */
   virtual const UpgradeMap& upgradeMap() const PURE;
+
+  /**
+   * @returns the internal redirect action which should be taken on this route.
+   */
+  virtual InternalRedirectAction internalRedirectAction() const PURE;
 };
 
 /**

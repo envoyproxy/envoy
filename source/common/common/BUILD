@@ -16,6 +16,7 @@ envoy_package()
 
 envoy_cc_library(
     name = "assert_lib",
+    srcs = ["assert.cc"],
     hdrs = ["assert.h"],
     deps = [":minimal_logger_lib"],
 )
@@ -81,6 +82,7 @@ envoy_basic_cc_library(
 
 envoy_cc_library(
     name = "hash_lib",
+    srcs = ["hash.cc"],
     hdrs = ["hash.h"],
     external_deps = ["xxhash"],
 )
@@ -160,6 +162,11 @@ envoy_cc_library(
 envoy_cc_library(
     name = "non_copyable",
     hdrs = ["non_copyable.h"],
+)
+
+envoy_cc_library(
+    name = "phantom",
+    hdrs = ["phantom.h"],
 )
 
 envoy_cc_library(

@@ -223,6 +223,17 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test_binary(
+    name = "header_map_impl_speed_test",
+    srcs = ["header_map_impl_speed_test.cc"],
+    external_deps = [
+        "benchmark",
+    ],
+    deps = [
+        "//source/common/http:header_map_lib",
+    ],
+)
+
 envoy_proto_library(
     name = "header_map_impl_fuzz_proto",
     srcs = ["header_map_impl_fuzz.proto"],

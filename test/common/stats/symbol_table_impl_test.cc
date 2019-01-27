@@ -87,7 +87,9 @@ TEST_F(StatNameTest, TestSuccessfulDecode) {
   EXPECT_EQ(table_.toString(stat_name_1), stat_name);
 }
 
-TEST_F(StatNameTest, TestBadDecodes) {
+class StatNameDeathTest : public StatNameTest {};
+
+TEST_F(StatNameDeathTest, TestBadDecodes) {
   {
     // If a symbol doesn't exist, decoding it should trigger an ASSERT() and crash.
     SymbolVec bad_symbol_vec = {1}; // symbol 0 is the empty symbol.
@@ -426,8 +428,19 @@ TEST(SymbolTableTest, Memory) {
     ENVOY_LOG_MISC(info,
                    "SymbolTableTest.Memory comparison skipped due to malloc-stats returning 0.");
   } else {
-    EXPECT_LT(symbol_table_mem_used, string_mem_used / 4);
-    EXPECT_LT(symbol_table_mem_used, 1750000); // Dec 16, 2018: 1744280 bytes.
+    // Make sure we don't regress. Data as of 2019/01/04:
+    //
+    // libstdc++:
+    // ----------
+    // string_mem_used:        7759488
+    // symbol_table_mem_used:  1744280 (4.45x)
+    //
+    // libc++:
+    // -------
+    // string_mem_used:        6710912
+    // symbol_table_mem_used:  1743512 (3.85x)
+    EXPECT_LT(symbol_table_mem_used, string_mem_used / 3);
+    EXPECT_LT(symbol_table_mem_used, 1750000);
   }
 }
 

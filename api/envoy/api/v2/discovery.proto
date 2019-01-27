@@ -1,6 +1,7 @@
 syntax = "proto3";
 
 package envoy.api.v2;
+option java_package = "io.envoyproxy.envoy.api.v2";
 option go_package = "v2";
 
 import "envoy/api/v2/core/base.proto";

@@ -20,9 +20,7 @@ GrpcHttp1BridgeFilterConfig::createFilter(const std::string&,
 /**
  * Static registration for the grpc HTTP1 bridge filter. @see RegisterFactory.
  */
-static Registry::RegisterFactory<GrpcHttp1BridgeFilterConfig,
-                                 Server::Configuration::NamedHttpFilterConfigFactory>
-    register_;
+REGISTER_FACTORY(GrpcHttp1BridgeFilterConfig, Server::Configuration::NamedHttpFilterConfigFactory);
 
 } // namespace GrpcHttp1Bridge
 } // namespace HttpFilters

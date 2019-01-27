@@ -2,8 +2,8 @@
 
 set -e
 
-VERSION=1.34.0
-SHA256=8889399ddd38aa0405f6e84f1c050a292286089441686b8a9c5e937de4f5b61d
+VERSION=1.35.1
+SHA256=cb70261634c33dc5adbe780afcfc5dab17838ee303631a02b983c6a217bc16ba
 
 curl https://github.com/nghttp2/nghttp2/releases/download/v"$VERSION"/nghttp2-"$VERSION".tar.gz -sLo nghttp2-"$VERSION".tar.gz \
   && echo "$SHA256" nghttp2-"$VERSION".tar.gz | sha256sum --check
