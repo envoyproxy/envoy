@@ -25,18 +25,16 @@ then
    tar -xz -C /tmp -f /tmp/docker-"$VER".tgz
    mv /tmp/docker/* /usr/bin
 
-   docker build -f ci/Dockerfile-envoy-image -t envoyproxy/envoy:latest .
    docker login -u "$DOCKERHUB_USERNAME" -p "$DOCKERHUB_PASSWORD"
+
    docker push envoyproxy/envoy:latest
    docker tag envoyproxy/envoy:latest envoyproxy/envoy:"$CIRCLE_SHA1"
    docker push envoyproxy/envoy:"$CIRCLE_SHA1"
 
-   docker build -f ci/Dockerfile-envoy-alpine -t envoyproxy/envoy-alpine:latest .
    docker tag envoyproxy/envoy-alpine:latest envoyproxy/envoy-alpine:"$CIRCLE_SHA1"
    docker push envoyproxy/envoy-alpine:"$CIRCLE_SHA1"
    docker push envoyproxy/envoy-alpine:latest
 
-   docker build -f ci/Dockerfile-envoy-alpine-debug -t envoyproxy/envoy-alpine-debug:latest .
    docker tag envoyproxy/envoy-alpine-debug:latest envoyproxy/envoy-alpine-debug:"$CIRCLE_SHA1"
    docker push envoyproxy/envoy-alpine-debug:"$CIRCLE_SHA1"
    docker push envoyproxy/envoy-alpine-debug:latest

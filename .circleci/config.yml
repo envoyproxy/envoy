@@ -34,6 +34,7 @@ jobs:
        - attach_workspace:
            at: .
        - setup_remote_docker
+       - run: ci/docker_build.sh
        - run: ci/docker_push.sh
        - run: ci/docker_tag.sh
    asan:
