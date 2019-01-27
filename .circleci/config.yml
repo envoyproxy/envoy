@@ -29,7 +29,8 @@ jobs:
            path: /build/envoy/generated
            destination: /
    docker:
-     executor: ubuntu-build
+     docker:
+       - image: docker
      steps:
        - attach_workspace:
            at: .
