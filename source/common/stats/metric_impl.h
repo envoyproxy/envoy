@@ -43,7 +43,7 @@ protected:
 private:
   StatName tagExtractedStatName() const;
 
-  std::unique_ptr<uint8_t[]> storage_;
+  StatNameList stat_names_;
 };
 
 class NullMetricImpl : public MetricImpl {

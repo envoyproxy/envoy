@@ -497,5 +497,17 @@ struct StatNameLessThan {
   const SymbolTable& symbol_table_;
 };
 
+class StatNameList {
+public:
+  ~StatNameList();
+  void populate(const std::vector<absl::string_view>& encodings, SymbolTable& symbol_table);
+  bool populated() const { return storage_ != nullptr; }
+  void foreach (std::function<bool(StatName)>) const;
+  void clear(SymbolTable& symbol_table);
+
+private:
+  std::unique_ptr<uint8_t[]> storage_;
+};
+
 } // namespace Stats
 } // namespace Envoy

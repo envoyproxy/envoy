@@ -7,86 +7,64 @@
 namespace Envoy {
 namespace Stats {
 
-MetricImpl::MetricImpl(absl::string_view tag_extracted_name, const std::vector<Tag>& tags,
-                       SymbolTable& symbol_table) {
-  ASSERT(tags.size() < 256);
-
-  // Encode all the names and tags into transient storage so we can count the
-  // required bytes.
-  SymbolEncoding tag_extracted_stat_name = symbol_table.encode(tag_extracted_name);
-  size_t total_size = 1 /* for tags.size() */ + tag_extracted_stat_name.bytesRequired();
-  std::vector<std::pair<SymbolEncoding, SymbolEncoding>> sym_vecs;
-  sym_vecs.resize(tags.size());
-  int index = 0;
-  for (auto tag : tags) {
-    auto& vecs = sym_vecs[index++];
-    SymbolEncoding x = symbol_table.encode(tag.name_);
-    vecs.first.swap(x);
-    SymbolEncoding y = symbol_table.encode(tag.value_);
-    vecs.second.swap(y);
-    total_size += vecs.first.bytesRequired() + vecs.second.bytesRequired();
-  }
-  storage_ = std::make_unique<uint8_t[]>(total_size);
-  uint8_t* p = &storage_[0];
-  *p++ = tags.size();
-  p += tag_extracted_stat_name.moveToStorage(p);
-  for (auto& sym_vec_pair : sym_vecs) {
-    p += sym_vec_pair.first.moveToStorage(p);
-    p += sym_vec_pair.second.moveToStorage(p);
-  }
-  ASSERT(p == &storage_[0] + total_size);
-}
-
-void MetricImpl::clear() {
-  SymbolTable& symbol_table = symbolTable();
-  uint8_t* p = &storage_[0];
-  uint32_t num_tags = *p++;
-  p += tagExtractedStatName().size();
-  symbol_table.free(tagExtractedStatName());
-  for (size_t i = 0; i < num_tags; ++i) {
-    Tag tag;
-    StatName name(p);
-    p += name.size();
-    symbol_table.free(name);
-    StatName value(p);
-    p += value.size();
-    symbol_table.free(value);
-  }
-  storage_.reset();
-}
-
 MetricImpl::~MetricImpl() {
   // The storage must be cleaned by a subclass of MetricImpl in its
   // destructor, because the symbol-table is owned by the subclass.
   // Simply call MetricImpl::clear() in the subclass dtor.
-  ASSERT(storage_ == nullptr);
+  ASSERT(!stat_names_.populated());
 }
+
+MetricImpl::MetricImpl(absl::string_view tag_extracted_name, const std::vector<Tag>& tags,
+                       SymbolTable& symbol_table) {
+  // Encode all the names and tags into transient storage so we can count the
+  // required bytes.
+  std::vector<absl::string_view> names;
+  names.resize(1 /* tag_extracted_name */ + 2 * tags.size());
+  names[0] = tag_extracted_name;
+  int index = 0;
+  for (auto& tag : tags) {
+    names[++index] = tag.name_;
+    names[++index] = tag.value_;
+  }
+  stat_names_.populate(names, symbol_table);
+}
+
+void MetricImpl::clear() { stat_names_.clear(symbolTable()); }
 
 std::string MetricImpl::tagExtractedName() const {
   return symbolTable().toString(tagExtractedStatName());
 }
 
-StatName MetricImpl::tagExtractedStatName() const { return StatName(&storage_[1]); }
+StatName MetricImpl::tagExtractedStatName() const {
+  StatName stat_name;
+  stat_names_.foreach ([&stat_name](StatName s) -> bool {
+    stat_name = s;
+    return false;
+  });
+  return stat_name;
+}
 
 std::vector<Tag> MetricImpl::tags() const {
-  uint8_t* p = &storage_[0];
-  uint32_t num_tags = *p++;
-  p += tagExtractedStatName().size();
-
   std::vector<Tag> tags;
-  tags.reserve(num_tags);
+  enum { TagExtractedName, Name, Value } state;
+  Tag tag;
   const SymbolTable& symbol_table = symbolTable();
-
-  for (size_t i = 0; i < num_tags; ++i) {
-    Tag tag;
-    StatName name(p);
-    tag.name_ = symbol_table.toString(name);
-    p += name.size();
-    StatName value(p);
-    tag.value_ = symbol_table.toString(value);
-    p += value.size();
-    tags.emplace_back(tag);
-  }
+  stat_names_.foreach ([&tags, &state, &tag, &symbol_table](StatName stat_name) -> bool {
+    switch (state) {
+    case TagExtractedName:
+      state = Name;
+      break;
+    case Name:
+      tag.name_ = symbol_table.toString(stat_name);
+      state = Value;
+      break;
+    case Value:
+      tag.value_ = symbol_table.toString(stat_name);
+      tags.emplace_back(tag);
+      state = Name;
+    }
+    return true;
+  });
   return tags;
 }
 
