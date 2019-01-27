@@ -45,9 +45,11 @@ public:
  */
 #define SINGLETON_MANAGER_REGISTRATION(NAME)                                                       \
   static constexpr char NAME##_singleton_name[] = #NAME "_singleton";                              \
-  static Envoy::Registry::RegisterFactory<                                                         \
-      Envoy::Singleton::RegistrationImpl<NAME##_singleton_name>, Envoy::Singleton::Registration>   \
-      NAME##_singleton_registered_;
+  static Envoy::Registry::                                                                         \
+      RegisterFactory</* NOLINT(fuchsia-statically-constructed-objects) */                         \
+                      Envoy::Singleton::RegistrationImpl<NAME##_singleton_name>,                   \
+                      Envoy::Singleton::Registration>                                              \
+          NAME##_singleton_registered_;
 
 #define SINGLETON_MANAGER_REGISTERED_NAME(NAME) NAME##_singleton_name
 
