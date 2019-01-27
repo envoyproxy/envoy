@@ -16,8 +16,7 @@ namespace Network {
  */
 class UdpListenerImpl : public BaseListenerImpl {
 public:
-  UdpListenerImpl(const Event::DispatcherImpl& dispatcher, Socket& socket,
-                  UdpListenerCallbacks& cb);
+  UdpListenerImpl(Event::DispatcherImpl& dispatcher, Socket& socket, UdpListenerCallbacks& cb);
 
   ~UdpListenerImpl();
 

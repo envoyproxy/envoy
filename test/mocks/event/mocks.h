@@ -50,7 +50,7 @@ public:
   }
 
   FileEventPtr createFileEvent(int fd, FileReadyCb cb, FileTriggerType trigger,
-                               uint32_t events) const override {
+                               uint32_t events) override {
     return FileEventPtr{createFileEvent_(fd, cb, trigger, events)};
   }
 
@@ -99,8 +99,8 @@ public:
   MOCK_METHOD1(createDnsResolver,
                Network::DnsResolverSharedPtr(
                    const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers));
-  MOCK_CONST_METHOD4(createFileEvent_,
-                     FileEvent*(int fd, FileReadyCb cb, FileTriggerType trigger, uint32_t events));
+  MOCK_METHOD4(createFileEvent_,
+               FileEvent*(int fd, FileReadyCb cb, FileTriggerType trigger, uint32_t events));
   MOCK_METHOD0(createFilesystemWatcher_, Filesystem::Watcher*());
   MOCK_METHOD4(createListener_,
                Network::Listener*(Network::Socket& socket, Network::ListenerCallbacks& cb,

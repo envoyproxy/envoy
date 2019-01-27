@@ -16,13 +16,13 @@ namespace Network {
  */
 class BaseListenerImpl : public Listener {
 public:
-  BaseListenerImpl(const Event::DispatcherImpl& dispatcher, Socket& socket);
+  BaseListenerImpl(Event::DispatcherImpl& dispatcher, Socket& socket);
 
 protected:
   virtual Address::InstanceConstSharedPtr getLocalAddress(int fd);
 
   Address::InstanceConstSharedPtr local_address_;
-  const Event::DispatcherImpl& dispatcher_;
+  Event::DispatcherImpl& dispatcher_;
   Socket& socket_;
 };
 

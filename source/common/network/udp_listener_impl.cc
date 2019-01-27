@@ -16,7 +16,7 @@
 namespace Envoy {
 namespace Network {
 
-UdpListenerImpl::UdpListenerImpl(const Event::DispatcherImpl& dispatcher, Socket& socket,
+UdpListenerImpl::UdpListenerImpl(Event::DispatcherImpl& dispatcher, Socket& socket,
                                  UdpListenerCallbacks& cb)
     : BaseListenerImpl(dispatcher, socket), cb_(cb) {
   file_event_ = dispatcher_.createFileEvent(

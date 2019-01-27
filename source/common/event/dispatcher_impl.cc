@@ -102,7 +102,7 @@ Network::DnsResolverSharedPtr DispatcherImpl::createDnsResolver(
 }
 
 FileEventPtr DispatcherImpl::createFileEvent(int fd, FileReadyCb cb, FileTriggerType trigger,
-                                             uint32_t events) const {
+                                             uint32_t events) {
   ASSERT(isThreadSafe());
   return FileEventPtr{new FileEventImpl(*this, fd, cb, trigger, events)};
 }

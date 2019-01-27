@@ -65,9 +65,8 @@ void ListenerImpl::setupServerSocket(const Event::DispatcherImpl& dispatcher, So
   evconnlistener_set_error_cb(listener_.get(), errorCallback);
 }
 
-ListenerImpl::ListenerImpl(const Event::DispatcherImpl& dispatcher, Socket& socket,
-                           ListenerCallbacks& cb, bool bind_to_port,
-                           bool hand_off_restored_destination_connections)
+ListenerImpl::ListenerImpl(Event::DispatcherImpl& dispatcher, Socket& socket, ListenerCallbacks& cb,
+                           bool bind_to_port, bool hand_off_restored_destination_connections)
     : BaseListenerImpl(dispatcher, socket), cb_(cb),
       hand_off_restored_destination_connections_(hand_off_restored_destination_connections),
       listener_(nullptr) {
