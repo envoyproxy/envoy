@@ -57,11 +57,11 @@ protected:
 
 bool sliceMatches(const SlicePtr& slice, const std::string& expected) {
   return slice != nullptr && slice->dataSize() == expected.size() &&
-         memcmp(slice->data(), expected.c_str(), expected.size()) == 0;
+         memcmp(slice->data(), expected.data(), expected.size()) == 0;
 }
 
 TEST_F(OwnedSliceTest, Create) {
-  static std::vector<uint64_t> Sizes = {0, 1, 64, 4096 - sizeof(OwnedSlice), 65535};
+  static constexpr uint64_t Sizes[] = {0, 1, 64, 4096 - sizeof(OwnedSlice), 65535};
   for (const auto size : Sizes) {
     auto slice = OwnedSlice::create(size);
     EXPECT_NE(nullptr, slice->data());
@@ -225,7 +225,7 @@ TEST(SliceDequeTest, CreateDelete) {
     slices.emplace_back(
         std::make_unique<DummySlice>(slice1, [&slice1_deleted]() { slice1_deleted = true; }));
     EXPECT_FALSE(slices.empty());
-    EXPECT_EQ(1, slices.size());
+    ASSERT_EQ(1, slices.size());
     EXPECT_FALSE(slice1_deleted);
     EXPECT_TRUE(sliceMatches(slices.front(), slice1));
 
@@ -234,18 +234,18 @@ TEST(SliceDequeTest, CreateDelete) {
     slices.emplace_back(
         std::make_unique<DummySlice>(slice2, [&slice2_deleted]() { slice2_deleted = true; }));
     EXPECT_FALSE(slices.empty());
-    EXPECT_EQ(2, slices.size());
+    ASSERT_EQ(2, slices.size());
     EXPECT_FALSE(slice1_deleted);
     EXPECT_FALSE(slice2_deleted);
     EXPECT_TRUE(sliceMatches(slices.front(), slice1));
     EXPECT_TRUE(sliceMatches(slices.back(), slice2));
 
     // Prepend a view to the deque, to exercise the ring buffer wraparound case.
-    const std::string slice3 = "slice2";
+    const std::string slice3 = "slice3";
     slices.emplace_front(
         std::make_unique<DummySlice>(slice3, [&slice3_deleted]() { slice3_deleted = true; }));
     EXPECT_FALSE(slices.empty());
-    EXPECT_EQ(3, slices.size());
+    ASSERT_EQ(3, slices.size());
     EXPECT_FALSE(slice1_deleted);
     EXPECT_FALSE(slice2_deleted);
     EXPECT_FALSE(slice3_deleted);
@@ -255,7 +255,7 @@ TEST(SliceDequeTest, CreateDelete) {
     // Remove the first view from the deque, and verify that its slice is deleted.
     slices.pop_front();
     EXPECT_FALSE(slices.empty());
-    EXPECT_EQ(2, slices.size());
+    ASSERT_EQ(2, slices.size());
     EXPECT_FALSE(slice1_deleted);
     EXPECT_FALSE(slice2_deleted);
     EXPECT_TRUE(slice3_deleted);

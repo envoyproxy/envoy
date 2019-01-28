@@ -180,7 +180,7 @@ void OwnedImpl::copyOut(size_t start, uint64_t size, void* data) const {
         continue;
       }
       uint64_t copy_size = std::min(size, data_size - start);
-      memcpy(dest, static_cast<const uint8_t*>(slice->data()) + start, copy_size);
+      memcpy(dest, slice->data() + start, copy_size);
       size -= copy_size;
       dest += copy_size;
       start = 0;
@@ -529,7 +529,7 @@ ssize_t OwnedImpl::search(const void* data, uint64_t size, size_t start) const {
         offset += slice_size;
         continue;
       }
-      const uint8_t* slice_start = static_cast<const uint8_t*>(slice->data());
+      const uint8_t* slice_start = slice->data();
       const uint8_t* haystack = slice_start;
       const uint8_t* haystack_end = haystack + slice_size;
       haystack += start;
@@ -547,7 +547,7 @@ ssize_t OwnedImpl::search(const void* data, uint64_t size, size_t start) const {
         size_t match_index = slice_index;
         const uint8_t* match_next = first_byte_match + 1;
         const uint8_t* match_end = haystack_end;
-        for (; i < size; i++) {
+        while (i < size) {
           if (match_next >= match_end) {
             // We've hit the end of this slice, so continue checking against the next slice.
             match_index++;
@@ -556,12 +556,14 @@ ssize_t OwnedImpl::search(const void* data, uint64_t size, size_t start) const {
               break;
             }
             const auto& match_slice = slices_[match_index];
-            match_next = static_cast<const uint8_t*>(match_slice->data());
+            match_next = match_slice->data();
             match_end = match_next + match_slice->dataSize();
+            continue;
           }
           if (*match_next++ != needle[i]) {
             break;
           }
+          i++;
         }
         if (i == size) {
           // Successful match of the entire needle.

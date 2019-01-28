@@ -318,6 +318,37 @@ TEST_P(OwnedImplTest, ReserveCommit) {
   }
 }
 
+TEST_P(OwnedImplTest, Search) {
+  // Populate a buffer with a string split across many small slices, to
+  // exercise edge cases in the search implementation.
+  static const char* Inputs[] = {"ab", "a", "", "aaa", "b", "a", "aaa", "ab", "a"};
+  std::vector<std::unique_ptr<BufferFragmentImpl>> fragments;
+  for (const char* input : Inputs) {
+    fragments.emplace_back(std::make_unique<BufferFragmentImpl>(input, strlen(input), nullptr));
+  }
+
+  Buffer::OwnedImpl buffer;
+  verifyImplementation(buffer);
+  for (const auto& fragment : fragments) {
+    buffer.addBufferFragment(*fragment);
+  }
+  EXPECT_STREQ("abaaaabaaaaaba", buffer.toString().c_str());
+
+  EXPECT_EQ(-1, buffer.search("c", 1, 0));
+  EXPECT_EQ(0, buffer.search("", 0, 0));
+  EXPECT_EQ(0, buffer.search("a", 1, 0));
+  EXPECT_EQ(1, buffer.search("b", 1, 1));
+  EXPECT_EQ(2, buffer.search("a", 1, 1));
+  EXPECT_EQ(0, buffer.search("abaa", 4, 0));
+  EXPECT_EQ(2, buffer.search("aaaa", 4, 0));
+  EXPECT_EQ(2, buffer.search("aaaa", 4, 1));
+  EXPECT_EQ(2, buffer.search("aaaa", 4, 2));
+  EXPECT_EQ(7, buffer.search("aaaaab", 6, 0));
+  EXPECT_EQ(0, buffer.search("abaaaabaaaaaba", 14, 0));
+  EXPECT_EQ(12, buffer.search("ba", 2, 10));
+  EXPECT_EQ(-1, buffer.search("abaaaabaaaaabaa", 15, 0));
+}
+
 TEST_P(OwnedImplTest, ToString) {
   Buffer::OwnedImpl buffer;
   verifyImplementation(buffer);

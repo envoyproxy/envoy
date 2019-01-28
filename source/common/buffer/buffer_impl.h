@@ -38,12 +38,12 @@ public:
   /**
    * @return a pointer to the start of the usable content.
    */
-  const void* data() const { return base_ + data_; }
+  const uint8_t* data() const { return base_ + data_; }
 
   /**
    * @return a pointer to the start of the usable content.
    */
-  void* data() { return base_ + data_; }
+  uint8_t* data() { return base_ + data_; }
 
   /**
    * @return the size in bytes of the usable content.
