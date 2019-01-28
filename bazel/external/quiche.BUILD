@@ -170,7 +170,7 @@ cc_library(
 
 cc_test(
     name = "quic_platform_test",
-    srcs = ["quic_string_utils_test.cc"],
+    srcs = ["quiche/quic/platform/api/quic_string_utils_test.cc"],
     deps = [
         ":quic_platform",
     ],
