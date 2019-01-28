@@ -8,12 +8,6 @@
 namespace Envoy {
 namespace Network {
 
-class IoHandle {
-public:
-
-  virtual int id() PURE;
-};
-
 /**
  * IoHandle: an abstract interface for all I/O operations
  */
@@ -37,7 +31,7 @@ public:
 
   virtual Api::SysCallSizeResult writev(const iovec* iovec, int num_iovec) PURE;
 
-  virtual bool isClosed() PURE;
+  virtual bool isClosed() const PURE;
 
   virtual Api::SysCallIntResult bind(const sockaddr* addr, socklen_t addrlen) PURE;
 
@@ -47,22 +41,22 @@ public:
                                                 socklen_t optlen) PURE;
 
   virtual Api::SysCallIntResult getSocketOption(int level, int optname, void* optval,
-                                                socklen_t* optlen) PURE;
+                                                socklen_t* optlen) const PURE;
 
-  virtual Api::SysCallIntResult getSocketName(struct sockaddr* addr, socklen_t* addr_len) PURE;
+  virtual Api::SysCallIntResult getSocketName(struct sockaddr* addr,
+                                              socklen_t* addr_len) const PURE;
 
-  virtual Api::SysCallIntResult getPeerName(struct sockaddr* addr, socklen_t* addr_len) PURE;
+  virtual Api::SysCallIntResult getPeerName(struct sockaddr* addr, socklen_t* addr_len) const PURE;
 
   virtual Api::SysCallIntResult setSocketFlag(int flag) PURE;
 
-  virtual Api::SysCallIntResult getSocketFlag() PURE;
+  virtual Api::SysCallIntResult getSocketFlag() const PURE;
 
   virtual Api::SysCallIntResult listen(int backlog) PURE;
 
-  virtual std::unique_ptr<IoHandle> dup() PURE;
+  virtual std::unique_ptr<IoHandle> dup() const PURE;
 
   virtual Api::SysCallIntResult shutdown(int how) PURE;
-
 };
 
 typedef std::unique_ptr<IoHandle> IoHandlePtr;

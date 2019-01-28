@@ -67,6 +67,9 @@ envoy_cc_library(
 envoy_cc_library(
     name = "io_handle_interface",
     hdrs = ["io_handle.h"],
+    deps = [
+        "//include/envoy/api:os_sys_calls_interface",
+    ],
 )
 
 envoy_cc_library(
@@ -105,13 +108,5 @@ envoy_cc_library(
     deps = [
         ":address_interface",
         "@envoy_api//envoy/api/v2/core:base_cc",
-    ],
-)
-
-envoy_cc_library(
-    name = "io_handle_interface",
-    hdrs = ["io_handle.h"],
-    deps = [
-        "//include/envoy/api:os_sys_calls_interface",
     ],
 )
