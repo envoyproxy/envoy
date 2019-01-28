@@ -122,6 +122,7 @@ cc_library(
         "quiche/quic/platform/api/quic_prefetch.h",
         "quiche/quic/platform/api/quic_string.h",
         "quiche/quic/platform/api/quic_string_piece.h",
+        "quiche/quic/platform/api/quic_ptr_util.h",
         # TODO: uncomment the following files as implementations are added.
         # "quiche/quic/platform/api/quic_bug_tracker.h",
         # "quiche/quic/platform/api/quic_client_stats.h",
@@ -145,7 +146,6 @@ cc_library(
         # "quiche/quic/platform/api/quic_mock_log.h",
         # "quiche/quic/platform/api/quic_mutex.h",
         # "quiche/quic/platform/api/quic_pcc_sender.h",
-        # "quiche/quic/platform/api/quic_ptr_util.h",
         # "quiche/quic/platform/api/quic_reference_counted.h",
         # "quiche/quic/platform/api/quic_server_stats.h",
         # "quiche/quic/platform/api/quic_singleton.h",
