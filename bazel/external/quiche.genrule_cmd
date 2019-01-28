@@ -21,6 +21,9 @@ cat <<EOF >sed_commands
 
 # Strip "net/third_party" from include directives to other QUICHE files.
 /^#include/ s!net/third_party/quiche/src/!quiche/!
+
+# Rewrite gtest includes.
+/^#include/ s!testing/gtest/include/gtest/!gtest/!
 EOF
 
 for src_file in $(SRCS); do
