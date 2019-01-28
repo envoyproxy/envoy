@@ -42,7 +42,7 @@ public:
    */
   void capture() {
     // Skip of one means we exclude the last call, which must be to capture().
-    stack_depth_ = absl::GetStackTrace(stack_trace_, MAX_STACK_DEPTH, /* skip_count = */ 1);
+    stack_depth_ = absl::GetStackTrace(stack_trace_, MaxStackDepth, /* skip_count = */ 1);
   }
 
   /**
@@ -56,7 +56,7 @@ public:
    */
   void captureFrom(const void* context) {
     stack_depth_ =
-        absl::GetStackTraceWithContext(stack_trace_, MAX_STACK_DEPTH, /* skip_count = */ 1, context,
+        absl::GetStackTraceWithContext(stack_trace_, MaxStackDepth, /* skip_count = */ 1, context,
                                        /* min_dropped_frames = */ nullptr);
   }
 
@@ -82,8 +82,8 @@ public:
   }
 
 private:
-  static constexpr int MAX_STACK_DEPTH = 64;
-  void* stack_trace_[MAX_STACK_DEPTH];
-  int stack_depth_;
+  static constexpr int MaxStackDepth = 64;
+  void* stack_trace_[MaxStackDepth];
+  int stack_depth_{0};
 };
 } // namespace Envoy
