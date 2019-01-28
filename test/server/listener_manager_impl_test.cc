@@ -2803,6 +2803,55 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, FreebindListenerEnabled) {
   }
 }
 
+// Validate that when tcp_fast_open_queue_length is set in the Listener, we see the socket option
+// propagated to setsockopt(). This is as close to an end-to-end test as we have
+// for this feature, due to the complexity of creating an integration test
+// involving the network stack. We only test the IPv4 case here, as the logic
+// around IPv4/IPv6 handling is tested generically in
+// socket_option_impl_test.cc.
+TEST_F(ListenerManagerImplWithRealFiltersTest, FastOpenListenerEnabled) {
+  NiceMock<Api::MockOsSysCalls> os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    name: FastOpenListener
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1111 }
+    filter_chains:
+    - filters:
+    tcp_fast_open_queue_length: 1
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+  if (ENVOY_SOCKET_TCP_FASTOPEN.has_value()) {
+    EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true))
+        .WillOnce(
+            Invoke([this](Network::Address::InstanceConstSharedPtr, Network::Address::SocketType,
+                          const Network::Socket::OptionsSharedPtr& options,
+                          bool) -> Network::SocketSharedPtr {
+              EXPECT_NE(options.get(), nullptr);
+              EXPECT_EQ(options->size(), 1);
+              EXPECT_TRUE(
+                  Network::Socket::applyOptions(options, *listener_factory_.socket_,
+                                                envoy::api::v2::core::SocketOption::STATE_LISTENING));
+              return listener_factory_.socket_;
+            }));
+    EXPECT_CALL(os_sys_calls, setsockopt_(_, ENVOY_SOCKET_TCP_FASTOPEN.value().first,
+                                          ENVOY_SOCKET_TCP_FASTOPEN.value().second, _, sizeof(int)))
+        .WillOnce(Invoke([](int, int, int, const void* optval, socklen_t) -> int {
+          EXPECT_EQ(1, *static_cast<const int*>(optval));
+          return 0;
+        }));
+    manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true);
+    EXPECT_EQ(1U, manager_->listeners().size());
+  } else {
+    // MockListenerSocket is not a real socket, so this always fails in testing.
+    EXPECT_THROW_WITH_MESSAGE(
+        manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true), EnvoyException,
+        "MockListenerComponentFactory: Setting socket options failed");
+    EXPECT_EQ(0U, manager_->listeners().size());
+  }
+}
+
 TEST_F(ListenerManagerImplWithRealFiltersTest, LiteralSockoptListenerEnabled) {
   NiceMock<Api::MockOsSysCalls> os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
