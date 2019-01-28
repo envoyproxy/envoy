@@ -23,11 +23,13 @@ public:
   void setLocalAddress(const Address::InstanceConstSharedPtr& local_address) override {
     local_address_ = local_address;
   }
-  int fd() const override { return fd_; }
+
+  IoHandle& ioHandle() override { return *io_handle_; }
+  const IoHandle& ioHandle() const override { return *io_handle_; }
   void close() override {
-    if (fd_ != -1) {
-      ::close(fd_);
-      fd_ = -1;
+    if (io_handle_->fd() != -1) {
+      ::close(io_handle_->fd());
+      io_handle_->close();
     }
   }
   void ensureOptions() {
@@ -46,18 +48,18 @@ public:
   const OptionsSharedPtr& options() const override { return options_; }
 
 protected:
-  SocketImpl(int fd, const Address::InstanceConstSharedPtr& local_address)
-      : fd_(fd), local_address_(local_address) {}
+  SocketImpl(IoHandlePtr&& io_handle, const Address::InstanceConstSharedPtr& local_address)
+      : io_handle_(std::move(io_handle)), local_address_(local_address) {}
 
-  int fd_;
+  IoHandlePtr io_handle_;
   Address::InstanceConstSharedPtr local_address_;
   OptionsSharedPtr options_;
 };
 
 class ListenSocketImpl : public SocketImpl {
 protected:
-  ListenSocketImpl(int fd, const Address::InstanceConstSharedPtr& local_address)
-      : SocketImpl(fd, local_address) {}
+  ListenSocketImpl(IoHandlePtr&& io_handle, const Address::InstanceConstSharedPtr& local_address)
+      : SocketImpl(std::move(io_handle), local_address) {}
 
   void setupSocket(const Network::Socket::OptionsSharedPtr& options, bool bind_to_port);
   void doBind();
@@ -82,16 +84,16 @@ public:
   NetworkListenSocket(const Address::InstanceConstSharedPtr& address,
                       const Network::Socket::OptionsSharedPtr& options, bool bind_to_port)
       : ListenSocketImpl(address->socket(T::type), address) {
-    RELEASE_ASSERT(fd_ != -1, "");
+    RELEASE_ASSERT(io_handle_->fd() != -1, "");
 
     setPrebindSocketOptions();
 
     setupSocket(options, bind_to_port);
   }
 
-  NetworkListenSocket(int fd, const Address::InstanceConstSharedPtr& address,
+  NetworkListenSocket(IoHandlePtr&& io_handle, const Address::InstanceConstSharedPtr& address,
                       const Network::Socket::OptionsSharedPtr& options)
-      : ListenSocketImpl(fd, address) {
+      : ListenSocketImpl(std::move(io_handle), address) {
     setListenSocketOptions(options);
   }
 
@@ -110,15 +112,16 @@ typedef std::unique_ptr<UdpListenSocket> UdpListenSocketPtr;
 class UdsListenSocket : public ListenSocketImpl {
 public:
   UdsListenSocket(const Address::InstanceConstSharedPtr& address);
-  UdsListenSocket(int fd, const Address::InstanceConstSharedPtr& address);
+  UdsListenSocket(IoHandlePtr&& io_handle, const Address::InstanceConstSharedPtr& address);
   Address::SocketType socketType() const override { return Address::SocketType::Stream; }
 };
 
 class ConnectionSocketImpl : public SocketImpl, public ConnectionSocket {
 public:
-  ConnectionSocketImpl(int fd, const Address::InstanceConstSharedPtr& local_address,
+  ConnectionSocketImpl(IoHandlePtr&& io_handle,
+                       const Address::InstanceConstSharedPtr& local_address,
                        const Address::InstanceConstSharedPtr& remote_address)
-      : SocketImpl(fd, local_address), remote_address_(remote_address) {}
+      : SocketImpl(std::move(io_handle), local_address), remote_address_(remote_address) {}
 
   // Network::Socket
   Address::SocketType socketType() const override { return Address::SocketType::Stream; }
@@ -165,9 +168,9 @@ protected:
 // ConnectionSocket used with server connections.
 class AcceptedSocketImpl : public ConnectionSocketImpl {
 public:
-  AcceptedSocketImpl(int fd, const Address::InstanceConstSharedPtr& local_address,
+  AcceptedSocketImpl(IoHandlePtr&& io_handle, const Address::InstanceConstSharedPtr& local_address,
                      const Address::InstanceConstSharedPtr& remote_address)
-      : ConnectionSocketImpl(fd, local_address, remote_address) {}
+      : ConnectionSocketImpl(std::move(io_handle), local_address, remote_address) {}
 };
 
 // ConnectionSocket used with client connections.

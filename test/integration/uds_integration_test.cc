@@ -9,14 +9,15 @@
 
 namespace Envoy {
 
-INSTANTIATE_TEST_CASE_P(TestParameters, UdsUpstreamIntegrationTest,
-                        testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+INSTANTIATE_TEST_SUITE_P(
+    TestParameters, UdsUpstreamIntegrationTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
 #if defined(__linux__)
-                                         testing::Values(false, true)
+                     testing::Values(false, true)
 #else
-                                         testing::Values(false)
+                     testing::Values(false)
 #endif
-                                             ));
+                         ));
 
 TEST_P(UdsUpstreamIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
   testRouterRequestAndResponseWithBody(1024, 512, false);
@@ -38,14 +39,15 @@ TEST_P(UdsUpstreamIntegrationTest, RouterDownstreamDisconnectBeforeResponseCompl
   testRouterDownstreamDisconnectBeforeResponseComplete();
 }
 
-INSTANTIATE_TEST_CASE_P(TestParameters, UdsListenerIntegrationTest,
-                        testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+INSTANTIATE_TEST_SUITE_P(
+    TestParameters, UdsListenerIntegrationTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
 #if defined(__linux__)
-                                         testing::Values(false, true)
+                     testing::Values(false, true)
 #else
-                                         testing::Values(false)
+                     testing::Values(false)
 #endif
-                                             ));
+                         ));
 
 void UdsListenerIntegrationTest::initialize() {
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {

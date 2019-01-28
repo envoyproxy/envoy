@@ -35,9 +35,9 @@ public:
   }
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, TapIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, TapIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 // Verify a basic tap flow using the admin handler.
 TEST_P(TapIntegrationTest, AdminBasicFlow) {

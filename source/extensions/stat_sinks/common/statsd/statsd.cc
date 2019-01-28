@@ -20,22 +20,23 @@ namespace StatSinks {
 namespace Common {
 namespace Statsd {
 
-Writer::Writer(Network::Address::InstanceConstSharedPtr address) {
-  fd_ = address->socket(Network::Address::SocketType::Datagram);
-  ASSERT(fd_ != -1);
+Writer::Writer(Network::Address::InstanceConstSharedPtr address)
+    : io_handle_(address->socket(Network::Address::SocketType::Datagram)) {
+  ASSERT(io_handle_->fd() != -1);
 
-  const Api::SysCallIntResult result = address->connect(fd_);
+  const Api::SysCallIntResult result = address->connect(io_handle_->fd());
   ASSERT(result.rc_ != -1);
 }
 
 Writer::~Writer() {
-  if (fd_ != -1) {
-    RELEASE_ASSERT(close(fd_) == 0, "");
+  if (io_handle_->fd() != -1) {
+    RELEASE_ASSERT(close(io_handle_->fd()) == 0, "");
+    io_handle_->close();
   }
 }
 
 void Writer::write(const std::string& message) {
-  ::send(fd_, message.c_str(), message.size(), MSG_DONTWAIT);
+  ::send(io_handle_->fd(), message.c_str(), message.size(), MSG_DONTWAIT);
 }
 
 UdpStatsdSink::UdpStatsdSink(ThreadLocal::SlotAllocator& tls,
