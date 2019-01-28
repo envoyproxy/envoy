@@ -2,7 +2,9 @@
 
 set -e
 
-# Transformations to QUICHE tarball performed here:
+# This script is invoked from quiche.BUILD to tweak QUICHE source files into a
+# form usable by Envoy. Transformations performed here:
+#
 # - Move subtree under quiche/ base dir, for clarity in #include statements.
 # - Rewrite include directives for platform/impl files to point to the directory
 #   containing Envoy's QUICHE platform implementation.

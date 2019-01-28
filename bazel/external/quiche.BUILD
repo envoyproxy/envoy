@@ -15,11 +15,8 @@ licenses(["notice"])  # Apache 2
 # source files in group 3 (the Platform impl). Unfortunately, QUICHE does not
 # yet provide a built-in way to customize this dependency, e.g. to override the
 # directory or namespace in which Platform impl types are defined. Hence the
-# gross hacks in this file and quiche.genrule_cmd.
-#
-# Transformations to QUICHE tarball performed here, via quiche.genrule_cmd:
-# - Move subtree under quiche/ base dir, for clarity in #include statements.
-# - Rewrite include directives for platform/impl files.
+# gross hacks in quiche.genrule_cmd, invoked from here to tweak QUICHE source
+# files into a form usable by Envoy.
 #
 # The mechanics of this will change as QUICHE evolves, supplies its own Bazel
 # buildfiles, and provides a built-in way to override platform impl directory
