@@ -459,6 +459,7 @@ public:
 
   Secret::SecretManager& secretManager() override { return *(secret_manager_.get()); }
 
+  MOCK_METHOD0(admin, Server::Admin&());
   MOCK_METHOD0(sslContextManager, Ssl::ContextManager&());
   MOCK_CONST_METHOD0(statsScope, Stats::Scope&());
   MOCK_METHOD0(clusterManager, Upstream::ClusterManager&());
@@ -468,6 +469,8 @@ public:
   MOCK_METHOD0(stats, Stats::Store&());
   MOCK_METHOD1(setInitManager, void(Init::Manager&));
   MOCK_METHOD0(initManager, Init::Manager*());
+  MOCK_METHOD0(singletonManager, Singleton::Manager&());
+  MOCK_METHOD0(threadLocal, ThreadLocal::SlotAllocator&());
 
   std::unique_ptr<Secret::SecretManager> secret_manager_;
 };

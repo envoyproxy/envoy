@@ -183,13 +183,15 @@ public:
 
   MOCK_CONST_METHOD0(localAddress, const Address::InstanceConstSharedPtr&());
   MOCK_METHOD1(setLocalAddress, void(const Address::InstanceConstSharedPtr&));
-  MOCK_CONST_METHOD0(fd, int());
+  MOCK_METHOD0(ioHandle, IoHandle&());
+  MOCK_CONST_METHOD0(ioHandle, const IoHandle&());
   MOCK_CONST_METHOD0(socketType, Address::SocketType());
   MOCK_METHOD0(close, void());
   MOCK_METHOD1(addOption_, void(const Socket::OptionConstSharedPtr& option));
   MOCK_METHOD1(addOptions_, void(const Socket::OptionsSharedPtr& options));
   MOCK_CONST_METHOD0(options, const OptionsSharedPtr&());
 
+  IoHandlePtr io_handle_;
   Address::InstanceConstSharedPtr local_address_;
   OptionsSharedPtr options_;
 };
@@ -230,10 +232,12 @@ public:
   MOCK_METHOD1(addOption_, void(const Socket::OptionConstSharedPtr&));
   MOCK_METHOD1(addOptions_, void(const Socket::OptionsSharedPtr&));
   MOCK_CONST_METHOD0(options, const Network::ConnectionSocket::OptionsSharedPtr&());
-  MOCK_CONST_METHOD0(fd, int());
+  MOCK_METHOD0(ioHandle, IoHandle&());
+  MOCK_CONST_METHOD0(ioHandle, const IoHandle&());
   MOCK_CONST_METHOD0(socketType, Address::SocketType());
   MOCK_METHOD0(close, void());
 
+  IoHandlePtr io_handle_;
   Address::InstanceConstSharedPtr local_address_;
   Address::InstanceConstSharedPtr remote_address_;
 };
@@ -327,7 +331,7 @@ public:
   MOCK_CONST_METHOD1(bind, Api::SysCallIntResult(int));
   MOCK_CONST_METHOD1(connect, Api::SysCallIntResult(int));
   MOCK_CONST_METHOD0(ip, Address::Ip*());
-  MOCK_CONST_METHOD1(socket, int(Address::SocketType));
+  MOCK_CONST_METHOD1(socket, IoHandlePtr(Address::SocketType));
   MOCK_CONST_METHOD0(type, Address::Type());
 
   const std::string& asString() const override { return physical_; }
@@ -368,7 +372,8 @@ public:
   MockTransportSocketCallbacks();
   ~MockTransportSocketCallbacks();
 
-  MOCK_CONST_METHOD0(fd, int());
+  MOCK_METHOD0(ioHandle, IoHandle&());
+  MOCK_CONST_METHOD0(ioHandle, const IoHandle&());
   MOCK_METHOD0(connection, Connection&());
   MOCK_METHOD0(shouldDrainReadBuffer, bool());
   MOCK_METHOD0(setReadBufferReady, void());

@@ -216,10 +216,6 @@ void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority,
 void LoadBalancerBase::recalculatePerPriorityPanic() {
   per_priority_panic_.resize(priority_set_.hostSetsPerPriority().size());
 
-  // TODO(snowp): Right now panic thresholds doesn't work well with degraded.
-  // The normalized_total_health takes degraded hosts into account, while
-  // the subsequent panic calculation only looks at healthy hosts. Ideally
-  // they should both take degraded into account.
   const uint32_t normalized_total_availability =
       calculateNormalizedTotalAvailability(per_priority_health_, per_priority_degraded_);
 
@@ -444,15 +440,17 @@ HostConstSharedPtr LoadBalancerBase::chooseHost(LoadBalancerContext* context) {
 }
 
 bool LoadBalancerBase::isGlobalPanic(const HostSet& host_set) {
-  // TODO(snowp): This should also account for degraded hosts.
   uint64_t global_panic_threshold = std::min<uint64_t>(
       100, runtime_.snapshot().getInteger(RuntimePanicThreshold, default_healthy_panic_percent_));
   double healthy_percent = host_set.hosts().size() == 0
                                ? 0
                                : 100.0 * host_set.healthyHosts().size() / host_set.hosts().size();
 
+  double degraded_percent = host_set.hosts().size() == 0
+                                ? 0
+                                : 100.0 * host_set.degradedHosts().size() / host_set.hosts().size();
   // If the % of healthy hosts in the cluster is less than our panic threshold, we use all hosts.
-  if (healthy_percent < global_panic_threshold) {
+  if ((healthy_percent + degraded_percent) < global_panic_threshold) {
     return true;
   }
 

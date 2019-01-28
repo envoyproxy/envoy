@@ -1541,8 +1541,8 @@ TEST_P(SubsetLoadBalancerTest, GaugesUpdatedOnDestroy) {
   EXPECT_EQ(1U, stats_.lb_subsets_removed_.value());
 }
 
-INSTANTIATE_TEST_CASE_P(UpdateOrderings, SubsetLoadBalancerTest,
-                        testing::ValuesIn({REMOVES_FIRST, SIMULTANEOUS}));
+INSTANTIATE_TEST_SUITE_P(UpdateOrderings, SubsetLoadBalancerTest,
+                         testing::ValuesIn({REMOVES_FIRST, SIMULTANEOUS}));
 
 } // namespace SubsetLoadBalancerTest
 } // namespace Upstream

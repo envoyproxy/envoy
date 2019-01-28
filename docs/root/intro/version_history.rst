@@ -17,6 +17,11 @@ Version history
   <envoy_api_field_config.filter.http.ext_authz.v2.HttpService.authorization_response>`. In addition, :ref:`client headers 
   <envoy_api_field_config.filter.http.ext_authz.v2.AuthorizationResponse.allowed_client_headers>` and :ref:`upstream headers 
   <envoy_api_field_config.filter.http.ext_authz.v2.AuthorizationResponse.allowed_upstream_headers>` replaces the previous *allowed_authorization_headers* object.
+* ext_authz: authorization request and response configuration has been separated into two distinct objects: :ref:`authorization request
+  <envoy_api_field_config.filter.http.ext_authz.v2.HttpService.authorization_request>` and :ref:`authorization response
+  <envoy_api_field_config.filter.http.ext_authz.v2.HttpService.authorization_response>`. In addition, :ref:`client headers
+  <envoy_api_field_config.filter.http.ext_authz.v2.AuthorizationResponse.allowed_client_headers>` and :ref:`upstream headers
+  <envoy_api_field_config.filter.http.ext_authz.v2.AuthorizationResponse.allowed_upstream_headers>` replaces the previous *allowed_authorization_headers* object.
   All the control header lists now support :ref:`string matcher <envoy_api_msg_type.matcher.StringMatcher>` instead of standard string.
 * http: added new grpc_http1_reverse_bridge filter for converting gRPC requests into HTTP/1.1 requests.
 * mysql: added a MySQL proxy filter that is capable of parsing SQL queries over MySQL wire protocol. Refer to ::ref:`MySQL proxy<config_network_filters_mysql_proxy>` for more details.
@@ -32,8 +37,8 @@ Version history
 * upstream: added :ref:`degraded health value<arch_overview_load_balancing_degraded>` which allows
   routing to certain hosts only when there are insufficient healthy hosts available.
 
-1.9.0
-===============
+1.9.0 (Dec 20, 2018)
+====================
 * access log: added a :ref:`JSON logging mode <config_access_log_format_dictionaries>` to output access logs in JSON format.
 * access log: added dynamic metadata to access log messages streamed over gRPC.
 * access log: added DOWNSTREAM_CONNECTION_TERMINATION.

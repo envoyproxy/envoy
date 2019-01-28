@@ -14,13 +14,9 @@
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 
-#include "extensions/transport_sockets/tls/context_config_impl.h"
-#include "extensions/transport_sockets/tls/context_manager_impl.h"
-#include "extensions/transport_sockets/tls/ssl_socket.h"
-
 #include "test/common/grpc/grpc_client_integration.h"
+#include "test/integration/http_integration.h"
 #include "test/integration/utility.h"
-#include "test/integration/xds_integration_test_base.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/simulated_time_system.h"
@@ -61,39 +57,18 @@ admin:
       port_value: 0
 )EOF";
 
-class AdsIntegrationTest : public XdsIntegrationTestBase,
-                           public Grpc::GrpcClientIntegrationParamTest {
+class AdsIntegrationTest : public HttpIntegrationTest, public Grpc::GrpcClientIntegrationParamTest {
 public:
   AdsIntegrationTest()
-      : XdsIntegrationTestBase(Http::CodecClient::Type::HTTP2, ipVersion(), config) {}
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), realTime(), config) {
+    create_xds_upstream_ = true;
+    tls_xds_upstream_ = true;
+  }
 
   void TearDown() override {
     cleanUpXdsConnection();
     test_server_.reset();
     fake_upstreams_.clear();
-  }
-
-  void createUpstreams() override {
-    XdsIntegrationTestBase::createUpstreams();
-    fake_upstreams_.emplace_back(new FakeUpstream(
-        createUpstreamSslContext(), 0, FakeHttpConnection::Type::HTTP2, version_, timeSystem()));
-  }
-
-  Network::TransportSocketFactoryPtr createUpstreamSslContext() {
-    envoy::api::v2::auth::DownstreamTlsContext tls_context;
-    auto* common_tls_context = tls_context.mutable_common_tls_context();
-    common_tls_context->add_alpn_protocols("h2");
-    auto* tls_cert = common_tls_context->add_tls_certificates();
-    tls_cert->mutable_certificate_chain()->set_filename(
-        TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcert.pem"));
-    tls_cert->mutable_private_key()->set_filename(
-        TestEnvironment::runfilesPath("test/config/integration/certs/upstreamkey.pem"));
-    auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
-        tls_context, factory_context_);
-
-    static Stats::Scope* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
-    return std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
-        std::move(cfg), context_manager_, *upstream_stats_store, std::vector<std::string>{});
   }
 
   envoy::api::v2::Cluster buildCluster(const std::string& name) {
@@ -177,7 +152,7 @@ public:
             ads_config->mutable_rate_limit_settings();
           }
           auto* grpc_service = ads_config->add_grpc_services();
-          setGrpcService(*grpc_service, "ads_cluster", fake_upstreams_.back()->localAddress());
+          setGrpcService(*grpc_service, "ads_cluster", xds_upstream_->localAddress());
           auto* ads_cluster = bootstrap.mutable_static_resources()->add_clusters();
           ads_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
           ads_cluster->set_name("ads_cluster");
@@ -195,9 +170,9 @@ public:
           }
         });
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
-    XdsIntegrationTestBase::initialize();
+    HttpIntegrationTest::initialize();
     if (xds_stream_ == nullptr) {
-      createXdsConnection(*(fake_upstreams_[1]));
+      createXdsConnection();
       AssertionResult result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
       RELEASE_ASSERT(result, result.message());
       xds_stream_->startGrpcStream();
@@ -330,7 +305,7 @@ public:
   Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{timeSystem()};
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersionsClientType, AdsIntegrationTest, GRPC_CLIENT_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, AdsIntegrationTest, GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // Validate basic config delivery and upgrade.
 TEST_P(AdsIntegrationTest, Basic) {
@@ -568,11 +543,13 @@ TEST_P(AdsIntegrationTest, RdsAfterLdsWithRdsChange) {
   makeSingleRequest();
 }
 
-class AdsFailIntegrationTest : public XdsIntegrationTestBase,
+class AdsFailIntegrationTest : public HttpIntegrationTest,
                                public Grpc::GrpcClientIntegrationParamTest {
 public:
   AdsFailIntegrationTest()
-      : XdsIntegrationTestBase(Http::CodecClient::Type::HTTP2, ipVersion(), config) {}
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), realTime(), config) {
+    create_xds_upstream_ = true;
+  }
 
   void TearDown() override {
     cleanUpXdsConnection();
@@ -580,43 +557,39 @@ public:
     fake_upstreams_.clear();
   }
 
-  void createUpstreams() override {
-    XdsIntegrationTestBase::createUpstreams();
-    fake_upstreams_.emplace_back(
-        new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_, timeSystem()));
-  }
-
   void initialize() override {
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
       auto* grpc_service =
           bootstrap.mutable_dynamic_resources()->mutable_ads_config()->add_grpc_services();
-      setGrpcService(*grpc_service, "ads_cluster", fake_upstreams_.back()->localAddress());
+      setGrpcService(*grpc_service, "ads_cluster", xds_upstream_->localAddress());
       auto* ads_cluster = bootstrap.mutable_static_resources()->add_clusters();
       ads_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       ads_cluster->set_name("ads_cluster");
     });
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
-    XdsIntegrationTestBase::initialize();
+    HttpIntegrationTest::initialize();
   }
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersionsClientType, AdsFailIntegrationTest,
-                        GRPC_CLIENT_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, AdsFailIntegrationTest,
+                         GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // Validate that we don't crash on failed ADS stream.
 TEST_P(AdsFailIntegrationTest, ConnectDisconnect) {
   initialize();
-  createXdsConnection(*fake_upstreams_[1]);
+  createXdsConnection();
   ASSERT_TRUE(xds_connection_->waitForNewStream(*dispatcher_, xds_stream_));
   xds_stream_->startGrpcStream();
   xds_stream_->finishGrpcStream(Grpc::Status::Internal);
 }
 
-class AdsConfigIntegrationTest : public XdsIntegrationTestBase,
+class AdsConfigIntegrationTest : public HttpIntegrationTest,
                                  public Grpc::GrpcClientIntegrationParamTest {
 public:
   AdsConfigIntegrationTest()
-      : XdsIntegrationTestBase(Http::CodecClient::Type::HTTP2, ipVersion(), config) {}
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), realTime(), config) {
+    create_xds_upstream_ = true;
+  }
 
   void TearDown() override {
     cleanUpXdsConnection();
@@ -624,17 +597,11 @@ public:
     fake_upstreams_.clear();
   }
 
-  void createUpstreams() override {
-    XdsIntegrationTestBase::createUpstreams();
-    fake_upstreams_.emplace_back(
-        new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_, timeSystem()));
-  }
-
   void initialize() override {
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
       auto* grpc_service =
           bootstrap.mutable_dynamic_resources()->mutable_ads_config()->add_grpc_services();
-      setGrpcService(*grpc_service, "ads_cluster", fake_upstreams_.back()->localAddress());
+      setGrpcService(*grpc_service, "ads_cluster", xds_upstream_->localAddress());
       auto* ads_cluster = bootstrap.mutable_static_resources()->add_clusters();
       ads_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       ads_cluster->set_name("ads_cluster");
@@ -648,17 +615,17 @@ public:
       eds_config->mutable_ads();
     });
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
-    XdsIntegrationTestBase::initialize();
+    HttpIntegrationTest::initialize();
   }
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersionsClientType, AdsConfigIntegrationTest,
-                        GRPC_CLIENT_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, AdsConfigIntegrationTest,
+                         GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // This is s regression validating that we don't crash on EDS static Cluster that uses ADS.
 TEST_P(AdsConfigIntegrationTest, EdsClusterWithAdsConfigSource) {
   initialize();
-  createXdsConnection(*fake_upstreams_[1]);
+  createXdsConnection();
   ASSERT_TRUE(xds_connection_->waitForNewStream(*dispatcher_, xds_stream_));
   xds_stream_->startGrpcStream();
   xds_stream_->finishGrpcStream(Grpc::Status::Ok);
@@ -679,7 +646,7 @@ TEST_P(AdsIntegrationTest, XdsBatching) {
   });
 
   pre_worker_start_test_steps_ = [this]() {
-    createXdsConnection(*fake_upstreams_.back());
+    createXdsConnection();
     ASSERT_TRUE(xds_connection_->waitForNewStream(*dispatcher_, xds_stream_));
     xds_stream_->startGrpcStream();
 

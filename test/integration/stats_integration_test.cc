@@ -25,9 +25,9 @@ public:
   void initialize() override { BaseIntegrationTest::initialize(); }
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, StatsIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, StatsIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(StatsIntegrationTest, WithDefaultConfig) {
   initialize();

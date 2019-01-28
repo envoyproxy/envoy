@@ -114,9 +114,8 @@ Network::FilterFactoryCb HttpConnectionManagerFilterConfigFactory::createFilterF
 /**
  * Static registration for the HTTP connection manager filter.
  */
-static Registry::RegisterFactory<HttpConnectionManagerFilterConfigFactory,
-                                 Server::Configuration::NamedNetworkFilterConfigFactory>
-    registered_;
+REGISTER_FACTORY(HttpConnectionManagerFilterConfigFactory,
+                 Server::Configuration::NamedNetworkFilterConfigFactory);
 
 InternalAddressConfig::InternalAddressConfig(
     const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::

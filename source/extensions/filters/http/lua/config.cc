@@ -34,9 +34,7 @@ LuaFilterConfig::createFilterFactory(const Json::Object& json_config,
 /**
  * Static registration for the Lua filter. @see RegisterFactory.
  */
-static Registry::RegisterFactory<LuaFilterConfig,
-                                 Server::Configuration::NamedHttpFilterConfigFactory>
-    register_;
+REGISTER_FACTORY(LuaFilterConfig, Server::Configuration::NamedHttpFilterConfigFactory);
 
 } // namespace Lua
 } // namespace HttpFilters

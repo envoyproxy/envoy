@@ -561,10 +561,11 @@ public:
          Ssl::ContextManager& ssl_context_manager, Runtime::Loader& runtime,
          Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
          AccessLog::AccessLogManager& log_manager, const LocalInfo::LocalInfo& local_info,
+         Server::Admin& admin, Singleton::Manager& singleton_manager,
          Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api);
-  // From Upstream::Cluster
-  virtual PrioritySet& prioritySet() override { return priority_set_; }
-  virtual const PrioritySet& prioritySet() const override { return priority_set_; }
+  // Upstream::Cluster
+  PrioritySet& prioritySet() override { return priority_set_; }
+  const PrioritySet& prioritySet() const override { return priority_set_; }
 
   /**
    * Optionally set the health checker for the primary cluster. This is done after cluster

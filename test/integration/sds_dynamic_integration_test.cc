@@ -50,14 +50,12 @@ public:
         client_cert_("client_cert") {}
 
 protected:
-  void createSdsStream(FakeUpstream& upstream) {
-    sds_upstream_ = &upstream;
-    AssertionResult result1 = sds_upstream_->waitForHttpConnection(*dispatcher_, sds_connection_);
-    RELEASE_ASSERT(result1, result1.message());
+  void createSdsStream(FakeUpstream&) {
+    createXdsConnection();
 
-    AssertionResult result2 = sds_connection_->waitForNewStream(*dispatcher_, sds_stream_);
+    AssertionResult result2 = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
     RELEASE_ASSERT(result2, result2.message());
-    sds_stream_->startGrpcStream();
+    xds_stream_->startGrpcStream();
   }
 
   void setUpSdsConfig(envoy::api::v2::auth::SdsSecretConfig* secret_config,
@@ -124,19 +122,7 @@ protected:
     discovery_response.set_type_url(Config::TypeUrl::get().Secret);
     discovery_response.add_resources()->PackFrom(secret);
 
-    sds_stream_->sendGrpcMessage(discovery_response);
-  }
-
-  void cleanUpSdsConnection() {
-    ASSERT(sds_upstream_ != nullptr);
-
-    // Don't ASSERT fail if an ADS reconnect ends up unparented.
-    sds_upstream_->set_allow_unexpected_disconnects(true);
-    AssertionResult result = sds_connection_->close();
-    RELEASE_ASSERT(result, result.message());
-    result = sds_connection_->waitForDisconnect();
-    RELEASE_ASSERT(result, result.message());
-    sds_connection_.reset();
+    xds_stream_->sendGrpcMessage(discovery_response);
   }
 
   void PrintServerCounters() {
@@ -149,10 +135,6 @@ protected:
   const std::string server_cert_;
   const std::string validation_secret_;
   const std::string client_cert_;
-  Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{timeSystem()};
-  FakeHttpConnectionPtr sds_connection_;
-  FakeUpstream* sds_upstream_{};
-  FakeStreamPtr sds_stream_;
 };
 
 // Downstream SDS integration test: static Listener with ssl cert from SDS
@@ -188,14 +170,12 @@ public:
   }
 
   void createUpstreams() override {
+    create_xds_upstream_ = true;
     HttpIntegrationTest::createUpstreams();
-    // SDS upstream
-    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_,
-                                                  timeSystem(), enable_half_close_));
   }
 
   void TearDown() override {
-    cleanUpSdsConnection();
+    cleanUpXdsConnection();
 
     client_ssl_ctx_.reset();
     cleanupUpstreamAndDownstream();
@@ -213,8 +193,8 @@ protected:
   Network::TransportSocketFactoryPtr client_ssl_ctx_;
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersionsClientType, SdsDynamicDownstreamIntegrationTest,
-                        GRPC_CLIENT_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, SdsDynamicDownstreamIntegrationTest,
+                         GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // A test that SDS server send a good server secret for a static listener.
 // The first ssl request should be OK.
@@ -310,8 +290,8 @@ private:
   bool use_combined_validation_context_;
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersionsClientType, SdsDynamicDownstreamCertValidationContextTest,
-                        GRPC_CLIENT_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, SdsDynamicDownstreamCertValidationContextTest,
+                         GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // A test that SDS server send a good certificate validation context for a static listener.
 // The first ssl request should be OK.
@@ -371,7 +351,7 @@ public:
   }
 
   void TearDown() override {
-    cleanUpSdsConnection();
+    cleanUpXdsConnection();
 
     cleanupUpstreamAndDownstream();
     codec_client_.reset();
@@ -385,14 +365,12 @@ public:
     fake_upstreams_.emplace_back(new FakeUpstream(createUpstreamSslContext(context_manager_), 0,
                                                   FakeHttpConnection::Type::HTTP1, version_,
                                                   timeSystem()));
-    // This is sds.
-    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_,
-                                                  timeSystem(), enable_half_close_));
+    create_xds_upstream_ = true;
   }
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, SdsDynamicUpstreamIntegrationTest,
-                        GRPC_CLIENT_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(IpVersions, SdsDynamicUpstreamIntegrationTest,
+                         GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // To test a static cluster with sds. SDS send a good client secret first.
 // The first request should work.

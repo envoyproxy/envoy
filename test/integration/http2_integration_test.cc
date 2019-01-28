@@ -18,9 +18,9 @@ using ::testing::MatchesRegex;
 
 namespace Envoy {
 
-INSTANTIATE_TEST_CASE_P(IpVersions, Http2IntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, Http2IntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(Http2IntegrationTest, RouterNotFound) { testRouterNotFound(); }
 
@@ -551,13 +551,13 @@ void Http2RingHashIntegrationTest::createUpstreams() {
   }
 }
 
-INSTANTIATE_TEST_CASE_P(IpVersions, Http2RingHashIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, Http2RingHashIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
-INSTANTIATE_TEST_CASE_P(IpVersions, Http2MetadataIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, Http2MetadataIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 void Http2RingHashIntegrationTest::sendMultipleRequests(
     int request_bytes, Http::TestHeaderMapImpl headers,
