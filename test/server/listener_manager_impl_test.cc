@@ -213,6 +213,63 @@ public:
     return result;
   }
 
+  void
+  expectCreateListenSocket(const envoy::api::v2::core::SocketOption::SocketState& expected_state,
+                           Network::Socket::Options::size_type expected_num_options) {
+    EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true))
+        .WillOnce(Invoke([this, expected_num_options, &expected_state](
+                             Network::Address::InstanceConstSharedPtr, Network::Address::SocketType,
+                             const Network::Socket::OptionsSharedPtr& options,
+                             bool) -> Network::SocketSharedPtr {
+          EXPECT_NE(options.get(), nullptr);
+          EXPECT_EQ(options->size(), expected_num_options);
+          EXPECT_TRUE(
+              Network::Socket::applyOptions(options, *listener_factory_.socket_, expected_state));
+          return listener_factory_.socket_;
+        }));
+  }
+
+  void expectSetsockopt(NiceMock<Api::MockOsSysCalls>& os_sys_calls, int expected_sockopt_level,
+                        int expected_sockopt_name, int expected_value, int expected_num_calls) {
+    EXPECT_CALL(os_sys_calls,
+                setsockopt_(_, expected_sockopt_level, expected_sockopt_name, _, sizeof(int)))
+        .Times(expected_num_calls)
+        .WillRepeatedly(
+            Invoke([expected_value](int, int, int, const void* optval, socklen_t) -> int {
+              EXPECT_EQ(expected_value, *static_cast<const int*>(optval));
+              return 0;
+            }));
+  }
+
+  void expectSetsockopt(NiceMock<Api::MockOsSysCalls>& os_sys_calls,
+                        const Network::SocketOptionName& expected_option, int expected_value,
+                        int expected_num_calls) {
+    expectSetsockopt(os_sys_calls, expected_option.value().first, expected_option.value().second,
+                     expected_value, expected_num_calls);
+  }
+
+  void expectThrowForInvalidSockopt(const envoy::api::v2::Listener& listener) {
+    EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(listener, "", true), EnvoyException,
+                              "MockListenerComponentFactory: Setting socket options failed");
+    EXPECT_EQ(0U, manager_->listeners().size());
+  }
+
+  void endToEndSockoptTest(const envoy::api::v2::Listener& listener,
+                           const envoy::api::v2::core::SocketOption::SocketState& expected_state,
+                           const Network::SocketOptionName& expected_option, int expected_value,
+                           int expected_num_options) {
+    NiceMock<Api::MockOsSysCalls> os_sys_calls;
+    TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+    if (expected_option.has_value()) {
+      expectCreateListenSocket(expected_state, expected_num_options);
+      expectSetsockopt(os_sys_calls, expected_option, expected_value, expected_num_options);
+      manager_->addOrUpdateListener(listener, "", true);
+      EXPECT_EQ(1U, manager_->listeners().size());
+    } else {
+      expectThrowForInvalidSockopt(listener);
+    }
+  }
+
 private:
   std::unique_ptr<Network::MockConnectionSocket> socket_;
   Network::Address::InstanceConstSharedPtr local_address_;
@@ -2709,49 +2766,19 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TransparentFreebindListenerDisabl
 // around IPv4/IPv6 handling is tested generically in
 // socket_option_impl_test.cc.
 TEST_F(ListenerManagerImplWithRealFiltersTest, TransparentListenerEnabled) {
-  NiceMock<Api::MockOsSysCalls> os_sys_calls;
-  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
-
-  const std::string yaml = TestEnvironment::substitute(R"EOF(
+  const envoy::api::v2::Listener listener = parseListenerFromV2Yaml(R"EOF(
     name: TransparentListener
     address:
       socket_address: { address: 127.0.0.1, port_value: 1111 }
     filter_chains:
     - filters:
     transparent: true
-  )EOF",
-                                                       Network::Address::IpVersion::v4);
-  if (ENVOY_SOCKET_IP_TRANSPARENT.has_value()) {
-    EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true))
-        .WillOnce(
-            Invoke([this](Network::Address::InstanceConstSharedPtr, Network::Address::SocketType,
-                          const Network::Socket::OptionsSharedPtr& options,
-                          bool) -> Network::SocketSharedPtr {
-              EXPECT_NE(options.get(), nullptr);
-              EXPECT_EQ(options->size(), 2);
-              EXPECT_TRUE(
-                  Network::Socket::applyOptions(options, *listener_factory_.socket_,
-                                                envoy::api::v2::core::SocketOption::STATE_PREBIND));
-              return listener_factory_.socket_;
-            }));
-    // Expecting the socket option to bet set twice, once pre-bind, once post-bind.
-    EXPECT_CALL(os_sys_calls,
-                setsockopt_(_, ENVOY_SOCKET_IP_TRANSPARENT.value().first,
-                            ENVOY_SOCKET_IP_TRANSPARENT.value().second, _, sizeof(int)))
-        .Times(2)
-        .WillRepeatedly(Invoke([](int, int, int, const void* optval, socklen_t) -> int {
-          EXPECT_EQ(1, *static_cast<const int*>(optval));
-          return 0;
-        }));
-    manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true);
-    EXPECT_EQ(1U, manager_->listeners().size());
-  } else {
-    // MockListenerSocket is not a real socket, so this always fails in testing.
-    EXPECT_THROW_WITH_MESSAGE(
-        manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true), EnvoyException,
-        "MockListenerComponentFactory: Setting socket options failed");
-    EXPECT_EQ(0U, manager_->listeners().size());
-  }
+  )EOF");
+
+  endToEndSockoptTest(listener, envoy::api::v2::core::SocketOption::STATE_PREBIND,
+                      ENVOY_SOCKET_IP_TRANSPARENT,
+                      /* expected_value */ 1,
+                      /* expected_num_options */ 2);
 }
 
 // Validate that when freebind is set in the Listener, we see the socket option
@@ -2761,46 +2788,19 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TransparentListenerEnabled) {
 // around IPv4/IPv6 handling is tested generically in
 // socket_option_impl_test.cc.
 TEST_F(ListenerManagerImplWithRealFiltersTest, FreebindListenerEnabled) {
-  NiceMock<Api::MockOsSysCalls> os_sys_calls;
-  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
-
-  const std::string yaml = TestEnvironment::substitute(R"EOF(
+  const envoy::api::v2::Listener listener = parseListenerFromV2Yaml(R"EOF(
     name: FreebindListener
     address:
       socket_address: { address: 127.0.0.1, port_value: 1111 }
     filter_chains:
     - filters:
     freebind: true
-  )EOF",
-                                                       Network::Address::IpVersion::v4);
-  if (ENVOY_SOCKET_IP_FREEBIND.has_value()) {
-    EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true))
-        .WillOnce(
-            Invoke([this](Network::Address::InstanceConstSharedPtr, Network::Address::SocketType,
-                          const Network::Socket::OptionsSharedPtr& options,
-                          bool) -> Network::SocketSharedPtr {
-              EXPECT_NE(options.get(), nullptr);
-              EXPECT_EQ(options->size(), 1);
-              EXPECT_TRUE(
-                  Network::Socket::applyOptions(options, *listener_factory_.socket_,
-                                                envoy::api::v2::core::SocketOption::STATE_PREBIND));
-              return listener_factory_.socket_;
-            }));
-    EXPECT_CALL(os_sys_calls, setsockopt_(_, ENVOY_SOCKET_IP_FREEBIND.value().first,
-                                          ENVOY_SOCKET_IP_FREEBIND.value().second, _, sizeof(int)))
-        .WillOnce(Invoke([](int, int, int, const void* optval, socklen_t) -> int {
-          EXPECT_EQ(1, *static_cast<const int*>(optval));
-          return 0;
-        }));
-    manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true);
-    EXPECT_EQ(1U, manager_->listeners().size());
-  } else {
-    // MockListenerSocket is not a real socket, so this always fails in testing.
-    EXPECT_THROW_WITH_MESSAGE(
-        manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true), EnvoyException,
-        "MockListenerComponentFactory: Setting socket options failed");
-    EXPECT_EQ(0U, manager_->listeners().size());
-  }
+  )EOF");
+
+  endToEndSockoptTest(listener, envoy::api::v2::core::SocketOption::STATE_PREBIND,
+                      ENVOY_SOCKET_IP_FREEBIND,
+                      /* expected_value */ 1,
+                      /* expected_num_options */ 1);
 }
 
 // Validate that when tcp_fast_open_queue_length is set in the Listener, we see the socket option
@@ -2810,53 +2810,26 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, FreebindListenerEnabled) {
 // around IPv4/IPv6 handling is tested generically in
 // socket_option_impl_test.cc.
 TEST_F(ListenerManagerImplWithRealFiltersTest, FastOpenListenerEnabled) {
-  NiceMock<Api::MockOsSysCalls> os_sys_calls;
-  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
-
-  const std::string yaml = TestEnvironment::substitute(R"EOF(
+  const envoy::api::v2::Listener listener = parseListenerFromV2Yaml(R"EOF(
     name: FastOpenListener
     address:
       socket_address: { address: 127.0.0.1, port_value: 1111 }
     filter_chains:
     - filters:
     tcp_fast_open_queue_length: 1
-  )EOF",
-                                                       Network::Address::IpVersion::v4);
-  if (ENVOY_SOCKET_TCP_FASTOPEN.has_value()) {
-    EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true))
-        .WillOnce(Invoke([this](Network::Address::InstanceConstSharedPtr,
-                                Network::Address::SocketType,
-                                const Network::Socket::OptionsSharedPtr& options,
-                                bool) -> Network::SocketSharedPtr {
-          EXPECT_NE(options.get(), nullptr);
-          EXPECT_EQ(options->size(), 1);
-          EXPECT_TRUE(
-              Network::Socket::applyOptions(options, *listener_factory_.socket_,
-                                            envoy::api::v2::core::SocketOption::STATE_LISTENING));
-          return listener_factory_.socket_;
-        }));
-    EXPECT_CALL(os_sys_calls, setsockopt_(_, ENVOY_SOCKET_TCP_FASTOPEN.value().first,
-                                          ENVOY_SOCKET_TCP_FASTOPEN.value().second, _, sizeof(int)))
-        .WillOnce(Invoke([](int, int, int, const void* optval, socklen_t) -> int {
-          EXPECT_EQ(1, *static_cast<const int*>(optval));
-          return 0;
-        }));
-    manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true);
-    EXPECT_EQ(1U, manager_->listeners().size());
-  } else {
-    // MockListenerSocket is not a real socket, so this always fails in testing.
-    EXPECT_THROW_WITH_MESSAGE(
-        manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true), EnvoyException,
-        "MockListenerComponentFactory: Setting socket options failed");
-    EXPECT_EQ(0U, manager_->listeners().size());
-  }
+  )EOF");
+
+  endToEndSockoptTest(listener, envoy::api::v2::core::SocketOption::STATE_LISTENING,
+                      ENVOY_SOCKET_TCP_FASTOPEN,
+                      /* expected_value */ 1,
+                      /* expected_num_options */ 1);
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, LiteralSockoptListenerEnabled) {
   NiceMock<Api::MockOsSysCalls> os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
-  const std::string yaml = TestEnvironment::substitute(R"EOF(
+  const envoy::api::v2::Listener listener = parseListenerFromV2Yaml(R"EOF(
     name: SockoptsListener
     address:
       socket_address: { address: 127.0.0.1, port_value: 1111 }
@@ -2869,31 +2842,13 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, LiteralSockoptListenerEnabled) {
       { level: 4, name: 5, int_value: 6, state: STATE_BOUND },
       { level: 7, name: 8, int_value: 9, state: STATE_LISTENING },
     ]
-  )EOF",
-                                                       Network::Address::IpVersion::v4);
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true))
-      .WillOnce(
-          Invoke([this](Network::Address::InstanceConstSharedPtr, Network::Address::SocketType,
-                        const Network::Socket::OptionsSharedPtr& options,
-                        bool) -> Network::SocketSharedPtr {
-            EXPECT_NE(options.get(), nullptr);
-            EXPECT_EQ(options->size(), 3);
-            EXPECT_TRUE(
-                Network::Socket::applyOptions(options, *listener_factory_.socket_,
-                                              envoy::api::v2::core::SocketOption::STATE_PREBIND));
-            return listener_factory_.socket_;
-          }));
-  EXPECT_CALL(os_sys_calls, setsockopt_(_, 1, 2, _, sizeof(int)))
-      .WillOnce(Invoke([](int, int, int, const void* optval, socklen_t) -> int {
-        EXPECT_EQ(3, *static_cast<const int*>(optval));
-        return 0;
-      }));
-  EXPECT_CALL(os_sys_calls, setsockopt_(_, 4, 5, _, sizeof(int)))
-      .WillOnce(Invoke([](int, int, int, const void* optval, socklen_t) -> int {
-        EXPECT_EQ(6, *static_cast<const int*>(optval));
-        return 0;
-      }));
-  manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true);
+  )EOF");
+
+  expectCreateListenSocket(envoy::api::v2::core::SocketOption::STATE_PREBIND,
+                           /* expected_num_options */ 3);
+  expectSetsockopt(os_sys_calls, 1, 2, 3, 1);
+  expectSetsockopt(os_sys_calls, 4, 5, 6, 1);
+  manager_->addOrUpdateListener(listener, "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 }
 
