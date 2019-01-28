@@ -571,7 +571,6 @@ def envoy_select_google_grpc(xs, repository = ""):
     return select({
         repository + "//bazel:disable_google_grpc": [],
         "//conditions:default": xs,
-        "//tools/cc_target_os:gce": [],
     })
 
 # Select the given values if exporting is enabled in the current build.
