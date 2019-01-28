@@ -64,6 +64,7 @@ public:
   CdsApiPtr createCds(const envoy::api::v2::core::ConfigSource& cds_config,
                       ClusterManager& cm) override;
 <<<<<<< HEAD
+<<<<<<< HEAD
   CdsApiPtr
   createIncrementalCds(const envoy::api::v2::core::ConfigSource& cds_config,
                        const absl::optional<envoy::api::v2::core::ConfigSource>& eds_config,
@@ -72,6 +73,8 @@ public:
   CdsApiPtr createIncrementalCds(const envoy::api::v2::core::ConfigSource& cds_config,
                                  ClusterManager& cm) override;
 >>>>>>> bring in final touches from CDS integration test PR
+=======
+>>>>>>> address comments, undo xds as incremental xds wrapper
   Secret::SecretManager& secretManager() override { return secret_manager_; }
 
 protected:

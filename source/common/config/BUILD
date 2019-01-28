@@ -213,26 +213,12 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "incremental_subscription_factory_lib",
-    hdrs = ["incremental_subscription_factory.h"],
-    deps = [
-        ":incremental_subscription_lib",
-        ":utility_lib",
-        "//include/envoy/config:incremental_subscription_interface",
-        "//include/envoy/grpc:async_client_interface",
-        "//include/envoy/upstream:cluster_manager_interface",
-        "//source/common/protobuf",
-        "@envoy_api//envoy/api/v2/core:base_cc",
-    ],
-)
-
-envoy_cc_library(
     name = "incremental_subscription_lib",
     hdrs = ["incremental_subscription_impl.h"],
     deps = [
         ":grpc_stream_lib",
         ":utility_lib",
-        "//include/envoy/config:incremental_subscription_interface",
+        "//include/envoy/config:subscription_interface",
         "//include/envoy/grpc:async_client_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/common:backoff_lib",
@@ -337,6 +323,7 @@ envoy_cc_library(
         ":grpc_mux_subscription_lib",
         ":grpc_subscription_lib",
         ":http_subscription_lib",
+        ":incremental_subscription_lib",
         ":utility_lib",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/upstream:cluster_manager_interface",
@@ -366,7 +353,6 @@ envoy_cc_library(
         ":json_utility_lib",
         ":resources_lib",
         "//include/envoy/config:grpc_mux_interface",
-        "//include/envoy/config:incremental_subscription_interface",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/local_info:local_info_interface",
         "//include/envoy/registry",

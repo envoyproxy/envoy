@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/common/exception.h"
 #include "envoy/common/pure.h"
 #include "envoy/stats/stats_macros.h"
@@ -28,6 +29,23 @@ public:
    */
   virtual void onConfigUpdate(const ResourceVector& resources,
                               const std::string& version_info) PURE;
+
+  // TODO(fredlas) it is a HACK that there are two of these. After incremental CDS is merged,
+  //               I intend to reimplement all non-incremental xDSes use of onConfigUpdate
+  //               in terms of this incremental-style one (and remove the original).
+  /**
+   * Called when an incremental configuration update is received.
+   * @param added_resources resources newly added since the previous fetch.
+   * @param removed_resources names of resources that this fetch instructed to be removed.
+   * @param system_version_info aggregate response data "version", for debugging.
+   * @throw EnvoyException with reason if the incremental config changes are rejected. Otherwise the
+   *        changes are accepted. Accepted changes have their version_info reflected in subsequent
+   *        requests.
+   */
+  virtual void
+  onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
+                 const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                 const std::string& system_version_info) PURE;
 
   /**
    * Called when either the Subscription is unable to fetch a config update or when onConfigUpdate

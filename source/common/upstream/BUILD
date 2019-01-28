@@ -29,17 +29,23 @@ envoy_cc_library(
 
 envoy_cc_library(
 <<<<<<< HEAD
+<<<<<<< HEAD
     name = "cds_incremental_lib",
     srcs = ["cds_incremental.cc"],
     hdrs = ["cds_incremental.h"],
+=======
+    name = "cds_api_incremental_lib",
+    srcs = ["cds_api_incremental_impl.cc"],
+    hdrs = ["cds_api_incremental_impl.h"],
+>>>>>>> address comments, undo xds as incremental xds wrapper
     deps = [
-        "//include/envoy/config:incremental_subscription_interface",
+        "//include/envoy/config:subscription_interface",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/local_info:local_info_interface",
         "//source/common/common:cleanup_lib",
         "//source/common/common:minimal_logger_lib",
-        "//source/common/config:incremental_subscription_factory_lib",
         "//source/common/config:resources_lib",
+        "//source/common/config:subscription_factory_lib",
         "//source/common/config:utility_lib",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/api/v2:cds_cc",
@@ -74,8 +80,8 @@ envoy_cc_library(
     srcs = ["cluster_manager_impl.cc"],
     hdrs = ["cluster_manager_impl.h"],
     deps = [
+        ":cds_api_incremental_lib",
         ":cds_api_lib",
-        ":cds_incremental_lib",
         ":load_balancer_lib",
         ":load_stats_reporter_lib",
         ":ring_hash_lb_lib",

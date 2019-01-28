@@ -49,6 +49,8 @@ public:
     drainRequests();
   }
 
+  void clearRequestQueue() { request_queue_ = {}; }
+
   void establishNewStream() {
     ENVOY_LOG(debug, "Establishing new gRPC bidi stream for {}", service_method_.DebugString());
     stream_ = async_client_->start(service_method_, *this);

@@ -25,11 +25,11 @@ struct ResourceNameDiff {
 };
 
 /**
- * TODO SOMETHING SOMETHING subscription. Also handles per-xDS API stats/logging.
+ * Manages the logic of a (non-aggregated) incremental xDS subscription.
  */
 template <class ResourceType>
 class IncrementalSubscriptionImpl
-    : public IncrementalSubscription<ResourceType>,
+    : public Subscription<ResourceType>,
       public GrpcStream<envoy::api::v2::IncrementalDiscoveryRequest,
                         envoy::api::v2::IncrementalDiscoveryResponse, ResourceNameDiff> {
 public:
@@ -37,15 +37,15 @@ public:
                               Grpc::AsyncClientPtr async_client, Event::Dispatcher& dispatcher,
                               const Protobuf::MethodDescriptor& service_method,
                               Runtime::RandomGenerator& random, Stats::Scope& scope,
-                              const RateLimitSettings& rate_limit_settings,
-                              IncrementalSubscriptionStats stats)
+                              const RateLimitSettings& rate_limit_settings, SubscriptionStats stats)
       : GrpcStream<envoy::api::v2::IncrementalDiscoveryRequest,
                    envoy::api::v2::IncrementalDiscoveryResponse, ResourceNameDiff>(
             std::move(async_client), service_method, random, dispatcher, scope,
             rate_limit_settings),
         type_url_(Grpc::Common::typeUrl(ResourceType().GetDescriptor()->full_name())),
         local_info_(local_info), stats_(stats) {
-    establishNewStream();
+    request_.set_type_url(type_url_);
+    request_.mutable_node()->MergeFrom(local_info_.node());
   }
 
   // Enqueues and attempts to send a discovery request, (un)subscribing to resources missing from /
@@ -53,28 +53,18 @@ public:
   // 'resources'.
   void buildAndQueueDiscoveryRequest(const std::vector<std::string>& resources) {
     ResourceNameDiff diff;
-    for (const auto& resource : resources) {
-      if (resources_.find(resource) == resources_.end()) {
-        diff.added_.push_back(resource);
-      }
-    }
-    for (const auto& entry : resources_) {
-      bool found = false;
-      for (const auto& resource : resources) {
-        if (entry.first == resource) {
-          found = true;
-          break;
-        }
-      }
-      if (!found) {
-        diff.removed_.push_back(entry.first);
-      }
-    }
+    std::set_difference(resources.begin(), resources.end(), resource_names_.begin(),
+                        resource_names_.end(), diff.added_.begin());
+    std::set_difference(resource_names_.begin(), resource_names_.end(), resources.begin(),
+                        resources.end(), diff.removed_.begin());
+
     for (const auto& added : diff.added_) {
       resources_[added] = "0";
+      resource_names_.insert(added);
     }
     for (const auto& removed : diff.removed_) {
       resources_.erase(removed);
+      resource_names_.erase(removed);
     }
     queueDiscoveryRequest(diff);
   }
@@ -110,8 +100,7 @@ public:
     // convenient side-effect that we order messages on the channel based on
     // Envoy's internal dependency ordering.
     if (!subscribed_) {
-      request_.set_type_url(type_url_);
-      request_.mutable_node()->MergeFrom(local_info_.node());
+
       subscribed_ = true;
     }
     buildAndQueueDiscoveryRequest(resources);
@@ -129,8 +118,7 @@ public:
     paused_ = false;
   }
 
-  // Config::IncrementalSubscription....Callbacks? these are just meant as wrappers. Not sure if
-  // this class would have these called on it, but perhaps.
+  // Config::SubscriptionCallbacks
   void onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
                       const Protobuf::RepeatedPtrField<std::string>& removed_resources,
                       const std::string& version_info) {
@@ -170,12 +158,16 @@ public:
   }
 
   void handleStreamEstablished() override {
-    // TODO need something like this? to guarantee this initial version'd request_ is what gets
-    // sent? request_queue_.clear(); "must be populated for first request in a stream"
-    request_.clear_initial_resource_versions();
+    // initial_resource_versions "must be populated for first request in a stream", so guarantee
+    // that the initial version'd request we're about to enqueue is what gets sent.
+    clearRequestQueue();
+
+    request_.Clear();
     for (auto const& resource : resources_) {
       (*request_.mutable_initial_resource_versions())[resource.first] = resource.second;
     }
+    request_.set_type_url(type_url_);
+    request_.mutable_node()->MergeFrom(local_info_.node());
     queueDiscoveryRequest(ResourceNameDiff()); // no change to subscribed resources
   }
 
@@ -189,11 +181,10 @@ public:
   }
 
   // Config::IncrementalSubscription
-  // TODO can combine with updateResources unless API needs to expose them both
   void start(const std::vector<std::string>& resources,
-             IncrementalSubscriptionCallbacks<ResourceType>& callbacks) override {
+             SubscriptionCallbacks<ResourceType>& callbacks) override {
     callbacks_ = &callbacks;
-
+    establishNewStream();
     subscribe(resources);
     // The attempt stat here is maintained for the purposes of having consistency between ADS and
     // individual IncrementalSubscriptions. Since ADS is push based and muxed, the notion of an
@@ -209,8 +200,10 @@ public:
 private:
   // A map from resource name to per-resource version.
   std::map<std::string, std::string> resources_;
+  // The keys of resources_.
+  std::set<std::string> resource_names_;
   const std::string type_url_;
-  IncrementalSubscriptionCallbacks<ResourceType>* callbacks_{};
+  SubscriptionCallbacks<ResourceType>* callbacks_{};
   // In-flight or previously sent request.
   envoy::api::v2::IncrementalDiscoveryRequest request_;
   // Paused via pause()?
@@ -223,7 +216,7 @@ private:
   std::queue<ResourceNameDiff> request_queue_;
   // Detects when Envoy is making too many requests.
 
-  IncrementalSubscriptionStats stats_; // TODO trim?
+  SubscriptionStats stats_;
 };
 
 } // namespace Config

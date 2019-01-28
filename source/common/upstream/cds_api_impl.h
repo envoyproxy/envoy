@@ -33,7 +33,12 @@ public:
   const std::string versionInfo() const override { return version_info_; }
 
   // Config::SubscriptionCallbacks
+  // TODO(fredlas) deduplicate
   void onConfigUpdate(const ResourceVector& resources, const std::string& version_info) override;
+  void onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>&,
+                      const Protobuf::RepeatedPtrField<std::string>&, const std::string&) override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
   void onConfigUpdateFailed(const EnvoyException* e) override;
   std::string resourceName(const ProtobufWkt::Any& resource) override {
     return MessageUtil::anyConvert<envoy::api::v2::Cluster>(resource).name();

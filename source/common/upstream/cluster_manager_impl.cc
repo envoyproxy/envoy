@@ -31,7 +31,7 @@
 #include "common/router/shadow_writer_impl.h"
 #include "common/tcp/conn_pool.h"
 #include "common/upstream/cds_api_impl.h"
-#include "common/upstream/cds_incremental.h"
+#include "common/upstream/cds_api_incremental_impl.h"
 #include "common/upstream/load_balancer_impl.h"
 #include "common/upstream/maglev_lb.h"
 #include "common/upstream/original_dst_cluster.h"
@@ -252,6 +252,7 @@ ClusterManagerImpl::ClusterManagerImpl(
   // We can now potentially create the CDS API once the backing cluster exists.
   if (bootstrap.dynamic_resources().has_cds_config()) {
 <<<<<<< HEAD
+<<<<<<< HEAD
     const auto& cds_config = bootstrap.dynamic_resources().cds_config();
     if (cds_config.config_source_specifier_case() ==
             envoy::api::v2::core::ConfigSource::kApiConfigSource &&
@@ -264,6 +265,9 @@ ClusterManagerImpl::ClusterManagerImpl(
 =======
     cds_api_ = factory_.createCds(bootstrap.dynamic_resources().cds_config(), *this);
 >>>>>>> config: removing the legacy rest API (#5522)
+=======
+    cds_api_ = factory_.createCds(bootstrap.dynamic_resources().cds_config(), *this);
+>>>>>>> address comments, undo xds as incremental xds wrapper
     init_helper_.setCds(cds_api_.get());
   } else {
     init_helper_.setCds(nullptr);
@@ -1198,6 +1202,7 @@ ClusterSharedPtr ProdClusterManagerFactory::clusterFromProto(
 
 CdsApiPtr ProdClusterManagerFactory::createCds(const envoy::api::v2::core::ConfigSource& cds_config,
                                                ClusterManager& cm) {
+<<<<<<< HEAD
   return CdsApiImpl::create(cds_config, cm, main_thread_dispatcher_, random_, local_info_, stats_);
 }
 
@@ -1212,6 +1217,14 @@ CdsApiPtr ProdClusterManagerFactory::createIncrementalCds(
   return CdsIncremental::create(cds_config, cm, main_thread_dispatcher_, random_, local_info_,
                                 stats_);
 >>>>>>> bring in final touches from CDS integration test PR
+=======
+  return cds_config.api_config_source().api_type() ==
+                 envoy::api::v2::core::ApiConfigSource::INCREMENTAL_GRPC
+             ? CdsApiIncrementalImpl::create(cds_config, cm, main_thread_dispatcher_, random_,
+                                             local_info_, stats_)
+             : CdsApiImpl::create(cds_config, cm, main_thread_dispatcher_, random_, local_info_,
+                                  stats_);
+>>>>>>> address comments, undo xds as incremental xds wrapper
 }
 
 } // namespace Upstream

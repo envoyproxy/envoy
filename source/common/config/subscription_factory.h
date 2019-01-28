@@ -11,6 +11,7 @@
 #include "common/config/grpc_mux_subscription_impl.h"
 #include "common/config/grpc_subscription_impl.h"
 #include "common/config/http_subscription_impl.h"
+#include "common/config/incremental_subscription_impl.h"
 #include "common/config/utility.h"
 #include "common/filesystem/filesystem_impl.h"
 #include "common/protobuf/protobuf.h"
@@ -65,15 +66,25 @@ public:
             Utility::apiConfigSourceRequestTimeout(api_config_source),
             *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(rest_method), stats));
         break;
-      case envoy::api::v2::core::ApiConfigSource::GRPC: {
+      case envoy::api::v2::core::ApiConfigSource::GRPC:
         result.reset(new GrpcSubscriptionImpl<ResourceType>(
             local_info,
             Config::Utility::factoryForGrpcApiConfigSource(cm.grpcAsyncClientManager(),
-                                                           config.api_config_source(), scope)
+                                                           api_config_source, scope)
                 ->create(),
             dispatcher, random,
             *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(grpc_method), stats,
             scope, Utility::parseRateLimitSettings(api_config_source)));
+        break;
+      case envoy::api::v2::core::ApiConfigSource::INCREMENTAL_GRPC: {
+        Utility::checkApiConfigSourceSubscriptionBackingCluster(cm.clusters(), api_config_source);
+        result.reset(new IncrementalSubscriptionImpl<ResourceType>(
+            local_info,
+            Config::Utility::factoryForGrpcApiConfigSource(cm.grpcAsyncClientManager(),
+                                                           api_config_source, scope)
+                ->create(),
+            dispatcher, *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(grpc_method),
+            random, scope, Utility::parseRateLimitSettings(api_config_source), stats));
         break;
       }
       default:
