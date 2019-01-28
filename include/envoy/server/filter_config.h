@@ -4,12 +4,13 @@
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/v2/core/base.pb.h"
+#include "envoy/http/codes.h"
+#include "envoy/http/context.h"
 #include "envoy/http/filter.h"
 #include "envoy/init/init.h"
 #include "envoy/json/json_object.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
-#include "envoy/ratelimit/ratelimit.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/admin.h"
 #include "envoy/server/overload_manager.h"
@@ -89,12 +90,6 @@ public:
   virtual Envoy::Runtime::RandomGenerator& random() PURE;
 
   /**
-   * @return a new ratelimit client. The implementation depends on the configuration of the server.
-   */
-  virtual RateLimit::ClientPtr
-  rateLimitClient(const absl::optional<std::chrono::milliseconds>& timeout) PURE;
-
-  /**
    * @return Runtime::Loader& the singleton runtime loader for the server.
    */
   virtual Envoy::Runtime::Loader& runtime() PURE;
@@ -140,9 +135,14 @@ public:
    * @return OverloadManager& the overload manager for the server.
    */
   virtual OverloadManager& overloadManager() PURE;
+
+  /**
+   * @return Http::Context& a reference to the http context.
+   */
+  virtual Http::Context& httpContext() PURE;
 };
 
-class ListenerFactoryContext : public FactoryContext {
+class ListenerFactoryContext : public virtual FactoryContext {
 public:
   /**
    * Store socket options to be set on the listen socket before listening.
@@ -150,6 +150,11 @@ public:
   virtual void addListenSocketOption(const Network::Socket::OptionConstSharedPtr& option) PURE;
 
   virtual void addListenSocketOptions(const Network::Socket::OptionsSharedPtr& options) PURE;
+
+  /**
+   * Give access to the listener configuration
+   */
+  virtual const Network::ListenerConfig& listenerConfig() const PURE;
 };
 
 /**

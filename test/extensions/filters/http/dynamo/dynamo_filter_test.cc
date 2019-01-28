@@ -62,6 +62,9 @@ TEST_F(DynamoFilterTest, operatorPresent) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue,
             filter_->encode100ContinueHeaders(continue_headers));
 
+  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->encodeMetadata(metadata_map));
+
   Http::TestHeaderMapImpl response_headers{{":status", "200"}};
   EXPECT_CALL(stats_, counter("prefix.dynamodb.operation_missing")).Times(0);
   EXPECT_CALL(stats_, counter("prefix.dynamodb.table_missing"));

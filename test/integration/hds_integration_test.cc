@@ -224,14 +224,14 @@ public:
   FakeRawConnectionPtr host_fake_raw_connection_;
 
   static constexpr int MaxTimeout = 100;
-  envoy::service::discovery::v2::HealthCheckRequest envoy_msg_;
+  envoy::service::discovery::v2::HealthCheckRequestOrEndpointHealthResponse envoy_msg_;
   envoy::service::discovery::v2::HealthCheckRequestOrEndpointHealthResponse response_;
   envoy::service::discovery::v2::HealthCheckSpecifier server_health_check_specifier_;
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, HdsIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, HdsIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 // Tests Envoy HTTP health checking a single healthy endpoint and reporting that it is
 // indeed healthy to the server.
@@ -241,7 +241,7 @@ TEST_P(HdsIntegrationTest, SingleEndpointHealthyHttp) {
   // Server <--> Envoy
   waitForHdsStream();
   ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, envoy_msg_));
-  EXPECT_EQ(envoy_msg_.capability().health_check_protocols(0),
+  EXPECT_EQ(envoy_msg_.health_check_request().capability().health_check_protocols(0),
             envoy::service::discovery::v2::Capability::HTTP);
 
   // Server asks for health checking
@@ -294,7 +294,7 @@ TEST_P(HdsIntegrationTest, SingleEndpointTimeoutHttp) {
   // Envoy sends a health check message to an endpoint
   healthcheckEndpoints();
 
-  // Endpoint doesn't repond to the health check
+  // Endpoint doesn't respond to the health check
 
   // Receive updates until the one we expect arrives
   waitForEndpointHealthResponse(envoy::api::v2::core::HealthStatus::TIMEOUT);
@@ -346,7 +346,7 @@ TEST_P(HdsIntegrationTest, SingleEndpointTimeoutTcp) {
   // Server <--> Envoy
   waitForHdsStream();
   ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, envoy_msg_));
-  EXPECT_EQ(envoy_msg_.capability().health_check_protocols(1),
+  EXPECT_EQ(envoy_msg_.health_check_request().capability().health_check_protocols(1),
             envoy::service::discovery::v2::Capability::TCP);
 
   // Server asks for health checking
@@ -469,7 +469,7 @@ TEST_P(HdsIntegrationTest, TwoEndpointsSameLocality) {
 
   healthcheckEndpoints("anna");
 
-  // Endpoints repond to the health check
+  // Endpoints respond to the health check
   host_stream_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "404"}}, false);
   host_stream_->encodeData(1024, true);
   host2_stream_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);

@@ -40,7 +40,20 @@ protected:
             TestEnvironment::PortMap(), GetParam())),
         random_string_(fmt::format("{}", computeBaseId())),
         argv_({"envoy-static", "--base-id", random_string_.c_str(), "-c", config_file_.c_str(),
-               nullptr}) {}
+               nullptr}) {
+    // The test main() sets the ThreadFactorySingleton since it is required by all other tests not
+    // instantiating their own MainCommon.
+    // Reset the singleton to a nullptr to avoid triggering an assertion when MainCommonBase() calls
+    // set() in the tests below.
+    Thread::ThreadFactorySingleton::set(nullptr);
+  }
+
+  ~MainCommonTest() override {
+    // This is ugly, but necessary to enable a stronger ASSERT() in ThreadFactorySingleton::set().
+    // The singleton needs to be reset to a non nullptr value such that when the constructor runs
+    // again, the ThreadFactorySingleton::set(nullptr) does not trigger the assertion.
+    Thread::ThreadFactorySingleton::set(&Thread::threadFactoryForTest());
+  }
 
   /**
    * Computes a numeric ID to incorporate into the names of
@@ -104,33 +117,46 @@ TEST_P(MainCommonTest, ConstructDestructHotRestartDisabledNoInit) {
   EXPECT_TRUE(main_common.run());
 }
 
-// Ensure that existing users of main_common() can link.
-TEST_P(MainCommonTest, LegacyMain) {
-#ifdef ENVOY_HANDLE_SIGNALS
-  // Enabled by default. Control with "bazel --define=signal_trace=disabled"
-  Envoy::SignalAction handle_sigs;
-#endif
+// Test that std::set_new_handler() was called and the callback functions as expected.
+// This test fails under TSAN and ASAN, so don't run it in that build:
+//   [  DEATH   ] ==845==ERROR: ThreadSanitizer: requested allocation size 0x3e800000000
+//   exceeds maximum supported size of 0x10000000000
+//
+//   [  DEATH   ] ==33378==ERROR: AddressSanitizer: requested allocation size 0x3e800000000
+//   (0x3e800001000 after adjustments for alignment, red zones etc.) exceeds maximum supported size
+//   of 0x10000000000 (thread T0)
 
-  std::unique_ptr<Envoy::OptionsImpl> options;
-  int return_code = -1;
-  try {
-    initOnly();
-    options = std::make_unique<Envoy::OptionsImpl>(argc(), argv(), &MainCommon::hotRestartVersion,
-                                                   spdlog::level::info);
-  } catch (const Envoy::NoServingException& e) {
-    return_code = EXIT_SUCCESS;
-  } catch (const Envoy::MalformedArgvException& e) {
-    return_code = EXIT_FAILURE;
-  }
-  if (return_code == -1) {
-    return_code = Envoy::main_common(*options);
-  }
-  EXPECT_EQ(EXIT_SUCCESS, return_code);
+class MainCommonDeathTest : public MainCommonTest {};
+
+TEST_P(MainCommonDeathTest, OutOfMemoryHandler) {
+#if defined(__has_feature) && (__has_feature(thread_sanitizer) || __has_feature(address_sanitizer))
+  ENVOY_LOG_MISC(critical,
+                 "MainCommonTest::OutOfMemoryHandler not supported by this compiler configuration");
+#else
+  MainCommon main_common(argc(), argv());
+  EXPECT_DEATH_LOG_TO_STDERR(
+      []() {
+        // Resolving symbols for a backtrace takes longer than the timeout in coverage builds,
+        // so disable handling that signal.
+        signal(SIGABRT, SIG_DFL);
+
+        // Allocating a fixed-size large array that results in OOM on gcc
+        // results in a compile-time error on clang of "array size too big",
+        // so dynamically find a size that is too large.
+        const uint64_t initial = 1 << 30;
+        for (uint64_t size = initial;
+             size >= initial; // Disallow wraparound to avoid infinite loops on failure.
+             size *= 1000) {
+          new int[size];
+        }
+      }(),
+      ".*panic: out of memory.*");
+#endif
 }
 
-INSTANTIATE_TEST_CASE_P(IpVersions, MainCommonTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, MainCommonTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 class AdminRequestTest : public MainCommonTest {
 protected:
@@ -221,6 +247,16 @@ TEST_P(AdminRequestTest, AdminRequestGetStatsAndKill) {
   started_.WaitForNotification();
   EXPECT_THAT(adminRequest("/stats", "GET"), HasSubstr("filesystem.reopen_failed"));
   kill(getpid(), SIGTERM);
+  EXPECT_TRUE(waitForEnvoyToExit());
+}
+
+// This test is the same as AdminRequestGetStatsAndQuit, except we send ourselves a SIGINT,
+// equivalent to receiving a Ctrl-C from the user.
+TEST_P(AdminRequestTest, AdminRequestGetStatsAndCtrlC) {
+  startEnvoy();
+  started_.WaitForNotification();
+  EXPECT_THAT(adminRequest("/stats", "GET"), HasSubstr("filesystem.reopen_failed"));
+  kill(getpid(), SIGINT);
   EXPECT_TRUE(waitForEnvoyToExit());
 }
 
@@ -338,12 +374,12 @@ TEST_P(MainCommonTest, ConstructDestructLogger) {
   VERBOSE_EXPECT_NO_THROW(MainCommon main_common(argc(), argv()));
 
   const std::string logger_name = "logger";
-  spdlog::details::log_msg log_msg(&logger_name, spdlog::level::level_enum::err);
+  spdlog::details::log_msg log_msg(&logger_name, spdlog::level::level_enum::err, "error");
   Logger::Registry::getSink()->log(log_msg);
 }
 
-INSTANTIATE_TEST_CASE_P(IpVersions, AdminRequestTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, AdminRequestTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 } // namespace Envoy

@@ -33,24 +33,24 @@ namespace Upstream {
  */
 class ProdClusterManagerFactory : public ClusterManagerFactory {
 public:
-  ProdClusterManagerFactory(Runtime::Loader& runtime, Stats::Store& stats,
+  ProdClusterManagerFactory(Server::Admin& admin, Runtime::Loader& runtime, Stats::Store& stats,
                             ThreadLocal::Instance& tls, Runtime::RandomGenerator& random,
                             Network::DnsResolverSharedPtr dns_resolver,
                             Ssl::ContextManager& ssl_context_manager,
                             Event::Dispatcher& main_thread_dispatcher,
                             const LocalInfo::LocalInfo& local_info,
-                            Secret::SecretManager& secret_manager, Api::Api& api)
-      : main_thread_dispatcher_(main_thread_dispatcher), api_(api), runtime_(runtime),
-        stats_(stats), tls_(tls), random_(random), dns_resolver_(dns_resolver),
-        ssl_context_manager_(ssl_context_manager), local_info_(local_info),
-        secret_manager_(secret_manager) {}
+                            Secret::SecretManager& secret_manager, Api::Api& api,
+                            Http::Context& http_context, AccessLog::AccessLogManager& log_manager,
+                            Singleton::Manager& singleton_manager)
+      : main_thread_dispatcher_(main_thread_dispatcher), api_(api), http_context_(http_context),
+        admin_(admin), runtime_(runtime), stats_(stats), tls_(tls), random_(random),
+        dns_resolver_(dns_resolver), ssl_context_manager_(ssl_context_manager),
+        local_info_(local_info), secret_manager_(secret_manager), log_manager_(log_manager),
+        singleton_manager_(singleton_manager) {}
 
   // Upstream::ClusterManagerFactory
   ClusterManagerPtr
-  clusterManagerFromProto(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,
-                          Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,
-                          Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
-                          AccessLog::AccessLogManager& log_manager, Server::Admin& admin) override;
+  clusterManagerFromProto(const envoy::config::bootstrap::v2::Bootstrap& bootstrap) override;
   Http::ConnectionPool::InstancePtr
   allocateConnPool(Event::Dispatcher& dispatcher, HostConstSharedPtr host,
                    ResourcePriority priority, Http::Protocol protocol,
@@ -62,18 +62,16 @@ public:
                       Network::TransportSocketOptionsSharedPtr transport_socket_options) override;
   ClusterSharedPtr clusterFromProto(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
                                     Outlier::EventLoggerSharedPtr outlier_event_logger,
-                                    AccessLog::AccessLogManager& log_manager,
                                     bool added_via_api) override;
   CdsApiPtr createCds(const envoy::api::v2::core::ConfigSource& cds_config,
-                      const absl::optional<envoy::api::v2::core::ConfigSource>& eds_config,
                       ClusterManager& cm) override;
   Secret::SecretManager& secretManager() override { return secret_manager_; }
 
 protected:
   Event::Dispatcher& main_thread_dispatcher_;
   Api::Api& api_;
-
-private:
+  Http::Context& http_context_;
+  Server::Admin& admin_;
   Runtime::Loader& runtime_;
   Stats::Store& stats_;
   ThreadLocal::Instance& tls_;
@@ -82,6 +80,8 @@ private:
   Ssl::ContextManager& ssl_context_manager_;
   const LocalInfo::LocalInfo& local_info_;
   Secret::SecretManager& secret_manager_;
+  AccessLog::AccessLogManager& log_manager_;
+  Singleton::Manager& singleton_manager_;
 };
 
 /**
@@ -168,8 +168,8 @@ public:
                      ThreadLocal::Instance& tls, Runtime::Loader& runtime,
                      Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
                      AccessLog::AccessLogManager& log_manager,
-                     Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
-                     Api::Api& api);
+                     Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin, Api::Api& api,
+                     Http::Context& http_context);
 
   // Upstream::ClusterManager
   bool addOrUpdateCluster(const envoy::api::v2::Cluster& cluster,
@@ -310,10 +310,7 @@ private:
     void drainTcpConnPools(HostSharedPtr old_host, TcpConnPoolsContainer& container);
     void removeTcpConn(const HostConstSharedPtr& host, Network::ClientConnection& connection);
     static void updateClusterMembership(const std::string& name, uint32_t priority,
-                                        HostVectorConstSharedPtr hosts,
-                                        HostVectorConstSharedPtr healthy_hosts,
-                                        HostsPerLocalityConstSharedPtr hosts_per_locality,
-                                        HostsPerLocalityConstSharedPtr healthy_hosts_per_locality,
+                                        HostSet::UpdateHostsParams&& update_hosts_params,
                                         LocalityWeightsConstSharedPtr locality_weights,
                                         const HostVector& hosts_added,
                                         const HostVector& hosts_removed, ThreadLocal::Slot& tls);
@@ -426,10 +423,8 @@ private:
   Stats::Store& stats_;
   ThreadLocal::SlotPtr tls_;
   Runtime::RandomGenerator& random_;
-  AccessLog::AccessLogManager& log_manager_;
   ClusterMap active_clusters_;
   ClusterMap warming_clusters_;
-  absl::optional<envoy::api::v2::core::ConfigSource> eds_config_;
   envoy::api::v2::core::BindConfig bind_config_;
   Outlier::EventLoggerSharedPtr outlier_event_logger_;
   const LocalInfo::LocalInfo& local_info_;
@@ -445,6 +440,7 @@ private:
   TimeSource& time_source_;
   ClusterUpdatesMap updates_map_;
   Event::Dispatcher& dispatcher_;
+  Http::Context& http_context_;
 };
 
 } // namespace Upstream

@@ -257,9 +257,13 @@ private:
     Network::FilterChainManager& filterChainManager() override { return parent_; }
     Network::FilterChainFactory& filterChainFactory() override { return parent_; }
     Network::Socket& socket() override { return parent_.mutable_socket(); }
+    const Network::Socket& socket() const override { return parent_.mutable_socket(); }
     bool bindToPort() override { return true; }
     bool handOffRestoredDestinationConnections() const override { return false; }
-    uint32_t perConnectionBufferLimitBytes() override { return 0; }
+    uint32_t perConnectionBufferLimitBytes() const override { return 0; }
+    std::chrono::milliseconds listenerFiltersTimeout() const override {
+      return std::chrono::milliseconds();
+    }
     Stats::Scope& listenerScope() override { return *scope_; }
     uint64_t listenerTag() const override { return 0; }
     const std::string& name() const override { return name_; }
@@ -336,6 +340,7 @@ public:
   void setEndStreamOnComplete(bool end_stream) override { end_stream_on_complete_ = end_stream; }
   void addOnDestroyCallback(std::function<void()> cb) override;
   Http::StreamDecoderFilterCallbacks& getDecoderFilterCallbacks() const override;
+  const Buffer::Instance* getRequestBody() const override;
   const Http::HeaderMap& getRequestHeaders() const override;
 
 private:

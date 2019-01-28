@@ -105,6 +105,10 @@ mkdir -p "${ENVOY_DELIVERY_DIR}"
 export ENVOY_COVERAGE_DIR="${ENVOY_BUILD_DIR}"/generated/coverage
 mkdir -p "${ENVOY_COVERAGE_DIR}"
 
+# This is where we dump failed test logs for CI collection.
+export ENVOY_FAILED_TEST_LOGS="${ENVOY_BUILD_DIR}"/generated/failed-testlogs
+mkdir -p "${ENVOY_FAILED_TEST_LOGS}"
+
 # This is where we build for bazel.release* and bazel.dev.
 export ENVOY_CI_DIR="${ENVOY_SRCDIR}"/ci
 
@@ -129,10 +133,5 @@ ln -sf "${ENVOY_SRCDIR}"/bazel/get_workspace_status "${ENVOY_FILTER_EXAMPLE_SRCD
 ln -sf "${ENVOY_SRCDIR}"/bazel/get_workspace_status "${ENVOY_CI_DIR}"/bazel/
 cp -f "${ENVOY_SRCDIR}"/.bazelrc "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/
 cp -f "${ENVOY_SRCDIR}"/.bazelrc "${ENVOY_CI_DIR}"/
-# TODO(PiotrSikora): remove once we deprecate tools/bazel.rc in favor of .bazelrc.
-mkdir -p "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/tools
-mkdir -p "${ENVOY_CI_DIR}"/tools
-ln -sf "${ENVOY_SRCDIR}"/tools/bazel.rc "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/tools/
-ln -sf "${ENVOY_SRCDIR}"/tools/bazel.rc "${ENVOY_CI_DIR}"/tools/
 
 export BUILDIFIER_BIN="/usr/local/bin/buildifier"

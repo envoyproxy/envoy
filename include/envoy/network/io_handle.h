@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/api/os_sys_calls.h"
 #include "envoy/common/pure.h"
 
@@ -8,13 +10,32 @@ namespace Network {
 
 class IoHandle {
 public:
+
+  virtual int id() PURE;
+};
+
+/**
+ * IoHandle: an abstract interface for all I/O operations
+ */
+class IoHandle {
+public:
   virtual ~IoHandle() {}
+
+  /**
+   * Return data associated with IoHandle.
+   *
+   * TODO(sbelair2) remove fd() method
+   */
+  virtual int fd() const PURE;
+
+  /**
+   * Clean up IoHandle resources
+   */
+  virtual Api::SysCallIntResult close() PURE;
 
   virtual Api::SysCallSizeResult readv(const iovec* iovec, int num_iovec) PURE;
 
   virtual Api::SysCallSizeResult writev(const iovec* iovec, int num_iovec) PURE;
-
-  virtual Api::SysCallIntResult close() PURE;
 
   virtual bool isClosed() PURE;
 
@@ -42,7 +63,6 @@ public:
 
   virtual Api::SysCallIntResult shutdown(int how) PURE;
 
-  virtual int id() PURE;
 };
 
 typedef std::unique_ptr<IoHandle> IoHandlePtr;

@@ -98,12 +98,12 @@ public:
                Stats::Scope& scope, Upstream::ClusterManager& cm, Runtime::Loader& runtime,
                Runtime::RandomGenerator& random, ShadowWriterPtr&& shadow_writer,
                bool emit_dynamic_stats, bool start_child_span, bool suppress_envoy_headers,
-               TimeSource& time_source)
+               TimeSource& time_source, Http::Context& http_context)
       : scope_(scope), local_info_(local_info), cm_(cm), runtime_(runtime),
         random_(random), stats_{ALL_ROUTER_STATS(POOL_COUNTER_PREFIX(scope, stat_prefix))},
         emit_dynamic_stats_(emit_dynamic_stats), start_child_span_(start_child_span),
-        suppress_envoy_headers_(suppress_envoy_headers), shadow_writer_(std::move(shadow_writer)),
-        time_source_(time_source) {}
+        suppress_envoy_headers_(suppress_envoy_headers), http_context_(http_context),
+        shadow_writer_(std::move(shadow_writer)), time_source_(time_source) {}
 
   FilterConfig(const std::string& stat_prefix, Server::Configuration::FactoryContext& context,
                ShadowWriterPtr&& shadow_writer,
@@ -112,7 +112,7 @@ public:
                      context.runtime(), context.random(), std::move(shadow_writer),
                      PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, dynamic_stats, true),
                      config.start_child_span(), config.suppress_envoy_headers(),
-                     context.timeSource()) {
+                     context.timeSource(), context.httpContext()) {
     for (const auto& upstream_log : config.upstream_log()) {
       upstream_logs_.push_back(AccessLog::AccessLogFactory::fromProto(upstream_log, context));
     }
@@ -131,6 +131,7 @@ public:
   const bool start_child_span_;
   const bool suppress_envoy_headers_;
   std::list<AccessLog::InstanceSharedPtr> upstream_logs_;
+  Http::Context& http_context_;
 
 private:
   ShadowWriterPtr shadow_writer_;
@@ -148,7 +149,8 @@ class Filter : Logger::Loggable<Logger::Id::router>,
 public:
   Filter(FilterConfig& config)
       : config_(config), downstream_response_started_(false), downstream_end_stream_(false),
-        do_shadowing_(false), is_retry_(false) {}
+        do_shadowing_(false), is_retry_(false),
+        attempting_internal_redirect_with_complete_stream_(false) {}
 
   ~Filter();
 
@@ -216,9 +218,9 @@ public:
     return retry_state_->shouldSelectAnotherHost(host);
   }
 
-  const Upstream::PriorityLoad&
+  const Upstream::HealthyAndDegradedLoad&
   determinePriorityLoad(const Upstream::PrioritySet& priority_set,
-                        const Upstream::PriorityLoad& original_priority_load) override {
+                        const Upstream::HealthyAndDegradedLoad& original_priority_load) override {
     // We only modify the priority load on retries.
     if (!is_retry_) {
       return original_priority_load;
@@ -379,11 +381,13 @@ private:
                        const absl::optional<Http::StreamResetReason>& reset_reason);
   void sendNoHealthyUpstreamResponse();
   bool setupRetry(bool end_stream);
+  bool setupRedirect(const Http::HeaderMap& headers);
   void doRetry();
   // Called immediately after a non-5xx header is received from upstream, performs stats accounting
   // and handle difference between gRPC and non-gRPC requests.
   void handleNon5xxResponseHeaders(const Http::HeaderMap& headers, bool end_stream);
   TimeSource& timeSource() { return config_.timeSource(); }
+  Http::Context& httpContext() { return config_.http_context_; }
 
   FilterConfig& config_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
@@ -411,6 +415,7 @@ private:
   bool do_shadowing_ : 1;
   bool is_retry_ : 1;
   bool include_attempt_count_ : 1;
+  bool attempting_internal_redirect_with_complete_stream_ : 1;
   uint32_t attempt_count_{1};
 };
 

@@ -27,8 +27,7 @@ Tracing::HttpTracerPtr ZipkinTracerFactory::createHttpTracerTyped(
 /**
  * Static registration for the lightstep tracer. @see RegisterFactory.
  */
-static Registry::RegisterFactory<ZipkinTracerFactory, Server::Configuration::TracerFactory>
-    register_;
+REGISTER_FACTORY(ZipkinTracerFactory, Server::Configuration::TracerFactory);
 
 } // namespace Zipkin
 } // namespace Tracers

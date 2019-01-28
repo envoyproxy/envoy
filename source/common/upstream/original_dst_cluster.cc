@@ -29,7 +29,7 @@ OriginalDstCluster::LoadBalancer::LoadBalancer(
       info_(parent->info()), use_http_header_(config ? config.value().use_http_header() : false) {
   // priority_set_ is initially empty.
   priority_set_.addMemberUpdateCb(
-      [this](uint32_t, const HostVector& hosts_added, const HostVector& hosts_removed) -> void {
+      [this](const HostVector& hosts_added, const HostVector& hosts_removed) -> void {
         // Update the hosts map
         // TODO(ramaraochavali): use cluster stats and move the log lines to debug.
         for (const HostSharedPtr& host : hosts_removed) {
@@ -148,9 +148,8 @@ void OriginalDstCluster::addHost(HostSharedPtr& host) {
   auto& first_host_set = priority_set_.getOrCreateHostSet(0);
   HostVectorSharedPtr new_hosts(new HostVector(first_host_set.hosts()));
   new_hosts->emplace_back(host);
-  first_host_set.updateHosts(new_hosts, createHealthyHostList(*new_hosts),
-                             HostsPerLocalityImpl::empty(), HostsPerLocalityImpl::empty(), {},
-                             {std::move(host)}, {}, absl::nullopt);
+  first_host_set.updateHosts(HostSetImpl::partitionHosts(new_hosts, HostsPerLocalityImpl::empty()),
+                             {}, {std::move(host)}, {}, absl::nullopt);
 }
 
 void OriginalDstCluster::cleanup() {
@@ -173,9 +172,8 @@ void OriginalDstCluster::cleanup() {
   }
 
   if (to_be_removed.size() > 0) {
-    host_set.updateHosts(new_hosts, createHealthyHostList(*new_hosts),
-                         HostsPerLocalityImpl::empty(), HostsPerLocalityImpl::empty(), {}, {},
-                         to_be_removed, absl::nullopt);
+    host_set.updateHosts(HostSetImpl::partitionHosts(new_hosts, HostsPerLocalityImpl::empty()), {},
+                         {}, to_be_removed, absl::nullopt);
   }
 
   cleanup_timer_->enableTimer(cleanup_interval_ms_);

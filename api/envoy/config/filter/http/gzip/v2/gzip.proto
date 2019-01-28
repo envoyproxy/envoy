@@ -1,6 +1,7 @@
 syntax = "proto3";
 
 package envoy.config.filter.http.gzip.v2;
+option java_package = "io.envoyproxy.envoy.config.filter.http.gzip.v2";
 option go_package = "v2";
 
 import "google/protobuf/wrappers.proto";

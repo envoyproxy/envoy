@@ -25,35 +25,8 @@ MockConnectionCallbacks::~MockConnectionCallbacks() {}
 MockServerConnectionCallbacks::MockServerConnectionCallbacks() {}
 MockServerConnectionCallbacks::~MockServerConnectionCallbacks() {}
 
-MockStreamDecoder::MockStreamDecoder() {}
-MockStreamDecoder::~MockStreamDecoder() {}
-
 MockStreamCallbacks::MockStreamCallbacks() {}
 MockStreamCallbacks::~MockStreamCallbacks() {}
-
-MockStream::MockStream() {
-  ON_CALL(*this, addCallbacks(_)).WillByDefault(Invoke([this](StreamCallbacks& callbacks) -> void {
-    callbacks_.push_back(&callbacks);
-  }));
-
-  ON_CALL(*this, removeCallbacks(_))
-      .WillByDefault(
-          Invoke([this](StreamCallbacks& callbacks) -> void { callbacks_.remove(&callbacks); }));
-
-  ON_CALL(*this, resetStream(_)).WillByDefault(Invoke([this](StreamResetReason reason) -> void {
-    for (StreamCallbacks* callbacks : callbacks_) {
-      callbacks->onResetStream(reason);
-    }
-  }));
-}
-
-MockStream::~MockStream() {}
-
-MockStreamEncoder::MockStreamEncoder() {
-  ON_CALL(*this, getStream()).WillByDefault(ReturnRef(stream_));
-}
-
-MockStreamEncoder::~MockStreamEncoder() {}
 
 MockServerConnection::MockServerConnection() {
   ON_CALL(*this, protocol()).WillByDefault(Return(protocol_));
@@ -157,18 +130,13 @@ MockFilterChainFactoryCallbacks::~MockFilterChainFactoryCallbacks() {}
 } // namespace Http
 
 namespace Http {
-namespace ConnectionPool {
-
-MockCancellable::MockCancellable() {}
-MockCancellable::~MockCancellable() {}
-
-MockInstance::MockInstance() {}
-MockInstance::~MockInstance() {}
-
-} // namespace ConnectionPool
 
 IsSubsetOfHeadersMatcher IsSubsetOfHeaders(const HeaderMap& expected_headers) {
   return IsSubsetOfHeadersMatcher(expected_headers);
+}
+
+IsSupersetOfHeadersMatcher IsSupersetOfHeaders(const HeaderMap& expected_headers) {
+  return IsSupersetOfHeadersMatcher(expected_headers);
 }
 
 } // namespace Http

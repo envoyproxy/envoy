@@ -1,6 +1,7 @@
 syntax = "proto3";
 
 package envoy.data.accesslog.v2;
+option java_package = "io.envoyproxy.envoy.data.accesslog.v2";
 
 import "envoy/api/v2/core/address.proto";
 import "envoy/api/v2/core/base.proto";
@@ -153,7 +154,7 @@ message ResponseFlags {
   // Indicates there was a local reset by a connection pool due to an initial connection failure.
   bool upstream_connection_failure = 6;
 
-  // Indicates the stream was reset locally due to connection termination.
+  // Indicates the stream was reset due to an upstream connection termination.
   bool upstream_connection_termination = 7;
 
   // Indicates the stream was reset because of a resource overflow.
@@ -185,9 +186,14 @@ message ResponseFlags {
   // Indicates if the request was deemed unauthorized and the reason for it.
   Unauthorized unauthorized_details = 13;
 
-  // [#not-implemented-hide:] Hide from docs.
   // Indicates that the request was rejected because there was an error in rate limit service.
   bool rate_limit_service_error = 14;
+
+  // Indicates the stream was reset due to a downstream connection termination.
+  bool downstream_connection_termination = 15;
+
+  // Indicates that the upstream retry limit was exceeded, resulting in a downstream error.
+  bool upstream_retry_limit_exceeded = 16;
 }
 
 // [#not-implemented-hide:]

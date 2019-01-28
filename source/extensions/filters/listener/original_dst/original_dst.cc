@@ -20,7 +20,8 @@ Network::FilterStatus OriginalDstFilter::onAccept(Network::ListenerFilterCallbac
   const Network::Address::Instance& local_address = *socket.localAddress();
 
   if (local_address.type() == Network::Address::Type::Ip) {
-    Network::Address::InstanceConstSharedPtr original_local_address = getOriginalDst(socket.fd());
+    Network::Address::InstanceConstSharedPtr original_local_address =
+        getOriginalDst(socket.ioHandle().fd());
 
     // A listener that has the use_original_dst flag set to true can still receive
     // connections that are NOT redirected using iptables. If a connection was not redirected,
@@ -28,7 +29,7 @@ Network::FilterStatus OriginalDstFilter::onAccept(Network::ListenerFilterCallbac
     // In this case the listener handles the connection directly and does not hand it off.
     if (original_local_address) {
       // Restore the local address to the original one.
-      socket.setLocalAddress(original_local_address, true);
+      socket.restoreLocalAddress(original_local_address);
     }
   }
 

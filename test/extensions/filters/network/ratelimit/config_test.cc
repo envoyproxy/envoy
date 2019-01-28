@@ -2,6 +2,7 @@
 
 #include "common/config/filter_json.h"
 
+#include "extensions/filters/common/ratelimit/ratelimit_registration.h"
 #include "extensions/filters/network/ratelimit/config.h"
 
 #include "test/mocks/server/mocks.h"
@@ -10,6 +11,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {
@@ -23,40 +25,36 @@ TEST(RateLimitFilterConfigTest, ValidateFail) {
                ProtoValidationException);
 }
 
-TEST(RateLimitFilterConfigTest, RatelimitCorrectJson) {
-  std::string json_string = R"EOF(
-  {
-    "stat_prefix": "my_stat_prefix",
-    "domain" : "fake_domain",
-    "descriptors": [[{ "key" : "my_key",  "value" : "my_value" }]],
-    "timeout_ms": 1337
-  }
-  )EOF";
-
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  NiceMock<Server::Configuration::MockFactoryContext> context;
-  RateLimitConfigFactory factory;
-  Network::FilterFactoryCb cb = factory.createFilterFactory(*json_config, context);
-  Network::MockConnection connection;
-  EXPECT_CALL(connection, addReadFilter(_));
-  cb(connection);
-}
-
 TEST(RateLimitFilterConfigTest, RatelimitCorrectProto) {
-  std::string json_string = R"EOF(
-  {
-    "stat_prefix": "my_stat_prefix",
-    "domain" : "fake_domain",
-    "descriptors": [[{ "key" : "my_key",  "value" : "my_value" }]],
-    "timeout_ms": 1337
-  }
+  const std::string yaml = R"EOF(
+  stat_prefix: my_stat_prefix
+  domain: fake_domain
+  descriptors:
+    entries:
+       key: my_key
+       value: my_value
+  timeout: 2s
   )EOF";
 
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   envoy::config::filter::network::rate_limit::v2::RateLimit proto_config{};
-  Envoy::Config::FilterJson::translateTcpRateLimitFilter(*json_config, proto_config);
+  MessageUtil::loadFromYaml(yaml, proto_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::MockInstance> instance;
+
+  // Return the same singleton manager as instance so that config can be found there.
+  EXPECT_CALL(context, singletonManager()).WillOnce(ReturnRef(instance.singletonManager()));
+
+  Filters::Common::RateLimit::ClientFactoryPtr client_factory =
+      Filters::Common::RateLimit::rateLimitClientFactory(
+          instance, instance.clusterManager().grpcAsyncClientManager(),
+          envoy::config::bootstrap::v2::Bootstrap());
+
+  EXPECT_CALL(context.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
+      .WillOnce(Invoke([](const envoy::api::v2::core::GrpcService&, Stats::Scope&, bool) {
+        return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
+      }));
+
   RateLimitConfigFactory factory;
   Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context);
   Network::MockConnection connection;
@@ -64,29 +62,15 @@ TEST(RateLimitFilterConfigTest, RatelimitCorrectProto) {
   cb(connection);
 }
 
-TEST(RateLimitFilterConfigTest, RatelimitEmptyProto) {
-  std::string json_string = R"EOF(
-  {
-    "stat_prefix": "my_stat_prefix",
-    "domain" : "fake_domain",
-    "descriptors": [[{ "key" : "my_key",  "value" : "my_value" }]],
-    "timeout_ms": 1337
-  }
-  )EOF";
-
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-
+TEST(RateLimitFilterConfigTest, RateLimitFilterEmptyProto) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::MockInstance> instance;
   RateLimitConfigFactory factory;
-  envoy::config::filter::network::rate_limit::v2::RateLimit proto_config =
+
+  envoy::config::filter::network::rate_limit::v2::RateLimit empty_proto_config =
       *dynamic_cast<envoy::config::filter::network::rate_limit::v2::RateLimit*>(
           factory.createEmptyConfigProto().get());
-  Envoy::Config::FilterJson::translateTcpRateLimitFilter(*json_config, proto_config);
-
-  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context);
-  Network::MockConnection connection;
-  EXPECT_CALL(connection, addReadFilter(_));
-  cb(connection);
+  EXPECT_THROW(factory.createFilterFactoryFromProto(empty_proto_config, context), EnvoyException);
 }
 
 } // namespace RateLimitFilter

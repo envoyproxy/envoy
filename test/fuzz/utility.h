@@ -36,7 +36,7 @@ inline test::fuzz::Headers toHeaders(const Http::HeaderMap& headers) {
 inline TestStreamInfo fromStreamInfo(const test::fuzz::StreamInfo& stream_info) {
   TestStreamInfo test_stream_info;
   test_stream_info.metadata_ = stream_info.dynamic_metadata();
-  // libc++ clocks don't track at nanosecond on OS X.
+  // libc++ clocks don't track at nanosecond on macOS.
   const auto start_time =
       std::numeric_limits<std::chrono::nanoseconds::rep>::max() < stream_info.start_time()
           ? 0
@@ -53,6 +53,7 @@ inline TestStreamInfo fromStreamInfo(const test::fuzz::StreamInfo& stream_info) 
   auto address = Network::Utility::resolveUrl("tcp://10.0.0.1:443");
   test_stream_info.upstream_local_address_ = address;
   test_stream_info.downstream_local_address_ = address;
+  test_stream_info.downstream_direct_remote_address_ = address;
   test_stream_info.downstream_remote_address_ = address;
   return test_stream_info;
 }

@@ -23,6 +23,23 @@ namespace Http {
 namespace Utility {
 
 /**
+ * Given a fully qualified URL, splits the string_view provided into scheme,
+ * host and path components.
+ */
+class Url {
+public:
+  bool initialize(absl::string_view absolute_url);
+  absl::string_view scheme() { return scheme_; }
+  absl::string_view host_and_port() { return host_and_port_; }
+  absl::string_view path() { return path_; }
+
+private:
+  absl::string_view scheme_;
+  absl::string_view host_and_port_;
+  absl::string_view path_;
+};
+
+/**
  * Append to x-forwarded-for header.
  * @param headers supplies the headers to append to.
  * @param remote_address supplies the remote address to append.
@@ -142,7 +159,7 @@ Http1Settings parseHttp1Settings(const envoy::api::v2::core::Http1ProtocolOption
  * @param is_head_request tells if this is a response to a HEAD request
  */
 void sendLocalReply(bool is_grpc, StreamDecoderFilterCallbacks& callbacks, const bool& is_reset,
-                    Code response_code, const std::string& body_text,
+                    Code response_code, absl::string_view body_text,
                     const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                     bool is_head_request);
 
@@ -162,7 +179,7 @@ void sendLocalReply(bool is_grpc, StreamDecoderFilterCallbacks& callbacks, const
 void sendLocalReply(bool is_grpc,
                     std::function<void(HeaderMapPtr&& headers, bool end_stream)> encode_headers,
                     std::function<void(Buffer::Instance& data, bool end_stream)> encode_data,
-                    const bool& is_reset, Code response_code, const std::string& body_text,
+                    const bool& is_reset, Code response_code, absl::string_view body_text,
                     const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                     bool is_head_request = false);
 

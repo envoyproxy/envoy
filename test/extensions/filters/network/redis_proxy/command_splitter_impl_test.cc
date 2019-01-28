@@ -11,7 +11,9 @@
 
 #include "test/extensions/filters/network/redis_proxy/mocks.h"
 #include "test/mocks/common.h"
+#include "test/mocks/stats/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/simulated_time_system.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -21,6 +23,8 @@ using testing::ByRef;
 using testing::DoAll;
 using testing::Eq;
 using testing::InSequence;
+using testing::NiceMock;
+using testing::Property;
 using testing::Ref;
 using testing::Return;
 using testing::WithArg;
@@ -45,8 +49,9 @@ public:
   }
 
   ConnPool::MockInstance* conn_pool_{new ConnPool::MockInstance()};
-  Stats::IsolatedStoreImpl store_;
-  InstanceImpl splitter_{ConnPool::InstancePtr{conn_pool_}, store_, "redis.foo."};
+  NiceMock<Stats::MockIsolatedStatsStore> store_;
+  Event::SimulatedTimeSystem time_system_;
+  InstanceImpl splitter_{ConnPool::InstancePtr{conn_pool_}, store_, "redis.foo.", time_system_};
   MockSplitCallbacks callbacks_;
   SplitRequestPtr handle_;
 };
@@ -54,7 +59,7 @@ public:
 TEST_F(RedisCommandSplitterImplTest, InvalidRequestNotArray) {
   RespValue response;
   response.type(RespType::Error);
-  response.asString() = "invalid request";
+  response.asString() = Response::get().InvalidRequest;
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
   RespValue request;
   EXPECT_EQ(nullptr, splitter_.makeRequest(request, callbacks_));
@@ -65,7 +70,7 @@ TEST_F(RedisCommandSplitterImplTest, InvalidRequestNotArray) {
 TEST_F(RedisCommandSplitterImplTest, InvalidRequestArrayTooSmall) {
   RespValue response;
   response.type(RespType::Error);
-  response.asString() = "invalid request";
+  response.asString() = Response::get().InvalidRequest;
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
   RespValue request;
   makeBulkStringArray(request, {"incr"});
@@ -77,7 +82,7 @@ TEST_F(RedisCommandSplitterImplTest, InvalidRequestArrayTooSmall) {
 TEST_F(RedisCommandSplitterImplTest, InvalidRequestArrayNotStrings) {
   RespValue response;
   response.type(RespType::Error);
-  response.asString() = "invalid request";
+  response.asString() = Response::get().InvalidRequest;
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
   RespValue request;
   makeBulkStringArray(request, {"incr", ""});
@@ -111,7 +116,7 @@ public:
   void fail() {
     RespValue response;
     response.type(RespType::Error);
-    response.asString() = "upstream failure";
+    response.asString() = Response::get().UpstreamFailure;
     EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
     pool_callbacks_->onFailure();
   }
@@ -130,18 +135,25 @@ public:
 TEST_P(RedisSingleServerRequestTest, Success) {
   InSequence s;
 
+  ToLowerTable table;
+  std::string lower_command(GetParam());
+  table.toLowerCase(lower_command);
+
   RespValue request;
   makeBulkStringArray(request, {GetParam(), "hello"});
   makeRequest("hello", request);
   EXPECT_NE(nullptr, handle_);
 
+  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  EXPECT_CALL(store_, deliverHistogramToSinks(
+                          Property(&Stats::Metric::name,
+                                   fmt::format("redis.foo.command.{}.latency", lower_command)),
+                          10));
   respond();
 
-  ToLowerTable table;
-  std::string lower_command(GetParam());
-  table.toLowerCase(lower_command);
-
   EXPECT_EQ(1UL, store_.counter(fmt::format("redis.foo.command.{}.total", lower_command)).value());
+  EXPECT_EQ(1UL,
+            store_.counter(fmt::format("redis.foo.command.{}.success", lower_command)).value());
 };
 
 TEST_P(RedisSingleServerRequestTest, SuccessMultipleArgs) {
@@ -152,13 +164,20 @@ TEST_P(RedisSingleServerRequestTest, SuccessMultipleArgs) {
   makeRequest("hello", request);
   EXPECT_NE(nullptr, handle_);
 
-  respond();
-
   ToLowerTable table;
   std::string lower_command(GetParam());
   table.toLowerCase(lower_command);
 
+  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  EXPECT_CALL(store_, deliverHistogramToSinks(
+                          Property(&Stats::Metric::name,
+                                   fmt::format("redis.foo.command.{}.latency", lower_command)),
+                          10));
+  respond();
+
   EXPECT_EQ(1UL, store_.counter(fmt::format("redis.foo.command.{}.total", lower_command)).value());
+  EXPECT_EQ(1UL,
+            store_.counter(fmt::format("redis.foo.command.{}.success", lower_command)).value());
 };
 
 TEST_P(RedisSingleServerRequestTest, Fail) {
@@ -169,7 +188,19 @@ TEST_P(RedisSingleServerRequestTest, Fail) {
   makeRequest("hello", request);
   EXPECT_NE(nullptr, handle_);
 
+  ToLowerTable table;
+  std::string lower_command(GetParam());
+  table.toLowerCase(lower_command);
+
+  time_system_.setMonotonicTime(std::chrono::milliseconds(5));
+  EXPECT_CALL(store_, deliverHistogramToSinks(
+                          Property(&Stats::Metric::name,
+                                   fmt::format("redis.foo.command.{}.latency", lower_command)),
+                          5));
   fail();
+
+  EXPECT_EQ(1UL, store_.counter(fmt::format("redis.foo.command.{}.total", lower_command)).value());
+  EXPECT_EQ(1UL, store_.counter(fmt::format("redis.foo.command.{}.error", lower_command)).value());
 };
 
 TEST_P(RedisSingleServerRequestTest, Cancel) {
@@ -192,17 +223,17 @@ TEST_P(RedisSingleServerRequestTest, NoUpstream) {
   EXPECT_CALL(*conn_pool_, makeRequest("hello", Ref(request), _)).WillOnce(Return(nullptr));
   RespValue response;
   response.type(RespType::Error);
-  response.asString() = "no upstream host";
+  response.asString() = Response::get().NoUpstreamHost;
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
   handle_ = splitter_.makeRequest(request, callbacks_);
   EXPECT_EQ(nullptr, handle_);
 };
 
-INSTANTIATE_TEST_CASE_P(RedisSingleServerRequestTest, RedisSingleServerRequestTest,
-                        testing::ValuesIn(SupportedCommands::simpleCommands()));
+INSTANTIATE_TEST_SUITE_P(RedisSingleServerRequestTest, RedisSingleServerRequestTest,
+                         testing::ValuesIn(SupportedCommands::simpleCommands()));
 
-INSTANTIATE_TEST_CASE_P(RedisSimpleRequestCommandHandlerMixedCaseTests,
-                        RedisSingleServerRequestTest, testing::Values("INCR", "inCrBY"));
+INSTANTIATE_TEST_SUITE_P(RedisSimpleRequestCommandHandlerMixedCaseTests,
+                         RedisSingleServerRequestTest, testing::Values("INCR", "inCrBY"));
 
 TEST_F(RedisSingleServerRequestTest, PingSuccess) {
   InSequence s;
@@ -227,13 +258,20 @@ TEST_F(RedisSingleServerRequestTest, EvalSuccess) {
   makeRequest("key", request);
   EXPECT_NE(nullptr, handle_);
 
-  respond();
-
   ToLowerTable table;
   std::string lower_command("eval");
   table.toLowerCase(lower_command);
 
+  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  EXPECT_CALL(store_, deliverHistogramToSinks(
+                          Property(&Stats::Metric::name,
+                                   fmt::format("redis.foo.command.{}.latency", lower_command)),
+                          10));
+  respond();
+
   EXPECT_EQ(1UL, store_.counter(fmt::format("redis.foo.command.{}.total", lower_command)).value());
+  EXPECT_EQ(1UL,
+            store_.counter(fmt::format("redis.foo.command.{}.success", lower_command)).value());
 };
 
 TEST_F(RedisSingleServerRequestTest, EvalShaSuccess) {
@@ -244,13 +282,20 @@ TEST_F(RedisSingleServerRequestTest, EvalShaSuccess) {
   makeRequest("keykey", request);
   EXPECT_NE(nullptr, handle_);
 
-  respond();
-
   ToLowerTable table;
   std::string lower_command("evalsha");
   table.toLowerCase(lower_command);
 
+  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  EXPECT_CALL(store_, deliverHistogramToSinks(
+                          Property(&Stats::Metric::name,
+                                   fmt::format("redis.foo.command.{}.latency", lower_command)),
+                          10));
+  respond();
+
   EXPECT_EQ(1UL, store_.counter(fmt::format("redis.foo.command.{}.total", lower_command)).value());
+  EXPECT_EQ(1UL,
+            store_.counter(fmt::format("redis.foo.command.{}.success", lower_command)).value());
 };
 
 TEST_F(RedisSingleServerRequestTest, EvalWrongNumberOfArgs) {
@@ -279,10 +324,13 @@ TEST_F(RedisSingleServerRequestTest, EvalNoUpstream) {
   EXPECT_CALL(*conn_pool_, makeRequest("key", Ref(request), _)).WillOnce(Return(nullptr));
   RespValue response;
   response.type(RespType::Error);
-  response.asString() = "no upstream host";
+  response.asString() = Response::get().NoUpstreamHost;
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
   handle_ = splitter_.makeRequest(request, callbacks_);
   EXPECT_EQ(nullptr, handle_);
+
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.eval.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.eval.error").value());
 };
 
 class RedisMGETCommandHandlerTest : public RedisCommandSplitterImplTest {
@@ -343,10 +391,14 @@ TEST_F(RedisMGETCommandHandlerTest, Normal) {
   RespValuePtr response1(new RespValue());
   response1->type(RespType::BulkString);
   response1->asString() = "response";
+  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  EXPECT_CALL(store_, deliverHistogramToSinks(
+                          Property(&Stats::Metric::name, "redis.foo.command.mget.latency"), 10));
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
   pool_callbacks_[0]->onResponse(std::move(response1));
 
   EXPECT_EQ(1UL, store_.counter("redis.foo.command.mget.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.mget.success").value());
 };
 
 TEST_F(RedisMGETCommandHandlerTest, NormalWithNull) {
@@ -379,14 +431,16 @@ TEST_F(RedisMGETCommandHandlerTest, NoUpstreamHostForAll) {
   expected_response.type(RespType::Array);
   std::vector<RespValue> elements(2);
   elements[0].type(RespType::Error);
-  elements[0].asString() = "no upstream host";
+  elements[0].asString() = Response::get().NoUpstreamHost;
   elements[1].type(RespType::Error);
-  elements[1].asString() = "no upstream host";
+  elements[1].asString() = Response::get().NoUpstreamHost;
   expected_response.asArray().swap(elements);
 
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
   setup(2, {0, 1});
   EXPECT_EQ(nullptr, handle_);
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.mget.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.mget.error").value());
 };
 
 TEST_F(RedisMGETCommandHandlerTest, NoUpstreamHostForOne) {
@@ -399,13 +453,15 @@ TEST_F(RedisMGETCommandHandlerTest, NoUpstreamHostForOne) {
   expected_response.type(RespType::Array);
   std::vector<RespValue> elements(2);
   elements[0].type(RespType::Error);
-  elements[0].asString() = "no upstream host";
+  elements[0].asString() = Response::get().NoUpstreamHost;
   elements[1].type(RespType::Error);
-  elements[1].asString() = "upstream failure";
+  elements[1].asString() = Response::get().UpstreamFailure;
   expected_response.asArray().swap(elements);
 
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
   pool_callbacks_[1]->onFailure();
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.mget.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.mget.error").value());
 };
 
 TEST_F(RedisMGETCommandHandlerTest, Failure) {
@@ -420,7 +476,7 @@ TEST_F(RedisMGETCommandHandlerTest, Failure) {
   elements[0].type(RespType::BulkString);
   elements[0].asString() = "response";
   elements[1].type(RespType::Error);
-  elements[1].asString() = "upstream failure";
+  elements[1].asString() = Response::get().UpstreamFailure;
   expected_response.asArray().swap(elements);
 
   pool_callbacks_[1]->onFailure();
@@ -428,8 +484,13 @@ TEST_F(RedisMGETCommandHandlerTest, Failure) {
   RespValuePtr response1(new RespValue());
   response1->type(RespType::BulkString);
   response1->asString() = "response";
+  time_system_.setMonotonicTime(std::chrono::milliseconds(5));
+  EXPECT_CALL(store_, deliverHistogramToSinks(
+                          Property(&Stats::Metric::name, "redis.foo.command.mget.latency"), 5));
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
   pool_callbacks_[0]->onResponse(std::move(response1));
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.mget.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.mget.error").value());
 };
 
 TEST_F(RedisMGETCommandHandlerTest, InvalidUpstreamResponse) {
@@ -442,9 +503,9 @@ TEST_F(RedisMGETCommandHandlerTest, InvalidUpstreamResponse) {
   expected_response.type(RespType::Array);
   std::vector<RespValue> elements(2);
   elements[0].type(RespType::Error);
-  elements[0].asString() = "upstream protocol error";
+  elements[0].asString() = Response::get().UpstreamProtocolError;
   elements[1].type(RespType::Error);
-  elements[1].asString() = "upstream failure";
+  elements[1].asString() = Response::get().UpstreamFailure;
   expected_response.asArray().swap(elements);
 
   pool_callbacks_[1]->onFailure();
@@ -452,8 +513,13 @@ TEST_F(RedisMGETCommandHandlerTest, InvalidUpstreamResponse) {
   RespValuePtr response1(new RespValue());
   response1->type(RespType::Integer);
   response1->asInteger() = 5;
+  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  EXPECT_CALL(store_, deliverHistogramToSinks(
+                          Property(&Stats::Metric::name, "redis.foo.command.mget.latency"), 10));
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
   pool_callbacks_[0]->onResponse(std::move(response1));
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.mget.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.mget.error").value());
 };
 
 TEST_F(RedisMGETCommandHandlerTest, Cancel) {
@@ -513,20 +579,25 @@ TEST_F(RedisMSETCommandHandlerTest, Normal) {
 
   RespValue expected_response;
   expected_response.type(RespType::SimpleString);
-  expected_response.asString() = "OK";
+  expected_response.asString() = Response::get().OK;
 
   RespValuePtr response2(new RespValue());
   response2->type(RespType::SimpleString);
-  response2->asString() = "OK";
+  response2->asString() = Response::get().OK;
   pool_callbacks_[1]->onResponse(std::move(response2));
 
   RespValuePtr response1(new RespValue());
   response1->type(RespType::SimpleString);
-  response1->asString() = "OK";
+  response1->asString() = Response::get().OK;
+
+  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  EXPECT_CALL(store_, deliverHistogramToSinks(
+                          Property(&Stats::Metric::name, "redis.foo.command.mset.latency"), 10));
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
   pool_callbacks_[0]->onResponse(std::move(response1));
 
   EXPECT_EQ(1UL, store_.counter("redis.foo.command.mset.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.mset.success").value());
 };
 
 TEST_F(RedisMSETCommandHandlerTest, NoUpstreamHostForAll) {
@@ -539,6 +610,8 @@ TEST_F(RedisMSETCommandHandlerTest, NoUpstreamHostForAll) {
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
   setup(2, {0, 1});
   EXPECT_EQ(nullptr, handle_);
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.mset.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.mset.error").value());
 };
 
 TEST_F(RedisMSETCommandHandlerTest, NoUpstreamHostForOne) {
@@ -553,9 +626,11 @@ TEST_F(RedisMSETCommandHandlerTest, NoUpstreamHostForOne) {
 
   RespValuePtr response2(new RespValue());
   response2->type(RespType::SimpleString);
-  response2->asString() = "OK";
+  response2->asString() = Response::get().OK;
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
   pool_callbacks_[1]->onResponse(std::move(response2));
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.mset.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.mset.error").value());
 };
 
 TEST_F(RedisMSETCommandHandlerTest, Cancel) {
@@ -579,6 +654,8 @@ TEST_F(RedisMSETCommandHandlerTest, WrongNumberOfArgs) {
   RespValue request;
   makeBulkStringArray(request, {"mset", "foo", "bar", "fizz"});
   EXPECT_EQ(nullptr, splitter_.makeRequest(request, callbacks_));
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.mset.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.mset.error").value());
 };
 
 class RedisSplitKeysSumResultHandlerTest : public RedisCommandSplitterImplTest,
@@ -635,10 +712,16 @@ TEST_P(RedisSplitKeysSumResultHandlerTest, Normal) {
   RespValuePtr response1(new RespValue());
   response1->type(RespType::Integer);
   response1->asInteger() = 1;
+  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  EXPECT_CALL(
+      store_,
+      deliverHistogramToSinks(
+          Property(&Stats::Metric::name, "redis.foo.command." + GetParam() + ".latency"), 10));
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
   pool_callbacks_[0]->onResponse(std::move(response1));
 
   EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".success").value());
 };
 
 TEST_P(RedisSplitKeysSumResultHandlerTest, NormalOneZero) {
@@ -663,6 +746,7 @@ TEST_P(RedisSplitKeysSumResultHandlerTest, NormalOneZero) {
   pool_callbacks_[0]->onResponse(std::move(response1));
 
   EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".success").value());
 };
 
 TEST_P(RedisSplitKeysSumResultHandlerTest, NoUpstreamHostForAll) {
@@ -675,10 +759,12 @@ TEST_P(RedisSplitKeysSumResultHandlerTest, NoUpstreamHostForAll) {
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
   setup(2, {0, 1});
   EXPECT_EQ(nullptr, handle_);
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".error").value());
 };
 
-INSTANTIATE_TEST_CASE_P(RedisSplitKeysSumResultHandlerTest, RedisSplitKeysSumResultHandlerTest,
-                        testing::ValuesIn(SupportedCommands::hashMultipleSumResultCommands()));
+INSTANTIATE_TEST_SUITE_P(RedisSplitKeysSumResultHandlerTest, RedisSplitKeysSumResultHandlerTest,
+                         testing::ValuesIn(SupportedCommands::hashMultipleSumResultCommands()));
 
 } // namespace CommandSplitter
 } // namespace RedisProxy

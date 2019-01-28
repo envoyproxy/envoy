@@ -4,6 +4,7 @@
 #include <iostream>
 #include <memory>
 #include <unordered_map>
+#include <vector>
 
 namespace Envoy {
 namespace Http {
@@ -36,7 +37,22 @@ public:
 
 using MetadataMapPtr = std::unique_ptr<MetadataMap>;
 
-using MetadataCallback = std::function<void(std::unique_ptr<MetadataMap>)>;
+using VectorMetadataMapPtr = std::vector<MetadataMapPtr>;
+
+class MetadataMapVector : public VectorMetadataMapPtr {
+public:
+  using VectorMetadataMapPtr::VectorMetadataMapPtr;
+
+  friend std::ostream& operator<<(std::ostream& out, const MetadataMapVector& metadata_map_vector) {
+    out << "metadata_map_vector:\n";
+    for (const auto& metadata_map : metadata_map_vector) {
+      out << *metadata_map;
+    }
+    return out;
+  }
+};
+
+using MetadataCallback = std::function<void(MetadataMapPtr&&)>;
 
 } // namespace Http
 } // namespace Envoy

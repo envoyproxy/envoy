@@ -146,13 +146,15 @@ features. The following sandboxes are available:
 .. toctree::
     :maxdepth: 1
 
-    sandboxes/front_proxy
-    sandboxes/zipkin_tracing
-    sandboxes/jaeger_tracing
-    sandboxes/jaeger_native_tracing
-    sandboxes/grpc_bridge
-    Lua <https://github.com/envoyproxy/envoy/tree/master/examples/lua>
+    sandboxes/cors
     Fault Injection <https://github.com/envoyproxy/envoy/tree/master/examples/fault-injection>
+    sandboxes/front_proxy
+    sandboxes/grpc_bridge
+    sandboxes/jaeger_native_tracing
+    sandboxes/jaeger_tracing
+    Lua <https://github.com/envoyproxy/envoy/tree/master/examples/lua>
+    Redis <https://github.com/envoyproxy/envoy/tree/master/examples/redis>
+    sandboxes/zipkin_tracing
 
 Other use cases
 ---------------
@@ -164,3 +166,4 @@ source distributions that target specific use cases.
     :maxdepth: 1
 
     distro/ambassador
+    distro/gloo

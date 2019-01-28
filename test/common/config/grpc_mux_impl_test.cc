@@ -138,6 +138,7 @@ TEST_F(GrpcMuxImplTest, ResetStream) {
   expectSendMessage("baz", {"z"}, "");
   grpc_mux_->start();
 
+  EXPECT_CALL(callbacks_, onConfigUpdateFailed(_)).Times(3);
   EXPECT_CALL(random_, random());
   ASSERT_TRUE(timer != nullptr); // initialized from dispatcher mock.
   EXPECT_CALL(*timer, enableTimer(_));

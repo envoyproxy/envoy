@@ -1,13 +1,14 @@
 #include "test/config/utility.h"
 
 #include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
-#include "envoy/config/transport_socket/capture/v2alpha/capture.pb.h"
+#include "envoy/config/transport_socket/tap/v2alpha/tap.pb.h"
 #include "envoy/http/codec.h"
 
 #include "common/common/assert.h"
 #include "common/config/resources.h"
 #include "common/protobuf/utility.h"
 
+#include "test/config/integration/certs/client_ecdsacert_hash.h"
 #include "test/config/integration/certs/clientcert_hash.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
@@ -75,7 +76,6 @@ const std::string ConfigHelper::DEFAULT_BUFFER_FILTER =
 name: envoy.buffer
 config:
     max_request_bytes : 5242880
-    max_request_time : 120s
 )EOF";
 
 const std::string ConfigHelper::SMALL_BUFFER_FILTER =
@@ -83,7 +83,6 @@ const std::string ConfigHelper::SMALL_BUFFER_FILTER =
 name: envoy.buffer
 config:
     max_request_bytes : 1024
-    max_request_time : 5s
 )EOF";
 
 const std::string ConfigHelper::DEFAULT_HEALTH_CHECK_FILTER =
@@ -149,16 +148,16 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
   uint32_t port_idx = 0;
   bool eds_hosts = false;
   auto* static_resources = bootstrap_.mutable_static_resources();
-  const auto capture_path = TestEnvironment::getOptionalEnvVar("CAPTURE_PATH");
-  if (capture_path) {
-    ENVOY_LOG_MISC(debug, "Test capture path set to {}", capture_path.value());
+  const auto tap_path = TestEnvironment::getOptionalEnvVar("TAP_PATH");
+  if (tap_path) {
+    ENVOY_LOG_MISC(debug, "Test tap path set to {}", tap_path.value());
   } else {
-    ENVOY_LOG_MISC(debug, "No capture path set for tests");
+    ENVOY_LOG_MISC(debug, "No tap path set for tests");
   }
   for (int i = 0; i < bootstrap_.mutable_static_resources()->listeners_size(); ++i) {
     auto* listener = static_resources->mutable_listeners(i);
     for (int j = 0; j < listener->filter_chains_size(); ++j) {
-      if (capture_path) {
+      if (tap_path) {
         auto* filter_chain = listener->mutable_filter_chains(j);
         const bool has_tls = filter_chain->has_tls_context();
         absl::optional<ProtobufWkt::Struct> tls_config;
@@ -167,8 +166,8 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
           MessageUtil::jsonConvert(filter_chain->tls_context(), tls_config.value());
           filter_chain->clear_tls_context();
         }
-        setCaptureTransportSocket(capture_path.value(), fmt::format("listener_{}_{}", i, j),
-                                  *filter_chain->mutable_transport_socket(), tls_config);
+        setTapTransportSocket(tap_path.value(), fmt::format("listener_{}_{}", i, j),
+                              *filter_chain->mutable_transport_socket(), tls_config);
       }
     }
   }
@@ -201,7 +200,7 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
       }
     }
 
-    if (capture_path) {
+    if (tap_path) {
       const bool has_tls = cluster->has_tls_context();
       absl::optional<ProtobufWkt::Struct> tls_config;
       if (has_tls) {
@@ -209,8 +208,8 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
         MessageUtil::jsonConvert(cluster->tls_context(), tls_config.value());
         cluster->clear_tls_context();
       }
-      setCaptureTransportSocket(capture_path.value(), fmt::format("cluster_{}", i),
-                                *cluster->mutable_transport_socket(), tls_config);
+      setTapTransportSocket(tap_path.value(), fmt::format("cluster_{}", i),
+                            *cluster->mutable_transport_socket(), tls_config);
     }
   }
   ASSERT(port_idx == ports.size() || eds_hosts);
@@ -229,10 +228,9 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
   finalized_ = true;
 }
 
-void ConfigHelper::setCaptureTransportSocket(
-    const std::string& capture_path, const std::string& type,
-    envoy::api::v2::core::TransportSocket& transport_socket,
-    const absl::optional<ProtobufWkt::Struct>& tls_config) {
+void ConfigHelper::setTapTransportSocket(const std::string& tap_path, const std::string& type,
+                                         envoy::api::v2::core::TransportSocket& transport_socket,
+                                         const absl::optional<ProtobufWkt::Struct>& tls_config) {
   // Determine inner transport socket.
   envoy::api::v2::core::TransportSocket inner_transport_socket;
   if (!transport_socket.name().empty()) {
@@ -244,18 +242,18 @@ void ConfigHelper::setCaptureTransportSocket(
   } else {
     inner_transport_socket.set_name("raw_buffer");
   }
-  // Configure outer capture transport socket.
-  transport_socket.set_name("envoy.transport_sockets.capture");
-  envoy::config::transport_socket::capture::v2alpha::Capture capture_config;
-  auto* file_sink = capture_config.mutable_file_sink();
+  // Configure outer tap transport socket.
+  transport_socket.set_name("envoy.transport_sockets.tap");
+  envoy::config::transport_socket::tap::v2alpha::Tap tap_config;
+  auto* file_sink = tap_config.mutable_file_sink();
   const ::testing::TestInfo* const test_info =
       ::testing::UnitTest::GetInstance()->current_test_info();
   const std::string test_id =
       std::string(test_info->name()) + "_" + std::string(test_info->test_case_name()) + "_" + type;
-  file_sink->set_path_prefix(capture_path + "_" + absl::StrReplaceAll(test_id, {{"/", "_"}}));
-  file_sink->set_format(envoy::config::transport_socket::capture::v2alpha::FileSink::PROTO_TEXT);
-  capture_config.mutable_transport_socket()->MergeFrom(inner_transport_socket);
-  MessageUtil::jsonConvert(capture_config, *transport_socket.mutable_config());
+  file_sink->set_path_prefix(tap_path + "_" + absl::StrReplaceAll(test_id, {{"/", "_"}}));
+  file_sink->set_format(envoy::config::transport_socket::tap::v2alpha::FileSink::PROTO_TEXT);
+  tap_config.mutable_transport_socket()->MergeFrom(inner_transport_socket);
+  transport_socket.mutable_typed_config()->PackFrom(tap_config);
 }
 
 void ConfigHelper::setSourceAddress(const std::string& address_string) {
@@ -326,12 +324,13 @@ void ConfigHelper::setConnectTimeout(std::chrono::milliseconds timeout) {
   connect_timeout_set_ = true;
 }
 
-void ConfigHelper::addRoute(const std::string& domains, const std::string& prefix,
-                            const std::string& cluster, bool validate_clusters,
-                            envoy::api::v2::route::RouteAction::ClusterNotFoundResponseCode code,
-                            envoy::api::v2::route::VirtualHost::TlsRequirementType type,
-                            envoy::api::v2::route::RouteAction::RetryPolicy retry_policy,
-                            bool include_attempt_count_header, const absl::string_view upgrade) {
+void ConfigHelper::addRoute(
+    const std::string& domains, const std::string& prefix, const std::string& cluster,
+    bool validate_clusters, envoy::api::v2::route::RouteAction::ClusterNotFoundResponseCode code,
+    envoy::api::v2::route::VirtualHost::TlsRequirementType type,
+    envoy::api::v2::route::RetryPolicy retry_policy, bool include_attempt_count_header,
+    const absl::string_view upgrade,
+    envoy::api::v2::route::RouteAction::InternalRedirectAction internal_redirect_action) {
   RELEASE_ASSERT(!finalized_, "");
   envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager hcm_config;
   loadHttpConnectionManager(hcm_config);
@@ -350,6 +349,7 @@ void ConfigHelper::addRoute(const std::string& domains, const std::string& prefi
   if (!upgrade.empty()) {
     route->add_upgrade_configs()->set_upgrade_type(std::string(upgrade));
   }
+  route->set_internal_redirect_action(internal_redirect_action);
   virtual_host->set_require_tls(type);
 
   storeHttpConnectionManager(hcm_config);
@@ -382,28 +382,44 @@ void ConfigHelper::setClientCodec(
   }
 }
 
-void ConfigHelper::addSslConfig() {
+void ConfigHelper::addSslConfig(const ServerSslOptions& options) {
   RELEASE_ASSERT(!finalized_, "");
 
   auto* filter_chain =
       bootstrap_.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
-  initializeTls(*filter_chain->mutable_tls_context()->mutable_common_tls_context());
+  initializeTls(options, *filter_chain->mutable_tls_context()->mutable_common_tls_context());
 }
 
-void ConfigHelper::initializeTls(envoy::api::v2::auth::CommonTlsContext& common_tls_context) {
+void ConfigHelper::initializeTls(const ServerSslOptions& options,
+                                 envoy::api::v2::auth::CommonTlsContext& common_tls_context) {
   common_tls_context.add_alpn_protocols("h2");
   common_tls_context.add_alpn_protocols("http/1.1");
 
   auto* validation_context = common_tls_context.mutable_validation_context();
   validation_context->mutable_trusted_ca()->set_filename(
       TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
-  validation_context->add_verify_certificate_hash(TEST_CLIENT_CERT_HASH);
+  validation_context->add_verify_certificate_hash(
+      options.expect_client_ecdsa_cert_ ? TEST_CLIENT_ECDSA_CERT_HASH : TEST_CLIENT_CERT_HASH);
 
-  auto* tls_certificate = common_tls_context.add_tls_certificates();
-  tls_certificate->mutable_certificate_chain()->set_filename(
-      TestEnvironment::runfilesPath("/test/config/integration/certs/servercert.pem"));
-  tls_certificate->mutable_private_key()->set_filename(
-      TestEnvironment::runfilesPath("/test/config/integration/certs/serverkey.pem"));
+  // We'll negotiate up to TLSv1.3 for the tests that care, but it really
+  // depends on what the client sets.
+  common_tls_context.mutable_tls_params()->set_tls_maximum_protocol_version(
+      options.tlsv1_3_ ? envoy::api::v2::auth::TlsParameters::TLSv1_3
+                       : envoy::api::v2::auth::TlsParameters::TLSv1_2);
+  if (options.rsa_cert_) {
+    auto* tls_certificate = common_tls_context.add_tls_certificates();
+    tls_certificate->mutable_certificate_chain()->set_filename(
+        TestEnvironment::runfilesPath("/test/config/integration/certs/servercert.pem"));
+    tls_certificate->mutable_private_key()->set_filename(
+        TestEnvironment::runfilesPath("/test/config/integration/certs/serverkey.pem"));
+  }
+  if (options.ecdsa_cert_) {
+    auto* tls_certificate = common_tls_context.add_tls_certificates();
+    tls_certificate->mutable_certificate_chain()->set_filename(
+        TestEnvironment::runfilesPath("/test/config/integration/certs/server_ecdsacert.pem"));
+    tls_certificate->mutable_private_key()->set_filename(
+        TestEnvironment::runfilesPath("/test/config/integration/certs/server_ecdsakey.pem"));
+  }
 }
 
 void ConfigHelper::renameListener(const std::string& name) {

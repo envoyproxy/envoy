@@ -109,7 +109,7 @@ void StreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream)
                    Headers::get().TransferEncoding.get().size(),
                    Headers::get().TransferEncodingValues.Chunked.c_str(),
                    Headers::get().TransferEncodingValues.Chunked.size());
-      // We do not aply chunk encoding for HTTP upgrades.
+      // We do not apply chunk encoding for HTTP upgrades.
       // If there is a body in a WebSocket Upgrade response, the chunks will be
       // passed through via maybeDirectDispatch so we need to avoid appending
       // extra chunk boundaries.
@@ -133,7 +133,7 @@ void StreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream)
 
 void StreamEncoderImpl::encodeData(Buffer::Instance& data, bool end_stream) {
   // end_stream may be indicated with a zero length data buffer. If that is the case, so not
-  // atually write the zero length buffer out.
+  // actually write the zero length buffer out.
   if (data.length() > 0) {
     if (chunk_encoding_) {
       connection_.buffer().add(fmt::format("{:x}\r\n", data.length()));
@@ -495,57 +495,22 @@ void ServerConnectionImpl::handlePath(HeaderMapImpl& headers, unsigned int metho
     return;
   }
 
-  struct http_parser_url u;
-  http_parser_url_init(&u);
-  int result = http_parser_parse_url(active_request_->request_url_.buffer(),
-                                     active_request_->request_url_.size(), is_connect, &u);
-
-  if (result != 0) {
-    sendProtocolError();
-    throw CodecProtocolException(
-        "http/1.1 protocol error: invalid url in request line, parsed invalid");
-  } else {
-    if ((u.field_set & (1 << UF_HOST)) == (1 << UF_HOST) &&
-        (u.field_set & (1 << UF_SCHEMA)) == (1 << UF_SCHEMA)) {
-      // RFC7230#5.7
-      // When a proxy receives a request with an absolute-form of
-      // request-target, the proxy MUST ignore the received Host header field
-      // (if any) and instead replace it with the host information of the
-      // request-target. A proxy that forwards such a request MUST generate a
-      // new Host field-value based on the received request-target rather than
-      // forward the received Host field-value.
-
-      uint16_t authority_len = u.field_data[UF_HOST].len;
-
-      if ((u.field_set & (1 << UF_PORT)) == (1 << UF_PORT)) {
-        authority_len = authority_len + u.field_data[UF_PORT].len + 1;
-      }
-
-      // Insert the host header, this will later be converted to :authority
-      std::string new_host(active_request_->request_url_.c_str() + u.field_data[UF_HOST].off,
-                           authority_len);
-
-      headers.insertHost().value(new_host);
-
-      // RFC allows the absolute-uri to not end in /, but the absolute path form
-      // must start with /
-      if ((u.field_set & (1 << UF_PATH)) == (1 << UF_PATH) && u.field_data[UF_PATH].len > 0) {
-        HeaderString new_path;
-        new_path.setCopy(active_request_->request_url_.c_str() + u.field_data[UF_PATH].off,
-                         active_request_->request_url_.size() - u.field_data[UF_PATH].off);
-        headers.addViaMove(std::move(path), std::move(new_path));
-      } else {
-        HeaderString new_path;
-        new_path.setCopy("/", 1);
-        headers.addViaMove(std::move(path), std::move(new_path));
-      }
-
-      active_request_->request_url_.clear();
-      return;
-    }
+  Utility::Url absolute_url;
+  if (!absolute_url.initialize(active_request_->request_url_.getStringView())) {
     sendProtocolError();
     throw CodecProtocolException("http/1.1 protocol error: invalid url in request line");
   }
+  // RFC7230#5.7
+  // When a proxy receives a request with an absolute-form of
+  // request-target, the proxy MUST ignore the received Host header field
+  // (if any) and instead replace it with the host information of the
+  // request-target. A proxy that forwards such a request MUST generate a
+  // new Host field-value based on the received request-target rather than
+  // forward the received Host field-value.
+  headers.insertHost().value(std::string(absolute_url.host_and_port()));
+
+  headers.insertPath().value(std::string(absolute_url.path()));
+  active_request_->request_url_.clear();
 }
 
 int ServerConnectionImpl::onHeadersComplete(HeaderMapImplPtr&& headers) {

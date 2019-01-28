@@ -39,7 +39,7 @@ SubsetLoadBalancer::SubsetLoadBalancer(
   refreshSubsets();
 
   // Configure future updates.
-  original_priority_set_callback_handle_ = priority_set.addMemberUpdateCb(
+  original_priority_set_callback_handle_ = priority_set.addPriorityUpdateCb(
       [this](uint32_t priority, const HostVector& hosts_added, const HostVector& hosts_removed) {
         if (!hosts_added.size() && !hosts_removed.size()) {
           // It's possible that metadata changed, without hosts being added nor removed.
@@ -125,7 +125,7 @@ HostConstSharedPtr SubsetLoadBalancer::tryChooseHostFromContext(LoadBalancerCont
 }
 
 // Iterates over the given metadata match criteria (which must be lexically sorted by key) and find
-// a matching LbSubsetEnryPtr, if any.
+// a matching LbSubsetEntryPtr, if any.
 SubsetLoadBalancer::LbSubsetEntryPtr SubsetLoadBalancer::findSubset(
     const std::vector<Router::MetadataMatchCriterionConstSharedPtr>& match_criteria) {
   const LbSubsetMap* subsets = &subsets_;
@@ -506,6 +506,7 @@ void SubsetLoadBalancer::HostSubsetImpl::update(const HostVector& hosts_added,
 
   HostVectorSharedPtr hosts(new HostVector());
   HostVectorSharedPtr healthy_hosts(new HostVector());
+  HostVectorSharedPtr degraded_hosts(new HostVector());
 
   // It's possible that hosts_added == original_host_set_.hosts(), e.g.: when
   // calling refreshSubsets() if only metadata change. If so, we can avoid the
@@ -514,8 +515,15 @@ void SubsetLoadBalancer::HostSubsetImpl::update(const HostVector& hosts_added,
     bool host_seen = predicate_added.count(host) == 1;
     if (host_seen || predicate(*host)) {
       hosts->emplace_back(host);
-      if (host->healthy()) {
+      switch (host->health()) {
+      case Host::Health::Healthy:
         healthy_hosts->emplace_back(host);
+        break;
+      case Host::Health::Degraded:
+        degraded_hosts->emplace_back(host);
+        break;
+      case Host::Health::Unhealthy:
+        break;
       }
     }
   }
@@ -537,10 +545,15 @@ void SubsetLoadBalancer::HostSubsetImpl::update(const HostVector& hosts_added,
     hosts_per_locality = original_host_set_.hostsPerLocality().filter(predicate);
   }
 
-  HostsPerLocalityConstSharedPtr healthy_hosts_per_locality =
-      hosts_per_locality->filter([](const Host& host) { return host.healthy(); });
+  HostsPerLocalityConstSharedPtr healthy_hosts_per_locality = hosts_per_locality->filter(
+      [](const Host& host) { return host.health() == Host::Health::Healthy; });
+  HostsPerLocalityConstSharedPtr degraded_hosts_per_locality = hosts_per_locality->filter(
+      [](const Host& host) { return host.health() == Host::Health::Degraded; });
 
-  HostSetImpl::updateHosts(hosts, healthy_hosts, hosts_per_locality, healthy_hosts_per_locality,
+  // TODO(snowp): Use partitionHosts here.
+  HostSetImpl::updateHosts(HostSetImpl::updateHostsParams(
+                               hosts, hosts_per_locality, healthy_hosts, healthy_hosts_per_locality,
+                               degraded_hosts, degraded_hosts_per_locality),
                            determineLocalityWeights(*hosts_per_locality), filtered_added,
                            filtered_removed);
 }
@@ -582,7 +595,7 @@ HostSetImplPtr SubsetLoadBalancer::PrioritySubsetImpl::createHostSet(
   const HostSetPtr& host_set = original_priority_set_.hostSetsPerPriority()[priority];
 
   ASSERT(!overprovisioning_factor.has_value() ||
-         overprovisioning_factor.value() == host_set->overprovisioning_factor());
+         overprovisioning_factor.value() == host_set->overprovisioningFactor());
   return HostSetImplPtr{
       new HostSubsetImpl(*host_set, locality_weight_aware_, scale_locality_weight_)};
 }

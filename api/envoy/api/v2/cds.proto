@@ -1,6 +1,7 @@
 syntax = "proto3";
 
 package envoy.api.v2;
+option java_package = "io.envoyproxy.envoy.api.v2";
 
 option java_generic_services = true;
 
@@ -231,9 +232,8 @@ message Cluster {
   // for upstream connections. The key should match the extension filter name, such as
   // "envoy.filters.network.thrift_proxy". See the extension's documentation for details on
   // specific options.
-  map<string, google.protobuf.Struct> extension_protocol_options = 35;
+  map<string, google.protobuf.Struct> extension_protocol_options = 35 [deprecated = true];
 
-  // [#not-implemented-hide:]
   // The extension_protocol_options field is used to provide extension-specific protocol options
   // for upstream connections. The key should match the extension filter name, such as
   // "envoy.filters.network.thrift_proxy". See the extension's documentation for details on
@@ -246,7 +246,7 @@ message Cluster {
   // :ref:`STRICT_DNS<envoy_api_enum_value_Cluster.DiscoveryType.STRICT_DNS>`,
   // or :ref:`LOGICAL_DNS<envoy_api_enum_value_Cluster.DiscoveryType.LOGICAL_DNS>`,
   // this value is used as the cluster’s DNS refresh
-  // rate. If this setting is not specified, the value defaults to 5000. For
+  // rate. If this setting is not specified, the value defaults to 5000ms. For
   // cluster types other than
   // :ref:`STRICT_DNS<envoy_api_enum_value_Cluster.DiscoveryType.STRICT_DNS>`
   // and :ref:`LOGICAL_DNS<envoy_api_enum_value_Cluster.DiscoveryType.LOGICAL_DNS>`
@@ -415,6 +415,20 @@ message Cluster {
     // Deprecated settings from v1 config.
     // [#not-implemented-hide:] Hide from docs.
     DeprecatedV1 deprecated_v1 = 2 [deprecated = true];
+
+    // The hash function used to hash hosts onto the ketama ring.
+    enum HashFunction {
+      // Use `xxHash <https://github.com/Cyan4973/xxHash>`_, this is the default hash function.
+      XX_HASH = 0;
+      // Use `MurmurHash2 <https://sites.google.com/site/murmurhash/>`_, this is compatible with
+      // std:hash<string> in GNU libstdc++ 3.4.20 or above. This is typically the case when compiled
+      // on Linux and not macOS.
+      MURMUR_HASH_2 = 1;
+    }
+
+    // The hash function used to hash hosts onto the ketama ring. The value defaults to
+    // :ref:`XX_HASH<envoy_api_enum_value_Cluster.RingHashLbConfig.HashFunction.XX_HASH>`.
+    HashFunction hash_function = 3 [(validate.rules).enum.defined_only = true];
   }
 
   // Specific configuration for the
@@ -484,8 +498,8 @@ message Cluster {
     // merged and delivered in one shot when the duration expires. The start of the duration is when
     // the first update happens. This is useful for big clusters, with potentially noisy deploys
     // that might trigger excessive CPU usage due to a constant stream of healthcheck state changes
-    // or metadata updates. By default, this is not configured and updates apply immediately. Also,
-    // the first set of updates to be seen apply immediately as well (e.g.: a new cluster).
+    // or metadata updates. The first set of updates to be seen apply immediately (e.g.: a new
+    // cluster).
     //
     // If this is not set, we default to a merge window of 1000ms. To disable it, set the merge
     // window to 0.

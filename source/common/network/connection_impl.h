@@ -14,7 +14,6 @@
 #include "common/common/logger.h"
 #include "common/event/libevent.h"
 #include "common/network/filter_manager_impl.h"
-#include "common/ssl/ssl_socket.h"
 #include "common/stream_info/stream_info_impl.h"
 
 #include "absl/types/optional.h"
@@ -105,7 +104,8 @@ public:
   }
 
   // Network::TransportSocketCallbacks
-  int fd() const override { return socket_->fd(); }
+  IoHandle& ioHandle() override { return socket_->ioHandle(); }
+  const IoHandle& ioHandle() const override { return socket_->ioHandle(); }
   Connection& connection() override { return *this; }
   void raiseEvent(ConnectionEvent event) override;
   // Should the read buffer be drained?
@@ -134,8 +134,8 @@ protected:
   void onHighWatermark();
 
   TransportSocketPtr transport_socket_;
-  FilterManagerImpl filter_manager_;
   ConnectionSocketPtr socket_;
+  FilterManagerImpl filter_manager_;
   StreamInfo::StreamInfoImpl stream_info_;
 
   Buffer::OwnedImpl read_buffer_;

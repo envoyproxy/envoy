@@ -58,8 +58,8 @@ public:
   EdsHelper eds_helper_;
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, EdsIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+INSTANTIATE_TEST_SUITE_P(IpVersions, EdsIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
 // Validate that health status updates are consumed from EDS.
 TEST_P(EdsIntegrationTest, HealthUpdate) {
@@ -103,7 +103,7 @@ TEST_P(EdsIntegrationTest, OverprovisioningFactorUpdate) {
     const auto& hostset_per_priority = cluster_ref.get().prioritySet().hostSetsPerPriority();
     EXPECT_EQ(1, hostset_per_priority.size());
     const Envoy::Upstream::HostSetPtr& host_set = hostset_per_priority[0];
-    EXPECT_EQ(expected_factor, host_set->overprovisioning_factor());
+    EXPECT_EQ(expected_factor, host_set->overprovisioningFactor());
   };
   get_and_compare(Envoy::Upstream::kDefaultOverProvisioningFactor);
 

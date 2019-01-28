@@ -21,13 +21,14 @@ genrule(
     stamp = 1,
 )
 
-# For MacOS, which doesn't have GNU ld's `--build-id` flag.
+# For macOS, which doesn't have GNU ld's `--build-id` flag.
 genrule(
     name = "raw_build_id",
     outs = ["raw_build_id.ldscript"],
     cmd = """
       grep BUILD_SCM_REVISION bazel-out/volatile-status.txt \\
     | sed 's/^BUILD_SCM_REVISION //' \\
+    | tr -d '\\n' \\
     > $@
     """,
     # Undocumented attr to depend on workspace status files.
@@ -95,6 +96,11 @@ config_setting(
 )
 
 config_setting(
+    name = "debug_tcmalloc",
+    values = {"define": "tcmalloc=debug"},
+)
+
+config_setting(
     name = "disable_signal_trace",
     values = {"define": "signal_trace=disabled"},
 )
@@ -120,6 +126,11 @@ config_setting(
 )
 
 config_setting(
+    name = "enable_log_debug_assert_in_release",
+    values = {"define": "log_debug_assert_in_release=enabled"},
+)
+
+config_setting(
     name = "enable_perf_annotation",
     values = {"define": "perf_annotation=enabled"},
 )
@@ -127,4 +138,24 @@ config_setting(
 config_setting(
     name = "force_libcpp",
     values = {"define": "force_libcpp=enabled"},
+)
+
+config_setting(
+    name = "boringssl_fips",
+    constraint_values = [
+        "@bazel_tools//platforms:linux",
+        "@bazel_tools//platforms:x86_64",
+    ],
+    values = {"define": "boringssl=fips"},
+)
+
+# Alias pointing to the selected version of BoringSSL:
+# - BoringSSL FIPS from @boringssl_fips//:ssl,
+# - non-FIPS BoringSSL from @boringssl//:ssl.
+alias(
+    name = "boringssl",
+    actual = select({
+        "//bazel:boringssl_fips": "@boringssl_fips//:ssl",
+        "//conditions:default": "@boringssl//:ssl",
+    }),
 )

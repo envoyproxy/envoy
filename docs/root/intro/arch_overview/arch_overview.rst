@@ -19,7 +19,7 @@ Architecture overview
   service_discovery
   health_checking
   connection_pooling
-  load_balancing
+  load_balancing/load_balancing
   outlier
   circuit_breaking
   global_rate_limiting
@@ -39,3 +39,4 @@ Architecture overview
   scripting
   ext_authz_filter
   overload_manager
+  ip_transparency

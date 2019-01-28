@@ -25,7 +25,9 @@ envoy_cc_library(
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/secret:secret_manager_interface",
         "//include/envoy/server:admin_interface",
+        "//include/envoy/singleton:manager_interface",
         "//include/envoy/tcp:conn_pool_interface",
+        "//include/envoy/thread_local:thread_local_interface",
         "@envoy_api//envoy/api/v2:cds_cc",
         "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
     ],
@@ -63,6 +65,7 @@ envoy_cc_library(
     deps = [
         ":upstream_interface",
         "//include/envoy/router:router_interface",
+        "//include/envoy/upstream:types_interface",
     ],
 )
 
@@ -97,6 +100,7 @@ envoy_cc_library(
     name = "retry_interface",
     hdrs = ["retry.h"],
     deps = [
+        "//include/envoy/upstream:types_interface",
         "//include/envoy/upstream:upstream_interface",
     ],
 )
@@ -112,6 +116,14 @@ envoy_cc_library(
     deps = [
         ":load_balancer_interface",
         ":upstream_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "types_interface",
+    hdrs = ["types.h"],
+    deps = [
+        "//source/common/common:phantom",
     ],
 )
 

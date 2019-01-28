@@ -65,7 +65,7 @@ TEST(UUID, sanityCheckOfUniqueness) {
 
 class DiskBackedLoaderImplTest : public testing::Test {
 public:
-  static void SetUpTestCase() {
+  static void SetUpTestSuite() {
     TestEnvironment::exec(
         {TestEnvironment::runfilesPath("test/common/runtime/filesystem_setup.sh")});
   }
@@ -258,7 +258,7 @@ TEST(LoaderImplTest, All) {
 }
 
 TEST(DiskLayer, IllegalPath) {
-#if defined(WIN32)
+#ifdef WIN32
   // no illegal paths on Windows at the moment
   return;
 #endif

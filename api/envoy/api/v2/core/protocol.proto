@@ -3,6 +3,7 @@
 syntax = "proto3";
 
 package envoy.api.v2.core;
+option java_package = "io.envoyproxy.envoy.api.v2.core";
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";

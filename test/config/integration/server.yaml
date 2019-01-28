@@ -2,7 +2,7 @@ static_resources:
   listeners:
   - address:
       socket_address:
-        address: "{{ ip_loopback_address }}"
+        address: {{ ip_loopback_address }}
         port_value: 0
     filter_chains:
     - filters:
@@ -68,8 +68,6 @@ static_resources:
                 type: logical_or
             - path: "/dev/null"
           deprecated_v1: true
-        deprecated_v1:
-          type: read
   - address:
       socket_address:
         address: {{ ip_loopback_address }}
@@ -147,8 +145,6 @@ static_resources:
             http1_settings:
               allow_absolute_url: true
           deprecated_v1: true
-        deprecated_v1:
-          type: read
   - address:
       socket_address:
         address: {{ ip_loopback_address }}
@@ -172,8 +168,6 @@ static_resources:
             codec_type: http1
             stat_prefix: router
           deprecated_v1: true
-        deprecated_v1:
-          type: read
     per_connection_buffer_limit_bytes: 1024
   - address:
       socket_address:
@@ -200,8 +194,6 @@ static_resources:
                 - "*"
                 name: integration
           deprecated_v1: true
-        deprecated_v1:
-          type: read
     per_connection_buffer_limit_bytes: 1024
   - address:
       socket_address:
@@ -228,8 +220,6 @@ static_resources:
             codec_type: http1
             stat_prefix: router
           deprecated_v1: true
-        deprecated_v1:
-          type: read
     per_connection_buffer_limit_bytes: 1024
   - address:
       socket_address:
@@ -281,7 +271,6 @@ static_resources:
                 domain: foo
             - name: buffer
               config:
-                max_request_time_s: 120
                 max_request_bytes: 5242880
             - config: {}
               name: router
@@ -303,8 +292,6 @@ static_resources:
               path: "/dev/null"
             - path: "/dev/null"
           deprecated_v1: true
-        deprecated_v1:
-          type: read
   - address:
       socket_address:
         address: {{ ip_loopback_address }}
@@ -320,11 +307,10 @@ static_resources:
             codec_type: http1
             stat_prefix: rds_dummy
             rds:
+              api_type: REST
               route_config_name: foo
               cluster: rds
           deprecated_v1: true
-        deprecated_v1:
-          type: read
   - address:
       socket_address:
         address: {{ ip_loopback_address }}
@@ -339,8 +325,6 @@ static_resources:
             stat_prefix: redis
             cluster_name: redis
           deprecated_v1: true
-        deprecated_v1:
-          type: read
   clusters:
   - name: cds
     connect_timeout: 5s
@@ -407,11 +391,13 @@ static_resources:
 dynamic_resources:
   lds_config:
     api_config_source:
+      api_type: REST
       cluster_names:
       - lds
       refresh_delay: 30s
   cds_config:
     api_config_source:
+      api_type: REST
       cluster_names:
       - cds
       refresh_delay: 30s
@@ -425,7 +411,8 @@ stats_sinks:
         address: {{ ip_loopback_address }}
         port_value: 8125
 - name: envoy.statsd
-  config:
+  typed_config:
+    "@type": type.googleapis.com/envoy.config.metrics.v2.StatsdSink
     tcp_cluster_name: statsd
 watchdog: {}
 runtime:

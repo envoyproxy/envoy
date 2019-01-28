@@ -80,8 +80,8 @@ public:
     request_encoder_ = &client_->newStream(response_decoder_);
     setupDefaultConnectionMocks();
 
-    EXPECT_CALL(server_callbacks_, newStream(_))
-        .WillOnce(Invoke([&](StreamEncoder& encoder) -> StreamDecoder& {
+    EXPECT_CALL(server_callbacks_, newStream(_, _))
+        .WillOnce(Invoke([&](StreamEncoder& encoder, bool) -> StreamDecoder& {
           response_encoder_ = &encoder;
           encoder.getStream().addCallbacks(server_stream_callbacks_);
           return request_decoder_;
@@ -380,7 +380,64 @@ TEST_P(Http2CodecImplTest, TrailingHeadersLargeBody) {
   response_encoder_->encodeTrailers(TestHeaderMapImpl{{"trailing", "header"}});
 }
 
-TEST_P(Http2CodecImplTest, SmallMetadataTest) {
+TEST_P(Http2CodecImplTest, SmallMetadataVecTest) {
+  allow_metadata_ = true;
+  initialize();
+
+  // Generates a valid stream_id by sending a request header.
+  TestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  request_encoder_->encodeHeaders(request_headers, true);
+
+  MetadataMapVector metadata_map_vector;
+  const int size = 10;
+  for (int i = 0; i < size; i++) {
+    MetadataMap metadata_map = {
+        {"header_key1", "header_value1"},
+        {"header_key2", "header_value2"},
+        {"header_key3", "header_value3"},
+        {"header_key4", "header_value4"},
+    };
+    MetadataMapPtr metadata_map_ptr = std::make_unique<MetadataMap>(metadata_map);
+    metadata_map_vector.push_back(std::move(metadata_map_ptr));
+  }
+
+  EXPECT_CALL(request_decoder_, decodeMetadata_(_)).Times(size);
+  request_encoder_->encodeMetadata(metadata_map_vector);
+
+  EXPECT_CALL(response_decoder_, decodeMetadata_(_)).Times(size);
+  response_encoder_->encodeMetadata(metadata_map_vector);
+}
+
+TEST_P(Http2CodecImplTest, LargeMetadataVecTest) {
+  allow_metadata_ = true;
+  initialize();
+
+  // Generates a valid stream_id by sending a request header.
+  TestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  request_encoder_->encodeHeaders(request_headers, true);
+
+  MetadataMapVector metadata_map_vector;
+  const int size = 10;
+  for (int i = 0; i < size; i++) {
+    MetadataMap metadata_map = {
+        {"header_key1", std::string(50 * 1024, 'a')},
+    };
+    MetadataMapPtr metadata_map_ptr = std::make_unique<MetadataMap>(metadata_map);
+    metadata_map_vector.push_back(std::move(metadata_map_ptr));
+  }
+
+  EXPECT_CALL(request_decoder_, decodeMetadata_(_)).Times(size);
+  request_encoder_->encodeMetadata(metadata_map_vector);
+
+  EXPECT_CALL(response_decoder_, decodeMetadata_(_)).Times(size);
+  response_encoder_->encodeMetadata(metadata_map_vector);
+}
+
+TEST_P(Http2CodecImplTest, BadMetadataVecReceivedTest) {
   allow_metadata_ = true;
   initialize();
 
@@ -396,57 +453,14 @@ TEST_P(Http2CodecImplTest, SmallMetadataTest) {
       {"header_key3", "header_value3"},
       {"header_key4", "header_value4"},
   };
-
-  EXPECT_CALL(request_decoder_, decodeMetadata_(_));
-  request_encoder_->encodeMetadata(metadata_map);
-
-  EXPECT_CALL(response_decoder_, decodeMetadata_(_));
-  response_encoder_->encodeMetadata(metadata_map);
-}
-
-TEST_P(Http2CodecImplTest, LargeMetadataTest) {
-  allow_metadata_ = true;
-  initialize();
-
-  // Generates a valid stream_id by sending a request header.
-  TestHeaderMapImpl request_headers;
-  HttpTestUtility::addDefaultHeaders(request_headers);
-  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
-  request_encoder_->encodeHeaders(request_headers, true);
-
-  MetadataMap metadata_map = {
-      {"header_key1", std::string(50 * 1024, 'a')},
-  };
-
-  EXPECT_CALL(request_decoder_, decodeMetadata_(_));
-  request_encoder_->encodeMetadata(metadata_map);
-
-  EXPECT_CALL(response_decoder_, decodeMetadata_(_));
-  response_encoder_->encodeMetadata(metadata_map);
-}
-
-TEST_P(Http2CodecImplTest, BadMetadataReceivedTest) {
-  allow_metadata_ = true;
-  initialize();
-
-  // Generates a valid stream_id by sending a request header.
-  TestHeaderMapImpl request_headers;
-  HttpTestUtility::addDefaultHeaders(request_headers);
-  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
-  request_encoder_->encodeHeaders(request_headers, true);
-
-  MetadataMap metadata_map = {
-      {"header_key1", "header_value1"},
-      {"header_key2", "header_value2"},
-      {"header_key3", "header_value3"},
-      {"header_key4", "header_value4"},
-  };
+  MetadataMapPtr metadata_map_ptr = std::make_unique<MetadataMap>(metadata_map);
+  MetadataMapVector metadata_map_vector;
+  metadata_map_vector.push_back(std::move(metadata_map_ptr));
 
   corrupt_data_ = true;
-  EXPECT_THROW_WITH_MESSAGE(request_encoder_->encodeMetadata(metadata_map), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(request_encoder_->encodeMetadata(metadata_map_vector), EnvoyException,
                             "The user callback function failed");
 }
-
 class Http2CodecImplDeferredResetTest : public Http2CodecImplTest {};
 
 TEST_P(Http2CodecImplDeferredResetTest, DeferredResetClient) {
@@ -584,8 +598,8 @@ TEST_P(Http2CodecImplFlowControlTest, TestFlowControlInPendingSendData) {
   // underlying connection. Pretend it is overrun.
   EXPECT_CALL(server_connection_, aboveHighWatermark()).WillOnce(Return(true));
   EXPECT_CALL(server_stream_callbacks2, onAboveWriteBufferHighWatermark());
-  EXPECT_CALL(server_callbacks_, newStream(_))
-      .WillOnce(Invoke([&](StreamEncoder& encoder) -> StreamDecoder& {
+  EXPECT_CALL(server_callbacks_, newStream(_, _))
+      .WillOnce(Invoke([&](StreamEncoder& encoder, bool) -> StreamDecoder& {
         response_encoder2 = &encoder;
         encoder.getStream().addCallbacks(server_stream_callbacks2);
         return request_decoder2;
@@ -768,8 +782,8 @@ TEST_P(Http2CodecImplStreamLimitTest, MaxClientStreams) {
   for (int i = 0; i < 101; ++i) {
     request_encoder_ = &client_->newStream(response_decoder_);
     setupDefaultConnectionMocks();
-    EXPECT_CALL(server_callbacks_, newStream(_))
-        .WillOnce(Invoke([&](StreamEncoder& encoder) -> StreamDecoder& {
+    EXPECT_CALL(server_callbacks_, newStream(_, _))
+        .WillOnce(Invoke([&](StreamEncoder& encoder, bool) -> StreamDecoder& {
           response_encoder_ = &encoder;
           encoder.getStream().addCallbacks(server_stream_callbacks_);
           return request_decoder_;
@@ -789,14 +803,14 @@ TEST_P(Http2CodecImplStreamLimitTest, MaxClientStreams) {
                      ::testing::Values(Http2Settings::MIN_INITIAL_CONNECTION_WINDOW_SIZE))
 
 // Deferred reset tests use only small windows so that we can test certain conditions.
-INSTANTIATE_TEST_CASE_P(Http2CodecImplDeferredResetTest, Http2CodecImplDeferredResetTest,
-                        ::testing::Combine(HTTP2SETTINGS_SMALL_WINDOW_COMBINE,
-                                           HTTP2SETTINGS_SMALL_WINDOW_COMBINE));
+INSTANTIATE_TEST_SUITE_P(Http2CodecImplDeferredResetTest, Http2CodecImplDeferredResetTest,
+                         ::testing::Combine(HTTP2SETTINGS_SMALL_WINDOW_COMBINE,
+                                            HTTP2SETTINGS_SMALL_WINDOW_COMBINE));
 
 // Flow control tests only use only small windows so that we can test certain conditions.
-INSTANTIATE_TEST_CASE_P(Http2CodecImplFlowControlTest, Http2CodecImplFlowControlTest,
-                        ::testing::Combine(HTTP2SETTINGS_SMALL_WINDOW_COMBINE,
-                                           HTTP2SETTINGS_SMALL_WINDOW_COMBINE));
+INSTANTIATE_TEST_SUITE_P(Http2CodecImplFlowControlTest, Http2CodecImplFlowControlTest,
+                         ::testing::Combine(HTTP2SETTINGS_SMALL_WINDOW_COMBINE,
+                                            HTTP2SETTINGS_SMALL_WINDOW_COMBINE));
 
 // we separate default/edge cases here to avoid combinatorial explosion
 #define HTTP2SETTINGS_DEFAULT_COMBINE                                                              \
@@ -807,13 +821,13 @@ INSTANTIATE_TEST_CASE_P(Http2CodecImplFlowControlTest, Http2CodecImplFlowControl
 
 // Stream limit test only uses the default values because not all combinations of
 // edge settings allow for the number of streams needed by the test.
-INSTANTIATE_TEST_CASE_P(Http2CodecImplStreamLimitTest, Http2CodecImplStreamLimitTest,
-                        ::testing::Combine(HTTP2SETTINGS_DEFAULT_COMBINE,
-                                           HTTP2SETTINGS_DEFAULT_COMBINE));
+INSTANTIATE_TEST_SUITE_P(Http2CodecImplStreamLimitTest, Http2CodecImplStreamLimitTest,
+                         ::testing::Combine(HTTP2SETTINGS_DEFAULT_COMBINE,
+                                            HTTP2SETTINGS_DEFAULT_COMBINE));
 
-INSTANTIATE_TEST_CASE_P(Http2CodecImplTestDefaultSettings, Http2CodecImplTest,
-                        ::testing::Combine(HTTP2SETTINGS_DEFAULT_COMBINE,
-                                           HTTP2SETTINGS_DEFAULT_COMBINE));
+INSTANTIATE_TEST_SUITE_P(Http2CodecImplTestDefaultSettings, Http2CodecImplTest,
+                         ::testing::Combine(HTTP2SETTINGS_DEFAULT_COMBINE,
+                                            HTTP2SETTINGS_DEFAULT_COMBINE));
 
 #define HTTP2SETTINGS_EDGE_COMBINE                                                                 \
   ::testing::Combine(                                                                              \
@@ -825,8 +839,9 @@ INSTANTIATE_TEST_CASE_P(Http2CodecImplTestDefaultSettings, Http2CodecImplTest,
       ::testing::Values(Http2Settings::MIN_INITIAL_CONNECTION_WINDOW_SIZE,                         \
                         Http2Settings::MAX_INITIAL_CONNECTION_WINDOW_SIZE))
 
-INSTANTIATE_TEST_CASE_P(Http2CodecImplTestEdgeSettings, Http2CodecImplTest,
-                        ::testing::Combine(HTTP2SETTINGS_EDGE_COMBINE, HTTP2SETTINGS_EDGE_COMBINE));
+INSTANTIATE_TEST_SUITE_P(Http2CodecImplTestEdgeSettings, Http2CodecImplTest,
+                         ::testing::Combine(HTTP2SETTINGS_EDGE_COMBINE,
+                                            HTTP2SETTINGS_EDGE_COMBINE));
 
 TEST(Http2CodecUtility, reconstituteCrumbledCookies) {
   {

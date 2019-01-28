@@ -10,7 +10,9 @@ General
 -------
 
 The cluster manager has a statistics tree rooted at *cluster_manager.* with the following
-statistics. Any ``:`` character in the stats name is replaced with ``_``.
+statistics. Any ``:`` character in the stats name is replaced with ``_``. Stats include
+all clusters managed by the cluster manager, including both clusters used for data plane
+upstreams and control plane xDS clusters.
 
 .. csv-table::
   :header: Name, Type, Description
@@ -76,8 +78,11 @@ Every cluster has a statistics tree rooted at *cluster.<name>.* with the followi
   upstream_flow_control_resumed_reading_total, Counter, Total number of times flow control resumed reading from upstream
   upstream_flow_control_backed_up_total, Counter, Total number of times the upstream connection backed up and paused reads from downstream
   upstream_flow_control_drained_total, Counter, Total number of times the upstream connection drained and resumed reads from downstream
+  upstream_internal_redirect_failed_total, Counter, Total number of times failed internal redirects resulted in redirects being passed downstream.
+  upstream_internal_redirect_succeed_total, Counter, Total number of times internal redirects resulted in a second upstream request.
   membership_change, Counter, Total cluster membership changes
   membership_healthy, Gauge, Current cluster healthy total (inclusive of both health checking and outlier detection)
+  membership_degraded, Gauge, Current cluster degraded total
   membership_total, Gauge, Current cluster membership total
   retry_or_shadow_abandoned, Counter, Total number of times shadowing or retry buffering was canceled due to buffer limits
   config_reload, Counter, Total API fetches that resulted in a config reload due to a different config
