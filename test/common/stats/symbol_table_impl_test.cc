@@ -322,22 +322,22 @@ TEST_P(StatNameTest, Sort) {
 }
 
 TEST_P(StatNameTest, Concat2) {
-  SymbolTable::StoragePtr joined = table_->join(makeStat("a.b"), makeStat("c.d"));
+  SymbolTable::StoragePtr joined = table_->join({makeStat("a.b"), makeStat("c.d")});
   EXPECT_EQ("a.b.c.d", table_->toString(StatName(joined.get())));
 }
 
 TEST_P(StatNameTest, ConcatFirstEmpty) {
-  SymbolTable::StoragePtr joined = table_->join(makeStat(""), makeStat("c.d"));
+  SymbolTable::StoragePtr joined = table_->join({makeStat(""), makeStat("c.d")});
   EXPECT_EQ("c.d", table_->toString(StatName(joined.get())));
 }
 
 TEST_P(StatNameTest, ConcatSecondEmpty) {
-  SymbolTable::StoragePtr joined = table_->join(makeStat("a.b"), makeStat(""));
+  SymbolTable::StoragePtr joined = table_->join({makeStat("a.b"), makeStat("")});
   EXPECT_EQ("a.b", table_->toString(StatName(joined.get())));
 }
 
 TEST_P(StatNameTest, ConcatAllEmpty) {
-  SymbolTable::StoragePtr joined = table_->join(makeStat(""), makeStat(""));
+  SymbolTable::StoragePtr joined = table_->join({makeStat(""), makeStat("")});
   EXPECT_EQ("", table_->toString(StatName(joined.get())));
 }
 

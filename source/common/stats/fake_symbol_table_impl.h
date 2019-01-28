@@ -60,9 +60,6 @@ public:
   }
   void free(const StatName&) override {}
   void incRefCount(const StatName&) override {}
-  SymbolTable::StoragePtr join(const StatName& a, const StatName& b) const override {
-    return join({a, b});
-  }
   SymbolTable::StoragePtr join(const std::vector<StatName>& names) const override {
     std::vector<absl::string_view> strings;
     for (StatName name : names) {

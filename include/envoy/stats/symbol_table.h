@@ -124,7 +124,6 @@ public:
    * form. Using this class, they can be combined without acessingm the
    * SymbolTable or, in particular, taking its lock.
    */
-  virtual StoragePtr join(const StatName& a, const StatName& b) const PURE;
   virtual StoragePtr join(const std::vector<StatName>& stat_names) const PURE;
 
 #ifndef ENVOY_CONFIG_COVERAGE

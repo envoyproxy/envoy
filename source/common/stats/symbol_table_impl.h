@@ -140,7 +140,6 @@ public:
   bool lessThan(const StatName& a, const StatName& b) const override;
   void free(const StatName& stat_name) override;
   void incRefCount(const StatName& stat_name) override;
-  SymbolTable::StoragePtr join(const StatName& a, const StatName& b) const override;
   SymbolTable::StoragePtr join(const std::vector<StatName>& stat_names) const override;
 #ifndef ENVOY_CONFIG_COVERAGE
   void debugPrint() const override;
