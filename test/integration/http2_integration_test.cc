@@ -131,18 +131,7 @@ TEST_P(Http2IntegrationTest, RetryPriority) { testRetryPriority(); }
 
 TEST_P(Http2IntegrationTest, GrpcRetry) { testGrpcRetry(); }
 
-TEST_P(Http2IntegrationTest, LargeHeadersInvokeResetStream) {
-  Http::TestHeaderMapImpl big_headers{
-      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
-  big_headers.addCopy("big", std::string(62 * 1024, 'a'));
-
-  initialize();
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto encoder_decoder = codec_client_->startRequest(big_headers);
-  auto response = std::move(encoder_decoder.second);
-  response->waitForReset();
-  codec_client_->close();
-}
+TEST_P(Http2IntegrationTest, LargeHeadersInvokeResetStream) { testLargeRequestHeaders(62, 60); }
 
 TEST_P(Http2IntegrationTest, LargeHeadersAcceptedIfConfigured) { testLargeRequestHeaders(62, 63); }
 
