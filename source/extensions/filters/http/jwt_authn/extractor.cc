@@ -7,6 +7,8 @@
 #include "common/http/utility.h"
 #include "common/singleton/const_singleton.h"
 
+#include "absl/strings/match.h"
+
 using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication;
 using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtHeader;
 using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtProvider;
@@ -19,7 +21,7 @@ namespace JwtAuthn {
 namespace {
 
 /**
- * Contant values
+ * Constant values
  */
 struct JwtConstValueStruct {
   // The header value prefix for Authorization.
@@ -179,7 +181,7 @@ std::vector<JwtLocationConstPtr> ExtractorImpl::extract(const Http::HeaderMap& h
     if (entry) {
       auto value_str = entry->value().getStringView();
       if (!location_spec->value_prefix_.empty()) {
-        if (!StringUtil::startsWith(value_str.data(), location_spec->value_prefix_, true)) {
+        if (!absl::StartsWith(value_str, location_spec->value_prefix_)) {
           // prefix doesn't match, skip it.
           continue;
         }

@@ -1,7 +1,5 @@
 #pragma once
 
-#include <strings.h>
-
 #include <chrono>
 #include <cstdint>
 #include <regex>
@@ -166,16 +164,6 @@ public:
   static bool atol(const char* str, int64_t& out, int base = 10);
 
   /**
-   * Perform a case insensitive compare of 2 strings.
-   * @param lhs supplies string 1.
-   * @param rhs supplies string 2.
-   * @return < 0, 0, > 0 depending on the comparison result.
-   */
-  static int caseInsensitiveCompare(const char* lhs, const char* rhs) {
-    return strcasecmp(lhs, rhs);
-  }
-
-  /**
    * Convert an unsigned integer to a base 10 string as fast as possible.
    * @param out supplies the string to fill.
    * @param out_len supplies the length of the output buffer. Must be >= MIN_ITOA_OUT_LEN.
@@ -324,17 +312,6 @@ public:
   static std::string escape(const std::string& source);
 
   /**
-   * @return true if @param source ends with @param end.
-   */
-  static bool endsWith(const std::string& source, const std::string& end);
-
-  /**
-   * @param case_sensitive determines if the compare is case sensitive
-   * @return true if @param source starts with @param start and ignores cases.
-   */
-  static bool startsWith(const char* source, const std::string& start, bool case_sensitive = true);
-
-  /**
    * Provide a default value for a string if empty.
    * @param s string.
    * @param default_value replacement for s if empty.
@@ -349,6 +326,13 @@ public:
    * @return std::string s converted to upper case.
    */
   static std::string toUpper(absl::string_view s);
+
+  /**
+   * Convert a string to lower case.
+   * @param s string.
+   * @return std::string s converted to lower case.
+   */
+  static std::string toLower(absl::string_view s);
 
   /**
    * Callable struct that returns the result of string comparison ignoring case.
@@ -524,6 +508,17 @@ struct StringViewHash {
 };
 
 /**
+ * Hashing functor for use with enum class types.
+ * This is needed for GCC 5.X; newer versions of GCC, as well as clang7, provide native hashing
+ * specializations.
+ */
+struct EnumClassHash {
+  template <typename T> std::size_t operator()(T t) const {
+    return std::hash<std::size_t>()(static_cast<std::size_t>(t));
+  }
+};
+
+/**
  * Computes running standard-deviation using Welford's algorithm:
  * https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Online_algorithm
  */
@@ -556,6 +551,54 @@ private:
   uint64_t count_{0};
   double mean_{0};
   double m2_{0};
+};
+
+template <class Value> struct TrieEntry {
+  Value value_{};
+  std::array<std::unique_ptr<TrieEntry>, 256> entries_;
+};
+
+/**
+ * A trie used for faster lookup with lookup time at most equal to the size of the key.
+ */
+template <class Value> struct TrieLookupTable {
+
+  /**
+   * Adds an entry to the Trie at the given Key.
+   * @param key the key used to add the entry.
+   * @param value the value to be associated with the key.
+   */
+  void add(const char* key, Value value) {
+    TrieEntry<Value>* current = &root_;
+    while (uint8_t c = *key) {
+      if (!current->entries_[c]) {
+        current->entries_[c] = std::make_unique<TrieEntry<Value>>();
+      }
+      current = current->entries_[c].get();
+      key++;
+    }
+    current->value_ = value;
+  }
+
+  /**
+   * Finds the entry associated with the key.
+   * @param key the key used to find.
+   * @return the value associated with the key.
+   */
+  Value find(const char* key) const {
+    const TrieEntry<Value>* current = &root_;
+    while (uint8_t c = *key) {
+      current = current->entries_[c].get();
+      if (current) {
+        key++;
+      } else {
+        return nullptr;
+      }
+    }
+    return current->value_;
+  }
+
+  TrieEntry<Value> root_;
 };
 
 } // namespace Envoy

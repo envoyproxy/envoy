@@ -3,5 +3,6 @@
 # ci/build_container/build_recipes.
 TARGET_RECIPES = {
     "tcmalloc_and_profiler": "gperftools",
+    "tcmalloc_debug": "gperftools",
     "luajit": "luajit",
 }

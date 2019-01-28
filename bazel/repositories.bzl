@@ -272,10 +272,19 @@ def envoy_dependencies(path = "@envoy_deps//", skip_targets = []):
     # Setup rules_foreign_cc
     _foreign_cc_dependencies()
 
+    # Binding to an alias pointing to the selected version of BoringSSL:
+    # - BoringSSL FIPS from @boringssl_fips//:ssl,
+    # - non-FIPS BoringSSL from @boringssl//:ssl.
+    _boringssl()
+    _boringssl_fips()
+    native.bind(
+        name = "ssl",
+        actual = "@envoy//bazel:boringssl",
+    )
+
     # The long repo names (`com_github_fmtlib_fmt` instead of `fmtlib`) are
     # semi-standard in the Bazel community, intended to avoid both duplicate
     # dependencies and name conflicts.
-    _boringssl()
     _com_google_absl()
     _com_github_bombela_backward()
     _com_github_circonus_labs_libcircllhist()
@@ -301,6 +310,8 @@ def envoy_dependencies(path = "@envoy_deps//", skip_targets = []):
     _com_github_tencent_rapidjson()
     _com_google_googletest()
     _com_google_protobuf()
+    _com_github_envoyproxy_sqlparser()
+    _com_googlesource_quiche()
 
     # Used for bundling gcovr into a relocatable .par file.
     _repository_impl("subpar")
@@ -312,9 +323,15 @@ def envoy_dependencies(path = "@envoy_deps//", skip_targets = []):
 
 def _boringssl():
     _repository_impl("boringssl")
-    native.bind(
-        name = "ssl",
-        actual = "@boringssl//:ssl",
+
+def _boringssl_fips():
+    location = REPOSITORY_LOCATIONS["boringssl_fips"]
+    genrule_repository(
+        name = "boringssl_fips",
+        urls = location["urls"],
+        sha256 = location["sha256"],
+        genrule_cmd_file = "@envoy//bazel/external:boringssl_fips.genrule_cmd",
+        build_file = "@envoy//bazel/external:boringssl_fips.BUILD",
     )
 
 def _com_github_bombela_backward():
@@ -357,6 +374,16 @@ def _com_github_cyan4973_xxhash():
     native.bind(
         name = "xxhash",
         actual = "@com_github_cyan4973_xxhash//:xxhash",
+    )
+
+def _com_github_envoyproxy_sqlparser():
+    _repository_impl(
+        name = "com_github_envoyproxy_sqlparser",
+        build_file = "@envoy//bazel/external:sqlparser.BUILD",
+    )
+    native.bind(
+        name = "sqlparser",
+        actual = "@com_github_envoyproxy_sqlparser//:sqlparser",
     )
 
 def _com_github_eile_tclap():
@@ -550,6 +577,26 @@ def _com_google_absl():
         actual = "@com_google_absl//absl/container:flat_hash_set",
     )
     native.bind(
+        name = "abseil_hash",
+        actual = "@com_google_absl//absl/hash:hash",
+    )
+    native.bind(
+        name = "abseil_inlined_vector",
+        actual = "@com_google_absl//absl/container:inlined_vector",
+    )
+    native.bind(
+        name = "abseil_memory",
+        actual = "@com_google_absl//absl/memory:memory",
+    )
+    native.bind(
+        name = "abseil_node_hash_map",
+        actual = "@com_google_absl//absl/container:node_hash_map",
+    )
+    native.bind(
+        name = "abseil_node_hash_set",
+        actual = "@com_google_absl//absl/container:node_hash_set",
+    )
+    native.bind(
         name = "abseil_strings",
         actual = "@com_google_absl//absl/strings:strings",
     )
@@ -611,6 +658,25 @@ def _com_google_protobuf():
         actual = "@com_google_protobuf//util/python:python_headers",
     )
 
+def _com_googlesource_quiche():
+    _repository_impl(
+        name = "com_googlesource_quiche",
+        build_file = "@envoy//bazel/external:quiche.BUILD",
+    )
+
+    native.bind(
+        name = "quiche_http2_platform",
+        actual = "@com_googlesource_quiche//:http2_platform",
+    )
+    native.bind(
+        name = "quiche_spdy_platform",
+        actual = "@com_googlesource_quiche//:spdy_platform",
+    )
+    native.bind(
+        name = "quiche_quic_platform",
+        actual = "@com_googlesource_quiche//:quic_platform",
+    )
+
 def _com_github_grpc_grpc():
     _repository_impl("com_github_grpc_grpc")
 
@@ -667,16 +733,23 @@ def _foreign_cc_dependencies():
 
 def _apply_dep_blacklist(ctxt, recipes):
     newlist = []
-    skip_list = dict()
+    skip_list = []
     if _is_linux_ppc(ctxt):
-        skip_list = PPC_SKIP_TARGETS
+        skip_list += PPC_SKIP_TARGETS.keys()
     for t in recipes:
-        if t not in skip_list.keys():
+        if t not in skip_list:
             newlist.append(t)
     return newlist
 
-def _is_linux_ppc(ctxt):
-    if ctxt.os.name != "linux":
-        return False
+def _is_linux(ctxt):
+    return ctxt.os.name == "linux"
+
+def _is_arch(ctxt, arch):
     res = ctxt.execute(["uname", "-m"])
-    return "ppc" in res.stdout
+    return arch in res.stdout
+
+def _is_linux_ppc(ctxt):
+    return _is_linux(ctxt) and _is_arch(ctxt, "ppc")
+
+def _is_linux_x86_64(ctxt):
+    return _is_linux(ctxt) and _is_arch(ctxt, "x86_64")

@@ -74,10 +74,11 @@ void ConnectionHandlerImpl::ActiveListener::removeConnection(ActiveConnection& c
 
 ConnectionHandlerImpl::ActiveListener::ActiveListener(ConnectionHandlerImpl& parent,
                                                       Network::ListenerConfig& config)
-    : ActiveListener(parent,
-                     parent.dispatcher_.createListener(
-                         config.socket(), *this, config.handOffRestoredDestinationConnections()),
-                     config) {}
+    : ActiveListener(
+          parent,
+          parent.dispatcher_.createListener(config.socket(), *this, config.bindToPort(),
+                                            config.handOffRestoredDestinationConnections()),
+          config) {}
 
 ConnectionHandlerImpl::ActiveListener::ActiveListener(ConnectionHandlerImpl& parent,
                                                       Network::ListenerPtr&& listener,
@@ -185,7 +186,7 @@ void ConnectionHandlerImpl::ActiveSocket::continueFilterChain(bool success) {
     }
     if (new_listener != nullptr) {
       // Hands off connections redirected by iptables to the listener associated with the
-      // original destination address. Pass 'hand_off_restored_destionations' as false to
+      // original destination address. Pass 'hand_off_restored_destination_connections' as false to
       // prevent further redirection.
       new_listener->onAccept(std::move(socket_), false);
     } else {

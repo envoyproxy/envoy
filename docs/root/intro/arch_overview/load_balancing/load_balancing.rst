@@ -6,10 +6,11 @@ Load Balancing
 
   overview
   load_balancers
-  original_dst
-  overprovisioning
   priority
-  zone_aware
-  panic_threshold
+  degraded
   locality_weight
+  overprovisioning
+  panic_threshold
+  original_dst
+  zone_aware
   subsets

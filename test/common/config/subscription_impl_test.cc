@@ -57,9 +57,9 @@ public:
   std::unique_ptr<SubscriptionTestHarness> test_harness_;
 };
 
-INSTANTIATE_TEST_CASE_P(SubscriptionImplTest, SubscriptionImplTest,
-                        testing::ValuesIn({SubscriptionType::Grpc, SubscriptionType::Http,
-                                           SubscriptionType::Filesystem}));
+INSTANTIATE_TEST_SUITE_P(SubscriptionImplTest, SubscriptionImplTest,
+                         testing::ValuesIn({SubscriptionType::Grpc, SubscriptionType::Http,
+                                            SubscriptionType::Filesystem}));
 
 // Validate basic request-response succeeds.
 TEST_P(SubscriptionImplTest, InitialRequestResponse) {

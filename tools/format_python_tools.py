@@ -5,7 +5,7 @@ import sys
 
 from yapf.yapflib.yapf_api import FormatFile
 
-EXCLUDE_LIST = ['pyformat']
+EXCLUDE_LIST = ['generated', 'venv']
 
 
 def collectFiles():
@@ -16,7 +16,11 @@ def collectFiles():
   """
   # TODO: Add ability to collect a specific file or files.
   matches = []
-  for root, dirnames, filenames in os.walk('.'):
+  path_parts = os.getcwd().split('/')
+  dirname = '.'
+  if path_parts[-1] == 'tools':
+    dirname = '/'.join(path_parts[:-1])
+  for root, dirnames, filenames in os.walk(dirname):
     dirnames[:] = [d for d in dirnames if d not in EXCLUDE_LIST]
     for filename in fnmatch.filter(filenames, '*.py'):
       matches.append(os.path.join(root, filename))
@@ -28,7 +32,7 @@ def validateFormat(fix=False):
 
     Arguments:
       fix: a flag to indicate if fixes should be applied.
-    """
+  """
   fixes_required = False
   failed_update_files = set()
   successful_update_files = set()

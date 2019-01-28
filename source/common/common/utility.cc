@@ -451,23 +451,6 @@ std::string AccessLogDateTimeFormatter::fromTime(const SystemTime& time) {
   return cached_time.formatted_time;
 }
 
-bool StringUtil::endsWith(const std::string& source, const std::string& end) {
-  if (source.length() < end.length()) {
-    return false;
-  }
-
-  size_t start_position = source.length() - end.length();
-  return std::equal(source.begin() + start_position, source.end(), end.begin());
-}
-
-bool StringUtil::startsWith(const char* source, const std::string& start, bool case_sensitive) {
-  if (case_sensitive) {
-    return strncmp(source, start.c_str(), start.size()) == 0;
-  } else {
-    return strncasecmp(source, start.c_str(), start.size()) == 0;
-  }
-}
-
 const std::string& StringUtil::nonEmptyStringOrDefault(const std::string& s,
                                                        const std::string& default_value) {
   return s.empty() ? default_value : s;
@@ -478,6 +461,13 @@ std::string StringUtil::toUpper(absl::string_view s) {
   upper_s.reserve(s.size());
   std::transform(s.cbegin(), s.cend(), std::back_inserter(upper_s), absl::ascii_toupper);
   return upper_s;
+}
+
+std::string StringUtil::toLower(absl::string_view s) {
+  std::string lower_s;
+  lower_s.reserve(s.size());
+  std::transform(s.cbegin(), s.cend(), std::back_inserter(lower_s), absl::ascii_tolower);
+  return lower_s;
 }
 
 bool StringUtil::CaseInsensitiveCompare::operator()(absl::string_view lhs,

@@ -1,10 +1,10 @@
 #pragma once
 
-#if !defined(WIN32)
-#include <alloca.h>
+#ifdef WIN32
+#include <malloc.h>
 
 #else
-#include <malloc.h>
+#include <alloca.h>
 #endif
 
 #include <stddef.h>

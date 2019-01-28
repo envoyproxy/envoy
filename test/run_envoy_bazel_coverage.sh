@@ -38,7 +38,7 @@ BAZEL_TEST_OPTIONS="${BAZEL_TEST_OPTIONS} -c dbg --copt=-DNDEBUG"
   --experimental_cc_skylark_api_enabled_packages=@rules_foreign_cc//tools/build_defs,tools/build_defs \
   --cache_test_results=no --cxxopt="--coverage" --cxxopt="-DENVOY_CONFIG_COVERAGE=1" \
   --linkopt="--coverage" --define ENVOY_CONFIG_COVERAGE=1 --test_output=streamed \
-  --strategy=Genrule=standalone --spawn_strategy=standalone --test_timeout=1000 \
+  --strategy=Genrule=standalone --spawn_strategy=standalone --test_timeout=2000 \
   --test_arg="--log-path /dev/null" --test_arg="-l trace"
 
 # The Bazel build has a lot of whack in it, in particular generated files, headers from external

@@ -23,6 +23,19 @@ bool SocketOptionImpl::setOption(Socket& socket,
   return true;
 }
 
+absl::optional<Socket::Option::Details>
+SocketOptionImpl::getOptionDetails(const Socket&,
+                                   envoy::api::v2::core::SocketOption::SocketState state) const {
+  if (state != in_state_ || !isSupported()) {
+    return absl::nullopt;
+  }
+
+  Socket::Option::Details info;
+  info.name_ = optname_;
+  info.value_ = value_;
+  return absl::optional<Option::Details>(std::move(info));
+}
+
 bool SocketOptionImpl::isSupported() const { return optname_.has_value(); }
 
 Api::SysCallIntResult SocketOptionImpl::setSocketOption(Socket& socket,
@@ -33,8 +46,8 @@ Api::SysCallIntResult SocketOptionImpl::setSocketOption(Socket& socket,
     return {-1, ENOTSUP};
   }
   auto& os_syscalls = Api::OsSysCallsSingleton::get();
-  return os_syscalls.setsockopt(socket.fd(), optname.value().first, optname.value().second,
-                                value.data(), value.size());
+  return os_syscalls.setsockopt(socket.ioHandle().fd(), optname.value().first,
+                                optname.value().second, value.data(), value.size());
 }
 
 } // namespace Network

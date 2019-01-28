@@ -102,6 +102,7 @@ private:
     const std::string& maxAge() const override { return EMPTY_STRING; };
     const absl::optional<bool>& allowCredentials() const override { return allow_credentials_; };
     bool enabled() const override { return false; };
+    bool shadowEnabled() const override { return false; };
 
     static const std::list<std::string> allow_origin_;
     static const std::list<std::regex> allow_origin_regex_;
@@ -144,6 +145,10 @@ private:
     // Router::ShadowPolicy
     const std::string& cluster() const override { return EMPTY_STRING; }
     const std::string& runtimeKey() const override { return EMPTY_STRING; }
+    const envoy::type::FractionalPercent& defaultValue() const override { return default_value_; }
+
+  private:
+    envoy::type::FractionalPercent default_value_;
   };
 
   struct NullConfig : public Router::Config {
@@ -234,6 +239,9 @@ private:
 
     bool includeAttemptCount() const override { return false; }
     const Router::RouteEntry::UpgradeMap& upgradeMap() const override { return upgrade_map_; }
+    Router::InternalRedirectAction internalRedirectAction() const override {
+      return Router::InternalRedirectAction::PassThrough;
+    }
 
     static const NullRateLimitPolicy rate_limit_policy_;
     static const NullRetryPolicy retry_policy_;
@@ -284,7 +292,12 @@ private:
   const Tracing::Config& tracingConfig() override { return tracing_config_; }
   void continueDecoding() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   HeaderMap& addDecodedTrailers() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-  void addDecodedData(Buffer::Instance&, bool) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  void addDecodedData(Buffer::Instance&, bool) override {
+    // This should only be called if the user has set up buffering. The request is already fully
+    // buffered. Note that this is only called via the async client's internal use of the router
+    // filter which uses this function for buffering.
+    ASSERT(buffered_body_ != nullptr);
+  }
   const Buffer::Instance* decodingBuffer() override { return buffered_body_.get(); }
   void sendLocalReply(Code code, absl::string_view body,
                       std::function<void(HeaderMap& headers)> modify_headers,
@@ -313,6 +326,7 @@ private:
   void removeDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks&) override {}
   void setDecoderBufferLimit(uint32_t) override {}
   uint32_t decoderBufferLimit() override { return 0; }
+  bool recreateStream() override { return false; }
 
   AsyncClient::StreamCallbacks& stream_callbacks_;
   const uint64_t stream_id_;
@@ -351,6 +365,10 @@ private:
   void onReset() override;
 
   // Http::StreamDecoderFilterCallbacks
+  void addDecodedData(Buffer::Instance&, bool) override {
+    // The request is already fully buffered. Note that this is only called via the async client's
+    // internal use of the router filter which uses this function for buffering.
+  }
   const Buffer::Instance* decodingBuffer() override { return request_->body().get(); }
 
   MessagePtr request_;

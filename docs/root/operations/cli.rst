@@ -31,11 +31,6 @@ following are the command line options that Envoy supports.
 
       ./envoy -c bootstrap.yaml --config-yaml "node: {id: 'node1'}"
 
-.. option:: --v2-config-only
-
-  *(deprecated)* This flag used to allow opting into only using a
-  :ref:`v2 bootstrap configuration file <config_overview_v2_bootstrap>`. This is now set by default.
-
 .. option:: --mode <string>
 
   *(optional)* One of the operating modes for Envoy:
@@ -79,7 +74,7 @@ following are the command line options that Envoy supports.
   *(optional)* The comma separated list of logging level per component. Non developers should generally 
   never set this option. For example, if you want `upstream` component to run at `debug` level and 
   `connection` component to run at `trace` level, you should pass ``upstream:debug,connection:trace`` to 
-  this flag.
+  this flag. See ``ALL_LOGGER_IDS`` in :repo:`/source/common/common/logger.h` for a list of components.
 
 .. option:: --log-path <path string>
 
@@ -247,3 +242,20 @@ following are the command line options that Envoy supports.
   validation is enabled. For most deployments, the default should be used which ensures configuration errors
   are caught upfront and Envoy is configured as intended. However in cases where Envoy needs to accept configuration 
   produced by newer control planes, effectively ignoring new features it does not know about yet, this can be disabled.
+
+.. option:: --version
+
+  *(optional)* This flag is used to display Envoy version and build information, e.g.
+  ``c93f9f6c1e5adddd10a3e3646c7e049c649ae177/1.9.0-dev/Clean/RELEASE/BoringSSL-FIPS``.
+
+  It consists of five slash-separated fields:
+
+  * source revision - git commit from which Envoy was built,
+
+  * release number - either release (e.g. ``1.9.0``) or a development build (e.g. ``1.9.0-dev``),
+
+  * status of the source tree at the build time - either ``Clean`` or ``Modified``,
+
+  * build mode - either ``RELEASE`` or ``DEBUG``,
+
+  * TLS library - either ``BoringSSL`` or ``BoringSSL-FIPS``.

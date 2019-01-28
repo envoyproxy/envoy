@@ -35,13 +35,13 @@ namespace Envoy {
 OptionsImpl::OptionsImpl(int argc, const char* const* argv,
                          const HotRestartVersionCb& hot_restart_version_cb,
                          spdlog::level::level_enum default_log_level)
-    : v2_config_only_(true), signal_handling_enabled_(true) {
+    : signal_handling_enabled_(true) {
   std::string log_levels_string = "Log levels: ";
-  for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_names); i++) {
-    log_levels_string += fmt::format("[{}]", spdlog::level::level_names[i]);
+  for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_string_views); i++) {
+    log_levels_string += fmt::format("[{}]", spdlog::level::level_string_views[i]);
   }
   log_levels_string +=
-      fmt::format("\nDefault is [{}]", spdlog::level::level_names[default_log_level]);
+      fmt::format("\nDefault is [{}]", spdlog::level::level_string_views[default_log_level]);
 
   const std::string component_log_level_string =
       "Comma separated list of component log levels. For example upstream:debug,config:trace";
@@ -63,9 +63,6 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
       "", "config-yaml", "Inline YAML configuration, merges with the contents of --config-path",
       false, "", "string", cmd);
 
-  // Deprecated and unused.
-  TCLAP::SwitchArg v2_config_only("", "v2-config-only", "deprecated", cmd, true);
-
   TCLAP::SwitchArg allow_unknown_fields("", "allow-unknown-fields",
                                         "allow unknown fields in the configuration", cmd, false);
 
@@ -75,9 +72,9 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
                                                         "The local "
                                                         "IP address version (v4 or v6).",
                                                         false, "v4", "string", cmd);
-  TCLAP::ValueArg<std::string> log_level("l", "log-level", log_levels_string, false,
-                                         spdlog::level::level_names[default_log_level], "string",
-                                         cmd);
+  TCLAP::ValueArg<std::string> log_level(
+      "l", "log-level", log_levels_string, false,
+      spdlog::level::level_string_views[default_log_level].data(), "string", cmd);
   TCLAP::ValueArg<std::string> component_log_level(
       "", "component-log-level", component_log_level_string, false, "", "string", cmd);
   TCLAP::ValueArg<std::string> log_format("", "log-format", log_format_string, false,
@@ -142,7 +139,6 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
   auto check_numeric_arg = [](bool is_error, uint64_t value, absl::string_view pattern) {
     if (is_error) {
       const std::string message = fmt::format(std::string(pattern), value);
-      std::cerr << message << std::endl;
       throw MalformedArgvException(message);
     }
   };
@@ -159,8 +155,8 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
   mutex_tracing_enabled_ = enable_mutex_tracing.getValue();
 
   log_level_ = default_log_level;
-  for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_names); i++) {
-    if (log_level.getValue() == spdlog::level::level_names[i]) {
+  for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_string_views); i++) {
+    if (log_level.getValue() == spdlog::level::level_string_views[i]) {
       log_level_ = static_cast<spdlog::level::level_enum>(i);
     }
   }
@@ -177,7 +173,6 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
     mode_ = Server::Mode::InitOnly;
   } else {
     const std::string message = fmt::format("error: unknown mode '{}'", mode.getValue());
-    std::cerr << message << std::endl;
     throw MalformedArgvException(message);
   }
 
@@ -188,7 +183,6 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
   } else {
     const std::string message =
         fmt::format("error: unknown IP address version '{}'", local_address_ip_version.getValue());
-    std::cerr << message << std::endl;
     throw MalformedArgvException(message);
   }
 
@@ -234,8 +228,8 @@ void OptionsImpl::parseComponentLogLevels(const std::string& component_log_level
     std::string log_name = log_name_level[0];
     std::string log_level = log_name_level[1];
     size_t level_to_use = std::numeric_limits<size_t>::max();
-    for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_names); i++) {
-      if (log_level == spdlog::level::level_names[i]) {
+    for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_string_views); i++) {
+      if (log_level == spdlog::level::level_string_views[i]) {
         level_to_use = i;
         break;
       }
@@ -254,10 +248,7 @@ void OptionsImpl::parseComponentLogLevels(const std::string& component_log_level
 
 uint32_t OptionsImpl::count() const { return count_; }
 
-void OptionsImpl::logError(const std::string& error) const {
-  std::cerr << error << std::endl;
-  throw MalformedArgvException(error);
-}
+void OptionsImpl::logError(const std::string& error) const { throw MalformedArgvException(error); }
 
 Server::CommandLineOptionsPtr OptionsImpl::toCommandLineOptions() const {
   Server::CommandLineOptionsPtr command_line_options =
@@ -269,7 +260,8 @@ Server::CommandLineOptionsPtr OptionsImpl::toCommandLineOptions() const {
   command_line_options->set_allow_unknown_fields(allow_unknown_fields_);
   command_line_options->set_admin_address_path(adminAddressPath());
   command_line_options->set_component_log_level(component_log_level_str_);
-  command_line_options->set_log_level(spdlog::level::to_c_str(logLevel()));
+  command_line_options->set_log_level(spdlog::level::to_string_view(logLevel()).data(),
+                                      spdlog::level::to_string_view(logLevel()).size());
   command_line_options->set_log_format(logFormat());
   command_line_options->set_log_path(logPath());
   command_line_options->set_service_cluster(serviceClusterName());
@@ -305,7 +297,7 @@ Server::CommandLineOptionsPtr OptionsImpl::toCommandLineOptions() const {
 
 OptionsImpl::OptionsImpl(const std::string& service_cluster, const std::string& service_node,
                          const std::string& service_zone, spdlog::level::level_enum log_level)
-    : base_id_(0u), concurrency_(1u), config_path_(""), config_yaml_(""), v2_config_only_(true),
+    : base_id_(0u), concurrency_(1u), config_path_(""), config_yaml_(""),
       local_address_ip_version_(Network::Address::IpVersion::v4), log_level_(log_level),
       log_format_(Logger::Logger::DEFAULT_LOG_FORMAT), restart_epoch_(0u),
       service_cluster_(service_cluster), service_node_(service_node), service_zone_(service_zone),

@@ -27,9 +27,9 @@ using testing::Not;
 
 namespace Envoy {
 
-INSTANTIATE_TEST_CASE_P(IpVersions, IntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, IntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(IntegrationTest, RouterNotFound) { testRouterNotFound(); }
 
@@ -80,11 +80,11 @@ TEST_P(IntegrationTest, RouterRequestAndResponseLargeHeaderNoBuffer) {
 }
 
 TEST_P(IntegrationTest, RouterHeaderOnlyRequestAndResponseNoBuffer) {
-  testRouterHeaderOnlyRequestAndResponse(true);
+  testRouterHeaderOnlyRequestAndResponse();
 }
 
 TEST_P(IntegrationTest, ShutdownWithActiveConnPoolConnections) {
-  testRouterHeaderOnlyRequestAndResponse(false);
+  testRequestAndResponseShutdownWithActiveConnection();
 }
 
 TEST_P(IntegrationTest, RouterUpstreamDisconnectBeforeRequestcomplete) {
@@ -208,6 +208,8 @@ TEST_P(IntegrationTest, InvalidCharacterInFirstline) { testInvalidCharacterInFir
 TEST_P(IntegrationTest, InvalidVersion) { testInvalidVersion(); }
 
 TEST_P(IntegrationTest, Http10Disabled) { testHttp10Disabled(); }
+
+TEST_P(IntegrationTest, Http10DisabledWithUpgrade) { testHttp10DisabledWithUpgrade(); }
 
 TEST_P(IntegrationTest, Http09Enabled) { testHttp09Enabled(); }
 

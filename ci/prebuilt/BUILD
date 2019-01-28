@@ -25,3 +25,10 @@ cc_library(
     hdrs = glob(["thirdparty_build/include/gperftools/**/*.h"]),
     strip_include_prefix = "thirdparty_build/include",
 )
+
+cc_library(
+    name = "tcmalloc_debug",
+    srcs = ["thirdparty_build/lib/libtcmalloc_debug.a"],
+    hdrs = glob(["thirdparty_build/include/gperftools/**/*.h"]),
+    strip_include_prefix = "thirdparty_build/include",
+)

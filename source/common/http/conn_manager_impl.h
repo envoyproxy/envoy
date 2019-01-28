@@ -72,7 +72,8 @@ public:
   void onGoAway() override;
 
   // Http::ServerConnectionCallbacks
-  StreamDecoder& newStream(StreamEncoder& response_encoder) override;
+  StreamDecoder& newStream(StreamEncoder& response_encoder,
+                           bool is_internally_created = false) override;
 
   // Network::ConnectionCallbacks
   void onEvent(Network::ConnectionEvent event) override;
@@ -95,7 +96,7 @@ private:
   struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks {
     ActiveStreamFilterBase(ActiveStream& parent, bool dual_filter)
         : parent_(parent), headers_continued_(false), continue_headers_continued_(false),
-          stopped_(false), dual_filter_(dual_filter) {}
+          stopped_(false), end_stream_(false), dual_filter_(dual_filter) {}
 
     bool commonHandleAfter100ContinueHeadersCallback(FilterHeadersStatus status);
     bool commonHandleAfterHeadersCallback(FilterHeadersStatus status, bool& headers_only);
@@ -131,6 +132,8 @@ private:
     bool headers_continued_ : 1;
     bool continue_headers_continued_ : 1;
     bool stopped_ : 1;
+    // If true, end_stream is called for this filter.
+    bool end_stream_ : 1;
     const bool dual_filter_ : 1;
   };
 
@@ -183,7 +186,7 @@ private:
     void encodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
     void encodeData(Buffer::Instance& data, bool end_stream) override;
     void encodeTrailers(HeaderMapPtr&& trailers) override;
-    void encodeMetadata(MetadataMapPtr&& metadata_map) override;
+    void encodeMetadata(MetadataMapPtr&& metadata_map_ptr) override;
     void onDecoderFilterAboveWriteBufferHighWatermark() override;
     void onDecoderFilterBelowWriteBufferLowWatermark() override;
     void
@@ -192,6 +195,7 @@ private:
     removeDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks& watermark_callbacks) override;
     void setDecoderBufferLimit(uint32_t limit) override { parent_.setBufferLimit(limit); }
     uint32_t decoderBufferLimit() override { return parent_.buffer_limit_; }
+    bool recreateStream() override;
 
     // Each decoder filter instance checks if the request passed to the filter is gRPC
     // so that we can issue gRPC local responses to gRPC requests. Filter's decodeHeaders()
@@ -293,7 +297,7 @@ private:
     void encodeHeaders(ActiveStreamEncoderFilter* filter, HeaderMap& headers, bool end_stream);
     void encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instance& data, bool end_stream);
     void encodeTrailers(ActiveStreamEncoderFilter* filter, HeaderMap& trailers);
-    void encodeMetadata(ActiveStreamEncoderFilter* filter, MetadataMapPtr&& metadata_map);
+    void encodeMetadata(ActiveStreamEncoderFilter* filter, MetadataMapPtr&& metadata_map_ptr);
     void maybeEndEncode(bool end_stream);
     uint64_t streamId() { return stream_id_; }
 
@@ -361,7 +365,8 @@ private:
     struct State {
       State()
           : remote_complete_(false), local_complete_(false), saw_connection_close_(false),
-            successful_upgrade_(false), created_filter_chain_(false) {}
+            successful_upgrade_(false), created_filter_chain_(false),
+            is_internally_created_(false) {}
 
       uint32_t filter_call_state_{0};
       // The following 3 members are booleans rather than part of the space-saving bitfield as they
@@ -375,6 +380,10 @@ private:
       bool saw_connection_close_ : 1;
       bool successful_upgrade_ : 1;
       bool created_filter_chain_ : 1;
+
+      // True if this stream is internally created. Currently only used for
+      // internal redirects or other streams created via recreateStream().
+      bool is_internally_created_ : 1;
     };
 
     // Possibly increases buffer_limit_ to the value of limit.

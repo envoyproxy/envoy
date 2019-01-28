@@ -103,14 +103,17 @@ public:
   // Set the connect timeout on upstream connections.
   void setConnectTimeout(std::chrono::milliseconds timeout);
 
+  // TODO(alyssawilk) this does not scale. Refactor.
   // Add an additional route to the configuration.
   void addRoute(const std::string& host, const std::string& route, const std::string& cluster,
                 bool validate_clusters,
                 envoy::api::v2::route::RouteAction::ClusterNotFoundResponseCode code,
                 envoy::api::v2::route::VirtualHost::TlsRequirementType type =
                     envoy::api::v2::route::VirtualHost::NONE,
-                envoy::api::v2::route::RouteAction::RetryPolicy retry_policy = {},
-                bool include_attempt_count_header = false, const absl::string_view upgrade = "");
+                envoy::api::v2::route::RetryPolicy retry_policy = {},
+                bool include_attempt_count_header = false, const absl::string_view upgrade = "",
+                const envoy::api::v2::route::RouteAction::InternalRedirectAction internal_action =
+                    envoy::api::v2::route::RouteAction::PASS_THROUGH_INTERNAL_REDIRECT);
 
   // Add an HTTP filter prior to existing filters.
   void addFilter(const std::string& filter_yaml);
@@ -151,10 +154,10 @@ private:
   // Finds the filter named 'name' from the first filter chain from the first listener.
   envoy::api::v2::listener::Filter* getFilterFromListener(const std::string& name);
 
-  // Configure a capture transport socket for a cluster/filter chain.
-  void setCaptureTransportSocket(const std::string& capture_path, const std::string& type,
-                                 envoy::api::v2::core::TransportSocket& transport_socket,
-                                 const absl::optional<ProtobufWkt::Struct>& tls_config);
+  // Configure a tap transport socket for a cluster/filter chain.
+  void setTapTransportSocket(const std::string& tap_path, const std::string& type,
+                             envoy::api::v2::core::TransportSocket& transport_socket,
+                             const absl::optional<ProtobufWkt::Struct>& tls_config);
 
   // The bootstrap proto Envoy will start up with.
   envoy::config::bootstrap::v2::Bootstrap bootstrap_;

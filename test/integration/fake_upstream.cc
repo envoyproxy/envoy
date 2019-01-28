@@ -17,9 +17,10 @@
 #include "common/network/listen_socket_impl.h"
 #include "common/network/raw_buffer_socket.h"
 #include "common/network/utility.h"
-#include "common/ssl/ssl_socket.h"
 
 #include "server/connection_handler_impl.h"
+
+#include "extensions/transport_sockets/tls/ssl_socket.h"
 
 #include "test/integration/utility.h"
 #include "test/test_common/network_utility.h"
@@ -244,7 +245,7 @@ AssertionResult FakeConnectionBase::enableHalfClose(bool enable,
       [enable](Network::Connection& connection) { connection.enableHalfClose(enable); }, timeout);
 }
 
-Http::StreamDecoder& FakeHttpConnection::newStream(Http::StreamEncoder& encoder) {
+Http::StreamDecoder& FakeHttpConnection::newStream(Http::StreamEncoder& encoder, bool) {
   Thread::LockGuard lock(lock_);
   new_streams_.emplace_back(new FakeStream(*this, encoder, time_system_));
   connection_event_.notifyOne();
@@ -346,7 +347,7 @@ static Network::SocketPtr makeTcpListenSocket(uint32_t port, Network::Address::I
   return Network::SocketPtr{new Network::TcpListenSocket(
       Network::Utility::parseInternetAddressAndPort(
           fmt::format("{}:{}", Network::Test::getAnyAddressUrlString(version), port)),
-      nullptr)};
+      nullptr, true)};
 }
 
 FakeUpstream::FakeUpstream(uint32_t port, FakeHttpConnection::Type type,
@@ -376,7 +377,7 @@ FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket
       handler_(new Server::ConnectionHandlerImpl(ENVOY_LOGGER(), *dispatcher_)),
       allow_unexpected_disconnects_(false), enable_half_close_(enable_half_close), listener_(*this),
       filter_chain_(Network::Test::createEmptyFilterChain(std::move(transport_socket_factory))) {
-  thread_ = api_->createThread([this]() -> void { threadRoutine(); });
+  thread_ = api_->threadFactory().createThread([this]() -> void { threadRoutine(); });
   server_initialized_.waitReady();
 }
 
@@ -405,7 +406,6 @@ bool FakeUpstream::createListenerFilterChain(Network::ListenerFilterManager&) { 
 
 void FakeUpstream::threadRoutine() {
   handler_->addListener(listener_);
-
   server_initialized_.setReady();
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   handler_.reset();

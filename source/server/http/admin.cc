@@ -37,9 +37,9 @@
 #include "common/common/version.h"
 #include "common/html/utility.h"
 #include "common/http/codes.h"
+#include "common/http/conn_manager_utility.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
-#include "common/http/http1/codec_impl.h"
 #include "common/json/json_loader.h"
 #include "common/memory/stats.h"
 #include "common/network/listen_socket_impl.h"
@@ -154,6 +154,31 @@ void populateFallbackResponseHeaders(Http::Code code, Http::HeaderMap& header_ma
   header_map.addReference(headers.XContentTypeOptions, headers.XContentTypeOptionValues.Nosniff);
 }
 
+// Helper method that ensures that we've setting flags based on all the health flag values on the
+// host.
+void setHealthFlag(Upstream::Host::HealthFlag flag, const Upstream::Host& host,
+                   envoy::admin::v2alpha::HostHealthStatus& health_status) {
+  switch (flag) {
+  case Upstream::Host::HealthFlag::FAILED_ACTIVE_HC:
+    health_status.set_failed_active_health_check(
+        host.healthFlagGet(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC));
+    break;
+  case Upstream::Host::HealthFlag::FAILED_OUTLIER_CHECK:
+    health_status.set_failed_outlier_check(
+        host.healthFlagGet(Upstream::Host::HealthFlag::FAILED_OUTLIER_CHECK));
+    break;
+  case Upstream::Host::HealthFlag::FAILED_EDS_HEALTH:
+    health_status.set_eds_health_status(
+        host.healthFlagGet(Upstream::Host::HealthFlag::FAILED_EDS_HEALTH)
+            ? envoy::api::v2::core::HealthStatus::UNHEALTHY
+            : envoy::api::v2::core::HealthStatus::HEALTHY);
+    break;
+  case Upstream::Host::HealthFlag::DEGRADED_ACTIVE_HC:
+    health_status.set_failed_active_degraded_check(
+        host.healthFlagGet(Upstream::Host::HealthFlag::DEGRADED_ACTIVE_HC));
+    break;
+  }
+}
 } // namespace
 
 AdminFilter::AdminFilter(AdminImpl& parent) : parent_(parent) {}
@@ -167,7 +192,13 @@ Http::FilterHeadersStatus AdminFilter::decodeHeaders(Http::HeaderMap& headers, b
   return Http::FilterHeadersStatus::StopIteration;
 }
 
-Http::FilterDataStatus AdminFilter::decodeData(Buffer::Instance&, bool end_stream) {
+Http::FilterDataStatus AdminFilter::decodeData(Buffer::Instance& data, bool end_stream) {
+  // Currently we generically buffer all admin request data in case a handler wants to use it.
+  // If we ever support streaming admin requests we may need to revisit this. Note, we must use
+  // addDecodedData() here since we might need to perform onComplete() processing if end_stream is
+  // true.
+  callbacks_->addDecodedData(data, false);
+
   if (end_stream) {
     onComplete();
   }
@@ -195,6 +226,8 @@ Http::StreamDecoderFilterCallbacks& AdminFilter::getDecoderFilterCallbacks() con
   return *callbacks_;
 }
 
+const Buffer::Instance* AdminFilter::getRequestBody() const { return callbacks_->decodingBuffer(); }
+
 const Http::HeaderMap& AdminFilter::getRequestHeaders() const {
   ASSERT(request_headers_ != nullptr);
   return *request_headers_;
@@ -210,8 +243,8 @@ bool AdminImpl::changeLogLevel(const Http::Utility::QueryParams& params) {
 
   // First see if the level is valid.
   size_t level_to_use = std::numeric_limits<size_t>::max();
-  for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_names); i++) {
-    if (level == spdlog::level::level_names[i]) {
+  for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_string_views); i++) {
+    if (level == spdlog::level::level_string_views[i]) {
       level_to_use = i;
       break;
     }
@@ -328,14 +361,13 @@ void AdminImpl::writeClustersAsJson(Buffer::Instance& response) {
 
         envoy::admin::v2alpha::HostHealthStatus& health_status =
             *host_status.mutable_health_status();
-        health_status.set_failed_active_health_check(
-            host->healthFlagGet(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC));
-        health_status.set_failed_outlier_check(
-            host->healthFlagGet(Upstream::Host::HealthFlag::FAILED_OUTLIER_CHECK));
-        health_status.set_eds_health_status(
-            host->healthFlagGet(Upstream::Host::HealthFlag::FAILED_EDS_HEALTH)
-                ? envoy::api::v2::core::HealthStatus::UNHEALTHY
-                : envoy::api::v2::core::HealthStatus::HEALTHY);
+
+// Invokes setHealthFlag for each health flag.
+#define SET_HEALTH_FLAG(name, notused)                                                             \
+  setHealthFlag(Upstream::Host::HealthFlag::name, *host, health_status);
+        HEALTH_FLAG_ENUM_VALUES(SET_HEALTH_FLAG)
+#undef SET_HEALTH_FLAG
+
         double success_rate = host->outlierDetector().successRate();
         if (success_rate >= 0.0) {
           host_status.mutable_success_rate()->set_value(success_rate);
@@ -506,8 +538,8 @@ Http::Code AdminImpl::handlerLogging(absl::string_view url, Http::HeaderMap&,
     response.add("usage: /logging?<name>=<level> (change single level)\n");
     response.add("usage: /logging?level=<level> (change all levels)\n");
     response.add("levels: ");
-    for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_names); i++) {
-      response.add(fmt::format("{} ", spdlog::level::level_names[i]));
+    for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_string_views); i++) {
+      response.add(fmt::format("{} ", spdlog::level::level_string_views[i]));
     }
 
     response.add("\n");
@@ -962,7 +994,7 @@ void AdminImpl::startHttpListener(const std::string& access_log_path,
   access_logs_.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
       access_log_path, {}, AccessLog::AccessLogFormatUtils::defaultAccessLogFormatter(),
       server_.accessLogManager()));
-  socket_ = std::make_unique<Network::TcpListenSocket>(address, nullptr);
+  socket_ = std::make_unique<Network::TcpListenSocket>(address, nullptr, true);
   listener_ = std::make_unique<AdminListener>(*this, std::move(listener_scope));
   if (!address_out_path.empty()) {
     std::ofstream address_out_file(address_out_path);
@@ -1024,10 +1056,10 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
       admin_filter_chain_(std::make_shared<AdminFilterChain>()) {}
 
 Http::ServerConnectionPtr AdminImpl::createCodec(Network::Connection& connection,
-                                                 const Buffer::Instance&,
+                                                 const Buffer::Instance& data,
                                                  Http::ServerConnectionCallbacks& callbacks) {
-  return Http::ServerConnectionPtr{
-      new Http::Http1::ServerConnectionImpl(connection, callbacks, Http::Http1Settings())};
+  return Http::ConnectionManagerUtility::autoCreateCodec(
+      connection, data, callbacks, server_.stats(), Http::Http1Settings(), Http::Http2Settings());
 }
 
 bool AdminImpl::createNetworkFilterChain(Network::Connection& connection,

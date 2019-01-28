@@ -836,11 +836,12 @@ filter:
       - UAEX
       - RLSE
       - DC
+      - URX
 config:
   path: /dev/null
   )EOF";
 
-  static_assert(StreamInfo::ResponseFlag::LastFlag == 0x4000,
+  static_assert(StreamInfo::ResponseFlag::LastFlag == 0x8000,
                 "A flag has been added. Fix this code.");
 
   std::vector<StreamInfo::ResponseFlag> all_response_flags = {
@@ -859,6 +860,7 @@ config:
       StreamInfo::ResponseFlag::UnauthorizedExternalService,
       StreamInfo::ResponseFlag::RateLimitServiceError,
       StreamInfo::ResponseFlag::DownstreamConnectionTermination,
+      StreamInfo::ResponseFlag::UpstreamRetryLimitExceeded,
   };
 
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
@@ -889,7 +891,30 @@ config:
       "[\"embedded message failed validation\"] | caused by "
       "ResponseFlagFilterValidationError.Flags[i]: [\"value must be in list \" [\"LH\" \"UH\" "
       "\"UT\" \"LR\" \"UR\" \"UF\" \"UC\" \"UO\" \"NR\" \"DI\" \"FI\" \"RL\" \"UAEX\" \"RLSE\" "
-      "\"DC\"]]): "
+      "\"DC\" \"URX\"]]): "
+      "response_flag_filter {\n  flags: \"UnsupportedFlag\"\n}\n");
+}
+
+TEST_F(AccessLogImplTest, ValidateTypedConfig) {
+  const std::string yaml = R"EOF(
+name: envoy.file_access_log
+filter:
+  response_flag_filter:
+    flags:
+      - UnsupportedFlag
+typed_config:
+  "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+  path: /dev/null
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_),
+      ProtoValidationException,
+      "Proto constraint validation failed (AccessLogFilterValidationError.ResponseFlagFilter: "
+      "[\"embedded message failed validation\"] | caused by "
+      "ResponseFlagFilterValidationError.Flags[i]: [\"value must be in list \" [\"LH\" \"UH\" "
+      "\"UT\" \"LR\" \"UR\" \"UF\" \"UC\" \"UO\" \"NR\" \"DI\" \"FI\" \"RL\" \"UAEX\" \"RLSE\" "
+      "\"DC\" \"URX\"]]): "
       "response_flag_filter {\n  flags: \"UnsupportedFlag\"\n}\n");
 }
 

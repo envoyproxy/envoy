@@ -16,13 +16,13 @@ namespace DubboProxy {
  */
 class DubboProxyFilterConfigFactory
     : public Common::FactoryBase<
-          envoy::extensions::filters::network::dubbo_proxy::v2alpha1::DubboProxy> {
+          envoy::config::filter::network::dubbo_proxy::v2alpha1::DubboProxy> {
 public:
   DubboProxyFilterConfigFactory() : FactoryBase(NetworkFilterNames::get().DubboProxy) {}
 
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const envoy::extensions::filters::network::dubbo_proxy::v2alpha1::DubboProxy& proto_config,
+      const envoy::config::filter::network::dubbo_proxy::v2alpha1::DubboProxy& proto_config,
       Server::Configuration::FactoryContext& context) override;
 };
 

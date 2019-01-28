@@ -14,6 +14,9 @@ envoy_package()
 envoy_basic_cc_library(
     name = "printers_includes",
     hdrs = ["printers.h"],
+    deps = [
+        "//include/envoy/network:address_interface",
+    ],
 )
 
 envoy_cc_test_library(
@@ -167,6 +170,7 @@ envoy_cc_test_library(
     hdrs = ["test_time_system.h"],
     deps = [
         "//include/envoy/event:timer_interface",
+        "//source/common/common:thread_lib",
     ],
 )
 
@@ -186,15 +190,5 @@ envoy_cc_test(
     deps = [
         ":simulated_time_system_lib",
         "//test/test_common:utility_lib",
-    ],
-)
-
-envoy_cc_library(
-    name = "tls_utility_lib",
-    srcs = ["tls_utility.cc"],
-    hdrs = ["tls_utility.h"],
-    external_deps = ["ssl"],
-    deps = [
-        "//source/common/common:assert_lib",
     ],
 )

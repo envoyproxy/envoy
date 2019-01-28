@@ -1,7 +1,0 @@
-// NOLINT(namespace-envoy)
-constexpr char TEST_SAN_URI_CERT_HASH[] =
-    "f214c479742b87363784c953b96d5c496830f1062b640794866b48103e5522ed";
-constexpr char TEST_SAN_URI_CERT_SPKI[] = "X6XHMwcqQzQnup+1TRyqpJfzuMfK6qO5FDLl90o8ahM=";
-constexpr char TEST_SAN_URI_CERT_SERIAL[] = "8a80523e06a5756a";
-constexpr char TEST_SAN_URI_CERT_NOT_BEFORE[] = "Dec 17 20:17:26 2018 GMT";
-constexpr char TEST_SAN_URI_CERT_NOT_AFTER[] = "Dec 16 20:17:26 2020 GMT";

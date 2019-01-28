@@ -7,7 +7,6 @@
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
 
-#include "common/common/thread.h"
 #include "common/event/libevent.h"
 
 namespace Envoy {
