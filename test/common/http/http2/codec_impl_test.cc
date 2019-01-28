@@ -36,8 +36,9 @@ using Http2SettingsTestParam = ::testing::tuple<Http2SettingsTuple, Http2Setting
 class TestServerConnectionImpl : public ServerConnectionImpl {
 public:
   TestServerConnectionImpl(Network::Connection& connection, ServerConnectionCallbacks& callbacks,
-                           Stats::Scope& scope, const Http2Settings& http2_settings)
-      : ServerConnectionImpl(connection, callbacks, scope, http2_settings) {}
+                           Stats::Scope& scope, const Http2Settings& http2_settings,
+                           uint32_t max_request_headers)
+      : ServerConnectionImpl(connection, callbacks, scope, http2_settings, max_request_headers) {}
   nghttp2_session* session() { return session_; }
   using ServerConnectionImpl::getStream;
 };
@@ -45,8 +46,9 @@ public:
 class TestClientConnectionImpl : public ClientConnectionImpl {
 public:
   TestClientConnectionImpl(Network::Connection& connection, Http::ConnectionCallbacks& callbacks,
-                           Stats::Scope& scope, const Http2Settings& http2_settings)
-      : ClientConnectionImpl(connection, callbacks, scope, http2_settings) {}
+                           Stats::Scope& scope, const Http2Settings& http2_settings,
+                           uint32_t max_request_headers)
+      : ClientConnectionImpl(connection, callbacks, scope, http2_settings, max_request_headers) {}
   nghttp2_session* session() { return session_; }
   using ClientConnectionImpl::getStream;
 };
@@ -73,9 +75,11 @@ public:
     Http2SettingsFromTuple(client_http2settings_, ::testing::get<0>(GetParam()));
     Http2SettingsFromTuple(server_http2settings_, ::testing::get<1>(GetParam()));
     client_ = std::make_unique<TestClientConnectionImpl>(client_connection_, client_callbacks_,
-                                                         stats_store_, client_http2settings_);
+                                                         stats_store_, client_http2settings_,
+                                                         max_request_headers_);
     server_ = std::make_unique<TestServerConnectionImpl>(server_connection_, server_callbacks_,
-                                                         stats_store_, server_http2settings_);
+                                                         stats_store_, server_http2settings_,
+                                                         max_request_headers_);
 
     request_encoder_ = &client_->newStream(response_decoder_);
     setupDefaultConnectionMocks();
@@ -144,6 +148,7 @@ public:
   StreamEncoder* response_encoder_{};
   MockStreamCallbacks server_stream_callbacks_;
   bool corrupt_data_ = false;
+  uint32_t max_request_headers_ = Http::DEFAULT_MAX_REQUEST_HEADERS_SIZE_KB;
 };
 
 TEST_P(Http2CodecImplTest, ShutdownNotice) {
@@ -775,9 +780,11 @@ TEST_P(Http2CodecImplStreamLimitTest, MaxClientStreams) {
   Http2SettingsFromTuple(client_http2settings_, ::testing::get<0>(GetParam()));
   Http2SettingsFromTuple(server_http2settings_, ::testing::get<1>(GetParam()));
   client_ = std::make_unique<TestClientConnectionImpl>(client_connection_, client_callbacks_,
-                                                       stats_store_, client_http2settings_);
+                                                       stats_store_, client_http2settings_,
+                                                       max_request_headers_);
   server_ = std::make_unique<TestServerConnectionImpl>(server_connection_, server_callbacks_,
-                                                       stats_store_, server_http2settings_);
+                                                       stats_store_, server_http2settings_,
+                                                       max_request_headers_);
 
   for (int i = 0; i < 101; ++i) {
     request_encoder_ = &client_->newStream(response_decoder_);
@@ -877,17 +884,28 @@ TEST(Http2CodecUtility, reconstituteCrumbledCookies) {
   }
 }
 
-// For issue #1421 regression test that Envoy's H2 codec applies header limits early.
-TEST_P(Http2CodecImplTest, TestCodecHeaderLimits) {
+TEST_P(Http2CodecImplTest, TestLargeHeadersInvokeResetStream) {
   initialize();
 
   TestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
-  std::string long_string = std::string(1024, 'q');
-  for (int i = 0; i < 63; ++i) {
-    request_headers.addCopy(fmt::format("{}", i), long_string);
-  }
-  EXPECT_CALL(server_stream_callbacks_, onResetStream(_));
+  std::string long_string = std::string(63 * 1024, 'q');
+  request_headers.addCopy("big", long_string);
+  EXPECT_CALL(server_stream_callbacks_, onResetStream(_)).Times(1);
+  request_encoder_->encodeHeaders(request_headers, false);
+}
+
+TEST_P(Http2CodecImplTest, TestLargeHeadersAcceptedIfConfigured) {
+  max_request_headers_ = 64;
+  initialize();
+
+  TestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  std::string long_string = std::string(63 * 1024, 'q');
+  request_headers.addCopy("big", long_string);
+
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, _));
+  EXPECT_CALL(server_stream_callbacks_, onResetStream(_)).Times(0);
   request_encoder_->encodeHeaders(request_headers, false);
 }
 

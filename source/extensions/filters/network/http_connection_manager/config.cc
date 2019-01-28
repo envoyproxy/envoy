@@ -326,10 +326,11 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
         new Http::Http1::ServerConnectionImpl(connection, callbacks, http1_settings_)};
   case CodecType::HTTP2:
     return Http::ServerConnectionPtr{new Http::Http2::ServerConnectionImpl(
-        connection, callbacks, context_.scope(), http2_settings_)};
+        connection, callbacks, context_.scope(), http2_settings_, max_request_headers_size_kb_)};
   case CodecType::AUTO:
     return Http::ConnectionManagerUtility::autoCreateCodec(
-        connection, data, callbacks, context_.scope(), http1_settings_, http2_settings_);
+        connection, data, callbacks, context_.scope(), http1_settings_, http2_settings_,
+        max_request_headers_size_kb_);
   }
 
   NOT_REACHED_GCOVR_EXCL_LINE;
