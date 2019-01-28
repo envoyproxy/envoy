@@ -69,7 +69,7 @@ public:
   Filters::Common::ExtAuthz::RequestCallbacks* request_callbacks_{};
   Http::TestHeaderMapImpl request_headers_;
   Buffer::OwnedImpl data_;
-  Stats::IsolatedStoreImpl stats_store_;
+  NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
@@ -85,7 +85,7 @@ public:
 };
 
 class HttpFilterTest : public HttpFilterTestBase<testing::Test> {
- public:
+public:
   HttpFilterTest() = default;
 };
 
@@ -158,41 +158,15 @@ TEST_F(HttpFilterTest, MergeConfig) {
   EXPECT_EQ("value", merged_extensions.at("key"));
 }
 
-class HttpExtAuthzFilterTestBase {
+class HttpExtAuthzFilterTestBase : public HttpFilterTest {
 public:
-  HttpExtAuthzFilterTestBase() : http_context_(stats_store_.symbolTable()) {}
-
   void initConfig(envoy::config::filter::http::ext_authz::v2::ExtAuthz& proto_config) {
     config_ = std::make_unique<FilterConfig>(proto_config, local_info_, stats_store_, runtime_,
                                              http_context_);
   }
-
-  FilterConfigSharedPtr config_;
-  Filters::Common::ExtAuthz::MockClient* client_;
-  std::unique_ptr<Filter> filter_;
-  NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks_;
-  Filters::Common::ExtAuthz::RequestCallbacks* request_callbacks_{};
-  Http::TestHeaderMapImpl request_headers_;
-  Buffer::OwnedImpl data_;
-  NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
-  NiceMock<Runtime::MockLoader> runtime_;
-  NiceMock<Upstream::MockClusterManager> cm_;
-  NiceMock<LocalInfo::MockLocalInfo> local_info_;
-  Network::Address::InstanceConstSharedPtr addr_;
-  NiceMock<Envoy::Network::MockConnection> connection_;
-  Http::ContextImpl http_context_;
-
-  /*
-  initialize(R"EOF(
-  grpc_service:
-    envoy_grpc:
-      cluster_name: "ext_authz_server"
-  failure_mode_allow: false
-  )EOF");
-  */
 };
 
-class HttpExtAuthzFilterTest : public testing::Test, public HttpExtAuthzFilterTestBase {
+class HttpExtAuthzFilterTest : public HttpExtAuthzFilterTestBase {
 public:
   void initialize(const std::string yaml) {
     envoy::config::filter::http::ext_authz::v2::ExtAuthz proto_config{};
@@ -205,6 +179,14 @@ public:
 // that the request is not allowed to continue.
 TEST_F(HttpFilterTest, ErrorFailClose) {
   InSequence s;
+
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  failure_mode_allow: false
+  )EOF");
+
   ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
   EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
   EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));

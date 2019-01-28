@@ -46,7 +46,7 @@ StatName MetricImpl::tagExtractedStatName() const {
 
 std::vector<Tag> MetricImpl::tags() const {
   std::vector<Tag> tags;
-  enum { TagExtractedName, Name, Value } state;
+  enum { TagExtractedName, Name, Value } state = TagExtractedName;
   Tag tag;
   const SymbolTable& symbol_table = symbolTable();
   stat_names_.foreach ([&tags, &state, &tag, &symbol_table](StatName stat_name) -> bool {
