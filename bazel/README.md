@@ -187,7 +187,9 @@ Envoy can produce backtraces on demand and from assertions and other fatal
 actions like segfaults. Where supported, stack traces will contain resolved
 symbols, though not include line numbers. On systems where absl::Symbolization is
 not supported, the stack traces written in the log or to stderr contain addresses rather
-than resolved symbols.
+than resolved symbols. If the symbols were resolved, the address is also included at
+the end of the line. It can be used with a debugging tool like `addr2line` to
+get a precise line number if the required debugging info is available.
 
 You will need to use either a `dbg` build type or the `opt` build type to get symbol
 information in the binaries.

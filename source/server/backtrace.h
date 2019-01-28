@@ -70,7 +70,7 @@ public:
       char out[1024];
       const bool success = absl::Symbolize(stack_trace_[i], out, sizeof(out));
       if (success) {
-        ENVOY_LOG(critical, "#{}: {}", i, out);
+        ENVOY_LOG(critical, "#{}: {} [{}]", i, out, stack_trace_[i]);
       } else {
         ENVOY_LOG(critical, "#{}: {}", i, stack_trace_[i]);
       }
