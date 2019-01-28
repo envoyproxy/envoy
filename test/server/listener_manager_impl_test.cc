@@ -2824,17 +2824,17 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, FastOpenListenerEnabled) {
                                                        Network::Address::IpVersion::v4);
   if (ENVOY_SOCKET_TCP_FASTOPEN.has_value()) {
     EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true))
-        .WillOnce(
-            Invoke([this](Network::Address::InstanceConstSharedPtr, Network::Address::SocketType,
-                          const Network::Socket::OptionsSharedPtr& options,
-                          bool) -> Network::SocketSharedPtr {
-              EXPECT_NE(options.get(), nullptr);
-              EXPECT_EQ(options->size(), 1);
-              EXPECT_TRUE(
-                  Network::Socket::applyOptions(options, *listener_factory_.socket_,
-                                                envoy::api::v2::core::SocketOption::STATE_LISTENING));
-              return listener_factory_.socket_;
-            }));
+        .WillOnce(Invoke([this](Network::Address::InstanceConstSharedPtr,
+                                Network::Address::SocketType,
+                                const Network::Socket::OptionsSharedPtr& options,
+                                bool) -> Network::SocketSharedPtr {
+          EXPECT_NE(options.get(), nullptr);
+          EXPECT_EQ(options->size(), 1);
+          EXPECT_TRUE(
+              Network::Socket::applyOptions(options, *listener_factory_.socket_,
+                                            envoy::api::v2::core::SocketOption::STATE_LISTENING));
+          return listener_factory_.socket_;
+        }));
     EXPECT_CALL(os_sys_calls, setsockopt_(_, ENVOY_SOCKET_TCP_FASTOPEN.value().first,
                                           ENVOY_SOCKET_TCP_FASTOPEN.value().second, _, sizeof(int)))
         .WillOnce(Invoke([](int, int, int, const void* optval, socklen_t) -> int {
