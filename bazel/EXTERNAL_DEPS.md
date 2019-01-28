@@ -17,9 +17,9 @@ build process.
    `external_deps` attribute.
 3. `bazel test //test/...`
 
-# Adding external dependencies to Envoy (external cmake)
+# Adding external dependencies to Envoy (external CMake)
 
-This is the preferred style of adding dependencies that use cmake for their build system.
+This is the preferred style of adding dependencies that use CMake for their build system.
 
 1. Define a the source Bazel repository in [`bazel/repositories.bzl`](repositories.bzl), in the
    `envoy_dependencies()` function.
