@@ -10,7 +10,7 @@
 #include "test/test_common/utility.h"
 
 #include "absl/synchronization/blocking_counter.h"
-#include "testing/base/public/benchmark.h"
+#include "benchmark/benchmark.h"
 
 static void BM_CreateRace(benchmark::State& state) {
   Envoy::Thread::ThreadFactory& thread_factory = Envoy::Thread::threadFactoryForTest();
