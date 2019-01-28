@@ -62,7 +62,7 @@ public:
   SingletonTimeSystemHelper() : time_system_(nullptr) {}
 
   void set(TestTimeSystem* time_system) {
-    ASSERT(time_system_ == nullptr);
+    RELEASE_ASSERT(time_system_ == nullptr, "Unexpected reset of SingletonTimeSystemHelper");
     time_system_.reset(time_system);
   }
 
