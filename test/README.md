@@ -77,7 +77,7 @@ In Envoy production code, time and timers are managed via
 which provides a mechanism for querying the time setting up time-based callbacks. Bypassing
 this abstraction in Envoy code is flagged as a format violation in CI.
 
-In tests we use a deriviation
+In tests we use a derivation
 [`Event::TestTimeSystem`](test_common/test_time_system.h) which adds the ability
 to sleep or do a blocking timed wait on a condition variable. There are two
 implementations of the `Event::TestTimeSystem` interface:
@@ -90,7 +90,7 @@ test; that could lead to hard-to-reproduce results. Thus both implementations
 have a mechanism to enforce that only one of them can be instantiated at once.
 A runtime assertion occurs if an `Event::TestRealTimeSystem` and
 `Event::SimulatedTimeSystem` are instantiated at the same time. Once the
-time-system goes out of scope, usually at the end of of a test method, the slate
+time-system goes out of scope, usually at the end of a test method, the slate
 is clean and a new test-method can use a different time system.
 
 There is also `Event::GlobalTimeSystem`, which can be instantiated in shared
