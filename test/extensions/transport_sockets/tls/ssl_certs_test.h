@@ -10,7 +10,7 @@ using testing::ReturnRef;
 namespace Envoy {
 class SslCertsTest : public testing::Test {
 public:
-  static void SetUpTestCase() {
+  static void SetUpTestSuite() {
     TestEnvironment::exec({TestEnvironment::runfilesPath(
         "test/extensions/transport_sockets/tls/gen_unittest_certs.sh")});
   }

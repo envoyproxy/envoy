@@ -57,9 +57,7 @@ StaticHeaderAuthenticator::GetMetadata(grpc::string_ref, grpc::string_ref, const
 /**
  * Static registration for the static header Google gRPC credentials factory. @see RegisterFactory.
  */
-static Registry::RegisterFactory<AccessTokenExampleGrpcCredentialsFactory,
-                                 Grpc::GoogleGrpcCredentialsFactory>
-    access_token_google_grpc_credentials_registered_;
+REGISTER_FACTORY(AccessTokenExampleGrpcCredentialsFactory, Grpc::GoogleGrpcCredentialsFactory);
 
 } // namespace Example
 } // namespace GrpcCredentials

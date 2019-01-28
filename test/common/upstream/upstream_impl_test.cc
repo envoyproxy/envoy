@@ -137,7 +137,8 @@ std::vector<StrictDnsConfigTuple> generateStrictDnsParams() {
 class StrictDnsParamTest : public testing::TestWithParam<StrictDnsConfigTuple>,
                            public UpstreamImplTestBase {};
 
-INSTANTIATE_TEST_CASE_P(DnsParam, StrictDnsParamTest, testing::ValuesIn(generateStrictDnsParams()));
+INSTANTIATE_TEST_SUITE_P(DnsParam, StrictDnsParamTest,
+                         testing::ValuesIn(generateStrictDnsParams()));
 
 TEST_P(StrictDnsParamTest, ImmediateResolve) {
   auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();

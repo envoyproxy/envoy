@@ -69,6 +69,6 @@ TEST_P(ConfigSchemasTest, CheckValidationExpectation) {
   }
 }
 
-INSTANTIATE_TEST_CASE_P(Default, ConfigSchemasTest, testing::ValuesIn(generateTestInputs()));
+INSTANTIATE_TEST_SUITE_P(Default, ConfigSchemasTest, testing::ValuesIn(generateTestInputs()));
 } // namespace Json
 } // namespace Envoy

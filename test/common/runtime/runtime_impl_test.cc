@@ -66,7 +66,8 @@ TEST(UUID, sanityCheckOfUniqueness) {
 class DiskBackedLoaderImplTest : public testing::Test {
 protected:
   DiskBackedLoaderImplTest() : api_(Api::createApiForTest(store)) {}
-  static void SetUpTestCase() {
+
+  static void SetUpTestSuite() {
     TestEnvironment::exec(
         {TestEnvironment::runfilesPath("test/common/runtime/filesystem_setup.sh")});
   }
