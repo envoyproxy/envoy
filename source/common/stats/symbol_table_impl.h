@@ -185,7 +185,7 @@ private:
    * @param symbol the individual symbol to be decoded.
    * @return absl::string_view the decoded string.
    */
-  absl::string_view fromSymbol(Symbol symbol) const;
+  absl::string_view fromSymbol(Symbol symbol) const EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
   // Stages a new symbol for use. To be called after a successful insertion.
   void newSymbol();
@@ -364,10 +364,14 @@ private:
   SymbolTable& symbol_table_;
 };
 
-// Represenets an ordered container of StatNames. The encoding for each StatName
+// Represents an ordered container of StatNames. The encoding for each StatName
 // is byte-packed together, so this carries less overhead than allocating the
 // storage separately. The tradeoff is there is no random access; you can only
-// itereate through the StatNames.
+// iterate through the StatNames.
+//
+// The maximum size of the list is 255 elements, so the length can fit in a
+// byte. It would not be difficult to increase this, but there does not appear
+// to be a current need.
 class StatNameList {
 public:
   ~StatNameList();

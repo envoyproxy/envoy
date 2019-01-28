@@ -155,8 +155,7 @@ SymbolEncoding SymbolTableImpl::encode(const absl::string_view name) {
 uint64_t SymbolTableImpl::numSymbols() const {
   Thread::LockGuard lock(lock_);
   ASSERT(encode_map_.size() == decode_map_.size());
-  uint64_t sz = encode_map_.size();
-  return sz;
+  return encode_map_.size();
 }
 
 std::string SymbolTableImpl::toString(const StatName& stat_name) const {
@@ -244,7 +243,7 @@ Symbol SymbolTableImpl::toSymbol(absl::string_view sv) {
 }
 
 absl::string_view SymbolTableImpl::fromSymbol(const Symbol symbol) const
-    SHARED_LOCKS_REQUIRED(lock_) {
+    EXCLUSIVE_LOCKS_REQUIRED(lock_) {
   auto search = decode_map_.find(symbol);
   RELEASE_ASSERT(search != decode_map_.end(), "no such symbol");
   return {*search->second};
@@ -268,6 +267,9 @@ bool SymbolTableImpl::lessThan(const StatName& a, const StatName& b) const {
   // without allocating memory.
   SymbolVec av = SymbolEncoding::decodeSymbols(a.data(), a.dataSize());
   SymbolVec bv = SymbolEncoding::decodeSymbols(b.data(), b.dataSize());
+
+  // Calling fromSymbol requires holding the lock, as it needs read-access to
+  // the maps that are written when adding new symbols.
   Thread::LockGuard lock(lock_);
   for (uint64_t i = 0, n = std::min(av.size(), bv.size()); i < n; ++i) {
     if (av[i] != bv[i]) {
@@ -349,7 +351,7 @@ StatNameList::~StatNameList() { ASSERT(!populated()); }
 
 void StatNameList::populate(const std::vector<absl::string_view>& names,
                             SymbolTable& symbol_table) {
-  ASSERT(names.size() < 256);
+  RELEASE_ASSERT(names.size() < 256, "Maximum number elements in a StatNameList exceeded");
 
   // First encode all the names.
   size_t total_size_bytes = 1; /* one byte for holding the number of names */

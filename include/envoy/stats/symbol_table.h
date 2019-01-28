@@ -141,7 +141,7 @@ private:
    * for a StatName. This way, the symbol table will grow and shrink
    * dynamically, instead of being write-only.
    *
-   * @param symbol_vec the vector of symbols.
+   * @param stat_name the stat name.
    */
   virtual void free(const StatName& stat_name) PURE;
 
