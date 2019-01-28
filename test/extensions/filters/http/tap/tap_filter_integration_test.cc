@@ -34,6 +34,27 @@ public:
 
     return nullptr;
   }
+
+  void makeRequest(const Http::TestHeaderMapImpl& request_headers,
+                   const Http::TestHeaderMapImpl& response_headers) {
+    IntegrationStreamDecoderPtr decoder = codec_client_->makeHeaderOnlyRequest(request_headers);
+    waitForNextUpstreamRequest();
+    upstream_request_->encodeHeaders(response_headers, true);
+    decoder->waitForEndStream();
+  }
+
+  const Http::TestHeaderMapImpl request_headers_tap_{{":method", "GET"},
+                                                     {":path", "/"},
+                                                     {":scheme", "http"},
+                                                     {":authority", "host"},
+                                                     {"foo", "bar"}};
+
+  const Http::TestHeaderMapImpl request_headers_no_tap_{
+      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
+
+  const Http::TestHeaderMapImpl response_headers_tap_{{":status", "200"}, {"bar", "baz"}};
+
+  const Http::TestHeaderMapImpl response_headers_no_tap_{{":status", "200"}};
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, TapIntegrationTest,
@@ -56,22 +77,12 @@ config:
               path_prefix: {}
 )EOF";
 
-  const std::string path_prefix = TestEnvironment::temporaryPath("");
+  const std::string path_prefix = TestEnvironment::temporaryDirectory() + '/';
   initializeFilter(fmt::format(filter_config, path_prefix));
 
   // Initial request/response with tap.
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
-  const Http::TestHeaderMapImpl request_headers_tap{{":method", "GET"},
-                                                    {":path", "/"},
-                                                    {":scheme", "http"},
-                                                    {":authority", "host"},
-                                                    {"foo", "bar"}};
-  IntegrationStreamDecoderPtr decoder = codec_client_->makeHeaderOnlyRequest(request_headers_tap);
-  waitForNextUpstreamRequest();
-  const Http::TestHeaderMapImpl response_headers_no_tap{{":status", "200"}};
-  upstream_request_->encodeHeaders(response_headers_no_tap, true);
-  decoder->waitForEndStream();
-
+  makeRequest(request_headers_tap_, response_headers_no_tap_);
   codec_client_->close();
   test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
 
@@ -101,16 +112,7 @@ config:
 
   // Initial request/response with no tap.
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
-  const Http::TestHeaderMapImpl request_headers_tap{{":method", "GET"},
-                                                    {":path", "/"},
-                                                    {":scheme", "http"},
-                                                    {":authority", "host"},
-                                                    {"foo", "bar"}};
-  IntegrationStreamDecoderPtr decoder = codec_client_->makeHeaderOnlyRequest(request_headers_tap);
-  waitForNextUpstreamRequest();
-  const Http::TestHeaderMapImpl response_headers_no_tap{{":status", "200"}};
-  upstream_request_->encodeHeaders(response_headers_no_tap, true);
-  decoder->waitForEndStream();
+  makeRequest(request_headers_tap_, response_headers_no_tap_);
 
   const std::string admin_request_yaml =
       R"EOF(
@@ -146,10 +148,7 @@ tap_config:
   test_server_->waitForGaugeEq("http.admin.downstream_rq_active", 0);
 
   // Second request/response with no tap.
-  decoder = codec_client_->makeHeaderOnlyRequest(request_headers_tap);
-  waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(response_headers_no_tap, true);
-  decoder->waitForEndStream();
+  makeRequest(request_headers_tap_, response_headers_no_tap_);
 
   // Setup the tap again and leave it open.
   admin_client_ = makeHttpConnection(makeClientConnection(lookupPort("admin")));
@@ -159,10 +158,7 @@ tap_config:
   EXPECT_FALSE(admin_response->complete());
 
   // Do a request which should tap, matching on request headers.
-  decoder = codec_client_->makeHeaderOnlyRequest(request_headers_tap);
-  waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(response_headers_no_tap, true);
-  decoder->waitForEndStream();
+  makeRequest(request_headers_tap_, response_headers_no_tap_);
 
   // Wait for the tap message.
   admin_response->waitForBodyData(1);
@@ -173,19 +169,10 @@ tap_config:
   admin_response->clearBody();
 
   // Do a request which should not tap.
-  const Http::TestHeaderMapImpl request_headers_no_tap{
-      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
-  decoder = codec_client_->makeHeaderOnlyRequest(request_headers_no_tap);
-  waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(response_headers_no_tap, true);
-  decoder->waitForEndStream();
+  makeRequest(request_headers_no_tap_, response_headers_no_tap_);
 
   // Do a request which should tap, matching on response headers.
-  decoder = codec_client_->makeHeaderOnlyRequest(request_headers_no_tap);
-  waitForNextUpstreamRequest();
-  const Http::TestHeaderMapImpl response_headers_tap{{":status", "200"}, {"bar", "baz"}};
-  upstream_request_->encodeHeaders(response_headers_tap, true);
-  decoder->waitForEndStream();
+  makeRequest(request_headers_no_tap_, response_headers_tap_);
 
   // Wait for the tap message.
   admin_response->waitForBodyData(1);
@@ -229,22 +216,13 @@ tap_config:
   EXPECT_FALSE(admin_response->complete());
 
   // Do a request that matches, but the response does not match. No tap.
-  decoder = codec_client_->makeHeaderOnlyRequest(request_headers_tap);
-  waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(response_headers_no_tap, true);
-  decoder->waitForEndStream();
+  makeRequest(request_headers_tap_, response_headers_no_tap_);
 
   // Do a request that doesn't match, but the response does match. No tap.
-  decoder = codec_client_->makeHeaderOnlyRequest(request_headers_no_tap);
-  waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(response_headers_tap, true);
-  decoder->waitForEndStream();
+  makeRequest(request_headers_no_tap_, response_headers_tap_);
 
   // Do a request that matches and a response that matches. Should tap.
-  decoder = codec_client_->makeHeaderOnlyRequest(request_headers_tap);
-  waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(response_headers_tap, true);
-  decoder->waitForEndStream();
+  makeRequest(request_headers_tap_, response_headers_tap_);
 
   // Wait for the tap message.
   admin_response->waitForBodyData(1);

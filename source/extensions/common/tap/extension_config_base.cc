@@ -40,6 +40,8 @@ ExtensionConfigBase::~ExtensionConfigBase() {
 }
 
 const absl::string_view ExtensionConfigBase::adminId() {
+  // It is only possible to get here if we had an admin config and registered with the admin
+  // handler.
   ASSERT(proto_config_.has_admin_config());
   return proto_config_.admin_config().config_id();
 }

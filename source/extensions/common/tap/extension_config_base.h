@@ -29,6 +29,9 @@ protected:
                       Event::Dispatcher& main_thread_dispatcher);
   ~ExtensionConfigBase();
 
+  // All tap configurations derive from TapConfig for type safety. In order to use a common
+  // extension base class (with TLS logic, etc.) we must dynamic cast to the actual tap
+  // configuration type that the extension expects (and is created by the configuration factory).
   template <class T> std::shared_ptr<T> currentConfigHelper() const {
     return std::dynamic_pointer_cast<T>(tls_slot_->getTyped<TlsFilterConfig>().config_);
   }
