@@ -254,7 +254,8 @@ def envoy_cc_library(
         linkstamp = None,
         tags = [],
         deps = [],
-        strip_include_prefix = None):
+        strip_include_prefix = None,
+        compatible_with = None):
     if tcmalloc_dep:
         deps += tcmalloc_external_deps(repository)
 
@@ -263,6 +264,7 @@ def envoy_cc_library(
         srcs = srcs,
         hdrs = hdrs,
         copts = envoy_copts(repository) + copts,
+        compatible_with = compatible_with,
         visibility = visibility,
         tags = tags,
         deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] + [
@@ -569,6 +571,7 @@ def envoy_select_google_grpc(xs, repository = ""):
     return select({
         repository + "//bazel:disable_google_grpc": [],
         "//conditions:default": xs,
+        "//tools/cc_target_os:gce": [],
     })
 
 # Select the given values if exporting is enabled in the current build.

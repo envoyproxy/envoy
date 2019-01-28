@@ -39,7 +39,7 @@ def api_py_proto_library(name, srcs = [], deps = [], has_services = 0):
         visibility = ["//visibility:public"],
     )
 
-def api_go_proto_library(name, proto, deps = []):
+def api_go_proto_library(name, proto, deps = [], compatible_with = None):
     go_proto_library(
         name = _Suffix(name, _GO_PROTO_SUFFIX),
         importpath = _Suffix(_GO_IMPORTPATH_PREFIX, name),
@@ -55,9 +55,10 @@ def api_go_proto_library(name, proto, deps = []):
             "@com_lyft_protoc_gen_validate//validate:go_default_library",
             "@googleapis//:rpc_status_go_proto",
         ],
+        compatible_with = compatible_with,
     )
 
-def api_go_grpc_library(name, proto, deps = []):
+def api_go_grpc_library(name, proto, deps = [], compatible_with = None):
     go_grpc_library(
         name = _Suffix(name, _GO_GRPC_SUFFIX),
         importpath = _Suffix(_GO_IMPORTPATH_PREFIX, name),
@@ -72,6 +73,7 @@ def api_go_grpc_library(name, proto, deps = []):
             "@com_lyft_protoc_gen_validate//validate:go_default_library",
             "@googleapis//:http_api_go_proto",
         ],
+        compatible_with = compatible_with,
     )
 
 # This is api_proto_library plus some logic internal to //envoy/api.
@@ -92,6 +94,7 @@ def api_proto_library(
         name,
         visibility = ["//visibility:private"],
         srcs = [],
+        compatible_with = None,
         deps = [],
         external_proto_deps = [],
         external_cc_proto_deps = [],
@@ -115,9 +118,11 @@ def api_proto_library(
             "@com_lyft_protoc_gen_validate//validate:validate_proto",
         ],
         visibility = visibility,
+        compatible_with = compatible_with,
     )
     pgv_cc_proto_library(
         name = _Suffix(name, _CC_SUFFIX),
+        compatible_with = compatible_with,
         linkstatic = linkstatic,
         cc_deps = [_LibrarySuffix(d, _CC_SUFFIX) for d in deps] + external_cc_proto_deps + [
             "@com_github_gogo_protobuf//:gogo_proto_cc",
