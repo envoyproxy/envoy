@@ -2,7 +2,6 @@ licenses(["notice"])  # Apache 2
 
 load("//bazel:envoy_build_system.bzl", "envoy_package")
 load("@rules_foreign_cc//tools/build_defs:cmake.bzl", "cmake_external")
-load("@foreign_cc_platform_utils//:tools.bzl", "NINJA_COMMAND", "NINJA_DEP")
 
 envoy_package()
 
@@ -16,11 +15,10 @@ cmake_external(
     cmake_options = ["-GNinja"],
     lib_source = "@com_github_c_ares_c_ares//:all",
     make_commands = [
-        NINJA_COMMAND,
-        NINJA_COMMAND + " install",
+        "ninja",
+        "ninja install",
     ],
     static_libraries = ["libcares.a"],
-    tools_deps = NINJA_DEP,
 )
 
 cmake_external(
@@ -33,11 +31,10 @@ cmake_external(
     cmake_options = ["-GNinja"],
     lib_source = "@com_github_libevent_libevent//:all",
     make_commands = [
-        NINJA_COMMAND,
-        NINJA_COMMAND + " install",
+        "ninja",
+        "ninja install",
     ],
     static_libraries = ["libevent.a"],
-    tools_deps = NINJA_DEP,
 )
 
 cmake_external(
@@ -50,11 +47,10 @@ cmake_external(
     cmake_options = ["-GNinja"],
     lib_source = "@com_github_nghttp2_nghttp2//:all",
     make_commands = [
-        NINJA_COMMAND,
-        NINJA_COMMAND + " install",
+        "ninja",
+        "ninja install",
     ],
     static_libraries = ["libnghttp2.a"],
-    tools_deps = NINJA_DEP,
 )
 
 cmake_external(
@@ -66,11 +62,10 @@ cmake_external(
     cmake_options = ["-GNinja"],
     lib_source = "@com_github_jbeder_yaml_cpp//:all",
     make_commands = [
-        NINJA_COMMAND,
-        NINJA_COMMAND + " install",
+        "ninja",
+        "ninja install",
     ],
     static_libraries = ["libyaml-cpp.a"],
-    tools_deps = NINJA_DEP,
 )
 
 cmake_external(
@@ -81,9 +76,8 @@ cmake_external(
     cmake_options = ["-GNinja"],
     lib_source = "@com_github_madler_zlib//:all",
     make_commands = [
-        NINJA_COMMAND,
-        NINJA_COMMAND + " install",
+        "ninja",
+        "ninja install",
     ],
     static_libraries = ["libz.a"],
-    tools_deps = NINJA_DEP,
 )
