@@ -3575,7 +3575,7 @@ TEST_P(SslSocketTest, UpstreamNotReadySslSocket) {
 }
 
 class SslReadBufferLimitTest : public SslSocketTest {
-public:
+protected:
   void initialize() {
     MessageUtil::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml_),
                               downstream_tls_context_);

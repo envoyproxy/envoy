@@ -20,7 +20,7 @@ namespace JwtAuthn {
 namespace {
 
 class JwksCacheTest : public ::testing::Test {
-public:
+protected:
   JwksCacheTest() : api_(Api::createApiForTest(stats_)) {}
   void SetUp() {
     MessageUtil::loadFromYaml(ExampleConfig, config_);

@@ -36,7 +36,7 @@ namespace Upstream {
 enum class ConfigType { V2_YAML, V1_JSON };
 
 class LogicalDnsClusterTest : public testing::Test {
-public:
+protected:
   LogicalDnsClusterTest() : api_(Api::createApiForTest(stats_store_)) {}
 
   void setupFromV1Json(const std::string& json) {

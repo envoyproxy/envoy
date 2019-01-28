@@ -43,7 +43,7 @@ namespace HttpFilters {
 namespace GrpcJsonTranscoder {
 
 class GrpcJsonTranscoderFilterTestBase {
-public:
+protected:
   GrpcJsonTranscoderFilterTestBase() : api_(Api::createApiForTest(stats_)) {}
 
   Stats::IsolatedStoreImpl stats_;
@@ -51,7 +51,7 @@ public:
 };
 
 class GrpcJsonTranscoderConfigTest : public testing::Test, public GrpcJsonTranscoderFilterTestBase {
-public:
+protected:
   const envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder
   getProtoConfig(const std::string& descriptor_path, const std::string& service_name,
                  bool match_incoming_request_route = false,
@@ -272,7 +272,7 @@ TEST_F(GrpcJsonTranscoderConfigTest, InvalidVariableBinding) {
 }
 
 class GrpcJsonTranscoderFilterTest : public testing::Test, public GrpcJsonTranscoderFilterTestBase {
-public:
+protected:
   GrpcJsonTranscoderFilterTest(const bool match_incoming_request_route = false)
       : config_(bookstoreProtoConfig(match_incoming_request_route), *api_), filter_(config_) {
     filter_.setDecoderFilterCallbacks(decoder_callbacks_);
@@ -704,7 +704,7 @@ struct GrpcJsonTranscoderFilterPrintTestParam {
 class GrpcJsonTranscoderFilterPrintTest
     : public testing::TestWithParam<GrpcJsonTranscoderFilterPrintTestParam>,
       public GrpcJsonTranscoderFilterTestBase {
-public:
+protected:
   GrpcJsonTranscoderFilterPrintTest() {
     auto json_config =
         Json::Factory::loadFromString(TestEnvironment::substitute(GetParam().config_json_));

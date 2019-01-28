@@ -43,7 +43,7 @@ public:
 };
 
 class HdsTest : public testing::Test {
-public:
+protected:
   HdsTest()
       : retry_timer_(new Event::MockTimer()), server_response_timer_(new Event::MockTimer()),
         async_client_(new Grpc::MockAsyncClient()), api_(Api::createApiForTest(stats_store_)) {

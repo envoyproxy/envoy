@@ -27,7 +27,7 @@ namespace Envoy {
 namespace Upstream {
 
 class CdsApiImplTest : public testing::Test {
-public:
+protected:
   CdsApiImplTest() : request_(&cm_.async_client_), api_(Api::createApiForTest(store_)) {}
 
   void setup() {

@@ -27,7 +27,7 @@ namespace Secret {
 namespace {
 
 class SdsApiTest : public testing::Test {
-public:
+protected:
   SdsApiTest() : api_(Api::createApiForTest(stats_store_)) {}
 
   Stats::MockIsolatedStatsStore stats_store_;

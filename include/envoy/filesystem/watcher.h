@@ -33,7 +33,7 @@ public:
   virtual void addWatch(const std::string& path, uint32_t events, OnChangedCb cb) PURE;
 };
 
-typedef std::unique_ptr<Watcher> WatcherPtr;
+using WatcherPtr = std::unique_ptr<Watcher>;
 
 } // namespace Filesystem
 } // namespace Envoy

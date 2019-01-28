@@ -12,7 +12,7 @@ namespace Envoy {
 namespace Json {
 
 class JsonLoaderTest : public testing::Test {
-public:
+protected:
   JsonLoaderTest() : api_(Api::createApiForTest(stats_store_)) {}
 
   Stats::IsolatedStoreImpl stats_store_;

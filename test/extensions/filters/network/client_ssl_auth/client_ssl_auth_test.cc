@@ -56,7 +56,7 @@ TEST(ClientSslAuthConfigTest, BadClientSslAuthConfig) {
 }
 
 class ClientSslAuthFilterTest : public testing::Test {
-public:
+protected:
   ClientSslAuthFilterTest()
       : request_(&cm_.async_client_), interval_timer_(new Event::MockTimer(&dispatcher_)),
         api_(Api::createApiForTest(stats_store_)) {}

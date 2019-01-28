@@ -101,7 +101,7 @@ envoy::api::v2::RouteConfiguration parseRouteConfigurationFromV2Yaml(const std::
 }
 
 class ConfigImplTestBase {
-public:
+protected:
   ConfigImplTestBase() : api_(Api::createApiForTest(stats_)) {
     ON_CALL(factory_context_, api()).WillByDefault(ReturnRef(*api_));
   }
@@ -1383,7 +1383,7 @@ virtual_hosts:
 }
 
 class RouterMatcherHashPolicyTest : public testing::Test, public ConfigImplTestBase {
-public:
+protected:
   RouterMatcherHashPolicyTest()
       : add_cookie_nop_(
             [](const std::string&, const std::string&, std::chrono::seconds) { return ""; }) {

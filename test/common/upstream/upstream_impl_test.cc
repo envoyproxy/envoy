@@ -44,7 +44,7 @@ namespace Upstream {
 namespace {
 
 class UpstreamImplTestBase {
-public:
+protected:
   UpstreamImplTestBase() : api_(Api::createApiForTest(stats_)) {}
 
   NiceMock<Server::MockAdmin> admin_;
@@ -176,7 +176,7 @@ TEST_P(StrictDnsParamTest, ImmediateResolve) {
 }
 
 class StrictDnsClusterImplTest : public testing::Test, public UpstreamImplTestBase {
-public:
+protected:
   std::shared_ptr<Network::MockDnsResolver> dns_resolver_ =
       std::make_shared<Network::MockDnsResolver>();
 };

@@ -29,7 +29,7 @@ namespace {
 std::vector<std::string> test_corpus_;
 
 class FuzzerCorpusTest : public ::testing::TestWithParam<std::string> {
-public:
+protected:
   FuzzerCorpusTest() : api_(Api::createApiForTest(stats_store_)) {}
 
   Stats::IsolatedStoreImpl stats_store_;

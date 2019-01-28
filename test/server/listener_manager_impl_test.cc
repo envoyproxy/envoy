@@ -56,7 +56,7 @@ public:
 };
 
 class ListenerManagerImplTest : public testing::Test {
-public:
+protected:
   ListenerManagerImplTest() : api_(Api::createApiForTest(stats_)) {
     ON_CALL(server_, api()).WillByDefault(ReturnRef(*api_));
     EXPECT_CALL(worker_factory_, createWorker_()).WillOnce(Return(worker_));

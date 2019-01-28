@@ -64,7 +64,7 @@ TEST(UUID, sanityCheckOfUniqueness) {
 }
 
 class DiskBackedLoaderImplTest : public testing::Test {
-public:
+protected:
   DiskBackedLoaderImplTest() : api_(Api::createApiForTest(store)) {}
   static void SetUpTestCase() {
     TestEnvironment::exec(
@@ -260,7 +260,7 @@ TEST(LoaderImplTest, All) {
 }
 
 class DiskLayerTest : public testing::Test {
-public:
+protected:
   DiskLayerTest() : api_(Api::createApiForTest(store_)) {}
 
   Stats::IsolatedStoreImpl store_;

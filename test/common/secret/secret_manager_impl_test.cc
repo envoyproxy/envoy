@@ -23,7 +23,7 @@ namespace Secret {
 namespace {
 
 class SecretManagerImplTest : public testing::Test {
-public:
+protected:
   SecretManagerImplTest() : api_(Api::createApiForTest(stats_store_)) {}
 
   Stats::MockIsolatedStatsStore stats_store_;
