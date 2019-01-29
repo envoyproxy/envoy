@@ -37,10 +37,6 @@ public:
 
   void cleanUpXdsConnection();
 
-  
-
-  
-
 protected:
   FakeUpstream* xds_upstream_{};
   FakeHttpConnectionPtr xds_connection_;

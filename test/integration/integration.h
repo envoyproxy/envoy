@@ -208,16 +208,17 @@ public:
     }
     xds_stream_->sendGrpcMessage(discovery_response);
   }
-  
-  AssertionResult
-  compareIncrementalDiscoveryRequest(const std::string& expected_type_url,
-                          const std::vector<std::string>& expected_resource_subscriptions,
-                          const std::vector<std::string>& expected_resource_unsubscriptions,
-                          const Protobuf::int32 expected_error_code = Grpc::Status::GrpcStatus::Ok,
-                          const std::string& expected_error_message = "");
+
+  AssertionResult compareIncrementalDiscoveryRequest(
+      const std::string& expected_type_url,
+      const std::vector<std::string>& expected_resource_subscriptions,
+      const std::vector<std::string>& expected_resource_unsubscriptions,
+      const Protobuf::int32 expected_error_code = Grpc::Status::GrpcStatus::Ok,
+      const std::string& expected_error_message = "");
   template <class T>
   void sendIncrementalDiscoveryResponse(const std::vector<T>& added_or_updated,
-                             const std::vector<std::string>& removed, const std::string& version) {
+                                        const std::vector<std::string>& removed,
+                                        const std::string& version) {
     envoy::api::v2::IncrementalDiscoveryResponse response;
     response.set_system_version_info("system_version_info_this_is_a_test");
     for (const auto& message : added_or_updated) {
