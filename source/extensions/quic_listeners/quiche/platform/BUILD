@@ -39,6 +39,9 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "quic_platform_impl_lib",
+    srcs = [
+        "quic_logging_impl.cc",
+    ],
     hdrs = [
         "quic_aligned_impl.h",
         "quic_arraysize_impl.h",
@@ -49,6 +52,7 @@ envoy_cc_library(
         "quic_fallthrough_impl.h",
         "quic_flag_utils_impl.h",
         "quic_iovec_impl.h",
+        "quic_logging_impl.h",
         "quic_prefetch_impl.h",
         "quic_ptr_util_impl.h",
         "quic_string_impl.h",
@@ -63,6 +67,9 @@ envoy_cc_library(
         "abseil_node_hash_set",
     ],
     visibility = ["//visibility:public"],
+    deps = [
+        "//source/common/common:assert_lib",
+    ],
 )
 
 envoy_cc_library(

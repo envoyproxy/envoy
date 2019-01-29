@@ -4,6 +4,7 @@
 #include "quiche/quic/platform/api/quic_containers.h"
 #include "quiche/quic/platform/api/quic_endian.h"
 #include "quiche/quic/platform/api/quic_estimate_memory_usage.h"
+#include "quiche/quic/platform/api/quic_logging.h"
 #include "quiche/quic/platform/api/quic_ptr_util.h"
 #include "quiche/quic/platform/api/quic_string.h"
 #include "quiche/quic/platform/api/quic_string_piece.h"
@@ -84,6 +85,127 @@ TEST(QuicPlatformTest, QuicPtrUtil) {
 
   p = quic::QuicWrapUnique(new quic::QuicString("aaa"));
   EXPECT_EQ("aaa", *p);
+}
+
+namespace {
+class QuicLogThresholdSaver {
+public:
+  QuicLogThresholdSaver()
+      : level_(QUIC_LOGGER().level()), verbosity_threshold_(quic::GetVerbosityLogThreshold()) {}
+
+  ~QuicLogThresholdSaver() {
+    quic::SetVerbosityLogThreshold(verbosity_threshold_);
+    QUIC_LOGGER().set_level(level_);
+  }
+
+private:
+  const quic::QuicLogLevel level_;
+  const int verbosity_threshold_;
+};
+} // namespace
+
+TEST(QuicPlatformTest, QuicLog) {
+  QuicLogThresholdSaver saver;
+
+  // By default, tests emit logs at level ERROR or higher.
+  ASSERT_EQ(quic::ERROR, QUIC_LOGGER().level());
+
+  int i = 0;
+
+  QUIC_LOG(INFO) << (i = 10);
+  QUIC_LOG_IF(INFO, false) << i++;
+  QUIC_LOG_IF(INFO, true) << i++;
+  EXPECT_EQ(0, i);
+
+  QUIC_LOG(ERROR) << (i = 11);
+  EXPECT_EQ(11, i);
+
+  QUIC_LOG_IF(ERROR, false) << i++;
+  EXPECT_EQ(11, i);
+
+  QUIC_LOG_IF(ERROR, true) << i++;
+  EXPECT_EQ(12, i);
+
+  // Set QUIC log level to INFO, since VLOG is emitted at the INFO level.
+  QUIC_LOGGER().set_level(quic::INFO);
+
+  ASSERT_EQ(0, quic::GetVerbosityLogThreshold());
+
+  QUIC_VLOG(1) << (i = 1);
+  EXPECT_EQ(12, i);
+
+  quic::SetVerbosityLogThreshold(1);
+
+  QUIC_VLOG(1) << (i = 1);
+  EXPECT_EQ(1, i);
+
+  errno = EINVAL;
+  QUIC_PLOG(INFO) << (i = 3);
+  EXPECT_EQ(3, i);
+}
+
+#ifdef NDEBUG
+#define VALUE_BY_COMPILE_MODE(debug_mode_value, release_mode_value) release_mode_value
+#else
+#define VALUE_BY_COMPILE_MODE(debug_mode_value, release_mode_value) debug_mode_value
+#endif
+
+TEST(QuicPlatformTest, QuicDLog) {
+  QuicLogThresholdSaver saver;
+
+  int i = 0;
+
+  QUIC_LOGGER().set_level(quic::ERROR);
+
+  QUIC_DLOG(INFO) << (i = 10);
+  QUIC_DLOG_IF(INFO, false) << i++;
+  QUIC_DLOG_IF(INFO, true) << i++;
+  EXPECT_EQ(0, i);
+
+  QUIC_LOGGER().set_level(quic::INFO);
+
+  QUIC_DLOG(INFO) << (i = 10);
+  QUIC_DLOG_IF(INFO, false) << i++;
+  EXPECT_EQ(VALUE_BY_COMPILE_MODE(10, 0), i);
+
+  QUIC_DLOG_IF(INFO, true) << (i = 11);
+  EXPECT_EQ(VALUE_BY_COMPILE_MODE(11, 0), i);
+
+  ASSERT_EQ(0, quic::GetVerbosityLogThreshold());
+
+  QUIC_DVLOG(1) << (i = 1);
+  EXPECT_EQ(VALUE_BY_COMPILE_MODE(11, 0), i);
+
+  quic::SetVerbosityLogThreshold(1);
+
+  QUIC_DVLOG(1) << (i = 1);
+  EXPECT_EQ(VALUE_BY_COMPILE_MODE(1, 0), i);
+
+  QUIC_DVLOG_IF(1, false) << (i = 2);
+  EXPECT_EQ(VALUE_BY_COMPILE_MODE(1, 0), i);
+
+  QUIC_DVLOG_IF(1, true) << (i = 2);
+  EXPECT_EQ(VALUE_BY_COMPILE_MODE(2, 0), i);
+}
+
+#undef VALUE_BY_COMPILE_MODE
+
+TEST(QuicPlatformTest, QuicBranchPrediction) {
+  QUIC_LOGGER().set_level(quic::INFO);
+
+  if (QUIC_PREDICT_FALSE(rand() % RAND_MAX == 123456789)) {
+    QUIC_LOG(INFO) << "Go buy some lottery tickets.";
+  } else {
+    QUIC_LOG(INFO) << "As predicted.";
+  }
+}
+
+TEST(QuicPlatformTest, QuicNotReached) {
+#ifdef NDEBUG
+  QUIC_NOTREACHED(); // Expect no-op.
+#else
+  EXPECT_DEATH(QUIC_NOTREACHED(), "not reached");
+#endif
 }
 
 } // namespace Quiche
