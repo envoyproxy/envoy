@@ -63,7 +63,6 @@ ELB
 ENOTSUP
 ENV
 EOF
-EOF
 EOS
 EPOLLRDHUP
 EQ
@@ -205,6 +204,7 @@ SNI
 SPDY
 SPIFFE
 SPKI
+SQL
 SR
 SRV
 SS
@@ -236,6 +236,7 @@ UDP
 UDS
 URI
 URL
+UTC
 UTF
 UUID
 UUIDs
@@ -298,6 +299,7 @@ bools
 borks
 broadcasted
 buf
+builtin
 cancellable
 canonicalize
 canonicalized
@@ -305,6 +307,7 @@ cardinality
 casted
 chrono
 chroot
+chunked
 circllhist
 cmd
 codec
@@ -417,6 +420,7 @@ getter
 getters
 gmock
 goog
+google
 goto
 gregs
 gzip
@@ -484,6 +488,8 @@ linearized
 linearizing
 linux
 liveness
+login
+lookup
 lossy
 lowp
 ltrim
@@ -505,6 +511,7 @@ mmap
 mongo
 msec
 msg
+multi
 mutex
 mutexes
 mux
@@ -522,7 +529,11 @@ ntop
 num
 observability
 oneof
+opcode
+optimizations
 ostream
+outlier
+outliers
 overridable
 param
 parameterizable
@@ -534,7 +545,6 @@ params
 paren
 parentid
 pcall
-pcap
 pcap
 pclose
 pfctl
@@ -556,7 +566,6 @@ protodoc
 protos
 proxied
 proxying
-pthread
 pthread
 pthreads
 pton
@@ -580,14 +589,21 @@ recurse
 recv
 redis
 redistributions
+refactored
+refactoring
 referencee
 referer
+regex
 reimplements
 releasor
 reparse
 reperform
 repicked
 repo
+resize
+resized
+resizes
+resizing
 resolv
 resolvers
 resync
@@ -610,6 +626,7 @@ sigaction
 sigactions
 signalstack
 siloed
+sim
 sizeof
 smatch
 sockaddr
@@ -618,6 +635,7 @@ spanid
 spdlog
 splitter
 src
+startup
 stateful
 stats
 statsd
@@ -645,6 +663,7 @@ templatize
 templatized
 templatizing
 th
+thru
 tm
 tmp
 tokenizing
@@ -686,6 +705,7 @@ unterminated
 untruncated
 untrusted
 untyped
+unweighted
 unzigzag
 upstreams
 uptime
@@ -701,6 +721,8 @@ variadic
 vec
 verifier
 verifiers
+versa
+versioned
 vhost
 vptr
 vptrs
