@@ -561,8 +561,8 @@ You may use any [Remote Caching](https://docs.bazel.build/versions/master/remote
 as an alternative to this.
 
 This requires Go 1.11+, follow the [instructions](https://golang.org/doc/install#install) to install
-if you don't have one. The command must run with Go modules enabled, and should work when ran from within the
-Envoy repository.
+if you don't have one. The command must run with Go modules enabled, and should work when run from
+the root of the Envoy repository.
 
 ```
 go run github.com/buchgr/bazel-remote --dir ${HOME}/bazel_cache --host 127.0.0.1 --port 28080 --max_size 64
