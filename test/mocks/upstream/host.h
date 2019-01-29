@@ -37,9 +37,9 @@ public:
   ~MockEventLogger();
 
   MOCK_METHOD4(logEject,
-               void(HostDescriptionConstSharedPtr host, Detector& detector,
+               void(const HostDescriptionConstSharedPtr& host, Detector& detector,
                     envoy::data::cluster::v2alpha::OutlierEjectionType type, bool enforced));
-  MOCK_METHOD1(logUneject, void(HostDescriptionConstSharedPtr host));
+  MOCK_METHOD1(logUneject, void(const HostDescriptionConstSharedPtr& host));
 };
 
 class MockDetector : public Detector {

@@ -141,7 +141,7 @@ public:
    * @param type supplies the type of the event.
    * @param enforced is true if the ejection took place; false, if only logging took place.
    */
-  virtual void logEject(const HostDescriptionConstSharedPtr host, Detector& detector,
+  virtual void logEject(const HostDescriptionConstSharedPtr& host, Detector& detector,
                         envoy::data::cluster::v2alpha::OutlierEjectionType type,
                         bool enforced) PURE;
 
@@ -149,7 +149,7 @@ public:
    * Log an unejection event.
    * @param host supplies the host that generated the event.
    */
-  virtual void logUneject(const HostDescriptionConstSharedPtr host) PURE;
+  virtual void logUneject(const HostDescriptionConstSharedPtr& host) PURE;
 };
 
 typedef std::shared_ptr<EventLogger> EventLoggerSharedPtr;

@@ -791,8 +791,8 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
   EXPECT_CALL(*file, write(absl::string_view(
                          "{\"type\":\"CONSECUTIVE_5XX\",\"cluster_name\":\"fake_cluster\","
                          "\"upstream_url\":\"10.0.0.1:443\",\"action\":\"EJECT\","
-                         "\"enforced\":true,\"eject_consecutive_event\":{},"
-                         "\"timestamp\":\"2018-12-18T09:00:00Z\",\"num_ejections\":0}\n")))
+                         "\"num_ejections\":0,\"enforced\":true,\"eject_consecutive_event\":{}"
+                         ",\"timestamp\":\"2018-12-18T09:00:00Z\"}\n")))
       .WillOnce(SaveArg<0>(&log1));
 
   event_logger.logEject(host, detector,
@@ -803,10 +803,10 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
   EXPECT_CALL(host->outlier_detector_, lastEjectionTime()).WillOnce(ReturnRef(monotonic_time));
 
   EXPECT_CALL(*file, write(absl::string_view(
-                         "{\"type\":\"CONSECUTIVE_5XX\","
-                         "\"cluster_name\":\"fake_cluster\",\"upstream_url\":\"10.0.0.1:443\","
-                         "\"action\":\"UNEJECT\",\"enforced\":false,"
-                         "\"timestamp\":\"2018-12-18T09:00:00Z\",\"num_ejections\":0}\n")))
+                         "{\"type\":\"CONSECUTIVE_5XX\",\"cluster_name\":\"fake_cluster\","
+                         "\"upstream_url\":\"10.0.0.1:443\",\"action\":\"UNEJECT\","
+                         "\"num_ejections\":0,\"enforced\":false,"
+                         "\"timestamp\":\"2018-12-18T09:00:00Z\"}\n")))
       .WillOnce(SaveArg<0>(&log2));
 
   event_logger.logUneject(host);
@@ -820,15 +820,14 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
   EXPECT_CALL(host->outlier_detector_, successRate()).WillOnce(Return(0));
   EXPECT_CALL(detector, successRateAverage()).WillOnce(Return(0));
   EXPECT_CALL(detector, successRateEjectionThreshold()).WillOnce(Return(0));
-  EXPECT_CALL(
-      *file,
-      write(absl::string_view(
-          "{\"type\":\"SUCCESS_RATE\",\"cluster_name\":\"fake_cluster\","
-          "\"upstream_url\":\"10.0.0.1:443\",\"action\":\"EJECT\",\"enforced\":false,"
-          "\"eject_success_rate_event\":{\"host_success_rate\":0,\"cluster_average_success_rate\":"
-          "0,"
-          "\"cluster_success_rate_ejection_threshold\":0},\"timestamp\":\"2018-12-18T09:00:00Z\","
-          "\"secs_since_last_action\":\"30\",\"num_ejections\":0}\n")))
+  EXPECT_CALL(*file,
+              write(absl::string_view(
+                  "{\"type\":\"SUCCESS_RATE\",\"cluster_name\":\"fake_cluster\","
+                  "\"upstream_url\":\"10.0.0.1:443\",\"action\":\"EJECT\","
+                  "\"num_ejections\":0,\"enforced\":false,\"eject_success_rate_event\":{"
+                  "\"host_success_rate\":0,\"cluster_average_success_rate\":0,"
+                  "\"cluster_success_rate_ejection_threshold\":0},"
+                  "\"timestamp\":\"2018-12-18T09:00:00Z\",\"secs_since_last_action\":\"30\"}\n")))
       .WillOnce(SaveArg<0>(&log3));
   event_logger.logEject(host, detector,
                         envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE, false);
@@ -836,11 +835,12 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
 
   StringViewSaver log4;
   EXPECT_CALL(host->outlier_detector_, lastEjectionTime()).WillOnce(ReturnRef(monotonic_time));
-  EXPECT_CALL(*file, write(absl::string_view(
-                         "{\"type\":\"CONSECUTIVE_5XX\",\"cluster_name\":\"fake_cluster\","
-                         "\"upstream_url\":\"10.0.0.1:443\",\"action\":\"UNEJECT\","
-                         "\"enforced\":false,\"timestamp\":\"2018-12-18T09:00:00Z\","
-                         "\"secs_since_last_action\":\"30\",\"num_ejections\":0}\n")))
+  EXPECT_CALL(*file,
+              write(absl::string_view(
+                  "{\"type\":\"CONSECUTIVE_5XX\",\"cluster_name\":\"fake_cluster\","
+                  "\"upstream_url\":\"10.0.0.1:443\",\"action\":\"UNEJECT\","
+                  "\"num_ejections\":0,\"enforced\":false,\"timestamp\":\"2018-12-18T09:00:00Z\","
+                  "\"secs_since_last_action\":\"30\"}\n")))
       .WillOnce(SaveArg<0>(&log4));
   event_logger.logUneject(host);
   Json::Factory::loadFromString(log4);

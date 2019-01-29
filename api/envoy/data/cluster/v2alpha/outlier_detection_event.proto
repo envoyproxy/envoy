@@ -30,7 +30,7 @@ message OutlierDetectionEvent {
   // If ``action`` is ``eject``, specifies the number of times the host has been ejected (local to
   // that Envoy and gets reset if the host gets removed from the upstream cluster for any reason and
   // then re-added).
-  google.protobuf.UInt32Value num_ejections = 7;
+  uint32 num_ejections = 7;
   // If ``action`` is ``eject``, specifies if the ejection was enforced. ``true`` means the host was
   // ejected. ``false`` means the event was logged but the host was not actually ejected.
   bool enforced = 8;
@@ -62,13 +62,12 @@ enum Action {
 
 message OutlierEjectSuccessRate {
   // Host’s success rate at the time of the ejection event on a 0-100 range.
-  google.protobuf.UInt32Value host_success_rate = 1 [(validate.rules).uint32.lte = 100];
+  uint32 host_success_rate = 1 [(validate.rules).uint32.lte = 100];
   // Average success rate of the hosts in the cluster at the time of the ejection event on a 0-100
   // range.
-  google.protobuf.UInt32Value cluster_average_success_rate = 2 [(validate.rules).uint32.lte = 100];
+  uint32 cluster_average_success_rate = 2 [(validate.rules).uint32.lte = 100];
   // Success rate ejection threshold at the time of the ejection event.
-  google.protobuf.UInt32Value cluster_success_rate_ejection_threshold = 3
-      [(validate.rules).uint32.lte = 100];
+  uint32 cluster_success_rate_ejection_threshold = 3 [(validate.rules).uint32.lte = 100];
 }
 
 message OutlierEjectConsecutive {

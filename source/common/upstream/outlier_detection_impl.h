@@ -268,15 +268,15 @@ public:
       : file_(log_manager.createAccessLog(file_name)), time_source_(time_source) {}
 
   // Upstream::Outlier::EventLogger
-  void logEject(HostDescriptionConstSharedPtr host, Detector& detector,
+  void logEject(const HostDescriptionConstSharedPtr& host, Detector& detector,
                 envoy::data::cluster::v2alpha::OutlierEjectionType type, bool enforced) override;
 
-  void logUneject(HostDescriptionConstSharedPtr host) override;
+  void logUneject(const HostDescriptionConstSharedPtr& host) override;
 
 private:
   void setCommonEventParams(envoy::data::cluster::v2alpha::OutlierDetectionEvent& event,
-                            HostDescriptionConstSharedPtr host,
-                            absl::optional<MonotonicTime>& time);
+                            const HostDescriptionConstSharedPtr& host,
+                            absl::optional<MonotonicTime> time);
 
   Filesystem::FileSharedPtr file_;
   TimeSource& time_source_;

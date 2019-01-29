@@ -473,7 +473,7 @@ void DetectorImpl::runCallbacks(HostSharedPtr host) {
   }
 }
 
-void EventLoggerImpl::logEject(const HostDescriptionConstSharedPtr host, Detector& detector,
+void EventLoggerImpl::logEject(const HostDescriptionConstSharedPtr& host, Detector& detector,
                                envoy::data::cluster::v2alpha::OutlierEjectionType type,
                                bool enforced) {
   envoy::data::cluster::v2alpha::OutlierDetectionEvent event;
@@ -487,12 +487,11 @@ void EventLoggerImpl::logEject(const HostDescriptionConstSharedPtr host, Detecto
   event.set_enforced(enforced);
 
   if (type == envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE) {
-    event.mutable_eject_success_rate_event()->mutable_cluster_average_success_rate()->set_value(
+    event.mutable_eject_success_rate_event()->set_cluster_average_success_rate(
         detector.successRateAverage());
-    event.mutable_eject_success_rate_event()
-        ->mutable_cluster_success_rate_ejection_threshold()
-        ->set_value(detector.successRateEjectionThreshold());
-    event.mutable_eject_success_rate_event()->mutable_host_success_rate()->set_value(
+    event.mutable_eject_success_rate_event()->set_cluster_success_rate_ejection_threshold(
+        detector.successRateEjectionThreshold());
+    event.mutable_eject_success_rate_event()->set_host_success_rate(
         host->outlierDetector().successRate());
   } else {
     event.mutable_eject_consecutive_event();
@@ -503,7 +502,7 @@ void EventLoggerImpl::logEject(const HostDescriptionConstSharedPtr host, Detecto
   file_->write(fmt::format("{}\n", json));
 }
 
-void EventLoggerImpl::logUneject(HostDescriptionConstSharedPtr host) {
+void EventLoggerImpl::logUneject(const HostDescriptionConstSharedPtr& host) {
   envoy::data::cluster::v2alpha::OutlierDetectionEvent event;
 
   absl::optional<MonotonicTime> time = host->outlierDetector().lastEjectionTime();
@@ -517,17 +516,17 @@ void EventLoggerImpl::logUneject(HostDescriptionConstSharedPtr host) {
 }
 
 void EventLoggerImpl::setCommonEventParams(
-    envoy::data::cluster::v2alpha::OutlierDetectionEvent& event, HostDescriptionConstSharedPtr host,
-    absl::optional<MonotonicTime>& time) {
+    envoy::data::cluster::v2alpha::OutlierDetectionEvent& event,
+    const HostDescriptionConstSharedPtr& host, absl::optional<MonotonicTime> time) {
   MonotonicTime monotonic_now = time_source_.monotonicTime();
   if (time) {
-    int secsFromLastAction =
-        std::chrono::duration_cast<std::chrono::seconds>(monotonic_now - time.value()).count();
-    event.mutable_secs_since_last_action()->set_value(secsFromLastAction);
+    std::chrono::seconds secsFromLastAction =
+        std::chrono::duration_cast<std::chrono::seconds>(monotonic_now - time.value());
+    event.mutable_secs_since_last_action()->set_value(secsFromLastAction.count());
   }
   event.set_cluster_name(host->cluster().name());
   event.set_upstream_url(host->address()->asString());
-  event.mutable_num_ejections()->set_value(host->outlierDetector().numEjections());
+  event.set_num_ejections(host->outlierDetector().numEjections());
   TimestampUtil::systemClockToTimestamp(time_source_.systemTime(), *event.mutable_timestamp());
 }
 
