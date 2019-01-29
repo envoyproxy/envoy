@@ -160,7 +160,7 @@ IoHandlePtr InstanceBase::socketFromSocketType(SocketType socketType) const {
     domain = AF_UNIX;
   }
 
-  IoHandlePtr io_handle = std::make_unique<IoSocketHandle>(::socket(domain, flags, 0));
+  IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>(::socket(domain, flags, 0));
   RELEASE_ASSERT(io_handle->fd() != -1, "");
 
 #ifdef __APPLE__

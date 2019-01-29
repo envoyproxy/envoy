@@ -27,10 +27,10 @@ public:
   IoHandle& ioHandle() override { return *io_handle_; }
   const IoHandle& ioHandle() const override { return *io_handle_; }
   void close() override {
-    if (io_handle_->fd() != -1) {
-      ::close(io_handle_->fd());
-      io_handle_->close();
+    if (io_handle_->isClosed()) {
+      return;
     }
+    io_handle_->close();
   }
   void ensureOptions() {
     if (!options_) {

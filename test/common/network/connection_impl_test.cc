@@ -82,7 +82,7 @@ TEST_P(ConnectionImplDeathTest, BadFd) {
   Api::ApiPtr api = Api::createApiForTest(stats_store);
   Event::SimulatedTimeSystem time_system;
   Event::DispatcherImpl dispatcher(time_system, *api);
-  IoHandlePtr io_handle = std::make_unique<IoSocketHandle>();
+  IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>();
   EXPECT_DEATH_LOG_TO_STDERR(
       ConnectionImpl(dispatcher,
                      std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
@@ -992,7 +992,7 @@ TEST_P(ConnectionImplTest, FlushWriteCloseTest) {
 // triggered.
 TEST_P(ConnectionImplTest, FlushWriteCloseTimeoutTest) {
   ConnectionMocks mocks = createConnectionMocks();
-  IoHandlePtr io_handle = std::make_unique<IoSocketHandle>(0);
+  IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>(0);
   auto server_connection = std::make_unique<Network::ConnectionImpl>(
       *mocks.dispatcher,
       std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
@@ -1119,7 +1119,7 @@ TEST_P(ConnectionImplTest, FlushWriteAndDelayConfigDisabledTest) {
                                 std::function<void()> above_high) -> Buffer::Instance* {
         return new Buffer::WatermarkBuffer(below_low, above_high);
       }));
-  IoHandlePtr io_handle = std::make_unique<IoSocketHandle>(0);
+  IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>(0);
   std::unique_ptr<Network::ConnectionImpl> server_connection(new Network::ConnectionImpl(
       dispatcher, std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
       std::make_unique<NiceMock<MockTransportSocket>>(), true));
@@ -1148,7 +1148,7 @@ TEST_P(ConnectionImplTest, FlushWriteAndDelayConfigDisabledTest) {
 // Test that tearing down the connection will disable the delayed close timer.
 TEST_P(ConnectionImplTest, DelayedCloseTimeoutDisableOnSocketClose) {
   ConnectionMocks mocks = createConnectionMocks();
-  IoHandlePtr io_handle = std::make_unique<IoSocketHandle>(0);
+  IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>(0);
   auto server_connection = std::make_unique<Network::ConnectionImpl>(
       *mocks.dispatcher,
       std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
@@ -1174,7 +1174,7 @@ TEST_P(ConnectionImplTest, DelayedCloseTimeoutDisableOnSocketClose) {
 // Test that the delayed close timeout callback is resilient to connection teardown edge cases.
 TEST_P(ConnectionImplTest, DelayedCloseTimeoutNullStats) {
   ConnectionMocks mocks = createConnectionMocks();
-  IoHandlePtr io_handle = std::make_unique<IoSocketHandle>(0);
+  IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>(0);
   auto server_connection = std::make_unique<Network::ConnectionImpl>(
       *mocks.dispatcher,
       std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
@@ -1246,7 +1246,7 @@ public:
         .WillOnce(Invoke([this](TransportSocketCallbacks& callbacks) {
           transport_socket_callbacks_ = &callbacks;
         }));
-    IoHandlePtr io_handle = std::make_unique<IoSocketHandle>(0);
+    IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>(0);
     connection_ = std::make_unique<ConnectionImpl>(
         dispatcher_, std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
         TransportSocketPtr(transport_socket_), true);

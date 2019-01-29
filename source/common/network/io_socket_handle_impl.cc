@@ -2,6 +2,9 @@
 
 #include "common/common/assert.h"
 
+#include <errno.h>
+#include <iostream>
+
 using Envoy::Api::SysCallIntResult;
 using Envoy::Api::SysCallSizeResult;
 
@@ -24,9 +27,9 @@ SysCallSizeResult IoSocketHandleImpl::writev(const iovec* iovec, int num_iovec) 
 
 SysCallIntResult IoSocketHandleImpl::close() {
   ASSERT(fd_ != -1);
-  auto result = Api::OsSysCallsSingleton::get().close(fd_);
+  const int rc = ::close(fd_);
   fd_ = -1;
-  return result;
+  return {rc, errno};
 }
 
 bool IoSocketHandleImpl::isClosed() const { return fd_ == -1; }

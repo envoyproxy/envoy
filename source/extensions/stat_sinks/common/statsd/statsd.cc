@@ -29,10 +29,10 @@ Writer::Writer(Network::Address::InstanceConstSharedPtr address)
 }
 
 Writer::~Writer() {
-  if (io_handle_->fd() != -1) {
-    RELEASE_ASSERT(close(io_handle_->fd()) == 0, "");
-    io_handle_->close();
+  if (io_handle_->isClosed()) {
+    return;
   }
+  RELEASE_ASSERT(io_handle_->close().rc_ == 0, "");
 }
 
 void Writer::write(const std::string& message) {
