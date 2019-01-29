@@ -190,6 +190,8 @@ def whitelistedForProtobufDeps(file_path):
 # specific cases. They should be passed down from where they are instantied to where
 # they need to be used, e.g. through the ServerInstance, Dispatcher, or ClusterManager.
 def whitelistedForRealTime(file_path):
+  if file_path.endswith(".md"):
+    return True
   return file_path in REAL_TIME_WHITELIST
 
 
