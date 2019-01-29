@@ -305,7 +305,7 @@ private:
   Http::ConnectionManagerTracingStats tracing_stats_;
   NullRouteConfigProvider route_config_provider_;
   std::list<UrlHandler> handlers_;
-  int32_t max_request_headers_size_kb_{Http::DEFAULT_MAX_REQUEST_HEADERS_SIZE_KB};
+  uint32_t max_request_headers_size_kb_{Http::DEFAULT_MAX_REQUEST_HEADERS_SIZE_KB};
   absl::optional<std::chrono::milliseconds> idle_timeout_;
   absl::optional<std::string> user_agent_;
   Http::SlowDateProviderImpl date_provider_;
