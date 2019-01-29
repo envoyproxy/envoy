@@ -20,16 +20,16 @@ class AsyncClientManagerImplTest : public testing::Test {
 public:
   AsyncClientManagerImplTest() : api_(Api::createApiForTest(api_stats_store_)) {}
 
-  Event::GlobalTimeSystem time_system_;
   Upstream::MockClusterManager cm_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   Stats::IsolatedStoreImpl api_stats_store_;
   Stats::MockStore scope_;
+  DangerousDeprecatedTestTime test_time_;
   Api::ApiPtr api_;
 };
 
 TEST_F(AsyncClientManagerImplTest, EnvoyGrpcOk) {
-  AsyncClientManagerImpl async_client_manager(cm_, tls_, time_system_, *api_);
+  AsyncClientManagerImpl async_client_manager(cm_, tls_, test_time_.timeSystem(), *api_);
   envoy::api::v2::core::GrpcService grpc_service;
   grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
 
@@ -44,7 +44,7 @@ TEST_F(AsyncClientManagerImplTest, EnvoyGrpcOk) {
 }
 
 TEST_F(AsyncClientManagerImplTest, EnvoyGrpcUnknown) {
-  AsyncClientManagerImpl async_client_manager(cm_, tls_, time_system_, *api_);
+  AsyncClientManagerImpl async_client_manager(cm_, tls_, test_time_.timeSystem(), *api_);
   envoy::api::v2::core::GrpcService grpc_service;
   grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
 
@@ -54,7 +54,7 @@ TEST_F(AsyncClientManagerImplTest, EnvoyGrpcUnknown) {
 }
 
 TEST_F(AsyncClientManagerImplTest, EnvoyGrpcDynamicCluster) {
-  AsyncClientManagerImpl async_client_manager(cm_, tls_, time_system_, *api_);
+  AsyncClientManagerImpl async_client_manager(cm_, tls_, test_time_.timeSystem(), *api_);
   envoy::api::v2::core::GrpcService grpc_service;
   grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
 
@@ -70,7 +70,7 @@ TEST_F(AsyncClientManagerImplTest, EnvoyGrpcDynamicCluster) {
 
 TEST_F(AsyncClientManagerImplTest, GoogleGrpc) {
   EXPECT_CALL(scope_, createScope_("grpc.foo."));
-  AsyncClientManagerImpl async_client_manager(cm_, tls_, time_system_, *api_);
+  AsyncClientManagerImpl async_client_manager(cm_, tls_, test_time_.timeSystem(), *api_);
   envoy::api::v2::core::GrpcService grpc_service;
   grpc_service.mutable_google_grpc()->set_stat_prefix("foo");
 
@@ -83,7 +83,7 @@ TEST_F(AsyncClientManagerImplTest, GoogleGrpc) {
 }
 
 TEST_F(AsyncClientManagerImplTest, EnvoyGrpcUnknownOk) {
-  AsyncClientManagerImpl async_client_manager(cm_, tls_, time_system_, *api_);
+  AsyncClientManagerImpl async_client_manager(cm_, tls_, test_time_.timeSystem(), *api_);
   envoy::api::v2::core::GrpcService grpc_service;
   grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
 
