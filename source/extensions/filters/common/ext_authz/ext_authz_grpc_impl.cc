@@ -16,13 +16,13 @@ namespace ExtAuthz {
 // Values used for selecting service paths.
 // TODO(gsagula): keep only V2 when V2Alpha gets deprecated. 
 constexpr char V2[] = "envoy.service.auth.v2.Authorization.Check";
-constexpr char Alpha[] = "envoy.service.auth.v2alpha.Authorization.Check";
+constexpr char V2alpha[] = "envoy.service.auth.v2alpha.Authorization.Check";
 
 GrpcClientImpl::GrpcClientImpl(Grpc::AsyncClientPtr&& async_client,
                                const absl::optional<std::chrono::milliseconds>& timeout,
                                bool use_alpha)
     : service_method_(use_alpha
-                          ? *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(Alpha)
+                          ? *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(V2alpha)
                           : *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(V2)),
       async_client_(std::move(async_client)), timeout_(timeout) {}
 

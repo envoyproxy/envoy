@@ -32,7 +32,7 @@ class ExtAuthzGrpcClientTest : public testing::Test {
 public:
   ExtAuthzGrpcClientTest()
       : async_client_(new Grpc::MockAsyncClient()), timeout_(10),
-        client_(Grpc::AsyncClientPtr{async_client_}, timeout_) {}
+        client_(Grpc::AsyncClientPtr{async_client_}, timeout_, false) {}
 
   Grpc::MockAsyncClient* async_client_;
   absl::optional<std::chrono::milliseconds> timeout_;
