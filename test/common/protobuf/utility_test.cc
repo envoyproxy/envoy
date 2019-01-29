@@ -6,6 +6,7 @@
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 
+#include "test/proto/deprecated.pb.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
@@ -38,6 +39,31 @@ TEST(UtilityTest, DowncastAndValidate) {
   EXPECT_THROW(
       MessageUtil::downcastAndValidate<const envoy::config::bootstrap::v2::Bootstrap&>(bootstrap),
       ProtoValidationException);
+}
+
+TEST(UtilityTest, ValidateDeprecatedFields) {
+  {
+    envoy::test::deprecation_test::Base base;
+    base.set_not_deprecated("foo");
+    // Fatal checks for a non-deprecated field should cause no problem.
+    MessageUtil::checkForDeprecation(base, true);
+  }
+  {
+    envoy::test::deprecation_test::Base base;
+    base.set_is_deprecated("foo");
+    // Non-fatal checks for a deprecated field shouldn't throw an exception.
+    MessageUtil::checkForDeprecation(base, false);
+    // Fatal checks for a deprecated field should result in an exception.
+    EXPECT_THROW_WITH_REGEX(MessageUtil::checkForDeprecation(base, true), ProtoValidationException,
+                            "Using deprecated option 'is_deprecated'.");
+  }
+  {
+    envoy::test::deprecation_test::Base base;
+    base.mutable_deprecated_message();
+    // Fatal checks for a present (unused) deprecated message should result in an exception.
+    EXPECT_THROW_WITH_REGEX(MessageUtil::checkForDeprecation(base, true), ProtoValidationException,
+                            "Using deprecated option 'deprecated_message'.");
+  }
 }
 
 TEST(UtilityTest, LoadBinaryProtoFromFile) {

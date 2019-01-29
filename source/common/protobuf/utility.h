@@ -6,6 +6,7 @@
 #include "envoy/json/json_object.h"
 #include "envoy/type/percent.pb.h"
 
+#include "common/common/fmt.h"
 #include "common/common/hash.h"
 #include "common/common/utility.h"
 #include "common/json/json_loader.h"
@@ -177,6 +178,26 @@ public:
   static void loadFromYaml(const std::string& yaml, Protobuf::Message& message);
   static void loadFromFile(const std::string& path, Protobuf::Message& message);
 
+  template <class MessageType>
+  static void checkForDeprecation(const MessageType& message, bool fatal) {
+    const auto* desc = message.GetDescriptor();
+    const auto* refl = message.GetReflection();
+    for (int i = 0; i < desc->field_count(); ++i) {
+      const auto* fd = desc->field(i);
+      if (fd->options().deprecated() && refl->HasField(message, fd)) {
+        std::string err = fmt::format(
+            "Using deprecated option '{}'. This configuration will be removed from Envoy soon. "
+            "Please see https://github.com/envoyproxy/envoy/blob/master/DEPRECATED.md for "
+            "details.",
+            fd->name());
+        if (fatal) {
+          throw ProtoValidationException(err, message);
+        } else {
+          ENVOY_LOG_MISC(warn, "{}", err);
+        }
+      }
+    }
+  }
   /**
    * Validate protoc-gen-validate constraints on a given protobuf.
    * Note the corresponding `.pb.validate.h` for the message has to be included in the source file
@@ -185,6 +206,9 @@ public:
    * @throw ProtoValidationException if the message does not satisfy its type constraints.
    */
   template <class MessageType> static void validate(const MessageType& message) {
+    // Do a (non-fatal) deprecation check to log warnings about deprecated field use.
+    checkForDeprecation(message, false);
+
     std::string err;
     if (!Validate(message, &err)) {
       throw ProtoValidationException(err, message);
