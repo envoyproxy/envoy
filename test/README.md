@@ -74,8 +74,9 @@ EXPECT_THAT(response->headers(), IsSupersetOfHeaders(required_headers));
 
 In Envoy production code, time and timers are managed via
 [`Event::TimeSystem`](https://github.com/envoyproxy/envoy/blob/master/include/envoy/event/timer.h),
-which provides a mechanism for querying the time setting up time-based callbacks. Bypassing
-this abstraction in Envoy code is flagged as a format violation in CI.
+which provides a mechanism for querying the time and setting up time-based
+callbacks. Bypassing this abstraction in Envoy code is flagged as a format
+violation in CI.
 
 In tests we use a derivation
 [`Event::TestTimeSystem`](test_common/test_time_system.h) which adds the ability
