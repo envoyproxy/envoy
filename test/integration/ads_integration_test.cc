@@ -305,7 +305,7 @@ public:
   Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{timeSystem()};
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersionsClientType, AdsIntegrationTest, GRPC_CLIENT_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, AdsIntegrationTest, GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // Validate basic config delivery and upgrade.
 TEST_P(AdsIntegrationTest, Basic) {
@@ -571,8 +571,8 @@ public:
   }
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersionsClientType, AdsFailIntegrationTest,
-                        GRPC_CLIENT_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, AdsFailIntegrationTest,
+                         GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // Validate that we don't crash on failed ADS stream.
 TEST_P(AdsFailIntegrationTest, ConnectDisconnect) {
@@ -619,8 +619,8 @@ public:
   }
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersionsClientType, AdsConfigIntegrationTest,
-                        GRPC_CLIENT_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, AdsConfigIntegrationTest,
+                         GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // This is s regression validating that we don't crash on EDS static Cluster that uses ADS.
 TEST_P(AdsConfigIntegrationTest, EdsClusterWithAdsConfigSource) {

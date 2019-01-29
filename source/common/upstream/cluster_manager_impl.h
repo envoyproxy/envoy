@@ -40,11 +40,13 @@ public:
                             Event::Dispatcher& main_thread_dispatcher,
                             const LocalInfo::LocalInfo& local_info,
                             Secret::SecretManager& secret_manager, Api::Api& api,
-                            Http::Context& http_context, AccessLog::AccessLogManager& log_manager)
+                            Http::Context& http_context, AccessLog::AccessLogManager& log_manager,
+                            Singleton::Manager& singleton_manager)
       : main_thread_dispatcher_(main_thread_dispatcher), api_(api), http_context_(http_context),
         admin_(admin), runtime_(runtime), stats_(stats), tls_(tls), random_(random),
         dns_resolver_(dns_resolver), ssl_context_manager_(ssl_context_manager),
-        local_info_(local_info), secret_manager_(secret_manager), log_manager_(log_manager) {}
+        local_info_(local_info), secret_manager_(secret_manager), log_manager_(log_manager),
+        singleton_manager_(singleton_manager) {}
 
   // Upstream::ClusterManagerFactory
   ClusterManagerPtr
@@ -79,6 +81,7 @@ protected:
   const LocalInfo::LocalInfo& local_info_;
   Secret::SecretManager& secret_manager_;
   AccessLog::AccessLogManager& log_manager_;
+  Singleton::Manager& singleton_manager_;
 };
 
 /**

@@ -18,7 +18,7 @@ struct HttpProtocolTestParams {
 //
 // typedef HttpProtocolIntegrationTest MyTest
 //
-// INSTANTIATE_TEST_CASE_P(Protocols, BufferIntegrationTest,
+// INSTANTIATE_TEST_SUITE_P(Protocols, BufferIntegrationTest,
 //                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
 //                         HttpProtocolIntegrationTest::protocolTestParamsToString);
 //

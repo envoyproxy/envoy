@@ -21,7 +21,7 @@ import "gogoproto/gogo.proto";
 // [#protodoc-title: HTTP connection manager]
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 
-// [#comment:next free field: 29]
+// [#comment:next free field: 30]
 message HttpConnectionManager {
   enum CodecType {
     option (gogoproto.goproto_enum_prefix) = false;
@@ -129,6 +129,15 @@ message HttpConnectionManager {
   // An optional override that the connection manager will write to the server
   // header in responses. If not set, the default is *envoy*.
   string server_name = 10;
+
+  // The maximum request headers size for incoming connections. The default max
+  // is 60K, based on default settings for http codecs. For HTTP1, the current
+  // limit set by http_parser is 80K. for HTTP2, the default allowed header
+  // block in nghttp2 is 64K. The max configurable setting is 63K in order to
+  // stay under both codec limits.
+  // Requests that exceed this size will receive a 431 response.
+  google.protobuf.UInt32Value max_request_headers_size_kb = 29
+      [(validate.rules).uint32.gt = 0, (validate.rules).uint32.lte = 63];
 
   // The idle timeout for connections managed by the connection manager. The
   // idle timeout is defined as the period in which there are no active

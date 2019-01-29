@@ -26,9 +26,8 @@ Network::FilterFactoryCb DubboProxyFilterConfigFactory::createFilterFactoryFromP
 /**
  * Static registration for the dubbo filter. @see RegisterFactory.
  */
-static Registry::RegisterFactory<DubboProxyFilterConfigFactory,
-                                 Server::Configuration::NamedNetworkFilterConfigFactory>
-    registered_;
+REGISTER_FACTORY(DubboProxyFilterConfigFactory,
+                 Server::Configuration::NamedNetworkFilterConfigFactory);
 
 } // namespace DubboProxy
 } // namespace NetworkFilters

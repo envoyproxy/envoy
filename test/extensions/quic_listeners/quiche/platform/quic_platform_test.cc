@@ -4,6 +4,7 @@
 #include "quiche/quic/platform/api/quic_containers.h"
 #include "quiche/quic/platform/api/quic_endian.h"
 #include "quiche/quic/platform/api/quic_estimate_memory_usage.h"
+#include "quiche/quic/platform/api/quic_ptr_util.h"
 #include "quiche/quic/platform/api/quic_string.h"
 #include "quiche/quic/platform/api/quic_string_piece.h"
 
@@ -75,6 +76,14 @@ TEST(QuicPlatformTest, QuicStringPiece) {
   quic::QuicString s = "bar";
   quic::QuicStringPiece sp(s);
   EXPECT_EQ('b', sp[0]);
+}
+
+TEST(QuicPlatformTest, QuicPtrUtil) {
+  auto p = quic::QuicMakeUnique<quic::QuicString>("abc");
+  EXPECT_EQ("abc", *p);
+
+  p = quic::QuicWrapUnique(new quic::QuicString("aaa"));
+  EXPECT_EQ("aaa", *p);
 }
 
 } // namespace Quiche

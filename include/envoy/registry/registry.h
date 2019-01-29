@@ -126,5 +126,13 @@ private:
   T instance_{};
 };
 
+/**
+ * Macro used for static registration.
+ */
+#define REGISTER_FACTORY(FACTORY, BASE)                                                            \
+  static Envoy::Registry::RegisterFactory</* NOLINT(fuchsia-statically-constructed-objects) */     \
+                                          FACTORY, BASE>                                           \
+      FACTORY##_registered
+
 } // namespace Registry
 } // namespace Envoy

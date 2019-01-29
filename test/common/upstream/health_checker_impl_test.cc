@@ -3384,7 +3384,7 @@ class BadResponseGrpcHealthCheckerImplTest
     : public GrpcHealthCheckerImplTestBase,
       public testing::TestWithParam<GrpcHealthCheckerImplTest::ResponseSpec> {};
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     BadResponse, BadResponseGrpcHealthCheckerImplTest,
     testing::ValuesIn(std::vector<GrpcHealthCheckerImplTest::ResponseSpec>{
         // Non-200 response.

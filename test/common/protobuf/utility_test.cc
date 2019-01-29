@@ -347,20 +347,20 @@ TEST_P(TimestampUtilTest, SystemClockToTimestampTest) {
   EXPECT_EQ(time_original, time_reflected);
 }
 
-INSTANTIATE_TEST_CASE_P(TimestampUtilTestAcrossRange, TimestampUtilTest,
-                        ::testing::Values(-1000 * 60 * 60 * 24 * 7, // week
-                                          -1000 * 60 * 60 * 24,     // day
-                                          -1000 * 60 * 60,          // hour
-                                          -1000 * 60,               // minute
-                                          -1000,                    // second
-                                          -1,                       // millisecond
-                                          0,
-                                          1,                      // millisecond
-                                          1000,                   // second
-                                          1000 * 60,              // minute
-                                          1000 * 60 * 60,         // hour
-                                          1000 * 60 * 60 * 24,    // day
-                                          1000 * 60 * 60 * 24 * 7 // week
-                                          ));
+INSTANTIATE_TEST_SUITE_P(TimestampUtilTestAcrossRange, TimestampUtilTest,
+                         ::testing::Values(-1000 * 60 * 60 * 24 * 7, // week
+                                           -1000 * 60 * 60 * 24,     // day
+                                           -1000 * 60 * 60,          // hour
+                                           -1000 * 60,               // minute
+                                           -1000,                    // second
+                                           -1,                       // millisecond
+                                           0,
+                                           1,                      // millisecond
+                                           1000,                   // second
+                                           1000 * 60,              // minute
+                                           1000 * 60 * 60,         // hour
+                                           1000 * 60 * 60 * 24,    // day
+                                           1000 * 60 * 60 * 24 * 7 // week
+                                           ));
 
 } // namespace Envoy

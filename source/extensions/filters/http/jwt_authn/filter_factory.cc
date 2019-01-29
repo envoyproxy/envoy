@@ -53,8 +53,7 @@ FilterFactory::createFilterFactoryFromProtoTyped(const JwtAuthentication& proto_
 /**
  * Static registration for this jwt_authn filter. @see RegisterFactory.
  */
-static Registry::RegisterFactory<FilterFactory, Server::Configuration::NamedHttpFilterConfigFactory>
-    register_;
+REGISTER_FACTORY(FilterFactory, Server::Configuration::NamedHttpFilterConfigFactory);
 
 } // namespace JwtAuthn
 } // namespace HttpFilters
