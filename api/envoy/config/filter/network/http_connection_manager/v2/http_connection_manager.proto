@@ -136,7 +136,7 @@ message HttpConnectionManager {
   // block in nghttp2 is 64K. The max configurable setting is 63K in order to
   // stay under both codec limits.
   // Requests that exceed this size will receive a 431 response.
-  google.protobuf.UInt32Value max_request_headers_size_kb = 29
+  google.protobuf.UInt32Value max_request_headers_kb = 29
       [(validate.rules).uint32.gt = 0, (validate.rules).uint32.lte = 63];
 
   // The idle timeout for connections managed by the connection manager. The
