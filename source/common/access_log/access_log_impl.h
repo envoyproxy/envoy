@@ -194,7 +194,7 @@ private:
 /**
  * Filters requests that have a response with a gRPC status. Because the gRPC protocol does not
  * guarantee a gRPC status code, if a gRPC status code is not available, then the filter will infer
- * infer the gRPC status code if an HTTP status code if available.
+ * the gRPC status code from an HTTP status code if available.
  */
 class GrpcStatusFilter : public Filter {
 public:
@@ -210,7 +210,8 @@ private:
   bool exclude_;
 
   /**
-   * Converts between the protobuf version of gRPC code and the code version of a gRPC code.
+   * Converts a Protobuf representation of a gRPC status into the equivalent code version of a gRPC
+   * status.
    */
   Grpc::Status::GrpcStatus
   protoToGrpcStatus(envoy::config::filter::accesslog::v2::GrpcStatusFilter_Status status) const;
