@@ -213,6 +213,9 @@ public:
     return result;
   }
 
+  /**
+   * Validate that createListenSocket is called once with the expected options.
+   */
   void
   expectCreateListenSocket(const envoy::api::v2::core::SocketOption::SocketState& expected_state,
                            Network::Socket::Options::size_type expected_num_options) {
@@ -229,8 +232,12 @@ public:
         }));
   }
 
+  /**
+   * Validate that setsockopt() is called the expected number of times with the expected options.
+   */
   void expectSetsockopt(NiceMock<Api::MockOsSysCalls>& os_sys_calls, int expected_sockopt_level,
-                        int expected_sockopt_name, int expected_value, int expected_num_calls) {
+                        int expected_sockopt_name, int expected_value,
+                        uint32_t expected_num_calls = 1) {
     EXPECT_CALL(os_sys_calls,
                 setsockopt_(_, expected_sockopt_level, expected_sockopt_name, _, sizeof(int)))
         .Times(expected_num_calls)
@@ -241,32 +248,27 @@ public:
             }));
   }
 
-  void expectSetsockopt(NiceMock<Api::MockOsSysCalls>& os_sys_calls,
+  /**
+   * Used by some tests below to validate that, if a given socket option is valid on this platform
+   * and set in the Listener, it should result in a call to setsockopt() with the appropriate
+   * values.
+   */
+  void testSocketOption(const envoy::api::v2::Listener& listener,
+                        const envoy::api::v2::core::SocketOption::SocketState& expected_state,
                         const Network::SocketOptionName& expected_option, int expected_value,
-                        int expected_num_calls) {
-    expectSetsockopt(os_sys_calls, expected_option.value().first, expected_option.value().second,
-                     expected_value, expected_num_calls);
-  }
-
-  void expectThrowForInvalidSockopt(const envoy::api::v2::Listener& listener) {
-    EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(listener, "", true), EnvoyException,
-                              "MockListenerComponentFactory: Setting socket options failed");
-    EXPECT_EQ(0U, manager_->listeners().size());
-  }
-
-  void endToEndSockoptTest(const envoy::api::v2::Listener& listener,
-                           const envoy::api::v2::core::SocketOption::SocketState& expected_state,
-                           const Network::SocketOptionName& expected_option, int expected_value,
-                           int expected_num_options) {
+                        uint32_t expected_num_options = 1) {
     NiceMock<Api::MockOsSysCalls> os_sys_calls;
     TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
     if (expected_option.has_value()) {
       expectCreateListenSocket(expected_state, expected_num_options);
-      expectSetsockopt(os_sys_calls, expected_option, expected_value, expected_num_options);
+      expectSetsockopt(os_sys_calls, expected_option.value().first, expected_option.value().second,
+                       expected_value, expected_num_options);
       manager_->addOrUpdateListener(listener, "", true);
       EXPECT_EQ(1U, manager_->listeners().size());
     } else {
-      expectThrowForInvalidSockopt(listener);
+      EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(listener, "", true), EnvoyException,
+                                "MockListenerComponentFactory: Setting socket options failed");
+      EXPECT_EQ(0U, manager_->listeners().size());
     }
   }
 
@@ -2775,10 +2777,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TransparentListenerEnabled) {
     transparent: true
   )EOF");
 
-  endToEndSockoptTest(listener, envoy::api::v2::core::SocketOption::STATE_PREBIND,
-                      ENVOY_SOCKET_IP_TRANSPARENT,
-                      /* expected_value */ 1,
-                      /* expected_num_options */ 2);
+  testSocketOption(listener, envoy::api::v2::core::SocketOption::STATE_PREBIND,
+                   ENVOY_SOCKET_IP_TRANSPARENT, /* expected_value */ 1,
+                   /* expected_num_options */ 2);
 }
 
 // Validate that when freebind is set in the Listener, we see the socket option
@@ -2797,10 +2798,8 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, FreebindListenerEnabled) {
     freebind: true
   )EOF");
 
-  endToEndSockoptTest(listener, envoy::api::v2::core::SocketOption::STATE_PREBIND,
-                      ENVOY_SOCKET_IP_FREEBIND,
-                      /* expected_value */ 1,
-                      /* expected_num_options */ 1);
+  testSocketOption(listener, envoy::api::v2::core::SocketOption::STATE_PREBIND,
+                   ENVOY_SOCKET_IP_FREEBIND, /* expected_value */ 1);
 }
 
 // Validate that when tcp_fast_open_queue_length is set in the Listener, we see the socket option
@@ -2819,10 +2818,8 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, FastOpenListenerEnabled) {
     tcp_fast_open_queue_length: 1
   )EOF");
 
-  endToEndSockoptTest(listener, envoy::api::v2::core::SocketOption::STATE_LISTENING,
-                      ENVOY_SOCKET_TCP_FASTOPEN,
-                      /* expected_value */ 1,
-                      /* expected_num_options */ 1);
+  testSocketOption(listener, envoy::api::v2::core::SocketOption::STATE_LISTENING,
+                   ENVOY_SOCKET_TCP_FASTOPEN, /* expected_value */ 1);
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, LiteralSockoptListenerEnabled) {
@@ -2846,8 +2843,14 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, LiteralSockoptListenerEnabled) {
 
   expectCreateListenSocket(envoy::api::v2::core::SocketOption::STATE_PREBIND,
                            /* expected_num_options */ 3);
-  expectSetsockopt(os_sys_calls, 1, 2, 3, 1);
-  expectSetsockopt(os_sys_calls, 4, 5, 6, 1);
+  expectSetsockopt(os_sys_calls,
+                   /* expected_sockopt_level */ 1,
+                   /* expected_sockopt_name */ 2,
+                   /* expected_value */ 3);
+  expectSetsockopt(os_sys_calls,
+                   /* expected_sockopt_level */ 4,
+                   /* expected_sockopt_name */ 5,
+                   /* expected_value */ 6);
   manager_->addOrUpdateListener(listener, "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 }
