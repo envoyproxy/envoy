@@ -5,24 +5,11 @@
 namespace Envoy {
 namespace Upstream {
 
-ValidationClusterManagerFactory::ValidationClusterManagerFactory(
-    Runtime::Loader& runtime, Stats::Store& stats, ThreadLocal::Instance& tls,
-    Runtime::RandomGenerator& random, Network::DnsResolverSharedPtr dns_resolver,
-    Ssl::ContextManager& ssl_context_manager, Event::Dispatcher& main_thread_dispatcher,
-    const LocalInfo::LocalInfo& local_info, Secret::SecretManager& secret_manager, Api::Api& api,
-    Http::Context& http_context)
-    : ProdClusterManagerFactory(runtime, stats, tls, random, dns_resolver, ssl_context_manager,
-                                main_thread_dispatcher, local_info, secret_manager, api,
-                                http_context) {}
-
 ClusterManagerPtr ValidationClusterManagerFactory::clusterManagerFromProto(
-    const envoy::config::bootstrap::v2::Bootstrap& bootstrap, Stats::Store& stats,
-    ThreadLocal::Instance& tls, Runtime::Loader& runtime, Runtime::RandomGenerator& random,
-    const LocalInfo::LocalInfo& local_info, AccessLog::AccessLogManager& log_manager,
-    Server::Admin& admin) {
+    const envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
   return std::make_unique<ValidationClusterManager>(
-      bootstrap, *this, stats, tls, runtime, random, local_info, log_manager,
-      main_thread_dispatcher_, admin, api_, http_context_);
+      bootstrap, *this, stats_, tls_, runtime_, random_, local_info_, log_manager_,
+      main_thread_dispatcher_, admin_, api_, http_context_);
 }
 
 CdsApiPtr

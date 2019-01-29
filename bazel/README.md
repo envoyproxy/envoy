@@ -82,6 +82,18 @@ Bazel can also be built with the Docker image used for CI, by installing Docker 
 See also the [documentation](https://github.com/envoyproxy/envoy/tree/master/ci) for developer use of the
 CI Docker image.
 
+## Linking against libc++ on Linux
+
+To link Envoy against libc++, use the following commands:
+```
+export CC=clang
+export CXX=clang++
+bazel build --config=libc++ //source/exe:envoy-static
+```
+Note: this assumes that both: clang compiler and libc++ library are installed in the system,
+and that `clang` and `clang++` are available in `$PATH`. On some systems, exports might need
+to be changed to versioned binaries, e.g. `CC=clang-7` and `CXX=clang++-7`.
+
 ## Using a compiler toolchain in a non-standard location
 
 By setting the `CC` and `LD_LIBRARY_PATH` in the environment that Bazel executes from as
@@ -486,6 +498,35 @@ with any tools (e.g. clang-tidy) compatible with the format.
 The compilation database could also be used to setup editors with cross reference, code completion.
 For example, you can use [You Complete Me](https://valloric.github.io/YouCompleteMe/) or
 [cquery](https://github.com/cquery-project/cquery) with supported editors.
+
+# Running clang-format without docker
+
+The easiest way to run the clang-format check/fix commands is to run them via
+docker, which helps ensure the right toolchain is set up. However you may prefer
+to run clang-format scripts on your workstation directly:
+ * It's possible there is a speed advantage
+ * Docker itself can sometimes go awry and you then have to deal with that
+ * Type-ahead doesn't always work when waiting running a command through docker
+To run the tools directly, you must install the correct version of clang. This
+may change over time but as of January 2019,
+[clang+llvm-7.0.0](http://releases.llvm.org/download.html) works well. You must
+also have 'buildifier' installed from the bazel distribution.
+
+Edit the paths shown here to reflect the installation locations on your system:
+
+```shell
+export CLANG_FORMAT="$HOME/ext/clang+llvm-7.0.0-x86_64-linux-gnu-ubuntu-16.04/bin/clang-format"
+export BUILDIFIER_BIN="/usr/bin/buildifier"
+```
+
+Once this is set up, you can run clang-tidy without docker:
+
+```shell
+./tools/check_format.py check
+./tools/check_spelling.sh check
+./tools/check_format.py fix
+./tools/check_spelling.sh fix
+```
 
 # Advanced caching setup
 

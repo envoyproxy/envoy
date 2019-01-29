@@ -63,9 +63,9 @@ public:
 // For tests which don't need to be run in both primary and failover modes.
 typedef RingHashLoadBalancerTest RingHashFailoverTest;
 
-INSTANTIATE_TEST_CASE_P(RingHashPrimaryOrFailover, RingHashLoadBalancerTest,
-                        ::testing::Values(true, false));
-INSTANTIATE_TEST_CASE_P(RingHashPrimaryOrFailover, RingHashFailoverTest, ::testing::Values(true));
+INSTANTIATE_TEST_SUITE_P(RingHashPrimaryOrFailover, RingHashLoadBalancerTest,
+                         ::testing::Values(true, false));
+INSTANTIATE_TEST_SUITE_P(RingHashPrimaryOrFailover, RingHashFailoverTest, ::testing::Values(true));
 
 TEST_P(RingHashLoadBalancerTest, NoHost) {
   init();
@@ -177,7 +177,7 @@ TEST_P(RingHashFailoverTest, BasicFailover) {
   EXPECT_EQ(failover_host_set_.healthy_hosts_[0], lb->chooseHost(nullptr));
 }
 
-#ifndef __APPLE__
+#if __GLIBCXX__ >= 20130411 && __GLIBCXX__ <= 20180726
 // Run similar tests with the default hash algorithm for GCC 5.
 // TODO(danielhochman): After v1 is deprecated this test can be deleted since std::hash will no
 // longer be in use.

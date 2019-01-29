@@ -86,9 +86,9 @@ public:
   Decompressor::ZlibDecompressorImpl decompressor_{};
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, GzipIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, GzipIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 /**
  * Exercises gzip compression with default configuration.

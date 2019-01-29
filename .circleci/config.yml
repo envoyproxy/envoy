@@ -4,7 +4,7 @@ executors:
   ubuntu-build:
     description: "A regular build executor based on ubuntu image"
     docker:
-      - image: envoyproxy/envoy-build:284769e833cc7752812f076a8b7a12e79c948df9
+      - image: envoyproxy/envoy-build:5c97e3a4a12bd438a66d3016873d201fd3c5e702
     resource_class: xlarge
     working_directory: /source
 
@@ -123,7 +123,7 @@ jobs:
        - run: ci/do_circle_ci.sh check_spelling
    build_image:
      docker:
-       - image: circleci/python:2.7
+       - image: circleci/python:3.7
          environment:
            # See comment in do_circle_ci.sh for why we do this.
            NUM_CPUS: 8

@@ -580,9 +580,9 @@ protected:
   std::unique_ptr<Event::DispatcherImpl> dispatcher_;
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, SslSocketTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, SslSocketTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(SslSocketTest, GetCertDigest) {
   const std::string client_ctx_yaml = R"EOF(
@@ -1073,7 +1073,7 @@ TEST_P(SslSocketTest, FailedClientCertAllowExpiredBadHashVerification) {
                  .setExpectedClientCertUri("spiffe://lyft.com/test-team"));
 }
 
-// Allow expired certificatess, but use the wrong CA so it should fail still.
+// Allow expired certificates, but use the wrong CA so it should fail still.
 TEST_P(SslSocketTest, FailedClientCertAllowServerExpiredWrongCAVerification) {
   envoy::api::v2::Listener listener;
   envoy::api::v2::auth::UpstreamTlsContext client;
@@ -3742,9 +3742,9 @@ public:
   Network::Address::InstanceConstSharedPtr source_address_;
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, SslReadBufferLimitTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, SslReadBufferLimitTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(SslReadBufferLimitTest, NoLimit) {
   readBufferLimitTest(0, 256 * 1024, 256 * 1024, 1, false);

@@ -100,7 +100,8 @@ public:
   MOCK_METHOD1(onHostAttempted, void(Upstream::HostDescriptionConstSharedPtr));
   MOCK_METHOD1(shouldSelectAnotherHost, bool(const Upstream::Host& host));
   MOCK_METHOD2(priorityLoadForRetry,
-               Upstream::HealthyLoad&(const Upstream::PrioritySet&, const Upstream::HealthyLoad&));
+               const Upstream::HealthyAndDegradedLoad&(const Upstream::PrioritySet&,
+                                                       const Upstream::HealthyAndDegradedLoad&));
   MOCK_CONST_METHOD0(hostSelectionMaxAttempts, uint32_t());
 
   DoRetryCallback callback_;

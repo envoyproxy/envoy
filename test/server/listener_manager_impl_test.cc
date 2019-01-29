@@ -7,6 +7,7 @@
 #include "common/api/os_sys_calls_impl.h"
 #include "common/config/metadata.h"
 #include "common/network/address_impl.h"
+#include "common/network/io_socket_handle_impl.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/socket_option_impl.h"
 #include "common/network/utility.h"
@@ -2376,7 +2377,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstFilter) {
   Network::MockListenerFilterManager manager;
 
   NiceMock<Network::MockListenerFilterCallbacks> callbacks;
-  Network::AcceptedSocketImpl socket(-1,
+  Network::AcceptedSocketImpl socket(std::make_unique<Network::IoSocketHandle>(),
                                      Network::Address::InstanceConstSharedPtr{
                                          new Network::Address::Ipv4Instance("127.0.0.1", 1234)},
                                      Network::Address::InstanceConstSharedPtr{
@@ -2402,9 +2403,13 @@ class OriginalDstTestFilter : public Extensions::ListenerFilters::OriginalDst::O
 };
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilter) {
+  // Static scope required for the io_handle to be in scope for the lambda below
+  // and for the final check at the end of this test.
   static int fd;
   fd = -1;
-  EXPECT_CALL(*listener_factory_.socket_, fd()).WillOnce(Return(0));
+  // temporary io_handle to test result of socket creation
+  Network::IoHandlePtr io_handle_tmp = std::make_unique<Network::IoSocketHandle>(0);
+  EXPECT_CALL(*listener_factory_.socket_, ioHandle()).WillOnce(ReturnRef(*io_handle_tmp));
 
   class OriginalDstTestConfigFactory : public Configuration::NamedListenerFilterConfigFactory {
   public:
@@ -2418,7 +2423,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilter) {
       EXPECT_CALL(*option, setOption(_, envoy::api::v2::core::SocketOption::STATE_BOUND))
           .WillOnce(Invoke(
               [](Network::Socket& socket, envoy::api::v2::core::SocketOption::SocketState) -> bool {
-                fd = socket.fd();
+                fd = socket.ioHandle().fd();
                 return true;
               }));
       context.addListenSocketOption(std::move(option));
@@ -2463,7 +2468,8 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilter) {
 
   NiceMock<Network::MockListenerFilterCallbacks> callbacks;
   Network::AcceptedSocketImpl socket(
-      -1, std::make_unique<Network::Address::Ipv4Instance>("127.0.0.1", 1234),
+      std::make_unique<Network::IoSocketHandle>(),
+      std::make_unique<Network::Address::Ipv4Instance>("127.0.0.1", 1234),
       std::make_unique<Network::Address::Ipv4Instance>("127.0.0.1", 5678));
 
   EXPECT_CALL(callbacks, socket()).WillOnce(Invoke([&]() -> Network::ConnectionSocket& {
@@ -2479,6 +2485,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilter) {
   EXPECT_TRUE(socket.localAddressRestored());
   EXPECT_EQ("127.0.0.2:2345", socket.localAddress()->asString());
   EXPECT_NE(fd, -1);
+  io_handle_tmp->close();
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterOptionFail) {
@@ -2539,9 +2546,13 @@ class OriginalDstTestFilterIPv6
 };
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterIPv6) {
+  // Static scope required for the io_handle to be in scope for the lambda below
+  // and for the final check at the end of this test.
   static int fd;
   fd = -1;
-  EXPECT_CALL(*listener_factory_.socket_, fd()).WillOnce(Return(0));
+  // temporary io_handle to test result of socket creation
+  Network::IoHandlePtr io_handle_tmp = std::make_unique<Network::IoSocketHandle>(0);
+  EXPECT_CALL(*listener_factory_.socket_, ioHandle()).WillOnce(ReturnRef(*io_handle_tmp));
 
   class OriginalDstTestConfigFactory : public Configuration::NamedListenerFilterConfigFactory {
   public:
@@ -2555,7 +2566,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterIPv6) {
       EXPECT_CALL(*option, setOption(_, envoy::api::v2::core::SocketOption::STATE_BOUND))
           .WillOnce(Invoke(
               [](Network::Socket& socket, envoy::api::v2::core::SocketOption::SocketState) -> bool {
-                fd = socket.fd();
+                fd = socket.ioHandle().fd();
                 return true;
               }));
       context.addListenSocketOption(std::move(option));
@@ -2600,7 +2611,8 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterIPv6) {
 
   NiceMock<Network::MockListenerFilterCallbacks> callbacks;
   Network::AcceptedSocketImpl socket(
-      -1, std::make_unique<Network::Address::Ipv6Instance>("::0001", 1234),
+      std::make_unique<Network::IoSocketHandle>(),
+      std::make_unique<Network::Address::Ipv6Instance>("::0001", 1234),
       std::make_unique<Network::Address::Ipv6Instance>("::0001", 5678));
 
   EXPECT_CALL(callbacks, socket()).WillOnce(Invoke([&]() -> Network::ConnectionSocket& {
@@ -2616,6 +2628,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterIPv6) {
   EXPECT_TRUE(socket.localAddressRestored());
   EXPECT_EQ("[1::2]:2345", socket.localAddress()->asString());
   EXPECT_NE(fd, -1);
+  io_handle_tmp->close();
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterOptionFailIPv6) {

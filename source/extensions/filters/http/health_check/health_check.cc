@@ -28,7 +28,7 @@ HealthCheckCacheManager::HealthCheckCacheManager(Event::Dispatcher& dispatcher,
 }
 
 void HealthCheckCacheManager::onTimer() {
-  use_cached_response_code_ = false;
+  use_cached_response_ = false;
   clear_cache_timer_->enableTimer(timeout_);
 }
 
@@ -47,7 +47,7 @@ Http::FilterHeadersStatus HealthCheckFilter::decodeHeaders(Http::HeaderMap& head
     // If we are not in pass through mode, we always handle. Otherwise, we handle if the server is
     // in the failed state or if we are using caching and we should use the cached response.
     if (!pass_through_mode_ || context_.healthCheckFailed() ||
-        (cache_manager_ && cache_manager_->useCachedResponseCode())) {
+        (cache_manager_ && cache_manager_->useCachedResponse())) {
       handling_ = true;
     }
   }
@@ -80,8 +80,9 @@ Http::FilterTrailersStatus HealthCheckFilter::decodeTrailers(Http::HeaderMap&) {
 Http::FilterHeadersStatus HealthCheckFilter::encodeHeaders(Http::HeaderMap& headers, bool) {
   if (health_check_request_) {
     if (cache_manager_) {
-      cache_manager_->setCachedResponseCode(
-          static_cast<Http::Code>(Http::Utility::getResponseStatus(headers)));
+      cache_manager_->setCachedResponse(
+          static_cast<Http::Code>(Http::Utility::getResponseStatus(headers)),
+          headers.EnvoyDegraded() != nullptr);
     }
 
     headers.insertEnvoyUpstreamHealthCheckedCluster().value(context_.localInfo().clusterName());
@@ -96,12 +97,15 @@ Http::FilterHeadersStatus HealthCheckFilter::encodeHeaders(Http::HeaderMap& head
 void HealthCheckFilter::onComplete() {
   ASSERT(handling_);
   Http::Code final_status = Http::Code::OK;
+  bool degraded = false;
   if (context_.healthCheckFailed()) {
     callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::FailedLocalHealthCheck);
     final_status = Http::Code::ServiceUnavailable;
   } else {
     if (cache_manager_) {
-      final_status = cache_manager_->getCachedResponseCode();
+      const auto status_and_degraded = cache_manager_->getCachedResponse();
+      final_status = status_and_degraded.first;
+      degraded = status_and_degraded.second;
     } else if (cluster_min_healthy_percentages_ != nullptr &&
                !cluster_min_healthy_percentages_->empty()) {
       // Check the status of the specified upstream cluster(s) to determine the right response.
@@ -143,7 +147,13 @@ void HealthCheckFilter::onComplete() {
     }
   }
 
-  callbacks_->sendLocalReply(final_status, "", nullptr, absl::nullopt);
+  callbacks_->sendLocalReply(final_status, "",
+                             [degraded](auto& headers) {
+                               if (degraded) {
+                                 headers.insertEnvoyDegraded();
+                               }
+                             },
+                             absl::nullopt);
 }
 
 } // namespace HealthCheck

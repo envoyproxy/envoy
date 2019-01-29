@@ -58,7 +58,8 @@ public:
         std::make_unique<GoogleAsyncClientImpl>(dispatcher_, *tls_, stub_factory_, scope_, config);
   }
 
-  Stats::IsolatedStoreImpl* stats_store_; // Ownership transerred to scope_.
+  DangerousDeprecatedTestTime test_time_;
+  Stats::IsolatedStoreImpl* stats_store_; // Ownership transferred to scope_.
   Api::ApiPtr api_;
   Event::DispatcherImpl dispatcher_;
   Stats::ScopeSharedPtr scope_;

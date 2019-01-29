@@ -56,7 +56,7 @@ void SslSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& c
   ASSERT(!callbacks_);
   callbacks_ = &callbacks;
 
-  BIO* bio = BIO_new_socket(callbacks_->fd(), 0);
+  BIO* bio = BIO_new_socket(callbacks_->ioHandle().fd(), 0);
   SSL_set_bio(ssl_.get(), bio, bio);
 }
 
@@ -65,7 +65,7 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
     PostIoAction action = doHandshake();
     if (action == PostIoAction::Close || !handshake_complete_) {
       // end_stream is false because either a hard error occurred (action == Close) or
-      // the handhshake isn't complete, so a half-close cannot occur yet.
+      // the handshake isn't complete, so a half-close cannot occur yet.
       return {action, 0, false};
     }
   }

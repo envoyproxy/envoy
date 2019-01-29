@@ -110,7 +110,7 @@ public:
   TestLb lb_{priority_set_, stats_, runtime_, random_, common_config_};
 };
 
-INSTANTIATE_TEST_CASE_P(PrimaryOrFailover, LoadBalancerBaseTest, ::testing::Values(true));
+INSTANTIATE_TEST_SUITE_P(PrimaryOrFailover, LoadBalancerBaseTest, ::testing::Values(true));
 
 // Basic test of host set selection.
 TEST_P(LoadBalancerBaseTest, PrioritySelection) {
@@ -118,9 +118,9 @@ TEST_P(LoadBalancerBaseTest, PrioritySelection) {
   updateHostSet(host_set_, 1 /* num_hosts */, 0 /* num_healthy_hosts */);
   updateHostSet(failover_host_set_, 1, 0);
 
-  HealthyLoad healthy_priority_load({100u, 0u});
-  EXPECT_CALL(context, determinePriorityLoad(_, _))
-      .WillRepeatedly(ReturnRef(healthy_priority_load));
+  HealthyAndDegradedLoad priority_load{Upstream::HealthyLoad({100, 0, 0}),
+                                       Upstream::DegradedLoad({0, 0, 0})};
+  EXPECT_CALL(context, determinePriorityLoad(_, _)).WillRepeatedly(ReturnRef(priority_load));
   // With both the primary and failover hosts unhealthy, we should select an
   // unhealthy primary host.
   EXPECT_EQ(100, lb_.percentageLoad(0));
@@ -134,7 +134,7 @@ TEST_P(LoadBalancerBaseTest, PrioritySelection) {
   EXPECT_EQ(0, lb_.percentageLoad(0));
   EXPECT_EQ(0, lb_.percentageLoad(1));
   EXPECT_EQ(100, lb_.percentageLoad(2));
-  healthy_priority_load = HealthyLoad({0u, 0u, 100u});
+  priority_load.healthy_priority_load_ = HealthyLoad({0u, 0u, 100});
   EXPECT_EQ(&tertiary_host_set_, &lb_.chooseHostSet(&context).first);
 
   // Now add a healthy host in P=0 and make sure it is immediately selected.
@@ -143,14 +143,14 @@ TEST_P(LoadBalancerBaseTest, PrioritySelection) {
   host_set_.runCallbacks({}, {});
   EXPECT_EQ(100, lb_.percentageLoad(0));
   EXPECT_EQ(0, lb_.percentageLoad(2));
-  healthy_priority_load = HealthyLoad({100u, 0u, 0u});
+  priority_load.healthy_priority_load_ = HealthyLoad({100u, 0u, 0u});
   EXPECT_EQ(&host_set_, &lb_.chooseHostSet(&context).first);
 
   // Remove the healthy host and ensure we fail back over to tertiary_host_set_
   updateHostSet(host_set_, 1 /* num_hosts */, 0 /* num_healthy_hosts */);
   EXPECT_EQ(0, lb_.percentageLoad(0));
   EXPECT_EQ(100, lb_.percentageLoad(2));
-  healthy_priority_load = HealthyLoad({0, 0, 100});
+  priority_load.healthy_priority_load_ = HealthyLoad({0u, 0u, 100});
   EXPECT_EQ(&tertiary_host_set_, &lb_.chooseHostSet(&context).first);
 }
 
@@ -190,9 +190,10 @@ TEST_P(LoadBalancerBaseTest, PrioritySelectionFuzz) {
   }
 
   EXPECT_CALL(context, determinePriorityLoad(_, _))
-      .WillRepeatedly(Invoke([](const auto&, const auto& original_load) -> const HealthyLoad& {
-        return original_load;
-      }));
+      .WillRepeatedly(
+          Invoke([](const auto&, const auto& original_load) -> const HealthyAndDegradedLoad& {
+            return original_load;
+          }));
 
   for (uint64_t i = 0; i < total_hosts; ++i) {
     const auto hs = lb_.chooseHostSet(&context);
@@ -214,12 +215,24 @@ TEST_P(LoadBalancerBaseTest, PrioritySelectionFuzz) {
 TEST_P(LoadBalancerBaseTest, PrioritySelectionWithFilter) {
   NiceMock<Upstream::MockLoadBalancerContext> context;
 
-  HealthyLoad healthy_priority_load({0u, 100u});
+  HealthyAndDegradedLoad priority_load{Upstream::HealthyLoad({0u, 100u}),
+                                       Upstream::DegradedLoad({0, 0})};
   // return a filter that excludes priority 0
-  EXPECT_CALL(context, determinePriorityLoad(_, _)).WillOnce(ReturnRef(healthy_priority_load));
+  EXPECT_CALL(context, determinePriorityLoad(_, _)).WillRepeatedly(ReturnRef(priority_load));
 
   updateHostSet(host_set_, 1 /* num_hosts */, 1 /* num_healthy_hosts */);
   updateHostSet(failover_host_set_, 1, 1);
+
+  // Since we've excluded P0, we should pick the failover host set
+  EXPECT_EQ(failover_host_set_.priority(), lb_.chooseHostSet(&context).first.priority());
+
+  updateHostSet(host_set_, 1 /* num_hosts */, 0 /* num_healthy_hosts */,
+                1 /* num_degraded_hosts */);
+  updateHostSet(failover_host_set_, 1, 0, 1);
+
+  // exclude priority 0 for degraded hosts
+  priority_load.healthy_priority_load_ = Upstream::HealthyLoad({0, 0});
+  priority_load.degraded_priority_load_ = Upstream::DegradedLoad({0, 100});
 
   // Since we've excluded P0, we should pick the failover host set
   EXPECT_EQ(failover_host_set_.priority(), lb_.chooseHostSet(&context).first.priority());
@@ -349,6 +362,18 @@ TEST_P(LoadBalancerBaseTest, GentleFailoverWithExtraLevels) {
   ASSERT_THAT(getLoadPercentage(), ElementsAre(0, 0, 100));
   ASSERT_THAT(getDegradedLoadPercentage(), ElementsAre(0, 0, 0));
   ASSERT_THAT(getPanic(), ElementsAre(true, true, true));
+
+  // Level P=0 is totally degraded. P=1 is 40*1.4=56% healthy and 40*1.4=56% degraded. P=2 is
+  // 40*1.4=56%% healthy. 100% of the traffic should go to P=2. No priorities should be in panic
+  // mode.
+  updateHostSet(host_set_, 5 /* num_hosts */, 0 /* num_healthy_hosts */,
+                5 /* num_degraded_hosts */);
+  updateHostSet(failover_host_set_, 5 /* num_hosts */, 2 /* num_healthy_hosts */,
+                2 /* num_degraded_hosts */);
+  updateHostSet(tertiary_host_set_, 5 /* num_hosts */, 2 /* num_healthy_hosts */);
+  ASSERT_THAT(getLoadPercentage(), ElementsAre(0, 56, 44));
+  ASSERT_THAT(getDegradedLoadPercentage(), ElementsAre(0, 0, 0));
+  ASSERT_THAT(getPanic(), ElementsAre(false, false, false));
 
   // All levels are completely down. 100% of traffic should go to P=0
   // and P=0 should be in panic mode
@@ -535,7 +560,7 @@ TEST_P(FailoverTest, ExtendPrioritiesWithLocalPrioritySet) {
   EXPECT_EQ(tertiary_host_set_.hosts_[0], lb_->chooseHost(nullptr));
 }
 
-INSTANTIATE_TEST_CASE_P(PrimaryOrFailover, FailoverTest, ::testing::Values(true));
+INSTANTIATE_TEST_SUITE_P(PrimaryOrFailover, FailoverTest, ::testing::Values(true));
 
 TEST_P(RoundRobinLoadBalancerTest, NoHosts) {
   init(false);
@@ -728,15 +753,15 @@ TEST_P(RoundRobinLoadBalancerTest, HostSelectionWithFilter) {
       .WillRepeatedly(Invoke([&](const Host& host) -> bool {
         return host.address()->asString() != hostSet().hosts_[0]->address()->asString();
       }));
-  HealthyLoad healthy_priority_load;
+  HealthyAndDegradedLoad priority_load{Upstream::HealthyLoad({0, 0}),
+                                       Upstream::DegradedLoad({0, 0})};
 
   if (GetParam()) {
-    healthy_priority_load = HealthyLoad({100u, 0u});
+    priority_load.healthy_priority_load_ = HealthyLoad({100u, 0u});
   } else {
-    healthy_priority_load = HealthyLoad({0u, 100u});
+    priority_load.healthy_priority_load_ = HealthyLoad({0u, 100u});
   }
-  EXPECT_CALL(context, determinePriorityLoad(_, _))
-      .WillRepeatedly(ReturnRef(healthy_priority_load));
+  EXPECT_CALL(context, determinePriorityLoad(_, _)).WillRepeatedly(ReturnRef(priority_load));
   EXPECT_CALL(context, hostSelectionRetryCount()).WillRepeatedly(Return(2));
 
   // Calling chooseHost multiple times always returns host one, since the filter will reject
@@ -1092,8 +1117,8 @@ TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareRoutingNoLocalLocality) {
   EXPECT_EQ(1U, stats_.lb_local_cluster_not_ok_.value());
 }
 
-INSTANTIATE_TEST_CASE_P(PrimaryOrFailover, RoundRobinLoadBalancerTest,
-                        ::testing::Values(true, false));
+INSTANTIATE_TEST_SUITE_P(PrimaryOrFailover, RoundRobinLoadBalancerTest,
+                         ::testing::Values(true, false));
 
 class LeastRequestLoadBalancerTest : public LoadBalancerTestBase {
 public:
@@ -1271,8 +1296,8 @@ TEST_P(LeastRequestLoadBalancerTest, WeightImbalanceCallbacks) {
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr));
 }
 
-INSTANTIATE_TEST_CASE_P(PrimaryOrFailover, LeastRequestLoadBalancerTest,
-                        ::testing::Values(true, false));
+INSTANTIATE_TEST_SUITE_P(PrimaryOrFailover, LeastRequestLoadBalancerTest,
+                         ::testing::Values(true, false));
 
 class RandomLoadBalancerTest : public LoadBalancerTestBase {
 public:
@@ -1292,7 +1317,7 @@ TEST_P(RandomLoadBalancerTest, Normal) {
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_.chooseHost(nullptr));
 }
 
-INSTANTIATE_TEST_CASE_P(PrimaryOrFailover, RandomLoadBalancerTest, ::testing::Values(true, false));
+INSTANTIATE_TEST_SUITE_P(PrimaryOrFailover, RandomLoadBalancerTest, ::testing::Values(true, false));
 
 TEST(LoadBalancerSubsetInfoImplTest, DefaultConfigIsDiabled) {
   auto subset_info =

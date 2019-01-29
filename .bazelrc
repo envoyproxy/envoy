@@ -44,5 +44,13 @@ build:clang-msan --define tcmalloc=disabled
 build:clang-msan --copt -fsanitize-memory-track-origins=2
 build:clang-msan --linkopt -fuse-ld=lld
 
+# Clang with libc++
+build:libc++ --action_env=CC
+build:libc++ --action_env=CXX
+build:libc++ --action_env=CXXFLAGS=-stdlib=libc++
+build:libc++ --action_env=PATH
+build:libc++ --define force_libcpp=enabled
+build:libc++ --linkopt -fuse-ld=lld
+
 # Test options
 test --test_env=HEAPCHECK=normal --test_env=PPROF_PATH

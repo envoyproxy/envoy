@@ -2,6 +2,7 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
+#include "envoy/network/io_handle.h"
 #include "envoy/ssl/connection.h"
 
 #include "absl/types/optional.h"
@@ -48,9 +49,14 @@ public:
   virtual ~TransportSocketCallbacks() {}
 
   /**
-   * @return int the file descriptor associated with the connection.
+   * @return reference to the IoHandle associated with the connection.
    */
-  virtual int fd() const PURE;
+  virtual IoHandle& ioHandle() PURE;
+
+  /**
+   * @return const reference to the IoHandle associated with the connection.
+   */
+  virtual const IoHandle& ioHandle() const PURE;
 
   /**
    * @return Network::Connection& the connection interface.
