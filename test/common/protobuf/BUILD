@@ -16,6 +16,7 @@ envoy_cc_test(
         "//source/common/protobuf:utility_lib",
         "//test/proto:deprecated_proto_cc",
         "//test/test_common:environment_lib",
+        "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
     ],

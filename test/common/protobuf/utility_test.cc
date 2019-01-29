@@ -8,6 +8,7 @@
 
 #include "test/proto/deprecated.pb.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -51,8 +52,9 @@ TEST(UtilityTest, ValidateDeprecatedFields) {
   {
     envoy::test::deprecation_test::Base base;
     base.set_is_deprecated("foo");
-    // Non-fatal checks for a deprecated field shouldn't throw an exception.
-    MessageUtil::checkForDeprecation(base, false);
+    // Non-fatal checks for a deprecated field should log rather than throw an exception.
+    EXPECT_LOG_CONTAINS("warning", "Using deprecated option 'is_deprecated'.",
+                        MessageUtil::checkForDeprecation(base, false));
     // Fatal checks for a deprecated field should result in an exception.
     EXPECT_THROW_WITH_REGEX(MessageUtil::checkForDeprecation(base, true), ProtoValidationException,
                             "Using deprecated option 'is_deprecated'.");
@@ -63,6 +65,39 @@ TEST(UtilityTest, ValidateDeprecatedFields) {
     // Fatal checks for a present (unused) deprecated message should result in an exception.
     EXPECT_THROW_WITH_REGEX(MessageUtil::checkForDeprecation(base, true), ProtoValidationException,
                             "Using deprecated option 'deprecated_message'.");
+  }
+
+  {
+    envoy::test::deprecation_test::Base base;
+    base.mutable_not_deprecated_message()->set_inner_not_deprecated("foo");
+    // Non-fatal checks for a deprecated field shouldn't throw an exception.
+    MessageUtil::checkForDeprecation(base, false);
+
+    base.mutable_not_deprecated_message()->set_inner_deprecated("bar");
+    // Fatal checks for a deprecated sub-message should result in an exception.
+    EXPECT_THROW_WITH_REGEX(MessageUtil::checkForDeprecation(base, true), ProtoValidationException,
+                            "Using deprecated option 'inner_deprecated'.");
+  }
+
+  // Check that repeated sub-messages get validated.
+  {
+    envoy::test::deprecation_test::Base base;
+    base.add_repeated_message();
+    base.add_repeated_message()->set_inner_deprecated("foo");
+    base.add_repeated_message();
+
+    // Fatal checks for a repeated deprecated sub-message should result in an exception.
+    EXPECT_THROW_WITH_REGEX(MessageUtil::checkForDeprecation(base, true), ProtoValidationException,
+                            "Using deprecated option 'inner_deprecated'.");
+  }
+  // Check that deprecated repeated messages trigger
+  {
+    envoy::test::deprecation_test::Base base;
+    base.add_deprecated_repeated_message();
+
+    // Fatal checks for a repeated deprecated sub-message should result in an exception.
+    EXPECT_THROW_WITH_REGEX(MessageUtil::checkForDeprecation(base, true), ProtoValidationException,
+                            "Using deprecated option 'deprecated_repeated_message'.");
   }
 }
 

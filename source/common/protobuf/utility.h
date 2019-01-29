@@ -178,26 +178,51 @@ public:
   static void loadFromYaml(const std::string& yaml, Protobuf::Message& message);
   static void loadFromFile(const std::string& path, Protobuf::Message& message);
 
-  template <class MessageType>
-  static void checkForDeprecation(const MessageType& message, bool fatal) {
-    const auto* desc = message.GetDescriptor();
-    const auto* refl = message.GetReflection();
-    for (int i = 0; i < desc->field_count(); ++i) {
-      const auto* fd = desc->field(i);
-      if (fd->options().deprecated() && refl->HasField(message, fd)) {
+  static void checkForDeprecation(const Protobuf::Message& message, bool fatal) {
+    const Protobuf::Descriptor* descriptor = message.GetDescriptor();
+    const Protobuf::Reflection* reflection = message.GetReflection();
+    for (int i = 0; i < descriptor->field_count(); ++i) {
+      const auto* field = descriptor->field(i);
+
+      // If this field is not in use, continue.
+      if ((field->is_repeated() && reflection->FieldSize(message, field) == 0) ||
+          (!field->is_repeated() && !reflection->HasField(message, field))) {
+        continue;
+      }
+
+      // If this field is deprecated, warn or throw an error.
+      if (field->options().deprecated()) {
         std::string err = fmt::format(
             "Using deprecated option '{}'. This configuration will be removed from Envoy soon. "
             "Please see https://github.com/envoyproxy/envoy/blob/master/DEPRECATED.md for "
             "details.",
-            fd->name());
+            field->name());
         if (fatal) {
           throw ProtoValidationException(err, message);
         } else {
           ENVOY_LOG_MISC(warn, "{}", err);
         }
       }
+
+      // If this is a message, recurse to check for deprecated fields in the sub-message.
+      switch (field->cpp_type()) {
+      case Protobuf::FieldDescriptor::CPPTYPE_MESSAGE: {
+        if (field->is_repeated()) {
+          const int size = reflection->FieldSize(message, field);
+          for (int j = 0; j < size; ++j) {
+            checkForDeprecation(reflection->GetRepeatedMessage(message, field, j), fatal);
+          }
+        } else {
+          checkForDeprecation(reflection->GetMessage(message, field), fatal);
+        }
+        break;
+      }
+      default:
+        break;
+      }
     }
   }
+
   /**
    * Validate protoc-gen-validate constraints on a given protobuf.
    * Note the corresponding `.pb.validate.h` for the message has to be included in the source file
