@@ -56,7 +56,7 @@ def main():
     for arg in sys.argv[1:]:
       if arg == "-lstdc++":
         if "-stdlib=libc++" in envoy_cxxflags:
-          arg.append("-lc++")
+          argv.append("-lc++")
       elif arg.startswith("-Wl,@"):
         # tempfile.mkstemp will write to the out-of-sandbox tempdir
         # unless the user has explicitly set environment variables

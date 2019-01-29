@@ -617,14 +617,9 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     }
   }
 
-  // Check for maximum incoming header size. Both codecs have some amount of checking for maximum
-  // header size. For HTTP/1.1 the entire headers data has be less than ~80K (hard coded in
-  // http_parser). For HTTP/2 the default allowed header block length is 64k.
-  // In order to have generally uniform behavior we also check total header size here and keep it
-  // under 60K. Ultimately it would be nice to have a configuration option ranging from the largest
-  // header size http_parser and nghttp2 will allow, down to 16k or 8k for
-  // envoy users who do not wish to proxy large headers.
-  if (request_headers_->byteSize() > (60 * 1024)) {
+  ASSERT(connection_manager_.config_.maxRequestHeadersSizeKb() > 0);
+  if (request_headers_->byteSize() >
+      (connection_manager_.config_.maxRequestHeadersSizeKb() * 1024)) {
     sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_),
                    Code::RequestHeaderFieldsTooLarge, "", nullptr, is_head_request_, absl::nullopt);
     return;

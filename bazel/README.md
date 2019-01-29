@@ -94,6 +94,9 @@ Note: this assumes that both: clang compiler and libc++ library are installed in
 and that `clang` and `clang++` are available in `$PATH`. On some systems, exports might need
 to be changed to versioned binaries, e.g. `CC=clang-7` and `CXX=clang++-7`.
 
+You might also need to ensure libc++ is installed correctly on your system, e.g. on Ubuntu this
+might look like `sudo apt-get install libc++abi-7-dev libc++-7-dev`.
+
 ## Using a compiler toolchain in a non-standard location
 
 By setting the `CC` and `LD_LIBRARY_PATH` in the environment that Bazel executes from as

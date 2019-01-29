@@ -2,6 +2,8 @@
 
 #include "common/common/utility.h"
 
+#include "test/test_common/global.h"
+
 namespace Envoy {
 
 DangerousDeprecatedTestTime::DangerousDeprecatedTestTime() {}
@@ -15,6 +17,10 @@ Thread::CondVar::WaitStatus TestRealTimeSystem::waitFor(Thread::MutexBasicLockab
                                                         const Duration& duration) noexcept {
   return condvar.waitFor(lock, duration);
 }
+
+SystemTime TestRealTimeSystem::systemTime() { return real_time_system_.systemTime(); }
+
+MonotonicTime TestRealTimeSystem::monotonicTime() { return real_time_system_.monotonicTime(); }
 
 } // namespace Event
 } // namespace Envoy
