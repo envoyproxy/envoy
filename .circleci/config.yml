@@ -197,6 +197,9 @@ workflows:
               only: /^v.*/
       - docker:
           requires: [release]
+          filters:
+            tags:
+              only: /^v.*/
       - asan
       - tsan
       - compile_time_options
