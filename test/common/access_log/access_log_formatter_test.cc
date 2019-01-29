@@ -598,7 +598,7 @@ TEST(AccessLogFormatterTest, CompositeFormatterSuccess) {
     absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
     EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
 
-    EXPECT_EQ("{{HTTP/1.1}}   -++test GET PUT\t@POST@\ttest-2[]",
+    EXPECT_EQ("{{HTTP/1.1}}   -++test GET PUT\t@POST@\ttest-2[]\n",
               formatter.format(request_header, response_header, response_trailer, stream_info));
   }
 
@@ -606,7 +606,7 @@ TEST(AccessLogFormatterTest, CompositeFormatterSuccess) {
     const std::string format = "{}*JUST PLAIN string]";
     FormatterImpl formatter(format);
 
-    EXPECT_EQ(format,
+    EXPECT_EQ(absl::StrCat(format, "\n"),
               formatter.format(request_header, response_header, response_trailer, stream_info));
   }
 
@@ -616,7 +616,7 @@ TEST(AccessLogFormatterTest, CompositeFormatterSuccess) {
 
     FormatterImpl formatter(format);
 
-    EXPECT_EQ("GET|G|PU|GET|POS",
+    EXPECT_EQ("GET|G|PU|GET|POS\n",
               formatter.format(request_header, response_header, response_trailer, stream_info));
   }
 
@@ -629,7 +629,7 @@ TEST(AccessLogFormatterTest, CompositeFormatterSuccess) {
                                "test_obj)%|%DYNAMIC_METADATA(com.test:test_obj:inner_key)%";
     FormatterImpl formatter(format);
 
-    EXPECT_EQ("\"test_value\"|{\"inner_key\":\"inner_value\"}|\"inner_value\"",
+    EXPECT_EQ("\"test_value\"|{\"inner_key\":\"inner_value\"}|\"inner_value\"\n",
               formatter.format(request_header, response_header, response_trailer, stream_info));
   }
 
@@ -647,7 +647,7 @@ TEST(AccessLogFormatterTest, CompositeFormatterSuccess) {
     gmtime_r(&test_epoch, &time_val);
     time_t expected_time_t = mktime(&time_val);
 
-    EXPECT_EQ(fmt::format("2018/03/28|{}|bad_format|2018-03-28T23:35:58.000Z|000000000.0.00.000",
+    EXPECT_EQ(fmt::format("2018/03/28|{}|bad_format|2018-03-28T23:35:58.000Z|000000000.0.00.000\n",
                           expected_time_t),
               formatter.format(request_header, response_header, response_trailer, stream_info));
   }
@@ -662,7 +662,7 @@ TEST(AccessLogFormatterTest, CompositeFormatterSuccess) {
     EXPECT_CALL(stream_info, startTime()).WillRepeatedly(Return(time));
     FormatterImpl formatter(format);
 
-    EXPECT_EQ("1970/01/01|0|bad_format|1970-01-01T00:00:00.000Z|000000000.0.00.000",
+    EXPECT_EQ("1970/01/01|0|bad_format|1970-01-01T00:00:00.000Z|000000000.0.00.000\n",
               formatter.format(request_header, response_header, response_trailer, stream_info));
   }
 
@@ -673,7 +673,7 @@ TEST(AccessLogFormatterTest, CompositeFormatterSuccess) {
     const SystemTime start_time(std::chrono::microseconds(1522796769123456));
     EXPECT_CALL(stream_info, startTime()).WillRepeatedly(Return(start_time));
     FormatterImpl formatter(format);
-    EXPECT_EQ("1522796769.123|1522796769.1234|1522796769.12345|1522796769.123456",
+    EXPECT_EQ("1522796769.123|1522796769.1234|1522796769.12345|1522796769.123456\n",
               formatter.format(request_header, response_header, response_trailer, stream_info));
   }
 
@@ -684,7 +684,7 @@ TEST(AccessLogFormatterTest, CompositeFormatterSuccess) {
     EXPECT_CALL(stream_info, startTime()).WillRepeatedly(Return(start_time));
     FormatterImpl formatter(format);
     EXPECT_EQ("segment1:1522796769.123|segment2:1522796769.1234|seg3:1522796769.123456|1522796769-"
-              "123-asdf-123456000|.1234560:segm5:2018",
+              "123-asdf-123456000|.1234560:segm5:2018\n",
               formatter.format(request_header, response_header, response_trailer, stream_info));
   }
 
@@ -695,7 +695,7 @@ TEST(AccessLogFormatterTest, CompositeFormatterSuccess) {
     const SystemTime start_time(std::chrono::microseconds(1522796769123456));
     EXPECT_CALL(stream_info, startTime()).WillOnce(Return(start_time));
     FormatterImpl formatter(format);
-    EXPECT_EQ("%%|%%123456000|1522796769%%123|1%%1522796769",
+    EXPECT_EQ("%%|%%123456000|1522796769%%123|1%%1522796769\n",
               formatter.format(request_header, response_header, response_trailer, stream_info));
   }
 }

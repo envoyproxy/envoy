@@ -68,7 +68,7 @@ std::string FormatterImpl::format(const Http::HeaderMap& request_headers,
     log_line += provider->format(request_headers, response_headers, response_trailers, stream_info);
   }
 
-  return log_line;
+  return absl::StrCat(log_line, "\n");
 }
 
 JsonFormatterImpl::JsonFormatterImpl(std::unordered_map<std::string, std::string>& format_mapping) {
