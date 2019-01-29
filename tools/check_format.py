@@ -147,7 +147,7 @@ def checkNamespace(file_path):
   return []
 
 
-def fixJavaProtoOptions(file_path):
+def fixJavaPackageProtoOption(file_path):
   package_name = None
   for line in fileinput.FileInput(file_path):
     if line.startswith("package "):
@@ -172,12 +172,62 @@ def fixJavaProtoOptions(file_path):
   return []
 
 
-def checkJavaProtoOptions(file_path):
+# Add 'option java_outclass_name = FooBarProto' for foo_bar.proto
+def fixJavaOuterClassnameProtoOption(file_path):
+  file_name = os.path.basename(file_path)[:-len(".proto")]
+  if "-" in file_name or "." in file_name or not file_name.islower():
+    return ["Unable to decide java_outer_classname for proto file: %s" % file_path]
+
+  for line in fileinput.FileInput(file_path):
+    if "option java_outer_classname = " in line:
+      return []
+
+  to_add = "option java_outer_classname = \"" + ''.join(
+      x.title() for x in file_name.split('_')) + "Proto\";\n"
+
+  for line in fileinput.FileInput(file_path, inplace=True):
+    if line.startswith("package "):
+      line = line.replace(line, line + to_add)
+    sys.stdout.write(line)
+
+  return []
+
+
+def fixJavaMultipleFilesProtoOption(file_path):
+  for line in fileinput.FileInput(file_path):
+    if "option java_multiple_files = " in line:
+      return []
+
+  for line in fileinput.FileInput(file_path, inplace=True):
+    if line.startswith("package "):
+      line = line.replace(line, line + "option java_multiple_files = true;\n")
+    sys.stdout.write(line)
+
+  return []
+
+
+def checkJavaPackageProtoOption(file_path):
   for line in fileinput.FileInput(file_path):
     if "option java_package = \"io.envoyproxy.envoy" in line:
       return []
 
   return ["Java proto option 'java_package' not set correctly for file: %s" % file_path]
+
+
+def checkJavaOuterClassnameProtoOption(file_path):
+  for line in fileinput.FileInput(file_path):
+    if "option java_outer_classname = " in line:
+      return []
+
+  return ["Java proto option 'java_outer_classname' not set for file: %s" % file_path]
+
+
+def checkJavaMultipleFilesProtoOption(file_path):
+  for line in fileinput.FileInput(file_path):
+    if "option java_multiple_files = " in line:
+      return []
+
+  return ["Java proto option 'java_multiple_files' not set for file: %s" % file_path]
 
 
 # To avoid breaking the Lyft import, we just check for path inclusion here.
@@ -435,7 +485,9 @@ def fixSourcePath(file_path):
       error_messages += fixHeaderOrder(file_path)
     error_messages += clangFormat(file_path)
   if file_path.endswith(PROTO_SUFFIX) and isApiFile(file_path):
-    error_messages += fixJavaProtoOptions(file_path)
+    error_messages += fixJavaMultipleFilesProtoOption(file_path)
+    error_messages += fixJavaOuterClassnameProtoOption(file_path)
+    error_messages += fixJavaPackageProtoOption(file_path)
   return error_messages
 
 
@@ -451,7 +503,9 @@ def checkSourcePath(file_path):
     error_messages += executeCommand(command, "clang-format check failed", file_path)
 
   if file_path.endswith(PROTO_SUFFIX) and isApiFile(file_path):
-    error_messages += checkJavaProtoOptions(file_path)
+    error_messages += checkJavaPackageProtoOption(file_path)
+    error_messages += checkJavaOuterClassnameProtoOption(file_path)
+    error_messages += checkJavaMultipleFilesProtoOption(file_path)
   return error_messages
 
 
