@@ -115,7 +115,7 @@ public:
     EXPECT_EQ(expected_listeners_config_dump.DebugString(), listeners_config_dump.DebugString());
   }
 
-  Event::TestTime<Event::SimulatedTimeSystem> time_system_;
+  Event::SimulatedTimeSystem time_system_;
   NiceMock<MockInstance> server_;
   NiceMock<MockListenerComponentFactory> listener_factory_;
   MockWorker* worker_ = new MockWorker();
@@ -556,7 +556,7 @@ TEST_F(ListenerManagerImplTest, AddListenerOnIpv6OnlySetups) {
 
 // Make sure that a listener that is not modifiable cannot be updated or removed.
 TEST_F(ListenerManagerImplTest, UpdateRemoveNotModifiableListener) {
-  time_system_->setSystemTime(std::chrono::milliseconds(1001001001001));
+  time_system_.setSystemTime(std::chrono::milliseconds(1001001001001));
 
   InSequence s;
 
@@ -613,7 +613,7 @@ dynamic_draining_listeners:
 }
 
 TEST_F(ListenerManagerImplTest, AddOrUpdateListener) {
-  time_system_->setSystemTime(std::chrono::milliseconds(1001001001001));
+  time_system_.setSystemTime(std::chrono::milliseconds(1001001001001));
 
   InSequence s;
 
@@ -680,7 +680,7 @@ filter_chains: {}
 per_connection_buffer_limit_bytes: 10
   )EOF";
 
-  time_system_->setSystemTime(std::chrono::milliseconds(2002002002002));
+  time_system_.setSystemTime(std::chrono::milliseconds(2002002002002));
 
   ListenerHandle* listener_foo_update1 = expectListenerCreate(false);
   EXPECT_CALL(*listener_foo, onDestroy());
@@ -719,7 +719,7 @@ dynamic_draining_listeners:
       manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_update1_yaml), "", true));
   checkStats(1, 1, 0, 0, 1, 0);
 
-  time_system_->setSystemTime(std::chrono::milliseconds(3003003003003));
+  time_system_.setSystemTime(std::chrono::milliseconds(3003003003003));
 
   // Update foo. Should go into warming, have an immediate warming callback, and start immediate
   // removal.
@@ -770,7 +770,7 @@ dynamic_draining_listeners:
   worker_->callRemovalCompletion();
   checkStats(1, 2, 0, 0, 1, 0);
 
-  time_system_->setSystemTime(std::chrono::milliseconds(4004004004004));
+  time_system_.setSystemTime(std::chrono::milliseconds(4004004004004));
 
   // Add bar listener.
   const std::string listener_bar_yaml = R"EOF(
@@ -791,7 +791,7 @@ filter_chains: {}
   worker_->callAddCompletion(true);
   checkStats(2, 2, 0, 0, 2, 0);
 
-  time_system_->setSystemTime(std::chrono::milliseconds(5005005005005));
+  time_system_.setSystemTime(std::chrono::milliseconds(5005005005005));
 
   // Add baz listener, this time requiring initializing.
   const std::string listener_baz_yaml = R"EOF(

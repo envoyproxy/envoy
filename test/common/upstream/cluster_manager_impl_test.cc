@@ -240,7 +240,7 @@ public:
   }
 
   Stats::IsolatedStoreImpl stats_store_;
-  Event::TestTime<Event::SimulatedTimeSystem> time_system_;
+  Event::SimulatedTimeSystem time_system_;
   Api::ApiPtr api_;
   NiceMock<TestClusterManagerFactory> factory_;
   std::unique_ptr<ClusterManagerImpl> cluster_manager_;
@@ -297,7 +297,7 @@ TEST_F(ClusterManagerImplTest, MultipleHealthCheckFail) {
 }
 
 TEST_F(ClusterManagerImplTest, MultipleProtocolCluster) {
-  time_system_->setSystemTime(std::chrono::milliseconds(1234567891234));
+  time_system_.setSystemTime(std::chrono::milliseconds(1234567891234));
 
   const std::string yaml = R"EOF(
   static_resources:
@@ -783,7 +783,7 @@ TEST_F(ClusterManagerImplTest, ShutdownOrder) {
 }
 
 TEST_F(ClusterManagerImplTest, InitializeOrder) {
-  time_system_->setSystemTime(std::chrono::milliseconds(1234567891234));
+  time_system_.setSystemTime(std::chrono::milliseconds(1234567891234));
 
   const std::string json = fmt::sprintf(
       R"EOF(
@@ -1001,7 +1001,7 @@ TEST_F(ClusterManagerImplTest, DynamicRemoveWithLocalCluster) {
 }
 
 TEST_F(ClusterManagerImplTest, RemoveWarmingCluster) {
-  time_system_->setSystemTime(std::chrono::milliseconds(1234567891234));
+  time_system_.setSystemTime(std::chrono::milliseconds(1234567891234));
 
   const std::string json = R"EOF(
   {

@@ -112,6 +112,7 @@ RawConnectionDriver::RawConnectionDriver(uint32_t port, Buffer::Instance& initia
                                          ReadCallback data_callback,
                                          Network::Address::IpVersion version) {
   api_ = Api::createApiForTest(stats_store_);
+  Event::GlobalTimeSystem time_system;
   dispatcher_ = api_->allocateDispatcher();
   callbacks_ = std::make_unique<ConnectionCallbacks>();
   client_ = dispatcher_->createClientConnection(

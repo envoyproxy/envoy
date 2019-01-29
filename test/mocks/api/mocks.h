@@ -25,18 +25,16 @@ public:
   ~MockApi();
 
   // Api::Api
-  Event::DispatcherPtr allocateDispatcher() override {
-    return Event::DispatcherPtr{allocateDispatcher_()};
-  }
+  Event::DispatcherPtr allocateDispatcher() override;
+  Event::TimeSystem& timeSystem() override { return time_system_; }
 
-  MOCK_METHOD0(allocateDispatcher_, Event::Dispatcher*());
+  MOCK_METHOD1(allocateDispatcher_, Event::Dispatcher*(Event::TimeSystem&));
   MOCK_METHOD3(createFile,
                Filesystem::FileSharedPtr(const std::string& path, Event::Dispatcher& dispatcher,
                                          Thread::BasicLockable& lock));
   MOCK_METHOD1(fileExists, bool(const std::string& path));
   MOCK_METHOD1(fileReadToEnd, std::string(const std::string& path));
   MOCK_METHOD0(threadFactory, Thread::ThreadFactory&());
-  Event::TimeSystem& timeSystem() override { return time_system_; }
 
   std::shared_ptr<Filesystem::MockFile> file_{new Filesystem::MockFile()};
   Event::GlobalTimeSystem time_system_;

@@ -42,7 +42,8 @@ OptionsImpl asConfigYaml(const OptionsImpl& src) {
 
 class ConfigTest {
 public:
-  ConfigTest(const OptionsImpl& options) : options_(options) {
+  ConfigTest(const OptionsImpl& options)
+      : api_(Api::createApiForTest(stats_store_)), options_(options) {
     ON_CALL(server_, options()).WillByDefault(ReturnRef(options_));
     ON_CALL(server_, random()).WillByDefault(ReturnRef(random_));
     ON_CALL(server_, sslContextManager()).WillByDefault(ReturnRef(ssl_context_manager_));
@@ -57,7 +58,7 @@ public:
     cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
         server_.admin(), server_.runtime(), server_.stats(), server_.threadLocal(),
         server_.random(), server_.dnsResolver(), ssl_context_manager_, server_.dispatcher(),
-        server_.localInfo(), server_.secretManager(), server_.api(), server_.httpContext(),
+        server_.localInfo(), server_.secretManager(), *api_, server_.httpContext(),
         server_.accessLogManager(), server_.singletonManager());
 
     ON_CALL(server_, clusterManager()).WillByDefault(Invoke([&]() -> Upstream::ClusterManager& {
@@ -92,6 +93,7 @@ public:
   }
 
   Stats::IsolatedStoreImpl stats_store_;
+  Api::ApiPtr api_;
   NiceMock<Server::MockInstance> server_;
   NiceMock<Ssl::MockContextManager> ssl_context_manager_;
   OptionsImpl options_;
@@ -115,7 +117,6 @@ void testMerge() {
 
 uint32_t run(const std::string& directory) {
   uint32_t num_tested = 0;
-  Event::TestTime<Event::SimulatedTimeSystem> time_system;
   for (const std::string& filename : TestUtility::listFiles(directory, false)) {
     ENVOY_LOG_MISC(info, "testing {}.\n", filename);
     OptionsImpl options(

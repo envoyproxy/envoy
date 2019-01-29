@@ -44,7 +44,7 @@ public:
   }
 
 private:
-  Event::TestTime<Event::SimulatedTimeSystem> time_system_;
+  Event::SimulatedTimeSystem time_system_;
   Stats::StatsOptionsImpl options_;
   Stats::HeapStatDataAllocator heap_alloc_;
   Stats::ThreadLocalStoreImpl store_;

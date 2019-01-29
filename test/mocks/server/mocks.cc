@@ -4,8 +4,6 @@
 
 #include "common/singleton/manager_impl.h"
 
-#include "test/test_common/test_time.h"
-
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -131,6 +129,7 @@ MockInstance::MockInstance()
   ON_CALL(*this, stats()).WillByDefault(ReturnRef(stats_store_));
   ON_CALL(*this, httpContext()).WillByDefault(ReturnRef(http_context_));
   ON_CALL(*this, dnsResolver()).WillByDefault(Return(dns_resolver_));
+  ON_CALL(*this, api()).WillByDefault(ReturnRef(api_));
   ON_CALL(*this, admin()).WillByDefault(ReturnRef(admin_));
   ON_CALL(*this, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
   ON_CALL(*this, sslContextManager()).WillByDefault(ReturnRef(ssl_context_manager_));
@@ -167,7 +166,6 @@ MockFactoryContext::MockFactoryContext()
     : singleton_manager_(
           new Singleton::ManagerImpl(Thread::threadFactoryForTest().currentThreadId())) {
   ON_CALL(*this, accessLogManager()).WillByDefault(ReturnRef(access_log_manager_));
-  ON_CALL(*this, api()).WillByDefault(ReturnRef(api_));
   ON_CALL(*this, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
   ON_CALL(*this, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
   ON_CALL(*this, drainDecision()).WillByDefault(ReturnRef(drain_manager_));
@@ -180,6 +178,7 @@ MockFactoryContext::MockFactoryContext()
   ON_CALL(*this, threadLocal()).WillByDefault(ReturnRef(thread_local_));
   ON_CALL(*this, admin()).WillByDefault(ReturnRef(admin_));
   ON_CALL(*this, listenerScope()).WillByDefault(ReturnRef(listener_scope_));
+  ON_CALL(*this, api()).WillByDefault(ReturnRef(api_));
   ON_CALL(*this, timeSource()).WillByDefault(ReturnRef(time_system_));
   ON_CALL(*this, overloadManager()).WillByDefault(ReturnRef(overload_manager_));
 }

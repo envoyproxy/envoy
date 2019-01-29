@@ -97,7 +97,7 @@ public:
     return msg;
   }
 
-  Event::TestTime<Event::SimulatedTimeSystem> time_system_;
+  Event::SimulatedTimeSystem time_system_;
   envoy::api::v2::core::Node node_;
   Event::MockDispatcher dispatcher_;
   Stats::IsolatedStoreImpl stats_store_;

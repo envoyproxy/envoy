@@ -29,7 +29,7 @@ protected:
 
   void SetUp() override { thread_.start(guard_dog_); }
 
-  Event::TestTime<Event::SimulatedTimeSystem> time_system_;
+  Event::GlobalTimeSystem time_system_;
   NiceMock<Server::Configuration::MockMain> config_;
   Stats::IsolatedStoreImpl fakestats_;
   Api::ApiPtr api_;

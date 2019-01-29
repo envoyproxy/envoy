@@ -95,7 +95,7 @@ public:
     EXPECT_CALL(response_encoder_, getStream()).Times(AtLeast(0));
   }
 
-  ~HttpConnectionManagerImplTest() {
+  virtual ~HttpConnectionManagerImplTest() {
     filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
   }
 
@@ -257,7 +257,7 @@ public:
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
   Event::TimeSystem& timeSystem() { return time_system_; }
 
-  Event::TestTime<Event::SimulatedTimeSystem> time_system_;
+  Event::GlobalTimeSystem time_system_;
   RouteConfigProvider route_config_provider_;
   NiceMock<Tracing::MockHttpTracer> tracer_;
   Http::ContextImpl http_context_;

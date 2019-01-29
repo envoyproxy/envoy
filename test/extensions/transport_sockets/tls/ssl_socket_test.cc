@@ -170,7 +170,7 @@ private:
 };
 
 void testUtil(const TestUtilOptions& options) {
-  Event::TestTime<Event::SimulatedTimeSystem> time_system;
+  Event::SimulatedTimeSystem time_system;
 
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
 
@@ -383,7 +383,7 @@ private:
 };
 
 const std::string testUtilV2(const TestUtilOptionsV2& options) {
-  Event::TestTime<Event::SimulatedTimeSystem> time_system;
+  Event::SimulatedTimeSystem time_system;
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
   ContextManagerImpl manager(*time_system);
   std::string new_session = EMPTY_STRING;
@@ -574,8 +574,12 @@ protected:
       : api_(Api::createApiForTest(stats_store_)),
         dispatcher_(std::make_unique<Event::DispatcherImpl>(*api_)) {}
 
+  void testClientSessionResumption(const std::string& server_ctx_yaml,
+                                   const std::string& client_ctx_yaml, bool expect_reuse,
+                                   const Network::Address::IpVersion version);
+
+  Event::SimulatedTimeSystem time_system_;
   Stats::IsolatedStoreImpl stats_store_;
-  Event::TestTime<Event::SimulatedTimeSystem> time_system_;
   Api::ApiPtr api_;
   std::unique_ptr<Event::DispatcherImpl> dispatcher_;
 };
@@ -1859,8 +1863,7 @@ TEST_P(SslSocketTest, FlushCloseDuringHandshake) {
   envoy::api::v2::auth::DownstreamTlsContext tls_context;
   MessageUtil::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), tls_context);
   auto server_cfg = std::make_unique<ServerContextConfigImpl>(tls_context, factory_context_);
-  Event::TestTime<Event::SimulatedTimeSystem> time_system;
-  ContextManagerImpl manager(*time_system);
+  ContextManagerImpl manager(time_system_);
   Stats::IsolatedStoreImpl server_stats_store;
   ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), manager,
                                                    server_stats_store, std::vector<std::string>{});
@@ -1920,8 +1923,7 @@ TEST_P(SslSocketTest, HalfClose) {
   envoy::api::v2::auth::DownstreamTlsContext server_tls_context;
   MessageUtil::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), server_tls_context);
   auto server_cfg = std::make_unique<ServerContextConfigImpl>(server_tls_context, factory_context_);
-  Event::TestTime<Event::SimulatedTimeSystem> time_system;
-  ContextManagerImpl manager(*time_system);
+  ContextManagerImpl manager(time_system_);
   Stats::IsolatedStoreImpl server_stats_store;
   ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), manager,
                                                    server_stats_store, std::vector<std::string>{});
@@ -2010,8 +2012,7 @@ TEST_P(SslSocketTest, ClientAuthMultipleCAs) {
   envoy::api::v2::auth::DownstreamTlsContext server_tls_context;
   MessageUtil::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), server_tls_context);
   auto server_cfg = std::make_unique<ServerContextConfigImpl>(server_tls_context, factory_context);
-  Event::TestTime<Event::SimulatedTimeSystem> time_system;
-  ContextManagerImpl manager(*time_system);
+  ContextManagerImpl manager(time_system_);
   Stats::IsolatedStoreImpl server_stats_store;
   ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), manager,
                                                    server_stats_store, std::vector<std::string>{});
@@ -2090,7 +2091,7 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
                                  const std::string& client_ctx_yaml, bool expect_reuse,
                                  const Network::Address::IpVersion ip_version) {
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
-  Event::TestTime<Event::SimulatedTimeSystem> time_system;
+  Event::SimulatedTimeSystem time_system;
   ContextManagerImpl manager(*time_system);
 
   envoy::api::v2::auth::DownstreamTlsContext server_tls_context1;
@@ -2504,8 +2505,7 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
   envoy::api::v2::auth::DownstreamTlsContext tls_context2;
   MessageUtil::loadFromYaml(TestEnvironment::substitute(server2_ctx_yaml), tls_context2);
   auto server2_cfg = std::make_unique<ServerContextConfigImpl>(tls_context2, factory_context_);
-  Event::TestTime<Event::SimulatedTimeSystem> time_system;
-  ContextManagerImpl manager(*time_system);
+  ContextManagerImpl manager(time_system_);
   Stats::IsolatedStoreImpl server_stats_store;
   ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), manager,
                                                    server_stats_store, std::vector<std::string>{});
@@ -2606,14 +2606,14 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
   EXPECT_EQ(0UL, client_stats_store.counter("ssl.session_reused").value());
 }
 
-void testClientSessionResumption(const std::string& server_ctx_yaml,
-                                 const std::string& client_ctx_yaml, bool expect_reuse,
-                                 const Network::Address::IpVersion version) {
+void SslSocketTest::testClientSessionResumption(const std::string& server_ctx_yaml,
+                                                const std::string& client_ctx_yaml,
+                                                bool expect_reuse,
+                                                const Network::Address::IpVersion version) {
   InSequence s;
 
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
-  Event::TestTime<Event::SimulatedTimeSystem> time_system;
-  ContextManagerImpl manager(*time_system);
+  ContextManagerImpl manager(time_system_);
 
   envoy::api::v2::auth::DownstreamTlsContext server_ctx_proto;
   MessageUtil::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), server_ctx_proto);
@@ -2880,8 +2880,7 @@ TEST_P(SslSocketTest, SslError) {
   envoy::api::v2::auth::DownstreamTlsContext tls_context;
   MessageUtil::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), tls_context);
   auto server_cfg = std::make_unique<ServerContextConfigImpl>(tls_context, factory_context_);
-  Event::TestTime<Event::SimulatedTimeSystem> time_system;
-  ContextManagerImpl manager(*time_system);
+  ContextManagerImpl manager(time_system_);
   Stats::IsolatedStoreImpl server_stats_store;
   ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), manager,
                                                    server_stats_store, std::vector<std::string>{});
@@ -3483,8 +3482,7 @@ TEST_P(SslSocketTest, DownstreamNotReadySslSocket) {
   EXPECT_TRUE(server_cfg->tlsCertificates().empty());
   EXPECT_FALSE(server_cfg->isReady());
 
-  Event::TestTime<Event::SimulatedTimeSystem> time_system;
-  ContextManagerImpl manager(*time_system);
+  ContextManagerImpl manager(time_system_);
   ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), manager, stats_store,
                                                    std::vector<std::string>{});
   auto transport_socket = server_ssl_socket_factory.createTransportSocket(nullptr);
@@ -3507,7 +3505,6 @@ TEST_P(SslSocketTest, UpstreamNotReadySslSocket) {
   NiceMock<Runtime::MockRandomGenerator> random;
   NiceMock<Upstream::MockClusterManager> cluster_manager;
   NiceMock<Init::MockManager> init_manager;
-  Event::TestTime<Event::SimulatedTimeSystem> time_system;
   EXPECT_CALL(factory_context, localInfo()).WillOnce(ReturnRef(local_info));
   EXPECT_CALL(factory_context, dispatcher()).WillOnce(ReturnRef(dispatcher));
   EXPECT_CALL(factory_context, random()).WillOnce(ReturnRef(random));
@@ -3524,7 +3521,7 @@ TEST_P(SslSocketTest, UpstreamNotReadySslSocket) {
   EXPECT_TRUE(client_cfg->tlsCertificates().empty());
   EXPECT_FALSE(client_cfg->isReady());
 
-  ContextManagerImpl manager(*time_system);
+  ContextManagerImpl manager(time_system_);
   ClientSslSocketFactory client_ssl_socket_factory(std::move(client_cfg), manager, stats_store);
   auto transport_socket = client_ssl_socket_factory.createTransportSocket(nullptr);
   EXPECT_EQ(EMPTY_STRING, transport_socket->protocol());
@@ -3543,8 +3540,7 @@ public:
                               downstream_tls_context_);
     auto server_cfg =
         std::make_unique<ServerContextConfigImpl>(downstream_tls_context_, factory_context_);
-    Event::TestTime<Event::SimulatedTimeSystem> time_system;
-    manager_ = std::make_unique<ContextManagerImpl>(*time_system);
+    manager_ = std::make_unique<ContextManagerImpl>(time_system_);
     server_ssl_socket_factory_ = std::make_unique<ServerSslSocketFactory>(
         std::move(server_cfg), *manager_, server_stats_store_, std::vector<std::string>{});
 

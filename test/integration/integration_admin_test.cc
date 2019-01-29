@@ -450,7 +450,7 @@ TEST_F(IntegrationAdminIpv4Ipv6Test, Ipv4Ipv6Listen) {
 // Testing the behavior of StatsMatcher, which allows/denies the  instantiation of stats based on
 // restrictions on their names.
 class StatsMatcherIntegrationTest
-    : public Event::TestTime<Event::SimulatedTimeSystem>,
+    : public Event::SimulatedTimeSystem,
       public HttpIntegrationTest,
       public testing::Test,
       public testing::WithParamInterface<Network::Address::IpVersion> {

@@ -3,25 +3,22 @@
 #include "common/common/assert.h"
 #include "common/common/lock_guard.h"
 
-#include "test/test_common/test_time.h"
-#include "test/test_common/utility.h"
-
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 using testing::_;
 using testing::Return;
-using testing::ReturnRef;
 
 namespace Envoy {
 namespace Api {
 
-MockApi::MockApi() {
-  ON_CALL(*this, createFile(_, _, _)).WillByDefault(Return(file_));
-  ON_CALL(*this, threadFactory()).WillByDefault(ReturnRef(Thread::threadFactoryForTest()));
-}
+MockApi::MockApi() { ON_CALL(*this, createFile(_, _, _)).WillByDefault(Return(file_)); }
 
 MockApi::~MockApi() {}
+
+Event::DispatcherPtr MockApi::allocateDispatcher() {
+  return Event::DispatcherPtr{allocateDispatcher_(timeSystem())};
+}
 
 MockOsSysCalls::MockOsSysCalls() { num_writes_ = num_open_ = 0; }
 

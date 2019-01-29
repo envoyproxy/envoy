@@ -10,7 +10,7 @@
 
 namespace Envoy {
 
-class GzipIntegrationTest : public Event::TestTime<Event::SimulatedTimeSystem>,
+class GzipIntegrationTest : public Event::SimulatedTimeSystem,
                             public HttpIntegrationTest,
                             public testing::TestWithParam<Network::Address::IpVersion> {
 public:

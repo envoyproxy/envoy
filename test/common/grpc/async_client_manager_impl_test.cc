@@ -20,7 +20,7 @@ class AsyncClientManagerImplTest : public testing::Test {
 public:
   AsyncClientManagerImplTest() : api_(Api::createApiForTest(api_stats_store_)) {}
 
-  Event::TestTime<Event::SimulatedTimeSystem> time_system_;
+  Event::GlobalTimeSystem time_system_;
   Upstream::MockClusterManager cm_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   Stats::IsolatedStoreImpl api_stats_store_;

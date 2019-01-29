@@ -39,7 +39,7 @@
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/mocks.h"
-#include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_time_system.h"
 
 #include "absl/strings/string_view.h"
 #include "gmock/gmock.h"
@@ -324,6 +324,7 @@ public:
   Secret::SecretManager& secretManager() override { return *(secret_manager_.get()); }
 
   MOCK_METHOD0(admin, Admin&());
+  MOCK_METHOD0(api, Api::Api&());
   MOCK_METHOD0(clusterManager, Upstream::ClusterManager&());
   MOCK_METHOD0(sslContextManager, Ssl::ContextManager&());
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
@@ -355,16 +356,15 @@ public:
   MOCK_CONST_METHOD0(statsFlushInterval, std::chrono::milliseconds());
 
   Event::TestTimeSystem& timeSystem() override { return time_system_; }
-  Api::Api& api() override { return api_; }
 
-  Event::GlobalTimeSystem time_system_;
   std::unique_ptr<Secret::SecretManager> secret_manager_;
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
   Stats::IsolatedStoreImpl stats_store_;
   std::shared_ptr<testing::NiceMock<Network::MockDnsResolver>> dns_resolver_{
       new testing::NiceMock<Network::MockDnsResolver>()};
-  testing::NiceMock<MockAdmin> admin_;
   testing::NiceMock<Api::MockApi> api_;
+  testing::NiceMock<MockAdmin> admin_;
+  Event::GlobalTimeSystem time_system_;
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
   Thread::MutexBasicLockable access_log_lock_;
   testing::NiceMock<Runtime::MockLoader> runtime_loader_;
@@ -412,7 +412,6 @@ public:
   ~MockFactoryContext();
 
   MOCK_METHOD0(accessLogManager, AccessLog::AccessLogManager&());
-  MOCK_METHOD0(api, Api::Api&());
   MOCK_METHOD0(clusterManager, Upstream::ClusterManager&());
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
   MOCK_METHOD0(drainDecision, const Network::DrainDecision&());
@@ -427,13 +426,13 @@ public:
   MOCK_METHOD0(threadLocal, ThreadLocal::Instance&());
   MOCK_METHOD0(admin, Server::Admin&());
   MOCK_METHOD0(listenerScope, Stats::Scope&());
+  MOCK_METHOD0(api, Api::Api&());
   MOCK_CONST_METHOD0(localInfo, const LocalInfo::LocalInfo&());
   MOCK_CONST_METHOD0(listenerMetadata, const envoy::api::v2::core::Metadata&());
   MOCK_METHOD0(timeSource, TimeSource&());
   Event::TestTimeSystem& timeSystem() { return time_system_; }
   Http::Context& httpContext() override { return http_context_; }
 
-  Event::GlobalTimeSystem time_system_;
   testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
@@ -443,12 +442,13 @@ public:
   testing::NiceMock<LocalInfo::MockLocalInfo> local_info_;
   testing::NiceMock<Envoy::Runtime::MockRandomGenerator> random_;
   testing::NiceMock<Envoy::Runtime::MockLoader> runtime_loader_;
+  testing::NiceMock<Api::MockApi> api_;
   Stats::IsolatedStoreImpl scope_;
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
   Singleton::ManagerPtr singleton_manager_;
   testing::NiceMock<MockAdmin> admin_;
   Stats::IsolatedStoreImpl listener_scope_;
-  Api::MockApi api_;
+  Event::GlobalTimeSystem time_system_;
   testing::NiceMock<MockOverloadManager> overload_manager_;
   Tracing::HttpNullTracer null_tracer_;
   Http::ContextImpl http_context_;

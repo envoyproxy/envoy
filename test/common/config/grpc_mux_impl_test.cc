@@ -36,14 +36,6 @@ namespace Envoy {
 namespace Config {
 namespace {
 
-struct SimTimeBase {
-  Event::TestTime<Event::SimulatedTimeSystem> time_system_;
-};
-
-struct MockTimeBase {
-  Event::TestTime<Event::MockTimeSystem> mock_time_system_;
-};
-
 // We test some mux specific stuff below, other unit test coverage for singleton use of GrpcMuxImpl
 // is provided in [grpc_]subscription_impl_test.cc.
 class GrpcMuxImplTestBase : public testing::Test {
@@ -100,7 +92,10 @@ public:
   Envoy::Config::RateLimitSettings rate_limit_settings_;
 };
 
-class GrpcMuxImplTest : public SimTimeBase, public GrpcMuxImplTestBase {};
+class GrpcMuxImplTest : public GrpcMuxImplTestBase {
+public:
+  Event::SimulatedTimeSystem time_system_;
+};
 
 // Validate behavior when multiple type URL watches are maintained, watches are created/destroyed
 // (via RAII).
@@ -336,7 +331,10 @@ TEST_F(GrpcMuxImplTest, WatchDemux) {
 
 // Exactly one test requires a mock time system to provoke behavior that cannot
 // easily be achieved with a SimulatedTimeSystem.
-class GrpcMuxImplTestWithMockTimeSystem : public MockTimeBase, public GrpcMuxImplTestBase {};
+class GrpcMuxImplTestWithMockTimeSystem : public GrpcMuxImplTestBase {
+public:
+  Event::DelegatingTestTimeSystem<MockTimeSystem> mock_time_system_;
+};
 
 //  Verifies that rate limiting is not enforced with defaults.
 TEST_F(GrpcMuxImplTestWithMockTimeSystem, TooManyRequestsWithDefaultSettings) {
@@ -491,7 +489,7 @@ TEST_F(GrpcMuxImplTest, TooManyRequestsWithCustomRateLimitSettings) {
   EXPECT_EQ(12, stats_.counter("control_plane.pending_requests").value());
 
   // Validate that drain requests call when there are multiple requests in queue.
-  time_system_->setMonotonicTime(std::chrono::seconds(10));
+  time_system_.setMonotonicTime(std::chrono::seconds(10));
   drain_timer_cb();
 }
 

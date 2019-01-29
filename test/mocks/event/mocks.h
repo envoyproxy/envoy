@@ -108,7 +108,6 @@ public:
   Buffer::WatermarkFactory& getWatermarkFactory() override { return buffer_factory_; }
 
   GlobalTimeSystem time_system_;
-
   std::list<DeferredDeletablePtr> to_delete_;
   MockBufferFactory buffer_factory_;
 };
