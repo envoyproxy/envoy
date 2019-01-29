@@ -233,7 +233,7 @@ elif [[ "$1" == "bazel.coverage" ]]; then
   # https://github.com/envoyproxy/envoy/pull/5611.
   # TODO(akonradi): use --local_cpu_resources flag once Bazel has a release
   # after 0.21.
-  [ -z "$CIRCLECI" ] || export BAZEL_TEST_OPTIONS="${BAZEL_TEST_OPTIONS} --local_resources=12288,5,1"
+  [ -z "$CIRCLECI" ] || export BAZEL_TEST_OPTIONS="${BAZEL_TEST_OPTIONS} --local_resources=12288,4,1"
 
   # There is a bug in gcovr 3.3, where it takes the -r path,
   # in our case /source, and does a regex replacement of various
