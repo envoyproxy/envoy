@@ -214,6 +214,20 @@ public:
   }
 
   /**
+   * Create an IPv4 listener with a given name.
+   */
+  envoy::api::v2::Listener createIPv4Listener(const std::string& name) {
+    envoy::api::v2::Listener listener = parseListenerFromV2Yaml(R"EOF(
+      address:
+        socket_address: { address: 127.0.0.1, port_value: 1111 }
+      filter_chains:
+      - filters:
+    )EOF");
+    listener.set_name(name);
+    return listener;
+  }
+
+  /**
    * Validate that createListenSocket is called once with the expected options.
    */
   void
@@ -2768,14 +2782,8 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TransparentFreebindListenerDisabl
 // around IPv4/IPv6 handling is tested generically in
 // socket_option_impl_test.cc.
 TEST_F(ListenerManagerImplWithRealFiltersTest, TransparentListenerEnabled) {
-  const envoy::api::v2::Listener listener = parseListenerFromV2Yaml(R"EOF(
-    name: TransparentListener
-    address:
-      socket_address: { address: 127.0.0.1, port_value: 1111 }
-    filter_chains:
-    - filters:
-    transparent: true
-  )EOF");
+  auto listener = createIPv4Listener("TransparentListener");
+  listener.mutable_transparent()->set_value(true);
 
   testSocketOption(listener, envoy::api::v2::core::SocketOption::STATE_PREBIND,
                    ENVOY_SOCKET_IP_TRANSPARENT, /* expected_value */ 1,
@@ -2789,14 +2797,8 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TransparentListenerEnabled) {
 // around IPv4/IPv6 handling is tested generically in
 // socket_option_impl_test.cc.
 TEST_F(ListenerManagerImplWithRealFiltersTest, FreebindListenerEnabled) {
-  const envoy::api::v2::Listener listener = parseListenerFromV2Yaml(R"EOF(
-    name: FreebindListener
-    address:
-      socket_address: { address: 127.0.0.1, port_value: 1111 }
-    filter_chains:
-    - filters:
-    freebind: true
-  )EOF");
+  auto listener = createIPv4Listener("FreebindListener");
+  listener.mutable_freebind()->set_value(true);
 
   testSocketOption(listener, envoy::api::v2::core::SocketOption::STATE_PREBIND,
                    ENVOY_SOCKET_IP_FREEBIND, /* expected_value */ 1);
@@ -2809,14 +2811,8 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, FreebindListenerEnabled) {
 // around IPv4/IPv6 handling is tested generically in
 // socket_option_impl_test.cc.
 TEST_F(ListenerManagerImplWithRealFiltersTest, FastOpenListenerEnabled) {
-  const envoy::api::v2::Listener listener = parseListenerFromV2Yaml(R"EOF(
-    name: FastOpenListener
-    address:
-      socket_address: { address: 127.0.0.1, port_value: 1111 }
-    filter_chains:
-    - filters:
-    tcp_fast_open_queue_length: 1
-  )EOF");
+  auto listener = createIPv4Listener("FastOpenListener");
+  listener.mutable_tcp_fast_open_queue_length()->set_value(1);
 
   testSocketOption(listener, envoy::api::v2::core::SocketOption::STATE_LISTENING,
                    ENVOY_SOCKET_TCP_FASTOPEN, /* expected_value */ 1);
