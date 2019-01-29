@@ -365,7 +365,7 @@ void StatNameList::populate(const std::vector<absl::string_view>& names,
   ASSERT(p == &storage_[0] + total_size_bytes);
 }
 
-void StatNameList::foreach (const std::function<bool(StatName)>& f) const {
+void StatNameList::iterate(const std::function<bool(StatName)>& f) const {
   uint8_t* p = &storage_[0];
   uint32_t num_elements = *p++;
   for (uint32_t i = 0; i < num_elements; ++i) {
@@ -378,11 +378,10 @@ void StatNameList::foreach (const std::function<bool(StatName)>& f) const {
 }
 
 void StatNameList::clear(SymbolTable& symbol_table) {
-  foreach ([&symbol_table](StatName stat_name) -> bool {
+  iterate([&symbol_table](StatName stat_name) -> bool {
     symbol_table.free(stat_name);
     return true;
-  })
-    ;
+  });
   storage_.reset();
 }
 

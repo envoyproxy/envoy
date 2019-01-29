@@ -123,6 +123,9 @@ public:
    * the scope prefix and the names to combine it with are already in StatName
    * form. Using this class, they can be combined without acessingm the
    * SymbolTable or, in particular, taking its lock.
+   *
+   * @param stat_names the names to join.
+   * @return Storage allocated for the joined name.
    */
   virtual StoragePtr join(const std::vector<StatName>& stat_names) const PURE;
 
@@ -151,7 +154,7 @@ private:
    * helps callers ensure the symbol-storage is maintained for the lifetime
    * of a reference.
    *
-   * @param symbol_vec the vector of symbols.
+   * @param stat_name the stat name.
    */
   virtual void incRefCount(const StatName& stat_name) PURE;
 };

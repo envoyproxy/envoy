@@ -396,7 +396,7 @@ public:
    *
    * @param f The function to call on each stat.
    */
-  void foreach (const std::function<bool(StatName)>& f) const;
+  void iterate(const std::function<bool(StatName)>& f) const;
 
   /**
    * Frees each StatName in the list. Failure to call this before destruction

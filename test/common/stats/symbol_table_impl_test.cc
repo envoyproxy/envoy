@@ -275,14 +275,14 @@ TEST_P(StatNameTest, List) {
   EXPECT_TRUE(name_list.populated());
 
   // First, decode only the first name.
-  name_list.foreach ([this](StatName stat_name) -> bool {
+  name_list.iterate([this](StatName stat_name) -> bool {
     EXPECT_EQ("hello.world", table_->toString(stat_name));
     return false;
   });
 
   // Decode all the names.
   std::vector<std::string> decoded_strings;
-  name_list.foreach ([this, &decoded_strings](StatName stat_name) -> bool {
+  name_list.iterate([this, &decoded_strings](StatName stat_name) -> bool {
     decoded_strings.push_back(table_->toString(stat_name));
     return true;
   });
@@ -370,6 +370,7 @@ TEST_P(StatNameTest, JoinAllEmpty) {
 TEST_P(StatNameTest, RacingSymbolCreation) {
   Thread::ThreadFactory& thread_factory = Thread::threadFactoryForTest();
   MutexTracerImpl& mutex_tracer = MutexTracerImpl::getOrCreateTracer();
+  int64_t start_contentions = mutex_tracer.numContentions();
 
   // Make 100 threads, each of which will race to encode an overlapping set of
   // symbols, triggering corner-cases in SymbolTable::toSymbol.
@@ -410,6 +411,15 @@ TEST_P(StatNameTest, RacingSymbolCreation) {
   // further mutex contentions occur.
   access.setReady();
   accesses.Wait();
+
+  // With fake symbol tables, there are no contentions as there are is no state
+  // in the symbol table to lock. This is why fake symbol tables are a safe way
+  // to transition the codebase to use the SymbolTable API without impacting
+  // hot-path performance.
+  if (GetParam() == SymbolTableType::Fake) {
+    EXPECT_EQ(create_contentions, mutex_tracer.numContentions());
+    EXPECT_EQ(start_contentions, create_contentions);
+  }
 
   // In a perfect world, we could use reader-locks in the SymbolTable
   // implementation, and there should be zero additional contentions
