@@ -65,15 +65,16 @@ private:
 
 // Use a Singleton SpanCatcher.
 SpanCatcher* GetSpanCatcher() {
-  static SpanCatcher* g_span_catcher = new SpanCatcher();
+  static auto g_span_catcher = new SpanCatcher();
   return g_span_catcher;
 }
 
 // Call this before generating spans to register the exporter that catches them.
 void RegisterSpanCatcher() {
   static bool done_once = false;
-  if (done_once)
+  if (done_once) {
     return;
+  }
   SpanExporter::RegisterHandler(absl::WrapUnique(GetSpanCatcher()));
   done_once = true;
 }
