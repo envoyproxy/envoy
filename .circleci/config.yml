@@ -4,7 +4,7 @@ executors:
   ubuntu-build:
     description: "A regular build executor based on ubuntu image"
     docker:
-      - image: envoyproxy/envoy-build:5c97e3a4a12bd438a66d3016873d201fd3c5e702
+      - image: envoyproxy/envoy-build:d1646d643b492ea070c96d0b67caf5bb2c8ca854
     resource_class: xlarge
     working_directory: /source
 
@@ -14,7 +14,10 @@ jobs:
      steps:
        - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
        - checkout
-       - run: ci/do_circle_ci.sh bazel.release
+       - run:
+           command:
+             ci/do_circle_ci.sh bazel.release
+           no_output_timeout: 60m
        - setup_remote_docker
        - run: ci/docker_push.sh
        - run: ci/docker_tag.sh
@@ -96,7 +99,10 @@ jobs:
      steps:
        - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
        - checkout
-       - run: ci/do_circle_ci.sh bazel.coverage
+       - run:
+           command:
+             ci/do_circle_ci.sh bazel.coverage
+           no_output_timeout: 60m
        - run: ci/coverage_publish.sh
        - store_artifacts:
            path: /build/envoy/generated/coverage

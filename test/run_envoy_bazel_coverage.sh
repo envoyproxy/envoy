@@ -80,7 +80,7 @@ rm "${SRCDIR}"/test/coverage/BUILD
 if [ "$VALIDATE_COVERAGE" == "true" ]
 then
   COVERAGE_VALUE=$(grep -Po 'lines: \K(\d|\.)*' "${COVERAGE_SUMMARY}")
-  COVERAGE_THRESHOLD=98.0
+  COVERAGE_THRESHOLD=97.5
   COVERAGE_FAILED=$(echo "${COVERAGE_VALUE}<${COVERAGE_THRESHOLD}" | bc)
   if test ${COVERAGE_FAILED} -eq 1; then
       echo Code coverage ${COVERAGE_VALUE} is lower than limit of ${COVERAGE_THRESHOLD}
