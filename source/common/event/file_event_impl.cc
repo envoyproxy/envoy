@@ -10,7 +10,7 @@
 namespace Envoy {
 namespace Event {
 
-FileEventImpl::FileEventImpl(const DispatcherImpl& dispatcher, int fd, FileReadyCb cb,
+FileEventImpl::FileEventImpl(DispatcherImpl& dispatcher, int fd, FileReadyCb cb,
                              FileTriggerType trigger, uint32_t events)
     : cb_(cb), base_(&dispatcher.base()), fd_(fd), trigger_(trigger) {
   assignEvents(events);

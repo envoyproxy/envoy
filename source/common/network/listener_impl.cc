@@ -47,7 +47,7 @@ void ListenerImpl::listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr*
       listener->hand_off_restored_destination_connections_);
 }
 
-void ListenerImpl::setupServerSocket(const Event::DispatcherImpl& dispatcher, Socket& socket) {
+void ListenerImpl::setupServerSocket(Event::DispatcherImpl& dispatcher, Socket& socket) {
   listener_.reset(
       evconnlistener_new(&dispatcher.base(), listenCallback, this, 0, -1, socket.ioHandle().fd()));
 

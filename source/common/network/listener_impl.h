@@ -18,7 +18,7 @@ public:
   void enable() override;
 
 protected:
-  void setupServerSocket(const Event::DispatcherImpl& dispatcher, Socket& socket);
+  void setupServerSocket(Event::DispatcherImpl& dispatcher, Socket& socket);
 
   ListenerCallbacks& cb_;
   const bool hand_off_restored_destination_connections_;
