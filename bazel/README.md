@@ -564,7 +564,7 @@ This requires Go 1.11+, follow the [instructions](https://golang.org/doc/install
 if you don't have one.
 
 ```
-go run github.com/buchgr/bazel-remote --dir ${HOME}/bazel_cache --host 127.0.0.1 --port 28080 --max_size 64
+GO111MODULE=on go run github.com/buchgr/bazel-remote --dir ${HOME}/bazel_cache --host 127.0.0.1 --port 28080 --max_size 64
 ```
 
 See [Bazel remote cache](github.com/buchgr/bazel-remote) for more information on the parameters.
