@@ -47,11 +47,15 @@ private:
              const LocalInfo::LocalInfo& local_info, Stats::Scope& scope, Api::Api& api);
   void runInitializeCallbackIfAny();
 
+  void pauseCdsDuringWarming();
+  void resumeCdsAfterWarming();
+
   ClusterManager& cm_;
   std::unique_ptr<Config::Subscription<envoy::api::v2::Cluster>> subscription_;
   std::string version_info_;
   std::function<void()> initialize_callback_;
   Stats::ScopePtr scope_;
+  unsigned in_flight_warming_clusters_;
 };
 
 } // namespace Upstream

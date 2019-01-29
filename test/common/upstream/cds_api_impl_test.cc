@@ -53,19 +53,17 @@ protected:
     EXPECT_CALL(cluster, info());
     EXPECT_CALL(*cluster.info_, type());
     cds_ = CdsApiImpl::create(cds_config, cm_, dispatcher_, random_, local_info_, store_, *api_);
-    cds_->setInitializedCb([this]() -> void { initialized_.ready(); });
+    resetCdsInitializedCb();
 
     expectRequest();
     cds_->initialize();
   }
 
-  void expectAdd(const std::string& cluster_name, const std::string& version) {
-    EXPECT_CALL(cm_, addOrUpdateCluster(_, version))
-        .WillOnce(Invoke(
-            [cluster_name](const envoy::api::v2::Cluster& cluster, const std::string&) -> bool {
-              EXPECT_EQ(cluster_name, cluster.name());
-              return true;
-            }));
+  void resetCdsInitializedCb() {
+    cds_->setInitializedCb([this]() -> void {
+      initialized_.ready();
+      cm_.finishClusterWarming();
+    });
   }
 
   void expectRequest() {
@@ -96,7 +94,52 @@ protected:
     return map;
   }
 
-  NiceMock<MockClusterManager> cm_;
+  class MockWarmingClusterManager : public MockClusterManager {
+  public:
+    explicit MockWarmingClusterManager(TimeSource& time_source) : MockClusterManager(time_source) {}
+
+    MockWarmingClusterManager() {}
+
+    void expectAdd(const std::string& cluster_name, const std::string& version) {
+      EXPECT_CALL(*this, addOrUpdateCluster(_, version, _))
+          .WillOnce(Invoke([cluster_name](const envoy::api::v2::Cluster& cluster,
+                                          const std::string&, auto) -> bool {
+            EXPECT_EQ(cluster_name, cluster.name());
+            return true;
+          }));
+    }
+
+    void expectAddWithWarming(const std::string& cluster_name, const std::string& version) {
+      EXPECT_CALL(*this, addOrUpdateCluster(_, version, _))
+          .WillOnce(Invoke([this, cluster_name](const envoy::api::v2::Cluster& cluster,
+                                                const std::string&, auto warming_cb) -> bool {
+            EXPECT_EQ(cluster_name, cluster.name());
+            EXPECT_EQ(warming_cbs_.cend(), warming_cbs_.find(cluster.name()));
+            warming_cbs_[cluster.name()] = warming_cb;
+            warming_cb(cluster.name(), ClusterManager::ClusterWarmingState::STARTED);
+            return true;
+          }));
+    }
+
+    void finishClusterWarming() {
+      for (const auto& cluster : clusters_to_warm_up_) {
+        EXPECT_NE(warming_cbs_.cend(), warming_cbs_.find(cluster));
+        warming_cbs_[cluster](cluster, ClusterManager::ClusterWarmingState::FINISHED);
+        warming_cbs_.erase(cluster);
+      }
+      clusters_to_warm_up_.clear();
+    }
+
+    void clustersToWarmUp(const std::vector<std::string>&& clusters) {
+      clusters_to_warm_up_ = clusters;
+    }
+
+  private:
+    std::map<std::string, ClusterManager::ClusterWarmingCallback> warming_cbs_;
+    std::vector<std::string> clusters_to_warm_up_;
+  };
+
+  NiceMock<MockWarmingClusterManager> cm_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
@@ -191,8 +234,8 @@ TEST_F(CdsApiImplTest, Basic) {
   message->body() = std::make_unique<Buffer::OwnedImpl>(response1_json);
 
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(ClusterManager::ClusterInfoMap{}));
-  expectAdd("cluster1", "0");
-  expectAdd("cluster2", "0");
+  cm_.expectAdd("cluster1", "0");
+  cm_.expectAdd("cluster2", "0");
   EXPECT_CALL(initialized_, ready());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   EXPECT_EQ("", cds_->versionInfo());
@@ -229,8 +272,8 @@ TEST_F(CdsApiImplTest, Basic) {
   message->body() = std::make_unique<Buffer::OwnedImpl>(response2_json);
 
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(makeClusterMap({"cluster1", "cluster2"})));
-  expectAdd("cluster1", "1");
-  expectAdd("cluster3", "1");
+  cm_.expectAdd("cluster1", "1");
+  cm_.expectAdd("cluster3", "1");
   EXPECT_CALL(cm_, removeCluster("cluster2"));
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
@@ -239,6 +282,125 @@ TEST_F(CdsApiImplTest, Basic) {
   EXPECT_EQ(2UL, store_.counter("cluster_manager.cds.update_success").value());
   EXPECT_EQ("1", cds_->versionInfo());
   EXPECT_EQ(13237225503670494420U, store_.gauge("cluster_manager.cds.version").value());
+}
+
+TEST_F(CdsApiImplTest, CdsPauseOnWarming) {
+  interval_timer_ = new Event::MockTimer(&dispatcher_);
+  InSequence s;
+
+  setup();
+
+  // Two clusters updated, both warmed up.
+  const std::string response1_json = R"EOF(
+{
+  "version_info": "0",
+  "resources": [
+    {
+      "@type": "type.googleapis.com/envoy.api.v2.Cluster",
+      "name": "cluster1",
+      "type": "EDS",
+      "eds_cluster_config": { "eds_config": { "path": "eds path" } }
+    },
+    {
+      "@type": "type.googleapis.com/envoy.api.v2.Cluster",
+      "name": "cluster2",
+      "type": "EDS",
+      "eds_cluster_config": { "eds_config": { "path": "eds path" } }
+    },
+  ]
+}
+)EOF";
+
+  Http::MessagePtr message(new Http::ResponseMessageImpl(
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
+  message->body() = std::make_unique<Buffer::OwnedImpl>(response1_json);
+
+  EXPECT_CALL(cm_.ads_mux_, pause(Config::TypeUrl::get().ClusterLoadAssignment)).Times(1);
+  EXPECT_CALL(cm_.ads_mux_, pause(Config::TypeUrl::get().Cluster)).Times(1);
+  EXPECT_CALL(cm_, clusters()).WillOnce(Return(ClusterManager::ClusterInfoMap{}));
+  cm_.expectAddWithWarming("cluster1", "0");
+  cm_.expectAddWithWarming("cluster2", "0");
+  EXPECT_CALL(initialized_, ready());
+  EXPECT_CALL(cm_.ads_mux_, resume(Config::TypeUrl::get().Cluster)).Times(1);
+  EXPECT_CALL(cm_.ads_mux_, resume(Config::TypeUrl::get().ClusterLoadAssignment)).Times(1);
+  EXPECT_CALL(cm_.ads_mux_, resume(Config::TypeUrl::get().Cluster)).Times(1);
+  EXPECT_CALL(*interval_timer_, enableTimer(_));
+  cm_.clustersToWarmUp({"cluster1", "cluster2"});
+  callbacks_->onSuccess(std::move(message));
+
+  expectRequest();
+  interval_timer_->callback_();
+
+  // Two clusters updated, only one warmed up.
+  const std::string response2_json = R"EOF(
+{
+  "version_info": "1",
+  "resources": [
+    {
+      "@type": "type.googleapis.com/envoy.api.v2.Cluster",
+      "name": "cluster1",
+      "type": "EDS",
+      "eds_cluster_config": { "eds_config": { "path": "eds path" } }
+    },
+    {
+      "@type": "type.googleapis.com/envoy.api.v2.Cluster",
+      "name": "cluster3",
+      "type": "EDS",
+      "eds_cluster_config": { "eds_config": { "path": "eds path" } }
+    },
+  ]
+}
+)EOF";
+
+  message = std::make_unique<Http::ResponseMessageImpl>(
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}});
+  message->body() = std::make_unique<Buffer::OwnedImpl>(response2_json);
+
+  EXPECT_CALL(cm_.ads_mux_, pause(Config::TypeUrl::get().ClusterLoadAssignment)).Times(1);
+  EXPECT_CALL(cm_.ads_mux_, pause(Config::TypeUrl::get().Cluster)).Times(1);
+  EXPECT_CALL(cm_, clusters()).WillOnce(Return(ClusterManager::ClusterInfoMap{}));
+  cm_.expectAddWithWarming("cluster1", "1");
+  cm_.expectAddWithWarming("cluster3", "1");
+  EXPECT_CALL(initialized_, ready());
+  EXPECT_CALL(cm_.ads_mux_, resume(Config::TypeUrl::get().ClusterLoadAssignment)).Times(1);
+  EXPECT_CALL(*interval_timer_, enableTimer(_));
+  resetCdsInitializedCb();
+  cm_.clustersToWarmUp({"cluster1"});
+  callbacks_->onSuccess(std::move(message));
+
+  expectRequest();
+  interval_timer_->callback_();
+
+  // One cluster updated and warmed up. Also finish warming up of the previously added cluster3.
+  const std::string response3_json = R"EOF(
+{
+  "version_info": "2",
+  "resources": [
+    {
+      "@type": "type.googleapis.com/envoy.api.v2.Cluster",
+      "name": "cluster4",
+      "type": "EDS",
+      "eds_cluster_config": { "eds_config": { "path": "eds path" } }
+    },
+  ]
+}
+)EOF";
+
+  message = std::make_unique<Http::ResponseMessageImpl>(
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}});
+  message->body() = std::make_unique<Buffer::OwnedImpl>(response3_json);
+
+  EXPECT_CALL(cm_.ads_mux_, pause(Config::TypeUrl::get().ClusterLoadAssignment)).Times(1);
+  EXPECT_CALL(cm_, clusters()).WillOnce(Return(ClusterManager::ClusterInfoMap{}));
+  cm_.expectAddWithWarming("cluster4", "2");
+  EXPECT_CALL(initialized_, ready());
+  EXPECT_CALL(cm_.ads_mux_, resume(Config::TypeUrl::get().Cluster)).Times(1);
+  EXPECT_CALL(cm_.ads_mux_, resume(Config::TypeUrl::get().ClusterLoadAssignment)).Times(1);
+  EXPECT_CALL(cm_.ads_mux_, resume(Config::TypeUrl::get().Cluster)).Times(1);
+  EXPECT_CALL(*interval_timer_, enableTimer(_));
+  resetCdsInitializedCb();
+  cm_.clustersToWarmUp({"cluster4", "cluster3"});
+  callbacks_->onSuccess(std::move(message));
 }
 
 TEST_F(CdsApiImplTest, Failure) {
