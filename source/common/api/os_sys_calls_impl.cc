@@ -91,23 +91,5 @@ SysCallIntResult OsSysCallsImpl::socket(int domain, int type, int protocol) {
   return {rc, errno};
 }
 
-SysCallIntResult OsSysCallsImpl::getsockname(int sockfd, struct sockaddr* addr,
-                                             socklen_t* addrlen) {
-  const int rc = ::getsockname(sockfd, addr, addrlen);
-  return {rc, errno};
-}
-
-SysCallIntResult OsSysCallsImpl::getpeername(int sockfd, struct sockaddr* addr,
-                                             socklen_t* addrlen) {
-  const int rc = ::getpeername(sockfd, addr, addrlen);
-  return {rc, errno};
-}
-
-SysCallIntResult OsSysCallsImpl::connect(int sockfd, const struct sockaddr* serv_addr,
-                                         socklen_t addrlen) {
-  const int rc = ::connect(sockfd, serv_addr, addrlen);
-  return {rc, errno};
-}
-
 } // namespace Api
 } // namespace Envoy
