@@ -49,7 +49,12 @@ public:
     drainRequests();
   }
 
-  void clearRequestQueue() { request_queue_ = {}; }
+  void clearRequestQueue() {
+    // TODO(fredlas) when we have C++17: request_queue_ = {};
+    while (!request_queue_.empty()) {
+      request_queue_.pop();
+    }
+  }
 
   void establishNewStream() {
     ENVOY_LOG(debug, "Establishing new gRPC bidi stream for {}", service_method_.DebugString());
