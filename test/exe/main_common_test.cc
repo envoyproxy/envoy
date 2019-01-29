@@ -274,7 +274,8 @@ TEST_P(AdminRequestTest, AdminRequestContentionEnabled) {
   started_.WaitForNotification();
 
   // Induce contention to guarantee a non-zero num_contentions count.
-  Thread::TestUtil::ContentionGenerator::generateContention(MutexTracerImpl::getOrCreateTracer());
+  Thread::TestUtil::ContentionGenerator contention_generator;
+  contention_generator.generateContention(MutexTracerImpl::getOrCreateTracer());
 
   std::string response = adminRequest("/contention", "GET");
   EXPECT_THAT(response, Not(HasSubstr("not enabled")));
