@@ -245,10 +245,12 @@ void ResponseStreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end
   connection_.addCharToBuffer('\r');
   connection_.addCharToBuffer('\n');
 
-  if (numeric_status == 204 || numeric_status < 199) {
+  if (numeric_status == 204 || numeric_status < 200) {
     // Per https://tools.ietf.org/html/rfc7230#section-3.3.2
     setIsContentLengthAllowed(false);
   } else {
+    // Make sure that if we encodeHeaders(100) then encodeHeaders(200) that we
+    // set is_content_length_allowed_ back to true.
     setIsContentLengthAllowed(true);
   }
 
