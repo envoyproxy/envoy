@@ -296,6 +296,17 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
     cluster_data->second->thread_aware_lb_->initialize();
   }
 
+  // If the cluster doesn't manage updates itself, we add a callback here that will trigger the
+  // membership update on each thread to ensure that the callbacks are also executed on the TLS
+  // clusters.
+  if (!cluster.manageMembershipUpdates()) {
+    cluster.prioritySet().addMemberUpdateCb(
+        [&cluster, this](const HostVector& hosts_added, const HostVector& hosts_removed) {
+          // TODO(snowp): Should this be subject to the same merge window as priority updates?
+          postThreadLocalMembershipUpdate(cluster, hosts_added, hosts_removed);
+        });
+  }
+
   // Now setup for cross-thread updates.
   cluster.prioritySet().addPriorityUpdateCb([&cluster, this](uint32_t priority,
                                                              const HostVector& hosts_added,
@@ -491,24 +502,26 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::api::v2::Cluster& clust
 }
 
 void ClusterManagerImpl::createOrUpdateThreadLocalCluster(ClusterData& cluster) {
-  tls_->runOnAllThreads([this, new_cluster = cluster.cluster_->info(),
-                         thread_aware_lb_factory = cluster.loadBalancerFactory()]() -> void {
-    ThreadLocalClusterManagerImpl& cluster_manager =
-        tls_->getTyped<ThreadLocalClusterManagerImpl>();
+  tls_->runOnAllThreads(
+      [this, new_cluster = cluster.cluster_->info(),
+       thread_aware_lb_factory = cluster.loadBalancerFactory(),
+       manage_membership_updates = cluster.cluster_->manageMembershipUpdates()]() -> void {
+        ThreadLocalClusterManagerImpl& cluster_manager =
+            tls_->getTyped<ThreadLocalClusterManagerImpl>();
 
-    if (cluster_manager.thread_local_clusters_.count(new_cluster->name()) > 0) {
-      ENVOY_LOG(debug, "updating TLS cluster {}", new_cluster->name());
-    } else {
-      ENVOY_LOG(debug, "adding TLS cluster {}", new_cluster->name());
-    }
+        if (cluster_manager.thread_local_clusters_.count(new_cluster->name()) > 0) {
+          ENVOY_LOG(debug, "updating TLS cluster {}", new_cluster->name());
+        } else {
+          ENVOY_LOG(debug, "adding TLS cluster {}", new_cluster->name());
+        }
 
-    auto thread_local_cluster = new ThreadLocalClusterManagerImpl::ClusterEntry(
-        cluster_manager, new_cluster, thread_aware_lb_factory);
-    cluster_manager.thread_local_clusters_[new_cluster->name()].reset(thread_local_cluster);
-    for (auto& cb : cluster_manager.update_callbacks_) {
-      cb->onClusterAddOrUpdate(*thread_local_cluster);
-    }
-  });
+        auto thread_local_cluster = new ThreadLocalClusterManagerImpl::ClusterEntry(
+            cluster_manager, new_cluster, thread_aware_lb_factory, manage_membership_updates);
+        cluster_manager.thread_local_clusters_[new_cluster->name()].reset(thread_local_cluster);
+        for (auto& cb : cluster_manager.update_callbacks_) {
+          cb->onClusterAddOrUpdate(*thread_local_cluster);
+        }
+      });
 }
 
 bool ClusterManagerImpl::removeCluster(const std::string& cluster_name) {
@@ -647,6 +660,15 @@ Tcp::ConnectionPool::Instance* ClusterManagerImpl::tcpConnPoolForCluster(
   return entry->second->tcpConnPool(priority, context, transport_socket_options);
 }
 
+void ClusterManagerImpl::postThreadLocalMembershipUpdate(const Cluster& cluster,
+                                                         const HostVector& hosts_added,
+                                                         const HostVector& hosts_removed) {
+  tls_->runOnAllThreads([this, name = cluster.info()->name(), hosts_added, hosts_removed]() {
+    ThreadLocalClusterManagerImpl::triggerMembershipCallbacks(name, hosts_added, hosts_removed,
+                                                              *tls_);
+  });
+}
+
 void ClusterManagerImpl::postThreadLocalClusterUpdate(const Cluster& cluster, uint32_t priority,
                                                       const HostVector& hosts_added,
                                                       const HostVector& hosts_removed) {
@@ -777,7 +799,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ThreadLocalClusterManagerImpl
     ENVOY_LOG(debug, "adding TLS local cluster {}", local_cluster_name.value());
     auto& local_cluster = parent.active_clusters_.at(local_cluster_name.value());
     thread_local_clusters_[local_cluster_name.value()] = std::make_unique<ClusterEntry>(
-        *this, local_cluster->cluster_->info(), local_cluster->loadBalancerFactory());
+        *this, local_cluster->cluster_->info(), local_cluster->loadBalancerFactory(),
+        local_cluster->cluster_->manageMembershipUpdates());
   }
 
   local_priority_set_ = local_cluster_name
@@ -793,7 +816,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ThreadLocalClusterManagerImpl
     ENVOY_LOG(debug, "adding TLS initial cluster {}", cluster.first);
     ASSERT(thread_local_clusters_.count(cluster.first) == 0);
     thread_local_clusters_[cluster.first] = std::make_unique<ClusterEntry>(
-        *this, cluster.second->cluster_->info(), cluster.second->loadBalancerFactory());
+        *this, cluster.second->cluster_->info(), cluster.second->loadBalancerFactory(),
+        cluster.second->cluster_->manageMembershipUpdates());
   }
 }
 
@@ -936,6 +960,19 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::updateClusterMembership(
   }
 }
 
+void ClusterManagerImpl::ThreadLocalClusterManagerImpl::triggerMembershipCallbacks(
+    const std::string& name, const HostVector& hosts_added, const HostVector& hosts_removed,
+    ThreadLocal::Slot& tls) {
+  ThreadLocalClusterManagerImpl& config = tls.getTyped<ThreadLocalClusterManagerImpl>();
+
+  ASSERT(config.thread_local_clusters_.find(name) != config.thread_local_clusters_.end());
+  const auto& cluster_entry = config.thread_local_clusters_[name];
+
+  ENVOY_LOG(debug, "triggering membership callbacks for TLS cluster {} added {} removed {}", name,
+            hosts_added.size(), hosts_removed.size());
+  cluster_entry->priority_set_.runUpdateCallbacks(hosts_added, hosts_removed);
+}
+
 void ClusterManagerImpl::ThreadLocalClusterManagerImpl::onHostHealthFailure(
     const HostSharedPtr& host, ThreadLocal::Slot& tls) {
 
@@ -989,8 +1026,9 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::onHostHealthFailure(
 
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
     ThreadLocalClusterManagerImpl& parent, ClusterInfoConstSharedPtr cluster,
-    const LoadBalancerFactorySharedPtr& lb_factory)
-    : parent_(parent), lb_factory_(lb_factory), cluster_info_(cluster),
+    const LoadBalancerFactorySharedPtr& lb_factory, bool manage_membership_updates)
+    : parent_(parent), priority_set_(manage_membership_updates), lb_factory_(lb_factory),
+      cluster_info_(cluster),
       http_async_client_(cluster, parent.parent_.stats_, parent.thread_local_dispatcher_,
                          parent.parent_.local_info_, parent.parent_, parent.parent_.runtime_,
                          parent.parent_.random_,

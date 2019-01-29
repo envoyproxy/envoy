@@ -427,7 +427,7 @@ class RoundRobinLoadBalancerTest : public LoadBalancerTestBase {
 public:
   void init(bool need_local_cluster) {
     if (need_local_cluster) {
-      local_priority_set_.reset(new PrioritySetImpl());
+      local_priority_set_.reset(new PrioritySetImpl(true));
       local_host_set_ = reinterpret_cast<HostSetImpl*>(&local_priority_set_->getOrCreateHostSet(0));
     }
     lb_.reset(new RoundRobinLoadBalancer(priority_set_, local_priority_set_.get(), stats_, runtime_,

@@ -451,7 +451,7 @@ TEST_F(OriginalDstClusterTest, MultipleClusters) {
   EXPECT_CALL(*cleanup_timer_, enableTimer(_));
   setupFromJson(json);
 
-  PrioritySetImpl second;
+  PrioritySetImpl second{true};
   cluster_->prioritySet().addPriorityUpdateCb(
       [&](uint32_t, const HostVector& added, const HostVector& removed) -> void {
         // Update second hostset accordingly;

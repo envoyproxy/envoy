@@ -133,7 +133,8 @@ OriginalDstCluster::OriginalDstCluster(
     const envoy::api::v2::Cluster& config, Runtime::Loader& runtime,
     Server::Configuration::TransportSocketFactoryContext& factory_context,
     Stats::ScopePtr&& stats_scope, bool added_via_api)
-    : ClusterImplBase(config, runtime, factory_context, std::move(stats_scope), added_via_api),
+    : ClusterImplBase(config, runtime, factory_context, std::move(stats_scope), added_via_api,
+                      true),
       dispatcher_(factory_context.dispatcher()),
       cleanup_interval_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, cleanup_interval, 5000))),
@@ -145,7 +146,7 @@ OriginalDstCluster::OriginalDstCluster(
 void OriginalDstCluster::addHost(HostSharedPtr& host) {
   // Given the current config, only EDS clusters support multiple priorities.
   ASSERT(priority_set_.hostSetsPerPriority().size() == 1);
-  auto& first_host_set = priority_set_.getOrCreateHostSet(0);
+  auto& first_host_set = priority_set_.getOrCreateHostSet(0, true);
   HostVectorSharedPtr new_hosts(new HostVector(first_host_set.hosts()));
   new_hosts->emplace_back(host);
   first_host_set.updateHosts(HostSetImpl::partitionHosts(new_hosts, HostsPerLocalityImpl::empty()),
@@ -157,7 +158,7 @@ void OriginalDstCluster::cleanup() {
   HostVector to_be_removed;
   // Given the current config, only EDS clusters support multiple priorities.
   ASSERT(priority_set_.hostSetsPerPriority().size() == 1);
-  auto& host_set = priority_set_.getOrCreateHostSet(0);
+  auto& host_set = priority_set_.getOrCreateHostSet(0, true);
 
   ENVOY_LOG(debug, "Cleaning up stale original dst hosts.");
   for (const HostSharedPtr& host : host_set.hosts()) {

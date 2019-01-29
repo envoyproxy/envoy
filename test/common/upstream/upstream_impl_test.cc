@@ -1500,7 +1500,7 @@ TEST(ClusterImplTest, CloseConnectionsOnHostHealthFailure) {
 
 // Test creating and extending a priority set.
 TEST(PrioritySet, Extend) {
-  PrioritySetImpl priority_set;
+  PrioritySetImpl priority_set(true);
   priority_set.getOrCreateHostSet(0);
 
   uint32_t priority_changes = 0;

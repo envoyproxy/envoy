@@ -141,6 +141,30 @@ private:
   const MockRetryPriority& retry_priority_;
 };
 
+// A mocked Cluster that uses a real PrioritySetImpl
+class MockClusterRealPrioritySet : public Cluster {
+public:
+  MockClusterRealPrioritySet(bool manage_membership_updates = false);
+  ~MockClusterRealPrioritySet();
+
+  // Upstream::Cluster
+  MOCK_METHOD0(healthChecker, HealthChecker*());
+  MOCK_CONST_METHOD0(info, ClusterInfoConstSharedPtr());
+  MOCK_METHOD0(outlierDetector, Outlier::Detector*());
+  MOCK_CONST_METHOD0(outlierDetector, const Outlier::Detector*());
+  MOCK_METHOD1(initialize, void(std::function<void()> callback));
+  MOCK_CONST_METHOD0(initializePhase, InitializePhase());
+  MOCK_CONST_METHOD0(sourceAddress, const Network::Address::InstanceConstSharedPtr&());
+  MOCK_METHOD0(prioritySet, PrioritySetImpl&());
+  MOCK_CONST_METHOD0(prioritySet, const PrioritySet&());
+  MOCK_CONST_METHOD0(manageMembershipUpdates, bool());
+
+  std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
+  std::function<void()> initialize_callback_;
+  Network::Address::InstanceConstSharedPtr source_address_;
+  PrioritySetImpl priority_set_;
+};
+
 class MockCluster : public Cluster {
 public:
   MockCluster();
@@ -156,6 +180,7 @@ public:
   MOCK_CONST_METHOD0(sourceAddress, const Network::Address::InstanceConstSharedPtr&());
   MOCK_METHOD0(prioritySet, MockPrioritySet&());
   MOCK_CONST_METHOD0(prioritySet, const PrioritySet&());
+  MOCK_CONST_METHOD0(manageMembershipUpdates, bool());
 
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
   std::function<void()> initialize_callback_;

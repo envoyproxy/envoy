@@ -219,6 +219,9 @@ public:
   ClusterManagerFactory& clusterManagerFactory() override { return factory_; }
 
 protected:
+  virtual void postThreadLocalMembershipUpdate(const Cluster& cluster,
+                                               const HostVector& hosts_added,
+                                               const HostVector& hosts_removed);
   virtual void postThreadLocalClusterUpdate(const Cluster& cluster, uint32_t priority,
                                             const HostVector& hosts_added,
                                             const HostVector& hosts_removed);
@@ -273,7 +276,7 @@ private:
 
     struct ClusterEntry : public ThreadLocalCluster {
       ClusterEntry(ThreadLocalClusterManagerImpl& parent, ClusterInfoConstSharedPtr cluster,
-                   const LoadBalancerFactorySharedPtr& lb_factory);
+                   const LoadBalancerFactorySharedPtr& lb_factory, bool manage_membership_updates);
       ~ClusterEntry();
 
       Http::ConnectionPool::Instance* connPool(ResourcePriority priority, Http::Protocol protocol,
@@ -314,6 +317,8 @@ private:
                                         LocalityWeightsConstSharedPtr locality_weights,
                                         const HostVector& hosts_added,
                                         const HostVector& hosts_removed, ThreadLocal::Slot& tls);
+    static void triggerMembershipCallbacks(const std::string& name, const HostVector& hosts_added,
+                                           const HostVector& hosts_removed, ThreadLocal::Slot& tls);
     static void onHostHealthFailure(const HostSharedPtr& host, ThreadLocal::Slot& tls);
 
     ClusterManagerImpl& parent_;

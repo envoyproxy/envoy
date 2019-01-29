@@ -195,7 +195,7 @@ HdsCluster::HdsCluster(Server::Admin& admin, Runtime::Loader& runtime,
       ssl_context_manager_(ssl_context_manager), added_via_api_(added_via_api),
       initial_hosts_(new HostVector()) {
   ENVOY_LOG(debug, "Creating an HdsCluster");
-  priority_set_.getOrCreateHostSet(0);
+  priority_set_.getOrCreateHostSet(0, true);
 
   info_ = info_factory.createClusterInfo({admin, runtime_, cluster_, bind_config_, stats_,
                                           ssl_context_manager_, added_via_api_, cm, local_info,
@@ -248,7 +248,7 @@ void HdsCluster::initialize(std::function<void()> callback) {
     host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
   }
 
-  auto& first_host_set = priority_set_.getOrCreateHostSet(0);
+  auto& first_host_set = priority_set_.getOrCreateHostSet(0, true);
 
   first_host_set.updateHosts(
       HostSetImpl::partitionHosts(initial_hosts_, HostsPerLocalityImpl::empty()), {},

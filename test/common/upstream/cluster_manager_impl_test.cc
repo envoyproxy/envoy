@@ -1227,6 +1227,100 @@ TEST_F(ClusterManagerImplTest, HostsPostedToTlsCluster) {
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
 }
 
+// Verifies that membership update callbacks are triggered on the thread local cluster.
+TEST_F(ClusterManagerImplTest, ThreadLocalMemberUpdateCallbacksHostSetNotManaged) {
+  const std::string json =
+      fmt::sprintf("{%s}", clustersJson({defaultStaticClusterJson("fake_cluster")}));
+  std::shared_ptr<MockClusterRealPrioritySet> cluster1(
+      new NiceMock<MockClusterRealPrioritySet>(false));
+  InSequence s;
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster1));
+  ON_CALL(*cluster1, manageMembershipUpdates()).WillByDefault(Return(false));
+  ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
+  EXPECT_CALL(*cluster1, initialize(_));
+
+  create(parseBootstrapFromJson(json));
+
+  ReadyWatcher initialized;
+  cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
+
+  EXPECT_CALL(initialized, ready());
+  cluster1->initialize_callback_();
+
+  HostSharedPtr host1 = makeTestHost(cluster1->info_, "tcp://127.0.0.1:80");
+  host1->healthFlagSet(HostImpl::HealthFlag::DEGRADED_ACTIVE_HC);
+
+  HostVector hosts{host1};
+  auto hosts_ptr = std::make_shared<HostVector>(hosts);
+
+  auto* tls_cluster = cluster_manager_->get(cluster1->info_->name());
+  bool cb_called = false;
+  tls_cluster->prioritySet().addMemberUpdateCb(
+      [&cb_called](const auto&, const auto&) { cb_called = true; });
+
+  cluster1->prioritySet().getOrCreateHostSet(0).updateHosts(
+      HostSetImpl::partitionHosts(hosts_ptr, HostsPerLocalityImpl::empty()), nullptr, hosts, {},
+      {});
+
+  // This should not trigger the cluster manager to post the update to the TLS cluster since we're
+  // managing the callback externally.
+  EXPECT_FALSE(cb_called);
+
+  cluster1->prioritySet().runUpdateCallbacks(hosts, {});
+
+  // After calling update on the priority set directly, the membership callback
+  // should trigger an update on the TLS cluster.
+  EXPECT_TRUE(cb_called);
+
+  factory_.tls_.shutdownThread();
+
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
+}
+
+// Verifies that membership update callbacks are triggered on the thread local cluster.
+TEST_F(ClusterManagerImplTest, ThreadLocalMemberUpdateCallbacksHostSetManaged) {
+  const std::string json =
+      fmt::sprintf("{%s}", clustersJson({defaultStaticClusterJson("fake_cluster")}));
+  std::shared_ptr<MockClusterRealPrioritySet> cluster1(
+      new NiceMock<MockClusterRealPrioritySet>(true));
+  InSequence s;
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster1));
+  ON_CALL(*cluster1, manageMembershipUpdates()).WillByDefault(Return(true));
+  ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
+  EXPECT_CALL(*cluster1, initialize(_));
+
+  create(parseBootstrapFromJson(json));
+
+  ReadyWatcher initialized;
+  cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
+
+  EXPECT_CALL(initialized, ready());
+  cluster1->initialize_callback_();
+
+  HostSharedPtr host1 = makeTestHost(cluster1->info_, "tcp://127.0.0.1:80");
+  host1->healthFlagSet(HostImpl::HealthFlag::DEGRADED_ACTIVE_HC);
+
+  HostVector hosts{host1};
+  auto hosts_ptr = std::make_shared<HostVector>(hosts);
+
+  auto* tls_cluster = cluster_manager_->get(cluster1->info_->name());
+  bool cb_called = false;
+  tls_cluster->prioritySet().addMemberUpdateCb(
+      [&cb_called](const auto&, const auto&) { cb_called = true; });
+
+  cluster1->prioritySet().getOrCreateHostSet(0).updateHosts(
+      HostSetImpl::partitionHosts(hosts_ptr, HostsPerLocalityImpl::empty()), nullptr, hosts, {},
+      {});
+
+  // This should trigger the cluster manager to post the update to the TLS cluster, triggering the
+  // TLS membership callback.
+  EXPECT_TRUE(cb_called);
+
+  factory_.tls_.shutdownThread();
+
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
+}
+
 // Test that we close all HTTP connection pool connections when there is a host health failure.
 TEST_F(ClusterManagerImplTest, CloseHttpConnectionsOnHealthFailure) {
   const std::string json =

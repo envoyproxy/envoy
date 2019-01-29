@@ -385,7 +385,7 @@ public:
   NiceMock<Runtime::MockRandomGenerator> random_;
   Stats::IsolatedStoreImpl stats_store_;
   ClusterStats stats_;
-  PrioritySetImpl local_priority_set_;
+  PrioritySetImpl local_priority_set_{true};
   HostVectorSharedPtr local_hosts_;
   HostsPerLocalitySharedPtr local_hosts_per_locality_;
   std::shared_ptr<SubsetLoadBalancer> lb_;

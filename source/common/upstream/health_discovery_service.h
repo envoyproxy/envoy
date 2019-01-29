@@ -54,6 +54,7 @@ public:
   Outlier::Detector* outlierDetector() override { return outlier_detector_.get(); }
   const Outlier::Detector* outlierDetector() const override { return outlier_detector_.get(); }
   void initialize(std::function<void()> callback) override;
+  bool manageMembershipUpdates() const override { return true; }
 
   // Creates and starts healthcheckers to its endpoints
   void startHealthchecks(AccessLog::AccessLogManager& access_log_manager, Runtime::Loader& runtime,
@@ -62,7 +63,7 @@ public:
   std::vector<Upstream::HealthCheckerSharedPtr> healthCheckers() { return health_checkers_; };
 
 protected:
-  PrioritySetImpl priority_set_;
+  PrioritySetImpl priority_set_{true};
   HealthCheckerSharedPtr health_checker_;
   Outlier::DetectorSharedPtr outlier_detector_;
 

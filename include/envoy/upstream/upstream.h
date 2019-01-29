@@ -774,6 +774,11 @@ public:
    * @return the const PrioritySet for the cluster.
    */
   virtual const PrioritySet& prioritySet() const PURE;
+
+  /**
+   * @return bool whether this cluster will trigger membership updates on host set changes.
+   */
+  virtual bool manageMembershipUpdates() const PURE;
 };
 
 typedef std::shared_ptr<Cluster> ClusterSharedPtr;

@@ -39,7 +39,7 @@ TEST(DISABLED_LeastRequestLoadBalancerWeightTest, Weight) {
   const uint64_t weight = 2;          // weighted_subset_percent of hosts will have this weight.
   const uint64_t active_requests = 3; // weighted_subset_percent will have this active requests.
 
-  PrioritySetImpl priority_set;
+  PrioritySetImpl priority_set(true);
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
   HostSet& host_set = priority_set.getOrCreateHostSet(0);
   HostVector hosts;
@@ -111,7 +111,7 @@ public:
    */
   void run(std::vector<uint32_t> originating_cluster, std::vector<uint32_t> all_destination_cluster,
            std::vector<uint32_t> healthy_destination_cluster) {
-    local_priority_set_ = new PrioritySetImpl;
+    local_priority_set_ = new PrioritySetImpl(true);
     // TODO(mattklein123): make load balancer per originating cluster host.
     RandomLoadBalancer lb(priority_set_, local_priority_set_, stats_, runtime_, random_,
                           common_config_);

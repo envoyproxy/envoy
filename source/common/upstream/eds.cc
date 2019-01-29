@@ -23,7 +23,7 @@ EdsClusterImpl::EdsClusterImpl(
     Server::Configuration::TransportSocketFactoryContext& factory_context,
     Stats::ScopePtr&& stats_scope, bool added_via_api)
     : BaseDynamicClusterImpl(cluster, runtime, factory_context, std::move(stats_scope),
-                             added_via_api),
+                             added_via_api, true),
       cm_(factory_context.clusterManager()), local_info_(factory_context.localInfo()),
       cluster_name_(cluster.eds_cluster_config().service_name().empty()
                         ? cluster.name()

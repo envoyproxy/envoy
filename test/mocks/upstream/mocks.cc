@@ -77,6 +77,20 @@ void MockPrioritySet::runUpdateCallbacks(uint32_t priority, const HostVector& ho
 
 MockRetryPriority::~MockRetryPriority() = default;
 
+MockClusterRealPrioritySet::MockClusterRealPrioritySet(bool manage_membership_updates)
+    : priority_set_(manage_membership_updates) {
+  ON_CALL(*this, prioritySet()).WillByDefault(ReturnRef(priority_set_));
+  ON_CALL(testing::Const(*this), prioritySet()).WillByDefault(ReturnRef(priority_set_));
+  ON_CALL(*this, info()).WillByDefault(Return(info_));
+  ON_CALL(*this, initialize(_))
+      .WillByDefault(Invoke([this](std::function<void()> callback) -> void {
+        EXPECT_EQ(nullptr, initialize_callback_);
+        initialize_callback_ = callback;
+      }));
+}
+
+MockClusterRealPrioritySet::~MockClusterRealPrioritySet() = default;
+
 MockCluster::MockCluster() {
   ON_CALL(*this, prioritySet()).WillByDefault(ReturnRef(priority_set_));
   ON_CALL(testing::Const(*this), prioritySet()).WillByDefault(ReturnRef(priority_set_));

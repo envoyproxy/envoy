@@ -37,7 +37,7 @@ public:
         {}, absl::nullopt);
   }
 
-  PrioritySetImpl priority_set_;
+  PrioritySetImpl priority_set_{true};
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
 };
 

@@ -319,7 +319,6 @@ public:
   static UpdateHostsParams partitionHosts(HostVectorConstSharedPtr hosts,
                                           HostsPerLocalityConstSharedPtr hosts_per_locality);
 
-protected:
   virtual void runUpdateCallbacks(const HostVector& hosts_added, const HostVector& hosts_removed) {
     member_update_cb_helper_.runCallbacks(priority_, hosts_added, hosts_removed);
   }
@@ -388,6 +387,9 @@ typedef std::unique_ptr<HostSetImpl> HostSetImplPtr;
 
 class PrioritySetImpl : public PrioritySet {
 public:
+  explicit PrioritySetImpl(bool manage_membership_updates)
+      : manage_membership_updates_(manage_membership_updates) {}
+
   // From PrioritySet
   Common::CallbackHandle* addMemberUpdateCb(MemberUpdateCb callback) const override {
     return member_update_cb_helper_.add(callback);
@@ -403,6 +405,15 @@ public:
   HostSet& getOrCreateHostSet(uint32_t priority,
                               absl::optional<uint32_t> overprovisioning_factor = absl::nullopt);
 
+  // Returns whether cluster membership updates are handled directly by the PrioritySet. If this is
+  // false, cluster membership must be managed outside the PrioritySet and runUpdateCallbacks must
+  // be called whenever hosts are added/removed to the cluster.
+  bool manageMembershipUpdates() const { return manage_membership_updates_; }
+
+  virtual void runUpdateCallbacks(const HostVector& hosts_added, const HostVector& hosts_removed) {
+    member_update_cb_helper_.runCallbacks(hosts_added, hosts_removed);
+  }
+
 protected:
   // Allows subclasses of PrioritySetImpl to create their own type of HostSetImpl.
   virtual HostSetImplPtr createHostSet(uint32_t priority,
@@ -411,9 +422,6 @@ protected:
   }
 
 private:
-  virtual void runUpdateCallbacks(const HostVector& hosts_added, const HostVector& hosts_removed) {
-    member_update_cb_helper_.runCallbacks(hosts_added, hosts_removed);
-  }
   virtual void runReferenceUpdateCallbacks(uint32_t priority, const HostVector& hosts_added,
                                            const HostVector& hosts_removed) {
     priority_update_cb_helper_.runCallbacks(priority, hosts_added, hosts_removed);
@@ -426,6 +434,10 @@ private:
   mutable Common::CallbackManager<const HostVector&, const HostVector&> member_update_cb_helper_;
   mutable Common::CallbackManager<uint32_t, const HostVector&, const HostVector&>
       priority_update_cb_helper_;
+  // If manage_cluster_updates_ is true, changes to the HostSet itself will trigger a
+  // MemberUpdateCallback. Should be set to false is cluster membership is handled outside the
+  // HostSet, e.g. if updates are made to multiple host sets at once.
+  const bool manage_membership_updates_;
 };
 
 /**
@@ -599,11 +611,13 @@ public:
   Outlier::Detector* outlierDetector() override { return outlier_detector_.get(); }
   const Outlier::Detector* outlierDetector() const override { return outlier_detector_.get(); }
   void initialize(std::function<void()> callback) override;
+  bool manageMembershipUpdates() const override { return priority_set_.manageMembershipUpdates(); }
 
 protected:
   ClusterImplBase(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
                   Server::Configuration::TransportSocketFactoryContext& factory_context,
-                  Stats::ScopePtr&& stats_scope, bool added_via_api);
+                  Stats::ScopePtr&& stats_scope, bool added_via_api,
+                  bool manage_membership_updates);
 
   /**
    * Overridden by every concrete cluster. The cluster should do whatever pre-init is needed. E.g.,
