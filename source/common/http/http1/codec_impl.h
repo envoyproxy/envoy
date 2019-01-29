@@ -56,6 +56,7 @@ protected:
   static const std::string LAST_CHUNK;
 
   ConnectionImpl& connection_;
+  void setIsContentLengthAllowed(bool value) { is_content_length_allowed_ = value; }
 
 private:
   /**
@@ -75,6 +76,7 @@ private:
   bool chunk_encoding_{true};
   bool processing_100_continue_{false};
   bool is_response_to_head_request_{false};
+  bool is_content_length_allowed_{true};
 };
 
 /**
