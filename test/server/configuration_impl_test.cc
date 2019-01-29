@@ -2,7 +2,6 @@
 #include <list>
 #include <string>
 
-#include "common/api/api_impl.h"
 #include "common/config/bootstrap_json.h"
 #include "common/config/well_known_names.h"
 #include "common/json/json_loader.h"
@@ -53,11 +52,10 @@ TEST(FilterChainUtility, buildFilterChainFailWithBadFilters) {
 class ConfigurationImplTest : public testing::Test {
 protected:
   ConfigurationImplTest()
-      : api_(Api::createApiForTest(stats_store_)),
-        cluster_manager_factory_(
+      : cluster_manager_factory_(
             server_.admin(), server_.runtime(), server_.stats(), server_.threadLocal(),
             server_.random(), server_.dnsResolver(), server_.sslContextManager(),
-            server_.dispatcher(), server_.localInfo(), server_.secretManager(), *api_,
+            server_.dispatcher(), server_.localInfo(), server_.secretManager(), server_.api(),
             server_.httpContext(), server_.accessLogManager(), server_.singletonManager()) {}
 
   NiceMock<Server::MockInstance> server_;

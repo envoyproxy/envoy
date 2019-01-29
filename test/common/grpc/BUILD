@@ -70,6 +70,7 @@ envoy_cc_test(
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/tracing:tracing_mocks",
         "//test/proto:helloworld_proto_cc",
+        "//test/test_common:test_time_lib",
         "//test/test_common:utility_lib",
     ] + envoy_select_google_grpc(["//source/common/grpc:google_async_client_lib"]),
 )
