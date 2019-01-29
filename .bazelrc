@@ -58,4 +58,4 @@ build:libc++ --define force_libcpp=enabled
 build:libc++ --linkopt -fuse-ld=lld
 
 # Test options
-test --test_env=HEAPCHECK=normal --test_env=PPROF_PATH --experimental_remap_main_repo
+test --test_env=HEAPCHECK=normal --test_env=PPROF_PATH
