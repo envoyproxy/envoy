@@ -39,7 +39,7 @@ except NameError:
   pass  # Python 3
 
 # Tag issues created with these labels.
-LABELS = ['deprecation', 'tech debt']
+LABELS = ['deprecation', 'tech debt', 'no stalebot']
 
 
 # Errors that happen during issue creation.

@@ -21,7 +21,9 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace DubboProxy {
 
-using ConfigDubboProxy = envoy::extensions::filters::network::dubbo_proxy::v2alpha1::DubboProxy;
+using ConfigProtocolType = envoy::config::filter::network::dubbo_proxy::v2alpha1::ProtocolType;
+using ConfigSerializationType =
+    envoy::config::filter::network::dubbo_proxy::v2alpha1::SerializationType;
 
 class DubboFilterTest : public testing::Test {
 public:
@@ -34,8 +36,8 @@ public:
       counter->reset();
     }
 
-    filter_ = std::make_unique<Filter>("test.", ConfigDubboProxy::Dubbo, ConfigDubboProxy::Hessian2,
-                                       store_, timeSystem());
+    filter_ = std::make_unique<Filter>("test.", ConfigProtocolType::Dubbo,
+                                       ConfigSerializationType::Hessian2, store_, timeSystem());
     filter_->initializeReadFilterCallbacks(read_filter_callbacks_);
     filter_->onNewConnection();
 
@@ -92,7 +94,7 @@ public:
         0x00,   0x00,   0x00,   0x00, 0x00, 0x00, 0x00, 0x01, // Request Id
         0x00,   0x00,   0x00,   0x16,                         // Body Length
         0x05,   '2',    '.',    '0',  '.',  '2',              // Dubbo version
-        0x04,   't',    'e',    's',  't',                    // Service naem
+        0x04,   't',    'e',    's',  't',                    // Service name
         0x05,   '0',    '.',    '0',  '.',  '0',              // Service version
         0x04,   't',    'e',    's',  't',                    // method name
     });
@@ -154,7 +156,7 @@ public:
                              0x05, '2', '.', '0', '.', '2'}); // Dubbo version
     } else {
       buffer.add(std::string{
-          0x04, 't', 'e', 's', 't',      // Service naem
+          0x04, 't', 'e', 's', 't',      // Service name
           0x05, '0', '.', '0', '.', '0', // Service version
           0x04, 't', 'e', 's', 't',      // method name
       });
@@ -178,7 +180,7 @@ public:
     addInt64(buffer, request_id);                            // Request Id
     buffer.add(std::string{0x00, 0x00, 0x00, 0x16,           // Body Length
                            0x05, '2',  '.',  '0',  '.', '2', // Dubbo version
-                           0x04, 't',  'e',  's',  't',      // Service naem
+                           0x04, 't',  'e',  's',  't',      // Service name
                            0x05, '0',  '.',  '0',  '.', '0', // Service version
                            0x04, 't',  'e',  's',  't'});    // method name
   }

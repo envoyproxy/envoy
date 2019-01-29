@@ -3,23 +3,23 @@
 External Authorization
 ======================
 * External authorization :ref:`architecture overview <arch_overview_ext_authz>`
-* :ref:`HTTP filter v2 API reference <envoy_api_msg_config.filter.http.ext_authz.v2alpha.ExtAuthz>`
+* :ref:`HTTP filter v2 API reference <envoy_api_msg_config.filter.http.ext_authz.v2.ExtAuthz>`
 * This filter should be configured with the name *envoy.ext_authz*.
 
-The external authorization HTTP filter calls an external gRPC or HTTP service to check if the incoming
+The external authorization filter calls an external gRPC or HTTP service to check whether an incoming
 HTTP request is authorized or not.
-If the request is deemed unauthorized then the request will be denied normally with 403 (Forbidden) response.
+If the request is deemed unauthorized, then the request will be denied normally with 403 (Forbidden) response.
 Note that sending additional custom metadata from the authorization service to the upstream, to the downstream or to the authorization service is
-also possible. This is explained in more details at :ref:`HTTP filter <envoy_api_msg_config.filter.http.ext_authz.v2alpha.ExtAuthz>`.
+also possible. This is explained in more details at :ref:`HTTP filter <envoy_api_msg_config.filter.http.ext_authz.v2.ExtAuthz>`.
 
 The content of the requests that are passed to an authorization service is specified by
-:ref:`CheckRequest <envoy_api_msg_service.auth.v2alpha.CheckRequest>`.
+:ref:`CheckRequest <envoy_api_msg_service.auth.v2.CheckRequest>`.
 
 .. _config_http_filters_ext_authz_http_configuration:
 
 The HTTP filter, using a gRPC/HTTP service, can be configured as follows. You can see all the
 configuration options at
-:ref:`HTTP filter <envoy_api_msg_config.filter.http.ext_authz.v2alpha.ExtAuthz>`.
+:ref:`HTTP filter <envoy_api_msg_config.filter.http.ext_authz.v2.ExtAuthz>`.
 
 Configuration Examples
 -----------------------------
@@ -104,6 +104,8 @@ In this example we add additional context on the virtual host, and disabled the 
 
 Statistics
 ----------
+.. _config_http_filters_ext_authz_stats:
+
 The HTTP filter outputs statistics in the *cluster.<route target cluster>.ext_authz.* namespace.
 
 .. csv-table::

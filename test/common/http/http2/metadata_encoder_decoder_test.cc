@@ -227,7 +227,7 @@ TEST_F(MetadataEncoderDecoderTest, VerifyEncoderDecoderMultipleMetadataReachSize
       break;
     }
   }
-  // Verifies max matadata limit reached.
+  // Verifies max metadata limit reached.
   EXPECT_LT(result, 0);
   EXPECT_LE(decoder_->max_payload_size_bound_, decoder_->total_payload_size_);
 

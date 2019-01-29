@@ -102,3 +102,6 @@ To sum this up in pseudo algorithms:
   priority_load(P_X) = min(100 - Σ(priority_load(P_0)..priority_load(P_X-1)),
                            health(P_X) / normalized_total_health)
 
+Note: This sectioned talked about healthy priorities, but this also extends to
+:ref:`degraded priorities <arch_overview_load_balancing_degraded>`.
+

@@ -29,6 +29,11 @@ struct HealthyLoad : PriorityLoad {
   using PriorityLoad::PriorityLoad;
 };
 
+struct HealthyAndDegradedLoad {
+  HealthyLoad healthy_priority_load_;
+  DegradedLoad degraded_priority_load_;
+};
+
 // Phantom type indicating that the type is related to host availability.
 struct Availability {};
 

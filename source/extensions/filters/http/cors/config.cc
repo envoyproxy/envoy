@@ -22,9 +22,7 @@ CorsFilterFactory::createFilter(const std::string& stats_prefix,
 /**
  * Static registration for the cors filter. @see RegisterFactory.
  */
-static Registry::RegisterFactory<CorsFilterFactory,
-                                 Server::Configuration::NamedHttpFilterConfigFactory>
-    register_;
+REGISTER_FACTORY(CorsFilterFactory, Server::Configuration::NamedHttpFilterConfigFactory);
 
 } // namespace Cors
 } // namespace HttpFilters

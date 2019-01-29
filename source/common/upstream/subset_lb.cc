@@ -125,7 +125,7 @@ HostConstSharedPtr SubsetLoadBalancer::tryChooseHostFromContext(LoadBalancerCont
 }
 
 // Iterates over the given metadata match criteria (which must be lexically sorted by key) and find
-// a matching LbSubsetEnryPtr, if any.
+// a matching LbSubsetEntryPtr, if any.
 SubsetLoadBalancer::LbSubsetEntryPtr SubsetLoadBalancer::findSubset(
     const std::vector<Router::MetadataMatchCriterionConstSharedPtr>& match_criteria) {
   const LbSubsetMap* subsets = &subsets_;

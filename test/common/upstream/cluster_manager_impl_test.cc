@@ -12,6 +12,7 @@
 #include "common/network/socket_option_impl.h"
 #include "common/network/transport_socket_options_impl.h"
 #include "common/network/utility.h"
+#include "common/singleton/manager_impl.h"
 #include "common/upstream/cluster_manager_impl.h"
 
 #include "extensions/transport_sockets/tls/context_manager_impl.h"
@@ -56,14 +57,14 @@ namespace {
 class TestClusterManagerFactory : public ClusterManagerFactory {
 public:
   TestClusterManagerFactory() {
-    ON_CALL(*this, clusterFromProto_(_, _, _, _, _))
+    ON_CALL(*this, clusterFromProto_(_, _, _, _))
         .WillByDefault(Invoke([&](const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
                                   Outlier::EventLoggerSharedPtr outlier_event_logger,
-                                  AccessLog::AccessLogManager& log_manager,
                                   bool added_via_api) -> ClusterSharedPtr {
-          return ClusterImplBase::create(
-              cluster, cm, stats_, tls_, dns_resolver_, ssl_context_manager_, runtime_, random_,
-              dispatcher_, log_manager, local_info_, outlier_event_logger, added_via_api);
+          return ClusterImplBase::create(cluster, cm, stats_, tls_, dns_resolver_,
+                                         ssl_context_manager_, runtime_, random_, dispatcher_,
+                                         log_manager_, local_info_, admin_, singleton_manager_,
+                                         outlier_event_logger, added_via_api);
         }));
   }
 
@@ -82,9 +83,8 @@ public:
 
   ClusterSharedPtr clusterFromProto(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
                                     Outlier::EventLoggerSharedPtr outlier_event_logger,
-                                    AccessLog::AccessLogManager& log_manager,
                                     bool added_via_api) override {
-    return clusterFromProto_(cluster, cm, outlier_event_logger, log_manager, added_via_api);
+    return clusterFromProto_(cluster, cm, outlier_event_logger, added_via_api);
   }
 
   CdsApiPtr createCds(const envoy::api::v2::core::ConfigSource&, ClusterManager&) override {
@@ -92,28 +92,20 @@ public:
   }
 
   ClusterManagerPtr
-  clusterManagerFromProto(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,
-                          Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,
-                          Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
-                          AccessLog::AccessLogManager& log_manager, Server::Admin& admin) override {
-    return ClusterManagerPtr{clusterManagerFromProto_(bootstrap, stats, tls, runtime, random,
-                                                      local_info, log_manager, admin)};
+  clusterManagerFromProto(const envoy::config::bootstrap::v2::Bootstrap& bootstrap) override {
+    return ClusterManagerPtr{clusterManagerFromProto_(bootstrap)};
   }
 
   Secret::SecretManager& secretManager() override { return secret_manager_; }
 
-  MOCK_METHOD8(clusterManagerFromProto_,
-               ClusterManager*(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,
-                               Stats::Store& stats, ThreadLocal::Instance& tls,
-                               Runtime::Loader& runtime, Runtime::RandomGenerator& random,
-                               const LocalInfo::LocalInfo& local_info,
-                               AccessLog::AccessLogManager& log_manager, Server::Admin& admin));
+  MOCK_METHOD1(clusterManagerFromProto_,
+               ClusterManager*(const envoy::config::bootstrap::v2::Bootstrap& bootstrap));
   MOCK_METHOD1(allocateConnPool_, Http::ConnectionPool::Instance*(HostConstSharedPtr host));
   MOCK_METHOD1(allocateTcpConnPool_, Tcp::ConnectionPool::Instance*(HostConstSharedPtr host));
-  MOCK_METHOD5(clusterFromProto_,
+  MOCK_METHOD4(clusterFromProto_,
                ClusterSharedPtr(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
                                 Outlier::EventLoggerSharedPtr outlier_event_logger,
-                                AccessLog::AccessLogManager& log_manager, bool added_via_api));
+                                bool added_via_api));
   MOCK_METHOD0(createCds_, CdsApi*());
 
   Stats::IsolatedStoreImpl stats_;
@@ -126,7 +118,10 @@ public:
   Extensions::TransportSockets::Tls::ContextManagerImpl ssl_context_manager_{
       dispatcher_.timeSystem()};
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  NiceMock<Server::MockAdmin> admin_;
   NiceMock<Secret::MockSecretManager> secret_manager_;
+  NiceMock<AccessLog::MockAccessLogManager> log_manager_;
+  Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest().currentThreadId()};
 };
 
 // Helper to intercept calls to postThreadLocalClusterUpdate.
@@ -169,9 +164,7 @@ envoy::config::bootstrap::v2::Bootstrap parseBootstrapFromV2Yaml(const std::stri
 
 class ClusterManagerImplTest : public testing::Test {
 public:
-  ClusterManagerImplTest() : api_(Api::createApiForTest(stats_store_)) {
-    factory_.dispatcher_.setTimeSystem(time_system_);
-  }
+  ClusterManagerImplTest() : api_(Api::createApiForTest(stats_store_)) {}
 
   void create(const envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
     cluster_manager_ = std::make_unique<ClusterManagerImpl>(
@@ -246,12 +239,12 @@ public:
   }
 
   Stats::IsolatedStoreImpl stats_store_;
+  Event::SimulatedTimeSystem time_system_;
   Api::ApiPtr api_;
   NiceMock<TestClusterManagerFactory> factory_;
   std::unique_ptr<ClusterManagerImpl> cluster_manager_;
   AccessLog::MockAccessLogManager log_manager_;
   NiceMock<Server::MockAdmin> admin_;
-  Event::SimulatedTimeSystem time_system_;
   MockLocalClusterUpdate local_cluster_update_;
   Http::ContextImpl http_context_;
 };
@@ -499,7 +492,7 @@ TEST_F(ClusterManagerImplTest, OriginalDstLbRestriction2) {
 
   EXPECT_THROW_WITH_MESSAGE(
       create(parseBootstrapFromJson(json)), EnvoyException,
-      "cluster: LB type 'original_dst_lb' may only be used with cluser type 'original_dst'");
+      "cluster: LB type 'original_dst_lb' may only be used with cluster type 'original_dst'");
 }
 
 TEST_F(ClusterManagerImplTest, SubsetLoadBalancerInitialization) {
@@ -618,7 +611,7 @@ public:
     cluster1->info_->lb_type_ = lb_type;
 
     InSequence s;
-    EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _, _)).WillOnce(Return(cluster1));
+    EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster1));
     ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
     create(parseBootstrapFromJson(json));
 
@@ -812,11 +805,11 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
 
   // This part tests static init.
   InSequence s;
-  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _, _)).WillOnce(Return(cds_cluster));
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cds_cluster));
   ON_CALL(*cds_cluster, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
-  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _, _)).WillOnce(Return(cluster1));
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster1));
   ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
-  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _, _)).WillOnce(Return(cluster2));
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster2));
   ON_CALL(*cluster2, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
   EXPECT_CALL(factory_, createCds_()).WillOnce(Return(cds));
   EXPECT_CALL(*cds, setInitializedCb(_));
@@ -843,16 +836,16 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
   std::shared_ptr<MockCluster> cluster5(new NiceMock<MockCluster>());
   cluster5->info_->name_ = "cluster5";
 
-  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _, _)).WillOnce(Return(cluster3));
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster3));
   ON_CALL(*cluster3, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
   cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster3"), "version1");
 
-  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _, _)).WillOnce(Return(cluster4));
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster4));
   ON_CALL(*cluster4, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
   EXPECT_CALL(*cluster4, initialize(_));
   cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster4"), "version2");
 
-  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _, _)).WillOnce(Return(cluster5));
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster5));
   ON_CALL(*cluster5, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
   cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster5"), "version3");
 
@@ -967,7 +960,7 @@ TEST_F(ClusterManagerImplTest, DynamicRemoveWithLocalCluster) {
 
   std::shared_ptr<MockCluster> foo(new NiceMock<MockCluster>());
   foo->info_->name_ = "foo";
-  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _, false)).WillOnce(Return(foo));
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, false)).WillOnce(Return(foo));
   ON_CALL(*foo, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
   EXPECT_CALL(*foo, initialize(_));
 
@@ -978,7 +971,7 @@ TEST_F(ClusterManagerImplTest, DynamicRemoveWithLocalCluster) {
   // cluster in its load balancer.
   std::shared_ptr<MockCluster> cluster1(new NiceMock<MockCluster>());
   cluster1->info_->name_ = "cluster1";
-  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _, true)).WillOnce(Return(cluster1));
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, true)).WillOnce(Return(cluster1));
   ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
   EXPECT_CALL(*cluster1, initialize(_));
   cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster1"), "");
@@ -1023,7 +1016,7 @@ TEST_F(ClusterManagerImplTest, RemoveWarmingCluster) {
   cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
 
   std::shared_ptr<MockCluster> cluster1(new NiceMock<MockCluster>());
-  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _, _)).WillOnce(Return(cluster1));
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster1));
   EXPECT_CALL(*cluster1, initializePhase()).Times(0);
   EXPECT_CALL(*cluster1, initialize(_));
   EXPECT_TRUE(
@@ -1071,7 +1064,7 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
       cluster_manager_->addThreadLocalClusterUpdateCallbacks(*callbacks);
 
   std::shared_ptr<MockCluster> cluster1(new NiceMock<MockCluster>());
-  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _, _)).WillOnce(Return(cluster1));
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster1));
   EXPECT_CALL(*cluster1, initializePhase()).Times(0);
   EXPECT_CALL(*cluster1, initialize(_));
   EXPECT_CALL(*callbacks, onClusterAddOrUpdate(_)).Times(1);
@@ -1093,7 +1086,7 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   std::shared_ptr<MockCluster> cluster2(new NiceMock<MockCluster>());
   cluster2->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster2->info_, "tcp://127.0.0.1:80")};
-  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _, _)).WillOnce(Return(cluster2));
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster2));
   EXPECT_CALL(*cluster2, initializePhase()).Times(0);
   EXPECT_CALL(*cluster2, initialize(_))
       .WillOnce(Invoke([cluster1](std::function<void()> initialize_callback) {
@@ -1159,7 +1152,7 @@ TEST_F(ClusterManagerImplTest, addOrUpdateClusterStaticExists) {
       fmt::sprintf("{%s}", clustersJson({defaultStaticClusterJson("some_cluster")}));
   std::shared_ptr<MockCluster> cluster1(new NiceMock<MockCluster>());
   InSequence s;
-  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _, _)).WillOnce(Return(cluster1));
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster1));
   ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
   EXPECT_CALL(*cluster1, initialize(_));
 
@@ -1175,6 +1168,57 @@ TEST_F(ClusterManagerImplTest, addOrUpdateClusterStaticExists) {
 
   // Attempt to remove a static cluster.
   EXPECT_FALSE(cluster_manager_->removeCluster("fake_cluster"));
+
+  factory_.tls_.shutdownThread();
+
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
+}
+
+// Verifies that we correctly propagate the host_set state to the TLS clusters.
+TEST_F(ClusterManagerImplTest, HostsPostedToTlsCluster) {
+  const std::string json =
+      fmt::sprintf("{%s}", clustersJson({defaultStaticClusterJson("fake_cluster")}));
+  std::shared_ptr<MockCluster> cluster1(new NiceMock<MockCluster>());
+  InSequence s;
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster1));
+  ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
+  EXPECT_CALL(*cluster1, initialize(_));
+
+  create(parseBootstrapFromJson(json));
+
+  ReadyWatcher initialized;
+  cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
+
+  EXPECT_CALL(initialized, ready());
+  cluster1->initialize_callback_();
+
+  // Set up the HostSet with 1 healthy, 1 degraded and 1 unhealthy.
+  HostSharedPtr host1 = makeTestHost(cluster1->info_, "tcp://127.0.0.1:80");
+  host1->healthFlagSet(HostImpl::HealthFlag::DEGRADED_ACTIVE_HC);
+  HostSharedPtr host2 = makeTestHost(cluster1->info_, "tcp://127.0.0.1:80");
+  host2->healthFlagSet(HostImpl::HealthFlag::FAILED_ACTIVE_HC);
+  HostSharedPtr host3 = makeTestHost(cluster1->info_, "tcp://127.0.0.1:80");
+
+  HostVector hosts{host1, host2, host3};
+  auto hosts_ptr = std::make_shared<HostVector>(hosts);
+
+  cluster1->priority_set_.host_sets_[0] = std::make_unique<HostSetImpl>(0, absl::nullopt);
+  cluster1->priority_set_.host_sets_[0]->updateHosts(
+      HostSetImpl::partitionHosts(hosts_ptr, HostsPerLocalityImpl::empty()), nullptr, hosts, {},
+      {});
+
+  // Trigger a per thread cluster update. Normally this is called whenever the HostSet is modified,
+  // but since we mock out PrioritySet the callbacks aren't wired up.
+  cluster1->priority_set_.runUpdateCallbacks(0, hosts, {});
+
+  auto* tls_cluster = cluster_manager_->get(cluster1->info_->name());
+
+  EXPECT_EQ(1, tls_cluster->prioritySet().hostSetsPerPriority().size());
+  EXPECT_EQ(1, tls_cluster->prioritySet().hostSetsPerPriority()[0]->degradedHosts().size());
+  EXPECT_EQ(host1, tls_cluster->prioritySet().hostSetsPerPriority()[0]->degradedHosts()[0]);
+  EXPECT_EQ(1, tls_cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(host3, tls_cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts()[0]);
+  EXPECT_EQ(3, tls_cluster->prioritySet().hostSetsPerPriority()[0]->hosts().size());
 
   factory_.tls_.shutdownThread();
 
@@ -1203,7 +1247,7 @@ TEST_F(ClusterManagerImplTest, CloseHttpConnectionsOnHealthFailure) {
   {
     InSequence s;
 
-    EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _, _)).WillOnce(Return(cluster1));
+    EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster1));
     EXPECT_CALL(health_checker, addHostCheckCompleteCb(_));
     EXPECT_CALL(outlier_detector, addChangedStateCb(_));
     EXPECT_CALL(*cluster1, initialize(_))
@@ -1265,7 +1309,7 @@ TEST_F(ClusterManagerImplTest, CloseTcpConnectionPoolsOnHealthFailure) {
   {
     InSequence s;
 
-    EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _, _)).WillOnce(Return(cluster1));
+    EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster1));
     EXPECT_CALL(health_checker, addHostCheckCompleteCb(_));
     EXPECT_CALL(outlier_detector, addChangedStateCb(_));
     EXPECT_CALL(*cluster1, initialize(_))
@@ -1337,7 +1381,7 @@ TEST_F(ClusterManagerImplTest, CloseTcpConnectionsOnHealthFailure) {
   {
     InSequence s;
 
-    EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _, _)).WillOnce(Return(cluster1));
+    EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster1));
     EXPECT_CALL(health_checker, addHostCheckCompleteCb(_));
     EXPECT_CALL(outlier_detector, addChangedStateCb(_));
     EXPECT_CALL(*cluster1, initialize(_))
@@ -1409,7 +1453,7 @@ TEST_F(ClusterManagerImplTest, DoNotCloseTcpConnectionsOnHealthFailure) {
   Network::MockClientConnection* connection1 = new NiceMock<Network::MockClientConnection>();
   Host::CreateConnectionData conn_info1;
 
-  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _, _)).WillOnce(Return(cluster1));
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster1));
   EXPECT_CALL(health_checker, addHostCheckCompleteCb(_));
   EXPECT_CALL(outlier_detector, addChangedStateCb(_));
   EXPECT_CALL(*cluster1, initialize(_))
@@ -1993,7 +2037,7 @@ TEST_F(ClusterManagerImplTest, MergedUpdates) {
       }))
       .WillOnce(Invoke([](uint32_t priority, const HostVector& hosts_added,
                           const HostVector& hosts_removed) -> void {
-        // Triggerd by the 2 HC updates, it's a merged update so no added/removed
+        // Triggered by the 2 HC updates, it's a merged update so no added/removed
         // hosts.
         EXPECT_EQ(0, priority);
         EXPECT_EQ(0, hosts_added.size());
@@ -2257,7 +2301,7 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesDestroyedOnUpdate) {
   // Update the cluster, which should cancel the pending updates.
   std::shared_ptr<MockCluster> updated(new NiceMock<MockCluster>());
   updated->info_->name_ = "new_cluster";
-  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _, true)).WillOnce(Return(updated));
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, true)).WillOnce(Return(updated));
 
   const std::string yaml_updated = R"EOF(
   name: new_cluster
