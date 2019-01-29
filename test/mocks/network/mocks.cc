@@ -119,7 +119,8 @@ MockSocketOption::MockSocketOption() {
 MockSocketOption::~MockSocketOption() {}
 
 MockConnectionSocket::MockConnectionSocket()
-    : io_handle_(std::make_unique<IoSocketHandleImpl>()), local_address_(new Address::Ipv4Instance(80)),
+    : io_handle_(std::make_unique<IoSocketHandleImpl>()),
+      local_address_(new Address::Ipv4Instance(80)),
       remote_address_(new Address::Ipv4Instance(80)) {
   ON_CALL(*this, localAddress()).WillByDefault(ReturnRef(local_address_));
   ON_CALL(*this, remoteAddress()).WillByDefault(ReturnRef(remote_address_));

@@ -1,9 +1,10 @@
 #include "common/network/io_socket_handle_impl.h"
 
-#include "common/common/assert.h"
-
 #include <errno.h>
+
 #include <iostream>
+
+#include "common/common/assert.h"
 
 using Envoy::Api::SysCallIntResult;
 using Envoy::Api::SysCallSizeResult;

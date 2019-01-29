@@ -158,8 +158,8 @@ bool supportsIpVersion(const Address::IpVersion version) {
   return true;
 }
 
-std::pair<Address::InstanceConstSharedPtr, Network::IoHandlePtr> bindFreeLoopbackPort(Address::IpVersion version,
-                                                                     Address::SocketType type) {
+std::pair<Address::InstanceConstSharedPtr, Network::IoHandlePtr>
+bindFreeLoopbackPort(Address::IpVersion version, Address::SocketType type) {
   Address::InstanceConstSharedPtr addr = getCanonicalLoopbackAddress(version);
   IoHandlePtr io_handle = addr->socket(type);
   Api::SysCallIntResult result = addr->bind(io_handle->fd());
