@@ -26,7 +26,7 @@ cmake_external(
     cache_entries = {
         "EVENT__DISABLE_OPENSSL": "on",
         "EVENT__DISABLE_REGRESS": "on",
-        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "CMAKE_BUILD_TYPE": "Release",
     },
     cmake_options = ["-GNinja"],
     lib_source = "@com_github_libevent_libevent//:all",
