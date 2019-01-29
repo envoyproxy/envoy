@@ -63,8 +63,9 @@ maximize the chances of your PR being merged.
 * For configuration deprecations that are not covered by the above semantic
   replacement policy, any deprecation will only take place after
   community consultation on mailing lists, Slack and GitHub, over the period of
-  a minimum of four Envoy release cycles (~12 months). This includes where a
-  feature is outright deleted with no replacement.
+  a minimum of two Envoy release cycles (~6 months). Cases where a feature is
+  outright deleted with no replacement will get an additional two Envoy release
+  cycles (~12 months) before removal.
 
 # Release cadence
 
