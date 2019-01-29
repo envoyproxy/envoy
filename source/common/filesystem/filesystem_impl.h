@@ -89,7 +89,7 @@ ssize_t fileSize(const std::string& path);
 
 /**
  * @return full file content as a string.
- * @throw EnvoyException if the file cannot be read.
+ * @throw EnvoyException if the file cannot be read, or if the path is blacklisted.
  * Be aware, this is not most highly performing file reading method.
  */
 std::string fileReadToEnd(const std::string& path);

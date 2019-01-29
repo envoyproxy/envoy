@@ -51,6 +51,10 @@ ssize_t fileSize(const std::string& path) {
 }
 
 std::string fileReadToEnd(const std::string& path) {
+  if (illegalPath(path)) {
+    throw EnvoyException(fmt::format("Invalid path: {}", path));
+  }
+
   std::ios::sync_with_stdio(false);
 
   std::ifstream file(path);

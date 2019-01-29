@@ -97,6 +97,10 @@ TEST_F(FileSystemImplTest, fileReadToEndDoesNotExist) {
                EnvoyException);
 }
 
+TEST_F(FileSystemImplTest, fileReadToEndBlacklisted) {
+  EXPECT_THROW(Filesystem::fileReadToEnd("/dev/urandom"), EnvoyException);
+}
+
 TEST_F(FileSystemImplTest, CanonicalPathSuccess) {
   EXPECT_EQ("/", Filesystem::canonicalPath("//"));
 }
