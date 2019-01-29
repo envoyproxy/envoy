@@ -115,13 +115,13 @@ public:
     EXPECT_EQ(expected_listeners_config_dump.DebugString(), listeners_config_dump.DebugString());
   }
 
-  Event::SimulatedTimeSystem time_system_;
   NiceMock<MockInstance> server_;
   NiceMock<MockListenerComponentFactory> listener_factory_;
   MockWorker* worker_ = new MockWorker();
   NiceMock<MockWorkerFactory> worker_factory_;
   std::unique_ptr<ListenerManagerImpl> manager_;
   NiceMock<MockGuardDog> guard_dog_;
+  Event::SimulatedTimeSystem time_system_;
 };
 
 class ListenerManagerImplWithRealFiltersTest : public ListenerManagerImplTest {
