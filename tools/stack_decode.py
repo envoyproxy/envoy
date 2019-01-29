@@ -16,6 +16,7 @@ import re
 import subprocess
 import sys
 
+
 # Process the log output looking for stacktrace snippets, for each line found to
 # contain backtrace output extract the address and call add2line to get the file
 # and line information. Output appended to end of original backtrace line. Output
@@ -54,6 +55,7 @@ def run_addr2line(obj_file, addr_to_resolve):
                                stdout=subprocess.PIPE)
   output_stdout, _ = addr2line.communicate()
   return output_stdout
+
 
 if __name__ == "__main__":
   if len(sys.argv) > 2 and sys.argv[1] == '-s':
