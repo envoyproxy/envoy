@@ -64,7 +64,8 @@ public:
    * Log the stack trace.
    */
   void logTrace() {
-    ENVOY_LOG(critical, "Backtrace:");
+    ENVOY_LOG(critical,
+              "Backtrace (use tools/stack_decode.py to get line numbers):");
 
     for (int i = 0; i < stack_depth_; ++i) {
       char out[1024];
@@ -72,7 +73,7 @@ public:
       if (success) {
         ENVOY_LOG(critical, "#{}: {} [{}]", i, out, stack_trace_[i]);
       } else {
-        ENVOY_LOG(critical, "#{}: {}", i, stack_trace_[i]);
+        ENVOY_LOG(critical, "#{}: [{}]", i, stack_trace_[i]);
       }
     }
   }
