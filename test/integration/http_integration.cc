@@ -1866,22 +1866,40 @@ void HttpIntegrationTest::testMultipleContentLengths() {
   }
 }
 
-void HttpIntegrationTest::testOverlyLongHeaders() {
+void HttpIntegrationTest::testLargeRequestHeaders(uint32_t size, uint32_t max_size) {
+  // `size` parameter is the size of the header that will be added to the
+  // request. The actual request byte size will exceed `size` due to keys
+  // and other headers.
+
+  config_helper_.addConfigModifier(
+      [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
+          -> void { hcm.mutable_max_request_headers_size_kb()->set_value(max_size); });
+
   Http::TestHeaderMapImpl big_headers{
       {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
 
-  big_headers.addCopy("big", std::string(60 * 1024, 'a'));
+  big_headers.addCopy("big", std::string(size * 1024, 'a'));
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
+  if (size >= max_size) {
+    // header size includes keys too, so expect rejection when equal
+    auto encoder_decoder = codec_client_->startRequest(big_headers);
+    auto response = std::move(encoder_decoder.second);
 
-  auto encoder_decoder = codec_client_->startRequest(big_headers);
-  auto response = std::move(encoder_decoder.second);
-
-  codec_client_->waitForDisconnect();
-
-  EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("431", response->headers().Status()->value().c_str());
+    if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+      codec_client_->waitForDisconnect();
+      EXPECT_TRUE(response->complete());
+      EXPECT_STREQ("431", response->headers().Status()->value().c_str());
+    } else {
+      response->waitForReset();
+      codec_client_->close();
+    }
+  } else {
+    auto response = sendRequestAndWaitForResponse(big_headers, 0, default_response_headers_, 0);
+    EXPECT_TRUE(response->complete());
+    EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  }
 }
 
 void HttpIntegrationTest::testUpstreamProtocolError() {
