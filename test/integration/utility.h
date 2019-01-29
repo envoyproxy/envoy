@@ -146,9 +146,6 @@ public:
                     const std::string& body, Http::CodecClient::Type type,
                     Network::Address::IpVersion ip_version, const std::string& host = "host",
                     const std::string& content_type = "");
-
-  // TODO(jmarantz): this should be injectable.
-  static DangerousDeprecatedTestTime evil_singleton_test_time_;
 };
 
 // A set of connection callbacks which tracks connection state.
