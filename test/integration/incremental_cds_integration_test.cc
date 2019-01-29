@@ -9,7 +9,7 @@
 #include "common/protobuf/utility.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
-#include "test/integration/incremental_xds_integration_test_base.h"
+#include "test/integration/http_integration.h"
 #include "test/integration/utility.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/network_utility.h"
@@ -79,11 +79,11 @@ static_resources:
 const char ClusterName[] = "cluster_0";
 const int UpstreamIndex = 1;
 
-class CdsIntegrationTest : public IncrementalXdsIntegrationTestBase,
+class CdsIntegrationTest : public HttpIntegrationTest,
                            public Grpc::GrpcClientIntegrationParamTest {
 public:
   CdsIntegrationTest()
-      : IncrementalXdsIntegrationTestBase(Http::CodecClient::Type::HTTP2, ipVersion(), Config) {}
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), realTime(), Config) {}
 
   void TearDown() override {
     cleanUpXdsConnection();
@@ -134,7 +134,7 @@ public:
     //    the bootstrap config have come up, and registering them in a port map (see lookupPort()).
     //    However, this test needs to defer all of that to later.
     defer_listener_finalization_ = true;
-    IncrementalXdsIntegrationTestBase::initialize();
+    HttpIntegrationTest::initialize();
 
     // Create the regular (i.e. not an xDS server) upstream. We create it manually here after
     // initialize() because finalize() expects all fake_upstreams_ to correspond to a static
@@ -153,8 +153,8 @@ public:
     xds_stream_->startGrpcStream();
     fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
-    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, {}, {}));
-    sendDiscoveryResponse<envoy::api::v2::Cluster>({buildCluster(ClusterName)}, {}, "1");
+    EXPECT_TRUE(compareIncrementalDiscoveryRequest(Config::TypeUrl::get().Cluster, {}, {}));
+    sendIncrementalDiscoveryResponse<envoy::api::v2::Cluster>({buildCluster(ClusterName)}, {}, "1");
     // We can continue the test once we're sure that Envoy's ClusterManager has made use of
     // the DiscoveryResponse describing cluster_0 that we sent.
     // 2 because the statically specified CDS server itself counts as a cluster.
@@ -185,8 +185,8 @@ TEST_P(CdsIntegrationTest, CdsClusterUpDownUp) {
 >>>>>>> bring in final touches from CDS integration test PR
 
   // Tell Envoy that cluster_0 is gone.
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, {}, {}));
-  sendDiscoveryResponse<envoy::api::v2::Cluster>({}, {ClusterName}, "42");
+  EXPECT_TRUE(compareIncrementalDiscoveryRequest(Config::TypeUrl::get().Cluster, {}, {}));
+  sendIncrementalDiscoveryResponse<envoy::api::v2::Cluster>({}, {ClusterName}, "42");
   // We can continue the test once we're sure that Envoy's ClusterManager has made use of
   // the DiscoveryResponse that says cluster_0 is gone.
   test_server_->waitForCounterGe("cluster_manager.cluster_removed", 1);
@@ -201,8 +201,8 @@ TEST_P(CdsIntegrationTest, CdsClusterUpDownUp) {
   codec_client_->waitForDisconnect();
 
   // Tell Envoy that cluster_0 is back.
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, {}, {}));
-  sendDiscoveryResponse<envoy::api::v2::Cluster>({buildCluster(ClusterName)}, {}, "413");
+  EXPECT_TRUE(compareIncrementalDiscoveryRequest(Config::TypeUrl::get().Cluster, {}, {}));
+  sendIncrementalDiscoveryResponse<envoy::api::v2::Cluster>({buildCluster(ClusterName)}, {}, "413");
 
   // We can continue the test once we're sure that Envoy's ClusterManager has made use of
   // the DiscoveryResponse describing cluster_0 that we sent. Again, 2 includes CDS server.

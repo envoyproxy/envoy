@@ -105,7 +105,7 @@ envoy_cc_test(
         "//test/config/integration/certs",
     ],
     deps = [
-        ":incremental_xds_integration_test_base",
+        ":http_integration_lib",
         "//source/common/config:protobuf_link_hacks",
         "//source/common/config:resources_lib",
         "//source/common/protobuf:utility_lib",
@@ -302,26 +302,6 @@ envoy_cc_test(
     deps = [
         ":http_protocol_integration_lib",
         "//test/test_common:test_time_lib",
-    ],
-)
-
-envoy_cc_test_library(
-    name = "incremental_xds_integration_test_base",
-    srcs = [
-        "incremental_xds_integration_test_base.cc",
-    ],
-    hdrs = [
-        "incremental_xds_integration_test_base.h",
-    ],
-    deps = [
-        ":http_integration_lib",
-        ":test_host_predicate_lib",
-        "//include/envoy/event:timer_interface",
-        "//source/common/common:thread_annotations",
-        "//source/extensions/filters/http/router:config",
-        "//source/extensions/filters/network/http_connection_manager:config",
-        "//test/common/upstream:utility_lib",
-        "//test/test_common:registry_lib",
     ],
 )
 
