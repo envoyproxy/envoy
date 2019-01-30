@@ -97,7 +97,7 @@
   the same time, also add a new empty "pending" section to the [release
   notes](docs/root/intro/version_history.rst) and to [DEPRECATED.md](DEPRECATED.md) for the
   following version. E.g., "1.7.0 (pending)".
-* Run the deprecate_versions.py script (e.g. `sh tools/deprecate_version/deprecate_version.sh 1.9.0 1.10.0`)
+* Run the deprecate_versions.py script (e.g. `sh tools/deprecate_version/deprecate_version.sh 1.8.0 1.10.0`)
   to file tracking issues for code which can be removed.
 
 ## When does a maintainer lose maintainer status

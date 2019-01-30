@@ -11,6 +11,9 @@ load("//bazel:cc_configure.bzl", "cc_configure")
 envoy_dependencies(
     path = "@envoy//ci/prebuilt",
 )
+# TODO(htuch): Roll this into envoy_dependencies()
+load("@rules_foreign_cc//:workspace_definitions.bzl", "rules_foreign_cc_dependencies")
+rules_foreign_cc_dependencies()
 
 cc_configure()
 
