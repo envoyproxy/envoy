@@ -37,6 +37,7 @@ def decode_stacktrace_log(object_file, input_source):
       if stackaddr_match:
         address = stackaddr_match.groups()[0]
         file_and_line_number = run_addr2line(object_file, address)
+        file_and_line_number = trim_proc_cwd(file_and_line_number)
         sys.stdout.write("%s %s" % (line.strip(), file_and_line_number))
         continue
       else:
@@ -55,6 +56,25 @@ def run_addr2line(obj_file, addr_to_resolve):
                                stdout=subprocess.PIPE)
   output_stdout, _ = addr2line.communicate()
   return output_stdout
+
+
+# Because of how bazel compiles, addr2line reports file names that begin with
+# "/proc/self/cwd/" and sometimes even "/proc/self/cwd/./". This isn't particularly
+# useful information, so trim it out and make a perfectly useful relative path.
+def trim_proc_cwd(file_and_line_number):
+  # Try the longer trim first, it will leave the string untouched if it doesn't
+  # match.
+  file_and_line_number = trim_from_start(file_and_line_number, "/proc/self/cwd/./")
+  file_and_line_number = trim_from_start(file_and_line_number, "/proc/self/cwd/")
+  return file_and_line_number
+
+
+def trim_from_start(string, trim):
+  if string.startswith(trim):
+    return string[len(trim):]
+  else:
+
+    return string
 
 
 if __name__ == "__main__":

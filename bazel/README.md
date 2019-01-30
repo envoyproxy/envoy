@@ -188,11 +188,28 @@ actions like segfaults. Where supported, stack traces will contain resolved
 symbols, though not include line numbers. On systems where absl::Symbolization is
 not supported, the stack traces written in the log or to stderr contain addresses rather
 than resolved symbols. If the symbols were resolved, the address is also included at
-the end of the line. It can be used with a debugging tool like `addr2line` to
-get a precise line number if the required debugging info is available.
+the end of the line.
 
-You will need to use either a `dbg` build type or the `opt` build type to get symbol
-information in the binaries.
+The `tools/stack_decode.py` script exists to process the output and do additional symbol
+resolution including file names and line numbers. It requires the `addr2line` program be
+installed and in your path. Any log lines not relevant to the backtrace capability are
+passed through the script unchanged (it acts like a filter). File and line information
+is appended to the stack trace lines.
+
+The script runs in one of two modes. To process log input from stdin, pass `-s` as the first
+argument, followed by the executable file path. You can postprocess a log or pipe the output
+of an Envoy process. If you do not specify the `-s` argument it runs the arguments as a child
+process. This enables you to run a test with backtrace post processing. Bazel sandboxing must
+be disabled by specifying standalone execution. Example command line:
+
+```
+bazel test -c dbg //test/server:backtrace_test
+--run_under=`pwd`/tools/stack_decode.py --strategy=TestRunner=standalone
+--cache_test_results=no --test_output=all
+```
+
+You will need to use either a `dbg` build type or the `opt` build type to get file and line
+symbol information in the binaries.
 
 By default main.cc will install signal handlers to print backtraces at the
 location where a fatal signal occurred. The signal handler will re-raise the
