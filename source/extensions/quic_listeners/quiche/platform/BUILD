@@ -57,6 +57,7 @@ envoy_cc_library(
         "quic_map_util_impl.h",
         "quic_prefetch_impl.h",
         "quic_ptr_util_impl.h",
+        "quic_sleep_impl.h",
         "quic_string_impl.h",
         "quic_string_piece_impl.h",
         "quic_test_impl.h",
