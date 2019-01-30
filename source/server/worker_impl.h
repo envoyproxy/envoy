@@ -11,7 +11,6 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/common/logger.h"
-#include "common/common/thread.h"
 
 #include "server/test_hooks.h"
 

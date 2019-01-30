@@ -2,14 +2,21 @@
 
 #include "envoy/event/timer.h"
 
+#include "common/common/assert.h"
 #include "common/common/thread.h"
+
+#include "test/test_common/global.h"
 
 namespace Envoy {
 namespace Event {
 
+class TestTimeSystem;
+
 // Adds sleep() and waitFor() interfaces to Event::TimeSystem.
 class TestTimeSystem : public Event::TimeSystem {
 public:
+  virtual ~TestTimeSystem() = default;
+
   /**
    * Advances time forward by the specified duration, running any timers
    * along the way that have been scheduled to fire.
@@ -39,6 +46,82 @@ public:
                                       const D& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) {
     return waitFor(mutex, condvar, std::chrono::duration_cast<Duration>(duration));
   }
+};
+
+// There should only be one instance of any time-system resident in a test
+// process at once. This helper class is used with Test::Global to help enforce
+// that with an ASSERT. Each time-system derivation should have a helper
+// implementation which is referenced from a delegate (see
+// DelegatingTestTimeSystemBase). In each delegate, a SingletonTimeSystemHelper
+// should be instantiated via Test::Global<SingletonTimeSystemHelper>. Only one
+// instance of SingletonTimeSystemHelper per process, at a time. When all
+// references to the delegates are destructed, the singleton will be destroyed
+// as well, so each test-method will get a fresh start.
+class SingletonTimeSystemHelper {
+public:
+  SingletonTimeSystemHelper() : time_system_(nullptr) {}
+
+  void set(TestTimeSystem* time_system) {
+    RELEASE_ASSERT(time_system_ == nullptr, "Unexpected reset of SingletonTimeSystemHelper");
+    time_system_.reset(time_system);
+  }
+
+  TestTimeSystem* timeSystem() { return time_system_.get(); }
+
+private:
+  std::unique_ptr<TestTimeSystem> time_system_;
+};
+
+// Implements the TestTimeSystem interface, delegating implementation of all
+// methods to a TestTimeSystem reference supplied by a timeSystem() method in a
+// subclass.
+template <class TimeSystemVariant> class DelegatingTestTimeSystemBase : public TestTimeSystem {
+public:
+  void sleep(const Duration& duration) override { timeSystem().sleep(duration); }
+
+  Thread::CondVar::WaitStatus
+  waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
+          const Duration& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) override {
+    return timeSystem().waitFor(mutex, condvar, duration);
+  }
+
+  SchedulerPtr createScheduler(Libevent::BasePtr& base_ptr) override {
+    return timeSystem().createScheduler(base_ptr);
+  }
+  SystemTime systemTime() override { return timeSystem().systemTime(); }
+  MonotonicTime monotonicTime() override { return timeSystem().monotonicTime(); }
+
+  TimeSystemVariant& operator*() { return timeSystem(); }
+
+  virtual TimeSystemVariant& timeSystem() PURE;
+};
+
+// Wraps a concrete time-system in a delegate that ensures there is only one
+// time-system of any variant resident in a process at a time. Attempts to
+// instantiate multiple instances of the same type of time-system will simply
+// reference the same shared delegate, which will be deleted when the last one
+// goes out of scope. Attempts to instantiate different types of type-systems
+// will result in a RELEASE_ASSERT. See the testcases in
+// test_time_system_test.cc to understand the allowable sequences.
+template <class TimeSystemVariant>
+class DelegatingTestTimeSystem : public DelegatingTestTimeSystemBase<TimeSystemVariant> {
+public:
+  DelegatingTestTimeSystem() {
+    TestTimeSystem* time_system = singleton_->timeSystem();
+    if (time_system == nullptr) {
+      time_system_ = new TimeSystemVariant;
+      singleton_->set(time_system_);
+    } else {
+      time_system_ = dynamic_cast<TimeSystemVariant*>(time_system);
+      RELEASE_ASSERT(time_system_, "Two different types of time-systems allocated");
+    }
+  }
+
+  TimeSystemVariant& timeSystem() override { return *time_system_; }
+
+private:
+  TimeSystemVariant* time_system_;
+  Test::Global<SingletonTimeSystemHelper> singleton_;
 };
 
 } // namespace Event

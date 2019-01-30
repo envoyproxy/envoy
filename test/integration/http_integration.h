@@ -150,7 +150,7 @@ protected:
       ConnectionCreationFunction* creator = nullptr);
   void testRouterUpstreamResponseBeforeRequestComplete();
   void testTwoRequests(bool force_network_backup = false);
-  void testOverlyLongHeaders();
+  void testLargeRequestHeaders(uint32_t size, uint32_t max_size = 60);
   void testIdleTimeoutBasic();
   void testIdleTimeoutWithTwoRequests();
   void testIdleTimerDisabled();

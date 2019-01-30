@@ -354,7 +354,7 @@ private:
     const double effective_weight_;
   };
 
-  // Rebuilds the provided locality scheduler with locality entires based on the locality weights
+  // Rebuilds the provided locality scheduler with locality entries based on the locality weights
   // and eligible hosts.
   //
   // @param locality_scheduler the locality scheduler to rebuild. Will be set to nullptr if no
@@ -562,7 +562,7 @@ public:
          Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
          AccessLog::AccessLogManager& log_manager, const LocalInfo::LocalInfo& local_info,
          Server::Admin& admin, Singleton::Manager& singleton_manager,
-         Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api);
+         Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api, Api::Api& api);
   // Upstream::Cluster
   PrioritySet& prioritySet() override { return priority_set_; }
   const PrioritySet& prioritySet() const override { return priority_set_; }

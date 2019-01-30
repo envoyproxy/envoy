@@ -35,8 +35,8 @@ public:
 
   /**
    * @param headers the headers to parse.
-   * @param bool indicating wether the header is at end_stream.
-   * @return bool indicating whether the header is a gRPC reseponse header
+   * @param bool indicating whether the header is at end_stream.
+   * @return bool indicating whether the header is a gRPC response header
    */
   static bool isGrpcResponseHeader(const Http::HeaderMap& headers, bool end_stream);
 
@@ -69,7 +69,7 @@ public:
   /**
    * Encode 'timeout' into 'grpc-timeout' format.
    * @param timeout the duration in std::chrono::milliseconds.
-   * @param value the HeaderString onto which format the timeout in 'grpc-timeout' format, upto
+   * @param value the HeaderString onto which format the timeout in 'grpc-timeout' format, up to
    *        8 decimal digits and a letter indicating the unit.
    */
   static void toGrpcTimeout(const std::chrono::milliseconds& timeout, Http::HeaderString& value);

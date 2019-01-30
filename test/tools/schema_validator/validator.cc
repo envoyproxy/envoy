@@ -46,7 +46,7 @@ Options::Options(int argc, char** argv) {
 }
 
 void Validator::validate(const std::string& json_path, Schema::Type schema_type) {
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromFile(json_path);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromFile(json_path, *api_);
 
   switch (schema_type) {
   case Schema::Type::Route: {

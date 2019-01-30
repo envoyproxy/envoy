@@ -323,7 +323,7 @@ message HystrixSink {
   //
   // rolling_window(ms) = stats_flush_interval(ms) * num_of_buckets
   //
-  // More detailed explanation can be found in `Hystix wiki
+  // More detailed explanation can be found in `Hystrix wiki
   // <https://github.com/Netflix/Hystrix/wiki/Metrics-and-Monitoring#hystrixrollingnumber>`_.
   int64 num_buckets = 1;
 }

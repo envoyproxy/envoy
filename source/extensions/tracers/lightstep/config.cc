@@ -20,7 +20,8 @@ LightstepTracerFactory::LightstepTracerFactory() : FactoryBase(TracerNames::get(
 Tracing::HttpTracerPtr LightstepTracerFactory::createHttpTracerTyped(
     const envoy::config::trace::v2::LightstepConfig& proto_config, Server::Instance& server) {
   auto opts = std::make_unique<lightstep::LightStepTracerOptions>();
-  const auto access_token_file = server.api().fileReadToEnd(proto_config.access_token_file());
+  const auto access_token_file =
+      server.api().fileSystem().fileReadToEnd(proto_config.access_token_file());
   const auto access_token_sv = StringUtil::rtrim(access_token_file);
   opts->access_token.assign(access_token_sv.data(), access_token_sv.size());
   opts->component_name = server.localInfo().clusterName();
