@@ -182,9 +182,9 @@ def fixJavaOuterClassnameProtoOption(file_path):
     if "option java_outer_classname = " in line:
       return []
 
-  to_add = ("option java_outer_classname = \""
-            +''.join(x.title() for x in file_name.split('_'))
-            + "Proto\";\n")
+  to_add = "option java_outer_classname = \"" \
+       + ''.join(x.title() for x in file_name.split('_')) \
+       + "Proto\";\n"
 
   for line in fileinput.FileInput(file_path, inplace=True):
     if line.startswith("package "):
