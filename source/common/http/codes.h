@@ -41,7 +41,7 @@ private:
    * prefixes, which are fairly common.
    *
    * Note: this layer probably should be called something other than join(),
-   * like joinSkipppingLeadingEmptyToken but I thought the decrease in
+   * like joinSkippingLeadingEmptyToken but I thought the decrease in
    * readability at all the call-sites would not be worth it.
    */
   static std::string join(const std::vector<absl::string_view>& v);

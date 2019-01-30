@@ -14,7 +14,7 @@ CheckResponsePtr TestCommon::makeCheckResponse(Grpc::Status::GrpcStatus response
                                                envoy::type::StatusCode http_status_code,
                                                const std::string& body,
                                                const HeaderValueOptionVector& headers) {
-  auto response = std::make_unique<envoy::service::auth::v2alpha::CheckResponse>();
+  auto response = std::make_unique<envoy::service::auth::v2::CheckResponse>();
   auto status = response->mutable_status();
   status->set_code(response_status);
 

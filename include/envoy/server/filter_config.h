@@ -205,7 +205,7 @@ public:
    * implementation is unable to produce a factory with the provided parameters, it should throw an
    * EnvoyException.
    * @param config supplies the protobuf configuration for the filter
-   * @return Upstream::ProtocoOptionsConfigConstSharedPtr the protocol options
+   * @return Upstream::ProtocolOptionsConfigConstSharedPtr the protocol options
    */
   virtual Upstream::ProtocolOptionsConfigConstSharedPtr
   createProtocolOptionsConfig(const Protobuf::Message& config) {

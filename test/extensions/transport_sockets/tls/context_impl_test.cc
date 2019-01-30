@@ -583,7 +583,7 @@ TEST(ClientContextConfigImplTest, InvalidCertificateSpki) {
                           EnvoyException, "Invalid base64-encoded SHA-256 .*");
 }
 
-// Validate that 2048-bit RSA ceritificates load successfully.
+// Validate that 2048-bit RSA certificates load successfully.
 TEST(ClientContextConfigImplTest, RSA2048Cert) {
   envoy::api::v2::auth::UpstreamTlsContext tls_context;
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
@@ -628,7 +628,7 @@ TEST(ClientContextConfigImplTest, RSA1024Cert) {
 #endif
 }
 
-// Validate that 3072-bit RSA ceritificates load successfully.
+// Validate that 3072-bit RSA certificates load successfully.
 TEST(ClientContextConfigImplTest, RSA3072Cert) {
   envoy::api::v2::auth::UpstreamTlsContext tls_context;
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
@@ -647,7 +647,7 @@ TEST(ClientContextConfigImplTest, RSA3072Cert) {
   manager.createSslClientContext(store, client_context_config);
 }
 
-// Validate that 4096-bit RSA ceritificates load successfully in non-FIPS builds, but are rejected
+// Validate that 4096-bit RSA certificates load successfully in non-FIPS builds, but are rejected
 // in FIPS builds.
 TEST(ClientContextConfigImplTest, RSA4096Cert) {
   envoy::api::v2::auth::UpstreamTlsContext tls_context;

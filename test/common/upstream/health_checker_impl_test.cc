@@ -2733,7 +2733,7 @@ public:
         .WillOnce(Return(45000));
     expectHealthcheckStop(0, 45000);
 
-    // Host state should not be changed (remains healty).
+    // Host state should not be changed (remains healthy).
     EXPECT_CALL(*this, onHostStatus(cluster_->prioritySet().getMockHostSet(0)->hosts_[0],
                                     HealthTransition::Unchanged));
     respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::SERVING);
@@ -2864,7 +2864,7 @@ TEST_F(GrpcHealthCheckerImplTest, SuccessNoTraffic) {
 
   // Default healthcheck interval for hosts without traffic is 60 seconds.
   expectHealthcheckStop(0, 60000);
-  // Host state should not be changed (remains healty).
+  // Host state should not be changed (remains healthy).
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
   respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::SERVING);
   expectHostHealthy(true);
@@ -2892,7 +2892,7 @@ TEST_F(GrpcHealthCheckerImplTest, SuccessStartFailedSuccessFirst) {
   expectHostHealthy(true);
 }
 
-// Test host recovery after first failed check requires several successul checks.
+// Test host recovery after first failed check requires several successful checks.
 TEST_F(GrpcHealthCheckerImplTest, SuccessStartFailedFailFirst) {
   setupHC();
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
@@ -2934,7 +2934,7 @@ TEST_F(GrpcHealthCheckerImplTest, SuccessStartFailedFailFirst) {
   expectHostHealthy(true);
 }
 
-// Test host recovery after explicit check failure requires several successul checks.
+// Test host recovery after explicit check failure requires several successful checks.
 TEST_F(GrpcHealthCheckerImplTest, GrpcHealthFail) {
   setupHC();
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
@@ -3351,7 +3351,7 @@ TEST_F(GrpcHealthCheckerImplTest, GoAwayProbeInProgress) {
             cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 }
 
-// Test receing GOAWAY between checks affects nothing.
+// Test receiving GOAWAY between checks affects nothing.
 TEST_F(GrpcHealthCheckerImplTest, GoAwayBetweenChecks) {
   setupHC();
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
@@ -3384,7 +3384,7 @@ class BadResponseGrpcHealthCheckerImplTest
     : public GrpcHealthCheckerImplTestBase,
       public testing::TestWithParam<GrpcHealthCheckerImplTest::ResponseSpec> {};
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     BadResponse, BadResponseGrpcHealthCheckerImplTest,
     testing::ValuesIn(std::vector<GrpcHealthCheckerImplTest::ResponseSpec>{
         // Non-200 response.

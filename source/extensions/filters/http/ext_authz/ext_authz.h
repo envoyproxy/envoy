@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-#include "envoy/config/filter/http/ext_authz/v2alpha/ext_authz.pb.h"
+#include "envoy/config/filter/http/ext_authz/v2/ext_authz.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/runtime/runtime.h"
@@ -36,7 +36,7 @@ enum class FilterRequestType { Internal, External, Both };
  */
 class FilterConfig {
 public:
-  FilterConfig(const envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz& config,
+  FilterConfig(const envoy::config::filter::http::ext_authz::v2::ExtAuthz& config,
                const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
                Runtime::Loader& runtime, Http::Context& http_context)
       : failure_mode_allow_(config.failure_mode_allow()), local_info_(local_info), scope_(scope),
@@ -67,8 +67,7 @@ class FilterConfigPerRoute : public Router::RouteSpecificFilterConfig {
 public:
   using ContextExtensionsMap = Protobuf::Map<ProtobufTypes::String, ProtobufTypes::String>;
 
-  FilterConfigPerRoute(
-      const envoy::config::filter::http::ext_authz::v2alpha::ExtAuthzPerRoute& config)
+  FilterConfigPerRoute(const envoy::config::filter::http::ext_authz::v2::ExtAuthzPerRoute& config)
       : context_extensions_(config.has_check_settings()
                                 ? config.check_settings().context_extensions()
                                 : ContextExtensionsMap()),
@@ -140,7 +139,7 @@ private:
 
   // Used to identify if the callback to onComplete() is synchronous (on the stack) or asynchronous.
   bool initiating_call_{};
-  envoy::service::auth::v2alpha::CheckRequest check_request_{};
+  envoy::service::auth::v2::CheckRequest check_request_{};
 };
 
 } // namespace ExtAuthz

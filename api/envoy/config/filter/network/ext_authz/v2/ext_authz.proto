@@ -14,7 +14,7 @@ import "validate/validate.proto";
 
 // External Authorization filter calls out to an external service over the
 // gRPC Authorization API defined by
-// :ref:`CheckRequest <envoy_api_msg_service.auth.v2alpha.CheckRequest>`.
+// :ref:`CheckRequest <envoy_api_msg_service.auth.v2.CheckRequest>`.
 // A failed check will cause this filter to close the TCP connection.
 message ExtAuthz {
   // The prefix to use when emitting statistics.

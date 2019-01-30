@@ -92,7 +92,7 @@ TEST_F(RetryPriorityTest, DefaultFrequency) {
   verifyPriorityLoads(original_priority_load, original_degraded_priority_load);
 }
 
-// Tests that we handle all hosts being unhealthy in the orignal priority set.
+// Tests that we handle all hosts being unhealthy in the original priority set.
 TEST_F(RetryPriorityTest, NoHealthyUpstreams) {
   const Upstream::HealthyLoad original_priority_load({0, 0, 0});
   const Upstream::DegradedLoad original_degraded_priority_load({0, 0});
@@ -160,7 +160,7 @@ TEST_F(RetryPriorityTest, DefaultFrequencyUnhealthyPriorities) {
   retry_priority_->onHostAttempted(host2);
   verifyPriorityLoads(expected_priority_load, expected_degraded_priority_load);
 
-  // Once we've exhausted all priorities, we should return to the originial load.
+  // Once we've exhausted all priorities, we should return to the original load.
   retry_priority_->onHostAttempted(host3);
   verifyPriorityLoads(original_priority_load, original_degraded_priority_load);
 }
@@ -202,7 +202,7 @@ TEST_F(RetryPriorityTest, DefaultFrequencyUnhealthyPrioritiesDegradedLoad) {
   retry_priority_->onHostAttempted(host2);
   verifyPriorityLoads(expected_priority_load, expected_degraded_priority_load);
 
-  // Once we've exhausted all priorities, we should return to the originial load.
+  // Once we've exhausted all priorities, we should return to the original load.
   retry_priority_->onHostAttempted(host3);
   verifyPriorityLoads(original_priority_load, original_degraded_priority_load);
 }
@@ -244,7 +244,7 @@ TEST_F(RetryPriorityTest, DefaultFrequencyUnhealthyPrioritiesDegradedLoadSpillov
   retry_priority_->onHostAttempted(host3);
   verifyPriorityLoads(expected_priority_load, expected_degraded_priority_load);
 
-  // Once we've exhausted all priorities, we should return to the originial load.
+  // Once we've exhausted all priorities, we should return to the original load.
   retry_priority_->onHostAttempted(host1);
   verifyPriorityLoads(original_priority_load, original_degraded_priority_load);
 }
@@ -274,7 +274,7 @@ TEST_F(RetryPriorityTest, OverridenFrequency) {
   retry_priority_->onHostAttempted(host1);
   verifyPriorityLoads(original_priority_load, original_degraded_priority_load);
 
-  // After a second attempt, the prioity load should change.
+  // After a second attempt, the priority load should change.
   const Upstream::HealthyLoad expected_priority_load({0, 100});
   const Upstream::DegradedLoad expected_degraded_priority_load({0, 0});
   retry_priority_->onHostAttempted(host1);

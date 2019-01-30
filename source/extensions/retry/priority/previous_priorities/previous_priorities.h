@@ -26,7 +26,7 @@ public:
 
 private:
   void recalculatePerPriorityState(uint32_t priority, const Upstream::PrioritySet& priority_set) {
-    // Recalcuate health and priority the same way the load balancer does it.
+    // Recalculate health and priority the same way the load balancer does it.
     Upstream::LoadBalancerBase::recalculatePerPriorityState(
         priority, priority_set, per_priority_load_, per_priority_health_, per_priority_degraded_);
   }

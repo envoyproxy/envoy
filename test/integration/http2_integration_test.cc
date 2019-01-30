@@ -18,9 +18,9 @@ using ::testing::MatchesRegex;
 
 namespace Envoy {
 
-INSTANTIATE_TEST_CASE_P(IpVersions, Http2IntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, Http2IntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(Http2IntegrationTest, RouterNotFound) { testRouterNotFound(); }
 
@@ -131,20 +131,9 @@ TEST_P(Http2IntegrationTest, RetryPriority) { testRetryPriority(); }
 
 TEST_P(Http2IntegrationTest, GrpcRetry) { testGrpcRetry(); }
 
-// Send a request with overly large headers, and ensure it results in stream reset.
-TEST_P(Http2IntegrationTest, MaxHeadersInCodec) {
-  Http::TestHeaderMapImpl big_headers{
-      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+TEST_P(Http2IntegrationTest, LargeHeadersInvokeResetStream) { testLargeRequestHeaders(62, 60); }
 
-  big_headers.addCopy("big", std::string(63 * 1024, 'a'));
-
-  initialize();
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto encoder_decoder = codec_client_->startRequest(big_headers);
-  auto response = std::move(encoder_decoder.second);
-  response->waitForReset();
-  codec_client_->close();
-}
+TEST_P(Http2IntegrationTest, LargeHeadersAcceptedIfConfigured) { testLargeRequestHeaders(62, 63); }
 
 TEST_P(Http2IntegrationTest, EncodingHeaderOnlyResponse) { testHeadersOnlyFilterEncoding(); }
 
@@ -337,6 +326,54 @@ TEST_P(Http2IntegrationTest, IdleTimeoutWithSimultaneousRequests) {
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_idle_timeout", 2);
 }
 
+// Test request mirroring / shadowing with an HTTP/2 downstream and a request with a body.
+TEST_P(Http2IntegrationTest, RequestMirrorWithBody) {
+  config_helper_.addConfigModifier(
+      [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
+          -> void {
+        hcm.mutable_route_config()
+            ->mutable_virtual_hosts(0)
+            ->mutable_routes(0)
+            ->mutable_route()
+            ->mutable_request_mirror_policy()
+            ->set_cluster("cluster_0");
+      });
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Send request with body.
+  IntegrationStreamDecoderPtr request =
+      codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "POST"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "host"}},
+                                         "hello");
+
+  // Wait for the first request as well as the shadow.
+  waitForNextUpstreamRequest();
+
+  FakeHttpConnectionPtr fake_upstream_connection2;
+  FakeStreamPtr upstream_request2;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection2));
+  ASSERT_TRUE(fake_upstream_connection2->waitForNewStream(*dispatcher_, upstream_request2));
+  ASSERT_TRUE(upstream_request2->waitForEndStream(*dispatcher_));
+
+  // Make sure both requests have a body. Also check the shadow for the shadow headers.
+  EXPECT_EQ("hello", upstream_request_->body().toString());
+  EXPECT_EQ("hello", upstream_request2->body().toString());
+  EXPECT_EQ("host-shadow", upstream_request2->headers().Host()->value().getStringView());
+
+  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
+  upstream_request2->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
+  request->waitForEndStream();
+  EXPECT_EQ("200", request->headers().Status()->value().getStringView());
+
+  // Cleanup.
+  ASSERT_TRUE(fake_upstream_connection2->close());
+  ASSERT_TRUE(fake_upstream_connection2->waitForDisconnect());
+}
+
 // Interleave two requests and responses and make sure the HTTP2 stack handles this correctly.
 void Http2IntegrationTest::simultaneousRequest(int32_t request1_bytes, int32_t request2_bytes) {
   FakeHttpConnectionPtr fake_upstream_connection1;
@@ -503,13 +540,13 @@ void Http2RingHashIntegrationTest::createUpstreams() {
   }
 }
 
-INSTANTIATE_TEST_CASE_P(IpVersions, Http2RingHashIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, Http2RingHashIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
-INSTANTIATE_TEST_CASE_P(IpVersions, Http2MetadataIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, Http2MetadataIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 void Http2RingHashIntegrationTest::sendMultipleRequests(
     int request_bytes, Http::TestHeaderMapImpl headers,

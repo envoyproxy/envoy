@@ -27,7 +27,7 @@ TEST(SignalsDeathTest, InvalidAddressDeathTest) {
   SignalAction actions;
   EXPECT_DEATH_LOG_TO_STDERR(
       []() -> void {
-        // Oooooops!
+        // Oops!
         volatile int* nasty_ptr = reinterpret_cast<int*>(0x0);
         *(nasty_ptr) = 0;
       }(),
