@@ -109,6 +109,19 @@ cc_library(
 
 cc_library(
     name = "quic_platform",
+    srcs = ["quiche/quic/platform/api/quic_mutex.cc"],
+    hdrs = [
+        "quiche/quic/platform/api/quic_mutex.h",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":quic_platform_base",
+        "@envoy//source/extensions/quic_listeners/quiche/platform:quic_platform_impl_lib",
+    ],
+)
+
+cc_library(
+    name = "quic_platform_base",
     hdrs = [
         "quiche/quic/platform/api/quic_aligned.h",
         "quiche/quic/platform/api/quic_arraysize.h",
@@ -143,7 +156,6 @@ cc_library(
         # "quiche/quic/platform/api/quic_mem_slice_span.h",
         # "quiche/quic/platform/api/quic_mem_slice_storage.h",
         # "quiche/quic/platform/api/quic_mock_log.h",
-        # "quiche/quic/platform/api/quic_mutex.h",
         # "quiche/quic/platform/api/quic_pcc_sender.h",
         # "quiche/quic/platform/api/quic_ptr_util.h",
         # "quiche/quic/platform/api/quic_reference_counted.h",
@@ -164,6 +176,6 @@ cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
-        "@envoy//source/extensions/quic_listeners/quiche/platform:quic_platform_impl_lib",
+        "@envoy//source/extensions/quic_listeners/quiche/platform:quic_platform_base_impl_lib",
     ],
 )
