@@ -55,7 +55,7 @@ typedef std::unique_ptr<Scheduler> SchedulerPtr;
  */
 class TimeSystem : public TimeSource {
 public:
-  virtual ~TimeSystem() {}
+  virtual ~TimeSystem() = default;
 
   using Duration = MonotonicTime::duration;
 
