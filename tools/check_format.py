@@ -172,7 +172,7 @@ def fixJavaPackageProtoOption(file_path):
   return []
 
 
-# Add 'option java_outclass_name = FooBarProto' for foo_bar.proto
+# Add 'option java_outer_classname = FooBarProto' for foo_bar.proto
 def fixJavaOuterClassnameProtoOption(file_path):
   file_name = os.path.basename(file_path)[:-len(".proto")]
   if "-" in file_name or "." in file_name or not file_name.islower():
@@ -182,8 +182,9 @@ def fixJavaOuterClassnameProtoOption(file_path):
     if "option java_outer_classname = " in line:
       return []
 
-  to_add = "option java_outer_classname = \"" + ''.join(
-      x.title() for x in file_name.split('_')) + "Proto\";\n"
+  to_add = ("option java_outer_classname = \""
+            +''.join(x.title() for x in file_name.split('_'))
+            + "Proto\";\n")
 
   for line in fileinput.FileInput(file_path, inplace=True):
     if line.startswith("package "):
