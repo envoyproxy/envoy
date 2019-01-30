@@ -6,7 +6,6 @@
 #include "envoy/http/header_map.h"
 
 #include "common/common/thread.h"
-#include "common/filesystem/filesystem_impl.h"
 #include "common/local_info/local_info_impl.h"
 #include "common/network/utility.h"
 #include "common/stats/thread_local_store.h"

@@ -65,7 +65,7 @@ message AggregatedConfigSource {
 
 // Rate Limit settings to be applied for discovery requests made by Envoy.
 message RateLimitSettings {
-  // Maximum number of tokens to be used for rate limting discovery request calls. If not set, a
+  // Maximum number of tokens to be used for rate limiting discovery request calls. If not set, a
   // default value of 100 will be used.
   google.protobuf.UInt32Value max_tokens = 1;
 

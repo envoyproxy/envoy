@@ -87,7 +87,7 @@ In addition, the following conventions should be followed:
 * Prefer `oneof` selections to boolean overloads of fields, for example, prefer:
 
   ```proto
-  oneof path_secifier {
+  oneof path_specifier {
     string simple_path = 1;
     string regex_path = 2;
   }

@@ -78,6 +78,9 @@ MockFilter::~MockFilter() {}
 MockListenerCallbacks::MockListenerCallbacks() {}
 MockListenerCallbacks::~MockListenerCallbacks() {}
 
+MockUdpListenerCallbacks::MockUdpListenerCallbacks() {}
+MockUdpListenerCallbacks::~MockUdpListenerCallbacks() {}
+
 MockDrainDecision::MockDrainDecision() {}
 MockDrainDecision::~MockDrainDecision() {}
 
