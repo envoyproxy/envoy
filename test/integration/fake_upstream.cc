@@ -218,7 +218,7 @@ FakeHttpConnection::FakeHttpConnection(SharedConnectionWrapper& shared_connectio
     settings.allow_connect_ = true;
     settings.allow_metadata_ = true;
     codec_ = std::make_unique<Http::Http2::ServerConnectionImpl>(shared_connection_.connection(),
-                                                                 *this, store, settings, Http::DEFAULT_MAX_REQUEST_HEADERS_SIZE);
+                                                                 *this, store, settings, Http::DEFAULT_MAX_REQUEST_HEADERS_KB);
     ASSERT(type == Type::HTTP2);
   }
 
