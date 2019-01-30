@@ -15,6 +15,10 @@ PPC_SKIP_TARGETS = {"luajit": "envoy.filters.http.lua"}
 # go version for rules_go
 GO_VERSION = "1.10.4"
 
+# Make all contents of an external repository accessible under a filegroup.  Used for external HTTP
+# archives, e.g. cares.
+BUILD_ALL_CONTENT = """filegroup(name = "all", srcs = glob(["**"]), visibility = ["//visibility:public"])"""
+
 def _repository_impl(name, **kwargs):
     # `existing_rule_keys` contains the names of repositories that have already
     # been defined in the Bazel workspace. By skipping repos with existing keys,
@@ -265,6 +269,9 @@ def envoy_dependencies(path = "@envoy_deps//", skip_targets = []):
     if "envoy_build_config" not in native.existing_rules().keys():
         _default_envoy_build_config(name = "envoy_build_config")
 
+    # Setup rules_foreign_cc
+    _foreign_cc_dependencies()
+
     # Binding to an alias pointing to the selected version of BoringSSL:
     # - BoringSSL FIPS from @boringssl_fips//:ssl,
     # - non-FIPS BoringSSL from @boringssl//:ssl.
@@ -281,6 +288,7 @@ def envoy_dependencies(path = "@envoy_deps//", skip_targets = []):
     _com_google_absl()
     _com_github_bombela_backward()
     _com_github_circonus_labs_libcircllhist()
+    _com_github_c_ares_c_ares()
     _com_github_cyan4973_xxhash()
     _com_github_eile_tclap()
     _com_github_fmtlib_fmt()
@@ -291,8 +299,13 @@ def envoy_dependencies(path = "@envoy_deps//", skip_targets = []):
     _com_lightstep_tracer_cpp()
     _com_github_datadog_dd_opentracing_cpp()
     _com_github_grpc_grpc()
+    _com_github_google_benchmark()
     _com_github_google_jwt_verify()
+    _com_github_jbeder_yaml_cpp()
+    _com_github_libevent_libevent()
+    _com_github_madler_zlib()
     _com_github_nanopb_nanopb()
+    _com_github_nghttp2_nghttp2()
     _com_github_nodejs_http_parser()
     _com_github_tencent_rapidjson()
     _com_google_googletest()
@@ -339,6 +352,18 @@ def _com_github_circonus_labs_libcircllhist():
     native.bind(
         name = "libcircllhist",
         actual = "@com_github_circonus_labs_libcircllhist//:libcircllhist",
+    )
+
+def _com_github_c_ares_c_ares():
+    location = REPOSITORY_LOCATIONS["com_github_c_ares_c_ares"]
+    http_archive(
+        name = "com_github_c_ares_c_ares",
+        build_file_content = BUILD_ALL_CONTENT,
+        **location
+    )
+    native.bind(
+        name = "ares",
+        actual = "//bazel/foreign_cc:ares",
     )
 
 def _com_github_cyan4973_xxhash():
@@ -401,6 +426,17 @@ def _com_github_gcovr_gcovr():
         actual = "@com_github_gcovr_gcovr//:gcovr",
     )
 
+def _com_github_google_benchmark():
+    location = REPOSITORY_LOCATIONS["com_github_google_benchmark"]
+    http_archive(
+        name = "com_github_google_benchmark",
+        **location
+    )
+    native.bind(
+        name = "benchmark",
+        actual = "@com_github_google_benchmark//:benchmark",
+    )
+
 def _com_github_google_libprotobuf_mutator():
     _repository_impl(
         name = "com_github_google_libprotobuf_mutator",
@@ -409,6 +445,57 @@ def _com_github_google_libprotobuf_mutator():
     native.bind(
         name = "libprotobuf_mutator",
         actual = "@com_github_google_libprotobuf_mutator//:libprotobuf_mutator",
+    )
+
+def _com_github_jbeder_yaml_cpp():
+    location = REPOSITORY_LOCATIONS["com_github_jbeder_yaml_cpp"]
+    http_archive(
+        name = "com_github_jbeder_yaml_cpp",
+        build_file_content = BUILD_ALL_CONTENT,
+        **location
+    )
+    native.bind(
+        name = "yaml_cpp",
+        actual = "//bazel/foreign_cc:yaml",
+    )
+
+def _com_github_libevent_libevent():
+    location = REPOSITORY_LOCATIONS["com_github_libevent_libevent"]
+    http_archive(
+        name = "com_github_libevent_libevent",
+        build_file_content = BUILD_ALL_CONTENT,
+        **location
+    )
+    native.bind(
+        name = "event",
+        actual = "//bazel/foreign_cc:event",
+    )
+
+def _com_github_madler_zlib():
+    location = REPOSITORY_LOCATIONS["com_github_madler_zlib"]
+    http_archive(
+        name = "com_github_madler_zlib",
+        build_file_content = BUILD_ALL_CONTENT,
+        **location
+    )
+    native.bind(
+        name = "zlib",
+        actual = "//bazel/foreign_cc:zlib",
+    )
+
+def _com_github_nghttp2_nghttp2():
+    location = REPOSITORY_LOCATIONS["com_github_nghttp2_nghttp2"]
+    http_archive(
+        name = "com_github_nghttp2_nghttp2",
+        build_file_content = BUILD_ALL_CONTENT,
+        patch_args = ["-p1"],
+        patch_cmds = ["find . -name '*.sh' -exec sed -i.orig '1s|#!/usr/bin/env sh\$|/bin/sh\$|' {} +"],
+        patches = ["//bazel/foreign_cc:nghttp2.patch"],
+        **location
+    )
+    native.bind(
+        name = "nghttp2",
+        actual = "//bazel/foreign_cc:nghttp2",
     )
 
 def _io_opentracing_cpp():
@@ -644,6 +731,9 @@ def _com_github_google_jwt_verify():
         name = "jwt_verify_lib",
         actual = "@com_github_google_jwt_verify//:jwt_verify_lib",
     )
+
+def _foreign_cc_dependencies():
+    _repository_impl("rules_foreign_cc")
 
 def _apply_dep_blacklist(ctxt, recipes):
     newlist = []
