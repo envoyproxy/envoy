@@ -36,7 +36,9 @@ namespace Upstream {
 enum class ConfigType { V2_YAML, V1_JSON };
 
 class LogicalDnsClusterTest : public testing::Test {
-public:
+protected:
+  LogicalDnsClusterTest() : api_(Api::createApiForTest(stats_store_)) {}
+
   void setupFromV1Json(const std::string& json) {
     resolve_timer_ = new Event::MockTimer(&dispatcher_);
     NiceMock<MockClusterManager> cm;
@@ -46,7 +48,7 @@ public:
                                                               : cluster_config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
         admin_, ssl_context_manager_, *scope, cm, local_info_, dispatcher_, random_, stats_store_,
-        singleton_manager_, tls_);
+        singleton_manager_, tls_, *api_);
     cluster_.reset(new LogicalDnsCluster(cluster_config, runtime_, dns_resolver_, tls_,
                                          factory_context, std::move(scope), false));
     cluster_->prioritySet().addPriorityUpdateCb(
@@ -65,7 +67,7 @@ public:
                                                               : cluster_config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
         admin_, ssl_context_manager_, *scope, cm, local_info_, dispatcher_, random_, stats_store_,
-        singleton_manager_, tls_);
+        singleton_manager_, tls_, *api_);
     cluster_.reset(new LogicalDnsCluster(cluster_config, runtime_, dns_resolver_, tls_,
                                          factory_context, std::move(scope), false));
     cluster_->prioritySet().addPriorityUpdateCb(
@@ -212,6 +214,7 @@ public:
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Server::MockAdmin> admin_;
   Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest().currentThreadId()};
+  Api::ApiPtr api_;
 };
 
 typedef std::tuple<std::string, Network::DnsLookupFamily, std::list<std::string>>

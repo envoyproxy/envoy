@@ -132,7 +132,7 @@ protected:
         std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), thread_local_,
         Thread::threadFactoryForTest());
 
-    EXPECT_TRUE(server_->api().fileExists("/dev/null"));
+    EXPECT_TRUE(server_->api().fileSystem().fileExists("/dev/null"));
   }
 
   void initializeWithHealthCheckParams(const std::string& bootstrap_path, const double timeout,
@@ -149,7 +149,7 @@ protected:
         std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), thread_local_,
         Thread::threadFactoryForTest());
 
-    EXPECT_TRUE(server_->api().fileExists("/dev/null"));
+    EXPECT_TRUE(server_->api().fileSystem().fileExists("/dev/null"));
   }
 
   // Returns the server's tracer as a pointer, for use in dynamic_cast tests.
@@ -305,18 +305,18 @@ TEST_P(ServerInstanceImplTest, LogToFile) {
   options_.service_cluster_name_ = "some_cluster_name";
   options_.service_node_name_ = "some_node_name";
   EXPECT_NO_THROW(initialize("test/server/empty_bootstrap.yaml"));
-  EXPECT_TRUE(server_->api().fileExists(path));
+  EXPECT_TRUE(server_->api().fileSystem().fileExists(path));
 
   GET_MISC_LOGGER().set_level(spdlog::level::info);
   ENVOY_LOG_MISC(warn, "LogToFile test string");
   Logger::Registry::getSink()->flush();
-  std::string log = server_->api().fileReadToEnd(path);
+  std::string log = server_->api().fileSystem().fileReadToEnd(path);
   EXPECT_GT(log.size(), 0);
   EXPECT_TRUE(log.find("LogToFile test string") != std::string::npos);
 
   // Test that critical messages get immediately flushed
   ENVOY_LOG_MISC(critical, "LogToFile second test string");
-  log = server_->api().fileReadToEnd(path);
+  log = server_->api().fileSystem().fileReadToEnd(path);
   EXPECT_TRUE(log.find("LogToFile second test string") != std::string::npos);
 }
 

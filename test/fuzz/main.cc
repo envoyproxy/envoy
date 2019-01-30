@@ -14,7 +14,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/logger.h"
-#include "common/filesystem/filesystem_impl.h"
+#include "common/stats/isolated_store_impl.h"
 
 #include "test/fuzz/fuzz_runner.h"
 #include "test/test_common/environment.h"
@@ -28,11 +28,17 @@ namespace {
 // List of paths for files in the test corpus.
 std::vector<std::string> test_corpus_;
 
-class FuzzerCorpusTest : public ::testing::TestWithParam<std::string> {};
+class FuzzerCorpusTest : public ::testing::TestWithParam<std::string> {
+protected:
+  FuzzerCorpusTest() : api_(Api::createApiForTest(stats_store_)) {}
+
+  Stats::IsolatedStoreImpl stats_store_;
+  Api::ApiPtr api_;
+};
 
 TEST_P(FuzzerCorpusTest, RunOneCorpusFile) {
   ENVOY_LOG_MISC(info, "Corpus file: {}", GetParam());
-  const std::string buf = Filesystem::fileReadToEnd(GetParam());
+  const std::string buf = api_->fileSystem().fileReadToEnd(GetParam());
   // Everything from here on is the same as under the fuzzer lib.
   LLVMFuzzerTestOneInput(reinterpret_cast<const uint8_t*>(buf.c_str()), buf.size());
 }
@@ -47,6 +53,8 @@ int main(int argc, char** argv) {
   RELEASE_ASSERT(argc >= 2, "");
   // Consider any file after the test path which doesn't have a - prefix to be a corpus entry.
   uint32_t input_args = 0;
+  Envoy::Stats::IsolatedStoreImpl stats_store;
+  Envoy::Api::ApiPtr api = Envoy::Api::createApiForTest(stats_store);
   for (int i = 1; i < argc; ++i) {
     const std::string arg{argv[i]};
     if (arg.empty() || arg[0] == '-') {
@@ -55,7 +63,7 @@ int main(int argc, char** argv) {
     ++input_args;
     // Outputs from envoy_directory_genrule might be directories or we might
     // have artisanal files.
-    if (Envoy::Filesystem::directoryExists(arg)) {
+    if (api->fileSystem().directoryExists(arg)) {
       const auto paths = Envoy::TestUtility::listFiles(arg, true);
       Envoy::test_corpus_.insert(Envoy::test_corpus_.begin(), paths.begin(), paths.end());
     } else {

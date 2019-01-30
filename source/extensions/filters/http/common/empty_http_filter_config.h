@@ -13,7 +13,7 @@ namespace Common {
 
 /**
  * Config registration for http filters that have empty configuration blocks.
- * The boiler plate instantation functions (createFilterFactory, createFilterFactoryFromProto,
+ * The boiler plate instantiation functions (createFilterFactory, createFilterFactoryFromProto,
  * and createEmptyConfigProto) are implemented here. Users of this class have to implement
  * the createFilter function that instantiates the actual filter.
  */

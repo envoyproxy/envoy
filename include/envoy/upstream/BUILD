@@ -93,6 +93,7 @@ envoy_cc_library(
     external_deps = ["abseil_optional"],
     deps = [
         "//include/envoy/common:time_interface",
+        "@envoy_api//envoy/data/cluster/v2alpha:outlier_detection_event_cc",
     ],
 )
 

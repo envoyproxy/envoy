@@ -29,7 +29,7 @@ namespace Upstream {
 
 class EdsTest : public testing::Test {
 protected:
-  EdsTest() { resetCluster(); }
+  EdsTest() : api_(Api::createApiForTest(stats_)) { resetCluster(); }
 
   void resetCluster() {
     resetCluster(R"EOF(
@@ -62,7 +62,7 @@ protected:
         eds_cluster_.alt_stat_name().empty() ? eds_cluster_.name() : eds_cluster_.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
         admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, random_, stats_,
-        singleton_manager_, tls_);
+        singleton_manager_, tls_, *api_);
     cluster_.reset(
         new EdsClusterImpl(eds_cluster_, runtime_, factory_context, std::move(scope), false));
     EXPECT_EQ(Cluster::InitializePhase::Secondary, cluster_->initializePhase());
@@ -80,6 +80,7 @@ protected:
   NiceMock<Server::MockAdmin> admin_;
   Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest().currentThreadId()};
   NiceMock<ThreadLocal::MockInstance> tls_;
+  Api::ApiPtr api_;
 };
 
 class EdsWithHealthCheckUpdateTest : public EdsTest {

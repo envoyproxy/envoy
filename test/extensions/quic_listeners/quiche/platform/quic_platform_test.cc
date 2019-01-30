@@ -4,8 +4,10 @@
 #include "quiche/quic/platform/api/quic_containers.h"
 #include "quiche/quic/platform/api/quic_endian.h"
 #include "quiche/quic/platform/api/quic_estimate_memory_usage.h"
+#include "quiche/quic/platform/api/quic_ptr_util.h"
 #include "quiche/quic/platform/api/quic_string.h"
 #include "quiche/quic/platform/api/quic_string_piece.h"
+#include "quiche/quic/platform/api/quic_uint128.h"
 
 // Basic tests to validate functioning of the QUICHE quic platform
 // implementation. For platform APIs in which the implementation is a simple
@@ -75,6 +77,20 @@ TEST(QuicPlatformTest, QuicStringPiece) {
   quic::QuicString s = "bar";
   quic::QuicStringPiece sp(s);
   EXPECT_EQ('b', sp[0]);
+}
+
+TEST(QuicPlatformTest, QuicUint128) {
+  quic::QuicUint128 i = MakeQuicUint128(16777216, 315);
+  EXPECT_EQ(315, QuicUint128Low64(i));
+  EXPECT_EQ(16777216, QuicUint128High64(i));
+}
+
+TEST(QuicPlatformTest, QuicPtrUtil) {
+  auto p = quic::QuicMakeUnique<quic::QuicString>("abc");
+  EXPECT_EQ("abc", *p);
+
+  p = quic::QuicWrapUnique(new quic::QuicString("aaa"));
+  EXPECT_EQ("aaa", *p);
 }
 
 } // namespace Quiche

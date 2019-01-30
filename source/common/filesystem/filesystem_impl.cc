@@ -27,30 +27,49 @@
 namespace Envoy {
 namespace Filesystem {
 
-bool fileExists(const std::string& path) {
+InstanceImpl::InstanceImpl(std::chrono::milliseconds file_flush_interval_msec,
+                           Thread::ThreadFactory& thread_factory, Stats::Store& stats_store)
+    : file_flush_interval_msec_(file_flush_interval_msec),
+      file_stats_{FILESYSTEM_STATS(POOL_COUNTER_PREFIX(stats_store, "filesystem."),
+                                   POOL_GAUGE_PREFIX(stats_store, "filesystem."))},
+      thread_factory_(thread_factory) {}
+
+FileSharedPtr InstanceImpl::createFile(const std::string& path, Event::Dispatcher& dispatcher,
+                                       Thread::BasicLockable& lock,
+                                       std::chrono::milliseconds file_flush_interval_msec) {
+  return std::make_shared<Filesystem::FileImpl>(path, dispatcher, lock, file_stats_,
+                                                file_flush_interval_msec, thread_factory_);
+};
+
+FileSharedPtr InstanceImpl::createFile(const std::string& path, Event::Dispatcher& dispatcher,
+                                       Thread::BasicLockable& lock) {
+  return createFile(path, dispatcher, lock, file_flush_interval_msec_);
+}
+
+bool InstanceImpl::fileExists(const std::string& path) {
   std::ifstream input_file(path);
   return input_file.is_open();
 }
 
-bool directoryExists(const std::string& path) {
-  DIR* const dir = opendir(path.c_str());
+bool InstanceImpl::directoryExists(const std::string& path) {
+  DIR* const dir = ::opendir(path.c_str());
   const bool dir_exists = nullptr != dir;
   if (dir_exists) {
-    closedir(dir);
+    ::closedir(dir);
   }
 
   return dir_exists;
 }
 
-ssize_t fileSize(const std::string& path) {
+ssize_t InstanceImpl::fileSize(const std::string& path) {
   struct stat info;
-  if (stat(path.c_str(), &info) != 0) {
+  if (::stat(path.c_str(), &info) != 0) {
     return -1;
   }
   return info.st_size;
 }
 
-std::string fileReadToEnd(const std::string& path) {
+std::string InstanceImpl::fileReadToEnd(const std::string& path) {
   std::ios::sync_with_stdio(false);
 
   std::ifstream file(path);
@@ -64,49 +83,37 @@ std::string fileReadToEnd(const std::string& path) {
   return file_string.str();
 }
 
-std::string canonicalPath(const std::string& path) {
+Api::SysCallStringResult InstanceImpl::canonicalPath(const std::string& path) {
   // TODO(htuch): When we are using C++17, switch to std::filesystem::canonical.
   char* resolved_path = ::realpath(path.c_str(), nullptr);
   if (resolved_path == nullptr) {
-    throw EnvoyException(fmt::format("Unable to determine canonical path for {}", path));
+    return {std::string(), errno};
   }
   std::string resolved_path_string{resolved_path};
-  free(resolved_path);
-  return resolved_path_string;
+  ::free(resolved_path);
+  return {resolved_path_string, 0};
 }
 
-bool illegalPath(const std::string& path) {
-  try {
-    const std::string canonical_path = canonicalPath(path);
-    // Platform specific path sanity; we provide a convenience to avoid Envoy
-    // instances poking in bad places. We may have to consider conditioning on
-    // platform in the future, growing these or relaxing some constraints (e.g.
-    // there are valid reasons to go via /proc for file paths).
-    // TODO(htuch): Optimize this as a hash lookup if we grow any further.
-    if (absl::StartsWith(canonical_path, "/dev") || absl::StartsWith(canonical_path, "/sys") ||
-        absl::StartsWith(canonical_path, "/proc")) {
-      return true;
-    }
-    return false;
-  } catch (const EnvoyException& ex) {
-    ENVOY_LOG_MISC(debug, "Unable to determine canonical path for {}: {}", path, ex.what());
+bool InstanceImpl::illegalPath(const std::string& path) {
+  const Api::SysCallStringResult canonical_path = canonicalPath(path);
+  if (canonical_path.rc_.empty()) {
+    ENVOY_LOG_MISC(debug, "Unable to determine canonical path for {}: {}", path,
+                   ::strerror(canonical_path.errno_));
     return true;
   }
+
+  // Platform specific path sanity; we provide a convenience to avoid Envoy
+  // instances poking in bad places. We may have to consider conditioning on
+  // platform in the future, growing these or relaxing some constraints (e.g.
+  // there are valid reasons to go via /proc for file paths).
+  // TODO(htuch): Optimize this as a hash lookup if we grow any further.
+  if (absl::StartsWith(canonical_path.rc_, "/dev") ||
+      absl::StartsWith(canonical_path.rc_, "/sys") ||
+      absl::StartsWith(canonical_path.rc_, "/proc")) {
+    return true;
+  }
+  return false;
 }
-
-Instance::Instance(std::chrono::milliseconds file_flush_interval_msec,
-                   Thread::ThreadFactory& thread_factory, Stats::Store& stats_store)
-    : file_flush_interval_msec_(file_flush_interval_msec),
-      file_stats_{FILESYSTEM_STATS(POOL_COUNTER_PREFIX(stats_store, "filesystem."),
-                                   POOL_GAUGE_PREFIX(stats_store, "filesystem."))},
-      thread_factory_(thread_factory) {}
-
-FileSharedPtr Instance::createFile(const std::string& path, Event::Dispatcher& dispatcher,
-                                   Thread::BasicLockable& lock,
-                                   std::chrono::milliseconds file_flush_interval_msec) {
-  return std::make_shared<Filesystem::FileImpl>(path, dispatcher, lock, file_stats_,
-                                                file_flush_interval_msec, thread_factory_);
-};
 
 FileImpl::FileImpl(const std::string& path, Event::Dispatcher& dispatcher,
                    Thread::BasicLockable& lock, FileSystemStats& stats,

@@ -67,8 +67,8 @@ modify different aspects of the server:
     - :ref:`circuit breakers<config_cluster_manager_cluster_circuit_breakers>` settings for all priority settings.
 
     - Information about :ref:`outlier detection<arch_overview_outlier_detection>` if a detector is installed. Currently
-      :ref:`success rate average<arch_overview_outlier_detection_ejection_event_logging_cluster_success_rate_average>`,
-      and :ref:`ejection threshold<arch_overview_outlier_detection_ejection_event_logging_cluster_success_rate_ejection_threshold>`
+      :ref:`average success rate <envoy_api_field_data.cluster.v2alpha.OutlierEjectSuccessRate.cluster_average_success_rate>`,
+      and :ref:`ejection threshold<envoy_api_field_data.cluster.v2alpha.OutlierEjectSuccessRate.cluster_success_rate_ejection_threshold>`
       are presented. Both of these values could be ``-1`` if there was not enough data to calculate them in the last
       :ref:`interval<envoy_api_field_cluster.OutlierDetection.interval>`.
 
