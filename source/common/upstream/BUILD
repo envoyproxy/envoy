@@ -211,6 +211,7 @@ envoy_cc_library(
         "//source/common/http:codes_lib",
         "//source/common/protobuf",
         "@envoy_api//envoy/api/v2:cds_cc",
+        "@envoy_api//envoy/data/cluster/v2alpha:outlier_detection_event_cc",
     ],
 )
 

@@ -187,8 +187,7 @@ void testUtil(const TestUtilOptions& options) {
   ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), manager,
                                                    server_stats_store, std::vector<std::string>{});
 
-  DangerousDeprecatedTestTime test_time;
-  Event::DispatcherImpl dispatcher(test_time.timeSystem(), *server_api);
+  Event::DispatcherImpl dispatcher(time_system, *server_api);
   Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(options.version()),
                                   nullptr, true);
   Network::MockListenerCallbacks callbacks;
@@ -414,8 +413,7 @@ const std::string testUtilV2(const TestUtilOptionsV2& options) {
   ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), manager,
                                                    server_stats_store, server_names);
 
-  DangerousDeprecatedTestTime test_time;
-  Event::DispatcherImpl dispatcher(test_time.timeSystem(), *server_api);
+  Event::DispatcherImpl dispatcher(time_system, *server_api);
   Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(options.version()),
                                   nullptr, true);
   NiceMock<Network::MockListenerCallbacks> callbacks;
@@ -590,10 +588,13 @@ void configureServerAndExpiredClientCertificate(envoy::api::v2::Listener& listen
 class SslSocketTest : public SslCertsTest,
                       public testing::WithParamInterface<Network::Address::IpVersion> {
 protected:
-  SslSocketTest()
-      : dispatcher_(std::make_unique<Event::DispatcherImpl>(test_time_.timeSystem(), *api_)) {}
+  SslSocketTest() : dispatcher_(std::make_unique<Event::DispatcherImpl>(time_system_, *api_)) {}
 
-  DangerousDeprecatedTestTime test_time_;
+  void testClientSessionResumption(const std::string& server_ctx_yaml,
+                                   const std::string& client_ctx_yaml, bool expect_reuse,
+                                   const Network::Address::IpVersion version);
+
+  Event::SimulatedTimeSystem time_system_;
   std::unique_ptr<Event::DispatcherImpl> dispatcher_;
 };
 
@@ -1876,8 +1877,7 @@ TEST_P(SslSocketTest, FlushCloseDuringHandshake) {
   envoy::api::v2::auth::DownstreamTlsContext tls_context;
   MessageUtil::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), tls_context);
   auto server_cfg = std::make_unique<ServerContextConfigImpl>(tls_context, factory_context_);
-  Event::SimulatedTimeSystem time_system;
-  ContextManagerImpl manager(time_system);
+  ContextManagerImpl manager(time_system_);
   Stats::IsolatedStoreImpl server_stats_store;
   ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), manager,
                                                    server_stats_store, std::vector<std::string>{});
@@ -1937,8 +1937,7 @@ TEST_P(SslSocketTest, HalfClose) {
   envoy::api::v2::auth::DownstreamTlsContext server_tls_context;
   MessageUtil::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), server_tls_context);
   auto server_cfg = std::make_unique<ServerContextConfigImpl>(server_tls_context, factory_context_);
-  Event::SimulatedTimeSystem time_system;
-  ContextManagerImpl manager(time_system);
+  ContextManagerImpl manager(time_system_);
   Stats::IsolatedStoreImpl server_stats_store;
   ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), manager,
                                                    server_stats_store, std::vector<std::string>{});
@@ -2025,8 +2024,7 @@ TEST_P(SslSocketTest, ClientAuthMultipleCAs) {
   envoy::api::v2::auth::DownstreamTlsContext server_tls_context;
   MessageUtil::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), server_tls_context);
   auto server_cfg = std::make_unique<ServerContextConfigImpl>(server_tls_context, factory_context_);
-  Event::SimulatedTimeSystem time_system;
-  ContextManagerImpl manager(time_system);
+  ContextManagerImpl manager(time_system_);
   Stats::IsolatedStoreImpl server_stats_store;
   ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), manager,
                                                    server_stats_store, std::vector<std::string>{});
@@ -2133,8 +2131,7 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
                                    true);
   NiceMock<Network::MockListenerCallbacks> callbacks;
   Network::MockConnectionHandler connection_handler;
-  DangerousDeprecatedTestTime test_time;
-  Event::DispatcherImpl dispatcher(test_time.timeSystem(), *server_api);
+  Event::DispatcherImpl dispatcher(time_system, *server_api);
   Network::ListenerPtr listener1 = dispatcher.createListener(socket1, callbacks, true, false);
   Network::ListenerPtr listener2 = dispatcher.createListener(socket2, callbacks, true, false);
 
@@ -2530,8 +2527,7 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
   envoy::api::v2::auth::DownstreamTlsContext tls_context2;
   MessageUtil::loadFromYaml(TestEnvironment::substitute(server2_ctx_yaml), tls_context2);
   auto server2_cfg = std::make_unique<ServerContextConfigImpl>(tls_context2, factory_context_);
-  Event::SimulatedTimeSystem time_system;
-  ContextManagerImpl manager(time_system);
+  ContextManagerImpl manager(time_system_);
   Stats::IsolatedStoreImpl server_stats_store;
   ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), manager,
                                                    server_stats_store, std::vector<std::string>{});
@@ -2632,13 +2628,13 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
   EXPECT_EQ(0UL, client_stats_store.counter("ssl.session_reused").value());
 }
 
-void testClientSessionResumption(const std::string& server_ctx_yaml,
-                                 const std::string& client_ctx_yaml, bool expect_reuse,
-                                 const Network::Address::IpVersion version) {
+void SslSocketTest::testClientSessionResumption(const std::string& server_ctx_yaml,
+                                                const std::string& client_ctx_yaml,
+                                                bool expect_reuse,
+                                                const Network::Address::IpVersion version) {
   InSequence s;
 
-  Event::SimulatedTimeSystem time_system;
-  ContextManagerImpl manager(time_system);
+  ContextManagerImpl manager(time_system_);
 
   Stats::IsolatedStoreImpl server_stats_store;
   Api::ApiPtr server_api = Api::createApiForTest(server_stats_store);
@@ -2658,7 +2654,7 @@ void testClientSessionResumption(const std::string& server_ctx_yaml,
   NiceMock<Network::MockListenerCallbacks> callbacks;
   Network::MockConnectionHandler connection_handler;
   Api::ApiPtr api = Api::createApiForTest(server_stats_store);
-  Event::DispatcherImpl dispatcher(time_system, *server_api);
+  Event::DispatcherImpl dispatcher(time_system_, *server_api);
   Network::ListenerPtr listener = dispatcher.createListener(socket, callbacks, true, false);
 
   Network::ConnectionPtr server_connection;
@@ -2918,8 +2914,7 @@ TEST_P(SslSocketTest, SslError) {
   envoy::api::v2::auth::DownstreamTlsContext tls_context;
   MessageUtil::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), tls_context);
   auto server_cfg = std::make_unique<ServerContextConfigImpl>(tls_context, factory_context_);
-  Event::SimulatedTimeSystem time_system;
-  ContextManagerImpl manager(time_system);
+  ContextManagerImpl manager(time_system_);
   Stats::IsolatedStoreImpl server_stats_store;
   ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), manager,
                                                    server_stats_store, std::vector<std::string>{});
@@ -3521,8 +3516,7 @@ TEST_P(SslSocketTest, DownstreamNotReadySslSocket) {
   EXPECT_TRUE(server_cfg->tlsCertificates().empty());
   EXPECT_FALSE(server_cfg->isReady());
 
-  Event::SimulatedTimeSystem time_system;
-  ContextManagerImpl manager(time_system);
+  ContextManagerImpl manager(time_system_);
   ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), manager, stats_store,
                                                    std::vector<std::string>{});
   auto transport_socket = server_ssl_socket_factory.createTransportSocket(nullptr);
@@ -3545,7 +3539,6 @@ TEST_P(SslSocketTest, UpstreamNotReadySslSocket) {
   NiceMock<Runtime::MockRandomGenerator> random;
   NiceMock<Upstream::MockClusterManager> cluster_manager;
   NiceMock<Init::MockManager> init_manager;
-  Event::SimulatedTimeSystem time_system;
   EXPECT_CALL(factory_context, localInfo()).WillOnce(ReturnRef(local_info));
   EXPECT_CALL(factory_context, dispatcher()).WillOnce(ReturnRef(dispatcher));
   EXPECT_CALL(factory_context, random()).WillOnce(ReturnRef(random));
@@ -3562,7 +3555,7 @@ TEST_P(SslSocketTest, UpstreamNotReadySslSocket) {
   EXPECT_TRUE(client_cfg->tlsCertificates().empty());
   EXPECT_FALSE(client_cfg->isReady());
 
-  ContextManagerImpl manager(time_system);
+  ContextManagerImpl manager(time_system_);
   ClientSslSocketFactory client_ssl_socket_factory(std::move(client_cfg), manager, stats_store);
   auto transport_socket = client_ssl_socket_factory.createTransportSocket(nullptr);
   EXPECT_EQ(EMPTY_STRING, transport_socket->protocol());
@@ -3581,8 +3574,7 @@ protected:
                               downstream_tls_context_);
     auto server_cfg =
         std::make_unique<ServerContextConfigImpl>(downstream_tls_context_, factory_context_);
-    Event::SimulatedTimeSystem time_system;
-    manager_ = std::make_unique<ContextManagerImpl>(time_system);
+    manager_ = std::make_unique<ContextManagerImpl>(time_system_);
     server_ssl_socket_factory_ = std::make_unique<ServerSslSocketFactory>(
         std::move(server_cfg), *manager_, server_stats_store_, std::vector<std::string>{});
 
@@ -3671,7 +3663,7 @@ protected:
     MockWatermarkBuffer* client_write_buffer = nullptr;
     MockBufferFactory* factory = new StrictMock<MockBufferFactory>;
     dispatcher_ = std::make_unique<Event::DispatcherImpl>(
-        test_time_.timeSystem(), Buffer::WatermarkFactoryPtr{factory}, *api_);
+        time_system_, Buffer::WatermarkFactoryPtr{factory}, *api_);
 
     // By default, expect 4 buffers to be created - the client and server read and write buffers.
     EXPECT_CALL(*factory, create_(_, _))

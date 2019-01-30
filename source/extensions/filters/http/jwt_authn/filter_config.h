@@ -54,7 +54,7 @@ struct JwtAuthnFilterStats {
 };
 
 /**
- * The filer config object to hold config and relavant objects.
+ * The filter config object to hold config and relevant objects.
  */
 class FilterConfig : public Logger::Loggable<Logger::Id::config>, public AuthFactory {
 public:

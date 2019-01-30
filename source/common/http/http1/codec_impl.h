@@ -198,7 +198,7 @@ private:
   /**
    * Called when URL data is received.
    * @param data supplies the start address.
-   * @param lenth supplies the length.
+   * @param length supplies the length.
    */
   virtual void onUrl(const char* data, size_t length) PURE;
 
@@ -217,7 +217,7 @@ private:
   void onHeaderValue(const char* data, size_t length);
 
   /**
-   * Called when headers are complete. A base routine happens first then a virtual disaptch is
+   * Called when headers are complete. A base routine happens first then a virtual dispatch is
    * invoked.
    * @return 0 if no error, 1 if there should be no body.
    */

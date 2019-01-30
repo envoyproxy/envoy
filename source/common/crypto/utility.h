@@ -1,8 +1,11 @@
 #pragma once
 
+#include <cstdint>
 #include <vector>
 
 #include "envoy/buffer/buffer.h"
+
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Common {

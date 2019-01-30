@@ -75,8 +75,9 @@ TEST_F(MutexTracerTest, TwoThreadsWithContention) {
   for (int i = 1; i <= 10; ++i) {
     int64_t curr_num_lifetime_wait_cycles = tracer_.lifetimeWaitCycles();
 
-    Thread::TestUtil::ContentionGenerator::generateContention(tracer_);
+    Thread::TestUtil::ContentionGenerator contention_generator;
 
+    contention_generator.generateContention(tracer_);
     EXPECT_EQ(tracer_.numContentions(), i);
     EXPECT_GT(tracer_.currentWaitCycles(), 0); // This shouldn't be hardcoded.
     EXPECT_GT(tracer_.lifetimeWaitCycles(), 0);

@@ -143,7 +143,7 @@ public:
    * SymbolEncoding and ultimately disposing of it by calling
    * StatName::free(). Otherwise the symbols will leak for the lifetime of the
    * table, though they won't show up as a C++ leaks as the memory is still
-   * reachable from the SymolTable.
+   * reachable from the SymbolTable.
    *
    * @param name The name to encode.
    * @return SymbolEncoding the encoded symbols.
@@ -161,7 +161,7 @@ public:
   }
 
   /**
-   * Deterines whether one StatName lexically precedes another. Note that
+   * Determines whether one StatName lexically precedes another. Note that
    * the lexical order may not exactly match the lexical order of the
    * elaborated strings. For example, stat-name of "-.-" would lexically
    * sort after "---" but when encoded as a StatName would come lexically
@@ -270,7 +270,7 @@ private:
   // If the free pool is exhausted, we monotonically increase this counter.
   Symbol monotonic_counter_;
 
-  // Bimap implementation.
+  // Bitmap implementation.
   // The encode map stores both the symbol and the ref count of that symbol.
   // Using absl::string_view lets us only store the complete string once, in the decode map.
   using EncodeMap = absl::flat_hash_map<absl::string_view, SharedSymbol, StringViewHash>;
@@ -413,7 +413,7 @@ StatName StatNameStorage::statName() const { return StatName(bytes_.get()); }
  * Joins two or more StatNames. For example if we have StatNames for {"a.b",
  * "c.d", "e.f"} then the joined stat-name matches "a.b.c.d.e.f". The advantage
  * of using this representation is that it avoids having to decode/encode
- * into the elaborted form, and does not require locking the SymbolTable.
+ * into the elaborated form, and does not require locking the SymbolTable.
  *
  * The caveat is that this representation does not bump reference counts on
  * for the referenced Symbols in the SymbolTable, so it's only valid as long
@@ -421,7 +421,7 @@ StatName StatNameStorage::statName() const { return StatName(bytes_.get()); }
  *
  * This is intended for use doing cached name lookups of scoped stats, where
  * the scope prefix and the names to combine it with are already in StatName
- * form. Using this class, they can be combined without acessingm the
+ * form. Using this class, they can be combined without accessing the
  * SymbolTable or, in particular, taking its lock.
  */
 class StatNameJoiner {
@@ -444,7 +444,7 @@ private:
  * Contains the backing store for a StatName and enough context so it can
  * self-delete through RAII. This works by augmenting StatNameStorage with a
  * reference to the SymbolTable&, so it has an extra 8 bytes of footprint. It
- * is intendended to be used in tests or as a scoped temp in a function, rather
+ * is intended to be used in tests or as a scoped temp in a function, rather
  * than stored in a larger structure such as a map, where the redundant copies
  * of the SymbolTable& would be costly in aggregate.
  */
