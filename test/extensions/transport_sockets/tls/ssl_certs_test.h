@@ -5,6 +5,8 @@
 
 #include "gtest/gtest.h"
 
+using testing::ReturnRef;
+
 namespace Envoy {
 class SslCertsTest : public testing::Test {
 public:
@@ -13,6 +15,13 @@ public:
         "test/extensions/transport_sockets/tls/gen_unittest_certs.sh")});
   }
 
+protected:
+  SslCertsTest() : api_(Api::createApiForTest(store_)) {
+    ON_CALL(factory_context_, api()).WillByDefault(ReturnRef(*api_));
+  }
+
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
+  Stats::IsolatedStoreImpl store_;
+  Api::ApiPtr api_;
 };
 } // namespace Envoy
