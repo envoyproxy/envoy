@@ -1,11 +1,12 @@
 #pragma once
 
 #include <cstdint>
-#include <functional>
 #include <memory>
 #include <string>
 
 #include "envoy/common/pure.h"
+#include "envoy/event/dispatcher.h"
+#include "envoy/thread/thread.h"
 
 #include "absl/strings/string_view.h"
 
@@ -38,25 +39,74 @@ public:
 typedef std::shared_ptr<File> FileSharedPtr;
 
 /**
- * Abstraction for a file watcher.
+ * Captures state, properties, and stats of a file-system.
  */
-class Watcher {
+class Instance {
 public:
-  typedef std::function<void(uint32_t events)> OnChangedCb;
-
-  struct Events {
-    static const uint32_t MovedTo = 0x1;
-  };
-
-  virtual ~Watcher() {}
+  virtual ~Instance() {}
 
   /**
-   * Add a file watch.
-   * @param path supplies the path to watch.
-   * @param events supplies the events to watch.
-   * @param cb supplies the callback to invoke when a change occurs.
+   * Creates a file, overriding the flush-interval set in the class.
+   *
+   * @param path The path of the file to open.
+   * @param dispatcher The dispatcher used for set up timers to run flush().
+   * @param lock The lock.
+   * @param file_flush_interval_msec Number of milliseconds to delay before flushing.
    */
-  virtual void addWatch(const std::string& path, uint32_t events, OnChangedCb cb) PURE;
+  virtual FileSharedPtr createFile(const std::string& path, Event::Dispatcher& dispatcher,
+                                   Thread::BasicLockable& lock,
+                                   std::chrono::milliseconds file_flush_interval_msec) PURE;
+
+  /**
+   * Creates a file, using the default flush-interval for the class.
+   *
+   * @param path The path of the file to open.
+   * @param dispatcher The dispatcher used for set up timers to run flush().
+   * @param lock The lock.
+   */
+  virtual FileSharedPtr createFile(const std::string& path, Event::Dispatcher& dispatcher,
+                                   Thread::BasicLockable& lock) PURE;
+
+  /**
+   * @return bool whether a file exists on disk and can be opened for read.
+   */
+  virtual bool fileExists(const std::string& path) PURE;
+
+  /**
+   * @return bool whether a directory exists on disk and can be opened for read.
+   */
+  virtual bool directoryExists(const std::string& path) PURE;
+
+  /**
+   * @return ssize_t the size in bytes of the specified file, or -1 if the file size
+   *                 cannot be determined for any reason, including without limitation
+   *                 the non-existence of the file.
+   */
+  virtual ssize_t fileSize(const std::string& path) PURE;
+
+  /**
+   * @return full file content as a string.
+   * @throw EnvoyException if the file cannot be read.
+   * Be aware, this is not most highly performing file reading method.
+   */
+  virtual std::string fileReadToEnd(const std::string& path) PURE;
+
+  /**
+   * @param path some filesystem path.
+   * @return SysCallStringResult containing the canonical path (see realpath(3)).
+   */
+  virtual Api::SysCallStringResult canonicalPath(const std::string& path) PURE;
+
+  /**
+   * Determine if the path is on a list of paths Envoy will refuse to access. This
+   * is a basic sanity check for users, blacklisting some clearly bad paths. Paths
+   * may still be problematic (e.g. indirectly leading to /dev/mem) even if this
+   * returns false, it is up to the user to validate that supplied paths are
+   * valid.
+   * @param path some filesystem path.
+   * @return is the path on the blacklist?
+   */
+  virtual bool illegalPath(const std::string& path) PURE;
 };
 
 typedef std::unique_ptr<Watcher> WatcherPtr;
