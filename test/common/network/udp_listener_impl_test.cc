@@ -42,7 +42,7 @@ protected:
       : version_(GetParam()),
         alt_address_(Network::Test::findOrCheckFreePort(
             Network::Test::getCanonicalLoopbackAddress(version_), Address::SocketType::Stream)),
-        api_(Api::createApiForTest(stats_store_)), dispatcher_(test_time_.timeSystem(), *api_) {}
+        api_(Api::createApiForTest(stats_store_)), dispatcher_(*api_) {}
 
   SocketPtr getSocket(Address::SocketType type, const Address::InstanceConstSharedPtr& address,
                       const Network::Socket::OptionsSharedPtr& options, bool bind) {

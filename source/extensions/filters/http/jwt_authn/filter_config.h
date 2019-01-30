@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/api/api.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
@@ -23,8 +24,8 @@ public:
   // Load the config from envoy config.
   ThreadLocalCache(
       const ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication& config,
-      TimeSource& time_source) {
-    jwks_cache_ = JwksCache::create(config, time_source);
+      TimeSource& time_source, Api::Api& api) {
+    jwks_cache_ = JwksCache::create(config, time_source, api);
   }
 
   // Get the JwksCache object.
@@ -64,10 +65,10 @@ public:
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context)
       : proto_config_(proto_config), stats_(generateStats(stats_prefix, context.scope())),
         tls_(context.threadLocal().allocateSlot()), cm_(context.clusterManager()),
-        time_source_(context.dispatcher().timeSystem()) {
+        time_source_(context.dispatcher().timeSystem()), api_(context.api()) {
     ENVOY_LOG(info, "Loaded JwtAuthConfig: {}", proto_config_.DebugString());
     tls_->set([this](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-      return std::make_shared<ThreadLocalCache>(proto_config_, time_source_);
+      return std::make_shared<ThreadLocalCache>(proto_config_, time_source_, api_);
     });
     extractor_ = Extractor::create(proto_config_);
 
@@ -139,6 +140,7 @@ private:
   // The list of rule matchers.
   std::vector<MatcherVerifierPair> rule_pairs_;
   TimeSource& time_source_;
+  Api::Api& api_;
 };
 typedef std::shared_ptr<FilterConfig> FilterConfigSharedPtr;
 

@@ -22,7 +22,13 @@ namespace Envoy {
 namespace Secret {
 namespace {
 
-class SecretManagerImplTest : public testing::Test {};
+class SecretManagerImplTest : public testing::Test {
+protected:
+  SecretManagerImplTest() : api_(Api::createApiForTest(stats_store_)) {}
+
+  Stats::MockIsolatedStatsStore stats_store_;
+  Api::ApiPtr api_;
+};
 
 // Validate that secret manager adds static TLS certificate secret successfully.
 TEST_F(SecretManagerImplTest, TlsCertificateSecretLoadSuccess) {
@@ -44,7 +50,7 @@ tls_certificate:
   ASSERT_NE(secret_manager->findStaticTlsCertificateProvider("abc.com"), nullptr);
 
   Ssl::TlsCertificateConfigImpl tls_config(
-      *secret_manager->findStaticTlsCertificateProvider("abc.com")->secret());
+      *secret_manager->findStaticTlsCertificateProvider("abc.com")->secret(), *api_);
   const std::string cert_pem =
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_cert.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(cert_pem)),
@@ -95,7 +101,7 @@ TEST_F(SecretManagerImplTest, CertificateValidationContextSecretLoadSuccess) {
   ASSERT_EQ(secret_manager->findStaticCertificateValidationContextProvider("undefined"), nullptr);
   ASSERT_NE(secret_manager->findStaticCertificateValidationContextProvider("abc.com"), nullptr);
   Ssl::CertificateValidationContextConfigImpl cvc_config(
-      *secret_manager->findStaticCertificateValidationContextProvider("abc.com")->secret());
+      *secret_manager->findStaticCertificateValidationContextProvider("abc.com")->secret(), *api_);
   const std::string cert_pem =
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(cert_pem)),
@@ -178,7 +184,7 @@ tls_certificate:
   auto secret_config = secret_resources.Add();
   MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), *secret_config);
   dynamic_cast<TlsCertificateSdsApi&>(*secret_provider).onConfigUpdate(secret_resources, "");
-  Ssl::TlsCertificateConfigImpl tls_config(*secret_provider->secret());
+  Ssl::TlsCertificateConfigImpl tls_config(*secret_provider->secret(), *api_);
   const std::string cert_pem =
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_cert.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(cert_pem)),

@@ -181,12 +181,15 @@ MockFactoryContext::MockFactoryContext()
   ON_CALL(*this, api()).WillByDefault(ReturnRef(api_));
   ON_CALL(*this, timeSource()).WillByDefault(ReturnRef(time_system_));
   ON_CALL(*this, overloadManager()).WillByDefault(ReturnRef(overload_manager_));
+  ON_CALL(*this, api()).WillByDefault(ReturnRef(api_));
 }
 
 MockFactoryContext::~MockFactoryContext() = default;
 
 MockTransportSocketFactoryContext::MockTransportSocketFactoryContext()
-    : secret_manager_(new Secret::SecretManagerImpl()) {}
+    : secret_manager_(new Secret::SecretManagerImpl()) {
+  ON_CALL(*this, api()).WillByDefault(ReturnRef(api_));
+}
 
 MockTransportSocketFactoryContext::~MockTransportSocketFactoryContext() = default;
 

@@ -46,9 +46,10 @@ public:
 
   // Server::ListenerComponentFactory
   LdsApiPtr createLdsApi(const envoy::api::v2::core::ConfigSource& lds_config) override {
-    return std::make_unique<LdsApiImpl>(
-        lds_config, server_.clusterManager(), server_.dispatcher(), server_.random(),
-        server_.initManager(), server_.localInfo(), server_.stats(), server_.listenerManager());
+    return std::make_unique<LdsApiImpl>(lds_config, server_.clusterManager(), server_.dispatcher(),
+                                        server_.random(), server_.initManager(),
+                                        server_.localInfo(), server_.stats(),
+                                        server_.listenerManager(), server_.api());
   }
   std::vector<Network::FilterFactoryCb> createNetworkFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
@@ -280,7 +281,6 @@ public:
   const envoy::api::v2::core::Metadata& listenerMetadata() const override {
     return config_.metadata();
   };
-  Api::Api& api() override { return parent_.server_.api(); }
   TimeSource& timeSource() override { return api().timeSystem(); }
   void ensureSocketOptions() {
     if (!listen_socket_options_) {
@@ -297,6 +297,7 @@ public:
     Network::Socket::appendOptions(listen_socket_options_, options);
   }
   const Network::ListenerConfig& listenerConfig() const override { return *this; }
+  Api::Api& api() override { return parent_.server_.api(); }
 
   // Network::DrainDecision
   bool drainClose() const override;

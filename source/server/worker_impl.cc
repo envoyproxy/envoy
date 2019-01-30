@@ -8,8 +8,6 @@
 #include "envoy/server/configuration.h"
 #include "envoy/thread_local/thread_local.h"
 
-#include "common/common/thread.h"
-
 #include "server/connection_handler_impl.h"
 
 namespace Envoy {

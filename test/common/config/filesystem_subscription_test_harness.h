@@ -31,7 +31,7 @@ public:
   FilesystemSubscriptionTestHarness()
       : path_(TestEnvironment::temporaryPath("eds.json")),
         api_(Api::createApiForTest(stats_store_)), dispatcher_(*api_),
-        subscription_(dispatcher_, path_, stats_) {}
+        subscription_(dispatcher_, path_, stats_, *api_) {}
 
   ~FilesystemSubscriptionTestHarness() { EXPECT_EQ(0, ::unlink(path_.c_str())); }
 
