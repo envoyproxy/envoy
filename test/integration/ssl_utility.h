@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/api/api.h"
 #include "envoy/network/address.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/secret/secret_manager.h"
@@ -51,8 +52,9 @@ struct ClientSslTransportOptions {
 
 Network::TransportSocketFactoryPtr
 createClientSslTransportSocketFactory(const ClientSslTransportOptions& options,
-                                      ContextManager& context_manager);
-Network::TransportSocketFactoryPtr createUpstreamSslContext(ContextManager& context_manager);
+                                      ContextManager& context_manager, Api::Api& api);
+Network::TransportSocketFactoryPtr createUpstreamSslContext(ContextManager& context_manager,
+                                                            Api::Api& api);
 
 Network::Address::InstanceConstSharedPtr getSslAddress(const Network::Address::IpVersion& version,
                                                        int port);

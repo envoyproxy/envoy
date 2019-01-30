@@ -2,6 +2,7 @@
 
 #include <numeric>
 
+#include "envoy/api/api.h"
 #include "envoy/common/exception.h"
 #include "envoy/json/json_object.h"
 #include "envoy/type/percent.pb.h"
@@ -175,7 +176,7 @@ public:
   static void loadFromJsonEx(const std::string& json, Protobuf::Message& message,
                              ProtoUnknownFieldsMode proto_unknown_fields);
   static void loadFromYaml(const std::string& yaml, Protobuf::Message& message);
-  static void loadFromFile(const std::string& path, Protobuf::Message& message);
+  static void loadFromFile(const std::string& path, Protobuf::Message& message, Api::Api& api);
 
   /**
    * Validate protoc-gen-validate constraints on a given protobuf.

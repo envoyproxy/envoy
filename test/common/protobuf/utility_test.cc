@@ -5,6 +5,7 @@
 
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
+#include "common/stats/isolated_store_impl.h"
 
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
@@ -13,7 +14,15 @@
 
 namespace Envoy {
 
-TEST(UtilityTest, convertPercentNaN) {
+class ProtobufUtilityTest : public testing::Test {
+protected:
+  ProtobufUtilityTest() : api_(Api::createApiForTest(stats_store_)) {}
+
+  Stats::IsolatedStoreImpl stats_store_;
+  Api::ApiPtr api_;
+};
+
+TEST_F(ProtobufUtilityTest, convertPercentNaN) {
   envoy::api::v2::Cluster::CommonLbConfig common_config_;
   common_config_.mutable_healthy_panic_threshold()->set_value(
       std::numeric_limits<double>::quiet_NaN());
@@ -22,7 +31,7 @@ TEST(UtilityTest, convertPercentNaN) {
                EnvoyException);
 }
 
-TEST(UtilityTest, RepeatedPtrUtilDebugString) {
+TEST_F(ProtobufUtilityTest, RepeatedPtrUtilDebugString) {
   Protobuf::RepeatedPtrField<ProtobufWkt::UInt32Value> repeated;
   EXPECT_EQ("[]", RepeatedPtrUtil::debugString(repeated));
   repeated.Add()->set_value(10);
@@ -31,7 +40,7 @@ TEST(UtilityTest, RepeatedPtrUtilDebugString) {
   EXPECT_EQ("[value: 10\n, value: 20\n]", RepeatedPtrUtil::debugString(repeated));
 }
 
-TEST(UtilityTest, DowncastAndValidate) {
+TEST_F(ProtobufUtilityTest, DowncastAndValidate) {
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
   bootstrap.mutable_runtime();
   EXPECT_THROW(MessageUtil::validate(bootstrap), ProtoValidationException);
@@ -40,7 +49,7 @@ TEST(UtilityTest, DowncastAndValidate) {
       ProtoValidationException);
 }
 
-TEST(UtilityTest, LoadBinaryProtoFromFile) {
+TEST_F(ProtobufUtilityTest, LoadBinaryProtoFromFile) {
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
   bootstrap.mutable_cluster_manager()
       ->mutable_upstream_bind_config()
@@ -51,22 +60,22 @@ TEST(UtilityTest, LoadBinaryProtoFromFile) {
       TestEnvironment::writeStringToFileForTest("proto.pb", bootstrap.SerializeAsString());
 
   envoy::config::bootstrap::v2::Bootstrap proto_from_file;
-  MessageUtil::loadFromFile(filename, proto_from_file);
+  MessageUtil::loadFromFile(filename, proto_from_file, *api_);
   EXPECT_TRUE(TestUtility::protoEqual(bootstrap, proto_from_file));
 }
 
-TEST(UtilityTest, LoadBinaryProtoUnknownFieldFromFile) {
+TEST_F(ProtobufUtilityTest, LoadBinaryProtoUnknownFieldFromFile) {
   ProtobufWkt::Duration source_duration;
   source_duration.set_seconds(42);
   const std::string filename =
       TestEnvironment::writeStringToFileForTest("proto.pb", source_duration.SerializeAsString());
   envoy::config::bootstrap::v2::Bootstrap proto_from_file;
   EXPECT_THROW_WITH_MESSAGE(
-      MessageUtil::loadFromFile(filename, proto_from_file), EnvoyException,
+      MessageUtil::loadFromFile(filename, proto_from_file, *api_), EnvoyException,
       "Protobuf message (type envoy.config.bootstrap.v2.Bootstrap) has unknown fields");
 }
 
-TEST(UtilityTest, LoadTextProtoFromFile) {
+TEST_F(ProtobufUtilityTest, LoadTextProtoFromFile) {
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
   bootstrap.mutable_cluster_manager()
       ->mutable_upstream_bind_config()
@@ -79,28 +88,29 @@ TEST(UtilityTest, LoadTextProtoFromFile) {
       TestEnvironment::writeStringToFileForTest("proto.pb_text", bootstrap_text);
 
   envoy::config::bootstrap::v2::Bootstrap proto_from_file;
-  MessageUtil::loadFromFile(filename, proto_from_file);
+  MessageUtil::loadFromFile(filename, proto_from_file, *api_);
   EXPECT_TRUE(TestUtility::protoEqual(bootstrap, proto_from_file));
 }
 
-TEST(UtilityTest, LoadTextProtoFromFile_Failure) {
+TEST_F(ProtobufUtilityTest, LoadTextProtoFromFile_Failure) {
   const std::string filename =
       TestEnvironment::writeStringToFileForTest("proto.pb_text", "invalid {");
 
   envoy::config::bootstrap::v2::Bootstrap proto_from_file;
-  EXPECT_THROW_WITH_MESSAGE(MessageUtil::loadFromFile(filename, proto_from_file), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(MessageUtil::loadFromFile(filename, proto_from_file, *api_),
+                            EnvoyException,
                             "Unable to parse file \"" + filename +
                                 "\" as a text protobuf (type envoy.config.bootstrap.v2.Bootstrap)");
 }
 
-TEST(UtilityTest, KeyValueStruct) {
+TEST_F(ProtobufUtilityTest, KeyValueStruct) {
   const ProtobufWkt::Struct obj = MessageUtil::keyValueStruct("test_key", "test_value");
   EXPECT_EQ(obj.fields_size(), 1);
   EXPECT_EQ(obj.fields().at("test_key").kind_case(), ProtobufWkt::Value::KindCase::kStringValue);
   EXPECT_EQ(obj.fields().at("test_key").string_value(), "test_value");
 }
 
-TEST(UtilityTest, ValueUtilEqual_NullValues) {
+TEST_F(ProtobufUtilityTest, ValueUtilEqual_NullValues) {
   ProtobufWkt::Value v1, v2;
   v1.set_null_value(ProtobufWkt::NULL_VALUE);
   v2.set_null_value(ProtobufWkt::NULL_VALUE);
@@ -112,7 +122,7 @@ TEST(UtilityTest, ValueUtilEqual_NullValues) {
   EXPECT_FALSE(ValueUtil::equal(v1, other));
 }
 
-TEST(UtilityTest, ValueUtilEqual_StringValues) {
+TEST_F(ProtobufUtilityTest, ValueUtilEqual_StringValues) {
   ProtobufWkt::Value v1, v2, v3;
   v1.set_string_value("s");
   v2.set_string_value("s");
@@ -122,7 +132,7 @@ TEST(UtilityTest, ValueUtilEqual_StringValues) {
   EXPECT_FALSE(ValueUtil::equal(v1, v3));
 }
 
-TEST(UtilityTest, ValueUtilEqual_NumberValues) {
+TEST_F(ProtobufUtilityTest, ValueUtilEqual_NumberValues) {
   ProtobufWkt::Value v1, v2, v3;
   v1.set_number_value(1.0);
   v2.set_number_value(1.0);
@@ -132,7 +142,7 @@ TEST(UtilityTest, ValueUtilEqual_NumberValues) {
   EXPECT_FALSE(ValueUtil::equal(v1, v3));
 }
 
-TEST(UtilityTest, ValueUtilEqual_BoolValues) {
+TEST_F(ProtobufUtilityTest, ValueUtilEqual_BoolValues) {
   ProtobufWkt::Value v1, v2, v3;
   v1.set_bool_value(true);
   v2.set_bool_value(true);
@@ -142,7 +152,7 @@ TEST(UtilityTest, ValueUtilEqual_BoolValues) {
   EXPECT_FALSE(ValueUtil::equal(v1, v3));
 }
 
-TEST(UtilityTest, ValueUtilEqual_StructValues) {
+TEST_F(ProtobufUtilityTest, ValueUtilEqual_StructValues) {
   ProtobufWkt::Value string_val1, string_val2, bool_val;
 
   string_val1.set_string_value("s1");
@@ -166,7 +176,7 @@ TEST(UtilityTest, ValueUtilEqual_StructValues) {
   EXPECT_FALSE(ValueUtil::equal(v1, v4));
 }
 
-TEST(UtilityTest, ValueUtilEqual_ListValues) {
+TEST_F(ProtobufUtilityTest, ValueUtilEqual_ListValues) {
   ProtobufWkt::Value v1, v2, v3, v4;
   v1.mutable_list_value()->add_values()->set_string_value("s");
   v1.mutable_list_value()->add_values()->set_bool_value(true);
@@ -184,14 +194,14 @@ TEST(UtilityTest, ValueUtilEqual_ListValues) {
   EXPECT_FALSE(ValueUtil::equal(v1, v4));
 }
 
-TEST(UtilityTest, ValueUtilHash) {
+TEST_F(ProtobufUtilityTest, ValueUtilHash) {
   ProtobufWkt::Value v;
   v.set_string_value("s1");
 
   EXPECT_NE(ValueUtil::hash(v), 0);
 }
 
-TEST(UtilityTest, HashedValue) {
+TEST_F(ProtobufUtilityTest, HashedValue) {
   ProtobufWkt::Value v1, v2, v3;
   v1.set_string_value("s");
   v2.set_string_value("s");
@@ -206,7 +216,7 @@ TEST(UtilityTest, HashedValue) {
   EXPECT_EQ(hv1, copy);
 }
 
-TEST(UtilityTest, HashedValueStdHash) {
+TEST_F(ProtobufUtilityTest, HashedValueStdHash) {
   ProtobufWkt::Value v1, v2, v3;
   v1.set_string_value("s");
   v2.set_string_value("s");
@@ -224,7 +234,7 @@ TEST(UtilityTest, HashedValueStdHash) {
   EXPECT_NE(set.find(hv3), set.end());
 }
 
-TEST(UtilityTest, AnyConvertWrongType) {
+TEST_F(ProtobufUtilityTest, AnyConvertWrongType) {
   ProtobufWkt::Duration source_duration;
   source_duration.set_seconds(42);
   ProtobufWkt::Any source_any;
@@ -233,7 +243,7 @@ TEST(UtilityTest, AnyConvertWrongType) {
                           EnvoyException, "Unable to unpack .*");
 }
 
-TEST(UtilityTest, AnyConvertWrongFields) {
+TEST_F(ProtobufUtilityTest, AnyConvertWrongFields) {
   const ProtobufWkt::Struct obj = MessageUtil::keyValueStruct("test_key", "test_value");
   ProtobufWkt::Any source_any;
   source_any.PackFrom(obj);
@@ -243,7 +253,7 @@ TEST(UtilityTest, AnyConvertWrongFields) {
                             "Protobuf message (type google.protobuf.Timestamp) has unknown fields");
 }
 
-TEST(UtilityTest, JsonConvertSuccess) {
+TEST_F(ProtobufUtilityTest, JsonConvertSuccess) {
   ProtobufWkt::Duration source_duration;
   source_duration.set_seconds(42);
   ProtobufWkt::Duration dest_duration;
@@ -251,7 +261,7 @@ TEST(UtilityTest, JsonConvertSuccess) {
   EXPECT_EQ(42, dest_duration.seconds());
 }
 
-TEST(UtilityTest, JsonConvertUnknownFieldSuccess) {
+TEST_F(ProtobufUtilityTest, JsonConvertUnknownFieldSuccess) {
   MessageUtil::proto_unknown_fields = ProtoUnknownFieldsMode::Allow;
   const ProtobufWkt::Struct obj = MessageUtil::keyValueStruct("test_key", "test_value");
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
@@ -259,7 +269,7 @@ TEST(UtilityTest, JsonConvertUnknownFieldSuccess) {
   MessageUtil::proto_unknown_fields = ProtoUnknownFieldsMode::Strict;
 }
 
-TEST(UtilityTest, JsonConvertFail) {
+TEST_F(ProtobufUtilityTest, JsonConvertFail) {
   ProtobufWkt::Duration source_duration;
   source_duration.set_seconds(-281474976710656);
   ProtobufWkt::Duration dest_duration;
@@ -269,7 +279,7 @@ TEST(UtilityTest, JsonConvertFail) {
 }
 
 // Regression test for https://github.com/envoyproxy/envoy/issues/3665.
-TEST(UtilityTest, JsonConvertCamelSnake) {
+TEST_F(ProtobufUtilityTest, JsonConvertCamelSnake) {
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
   // Make sure we use a field eligible for snake/camel case translation.
   bootstrap.mutable_cluster_manager()->set_local_cluster_name("foo");
@@ -286,7 +296,7 @@ TEST(UtilityTest, JsonConvertCamelSnake) {
                        .string_value());
 }
 
-TEST(UtilityTest, YamlLoadFromStringFail) {
+TEST_F(ProtobufUtilityTest, YamlLoadFromStringFail) {
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
   // Verify loadFromYaml can parse valid YAML string.
   MessageUtil::loadFromYaml("node: { id: node1 }", bootstrap);

@@ -2,6 +2,7 @@
 
 #include <functional>
 
+#include "envoy/api/api.h"
 #include "envoy/api/v2/cds.pb.h"
 #include "envoy/config/subscription.h"
 #include "envoy/event/dispatcher.h"
@@ -23,7 +24,8 @@ class CdsApiImpl : public CdsApiIncrementalImpl,
 public:
   static CdsApiPtr create(const envoy::api::v2::core::ConfigSource& cds_config, ClusterManager& cm,
                           Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
-                          const LocalInfo::LocalInfo& local_info, Stats::Scope& scope);
+                          const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
+                          Api::Api& api);
 
   // Config::SubscriptionCallbacks
 <<<<<<< HEAD
@@ -47,7 +49,12 @@ public:
 private:
   CdsApiImpl(const envoy::api::v2::core::ConfigSource& cds_config, ClusterManager& cm,
              Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
+<<<<<<< HEAD
              const LocalInfo::LocalInfo& local_info, Stats::Scope& scope);
+=======
+             const LocalInfo::LocalInfo& local_info, Stats::Scope& scope, Api::Api& api);
+  void runInitializeCallbackIfAny();
+>>>>>>> filesystem: convert free functions to object methods (#5692)
 
   std::unique_ptr<Config::Subscription<envoy::api::v2::Cluster>> subscription_;
   std::string version_info_;

@@ -3,8 +3,6 @@
 #include <algorithm>
 #include <fstream>
 
-#include "common/filesystem/filesystem_impl.h"
-
 #include "test/test_common/environment.h"
 
 namespace Envoy {
@@ -100,7 +98,7 @@ void BaseThriftIntegrationTest::preparePayloads(const PayloadOptions& options,
 void BaseThriftIntegrationTest::readAll(std::string file, Buffer::Instance& buffer) {
   file = TestEnvironment::substitute(file, version_);
 
-  std::string data = Filesystem::fileReadToEnd(file);
+  std::string data = api_->fileSystem().fileReadToEnd(file);
   buffer.add(data);
 }
 

@@ -42,6 +42,7 @@ using testing::AtLeast;
 using testing::Invoke;
 using testing::IsSubstring;
 using testing::NiceMock;
+using testing::ReturnRef;
 
 namespace Envoy {
 
@@ -232,7 +233,7 @@ BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version,
       mock_buffer_factory_(new NiceMock<MockBufferFactory>), time_system_(std::move(time_system)),
       dispatcher_(new Event::DispatcherImpl(
           *time_system_, Buffer::WatermarkFactoryPtr{mock_buffer_factory_}, *api_)),
-      version_(version), config_helper_(version, config),
+      version_(version), config_helper_(version, *api_, config),
       default_log_level_(TestEnvironment::getOptions().logLevel()) {
   // This is a hack, but there are situations where we disconnect fake upstream connections and
   // then we expect the server connection pool to get the disconnect before the next test starts.
@@ -246,6 +247,7 @@ BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version,
                                std::function<void()> above_high) -> Buffer::Instance* {
         return new Buffer::WatermarkBuffer(below_low, above_high);
       }));
+  ON_CALL(factory_context_, api()).WillByDefault(ReturnRef(*api_));
 }
 
 Network::ClientConnectionPtr BaseIntegrationTest::makeClientConnection(uint32_t port) {

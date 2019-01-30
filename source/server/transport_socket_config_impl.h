@@ -18,10 +18,10 @@ public:
                                     Event::Dispatcher& dispatcher,
                                     Envoy::Runtime::RandomGenerator& random, Stats::Store& stats,
                                     Singleton::Manager& singleton_manager,
-                                    ThreadLocal::SlotAllocator& tls)
+                                    ThreadLocal::SlotAllocator& tls, Api::Api& api)
       : admin_(admin), context_manager_(context_manager), stats_scope_(stats_scope),
         cluster_manager_(cm), local_info_(local_info), dispatcher_(dispatcher), random_(random),
-        stats_(stats), singleton_manager_(singleton_manager), tls_(tls) {}
+        stats_(stats), singleton_manager_(singleton_manager), tls_(tls), api_(api) {}
 
   // TransportSocketFactoryContext
   Server::Admin& admin() override { return admin_; }
@@ -40,6 +40,8 @@ public:
   Singleton::Manager& singletonManager() override { return singleton_manager_; }
   ThreadLocal::SlotAllocator& threadLocal() override { return tls_; }
 
+  Api::Api& api() override { return api_; }
+
 private:
   Server::Admin& admin_;
   Ssl::ContextManager& context_manager_;
@@ -52,6 +54,7 @@ private:
   Singleton::Manager& singleton_manager_;
   ThreadLocal::SlotAllocator& tls_;
   Init::Manager* init_manager_{};
+  Api::Api& api_;
 };
 
 } // namespace Configuration

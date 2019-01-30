@@ -109,6 +109,7 @@ envoy_cc_library(
     hdrs = ["google_grpc_creds_impl.h"],
     external_deps = ["grpc"],
     deps = [
+        "//include/envoy/api:api_interface",
         "//include/envoy/grpc:google_grpc_creds_interface",
         "//include/envoy/registry",
         "//source/common/config:datasource_lib",

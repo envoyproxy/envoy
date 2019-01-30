@@ -113,10 +113,11 @@ config:
     nanos: 0
 )EOF";
 
-ConfigHelper::ConfigHelper(const Network::Address::IpVersion version, const std::string& config) {
+ConfigHelper::ConfigHelper(const Network::Address::IpVersion version, Api::Api& api,
+                           const std::string& config) {
   RELEASE_ASSERT(!finalized_, "");
   std::string filename = TestEnvironment::writeStringToFileForTest("basic_config.yaml", config);
-  MessageUtil::loadFromFile(filename, bootstrap_);
+  MessageUtil::loadFromFile(filename, bootstrap_, api);
 
   // Fix up all the socket addresses with the correct version.
   auto* admin = bootstrap_.mutable_admin();

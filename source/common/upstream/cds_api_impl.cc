@@ -18,14 +18,32 @@ namespace Upstream {
 CdsApiPtr CdsApiImpl::create(const envoy::api::v2::core::ConfigSource& cds_config,
                              ClusterManager& cm, Event::Dispatcher& dispatcher,
                              Runtime::RandomGenerator& random,
-                             const LocalInfo::LocalInfo& local_info, Stats::Scope& scope) {
-  return CdsApiPtr{new CdsApiImpl(cds_config, cm, dispatcher, random, local_info, scope)};
+                             const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
+                             Api::Api& api) {
+  return CdsApiPtr{new CdsApiImpl(cds_config, cm, dispatcher, random, local_info, scope, api)};
 }
 
 CdsApiImpl::CdsApiImpl(const envoy::api::v2::core::ConfigSource& cds_config, ClusterManager& cm,
                        Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
+<<<<<<< HEAD
                        const LocalInfo::LocalInfo& local_info, Stats::Scope& scope)
     : CdsApiIncrementalImpl(cds_config, cm, dispatcher, random, local_info, scope) {}
+=======
+                       const LocalInfo::LocalInfo& local_info, Stats::Scope& scope, Api::Api& api)
+    : cm_(cm), scope_(scope.createScope("cluster_manager.cds.")) {
+  Config::Utility::checkLocalInfo("cds", local_info);
+
+  subscription_ =
+      Config::SubscriptionFactory::subscriptionFromConfigSource<envoy::api::v2::Cluster>(
+          cds_config, local_info, dispatcher, cm, random, *scope_,
+          "envoy.api.v2.ClusterDiscoveryService.FetchClusters",
+          "envoy.api.v2.ClusterDiscoveryService.StreamClusters", api);
+}
+
+void CdsApiImpl::onConfigUpdate(const ResourceVector& resources, const std::string& version_info) {
+  cm_.adsMux().pause(Config::TypeUrl::get().ClusterLoadAssignment);
+  Cleanup eds_resume([this] { cm_.adsMux().resume(Config::TypeUrl::get().ClusterLoadAssignment); });
+>>>>>>> filesystem: convert free functions to object methods (#5692)
 
 // TODO(fredlas) use ResourceVector typedef once all xDS have incremental implemented,
 //               so that we can rely on IncrementalSubscriptionCallbacks to provide the typedef.
