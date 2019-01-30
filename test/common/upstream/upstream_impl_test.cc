@@ -1074,13 +1074,7 @@ TEST_F(StaticClusterImplTest, LoadAssignmentLocality) {
   EXPECT_FALSE(cluster.info()->addedViaApi());
 }
 
-TEST(StaticClusterImplTest, LoadAssignmentEdsHealth) {
-  Stats::IsolatedStoreImpl stats;
-  Ssl::MockContextManager ssl_context_manager;
-  NiceMock<Event::MockDispatcher> dispatcher;
-  NiceMock<Runtime::MockLoader> runtime;
-  NiceMock<LocalInfo::MockLocalInfo> local_info;
-  NiceMock<Runtime::MockRandomGenerator> random;
+TEST_F(StaticClusterImplTest, LoadAssignmentEdsHealth) {
   const std::string yaml = R"EOF(
     name: staticcluster
     connect_timeout: 0.25s
@@ -1107,7 +1101,8 @@ TEST(StaticClusterImplTest, LoadAssignmentEdsHealth) {
       "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                             : cluster_config.alt_stat_name()));
   Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-      ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats);
+      admin, ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats,
+      singleton_manager, tls);
   StaticClusterImpl cluster(cluster_config, runtime, factory_context, std::move(scope), false);
   cluster.initialize([] {});
 
@@ -1115,14 +1110,6 @@ TEST(StaticClusterImplTest, LoadAssignmentEdsHealth) {
   EXPECT_EQ(Host::Health::Degraded,
             cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->health());
 }
-
-TEST(StaticClusterImplTest, AltStatName) {
-  Stats::IsolatedStoreImpl stats;
-  Ssl::MockContextManager ssl_context_manager;
-  NiceMock<Runtime::MockLoader> runtime;
-  NiceMock<LocalInfo::MockLocalInfo> local_info;
-  NiceMock<Runtime::MockRandomGenerator> random;
-  NiceMock<Event::MockDispatcher> dispatcher;
 
 TEST_F(StaticClusterImplTest, AltStatName) {
   const std::string yaml = R"EOF(
