@@ -23,6 +23,24 @@ public:
   MOCK_METHOD0(flush, void());
 };
 
+class MockInstance : public Instance {
+public:
+  MockInstance();
+  ~MockInstance();
+
+  // Filesystem::Instance
+  MOCK_METHOD4(createFile, FileSharedPtr(const std::string&, Event::Dispatcher&,
+                                         Thread::BasicLockable&, std::chrono::milliseconds));
+  MOCK_METHOD3(createFile,
+               FileSharedPtr(const std::string&, Event::Dispatcher&, Thread::BasicLockable&));
+  MOCK_METHOD1(fileExists, bool(const std::string&));
+  MOCK_METHOD1(directoryExists, bool(const std::string&));
+  MOCK_METHOD1(fileSize, ssize_t(const std::string&));
+  MOCK_METHOD1(fileReadToEnd, std::string(const std::string&));
+  MOCK_METHOD1(canonicalPath, Api::SysCallStringResult(const std::string&));
+  MOCK_METHOD1(illegalPath, bool(const std::string&));
+};
+
 class MockWatcher : public Watcher {
 public:
   MockWatcher();

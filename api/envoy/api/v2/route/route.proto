@@ -340,7 +340,7 @@ message RouteMatch {
   // Indicates that the route should additionally match on a runtime key. Every time the route
   // is considered for a match, it must also fall under the percentage of matches indicated by
   // this field. For some fraction N/D, a random number in the range [0,D) is selected. If the
-  // number is <= the value of the numberator N, or if the key is not present, the default
+  // number is <= the value of the numerator N, or if the key is not present, the default
   // value, the router continues to evaluate the remaining match criteria. A runtime_fraction
   // route configuration can be used to roll out route changes in a gradual manner without full
   // code/config deploys. Refer to the :ref:`traffic shifting
@@ -601,7 +601,7 @@ message RouteAction {
     // fall under the percentage of matches indicated by this field.
     //
     // For some fraction N/D, a random number in the range [0,D) is selected. If the
-    // number is <= the value of the numberator N, or if the key is not present, the default
+    // number is <= the value of the numerator N, or if the key is not present, the default
     // value, the request will be mirrored.
     //
     // .. note::

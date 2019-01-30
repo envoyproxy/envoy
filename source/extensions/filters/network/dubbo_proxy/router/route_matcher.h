@@ -79,7 +79,7 @@ private:
   std::vector<Http::HeaderUtility::HeaderData> config_headers_;
   std::vector<WeightedClusterEntrySharedPtr> weighted_clusters_;
 
-  // TODO(leilei.gll) Implement it.
+  // TODO(gengleilei) Implement it.
   Envoy::Router::MetadataMatchCriteriaConstPtr metadata_match_criteria_;
 };
 

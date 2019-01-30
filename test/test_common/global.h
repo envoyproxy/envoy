@@ -22,7 +22,7 @@ class Globals {
 public:
   /**
    * Walks through all global singletons and ensures that none of them are
-   * active. No singletons should be allocaed at the end of unit tests, so
+   * active. No singletons should be allocated at the end of unit tests, so
    * this is called at the end of Envoy::TestRunner::RunTests().
    *
    * @return std::string empty string if quiescent, otherwise newline-separated
@@ -51,7 +51,7 @@ public:
    */
   template <class Type> static SingletonSharedPtr get() { return instance().getHelper<Type>(); }
 
-  ~Globals() = delete; // GlobalHeler is constructed once and never destroyed.
+  ~Globals() = delete; // Globals is constructed once and never destroyed.
 
 private:
   /**
@@ -104,7 +104,7 @@ private:
  *
  *   Global<FooImpl> foo;
  *
- * You can ghen access the singleton FooImpl via foo.get(). The underlying
+ * You can then access the singleton FooImpl via foo.get(). The underlying
  * FooImpl is ref-counted, and when the last TestGlobal is freed, the singleton
  * FooImpl will be destructed and the singleton pointer nulled.
  *

@@ -34,7 +34,7 @@ message RouteConfiguration {
 }
 
 message Route {
-  // Route matching prarameters.
+  // Route matching parameters.
   RouteMatch match = 1 [(validate.rules).message.required = true, (gogoproto.nullable) = false];
 
   // Route request to some upstream cluster.

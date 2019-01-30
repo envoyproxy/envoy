@@ -207,7 +207,7 @@ public:
  * HTTP/1.* Codec settings
  */
 struct Http1Settings {
-  // Enable codec to parse absolute uris. This enables forward/explicit proxy support for non TLS
+  // Enable codec to parse absolute URIs. This enables forward/explicit proxy support for non TLS
   // traffic
   bool allow_absolute_url_{false};
   // Allow HTTP/1.0 from downstream.
