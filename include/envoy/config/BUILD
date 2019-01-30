@@ -23,6 +23,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/stats:stats_macros",
         "//source/common/protobuf",
+        "@envoy_api//envoy/api/v2:discovery_cc",
     ],
 )
 

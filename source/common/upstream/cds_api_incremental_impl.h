@@ -51,7 +51,7 @@ public:
   void onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
                       const Protobuf::RepeatedPtrField<std::string>& removed_resources,
                       const std::string& system_version_info) override;
-  virtual void onConfigUpdate(const ResourceVector&, const std::string&) override {
+  void onConfigUpdate(const ResourceVector&, const std::string&) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
   void onConfigUpdateFailed(const EnvoyException* e) override;
