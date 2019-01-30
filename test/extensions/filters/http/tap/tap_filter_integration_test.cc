@@ -93,7 +93,7 @@ config:
   ASSERT_NE(pb_file, files.end());
 
   envoy::data::tap::v2alpha::BufferedTraceWrapper trace;
-  MessageUtil::loadFromFile(*pb_file, trace);
+  MessageUtil::loadFromFile(*pb_file, trace, *api_);
   EXPECT_TRUE(trace.has_http_buffered_trace());
 }
 
