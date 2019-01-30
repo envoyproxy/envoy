@@ -30,13 +30,5 @@ public:
   static uint64_t grpcToHttpStatus(Status::GrpcStatus grpc_status);
 };
 
-/**
- * An explicit hash function for Grpc::Status::GrpcStatus to satisfy cross-compiler requirements.
- */
-class GrpcStatusHash {
-public:
-  size_t operator()(const Status::GrpcStatus status) const;
-};
-
 } // namespace Grpc
 } // namespace Envoy

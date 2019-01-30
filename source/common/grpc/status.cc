@@ -88,9 +88,5 @@ uint64_t Utility::grpcToHttpStatus(Status::GrpcStatus grpc_status) {
   }
 }
 
-size_t GrpcStatusHash::operator()(const Status::GrpcStatus status) const {
-  return static_cast<size_t>(status);
-}
-
 } // namespace Grpc
 } // namespace Envoy
