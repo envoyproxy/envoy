@@ -185,7 +185,7 @@ TEST_F(LdsApiTest, MisconfiguredListenerNameIsPresentInException) {
   EXPECT_CALL(request_, cancel());
 }
 
-// Validate onConfigUpadte throws EnvoyException with duplicate listeners.
+// Validate onConfigUpdate throws EnvoyException with duplicate listeners.
 TEST_F(LdsApiTest, ValidateDuplicateListeners) {
   InSequence s;
 

@@ -122,7 +122,7 @@ TEST_F(CdsApiImplTest, ValidateFail) {
   EXPECT_CALL(request_, cancel());
 }
 
-// Validate onConfigUpadte throws EnvoyException with duplicate clusters.
+// Validate onConfigUpdate throws EnvoyException with duplicate clusters.
 TEST_F(CdsApiImplTest, ValidateDuplicateClusters) {
   InSequence s;
 

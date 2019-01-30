@@ -93,7 +93,7 @@ Address::InstanceConstSharedPtr getAnyAddress(const Address::IpVersion version,
  * This function tries to create a socket of type IpVersion version and bind to it. If
  * successful this function returns true. If either socket creation or socket
  * bind fail, this function returns false.
- * @param version the IP verson to test.
+ * @param version the IP version to test.
  * @return bool whether IpVersion addresses are "supported".
  */
 bool supportsIpVersion(const Address::IpVersion version);

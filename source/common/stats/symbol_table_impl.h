@@ -141,6 +141,7 @@ public:
   void free(const StatName& stat_name) override;
   void incRefCount(const StatName& stat_name) override;
   SymbolTable::StoragePtr join(const std::vector<StatName>& stat_names) const override;
+
 #ifndef ENVOY_CONFIG_COVERAGE
   void debugPrint() const override;
 #endif
@@ -201,7 +202,7 @@ private:
   // If the free pool is exhausted, we monotonically increase this counter.
   Symbol monotonic_counter_;
 
-  // Bimap implementation.
+  // Bitmap implementation.
   // The encode map stores both the symbol and the ref count of that symbol.
   // Using absl::string_view lets us only store the complete string once, in the decode map.
   using EncodeMap = absl::flat_hash_map<absl::string_view, SharedSymbol, StringViewHash>;
@@ -342,7 +343,7 @@ StatName StatNameStorage::statName() const { return StatName(bytes_.get()); }
  * Contains the backing store for a StatName and enough context so it can
  * self-delete through RAII. This works by augmenting StatNameStorage with a
  * reference to the SymbolTable&, so it has an extra 8 bytes of footprint. It
- * is intendended to be used in tests or as a scoped temp in a function, rather
+ * is intended to be used in tests or as a scoped temp in a function, rather
  * than stored in a larger structure such as a map, where the redundant copies
  * of the SymbolTable& would be costly in aggregate.
  */

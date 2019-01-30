@@ -72,6 +72,7 @@ proto_library(
         "//envoy/config/trace/v2:trace",
         "//envoy/config/transport_socket/tap/v2alpha:tap",
         "//envoy/data/accesslog/v2:accesslog",
+        "//envoy/data/cluster/v2alpha:outlier_detection_event",
         "//envoy/data/core/v2alpha:health_check_event",
         "//envoy/data/tap/v2alpha:http",
         "//envoy/data/tap/v2alpha:transport",

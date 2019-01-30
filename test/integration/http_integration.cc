@@ -1702,7 +1702,8 @@ void HttpIntegrationTest::testAbsolutePathWithPort() {
 void HttpIntegrationTest::testAbsolutePathWithoutPort() {
   // Add a restrictive default match, to avoid the request hitting the * / catchall.
   config_helper_.setDefaultHostAndRoute("foo.com", "/found");
-  // Set a matcher for namewithport:1234 and verify http://namewithport does not match
+  // Set a matcher for www.namewithport.com:1234 and verify http://www.namewithport.com does not
+  // match
   config_helper_.addRoute("www.namewithport.com:1234", "/", "cluster_0", true,
                           envoy::api::v2::route::RouteAction::SERVICE_UNAVAILABLE,
                           envoy::api::v2::route::VirtualHost::ALL);

@@ -618,7 +618,7 @@ TEST_F(MySQLCodecTest, MySQLClientLogin320IncompleteAuthLen) {
 
 /*
  * Negative Test the MYSQL Client Login 320 message parser:
- * Incomplete header at authpasswd
+ * Incomplete header at "authpasswd"
  */
 TEST_F(MySQLCodecTest, MySQLClientLogin320IncompleteAuthPasswd) {
   ClientLogin mysql_clogin_encode{};

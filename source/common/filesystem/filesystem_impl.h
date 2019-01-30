@@ -136,7 +136,7 @@ public:
    */
   void reopen() override;
 
-  // Fileystem::File
+  // Filesystem::File
   void flush() override;
 
 private:
@@ -159,7 +159,7 @@ private:
                                           // to disk. This is used to make sure that file blocks do
                                           // not get interleaved by multiple processes writing to
                                           // the same file during hot-restart.
-  Thread::MutexBasicLockable flush_lock_; // This lock is used to prevent simulataneous flushes from
+  Thread::MutexBasicLockable flush_lock_; // This lock is used to prevent simultaneous flushes from
                                           // the flush thread and a synchronous flush. This protects
                                           // concurrent access to the about_to_write_buffer_, fd_,
                                           // and all other data used during flushing and file

@@ -186,8 +186,8 @@ protected:
     void pendingSendBufferLowWatermark();
 
     // Max header size of 63K. This is arbitrary but makes it easier to test since nghttp2 doesn't
-    // appear to transmit headers greater than approximtely 64K (NGHTTP2_MAX_HEADERSLEN) for reasons
-    // I don't fully understand.
+    // appear to transmit headers greater than approximately 64K (NGHTTP2_MAX_HEADERSLEN) for
+    // reasons I don't fully understand.
     static const uint64_t MAX_HEADER_SIZE = 63 * 1024;
 
     // Does any necessary WebSocket/Upgrade conversion, then passes the headers
