@@ -779,21 +779,15 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilte
     ENVOY_STREAM_LOG(trace, "decode headers called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
 
-    if (!request_metadata_map_vector_.empty()) {
-      insert_new_metadata_in_headers_ = true;
-    }
-
-    processNewlyAddedMetadata();
+    bool new_metadata_added = processNewlyAddedMetadata();
 
     // If end_stream is set in headers, and a filter adds new metadata, we need to delay end_stream
     // in headers by inserting an empty data frame with end_stream set. The empty data frame is sent
     // after the new metadata.
-    if ((*entry)->end_stream_ && insert_new_metadata_in_headers_ && !empty_data_end_stream_sent_) {
+    if ((*entry)->end_stream_ && new_metadata_added && !empty_data_end_stream_sent_) {
       Buffer::OwnedImpl empty_data("");
-      ENVOY_STREAM_LOG(trace,
-                       "inserts an empty data frame to carry end_stream instead of headers "
-                       "because new metadata is added in headers.",
-                       *this);
+      ENVOY_STREAM_LOG(
+          trace, "inserting an empty data frame for end_stream due metadata being added.", *this);
       addDecodedData(*((*entry).get()), empty_data, true);
       empty_data_end_stream_sent_ = true;
     }
@@ -814,7 +808,6 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilte
   }
 
   if (continue_data_entry != decoder_filters_.end()) {
-
     // We use the continueDecoding() code since it will correctly handle not calling
     // decodeHeaders() again. Fake setting stopped_ since the continueDecoding() code expects it.
     ASSERT(buffered_request_data_);
@@ -1457,13 +1450,15 @@ void ConnectionManagerImpl::ActiveStream::maybeEndEncode(bool end_stream) {
   }
 }
 
-void ConnectionManagerImpl::ActiveStream::processNewlyAddedMetadata() {
-  if (!request_metadata_map_vector_.empty()) {
-    for (const auto& metadata_map : request_metadata_map_vector_) {
-      decodeMetadata(nullptr, *metadata_map);
-    }
-    request_metadata_map_vector_.clear();
+bool ConnectionManagerImpl::ActiveStream::processNewlyAddedMetadata() {
+  if (request_metadata_map_vector_.empty()) {
+    return false;
   }
+  for (const auto& metadata_map : request_metadata_map_vector_) {
+    decodeMetadata(nullptr, *metadata_map);
+  }
+  request_metadata_map_vector_.clear();
+  return true;
 }
 
 void ConnectionManagerImpl::ActiveStream::onResetStream(StreamResetReason) {
