@@ -108,6 +108,7 @@ cc_library(
         "quiche/quic/platform/api/quic_string.h",
         "quiche/quic/platform/api/quic_string_piece.h",
         "quiche/quic/platform/api/quic_ptr_util.h",
+        "quiche/quic/platform/api/quic_uint128.h",
         # TODO: uncomment the following files as implementations are added.
         # "quiche/quic/platform/api/quic_bug_tracker.h",
         # "quiche/quic/platform/api/quic_client_stats.h",
@@ -145,7 +146,6 @@ cc_library(
         # "quiche/quic/platform/api/quic_test_output.h",
         # "quiche/quic/platform/api/quic_text_utils.h",
         # "quiche/quic/platform/api/quic_thread.h",
-        # "quiche/quic/platform/api/quic_uint128.h",
     ],
     visibility = ["//visibility:public"],
     deps = [
