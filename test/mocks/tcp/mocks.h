@@ -50,7 +50,7 @@ public:
   MOCK_METHOD1(setConnectionState_, void(ConnectionPool::ConnectionStatePtr& state));
 
   // If set, invoked in ~MockConnectionData, which indicates that the connection pool
-  // caller has relased a connection.
+  // caller has released a connection.
   std::function<void()> release_callback_;
 };
 

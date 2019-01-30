@@ -82,11 +82,11 @@ private:
   // Otherwise, default_cvc_ is nullptr.
   std::unique_ptr<envoy::api::v2::auth::CertificateValidationContext> default_cvc_;
   std::vector<Secret::TlsCertificateConfigProviderSharedPtr> tls_certificate_providers_;
-  // Handle for TLS certificate dyanmic secret callback.
+  // Handle for TLS certificate dynamic secret callback.
   Common::CallbackHandle* tc_update_callback_handle_{};
   Secret::CertificateValidationContextConfigProviderSharedPtr
       certificate_validation_context_provider_;
-  // Handle for certificate validation context dyanmic secret callback.
+  // Handle for certificate validation context dynamic secret callback.
   Common::CallbackHandle* cvc_update_callback_handle_{};
   Common::CallbackHandle* cvc_validation_callback_handle_{};
   const unsigned min_protocol_version_;

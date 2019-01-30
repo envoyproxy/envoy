@@ -197,7 +197,7 @@ message HttpConnectionManager {
   // during which Envoy will flush the write buffers for the connection and await the peer to close
   // (i.e., a TCP FIN/RST is received by Envoy from the downstream connection).
   //
-  // Delaying Envoy's connection close and giving the peer the opportunity to initate the close
+  // Delaying Envoy's connection close and giving the peer the opportunity to initiate the close
   // sequence mitigates a race condition that exists when downstream clients do not drain/process
   // data in a connection's receive buffer after a remote close has been detected via a socket
   // write(). This race leads to such clients failing to process the response code sent by Envoy,
@@ -364,7 +364,7 @@ message HttpConnectionManager {
     // HTTP connections will be used for this upgrade type.
     repeated HttpFilter filters = 2;
     // Determines if upgrades are enabled or disabled by default. Defaults to true.
-    // This can be overriden on a per-route basis with :ref:`cluster
+    // This can be overridden on a per-route basis with :ref:`cluster
     // <envoy_api_field_route.RouteAction.upgrade_configs>` as documented in the
     // :ref:`upgrade documentation <arch_overview_websocket>`.
     google.protobuf.BoolValue enabled = 3;

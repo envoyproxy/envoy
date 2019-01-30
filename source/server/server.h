@@ -132,7 +132,7 @@ private:
 };
 
 /**
- * This is the actual full standalone server which stiches together various common components.
+ * This is the actual full standalone server which stitches together various common components.
  */
 class InstanceImpl : Logger::Loggable<Logger::Id::main>, public Instance {
 public:
