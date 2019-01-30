@@ -69,7 +69,7 @@ typedef std::shared_ptr<ProxyFilterConfig> ProxyFilterConfigSharedPtr;
 
 /**
  * A redis multiplexing proxy filter. This filter will take incoming redis pipelined commands, and
- * mulitplex them onto a consistently hashed connection pool of backend servers.
+ * multiplex them onto a consistently hashed connection pool of backend servers.
  */
 class ProxyFilter : public Network::ReadFilter,
                     public DecoderCallbacks,

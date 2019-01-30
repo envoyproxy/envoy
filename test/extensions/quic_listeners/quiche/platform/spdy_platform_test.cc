@@ -12,7 +12,7 @@
 // Basic tests to validate functioning of the QUICHE spdy platform
 // implementation. For platform APIs in which the implementation is a simple
 // typedef/passthrough to a std:: or absl:: construct, the tests are kept
-// minimal, and serve primarily to verofy the APIs compile and link without
+// minimal, and serve primarily to verify the APIs compile and link without
 // issue.
 
 namespace Envoy {

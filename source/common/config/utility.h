@@ -60,7 +60,7 @@ public:
   /**
    * Extract typed resources from a DiscoveryResponse.
    * @param response reference to DiscoveryResponse.
-   * @return Protobuf::RepatedPtrField<ResourceType> vector of typed resources in response.
+   * @return Protobuf::RepeatedPtrField<ResourceType> vector of typed resources in response.
    */
   template <class ResourceType>
   static Protobuf::RepeatedPtrField<ResourceType>
