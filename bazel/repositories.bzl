@@ -572,8 +572,12 @@ def _com_google_protobuf():
     )
 
 def _com_googlesource_quiche():
-    _repository_impl(
+    location = REPOSITORY_LOCATIONS["com_googlesource_quiche"]
+    genrule_repository(
         name = "com_googlesource_quiche",
+        urls = location["urls"],
+        sha256 = location["sha256"],
+        genrule_cmd_file = "@envoy//bazel/external:quiche.genrule_cmd",
         build_file = "@envoy//bazel/external:quiche.BUILD",
     )
 
