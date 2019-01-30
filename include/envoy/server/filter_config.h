@@ -140,6 +140,11 @@ public:
    * @return Http::Context& a reference to the http context.
    */
   virtual Http::Context& httpContext() PURE;
+
+  /**
+   * @return Api::Api& a reference to the api object.
+   */
+  virtual Api::Api& api() PURE;
 };
 
 class ListenerFactoryContext : public virtual FactoryContext {

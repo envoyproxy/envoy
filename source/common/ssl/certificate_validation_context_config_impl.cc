@@ -12,11 +12,11 @@ namespace Ssl {
 static const std::string INLINE_STRING = "<inline>";
 
 CertificateValidationContextConfigImpl::CertificateValidationContextConfigImpl(
-    const envoy::api::v2::auth::CertificateValidationContext& config)
-    : ca_cert_(Config::DataSource::read(config.trusted_ca(), true)),
+    const envoy::api::v2::auth::CertificateValidationContext& config, Api::Api& api)
+    : ca_cert_(Config::DataSource::read(config.trusted_ca(), true, api)),
       ca_cert_path_(Config::DataSource::getPath(config.trusted_ca())
                         .value_or(ca_cert_.empty() ? EMPTY_STRING : INLINE_STRING)),
-      certificate_revocation_list_(Config::DataSource::read(config.crl(), true)),
+      certificate_revocation_list_(Config::DataSource::read(config.crl(), true, api)),
       certificate_revocation_list_path_(
           Config::DataSource::getPath(config.crl())
               .value_or(certificate_revocation_list_.empty() ? EMPTY_STRING : INLINE_STRING)),

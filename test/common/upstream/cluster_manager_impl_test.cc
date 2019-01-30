@@ -56,7 +56,7 @@ namespace {
 // the expectations when needed.
 class TestClusterManagerFactory : public ClusterManagerFactory {
 public:
-  TestClusterManagerFactory() {
+  TestClusterManagerFactory() : api_(Api::createApiForTest(stats_)) {
     ON_CALL(*this, clusterFromProto_(_, _, _, _))
         .WillByDefault(Invoke([&](const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
                                   Outlier::EventLoggerSharedPtr outlier_event_logger,
@@ -64,7 +64,7 @@ public:
           return ClusterImplBase::create(cluster, cm, stats_, tls_, dns_resolver_,
                                          ssl_context_manager_, runtime_, random_, dispatcher_,
                                          log_manager_, local_info_, admin_, singleton_manager_,
-                                         outlier_event_logger, added_via_api);
+                                         outlier_event_logger, added_via_api, *api_);
         }));
   }
 
@@ -122,6 +122,7 @@ public:
   NiceMock<Secret::MockSecretManager> secret_manager_;
   NiceMock<AccessLog::MockAccessLogManager> log_manager_;
   Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest().currentThreadId()};
+  Api::ApiPtr api_;
 };
 
 // Helper to intercept calls to postThreadLocalClusterUpdate.
