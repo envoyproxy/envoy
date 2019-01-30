@@ -42,7 +42,7 @@ namespace Config {
 // This approach enables linear memory scalability based primarily on the size of the configuration
 // set.
 //
-// A blueprint to follow for implementing {im,}mutable config providers is as follows:
+// A blueprint to follow for implementing mutable or immutable config providers is as follows:
 //
 // For both:
 //   1) Create a class derived from ConfigProviderManagerImplBase and implement the required
@@ -324,7 +324,7 @@ private:
  * All config processing is done on the main thread, so instantiation of *ConfigProvider* objects
  * via createStaticConfigProvider() and createXdsConfigProvider() is naturally thread safe. Care
  * must be taken with regards to destruction of these objects, since it must also happen on the main
- * thread _prior_ to destruction of the ConfigProviderManagerImplBase oject from which they were
+ * thread _prior_ to destruction of the ConfigProviderManagerImplBase object from which they were
  * created.
  *
  * This class can not be instantiated directly; instead, it provides the foundation for
@@ -362,7 +362,7 @@ protected:
   /**
    * Returns the subscription associated with the config_source_proto; if none exists, a new one is
    * allocated according to the subscription_factory_fn.
-   * @param config_source_proto supplies the proto specifying the config subscription paremeters.
+   * @param config_source_proto supplies the proto specifying the config subscription parameters.
    * @param init_manager supplies the init manager.
    * @param subscription_factory_fn supplies a function to be called when a new subscription needs
    *                                to be allocated.
