@@ -122,7 +122,7 @@ class SpellChecker:
     self.aspell.poll()
     if self.aspell.returncode is not None:
       print("aspell quit unexpectedly: return code %d" % (self.aspell.returncode))
-      sys.exit(1)
+      sys.exit(2)
 
     debug("ASPELL< %s" % (line))
 
@@ -161,7 +161,7 @@ class SpellChecker:
         errors.append((original, int(o), suggestions))
       else:
         print("aspell produced unexpected output: %s" % (result))
-        sys.exit(1)
+        sys.exit(2)
 
     return errors
 
@@ -384,7 +384,7 @@ def fix_error(checker, file, line_offset, lines, errors):
 
   if len(errors) != len(replacements):
     print("Internal error %d errors with %d replacements" % (len(errors), len(replacements)))
-    sys.exit(1)
+    sys.exit(2)
 
   # Perform replacements on the line
   line = lines[line_offset]
@@ -468,6 +468,8 @@ def execute(files, dictionary_file, fix):
 
   print("Checked %d comments, found %d errors." % (total_comments, total_errors))
 
+  return total_errors == 0
+
 
 if __name__ == "__main__":
   default_dictionary = os.path.join(TOOLS_DIR, 'spelling_dictionary.txt')
@@ -509,4 +511,11 @@ if __name__ == "__main__":
       for root, _, files in os.walk(p):
         target_paths += [os.path.join(root, f) for f in files if os.path.splitext(f)[1] in exts]
 
-  execute(target_paths, args.dictionary, args.operation_type == 'fix')
+  rv = execute(target_paths, args.dictionary, args.operation_type == 'fix')
+
+  if args.operation_type == 'check':
+    if not rv:
+      print("ERROR: spell check failed. Run 'tool/check_spelling_pedantic.py fix'")
+      sys.exit(1)
+
+    print("PASS")
