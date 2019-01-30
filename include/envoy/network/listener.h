@@ -115,6 +115,59 @@ public:
 };
 
 /**
+ * Utility struct that encapsulates the information from a udp socket's
+ * recvfrom/recvmmsg call.
+ *
+ * TODO(conqerAtapple): Maybe this belongs inside the UdpListenerCallbacks
+ * class.
+ */
+struct UdpData {
+  Address::InstanceConstSharedPtr local_address_;
+  Address::InstanceConstSharedPtr peer_address_; // TODO(conquerAtapple): Fix ownership semantics.
+  Buffer::InstancePtr buffer_;
+  // TODO(conquerAtapple):
+  // Add UdpReader here so that the callback handler can
+  // then use the reader to do multiple reads(recvmmsg) once the OS notifies it
+  // has data. We could also just return a `ReaderFactory` that returns either a
+  // `recvfrom` reader (with peer information) or a `read/recvmmsg` reader. This
+  // is still being flushed out (Jan, 2019).
+};
+
+/**
+ * Udp listener callbacks.
+ */
+class UdpListenerCallbacks {
+public:
+  enum class ErrorCode { SyscallError, UnknownError };
+
+  virtual ~UdpListenerCallbacks() = default;
+
+  /**
+   * Called whenever data is received by the underlying udp socket.
+   *
+   * @param data UdpData from the underlying socket.
+   */
+  virtual void onData(const UdpData& data) PURE;
+
+  /**
+   * Called when the underlying socket is ready for write.
+   *
+   * @param socket Underlying server socket for the listener.
+   *
+   * TODO(conqerAtapple): Maybe we need a UdpWriter here instead of Socket.
+   */
+  virtual void onWriteReady(const Socket& socket) PURE;
+
+  /**
+   * Called when there is an error event.
+   *
+   * @param error_code ErrorCode for the error event.
+   * @param error_number System error number.
+   */
+  virtual void onError(const ErrorCode& error_code, int error_number) PURE;
+};
+
+/**
  * An abstract socket listener. Free the listener to stop listening on the socket.
  */
 class Listener {
