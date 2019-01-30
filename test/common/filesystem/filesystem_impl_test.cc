@@ -99,6 +99,8 @@ TEST_F(FileSystemImplTest, fileReadToEndDoesNotExist) {
 
 TEST_F(FileSystemImplTest, fileReadToEndBlacklisted) {
   EXPECT_THROW(Filesystem::fileReadToEnd("/dev/urandom"), EnvoyException);
+  EXPECT_THROW(Filesystem::fileReadToEnd("/proc/cpuinfo"), EnvoyException);
+  EXPECT_THROW(Filesystem::fileReadToEnd("/sys/block/sda/dev"), EnvoyException);
 }
 
 TEST_F(FileSystemImplTest, CanonicalPathSuccess) {
