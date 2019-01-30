@@ -68,7 +68,7 @@ std::string FormatterImpl::format(const Http::HeaderMap& request_headers,
     log_line += provider->format(request_headers, response_headers, response_trailers, stream_info);
   }
 
-  return absl::StrCat(log_line, "\n");
+  return log_line;
 }
 
 JsonFormatterImpl::JsonFormatterImpl(std::unordered_map<std::string, std::string>& format_mapping) {
@@ -99,6 +99,7 @@ std::string JsonFormatterImpl::format(const Http::HeaderMap& request_headers,
   }
 
   return absl::StrCat(log_line, "\n");
+  //return log_line;
 }
 
 std::unordered_map<std::string, std::string> JsonFormatterImpl::toMap(
@@ -249,6 +250,11 @@ std::vector<FormatterProviderPtr> AccessLogFormatParser::parse(const std::string
 
   if (!current_token.empty()) {
     formatters.emplace_back(FormatterProviderPtr{new PlainStringFormatter(current_token)});
+  }
+
+  auto newline_position = format.find('\n');
+  if (newline_position != std::string::npos) {
+    formatters.emplace_back(FormatterProviderPtr{new PlainStringFormatter("\n")});
   }
 
   return formatters;
