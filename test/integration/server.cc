@@ -46,11 +46,11 @@ OptionsImpl createTestOptionsImpl(const std::string& config_path, const std::str
 
 IntegrationTestServerPtr IntegrationTestServer::create(
     const std::string& config_path, const Network::Address::IpVersion version,
-    std::function<void()> pre_worker_start_test_steps, bool deterministic,
+    std::function<void()> server_init_coroutines, bool deterministic,
     Event::TestTimeSystem& time_system, Api::Api& api, bool defer_listener_finalization) {
   IntegrationTestServerPtr server{
       std::make_unique<IntegrationTestServerImpl>(time_system, api, config_path)};
-  server->start(version, pre_worker_start_test_steps, deterministic, defer_listener_finalization);
+  server->start(version, server_init_coroutines, deterministic, defer_listener_finalization);
   return server;
 }
 
@@ -65,7 +65,7 @@ void IntegrationTestServer::waitUntilListenersReady() {
 }
 
 void IntegrationTestServer::start(const Network::Address::IpVersion version,
-                                  std::function<void()> pre_worker_start_test_steps,
+                                  std::function<void()> server_init_coroutines,
                                   bool deterministic, bool defer_listener_finalization) {
   ENVOY_LOG(info, "starting integration test server");
   ASSERT(!thread_);
@@ -73,8 +73,11 @@ void IntegrationTestServer::start(const Network::Address::IpVersion version,
       [version, deterministic, this]() -> void { threadRoutine(version, deterministic); });
 
   // If any steps need to be done prior to workers starting, do them now. E.g., xDS pre-init.
-  if (pre_worker_start_test_steps != nullptr) {
-    pre_worker_start_test_steps();
+  // Note that there is no synchronization guaranteeing this happens either
+  // before workers starting or after server start.  Any needed synchornization must occur in the routines.
+  // These steps are executed at this point in the code to allow server initialization to be dependent on them (e.g. control plane peers).
+  if (server_init_coroutines != nullptr) {
+    server_init_coroutines();
   }
 
   // Wait for the server to be created and the number of initial listeners to wait for to be set.
