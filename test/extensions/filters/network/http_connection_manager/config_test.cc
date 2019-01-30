@@ -169,7 +169,7 @@ TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersSizeDefault) {
 TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersSizeConfigured) {
   const std::string yaml_string = R"EOF(
   stat_prefix: ingress_http
-  max_request_headers_size_kb: 16
+  max_request_headers_kb: 16
   route_config:
     name: local_route
   http_filters:
