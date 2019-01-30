@@ -60,6 +60,7 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+<<<<<<< HEAD
     name = "cds_subscription_lib",
     srcs = ["cds_subscription.cc"],
     hdrs = ["cds_subscription.h"],
@@ -83,6 +84,8 @@ envoy_cc_library(
 envoy_cc_library(
 =======
 >>>>>>> config: removing the legacy rest API (#5522)
+=======
+>>>>>>> trim unused cds_subscription_lib from BUILD
     name = "cluster_manager_lib",
     srcs = ["cluster_manager_impl.cc"],
     hdrs = ["cluster_manager_impl.h"],
