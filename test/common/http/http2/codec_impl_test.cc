@@ -148,7 +148,7 @@ public:
   StreamEncoder* response_encoder_{};
   MockStreamCallbacks server_stream_callbacks_;
   bool corrupt_data_ = false;
-  uint32_t max_request_headers_ = Http::DEFAULT_MAX_REQUEST_HEADERS_SIZE_KB;
+  uint32_t max_request_headers_ = Http::DEFAULT_MAX_REQUEST_HEADERS_SIZE;
 };
 
 TEST_P(Http2CodecImplTest, ShutdownNotice) {
