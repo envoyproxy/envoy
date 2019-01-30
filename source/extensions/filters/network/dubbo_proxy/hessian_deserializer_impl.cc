@@ -27,7 +27,7 @@ RpcInvocationPtr HessianDeserializerImpl::deserializeRpcInvocation(Buffer::Insta
                                                                    size_t body_size) {
   ASSERT(buffer.length() >= body_size);
   size_t total_size = 0, size;
-  // TODO(zyfjeff:) Add format checker
+  // TODO(zyfjeff): Add format checker
   std::string dubbo_version = HessianUtils::peekString(buffer, &size);
   total_size = total_size + size;
   std::string service_name = HessianUtils::peekString(buffer, &size, total_size);
