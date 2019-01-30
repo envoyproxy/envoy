@@ -14,58 +14,56 @@ namespace Envoy {
 namespace Filesystem {
 
 /**
- * Abstraction for a file on disk.
+ * Abstraction for a basic file on disk.
  */
-class File {
+class RawFile {
 public:
-  virtual ~File() {}
+  virtual ~RawFile() {}
 
   /**
-   * Write data to the file.
+   * Open the file with O_RDWR | O_APPEND | O_CREAT
+   * The file will be closed when this object is destructed
+   *
+   * @return bool whether the open succeeded
    */
-  virtual void write(absl::string_view) PURE;
+  virtual Api::SysCallBoolResult open() PURE;
 
   /**
-   * Reopen the file.
+   * Write the buffer to the file. The file must be explicitly opened before writing.
+   *
+   * @return ssize_t number of bytes written, or -1 for failure
    */
-  virtual void reopen() PURE;
+  virtual Api::SysCallSizeResult write(absl::string_view buffer) PURE;
 
   /**
-   * Synchronously flush all pending data to disk.
+   * Close the file.
+   *
+   * @return bool whether the close succeeded
    */
-  virtual void flush() PURE;
+  virtual Api::SysCallBoolResult close() PURE;
+
+  /**
+   * @return bool is the file open
+   */
+  virtual bool isOpen() PURE;
+
+  /**
+   * @return string the file path
+   */
+  virtual std::string path() PURE;
 };
 
-typedef std::shared_ptr<File> FileSharedPtr;
+typedef std::unique_ptr<RawFile> RawFilePtr;
 
-/**
- * Captures state, properties, and stats of a file-system.
- */
-class Instance {
+class RawInstance {
 public:
-  virtual ~Instance() {}
+  virtual ~RawInstance() {}
 
   /**
-   * Creates a file, overriding the flush-interval set in the class.
-   *
-   * @param path The path of the file to open.
-   * @param dispatcher The dispatcher used for set up timers to run flush().
-   * @param lock The lock.
-   * @param file_flush_interval_msec Number of milliseconds to delay before flushing.
+   *  @param path The path of the RawFile
+   *  @return a RawFilePtr. The file is not opened.
    */
-  virtual FileSharedPtr createFile(const std::string& path, Event::Dispatcher& dispatcher,
-                                   Thread::BasicLockable& lock,
-                                   std::chrono::milliseconds file_flush_interval_msec) PURE;
-
-  /**
-   * Creates a file, using the default flush-interval for the class.
-   *
-   * @param path The path of the file to open.
-   * @param dispatcher The dispatcher used for set up timers to run flush().
-   * @param lock The lock.
-   */
-  virtual FileSharedPtr createFile(const std::string& path, Event::Dispatcher& dispatcher,
-                                   Thread::BasicLockable& lock) PURE;
+  virtual RawFilePtr createRawFile(const std::string& path) PURE;
 
   /**
    * @return bool whether a file exists on disk and can be opened for read.
@@ -107,6 +105,61 @@ public:
    * @return is the path on the blacklist?
    */
   virtual bool illegalPath(const std::string& path) PURE;
+};
+
+/**
+ * Abstraction for a file on disk. It is specifically designed for writing access logs.
+ */
+class File {
+public:
+  virtual ~File() {}
+
+  /**
+   * Write data to the file.
+   */
+  virtual void write(absl::string_view) PURE;
+
+  /**
+   * Reopen the file.
+   */
+  virtual void reopen() PURE;
+
+  /**
+   * Synchronously flush all pending data to disk.
+   */
+  virtual void flush() PURE;
+};
+
+typedef std::shared_ptr<File> FileSharedPtr;
+
+/**
+ * Captures state, properties, and stats of a file-system.
+ */
+class Instance : public RawInstance {
+public:
+  virtual ~Instance() {}
+
+  /**
+   * Creates a file, overriding the flush-interval set in the class.
+   *
+   * @param path The path of the file to open.
+   * @param dispatcher The dispatcher used for set up timers to run flush().
+   * @param lock The lock.
+   * @param file_flush_interval_msec Number of milliseconds to delay before flushing.
+   */
+  virtual FileSharedPtr createFile(const std::string& path, Event::Dispatcher& dispatcher,
+                                   Thread::BasicLockable& lock,
+                                   std::chrono::milliseconds file_flush_interval_msec) PURE;
+
+  /**
+   * Creates a file, using the default flush-interval for the class.
+   *
+   * @param path The path of the file to open.
+   * @param dispatcher The dispatcher used for set up timers to run flush().
+   * @param lock The lock.
+   */
+  virtual FileSharedPtr createFile(const std::string& path, Event::Dispatcher& dispatcher,
+                                   Thread::BasicLockable& lock) PURE;
 };
 
 typedef std::unique_ptr<Watcher> WatcherPtr;

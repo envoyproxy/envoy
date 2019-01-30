@@ -2,12 +2,8 @@
 
 #include <atomic>
 #include <chrono>
-#include <cstdint>
-#include <cstdlib>
 #include <string>
 
-#include "envoy/api/api.h"
-#include "envoy/api/os_sys_calls.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/stats/stats_macros.h"
@@ -32,20 +28,21 @@ struct FileSystemStats {
 
 namespace Filesystem {
 
-/**
- * Captures state, properties, and stats of a file-system.
- */
 class InstanceImpl : public Instance {
 public:
-  InstanceImpl(std::chrono::milliseconds file_flush_interval_msec,
-               Thread::ThreadFactory& thread_factory, Stats::Store& store);
-
   // Filesystem::Instance
+  InstanceImpl(std::chrono::milliseconds file_flush_interval_msec,
+               Thread::ThreadFactory& thread_factory, Stats::Store& store,
+               RawInstance& raw_instance);
+
   FileSharedPtr createFile(const std::string& path, Event::Dispatcher& dispatcher,
                            Thread::BasicLockable& lock,
                            std::chrono::milliseconds file_flush_interval_msec) override;
   FileSharedPtr createFile(const std::string& path, Event::Dispatcher& dispatcher,
                            Thread::BasicLockable& lock) override;
+
+  // Filesystem::RawInstance
+  RawFilePtr createRawFile(const std::string& path) override;
   bool fileExists(const std::string& path) override;
   bool directoryExists(const std::string& path) override;
   ssize_t fileSize(const std::string& path) override;
@@ -57,6 +54,7 @@ private:
   const std::chrono::milliseconds file_flush_interval_msec_;
   FileSystemStats file_stats_;
   Thread::ThreadFactory& thread_factory_;
+  RawInstance& raw_instance_;
 };
 
 /**
@@ -68,7 +66,7 @@ private:
  */
 class FileImpl : public File {
 public:
-  FileImpl(const std::string& path, Event::Dispatcher& dispatcher, Thread::BasicLockable& lock,
+  FileImpl(RawFilePtr&& raw_file, Event::Dispatcher& dispatcher, Thread::BasicLockable& lock,
            FileSystemStats& stats_, std::chrono::milliseconds flush_interval_msec,
            Thread::ThreadFactory& thread_factory);
   ~FileImpl();
@@ -96,8 +94,7 @@ private:
   // Minimum size before the flush thread will be told to flush.
   static const uint64_t MIN_FLUSH_SIZE = 1024 * 64;
 
-  int fd_;
-  std::string path_;
+  RawFilePtr raw_file_;
 
   // These locks are always acquired in the following order if multiple locks are held:
   //    1) write_lock_
@@ -133,7 +130,6 @@ private:
                                             // continue to fill. This buffer is then used for the
                                             // final write to disk.
   Event::TimerPtr flush_timer_;
-  Api::OsSysCalls& os_sys_calls_;
   Thread::ThreadFactory& thread_factory_;
   const std::chrono::milliseconds flush_interval_msec_; // Time interval buffer gets flushed no
                                                         // matter if it reached the MIN_FLUSH_SIZE

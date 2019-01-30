@@ -1,16 +1,5 @@
 #include "common/filesystem/filesystem_impl.h"
 
-#include <dirent.h>
-#include <sys/stat.h>
-
-#include <chrono>
-#include <cstdint>
-#include <fstream>
-#include <iostream>
-#include <memory>
-#include <sstream>
-#include <string>
-
 #include "envoy/common/exception.h"
 #include "envoy/common/time.h"
 #include "envoy/event/dispatcher.h"
@@ -22,22 +11,21 @@
 #include "common/common/lock_guard.h"
 #include "common/common/stack_array.h"
 
-#include "absl/strings/match.h"
-
 namespace Envoy {
 namespace Filesystem {
 
 InstanceImpl::InstanceImpl(std::chrono::milliseconds file_flush_interval_msec,
-                           Thread::ThreadFactory& thread_factory, Stats::Store& stats_store)
+                           Thread::ThreadFactory& thread_factory, Stats::Store& stats_store,
+                           RawInstance& raw_instance)
     : file_flush_interval_msec_(file_flush_interval_msec),
       file_stats_{FILESYSTEM_STATS(POOL_COUNTER_PREFIX(stats_store, "filesystem."),
                                    POOL_GAUGE_PREFIX(stats_store, "filesystem."))},
-      thread_factory_(thread_factory) {}
+      thread_factory_(thread_factory), raw_instance_(raw_instance) {}
 
 FileSharedPtr InstanceImpl::createFile(const std::string& path, Event::Dispatcher& dispatcher,
                                        Thread::BasicLockable& lock,
                                        std::chrono::milliseconds file_flush_interval_msec) {
-  return std::make_shared<Filesystem::FileImpl>(path, dispatcher, lock, file_stats_,
+  return std::make_shared<Filesystem::FileImpl>(createRawFile(path), dispatcher, lock, file_stats_,
                                                 file_flush_interval_msec, thread_factory_);
 };
 
@@ -46,96 +34,47 @@ FileSharedPtr InstanceImpl::createFile(const std::string& path, Event::Dispatche
   return createFile(path, dispatcher, lock, file_flush_interval_msec_);
 }
 
-bool InstanceImpl::fileExists(const std::string& path) {
-  std::ifstream input_file(path);
-  return input_file.is_open();
+RawFilePtr InstanceImpl::createRawFile(const std::string& path) {
+  return raw_instance_.createRawFile(path);
 }
+
+bool InstanceImpl::fileExists(const std::string& path) { return raw_instance_.fileExists(path); }
 
 bool InstanceImpl::directoryExists(const std::string& path) {
-  DIR* const dir = ::opendir(path.c_str());
-  const bool dir_exists = nullptr != dir;
-  if (dir_exists) {
-    ::closedir(dir);
-  }
-
-  return dir_exists;
+  return raw_instance_.directoryExists(path);
 }
 
-ssize_t InstanceImpl::fileSize(const std::string& path) {
-  struct stat info;
-  if (::stat(path.c_str(), &info) != 0) {
-    return -1;
-  }
-  return info.st_size;
-}
+ssize_t InstanceImpl::fileSize(const std::string& path) { return raw_instance_.fileSize(path); }
 
 std::string InstanceImpl::fileReadToEnd(const std::string& path) {
-  std::ios::sync_with_stdio(false);
-
-  std::ifstream file(path);
-  if (!file) {
-    throw EnvoyException(fmt::format("unable to read file: {}", path));
-  }
-
-  std::stringstream file_string;
-  file_string << file.rdbuf();
-
-  return file_string.str();
+  return raw_instance_.fileReadToEnd(path);
 }
 
 Api::SysCallStringResult InstanceImpl::canonicalPath(const std::string& path) {
-  // TODO(htuch): When we are using C++17, switch to std::filesystem::canonical.
-  char* resolved_path = ::realpath(path.c_str(), nullptr);
-  if (resolved_path == nullptr) {
-    return {std::string(), errno};
-  }
-  std::string resolved_path_string{resolved_path};
-  ::free(resolved_path);
-  return {resolved_path_string, 0};
+  return raw_instance_.canonicalPath(path);
 }
 
-bool InstanceImpl::illegalPath(const std::string& path) {
-  const Api::SysCallStringResult canonical_path = canonicalPath(path);
-  if (canonical_path.rc_.empty()) {
-    ENVOY_LOG_MISC(debug, "Unable to determine canonical path for {}: {}", path,
-                   ::strerror(canonical_path.errno_));
-    return true;
-  }
+bool InstanceImpl::illegalPath(const std::string& path) { return raw_instance_.illegalPath(path); }
 
-  // Platform specific path sanity; we provide a convenience to avoid Envoy
-  // instances poking in bad places. We may have to consider conditioning on
-  // platform in the future, growing these or relaxing some constraints (e.g.
-  // there are valid reasons to go via /proc for file paths).
-  // TODO(htuch): Optimize this as a hash lookup if we grow any further.
-  if (absl::StartsWith(canonical_path.rc_, "/dev") ||
-      absl::StartsWith(canonical_path.rc_, "/sys") ||
-      absl::StartsWith(canonical_path.rc_, "/proc")) {
-    return true;
-  }
-  return false;
-}
-
-FileImpl::FileImpl(const std::string& path, Event::Dispatcher& dispatcher,
+FileImpl::FileImpl(RawFilePtr&& raw_file, Event::Dispatcher& dispatcher,
                    Thread::BasicLockable& lock, FileSystemStats& stats,
                    std::chrono::milliseconds flush_interval_msec,
                    Thread::ThreadFactory& thread_factory)
-    : path_(path), file_lock_(lock), flush_timer_(dispatcher.createTimer([this]() -> void {
+    : raw_file_(std::move(raw_file)), file_lock_(lock),
+      flush_timer_(dispatcher.createTimer([this]() -> void {
         stats_.flushed_by_timer_.inc();
         flush_event_.notifyOne();
         flush_timer_->enableTimer(flush_interval_msec_);
       })),
-      os_sys_calls_(Api::OsSysCallsSingleton::get()), thread_factory_(thread_factory),
-      flush_interval_msec_(flush_interval_msec), stats_(stats) {
+      thread_factory_(thread_factory), flush_interval_msec_(flush_interval_msec), stats_(stats) {
   open();
 }
 
 void FileImpl::open() {
-  Api::SysCallIntResult result =
-      os_sys_calls_.open(path_, O_RDWR | O_APPEND | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
-  fd_ = result.rc_;
-  if (-1 == fd_) {
+  const auto result = raw_file_->open();
+  if (!result.rc_) {
     throw EnvoyException(
-        fmt::format("unable to open file '{}': {}", path_, strerror(result.errno_)));
+        fmt::format("unable to open file '{}': {}", raw_file_->path(), strerror(result.errno_)));
   }
 }
 
@@ -153,12 +92,14 @@ FileImpl::~FileImpl() {
   }
 
   // Flush any remaining data. If file was not opened for some reason, skip flushing part.
-  if (fd_ != -1) {
+  if (raw_file_->isOpen()) {
     if (flush_buffer_.length() > 0) {
       doWrite(flush_buffer_);
     }
 
-    os_sys_calls_.close(fd_);
+    const auto result = raw_file_->close();
+    ASSERT(result.rc_, fmt::format("unable to close file '{}': {}", raw_file_->path(),
+                                   strerror(result.errno_)));
   }
 }
 
@@ -178,7 +119,8 @@ void FileImpl::doWrite(Buffer::Instance& buffer) {
   {
     Thread::LockGuard lock(file_lock_);
     for (const Buffer::RawSlice& slice : slices) {
-      const Api::SysCallSizeResult result = os_sys_calls_.write(fd_, slice.mem_, slice.len_);
+      absl::string_view data(static_cast<char*>(slice.mem_), slice.len_);
+      const Api::SysCallSizeResult result = raw_file_->write(data);
       ASSERT(result.rc_ == static_cast<ssize_t>(slice.len_));
       stats_.write_completed_.inc();
     }
@@ -213,12 +155,14 @@ void FileImpl::flushThreadFunc() {
       ASSERT(flush_buffer_.length() == 0);
     }
 
-    // if we failed to open file before (-1 == fd_), then simply ignore
-    if (fd_ != -1) {
+    // if we failed to open file before, then simply ignore
+    if (raw_file_->isOpen()) {
       try {
         if (reopen_file_) {
           reopen_file_ = false;
-          os_sys_calls_.close(fd_);
+          const auto result = raw_file_->close();
+          ASSERT(result.rc_, fmt::format("unable to close file '{}': {}", raw_file_->path(),
+                                         strerror(result.errno_)));
           open();
         }
 
