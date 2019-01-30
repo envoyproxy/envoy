@@ -31,12 +31,12 @@ EOF
 for src_file in $(SRCS); do
   # Extract relative path (e.g. "quic/core/quic_utils.cc") from full path in
   # src_path (e.g. "external/com_googlesource_quiche/quic/core/quic_utils.cc").
-  src_path=$${src_file#$$src_base_dir/}
+  src_path="$${src_file#$$src_base_dir/}"
 
   # Map to output file with quiche/ base directory inserted in path.
-  out_file=$(@D)/quiche/$$src_path
-  mkdir -p $$(dirname $$out_file)
+  out_file="$(@D)/quiche/$$src_path"
+  mkdir -p "$$(dirname "$$out_file")"
 
   # Apply text substitutions. -E ensures consistent behavior on Linux vs. OS X.
-  sed -E -f sed_commands $$src_file > $$out_file
+  sed -E -f sed_commands "$$src_file" > "$$out_file"
 done
