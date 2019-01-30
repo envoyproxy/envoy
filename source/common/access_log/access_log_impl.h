@@ -206,7 +206,8 @@ public:
                 const Http::HeaderMap& response_trailers) override;
 
 private:
-  std::unordered_set<Grpc::Status::GrpcStatus, Grpc::GrpcStatusHash> statuses_;
+  // std::unordered_set<Grpc::Status::GrpcStatus, Grpc::GrpcStatusHash> statuses_;
+  std::unordered_set<Grpc::Status::GrpcStatus> statuses_;
   bool exclude_;
 
   /**
