@@ -15,6 +15,7 @@
 #include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
+#include "codec_impl_test_util.h"
 #include "gmock/gmock.h"
 
 using testing::_;
@@ -32,26 +33,6 @@ namespace Http2 {
 
 using Http2SettingsTuple = ::testing::tuple<uint32_t, uint32_t, uint32_t, uint32_t>;
 using Http2SettingsTestParam = ::testing::tuple<Http2SettingsTuple, Http2SettingsTuple>;
-
-class TestServerConnectionImpl : public ServerConnectionImpl {
-public:
-  TestServerConnectionImpl(Network::Connection& connection, ServerConnectionCallbacks& callbacks,
-                           Stats::Scope& scope, const Http2Settings& http2_settings,
-                           uint32_t max_request_headers)
-      : ServerConnectionImpl(connection, callbacks, scope, http2_settings, max_request_headers) {}
-  nghttp2_session* session() { return session_; }
-  using ServerConnectionImpl::getStream;
-};
-
-class TestClientConnectionImpl : public ClientConnectionImpl {
-public:
-  TestClientConnectionImpl(Network::Connection& connection, Http::ConnectionCallbacks& callbacks,
-                           Stats::Scope& scope, const Http2Settings& http2_settings,
-                           uint32_t max_request_headers)
-      : ClientConnectionImpl(connection, callbacks, scope, http2_settings, max_request_headers) {}
-  nghttp2_session* session() { return session_; }
-  using ClientConnectionImpl::getStream;
-};
 
 class Http2CodecImplTest : public TestBaseWithParam<Http2SettingsTestParam> {
 public:
