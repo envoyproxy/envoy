@@ -6,10 +6,10 @@
 #include "envoy/common/exception.h"
 #include "envoy/http/filter.h"
 
+#include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/utility.h"
-#include "common/filesystem/filesystem_impl.h"
 #include "common/grpc/common.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
@@ -79,13 +79,14 @@ private:
 } // namespace
 
 JsonTranscoderConfig::JsonTranscoderConfig(
-    const envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder& proto_config) {
+    const envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder& proto_config,
+    Api::Api& api) {
   FileDescriptorSet descriptor_set;
 
   switch (proto_config.descriptor_set_case()) {
   case envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder::kProtoDescriptor:
     if (!descriptor_set.ParseFromString(
-            Filesystem::fileReadToEnd(proto_config.proto_descriptor()))) {
+            api.fileSystem().fileReadToEnd(proto_config.proto_descriptor()))) {
       throw EnvoyException("transcoding_filter: Unable to parse proto descriptor");
     }
     break;

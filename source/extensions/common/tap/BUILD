@@ -47,6 +47,7 @@ envoy_cc_library(
         ":tap_interface",
         "//include/envoy/server:admin_interface",
         "//include/envoy/singleton:manager_interface",
+        "//source/common/buffer:buffer_lib",
         "@envoy_api//envoy/admin/v2alpha:tap_cc",
     ],
 )

@@ -223,5 +223,6 @@ envoy_cc_test(
         "//source/common/config:config_provider_lib",
         "//source/common/protobuf:utility_lib",
         "//test/mocks/server:server_mocks",
+        "//test/test_common:simulated_time_system_lib",
     ],
 )

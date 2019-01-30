@@ -239,7 +239,7 @@ private:
   struct TlsCache : public ThreadLocal::ThreadLocalObject {
     // The TLS scope cache is keyed by scope ID. This is used to avoid complex circular references
     // during scope destruction. An ID is required vs. using the address of the scope pointer
-    // because it's possible that the memory allocator will recyle the scope pointer immediately
+    // because it's possible that the memory allocator will recycle the scope pointer immediately
     // upon destruction, leading to a situation in which a new scope with the same address is used
     // to reference the cache, and then subsequently cache flushed, leaving nothing in the central
     // store. See the overview for more information. This complexity is required for lockless

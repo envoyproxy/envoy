@@ -139,9 +139,15 @@ envoy_cc_library(
 envoy_cc_library(
     name = "listener_lib",
     srcs = [
+        "base_listener_impl.cc",
         "listener_impl.cc",
+        "udp_listener_impl.cc",
     ],
-    hdrs = ["listener_impl.h"],
+    hdrs = [
+        "base_listener_impl.h",
+        "listener_impl.h",
+        "udp_listener_impl.h",
+    ],
     deps = [
         ":address_lib",
         ":io_socket_handle_lib",
@@ -151,6 +157,7 @@ envoy_cc_library(
         "//include/envoy/network:listener_interface",
         "//include/envoy/stats:stats_interface",
         "//include/envoy/stats:stats_macros",
+        "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
         "//source/common/common:linked_object",

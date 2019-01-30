@@ -40,16 +40,16 @@ message ExtAuthz {
   bool failure_mode_allow = 2;
 }
 
-// HttpService is used for raw HTTP comunication between the filter and the authorization service.
+// HttpService is used for raw HTTP communication between the filter and the authorization service.
 // When configured, the filter will parse the client request and use these attributes to call the
 // authorization server. Depending on the response, the filter may reject or accept the client
-// request. Note that in any of these events, metadata can be added, removed or overriden by the
+// request. Note that in any of these events, metadata can be added, removed or overridden by the
 // filter:
 //
 // *On authorization request*, a list of allowed request headers may be supplied. See
 // :ref:`allowed_headers
 // <envoy_api_field_config.filter.http.ext_authz.v2.AuthorizationRequest.allowed_headers>`
-// for details. Additional headers metadata may be added to the authorization resquest. See
+// for details. Additional headers metadata may be added to the authorization request. See
 // :ref:`headers_to_add
 // <envoy_api_field_config.filter.http.ext_authz.v2.AuthorizationRequest.headers_to_add>` for
 // details.
@@ -96,14 +96,14 @@ message AuthorizationRequest {
   envoy.type.matcher.ListStringMatcher allowed_headers = 1;
 
   // Sets a list of headers that will be included to the request to authorization service. Note that
-  // client request of the same key will be overriden.
+  // client request of the same key will be overridden.
   repeated envoy.api.v2.core.HeaderValue headers_to_add = 2;
 }
 
 message AuthorizationResponse {
   // When this :ref:`list <envoy_api_msg_type.matcher.ListStringMatcher>` is set, authorization
   // response headers that have a correspondent match will be added to the original client request.
-  // Note that coexistent headers will be overriden.
+  // Note that coexistent headers will be overridden.
   envoy.type.matcher.ListStringMatcher allowed_upstream_headers = 1;
 
   // When this :ref:`list <envoy_api_msg_type.matcher.ListStringMatcher>`. is set, authorization
@@ -114,7 +114,7 @@ message AuthorizationResponse {
   envoy.type.matcher.ListStringMatcher allowed_client_headers = 2;
 }
 
-// Extra settings on a per virtualhost/route/weighter-cluster level.
+// Extra settings on a per virtualhost/route/weighted-cluster level.
 message ExtAuthzPerRoute {
   oneof override {
     option (validate.required) = true;
