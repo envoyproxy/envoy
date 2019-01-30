@@ -119,13 +119,13 @@ TEST_F(RawInstanceImplTest, OpenTwice) {
   EXPECT_EQ(getFd(file.get()), -1);
 
   auto result = file->open();
-  const int intial_fd = getFd(file.get());
+  const int initial_fd = getFd(file.get());
   EXPECT_TRUE(result.rc_);
   EXPECT_TRUE(file->isOpen());
 
   // check that we don't leak a file descriptor
   result = file->open();
-  EXPECT_EQ(intial_fd, getFd(file.get()));
+  EXPECT_EQ(initial_fd, getFd(file.get()));
   EXPECT_TRUE(result.rc_);
   EXPECT_TRUE(file->isOpen());
 }
