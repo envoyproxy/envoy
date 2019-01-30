@@ -120,9 +120,6 @@ protected:
   // Close |codec_client_| and |fake_upstream_connection_| cleanly.
   void cleanupUpstreamAndDownstream();
 
-  // Utility function to add filters.
-  void addFilters(std::vector<std::string> filters);
-
   // Check for completion of upstream_request_, and a simple "200" response.
   void checkSimpleRequestSuccess(uint64_t expected_request_size, uint64_t expected_response_size,
                                  IntegrationStreamDecoder* response);
@@ -201,20 +198,11 @@ protected:
   void testRetryHostPredicateFilter();
   void testHittingDecoderFilterLimit();
   void testHittingEncoderFilterLimit();
-  void testEnvoyProxyMetadataInResponse();
-  void testEnvoyProxyMultipleMetadata();
-  void testEnvoyProxyInvalidMetadata();
-  void testResponseMetadata();
   void testEnvoyMultipleMetadataReachSizeLimit();
   void testEnvoyHandling100Continue(bool additional_continue_from_upstream = false,
                                     const std::string& via = "");
   void testEnvoyProxying100Continue(bool continue_before_upstream_complete = false,
                                     bool with_encoder_filter = false);
-  void testEnvoyProxySmallMetadataInRequest();
-  void testEnvoyProxyLargeMetadataInRequest();
-  void testEnvoyRequestMetadataReachSizeLimit();
-  void testConsumeAndInsertRequestMetadata();
-  void testDecodeHeaderOnlyRequestWithRequestMetadata();
 
   // HTTP/2 client tests.
   void testDownstreamResetBeforeResponseComplete();
