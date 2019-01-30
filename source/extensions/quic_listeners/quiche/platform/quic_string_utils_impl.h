@@ -1,7 +1,6 @@
 #pragma once
 
 #include "absl/strings/str_cat.h"
-
 #include "quiche/quic/platform/api/quic_string.h"
 
 // NOLINT(namespace-envoy)
@@ -12,9 +11,8 @@
 
 namespace quic {
 
-template <typename... Args>
-inline void QuicStrAppendImpl(QuicString* output, const Args&... args) {
-  absl::StrAppend(output, absl::LegacyPrecision(args)...);
+template <typename... Args> inline void QuicStrAppendImpl(QuicString* output, const Args&... args) {
+  absl::StrAppend(output, args...);
 }
 
-}  // namespace quic
+} // namespace quic

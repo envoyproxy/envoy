@@ -26,6 +26,10 @@ licenses(["notice"])  # Apache 2
 # should remain largely the same.
 
 load(":genrule_cmd.bzl", "genrule_cmd")
+load(
+    "@envoy//bazel:envoy_build_system.bzl",
+    "envoy_cc_test",
+)
 
 src_files = glob([
     "**/*.h",
@@ -150,5 +154,14 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "@envoy//source/extensions/quic_listeners/quiche/platform:quic_platform_impl_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "quic_platform_test",
+    srcs = ["quiche/quic/platform/api/quic_string_utils_test.cc"],
+    repository = "@envoy",
+    deps = [
+        ":quic_platform",
     ],
 )
