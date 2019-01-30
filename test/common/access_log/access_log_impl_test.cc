@@ -969,13 +969,27 @@ config:
   path: /dev/null
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(
-      AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_), EnvoyException,
-      "Unable to parse JSON as proto (INVALID_ARGUMENT:(filter.grpc_status_filter.statuses[0]): "
-      "invalid value \"NOT_A_VALID_CODE\" for type TYPE_ENUM): "
-      "{\"config\":{\"path\":\"/dev/"
-      "null\"},\"filter\":{\"grpc_status_filter\":{\"statuses\":[\"NOT_A_VALID_CODE\"]}},\"name\":"
-      "\"envoy.file_access_log\"}");
+  // The error message is serialized from JSON, and its fields can be ordered differently depending
+  // on where it is run. Thus we cannot use the standard EXPECT_THROW_WITH_MESSAGE, and instead
+  // check:
+  //   1. The statement throws
+  //   2. The exception is an EnvoyException
+  //   3. The EnvoyException contains a substring that uniquely identifies the kind of exception.
+  try {
+    AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+    FAIL() << "Expected EnvoyException";
+  } catch (const EnvoyException& e) {
+    const std::string err = e.what();
+    const std::string err_str =
+        "Unable to parse JSON as proto (INVALID_ARGUMENT:(filter.grpc_status_filter.statuses[0]): "
+        "invalid value \"NOT_A_VALID_CODE\" for type TYPE_ENUM)";
+
+    if (err.find(err_str) == std::string::npos) {
+      FAIL() << "Expected exception to contain \"" << err_str << "\"";
+    }
+  } catch (...) {
+    FAIL() << "Expected EnvoyException";
+  }
 }
 
 TEST_F(AccessLogImplTest, GrpcStatusFilterBlock) {
