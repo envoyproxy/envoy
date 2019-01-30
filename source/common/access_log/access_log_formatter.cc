@@ -253,7 +253,7 @@ std::vector<FormatterProviderPtr> AccessLogFormatParser::parse(const std::string
   }
 
   auto newline_position = format.find('\n');
-  if (newline_position != std::string::npos) {
+  if (newline_position == std::string::npos) {
     formatters.emplace_back(FormatterProviderPtr{new PlainStringFormatter("\n")});
   }
 
