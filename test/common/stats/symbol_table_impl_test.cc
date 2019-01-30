@@ -370,7 +370,6 @@ TEST_P(StatNameTest, JoinAllEmpty) {
 TEST_P(StatNameTest, RacingSymbolCreation) {
   Thread::ThreadFactory& thread_factory = Thread::threadFactoryForTest();
   MutexTracerImpl& mutex_tracer = MutexTracerImpl::getOrCreateTracer();
-  int64_t start_contentions = mutex_tracer.numContentions();
 
   // Make 100 threads, each of which will race to encode an overlapping set of
   // symbols, triggering corner-cases in SymbolTable::toSymbol.
@@ -409,6 +408,7 @@ TEST_P(StatNameTest, RacingSymbolCreation) {
 
   // But when we access the already-existing symbols, we guarantee that no
   // further mutex contentions occur.
+  int64_t start_contentions = mutex_tracer.numContentions();
   access.setReady();
   accesses.Wait();
 
