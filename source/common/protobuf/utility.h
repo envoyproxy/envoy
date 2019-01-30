@@ -178,50 +178,14 @@ public:
   static void loadFromYaml(const std::string& yaml, Protobuf::Message& message);
   static void loadFromFile(const std::string& path, Protobuf::Message& message);
 
-  static void checkForDeprecation(const Protobuf::Message& message, bool fatal) {
-    const Protobuf::Descriptor* descriptor = message.GetDescriptor();
-    const Protobuf::Reflection* reflection = message.GetReflection();
-    for (int i = 0; i < descriptor->field_count(); ++i) {
-      const auto* field = descriptor->field(i);
-
-      // If this field is not in use, continue.
-      if ((field->is_repeated() && reflection->FieldSize(message, field) == 0) ||
-          (!field->is_repeated() && !reflection->HasField(message, field))) {
-        continue;
-      }
-
-      // If this field is deprecated, warn or throw an error.
-      if (field->options().deprecated()) {
-        std::string err = fmt::format(
-            "Using deprecated option '{}'. This configuration will be removed from Envoy soon. "
-            "Please see https://github.com/envoyproxy/envoy/blob/master/DEPRECATED.md for "
-            "details.",
-            field->name());
-        if (fatal) {
-          throw ProtoValidationException(err, message);
-        } else {
-          ENVOY_LOG_MISC(warn, "{}", err);
-        }
-      }
-
-      // If this is a message, recurse to check for deprecated fields in the sub-message.
-      switch (field->cpp_type()) {
-      case Protobuf::FieldDescriptor::CPPTYPE_MESSAGE: {
-        if (field->is_repeated()) {
-          const int size = reflection->FieldSize(message, field);
-          for (int j = 0; j < size; ++j) {
-            checkForDeprecation(reflection->GetRepeatedMessage(message, field, j), fatal);
-          }
-        } else {
-          checkForDeprecation(reflection->GetMessage(message, field), fatal);
-        }
-        break;
-      }
-      default:
-        break;
-      }
-    }
-  }
+  /**
+   * Checks for use of deprecated fields in message and all sub-messages.
+   * @param message message to validate.
+   * @param warn_only if true, logs a warning rather than throwing an exception if deprecated fields
+   *   are in use.
+   * @throw ProtoValidationException if deprecated fields are used and warn_only is false.
+   */
+  static void checkForDeprecation(const Protobuf::Message& message, bool warn_only);
 
   /**
    * Validate protoc-gen-validate constraints on a given protobuf.
@@ -231,8 +195,8 @@ public:
    * @throw ProtoValidationException if the message does not satisfy its type constraints.
    */
   template <class MessageType> static void validate(const MessageType& message) {
-    // Do a (non-fatal) deprecation check to log warnings about deprecated field use.
-    checkForDeprecation(message, false);
+    // Log warnings if deprecated fields are in use.
+    checkForDeprecation(message, true);
 
     std::string err;
     if (!Validate(message, &err)) {
