@@ -4,6 +4,7 @@
 
 #include "gtest/gtest.h"
 
+// A test class for testing HTTP/1.1 upstream and downstreams
 namespace Envoy {
 class IntegrationTest : public HttpIntegrationTest,
                         public testing::TestWithParam<Network::Address::IpVersion> {
