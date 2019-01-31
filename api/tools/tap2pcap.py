@@ -28,7 +28,7 @@ import time
 
 from google.protobuf import text_format
 
-from envoy.data.tap.v2alpha import transport_pb2
+from envoy.data.tap.v2alpha import wrapper_pb2
 
 
 def DumpEvent(direction, timestamp, data):
@@ -44,14 +44,15 @@ def DumpEvent(direction, timestamp, data):
 
 
 def Tap2Pcap(tap_path, pcap_path):
-  trace = transport_pb2.Trace()
+  wrapper = wrapper_pb2.BufferedTraceWrapper()
   if tap_path.endswith('.pb_text'):
     with open(tap_path, 'r') as f:
-      text_format.Merge(f.read(), trace)
+      text_format.Merge(f.read(), wrapper)
   else:
     with open(tap_path, 'r') as f:
-      trace.ParseFromString(f.read())
+      wrapper.ParseFromString(f.read())
 
+  trace = wrapper.socket_buffered_trace
   local_address = trace.connection.local_address.socket_address.address
   local_port = trace.connection.local_address.socket_address.port_value
   remote_address = trace.connection.remote_address.socket_address.address

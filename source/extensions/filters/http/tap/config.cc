@@ -10,11 +10,12 @@ namespace Extensions {
 namespace HttpFilters {
 namespace TapFilter {
 
-class HttpTapConfigFactoryImpl : public HttpTapConfigFactory {
+class HttpTapConfigFactoryImpl : public Extensions::Common::Tap::TapConfigFactory {
 public:
-  HttpTapConfigSharedPtr
-  createHttpConfigFromProto(envoy::service::tap::v2alpha::TapConfig&& proto_config,
-                            Extensions::Common::Tap::Sink* admin_streamer) override {
+  // TapConfigFactory
+  Extensions::Common::Tap::TapConfigSharedPtr
+  createConfigFromProto(envoy::service::tap::v2alpha::TapConfig&& proto_config,
+                        Extensions::Common::Tap::Sink* admin_streamer) override {
     return std::make_shared<HttpTapConfigImpl>(std::move(proto_config), admin_streamer);
   }
 };

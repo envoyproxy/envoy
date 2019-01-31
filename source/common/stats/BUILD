@@ -136,6 +136,12 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "fake_symbol_table_lib",
+    hdrs = ["fake_symbol_table_impl.h"],
+    deps = [":symbol_table_lib"],
+)
+
+envoy_cc_library(
     name = "stats_options_lib",
     hdrs = ["stats_options_impl.h"],
     deps = [
