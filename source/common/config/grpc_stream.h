@@ -50,6 +50,7 @@ public:
   }
 
   void clearRequestQueue() {
+    control_plane_stats_.pending_requests_.sub(request_queue_.size());
     // TODO(fredlas) when we have C++17: request_queue_ = {};
     while (!request_queue_.empty()) {
       request_queue_.pop();

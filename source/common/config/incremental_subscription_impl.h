@@ -61,9 +61,9 @@ public:
   void buildAndQueueDiscoveryRequest(const std::vector<std::string>& resources) {
     ResourceNameDiff diff;
     std::set_difference(resources.begin(), resources.end(), resource_names_.begin(),
-                        resource_names_.end(), diff.added_.begin());
+                        resource_names_.end(), std::inserter(diff.added_, diff.added_.begin()));
     std::set_difference(resource_names_.begin(), resource_names_.end(), resources.begin(),
-                        resources.end(), diff.removed_.begin());
+                        resources.end(), std::inserter(diff.removed_, diff.removed_.begin()));
 
     for (const auto& added : diff.added_) {
       resources_[added] = "0";
@@ -89,10 +89,12 @@ public:
 
     request_.clear_resource_names_subscribe();
     request_.clear_resource_names_unsubscribe();
-    std::copy(diff.added_.begin(), diff.added_.end(),
-              request_.mutable_resource_names_subscribe()->begin());
+    std::copy(
+        diff.added_.begin(), diff.added_.end(),
+        ::google::protobuf::RepeatedFieldBackInserter(request_.mutable_resource_names_subscribe()));
     std::copy(diff.removed_.begin(), diff.removed_.end(),
-              request_.mutable_resource_names_unsubscribe()->begin());
+              ::google::protobuf::RepeatedFieldBackInserter(
+                  request_.mutable_resource_names_unsubscribe()));
 
     ENVOY_LOG(trace, "Sending DiscoveryRequest for {}: {}", type_url_, request_.DebugString());
     sendMessage(request_);

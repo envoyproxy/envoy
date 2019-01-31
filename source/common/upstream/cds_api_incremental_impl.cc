@@ -82,7 +82,7 @@ void CdsApiIncrementalImpl::onIncrementalConfigUpdate(
       if (cm_.addOrUpdateCluster(cluster, resource.version())) {
         ENVOY_LOG(debug, "cds: add/update cluster '{}'", cluster.name());
       }
-    } catch (EnvoyException e) {
+    } catch (const EnvoyException& e) {
       // TODO TODO add this resource to the "resource updates that had problems" pile, to go into a
       // larger partial rejection exception
       std::cerr << "TODO TODO had a problem with a resource" << std::endl;
