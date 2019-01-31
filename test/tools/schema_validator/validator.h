@@ -6,6 +6,7 @@
 
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/utility.h"
 
 namespace Envoy {
 
@@ -57,6 +58,7 @@ private:
  */
 class Validator {
 public:
+  Validator() : api_(Api::createApiForTest(stats_)) {}
   /**
    * Validates the JSON at config_path against schema_type.
    * An EnvoyException is thrown in several cases:
@@ -65,7 +67,11 @@ public:
    * @param json_path specifies the path to the JSON file.
    * @param schema_type specifies the schema to validate the JSON against.
    */
-  static void validate(const std::string& json_path, Schema::Type schema_type);
+  void validate(const std::string& json_path, Schema::Type schema_type);
+
+private:
+  Stats::IsolatedStoreImpl stats_;
+  Api::ApiPtr api_;
 };
 
 } // namespace Envoy

@@ -8,6 +8,9 @@ namespace Filesystem {
 MockFile::MockFile() {}
 MockFile::~MockFile() {}
 
+MockInstance::MockInstance() {}
+MockInstance::~MockInstance() {}
+
 MockWatcher::MockWatcher() {}
 MockWatcher::~MockWatcher() {}
 

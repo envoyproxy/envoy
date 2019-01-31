@@ -20,15 +20,17 @@ public:
                     Extensions::Common::Tap::Sink* admin_streamer);
 
   // TapFilter::HttpTapConfig
-  HttpPerRequestTapperPtr createPerRequestTapper() override;
+  HttpPerRequestTapperPtr createPerRequestTapper(uint64_t stream_id) override;
 };
 
 using HttpTapConfigImplSharedPtr = std::shared_ptr<HttpTapConfigImpl>;
 
 class HttpPerRequestTapperImpl : public HttpPerRequestTapper, Logger::Loggable<Logger::Id::tap> {
 public:
-  HttpPerRequestTapperImpl(HttpTapConfigImplSharedPtr config)
-      : config_(std::move(config)), statuses_(config_->numMatchers()) {}
+  HttpPerRequestTapperImpl(HttpTapConfigImplSharedPtr config, uint64_t stream_id)
+      : config_(std::move(config)), stream_id_(stream_id), statuses_(config_->numMatchers()) {
+    config_->rootMatcher().onNewStream(statuses_);
+  }
 
   // TapFilter::HttpPerRequestTapper
   void onRequestHeaders(const Http::HeaderMap& headers) override;
@@ -38,6 +40,7 @@ public:
 
 private:
   HttpTapConfigImplSharedPtr config_;
+  const uint64_t stream_id_;
   std::vector<bool> statuses_;
 };
 

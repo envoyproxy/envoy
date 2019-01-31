@@ -307,7 +307,7 @@ public:
     google_tls_ = std::make_unique<GoogleAsyncClientThreadLocal>(*api_);
     GoogleGenericStubFactory stub_factory;
     return std::make_unique<GoogleAsyncClientImpl>(dispatcher_, *google_tls_, stub_factory,
-                                                   stats_scope_, createGoogleGrpcConfig());
+                                                   stats_scope_, createGoogleGrpcConfig(), *api_);
 #else
     NOT_REACHED_GCOVR_EXCL_LINE;
 #endif
@@ -451,6 +451,9 @@ public:
 // SSL connection credential validation tests.
 class GrpcSslClientIntegrationTest : public GrpcClientIntegrationTest {
 public:
+  GrpcSslClientIntegrationTest() {
+    ON_CALL(factory_context_, api()).WillByDefault(ReturnRef(*api_));
+  }
   void TearDown() override {
     // Reset some state in the superclass before we destruct context_manager_ in our destructor, it
     // doesn't like dangling contexts at destruction.

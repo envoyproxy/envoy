@@ -37,11 +37,12 @@ TEST_F(FilesystemSubscriptionImplTest, InitialFile) {
 TEST(MiscFilesystemSubscriptionImplTest, BadWatch) {
   Event::MockDispatcher dispatcher;
   Stats::MockIsolatedStatsStore stats_store;
+  Api::ApiPtr api = Api::createApiForTest(stats_store);
   SubscriptionStats stats{Utility::generateStats(stats_store)};
   auto* watcher = new Filesystem::MockWatcher();
   EXPECT_CALL(dispatcher, createFilesystemWatcher_()).WillOnce(Return(watcher));
   EXPECT_CALL(*watcher, addWatch(_, _, _)).WillOnce(Throw(EnvoyException("bad path")));
-  EXPECT_THROW_WITH_MESSAGE(FilesystemEdsSubscriptionImpl(dispatcher, "##!@/dev/null", stats),
+  EXPECT_THROW_WITH_MESSAGE(FilesystemEdsSubscriptionImpl(dispatcher, "##!@/dev/null", stats, *api),
                             EnvoyException, "bad path");
 }
 

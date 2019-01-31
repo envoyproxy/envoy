@@ -562,7 +562,7 @@ public:
          Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
          AccessLog::AccessLogManager& log_manager, const LocalInfo::LocalInfo& local_info,
          Server::Admin& admin, Singleton::Manager& singleton_manager,
-         Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api);
+         Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api, Api::Api& api);
   // Upstream::Cluster
   PrioritySet& prioritySet() override { return priority_set_; }
   const PrioritySet& prioritySet() const override { return priority_set_; }

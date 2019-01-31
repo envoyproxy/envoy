@@ -17,5 +17,8 @@ api_proto_library_internal(
 api_proto_library_internal(
     name = "wrapper",
     srcs = ["wrapper.proto"],
-    deps = [":http"],
+    deps = [
+        ":http",
+        ":transport",
+    ],
 )
