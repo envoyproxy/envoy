@@ -5,7 +5,7 @@
 
 #include "envoy/event/dispatcher.h"
 
-#include "absl/types/optional.h"
+#include "common/common/recursion_checker.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -22,12 +22,12 @@ public:
   /**
    * Returns an existing pool for `key`, or creates a new one using `factory`. Note that it is
    * possible for this to fail if a limit on the number of pools allowed is reached.
-   * @return The pool corresponding to `key`, or `absl::nullopt`
+   * @return The pool corresponding to `key`, or `absl::nullopt`.
    */
-  absl::optional<POOL_TYPE*> getPool(KEY_TYPE key, PoolFactory factory);
+  POOL_TYPE& getPool(KEY_TYPE key, PoolFactory factory);
 
   /**
-   * @return the number of pools
+   * @return the number of pools.
    */
   size_t size() const;
 
@@ -45,7 +45,7 @@ public:
   void addDrainedCallback(DrainedCb cb);
 
   /**
-   * Instructs each connection pool to drain its connections
+   * Instructs each connection pool to drain its connections.
    */
   void drainConnections();
 
@@ -53,6 +53,7 @@ private:
   std::map<KEY_TYPE, std::unique_ptr<POOL_TYPE>> active_pools_;
   Event::Dispatcher& thread_local_dispatcher_;
   std::vector<DrainedCb> cached_callbacks_;
+  Common::RecursionChecker recursion_checker_;
 };
 
 } // namespace Upstream
