@@ -7,7 +7,6 @@
 #include "envoy/json/json_object.h"
 #include "envoy/type/percent.pb.h"
 
-#include "common/common/fmt.h"
 #include "common/common/hash.h"
 #include "common/common/utility.h"
 #include "common/json/json_loader.h"
@@ -138,7 +137,7 @@ public:
 
 enum class ProtoUnknownFieldsMode { Strict, Allow };
 
-class MessageUtil : public Logger::Loggable<Logger::Id::config> {
+class MessageUtil {
 public:
   // std::hash
   std::size_t operator()(const Protobuf::Message& message) const { return hash(message); }
