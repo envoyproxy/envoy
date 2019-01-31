@@ -4,16 +4,14 @@
 # CircleCI logs.
 set -e
 
-# push the envoy image on merge to master
-want_push='false'
-for branch in "master"
-do
-   if [ "$CIRCLE_BRANCH" == "$branch" ]
-   then
-       want_push='true'
-   fi
-done
-if [ -z "$CIRCLE_PULL_REQUEST" ] && [ -z "$CIRCLE_TAG" ] && [ "$want_push" == "true" ]
+if [ -n "$CIRCLE_PULL_REQUEST" ]
+then
+   echo 'Ignoring PR branch for docker push.'
+   exit 0
+fi
+
+# push the envoy image on tags or merge to master
+if [ -n "$CIRCLE_TAG" ] || [ "$CIRCLE_BRANCH" == 'master' ]
 then
    docker login -u "$DOCKERHUB_USERNAME" -p "$DOCKERHUB_PASSWORD"
 
@@ -34,5 +32,5 @@ then
    # have a better CI setup.
    #./ci/verify_examples.sh
 else
-   echo 'Ignoring PR branch for docker push.'
+   echo 'Ignoring non-master branch for docker push.'
 fi
