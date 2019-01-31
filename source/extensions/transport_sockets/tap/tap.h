@@ -1,11 +1,12 @@
 #pragma once
 
-#include <fstream>
-
 #include "envoy/config/transport_socket/tap/v2alpha/tap.pb.h"
-#include "envoy/data/tap/v2alpha/transport.pb.h"
+#include "envoy/data/tap/v2alpha/wrapper.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/network/transport_socket.h"
+
+#include "extensions/common/tap/extension_config_base.h"
+#include "extensions/transport_sockets/tap/tap_config.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -14,9 +15,7 @@ namespace Tap {
 
 class TapSocket : public Network::TransportSocket {
 public:
-  TapSocket(const std::string& path_prefix,
-            envoy::config::transport_socket::tap::v2alpha::FileSink::Format format,
-            Network::TransportSocketPtr&& transport_socket, Event::TimeSystem& time_system);
+  TapSocket(SocketTapConfigSharedPtr config, Network::TransportSocketPtr&& transport_socket);
 
   // Network::TransportSocket
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override;
@@ -29,24 +28,19 @@ public:
   const Ssl::Connection* ssl() const override;
 
 private:
-  const std::string& path_prefix_;
-  const envoy::config::transport_socket::tap::v2alpha::FileSink::Format format_;
-  // TODO(htuch): Buffering the entire trace until socket close won't scale to
-  // long lived connections or large transfers. We could emit multiple tap
-  // files with bounded size, with identical connection ID to allow later
-  // reassembly.
-  envoy::data::tap::v2alpha::Trace trace_;
+  SocketTapConfigSharedPtr config_;
+  PerSocketTapperPtr tapper_;
   Network::TransportSocketPtr transport_socket_;
-  Network::TransportSocketCallbacks* callbacks_{};
-  Event::TimeSystem& time_system_;
 };
 
-class TapSocketFactory : public Network::TransportSocketFactory {
+class TapSocketFactory : public Network::TransportSocketFactory,
+                         public Common::Tap::ExtensionConfigBase {
 public:
-  TapSocketFactory(const std::string& path_prefix,
-                   envoy::config::transport_socket::tap::v2alpha::FileSink::Format format,
-                   Network::TransportSocketFactoryPtr&& transport_socket_factory,
-                   Event::TimeSystem& time_system);
+  TapSocketFactory(const envoy::config::transport_socket::tap::v2alpha::Tap& proto_config,
+                   Common::Tap::TapConfigFactoryPtr&& config_factory, Server::Admin& admin,
+                   Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls,
+                   Event::Dispatcher& main_thread_dispatcher,
+                   Network::TransportSocketFactoryPtr&& transport_socket_factory);
 
   // Network::TransportSocketFactory
   Network::TransportSocketPtr
@@ -54,10 +48,7 @@ public:
   bool implementsSecureTransport() const override;
 
 private:
-  const std::string path_prefix_;
-  const envoy::config::transport_socket::tap::v2alpha::FileSink::Format format_;
   Network::TransportSocketFactoryPtr transport_socket_factory_;
-  Event::TimeSystem& time_system_;
 };
 
 } // namespace Tap

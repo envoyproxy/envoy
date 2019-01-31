@@ -17,6 +17,7 @@ envoy_extension_cc_test(
     extension_name = "envoy.filters.http.tap",
     deps = [
         "//source/extensions/filters/http/tap:tap_filter_lib",
+        "//test/mocks/http:http_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:utility_lib",
     ],

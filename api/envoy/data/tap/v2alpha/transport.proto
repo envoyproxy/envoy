@@ -23,8 +23,8 @@ message Connection {
   envoy.api.v2.core.Address remote_address = 3;
 }
 
-// Event in a trace.
-message Event {
+// Event in a socket trace.
+message SocketEvent {
   // Timestamp for event.
   google.protobuf.Timestamp timestamp = 1;
   // Data read by Envoy from the transport socket.
@@ -50,9 +50,9 @@ message Event {
 // Sequence of read/write events that constitute a trace on a socket.
 // Multiple Trace messages might be emitted for a given connection ID, with the
 // sink (e.g. file set, network) responsible for later reassembly.
-message Trace {
+message SocketTrace {
   // Connection properties.
   Connection connection = 1;
   // Sequence of observed events.
-  repeated Event events = 2;
+  repeated SocketEvent events = 2;
 }
