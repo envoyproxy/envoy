@@ -40,6 +40,7 @@ void CdsApiImpl::onConfigUpdate(const ResourceVector& resources, const std::stri
   cm_.adsMux().pause(Config::TypeUrl::get().ClusterLoadAssignment);
   Cleanup eds_resume([this] { cm_.adsMux().resume(Config::TypeUrl::get().ClusterLoadAssignment); });
 
+  std::list<EnvoyException> exceptions;
   std::unordered_set<std::string> cluster_names;
   for (const auto& cluster : resources) {
     if (!cluster_names.insert(cluster.name()).second) {
@@ -53,9 +54,13 @@ void CdsApiImpl::onConfigUpdate(const ResourceVector& resources, const std::stri
   ClusterManager::ClusterInfoMap clusters_to_remove = cm_.clusters();
   for (auto& cluster : resources) {
     const std::string cluster_name = cluster.name();
-    clusters_to_remove.erase(cluster_name);
-    if (cm_.addOrUpdateCluster(cluster, version_info)) {
-      ENVOY_LOG(debug, "cds: add/update cluster '{}'", cluster_name);
+    try {
+      clusters_to_remove.erase(cluster_name);
+      if (cm_.addOrUpdateCluster(cluster, version_info)) {
+        ENVOY_LOG(debug, "cds: add/update cluster '{}'", cluster_name);
+      }
+    } catch (const EnvoyException& e) {
+      exceptions.push_back(e);
     }
   }
 
@@ -68,6 +73,13 @@ void CdsApiImpl::onConfigUpdate(const ResourceVector& resources, const std::stri
 
   version_info_ = version_info;
   runInitializeCallbackIfAny();
+  if (!exceptions.empty()) {
+    std::stringstream message;
+    for (auto& exception : exceptions) {
+      message << exception.what() << "\n";
+    }
+    throw EnvoyException(message.str());
+  }
 }
 
 void CdsApiImpl::onConfigUpdateFailed(const EnvoyException*) {
