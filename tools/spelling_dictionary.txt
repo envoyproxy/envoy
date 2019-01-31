@@ -148,6 +148,7 @@ Nilsson
 OCSP
 OK
 OOM
+OS
 OSI
 OSS
 OSX
@@ -587,6 +588,7 @@ rebalancing
 rebuffer
 recurse
 recv
+recvmmsg
 redis
 redistributions
 refactored
@@ -738,5 +740,3 @@ xyz
 zag
 zig
 zlib
-recvmmsg
-OS

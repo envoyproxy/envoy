@@ -175,7 +175,7 @@ class SpellChecker:
     words = [w for w in words if len(w) > 0 and w[0] != "#"]
 
     # Allow acronyms and abbreviations to be spelled in lowercase.
-    # (e.g. Convert "HTTP"" into "HTTP" and "http" which also matches
+    # (e.g. Convert "HTTP" into "HTTP" and "http" which also matches
     # "Http").
     for word in words:
       if word.isupper():
