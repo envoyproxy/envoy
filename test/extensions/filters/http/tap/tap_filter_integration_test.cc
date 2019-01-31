@@ -77,7 +77,9 @@ config:
               path_prefix: {}
 )EOF";
 
-  const std::string path_prefix = TestEnvironment::temporaryDirectory() + '/';
+  const std::string path_prefix =
+      TestEnvironment::temporaryDirectory() + "/tap_integration_static_file/";
+  TestEnvironment::createPath(path_prefix);
   initializeFilter(fmt::format(filter_config, path_prefix));
 
   // Initial request/response with tap.
