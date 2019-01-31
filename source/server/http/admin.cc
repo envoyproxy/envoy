@@ -743,7 +743,12 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheus(
     for (size_t i = 0; i < supported_buckets.size(); ++i) {
       double bucket = supported_buckets[i];
       uint64_t value = computed_buckets[i];
-      response.add(fmt::format("{0}_bucket{{{1}le=\"{2:.12g}\"}} {3}\n", metric_name, hist_tags,
+      // We want to print the bucket in a fixed point (non-scientific) format. The fmt library
+      // doesn't have a specific modifier to format as a fixed-point value only so we use the
+      // 'g' operator which prints the number in general fixed point format or scientific format
+      // with precision 50 to round the number up to 32 significant digits in fixed point format
+      // which should cover pretty much all cases
+      response.add(fmt::format("{0}_bucket{{{1}le=\"{2:.32g}\"}} {3}\n", metric_name, hist_tags,
                                bucket, value));
     }
 
