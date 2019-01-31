@@ -52,34 +52,21 @@ def decode_stacktrace_log(object_file, input_source):
 #
 # Returns list of result lines
 def run_addr2line(obj_file, addr_to_resolve):
-  addr2line = subprocess.Popen(["addr2line", "-Cpie", obj_file, addr_to_resolve],
-                               stdout=subprocess.PIPE)
-  output_stdout, _ = addr2line.communicate()
-  return output_stdout
+  return subprocess.check_output(["addr2line", "-Cpie", obj_file, addr_to_resolve])
 
 
 # Because of how bazel compiles, addr2line reports file names that begin with
 # "/proc/self/cwd/" and sometimes even "/proc/self/cwd/./". This isn't particularly
 # useful information, so trim it out and make a perfectly useful relative path.
 def trim_proc_cwd(file_and_line_number):
-  # Try the longer trim first, it will leave the string untouched if it doesn't
-  # match.
-  file_and_line_number = trim_from_start(file_and_line_number, "/proc/self/cwd/./")
-  file_and_line_number = trim_from_start(file_and_line_number, "/proc/self/cwd/")
-  return file_and_line_number
-
-
-def trim_from_start(string, trim):
-  if string.startswith(trim):
-    return string[len(trim):]
-  else:
-
-    return string
+  trim_regex = r'/proc/self/cwd/(\./)?'
+  return re.sub(trim_regex, '', file_and_line_number)
 
 
 if __name__ == "__main__":
   if len(sys.argv) > 2 and sys.argv[1] == '-s':
     decode_stacktrace_log(sys.argv[2], sys.stdin)
+    sys.exit(0)
   elif len(sys.argv) > 1:
     rununder = subprocess.Popen(sys.argv[1:], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     decode_stacktrace_log(sys.argv[1], rununder.stdout)
@@ -88,4 +75,4 @@ if __name__ == "__main__":
   else:
     print "Usage (execute subprocess): stack_decode.py executable_file [additional args]"
     print "Usage (read from stdin): stack_decode.py -s executable_file"
-  sys.exit(0)
+    sys.exit(1)

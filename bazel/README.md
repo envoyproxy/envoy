@@ -200,12 +200,19 @@ The script runs in one of two modes. To process log input from stdin, pass `-s` 
 argument, followed by the executable file path. You can postprocess a log or pipe the output
 of an Envoy process. If you do not specify the `-s` argument it runs the arguments as a child
 process. This enables you to run a test with backtrace post processing. Bazel sandboxing must
-be disabled by specifying standalone execution. Example command line:
+be disabled by specifying standalone execution. Example command line with
+`run_under`:
 
 ```
 bazel test -c dbg //test/server:backtrace_test
 --run_under=`pwd`/tools/stack_decode.py --strategy=TestRunner=standalone
 --cache_test_results=no --test_output=all
+```
+
+Example using input on stdin:
+
+```
+bazel test -c dbg //test/server:backtrace_test --cache_test_results=no --test_output=streamed |& tools/stack_decode.py -s bazel-bin/test/server/backtrace_test
 ```
 
 You will need to use either a `dbg` build type or the `opt` build type to get file and line
