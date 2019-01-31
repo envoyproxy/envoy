@@ -836,8 +836,8 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools(
     HostSharedPtr old_host, ConnPoolsContainer& container) {
   container.drains_remaining_ += container.pools_->size();
 
-  // make a copy to protect against the erase in the callback
-  auto pools = container.pools_;
+  // Make a copy to protect against erasure in the callback.
+  std::shared_ptr<ConnPoolsContainer::ConnPools> pools = container.pools_;
   pools->addDrainedCallback([this, old_host]() -> void {
     if (destroying_) {
       // It is possible for a connection pool to fire drain callbacks during destruction. Instead
@@ -850,7 +850,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools(
     ConnPoolsContainer* to_clear = getHttpConnPoolsContainer(old_host);
     if (to_clear == nullptr) {
       // This could happen if we have cleaned out the host before iterating through every connection
-      // pool. Handle it by just continuing
+      // pool. Handle it by just continuing.
       return;
     }
 
@@ -861,6 +861,10 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools(
     }
   });
 
+  // We need to hold off on actually empting out the container until we have finished processing
+  // `addDrainedCallback`. If we did not, then it's possible that the container could be erased
+  // in the middle of its iteration, which leads to undefined behaviour. We handle that case by
+  // checking here to see if the drains have completed.
   container.ready_to_drain_ = true;
   if (container.drains_remaining_ == 0) {
     clearContainer(old_host, container);
@@ -991,27 +995,17 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::onHostHealthFailure(
   }
 }
 
-ClusterManagerImpl::ThreadLocalClusterManagerImpl::ConnPoolsContainer&
-ClusterManagerImpl::ThreadLocalClusterManagerImpl::getOrAllocateHttpConnPoolsContainer(
-    const HostConstSharedPtr& host) {
+ClusterManagerImpl::ThreadLocalClusterManagerImpl::ConnPoolsContainer*
+ClusterManagerImpl::ThreadLocalClusterManagerImpl::getHttpConnPoolsContainer(
+    const HostConstSharedPtr& host, bool allocate) {
   auto container_iter = host_http_conn_pool_map_.find(host);
   if (container_iter == host_http_conn_pool_map_.end()) {
+    if(!allocate) { return nullptr; }
     ConnPoolsContainer container{thread_local_dispatcher_};
     container_iter = host_http_conn_pool_map_.emplace(host, std::move(container)).first;
   }
 
-  return container_iter->second;
-}
-
-ClusterManagerImpl::ThreadLocalClusterManagerImpl::ConnPoolsContainer*
-ClusterManagerImpl::ThreadLocalClusterManagerImpl::getHttpConnPoolsContainer(
-    const HostConstSharedPtr& host) {
-  auto container_iter = host_http_conn_pool_map_.find(host);
-  if (container_iter != host_http_conn_pool_map_.end()) {
-    return &container_iter->second;
-  }
-
-  return nullptr;
+  return &container_iter->second;
 }
 
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
@@ -1120,19 +1114,17 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
     }
   }
 
-  ConnPoolsContainer& container = parent_.getOrAllocateHttpConnPoolsContainer(host);
+  ConnPoolsContainer& container = *parent_.getHttpConnPoolsContainer(host, true);
 
-  // note: to simplify this, we assume that the factory is only called in the scope of this
+  // Note: to simplify this, we assume that the factory is only called in the scope of this
   // function. Otherwise, we'd need to capture a few of these variables by value.
-  auto opt_pool = container.pools_->getPool(hash_key, [&]() {
+  Http::ConnectionPool::Instance& pool = container.pools_->getPool(hash_key, [&]() {
     return parent_.parent_.factory_.allocateConnPool(
         parent_.thread_local_dispatcher_, host, priority, protocol,
         have_options ? context->downstreamConnection()->socketOptions() : nullptr);
   });
 
-  // currently the map cannot fail -- it does not have limits.
-  ASSERT(opt_pool.has_value());
-  return opt_pool.value();
+  return &pool;
 }
 
 Tcp::ConnectionPool::Instance*

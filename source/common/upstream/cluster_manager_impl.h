@@ -237,7 +237,7 @@ private:
 
       typedef ConnPoolMap<std::vector<uint8_t>, Http::ConnectionPool::Instance> ConnPools;
 
-      // this is a shared_ptr so we can keep it alive while cleaning up
+      // This is a shared_ptr so we can keep it alive while cleaning up.
       std::shared_ptr<ConnPools> pools_;
       bool ready_to_drain_{false};
       uint64_t drains_remaining_{};
@@ -323,8 +323,8 @@ private:
                                         const HostVector& hosts_removed, ThreadLocal::Slot& tls);
     static void onHostHealthFailure(const HostSharedPtr& host, ThreadLocal::Slot& tls);
 
-    ConnPoolsContainer& getOrAllocateHttpConnPoolsContainer(const HostConstSharedPtr& host);
-    ConnPoolsContainer* getHttpConnPoolsContainer(const HostConstSharedPtr& host);
+    ConnPoolsContainer* getHttpConnPoolsContainer(const HostConstSharedPtr& host,
+                                                  bool allocate = false);
 
     ClusterManagerImpl& parent_;
     Event::Dispatcher& thread_local_dispatcher_;
