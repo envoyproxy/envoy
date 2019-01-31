@@ -11,7 +11,6 @@ cmake_external(
         "CARES_SHARED": "no",
         "CARES_STATIC": "on",
         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
-        "CMAKE_INSTALL_LIBDIR": "lib",
     },
     cmake_options = ["-GNinja"],
     lib_source = "@com_github_c_ares_c_ares//:all",
@@ -28,7 +27,6 @@ cmake_external(
         "EVENT__DISABLE_OPENSSL": "on",
         "EVENT__DISABLE_REGRESS": "on",
         "CMAKE_BUILD_TYPE": "Release",
-        "CMAKE_INSTALL_LIBDIR": "lib",
     },
     cmake_options = ["-GNinja"],
     lib_source = "@com_github_libevent_libevent//:all",
@@ -61,7 +59,6 @@ cmake_external(
     cache_entries = {
         "YAML_CPP_BUILD_TESTS": "off",
         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
-        "CMAKE_INSTALL_LIBDIR": "lib",
     },
     cmake_options = ["-GNinja"],
     lib_source = "@com_github_jbeder_yaml_cpp//:all",
@@ -76,7 +73,6 @@ cmake_external(
     name = "zlib",
     cache_entries = {
         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
-        "CMAKE_INSTALL_LIBDIR": "lib",
     },
     cmake_options = ["-GNinja"],
     lib_source = "@com_github_madler_zlib//:all",
