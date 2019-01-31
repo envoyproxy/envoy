@@ -15,7 +15,6 @@
 #include "extensions/transport_sockets/tls/context_manager_impl.h"
 #include "extensions/transport_sockets/tls/ssl_socket.h"
 
-#include "test/extensions/transport_sockets/tls/integration/ssl_integration_test.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/test_base.h"

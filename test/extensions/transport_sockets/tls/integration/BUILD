@@ -17,21 +17,6 @@ load(
 
 envoy_package()
 
-envoy_cc_test_library(
-    name = "ssl_integration_lib",
-    hdrs = [
-        "ssl_integration_test.h",
-    ],
-    deps = [
-        "//source/common/http:header_map_lib",
-        "//source/extensions/filters/listener/tls_inspector:config",
-        "//source/extensions/transport_sockets/tls:config",
-        "//test/integration:http_integration_lib",
-        "//test/mocks/server:server_mocks",
-        "//test/test_common:utility_lib",
-    ],
-)
-
 envoy_cc_test(
     name = "ssl_integration_test",
     srcs = [

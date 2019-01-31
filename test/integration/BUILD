@@ -624,7 +624,6 @@ envoy_cc_test(
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/listener/tls_inspector:config",
         "//source/extensions/transport_sockets/tls:config",
-        "//test/extensions/transport_sockets/tls/integration:ssl_integration_lib",
         "//test/mocks/server:server_mocks",
         "//test/test_common:utility_lib",
     ],
