@@ -76,6 +76,8 @@ TEST(HttpExtAuthzConfigTest, CorrectProtoHttp) {
     path_prefix: /extauth
     
   failure_mode_allow: true
+  with_request_body:
+    max_request_bytes: 100
   )EOF";
 
   ExtAuthzFilterConfig factory;

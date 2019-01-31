@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.service.auth.v2;
 option java_package = "io.envoyproxy.envoy.service.auth.v2";
 
+import "envoy/api/v2/core/base.proto";
 import "envoy/api/v2/core/address.proto";
 
 import "google/protobuf/timestamp.proto";
@@ -102,6 +103,9 @@ message AttributeContext {
     // The network protocol used with the request, such as
     // "http/1.1", "spdy/3", "h2", "h2c"
     string protocol = 10;
+
+    // The HTTP request body.
+    envoy.api.v2.core.DataSource body = 11;
   }
 
   // The source of a network activity, such as starting a TCP connection.

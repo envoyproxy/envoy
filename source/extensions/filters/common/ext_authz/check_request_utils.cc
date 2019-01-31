@@ -74,7 +74,7 @@ std::string CheckRequestUtils::getHeaderStr(const Envoy::Http::HeaderEntry* entr
 void CheckRequestUtils::setHttpRequest(
     ::envoy::service::auth::v2::AttributeContext_HttpRequest& httpreq,
     const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
-    const Envoy::Http::HeaderMap& headers) {
+    const Envoy::Http::HeaderMap& headers, bool with_request_body) {
 
   // Set id
   // The streamId is not qualified as a const. Although it is as it does not modify the object.
@@ -114,20 +114,26 @@ void CheckRequestUtils::setHttpRequest(
         return Envoy::Http::HeaderMap::Iterate::Continue;
       },
       mutable_headers);
+
+  // Set request body.
+  const Buffer::Instance* buffer = sdfc->decodingBuffer();
+  if (with_request_body && buffer != nullptr) {
+    httpreq.mutable_body()->set_inline_bytes(buffer->toString());
+  }
 }
 
 void CheckRequestUtils::setAttrContextRequest(
     ::envoy::service::auth::v2::AttributeContext_Request& req,
     const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
-    const Envoy::Http::HeaderMap& headers) {
-  setHttpRequest(*req.mutable_http(), callbacks, headers);
+    const Envoy::Http::HeaderMap& headers, bool with_request_body) {
+  setHttpRequest(*req.mutable_http(), callbacks, headers, with_request_body);
 }
 
 void CheckRequestUtils::createHttpCheck(
     const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
     const Envoy::Http::HeaderMap& headers,
     Protobuf::Map<ProtobufTypes::String, ProtobufTypes::String>&& context_extensions,
-    envoy::service::auth::v2::CheckRequest& request) {
+    envoy::service::auth::v2::CheckRequest& request, bool with_request_body) {
 
   auto attrs = request.mutable_attributes();
 
@@ -138,7 +144,7 @@ void CheckRequestUtils::createHttpCheck(
 
   setAttrContextPeer(*attrs->mutable_source(), *cb->connection(), service, false);
   setAttrContextPeer(*attrs->mutable_destination(), *cb->connection(), "", true);
-  setAttrContextRequest(*attrs->mutable_request(), callbacks, headers);
+  setAttrContextRequest(*attrs->mutable_request(), callbacks, headers, with_request_body);
 
   // Fill in the context extensions:
   (*attrs->mutable_context_extensions()) = std::move(context_extensions);

@@ -26,6 +26,7 @@ public:
   CheckRequestUtilsTest() {
     addr_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 1111);
     protocol_ = Envoy::Http::Protocol::Http10;
+    buffer_ = std::make_unique<Buffer::OwnedImpl>("foo");
   };
 
   Network::Address::InstanceConstSharedPtr addr_;
@@ -36,6 +37,7 @@ public:
   NiceMock<Envoy::Network::MockConnection> connection_;
   NiceMock<Envoy::Ssl::MockConnection> ssl_;
   NiceMock<Envoy::StreamInfo::MockStreamInfo> req_info_;
+  Buffer::InstancePtr buffer_;
 };
 
 // Verify that createTcpCheck's dependencies are invoked when it's called.
@@ -57,12 +59,15 @@ TEST_F(CheckRequestUtilsTest, BasicHttp) {
   EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
   EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
   EXPECT_CALL(Const(connection_), ssl()).Times(2).WillRepeatedly(Return(&ssl_));
-  EXPECT_CALL(callbacks_, streamId()).WillOnce(Return(0));
+  EXPECT_CALL(callbacks_, streamId()).Times(1).WillOnce(Return(0));
+  EXPECT_CALL(callbacks_, decodingBuffer()).WillOnce(Return(buffer_.get()));
   EXPECT_CALL(callbacks_, streamInfo()).Times(3).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_CALL(req_info_, protocol()).Times(2).WillRepeatedly(ReturnPointee(&protocol_));
   Protobuf::Map<ProtobufTypes::String, ProtobufTypes::String> empty;
 
-  CheckRequestUtils::createHttpCheck(&callbacks_, headers, std::move(empty), request);
+  CheckRequestUtils::createHttpCheck(&callbacks_, headers, std::move(empty), request, true);
+
+  EXPECT_EQ("foo", request.attributes().request().http().body().inline_bytes());
 }
 
 // Verify that createHttpCheck extract the proper attributes from the http request into CheckRequest
@@ -77,6 +82,7 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeer) {
   EXPECT_CALL(Const(connection_), ssl()).WillRepeatedly(Return(&ssl_));
   EXPECT_CALL(callbacks_, streamId()).WillRepeatedly(Return(0));
   EXPECT_CALL(callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
+  EXPECT_CALL(callbacks_, decodingBuffer()).Times(1);
   EXPECT_CALL(req_info_, protocol()).WillRepeatedly(ReturnPointee(&protocol_));
   EXPECT_CALL(ssl_, uriSanPeerCertificate()).WillOnce(Return("source"));
   EXPECT_CALL(ssl_, uriSanLocalCertificate()).WillOnce(Return("destination"));
@@ -85,7 +91,7 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeer) {
   context_extensions["key"] = "value";
 
   CheckRequestUtils::createHttpCheck(&callbacks_, request_headers, std::move(context_extensions),
-                                     request);
+                                     request, false);
 
   EXPECT_EQ("source", request.attributes().source().principal());
   EXPECT_EQ("destination", request.attributes().destination().principal());
