@@ -4,7 +4,7 @@
 #include <string>
 
 #include "envoy/config/transport_socket/tap/v2alpha/tap.pb.h"
-#include "envoy/data/tap/v2alpha/transport.pb.h"
+#include "envoy/data/tap/v2alpha/wrapper.pb.h"
 
 #include "common/event/dispatcher_impl.h"
 #include "common/network/connection_impl.h"
@@ -337,9 +337,12 @@ TEST_P(SslCertficateIntegrationTest, ServerRsaEcdsaClientEcdsaOnly) {
   checkStats();
 }
 
+// TODO(mattklein123): Move this into a dedicated integration test for the tap transport socket as
+// well as add more tests.
 class SslTapIntegrationTest : public SslIntegrationTest {
 public:
   void initialize() override {
+    // TODO(mattklein123): Merge/use the code in ConfigHelper::setTapTransportSocket().
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
       auto* filter_chain =
           bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
@@ -351,11 +354,20 @@ public:
       auto* transport_socket = filter_chain->mutable_transport_socket();
       transport_socket->set_name("envoy.transport_sockets.tap");
       envoy::config::transport_socket::tap::v2alpha::Tap tap_config;
-      auto* file_sink = tap_config.mutable_file_sink();
+      tap_config.mutable_common_config()
+          ->mutable_static_config()
+          ->mutable_match_config()
+          ->set_any_match(true);
+      auto* file_sink = tap_config.mutable_common_config()
+                            ->mutable_static_config()
+                            ->mutable_output_config()
+                            ->mutable_sinks()
+                            ->Add()
+                            ->mutable_file_per_tap();
       file_sink->set_path_prefix(path_prefix_);
-      file_sink->set_format(
-          text_format_ ? envoy::config::transport_socket::tap::v2alpha::FileSink::PROTO_TEXT
-                       : envoy::config::transport_socket::tap::v2alpha::FileSink::PROTO_BINARY);
+      file_sink->set_format(text_format_
+                                ? envoy::service::tap::v2alpha::FilePerTapSink::PROTO_TEXT
+                                : envoy::service::tap::v2alpha::FilePerTapSink::PROTO_BINARY);
       tap_config.mutable_transport_socket()->MergeFrom(ssl_transport_socket);
       MessageUtil::jsonConvert(tap_config, *transport_socket->mutable_config());
       // Nuke TLS context from legacy location.
@@ -404,15 +416,19 @@ TEST_P(SslTapIntegrationTest, TwoRequestsWithBinaryProto) {
                                              expected_remote_address);
   codec_client_->close();
   test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
-  envoy::data::tap::v2alpha::Trace trace;
+  envoy::data::tap::v2alpha::BufferedTraceWrapper trace;
   MessageUtil::loadFromFile(fmt::format("{}_{}.pb", path_prefix_, first_id), trace, *api_);
   // Validate general expected properties in the trace.
-  EXPECT_EQ(first_id, trace.connection().id());
-  EXPECT_THAT(expected_local_address, ProtoEq(trace.connection().local_address()));
-  EXPECT_THAT(expected_remote_address, ProtoEq(trace.connection().remote_address()));
-  ASSERT_GE(trace.events().size(), 2);
-  EXPECT_TRUE(absl::StartsWith(trace.events(0).read().data(), "POST /test/long/url HTTP/1.1"));
-  EXPECT_TRUE(absl::StartsWith(trace.events(1).write().data(), "HTTP/1.1 200 OK"));
+  EXPECT_EQ(first_id, trace.socket_buffered_trace().connection().id());
+  EXPECT_THAT(expected_local_address,
+              ProtoEq(trace.socket_buffered_trace().connection().local_address()));
+  EXPECT_THAT(expected_remote_address,
+              ProtoEq(trace.socket_buffered_trace().connection().remote_address()));
+  ASSERT_GE(trace.socket_buffered_trace().events().size(), 2);
+  EXPECT_TRUE(absl::StartsWith(trace.socket_buffered_trace().events(0).read().data(),
+                               "POST /test/long/url HTTP/1.1"));
+  EXPECT_TRUE(
+      absl::StartsWith(trace.socket_buffered_trace().events(1).write().data(), "HTTP/1.1 200 OK"));
 
   // Verify a second request hits a different file.
   const uint64_t second_id = Network::ConnectionImpl::nextGlobalIdForTest() + 1;
@@ -432,10 +448,12 @@ TEST_P(SslTapIntegrationTest, TwoRequestsWithBinaryProto) {
   test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 2);
   MessageUtil::loadFromFile(fmt::format("{}_{}.pb", path_prefix_, second_id), trace, *api_);
   // Validate second connection ID.
-  EXPECT_EQ(second_id, trace.connection().id());
-  ASSERT_GE(trace.events().size(), 2);
-  EXPECT_TRUE(absl::StartsWith(trace.events(0).read().data(), "GET /test/long/url HTTP/1.1"));
-  EXPECT_TRUE(absl::StartsWith(trace.events(1).write().data(), "HTTP/1.1 200 OK"));
+  EXPECT_EQ(second_id, trace.socket_buffered_trace().connection().id());
+  ASSERT_GE(trace.socket_buffered_trace().events().size(), 2);
+  EXPECT_TRUE(absl::StartsWith(trace.socket_buffered_trace().events(0).read().data(),
+                               "GET /test/long/url HTTP/1.1"));
+  EXPECT_TRUE(
+      absl::StartsWith(trace.socket_buffered_trace().events(1).write().data(), "HTTP/1.1 200 OK"));
 }
 
 // Validate a single request with text proto output.
@@ -449,11 +467,13 @@ TEST_P(SslTapIntegrationTest, RequestWithTextProto) {
   checkStats();
   codec_client_->close();
   test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
-  envoy::data::tap::v2alpha::Trace trace;
+  envoy::data::tap::v2alpha::BufferedTraceWrapper trace;
   MessageUtil::loadFromFile(fmt::format("{}_{}.pb_text", path_prefix_, id), trace, *api_);
   // Test some obvious properties.
-  EXPECT_TRUE(absl::StartsWith(trace.events(0).read().data(), "POST /test/long/url HTTP/1.1"));
-  EXPECT_TRUE(absl::StartsWith(trace.events(1).write().data(), "HTTP/1.1 200 OK"));
+  EXPECT_TRUE(absl::StartsWith(trace.socket_buffered_trace().events(0).read().data(),
+                               "POST /test/long/url HTTP/1.1"));
+  EXPECT_TRUE(
+      absl::StartsWith(trace.socket_buffered_trace().events(1).write().data(), "HTTP/1.1 200 OK"));
 }
 
 } // namespace Ssl
