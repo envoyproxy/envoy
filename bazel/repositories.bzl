@@ -363,7 +363,7 @@ def _com_github_c_ares_c_ares():
     )
     native.bind(
         name = "ares",
-        actual = "//bazel/foreign_cc:ares",
+        actual = "@envoy//bazel/foreign_cc:ares",
     )
 
 def _com_github_cyan4973_xxhash():
@@ -456,7 +456,7 @@ def _com_github_jbeder_yaml_cpp():
     )
     native.bind(
         name = "yaml_cpp",
-        actual = "//bazel/foreign_cc:yaml",
+        actual = "@envoy//bazel/foreign_cc:yaml",
     )
 
 def _com_github_libevent_libevent():
@@ -468,7 +468,7 @@ def _com_github_libevent_libevent():
     )
     native.bind(
         name = "event",
-        actual = "//bazel/foreign_cc:event",
+        actual = "@envoy//bazel/foreign_cc:event",
     )
 
 def _com_github_madler_zlib():
@@ -480,7 +480,7 @@ def _com_github_madler_zlib():
     )
     native.bind(
         name = "zlib",
-        actual = "//bazel/foreign_cc:zlib",
+        actual = "@envoy//bazel/foreign_cc:zlib",
     )
 
 def _com_github_nghttp2_nghttp2():
@@ -490,12 +490,12 @@ def _com_github_nghttp2_nghttp2():
         build_file_content = BUILD_ALL_CONTENT,
         patch_args = ["-p1"],
         patch_cmds = ["find . -name '*.sh' -exec sed -i.orig '1s|#!/usr/bin/env sh\$|/bin/sh\$|' {} +"],
-        patches = ["//bazel/foreign_cc:nghttp2.patch"],
+        patches = ["@envoy//bazel/foreign_cc:nghttp2.patch"],
         **location
     )
     native.bind(
         name = "nghttp2",
-        actual = "//bazel/foreign_cc:nghttp2",
+        actual = "@envoy//bazel/foreign_cc:nghttp2",
     )
 
 def _io_opentracing_cpp():

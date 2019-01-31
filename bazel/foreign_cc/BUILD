@@ -43,6 +43,7 @@ cmake_external(
         "ENABLE_STATIC_LIB": "on",
         "ENABLE_LIB_ONLY": "on",
         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "CMAKE_INSTALL_LIBDIR": "lib",
     },
     cmake_options = ["-GNinja"],
     lib_source = "@com_github_nghttp2_nghttp2//:all",

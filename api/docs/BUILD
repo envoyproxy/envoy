@@ -33,6 +33,7 @@ proto_library(
         "//envoy/config/accesslog/v2:als",
         "//envoy/config/accesslog/v2:file",
         "//envoy/config/bootstrap/v2:bootstrap",
+        "//envoy/config/common/tap/v2alpha:common",
         "//envoy/config/filter/accesslog/v2:accesslog",
         "//envoy/config/filter/http/buffer/v2:buffer",
         "//envoy/config/filter/http/ext_authz/v2:ext_authz",
