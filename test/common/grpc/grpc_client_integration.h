@@ -9,7 +9,7 @@
 namespace Envoy {
 namespace Grpc {
 
-// Support paramaterizing over gRPC client type.
+// Support parameterizing over gRPC client type.
 enum class ClientType { EnvoyGrpc, GoogleGrpc };
 
 class BaseGrpcClientIntegrationParamTest {

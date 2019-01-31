@@ -77,6 +77,7 @@ PROTO_RST="
   /envoy/config/accesslog/v2/als/envoy/config/accesslog/v2/als.proto.rst
   /envoy/config/accesslog/v2/file/envoy/config/accesslog/v2/file.proto.rst
   /envoy/config/bootstrap/v2/bootstrap/envoy/config/bootstrap/v2/bootstrap.proto.rst
+  /envoy/config/common/tap/v2alpha/common/envoy/config/common/tap/v2alpha/common.proto.rst
   /envoy/config/ratelimit/v2/rls/envoy/config/ratelimit/v2/rls.proto.rst
   /envoy/config/metrics/v2/metrics_service/envoy/config/metrics/v2/metrics_service.proto.rst
   /envoy/config/metrics/v2/stats/envoy/config/metrics/v2/stats.proto.rst
@@ -84,7 +85,7 @@ PROTO_RST="
   /envoy/config/filter/accesslog/v2/accesslog/envoy/config/filter/accesslog/v2/accesslog.proto.rst
   /envoy/config/filter/fault/v2/fault/envoy/config/filter/fault/v2/fault.proto.rst
   /envoy/config/filter/http/buffer/v2/buffer/envoy/config/filter/http/buffer/v2/buffer.proto.rst
-  /envoy/config/filter/http/ext_authz/v2alpha/ext_authz/envoy/config/filter/http/ext_authz/v2alpha/ext_authz.proto.rst
+  /envoy/config/filter/http/ext_authz/v2/ext_authz/envoy/config/filter/http/ext_authz/v2/ext_authz.proto.rst
   /envoy/config/filter/http/fault/v2/fault/envoy/config/filter/http/fault/v2/fault.proto.rst
   /envoy/config/filter/http/gzip/v2/gzip/envoy/config/filter/http/gzip/v2/gzip.proto.rst
   /envoy/config/filter/http/health_check/v2/health_check/envoy/config/filter/http/health_check/v2/health_check.proto.rst
@@ -116,15 +117,16 @@ PROTO_RST="
   /envoy/config/rbac/v2alpha/rbac/envoy/config/rbac/v2alpha/rbac.proto.rst
   /envoy/config/resource_monitor/fixed_heap/v2alpha/fixed_heap/envoy/config/resource_monitor/fixed_heap/v2alpha/fixed_heap.proto.rst
   /envoy/config/resource_monitor/injected_resource/v2alpha/injected_resource/envoy/config/resource_monitor/injected_resource/v2alpha/injected_resource.proto.rst
-  /envoy/config/transport_socket/capture/v2alpha/capture/envoy/config/transport_socket/capture/v2alpha/capture.proto.rst
+  /envoy/config/transport_socket/tap/v2alpha/tap/envoy/config/transport_socket/tap/v2alpha/tap.proto.rst
   /envoy/data/accesslog/v2/accesslog/envoy/data/accesslog/v2/accesslog.proto.rst
   /envoy/data/core/v2alpha/health_check_event/envoy/data/core/v2alpha/health_check_event.proto.rst
-  /envoy/data/tap/v2alpha/capture/envoy/data/tap/v2alpha/capture.proto.rst
+  /envoy/data/tap/v2alpha/transport/envoy/data/tap/v2alpha/transport.proto.rst
   /envoy/data/tap/v2alpha/http/envoy/data/tap/v2alpha/http.proto.rst
   /envoy/data/tap/v2alpha/wrapper/envoy/data/tap/v2alpha/wrapper.proto.rst
+  /envoy/data/cluster/v2alpha/outlier_detection_event/envoy/data/cluster/v2alpha/outlier_detection_event.proto.rst
   /envoy/service/accesslog/v2/als/envoy/service/accesslog/v2/als.proto.rst
-  /envoy/service/auth/v2alpha/external_auth/envoy/service/auth/v2alpha/attribute_context.proto.rst
-  /envoy/service/auth/v2alpha/external_auth/envoy/service/auth/v2alpha/external_auth.proto.rst
+  /envoy/service/auth/v2/external_auth/envoy/service/auth/v2/attribute_context.proto.rst
+  /envoy/service/auth/v2/external_auth/envoy/service/auth/v2/external_auth.proto.rst
   /envoy/service/ratelimit/v2/rls/envoy/service/ratelimit/v2/rls.proto.rst
   /envoy/service/tap/v2alpha/common/envoy/service/tap/v2alpha/common.proto.rst
   /envoy/type/http_status/envoy/type/http_status.proto.rst

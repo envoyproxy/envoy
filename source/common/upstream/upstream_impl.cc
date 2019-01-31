@@ -451,7 +451,7 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
   case envoy::api::v2::Cluster::ORIGINAL_DST_LB:
     if (config.type() != envoy::api::v2::Cluster::ORIGINAL_DST) {
       throw EnvoyException(fmt::format(
-          "cluster: LB type 'original_dst_lb' may only be used with cluser type 'original_dst'"));
+          "cluster: LB type 'original_dst_lb' may only be used with cluster type 'original_dst'"));
     }
     lb_type_ = LoadBalancerType::OriginalDst;
     break;
@@ -530,7 +530,8 @@ ClusterSharedPtr ClusterImplBase::create(
     Ssl::ContextManager& ssl_context_manager, Runtime::Loader& runtime,
     Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
     AccessLog::AccessLogManager& log_manager, const LocalInfo::LocalInfo& local_info,
-    Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) {
+    Server::Admin& admin, Singleton::Manager& singleton_manager,
+    Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api, Api::Api& api) {
   std::unique_ptr<ClusterImplBase> new_cluster;
 
   // We make this a shared pointer to deal with the distinct ownership
@@ -552,7 +553,8 @@ ClusterSharedPtr ClusterImplBase::create(
 
   auto stats_scope = generateStatsScope(cluster, stats);
   Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-      ssl_context_manager, *stats_scope, cm, local_info, dispatcher, random, stats);
+      admin, ssl_context_manager, *stats_scope, cm, local_info, dispatcher, random, stats,
+      singleton_manager, tls, api);
 
   switch (cluster.type()) {
   case envoy::api::v2::Cluster::STATIC:

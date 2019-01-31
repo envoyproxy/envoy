@@ -12,9 +12,9 @@
 
 namespace Envoy {
 
-INSTANTIATE_TEST_CASE_P(IpVersions, Http2UpstreamIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, Http2UpstreamIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(Http2UpstreamIntegrationTest, RouterNotFound) { testRouterNotFound(); }
 
@@ -152,7 +152,7 @@ TEST_P(Http2UpstreamIntegrationTest, BidirectionalStreamingReset) {
   upstream_request_->encodeData(1024, false);
   response->waitForBodyData(1024);
 
-  // Finish sending therequest.
+  // Finish sending the request.
   codec_client_->sendTrailers(*request_encoder_, Http::TestHeaderMapImpl{{"trailer", "foo"}});
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 

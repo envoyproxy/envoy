@@ -8,6 +8,7 @@
 
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
+#include "common/singleton/manager_impl.h"
 #include "common/upstream/original_dst_cluster.h"
 #include "common/upstream/upstream_impl.h"
 
@@ -18,6 +19,7 @@
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/utility.h"
@@ -60,7 +62,9 @@ public:
   // cleanup timer must be created before the cluster (in setup()), so that we can set expectations
   // on it. Ownership is transferred to the cluster at the cluster constructor, so the cluster will
   // take care of destructing it!
-  OriginalDstClusterTest() : cleanup_timer_(new Event::MockTimer(&dispatcher_)) {}
+  OriginalDstClusterTest()
+      : cleanup_timer_(new Event::MockTimer(&dispatcher_)),
+        api_(Api::createApiForTest(stats_store_)) {}
 
   void setupFromJson(const std::string& json) { setup(parseClusterFromJson(json)); }
   void setupFromYaml(const std::string& yaml) { setup(parseClusterFromV2Yaml(yaml)); }
@@ -71,7 +75,8 @@ public:
         "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                               : cluster_config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-        ssl_context_manager_, *scope, cm, local_info_, dispatcher_, random_, stats_store_);
+        admin_, ssl_context_manager_, *scope, cm, local_info_, dispatcher_, random_, stats_store_,
+        singleton_manager_, tls_, *api_);
     cluster_.reset(
         new OriginalDstCluster(cluster_config, runtime_, factory_context, std::move(scope), false));
     cluster_->prioritySet().addPriorityUpdateCb(
@@ -91,6 +96,10 @@ public:
   Event::MockTimer* cleanup_timer_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  NiceMock<Server::MockAdmin> admin_;
+  Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest().currentThreadId()};
+  NiceMock<ThreadLocal::MockInstance> tls_;
+  Api::ApiPtr api_;
 };
 
 TEST(OriginalDstClusterConfigTest, BadConfig) {

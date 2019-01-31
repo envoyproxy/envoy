@@ -146,7 +146,6 @@ MockInstance::MockInstance()
   ON_CALL(*this, mutexTracer()).WillByDefault(Return(nullptr));
   ON_CALL(*this, singletonManager()).WillByDefault(ReturnRef(*singleton_manager_));
   ON_CALL(*this, overloadManager()).WillByDefault(ReturnRef(overload_manager_));
-  // ON_CALL(*this, timeSystem()).WillByDefault(ReturnRef(test_time_.timeSystem()));;
 }
 
 MockInstance::~MockInstance() = default;
@@ -181,12 +180,15 @@ MockFactoryContext::MockFactoryContext()
   ON_CALL(*this, listenerScope()).WillByDefault(ReturnRef(listener_scope_));
   ON_CALL(*this, timeSource()).WillByDefault(ReturnRef(time_system_));
   ON_CALL(*this, overloadManager()).WillByDefault(ReturnRef(overload_manager_));
+  ON_CALL(*this, api()).WillByDefault(ReturnRef(api_));
 }
 
 MockFactoryContext::~MockFactoryContext() = default;
 
 MockTransportSocketFactoryContext::MockTransportSocketFactoryContext()
-    : secret_manager_(new Secret::SecretManagerImpl()) {}
+    : secret_manager_(new Secret::SecretManagerImpl()) {
+  ON_CALL(*this, api()).WillByDefault(ReturnRef(api_));
+}
 
 MockTransportSocketFactoryContext::~MockTransportSocketFactoryContext() = default;
 

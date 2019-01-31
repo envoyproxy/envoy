@@ -51,6 +51,7 @@ public:
   MOCK_METHOD0(filterFactory, FilterChainFactory&());
   MOCK_METHOD0(reverseEncodeOrder, bool());
   MOCK_METHOD0(generateRequestId, bool());
+  MOCK_CONST_METHOD0(maxRequestHeadersSizeKb, uint32_t());
   MOCK_CONST_METHOD0(idleTimeout, absl::optional<std::chrono::milliseconds>());
   MOCK_CONST_METHOD0(streamIdleTimeout, std::chrono::milliseconds());
   MOCK_CONST_METHOD0(requestTimeout, std::chrono::milliseconds());
@@ -198,7 +199,7 @@ TEST_F(ConnectionManagerUtilityTest, SkipXffAppendUseRemoteAddress) {
   EXPECT_FALSE(headers.has(Headers::get().ForwardedFor));
 }
 
-// Verify that we pass-thru XFF when skipAffAppend(), even if using remote
+// Verify that we pass-thru XFF when skipXffAppend(), even if using remote
 // address and where the address is external.
 TEST_F(ConnectionManagerUtilityTest, SkipXffAppendPassThruUseRemoteAddress) {
   EXPECT_CALL(config_, skipXffAppend()).WillOnce(Return(true));
@@ -737,7 +738,7 @@ TEST_F(ConnectionManagerUtilityTest, MtlsForwardOnlyClientCert) {
             headers.get_("x-forwarded-client-cert"));
 }
 
-// The server (local) dentity is foo.com/be. The client does not set XFCC.
+// The server (local) identity is foo.com/be. The client does not set XFCC.
 TEST_F(ConnectionManagerUtilityTest, MtlsSetForwardClientCert) {
   NiceMock<Ssl::MockConnection> ssl;
   ON_CALL(ssl, peerCertificatePresented()).WillByDefault(Return(true));
@@ -771,7 +772,7 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSetForwardClientCert) {
 }
 
 // This test assumes the following scenario:
-// The client identity is foo.com/fe, and the server (local) dentity is foo.com/be. The client
+// The client identity is foo.com/fe, and the server (local) identity is foo.com/be. The client
 // also sends the XFCC header with the authentication result of the previous hop, (bar.com/be
 // calling foo.com/fe).
 TEST_F(ConnectionManagerUtilityTest, MtlsAppendForwardClientCert) {
@@ -807,7 +808,7 @@ TEST_F(ConnectionManagerUtilityTest, MtlsAppendForwardClientCert) {
 }
 
 // This test assumes the following scenario:
-// The client identity is foo.com/fe, and the server (local) dentity is foo.com/be. The client
+// The client identity is foo.com/fe, and the server (local) identity is foo.com/be. The client
 // also sends the XFCC header with the authentication result of the previous hop, (bar.com/be
 // calling foo.com/fe).
 TEST_F(ConnectionManagerUtilityTest, MtlsAppendForwardClientCertLocalSanEmpty) {
@@ -835,7 +836,7 @@ TEST_F(ConnectionManagerUtilityTest, MtlsAppendForwardClientCertLocalSanEmpty) {
 }
 
 // This test assumes the following scenario:
-// The client identity is foo.com/fe, and the server (local) dentity is foo.com/be. The client
+// The client identity is foo.com/fe, and the server (local) identity is foo.com/be. The client
 // also sends the XFCC header with the authentication result of the previous hop, (bar.com/be
 // calling foo.com/fe).
 TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCert) {
@@ -870,7 +871,7 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCert) {
 }
 
 // This test assumes the following scenario:
-// The client identity is foo.com/fe, and the server (local) dentity is foo.com/be. The client
+// The client identity is foo.com/fe, and the server (local) identity is foo.com/be. The client
 // also sends the XFCC header with the authentication result of the previous hop, (bar.com/be
 // calling foo.com/fe).
 TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCertPeerSanEmpty) {

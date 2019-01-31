@@ -13,11 +13,14 @@ namespace OriginalSrc {
  */
 class OriginalSrcSocketOption : public Network::Socket::Option {
 public:
+  /**
+   * Constructs a socket option which will set the socket to use source @c src_address
+   */
   OriginalSrcSocketOption(Network::Address::InstanceConstSharedPtr src_address);
   ~OriginalSrcSocketOption() {}
 
   /**
-   * Updates the source address of the socket to match @c src_address_.
+   * Updates the source address of the socket to match `src_address_`.
    * Adds socket options to the socket to allow this to work.
    */
   bool setOption(Network::Socket& socket,
@@ -32,12 +35,8 @@ public:
   getOptionDetails(const Network::Socket& socket,
                    envoy::api::v2::core::SocketOption::SocketState state) const override;
 
-  static constexpr uint8_t IPV4_KEY = 0;
-  static constexpr uint8_t IPV6_KEY = 1;
-
 private:
   Network::Address::InstanceConstSharedPtr src_address_;
-  Network::Socket::Options options_to_apply_;
 };
 
 } // namespace OriginalSrc

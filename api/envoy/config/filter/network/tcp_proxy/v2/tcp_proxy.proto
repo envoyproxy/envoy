@@ -29,13 +29,11 @@ message TcpProxy {
     //
     // .. note::
     //
-    //  Once full filter chain matching is implemented in listeners, this field will become the only
-    //  way to configure the target cluster. All other matching will be done via :ref:`filter chain
-    //  matching rules <envoy_api_msg_listener.FilterChainMatch>`. For very simple configurations,
-    //  this field can still be used to select the cluster when no other matching rules are
-    //  required. Otherwise, a :ref:`deprecated_v1
-    //  <envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.deprecated_v1>` configuration
-    //  is required to use more complex routing in the interim.
+    //  Complex routing (based on connection properties) is being implemented in listeners. Once
+    //  fully implemented, this field (or `weighted_clusters`) will be the only way to configure
+    //  the target cluster. In the interim, complex routing requires using a :ref:`deprecated_v1
+    //  <envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.deprecated_v1>` configuration.
+    //  This field is ignored if a `deprecated_v1` configuration is set.
     //
     string cluster = 2;
 
@@ -136,12 +134,41 @@ message TcpProxy {
   // TCP Proxy filter configuration using deprecated V1 format. This is required for complex
   // routing until filter chain matching in the listener is implemented.
   //
+  // Example:
+  //
+  // .. code-block:: yaml
+  //
+  //     - name: "envoy.tcp_proxy"
+  //       config:
+  //         deprecated_v1: true
+  //         value:
+  //           stat_prefix: "prefix"
+  //           access_log:
+  //             - ...
+  //           route_config:
+  //             routes:
+  //               - cluster: "cluster"
+  //                 destination_ip_list:
+  //                   - "10.1.0.0/8"
+  //                 destination_ports: "8080"
+  //                 source_ip_list:
+  //                   - "10.1.0.0/16"
+  //                   - "2001:db8::/32"
+  //                 source_ports: "8000,9000-9999"
+  //
   // .. attention::
   //
-  //   Using this field will lead to `problems loading the configuration
-  //   <https://github.com/envoyproxy/envoy/issues/2441>`_. If you want to configure the filter
-  //   using v1 config structure, please make this field a boolean with value ``true`` and configure
-  //   via the opaque ``value`` field like is suggested in :api:`envoy/config/filter/README.md`.
+  //   Using the deprecated V1 configuration excludes the use of any V2 configuration options. Only
+  //   the V1 configuration is used. All available fields are shown in the example, although the
+  //   access log configuration is omitted for simplicity. The access log configuration uses the
+  //   :repo:`deprecated V1 access log configuration<source/common/json/config_schemas.cc>`.
+  //
+  // .. attention::
+  //
+  //   In the deprecated V1 configuration, source and destination CIDR ranges are specified as a
+  //   list of strings with each string in CIDR notation. Source and destination ports are
+  //   specified as single strings containing a comma-separated list of ports and/or port ranges.
+  //
   DeprecatedV1 deprecated_v1 = 6 [deprecated = true];
 
   // The maximum number of unsuccessful connection attempts that will be made before

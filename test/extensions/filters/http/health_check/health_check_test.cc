@@ -266,7 +266,7 @@ TEST_F(HealthCheckFilterCachingTest, CachedServiceUnavailableCallbackCalled) {
   EXPECT_CALL(context_, healthCheckFailed()).WillRepeatedly(Return(false));
   EXPECT_CALL(callbacks_.stream_info_, healthCheck(true));
   EXPECT_CALL(callbacks_.active_span_, setSampled(false));
-  cache_manager_->setCachedResponseCode(Http::Code::ServiceUnavailable);
+  cache_manager_->setCachedResponse(Http::Code::ServiceUnavailable, false);
 
   Http::TestHeaderMapImpl health_check_response{{":status", "503"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&health_check_response), true))
@@ -287,7 +287,7 @@ TEST_F(HealthCheckFilterCachingTest, CachedOkCallbackNotCalled) {
   EXPECT_CALL(context_, healthCheckFailed()).WillRepeatedly(Return(false));
   EXPECT_CALL(callbacks_.stream_info_, healthCheck(true));
   EXPECT_CALL(callbacks_.active_span_, setSampled(false));
-  cache_manager_->setCachedResponseCode(Http::Code::OK);
+  cache_manager_->setCachedResponse(Http::Code::OK, false);
 
   Http::TestHeaderMapImpl health_check_response{{":status", "200"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&health_check_response), true))
@@ -313,7 +313,40 @@ TEST_F(HealthCheckFilterCachingTest, All) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue,
             filter_->encodeHeaders(service_response_headers, true));
 
-  // Verify that the next request uses the cached value.
+  // Verify that the next request uses the cached value without setting the degraded header.
+  prepareFilter(true);
+  EXPECT_CALL(callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::ResponseFlag::FailedLocalHealthCheck));
+  EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&health_check_response), true))
+      .Times(1)
+      .WillRepeatedly(Invoke([&](Http::HeaderMap& headers, bool end_stream) {
+        filter_->encodeHeaders(headers, end_stream);
+        EXPECT_STREQ("cluster_name", headers.EnvoyUpstreamHealthCheckedCluster()->value().c_str());
+      }));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, true));
+
+  // Fire the timer, this should result in the next request going through.
+  EXPECT_CALL(*cache_timer_, enableTimer(_));
+  cache_timer_->callback_();
+  prepareFilter(true);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, true));
+}
+
+TEST_F(HealthCheckFilterCachingTest, DegradedHeader) {
+  EXPECT_CALL(callbacks_.stream_info_, healthCheck(true)).Times(3);
+  EXPECT_CALL(callbacks_.active_span_, setSampled(false)).Times(3);
+
+  // Verify that the first request goes through.
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, true));
+  Http::TestHeaderMapImpl service_response_headers{{":status", "503"},
+                                                   {"x-envoy-degraded", "true"}};
+  Http::TestHeaderMapImpl health_check_response{{":status", "503"}, {"x-envoy-degraded", ""}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+            filter_->encodeHeaders(service_response_headers, true));
+
+  // Verify that the next request uses the cached value and that the x-envoy-degraded header is set.
   prepareFilter(true);
   EXPECT_CALL(callbacks_.stream_info_,
               setResponseFlag(StreamInfo::ResponseFlag::FailedLocalHealthCheck));

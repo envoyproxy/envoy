@@ -4,6 +4,7 @@
 #include "envoy/stats/scope.h"
 
 #include "common/config/utility.h"
+#include "common/singleton/manager_impl.h"
 #include "common/upstream/eds.h"
 
 #include "server/transport_socket_config_impl.h"
@@ -11,6 +12,7 @@
 #include "test/common/upstream/utility.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/utility.h"
@@ -27,7 +29,7 @@ namespace Upstream {
 
 class EdsTest : public testing::Test {
 protected:
-  EdsTest() { resetCluster(); }
+  EdsTest() : api_(Api::createApiForTest(stats_)) { resetCluster(); }
 
   void resetCluster() {
     resetCluster(R"EOF(
@@ -59,7 +61,8 @@ protected:
         "cluster.{}.",
         eds_cluster_.alt_stat_name().empty() ? eds_cluster_.name() : eds_cluster_.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-        ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, random_, stats_);
+        admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, random_, stats_,
+        singleton_manager_, tls_, *api_);
     cluster_.reset(
         new EdsClusterImpl(eds_cluster_, runtime_, factory_context, std::move(scope), false));
     EXPECT_EQ(Cluster::InitializePhase::Secondary, cluster_->initializePhase());
@@ -74,6 +77,10 @@ protected:
   NiceMock<Runtime::MockRandomGenerator> random_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  NiceMock<Server::MockAdmin> admin_;
+  Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest().currentThreadId()};
+  NiceMock<ThreadLocal::MockInstance> tls_;
+  Api::ApiPtr api_;
 };
 
 class EdsWithHealthCheckUpdateTest : public EdsTest {
@@ -881,7 +888,7 @@ TEST_F(EdsTest, RemoveUnreferencedLocalities) {
     EXPECT_EQ(2, hosts_per_locality.size());
   }
 
-  // Reset the ClusterLoadAssingment to only contain one of the locality per priority.
+  // Reset the ClusterLoadAssignment to only contain one of the locality per priority.
   // This should leave us with only one locality.
   cluster_load_assignment->clear_endpoints();
   add_hosts_to_locality("oceania", "koala", "ingsoc", 4, 0);

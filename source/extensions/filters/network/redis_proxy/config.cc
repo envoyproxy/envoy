@@ -32,7 +32,7 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
       filter_config->cluster_name_, context.clusterManager(),
       ConnPool::ClientFactoryImpl::instance_, context.threadLocal(), proto_config.settings()));
   std::shared_ptr<CommandSplitter::Instance> splitter(new CommandSplitter::InstanceImpl(
-      std::move(conn_pool), context.scope(), filter_config->stat_prefix_));
+      std::move(conn_pool), context.scope(), filter_config->stat_prefix_, context.timeSource()));
   return [splitter, filter_config](Network::FilterManager& filter_manager) -> void {
     DecoderFactoryImpl factory;
     filter_manager.addReadFilter(std::make_shared<ProxyFilter>(
@@ -51,9 +51,8 @@ RedisProxyFilterConfigFactory::createFilterFactory(const Json::Object& json_conf
 /**
  * Static registration for the redis filter. @see RegisterFactory.
  */
-static Registry::RegisterFactory<RedisProxyFilterConfigFactory,
-                                 Server::Configuration::NamedNetworkFilterConfigFactory>
-    registered_;
+REGISTER_FACTORY(RedisProxyFilterConfigFactory,
+                 Server::Configuration::NamedNetworkFilterConfigFactory);
 
 } // namespace RedisProxy
 } // namespace NetworkFilters

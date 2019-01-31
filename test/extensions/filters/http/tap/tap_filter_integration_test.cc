@@ -2,6 +2,7 @@
 
 #include "test/integration/http_integration.h"
 
+#include "absl/strings/match.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -33,36 +34,87 @@ public:
 
     return nullptr;
   }
+
+  void makeRequest(const Http::TestHeaderMapImpl& request_headers,
+                   const Http::TestHeaderMapImpl& response_headers) {
+    IntegrationStreamDecoderPtr decoder = codec_client_->makeHeaderOnlyRequest(request_headers);
+    waitForNextUpstreamRequest();
+    upstream_request_->encodeHeaders(response_headers, true);
+    decoder->waitForEndStream();
+  }
+
+  const Http::TestHeaderMapImpl request_headers_tap_{{":method", "GET"},
+                                                     {":path", "/"},
+                                                     {":scheme", "http"},
+                                                     {":authority", "host"},
+                                                     {"foo", "bar"}};
+
+  const Http::TestHeaderMapImpl request_headers_no_tap_{
+      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
+
+  const Http::TestHeaderMapImpl response_headers_tap_{{":status", "200"}, {"bar", "baz"}};
+
+  const Http::TestHeaderMapImpl response_headers_no_tap_{{":status", "200"}};
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, TapIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, TapIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
-// Verify a basic tap flow using the admin handler.
-TEST_P(TapIntegrationTest, AdminBasicFlow) {
-  const std::string FILTER_CONFIG =
+// Verify a static configuration with an any matcher, writing to a file per tap sink.
+TEST_P(TapIntegrationTest, StaticFilePerTap) {
+  const std::string filter_config =
       R"EOF(
 name: envoy.filters.http.tap
 config:
-  admin_config:
-    config_id: test_config_id
+  common_config:
+    static_config:
+      match_config:
+        any_match: true
+      output_config:
+        sinks:
+          - file_per_tap:
+              path_prefix: {}
 )EOF";
 
-  initializeFilter(FILTER_CONFIG);
+  const std::string path_prefix =
+      TestEnvironment::temporaryDirectory() + "/tap_integration_static_file/";
+  TestEnvironment::createPath(path_prefix);
+  initializeFilter(fmt::format(filter_config, path_prefix));
+
+  // Initial request/response with tap.
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  makeRequest(request_headers_tap_, response_headers_no_tap_);
+  codec_client_->close();
+  test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
+
+  // Find the written .pb file and verify it.
+  auto files = TestUtility::listFiles(path_prefix, false);
+  auto pb_file = std::find_if(files.begin(), files.end(),
+                              [](const std::string& s) { return absl::EndsWith(s, ".pb"); });
+  ASSERT_NE(pb_file, files.end());
+
+  envoy::data::tap::v2alpha::BufferedTraceWrapper trace;
+  MessageUtil::loadFromFile(*pb_file, trace, *api_);
+  EXPECT_TRUE(trace.has_http_buffered_trace());
+}
+
+// Verify a basic tap flow using the admin handler.
+TEST_P(TapIntegrationTest, AdminBasicFlow) {
+  const std::string filter_config =
+      R"EOF(
+name: envoy.filters.http.tap
+config:
+  common_config:
+    admin_config:
+      config_id: test_config_id
+)EOF";
+
+  initializeFilter(filter_config);
 
   // Initial request/response with no tap.
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
-  const Http::TestHeaderMapImpl request_headers_tap{{":method", "GET"},
-                                                    {":path", "/"},
-                                                    {":scheme", "http"},
-                                                    {":authority", "host"},
-                                                    {"foo", "bar"}};
-  IntegrationStreamDecoderPtr decoder = codec_client_->makeHeaderOnlyRequest(request_headers_tap);
-  waitForNextUpstreamRequest();
-  const Http::TestHeaderMapImpl response_headers_no_tap{{":status", "200"}};
-  upstream_request_->encodeHeaders(response_headers_no_tap, true);
-  decoder->waitForEndStream();
+  makeRequest(request_headers_tap_, response_headers_no_tap_);
 
   const std::string admin_request_yaml =
       R"EOF(
@@ -98,10 +150,7 @@ tap_config:
   test_server_->waitForGaugeEq("http.admin.downstream_rq_active", 0);
 
   // Second request/response with no tap.
-  decoder = codec_client_->makeHeaderOnlyRequest(request_headers_tap);
-  waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(response_headers_no_tap, true);
-  decoder->waitForEndStream();
+  makeRequest(request_headers_tap_, response_headers_no_tap_);
 
   // Setup the tap again and leave it open.
   admin_client_ = makeHttpConnection(makeClientConnection(lookupPort("admin")));
@@ -111,10 +160,7 @@ tap_config:
   EXPECT_FALSE(admin_response->complete());
 
   // Do a request which should tap, matching on request headers.
-  decoder = codec_client_->makeHeaderOnlyRequest(request_headers_tap);
-  waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(response_headers_no_tap, true);
-  decoder->waitForEndStream();
+  makeRequest(request_headers_tap_, response_headers_no_tap_);
 
   // Wait for the tap message.
   admin_response->waitForBodyData(1);
@@ -125,19 +171,10 @@ tap_config:
   admin_response->clearBody();
 
   // Do a request which should not tap.
-  const Http::TestHeaderMapImpl request_headers_no_tap{
-      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
-  decoder = codec_client_->makeHeaderOnlyRequest(request_headers_no_tap);
-  waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(response_headers_no_tap, true);
-  decoder->waitForEndStream();
+  makeRequest(request_headers_no_tap_, response_headers_no_tap_);
 
   // Do a request which should tap, matching on response headers.
-  decoder = codec_client_->makeHeaderOnlyRequest(request_headers_no_tap);
-  waitForNextUpstreamRequest();
-  const Http::TestHeaderMapImpl response_headers_tap{{":status", "200"}, {"bar", "baz"}};
-  upstream_request_->encodeHeaders(response_headers_tap, true);
-  decoder->waitForEndStream();
+  makeRequest(request_headers_no_tap_, response_headers_tap_);
 
   // Wait for the tap message.
   admin_response->waitForBodyData(1);
@@ -181,22 +218,13 @@ tap_config:
   EXPECT_FALSE(admin_response->complete());
 
   // Do a request that matches, but the response does not match. No tap.
-  decoder = codec_client_->makeHeaderOnlyRequest(request_headers_tap);
-  waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(response_headers_no_tap, true);
-  decoder->waitForEndStream();
+  makeRequest(request_headers_tap_, response_headers_no_tap_);
 
   // Do a request that doesn't match, but the response does match. No tap.
-  decoder = codec_client_->makeHeaderOnlyRequest(request_headers_no_tap);
-  waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(response_headers_tap, true);
-  decoder->waitForEndStream();
+  makeRequest(request_headers_no_tap_, response_headers_tap_);
 
   // Do a request that matches and a response that matches. Should tap.
-  decoder = codec_client_->makeHeaderOnlyRequest(request_headers_tap);
-  waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(response_headers_tap, true);
-  decoder->waitForEndStream();
+  makeRequest(request_headers_tap_, response_headers_tap_);
 
   // Wait for the tap message.
   admin_response->waitForBodyData(1);

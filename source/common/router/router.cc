@@ -17,7 +17,6 @@
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/utility.h"
-#include "common/filesystem/filesystem_impl.h"
 #include "common/grpc/common.h"
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
@@ -424,11 +423,18 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
     do_shadowing_ = false;
   }
 
-  // If we are going to buffer for retries or shadowing, we need to make a copy before encoding
-  // since it's all moves from here on.
   if (buffering) {
+    // If we are going to buffer for retries or shadowing, we need to make a copy before encoding
+    // since it's all moves from here on.
     Buffer::OwnedImpl copy(data);
     upstream_request_->encodeData(copy, end_stream);
+
+    // If we are potentially going to retry or shadow this request we need to buffer.
+    // This will not cause the connection manager to 413 because before we hit the
+    // buffer limit we give up on retries and buffering. We must buffer using addDecodedData()
+    // so that all buffered data is available by the time we do request complete processing and
+    // potentially shadow.
+    callbacks_->addDecodedData(data, true);
   } else {
     upstream_request_->encodeData(data, end_stream);
   }
@@ -437,11 +443,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
     onRequestComplete();
   }
 
-  // If we are potentially going to retry or shadow this request we need to buffer.
-  // This will not cause the connection manager to 413 because before we hit the
-  // buffer limit we give up on retries and buffering.
-  return buffering ? Http::FilterDataStatus::StopIterationAndBuffer
-                   : Http::FilterDataStatus::StopIterationNoBuffer;
+  return Http::FilterDataStatus::StopIterationNoBuffer;
 }
 
 Http::FilterTrailersStatus Filter::decodeTrailers(Http::HeaderMap& trailers) {

@@ -18,9 +18,9 @@ namespace Event {
 // mechanism used in RealTimeSystem timers is employed for simulated alarms.
 // Note that libevent is placed into thread-safe mode due to the call to
 // evthread_use_pthreads() in source/common/event/libevent.cc.
-class SimulatedTimeSystem::Alarm : public TimerImpl {
+class SimulatedTimeSystemHelper::Alarm : public TimerImpl {
 public:
-  Alarm(SimulatedTimeSystem& time_system, Libevent::BasePtr& libevent, TimerCb cb)
+  Alarm(SimulatedTimeSystemHelper& time_system, Libevent::BasePtr& libevent, TimerCb cb)
       : TimerImpl(libevent, [this, cb] { runAlarm(cb); }), time_system_(time_system),
         index_(time_system.nextIndex()), armed_(false) {}
 
@@ -56,7 +56,7 @@ private:
     cb();
   }
 
-  SimulatedTimeSystem& time_system_;
+  SimulatedTimeSystemHelper& time_system_;
   MonotonicTime time_;
   uint64_t index_;
   bool armed_;
@@ -64,7 +64,7 @@ private:
 
 // Compare two alarms, based on wakeup time and insertion order. Returns true if
 // a comes before b.
-bool SimulatedTimeSystem::CompareAlarms::operator()(const Alarm* a, const Alarm* b) const {
+bool SimulatedTimeSystemHelper::CompareAlarms::operator()(const Alarm* a, const Alarm* b) const {
   if (a != b) {
     if (a->time() < b->time()) {
       return true;
@@ -79,33 +79,34 @@ bool SimulatedTimeSystem::CompareAlarms::operator()(const Alarm* a, const Alarm*
 // associated with a scheduler. The scheduler creates the timers with a libevent
 // context, so that the timer callbacks can be executed via Dispatcher::run() in
 // the expected thread.
-class SimulatedTimeSystem::SimulatedScheduler : public Scheduler {
+class SimulatedTimeSystemHelper::SimulatedScheduler : public Scheduler {
 public:
-  SimulatedScheduler(SimulatedTimeSystem& time_system, Libevent::BasePtr& libevent)
+  SimulatedScheduler(SimulatedTimeSystemHelper& time_system, Libevent::BasePtr& libevent)
       : time_system_(time_system), libevent_(libevent) {}
   TimerPtr createTimer(const TimerCb& cb) override {
-    return std::make_unique<SimulatedTimeSystem::Alarm>(time_system_, libevent_, cb);
+    return std::make_unique<SimulatedTimeSystemHelper::Alarm>(time_system_, libevent_, cb);
   };
 
 private:
-  SimulatedTimeSystem& time_system_;
+  SimulatedTimeSystemHelper& time_system_;
   Libevent::BasePtr& libevent_;
 };
 
-SimulatedTimeSystem::Alarm::~Alarm() {
+SimulatedTimeSystemHelper::Alarm::Alarm::~Alarm() {
   if (armed_) {
     disableTimer();
   }
 }
 
-void SimulatedTimeSystem::Alarm::disableTimer() {
+void SimulatedTimeSystemHelper::Alarm::Alarm::disableTimer() {
   if (armed_) {
     time_system_.removeAlarm(this);
     armed_ = false;
   }
 }
 
-void SimulatedTimeSystem::Alarm::enableTimer(const std::chrono::milliseconds& duration) {
+void SimulatedTimeSystemHelper::Alarm::Alarm::enableTimer(
+    const std::chrono::milliseconds& duration) {
   disableTimer();
   armed_ = true;
   if (duration.count() == 0) {
@@ -125,35 +126,37 @@ static int instance_count = 0;
 // When we initialize our simulated time, we'll start the current time based on
 // the real current time. But thereafter, real-time will not be used, and time
 // will march forward only by calling sleep().
-SimulatedTimeSystem::SimulatedTimeSystem()
+SimulatedTimeSystemHelper::SimulatedTimeSystemHelper()
     : monotonic_time_(MonotonicTime(std::chrono::seconds(0))),
       system_time_(real_time_source_.systemTime()), index_(0), pending_alarms_(0) {
   ++instance_count;
   ASSERT(instance_count <= 1);
 }
 
-SimulatedTimeSystem::~SimulatedTimeSystem() { --instance_count; }
+SimulatedTimeSystemHelper::~SimulatedTimeSystemHelper() { --instance_count; }
 
-SystemTime SimulatedTimeSystem::systemTime() {
+bool SimulatedTimeSystemHelper::hasInstance() { return instance_count > 0; }
+
+SystemTime SimulatedTimeSystemHelper::systemTime() {
   Thread::LockGuard lock(mutex_);
   return system_time_;
 }
 
-MonotonicTime SimulatedTimeSystem::monotonicTime() {
+MonotonicTime SimulatedTimeSystemHelper::monotonicTime() {
   Thread::LockGuard lock(mutex_);
   return monotonic_time_;
 }
 
-void SimulatedTimeSystem::sleep(const Duration& duration) {
+void SimulatedTimeSystemHelper::sleep(const Duration& duration) {
   mutex_.lock();
   MonotonicTime monotonic_time =
       monotonic_time_ + std::chrono::duration_cast<MonotonicTime::duration>(duration);
   setMonotonicTimeAndUnlock(monotonic_time);
 }
 
-Thread::CondVar::WaitStatus SimulatedTimeSystem::waitFor(Thread::MutexBasicLockable& mutex,
-                                                         Thread::CondVar& condvar,
-                                                         const Duration& duration) noexcept {
+Thread::CondVar::WaitStatus SimulatedTimeSystemHelper::waitFor(Thread::MutexBasicLockable& mutex,
+                                                               Thread::CondVar& condvar,
+                                                               const Duration& duration) noexcept {
   const Duration real_time_poll_delay(std::chrono::milliseconds(50));
   const MonotonicTime end_time = monotonicTime() + duration;
 
@@ -187,27 +190,27 @@ Thread::CondVar::WaitStatus SimulatedTimeSystem::waitFor(Thread::MutexBasicLocka
   return Thread::CondVar::WaitStatus::Timeout;
 }
 
-int64_t SimulatedTimeSystem::nextIndex() {
+int64_t SimulatedTimeSystemHelper::nextIndex() {
   Thread::LockGuard lock(mutex_);
   return index_++;
 }
 
-void SimulatedTimeSystem::addAlarm(Alarm* alarm, const std::chrono::milliseconds& duration) {
+void SimulatedTimeSystemHelper::addAlarm(Alarm* alarm, const std::chrono::milliseconds& duration) {
   Thread::LockGuard lock(mutex_);
   alarm->setTime(monotonic_time_ + duration);
   alarms_.insert(alarm);
 }
 
-void SimulatedTimeSystem::removeAlarm(Alarm* alarm) {
+void SimulatedTimeSystemHelper::removeAlarm(Alarm* alarm) {
   Thread::LockGuard lock(mutex_);
   alarms_.erase(alarm);
 }
 
-SchedulerPtr SimulatedTimeSystem::createScheduler(Libevent::BasePtr& libevent) {
+SchedulerPtr SimulatedTimeSystemHelper::createScheduler(Libevent::BasePtr& libevent) {
   return std::make_unique<SimulatedScheduler>(*this, libevent);
 }
 
-void SimulatedTimeSystem::setMonotonicTimeAndUnlock(const MonotonicTime& monotonic_time) {
+void SimulatedTimeSystemHelper::setMonotonicTimeAndUnlock(const MonotonicTime& monotonic_time) {
   // We don't have a convenient LockGuard construct that allows temporarily
   // dropping the lock to run a callback. The main issue here is that we must
   // be careful not to be holding mutex_ when an exception can be thrown.
@@ -243,7 +246,7 @@ void SimulatedTimeSystem::setMonotonicTimeAndUnlock(const MonotonicTime& monoton
   mutex_.unlock();
 }
 
-void SimulatedTimeSystem::setSystemTime(const SystemTime& system_time) {
+void SimulatedTimeSystemHelper::setSystemTime(const SystemTime& system_time) {
   mutex_.lock();
   if (system_time > system_time_) {
     MonotonicTime monotonic_time =

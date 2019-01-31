@@ -6,6 +6,7 @@
 #include "envoy/server/listener_manager.h"
 
 #include "common/network/address_impl.h"
+#include "common/network/io_socket_handle_impl.h"
 #include "common/network/utility.h"
 
 #include "test/test_common/printers.h"
@@ -77,6 +78,9 @@ MockFilter::~MockFilter() {}
 MockListenerCallbacks::MockListenerCallbacks() {}
 MockListenerCallbacks::~MockListenerCallbacks() {}
 
+MockUdpListenerCallbacks::MockUdpListenerCallbacks() {}
+MockUdpListenerCallbacks::~MockUdpListenerCallbacks() {}
+
 MockDrainDecision::MockDrainDecision() {}
 MockDrainDecision::~MockDrainDecision() {}
 
@@ -102,13 +106,16 @@ MockFilterChainFactory::MockFilterChainFactory() {
 }
 MockFilterChainFactory::~MockFilterChainFactory() {}
 
-MockListenSocket::MockListenSocket() : local_address_(new Address::Ipv4Instance(80)) {
+MockListenSocket::MockListenSocket()
+    : io_handle_(std::make_unique<IoSocketHandle>()),
+      local_address_(new Address::Ipv4Instance(80)) {
   ON_CALL(*this, localAddress()).WillByDefault(ReturnRef(local_address_));
   ON_CALL(*this, options()).WillByDefault(ReturnRef(options_));
-  ON_CALL(*this, fd()).WillByDefault(Return(-1));
+  ON_CALL(*this, ioHandle()).WillByDefault(ReturnRef(*io_handle_));
+  ON_CALL(testing::Const(*this), ioHandle()).WillByDefault(ReturnRef(*io_handle_));
 }
 
-MockListenSocket::~MockListenSocket() {}
+MockListenSocket::~MockListenSocket() { io_handle_->close(); }
 
 MockSocketOption::MockSocketOption() {
   ON_CALL(*this, setOption(_, _)).WillByDefault(Return(true));
@@ -117,13 +124,15 @@ MockSocketOption::MockSocketOption() {
 MockSocketOption::~MockSocketOption() {}
 
 MockConnectionSocket::MockConnectionSocket()
-    : local_address_(new Address::Ipv4Instance(80)),
+    : io_handle_(std::make_unique<IoSocketHandle>()), local_address_(new Address::Ipv4Instance(80)),
       remote_address_(new Address::Ipv4Instance(80)) {
   ON_CALL(*this, localAddress()).WillByDefault(ReturnRef(local_address_));
   ON_CALL(*this, remoteAddress()).WillByDefault(ReturnRef(remote_address_));
+  ON_CALL(*this, ioHandle()).WillByDefault(ReturnRef(*io_handle_));
+  ON_CALL(testing::Const(*this), ioHandle()).WillByDefault(ReturnRef(*io_handle_));
 }
 
-MockConnectionSocket::~MockConnectionSocket() {}
+MockConnectionSocket::~MockConnectionSocket() { io_handle_->close(); }
 
 MockListener::MockListener() {}
 MockListener::~MockListener() { onDestroy(); }

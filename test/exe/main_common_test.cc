@@ -145,7 +145,7 @@ TEST_P(MainCommonDeathTest, OutOfMemoryHandler) {
         // so dynamically find a size that is too large.
         const uint64_t initial = 1 << 30;
         for (uint64_t size = initial;
-             size >= initial; // Disallow wraparound to avoid inifinite loops on failure.
+             size >= initial; // Disallow wraparound to avoid infinite loops on failure.
              size *= 1000) {
           new int[size];
         }
@@ -154,9 +154,9 @@ TEST_P(MainCommonDeathTest, OutOfMemoryHandler) {
 #endif
 }
 
-INSTANTIATE_TEST_CASE_P(IpVersions, MainCommonTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, MainCommonTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 class AdminRequestTest : public MainCommonTest {
 protected:
@@ -274,7 +274,8 @@ TEST_P(AdminRequestTest, AdminRequestContentionEnabled) {
   started_.WaitForNotification();
 
   // Induce contention to guarantee a non-zero num_contentions count.
-  Thread::TestUtil::ContentionGenerator::generateContention(MutexTracerImpl::getOrCreateTracer());
+  Thread::TestUtil::ContentionGenerator contention_generator;
+  contention_generator.generateContention(MutexTracerImpl::getOrCreateTracer());
 
   std::string response = adminRequest("/contention", "GET");
   EXPECT_THAT(response, Not(HasSubstr("not enabled")));
@@ -378,8 +379,8 @@ TEST_P(MainCommonTest, ConstructDestructLogger) {
   Logger::Registry::getSink()->log(log_msg);
 }
 
-INSTANTIATE_TEST_CASE_P(IpVersions, AdminRequestTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, AdminRequestTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 } // namespace Envoy

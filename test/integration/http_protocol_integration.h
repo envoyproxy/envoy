@@ -18,7 +18,7 @@ struct HttpProtocolTestParams {
 //
 // typedef HttpProtocolIntegrationTest MyTest
 //
-// INSTANTIATE_TEST_CASE_P(Protocols, BufferIntegrationTest,
+// INSTANTIATE_TEST_SUITE_P(Protocols, BufferIntegrationTest,
 //                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
 //                         HttpProtocolIntegrationTest::protocolTestParamsToString);
 //
@@ -36,7 +36,7 @@ public:
   // [HTTP upstream  / HTTP2 downstream] x [IPv4, Ipv6]
   //
   // Upstream and downstream protocols may be changed via the input vectors.
-  // Address combinations are propogated from TestEnvironment::getIpVersionsForTest()
+  // Address combinations are propagated from TestEnvironment::getIpVersionsForTest()
   static std::vector<HttpProtocolTestParams>
   getProtocolTestParams(const std::vector<Http::CodecClient::Type>& downstream_protocols =
                             {Http::CodecClient::Type::HTTP1, Http::CodecClient::Type::HTTP2},

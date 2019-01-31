@@ -69,7 +69,7 @@ void ValidationInstance::initialize(Options& options,
   // be ready to serve, then the config has passed validation.
   // Handle configuration that needs to take place prior to the main configuration load.
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
-  InstanceUtil::loadBootstrapConfig(bootstrap, options);
+  InstanceUtil::loadBootstrapConfig(bootstrap, options, api());
 
   Config::Utility::createTagProducer(bootstrap);
 
@@ -81,7 +81,7 @@ void ValidationInstance::initialize(Options& options,
 
   Configuration::InitialImpl initial_config(bootstrap);
   overload_manager_ = std::make_unique<OverloadManagerImpl>(dispatcher(), stats(), threadLocal(),
-                                                            bootstrap.overload_manager());
+                                                            bootstrap.overload_manager(), api());
   listener_manager_ = std::make_unique<ListenerManagerImpl>(*this, *this, *this, time_system_);
   thread_local_.registerThread(*dispatcher_, true);
   runtime_loader_ = component_factory.createRuntime(*this, initial_config);
@@ -89,8 +89,9 @@ void ValidationInstance::initialize(Options& options,
   ssl_context_manager_ =
       std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(time_system_);
   cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
-      runtime(), stats(), threadLocal(), random(), dnsResolver(), sslContextManager(), dispatcher(),
-      localInfo(), *secret_manager_, api(), http_context_);
+      admin(), runtime(), stats(), threadLocal(), random(), dnsResolver(), sslContextManager(),
+      dispatcher(), localInfo(), *secret_manager_, api(), http_context_, accessLogManager(),
+      singletonManager());
   config_.initialize(bootstrap, *this, *cluster_manager_factory_);
   http_context_.setTracer(config_.httpTracer());
   clusterManager().setInitializedCb(

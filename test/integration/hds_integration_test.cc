@@ -229,9 +229,9 @@ public:
   envoy::service::discovery::v2::HealthCheckSpecifier server_health_check_specifier_;
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, HdsIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, HdsIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 // Tests Envoy HTTP health checking a single healthy endpoint and reporting that it is
 // indeed healthy to the server.
@@ -294,7 +294,7 @@ TEST_P(HdsIntegrationTest, SingleEndpointTimeoutHttp) {
   // Envoy sends a health check message to an endpoint
   healthcheckEndpoints();
 
-  // Endpoint doesn't repond to the health check
+  // Endpoint doesn't respond to the health check
 
   // Receive updates until the one we expect arrives
   waitForEndpointHealthResponse(envoy::api::v2::core::HealthStatus::TIMEOUT);
@@ -469,7 +469,7 @@ TEST_P(HdsIntegrationTest, TwoEndpointsSameLocality) {
 
   healthcheckEndpoints("anna");
 
-  // Endpoints repond to the health check
+  // Endpoints respond to the health check
   host_stream_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "404"}}, false);
   host_stream_->encodeData(1024, true);
   host2_stream_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);

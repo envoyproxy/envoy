@@ -30,9 +30,7 @@ class LoadStatsReporterTest : public testing::Test {
 public:
   LoadStatsReporterTest()
       : retry_timer_(new Event::MockTimer()), response_timer_(new Event::MockTimer()),
-        async_client_(new Grpc::MockAsyncClient()) {
-    dispatcher_.setTimeSystem(time_system_);
-  }
+        async_client_(new Grpc::MockAsyncClient()) {}
 
   void createLoadStatsReporter() {
     InSequence s;
@@ -68,6 +66,7 @@ public:
     load_stats_reporter_->onReceiveMessage(std::move(response));
   }
 
+  Event::SimulatedTimeSystem time_system_;
   NiceMock<Upstream::MockClusterManager> cm_;
   Event::MockDispatcher dispatcher_;
   Stats::IsolatedStoreImpl stats_store_;
@@ -78,7 +77,6 @@ public:
   Event::TimerCb response_timer_cb_;
   Grpc::MockAsyncStream async_stream_;
   Grpc::MockAsyncClient* async_client_;
-  Event::SimulatedTimeSystem time_system_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
 };
 
