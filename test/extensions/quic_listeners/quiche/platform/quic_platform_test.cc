@@ -4,6 +4,7 @@
 #include "quiche/quic/platform/api/quic_containers.h"
 #include "quiche/quic/platform/api/quic_endian.h"
 #include "quiche/quic/platform/api/quic_estimate_memory_usage.h"
+#include "quiche/quic/platform/api/quic_map_util.h"
 #include "quiche/quic/platform/api/quic_ptr_util.h"
 #include "quiche/quic/platform/api/quic_string.h"
 #include "quiche/quic/platform/api/quic_string_piece.h"
@@ -66,6 +67,24 @@ TEST(QuicPlatformTest, QuicEstimateMemoryUsage) {
   quic::QuicString s = "foo";
   // Stubbed out to always return 0.
   EXPECT_EQ(0, quic::QuicEstimateMemoryUsage(s));
+}
+
+TEST(QuicPlatformTest, QuicMapUtil) {
+  std::map<std::string, int> stdmap = {{"one", 1}, {"two", 2}, {"three", 3}};
+  EXPECT_TRUE(quic::QuicContainsKey(stdmap, "one"));
+  EXPECT_FALSE(quic::QuicContainsKey(stdmap, "zero"));
+
+  quic::QuicUnorderedMap<int, int> umap = {{1, 1}, {2, 4}, {3, 9}};
+  EXPECT_TRUE(quic::QuicContainsKey(umap, 2));
+  EXPECT_FALSE(quic::QuicContainsKey(umap, 10));
+
+  quic::QuicUnorderedSet<quic::QuicString> uset({"foo", "bar"});
+  EXPECT_TRUE(quic::QuicContainsKey(uset, "foo"));
+  EXPECT_FALSE(quic::QuicContainsKey(uset, "abc"));
+
+  std::vector<int> stdvec = {1, 2, 3};
+  EXPECT_TRUE(quic::QuicContainsValue(stdvec, 1));
+  EXPECT_FALSE(quic::QuicContainsValue(stdvec, 0));
 }
 
 TEST(QuicPlatformTest, QuicString) {
