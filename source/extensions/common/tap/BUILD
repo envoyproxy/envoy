@@ -51,3 +51,14 @@ envoy_cc_library(
         "@envoy_api//envoy/admin/v2alpha:tap_cc",
     ],
 )
+
+envoy_cc_library(
+    name = "extension_config_base",
+    srcs = ["extension_config_base.cc"],
+    hdrs = ["extension_config_base.h"],
+    deps = [
+        "//include/envoy/thread_local:thread_local_interface",
+        "//source/extensions/common/tap:admin",
+        "@envoy_api//envoy/config/common/tap/v2alpha:common_cc",
+    ],
+)

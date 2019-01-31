@@ -117,7 +117,6 @@ public:
   virtual void closeSocket(Network::ConnectionEvent event) PURE;
 
   /**
-   *
    * @param buffer supplies the buffer to read to.
    * @return IoResult the result of the read action.
    */

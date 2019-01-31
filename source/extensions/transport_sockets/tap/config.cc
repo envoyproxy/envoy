@@ -8,11 +8,28 @@
 #include "common/protobuf/utility.h"
 
 #include "extensions/transport_sockets/tap/tap.h"
+#include "extensions/transport_sockets/tap/tap_config_impl.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
 namespace Tap {
+
+class SocketTapConfigFactoryImpl : public Extensions::Common::Tap::TapConfigFactory {
+public:
+  SocketTapConfigFactoryImpl(Event::TimeSystem& time_system) : time_system_(time_system) {}
+
+  // TapConfigFactory
+  Extensions::Common::Tap::TapConfigSharedPtr
+  createConfigFromProto(envoy::service::tap::v2alpha::TapConfig&& proto_config,
+                        Extensions::Common::Tap::Sink* admin_streamer) override {
+    return std::make_shared<SocketTapConfigImpl>(std::move(proto_config), admin_streamer,
+                                                 time_system_);
+  }
+
+private:
+  Event::TimeSystem& time_system_;
+};
 
 Network::TransportSocketFactoryPtr UpstreamTapSocketConfigFactory::createTransportSocketFactory(
     const Protobuf::Message& message,
@@ -28,8 +45,9 @@ Network::TransportSocketFactoryPtr UpstreamTapSocketConfigFactory::createTranspo
   auto inner_transport_factory =
       inner_config_factory.createTransportSocketFactory(*inner_factory_config, context);
   return std::make_unique<TapSocketFactory>(
-      outer_config.file_sink().path_prefix(), outer_config.file_sink().format(),
-      std::move(inner_transport_factory), context.dispatcher().timeSystem());
+      outer_config, std::make_unique<SocketTapConfigFactoryImpl>(context.dispatcher().timeSystem()),
+      context.admin(), context.singletonManager(), context.threadLocal(), context.dispatcher(),
+      std::move(inner_transport_factory));
 }
 
 Network::TransportSocketFactoryPtr DownstreamTapSocketConfigFactory::createTransportSocketFactory(
@@ -46,8 +64,9 @@ Network::TransportSocketFactoryPtr DownstreamTapSocketConfigFactory::createTrans
   auto inner_transport_factory = inner_config_factory.createTransportSocketFactory(
       *inner_factory_config, context, server_names);
   return std::make_unique<TapSocketFactory>(
-      outer_config.file_sink().path_prefix(), outer_config.file_sink().format(),
-      std::move(inner_transport_factory), context.dispatcher().timeSystem());
+      outer_config, std::make_unique<SocketTapConfigFactoryImpl>(context.dispatcher().timeSystem()),
+      context.admin(), context.singletonManager(), context.threadLocal(), context.dispatcher(),
+      std::move(inner_transport_factory));
 }
 
 ProtobufTypes::MessagePtr TapSocketConfigFactory::createEmptyConfigProto() {
