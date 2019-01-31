@@ -126,7 +126,7 @@ void MessageUtil::checkForDeprecation(const Protobuf::Message& message, bool war
           "details.",
           field->full_name());
       if (warn_only) {
-        ENVOY_LOG_MISC(warn, "{}", err);
+        ENVOY_LOG(warn, "{}", err);
       } else {
         throw ProtoValidationException(err, message);
       }

@@ -138,7 +138,7 @@ public:
 
 enum class ProtoUnknownFieldsMode { Strict, Allow };
 
-class MessageUtil {
+class MessageUtil : public Logger::Loggable<Logger::Id::config> {
 public:
   // std::hash
   std::size_t operator()(const Protobuf::Message& message) const { return hash(message); }
