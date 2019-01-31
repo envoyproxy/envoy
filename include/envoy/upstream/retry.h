@@ -23,7 +23,7 @@ public:
    * @param priority_set current priority set of cluster.
    * @param original_priority_load the unmodified HealthAndDegradedLoad.
    * @return HealthAndDegradedLoad load that should be used for the next retry. Return
-   * original_priority_load if the original load should be used. a pointer to riginal_priority,
+   * original_priority_load if the original load should be used. a pointer to original_priority,
    * original_degraded_priority if no changes should be made.
    */
   virtual const HealthyAndDegradedLoad&

@@ -171,7 +171,7 @@ bool InstanceImpl::healthCheckFailed() { return server_stats_->live_.value() == 
 
 InstanceUtil::BootstrapVersion
 InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& bootstrap,
-                                  const Options& options) {
+                                  const Options& options, Api::Api& api) {
   const std::string& config_path = options.configPath();
   const std::string& config_yaml = options.configYaml();
 
@@ -183,7 +183,7 @@ InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& boots
   }
 
   if (!config_path.empty()) {
-    MessageUtil::loadFromFile(config_path, bootstrap);
+    MessageUtil::loadFromFile(config_path, bootstrap, api);
   }
   if (!config_yaml.empty()) {
     envoy::config::bootstrap::v2::Bootstrap bootstrap_override;
@@ -224,7 +224,7 @@ void InstanceImpl::initialize(const Options& options,
                 Configuration::UpstreamTransportSocketConfigFactory>::allFactoryNames());
 
   // Handle configuration that needs to take place prior to the main configuration load.
-  InstanceUtil::loadBootstrapConfig(bootstrap_, options);
+  InstanceUtil::loadBootstrapConfig(bootstrap_, options, api());
   bootstrap_config_update_time_ = time_system_.systemTime();
 
   // Needs to happen as early as possible in the instantiation to preempt the objects that require
@@ -285,7 +285,7 @@ void InstanceImpl::initialize(const Options& options,
 
   // Initialize the overload manager early so other modules can register for actions.
   overload_manager_ = std::make_unique<OverloadManagerImpl>(dispatcher(), stats(), threadLocal(),
-                                                            bootstrap_.overload_manager());
+                                                            bootstrap_.overload_manager(), api());
 
   // Workers get created first so they register for thread local updates.
   listener_manager_ = std::make_unique<ListenerManagerImpl>(*this, listener_component_factory_,
@@ -307,8 +307,9 @@ void InstanceImpl::initialize(const Options& options,
       std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(time_system_);
 
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
-      runtime(), stats(), threadLocal(), random(), dnsResolver(), sslContextManager(), dispatcher(),
-      localInfo(), secretManager(), api(), http_context_);
+      admin(), runtime(), stats(), threadLocal(), random(), dnsResolver(), sslContextManager(),
+      dispatcher(), localInfo(), secretManager(), api(), http_context_, accessLogManager(),
+      singletonManager());
 
   // Now the configuration gets parsed. The configuration may start setting
   // thread local data per above. See MainImpl::initialize() for why ConfigImpl
@@ -332,7 +333,8 @@ void InstanceImpl::initialize(const Options& options,
         Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, hds_config, stats())
             ->create(),
         dispatcher(), runtime(), stats(), sslContextManager(), random(), info_factory_,
-        access_log_manager_, clusterManager(), localInfo());
+        access_log_manager_, clusterManager(), localInfo(), admin(), singletonManager(),
+        threadLocal(), api());
   }
 
   for (Stats::SinkPtr& sink : config_.statsSinks()) {
@@ -370,7 +372,8 @@ Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,
 
     return std::make_unique<Runtime::DiskBackedLoaderImpl>(
         server.dispatcher(), server.threadLocal(), config.runtime()->symlinkRoot(),
-        config.runtime()->subdirectory(), override_subdirectory, server.stats(), server.random());
+        config.runtime()->subdirectory(), override_subdirectory, server.stats(), server.random(),
+        server.api());
   } else {
     return std::make_unique<Runtime::LoaderImpl>(server.random(), server.stats(),
                                                  server.threadLocal());
@@ -383,7 +386,7 @@ void InstanceImpl::loadServerFlags(const absl::optional<std::string>& flags_path
   }
 
   ENVOY_LOG(info, "server flags path: {}", flags_path.value());
-  if (api_->fileExists(flags_path.value() + "/drain")) {
+  if (api_->fileSystem().fileExists(flags_path.value() + "/drain")) {
     ENVOY_LOG(info, "starting server in drain mode");
     failHealthcheck(true);
   }
@@ -418,6 +421,9 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
     });
   }
 
+  // Start overload manager before workers.
+  overload_manager.start();
+
   // Register for cluster manager init notification. We don't start serving worker traffic until
   // upstream clusters are initialized which may involve running the event loop. Note however that
   // this can fire immediately if all clusters have already initialized. Also note that we need
@@ -435,7 +441,7 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
 
     ENVOY_LOG(info, "all clusters initialized. initializing init manager");
 
-    // Note: the lamda below should not capture "this" since the RunHelper object may
+    // Note: the lambda below should not capture "this" since the RunHelper object may
     // have been destructed by the time it gets executed.
     init_manager.initialize([&instance, workers_start_cb]() {
       if (instance.isShutdown()) {
@@ -449,8 +455,6 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
     // as we've subscribed to all the statically defined RDS resources.
     cm.adsMux().resume(Config::TypeUrl::get().RouteConfiguration);
   });
-
-  overload_manager.start();
 }
 
 void InstanceImpl::run() {

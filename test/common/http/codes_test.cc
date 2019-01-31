@@ -256,7 +256,7 @@ TEST_F(CodeStatsTest, StripTrailingDot) {
 TEST_F(CodeStatsTest, Join) {
   EXPECT_EQ("hello.world", join({"hello", "world"}));
   EXPECT_EQ("hello.world", join({"", "hello", "world"})); // leading empty token ignored.
-  EXPECT_EQ("hello.", join({"hello", ""}));               // trailign empty token not ignored.
+  EXPECT_EQ("hello.", join({"hello", ""}));               // trailing empty token not ignored.
   EXPECT_EQ("hello", join({"hello"}));
   EXPECT_EQ("", join({""}));
 }

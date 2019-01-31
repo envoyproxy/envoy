@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/api.h"
 #include "envoy/api/v2/cds.pb.h"
 #include "envoy/api/v2/core/base.pb.h"
 #include "envoy/api/v2/core/protocol.pb.h"
@@ -57,7 +58,7 @@ public:
   //
   // By default, this runs with an L7 proxy config, but config can be set to TCP_PROXY_CONFIG
   // to test L4 proxying.
-  ConfigHelper(const Network::Address::IpVersion version,
+  ConfigHelper(const Network::Address::IpVersion version, Api::Api& api,
                const std::string& config = HTTP_PROXY_CONFIG);
 
   static void initializeTls(const ServerSslOptions& options,
@@ -145,7 +146,7 @@ private:
   // Load the first HCM struct from the first listener into a parsed proto.
   bool loadHttpConnectionManager(
       envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm);
-  // Stick the contents of the procided HCM proto and stuff them into the first HCM
+  // Take the contents of the provided HCM proto and stuff them into the first HCM
   // struct of the first listener.
   void storeHttpConnectionManager(
       const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
@@ -154,10 +155,10 @@ private:
   // Finds the filter named 'name' from the first filter chain from the first listener.
   envoy::api::v2::listener::Filter* getFilterFromListener(const std::string& name);
 
-  // Configure a capture transport socket for a cluster/filter chain.
-  void setCaptureTransportSocket(const std::string& capture_path, const std::string& type,
-                                 envoy::api::v2::core::TransportSocket& transport_socket,
-                                 const absl::optional<ProtobufWkt::Struct>& tls_config);
+  // Configure a tap transport socket for a cluster/filter chain.
+  void setTapTransportSocket(const std::string& tap_path, const std::string& type,
+                             envoy::api::v2::core::TransportSocket& transport_socket,
+                             const absl::optional<ProtobufWkt::Struct>& tls_config);
 
   // The bootstrap proto Envoy will start up with.
   envoy::config::bootstrap::v2::Bootstrap bootstrap_;

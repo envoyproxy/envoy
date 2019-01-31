@@ -39,7 +39,7 @@
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/mocks.h"
-#include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_time_system.h"
 
 #include "absl/strings/string_view.h"
 #include "gmock/gmock.h"
@@ -355,7 +355,7 @@ public:
   MOCK_METHOD0(localInfo, const LocalInfo::LocalInfo&());
   MOCK_CONST_METHOD0(statsFlushInterval, std::chrono::milliseconds());
 
-  Event::TestTimeSystem& timeSystem() override { return test_time_.timeSystem(); }
+  Event::TestTimeSystem& timeSystem() override { return time_system_; }
 
   std::unique_ptr<Secret::SecretManager> secret_manager_;
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
@@ -364,7 +364,7 @@ public:
       new testing::NiceMock<Network::MockDnsResolver>()};
   testing::NiceMock<Api::MockApi> api_;
   testing::NiceMock<MockAdmin> admin_;
-  DangerousDeprecatedTestTime test_time_;
+  Event::GlobalTimeSystem time_system_;
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
   Thread::MutexBasicLockable access_log_lock_;
   testing::NiceMock<Runtime::MockLoader> runtime_loader_;
@@ -429,8 +429,9 @@ public:
   MOCK_CONST_METHOD0(localInfo, const LocalInfo::LocalInfo&());
   MOCK_CONST_METHOD0(listenerMetadata, const envoy::api::v2::core::Metadata&());
   MOCK_METHOD0(timeSource, TimeSource&());
-  Event::SimulatedTimeSystem& timeSystem() { return time_system_; }
+  Event::TestTimeSystem& timeSystem() { return time_system_; }
   Http::Context& httpContext() override { return http_context_; }
+  MOCK_METHOD0(api, Api::Api&());
 
   testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
@@ -446,10 +447,11 @@ public:
   Singleton::ManagerPtr singleton_manager_;
   testing::NiceMock<MockAdmin> admin_;
   Stats::IsolatedStoreImpl listener_scope_;
-  Event::SimulatedTimeSystem time_system_;
+  Event::GlobalTimeSystem time_system_;
   testing::NiceMock<MockOverloadManager> overload_manager_;
   Tracing::HttpNullTracer null_tracer_;
   Http::ContextImpl http_context_;
+  testing::NiceMock<Api::MockApi> api_;
 };
 
 class MockTransportSocketFactoryContext : public TransportSocketFactoryContext {
@@ -459,6 +461,7 @@ public:
 
   Secret::SecretManager& secretManager() override { return *(secret_manager_.get()); }
 
+  MOCK_METHOD0(admin, Server::Admin&());
   MOCK_METHOD0(sslContextManager, Ssl::ContextManager&());
   MOCK_CONST_METHOD0(statsScope, Stats::Scope&());
   MOCK_METHOD0(clusterManager, Upstream::ClusterManager&());
@@ -468,8 +471,12 @@ public:
   MOCK_METHOD0(stats, Stats::Store&());
   MOCK_METHOD1(setInitManager, void(Init::Manager&));
   MOCK_METHOD0(initManager, Init::Manager*());
+  MOCK_METHOD0(singletonManager, Singleton::Manager&());
+  MOCK_METHOD0(threadLocal, ThreadLocal::SlotAllocator&());
+  MOCK_METHOD0(api, Api::Api&());
 
   std::unique_ptr<Secret::SecretManager> secret_manager_;
+  testing::NiceMock<Api::MockApi> api_;
 };
 
 class MockListenerFactoryContext : public MockFactoryContext, public ListenerFactoryContext {

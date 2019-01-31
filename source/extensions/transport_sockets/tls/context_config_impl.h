@@ -46,10 +46,10 @@ public:
 
   bool isReady() const override {
     const bool tls_is_ready =
-        (tls_certficate_providers_.empty() || !tls_certificate_configs_.empty());
+        (tls_certificate_providers_.empty() || !tls_certificate_configs_.empty());
     const bool combined_cvc_is_ready =
         (default_cvc_ == nullptr || validation_context_config_ != nullptr);
-    const bool cvc_is_ready = (certficate_validation_context_provider_ == nullptr ||
+    const bool cvc_is_ready = (certificate_validation_context_provider_ == nullptr ||
                                default_cvc_ != nullptr || validation_context_config_ != nullptr);
     return tls_is_ready && combined_cvc_is_ready && cvc_is_ready;
   }
@@ -65,6 +65,7 @@ protected:
                     const unsigned default_max_protocol_version,
                     const std::string& default_cipher_suites, const std::string& default_curves,
                     Server::Configuration::TransportSocketFactoryContext& factory_context);
+  Api::Api& api_;
 
 private:
   static unsigned
@@ -81,12 +82,12 @@ private:
   // holds a copy of CombinedCertificateValidationContext::default_validation_context.
   // Otherwise, default_cvc_ is nullptr.
   std::unique_ptr<envoy::api::v2::auth::CertificateValidationContext> default_cvc_;
-  std::vector<Secret::TlsCertificateConfigProviderSharedPtr> tls_certficate_providers_;
-  // Handle for TLS certificate dyanmic secret callback.
+  std::vector<Secret::TlsCertificateConfigProviderSharedPtr> tls_certificate_providers_;
+  // Handle for TLS certificate dynamic secret callback.
   Common::CallbackHandle* tc_update_callback_handle_{};
   Secret::CertificateValidationContextConfigProviderSharedPtr
-      certficate_validation_context_provider_;
-  // Handle for certificate validation context dyanmic secret callback.
+      certificate_validation_context_provider_;
+  // Handle for certificate validation context dynamic secret callback.
   Common::CallbackHandle* cvc_update_callback_handle_{};
   Common::CallbackHandle* cvc_validation_callback_handle_{};
   const unsigned min_protocol_version_;

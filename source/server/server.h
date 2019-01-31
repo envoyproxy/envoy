@@ -107,10 +107,11 @@ public:
    * @param bootstrap supplies the bootstrap to fill.
    * @param config_path supplies the config path.
    * @param v2_only supplies whether to attempt v1 fallback.
+   * @param api reference to the Api object
    * @return BootstrapVersion to indicate which version of the API was parsed.
    */
   static BootstrapVersion loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& bootstrap,
-                                              const Options& options);
+                                              const Options& options, Api::Api& api);
 };
 
 /**
@@ -132,7 +133,7 @@ private:
 };
 
 /**
- * This is the actual full standalone server which stiches together various common components.
+ * This is the actual full standalone server which stitches together various common components.
  */
 class InstanceImpl : Logger::Loggable<Logger::Id::main>, public Instance {
 public:

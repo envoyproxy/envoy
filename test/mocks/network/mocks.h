@@ -117,6 +117,24 @@ public:
   MOCK_METHOD1(onNewConnection_, void(ConnectionPtr& conn));
 };
 
+class MockUdpListenerCallbacks : public UdpListenerCallbacks {
+public:
+  MockUdpListenerCallbacks();
+  ~MockUdpListenerCallbacks();
+
+  void onData(const UdpData& data) override { onData_(data); }
+
+  void onWriteReady(const Socket& socket) override { onWriteReady_(socket); }
+
+  void onError(const ErrorCode& err_code, int err) override { onError_(err_code, err); }
+
+  MOCK_METHOD1(onData_, void(const UdpData& data));
+
+  MOCK_METHOD1(onWriteReady_, void(const Socket& socket));
+
+  MOCK_METHOD2(onError_, void(const ErrorCode& err_code, int err));
+};
+
 class MockDrainDecision : public DrainDecision {
 public:
   MockDrainDecision();
@@ -183,13 +201,15 @@ public:
 
   MOCK_CONST_METHOD0(localAddress, const Address::InstanceConstSharedPtr&());
   MOCK_METHOD1(setLocalAddress, void(const Address::InstanceConstSharedPtr&));
-  MOCK_CONST_METHOD0(fd, int());
+  MOCK_METHOD0(ioHandle, IoHandle&());
+  MOCK_CONST_METHOD0(ioHandle, const IoHandle&());
   MOCK_CONST_METHOD0(socketType, Address::SocketType());
   MOCK_METHOD0(close, void());
   MOCK_METHOD1(addOption_, void(const Socket::OptionConstSharedPtr& option));
   MOCK_METHOD1(addOptions_, void(const Socket::OptionsSharedPtr& options));
   MOCK_CONST_METHOD0(options, const OptionsSharedPtr&());
 
+  IoHandlePtr io_handle_;
   Address::InstanceConstSharedPtr local_address_;
   OptionsSharedPtr options_;
 };
@@ -230,10 +250,12 @@ public:
   MOCK_METHOD1(addOption_, void(const Socket::OptionConstSharedPtr&));
   MOCK_METHOD1(addOptions_, void(const Socket::OptionsSharedPtr&));
   MOCK_CONST_METHOD0(options, const Network::ConnectionSocket::OptionsSharedPtr&());
-  MOCK_CONST_METHOD0(fd, int());
+  MOCK_METHOD0(ioHandle, IoHandle&());
+  MOCK_CONST_METHOD0(ioHandle, const IoHandle&());
   MOCK_CONST_METHOD0(socketType, Address::SocketType());
   MOCK_METHOD0(close, void());
 
+  IoHandlePtr io_handle_;
   Address::InstanceConstSharedPtr local_address_;
   Address::InstanceConstSharedPtr remote_address_;
 };
@@ -291,6 +313,7 @@ public:
 
   MOCK_METHOD0(numConnections, uint64_t());
   MOCK_METHOD1(addListener, void(ListenerConfig& config));
+  MOCK_METHOD1(addUdpListener, void(ListenerConfig& config));
   MOCK_METHOD1(findListenerByAddress,
                Network::Listener*(const Network::Address::Instance& address));
   MOCK_METHOD1(removeListeners, void(uint64_t listener_tag));
@@ -327,7 +350,7 @@ public:
   MOCK_CONST_METHOD1(bind, Api::SysCallIntResult(int));
   MOCK_CONST_METHOD1(connect, Api::SysCallIntResult(int));
   MOCK_CONST_METHOD0(ip, Address::Ip*());
-  MOCK_CONST_METHOD1(socket, int(Address::SocketType));
+  MOCK_CONST_METHOD1(socket, IoHandlePtr(Address::SocketType));
   MOCK_CONST_METHOD0(type, Address::Type());
 
   const std::string& asString() const override { return physical_; }
@@ -368,7 +391,8 @@ public:
   MockTransportSocketCallbacks();
   ~MockTransportSocketCallbacks();
 
-  MOCK_CONST_METHOD0(fd, int());
+  MOCK_METHOD0(ioHandle, IoHandle&());
+  MOCK_CONST_METHOD0(ioHandle, const IoHandle&());
   MOCK_METHOD0(connection, Connection&());
   MOCK_METHOD0(shouldDrainReadBuffer, bool());
   MOCK_METHOD0(setReadBufferReady, void());

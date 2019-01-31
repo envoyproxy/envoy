@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package envoy.data.tap.v2alpha;
+option java_package = "io.envoyproxy.envoy.data.tap.v2alpha";
+
+import "envoy/api/v2/core/base.proto";
+
+// [#protodoc-title: HTTP tap data]
+
+// A fully buffered HTTP trace message.
+message HttpBufferedTrace {
+  // Request headers.
+  repeated api.v2.core.HeaderValue request_headers = 2;
+
+  // Response headers.
+  repeated api.v2.core.HeaderValue response_headers = 3;
+}
