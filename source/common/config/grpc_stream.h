@@ -46,6 +46,7 @@ public:
 
   void queueDiscoveryRequest(const RequestQueueItem& queue_item) {
     request_queue_.push(queue_item);
+    control_plane_stats_.pending_requests_.inc();
     drainRequests();
   }
 
@@ -64,13 +65,12 @@ public:
 
   bool grpcStreamAvailable() const { return stream_ != nullptr; }
 
-  bool checkRateLimitAllowsDrain(int queue_size) {
+  bool checkRateLimitAllowsDrain() {
     if (!rate_limiting_enabled_ || limit_request_->consume()) {
       return true;
     }
     ASSERT(drain_request_timer_ != nullptr);
     control_plane_stats_.rate_limit_enforced_.inc();
-    control_plane_stats_.pending_requests_.set(queue_size);
     // Enable the drain request timer.
     drain_request_timer_->enableTimer(
         std::chrono::milliseconds(limit_request_->nextTokenAvailableMs()));
@@ -109,10 +109,11 @@ public:
 private:
   void drainRequests() {
     ENVOY_LOG(trace, "draining discovery requests {}", request_queue_.size());
-    while (!request_queue_.empty() && checkRateLimitAllowsDrain(request_queue_.size())) {
+    while (!request_queue_.empty() && checkRateLimitAllowsDrain()) {
       // Process the request, if rate limiting is not enabled at all or if it is under rate limit.
       sendDiscoveryRequest(request_queue_.front());
       request_queue_.pop();
+      control_plane_stats_.pending_requests_.dec();
     }
   }
 

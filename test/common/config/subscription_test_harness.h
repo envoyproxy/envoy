@@ -58,8 +58,9 @@ public:
     EXPECT_EQ(version, stats_.version_.value());
   }
 
-  virtual void verifyControlPlaneStats(uint32_t connected_state) {
+  virtual void verifyControlPlaneStats(uint32_t connected_state, uint32_t pending_requests) {
     EXPECT_EQ(connected_state, stats_store_.gauge("control_plane.connected_state").value());
+    EXPECT_EQ(pending_requests, stats_store_.gauge("control_plane.pending_requests").value());
   }
 
   Stats::IsolatedStoreImpl stats_store_;
