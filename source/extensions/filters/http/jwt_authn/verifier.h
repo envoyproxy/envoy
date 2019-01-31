@@ -11,7 +11,7 @@ class Verifier;
 typedef std::unique_ptr<const Verifier> VerifierConstPtr;
 
 /**
- * Supports verification of JWTs with configured requirments.
+ * Supports verification of JWTs with configured requirements.
  */
 class Verifier {
 public:
@@ -60,7 +60,7 @@ public:
     virtual Callbacks* callback() const PURE;
 
     /**
-     * Cancel any pending reuqets for this context.
+     * Cancel any pending requests for this context.
      */
     virtual void cancel() PURE;
   };

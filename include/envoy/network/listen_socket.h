@@ -41,12 +41,12 @@ public:
   virtual void setLocalAddress(const Address::InstanceConstSharedPtr& local_address) PURE;
 
   /**
-   * @return IoHandle for the underlying connnection
+   * @return IoHandle for the underlying connection
    */
   virtual IoHandle& ioHandle() PURE;
 
   /**
-   * @return const IoHandle for the underlying connnection
+   * @return const IoHandle for the underlying connection
    */
   virtual const IoHandle& ioHandle() const PURE;
 

@@ -30,10 +30,8 @@ public:
   MockDispatcher();
   ~MockDispatcher();
 
-  void setTimeSystem(TimeSystem& time_system) { time_system_ = &time_system; }
-
   // Dispatcher
-  TimeSystem& timeSystem() override { return *time_system_; }
+  TimeSystem& timeSystem() override { return time_system_; }
   Network::ConnectionPtr
   createServerConnection(Network::ConnectionSocketPtr&& socket,
                          Network::TransportSocketPtr&& transport_socket) override {
@@ -63,6 +61,11 @@ public:
                                       bool hand_off_restored_destination_connections) override {
     return Network::ListenerPtr{
         createListener_(socket, cb, bind_to_port, hand_off_restored_destination_connections)};
+  }
+
+  Network::ListenerPtr createUdpListener(Network::Socket& socket,
+                                         Network::UdpListenerCallbacks& cb) override {
+    return Network::ListenerPtr{createUdpListener_(socket, cb)};
   }
 
   Event::TimerPtr createTimer(Event::TimerCb cb) override {
@@ -101,6 +104,8 @@ public:
                Network::Listener*(Network::Socket& socket, Network::ListenerCallbacks& cb,
                                   bool bind_to_port,
                                   bool hand_off_restored_destination_connections));
+  MOCK_METHOD2(createUdpListener_,
+               Network::Listener*(Network::Socket& socket, Network::UdpListenerCallbacks& cb));
   MOCK_METHOD1(createTimer_, Timer*(Event::TimerCb cb));
   MOCK_METHOD1(deferredDelete_, void(DeferredDeletable* to_delete));
   MOCK_METHOD0(exit, void());
@@ -109,10 +114,7 @@ public:
   MOCK_METHOD1(run, void(RunType type));
   Buffer::WatermarkFactory& getWatermarkFactory() override { return buffer_factory_; }
 
-  // TODO(jmarantz): Switch these to using mock-time.
-  DangerousDeprecatedTestTime test_time_;
-  TimeSystem* time_system_;
-
+  GlobalTimeSystem time_system_;
   std::list<DeferredDeletablePtr> to_delete_;
   MockBufferFactory buffer_factory_;
 };

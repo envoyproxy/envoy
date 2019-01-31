@@ -1,6 +1,7 @@
 syntax = "proto3";
 
 import "envoy/data/tap/v2alpha/http.proto";
+import "envoy/data/tap/v2alpha/transport.proto";
 
 import "validate/validate.proto";
 
@@ -17,5 +18,8 @@ message BufferedTraceWrapper {
 
     // An HTTP buffered tap trace.
     HttpBufferedTrace http_buffered_trace = 1;
+
+    // A buffered socket tap trace.
+    SocketTrace socket_buffered_trace = 2;
   }
 }

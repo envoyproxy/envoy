@@ -3,7 +3,6 @@
 #include <string>
 
 #include "common/config/filter_json.h"
-#include "common/filesystem/filesystem_impl.h"
 #include "common/http/message_impl.h"
 #include "common/network/address_impl.h"
 
@@ -57,9 +56,10 @@ TEST(ClientSslAuthConfigTest, BadClientSslAuthConfig) {
 }
 
 class ClientSslAuthFilterTest : public testing::Test {
-public:
+protected:
   ClientSslAuthFilterTest()
-      : request_(&cm_.async_client_), interval_timer_(new Event::MockTimer(&dispatcher_)) {}
+      : request_(&cm_.async_client_), interval_timer_(new Event::MockTimer(&dispatcher_)),
+        api_(Api::createApiForTest(stats_store_)) {}
   ~ClientSslAuthFilterTest() { tls_.shutdownThread(); }
 
   void setup() {
@@ -118,6 +118,7 @@ public:
   Ssl::MockConnection ssl_;
   Stats::IsolatedStoreImpl stats_store_;
   NiceMock<Runtime::MockRandomGenerator> random_;
+  Api::ApiPtr api_;
 };
 
 TEST_F(ClientSslAuthFilterTest, NoCluster) {
@@ -175,8 +176,8 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   Http::MessagePtr message(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body() =
-      std::make_unique<Buffer::OwnedImpl>(Filesystem::fileReadToEnd(TestEnvironment::runfilesPath(
+  message->body() = std::make_unique<Buffer::OwnedImpl>(
+      api_->fileSystem().fileReadToEnd(TestEnvironment::runfilesPath(
           "test/extensions/filters/network/client_ssl_auth/test_data/vpn_response_1.json")));
   callbacks_->onSuccess(std::move(message));
   EXPECT_EQ(1U, stats_store_.gauge("auth.clientssl.vpn.total_principals").value());

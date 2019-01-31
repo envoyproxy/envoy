@@ -7,6 +7,7 @@
 #include <unordered_map>
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/api/api.h"
 #include "envoy/api/v2/cds.pb.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/config/grpc_mux.h"
@@ -319,6 +320,7 @@ public:
     Runtime::RandomGenerator& random_;
     Singleton::Manager& singleton_manager_;
     ThreadLocal::SlotAllocator& tls_;
+    Api::Api& api_;
   };
 
   /**

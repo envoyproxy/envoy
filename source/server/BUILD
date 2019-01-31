@@ -103,6 +103,7 @@ envoy_cc_library(
         "//include/envoy/thread:thread_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
+        "//source/common/common:thread_lib",
         "//source/common/event:libevent_lib",
     ],
 )
