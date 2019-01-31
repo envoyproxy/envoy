@@ -57,10 +57,10 @@ public:
     Http2SettingsFromTuple(server_http2settings_, ::testing::get<1>(GetParam()));
     client_ = std::make_unique<TestClientConnectionImpl>(client_connection_, client_callbacks_,
                                                          stats_store_, client_http2settings_,
-                                                         max_request_headers_);
+                                                         max_request_headers_kb_);
     server_ = std::make_unique<TestServerConnectionImpl>(server_connection_, server_callbacks_,
                                                          stats_store_, server_http2settings_,
-                                                         max_request_headers_);
+                                                         max_request_headers_kb_);
 
     request_encoder_ = &client_->newStream(response_decoder_);
     setupDefaultConnectionMocks();
@@ -129,7 +129,7 @@ public:
   StreamEncoder* response_encoder_{};
   MockStreamCallbacks server_stream_callbacks_;
   bool corrupt_data_ = false;
-  uint32_t max_request_headers_ = Http::DEFAULT_MAX_REQUEST_HEADERS_KB;
+  uint32_t max_request_headers_kb_ = Http::DEFAULT_MAX_REQUEST_HEADERS_KB;
 };
 
 TEST_P(Http2CodecImplTest, ShutdownNotice) {
@@ -762,10 +762,10 @@ TEST_P(Http2CodecImplStreamLimitTest, MaxClientStreams) {
   Http2SettingsFromTuple(server_http2settings_, ::testing::get<1>(GetParam()));
   client_ = std::make_unique<TestClientConnectionImpl>(client_connection_, client_callbacks_,
                                                        stats_store_, client_http2settings_,
-                                                       max_request_headers_);
+                                                       max_request_headers_kb_);
   server_ = std::make_unique<TestServerConnectionImpl>(server_connection_, server_callbacks_,
                                                        stats_store_, server_http2settings_,
-                                                       max_request_headers_);
+                                                       max_request_headers_kb_);
 
   for (int i = 0; i < 101; ++i) {
     request_encoder_ = &client_->newStream(response_decoder_);
@@ -877,7 +877,7 @@ TEST_P(Http2CodecImplTest, TestLargeHeadersInvokeResetStream) {
 }
 
 TEST_P(Http2CodecImplTest, TestLargeHeadersAcceptedIfConfigured) {
-  max_request_headers_ = 64;
+  max_request_headers_kb_ = 64;
   initialize();
 
   TestHeaderMapImpl request_headers;

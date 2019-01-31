@@ -316,7 +316,7 @@ class ClientConnectionImpl : public ClientConnection, public ConnectionImpl {
 public:
   ClientConnectionImpl(Network::Connection& connection, ConnectionCallbacks& callbacks,
                        Stats::Scope& stats, const Http2Settings& http2_settings,
-                       uint32_t max_request_headers);
+                       uint32_t max_request_headers_kb);
 
   // Http::ClientConnection
   Http::StreamEncoder& newStream(StreamDecoder& response_decoder) override;
@@ -337,7 +337,7 @@ class ServerConnectionImpl : public ServerConnection, public ConnectionImpl {
 public:
   ServerConnectionImpl(Network::Connection& connection, ServerConnectionCallbacks& callbacks,
                        Stats::Scope& scope, const Http2Settings& http2_settings,
-                       uint32_t max_request_headers);
+                       uint32_t max_request_headers_kb);
 
 private:
   // ConnectionImpl
