@@ -110,7 +110,7 @@ public:
    * @return BootstrapVersion to indicate which version of the API was parsed.
    */
   static BootstrapVersion loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& bootstrap,
-                                              Options& options);
+                                              const Options& options);
 };
 
 /**
@@ -119,7 +119,7 @@ public:
  */
 class RunHelper : Logger::Loggable<Logger::Id::main> {
 public:
-  RunHelper(Instance& instance, Options& options, Event::Dispatcher& dispatcher,
+  RunHelper(Instance& instance, const Options& options, Event::Dispatcher& dispatcher,
             Upstream::ClusterManager& cm, AccessLog::AccessLogManager& access_log_manager,
             InitManagerImpl& init_manager, OverloadManager& overload_manager,
             std::function<void()> workers_start_cb);
@@ -191,7 +191,7 @@ public:
 private:
   ProtobufTypes::MessagePtr dumpBootstrapConfig();
   void flushStats();
-  void initialize(Options& options, Network::Address::InstanceConstSharedPtr local_address,
+  void initialize(const Options& options, Network::Address::InstanceConstSharedPtr local_address,
                   ComponentFactory& component_factory);
   void loadServerFlags(const absl::optional<std::string>& flags_path);
   uint64_t numConnections();
@@ -199,7 +199,7 @@ private:
   void terminate();
 
   bool shutdown_;
-  Options& options_;
+  const Options& options_;
   Event::TimeSystem& time_system_;
   HotRestart& restarter_;
   const time_t start_time_;
