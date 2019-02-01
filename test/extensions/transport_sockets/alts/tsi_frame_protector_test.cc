@@ -11,11 +11,11 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Alts {
 
-using testing::_;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::SaveArg;
+using testing::_;
 using namespace std::string_literals;
 
 /**

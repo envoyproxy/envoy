@@ -2,8 +2,8 @@
 
 #include "common/secret/secret_provider_impl.h"
 
-using testing::_;
 using testing::Invoke;
+using testing::_;
 
 namespace Envoy {
 namespace Secret {

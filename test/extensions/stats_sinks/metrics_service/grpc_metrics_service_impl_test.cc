@@ -8,11 +8,11 @@
 #include "test/test_common/simulated_time_system.h"
 
 using namespace std::chrono_literals;
-using testing::_;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
+using testing::_;
 
 namespace Envoy {
 namespace Extensions {

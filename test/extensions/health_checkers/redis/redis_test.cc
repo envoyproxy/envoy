@@ -9,7 +9,6 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 
-using testing::_;
 using testing::DoAll;
 using testing::InSequence;
 using testing::NiceMock;
@@ -18,6 +17,7 @@ using testing::Return;
 using testing::ReturnRef;
 using testing::SaveArg;
 using testing::WithArg;
+using testing::_;
 
 namespace Envoy {
 namespace Extensions {

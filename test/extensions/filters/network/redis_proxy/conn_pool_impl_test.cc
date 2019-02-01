@@ -15,7 +15,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::_;
 using testing::DoAll;
 using testing::Eq;
 using testing::InSequence;
@@ -25,6 +24,7 @@ using testing::Return;
 using testing::ReturnNew;
 using testing::ReturnRef;
 using testing::SaveArg;
+using testing::_;
 
 namespace Envoy {
 namespace Extensions {

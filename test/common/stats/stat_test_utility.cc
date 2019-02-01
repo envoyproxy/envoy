@@ -7,11 +7,11 @@ namespace Stats {
 namespace TestUtil {
 
 bool hasDeterministicMallocStats() {
-  // We can only test absolute memory usage if the malloc library is a known
-  // quantity. This decision is centralized here. As the preferred malloc
-  // library for Envoy is TCMALLOC that's what we test for here. If we switch
-  // to a different malloc library than we'd have to re-evaluate all the
-  // thresholds in the tests referencing hasDeterministicMallocStats().
+// We can only test absolute memory usage if the malloc library is a known
+// quantity. This decision is centralized here. As the preferred malloc
+// library for Envoy is TCMALLOC that's what we test for here. If we switch
+// to a different malloc library than we'd have to re-evaluate all the
+// thresholds in the tests referencing hasDeterministicMallocStats().
 #if defined(TCMALLOC) && !defined(ENVOY_MEMORY_DEBUG_ENABLED)
   const size_t start_mem = Memory::Stats::totalCurrentlyAllocated();
   std::unique_ptr<char[]> data(new char[10000]);

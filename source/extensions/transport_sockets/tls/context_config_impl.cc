@@ -339,7 +339,7 @@ ServerContextConfigImpl::ServerContextConfigImpl(
                         DEFAULT_CIPHER_SUITES, DEFAULT_CURVES, factory_context),
       require_client_certificate_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, require_client_certificate, false)),
-      session_ticket_keys_([&config, &api = api_] {
+      session_ticket_keys_([&config, &api = api_ ] {
         std::vector<SessionTicketKey> ret;
 
         switch (config.session_ticket_keys_type_case()) {

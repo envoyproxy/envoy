@@ -1,7 +1,7 @@
 #include "test/mocks/http/stream.h"
 
-using testing::_;
 using testing::Invoke;
+using testing::_;
 
 namespace Envoy {
 namespace Http {

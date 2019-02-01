@@ -24,7 +24,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::_;
 using testing::AtMost;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
@@ -34,6 +33,7 @@ using testing::Ref;
 using testing::Return;
 using testing::SaveArg;
 using testing::Throw;
+using testing::_;
 
 namespace Envoy {
 namespace Http {

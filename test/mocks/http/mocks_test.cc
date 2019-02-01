@@ -4,8 +4,8 @@
 #include "test/test_common/utility.h"
 
 namespace Envoy {
-using ::testing::_;
 using ::testing::Not;
+using ::testing::_;
 
 namespace Http {
 TEST(HeaderValueOfTest, ConstHeaderMap) {

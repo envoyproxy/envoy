@@ -32,7 +32,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::_;
 using testing::AllOf;
 using testing::Ge;
 using testing::HasSubstr;
@@ -44,6 +43,7 @@ using testing::Ref;
 using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
+using testing::_;
 
 namespace Envoy {
 namespace Server {

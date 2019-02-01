@@ -16,8 +16,8 @@
 
 #include "gtest/gtest.h"
 
-using Envoy::Http::Headers;
 using Envoy::Http::HeaderValueOf;
+using Envoy::Http::Headers;
 using Envoy::Http::HttpStatusIs;
 using testing::EndsWith;
 using testing::HasSubstr;
