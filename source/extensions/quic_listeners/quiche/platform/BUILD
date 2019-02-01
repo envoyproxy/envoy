@@ -16,19 +16,39 @@ envoy_package()
 
 # TODO: add build target for quic_platform_impl_lib
 
+HTTP2_HEADER_ONLY_IMPL = [
+    "http2_arraysize_impl.h",
+    "http2_containers_impl.h",
+    "http2_estimate_memory_usage_impl.h",
+    "http2_export_impl.h",
+    "http2_flag_utils_impl.h",
+    "http2_macros_impl.h",
+    "http2_optional_impl.h",
+    "http2_ptr_util_impl.h",
+    "http2_string_impl.h",
+    "http2_string_piece_impl.h",
+]
+
+# Generate dummy .cc file that includes HTTP2 platform impl headers, to ensure that they will actually be compiled.
+#
+# TODO(wub): remove once real dependencies from core QUICHE code to platform libraries are added.
+genrule(
+    name = "generate_http2_header_only_impl",
+    srcs = HTTP2_HEADER_ONLY_IMPL,
+    outs = ["http2_header_only_impl.cc"],
+    cmd = """
+    for SRC in $(SRCS); do echo "$$SRC" | sed 's!^.*source/extensions!#include "extensions!' | sed 's/$$/"/' >>$@; done
+    """,
+)
+
 envoy_cc_library(
     name = "http2_platform_impl_lib",
-    hdrs = [
-        "http2_arraysize_impl.h",
-        "http2_containers_impl.h",
-        "http2_estimate_memory_usage_impl.h",
-        "http2_export_impl.h",
-        "http2_flag_utils_impl.h",
-        "http2_macros_impl.h",
-        "http2_optional_impl.h",
-        "http2_ptr_util_impl.h",
-        "http2_string_impl.h",
-        "http2_string_piece_impl.h",
+    srcs = [
+        "http2_header_only_impl.cc",
+        # Non header-only impl source goes here.
+    ],
+    hdrs = HTTP2_HEADER_ONLY_IMPL + [
+        # Non header-only impl header goes here.
     ],
     external_deps = [
         "abseil_base",
@@ -54,8 +74,11 @@ QUIC_HEADER_ONLY_BASE_IMPL = [
     "quic_uint128_impl.h",
 ]
 
+# Generate dummy .cc file that includes QUIC platform impl headers, to ensure that they will actually be compiled.
+#
+# TODO(wub): remove once real dependencies from core QUICHE code to platform libraries are added.
 genrule(
-    name = "generate_dummy_src_for_quic_header_only_base_impl",
+    name = "generate_quic_header_only_base_impl",
     srcs = QUIC_HEADER_ONLY_BASE_IMPL,
     outs = ["quic_header_only_base_impl.cc"],
     cmd = """
@@ -88,7 +111,7 @@ QUIC_HEADER_ONLY_IMPL = [
 ]
 
 genrule(
-    name = "generate_dummy_src_for_quic_header_only_impl",
+    name = "generate_quic_header_only_impl",
     srcs = QUIC_HEADER_ONLY_IMPL,
     outs = ["quic_header_only_impl.cc"],
     cmd = """
@@ -112,21 +135,41 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
 )
 
+SPDY_HEADER_ONLY_IMPL = [
+    "spdy_arraysize_impl.h",
+    "spdy_containers_impl.h",
+    "spdy_endianness_util_impl.h",
+    "spdy_estimate_memory_usage_impl.h",
+    "spdy_export_impl.h",
+    "spdy_macros_impl.h",
+    "spdy_ptr_util_impl.h",
+    "spdy_string_impl.h",
+    "spdy_string_piece_impl.h",
+    "spdy_test_helpers_impl.h",
+    "spdy_test_utils_prod_impl.h",
+    "spdy_unsafe_arena_impl.h",
+]
+
+# Generate dummy .cc file that includes SPDY platform impl headers, to ensure that they will actually be compiled.
+#
+# TODO(wub): remove once real dependencies from core QUICHE code to platform libraries are added.
+genrule(
+    name = "generate_spdy_header_only_impl",
+    srcs = SPDY_HEADER_ONLY_IMPL,
+    outs = ["spdy_header_only_impl.cc"],
+    cmd = """
+    for SRC in $(SRCS); do echo "$$SRC" | sed 's!^.*source/extensions!#include "extensions!' | sed 's/$$/"/' >>$@; done
+    """,
+)
+
 envoy_cc_library(
     name = "spdy_platform_impl_lib",
-    hdrs = [
-        "spdy_arraysize_impl.h",
-        "spdy_containers_impl.h",
-        "spdy_endianness_util_impl.h",
-        "spdy_estimate_memory_usage_impl.h",
-        "spdy_export_impl.h",
-        "spdy_macros_impl.h",
-        "spdy_ptr_util_impl.h",
-        "spdy_string_impl.h",
-        "spdy_string_piece_impl.h",
-        "spdy_test_helpers_impl.h",
-        "spdy_test_utils_prod_impl.h",
-        "spdy_unsafe_arena_impl.h",
+    srcs = [
+        "spdy_header_only_impl.cc",
+        # Non header-only impl source goes here.
+    ],
+    hdrs = SPDY_HEADER_ONLY_IMPL + [
+        # Non header-only impl header goes here.
     ],
     external_deps = [
         "abseil_base",
