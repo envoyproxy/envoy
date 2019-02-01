@@ -382,8 +382,8 @@ def checkSourceLine(line, file_path, reportError):
     reportError("Don't use 'using testing::Test;, elaborate the type instead")
   if line.startswith('using testing::TestWithParams;'):
     reportError("Don't use 'using testing::Test;, elaborate the type instead")
-  if file_path != './test/test_common/test_base.h' and (
-      ' testing::Test ' in line or ' testing::TestWithParam' in line):
+  if file_path != './test/test_common/test_base.h' and (' testing::Test ' in line or
+                                                        ' testing::TestWithParam' in line):
     reportError("Derive test classes from TestBase in test/test_common/test_base.h")
 
 
