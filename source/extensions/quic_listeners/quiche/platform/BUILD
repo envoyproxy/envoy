@@ -68,9 +68,6 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "quic_platform_impl_lib",
-    srcs = [
-        "quic_mutex_impl.cc",
-    ],
     hdrs = [
         "quic_mutex_impl.h",
     ],
