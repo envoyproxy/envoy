@@ -20,6 +20,7 @@
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -67,8 +68,9 @@ public:
             }));
   }
 
-  Event::SimulatedTimeSystem& timeSystem() { return factory_context_.timeSystem(); }
+  Event::SimulatedTimeSystem& timeSystem() { return time_system_; }
 
+  Event::SimulatedTimeSystem time_system_;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   Http::MockAsyncClientRequest request_;
   Http::AsyncClient::Callbacks* callbacks_{};

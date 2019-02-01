@@ -3,6 +3,7 @@ licenses(["notice"])  # Apache 2
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_binary",
+    "envoy_cc_platform_dep",
     "envoy_package",
     "envoy_py_test_binary",
 )
@@ -29,20 +30,24 @@ envoy_cc_binary(
     name = "bootstrap2pb",
     srcs = ["bootstrap2pb.cc"],
     deps = [
+        "//source/common/api:api_lib",
         "//source/common/common:assert_lib",
+        "//source/common/stats:isolated_store_lib",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
-    ],
+    ] + envoy_cc_platform_dep("//source/exe:platform_impl_lib"),
 )
 
 envoy_cc_binary(
     name = "v1_to_bootstrap",
     srcs = ["v1_to_bootstrap.cc"],
     deps = [
+        "//source/common/api:api_lib",
         "//source/common/config:bootstrap_json_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/stats:stats_options_lib",
+        "//source/common/stats:isolated_store_lib",
         "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
-    ],
+    ] + envoy_cc_platform_dep("//source/exe:platform_impl_lib"),
 )

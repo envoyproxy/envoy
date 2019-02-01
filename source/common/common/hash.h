@@ -27,7 +27,7 @@ public:
   /**
    * TODO(gsagula): extend xxHash to handle case-insensitive.
    *
-   * Return 64-bit hash representation of string ingnoring case.
+   * Return 64-bit hash representation of string ignoring case.
    * See djb2 (http://www.cse.yorku.ca/~oz/hash.html) for more details.
    * @param input supplies the string view.
    * @return 64-bit hash representation of the supplied string view.

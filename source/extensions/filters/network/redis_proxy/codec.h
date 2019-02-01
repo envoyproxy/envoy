@@ -18,7 +18,7 @@ namespace RedisProxy {
 enum class RespType { Null, SimpleString, BulkString, Integer, Error, Array };
 
 /**
- * A variant implementation of a RESP value optimized for peformance. A C++11 union is used for
+ * A variant implementation of a RESP value optimized for performance. A C++11 union is used for
  * the underlying type so that no unnecessary allocations/constructions are needed.
  */
 class RespValue {

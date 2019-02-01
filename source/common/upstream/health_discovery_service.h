@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/api/api.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/service/discovery/v2/hds.pb.h"
@@ -42,7 +43,7 @@ public:
              ClusterInfoFactory& info_factory, ClusterManager& cm,
              const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
              Runtime::RandomGenerator& random, Singleton::Manager& singleton_manager,
-             ThreadLocal::SlotAllocator& tls);
+             ThreadLocal::SlotAllocator& tls, Api::Api& api);
 
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
@@ -116,7 +117,8 @@ public:
               Ssl::ContextManager& ssl_context_manager, Runtime::RandomGenerator& random,
               ClusterInfoFactory& info_factory, AccessLog::AccessLogManager& access_log_manager,
               ClusterManager& cm, const LocalInfo::LocalInfo& local_info, Server::Admin& admin,
-              Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls);
+              Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls,
+              Api::Api& api);
 
   // Grpc::TypedAsyncStreamCallbacks
   void onCreateInitialMetadata(Http::HeaderMap& metadata) override;
@@ -188,6 +190,7 @@ private:
 
   // How often envoy reports the healthcheck results to the server
   uint32_t server_response_ms_ = 0;
+  Api::Api& api_;
 };
 
 typedef std::unique_ptr<HdsDelegate> HdsDelegatePtr;
