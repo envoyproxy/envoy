@@ -11,7 +11,7 @@ import sys
 
 from functools import partial
 
-# handle function rename between python 2/3
+# Handle function rename between python 2/3.
 try:
   input = raw_input
 except NameError:
@@ -19,19 +19,19 @@ except NameError:
 
 TOOLS_DIR = os.path.dirname(os.path.realpath(__file__))
 
-# e.g., // comment OR /* comment */ (single line)
+# Single line comments: // comment OR /* comment */
 # Limit the characters that may precede // to help filter out some code
 # mistakenly processed as a comment.
 INLINE_COMMENT = re.compile(r'(?:^|[^:"])//(.*?)$|/\*+(.*?)\*+/')
 
-# e.g., /* comment */ (multiple lines)
+# Multi-line comments: /* comment */ (multiple lines)
 MULTI_COMMENT_START = re.compile(r'/\*(.*?)$')
 MULTI_COMMENT_END = re.compile(r'^(.*?)\*/')
 
-# e.g., TODO(username): blah
+# Envoy TODO comment style.
 TODO = re.compile(r'(TODO|NOTE)\s*\(@?[A-Za-z0-9-]+\):?')
 
-# e.g., ignore parameter names in doxygen comments
+# Ignore parameter names in doxygen comments.
 METHOD_DOC = re.compile('@(param\s+\w+|return(\s+const)?\s+\w+)')
 
 # Camel Case splitter
@@ -45,7 +45,7 @@ NUMBER = re.compile(r'\d')
 # Hex: match 1) longish strings of hex digits (to avoid matching "add" and
 # other simple words that happen to look like hex), 2) 2 or more two digit
 # hex numbers separated by colons, 3) "0x" prefixed hex numbers of any length,
-# or 4) UUIDs
+# or 4) UUIDs.
 HEX = re.compile(r'(?:^|\s|[(])([A-Fa-f0-9]{8,})(?:$|\s|[.,)])')
 HEX_SIG = re.compile(r'\W([A-Fa-f0-9]{2}(:[A-Fa-f0-9]{2})+)\W')
 PREFIXED_HEX = re.compile(r'0x[A-Fa-f0-9]+')
@@ -55,13 +55,13 @@ UUID = re.compile(r'[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-
 # aspell ignores that anyway.
 IPV6_ADDR = re.compile(r'\W([A-Fa-f0-9]+:[A-Fa-f0-9:]+/[0-9]{1,3})\W')
 
-# Quoted words: "word", 'word', or *word*
+# Quoted words: "word", 'word', or *word*.
 QUOTED_WORD = re.compile(r'(["\'*])[A-Za-z0-9]+(\1)')
 
-# Command flags (e.g. "-rf") and percent specifiers
+# Command flags (e.g. "-rf") and percent specifiers.
 FLAG = re.compile(r'\W([-%][A-Za-z]+)')
 
-# Bare github users (e.g. @user)
+# Bare github users (e.g. @user).
 USER = re.compile(r'\W(@[A-Za-z0-9-]+)')
 
 DEBUG = False
@@ -94,8 +94,7 @@ class SpellChecker:
     pws = os.path.join(TOOLS_DIR, '.aspell.en.pws')
     with open(pws, 'w') as f:
       f.write("personal_ws-1.1 en %d\n" % (len(words)))
-      for word in words:
-        f.write(word)
+      f.writelines(words)
 
     # Start an aspell process.
     aspell_args = ["aspell", "pipe", "--run-together", "--encoding=utf-8", "--personal=" + pws]
@@ -134,14 +133,15 @@ class SpellChecker:
       result = self.aspell.stdout.readline().strip()
       debug("ASPELL> %s" % (result))
 
+      # Check for end of results.
       if result == "":
-        break  # handled all results
+        break
 
       t = result[0]
       if t == "*" or t == "-" or t == "+":
-        # *: found in dictionary
-        # -: found run-together words in dictionary
-        # +: found root word in dictionary
+        # *: found in dictionary.
+        # -: found run-together words in dictionary.
+        # +: found root word in dictionary.
         continue
 
       # & <original> <N> <offset>: m1, m2, ... mN, g1, g2, ...
@@ -150,12 +150,12 @@ class SpellChecker:
       original, rem = result[2:].split(" ", 1)
 
       if t == "#":
-        # Not in dictionary, but no suggestions
+        # Not in dictionary, but no suggestions.
         errors.append((original, int(rem), []))
       elif t == '&' or t == '?':
-        # Near misses and/or guesses
-        _, rem = rem.split(" ", 1)  # drop N (or 0)
-        o, rem = rem.split(": ", 1)  # o is offset from start of line
+        # Near misses and/or guesses.
+        _, rem = rem.split(" ", 1)   # Drop N (may be 0).
+        o, rem = rem.split(": ", 1)  # o is offset from start of line.
         suggestions = rem.split(", ")
 
         errors.append((original, int(o), suggestions))
@@ -166,13 +166,13 @@ class SpellChecker:
     return errors
 
   def load_dictionary(self):
-    # Read the custom dictionary
+    # Read the custom dictionary.
     words = []
     with open(self.dictionary_file, 'r') as f:
       words = f.readlines()
 
     # Strip comments and blank lines.
-    words = [w for w in words if len(w) > 0 and w[0] != "#"]
+    words = [w for w in words if len(w.strip()) > 0 and w[0] != "#"]
 
     # Allow acronyms and abbreviations to be spelled in lowercase.
     # (e.g. Convert "HTTP" into "HTTP" and "http" which also matches
@@ -184,10 +184,32 @@ class SpellChecker:
     return words
 
   def add_words(self, additions):
-    additions = [w + os.linesep for w in additions]
+    lines = []
+    with open(self.dictionary_file, 'r') as f:
+      lines = f.readlines()
 
-    with open(self.dictionary_file, 'a') as f:
-      f.writelines(additions)
+    additions = [w + os.linesep for w in additions]
+    additions.sort()
+
+    # Insert additions into the lines ignoring comments and blank lines.
+    idx = 0
+    add_idx = 0
+    while idx < len(lines) and add_idx < len(additions):
+      line = lines[idx]
+      if len(line.strip()) != 0 and line[0] != "#":
+        c = cmp(additions[add_idx], line)
+        if c < 0:
+          lines.insert(idx, additions[add_idx])
+          add_idx += 1
+        elif c == 0:
+          add_idx += 1
+      idx += 1
+
+    # Append any remaining additions.
+    lines += additions[add_idx:]
+
+    with open(self.dictionary_file, 'w') as f:
+      f.writelines(lines)
 
     self.stop()
     self.start()
@@ -197,8 +219,9 @@ class SpellChecker:
 # True if they are all spelled correctly, False if word is not camel
 # case or has a misspelled sub-word.
 def check_camel_case(checker, word):
-  # Words is not camel case: the previous result stands.
   parts = re.findall(CAMEL_CASE, word)
+
+  # Word is not camel case: the previous result stands.
   if len(parts) <= 1:
     return False
 
@@ -255,7 +278,7 @@ def check_comment(checker, offset, comment):
   # Github user refs:
   comment = mask_with_regex(comment, USER, 1)
 
-  # Everything got stripped, return early.
+  # Everything got masked, return early.
   if comment == "" or comment.strip() == "":
     return []
 
@@ -303,8 +326,8 @@ def print_fix_options(word, suggestions):
 
   col_width = max(len(word) for word in suggestions)
   opt_width = int(math.log(len(suggestions), 10)) + 1
-  padding = 2  # two spaces of padding
-  delim = 2  # colon and space after number
+  padding = 2  # Two spaces of padding.
+  delim = 2  # Colon and space after number.
   num_cols = int(78 / (col_width + padding + opt_width + delim))
   num_rows = int(len(suggestions) / num_cols + 1)
   rows = [""] * num_rows
@@ -386,7 +409,7 @@ def fix_error(checker, file, line_offset, lines, errors):
     print("Internal error %d errors with %d replacements" % (len(errors), len(replacements)))
     sys.exit(2)
 
-  # Perform replacements on the line
+  # Perform replacements on the line.
   line = lines[line_offset]
   for idx in range(len(replacements) - 1, -1, -1):
     word, offset, _ = errors[idx]
@@ -397,7 +420,7 @@ def fix_error(checker, file, line_offset, lines, errors):
     line = line[:offset] + replacement + line[offset + len(word):]
   lines[line_offset] = line
 
-  # Update dictionary
+  # Update the dictionary.
   checker.add_words(additions)
 
 
@@ -423,8 +446,8 @@ def check_file(checker, file, lines, error_handler):
 
     if not in_comment:
       for inline in INLINE_COMMENT.finditer(line, last):
-        # Single-line comment
-        m = inline.lastindex  # 1 or 2 depending on group matched
+        # Single-line comment.
+        m = inline.lastindex  # 1 or 2 depending on group matched.
         errors += check_comment(checker, inline.start(m), inline.group(m))
         num_comments += 1
         last = inline.end(m)
