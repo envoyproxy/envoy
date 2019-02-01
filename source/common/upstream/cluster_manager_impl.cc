@@ -861,9 +861,9 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools(
     }
   });
 
-  // We need to hold off on actually empting out the container until we have finished processing
-  // `addDrainedCallback`. If we did not, then it's possible that the container could be erased
-  // in the middle of its iteration, which leads to undefined behaviour. We handle that case by
+  // We need to hold off on actually emptying out the container until we have finished processing
+  // `addDrainedCallback`. If we do not, then it's possible that the container could be erased in
+  // the middle of its iteration, which leads to undefined behaviour. We handle that case by
   // checking here to see if the drains have completed.
   container.ready_to_drain_ = true;
   if (container.drains_remaining_ == 0) {
