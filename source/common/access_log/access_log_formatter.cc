@@ -99,7 +99,6 @@ std::string JsonFormatterImpl::format(const Http::HeaderMap& request_headers,
   }
 
   return absl::StrCat(log_line, "\n");
-  //return log_line;
 }
 
 std::unordered_map<std::string, std::string> JsonFormatterImpl::toMap(

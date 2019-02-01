@@ -410,7 +410,7 @@ TEST(AccessLogFormatterTest, JsonFormatterPlainStringTest) {
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
 
   std::unordered_map<std::string, std::string> expected_json_map = {
-      {"plain_string", "plain_string_value"}};
+      {"plain_string", "plain_string_value\n"}};
 
   std::unordered_map<std::string, std::string> key_mapping = {
       {"plain_string", "plain_string_value"}};
@@ -431,7 +431,7 @@ TEST(AccessLogFormatterTest, JsonFormatterSingleOperatorTest) {
   absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
 
-  std::unordered_map<std::string, std::string> expected_json_map = {{"protocol", "HTTP/1.1"}};
+  std::unordered_map<std::string, std::string> expected_json_map = {{"protocol", "HTTP/1.1\n"}};
 
   std::unordered_map<std::string, std::string> key_mapping = {{"protocol", "%PROTOCOL%"}};
   JsonFormatterImpl formatter(key_mapping);
@@ -447,10 +447,10 @@ TEST(AccessLogFormatterTest, JsonFormatterNonExistentHeaderTest) {
   Http::TestHeaderMapImpl response_trailer;
 
   std::unordered_map<std::string, std::string> expected_json_map = {
-      {"protocol", "HTTP/1.1"},
-      {"some_request_header", "SOME_REQUEST_HEADER"},
-      {"nonexistent_response_header", "-"},
-      {"some_response_header", "SOME_RESPONSE_HEADER"}};
+      {"protocol", "HTTP/1.1\n"},
+      {"some_request_header", "SOME_REQUEST_HEADER\n"},
+      {"nonexistent_response_header", "-\n"},
+      {"some_response_header", "SOME_RESPONSE_HEADER\n"}};
 
   std::unordered_map<std::string, std::string> key_mapping = {
       {"protocol", "%PROTOCOL%"},
@@ -473,10 +473,10 @@ TEST(AccessLogFormatterTest, JsonFormatterAlternateHeaderTest) {
   Http::TestHeaderMapImpl response_trailer;
 
   std::unordered_map<std::string, std::string> expected_json_map = {
-      {"request_present_header_or_request_absent_header", "REQUEST_PRESENT_HEADER"},
-      {"request_absent_header_or_request_present_header", "REQUEST_PRESENT_HEADER"},
-      {"response_absent_header_or_response_absent_header", "RESPONSE_PRESENT_HEADER"},
-      {"response_present_header_or_response_absent_header", "RESPONSE_PRESENT_HEADER"}};
+      {"request_present_header_or_request_absent_header", "REQUEST_PRESENT_HEADER\n"},
+      {"request_absent_header_or_request_present_header", "REQUEST_PRESENT_HEADER\n"},
+      {"response_absent_header_or_response_absent_header", "RESPONSE_PRESENT_HEADER\n"},
+      {"response_present_header_or_response_absent_header", "RESPONSE_PRESENT_HEADER\n"}};
 
   std::unordered_map<std::string, std::string> key_mapping = {
       {"request_present_header_or_request_absent_header",
@@ -508,9 +508,9 @@ TEST(AccessLogFormatterTest, JsonFormatterDynamicMetadataTest) {
   EXPECT_CALL(Const(stream_info), dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
 
   std::unordered_map<std::string, std::string> expected_json_map = {
-      {"test_key", "\"test_value\""},
-      {"test_obj", "{\"inner_key\":\"inner_value\"}"},
-      {"test_obj.inner_key", "\"inner_value\""}};
+      {"test_key", "\"test_value\"""\n"},
+      {"test_obj", "{\"inner_key\":\"inner_value\"}""\n"},
+      {"test_obj.inner_key", "\"inner_value\"""\n"}};
 
   std::unordered_map<std::string, std::string> key_mapping = {
       {"test_key", "%DYNAMIC_METADATA(com.test:test_key)%"},
@@ -539,11 +539,11 @@ TEST(AccessLogFormatterTest, JsonFormatterStartTimeTest) {
   time_t expected_time_t = mktime(&time_val);
 
   std::unordered_map<std::string, std::string> expected_json_map = {
-      {"simple_date", "2018/03/28"},
-      {"test_time", fmt::format("{}", expected_time_t)},
-      {"bad_format", "bad_format"},
-      {"default", "2018-03-28T23:35:58.000Z"},
-      {"all_zeroes", "000000000.0.00.000"}};
+      {"simple_date", "2018/03/28\n"},
+      {"test_time", fmt::format("{}\n", expected_time_t)},
+      {"bad_format", "bad_format\n"},
+      {"default", "2018-03-28T23:35:58.000Z\n"},
+      {"all_zeroes", "000000000.0.00.000\n"}};
 
   std::unordered_map<std::string, std::string> key_mapping = {
       {"simple_date", "%START_TIME(%Y/%m/%d)%"},
@@ -565,7 +565,7 @@ TEST(AccessLogFormatterTest, JsonFormatterMultiTokenTest) {
     Http::TestHeaderMapImpl response_trailer;
 
     std::unordered_map<std::string, std::string> expected_json_map = {
-        {"multi_token_field", "HTTP/1.1 plainstring SOME_REQUEST_HEADER SOME_RESPONSE_HEADER"}};
+        {"multi_token_field", "HTTP/1.1 plainstring SOME_REQUEST_HEADER SOME_RESPONSE_HEADER\n"}};
 
     std::unordered_map<std::string, std::string> key_mapping = {
         {"multi_token_field",
