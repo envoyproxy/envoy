@@ -37,7 +37,7 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
 )
 
-QUIC_HEADER_ONLY_IMPL = [
+QUIC_HEADER_ONLY_BASE_IMPL = [
     "quic_aligned_impl.h",
     "quic_arraysize_impl.h",
     "quic_containers_impl.h",
@@ -52,6 +52,39 @@ QUIC_HEADER_ONLY_IMPL = [
     "quic_string_impl.h",
     "quic_string_piece_impl.h",
     "quic_uint128_impl.h",
+]
+
+genrule(
+    name = "generate_dummy_src_for_quic_header_only_base_impl",
+    srcs = QUIC_HEADER_ONLY_BASE_IMPL,
+    outs = ["quic_header_only_base_impl.cc"],
+    cmd = """
+    for SRC in $(SRCS); do echo "$$SRC" | sed 's!^.*source/extensions!#include "extensions!' | sed 's/$$/"/' >>$@; done
+    """,
+)
+
+envoy_cc_library(
+    name = "quic_platform_base_impl_lib",
+    srcs = [
+        "quic_header_only_base_impl.cc",
+        # Non header-only impl source goes here.
+    ],
+    hdrs = QUIC_HEADER_ONLY_BASE_IMPL + [
+        # Non header-only impl header goes here.
+    ],
+    external_deps = [
+        "abseil_base",
+        "abseil_hash",
+        "abseil_inlined_vector",
+        "abseil_memory",
+        "abseil_node_hash_map",
+        "abseil_node_hash_set",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+QUIC_HEADER_ONLY_IMPL = [
+    "quic_mutex_impl.h",
 ]
 
 genrule(
@@ -73,12 +106,8 @@ envoy_cc_library(
         # Non header-only impl header goes here.
     ],
     external_deps = [
-        "abseil_base",
-        "abseil_hash",
-        "abseil_inlined_vector",
-        "abseil_memory",
-        "abseil_node_hash_map",
-        "abseil_node_hash_set",
+        "quiche_quic_platform_base",
+        "abseil_synchronization",
     ],
     visibility = ["//visibility:public"],
 )
