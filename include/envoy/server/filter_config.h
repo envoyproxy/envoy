@@ -140,6 +140,11 @@ public:
    * @return Http::Context& a reference to the http context.
    */
   virtual Http::Context& httpContext() PURE;
+
+  /**
+   * @return Api::Api& a reference to the api object.
+   */
+  virtual Api::Api& api() PURE;
 };
 
 class ListenerFactoryContext : public virtual FactoryContext {
@@ -205,7 +210,7 @@ public:
    * implementation is unable to produce a factory with the provided parameters, it should throw an
    * EnvoyException.
    * @param config supplies the protobuf configuration for the filter
-   * @return Upstream::ProtocoOptionsConfigConstSharedPtr the protocol options
+   * @return Upstream::ProtocolOptionsConfigConstSharedPtr the protocol options
    */
   virtual Upstream::ProtocolOptionsConfigConstSharedPtr
   createProtocolOptionsConfig(const Protobuf::Message& config) {

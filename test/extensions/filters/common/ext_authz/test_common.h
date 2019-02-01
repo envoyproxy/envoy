@@ -82,7 +82,7 @@ MATCHER_P(AuthzOkResponse, response, "") {
   if (arg->status != response.status) {
     return false;
   }
-  // Compare headers_to_apppend.
+  // Compare headers_to_append.
   if (!TestCommon::CompareHeaderVector(response.headers_to_append, arg->headers_to_append)) {
     return false;
   }

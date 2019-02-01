@@ -266,7 +266,7 @@ resolveMostSpecificPerFilterConfigGeneric(const std::string& filter_name,
                                           const Router::RouteConstSharedPtr& route);
 
 /**
- * Retreives the route specific config. Route specific config can be in a few
+ * Retrieves the route specific config. Route specific config can be in a few
  * places, that are checked in order. The first config found is returned. The
  * order is:
  * - the routeEntry() (for config that's applied on weighted clusters)

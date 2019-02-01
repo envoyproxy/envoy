@@ -99,8 +99,12 @@ void StreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream)
     } else if (end_stream && !is_response_to_head_request_) {
       // If this is a headers-only stream, append an explicit "Content-Length: 0" unless it's a
       // response to a HEAD request.
-      encodeHeader(Headers::get().ContentLength.get().c_str(),
-                   Headers::get().ContentLength.get().size(), "0", 1);
+      // For 204s and 1xx where content length is disallowed, don't append the content length but
+      // also don't chunk encode.
+      if (is_content_length_allowed_) {
+        encodeHeader(Headers::get().ContentLength.get().c_str(),
+                     Headers::get().ContentLength.get().size(), "0", 1);
+      }
       chunk_encoding_ = false;
     } else if (connection_.protocol() == Protocol::Http10) {
       chunk_encoding_ = false;
@@ -240,6 +244,15 @@ void ResponseStreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end
 
   connection_.addCharToBuffer('\r');
   connection_.addCharToBuffer('\n');
+
+  if (numeric_status == 204 || numeric_status < 200) {
+    // Per https://tools.ietf.org/html/rfc7230#section-3.3.2
+    setIsContentLengthAllowed(false);
+  } else {
+    // Make sure that if we encodeHeaders(100) then encodeHeaders(200) that we
+    // set is_content_length_allowed_ back to true.
+    setIsContentLengthAllowed(true);
+  }
 
   StreamEncoderImpl::encodeHeaders(headers, end_stream);
 }

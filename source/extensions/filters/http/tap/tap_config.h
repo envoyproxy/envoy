@@ -42,35 +42,16 @@ using HttpPerRequestTapperPtr = std::unique_ptr<HttpPerRequestTapper>;
 /**
  * Abstract HTTP tap configuration.
  */
-class HttpTapConfig {
+class HttpTapConfig : public Extensions::Common::Tap::TapConfig {
 public:
-  virtual ~HttpTapConfig() = default;
-
   /**
    * @return a new per-request HTTP tapper which is used to handle tapping of a discrete request.
+   * @param stream_id supplies the owning HTTP stream ID.
    */
-  virtual HttpPerRequestTapperPtr createPerRequestTapper() PURE;
+  virtual HttpPerRequestTapperPtr createPerRequestTapper(uint64_t stream_id) PURE;
 };
 
 using HttpTapConfigSharedPtr = std::shared_ptr<HttpTapConfig>;
-
-/**
- * Configuration factory for the HTTP tap filter.
- */
-class HttpTapConfigFactory {
-public:
-  virtual ~HttpTapConfigFactory() = default;
-
-  /**
-   * @return a new configuration given a raw tap service config proto. See
-   * Extensions::Common::Tap::ExtensionConfig::newTapConfig() for param info.
-   */
-  virtual HttpTapConfigSharedPtr
-  createHttpConfigFromProto(envoy::service::tap::v2alpha::TapConfig&& proto_config,
-                            Extensions::Common::Tap::Sink* admin_streamer) PURE;
-};
-
-using HttpTapConfigFactoryPtr = std::unique_ptr<HttpTapConfigFactory>;
 
 } // namespace TapFilter
 } // namespace HttpFilters

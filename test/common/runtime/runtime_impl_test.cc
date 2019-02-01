@@ -64,7 +64,9 @@ TEST(UUID, sanityCheckOfUniqueness) {
 }
 
 class DiskBackedLoaderImplTest : public testing::Test {
-public:
+protected:
+  DiskBackedLoaderImplTest() : api_(Api::createApiForTest(store)) {}
+
   static void SetUpTestSuite() {
     TestEnvironment::exec(
         {TestEnvironment::runfilesPath("test/common/runtime/filesystem_setup.sh")});
@@ -78,7 +80,7 @@ public:
   void run(const std::string& primary_dir, const std::string& override_dir) {
     loader = std::make_unique<DiskBackedLoaderImpl>(dispatcher, tls,
                                                     TestEnvironment::temporaryPath(primary_dir),
-                                                    "envoy", override_dir, store, generator);
+                                                    "envoy", override_dir, store, generator, *api_);
   }
 
   Event::MockDispatcher dispatcher;
@@ -87,6 +89,7 @@ public:
   Stats::IsolatedStoreImpl store;
   MockRandomGenerator generator;
   std::unique_ptr<LoaderImpl> loader;
+  Api::ApiPtr api_;
 };
 
 TEST_F(DiskBackedLoaderImplTest, All) {
@@ -257,19 +260,28 @@ TEST(LoaderImplTest, All) {
   testNewOverrides(loader, store);
 }
 
-TEST(DiskLayer, IllegalPath) {
+class DiskLayerTest : public testing::Test {
+protected:
+  DiskLayerTest() : api_(Api::createApiForTest(store_)) {}
+
+  Stats::IsolatedStoreImpl store_;
+  Api::ApiPtr api_;
+};
+
+TEST_F(DiskLayerTest, IllegalPath) {
 #ifdef WIN32
   // no illegal paths on Windows at the moment
   return;
 #endif
-  EXPECT_THROW_WITH_MESSAGE(DiskLayer("test", "/dev"), EnvoyException, "Invalid path: /dev");
+  EXPECT_THROW_WITH_MESSAGE(DiskLayer("test", "/dev", *api_), EnvoyException, "Invalid path: /dev");
 }
 
 // Validate that we catch recursion that goes too deep in the runtime filesystem
 // walk.
-TEST(DiskLayer, Loop) {
+TEST_F(DiskLayerTest, Loop) {
   EXPECT_THROW_WITH_MESSAGE(
-      DiskLayer("test", TestEnvironment::temporaryPath("test/common/runtime/test_data/loop")),
+      DiskLayer("test", TestEnvironment::temporaryPath("test/common/runtime/test_data/loop"),
+                *api_),
       EnvoyException, "Walk recursion depth exceded 16");
 }
 

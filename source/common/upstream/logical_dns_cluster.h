@@ -57,7 +57,7 @@ private:
 
     // Upstream::HostDescription
     // Override setting health check address, since for logical DNS the registered host has 0.0.0.0
-    // as its address (see mattklein123's comment in logical_dns_cluster.cc why this is),
+    // as its address (see @mattklein123's comment in logical_dns_cluster.cc why this is),
     // while the health check address needs the resolved address to do the health checking, so we
     // set it here.
     void setHealthCheckAddress(Network::Address::InstanceConstSharedPtr address) override {
