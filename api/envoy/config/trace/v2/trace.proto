@@ -104,6 +104,7 @@ message DatadogConfig {
 }
 
 // Configuration for the OpenCensus tracer.
+// [#proto-status: experimental]
 message OpenCensusConfig {
   // Configures tracing, e.g. the sampler, max number of annotations, etc.
   opencensus.proto.trace.v1.TraceConfig trace_config = 1;
