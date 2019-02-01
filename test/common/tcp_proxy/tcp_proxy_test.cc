@@ -272,7 +272,7 @@ TEST(ConfigTest, Routes) {
   }
 
   {
-    // hit route with destination_ip (2001:abcd/64")
+    // hit route with destination_ip ("2001:abcd/64")
     NiceMock<Network::MockConnection> connection;
     connection.local_address_ =
         std::make_shared<Network::Address::Ipv6Instance>("2001:abcd:0:0:1::");

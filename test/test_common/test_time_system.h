@@ -96,7 +96,7 @@ public:
   virtual TimeSystemVariant& timeSystem() PURE;
 };
 
-// Wraps a concrete time-system in a delegate that ensures thare is only one
+// Wraps a concrete time-system in a delegate that ensures there is only one
 // time-system of any variant resident in a process at a time. Attempts to
 // instantiate multiple instances of the same type of time-system will simply
 // reference the same shared delegate, which will be deleted when the last one

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/api/api.h"
 #include "envoy/common/pure.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/server/resource_monitor.h"
@@ -19,6 +20,11 @@ public:
    *         for all singleton processing.
    */
   virtual Event::Dispatcher& dispatcher() PURE;
+
+  /**
+   * @return reference to the Api object
+   */
+  virtual Api::Api& api() PURE;
 };
 
 /**

@@ -18,13 +18,20 @@ Version history
   <envoy_api_field_config.filter.http.ext_authz.v2.AuthorizationResponse.allowed_client_headers>` and :ref:`upstream headers
   <envoy_api_field_config.filter.http.ext_authz.v2.AuthorizationResponse.allowed_upstream_headers>` replaces the previous *allowed_authorization_headers* object.
   All the control header lists now support :ref:`string matcher <envoy_api_msg_type.matcher.StringMatcher>` instead of standard string.
+* governance: extending Envoy deprecation policy from 1 release (0-3 months) to 2 releases (3-6 months).
 * http: added new grpc_http1_reverse_bridge filter for converting gRPC requests into HTTP/1.1 requests.
+* http: fixed a bug where Content-Length:0 was added to HTTP/1 204 responses.
+* outlier_detection: added support for :ref:`outlier detection event protobuf-based logging <arch_overview_outlier_detection_logging>`.
 * mysql: added a MySQL proxy filter that is capable of parsing SQL queries over MySQL wire protocol. Refer to ::ref:`MySQL proxy<config_network_filters_mysql_proxy>` for more details.
-* http: added :ref:`max request headers size <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.max_request_headers_size_kb>`. The default behaviour is unchanged.
+* http: added :ref:`max request headers size <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.max_request_headers_kb>`. The default behaviour is unchanged.
 * redis: added :ref:`success and error stats <config_network_filters_redis_proxy_per_command_stats>` for commands.
 * redis: added :ref:`latency stats <config_network_filters_redis_proxy_per_command_stats>` for commands.
+* redis: migrate hash function for host selection to `MurmurHash2 <https://sites.google.com/site/murmurhash>`_ from std::hash. MurmurHash2 is compatible with std::hash in GNU libstdc++ 3.4.20 or above. This is typically the case when compiled on Linux and not macOS.
 * router: added ability to configure a :ref:`retry policy <envoy_api_msg_route.RetryPolicy>` at the
   virtual host level.
+* stats: added support for histograms in prometheus
+* stats: added usedonly flag to prometheus stats to only output metrics which have been
+  updated at least once.
 * tap: added new alpha :ref:`HTTP tap filter <config_http_filters_tap>`.
 * tls: enabled TLS 1.3 on the server-side (non-FIPS builds).
 * router: added per-route configuration of :ref:`internal redirects <envoy_api_field_route.RouteAction.internal_redirect_action>`.

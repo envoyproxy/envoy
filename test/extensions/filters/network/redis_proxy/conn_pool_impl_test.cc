@@ -435,7 +435,7 @@ TEST_F(RedisConnPoolImplTest, Basic) {
 
   EXPECT_CALL(cm_.thread_local_cluster_.lb_, chooseHost(_))
       .WillOnce(Invoke([&](Upstream::LoadBalancerContext* context) -> Upstream::HostConstSharedPtr {
-        EXPECT_EQ(context->computeHashKey().value(), std::hash<std::string>()("hash_key"));
+        EXPECT_EQ(context->computeHashKey().value(), MurmurHash::murmurHash2_64("hash_key"));
         EXPECT_EQ(context->metadataMatchCriteria(), nullptr);
         EXPECT_EQ(context->downstreamConnection(), nullptr);
         return cm_.thread_local_cluster_.lb_.host_;

@@ -113,10 +113,11 @@ config:
     nanos: 0
 )EOF";
 
-ConfigHelper::ConfigHelper(const Network::Address::IpVersion version, const std::string& config) {
+ConfigHelper::ConfigHelper(const Network::Address::IpVersion version, Api::Api& api,
+                           const std::string& config) {
   RELEASE_ASSERT(!finalized_, "");
   std::string filename = TestEnvironment::writeStringToFileForTest("basic_config.yaml", config);
-  MessageUtil::loadFromFile(filename, bootstrap_);
+  MessageUtil::loadFromFile(filename, bootstrap_, api);
 
   // Fix up all the socket addresses with the correct version.
   auto* admin = bootstrap_.mutable_admin();
@@ -245,13 +246,22 @@ void ConfigHelper::setTapTransportSocket(const std::string& tap_path, const std:
   // Configure outer tap transport socket.
   transport_socket.set_name("envoy.transport_sockets.tap");
   envoy::config::transport_socket::tap::v2alpha::Tap tap_config;
-  auto* file_sink = tap_config.mutable_file_sink();
+  tap_config.mutable_common_config()
+      ->mutable_static_config()
+      ->mutable_match_config()
+      ->set_any_match(true);
+  auto* file_sink = tap_config.mutable_common_config()
+                        ->mutable_static_config()
+                        ->mutable_output_config()
+                        ->mutable_sinks()
+                        ->Add()
+                        ->mutable_file_per_tap();
   const ::testing::TestInfo* const test_info =
       ::testing::UnitTest::GetInstance()->current_test_info();
   const std::string test_id =
       std::string(test_info->name()) + "_" + std::string(test_info->test_case_name()) + "_" + type;
   file_sink->set_path_prefix(tap_path + "_" + absl::StrReplaceAll(test_id, {{"/", "_"}}));
-  file_sink->set_format(envoy::config::transport_socket::tap::v2alpha::FileSink::PROTO_TEXT);
+  file_sink->set_format(envoy::service::tap::v2alpha::FilePerTapSink::PROTO_TEXT);
   tap_config.mutable_transport_socket()->MergeFrom(inner_transport_socket);
   transport_socket.mutable_typed_config()->PackFrom(tap_config);
 }

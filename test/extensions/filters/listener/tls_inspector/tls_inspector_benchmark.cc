@@ -11,9 +11,9 @@
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
+#include "benchmark/benchmark.h"
 #include "gtest/gtest.h"
 #include "openssl/ssl.h"
-#include "testing/base/public/benchmark.h"
 
 using testing::_;
 using testing::AtLeast;

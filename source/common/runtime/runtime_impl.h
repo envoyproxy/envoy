@@ -5,6 +5,7 @@
 #include <string>
 #include <unordered_map>
 
+#include "envoy/api/api.h"
 #include "envoy/common/exception.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/stats_macros.h"
@@ -141,10 +142,11 @@ private:
  */
 class DiskLayer : public OverrideLayerImpl, Logger::Loggable<Logger::Id::runtime> {
 public:
-  DiskLayer(const std::string& name, const std::string& path);
+  DiskLayer(const std::string& name, const std::string& path, Api::Api& api);
 
 private:
-  void walkDirectory(const std::string& path, const std::string& prefix, uint32_t depth);
+  void walkDirectory(const std::string& path, const std::string& prefix, uint32_t depth,
+                     Api::Api& api);
 
   const std::string path_;
   // Maximum recursion depth for walkDirectory().
@@ -197,7 +199,7 @@ public:
   DiskBackedLoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls,
                        const std::string& root_symlink_path, const std::string& subdir,
                        const std::string& override_dir, Stats::Store& store,
-                       RandomGenerator& generator);
+                       RandomGenerator& generator, Api::Api& api);
 
 private:
   std::unique_ptr<SnapshotImpl> createNewSnapshot() override;
@@ -205,6 +207,7 @@ private:
   const Filesystem::WatcherPtr watcher_;
   const std::string root_path_;
   const std::string override_path_;
+  Api::Api& api_;
 };
 
 } // namespace Runtime

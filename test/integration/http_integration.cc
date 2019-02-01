@@ -1702,7 +1702,8 @@ void HttpIntegrationTest::testAbsolutePathWithPort() {
 void HttpIntegrationTest::testAbsolutePathWithoutPort() {
   // Add a restrictive default match, to avoid the request hitting the * / catchall.
   config_helper_.setDefaultHostAndRoute("foo.com", "/found");
-  // Set a matcher for namewithport:1234 and verify http://namewithport does not match
+  // Set a matcher for www.namewithport.com:1234 and verify http://www.namewithport.com does not
+  // match
   config_helper_.addRoute("www.namewithport.com:1234", "/", "cluster_0", true,
                           envoy::api::v2::route::RouteAction::SERVICE_UNAVAILABLE,
                           envoy::api::v2::route::VirtualHost::ALL);
@@ -1873,7 +1874,7 @@ void HttpIntegrationTest::testLargeRequestHeaders(uint32_t size, uint32_t max_si
 
   config_helper_.addConfigModifier(
       [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
-          -> void { hcm.mutable_max_request_headers_size_kb()->set_value(max_size); });
+          -> void { hcm.mutable_max_request_headers_kb()->set_value(max_size); });
 
   Http::TestHeaderMapImpl big_headers{
       {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
