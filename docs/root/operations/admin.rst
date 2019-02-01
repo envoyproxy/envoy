@@ -312,6 +312,10 @@ explanation of the output.
   Outputs /stats in `Prometheus <https://prometheus.io/docs/instrumenting/exposition_formats/>`_
   v0.0.4 format. This can be used to integrate with a Prometheus server.
 
+  You can optionally pass the `usedonly` URL query argument to only get statistics that
+  Envoy has updated (counters incremented at least once, gauges changed at least once,
+  and histograms added to at least once)
+
 .. _operations_admin_interface_runtime:
 
 .. http:get:: /runtime
