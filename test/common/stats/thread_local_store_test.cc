@@ -129,13 +129,21 @@ public:
 
     NameHistogramMap name_histogram_map = makeHistogramMap(histogram_list);
     const ParentHistogramSharedPtr& h1 = name_histogram_map["h1"];
-    EXPECT_EQ(h1->cumulativeStatistics().summary(), h1_cumulative_statistics.summary());
-    EXPECT_EQ(h1->intervalStatistics().summary(), h1_interval_statistics.summary());
+    EXPECT_EQ(h1->cumulativeStatistics().quantileSummary(),
+              h1_cumulative_statistics.quantileSummary());
+    EXPECT_EQ(h1->intervalStatistics().quantileSummary(), h1_interval_statistics.quantileSummary());
+    EXPECT_EQ(h1->cumulativeStatistics().bucketSummary(), h1_cumulative_statistics.bucketSummary());
+    EXPECT_EQ(h1->intervalStatistics().bucketSummary(), h1_interval_statistics.bucketSummary());
 
     if (histogram_list.size() > 1) {
       const ParentHistogramSharedPtr& h2 = name_histogram_map["h2"];
-      EXPECT_EQ(h2->cumulativeStatistics().summary(), h2_cumulative_statistics.summary());
-      EXPECT_EQ(h2->intervalStatistics().summary(), h2_interval_statistics.summary());
+      EXPECT_EQ(h2->cumulativeStatistics().quantileSummary(),
+                h2_cumulative_statistics.quantileSummary());
+      EXPECT_EQ(h2->intervalStatistics().quantileSummary(),
+                h2_interval_statistics.quantileSummary());
+      EXPECT_EQ(h2->cumulativeStatistics().bucketSummary(),
+                h2_cumulative_statistics.bucketSummary());
+      EXPECT_EQ(h2->intervalStatistics().bucketSummary(), h2_interval_statistics.bucketSummary());
     }
 
     h1_interval_values_.clear();
@@ -671,7 +679,7 @@ TEST_F(HeapStatsThreadLocalStoreTest, NonHotRestartNoTruncation) {
   store_->counter(name_1);
 
   // This works fine, and we can find it by its long name because heap-stats do not
-  // get truncsated.
+  // get truncated.
   EXPECT_NE(nullptr, TestUtility::findCounter(*store_, name_1).get());
 }
 
@@ -850,8 +858,18 @@ TEST_F(HistogramTest, BasicHistogramSummaryValidate) {
   const std::string h1_expected_summary =
       "P0: 1, P25: 1.025, P50: 1.05, P75: 1.075, P90: 1.09, P95: 1.095, "
       "P99: 1.099, P99.5: 1.0995, P99.9: 1.0999, P100: 1.1";
-  const std::string h2_expected_summary = "P0: 0, P25: 25, P50: 50, P75: 75, P90: 90, P95: 95, "
-                                          "P99: 99, P99.5: 99.5, P99.9: 99.9, P100: 100";
+  const std::string h2_expected_summary =
+      "P0: 0, P25: 25, P50: 50, P75: 75, P90: 90, P95: 95, P99: 99, "
+      "P99.5: 99.5, P99.9: 99.9, P100: 100";
+
+  const std::string h1_expected_buckets =
+      "B0.5: 0, B1: 0, B5: 1, B10: 1, B25: 1, B50: 1, B100: 1, B250: 1, "
+      "B500: 1, B1000: 1, B2500: 1, B5000: 1, B10000: 1, B30000: 1, B60000: 1, "
+      "B300000: 1, B600000: 1, B1.8e+06: 1, B3.6e+06: 1";
+  const std::string h2_expected_buckets =
+      "B0.5: 1, B1: 1, B5: 5, B10: 10, B25: 25, B50: 50, B100: 100, B250: 100, "
+      "B500: 100, B1000: 100, B2500: 100, B5000: 100, B10000: 100, B30000: 100, "
+      "B60000: 100, B300000: 100, B600000: 100, B1.8e+06: 100, B3.6e+06: 100";
 
   for (size_t i = 0; i < 100; ++i) {
     expectCallAndAccumulate(h2, i);
@@ -860,8 +878,12 @@ TEST_F(HistogramTest, BasicHistogramSummaryValidate) {
   EXPECT_EQ(2, validateMerge());
 
   NameHistogramMap name_histogram_map = makeHistogramMap(store_->histograms());
-  EXPECT_EQ(h1_expected_summary, name_histogram_map["h1"]->cumulativeStatistics().summary());
-  EXPECT_EQ(h2_expected_summary, name_histogram_map["h2"]->cumulativeStatistics().summary());
+  EXPECT_EQ(h1_expected_summary,
+            name_histogram_map["h1"]->cumulativeStatistics().quantileSummary());
+  EXPECT_EQ(h2_expected_summary,
+            name_histogram_map["h2"]->cumulativeStatistics().quantileSummary());
+  EXPECT_EQ(h1_expected_buckets, name_histogram_map["h1"]->cumulativeStatistics().bucketSummary());
+  EXPECT_EQ(h2_expected_buckets, name_histogram_map["h2"]->cumulativeStatistics().bucketSummary());
 }
 
 // Validates the summary after known value merge in to same histogram.
@@ -880,9 +902,15 @@ TEST_F(HistogramTest, BasicHistogramMergeSummary) {
 
   const std::string expected_summary = "P0: 0, P25: 25, P50: 50, P75: 75, P90: 90, P95: 95, P99: "
                                        "99, P99.5: 99.5, P99.9: 99.9, P100: 100";
+  const std::string expected_bucket_summary =
+      "B0.5: 1, B1: 1, B5: 5, B10: 10, B25: 25, B50: 50, B100: 100, B250: 100, "
+      "B500: 100, B1000: 100, B2500: 100, B5000: 100, B10000: 100, B30000: 100, "
+      "B60000: 100, B300000: 100, B600000: 100, B1.8e+06: 100, B3.6e+06: 100";
 
   NameHistogramMap name_histogram_map = makeHistogramMap(store_->histograms());
-  EXPECT_EQ(expected_summary, name_histogram_map["h1"]->cumulativeStatistics().summary());
+  EXPECT_EQ(expected_summary, name_histogram_map["h1"]->cumulativeStatistics().quantileSummary());
+  EXPECT_EQ(expected_bucket_summary,
+            name_histogram_map["h1"]->cumulativeStatistics().bucketSummary());
 }
 
 TEST_F(HistogramTest, BasicHistogramUsed) {

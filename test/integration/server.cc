@@ -6,7 +6,6 @@
 #include "envoy/http/header_map.h"
 
 #include "common/common/thread.h"
-#include "common/filesystem/filesystem_impl.h"
 #include "common/local_info/local_info_impl.h"
 #include "common/network/utility.h"
 #include "common/stats/thread_local_store.h"
@@ -86,9 +85,9 @@ void IntegrationTestServer::start(const Network::Address::IpVersion version,
     waitUntilListenersReady();
   }
 
-  // If we are capturing, spin up tcpdump.
-  const auto capture_path = TestEnvironment::getOptionalEnvVar("CAPTURE_PATH");
-  if (capture_path) {
+  // If we are tapping, spin up tcpdump.
+  const auto tap_path = TestEnvironment::getOptionalEnvVar("TAP_PATH");
+  if (tap_path) {
     std::vector<uint32_t> ports;
     for (auto listener : server().listenerManager().listeners()) {
       const auto listen_addr = listener.get().socket().localAddress();
@@ -102,7 +101,7 @@ void IntegrationTestServer::start(const Network::Address::IpVersion version,
     const std::string test_id =
         std::string(test_info->name()) + "_" + std::string(test_info->test_case_name());
     const std::string pcap_path =
-        capture_path.value() + "_" + absl::StrReplaceAll(test_id, {{"/", "_"}}) + "_server.pcap";
+        tap_path.value() + "_" + absl::StrReplaceAll(test_id, {{"/", "_"}}) + "_server.pcap";
     tcp_dump_ = std::make_unique<TcpDump>(pcap_path, "lo", ports);
   }
 }

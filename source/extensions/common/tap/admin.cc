@@ -90,15 +90,16 @@ void AdminHandler::registerConfig(ExtensionConfig& config, const std::string& co
 
 void AdminHandler::unregisterConfig(ExtensionConfig& config) {
   ASSERT(!config.adminId().empty());
-  ASSERT(config_id_map_[config.adminId()].count(&config) == 1);
-  config_id_map_[config.adminId()].erase(&config);
-  if (config_id_map_[config.adminId()].empty()) {
-    config_id_map_.erase(config.adminId());
+  std::string admin_id(config.adminId());
+  ASSERT(config_id_map_[admin_id].count(&config) == 1);
+  config_id_map_[admin_id].erase(&config);
+  if (config_id_map_[admin_id].empty()) {
+    config_id_map_.erase(admin_id);
   }
 }
 
 void AdminHandler::submitBufferedTrace(
-    std::shared_ptr<envoy::data::tap::v2alpha::BufferedTraceWrapper> trace) {
+    std::shared_ptr<envoy::data::tap::v2alpha::BufferedTraceWrapper> trace, uint64_t) {
   ENVOY_LOG(debug, "admin submitting buffered trace to main thread");
   main_thread_dispatcher_.post([this, trace]() {
     if (attached_request_.has_value()) {

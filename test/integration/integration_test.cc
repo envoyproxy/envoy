@@ -4,7 +4,6 @@
 
 #include "envoy/config/accesslog/v2/file.pb.h"
 
-#include "common/filesystem/filesystem_impl.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 #include "common/protobuf/utility.h"
@@ -27,9 +26,9 @@ using testing::Not;
 
 namespace Envoy {
 
-INSTANTIATE_TEST_CASE_P(IpVersions, IntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, IntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(IntegrationTest, RouterNotFound) { testRouterNotFound(); }
 
@@ -237,7 +236,9 @@ TEST_P(IntegrationTest, InvalidContentLength) { testInvalidContentLength(); }
 
 TEST_P(IntegrationTest, MultipleContentLengths) { testMultipleContentLengths(); }
 
-TEST_P(IntegrationTest, OverlyLongHeaders) { testOverlyLongHeaders(); }
+TEST_P(IntegrationTest, LargeHeadersRejected) { testLargeRequestHeaders(62, 60); }
+
+TEST_P(IntegrationTest, LargeHeadersAccepted) { testLargeRequestHeaders(62, 63); }
 
 TEST_P(IntegrationTest, UpstreamProtocolError) { testUpstreamProtocolError(); }
 

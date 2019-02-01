@@ -74,7 +74,7 @@ protected:
   OverloadManagerImplTest()
       : factory1_("envoy.resource_monitors.fake_resource1"),
         factory2_("envoy.resource_monitors.fake_resource2"), register_factory1_(factory1_),
-        register_factory2_(factory2_) {}
+        register_factory2_(factory2_), api_(Api::createApiForTest(stats_)) {}
 
   void setDispatcherExpectation() {
     timer_ = new NiceMock<Event::MockTimer>();
@@ -122,7 +122,7 @@ protected:
 
   std::unique_ptr<OverloadManagerImpl> createOverloadManager(const std::string& config) {
     return std::make_unique<OverloadManagerImpl>(dispatcher_, stats_, thread_local_,
-                                                 parseConfig(config));
+                                                 parseConfig(config), *api_);
   }
 
   FakeResourceMonitorFactory factory1_;
@@ -134,6 +134,7 @@ protected:
   Stats::IsolatedStoreImpl stats_;
   NiceMock<ThreadLocal::MockInstance> thread_local_;
   Event::TimerCb timer_cb_;
+  Api::ApiPtr api_;
 };
 
 TEST_F(OverloadManagerImplTest, CallbackOnlyFiresWhenStateChanges) {

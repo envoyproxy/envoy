@@ -19,9 +19,7 @@ Http::FilterFactoryCb GrpcWebFilterConfig::createFilter(const std::string&,
 /**
  * Static registration for the gRPC-Web filter. @see RegisterFactory.
  */
-static Registry::RegisterFactory<GrpcWebFilterConfig,
-                                 Server::Configuration::NamedHttpFilterConfigFactory>
-    register_;
+REGISTER_FACTORY(GrpcWebFilterConfig, Server::Configuration::NamedHttpFilterConfigFactory);
 
 } // namespace GrpcWeb
 } // namespace HttpFilters

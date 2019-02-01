@@ -13,10 +13,10 @@ envoy_cc_library(
     srcs = ["injected_resource_monitor.cc"],
     hdrs = ["injected_resource_monitor.h"],
     deps = [
+        "//include/envoy/api:api_interface",
         "//include/envoy/filesystem:filesystem_interface",
         "//include/envoy/server:resource_monitor_config_interface",
         "//source/common/common:assert_lib",
-        "//source/common/filesystem:filesystem_lib",
         "@envoy_api//envoy/config/resource_monitor/injected_resource/v2alpha:injected_resource_cc",
     ],
 )

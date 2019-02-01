@@ -105,7 +105,7 @@ public:
   /**
    * Create a particular Dubbo protocol.
    * @param callbacks the callbacks to be notified of protocol decodes.
-   * @return ptotocol instance pointer.
+   * @return protocol instance pointer.
    */
   virtual ProtocolPtr createProtocol(ProtocolCallbacks& callbacks) PURE;
 

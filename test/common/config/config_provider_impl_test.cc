@@ -5,6 +5,7 @@
 
 #include "test/common/config/dummy_config.pb.h"
 #include "test/mocks/server/mocks.h"
+#include "test/test_common/simulated_time_system.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -211,9 +212,10 @@ public:
     provider_manager_ = std::make_unique<DummyConfigProviderManager>(factory_context_.admin_);
   }
 
-  Event::SimulatedTimeSystem& timeSystem() { return factory_context_.timeSystem(); }
+  Event::SimulatedTimeSystem& timeSystem() { return time_system_; }
 
 protected:
+  Event::SimulatedTimeSystem time_system_;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   std::unique_ptr<DummyConfigProviderManager> provider_manager_;
 };

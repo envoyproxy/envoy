@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/api/api.h"
 #include "envoy/api/v2/core/base.pb.h"
 
 #include "absl/types/optional.h"
@@ -12,10 +13,11 @@ namespace DataSource {
  * Read contents of the DataSource.
  * @param source data source.
  * @param allow_empty return an empty string if no DataSource case is specified.
+ * @param api reference to the Api object
  * @return std::string with DataSource contents.
  * @throw EnvoyException if no DataSource case is specified and !allow_empty.
  */
-std::string read(const envoy::api::v2::core::DataSource& source, bool allow_empty);
+std::string read(const envoy::api::v2::core::DataSource& source, bool allow_empty, Api::Api& api);
 
 /**
  * @param source data source.

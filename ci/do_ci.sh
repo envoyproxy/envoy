@@ -5,7 +5,9 @@
 set -e
 
 build_setup_args=""
-if [[ "$1" == "fix_format" || "$1" == "check_format" || "$1" == "check_repositories" || "$1" == "check_spelling" || "$1" == "fix_spelling" || "$1" == "bazel.clang_tidy" ]]; then
+if [[ "$1" == "fix_format" || "$1" == "check_format" || "$1" == "check_repositories" || \
+        "$1" == "check_spelling" || "$1" == "fix_spelling" || "$1" == "bazel.clang_tidy" || \
+        "$1" == "check_spelling_pedantic" ]]; then
   build_setup_args="-nofetch"
 fi
 
@@ -82,6 +84,16 @@ if [[ "$1" == "bazel.release" ]]; then
     echo "Testing..."
     # We have various test binaries in the test directory such as tools, benchmarks, etc. We
     # run a build pass to make sure they compile.
+
+    # Reduce the amount of memory and number of cores Bazel tries to use to
+    # prevent it from launching too many subprocesses. This should prevent the
+    # system from running out of memory and killing tasks. See discussion on
+    # https://github.com/envoyproxy/envoy/pull/5611.
+    # TODO(akonradi): use --local_cpu_resources flag once Bazel has a release
+    # after 0.21.
+    [ -z "$CIRCLECI" ] || export BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --local_resources=12288,5,1"
+    [ -z "$CIRCLECI" ] || export BAZEL_TEST_OPTIONS="${BAZEL_TEST_OPTIONS} --local_resources=12288,5,1 --local_test_jobs=8"
+
     bazel build ${BAZEL_BUILD_OPTIONS} -c opt //include/... //source/... //test/...
     # Now run all of the tests which should already be compiled.
     bazel_with_collection test ${BAZEL_TEST_OPTIONS} -c opt //test/...
@@ -111,19 +123,19 @@ elif [[ "$1" == "bazel.asan" ]]; then
   echo "Building and testing..."
   bazel_with_collection test ${BAZEL_TEST_OPTIONS} -c dbg --config=clang-asan @envoy//test/... \
     //:echo2_integration_test //:envoy_binary_test
-  # Also validate that integration test traffic capture (useful when debugging etc.)
-  # works. This requires that we set CAPTURE_ENV. We do this under bazel.asan to
+  # Also validate that integration test traffic tapping (useful when debugging etc.)
+  # works. This requires that we set TAP_PATH. We do this under bazel.asan to
   # ensure a debug build in CI.
-  CAPTURE_TMP=/tmp/capture/
-  rm -rf "${CAPTURE_TMP}"
-  mkdir -p "${CAPTURE_TMP}"
+  TAP_TMP=/tmp/tap/
+  rm -rf "${TAP_TMP}"
+  mkdir -p "${TAP_TMP}"
   bazel_with_collection test ${BAZEL_TEST_OPTIONS} -c dbg --config=clang-asan \
     @envoy//test/integration:ssl_integration_test \
-    --test_env=CAPTURE_PATH="${CAPTURE_TMP}/capture"
+    --test_env=TAP_PATH="${TAP_TMP}/tap"
   # Verify that some pb_text files have been created. We can't check for pcap,
   # since tcpdump is not available in general due to CircleCI lack of support
   # for privileged Docker executors.
-  ls -l "${CAPTURE_TMP}"/*.pb_text > /dev/null
+  ls -l "${TAP_TMP}"/tap_*.pb_text > /dev/null
   exit 0
 elif [[ "$1" == "bazel.tsan" ]]; then
   setup_clang_toolchain
@@ -201,7 +213,7 @@ elif [[ "$1" == "bazel.api" ]]; then
   bazel build ${BAZEL_BUILD_OPTIONS} -c fastbuild @envoy_api//envoy/...
   echo "Testing API..."
   bazel_with_collection test ${BAZEL_TEST_OPTIONS} -c fastbuild @envoy_api//test/... @envoy_api//tools/... \
-    @envoy_api//tools:capture2pcap_test
+    @envoy_api//tools:tap2pcap_test
   exit 0
 elif [[ "$1" == "bazel.coverage" ]]; then
   setup_gcc_toolchain
@@ -216,6 +228,15 @@ elif [[ "$1" == "bazel.coverage" ]]; then
   export GCOVR_DIR="${ENVOY_BUILD_DIR}/bazel-envoy"
   export TESTLOGS_DIR="${ENVOY_BUILD_DIR}/bazel-testlogs"
   export WORKSPACE=ci
+
+  # Reduce the amount of memory and number of cores Bazel tries to use to
+  # prevent it from launching too many subprocesses. This should prevent the
+  # system from running out of memory and killing tasks. See discussion on
+  # https://github.com/envoyproxy/envoy/pull/5611.
+  # TODO(akonradi): use --local_cpu_resources flag once Bazel has a release
+  # after 0.21.
+  [ -z "$CIRCLECI" ] || export BAZEL_TEST_OPTIONS="${BAZEL_TEST_OPTIONS} --local_resources=12288,4,1"
+
   # There is a bug in gcovr 3.3, where it takes the -r path,
   # in our case /source, and does a regex replacement of various
   # source file paths during HTML generation. It attempts to strip
@@ -278,6 +299,11 @@ elif [[ "$1" == "fix_spelling" ]];then
   cd "${ENVOY_SRCDIR}"
   echo "fix_spell..."
   ./tools/check_spelling.sh fix
+  exit 0
+elif [[ "$1" == "check_spelling_pedantic" ]]; then
+  cd "${ENVOY_SRCDIR}"
+  echo "check_spelling_pedantic..."
+  ./tools/check_spelling_pedantic.py check
   exit 0
 elif [[ "$1" == "docs" ]]; then
   echo "generating docs..."

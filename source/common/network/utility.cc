@@ -194,7 +194,7 @@ void Utility::throwWithMalformedIp(const std::string& ip_address) {
 }
 
 // TODO(hennna): Currently getLocalAddress does not support choosing between
-// multiple interfaces and addresses not returned by getifaddrs. In additon,
+// multiple interfaces and addresses not returned by getifaddrs. In addition,
 // the default is to return a loopback address of type version. This function may
 // need to be updated in the future. Discussion can be found at Github issue #939.
 Address::InstanceConstSharedPtr Utility::getLocalAddress(const Address::IpVersion version) {
@@ -227,7 +227,7 @@ Address::InstanceConstSharedPtr Utility::getLocalAddress(const Address::IpVersio
     freeifaddrs(ifaddr);
   }
 
-  // If the local address is not found above, then return the loopback addresss by default.
+  // If the local address is not found above, then return the loopback address by default.
   if (ret == nullptr) {
     if (version == Address::IpVersion::v4) {
       ret.reset(new Address::Ipv4Instance("127.0.0.1"));

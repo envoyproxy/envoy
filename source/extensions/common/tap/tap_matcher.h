@@ -23,13 +23,18 @@ using MatcherPtr = std::unique_ptr<Matcher>;
  * - A per-stream/request matching status must be kept in order to compute interim match status.
  * - In order to make this computationally efficient, the matching tree is kept in a vector, with
  *   all references to other matchers implemented using an index into the vector. The vector is
- *   effectively a flattened N-ary tree.
+ *   effectively a preorder traversal flattened N-ary tree.
  * - The previous point allows the creation of a per-stream/request vector of booleans of the same
  *   size as the matcher vector. Then, when match status is updated given new information, the
  *   vector of booleans can be easily updated using the same indexes as in the constant match
  *   configuration.
  * - Finally, a matches() function can be trivially implemented by looking in the status vector at
  *   the index position that the current matcher is located in.
+ *
+ * TODO(mattklein123): Currently, any match updates perform a recursive call on any child match
+ * nodes. It's possible that we can short circuit this in certain cases but this needs more
+ * thinking (e.g., if an OR matcher already has one match and it's not possible for a matcher to
+ * flip from true to false).
  */
 class Matcher {
 public:
@@ -41,15 +46,27 @@ public:
   size_t index() { return my_index_; }
 
   /**
-   * Update match status given new information.
-   * @param request_headers supplies the request headers, if available.
-   * @param response_headers supplies the response headers, if available.
+   * Update match status when a stream is created. This might be an HTTP stream, a TCP connectin,
+   * etc. This allows any matchers to flip to an initial state of true if applicable.
+   */
+  virtual bool onNewStream(std::vector<bool>& statuses) const PURE;
+
+  /**
+   * Update match status given HTTP request headers.
+   * @param request_headers supplies the request headers.
    * @param statuses supplies the per-stream-request match status vector which must be the same
    *                 size as the match tree vector (see above).
    */
-  virtual bool updateMatchStatus(const Http::HeaderMap* request_headers,
-                                 const Http::HeaderMap* response_headers,
-                                 std::vector<bool>& statuses) const PURE;
+  virtual bool onHttpRequestHeaders(const Http::HeaderMap& request_headers,
+                                    std::vector<bool>& statuses) const PURE;
+  /**
+   * Update match status given HTTP response headers.
+   * @param response_headers supplies the response headers.
+   * @param statuses supplies the per-stream-request match status vector which must be the same
+   *                 size as the match tree vector (see above).
+   */
+  virtual bool onHttpResponseHeaders(const Http::HeaderMap& response_headers,
+                                     std::vector<bool>& statuses) const PURE;
 
   /**
    * @return whether given currently available information, the matcher matches.
@@ -91,11 +108,15 @@ public:
                   std::vector<MatcherPtr>& matchers, Type type);
 
   // Extensions::Common::Tap::Matcher
-  bool updateMatchStatus(const Http::HeaderMap* request_headers,
-                         const Http::HeaderMap* response_headers,
-                         std::vector<bool>& statuses) const override;
+  bool onNewStream(std::vector<bool>& statuses) const override;
+  bool onHttpRequestHeaders(const Http::HeaderMap& request_headers,
+                            std::vector<bool>& statuses) const override;
+  bool onHttpResponseHeaders(const Http::HeaderMap& response_headers,
+                             std::vector<bool>& statuses) const override;
 
 private:
+  bool updateLocalStatus(std::vector<bool>& statuses) const;
+
   std::vector<MatcherPtr>& matchers_;
   std::vector<size_t> indexes_;
   const Type type_;
@@ -110,9 +131,11 @@ public:
              std::vector<MatcherPtr>& matchers);
 
   // Extensions::Common::Tap::Matcher
-  bool updateMatchStatus(const Http::HeaderMap* request_headers,
-                         const Http::HeaderMap* response_headers,
-                         std::vector<bool>& statuses) const override;
+  bool onNewStream(std::vector<bool>& statuses) const override;
+  bool onHttpRequestHeaders(const Http::HeaderMap& request_headers,
+                            std::vector<bool>& statuses) const override;
+  bool onHttpResponseHeaders(const Http::HeaderMap& response_headers,
+                             std::vector<bool>& statuses) const override;
 
 private:
   std::vector<MatcherPtr>& matchers_;
@@ -127,9 +150,14 @@ public:
   AnyMatcher(std::vector<MatcherPtr>& matchers) : Matcher(matchers) {}
 
   // Extensions::Common::Tap::Matcher
-  bool updateMatchStatus(const Http::HeaderMap*, const Http::HeaderMap*,
-                         std::vector<bool>& statuses) const override {
+  bool onNewStream(std::vector<bool>& statuses) const override {
     statuses[my_index_] = true;
+    return true;
+  }
+  bool onHttpRequestHeaders(const Http::HeaderMap&, std::vector<bool>&) const override {
+    return true;
+  }
+  bool onHttpResponseHeaders(const Http::HeaderMap&, std::vector<bool>&) const override {
     return true;
   }
 };
@@ -143,9 +171,12 @@ public:
                      const std::vector<MatcherPtr>& matchers);
 
   // Extensions::Common::Tap::Matcher
-  bool updateMatchStatus(const Http::HeaderMap* request_headers,
-                         const Http::HeaderMap* response_headers,
-                         std::vector<bool>& statuses) const override;
+  bool onNewStream(std::vector<bool>&) const override { return false; }
+  bool onHttpRequestHeaders(const Http::HeaderMap& request_headers,
+                            std::vector<bool>& statuses) const override;
+  bool onHttpResponseHeaders(const Http::HeaderMap&, std::vector<bool>& statuses) const override {
+    return statuses[my_index_];
+  }
 
 private:
   std::vector<Http::HeaderUtility::HeaderData> headers_to_match_;
@@ -160,9 +191,12 @@ public:
                       const std::vector<MatcherPtr>& matchers);
 
   // Extensions::Common::Tap::Matcher
-  bool updateMatchStatus(const Http::HeaderMap* request_headers,
-                         const Http::HeaderMap* response_headers,
-                         std::vector<bool>& statuses) const override;
+  bool onNewStream(std::vector<bool>&) const override { return false; }
+  bool onHttpRequestHeaders(const Http::HeaderMap&, std::vector<bool>&) const override {
+    return false;
+  }
+  bool onHttpResponseHeaders(const Http::HeaderMap& response_headers,
+                             std::vector<bool>& statuses) const override;
 
 private:
   std::vector<Http::HeaderUtility::HeaderData> headers_to_match_;

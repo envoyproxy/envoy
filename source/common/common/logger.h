@@ -185,7 +185,7 @@ private:
 
 /**
  * Defines a scope for the logging system with the specified lock and log level.
- * This is equivalalent to setLogLevel, setLogFormat, and setLock, which can be
+ * This is equivalent to setLogLevel, setLogFormat, and setLock, which can be
  * called individually as well, e.g. to set the log level without changing the
  * lock or format.
  *

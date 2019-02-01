@@ -10,6 +10,7 @@
 #include "common/common/empty_string.h"
 #include "common/common/fmt.h"
 #include "common/config/utility.h"
+#include "common/network/io_socket_handle_impl.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/resolver_impl.h"
 #include "common/network/socket_option_factory.h"
@@ -117,9 +118,10 @@ Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
     }
     const std::string addr = fmt::format("unix://{}", address->asString());
     const int fd = server_.hotRestart().duplicateParentListenSocket(addr);
-    if (fd != -1) {
+    Network::IoHandlePtr io_handle = std::make_unique<Network::IoSocketHandle>(fd);
+    if (io_handle->fd() != -1) {
       ENVOY_LOG(debug, "obtained socket for address {} from parent", addr);
-      return std::make_shared<Network::UdsListenSocket>(fd, address);
+      return std::make_shared<Network::UdsListenSocket>(std::move(io_handle), address);
     }
     return std::make_shared<Network::UdsListenSocket>(address);
   }
@@ -131,10 +133,11 @@ Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
   const int fd = server_.hotRestart().duplicateParentListenSocket(addr);
   if (fd != -1) {
     ENVOY_LOG(debug, "obtained socket for address {} from parent", addr);
+    Network::IoHandlePtr io_handle = std::make_unique<Network::IoSocketHandle>(fd);
     if (socket_type == Network::Address::SocketType::Stream) {
-      return std::make_shared<Network::TcpListenSocket>(fd, address, options);
+      return std::make_shared<Network::TcpListenSocket>(std::move(io_handle), address, options);
     } else {
-      return std::make_shared<Network::UdpListenSocket>(fd, address, options);
+      return std::make_shared<Network::UdpListenSocket>(std::move(io_handle), address, options);
     }
   }
   if (socket_type == Network::Address::SocketType::Stream) {
@@ -266,9 +269,10 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
         filter_chain_match.application_protocols().begin(),
         filter_chain_match.application_protocols().end());
     Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-        parent_.server_.sslContextManager(), *listener_scope_, parent_.server_.clusterManager(),
-        parent_.server_.localInfo(), parent_.server_.dispatcher(), parent_.server_.random(),
-        parent_.server_.stats());
+        parent_.server_.admin(), parent_.server_.sslContextManager(), *listener_scope_,
+        parent_.server_.clusterManager(), parent_.server_.localInfo(), parent_.server_.dispatcher(),
+        parent_.server_.random(), parent_.server_.stats(), parent_.server_.singletonManager(),
+        parent_.server_.threadLocal(), parent_.server_.api());
     factory_context.setInitManager(initManager());
     addFilterChain(
         PROTOBUF_GET_WRAPPED_OR_DEFAULT(filter_chain_match, destination_port, 0), destination_ips,

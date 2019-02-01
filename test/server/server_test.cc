@@ -63,8 +63,8 @@ public:
     sigint_ = new Event::MockSignalEvent(&dispatcher_);
     sigusr1_ = new Event::MockSignalEvent(&dispatcher_);
     sighup_ = new Event::MockSignalEvent(&dispatcher_);
-    EXPECT_CALL(cm_, setInitializedCb(_)).WillOnce(SaveArg<0>(&cm_init_callback_));
     EXPECT_CALL(overload_manager_, start());
+    EXPECT_CALL(cm_, setInitializedCb(_)).WillOnce(SaveArg<0>(&cm_init_callback_));
     ON_CALL(server_, shutdown()).WillByDefault(Assign(&shutdown_, true));
 
     helper_ = std::make_unique<RunHelper>(server_, options_, dispatcher_, cm_, access_log_manager_,
@@ -132,7 +132,7 @@ protected:
         std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), thread_local_,
         Thread::threadFactoryForTest());
 
-    EXPECT_TRUE(server_->api().fileExists("/dev/null"));
+    EXPECT_TRUE(server_->api().fileSystem().fileExists("/dev/null"));
   }
 
   void initializeWithHealthCheckParams(const std::string& bootstrap_path, const double timeout,
@@ -149,7 +149,7 @@ protected:
         std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), thread_local_,
         Thread::threadFactoryForTest());
 
-    EXPECT_TRUE(server_->api().fileExists("/dev/null"));
+    EXPECT_TRUE(server_->api().fileSystem().fileExists("/dev/null"));
   }
 
   // Returns the server's tracer as a pointer, for use in dynamic_cast tests.
@@ -167,9 +167,9 @@ protected:
   std::unique_ptr<InstanceImpl> server_;
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, ServerInstanceImplTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, ServerInstanceImplTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(ServerInstanceImplTest, V2ConfigOnly) {
   options_.service_cluster_name_ = "some_cluster_name";
@@ -279,7 +279,7 @@ TEST_P(ServerInstanceImplTest, BootstrapNodeWithoutAccessLog) {
                             "An admin access log path is required for a listening server.");
 }
 
-// Empty bootstrap succeeeds.
+// Empty bootstrap succeeds.
 TEST_P(ServerInstanceImplTest, EmptyBootstrap) {
   options_.service_cluster_name_ = "some_cluster_name";
   options_.service_node_name_ = "some_node_name";
@@ -305,18 +305,18 @@ TEST_P(ServerInstanceImplTest, LogToFile) {
   options_.service_cluster_name_ = "some_cluster_name";
   options_.service_node_name_ = "some_node_name";
   EXPECT_NO_THROW(initialize("test/server/empty_bootstrap.yaml"));
-  EXPECT_TRUE(server_->api().fileExists(path));
+  EXPECT_TRUE(server_->api().fileSystem().fileExists(path));
 
   GET_MISC_LOGGER().set_level(spdlog::level::info);
   ENVOY_LOG_MISC(warn, "LogToFile test string");
   Logger::Registry::getSink()->flush();
-  std::string log = server_->api().fileReadToEnd(path);
+  std::string log = server_->api().fileSystem().fileReadToEnd(path);
   EXPECT_GT(log.size(), 0);
   EXPECT_TRUE(log.find("LogToFile test string") != std::string::npos);
 
   // Test that critical messages get immediately flushed
   ENVOY_LOG_MISC(critical, "LogToFile second test string");
-  log = server_->api().fileReadToEnd(path);
+  log = server_->api().fileSystem().fileReadToEnd(path);
   EXPECT_TRUE(log.find("LogToFile second test string") != std::string::npos);
 }
 
@@ -394,7 +394,7 @@ TEST_P(ServerInstanceImplTest, ZipkinHttpTracingEnabled) {
   EXPECT_NO_THROW(initialize("test/server/zipkin_tracing.yaml"));
   EXPECT_EQ(nullptr, dynamic_cast<Tracing::HttpNullTracer*>(tracer()));
 
-  // Note: there is no ZipkingTracerImpl object;
+  // Note: there is no ZipkinTracerImpl object;
   // source/extensions/tracers/zipkin/config.cc instantiates the tracer with
   //     std::make_unique<Tracing::HttpTracerImpl>(std::move(zipkin_driver), server.localInfo());
   // so we look for a successful dynamic cast to HttpTracerImpl, rather

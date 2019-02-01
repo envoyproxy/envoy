@@ -91,9 +91,29 @@ message OutputSink {
     //   been configured to receive tap configuration from some other source (e.g., static
     //   file, XDS, etc.) configuring the streaming admin output type will fail.
     StreamingAdminSink streaming_admin = 1;
+
+    // Tap output will be written to a file per tap sink.
+    FilePerTapSink file_per_tap = 2;
   }
 }
 
 // Streaming admin sink configuration.
 message StreamingAdminSink {
+}
+
+// The file per tap sink outputs a discrete file for every tapped stream.
+message FilePerTapSink {
+  // Path prefix. The output file will be of the form <path_prefix>_<id>.pb, where <id> is an
+  // identifier distinguishing the recorded trace for stream instances (the Envoy
+  // connection ID, HTTP stream ID, etc.).
+  string path_prefix = 1 [(validate.rules).string.min_bytes = 1];
+
+  // File format.
+  enum Format {
+    // Binary proto format.
+    PROTO_BINARY = 0;
+    // Text proto format.
+    PROTO_TEXT = 1;
+  }
+  Format format = 2 [(validate.rules).enum.defined_only = true];
 }

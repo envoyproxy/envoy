@@ -154,9 +154,9 @@ protected:
   }
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, GrpcJsonTranscoderIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, GrpcJsonTranscoderIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryPost) {
   testTranscoding<bookstore::CreateShelfRequest, bookstore::Shelf>(

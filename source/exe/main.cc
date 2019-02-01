@@ -35,6 +35,6 @@ int main(int argc, char** argv) {
   }
 
   // Run the server listener loop outside try/catch blocks, so that unexpected exceptions
-  // show up as a core-dumps for easier diagnostis.
+  // show up as a core-dumps for easier diagnostics.
   return main_common->run() ? EXIT_SUCCESS : EXIT_FAILURE;
 }

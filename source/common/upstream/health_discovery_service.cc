@@ -12,14 +12,17 @@ HdsDelegate::HdsDelegate(Stats::Scope& scope, Grpc::AsyncClientPtr async_client,
                          Envoy::Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
                          Runtime::RandomGenerator& random, ClusterInfoFactory& info_factory,
                          AccessLog::AccessLogManager& access_log_manager, ClusterManager& cm,
-                         const LocalInfo::LocalInfo& local_info)
+                         const LocalInfo::LocalInfo& local_info, Server::Admin& admin,
+                         Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls,
+                         Api::Api& api)
     : stats_{ALL_HDS_STATS(POOL_COUNTER_PREFIX(scope, "hds_delegate."))},
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "envoy.service.discovery.v2.HealthDiscoveryService.StreamHealthCheck")),
       async_client_(std::move(async_client)), dispatcher_(dispatcher), runtime_(runtime),
       store_stats(stats), ssl_context_manager_(ssl_context_manager), random_(random),
       info_factory_(info_factory), access_log_manager_(access_log_manager), cm_(cm),
-      local_info_(local_info) {
+      local_info_(local_info), admin_(admin), singleton_manager_(singleton_manager), tls_(tls),
+      api_(api) {
   health_check_request_.mutable_health_check_request()->mutable_node()->MergeFrom(
       local_info_.node());
   backoff_strategy_ = std::make_unique<JitteredBackOffStrategy>(RetryInitialDelayMilliseconds,
@@ -144,9 +147,9 @@ void HdsDelegate::processMessage(
     ENVOY_LOG(debug, "New HdsCluster config {} ", cluster_config.DebugString());
 
     // Create HdsCluster
-    hds_clusters_.emplace_back(new HdsCluster(runtime_, cluster_config, bind_config, store_stats,
-                                              ssl_context_manager_, false, info_factory_, cm_,
-                                              local_info_, dispatcher_, random_));
+    hds_clusters_.emplace_back(new HdsCluster(
+        admin_, runtime_, cluster_config, bind_config, store_stats, ssl_context_manager_, false,
+        info_factory_, cm_, local_info_, dispatcher_, random_, singleton_manager_, tls_, api_));
 
     hds_clusters_.back()->startHealthchecks(access_log_manager_, runtime_, random_, dispatcher_);
   }
@@ -182,21 +185,23 @@ void HdsDelegate::onRemoteClose(Grpc::Status::GrpcStatus status, const std::stri
   handleFailure();
 }
 
-HdsCluster::HdsCluster(Runtime::Loader& runtime, const envoy::api::v2::Cluster& cluster,
+HdsCluster::HdsCluster(Server::Admin& admin, Runtime::Loader& runtime,
+                       const envoy::api::v2::Cluster& cluster,
                        const envoy::api::v2::core::BindConfig& bind_config, Stats::Store& stats,
                        Ssl::ContextManager& ssl_context_manager, bool added_via_api,
                        ClusterInfoFactory& info_factory, ClusterManager& cm,
                        const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
-                       Runtime::RandomGenerator& random)
+                       Runtime::RandomGenerator& random, Singleton::Manager& singleton_manager,
+                       ThreadLocal::SlotAllocator& tls, Api::Api& api)
     : runtime_(runtime), cluster_(cluster), bind_config_(bind_config), stats_(stats),
       ssl_context_manager_(ssl_context_manager), added_via_api_(added_via_api),
       initial_hosts_(new HostVector()) {
   ENVOY_LOG(debug, "Creating an HdsCluster");
   priority_set_.getOrCreateHostSet(0);
 
-  info_ =
-      info_factory.createClusterInfo(runtime_, cluster_, bind_config_, stats_, ssl_context_manager_,
-                                     added_via_api_, cm, local_info, dispatcher, random);
+  info_ = info_factory.createClusterInfo({admin, runtime_, cluster_, bind_config_, stats_,
+                                          ssl_context_manager_, added_via_api_, cm, local_info,
+                                          dispatcher, random, singleton_manager, tls, api});
 
   for (const auto& host : cluster.hosts()) {
     initial_hosts_->emplace_back(new HostImpl(
@@ -210,24 +215,23 @@ HdsCluster::HdsCluster(Runtime::Loader& runtime, const envoy::api::v2::Cluster& 
 
 ClusterSharedPtr HdsCluster::create() { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
-ClusterInfoConstSharedPtr ProdClusterInfoFactory::createClusterInfo(
-    Runtime::Loader& runtime, const envoy::api::v2::Cluster& cluster,
-    const envoy::api::v2::core::BindConfig& bind_config, Stats::Store& stats,
-    Ssl::ContextManager& ssl_context_manager, bool added_via_api, ClusterManager& cm,
-    const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
-    Runtime::RandomGenerator& random) {
-
-  Envoy::Stats::ScopePtr scope = stats.createScope(fmt::format("cluster.{}.", cluster.name()));
+ClusterInfoConstSharedPtr
+ProdClusterInfoFactory::createClusterInfo(const CreateClusterInfoParams& params) {
+  Envoy::Stats::ScopePtr scope =
+      params.stats_.createScope(fmt::format("cluster.{}.", params.cluster_.name()));
 
   Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-      ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats);
+      params.admin_, params.ssl_context_manager_, *scope, params.cm_, params.local_info_,
+      params.dispatcher_, params.random_, params.stats_, params.singleton_manager_, params.tls_,
+      params.api_);
 
   // TODO(JimmyCYJ): Support SDS for HDS cluster.
   Network::TransportSocketFactoryPtr socket_factory =
-      Upstream::createTransportSocketFactory(cluster, factory_context);
+      Upstream::createTransportSocketFactory(params.cluster_, factory_context);
 
-  return std::make_unique<ClusterInfoImpl>(cluster, bind_config, runtime, std::move(socket_factory),
-                                           std::move(scope), added_via_api);
+  return std::make_unique<ClusterInfoImpl>(params.cluster_, params.bind_config_, params.runtime_,
+                                           std::move(socket_factory), std::move(scope),
+                                           params.added_via_api_);
 }
 
 void HdsCluster::startHealthchecks(AccessLog::AccessLogManager& access_log_manager,

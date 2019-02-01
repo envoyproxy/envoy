@@ -1,5 +1,10 @@
 # Envoy specific Bazel build/test options.
 
+# Bazel doesn't need more than 200MB of memory based on memory profiling:
+# https://docs.bazel.build/versions/master/skylark/performance.html#memory-profiling
+# Limiting JVM heapsize here to let it do GC more when approaching the limit to
+# leave room for compiler/linker.
+startup --host_jvm_args=-Xmx512m
 build --workspace_status_command=bazel/get_workspace_status
 
 # Basic ASAN/UBSAN that works for gcc

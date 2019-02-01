@@ -44,21 +44,26 @@ ToolConfig::ToolConfig(std::unique_ptr<Http::TestHeaderMapImpl> headers, int ran
 RouterCheckTool RouterCheckTool::create(const std::string& router_config_file) {
   // TODO(hennna): Allow users to load a full config and extract the route configuration from it.
   envoy::api::v2::RouteConfiguration route_config;
-  MessageUtil::loadFromFile(router_config_file, route_config);
+  auto stats = std::make_unique<Stats::IsolatedStoreImpl>();
+  auto api = Api::createApiForTest(*stats);
+  MessageUtil::loadFromFile(router_config_file, route_config, *api);
 
   auto factory_context = std::make_unique<NiceMock<Server::Configuration::MockFactoryContext>>();
   auto config = std::make_unique<Router::ConfigImpl>(route_config, *factory_context, false);
 
-  return RouterCheckTool(std::move(factory_context), std::move(config));
+  return RouterCheckTool(std::move(factory_context), std::move(config), std::move(stats),
+                         std::move(api));
 }
 
 RouterCheckTool::RouterCheckTool(
     std::unique_ptr<NiceMock<Server::Configuration::MockFactoryContext>> factory_context,
-    std::unique_ptr<Router::ConfigImpl> config)
-    : factory_context_(std::move(factory_context)), config_(std::move(config)) {}
+    std::unique_ptr<Router::ConfigImpl> config, std::unique_ptr<Stats::IsolatedStoreImpl> stats,
+    Api::ApiPtr api)
+    : factory_context_(std::move(factory_context)), config_(std::move(config)),
+      stats_(std::move(stats)), api_(std::move(api)) {}
 
 bool RouterCheckTool::compareEntriesInJson(const std::string& expected_route_json) {
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromFile(expected_route_json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromFile(expected_route_json, *api_);
   loader->validateSchema(Json::ToolSchema::routerCheckSchema());
 
   bool no_failures = true;

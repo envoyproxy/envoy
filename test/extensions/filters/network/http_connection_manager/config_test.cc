@@ -152,6 +152,35 @@ TEST_F(HttpConnectionManagerConfigTest, UnixSocketInternalAddress) {
   EXPECT_FALSE(config.internalAddressConfig().isInternalAddress(externalIpAddress));
 }
 
+TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersSizeDefault) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_);
+  EXPECT_EQ(60, config.maxRequestHeadersSizeKb());
+}
+
+TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersSizeConfigured) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  max_request_headers_kb: 16
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_);
+  EXPECT_EQ(16, config.maxRequestHeadersSizeKb());
+}
+
 // Validated that an explicit zero stream idle timeout disables.
 TEST_F(HttpConnectionManagerConfigTest, DisabledStreamIdleTimeout) {
   const std::string yaml_string = R"EOF(

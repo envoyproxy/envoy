@@ -27,7 +27,7 @@ namespace Filters {
 namespace Common {
 namespace ExtAuthz {
 
-typedef Grpc::TypedAsyncRequestCallbacks<envoy::service::auth::v2alpha::CheckResponse>
+typedef Grpc::TypedAsyncRequestCallbacks<envoy::service::auth::v2::CheckResponse>
     ExtAuthzAsyncCallbacks;
 
 struct ConstantValues {
@@ -53,13 +53,12 @@ public:
 
   // ExtAuthz::Client
   void cancel() override;
-  void check(RequestCallbacks& callbacks,
-             const envoy::service::auth::v2alpha::CheckRequest& request,
+  void check(RequestCallbacks& callbacks, const envoy::service::auth::v2::CheckRequest& request,
              Tracing::Span& parent_span) override;
 
   // Grpc::AsyncRequestCallbacks
   void onCreateInitialMetadata(Http::HeaderMap&) override {}
-  void onSuccess(std::unique_ptr<envoy::service::auth::v2alpha::CheckResponse>&& response,
+  void onSuccess(std::unique_ptr<envoy::service::auth::v2::CheckResponse>&& response,
                  Tracing::Span& span) override;
   void onFailure(Grpc::Status::GrpcStatus status, const std::string& message,
                  Tracing::Span& span) override;
