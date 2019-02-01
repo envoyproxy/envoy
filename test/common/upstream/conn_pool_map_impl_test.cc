@@ -8,6 +8,7 @@
 #include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/conn_pool.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -185,8 +186,8 @@ TEST_F(ConnPoolMapImplTest, ReentryClearTripsAssert) {
   ON_CALL(*mock_pools_[0], addDrainedCallback(_))
       .WillByDefault(Invoke([](Http::ConnectionPool::Instance::DrainedCb cb) { cb(); }));
 
-  EXPECT_DEATH(test_map->addDrainedCallback([&test_map] { test_map->clear(); }),
-               ".*Details: A resource should only be entered once");
+  EXPECT_DEATH_LOG_TO_STDERR(test_map->addDrainedCallback([&test_map] { test_map->clear(); }),
+                             ".*Details: A resource should only be entered once");
 }
 
 TEST_F(ConnPoolMapImplTest, ReentryGetPoolTripsAssert) {
@@ -196,7 +197,7 @@ TEST_F(ConnPoolMapImplTest, ReentryGetPoolTripsAssert) {
   ON_CALL(*mock_pools_[0], addDrainedCallback(_))
       .WillByDefault(Invoke([](Http::ConnectionPool::Instance::DrainedCb cb) { cb(); }));
 
-  EXPECT_DEATH(
+  EXPECT_DEATH_LOG_TO_STDERR(
       test_map->addDrainedCallback([&test_map, this] { test_map->getPool(2, getBasicFactory()); }),
       ".*Details: A resource should only be entered once");
 }
@@ -208,8 +209,9 @@ TEST_F(ConnPoolMapImplTest, ReentryDrainConnectionsTripsAssert) {
   ON_CALL(*mock_pools_[0], addDrainedCallback(_))
       .WillByDefault(Invoke([](Http::ConnectionPool::Instance::DrainedCb cb) { cb(); }));
 
-  EXPECT_DEATH(test_map->addDrainedCallback([&test_map] { test_map->drainConnections(); }),
-               ".*Details: A resource should only be entered once");
+  EXPECT_DEATH_LOG_TO_STDERR(
+      test_map->addDrainedCallback([&test_map] { test_map->drainConnections(); }),
+      ".*Details: A resource should only be entered once");
 }
 
 TEST_F(ConnPoolMapImplTest, ReentryAddDrainedCallbackTripsAssert) {
@@ -219,8 +221,9 @@ TEST_F(ConnPoolMapImplTest, ReentryAddDrainedCallbackTripsAssert) {
   ON_CALL(*mock_pools_[0], addDrainedCallback(_))
       .WillByDefault(Invoke([](Http::ConnectionPool::Instance::DrainedCb cb) { cb(); }));
 
-  EXPECT_DEATH(test_map->addDrainedCallback([&test_map] { test_map->addDrainedCallback([]() {}); }),
-               ".*Details: A resource should only be entered once");
+  EXPECT_DEATH_LOG_TO_STDERR(
+      test_map->addDrainedCallback([&test_map] { test_map->addDrainedCallback([]() {}); }),
+      ".*Details: A resource should only be entered once");
 }
 } // namespace Upstream
 } // namespace Envoy
