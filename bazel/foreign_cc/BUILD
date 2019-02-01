@@ -58,6 +58,7 @@ cmake_external(
     name = "yaml",
     cache_entries = {
         "YAML_CPP_BUILD_TESTS": "off",
+        "YAML_CPP_BUILD_TOOLS": "off",
         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
     },
     cmake_options = ["-GNinja"],
