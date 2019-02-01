@@ -13,6 +13,9 @@
 namespace Envoy {
 namespace Http {
 
+// Legacy default value of 60K is safely under both codec default limits.
+static const uint32_t DEFAULT_MAX_REQUEST_HEADERS_SIZE_KB = 60;
+
 class Stream;
 
 /**
@@ -204,7 +207,7 @@ public:
  * HTTP/1.* Codec settings
  */
 struct Http1Settings {
-  // Enable codec to parse absolute uris. This enables forward/explicit proxy support for non TLS
+  // Enable codec to parse absolute URIs. This enables forward/explicit proxy support for non TLS
   // traffic
   bool allow_absolute_url_{false};
   // Allow HTTP/1.0 from downstream.

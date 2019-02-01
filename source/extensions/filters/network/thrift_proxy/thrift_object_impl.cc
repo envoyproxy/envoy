@@ -252,7 +252,7 @@ void ThriftMapValueImpl::delegateComplete() {
     return;
   }
 
-  // Prepare for any elements's value.
+  // Prepare for any element's value.
   auto& elem = elements_.back();
   if (elem.second == nullptr) {
     auto value = makeValue(this, elem_type_);

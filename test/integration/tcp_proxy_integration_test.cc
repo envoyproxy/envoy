@@ -5,7 +5,6 @@
 #include "envoy/config/accesslog/v2/file.pb.h"
 #include "envoy/config/filter/network/tcp_proxy/v2/tcp_proxy.pb.validate.h"
 
-#include "common/filesystem/filesystem_impl.h"
 #include "common/network/utility.h"
 
 #include "extensions/transport_sockets/tls/context_manager_impl.h"
@@ -23,9 +22,9 @@ using testing::NiceMock;
 namespace Envoy {
 namespace {
 
-INSTANTIATE_TEST_CASE_P(IpVersions, TcpProxyIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, TcpProxyIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 void TcpProxyIntegrationTest::initialize() {
   config_helper_.renameListener("tcp_proxy");
@@ -260,7 +259,7 @@ TEST_P(TcpProxyIntegrationTest, AccessLog) {
   std::string log_result;
   // Access logs only get flushed to disk periodically, so poll until the log is non-empty
   do {
-    log_result = Filesystem::fileReadToEnd(access_log_path);
+    log_result = api_->fileSystem().fileReadToEnd(access_log_path);
   } while (log_result.empty());
 
   // Regex matching localhost:port
@@ -358,9 +357,9 @@ TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithLargeOutstandingData) {
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect(true));
 }
 
-INSTANTIATE_TEST_CASE_P(IpVersions, TcpProxySslIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, TcpProxySslIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 void TcpProxySslIntegrationTest::initialize() {
   config_helper_.addSslConfig();
@@ -388,10 +387,10 @@ void TcpProxySslIntegrationTest::setupConnections() {
             .WillByDefault(Invoke(client_write_buffer_, &MockWatermarkBuffer::trackDrains));
         return client_write_buffer_;
       }));
-  // Set up the SSl client.
+  // Set up the SSL client.
   Network::Address::InstanceConstSharedPtr address =
       Ssl::getSslAddress(version_, lookupPort("tcp_proxy"));
-  context_ = Ssl::createClientSslTransportSocketFactory({}, *context_manager_);
+  context_ = Ssl::createClientSslTransportSocketFactory({}, *context_manager_, *api_);
   ssl_client_ =
       dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
                                           context_->createTransportSocket(nullptr), nullptr);

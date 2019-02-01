@@ -4,7 +4,7 @@ executors:
   ubuntu-build:
     description: "A regular build executor based on ubuntu image"
     docker:
-      - image: envoyproxy/envoy-build:c1fde9909df98373be1fd2cc0733caf1f91917a6
+      - image: envoyproxy/envoy-build:111781fa2823535762e9c514db0c5c41a119b4b1
     resource_class: xlarge
     working_directory: /source
 
@@ -14,7 +14,10 @@ jobs:
      steps:
        - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
        - checkout
-       - run: ci/do_circle_ci.sh bazel.release
+       - run:
+           command:
+             ci/do_circle_ci.sh bazel.release
+           no_output_timeout: 60m
        - setup_remote_docker
        - run: ci/docker_push.sh
        - run: ci/docker_tag.sh
@@ -96,7 +99,10 @@ jobs:
      steps:
        - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
        - checkout
-       - run: ci/do_circle_ci.sh bazel.coverage
+       - run:
+           command:
+             ci/do_circle_ci.sh bazel.coverage
+           no_output_timeout: 60m
        - run: ci/coverage_publish.sh
        - store_artifacts:
            path: /build/envoy/generated/coverage
@@ -123,7 +129,7 @@ jobs:
        - run: ci/do_circle_ci.sh check_spelling
    build_image:
      docker:
-       - image: circleci/python:2.7
+       - image: circleci/python:3.7
          environment:
            # See comment in do_circle_ci.sh for why we do this.
            NUM_CPUS: 8

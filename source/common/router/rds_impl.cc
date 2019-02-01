@@ -72,7 +72,7 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
       rds.config_source(), factory_context.localInfo(), factory_context.dispatcher(),
       factory_context.clusterManager(), factory_context.random(), *scope_,
       "envoy.api.v2.RouteDiscoveryService.FetchRoutes",
-      "envoy.api.v2.RouteDiscoveryService.StreamRoutes");
+      "envoy.api.v2.RouteDiscoveryService.StreamRoutes", factory_context.api());
 }
 
 RdsRouteConfigSubscription::~RdsRouteConfigSubscription() {

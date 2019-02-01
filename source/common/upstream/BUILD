@@ -51,7 +51,6 @@ envoy_cc_library(
         "//source/common/config:cds_json_lib",
         "//source/common/config:grpc_mux_lib",
         "//source/common/config:utility_lib",
-        "//source/common/filesystem:filesystem_lib",
         "//source/common/grpc:async_client_manager_lib",
         "//source/common/http:async_client_lib",
         "//source/common/http/http1:conn_pool_lib",
@@ -148,6 +147,7 @@ envoy_cc_library(
     deps = [
         ":health_checker_lib",
         ":upstream_includes",
+        "//include/envoy/api:api_interface",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/server:transport_socket_config_interface",
@@ -211,6 +211,7 @@ envoy_cc_library(
         "//source/common/http:codes_lib",
         "//source/common/protobuf",
         "@envoy_api//envoy/api/v2:cds_cc",
+        "@envoy_api//envoy/data/cluster/v2alpha:outlier_detection_event_cc",
     ],
 )
 

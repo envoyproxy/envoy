@@ -32,6 +32,8 @@ routing PRs, questions, etc. to the right place.
   * Lua, access logging, and general miscellany.
 * Joshua Marantz ([jmarantz](https://github.com/jmarantz)) (jmarantz@google.com)
   * Stats, abseil, scalability, and performance.
+* Snow Pettersen ([snowp](https://github.com/snowp)) (snowp@squareup.com)
+  * Upstream, host/priority sets, load balancing, and retry plugins.
 
 # Emeritus maintainers
 

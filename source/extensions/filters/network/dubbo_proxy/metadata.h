@@ -1,4 +1,3 @@
-
 #pragma once
 
 #include <memory>
@@ -20,7 +19,7 @@ namespace DubboProxy {
 
 class MessageMetadata {
 public:
-  // TODO(leilei.gll) Add parameter data types and implement Dubbo data type mapping.
+  // TODO(gengleilei) Add parameter data types and implement Dubbo data type mapping.
   typedef std::unordered_map<uint32_t, std::string> ParameterValueMap;
   typedef std::unique_ptr<ParameterValueMap> ParameterValueMapPtr;
 

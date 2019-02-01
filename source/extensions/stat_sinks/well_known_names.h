@@ -16,7 +16,7 @@ class StatsSinkNameValues {
 public:
   // Statsd sink
   const std::string Statsd = "envoy.statsd";
-  // DogStatsD compatible stastsd sink
+  // DogStatsD compatible statsd sink
   const std::string DogStatsd = "envoy.dog_statsd";
   // MetricsService sink
   const std::string MetricsService = "envoy.metrics_service";

@@ -22,7 +22,7 @@ struct KeyValueOption {
 
 typedef std::vector<KeyValueOption> KeyValueOptionVector;
 typedef std::vector<envoy::api::v2::core::HeaderValueOption> HeaderValueOptionVector;
-typedef std::unique_ptr<envoy::service::auth::v2alpha::CheckResponse> CheckResponsePtr;
+typedef std::unique_ptr<envoy::service::auth::v2::CheckResponse> CheckResponsePtr;
 
 class TestCommon {
 public:
@@ -82,7 +82,7 @@ MATCHER_P(AuthzOkResponse, response, "") {
   if (arg->status != response.status) {
     return false;
   }
-  // Compare headers_to_apppend.
+  // Compare headers_to_append.
   if (!TestCommon::CompareHeaderVector(response.headers_to_append, arg->headers_to_append)) {
     return false;
   }

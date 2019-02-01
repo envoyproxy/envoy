@@ -70,7 +70,7 @@ namespace Envoy {
 /*
   Macro to use instead of EXPECT_DEATH when stderr is produced by a logger.
   It temporarily installs stderr sink and restores the original logger sink after the test
-  completes and sdterr_sink object goes of of scope.
+  completes and stderr_sink object goes of of scope.
   EXPECT_DEATH(statement, regex) test passes when statement causes crash and produces error message
   matching regex. Test fails when statement does not crash or it crashes but message does not
   match regex. If a message produced during crash is redirected away from strerr, the test fails.
@@ -109,9 +109,9 @@ class TestUtility {
 public:
   /**
    * Compare 2 HeaderMaps.
-   * @param lhs supplies HeaderMaps 1.
-   * @param rhs supplies HeaderMaps 2.
-   * @return TRUE if the HeaderMapss are equal, ignoring the order of the
+   * @param lhs supplies HeaderMap 1.
+   * @param rhs supplies HeaderMap 2.
+   * @return TRUE if the HeaderMaps are equal, ignoring the order of the
    * headers, false if not.
    */
   static bool headerMapEqualIgnoreOrder(const Http::HeaderMap& lhs, const Http::HeaderMap& rhs);
@@ -128,7 +128,7 @@ public:
    * Feed a buffer with random characters.
    * @param buffer supplies the buffer to be fed.
    * @param n_char number of characters that should be added to the supplied buffer.
-   * @param seed seeds pseudo-random number genarator (default = 0).
+   * @param seed seeds pseudo-random number generator (default = 0).
    */
   static void feedBufferWithRandomCharacters(Buffer::Instance& buffer, uint64_t n_char,
                                              uint64_t seed = 0);
@@ -391,6 +391,19 @@ private:
   bool ready_{false};
 };
 
+// TODO(sbelair2) Perform the fd close in the close of the IoHandle-
+// i.e., ScopedIoHandleCloser should incorporate the ScopedFdCloser
+class ScopedIoHandleCloser {
+public:
+  ScopedIoHandleCloser(Network::IoHandlePtr& io_handle);
+  ~ScopedIoHandleCloser();
+
+private:
+  Network::IoHandlePtr& io_handle_;
+};
+
+// TODO(sbelair2) Clean up ScopedFdCloser everywhere IOHandle is used-
+// ScopedFdCloser should no longer be needed.
 class ScopedFdCloser {
 public:
   ScopedFdCloser(int fd);

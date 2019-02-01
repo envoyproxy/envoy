@@ -369,7 +369,7 @@ private:
 };
 
 /**
- * A round roubin load balancer. When in weighted mode, EDF scheduling is used. When in not
+ * A round robin load balancer. When in weighted mode, EDF scheduling is used. When in not
  * weighted mode, simple RR index selection is used.
  */
 class RoundRobinLoadBalancer : public EdfLoadBalancerBase {
@@ -443,7 +443,7 @@ private:
     // always add 1 to avoid division by 0. Note that if all weights are 1, the EDF schedule is
     // unlikely to yield the same result as P2C given the lack of randomness as well as the fact
     // that hosts are always picked, regardless of their current request load at the time of pick.
-    // It might be posible to do better by picking two hosts off of the schedule, and selecting
+    // It might be possible to do better by picking two hosts off of the schedule, and selecting
     // the one with fewer active requests at the time of selection.
     // TODO(mattklein123): @htuch brings up the point that how we are scaling weight here might not
     // be the only/best way of doing this. Essentially, it makes weight and active requests equally

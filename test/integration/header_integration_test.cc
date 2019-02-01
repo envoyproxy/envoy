@@ -419,10 +419,10 @@ protected:
   FakeStreamPtr eds_stream_;
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersionsSuppressEnvoyHeaders, HeaderIntegrationTest,
-                        testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                                         testing::Bool()),
-                        ipSuppressEnvoyHeadersTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(
+    IpVersionsSuppressEnvoyHeaders, HeaderIntegrationTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()), testing::Bool()),
+    ipSuppressEnvoyHeadersTestParamsToString);
 
 // Validate that downstream request headers are passed upstream and upstream response headers are
 // passed downstream.

@@ -21,8 +21,8 @@ public:
   virtual bool peerCertificatePresented() const PURE;
 
   /**
-   * @return std::string the URI in the SAN feld of the local certificate. Returns "" if there is no
-   *         local certificate, or no SAN field, or no URI.
+   * @return std::string the URI in the SAN field of the local certificate. Returns "" if there is
+   *         no local certificate, or no SAN field, or no URI.
    **/
   virtual std::string uriSanLocalCertificate() const PURE;
 
