@@ -46,7 +46,7 @@ public:
   size_t index() { return my_index_; }
 
   /**
-   * Update match status when a stream is created. This might be an HTTP stream, a TCP connectin,
+   * Update match status when a stream is created. This might be an HTTP stream, a TCP connection,
    * etc. This allows any matchers to flip to an initial state of true if applicable.
    */
   virtual bool onNewStream(std::vector<bool>& statuses) const PURE;

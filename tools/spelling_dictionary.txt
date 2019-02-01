@@ -591,6 +591,7 @@ recv
 recvmmsg
 redis
 redistributions
+reentrant
 refactored
 refactoring
 referencee
