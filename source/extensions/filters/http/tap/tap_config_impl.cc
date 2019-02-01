@@ -14,16 +14,16 @@ HttpTapConfigImpl::HttpTapConfigImpl(envoy::service::tap::v2alpha::TapConfig&& p
                                      Common::Tap::Sink* admin_streamer)
     : Extensions::Common::Tap::TapConfigBaseImpl(std::move(proto_config), admin_streamer) {}
 
-HttpPerRequestTapperPtr HttpTapConfigImpl::createPerRequestTapper() {
-  return std::make_unique<HttpPerRequestTapperImpl>(shared_from_this());
+HttpPerRequestTapperPtr HttpTapConfigImpl::createPerRequestTapper(uint64_t stream_id) {
+  return std::make_unique<HttpPerRequestTapperImpl>(shared_from_this(), stream_id);
 }
 
 void HttpPerRequestTapperImpl::onRequestHeaders(const Http::HeaderMap& headers) {
-  config_->rootMatcher().updateMatchStatus(&headers, nullptr, statuses_);
+  config_->rootMatcher().onHttpRequestHeaders(headers, statuses_);
 }
 
 void HttpPerRequestTapperImpl::onResponseHeaders(const Http::HeaderMap& headers) {
-  config_->rootMatcher().updateMatchStatus(nullptr, &headers, statuses_);
+  config_->rootMatcher().onHttpResponseHeaders(headers, statuses_);
 }
 
 namespace {
@@ -51,7 +51,7 @@ bool HttpPerRequestTapperImpl::onDestroyLog(const Http::HeaderMap* request_heade
   }
 
   ENVOY_LOG(debug, "submitting buffered trace sink");
-  config_->sink().submitBufferedTrace(trace);
+  config_->sink().submitBufferedTrace(trace, stream_id_);
   return true;
 }
 

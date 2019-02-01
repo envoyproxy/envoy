@@ -375,7 +375,8 @@ public:
    */
   static uint64_t statsAsPrometheus(const std::vector<Stats::CounterSharedPtr>& counters,
                                     const std::vector<Stats::GaugeSharedPtr>& gauges,
-                                    Buffer::Instance& response);
+                                    const std::vector<Stats::ParentHistogramSharedPtr>& histograms,
+                                    Buffer::Instance& response, const bool used_only);
   /**
    * Format the given tags, returning a string as a comma-separated list
    * of <tag_name>="<tag_value>" pairs.
@@ -391,6 +392,14 @@ private:
    * Take a string and sanitize it according to Prometheus conventions.
    */
   static std::string sanitizeName(const std::string& name);
+
+  /*
+   * Determine whether a metric has never been emitted and choose to
+   * not show it if we only wanted used metrics.
+   */
+  static bool shouldShowMetric(const std::shared_ptr<Stats::Metric>& metric, const bool used_only) {
+    return !used_only || metric->used();
+  }
 };
 
 } // namespace Server

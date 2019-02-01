@@ -23,7 +23,7 @@ class HealthCheckerFactory : public Logger::Loggable<Logger::Id::health_checker>
 public:
   /**
    * Create a health checker.
-   * @param hc_config supplies the health check proto.
+   * @param health_check_config supplies the health check proto.
    * @param cluster supplies the owning cluster.
    * @param runtime supplies the runtime loader.
    * @param random supplies the random generator.
@@ -31,7 +31,7 @@ public:
    * @param event_logger supplies the event_logger.
    * @return a health checker.
    */
-  static HealthCheckerSharedPtr create(const envoy::api::v2::core::HealthCheck& hc_config,
+  static HealthCheckerSharedPtr create(const envoy::api::v2::core::HealthCheck& health_check_config,
                                        Upstream::Cluster& cluster, Runtime::Loader& runtime,
                                        Runtime::RandomGenerator& random,
                                        Event::Dispatcher& dispatcher,
