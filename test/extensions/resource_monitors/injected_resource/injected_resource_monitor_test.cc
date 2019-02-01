@@ -61,7 +61,7 @@ protected:
   std::unique_ptr<InjectedResourceMonitor> createMonitor() {
     envoy::config::resource_monitor::injected_resource::v2alpha::InjectedResourceConfig config;
     config.set_filename(resource_filename_);
-    Server::Configuration::ResourceMonitorFactoryContextImpl context(dispatcher_);
+    Server::Configuration::ResourceMonitorFactoryContextImpl context(dispatcher_, *api_);
     return std::make_unique<TestableInjectedResourceMonitor>(config, context);
   }
 

@@ -28,14 +28,15 @@ namespace Config {
 
 class SubscriptionFactoryTest : public ::testing::Test {
 public:
-  SubscriptionFactoryTest() : http_request_(&cm_.async_client_) {}
+  SubscriptionFactoryTest()
+      : http_request_(&cm_.async_client_), api_(Api::createApiForTest(stats_store_)) {}
 
   std::unique_ptr<Subscription<envoy::api::v2::ClusterLoadAssignment>>
   subscriptionFromConfigSource(const envoy::api::v2::core::ConfigSource& config) {
     return SubscriptionFactory::subscriptionFromConfigSource<envoy::api::v2::ClusterLoadAssignment>(
         config, local_info_, dispatcher_, cm_, random_, stats_store_,
         "envoy.api.v2.EndpointDiscoveryService.FetchEndpoints",
-        "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints");
+        "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints", *api_);
   }
 
   Upstream::MockClusterManager cm_;
@@ -45,6 +46,7 @@ public:
   Http::MockAsyncClientRequest http_request_;
   Stats::MockIsolatedStatsStore stats_store_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  Api::ApiPtr api_;
 };
 
 class SubscriptionFactoryTestApiConfigSource
@@ -302,10 +304,10 @@ TEST_F(SubscriptionFactoryTest, GrpcSubscription) {
   subscriptionFromConfigSource(config)->start({"static_cluster"}, callbacks_);
 }
 
-INSTANTIATE_TEST_CASE_P(SubscriptionFactoryTestApiConfigSource,
-                        SubscriptionFactoryTestApiConfigSource,
-                        ::testing::Values(envoy::api::v2::core::ApiConfigSource::REST,
-                                          envoy::api::v2::core::ApiConfigSource::GRPC));
+INSTANTIATE_TEST_SUITE_P(SubscriptionFactoryTestApiConfigSource,
+                         SubscriptionFactoryTestApiConfigSource,
+                         ::testing::Values(envoy::api::v2::core::ApiConfigSource::REST,
+                                           envoy::api::v2::core::ApiConfigSource::GRPC));
 
 TEST_P(SubscriptionFactoryTestApiConfigSource, NonExistentCluster) {
   envoy::api::v2::core::ConfigSource config;

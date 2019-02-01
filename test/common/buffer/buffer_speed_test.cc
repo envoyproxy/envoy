@@ -2,7 +2,7 @@
 #include "common/common/assert.h"
 
 #include "absl/strings/string_view.h"
-#include "testing/base/public/benchmark.h"
+#include "benchmark/benchmark.h"
 
 namespace Envoy {
 

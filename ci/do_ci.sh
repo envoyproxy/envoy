@@ -5,7 +5,9 @@
 set -e
 
 build_setup_args=""
-if [[ "$1" == "fix_format" || "$1" == "check_format" || "$1" == "check_repositories" || "$1" == "check_spelling" || "$1" == "fix_spelling" || "$1" == "bazel.clang_tidy" ]]; then
+if [[ "$1" == "fix_format" || "$1" == "check_format" || "$1" == "check_repositories" || \
+        "$1" == "check_spelling" || "$1" == "fix_spelling" || "$1" == "bazel.clang_tidy" || \
+        "$1" == "check_spelling_pedantic" ]]; then
   build_setup_args="-nofetch"
 fi
 
@@ -82,6 +84,16 @@ if [[ "$1" == "bazel.release" ]]; then
     echo "Testing..."
     # We have various test binaries in the test directory such as tools, benchmarks, etc. We
     # run a build pass to make sure they compile.
+
+    # Reduce the amount of memory and number of cores Bazel tries to use to
+    # prevent it from launching too many subprocesses. This should prevent the
+    # system from running out of memory and killing tasks. See discussion on
+    # https://github.com/envoyproxy/envoy/pull/5611.
+    # TODO(akonradi): use --local_cpu_resources flag once Bazel has a release
+    # after 0.21.
+    [ -z "$CIRCLECI" ] || export BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --local_resources=12288,5,1"
+    [ -z "$CIRCLECI" ] || export BAZEL_TEST_OPTIONS="${BAZEL_TEST_OPTIONS} --local_resources=12288,5,1 --local_test_jobs=8"
+
     bazel build ${BAZEL_BUILD_OPTIONS} -c opt //include/... //source/... //test/...
     # Now run all of the tests which should already be compiled.
     bazel_with_collection test ${BAZEL_TEST_OPTIONS} -c opt //test/...
@@ -216,6 +228,15 @@ elif [[ "$1" == "bazel.coverage" ]]; then
   export GCOVR_DIR="${ENVOY_BUILD_DIR}/bazel-envoy"
   export TESTLOGS_DIR="${ENVOY_BUILD_DIR}/bazel-testlogs"
   export WORKSPACE=ci
+
+  # Reduce the amount of memory and number of cores Bazel tries to use to
+  # prevent it from launching too many subprocesses. This should prevent the
+  # system from running out of memory and killing tasks. See discussion on
+  # https://github.com/envoyproxy/envoy/pull/5611.
+  # TODO(akonradi): use --local_cpu_resources flag once Bazel has a release
+  # after 0.21.
+  [ -z "$CIRCLECI" ] || export BAZEL_TEST_OPTIONS="${BAZEL_TEST_OPTIONS} --local_resources=12288,4,1"
+
   # There is a bug in gcovr 3.3, where it takes the -r path,
   # in our case /source, and does a regex replacement of various
   # source file paths during HTML generation. It attempts to strip
@@ -278,6 +299,11 @@ elif [[ "$1" == "fix_spelling" ]];then
   cd "${ENVOY_SRCDIR}"
   echo "fix_spell..."
   ./tools/check_spelling.sh fix
+  exit 0
+elif [[ "$1" == "check_spelling_pedantic" ]]; then
+  cd "${ENVOY_SRCDIR}"
+  echo "check_spelling_pedantic..."
+  ./tools/check_spelling_pedantic.py check
   exit 0
 elif [[ "$1" == "docs" ]]; then
   echo "generating docs..."

@@ -1,5 +1,6 @@
 #include "extensions/filters/http/tap/tap_filter.h"
 
+#include "test/mocks/http/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/utility.h"
 
@@ -26,11 +27,11 @@ public:
 
 class MockHttpTapConfig : public HttpTapConfig {
 public:
-  HttpPerRequestTapperPtr createPerRequestTapper() override {
-    return HttpPerRequestTapperPtr{createPerRequestTapper_()};
+  HttpPerRequestTapperPtr createPerRequestTapper(uint64_t stream_id) override {
+    return HttpPerRequestTapperPtr{createPerRequestTapper_(stream_id)};
   }
 
-  MOCK_METHOD0(createPerRequestTapper_, HttpPerRequestTapper*());
+  MOCK_METHOD1(createPerRequestTapper_, HttpPerRequestTapper*(uint64_t stream_id));
 };
 
 class MockHttpPerRequestTapper : public HttpPerRequestTapper {
@@ -49,13 +50,16 @@ public:
     }
 
     EXPECT_CALL(*filter_config_, currentConfig()).WillRepeatedly(Return(http_tap_config_));
+    filter_ = std::make_unique<Filter>(filter_config_);
+
     if (has_config) {
+      EXPECT_CALL(callbacks_, streamId());
       http_per_request_tapper_ = new MockHttpPerRequestTapper();
-      EXPECT_CALL(*http_tap_config_, createPerRequestTapper_())
+      EXPECT_CALL(*http_tap_config_, createPerRequestTapper_(_))
           .WillOnce(Return(http_per_request_tapper_));
     }
 
-    filter_ = std::make_unique<Filter>(filter_config_);
+    filter_->setDecoderFilterCallbacks(callbacks_);
   }
 
   std::shared_ptr<MockFilterConfig> filter_config_{new MockFilterConfig()};
@@ -63,6 +67,7 @@ public:
   MockHttpPerRequestTapper* http_per_request_tapper_;
   std::unique_ptr<Filter> filter_;
   StreamInfo::MockStreamInfo stream_info_;
+  Http::MockStreamDecoderFilterCallbacks callbacks_;
 };
 
 // Verify filter functionality when there is no tap config.

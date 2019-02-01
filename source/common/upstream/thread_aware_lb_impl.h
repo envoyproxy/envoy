@@ -72,7 +72,7 @@ private:
     Runtime::RandomGenerator& random_;
     absl::Mutex mutex_;
     std::shared_ptr<std::vector<PerPriorityStatePtr>> per_priority_state_ GUARDED_BY(mutex_);
-    // This is split out of PerPriorityState so LoadBalancerBase::ChoosePriorirty can be reused.
+    // This is split out of PerPriorityState so LoadBalancerBase::ChoosePriority can be reused.
     std::shared_ptr<HealthyLoad> healthy_per_priority_load_ GUARDED_BY(mutex_);
     std::shared_ptr<DegradedLoad> degraded_per_priority_load_ GUARDED_BY(mutex_);
   };

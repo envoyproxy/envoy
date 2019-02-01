@@ -10,7 +10,7 @@
 #include "test/test_common/utility.h"
 
 #include "absl/synchronization/blocking_counter.h"
-#include "testing/base/public/benchmark.h"
+#include "benchmark/benchmark.h"
 
 static void BM_CreateRace(benchmark::State& state) {
   Envoy::Thread::ThreadFactory& thread_factory = Envoy::Thread::threadFactoryForTest();
@@ -22,7 +22,7 @@ static void BM_CreateRace(benchmark::State& state) {
   threads.reserve(num_threads);
   Envoy::ConditionalInitializer access, wait;
   absl::BlockingCounter accesses(num_threads);
-  Envoy::Stats::SymbolTable table;
+  Envoy::Stats::SymbolTableImpl table;
   const absl::string_view stat_name_string = "here.is.a.stat.name";
   Envoy::Stats::StatNameStorage initial(stat_name_string, table);
 

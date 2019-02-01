@@ -166,7 +166,7 @@ public:
     });
 
     HttpIntegrationTest::initialize();
-    client_ssl_ctx_ = createClientSslTransportSocketFactory({}, context_manager_);
+    client_ssl_ctx_ = createClientSslTransportSocketFactory({}, context_manager_, *api_);
   }
 
   void createUpstreams() override {
@@ -193,8 +193,8 @@ protected:
   Network::TransportSocketFactoryPtr client_ssl_ctx_;
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersionsClientType, SdsDynamicDownstreamIntegrationTest,
-                        GRPC_CLIENT_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, SdsDynamicDownstreamIntegrationTest,
+                         GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // A test that SDS server send a good server secret for a static listener.
 // The first ssl request should be OK.
@@ -281,7 +281,7 @@ public:
     });
 
     HttpIntegrationTest::initialize();
-    client_ssl_ctx_ = createClientSslTransportSocketFactory({}, context_manager_);
+    client_ssl_ctx_ = createClientSslTransportSocketFactory({}, context_manager_, *api_);
   }
 
   void enableCombinedValidationContext(bool enable) { use_combined_validation_context_ = enable; }
@@ -290,8 +290,8 @@ private:
   bool use_combined_validation_context_;
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersionsClientType, SdsDynamicDownstreamCertValidationContextTest,
-                        GRPC_CLIENT_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, SdsDynamicDownstreamCertValidationContextTest,
+                         GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // A test that SDS server send a good certificate validation context for a static listener.
 // The first ssl request should be OK.
@@ -362,15 +362,15 @@ public:
 
   void createUpstreams() override {
     // This is for backend with ssl
-    fake_upstreams_.emplace_back(new FakeUpstream(createUpstreamSslContext(context_manager_), 0,
-                                                  FakeHttpConnection::Type::HTTP1, version_,
+    fake_upstreams_.emplace_back(new FakeUpstream(createUpstreamSslContext(context_manager_, *api_),
+                                                  0, FakeHttpConnection::Type::HTTP1, version_,
                                                   timeSystem()));
     create_xds_upstream_ = true;
   }
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, SdsDynamicUpstreamIntegrationTest,
-                        GRPC_CLIENT_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(IpVersions, SdsDynamicUpstreamIntegrationTest,
+                         GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // To test a static cluster with sds. SDS send a good client secret first.
 // The first request should work.

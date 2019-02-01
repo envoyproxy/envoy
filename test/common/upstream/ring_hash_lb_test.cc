@@ -63,9 +63,9 @@ public:
 // For tests which don't need to be run in both primary and failover modes.
 typedef RingHashLoadBalancerTest RingHashFailoverTest;
 
-INSTANTIATE_TEST_CASE_P(RingHashPrimaryOrFailover, RingHashLoadBalancerTest,
-                        ::testing::Values(true, false));
-INSTANTIATE_TEST_CASE_P(RingHashPrimaryOrFailover, RingHashFailoverTest, ::testing::Values(true));
+INSTANTIATE_TEST_SUITE_P(RingHashPrimaryOrFailover, RingHashLoadBalancerTest,
+                         ::testing::Values(true, false));
+INSTANTIATE_TEST_SUITE_P(RingHashPrimaryOrFailover, RingHashFailoverTest, ::testing::Values(true));
 
 TEST_P(RingHashLoadBalancerTest, NoHost) {
   init();

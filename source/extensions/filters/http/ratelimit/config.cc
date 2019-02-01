@@ -55,9 +55,7 @@ RateLimitFilterConfig::createFilterFactory(const Json::Object& json_config,
 /**
  * Static registration for the rate limit filter. @see RegisterFactory.
  */
-static Registry::RegisterFactory<RateLimitFilterConfig,
-                                 Server::Configuration::NamedHttpFilterConfigFactory>
-    register_;
+REGISTER_FACTORY(RateLimitFilterConfig, Server::Configuration::NamedHttpFilterConfigFactory);
 
 } // namespace RateLimitFilter
 } // namespace HttpFilters

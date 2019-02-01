@@ -45,9 +45,9 @@ config:
   }
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, ReverseBridgeIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, ReverseBridgeIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 // Verifies that we don't do anything with the request when it's hitting a route that
 // doesn't enable the bridge.

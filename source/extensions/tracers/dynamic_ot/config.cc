@@ -28,9 +28,7 @@ Tracing::HttpTracerPtr DynamicOpenTracingTracerFactory::createHttpTracerTyped(
 /**
  * Static registration for the dynamic opentracing tracer. @see RegisterFactory.
  */
-static Registry::RegisterFactory<DynamicOpenTracingTracerFactory,
-                                 Server::Configuration::TracerFactory>
-    register_;
+REGISTER_FACTORY(DynamicOpenTracingTracerFactory, Server::Configuration::TracerFactory);
 
 } // namespace DynamicOt
 } // namespace Tracers

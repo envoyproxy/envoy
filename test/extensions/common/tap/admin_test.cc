@@ -16,7 +16,7 @@ namespace {
 
 class MockExtensionConfig : public ExtensionConfig {
 public:
-  MOCK_METHOD0(adminId, const std::string&());
+  MOCK_METHOD0(adminId, const absl::string_view());
   MOCK_METHOD0(clearTapConfig, void());
   MOCK_METHOD2(newTapConfig,
                void(envoy::service::tap::v2alpha::TapConfig&& proto_config, Sink* admin_streamer));

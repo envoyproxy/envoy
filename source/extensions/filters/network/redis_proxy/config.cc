@@ -51,9 +51,8 @@ RedisProxyFilterConfigFactory::createFilterFactory(const Json::Object& json_conf
 /**
  * Static registration for the redis filter. @see RegisterFactory.
  */
-static Registry::RegisterFactory<RedisProxyFilterConfigFactory,
-                                 Server::Configuration::NamedNetworkFilterConfigFactory>
-    registered_;
+REGISTER_FACTORY(RedisProxyFilterConfigFactory,
+                 Server::Configuration::NamedNetworkFilterConfigFactory);
 
 } // namespace RedisProxy
 } // namespace NetworkFilters

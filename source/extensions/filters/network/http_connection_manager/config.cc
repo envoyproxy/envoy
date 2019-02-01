@@ -114,9 +114,8 @@ Network::FilterFactoryCb HttpConnectionManagerFilterConfigFactory::createFilterF
 /**
  * Static registration for the HTTP connection manager filter.
  */
-static Registry::RegisterFactory<HttpConnectionManagerFilterConfigFactory,
-                                 Server::Configuration::NamedNetworkFilterConfigFactory>
-    registered_;
+REGISTER_FACTORY(HttpConnectionManagerFilterConfigFactory,
+                 Server::Configuration::NamedNetworkFilterConfigFactory);
 
 InternalAddressConfig::InternalAddressConfig(
     const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
@@ -141,6 +140,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       route_config_provider_manager_(route_config_provider_manager),
       http2_settings_(Http::Utility::parseHttp2Settings(config.http2_protocol_options())),
       http1_settings_(Http::Utility::parseHttp1Settings(config.http_protocol_options())),
+      max_request_headers_size_kb_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          config, max_request_headers_kb, Http::DEFAULT_MAX_REQUEST_HEADERS_SIZE_KB)),
       idle_timeout_(PROTOBUF_GET_OPTIONAL_MS(config, idle_timeout)),
       stream_idle_timeout_(
           PROTOBUF_GET_MS_OR_DEFAULT(config, stream_idle_timeout, StreamIdleTimeoutMs)),

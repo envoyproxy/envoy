@@ -207,6 +207,7 @@ envoy_cc_test(
     srcs = ["filter_json_test.cc"],
     deps = [
         "//source/common/config:filter_json_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 
@@ -223,5 +224,6 @@ envoy_cc_test(
         "//source/common/config:config_provider_lib",
         "//source/common/protobuf:utility_lib",
         "//test/mocks/server:server_mocks",
+        "//test/test_common:simulated_time_system_lib",
     ],
 )

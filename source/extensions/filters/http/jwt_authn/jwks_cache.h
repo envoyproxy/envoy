@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/api/api.h"
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
 #include "envoy/config/filter/http/jwt_authn/v2alpha/config.pb.h"
@@ -67,7 +68,7 @@ public:
   // Factory function to create an instance.
   static JwksCachePtr
   create(const ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication& config,
-         TimeSource& time_source);
+         TimeSource& time_source, Api::Api& api);
 };
 
 } // namespace JwtAuthn

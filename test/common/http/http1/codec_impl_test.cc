@@ -348,6 +348,59 @@ TEST_F(Http1ServerConnectionImplTest, HeaderOnlyResponse) {
   EXPECT_EQ("HTTP/1.1 200 OK\r\ncontent-length: 0\r\n\r\n", output);
 }
 
+TEST_F(Http1ServerConnectionImplTest, HeaderOnlyResponseWith204) {
+  initialize();
+
+  NiceMock<Http::MockStreamDecoder> decoder;
+  Http::StreamEncoder* response_encoder = nullptr;
+  EXPECT_CALL(callbacks_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamEncoder& encoder, bool) -> Http::StreamDecoder& {
+        response_encoder = &encoder;
+        return decoder;
+      }));
+
+  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\n");
+  codec_->dispatch(buffer);
+  EXPECT_EQ(0U, buffer.length());
+
+  std::string output;
+  ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
+
+  TestHeaderMapImpl headers{{":status", "204"}};
+  response_encoder->encodeHeaders(headers, true);
+  EXPECT_EQ("HTTP/1.1 204 No Content\r\n\r\n", output);
+}
+
+TEST_F(Http1ServerConnectionImplTest, HeaderOnlyResponseWith100Then200) {
+  initialize();
+
+  NiceMock<Http::MockStreamDecoder> decoder;
+  Http::StreamEncoder* response_encoder = nullptr;
+  EXPECT_CALL(callbacks_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamEncoder& encoder, bool) -> Http::StreamDecoder& {
+        response_encoder = &encoder;
+        return decoder;
+      }));
+
+  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\n");
+  codec_->dispatch(buffer);
+  EXPECT_EQ(0U, buffer.length());
+
+  std::string output;
+  ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
+
+  TestHeaderMapImpl continue_headers{{":status", "100"}};
+  response_encoder->encode100ContinueHeaders(continue_headers);
+  EXPECT_EQ("HTTP/1.1 100 Continue\r\n\r\n", output);
+  output.clear();
+
+  // Test the special case where we encode 100 headers (no content length may be
+  // appended) then 200 headers (content length 0 will be appended).
+  TestHeaderMapImpl headers{{":status", "200"}};
+  response_encoder->encodeHeaders(headers, true);
+  EXPECT_EQ("HTTP/1.1 200 OK\r\ncontent-length: 0\r\n\r\n", output);
+}
+
 class Http1ServerConnectionImplDeathTest : public Http1ServerConnectionImplTest {};
 
 TEST_F(Http1ServerConnectionImplDeathTest, MetadataTest) {

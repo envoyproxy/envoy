@@ -13,14 +13,16 @@ HdsDelegate::HdsDelegate(Stats::Scope& scope, Grpc::AsyncClientPtr async_client,
                          Runtime::RandomGenerator& random, ClusterInfoFactory& info_factory,
                          AccessLog::AccessLogManager& access_log_manager, ClusterManager& cm,
                          const LocalInfo::LocalInfo& local_info, Server::Admin& admin,
-                         Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls)
+                         Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls,
+                         Api::Api& api)
     : stats_{ALL_HDS_STATS(POOL_COUNTER_PREFIX(scope, "hds_delegate."))},
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "envoy.service.discovery.v2.HealthDiscoveryService.StreamHealthCheck")),
       async_client_(std::move(async_client)), dispatcher_(dispatcher), runtime_(runtime),
       store_stats(stats), ssl_context_manager_(ssl_context_manager), random_(random),
       info_factory_(info_factory), access_log_manager_(access_log_manager), cm_(cm),
-      local_info_(local_info), admin_(admin), singleton_manager_(singleton_manager), tls_(tls) {
+      local_info_(local_info), admin_(admin), singleton_manager_(singleton_manager), tls_(tls),
+      api_(api) {
   health_check_request_.mutable_health_check_request()->mutable_node()->MergeFrom(
       local_info_.node());
   backoff_strategy_ = std::make_unique<JitteredBackOffStrategy>(RetryInitialDelayMilliseconds,
@@ -147,7 +149,7 @@ void HdsDelegate::processMessage(
     // Create HdsCluster
     hds_clusters_.emplace_back(new HdsCluster(
         admin_, runtime_, cluster_config, bind_config, store_stats, ssl_context_manager_, false,
-        info_factory_, cm_, local_info_, dispatcher_, random_, singleton_manager_, tls_));
+        info_factory_, cm_, local_info_, dispatcher_, random_, singleton_manager_, tls_, api_));
 
     hds_clusters_.back()->startHealthchecks(access_log_manager_, runtime_, random_, dispatcher_);
   }
@@ -190,7 +192,7 @@ HdsCluster::HdsCluster(Server::Admin& admin, Runtime::Loader& runtime,
                        ClusterInfoFactory& info_factory, ClusterManager& cm,
                        const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
                        Runtime::RandomGenerator& random, Singleton::Manager& singleton_manager,
-                       ThreadLocal::SlotAllocator& tls)
+                       ThreadLocal::SlotAllocator& tls, Api::Api& api)
     : runtime_(runtime), cluster_(cluster), bind_config_(bind_config), stats_(stats),
       ssl_context_manager_(ssl_context_manager), added_via_api_(added_via_api),
       initial_hosts_(new HostVector()) {
@@ -199,7 +201,7 @@ HdsCluster::HdsCluster(Server::Admin& admin, Runtime::Loader& runtime,
 
   info_ = info_factory.createClusterInfo({admin, runtime_, cluster_, bind_config_, stats_,
                                           ssl_context_manager_, added_via_api_, cm, local_info,
-                                          dispatcher, random, singleton_manager, tls});
+                                          dispatcher, random, singleton_manager, tls, api});
 
   for (const auto& host : cluster.hosts()) {
     initial_hosts_->emplace_back(new HostImpl(
@@ -220,7 +222,8 @@ ProdClusterInfoFactory::createClusterInfo(const CreateClusterInfoParams& params)
 
   Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
       params.admin_, params.ssl_context_manager_, *scope, params.cm_, params.local_info_,
-      params.dispatcher_, params.random_, params.stats_, params.singleton_manager_, params.tls_);
+      params.dispatcher_, params.random_, params.stats_, params.singleton_manager_, params.tls_,
+      params.api_);
 
   // TODO(JimmyCYJ): Support SDS for HDS cluster.
   Network::TransportSocketFactoryPtr socket_factory =
