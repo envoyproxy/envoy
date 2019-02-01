@@ -56,6 +56,7 @@ envoy_cc_library(
         "quic_iovec_impl.h",
         "quic_prefetch_impl.h",
         "quic_ptr_util_impl.h",
+        "quic_stack_trace_impl.h",
         "quic_string_impl.h",
         "quic_string_piece_impl.h",
         "quic_uint128_impl.h",
@@ -71,6 +72,7 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = envoy_select_quiche([
         "//source/common/common:assert_lib",
+        "//source/server:backtrace_lib",
     ]),
 )
 

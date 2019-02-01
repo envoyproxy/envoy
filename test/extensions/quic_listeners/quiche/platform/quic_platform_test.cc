@@ -10,6 +10,7 @@
 #include "quiche/quic/platform/api/quic_logging.h"
 #include "quiche/quic/platform/api/quic_mutex.h"
 #include "quiche/quic/platform/api/quic_ptr_util.h"
+#include "quiche/quic/platform/api/quic_stack_trace.h"
 #include "quiche/quic/platform/api/quic_string.h"
 #include "quiche/quic/platform/api/quic_string_piece.h"
 #include "quiche/quic/platform/api/quic_uint128.h"
@@ -84,6 +85,12 @@ TEST(QuicPlatformTest, QuicEstimateMemoryUsage) {
   quic::QuicString s = "foo";
   // Stubbed out to always return 0.
   EXPECT_EQ(0, quic::QuicEstimateMemoryUsage(s));
+}
+
+TEST(QuicPlatformTest, QuicStackTrace) {
+  // Just make sure it compiles.
+  EXPECT_NE("", quic::QuicStackTrace());
+  std::cout << "QuicStackTrace():\n" << quic::QuicStackTrace() << std::endl;
 }
 
 TEST(QuicPlatformTest, QuicString) {

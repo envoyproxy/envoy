@@ -81,6 +81,14 @@ public:
     ENVOY_LOG(critical, "Caught {}, suspect faulting address {}", signame, addr);
   }
 
+  void print(std::ostream& os) {
+    backward::Printer p;
+    p.object = true;
+    p.color_mode = backward::ColorMode::never;
+    p.address = true;
+    p.print(stack_trace_, os);
+  }
+
 private:
   static constexpr int MaxStackDepth = 64;
   void* stack_trace_[MaxStackDepth];
