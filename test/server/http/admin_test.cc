@@ -1201,6 +1201,24 @@ TEST_P(AdminInstanceTest, PostRequest) {
               HasSubstr("text/plain"));
 }
 
+class HistogramWrapper {
+public:
+  HistogramWrapper() : histogram_(hist_alloc()) {}
+
+  ~HistogramWrapper() { hist_free(histogram_); }
+
+  const histogram_t* getHistogram() { return histogram_; }
+
+  void setHistogramValues(const std::vector<uint64_t>& values) {
+    for (uint64_t value : values) {
+      hist_insert_intscale(histogram_, value, 0, 1);
+    }
+  }
+
+private:
+  histogram_t* histogram_;
+};
+
 class PrometheusStatsFormatterTest : public testing::Test {
 protected:
   PrometheusStatsFormatterTest() /*: alloc_(stats_options_)*/ {}
@@ -1214,10 +1232,15 @@ protected:
     gauges_.push_back(alloc_.makeGauge(name, std::move(tname), std::move(cluster_tags)));
   }
 
+  void addHistogram(const Stats::ParentHistogramSharedPtr histogram) {
+    histograms_.push_back(histogram);
+  }
+
   Stats::StatsOptionsImpl stats_options_;
   Stats::HeapStatDataAllocator alloc_;
   std::vector<Stats::CounterSharedPtr> counters_;
   std::vector<Stats::GaugeSharedPtr> gauges_;
+  std::vector<Stats::ParentHistogramSharedPtr> histograms_;
 };
 
 TEST_F(PrometheusStatsFormatterTest, MetricName) {
@@ -1267,7 +1290,9 @@ TEST_F(PrometheusStatsFormatterTest, MetricNameCollison) {
            {{"another_tag_name_4", "another_tag_4-value"}});
 
   Buffer::OwnedImpl response;
-  EXPECT_EQ(2UL, PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, response));
+  auto size =
+      PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, response);
+  EXPECT_EQ(2UL, size);
 }
 
 TEST_F(PrometheusStatsFormatterTest, UniqueMetricName) {
@@ -1285,7 +1310,115 @@ TEST_F(PrometheusStatsFormatterTest, UniqueMetricName) {
            {{"another_tag_name_4", "another_tag_4-value"}});
 
   Buffer::OwnedImpl response;
-  EXPECT_EQ(4UL, PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, response));
+  auto size =
+      PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, response);
+  EXPECT_EQ(4UL, size);
+}
+
+TEST_F(PrometheusStatsFormatterTest, HistogramWithNoValuesAndNoTags) {
+  HistogramWrapper h1_cumulative;
+  h1_cumulative.setHistogramValues(std::vector<uint64_t>(0));
+  Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
+
+  auto histogram = std::make_shared<NiceMock<Stats::MockParentHistogram>>();
+  histogram->name_ = "histogram1";
+  histogram->used_ = true;
+  ON_CALL(*histogram, cumulativeStatistics())
+      .WillByDefault(testing::ReturnRef(h1_cumulative_statistics));
+
+  addHistogram(histogram);
+
+  Buffer::OwnedImpl response;
+  auto size =
+      PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, response);
+  EXPECT_EQ(1UL, size);
+
+  const std::string expected_output = R"EOF(# TYPE envoy_histogram1 histogram
+envoy_histogram1_bucket{le="0.5"} 0
+envoy_histogram1_bucket{le="1"} 0
+envoy_histogram1_bucket{le="5"} 0
+envoy_histogram1_bucket{le="10"} 0
+envoy_histogram1_bucket{le="25"} 0
+envoy_histogram1_bucket{le="50"} 0
+envoy_histogram1_bucket{le="100"} 0
+envoy_histogram1_bucket{le="250"} 0
+envoy_histogram1_bucket{le="500"} 0
+envoy_histogram1_bucket{le="1000"} 0
+envoy_histogram1_bucket{le="2500"} 0
+envoy_histogram1_bucket{le="5000"} 0
+envoy_histogram1_bucket{le="10000"} 0
+envoy_histogram1_bucket{le="30000"} 0
+envoy_histogram1_bucket{le="60000"} 0
+envoy_histogram1_bucket{le="300000"} 0
+envoy_histogram1_bucket{le="600000"} 0
+envoy_histogram1_bucket{le="1800000"} 0
+envoy_histogram1_bucket{le="3600000"} 0
+envoy_histogram1_bucket{le="+Inf"} 0
+envoy_histogram1_sum{} 0
+envoy_histogram1_count{} 0
+)EOF";
+
+  EXPECT_EQ(expected_output, response.toString());
+}
+
+TEST_F(PrometheusStatsFormatterTest, OutputWithAllMetricTypes) {
+  addCounter("cluster.test_1.upstream_cx_total", {{"a.tag-name", "a.tag-value"}});
+  addCounter("cluster.test_2.upstream_cx_total", {{"another_tag_name", "another_tag-value"}});
+  addGauge("cluster.test_3.upstream_cx_total", {{"another_tag_name_3", "another_tag_3-value"}});
+  addGauge("cluster.test_4.upstream_cx_total", {{"another_tag_name_4", "another_tag_4-value"}});
+
+  const std::vector<uint64_t> h1_values = {50, 20, 30, 70, 100, 5000, 200};
+  HistogramWrapper h1_cumulative;
+  h1_cumulative.setHistogramValues(h1_values);
+  Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
+
+  auto histogram1 = std::make_shared<NiceMock<Stats::MockParentHistogram>>();
+  histogram1->name_ = "cluster.test_1.upstream_rq_time";
+  histogram1->used_ = true;
+  histogram1->tags_ = {Stats::Tag{"key1", "value1"}, Stats::Tag{"key2", "value2"}};
+  addHistogram(histogram1);
+  EXPECT_CALL(*histogram1, cumulativeStatistics())
+      .WillOnce(testing::ReturnRef(h1_cumulative_statistics));
+
+  Buffer::OwnedImpl response;
+  auto size =
+      PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, response);
+  EXPECT_EQ(5UL, size);
+
+  const std::string expected_output = R"EOF(# TYPE envoy_cluster_test_1_upstream_cx_total counter
+envoy_cluster_test_1_upstream_cx_total{a_tag_name="a.tag-value"} 0
+# TYPE envoy_cluster_test_2_upstream_cx_total counter
+envoy_cluster_test_2_upstream_cx_total{another_tag_name="another_tag-value"} 0
+# TYPE envoy_cluster_test_3_upstream_cx_total gauge
+envoy_cluster_test_3_upstream_cx_total{another_tag_name_3="another_tag_3-value"} 0
+# TYPE envoy_cluster_test_4_upstream_cx_total gauge
+envoy_cluster_test_4_upstream_cx_total{another_tag_name_4="another_tag_4-value"} 0
+# TYPE envoy_cluster_test_1_upstream_rq_time histogram
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="0.5"} 0
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="1"} 0
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="5"} 0
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="10"} 0
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="25"} 1
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="50"} 2
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="100"} 4
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="250"} 6
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="500"} 6
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="1000"} 6
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="2500"} 6
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="5000"} 6
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="10000"} 7
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="30000"} 7
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="60000"} 7
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="300000"} 7
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="600000"} 7
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="1800000"} 7
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="3600000"} 7
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="+Inf"} 7
+envoy_cluster_test_1_upstream_rq_time_sum{key1="value1",key2="value2"} 5532
+envoy_cluster_test_1_upstream_rq_time_count{key1="value1",key2="value2"} 7
+)EOF";
+
+  EXPECT_EQ(expected_output, response.toString());
 }
 
 } // namespace Server

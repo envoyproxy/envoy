@@ -26,11 +26,6 @@ REPOSITORY_LOCATIONS = dict(
         strip_prefix = "thrift-0.11.0",
         urls = ["https://files.pythonhosted.org/packages/c6/b4/510617906f8e0c5660e7d96fbc5585113f83ad547a3989b80297ac72a74c/thrift-0.11.0.tar.gz"],
     ),
-    com_github_bombela_backward = dict(
-        sha256 = "ad73be31c5cfcbffbde7d34dba18158a42043a109e7f41946f0b0abd589ed55e",
-        strip_prefix = "backward-cpp-1.4",
-        urls = ["https://github.com/bombela/backward-cpp/archive/v1.4.tar.gz"],
-    ),
     com_github_c_ares_c_ares = dict(
         sha256 = "7deb7872cbd876c29036d5f37e30c4cbc3cc068d59d8b749ef85bb0736649f04",
         strip_prefix = "c-ares-cares-1_15_0",

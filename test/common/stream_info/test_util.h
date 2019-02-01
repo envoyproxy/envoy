@@ -54,8 +54,8 @@ public:
   const Network::Address::InstanceConstSharedPtr& upstreamLocalAddress() const override {
     return upstream_local_address_;
   }
-  bool healthCheck() const override { return hc_request_; }
-  void healthCheck(bool is_hc) override { hc_request_ = is_hc; }
+  bool healthCheck() const override { return health_check_request_; }
+  void healthCheck(bool is_health_check) override { health_check_request_ = is_health_check; }
 
   void setDownstreamLocalAddress(
       const Network::Address::InstanceConstSharedPtr& downstream_local_address) override {
@@ -194,7 +194,7 @@ public:
   absl::optional<uint32_t> response_code_;
   uint64_t response_flags_{};
   Upstream::HostDescriptionConstSharedPtr upstream_host_{};
-  bool hc_request_{};
+  bool health_check_request_{};
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
   Network::Address::InstanceConstSharedPtr downstream_local_address_;
   Network::Address::InstanceConstSharedPtr downstream_direct_remote_address_;
