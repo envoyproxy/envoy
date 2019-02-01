@@ -673,6 +673,10 @@ def _com_googlesource_quiche():
         name = "quiche_quic_platform",
         actual = "@com_googlesource_quiche//:quic_platform",
     )
+    native.bind(
+        name = "quiche_quic_platform_base",
+        actual = "@com_googlesource_quiche//:quic_platform_base",
+    )
 
 def _com_github_grpc_grpc():
     _repository_impl("com_github_grpc_grpc")
