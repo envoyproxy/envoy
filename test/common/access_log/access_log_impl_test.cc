@@ -970,8 +970,7 @@ config:
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_),
-                          EnvoyException,
-                          ".*\"NOT_A_VALID_CODE\" for type TYPE_ENUM.*");
+                          EnvoyException, ".*\"NOT_A_VALID_CODE\" for type TYPE_ENUM.*");
 }
 
 TEST_F(AccessLogImplTest, GrpcStatusFilterBlock) {
