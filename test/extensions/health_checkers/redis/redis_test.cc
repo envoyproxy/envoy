@@ -45,12 +45,12 @@ public:
       config:
     )EOF";
 
-    const auto& hc_config = Upstream::parseHealthCheckFromV2Yaml(yaml);
-    const auto& redis_config = getRedisHealthCheckConfig(hc_config);
+    const auto& health_check_config = Upstream::parseHealthCheckFromV2Yaml(yaml);
+    const auto& redis_config = getRedisHealthCheckConfig(health_check_config);
 
     health_checker_.reset(
-        new RedisHealthChecker(*cluster_, hc_config, redis_config, dispatcher_, runtime_, random_,
-                               Upstream::HealthCheckEventLoggerPtr(event_logger_), *this));
+        new RedisHealthChecker(*cluster_, health_check_config, redis_config, dispatcher_, runtime_,
+                               random_, Upstream::HealthCheckEventLoggerPtr(event_logger_), *this));
   }
 
   void setupAlwaysLogHealthCheckFailures() {
@@ -67,12 +67,12 @@ public:
       config:
     )EOF";
 
-    const auto& hc_config = Upstream::parseHealthCheckFromV2Yaml(yaml);
-    const auto& redis_config = getRedisHealthCheckConfig(hc_config);
+    const auto& health_check_config = Upstream::parseHealthCheckFromV2Yaml(yaml);
+    const auto& redis_config = getRedisHealthCheckConfig(health_check_config);
 
     health_checker_.reset(
-        new RedisHealthChecker(*cluster_, hc_config, redis_config, dispatcher_, runtime_, random_,
-                               Upstream::HealthCheckEventLoggerPtr(event_logger_), *this));
+        new RedisHealthChecker(*cluster_, health_check_config, redis_config, dispatcher_, runtime_,
+                               random_, Upstream::HealthCheckEventLoggerPtr(event_logger_), *this));
   }
 
   void setupExistsHealthcheck() {
@@ -89,12 +89,12 @@ public:
         key: foo
     )EOF";
 
-    const auto& hc_config = Upstream::parseHealthCheckFromV2Yaml(yaml);
-    const auto& redis_config = getRedisHealthCheckConfig(hc_config);
+    const auto& health_check_config = Upstream::parseHealthCheckFromV2Yaml(yaml);
+    const auto& redis_config = getRedisHealthCheckConfig(health_check_config);
 
     health_checker_.reset(
-        new RedisHealthChecker(*cluster_, hc_config, redis_config, dispatcher_, runtime_, random_,
-                               Upstream::HealthCheckEventLoggerPtr(event_logger_), *this));
+        new RedisHealthChecker(*cluster_, health_check_config, redis_config, dispatcher_, runtime_,
+                               random_, Upstream::HealthCheckEventLoggerPtr(event_logger_), *this));
   }
 
   void setupDontReuseConnection() {
@@ -111,12 +111,12 @@ public:
       config:
     )EOF";
 
-    const auto& hc_config = Upstream::parseHealthCheckFromV2Yaml(yaml);
-    const auto& redis_config = getRedisHealthCheckConfig(hc_config);
+    const auto& health_check_config = Upstream::parseHealthCheckFromV2Yaml(yaml);
+    const auto& redis_config = getRedisHealthCheckConfig(health_check_config);
 
     health_checker_.reset(
-        new RedisHealthChecker(*cluster_, hc_config, redis_config, dispatcher_, runtime_, random_,
-                               Upstream::HealthCheckEventLoggerPtr(event_logger_), *this));
+        new RedisHealthChecker(*cluster_, health_check_config, redis_config, dispatcher_, runtime_,
+                               random_, Upstream::HealthCheckEventLoggerPtr(event_logger_), *this));
   }
 
   Extensions::NetworkFilters::RedisProxy::ConnPool::ClientPtr
