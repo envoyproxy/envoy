@@ -37,23 +37,40 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
 )
 
+QUIC_HEADER_ONLY_IMPL = [
+    "quic_aligned_impl.h",
+    "quic_arraysize_impl.h",
+    "quic_containers_impl.h",
+    "quic_endian_impl.h",
+    "quic_estimate_memory_usage_impl.h",
+    "quic_export_impl.h",
+    "quic_fallthrough_impl.h",
+    "quic_flag_utils_impl.h",
+    "quic_iovec_impl.h",
+    "quic_prefetch_impl.h",
+    "quic_ptr_util_impl.h",
+    "quic_string_impl.h",
+    "quic_string_piece_impl.h",
+    "quic_uint128_impl.h",
+]
+
+genrule(
+    name = "generate_dummy_src_for_quic_header_only_impl",
+    srcs = QUIC_HEADER_ONLY_IMPL,
+    outs = ["quic_header_only_impl.cc"],
+    cmd = """
+    for SRC in $(SRCS); do echo "$$SRC" | sed 's!^.*source/extensions!#include "extensions!' | sed 's/$$/"/' >>$@; done
+    """,
+)
+
 envoy_cc_library(
     name = "quic_platform_impl_lib",
-    hdrs = [
-        "quic_aligned_impl.h",
-        "quic_arraysize_impl.h",
-        "quic_containers_impl.h",
-        "quic_endian_impl.h",
-        "quic_estimate_memory_usage_impl.h",
-        "quic_export_impl.h",
-        "quic_fallthrough_impl.h",
-        "quic_flag_utils_impl.h",
-        "quic_iovec_impl.h",
-        "quic_prefetch_impl.h",
-        "quic_ptr_util_impl.h",
-        "quic_string_impl.h",
-        "quic_string_piece_impl.h",
-        "quic_uint128_impl.h",
+    srcs = [
+        "quic_header_only_impl.cc",
+        # Non header-only impl source goes here.
+    ],
+    hdrs = QUIC_HEADER_ONLY_IMPL + [
+        # Non header-only impl header goes here.
     ],
     external_deps = [
         "abseil_base",
