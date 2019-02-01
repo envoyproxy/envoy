@@ -20,9 +20,5 @@ Event::DispatcherPtr Impl::allocateDispatcher() {
   return std::make_unique<Event::DispatcherImpl>(*this);
 }
 
-Thread::ThreadFactory& Impl::threadFactory() { return thread_factory_; }
-
-Filesystem::Instance& Impl::fileSystem() { return file_system_; }
-
 } // namespace Api
 } // namespace Envoy

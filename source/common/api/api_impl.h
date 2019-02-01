@@ -23,8 +23,8 @@ public:
 
   // Api::Api
   Event::DispatcherPtr allocateDispatcher() override;
-  Thread::ThreadFactory& threadFactory() override;
-  Filesystem::Instance& fileSystem() override;
+  Thread::ThreadFactory& threadFactory() override { return thread_factory_; }
+  Filesystem::Instance& fileSystem() override { return file_system_; }
   Event::TimeSystem& timeSystem() override { return time_system_; }
 
 private:
