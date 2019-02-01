@@ -37,9 +37,13 @@ public:
 class MockHttpPerRequestTapper : public HttpPerRequestTapper {
 public:
   MOCK_METHOD1(onRequestHeaders, void(const Http::HeaderMap& headers));
+  MOCK_METHOD1(onRequestTrailers, void(const Http::HeaderMap& headers));
   MOCK_METHOD1(onResponseHeaders, void(const Http::HeaderMap& headers));
-  MOCK_METHOD2(onDestroyLog, bool(const Http::HeaderMap* request_headers,
-                                  const Http::HeaderMap* response_headers));
+  MOCK_METHOD1(onResponseTrailers, void(const Http::HeaderMap& headers));
+  MOCK_METHOD4(onDestroyLog,
+               bool(const Http::HeaderMap* request_headers, const Http::HeaderMap* request_trailers,
+                    const Http::HeaderMap* response_headers,
+                    const Http::HeaderMap* response_trailers));
 };
 
 class TapFilterTest : public testing::Test {
@@ -107,6 +111,7 @@ TEST_F(TapFilterTest, Config) {
   Buffer::OwnedImpl request_body;
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(request_body, false));
   Http::TestHeaderMapImpl request_trailers;
+  EXPECT_CALL(*http_per_request_tapper_, onRequestTrailers(_));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
 
   Http::TestHeaderMapImpl response_headers;
@@ -117,9 +122,11 @@ TEST_F(TapFilterTest, Config) {
   Buffer::OwnedImpl response_body;
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_body, false));
   Http::TestHeaderMapImpl response_trailers;
+  EXPECT_CALL(*http_per_request_tapper_, onResponseTrailers(_));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers));
 
-  EXPECT_CALL(*http_per_request_tapper_, onDestroyLog(&request_headers, &response_headers))
+  EXPECT_CALL(*http_per_request_tapper_, onDestroyLog(&request_headers, &request_trailers,
+                                                      &response_headers, &response_trailers))
       .WillOnce(Return(true));
   filter_->log(&request_headers, &response_headers, &response_trailers, stream_info_);
   EXPECT_EQ(1UL, filter_config_->stats_.rq_tapped_.value());
