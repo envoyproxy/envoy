@@ -154,7 +154,7 @@ class SpellChecker:
         errors.append((original, int(rem), []))
       elif t == '&' or t == '?':
         # Near misses and/or guesses.
-        _, rem = rem.split(" ", 1)   # Drop N (may be 0).
+        _, rem = rem.split(" ", 1)  # Drop N (may be 0).
         o, rem = rem.split(": ", 1)  # o is offset from start of line.
         suggestions = rem.split(", ")
 
