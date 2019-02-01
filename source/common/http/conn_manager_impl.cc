@@ -498,7 +498,7 @@ void ConnectionManagerImpl::ActiveStream::chargeStats(const HeaderMap& headers) 
   uint64_t response_code = Utility::getResponseStatus(headers);
   stream_info_.response_code_ = response_code;
 
-  if (stream_info_.hc_request_) {
+  if (stream_info_.health_check_request_) {
     return;
   }
 
