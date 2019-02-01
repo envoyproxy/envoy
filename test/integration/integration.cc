@@ -368,9 +368,9 @@ void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>
 
 void BaseIntegrationTest::createGeneratedApiTestServer(const std::string& bootstrap_path,
                                                        const std::vector<std::string>& port_names) {
-  test_server_ = IntegrationTestServer::create(bootstrap_path, version_,
-                                               server_init_coroutines_, deterministic_,
-                                               *time_system_, *api_, defer_listener_finalization_);
+  test_server_ = IntegrationTestServer::create(bootstrap_path, version_, server_init_coroutines_,
+                                               deterministic_, *time_system_, *api_,
+                                               defer_listener_finalization_);
   if (config_helper_.bootstrap().static_resources().listeners_size() > 0 &&
       !defer_listener_finalization_) {
     // Wait for listeners to be created before invoking registerTestServerPorts() below, as that

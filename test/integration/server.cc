@@ -64,8 +64,8 @@ void IntegrationTestServer::waitUntilListenersReady() {
 }
 
 void IntegrationTestServer::start(const Network::Address::IpVersion version,
-                                  std::function<void()> server_init_coroutines,
-                                  bool deterministic, bool defer_listener_finalization) {
+                                  std::function<void()> server_init_coroutines, bool deterministic,
+                                  bool defer_listener_finalization) {
   ENVOY_LOG(info, "starting integration test server");
   ASSERT(!thread_);
   thread_ = api_.threadFactory().createThread(
@@ -73,8 +73,9 @@ void IntegrationTestServer::start(const Network::Address::IpVersion version,
 
   // If any steps need to be done prior to workers starting, do them now. E.g., xDS pre-init.
   // Note that there is no synchronization guaranteeing this happens either
-  // before workers starting or after server start.  Any needed synchornization must occur in the routines.
-  // These steps are executed at this point in the code to allow server initialization to be dependent on them (e.g. control plane peers).
+  // before workers starting or after server start. Any needed synchornization must occur in the
+  // routines. These steps are executed at this point in the code to allow server initialization to
+  // be dependent on them (e.g. control plane peers).
   if (server_init_coroutines != nullptr) {
     server_init_coroutines();
   }
