@@ -190,17 +190,21 @@ Envoy can produce backtraces on demand and from assertions and other fatal
 actions like segfaults. Where supported, stack traces will contain resolved
 symbols, though not include line numbers. On systems where absl::Symbolization is
 not supported, the stack traces written in the log or to stderr contain addresses rather
-than resolved symbols. The `tools/stack_decode.py` script exists to process the output
-and do symbol resolution including line numbers, to make the stack traces useful.
-Any log lines not relevant to the backtrace capability
-are passed through the script unchanged (it acts like a filter).
+than resolved symbols. If the symbols were resolved, the address is also included at
+the end of the line.
 
-The script runs in one of two modes. If passed no arguments it anticipates
-Envoy (or test) output on stdin. You can postprocess a log or pipe the output of
-an Envoy process. If passed some arguments it runs the arguments as a child
-process. This enables you to run a test with backtrace post processing. Bazel
-sandboxing must be disabled by specifying standalone execution. Example
-command line:
+The `tools/stack_decode.py` script exists to process the output and do additional symbol
+resolution including file names and line numbers. It requires the `addr2line` program be
+installed and in your path. Any log lines not relevant to the backtrace capability are
+passed through the script unchanged (it acts like a filter). File and line information
+is appended to the stack trace lines.
+
+The script runs in one of two modes. To process log input from stdin, pass `-s` as the first
+argument, followed by the executable file path. You can postprocess a log or pipe the output
+of an Envoy process. If you do not specify the `-s` argument it runs the arguments as a child
+process. This enables you to run a test with backtrace post processing. Bazel sandboxing must
+be disabled by specifying standalone execution. Example command line with
+`run_under`:
 
 ```
 bazel test -c dbg //test/server:backtrace_test
@@ -208,8 +212,14 @@ bazel test -c dbg //test/server:backtrace_test
 --cache_test_results=no --test_output=all
 ```
 
-You will need to use either a `dbg` build type or the `opt` build type to get symbol
-information in the binaries.
+Example using input on stdin:
+
+```
+bazel test -c dbg //test/server:backtrace_test --cache_test_results=no --test_output=streamed |& tools/stack_decode.py -s bazel-bin/test/server/backtrace_test
+```
+
+You will need to use either a `dbg` build type or the `opt` build type to get file and line
+symbol information in the binaries.
 
 By default main.cc will install signal handlers to print backtraces at the
 location where a fatal signal occurred. The signal handler will re-raise the
