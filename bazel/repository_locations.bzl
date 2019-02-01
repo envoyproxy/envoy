@@ -230,9 +230,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/google/subpar/archive/1.3.0.tar.gz"],
     ),
     io_opencensus_cpp = dict(
-        sha256 = "b967e22fd6be41e2e78bb2fee2d7027ed48cc6b9e0ce2620c2f3db3a8913ff9c",
-        strip_prefix = "opencensus-cpp-e9d986ebeb413acb4f8ec1bdff33485866a794b7",
-        urls = ["https://github.com/census-instrumentation/opencensus-cpp/archive/e9d986ebeb413acb4f8ec1bdff33485866a794b7.tar.gz"],
+        sha256 = "23dd2b55dfc688eeabf156d9b0d137e3286615dcc0ddc0ec3fc021eeda206c9e",
+        strip_prefix = "opencensus-cpp-d5db5e8b25596da8ec25aaae860c6936bd904da8",
+        urls = ["https://github.com/census-instrumentation/opencensus-cpp/archive/d5db5e8b25596da8ec25aaae860c6936bd904da8.tar.gz"],
     ),
     com_github_curl = dict(
         sha256 = "d483b89062832e211c887d7cf1b65c902d591b48c11fe7d174af781681580b41",

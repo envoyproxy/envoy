@@ -664,6 +664,14 @@ def _io_opencensus_cpp():
         actual = "@io_opencensus_cpp//opencensus/trace:cloud_trace_context",
     )
     native.bind(
+        name = "opencensus_trace_grpc_trace_bin",
+        actual = "@io_opencensus_cpp//opencensus/trace:grpc_trace_bin",
+    )
+    native.bind(
+        name = "opencensus_trace_trace_context",
+        actual = "@io_opencensus_cpp//opencensus/trace:trace_context",
+    )
+    native.bind(
         name = "opencensus_exporter_stdout",
         actual = "@io_opencensus_cpp//opencensus/exporters/trace/stdout:stdout_exporter",
     )

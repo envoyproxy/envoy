@@ -28,6 +28,8 @@ envoy_cc_library(
     external_deps = [
         "opencensus_trace",
         "opencensus_trace_cloud_trace_context",
+        "opencensus_trace_grpc_trace_bin",
+        "opencensus_trace_trace_context",
         "opencensus_exporter_stdout",
         "opencensus_exporter_stackdriver",
         "opencensus_exporter_zipkin",

@@ -5,6 +5,8 @@
 #include "opencensus/exporters/trace/stdout/stdout_exporter.h"
 #include "opencensus/exporters/trace/zipkin/zipkin_exporter.h"
 #include "opencensus/trace/propagation/cloud_trace_context.h"
+#include "opencensus/trace/propagation/grpc_trace_bin.h"
+#include "opencensus/trace/propagation/trace_context.h"
 #include "opencensus/trace/sampler.h"
 #include "opencensus/trace/span.h"
 #include "opencensus/trace/trace_config.h"
@@ -88,13 +90,13 @@ void Span::injectContext(Http::HeaderMap& request_headers) {
         ::opencensus::trace::propagation::ToCloudTraceContextHeader(span_.context()));
   }
   if (oc_config_->propagate_trace_context()) {
-    // TODO: Replace this with propagation/trace_context.h after
-    // https://github.com/census-instrumentation/opencensus-cpp/pull/260 is merged.
     request_headers.addCopy(Http::LowerCaseString{"traceparent"},
-                            absl::StrCat("00-", span_.context().ToString()));
+                            ::opencensus::trace::propagation::ToTraceParentHeader(span_.context()));
   }
   if (oc_config_->propagate_grpc_trace_bin()) {
-    // TODO: Unimplemented.
+    request_headers.addCopy(
+        Http::LowerCaseString{"grpc-trace-bin"},
+        ::opencensus::trace::propagation::ToGrpcTraceBinHeader(span_.context()));
   }
 }
 
@@ -126,9 +128,6 @@ Driver::Driver(const envoy::config::trace::v2::OpenCensusConfig& oc_config)
     ::opencensus::exporters::trace::ZipkinExporterOptions opts(oc_config.zipkin_url());
     opts.service_name = oc_config.zipkin_service_name();
     ::opencensus::exporters::trace::ZipkinExporter::Register(opts);
-  }
-  if (oc_config.propagate_grpc_trace_bin()) {
-    ENVOY_LOG(warn, "propagate_grpc_trace_bin is unimplemented.");
   }
 }
 
