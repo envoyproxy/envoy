@@ -32,12 +32,21 @@ void buildMatcher(const envoy::service::tap::v2alpha::MatchPredicate& match_conf
   case envoy::service::tap::v2alpha::MatchPredicate::kAnyMatch:
     new_matcher = std::make_unique<AnyMatcher>(matchers);
     break;
-  case envoy::service::tap::v2alpha::MatchPredicate::kHttpRequestMatch:
-    new_matcher = std::make_unique<HttpRequestMatcher>(match_config.http_request_match(), matchers);
+  case envoy::service::tap::v2alpha::MatchPredicate::kHttpRequestHeadersMatch:
+    new_matcher = std::make_unique<HttpRequestHeadersMatcher>(
+        match_config.http_request_headers_match(), matchers);
     break;
-  case envoy::service::tap::v2alpha::MatchPredicate::kHttpResponseMatch:
-    new_matcher =
-        std::make_unique<HttpResponseMatcher>(match_config.http_response_match(), matchers);
+  case envoy::service::tap::v2alpha::MatchPredicate::kHttpRequestTrailersMatch:
+    new_matcher = std::make_unique<HttpRequestTrailersMatcher>(
+        match_config.http_request_trailers_match(), matchers);
+    break;
+  case envoy::service::tap::v2alpha::MatchPredicate::kHttpResponseHeadersMatch:
+    new_matcher = std::make_unique<HttpResponseHeadersMatcher>(
+        match_config.http_response_headers_match(), matchers);
+    break;
+  case envoy::service::tap::v2alpha::MatchPredicate::kHttpResponseTrailersMatch:
+    new_matcher = std::make_unique<HttpResponseTrailersMatcher>(
+        match_config.http_response_trailers_match(), matchers);
     break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
@@ -50,14 +59,19 @@ void buildMatcher(const envoy::service::tap::v2alpha::MatchPredicate& match_conf
 SetLogicMatcher::SetLogicMatcher(
     const envoy::service::tap::v2alpha::MatchPredicate::MatchSet& configs,
     std::vector<MatcherPtr>& matchers, Type type)
-    : Matcher(matchers), matchers_(matchers), type_(type) {
+    : LogicMatcherBase(matchers), matchers_(matchers), type_(type) {
   for (const auto& config : configs.rules()) {
     indexes_.push_back(matchers_.size());
     buildMatcher(config, matchers_);
   }
 }
 
-bool SetLogicMatcher::updateLocalStatus(std::vector<bool>& statuses) const {
+bool SetLogicMatcher::updateLocalStatus(std::vector<bool>& statuses,
+                                        const UpdateFunctor& functor) const {
+  for (size_t index : indexes_) {
+    statuses[index] = functor(*matchers_[index], statuses);
+  }
+
   auto predicate = [&statuses](size_t index) { return statuses[index]; };
   if (type_ == Type::And) {
     statuses[my_index_] = std::all_of(indexes_.begin(), indexes_.end(), predicate);
@@ -69,81 +83,30 @@ bool SetLogicMatcher::updateLocalStatus(std::vector<bool>& statuses) const {
   return statuses[my_index_];
 }
 
-bool SetLogicMatcher::onNewStream(std::vector<bool>& statuses) const {
-  for (size_t index : indexes_) {
-    statuses[index] = matchers_[index]->onNewStream(statuses);
-  }
-
-  return updateLocalStatus(statuses);
-}
-
-bool SetLogicMatcher::onHttpRequestHeaders(const Http::HeaderMap& request_headers,
-                                           std::vector<bool>& statuses) const {
-  for (size_t index : indexes_) {
-    statuses[index] = matchers_[index]->onHttpRequestHeaders(request_headers, statuses);
-  }
-
-  return updateLocalStatus(statuses);
-}
-
-bool SetLogicMatcher::onHttpResponseHeaders(const Http::HeaderMap& response_headers,
-                                            std::vector<bool>& statuses) const {
-  for (size_t index : indexes_) {
-    statuses[index] = matchers_[index]->onHttpResponseHeaders(response_headers, statuses);
-  }
-
-  return updateLocalStatus(statuses);
-}
-
 NotMatcher::NotMatcher(const envoy::service::tap::v2alpha::MatchPredicate& config,
                        std::vector<MatcherPtr>& matchers)
-    : Matcher(matchers), matchers_(matchers), not_index_(matchers.size()) {
+    : LogicMatcherBase(matchers), matchers_(matchers), not_index_(matchers.size()) {
   buildMatcher(config, matchers);
 }
 
-bool NotMatcher::onNewStream(std::vector<bool>& statuses) const {
-  statuses[my_index_] = !matchers_[not_index_]->onNewStream(statuses);
+bool NotMatcher::updateLocalStatus(std::vector<bool>& statuses,
+                                   const UpdateFunctor& functor) const {
+  statuses[my_index_] = !functor(*matchers_[not_index_], statuses);
   return statuses[my_index_];
 }
 
-bool NotMatcher::onHttpRequestHeaders(const Http::HeaderMap& request_headers,
-                                      std::vector<bool>& statuses) const {
-  statuses[my_index_] = !matchers_[not_index_]->onHttpRequestHeaders(request_headers, statuses);
-  return statuses[my_index_];
-}
-
-bool NotMatcher::onHttpResponseHeaders(const Http::HeaderMap& response_headers,
-                                       std::vector<bool>& statuses) const {
-  statuses[my_index_] = !matchers_[not_index_]->onHttpResponseHeaders(response_headers, statuses);
-  return statuses[my_index_];
-}
-
-HttpRequestMatcher::HttpRequestMatcher(const envoy::service::tap::v2alpha::HttpRequestMatch& config,
-                                       const std::vector<MatcherPtr>& matchers)
-    : Matcher(matchers) {
-  for (const auto& header_match : config.headers()) {
-    headers_to_match_.emplace_back(header_match);
-  }
-}
-
-bool HttpRequestMatcher::onHttpRequestHeaders(const Http::HeaderMap& request_headers,
-                                              std::vector<bool>& statuses) const {
-  statuses[my_index_] = Http::HeaderUtility::matchHeaders(request_headers, headers_to_match_);
-  return statuses[my_index_];
-}
-
-HttpResponseMatcher::HttpResponseMatcher(
-    const envoy::service::tap::v2alpha::HttpResponseMatch& config,
+HttpHeaderMatcherBase::HttpHeaderMatcherBase(
+    const envoy::service::tap::v2alpha::HttpHeadersMatch& config,
     const std::vector<MatcherPtr>& matchers)
-    : Matcher(matchers) {
+    : SimpleMatcher(matchers) {
   for (const auto& header_match : config.headers()) {
     headers_to_match_.emplace_back(header_match);
   }
 }
 
-bool HttpResponseMatcher::onHttpResponseHeaders(const Http::HeaderMap& response_headers,
-                                                std::vector<bool>& statuses) const {
-  statuses[my_index_] = Http::HeaderUtility::matchHeaders(response_headers, headers_to_match_);
+bool HttpHeaderMatcherBase::matchHeaders(const Http::HeaderMap& headers,
+                                         std::vector<bool>& statuses) const {
+  statuses[my_index_] = Http::HeaderUtility::matchHeaders(headers, headers_to_match_);
   return statuses[my_index_];
 }
 

@@ -48,23 +48,23 @@ message MatchPredicate {
     // The match configuration will always match.
     bool any_match = 4 [(validate.rules).bool.const = true];
 
-    // HTTP request match configuration.
-    HttpRequestMatch http_request_match = 5;
+    // HTTP request headers match configuration.
+    HttpHeadersMatch http_request_headers_match = 5;
 
-    // HTTP response match configuration.
-    HttpResponseMatch http_response_match = 6;
+    // HTTP request trailers match configuration.
+    HttpHeadersMatch http_request_trailers_match = 6;
+
+    // HTTP response headers match configuration.
+    HttpHeadersMatch http_response_headers_match = 7;
+
+    // HTTP response trailers match configuration.
+    HttpHeadersMatch http_response_trailers_match = 8;
   }
 }
 
-// HTTP request match configuration.
-message HttpRequestMatch {
-  // HTTP request headers to match.
-  repeated api.v2.route.HeaderMatcher headers = 1;
-}
-
-// HTTP response match configuration.
-message HttpResponseMatch {
-  // HTTP response headers to match.
+// HTTP headers match configuration.
+message HttpHeadersMatch {
+  // HTTP headers to match.
   repeated api.v2.route.HeaderMatcher headers = 1;
 }
 

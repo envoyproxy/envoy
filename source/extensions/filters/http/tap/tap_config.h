@@ -25,16 +25,28 @@ public:
   virtual void onRequestHeaders(const Http::HeaderMap& headers) PURE;
 
   /**
+   * Called when request trailers are received.
+   */
+  virtual void onRequestTrailers(const Http::HeaderMap& trailers) PURE;
+
+  /**
    * Called when response headers are received.
    */
   virtual void onResponseHeaders(const Http::HeaderMap& headers) PURE;
+
+  /**
+   * Called when response trailers are received.
+   */
+  virtual void onResponseTrailers(const Http::HeaderMap& headers) PURE;
 
   /**
    * Called when the request is being destroyed and is being logged.
    * @return whether the request was tapped or not.
    */
   virtual bool onDestroyLog(const Http::HeaderMap* request_headers,
-                            const Http::HeaderMap* response_headers) PURE;
+                            const Http::HeaderMap* request_trailers,
+                            const Http::HeaderMap* response_headers,
+                            const Http::HeaderMap* response_trailers) PURE;
 };
 
 using HttpPerRequestTapperPtr = std::unique_ptr<HttpPerRequestTapper>;

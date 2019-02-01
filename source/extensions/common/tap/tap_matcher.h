@@ -38,6 +38,16 @@ using MatcherPtr = std::unique_ptr<Matcher>;
  */
 class Matcher {
 public:
+  /**
+   * Base class constructor for a matcher.
+   * @param matchers supplies the match tree vector being built.
+   */
+  Matcher(const std::vector<MatcherPtr>& matchers)
+      // NOTE: This code assumes that the index for the matcher being constructed has already been
+      // allocated, which is why my_index_ is set to size() - 1. See buildMatcher() in
+      // tap_matcher.cc.
+      : my_index_(matchers.size() - 1) {}
+
   virtual ~Matcher() = default;
 
   /**
@@ -46,7 +56,7 @@ public:
   size_t index() { return my_index_; }
 
   /**
-   * Update match status when a stream is created. This might be an HTTP stream, a TCP connectin,
+   * Update match status when a stream is created. This might be an HTTP stream, a TCP connection,
    * etc. This allows any matchers to flip to an initial state of true if applicable.
    */
   virtual bool onNewStream(std::vector<bool>& statuses) const PURE;
@@ -59,6 +69,16 @@ public:
    */
   virtual bool onHttpRequestHeaders(const Http::HeaderMap& request_headers,
                                     std::vector<bool>& statuses) const PURE;
+
+  /**
+   * Update match status given HTTP request trailers.
+   * @param request_trailers supplies the request trailers.
+   * @param statuses supplies the per-stream-request match status vector which must be the same
+   *                 size as the match tree vector (see above).
+   */
+  virtual bool onHttpRequestTrailers(const Http::HeaderMap& request_trailers,
+                                     std::vector<bool>& statuses) const PURE;
+
   /**
    * Update match status given HTTP response headers.
    * @param response_headers supplies the response headers.
@@ -69,6 +89,15 @@ public:
                                      std::vector<bool>& statuses) const PURE;
 
   /**
+   * Update match status given HTTP response trailers.
+   * @param response_headers supplies the response trailers.
+   * @param statuses supplies the per-stream-request match status vector which must be the same
+   *                 size as the match tree vector (see above).
+   */
+  virtual bool onHttpResponseTrailers(const Http::HeaderMap& response_trailers,
+                                      std::vector<bool>& statuses) const PURE;
+
+  /**
    * @return whether given currently available information, the matcher matches.
    * @param statuses supplies the per-stream-request match status vector which must be the same
    *                 size as the match tree vector (see above).
@@ -76,16 +105,6 @@ public:
   bool matches(const std::vector<bool>& statuses) const { return statuses[my_index_]; }
 
 protected:
-  /**
-   * Base class constructor for a matcher.
-   * @param matchers supplies the match tree vector being built.
-   */
-  Matcher(const std::vector<MatcherPtr>& matchers)
-      // NOTE: This code assumes that the index for the matcher being constructed has already been
-      // allocated, which is why my_index_ is set to size() - 1. See buildMatcher() in
-      // tap_matcher.cc.
-      : my_index_(matchers.size() - 1) {}
-
   const size_t my_index_;
 };
 
@@ -98,24 +117,63 @@ void buildMatcher(const envoy::service::tap::v2alpha::MatchPredicate& match_conf
                   std::vector<MatcherPtr>& matchers);
 
 /**
+ * Base class for logic matchers that need to forward update calls to child matchers.
+ */
+class LogicMatcherBase : public Matcher {
+public:
+  using Matcher::Matcher;
+
+  // Extensions::Common::Tap::Matcher
+  bool onNewStream(std::vector<bool>& statuses) const override {
+    return updateLocalStatus(
+        statuses, [](Matcher& m, std::vector<bool>& statuses) { return m.onNewStream(statuses); });
+  }
+  bool onHttpRequestHeaders(const Http::HeaderMap& request_headers,
+                            std::vector<bool>& statuses) const override {
+    return updateLocalStatus(statuses, [&request_headers](Matcher& m, std::vector<bool>& statuses) {
+      return m.onHttpRequestHeaders(request_headers, statuses);
+    });
+  }
+  bool onHttpRequestTrailers(const Http::HeaderMap& request_trailers,
+                             std::vector<bool>& statuses) const override {
+    return updateLocalStatus(statuses,
+                             [&request_trailers](Matcher& m, std::vector<bool>& statuses) {
+                               return m.onHttpRequestTrailers(request_trailers, statuses);
+                             });
+  }
+  bool onHttpResponseHeaders(const Http::HeaderMap& response_headers,
+                             std::vector<bool>& statuses) const override {
+    return updateLocalStatus(statuses,
+                             [&response_headers](Matcher& m, std::vector<bool>& statuses) {
+                               return m.onHttpResponseHeaders(response_headers, statuses);
+                             });
+  }
+  bool onHttpResponseTrailers(const Http::HeaderMap& response_trailers,
+                              std::vector<bool>& statuses) const override {
+    return updateLocalStatus(statuses,
+                             [&response_trailers](Matcher& m, std::vector<bool>& statuses) {
+                               return m.onHttpResponseTrailers(response_trailers, statuses);
+                             });
+  }
+
+protected:
+  using UpdateFunctor = std::function<bool(Matcher&, std::vector<bool>&)>;
+  virtual bool updateLocalStatus(std::vector<bool>& statuses,
+                                 const UpdateFunctor& functor) const PURE;
+};
+
+/**
  * Matcher for implementing set logic.
  */
-class SetLogicMatcher : public Matcher {
+class SetLogicMatcher : public LogicMatcherBase {
 public:
   enum class Type { And, Or };
 
   SetLogicMatcher(const envoy::service::tap::v2alpha::MatchPredicate::MatchSet& configs,
                   std::vector<MatcherPtr>& matchers, Type type);
 
-  // Extensions::Common::Tap::Matcher
-  bool onNewStream(std::vector<bool>& statuses) const override;
-  bool onHttpRequestHeaders(const Http::HeaderMap& request_headers,
-                            std::vector<bool>& statuses) const override;
-  bool onHttpResponseHeaders(const Http::HeaderMap& response_headers,
-                             std::vector<bool>& statuses) const override;
-
 private:
-  bool updateLocalStatus(std::vector<bool>& statuses) const;
+  bool updateLocalStatus(std::vector<bool>& statuses, const UpdateFunctor& functor) const override;
 
   std::vector<MatcherPtr>& matchers_;
   std::vector<size_t> indexes_;
@@ -125,81 +183,124 @@ private:
 /**
  * Not matcher.
  */
-class NotMatcher : public Matcher {
+class NotMatcher : public LogicMatcherBase {
 public:
   NotMatcher(const envoy::service::tap::v2alpha::MatchPredicate& config,
              std::vector<MatcherPtr>& matchers);
 
-  // Extensions::Common::Tap::Matcher
-  bool onNewStream(std::vector<bool>& statuses) const override;
-  bool onHttpRequestHeaders(const Http::HeaderMap& request_headers,
-                            std::vector<bool>& statuses) const override;
-  bool onHttpResponseHeaders(const Http::HeaderMap& response_headers,
-                             std::vector<bool>& statuses) const override;
-
 private:
+  bool updateLocalStatus(std::vector<bool>& statuses, const UpdateFunctor& functor) const override;
+
   std::vector<MatcherPtr>& matchers_;
   const size_t not_index_;
 };
 
 /**
+ * A base class for a matcher that generally wants to return default values, but might override
+ * a single update function.
+ */
+class SimpleMatcher : public Matcher {
+public:
+  using Matcher::Matcher;
+
+  // Extensions::Common::Tap::Matcher
+  bool onNewStream(std::vector<bool>& statuses) const { return statuses[my_index_]; }
+  bool onHttpRequestHeaders(const Http::HeaderMap&, std::vector<bool>& statuses) const {
+    return statuses[my_index_];
+  }
+  bool onHttpRequestTrailers(const Http::HeaderMap&, std::vector<bool>& statuses) const {
+    return statuses[my_index_];
+  }
+  bool onHttpResponseHeaders(const Http::HeaderMap&, std::vector<bool>& statuses) const {
+    return statuses[my_index_];
+  }
+  bool onHttpResponseTrailers(const Http::HeaderMap&, std::vector<bool>& statuses) const {
+    return statuses[my_index_];
+  }
+};
+
+/**
  * Any matcher (always matches).
  */
-class AnyMatcher : public Matcher {
+class AnyMatcher : public SimpleMatcher {
 public:
-  AnyMatcher(std::vector<MatcherPtr>& matchers) : Matcher(matchers) {}
+  using SimpleMatcher::SimpleMatcher;
 
   // Extensions::Common::Tap::Matcher
   bool onNewStream(std::vector<bool>& statuses) const override {
     statuses[my_index_] = true;
     return true;
   }
-  bool onHttpRequestHeaders(const Http::HeaderMap&, std::vector<bool>&) const override {
-    return true;
-  }
-  bool onHttpResponseHeaders(const Http::HeaderMap&, std::vector<bool>&) const override {
-    return true;
-  }
 };
 
 /**
- * HTTP request matcher.
+ * Base class for the various HTTP header matchers.
  */
-class HttpRequestMatcher : public Matcher {
+class HttpHeaderMatcherBase : public SimpleMatcher {
 public:
-  HttpRequestMatcher(const envoy::service::tap::v2alpha::HttpRequestMatch& config,
-                     const std::vector<MatcherPtr>& matchers);
+  HttpHeaderMatcherBase(const envoy::service::tap::v2alpha::HttpHeadersMatch& config,
+                        const std::vector<MatcherPtr>& matchers);
+
+protected:
+  bool matchHeaders(const Http::HeaderMap& headers, std::vector<bool>& statuses) const;
+
+  std::vector<Http::HeaderUtility::HeaderData> headers_to_match_;
+};
+
+/**
+ * HTTP request headers matcher.
+ */
+class HttpRequestHeadersMatcher : public HttpHeaderMatcherBase {
+public:
+  using HttpHeaderMatcherBase::HttpHeaderMatcherBase;
 
   // Extensions::Common::Tap::Matcher
-  bool onNewStream(std::vector<bool>&) const override { return false; }
   bool onHttpRequestHeaders(const Http::HeaderMap& request_headers,
-                            std::vector<bool>& statuses) const override;
-  bool onHttpResponseHeaders(const Http::HeaderMap&, std::vector<bool>& statuses) const override {
-    return statuses[my_index_];
+                            std::vector<bool>& statuses) const override {
+    return matchHeaders(request_headers, statuses);
   }
-
-private:
-  std::vector<Http::HeaderUtility::HeaderData> headers_to_match_;
 };
 
 /**
- * HTTP response matcher.
+ * HTTP request trailers matcher.
  */
-class HttpResponseMatcher : public Matcher {
+class HttpRequestTrailersMatcher : public HttpHeaderMatcherBase {
 public:
-  HttpResponseMatcher(const envoy::service::tap::v2alpha::HttpResponseMatch& config,
-                      const std::vector<MatcherPtr>& matchers);
+  using HttpHeaderMatcherBase::HttpHeaderMatcherBase;
 
   // Extensions::Common::Tap::Matcher
-  bool onNewStream(std::vector<bool>&) const override { return false; }
-  bool onHttpRequestHeaders(const Http::HeaderMap&, std::vector<bool>&) const override {
-    return false;
+  bool onHttpRequestTrailers(const Http::HeaderMap& request_trailers,
+                             std::vector<bool>& statuses) const override {
+    return matchHeaders(request_trailers, statuses);
   }
-  bool onHttpResponseHeaders(const Http::HeaderMap& response_headers,
-                             std::vector<bool>& statuses) const override;
+};
 
-private:
-  std::vector<Http::HeaderUtility::HeaderData> headers_to_match_;
+/**
+ * HTTP response headers matcher.
+ */
+class HttpResponseHeadersMatcher : public HttpHeaderMatcherBase {
+public:
+  using HttpHeaderMatcherBase::HttpHeaderMatcherBase;
+
+  // Extensions::Common::Tap::Matcher
+  bool onHttpResponseHeaders(const Http::HeaderMap& response_headers,
+                             std::vector<bool>& statuses) const override {
+    return matchHeaders(response_headers, statuses);
+  }
+};
+
+/**
+ * HTTP response trailers matcher.
+ */
+class HttpResponseTrailersMatcher : public HttpHeaderMatcherBase {
+public:
+  using HttpHeaderMatcherBase::HttpHeaderMatcherBase;
+
+  // Extensions::Common::Tap::Matcher
+  bool onHttpResponseTrailers(const Http::HeaderMap& response_trailers,
+                              std::vector<bool>& statuses) const override {
+    return matchHeaders(response_trailers, statuses);
+  }
 };
 
 } // namespace Tap

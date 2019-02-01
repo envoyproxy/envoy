@@ -65,11 +65,11 @@ An example POST body:
     match_config:
       and_match:
         rules:
-          - http_request_match:
+          - http_request_headers_match:
               headers:
                 - name: foo
                   exact_match: bar
-          - http_response_match:
+          - http_response_headers_match:
               headers:
                 - name: bar
                   exact_match: baz
@@ -90,11 +90,11 @@ Another example POST body:
     match_config:
       or_match:
         rules:
-          - http_request_match:
+          - http_request_headers_match:
               headers:
                 - name: foo
                   exact_match: bar
-          - http_response_match:
+          - http_response_headers_match:
               headers:
                 - name: bar
                   exact_match: baz

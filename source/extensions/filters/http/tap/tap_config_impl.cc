@@ -22,8 +22,16 @@ void HttpPerRequestTapperImpl::onRequestHeaders(const Http::HeaderMap& headers) 
   config_->rootMatcher().onHttpRequestHeaders(headers, statuses_);
 }
 
+void HttpPerRequestTapperImpl::onRequestTrailers(const Http::HeaderMap& trailers) {
+  config_->rootMatcher().onHttpRequestTrailers(trailers, statuses_);
+}
+
 void HttpPerRequestTapperImpl::onResponseHeaders(const Http::HeaderMap& headers) {
   config_->rootMatcher().onHttpResponseHeaders(headers, statuses_);
+}
+
+void HttpPerRequestTapperImpl::onResponseTrailers(const Http::HeaderMap& trailers) {
+  config_->rootMatcher().onHttpResponseTrailers(trailers, statuses_);
 }
 
 namespace {
@@ -38,16 +46,24 @@ Http::HeaderMap::Iterate fillHeaderList(const Http::HeaderEntry& header, void* c
 } // namespace
 
 bool HttpPerRequestTapperImpl::onDestroyLog(const Http::HeaderMap* request_headers,
-                                            const Http::HeaderMap* response_headers) {
+                                            const Http::HeaderMap* request_trailers,
+                                            const Http::HeaderMap* response_headers,
+                                            const Http::HeaderMap* response_trailers) {
   if (!config_->rootMatcher().matches(statuses_)) {
     return false;
   }
 
   auto trace = std::make_shared<envoy::data::tap::v2alpha::BufferedTraceWrapper>();
   auto& http_trace = *trace->mutable_http_buffered_trace();
-  request_headers->iterate(fillHeaderList, http_trace.mutable_request_headers());
+  request_headers->iterate(fillHeaderList, http_trace.mutable_request()->mutable_headers());
+  if (request_trailers != nullptr) {
+    request_trailers->iterate(fillHeaderList, http_trace.mutable_request()->mutable_trailers());
+  }
   if (response_headers != nullptr) {
-    response_headers->iterate(fillHeaderList, http_trace.mutable_response_headers());
+    response_headers->iterate(fillHeaderList, http_trace.mutable_response()->mutable_headers());
+  }
+  if (response_trailers != nullptr) {
+    response_trailers->iterate(fillHeaderList, http_trace.mutable_response()->mutable_trailers());
   }
 
   ENVOY_LOG(debug, "submitting buffered trace sink");
