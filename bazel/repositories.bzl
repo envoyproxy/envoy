@@ -286,7 +286,6 @@ def envoy_dependencies(path = "@envoy_deps//", skip_targets = []):
     # semi-standard in the Bazel community, intended to avoid both duplicate
     # dependencies and name conflicts.
     _com_google_absl()
-    _com_github_bombela_backward()
     _com_github_circonus_labs_libcircllhist()
     _com_github_c_ares_c_ares()
     _com_github_cyan4973_xxhash()
@@ -334,16 +333,6 @@ def _boringssl_fips():
         build_file = "@envoy//bazel/external:boringssl_fips.BUILD",
     )
 
-def _com_github_bombela_backward():
-    _repository_impl(
-        name = "com_github_bombela_backward",
-        build_file = "@envoy//bazel/external:backward.BUILD",
-    )
-    native.bind(
-        name = "backward",
-        actual = "@com_github_bombela_backward//:backward",
-    )
-
 def _com_github_circonus_labs_libcircllhist():
     _repository_impl(
         name = "com_github_circonus_labs_libcircllhist",
@@ -363,7 +352,7 @@ def _com_github_c_ares_c_ares():
     )
     native.bind(
         name = "ares",
-        actual = "//bazel/foreign_cc:ares",
+        actual = "@envoy//bazel/foreign_cc:ares",
     )
 
 def _com_github_cyan4973_xxhash():
@@ -456,7 +445,7 @@ def _com_github_jbeder_yaml_cpp():
     )
     native.bind(
         name = "yaml_cpp",
-        actual = "//bazel/foreign_cc:yaml",
+        actual = "@envoy//bazel/foreign_cc:yaml",
     )
 
 def _com_github_libevent_libevent():
@@ -468,7 +457,7 @@ def _com_github_libevent_libevent():
     )
     native.bind(
         name = "event",
-        actual = "//bazel/foreign_cc:event",
+        actual = "@envoy//bazel/foreign_cc:event",
     )
 
 def _com_github_madler_zlib():
@@ -480,7 +469,7 @@ def _com_github_madler_zlib():
     )
     native.bind(
         name = "zlib",
-        actual = "//bazel/foreign_cc:zlib",
+        actual = "@envoy//bazel/foreign_cc:zlib",
     )
 
 def _com_github_nghttp2_nghttp2():
@@ -490,12 +479,12 @@ def _com_github_nghttp2_nghttp2():
         build_file_content = BUILD_ALL_CONTENT,
         patch_args = ["-p1"],
         patch_cmds = ["find . -name '*.sh' -exec sed -i.orig '1s|#!/usr/bin/env sh\$|/bin/sh\$|' {} +"],
-        patches = ["//bazel/foreign_cc:nghttp2.patch"],
+        patches = ["@envoy//bazel/foreign_cc:nghttp2.patch"],
         **location
     )
     native.bind(
         name = "nghttp2",
-        actual = "//bazel/foreign_cc:nghttp2",
+        actual = "@envoy//bazel/foreign_cc:nghttp2",
     )
 
 def _io_opentracing_cpp():
@@ -616,6 +605,10 @@ def _com_google_absl():
         name = "abseil_symbolize",
         actual = "@com_google_absl//absl/debugging:symbolize",
     )
+    native.bind(
+        name = "abseil_stacktrace",
+        actual = "@com_google_absl//absl/debugging:stacktrace",
+    )
 
     # Require abseil_time as an indirect dependency as it is needed by the
     # direct dependency jwt_verify_lib.
@@ -679,6 +672,10 @@ def _com_googlesource_quiche():
     native.bind(
         name = "quiche_quic_platform",
         actual = "@com_googlesource_quiche//:quic_platform",
+    )
+    native.bind(
+        name = "quiche_quic_platform_base",
+        actual = "@com_googlesource_quiche//:quic_platform_base",
     )
 
 def _com_github_grpc_grpc():

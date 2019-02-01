@@ -2,6 +2,8 @@
 
 #include "extensions/common/tap/tap_matcher.h"
 
+#include "test/test_common/utility.h"
+
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -15,6 +17,7 @@ public:
   std::vector<MatcherPtr> matchers_;
   std::vector<bool> statuses_;
   envoy::service::tap::v2alpha::MatchPredicate config_;
+  Http::TestHeaderMapImpl headers_;
 };
 
 TEST_F(TapMatcherTest, Any) {
@@ -27,7 +30,10 @@ any_match: true
   buildMatcher(config_, matchers_);
   EXPECT_EQ(1, matchers_.size());
   statuses_.resize(matchers_.size());
-  EXPECT_TRUE(matchers_[0]->updateMatchStatus(nullptr, nullptr, statuses_));
+  EXPECT_TRUE(matchers_[0]->onNewStream(statuses_));
+  EXPECT_TRUE(matchers_[0]->onHttpRequestHeaders(headers_, statuses_));
+  EXPECT_TRUE(matchers_[0]->onHttpResponseHeaders(headers_, statuses_));
+  EXPECT_TRUE(matchers_[0]->matches(statuses_));
 }
 
 TEST_F(TapMatcherTest, Not) {
@@ -41,7 +47,10 @@ not_match:
   buildMatcher(config_, matchers_);
   EXPECT_EQ(2, matchers_.size());
   statuses_.resize(matchers_.size());
-  EXPECT_FALSE(matchers_[0]->updateMatchStatus(nullptr, nullptr, statuses_));
+  EXPECT_FALSE(matchers_[0]->onNewStream(statuses_));
+  EXPECT_FALSE(matchers_[0]->onHttpRequestHeaders(headers_, statuses_));
+  EXPECT_FALSE(matchers_[0]->onHttpResponseHeaders(headers_, statuses_));
+  EXPECT_FALSE(matchers_[0]->matches(statuses_));
 }
 
 } // namespace

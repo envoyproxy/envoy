@@ -8,8 +8,9 @@ Envoy currently provides two experimental extensions that can tap traffic:
   * :ref:`HTTP tap filter <config_http_filters_tap>`. See the linked filter documentation for more
     information.
   * :ref:`Tap transport socket extension <envoy_api_msg_core.TransportSocket>` that can intercept
-    traffic and write to a :ref:`protobuf trace file <envoy_api_msg_data.tap.v2alpha.Trace>`. The
-    remainder of this document describes the configuration of the tap transport socket.
+    traffic and write to a :ref:`protobuf trace file
+    <envoy_api_msg_data.tap.v2alpha.BufferedTraceWrapper>`. The remainder of this document describes
+    the configuration of the tap transport socket.
 
 Tap transport socket configuration
 ----------------------------------
@@ -33,8 +34,14 @@ or cluster. For a plain text socket this might look like:
   transport_socket:
     name: envoy.transport_sockets.tap
     config:
-      file_sink:
-        path_prefix: /some/tap/path
+      common_config:
+        static_config:
+          match_config:
+            any_match: true
+          output_config:
+            sinks:
+              - file_per_tap:
+                  path_prefix: /some/tap/path
       transport_socket:
         name: raw_buffer
 
@@ -45,8 +52,14 @@ For a TLS socket, this will be:
   transport_socket:
     name: envoy.transport_sockets.tap
     config:
-      file_sink:
-        path_prefix: /some/tap/path
+      common_config:
+        static_config:
+          match_config:
+            any_match: true
+          output_config:
+            sinks:
+              - file_per_tap:
+                  path_prefix: /some/tap/path
       transport_socket:
         name: ssl
         config: <TLS context>
