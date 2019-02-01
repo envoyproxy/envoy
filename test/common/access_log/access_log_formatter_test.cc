@@ -508,9 +508,12 @@ TEST(AccessLogFormatterTest, JsonFormatterDynamicMetadataTest) {
   EXPECT_CALL(Const(stream_info), dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
 
   std::unordered_map<std::string, std::string> expected_json_map = {
-      {"test_key", "\"test_value\"""\n"},
-      {"test_obj", "{\"inner_key\":\"inner_value\"}""\n"},
-      {"test_obj.inner_key", "\"inner_value\"""\n"}};
+      {"test_key", "\"test_value\""
+                   "\n"},
+      {"test_obj", "{\"inner_key\":\"inner_value\"}"
+                   "\n"},
+      {"test_obj.inner_key", "\"inner_value\""
+                             "\n"}};
 
   std::unordered_map<std::string, std::string> key_mapping = {
       {"test_key", "%DYNAMIC_METADATA(com.test:test_key)%"},
