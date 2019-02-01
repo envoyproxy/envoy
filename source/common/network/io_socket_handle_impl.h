@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/network/io_handle.h"
+#include "envoy/api/os_sys_calls.h"
 
 namespace Envoy {
 namespace Network {
@@ -8,7 +9,7 @@ namespace Network {
 /**
  * IoHandle derivative for sockets
  */
-class IoSocketHandleImpl : public IoHandle {
+class IoSocketHandleImpl : public IoHandle<Api::SysCallIntResult> {
 public:
   explicit IoSocketHandleImpl(int fd = -1) : fd_(fd) {}
 

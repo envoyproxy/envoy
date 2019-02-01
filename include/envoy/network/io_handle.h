@@ -10,7 +10,7 @@ namespace Network {
 /**
  * IoHandle: an abstract interface for all I/O operations
  */
-class IoHandle {
+template <class T> class IoHandle {
 public:
   virtual ~IoHandle() {}
 
@@ -24,12 +24,12 @@ public:
   /**
    * Clean up IoHandle resources
    */
-  virtual Api::SysCallIntResult close() PURE;
+  virtual T close() PURE;
 
   virtual bool isClosed() const PURE;
 };
 
-typedef std::unique_ptr<IoHandle> IoHandlePtr;
+typedef std::unique_ptr<IoHandle<T>> IoHandlePtr;
 
 } // namespace Network
 } // namespace Envoy
