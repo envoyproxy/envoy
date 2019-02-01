@@ -91,8 +91,7 @@ message OutlierDetection {
 
   // The % chance that a host will be actually ejected when an outlier status
   // is detected through success rate statistics for locally originated errors.
-  // This setting can be used to
-  // disable ejection or to ramp it up slowly. Defaults to 100.
+  // This setting can be used to disable ejection or to ramp it up slowly. Defaults to 100.
   google.protobuf.UInt32Value enforcing_local_origin_success_rate = 14
       [(validate.rules).uint32.lte = 100];
 }

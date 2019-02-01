@@ -172,8 +172,8 @@ DetectorImpl::DetectorImpl(const Cluster& cluster,
       interval_timer_(dispatcher.createTimer([this]() -> void { onIntervalTimer(); })),
       event_logger_(event_logger) {
   // Insert success rate initial numbers for each type of SR detector
-  success_rate_nums_[DetectorHostMonitor::externalOrigin] = std::make_tuple(-1, -1);
-  success_rate_nums_[DetectorHostMonitor::localOrigin] = std::make_tuple(-1, -1);
+  success_rate_nums_[DetectorHostMonitor::externalOrigin] = {-1, -1};
+  success_rate_nums_[DetectorHostMonitor::localOrigin] = {-1, -1};
 }
 
 DetectorImpl::~DetectorImpl() {
@@ -429,7 +429,7 @@ void DetectorImpl::onConsecutiveErrorWorker(HostSharedPtr host, EjectionType typ
   }
 }
 
-std::tuple<double, double> DetectorImpl::successRateEjectionThreshold(
+DetectorImpl::EjectionPair DetectorImpl::successRateEjectionThreshold(
     double success_rate_sum, const std::vector<HostSuccessRatePair>& valid_success_rate_hosts,
     double success_rate_stdev_factor) {
   // This function is using mean and standard deviation as statistical measures for outlier
@@ -456,7 +456,7 @@ std::tuple<double, double> DetectorImpl::successRateEjectionThreshold(
   variance /= valid_success_rate_hosts.size();
   double stdev = std::sqrt(variance);
 
-  return std::make_tuple(mean, (mean - (success_rate_stdev_factor * stdev)));
+  return {mean, (mean - (success_rate_stdev_factor * stdev))};
 }
 
 void DetectorImpl::processSuccessRateEjections(
@@ -469,7 +469,7 @@ void DetectorImpl::processSuccessRateEjections(
   double success_rate_sum = 0;
 
   // Reset the Detector's success rate mean and stdev.
-  success_rate_nums_[monitor_type] = std::make_tuple(-1, -1);
+  success_rate_nums_[monitor_type] = {-1, -1};
 
   // Exit early if there are not enough hosts.
   if (host_monitors_.size() < success_rate_minimum_hosts) {
@@ -497,17 +497,17 @@ void DetectorImpl::processSuccessRateEjections(
 
   if (!valid_success_rate_hosts.empty() &&
       valid_success_rate_hosts.size() >= success_rate_minimum_hosts) {
-    double success_rate_stdev_factor =
+    const double success_rate_stdev_factor =
         runtime_.snapshot().getInteger("outlier_detection.success_rate_stdev_factor",
                                        config_.successRateStdevFactor()) /
         1000.0;
     success_rate_nums_[monitor_type] = successRateEjectionThreshold(
         success_rate_sum, valid_success_rate_hosts, success_rate_stdev_factor);
-    double success_rate_ejection_threshold = std::get<1>(success_rate_nums_[monitor_type]);
+    const double success_rate_ejection_threshold = success_rate_nums_[monitor_type].ejection_threshold_;
     for (const auto& host_success_rate_pair : valid_success_rate_hosts) {
       if (host_success_rate_pair.success_rate_ < success_rate_ejection_threshold) {
         stats_.ejections_success_rate_.inc(); // Deprecated.
-        EjectionType type = host_monitors_[host_success_rate_pair.host_]
+        const EjectionType type = host_monitors_[host_success_rate_pair.host_]
                                 ->getSRMonitor(monitor_type)
                                 ->getEjectionType();
         updateDetectedEjectionStats(type);

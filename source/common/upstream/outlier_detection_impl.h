@@ -197,7 +197,7 @@ private:
   // counters for local origin failures
   std::atomic<uint32_t> consecutive_local_origin_failure_{0};
 
-  std::map<SuccessRateMonitorType, std::unique_ptr<SuccessRateMonitor>> success_rate_monitors_;
+  absl::flat_hash_map<SuccessRateMonitorType, std::unique_ptr<SuccessRateMonitor>> success_rate_monitors_;
 };
 
 /**
@@ -237,22 +237,22 @@ class DetectorConfig {
 public:
   DetectorConfig(const envoy::api::v2::cluster::OutlierDetection& config);
 
-  uint64_t intervalMs() { return interval_ms_; }
-  uint64_t baseEjectionTimeMs() { return base_ejection_time_ms_; }
-  uint64_t consecutive5xx() { return consecutive_5xx_; }
-  uint64_t consecutiveGatewayFailure() { return consecutive_gateway_failure_; }
-  uint64_t maxEjectionPercent() { return max_ejection_percent_; }
-  uint64_t successRateMinimumHosts() { return success_rate_minimum_hosts_; }
-  uint64_t successRateRequestVolume() { return success_rate_request_volume_; }
-  uint64_t successRateStdevFactor() { return success_rate_stdev_factor_; }
-  uint64_t enforcingConsecutive5xx() { return enforcing_consecutive_5xx_; }
-  uint64_t enforcingConsecutiveGatewayFailure() { return enforcing_consecutive_gateway_failure_; }
-  uint64_t enforcingSuccessRate() { return enforcing_success_rate_; }
-  uint64_t consecutiveLocalOriginFailure() { return consecutive_local_origin_failure_; }
-  uint64_t enforcingConsecutiveLocalOriginFailure() {
+  uint64_t intervalMs() const { return interval_ms_; }
+  uint64_t baseEjectionTimeMs() const { return base_ejection_time_ms_; }
+  uint64_t consecutive5xx() const { return consecutive_5xx_; }
+  uint64_t consecutiveGatewayFailure() const { return consecutive_gateway_failure_; }
+  uint64_t maxEjectionPercent() const { return max_ejection_percent_; }
+  uint64_t successRateMinimumHosts() const { return success_rate_minimum_hosts_; }
+  uint64_t successRateRequestVolume() const { return success_rate_request_volume_; }
+  uint64_t successRateStdevFactor() const { return success_rate_stdev_factor_; }
+  uint64_t enforcingConsecutive5xx() const { return enforcing_consecutive_5xx_; }
+  uint64_t enforcingConsecutiveGatewayFailure() const { return enforcing_consecutive_gateway_failure_; }
+  uint64_t enforcingSuccessRate() const { return enforcing_success_rate_; }
+  uint64_t consecutiveLocalOriginFailure() const { return consecutive_local_origin_failure_; }
+  uint64_t enforcingConsecutiveLocalOriginFailure() const {
     return enforcing_consecutive_local_origin_failure_;
   }
-  uint64_t enforcingLocalOriginSuccessRate() { return enforcing_local_origin_success_rate_; }
+  uint64_t enforcingLocalOriginSuccessRate() const { return enforcing_local_origin_success_rate_; }
 
 private:
   const uint64_t interval_ms_;
@@ -294,23 +294,27 @@ public:
   void addChangedStateCb(ChangeStateCb cb) override { callbacks_.push_back(cb); }
   double
   successRateAverage(DetectorHostMonitor::SuccessRateMonitorType monitor_type) const override {
-    return std::get<0>(success_rate_nums_.at(monitor_type));
+    return success_rate_nums_.at(monitor_type).success_rate_average_;
   }
   double successRateEjectionThreshold(
       DetectorHostMonitor::SuccessRateMonitorType monitor_type) const override {
-    return std::get<1>(success_rate_nums_.at(monitor_type));
+    return success_rate_nums_.at(monitor_type).ejection_threshold_;
   }
 
   /**
-   * This function returns tuple of double values for success rate outlier detection. The pair
+   * This function returns pair of double values for success rate outlier detection. The pair
    * contains the average success rate of all valid hosts in the cluster and the ejection threshold.
    * If a host's success rate is under this threshold, the host is an outlier.
    * @param success_rate_sum is the sum of the data in the success_rate_data vector.
    * @param valid_success_rate_hosts is the vector containing the individual success rate data
    *        points.
-   * @return std::tuple<double, double>.
+   * @return EjectionPair 
    */
-  static std::tuple<double, double>
+  struct EjectionPair {
+    double success_rate_average_; // average success rate of all valid hosts in the cluster
+    double ejection_threshold_;   // ejection threshold for the cluster
+  };
+  static EjectionPair
   successRateEjectionThreshold(double success_rate_sum,
                                const std::vector<HostSuccessRatePair>& valid_success_rate_hosts,
                                double success_rate_stdev_factor);
@@ -345,7 +349,7 @@ private:
   std::unordered_map<HostSharedPtr, DetectorHostMonitorImpl*> host_monitors_;
   EventLoggerSharedPtr event_logger_;
 
-  std::map<DetectorHostMonitor::SuccessRateMonitorType, std::tuple<double, double>>
+  absl::flat_hash_map<DetectorHostMonitor::SuccessRateMonitorType, EjectionPair>
       success_rate_nums_;
 };
 
