@@ -148,6 +148,7 @@ Nilsson
 OCSP
 OK
 OOM
+OS
 OSI
 OSS
 OSX
@@ -587,8 +588,10 @@ rebalancing
 rebuffer
 recurse
 recv
+recvmmsg
 redis
 redistributions
+reentrant
 refactored
 refactoring
 referencee

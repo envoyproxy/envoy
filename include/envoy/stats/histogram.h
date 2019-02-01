@@ -45,7 +45,7 @@ public:
   virtual const std::vector<double>& supportedBuckets() const PURE;
 
   /**
-   * Returns computed bucket values during the period. The vector contains an appoximation
+   * Returns computed bucket values during the period. The vector contains an approximation
    * of samples below each quantile bucket defined in supportedBuckets(). This vector is
    * guaranteed to be the same length as supportedBuckets().
    */

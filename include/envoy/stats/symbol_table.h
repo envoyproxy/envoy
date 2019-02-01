@@ -87,7 +87,7 @@ public:
    * with a corrupt stats set.
    *
    * @param stat_name the stat name.
-   * @return std::string stringifiied stat_name.
+   * @return std::string stringified stat_name.
    */
   virtual std::string toString(const StatName& stat_name) const PURE;
 
@@ -122,7 +122,7 @@ public:
    *
    * This is intended for use doing cached name lookups of scoped stats, where
    * the scope prefix and the names to combine it with are already in StatName
-   * form. Using this class, they can be combined without acessingm the
+   * form. Using this class, they can be combined without accessing the
    * SymbolTable or, in particular, taking its lock.
    *
    * @param stat_names the names to join.
