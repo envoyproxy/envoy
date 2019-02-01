@@ -8,7 +8,7 @@
 #include "test/test_common/printers.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using testing::_;
 using testing::DoAll;
@@ -24,7 +24,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Cors {
 
-class CorsFilterTest : public testing::Test {
+class CorsFilterTest : public TestBase {
 public:
   CorsFilterTest() : config_(new CorsFilterConfig("test.", stats_)), filter_(config_) {
     cors_policy_ = std::make_unique<Router::TestCorsPolicy>();

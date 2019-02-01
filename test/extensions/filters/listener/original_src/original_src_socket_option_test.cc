@@ -9,7 +9,7 @@
 #include "test/test_common/printers.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using testing::_;
 using testing::Eq;
@@ -20,7 +20,7 @@ namespace ListenerFilters {
 namespace OriginalSrc {
 namespace {
 
-class OriginalSrcSocketOptionTest : public testing::Test {
+class OriginalSrcSocketOptionTest : public TestBase {
 public:
   std::unique_ptr<OriginalSrcSocketOption>
   makeOptionByAddress(const Network::Address::InstanceConstSharedPtr& address) {

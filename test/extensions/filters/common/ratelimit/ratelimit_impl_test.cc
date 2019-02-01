@@ -17,7 +17,7 @@
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using testing::_;
 using testing::AtLeast;
@@ -41,7 +41,7 @@ public:
   MOCK_METHOD2(complete_, void(LimitStatus status, const Http::HeaderMap* headers));
 };
 
-class RateLimitGrpcClientTest : public testing::Test {
+class RateLimitGrpcClientTest : public TestBase {
 public:
   RateLimitGrpcClientTest()
       : async_client_(new Grpc::MockAsyncClient()),

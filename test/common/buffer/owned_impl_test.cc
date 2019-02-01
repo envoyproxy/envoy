@@ -6,7 +6,7 @@
 
 #include "absl/strings/str_cat.h"
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using testing::_;
 using testing::Return;
@@ -15,7 +15,7 @@ namespace Envoy {
 namespace Buffer {
 namespace {
 
-class OwnedImplTest : public testing::Test {
+class OwnedImplTest : public TestBase {
 public:
   OwnedImplTest() {}
 

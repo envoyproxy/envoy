@@ -12,7 +12,7 @@
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using testing::_;
 using testing::Return;
@@ -44,7 +44,7 @@ public:
   std::shared_ptr<GoogleStub> shared_stub_{stub_};
 };
 
-class EnvoyGoogleAsyncClientImplTest : public testing::Test {
+class EnvoyGoogleAsyncClientImplTest : public TestBase {
 public:
   EnvoyGoogleAsyncClientImplTest()
       : stats_store_(new Stats::IsolatedStoreImpl), api_(Api::createApiForTest(*stats_store_)),

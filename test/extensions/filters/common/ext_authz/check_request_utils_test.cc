@@ -9,7 +9,7 @@
 #include "test/mocks/upstream/mocks.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using testing::Return;
 using testing::ReturnPointee;
@@ -21,7 +21,7 @@ namespace Filters {
 namespace Common {
 namespace ExtAuthz {
 
-class CheckRequestUtilsTest : public testing::Test {
+class CheckRequestUtilsTest : public TestBase {
 public:
   CheckRequestUtilsTest() {
     addr_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 1111);

@@ -17,7 +17,7 @@
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using testing::_;
 using testing::InSequence;
@@ -30,7 +30,7 @@ using testing::Throw;
 
 namespace Envoy {
 
-class FileSystemImplTest : public testing::Test {
+class FileSystemImplTest : public TestBase {
 protected:
   FileSystemImplTest()
       : file_system_(std::chrono::milliseconds(10000), Thread::threadFactoryForTest(),

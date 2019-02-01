@@ -1,7 +1,7 @@
 #include "mocks.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using testing::Return;
 using testing::ReturnRef;

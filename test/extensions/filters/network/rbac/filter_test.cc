@@ -17,7 +17,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace RBACFilter {
 
-class RoleBasedAccessControlNetworkFilterTest : public testing::Test {
+class RoleBasedAccessControlNetworkFilterTest : public TestBase {
 public:
   RoleBasedAccessControlFilterConfigSharedPtr setupConfig(bool with_policy = true,
                                                           bool continuous = false) {

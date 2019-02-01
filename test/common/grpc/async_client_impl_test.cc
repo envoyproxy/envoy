@@ -7,7 +7,7 @@
 #include "test/test_common/test_time.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using testing::_;
 using testing::Invoke;
@@ -19,7 +19,7 @@ namespace Envoy {
 namespace Grpc {
 namespace {
 
-class EnvoyAsyncClientImplTest : public testing::Test {
+class EnvoyAsyncClientImplTest : public TestBase {
 public:
   EnvoyAsyncClientImplTest()
       : method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")) {

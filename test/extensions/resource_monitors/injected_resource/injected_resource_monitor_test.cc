@@ -12,7 +12,7 @@
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -43,7 +43,7 @@ public:
   MOCK_METHOD1(onFailure, void(const EnvoyException&));
 };
 
-class InjectedResourceMonitorTest : public testing::Test {
+class InjectedResourceMonitorTest : public TestBase {
 protected:
   InjectedResourceMonitorTest()
       : api_(Api::createApiForTest(stats_store_)), dispatcher_(test_time_.timeSystem(), *api_),

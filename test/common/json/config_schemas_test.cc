@@ -10,7 +10,7 @@
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using testing::_;
 
@@ -27,7 +27,7 @@ std::vector<std::string> generateTestInputs() {
   return file_list;
 }
 
-class ConfigSchemasTest : public ::testing::TestWithParam<std::string> {
+class ConfigSchemasTest : public TestBaseWithParam<std::string> {
 protected:
   ConfigSchemasTest() : api_(Api::createApiForTest(stats_store_)) {}
 

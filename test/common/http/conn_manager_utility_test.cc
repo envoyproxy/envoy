@@ -16,7 +16,7 @@
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using testing::_;
 using testing::InSequence;
@@ -82,7 +82,7 @@ public:
       std::make_unique<DefaultInternalAddressConfig>();
 };
 
-class ConnectionManagerUtilityTest : public testing::Test {
+class ConnectionManagerUtilityTest : public TestBase {
 public:
   ConnectionManagerUtilityTest() {
     ON_CALL(config_, userAgent()).WillByDefault(ReturnRef(user_agent_));

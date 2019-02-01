@@ -17,7 +17,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace JwtAuthn {
 
-class AllVerifierTest : public ::testing::Test {
+class AllVerifierTest : public TestBase {
 public:
   void SetUp() { MessageUtil::loadFromYaml(ExampleConfig, proto_config_); }
 

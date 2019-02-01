@@ -22,7 +22,7 @@
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using testing::AssertionFailure;
 using testing::AssertionResult;

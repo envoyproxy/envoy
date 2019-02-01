@@ -15,7 +15,7 @@
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using testing::_;
 using testing::InSequence;
@@ -26,7 +26,7 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Upstream {
 
-class CdsApiImplTest : public testing::Test {
+class CdsApiImplTest : public TestBase {
 protected:
   CdsApiImplTest() : request_(&cm_.async_client_), api_(Api::createApiForTest(store_)) {}
 

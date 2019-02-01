@@ -15,7 +15,7 @@
 #include "test/mocks/upstream/mocks.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using testing::_;
 using testing::InSequence;
@@ -29,7 +29,7 @@ namespace StatSinks {
 namespace Common {
 namespace Statsd {
 
-class TcpStatsdSinkTest : public testing::Test {
+class TcpStatsdSinkTest : public TestBase {
 public:
   TcpStatsdSinkTest() {
     sink_ = std::make_unique<TcpStatsdSink>(

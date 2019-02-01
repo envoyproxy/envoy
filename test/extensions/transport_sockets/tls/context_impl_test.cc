@@ -21,7 +21,7 @@
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 #include "openssl/x509v3.h"
 
 using Envoy::Protobuf::util::MessageDifferencer;

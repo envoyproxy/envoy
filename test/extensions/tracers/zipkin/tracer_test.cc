@@ -14,7 +14,7 @@
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using testing::NiceMock;
 using testing::Return;
@@ -36,7 +36,7 @@ private:
   std::vector<Span> reported_spans_;
 };
 
-class ZipkinTracerTest : public testing::Test {
+class ZipkinTracerTest : public TestBase {
 protected:
   Event::SimulatedTimeSystem time_system_;
 };

@@ -7,13 +7,13 @@
 #include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"
 
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 namespace Envoy {
 namespace {
 
 class StatsIntegrationTest : public BaseIntegrationTest,
-                             public testing::TestWithParam<Network::Address::IpVersion> {
+                             public TestBaseWithParam<Network::Address::IpVersion> {
 public:
   StatsIntegrationTest() : BaseIntegrationTest(GetParam(), realTime()) {}
 

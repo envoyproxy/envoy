@@ -9,7 +9,7 @@
 #include "test/mocks/secret/mocks.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using testing::NiceMock;
 
@@ -44,7 +44,7 @@ private:
 };
 
 class SslIntegrationTest : public SslIntegrationTestBase,
-                           public testing::TestWithParam<Network::Address::IpVersion> {
+                           public TestBaseWithParam<Network::Address::IpVersion> {
 public:
   SslIntegrationTest() : SslIntegrationTestBase(GetParam()) {}
   void TearDown() override { SslIntegrationTestBase::TearDown(); };

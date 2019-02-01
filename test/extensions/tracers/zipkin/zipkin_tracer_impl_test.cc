@@ -24,7 +24,7 @@
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using testing::_;
 using testing::Invoke;
@@ -37,7 +37,7 @@ namespace Extensions {
 namespace Tracers {
 namespace Zipkin {
 
-class ZipkinDriverTest : public testing::Test {
+class ZipkinDriverTest : public TestBase {
 public:
   ZipkinDriverTest() : time_source_(test_time_.timeSystem()) {}
 

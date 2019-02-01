@@ -18,7 +18,7 @@
 #include "test/test_common/printers.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using testing::_;
 using testing::InSequence;
@@ -32,7 +32,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace RateLimitFilter {
 
-class RateLimitFilterTest : public testing::Test {
+class RateLimitFilterTest : public TestBase {
 public:
   RateLimitFilterTest() {}
 

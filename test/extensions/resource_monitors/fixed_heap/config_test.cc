@@ -9,7 +9,7 @@
 
 #include "test/mocks/event/mocks.h"
 
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 namespace Envoy {
 namespace Extensions {

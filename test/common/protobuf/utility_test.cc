@@ -10,11 +10,11 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 namespace Envoy {
 
-class ProtobufUtilityTest : public testing::Test {
+class ProtobufUtilityTest : public TestBase {
 protected:
   ProtobufUtilityTest() : api_(Api::createApiForTest(stats_store_)) {}
 
@@ -338,7 +338,7 @@ TEST(DurationUtilTest, OutOfRange) {
   }
 }
 
-class TimestampUtilTest : public ::testing::Test, public ::testing::WithParamInterface<int64_t> {};
+class TimestampUtilTest : public TestBase, public ::testing::WithParamInterface<int64_t> {};
 
 TEST_P(TimestampUtilTest, SystemClockToTimestampTest) {
   // Generate an input time_point<system_clock>,

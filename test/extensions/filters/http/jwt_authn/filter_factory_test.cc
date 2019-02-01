@@ -6,7 +6,7 @@
 #include "test/mocks/server/mocks.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication;
 using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtProvider;

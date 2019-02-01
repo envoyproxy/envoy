@@ -15,7 +15,7 @@
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using testing::_;
 using testing::DoAll;
@@ -152,7 +152,7 @@ protected:
 /**
  * Test fixture for connection pool tests.
  */
-class TcpConnPoolImplTest : public testing::Test {
+class TcpConnPoolImplTest : public TestBase {
 public:
   TcpConnPoolImplTest()
       : upstream_ready_timer_(new NiceMock<Event::MockTimer>(&dispatcher_)),
@@ -175,7 +175,7 @@ public:
 /**
  * Test fixture for connection pool destructor tests.
  */
-class TcpConnPoolImplDestructorTest : public testing::Test {
+class TcpConnPoolImplDestructorTest : public TestBase {
 public:
   TcpConnPoolImplDestructorTest()
       : upstream_ready_timer_(new NiceMock<Event::MockTimer>(&dispatcher_)),

@@ -11,14 +11,14 @@
 
 #include "fmt/printf.h"
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace DynamicOt {
 
-class DynamicOpenTracingDriverTest : public testing::Test {
+class DynamicOpenTracingDriverTest : public TestBase {
 public:
   void setup(const std::string& library, const std::string& tracer_config) {
     driver_ = std::make_unique<DynamicOpenTracingDriver>(stats_, library, tracer_config);

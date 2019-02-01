@@ -5,13 +5,13 @@
 
 #include "test/test_common/utility.h"
 
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 namespace Envoy {
 namespace Decompressor {
 namespace {
 
-class ZlibDecompressorImplTest : public testing::Test {
+class ZlibDecompressorImplTest : public TestBase {
 protected:
   void drainBuffer(Buffer::OwnedImpl& buffer) { buffer.drain(buffer.length()); }
 

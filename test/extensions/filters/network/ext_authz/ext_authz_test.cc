@@ -20,7 +20,7 @@
 #include "test/test_common/printers.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using testing::_;
 using testing::InSequence;
@@ -35,7 +35,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ExtAuthz {
 
-class ExtAuthzFilterTest : public testing::Test {
+class ExtAuthzFilterTest : public TestBase {
 public:
   ExtAuthzFilterTest() {
     std::string json = R"EOF(

@@ -13,7 +13,7 @@
 #include "circllhist.h"
 #include "fmt/printf.h"
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using testing::_;
 using testing::HasSubstr;
@@ -116,7 +116,7 @@ private:
   histogram_t* histogram_;
 };
 
-class HystrixSinkTest : public testing::Test {
+class HystrixSinkTest : public TestBase {
 public:
   HystrixSinkTest() { sink_ = std::make_unique<HystrixSink>(server_, window_size_); }
 

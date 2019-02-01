@@ -7,7 +7,7 @@
 #include "test/mocks/upstream/mocks.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using namespace testing;
 

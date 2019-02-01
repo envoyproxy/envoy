@@ -3,7 +3,7 @@
 #include "common/network/address_impl.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using testing::Invoke;
 using testing::Return;

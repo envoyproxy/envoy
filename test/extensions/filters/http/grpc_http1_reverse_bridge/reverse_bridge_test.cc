@@ -15,7 +15,7 @@
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using Envoy::Http::HeaderValueOf;
 using testing::_;
@@ -27,7 +27,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GrpcHttp1ReverseBridge {
 
-class ReverseBridgeTest : public testing::Test {
+class ReverseBridgeTest : public TestBase {
 protected:
   void initialize(bool withhold_grpc_headers = true) {
     filter_ = std::make_unique<Filter>("application/x-protobuf", withhold_grpc_headers);

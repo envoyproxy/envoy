@@ -12,7 +12,7 @@
 #include "test/test_common/printers.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using testing::_;
 using testing::Exactly;
@@ -24,7 +24,7 @@ namespace ListenerFilters {
 namespace OriginalSrc {
 namespace {
 
-class OriginalSrcTest : public testing::Test {
+class OriginalSrcTest : public TestBase {
 public:
   std::unique_ptr<OriginalSrcFilter> makeDefaultFilter() {
     Config default_config;

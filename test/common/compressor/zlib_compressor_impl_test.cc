@@ -5,13 +5,13 @@
 
 #include "test/test_common/utility.h"
 
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 namespace Envoy {
 namespace Compressor {
 namespace {
 
-class ZlibCompressorImplTest : public testing::Test {
+class ZlibCompressorImplTest : public TestBase {
 protected:
   void expectValidFlushedBuffer(const Buffer::OwnedImpl& output_buffer) {
     uint64_t num_comp_slices = output_buffer.getRawSlices(nullptr, 0);

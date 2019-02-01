@@ -4,7 +4,7 @@
 
 #include "test/mocks/stats/mocks.h"
 
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using testing::NiceMock;
 using testing::ReturnPointee;

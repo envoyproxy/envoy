@@ -3,12 +3,12 @@
 
 #include "test/test_common/global.h"
 
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 namespace Envoy {
 namespace Test {
 
-class GlobalTest : public testing::Test {
+class GlobalTest : public TestBase {
 protected:
 };
 

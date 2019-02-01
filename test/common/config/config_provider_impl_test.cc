@@ -8,7 +8,7 @@
 #include "test/test_common/simulated_time_system.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 namespace Envoy {
 namespace Config {
@@ -205,7 +205,7 @@ DummyConfigSubscription::DummyConfigSubscription(
           "DummyDS", manager_identifier, config_provider_manager, factory_context.timeSource(),
           factory_context.timeSource().systemTime(), factory_context.localInfo()) {}
 
-class ConfigProviderImplTest : public testing::Test {
+class ConfigProviderImplTest : public TestBase {
 public:
   ConfigProviderImplTest() {
     EXPECT_CALL(factory_context_.admin_.config_tracker_, add_("dummy", _));

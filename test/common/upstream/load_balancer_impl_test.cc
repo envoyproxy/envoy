@@ -13,7 +13,7 @@
 #include "test/mocks/upstream/mocks.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using testing::ElementsAre;
 using testing::NiceMock;
@@ -23,7 +23,7 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Upstream {
 
-class LoadBalancerTestBase : public ::testing::TestWithParam<bool> {
+class LoadBalancerTestBase : public TestBaseWithParam<bool> {
 protected:
   // Run all tests against both priority 0 and priority 1 host sets, to ensure
   // all the load balancers have equivalent functonality for failover host sets.

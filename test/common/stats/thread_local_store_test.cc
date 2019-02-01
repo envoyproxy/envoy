@@ -21,7 +21,7 @@
 
 #include "absl/strings/str_split.h"
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using testing::_;
 using testing::InSequence;
@@ -33,7 +33,7 @@ using testing::Return;
 namespace Envoy {
 namespace Stats {
 
-class StatsThreadLocalStoreTest : public testing::Test {
+class StatsThreadLocalStoreTest : public TestBase {
 public:
   void SetUp() override {
     alloc_ = std::make_unique<MockedTestAllocator>(options_);
@@ -71,7 +71,7 @@ private:
   histogram_t* histogram_;
 };
 
-class HistogramTest : public testing::Test {
+class HistogramTest : public TestBase {
 public:
   typedef std::map<std::string, ParentHistogramSharedPtr> NameHistogramMap;
 

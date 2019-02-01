@@ -16,7 +16,7 @@
 #include "test/test_common/simulated_time_system.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using testing::_;
 using testing::ByRef;
@@ -35,7 +35,7 @@ namespace NetworkFilters {
 namespace RedisProxy {
 namespace CommandSplitter {
 
-class RedisCommandSplitterImplTest : public testing::Test {
+class RedisCommandSplitterImplTest : public TestBase {
 public:
   void makeBulkStringArray(RespValue& value, const std::vector<std::string>& strings) {
     std::vector<RespValue> values(strings.size());

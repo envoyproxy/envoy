@@ -8,7 +8,7 @@
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using ::testing::Return;
 
@@ -16,7 +16,7 @@ namespace Envoy {
 namespace Grpc {
 namespace {
 
-class AsyncClientManagerImplTest : public testing::Test {
+class AsyncClientManagerImplTest : public TestBase {
 public:
   AsyncClientManagerImplTest() : api_(Api::createApiForTest(api_stats_store_)) {}
 

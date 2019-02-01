@@ -30,7 +30,7 @@
 
 #include "absl/strings/escaping.h"
 #include "absl/strings/match.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using testing::_;
 using testing::InSequence;
@@ -55,7 +55,7 @@ public:
   Configuration::FactoryContext* context_{};
 };
 
-class ListenerManagerImplTest : public testing::Test {
+class ListenerManagerImplTest : public TestBase {
 protected:
   ListenerManagerImplTest() : api_(Api::createApiForTest(stats_)) {
     ON_CALL(server_, api()).WillByDefault(ReturnRef(*api_));

@@ -20,7 +20,7 @@
 
 #include "absl/types/optional.h"
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using testing::_;
 using testing::EndsWith;
@@ -106,7 +106,7 @@ private:
 
 enum UpdateOrder { REMOVES_FIRST, SIMULTANEOUS };
 
-class SubsetLoadBalancerTest : public testing::TestWithParam<UpdateOrder> {
+class SubsetLoadBalancerTest : public TestBaseWithParam<UpdateOrder> {
 public:
   SubsetLoadBalancerTest() : stats_(ClusterInfoImpl::generateStats(stats_store_)) {
     stats_.max_host_weight_.set(1UL);

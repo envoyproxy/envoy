@@ -1,7 +1,7 @@
 #include "common/common/stack_array.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 namespace Envoy {
 

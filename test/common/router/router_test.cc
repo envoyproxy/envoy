@@ -28,7 +28,7 @@
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using testing::_;
 using testing::AssertionFailure;
@@ -74,7 +74,7 @@ public:
   bool reject_all_hosts_ = false;
 };
 
-class RouterTestBase : public testing::Test {
+class RouterTestBase : public TestBase {
 public:
   RouterTestBase(bool start_child_span, bool suppress_envoy_headers)
       : shadow_writer_(new MockShadowWriter()),

@@ -5,13 +5,13 @@
 #include "test/test_common/utility.h"
 
 #include "event2/event.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 namespace Envoy {
 namespace Event {
 namespace Test {
 
-class SimulatedTimeSystemTest : public testing::Test {
+class SimulatedTimeSystemTest : public TestBase {
 protected:
   SimulatedTimeSystemTest()
       : event_system_(event_base_new()), scheduler_(time_system_.createScheduler(event_system_)),

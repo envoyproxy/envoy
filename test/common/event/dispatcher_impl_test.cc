@@ -12,7 +12,7 @@
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using testing::InSequence;
 
@@ -61,7 +61,7 @@ TEST(DeferredDeleteTest, DeferredDelete) {
   dispatcher.clearDeferredDeleteList();
 }
 
-class DispatcherImplTest : public ::testing::Test {
+class DispatcherImplTest : public TestBase {
 protected:
   DispatcherImplTest()
       : api_(Api::createApiForTest(stat_store_)),

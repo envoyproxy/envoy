@@ -12,7 +12,7 @@
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 #include "spdlog/spdlog.h"
 
 using testing::NiceMock;
@@ -28,7 +28,7 @@ public:
   MOCK_METHOD1(write, void(const std::string& message));
 };
 
-class UdpStatsdSinkTest : public testing::TestWithParam<Network::Address::IpVersion> {};
+class UdpStatsdSinkTest : public TestBaseWithParam<Network::Address::IpVersion> {};
 INSTANTIATE_TEST_SUITE_P(IpVersions, UdpStatsdSinkTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
@@ -72,7 +72,7 @@ TEST_P(UdpStatsdSinkTest, InitWithIpAddress) {
   tls_.shutdownThread();
 }
 
-class UdpStatsdSinkWithTagsTest : public testing::TestWithParam<Network::Address::IpVersion> {};
+class UdpStatsdSinkWithTagsTest : public TestBaseWithParam<Network::Address::IpVersion> {};
 INSTANTIATE_TEST_SUITE_P(IpVersions, UdpStatsdSinkWithTagsTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);

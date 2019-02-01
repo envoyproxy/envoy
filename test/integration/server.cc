@@ -21,7 +21,7 @@
 #include "test/test_common/environment.h"
 
 #include "absl/strings/str_replace.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 namespace Envoy {
 namespace Server {

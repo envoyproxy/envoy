@@ -8,7 +8,7 @@
 #include "test/test_common/logging.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using testing::_;
 using testing::Invoke;
@@ -19,7 +19,7 @@ namespace Envoy {
 namespace Network {
 namespace {
 
-class SocketOptionTest : public testing::Test {
+class SocketOptionTest : public TestBase {
 public:
   SocketOptionTest() { socket_.local_address_.reset(); }
 

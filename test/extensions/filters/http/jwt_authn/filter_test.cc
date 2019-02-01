@@ -6,7 +6,7 @@
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication;
 using ::google::jwt_verify::Status;
@@ -33,7 +33,7 @@ public:
   MOCK_CONST_METHOD1(findVerifier, const Verifier*(const Http::HeaderMap& headers));
 };
 
-class FilterTest : public ::testing::Test {
+class FilterTest : public TestBase {
 public:
   void SetUp() {
     mock_config_ = ::std::make_shared<MockFilterConfig>(proto_config_, "", mock_context_);

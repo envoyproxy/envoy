@@ -5,7 +5,7 @@
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using testing::InSequence;
 using testing::Return;
@@ -42,7 +42,7 @@ public:
                                   const Http::HeaderMap* response_headers));
 };
 
-class TapFilterTest : public testing::Test {
+class TapFilterTest : public TestBase {
 public:
   void setup(bool has_config) {
     if (has_config) {

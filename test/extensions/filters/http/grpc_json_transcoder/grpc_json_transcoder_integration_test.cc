@@ -9,7 +9,7 @@
 #include "test/test_common/utility.h"
 
 #include "absl/strings/match.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using Envoy::Protobuf::Message;
 using Envoy::Protobuf::TextFormat;
@@ -22,7 +22,7 @@ namespace Envoy {
 
 class GrpcJsonTranscoderIntegrationTest
     : public HttpIntegrationTest,
-      public testing::TestWithParam<Network::Address::IpVersion> {
+      public TestBaseWithParam<Network::Address::IpVersion> {
 public:
   GrpcJsonTranscoderIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()) {}

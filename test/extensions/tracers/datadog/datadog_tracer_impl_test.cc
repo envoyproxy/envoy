@@ -24,7 +24,7 @@
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using testing::_;
 using testing::AtLeast;
@@ -38,7 +38,7 @@ namespace Extensions {
 namespace Tracers {
 namespace Datadog {
 
-class DatadogDriverTest : public testing::Test {
+class DatadogDriverTest : public TestBase {
 public:
   void setup(envoy::config::trace::v2::DatadogConfig& datadog_config, bool init_timer) {
     ON_CALL(cm_, httpAsyncClientForCluster("fake_cluster"))

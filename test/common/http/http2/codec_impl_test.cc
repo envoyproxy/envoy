@@ -15,7 +15,7 @@
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using testing::_;
 using testing::AnyNumber;
@@ -51,7 +51,7 @@ public:
   using ClientConnectionImpl::getStream;
 };
 
-class Http2CodecImplTest : public testing::TestWithParam<Http2SettingsTestParam> {
+class Http2CodecImplTest : public TestBaseWithParam<Http2SettingsTestParam> {
 public:
   struct ConnectionWrapper {
     void dispatch(const Buffer::Instance& data, ConnectionImpl& connection) {

@@ -5,7 +5,7 @@
 
 #include "test/test_common/environment.h"
 
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 #include "openssl/ssl.h"
 #include "openssl/x509v3.h"
 

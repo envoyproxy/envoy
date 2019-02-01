@@ -17,7 +17,7 @@
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using ::testing::_;
 using ::testing::Invoke;
@@ -26,7 +26,7 @@ using ::testing::Return;
 namespace Envoy {
 namespace Config {
 
-class SubscriptionFactoryTest : public ::testing::Test {
+class SubscriptionFactoryTest : public TestBase {
 public:
   SubscriptionFactoryTest()
       : http_request_(&cm_.async_client_), api_(Api::createApiForTest(stats_store_)) {}

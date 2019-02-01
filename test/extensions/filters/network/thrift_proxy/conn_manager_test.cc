@@ -19,7 +19,7 @@
 #include "test/test_common/printers.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using testing::_;
 using testing::AnyNumber;
@@ -70,7 +70,7 @@ public:
   MockProtocol* protocol_{};
 };
 
-class ThriftConnectionManagerTest : public testing::Test {
+class ThriftConnectionManagerTest : public TestBase {
 public:
   ThriftConnectionManagerTest() : stats_(ThriftFilterStats::generateStats("test.", store_)) {}
   ~ThriftConnectionManagerTest() {

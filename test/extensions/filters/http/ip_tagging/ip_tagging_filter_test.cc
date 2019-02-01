@@ -14,7 +14,7 @@
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using testing::_;
 using testing::Return;
@@ -25,7 +25,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace IpTagging {
 
-class IpTaggingFilterTest : public testing::Test {
+class IpTaggingFilterTest : public TestBase {
 public:
   IpTaggingFilterTest() {
     ON_CALL(runtime_.snapshot_, featureEnabled("ip_tagging.http_filter_enabled", 100))

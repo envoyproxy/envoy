@@ -10,7 +10,7 @@
 #include "test/test_common/utility.h"
 
 #include "absl/time/time.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 #include "openssl/x509v3.h"
 
 namespace Envoy {

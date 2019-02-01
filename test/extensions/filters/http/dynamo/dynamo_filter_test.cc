@@ -13,7 +13,7 @@
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using testing::_;
 using testing::NiceMock;
@@ -26,7 +26,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Dynamo {
 
-class DynamoFilterTest : public testing::Test {
+class DynamoFilterTest : public TestBase {
 public:
   void setup(bool enabled) {
     ON_CALL(loader_.snapshot_, featureEnabled("dynamodb.filter_enabled", 100))

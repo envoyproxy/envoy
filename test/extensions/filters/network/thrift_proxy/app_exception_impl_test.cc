@@ -5,7 +5,7 @@
 #include "test/extensions/filters/network/thrift_proxy/mocks.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using testing::InSequence;
 using testing::Ref;

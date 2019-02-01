@@ -18,7 +18,7 @@
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using testing::_;
 using testing::AtLeast;
@@ -42,7 +42,7 @@ public:
   };
 };
 
-class HdsTest : public testing::Test {
+class HdsTest : public TestBase {
 protected:
   HdsTest()
       : retry_timer_(new Event::MockTimer()), server_response_timer_(new Event::MockTimer()),

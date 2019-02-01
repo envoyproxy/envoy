@@ -4,7 +4,7 @@
 #include "test/test_common/logging.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using ::testing::Throw;
 
@@ -13,7 +13,7 @@ namespace Config {
 namespace {
 
 class FilesystemSubscriptionImplTest : public FilesystemSubscriptionTestHarness,
-                                       public testing::Test {};
+                                       public TestBase {};
 
 // Validate that the client can recover from bad JSON responses.
 TEST_F(FilesystemSubscriptionImplTest, BadJsonRecovery) {

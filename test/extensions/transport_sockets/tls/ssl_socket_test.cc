@@ -37,7 +37,7 @@
 
 #include "absl/strings/str_replace.h"
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 #include "openssl/ssl.h"
 
 using testing::_;

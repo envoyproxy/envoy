@@ -5,7 +5,7 @@
 #include "test/mocks/network/mocks.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 #include "src/core/tsi/fake_transport_security.h"
 
 namespace Envoy {
@@ -18,7 +18,7 @@ using testing::Return;
 using testing::ReturnRef;
 using testing::StrictMock;
 
-class TsiSocketTest : public testing::Test {
+class TsiSocketTest : public TestBase {
 protected:
   TsiSocketTest() {
     server_.handshaker_factory_ = [](Event::Dispatcher& dispatcher,
@@ -382,7 +382,7 @@ TEST_F(TsiSocketTest, HandshakeWithInternalError) {
   raw_handshaker->vtable = vtable;
 }
 
-class TsiSocketFactoryTest : public testing::Test {
+class TsiSocketFactoryTest : public TestBase {
 protected:
   void SetUp() override {
     auto handshaker_factory = [](Event::Dispatcher& dispatcher,

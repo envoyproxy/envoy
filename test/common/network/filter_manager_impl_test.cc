@@ -22,7 +22,7 @@
 #include "test/test_common/printers.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using testing::_;
 using testing::InSequence;
@@ -34,7 +34,7 @@ using testing::WithArgs;
 namespace Envoy {
 namespace Network {
 
-class NetworkFilterManagerTest : public testing::Test, public BufferSource {
+class NetworkFilterManagerTest : public TestBase, public BufferSource {
 public:
   StreamBuffer getReadBuffer() override { return {read_buffer_, read_end_stream_}; }
   StreamBuffer getWriteBuffer() override { return {write_buffer_, write_end_stream_}; }

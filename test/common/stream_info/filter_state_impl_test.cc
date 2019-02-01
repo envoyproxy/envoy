@@ -4,7 +4,7 @@
 
 #include "test/test_common/utility.h"
 
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 namespace Envoy {
 namespace StreamInfo {
@@ -44,7 +44,7 @@ private:
   int value_;
 };
 
-class FilterStateImplTest : public testing::Test {
+class FilterStateImplTest : public TestBase {
 public:
   FilterStateImplTest() { resetFilterState(); }
 

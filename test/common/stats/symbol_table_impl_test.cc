@@ -10,7 +10,7 @@
 #include "test/test_common/utility.h"
 
 #include "absl/synchronization/blocking_counter.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 namespace Envoy {
 namespace Stats {
@@ -28,7 +28,7 @@ enum class SymbolTableType {
   Fake,
 };
 
-class StatNameTest : public testing::TestWithParam<SymbolTableType> {
+class StatNameTest : public TestBaseWithParam<SymbolTableType> {
 protected:
   StatNameTest() {
     switch (GetParam()) {

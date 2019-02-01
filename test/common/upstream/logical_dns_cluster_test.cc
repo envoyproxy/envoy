@@ -24,7 +24,7 @@
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using testing::_;
 using testing::Invoke;
@@ -35,7 +35,7 @@ namespace Upstream {
 
 enum class ConfigType { V2_YAML, V1_JSON };
 
-class LogicalDnsClusterTest : public testing::Test {
+class LogicalDnsClusterTest : public TestBase {
 protected:
   LogicalDnsClusterTest() : api_(Api::createApiForTest(stats_store_)) {}
 

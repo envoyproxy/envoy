@@ -22,7 +22,7 @@
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using testing::_;
 using testing::AtLeast;
@@ -38,7 +38,7 @@ namespace {
 
 // We test some mux specific stuff below, other unit test coverage for singleton use of GrpcMuxImpl
 // is provided in [grpc_]subscription_impl_test.cc.
-class GrpcMuxImplTestBase : public testing::Test {
+class GrpcMuxImplTestBase : public TestBase {
 public:
   GrpcMuxImplTestBase() : async_client_(new Grpc::MockAsyncClient()) {}
 

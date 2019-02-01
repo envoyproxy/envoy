@@ -8,7 +8,7 @@
 #include "test/mocks/upstream/mocks.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using namespace testing;
 
@@ -17,7 +17,7 @@ namespace Extensions {
 namespace Retry {
 namespace Priority {
 
-class RetryPriorityTest : public ::testing::Test {
+class RetryPriorityTest : public TestBase {
 public:
   void initialize(const Upstream::HealthyLoad& original_healthy_priority_load,
                   const Upstream::DegradedLoad& original_degraded_priority_load) {

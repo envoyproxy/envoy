@@ -25,7 +25,7 @@
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using testing::_;
 using testing::Invoke;
@@ -57,7 +57,7 @@ public:
   Http::HeaderMapPtr downstream_headers_;
 };
 
-class OriginalDstClusterTest : public testing::Test {
+class OriginalDstClusterTest : public TestBase {
 public:
   // cleanup timer must be created before the cluster (in setup()), so that we can set expectations
   // on it. Ownership is transferred to the cluster at the cluster constructor, so the cluster will

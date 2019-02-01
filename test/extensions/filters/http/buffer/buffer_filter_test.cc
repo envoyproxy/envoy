@@ -14,7 +14,7 @@
 #include "test/test_common/printers.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using testing::_;
 using testing::DoAll;
@@ -28,7 +28,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace BufferFilter {
 
-class BufferFilterTest : public testing::Test {
+class BufferFilterTest : public TestBase {
 public:
   BufferFilterConfigSharedPtr setupConfig() {
     envoy::config::filter::http::buffer::v2::Buffer proto_config;

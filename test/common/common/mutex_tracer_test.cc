@@ -7,11 +7,11 @@
 #include "test/test_common/contention.h"
 
 #include "absl/synchronization/mutex.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 namespace Envoy {
 
-class MutexTracerTest : public testing::Test {
+class MutexTracerTest : public TestBase {
 protected:
   void SetUp() override { tracer_.reset(); }
 

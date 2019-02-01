@@ -25,7 +25,7 @@
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using testing::_;
 using testing::AtLeast;
@@ -39,7 +39,7 @@ namespace Extensions {
 namespace Tracers {
 namespace Lightstep {
 
-class LightStepDriverTest : public testing::Test {
+class LightStepDriverTest : public TestBase {
 public:
   void setup(envoy::config::trace::v2::LightstepConfig& lightstep_config, bool init_timer,
              Common::Ot::OpenTracingDriver::PropagationMode propagation_mode =

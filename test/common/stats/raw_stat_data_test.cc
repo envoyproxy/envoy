@@ -6,12 +6,12 @@
 #include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 namespace Envoy {
 namespace Stats {
 
-class RawStatDataTest : public testing::Test {
+class RawStatDataTest : public TestBase {
 public:
   RawStatDataTest() : allocator_(stats_options_) {}
 

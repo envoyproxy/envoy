@@ -20,7 +20,7 @@
 #include "test/test_common/printers.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using testing::_;
 using testing::AnyNumber;
@@ -60,7 +60,7 @@ public:
   DecoderCallbacks* callbacks_{};
 };
 
-class MongoProxyFilterTest : public testing::Test {
+class MongoProxyFilterTest : public TestBase {
 public:
   MongoProxyFilterTest() { setup(); }
 

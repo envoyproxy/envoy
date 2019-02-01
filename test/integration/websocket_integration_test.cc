@@ -13,7 +13,7 @@
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_cat.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using testing::MatchesRegex;
 

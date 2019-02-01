@@ -23,7 +23,7 @@
 
 #include "absl/strings/match.h"
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 #include "integration.h"
 #include "utility.h"
 
@@ -35,7 +35,7 @@ namespace Ssl {
 
 class SdsStaticDownstreamIntegrationTest
     : public HttpIntegrationTest,
-      public testing::TestWithParam<Network::Address::IpVersion> {
+      public TestBaseWithParam<Network::Address::IpVersion> {
 public:
   SdsStaticDownstreamIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()) {}
@@ -108,7 +108,7 @@ TEST_P(SdsStaticDownstreamIntegrationTest, RouterRequestAndResponseWithGiantBody
 
 class SdsStaticUpstreamIntegrationTest
     : public HttpIntegrationTest,
-      public testing::TestWithParam<Network::Address::IpVersion> {
+      public TestBaseWithParam<Network::Address::IpVersion> {
 public:
   SdsStaticUpstreamIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()) {}

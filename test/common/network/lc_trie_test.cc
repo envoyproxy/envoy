@@ -7,13 +7,13 @@
 
 #include "test/test_common/utility.h"
 
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 namespace Envoy {
 namespace Network {
 namespace LcTrie {
 
-class LcTrieTest : public testing::Test {
+class LcTrieTest : public TestBase {
 public:
   void setup(const std::vector<std::vector<std::string>>& cidr_range_strings,
              bool exclusive = false, double fill_factor = 0, uint32_t root_branch_factor = 0) {

@@ -6,7 +6,7 @@
 
 #include "test/mocks/network/mocks.h"
 
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -37,7 +37,7 @@ private:
   Network::Connection& connection_;
 };
 
-class NoOpTransportSocketCallbacksTest : public testing::Test {
+class NoOpTransportSocketCallbacksTest : public TestBase {
 protected:
   NoOpTransportSocketCallbacksTest()
       : wrapper_callbacks_(connection_), wrapped_callbacks_(wrapper_callbacks_) {}

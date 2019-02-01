@@ -9,7 +9,7 @@
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using testing::_;
 using testing::InSequence;
@@ -22,7 +22,7 @@ using testing::Throw;
 namespace Envoy {
 namespace Server {
 
-class WorkerImplTest : public testing::Test {
+class WorkerImplTest : public TestBase {
 public:
   WorkerImplTest() : api_(Api::createApiForTest(stats_store_)) {
     // In the real worker the watchdog has timers that prevent exit. Here we need to prevent event

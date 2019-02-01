@@ -12,7 +12,7 @@
 
 #include "absl/strings/match.h"
 #include "absl/strings/string_view.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using testing::_;
 using testing::Invoke;
@@ -24,7 +24,7 @@ using testing::WithArg;
 namespace Envoy {
 namespace Server {
 
-class HotRestartImplTest : public testing::Test {
+class HotRestartImplTest : public TestBase {
 public:
   void setup() {
     EXPECT_CALL(os_sys_calls_, shmUnlink(_));

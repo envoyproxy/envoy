@@ -21,7 +21,7 @@
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using testing::_;
 using testing::InSequence;
@@ -37,7 +37,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace RateLimitFilter {
 
-class HttpRateLimitFilterTest : public testing::Test {
+class HttpRateLimitFilterTest : public TestBase {
 public:
   HttpRateLimitFilterTest() {
     ON_CALL(runtime_.snapshot_, featureEnabled("ratelimit.http_filter_enabled", 100))

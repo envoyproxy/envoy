@@ -3,13 +3,13 @@
 #include "test/integration/http_integration.h"
 
 #include "absl/strings/match.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 namespace Envoy {
 namespace {
 
 class TapIntegrationTest : public HttpIntegrationTest,
-                           public testing::TestWithParam<Network::Address::IpVersion> {
+                           public TestBaseWithParam<Network::Address::IpVersion> {
 public:
   TapIntegrationTest()
       // Note: This test must use HTTP/2 because of the lack of early close detection for
