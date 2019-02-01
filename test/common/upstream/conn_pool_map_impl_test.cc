@@ -182,9 +182,8 @@ TEST_F(ConnPoolMapImplTest, ReentryClearTripsAssert) {
   TestMapPtr test_map = makeTestMap();
 
   test_map->getPool(1, getBasicFactory());
-  ON_CALL(*mock_pools_[0], addDrainedCallback(_)).WillByDefault(Invoke([](Http::ConnectionPool::Instance::DrainedCb cb){
-    cb();
-  }));
+  ON_CALL(*mock_pools_[0], addDrainedCallback(_))
+      .WillByDefault(Invoke([](Http::ConnectionPool::Instance::DrainedCb cb) { cb(); }));
 
   EXPECT_DEATH(test_map->addDrainedCallback([&test_map] { test_map->clear(); }),
                ".*Details: A resource should only be entered once");
@@ -194,21 +193,20 @@ TEST_F(ConnPoolMapImplTest, ReentryGetPoolTripsAssert) {
   TestMapPtr test_map = makeTestMap();
 
   test_map->getPool(1, getBasicFactory());
-  ON_CALL(*mock_pools_[0], addDrainedCallback(_)).WillByDefault(Invoke([](Http::ConnectionPool::Instance::DrainedCb cb){
-    cb();
-  }));
+  ON_CALL(*mock_pools_[0], addDrainedCallback(_))
+      .WillByDefault(Invoke([](Http::ConnectionPool::Instance::DrainedCb cb) { cb(); }));
 
-  EXPECT_DEATH(test_map->addDrainedCallback([&test_map, this] { test_map->getPool(2, getBasicFactory()); }),
-               ".*Details: A resource should only be entered once");
+  EXPECT_DEATH(
+      test_map->addDrainedCallback([&test_map, this] { test_map->getPool(2, getBasicFactory()); }),
+      ".*Details: A resource should only be entered once");
 }
 
 TEST_F(ConnPoolMapImplTest, ReentryDrainConnectionsTripsAssert) {
   TestMapPtr test_map = makeTestMap();
 
   test_map->getPool(1, getBasicFactory());
-  ON_CALL(*mock_pools_[0], addDrainedCallback(_)).WillByDefault(Invoke([](Http::ConnectionPool::Instance::DrainedCb cb){
-    cb();
-  }));
+  ON_CALL(*mock_pools_[0], addDrainedCallback(_))
+      .WillByDefault(Invoke([](Http::ConnectionPool::Instance::DrainedCb cb) { cb(); }));
 
   EXPECT_DEATH(test_map->addDrainedCallback([&test_map] { test_map->drainConnections(); }),
                ".*Details: A resource should only be entered once");
@@ -218,11 +216,10 @@ TEST_F(ConnPoolMapImplTest, ReentryAddDrainedCallbackTripsAssert) {
   TestMapPtr test_map = makeTestMap();
 
   test_map->getPool(1, getBasicFactory());
-  ON_CALL(*mock_pools_[0], addDrainedCallback(_)).WillByDefault(Invoke([](Http::ConnectionPool::Instance::DrainedCb cb){
-    cb();
-  }));
+  ON_CALL(*mock_pools_[0], addDrainedCallback(_))
+      .WillByDefault(Invoke([](Http::ConnectionPool::Instance::DrainedCb cb) { cb(); }));
 
-  EXPECT_DEATH(test_map->addDrainedCallback([&test_map] { test_map->addDrainedCallback([](){}); }),
+  EXPECT_DEATH(test_map->addDrainedCallback([&test_map] { test_map->addDrainedCallback([]() {}); }),
                ".*Details: A resource should only be entered once");
 }
 } // namespace Upstream

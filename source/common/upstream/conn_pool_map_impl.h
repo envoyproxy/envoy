@@ -2,9 +2,7 @@
 
 #include "common/upstream/conn_pool_map.h"
 
-namespace {
-
-}
+namespace {}
 namespace Envoy {
 namespace Upstream {
 

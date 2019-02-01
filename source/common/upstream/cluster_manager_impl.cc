@@ -1000,7 +1000,9 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::getHttpConnPoolsContainer(
     const HostConstSharedPtr& host, bool allocate) {
   auto container_iter = host_http_conn_pool_map_.find(host);
   if (container_iter == host_http_conn_pool_map_.end()) {
-    if(!allocate) { return nullptr; }
+    if (!allocate) {
+      return nullptr;
+    }
     ConnPoolsContainer container{thread_local_dispatcher_};
     container_iter = host_http_conn_pool_map_.emplace(host, std::move(container)).first;
   }

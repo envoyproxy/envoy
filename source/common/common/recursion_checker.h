@@ -14,9 +14,7 @@ public:
     entered_ = true;
   }
 
-  void exit() {
-    entered_ = false;
-  }
+  void exit() { entered_ = false; }
 
 private:
   bool entered_ = false;
@@ -24,17 +22,13 @@ private:
 
 class AutoRecursionChecker {
 public:
-  explicit AutoRecursionChecker(RecursionChecker& checker): checker_(checker) {
-    checker.enter();
-  }
+  explicit AutoRecursionChecker(RecursionChecker& checker) : checker_(checker) { checker.enter(); }
 
-  ~AutoRecursionChecker() {
-    checker_.exit();
-  }
+  ~AutoRecursionChecker() { checker_.exit(); }
 
 private:
-  RecursionChecker &checker_;
+  RecursionChecker& checker_;
 };
 
-}
-}
+} // namespace Common
+} // namespace Envoy
