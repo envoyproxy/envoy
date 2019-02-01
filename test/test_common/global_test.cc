@@ -2,7 +2,6 @@
 #include <vector>
 
 #include "test/test_common/global.h"
-
 #include "test/test_common/test_base.h"
 
 namespace Envoy {

@@ -5,7 +5,6 @@
 #include "extensions/transport_sockets/alts/noop_transport_socket_callbacks.h"
 
 #include "test/mocks/network/mocks.h"
-
 #include "test/test_common/test_base.h"
 
 namespace Envoy {

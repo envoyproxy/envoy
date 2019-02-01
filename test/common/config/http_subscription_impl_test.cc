@@ -1,7 +1,6 @@
 #include <memory>
 
 #include "test/common/config/http_subscription_test_harness.h"
-
 #include "test/test_common/test_base.h"
 
 namespace Envoy {

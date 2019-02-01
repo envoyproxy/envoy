@@ -6,10 +6,10 @@
 
 #include "test/integration/http_integration.h"
 #include "test/mocks/http/mocks.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/match.h"
-#include "test/test_common/test_base.h"
 
 using Envoy::Http::HeaderValueOf;
 

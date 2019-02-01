@@ -9,7 +9,6 @@
 #include "test/integration/http_integration.h"
 #include "test/integration/server.h"
 #include "test/test_common/environment.h"
-
 #include "test/test_common/test_base.h"
 
 namespace Envoy {

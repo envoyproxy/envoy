@@ -13,10 +13,10 @@
 #include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "test/test_common/test_base.h"
 
 using ::testing::_;
 using ::testing::Invoke;

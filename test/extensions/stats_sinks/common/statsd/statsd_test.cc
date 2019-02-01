@@ -13,9 +13,9 @@
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
-#include "test/test_common/test_base.h"
 
 using testing::_;
 using testing::InSequence;

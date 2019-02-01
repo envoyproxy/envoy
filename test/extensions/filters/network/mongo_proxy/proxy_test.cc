@@ -18,9 +18,9 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
-#include "test/test_common/test_base.h"
 
 using testing::_;
 using testing::AnyNumber;

@@ -1,8 +1,7 @@
 #include "exe/terminate_handler.h"
 
-#include "test/test_common/utility.h"
-
 #include "test/test_common/test_base.h"
+#include "test/test_common/utility.h"
 
 namespace Envoy {
 

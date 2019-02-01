@@ -9,9 +9,8 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
-#include "test/test_common/utility.h"
-
 #include "test/test_common/test_base.h"
+#include "test/test_common/utility.h"
 
 using testing::Return;
 

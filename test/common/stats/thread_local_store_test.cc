@@ -17,11 +17,11 @@
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_split.h"
 #include "gmock/gmock.h"
-#include "test/test_common/test_base.h"
 
 using testing::_;
 using testing::InSequence;

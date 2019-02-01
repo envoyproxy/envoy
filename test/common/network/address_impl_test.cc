@@ -18,9 +18,8 @@
 
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
-#include "test/test_common/utility.h"
-
 #include "test/test_common/test_base.h"
+#include "test/test_common/utility.h"
 
 namespace Envoy {
 namespace Network {

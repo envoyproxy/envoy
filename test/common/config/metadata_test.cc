@@ -5,9 +5,8 @@
 #include "common/protobuf/utility.h"
 
 #include "test/test_common/registry.h"
-#include "test/test_common/utility.h"
-
 #include "test/test_common/test_base.h"
+#include "test/test_common/utility.h"
 
 namespace Envoy {
 namespace Config {

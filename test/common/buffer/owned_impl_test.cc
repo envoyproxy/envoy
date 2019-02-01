@@ -2,11 +2,11 @@
 #include "common/buffer/buffer_impl.h"
 
 #include "test/mocks/api/mocks.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "absl/strings/str_cat.h"
 #include "gmock/gmock.h"
-#include "test/test_common/test_base.h"
 
 using testing::_;
 using testing::Return;

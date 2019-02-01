@@ -6,9 +6,9 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
-#include "test/test_common/test_base.h"
 
 using testing::_;
 using testing::DoAll;

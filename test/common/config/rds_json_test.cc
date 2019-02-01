@@ -3,8 +3,9 @@
 #include "common/config/rds_json.h"
 #include "common/json/json_loader.h"
 
-#include "gmock/gmock.h"
 #include "test/test_common/test_base.h"
+
+#include "gmock/gmock.h"
 
 using testing::_;
 

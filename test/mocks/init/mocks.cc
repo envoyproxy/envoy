@@ -2,8 +2,9 @@
 
 #include <functional>
 
-#include "gmock/gmock.h"
 #include "test/test_common/test_base.h"
+
+#include "gmock/gmock.h"
 
 using testing::_;
 using testing::Invoke;

@@ -5,7 +5,6 @@
 #include "test/extensions/filters/network/thrift_proxy/integration.h"
 #include "test/extensions/filters/network/thrift_proxy/utility.h"
 #include "test/test_common/network_utility.h"
-
 #include "test/test_common/test_base.h"
 
 using testing::Combine;
@@ -19,7 +18,8 @@ namespace ThriftProxy {
 
 class ThriftTranslationIntegrationTest
     : public BaseThriftIntegrationTest,
-      public TestBaseWithParam<std::tuple<TransportType, ProtocolType, TransportType, ProtocolType>> {
+      public TestBaseWithParam<
+          std::tuple<TransportType, ProtocolType, TransportType, ProtocolType>> {
 public:
   static void SetUpTestSuite() {
     thrift_config_ = ConfigHelper::BASE_CONFIG + R"EOF(

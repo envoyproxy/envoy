@@ -11,9 +11,9 @@
 #include "test/integration/utility.h"
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
-#include "test/test_common/test_base.h"
 #include "mysql_test_utils.h"
 #include "rapidjson/document.h"
 

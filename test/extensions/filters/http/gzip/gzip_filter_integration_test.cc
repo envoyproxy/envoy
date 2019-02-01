@@ -4,9 +4,8 @@
 
 #include "test/integration/http_integration.h"
 #include "test/test_common/simulated_time_system.h"
-#include "test/test_common/utility.h"
-
 #include "test/test_common/test_base.h"
+#include "test/test_common/utility.h"
 
 namespace Envoy {
 

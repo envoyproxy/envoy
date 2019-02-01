@@ -5,9 +5,9 @@
 #include "common/common/thread.h"
 #include "common/event/libevent.h"
 
-#include "test/test_common/test_base.h"
 #include "test/mocks/access_log/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
 

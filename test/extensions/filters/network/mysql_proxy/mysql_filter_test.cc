@@ -3,9 +3,9 @@
 #include "extensions/filters/network/mysql_proxy/mysql_utils.h"
 
 #include "test/mocks/network/mocks.h"
+#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
-#include "test/test_common/test_base.h"
 #include "mysql_test_utils.h"
 
 using testing::NiceMock;

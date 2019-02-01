@@ -7,10 +7,10 @@
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "absl/synchronization/blocking_counter.h"
-#include "test/test_common/test_base.h"
 
 namespace Envoy {
 namespace Stats {

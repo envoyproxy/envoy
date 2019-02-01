@@ -13,9 +13,9 @@
 #include "test/extensions/filters/network/thrift_proxy/mocks.h"
 #include "test/mocks/ratelimit/mocks.h"
 #include "test/mocks/server/mocks.h"
+#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
-#include "test/test_common/test_base.h"
 
 using testing::ContainerEq;
 using testing::NiceMock;

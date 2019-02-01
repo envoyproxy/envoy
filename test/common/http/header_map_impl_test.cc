@@ -4,9 +4,8 @@
 #include "common/http/header_map_impl.h"
 
 #include "test/test_common/printers.h"
-#include "test/test_common/utility.h"
-
 #include "test/test_common/test_base.h"
+#include "test/test_common/utility.h"
 
 using ::testing::InSequence;
 

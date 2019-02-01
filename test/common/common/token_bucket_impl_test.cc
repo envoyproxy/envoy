@@ -3,7 +3,6 @@
 #include "common/common/token_bucket_impl.h"
 
 #include "test/test_common/simulated_time_system.h"
-
 #include "test/test_common/test_base.h"
 
 namespace Envoy {

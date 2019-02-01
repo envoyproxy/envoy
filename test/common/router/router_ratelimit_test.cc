@@ -14,10 +14,10 @@
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "test/test_common/test_base.h"
 
 using testing::_;
 using testing::NiceMock;

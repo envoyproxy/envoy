@@ -25,12 +25,12 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/escaping.h"
 #include "absl/strings/match.h"
-#include "test/test_common/test_base.h"
 
 using testing::_;
 using testing::InSequence;

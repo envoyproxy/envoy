@@ -1,7 +1,6 @@
 #pragma once
 
 #include "test/integration/http_protocol_integration.h"
-
 #include "test/test_common/test_base.h"
 
 namespace Envoy {

@@ -1,6 +1,5 @@
-#include "test/test_common/utility.h"
-
 #include "test/test_common/test_base.h"
+#include "test/test_common/utility.h"
 
 using Envoy::Http::HeaderMap;
 

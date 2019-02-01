@@ -5,7 +5,6 @@
 
 #include "test/integration/integration.h"
 #include "test/mocks/secret/mocks.h"
-
 #include "test/test_common/test_base.h"
 
 namespace Envoy {

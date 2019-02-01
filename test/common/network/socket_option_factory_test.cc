@@ -4,9 +4,8 @@
 
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/network/mocks.h"
-#include "test/test_common/threadsafe_singleton_injector.h"
-
 #include "test/test_common/test_base.h"
+#include "test/test_common/threadsafe_singleton_injector.h"
 
 using testing::_;
 

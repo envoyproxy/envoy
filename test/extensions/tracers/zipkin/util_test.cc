@@ -1,8 +1,7 @@
 #include "extensions/tracers/zipkin/util.h"
 
-#include "test/test_common/test_time.h"
-
 #include "test/test_common/test_base.h"
+#include "test/test_common/test_time.h"
 
 namespace Envoy {
 namespace Extensions {

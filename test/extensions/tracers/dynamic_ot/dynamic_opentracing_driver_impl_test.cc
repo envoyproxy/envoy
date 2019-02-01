@@ -8,10 +8,10 @@
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/test_base.h"
 
 #include "fmt/printf.h"
 #include "gmock/gmock.h"
-#include "test/test_common/test_base.h"
 
 namespace Envoy {
 namespace Extensions {

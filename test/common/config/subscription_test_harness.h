@@ -3,9 +3,9 @@
 #include "common/config/utility.h"
 
 #include "test/mocks/stats/mocks.h"
+#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
-#include "test/test_common/test_base.h"
 
 namespace Envoy {
 namespace Config {

@@ -3,7 +3,6 @@
 #include "common/stats/source_impl.h"
 
 #include "test/mocks/stats/mocks.h"
-
 #include "test/test_common/test_base.h"
 
 using testing::NiceMock;
