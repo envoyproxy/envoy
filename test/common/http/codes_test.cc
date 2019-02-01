@@ -16,8 +16,8 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::Property;
 using testing::_;
+using testing::Property;
 
 namespace Envoy {
 namespace Http {

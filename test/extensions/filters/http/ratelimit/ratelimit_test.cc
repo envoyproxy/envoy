@@ -23,6 +23,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
@@ -30,7 +31,6 @@ using testing::Return;
 using testing::ReturnRef;
 using testing::SetArgReferee;
 using testing::WithArgs;
-using testing::_;
 
 namespace Envoy {
 namespace Extensions {

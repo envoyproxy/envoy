@@ -25,8 +25,6 @@ public:
    * Clean up IoHandle resources
    */
   virtual Api::SysCallIntResult close() PURE;
-
-  virtual bool isClosed() const PURE;
 };
 
 typedef std::unique_ptr<IoHandle> IoHandlePtr;

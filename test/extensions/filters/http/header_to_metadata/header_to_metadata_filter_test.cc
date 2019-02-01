@@ -9,8 +9,8 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::NiceMock;
 using testing::_;
+using testing::NiceMock;
 
 namespace Envoy {
 namespace Extensions {

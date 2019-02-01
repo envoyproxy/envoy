@@ -16,6 +16,7 @@
 
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::Assign;
 using testing::HasSubstr;
 using testing::InSequence;
@@ -26,7 +27,6 @@ using testing::Ref;
 using testing::Return;
 using testing::SaveArg;
 using testing::StrictMock;
-using testing::_;
 
 namespace Envoy {
 namespace Server {

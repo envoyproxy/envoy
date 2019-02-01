@@ -15,6 +15,7 @@
 #include "gtest/gtest.h"
 #include "openssl/ssl.h"
 
+using testing::_;
 using testing::AtLeast;
 using testing::Invoke;
 using testing::NiceMock;
@@ -22,7 +23,6 @@ using testing::Return;
 using testing::ReturnNew;
 using testing::ReturnRef;
 using testing::SaveArg;
-using testing::_;
 
 namespace Envoy {
 namespace Extensions {

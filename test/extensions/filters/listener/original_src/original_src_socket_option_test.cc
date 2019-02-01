@@ -11,8 +11,8 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::Eq;
 using testing::_;
+using testing::Eq;
 
 namespace Envoy {
 namespace Extensions {

@@ -4,9 +4,9 @@
 
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::Return;
 using testing::SaveArg;
-using testing::_;
 
 namespace Envoy {
 namespace Extensions {

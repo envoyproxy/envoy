@@ -29,7 +29,7 @@ HttpGrpcAccessLogFactory::createAccessLogInstance(const Protobuf::Message& confi
   std::shared_ptr<GrpcAccessLogStreamer> grpc_access_log_streamer =
       context.singletonManager().getTyped<GrpcAccessLogStreamer>(
           SINGLETON_MANAGER_REGISTERED_NAME(grpc_access_log_streamer),
-          [&context, grpc_service = proto_config.common_config().grpc_service() ] {
+          [&context, grpc_service = proto_config.common_config().grpc_service()] {
             return std::make_shared<GrpcAccessLogStreamerImpl>(
                 context.clusterManager().grpcAsyncClientManager().factoryForGrpcService(
                     grpc_service, context.scope(), false),

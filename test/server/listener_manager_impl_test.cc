@@ -32,13 +32,13 @@
 #include "absl/strings/match.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
 using testing::Throw;
-using testing::_;
 
 namespace Envoy {
 namespace Server {
@@ -2263,8 +2263,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TlsCertificateInline) {
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns3_key.pem"));
   const std::string ca = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"));
-  const std::string yaml = absl::StrCat(
-      R"EOF(
+  const std::string yaml = absl::StrCat(R"EOF(
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     filter_chains:
@@ -2272,10 +2271,12 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TlsCertificateInline) {
         common_tls_context:
           tls_certificates:
             - certificate_chain: { inline_string: ")EOF",
-      absl::CEscape(cert), R"EOF(" }
-              private_key: { inline_string: ")EOF", absl::CEscape(pkey), R"EOF(" }
+                                        absl::CEscape(cert), R"EOF(" }
+              private_key: { inline_string: ")EOF",
+                                        absl::CEscape(pkey), R"EOF(" }
           validation_context:
-              trusted_ca: { inline_string: ")EOF", absl::CEscape(ca), R"EOF(" }
+              trusted_ca: { inline_string: ")EOF",
+                                        absl::CEscape(ca), R"EOF(" }
   )EOF");
 
   EXPECT_CALL(server_.random_, uuid());

@@ -12,6 +12,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::AnyNumber;
 using testing::Combine;
 using testing::DoAll;
@@ -28,7 +29,6 @@ using testing::StrictMock;
 using testing::TestParamInfo;
 using testing::TestWithParam;
 using testing::Values;
-using testing::_;
 
 namespace Envoy {
 namespace Extensions {

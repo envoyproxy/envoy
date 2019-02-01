@@ -40,8 +40,9 @@ void LdsJson::translateListener(const Json::Object& json_listener,
     filter->set_name(Extensions::NetworkFilters::NetworkFilterNames::get().v1_converter_.getV2Name(
         json_filter->getString("name")));
 
-    const std::string json_config = "{\"deprecated_v1\": true, \"value\": " +
-                                    json_filter->getObject("config")->asJsonString() + "}";
+    const std::string json_config =
+        "{\"deprecated_v1\": true, \"value\": " + json_filter->getObject("config")->asJsonString() +
+        "}";
 
     const auto status = Protobuf::util::JsonStringToMessage(json_config, filter->mutable_config());
     // JSON schema has already validated that this is a valid JSON object.
