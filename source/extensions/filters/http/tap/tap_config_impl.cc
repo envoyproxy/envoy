@@ -55,15 +55,15 @@ bool HttpPerRequestTapperImpl::onDestroyLog(const Http::HeaderMap* request_heade
 
   auto trace = std::make_shared<envoy::data::tap::v2alpha::BufferedTraceWrapper>();
   auto& http_trace = *trace->mutable_http_buffered_trace();
-  request_headers->iterate(fillHeaderList, http_trace.mutable_request_headers());
+  request_headers->iterate(fillHeaderList, http_trace.mutable_request()->mutable_headers());
   if (request_trailers != nullptr) {
-    request_trailers->iterate(fillHeaderList, http_trace.mutable_request_trailers());
+    request_trailers->iterate(fillHeaderList, http_trace.mutable_request()->mutable_trailers());
   }
   if (response_headers != nullptr) {
-    response_headers->iterate(fillHeaderList, http_trace.mutable_response_headers());
+    response_headers->iterate(fillHeaderList, http_trace.mutable_response()->mutable_headers());
   }
   if (response_trailers != nullptr) {
-    response_trailers->iterate(fillHeaderList, http_trace.mutable_response_trailers());
+    response_trailers->iterate(fillHeaderList, http_trace.mutable_response()->mutable_trailers());
   }
 
   ENVOY_LOG(debug, "submitting buffered trace sink");

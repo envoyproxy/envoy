@@ -186,8 +186,8 @@ tap_config:
   admin_response_->waitForBodyData(1);
   envoy::data::tap::v2alpha::BufferedTraceWrapper trace;
   MessageUtil::loadFromYaml(admin_response_->body(), trace);
-  EXPECT_EQ(trace.http_buffered_trace().request_headers().size(), 8);
-  EXPECT_EQ(trace.http_buffered_trace().response_headers().size(), 4);
+  EXPECT_EQ(trace.http_buffered_trace().request().headers().size(), 8);
+  EXPECT_EQ(trace.http_buffered_trace().response().headers().size(), 4);
   admin_response_->clearBody();
 
   // Do a request which should not tap.
@@ -199,13 +199,13 @@ tap_config:
   // Wait for the tap message.
   admin_response_->waitForBodyData(1);
   MessageUtil::loadFromYaml(admin_response_->body(), trace);
-  EXPECT_EQ(trace.http_buffered_trace().request_headers().size(), 7);
+  EXPECT_EQ(trace.http_buffered_trace().request().headers().size(), 7);
   EXPECT_EQ(
       "http",
-      findHeader("x-forwarded-proto", trace.http_buffered_trace().request_headers())->value());
-  EXPECT_EQ(trace.http_buffered_trace().response_headers().size(), 5);
-  EXPECT_NE(nullptr, findHeader("date", trace.http_buffered_trace().response_headers()));
-  EXPECT_EQ("baz", findHeader("bar", trace.http_buffered_trace().response_headers())->value());
+      findHeader("x-forwarded-proto", trace.http_buffered_trace().request().headers())->value());
+  EXPECT_EQ(trace.http_buffered_trace().response().headers().size(), 5);
+  EXPECT_NE(nullptr, findHeader("date", trace.http_buffered_trace().response().headers()));
+  EXPECT_EQ("baz", findHeader("bar", trace.http_buffered_trace().response().headers())->value());
 
   admin_client_->close();
   test_server_->waitForGaugeEq("http.admin.downstream_rq_active", 0);
@@ -286,9 +286,9 @@ tap_config:
   admin_response_->waitForBodyData(1);
   MessageUtil::loadFromYaml(admin_response_->body(), trace);
   EXPECT_EQ("bar",
-            findHeader("foo_trailer", trace.http_buffered_trace().request_trailers())->value());
+            findHeader("foo_trailer", trace.http_buffered_trace().request().trailers())->value());
   EXPECT_EQ("baz",
-            findHeader("bar_trailer", trace.http_buffered_trace().response_trailers())->value());
+            findHeader("bar_trailer", trace.http_buffered_trace().response().trailers())->value());
 
   admin_client_->close();
 }

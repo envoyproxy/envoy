@@ -9,15 +9,18 @@ import "envoy/api/v2/core/base.proto";
 
 // A fully buffered HTTP trace message.
 message HttpBufferedTrace {
-  // Request headers.
-  repeated api.v2.core.HeaderValue request_headers = 1;
+  // HTTP message wrapper.
+  message Message {
+    // Message headers.
+    repeated api.v2.core.HeaderValue headers = 1;
 
-  // Request trailers.
-  repeated api.v2.core.HeaderValue request_trailers = 2;
+    // Message trailers.
+    repeated api.v2.core.HeaderValue trailers = 2;
+  }
 
-  // Response headers.
-  repeated api.v2.core.HeaderValue response_headers = 3;
+  // Request message.
+  Message request = 1;
 
-  // Response trailers.
-  repeated api.v2.core.HeaderValue response_trailers = 4;
+  // Response message.
+  Message response = 2;
 }
