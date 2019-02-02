@@ -416,7 +416,7 @@ TEST(AddressFromSockAddrDeathTest, Pipe) {
 struct TestCase {
   enum InstanceType { Ipv4, Ipv6, Pipe };
 
-  TestCase() : type_(Ipv4), port_(0) {}
+  TestCase() : type_(Ipv4) {}
   TestCase(enum InstanceType type, std::string address, uint32_t port)
       : type_(type), address_(address), port_(port) {}
   TestCase(const TestCase& rhs) : type_(rhs.type_), address_(rhs.address_), port_(rhs.port_) {}
@@ -427,7 +427,7 @@ struct TestCase {
 
   enum InstanceType type_;
   std::string address_;
-  uint32_t port_; // Ignored for Pipe
+  uint32_t port_ = 0; // Ignored for Pipe
 };
 
 class MixedAddressTest : public TestBaseWithParam<::testing::tuple<TestCase, TestCase>> {
