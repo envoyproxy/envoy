@@ -48,8 +48,7 @@ docker-compose exec envoy bash
 bash enable_delay_fault_injection.sh
 ```
 
-The script above enables HTTP 3.000 ms delays for 50% of the requests. So, you should now see a continuous sequence of HTTP 200
-responses for all request but half of the requests will take 3.000 ms to complete.
+The script above will add a 3-second delay to 50% of HTTP requests. You should now see a continuous sequence of HTTP 200 responses for all requests, but half of the requests will take 3 seconds to complete.
 
 To disable the delay injection:
 
