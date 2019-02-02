@@ -196,7 +196,7 @@ Router::RouteConfigProviderPtr RouteConfigProviderManagerImpl::createRdsRouteCon
   // RdsRouteConfigSubscriptions are unique based on their serialized RDS config.
   // TODO(htuch): Full serialization here gives large IDs, could get away with a
   // strong hash instead.
-  const std::string manager_identifier = rds.SerializeAsString();
+  const std::string manager_identifier = std::to_string(MessageUtil::hash(rds));
 
   RdsRouteConfigSubscriptionSharedPtr subscription;
 
