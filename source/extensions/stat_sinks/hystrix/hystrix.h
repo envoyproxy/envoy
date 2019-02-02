@@ -147,6 +147,8 @@ private:
                             uint64_t reporting_hosts, std::chrono::milliseconds rolling_window_ms,
                             std::stringstream& ss);
 
+  const std::string& zeroValue() const;
+
   std::vector<Http::StreamDecoderFilterCallbacks*> callbacks_list_;
   Server::Instance& server_;
   uint64_t current_index_;

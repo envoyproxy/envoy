@@ -9,6 +9,7 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/logger.h"
+#include "common/common/macros.h"
 #include "common/config/well_known_names.h"
 #include "common/http/headers.h"
 
@@ -275,6 +276,8 @@ HystrixSink::HystrixSink(Server::Instance& server, const uint64_t num_buckets)
                    MAKE_ADMIN_HANDLER(handlerHystrixEventStream), false, false);
 }
 
+const std::string& HystrixSink::zeroValue() const { CONSTRUCT_ON_FIRST_USE(std::string, "0"); }
+
 Http::Code HystrixSink::handlerHystrixEventStream(absl::string_view,
                                                   Http::HeaderMap& response_headers,
                                                   Buffer::Instance&,
@@ -290,7 +293,7 @@ Http::Code HystrixSink::handlerHystrixEventStream(absl::string_view,
       AccessControlAllowHeadersValue.AllowHeadersHystrix);
   response_headers.insertAccessControlAllowOrigin().value().setReference(
       Http::Headers::get().AccessControlAllowOriginValue.All);
-  response_headers.insertNoChunks().value().setReference("0");
+  response_headers.insertNoChunks().value().setReference(zeroValue());
 
   Http::StreamDecoderFilterCallbacks& stream_decoder_filter_callbacks =
       admin_stream.getDecoderFilterCallbacks();
