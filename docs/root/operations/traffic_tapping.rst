@@ -29,6 +29,8 @@ To configure traffic tapping, add an `envoy.transport_sockets.tap` transport soc
 :ref:`configuration <envoy_api_msg_config.transport_socket.tap.v2alpha.Tap>` to the listener
 or cluster. For a plain text socket this might look like:
 
+fixfix format docs
+
 .. code-block:: yaml
 
   transport_socket:
@@ -40,7 +42,8 @@ or cluster. For a plain text socket this might look like:
             any_match: true
           output_config:
             sinks:
-              - file_per_tap:
+              - format: PROTO_BINARY
+                file_per_tap:
                   path_prefix: /some/tap/path
       transport_socket:
         name: raw_buffer
@@ -58,7 +61,8 @@ For a TLS socket, this will be:
             any_match: true
           output_config:
             sinks:
-              - file_per_tap:
+              - format: PROTO_BINARY
+                file_per_tap:
                   path_prefix: /some/tap/path
       transport_socket:
         name: ssl
