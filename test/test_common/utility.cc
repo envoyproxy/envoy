@@ -418,5 +418,10 @@ ApiPtr createApiForTest(Stats::Store& stat_store) {
                                     stat_store);
 }
 
+ApiPtr createApiForTest(Stats::Store& stat_store, Event::TimeSystem& time_system) {
+  return std::make_unique<Impl>(std::chrono::milliseconds(1000), Thread::threadFactoryForTest(),
+                                stat_store, time_system);
+}
+
 } // namespace Api
 } // namespace Envoy
