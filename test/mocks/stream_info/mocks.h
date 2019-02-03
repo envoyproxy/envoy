@@ -52,7 +52,7 @@ public:
   MOCK_METHOD1(setUpstreamLocalAddress, void(const Network::Address::InstanceConstSharedPtr&));
   MOCK_CONST_METHOD0(upstreamLocalAddress, const Network::Address::InstanceConstSharedPtr&());
   MOCK_CONST_METHOD0(healthCheck, bool());
-  MOCK_METHOD1(healthCheck, void(bool is_hc));
+  MOCK_METHOD1(healthCheck, void(bool is_health_check));
   MOCK_METHOD1(setDownstreamLocalAddress, void(const Network::Address::InstanceConstSharedPtr&));
   MOCK_CONST_METHOD0(downstreamLocalAddress, const Network::Address::InstanceConstSharedPtr&());
   MOCK_METHOD1(setDownstreamDirectRemoteAddress,

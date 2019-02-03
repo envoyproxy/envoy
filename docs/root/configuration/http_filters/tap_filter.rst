@@ -32,8 +32,9 @@ Example filter configuration:
 
   name: envoy.filters.http.tap
   config:
-    admin_config:
-      config_id: test_config_id
+    common_config:
+      admin_config:
+        config_id: test_config_id
 
 The previous snippet configures the filter for control via the :http:post:`/tap` admin handler.
 See the following section for more details.
@@ -44,7 +45,7 @@ Admin handler
 -------------
 
 When the HTTP filter specifies an :ref:`admin_config
-<envoy_api_msg_config.filter.http.tap.v2alpha.AdminConfig>`, it is configured for admin control and
+<envoy_api_msg_config.common.tap.v2alpha.AdminConfig>`, it is configured for admin control and
 the :http:post:`/tap` admin handler will be installed. The admin handler can be used for live
 tapping and debugging of HTTP traffic. It works as follows:
 
@@ -64,11 +65,11 @@ An example POST body:
     match_config:
       and_match:
         rules:
-          - http_request_match:
+          - http_request_headers_match:
               headers:
                 - name: foo
                   exact_match: bar
-          - http_response_match:
+          - http_response_headers_match:
               headers:
                 - name: bar
                   exact_match: baz
@@ -89,11 +90,11 @@ Another example POST body:
     match_config:
       or_match:
         rules:
-          - http_request_match:
+          - http_request_headers_match:
               headers:
                 - name: foo
                   exact_match: bar
-          - http_response_match:
+          - http_response_headers_match:
               headers:
                 - name: bar
                   exact_match: baz

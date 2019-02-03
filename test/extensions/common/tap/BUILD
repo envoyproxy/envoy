@@ -22,5 +22,6 @@ envoy_cc_test(
     srcs = ["tap_matcher_test.cc"],
     deps = [
         "//source/extensions/common/tap:tap_matcher",
+        "//test/test_common:utility_lib",
     ],
 )

@@ -93,7 +93,8 @@ public:
   const HistogramStatistics& cumulativeStatistics() const override {
     return cumulative_statistics_;
   }
-  const std::string summary() const override;
+  const std::string quantileSummary() const override;
+  const std::string bucketSummary() const override;
 
   // Stats::Metric
   StatName statName() const override { return name_.statName(); }

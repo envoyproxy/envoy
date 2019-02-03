@@ -124,7 +124,8 @@ public:
   ~MockParentHistogram();
 
   void merge() override {}
-  const std::string summary() const override { return ""; };
+  const std::string quantileSummary() const override { return ""; };
+  const std::string bucketSummary() const override { return ""; };
 
   MOCK_CONST_METHOD0(used, bool());
   MOCK_METHOD1(recordValue, void(uint64_t value));
