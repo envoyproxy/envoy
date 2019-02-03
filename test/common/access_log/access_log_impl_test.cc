@@ -924,17 +924,15 @@ typed_config:
 }
 
 TEST_F(AccessLogImplTest, GrpcStatusFilterValues) {
-  const std::string yaml_prefix = R"EOF(
+  const std::string yaml_template = R"EOF(
 name: envoy.file_access_log
 filter:
   grpc_status_filter:
     statuses:
-      - )EOF";
-
-  const std::string yaml_suffix = R"EOF(
+      - {}
 config:
   path: /dev/null
-  )EOF";
+)EOF";
 
   const auto desc = envoy::config::filter::accesslog::v2::GrpcStatusFilter_Status_descriptor();
   const int grpcStatuses = static_cast<int>(Grpc::Status::GrpcStatus::MaximumValid) + 1;
@@ -943,12 +941,9 @@ config:
            << ", GrpcStatusFilter_Status has " << desc->value_count() << ".";
   }
 
-  std::ostringstream out;
   for (int i = 0; i < desc->value_count(); i++) {
-    out << yaml_prefix << desc->value(i)->name() << yaml_suffix;
-
-    InstanceSharedPtr log =
-        AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(out.str()), context_);
+    InstanceSharedPtr log = AccessLogFactory::fromProto(
+        parseAccessLogFromV2Yaml(fmt::format(yaml_template, desc->value(i)->name())), context_);
 
     EXPECT_CALL(*file_, write(_));
 
@@ -994,17 +989,15 @@ config:
 }
 
 TEST_F(AccessLogImplTest, GrpcStatusFilterHttpCodes) {
-  const std::string yamlPrefix = R"EOF(
+  const std::string yaml_template = R"EOF(
 name: envoy.file_access_log
 filter:
   grpc_status_filter:
     statuses:
-)EOF";
-
-  const std::string yamlSuffix = R"EOF(
+      - {}
 config:
   path: /dev/null
-  )EOF";
+)EOF";
 
   // This mapping includes UNKNOWN <-> 200 because we expect that gRPC should provide an explicit
   // status code for successes. In general, the only status codes that receive an HTTP mapping are
@@ -1015,18 +1008,14 @@ config:
       {"PERMISSION_DENIED", 403}, {"UNAVAILABLE", 429}, {"UNIMPLEMENTED", 404},
       {"UNAVAILABLE", 502},       {"UNAVAILABLE", 503}, {"UNAVAILABLE", 504}};
 
-  std::ostringstream out;
   for (const auto& pair : statusMapping) {
-    out << yamlPrefix << "      - " << pair.first << yamlSuffix;
     stream_info_.response_code_ = pair.second;
 
-    const InstanceSharedPtr log =
-        AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(out.str()), context_);
+    const InstanceSharedPtr log = AccessLogFactory::fromProto(
+        parseAccessLogFromV2Yaml(fmt::format(yaml_template, pair.first)), context_);
 
     EXPECT_CALL(*file_, write(_));
     log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
-
-    out.clear();
   }
 }
 
