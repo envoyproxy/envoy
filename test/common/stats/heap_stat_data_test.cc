@@ -33,7 +33,7 @@ protected:
     EXPECT_EQ(0, symbol_table_.numSymbols());
   }
 
-  SymbolTable symbol_table_;
+  SymbolTableImpl symbol_table_;
   HeapStatDataAllocator alloc_;
   std::vector<StatNameStorage> stat_name_storage_;
 };

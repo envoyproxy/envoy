@@ -39,7 +39,7 @@ public:
     code_stats_.chargeResponseStat(info);
   }
 
-  Stats::SymbolTable symbol_table_;
+  Stats::SymbolTableImpl symbol_table_;
   Stats::IsolatedStoreImpl global_store_;
   Stats::IsolatedStoreImpl cluster_scope_;
   Http::CodeStatsImpl code_stats_;
@@ -254,10 +254,11 @@ protected:
       storage_vec.emplace_back(std::make_unique<Stats::StatNameTempStorage>(str, symbol_table_));
       stat_name_vec.push_back(storage_vec.back()->statName());
     }
-    return symbol_table_.toString(CodeStatsImpl::Join(stat_name_vec).statName());
+    Stats::SymbolTable::StoragePtr stat_name_storage = symbol_table_.join(stat_name_vec);
+    return symbol_table_.toString(Stats::StatName(stat_name_storage.get()));
   }
 
-  Stats::SymbolTable symbol_table_;
+  Stats::SymbolTableImpl symbol_table_;
   CodeStatsImpl code_stats_;
 };
 

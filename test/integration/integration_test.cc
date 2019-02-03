@@ -4,7 +4,6 @@
 
 #include "envoy/config/accesslog/v2/file.pb.h"
 
-#include "common/filesystem/filesystem_impl.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 #include "common/protobuf/utility.h"
@@ -237,7 +236,9 @@ TEST_P(IntegrationTest, InvalidContentLength) { testInvalidContentLength(); }
 
 TEST_P(IntegrationTest, MultipleContentLengths) { testMultipleContentLengths(); }
 
-TEST_P(IntegrationTest, OverlyLongHeaders) { testOverlyLongHeaders(); }
+TEST_P(IntegrationTest, LargeHeadersRejected) { testLargeRequestHeaders(62, 60); }
+
+TEST_P(IntegrationTest, LargeHeadersAccepted) { testLargeRequestHeaders(62, 63); }
 
 TEST_P(IntegrationTest, UpstreamProtocolError) { testUpstreamProtocolError(); }
 

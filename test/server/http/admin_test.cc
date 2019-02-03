@@ -63,7 +63,7 @@ public:
                                   true /*pretty_print*/);
   }
 
-  Stats::SymbolTable symbol_table_;
+  Stats::SymbolTableImpl symbol_table_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   Stats::StatsOptionsImpl options_;
@@ -1215,7 +1215,7 @@ protected:
     gauges_.push_back(alloc_.makeGauge(storage.statName(), name, cluster_tags));
   }
 
-  Stats::SymbolTable symbol_table_;
+  Stats::SymbolTableImpl symbol_table_;
   Stats::HeapStatDataAllocator alloc_;
   std::vector<Stats::CounterSharedPtr> counters_;
   std::vector<Stats::GaugeSharedPtr> gauges_;

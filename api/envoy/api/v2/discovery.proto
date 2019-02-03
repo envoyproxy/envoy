@@ -110,7 +110,7 @@ message DiscoveryResponse {
 //
 // In Incremental xDS the nonce field is required and used to pair
 // IncrementalDiscoveryResponse to a IncrementalDiscoveryRequest ACK or NACK.
-// Optionaly, a response message level system_version_info is present for
+// Optionally, a response message level system_version_info is present for
 // debugging purposes only.
 //
 // IncrementalDiscoveryRequest can be sent in 3 situations:

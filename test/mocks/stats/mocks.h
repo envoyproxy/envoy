@@ -186,7 +186,7 @@ public:
   SymbolTable& symbolTable() override { return symbol_table_; }
   const SymbolTable& symbolTable() const override { return symbol_table_; }
 
-  SymbolTable owned_symbol_table_;
+  SymbolTableImpl owned_symbol_table_;
   SymbolTable& symbol_table_;
   testing::NiceMock<MockCounter> counter_;
   std::vector<std::unique_ptr<MockHistogram>> histograms_;
@@ -197,7 +197,7 @@ public:
  * With IsolatedStoreImpl it's hard to test timing stats.
  * MockIsolatedStatsStore mocks only deliverHistogramToSinks for better testing.
  */
-class MockIsolatedStatsStore : private Test::Global<Stats::SymbolTable>, public IsolatedStoreImpl {
+class MockIsolatedStatsStore : private Test::Global<Stats::SymbolTableImpl>, public IsolatedStoreImpl {
 public:
   MockIsolatedStatsStore();
   ~MockIsolatedStatsStore();

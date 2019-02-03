@@ -6,7 +6,6 @@
 #include "envoy/http/header_map.h"
 
 #include "common/common/thread.h"
-#include "common/filesystem/filesystem_impl.h"
 #include "common/local_info/local_info_impl.h"
 #include "common/network/utility.h"
 #include "common/stats/thread_local_store.h"
@@ -171,7 +170,7 @@ void IntegrationTestServerImpl::createAndRunEnvoyServer(
     Network::Address::InstanceConstSharedPtr local_address, TestHooks& hooks,
     Thread::BasicLockable& access_log_lock, Server::ComponentFactory& component_factory,
     Runtime::RandomGeneratorPtr&& random_generator) {
-  Stats::SymbolTable symbol_table;
+  Stats::SymbolTableImpl symbol_table;
   Server::HotRestartNopImpl restarter(symbol_table);
   ThreadLocal::InstanceImpl tls;
   Stats::HeapStatDataAllocator stats_allocator(symbol_table);

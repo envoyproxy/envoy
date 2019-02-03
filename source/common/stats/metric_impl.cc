@@ -37,7 +37,7 @@ std::string MetricImpl::tagExtractedName() const {
 
 StatName MetricImpl::tagExtractedStatName() const {
   StatName stat_name;
-  stat_names_.foreach ([&stat_name](StatName s) -> bool {
+  stat_names_.iterate([&stat_name](StatName s) -> bool {
     stat_name = s;
     return false;
   });
@@ -49,7 +49,7 @@ std::vector<Tag> MetricImpl::tags() const {
   enum { TagExtractedName, Name, Value } state = TagExtractedName;
   Tag tag;
   const SymbolTable& symbol_table = symbolTable();
-  stat_names_.foreach ([&tags, &state, &tag, &symbol_table](StatName stat_name) -> bool {
+  stat_names_.iterate([&tags, &state, &tag, &symbol_table](StatName stat_name) -> bool {
     switch (state) {
     case TagExtractedName:
       state = Name;
@@ -65,6 +65,7 @@ std::vector<Tag> MetricImpl::tags() const {
     }
     return true;
   });
+  ASSERT(state != Value);
   return tags;
 }
 

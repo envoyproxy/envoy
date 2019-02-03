@@ -340,8 +340,8 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counterx(StatName name) {
   // after we construct the stat we can insert it into the required maps. This
   // strategy costs an extra hash lookup for each miss, but saves time
   // re-copying the string and significant memory overhead.
-  StatNameJoiner final_name(prefix_.statName(), name);
-  StatName final_stat_name = final_name.statName();
+  Stats::SymbolTable::StoragePtr final_name = symbolTable().join({prefix_.statName(), name});
+  StatName final_stat_name(final_name.get());
 
   if (parent_.rejects(final_stat_name)) {
     return parent_.null_counter_;
@@ -388,8 +388,8 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugex(StatName name) {
   // a temporary, and address sanitization errors would follow. Instead we must
   // do a find() first, using that if it succeeds. If it fails, then after we
   // construct the stat we can insert it into the required maps.
-  StatNameJoiner final_name(prefix_.statName(), name);
-  StatName final_stat_name = final_name.statName();
+  Stats::SymbolTable::StoragePtr final_name = symbolTable().join({prefix_.statName(), name});
+  StatName final_stat_name(final_name.get());
 
   if (parent_.rejects(final_stat_name)) {
     return parent_.null_gauge_;
@@ -418,8 +418,8 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramx(StatName name) {
   // a temporary, and address sanitization errors would follow. Instead we must
   // do a find() first, using that if it succeeds. If it fails, then after we
   // construct the stat we can insert it into the required maps.
-  StatNameJoiner final_name(prefix_.statName(), name);
-  StatName final_stat_name = final_name.statName();
+  Stats::SymbolTable::StoragePtr final_name = symbolTable().join({prefix_.statName(), name});
+  StatName final_stat_name(final_name.get());
 
   if (parent_.rejects(final_stat_name)) {
     return parent_.null_histogram_;

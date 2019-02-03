@@ -106,17 +106,6 @@ TEST_P(ListenerImplTest, SetListeningSocketOptionsSuccess) {
   TestListenerImpl listener(dispatcher_, socket, listener_callbacks, true, false);
 }
 
-// Test that socket options are set after the listener is setup.
-TEST_P(ListenerImplTest, UdpSetListeningSocketOptionsSuccess) {
-  Network::MockListenerCallbacks listener_callbacks;
-  Network::MockConnectionHandler connection_handler;
-
-  Network::UdpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(version_), nullptr,
-                                  true);
-  std::shared_ptr<MockSocketOption> option = std::make_shared<MockSocketOption>();
-  socket.addOption(option);
-}
-
 // Test that an exception is thrown if there is an error setting socket options.
 TEST_P(ListenerImplTest, SetListeningSocketOptionsError) {
   Network::MockListenerCallbacks listener_callbacks;

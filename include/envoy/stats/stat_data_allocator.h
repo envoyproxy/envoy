@@ -56,7 +56,7 @@ public:
   virtual SymbolTable& symbolTable() PURE;
 
   // TODO(jmarantz): create a parallel mechanism to instantiate histograms. At
-  // the moment, histograms don't fit the same pattern of counters and gaugaes
+  // the moment, histograms don't fit the same pattern of counters and gauges
   // as they are not actually created in the context of a stats allocator.
 };
 

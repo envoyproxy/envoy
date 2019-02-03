@@ -21,7 +21,7 @@ import "gogoproto/gogo.proto";
 // [#protodoc-title: HTTP connection manager]
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 
-// [#comment:next free field: 29]
+// [#comment:next free field: 30]
 message HttpConnectionManager {
   enum CodecType {
     option (gogoproto.goproto_enum_prefix) = false;
@@ -130,6 +130,15 @@ message HttpConnectionManager {
   // header in responses. If not set, the default is *envoy*.
   string server_name = 10;
 
+  // The maximum request headers size for incoming connections. The default max
+  // is 60K, based on default settings for http codecs. For HTTP1, the current
+  // limit set by http_parser is 80K. for HTTP2, the default allowed header
+  // block in nghttp2 is 64K. The max configurable setting is 63K in order to
+  // stay under both codec limits.
+  // Requests that exceed this size will receive a 431 response.
+  google.protobuf.UInt32Value max_request_headers_kb = 29
+      [(validate.rules).uint32.gt = 0, (validate.rules).uint32.lte = 63];
+
   // The idle timeout for connections managed by the connection manager. The
   // idle timeout is defined as the period in which there are no active
   // requests. If not set, there is no idle timeout. When the idle timeout is
@@ -188,7 +197,7 @@ message HttpConnectionManager {
   // during which Envoy will flush the write buffers for the connection and await the peer to close
   // (i.e., a TCP FIN/RST is received by Envoy from the downstream connection).
   //
-  // Delaying Envoy's connection close and giving the peer the opportunity to initate the close
+  // Delaying Envoy's connection close and giving the peer the opportunity to initiate the close
   // sequence mitigates a race condition that exists when downstream clients do not drain/process
   // data in a connection's receive buffer after a remote close has been detected via a socket
   // write(). This race leads to such clients failing to process the response code sent by Envoy,
@@ -355,7 +364,7 @@ message HttpConnectionManager {
     // HTTP connections will be used for this upgrade type.
     repeated HttpFilter filters = 2;
     // Determines if upgrades are enabled or disabled by default. Defaults to true.
-    // This can be overriden on a per-route basis with :ref:`cluster
+    // This can be overridden on a per-route basis with :ref:`cluster
     // <envoy_api_field_route.RouteAction.upgrade_configs>` as documented in the
     // :ref:`upgrade documentation <arch_overview_websocket>`.
     google.protobuf.BoolValue enabled = 3;

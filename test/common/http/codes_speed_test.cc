@@ -12,7 +12,7 @@
 #include "common/http/codes.h"
 #include "common/stats/isolated_store_impl.h"
 
-#include "testing/base/public/benchmark.h"
+#include "benchmark/benchmark.h"
 
 namespace Envoy {
 namespace Http {
@@ -54,7 +54,7 @@ public:
     code_stats_.chargeResponseTiming(info);
   }
 
-  Stats::SymbolTable symbol_table_;
+  Stats::SymbolTableImpl symbol_table_;
   Stats::IsolatedStoreImpl global_store_;
   Stats::IsolatedStoreImpl cluster_scope_;
   Http::CodeStatsImpl code_stats_;

@@ -35,18 +35,21 @@ ScopePtr ScopePrefixer::createScope(const std::string& name) {
 }
 
 Counter& ScopePrefixer::counterx(StatName name) {
-  StatNameJoiner joiner(prefix_.statName(), name);
-  return scope_->counterx(joiner.statName());
+  Stats::SymbolTable::StoragePtr stat_name_storage = scope_->symbolTable().join(
+      {prefix_.statName(), name});
+  return scope_->counterx(StatName(stat_name_storage.get()));
 }
 
 Gauge& ScopePrefixer::gaugex(StatName name) {
-  StatNameJoiner joiner(prefix_.statName(), name);
-  return scope_->gaugex(joiner.statName());
+  Stats::SymbolTable::StoragePtr stat_name_storage = scope_->symbolTable().join(
+      {prefix_.statName(), name});
+  return scope_->gaugex(StatName(stat_name_storage.get()));
 }
 
 Histogram& ScopePrefixer::histogramx(StatName name) {
-  StatNameJoiner joiner(prefix_.statName(), name);
-  return scope_->histogramx(joiner.statName());
+  Stats::SymbolTable::StoragePtr stat_name_storage = scope_->symbolTable().join(
+      {prefix_.statName(), name});
+  return scope_->histogramx(StatName(stat_name_storage.get()));
 }
 
 void ScopePrefixer::deliverHistogramToSinks(const Histogram& histograms, uint64_t val) {
