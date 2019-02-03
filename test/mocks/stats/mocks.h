@@ -198,7 +198,8 @@ public:
  * With IsolatedStoreImpl it's hard to test timing stats.
  * MockIsolatedStatsStore mocks only deliverHistogramToSinks for better testing.
  */
-class MockIsolatedStatsStore : private Test::Global<Stats::SymbolTableImpl>, public IsolatedStoreImpl {
+class MockIsolatedStatsStore : private Test::Global<Stats::SymbolTableImpl>,
+                               public IsolatedStoreImpl {
 public:
   MockIsolatedStatsStore();
   ~MockIsolatedStatsStore();

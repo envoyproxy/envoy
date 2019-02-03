@@ -51,14 +51,14 @@ Stats::StatName CodeStatsImpl::makeStatName(absl::string_view name) {
   return storage_.back().statName();
 }
 
-void CodeStatsImpl::incCounter(
-    Stats::Scope& scope, const std::vector<Stats::StatName>& names) const {
+void CodeStatsImpl::incCounter(Stats::Scope& scope,
+                               const std::vector<Stats::StatName>& names) const {
   Stats::SymbolTable::StoragePtr stat_name_storage = symbol_table_.join(names);
   scope.counterx(Stats::StatName(stat_name_storage.get())).inc();
 }
 
-void CodeStatsImpl::recordHistogram(
-    Stats::Scope& scope, const std::vector<Stats::StatName>& names, uint64_t count) const {
+void CodeStatsImpl::recordHistogram(Stats::Scope& scope, const std::vector<Stats::StatName>& names,
+                                    uint64_t count) const {
   Stats::SymbolTable::StoragePtr stat_name_storage = symbol_table_.join(names);
   scope.histogramx(Stats::StatName(stat_name_storage.get())).recordValue(count);
 }
@@ -85,9 +85,9 @@ void CodeStatsImpl::chargeResponseStat(const ResponseStatInfo& info) const {
   Stats::StatName rq_code = upstream_rq_.statName(code);
 
   auto write_category = [this, prefix, rq_group, rq_code, &info](Stats::StatName category) {
-                          incCounter(info.cluster_scope_, {prefix, category, upstream_rq_completed_});
-                          incCounter(info.cluster_scope_, {prefix, category, rq_group});
-                          incCounter(info.cluster_scope_, {prefix, category, rq_code});
+    incCounter(info.cluster_scope_, {prefix, category, upstream_rq_completed_});
+    incCounter(info.cluster_scope_, {prefix, category, rq_group});
+    incCounter(info.cluster_scope_, {prefix, category, rq_code});
   };
 
   // If the response is from a canary, also create canary stats.
@@ -110,11 +110,9 @@ void CodeStatsImpl::chargeResponseStat(const ResponseStatInfo& info) const {
     Stats::StatName vcluster_name = vcluster_storage.statName();
 
     incCounter(info.global_scope_,
-            {vhost_, vhost_name, vcluster_, vcluster_name, upstream_rq_completed_});
-    incCounter(info.global_scope_,
-            {vhost_, vhost_name, vcluster_, vcluster_name, rq_group});
-    incCounter(info.global_scope_,
-            {vhost_, vhost_name, vcluster_, vcluster_name, rq_code});
+               {vhost_, vhost_name, vcluster_, vcluster_name, upstream_rq_completed_});
+    incCounter(info.global_scope_, {vhost_, vhost_name, vcluster_, vcluster_name, rq_group});
+    incCounter(info.global_scope_, {vhost_, vhost_name, vcluster_, vcluster_name, rq_code});
   }
 
   // Handle per zone stats.
@@ -151,10 +149,8 @@ void CodeStatsImpl::chargeResponseTiming(const ResponseTimingInfo& info) const {
     Stats::StatName vhost_name = vhost_storage.statName();
     Stats::StatNameTempStorage vcluster_storage(info.request_vcluster_name_, symbol_table_);
     Stats::StatName vcluster_name = vcluster_storage.statName();
-    recordHistogram(
-        info.global_scope_,
-        {vhost_, vhost_name, vcluster_, vcluster_name, upstream_rq_time_},
-        count);
+    recordHistogram(info.global_scope_,
+                    {vhost_, vhost_name, vcluster_, vcluster_name, upstream_rq_time_}, count);
   }
 
   // Handle per zone stats.

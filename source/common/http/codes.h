@@ -28,8 +28,8 @@ private:
   friend class CodeStatsTest;
 
   void incCounter(Stats::Scope& scope, const std::vector<Stats::StatName>& names) const;
-  void recordHistogram(
-      Stats::Scope& scope, const std::vector<Stats::StatName>& names, uint64_t count) const;
+  void recordHistogram(Stats::Scope& scope, const std::vector<Stats::StatName>& names,
+                       uint64_t count) const;
 
   class RequestCodeGroup {
   public:

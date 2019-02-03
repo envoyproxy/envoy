@@ -35,20 +35,20 @@ ScopePtr ScopePrefixer::createScope(const std::string& name) {
 }
 
 Counter& ScopePrefixer::counterx(StatName name) {
-  Stats::SymbolTable::StoragePtr stat_name_storage = scope_->symbolTable().join(
-      {prefix_.statName(), name});
+  Stats::SymbolTable::StoragePtr stat_name_storage =
+      scope_->symbolTable().join({prefix_.statName(), name});
   return scope_->counterx(StatName(stat_name_storage.get()));
 }
 
 Gauge& ScopePrefixer::gaugex(StatName name) {
-  Stats::SymbolTable::StoragePtr stat_name_storage = scope_->symbolTable().join(
-      {prefix_.statName(), name});
+  Stats::SymbolTable::StoragePtr stat_name_storage =
+      scope_->symbolTable().join({prefix_.statName(), name});
   return scope_->gaugex(StatName(stat_name_storage.get()));
 }
 
 Histogram& ScopePrefixer::histogramx(StatName name) {
-  Stats::SymbolTable::StoragePtr stat_name_storage = scope_->symbolTable().join(
-      {prefix_.statName(), name});
+  Stats::SymbolTable::StoragePtr stat_name_storage =
+      scope_->symbolTable().join({prefix_.statName(), name});
   return scope_->histogramx(StatName(stat_name_storage.get()));
 }
 
