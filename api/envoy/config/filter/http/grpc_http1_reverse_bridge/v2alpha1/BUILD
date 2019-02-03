@@ -1,4 +1,4 @@
-load("//bazel:api_build_system.bzl", "api_proto_library")
+load("@//api/bazel:api_build_system.bzl", "api_proto_library")
 
 licenses(["notice"])  # Apache 2
 
