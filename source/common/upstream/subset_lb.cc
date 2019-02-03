@@ -603,7 +603,7 @@ HostSetImplPtr SubsetLoadBalancer::PrioritySubsetImpl::createHostSet(
 void SubsetLoadBalancer::PrioritySubsetImpl::update(uint32_t priority,
                                                     const HostVector& hosts_added,
                                                     const HostVector& hosts_removed) {
-  HostSubsetImpl* host_subset = getOrCreateHostSubset(priority);
+  HostSubsetImpl* host_subset = getOrCreateMutableHostSubset(priority);
   host_subset->update(hosts_added, hosts_removed, predicate_);
 
   if (host_subset->hosts().empty() != empty_) {

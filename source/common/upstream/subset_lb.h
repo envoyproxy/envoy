@@ -69,13 +69,13 @@ private:
 
     bool empty() { return empty_; }
 
-    HostSubsetImpl* getOrCreateHostSubset(uint32_t priority) {
-      return reinterpret_cast<HostSubsetImpl*>(&getOrCreateHostSet(priority));
+    const HostSubsetImpl* getOrCreateHostSubset(uint32_t priority) {
+      return reinterpret_cast<const HostSubsetImpl*>(&getOrCreateMutableHostSet(priority));
     }
 
     void triggerCallbacks() {
       for (size_t i = 0; i < hostSetsPerPriority().size(); ++i) {
-        getOrCreateHostSubset(i)->triggerCallbacks();
+        getOrCreateMutableHostSubset(i)->triggerCallbacks();
       }
     }
 
@@ -87,6 +87,10 @@ private:
   protected:
     HostSetImplPtr createHostSet(uint32_t priority,
                                  absl::optional<uint32_t> overprovisioning_factor) override;
+
+    HostSubsetImpl* getOrCreateMutableHostSubset(uint32_t priority) {
+      return reinterpret_cast<HostSubsetImpl*>(&getOrCreateMutableHostSet(priority));
+    }
 
   private:
     const PrioritySet& original_priority_set_;
