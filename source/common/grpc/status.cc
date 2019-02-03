@@ -1,8 +1,5 @@
 #include "common/grpc/status.h"
 
-#include <string>
-#include <unordered_map>
-
 namespace Envoy {
 namespace Grpc {
 

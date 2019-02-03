@@ -4,8 +4,6 @@
 
 #include "envoy/grpc/status.h"
 
-#include "absl/types/optional.h"
-
 namespace Envoy {
 namespace Grpc {
 
