@@ -57,10 +57,6 @@ public:
   MOCK_CONST_METHOD0(degradedHostsPerLocality, const HostsPerLocality&());
   MOCK_CONST_METHOD0(localityWeights, LocalityWeightsConstSharedPtr());
   MOCK_METHOD0(chooseLocality, absl::optional<uint32_t>());
-  MOCK_METHOD5(updateHosts, void(HostSet::UpdateHostsParams&& update_hosts_params,
-                                 LocalityWeightsConstSharedPtr locality_weights,
-                                 const HostVector& hosts_added, const HostVector& hosts_removed,
-                                 absl::optional<uint32_t> overprovisioning_factor));
   MOCK_CONST_METHOD0(priority, uint32_t());
   uint32_t overprovisioningFactor() const override { return overprovisioning_factor_; }
   void setOverprovisioningFactor(const uint32_t overprovisioning_factor) {
@@ -93,6 +89,10 @@ public:
   MOCK_CONST_METHOD1(addPriorityUpdateCb, Common::CallbackHandle*(PriorityUpdateCb callback));
   MOCK_CONST_METHOD0(hostSetsPerPriority, const std::vector<HostSetPtr>&());
   MOCK_METHOD0(hostSetsPerPriority, std::vector<HostSetPtr>&());
+  MOCK_METHOD6(updateHosts, void(uint32_t priority, UpdateHostsParams&& update_hosts_params,
+                                 LocalityWeightsConstSharedPtr locality_weights,
+                                 const HostVector& hosts_added, const HostVector& hosts_removed,
+                                 absl::optional<uint32_t> overprovisioning_factor));
 
   MockHostSet* getMockHostSet(uint32_t priority) {
     getHostSet(priority); // Ensure the host set exists.

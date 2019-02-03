@@ -1517,8 +1517,8 @@ TEST(PrioritySet, Extend) {
   HostVector hosts_added{hosts->front()};
   HostVector hosts_removed{};
 
-  priority_set.hostSetsPerPriority()[1]->updateHosts(
-      HostSetImpl::updateHostsParams(hosts, hosts_per_locality, hosts, hosts_per_locality), {},
+  priority_set.updateHosts(
+      1, HostSetImpl::updateHostsParams(hosts, hosts_per_locality, hosts, hosts_per_locality), {},
       hosts_added, hosts_removed, absl::nullopt);
   EXPECT_EQ(1, priority_changes);
   EXPECT_EQ(1, membership_changes);
