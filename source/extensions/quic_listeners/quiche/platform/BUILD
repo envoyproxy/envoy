@@ -70,6 +70,8 @@ envoy_cc_library(
     name = "quic_platform_impl_lib",
     hdrs = [
         "quic_mutex_impl.h",
+        "quic_str_cat_impl.h",
+        "quic_string_utils_impl.h",
     ],
     external_deps = [
         "quiche_quic_platform_base",
