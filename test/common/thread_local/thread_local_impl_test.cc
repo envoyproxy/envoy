@@ -23,7 +23,7 @@ public:
   MOCK_METHOD0(onDestroy, void());
 };
 
-class ThreadLocalInstanceImplTest : public testing::Test {
+class ThreadLocalInstanceImplTest : public TestBase {
 public:
   ThreadLocalInstanceImplTest() {
     tls_.registerThread(main_dispatcher_, true);

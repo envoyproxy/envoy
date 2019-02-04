@@ -45,37 +45,37 @@ private:
 };
 
 HealthCheckerSharedPtr
-HealthCheckerFactory::create(const envoy::api::v2::core::HealthCheck& hc_config,
+HealthCheckerFactory::create(const envoy::api::v2::core::HealthCheck& health_check_config,
                              Upstream::Cluster& cluster, Runtime::Loader& runtime,
                              Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
                              AccessLog::AccessLogManager& log_manager) {
   HealthCheckEventLoggerPtr event_logger;
-  if (!hc_config.event_log_path().empty()) {
+  if (!health_check_config.event_log_path().empty()) {
     event_logger = std::make_unique<HealthCheckEventLoggerImpl>(
-        log_manager, dispatcher.timeSystem(), hc_config.event_log_path());
+        log_manager, dispatcher.timeSystem(), health_check_config.event_log_path());
   }
-  switch (hc_config.health_checker_case()) {
+  switch (health_check_config.health_checker_case()) {
   case envoy::api::v2::core::HealthCheck::HealthCheckerCase::kHttpHealthCheck:
-    return std::make_shared<ProdHttpHealthCheckerImpl>(cluster, hc_config, dispatcher, runtime,
-                                                       random, std::move(event_logger));
+    return std::make_shared<ProdHttpHealthCheckerImpl>(cluster, health_check_config, dispatcher,
+                                                       runtime, random, std::move(event_logger));
   case envoy::api::v2::core::HealthCheck::HealthCheckerCase::kTcpHealthCheck:
-    return std::make_shared<TcpHealthCheckerImpl>(cluster, hc_config, dispatcher, runtime, random,
-                                                  std::move(event_logger));
+    return std::make_shared<TcpHealthCheckerImpl>(cluster, health_check_config, dispatcher, runtime,
+                                                  random, std::move(event_logger));
   case envoy::api::v2::core::HealthCheck::HealthCheckerCase::kGrpcHealthCheck:
     if (!(cluster.info()->features() & Upstream::ClusterInfo::Features::HTTP2)) {
       throw EnvoyException(fmt::format("{} cluster must support HTTP/2 for gRPC healthchecking",
                                        cluster.info()->name()));
     }
-    return std::make_shared<ProdGrpcHealthCheckerImpl>(cluster, hc_config, dispatcher, runtime,
-                                                       random, std::move(event_logger));
+    return std::make_shared<ProdGrpcHealthCheckerImpl>(cluster, health_check_config, dispatcher,
+                                                       runtime, random, std::move(event_logger));
   case envoy::api::v2::core::HealthCheck::HealthCheckerCase::kCustomHealthCheck: {
     auto& factory =
         Config::Utility::getAndCheckFactory<Server::Configuration::CustomHealthCheckerFactory>(
-            std::string(hc_config.custom_health_check().name()));
+            std::string(health_check_config.custom_health_check().name()));
     std::unique_ptr<Server::Configuration::HealthCheckerFactoryContext> context(
         new HealthCheckerFactoryContextImpl(cluster, runtime, random, dispatcher,
                                             std::move(event_logger)));
-    return factory.createCustomHealthChecker(hc_config, *context);
+    return factory.createCustomHealthChecker(health_check_config, *context);
   }
   default:
     // Checked by schema.

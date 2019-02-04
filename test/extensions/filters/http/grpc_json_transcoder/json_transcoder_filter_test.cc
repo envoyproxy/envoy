@@ -15,10 +15,10 @@
 #include "test/proto/bookstore.pb.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Invoke;
@@ -50,7 +50,7 @@ protected:
   Api::ApiPtr api_;
 };
 
-class GrpcJsonTranscoderConfigTest : public testing::Test, public GrpcJsonTranscoderFilterTestBase {
+class GrpcJsonTranscoderConfigTest : public TestBase, public GrpcJsonTranscoderFilterTestBase {
 protected:
   const envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder
   getProtoConfig(const std::string& descriptor_path, const std::string& service_name,
@@ -271,7 +271,7 @@ TEST_F(GrpcJsonTranscoderConfigTest, InvalidVariableBinding) {
   EXPECT_FALSE(transcoder);
 }
 
-class GrpcJsonTranscoderFilterTest : public testing::Test, public GrpcJsonTranscoderFilterTestBase {
+class GrpcJsonTranscoderFilterTest : public TestBase, public GrpcJsonTranscoderFilterTestBase {
 protected:
   GrpcJsonTranscoderFilterTest(const bool match_incoming_request_route = false)
       : config_(bookstoreProtoConfig(match_incoming_request_route), *api_), filter_(config_) {
@@ -702,7 +702,7 @@ struct GrpcJsonTranscoderFilterPrintTestParam {
 };
 
 class GrpcJsonTranscoderFilterPrintTest
-    : public testing::TestWithParam<GrpcJsonTranscoderFilterPrintTestParam>,
+    : public TestBaseWithParam<GrpcJsonTranscoderFilterPrintTestParam>,
       public GrpcJsonTranscoderFilterTestBase {
 protected:
   GrpcJsonTranscoderFilterPrintTest() {

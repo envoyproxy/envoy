@@ -11,8 +11,7 @@
 
 #include "test/integration/ssl_utility.h"
 #include "test/integration/utility.h"
-
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using testing::_;
 using testing::Invoke;

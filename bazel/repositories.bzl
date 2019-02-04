@@ -286,7 +286,6 @@ def envoy_dependencies(path = "@envoy_deps//", skip_targets = []):
     # semi-standard in the Bazel community, intended to avoid both duplicate
     # dependencies and name conflicts.
     _com_google_absl()
-    _com_github_bombela_backward()
     _com_github_circonus_labs_libcircllhist()
     _com_github_c_ares_c_ares()
     _com_github_cyan4973_xxhash()
@@ -332,16 +331,6 @@ def _boringssl_fips():
         sha256 = location["sha256"],
         genrule_cmd_file = "@envoy//bazel/external:boringssl_fips.genrule_cmd",
         build_file = "@envoy//bazel/external:boringssl_fips.BUILD",
-    )
-
-def _com_github_bombela_backward():
-    _repository_impl(
-        name = "com_github_bombela_backward",
-        build_file = "@envoy//bazel/external:backward.BUILD",
-    )
-    native.bind(
-        name = "backward",
-        actual = "@com_github_bombela_backward//:backward",
     )
 
 def _com_github_circonus_labs_libcircllhist():
@@ -616,6 +605,10 @@ def _com_google_absl():
         name = "abseil_symbolize",
         actual = "@com_google_absl//absl/debugging:symbolize",
     )
+    native.bind(
+        name = "abseil_stacktrace",
+        actual = "@com_google_absl//absl/debugging:stacktrace",
+    )
 
     # Require abseil_time as an indirect dependency as it is needed by the
     # direct dependency jwt_verify_lib.
@@ -679,6 +672,10 @@ def _com_googlesource_quiche():
     native.bind(
         name = "quiche_quic_platform",
         actual = "@com_googlesource_quiche//:quic_platform",
+    )
+    native.bind(
+        name = "quiche_quic_platform_base",
+        actual = "@com_googlesource_quiche//:quic_platform_base",
     )
 
 def _com_github_grpc_grpc():

@@ -11,6 +11,7 @@
 #include "test/integration/utility.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/match.h"
@@ -18,7 +19,6 @@
 #include "gmock/gmock.h"
 #include "grpcpp/grpcpp.h"
 #include "grpcpp/impl/codegen/service_type.h"
-#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -26,7 +26,7 @@ namespace TransportSockets {
 namespace Alts {
 
 class AltsIntegrationTestBase : public HttpIntegrationTest,
-                                public testing::TestWithParam<Network::Address::IpVersion> {
+                                public TestBaseWithParam<Network::Address::IpVersion> {
 public:
   AltsIntegrationTestBase(const std::string& server_peer_identity,
                           const std::string& client_peer_identity, bool server_connect_handshaker,

@@ -41,7 +41,7 @@
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using testing::GTEST_FLAG(random_seed);
 
