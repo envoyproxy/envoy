@@ -91,7 +91,7 @@ void DetectorHostMonitorImpl::putResult(Result result) {
   // error, but connection to server was OK.
   case Result::SUCCESS:
     return localOriginNoFailure();
-  // Connectivity releated errors.
+  // Connectivity related errors.
   case Result::TIMEOUT:
   case Result::CONNECT_FAILED:
     return localOriginFailure();
