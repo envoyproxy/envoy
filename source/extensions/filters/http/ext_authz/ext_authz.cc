@@ -13,12 +13,9 @@ namespace HttpFilters {
 namespace ExtAuthz {
 
 namespace {
-// This in conjunction with filter decoder header and end_stream parameter to make sure that request
-// has no massage body. In theory, end of stream should be received in most of cases which
-// header-only request methods are used. However, this is not true when WebSocket handshake is
-// performed which the request method is a GET, but the end of stream is false.
+// Asserts that the HTTP method is for a header-only request. For details
+// https://tools.ietf.org/html/rfc7231#section-4.3.
 bool isHeaderOnlyMethod(absl::string_view method) {
-  // List of request headers-only method (https://tools.ietf.org/html/rfc7231#section-4.3).
   const static std::vector<std::string>* keys = new std::vector<std::string>(
       {Http::Headers::get().MethodValues.Get, Http::Headers::get().MethodValues.Head,
        Http::Headers::get().MethodValues.Connect, Http::Headers::get().MethodValues.Options,
