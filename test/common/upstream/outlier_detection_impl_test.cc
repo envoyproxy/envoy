@@ -382,8 +382,11 @@ TEST_F(OutlierDetectorImplTest, BasicFlowLocalOriginFailure) {
 
   // When connect failure is detected the following methods should be called.
   EXPECT_CALL(checker_, check(hosts_[0]));
-  EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
-                                       _, envoy::data::cluster::v2alpha::OutlierEjectionType::CONSECUTIVE_LOCAL_ORIGIN_FAILURE, true));
+  EXPECT_CALL(
+      *event_logger_,
+      logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]), _,
+               envoy::data::cluster::v2alpha::OutlierEjectionType::CONSECUTIVE_LOCAL_ORIGIN_FAILURE,
+               true));
   time_system_.setMonotonicTime(std::chrono::milliseconds(0));
 
   // Get the configured number of failures and simulate than number of connect failures.
@@ -579,20 +582,31 @@ TEST_F(OutlierDetectorImplTest, BasicFlowSuccessRateExternalOrigin) {
 
   time_system_.setMonotonicTime(std::chrono::milliseconds(10000));
   EXPECT_CALL(checker_, check(hosts_[4]));
-  EXPECT_CALL(*event_logger_,
-              logEject(std::static_pointer_cast<const HostDescription>(hosts_[4]), _,
-                       envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_EXTERNAL_ORIGIN, true));
+  EXPECT_CALL(
+      *event_logger_,
+      logEject(std::static_pointer_cast<const HostDescription>(hosts_[4]), _,
+               envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_EXTERNAL_ORIGIN,
+               true));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
   ON_CALL(runtime_.snapshot_, getInteger("outlier_detection.success_rate_stdev_factor", 1900))
       .WillByDefault(Return(1900));
   interval_timer_->callback_();
-  EXPECT_EQ(50, hosts_[4]->outlierDetector().successRate(envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_EXTERNAL_ORIGIN));
-  EXPECT_EQ(90, detector->successRateAverage(envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_EXTERNAL_ORIGIN));
-  EXPECT_EQ(52, detector->successRateEjectionThreshold(envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_EXTERNAL_ORIGIN));
+  EXPECT_EQ(50,
+            hosts_[4]->outlierDetector().successRate(
+                envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_EXTERNAL_ORIGIN));
+  EXPECT_EQ(90,
+            detector->successRateAverage(
+                envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_EXTERNAL_ORIGIN));
+  EXPECT_EQ(52,
+            detector->successRateEjectionThreshold(
+                envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_EXTERNAL_ORIGIN));
   // Make sure that local origin success rate monitor is not affected
-  EXPECT_EQ(-1, hosts_[4]->outlierDetector().successRate(envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_LOCAL_ORIGIN));
-  EXPECT_EQ(-1, detector->successRateAverage(envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_LOCAL_ORIGIN));
-  EXPECT_EQ(-1, detector->successRateEjectionThreshold(envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_LOCAL_ORIGIN));
+  EXPECT_EQ(-1, hosts_[4]->outlierDetector().successRate(
+                    envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_LOCAL_ORIGIN));
+  EXPECT_EQ(-1, detector->successRateAverage(
+                    envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_LOCAL_ORIGIN));
+  EXPECT_EQ(-1, detector->successRateEjectionThreshold(
+                    envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_LOCAL_ORIGIN));
   EXPECT_TRUE(hosts_[4]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
   EXPECT_EQ(1UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
 
@@ -634,9 +648,15 @@ TEST_F(OutlierDetectorImplTest, BasicFlowSuccessRateExternalOrigin) {
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
   interval_timer_->callback_();
   EXPECT_EQ(0UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
-  EXPECT_EQ(-1, hosts_[4]->outlierDetector().successRate(envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_EXTERNAL_ORIGIN));
-  EXPECT_EQ(-1, detector->successRateAverage(envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_EXTERNAL_ORIGIN));
-  EXPECT_EQ(-1, detector->successRateEjectionThreshold(envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_EXTERNAL_ORIGIN));
+  EXPECT_EQ(-1,
+            hosts_[4]->outlierDetector().successRate(
+                envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_EXTERNAL_ORIGIN));
+  EXPECT_EQ(-1,
+            detector->successRateAverage(
+                envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_EXTERNAL_ORIGIN));
+  EXPECT_EQ(-1,
+            detector->successRateEjectionThreshold(
+                envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_EXTERNAL_ORIGIN));
 }
 
 TEST_F(OutlierDetectorImplTest, BasicFlowSuccessRateLocalOrigin) {
@@ -660,8 +680,11 @@ TEST_F(OutlierDetectorImplTest, BasicFlowSuccessRateLocalOrigin) {
       .WillByDefault(Return(false));
   // Expect non-enforcing logging to happen every time the consecutive_ counter
   // gets saturated (every 5 times).
-  EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[4]),
-                                       _, envoy::data::cluster::v2alpha::OutlierEjectionType::CONSECUTIVE_LOCAL_ORIGIN_FAILURE, false))
+  EXPECT_CALL(
+      *event_logger_,
+      logEject(std::static_pointer_cast<const HostDescription>(hosts_[4]), _,
+               envoy::data::cluster::v2alpha::OutlierEjectionType::CONSECUTIVE_LOCAL_ORIGIN_FAILURE,
+               false))
       .Times(40);
   // Cause a SR error on one host. First have 4 of the hosts have perfect SR.
   loadRq(hosts_, 200, Result::SUCCESS);
@@ -669,19 +692,31 @@ TEST_F(OutlierDetectorImplTest, BasicFlowSuccessRateLocalOrigin) {
 
   time_system_.setMonotonicTime(std::chrono::milliseconds(10000));
   EXPECT_CALL(checker_, check(hosts_[4]));
-  EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[4]),
-                                       _, envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_LOCAL_ORIGIN, true));
+  EXPECT_CALL(
+      *event_logger_,
+      logEject(std::static_pointer_cast<const HostDescription>(hosts_[4]), _,
+               envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_LOCAL_ORIGIN,
+               true));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
   ON_CALL(runtime_.snapshot_, getInteger("outlier_detection.success_rate_stdev_factor", 1900))
       .WillByDefault(Return(1900));
   interval_timer_->callback_();
-  EXPECT_EQ(50, hosts_[4]->outlierDetector().successRate(envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_LOCAL_ORIGIN));
-  EXPECT_EQ(90, detector->successRateAverage(envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_LOCAL_ORIGIN));
-  EXPECT_EQ(52, detector->successRateEjectionThreshold(envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_LOCAL_ORIGIN));
+  EXPECT_EQ(50, hosts_[4]->outlierDetector().successRate(
+                    envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_LOCAL_ORIGIN));
+  EXPECT_EQ(90, detector->successRateAverage(
+                    envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_LOCAL_ORIGIN));
+  EXPECT_EQ(52, detector->successRateEjectionThreshold(
+                    envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_LOCAL_ORIGIN));
   // Make sure that external origin success rate monitor is not affected
-  EXPECT_EQ(-1, hosts_[4]->outlierDetector().successRate(envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_EXTERNAL_ORIGIN));
-  EXPECT_EQ(-1, detector->successRateAverage(envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_EXTERNAL_ORIGIN));
-  EXPECT_EQ(-1, detector->successRateEjectionThreshold(envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_EXTERNAL_ORIGIN));
+  EXPECT_EQ(-1,
+            hosts_[4]->outlierDetector().successRate(
+                envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_EXTERNAL_ORIGIN));
+  EXPECT_EQ(-1,
+            detector->successRateAverage(
+                envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_EXTERNAL_ORIGIN));
+  EXPECT_EQ(-1,
+            detector->successRateEjectionThreshold(
+                envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_EXTERNAL_ORIGIN));
   EXPECT_TRUE(hosts_[4]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
   EXPECT_EQ(1UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
 
@@ -704,8 +739,11 @@ TEST_F(OutlierDetectorImplTest, BasicFlowSuccessRateLocalOrigin) {
 
   // Expect non-enforcing logging to happen every time the consecutive_ counter
   // gets saturated (every 5 times).
-  EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[4]),
-                                       _, envoy::data::cluster::v2alpha::OutlierEjectionType::CONSECUTIVE_LOCAL_ORIGIN_FAILURE, false))
+  EXPECT_CALL(
+      *event_logger_,
+      logEject(std::static_pointer_cast<const HostDescription>(hosts_[4]), _,
+               envoy::data::cluster::v2alpha::OutlierEjectionType::CONSECUTIVE_LOCAL_ORIGIN_FAILURE,
+               false))
       .Times(5);
 
   // Give 4 hosts enough request volume but not to the 5th. Should not cause an ejection.
@@ -716,9 +754,12 @@ TEST_F(OutlierDetectorImplTest, BasicFlowSuccessRateLocalOrigin) {
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
   interval_timer_->callback_();
   EXPECT_EQ(0UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
-  EXPECT_EQ(-1, hosts_[4]->outlierDetector().successRate(envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_LOCAL_ORIGIN));
-  EXPECT_EQ(-1, detector->successRateAverage(envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_LOCAL_ORIGIN));
-  EXPECT_EQ(-1, detector->successRateEjectionThreshold(envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_LOCAL_ORIGIN));
+  EXPECT_EQ(-1, hosts_[4]->outlierDetector().successRate(
+                    envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_LOCAL_ORIGIN));
+  EXPECT_EQ(-1, detector->successRateAverage(
+                    envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_LOCAL_ORIGIN));
+  EXPECT_EQ(-1, detector->successRateEjectionThreshold(
+                    envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_LOCAL_ORIGIN));
 }
 
 // Validate that empty hosts doesn't crash success rate handling when success_rate_minimum_hosts is
@@ -992,9 +1033,18 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
 
   StringViewSaver log3;
   EXPECT_CALL(host->outlier_detector_, lastUnejectionTime()).WillOnce(ReturnRef(monotonic_time));
-  EXPECT_CALL(host->outlier_detector_, successRate(envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_EXTERNAL_ORIGIN)).WillOnce(Return(0));
-  EXPECT_CALL(detector, successRateAverage(envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_EXTERNAL_ORIGIN)).WillOnce(Return(0));
-  EXPECT_CALL(detector, successRateEjectionThreshold(envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_EXTERNAL_ORIGIN)).WillOnce(Return(0));
+  EXPECT_CALL(
+      host->outlier_detector_,
+      successRate(envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_EXTERNAL_ORIGIN))
+      .WillOnce(Return(0));
+  EXPECT_CALL(detector,
+              successRateAverage(
+                  envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_EXTERNAL_ORIGIN))
+      .WillOnce(Return(0));
+  EXPECT_CALL(detector,
+              successRateEjectionThreshold(
+                  envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_EXTERNAL_ORIGIN))
+      .WillOnce(Return(0));
   EXPECT_CALL(*file,
               write(absl::string_view(
                   "{\"type\":\"SUCCESS_RATE_EXTERNAL_ORIGIN\",\"cluster_name\":\"fake_cluster\","
@@ -1004,8 +1054,9 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
                   "\"cluster_success_rate_ejection_threshold\":0},"
                   "\"timestamp\":\"2018-12-18T09:00:00Z\",\"secs_since_last_action\":\"30\"}\n")))
       .WillOnce(SaveArg<0>(&log3));
-  event_logger.logEject(host, detector,
-                        envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_EXTERNAL_ORIGIN, false);
+  event_logger.logEject(
+      host, detector,
+      envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_EXTERNAL_ORIGIN, false);
   Json::Factory::loadFromString(log3);
 
   StringViewSaver log4;
@@ -1032,7 +1083,7 @@ TEST(OutlierUtility, SRThreshold) {
   DetectorImpl::EjectionPair success_rate_nums =
       DetectorImpl::successRateEjectionThreshold(sum, data, 1.9);
   EXPECT_EQ(90.0, success_rate_nums.success_rate_average_); // average success rate
-  EXPECT_EQ(52.0, success_rate_nums.ejection_threshold_); // ejection threshold
+  EXPECT_EQ(52.0, success_rate_nums.ejection_threshold_);   // ejection threshold
 }
 
 } // namespace Outlier

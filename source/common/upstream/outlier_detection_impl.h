@@ -35,7 +35,9 @@ public:
   void putResponseTime(std::chrono::milliseconds) override {}
   const absl::optional<MonotonicTime>& lastEjectionTime() override { return time_; }
   const absl::optional<MonotonicTime>& lastUnejectionTime() override { return time_; }
-  double successRate(envoy::data::cluster::v2alpha::OutlierEjectionType) const override { return -1; }
+  double successRate(envoy::data::cluster::v2alpha::OutlierEjectionType) const override {
+    return -1;
+  }
 
 private:
   const absl::optional<MonotonicTime> time_;
@@ -118,7 +120,9 @@ public:
     success_rate_accumulator_bucket_.load()->success_request_counter_++;
   }
 
-  envoy::data::cluster::v2alpha::OutlierEjectionType getEjectionType() const { return ejection_type_; }
+  envoy::data::cluster::v2alpha::OutlierEjectionType getEjectionType() const {
+    return ejection_type_;
+  }
 
 private:
   SuccessRateAccumulator success_rate_accumulator_;
@@ -137,10 +141,14 @@ public:
   DetectorHostMonitorImpl(std::shared_ptr<DetectorImpl> detector, HostSharedPtr host)
       : detector_(detector), host_(host) {
     // add Success Rate monitors
-    success_rate_monitors_[envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_EXTERNAL_ORIGIN] =
-        std::make_unique<SuccessRateMonitor>(envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_EXTERNAL_ORIGIN);
-    success_rate_monitors_[envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_LOCAL_ORIGIN] =
-        std::make_unique<SuccessRateMonitor>(envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_LOCAL_ORIGIN);
+    success_rate_monitors_
+        [envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_EXTERNAL_ORIGIN] =
+            std::make_unique<SuccessRateMonitor>(
+                envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_EXTERNAL_ORIGIN);
+    success_rate_monitors_
+        [envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_LOCAL_ORIGIN] =
+            std::make_unique<SuccessRateMonitor>(
+                envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_LOCAL_ORIGIN);
   }
 
   void eject(MonotonicTime ejection_time);
@@ -165,7 +173,8 @@ public:
   const std::unique_ptr<SuccessRateMonitor>& getSRMonitor() const {
     return success_rate_monitors_.at(Type);
   }
-  const std::unique_ptr<SuccessRateMonitor>& getSRMonitor(envoy::data::cluster::v2alpha::OutlierEjectionType Type) const {
+  const std::unique_ptr<SuccessRateMonitor>&
+  getSRMonitor(envoy::data::cluster::v2alpha::OutlierEjectionType Type) const {
     return success_rate_monitors_.at(Type);
   }
 
@@ -173,7 +182,8 @@ public:
     return getSRMonitor(type)->getSuccessRate();
   }
   void updateCurrentSuccessRateBucket();
-  void successRate(envoy::data::cluster::v2alpha::OutlierEjectionType type, double new_success_rate) {
+  void successRate(envoy::data::cluster::v2alpha::OutlierEjectionType type,
+                   double new_success_rate) {
     getSRMonitor(type)->setSuccessRate(new_success_rate);
   }
 
@@ -195,7 +205,9 @@ private:
   // counters for local origin failures
   std::atomic<uint32_t> consecutive_local_origin_failure_{0};
 
-  absl::flat_hash_map<envoy::data::cluster::v2alpha::OutlierEjectionType, std::unique_ptr<SuccessRateMonitor>> success_rate_monitors_;
+  absl::flat_hash_map<envoy::data::cluster::v2alpha::OutlierEjectionType,
+                      std::unique_ptr<SuccessRateMonitor>>
+      success_rate_monitors_;
 };
 
 /**
@@ -244,7 +256,9 @@ public:
   uint64_t successRateRequestVolume() const { return success_rate_request_volume_; }
   uint64_t successRateStdevFactor() const { return success_rate_stdev_factor_; }
   uint64_t enforcingConsecutive5xx() const { return enforcing_consecutive_5xx_; }
-  uint64_t enforcingConsecutiveGatewayFailure() const { return enforcing_consecutive_gateway_failure_; }
+  uint64_t enforcingConsecutiveGatewayFailure() const {
+    return enforcing_consecutive_gateway_failure_;
+  }
   uint64_t enforcingSuccessRate() const { return enforcing_success_rate_; }
   uint64_t consecutiveLocalOriginFailure() const { return consecutive_local_origin_failure_; }
   uint64_t enforcingConsecutiveLocalOriginFailure() const {
@@ -290,8 +304,8 @@ public:
 
   // Upstream::Outlier::Detector
   void addChangedStateCb(ChangeStateCb cb) override { callbacks_.push_back(cb); }
-  double
-  successRateAverage(envoy::data::cluster::v2alpha::OutlierEjectionType monitor_type) const override {
+  double successRateAverage(
+      envoy::data::cluster::v2alpha::OutlierEjectionType monitor_type) const override {
     return success_rate_nums_.at(monitor_type).success_rate_average_;
   }
   double successRateEjectionThreshold(
@@ -306,7 +320,7 @@ public:
    * @param success_rate_sum is the sum of the data in the success_rate_data vector.
    * @param valid_success_rate_hosts is the vector containing the individual success rate data
    *        points.
-   * @return EjectionPair 
+   * @return EjectionPair
    */
   struct EjectionPair {
     double success_rate_average_; // average success rate of all valid hosts in the cluster

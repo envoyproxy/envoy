@@ -42,7 +42,6 @@ enum class Result {
  */
 class DetectorHostMonitor {
 public:
-
   virtual ~DetectorHostMonitor() {}
 
   /**
