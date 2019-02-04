@@ -23,7 +23,7 @@ MaglevTable::MaglevTable(const HostsPerLocality& hosts_per_locality,
     }
   };
 
-  // Compute maximum host weight. If this is zero, we are doing unweighted Maglev.
+  // Compute maximum host weight.
   uint32_t max_host_weight = 0;
   uint32_t total_hosts = 0;
   for (uint32_t i = 0; i < hosts_per_locality.get().size(); ++i) {
@@ -46,8 +46,7 @@ MaglevTable::MaglevTable(const HostsPerLocality& hosts_per_locality,
       const std::string& address = host->address()->asString();
       table_build_entries.emplace_back(host, HashUtil::xxHash64(address) % table_size_,
                                        (HashUtil::xxHash64(address, 1) % (table_size_ - 1)) + 1,
-                                       max_host_weight > 0 ? effective_weight(host->weight(), i)
-                                                           : 0);
+                                       effective_weight(host->weight(), i));
     }
   }
 
@@ -57,18 +56,15 @@ MaglevTable::MaglevTable(const HostsPerLocality& hosts_per_locality,
   while (true) {
     for (uint64_t i = 0; i < table_build_entries.size(); i++) {
       TableBuildEntry& entry = table_build_entries[i];
-      // Only consider weight if we are doing weighted Maglev.
-      if (max_host_weight > 0) {
-        // Counts are in units of max_host_weight. To understand how counts_ and
-        // weight_ are used below, consider a host with weight equal to
-        // max_host_weight. This would be picked on every single iteration. If
-        // it had weight equal to backend_weight_scale / 3, then this would only
-        // happen every 3 iterations, etc.
-        if (iteration * entry.weight_ < entry.counts_) {
-          continue;
-        }
-        entry.counts_ += max_host_weight;
+      // Counts are in units of max_host_weight. To understand how counts_ and
+      // weight_ are used below, consider a host with weight equal to
+      // max_host_weight. This would be picked on every single iteration. If
+      // it had weight equal to backend_weight_scale / 3, then this would only
+      // happen every 3 iterations, etc.
+      if (iteration * entry.weight_ < entry.counts_) {
+        continue;
       }
+      entry.counts_ += max_host_weight;
       uint64_t c = permutation(entry);
       while (table_[c] != nullptr) {
         entry.next_++;
