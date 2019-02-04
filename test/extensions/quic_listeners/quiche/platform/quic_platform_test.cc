@@ -33,7 +33,7 @@ TEST(QuicPlatformTest, QuicArraysize) {
 enum class TestEnum { ZERO = 0, ONE, TWO, COUNT };
 
 TEST(QuicPlatformTest, QuicClientStats) {
-  // Just make sure they compiles.
+  // Just make sure they compile.
   QUIC_CLIENT_HISTOGRAM_ENUM("my.enum.histogram", TestEnum::ONE, TestEnum::COUNT, "doc");
   QUIC_CLIENT_HISTOGRAM_BOOL("my.bool.histogram", false, "doc");
   QUIC_CLIENT_HISTOGRAM_TIMES("my.timing.histogram", quic::QuicTime::Delta::FromSeconds(5),
