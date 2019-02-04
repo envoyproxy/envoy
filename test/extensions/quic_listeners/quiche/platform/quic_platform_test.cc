@@ -1,9 +1,11 @@
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
+
 #include "quiche/quic/platform/api/quic_aligned.h"
 #include "quiche/quic/platform/api/quic_arraysize.h"
 #include "quiche/quic/platform/api/quic_containers.h"
 #include "quiche/quic/platform/api/quic_endian.h"
 #include "quiche/quic/platform/api/quic_estimate_memory_usage.h"
+#include "quiche/quic/platform/api/quic_mutex.h"
 #include "quiche/quic/platform/api/quic_ptr_util.h"
 #include "quiche/quic/platform/api/quic_string.h"
 #include "quiche/quic/platform/api/quic_string_piece.h"
@@ -91,6 +93,27 @@ TEST(QuicPlatformTest, QuicPtrUtil) {
 
   p = quic::QuicWrapUnique(new quic::QuicString("aaa"));
   EXPECT_EQ("aaa", *p);
+}
+
+TEST(QuicPlatformTest, QuicMutex) {
+  quic::QuicMutex mu;
+
+  quic::QuicWriterMutexLock wmu(&mu);
+  mu.AssertReaderHeld();
+  mu.WriterUnlock();
+  {
+    quic::QuicReaderMutexLock rmu(&mu);
+    mu.AssertReaderHeld();
+  }
+  mu.WriterLock();
+}
+
+TEST(QuicPlatformTest, QuicNotification) {
+  quic::QuicNotification notification;
+  EXPECT_FALSE(notification.HasBeenNotified());
+  notification.Notify();
+  notification.WaitForNotification();
+  EXPECT_TRUE(notification.HasBeenNotified());
 }
 
 } // namespace Quiche

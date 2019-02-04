@@ -7,10 +7,10 @@
 #include "test/extensions/transport_sockets/tls/test_data/san_dns_cert_info.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "absl/time/time.h"
-#include "gtest/gtest.h"
 #include "openssl/x509v3.h"
 
 namespace Envoy {

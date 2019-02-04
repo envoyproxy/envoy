@@ -16,10 +16,10 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_base.h"
 
 #include "absl/types/optional.h"
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::NiceMock;
@@ -56,7 +56,7 @@ public:
   MOCK_METHOD1(check, void(HostSharedPtr host));
 };
 
-class OutlierDetectorImplTest : public testing::Test {
+class OutlierDetectorImplTest : public TestBase {
 public:
   OutlierDetectorImplTest() {
     ON_CALL(runtime_.snapshot_, featureEnabled("outlier_detection.enforcing_consecutive_5xx", 100))

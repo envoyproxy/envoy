@@ -447,6 +447,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
 }
 
 Http::FilterTrailersStatus Filter::decodeTrailers(Http::HeaderMap& trailers) {
+  ENVOY_STREAM_LOG(debug, "router decoding trailers:\n{}", *callbacks_, trailers);
   downstream_trailers_ = &trailers;
   upstream_request_->encodeTrailers(trailers);
   onRequestComplete();

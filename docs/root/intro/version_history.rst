@@ -7,6 +7,7 @@ Version history
 * admin: the admin server can now be accessed via HTTP/2 (prior knowledge).
 * buffer: fix vulnerabilities when allocation fails.
 * config: added support of using google.protobuf.Any in opaque configs for extensions.
+* config: logging warnings when deprecated fields are in use.
 * config: removed deprecated --v2-config-only from command line config.
 * config: removed deprecated_v1 sds_config from :ref:`Bootstrap config <config_overview_v2_bootstrap>`.
 * config: removed REST_LEGACY as a valid :ref:`ApiType <envoy_api_field_core.ApiConfigSource.api_type>`.
@@ -30,6 +31,8 @@ Version history
 * router: added ability to configure a :ref:`retry policy <envoy_api_msg_route.RetryPolicy>` at the
   virtual host level.
 * stats: added support for histograms in prometheus
+* stats: added usedonly flag to prometheus stats to only output metrics which have been
+  updated at least once.
 * tap: added new alpha :ref:`HTTP tap filter <config_http_filters_tap>`.
 * tls: enabled TLS 1.3 on the server-side (non-FIPS builds).
 * router: added per-route configuration of :ref:`internal redirects <envoy_api_field_route.RouteAction.internal_redirect_action>`.
