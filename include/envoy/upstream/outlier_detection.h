@@ -7,6 +7,7 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
+#include "envoy/data/cluster/v2alpha/outlier_detection_event.pb.h"
 
 #include "absl/types/optional.h"
 
@@ -41,8 +42,6 @@ enum class Result {
  */
 class DetectorHostMonitor {
 public:
-  // Types of Success Rate monitors.
-  using SuccessRateMonitorType = enum { externalOrigin, localOrigin };
 
   virtual ~DetectorHostMonitor() {}
 
@@ -84,7 +83,7 @@ public:
    *         -1 means that the host did not have enough request volume to calculate success rate
    *         or the cluster did not have enough hosts to run through success rate outlier ejection.
    */
-  virtual double successRate(SuccessRateMonitorType) const PURE;
+  virtual double successRate(envoy::data::cluster::v2alpha::OutlierEjectionType) const PURE;
 };
 
 typedef std::unique_ptr<DetectorHostMonitor> DetectorHostMonitorPtr;
@@ -114,7 +113,7 @@ public:
    * @return the average success rate, or -1 if there were not enough hosts with enough request
    *         volume to proceed with success rate based outlier ejection.
    */
-  virtual double successRateAverage(DetectorHostMonitor::SuccessRateMonitorType) const PURE;
+  virtual double successRateAverage(envoy::data::cluster::v2alpha::OutlierEjectionType) const PURE;
 
   /**
    * Returns the success rate threshold used in the last interval. The threshold is used to eject
@@ -123,18 +122,10 @@ public:
    *         proceed with success rate based outlier ejection.
    */
   virtual double
-      successRateEjectionThreshold(DetectorHostMonitor::SuccessRateMonitorType) const PURE;
+      successRateEjectionThreshold(envoy::data::cluster::v2alpha::OutlierEjectionType) const PURE;
 };
 
 typedef std::shared_ptr<Detector> DetectorSharedPtr;
-
-enum class EjectionType {
-  Consecutive5xx,
-  SuccessRateExternalOrigin,
-  ConsecutiveGatewayFailure,
-  ConsecutiveLocalOriginFailure,
-  SuccessRateLocalOrigin
-};
 
 /**
  * Sink for outlier detection event logs.
@@ -150,14 +141,15 @@ public:
    * @param type supplies the type of the event.
    * @param enforced is true if the ejection took place; false, if only logging took place.
    */
-  virtual void logEject(HostDescriptionConstSharedPtr host, Detector& detector, EjectionType type,
+  virtual void logEject(const HostDescriptionConstSharedPtr& host, Detector& detector,
+                        envoy::data::cluster::v2alpha::OutlierEjectionType type,
                         bool enforced) PURE;
 
   /**
    * Log an unejection event.
    * @param host supplies the host that generated the event.
    */
-  virtual void logUneject(HostDescriptionConstSharedPtr host) PURE;
+  virtual void logUneject(const HostDescriptionConstSharedPtr& host) PURE;
 };
 
 typedef std::shared_ptr<EventLogger> EventLoggerSharedPtr;

@@ -351,7 +351,7 @@ TEST_F(AccessLogImplTest, healthCheckTrue) {
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromJson(json), context_);
 
   Http::TestHeaderMapImpl header_map{};
-  stream_info_.hc_request_ = true;
+  stream_info_.health_check_request_ = true;
   EXPECT_CALL(*file_, write(_)).Times(0);
 
   log->log(&header_map, &response_headers_, &response_trailers_, stream_info_);
@@ -464,7 +464,7 @@ TEST_F(AccessLogImplTest, andFilter) {
   {
     EXPECT_CALL(*file_, write(_)).Times(0);
     Http::TestHeaderMapImpl header_map{};
-    stream_info_.hc_request_ = true;
+    stream_info_.health_check_request_ = true;
     log->log(&header_map, &response_headers_, &response_trailers_, stream_info_);
   }
 }
@@ -527,7 +527,7 @@ TEST_F(AccessLogImplTest, multipleOperators) {
   {
     EXPECT_CALL(*file_, write(_)).Times(0);
     Http::TestHeaderMapImpl header_map{};
-    stream_info_.hc_request_ = true;
+    stream_info_.health_check_request_ = true;
 
     log->log(&header_map, &response_headers_, &response_trailers_, stream_info_);
   }
@@ -881,6 +881,29 @@ filter:
     flags:
       - UnsupportedFlag
 config:
+  path: /dev/null
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_),
+      ProtoValidationException,
+      "Proto constraint validation failed (AccessLogFilterValidationError.ResponseFlagFilter: "
+      "[\"embedded message failed validation\"] | caused by "
+      "ResponseFlagFilterValidationError.Flags[i]: [\"value must be in list \" [\"LH\" \"UH\" "
+      "\"UT\" \"LR\" \"UR\" \"UF\" \"UC\" \"UO\" \"NR\" \"DI\" \"FI\" \"RL\" \"UAEX\" \"RLSE\" "
+      "\"DC\" \"URX\"]]): "
+      "response_flag_filter {\n  flags: \"UnsupportedFlag\"\n}\n");
+}
+
+TEST_F(AccessLogImplTest, ValidateTypedConfig) {
+  const std::string yaml = R"EOF(
+name: envoy.file_access_log
+filter:
+  response_flag_filter:
+    flags:
+      - UnsupportedFlag
+typed_config:
+  "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
   path: /dev/null
   )EOF";
 

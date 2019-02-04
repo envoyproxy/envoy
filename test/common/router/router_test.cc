@@ -20,6 +20,7 @@
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/ssl/mocks.h"
+#include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/printers.h"
@@ -183,6 +184,28 @@ public:
     router_.onDestroy();
   }
 
+  void sendRequest(bool end_stream = true) {
+    if (end_stream) {
+      EXPECT_CALL(callbacks_.dispatcher_, createTimer_(_)).Times(1);
+    }
+    EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+        .WillOnce(Invoke(
+            [&](Http::StreamDecoder& decoder,
+                Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
+              response_decoder_ = &decoder;
+              callbacks.onPoolReady(original_encoder_, cm_.conn_pool_.host_);
+              return nullptr;
+            }));
+    HttpTestUtility::addDefaultHeaders(default_request_headers_);
+    router_.decodeHeaders(default_request_headers_, end_stream);
+  }
+
+  void enableRedirects() {
+    ON_CALL(callbacks_.route_->route_entry_, internalRedirectAction())
+        .WillByDefault(Return(InternalRedirectAction::Handle));
+    ON_CALL(callbacks_, connection()).WillByDefault(Return(&connection_));
+  }
+
   DangerousDeprecatedTestTime test_time_;
   std::string upstream_zone_{"to_az"};
   envoy::api::v2::core::Locality upstream_locality_;
@@ -201,11 +224,21 @@ public:
   Event::MockTimer* per_try_timeout_{};
   Network::Address::InstanceConstSharedPtr host_address_{
       Network::Utility::resolveUrl("tcp://10.0.0.5:9211")};
+  NiceMock<Http::MockStreamEncoder> original_encoder_;
+  NiceMock<Http::MockStreamEncoder> second_encoder_;
+  NiceMock<Network::MockConnection> connection_;
+  Http::StreamDecoder* response_decoder_ = nullptr;
+  Http::TestHeaderMapImpl default_request_headers_{};
+  Http::HeaderMapPtr redirect_headers_{
+      new Http::TestHeaderMapImpl{{":status", "302"}, {"location", "http://www.foo.com"}}};
+  NiceMock<Tracing::MockSpan> span_;
 };
 
 class RouterTest : public RouterTestBase {
 public:
-  RouterTest() : RouterTestBase(false, false) { EXPECT_CALL(callbacks_, activeSpan()).Times(0); }
+  RouterTest() : RouterTestBase(false, false) {
+    EXPECT_CALL(callbacks_, activeSpan()).WillRepeatedly(ReturnRef(span_));
+  };
 };
 
 class RouterTestSuppressEnvoyHeaders : public RouterTestBase {
@@ -277,6 +310,7 @@ TEST_F(RouterTest, Http1Upstream) {
   Http::TestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
   EXPECT_CALL(callbacks_.route_->route_entry_, finalizeRequestHeaders(_, _, true));
+  EXPECT_CALL(span_, injectContext(_));
   router_.decodeHeaders(headers, true);
   EXPECT_EQ("10", headers.get_("x-envoy-expected-rq-timeout-ms"));
 
@@ -318,6 +352,7 @@ TEST_F(RouterTest, Http2Upstream) {
 
   Http::TestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
+  EXPECT_CALL(span_, injectContext(_));
   router_.decodeHeaders(headers, true);
 
   // When the router filter gets reset we should cancel the pool request.
@@ -670,6 +705,7 @@ TEST_F(RouterTest, MaintenanceMode) {
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
   EXPECT_CALL(callbacks_, encodeData(_, true));
   EXPECT_CALL(callbacks_.stream_info_, setResponseFlag(StreamInfo::ResponseFlag::UpstreamOverflow));
+  EXPECT_CALL(span_, injectContext(_)).Times(0);
 
   Http::TestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
@@ -1683,7 +1719,8 @@ TEST_F(RouterTest, RetryUpstream5xxNotComplete) {
 
   Buffer::InstancePtr body_data(new Buffer::OwnedImpl("hello"));
   EXPECT_CALL(*router_.retry_state_, enabled()).WillOnce(Return(true));
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, router_.decodeData(*body_data, false));
+  EXPECT_CALL(callbacks_, addDecodedData(_, true));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, router_.decodeData(*body_data, false));
 
   Http::TestHeaderMapImpl trailers{{"some", "trailer"}};
   router_.decodeTrailers(trailers);
@@ -1809,7 +1846,8 @@ TEST_F(RouterTest, RetryRespsectsMaxHostSelectionCount) {
 
   Buffer::InstancePtr body_data(new Buffer::OwnedImpl("hello"));
   EXPECT_CALL(*router_.retry_state_, enabled()).WillOnce(Return(true));
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, router_.decodeData(*body_data, false));
+  EXPECT_CALL(callbacks_, addDecodedData(_, true));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, router_.decodeData(*body_data, false));
 
   Http::TestHeaderMapImpl trailers{{"some", "trailer"}};
   router_.decodeTrailers(trailers);
@@ -1875,7 +1913,8 @@ TEST_F(RouterTest, RetryRespectsRetryHostPredicate) {
 
   Buffer::InstancePtr body_data(new Buffer::OwnedImpl("hello"));
   EXPECT_CALL(*router_.retry_state_, enabled()).WillOnce(Return(true));
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, router_.decodeData(*body_data, false));
+  EXPECT_CALL(callbacks_, addDecodedData(_, true));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, router_.decodeData(*body_data, false));
 
   Http::TestHeaderMapImpl trailers{{"some", "trailer"}};
   router_.decodeTrailers(trailers);
@@ -1915,6 +1954,137 @@ TEST_F(RouterTest, RetryRespectsRetryHostPredicate) {
   EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
 }
 
+TEST_F(RouterTest, InternalRedirectRejectedOnSecondPass) {
+  enableRedirects();
+  default_request_headers_.insertEnvoyOriginalUrl().value(std::string("http://www.foo.com"));
+  sendRequest();
+
+  response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
+
+  Buffer::OwnedImpl data("1234567890");
+  response_decoder_->decodeData(data, true);
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_internal_redirect_failed_total")
+                    .value());
+}
+
+TEST_F(RouterTest, InternalRedirectRejectedWithEmptyLocation) {
+  enableRedirects();
+  sendRequest();
+
+  redirect_headers_->insertLocation().value(std::string(""));
+  response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
+
+  Buffer::OwnedImpl data("1234567890");
+  response_decoder_->decodeData(data, true);
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_internal_redirect_failed_total")
+                    .value());
+}
+
+TEST_F(RouterTest, InternalRedirectRejectedWithInvalidLocation) {
+  enableRedirects();
+  sendRequest();
+
+  redirect_headers_->insertLocation().value(std::string("h"));
+  response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
+
+  Buffer::OwnedImpl data("1234567890");
+  response_decoder_->decodeData(data, true);
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_internal_redirect_failed_total")
+                    .value());
+}
+
+TEST_F(RouterTest, InternalRedirectRejectedWithoutCompleteRequest) {
+  enableRedirects();
+
+  sendRequest(false);
+
+  response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
+
+  Buffer::OwnedImpl data("1234567890");
+  response_decoder_->decodeData(data, true);
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_internal_redirect_failed_total")
+                    .value());
+}
+
+TEST_F(RouterTest, InternalRedirectRejectedWithoutLocation) {
+  enableRedirects();
+
+  sendRequest();
+
+  redirect_headers_->removeLocation();
+  response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
+  Buffer::OwnedImpl data("1234567890");
+  response_decoder_->decodeData(data, true);
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_internal_redirect_failed_total")
+                    .value());
+}
+
+TEST_F(RouterTest, InternalRedirectRejectedWithBody) {
+  enableRedirects();
+
+  sendRequest();
+
+  EXPECT_CALL(callbacks_, decodingBuffer()).Times(1);
+  response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
+  Buffer::OwnedImpl data("1234567890");
+  response_decoder_->decodeData(data, true);
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_internal_redirect_failed_total")
+                    .value());
+}
+
+TEST_F(RouterTest, InternalRedirectRejectedWithCrossSchemeRedirect) {
+  enableRedirects();
+
+  sendRequest();
+
+  redirect_headers_->insertLocation().value(std::string("https://www.foo.com"));
+  response_decoder_->decodeHeaders(std::move(redirect_headers_), true);
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_internal_redirect_failed_total")
+                    .value());
+}
+
+TEST_F(RouterTest, HttpInternalRedirectSucceeded) {
+  enableRedirects();
+  default_request_headers_.insertForwardedProto().value(std::string("http"));
+  sendRequest();
+
+  EXPECT_CALL(callbacks_, decodingBuffer()).Times(1);
+  EXPECT_CALL(callbacks_, recreateStream()).Times(1).WillOnce(Return(true));
+  response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_internal_redirect_succeeded_total")
+                    .value());
+
+  // In production, the HCM recreateStream would have called this.
+  router_.onDestroy();
+}
+
+TEST_F(RouterTest, HttpsInternalRedirectSucceeded) {
+  Ssl::MockConnection ssl_connection;
+  enableRedirects();
+
+  sendRequest();
+
+  redirect_headers_->insertLocation().value(std::string("https://www.foo.com"));
+  EXPECT_CALL(connection_, ssl()).Times(1).WillOnce(Return(&ssl_connection));
+  EXPECT_CALL(callbacks_, decodingBuffer()).Times(1);
+  EXPECT_CALL(callbacks_, recreateStream()).Times(1).WillOnce(Return(true));
+  response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_internal_redirect_succeeded_total")
+                    .value());
+
+  // In production, the HCM recreateStream would have called this.
+  router_.onDestroy();
+}
+
 TEST_F(RouterTest, Shadow) {
   callbacks_.route_->route_entry_.shadow_policy_.cluster_ = "foo";
   callbacks_.route_->route_entry_.shadow_policy_.runtime_key_ = "bar";
@@ -1938,7 +2108,8 @@ TEST_F(RouterTest, Shadow) {
   router_.decodeHeaders(headers, false);
 
   Buffer::InstancePtr body_data(new Buffer::OwnedImpl("hello"));
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, router_.decodeData(*body_data, false));
+  EXPECT_CALL(callbacks_, addDecodedData(_, true));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, router_.decodeData(*body_data, false));
 
   Http::TestHeaderMapImpl trailers{{"some", "trailer"}};
   EXPECT_CALL(callbacks_, decodingBuffer())
@@ -2047,6 +2218,7 @@ TEST_F(RouterTest, DirectResponse) {
 
   Http::TestHeaderMapImpl response_headers{{":status", "200"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
+  EXPECT_CALL(span_, injectContext(_)).Times(0);
   Http::TestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
   router_.decodeHeaders(headers, true);

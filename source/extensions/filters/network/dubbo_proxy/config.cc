@@ -10,7 +10,7 @@ namespace NetworkFilters {
 namespace DubboProxy {
 
 Network::FilterFactoryCb DubboProxyFilterConfigFactory::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::network::dubbo_proxy::v2alpha1::DubboProxy& proto_config,
+    const envoy::config::filter::network::dubbo_proxy::v2alpha1::DubboProxy& proto_config,
     Server::Configuration::FactoryContext& context) {
   ASSERT(!proto_config.stat_prefix().empty());
 
@@ -26,9 +26,8 @@ Network::FilterFactoryCb DubboProxyFilterConfigFactory::createFilterFactoryFromP
 /**
  * Static registration for the dubbo filter. @see RegisterFactory.
  */
-static Registry::RegisterFactory<DubboProxyFilterConfigFactory,
-                                 Server::Configuration::NamedNetworkFilterConfigFactory>
-    registered_;
+REGISTER_FACTORY(DubboProxyFilterConfigFactory,
+                 Server::Configuration::NamedNetworkFilterConfigFactory);
 
 } // namespace DubboProxy
 } // namespace NetworkFilters

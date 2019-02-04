@@ -47,20 +47,6 @@ private:
 };
 
 /**
- * Utilities for the HTTP connection manager that facilitate testing.
- */
-class HttpConnectionManagerConfigUtility {
-public:
-  /**
-   * Determine the next protocol to used based both on ALPN as well as protocol inspection.
-   * @param connection supplies the connection to determine a protocol for.
-   * @param data supplies the currently available read data on the connection.
-   */
-  static std::string determineNextProtocol(Network::Connection& connection,
-                                           const Buffer::Instance& data);
-};
-
-/**
  * Determines if an address is internal based on user provided config.
  */
 class InternalAddressConfig : public Http::InternalAddressConfig {
@@ -115,6 +101,7 @@ public:
   FilterChainFactory& filterFactory() override { return *this; }
   bool reverseEncodeOrder() override { return reverse_encode_order_; }
   bool generateRequestId() override { return generate_request_id_; }
+  uint32_t maxRequestHeadersSizeKb() const override { return max_request_headers_size_kb_; }
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
   std::chrono::milliseconds streamIdleTimeout() const override { return stream_idle_timeout_; }
   std::chrono::milliseconds requestTimeout() const override { return request_timeout_; }
@@ -171,6 +158,7 @@ private:
   std::string server_name_;
   Http::TracingConnectionManagerConfigPtr tracing_config_;
   absl::optional<std::string> user_agent_;
+  uint32_t max_request_headers_size_kb_;
   absl::optional<std::chrono::milliseconds> idle_timeout_;
   std::chrono::milliseconds stream_idle_timeout_;
   std::chrono::milliseconds request_timeout_;

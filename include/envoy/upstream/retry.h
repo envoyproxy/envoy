@@ -1,12 +1,10 @@
 #pragma once
 
+#include "envoy/upstream/types.h"
 #include "envoy/upstream/upstream.h"
 
 namespace Envoy {
 namespace Upstream {
-
-// Redeclare this here in order to get around cyclical dependencies.
-typedef std::vector<uint32_t> PriorityLoad;
 
 /**
  * Used to optionally modify the PriorityLoad when selecting a priority for
@@ -23,12 +21,14 @@ public:
    * Determines what PriorityLoad to use.
    *
    * @param priority_set current priority set of cluster.
-   * @param original_priority the unmodified PriorityLoad.
-   * @return a reference to the PriorityLoad to use. Return original_priority if no changes should
-   * be made.
+   * @param original_priority_load the unmodified HealthAndDegradedLoad.
+   * @return HealthAndDegradedLoad load that should be used for the next retry. Return
+   * original_priority_load if the original load should be used. a pointer to original_priority,
+   * original_degraded_priority if no changes should be made.
    */
-  virtual const PriorityLoad& determinePriorityLoad(const PrioritySet& priority_set,
-                                                    const PriorityLoad& original_priority) PURE;
+  virtual const HealthyAndDegradedLoad&
+  determinePriorityLoad(const PrioritySet& priority_set,
+                        const HealthyAndDegradedLoad& original_priority_load) PURE;
 
   /**
    * Called after a host has been attempted but before host selection for the next attempt has

@@ -18,8 +18,15 @@ envoy_cc_mock(
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
     deps = [
+        "//source/common/protobuf:utility_lib",
+        "//source/extensions/filters/network/dubbo_proxy:decoder_events_lib",
         "//source/extensions/filters/network/dubbo_proxy:deserializer_interface",
         "//source/extensions/filters/network/dubbo_proxy:protocol_interface",
+        "//source/extensions/filters/network/dubbo_proxy/filters:factory_base_lib",
+        "//source/extensions/filters/network/dubbo_proxy/filters:filter_interface",
+        "//source/extensions/filters/network/dubbo_proxy/router:router_interface",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:printers_lib",
     ],
 )
@@ -97,5 +104,17 @@ envoy_extension_cc_test(
     extension_name = "envoy.filters.network.dubbo_proxy",
     deps = [
         "//source/extensions/filters/network/dubbo_proxy:metadata_lib",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "route_matcher_test",
+    srcs = ["route_matcher_test.cc"],
+    extension_name = "envoy.filters.network.dubbo_proxy",
+    deps = [
+        "//source/extensions/filters/network/dubbo_proxy:metadata_lib",
+        "//source/extensions/filters/network/dubbo_proxy/router:router_matcher",
+        "//test/mocks/server:server_mocks",
+        "@envoy_api//envoy/config/filter/network/dubbo_proxy/v2alpha1:dubbo_proxy_cc",
     ],
 )

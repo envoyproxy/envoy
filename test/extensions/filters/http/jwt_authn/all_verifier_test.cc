@@ -29,7 +29,7 @@ public:
 
   JwtAuthentication proto_config_;
   FilterConfigSharedPtr filter_config_;
-  VerifierPtr verifier_;
+  VerifierConstPtr verifier_;
   NiceMock<Server::Configuration::MockFactoryContext> mock_factory_ctx_;
   ContextSharedPtr context_;
   MockVerifierCallbacks mock_cb_;

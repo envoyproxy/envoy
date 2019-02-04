@@ -36,7 +36,7 @@ inline test::fuzz::Headers toHeaders(const Http::HeaderMap& headers) {
 inline TestStreamInfo fromStreamInfo(const test::fuzz::StreamInfo& stream_info) {
   TestStreamInfo test_stream_info;
   test_stream_info.metadata_ = stream_info.dynamic_metadata();
-  // libc++ clocks don't track at nanosecond on OS X.
+  // libc++ clocks don't track at nanosecond on macOS.
   const auto start_time =
       std::numeric_limits<std::chrono::nanoseconds::rep>::max() < stream_info.start_time()
           ? 0

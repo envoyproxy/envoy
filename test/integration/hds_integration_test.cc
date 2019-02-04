@@ -167,9 +167,9 @@ public:
     health_check->mutable_health_checks(0)->mutable_interval()->set_seconds(MaxTimeout);
     health_check->mutable_health_checks(0)->mutable_unhealthy_threshold()->set_value(2);
     health_check->mutable_health_checks(0)->mutable_healthy_threshold()->set_value(2);
-    auto* tcp_hc = health_check->mutable_health_checks(0)->mutable_tcp_health_check();
-    tcp_hc->mutable_send()->set_text("50696E67");
-    tcp_hc->add_receive()->set_text("506F6E67");
+    auto* tcp_health_check = health_check->mutable_health_checks(0)->mutable_tcp_health_check();
+    tcp_health_check->mutable_send()->set_text("50696E67");
+    tcp_health_check->add_receive()->set_text("506F6E67");
 
     return server_health_check_specifier_;
   }
@@ -229,9 +229,9 @@ public:
   envoy::service::discovery::v2::HealthCheckSpecifier server_health_check_specifier_;
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, HdsIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, HdsIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 // Tests Envoy HTTP health checking a single healthy endpoint and reporting that it is
 // indeed healthy to the server.
@@ -294,7 +294,7 @@ TEST_P(HdsIntegrationTest, SingleEndpointTimeoutHttp) {
   // Envoy sends a health check message to an endpoint
   healthcheckEndpoints();
 
-  // Endpoint doesn't repond to the health check
+  // Endpoint doesn't respond to the health check
 
   // Receive updates until the one we expect arrives
   waitForEndpointHealthResponse(envoy::api::v2::core::HealthStatus::TIMEOUT);
@@ -469,7 +469,7 @@ TEST_P(HdsIntegrationTest, TwoEndpointsSameLocality) {
 
   healthcheckEndpoints("anna");
 
-  // Endpoints repond to the health check
+  // Endpoints respond to the health check
   host_stream_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "404"}}, false);
   host_stream_->encodeData(1024, true);
   host2_stream_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);

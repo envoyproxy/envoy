@@ -2,7 +2,6 @@ syntax = "proto3";
 
 package envoy.admin.v2alpha;
 option java_package = "io.envoyproxy.envoy.admin.v2alpha";
-option java_multiple_files = true;
 
 import "envoy/admin/v2alpha/metrics.proto";
 import "envoy/api/v2/core/address.proto";

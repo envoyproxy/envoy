@@ -3,14 +3,15 @@
 #include <memory>
 #include <string>
 
-#include "envoy/config/transport_socket/capture/v2alpha/capture.pb.h"
-#include "envoy/data/tap/v2alpha/capture.pb.h"
+#include "envoy/config/transport_socket/tap/v2alpha/tap.pb.h"
+#include "envoy/data/tap/v2alpha/wrapper.pb.h"
 
 #include "common/event/dispatcher_impl.h"
 #include "common/network/connection_impl.h"
 #include "common/network/utility.h"
-#include "common/ssl/context_config_impl.h"
-#include "common/ssl/context_manager_impl.h"
+
+#include "extensions/transport_sockets/tls/context_config_impl.h"
+#include "extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"
@@ -34,7 +35,8 @@ void SslIntegrationTestBase::initialize() {
                                   .setExpectClientEcdsaCert(client_ecdsa_cert_));
   HttpIntegrationTest::initialize();
 
-  context_manager_ = std::make_unique<ContextManagerImpl>(timeSystem());
+  context_manager_ =
+      std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(timeSystem());
 
   registerTestServerPorts({"http"});
 }
@@ -62,7 +64,7 @@ SslIntegrationTestBase::makeSslClientConnection(const ClientSslTransportOptions&
     RELEASE_ASSERT(::system(s_client_cmd.c_str()) == 0, "");
   }
   auto client_transport_socket_factory_ptr =
-      createClientSslTransportSocketFactory(options, *context_manager_);
+      createClientSslTransportSocketFactory(options, *context_manager_, *api_);
   return dispatcher_->createClientConnection(
       address, Network::Address::InstanceConstSharedPtr(),
       client_transport_socket_factory_ptr->createTransportSocket({}), nullptr);
@@ -75,9 +77,9 @@ void SslIntegrationTestBase::checkStats() {
   counter->reset();
 }
 
-INSTANTIATE_TEST_CASE_P(IpVersions, SslIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, SslIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(SslIntegrationTest, RouterRequestAndResponseWithGiantBodyBuffer) {
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
@@ -127,7 +129,7 @@ TEST_P(SslIntegrationTest, RouterHeaderOnlyRequestAndResponse) {
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection({});
   };
-  testRouterHeaderOnlyRequestAndResponse(true, &creator);
+  testRouterHeaderOnlyRequestAndResponse(&creator);
   checkStats();
 }
 
@@ -149,7 +151,7 @@ TEST_P(SslIntegrationTest, RouterDownstreamDisconnectBeforeRequestComplete) {
 
 TEST_P(SslIntegrationTest, RouterDownstreamDisconnectBeforeResponseComplete) {
 #ifdef __APPLE__
-  // Skip this test on OS X: we can't detect the early close on OS X, and we
+  // Skip this test on macOS: we can't detect the early close on macOS, and we
   // won't clean up the upstream connection until it times out. See #4294.
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
     return;
@@ -220,7 +222,7 @@ public:
   const envoy::api::v2::auth::TlsParameters_TlsProtocol tls_version_{std::get<1>(GetParam())};
 };
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     IpVersionsClientVersions, SslCertficateIntegrationTest,
     testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                      testing::Values(envoy::api::v2::auth::TlsParameters::TLSv1_2,
@@ -278,8 +280,9 @@ TEST_P(SslCertficateIntegrationTest, ServerEcdsaClientRsaOnly) {
   initialize();
   auto codec_client = makeRawHttpConnection(makeSslClientConnection(rsaOnlyClientOptions()));
   EXPECT_FALSE(codec_client->connected());
-  Stats::CounterSharedPtr counter =
-      test_server_->counter(listenerStatPrefix("ssl.connection_error"));
+  const std::string counter_name = listenerStatPrefix("ssl.connection_error");
+  Stats::CounterSharedPtr counter = test_server_->counter(counter_name);
+  test_server_->waitForCounterGe(counter_name, 1);
   EXPECT_EQ(1U, counter->value());
   counter->reset();
 }
@@ -303,8 +306,9 @@ TEST_P(SslCertficateIntegrationTest, ServerRsaClientEcdsaOnly) {
   initialize();
   EXPECT_FALSE(
       makeRawHttpConnection(makeSslClientConnection(ecdsaOnlyClientOptions()))->connected());
-  Stats::CounterSharedPtr counter =
-      test_server_->counter(listenerStatPrefix("ssl.connection_error"));
+  const std::string counter_name = listenerStatPrefix("ssl.connection_error");
+  Stats::CounterSharedPtr counter = test_server_->counter(counter_name);
+  test_server_->waitForCounterGe(counter_name, 1);
   EXPECT_EQ(1U, counter->value());
   counter->reset();
 }
@@ -333,9 +337,12 @@ TEST_P(SslCertficateIntegrationTest, ServerRsaEcdsaClientEcdsaOnly) {
   checkStats();
 }
 
-class SslCaptureIntegrationTest : public SslIntegrationTest {
+// TODO(mattklein123): Move this into a dedicated integration test for the tap transport socket as
+// well as add more tests.
+class SslTapIntegrationTest : public SslIntegrationTest {
 public:
   void initialize() override {
+    // TODO(mattklein123): Merge/use the code in ConfigHelper::setTapTransportSocket().
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
       auto* filter_chain =
           bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
@@ -343,17 +350,26 @@ public:
       envoy::api::v2::core::TransportSocket ssl_transport_socket;
       ssl_transport_socket.set_name("tls");
       MessageUtil::jsonConvert(filter_chain->tls_context(), *ssl_transport_socket.mutable_config());
-      // Configure outer capture transport socket.
+      // Configure outer tap transport socket.
       auto* transport_socket = filter_chain->mutable_transport_socket();
-      transport_socket->set_name("envoy.transport_sockets.capture");
-      envoy::config::transport_socket::capture::v2alpha::Capture capture_config;
-      auto* file_sink = capture_config.mutable_file_sink();
+      transport_socket->set_name("envoy.transport_sockets.tap");
+      envoy::config::transport_socket::tap::v2alpha::Tap tap_config;
+      tap_config.mutable_common_config()
+          ->mutable_static_config()
+          ->mutable_match_config()
+          ->set_any_match(true);
+      auto* file_sink = tap_config.mutable_common_config()
+                            ->mutable_static_config()
+                            ->mutable_output_config()
+                            ->mutable_sinks()
+                            ->Add()
+                            ->mutable_file_per_tap();
       file_sink->set_path_prefix(path_prefix_);
-      file_sink->set_format(
-          text_format_ ? envoy::config::transport_socket::capture::v2alpha::FileSink::PROTO_TEXT
-                       : envoy::config::transport_socket::capture::v2alpha::FileSink::PROTO_BINARY);
-      capture_config.mutable_transport_socket()->MergeFrom(ssl_transport_socket);
-      MessageUtil::jsonConvert(capture_config, *transport_socket->mutable_config());
+      file_sink->set_format(text_format_
+                                ? envoy::service::tap::v2alpha::FilePerTapSink::PROTO_TEXT
+                                : envoy::service::tap::v2alpha::FilePerTapSink::PROTO_BINARY);
+      tap_config.mutable_transport_socket()->MergeFrom(ssl_transport_socket);
+      MessageUtil::jsonConvert(tap_config, *transport_socket->mutable_config());
       // Nuke TLS context from legacy location.
       filter_chain->clear_tls_context();
       // Rest of TLS initialization.
@@ -367,12 +383,12 @@ public:
   bool text_format_{};
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, SslCaptureIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, SslTapIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 // Validate two back-to-back requests with binary proto output.
-TEST_P(SslCaptureIntegrationTest, TwoRequestsWithBinaryProto) {
+TEST_P(SslTapIntegrationTest, TwoRequestsWithBinaryProto) {
   initialize();
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection({});
@@ -400,15 +416,19 @@ TEST_P(SslCaptureIntegrationTest, TwoRequestsWithBinaryProto) {
                                              expected_remote_address);
   codec_client_->close();
   test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
-  envoy::data::tap::v2alpha::Trace trace;
-  MessageUtil::loadFromFile(fmt::format("{}_{}.pb", path_prefix_, first_id), trace);
+  envoy::data::tap::v2alpha::BufferedTraceWrapper trace;
+  MessageUtil::loadFromFile(fmt::format("{}_{}.pb", path_prefix_, first_id), trace, *api_);
   // Validate general expected properties in the trace.
-  EXPECT_EQ(first_id, trace.connection().id());
-  EXPECT_THAT(expected_local_address, ProtoEq(trace.connection().local_address()));
-  EXPECT_THAT(expected_remote_address, ProtoEq(trace.connection().remote_address()));
-  ASSERT_GE(trace.events().size(), 2);
-  EXPECT_TRUE(absl::StartsWith(trace.events(0).read().data(), "POST /test/long/url HTTP/1.1"));
-  EXPECT_TRUE(absl::StartsWith(trace.events(1).write().data(), "HTTP/1.1 200 OK"));
+  EXPECT_EQ(first_id, trace.socket_buffered_trace().connection().id());
+  EXPECT_THAT(expected_local_address,
+              ProtoEq(trace.socket_buffered_trace().connection().local_address()));
+  EXPECT_THAT(expected_remote_address,
+              ProtoEq(trace.socket_buffered_trace().connection().remote_address()));
+  ASSERT_GE(trace.socket_buffered_trace().events().size(), 2);
+  EXPECT_TRUE(absl::StartsWith(trace.socket_buffered_trace().events(0).read().data(),
+                               "POST /test/long/url HTTP/1.1"));
+  EXPECT_TRUE(
+      absl::StartsWith(trace.socket_buffered_trace().events(1).write().data(), "HTTP/1.1 200 OK"));
 
   // Verify a second request hits a different file.
   const uint64_t second_id = Network::ConnectionImpl::nextGlobalIdForTest() + 1;
@@ -426,16 +446,18 @@ TEST_P(SslCaptureIntegrationTest, TwoRequestsWithBinaryProto) {
   checkStats();
   codec_client_->close();
   test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 2);
-  MessageUtil::loadFromFile(fmt::format("{}_{}.pb", path_prefix_, second_id), trace);
+  MessageUtil::loadFromFile(fmt::format("{}_{}.pb", path_prefix_, second_id), trace, *api_);
   // Validate second connection ID.
-  EXPECT_EQ(second_id, trace.connection().id());
-  ASSERT_GE(trace.events().size(), 2);
-  EXPECT_TRUE(absl::StartsWith(trace.events(0).read().data(), "GET /test/long/url HTTP/1.1"));
-  EXPECT_TRUE(absl::StartsWith(trace.events(1).write().data(), "HTTP/1.1 200 OK"));
+  EXPECT_EQ(second_id, trace.socket_buffered_trace().connection().id());
+  ASSERT_GE(trace.socket_buffered_trace().events().size(), 2);
+  EXPECT_TRUE(absl::StartsWith(trace.socket_buffered_trace().events(0).read().data(),
+                               "GET /test/long/url HTTP/1.1"));
+  EXPECT_TRUE(
+      absl::StartsWith(trace.socket_buffered_trace().events(1).write().data(), "HTTP/1.1 200 OK"));
 }
 
 // Validate a single request with text proto output.
-TEST_P(SslCaptureIntegrationTest, RequestWithTextProto) {
+TEST_P(SslTapIntegrationTest, RequestWithTextProto) {
   text_format_ = true;
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection({});
@@ -445,11 +467,13 @@ TEST_P(SslCaptureIntegrationTest, RequestWithTextProto) {
   checkStats();
   codec_client_->close();
   test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
-  envoy::data::tap::v2alpha::Trace trace;
-  MessageUtil::loadFromFile(fmt::format("{}_{}.pb_text", path_prefix_, id), trace);
+  envoy::data::tap::v2alpha::BufferedTraceWrapper trace;
+  MessageUtil::loadFromFile(fmt::format("{}_{}.pb_text", path_prefix_, id), trace, *api_);
   // Test some obvious properties.
-  EXPECT_TRUE(absl::StartsWith(trace.events(0).read().data(), "POST /test/long/url HTTP/1.1"));
-  EXPECT_TRUE(absl::StartsWith(trace.events(1).write().data(), "HTTP/1.1 200 OK"));
+  EXPECT_TRUE(absl::StartsWith(trace.socket_buffered_trace().events(0).read().data(),
+                               "POST /test/long/url HTTP/1.1"));
+  EXPECT_TRUE(
+      absl::StartsWith(trace.socket_buffered_trace().events(1).write().data(), "HTTP/1.1 200 OK"));
 }
 
 } // namespace Ssl

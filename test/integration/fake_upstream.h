@@ -404,7 +404,7 @@ public:
                      Event::TestTimeSystem& time_system);
 
   // By default waitForNewStream assumes the next event is a new stream and
-  // returns AssertionFaliure if an unexpected event occurs. If a caller truly
+  // returns AssertionFailure if an unexpected event occurs. If a caller truly
   // wishes to wait for a new stream, set ignore_spurious_events = true. Returns
   // the new stream via the stream argument.
   ABSL_MUST_USE_RESULT
@@ -414,7 +414,7 @@ public:
                    std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   // Http::ServerConnectionCallbacks
-  Http::StreamDecoder& newStream(Http::StreamEncoder& response_encoder) override;
+  Http::StreamDecoder& newStream(Http::StreamEncoder& response_encoder, bool) override;
   void onGoAway() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
 private:

@@ -152,6 +152,35 @@ TEST_F(HttpConnectionManagerConfigTest, UnixSocketInternalAddress) {
   EXPECT_FALSE(config.internalAddressConfig().isInternalAddress(externalIpAddress));
 }
 
+TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersSizeDefault) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_);
+  EXPECT_EQ(60, config.maxRequestHeadersSizeKb());
+}
+
+TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersSizeConfigured) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  max_request_headers_kb: 16
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_);
+  EXPECT_EQ(16, config.maxRequestHeadersSizeKb());
+}
+
 // Validated that an explicit zero stream idle timeout disables.
 TEST_F(HttpConnectionManagerConfigTest, DisabledStreamIdleTimeout) {
   const std::string yaml_string = R"EOF(
@@ -244,50 +273,6 @@ TEST_F(HttpConnectionManagerConfigTest, SingleDateProvider) {
   EXPECT_CALL(context_.thread_local_, allocateSlot());
   Network::FilterFactoryCb cb1 = factory.createFilterFactory(*json_config, context_);
   Network::FilterFactoryCb cb2 = factory.createFilterFactory(*json_config, context_);
-}
-
-TEST(HttpConnectionManagerConfigUtilityTest, DetermineNextProtocol) {
-  {
-    Network::MockConnection connection;
-    EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return("hello"));
-    Buffer::OwnedImpl data("");
-    EXPECT_EQ("hello", HttpConnectionManagerConfigUtility::determineNextProtocol(connection, data));
-  }
-
-  {
-    Network::MockConnection connection;
-    EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return(""));
-    Buffer::OwnedImpl data("");
-    EXPECT_EQ("", HttpConnectionManagerConfigUtility::determineNextProtocol(connection, data));
-  }
-
-  {
-    Network::MockConnection connection;
-    EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return(""));
-    Buffer::OwnedImpl data("GET / HTTP/1.1");
-    EXPECT_EQ("", HttpConnectionManagerConfigUtility::determineNextProtocol(connection, data));
-  }
-
-  {
-    Network::MockConnection connection;
-    EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return(""));
-    Buffer::OwnedImpl data("PRI * HTTP/2.0\r\n");
-    EXPECT_EQ("h2", HttpConnectionManagerConfigUtility::determineNextProtocol(connection, data));
-  }
-
-  {
-    Network::MockConnection connection;
-    EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return(""));
-    Buffer::OwnedImpl data("PRI * HTTP/2");
-    EXPECT_EQ("h2", HttpConnectionManagerConfigUtility::determineNextProtocol(connection, data));
-  }
-
-  {
-    Network::MockConnection connection;
-    EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return(""));
-    Buffer::OwnedImpl data("PRI * HTTP/");
-    EXPECT_EQ("", HttpConnectionManagerConfigUtility::determineNextProtocol(connection, data));
-  }
 }
 
 TEST_F(HttpConnectionManagerConfigTest, BadHttpConnectionMangerConfig) {

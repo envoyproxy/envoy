@@ -14,6 +14,7 @@
 #include "common/common/fmt.h"
 #include "common/config/filter_json.h"
 #include "common/config/utility.h"
+#include "common/http/conn_manager_utility.h"
 #include "common/http/date_provider_impl.h"
 #include "common/http/default_server_string.h"
 #include "common/http/http1/codec_impl.h"
@@ -113,27 +114,8 @@ Network::FilterFactoryCb HttpConnectionManagerFilterConfigFactory::createFilterF
 /**
  * Static registration for the HTTP connection manager filter.
  */
-static Registry::RegisterFactory<HttpConnectionManagerFilterConfigFactory,
-                                 Server::Configuration::NamedNetworkFilterConfigFactory>
-    registered_;
-
-std::string
-HttpConnectionManagerConfigUtility::determineNextProtocol(Network::Connection& connection,
-                                                          const Buffer::Instance& data) {
-  if (!connection.nextProtocol().empty()) {
-    return connection.nextProtocol();
-  }
-
-  // See if the data we have so far shows the HTTP/2 prefix. We ignore the case where someone sends
-  // us the first few bytes of the HTTP/2 prefix since in all public cases we use SSL/ALPN. For
-  // internal cases this should practically never happen.
-  if (-1 != data.search(Http::Http2::CLIENT_MAGIC_PREFIX.c_str(),
-                        Http::Http2::CLIENT_MAGIC_PREFIX.size(), 0)) {
-    return Http::Http2::ALPN_STRING;
-  }
-
-  return "";
-}
+REGISTER_FACTORY(HttpConnectionManagerFilterConfigFactory,
+                 Server::Configuration::NamedNetworkFilterConfigFactory);
 
 InternalAddressConfig::InternalAddressConfig(
     const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
@@ -158,6 +140,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       route_config_provider_manager_(route_config_provider_manager),
       http2_settings_(Http::Utility::parseHttp2Settings(config.http2_protocol_options())),
       http1_settings_(Http::Utility::parseHttp1Settings(config.http_protocol_options())),
+      max_request_headers_size_kb_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          config, max_request_headers_kb, Http::DEFAULT_MAX_REQUEST_HEADERS_SIZE_KB)),
       idle_timeout_(PROTOBUF_GET_OPTIONAL_MS(config, idle_timeout)),
       stream_idle_timeout_(
           PROTOBUF_GET_MS_OR_DEFAULT(config, stream_idle_timeout, StreamIdleTimeoutMs)),
@@ -344,14 +328,8 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
     return Http::ServerConnectionPtr{new Http::Http2::ServerConnectionImpl(
         connection, callbacks, context_.scope(), http2_settings_)};
   case CodecType::AUTO:
-    if (HttpConnectionManagerConfigUtility::determineNextProtocol(connection, data) ==
-        Http::Http2::ALPN_STRING) {
-      return Http::ServerConnectionPtr{new Http::Http2::ServerConnectionImpl(
-          connection, callbacks, context_.scope(), http2_settings_)};
-    } else {
-      return Http::ServerConnectionPtr{
-          new Http::Http1::ServerConnectionImpl(connection, callbacks, http1_settings_)};
-    }
+    return Http::ConnectionManagerUtility::autoCreateCodec(
+        connection, data, callbacks, context_.scope(), http1_settings_, http2_settings_);
   }
 
   NOT_REACHED_GCOVR_EXCL_LINE;

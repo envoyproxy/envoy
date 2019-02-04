@@ -15,8 +15,9 @@
 #include "common/http/http2/conn_pool.h"
 #include "common/network/connection_impl.h"
 #include "common/network/raw_buffer_socket.h"
-#include "common/ssl/context_config_impl.h"
-#include "common/ssl/ssl_socket.h"
+
+#include "extensions/transport_sockets/tls/context_config_impl.h"
+#include "extensions/transport_sockets/tls/ssl_socket.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/common/grpc/utility.h"
@@ -306,7 +307,7 @@ public:
     google_tls_ = std::make_unique<GoogleAsyncClientThreadLocal>(*api_);
     GoogleGenericStubFactory stub_factory;
     return std::make_unique<GoogleAsyncClientImpl>(dispatcher_, *google_tls_, stub_factory,
-                                                   stats_scope_, createGoogleGrpcConfig());
+                                                   stats_scope_, createGoogleGrpcConfig(), *api_);
 #else
     NOT_REACHED_GCOVR_EXCL_LINE;
 #endif
@@ -431,7 +432,7 @@ public:
   Upstream::MockThreadLocalCluster thread_local_cluster_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Runtime::MockLoader runtime_;
-  Ssl::ContextManagerImpl context_manager_{test_time_.timeSystem()};
+  Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{test_time_.timeSystem()};
   NiceMock<Runtime::MockRandomGenerator> random_;
   Http::AsyncClientPtr http_async_client_;
   Http::ConnectionPool::InstancePtr http_conn_pool_;
@@ -450,6 +451,9 @@ public:
 // SSL connection credential validation tests.
 class GrpcSslClientIntegrationTest : public GrpcClientIntegrationTest {
 public:
+  GrpcSslClientIntegrationTest() {
+    ON_CALL(factory_context_, api()).WillByDefault(ReturnRef(*api_));
+  }
   void TearDown() override {
     // Reset some state in the superclass before we destruct context_manager_ in our destructor, it
     // doesn't like dangling contexts at destruction.
@@ -479,10 +483,12 @@ public:
       tls_cert->mutable_private_key()->set_filename(
           TestEnvironment::runfilesPath("test/config/integration/certs/clientkey.pem"));
     }
-    auto cfg = std::make_unique<Ssl::ClientContextConfigImpl>(tls_context, factory_context_);
+    auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ClientContextConfigImpl>(
+        tls_context, factory_context_);
 
-    mock_cluster_info_->transport_socket_factory_ = std::make_unique<Ssl::ClientSslSocketFactory>(
-        std::move(cfg), context_manager_, *stats_store_);
+    mock_cluster_info_->transport_socket_factory_ =
+        std::make_unique<Extensions::TransportSockets::Tls::ClientSslSocketFactory>(
+            std::move(cfg), context_manager_, *stats_store_);
     ON_CALL(*mock_cluster_info_, transportSocketFactory())
         .WillByDefault(ReturnRef(*mock_cluster_info_->transport_socket_factory_));
     async_client_transport_socket_ =
@@ -510,10 +516,11 @@ public:
           TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
     }
 
-    auto cfg = std::make_unique<Ssl::ServerContextConfigImpl>(tls_context, factory_context_);
+    auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
+        tls_context, factory_context_);
 
     static Stats::Scope* upstream_stats_store = new Stats::IsolatedStoreImpl();
-    return std::make_unique<Ssl::ServerSslSocketFactory>(
+    return std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
         std::move(cfg), context_manager_, *upstream_stats_store, std::vector<std::string>{});
   }
 

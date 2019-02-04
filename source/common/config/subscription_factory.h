@@ -2,6 +2,7 @@
 
 #include <functional>
 
+#include "envoy/api/api.h"
 #include "envoy/api/v2/core/base.pb.h"
 #include "envoy/config/subscription.h"
 #include "envoy/stats/scope.h"
@@ -12,7 +13,6 @@
 #include "common/config/grpc_subscription_impl.h"
 #include "common/config/http_subscription_impl.h"
 #include "common/config/utility.h"
-#include "common/filesystem/filesystem_impl.h"
 #include "common/protobuf/protobuf.h"
 
 namespace Envoy {
@@ -34,29 +34,32 @@ public:
    *        description).
    * @param grpc_method fully qualified name of v2 gRPC API bidi streaming method (as per protobuf
    *        service description).
+   * @param api reference to the Api object
    */
   template <class ResourceType>
   static std::unique_ptr<Subscription<ResourceType>> subscriptionFromConfigSource(
       const envoy::api::v2::core::ConfigSource& config, const LocalInfo::LocalInfo& local_info,
       Event::Dispatcher& dispatcher, Upstream::ClusterManager& cm, Runtime::RandomGenerator& random,
-      Stats::Scope& scope, std::function<Subscription<ResourceType>*()> rest_legacy_constructor,
-      const std::string& rest_method, const std::string& grpc_method) {
+      Stats::Scope& scope, const std::string& rest_method, const std::string& grpc_method,
+      Api::Api& api) {
     std::unique_ptr<Subscription<ResourceType>> result;
     SubscriptionStats stats = Utility::generateStats(scope);
     switch (config.config_source_specifier_case()) {
     case envoy::api::v2::core::ConfigSource::kPath: {
-      Utility::checkFilesystemSubscriptionBackingPath(config.path());
-      result.reset(
-          new Config::FilesystemSubscriptionImpl<ResourceType>(dispatcher, config.path(), stats));
+      Utility::checkFilesystemSubscriptionBackingPath(config.path(), api);
+      result.reset(new Config::FilesystemSubscriptionImpl<ResourceType>(dispatcher, config.path(),
+                                                                        stats, api));
       break;
     }
     case envoy::api::v2::core::ConfigSource::kApiConfigSource: {
       const envoy::api::v2::core::ApiConfigSource& api_config_source = config.api_config_source();
       Utility::checkApiConfigSourceSubscriptionBackingCluster(cm.clusters(), api_config_source);
       switch (api_config_source.api_type()) {
-      case envoy::api::v2::core::ApiConfigSource::REST_LEGACY:
-        result.reset(rest_legacy_constructor());
-        break;
+      case envoy::api::v2::core::ApiConfigSource::UNSUPPORTED_REST_LEGACY:
+        throw EnvoyException(
+            "REST_LEGACY no longer a supported ApiConfigSource. "
+            "Please specify an explicit supported api_type in the following config:\n" +
+            config.DebugString());
       case envoy::api::v2::core::ApiConfigSource::REST:
         result.reset(new HttpSubscriptionImpl<ResourceType>(
             local_info, cm, api_config_source.cluster_names()[0], dispatcher, random,

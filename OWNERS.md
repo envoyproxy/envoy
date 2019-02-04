@@ -16,7 +16,7 @@ routing PRs, questions, etc. to the right place.
     connections, etc.).
 * Stephan Zuercher ([zuercher](https://github.com/zuercher)) (zuercher@gmail.com)
   * Load balancing, upstream clusters and cluster manager, logging, complex HTTP routing
-    (metadata, etc.), and OSX build.
+    (metadata, etc.), and macOS build.
 * Greg Greenway ([ggreenway](https://github.com/ggreenway)) (ggreenway@apple.com)
   * TCP proxy, TLS, logging, and core networking (listeners, connections, etc.).
 
@@ -32,6 +32,8 @@ routing PRs, questions, etc. to the right place.
   * Lua, access logging, and general miscellany.
 * Joshua Marantz ([jmarantz](https://github.com/jmarantz)) (jmarantz@google.com)
   * Stats, abseil, scalability, and performance.
+* Snow Pettersen ([snowp](https://github.com/snowp)) (snowp@squareup.com)
+  * Upstream, host/priority sets, load balancing, and retry plugins.
 
 # Emeritus maintainers
 

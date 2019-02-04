@@ -11,17 +11,15 @@
 #include "envoy/network/connection.h"
 #include "envoy/stats/scope.h"
 
-//#include "envoy/stats/stats_macros.h"
-
 #include "common/buffer/buffer_impl.h"
 #include "common/buffer/watermark_buffer.h"
 #include "common/common/linked_object.h"
 #include "common/common/logger.h"
 #include "common/http/codec_helper.h"
 #include "common/http/header_map_impl.h"
-#include "common/http/utility.h"
 #include "common/http/http2/metadata_decoder.h"
 #include "common/http/http2/metadata_encoder.h"
+#include "common/http/utility.h"
 
 #include "absl/types/optional.h"
 #include "nghttp2/nghttp2.h"
@@ -188,8 +186,8 @@ protected:
     void pendingSendBufferLowWatermark();
 
     // Max header size of 63K. This is arbitrary but makes it easier to test since nghttp2 doesn't
-    // appear to transmit headers greater than approximtely 64K (NGHTTP2_MAX_HEADERSLEN) for reasons
-    // I don't fully understand.
+    // appear to transmit headers greater than approximately 64K (NGHTTP2_MAX_HEADERSLEN) for
+    // reasons I don't fully understand.
     static const uint64_t MAX_HEADER_SIZE = 63 * 1024;
 
     // Does any necessary WebSocket/Upgrade conversion, then passes the headers

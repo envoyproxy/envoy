@@ -35,7 +35,7 @@ public:
   void putResponseTime(std::chrono::milliseconds) override {}
   const absl::optional<MonotonicTime>& lastEjectionTime() override { return time_; }
   const absl::optional<MonotonicTime>& lastUnejectionTime() override { return time_; }
-  double successRate(SuccessRateMonitorType) const override { return -1; }
+  double successRate(envoy::data::cluster::v2alpha::OutlierEjectionType) const override { return -1; }
 
 private:
   const absl::optional<MonotonicTime> time_;
@@ -102,7 +102,7 @@ private:
 class SuccessRateMonitor {
 public:
   SuccessRateMonitor() = delete;
-  SuccessRateMonitor(EjectionType ejection_type)
+  SuccessRateMonitor(envoy::data::cluster::v2alpha::OutlierEjectionType ejection_type)
       : ejection_type_(ejection_type), success_rate_(-1) {
     // Point the success_rate_accumulator_bucket_ pointer to a bucket.
     updateCurrentSuccessRateBucket();
@@ -118,12 +118,12 @@ public:
     success_rate_accumulator_bucket_.load()->success_request_counter_++;
   }
 
-  EjectionType getEjectionType() const { return ejection_type_; }
+  envoy::data::cluster::v2alpha::OutlierEjectionType getEjectionType() const { return ejection_type_; }
 
 private:
   SuccessRateAccumulator success_rate_accumulator_;
   std::atomic<SuccessRateAccumulatorBucket*> success_rate_accumulator_bucket_;
-  EjectionType ejection_type_;
+  envoy::data::cluster::v2alpha::OutlierEjectionType ejection_type_;
   double success_rate_;
 };
 
@@ -137,10 +137,10 @@ public:
   DetectorHostMonitorImpl(std::shared_ptr<DetectorImpl> detector, HostSharedPtr host)
       : detector_(detector), host_(host) {
     // add Success Rate monitors
-    success_rate_monitors_[externalOrigin] =
-        std::make_unique<SuccessRateMonitor>(EjectionType::SuccessRateExternalOrigin);
-    success_rate_monitors_[localOrigin] =
-        std::make_unique<SuccessRateMonitor>(EjectionType::SuccessRateLocalOrigin);
+    success_rate_monitors_[envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_EXTERNAL_ORIGIN] =
+        std::make_unique<SuccessRateMonitor>(envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_EXTERNAL_ORIGIN);
+    success_rate_monitors_[envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_LOCAL_ORIGIN] =
+        std::make_unique<SuccessRateMonitor>(envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_LOCAL_ORIGIN);
   }
 
   void eject(MonotonicTime ejection_time);
@@ -161,21 +161,19 @@ public:
   }
 
   // Template based and function based methods for managing SuccessRate detectors
-  template <SuccessRateMonitorType Type>
+  template <envoy::data::cluster::v2alpha::OutlierEjectionType Type>
   const std::unique_ptr<SuccessRateMonitor>& getSRMonitor() const {
     return success_rate_monitors_.at(Type);
   }
-  const std::unique_ptr<SuccessRateMonitor>& getSRMonitor(SuccessRateMonitorType Type) const {
+  const std::unique_ptr<SuccessRateMonitor>& getSRMonitor(envoy::data::cluster::v2alpha::OutlierEjectionType Type) const {
     return success_rate_monitors_.at(Type);
   }
 
-  static EjectionType getEjectionType(SuccessRateMonitorType type);
-
-  double successRate(SuccessRateMonitorType type) const override {
+  double successRate(envoy::data::cluster::v2alpha::OutlierEjectionType type) const override {
     return getSRMonitor(type)->getSuccessRate();
   }
   void updateCurrentSuccessRateBucket();
-  void successRate(SuccessRateMonitorType type, double new_success_rate) {
+  void successRate(envoy::data::cluster::v2alpha::OutlierEjectionType type, double new_success_rate) {
     getSRMonitor(type)->setSuccessRate(new_success_rate);
   }
 
@@ -197,7 +195,7 @@ private:
   // counters for local origin failures
   std::atomic<uint32_t> consecutive_local_origin_failure_{0};
 
-  absl::flat_hash_map<SuccessRateMonitorType, std::unique_ptr<SuccessRateMonitor>> success_rate_monitors_;
+  absl::flat_hash_map<envoy::data::cluster::v2alpha::OutlierEjectionType, std::unique_ptr<SuccessRateMonitor>> success_rate_monitors_;
 };
 
 /**
@@ -293,11 +291,11 @@ public:
   // Upstream::Outlier::Detector
   void addChangedStateCb(ChangeStateCb cb) override { callbacks_.push_back(cb); }
   double
-  successRateAverage(DetectorHostMonitor::SuccessRateMonitorType monitor_type) const override {
+  successRateAverage(envoy::data::cluster::v2alpha::OutlierEjectionType monitor_type) const override {
     return success_rate_nums_.at(monitor_type).success_rate_average_;
   }
   double successRateEjectionThreshold(
-      DetectorHostMonitor::SuccessRateMonitorType monitor_type) const override {
+      envoy::data::cluster::v2alpha::OutlierEjectionType monitor_type) const override {
     return success_rate_nums_.at(monitor_type).ejection_threshold_;
   }
 
@@ -327,17 +325,19 @@ private:
   void addHostMonitor(HostSharedPtr host);
   void armIntervalTimer();
   void checkHostForUneject(HostSharedPtr host, DetectorHostMonitorImpl* monitor, MonotonicTime now);
-  void ejectHost(HostSharedPtr host, EjectionType type);
+  void ejectHost(HostSharedPtr host, envoy::data::cluster::v2alpha::OutlierEjectionType type);
   static DetectionStats generateStats(Stats::Scope& scope);
   void initialize(const Cluster& cluster);
-  void onConsecutiveErrorWorker(HostSharedPtr host, EjectionType type);
-  void notifyMainThreadConsecutiveError(HostSharedPtr host, EjectionType type);
+  void onConsecutiveErrorWorker(HostSharedPtr host,
+                                envoy::data::cluster::v2alpha::OutlierEjectionType type);
+  void notifyMainThreadConsecutiveError(HostSharedPtr host,
+                                        envoy::data::cluster::v2alpha::OutlierEjectionType type);
   void onIntervalTimer();
   void runCallbacks(HostSharedPtr host);
-  bool enforceEjection(EjectionType type);
-  void updateEnforcedEjectionStats(EjectionType type);
-  void updateDetectedEjectionStats(EjectionType type);
-  void processSuccessRateEjections(DetectorHostMonitor::SuccessRateMonitorType monitor_type);
+  bool enforceEjection(envoy::data::cluster::v2alpha::OutlierEjectionType type);
+  void updateEnforcedEjectionStats(envoy::data::cluster::v2alpha::OutlierEjectionType type);
+  void updateDetectedEjectionStats(envoy::data::cluster::v2alpha::OutlierEjectionType type);
+  void processSuccessRateEjections(envoy::data::cluster::v2alpha::OutlierEjectionType type);
 
   DetectorConfig config_;
   Event::Dispatcher& dispatcher_;
@@ -349,7 +349,7 @@ private:
   std::unordered_map<HostSharedPtr, DetectorHostMonitorImpl*> host_monitors_;
   EventLoggerSharedPtr event_logger_;
 
-  absl::flat_hash_map<DetectorHostMonitor::SuccessRateMonitorType, EjectionPair>
+  absl::flat_hash_map<envoy::data::cluster::v2alpha::OutlierEjectionType, EjectionPair>
       success_rate_nums_;
 };
 
@@ -360,13 +360,15 @@ public:
       : file_(log_manager.createAccessLog(file_name)), time_source_(time_source) {}
 
   // Upstream::Outlier::EventLogger
-  void logEject(HostDescriptionConstSharedPtr host, Detector& detector, EjectionType type,
-                bool enforced) override;
-  void logUneject(HostDescriptionConstSharedPtr host) override;
+  void logEject(const HostDescriptionConstSharedPtr& host, Detector& detector,
+                envoy::data::cluster::v2alpha::OutlierEjectionType type, bool enforced) override;
+
+  void logUneject(const HostDescriptionConstSharedPtr& host) override;
 
 private:
-  std::string typeToString(EjectionType type);
-  int secsSinceLastAction(const absl::optional<MonotonicTime>& lastActionTime, MonotonicTime now);
+  void setCommonEventParams(envoy::data::cluster::v2alpha::OutlierDetectionEvent& event,
+                            const HostDescriptionConstSharedPtr& host,
+                            absl::optional<MonotonicTime> time);
 
   Filesystem::FileSharedPtr file_;
   TimeSource& time_source_;

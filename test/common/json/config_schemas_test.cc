@@ -4,6 +4,7 @@
 #include "common/common/fmt.h"
 #include "common/json/config_schemas.h"
 #include "common/json/json_loader.h"
+#include "common/stats/isolated_store_impl.h"
 
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
@@ -26,10 +27,16 @@ std::vector<std::string> generateTestInputs() {
   return file_list;
 }
 
-class ConfigSchemasTest : public ::testing::TestWithParam<std::string> {};
+class ConfigSchemasTest : public ::testing::TestWithParam<std::string> {
+protected:
+  ConfigSchemasTest() : api_(Api::createApiForTest(stats_store_)) {}
+
+  Stats::IsolatedStoreImpl stats_store_;
+  Api::ApiPtr api_;
+};
 
 TEST_P(ConfigSchemasTest, CheckValidationExpectation) {
-  ObjectSharedPtr json = Factory::loadFromFile(GetParam());
+  ObjectSharedPtr json = Factory::loadFromFile(GetParam(), *api_);
 
   // lookup schema in test input
   std::string schema, schema_name{json->getString("schema")};
@@ -62,6 +69,6 @@ TEST_P(ConfigSchemasTest, CheckValidationExpectation) {
   }
 }
 
-INSTANTIATE_TEST_CASE_P(Default, ConfigSchemasTest, testing::ValuesIn(generateTestInputs()));
+INSTANTIATE_TEST_SUITE_P(Default, ConfigSchemasTest, testing::ValuesIn(generateTestInputs()));
 } // namespace Json
 } // namespace Envoy

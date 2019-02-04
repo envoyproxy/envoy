@@ -338,7 +338,7 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gauge(const std::string& name) {
   // Note that we can do map.find(final_name.c_str()), but we cannot do
   // map[final_name.c_str()] as the char*-keyed maps would then save the pointer to
   // a temporary, and address sanitization errors would follow. Instead we must
-  // do a find() first, using tha if it succeeds. If it fails, then after we
+  // do a find() first, using that if it succeeds. If it fails, then after we
   // construct the stat we can insert it into the required maps.
   std::string final_name = prefix_ + name;
   if (parent_.rejects(final_name)) {
@@ -366,7 +366,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(const std::string& name) {
   // Note that we can do map.find(final_name.c_str()), but we cannot do
   // map[final_name.c_str()] as the char*-keyed maps would then save the pointer to
   // a temporary, and address sanitization errors would follow. Instead we must
-  // do a find() first, using tha if it succeeds. If it fails, then after we
+  // do a find() first, using that if it succeeds. If it fails, then after we
   // construct the stat we can insert it into the required maps.
   std::string final_name = prefix_ + name;
   if (parent_.rejects(final_name)) {
@@ -503,7 +503,7 @@ void ParentHistogramImpl::merge() {
   }
 }
 
-const std::string ParentHistogramImpl::summary() const {
+const std::string ParentHistogramImpl::quantileSummary() const {
   if (used()) {
     std::vector<std::string> summary;
     const std::vector<double>& supported_quantiles_ref = interval_statistics_.supportedQuantiles();
@@ -514,6 +514,22 @@ const std::string ParentHistogramImpl::summary() const {
                                     cumulative_statistics_.computedQuantiles()[i]));
     }
     return absl::StrJoin(summary, " ");
+  } else {
+    return std::string("No recorded values");
+  }
+}
+
+const std::string ParentHistogramImpl::bucketSummary() const {
+  if (used()) {
+    std::vector<std::string> bucket_summary;
+    const std::vector<double>& supported_buckets = interval_statistics_.supportedBuckets();
+    bucket_summary.reserve(supported_buckets.size());
+    for (size_t i = 0; i < supported_buckets.size(); ++i) {
+      bucket_summary.push_back(fmt::format("B{}({},{})", supported_buckets[i],
+                                           interval_statistics_.computedBuckets()[i],
+                                           cumulative_statistics_.computedBuckets()[i]));
+    }
+    return absl::StrJoin(bucket_summary, " ");
   } else {
     return std::string("No recorded values");
   }

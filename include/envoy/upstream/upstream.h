@@ -311,7 +311,7 @@ public:
   /**
    * Updates the hosts in a given host set.
    *
-   * @param update_hosts_param supplies the list of hosts and hosts per localitiy.
+   * @param update_hosts_param supplies the list of hosts and hosts per locality.
    * @param locality_weights supplies a map from locality to associated weight.
    * @param hosts_added supplies the hosts added since the last update.
    * @param hosts_removed supplies the hosts removed since the last update.
@@ -341,20 +341,35 @@ typedef std::unique_ptr<HostSet> HostSetPtr;
  */
 class PrioritySet {
 public:
+  typedef std::function<void(const HostVector& hosts_added, const HostVector& hosts_removed)>
+      MemberUpdateCb;
+
   typedef std::function<void(uint32_t priority, const HostVector& hosts_added,
                              const HostVector& hosts_removed)>
-      MemberUpdateCb;
+      PriorityUpdateCb;
 
   virtual ~PrioritySet() {}
 
   /**
    * Install a callback that will be invoked when any of the HostSets in the PrioritySet changes.
+   * hosts_added and hosts_removed will only be populated when a host is added or completely removed
+   * from the PrioritySet.
    * This includes when a new HostSet is created.
    *
    * @param callback supplies the callback to invoke.
    * @return Common::CallbackHandle* a handle which can be used to unregister the callback.
    */
   virtual Common::CallbackHandle* addMemberUpdateCb(MemberUpdateCb callback) const PURE;
+
+  /**
+   * Install a callback that will be invoked when a host set changes. Triggers when any change
+   * happens to the hosts within the host set. If hosts are added/removed from the host set, the
+   * added/removed hosts will be passed to the callback.
+   *
+   * @param callback supplies the callback to invoke.
+   * @return Common::CallbackHandle* a handle which can be used to unregister the callback.
+   */
+  virtual Common::CallbackHandle* addPriorityUpdateCb(PriorityUpdateCb callback) const PURE;
 
   /**
    * Returns the host sets for this priority set, ordered by priority.
@@ -435,10 +450,13 @@ public:
   COUNTER  (upstream_flow_control_resumed_reading_total)                                           \
   COUNTER  (upstream_flow_control_backed_up_total)                                                 \
   COUNTER  (upstream_flow_control_drained_total)                                                   \
+  COUNTER  (upstream_internal_redirect_failed_total)                                               \
+  COUNTER  (upstream_internal_redirect_succeeded_total)                                            \
   COUNTER  (bind_errors)                                                                           \
   GAUGE    (max_host_weight)                                                                       \
   COUNTER  (membership_change)                                                                     \
   GAUGE    (membership_healthy)                                                                    \
+  GAUGE    (membership_degraded)                                                                   \
   GAUGE    (membership_total)                                                                      \
   COUNTER  (retry_or_shadow_abandoned)                                                             \
   COUNTER  (update_attempt)                                                                        \

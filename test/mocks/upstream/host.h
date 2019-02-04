@@ -5,6 +5,7 @@
 #include <list>
 #include <string>
 
+#include "envoy/api/v2/cluster/outlier_detection.pb.h"
 #include "envoy/upstream/upstream.h"
 
 #include "test/mocks/upstream/cluster_info.h"
@@ -26,8 +27,8 @@ public:
   MOCK_METHOD1(putResponseTime, void(std::chrono::milliseconds time));
   MOCK_METHOD0(lastEjectionTime, const absl::optional<MonotonicTime>&());
   MOCK_METHOD0(lastUnejectionTime, const absl::optional<MonotonicTime>&());
-  MOCK_CONST_METHOD1(successRate, double(SuccessRateMonitorType type));
-  MOCK_METHOD2(successRate, void(SuccessRateMonitorType type, double new_success_rate));
+  MOCK_CONST_METHOD1(successRate, double(envoy::data::cluster::v2alpha::OutlierEjectionType type));
+  MOCK_METHOD2(successRate, void(envoy::data::cluster::v2alpha::OutlierEjectionType type, double new_success_rate));
 };
 
 class MockEventLogger : public EventLogger {
@@ -35,9 +36,10 @@ public:
   MockEventLogger();
   ~MockEventLogger();
 
-  MOCK_METHOD4(logEject, void(HostDescriptionConstSharedPtr host, Detector& detector,
-                              EjectionType type, bool enforced));
-  MOCK_METHOD1(logUneject, void(HostDescriptionConstSharedPtr host));
+  MOCK_METHOD4(logEject,
+               void(const HostDescriptionConstSharedPtr& host, Detector& detector,
+                    envoy::data::cluster::v2alpha::OutlierEjectionType type, bool enforced));
+  MOCK_METHOD1(logUneject, void(const HostDescriptionConstSharedPtr& host));
 };
 
 class MockDetector : public Detector {
@@ -52,9 +54,9 @@ public:
   }
 
   MOCK_METHOD1(addChangedStateCb, void(ChangeStateCb cb));
-  MOCK_CONST_METHOD1(successRateAverage, double(DetectorHostMonitor::SuccessRateMonitorType));
+  MOCK_CONST_METHOD1(successRateAverage, double(envoy::data::cluster::v2alpha::OutlierEjectionType));
   MOCK_CONST_METHOD1(successRateEjectionThreshold,
-                     double(DetectorHostMonitor::SuccessRateMonitorType));
+                     double(envoy::data::cluster::v2alpha::OutlierEjectionType));
 
   std::list<ChangeStateCb> callbacks_;
 };
