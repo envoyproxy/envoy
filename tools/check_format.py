@@ -51,6 +51,9 @@ SUBDIR_SET = set(common.includeDirOrder())
 INCLUDE_ANGLE = "#include <"
 INCLUDE_ANGLE_LEN = len(INCLUDE_ANGLE)
 PROTO_PACKAGE_REGEX = re.compile(r"^package (\S+);\n*", re.MULTILINE)
+PROTO_OPTION_JAVA_PACKAGE = "option java_package = \""
+PROTO_OPTION_JAVA_OUTER_CLASSNAME = "option java_outer_classname = \""
+PROTO_OPTION_JAVA_MULTIPLE_FILES = "option java_multiple_files = "
 
 # yapf: disable
 PROTOBUF_TYPE_ERRORS = {
@@ -149,22 +152,17 @@ def checkNamespace(file_path):
 
 # If the substring is not found in the file, then insert to_add
 def insertProtoOptionIfNotFound(substring, file_path, to_add):
-
-  def repl(m):
-    return m.group(0).rstrip() + "\n\n" + to_add + "\n"
-
-  with open(file_path, "r+") as f:
+  text = None
+  with open(file_path) as f:
     text = f.read()
-    if substring in text:
-      return []
 
-    new_text = re.sub(PROTO_PACKAGE_REGEX, repl, text)
-    f.seek(0)
-    f.write(new_text)
-    f.truncate()
-    sys.stdout.write(new_text)
-    sys.stdout.flush()
-  return []
+  if not substring in text:
+
+    def repl(m):
+      return m.group(0).rstrip() + "\n\n" + to_add + "\n"
+
+    with open(file_path, "w") as f:
+      f.write(re.sub(PROTO_PACKAGE_REGEX, repl, text))
 
 
 def packageNameForProto(file_path):
@@ -182,9 +180,9 @@ def packageNameForProto(file_path):
 
 def fixJavaPackageProtoOption(file_path):
   package_name = packageNameForProto(file_path)[0]
-  to_add = "option java_package = \"io.envoyproxy.{}\";".format(package_name)
-  return insertProtoOptionIfNotFound("\noption java_package = \"io.envoyproxy.envoy", file_path,
-                                     to_add)
+  to_add = PROTO_OPTION_JAVA_PACKAGE + "io.envoyproxy.{}\";".format(package_name)
+  insertProtoOptionIfNotFound("\n" + PROTO_OPTION_JAVA_PACKAGE, file_path, to_add)
+  return []
 
 
 # Add "option java_outer_classname = FooBarProto;" for foo_bar.proto
@@ -193,15 +191,17 @@ def fixJavaOuterClassnameProtoOption(file_path):
   if "-" in file_name or "." in file_name or not file_name.islower():
     return ["Unable to decide java_outer_classname for proto file: %s" % file_path]
 
-  to_add = "option java_outer_classname = \"" \
+  to_add = PROTO_OPTION_JAVA_OUTER_CLASSNAME \
        + "".join(x.title() for x in file_name.split("_")) \
        + "Proto\";"
-  return insertProtoOptionIfNotFound("\noption java_outer_classname = ", file_path, to_add)
+  insertProtoOptionIfNotFound("\n" + PROTO_OPTION_JAVA_OUTER_CLASSNAME, file_path, to_add)
+  return []
 
 
 def fixJavaMultipleFilesProtoOption(file_path):
-  to_add = "option java_multiple_files = true;"
-  return insertProtoOptionIfNotFound("\noption java_multiple_files = ", file_path, to_add)
+  to_add = PROTO_OPTION_JAVA_MULTIPLE_FILES + "true;"
+  insertProtoOptionIfNotFound("\n" + PROTO_OPTION_JAVA_MULTIPLE_FILES, file_path, to_add)
+  return []
 
 
 # To avoid breaking the Lyft import, we just check for path inclusion here.
@@ -237,10 +237,7 @@ def findSubstringAndReturnError(pattern, file_path, error_message):
 
 def errorIfNoSubstringFound(pattern, file_path, error_message):
   with open(file_path) as f:
-    if pattern in f.read():
-      return []
-    return [file_path + ": " + error_message]
-    # return [] if pattern in f.read() else [file_path + ": " + error_message]
+    return [] if pattern in f.read() else [file_path + ": " + error_message]
 
 
 def isApiFile(file_path):
@@ -493,12 +490,11 @@ def checkSourcePath(file_path):
     if package_name is None:
       error_messages += error_message
     else:
-      error_messages += errorIfNoSubstringFound(
-          "option java_package = \"", file_path,
-          "Java proto option 'java_package' not set correctly")
-      error_messages += errorIfNoSubstringFound("option java_outer_classname = \"", file_path,
+      error_messages += errorIfNoSubstringFound("\n" + PROTO_OPTION_JAVA_PACKAGE, file_path,
+                                                "Java proto option 'java_package' not set")
+      error_messages += errorIfNoSubstringFound("\n" + PROTO_OPTION_JAVA_OUTER_CLASSNAME, file_path,
                                                 "Java proto option 'java_outer_classname' not set")
-      error_messages += errorIfNoSubstringFound("option java_multiple_files = ", file_path,
+      error_messages += errorIfNoSubstringFound("\n" + PROTO_OPTION_JAVA_MULTIPLE_FILES, file_path,
                                                 "Java proto option 'java_multiple_files' not set")
   return error_messages
 
