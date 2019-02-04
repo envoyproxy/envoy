@@ -22,7 +22,7 @@ using testing::ReturnNew;
 namespace Envoy {
 namespace Runtime {
 
-TEST_F(TestBase, Random_DISABLED_benchmarkRandom) {
+TEST_F(TestBase, DISABLED_Random_benchmarkRandom) {
   Runtime::RandomGeneratorImpl random;
 
   for (size_t i = 0; i < 1000000000; ++i) {
