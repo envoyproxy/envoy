@@ -3,9 +3,8 @@
 
 #include "exe/signal_action.h"
 
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
-
-#include "gtest/gtest.h"
 
 namespace Envoy {
 #if defined(__has_feature)
@@ -27,7 +26,7 @@ TEST(SignalsDeathTest, InvalidAddressDeathTest) {
   SignalAction actions;
   EXPECT_DEATH_LOG_TO_STDERR(
       []() -> void {
-        // Oooooops!
+        // Oops!
         volatile int* nasty_ptr = reinterpret_cast<int*>(0x0);
         *(nasty_ptr) = 0;
       }(),

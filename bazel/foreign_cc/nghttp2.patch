@@ -1,0 +1,12 @@
+diff --git a/lib/CMakeLists.txt b/lib/CMakeLists.txt
+index 17e422b2..e58070f5 100644
+--- a/lib/CMakeLists.txt
++++ b/lib/CMakeLists.txt
+@@ -52,6 +52,7 @@
+     COMPILE_FLAGS "${WARNCFLAGS}"
+     VERSION ${LT_VERSION} SOVERSION ${LT_SOVERSION}
+     ARCHIVE_OUTPUT_NAME nghttp2
++    ARCHIVE_OUTPUT_DIRECTORY static
+   )
+   target_compile_definitions(nghttp2_static PUBLIC "-DNGHTTP2_STATICLIB")
+   if(ENABLE_STATIC_LIB)

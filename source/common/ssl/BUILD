@@ -25,6 +25,7 @@ envoy_cc_library(
     srcs = ["certificate_validation_context_config_impl.cc"],
     hdrs = ["certificate_validation_context_config_impl.h"],
     deps = [
+        "//include/envoy/api:api_interface",
         "//include/envoy/ssl:certificate_validation_context_config_interface",
         "//source/common/common:empty_string",
         "//source/common/config:datasource_lib",

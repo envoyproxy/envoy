@@ -30,11 +30,11 @@
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::InSequence;
@@ -56,7 +56,7 @@ namespace {
 // the expectations when needed.
 class TestClusterManagerFactory : public ClusterManagerFactory {
 public:
-  TestClusterManagerFactory() {
+  TestClusterManagerFactory() : api_(Api::createApiForTest(stats_)) {
     ON_CALL(*this, clusterFromProto_(_, _, _, _))
         .WillByDefault(Invoke([&](const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
                                   Outlier::EventLoggerSharedPtr outlier_event_logger,
@@ -64,7 +64,7 @@ public:
           return ClusterImplBase::create(cluster, cm, stats_, tls_, dns_resolver_,
                                          ssl_context_manager_, runtime_, random_, dispatcher_,
                                          log_manager_, local_info_, admin_, singleton_manager_,
-                                         outlier_event_logger, added_via_api);
+                                         outlier_event_logger, added_via_api, *api_);
         }));
   }
 
@@ -122,6 +122,7 @@ public:
   NiceMock<Secret::MockSecretManager> secret_manager_;
   NiceMock<AccessLog::MockAccessLogManager> log_manager_;
   Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest().currentThreadId()};
+  Api::ApiPtr api_;
 };
 
 // Helper to intercept calls to postThreadLocalClusterUpdate.
@@ -162,11 +163,9 @@ envoy::config::bootstrap::v2::Bootstrap parseBootstrapFromV2Yaml(const std::stri
   return bootstrap;
 }
 
-class ClusterManagerImplTest : public testing::Test {
+class ClusterManagerImplTest : public TestBase {
 public:
-  ClusterManagerImplTest() : api_(Api::createApiForTest(stats_store_)) {
-    factory_.dispatcher_.setTimeSystem(time_system_);
-  }
+  ClusterManagerImplTest() : api_(Api::createApiForTest(stats_store_)) {}
 
   void create(const envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
     cluster_manager_ = std::make_unique<ClusterManagerImpl>(
@@ -241,12 +240,12 @@ public:
   }
 
   Stats::IsolatedStoreImpl stats_store_;
+  Event::SimulatedTimeSystem time_system_;
   Api::ApiPtr api_;
   NiceMock<TestClusterManagerFactory> factory_;
   std::unique_ptr<ClusterManagerImpl> cluster_manager_;
   AccessLog::MockAccessLogManager log_manager_;
   NiceMock<Server::MockAdmin> admin_;
-  Event::SimulatedTimeSystem time_system_;
   MockLocalClusterUpdate local_cluster_update_;
   Http::ContextImpl http_context_;
 };
@@ -2337,7 +2336,7 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesDestroyedOnUpdate) {
   EXPECT_EQ(0, factory_.stats_.gauge("cluster_manager.warming_clusters").value());
 }
 
-class ClusterManagerInitHelperTest : public testing::Test {
+class ClusterManagerInitHelperTest : public TestBase {
 public:
   MOCK_METHOD1(onClusterInit, void(Cluster& cluster));
 

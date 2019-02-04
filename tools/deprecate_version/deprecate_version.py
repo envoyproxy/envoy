@@ -5,11 +5,11 @@
 #
 # Direct usage (not recommended):
 #
-# python tools/deprecate_version/deprecate_version.py <deprecate for version> <deprecate by version>
+# python tools/deprecate_version/deprecate_version.py <2 releases ago> <current release>
 #
 # e.g
 #
-#  python tools/deprecate_version/deprecate_version.py 1.6.0 1.7.0
+#  python tools/deprecate_version/deprecate_version.py 1.5.0 1.7.0
 #
 # A GitHub access token must be set in GH_ACCESS_TOKEN. To create one, go to
 # Settings -> Developer settings -> Personal access tokens in GitHub and create
@@ -59,7 +59,7 @@ def GetHistory():
   history = defaultdict(set)
   for commit, lines in repo.blame('HEAD', 'DEPRECATED.md'):
     for line in lines:
-      sr = re.match('## Version (.*)', line)
+      sr = re.match('## Version (.*) \(.*\)', line)
       if sr:
         version = sr.group(1)
         continue

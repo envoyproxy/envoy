@@ -11,7 +11,7 @@ accepting new connections.
   :ref:`CDS <arch_overview_dynamic_config_cds>` if applicable, waits for one response (or failure),
   and does the same primary/secondary initialization of CDS provided clusters.
 * If clusters use :ref:`active health checking <arch_overview_health_checking>`, Envoy also does a
-  single active HC round.
+  single active health check round.
 * Once cluster manager initialization is done, :ref:`RDS <arch_overview_dynamic_config_rds>` and
   :ref:`LDS <arch_overview_dynamic_config_lds>` initialize (if applicable). The server
   doesn't start accepting connections until there has been at least one response (or failure) for

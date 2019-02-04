@@ -10,10 +10,10 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::ContainerEq;
@@ -43,7 +43,7 @@ parseHttpConnectionManagerFromV2Yaml(const std::string& yaml) {
   return http_connection_manager;
 }
 
-class HttpConnectionManagerConfigTest : public testing::Test {
+class HttpConnectionManagerConfigTest : public TestBase {
 public:
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   Http::SlowDateProviderImpl date_provider_{context_.dispatcher().timeSystem()};
@@ -150,6 +150,35 @@ TEST_F(HttpConnectionManagerConfigTest, UnixSocketInternalAddress) {
   EXPECT_TRUE(config.internalAddressConfig().isInternalAddress(unixAddress));
   EXPECT_TRUE(config.internalAddressConfig().isInternalAddress(internalIpAddress));
   EXPECT_FALSE(config.internalAddressConfig().isInternalAddress(externalIpAddress));
+}
+
+TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersSizeDefault) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_);
+  EXPECT_EQ(60, config.maxRequestHeadersSizeKb());
+}
+
+TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersSizeConfigured) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  max_request_headers_kb: 16
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_);
+  EXPECT_EQ(16, config.maxRequestHeadersSizeKb());
 }
 
 // Validated that an explicit zero stream idle timeout disables.

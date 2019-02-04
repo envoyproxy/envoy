@@ -19,6 +19,7 @@
 #include "common/network/connection_impl.h"
 #include "common/network/dns_impl.h"
 #include "common/network/listener_impl.h"
+#include "common/network/udp_listener_impl.h"
 
 #include "event2/event.h"
 
@@ -117,6 +118,12 @@ DispatcherImpl::createListener(Network::Socket& socket, Network::ListenerCallbac
   ASSERT(isThreadSafe());
   return Network::ListenerPtr{new Network::ListenerImpl(*this, socket, cb, bind_to_port,
                                                         hand_off_restored_destination_connections)};
+}
+
+Network::ListenerPtr DispatcherImpl::createUdpListener(Network::Socket& socket,
+                                                       Network::UdpListenerCallbacks& cb) {
+  ASSERT(isThreadSafe());
+  return Network::ListenerPtr{new Network::UdpListenerImpl(*this, socket, cb)};
 }
 
 TimerPtr DispatcherImpl::createTimer(TimerCb cb) {

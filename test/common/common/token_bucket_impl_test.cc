@@ -3,12 +3,11 @@
 #include "common/common/token_bucket_impl.h"
 
 #include "test/test_common/simulated_time_system.h"
-
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 namespace Envoy {
 
-class TokenBucketImplTest : public testing::Test {
+class TokenBucketImplTest : public TestBase {
 protected:
   Event::SimulatedTimeSystem time_system_;
 };

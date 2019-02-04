@@ -12,10 +12,10 @@
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::InSequence;
@@ -26,9 +26,9 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Upstream {
 
-class CdsApiImplTest : public testing::Test {
-public:
-  CdsApiImplTest() : request_(&cm_.async_client_) {}
+class CdsApiImplTest : public TestBase {
+protected:
+  CdsApiImplTest() : request_(&cm_.async_client_), api_(Api::createApiForTest(store_)) {}
 
   void setup() {
     const std::string config_json = R"EOF(
@@ -52,7 +52,7 @@ public:
     EXPECT_CALL(*cluster.info_, addedViaApi());
     EXPECT_CALL(cluster, info());
     EXPECT_CALL(*cluster.info_, type());
-    cds_ = CdsApiImpl::create(cds_config, cm_, dispatcher_, random_, local_info_, store_);
+    cds_ = CdsApiImpl::create(cds_config, cm_, dispatcher_, random_, local_info_, store_, *api_);
     cds_->setInitializedCb([this]() -> void { initialized_.ready(); });
 
     expectRequest();
@@ -106,6 +106,7 @@ public:
   Event::MockTimer* interval_timer_;
   Http::AsyncClient::Callbacks* callbacks_{};
   ReadyWatcher initialized_;
+  Api::ApiPtr api_;
 };
 
 // Negative test for protoc-gen-validate constraints.
@@ -122,7 +123,7 @@ TEST_F(CdsApiImplTest, ValidateFail) {
   EXPECT_CALL(request_, cancel());
 }
 
-// Validate onConfigUpadte throws EnvoyException with duplicate clusters.
+// Validate onConfigUpdate throws EnvoyException with duplicate clusters.
 TEST_F(CdsApiImplTest, ValidateDuplicateClusters) {
   InSequence s;
 
@@ -154,8 +155,9 @@ TEST_F(CdsApiImplTest, InvalidOptions) {
   local_info_.node_.set_id("");
   envoy::api::v2::core::ConfigSource cds_config;
   Config::Utility::translateCdsConfig(*config, cds_config);
-  EXPECT_THROW(CdsApiImpl::create(cds_config, cm_, dispatcher_, random_, local_info_, store_),
-               EnvoyException);
+  EXPECT_THROW(
+      CdsApiImpl::create(cds_config, cm_, dispatcher_, random_, local_info_, store_, *api_),
+      EnvoyException);
 }
 
 TEST_F(CdsApiImplTest, Basic) {

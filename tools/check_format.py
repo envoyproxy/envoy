@@ -16,7 +16,7 @@ import traceback
 
 EXCLUDED_PREFIXES = ("./generated/", "./thirdparty/", "./build", "./.git/", "./bazel-", "./.cache",
                      "./source/extensions/extensions_build_config.bzl",
-                     "./tools/testdata/check_format/")
+                     "./tools/testdata/check_format/", "./tools/pyformat/")
 SUFFIXES = (".cc", ".h", "BUILD", "WORKSPACE", ".bzl", ".md", ".rst", ".proto")
 DOCS_SUFFIX = (".md", ".rst")
 PROTO_SUFFIX = (".proto")
@@ -190,6 +190,8 @@ def whitelistedForProtobufDeps(file_path):
 # specific cases. They should be passed down from where they are instantied to where
 # they need to be used, e.g. through the ServerInstance, Dispatcher, or ClusterManager.
 def whitelistedForRealTime(file_path):
+  if file_path.endswith(".md"):
+    return True
   return file_path in REAL_TIME_WHITELIST
 
 
@@ -378,6 +380,11 @@ def checkSourceLine(line, file_path, reportError):
     reportError("Don't use the '?:' operator, it is a non-standard GCC extension")
   if line.startswith('using testing::Test;'):
     reportError("Don't use 'using testing::Test;, elaborate the type instead")
+  if line.startswith('using testing::TestWithParams;'):
+    reportError("Don't use 'using testing::Test;, elaborate the type instead")
+  if file_path != './test/test_common/test_base.h' and (' testing::Test ' in line or
+                                                        ' testing::TestWithParam' in line):
+    reportError("Derive test classes from TestBase in test/test_common/test_base.h")
 
 
 def checkBuildLine(line, file_path, reportError):
