@@ -13,13 +13,21 @@ MaglevTable::MaglevTable(const HostsPerLocality& hosts_per_locality,
   // not good!).
   ASSERT(Primes::isPrime(table_size));
 
+  // Sanity-check that the locality weights, if provided, line up with the hosts per locality.
+  if (locality_weights != nullptr) {
+    ASSERT(locality_weights->size() == hosts_per_locality.get().size());
+  }
+
   // Compute host weight combined with locality weight where applicable.
   const auto effective_weight = [&locality_weights](uint32_t host_weight,
                                                     uint32_t locality_index) -> uint32_t {
-    if (locality_weights == nullptr || locality_weights->empty()) {
+    ASSERT(host_weight != 0);
+    if (locality_weights == nullptr) {
       return host_weight;
     } else {
-      return host_weight * (*locality_weights)[locality_index];
+      auto locality_weight = (*locality_weights)[locality_index];
+      ASSERT(locality_weight != 0);
+      return host_weight * locality_weight;
     }
   };
 
