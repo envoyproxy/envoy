@@ -4,7 +4,7 @@
 
 #include "envoy/event/dispatcher.h"
 
-#include "common/common/recursion_checker.h"
+#include "common/common/debug_recursion_checker.h"
 
 #include "absl/container/flat_hash_map.h"
 
@@ -54,7 +54,7 @@ private:
   absl::flat_hash_map<KEY_TYPE, std::unique_ptr<POOL_TYPE>> active_pools_;
   Event::Dispatcher& thread_local_dispatcher_;
   std::vector<DrainedCb> cached_callbacks_;
-  Common::RecursionChecker recursion_checker_;
+  Common::DebugRecursionChecker recursion_checker_;
 };
 
 } // namespace Upstream

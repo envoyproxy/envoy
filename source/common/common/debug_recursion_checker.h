@@ -7,7 +7,7 @@ namespace Common {
 /**
  * A helper class to prevent re-entry into a non-reentrant class.
  */
-class RecursionChecker {
+class DebugRecursionChecker {
 public:
   void enter() {
     ASSERT(!entered_, "A resource should only be entered once");
@@ -26,14 +26,16 @@ private:
   bool entered_ = false;
 };
 
-class AutoRecursionChecker {
+class AutoDebugRecursionChecker {
 public:
-  explicit AutoRecursionChecker(RecursionChecker& checker) : checker_(checker) { checker.enter(); }
+  explicit AutoDebugRecursionChecker(DebugRecursionChecker& checker) : checker_(checker) {
+    checker.enter();
+  }
 
-  ~AutoRecursionChecker() { checker_.exit(); }
+  ~AutoDebugRecursionChecker() { checker_.exit(); }
 
 private:
-  RecursionChecker& checker_;
+  DebugRecursionChecker& checker_;
 };
 
 } // namespace Common

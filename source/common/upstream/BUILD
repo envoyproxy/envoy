@@ -73,7 +73,7 @@ envoy_cc_library(
     hdrs = ["conn_pool_map.h"],
     deps = [
         "//include/envoy/event:dispatcher_interface",
-        "//source/common/common:recursion_checker_lib",
+        "//source/common/common:debug_recursion_checker_lib",
     ],
 )
 

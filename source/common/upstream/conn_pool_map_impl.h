@@ -14,7 +14,7 @@ ConnPoolMap<KEY_TYPE, POOL_TYPE>::~ConnPoolMap() = default;
 
 template <typename KEY_TYPE, typename POOL_TYPE>
 POOL_TYPE& ConnPoolMap<KEY_TYPE, POOL_TYPE>::getPool(KEY_TYPE key, const PoolFactory& factory) {
-  Common::AutoRecursionChecker assert_not_in(recursion_checker_);
+  Common::AutoDebugRecursionChecker assert_not_in(recursion_checker_);
   // TODO(klarose): Consider how we will change the connection pool's configuration in the future.
   // The plan is to change the downstream socket options... We may want to take those as a parameter
   // here. Maybe we'll pass them to the factory function?
@@ -38,7 +38,7 @@ size_t ConnPoolMap<KEY_TYPE, POOL_TYPE>::size() const {
 }
 
 template <typename KEY_TYPE, typename POOL_TYPE> void ConnPoolMap<KEY_TYPE, POOL_TYPE>::clear() {
-  Common::AutoRecursionChecker assert_not_in(recursion_checker_);
+  Common::AutoDebugRecursionChecker assert_not_in(recursion_checker_);
   for (auto& pool_pair : active_pools_) {
     thread_local_dispatcher_.deferredDelete(std::move(pool_pair.second));
   }
@@ -48,7 +48,7 @@ template <typename KEY_TYPE, typename POOL_TYPE> void ConnPoolMap<KEY_TYPE, POOL
 
 template <typename KEY_TYPE, typename POOL_TYPE>
 void ConnPoolMap<KEY_TYPE, POOL_TYPE>::addDrainedCallback(const DrainedCb& cb) {
-  Common::AutoRecursionChecker assert_not_in(recursion_checker_);
+  Common::AutoDebugRecursionChecker assert_not_in(recursion_checker_);
   for (auto& pool_pair : active_pools_) {
     pool_pair.second->addDrainedCallback(cb);
   }
@@ -58,7 +58,7 @@ void ConnPoolMap<KEY_TYPE, POOL_TYPE>::addDrainedCallback(const DrainedCb& cb) {
 
 template <typename KEY_TYPE, typename POOL_TYPE>
 void ConnPoolMap<KEY_TYPE, POOL_TYPE>::drainConnections() {
-  Common::AutoRecursionChecker assert_not_in(recursion_checker_);
+  Common::AutoDebugRecursionChecker assert_not_in(recursion_checker_);
   for (auto& pool_pair : active_pools_) {
     pool_pair.second->drainConnections();
   }
