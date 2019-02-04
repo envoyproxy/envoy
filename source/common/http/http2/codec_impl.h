@@ -120,7 +120,7 @@ protected:
    */
   class Http2Options {
   public:
-    Http2Options(const Http2Settings& http2_settings);
+    Http2Options(const Http2Settings& http2_settings, const uint32_t max_request_headers_kb);
     ~Http2Options();
 
     const nghttp2_option* options() { return options_; }
@@ -131,7 +131,7 @@ protected:
 
   class ClientHttp2Options : public Http2Options {
   public:
-    ClientHttp2Options(const Http2Settings& http2_settings);
+    ClientHttp2Options(const Http2Settings& http2_settings, const uint32_t max_request_headers_kb);
   };
 
   /**

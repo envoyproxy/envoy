@@ -845,7 +845,8 @@ ConnectionImpl::Http2Callbacks::Http2Callbacks() {
 
 ConnectionImpl::Http2Callbacks::~Http2Callbacks() { nghttp2_session_callbacks_del(callbacks_); }
 
-ConnectionImpl::Http2Options::Http2Options(const Http2Settings& http2_settings) {
+ConnectionImpl::Http2Options::Http2Options(const Http2Settings& http2_settings,
+                                           const uint32_t max_request_headers_kb) {
   nghttp2_option_new(&options_);
   // Currently we do not do anything with stream priority. Setting the following option prevents
   // nghttp2 from keeping around closed streams for use during stream priority dependency graph
@@ -853,6 +854,7 @@ ConnectionImpl::Http2Options::Http2Options(const Http2Settings& http2_settings) 
   // of kept alive HTTP/2 connections.
   nghttp2_option_set_no_closed_streams(options_, 1);
   nghttp2_option_set_no_auto_window_update(options_, 1);
+  nghttp2_option_set_max_send_header_block_length(options_, max_request_headers_kb * 1024);
 
   if (http2_settings.hpack_table_size_ != NGHTTP2_DEFAULT_HEADER_TABLE_SIZE) {
     nghttp2_option_set_max_deflate_dynamic_table_size(options_, http2_settings.hpack_table_size_);
@@ -865,8 +867,9 @@ ConnectionImpl::Http2Options::Http2Options(const Http2Settings& http2_settings) 
 
 ConnectionImpl::Http2Options::~Http2Options() { nghttp2_option_del(options_); }
 
-ConnectionImpl::ClientHttp2Options::ClientHttp2Options(const Http2Settings& http2_settings)
-    : Http2Options(http2_settings) {
+ConnectionImpl::ClientHttp2Options::ClientHttp2Options(const Http2Settings& http2_settings,
+                                                       const uint32_t max_request_headers_kb)
+    : Http2Options(http2_settings, max_request_headers_kb) {
   // Temporarily disable initial max streams limit/protection, since we might want to create
   // more than 100 streams before receiving the HTTP/2 SETTINGS frame from the server.
   //
@@ -881,7 +884,7 @@ ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection,
                                            const uint32_t max_request_headers_kb)
     : ConnectionImpl(connection, stats, http2_settings, max_request_headers_kb),
       callbacks_(callbacks) {
-  ClientHttp2Options client_http2_options(http2_settings);
+  ClientHttp2Options client_http2_options(http2_settings, max_request_headers_kb);
   nghttp2_session_client_new2(&session_, http2_callbacks_.callbacks(), base(),
                               client_http2_options.options());
   sendSettings(http2_settings, true);
@@ -930,7 +933,7 @@ ServerConnectionImpl::ServerConnectionImpl(Network::Connection& connection,
                                            const uint32_t max_request_headers_kb)
     : ConnectionImpl(connection, scope, http2_settings, max_request_headers_kb),
       callbacks_(callbacks) {
-  Http2Options http2_options(http2_settings);
+  Http2Options http2_options(http2_settings, max_request_headers_kb);
   nghttp2_session_server_new2(&session_, http2_callbacks_.callbacks(), base(),
                               http2_options.options());
   sendSettings(http2_settings, false);
