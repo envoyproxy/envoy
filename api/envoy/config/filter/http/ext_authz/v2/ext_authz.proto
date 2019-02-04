@@ -39,9 +39,9 @@ message ExtAuthz {
   // <config_http_filters_ext_authz_stats>`.
   bool failure_mode_allow = 2;
 
-  // *ADD SOME DEPRECATION NOTICE??*
-  // This value configures what package version the gRPC service should use. This is particularly
-  // useful when transitioning from alpha to release versions assuming that both are compatible.
+  // Sets the package version the the gRPC service should use. This is particularly
+  // useful when transitioning from alpha to release versions assuming that both definitions are
+  // semantically compatible.
   bool use_alpha = 4;
 }
 

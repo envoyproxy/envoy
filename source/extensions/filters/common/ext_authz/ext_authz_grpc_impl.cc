@@ -14,7 +14,7 @@ namespace Common {
 namespace ExtAuthz {
 
 // Values used for selecting service paths.
-// TODO(gsagula): keep only V2 when V2Alpha gets deprecated. 
+// TODO(gsagula): keep only V2 when V2Alpha gets deprecated.
 constexpr char V2[] = "envoy.service.auth.v2.Authorization.Check";
 constexpr char V2alpha[] = "envoy.service.auth.v2alpha.Authorization.Check";
 
