@@ -3,12 +3,13 @@
 #include <memory>
 
 #include "envoy/common/pure.h"
-#include "envoy/network/address.h"
-
-class Network::Address::Instance;
 
 namespace Envoy {
 namespace Network {
+
+namespace Address {
+class Instance;
+}  // namespace Address
 
 template <typename T> struct IoHandleCallResult {
   T rc_;
@@ -24,6 +25,16 @@ typedef IoHandleCallResult<ssize_t> IoHandleCallSizeResult;
 class IoHandle {
 public:
   virtual ~IoHandle() {}
+
+  /**
+   * Return data associated with IoHandle.
+   *
+   * TODO(sbelair2) remove fd() method
+   * We probably still need some method similar to this one for
+   * evconnlistener_new(). Or We can move it to IoSocketHandle and down cast the
+   * IoHandle to IoSocketHandle wherever needed.
+   */
+  virtual int fd() const PURE;
 
   /**
    * Clean up IoHandle resources
