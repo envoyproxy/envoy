@@ -8,6 +8,10 @@
 
 #include <string>
 
+// NOTE(wub): These macros are currently NOOP because they are supposed to be
+// used by client-side stats. They should be implemented when QUIC client code
+// is used by Envoy to connect to backends.
+
 #define QUIC_CLIENT_HISTOGRAM_ENUM_IMPL(name, sample, enum_size, docstring)                        \
   do {                                                                                             \
   } while (0)
