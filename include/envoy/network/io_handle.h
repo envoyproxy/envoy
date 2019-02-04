@@ -3,6 +3,9 @@
 #include <memory>
 
 #include "envoy/common/pure.h"
+#include "envoy/network/address.h"
+
+class Network::Address::Instance;
 
 namespace Envoy {
 namespace Network {
