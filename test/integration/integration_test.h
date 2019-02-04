@@ -3,6 +3,7 @@
 #include "test/integration/http_integration.h"
 #include "test/test_common/test_base.h"
 
+// A test class for testing HTTP/1.1 upstream and downstreams
 namespace Envoy {
 class IntegrationTest : public HttpIntegrationTest,
                         public TestBaseWithParam<Network::Address::IpVersion> {
