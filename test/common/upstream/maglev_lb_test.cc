@@ -20,7 +20,7 @@ public:
 
 // Note: ThreadAwareLoadBalancer base is heavily tested by RingHashLoadBalancerTest. Only basic
 //       functionality is covered here.
-class MaglevLoadBalancerTest : public ::testing::Test {
+class MaglevLoadBalancerTest : public TestBase {
 public:
   MaglevLoadBalancerTest() : stats_(ClusterInfoImpl::generateStats(stats_store_)) {}
 

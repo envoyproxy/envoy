@@ -122,7 +122,7 @@ paradigm has a number of benefits:
   whether to route to a host:
 
 .. csv-table::
-  :header: Discovery Status, HC OK, HC Failed
+  :header: Discovery Status, Health Check OK, Health Check Failed
   :widths: 1, 1, 2
 
   Discovered, Route, Don't Route

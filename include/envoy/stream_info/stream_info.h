@@ -260,9 +260,9 @@ public:
   virtual bool healthCheck() const PURE;
 
   /**
-   * @param is_hc whether the request is a health check request or not.
+   * @param is_health_check whether the request is a health check request or not.
    */
-  virtual void healthCheck(bool is_hc) PURE;
+  virtual void healthCheck(bool is_health_check) PURE;
 
   /**
    * @param downstream_local_address sets the local address of the downstream connection. Note that

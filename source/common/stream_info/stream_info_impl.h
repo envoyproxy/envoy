@@ -152,9 +152,9 @@ struct StreamInfoImpl : public StreamInfo {
     return upstream_local_address_;
   }
 
-  bool healthCheck() const override { return hc_request_; }
+  bool healthCheck() const override { return health_check_request_; }
 
-  void healthCheck(bool is_hc) override { hc_request_ = is_hc; }
+  void healthCheck(bool is_health_check) override { health_check_request_ = is_health_check; }
 
   void setDownstreamLocalAddress(
       const Network::Address::InstanceConstSharedPtr& downstream_local_address) override {
@@ -218,7 +218,7 @@ struct StreamInfoImpl : public StreamInfo {
   absl::optional<uint32_t> response_code_;
   uint64_t response_flags_{};
   Upstream::HostDescriptionConstSharedPtr upstream_host_{};
-  bool hc_request_{};
+  bool health_check_request_{};
   const Router::RouteEntry* route_entry_{};
   envoy::api::v2::core::Metadata metadata_{};
   FilterStateImpl filter_state_{};

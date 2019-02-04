@@ -26,11 +26,6 @@ REPOSITORY_LOCATIONS = dict(
         strip_prefix = "thrift-0.11.0",
         urls = ["https://files.pythonhosted.org/packages/c6/b4/510617906f8e0c5660e7d96fbc5585113f83ad547a3989b80297ac72a74c/thrift-0.11.0.tar.gz"],
     ),
-    com_github_bombela_backward = dict(
-        sha256 = "ad73be31c5cfcbffbde7d34dba18158a42043a109e7f41946f0b0abd589ed55e",
-        strip_prefix = "backward-cpp-1.4",
-        urls = ["https://github.com/bombela/backward-cpp/archive/v1.4.tar.gz"],
-    ),
     com_github_c_ares_c_ares = dict(
         sha256 = "7deb7872cbd876c29036d5f37e30c4cbc3cc068d59d8b749ef85bb0736649f04",
         strip_prefix = "c-ares-cares-1_15_0",
@@ -235,8 +230,8 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/google/subpar/archive/1.3.0.tar.gz"],
     ),
     com_googlesource_quiche = dict(
-        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/c9b2cecd1d005893114a03c101532017ddfa12cb.tar.gz
-        sha256 = "c8faea835132103d574cc2769a58e244bee3de02669471330a174f2ffae6fcc3",
-        urls = ["https://storage.googleapis.com/quiche-envoy-integration/c9b2cecd1d005893114a03c101532017ddfa12cb.tar.gz"],
+        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/dc5ce1a82e342bfd366a1ccdf2a2717edb46e4ec.tar.gz
+        sha256 = "ed4aec9af6b251385b720d3a23a22a4264d649806ff95dc0b29dab9f786387a0",
+        urls = ["https://storage.googleapis.com/quiche-envoy-integration/dc5ce1a82e342bfd366a1ccdf2a2717edb46e4ec.tar.gz"],
     ),
 )
