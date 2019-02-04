@@ -10,11 +10,17 @@ namespace Common {
 class RecursionChecker {
 public:
   void enter() {
-    RELEASE_ASSERT(!entered_, "A resource should only be entered once");
+    ASSERT(!entered_, "A resource should only be entered once");
+#if !defined(NDEBUG)
     entered_ = true;
+#endif // !defined(NDEBUG)
   }
 
-  void exit() { entered_ = false; }
+  void exit() {
+#if !defined(NDEBUG)
+    entered_ = false;
+#endif // !defined(NDEBUG)
+  }
 
 private:
   bool entered_ = false;

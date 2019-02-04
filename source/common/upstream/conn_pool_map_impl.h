@@ -2,7 +2,6 @@
 
 #include "common/upstream/conn_pool_map.h"
 
-namespace {}
 namespace Envoy {
 namespace Upstream {
 
@@ -14,7 +13,7 @@ template <typename KEY_TYPE, typename POOL_TYPE>
 ConnPoolMap<KEY_TYPE, POOL_TYPE>::~ConnPoolMap() = default;
 
 template <typename KEY_TYPE, typename POOL_TYPE>
-POOL_TYPE& ConnPoolMap<KEY_TYPE, POOL_TYPE>::getPool(KEY_TYPE key, PoolFactory factory) {
+POOL_TYPE& ConnPoolMap<KEY_TYPE, POOL_TYPE>::getPool(KEY_TYPE key, const PoolFactory& factory) {
   Common::AutoRecursionChecker assert_not_in(recursion_checker_);
   // TODO(klarose): Consider how we will change the connection pool's configuration in the future.
   // The plan is to change the downstream socket options... We may want to take those as a parameter
@@ -48,7 +47,7 @@ template <typename KEY_TYPE, typename POOL_TYPE> void ConnPoolMap<KEY_TYPE, POOL
 }
 
 template <typename KEY_TYPE, typename POOL_TYPE>
-void ConnPoolMap<KEY_TYPE, POOL_TYPE>::addDrainedCallback(DrainedCb cb) {
+void ConnPoolMap<KEY_TYPE, POOL_TYPE>::addDrainedCallback(const DrainedCb& cb) {
   Common::AutoRecursionChecker assert_not_in(recursion_checker_);
   for (auto& pool_pair : active_pools_) {
     pool_pair.second->addDrainedCallback(cb);

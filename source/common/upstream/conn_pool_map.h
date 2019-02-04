@@ -25,7 +25,7 @@ public:
    * possible for this to fail if a limit on the number of pools allowed is reached.
    * @return The pool corresponding to `key`, or `absl::nullopt`.
    */
-  POOL_TYPE& getPool(KEY_TYPE key, PoolFactory factory);
+  POOL_TYPE& getPool(KEY_TYPE key, const PoolFactory& factory);
 
   /**
    * @return the number of pools.
@@ -43,7 +43,7 @@ public:
    * the state of `this`, there is a good chance it will cause corruption due to the callback firing
    * immediately.
    */
-  void addDrainedCallback(DrainedCb cb);
+  void addDrainedCallback(const DrainedCb& cb);
 
   /**
    * Instructs each connection pool to drain its connections.
