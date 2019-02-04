@@ -72,7 +72,7 @@ TEST(HttpTracerUtilityTest, IsTracing) {
     EXPECT_TRUE(result.traced);
   }
 
-  // HC request.
+  // Health Check request.
   {
     Http::TestHeaderMapImpl traceable_header_hc{{"x-request-id", forced_guid}};
     EXPECT_CALL(stream_info, healthCheck()).WillOnce(Return(true));
