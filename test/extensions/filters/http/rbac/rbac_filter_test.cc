@@ -21,7 +21,7 @@ namespace HttpFilters {
 namespace RBACFilter {
 namespace {
 
-class RoleBasedAccessControlFilterTest : public testing::Test {
+class RoleBasedAccessControlFilterTest : public TestBase {
 public:
   RoleBasedAccessControlFilterConfigSharedPtr setupConfig() {
     envoy::config::filter::http::rbac::v2::RBAC config;
