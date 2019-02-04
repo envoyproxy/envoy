@@ -6,7 +6,6 @@
 #include "envoy/http/header_map.h"
 
 #include "common/common/thread.h"
-#include "common/filesystem/filesystem_impl.h"
 #include "common/local_info/local_info_impl.h"
 #include "common/network/utility.h"
 #include "common/stats/thread_local_store.h"
@@ -20,9 +19,9 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/test_base.h"
 
 #include "absl/strings/str_replace.h"
-#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Server {

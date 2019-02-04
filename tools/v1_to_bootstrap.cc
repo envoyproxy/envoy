@@ -10,10 +10,14 @@
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.validate.h"
 
+#include "common/api/api_impl.h"
 #include "common/config/bootstrap_json.h"
 #include "common/json/json_loader.h"
 #include "common/protobuf/utility.h"
+#include "common/stats/isolated_store_impl.h"
 #include "common/stats/stats_options_impl.h"
+
+#include "exe/platform_impl.h"
 
 // NOLINT(namespace-envoy)
 int main(int argc, char** argv) {
@@ -22,8 +26,13 @@ int main(int argc, char** argv) {
     return EXIT_FAILURE;
   }
 
+  Envoy::PlatformImpl platform_impl_;
+  Envoy::Stats::IsolatedStoreImpl stats_store;
+  Envoy::Api::Impl api(std::chrono::milliseconds(1000), platform_impl_.threadFactory(),
+                       stats_store);
+
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
-  auto config_json = Envoy::Json::Factory::loadFromFile(argv[1]);
+  auto config_json = Envoy::Json::Factory::loadFromFile(argv[1], api);
   Envoy::Stats::StatsOptionsImpl stats_options;
   Envoy::Config::BootstrapJson::translateBootstrap(*config_json, bootstrap, stats_options);
   Envoy::MessageUtil::validate(bootstrap);

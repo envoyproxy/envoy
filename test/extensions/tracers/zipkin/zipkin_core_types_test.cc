@@ -5,9 +5,8 @@
 #include "extensions/tracers/zipkin/zipkin_core_constants.h"
 #include "extensions/tracers/zipkin/zipkin_core_types.h"
 
+#include "test/test_common/test_base.h"
 #include "test/test_common/test_time.h"
-
-#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Extensions {

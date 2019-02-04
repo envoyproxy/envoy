@@ -14,10 +14,10 @@
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using ::testing::_;
 using ::testing::Invoke;
@@ -26,16 +26,17 @@ using ::testing::Return;
 namespace Envoy {
 namespace Config {
 
-class SubscriptionFactoryTest : public ::testing::Test {
+class SubscriptionFactoryTest : public TestBase {
 public:
-  SubscriptionFactoryTest() : http_request_(&cm_.async_client_) {}
+  SubscriptionFactoryTest()
+      : http_request_(&cm_.async_client_), api_(Api::createApiForTest(stats_store_)) {}
 
   std::unique_ptr<Subscription<envoy::api::v2::ClusterLoadAssignment>>
   subscriptionFromConfigSource(const envoy::api::v2::core::ConfigSource& config) {
     return SubscriptionFactory::subscriptionFromConfigSource<envoy::api::v2::ClusterLoadAssignment>(
         config, local_info_, dispatcher_, cm_, random_, stats_store_,
         "envoy.api.v2.EndpointDiscoveryService.FetchEndpoints",
-        "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints");
+        "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints", *api_);
   }
 
   Upstream::MockClusterManager cm_;
@@ -45,6 +46,7 @@ public:
   Http::MockAsyncClientRequest http_request_;
   Stats::MockIsolatedStatsStore stats_store_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  Api::ApiPtr api_;
 };
 
 class SubscriptionFactoryTestApiConfigSource

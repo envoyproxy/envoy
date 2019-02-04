@@ -11,11 +11,11 @@
 #include "test/common/config/subscription_test_harness.h"
 #include "test/mocks/config/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::NiceMock;
@@ -32,7 +32,7 @@ public:
   FilesystemSubscriptionTestHarness()
       : path_(TestEnvironment::temporaryPath("eds.json")),
         api_(Api::createApiForTest(stats_store_)), dispatcher_(test_time_.timeSystem(), *api_),
-        subscription_(dispatcher_, path_, stats_) {}
+        subscription_(dispatcher_, path_, stats_, *api_) {}
 
   ~FilesystemSubscriptionTestHarness() { EXPECT_EQ(0, ::unlink(path_.c_str())); }
 

@@ -11,9 +11,9 @@
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::DoAll;
@@ -39,7 +39,7 @@ createConnPoolSettings() {
   return setting;
 }
 
-class RedisClientImplTest : public testing::Test, public DecoderFactory {
+class RedisClientImplTest : public TestBase, public DecoderFactory {
 public:
   // RedisProxy::DecoderFactory
   DecoderPtr create(DecoderCallbacks& callbacks) override {
@@ -380,7 +380,7 @@ TEST(RedisClientFactoryImplTest, Basic) {
   client->close();
 }
 
-class RedisConnPoolImplTest : public testing::Test, public ClientFactory {
+class RedisConnPoolImplTest : public TestBase, public ClientFactory {
 public:
   void setup(bool cluster_exists = true) {
     EXPECT_CALL(cm_, addThreadLocalClusterUpdateCallbacks_(_))
@@ -435,7 +435,7 @@ TEST_F(RedisConnPoolImplTest, Basic) {
 
   EXPECT_CALL(cm_.thread_local_cluster_.lb_, chooseHost(_))
       .WillOnce(Invoke([&](Upstream::LoadBalancerContext* context) -> Upstream::HostConstSharedPtr {
-        EXPECT_EQ(context->computeHashKey().value(), std::hash<std::string>()("hash_key"));
+        EXPECT_EQ(context->computeHashKey().value(), MurmurHash::murmurHash2_64("hash_key"));
         EXPECT_EQ(context->metadataMatchCriteria(), nullptr);
         EXPECT_EQ(context->downstreamConnection(), nullptr);
         return cm_.thread_local_cluster_.lb_.host_;

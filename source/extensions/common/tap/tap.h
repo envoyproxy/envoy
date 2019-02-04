@@ -23,10 +23,14 @@ public:
    * Send a fully buffered trace to the sink.
    * @param trace supplies the trace to send. The trace message is a discrete trace message (as
    *        opposed to a portion of a larger trace that should be aggregated).
+   * @param trace_id supplies a locally unique trace ID. Some sinks use this for output generation.
    */
   virtual void
-  submitBufferedTrace(std::shared_ptr<envoy::data::tap::v2alpha::BufferedTraceWrapper> trace) PURE;
+  submitBufferedTrace(std::shared_ptr<envoy::data::tap::v2alpha::BufferedTraceWrapper> trace,
+                      uint64_t trace_id) PURE;
 };
+
+using SinkPtr = std::unique_ptr<Sink>;
 
 /**
  * Generic configuration for a tap extension (filter, transport socket, etc.).
@@ -57,6 +61,35 @@ public:
   virtual void newTapConfig(envoy::service::tap::v2alpha::TapConfig&& proto_config,
                             Sink* admin_streamer) PURE;
 };
+
+/**
+ * Abstract tap configuration base class. Used for type safety.
+ */
+class TapConfig {
+public:
+  virtual ~TapConfig() = default;
+};
+
+using TapConfigSharedPtr = std::shared_ptr<TapConfig>;
+
+/**
+ * Abstract tap configuration factory. Given a new generic tap configuration, produces an
+ * extension specific tap configuration.
+ */
+class TapConfigFactory {
+public:
+  virtual ~TapConfigFactory() = default;
+
+  /**
+   * @return a new configuration given a raw tap service config proto. See
+   * ExtensionConfig::newTapConfig() for param info.
+   */
+  virtual TapConfigSharedPtr
+  createConfigFromProto(envoy::service::tap::v2alpha::TapConfig&& proto_config,
+                        Sink* admin_streamer) PURE;
+};
+
+using TapConfigFactoryPtr = std::unique_ptr<TapConfigFactory>;
 
 } // namespace Tap
 } // namespace Common

@@ -18,13 +18,14 @@ namespace Upstream {
 CdsApiPtr CdsApiImpl::create(const envoy::api::v2::core::ConfigSource& cds_config,
                              ClusterManager& cm, Event::Dispatcher& dispatcher,
                              Runtime::RandomGenerator& random,
-                             const LocalInfo::LocalInfo& local_info, Stats::Scope& scope) {
-  return CdsApiPtr{new CdsApiImpl(cds_config, cm, dispatcher, random, local_info, scope)};
+                             const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
+                             Api::Api& api) {
+  return CdsApiPtr{new CdsApiImpl(cds_config, cm, dispatcher, random, local_info, scope, api)};
 }
 
 CdsApiImpl::CdsApiImpl(const envoy::api::v2::core::ConfigSource& cds_config, ClusterManager& cm,
                        Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
-                       const LocalInfo::LocalInfo& local_info, Stats::Scope& scope)
+                       const LocalInfo::LocalInfo& local_info, Stats::Scope& scope, Api::Api& api)
     : cm_(cm), scope_(scope.createScope("cluster_manager.cds.")) {
   Config::Utility::checkLocalInfo("cds", local_info);
 
@@ -32,7 +33,7 @@ CdsApiImpl::CdsApiImpl(const envoy::api::v2::core::ConfigSource& cds_config, Clu
       Config::SubscriptionFactory::subscriptionFromConfigSource<envoy::api::v2::Cluster>(
           cds_config, local_info, dispatcher, cm, random, *scope_,
           "envoy.api.v2.ClusterDiscoveryService.FetchClusters",
-          "envoy.api.v2.ClusterDiscoveryService.StreamClusters");
+          "envoy.api.v2.ClusterDiscoveryService.StreamClusters", api);
 }
 
 void CdsApiImpl::onConfigUpdate(const ResourceVector& resources, const std::string& version_info) {

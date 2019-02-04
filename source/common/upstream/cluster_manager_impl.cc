@@ -19,7 +19,6 @@
 #include "common/common/utility.h"
 #include "common/config/cds_json.h"
 #include "common/config/utility.h"
-#include "common/filesystem/filesystem_impl.h"
 #include "common/grpc/async_client_manager_impl.h"
 #include "common/http/async_client_impl.h"
 #include "common/http/http1/conn_pool.h"
@@ -473,7 +472,7 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::api::v2::Cluster& clust
       auto& cluster_entry = *warming_it->second;
 
       // If the cluster is being updated, we need to cancel any pending merged updates.
-      // Othewise, applyUpdates() will fire with a dangling cluster reference.
+      // Otherwise, applyUpdates() will fire with a dangling cluster reference.
       updates_map_.erase(cluster_name);
 
       active_clusters_[cluster_name] = std::move(warming_it->second);
@@ -1181,12 +1180,13 @@ ClusterSharedPtr ProdClusterManagerFactory::clusterFromProto(
   return ClusterImplBase::create(cluster, cm, stats_, tls_, dns_resolver_, ssl_context_manager_,
                                  runtime_, random_, main_thread_dispatcher_, log_manager_,
                                  local_info_, admin_, singleton_manager_, outlier_event_logger,
-                                 added_via_api);
+                                 added_via_api, api_);
 }
 
 CdsApiPtr ProdClusterManagerFactory::createCds(const envoy::api::v2::core::ConfigSource& cds_config,
                                                ClusterManager& cm) {
-  return CdsApiImpl::create(cds_config, cm, main_thread_dispatcher_, random_, local_info_, stats_);
+  return CdsApiImpl::create(cds_config, cm, main_thread_dispatcher_, random_, local_info_, stats_,
+                            api_);
 }
 
 } // namespace Upstream

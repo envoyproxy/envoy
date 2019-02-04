@@ -371,7 +371,7 @@ Utility::getLastAddressFromXFF(const Http::HeaderMap& request_headers, uint32_t 
     // This technically requires a copy because inet_pton takes a null terminated string. In
     // practice, we are working with a view at the end of the owning string, and could pass the
     // raw pointer.
-    // TODO(mattklein123 PERF: Avoid the copy here.
+    // TODO(mattklein123) PERF: Avoid the copy here.
     return {
         Network::Utility::parseInternetAddress(std::string(xff_string.data(), xff_string.size())),
         last_comma == std::string::npos && num_to_skip == 0};

@@ -5,9 +5,8 @@
 #include "common/protobuf/utility.h"
 
 #include "test/test_common/registry.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
-
-#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Config {
@@ -48,7 +47,7 @@ TEST(MetadataTest, MetadataValuePath) {
             ProtobufWkt::Value::KindCase::KIND_NOT_SET);
 }
 
-class TypedMetadataTest : public testing::Test {
+class TypedMetadataTest : public TestBase {
 public:
   TypedMetadataTest() : registered_factory_(foo_factory_) {}
 

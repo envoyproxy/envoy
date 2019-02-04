@@ -14,7 +14,7 @@ namespace Event {
 // Implements a simulated time system including a scheduler for timers. This is
 // designed to be used as as the exclusive time-system resident in a process at
 // any particular time, and as such should not be instantiated directly by
-// tests. Instead it should be instantied via SimulatedTimeSystem, declared
+// tests. Instead it should be instantiated via SimulatedTimeSystem, declared
 // below.
 class SimulatedTimeSystemHelper : public TestTimeSystem {
 public:

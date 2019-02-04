@@ -38,7 +38,7 @@ EdsClusterImpl::EdsClusterImpl(
       envoy::api::v2::ClusterLoadAssignment>(
       eds_config, local_info_, dispatcher, cm, random, info_->statsScope(),
       "envoy.api.v2.EndpointDiscoveryService.FetchEndpoints",
-      "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints");
+      "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints", factory_context.api());
 }
 
 void EdsClusterImpl::startPreInit() { subscription_->start({cluster_name_}, *this); }

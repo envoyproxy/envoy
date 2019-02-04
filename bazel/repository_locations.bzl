@@ -5,10 +5,10 @@ REPOSITORY_LOCATIONS = dict(
     ),
     boringssl = dict(
         # Use commits from branch "chromium-stable-with-bazel"
-        sha256 = "a4a71d97b90825f509c472cc9ad2404d4100f6cce042fc159388956bc5c616fb",
-        strip_prefix = "boringssl-77e47de9e16ec8865d1bc6d614dd918141f094d2",
-        # chromium-71.0.3578.80
-        urls = ["https://github.com/google/boringssl/archive/77e47de9e16ec8865d1bc6d614dd918141f094d2.tar.gz"],
+        sha256 = "de3fc9ff61e2fa736681b401ac94ea016f6ff522da419c312eca6aec60ad6f50",
+        strip_prefix = "boringssl-a7d9ef75919900bf4dca947ad3d5d03f0dee3f2a",
+        # chromium-72.0.3626.81
+        urls = ["https://github.com/google/boringssl/archive/a7d9ef75919900bf4dca947ad3d5d03f0dee3f2a.tar.gz"],
     ),
     boringssl_fips = dict(
         sha256 = "b12ad676ee533824f698741bd127f6fbc82c46344398a6d78d25e62c6c418c73",
@@ -26,10 +26,10 @@ REPOSITORY_LOCATIONS = dict(
         strip_prefix = "thrift-0.11.0",
         urls = ["https://files.pythonhosted.org/packages/c6/b4/510617906f8e0c5660e7d96fbc5585113f83ad547a3989b80297ac72a74c/thrift-0.11.0.tar.gz"],
     ),
-    com_github_bombela_backward = dict(
-        sha256 = "ad73be31c5cfcbffbde7d34dba18158a42043a109e7f41946f0b0abd589ed55e",
-        strip_prefix = "backward-cpp-1.4",
-        urls = ["https://github.com/bombela/backward-cpp/archive/v1.4.tar.gz"],
+    com_github_c_ares_c_ares = dict(
+        sha256 = "7deb7872cbd876c29036d5f37e30c4cbc3cc068d59d8b749ef85bb0736649f04",
+        strip_prefix = "c-ares-cares-1_15_0",
+        urls = ["https://github.com/c-ares/c-ares/archive/cares-1_15_0.tar.gz"],
     ),
     com_github_circonus_labs_libcircllhist = dict(
         sha256 = "9949e2864b8ad00ee5c3e9c1c3c01e51b6b68bb442a919652fc66b9776477987",
@@ -83,6 +83,11 @@ REPOSITORY_LOCATIONS = dict(
         strip_prefix = "nanopb-0.3.9.2",
         urls = ["https://github.com/nanopb/nanopb/archive/0.3.9.2.tar.gz"],
     ),
+    com_github_nghttp2_nghttp2 = dict(
+        sha256 = "cb70261634c33dc5adbe780afcfc5dab17838ee303631a02b983c6a217bc16ba",
+        strip_prefix = "nghttp2-1.35.1",
+        urls = ["https://github.com/nghttp2/nghttp2/releases/download/v1.35.1/nghttp2-1.35.1.tar.gz"],
+    ),
     io_opentracing_cpp = dict(
         sha256 = "015c4187f7a6426a2b5196f0ccd982aa87f010cf61f507ae3ce5c90523f92301",
         strip_prefix = "opentracing-cpp-1.5.1",
@@ -100,9 +105,30 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/googleapis/googleapis/archive/d6f78d948c53f3b400bb46996eb3084359914f9b.tar.gz"],
     ),
     com_github_datadog_dd_opentracing_cpp = dict(
-        sha256 = "1798ce816e389ad89c379cb734487ed8b7db3d909be0c8548bd96538f78639b7",
-        strip_prefix = "dd-opentracing-cpp-0.4.1",
-        urls = ["https://github.com/DataDog/dd-opentracing-cpp/archive/v0.4.1.tar.gz"],
+        sha256 = "a3d1c03e7af570fa64c01df259e6e9bb78637a6bd9c65c6bf7e8703e466dc22f",
+        strip_prefix = "dd-opentracing-cpp-0.4.2",
+        urls = ["https://github.com/DataDog/dd-opentracing-cpp/archive/v0.4.2.tar.gz"],
+    ),
+    com_github_google_benchmark = dict(
+        # TODO (moderation) change back to tarball method on next benchmark release
+        sha256 = "0de43b6eaddd356f1d6cd164f73f37faf2f6c96fd684e1f7ea543ce49c1d144e",
+        strip_prefix = "benchmark-505be96ab23056580a3a2315abba048f4428b04e",
+        urls = ["https://github.com/google/benchmark/archive/505be96ab23056580a3a2315abba048f4428b04e.tar.gz"],
+    ),
+    com_github_libevent_libevent = dict(
+        sha256 = "316ddb401745ac5d222d7c529ef1eada12f58f6376a66c1118eee803cb70f83d",
+        strip_prefix = "libevent-release-2.1.8-stable",
+        urls = ["https://github.com/libevent/libevent/archive/release-2.1.8-stable.tar.gz"],
+    ),
+    com_github_madler_zlib = dict(
+        sha256 = "629380c90a77b964d896ed37163f5c3a34f6e6d897311f1df2a7016355c45eff",
+        strip_prefix = "zlib-1.2.11",
+        urls = ["https://github.com/madler/zlib/archive/v1.2.11.tar.gz"],
+    ),
+    com_github_jbeder_yaml_cpp = dict(
+        sha256 = "53dcffd55f3433b379fcc694f45c54898711c0e29159a7bd02e82a3e0253bac3",
+        strip_prefix = "yaml-cpp-0f9a586ca1dc29c2ecb8dd715a315b93e3f40f79",
+        urls = ["https://github.com/jbeder/yaml-cpp/archive/0f9a586ca1dc29c2ecb8dd715a315b93e3f40f79.tar.gz"],
     ),
     com_github_msgpack_msgpack_c = dict(
         sha256 = "bda49f996a73d2c6080ff0523e7b535917cd28c8a79c3a5da54fc29332d61d1e",
@@ -187,6 +213,11 @@ REPOSITORY_LOCATIONS = dict(
         sha256 = "7be7dc01f1e0afdba6c8eb2b43d2fa01c743be1b9273ab1eaf6c233df078d705",
         urls = ["https://github.com/bazelbuild/rules_go/releases/download/0.16.5/rules_go-0.16.5.tar.gz"],
     ),
+    rules_foreign_cc = dict(
+        sha256 = "78cbd1a8134b2f0ead8e637228d8ac1ac7c0ab3f0fbcd149a85e55330697d9a3",
+        strip_prefix = "rules_foreign_cc-216ded8acb95d81e312b228dce3c39872c7a7c34",
+        urls = ["https://github.com/bazelbuild/rules_foreign_cc/archive/216ded8acb95d81e312b228dce3c39872c7a7c34.tar.gz"],
+    ),
     six_archive = dict(
         sha256 = "105f8d68616f8248e24bf0e9372ef04d3cc10104f1980f54d57b2ce73a5ad56a",
         urls = ["https://pypi.python.org/packages/source/s/six/six-1.10.0.tar.gz#md5=34eed507548117b2ab523ab14b2f8b55"],
@@ -199,8 +230,8 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/google/subpar/archive/1.3.0.tar.gz"],
     ),
     com_googlesource_quiche = dict(
-        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/c9b2cecd1d005893114a03c101532017ddfa12cb.tar.gz
-        sha256 = "c8faea835132103d574cc2769a58e244bee3de02669471330a174f2ffae6fcc3",
-        urls = ["https://storage.googleapis.com/quiche-envoy-integration/c9b2cecd1d005893114a03c101532017ddfa12cb.tar.gz"],
+        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/dc5ce1a82e342bfd366a1ccdf2a2717edb46e4ec.tar.gz
+        sha256 = "ed4aec9af6b251385b720d3a23a22a4264d649806ff95dc0b29dab9f786387a0",
+        urls = ["https://storage.googleapis.com/quiche-envoy-integration/dc5ce1a82e342bfd366a1ccdf2a2717edb46e4ec.tar.gz"],
     ),
 )

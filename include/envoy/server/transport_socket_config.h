@@ -93,6 +93,11 @@ public:
    * @return the server's TLS slot allocator.
    */
   virtual ThreadLocal::SlotAllocator& threadLocal() PURE;
+
+  /**
+   * @return reference to the Api object
+   */
+  virtual Api::Api& api() PURE;
 };
 
 class TransportSocketConfigFactory {

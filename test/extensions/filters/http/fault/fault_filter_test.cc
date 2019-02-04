@@ -18,10 +18,10 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::DoAll;
@@ -36,7 +36,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Fault {
 
-class FaultFilterTest : public testing::Test {
+class FaultFilterTest : public TestBase {
 public:
   const std::string fixed_delay_and_abort_nodes_json = R"EOF(
     {

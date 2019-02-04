@@ -8,11 +8,11 @@
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/proto/helloworld.pb.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Return;
@@ -44,7 +44,7 @@ public:
   std::shared_ptr<GoogleStub> shared_stub_{stub_};
 };
 
-class EnvoyGoogleAsyncClientImplTest : public testing::Test {
+class EnvoyGoogleAsyncClientImplTest : public TestBase {
 public:
   EnvoyGoogleAsyncClientImplTest()
       : stats_store_(new Stats::IsolatedStoreImpl), api_(Api::createApiForTest(*stats_store_)),
@@ -55,8 +55,8 @@ public:
     google_grpc->set_target_uri("fake_address");
     google_grpc->set_stat_prefix("test_cluster");
     tls_ = std::make_unique<GoogleAsyncClientThreadLocal>(*api_);
-    grpc_client_ =
-        std::make_unique<GoogleAsyncClientImpl>(dispatcher_, *tls_, stub_factory_, scope_, config);
+    grpc_client_ = std::make_unique<GoogleAsyncClientImpl>(dispatcher_, *tls_, stub_factory_,
+                                                           scope_, config, *api_);
   }
 
   DangerousDeprecatedTestTime test_time_;

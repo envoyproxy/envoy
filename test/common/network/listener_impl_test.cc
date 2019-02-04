@@ -6,11 +6,11 @@
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Invoke;
@@ -55,7 +55,7 @@ static void errorCallbackTest(Address::IpVersion version) {
   dispatcher.run(Event::Dispatcher::RunType::Block);
 }
 
-class ListenerImplDeathTest : public testing::TestWithParam<Address::IpVersion> {};
+class ListenerImplDeathTest : public TestBaseWithParam<Address::IpVersion> {};
 INSTANTIATE_TEST_SUITE_P(IpVersions, ListenerImplDeathTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
@@ -73,7 +73,7 @@ public:
   MOCK_METHOD1(getLocalAddress, Address::InstanceConstSharedPtr(int fd));
 };
 
-class ListenerImplTest : public testing::TestWithParam<Address::IpVersion> {
+class ListenerImplTest : public TestBaseWithParam<Address::IpVersion> {
 protected:
   ListenerImplTest()
       : version_(GetParam()),
@@ -104,17 +104,6 @@ TEST_P(ListenerImplTest, SetListeningSocketOptionsSuccess) {
   EXPECT_CALL(*option, setOption(_, envoy::api::v2::core::SocketOption::STATE_LISTENING))
       .WillOnce(Return(true));
   TestListenerImpl listener(dispatcher_, socket, listener_callbacks, true, false);
-}
-
-// Test that socket options are set after the listener is setup.
-TEST_P(ListenerImplTest, UdpSetListeningSocketOptionsSuccess) {
-  Network::MockListenerCallbacks listener_callbacks;
-  Network::MockConnectionHandler connection_handler;
-
-  Network::UdpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(version_), nullptr,
-                                  true);
-  std::shared_ptr<MockSocketOption> option = std::make_shared<MockSocketOption>();
-  socket.addOption(option);
 }
 
 // Test that an exception is thrown if there is an error setting socket options.

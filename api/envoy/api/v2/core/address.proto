@@ -56,7 +56,7 @@ message SocketAddress {
   // IP address, no resolution will occur.
   string resolver_name = 5;
 
-  // When binding to an IPv6 address above, this enables `IPv4 compatibity
+  // When binding to an IPv6 address above, this enables `IPv4 compatibility
   // <https://tools.ietf.org/html/rfc3493#page-11>`_. Binding to ``::`` will
   // allow both IPv4 and IPv6 connections, with peer IPv4 addresses mapped into
   // IPv6 space as ``::FFFF:<IPv4-address>``.

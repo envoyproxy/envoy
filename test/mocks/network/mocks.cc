@@ -10,9 +10,9 @@
 #include "common/network/utility.h"
 
 #include "test/test_common/printers.h"
+#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Invoke;
@@ -77,6 +77,9 @@ MockFilter::~MockFilter() {}
 
 MockListenerCallbacks::MockListenerCallbacks() {}
 MockListenerCallbacks::~MockListenerCallbacks() {}
+
+MockUdpListenerCallbacks::MockUdpListenerCallbacks() {}
+MockUdpListenerCallbacks::~MockUdpListenerCallbacks() {}
 
 MockDrainDecision::MockDrainDecision() {}
 MockDrainDecision::~MockDrainDecision() {}

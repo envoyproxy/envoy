@@ -404,7 +404,7 @@ public:
                      Event::TestTimeSystem& time_system);
 
   // By default waitForNewStream assumes the next event is a new stream and
-  // returns AssertionFaliure if an unexpected event occurs. If a caller truly
+  // returns AssertionFailure if an unexpected event occurs. If a caller truly
   // wishes to wait for a new stream, set ignore_spurious_events = true. Returns
   // the new stream via the stream argument.
   ABSL_MUST_USE_RESULT

@@ -87,7 +87,7 @@ private:
 
   const LocalInfo::LocalInfo& local_info_;
   std::unordered_map<std::string, ApiState> api_state_;
-  // Envoy's dependendency ordering.
+  // Envoy's dependency ordering.
   std::list<std::string> subscriptions_;
 };
 

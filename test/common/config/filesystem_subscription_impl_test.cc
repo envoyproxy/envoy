@@ -2,9 +2,9 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/filesystem/mocks.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using ::testing::Throw;
 
@@ -12,8 +12,7 @@ namespace Envoy {
 namespace Config {
 namespace {
 
-class FilesystemSubscriptionImplTest : public FilesystemSubscriptionTestHarness,
-                                       public testing::Test {};
+class FilesystemSubscriptionImplTest : public FilesystemSubscriptionTestHarness, public TestBase {};
 
 // Validate that the client can recover from bad JSON responses.
 TEST_F(FilesystemSubscriptionImplTest, BadJsonRecovery) {
@@ -37,11 +36,12 @@ TEST_F(FilesystemSubscriptionImplTest, InitialFile) {
 TEST(MiscFilesystemSubscriptionImplTest, BadWatch) {
   Event::MockDispatcher dispatcher;
   Stats::MockIsolatedStatsStore stats_store;
+  Api::ApiPtr api = Api::createApiForTest(stats_store);
   SubscriptionStats stats{Utility::generateStats(stats_store)};
   auto* watcher = new Filesystem::MockWatcher();
   EXPECT_CALL(dispatcher, createFilesystemWatcher_()).WillOnce(Return(watcher));
   EXPECT_CALL(*watcher, addWatch(_, _, _)).WillOnce(Throw(EnvoyException("bad path")));
-  EXPECT_THROW_WITH_MESSAGE(FilesystemEdsSubscriptionImpl(dispatcher, "##!@/dev/null", stats),
+  EXPECT_THROW_WITH_MESSAGE(FilesystemEdsSubscriptionImpl(dispatcher, "##!@/dev/null", stats, *api),
                             EnvoyException, "bad path");
 }
 

@@ -207,6 +207,7 @@ envoy_cc_test(
     srcs = ["filter_json_test.cc"],
     deps = [
         "//source/common/config:filter_json_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 

@@ -40,7 +40,7 @@ message HealthCheck {
     (gogoproto.stdduration) = true
   ];
 
-  // An optional jitter amount in millseconds. If specified, during every
+  // An optional jitter amount in milliseconds. If specified, during every
   // interval Envoy will add interval_jitter to the wait time.
   google.protobuf.Duration interval_jitter = 3;
 
