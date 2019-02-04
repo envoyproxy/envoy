@@ -101,6 +101,13 @@ private:
       sendDiscoveryRequest(request_queue_.front());
       request_queue_.pop();
     }
+    // Although request_queue_.push() happens elsewhere, the only time the queue is non-transiently
+    // non-empty is when it remains non-empty after a drain attempt. (The push() doesn't matter
+    // because we always attempt this drain immediately after the push). Basically, a change in
+    // queue length is not "meaningful" until it has persisted until here. Since we are constantly
+    // doing set(0), we need the if(>0 || used) to keep this stat from being wrongly marked
+    // interesting and needlessly taking up space. The first time we set(123), used becomes true,
+    // and so we will subsequently always do the set (including set(0)).
     if (request_queue_.size() > 0 || control_plane_stats_.pending_requests_.used()) {
       control_plane_stats_.pending_requests_.set(request_queue_.size());
     }
