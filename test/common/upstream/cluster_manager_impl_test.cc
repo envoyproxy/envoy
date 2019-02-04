@@ -147,6 +147,13 @@ public:
                            main_thread_dispatcher, admin, api, http_context_),
         local_cluster_update_(local_cluster_update) {}
 
+  std::map<std::string, std::reference_wrapper<Cluster>> activeClusters() {
+    std::map<std::string, std::reference_wrapper<Cluster>> clusters;
+    for (auto& cluster : active_clusters_) {
+      clusters.emplace(cluster.first, *cluster.second->cluster_);
+    }
+    return clusters; 
+  }
 protected:
   void postThreadLocalClusterUpdate(const Cluster&, uint32_t priority,
                                     const HostVector& hosts_added,
@@ -168,9 +175,9 @@ public:
   ClusterManagerImplTest() : api_(Api::createApiForTest(stats_store_)) {}
 
   void create(const envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
-    cluster_manager_ = std::make_unique<ClusterManagerImpl>(
+    cluster_manager_ = std::make_unique<TestClusterManagerImpl>(
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.random_,
-        factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, *api_, http_context_);
+        factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, *api_, local_cluster_update_);
   }
 
   void createWithLocalClusterUpdate(const bool enable_merge_window = true) {
@@ -243,7 +250,7 @@ public:
   Event::SimulatedTimeSystem time_system_;
   Api::ApiPtr api_;
   NiceMock<TestClusterManagerFactory> factory_;
-  std::unique_ptr<ClusterManagerImpl> cluster_manager_;
+  std::unique_ptr<TestClusterManagerImpl> cluster_manager_;
   AccessLog::MockAccessLogManager log_manager_;
   NiceMock<Server::MockAdmin> admin_;
   MockLocalClusterUpdate local_cluster_update_;
@@ -765,22 +772,20 @@ TEST_F(ClusterManagerImplTest, ShutdownOrder) {
       fmt::sprintf("{%s}", clustersJson({defaultStaticClusterJson("cluster_1")}));
 
   create(parseBootstrapFromJson(json));
-  const Cluster& cluster = cluster_manager_->clusters().begin()->second;
-  EXPECT_EQ("cluster_1", cluster.info()->name());
-  EXPECT_EQ(cluster.info(), cluster_manager_->get("cluster_1")->info());
-  EXPECT_EQ(
-      1UL,
-      cluster_manager_->get("cluster_1")->prioritySet().hostSetsPerPriority()[0]->hosts().size());
-  EXPECT_EQ(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0],
+  auto& cluster = cluster_manager_->activeClusters().begin()->second;
+  EXPECT_EQ("cluster_1", cluster.get().info()->name());
+  EXPECT_EQ(cluster.get().info(), cluster_manager_->get("cluster_1")->info());
+  EXPECT_EQ(1UL, cluster_manager_->get("cluster_1")->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ(cluster.get().prioritySet().hostSetsPerPriority()[0]->hosts()[0],
             cluster_manager_->get("cluster_1")->loadBalancer().chooseHost(nullptr));
 
   // Local reference, primary reference, thread local reference, host reference, async client
   // reference.
-  EXPECT_EQ(5U, cluster.info().use_count());
+  EXPECT_EQ(5U, cluster.get().info().use_count());
 
   // Thread local reference should be gone.
   factory_.tls_.shutdownThread();
-  EXPECT_EQ(3U, cluster.info().use_count());
+  EXPECT_EQ(3U, cluster.get().info().use_count());
 }
 
 TEST_F(ClusterManagerImplTest, InitializeOrder) {
@@ -2058,16 +2063,16 @@ TEST_F(ClusterManagerImplTest, MergedUpdates) {
       }));
 
   Event::MockTimer* timer = new NiceMock<Event::MockTimer>(&factory_.dispatcher_);
-  const Cluster& cluster = cluster_manager_->clusters().begin()->second;
+  auto& cluster = cluster_manager_->activeClusters().begin()->second;
   HostVectorSharedPtr hosts(
-      new HostVector(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()));
+      new HostVector(cluster.get().prioritySet().hostSetsPerPriority()[0]->hosts()));
   HostsPerLocalitySharedPtr hosts_per_locality = std::make_shared<HostsPerLocalityImpl>();
   HostVector hosts_added;
   HostVector hosts_removed;
 
   // The first update should be applied immediately, since it's not mergeable.
   hosts_removed.push_back((*hosts)[0]);
-  cluster.prioritySet().updateHosts(
+  cluster.get().prioritySet().updateHosts(
       0, HostSetImpl::updateHostsParams(hosts, hosts_per_locality, hosts, hosts_per_locality), {},
       hosts_added, hosts_removed, absl::nullopt);
   EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated").value());
@@ -2076,10 +2081,10 @@ TEST_F(ClusterManagerImplTest, MergedUpdates) {
 
   // These calls should be merged, since there are no added/removed hosts.
   hosts_removed.clear();
-  cluster.prioritySet().updateHosts(
+  cluster.get().prioritySet().updateHosts(
       0, HostSetImpl::updateHostsParams(hosts, hosts_per_locality, hosts, hosts_per_locality), {},
       hosts_added, hosts_removed, absl::nullopt);
-  cluster.prioritySet().updateHosts(
+  cluster.get().prioritySet().updateHosts(
       0, HostSetImpl::updateHostsParams(hosts, hosts_per_locality, hosts, hosts_per_locality), {},
       hosts_added, hosts_removed, absl::nullopt);
   EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated").value());
@@ -2095,7 +2100,7 @@ TEST_F(ClusterManagerImplTest, MergedUpdates) {
   // Add the host back, the update should be immediately applied.
   hosts_removed.clear();
   hosts_added.push_back((*hosts)[0]);
-  cluster.prioritySet().updateHosts(
+  cluster.get().prioritySet().updateHosts(
       0, HostSetImpl::updateHostsParams(hosts, hosts_per_locality, hosts, hosts_per_locality), {},
       hosts_added, hosts_removed, absl::nullopt);
   EXPECT_EQ(2, factory_.stats_.counter("cluster_manager.cluster_updated").value());
@@ -2106,17 +2111,17 @@ TEST_F(ClusterManagerImplTest, MergedUpdates) {
   hosts_added.clear();
 
   (*hosts)[0]->metadata(buildMetadata("v1"));
-  cluster.prioritySet().updateHosts(
+  cluster.get().prioritySet().updateHosts(
       0, HostSetImpl::updateHostsParams(hosts, hosts_per_locality, hosts, hosts_per_locality), {},
       hosts_added, hosts_removed, absl::nullopt);
 
   (*hosts)[0]->healthFlagSet(Host::HealthFlag::FAILED_EDS_HEALTH);
-  cluster.prioritySet().updateHosts(
+  cluster.get().prioritySet().updateHosts(
       0, HostSetImpl::updateHostsParams(hosts, hosts_per_locality, hosts, hosts_per_locality), {},
       hosts_added, hosts_removed, absl::nullopt);
 
   (*hosts)[0]->weight(100);
-  cluster.prioritySet().updateHosts(
+  cluster.get().prioritySet().updateHosts(
       0, HostSetImpl::updateHostsParams(hosts, hosts_per_locality, hosts, hosts_per_locality), {},
       hosts_added, hosts_removed, absl::nullopt);
 
@@ -2127,7 +2132,7 @@ TEST_F(ClusterManagerImplTest, MergedUpdates) {
 
   // Remove the host again, should cancel the scheduled update and be delivered immediately.
   hosts_removed.push_back((*hosts)[0]);
-  cluster.prioritySet().updateHosts(
+  cluster.get().prioritySet().updateHosts(
       0, HostSetImpl::updateHostsParams(hosts, hosts_per_locality, hosts, hosts_per_locality), {},
       hosts_added, hosts_removed, absl::nullopt);
 
@@ -2150,9 +2155,9 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesOutOfWindow) {
         EXPECT_EQ(0, hosts_removed.size());
       }));
 
-  const Cluster& cluster = cluster_manager_->clusters().begin()->second;
+  auto& cluster = cluster_manager_->activeClusters().begin()->second;
   HostVectorSharedPtr hosts(
-      new HostVector(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()));
+      new HostVector(cluster.get().prioritySet().hostSetsPerPriority()[0]->hosts()));
   HostsPerLocalitySharedPtr hosts_per_locality = std::make_shared<HostsPerLocalityImpl>();
   HostVector hosts_added;
   HostVector hosts_removed;
@@ -2161,7 +2166,7 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesOutOfWindow) {
   // it's outside the default merge window of 3 seconds (found in debugger as value of
   // cluster.info()->lbConfig().update_merge_window() in ClusterManagerImpl::scheduleUpdate.
   time_system_.sleep(std::chrono::seconds(60));
-  cluster.prioritySet().updateHosts(
+  cluster.get().prioritySet().updateHosts(
       0, HostSetImpl::updateHostsParams(hosts, hosts_per_locality, hosts, hosts_per_locality), {},
       hosts_added, hosts_removed, absl::nullopt);
   EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated").value());
@@ -2174,9 +2179,9 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesOutOfWindow) {
 TEST_F(ClusterManagerImplTest, MergedUpdatesInsideWindow) {
   createWithLocalClusterUpdate();
 
-  const Cluster& cluster = cluster_manager_->clusters().begin()->second;
+  auto& cluster = cluster_manager_->activeClusters().begin()->second;
   HostVectorSharedPtr hosts(
-      new HostVector(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()));
+      new HostVector(cluster.get().prioritySet().hostSetsPerPriority()[0]->hosts()));
   HostsPerLocalitySharedPtr hosts_per_locality = std::make_shared<HostsPerLocalityImpl>();
   HostVector hosts_added;
   HostVector hosts_removed;
@@ -2186,7 +2191,7 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesInsideWindow) {
   // in ClusterManagerImpl::scheduleUpdate. Note that initially the update-time is
   // default-initialized to a monotonic time of 0, as is SimulatedTimeSystem::monotonic_time_.
   time_system_.sleep(std::chrono::seconds(2));
-  cluster.prioritySet().updateHosts(
+  cluster.get().prioritySet().updateHosts(
       0, HostSetImpl::updateHostsParams(hosts, hosts_per_locality, hosts, hosts_per_locality), {},
       hosts_added, hosts_removed, absl::nullopt);
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated").value());
@@ -2210,16 +2215,16 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesOutOfWindowDisabled) {
         EXPECT_EQ(0, hosts_removed.size());
       }));
 
-  const Cluster& cluster = cluster_manager_->clusters().begin()->second;
+  auto& cluster = cluster_manager_->activeClusters().begin()->second;
   HostVectorSharedPtr hosts(
-      new HostVector(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()));
+      new HostVector(cluster.get().prioritySet().hostSetsPerPriority()[0]->hosts()));
   HostsPerLocalitySharedPtr hosts_per_locality = std::make_shared<HostsPerLocalityImpl>();
   HostVector hosts_added;
   HostVector hosts_removed;
 
   // The first update should be applied immediately, because even though it's mergeable
   // and outside a merge window, merging is disabled.
-  cluster.prioritySet().updateHosts(
+  cluster.get().prioritySet().updateHosts(
       0, HostSetImpl::updateHostsParams(hosts, hosts_per_locality, hosts, hosts_per_locality), {},
       hosts_added, hosts_removed, absl::nullopt);
   EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated").value());
@@ -2268,16 +2273,16 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesDestroyedOnUpdate) {
   )EOF";
   EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(parseClusterFromV2Yaml(yaml), "version1"));
 
-  const Cluster& cluster = cluster_manager_->clusters().find("new_cluster")->second;
+  auto& cluster = cluster_manager_->activeClusters().find("new_cluster")->second;
   HostVectorSharedPtr hosts(
-      new HostVector(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()));
+      new HostVector(cluster.get().prioritySet().hostSetsPerPriority()[0]->hosts()));
   HostsPerLocalitySharedPtr hosts_per_locality = std::make_shared<HostsPerLocalityImpl>();
   HostVector hosts_added;
   HostVector hosts_removed;
 
   // The first update should be applied immediately, since it's not mergeable.
   hosts_removed.push_back((*hosts)[0]);
-  cluster.prioritySet().updateHosts(
+  cluster.get().prioritySet().updateHosts(
       0, HostSetImpl::updateHostsParams(hosts, hosts_per_locality, hosts, hosts_per_locality), {},
       hosts_added, hosts_removed, absl::nullopt);
   EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated").value());
@@ -2286,10 +2291,10 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesDestroyedOnUpdate) {
 
   // These calls should be merged, since there are no added/removed hosts.
   hosts_removed.clear();
-  cluster.prioritySet().updateHosts(
+  cluster.get().prioritySet().updateHosts(
       0, HostSetImpl::updateHostsParams(hosts, hosts_per_locality, hosts, hosts_per_locality), {},
       hosts_added, hosts_removed, absl::nullopt);
-  cluster.prioritySet().updateHosts(
+  cluster.get().prioritySet().updateHosts(
       0, HostSetImpl::updateHostsParams(hosts, hosts_per_locality, hosts, hosts_per_locality), {},
       hosts_added, hosts_removed, absl::nullopt);
   EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated").value());
