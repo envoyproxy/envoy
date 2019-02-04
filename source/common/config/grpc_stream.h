@@ -65,18 +65,6 @@ public:
 
   bool grpcStreamAvailable() const { return stream_ != nullptr; }
 
-  bool checkRateLimitAllowsDrain() {
-    if (!rate_limiting_enabled_ || limit_request_->consume()) {
-      return true;
-    }
-    ASSERT(drain_request_timer_ != nullptr);
-    control_plane_stats_.rate_limit_enforced_.inc();
-    // Enable the drain request timer.
-    drain_request_timer_->enableTimer(
-        std::chrono::milliseconds(limit_request_->nextTokenAvailableMs()));
-    return false;
-  }
-
   void sendMessage(const RequestProto& request) { stream_->sendMessage(request, false); }
 
   // Grpc::AsyncStreamCallbacks
@@ -117,6 +105,18 @@ private:
     }
   }
 
+  bool checkRateLimitAllowsDrain() {
+    if (!rate_limiting_enabled_ || limit_request_->consume()) {
+      return true;
+    }
+    ASSERT(drain_request_timer_ != nullptr);
+    control_plane_stats_.rate_limit_enforced_.inc();
+    // Enable the drain request timer.
+    drain_request_timer_->enableTimer(
+        std::chrono::milliseconds(limit_request_->nextTokenAvailableMs()));
+    return false;
+  }
+
   void setRetryTimer() {
     retry_timer_->enableTimer(std::chrono::milliseconds(backoff_strategy_->nextBackOffMs()));
   }
@@ -130,8 +130,6 @@ private:
   // TODO(htuch): Make this configurable or some static.
   const uint32_t RETRY_INITIAL_DELAY_MS = 500;
   const uint32_t RETRY_MAX_DELAY_MS = 30000; // Do not cross more than 30s
-
-  std::queue<RequestQueueItem> request_queue_;
 
   Grpc::AsyncClientPtr async_client_;
   Grpc::AsyncStream* stream_{};
@@ -148,6 +146,9 @@ private:
   TokenBucketPtr limit_request_;
   const bool rate_limiting_enabled_;
   Event::TimerPtr drain_request_timer_;
+  // A queue to store requests while rate limited. Note that when requests cannot be sent due to the
+  // gRPC stream being down, this queue does not store them; rather, they are simply dropped.
+  std::queue<RequestQueueItem> request_queue_;
 };
 
 } // namespace Config

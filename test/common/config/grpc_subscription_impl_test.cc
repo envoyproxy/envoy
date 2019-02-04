@@ -1,6 +1,5 @@
 #include "test/common/config/grpc_subscription_test_harness.h"
-
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using testing::InSequence;
 
@@ -8,7 +7,7 @@ namespace Envoy {
 namespace Config {
 namespace {
 
-class GrpcSubscriptionImplTest : public GrpcSubscriptionTestHarness, public testing::Test {};
+class GrpcSubscriptionImplTest : public GrpcSubscriptionTestHarness, public TestBase {};
 
 // Validate that stream creation results in a timer based retry and can recover.
 TEST_F(GrpcSubscriptionImplTest, StreamCreationFailure) {
@@ -30,7 +29,7 @@ TEST_F(GrpcSubscriptionImplTest, StreamCreationFailure) {
   expectSendMessage({"cluster2"}, "");
   timer_cb_();
   verifyStats(3, 0, 0, 1, 0);
-  verifyControlPlaneStats(1, 0);
+  verifyControlPlaneStats(1);
 }
 
 // Validate that the client can recover from a remote stream closure via retry.
@@ -44,17 +43,12 @@ TEST_F(GrpcSubscriptionImplTest, RemoteStreamClose) {
   EXPECT_CALL(random_, random());
   subscription_->grpcMux().onRemoteClose(Grpc::Status::GrpcStatus::Canceled, "");
   verifyStats(2, 0, 0, 1, 0);
-  verifyControlPlaneStats(0, 0);
+  verifyControlPlaneStats(0);
 
   // Retry and succeed.
   EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
   expectSendMessage({"cluster0", "cluster1"}, "");
-  // Verify that a request attempt that arrives while disconnected is counted as pending.
-  subscription_->grpcMux().queueDiscoveryRequest("some_type_url");
-  verifyControlPlaneStats(0, 1);
   timer_cb_();
-  // Verify that queued requests are sent upon reconnect, with queue stats are updated accordingly.
-  verifyControlPlaneStats(1, 0);
   verifyStats(2, 0, 0, 1, 0);
 }
 

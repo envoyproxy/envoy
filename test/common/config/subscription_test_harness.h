@@ -3,9 +3,9 @@
 #include "common/config/utility.h"
 
 #include "test/mocks/stats/mocks.h"
+#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Config {
@@ -58,9 +58,8 @@ public:
     EXPECT_EQ(version, stats_.version_.value());
   }
 
-  virtual void verifyControlPlaneStats(uint32_t connected_state, uint32_t pending_requests) {
+  virtual void verifyControlPlaneStats(uint32_t connected_state) {
     EXPECT_EQ(connected_state, stats_store_.gauge("control_plane.connected_state").value());
-    EXPECT_EQ(pending_requests, stats_store_.gauge("control_plane.pending_requests").value());
   }
 
   Stats::IsolatedStoreImpl stats_store_;
