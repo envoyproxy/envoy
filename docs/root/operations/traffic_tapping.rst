@@ -29,8 +29,6 @@ To configure traffic tapping, add an `envoy.transport_sockets.tap` transport soc
 :ref:`configuration <envoy_api_msg_config.transport_socket.tap.v2alpha.Tap>` to the listener
 or cluster. For a plain text socket this might look like:
 
-fixfix format docs
-
 .. code-block:: yaml
 
   transport_socket:
