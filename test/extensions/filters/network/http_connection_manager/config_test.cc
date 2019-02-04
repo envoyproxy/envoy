@@ -10,10 +10,10 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::ContainerEq;
@@ -43,7 +43,7 @@ parseHttpConnectionManagerFromV2Yaml(const std::string& yaml) {
   return http_connection_manager;
 }
 
-class HttpConnectionManagerConfigTest : public testing::Test {
+class HttpConnectionManagerConfigTest : public TestBase {
 public:
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   Http::SlowDateProviderImpl date_provider_{context_.dispatcher().timeSystem()};

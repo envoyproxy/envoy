@@ -137,7 +137,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_test_library(
+envoy_cc_library(
     name = "global_lib",
     srcs = ["global.cc"],
     hdrs = ["global.h"],
@@ -152,6 +152,16 @@ envoy_cc_test(
     srcs = ["global_test.cc"],
     deps = [
         ":global_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "test_base",
+    srcs = ["test_base.cc"],
+    hdrs = ["test_base.h"],
+    deps = [
+        "//external:googletest",
+        "//test/test_common:global_lib",
     ],
 )
 

@@ -6,11 +6,9 @@
 
 #include "test/extensions/filters/network/thrift_proxy/utility.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
-#include "gtest/gtest.h"
-
-using testing::TestWithParam;
 using testing::Values;
 
 namespace Envoy {
@@ -18,7 +16,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
 
-class CompactProtocolTest : public testing::Test {
+class CompactProtocolTest : public TestBase {
 public:
   void resetMetadata() {
     metadata_.setMethodName("-");
@@ -998,7 +996,7 @@ TEST_F(CompactProtocolTest, ReadBinary) {
   EXPECT_EQ(buffer.length(), 0);
 }
 
-class CompactProtocolFieldTypeTest : public TestWithParam<uint8_t> {};
+class CompactProtocolFieldTypeTest : public TestBaseWithParam<uint8_t> {};
 
 TEST_P(CompactProtocolFieldTypeTest, ConvertsToFieldType) {
   uint8_t compact_field_type = GetParam();
