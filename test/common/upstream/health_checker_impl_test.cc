@@ -104,8 +104,6 @@ public:
 class HttpHealthCheckerImplTest : public TestBase {
 public:
   struct TestSession {
-    TestSession() {}
-
     Event::MockTimer* interval_timer_{};
     Event::MockTimer* timeout_timer_{};
     Http::MockClientConnection* codec_{};

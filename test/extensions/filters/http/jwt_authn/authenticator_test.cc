@@ -29,7 +29,7 @@ namespace JwtAuthn {
 
 class AuthenticatorTest : public TestBase {
 public:
-  void SetUp() {
+  void SetUp() override {
     MessageUtil::loadFromYaml(ExampleConfig, proto_config_);
     CreateAuthenticator();
   }

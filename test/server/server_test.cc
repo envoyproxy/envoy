@@ -55,7 +55,7 @@ TEST(ServerInstanceUtil, flushHelper) {
 
 class RunHelperTest : public TestBase {
 public:
-  RunHelperTest() : shutdown_(false) {
+  RunHelperTest() {
     InSequence s;
 
     sigterm_ = new Event::MockSignalEvent(&dispatcher_);

@@ -33,8 +33,7 @@ namespace ExtAuthz {
 class ExtAuthzHttpClientTest : public TestBase {
 public:
   ExtAuthzHttpClientTest()
-      : cm_{}, async_client_{},
-        async_request_{&async_client_}, config_{createConfig()}, client_{cm_, config_} {
+      : async_request_{&async_client_}, config_{createConfig()}, client_{cm_, config_} {
     ON_CALL(cm_, httpAsyncClientForCluster(config_->cluster()))
         .WillByDefault(ReturnRef(async_client_));
   }

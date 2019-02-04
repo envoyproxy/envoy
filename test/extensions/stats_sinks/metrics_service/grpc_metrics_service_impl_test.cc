@@ -21,9 +21,9 @@ namespace MetricsService {
 
 class GrpcMetricsStreamerImplTest : public TestBase {
 public:
-  typedef Grpc::MockAsyncStream MockMetricsStream;
-  typedef Grpc::TypedAsyncStreamCallbacks<envoy::service::metrics::v2::StreamMetricsResponse>
-      MetricsServiceCallbacks;
+  using MockMetricsStream = Grpc::MockAsyncStream;
+  using MetricsServiceCallbacks =
+      Grpc::TypedAsyncStreamCallbacks<envoy::service::metrics::v2::StreamMetricsResponse>;
 
   GrpcMetricsStreamerImplTest() {
     EXPECT_CALL(*factory_, create()).WillOnce(Invoke([this] {

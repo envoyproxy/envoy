@@ -73,7 +73,7 @@ private:
 
 class HistogramTest : public TestBase {
 public:
-  typedef std::map<std::string, ParentHistogramSharedPtr> NameHistogramMap;
+  using NameHistogramMap = std::map<std::string, ParentHistogramSharedPtr>;
 
   HistogramTest() : alloc_(options_) {}
 

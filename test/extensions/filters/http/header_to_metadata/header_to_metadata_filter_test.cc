@@ -19,8 +19,6 @@ namespace HeaderToMetadataFilter {
 
 class HeaderToMetadataTest : public TestBase {
 public:
-  HeaderToMetadataTest() {}
-
   const std::string request_config_yaml = R"EOF(
 request_rules:
   - header: x-version

@@ -74,8 +74,6 @@ public:
 
 class RouterUpstreamLogTest : public TestBase {
 public:
-  RouterUpstreamLogTest() {}
-
   void init(absl::optional<envoy::config::filter::accesslog::v2::AccessLog> upstream_log) {
     envoy::config::filter::http::router::v2::Router router_proto;
 

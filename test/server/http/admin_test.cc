@@ -1221,7 +1221,6 @@ private:
 
 class PrometheusStatsFormatterTest : public TestBase {
 protected:
-  PrometheusStatsFormatterTest() /*: alloc_(stats_options_)*/ {}
   void addCounter(const std::string& name, std::vector<Stats::Tag> cluster_tags) {
     std::string tname = std::string(name);
     counters_.push_back(alloc_.makeCounter(name, std::move(tname), std::move(cluster_tags)));
