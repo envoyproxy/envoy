@@ -7,14 +7,13 @@
 
 #include "test/mocks/common.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
-
-#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Event {
 
-class FileEventImplTest : public testing::Test {
+class FileEventImplTest : public TestBase {
 public:
   FileEventImplTest() : api_(Api::createApiForTest(stats_store_)), dispatcher_(*api_) {}
 
@@ -38,7 +37,7 @@ protected:
   DispatcherImpl dispatcher_;
 };
 
-class FileEventImplActivateTest : public testing::TestWithParam<Network::Address::IpVersion> {};
+class FileEventImplActivateTest : public TestBaseWithParam<Network::Address::IpVersion> {};
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, FileEventImplActivateTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),

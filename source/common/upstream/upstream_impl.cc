@@ -749,10 +749,10 @@ void ClusterImplBase::setOutlierDetector(const Outlier::DetectorSharedPtr& outli
 }
 
 void ClusterImplBase::reloadHealthyHosts() {
-  // Every time a host changes HC state we cause a full healthy host recalculation which
+  // Every time a host changes Health Check state we cause a full healthy host recalculation which
   // for expensive LBs (ring, subset, etc.) can be quite time consuming. During startup, this
   // can also block worker threads by doing this repeatedly. There is no reason to do this
-  // as we will not start taking traffic until we are initialized. By blocking HC updates
+  // as we will not start taking traffic until we are initialized. By blocking Health Check updates
   // while initializing we can avoid this.
   if (initialization_complete_callback_ != nullptr) {
     return;
