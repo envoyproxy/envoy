@@ -12,7 +12,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GrpcHttp1Bridge {
 
-TEST(GrpcHttp1BridgeFilterConfigTest, GrpcHttp1BridgeFilter) {
+TEST_F(TestBase, GrpcHttp1BridgeFilterConfigTest_GrpcHttp1BridgeFilter) {
   std::string json_string = R"EOF(
   {
   }

@@ -778,7 +778,7 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasicMultiplePriorities) {
   EXPECT_CALL(resolver3.active_dns_query_, cancel());
 }
 
-TEST(HostImplTest, HostCluster) {
+TEST_F(TestBase, HostImplTest_HostCluster) {
   MockCluster cluster;
   HostSharedPtr host = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 1);
   EXPECT_EQ(cluster.info_.get(), &host->cluster());
@@ -787,7 +787,7 @@ TEST(HostImplTest, HostCluster) {
   EXPECT_EQ("", host->locality().zone());
 }
 
-TEST(HostImplTest, Weight) {
+TEST_F(TestBase, HostImplTest_Weight) {
   MockCluster cluster;
 
   EXPECT_EQ(1U, makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 0)->weight());
@@ -804,7 +804,7 @@ TEST(HostImplTest, Weight) {
   EXPECT_EQ(128U, host->weight());
 }
 
-TEST(HostImplTest, HostnameCanaryAndLocality) {
+TEST_F(TestBase, HostImplTest_HostnameCanaryAndLocality) {
   MockCluster cluster;
   envoy::api::v2::core::Metadata metadata;
   Config::Metadata::mutableMetadataValue(metadata, Config::MetadataFilters::get().ENVOY_LB,
@@ -826,7 +826,7 @@ TEST(HostImplTest, HostnameCanaryAndLocality) {
   EXPECT_EQ(1, host.priority());
 }
 
-TEST(HostImplTest, HealthFlags) {
+TEST_F(TestBase, HostImplTest_HealthFlags) {
   MockCluster cluster;
   HostSharedPtr host = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 1);
 
@@ -1371,7 +1371,7 @@ TEST_F(StaticClusterImplTest, MalformedHostIP) {
       "setting cluster type to 'STRICT_DNS' or 'LOGICAL_DNS'");
 }
 
-TEST(ClusterDefinitionTest, BadClusterConfig) {
+TEST_F(TestBase, ClusterDefinitionTest_BadClusterConfig) {
   const std::string json = R"EOF(
   {
     "name": "cluster_1",
@@ -1387,7 +1387,7 @@ TEST(ClusterDefinitionTest, BadClusterConfig) {
   EXPECT_THROW(loader->validateSchema(Json::Schema::CLUSTER_SCHEMA), Json::Exception);
 }
 
-TEST(ClusterDefinitionTest, BadDnsClusterConfig) {
+TEST_F(TestBase, ClusterDefinitionTest_BadDnsClusterConfig) {
   const std::string json = R"EOF(
   {
     "name": "cluster_1",
@@ -1477,7 +1477,7 @@ TEST_F(ClusterImplTest, CloseConnectionsOnHostHealthFailure) {
 }
 
 // Test creating and extending a priority set.
-TEST(PrioritySet, Extend) {
+TEST_F(TestBase, PrioritySet_Extend) {
   PrioritySetImpl priority_set;
   priority_set.getOrCreateHostSet(0);
 
@@ -1914,13 +1914,13 @@ TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForFilterWithOptions) {
 }
 
 // Validate empty singleton for HostsPerLocalityImpl.
-TEST(HostsPerLocalityImpl, Empty) {
+TEST_F(TestBase, HostsPerLocalityImpl_Empty) {
   EXPECT_FALSE(HostsPerLocalityImpl::empty()->hasLocalLocality());
   EXPECT_EQ(0, HostsPerLocalityImpl::empty()->get().size());
 }
 
 // Validate HostsPerLocalityImpl constructors.
-TEST(HostsPerLocalityImpl, Cons) {
+TEST_F(TestBase, HostsPerLocalityImpl_Cons) {
   {
     const HostsPerLocalityImpl hosts_per_locality;
     EXPECT_FALSE(hosts_per_locality.hasLocalLocality());
@@ -1948,7 +1948,7 @@ TEST(HostsPerLocalityImpl, Cons) {
   }
 }
 
-TEST(HostsPerLocalityImpl, Filter) {
+TEST_F(TestBase, HostsPerLocalityImpl_Filter) {
   MockCluster cluster;
   HostSharedPtr host_0 = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 1);
   HostSharedPtr host_1 = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 1);
@@ -2126,7 +2126,7 @@ TEST_F(HostSetImplLocalityTest, UnhealthyFailover) {
   expectPicks(0, 100);
 }
 
-TEST(OverProvisioningFactorTest, LocalityPickChanges) {
+TEST_F(TestBase, OverProvisioningFactorTest_LocalityPickChanges) {
   auto setUpHostSetWithOPFAndTestPicks = [](const uint32_t overprovisioning_factor,
                                             const uint32_t pick_0, const uint32_t pick_1) {
     HostSetImpl host_set(0, overprovisioning_factor);

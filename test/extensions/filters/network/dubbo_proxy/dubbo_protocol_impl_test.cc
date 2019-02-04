@@ -16,7 +16,7 @@ namespace DubboProxy {
 
 using testing::StrictMock;
 
-TEST(DubboProtocolImplTest, NotEnoughData) {
+TEST_F(TestBase, DubboProtocolImplTest_NotEnoughData) {
   Buffer::OwnedImpl buffer;
   MockProtocolCallbacks cb;
   DubboProtocolImpl dubbo_protocol(cb);
@@ -26,13 +26,13 @@ TEST(DubboProtocolImplTest, NotEnoughData) {
   EXPECT_FALSE(dubbo_protocol.decode(buffer, &context));
 }
 
-TEST(DubboProtocolImplTest, Name) {
+TEST_F(TestBase, DubboProtocolImplTest_Name) {
   MockProtocolCallbacks cb;
   DubboProtocolImpl dubbo_protocol(cb);
   EXPECT_EQ(dubbo_protocol.name(), "dubbo");
 }
 
-TEST(DubboProtocolImplTest, Normal) {
+TEST_F(TestBase, DubboProtocolImplTest_Normal) {
   MockProtocolCallbacks cb;
   DubboProtocolImpl dubbo_protocol(cb);
   // Normal dubbo request message
@@ -62,7 +62,7 @@ TEST(DubboProtocolImplTest, Normal) {
   }
 }
 
-TEST(DubboProtocolImplTest, InvalidProtocol) {
+TEST_F(TestBase, DubboProtocolImplTest_InvalidProtocol) {
   MockProtocolCallbacks cb;
   DubboProtocolImpl dubbo_protocol(cb);
   Protocol::Context context;
@@ -109,7 +109,7 @@ TEST(DubboProtocolImplTest, InvalidProtocol) {
   }
 }
 
-TEST(DubboProtocolImplTest, DubboProtocolConfigFactory) {
+TEST_F(TestBase, DubboProtocolImplTest_DubboProtocolConfigFactory) {
   MockProtocolCallbacks cb;
   auto protocol = NamedProtocolConfigFactory::getFactory(ProtocolType::Dubbo).createProtocol(cb);
   EXPECT_EQ(protocol->name(), "dubbo");

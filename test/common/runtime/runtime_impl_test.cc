@@ -22,7 +22,7 @@ using testing::ReturnNew;
 namespace Envoy {
 namespace Runtime {
 
-TEST(Random, DISABLED_benchmarkRandom) {
+TEST_F(TestBase, Random_DISABLED_benchmarkRandom) {
   Runtime::RandomGeneratorImpl random;
 
   for (size_t i = 0; i < 1000000000; ++i) {
@@ -30,7 +30,7 @@ TEST(Random, DISABLED_benchmarkRandom) {
   }
 }
 
-TEST(Random, sanityCheckOfUniquenessRandom) {
+TEST_F(TestBase, Random_sanityCheckOfUniquenessRandom) {
   Runtime::RandomGeneratorImpl random;
   std::set<uint64_t> results;
   const size_t num_of_results = 1000000;
@@ -42,7 +42,7 @@ TEST(Random, sanityCheckOfUniquenessRandom) {
   EXPECT_EQ(num_of_results, results.size());
 }
 
-TEST(UUID, checkLengthOfUUID) {
+TEST_F(TestBase, UUID_checkLengthOfUUID) {
   RandomGeneratorImpl random;
 
   std::string result = random.uuid();
@@ -51,7 +51,7 @@ TEST(UUID, checkLengthOfUUID) {
   EXPECT_EQ(expected_length, result.length());
 }
 
-TEST(UUID, sanityCheckOfUniqueness) {
+TEST_F(TestBase, UUID_sanityCheckOfUniqueness) {
   std::set<std::string> uuids;
   const size_t num_of_uuids = 100000;
 
@@ -248,7 +248,7 @@ TEST_F(DiskBackedLoaderImplTest, mergeValues) {
   EXPECT_EQ(0, store.gauge("runtime.admin_overrides_active").value());
 }
 
-TEST(LoaderImplTest, All) {
+TEST_F(TestBase, LoaderImplTest_All) {
   MockRandomGenerator generator;
   NiceMock<ThreadLocal::MockInstance> tls;
   Stats::IsolatedStoreImpl store;

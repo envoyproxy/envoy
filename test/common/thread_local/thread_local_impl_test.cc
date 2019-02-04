@@ -114,7 +114,7 @@ TEST_F(ThreadLocalInstanceImplTest, RunOnAllThreads) {
 }
 
 // Validate ThreadLocal::InstanceImpl's dispatcher() behavior.
-TEST(ThreadLocalInstanceImplDispatcherTest, Dispatcher) {
+TEST_F(TestBase, ThreadLocalInstanceImplDispatcherTest_Dispatcher) {
   InstanceImpl tls;
 
   DangerousDeprecatedTestTime test_time;

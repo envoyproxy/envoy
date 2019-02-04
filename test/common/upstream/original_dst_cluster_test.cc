@@ -102,7 +102,7 @@ public:
   Api::ApiPtr api_;
 };
 
-TEST(OriginalDstClusterConfigTest, BadConfig) {
+TEST_F(TestBase, OriginalDstClusterConfigTest_BadConfig) {
   std::string json = R"EOF(
   {
     "name": "name",
@@ -116,7 +116,7 @@ TEST(OriginalDstClusterConfigTest, BadConfig) {
   EXPECT_THROW(parseClusterFromJson(json), EnvoyException);
 }
 
-TEST(OriginalDstClusterConfigTest, GoodConfig) {
+TEST_F(TestBase, OriginalDstClusterConfigTest_GoodConfig) {
   std::string json = R"EOF(
   {
     "name": "name",

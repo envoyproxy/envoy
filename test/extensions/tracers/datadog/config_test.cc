@@ -14,7 +14,7 @@ namespace Extensions {
 namespace Tracers {
 namespace Datadog {
 
-TEST(DatadogTracerConfigTest, DatadogHttpTracer) {
+TEST_F(TestBase, DatadogTracerConfigTest_DatadogHttpTracer) {
   NiceMock<Server::MockInstance> server;
   EXPECT_CALL(server.cluster_manager_, get("fake_cluster"))
       .WillRepeatedly(Return(&server.cluster_manager_.thread_local_cluster_));

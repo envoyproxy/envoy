@@ -18,14 +18,14 @@ namespace Extensions {
 namespace HttpFilters {
 namespace RateLimitFilter {
 
-TEST(RateLimitFilterConfigTest, ValidateFail) {
+TEST_F(TestBase, RateLimitFilterConfigTest_ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_THROW(RateLimitFilterConfig().createFilterFactoryFromProto(
                    envoy::config::filter::http::rate_limit::v2::RateLimit(), "stats", context),
                ProtoValidationException);
 }
 
-TEST(RateLimitFilterConfigTest, RateLimitFilterCorrectProto) {
+TEST_F(TestBase, RateLimitFilterConfigTest_RateLimitFilterCorrectProto) {
   const std::string yaml = R"EOF(
   domain: test
   timeout: 2s
@@ -57,7 +57,7 @@ TEST(RateLimitFilterConfigTest, RateLimitFilterCorrectProto) {
   cb(filter_callback);
 }
 
-TEST(RateLimitFilterConfigTest, RateLimitFilterWithBootstrapOnlyConfig) {
+TEST_F(TestBase, RateLimitFilterConfigTest_RateLimitFilterWithBootstrapOnlyConfig) {
   const std::string yaml = R"EOF(
   domain: test
   timeout: 2s
@@ -99,7 +99,7 @@ TEST(RateLimitFilterConfigTest, RateLimitFilterWithBootstrapOnlyConfig) {
   cb(filter_callback);
 }
 
-TEST(RateLimitFilterConfigTest, RateLimitFilterWithServiceConfig) {
+TEST_F(TestBase, RateLimitFilterConfigTest_RateLimitFilterWithServiceConfig) {
   const std::string yaml = R"EOF(
   domain: test
   timeout: 2s
@@ -135,7 +135,7 @@ TEST(RateLimitFilterConfigTest, RateLimitFilterWithServiceConfig) {
   cb(filter_callback);
 }
 
-TEST(RateLimitFilterConfigTest, RateLimitFilterWithConflictingConfig) {
+TEST_F(TestBase, RateLimitFilterConfigTest_RateLimitFilterWithConflictingConfig) {
   const std::string yaml = R"EOF(
   domain: test
   timeout: 2s
@@ -173,7 +173,7 @@ TEST(RateLimitFilterConfigTest, RateLimitFilterWithConflictingConfig) {
                             "rate limit service config in filter does not match with bootstrap");
 }
 
-TEST(RateLimitFilterConfigTest, RateLimitFilterEmptyProto) {
+TEST_F(TestBase, RateLimitFilterConfigTest_RateLimitFilterEmptyProto) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   NiceMock<Server::MockInstance> instance;
 
@@ -187,7 +187,7 @@ TEST(RateLimitFilterConfigTest, RateLimitFilterEmptyProto) {
                EnvoyException);
 }
 
-TEST(RateLimitFilterConfigTest, BadRateLimitFilterConfig) {
+TEST_F(TestBase, RateLimitFilterConfigTest_BadRateLimitFilterConfig) {
   const std::string yaml = R"EOF(
   domain: test
   timeout: 20

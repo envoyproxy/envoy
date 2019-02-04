@@ -8,7 +8,7 @@ namespace NetworkFilters {
 namespace ThriftProxy {
 
 // Test behavior of nextSequenceId()
-TEST(ThriftConnectionStateTest, NextSequenceId) {
+TEST_F(TestBase, ThriftConnectionStateTest_NextSequenceId) {
   // Default sequence ids
   {
     ThriftConnectionState cs;
@@ -27,7 +27,7 @@ TEST(ThriftConnectionStateTest, NextSequenceId) {
 }
 
 // Test how markUpgraded/upgradedAttempts/isUpgraded when upgrade is successful.
-TEST(ThriftConnectionStateTest, TestUpgradeSucceeded) {
+TEST_F(TestBase, ThriftConnectionStateTest_TestUpgradeSucceeded) {
   ThriftConnectionState cs;
   EXPECT_FALSE(cs.upgradeAttempted());
   EXPECT_FALSE(cs.isUpgraded());
@@ -38,7 +38,7 @@ TEST(ThriftConnectionStateTest, TestUpgradeSucceeded) {
 }
 
 // Test how markUpgraded/upgradedAttempts/isUpgraded when upgrade fails.
-TEST(ThriftConnectionStateTest, TestUpgradeFailed) {
+TEST_F(TestBase, ThriftConnectionStateTest_TestUpgradeFailed) {
   ThriftConnectionState cs;
   EXPECT_FALSE(cs.upgradeAttempted());
   EXPECT_FALSE(cs.isUpgraded());

@@ -310,7 +310,7 @@ TEST_F(StreamInfoHeaderFormatterTest, WrongFormatOnUpstreamMetadataVariable) {
       "does not match actual type 'Object'.");
 }
 
-TEST(HeaderParserTest, TestParseInternal) {
+TEST_F(TestBase, HeaderParserTest_TestParseInternal) {
   struct TestCase {
     std::string input_;
     absl::optional<std::string> expected_output_;
@@ -451,7 +451,7 @@ TEST(HeaderParserTest, TestParseInternal) {
   }
 }
 
-TEST(HeaderParserTest, EvaluateHeaders) {
+TEST_F(TestBase, HeaderParserTest_EvaluateHeaders) {
   const std::string ymal = R"EOF(
 match: { prefix: "/new_endpoint" }
 route:
@@ -472,7 +472,7 @@ request_headers_to_add:
   EXPECT_TRUE(header_map.has("x-client-ip"));
 }
 
-TEST(HeaderParserTest, EvaluateEmptyHeaders) {
+TEST_F(TestBase, HeaderParserTest_EvaluateEmptyHeaders) {
   const std::string ymal = R"EOF(
 match: { prefix: "/new_endpoint" }
 route:
@@ -498,7 +498,7 @@ request_headers_to_add:
   EXPECT_FALSE(header_map.has("x-key"));
 }
 
-TEST(HeaderParserTest, EvaluateStaticHeaders) {
+TEST_F(TestBase, HeaderParserTest_EvaluateStaticHeaders) {
   const std::string ymal = R"EOF(
 match: { prefix: "/new_endpoint" }
 route:
@@ -520,7 +520,7 @@ request_headers_to_add:
   EXPECT_EQ("static-value", header_map.get_("static-header"));
 }
 
-TEST(HeaderParserTest, EvaluateCompoundHeaders) {
+TEST_F(TestBase, HeaderParserTest_EvaluateCompoundHeaders) {
   const std::string yaml = R"EOF(
 match: { prefix: "/new_endpoint" }
 route:
@@ -617,7 +617,7 @@ request_headers_to_remove: ["x-nope"]
   EXPECT_FALSE(header_map.has("x-nope"));
 }
 
-TEST(HeaderParserTest, EvaluateHeadersWithAppendFalse) {
+TEST_F(TestBase, HeaderParserTest_EvaluateHeadersWithAppendFalse) {
   const std::string ymal = R"EOF(
 match: { prefix: "/new_endpoint" }
 route:
@@ -695,7 +695,7 @@ request_headers_to_add:
   EXPECT_EQ(1, counts["x-request-start"]);
 }
 
-TEST(HeaderParserTest, EvaluateResponseHeaders) {
+TEST_F(TestBase, HeaderParserTest_EvaluateResponseHeaders) {
   const std::string yaml = R"EOF(
 match: { prefix: "/new_endpoint" }
 route:
@@ -756,7 +756,7 @@ response_headers_to_remove: ["x-nope"]
             header_map.get_("x-request-start-range"));
 }
 
-TEST(HeaderParserTest, EvaluateRequestHeadersRemoveBeforeAdd) {
+TEST_F(TestBase, HeaderParserTest_EvaluateRequestHeadersRemoveBeforeAdd) {
   const std::string yaml = R"EOF(
 match: { prefix: "/new_endpoint" }
 route:
@@ -778,7 +778,7 @@ request_headers_to_remove: ["x-foo-header"]
   EXPECT_EQ("bar", header_map.get_("x-foo-header"));
 }
 
-TEST(HeaderParserTest, EvaluateResponseHeadersRemoveBeforeAdd) {
+TEST_F(TestBase, HeaderParserTest_EvaluateResponseHeadersRemoveBeforeAdd) {
   const std::string yaml = R"EOF(
 match: { prefix: "/new_endpoint" }
 route:

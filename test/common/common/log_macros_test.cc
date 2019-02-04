@@ -28,7 +28,7 @@ private:
   NiceMock<Http::MockStreamDecoderFilterCallbacks> stream_;
 };
 
-TEST(Logger, All) {
+TEST_F(TestBase, Logger_All) {
   // This test exists just to ensure all macros compile and run with the expected arguments provided
 
   TestFilterLog filter;
@@ -38,7 +38,7 @@ TEST(Logger, All) {
   ENVOY_LOG_MISC(info, "fake message");
 }
 
-TEST(Logger, evaluateParams) {
+TEST_F(TestBase, Logger_evaluateParams) {
   uint32_t i = 1;
 
   // Set logger's level to low level.
@@ -48,7 +48,7 @@ TEST(Logger, evaluateParams) {
   EXPECT_THAT(i, testing::Eq(2));
 }
 
-TEST(Logger, doNotEvaluateParams) {
+TEST_F(TestBase, Logger_doNotEvaluateParams) {
   uint32_t i = 1;
 
   // Set logger's logging level high and log a message with lower severity
@@ -58,7 +58,7 @@ TEST(Logger, doNotEvaluateParams) {
   EXPECT_THAT(i, testing::Eq(1));
 }
 
-TEST(Logger, logAsStatement) {
+TEST_F(TestBase, Logger_logAsStatement) {
   // Just log as part of if ... statement
   uint32_t i = 1, j = 1;
 
@@ -86,7 +86,7 @@ TEST(Logger, logAsStatement) {
   EXPECT_THAT(j, testing::Eq(1));
 }
 
-TEST(Logger, checkLoggerLevel) {
+TEST_F(TestBase, Logger_checkLoggerLevel) {
   class logTestClass : public Logger::Loggable<Logger::Id::misc> {
   public:
     void setLevel(const spdlog::level::level_enum level) { ENVOY_LOGGER().set_level(level); }
@@ -111,7 +111,7 @@ TEST(Logger, checkLoggerLevel) {
   EXPECT_THAT(testObj.executeAtTraceLevel(), testing::Eq(2));
 }
 
-TEST(RegistryTest, LoggerWithName) {
+TEST_F(TestBase, RegistryTest_LoggerWithName) {
   EXPECT_EQ(nullptr, Logger::Registry::logger("blah"));
   EXPECT_EQ("upstream", Logger::Registry::logger("upstream")->name());
 }

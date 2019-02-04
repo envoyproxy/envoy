@@ -3621,7 +3621,7 @@ virtual_hosts:
   }
 }
 
-TEST(NullConfigImplTest, All) {
+TEST_F(TestBase, NullConfigImplTest_All) {
   NullConfigImpl config;
   Http::TestHeaderMapImpl headers = genRedirectHeaders("redirect.lyft.com", "/baz", true, false);
   EXPECT_EQ(nullptr, config.route(headers, 0));
@@ -4327,7 +4327,7 @@ TEST_F(CustomRequestHeadersTest, CustomHeaderWrongFormat) {
       "'DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT'");
 }
 
-TEST(MetadataMatchCriteriaImpl, Create) {
+TEST_F(TestBase, MetadataMatchCriteriaImpl_Create) {
   auto v1 = ProtobufWkt::Value();
   v1.set_string_value("v1");
   auto v2 = ProtobufWkt::Value();
@@ -4357,7 +4357,7 @@ TEST(MetadataMatchCriteriaImpl, Create) {
   EXPECT_EQ((*it)->value().value().bool_value(), true);
 }
 
-TEST(MetadataMatchCriteriaImpl, Merge) {
+TEST_F(TestBase, MetadataMatchCriteriaImpl_Merge) {
   auto pv1 = ProtobufWkt::Value();
   pv1.set_string_value("v1");
   auto pv2 = ProtobufWkt::Value();

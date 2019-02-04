@@ -6,7 +6,7 @@
 #include "test/test_common/test_base.h"
 
 namespace Envoy {
-TEST(UUIDUtilsTest, mod) {
+TEST_F(TestBase, UUIDUtilsTest_mod) {
   uint64_t result;
   EXPECT_TRUE(UuidUtils::uuidModBy("00000000-0000-0000-0000-000000000000", result, 100));
   EXPECT_EQ(0, result);
@@ -35,7 +35,7 @@ TEST(UUIDUtilsTest, mod) {
   EXPECT_EQ(7295, result);
 }
 
-TEST(UUIDUtilsTest, checkDistribution) {
+TEST_F(TestBase, UUIDUtilsTest_checkDistribution) {
   Runtime::RandomGeneratorImpl random;
 
   const int mod = 100;
@@ -62,7 +62,7 @@ TEST(UUIDUtilsTest, checkDistribution) {
   EXPECT_NEAR(required_percentage / 100.0, interesting_samples * 1.0 / total_samples, 0.002);
 }
 
-TEST(UUIDUtilsTest, DISABLED_benchmark) {
+TEST_F(TestBase, UUIDUtilsTest_DISABLED_benchmark) {
   Runtime::RandomGeneratorImpl random;
 
   for (int i = 0; i < 100000000; ++i) {
@@ -70,7 +70,7 @@ TEST(UUIDUtilsTest, DISABLED_benchmark) {
   }
 }
 
-TEST(UUIDUtilsTest, setAndCheckTraceable) {
+TEST_F(TestBase, UUIDUtilsTest_setAndCheckTraceable) {
   Runtime::RandomGeneratorImpl random;
 
   std::string uuid = random.uuid();

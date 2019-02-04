@@ -27,7 +27,7 @@ namespace Extensions {
 namespace StatSinks {
 namespace Statsd {
 
-TEST(StatsConfigTest, ValidTcpStatsd) {
+TEST_F(TestBase, StatsConfigTest_ValidTcpStatsd) {
   const std::string name = StatsSinkNames::get().Statsd;
 
   envoy::config::metrics::v2::StatsdSink sink_config;
@@ -115,7 +115,7 @@ TEST_P(StatsConfigParameterizedTest, UdpSinkCustomPrefix) {
   EXPECT_EQ(udp_sink->getPrefix(), customPrefix);
 }
 
-TEST(StatsConfigTest, TcpSinkDefaultPrefix) {
+TEST_F(TestBase, StatsConfigTest_TcpSinkDefaultPrefix) {
   const std::string name = StatsSinkNames::get().Statsd;
 
   envoy::config::metrics::v2::StatsdSink sink_config;
@@ -138,7 +138,7 @@ TEST(StatsConfigTest, TcpSinkDefaultPrefix) {
   EXPECT_EQ(tcp_sink->getPrefix(), defaultPrefix);
 }
 
-TEST(StatsConfigTest, TcpSinkCustomPrefix) {
+TEST_F(TestBase, StatsConfigTest_TcpSinkCustomPrefix) {
   const std::string name = StatsSinkNames::get().Statsd;
 
   envoy::config::metrics::v2::StatsdSink sink_config;
@@ -194,7 +194,7 @@ TEST_P(StatsConfigLoopbackTest, ValidUdpIpStatsd) {
 }
 
 // Negative test for protoc-gen-validate constraints for statsd.
-TEST(StatsdConfigTest, ValidateFail) {
+TEST_F(TestBase, StatsdConfigTest_ValidateFail) {
   NiceMock<Server::MockInstance> server;
   EXPECT_THROW(
       StatsdSinkFactory().createStatsSink(envoy::config::metrics::v2::StatsdSink(), server),

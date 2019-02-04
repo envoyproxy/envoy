@@ -15,7 +15,7 @@ using testing::NiceMock;
 namespace Envoy {
 namespace Http {
 
-TEST(DateProviderImplTest, All) {
+TEST_F(TestBase, DateProviderImplTest_All) {
   Event::MockDispatcher dispatcher;
   NiceMock<ThreadLocal::MockInstance> tls;
   Event::MockTimer* timer = new Event::MockTimer(&dispatcher);

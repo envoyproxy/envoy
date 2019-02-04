@@ -3,7 +3,7 @@
 #include "test/test_common/test_base.h"
 
 namespace Envoy {
-TEST(Backward, Basic) {
+TEST_F(TestBase, Backward_Basic) {
   // There isn't much to test here and this feature is really just useful for
   // debugging. This test simply verifies that we do not cause a crash when
   // logging a backtrace, and covers the added lines.
@@ -12,7 +12,7 @@ TEST(Backward, Basic) {
   tracer.logTrace();
 }
 
-TEST(Backward, InvalidUsageTest) {
+TEST_F(TestBase, Backward_InvalidUsageTest) {
   // Ensure we do not crash if logging is attempted when there was no trace captured
   BackwardsTrace tracer;
   tracer.logTrace();

@@ -739,7 +739,7 @@ TEST_P(DecoderStateMachineNestingTest, NestedTypes) {
   EXPECT_EQ(dsm.currentState(), ProtocolState::Done);
 }
 
-TEST(DecoderTest, OnData) {
+TEST_F(TestBase, DecoderTest_OnData) {
   NiceMock<MockTransport> transport;
   NiceMock<MockProtocol> proto;
   NiceMock<MockDecoderCallbacks> callbacks;
@@ -799,7 +799,7 @@ TEST(DecoderTest, OnData) {
   EXPECT_TRUE(underflow);
 }
 
-TEST(DecoderTest, OnDataWithProtocolHint) {
+TEST_F(TestBase, DecoderTest_OnDataWithProtocolHint) {
   NiceMock<MockTransport> transport;
   NiceMock<MockProtocol> proto;
   NiceMock<MockDecoderCallbacks> callbacks;
@@ -866,7 +866,7 @@ TEST(DecoderTest, OnDataWithProtocolHint) {
   EXPECT_TRUE(underflow);
 }
 
-TEST(DecoderTest, OnDataWithInconsistentProtocolHint) {
+TEST_F(TestBase, DecoderTest_OnDataWithInconsistentProtocolHint) {
   NiceMock<MockTransport> transport;
   NiceMock<MockProtocol> proto;
   NiceMock<MockDecoderCallbacks> callbacks;
@@ -890,7 +890,7 @@ TEST(DecoderTest, OnDataWithInconsistentProtocolHint) {
                             "transport reports protocol binary, but configured for compact");
 }
 
-TEST(DecoderTest, OnDataThrowsTransportAppException) {
+TEST_F(TestBase, DecoderTest_OnDataThrowsTransportAppException) {
   NiceMock<MockTransport> transport;
   NiceMock<MockProtocol> proto;
   NiceMock<MockDecoderCallbacks> callbacks;
@@ -911,7 +911,7 @@ TEST(DecoderTest, OnDataThrowsTransportAppException) {
   EXPECT_THROW_WITH_MESSAGE(decoder.onData(buffer, underflow), AppException, "unknown xform");
 }
 
-TEST(DecoderTest, OnDataResumes) {
+TEST_F(TestBase, DecoderTest_OnDataResumes) {
   NiceMock<MockTransport> transport;
   NiceMock<MockProtocol> proto;
   NiceMock<MockDecoderCallbacks> callbacks;
@@ -953,7 +953,7 @@ TEST(DecoderTest, OnDataResumes) {
   EXPECT_FALSE(underflow); // buffer.length() == 1
 }
 
-TEST(DecoderTest, OnDataResumesTransportFrameStart) {
+TEST_F(TestBase, DecoderTest_OnDataResumesTransportFrameStart) {
   StrictMock<MockTransport> transport;
   StrictMock<MockProtocol> proto;
   NiceMock<MockDecoderCallbacks> callbacks;
@@ -997,7 +997,7 @@ TEST(DecoderTest, OnDataResumesTransportFrameStart) {
   EXPECT_TRUE(underflow); // buffer.length() == 0
 }
 
-TEST(DecoderTest, OnDataResumesTransportFrameEnd) {
+TEST_F(TestBase, DecoderTest_OnDataResumesTransportFrameEnd) {
   StrictMock<MockTransport> transport;
   StrictMock<MockProtocol> proto;
   NiceMock<MockDecoderCallbacks> callbacks;
@@ -1040,7 +1040,7 @@ TEST(DecoderTest, OnDataResumesTransportFrameEnd) {
   EXPECT_TRUE(underflow); // buffer.length() == 0
 }
 
-TEST(DecoderTest, OnDataHandlesStopIterationAndResumes) {
+TEST_F(TestBase, DecoderTest_OnDataHandlesStopIterationAndResumes) {
   StrictMock<MockTransport> transport;
   EXPECT_CALL(transport, name()).WillRepeatedly(ReturnRef(transport.name_));
 
@@ -1143,7 +1143,7 @@ TEST(DecoderTest, OnDataHandlesStopIterationAndResumes) {
 
 #define TEST_NAME(X) EXPECT_EQ(ProtocolStateNameValues::name(ProtocolState::X), #X);
 
-TEST(ProtocolStateNameValuesTest, ValidNames) { ALL_PROTOCOL_STATES(TEST_NAME) }
+TEST_F(TestBase, ProtocolStateNameValuesTest_ValidNames) { ALL_PROTOCOL_STATES(TEST_NAME) }
 
 } // namespace ThriftProxy
 } // namespace NetworkFilters

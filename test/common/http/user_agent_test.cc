@@ -15,7 +15,7 @@ using testing::Property;
 namespace Envoy {
 namespace Http {
 
-TEST(UserAgentTest, All) {
+TEST_F(TestBase, UserAgentTest_All) {
   Stats::MockStore stat_store;
   NiceMock<Stats::MockHistogram> original_histogram;
   Event::SimulatedTimeSystem time_system;

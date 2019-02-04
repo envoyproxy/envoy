@@ -7,7 +7,7 @@
 namespace Envoy {
 namespace Router {
 
-TEST(StringAccessorImplTest, Storage) {
+TEST_F(TestBase, StringAccessorImplTest_Storage) {
   const char* const TestString = "test string 1";
   StringAccessorImpl accessor(TestString);
 

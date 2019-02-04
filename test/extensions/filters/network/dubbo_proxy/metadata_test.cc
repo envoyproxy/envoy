@@ -7,7 +7,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace DubboProxy {
 
-TEST(MessageMetadataTest, Fields) {
+TEST_F(TestBase, MessageMetadataTest_Fields) {
   MessageMetadata metadata;
 
   EXPECT_FALSE(metadata.method_name().has_value());
@@ -29,7 +29,7 @@ TEST(MessageMetadataTest, Fields) {
   EXPECT_EQ("group", metadata.service_group().value());
 }
 
-TEST(MessageMetadataTest, Headers) {
+TEST_F(TestBase, MessageMetadataTest_Headers) {
   MessageMetadata metadata;
 
   EXPECT_FALSE(metadata.hasHeaders());
@@ -37,7 +37,7 @@ TEST(MessageMetadataTest, Headers) {
   EXPECT_EQ(metadata.headers().size(), 1);
 }
 
-TEST(MessageMetadataTest, Parameters) {
+TEST_F(TestBase, MessageMetadataTest_Parameters) {
   MessageMetadata metadata;
 
   EXPECT_FALSE(metadata.hasParameters());

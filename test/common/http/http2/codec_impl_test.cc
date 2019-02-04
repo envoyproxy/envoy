@@ -843,7 +843,7 @@ INSTANTIATE_TEST_SUITE_P(Http2CodecImplTestEdgeSettings, Http2CodecImplTest,
                          ::testing::Combine(HTTP2SETTINGS_EDGE_COMBINE,
                                             HTTP2SETTINGS_EDGE_COMBINE));
 
-TEST(Http2CodecUtility, reconstituteCrumbledCookies) {
+TEST_F(TestBase, Http2CodecUtility_reconstituteCrumbledCookies) {
   {
     HeaderString key;
     HeaderString value;

@@ -178,7 +178,7 @@ public:
 };
 
 // Bad code in initial config.
-TEST(LuaHttpFilterConfigTest, BadCode) {
+TEST_F(TestBase, LuaHttpFilterConfigTest_BadCode) {
   const std::string SCRIPT{R"EOF(
     bad
   )EOF"};

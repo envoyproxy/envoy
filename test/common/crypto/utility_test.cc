@@ -8,21 +8,21 @@ namespace Envoy {
 namespace Common {
 namespace Crypto {
 
-TEST(UtilityTest, TestSha256Digest) {
+TEST_F(TestBase, UtilityTest_TestSha256Digest) {
   const Buffer::OwnedImpl buffer("test data");
   const auto digest = Utility::getSha256Digest(buffer);
   EXPECT_EQ("916f0027a575074ce72a331777c3478d6513f786a591bd892da1a577bf2335f9",
             Hex::encode(digest));
 }
 
-TEST(UtilityTest, TestSha256DigestWithEmptyBuffer) {
+TEST_F(TestBase, UtilityTest_TestSha256DigestWithEmptyBuffer) {
   const Buffer::OwnedImpl buffer;
   const auto digest = Utility::getSha256Digest(buffer);
   EXPECT_EQ("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
             Hex::encode(digest));
 }
 
-TEST(UtilityTest, TestSha256DigestGrowingBuffer) {
+TEST_F(TestBase, UtilityTest_TestSha256DigestGrowingBuffer) {
   // Adding multiple slices to the buffer
   Buffer::OwnedImpl buffer("slice 1");
   auto digest = Utility::getSha256Digest(buffer);
@@ -38,13 +38,13 @@ TEST(UtilityTest, TestSha256DigestGrowingBuffer) {
             Hex::encode(digest));
 }
 
-TEST(UtilityTest, TestSha256Hmac) {
+TEST_F(TestBase, UtilityTest_TestSha256Hmac) {
   const std::string key = "key";
   auto hmac = Utility::getSha256Hmac(std::vector<uint8_t>(key.begin(), key.end()), "test data");
   EXPECT_EQ("087d9eb992628854842ca4dbf790f8164c80355c1e78b72789d830334927a84c", Hex::encode(hmac));
 }
 
-TEST(UtilityTest, TestSha256HmacWithEmptyArguments) {
+TEST_F(TestBase, UtilityTest_TestSha256HmacWithEmptyArguments) {
   auto hmac = Utility::getSha256Hmac(std::vector<uint8_t>(), "");
   EXPECT_EQ("b613679a0814d9ec772f95d778c35fc5ff1697c493715653c6c712144292c5ad", Hex::encode(hmac));
 }

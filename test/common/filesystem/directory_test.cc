@@ -195,7 +195,7 @@ TEST_F(DirectoryTest, DirectoryWithEmptyDirectory) {
 }
 
 // Test that the constructor throws an exception when given a non-existing path
-TEST(DirectoryIteratorImpl, NonExistingDir) {
+TEST_F(TestBase, DirectoryIteratorImpl_NonExistingDir) {
   const std::string dir_path("some/non/existing/dir");
 
 #ifdef WIN32
@@ -210,7 +210,7 @@ TEST(DirectoryIteratorImpl, NonExistingDir) {
 }
 
 // Test that we correctly handle trailing path separators
-TEST(Directory, DirectoryHasTrailingPathSeparator) {
+TEST_F(TestBase, Directory_DirectoryHasTrailingPathSeparator) {
 #ifdef WIN32
   const std::string dir_path(TestEnvironment::temporaryPath("envoy_test") + "\\");
 #else

@@ -9,7 +9,7 @@ namespace Extensions {
 namespace QuicListeners {
 namespace Quiche {
 
-TEST(DummyTest, Dummy) {
+TEST_F(TestBase, DummyTest_Dummy) {
   http2::Http2String foo = "bar";
   EXPECT_EQ("bar cowbell", moreCowbell(foo));
 }

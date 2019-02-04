@@ -87,14 +87,14 @@ TEST_P(IpWhiteListConfigTest, ClientSslAuthEmptyProto) {
   cb(connection);
 }
 
-TEST(ClientSslAuthConfigFactoryTest, ValidateFail) {
+TEST_F(TestBase, ClientSslAuthConfigFactoryTest_ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_THROW(ClientSslAuthConfigFactory().createFilterFactoryFromProto(
                    envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth(), context),
                ProtoValidationException);
 }
 
-TEST(ClientSslAuthConfigFactoryTest, DoubleRegistrationTest) {
+TEST_F(TestBase, ClientSslAuthConfigFactoryTest_DoubleRegistrationTest) {
   EXPECT_THROW_WITH_MESSAGE(
       (Registry::RegisterFactory<ClientSslAuthConfigFactory,
                                  Server::Configuration::NamedNetworkFilterConfigFactory>()),

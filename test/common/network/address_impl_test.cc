@@ -116,13 +116,13 @@ TEST_P(AddressImplSocketTest, SocketBindAndConnect) {
   testSocketBindAndConnect(GetParam(), true);
 }
 
-TEST(Ipv4CompatAddressImplSocktTest, SocketBindAndConnect) {
+TEST_F(TestBase, Ipv4CompatAddressImplSocktTest_SocketBindAndConnect) {
   if (TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v6)) {
     testSocketBindAndConnect(Network::Address::IpVersion::v6, false);
   }
 }
 
-TEST(Ipv4InstanceTest, SockaddrToString) {
+TEST_F(TestBase, Ipv4InstanceTest_SockaddrToString) {
   // Test addresses from various RFC 5735 reserved ranges
   static const char* addresses[] = {"0.0.0.0",        "0.0.0.255",       "0.0.255.255",
                                     "0.255.255.255",  "192.0.2.0",       "198.151.100.1",
@@ -138,7 +138,7 @@ TEST(Ipv4InstanceTest, SockaddrToString) {
   }
 }
 
-TEST(Ipv4InstanceTest, SocketAddress) {
+TEST_F(TestBase, Ipv4InstanceTest_SocketAddress) {
   sockaddr_in addr4;
   addr4.sin_family = AF_INET;
   EXPECT_EQ(1, inet_pton(AF_INET, "1.2.3.4", &addr4.sin_addr));
@@ -156,7 +156,7 @@ TEST(Ipv4InstanceTest, SocketAddress) {
   EXPECT_TRUE(address.ip()->isUnicastAddress());
 }
 
-TEST(Ipv4InstanceTest, AddressOnly) {
+TEST_F(TestBase, Ipv4InstanceTest_AddressOnly) {
   Ipv4Instance address("3.4.5.6");
   EXPECT_EQ("3.4.5.6:0", address.asString());
   EXPECT_EQ(Type::Ip, address.type());
@@ -167,7 +167,7 @@ TEST(Ipv4InstanceTest, AddressOnly) {
   EXPECT_TRUE(address.ip()->isUnicastAddress());
 }
 
-TEST(Ipv4InstanceTest, AddressAndPort) {
+TEST_F(TestBase, Ipv4InstanceTest_AddressAndPort) {
   Ipv4Instance address("127.0.0.1", 80);
   EXPECT_EQ("127.0.0.1:80", address.asString());
   EXPECT_EQ(Type::Ip, address.type());
@@ -179,7 +179,7 @@ TEST(Ipv4InstanceTest, AddressAndPort) {
   EXPECT_TRUE(address.ip()->isUnicastAddress());
 }
 
-TEST(Ipv4InstanceTest, PortOnly) {
+TEST_F(TestBase, Ipv4InstanceTest_PortOnly) {
   Ipv4Instance address(443);
   EXPECT_EQ("0.0.0.0:443", address.asString());
   EXPECT_EQ(Type::Ip, address.type());
@@ -191,7 +191,7 @@ TEST(Ipv4InstanceTest, PortOnly) {
   EXPECT_FALSE(address.ip()->isUnicastAddress());
 }
 
-TEST(Ipv4InstanceTest, Multicast) {
+TEST_F(TestBase, Ipv4InstanceTest_Multicast) {
   Ipv4Instance address("230.0.0.1");
   EXPECT_EQ("230.0.0.1:0", address.asString());
   EXPECT_EQ(Type::Ip, address.type());
@@ -203,7 +203,7 @@ TEST(Ipv4InstanceTest, Multicast) {
   EXPECT_FALSE(address.ip()->isUnicastAddress());
 }
 
-TEST(Ipv4InstanceTest, Broadcast) {
+TEST_F(TestBase, Ipv4InstanceTest_Broadcast) {
   Ipv4Instance address("255.255.255.255");
   EXPECT_EQ("255.255.255.255:0", address.asString());
   EXPECT_EQ(Type::Ip, address.type());
@@ -214,12 +214,12 @@ TEST(Ipv4InstanceTest, Broadcast) {
   EXPECT_FALSE(address.ip()->isUnicastAddress());
 }
 
-TEST(Ipv4InstanceTest, BadAddress) {
+TEST_F(TestBase, Ipv4InstanceTest_BadAddress) {
   EXPECT_THROW(Ipv4Instance("foo"), EnvoyException);
   EXPECT_THROW(Ipv4Instance("bar", 1), EnvoyException);
 }
 
-TEST(Ipv6InstanceTest, SocketAddress) {
+TEST_F(TestBase, Ipv6InstanceTest_SocketAddress) {
   sockaddr_in6 addr6;
   addr6.sin6_family = AF_INET6;
   EXPECT_EQ(1, inet_pton(AF_INET6, "01:023::00Ef", &addr6.sin6_addr));
@@ -237,7 +237,7 @@ TEST(Ipv6InstanceTest, SocketAddress) {
   EXPECT_TRUE(address.ip()->isUnicastAddress());
 }
 
-TEST(Ipv6InstanceTest, AddressOnly) {
+TEST_F(TestBase, Ipv6InstanceTest_AddressOnly) {
   Ipv6Instance address("2001:0db8:85a3:0000:0000:8a2e:0370:7334");
   EXPECT_EQ("[2001:db8:85a3::8a2e:370:7334]:0", address.asString());
   EXPECT_EQ(Type::Ip, address.type());
@@ -249,7 +249,7 @@ TEST(Ipv6InstanceTest, AddressOnly) {
   EXPECT_TRUE(address.ip()->isUnicastAddress());
 }
 
-TEST(Ipv6InstanceTest, AddressAndPort) {
+TEST_F(TestBase, Ipv6InstanceTest_AddressAndPort) {
   Ipv6Instance address("::0001", 80);
   EXPECT_EQ("[::1]:80", address.asString());
   EXPECT_EQ(Type::Ip, address.type());
@@ -260,7 +260,7 @@ TEST(Ipv6InstanceTest, AddressAndPort) {
   EXPECT_TRUE(address.ip()->isUnicastAddress());
 }
 
-TEST(Ipv6InstanceTest, PortOnly) {
+TEST_F(TestBase, Ipv6InstanceTest_PortOnly) {
   Ipv6Instance address(443);
   EXPECT_EQ("[::]:443", address.asString());
   EXPECT_EQ(Type::Ip, address.type());
@@ -272,7 +272,7 @@ TEST(Ipv6InstanceTest, PortOnly) {
   EXPECT_FALSE(address.ip()->isUnicastAddress());
 }
 
-TEST(Ipv6InstanceTest, Multicast) {
+TEST_F(TestBase, Ipv6InstanceTest_Multicast) {
   Ipv6Instance address("FF00::");
   EXPECT_EQ("[ff00::]:0", address.asString());
   EXPECT_EQ(Type::Ip, address.type());
@@ -285,7 +285,7 @@ TEST(Ipv6InstanceTest, Multicast) {
   EXPECT_FALSE(address.ip()->isUnicastAddress());
 }
 
-TEST(Ipv6InstanceTest, Broadcast) {
+TEST_F(TestBase, Ipv6InstanceTest_Broadcast) {
   Ipv6Instance address("FFFF:FFFF:FFFF:FFFF:FFFF:FFFF:FFFF:FFFF");
   EXPECT_EQ("[ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff]:0", address.asString());
   EXPECT_EQ(Type::Ip, address.type());
@@ -297,19 +297,19 @@ TEST(Ipv6InstanceTest, Broadcast) {
   EXPECT_FALSE(address.ip()->isUnicastAddress());
 }
 
-TEST(Ipv6InstanceTest, BadAddress) {
+TEST_F(TestBase, Ipv6InstanceTest_BadAddress) {
   EXPECT_THROW(Ipv6Instance("foo"), EnvoyException);
   EXPECT_THROW(Ipv6Instance("bar", 1), EnvoyException);
 }
 
-TEST(PipeInstanceTest, Basic) {
+TEST_F(TestBase, PipeInstanceTest_Basic) {
   PipeInstance address("/foo");
   EXPECT_EQ("/foo", address.asString());
   EXPECT_EQ(Type::Pipe, address.type());
   EXPECT_EQ(nullptr, address.ip());
 }
 
-TEST(PipeInstanceTest, AbstractNamespace) {
+TEST_F(TestBase, PipeInstanceTest_AbstractNamespace) {
 #if defined(__linux__)
   PipeInstance address("@/foo");
   EXPECT_EQ("@/foo", address.asString());
@@ -320,13 +320,13 @@ TEST(PipeInstanceTest, AbstractNamespace) {
 #endif
 }
 
-TEST(PipeInstanceTest, BadAddress) {
+TEST_F(TestBase, PipeInstanceTest_BadAddress) {
   std::string long_address(1000, 'X');
   EXPECT_THROW_WITH_REGEX(PipeInstance address(long_address), EnvoyException,
                           "exceeds maximum UNIX domain socket path size");
 }
 
-TEST(PipeInstanceTest, UnlinksExistingFile) {
+TEST_F(TestBase, PipeInstanceTest_UnlinksExistingFile) {
   const auto bind_uds_socket = [](const std::string& path) {
     PipeInstance address(path);
     IoHandlePtr io_handle = address.socket(SocketType::Stream);
@@ -344,7 +344,7 @@ TEST(PipeInstanceTest, UnlinksExistingFile) {
   bind_uds_socket(path); // after closing, second bind to the same path should succeed.
 }
 
-TEST(AddressFromSockAddrDeathTest, IPv4) {
+TEST_F(TestBase, AddressFromSockAddrDeathTest_IPv4) {
   sockaddr_storage ss;
   auto& sin = reinterpret_cast<sockaddr_in&>(ss);
 
@@ -363,7 +363,7 @@ TEST(AddressFromSockAddrDeathTest, IPv4) {
   EXPECT_THROW(addressFromSockAddr(ss, sizeof(sockaddr_in)), EnvoyException);
 }
 
-TEST(AddressFromSockAddrDeathTest, IPv6) {
+TEST_F(TestBase, AddressFromSockAddrDeathTest_IPv6) {
   sockaddr_storage ss;
   auto& sin6 = reinterpret_cast<sockaddr_in6&>(ss);
 
@@ -387,7 +387,7 @@ TEST(AddressFromSockAddrDeathTest, IPv6) {
             addressFromSockAddr(ss, sizeof(sockaddr_in6), true)->asString());
 }
 
-TEST(AddressFromSockAddrDeathTest, Pipe) {
+TEST_F(TestBase, AddressFromSockAddrDeathTest_Pipe) {
   sockaddr_storage ss;
   auto& sun = reinterpret_cast<sockaddr_un&>(ss);
   sun.sun_family = AF_UNIX;

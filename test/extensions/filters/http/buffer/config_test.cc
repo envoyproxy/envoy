@@ -16,7 +16,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace BufferFilter {
 
-TEST(BufferFilterFactoryTest, BufferFilterCorrectJson) {
+TEST_F(TestBase, BufferFilterFactoryTest_BufferFilterCorrectJson) {
   std::string json_string = R"EOF(
   {
     "max_request_bytes" : 1028
@@ -32,7 +32,7 @@ TEST(BufferFilterFactoryTest, BufferFilterCorrectJson) {
   cb(filter_callback);
 }
 
-TEST(BufferFilterFactoryTest, BufferFilterIncorrectJson) {
+TEST_F(TestBase, BufferFilterFactoryTest_BufferFilterIncorrectJson) {
   // This is incorrect because the number is quote-wrapped
   std::string json_string = R"EOF(
   {
@@ -46,7 +46,7 @@ TEST(BufferFilterFactoryTest, BufferFilterIncorrectJson) {
   EXPECT_THROW(factory.createFilterFactory(*json_config, "stats", context), Json::Exception);
 }
 
-TEST(BufferFilterFactoryTest, BufferFilterCorrectProto) {
+TEST_F(TestBase, BufferFilterFactoryTest_BufferFilterCorrectProto) {
   envoy::config::filter::http::buffer::v2::Buffer config{};
   config.mutable_max_request_bytes()->set_value(1028);
 
@@ -58,7 +58,7 @@ TEST(BufferFilterFactoryTest, BufferFilterCorrectProto) {
   cb(filter_callback);
 }
 
-TEST(BufferFilterFactoryTest, BufferFilterEmptyProto) {
+TEST_F(TestBase, BufferFilterFactoryTest_BufferFilterEmptyProto) {
   BufferFilterFactory factory;
   envoy::config::filter::http::buffer::v2::Buffer config =
       *dynamic_cast<envoy::config::filter::http::buffer::v2::Buffer*>(
@@ -73,7 +73,7 @@ TEST(BufferFilterFactoryTest, BufferFilterEmptyProto) {
   cb(filter_callback);
 }
 
-TEST(BufferFilterFactoryTest, BufferFilterEmptyRouteProto) {
+TEST_F(TestBase, BufferFilterFactoryTest_BufferFilterEmptyRouteProto) {
   BufferFilterFactory factory;
   EXPECT_NO_THROW({
     envoy::config::filter::http::buffer::v2::BufferPerRoute* config =
@@ -83,7 +83,7 @@ TEST(BufferFilterFactoryTest, BufferFilterEmptyRouteProto) {
   });
 }
 
-TEST(BufferFilterFactoryTest, BufferFilterRouteSpecificConfig) {
+TEST_F(TestBase, BufferFilterFactoryTest_BufferFilterRouteSpecificConfig) {
   BufferFilterFactory factory;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
 

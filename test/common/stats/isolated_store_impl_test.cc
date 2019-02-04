@@ -12,7 +12,7 @@
 namespace Envoy {
 namespace Stats {
 
-TEST(StatsIsolatedStoreImplTest, All) {
+TEST_F(TestBase, StatsIsolatedStoreImplTest_All) {
   IsolatedStoreImpl store;
 
   ScopePtr scope1 = store.createScope("scope1.");
@@ -57,7 +57,7 @@ TEST(StatsIsolatedStoreImplTest, All) {
   EXPECT_EQ(2UL, store.gauges().size());
 }
 
-TEST(StatsIsolatedStoreImplTest, LongStatName) {
+TEST_F(TestBase, StatsIsolatedStoreImplTest_LongStatName) {
   IsolatedStoreImpl store;
   Stats::StatsOptionsImpl stats_options;
   const std::string long_string(stats_options.maxNameLength() + 1, 'A');
@@ -81,7 +81,7 @@ struct TestStats {
   ALL_TEST_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT)
 };
 
-TEST(StatsMacros, All) {
+TEST_F(TestBase, StatsMacros_All) {
   IsolatedStoreImpl stats_store;
   TestStats test_stats{ALL_TEST_STATS(POOL_COUNTER_PREFIX(stats_store, "test."),
                                       POOL_GAUGE_PREFIX(stats_store, "test."),

@@ -418,7 +418,7 @@ http_logs:
   }
 }
 
-TEST(responseFlagsToAccessLogResponseFlagsTest, All) {
+TEST_F(TestBase, responseFlagsToAccessLogResponseFlagsTest_All) {
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   ON_CALL(stream_info, hasResponseFlag(_)).WillByDefault(Return(true));
   envoy::data::accesslog::v2::AccessLogCommon common_access_log;

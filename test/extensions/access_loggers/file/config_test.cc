@@ -18,7 +18,7 @@ namespace Extensions {
 namespace AccessLoggers {
 namespace File {
 
-TEST(FileAccessLogConfigTest, ValidateFail) {
+TEST_F(TestBase, FileAccessLogConfigTest_ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
   EXPECT_THROW(FileAccessLogFactory().createAccessLogInstance(
@@ -26,7 +26,7 @@ TEST(FileAccessLogConfigTest, ValidateFail) {
                ProtoValidationException);
 }
 
-TEST(FileAccessLogConfigTest, ConfigureFromProto) {
+TEST_F(TestBase, FileAccessLogConfigTest_ConfigureFromProto) {
   envoy::config::filter::accesslog::v2::AccessLog config;
 
   envoy::config::accesslog::v2::FileAccessLog fal_config;
@@ -51,7 +51,7 @@ TEST(FileAccessLogConfigTest, ConfigureFromProto) {
                             "Didn't find a registered implementation for name: 'INVALID'");
 }
 
-TEST(FileAccessLogConfigTest, FileAccessLogTest) {
+TEST_F(TestBase, FileAccessLogConfigTest_FileAccessLogTest) {
   auto factory =
       Registry::FactoryRegistry<Server::Configuration::AccessLogInstanceFactory>::getFactory(
           AccessLogNames::get().File);
@@ -74,7 +74,7 @@ TEST(FileAccessLogConfigTest, FileAccessLogTest) {
   EXPECT_NE(nullptr, dynamic_cast<FileAccessLog*>(instance.get()));
 }
 
-TEST(FileAccessLogConfigTest, FileAccessLogJsonTest) {
+TEST_F(TestBase, FileAccessLogConfigTest_FileAccessLogJsonTest) {
   envoy::config::filter::accesslog::v2::AccessLog config;
 
   envoy::config::accesslog::v2::FileAccessLog fal_config;
@@ -107,7 +107,7 @@ TEST(FileAccessLogConfigTest, FileAccessLogJsonTest) {
                             "Didn't find a registered implementation for name: 'INVALID'");
 }
 
-TEST(FileAccessLogConfigTest, FileAccessLogJsonWithBoolValueTest) {
+TEST_F(TestBase, FileAccessLogConfigTest_FileAccessLogJsonWithBoolValueTest) {
   {
     // Make sure we fail if you set a bool value in the format dictionary
     envoy::config::filter::accesslog::v2::AccessLog config;
@@ -129,7 +129,7 @@ TEST(FileAccessLogConfigTest, FileAccessLogJsonWithBoolValueTest) {
   }
 }
 
-TEST(FileAccessLogConfigTest, FileAccessLogJsonWithNestedKeyTest) {
+TEST_F(TestBase, FileAccessLogConfigTest_FileAccessLogJsonWithNestedKeyTest) {
   {
     // Make sure we fail if you set a nested Struct value in the format dictionary
     envoy::config::filter::accesslog::v2::AccessLog config;

@@ -15,12 +15,12 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace DubboProxy {
 
-TEST(HessianProtocolTest, Name) {
+TEST_F(TestBase, HessianProtocolTest_Name) {
   HessianDeserializerImpl deserializer;
   EXPECT_EQ(deserializer.name(), "hessian");
 }
 
-TEST(HessianProtocolTest, deserializeRpcInvocation) {
+TEST_F(TestBase, HessianProtocolTest_deserializeRpcInvocation) {
   HessianDeserializerImpl deserializer;
 
   {
@@ -53,7 +53,7 @@ TEST(HessianProtocolTest, deserializeRpcInvocation) {
   }
 }
 
-TEST(HessianProtocolTest, deserializeRpcResult) {
+TEST_F(TestBase, HessianProtocolTest_deserializeRpcResult) {
   HessianDeserializerImpl deserializer;
 
   {
@@ -123,7 +123,7 @@ TEST(HessianProtocolTest, deserializeRpcResult) {
   }
 }
 
-TEST(HessianProtocolTest, HessianDeserializerConfigFactory) {
+TEST_F(TestBase, HessianProtocolTest_HessianDeserializerConfigFactory) {
   auto deserializer =
       NamedDeserializerConfigFactory::getFactory(SerializationType::Hessian).createDeserializer();
   EXPECT_EQ(deserializer->name(), "hessian");

@@ -11,7 +11,7 @@
 namespace Envoy {
 namespace Grpc {
 
-TEST(GrpcCommonTest, GetGrpcStatus) {
+TEST_F(TestBase, GrpcCommonTest_GetGrpcStatus) {
   Http::TestHeaderMapImpl ok_trailers{{"grpc-status", "0"}};
   EXPECT_EQ(Status::Ok, Common::getGrpcStatus(ok_trailers).value());
 
@@ -28,7 +28,7 @@ TEST(GrpcCommonTest, GetGrpcStatus) {
   EXPECT_EQ(Status::InvalidCode, Common::getGrpcStatus(invalid_trailers).value());
 }
 
-TEST(GrpcCommonTest, GetGrpcMessage) {
+TEST_F(TestBase, GrpcCommonTest_GetGrpcMessage) {
   Http::TestHeaderMapImpl empty_trailers;
   EXPECT_EQ("", Common::getGrpcMessage(empty_trailers));
 
@@ -39,7 +39,7 @@ TEST(GrpcCommonTest, GetGrpcMessage) {
   EXPECT_EQ("", Common::getGrpcMessage(empty_error_trailers));
 }
 
-TEST(GrpcCommonTest, GetGrpcTimeout) {
+TEST_F(TestBase, GrpcCommonTest_GetGrpcTimeout) {
   Http::TestHeaderMapImpl empty_headers;
   EXPECT_EQ(std::chrono::milliseconds(0), Common::getGrpcTimeout(empty_headers));
 
@@ -74,7 +74,7 @@ TEST(GrpcCommonTest, GetGrpcTimeout) {
   // so we don't test for them.
 }
 
-TEST(GrpcCommonTest, ToGrpcTimeout) {
+TEST_F(TestBase, GrpcCommonTest_ToGrpcTimeout) {
   Http::HeaderString value;
 
   Common::toGrpcTimeout(std::chrono::milliseconds(0UL), value);
@@ -99,7 +99,7 @@ TEST(GrpcCommonTest, ToGrpcTimeout) {
   EXPECT_STREQ("99999999H", value.c_str());
 }
 
-TEST(GrpcCommonTest, ChargeStats) {
+TEST_F(TestBase, GrpcCommonTest_ChargeStats) {
   NiceMock<Upstream::MockClusterInfo> cluster;
   Common::chargeStat(cluster, "service", "method", true);
   EXPECT_EQ(1U, cluster.stats_store_.counter("grpc.service.method.success").value());
@@ -129,7 +129,7 @@ TEST(GrpcCommonTest, ChargeStats) {
   EXPECT_EQ(4U, cluster.stats_store_.counter("grpc.service.method.total").value());
 }
 
-TEST(GrpcCommonTest, PrepareHeaders) {
+TEST_F(TestBase, GrpcCommonTest_PrepareHeaders) {
   {
     Http::MessagePtr message =
         Common::prepareHeaders("cluster", "service_name", "method_name", absl::nullopt);
@@ -202,7 +202,7 @@ TEST(GrpcCommonTest, PrepareHeaders) {
   }
 }
 
-TEST(GrpcCommonTest, ResolveServiceAndMethod) {
+TEST_F(TestBase, GrpcCommonTest_ResolveServiceAndMethod) {
   std::string service;
   std::string method;
   Http::HeaderMapImpl headers;
@@ -223,7 +223,7 @@ TEST(GrpcCommonTest, ResolveServiceAndMethod) {
   EXPECT_FALSE(Common::resolveServiceAndMethod(&path, &service, &method));
 }
 
-TEST(GrpcCommonTest, GrpcToHttpStatus) {
+TEST_F(TestBase, GrpcCommonTest_GrpcToHttpStatus) {
   const std::vector<std::pair<Status::GrpcStatus, uint64_t>> test_set = {
       {Status::GrpcStatus::Ok, 200},
       {Status::GrpcStatus::Canceled, 499},
@@ -249,7 +249,7 @@ TEST(GrpcCommonTest, GrpcToHttpStatus) {
   }
 }
 
-TEST(GrpcCommonTest, HttpToGrpcStatus) {
+TEST_F(TestBase, GrpcCommonTest_HttpToGrpcStatus) {
   const std::vector<std::pair<uint64_t, Status::GrpcStatus>> test_set = {
       {400, Status::GrpcStatus::Internal},         {401, Status::GrpcStatus::Unauthenticated},
       {403, Status::GrpcStatus::PermissionDenied}, {404, Status::GrpcStatus::Unimplemented},
@@ -262,7 +262,7 @@ TEST(GrpcCommonTest, HttpToGrpcStatus) {
   }
 }
 
-TEST(GrpcCommonTest, HasGrpcContentType) {
+TEST_F(TestBase, GrpcCommonTest_HasGrpcContentType) {
   {
     Http::TestHeaderMapImpl headers{};
     EXPECT_FALSE(Common::hasGrpcContentType(headers));
@@ -281,7 +281,7 @@ TEST(GrpcCommonTest, HasGrpcContentType) {
   EXPECT_FALSE(isGrpcContentType("application/grpc-web+foo"));
 }
 
-TEST(GrpcCommonTest, IsGrpcResponseHeader) {
+TEST_F(TestBase, GrpcCommonTest_IsGrpcResponseHeader) {
   Http::TestHeaderMapImpl grpc_status_only{{":status", "500"}, {"grpc-status", "14"}};
   EXPECT_TRUE(Common::isGrpcResponseHeader(grpc_status_only, true));
   EXPECT_FALSE(Common::isGrpcResponseHeader(grpc_status_only, false));
@@ -297,7 +297,7 @@ TEST(GrpcCommonTest, IsGrpcResponseHeader) {
   EXPECT_FALSE(Common::isGrpcResponseHeader(json_response_header, false));
 }
 
-TEST(GrpcCommonTest, ValidateResponse) {
+TEST_F(TestBase, GrpcCommonTest_ValidateResponse) {
   {
     Http::ResponseMessageImpl response(
         Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}});

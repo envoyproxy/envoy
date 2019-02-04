@@ -11,7 +11,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace MongoProxy {
 
-TEST(QueryMessageInfoTest, FindCommand) {
+TEST_F(TestBase, QueryMessageInfoTest_FindCommand) {
   std::string json = R"EOF(
     {"hostname":"api-production-iad-canary","httpUniqueId":"VqqX7H8AAQEAAE@8EUkAAAAR","callingFunction":"getByMongoId"}
   )EOF";
@@ -29,7 +29,7 @@ TEST(QueryMessageInfoTest, FindCommand) {
   EXPECT_EQ(QueryMessageInfo::QueryType::PrimaryKey, info.type());
 }
 
-TEST(QueryMessageInfoTest, Type) {
+TEST_F(TestBase, QueryMessageInfoTest_Type) {
   {
     QueryMessageImpl q(1, 0);
     q.fullCollectionName("db.foo");
@@ -85,7 +85,7 @@ TEST(QueryMessageInfoTest, Type) {
   }
 }
 
-TEST(QueryMessageInfoTest, CollectionFromFullCollectionName) {
+TEST_F(TestBase, QueryMessageInfoTest_CollectionFromFullCollectionName) {
   {
     QueryMessageImpl q(0, 0);
     q.fullCollectionName("db.foo");
@@ -101,7 +101,7 @@ TEST(QueryMessageInfoTest, CollectionFromFullCollectionName) {
   }
 }
 
-TEST(QueryMessageInfoTest, Callsite) {
+TEST_F(TestBase, QueryMessageInfoTest_Callsite) {
   {
     QueryMessageImpl q(0, 0);
     q.fullCollectionName("db.foo");
@@ -131,7 +131,7 @@ TEST(QueryMessageInfoTest, Callsite) {
   }
 }
 
-TEST(QueryMessageInfoTest, MaxTime) {
+TEST_F(TestBase, QueryMessageInfoTest_MaxTime) {
   {
     QueryMessageImpl q(0, 0);
     q.fullCollectionName("db.foo");
@@ -157,7 +157,7 @@ TEST(QueryMessageInfoTest, MaxTime) {
   }
 }
 
-TEST(QueryMessageInfoTest, Command) {
+TEST_F(TestBase, QueryMessageInfoTest_Command) {
   {
     QueryMessageImpl q(0, 0);
     q.fullCollectionName("db.$cmd");

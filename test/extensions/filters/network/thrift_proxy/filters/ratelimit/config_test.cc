@@ -26,7 +26,7 @@ parseRateLimitFromV2Yaml(const std::string& yaml) {
 }
 } // namespace
 
-TEST(RateLimitFilterConfigTest, ValidateFail) {
+TEST_F(TestBase, RateLimitFilterConfigTest_ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_THROW(
       RateLimitFilterConfig().createFilterFactoryFromProto(
@@ -34,7 +34,7 @@ TEST(RateLimitFilterConfigTest, ValidateFail) {
       ProtoValidationException);
 }
 
-TEST(RateLimitFilterConfigTest, RateLimitFilterCorrectProto) {
+TEST_F(TestBase, RateLimitFilterConfigTest_RateLimitFilterCorrectProto) {
   const std::string yaml_string = R"EOF(
 domain: "test"
 timeout: "1.337s"
