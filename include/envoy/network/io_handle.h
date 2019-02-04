@@ -69,7 +69,7 @@ public:
   /**
    * Wrap dup()
    */
-  virtual IoHandlePtr dup() PURE;
+  virtual std::unique_ptr<IoHandle> dup() PURE;
 
   virtual IoHandleCallIntResult shutdown(int how) PURE;
 };
