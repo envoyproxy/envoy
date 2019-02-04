@@ -6,8 +6,9 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
-#include "quiche/quic/platform/api/quic_string.h"
 #include "server/backtrace.h"
+
+#include "quiche/quic/platform/api/quic_string.h"
 
 namespace quic {
 
@@ -15,7 +16,7 @@ inline QuicString QuicStackTraceImpl() {
   Envoy::BackwardsTrace t;
   t.capture();
   std::ostringstream os;
-  t.print(os);
+  t.printTrace(os);
   return os.str();
 }
 
