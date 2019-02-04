@@ -3,28 +3,35 @@
 from __future__ import print_function
 
 import argparse
+import math
 import os
 import re
 import subprocess
 import sys
 
-# TODO(zuercher): provide support for fixing errors
+from functools import partial
+
+# Handle function rename between python 2/3.
+try:
+  input = raw_input
+except NameError:
+  pass
 
 TOOLS_DIR = os.path.dirname(os.path.realpath(__file__))
 
-# e.g., // comment OR /* comment */ (single line)
+# Single line comments: // comment OR /* comment */
 # Limit the characters that may precede // to help filter out some code
 # mistakenly processed as a comment.
 INLINE_COMMENT = re.compile(r'(?:^|[^:"])//(.*?)$|/\*+(.*?)\*+/')
 
-# e.g., /* comment */ (multiple lines)
+# Multi-line comments: /* comment */ (multiple lines)
 MULTI_COMMENT_START = re.compile(r'/\*(.*?)$')
 MULTI_COMMENT_END = re.compile(r'^(.*?)\*/')
 
-# e.g., TODO(username): blah
+# Envoy TODO comment style.
 TODO = re.compile(r'(TODO|NOTE)\s*\(@?[A-Za-z0-9-]+\):?')
 
-# e.g., ignore parameter names in doxygen comments
+# Ignore parameter names in doxygen comments.
 METHOD_DOC = re.compile('@(param\s+\w+|return(\s+const)?\s+\w+)')
 
 # Camel Case splitter
@@ -38,7 +45,7 @@ NUMBER = re.compile(r'\d')
 # Hex: match 1) longish strings of hex digits (to avoid matching "add" and
 # other simple words that happen to look like hex), 2) 2 or more two digit
 # hex numbers separated by colons, 3) "0x" prefixed hex numbers of any length,
-# or 4) UUIDs
+# or 4) UUIDs.
 HEX = re.compile(r'(?:^|\s|[(])([A-Fa-f0-9]{8,})(?:$|\s|[.,)])')
 HEX_SIG = re.compile(r'\W([A-Fa-f0-9]{2}(:[A-Fa-f0-9]{2})+)\W')
 PREFIXED_HEX = re.compile(r'0x[A-Fa-f0-9]+')
@@ -48,13 +55,13 @@ UUID = re.compile(r'[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-
 # aspell ignores that anyway.
 IPV6_ADDR = re.compile(r'\W([A-Fa-f0-9]+:[A-Fa-f0-9:]+/[0-9]{1,3})\W')
 
-# Quoted words: "word", 'word', or *word*
+# Quoted words: "word", 'word', or *word*.
 QUOTED_WORD = re.compile(r'(["\'*])[A-Za-z0-9]+(\1)')
 
-# Command flags (e.g. "-rf") and percent specifiers
+# Command flags (e.g. "-rf") and percent specifiers.
 FLAG = re.compile(r'\W([-%][A-Za-z]+)')
 
-# Bare github users (e.g. @user)
+# Bare github users (e.g. @user).
 USER = re.compile(r'\W(@[A-Za-z0-9-]+)')
 
 DEBUG = False
@@ -73,17 +80,153 @@ def debug(s):
     print(s)
 
 
+class SpellChecker:
+  """Aspell-based spell checker."""
+
+  def __init__(self, dictionary_file):
+    self.dictionary_file = dictionary_file
+    self.aspell = None
+
+  def start(self):
+    words = self.load_dictionary()
+
+    # Generate aspell personal dictionary.
+    pws = os.path.join(TOOLS_DIR, '.aspell.en.pws')
+    with open(pws, 'w') as f:
+      f.write("personal_ws-1.1 en %d\n" % (len(words)))
+      f.writelines(words)
+
+    # Start an aspell process.
+    aspell_args = ["aspell", "pipe", "--run-together", "--encoding=utf-8", "--personal=" + pws]
+    self.aspell = subprocess.Popen(
+        aspell_args,
+        bufsize=4096,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        universal_newlines=True)
+
+    # Read the version line that aspell emits on startup.
+    self.aspell.stdout.readline()
+
+  def stop(self):
+    if not self.aspell:
+      return
+
+    self.aspell.stdin.close()
+    self.aspell.wait()
+    self.aspell = None
+
+  def check(self, line):
+    self.aspell.poll()
+    if self.aspell.returncode is not None:
+      print("aspell quit unexpectedly: return code %d" % (self.aspell.returncode))
+      sys.exit(2)
+
+    debug("ASPELL< %s" % (line))
+
+    self.aspell.stdin.write(line + os.linesep)
+    self.aspell.stdin.flush()
+
+    errors = []
+    while True:
+      result = self.aspell.stdout.readline().strip()
+      debug("ASPELL> %s" % (result))
+
+      # Check for end of results.
+      if result == "":
+        break
+
+      t = result[0]
+      if t == "*" or t == "-" or t == "+":
+        # *: found in dictionary.
+        # -: found run-together words in dictionary.
+        # +: found root word in dictionary.
+        continue
+
+      # & <original> <N> <offset>: m1, m2, ... mN, g1, g2, ...
+      # ? <original> 0 <offset>: g1, g2, ....
+      # # <original> <offset>
+      original, rem = result[2:].split(" ", 1)
+
+      if t == "#":
+        # Not in dictionary, but no suggestions.
+        errors.append((original, int(rem), []))
+      elif t == '&' or t == '?':
+        # Near misses and/or guesses.
+        _, rem = rem.split(" ", 1)  # Drop N (may be 0).
+        o, rem = rem.split(": ", 1)  # o is offset from start of line.
+        suggestions = rem.split(", ")
+
+        errors.append((original, int(o), suggestions))
+      else:
+        print("aspell produced unexpected output: %s" % (result))
+        sys.exit(2)
+
+    return errors
+
+  def load_dictionary(self):
+    # Read the custom dictionary.
+    words = []
+    with open(self.dictionary_file, 'r') as f:
+      words = f.readlines()
+
+    # Strip comments and blank lines.
+    words = [w for w in words if len(w.strip()) > 0 and w[0] != "#"]
+
+    # Allow acronyms and abbreviations to be spelled in lowercase.
+    # (e.g. Convert "HTTP" into "HTTP" and "http" which also matches
+    # "Http").
+    for word in words:
+      if word.isupper():
+        words += word.lower()
+
+    return words
+
+  def add_words(self, additions):
+    lines = []
+    with open(self.dictionary_file, 'r') as f:
+      lines = f.readlines()
+
+    additions = [w + os.linesep for w in additions]
+    additions.sort()
+
+    # Insert additions into the lines ignoring comments and blank lines.
+    idx = 0
+    add_idx = 0
+    while idx < len(lines) and add_idx < len(additions):
+      line = lines[idx]
+      if len(line.strip()) != 0 and line[0] != "#":
+        c = cmp(additions[add_idx], line)
+        if c < 0:
+          lines.insert(idx, additions[add_idx])
+          add_idx += 1
+        elif c == 0:
+          add_idx += 1
+      idx += 1
+
+    # Append any remaining additions.
+    lines += additions[add_idx:]
+
+    with open(self.dictionary_file, 'w') as f:
+      f.writelines(lines)
+
+    self.stop()
+    self.start()
+
+
 # Split camel case words and run them through the dictionary. Returns
 # True if they are all spelled correctly, False if word is not camel
 # case or has a misspelled sub-word.
-def check_camel_case(aspell, word):
-  # Words is not camel case: the previous result stands.
+def check_camel_case(checker, word):
   parts = re.findall(CAMEL_CASE, word)
+
+  # Word is not camel case: the previous result stands.
   if len(parts) <= 1:
     return False
 
   for part in parts:
-    if check_comment(aspell, 0, part):
+    if check_comment(checker, 0, part):
       # Part of camel case word is misspelled, the result stands.
       return False
 
@@ -105,10 +248,10 @@ def mask_with_regex(comment, regex, group, secondary=None):
   return comment
 
 
-# Checks the comment at offset against the aspell pipe. Result is an array
+# Checks the comment at offset against the spell checker. Result is an array
 # of tuples where each tuple is the misspelled word, it's offset from the
 # start of the line, and an array of possible replacements.
-def check_comment(aspell, offset, comment):
+def check_comment(checker, offset, comment):
   # Replace TODO comments with spaces to preserve string offsets.
   comment = mask_with_regex(comment, TODO, 0)
 
@@ -135,170 +278,220 @@ def check_comment(aspell, offset, comment):
   # Github user refs:
   comment = mask_with_regex(comment, USER, 1)
 
-  # Everything got stripped, return early.
+  # Everything got masked, return early.
   if comment == "" or comment.strip() == "":
     return []
 
-  # aspell does not like leading punctuation
+  # Mask leading punctuation.
   if not comment[0].isalnum():
     comment = ' ' + comment[1:]
 
-  errors = []
+  errors = checker.check(comment)
 
-  aspell.poll()
-  if aspell.returncode is not None:
-    print("aspell quit unexpectedly: return code %d" % (aspell.returncode))
-    sys.exit(1)
-
-  debug("ASPELL< %s" % (comment))
-
-  aspell.stdin.write(comment + os.linesep)
-  aspell.stdin.flush()
-  while True:
-    result = aspell.stdout.readline().strip()
-    debug("ASPELL> %s" % (result))
-
-    if result == "":
-      break  # handled all results
-
-    t = result[0]
-    if t == "*" or t == "-" or t == "+":
-      # *: found in dictionary
-      # -: found run-together words in dictionary
-      # +: found root word in dictionary
-      continue
-
-    # & <original> <N> <offset>: m1, m2, ... mN, g1, g2, ...
-    # ? <original> 0 <offset>: g1, g2, ....
-    # # <original> <offset>
-    original, rem = result[2:].split(" ", 1)
-
-    if t == "#":
-      # Not in dictionary, but no suggestions
-      errors.append((original, int(rem) + offset, []))
-    elif t == '&' or t == '?':
-      # Near misses and/or guesses
-      _, rem = rem.split(" ", 1)  # drop N (or 0)
-      o, rem = rem.split(": ", 1)  # o is offset from start of comment
-      suggestions = rem.split(", ")
-
-      errors.append((original, int(o) + offset, suggestions))
-    else:
-      print("aspell produced unexpected output: %s" % (result))
-      sys.exit(2)
+  # Fix up offsets relative to the start of the line vs start of the comment.
+  errors = [(w, o + offset, s) for (w, o, s) in errors]
 
   # Retry camel case words after splitting them.
-  errors = [err for err in errors if not check_camel_case(aspell, err[0])]
+  errors = [err for err in errors if not check_camel_case(checker, err[0])]
   return errors
 
 
-def check_file(aspell, file, lines):
+def print_error(file, line_offset, lines, errors):
+  # Highlight misspelled words.
+  line = lines[line_offset]
+  prefix = "%s:%d:" % (file, line_offset + 1)
+  for (word, offset, suggestions) in reversed(errors):
+    line = line[:offset] + red(word) + line[offset + len(word):]
+
+  print("%s%s" % (prefix, line.rstrip()))
+
+  if MARK:
+    # Print a caret at the start of each misspelled word.
+    marks = ' ' * len(prefix)
+    last = 0
+    for (word, offset, suggestions) in errors:
+      marks += (' ' * (offset - last)) + '^'
+      last = offset + 1
+    print(marks)
+
+
+def print_fix_options(word, suggestions):
+  print("%s:" % (word))
+  print("  a: accept and add to dictionary")
+  print("  A: accept and add to dictionary as ALLCAPS (for acronyms)")
+  print("  i: ignore")
+  print("  r <word>: replace with given word and add to dictionary")
+  print("  R <word>: replace with given word and add to dictionary as ALLCAPS (for acronyms)")
+  print("  x: abort")
+
+  col_width = max(len(word) for word in suggestions)
+  opt_width = int(math.log(len(suggestions), 10)) + 1
+  padding = 2  # Two spaces of padding.
+  delim = 2  # Colon and space after number.
+  num_cols = int(78 / (col_width + padding + opt_width + delim))
+  num_rows = int(len(suggestions) / num_cols + 1)
+  rows = [""] * num_rows
+
+  indent = " " * padding
+  for idx, sugg in enumerate(suggestions):
+    row = idx % len(rows)
+    row_data = "%d: %s" % (idx, sugg)
+
+    rows[row] += indent + row_data.ljust(col_width + opt_width + delim)
+
+  for row in rows:
+    print(row)
+
+
+def fix_error(checker, file, line_offset, lines, errors):
+  print_error(file, line_offset, lines, errors)
+
+  fixed = {}
+  replacements = []
+  additions = []
+  for (word, offset, suggestions) in errors:
+    if word in fixed:
+      # Same typo was repeated in a line, so just reuse the previous choice.
+      replacements += [fixed[word]]
+      continue
+
+    print_fix_options(word, suggestions)
+
+    replacement = ""
+    while replacement == "":
+      try:
+        choice = input("> ")
+      except EOFError:
+        choice = "x"
+
+      add = None
+      if choice == "x":
+        print("Spell checking aborted.")
+        sys.exit(2)
+      elif choice == "a":
+        replacement = word
+        add = word
+      elif choice == "A":
+        replacement = word
+        add = word.upper()
+      elif choice == "i":
+        replacement = word
+      elif choice[:1] == "r" or choice[:1] == "R":
+        replacement = choice[1:].strip()
+        if replacement == "":
+          print("Invalid choice: '%s'. Must specify a replacement (e.g. 'r corrected')." % (choice))
+          continue
+
+        if choice[:1] == "R":
+          if replacement.upper() not in suggestions:
+            add = replacement.upper()
+        elif replacement not in suggestions:
+          add = replacement
+      elif choice == 's':
+        for idx, sugg in enumerate(suggestions[:10]):
+          print("\t%d: %s" % (idx, sugg))
+      else:
+        try:
+          idx = int(choice)
+        except ValueError:
+          idx = -1
+        if idx >= 0 and idx < len(suggestions):
+          replacement = suggestions[idx]
+        else:
+          print("Invalid choice: '%s'" % (choice))
+
+    fixed[word] = replacement
+    replacements += [replacement]
+    if add:
+      additions += [add]
+
+  if len(errors) != len(replacements):
+    print("Internal error %d errors with %d replacements" % (len(errors), len(replacements)))
+    sys.exit(2)
+
+  # Perform replacements on the line.
+  line = lines[line_offset]
+  for idx in range(len(replacements) - 1, -1, -1):
+    word, offset, _ = errors[idx]
+    replacement = replacements[idx]
+    if word == replacement:
+      continue
+
+    line = line[:offset] + replacement + line[offset + len(word):]
+  lines[line_offset] = line
+
+  # Update the dictionary.
+  checker.add_words(additions)
+
+
+def check_file(checker, file, lines, error_handler):
   in_comment = False
-  line_num = 0
-  num = 0
-  for line in lines:
-    line_num += 1
+  num_comments = 0
+  num_errors = 0
+  for line_idx, line in enumerate(lines):
     errors = []
     last = 0
     if in_comment:
       mc_end = MULTI_COMMENT_END.search(line)
       if mc_end is None:
         # Full line is within a multi-line comment.
-        errors += check_comment(aspell, 0, line)
-        num += 1
+        errors += check_comment(checker, 0, line)
+        num_comments += 1
       else:
         # Start of line is the end of a multi-line comment.
-        errors += check_comment(aspell, 0, mc_end.group(1))
-        num += 1
+        errors += check_comment(checker, 0, mc_end.group(1))
+        num_comments += 1
         last = mc_end.end()
         in_comment = False
 
     if not in_comment:
       for inline in INLINE_COMMENT.finditer(line, last):
-        # Single-line comment
-        m = inline.lastindex  # 1 or 2 depending on group matched
-        errors += check_comment(aspell, inline.start(m), inline.group(m))
-        num += 1
+        # Single-line comment.
+        m = inline.lastindex  # 1 or 2 depending on group matched.
+        errors += check_comment(checker, inline.start(m), inline.group(m))
+        num_comments += 1
         last = inline.end(m)
       if last < len(line):
         mc_start = MULTI_COMMENT_START.search(line, last)
         if mc_start is not None:
           # New multi-lie comment starts at end of line.
-          errors += check_comment(aspell, mc_start.start(1), mc_start.group(1))
-          num += 1
+          errors += check_comment(checker, mc_start.start(1), mc_start.group(1))
+          num_comments += 1
           in_comment = True
 
     if errors:
-      # Highlight misspelled words.
-      prefix = "%s:%d:" % (file, line_num)
-      for (word, offset, suggestions) in reversed(errors):
-        line = line[:offset] + red(word) + line[offset + len(word):]
+      num_errors += len(errors)
+      error_handler(file, line_idx, lines, errors)
 
-      print("%s%s" % (prefix, line.rstrip()))
-
-      if MARK:
-        # Print a caret at the start of each misspelled word.
-        marks = ' ' * len(prefix)
-        last = 0
-        for (word, offset, suggestions) in errors:
-          marks += (' ' * (offset - last)) + '^'
-          last = offset + 1
-        print(marks)
-
-  return num
+  return (num_comments, num_errors)
 
 
-def start_aspell(dictionary):
-  # Read the custom dictionary
-  words = []
-  with open(dictionary, 'r') as f:
-    words = f.readlines()
+def execute(files, dictionary_file, fix):
+  checker = SpellChecker(dictionary_file)
+  checker.start()
 
-  # Strip comments.
-  words = [w for w in words if len(w) > 0 and w[0] != "#"]
+  handler = print_error
+  if fix:
+    handler = partial(fix_error, checker)
 
-  # Allow acronyms and abbreviations to be spelled in lowercase.
-  # (e.g. Convert "HTTP"" into "HTTP" and "http" which also matches
-  # "Http").
-  for word in words:
-    if word.isupper():
-      words += word.lower()
-
-  # Generate aspell personal dictionary.
-  pws = os.path.join(TOOLS_DIR, '.aspell.en.pws')
-  with open(pws, 'w') as f:
-    f.write("personal_ws-1.1 en %d\n" % (len(words)))
-    for word in words:
-      f.write(word)
-
-  # Start an aspell process.
-  aspell_args = ["aspell", "pipe", "--run-together", "--encoding=utf-8", "--personal=" + pws]
-  aspell = subprocess.Popen(
-      aspell_args,
-      bufsize=4096,
-      stdin=subprocess.PIPE,
-      stdout=subprocess.PIPE,
-      stderr=subprocess.STDOUT,
-      universal_newlines=True)
-
-  # Read the version line that aspell emits on startup.
-  aspell.stdout.readline()
-  return aspell
-
-
-def execute(files, dictionary):
-  aspell = start_aspell(dictionary)
-
-  num = 0
+  total_comments = 0
+  total_errors = 0
   for path in files:
     with open(path, 'r') as f:
       lines = f.readlines()
-      num += check_file(aspell, path, lines)
+      (num_comments, num_errors) = check_file(checker, path, lines, handler)
+      total_comments += num_comments
+      total_errors += num_errors
 
-  aspell.stdin.close()
-  aspell.wait()
+    if fix and num_errors > 0:
+      with open(path, 'w') as f:
+        f.writelines(lines)
 
-  print("Checked %d lines of comments" % (num))
+  checker.stop()
+
+  print("Checked %d comments, found %d errors." % (total_comments, total_errors))
+
+  return total_errors == 0
 
 
 if __name__ == "__main__":
@@ -308,7 +501,7 @@ if __name__ == "__main__":
   parser.add_argument(
       'operation_type',
       type=str,
-      choices=['check'],
+      choices=['check', 'fix'],
       help="specify if the run should 'check' or 'fix' spelling.")
   parser.add_argument(
       'target_paths', type=str, nargs="*", help="specify the files for the script to process.")
@@ -341,4 +534,11 @@ if __name__ == "__main__":
       for root, _, files in os.walk(p):
         target_paths += [os.path.join(root, f) for f in files if os.path.splitext(f)[1] in exts]
 
-  execute(target_paths, args.dictionary)
+  rv = execute(target_paths, args.dictionary, args.operation_type == 'fix')
+
+  if args.operation_type == 'check':
+    if not rv:
+      print("ERROR: spell check failed. Run 'tool/check_spelling_pedantic.py fix'")
+      sys.exit(1)
+
+    print("PASS")

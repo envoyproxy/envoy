@@ -12,10 +12,10 @@
 #include "test/config/integration/certs/clientcert_hash.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_replace.h"
-#include "gtest/gtest.h"
 
 namespace Envoy {
 
@@ -246,13 +246,22 @@ void ConfigHelper::setTapTransportSocket(const std::string& tap_path, const std:
   // Configure outer tap transport socket.
   transport_socket.set_name("envoy.transport_sockets.tap");
   envoy::config::transport_socket::tap::v2alpha::Tap tap_config;
-  auto* file_sink = tap_config.mutable_file_sink();
+  tap_config.mutable_common_config()
+      ->mutable_static_config()
+      ->mutable_match_config()
+      ->set_any_match(true);
+  auto* file_sink = tap_config.mutable_common_config()
+                        ->mutable_static_config()
+                        ->mutable_output_config()
+                        ->mutable_sinks()
+                        ->Add()
+                        ->mutable_file_per_tap();
   const ::testing::TestInfo* const test_info =
       ::testing::UnitTest::GetInstance()->current_test_info();
   const std::string test_id =
       std::string(test_info->name()) + "_" + std::string(test_info->test_case_name()) + "_" + type;
   file_sink->set_path_prefix(tap_path + "_" + absl::StrReplaceAll(test_id, {{"/", "_"}}));
-  file_sink->set_format(envoy::config::transport_socket::tap::v2alpha::FileSink::PROTO_TEXT);
+  file_sink->set_format(envoy::service::tap::v2alpha::FilePerTapSink::PROTO_TEXT);
   tap_config.mutable_transport_socket()->MergeFrom(inner_transport_socket);
   transport_socket.mutable_typed_config()->PackFrom(tap_config);
 }

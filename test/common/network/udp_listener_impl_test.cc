@@ -10,11 +10,11 @@
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Invoke;
@@ -36,7 +36,7 @@ public:
   }
 };
 
-class ListenerImplTest : public testing::TestWithParam<Address::IpVersion> {
+class ListenerImplTest : public TestBaseWithParam<Address::IpVersion> {
 protected:
   ListenerImplTest()
       : version_(GetParam()),
@@ -256,7 +256,7 @@ TEST_P(ListenerImplTest, UdpEcho) {
   getSocketAddressInfo(*client_socket.get(), server_ip->port(), server_addr, addr_len);
   ASSERT_GT(addr_len, 0);
 
-  // We send 2 packets and exptect it to echo.
+  // We send 2 packets and expect it to echo.
   const std::string first("first");
   const std::string second("second");
 
@@ -456,7 +456,7 @@ TEST_P(ListenerImplTest, UdpListenerEnableDisable) {
 }
 
 /**
- * Tests UDP listebe's error callback.
+ * Tests UDP listener's error callback.
  */
 TEST_P(ListenerImplTest, UdpListenerRecvFromError) {
   // Setup server socket

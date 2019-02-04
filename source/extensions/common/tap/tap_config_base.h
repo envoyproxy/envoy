@@ -18,19 +18,31 @@ class TapConfigBaseImpl {
 public:
   size_t numMatchers() { return matchers_.size(); }
   Matcher& rootMatcher();
-  Extensions::Common::Tap::Sink& sink() {
-    // TODO(mattklein123): When we support multiple sinks, select the right one. Right now
-    // it must be admin.
-    return *admin_streamer_;
-  }
+  Extensions::Common::Tap::Sink& sink() { return *sink_to_use_; }
 
 protected:
   TapConfigBaseImpl(envoy::service::tap::v2alpha::TapConfig&& proto_config,
                     Common::Tap::Sink* admin_streamer);
 
 private:
-  Sink* admin_streamer_;
+  Sink* sink_to_use_;
+  SinkPtr sink_;
   std::vector<MatcherPtr> matchers_;
+};
+
+/**
+ * A tap sink that writes each tap trace to a discrete output file.
+ */
+class FilePerTapSink : public Sink {
+public:
+  FilePerTapSink(const envoy::service::tap::v2alpha::FilePerTapSink& config) : config_(config) {}
+
+  // Sink
+  void submitBufferedTrace(std::shared_ptr<envoy::data::tap::v2alpha::BufferedTraceWrapper> trace,
+                           uint64_t trace_id) override;
+
+private:
+  const envoy::service::tap::v2alpha::FilePerTapSink config_;
 };
 
 } // namespace Tap
