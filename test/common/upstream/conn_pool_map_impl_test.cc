@@ -180,6 +180,8 @@ TEST_F(ConnPoolMapImplTest, ClearDefersDelete) {
   EXPECT_EQ(dispatcher_.to_delete_.size(), 2);
 }
 
+// The following tests only die in debug builds, so don't run them if this isn't one.
+#if !defined(NDEBUG)
 TEST_F(ConnPoolMapImplTest, ReentryClearTripsAssert) {
   TestMapPtr test_map = makeTestMap();
 
@@ -226,5 +228,6 @@ TEST_F(ConnPoolMapImplTest, ReentryAddDrainedCallbackTripsAssert) {
       test_map->addDrainedCallback([&test_map] { test_map->addDrainedCallback([]() {}); }),
       ".*Details: A resource should only be entered once");
 }
+#endif // !defined(NDEBUG)
 } // namespace Upstream
 } // namespace Envoy
