@@ -24,10 +24,10 @@
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::DoAll;
@@ -101,7 +101,7 @@ public:
   Http::CodecClient::Type codecClientType() { return codec_client_type_; }
 };
 
-class HttpHealthCheckerImplTest : public testing::Test {
+class HttpHealthCheckerImplTest : public TestBase {
 public:
   struct TestSession {
     TestSession() {}
@@ -1969,7 +1969,7 @@ TEST(TcpHealthCheckMatcher, match) {
   EXPECT_TRUE(TcpHealthCheckMatcher::match(segments, buffer));
 }
 
-class TcpHealthCheckerImplTest : public testing::Test {
+class TcpHealthCheckerImplTest : public TestBase {
 public:
   TcpHealthCheckerImplTest()
       : cluster_(new NiceMock<MockCluster>()), event_logger_(new MockHealthCheckEventLogger()) {}
@@ -2753,7 +2753,7 @@ public:
   std::list<uint32_t> codec_index_{};
 };
 
-class GrpcHealthCheckerImplTest : public GrpcHealthCheckerImplTestBase, public testing::Test {};
+class GrpcHealthCheckerImplTest : public GrpcHealthCheckerImplTestBase, public TestBase {};
 
 // Test single host check success.
 TEST_F(GrpcHealthCheckerImplTest, Success) { testSingleHostSuccess(absl::nullopt); }
@@ -3382,7 +3382,7 @@ TEST_F(GrpcHealthCheckerImplTest, GoAwayBetweenChecks) {
 
 class BadResponseGrpcHealthCheckerImplTest
     : public GrpcHealthCheckerImplTestBase,
-      public testing::TestWithParam<GrpcHealthCheckerImplTest::ResponseSpec> {};
+      public TestBaseWithParam<GrpcHealthCheckerImplTest::ResponseSpec> {};
 
 INSTANTIATE_TEST_SUITE_P(
     BadResponse, BadResponseGrpcHealthCheckerImplTest,

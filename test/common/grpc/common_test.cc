@@ -5,9 +5,8 @@
 
 #include "test/mocks/upstream/mocks.h"
 #include "test/proto/helloworld.pb.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
-
-#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Grpc {

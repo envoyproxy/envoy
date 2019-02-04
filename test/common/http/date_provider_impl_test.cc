@@ -6,9 +6,9 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::NiceMock;
 

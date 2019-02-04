@@ -14,10 +14,10 @@
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::NiceMock;
@@ -97,7 +97,7 @@ static Http::TestHeaderMapImpl genHeaders(const std::string& host, const std::st
   return Http::TestHeaderMapImpl{{":authority", host}, {":path", path}, {":method", method}};
 }
 
-class RateLimitConfiguration : public testing::Test {
+class RateLimitConfiguration : public TestBase {
 public:
   void SetUpTest(const std::string json) {
     envoy::api::v2::RouteConfiguration route_config;
@@ -343,7 +343,7 @@ TEST_F(RateLimitConfiguration, Stages) {
   EXPECT_TRUE(rate_limits.empty());
 }
 
-class RateLimitPolicyEntryTest : public testing::Test {
+class RateLimitPolicyEntryTest : public TestBase {
 public:
   void SetUpTest(const std::string json) {
     rate_limit_entry_ = std::make_unique<RateLimitPolicyEntryImpl>(parseRateLimitFromJson(json));

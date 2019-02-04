@@ -37,7 +37,7 @@ public:
   MOCK_METHOD2(scriptLog, void(spdlog::level::level_enum level, const char* message));
 };
 
-class LuaHttpFilterTest : public testing::Test {
+class LuaHttpFilterTest : public TestBase {
 public:
   LuaHttpFilterTest() {
     // Avoid strict mock failures for the following calls. We want strict for other calls.

@@ -1,8 +1,7 @@
 #include "extensions/filters/http/common/aws/utility.h"
 
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
-
-#include "gtest/gtest.h"
 
 using testing::ElementsAre;
 using testing::Pair;

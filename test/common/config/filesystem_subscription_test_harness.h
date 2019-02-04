@@ -11,11 +11,11 @@
 #include "test/common/config/subscription_test_harness.h"
 #include "test/mocks/config/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::NiceMock;

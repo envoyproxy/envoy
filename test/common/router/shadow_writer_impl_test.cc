@@ -6,9 +6,9 @@
 #include "common/router/shadow_writer_impl.h"
 
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::InSequence;
@@ -18,7 +18,7 @@ using testing::Return;
 namespace Envoy {
 namespace Router {
 
-class ShadowWriterImplTest : public testing::Test {
+class ShadowWriterImplTest : public TestBase {
 public:
   void expectShadowWriter(absl::string_view host, absl::string_view shadowed_host) {
     Http::MessagePtr message(new Http::RequestMessageImpl());

@@ -3,7 +3,7 @@
 #include "common/runtime/runtime_impl.h"
 #include "common/runtime/uuid_util.h"
 
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 namespace Envoy {
 TEST(UUIDUtilsTest, mod) {

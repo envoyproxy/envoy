@@ -5,7 +5,7 @@
 
 #include "common/common/hex.h"
 
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 namespace Envoy {
 TEST(Hex, SimpleEncode) {

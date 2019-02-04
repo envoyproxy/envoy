@@ -27,7 +27,7 @@
 #include "test/test_common/network_utility.h"
 
 #include "absl/strings/match.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 #include "spdlog/spdlog.h"
 
 namespace Envoy {

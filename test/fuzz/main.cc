@@ -18,9 +18,8 @@
 
 #include "test/fuzz/fuzz_runner.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
-
-#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace {
@@ -28,7 +27,7 @@ namespace {
 // List of paths for files in the test corpus.
 std::vector<std::string> test_corpus_;
 
-class FuzzerCorpusTest : public ::testing::TestWithParam<std::string> {
+class FuzzerCorpusTest : public TestBaseWithParam<std::string> {
 protected:
   FuzzerCorpusTest() : api_(Api::createApiForTest(stats_store_)) {}
 

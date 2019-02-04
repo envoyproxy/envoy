@@ -1,6 +1,7 @@
 #include <functional>
 
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
+
 #include "quiche/spdy/platform/api/spdy_arraysize.h"
 #include "quiche/spdy/platform/api/spdy_containers.h"
 #include "quiche/spdy/platform/api/spdy_endianness_util.h"

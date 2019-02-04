@@ -4,16 +4,15 @@
 
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
-
-#include "gtest/gtest.h"
 
 using testing::_;
 
 namespace Envoy {
 namespace Network {
 
-class SocketOptionFactoryTest : public testing::Test {
+class SocketOptionFactoryTest : public TestBase {
 public:
   SocketOptionFactoryTest() = default;
 

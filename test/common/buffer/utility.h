@@ -4,7 +4,7 @@
 
 #include "common/buffer/buffer_impl.h"
 
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 namespace Envoy {
 namespace Buffer {

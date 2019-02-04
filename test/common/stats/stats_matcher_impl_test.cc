@@ -2,9 +2,8 @@
 
 #include "common/stats/stats_matcher_impl.h"
 
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
-
-#include "gtest/gtest.h"
 
 using testing::IsFalse;
 using testing::IsTrue;
@@ -12,7 +11,7 @@ using testing::IsTrue;
 namespace Envoy {
 namespace Stats {
 
-class StatsMatcherTest : public testing::Test {
+class StatsMatcherTest : public TestBase {
 protected:
   envoy::type::matcher::StringMatcher* inclusionList() {
     return stats_config_.mutable_stats_matcher()->mutable_inclusion_list()->add_patterns();

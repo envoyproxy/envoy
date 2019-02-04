@@ -1,12 +1,12 @@
 #include "common/common/lock_guard.h"
 #include "common/common/thread.h"
 
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 namespace Envoy {
 namespace Thread {
 
-class ThreadTest : public testing::Test {
+class ThreadTest : public TestBase {
 protected:
   ThreadTest() : a_(0), b_(0) {}
   int a_ GUARDED_BY(a_mutex_);

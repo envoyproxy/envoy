@@ -12,9 +12,9 @@
 #include "test/common/stream_info/test_int_accessor.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace StreamInfo {
@@ -27,7 +27,7 @@ std::chrono::nanoseconds checkDuration(std::chrono::nanoseconds last,
   return timing.value();
 }
 
-class StreamInfoImplTest : public testing::Test {
+class StreamInfoImplTest : public TestBase {
 protected:
   DangerousDeprecatedTestTime test_time_;
 };

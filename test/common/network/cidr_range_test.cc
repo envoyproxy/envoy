@@ -11,7 +11,7 @@
 #include "common/network/cidr_range.h"
 #include "common/network/utility.h"
 
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 // We are adding things into the std namespace.
 // Note that this is technically undefined behavior!

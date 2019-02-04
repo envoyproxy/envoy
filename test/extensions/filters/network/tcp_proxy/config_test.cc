@@ -1,9 +1,9 @@
 #include "extensions/filters/network/tcp_proxy/config.h"
 
 #include "test/mocks/server/mocks.h"
+#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 
@@ -12,7 +12,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace TcpProxy {
 
-class RouteIpListConfigTest : public ::testing::TestWithParam<std::string> {};
+class RouteIpListConfigTest : public TestBaseWithParam<std::string> {};
 
 INSTANTIATE_TEST_SUITE_P(IpList, RouteIpListConfigTest,
                          ::testing::Values(R"EOF("destination_ip_list": [

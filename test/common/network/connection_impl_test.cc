@@ -22,10 +22,10 @@
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::AnyNumber;
@@ -72,7 +72,7 @@ TEST(ConnectionImplUtility, updateBufferStats) {
   ConnectionImplUtility::updateBufferStats(3, 3, previous_total, counter, gauge);
 }
 
-class ConnectionImplDeathTest : public testing::TestWithParam<Address::IpVersion> {};
+class ConnectionImplDeathTest : public TestBaseWithParam<Address::IpVersion> {};
 INSTANTIATE_TEST_SUITE_P(IpVersions, ConnectionImplDeathTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
@@ -90,7 +90,7 @@ TEST_P(ConnectionImplDeathTest, BadFd) {
       ".*assert failure: ioHandle\\(\\).fd\\(\\) != -1.*");
 }
 
-class ConnectionImplTest : public testing::TestWithParam<Address::IpVersion> {
+class ConnectionImplTest : public TestBaseWithParam<Address::IpVersion> {
 public:
   ConnectionImplTest() : api_(Api::createApiForTest(stats_store_)) {}
 
@@ -1229,7 +1229,7 @@ public:
 private:
   ReadFilterCallbacks* callbacks_{nullptr};
 };
-class MockTransportConnectionImplTest : public testing::Test {
+class MockTransportConnectionImplTest : public TestBase {
 public:
   MockTransportConnectionImplTest() {
     EXPECT_CALL(dispatcher_.buffer_factory_, create_(_, _))
@@ -1643,7 +1643,7 @@ TEST_P(ReadBufferLimitTest, SomeLimit) {
   readBufferLimitTest(read_buffer_limit, read_buffer_limit - 1 + 16384);
 }
 
-class TcpClientConnectionImplTest : public testing::TestWithParam<Address::IpVersion> {
+class TcpClientConnectionImplTest : public TestBaseWithParam<Address::IpVersion> {
 protected:
   TcpClientConnectionImplTest()
       : api_(Api::createApiForTest(stats_store_)), dispatcher_(time_system_, *api_) {}
@@ -1688,7 +1688,7 @@ TEST_P(TcpClientConnectionImplTest, BadConnectConnRefused) {
   dispatcher_.run(Event::Dispatcher::RunType::Block);
 }
 
-class PipeClientConnectionImplTest : public testing::Test {
+class PipeClientConnectionImplTest : public TestBase {
 protected:
   PipeClientConnectionImplTest()
       : api_(Api::createApiForTest(stats_store_)), dispatcher_(time_system_, *api_) {}

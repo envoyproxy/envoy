@@ -1,6 +1,7 @@
 #include <memory>
 
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
+
 #include "quiche/http2/platform/api/http2_arraysize.h"
 #include "quiche/http2/platform/api/http2_containers.h"
 #include "quiche/http2/platform/api/http2_estimate_memory_usage.h"

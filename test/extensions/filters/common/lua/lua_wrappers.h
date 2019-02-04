@@ -14,7 +14,7 @@ namespace Filters {
 namespace Common {
 namespace Lua {
 
-template <class T> class LuaWrappersTestBase : public testing::Test {
+template <class T> class LuaWrappersTestBase : public TestBase {
 public:
   virtual void setup(const std::string& code) {
     coroutine_.reset();

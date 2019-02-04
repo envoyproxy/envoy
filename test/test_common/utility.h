@@ -24,10 +24,10 @@
 #include "common/stats/raw_stat_data.h"
 
 #include "test/test_common/printers.h"
+#include "test/test_common/test_base.h"
 
 #include "absl/time/time.h"
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::AssertionFailure;
@@ -285,7 +285,7 @@ public:
   // Tests using this will be of the form IpVersions/SslSocketTest.HalfClose/IPv4
   // instead of IpVersions/SslSocketTest.HalfClose/1
   static std::string
-  ipTestParamsToString(const testing::TestParamInfo<Network::Address::IpVersion>& params) {
+  ipTestParamsToString(const ::testing::TestParamInfo<Network::Address::IpVersion>& params) {
     return params.param == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6";
   }
 

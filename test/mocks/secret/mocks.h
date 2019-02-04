@@ -5,8 +5,9 @@
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/ssl/tls_certificate_config.h"
 
+#include "test/test_common/test_base.h"
+
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Secret {

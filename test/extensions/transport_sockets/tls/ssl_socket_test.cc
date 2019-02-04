@@ -33,11 +33,11 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_replace.h"
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 #include "openssl/ssl.h"
 
 using testing::_;

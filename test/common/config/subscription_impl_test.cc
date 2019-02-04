@@ -15,7 +15,7 @@ enum class SubscriptionType {
   Filesystem,
 };
 
-class SubscriptionImplTest : public testing::TestWithParam<SubscriptionType> {
+class SubscriptionImplTest : public TestBaseWithParam<SubscriptionType> {
 public:
   SubscriptionImplTest() {
     switch (GetParam()) {

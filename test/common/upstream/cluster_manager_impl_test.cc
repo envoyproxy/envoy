@@ -30,11 +30,11 @@
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::InSequence;
@@ -163,7 +163,7 @@ envoy::config::bootstrap::v2::Bootstrap parseBootstrapFromV2Yaml(const std::stri
   return bootstrap;
 }
 
-class ClusterManagerImplTest : public testing::Test {
+class ClusterManagerImplTest : public TestBase {
 public:
   ClusterManagerImplTest() : api_(Api::createApiForTest(stats_store_)) {}
 
@@ -2336,7 +2336,7 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesDestroyedOnUpdate) {
   EXPECT_EQ(0, factory_.stats_.gauge("cluster_manager.warming_clusters").value());
 }
 
-class ClusterManagerInitHelperTest : public testing::Test {
+class ClusterManagerInitHelperTest : public TestBase {
 public:
   MOCK_METHOD1(onClusterInit, void(Cluster& cluster));
 

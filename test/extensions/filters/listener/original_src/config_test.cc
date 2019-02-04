@@ -5,7 +5,7 @@
 
 #include "extensions/filters/listener/original_src/config.h"
 
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -15,7 +15,7 @@ namespace {
 
 // In keeping with the class under test, it would have made sense to call this ConfigTest. However,
 // when running coverage tests, that conflicts with tests elsewhere in the codebase.
-class OriginalSrcConfigTest : public testing::Test {
+class OriginalSrcConfigTest : public TestBase {
 public:
   Config makeConfigFromProto(
       const envoy::config::filter::listener::original_src::v2alpha1::OriginalSrc& proto_config) {

@@ -7,9 +7,8 @@
 #include "extensions/filters/http/dynamo/dynamo_request_parser.h"
 
 #include "test/test_common/printers.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
-
-#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Extensions {

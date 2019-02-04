@@ -8,6 +8,7 @@
 
 #include "common/common/logger.h"
 
+#include "test/test_common/test_base.h"
 #include "test/test_common/test_time.h"
 
 #include "absl/strings/string_view.h"

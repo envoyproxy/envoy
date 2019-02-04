@@ -7,11 +7,11 @@
 #include "test/integration/http_integration.h"
 #include "test/integration/server.h"
 #include "test/mocks/server/mocks.h"
+#include "test/test_common/test_base.h"
 
 #include "absl/strings/ascii.h"
 #include "absl/strings/str_replace.h"
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::NiceMock;
 using testing::ReturnRef;
@@ -20,7 +20,7 @@ namespace Envoy {
 namespace Xfcc {
 
 class XfccIntegrationTest : public HttpIntegrationTest,
-                            public testing::TestWithParam<Network::Address::IpVersion> {
+                            public TestBaseWithParam<Network::Address::IpVersion> {
 public:
   const std::string previous_xfcc_ =
       "By=spiffe://lyft.com/frontend;Hash=123456;URI=spiffe://lyft.com/testclient";

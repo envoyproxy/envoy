@@ -11,10 +11,10 @@
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::NiceMock;
@@ -23,7 +23,7 @@ using testing::Return;
 namespace Envoy {
 namespace Router {
 
-class RouterRetryStateImplTest : public testing::Test {
+class RouterRetryStateImplTest : public TestBase {
 public:
   RouterRetryStateImplTest() : callback_([this]() -> void { callback_ready_.ready(); }) {
     ON_CALL(runtime_.snapshot_, featureEnabled("upstream.use_retry", 100))

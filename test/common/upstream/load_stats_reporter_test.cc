@@ -10,10 +10,10 @@
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::InSequence;
@@ -26,7 +26,7 @@ using testing::Return;
 namespace Envoy {
 namespace Upstream {
 
-class LoadStatsReporterTest : public testing::Test {
+class LoadStatsReporterTest : public TestBase {
 public:
   LoadStatsReporterTest()
       : retry_timer_(new Event::MockTimer()), response_timer_(new Event::MockTimer()),

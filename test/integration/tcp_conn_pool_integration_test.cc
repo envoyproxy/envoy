@@ -112,7 +112,7 @@ public:
 } // namespace
 
 class TcpConnPoolIntegrationTest : public BaseIntegrationTest,
-                                   public testing::TestWithParam<Network::Address::IpVersion> {
+                                   public TestBaseWithParam<Network::Address::IpVersion> {
 public:
   TcpConnPoolIntegrationTest()
       : BaseIntegrationTest(GetParam(), realTime(), tcp_conn_pool_config),

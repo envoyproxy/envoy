@@ -9,13 +9,14 @@
 #include "common/common/hash.h"
 #include "common/stats/stats_options_impl.h"
 
+#include "test/test_common/test_base.h"
+
 #include "absl/strings/string_view.h"
-#include "gtest/gtest.h"
 
 namespace Envoy {
 
 // Tests BlockMemoryHashSet.
-class BlockMemoryHashSetTest : public testing::Test {
+class BlockMemoryHashSetTest : public TestBase {
 protected:
   // TestValue that doesn't define a hash.
   struct TestValueBase {

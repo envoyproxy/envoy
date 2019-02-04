@@ -1,8 +1,7 @@
 #pragma once
 
 #include "test/integration/http_integration.h"
-
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 namespace Envoy {
 
@@ -27,7 +26,7 @@ struct HttpProtocolTestParams {
 // ....
 // }
 class HttpProtocolIntegrationTest : public HttpIntegrationTest,
-                                    public testing::TestWithParam<HttpProtocolTestParams> {
+                                    public TestBaseWithParam<HttpProtocolTestParams> {
 public:
   // By default returns 8 combinations of
   // [HTTP  upstream / HTTP  downstream] x [Ipv4, IPv6]
@@ -46,7 +45,7 @@ public:
   // Allows pretty printed test names of the form
   // FooTestCase.BarInstance/IPv4_Http2Downstream_HttpUpstream
   static std::string
-  protocolTestParamsToString(const testing::TestParamInfo<HttpProtocolTestParams>& p);
+  protocolTestParamsToString(const ::testing::TestParamInfo<HttpProtocolTestParams>& p);
 
   HttpProtocolIntegrationTest()
       : HttpIntegrationTest(GetParam().downstream_protocol, GetParam().version, realTime()) {}

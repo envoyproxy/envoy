@@ -13,10 +13,10 @@
 #include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using ::testing::_;
 using ::testing::Invoke;
@@ -26,7 +26,7 @@ namespace Envoy {
 namespace Secret {
 namespace {
 
-class SdsApiTest : public testing::Test {
+class SdsApiTest : public TestBase {
 protected:
   SdsApiTest() : api_(Api::createApiForTest(stats_store_)) {}
 

@@ -6,9 +6,9 @@
 #include "extensions/filters/network/well_known_names.h"
 
 #include "test/mocks/server/mocks.h"
+#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 
@@ -17,7 +17,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ClientSslAuth {
 
-class IpWhiteListConfigTest : public ::testing::TestWithParam<std::string> {};
+class IpWhiteListConfigTest : public TestBaseWithParam<std::string> {};
 
 INSTANTIATE_TEST_SUITE_P(IpList, IpWhiteListConfigTest,
                          ::testing::Values(R"EOF(["192.168.3.0/24"])EOF",

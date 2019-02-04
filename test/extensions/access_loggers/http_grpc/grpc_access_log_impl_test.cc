@@ -22,7 +22,7 @@ namespace Extensions {
 namespace AccessLoggers {
 namespace HttpGrpc {
 
-class GrpcAccessLogStreamerImplTest : public testing::Test {
+class GrpcAccessLogStreamerImplTest : public TestBase {
 public:
   typedef Grpc::MockAsyncStream MockAccessLogStream;
   typedef Grpc::TypedAsyncStreamCallbacks<envoy::service::accesslog::v2::StreamAccessLogsResponse>
@@ -112,7 +112,7 @@ public:
                           const std::string& log_name));
 };
 
-class HttpGrpcAccessLogTest : public testing::Test {
+class HttpGrpcAccessLogTest : public TestBase {
 public:
   void init() {
     ON_CALL(*filter_, evaluate(_, _)).WillByDefault(Return(true));

@@ -10,11 +10,11 @@
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Invoke;
@@ -36,7 +36,7 @@ public:
   }
 };
 
-class ListenerImplTest : public testing::TestWithParam<Address::IpVersion> {
+class ListenerImplTest : public TestBaseWithParam<Address::IpVersion> {
 protected:
   ListenerImplTest()
       : version_(GetParam()),

@@ -4,8 +4,9 @@
 #include "common/http/http2/metadata_encoder.h"
 #include "common/runtime/runtime_impl.h"
 
+#include "test/test_common/test_base.h"
+
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 #include "nghttp2/nghttp2.h"
 
 // A global variable in nghttp2 to disable preface and initial settings for tests.
@@ -80,7 +81,7 @@ static ssize_t send_callback(nghttp2_session* session, const uint8_t* buf, size_
 }
 } // namespace
 
-class MetadataEncoderDecoderTest : public ::testing::Test {
+class MetadataEncoderDecoderTest : public TestBase {
 public:
   void initialize(MetadataCallback cb) {
     decoder_ = std::make_unique<MetadataDecoder>(cb);

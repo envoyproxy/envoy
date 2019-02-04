@@ -8,13 +8,13 @@
 
 #include "common/common/utility.h"
 
+#include "test/test_common/test_base.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::ContainerEq;
 

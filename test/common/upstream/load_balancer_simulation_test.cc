@@ -11,9 +11,9 @@
 #include "test/common/upstream/utility.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::NiceMock;
 using testing::Return;
@@ -90,7 +90,7 @@ TEST(DISABLED_LeastRequestLoadBalancerWeightTest, Weight) {
 /**
  * This test is for simulation only and should not be run as part of unit tests.
  */
-class DISABLED_SimulationTest : public testing::Test {
+class DISABLED_SimulationTest : public TestBase {
 public:
   DISABLED_SimulationTest() : stats_(ClusterInfoImpl::generateStats(stats_store_)) {
     ON_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50U))
