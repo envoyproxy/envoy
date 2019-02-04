@@ -46,7 +46,6 @@ public:
 
   void queueDiscoveryRequest(const RequestQueueItem& queue_item) {
     request_queue_.push(queue_item);
-    control_plane_stats_.pending_requests_.inc();
     drainRequests();
   }
 
@@ -101,7 +100,9 @@ private:
       // Process the request, if rate limiting is not enabled at all or if it is under rate limit.
       sendDiscoveryRequest(request_queue_.front());
       request_queue_.pop();
-      control_plane_stats_.pending_requests_.dec();
+    }
+    if (request_queue_.size() > 0 || control_plane_stats_.pending_requests_.used()) {
+      control_plane_stats_.pending_requests_.set(request_queue_.size());
     }
   }
 
