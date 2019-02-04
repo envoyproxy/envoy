@@ -197,7 +197,9 @@ bool updateHealthFlag(const Host& updated_host, Host& existing_host, Host::Healt
 void setEdsHealthFlag(Host& host, envoy::api::v2::core::HealthStatus health_status) {
   switch (health_status) {
   case envoy::api::v2::core::HealthStatus::UNHEALTHY:
+    FALLTHRU;
   case envoy::api::v2::core::HealthStatus::DRAINING:
+    FALLTHRU;
   case envoy::api::v2::core::HealthStatus::TIMEOUT:
     host.healthFlagSet(Host::HealthFlag::FAILED_EDS_HEALTH);
     break;
