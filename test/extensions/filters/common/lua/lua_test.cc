@@ -33,7 +33,7 @@ private:
 
 int TestObject::luaTestCall(lua_State* state) { return doTestCall(state); }
 
-class LuaTest : public testing::Test {
+class LuaTest : public TestBase {
 public:
   LuaTest() : yield_callback_([this]() { on_yield_.ready(); }) {}
 

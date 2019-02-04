@@ -9,11 +9,11 @@
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/stats/mocks.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
-#include "gtest/gtest.h"
+#include "benchmark/benchmark.h"
 #include "openssl/ssl.h"
-#include "testing/base/public/benchmark.h"
 
 using testing::_;
 using testing::AtLeast;

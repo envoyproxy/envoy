@@ -9,11 +9,11 @@
 #include "test/mocks/common.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/stats/mocks.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::InSequence;
 using testing::NiceMock;
@@ -21,7 +21,7 @@ using testing::NiceMock;
 namespace Envoy {
 namespace Event {
 
-class DispatchedThreadTest : public testing::Test {
+class DispatchedThreadTest : public TestBase {
 protected:
   DispatchedThreadTest()
       : config_(1000, 1000, 1000, 1000), api_(Api::createApiForTest(fakestats_)),

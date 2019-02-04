@@ -7,10 +7,9 @@
 
 #include "test/mocks/access_log/mocks.h"
 #include "test/test_common/environment.h"
-#include "test/test_common/global.h"
+#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 namespace Envoy {
 class TestRunner {
@@ -27,8 +26,8 @@ public:
     // (https://github.com/google/googletest/blob/master/googletest/docs/AdvancedGuide.md#logging-additional-information),
     // they are available in the test XML.
     // TODO(htuch): Log these as well?
-    ::testing::Test::RecordProperty("TemporaryDirectory", TestEnvironment::temporaryDirectory());
-    ::testing::Test::RecordProperty("RunfilesDirectory", TestEnvironment::runfilesDirectory());
+    TestBase::RecordProperty("TemporaryDirectory", TestEnvironment::temporaryDirectory());
+    TestBase::RecordProperty("RunfilesDirectory", TestEnvironment::runfilesDirectory());
 
     TestEnvironment::setEnvVar("TEST_UDSDIR", TestEnvironment::unixDomainSocketDirectory(), 1);
 
@@ -49,9 +48,7 @@ public:
     int exit_status = RUN_ALL_TESTS();
 
     // Check that all singletons have been destroyed.
-    std::string active_singletons = Test::Globals::describeActiveSingletons();
-    if (!active_singletons.empty()) {
-      std::cerr << "\n\nFAIL: Active singletons exist:\n" << active_singletons << std::endl;
+    if (!TestBase::checkSingletonQuiescensce()) {
       exit_status = EXIT_FAILURE;
     }
 
