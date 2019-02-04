@@ -170,7 +170,7 @@ def packageNameForProto(file_path):
   error_message = []
   with open(file_path) as f:
     result = PROTO_PACKAGE_REGEX.search(f.read())
-    if not result is None and len(result.groups()) == 1:
+    if result is not None and len(result.groups()) == 1:
       package_name = result.group(1)
     if package_name is None:
       error_message = ["Unable to find package name for proto file: %s" % file_path]
