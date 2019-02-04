@@ -1,7 +1,8 @@
-#include "test/integration/incremental_xds_integration_test_base.h"
+#include "test/integration/delta_xds_integration_test_base.h"
 
 #include "envoy/api/v2/discovery.pb.h"
-#include "envoy/grpc/status.h"
+
+#inc lude "envoy/grpc/status.h"
 #include "envoy/stats/scope.h"
 
 #include "common/config/resources.h"
@@ -24,13 +25,13 @@ using testing::IsSubstring;
 
 namespace Envoy {
 
-void IncrementalXdsIntegrationTestBase::createXdsConnection(FakeUpstream& upstream) {
+void DeltaXdsIntegrationTestBase::createXdsConnection(FakeUpstream& upstream) {
   xds_upstream_ = &upstream;
   AssertionResult result = xds_upstream_->waitForHttpConnection(*dispatcher_, xds_connection_);
   RELEASE_ASSERT(result, result.message());
 }
 
-void IncrementalXdsIntegrationTestBase::cleanUpXdsConnection() {
+void DeltaXdsIntegrationTestBase::cleanUpXdsConnection() {
   // Don't ASSERT fail if an xDS reconnect ends up unparented.
   if (xds_upstream_) {
     xds_upstream_->set_allow_unexpected_disconnects(true);
@@ -42,12 +43,12 @@ void IncrementalXdsIntegrationTestBase::cleanUpXdsConnection() {
   xds_connection_.reset();
 }
 
-AssertionResult IncrementalXdsIntegrationTestBase::compareDiscoveryRequest(
+AssertionResult DeltaXdsIntegrationTestBase::compareDiscoveryRequest(
     const std::string& expected_type_url,
     const std::vector<std::string>& expected_resource_subscriptions,
     const std::vector<std::string>& expected_resource_unsubscriptions,
     const Protobuf::int32 expected_error_code, const std::string& expected_error_message) {
-  envoy::api::v2::IncrementalDiscoveryRequest request;
+  envoy::api::v2::DeltaDiscoveryRequest request;
   VERIFY_ASSERTION(xds_stream_->waitForGrpcMessage(*dispatcher_, request));
 
   EXPECT_TRUE(request.has_node());

@@ -90,7 +90,7 @@ void Utility::checkApiConfigSourceNames(
     const envoy::api::v2::core::ApiConfigSource& api_config_source) {
   const bool is_grpc =
       (api_config_source.api_type() == envoy::api::v2::core::ApiConfigSource::GRPC ||
-       api_config_source.api_type() == envoy::api::v2::core::ApiConfigSource::INCREMENTAL_GRPC);
+       api_config_source.api_type() == envoy::api::v2::core::ApiConfigSource::DELTA_GRPC);
 
   if (api_config_source.cluster_names().empty() && api_config_source.grpc_services().empty()) {
     throw EnvoyException(
@@ -100,12 +100,12 @@ void Utility::checkApiConfigSourceNames(
 
   if (is_grpc) {
     if (!api_config_source.cluster_names().empty()) {
-      throw EnvoyException(fmt::format("envoy::api::v2::core::ConfigSource::(INCREMENTAL_)GRPC "
+      throw EnvoyException(fmt::format("envoy::api::v2::core::ConfigSource::(DELTA_)GRPC "
                                        "must not have a cluster name specified: {}",
                                        api_config_source.DebugString()));
     }
     if (api_config_source.grpc_services().size() > 1) {
-      throw EnvoyException(fmt::format("envoy::api::v2::core::ConfigSource::(INCREMENTAL_)GRPC "
+      throw EnvoyException(fmt::format("envoy::api::v2::core::ConfigSource::(DELTA_)GRPC "
                                        "must have a single gRPC service specified: {}",
                                        api_config_source.DebugString()));
     }
@@ -251,7 +251,7 @@ Grpc::AsyncClientFactoryPtr Utility::factoryForGrpcApiConfigSource(
   Utility::checkApiConfigSourceNames(api_config_source);
 
   if (api_config_source.api_type() != envoy::api::v2::core::ApiConfigSource::GRPC &&
-      api_config_source.api_type() != envoy::api::v2::core::ApiConfigSource::INCREMENTAL_GRPC) {
+      api_config_source.api_type() != envoy::api::v2::core::ApiConfigSource::DELTA_GRPC) {
     throw EnvoyException(fmt::format("envoy::api::v2::core::ConfigSource type must be gRPC: {}",
                                      api_config_source.DebugString()));
   }

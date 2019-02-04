@@ -8,11 +8,11 @@
 #include "envoy/stats/scope.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/config/delta_subscription_impl.h"
 #include "common/config/filesystem_subscription_impl.h"
 #include "common/config/grpc_mux_subscription_impl.h"
 #include "common/config/grpc_subscription_impl.h"
 #include "common/config/http_subscription_impl.h"
-#include "common/config/incremental_subscription_impl.h"
 #include "common/config/utility.h"
 #include "common/protobuf/protobuf.h"
 
@@ -84,9 +84,9 @@ public:
             *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(grpc_method), stats,
             scope, Utility::parseRateLimitSettings(api_config_source)));
         break;
-      case envoy::api::v2::core::ApiConfigSource::INCREMENTAL_GRPC: {
+      case envoy::api::v2::core::ApiConfigSource::DELTA_GRPC: {
         Utility::checkApiConfigSourceSubscriptionBackingCluster(cm.clusters(), api_config_source);
-        result.reset(new IncrementalSubscriptionImpl<ResourceType>(
+        result.reset(new DeltaSubscriptionImpl<ResourceType>(
             local_info,
             Config::Utility::factoryForGrpcApiConfigSource(cm.grpcAsyncClientManager(),
                                                            api_config_source, scope)

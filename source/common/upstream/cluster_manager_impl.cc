@@ -29,8 +29,8 @@
 #include "common/protobuf/utility.h"
 #include "common/router/shadow_writer_impl.h"
 #include "common/tcp/conn_pool.h"
+#include "common/upstream/cds_api_delta_impl.h"
 #include "common/upstream/cds_api_impl.h"
-#include "common/upstream/cds_api_incremental_impl.h"
 #include "common/upstream/load_balancer_impl.h"
 #include "common/upstream/maglev_lb.h"
 #include "common/upstream/original_dst_cluster.h"
@@ -1225,9 +1225,15 @@ CdsApiPtr ProdClusterManagerFactory::createIncrementalCds(
 >>>>>>> bring in final touches from CDS integration test PR
 =======
   return cds_config.api_config_source().api_type() ==
+<<<<<<< HEAD
                  envoy::api::v2::core::ApiConfigSource::INCREMENTAL_GRPC
              ? CdsApiIncrementalImpl::create(cds_config, cm, main_thread_dispatcher_, random_,
                                              local_info_, stats_)
+=======
+                 envoy::api::v2::core::ApiConfigSource::DELTA_GRPC
+             ? CdsApiDeltaImpl::create(cds_config, cm, main_thread_dispatcher_, random_,
+                                       local_info_, stats_, api_)
+>>>>>>> rename incremental to delta
              : CdsApiImpl::create(cds_config, cm, main_thread_dispatcher_, random_, local_info_,
                                   stats_);
 >>>>>>> address comments, undo xds as incremental xds wrapper

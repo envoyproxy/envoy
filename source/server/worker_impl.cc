@@ -39,7 +39,6 @@ void WorkerImpl::addListener(Network::ListenerConfig& listener, AddListenerCompl
   // to surface this.
   dispatcher_->post([this, &listener, completion]() -> void {
     try {
-      ENVOY_LOG(info, "adding a listener...");
       handler_->addListener(listener);
       hooks_.onWorkerListenerAdded();
       completion(true);

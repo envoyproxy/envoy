@@ -32,6 +32,7 @@ envoy_cc_library(
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
     name = "cds_incremental_lib",
     srcs = ["cds_incremental.cc"],
     hdrs = ["cds_incremental.h"],
@@ -45,6 +46,11 @@ envoy_cc_library(
     srcs = ["cds_api_incremental_impl.cc"],
     hdrs = ["cds_api_incremental_impl.h"],
 >>>>>>> snapshot
+=======
+    name = "cds_api_delta_lib",
+    srcs = ["cds_api_delta_impl.cc"],
+    hdrs = ["cds_api_delta_impl.h"],
+>>>>>>> rename incremental to delta
     deps = [
         "//include/envoy/config:subscription_interface",
         "//include/envoy/event:dispatcher_interface",
@@ -90,7 +96,7 @@ envoy_cc_library(
     srcs = ["cluster_manager_impl.cc"],
     hdrs = ["cluster_manager_impl.h"],
     deps = [
-        ":cds_api_incremental_lib",
+        ":cds_api_delta_lib",
         ":cds_api_lib",
         ":load_balancer_lib",
         ":load_stats_reporter_lib",

@@ -1,4 +1,4 @@
-#include "common/upstream/cds_api_incremental_impl.h"
+#include "common/upstream/cds_api_delta_impl.h"
 
 #include <string>
 
@@ -20,6 +20,7 @@
 namespace Envoy {
 namespace Upstream {
 
+<<<<<<< HEAD:source/common/upstream/cds_api_incremental_impl.cc
 <<<<<<< HEAD
 =======
 <<<<<<<< HEAD:source/common/upstream/cds_api_incremental_impl.cc
@@ -49,12 +50,28 @@ CdsApiIncrementalImpl::CdsApiIncrementalImpl(const envoy::api::v2::core::ConfigS
                                              Runtime::RandomGenerator& random,
                                              const LocalInfo::LocalInfo& local_info,
                                              Stats::Scope& scope)
+=======
+CdsApiPtr CdsApiDeltaImpl::create(const envoy::api::v2::core::ConfigSource& cds_config,
+                                  ClusterManager& cm, Event::Dispatcher& dispatcher,
+                                  Runtime::RandomGenerator& random,
+                                  const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
+                                  Api::Api& api) {
+  return CdsApiPtr{new CdsApiDeltaImpl(cds_config, cm, dispatcher, random, local_info, scope, api)};
+}
+
+CdsApiDeltaImpl::CdsApiDeltaImpl(const envoy::api::v2::core::ConfigSource& cds_config,
+                                 ClusterManager& cm, Event::Dispatcher& dispatcher,
+                                 Runtime::RandomGenerator& random,
+                                 const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
+                                 Api::Api& api)
+>>>>>>> rename incremental to delta:source/common/upstream/cds_api_delta_impl.cc
     : cm_(cm), scope_(scope.createScope("cluster_manager.cds.")) {
   Config::Utility::checkLocalInfo("cds", local_info);
   subscription_ =
 <<<<<<< HEAD
       Config::SubscriptionFactory::subscriptionFromConfigSource<envoy::api::v2::Cluster>(
           cds_config, local_info, dispatcher, cm, random, *scope_, "not implemented",
+<<<<<<< HEAD:source/common/upstream/cds_api_incremental_impl.cc
           "envoy.api.v2.ClusterDiscoveryService.IncrementalClusters");
 }
 
@@ -67,6 +84,12 @@ void CdsApiIncrementalImpl::onConfigUpdate(
 
 void CdsApiIncrementalImpl::onIncrementalConfigUpdate(
 >>>>>>> snapshot
+=======
+          "envoy.api.v2.ClusterDiscoveryService.DeltaClusters", api);
+}
+
+void CdsApiDeltaImpl::onConfigUpdate(
+>>>>>>> rename incremental to delta:source/common/upstream/cds_api_delta_impl.cc
     const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
     const std::string& system_version_info) {
@@ -105,15 +128,20 @@ void CdsApiIncrementalImpl::onIncrementalConfigUpdate(
   runInitializeCallbackIfAny();
 }
 
+<<<<<<< HEAD:source/common/upstream/cds_api_incremental_impl.cc
 <<<<<<< HEAD
 void CdsApiIncrementalImpl::onConfigUpdateFailed(const EnvoyException*) {
 =======
 void CdsApiIncrementalImpl::onIncrementalConfigUpdateFailed(const EnvoyException*) {
 >>>>>>> snapshot
+=======
+void CdsApiDeltaImpl::onConfigUpdateFailed(const EnvoyException*) {
+>>>>>>> rename incremental to delta:source/common/upstream/cds_api_delta_impl.cc
   // We need to allow server startup to continue, even if we have a bad config.
   runInitializeCallbackIfAny();
 }
 
+<<<<<<< HEAD:source/common/upstream/cds_api_incremental_impl.cc
 <<<<<<< HEAD
 =======
 std::set<std::string> CdsApiIncrementalImpl::clusterNames() {
@@ -126,6 +154,9 @@ std::set<std::string> CdsApiIncrementalImpl::clusterNames() {
 
 >>>>>>> snapshot
 void CdsApiIncrementalImpl::runInitializeCallbackIfAny() {
+=======
+void CdsApiDeltaImpl::runInitializeCallbackIfAny() {
+>>>>>>> rename incremental to delta:source/common/upstream/cds_api_delta_impl.cc
   if (initialize_callback_) {
     initialize_callback_();
     initialize_callback_ = nullptr;

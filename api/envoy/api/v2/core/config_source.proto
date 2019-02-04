@@ -18,7 +18,7 @@ option (gogoproto.equal_all) = true;
 // API configuration source. This identifies the API type and cluster that Envoy
 // will use to fetch an xDS API.
 message ApiConfigSource {
-  // APIs may be fetched via either REST or gRPC. If gRPC, updates can be received incrementally.
+  // APIs may be fetched via either REST or gRPC.
   enum ApiType {
     // Ideally this would be 'reserved 0' but one can't reserve the default
     // value. Instead we throw an exception if this is ever used.
@@ -29,14 +29,14 @@ message ApiConfigSource {
     REST = 1;
     // gRPC v2 API.
     GRPC = 2;
-    // Using the incremental xDS gRPC service, i.e. IncrementalDiscovery{Request,Response}
+    // Using the delta xDS gRPC service, i.e. DeltaDiscovery{Request,Response}
     // rather than Discovery{Request,Response}. Rather than sending Envoy the entire state
     // with every update, the xDS server only sends what has changed since the last update.
     //
     // .. warning::
-    // INCREMENTAL_GRPC is not yet entirely implemented! Initially, only CDS is available.
+    // DELTA_GRPC is not yet entirely implemented! Initially, only CDS is available.
     // Do not use for other xDSes. TODO(fredlas) update/remove this warning when appropriate.
-    INCREMENTAL_GRPC = 3;
+    DELTA_GRPC = 3;
   }
   ApiType api_type = 1 [(validate.rules).enum.defined_only = true];
   // Cluster names should be used only with REST. If > 1

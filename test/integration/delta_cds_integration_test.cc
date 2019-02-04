@@ -38,7 +38,7 @@ admin:
 dynamic_resources:
   cds_config:
     api_config_source:
-      api_type: INCREMENTAL_GRPC
+      api_type: DELTA_GRPC
       grpc_services:
         envoy_grpc:
           cluster_name: my_cds_cluster
@@ -152,8 +152,8 @@ public:
     xds_stream_->startGrpcStream();
     fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
-    EXPECT_TRUE(compareIncrementalDiscoveryRequest(Config::TypeUrl::get().Cluster, {}, {}));
-    sendIncrementalDiscoveryResponse<envoy::api::v2::Cluster>({buildCluster(ClusterName)}, {}, "1");
+    EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().Cluster, {}, {}));
+    sendDeltaDiscoveryResponse<envoy::api::v2::Cluster>({buildCluster(ClusterName)}, {}, "1");
     // We can continue the test once we're sure that Envoy's ClusterManager has made use of
     // the DiscoveryResponse describing cluster_0 that we sent.
     // 2 because the statically specified CDS server itself counts as a cluster.
@@ -184,8 +184,8 @@ TEST_P(CdsIntegrationTest, CdsClusterUpDownUp) {
 >>>>>>> bring in final touches from CDS integration test PR
 
   // Tell Envoy that cluster_0 is gone.
-  EXPECT_TRUE(compareIncrementalDiscoveryRequest(Config::TypeUrl::get().Cluster, {}, {}));
-  sendIncrementalDiscoveryResponse<envoy::api::v2::Cluster>({}, {ClusterName}, "42");
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().Cluster, {}, {}));
+  sendDeltaDiscoveryResponse<envoy::api::v2::Cluster>({}, {ClusterName}, "42");
   // We can continue the test once we're sure that Envoy's ClusterManager has made use of
   // the DiscoveryResponse that says cluster_0 is gone.
   test_server_->waitForCounterGe("cluster_manager.cluster_removed", 1);
@@ -200,8 +200,8 @@ TEST_P(CdsIntegrationTest, CdsClusterUpDownUp) {
   codec_client_->waitForDisconnect();
 
   // Tell Envoy that cluster_0 is back.
-  EXPECT_TRUE(compareIncrementalDiscoveryRequest(Config::TypeUrl::get().Cluster, {}, {}));
-  sendIncrementalDiscoveryResponse<envoy::api::v2::Cluster>({buildCluster(ClusterName)}, {}, "413");
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().Cluster, {}, {}));
+  sendDeltaDiscoveryResponse<envoy::api::v2::Cluster>({buildCluster(ClusterName)}, {}, "413");
 
   // We can continue the test once we're sure that Envoy's ClusterManager has made use of
   // the DiscoveryResponse describing cluster_0 that we sent. Again, 2 includes CDS server.

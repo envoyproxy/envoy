@@ -172,7 +172,7 @@ TEST_F(SubscriptionFactoryTest, GrpcClusterMultiton) {
   EXPECT_CALL(*cluster.info_, type()).WillRepeatedly(Return(envoy::api::v2::Cluster::STATIC));
 
   EXPECT_THROW_WITH_REGEX(subscriptionFromConfigSource(config), EnvoyException,
-                          "envoy::api::v2::core::ConfigSource::.INCREMENTAL_.GRPC must have a "
+                          "envoy::api::v2::core::ConfigSource::.DELTA_.GRPC must have a "
                           "single gRPC service specified:");
 }
 

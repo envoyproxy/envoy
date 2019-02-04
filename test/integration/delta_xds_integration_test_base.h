@@ -24,13 +24,13 @@ using testing::IsSubstring;
 
 namespace Envoy {
 
-class IncrementalXdsIntegrationTestBase : public HttpIntegrationTest {
+class DeltaXdsIntegrationTestBase : public HttpIntegrationTest {
 public:
-  IncrementalXdsIntegrationTestBase(Http::CodecClient::Type downstream_protocol,
-                                    Network::Address::IpVersion version)
+  DeltaXdsIntegrationTestBase(Http::CodecClient::Type downstream_protocol,
+                              Network::Address::IpVersion version)
       : HttpIntegrationTest(downstream_protocol, version, realTime()) {}
-  IncrementalXdsIntegrationTestBase(Http::CodecClient::Type downstream_protocol,
-                                    Network::Address::IpVersion version, const std::string& config)
+  DeltaXdsIntegrationTestBase(Http::CodecClient::Type downstream_protocol,
+                              Network::Address::IpVersion version, const std::string& config)
       : HttpIntegrationTest(downstream_protocol, version, realTime(), config) {}
 
   void createXdsConnection(FakeUpstream& upstream);

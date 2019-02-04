@@ -99,8 +99,8 @@ envoy_cc_test(
 <<<<<<< HEAD
 <<<<<<< HEAD
 envoy_cc_test(
-    name = "incremental_cds_integration_test",
-    srcs = ["incremental_cds_integration_test.cc"],
+    name = "delta_cds_integration_test",
+    srcs = ["delta_cds_integration_test.cc"],
     data = [
         "//test/config/integration/certs",
     ],

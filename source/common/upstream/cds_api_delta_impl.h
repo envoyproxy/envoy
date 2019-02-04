@@ -15,8 +15,9 @@ namespace Envoy {
 namespace Upstream {
 
 /**
- * Incremental CDS API implementation that fetches via IncrementalSubscription.
+ * Delta CDS API implementation that fetches via DeltaSubscription.
  */
+<<<<<<< HEAD:source/common/upstream/cds_api_incremental_impl.h
 class CdsApiIncrementalImpl : public CdsApi,
 <<<<<<< HEAD:source/common/upstream/cds_api_incremental_impl.h
                               Config::SubscriptionCallbacks<envoy::api::v2::Cluster>,
@@ -25,6 +26,11 @@ class CdsApiIncrementalImpl : public CdsApi,
                               Config::IncrementalSubscriptionCallbacks<envoy::api::v2::Cluster>,
                               public Logger::Loggable<Logger::Id::upstream> {
 >>>>>>> snapshot:source/common/upstream/cds_api_incremental_impl.h
+=======
+class CdsApiDeltaImpl : public CdsApi,
+                        Config::SubscriptionCallbacks<envoy::api::v2::Cluster>,
+                        Logger::Loggable<Logger::Id::upstream> {
+>>>>>>> rename incremental to delta:source/common/upstream/cds_api_delta_impl.h
 public:
 <<<<<<< HEAD
   static CdsApiPtr create(const envoy::api::v2::core::ConfigSource& cds_config,
@@ -60,6 +66,7 @@ public:
   }
 
 private:
+<<<<<<< HEAD:source/common/upstream/cds_api_incremental_impl.h
 =======
   // Config::IncrementalSubscriptionCallbacks
   void onIncrementalConfigUpdate(
@@ -78,6 +85,11 @@ protected:
   CdsApiIncrementalImpl(const envoy::api::v2::core::ConfigSource& cds_config, ClusterManager& cm,
                         Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
                         const LocalInfo::LocalInfo& local_info, Stats::Scope& scope);
+=======
+  CdsApiDeltaImpl(const envoy::api::v2::core::ConfigSource& cds_config, ClusterManager& cm,
+                  Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
+                  const LocalInfo::LocalInfo& local_info, Stats::Scope& scope, Api::Api& api);
+>>>>>>> rename incremental to delta:source/common/upstream/cds_api_delta_impl.h
   void runInitializeCallbackIfAny();
 
 private:

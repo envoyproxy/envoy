@@ -25,23 +25,22 @@ struct ResourceNameDiff {
 };
 
 /**
- * Manages the logic of a (non-aggregated) incremental xDS subscription.
+ * Manages the logic of a (non-aggregated) delta xDS subscription.
  */
 template <class ResourceType>
-class IncrementalSubscriptionImpl
+class DeltaSubscriptionImpl
     : public Subscription<ResourceType>,
-      public GrpcStream<envoy::api::v2::IncrementalDiscoveryRequest,
-                        envoy::api::v2::IncrementalDiscoveryResponse, ResourceNameDiff> {
+      public GrpcStream<envoy::api::v2::DeltaDiscoveryRequest,
+                        envoy::api::v2::DeltaDiscoveryResponse, ResourceNameDiff> {
 public:
-  IncrementalSubscriptionImpl(const LocalInfo::LocalInfo& local_info,
-                              Grpc::AsyncClientPtr async_client, Event::Dispatcher& dispatcher,
-                              const Protobuf::MethodDescriptor& service_method,
-                              Runtime::RandomGenerator& random, Stats::Scope& scope,
-                              const RateLimitSettings& rate_limit_settings, SubscriptionStats stats)
-      : GrpcStream<envoy::api::v2::IncrementalDiscoveryRequest,
-                   envoy::api::v2::IncrementalDiscoveryResponse, ResourceNameDiff>(
-            std::move(async_client), service_method, random, dispatcher, scope,
-            rate_limit_settings),
+  DeltaSubscriptionImpl(const LocalInfo::LocalInfo& local_info, Grpc::AsyncClientPtr async_client,
+                        Event::Dispatcher& dispatcher,
+                        const Protobuf::MethodDescriptor& service_method,
+                        Runtime::RandomGenerator& random, Stats::Scope& scope,
+                        const RateLimitSettings& rate_limit_settings, SubscriptionStats stats)
+      : GrpcStream<envoy::api::v2::DeltaDiscoveryRequest, envoy::api::v2::DeltaDiscoveryResponse,
+                   ResourceNameDiff>(std::move(async_client), service_method, random, dispatcher,
+                                     scope, rate_limit_settings),
         type_url_(Grpc::Common::typeUrl(ResourceType().GetDescriptor()->full_name())),
 <<<<<<< HEAD
         local_info_(local_info), stats_(stats) {
@@ -104,7 +103,7 @@ public:
 
 <<<<<<< HEAD
   void subscribe(const std::vector<std::string>& resources) {
-    ENVOY_LOG(debug, "incremental subscribe for " + type_url_);
+    ENVOY_LOG(debug, "delta subscribe for " + type_url_);
 
     // Lazily kick off the requests based on first subscription. This has the
     // convenient side-effect that we order messages on the channel based on
@@ -141,12 +140,11 @@ public:
     stats_.update_success_.inc();
     stats_.update_attempt_.inc();
     stats_.version_.set(HashUtil::xxHash64(version_info));
-    ENVOY_LOG(debug, "Incremental config for {} accepted with {} resources added, {} removed",
-              type_url_, added_resources.size(), removed_resources.size());
+    ENVOY_LOG(debug, "Delta config for {} accepted with {} resources added, {} removed", type_url_,
+              added_resources.size(), removed_resources.size());
   }
 
-  void
-  handleResponse(std::unique_ptr<envoy::api::v2::IncrementalDiscoveryResponse>&& message) override {
+  void handleResponse(std::unique_ptr<envoy::api::v2::DeltaDiscoveryResponse>&& message) override {
     ENVOY_LOG(debug, "Received gRPC message for {} at version {}", type_url_,
               message->system_version_info());
 
@@ -157,7 +155,7 @@ public:
                      message->system_version_info());
     } catch (const EnvoyException& e) {
       stats_.update_rejected_.inc();
-      ENVOY_LOG(warn, "incremental config for {} rejected: {}", type_url_, e.what());
+      ENVOY_LOG(warn, "delta config for {} rejected: {}", type_url_, e.what());
       stats_.update_attempt_.inc();
       if (callbacks_) {
         callbacks_->onIncrementalConfigUpdateFailed(&e);
@@ -185,14 +183,14 @@ public:
 
   void handleEstablishmentFailure() override {
     stats_.update_failure_.inc();
-    ENVOY_LOG(debug, "incremental update for {} failed", type_url_);
+    ENVOY_LOG(debug, "delta update for {} failed", type_url_);
     stats_.update_attempt_.inc();
     if (callbacks_) {
       callbacks_->onIncrementalConfigUpdateFailed(nullptr);
     }
   }
 
-  // Config::IncrementalSubscription
+  // Config::DeltaSubscription
   void start(const std::vector<std::string>& resources,
              SubscriptionCallbacks<ResourceType>& callbacks) override {
     callbacks_ = &callbacks;
@@ -204,7 +202,7 @@ public:
     buildAndQueueDiscoveryRequest(resources);
 >>>>>>> snapshot
     // The attempt stat here is maintained for the purposes of having consistency between ADS and
-    // individual IncrementalSubscriptions. Since ADS is push based and muxed, the notion of an
+    // individual DeltaSubscriptions. Since ADS is push based and muxed, the notion of an
     // "attempt" for a given xDS API combined by ADS is not really that meaningful.
     stats_.update_attempt_.inc();
   }
@@ -222,7 +220,7 @@ private:
   const std::string type_url_;
   SubscriptionCallbacks<ResourceType>* callbacks_{};
   // In-flight or previously sent request.
-  envoy::api::v2::IncrementalDiscoveryRequest request_;
+  envoy::api::v2::DeltaDiscoveryRequest request_;
   // Paused via pause()?
   bool paused_{};
 
