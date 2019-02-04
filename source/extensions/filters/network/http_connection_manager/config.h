@@ -158,7 +158,7 @@ private:
   std::string server_name_;
   Http::TracingConnectionManagerConfigPtr tracing_config_;
   absl::optional<std::string> user_agent_;
-  uint32_t max_request_headers_kb_;
+  const uint32_t max_request_headers_kb_;
   absl::optional<std::chrono::milliseconds> idle_timeout_;
   std::chrono::milliseconds stream_idle_timeout_;
   std::chrono::milliseconds request_timeout_;

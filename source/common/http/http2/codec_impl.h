@@ -74,7 +74,7 @@ public:
 class ConnectionImpl : public virtual Connection, protected Logger::Loggable<Logger::Id::http2> {
 public:
   ConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
-                 const Http2Settings& http2_settings, uint32_t max_request_headers_kb)
+                 const Http2Settings& http2_settings, const uint32_t max_request_headers_kb)
       : stats_{ALL_HTTP2_CODEC_STATS(POOL_COUNTER_PREFIX(stats, "http2."))},
         connection_(connection), max_request_headers_kb_(max_request_headers_kb),
         per_stream_buffer_limit_(http2_settings.initial_stream_window_size_), dispatching_(false),
@@ -286,7 +286,7 @@ protected:
   nghttp2_session* session_{};
   CodecStats stats_;
   Network::Connection& connection_;
-  uint32_t max_request_headers_kb_;
+  const uint32_t max_request_headers_kb_;
   uint32_t per_stream_buffer_limit_;
   bool allow_metadata_;
 
@@ -316,7 +316,7 @@ class ClientConnectionImpl : public ClientConnection, public ConnectionImpl {
 public:
   ClientConnectionImpl(Network::Connection& connection, ConnectionCallbacks& callbacks,
                        Stats::Scope& stats, const Http2Settings& http2_settings,
-                       uint32_t max_request_headers_kb);
+                       const uint32_t max_request_headers_kb);
 
   // Http::ClientConnection
   Http::StreamEncoder& newStream(StreamDecoder& response_decoder) override;
@@ -337,7 +337,7 @@ class ServerConnectionImpl : public ServerConnection, public ConnectionImpl {
 public:
   ServerConnectionImpl(Network::Connection& connection, ServerConnectionCallbacks& callbacks,
                        Stats::Scope& scope, const Http2Settings& http2_settings,
-                       uint32_t max_request_headers_kb);
+                       const uint32_t max_request_headers_kb);
 
 private:
   // ConnectionImpl
