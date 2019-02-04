@@ -9,7 +9,7 @@ namespace Network {
 
 namespace Address {
 class Instance;
-}  // namespace Address
+} // namespace Address
 
 template <typename T> struct IoHandleCallResult {
   T rc_;
