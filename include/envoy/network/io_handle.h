@@ -11,7 +11,13 @@ namespace Address {
 class Instance;
 } // namespace Address
 
+/**
+ * Basic type for return result which has a return code and error code defined
+ * according to different implementation.
+ */
 template <typename T> struct IoHandleCallResult {
+  virtual ~IoHandleCallResult() {}
+
   T rc_;
   int errno_;
 };
