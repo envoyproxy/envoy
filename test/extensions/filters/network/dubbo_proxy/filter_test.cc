@@ -10,9 +10,9 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::NiceMock;
 
@@ -25,10 +25,8 @@ using ConfigProtocolType = envoy::config::filter::network::dubbo_proxy::v2alpha1
 using ConfigSerializationType =
     envoy::config::filter::network::dubbo_proxy::v2alpha1::SerializationType;
 
-class DubboFilterTest : public testing::Test {
+class DubboFilterTest : public TestBase {
 public:
-  DubboFilterTest() {}
-
   TimeSource& timeSystem() { return factory_context_.dispatcher().timeSystem(); }
 
   void initializeFilter() {

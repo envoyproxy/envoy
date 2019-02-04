@@ -34,9 +34,12 @@ public:
 
   // TapFilter::HttpPerRequestTapper
   void onRequestHeaders(const Http::HeaderMap& headers) override;
+  void onRequestTrailers(const Http::HeaderMap& headers) override;
   void onResponseHeaders(const Http::HeaderMap& headers) override;
-  bool onDestroyLog(const Http::HeaderMap* request_headers,
-                    const Http::HeaderMap* response_headers) override;
+  void onResponseTrailers(const Http::HeaderMap& headers) override;
+  bool onDestroyLog(const Http::HeaderMap* request_headers, const Http::HeaderMap* request_trailers,
+                    const Http::HeaderMap* response_headers,
+                    const Http::HeaderMap* response_trailers) override;
 
 private:
   HttpTapConfigImplSharedPtr config_;

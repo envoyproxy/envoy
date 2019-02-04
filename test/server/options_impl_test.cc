@@ -9,17 +9,17 @@
 
 #include "server/options_impl.h"
 
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
 
 using testing::HasSubstr;
 
 namespace Envoy {
 
-class OptionsImplTest : public testing::Test {
+class OptionsImplTest : public TestBase {
 
 public:
   // Do the ugly work of turning a std::string into a char** and create an OptionsImpl. Args are
