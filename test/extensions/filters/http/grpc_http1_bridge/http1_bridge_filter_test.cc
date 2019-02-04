@@ -24,7 +24,7 @@ namespace GrpcHttp1Bridge {
 
 class GrpcHttp1BridgeFilterTest : public TestBase {
 public:
-  GrpcHttp1BridgeFilterTest() : filter_() {
+  GrpcHttp1BridgeFilterTest() {
     filter_.setDecoderFilterCallbacks(decoder_callbacks_);
     filter_.setEncoderFilterCallbacks(encoder_callbacks_);
     ON_CALL(decoder_callbacks_.stream_info_, protocol()).WillByDefault(ReturnPointee(&protocol_));
