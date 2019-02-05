@@ -387,7 +387,7 @@ TextReadout& ThreadLocalStoreImpl::ScopeImpl::textReadout(const std::string& nam
   // construct the stat we can insert it into the required maps.
   std::string final_name = prefix_ + name;
   if (parent_.rejects(final_name)) {
-    return null_bool_;
+    return null_readout_;
   }
 
   StatMap<TextReadoutSharedPtr>* tls_cache = nullptr;

@@ -81,24 +81,23 @@ TEST(StatsIsolatedStoreImplTest, LongStatName) {
  * Test stats macros. @see stats_macros.h
  */
 // clang-format off
-#define ALL_TEST_STATS(COUNTER, GAUGE, BOOL_INDICATOR, HISTOGRAM)              \
-  COUNTER       (test_counter)                                                 \
-  GAUGE         (test_gauge)                                                   \
-  BOOL_INDICATOR(test_text_readout)                                          \
+#define ALL_TEST_STATS(COUNTER, GAUGE, TEXT_READOUT, HISTOGRAM)              \
+  COUNTER       (test_counter)                                               \
+  GAUGE         (test_gauge)                                                 \
+  TEXT_READOUT  (test_text_readout)                                          \
   HISTOGRAM     (test_histogram)
 // clang-format on
 
 struct TestStats {
-  ALL_TEST_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_BOOL_INDICATOR_STRUCT,
+  ALL_TEST_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_TEXT_READOUT_STRUCT,
                  GENERATE_HISTOGRAM_STRUCT)
 };
 
 TEST(StatsMacros, All) {
   IsolatedStoreImpl stats_store;
-  TestStats test_stats{ALL_TEST_STATS(POOL_COUNTER_PREFIX(stats_store, "test."),
-                                      POOL_GAUGE_PREFIX(stats_store, "test."),
-                                      POOL_BOOL_INDICATOR_PREFIX(stats_store, "test."),
-                                      POOL_HISTOGRAM_PREFIX(stats_store, "test."))};
+  TestStats test_stats{ALL_TEST_STATS(
+      POOL_COUNTER_PREFIX(stats_store, "test."), POOL_GAUGE_PREFIX(stats_store, "test."),
+      POOL_TEXT_READOUT_PREFIX(stats_store, "test."), POOL_HISTOGRAM_PREFIX(stats_store, "test."))};
 
   Counter& counter = test_stats.test_counter_;
   EXPECT_EQ("test.test_counter", counter.name());

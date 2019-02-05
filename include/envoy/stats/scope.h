@@ -52,7 +52,7 @@ public:
   virtual Gauge& gauge(const std::string& name) PURE;
 
   /**
-   * @return a bool within the scope's namespace.
+   * @return a text stat within the scope's namespace.
    */
   virtual TextReadout& textReadout(const std::string& name) PURE;
 

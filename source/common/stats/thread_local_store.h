@@ -241,7 +241,7 @@ private:
 
     NullCounterImpl null_counter_;
     NullGaugeImpl null_gauge_;
-    NullTextReadoutImpl null_bool_;
+    NullTextReadoutImpl null_readout_;
     NullHistogramImpl null_histogram_;
   };
 

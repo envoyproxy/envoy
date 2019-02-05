@@ -40,7 +40,7 @@ public:
   virtual std::vector<GaugeSharedPtr> gauges() const PURE;
 
   /**
-   * @return a list of all known bools.
+   * @return a list of all known text readouts.
    */
   virtual std::vector<TextReadoutSharedPtr> textReadouts() const PURE;
 

@@ -38,9 +38,9 @@ public:
   virtual const std::vector<GaugeSharedPtr>& cachedGauges() PURE;
 
   /**
-   * Returns all known bools. Will use cached values if already accessed and clearCache() hasn't
+   * Returns all known readouts. Will use cached values if already accessed and clearCache() hasn't
    * been called since.
-   * @return std::vector<TextReadoutSharedPtr>& all known bools. Note: reference may not be
+   * @return std::vector<TextReadoutSharedPtr>& all known readouts. Note: reference may not be
    * valid after clearCache() is called.
    */
   virtual const std::vector<TextReadoutSharedPtr>& cachedTextReadouts() PURE;

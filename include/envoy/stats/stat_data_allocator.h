@@ -51,7 +51,7 @@ public:
    * @param name the full name of the stat.
    * @param tag_extracted_name the name of the stat with tag-values stripped out.
    * @param tags the extracted tag values.
-   * @return TextReadoutSharedPtr a bool, or nullptr if allocation failed, in which case
+   * @return TextReadoutSharedPtr a readout, or nullptr if allocation failed, in which case
    *     tag_extracted_name and tags are not moved.
    */
   virtual TextReadoutSharedPtr makeTextReadout(absl::string_view name,
