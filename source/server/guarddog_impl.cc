@@ -17,8 +17,8 @@ namespace Envoy {
 namespace Server {
 
 GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuration::Main& config,
-                           Event::TimeSystem& time_system, Api::Api& api)
-    : time_system_(time_system), miss_timeout_(config.wdMissTimeout()),
+                           Api::Api& api)
+    : time_system_(api.timeSystem()), miss_timeout_(config.wdMissTimeout()),
       megamiss_timeout_(config.wdMegaMissTimeout()), kill_timeout_(config.wdKillTimeout()),
       multi_kill_timeout_(config.wdMultiKillTimeout()),
       loop_interval_([&]() -> std::chrono::milliseconds {

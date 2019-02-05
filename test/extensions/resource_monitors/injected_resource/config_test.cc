@@ -10,7 +10,6 @@
 
 #include "test/test_common/environment.h"
 #include "test/test_common/test_base.h"
-#include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {
@@ -28,8 +27,7 @@ TEST(InjectedResourceMonitorFactoryTest, CreateMonitor) {
   config.set_filename(TestEnvironment::temporaryPath("injected_resource"));
   Stats::IsolatedStoreImpl stats_store;
   Api::ApiPtr api = Api::createApiForTest(stats_store);
-  DangerousDeprecatedTestTime test_time;
-  Event::DispatcherImpl dispatcher(test_time.timeSystem(), *api);
+  Event::DispatcherImpl dispatcher(*api);
   Server::Configuration::ResourceMonitorFactoryContextImpl context(dispatcher, *api);
   Server::ResourceMonitorPtr monitor = factory->createResourceMonitor(config, context);
   EXPECT_NE(monitor, nullptr);

@@ -7,7 +7,6 @@
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/test_base.h"
-#include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
 using testing::_;
@@ -31,12 +30,11 @@ public:
 
   Stats::IsolatedStoreImpl stats_store_;
   NiceMock<ThreadLocal::MockInstance> tls_;
-  DangerousDeprecatedTestTime test_time;
   Network::MockConnectionHandler* handler_ = new Network::MockConnectionHandler();
   NiceMock<MockGuardDog> guard_dog_;
   NiceMock<MockOverloadManager> overload_manager_;
   Api::ApiPtr api_;
-  Event::DispatcherImpl* dispatcher_ = new Event::DispatcherImpl(test_time.timeSystem(), *api_);
+  Event::DispatcherImpl* dispatcher_ = new Event::DispatcherImpl(*api_);
   DefaultTestHooks hooks_;
   WorkerImpl worker_{tls_,
                      hooks_,

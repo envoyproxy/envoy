@@ -145,6 +145,7 @@ envoy_cc_library(
     deps = [
         ":admin_interface",
         "//include/envoy/access_log:access_log_interface",
+        "//include/envoy/api:api_interface",
         "//include/envoy/http:codes_interface",
         "//include/envoy/http:context_interface",
         "//include/envoy/http:filter_interface",

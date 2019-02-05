@@ -4,7 +4,6 @@
 #include "common/thread_local/thread_local_impl.h"
 
 #include "test/mocks/event/mocks.h"
-#include "test/test_common/test_time.h"
 
 #include "gmock/gmock.h"
 
@@ -117,11 +116,10 @@ TEST_F(ThreadLocalInstanceImplTest, RunOnAllThreads) {
 TEST(ThreadLocalInstanceImplDispatcherTest, Dispatcher) {
   InstanceImpl tls;
 
-  DangerousDeprecatedTestTime test_time;
   Stats::IsolatedStoreImpl stats_store;
   Api::ApiPtr api = Api::createApiForTest(stats_store);
-  Event::DispatcherImpl main_dispatcher(test_time.timeSystem(), *api);
-  Event::DispatcherImpl thread_dispatcher(test_time.timeSystem(), *api);
+  Event::DispatcherImpl main_dispatcher(*api);
+  Event::DispatcherImpl thread_dispatcher(*api);
 
   tls.registerThread(main_dispatcher, true);
   tls.registerThread(thread_dispatcher, false);

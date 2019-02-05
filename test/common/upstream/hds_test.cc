@@ -46,7 +46,8 @@ class HdsTest : public TestBase {
 protected:
   HdsTest()
       : retry_timer_(new Event::MockTimer()), server_response_timer_(new Event::MockTimer()),
-        async_client_(new Grpc::MockAsyncClient()), api_(Api::createApiForTest(stats_store_)) {
+        async_client_(new Grpc::MockAsyncClient()), api_(Api::createApiForTest(stats_store_)),
+        ssl_context_manager_(api_->timeSystem()) {
     node_.set_id("hds-node");
   }
 
@@ -96,6 +97,7 @@ protected:
     return msg;
   }
 
+  Event::SimulatedTimeSystem time_system_;
   envoy::api::v2::core::Node node_;
   Event::MockDispatcher dispatcher_;
   Stats::IsolatedStoreImpl stats_store_;
@@ -115,8 +117,8 @@ protected:
   Grpc::MockAsyncStream async_stream_;
   Grpc::MockAsyncClient* async_client_;
   Runtime::MockLoader runtime_;
-  Event::SimulatedTimeSystem time_system_;
-  Extensions::TransportSockets::Tls::ContextManagerImpl ssl_context_manager_{time_system_};
+  Api::ApiPtr api_;
+  Extensions::TransportSockets::Tls::ContextManagerImpl ssl_context_manager_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   NiceMock<Envoy::AccessLog::MockAccessLogManager> log_manager_;
   NiceMock<Upstream::MockClusterManager> cm_;
@@ -124,7 +126,6 @@ protected:
   NiceMock<Server::MockAdmin> admin_;
   Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest().currentThreadId()};
   NiceMock<ThreadLocal::MockInstance> tls_;
-  Api::ApiPtr api_;
 };
 
 // Test that HdsDelegate builds and sends initial message correctly

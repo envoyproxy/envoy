@@ -7,7 +7,6 @@
 
 #include "test/test_common/environment.h"
 #include "test/test_common/test_base.h"
-#include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/match.h"
@@ -46,7 +45,7 @@ public:
 class InjectedResourceMonitorTest : public TestBase {
 protected:
   InjectedResourceMonitorTest()
-      : api_(Api::createApiForTest(stats_store_)), dispatcher_(test_time_.timeSystem(), *api_),
+      : api_(Api::createApiForTest(stats_store_)), dispatcher_(*api_),
         resource_filename_(TestEnvironment::temporaryPath("injected_resource")),
         file_updater_(resource_filename_), monitor_(createMonitor()) {}
 
@@ -67,7 +66,6 @@ protected:
 
   Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
-  DangerousDeprecatedTestTime test_time_;
   Event::DispatcherImpl dispatcher_;
   const std::string resource_filename_;
   AtomicFileUpdater file_updater_;

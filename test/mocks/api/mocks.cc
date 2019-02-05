@@ -17,6 +17,10 @@ MockApi::MockApi() { ON_CALL(*this, fileSystem()).WillByDefault(ReturnRef(file_s
 
 MockApi::~MockApi() {}
 
+Event::DispatcherPtr MockApi::allocateDispatcher() {
+  return Event::DispatcherPtr{allocateDispatcher_(timeSystem())};
+}
+
 MockOsSysCalls::MockOsSysCalls() { num_writes_ = num_open_ = 0; }
 
 MockOsSysCalls::~MockOsSysCalls() {}

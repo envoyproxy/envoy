@@ -23,8 +23,8 @@ namespace Event {
  */
 class DispatcherImpl : Logger::Loggable<Logger::Id::main>, public Dispatcher {
 public:
-  explicit DispatcherImpl(TimeSystem& time_system, Api::Api& api);
-  DispatcherImpl(TimeSystem& time_system, Buffer::WatermarkFactoryPtr&& factory, Api::Api& api);
+  explicit DispatcherImpl(Api::Api& api);
+  DispatcherImpl(Buffer::WatermarkFactoryPtr&& factory, Api::Api& api);
   ~DispatcherImpl();
 
   /**
@@ -33,7 +33,7 @@ public:
   event_base& base() { return *base_; }
 
   // Event::Dispatcher
-  TimeSystem& timeSystem() override { return time_system_; }
+  TimeSystem& timeSystem() override { return api_.timeSystem(); }
   void clearDeferredDeleteList() override;
   Network::ConnectionPtr
   createServerConnection(Network::ConnectionSocketPtr&& socket,
@@ -70,7 +70,6 @@ private:
   bool isThreadSafe() const { return run_tid_ == nullptr || run_tid_->isCurrentThreadId(); }
 
   Api::Api& api_;
-  TimeSystem& time_system_;
   Thread::ThreadIdPtr run_tid_;
   Buffer::WatermarkFactoryPtr buffer_factory_;
   Libevent::BasePtr base_;
