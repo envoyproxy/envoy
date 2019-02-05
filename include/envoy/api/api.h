@@ -43,7 +43,6 @@ public:
 
   /**
    * TODO(jmarantz): This is exposed for now only for the dispatcher. We will
-   *
    * do a refactor in the future to remove the need for this accessor.
    * @return a reference to the time-system
    */
