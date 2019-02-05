@@ -34,8 +34,6 @@ namespace RateLimitFilter {
 
 class RateLimitFilterTest : public TestBase {
 public:
-  RateLimitFilterTest() {}
-
   void SetUpTest(const std::string& yaml) {
     ON_CALL(runtime_.snapshot_, featureEnabled("ratelimit.tcp_filter_enabled", 100))
         .WillByDefault(Return(true));

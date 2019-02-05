@@ -19,7 +19,7 @@ namespace JwtAuthn {
 
 class AllVerifierTest : public TestBase {
 public:
-  void SetUp() { MessageUtil::loadFromYaml(ExampleConfig, proto_config_); }
+  void SetUp() override { MessageUtil::loadFromYaml(ExampleConfig, proto_config_); }
 
   void createVerifier() {
     filter_config_ = ::std::make_shared<FilterConfig>(proto_config_, "", mock_factory_ctx_);
