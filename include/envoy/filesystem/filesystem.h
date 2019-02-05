@@ -54,6 +54,7 @@ public:
 
   /**
    * @return string a human-readable string describing the error code
+   * TODO(sesmith177) Abstract this method so it isn't dependant on integer error codes
    */
   virtual std::string errorToString(int error) PURE;
 };
