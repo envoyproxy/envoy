@@ -7,14 +7,15 @@
 #include "common/protobuf/utility.h"
 #include "common/stats/isolated_store_impl.h"
 
+#include "test/proto/deprecated.pb.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/logging.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
-
-#include "gtest/gtest.h"
 
 namespace Envoy {
 
-class ProtobufUtilityTest : public testing::Test {
+class ProtobufUtilityTest : public TestBase {
 protected:
   ProtobufUtilityTest() : api_(Api::createApiForTest(stats_store_)) {}
 
@@ -338,7 +339,73 @@ TEST(DurationUtilTest, OutOfRange) {
   }
 }
 
-class TimestampUtilTest : public ::testing::Test, public ::testing::WithParamInterface<int64_t> {};
+TEST(DeprecatedFields, NoErrorWhenDeprecatedFieldsUnused) {
+  envoy::test::deprecation_test::Base base;
+  base.set_not_deprecated("foo");
+  // Fatal checks for a non-deprecated field should cause no problem.
+  MessageUtil::checkForDeprecation(base, true);
+}
+
+TEST(DeprecatedFields, IndividualFieldDeprecated) {
+  envoy::test::deprecation_test::Base base;
+  base.set_is_deprecated("foo");
+  // Non-fatal checks for a deprecated field should log rather than throw an exception.
+  EXPECT_LOG_CONTAINS("warning",
+                      "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated'.",
+                      MessageUtil::checkForDeprecation(base, true));
+  // Fatal checks for a deprecated field should result in an exception.
+  EXPECT_THROW_WITH_REGEX(
+      MessageUtil::checkForDeprecation(base, false), ProtoValidationException,
+      "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated'.");
+}
+
+TEST(DeprecatedFields, MessageDeprecated) {
+  envoy::test::deprecation_test::Base base;
+  base.mutable_deprecated_message();
+  // Fatal checks for a present (unused) deprecated message should result in an exception.
+  EXPECT_THROW_WITH_REGEX(
+      MessageUtil::checkForDeprecation(base, false), ProtoValidationException,
+      "Using deprecated option 'envoy.test.deprecation_test.Base.deprecated_message'.");
+}
+
+TEST(DeprecatedFields, InnerMessageDeprecated) {
+  envoy::test::deprecation_test::Base base;
+  base.mutable_not_deprecated_message()->set_inner_not_deprecated("foo");
+  // Non-fatal checks for a deprecated field shouldn't throw an exception.
+  MessageUtil::checkForDeprecation(base, true);
+
+  base.mutable_not_deprecated_message()->set_inner_deprecated("bar");
+  // Fatal checks for a deprecated sub-message should result in an exception.
+  EXPECT_THROW_WITH_REGEX(MessageUtil::checkForDeprecation(base, false), ProtoValidationException,
+                          "Using deprecated option "
+                          "'envoy.test.deprecation_test.Base.InnerMessage.inner_deprecated'.");
+}
+
+// Check that repeated sub-messages get validated.
+TEST(DeprecatedFields, SubMessageDeprecated) {
+  envoy::test::deprecation_test::Base base;
+  base.add_repeated_message();
+  base.add_repeated_message()->set_inner_deprecated("foo");
+  base.add_repeated_message();
+
+  // Fatal checks for a repeated deprecated sub-message should result in an exception.
+  EXPECT_THROW_WITH_REGEX(MessageUtil::checkForDeprecation(base, false), ProtoValidationException,
+                          "Using deprecated option "
+                          "'envoy.test.deprecation_test.Base.InnerMessage.inner_deprecated'.");
+}
+
+// Check that deprecated repeated messages trigger
+TEST(DeprecatedFields, RepeatedMessageDeprecated) {
+  envoy::test::deprecation_test::Base base;
+  base.add_deprecated_repeated_message();
+
+  // Fatal checks for a repeated deprecated sub-message should result in an exception.
+  EXPECT_THROW_WITH_REGEX(
+      MessageUtil::checkForDeprecation(base, false), ProtoValidationException,
+      "Using deprecated option 'envoy.test.deprecation_test.Base.deprecated_repeated_message'.");
+}
+
+class TimestampUtilTest : public TestBase, public ::testing::WithParamInterface<int64_t> {};
 
 TEST_P(TimestampUtilTest, SystemClockToTimestampTest) {
   // Generate an input time_point<system_clock>,

@@ -1,9 +1,12 @@
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
+
 #include "quiche/quic/platform/api/quic_aligned.h"
 #include "quiche/quic/platform/api/quic_arraysize.h"
+#include "quiche/quic/platform/api/quic_client_stats.h"
 #include "quiche/quic/platform/api/quic_containers.h"
 #include "quiche/quic/platform/api/quic_endian.h"
 #include "quiche/quic/platform/api/quic_estimate_memory_usage.h"
+#include "quiche/quic/platform/api/quic_mutex.h"
 #include "quiche/quic/platform/api/quic_ptr_util.h"
 #include "quiche/quic/platform/api/quic_string.h"
 #include "quiche/quic/platform/api/quic_string_piece.h"
@@ -25,6 +28,19 @@ TEST(QuicPlatformTest, QuicAlignOf) { EXPECT_LT(0, QUIC_ALIGN_OF(int)); }
 TEST(QuicPlatformTest, QuicArraysize) {
   int array[] = {0, 1, 2, 3, 4};
   EXPECT_EQ(5, QUIC_ARRAYSIZE(array));
+}
+
+enum class TestEnum { ZERO = 0, ONE, TWO, COUNT };
+
+TEST(QuicPlatformTest, QuicClientStats) {
+  // Just make sure they compile.
+  QUIC_CLIENT_HISTOGRAM_ENUM("my.enum.histogram", TestEnum::ONE, TestEnum::COUNT, "doc");
+  QUIC_CLIENT_HISTOGRAM_BOOL("my.bool.histogram", false, "doc");
+  QUIC_CLIENT_HISTOGRAM_TIMES("my.timing.histogram", quic::QuicTime::Delta::FromSeconds(5),
+                              quic::QuicTime::Delta::FromSeconds(1),
+                              quic::QuicTime::Delta::FromSecond(3600), 100, "doc");
+  QUIC_CLIENT_HISTOGRAM_COUNTS("my.count.histogram", 123, 0, 1000, 100, "doc");
+  quic::QuicClientSparseHistogram("my.sparse.histogram", 345);
 }
 
 TEST(QuicPlatformTest, QuicUnorderedMap) {
@@ -91,6 +107,27 @@ TEST(QuicPlatformTest, QuicPtrUtil) {
 
   p = quic::QuicWrapUnique(new quic::QuicString("aaa"));
   EXPECT_EQ("aaa", *p);
+}
+
+TEST(QuicPlatformTest, QuicMutex) {
+  quic::QuicMutex mu;
+
+  quic::QuicWriterMutexLock wmu(&mu);
+  mu.AssertReaderHeld();
+  mu.WriterUnlock();
+  {
+    quic::QuicReaderMutexLock rmu(&mu);
+    mu.AssertReaderHeld();
+  }
+  mu.WriterLock();
+}
+
+TEST(QuicPlatformTest, QuicNotification) {
+  quic::QuicNotification notification;
+  EXPECT_FALSE(notification.HasBeenNotified());
+  notification.Notify();
+  notification.WaitForNotification();
+  EXPECT_TRUE(notification.HasBeenNotified());
 }
 
 } // namespace Quiche

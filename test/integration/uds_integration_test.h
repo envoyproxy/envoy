@@ -9,14 +9,13 @@
 #include "test/integration/http_integration.h"
 #include "test/integration/server.h"
 #include "test/test_common/environment.h"
-
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 namespace Envoy {
 
 class UdsUpstreamIntegrationTest
     : public HttpIntegrationTest,
-      public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>> {
+      public TestBaseWithParam<std::tuple<Network::Address::IpVersion, bool>> {
 public:
   UdsUpstreamIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, std::get<0>(GetParam()), realTime()),
@@ -47,7 +46,7 @@ protected:
 
 class UdsListenerIntegrationTest
     : public HttpIntegrationTest,
-      public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>> {
+      public TestBaseWithParam<std::tuple<Network::Address::IpVersion, bool>> {
 public:
   UdsListenerIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, std::get<0>(GetParam()), realTime()),
