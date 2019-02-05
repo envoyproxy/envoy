@@ -63,10 +63,16 @@ public:
 
   using MakeTimeSystemFn = std::function<TestTimeSystem*()>;
 
+  /**
+   * Returns a singleton time-system, creating a default one of there's not
+   * one already. This method is thread-safe.
+   *
+   * @return the thread system.
+   */
   TestTimeSystem* timeSystem(const MakeTimeSystemFn& make_time_system);
 
 private:
-  std::unique_ptr<TestTimeSystem> time_system_;
+  std::unique_ptr<TestTimeSystem> time_system_ GUARDED_BY(mutex_);
   Thread::MutexBasicLockable mutex_;
 };
 
