@@ -38,6 +38,7 @@ public:
 
   /**
    * @return a reference to the TimeSystem
+   * TODO(jmarantz): change this to return a TimeSource.
    */
   virtual Event::TimeSystem& timeSystem() PURE;
 };
