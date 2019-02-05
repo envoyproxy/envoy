@@ -7,6 +7,7 @@ option go_package = "v2";
 import "envoy/api/v2/core/config_source.proto";
 import "envoy/api/v2/core/protocol.proto";
 import "envoy/api/v2/rds.proto";
+import "envoy/api/v2/srds.proto";
 import "envoy/config/filter/accesslog/v2/accesslog.proto";
 import "envoy/type/percent.proto";
 
@@ -21,7 +22,7 @@ import "gogoproto/gogo.proto";
 // [#protodoc-title: HTTP connection manager]
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 
-// [#comment:next free field: 30]
+// [#comment:next free field: 32]
 message HttpConnectionManager {
   enum CodecType {
     option (gogoproto.goproto_enum_prefix) = false;
@@ -58,6 +59,14 @@ message HttpConnectionManager {
 
     // The route table for the connection manager is static and is specified in this property.
     envoy.api.v2.RouteConfiguration route_config = 4;
+  }
+
+  oneof scoped_routes_specifier {
+    // Configuration for the Scoped RDS API which dynamically loads routing configuration scopes.
+    ScopedRds scoped_rds = 30;
+
+    // A static set of routing scopes.
+    envoy.api.v2.ScopedRouteConfigurationsSet scoped_routes_config = 31;
   }
 
   // A list of individual HTTP filters that make up the filter chain for
@@ -386,11 +395,31 @@ message Rds {
   envoy.api.v2.core.ConfigSource config_source = 1
       [(validate.rules).message.required = true, (gogoproto.nullable) = false];
 
-  // The name of the route configuration. This name will be passed to the RDS
-  // API. This allows an Envoy configuration with multiple HTTP listeners (and
-  // associated HTTP connection manager filters) to use different route
-  // configurations.
-  string route_config_name = 2 [(validate.rules).string.min_bytes = 1];
+  oneof subscription_specifier {
+    option (validate.required) = true;
+
+    // The name of the route configuration. This name will be passed to the RDS
+    // API. This allows an Envoy configuration with multiple HTTP listeners (and
+    // associated HTTP connection manager filters) to use different route
+    // configurations.
+    string route_config_name = 2 [(validate.rules).string.min_bytes = 1];
+
+    // Must be set to true when scoped RDS is enabled.
+    // If this is enabled, RDS subscriptions will be triggered by scoped RDS config updates using
+    // this configuration as a template.
+    bool scoped_rds_template = 3;
+  }
+}
+
+message ScopedRds {
+  // Configuration source specifier for scoped RDS.
+  envoy.api.v2.core.ConfigSource config_source = 1
+      [(validate.rules).message.required = true, (gogoproto.nullable) = false];
+
+  // The name of the set of routing configuration scopes. This name will be passed to the scoped RDS
+  // API.
+  // This allows Envoy to segment routing configuration based on a configurable request attribute.
+  string scoped_routes_config_set_name = 2 [(validate.rules).string.min_bytes = 1];
 }
 
 message HttpFilter {

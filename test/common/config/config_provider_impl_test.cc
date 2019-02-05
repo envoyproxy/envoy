@@ -157,9 +157,11 @@ public:
   }
 
   // Envoy::Config::ConfigProviderManager
-  ConfigProviderPtr createXdsConfigProvider(const Protobuf::Message& config_source_proto,
-                                            Server::Configuration::FactoryContext& factory_context,
-                                            const std::string&) override {
+  ConfigProviderPtr
+  createXdsConfigProvider(const Protobuf::Message& config_source_proto,
+                          Server::Configuration::FactoryContext& factory_context,
+                          const std::string&,
+                          const Envoy::Config::ConfigProviderManager::OptionalArg&) override {
     DummyConfigSubscriptionSharedPtr subscription = getSubscription<DummyConfigSubscription>(
         config_source_proto, factory_context.initManager(),
         [&factory_context](const std::string& manager_identifier,
@@ -183,7 +185,8 @@ public:
   // Envoy::Config::ConfigProviderManager
   ConfigProviderPtr
   createStaticConfigProvider(const Protobuf::Message& config_proto,
-                             Server::Configuration::FactoryContext& factory_context) override {
+                             Server::Configuration::FactoryContext& factory_context,
+                             const Envoy::Config::ConfigProviderManager::OptionalArg&) override {
     return std::make_unique<StaticDummyConfigProvider>(
         dynamic_cast<const test::common::config::DummyConfig&>(config_proto), factory_context,
         *this);
@@ -235,7 +238,8 @@ TEST_F(ConfigProviderImplTest, SharedOwnership) {
   envoy::api::v2::core::ApiConfigSource config_source_proto;
   config_source_proto.set_api_type(envoy::api::v2::core::ApiConfigSource::GRPC);
   ConfigProviderPtr provider1 = provider_manager_->createXdsConfigProvider(
-      config_source_proto, factory_context_, "dummy_prefix");
+      config_source_proto, factory_context_, "dummy_prefix",
+      ConfigProviderManager::NullOptionalArg());
 
   // No config protos have been received via the subscription yet.
   EXPECT_FALSE(provider1->configProtoInfo<test::common::config::DummyConfig>().has_value());
@@ -250,7 +254,8 @@ TEST_F(ConfigProviderImplTest, SharedOwnership) {
   // Check that a newly created provider with the same config source will share
   // the subscription, config proto and resulting ConfigProvider::Config.
   ConfigProviderPtr provider2 = provider_manager_->createXdsConfigProvider(
-      config_source_proto, factory_context_, "dummy_prefix");
+      config_source_proto, factory_context_, "dummy_prefix",
+      ConfigProviderManager::NullOptionalArg());
 
   EXPECT_TRUE(provider2->configProtoInfo<test::common::config::DummyConfig>().has_value());
   EXPECT_EQ(&dynamic_cast<DummyDynamicConfigProvider&>(*provider1).subscription(),
@@ -263,7 +268,8 @@ TEST_F(ConfigProviderImplTest, SharedOwnership) {
   // Change the config source and verify that a new subscription is used.
   config_source_proto.set_api_type(envoy::api::v2::core::ApiConfigSource::REST);
   ConfigProviderPtr provider3 = provider_manager_->createXdsConfigProvider(
-      config_source_proto, factory_context_, "dummy_prefix");
+      config_source_proto, factory_context_, "dummy_prefix",
+      ConfigProviderManager::NullOptionalArg());
 
   EXPECT_NE(&dynamic_cast<DummyDynamicConfigProvider&>(*provider1).subscription(),
             &dynamic_cast<DummyDynamicConfigProvider&>(*provider3).subscription());
@@ -321,7 +327,8 @@ dynamic_dummy_configs:
   timeSystem().setSystemTime(std::chrono::milliseconds(1234567891234));
 
   ConfigProviderPtr static_config = provider_manager_->createStaticConfigProvider(
-      parseDummyConfigFromYaml(config_yaml), factory_context_);
+      parseDummyConfigFromYaml(config_yaml), factory_context_,
+      ConfigProviderManager::NullOptionalArg());
   message_ptr = factory_context_.admin_.config_tracker_.config_tracker_callbacks_["dummy"]();
   const auto& dummy_config_dump2 =
       static_cast<const test::common::config::DummyConfigsDump&>(*message_ptr);
@@ -337,7 +344,8 @@ dynamic_dummy_configs:
   envoy::api::v2::core::ApiConfigSource config_source_proto;
   config_source_proto.set_api_type(envoy::api::v2::core::ApiConfigSource::GRPC);
   ConfigProviderPtr dynamic_provider = provider_manager_->createXdsConfigProvider(
-      config_source_proto, factory_context_, "dummy_prefix");
+      config_source_proto, factory_context_, "dummy_prefix",
+      ConfigProviderManager::NullOptionalArg());
 
   // Static + dynamic config dump.
   Protobuf::RepeatedPtrField<test::common::config::DummyConfig> dummy_configs;
@@ -375,7 +383,8 @@ TEST_F(ConfigProviderImplTest, LocalInfoNotDefined) {
   config_source_proto.set_api_type(envoy::api::v2::core::ApiConfigSource::GRPC);
   EXPECT_THROW_WITH_MESSAGE(
       provider_manager_->createXdsConfigProvider(config_source_proto, factory_context_,
-                                                 "dummy_prefix"),
+                                                 "dummy_prefix",
+                                                 ConfigProviderManager::NullOptionalArg()),
       EnvoyException,
       "DummyDS: node 'id' and 'cluster' are required. Set it either in 'node' config or "
       "via --service-node and --service-cluster options.");

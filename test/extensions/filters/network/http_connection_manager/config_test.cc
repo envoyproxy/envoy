@@ -6,6 +6,7 @@
 
 #include "extensions/filters/network/http_connection_manager/config.h"
 
+#include "test/mocks/config/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
@@ -48,6 +49,7 @@ public:
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   Http::SlowDateProviderImpl date_provider_{context_.dispatcher().timeSystem()};
   NiceMock<Router::MockRouteConfigProviderManager> route_config_provider_manager_;
+  NiceMock<Config::MockConfigProviderManager> scoped_routes_config_provider_manager_;
 };
 
 TEST_F(HttpConnectionManagerConfigTest, ValidateFail) {
@@ -86,7 +88,8 @@ TEST_F(HttpConnectionManagerConfigTest, InvalidFilterName) {
 
   EXPECT_THROW_WITH_MESSAGE(
       HttpConnectionManagerConfig(parseHttpConnectionManagerFromJson(json_string), context_,
-                                  date_provider_, route_config_provider_manager_),
+                                  date_provider_, route_config_provider_manager_,
+                                  scoped_routes_config_provider_manager_),
       EnvoyException, "Didn't find a registered implementation for name: 'foo'");
 }
 
@@ -122,7 +125,8 @@ TEST_F(HttpConnectionManagerConfigTest, MiscConfig) {
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromJson(json_string), context_,
-                                     date_provider_, route_config_provider_manager_);
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_);
 
   EXPECT_THAT(std::vector<Http::LowerCaseString>({Http::LowerCaseString("foo")}),
               ContainerEq(config.tracingConfig()->request_headers_for_tags_));
@@ -143,7 +147,8 @@ TEST_F(HttpConnectionManagerConfigTest, UnixSocketInternalAddress) {
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_);
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_);
   Network::Address::PipeInstance unixAddress{"/foo"};
   Network::Address::Ipv4Instance internalIpAddress{"127.0.0.1", 0};
   Network::Address::Ipv4Instance externalIpAddress{"12.0.0.1", 0};
@@ -162,7 +167,8 @@ TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersSizeDefault) {
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_);
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_);
   EXPECT_EQ(60, config.maxRequestHeadersSizeKb());
 }
 
@@ -177,7 +183,8 @@ TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersSizeConfigured) {
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_);
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_);
   EXPECT_EQ(16, config.maxRequestHeadersSizeKb());
 }
 
@@ -193,7 +200,8 @@ TEST_F(HttpConnectionManagerConfigTest, DisabledStreamIdleTimeout) {
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_);
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_);
   EXPECT_EQ(0, config.streamIdleTimeout().count());
 }
 
@@ -208,7 +216,8 @@ TEST_F(HttpConnectionManagerConfigTest, ConfiguredRequestTimeout) {
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_);
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_);
   EXPECT_EQ(53 * 1000, config.requestTimeout().count());
 }
 
@@ -223,7 +232,8 @@ TEST_F(HttpConnectionManagerConfigTest, DisabledRequestTimeout) {
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_);
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_);
   EXPECT_EQ(0, config.requestTimeout().count());
 }
 
@@ -237,7 +247,8 @@ TEST_F(HttpConnectionManagerConfigTest, UnconfiguredRequestTimeout) {
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_);
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_);
   EXPECT_EQ(0, config.requestTimeout().count());
 }
 
@@ -447,8 +458,140 @@ TEST_F(HttpConnectionManagerConfigTest, ReversedEncodeOrderConfig) {
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_);
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_);
   EXPECT_TRUE(config.reverseEncodeOrder());
+}
+
+TEST_F(HttpConnectionManagerConfigTest, ScopedRoutingValidationFailures) {
+  const std::string config_yaml = R"EOF(
+route_config:
+  name: foo_route
+scoped_routes_config:
+  name: foo_route_scopes
+codec_type: auto
+stat_prefix: foo
+http_filters:
+  - name: envoy.router
+)EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      HttpConnectionManagerConfig(parseHttpConnectionManagerFromV2Yaml(config_yaml), context_,
+                                  date_provider_, route_config_provider_manager_,
+                                  scoped_routes_config_provider_manager_),
+      EnvoyException, "Error: RDS must be used when scoped routing is enabled");
+
+  const std::string config_yaml2 = R"EOF(
+route_config:
+  name: foo_route
+scoped_rds:
+  config_source: { path: /path/to/file }
+  scoped_routes_config_set_name: foo_scope
+codec_type: auto
+stat_prefix: foo
+http_filters:
+  - name: envoy.router
+)EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      HttpConnectionManagerConfig(parseHttpConnectionManagerFromV2Yaml(config_yaml2), context_,
+                                  date_provider_, route_config_provider_manager_,
+                                  scoped_routes_config_provider_manager_),
+      EnvoyException, "Error: RDS must be used when scoped routing is enabled");
+
+  const std::string config_yaml3 = R"EOF(
+rds:
+  config_source: { path: /path/to/file }
+  route_config_name: foo_routes
+scoped_routes_config:
+  name: foo_route_scopes
+codec_type: auto
+stat_prefix: foo
+http_filters:
+  - name: envoy.router
+)EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      HttpConnectionManagerConfig(parseHttpConnectionManagerFromV2Yaml(config_yaml3), context_,
+                                  date_provider_, route_config_provider_manager_,
+                                  scoped_routes_config_provider_manager_),
+      EnvoyException,
+      "Error: the RDS subscription specifier must be set to scoped_rds_template=true "
+      "when scoped routing is enabled");
+
+  const std::string config_yaml4 = R"EOF(
+rds:
+  config_source: { path: /path/to/file }
+  scoped_rds_template: true
+codec_type: auto
+stat_prefix: foo
+http_filters:
+  - name: envoy.router
+)EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      HttpConnectionManagerConfig(parseHttpConnectionManagerFromV2Yaml(config_yaml4), context_,
+                                  date_provider_, route_config_provider_manager_,
+                                  scoped_routes_config_provider_manager_),
+      EnvoyException,
+      "Error: RDS must specify a route_config_name when scoped routing is not enabled");
+}
+
+TEST_F(HttpConnectionManagerConfigTest, ScopedRoutingValidationSuccess) {
+  const std::string config_yaml = R"EOF(
+rds:
+  config_source: { path: /path/to/file }
+  scoped_rds_template: true
+scoped_routes_config:
+  name: foo_route_scopes
+codec_type: auto
+stat_prefix: foo
+http_filters:
+  - name: envoy.router
+)EOF";
+
+  HttpConnectionManagerConfig(parseHttpConnectionManagerFromV2Yaml(config_yaml), context_,
+                              date_provider_, route_config_provider_manager_,
+                              scoped_routes_config_provider_manager_);
+
+  const std::string config_yaml2 = R"EOF(
+rds:
+  config_source: { path: /path/to/file }
+  scoped_rds_template: true
+scoped_rds:
+  config_source: { path: /path/to/file }
+  scoped_routes_config_set_name: foo_scope
+codec_type: auto
+stat_prefix: foo
+http_filters:
+  - name: envoy.router
+)EOF";
+
+  HttpConnectionManagerConfig(parseHttpConnectionManagerFromV2Yaml(config_yaml2), context_,
+                              date_provider_, route_config_provider_manager_,
+                              scoped_routes_config_provider_manager_);
+}
+
+TEST_F(HttpConnectionManagerConfigTest, ScopedRdsAndStatic) {
+  const std::string config_yaml = R"EOF(
+rds:
+  config_source: { path: /path/to/file }
+  scoped_rds_template: true
+scoped_routes_config:
+  name: foo_route_scopes
+scoped_rds:
+  config_source: { path: /path/to/file }
+  scoped_routes_config_set_name: foo_scope
+codec_type: auto
+stat_prefix: foo
+http_filters:
+  - name: envoy.router
+)EOF";
+
+  EXPECT_THROW(HttpConnectionManagerConfig(parseHttpConnectionManagerFromV2Yaml(config_yaml),
+                                           context_, date_provider_, route_config_provider_manager_,
+                                           scoped_routes_config_provider_manager_),
+               EnvoyException);
 }
 
 class FilterChainTest : public HttpConnectionManagerConfigTest {
@@ -483,7 +626,8 @@ public:
 
 TEST_F(FilterChainTest, createFilterChain) {
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromJson(basic_config_), context_,
-                                     date_provider_, route_config_provider_manager_);
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_);
 
   Http::MockFilterChainFactoryCallbacks callbacks;
   EXPECT_CALL(callbacks, addStreamFilter(_));        // Dynamo
@@ -497,7 +641,8 @@ TEST_F(FilterChainTest, createUpgradeFilterChain) {
   hcm_config.add_upgrade_configs()->set_upgrade_type("websocket");
 
   HttpConnectionManagerConfig config(hcm_config, context_, date_provider_,
-                                     route_config_provider_manager_);
+                                     route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_);
 
   NiceMock<Http::MockFilterChainFactoryCallbacks> callbacks;
   // Check the case where WebSockets are configured in the HCM, and no router
@@ -543,7 +688,8 @@ TEST_F(FilterChainTest, createUpgradeFilterChainHCMDisabled) {
   hcm_config.mutable_upgrade_configs(0)->mutable_enabled()->set_value(false);
 
   HttpConnectionManagerConfig config(hcm_config, context_, date_provider_,
-                                     route_config_provider_manager_);
+                                     route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_);
 
   NiceMock<Http::MockFilterChainFactoryCallbacks> callbacks;
   // Check the case where WebSockets are off in the HCM, and no router config is present.
@@ -592,7 +738,8 @@ TEST_F(FilterChainTest, createCustomUpgradeFilterChain) {
                                              "envoy.http_dynamo_filter");
 
   HttpConnectionManagerConfig config(hcm_config, context_, date_provider_,
-                                     route_config_provider_manager_);
+                                     route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_);
 
   {
     Http::MockFilterChainFactoryCallbacks callbacks;
@@ -621,7 +768,8 @@ TEST_F(FilterChainTest, invalidConfig) {
   hcm_config.add_upgrade_configs()->set_upgrade_type("websocket");
 
   EXPECT_THROW_WITH_MESSAGE(HttpConnectionManagerConfig(hcm_config, context_, date_provider_,
-                                                        route_config_provider_manager_),
+                                                        route_config_provider_manager_,
+                                                        scoped_routes_config_provider_manager_),
                             EnvoyException,
                             "Error: multiple upgrade configs with the same name: 'websocket'");
 }

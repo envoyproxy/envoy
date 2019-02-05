@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/api/v2/eds.pb.h"
+#include "envoy/config/config_provider_manager.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
 
@@ -72,6 +73,22 @@ public:
                                     const std::string& version_info));
   MOCK_METHOD1(onConfigUpdateFailed, void(const EnvoyException* e));
   MOCK_METHOD1(resourceName, std::string(const ProtobufWkt::Any& resource));
+};
+
+class MockConfigProviderManager : public ConfigProviderManager {
+public:
+  MockConfigProviderManager() = default;
+  ~MockConfigProviderManager() override = default;
+
+  MOCK_METHOD4(createXdsConfigProvider,
+               ConfigProviderPtr(const Protobuf::Message& config_source_proto,
+                                 Server::Configuration::FactoryContext& factory_context,
+                                 const std::string& stat_prefix,
+                                 const Envoy::Config::ConfigProviderManager::OptionalArg& optarg));
+  MOCK_METHOD3(createStaticConfigProvider,
+               ConfigProviderPtr(const Protobuf::Message& config_proto,
+                                 Server::Configuration::FactoryContext& factory_context,
+                                 const Envoy::Config::ConfigProviderManager::OptionalArg& optarg));
 };
 
 } // namespace Config

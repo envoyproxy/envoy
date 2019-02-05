@@ -173,7 +173,10 @@ public:
    * Must be called by derived classes when the onConfigUpdateFailed() callback associated with the
    * underlying subscription is issued.
    */
-  void onConfigUpdateFailed() { runInitializeCallbackIfAny(); }
+  void onConfigUpdateFailed() {
+    setLastUpdated();
+    runInitializeCallbackIfAny();
+  }
 
   /**
    * Determines whether a configuration proto is a new update, and if so, propagates it to all

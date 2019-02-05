@@ -366,11 +366,17 @@ void ConnectionManagerImpl::chargeTracingStats(const Tracing::Reason& tracing_re
 
 ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connection_manager)
     : connection_manager_(connection_manager),
-      snapped_route_config_(connection_manager.config_.routeConfigProvider().config()),
       stream_id_(connection_manager.random_generator_.random()),
       request_response_timespan_(new Stats::Timespan(
           connection_manager_.stats_.named_.downstream_rq_time_, connection_manager_.timeSystem())),
       stream_info_(connection_manager_.codec_->protocol(), connection_manager_.timeSystem()) {
+  if (connection_manager.config_.routeConfigProvider() != nullptr) {
+    snapped_route_config_ = connection_manager.config_.routeConfigProvider()->config();
+  }
+  if (connection_manager.config_.scopedRouteConfigProvider() != nullptr) {
+    snapped_scoped_route_config_ =
+        connection_manager_.config_.scopedRouteConfigProvider()->config<Router::ScopedConfig>();
+  }
   connection_manager_.stats_.named_.downstream_rq_total_.inc();
   connection_manager_.stats_.named_.downstream_rq_active_.inc();
   if (connection_manager_.codec_->protocol() == Protocol::Http2) {
@@ -1047,22 +1053,23 @@ void ConnectionManagerImpl::ActiveStream::sendLocalReply(
   if (!state_.created_filter_chain_) {
     createFilterChain();
   }
-  Utility::sendLocalReply(is_grpc_request,
-                          [this, modify_headers](HeaderMapPtr&& headers, bool end_stream) -> void {
-                            if (modify_headers != nullptr) {
-                              modify_headers(*headers);
-                            }
-                            response_headers_ = std::move(headers);
-                            // TODO: Start encoding from the last decoder filter that saw the
-                            // request instead.
-                            encodeHeaders(nullptr, *response_headers_, end_stream);
-                          },
-                          [this](Buffer::Instance& data, bool end_stream) -> void {
-                            // TODO: Start encoding from the last decoder filter that saw the
-                            // request instead.
-                            encodeData(nullptr, data, end_stream);
-                          },
-                          state_.destroyed_, code, body, grpc_status, is_head_request);
+  Utility::sendLocalReply(
+      is_grpc_request,
+      [this, modify_headers](HeaderMapPtr&& headers, bool end_stream) -> void {
+        if (modify_headers != nullptr) {
+          modify_headers(*headers);
+        }
+        response_headers_ = std::move(headers);
+        // TODO: Start encoding from the last decoder filter that saw the
+        // request instead.
+        encodeHeaders(nullptr, *response_headers_, end_stream);
+      },
+      [this](Buffer::Instance& data, bool end_stream) -> void {
+        // TODO: Start encoding from the last decoder filter that saw the
+        // request instead.
+        encodeData(nullptr, data, end_stream);
+      },
+      state_.destroyed_, code, body, grpc_status, is_head_request);
 }
 
 void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(

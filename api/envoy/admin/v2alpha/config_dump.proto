@@ -6,6 +6,7 @@ option java_package = "io.envoyproxy.envoy.admin.v2alpha";
 import "envoy/api/v2/cds.proto";
 import "envoy/api/v2/lds.proto";
 import "envoy/api/v2/rds.proto";
+import "envoy/api/v2/srds.proto";
 import "envoy/config/bootstrap/v2/bootstrap.proto";
 
 import "google/protobuf/any.proto";
@@ -174,4 +175,38 @@ message RoutesConfigDump {
 
   // The dynamically loaded route configs.
   repeated DynamicRouteConfig dynamic_route_configs = 3 [(gogoproto.nullable) = false];
+}
+
+// Envoy's scoped RDS implementation fills this message with all currently loaded route
+// configuration scopes (defined via ScopedRouteConfigurationsSet protos). This message lists both
+// the scopes defined inline with the higher order object (i.e., the HttpConnectionManager) and the
+// dynamically obtained scopes via the SRDS API.
+message ScopedRoutesConfigDump {
+  message InlineScopedRoutesConfig {
+    // The scoped routes config.
+    envoy.api.v2.ScopedRouteConfigurationsSet scoped_routes_config = 1;
+
+    // The timestamp when the scoped route config set was last updated.
+    google.protobuf.Timestamp last_updated = 2;
+  }
+
+  message DynamicScopedRoutesConfig {
+    // This is the per-resource version information. This version is currently taken from the
+    // :ref:`version_info <envoy_api_field_DiscoveryResponse.version_info>` field at the time that
+    // the scoped routes configuration was loaded.
+    string version_info = 1;
+
+    // The scoped routes config.
+    envoy.api.v2.ScopedRouteConfigurationsSet scoped_routes_config = 2;
+
+    // The timestamp when the scoped route config set was last updated.
+    google.protobuf.Timestamp last_updated = 3;
+  }
+
+  // The statically loaded scoped routes configs.
+  repeated InlineScopedRoutesConfig inline_scoped_routes_configs = 1 [(gogoproto.nullable) = false];
+
+  // The dynamically loaded scoped routes configs.
+  repeated DynamicScopedRoutesConfig dynamic_scoped_routes_configs = 2
+      [(gogoproto.nullable) = false];
 }

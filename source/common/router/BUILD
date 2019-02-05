@@ -94,6 +94,34 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "scoped_config_lib",
+    srcs = ["scoped_config_impl.cc"],
+    hdrs = ["scoped_config_impl.h"],
+    deps = [
+        ":config_lib",
+        "//include/envoy/router:scopes_interface",
+        "@envoy_api//envoy/api/v2:srds_cc",
+    ],
+)
+
+envoy_cc_library(
+    name = "scoped_rds_lib",
+    srcs = ["scoped_rds.cc"],
+    hdrs = ["scoped_rds.h"],
+    deps = [
+        ":scoped_config_lib",
+        "//include/envoy/config:subscription_interface",
+        "//include/envoy/stats:stats_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/config:config_provider_lib",
+        "//source/common/config:subscription_factory_lib",
+        "@envoy_api//envoy/admin/v2alpha:config_dump_cc",
+        "@envoy_api//envoy/api/v2:srds_cc",
+    ],
+)
+
+envoy_cc_library(
     name = "retry_state_lib",
     srcs = ["retry_state_impl.cc"],
     hdrs = ["retry_state_impl.h"],

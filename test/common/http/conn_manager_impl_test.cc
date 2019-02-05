@@ -74,8 +74,25 @@ public:
     std::shared_ptr<Router::MockConfig> route_config_{new NiceMock<Router::MockConfig>()};
   };
 
+  struct ScopedRouteConfigProvider : public Config::ConfigProvider {
+    ScopedRouteConfigProvider(TimeSource& time_source)
+        : config_(std::make_shared<Router::MockScopedConfig>()), time_source_(time_source) {}
+
+    ~ScopedRouteConfigProvider() override = default;
+
+    // Config::ConfigProvider
+    SystemTime lastUpdated() const override { return time_source_.systemTime(); }
+    const Protobuf::Message* getConfigProto() const override { return nullptr; }
+    std::string getConfigVersion() const override { return ""; }
+    ConfigConstSharedPtr getConfig() const override { return config_; }
+
+    std::shared_ptr<Router::MockScopedConfig> config_;
+    TimeSource& time_source_;
+  };
+
   HttpConnectionManagerImplTest()
-      : route_config_provider_(test_time_.timeSystem()), access_log_path_("dummy_path"),
+      : route_config_provider_(test_time_.timeSystem()),
+        scoped_route_config_provider_(test_time_.timeSystem()), access_log_path_("dummy_path"),
         access_logs_{
             AccessLog::InstanceSharedPtr{new Extensions::AccessLoggers::File::FileAccessLog(
                 access_log_path_, {}, AccessLog::AccessLogFormatUtils::defaultAccessLogFormatter(),
@@ -235,7 +252,10 @@ public:
   std::chrono::milliseconds streamIdleTimeout() const override { return stream_idle_timeout_; }
   std::chrono::milliseconds requestTimeout() const override { return request_timeout_; }
   std::chrono::milliseconds delayedCloseTimeout() const override { return delayed_close_timeout_; }
-  Router::RouteConfigProvider& routeConfigProvider() override { return route_config_provider_; }
+  Router::RouteConfigProvider* routeConfigProvider() override { return &route_config_provider_; }
+  Config::ConfigProvider* scopedRouteConfigProvider() override {
+    return &scoped_route_config_provider_;
+  }
   const std::string& serverName() override { return server_name_; }
   ConnectionManagerStats& stats() override { return stats_; }
   ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
@@ -259,6 +279,7 @@ public:
 
   DangerousDeprecatedTestTime test_time_;
   RouteConfigProvider route_config_provider_;
+  ScopedRouteConfigProvider scoped_route_config_provider_;
   NiceMock<Tracing::MockHttpTracer> tracer_;
   Http::ContextImpl http_context_;
   NiceMock<Runtime::MockLoader> runtime_;

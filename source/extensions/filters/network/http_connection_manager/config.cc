@@ -23,6 +23,7 @@
 #include "common/json/config_schemas.h"
 #include "common/protobuf/utility.h"
 #include "common/router/rds_impl.h"
+#include "common/router/scoped_rds.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -64,11 +65,48 @@ std::unique_ptr<Http::InternalAddressConfig> createInternalAddressConfig(
   return std::make_unique<Http::DefaultInternalAddressConfig>();
 }
 
+// Validates that HttpConnectionManager configuration correctly specifies routing configuration.
+void validateScopedRoutingAndRds(
+    const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
+        config) {
+  // NOTE: This validation can not be done via proto validators due to the conditionals involved.
+  if (config.scoped_routes_specifier_case() !=
+      envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
+          SCOPED_ROUTES_SPECIFIER_NOT_SET) {
+    // When scoped routing is enabled, RDS _must_ be used and subscriptions are dynamically
+    // generated based on the SRDS config.
+    if (config.route_specifier_case() !=
+        envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::kRds) {
+      throw EnvoyException(fmt::format("Error: RDS must be used when scoped routing is enabled"));
+    }
+
+    if (config.rds().subscription_specifier_case() !=
+            envoy::config::filter::network::http_connection_manager::v2::Rds::kScopedRdsTemplate ||
+        config.rds().scoped_rds_template() != true) {
+      throw EnvoyException(fmt::format(
+          "Error: the RDS subscription specifier must be set to scoped_rds_template=true "
+          "when scoped routing is enabled"));
+    }
+  } else {
+    // Scoped routing is not enabled, ensure a route configuration name is specified if RDS is
+    // used.
+    if (config.route_specifier_case() ==
+        envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::kRds) {
+      if (config.rds().subscription_specifier_case() !=
+          envoy::config::filter::network::http_connection_manager::v2::Rds::kRouteConfigName) {
+        throw EnvoyException(fmt::format(
+            "Error: RDS must specify a route_config_name when scoped routing is not enabled"));
+      }
+    }
+  }
+}
+
 } // namespace
 
 // Singleton registration via macro defined in envoy/singleton/manager.h
 SINGLETON_MANAGER_REGISTRATION(date_provider);
 SINGLETON_MANAGER_REGISTRATION(route_config_provider_manager);
+SINGLETON_MANAGER_REGISTRATION(scoped_routes_config_provider_manager);
 
 Network::FilterFactoryCb
 HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
@@ -88,14 +126,21 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
             return std::make_shared<Router::RouteConfigProviderManagerImpl>(context.admin());
           });
 
+  std::shared_ptr<Config::ConfigProviderManager> scoped_routes_config_provider_manager =
+      context.singletonManager().getTyped<Config::ConfigProviderManager>(
+          SINGLETON_MANAGER_REGISTERED_NAME(scoped_routes_config_provider_manager), [&context] {
+            return std::make_shared<Router::ScopedRoutesConfigProviderManager>(context.admin());
+          });
+
   std::shared_ptr<HttpConnectionManagerConfig> filter_config(new HttpConnectionManagerConfig(
-      proto_config, context, *date_provider, *route_config_provider_manager));
+      proto_config, context, *date_provider, *route_config_provider_manager,
+      *scoped_routes_config_provider_manager));
 
   // This lambda captures the shared_ptrs created above, thus preserving the
   // reference count. Moreover, keep in mind the capture list determines
   // destruction order.
-  return [route_config_provider_manager, filter_config, &context,
-          date_provider](Network::FilterManager& filter_manager) -> void {
+  return [route_config_provider_manager, scoped_routes_config_provider_manager, filter_config,
+          &context, date_provider](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(
         *filter_config, context.drainDecision(), context.random(), context.httpContext(),
         context.runtime(), context.localInfo(), context.clusterManager(),
@@ -126,7 +171,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
         config,
     Server::Configuration::FactoryContext& context, Http::DateProvider& date_provider,
-    Router::RouteConfigProviderManager& route_config_provider_manager)
+    Router::RouteConfigProviderManager& route_config_provider_manager,
+    Config::ConfigProviderManager& scoped_routes_config_provider_manager)
     : context_(context), reverse_encode_order_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
                              config, bugfix_reverse_encode_order, true)),
       stats_prefix_(fmt::format("http.{}.", config.stat_prefix())),
@@ -138,6 +184,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       xff_num_trusted_hops_(config.xff_num_trusted_hops()),
       skip_xff_append_(config.skip_xff_append()), via_(config.via()),
       route_config_provider_manager_(route_config_provider_manager),
+      scoped_routes_config_provider_manager_(scoped_routes_config_provider_manager),
       http2_settings_(Http::Utility::parseHttp2Settings(config.http2_protocol_options())),
       http1_settings_(Http::Utility::parseHttp1Settings(config.http_protocol_options())),
       max_request_headers_size_kb_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
@@ -153,9 +200,19 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
                                                                          context_.listenerScope())),
       proxy_100_continue_(config.proxy_100_continue()),
       delayed_close_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, delayed_close_timeout, 1000)) {
+  // Throws an exception on failure.
+  validateScopedRoutingAndRds(config);
 
-  route_config_provider_ = Router::RouteConfigProviderUtil::create(config, context_, stats_prefix_,
-                                                                   route_config_provider_manager_);
+  // If soped RDS is enabled, avoid creating a route config provider. Route config providers will be
+  // managed by the scoped routing logic instead.
+  if (config.rds().subscription_specifier_case() !=
+      envoy::config::filter::network::http_connection_manager::v2::Rds::kScopedRdsTemplate) {
+    route_config_provider_ = Router::RouteConfigProviderUtil::create(
+        config, context_, stats_prefix_, route_config_provider_manager_);
+  }
+
+  scoped_routes_config_provider_ = Router::ScopedRoutesConfigProviderUtil::maybeCreate(
+      config, context_, stats_prefix_, scoped_routes_config_provider_manager_);
 
   switch (config.forward_client_cert_details()) {
   case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::SANITIZE:
