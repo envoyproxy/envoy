@@ -36,6 +36,7 @@ envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings
 createConnPoolSettings() {
   envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings setting{};
   setting.mutable_op_timeout()->CopyFrom(Protobuf::util::TimeUtil::MillisecondsToDuration(20));
+  setting.set_enable_hashtagging(true);
   return setting;
 }
 
@@ -302,6 +303,7 @@ TEST_F(RedisClientImplTest, ConnectFail) {
 class ConfigOutlierDisabled : public Config {
   bool disableOutlierEvents() const override { return true; }
   std::chrono::milliseconds opTimeout() const override { return std::chrono::milliseconds(25); }
+  bool enableHashtagging() const override { return false; }
 };
 
 TEST_F(RedisClientImplTest, OutlierDisabled) {
@@ -446,6 +448,37 @@ TEST_F(RedisConnPoolImplTest, Basic) {
   EXPECT_EQ(&active_request, request);
 
   EXPECT_CALL(*client, close());
+  tls_.shutdownThread();
+};
+
+TEST_F(RedisConnPoolImplTest, Hashtagging) {
+  InSequence s;
+
+  setup();
+
+  RespValue value;
+  MockPoolCallbacks callbacks;
+
+  auto expectHashKey = [](const std::string& s) {
+    return [s](Upstream::LoadBalancerContext* context) -> Upstream::HostConstSharedPtr {
+      EXPECT_EQ(context->computeHashKey().value(), MurmurHash::murmurHash2_64(s));
+      return nullptr;
+    };
+  };
+
+  EXPECT_CALL(cm_.thread_local_cluster_.lb_, chooseHost(_)).WillOnce(Invoke(expectHashKey("foo")));
+  conn_pool_->makeRequest("{foo}.bar", value, callbacks);
+
+  EXPECT_CALL(cm_.thread_local_cluster_.lb_, chooseHost(_))
+      .WillOnce(Invoke(expectHashKey("foo{}{bar}")));
+  conn_pool_->makeRequest("foo{}{bar}", value, callbacks);
+
+  EXPECT_CALL(cm_.thread_local_cluster_.lb_, chooseHost(_)).WillOnce(Invoke(expectHashKey("{bar")));
+  conn_pool_->makeRequest("foo{{bar}}zap", value, callbacks);
+
+  EXPECT_CALL(cm_.thread_local_cluster_.lb_, chooseHost(_)).WillOnce(Invoke(expectHashKey("bar")));
+  conn_pool_->makeRequest("foo{bar}{zap}", value, callbacks);
+
   tls_.shutdownThread();
 };
 

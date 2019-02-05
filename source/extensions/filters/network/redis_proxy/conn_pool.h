@@ -94,6 +94,12 @@ public:
    * passive healthcheck operations.
    */
   virtual bool disableOutlierEvents() const PURE;
+
+  /**
+   * @return when enabled, a hash tagging function will be used to guarantee that keys with the
+   * same hash tag will be forwarded to the same upstream.
+   */
+  virtual bool enableHashtagging() const PURE;
 };
 
 /**

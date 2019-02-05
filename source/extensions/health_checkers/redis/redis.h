@@ -57,6 +57,7 @@ private:
       // Allow the main Health Check infra to control timeout.
       return parent_.timeout_ * 2;
     }
+    bool enableHashtagging() const override { return false; }
 
     // Extensions::NetworkFilters::RedisProxy::ConnPool::PoolCallbacks
     void onResponse(Extensions::NetworkFilters::RedisProxy::RespValuePtr&& value) override;

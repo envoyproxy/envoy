@@ -31,6 +31,18 @@ message RedisProxy {
     // is ready.
     google.protobuf.Duration op_timeout = 1
         [(validate.rules).duration.required = true, (gogoproto.stdduration) = true];
+
+    // Use hash tagging on every redis key to guarantee that keys with the same hash tag will be
+    // forwarded to the same upstream. The hash key used for determining the upstream in a
+    // consistent hash ring configuration will be computed from the hash tagged key instead of the
+    // whole key. The algorithm used to compute the hash tag is identical to the `redis-cluster
+    // implementation <https://redis.io/topics/cluster-spec#keys-hash-tags>`_.
+    //
+    // Examples:
+    //
+    // * '{user1000}.following' and '{user1000}.followers' **will** be sent to the same upstream
+    // * '{user1000}.following' and '{user1001}.following' **might** be sent to the same upstream
+    bool enable_hashtagging = 2;
   }
 
   // Network settings for the connection pool to the upstream cluster.
