@@ -23,7 +23,6 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "debug_recursion_checker_lib",
-    srcs = [],
     hdrs = ["debug_recursion_checker.h"],
     deps = [":assert_lib"],
 )

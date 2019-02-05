@@ -182,7 +182,9 @@ TEST_F(ConnPoolMapImplTest, ClearDefersDelete) {
 
 // The following tests only die in debug builds, so don't run them if this isn't one.
 #if !defined(NDEBUG)
-TEST_F(ConnPoolMapImplTest, ReentryClearTripsAssert) {
+class ConnPoolMapImplDeathTest : public ConnPoolMapImplTest {};
+
+TEST_F(ConnPoolMapImplDeathTest, ReentryClearTripsAssert) {
   TestMapPtr test_map = makeTestMap();
 
   test_map->getPool(1, getBasicFactory());
@@ -193,7 +195,7 @@ TEST_F(ConnPoolMapImplTest, ReentryClearTripsAssert) {
                              ".*Details: A resource should only be entered once");
 }
 
-TEST_F(ConnPoolMapImplTest, ReentryGetPoolTripsAssert) {
+TEST_F(ConnPoolMapImplDeathTest, ReentryGetPoolTripsAssert) {
   TestMapPtr test_map = makeTestMap();
 
   test_map->getPool(1, getBasicFactory());
@@ -205,7 +207,7 @@ TEST_F(ConnPoolMapImplTest, ReentryGetPoolTripsAssert) {
       ".*Details: A resource should only be entered once");
 }
 
-TEST_F(ConnPoolMapImplTest, ReentryDrainConnectionsTripsAssert) {
+TEST_F(ConnPoolMapImplDeathTest, ReentryDrainConnectionsTripsAssert) {
   TestMapPtr test_map = makeTestMap();
 
   test_map->getPool(1, getBasicFactory());
@@ -217,7 +219,7 @@ TEST_F(ConnPoolMapImplTest, ReentryDrainConnectionsTripsAssert) {
       ".*Details: A resource should only be entered once");
 }
 
-TEST_F(ConnPoolMapImplTest, ReentryAddDrainedCallbackTripsAssert) {
+TEST_F(ConnPoolMapImplDeathTest, ReentryAddDrainedCallbackTripsAssert) {
   TestMapPtr test_map = makeTestMap();
 
   test_map->getPool(1, getBasicFactory());

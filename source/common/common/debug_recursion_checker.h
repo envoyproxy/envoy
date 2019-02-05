@@ -5,7 +5,7 @@
 namespace Envoy {
 namespace Common {
 /**
- * A helper class to prevent re-entry into a non-reentrant class.
+ * A helper class to assert that a call is not recursive.
  */
 class DebugRecursionChecker {
 public:
