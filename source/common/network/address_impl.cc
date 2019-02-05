@@ -161,7 +161,8 @@ IoHandlePtr InstanceBase::socketFromSocketType(SocketType socketType) const {
   }
 
   IoHandlePtr io_handle = std::make_unique<IoSocketHandle>(::socket(domain, flags, 0));
-  RELEASE_ASSERT(io_handle->fd() != -1, "");
+  RELEASE_ASSERT(
+      io_handle->fd() != -1, fmt::format("socket(2) failed, got error: {}", strerror(errno)));
 
 #ifdef __APPLE__
   // Cannot set SOCK_NONBLOCK as a ::socket flag.
