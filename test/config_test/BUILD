@@ -44,5 +44,6 @@ envoy_cc_test_library(
         "//test/mocks/server:server_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/test_common:threadsafe_singleton_injector_lib",
+        "//test/test_common:simulated_time_system_lib",
     ] + envoy_all_extensions(),
 )

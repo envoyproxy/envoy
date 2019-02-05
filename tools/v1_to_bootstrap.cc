@@ -12,6 +12,7 @@
 
 #include "common/api/api_impl.h"
 #include "common/config/bootstrap_json.h"
+#include "common/event/real_time_system.h"
 #include "common/json/json_loader.h"
 #include "common/protobuf/utility.h"
 #include "common/stats/isolated_store_impl.h"
@@ -28,8 +29,9 @@ int main(int argc, char** argv) {
 
   Envoy::PlatformImpl platform_impl_;
   Envoy::Stats::IsolatedStoreImpl stats_store;
-  Envoy::Api::Impl api(std::chrono::milliseconds(1000), platform_impl_.threadFactory(),
-                       stats_store);
+  Envoy::Event::RealTimeSystem time_system; // NO_CHECK_FORMAT(real_time)
+  Envoy::Api::Impl api(std::chrono::milliseconds(1000), platform_impl_.threadFactory(), stats_store,
+                       time_system);
 
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
   auto config_json = Envoy::Json::Factory::loadFromFile(argv[1], api);
