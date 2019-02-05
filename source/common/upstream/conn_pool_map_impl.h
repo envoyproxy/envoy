@@ -6,8 +6,9 @@ namespace Envoy {
 namespace Upstream {
 
 template <typename KEY_TYPE, typename POOL_TYPE>
-ConnPoolMap<KEY_TYPE, POOL_TYPE>::ConnPoolMap(Envoy::Event::Dispatcher& dispatcher)
-    : thread_local_dispatcher_(dispatcher) {}
+ConnPoolMap<KEY_TYPE, POOL_TYPE>::ConnPoolMap(Envoy::Event::Dispatcher& dispatcher,
+                                              absl::optional<uint64_t> max_size)
+    : thread_local_dispatcher_(dispatcher), max_size_(max_size) {}
 
 template <typename KEY_TYPE, typename POOL_TYPE>
 ConnPoolMap<KEY_TYPE, POOL_TYPE>::~ConnPoolMap() = default;

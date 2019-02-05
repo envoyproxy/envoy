@@ -28,7 +28,7 @@ public:
   using TestMap = ConnPoolMap<int, Http::ConnectionPool::Instance>;
   using TestMapPtr = std::unique_ptr<TestMap>;
 
-  TestMapPtr makeTestMap() { return std::make_unique<TestMap>(dispatcher_); }
+  TestMapPtr makeTestMap() { return std::make_unique<TestMap>(dispatcher_, absl::nullopt); }
 
   TestMap::PoolFactory getBasicFactory() {
     return [&]() {

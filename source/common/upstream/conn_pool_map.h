@@ -7,6 +7,7 @@
 #include "common/common/debug_recursion_checker.h"
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -18,7 +19,7 @@ public:
   using PoolFactory = std::function<std::unique_ptr<POOL_TYPE>()>;
   using DrainedCb = std::function<void()>;
 
-  ConnPoolMap(Event::Dispatcher& dispatcher);
+  ConnPoolMap(Event::Dispatcher& dispatcher, absl::optional<uint64_t> max_size);
   ~ConnPoolMap();
   /**
    * Returns an existing pool for `key`, or creates a new one using `factory`. Note that it is
@@ -55,6 +56,7 @@ private:
   Event::Dispatcher& thread_local_dispatcher_;
   std::vector<DrainedCb> cached_callbacks_;
   Common::DebugRecursionChecker recursion_checker_;
+  absl::optional<uint64_t> max_size_;
 };
 
 } // namespace Upstream
