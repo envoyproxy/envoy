@@ -5,6 +5,9 @@ syntax = "proto3";
 // sequences on a socket.
 
 package envoy.data.tap.v2alpha;
+
+option java_outer_classname = "TransportProto";
+option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.data.tap.v2alpha";
 option go_package = "v2";
 
