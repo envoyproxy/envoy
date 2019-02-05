@@ -73,7 +73,7 @@ void IntegrationTestServer::start(const Network::Address::IpVersion version,
 
   // If any steps need to be done prior to workers starting, do them now. E.g., xDS pre-init.
   // Note that there is no synchronization guaranteeing this happens either
-  // before workers starting or after server start. Any needed synchornization must occur in the
+  // before workers starting or after server start. Any needed synchronization must occur in the
   // routines. These steps are executed at this point in the code to allow server initialization to
   // be dependent on them (e.g. control plane peers).
   if (server_init_coroutines != nullptr) {
