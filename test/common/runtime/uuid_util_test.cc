@@ -7,9 +7,9 @@
 
 namespace Envoy {
 
-namespace TestBaseSubclass {
+using UUIDUtilsTest = TestBase;
 
-TEST_E(UUIDUtilsTest, mod, {
+TEST_F(UUIDUtilsTest, mod) {
   uint64_t result;
   EXPECT_TRUE(UuidUtils::uuidModBy("00000000-0000-0000-0000-000000000000", result, 100));
   EXPECT_EQ(0, result);
@@ -36,9 +36,9 @@ TEST_E(UUIDUtilsTest, mod, {
 
   EXPECT_TRUE(UuidUtils::uuidModBy("ffffffff-0012-0110-00ff-0c00400600ff", result, 10000));
   EXPECT_EQ(7295, result);
-})
+}
 
-TEST_E(UUIDUtilsTest, checkDistribution, {
+TEST_F(UUIDUtilsTest, checkDistribution) {
   Runtime::RandomGeneratorImpl random;
 
   const int mod = 100;
@@ -63,17 +63,17 @@ TEST_E(UUIDUtilsTest, checkDistribution, {
   }
 
   EXPECT_NEAR(required_percentage / 100.0, interesting_samples * 1.0 / total_samples, 0.002);
-})
+}
 
-TEST_E(UUIDUtilsTest, DISABLED_benchmark, {
+TEST_F(UUIDUtilsTest, DISABLED_benchmark) {
   Runtime::RandomGeneratorImpl random;
 
   for (int i = 0; i < 100000000; ++i) {
     random.uuid();
   }
-})
+}
 
-TEST_E(UUIDUtilsTest, setAndCheckTraceable, {
+TEST_F(UUIDUtilsTest, setAndCheckTraceable) {
   Runtime::RandomGeneratorImpl random;
 
   std::string uuid = random.uuid();
@@ -93,8 +93,6 @@ TEST_E(UUIDUtilsTest, setAndCheckTraceable, {
 
   std::string invalid_uuid = "";
   EXPECT_FALSE(UuidUtils::setTraceableUuid(invalid_uuid, UuidTraceStatus::Forced));
-})
-
-} // namespace TestBaseSubclass
+}
 
 } // namespace Envoy
