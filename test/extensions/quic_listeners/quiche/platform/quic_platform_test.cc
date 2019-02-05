@@ -2,6 +2,7 @@
 
 #include "quiche/quic/platform/api/quic_aligned.h"
 #include "quiche/quic/platform/api/quic_arraysize.h"
+#include "quiche/quic/platform/api/quic_client_stats.h"
 #include "quiche/quic/platform/api/quic_containers.h"
 #include "quiche/quic/platform/api/quic_endian.h"
 #include "quiche/quic/platform/api/quic_estimate_memory_usage.h"
@@ -27,6 +28,19 @@ TEST(QuicPlatformTest, QuicAlignOf) { EXPECT_LT(0, QUIC_ALIGN_OF(int)); }
 TEST(QuicPlatformTest, QuicArraysize) {
   int array[] = {0, 1, 2, 3, 4};
   EXPECT_EQ(5, QUIC_ARRAYSIZE(array));
+}
+
+enum class TestEnum { ZERO = 0, ONE, TWO, COUNT };
+
+TEST(QuicPlatformTest, QuicClientStats) {
+  // Just make sure they compile.
+  QUIC_CLIENT_HISTOGRAM_ENUM("my.enum.histogram", TestEnum::ONE, TestEnum::COUNT, "doc");
+  QUIC_CLIENT_HISTOGRAM_BOOL("my.bool.histogram", false, "doc");
+  QUIC_CLIENT_HISTOGRAM_TIMES("my.timing.histogram", quic::QuicTime::Delta::FromSeconds(5),
+                              quic::QuicTime::Delta::FromSeconds(1),
+                              quic::QuicTime::Delta::FromSecond(3600), 100, "doc");
+  QUIC_CLIENT_HISTOGRAM_COUNTS("my.count.histogram", 123, 0, 1000, 100, "doc");
+  quic::QuicClientSparseHistogram("my.sparse.histogram", 345);
 }
 
 TEST(QuicPlatformTest, QuicUnorderedMap) {

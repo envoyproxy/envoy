@@ -140,8 +140,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       route_config_provider_manager_(route_config_provider_manager),
       http2_settings_(Http::Utility::parseHttp2Settings(config.http2_protocol_options())),
       http1_settings_(Http::Utility::parseHttp1Settings(config.http_protocol_options())),
-      max_request_headers_size_kb_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-          config, max_request_headers_kb, Http::DEFAULT_MAX_REQUEST_HEADERS_SIZE_KB)),
+      max_request_headers_kb_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          config, max_request_headers_kb, Http::DEFAULT_MAX_REQUEST_HEADERS_KB)),
       idle_timeout_(PROTOBUF_GET_OPTIONAL_MS(config, idle_timeout)),
       stream_idle_timeout_(
           PROTOBUF_GET_MS_OR_DEFAULT(config, stream_idle_timeout, StreamIdleTimeoutMs)),
@@ -326,10 +326,11 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
         new Http::Http1::ServerConnectionImpl(connection, callbacks, http1_settings_)};
   case CodecType::HTTP2:
     return Http::ServerConnectionPtr{new Http::Http2::ServerConnectionImpl(
-        connection, callbacks, context_.scope(), http2_settings_)};
+        connection, callbacks, context_.scope(), http2_settings_, maxRequestHeadersKb())};
   case CodecType::AUTO:
-    return Http::ConnectionManagerUtility::autoCreateCodec(
-        connection, data, callbacks, context_.scope(), http1_settings_, http2_settings_);
+    return Http::ConnectionManagerUtility::autoCreateCodec(connection, data, callbacks,
+                                                           context_.scope(), http1_settings_,
+                                                           http2_settings_, maxRequestHeadersKb());
   }
 
   NOT_REACHED_GCOVR_EXCL_LINE;

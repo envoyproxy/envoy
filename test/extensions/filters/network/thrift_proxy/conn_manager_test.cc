@@ -73,7 +73,7 @@ public:
 class ThriftConnectionManagerTest : public TestBase {
 public:
   ThriftConnectionManagerTest() : stats_(ThriftFilterStats::generateStats("test.", store_)) {}
-  ~ThriftConnectionManagerTest() {
+  ~ThriftConnectionManagerTest() override {
     filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
   }
 

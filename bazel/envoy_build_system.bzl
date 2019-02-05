@@ -592,3 +592,9 @@ def envoy_select_boringssl(if_fips, default = None):
         "@envoy//bazel:boringssl_fips": if_fips,
         "//conditions:default": default or [],
     })
+
+def envoy_select_quiche(xs, repository = ""):
+    return select({
+        repository + "//bazel:enable_quiche": xs,
+        "//conditions:default": [],
+    })
