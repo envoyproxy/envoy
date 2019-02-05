@@ -60,8 +60,7 @@ protected:
   ListenerManagerImplTest() : api_(Api::createApiForTest(stats_)) {
     ON_CALL(server_, api()).WillByDefault(ReturnRef(*api_));
     EXPECT_CALL(worker_factory_, createWorker_()).WillOnce(Return(worker_));
-    manager_ = std::make_unique<ListenerManagerImpl>(server_, listener_factory_, worker_factory_,
-                                                     time_system_);
+    manager_ = std::make_unique<ListenerManagerImpl>(server_, listener_factory_, worker_factory_);
   }
 
   /**
