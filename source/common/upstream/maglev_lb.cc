@@ -70,6 +70,7 @@ MaglevTable::MaglevTable(const HostsPerLocality& hosts_per_locality,
       // it had weight equal to backend_weight_scale / 3, then this would only
       // happen every 3 iterations, etc.
       if (iteration * entry.weight_ < entry.counts_) {
+        ASSERT(max_host_weight > 1);
         continue;
       }
       entry.counts_ += max_host_weight;
