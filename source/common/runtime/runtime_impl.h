@@ -48,6 +48,7 @@ public:
   COUNTER(override_dir_not_exists)                                                                 \
   COUNTER(override_dir_exists)                                                                     \
   COUNTER(load_success)                                                                            \
+  COUNTER(deprecated_feature_use)                                                                \
   GAUGE  (num_keys)                                                                                \
   GAUGE  (admin_overrides_active)
 // clang-format on
@@ -100,6 +101,7 @@ private:
   const std::vector<OverrideLayerConstPtr> layers_;
   EntryMap values_;
   RandomGenerator& generator_;
+  RuntimeStats& stats_;
 };
 
 /**

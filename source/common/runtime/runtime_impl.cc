@@ -150,7 +150,12 @@ bool SnapshotImpl::deprecatedFeatureEnabled(const std::string& key) const {
   ASSERT(absl::StartsWith(key, "envoy.deprecated_feature."));
   bool disallowed_by_default = DisallowedFeaturesDefaults::get().disallowedByDefault(key);
   int default_value = disallowed_by_default ? 0 : 100;
-  return getInteger(key, default_value) == 100;
+  if (getInteger(key, default_value) == 100) {
+    // It is assumed this check is called when the feature is about to be used.
+    stats_.deprecated_feature_use_.inc();
+    return true;
+  }
+  return false;
 }
 
 bool SnapshotImpl::featureEnabled(const std::string& key, uint64_t default_value,
@@ -227,7 +232,7 @@ const std::vector<Snapshot::OverrideLayerConstPtr>& SnapshotImpl::getLayers() co
 
 SnapshotImpl::SnapshotImpl(RandomGenerator& generator, RuntimeStats& stats,
                            std::vector<OverrideLayerConstPtr>&& layers)
-    : layers_{std::move(layers)}, generator_{generator} {
+    : layers_{std::move(layers)}, generator_{generator}, stats_{stats} {
   for (const auto& layer : layers_) {
     for (const auto& kv : layer->values()) {
       values_.erase(kv.first);

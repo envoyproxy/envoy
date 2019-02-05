@@ -396,6 +396,8 @@ TEST_F(DeprecatedFieldsTest, IndividualFieldDisallowedWithRuntimeOverride) {
   EXPECT_THROW_WITH_REGEX(
       MessageUtil::checkForDeprecation(base), ProtoValidationException,
       "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated_fatal'.");
+  // The config will be rejected, so the feature will not be used.
+  EXPECT_EQ(0, store_.gauge("runtime.deprecated_feature_use").value());
 
   // Now create a new snapshot with this feature allowed.
   Runtime::LoaderSingleton::getExisting()->mergeValues(
@@ -405,9 +407,23 @@ TEST_F(DeprecatedFieldsTest, IndividualFieldDisallowedWithRuntimeOverride) {
   EXPECT_LOG_CONTAINS(
       "warning", "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated_fatal'.",
       MessageUtil::checkForDeprecation(base));
+  EXPECT_EQ(1, store_.gauge("runtime.deprecated_feature_use").value());
 }
 
-// FIXME mix of warn and throw.
+// Note that given how Envoy config parsing works, the first time we hit a
+// 'fatal' error and throw, we won't log future warnings. That said, this tests
+// the case of the warning occuring before the fatal error.
+TEST_F(DeprecatedFieldsTest, MixOfFatalAndWarnings) {
+  envoy::test::deprecation_test::Base base;
+  base.set_is_deprecated("foo");
+  base.set_is_deprecated_fatal("foo");
+  EXPECT_LOG_CONTAINS(
+      "warning", "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated'.", {
+        EXPECT_THROW_WITH_REGEX(
+            MessageUtil::checkForDeprecation(base), ProtoValidationException,
+            "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated_fatal'.");
+      });
+}
 
 // Present (unused) deprecated messages should be detected as deprecated.
 TEST_F(DeprecatedFieldsTest, MessageDeprecated) {
@@ -416,6 +432,7 @@ TEST_F(DeprecatedFieldsTest, MessageDeprecated) {
   EXPECT_LOG_CONTAINS(
       "warning", "Using deprecated option 'envoy.test.deprecation_test.Base.deprecated_message'.",
       MessageUtil::checkForDeprecation(base));
+  EXPECT_EQ(1, store_.gauge("runtime.deprecated_feature_use").value());
 }
 
 TEST_F(DeprecatedFieldsTest, InnerMessageDeprecated) {

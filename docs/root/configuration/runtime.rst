@@ -79,6 +79,29 @@ old tree to the new runtime tree, using the equivalent of the following command:
 
 It's beyond the scope of this document how the file system data is deployed, garbage collected, etc.
 
+Using runtime overrides for deprecated features
+-----------------------------------------------
+
+The Envoy runtime is also a part of the Envoy feature deprecation process.
+
+As described in the Envoy `breaking change policy <//github.com/envoyproxy/envoy/blob/master/CONTRIBUTING.md#breaking-change-policy>`_,
+feature deprecation in Envoy is in 3 phases: warn-by-default, fail-by-default, and code removal.
+
+In the first phase, Envoy simply logs a warning to the warning log that the feature is deprecated.
+Users are encouraged to go to
+`DEPRECATED.md <https://github.com/envoyproxy/envoy/blob/master/DEPRECATED.md>` to see how to
+migrate to the new code path and make sure it is suitable for their use case.
+
+In the second phase the full configuration name Foo.Bar.Eep will be added to
+`runtime_features.h <https://github.com/envoyproxy/envoy/blob/master/source/common/runtime/runtime_features.h>`
+and use of that configuration field will cause the config to be rejected by default. 
+This fail-by-default mode can be overridden in runtime configuration for a proto styled
+``Foo.Bar.Eep``, by setting the runtime value ``envoy.deprecated_features.Eep 100`` but use of this
+is **strongly discouraged**. Fatal-by-default configuration indicates that the removal of the
+old code paths is imminent. It is far better for both Envoy users and for Envoy contributors if any
+bugs or feature gaps with the new code paths are flushed out ahead of time, rather than after the
+code is removed!
+
 Statistics
 ----------
 
@@ -92,4 +115,8 @@ The file system runtime provider emits some statistics in the *runtime.* namespa
   override_dir_not_exists, Counter, Total number of loads that did not use an override directory
   override_dir_exists, Counter, Total number of loads that did use an override directory
   load_success, Counter, Total number of load attempts that were successful
+  deprecated_feature_use, Counter, Total number of times deprecated features were used.
   num_keys, Gauge, Number of keys currently loaded
+
+
+
