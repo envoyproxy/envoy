@@ -9,9 +9,8 @@ api_proto_library_internal(
     ],
     has_services = 1,
     deps = [
-        ":attribute_context",
         "//envoy/api/v2/core:base",
-        "//envoy/service/v2/auth:attribute_context",
+        "//envoy/service/auth/v2:external_auth",
         "//envoy/type:http_status",
     ],
 )

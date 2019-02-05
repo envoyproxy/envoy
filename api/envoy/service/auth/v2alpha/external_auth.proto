@@ -5,12 +5,7 @@ option java_package = "io.envoyproxy.envoy.service.auth.v2alpha";
 option go_package = "v2alpha";
 option java_generic_services = true;
 
-import "envoy/api/v2/core/base.proto";
-import "envoy/type/http_status.proto";
-import "envoy/service/auth/v2/attribute_context.proto";
-
-import "google/rpc/status.proto";
-import "validate/validate.proto";
+import "envoy/service/auth/v2/external_auth.proto";
 
 // [#protodoc-title: Authorization Service ]
 
@@ -22,5 +17,5 @@ import "validate/validate.proto";
 service Authorization {
   // Performs authorization check based on the attributes associated with the
   // incoming request, and returns status `OK` or not `OK`.
-  rpc Check(CheckRequest) returns (CheckResponse);
+  rpc Check(v2.CheckRequest) returns (v2.CheckResponse);
 }
