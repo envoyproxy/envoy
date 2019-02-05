@@ -10,6 +10,12 @@ DangerousDeprecatedTestTime::DangerousDeprecatedTestTime() {}
 
 namespace Event {
 
+TestTimeSystem& GlobalTimeSystem::timeSystem() {
+  // TODO(#4160): Switch default to SimulatedTimeSystem.
+  auto make_real_time_system = []() -> TestTimeSystem* { return new TestRealTimeSystem; };
+  return *singleton_->timeSystem(make_real_time_system);
+}
+
 void TestRealTimeSystem::sleep(const Duration& duration) { std::this_thread::sleep_for(duration); }
 
 Thread::CondVar::WaitStatus TestRealTimeSystem::waitFor(Thread::MutexBasicLockable& lock,

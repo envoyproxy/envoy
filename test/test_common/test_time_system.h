@@ -61,15 +61,13 @@ class SingletonTimeSystemHelper {
 public:
   SingletonTimeSystemHelper() : time_system_(nullptr) {}
 
-  void set(TestTimeSystem* time_system) {
-    RELEASE_ASSERT(time_system_ == nullptr, "Unexpected reset of SingletonTimeSystemHelper");
-    time_system_.reset(time_system);
-  }
+  using MakeTimeSystemFn = std::function<TestTimeSystem*()>;
 
-  TestTimeSystem* timeSystem() { return time_system_.get(); }
+  TestTimeSystem* timeSystem(const MakeTimeSystemFn& make_time_system);
 
 private:
   std::unique_ptr<TestTimeSystem> time_system_;
+  Thread::MutexBasicLockable mutex_;
 };
 
 // Implements the TestTimeSystem interface, delegating implementation of all
@@ -107,14 +105,9 @@ template <class TimeSystemVariant>
 class DelegatingTestTimeSystem : public DelegatingTestTimeSystemBase<TimeSystemVariant> {
 public:
   DelegatingTestTimeSystem() {
-    TestTimeSystem* time_system = singleton_->timeSystem();
-    if (time_system == nullptr) {
-      time_system_ = new TimeSystemVariant;
-      singleton_->set(time_system_);
-    } else {
-      time_system_ = dynamic_cast<TimeSystemVariant*>(time_system);
-      RELEASE_ASSERT(time_system_, "Two different types of time-systems allocated");
-    }
+    auto make_time_system = []() -> TestTimeSystem* { return new TimeSystemVariant; };
+    time_system_ = dynamic_cast<TimeSystemVariant*>(singleton_->timeSystem(make_time_system));
+    RELEASE_ASSERT(time_system_, "Two different types of time-systems allocated");
   }
 
   TimeSystemVariant& timeSystem() override { return *time_system_; }
