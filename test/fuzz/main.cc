@@ -52,10 +52,10 @@ int main(int argc, char** argv) {
   RELEASE_ASSERT(argc >= 2, "");
   // Consider any file after the test path which doesn't have a - prefix to be a corpus entry.
   uint32_t input_args = 0;
-  Envoy::Stats::IsolatedStoreImpl stats_store;
   // Ensure we cleanup API resources before we jump into the tests, the test API creates a singleton
   // time system that we don't want to leak into gtest.
   {
+    Envoy::Stats::IsolatedStoreImpl stats_store;
     Envoy::Api::ApiPtr api = Envoy::Api::createApiForTest(stats_store);
     for (int i = 1; i < argc; ++i) {
       const std::string arg{argv[i]};
