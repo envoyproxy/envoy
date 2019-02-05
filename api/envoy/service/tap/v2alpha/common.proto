@@ -5,6 +5,9 @@ import "envoy/api/v2/route/route.proto";
 import "validate/validate.proto";
 
 package envoy.service.tap.v2alpha;
+
+option java_outer_classname = "CommonProto";
+option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.service.tap.v2alpha";
 
 // [#protodoc-title: Common tap configuration]

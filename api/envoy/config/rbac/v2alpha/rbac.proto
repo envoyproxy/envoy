@@ -7,6 +7,9 @@ import "envoy/type/matcher/metadata.proto";
 import "envoy/type/matcher/string.proto";
 
 package envoy.config.rbac.v2alpha;
+
+option java_outer_classname = "RbacProto";
+option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.config.rbac.v2alpha";
 option go_package = "v2alpha";
 

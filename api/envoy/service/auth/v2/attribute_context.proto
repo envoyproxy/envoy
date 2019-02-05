@@ -1,6 +1,9 @@
 syntax = "proto3";
 
 package envoy.service.auth.v2;
+
+option java_outer_classname = "AttributeContextProto";
+option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.service.auth.v2";
 
 import "envoy/api/v2/core/address.proto";

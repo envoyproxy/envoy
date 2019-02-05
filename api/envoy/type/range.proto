@@ -1,6 +1,9 @@
 syntax = "proto3";
 
 package envoy.type;
+
+option java_outer_classname = "RangeProto";
+option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.type";
 option go_package = "envoy_type";
 

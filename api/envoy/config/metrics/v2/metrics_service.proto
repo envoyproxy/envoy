@@ -3,6 +3,9 @@ syntax = "proto3";
 // [#protodoc-title: Metrics service]
 
 package envoy.config.metrics.v2;
+
+option java_outer_classname = "MetricsServiceProto";
+option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.config.metrics.v2";
 
 import "envoy/api/v2/core/grpc_service.proto";
