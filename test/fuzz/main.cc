@@ -73,6 +73,9 @@ int main(int argc, char** argv) {
   for (size_t i = 0; i < Envoy::test_corpus_.size(); ++i) {
     argv[i + 1] = argv[i + 1 + input_args];
   }
+  // Cleanup before we jump into the tests, the test API creates a singleton time system that we
+  // don't want to leak into gtest.
+  api.reset();
 
   testing::InitGoogleTest(&argc, argv);
   Envoy::Fuzz::Runner::setupEnvironment(argc, argv, spdlog::level::info);
