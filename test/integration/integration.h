@@ -132,20 +132,15 @@ class BaseIntegrationTest : Logger::Loggable<Logger::Id::testing> {
 public:
   using TestTimeSystemPtr = std::unique_ptr<Event::TestTimeSystem>;
 
-  BaseIntegrationTest(Network::Address::IpVersion version, TestTimeSystemPtr time_system,
+  BaseIntegrationTest(Network::Address::IpVersion version,
                       const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG);
+  BaseIntegrationTest(Network::Address::IpVersion version, TestTimeSystemPtr,
+                      const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG)
+      : BaseIntegrationTest(version, config) {}
 
   virtual ~BaseIntegrationTest() {}
 
-  /**
-   * Helper function to create a simulated time integration test during construction.
-   */
-  static TestTimeSystemPtr simTime() { return std::make_unique<Event::SimulatedTimeSystem>(); }
-
-  /**
-   * Helper function to create a wall-clock time integration test during construction.
-   */
-  static TestTimeSystemPtr realTime() { return std::make_unique<Event::TestRealTimeSystem>(); }
+  static TestTimeSystemPtr realTime() { return TestTimeSystemPtr(); }
 
   // Initialize the basic proto configuration, create fake upstreams, and start Envoy.
   virtual void initialize();
@@ -182,7 +177,7 @@ public:
   void createApiTestServer(const ApiFilesystemConfig& api_filesystem_config,
                            const std::vector<std::string>& port_names);
 
-  Event::TestTimeSystem& timeSystem() { return *time_system_; }
+  Event::TestTimeSystem& timeSystem() { return time_system_; }
 
   Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
@@ -210,7 +205,7 @@ public:
   }
 
 private:
-  TestTimeSystemPtr time_system_;
+  Event::GlobalTimeSystem time_system_;
 
 public:
   Event::DispatcherPtr dispatcher_;

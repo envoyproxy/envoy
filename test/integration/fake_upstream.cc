@@ -374,7 +374,7 @@ FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket
                            Event::TestTimeSystem& time_system, bool enable_half_close)
     : http_type_(type), socket_(std::move(listen_socket)),
       api_(Api::createApiForTest(stats_store_)), time_system_(time_system),
-      dispatcher_(api_->allocateDispatcher(time_system_)),
+      dispatcher_(api_->allocateDispatcher()),
       handler_(new Server::ConnectionHandlerImpl(ENVOY_LOGGER(), *dispatcher_)),
       allow_unexpected_disconnects_(false), enable_half_close_(enable_half_close), listener_(*this),
       filter_chain_(Network::Test::createEmptyFilterChain(std::move(transport_socket_factory))) {
