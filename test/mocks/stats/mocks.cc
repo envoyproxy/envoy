@@ -31,6 +31,14 @@ MockGauge::MockGauge() {
 }
 MockGauge::~MockGauge() {}
 
+MockTextReadout::MockTextReadout() {
+  ON_CALL(*this, tagExtractedName()).WillByDefault(ReturnRef(name_));
+  ON_CALL(*this, tags()).WillByDefault(ReturnRef(tags_));
+  ON_CALL(*this, used()).WillByDefault(ReturnPointee(&used_));
+  ON_CALL(*this, value()).WillByDefault(ReturnPointee(&value_));
+}
+MockTextReadout::~MockTextReadout() {}
+
 MockHistogram::MockHistogram() {
   ON_CALL(*this, recordValue(_)).WillByDefault(Invoke([this](uint64_t value) {
     if (store_ != nullptr) {

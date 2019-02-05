@@ -85,6 +85,11 @@ public:
     return wrapped_scope_->gauge(name);
   }
 
+  TextReadout& textReadout(const std::string& name) override {
+    Thread::LockGuard lock(lock_);
+    return wrapped_scope_->textReadout(name);
+  }
+
   Histogram& histogram(const std::string& name) override {
     Thread::LockGuard lock(lock_);
     return wrapped_scope_->histogram(name);
@@ -119,6 +124,10 @@ public:
     Thread::LockGuard lock(lock_);
     return store_.gauge(name);
   }
+  TextReadout& textReadout(const std::string& name) override {
+    Thread::LockGuard lock(lock_);
+    return store_.textReadout(name);
+  }
   Histogram& histogram(const std::string& name) override {
     Thread::LockGuard lock(lock_);
     return store_.histogram(name);
@@ -134,7 +143,10 @@ public:
     Thread::LockGuard lock(lock_);
     return store_.gauges();
   }
-
+  std::vector<TextReadoutSharedPtr> textReadouts() const override {
+    Thread::LockGuard lock(lock_);
+    return store_.textReadouts();
+  }
   std::vector<ParentHistogramSharedPtr> histograms() const override {
     Thread::LockGuard lock(lock_);
     return store_.histograms();

@@ -74,6 +74,28 @@ public:
   std::vector<Tag> tags_;
 };
 
+class MockTextReadout : public TextReadout {
+public:
+  MockTextReadout();
+  ~MockTextReadout();
+
+  // Note: cannot be mocked because it is accessed as a Property in a gmock EXPECT_CALL. This
+  // creates a deadlock in gmock and is an unintended use of mock functions.
+  std::string name() const override { return name_; };
+  const char* nameCStr() const override { return name_.c_str(); };
+
+  MOCK_CONST_METHOD0(tagExtractedName, const std::string&());
+  MOCK_CONST_METHOD0(tags, const std::vector<Tag>&());
+  MOCK_METHOD1(set, void(const std::string& value));
+  MOCK_CONST_METHOD0(used, bool());
+  MOCK_CONST_METHOD0(value, std::string());
+
+  bool used_;
+  std::string value_;
+  std::string name_;
+  std::vector<Tag> tags_;
+};
+
 class MockHistogram : public Histogram {
 public:
   MockHistogram();
@@ -129,6 +151,7 @@ public:
 
   MOCK_METHOD0(cachedCounters, const std::vector<CounterSharedPtr>&());
   MOCK_METHOD0(cachedGauges, const std::vector<GaugeSharedPtr>&());
+  MOCK_METHOD0(cachedTextReadouts, const std::vector<TextReadoutSharedPtr>&());
   MOCK_METHOD0(cachedHistograms, const std::vector<ParentHistogramSharedPtr>&());
   MOCK_METHOD0(clearCache, void());
 
@@ -159,6 +182,8 @@ public:
   MOCK_METHOD1(createScope_, Scope*(const std::string& name));
   MOCK_METHOD1(gauge, Gauge&(const std::string&));
   MOCK_CONST_METHOD0(gauges, std::vector<GaugeSharedPtr>());
+  MOCK_METHOD1(textReadout, TextReadout&(const std::string&));
+  MOCK_CONST_METHOD0(textReadouts, std::vector<TextReadoutSharedPtr>());
   MOCK_METHOD1(histogram, Histogram&(const std::string& name));
   MOCK_CONST_METHOD0(histograms, std::vector<ParentHistogramSharedPtr>());
   MOCK_CONST_METHOD0(statsOptions, const StatsOptions&());

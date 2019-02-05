@@ -94,5 +94,18 @@ public:
 
 typedef std::shared_ptr<Gauge> GaugeSharedPtr;
 
+/**
+ * A string, possibly non-ASCII.
+ */
+class TextReadout : public virtual Metric {
+public:
+  virtual ~TextReadout() {}
+
+  virtual void set(const std::string& value) PURE;
+  virtual std::string value() const PURE;
+};
+
+typedef std::shared_ptr<TextReadout> TextReadoutSharedPtr;
+
 } // namespace Stats
 } // namespace Envoy

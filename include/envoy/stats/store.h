@@ -40,6 +40,11 @@ public:
   virtual std::vector<GaugeSharedPtr> gauges() const PURE;
 
   /**
+   * @return a list of all known bools.
+   */
+  virtual std::vector<TextReadoutSharedPtr> textReadouts() const PURE;
+
+  /**
    * @return a list of all known histograms.
    */
   virtual std::vector<ParentHistogramSharedPtr> histograms() const PURE;

@@ -17,6 +17,12 @@ std::vector<GaugeSharedPtr>& SourceImpl::cachedGauges() {
   }
   return *gauges_;
 }
+std::vector<TextReadoutSharedPtr>& SourceImpl::cachedTextReadouts() {
+  if (!text_readouts_) {
+    text_readouts_ = store_.textReadouts();
+  }
+  return *text_readouts_;
+}
 std::vector<ParentHistogramSharedPtr>& SourceImpl::cachedHistograms() {
   if (!histograms_) {
     histograms_ = store_.histograms();
@@ -27,6 +33,7 @@ std::vector<ParentHistogramSharedPtr>& SourceImpl::cachedHistograms() {
 void SourceImpl::clearCache() {
   counters_.reset();
   gauges_.reset();
+  text_readouts_.reset();
   histograms_.reset();
 }
 
