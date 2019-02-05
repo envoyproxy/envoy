@@ -23,6 +23,7 @@ public:
   Api::SysCallBoolResult close() override;
   bool isOpen() override { return is_open_; };
   MOCK_METHOD0(path, std::string());
+  MOCK_METHOD1(errorToString, std::string(int));
 
   MOCK_METHOD0(open_, Api::SysCallBoolResult());
   MOCK_METHOD1(write_, Api::SysCallSizeResult(absl::string_view buffer));

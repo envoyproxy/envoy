@@ -51,6 +51,11 @@ public:
    * @return string the file path
    */
   virtual std::string path() PURE;
+
+  /**
+   * @return string a human-readable string describing the error code
+   */
+  virtual std::string errorToString(int error) PURE;
 };
 
 typedef std::unique_ptr<RawFile> RawFilePtr;

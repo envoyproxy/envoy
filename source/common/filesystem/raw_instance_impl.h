@@ -19,6 +19,7 @@ public:
   Api::SysCallBoolResult close() override;
   bool isOpen() override;
   std::string path() override;
+  std::string errorToString(int error) override;
 
 private:
   int fd_;

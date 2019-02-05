@@ -71,7 +71,7 @@ FileImpl::FileImpl(RawFilePtr&& raw_file, Event::Dispatcher& dispatcher,
 }
 
 void FileImpl::open() {
-  const auto result = raw_file_->open();
+  const Api::SysCallBoolResult result = raw_file_->open();
   if (!result.rc_) {
     throw EnvoyException(
         fmt::format("unable to open file '{}': {}", raw_file_->path(), strerror(result.errno_)));
@@ -97,7 +97,7 @@ FileImpl::~FileImpl() {
       doWrite(flush_buffer_);
     }
 
-    const auto result = raw_file_->close();
+    const Api::SysCallBoolResult result = raw_file_->close();
     ASSERT(result.rc_, fmt::format("unable to close file '{}': {}", raw_file_->path(),
                                    strerror(result.errno_)));
   }
@@ -160,9 +160,9 @@ void FileImpl::flushThreadFunc() {
       try {
         if (reopen_file_) {
           reopen_file_ = false;
-          const auto result = raw_file_->close();
+          const Api::SysCallBoolResult result = raw_file_->close();
           ASSERT(result.rc_, fmt::format("unable to close file '{}': {}", raw_file_->path(),
-                                         strerror(result.errno_)));
+                                         raw_file_->errorToString(result.errno_)));
           open();
         }
 

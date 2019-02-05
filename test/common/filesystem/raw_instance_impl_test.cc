@@ -113,7 +113,7 @@ TEST_F(RawInstanceImplTest, Open) {
   ::unlink(new_file_path.c_str());
 
   RawFilePtr file = raw_instance_.createRawFile(new_file_path);
-  const auto result = file->open();
+  const Api::SysCallBoolResult result = file->open();
   EXPECT_TRUE(result.rc_);
   EXPECT_TRUE(file->isOpen());
 }
@@ -125,7 +125,7 @@ TEST_F(RawInstanceImplTest, OpenTwice) {
   RawFilePtr file = raw_instance_.createRawFile(new_file_path);
   EXPECT_EQ(getFd(file.get()), -1);
 
-  auto result = file->open();
+  Api::SysCallBoolResult result = file->open();
   const int initial_fd = getFd(file.get());
   EXPECT_TRUE(result.rc_);
   EXPECT_TRUE(file->isOpen());
@@ -139,7 +139,7 @@ TEST_F(RawInstanceImplTest, OpenTwice) {
 
 TEST_F(RawInstanceImplTest, OpenBadFilePath) {
   RawFilePtr file = raw_instance_.createRawFile("");
-  const auto result = file->open();
+  const Api::SysCallBoolResult result = file->open();
   EXPECT_FALSE(result.rc_);
 }
 
@@ -149,7 +149,7 @@ TEST_F(RawInstanceImplTest, ExistingFile) {
 
   {
     RawFilePtr file = raw_instance_.createRawFile(file_path);
-    const auto open_result = file->open();
+    const Api::SysCallBoolResult open_result = file->open();
     EXPECT_TRUE(open_result.rc_);
     std::string data(" new data");
     const Api::SysCallSizeResult result = file->write(data);
@@ -166,7 +166,7 @@ TEST_F(RawInstanceImplTest, NonExistingFile) {
 
   {
     RawFilePtr file = raw_instance_.createRawFile(new_file_path);
-    const auto open_result = file->open();
+    const Api::SysCallBoolResult open_result = file->open();
     EXPECT_TRUE(open_result.rc_);
     std::string data(" new data");
     const Api::SysCallSizeResult result = file->write(data);
@@ -182,7 +182,7 @@ TEST_F(RawInstanceImplTest, Close) {
   ::unlink(new_file_path.c_str());
 
   RawFilePtr file = raw_instance_.createRawFile(new_file_path);
-  const auto result = file->close();
+  const Api::SysCallBoolResult result = file->close();
   EXPECT_TRUE(result.rc_);
   EXPECT_FALSE(file->isOpen());
 }
@@ -192,7 +192,7 @@ TEST_F(RawInstanceImplTest, CloseTwice) {
   ::unlink(new_file_path.c_str());
 
   RawFilePtr file = raw_instance_.createRawFile(new_file_path);
-  auto result = file->close();
+  Api::SysCallBoolResult result = file->close();
   EXPECT_TRUE(result.rc_);
   EXPECT_FALSE(file->isOpen());
 
@@ -207,7 +207,7 @@ TEST_F(RawInstanceImplTest, WriteAfterClose) {
   ::unlink(new_file_path.c_str());
 
   RawFilePtr file = raw_instance_.createRawFile(new_file_path);
-  auto bool_result = file->open();
+  Api::SysCallBoolResult bool_result = file->open();
   EXPECT_TRUE(bool_result.rc_);
   bool_result = file->close();
   EXPECT_TRUE(bool_result.rc_);

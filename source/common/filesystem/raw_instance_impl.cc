@@ -25,7 +25,7 @@ namespace Filesystem {
 RawFileImpl::RawFileImpl(const std::string& path) : fd_(-1), path_(path) {}
 
 RawFileImpl::~RawFileImpl() {
-  const auto result = close();
+  const Api::SysCallBoolResult result = close();
   ASSERT(result.rc_);
 }
 
@@ -66,6 +66,8 @@ Api::SysCallBoolResult RawFileImpl::close() {
 bool RawFileImpl::isOpen() { return fd_ != -1; }
 
 std::string RawFileImpl::path() { return path_; }
+
+std::string RawFileImpl::errorToString(int error) { return ::strerror(error); }
 
 RawFilePtr RawInstanceImpl::createRawFile(const std::string& path) {
   return std::make_unique<RawFileImpl>(path);
