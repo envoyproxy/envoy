@@ -1,6 +1,9 @@
 syntax = "proto3";
 
 package envoy.data.cluster.v2alpha;
+
+option java_outer_classname = "OutlierDetectionEventProto";
+option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.data.cluster.v2alpha";
 
 import "google/protobuf/timestamp.proto";
