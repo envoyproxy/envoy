@@ -73,6 +73,12 @@ TEST_F(RawInstanceImplTest, fileReadToEndDoesNotExist) {
                EnvoyException);
 }
 
+TEST_F(RawInstanceImplTest, fileReadToEndBlacklisted) {
+  EXPECT_THROW(raw_instance_.fileReadToEnd("/dev/urandom"), EnvoyException);
+  EXPECT_THROW(raw_instance_.fileReadToEnd("/proc/cpuinfo"), EnvoyException);
+  EXPECT_THROW(raw_instance_.fileReadToEnd("/sys/block/sda/dev"), EnvoyException);
+}
+
 TEST_F(RawInstanceImplTest, CanonicalPathSuccess) {
   EXPECT_EQ("/", raw_instance_.canonicalPath("//").rc_);
 }
