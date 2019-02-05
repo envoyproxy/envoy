@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.api.v2;
 
+option java_outer_classname = "SrdsProto";
 option java_package = "io.envoyproxy.envoy.api.v2";
 option java_multiple_files = true;
 option java_generic_services = true;
@@ -50,16 +51,16 @@ service ScopedRoutesDiscoveryService {
 message ScopedRouteConfigurationsSet {
   // The name of the set of route configuration scopes. This will be the
   // :ref:`scoped_routes_config_set_name
-  // <envoy_api_field_config.filter.network.http_connection_manager.v3.ScopedRds.scoped_routes_config_set_name>`
+  // <envoy_api_field_config.filter.network.http_connection_manager.v2.ScopedRds.scoped_routes_config_set_name>`
   // set in :ref:`envoy_api_msg_config.filter.network.http_connection_manager.v2.ScopedRds`.
   string name = 1 [(validate.rules).string.min_bytes = 1];
 
   // Specifies the mechanism for constructing keys based on request attributes to match
-  // :ref:`envoy_api_field_api.v2.ScopedRouteConfigurationsSet.scopes` against.
+  // :ref:`scopes <envoy_api_field_ScopedRouteConfigurationsSet.scopes>` against.
   //
   // Upon receiving a request's headers, the Router will build a key using the algorithm specified
   // by this message. This key will be used to look up a corresponding
-  // :ref:`Scope <envoy_api_msg.ScopedRouteConfigurationsSet.Scope>` in a table containing the set
+  // :ref:`Scope <envoy_api_msg_ScopedRouteConfigurationsSet.Scope>` in a table containing the set
   // of :ref:`scopes <envoy_api_field_ScopedRouteConfigurationsSet.scopes>`.
   message ScopeKeyBuilder {
     // Specifies the mechanism for constructing fragments which are composed into keys.
@@ -122,7 +123,8 @@ message ScopedRouteConfigurationsSet {
   // :ref:`Key <envoy_api_msg_ScopedRouteConfigurationsSet.Scope.Key>` which is matched against
   // each HTTP request.
   message Scope {
-    // Specifies a key which is matched against by the output of a :ref:`ScopeKeyBuilder`.
+    // Specifies a key which is matched against by the output of a :ref:`ScopeKeyBuilder
+    // <envoy_api_msg_ScopedRouteConfigurationsSet.ScopeKeyBuilder>`.
     message Key {
       message Fragment {
         oneof type {
