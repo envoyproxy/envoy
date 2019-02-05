@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/api/api.h"
 #include "envoy/api/v2/core/base.pb.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
@@ -60,7 +61,7 @@ public:
   /**
    * Extract typed resources from a DiscoveryResponse.
    * @param response reference to DiscoveryResponse.
-   * @return Protobuf::RepatedPtrField<ResourceType> vector of typed resources in response.
+   * @return Protobuf::RepeatedPtrField<ResourceType> vector of typed resources in response.
    */
   template <class ResourceType>
   static Protobuf::RepeatedPtrField<ResourceType>
@@ -147,8 +148,9 @@ public:
   /**
    * Check the existence of a path for a filesystem subscription. Throws on error.
    * @param path the path to validate.
+   * @param api reference to the Api object
    */
-  static void checkFilesystemSubscriptionBackingPath(const std::string& path);
+  static void checkFilesystemSubscriptionBackingPath(const std::string& path, Api::Api& api);
 
   /**
    * Check the grpc_services and cluster_names for API config sanity. Throws on error.

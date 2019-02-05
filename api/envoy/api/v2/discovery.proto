@@ -1,6 +1,9 @@
 syntax = "proto3";
 
 package envoy.api.v2;
+
+option java_outer_classname = "DiscoveryProto";
+option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.api.v2";
 option go_package = "v2";
 
@@ -110,7 +113,7 @@ message DiscoveryResponse {
 //
 // In Incremental xDS the nonce field is required and used to pair
 // IncrementalDiscoveryResponse to a IncrementalDiscoveryRequest ACK or NACK.
-// Optionaly, a response message level system_version_info is present for
+// Optionally, a response message level system_version_info is present for
 // debugging purposes only.
 //
 // IncrementalDiscoveryRequest can be sent in 3 situations:

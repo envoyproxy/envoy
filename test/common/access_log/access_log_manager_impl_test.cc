@@ -7,28 +7,30 @@
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/filesystem/mocks.h"
+#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Return;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace AccessLog {
 
 TEST(AccessLogManagerImpl, reopenAllFiles) {
   Api::MockApi api;
+  Filesystem::MockInstance file_system;
+  EXPECT_CALL(api, fileSystem()).WillRepeatedly(ReturnRef(file_system));
   Event::MockDispatcher dispatcher;
   Thread::MutexBasicLockable lock;
-  Stats::IsolatedStoreImpl stats_store;
 
   std::shared_ptr<Filesystem::MockFile> log1(new Filesystem::MockFile());
   std::shared_ptr<Filesystem::MockFile> log2(new Filesystem::MockFile());
   AccessLogManagerImpl access_log_manager(api, dispatcher, lock);
-  EXPECT_CALL(api, createFile("foo", _, _)).WillOnce(Return(log1));
+  EXPECT_CALL(file_system, createFile("foo", _, _)).WillOnce(Return(log1));
   access_log_manager.createAccessLog("foo");
-  EXPECT_CALL(api, createFile("bar", _, _)).WillOnce(Return(log2));
+  EXPECT_CALL(file_system, createFile("bar", _, _)).WillOnce(Return(log2));
   access_log_manager.createAccessLog("bar");
 
   // Make sure that getting the access log with the same name returns the same underlying file.

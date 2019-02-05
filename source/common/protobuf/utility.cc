@@ -2,7 +2,6 @@
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
-#include "common/filesystem/filesystem_impl.h"
 #include "common/json/json_loader.h"
 #include "common/protobuf/protobuf.h"
 
@@ -80,8 +79,8 @@ void MessageUtil::loadFromYaml(const std::string& yaml, Protobuf::Message& messa
   throw EnvoyException("Unable to convert YAML as JSON: " + yaml);
 }
 
-void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& message) {
-  const std::string contents = Filesystem::fileReadToEnd(path);
+void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& message, Api::Api& api) {
+  const std::string contents = api.fileSystem().fileReadToEnd(path);
   // If the filename ends with .pb, attempt to parse it as a binary proto.
   if (absl::EndsWith(path, ".pb")) {
     // Attempt to parse the binary format.
@@ -104,6 +103,46 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
     loadFromYaml(contents, message);
   } else {
     loadFromJson(contents, message);
+  }
+}
+
+void MessageUtil::checkForDeprecation(const Protobuf::Message& message, bool warn_only) {
+  const Protobuf::Descriptor* descriptor = message.GetDescriptor();
+  const Protobuf::Reflection* reflection = message.GetReflection();
+  for (int i = 0; i < descriptor->field_count(); ++i) {
+    const auto* field = descriptor->field(i);
+
+    // If this field is not in use, continue.
+    if ((field->is_repeated() && reflection->FieldSize(message, field) == 0) ||
+        (!field->is_repeated() && !reflection->HasField(message, field))) {
+      continue;
+    }
+
+    // If this field is deprecated, warn or throw an error.
+    if (field->options().deprecated()) {
+      std::string err = fmt::format(
+          "Using deprecated option '{}'. This configuration will be removed from Envoy soon. "
+          "Please see https://github.com/envoyproxy/envoy/blob/master/DEPRECATED.md for "
+          "details.",
+          field->full_name());
+      if (warn_only) {
+        ENVOY_LOG_MISC(warn, "{}", err);
+      } else {
+        throw ProtoValidationException(err, message);
+      }
+    }
+
+    // If this is a message, recurse to check for deprecated fields in the sub-message.
+    if (field->cpp_type() == Protobuf::FieldDescriptor::CPPTYPE_MESSAGE) {
+      if (field->is_repeated()) {
+        const int size = reflection->FieldSize(message, field);
+        for (int j = 0; j < size; ++j) {
+          checkForDeprecation(reflection->GetRepeatedMessage(message, field, j), warn_only);
+        }
+      } else {
+        checkForDeprecation(reflection->GetMessage(message, field), warn_only);
+      }
+    }
   }
 }
 

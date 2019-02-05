@@ -6,9 +6,9 @@
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/stats/mocks.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
-#include "gtest/gtest.h"
 #include "openssl/ssl.h"
 
 using testing::_;
@@ -28,7 +28,7 @@ namespace Extensions {
 namespace ListenerFilters {
 namespace TlsInspector {
 
-class TlsInspectorTest : public testing::Test {
+class TlsInspectorTest : public TestBase {
 public:
   TlsInspectorTest()
       : cfg_(std::make_shared<Config>(store_)),

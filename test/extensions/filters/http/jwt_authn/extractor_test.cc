@@ -48,9 +48,9 @@ providers:
         value_prefix: AAABBB
 )";
 
-class ExtractorTest : public ::testing::Test {
+class ExtractorTest : public TestBase {
 public:
-  void SetUp() {
+  void SetUp() override {
     MessageUtil::loadFromYaml(ExampleConfig, config_);
     extractor_ = Extractor::create(config_);
   }

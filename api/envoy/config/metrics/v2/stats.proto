@@ -4,6 +4,9 @@
 syntax = "proto3";
 
 package envoy.config.metrics.v2;
+
+option java_outer_classname = "StatsProto";
+option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.config.metrics.v2";
 option go_package = "v2";
 
@@ -323,7 +326,7 @@ message HystrixSink {
   //
   // rolling_window(ms) = stats_flush_interval(ms) * num_of_buckets
   //
-  // More detailed explanation can be found in `Hystix wiki
+  // More detailed explanation can be found in `Hystrix wiki
   // <https://github.com/Netflix/Hystrix/wiki/Metrics-and-Monitoring#hystrixrollingnumber>`_.
   int64 num_buckets = 1;
 }

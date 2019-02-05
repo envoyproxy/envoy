@@ -4,7 +4,7 @@ executors:
   ubuntu-build:
     description: "A regular build executor based on ubuntu image"
     docker:
-      - image: envoyproxy/envoy-build:d1646d643b492ea070c96d0b67caf5bb2c8ca854
+      - image: envoyproxy/envoy-build:698009170e362f9ca0594f2b1927fbbee199bf98
     resource_class: xlarge
     working_directory: /source
 
@@ -127,6 +127,7 @@ jobs:
        - run: ci/do_circle_ci.sh check_format
        - run: ci/do_circle_ci.sh check_repositories
        - run: ci/do_circle_ci.sh check_spelling
+       - run: ci/do_circle_ci.sh check_spelling_pedantic
    build_image:
      docker:
        - image: circleci/python:3.7

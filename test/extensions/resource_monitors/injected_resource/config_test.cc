@@ -9,10 +9,9 @@
 #include "extensions/resource_monitors/injected_resource/config.h"
 
 #include "test/test_common/environment.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
-
-#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -31,7 +30,7 @@ TEST(InjectedResourceMonitorFactoryTest, CreateMonitor) {
   Api::ApiPtr api = Api::createApiForTest(stats_store);
   DangerousDeprecatedTestTime test_time;
   Event::DispatcherImpl dispatcher(test_time.timeSystem(), *api);
-  Server::Configuration::ResourceMonitorFactoryContextImpl context(dispatcher);
+  Server::Configuration::ResourceMonitorFactoryContextImpl context(dispatcher, *api);
   Server::ResourceMonitorPtr monitor = factory->createResourceMonitor(config, context);
   EXPECT_NE(monitor, nullptr);
 }

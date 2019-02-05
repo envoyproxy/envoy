@@ -6,6 +6,6 @@ api_proto_library_internal(
     name = "tap",
     srcs = ["tap.proto"],
     deps = [
-        "//envoy/service/tap/v2alpha:common",
+        "//envoy/config/common/tap/v2alpha:common",
     ],
 )

@@ -1,6 +1,9 @@
 syntax = "proto3";
 
 package envoy.config.filter.network.dubbo_proxy.v2alpha1;
+
+option java_outer_classname = "RouteProto";
+option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.config.filter.network.dubbo_proxy.v2alpha1";
 option go_package = "v2";
 
@@ -34,7 +37,7 @@ message RouteConfiguration {
 }
 
 message Route {
-  // Route matching prarameters.
+  // Route matching parameters.
   RouteMatch match = 1 [(validate.rules).message.required = true, (gogoproto.nullable) = false];
 
   // Route request to some upstream cluster.

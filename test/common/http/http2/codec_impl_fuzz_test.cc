@@ -9,6 +9,8 @@
 
 #include <functional>
 
+#include "codec_impl_test_util.h"
+
 #include "common/common/assert.h"
 #include "common/common/logger.h"
 #include "common/http/header_map_impl.h"
@@ -29,24 +31,6 @@ using testing::InvokeWithoutArgs;
 namespace Envoy {
 namespace Http {
 namespace Http2 {
-
-class TestServerConnectionImpl : public ServerConnectionImpl {
-public:
-  TestServerConnectionImpl(Network::Connection& connection, ServerConnectionCallbacks& callbacks,
-                           Stats::Scope& scope, const Http2Settings& http2_settings)
-      : ServerConnectionImpl(connection, callbacks, scope, http2_settings) {}
-  nghttp2_session* session() { return session_; }
-  using ServerConnectionImpl::getStream;
-};
-
-class TestClientConnectionImpl : public ClientConnectionImpl {
-public:
-  TestClientConnectionImpl(Network::Connection& connection, Http::ConnectionCallbacks& callbacks,
-                           Stats::Scope& scope, const Http2Settings& http2_settings)
-      : ClientConnectionImpl(connection, callbacks, scope, http2_settings) {}
-  nghttp2_session* session() { return session_; }
-  using ClientConnectionImpl::getStream;
-};
 
 // Convert from test proto Http2Settings to Http2Settings.
 Http2Settings fromHttp2Settings(const test::common::http::http2::Http2Settings& settings) {
@@ -260,14 +244,16 @@ DEFINE_PROTO_FUZZER(const test::common::http::http2::CodecImplFuzzTestCase& inpu
   NiceMock<Network::MockConnection> client_connection;
   const Http2Settings client_http2settings{fromHttp2Settings(input.client_settings())};
   NiceMock<MockConnectionCallbacks> client_callbacks;
+  uint32_t max_request_headers_kb = Http::DEFAULT_MAX_REQUEST_HEADERS_KB;
+
   TestClientConnectionImpl client(client_connection, client_callbacks, stats_store,
-                                  client_http2settings);
+                                  client_http2settings, max_request_headers_kb);
 
   NiceMock<Network::MockConnection> server_connection;
   const Http2Settings server_http2settings{fromHttp2Settings(input.server_settings())};
   NiceMock<MockServerConnectionCallbacks> server_callbacks;
   TestServerConnectionImpl server(server_connection, server_callbacks, stats_store,
-                                  server_http2settings);
+                                  server_http2settings, max_request_headers_kb);
 
   ReorderBuffer client_write_buf{server};
   ReorderBuffer server_write_buf{client};

@@ -18,6 +18,7 @@ SOURCE_VERSION
 tags
 TAGS
 /test/coverage/BUILD
+/tools/.aspell.en.pws
 .vimrc
 .vs
 .vscode

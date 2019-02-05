@@ -20,12 +20,12 @@
 #include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/test_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/match.h"
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 #include "integration.h"
 #include "utility.h"
 
@@ -166,7 +166,7 @@ public:
     });
 
     HttpIntegrationTest::initialize();
-    client_ssl_ctx_ = createClientSslTransportSocketFactory({}, context_manager_);
+    client_ssl_ctx_ = createClientSslTransportSocketFactory({}, context_manager_, *api_);
   }
 
   void createUpstreams() override {
@@ -281,7 +281,7 @@ public:
     });
 
     HttpIntegrationTest::initialize();
-    client_ssl_ctx_ = createClientSslTransportSocketFactory({}, context_manager_);
+    client_ssl_ctx_ = createClientSslTransportSocketFactory({}, context_manager_, *api_);
   }
 
   void enableCombinedValidationContext(bool enable) { use_combined_validation_context_ = enable; }
@@ -362,8 +362,8 @@ public:
 
   void createUpstreams() override {
     // This is for backend with ssl
-    fake_upstreams_.emplace_back(new FakeUpstream(createUpstreamSslContext(context_manager_), 0,
-                                                  FakeHttpConnection::Type::HTTP1, version_,
+    fake_upstreams_.emplace_back(new FakeUpstream(createUpstreamSslContext(context_manager_, *api_),
+                                                  0, FakeHttpConnection::Type::HTTP1, version_,
                                                   timeSystem()));
     create_xds_upstream_ = true;
   }

@@ -41,7 +41,7 @@ public:
   virtual size_t size() const PURE;
 
   /**
-   * Called by a buffer when the refernced data is no longer needed.
+   * Called by a buffer when the referenced data is no longer needed.
    */
   virtual void done() PURE;
 

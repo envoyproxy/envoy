@@ -13,9 +13,9 @@
 #include "test/extensions/filters/network/thrift_proxy/mocks.h"
 #include "test/mocks/ratelimit/mocks.h"
 #include "test/mocks/server/mocks.h"
+#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::ContainerEq;
 using testing::NiceMock;
@@ -27,7 +27,7 @@ namespace ThriftProxy {
 namespace Router {
 namespace {
 
-class ThriftRateLimitConfigurationTest : public testing::Test {
+class ThriftRateLimitConfigurationTest : public TestBase {
 public:
   void initialize(const std::string& yaml) {
     envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftProxy config;
@@ -168,9 +168,9 @@ route_config:
   EXPECT_TRUE(rate_limits.empty());
 }
 
-class ThriftRateLimitPolicyEntryTest : public testing::Test {
+class ThriftRateLimitPolicyEntryTest : public TestBase {
 public:
-  void initialize(const std::string yaml) {
+  void initialize(const std::string& yaml) {
     envoy::api::v2::route::RateLimit rate_limit;
     MessageUtil::loadFromYaml(yaml, rate_limit);
 
