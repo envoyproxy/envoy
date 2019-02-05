@@ -8,6 +8,7 @@
 
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_base.h"
 
 #include "absl/strings/string_view.h"
 #include "gmock/gmock.h"
@@ -32,7 +33,7 @@ parseScopedRoutesConfigFromYaml(const std::string& yaml) {
   return scoped_routes_proto;
 }
 
-class ScopedRoutesTestBase : public testing::Test {
+class ScopedRoutesTestBase : public TestBase {
 protected:
   ScopedRoutesTestBase() {
     EXPECT_CALL(factory_context_.admin_.config_tracker_, add_("route_scopes", _));
