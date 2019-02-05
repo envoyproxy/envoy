@@ -14,6 +14,6 @@ bool TestBase::checkSingletonQuiescensce() {
   return true;
 }
 
-TestBase::~TestBase() { checkSingletonQuiescensce(); }
+TestBaseScope::~TestBaseScope() { TestBase::checkSingletonQuiescensce(); }
 
 } // namespace Envoy
