@@ -823,7 +823,8 @@ TEST(HostImplTest, HostnameCanaryAndLocality) {
   locality.set_sub_zone("world");
   HostImpl host(cluster.info_, "lyft.com", Network::Utility::resolveUrl("tcp://10.0.0.1:1234"),
                 metadata, 1, locality,
-                envoy::api::v2::endpoint::Endpoint::HealthCheckConfig::default_instance(), 1);
+                envoy::api::v2::endpoint::Endpoint::HealthCheckConfig::default_instance(), 1,
+                envoy::api::v2::core::HealthStatus::UNKNOWN);
   EXPECT_EQ(cluster.info_.get(), &host.cluster());
   EXPECT_EQ("lyft.com", host.hostname());
   EXPECT_TRUE(host.canary());
@@ -1059,6 +1060,7 @@ TEST_F(StaticClusterImplTest, LoadAssignmentLocality) {
   EXPECT_FALSE(cluster.info()->addedViaApi());
 }
 
+// Validates that setting an EDS health value through LoadAssignment is honored for static clusters.
 TEST_F(StaticClusterImplTest, LoadAssignmentEdsHealth) {
   const std::string yaml = R"EOF(
     name: staticcluster

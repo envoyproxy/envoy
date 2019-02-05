@@ -194,24 +194,6 @@ bool updateHealthFlag(const Host& updated_host, Host& existing_host, Host::Healt
   return false;
 }
 
-void setEdsHealthFlag(Host& host, envoy::api::v2::core::HealthStatus health_status) {
-  switch (health_status) {
-  case envoy::api::v2::core::HealthStatus::UNHEALTHY:
-    FALLTHRU;
-  case envoy::api::v2::core::HealthStatus::DRAINING:
-    FALLTHRU;
-  case envoy::api::v2::core::HealthStatus::TIMEOUT:
-    host.healthFlagSet(Host::HealthFlag::FAILED_EDS_HEALTH);
-    break;
-  case envoy::api::v2::core::HealthStatus::DEGRADED:
-    host.healthFlagSet(Host::HealthFlag::DEGRADED_EDS_HEALTH);
-    break;
-  default:;
-    break;
-    // No health flags should be set.
-  }
-}
-
 } // namespace
 
 Host::CreateConnectionData HostImpl::createConnection(
@@ -219,6 +201,24 @@ Host::CreateConnectionData HostImpl::createConnection(
     Network::TransportSocketOptionsSharedPtr transport_socket_options) const {
   return {createConnection(dispatcher, *cluster_, address_, options, transport_socket_options),
           shared_from_this()};
+}
+
+void HostImpl::setEdsHealthFlag(envoy::api::v2::core::HealthStatus health_status) {
+  switch (health_status) {
+  case envoy::api::v2::core::HealthStatus::UNHEALTHY:
+    FALLTHRU;
+  case envoy::api::v2::core::HealthStatus::DRAINING:
+    FALLTHRU;
+  case envoy::api::v2::core::HealthStatus::TIMEOUT:
+    healthFlagSet(Host::HealthFlag::FAILED_EDS_HEALTH);
+    break;
+  case envoy::api::v2::core::HealthStatus::DEGRADED:
+    healthFlagSet(Host::HealthFlag::DEGRADED_EDS_HEALTH);
+    break;
+  default:;
+    break;
+    // No health flags should be set.
+  }
 }
 
 Host::CreateConnectionData
@@ -909,20 +909,18 @@ void PriorityStateManager::registerHostForPriority(
   const HostSharedPtr host(
       new HostImpl(parent_.info(), hostname, address, lb_endpoint.metadata(),
                    lb_endpoint.load_balancing_weight().value(), locality_lb_endpoint.locality(),
-                   lb_endpoint.endpoint().health_check_config(), locality_lb_endpoint.priority()));
-  registerHostForPriority(host, locality_lb_endpoint, lb_endpoint);
+                   lb_endpoint.endpoint().health_check_config(), locality_lb_endpoint.priority(),
+                   lb_endpoint.health_status()));
+  registerHostForPriority(host, locality_lb_endpoint);
 }
 
 void PriorityStateManager::registerHostForPriority(
     const HostSharedPtr& host,
-    const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint,
-    const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint) {
+    const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint) {
   const uint32_t priority = locality_lb_endpoint.priority();
   // Should be called after initializePriorityFor.
   ASSERT(priority_state_[priority].first);
   priority_state_[priority].first->emplace_back(host);
-
-  setEdsHealthFlag(*priority_state_[priority].first->back(), lb_endpoint.health_status());
 }
 
 void PriorityStateManager::updateClusterPrioritySet(
@@ -1279,8 +1277,7 @@ void StrictDnsClusterImpl::updateAllHosts(const HostVector& hosts_added,
     priority_state_manager.initializePriorityFor(target->locality_lb_endpoint_);
     for (const HostSharedPtr& host : target->hosts_) {
       if (target->locality_lb_endpoint_.priority() == current_priority) {
-        priority_state_manager.registerHostForPriority(host, target->locality_lb_endpoint_,
-                                                       target->lb_endpoint_);
+        priority_state_manager.registerHostForPriority(host, target->locality_lb_endpoint_);
       }
     }
   }
@@ -1329,8 +1326,7 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
               parent_.info_, dns_address_, Network::Utility::getAddressWithPort(*address, port_),
               lb_endpoint_.metadata(), lb_endpoint_.load_balancing_weight().value(),
               locality_lb_endpoint_.locality(), lb_endpoint_.endpoint().health_check_config(),
-              locality_lb_endpoint_.priority()));
-          setEdsHealthFlag(*new_hosts.back(), lb_endpoint_.health_status());
+              locality_lb_endpoint_.priority(), lb_endpoint_.health_status()));
         }
 
         HostVector hosts_added;
