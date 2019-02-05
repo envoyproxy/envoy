@@ -1,7 +1,5 @@
 #pragma once
 
-#include "common/common/assert.h"
-
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -30,9 +28,7 @@ public:
 // Templatized version of TestBase. See above notes.
 template <class T> class TestBaseWithParam : public ::testing::TestWithParam<T> {
 public:
-  ~TestBaseWithParam() {
-    RELEASE_ASSERT(TestBase::checkSingletonQuiescensce(), "active singletons exist");
-  }
+  ~TestBaseWithParam() { TestBase::checkSingletonQuiescensce(); }
 };
 
 } // namespace Envoy

@@ -14,6 +14,6 @@ bool TestBase::checkSingletonQuiescensce() {
   return true;
 }
 
-TestBase::~TestBase() { RELEASE_ASSERT(checkSingletonQuiescensce(), "active singletons exist"); }
+TestBase::~TestBase() { checkSingletonQuiescensce(); }
 
 } // namespace Envoy

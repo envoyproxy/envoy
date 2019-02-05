@@ -162,7 +162,6 @@ envoy_cc_library(
     hdrs = ["test_base.h"],
     deps = [
         "//external:googletest",
-        "//source/common/common:assert_lib",
         "//test/test_common:global_lib",
     ],
 )
