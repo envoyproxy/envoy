@@ -22,6 +22,12 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "debug_recursion_checker_lib",
+    hdrs = ["debug_recursion_checker.h"],
+    deps = [":assert_lib"],
+)
+
+envoy_cc_library(
     name = "backoff_lib",
     srcs = ["backoff_strategy.cc"],
     hdrs = ["backoff_strategy.h"],

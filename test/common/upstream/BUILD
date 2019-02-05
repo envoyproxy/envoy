@@ -61,6 +61,19 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "conn_pool_map_impl_test",
+    srcs = ["conn_pool_map_impl_test.cc"],
+    deps = [
+        "//include/envoy/http:conn_pool_interface",
+        "//source/common/upstream:conn_pool_map_impl_lib",
+        "//test/mocks:common_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/http:conn_pool_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "edf_scheduler_test",
     srcs = ["edf_scheduler_test.cc"],
     deps = ["//source/common/upstream:edf_scheduler_lib"],
