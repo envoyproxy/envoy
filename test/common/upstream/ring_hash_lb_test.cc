@@ -327,5 +327,89 @@ TEST_P(RingHashLoadBalancerTest, UnevenHosts) {
   }
 }
 
+TEST_P(RingHashLoadBalancerTest, HostWeighted) {
+  // assign host weights with a greatest common denominator greater than 1, to validate that the
+  // ring won't contain unnecessary duplicate entries.
+  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", 2),
+                      makeTestHost(info_, "tcp://127.0.0.1:91", 4),
+                      makeTestHost(info_, "tcp://127.0.0.1:92", 6)};
+  hostSet().healthy_hosts_ = hostSet().hosts_;
+  hostSet().runCallbacks({}, {});
+
+  config_ = (envoy::api::v2::Cluster::RingHashLbConfig());
+  config_.value().mutable_minimum_ring_size()->set_value(6);
+  init();
+
+  // :90 should appear once, :91 should appear twice and :92 should appear three times.
+  std::unordered_map<uint64_t, uint32_t> expected{
+      {928266305478181108UL, 2},  {4443673547860492590UL, 2},  {5583722120771150861UL, 1},
+      {6311230543546372928UL, 1}, {13444792449719432967UL, 2}, {16117243373044804889UL, 0}};
+
+  LoadBalancerPtr lb = lb_->factory()->create();
+  for (const auto& entry : expected) {
+    TestLoadBalancerContext context(entry.first);
+    EXPECT_EQ(hostSet().hosts_[entry.second], lb->chooseHost(&context));
+  }
+}
+
+TEST_P(RingHashLoadBalancerTest, LocalityWeighted) {
+  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90"),
+                      makeTestHost(info_, "tcp://127.0.0.1:91"),
+                      makeTestHost(info_, "tcp://127.0.0.1:92")};
+  hostSet().healthy_hosts_ = hostSet().hosts_;
+  hostSet().hosts_per_locality_ =
+      makeHostsPerLocality({{hostSet().hosts_[0]}, {hostSet().hosts_[1]}, {hostSet().hosts_[2]}});
+  hostSet().healthy_hosts_per_locality_ = hostSet().hosts_per_locality_;
+  // assign locality weights with a greatest common denominator greater than 1, to validate that the
+  // ring won't contain unnecessary duplicate entries.
+  hostSet().locality_weights_ = makeLocalityWeights({2, 4, 6});
+  hostSet().runCallbacks({}, {});
+
+  config_ = (envoy::api::v2::Cluster::RingHashLbConfig());
+  config_.value().mutable_minimum_ring_size()->set_value(6);
+  init();
+
+  // :90 should appear once, :91 should appear twice and :92 should appear three times.
+  std::unordered_map<uint64_t, uint32_t> expected{
+      {928266305478181108UL, 2},  {4443673547860492590UL, 2},  {5583722120771150861UL, 1},
+      {6311230543546372928UL, 1}, {13444792449719432967UL, 2}, {16117243373044804889UL, 0}};
+
+  LoadBalancerPtr lb = lb_->factory()->create();
+  for (const auto& entry : expected) {
+    TestLoadBalancerContext context(entry.first);
+    EXPECT_EQ(hostSet().hosts_[entry.second], lb->chooseHost(&context));
+  }
+}
+
+TEST_P(RingHashLoadBalancerTest, HostAndLocalityWeighted) {
+  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", 1),
+                      makeTestHost(info_, "tcp://127.0.0.1:91", 2),
+                      makeTestHost(info_, "tcp://127.0.0.1:92", 3)};
+  hostSet().healthy_hosts_ = hostSet().hosts_;
+  hostSet().hosts_per_locality_ =
+      makeHostsPerLocality({{hostSet().hosts_[0]}, {hostSet().hosts_[1]}, {hostSet().hosts_[2]}});
+  hostSet().healthy_hosts_per_locality_ = hostSet().hosts_per_locality_;
+  hostSet().locality_weights_ = makeLocalityWeights({1, 2, 3});
+  hostSet().runCallbacks({}, {});
+
+  config_ = (envoy::api::v2::Cluster::RingHashLbConfig());
+  config_.value().mutable_minimum_ring_size()->set_value(0);
+  init();
+
+  // :90 should appear once, :91 should appear four times and :92 should appear nine times.
+  std::unordered_map<uint64_t, uint32_t> expected{
+      {928266305478181108UL, 2},   {4443673547860492590UL, 2},  {4470782202023056897UL, 1},
+      {5583722120771150861UL, 1},  {6311230543546372928UL, 1},  {7028796200958575341UL, 2},
+      {7622568113965459810UL, 2},  {8301579928699792521UL, 1},  {8763220459450311387UL, 2},
+      {13444792449719432967UL, 2}, {14054452251593525090UL, 2}, {15052576707013241299UL, 2},
+      {15299362238897758650UL, 2}, {16117243373044804889UL, 0}};
+
+  LoadBalancerPtr lb = lb_->factory()->create();
+  for (const auto& entry : expected) {
+    TestLoadBalancerContext context(entry.first);
+    EXPECT_EQ(hostSet().hosts_[entry.second], lb->chooseHost(&context));
+  }
+}
+
 } // namespace Upstream
 } // namespace Envoy

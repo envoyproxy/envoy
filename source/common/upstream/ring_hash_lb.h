@@ -6,6 +6,7 @@
 
 #include "common/common/logger.h"
 #include "common/upstream/thread_aware_lb_impl.h"
+#include "common/upstream/upstream_impl.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -22,8 +23,8 @@ namespace Upstream {
 class RingHashLoadBalancer : public ThreadAwareLoadBalancerBase,
                              Logger::Loggable<Logger::Id::upstream> {
 public:
-  RingHashLoadBalancer(PrioritySet& priority_set, ClusterStats& stats, Runtime::Loader& runtime,
-                       Runtime::RandomGenerator& random,
+  RingHashLoadBalancer(const PrioritySet& priority_set, ClusterStats& stats,
+                       Runtime::Loader& runtime, Runtime::RandomGenerator& random,
                        const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig>& config,
                        const envoy::api::v2::Cluster::CommonLbConfig& common_config);
 
@@ -34,8 +35,9 @@ private:
   };
 
   struct Ring : public HashingLoadBalancer {
-    Ring(const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig>& config,
-         const HostVector& hosts);
+    Ring(const HostsPerLocality& hosts_per_locality,
+         const LocalityWeightsConstSharedPtr& locality_weights,
+         const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig>& config);
 
     // ThreadAwareLoadBalancerBase::HashingLoadBalancer
     HostConstSharedPtr chooseHost(uint64_t hash) const override;
@@ -46,13 +48,29 @@ private:
 
   // ThreadAwareLoadBalancerBase
   HashingLoadBalancerSharedPtr createLoadBalancer(const HostSet& host_set, bool in_panic) override {
+    // TODO(mergeconflict): refactor this and MaglevLoadBalancer::createLoadBalancer back into base
+
     // Note that we only compute global panic on host set refresh. Given that the runtime setting
     // will rarely change, this is a reasonable compromise to avoid creating extra LBs when we only
     // need to create one per priority level.
+    const bool has_locality =
+        host_set.localityWeights() != nullptr && !host_set.localityWeights()->empty();
     if (in_panic) {
-      return std::make_shared<Ring>(config_, host_set.hosts());
+      if (!has_locality) {
+        return std::make_shared<Ring>(HostsPerLocalityImpl(host_set.hosts(), false), nullptr,
+                                      config_);
+      } else {
+        return std::make_shared<Ring>(host_set.hostsPerLocality(), host_set.localityWeights(),
+                                      config_);
+      }
     } else {
-      return std::make_shared<Ring>(config_, host_set.healthyHosts());
+      if (!has_locality) {
+        return std::make_shared<Ring>(HostsPerLocalityImpl(host_set.healthyHosts(), false), nullptr,
+                                      config_);
+      } else {
+        return std::make_shared<Ring>(host_set.healthyHostsPerLocality(),
+                                      host_set.localityWeights(), config_);
+      }
     }
   }
 

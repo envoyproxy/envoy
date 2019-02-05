@@ -59,6 +59,9 @@ public:
 private:
   // ThreadAwareLoadBalancerBase
   HashingLoadBalancerSharedPtr createLoadBalancer(const HostSet& host_set, bool in_panic) override {
+    // TODO(mergeconflict): refactor this and RingHashLoadBalancer::createLoadBalancer back into
+    // base
+
     // Note that we only compute global panic on host set refresh. Given that the runtime setting
     // will rarely change, this is a reasonable compromise to avoid creating extra LBs when we only
     // need to create one per priority level.

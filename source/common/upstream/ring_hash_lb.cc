@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <iostream>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "common/common/assert.h"
@@ -14,7 +15,7 @@ namespace Envoy {
 namespace Upstream {
 
 RingHashLoadBalancer::RingHashLoadBalancer(
-    PrioritySet& priority_set, ClusterStats& stats, Runtime::Loader& runtime,
+    const PrioritySet& priority_set, ClusterStats& stats, Runtime::Loader& runtime,
     Runtime::RandomGenerator& random,
     const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig>& config,
     const envoy::api::v2::Cluster::CommonLbConfig& common_config)
@@ -60,11 +61,14 @@ HostConstSharedPtr RingHashLoadBalancer::Ring::chooseHost(uint64_t h) const {
 
 using HashFunction = envoy::api::v2::Cluster_RingHashLbConfig_HashFunction;
 RingHashLoadBalancer::Ring::Ring(
-    const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig>& config,
-    const HostVector& hosts) {
+    const HostsPerLocality& hosts_per_locality,
+    const LocalityWeightsConstSharedPtr& locality_weights,
+    const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig>& config) {
   ENVOY_LOG(trace, "ring hash: building ring");
-  if (hosts.empty()) {
-    return;
+
+  // Sanity-check that the locality weights, if provided, line up with the hosts per locality.
+  if (locality_weights != nullptr) {
+    ASSERT(locality_weights->size() == hosts_per_locality.get().size());
   }
 
   // Currently we specify the minimum size of the ring, and determine the replication factor
@@ -78,16 +82,47 @@ RingHashLoadBalancer::Ring::Ring(
   const uint64_t min_ring_size =
       config ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.value(), minimum_ring_size, 1024) : 1024;
 
+  // Compute the "effective" weight of each host as the product of its own weight and the locality
+  // weight, if given. Sum these effective weights and find their greatest common denominator for
+  // normalization, so that we can size the ring appropriately.
+  // NOTE: GCD is associative, same as std::max() for example. To compute GCD(a, b, c, ...), we
+  //       GCD(GCD(GCD(GCD(0, a), b), c), ...).
+  uint64_t sum = 0;
+  uint32_t gcd = 0;
+  std::unordered_map<HostConstSharedPtr, uint32_t> effective_weights;
+  for (uint64_t i = 0; i < hosts_per_locality.get().size(); ++i) {
+    for (const auto& host : hosts_per_locality.get()[i]) {
+      auto host_weight = host->weight();
+      ASSERT(host_weight != 0);
+      // TODO(mergeconflict): C++17 introduces std::shared_ptr::operator[], so we don't have to
+      //                      dereference locality_weights explicitly.
+      auto locality_weight = locality_weights == nullptr ? 1 : (*locality_weights)[i];
+      ASSERT(locality_weight != 0);
+
+      auto effective_weight = host_weight * locality_weight;
+      sum += effective_weight;
+      // TODO(mergeconflict): C++17 introduces std::gcd in <numeric>.
+      gcd = std::__gcd(gcd, effective_weight);
+      effective_weights[host] = effective_weight;
+    }
+  }
+
+  // We can't do anything sensible with no hosts.
+  if (sum == 0) {
+    return;
+  }
+  sum /= gcd;
+
   uint64_t hashes_per_host = 1;
-  if (hosts.size() < min_ring_size) {
-    hashes_per_host = min_ring_size / hosts.size();
-    if ((min_ring_size % hosts.size()) != 0) {
+  if (sum < min_ring_size) {
+    hashes_per_host = min_ring_size / sum;
+    if (min_ring_size % sum != 0) {
       hashes_per_host++;
     }
   }
 
   ENVOY_LOG(info, "ring hash: min_ring_size={} hashes_per_host={}", min_ring_size, hashes_per_host);
-  ring_.reserve(hosts.size() * hashes_per_host);
+  ring_.reserve(sum * hashes_per_host);
 
   const bool use_std_hash =
       config ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.value().deprecated_v1(), use_std_hash, false)
@@ -98,7 +133,9 @@ RingHashLoadBalancer::Ring::Ring(
              : HashFunction::Cluster_RingHashLbConfig_HashFunction_XX_HASH;
 
   char hash_key_buffer[196];
-  for (const auto& host : hosts) {
+  for (const auto& entry : effective_weights) {
+    auto host = entry.first;
+    auto effective_weight = entry.second / gcd;
     const std::string& address_string = host->address()->asString();
     uint64_t offset_start = address_string.size();
 
@@ -113,7 +150,7 @@ RingHashLoadBalancer::Ring::Ring(
         address_string.size() + 1 + StringUtil::MIN_ITOA_OUT_LEN <= sizeof(hash_key_buffer), "");
     memcpy(hash_key_buffer, address_string.c_str(), offset_start);
     hash_key_buffer[offset_start++] = '_';
-    for (uint64_t i = 0; i < hashes_per_host; i++) {
+    for (uint64_t i = 0; i < effective_weight * hashes_per_host; i++) {
       const uint64_t total_hash_key_len =
           offset_start +
           StringUtil::itoa(hash_key_buffer + offset_start, StringUtil::MIN_ITOA_OUT_LEN, i);
