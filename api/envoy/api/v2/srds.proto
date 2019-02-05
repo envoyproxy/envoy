@@ -49,7 +49,8 @@ service ScopedRoutesDiscoveryService {
 // [#comment:next free field: 4]
 message ScopedRouteConfigurationsSet {
   // The name of the set of route configuration scopes. This will be the
-  // :ref:`scoped_routes_config_set_name <envoy_api_field_config.filter.network.http_connection_manager.v3.ScopedRds.scoped_routes_config_set_name>`
+  // :ref:`scoped_routes_config_set_name
+  // <envoy_api_field_config.filter.network.http_connection_manager.v3.ScopedRds.scoped_routes_config_set_name>`
   // set in :ref:`envoy_api_msg_config.filter.network.http_connection_manager.v2.ScopedRds`.
   string name = 1 [(validate.rules).string.min_bytes = 1];
 
@@ -58,7 +59,7 @@ message ScopedRouteConfigurationsSet {
   //
   // Upon receiving a request's headers, the Router will build a key using the algorithm specified
   // by this message. This key will be used to look up a corresponding
-  // :ref:`Scope <envoy_api_msg.ScopedRouteConfigurationsSet.Scope>` in a table containing the set 
+  // :ref:`Scope <envoy_api_msg.ScopedRouteConfigurationsSet.Scope>` in a table containing the set
   // of :ref:`scopes <envoy_api_field_ScopedRouteConfigurationsSet.scopes>`.
   message ScopeKeyBuilder {
     // Specifies the mechanism for constructing fragments which are composed into keys.
@@ -111,14 +112,14 @@ message ScopedRouteConfigurationsSet {
     }
 
     // The constructed key consists of the union of these fragments.
-    repeated FragmentBuilder fragments = 1 [(validate.rules).repeated.min_items = 1];
+    repeated FragmentBuilder fragments = 1 [(validate.rules).repeated .min_items = 1];
   }
 
   // The key construction mechanism.
   ScopeKeyBuilder scope_key_builder = 2 [(validate.rules).message.required = true];
 
   // Specifies a routing scope, which associates a :ref:`envoy_api_msg_RouteConfiguration` to a
-  // :ref:`Key <envoy_api_msg_ScopedRouteConfigurationsSet.Scope.Key>` which is matched against 
+  // :ref:`Key <envoy_api_msg_ScopedRouteConfigurationsSet.Scope.Key>` which is matched against
   // each HTTP request.
   message Scope {
     // Specifies a key which is matched against by the output of a :ref:`ScopeKeyBuilder`.
@@ -133,7 +134,7 @@ message ScopedRouteConfigurationsSet {
       }
 
       // The ordered set of fragments to match against.
-      repeated Fragment fragments = 1 [(validate.rules).repeated.min_items = 1];
+      repeated Fragment fragments = 1 [(validate.rules).repeated .min_items = 1];
     }
 
     // The resource name to use for a :ref:`envoy_api_msg_DiscoveryRequest` to an RDS server to
@@ -146,5 +147,5 @@ message ScopedRouteConfigurationsSet {
 
   // The set of scopes containing :ref:`Key <envoy_api_msg_ScopedRouteConfigurationsSet.Scope.Key>`
   // to :ref:`envoy_api_msg_RouteConfiguration` mappings.
-  repeated Scope scopes = 3 [(validate.rules).repeated.min_items = 1];
+  repeated Scope scopes = 3 [(validate.rules).repeated .min_items = 1];
 }
