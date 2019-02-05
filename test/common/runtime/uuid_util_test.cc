@@ -36,7 +36,7 @@ TEST_E(UUIDUtilsTest, mod, {
 
   EXPECT_TRUE(UuidUtils::uuidModBy("ffffffff-0012-0110-00ff-0c00400600ff", result, 10000));
   EXPECT_EQ(7295, result);
-  })
+})
 
 TEST_E(UUIDUtilsTest, checkDistribution, {
   Runtime::RandomGeneratorImpl random;
@@ -63,7 +63,7 @@ TEST_E(UUIDUtilsTest, checkDistribution, {
   }
 
   EXPECT_NEAR(required_percentage / 100.0, interesting_samples * 1.0 / total_samples, 0.002);
-  })
+})
 
 TEST_E(UUIDUtilsTest, DISABLED_benchmark, {
   Runtime::RandomGeneratorImpl random;
@@ -71,7 +71,7 @@ TEST_E(UUIDUtilsTest, DISABLED_benchmark, {
   for (int i = 0; i < 100000000; ++i) {
     random.uuid();
   }
-  })
+})
 
 TEST_E(UUIDUtilsTest, setAndCheckTraceable, {
   Runtime::RandomGeneratorImpl random;
@@ -93,7 +93,7 @@ TEST_E(UUIDUtilsTest, setAndCheckTraceable, {
 
   std::string invalid_uuid = "";
   EXPECT_FALSE(UuidUtils::setTraceableUuid(invalid_uuid, UuidTraceStatus::Forced));
-  })
+})
 
 } // namespace TestBaseSubclass
 

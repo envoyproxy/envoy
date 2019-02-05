@@ -5,7 +5,7 @@
 namespace Envoy {
 
 class TestBaseScope {
- public:
+public:
   ~TestBaseScope();
 };
 
@@ -17,11 +17,15 @@ public:
 };
 
 // Templatized version of TestBase.
-template <class T> class TestBaseWithParam : public ::testing::TestWithParam<T>,
-                                             public TestBaseScope {
+template <class T>
+class TestBaseWithParam : public ::testing::TestWithParam<T>, public TestBaseScope {
 public:
 };
 
-#define TEST_E(fixture, name, code) TEST(fixture, name) { TestBaseScope test_base_scope; code }
+#define TEST_E(fixture, name, code)                                                                \
+  TEST(fixture, name) {                                                                            \
+    TestBaseScope test_base_scope;                                                                 \
+    code                                                                                           \
+  }
 
 } // namespace Envoy
