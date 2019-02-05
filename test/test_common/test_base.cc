@@ -1,5 +1,6 @@
 #include "test/test_common/test_base.h"
 
+#include "common/common/assert.h"
 #include "test/test_common/global.h"
 
 namespace Envoy {
@@ -14,6 +15,6 @@ bool TestBase::checkSingletonQuiescensce() {
   return true;
 }
 
-TestBaseScope::~TestBaseScope() { TestBase::checkSingletonQuiescensce(); }
+TestBaseScope::~TestBaseScope() { RELEASE_ASSERT(TestBase::checkSingletonQuiescensce(), "foo"); }
 
 } // namespace Envoy

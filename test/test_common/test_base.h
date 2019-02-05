@@ -33,10 +33,4 @@ public:
 template <class T>
 class TestBaseWithParam : public ::testing::TestWithParam<T>, public TestBaseScope {};
 
-#define TEST_E(fixture, name, code)                                                                \
-  TEST(fixture, name) {                                                                            \
-    TestBaseScope test_base_scope;                                                                 \
-    code                                                                                           \
-  }
-
 } // namespace Envoy
