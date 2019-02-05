@@ -29,7 +29,7 @@ protected:
   }
 
   void initialize() override {
-    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
       // Add the static cluster to serve SRDS.
       auto* scoped_rds_cluster = bootstrap.mutable_static_resources()->add_clusters();
       scoped_rds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
