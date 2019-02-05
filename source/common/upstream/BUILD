@@ -254,6 +254,7 @@ envoy_cc_library(
         ":thread_aware_lb_lib",
         ":upstream_lib",
         "//source/common/common:minimal_logger_lib",
+        "//source/common/common:numeric",
     ],
 )
 

@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "common/common/assert.h"
+#include "common/common/numeric.h"
 #include "common/upstream/load_balancer_impl.h"
 
 #include "absl/strings/string_view.h"
@@ -85,8 +86,8 @@ RingHashLoadBalancer::Ring::Ring(
   // Compute the "effective" weight of each host as the product of its own weight and the locality
   // weight, if given. Sum these effective weights and find their greatest common denominator for
   // normalization, so that we can size the ring appropriately.
-  // NOTE: GCD is associative, same as std::max() for example. To compute GCD(a, b, c, ...), we
-  //       GCD(GCD(GCD(GCD(0, a), b), c), ...).
+  // NOTE: GCD is associative, same as std::max() for example. To evaluate GCD(a, b, c, ...), we
+  //       compute GCD(GCD(GCD(GCD(0, a), b), c), ...).
   uint64_t sum = 0;
   uint32_t gcd = 0;
   std::unordered_map<HostConstSharedPtr, uint32_t> effective_weights;
@@ -101,8 +102,7 @@ RingHashLoadBalancer::Ring::Ring(
 
       auto effective_weight = host_weight * locality_weight;
       sum += effective_weight;
-      // TODO(mergeconflict): C++17 introduces std::gcd in <numeric>.
-      gcd = std::__gcd(gcd, effective_weight);
+      gcd = Envoy::gcd(gcd, effective_weight);
       effective_weights[host] = effective_weight;
     }
   }
