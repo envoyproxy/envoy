@@ -10,7 +10,6 @@
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/test_base.h"
-#include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -29,7 +28,6 @@ protected:
 
   void SetUp() override { thread_.start(guard_dog_); }
 
-  Event::GlobalTimeSystem time_system_;
   NiceMock<Server::Configuration::MockMain> config_;
   Stats::IsolatedStoreImpl fakestats_;
   Api::ApiPtr api_;
