@@ -17,7 +17,7 @@ public:
     enable_half_close_ = true;
   }
 
-  ~TcpProxyIntegrationTest() {
+  ~TcpProxyIntegrationTest() override {
     test_server_.reset();
     fake_upstreams_.clear();
   }
