@@ -154,8 +154,10 @@ private:
   AccessLog::AccessLogManagerImpl access_log_manager_;
   std::unique_ptr<Upstream::ValidationClusterManagerFactory> cluster_manager_factory_;
   InitManagerImpl init_manager_;
-  std::unique_ptr<ListenerManagerImpl> listener_manager_;
+  // secret_manager_ must come before listener_manager_, since there may be active filter chains
+  // referencing it, so need to destruct these first.
   std::unique_ptr<Secret::SecretManager> secret_manager_;
+  std::unique_ptr<ListenerManagerImpl> listener_manager_;
   std::unique_ptr<OverloadManager> overload_manager_;
   MutexTracer* mutex_tracer_;
   Http::ContextImpl http_context_;
