@@ -174,7 +174,7 @@ class IntegrationTestServer : public Logger::Loggable<Logger::Id::testing>,
 public:
   static IntegrationTestServerPtr create(const std::string& config_path,
                                          const Network::Address::IpVersion version,
-                                         std::function<void()> server_init_coroutines,
+                                         std::function<void()> on_server_init_function,
                                          bool deterministic, Event::TestTimeSystem& time_system,
                                          Api::Api& api, bool defer_listener_finalization = false);
   // Note that the derived class is responsible for tearing down the server in its
@@ -191,7 +191,7 @@ public:
     on_worker_listener_removed_cb_ = on_worker_listener_removed;
   }
   void start(const Network::Address::IpVersion version,
-             std::function<void()> server_init_coroutines, bool deterministic,
+             std::function<void()> on_server_init_function, bool deterministic,
              bool defer_listener_finalization);
 
   void waitForCounterGe(const std::string& name, uint64_t value) override {

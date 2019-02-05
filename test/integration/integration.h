@@ -234,7 +234,7 @@ protected:
   // Will not return until that server is listening.
   virtual IntegrationTestServerPtr
   createIntegrationTestServer(const std::string& bootstrap_path,
-                              std::function<void()> server_init_coroutines,
+                              std::function<void()> on_server_init_function,
                               Event::TestTimeSystem& time_system);
 
   bool initialized() const { return initialized_; }
@@ -246,7 +246,7 @@ protected:
 
   // Steps that should be done in parallel with the envoy server starting. E.g., xDS
   // pre-init, control plane synchronization needed for server start.
-  std::function<void()> server_init_coroutines_;
+  std::function<void()> on_server_init_function_;
 
   std::vector<std::unique_ptr<FakeUpstream>> fake_upstreams_;
   // Target number of upstreams.

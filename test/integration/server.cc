@@ -45,11 +45,11 @@ OptionsImpl createTestOptionsImpl(const std::string& config_path, const std::str
 
 IntegrationTestServerPtr IntegrationTestServer::create(
     const std::string& config_path, const Network::Address::IpVersion version,
-    std::function<void()> server_init_coroutines, bool deterministic,
+    std::function<void()> on_server_init_function, bool deterministic,
     Event::TestTimeSystem& time_system, Api::Api& api, bool defer_listener_finalization) {
   IntegrationTestServerPtr server{
       std::make_unique<IntegrationTestServerImpl>(time_system, api, config_path)};
-  server->start(version, server_init_coroutines, deterministic, defer_listener_finalization);
+  server->start(version, on_server_init_function, deterministic, defer_listener_finalization);
   return server;
 }
 
@@ -64,7 +64,7 @@ void IntegrationTestServer::waitUntilListenersReady() {
 }
 
 void IntegrationTestServer::start(const Network::Address::IpVersion version,
-                                  std::function<void()> server_init_coroutines, bool deterministic,
+                                  std::function<void()> on_server_init_function, bool deterministic,
                                   bool defer_listener_finalization) {
   ENVOY_LOG(info, "starting integration test server");
   ASSERT(!thread_);
@@ -76,8 +76,8 @@ void IntegrationTestServer::start(const Network::Address::IpVersion version,
   // before workers starting or after server start. Any needed synchronization must occur in the
   // routines. These steps are executed at this point in the code to allow server initialization to
   // be dependent on them (e.g. control plane peers).
-  if (server_init_coroutines != nullptr) {
-    server_init_coroutines();
+  if (on_server_init_function != nullptr) {
+    on_server_init_function();
   }
 
   // Wait for the server to be created and the number of initial listeners to wait for to be set.

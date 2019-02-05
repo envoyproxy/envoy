@@ -644,7 +644,7 @@ TEST_P(AdsIntegrationTest, XdsBatching) {
     static_resources->add_listeners()->MergeFrom(buildListener("rds_listener2", "route_config2"));
   });
 
-  server_init_coroutines_ = [this]() {
+  on_server_init_function_ = [this]() {
     createXdsConnection();
     ASSERT_TRUE(xds_connection_->waitForNewStream(*dispatcher_, xds_stream_));
     xds_stream_->startGrpcStream();
