@@ -23,7 +23,7 @@ envoy_cc_library(
     hdrs = [
         "span_buffer.h",
         "span_context.h",
-        "tracer.h",
+        "tracer_test.h",
         "tracer_interface.h",
         "util.h",
         "zipkin_core_constants.h",

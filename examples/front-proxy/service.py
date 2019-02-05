@@ -18,8 +18,6 @@ TRACE_HEADERS_TO_PROPAGATE = [
     'X-B3-Sampled',
     'X-B3-Flags',
 
-    'X-Amzn-Trace-Id',
-
     # Jaeger header (for native client)
     "uber-trace-id"
 ]
@@ -27,7 +25,7 @@ TRACE_HEADERS_TO_PROPAGATE = [
 @app.route('/service/<service_number>')
 def hello(service_number):
     return ('Hello from behind Envoy (service {})! hostname: {} resolved'
-            'hostname: {}\n'.format(os.environ['SERVICE_NAME'], 
+            'hostname: {}\n'.format(os.environ['SERVICE_NAME'],
                                     socket.gethostname(),
                                     socket.gethostbyname(socket.gethostname())))
 
@@ -41,7 +39,7 @@ def trace(service_number):
                 headers[header] = request.headers[header]
         ret = requests.get("http://localhost:9000/trace/2", headers=headers)
     return ('Hello from behind Envoy (service {})! hostname: {} resolved'
-            'hostname: {}\n'.format(os.environ['SERVICE_NAME'], 
+            'hostname: {}\n'.format(os.environ['SERVICE_NAME'],
                                     socket.gethostname(),
                                     socket.gethostbyname(socket.gethostname())))
 

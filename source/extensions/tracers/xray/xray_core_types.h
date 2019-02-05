@@ -34,16 +34,6 @@ namespace Envoy {
                     virtual const std::string toJson() PURE;
                 };
 
-                /**
-                 * Enum representing valid types of Zipkin binary annotations.
-                 */
-                enum AnnotationType { BOOL = 0, STRING = 1 };
-
-                /**
-                 * Represents a Zipkin binary annotation. This class is based on Zipkin's Thrift definition of
-                 * a binary annotation. A binary annotation allows arbitrary key-value pairs to be associated
-                 * with a Zipkin span.
-                 */
                 class BinaryAnnotation : public XRayBase {
                 public:
                     /**
@@ -59,7 +49,7 @@ namespace Envoy {
                     /**
                      * Default constructor. Creates an empty binary annotation.
                      */
-                    BinaryAnnotation() : key_(), value_(), annotation_type_(STRING) {}
+                    BinaryAnnotation() : key_(), value_() {}
 
                     /**
                      * Constructor that creates a binary annotation based on the given parameters.
@@ -67,17 +57,7 @@ namespace Envoy {
                      * @param key The key name of the annotation.
                      * @param value The value associated with the key.
                      */
-                    BinaryAnnotation(const std::string& key, const std::string& value) : key_(key), value_(value), annotation_type_(STRING) {}
-
-                    /**
-                     * @return the type of the binary annotation.
-                     */
-                    AnnotationType annotationType() const { return annotation_type_; }
-
-                    /**
-                     * Sets the binary's annotation type.
-                     */
-                    void setAnnotationType(AnnotationType annotationType) { annotation_type_ = annotationType; }
+                    BinaryAnnotation(const std::string& key, const std::string& value) : key_(key), value_(value) {}
 
                     /**
                      * @return the key attribute.
@@ -100,7 +80,7 @@ namespace Envoy {
                     void setValue(const std::string& value) { value_ = value; }
 
                     /**
-                     * Serializes the binary annotation as a Zipkin-compliant JSON representation as a string.
+                     * Serializes the binary annotation as JSON representation as a string.
                      *
                      * @return a stringified JSON.
                      */
@@ -109,7 +89,6 @@ namespace Envoy {
                 private:
                     std::string key_;
                     std::string value_;
-                    AnnotationType annotation_type_;
                 };
 
                 class ChildSpan : public XRayBase {
@@ -161,7 +140,7 @@ namespace Envoy {
                     /**
                      * Default constructor. Creates an empty span.
                      */
-                    Span() : trace_id_(), name_(), id_(0), debug_(false), sampled_(false), start_time_(0) {}
+                    Span() : trace_id_(), name_(), id_(0), sampled_(false), start_time_(0) {}
 
                     /**
                      * Sets the span's trace id attribute.
@@ -192,11 +171,6 @@ namespace Envoy {
                      * Set the span's sampled flag.
                      */
                     void setSampled(bool val) { sampled_ = val; }
-
-                    /**
-                     * Sets the span's debug attribute.
-                     */
-                    void setDebug() { debug_ = true; }
 
                     /**
                      * Sets the span's binary annotations all at once.
@@ -238,26 +212,11 @@ namespace Envoy {
                     bool isSetTimestamp() const { return timestamp_.has_value(); }
 
                     /**
-                     * Sets the span's duration attribute.
-                     */
-                    void setDuration(const int64_t val) { duration_ = val; }
-
-                    /**
-                     * @return Whether or not the duration attribute is set.
-                     */
-                    bool isSetDuration() const { return duration_.has_value(); }
-
-                    /**
                      * Sets the span start-time attribute (monotonic, used to calculate duration).
                      */
                     void setStartTime(const double time) { start_time_ = time; }
 
                     void setServiceName(const std::string& service_name);
-
-                    /**
-                     * @return the span's duration attribute.
-                     */
-                    int64_t duration() const { return duration_.value(); }
 
                     /**
                      * @return the span's id as an integer.
@@ -282,11 +241,6 @@ namespace Envoy {
                      * @return the span's parent id as an integer.
                      */
                     uint64_t parentId() const { return parent_id_.value(); }
-
-                    /**
-                     * @return whether or not the debug attribute is set
-                     */
-                    bool debug() const { return debug_; }
 
                     /**
                      * @return whether or not the sampled attribute is set
@@ -345,11 +299,9 @@ namespace Envoy {
                     std::string name_;
                     uint64_t id_;
                     absl::optional<uint64_t> parent_id_;
-                    bool debug_;
                     bool sampled_;
                     std::vector<BinaryAnnotation> binary_annotations_;
                     absl::optional<int64_t> timestamp_;
-                    absl::optional<int64_t> duration_;
                     double start_time_;
                     TracerInterface* tracer_;
                     std::vector<ChildSpan> child_span_;

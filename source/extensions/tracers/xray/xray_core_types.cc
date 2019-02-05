@@ -25,13 +25,11 @@ namespace Envoy {
                 BinaryAnnotation::BinaryAnnotation(const BinaryAnnotation& ann) {
                     key_ = ann.key();
                     value_ = ann.value();
-                    annotation_type_ = ann.annotationType();
                 }
 
                 BinaryAnnotation& BinaryAnnotation::operator=(const BinaryAnnotation& ann) {
                     key_ = ann.key();
                     value_ = ann.value();
-                    annotation_type_ = ann.annotationType();
 
                     return *this;
                 }
@@ -138,14 +136,10 @@ namespace Envoy {
                     if (span.isSetParentId()) {
                         parent_id_ = span.parentId();
                     }
-                    debug_ = span.debug();
                     sampled_ = span.sampled();
                     binary_annotations_ = span.binaryAnnotations();
                     if (span.isSetTimestamp()) {
                         timestamp_ = span.timestamp();
-                    }
-                    if (span.isSetDuration()) {
-                        duration_ = span.duration();
                     }
                     start_time_ = span.startTime();
                     tracer_ = span.tracer();

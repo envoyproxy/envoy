@@ -15,17 +15,6 @@ namespace Envoy {
     namespace Extensions {
         namespace Tracers {
             namespace XRay {
-                std::string Util::mergeKeyWithValue(const std::string& source, const std::string& field_name) {
-                    rapidjson::StringBuffer sb;
-                    rapidjson::Writer<rapidjson::StringBuffer> w(sb);
-                    w.StartObject();
-                    w.Key(field_name.c_str());
-                    w.String(source.c_str());
-                    w.EndObject();
-                    std::string new_string = sb.GetString();
-                    return new_string;
-                }
-
                 void Util::mergeJsons(std::string& target, const std::string& source,
                                       const std::string& field_name) {
                     rapidjson::Document target_doc, source_doc;
@@ -57,18 +46,12 @@ namespace Envoy {
                     mergeJsons(target, stringified_json_array, field_name);
                 }
 
-                std::string Util::addArrayToJsonWithKey(const std::vector<std::string>& json_array, const std::string& field_name) {
-                    std::string stringified_json_array;
-
-                    if (json_array.size() > 0) {
-                        stringified_json_array += json_array[0];
-                        for (auto it = json_array.begin() + 1; it != json_array.end(); it++) {
-                            stringified_json_array += ",";
-                            stringified_json_array += *it;
-                        }
-                    }
-
-                    return mergeKeyWithValue(stringified_json_array, field_name);
+                uint64_t Util::generateRandom64(TimeSource& time_source) {
+                    uint64_t seed = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                            time_source.systemTime().time_since_epoch())
+                            .count();
+                    std::mt19937_64 rand_64(seed);
+                    return rand_64();
                 }
 
             } // namespace XRay

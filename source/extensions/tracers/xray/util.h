@@ -3,14 +3,16 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/time.h"
+
 namespace Envoy {
     namespace Extensions {
         namespace Tracers {
             namespace XRay {
 
-/**
- * Utility class with a few convenient methods
- */
+                /**
+                 * Utility class with a few convenient methods
+                */
                 class Util {
                 public:
                     // ====
@@ -36,10 +38,10 @@ namespace Envoy {
                      */
                     static void addArrayToJson(std::string& target, const std::vector<std::string>& json_array, const std::string& field_name);
 
-                    static std::string addArrayToJsonWithKey(const std::vector<std::string>& json_array, const std::string& field_name);
-
-
-                    static std::string mergeKeyWithValue(const std::string& source, const std::string& field_name);
+                    /**
+                     * Returns a randomly-generated 64-bit integer number.
+                     */
+                    static uint64_t generateRandom64(TimeSource& time_source);
 
                 };
 
