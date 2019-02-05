@@ -101,7 +101,7 @@ public:
   FilterChainFactory& filterFactory() override { return *this; }
   bool reverseEncodeOrder() override { return reverse_encode_order_; }
   bool generateRequestId() override { return generate_request_id_; }
-  uint32_t maxRequestHeadersSizeKb() const override { return max_request_headers_size_kb_; }
+  uint32_t maxRequestHeadersKb() const override { return max_request_headers_kb_; }
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
   std::chrono::milliseconds streamIdleTimeout() const override { return stream_idle_timeout_; }
   std::chrono::milliseconds requestTimeout() const override { return request_timeout_; }
@@ -158,7 +158,7 @@ private:
   std::string server_name_;
   Http::TracingConnectionManagerConfigPtr tracing_config_;
   absl::optional<std::string> user_agent_;
-  uint32_t max_request_headers_size_kb_;
+  const uint32_t max_request_headers_kb_;
   absl::optional<std::chrono::milliseconds> idle_timeout_;
   std::chrono::milliseconds stream_idle_timeout_;
   std::chrono::milliseconds request_timeout_;

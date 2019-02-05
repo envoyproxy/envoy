@@ -231,7 +231,7 @@ public:
   /**
    * @return maximum request headers size the connection manager will accept.
    */
-  virtual uint32_t maxRequestHeadersSizeKb() const PURE;
+  virtual uint32_t maxRequestHeadersKb() const PURE;
 
   /**
    * @return per-stream idle timeout for incoming connection manager connections. Zero indicates a

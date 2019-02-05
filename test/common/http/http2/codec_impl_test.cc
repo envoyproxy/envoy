@@ -15,6 +15,7 @@
 #include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
+#include "codec_impl_test_util.h"
 #include "gmock/gmock.h"
 
 using testing::_;
@@ -32,24 +33,6 @@ namespace Http2 {
 
 using Http2SettingsTuple = ::testing::tuple<uint32_t, uint32_t, uint32_t, uint32_t>;
 using Http2SettingsTestParam = ::testing::tuple<Http2SettingsTuple, Http2SettingsTuple>;
-
-class TestServerConnectionImpl : public ServerConnectionImpl {
-public:
-  TestServerConnectionImpl(Network::Connection& connection, ServerConnectionCallbacks& callbacks,
-                           Stats::Scope& scope, const Http2Settings& http2_settings)
-      : ServerConnectionImpl(connection, callbacks, scope, http2_settings) {}
-  nghttp2_session* session() { return session_; }
-  using ServerConnectionImpl::getStream;
-};
-
-class TestClientConnectionImpl : public ClientConnectionImpl {
-public:
-  TestClientConnectionImpl(Network::Connection& connection, Http::ConnectionCallbacks& callbacks,
-                           Stats::Scope& scope, const Http2Settings& http2_settings)
-      : ClientConnectionImpl(connection, callbacks, scope, http2_settings) {}
-  nghttp2_session* session() { return session_; }
-  using ClientConnectionImpl::getStream;
-};
 
 class Http2CodecImplTest : public TestBaseWithParam<Http2SettingsTestParam> {
 public:
@@ -73,9 +56,11 @@ public:
     Http2SettingsFromTuple(client_http2settings_, ::testing::get<0>(GetParam()));
     Http2SettingsFromTuple(server_http2settings_, ::testing::get<1>(GetParam()));
     client_ = std::make_unique<TestClientConnectionImpl>(client_connection_, client_callbacks_,
-                                                         stats_store_, client_http2settings_);
+                                                         stats_store_, client_http2settings_,
+                                                         max_request_headers_kb_);
     server_ = std::make_unique<TestServerConnectionImpl>(server_connection_, server_callbacks_,
-                                                         stats_store_, server_http2settings_);
+                                                         stats_store_, server_http2settings_,
+                                                         max_request_headers_kb_);
 
     request_encoder_ = &client_->newStream(response_decoder_);
     setupDefaultConnectionMocks();
@@ -144,6 +129,7 @@ public:
   StreamEncoder* response_encoder_{};
   MockStreamCallbacks server_stream_callbacks_;
   bool corrupt_data_ = false;
+  uint32_t max_request_headers_kb_ = Http::DEFAULT_MAX_REQUEST_HEADERS_KB;
 };
 
 TEST_P(Http2CodecImplTest, ShutdownNotice) {
@@ -775,9 +761,11 @@ TEST_P(Http2CodecImplStreamLimitTest, MaxClientStreams) {
   Http2SettingsFromTuple(client_http2settings_, ::testing::get<0>(GetParam()));
   Http2SettingsFromTuple(server_http2settings_, ::testing::get<1>(GetParam()));
   client_ = std::make_unique<TestClientConnectionImpl>(client_connection_, client_callbacks_,
-                                                       stats_store_, client_http2settings_);
+                                                       stats_store_, client_http2settings_,
+                                                       max_request_headers_kb_);
   server_ = std::make_unique<TestServerConnectionImpl>(server_connection_, server_callbacks_,
-                                                       stats_store_, server_http2settings_);
+                                                       stats_store_, server_http2settings_,
+                                                       max_request_headers_kb_);
 
   for (int i = 0; i < 101; ++i) {
     request_encoder_ = &client_->newStream(response_decoder_);
@@ -877,18 +865,52 @@ TEST(Http2CodecUtility, reconstituteCrumbledCookies) {
   }
 }
 
-// For issue #1421 regression test that Envoy's H2 codec applies header limits early.
-TEST_P(Http2CodecImplTest, TestCodecHeaderLimits) {
+TEST_P(Http2CodecImplTest, TestLargeHeadersInvokeResetStream) {
   initialize();
 
   TestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
-  std::string long_string = std::string(1024, 'q');
-  for (int i = 0; i < 63; ++i) {
-    request_headers.addCopy(fmt::format("{}", i), long_string);
-  }
-  EXPECT_CALL(server_stream_callbacks_, onResetStream(_));
+  std::string long_string = std::string(63 * 1024, 'q');
+  request_headers.addCopy("big", long_string);
+  EXPECT_CALL(server_stream_callbacks_, onResetStream(_)).Times(1);
   request_encoder_->encodeHeaders(request_headers, false);
+}
+
+TEST_P(Http2CodecImplTest, TestLargeHeadersAcceptedIfConfigured) {
+  max_request_headers_kb_ = 64;
+  initialize();
+
+  TestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  std::string long_string = std::string(63 * 1024, 'q');
+  request_headers.addCopy("big", long_string);
+
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, _));
+  EXPECT_CALL(server_stream_callbacks_, onResetStream(_)).Times(0);
+  request_encoder_->encodeHeaders(request_headers, false);
+}
+
+TEST_P(Http2CodecImplTest, TestLargeHeadersAtLimitAccepted) {
+  uint32_t codec_limit_kb = 64;
+  max_request_headers_kb_ = codec_limit_kb;
+  initialize();
+
+  TestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  std::string key = "big";
+  uint32_t head_room = 77;
+  uint32_t long_string_length =
+      codec_limit_kb * 1024 - request_headers.byteSize() - key.length() - head_room;
+  std::string long_string = std::string(long_string_length, 'q');
+  request_headers.addCopy(key, long_string);
+
+  // The amount of data sent to the codec is not equivalent to the size of the
+  // request headers that Envoy computes, as the codec limits based on the
+  // entire http2 frame. The exact head room needed (76) was found through iteration.
+  ASSERT_EQ(request_headers.byteSize() + head_room, codec_limit_kb * 1024);
+
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, _));
+  request_encoder_->encodeHeaders(request_headers, true);
 }
 
 TEST_P(Http2CodecImplTest, TestCodecHeaderCompression) {

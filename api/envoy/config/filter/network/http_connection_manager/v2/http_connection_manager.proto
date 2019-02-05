@@ -133,11 +133,11 @@ message HttpConnectionManager {
   // The maximum request headers size for incoming connections. The default max
   // is 60K, based on default settings for http codecs. For HTTP1, the current
   // limit set by http_parser is 80K. for HTTP2, the default allowed header
-  // block in nghttp2 is 64K. The max configurable setting is 63K in order to
+  // block in nghttp2 is 64K. The max configurable setting is 64K in order to
   // stay under both codec limits.
   // Requests that exceed this size will receive a 431 response.
   google.protobuf.UInt32Value max_request_headers_kb = 29
-      [(validate.rules).uint32.gt = 0, (validate.rules).uint32.lte = 63];
+      [(validate.rules).uint32.gt = 0, (validate.rules).uint32.lte = 64];
 
   // The idle timeout for connections managed by the connection manager. The
   // idle timeout is defined as the period in which there are no active
