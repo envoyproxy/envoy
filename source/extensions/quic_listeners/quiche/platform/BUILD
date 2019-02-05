@@ -42,6 +42,7 @@ envoy_cc_library(
     hdrs = [
         "quic_aligned_impl.h",
         "quic_arraysize_impl.h",
+        "quic_client_stats_impl.h",
         "quic_containers_impl.h",
         "quic_endian_impl.h",
         "quic_estimate_memory_usage_impl.h",
