@@ -27,8 +27,6 @@ using ConfigSerializationType =
 
 class DubboFilterTest : public TestBase {
 public:
-  DubboFilterTest() {}
-
   TimeSource& timeSystem() { return factory_context_.dispatcher().timeSystem(); }
 
   void initializeFilter() {
