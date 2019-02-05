@@ -1,8 +1,8 @@
-#include "common/common/numeric.h"
-
 #include <functional>
 #include <limits>
 #include <random>
+
+#include "common/common/numeric.h"
 
 #include "test/test_common/test_base.h"
 
@@ -12,37 +12,35 @@ std::random_device rd;
 std::mt19937 gen(rd());
 std::uniform_int_distribution<int32_t> negative_ints(std::numeric_limits<int32_t>::min(), -1);
 std::uniform_int_distribution<int32_t> nonnegative_ints(0, std::numeric_limits<int32_t>::max());
-std::uniform_int_distribution<int32_t> signed_ints(std::numeric_limits<int32_t>::min(), std::numeric_limits<int32_t>::max());
+std::uniform_int_distribution<int32_t> signed_ints(std::numeric_limits<int32_t>::min(),
+                                                   std::numeric_limits<int32_t>::max());
 std::uniform_int_distribution<uint32_t> unsigned_ints(0, std::numeric_limits<uint32_t>::max());
 
-template <typename T> void law(std::uniform_int_distribution<T>& distribution, std::function<void(T)> f) {
+template <typename T>
+void law(std::uniform_int_distribution<T>& distribution, std::function<void(T)> f) {
   for (int i = 0; i < 100; ++i) {
     f(distribution(gen));
   }
 }
 
-template <typename T> void law(std::uniform_int_distribution<T>& distribution, std::function<void(T, T)> f) {
+template <typename T>
+void law(std::uniform_int_distribution<T>& distribution, std::function<void(T, T)> f) {
   for (int i = 0; i < 100; ++i) {
     f(distribution(gen), distribution(gen));
   }
 }
 
-template <typename T> void law(std::uniform_int_distribution<T>& distribution, std::function<void(T, T, T)> f) {
+template <typename T>
+void law(std::uniform_int_distribution<T>& distribution, std::function<void(T, T, T)> f) {
   for (int i = 0; i < 100; ++i) {
     f(distribution(gen), distribution(gen), distribution(gen));
   }
 }
 
 TEST(NumericTest, Abs) {
-  law<int32_t>(negative_ints, [](int32_t n) {
-    EXPECT_EQ(-n, abs(n));
-  });
-  law<int32_t>(nonnegative_ints, [](int32_t n) {
-    EXPECT_EQ(n, abs(n));
-  });
-  law<uint32_t>(unsigned_ints, [](uint32_t n) {
-    EXPECT_EQ(n, abs(n));
-  });
+  law<int32_t>(negative_ints, [](int32_t n) { EXPECT_EQ(-n, abs(n)); });
+  law<int32_t>(nonnegative_ints, [](int32_t n) { EXPECT_EQ(n, abs(n)); });
+  law<uint32_t>(unsigned_ints, [](uint32_t n) { EXPECT_EQ(n, abs(n)); });
 }
 
 TEST(NumericTest, Gcd) {
