@@ -83,11 +83,11 @@ public:
 
 class HttpFilterTest : public HttpFilterTestBase<TestBase> {};
 
-typedef envoy::config::filter::http::ext_authz::v2::ExtAuthz CreateFilterConfigFunc();
+using CreateFilterConfigFunc = envoy::config::filter::http::ext_authz::v2::ExtAuthz();
 
 class HttpFilterTestParam : public HttpFilterTestBase<TestBaseWithParam<CreateFilterConfigFunc*>> {
 public:
-  virtual void SetUp() override { initialize(""); }
+  void SetUp() override { initialize(""); }
 };
 
 template <bool failure_mode_allow_value, bool http_client>

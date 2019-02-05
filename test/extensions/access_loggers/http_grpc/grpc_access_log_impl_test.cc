@@ -24,9 +24,9 @@ namespace HttpGrpc {
 
 class GrpcAccessLogStreamerImplTest : public TestBase {
 public:
-  typedef Grpc::MockAsyncStream MockAccessLogStream;
-  typedef Grpc::TypedAsyncStreamCallbacks<envoy::service::accesslog::v2::StreamAccessLogsResponse>
-      AccessLogCallbacks;
+  using MockAccessLogStream = Grpc::MockAsyncStream;
+  using AccessLogCallbacks =
+      Grpc::TypedAsyncStreamCallbacks<envoy::service::accesslog::v2::StreamAccessLogsResponse>;
 
   GrpcAccessLogStreamerImplTest() {
     EXPECT_CALL(*factory_, create()).WillOnce(Invoke([this] {

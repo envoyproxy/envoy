@@ -5250,8 +5250,7 @@ virtual_hosts:
 class PerFilterConfigsTest : public TestBase, public ConfigImplTestBase {
 public:
   PerFilterConfigsTest()
-      : factory_(), registered_factory_(factory_), default_factory_(),
-        registered_default_factory_(default_factory_) {}
+      : registered_factory_(factory_), registered_default_factory_(default_factory_) {}
 
   struct DerivedFilterConfig : public RouteSpecificFilterConfig {
     ProtobufWkt::Timestamp config_;

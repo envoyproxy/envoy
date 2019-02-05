@@ -35,7 +35,7 @@ public:
 
 class FilterTest : public TestBase {
 public:
-  void SetUp() {
+  void SetUp() override {
     mock_config_ = ::std::make_shared<MockFilterConfig>(proto_config_, "", mock_context_);
 
     mock_verifier_ = std::make_unique<MockVerifier>();
