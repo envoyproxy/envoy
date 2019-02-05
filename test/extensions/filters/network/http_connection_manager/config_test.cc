@@ -169,7 +169,7 @@ TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersSizeDefault) {
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_);
-  EXPECT_EQ(60, config.maxRequestHeadersSizeKb());
+  EXPECT_EQ(60, config.maxRequestHeadersKb());
 }
 
 TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersSizeConfigured) {
@@ -185,7 +185,7 @@ TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersSizeConfigured) {
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_);
-  EXPECT_EQ(16, config.maxRequestHeadersSizeKb());
+  EXPECT_EQ(16, config.maxRequestHeadersKb());
 }
 
 // Validated that an explicit zero stream idle timeout disables.
