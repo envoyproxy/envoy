@@ -26,6 +26,10 @@ licenses(["notice"])  # Apache 2
 # should remain largely the same.
 
 load(":genrule_cmd.bzl", "genrule_cmd")
+load(
+    "@envoy//bazel:envoy_build_system.bzl",
+    "envoy_cc_test",
+)
 
 src_files = glob([
     "**/*.h",
@@ -118,9 +122,11 @@ cc_library(
         "quiche/quic/platform/api/quic_flag_utils.h",
         "quiche/quic/platform/api/quic_iovec.h",
         "quiche/quic/platform/api/quic_prefetch.h",
+        "quiche/quic/platform/api/quic_ptr_util.h",
+        "quiche/quic/platform/api/quic_str_cat.h",
         "quiche/quic/platform/api/quic_string.h",
         "quiche/quic/platform/api/quic_string_piece.h",
-        "quiche/quic/platform/api/quic_ptr_util.h",
+        "quiche/quic/platform/api/quic_string_utils.h",
         "quiche/quic/platform/api/quic_uint128.h",
         # TODO: uncomment the following files as implementations are added.
         # "quiche/quic/platform/api/quic_bug_tracker.h",
@@ -150,8 +156,6 @@ cc_library(
         # "quiche/quic/platform/api/quic_sleep.h",
         # "quiche/quic/platform/api/quic_socket_address.h",
         # "quiche/quic/platform/api/quic_stack_trace.h",
-        # "quiche/quic/platform/api/quic_str_cat.h",
-        # "quiche/quic/platform/api/quic_string_utils.h",
         # "quiche/quic/platform/api/quic_test.h",
         # "quiche/quic/platform/api/quic_test_loopback.h",
         # "quiche/quic/platform/api/quic_test_mem_slice_vector.h",
@@ -162,5 +166,14 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "@envoy//source/extensions/quic_listeners/quiche/platform:quic_platform_base_impl_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "quic_platform_test",
+    srcs = ["quiche/quic/platform/api/quic_string_utils_test.cc"],
+    repository = "@envoy",
+    deps = [
+        ":quic_platform",
     ],
 )

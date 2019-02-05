@@ -9,11 +9,11 @@
 
 #include "common/common/perf_annotation.h"
 
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 namespace Envoy {
 
-class PerfAnnotationTest : public testing::Test {
+class PerfAnnotationTest : public TestBase {
 protected:
   void TearDown() override { PERF_CLEAR(); }
 };
