@@ -97,7 +97,7 @@ TEST_F(InjectedResourceMonitorTest, ReportsErrorForOutOfRangePressure) {
 }
 
 TEST_F(InjectedResourceMonitorTest, ReportsErrorOnFileRead) {
-  EXPECT_CALL(cb_, onFailure(ExceptionContains("unable to read file")));
+  EXPECT_CALL(cb_, onFailure(ExceptionContains("Invalid path")));
   monitor_->updateResourceUsage(cb_);
 }
 

@@ -70,6 +70,10 @@ ssize_t InstanceImpl::fileSize(const std::string& path) {
 }
 
 std::string InstanceImpl::fileReadToEnd(const std::string& path) {
+  if (illegalPath(path)) {
+    throw EnvoyException(fmt::format("Invalid path: {}", path));
+  }
+
   std::ios::sync_with_stdio(false);
 
   std::ifstream file(path);
