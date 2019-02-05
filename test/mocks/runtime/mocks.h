@@ -27,6 +27,7 @@ public:
   MockSnapshot();
   ~MockSnapshot();
 
+  MOCK_CONST_METHOD1(deprecatedFeatureEnabled, bool(const std::string& key));
   MOCK_CONST_METHOD2(featureEnabled, bool(const std::string& key, uint64_t default_value));
   MOCK_CONST_METHOD3(featureEnabled,
                      bool(const std::string& key, uint64_t default_value, uint64_t random_value));

@@ -9,6 +9,9 @@
 #include "envoy/common/pure.h"
 #include "envoy/type/percent.pb.h"
 
+#include "common/common/assert.h"
+#include "common/singleton/threadsafe_singleton.h"
+
 #include "absl/types/optional.h"
 
 namespace Envoy {
@@ -70,6 +73,15 @@ public:
   };
 
   typedef std::unique_ptr<const OverrideLayer> OverrideLayerConstPtr;
+
+  // Returns true if a deprecated feature is allowed.
+  //
+  // Unlike most runtime features, deprecated features (see FIXME(alyssar) doc)
+  // are either allowed or disallowed by default. They are allowed by default, or with explicit
+  // configuration to "100" via runtime configuration. They can be disallowed either by inclusion
+  // in the hard-coded disallowed_features[] list, or by configuration of a non-100 value in runtime
+  // config.
+  virtual bool deprecatedFeatureEnabled(const std::string& key) const PURE;
 
   /**
    * Test if a feature is enabled using the built in random generator. This is done by generating
@@ -202,6 +214,16 @@ public:
 };
 
 typedef std::unique_ptr<Loader> LoaderPtr;
+
+// To make the runtime generally accessible, we make use of the dreaded
+// singleton class. For Envoy, the runtime will be created and cleaned up by the
+// Server::InstanceImpl initialize() and destructor, respectively.
+//
+// This makes it possible for call sites to easily make use of runtime values to
+// determine if a given feature is on or off, as well as various deprecated configuration
+// protos being enabled or disabled by default.
+typedef InjectableSingleton<Loader> LoaderSingleton;
+typedef ScopedInjectableLoader<Loader> ScopedLoaderSingleton;
 
 } // namespace Runtime
 } // namespace Envoy

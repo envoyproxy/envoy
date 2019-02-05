@@ -5,6 +5,7 @@
 #include "envoy/api/api.h"
 #include "envoy/common/exception.h"
 #include "envoy/json/json_object.h"
+#include "envoy/runtime/runtime.h"
 #include "envoy/type/percent.pb.h"
 
 #include "common/common/hash.h"
@@ -181,11 +182,13 @@ public:
   /**
    * Checks for use of deprecated fields in message and all sub-messages.
    * @param message message to validate.
-   * @param warn_only if true, logs a warning rather than throwing an exception if deprecated fields
-   *   are in use.
-   * @throw ProtoValidationException if deprecated fields are used and warn_only is false.
+   * @param loader optional a pointer to the runtime loader for live deprecation status.
+   * @throw ProtoValidationException if deprecated fields are used and listed
+   *   Runtime::DisallowedFeatures
    */
-  static void checkForDeprecation(const Protobuf::Message& message, bool warn_only);
+  static void
+  checkForDeprecation(const Protobuf::Message& message,
+                      Runtime::Loader* loader = Runtime::LoaderSingleton::getExisting());
 
   /**
    * Validate protoc-gen-validate constraints on a given protobuf.
@@ -196,7 +199,7 @@ public:
    */
   template <class MessageType> static void validate(const MessageType& message) {
     // Log warnings if deprecated fields are in use.
-    checkForDeprecation(message, true);
+    checkForDeprecation(message);
 
     std::string err;
     if (!Validate(message, &err)) {

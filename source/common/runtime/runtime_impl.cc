@@ -14,7 +14,9 @@
 #include "common/common/utility.h"
 #include "common/filesystem/directory.h"
 #include "common/protobuf/utility.h"
+#include "common/runtime/runtime_features.h"
 
+#include "absl/strings/match.h"
 #include "openssl/rand.h"
 
 namespace Envoy {
@@ -142,6 +144,13 @@ std::string RandomGeneratorImpl::uuid() {
   }
 
   return std::string(uuid, UUID_LENGTH);
+}
+
+bool SnapshotImpl::deprecatedFeatureEnabled(const std::string& key) const {
+  ASSERT(absl::StartsWith(key, "envoy.deprecated_feature."));
+  bool disallowed_by_default = DisallowedFeaturesDefaults::get().disallowedByDefault(key);
+  int default_value = disallowed_by_default ? 0 : 100;
+  return getInteger(key, default_value) == 100;
 }
 
 bool SnapshotImpl::featureEnabled(const std::string& key, uint64_t default_value,

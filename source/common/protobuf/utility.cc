@@ -106,7 +106,7 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
   }
 }
 
-void MessageUtil::checkForDeprecation(const Protobuf::Message& message, bool warn_only) {
+void MessageUtil::checkForDeprecation(const Protobuf::Message& message, Runtime::Loader* runtime) {
   const Protobuf::Descriptor* descriptor = message.GetDescriptor();
   const Protobuf::Reflection* reflection = message.GetReflection();
   for (int i = 0; i < descriptor->field_count(); ++i) {
@@ -116,6 +116,12 @@ void MessageUtil::checkForDeprecation(const Protobuf::Message& message, bool war
     if ((field->is_repeated() && reflection->FieldSize(message, field) == 0) ||
         (!field->is_repeated() && !reflection->HasField(message, field))) {
       continue;
+    }
+
+    bool warn_only = true;
+    if (runtime && !runtime->snapshot().deprecatedFeatureEnabled(
+                       absl::StrCat("envoy.deprecated_feature.", field->name()))) {
+      warn_only = false;
     }
 
     // If this field is deprecated, warn or throw an error.
@@ -137,10 +143,10 @@ void MessageUtil::checkForDeprecation(const Protobuf::Message& message, bool war
       if (field->is_repeated()) {
         const int size = reflection->FieldSize(message, field);
         for (int j = 0; j < size; ++j) {
-          checkForDeprecation(reflection->GetRepeatedMessage(message, field, j), warn_only);
+          checkForDeprecation(reflection->GetRepeatedMessage(message, field, j), runtime);
         }
       } else {
-        checkForDeprecation(reflection->GetMessage(message, field), warn_only);
+        checkForDeprecation(reflection->GetMessage(message, field), runtime);
       }
     }
   }
