@@ -357,10 +357,15 @@ def envoy_cc_fuzz_test(name, corpus, deps = [], tags = [], **kwargs):
         }),
         tags = tags,
     )
+
+    # This target exists only for
+    # https://github.com/google/oss-fuzz/blob/master/projects/envoy/build.sh. It won't yield
+    # anything useful on its own, as it expects to be run in an environment where the linker options
+    # provide a path to FuzzingEngine.
     native.cc_binary(
         name = name + "_driverless",
         copts = envoy_copts("@envoy", test = True),
-        linkopts = envoy_test_linkopts(),
+        linkopts = ["-lFuzzingEngine"] + envoy_test_linkopts(),
         linkstatic = 1,
         testonly = 1,
         deps = [":" + test_lib_name],
