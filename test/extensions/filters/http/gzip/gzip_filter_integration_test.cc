@@ -9,11 +9,11 @@
 
 namespace Envoy {
 
-class GzipIntegrationTest : public HttpIntegrationTest,
+class GzipIntegrationTest : public Event::SimulatedTimeSystem,
+                            public HttpIntegrationTest,
                             public TestBaseWithParam<Network::Address::IpVersion> {
 public:
-  GzipIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), simTime()) {}
+  GzipIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
 
   void SetUp() override { decompressor_.init(window_bits); }
   void TearDown() override { cleanupUpstreamAndDownstream(); }

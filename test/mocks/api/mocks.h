@@ -12,7 +12,7 @@
 #include "common/api/os_sys_calls_impl.h"
 
 #include "test/mocks/filesystem/mocks.h"
-#include "test/test_common/test_time_system.h"
+#include "test/test_common/test_time.h"
 
 #include "gmock/gmock.h"
 
@@ -25,15 +25,15 @@ public:
   ~MockApi();
 
   // Api::Api
-  Event::DispatcherPtr allocateDispatcher(Event::TimeSystem& time_system) override {
-    return Event::DispatcherPtr{allocateDispatcher_(time_system)};
-  }
+  Event::DispatcherPtr allocateDispatcher() override;
+  Event::TimeSystem& timeSystem() override { return time_system_; }
 
   MOCK_METHOD1(allocateDispatcher_, Event::Dispatcher*(Event::TimeSystem&));
   MOCK_METHOD0(fileSystem, Filesystem::Instance&());
   MOCK_METHOD0(threadFactory, Thread::ThreadFactory&());
 
   testing::NiceMock<Filesystem::MockInstance> file_system_;
+  Event::GlobalTimeSystem time_system_;
 };
 
 class MockOsSysCalls : public OsSysCallsImpl {
