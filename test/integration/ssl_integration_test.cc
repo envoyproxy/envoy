@@ -14,11 +14,11 @@
 #include "extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "test/test_common/network_utility.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/match.h"
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 #include "integration.h"
 #include "utility.h"
 
@@ -176,8 +176,8 @@ TEST_P(SslIntegrationTest, AdminCertEndpoint) {
 // Validate certificate selection across different certificate types and client TLS versions.
 class SslCertficateIntegrationTest
     : public SslIntegrationTestBase,
-      public testing::TestWithParam<std::tuple<Network::Address::IpVersion,
-                                               envoy::api::v2::auth::TlsParameters_TlsProtocol>> {
+      public TestBaseWithParam<std::tuple<Network::Address::IpVersion,
+                                          envoy::api::v2::auth::TlsParameters_TlsProtocol>> {
 public:
   SslCertficateIntegrationTest() : SslIntegrationTestBase(std::get<0>(GetParam())) {
     server_tlsv1_3_ = true;
@@ -210,7 +210,7 @@ public:
   }
 
   static std::string ipClientVersionTestParamsToString(
-      const testing::TestParamInfo<
+      const ::testing::TestParamInfo<
           std::tuple<Network::Address::IpVersion, envoy::api::v2::auth::TlsParameters_TlsProtocol>>&
           params) {
     return fmt::format("{}_TLSv1_{}",
