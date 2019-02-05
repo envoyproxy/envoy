@@ -22,10 +22,11 @@ public:
        Stats::Store& stats_store, Event::TimeSystem& time_system);
 
   // Api::Api
-  Event::DispatcherPtr allocateDispatcher() override;
   Thread::ThreadFactory& threadFactory() override { return thread_factory_; }
   Filesystem::Instance& fileSystem() override { return file_system_; }
-  Event::TimeSystem& timeSystem() override { return time_system_; }
+  Event::DispatcherPtr allocateDispatcher() override;
+  TimeSource& timeSource() override { return time_system_; }
+  Event::TimeSystem& timeSystemForDispatcher() override { return time_system_; }
 
 private:
   Thread::ThreadFactory& thread_factory_;

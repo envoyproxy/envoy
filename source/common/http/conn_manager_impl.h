@@ -51,7 +51,7 @@ public:
                         Runtime::RandomGenerator& random_generator, Http::Context& http_context,
                         Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info,
                         Upstream::ClusterManager& cluster_manager,
-                        Server::OverloadManager* overload_manager, Event::TimeSystem& time_system);
+                        Server::OverloadManager* overload_manager, TimeSource& time_system);
   ~ConnectionManagerImpl();
 
   static ConnectionManagerStats generateStats(const std::string& prefix, Stats::Scope& scope);
@@ -85,7 +85,7 @@ public:
     codec_->onUnderlyingConnectionBelowWriteBufferLowWatermark();
   }
 
-  Event::TimeSystem& timeSystem() { return time_system_; }
+  TimeSource& timeSource() { return time_source_; }
 
 private:
   struct ActiveStream;
@@ -489,7 +489,7 @@ private:
   // lookup in the hot path of processing each request.
   const Server::OverloadActionState& overload_stop_accepting_requests_ref_;
   const Server::OverloadActionState& overload_disable_keepalive_ref_;
-  Event::TimeSystem& time_system_;
+  TimeSource& time_source_;
 };
 
 } // namespace Http
