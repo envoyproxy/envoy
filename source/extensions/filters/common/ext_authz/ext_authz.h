@@ -16,8 +16,6 @@ namespace Filters {
 namespace Common {
 namespace ExtAuthz {
 
-// typedef std::unique_ptr<envoy::service::auth::v2alpha> DummyPtr;
-
 /**
  * Possible async results for a check call.
  */
