@@ -34,8 +34,8 @@ void GrpcMetricsStreamerImpl::send(envoy::service::metrics::v2::StreamMetricsMes
 }
 
 MetricsServiceSink::MetricsServiceSink(const GrpcMetricsStreamerSharedPtr& grpc_metrics_streamer,
-                                       TimeSource& time_system)
-    : grpc_metrics_streamer_(grpc_metrics_streamer), time_source_(time_system) {}
+                                       TimeSource& time_source)
+    : grpc_metrics_streamer_(grpc_metrics_streamer), time_source_(time_source) {}
 
 void MetricsServiceSink::flushCounter(const Stats::Counter& counter) {
   io::prometheus::client::MetricFamily* metrics_family = message_.add_envoy_metrics();

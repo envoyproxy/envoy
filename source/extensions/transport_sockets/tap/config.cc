@@ -17,7 +17,7 @@ namespace Tap {
 
 class SocketTapConfigFactoryImpl : public Extensions::Common::Tap::TapConfigFactory {
 public:
-  SocketTapConfigFactoryImpl(TimeSource& time_system) : time_source_(time_system) {}
+  SocketTapConfigFactoryImpl(TimeSource& time_source) : time_source_(time_source) {}
 
   // TapConfigFactory
   Extensions::Common::Tap::TapConfigSharedPtr
