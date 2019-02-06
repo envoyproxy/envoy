@@ -4,6 +4,7 @@
 #include <string>
 
 #include "envoy/filesystem/filesystem.h"
+#include "envoy/filesystem/watcher.h"
 
 #include "common/common/thread.h"
 
@@ -12,12 +13,12 @@
 namespace Envoy {
 namespace Filesystem {
 
-class MockRawFile : public RawFile {
+class MockFile : public File {
 public:
-  MockRawFile();
-  ~MockRawFile();
+  MockFile();
+  ~MockFile();
 
-  // Filesystem::RawFile
+  // Filesystem::File
   Api::SysCallBoolResult open() override;
   Api::SysCallSizeResult write(absl::string_view buffer) override;
   Api::SysCallBoolResult close() override;
@@ -40,45 +41,13 @@ private:
   bool is_open_;
 };
 
-class MockRawInstance : public RawInstance {
-public:
-  MockRawInstance();
-  ~MockRawInstance();
-
-  // Filesystem::RawInstance
-  MOCK_METHOD1(createRawFile, RawFilePtr(const std::string&));
-  MOCK_METHOD1(fileExists, bool(const std::string&));
-  MOCK_METHOD1(directoryExists, bool(const std::string&));
-  MOCK_METHOD1(fileSize, ssize_t(const std::string&));
-  MOCK_METHOD1(fileReadToEnd, std::string(const std::string&));
-  MOCK_METHOD1(canonicalPath, Api::SysCallStringResult(const std::string&));
-  MOCK_METHOD1(illegalPath, bool(const std::string&));
-};
-
-class MockFile : public File {
-public:
-  MockFile();
-  ~MockFile();
-
-  // Filesystem::File
-  MOCK_METHOD1(write, void(absl::string_view data));
-  MOCK_METHOD0(reopen, void());
-  MOCK_METHOD0(flush, void());
-};
-
 class MockInstance : public Instance {
 public:
   MockInstance();
   ~MockInstance();
 
   // Filesystem::Instance
-  MOCK_METHOD4(createFile, FileSharedPtr(const std::string&, Event::Dispatcher&,
-                                         Thread::BasicLockable&, std::chrono::milliseconds));
-  MOCK_METHOD3(createFile,
-               FileSharedPtr(const std::string&, Event::Dispatcher&, Thread::BasicLockable&));
-
-  // Filesystem::RawInstance
-  MOCK_METHOD1(createRawFile, RawFilePtr(const std::string&));
+  MOCK_METHOD1(createFile, FilePtr(const std::string&));
   MOCK_METHOD1(fileExists, bool(const std::string&));
   MOCK_METHOD1(directoryExists, bool(const std::string&));
   MOCK_METHOD1(fileSize, ssize_t(const std::string&));

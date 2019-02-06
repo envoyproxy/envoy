@@ -408,19 +408,13 @@ protected:
 
 class TestImpl : public TimeSystemProvider, public Impl {
 public:
-  TestImpl(std::chrono::milliseconds file_flush_interval_msec,
-           Thread::ThreadFactory& thread_factory, Stats::Store& stats_store)
-      : Impl(file_flush_interval_msec, thread_factory, stats_store, global_time_system_) {}
+  TestImpl(Thread::ThreadFactory& thread_factory) : Impl(thread_factory, global_time_system_) {}
 };
 
-ApiPtr createApiForTest(Stats::Store& stat_store) {
-  return std::make_unique<TestImpl>(std::chrono::milliseconds(1000), Thread::threadFactoryForTest(),
-                                    stat_store);
-}
+ApiPtr createApiForTest() { return std::make_unique<TestImpl>(Thread::threadFactoryForTest()); }
 
-ApiPtr createApiForTest(Stats::Store& stat_store, Event::TimeSystem& time_system) {
-  return std::make_unique<Impl>(std::chrono::milliseconds(1000), Thread::threadFactoryForTest(),
-                                stat_store, time_system);
+ApiPtr createApiForTest(Event::TimeSystem& time_system) {
+  return std::make_unique<Impl>(Thread::threadFactoryForTest(), time_system);
 }
 
 } // namespace Api

@@ -5,10 +5,10 @@
 namespace Envoy {
 namespace Filesystem {
 
-MockRawFile::MockRawFile() : num_opens_(0), num_writes_(0), is_open_(false) {}
-MockRawFile::~MockRawFile() {}
+MockFile::MockFile() : num_opens_(0), num_writes_(0), is_open_(false) {}
+MockFile::~MockFile() {}
 
-Api::SysCallBoolResult MockRawFile::open() {
+Api::SysCallBoolResult MockFile::open() {
   Thread::LockGuard lock(open_mutex_);
 
   const Api::SysCallBoolResult result = open_();
@@ -19,7 +19,7 @@ Api::SysCallBoolResult MockRawFile::open() {
   return result;
 }
 
-Api::SysCallSizeResult MockRawFile::write(absl::string_view buffer) {
+Api::SysCallSizeResult MockFile::write(absl::string_view buffer) {
   Thread::LockGuard lock(write_mutex_);
   if (!is_open_) {
     return {-1, EBADF};
@@ -32,18 +32,12 @@ Api::SysCallSizeResult MockRawFile::write(absl::string_view buffer) {
   return result;
 }
 
-Api::SysCallBoolResult MockRawFile::close() {
+Api::SysCallBoolResult MockFile::close() {
   const Api::SysCallBoolResult result = close_();
   is_open_ = !result.rc_;
 
   return result;
 }
-
-MockRawInstance::MockRawInstance() {}
-MockRawInstance::~MockRawInstance() {}
-
-MockFile::MockFile() {}
-MockFile::~MockFile() {}
 
 MockInstance::MockInstance() {}
 MockInstance::~MockInstance() {}

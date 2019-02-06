@@ -54,8 +54,7 @@ InstanceImpl::InstanceImpl(Options& options, Event::TimeSystem& time_system,
                            ThreadLocal::Instance& tls, Thread::ThreadFactory& thread_factory)
     : shutdown_(false), options_(options), time_system_(time_system), restarter_(restarter),
       start_time_(time(nullptr)), original_start_time_(start_time_), stats_store_(store),
-      thread_local_(tls),
-      api_(new Api::Impl(options.fileFlushIntervalMsec(), thread_factory, store, time_system)),
+      thread_local_(tls), api_(new Api::Impl(thread_factory, time_system)),
       secret_manager_(std::make_unique<Secret::SecretManagerImpl>()),
       dispatcher_(api_->allocateDispatcher()),
       singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory().currentThreadId())),
@@ -63,7 +62,9 @@ InstanceImpl::InstanceImpl(Options& options, Event::TimeSystem& time_system,
       random_generator_(std::move(random_generator)), listener_component_factory_(*this),
       worker_factory_(thread_local_, *api_, hooks),
       dns_resolver_(dispatcher_->createDnsResolver({})),
-      access_log_manager_(*api_, *dispatcher_, access_log_lock), terminated_(false),
+      access_log_manager_(options.fileFlushIntervalMsec(), *api_, *dispatcher_, access_log_lock,
+                          store),
+      terminated_(false),
       mutex_tracer_(options.mutexTracingEnabled() ? &Envoy::MutexTracerImpl::getOrCreateTracer()
                                                   : nullptr) {
 

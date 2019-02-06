@@ -11,6 +11,9 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace AccessLog {
 
+MockAccessLogFile::MockAccessLogFile() {}
+MockAccessLogFile::~MockAccessLogFile() {}
+
 MockFilter::MockFilter() {}
 MockFilter::~MockFilter() {}
 

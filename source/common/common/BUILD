@@ -134,7 +134,6 @@ envoy_cc_library(
         ":macros",
         ":minimal_logger_lib",
         "//include/envoy/access_log:access_log_interface",
-        "//include/envoy/filesystem:filesystem_interface",
     ],
 )
 
