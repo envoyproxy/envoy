@@ -79,8 +79,12 @@ static_resources:
 const char ClusterName[] = "cluster_0";
 const int UpstreamIndex = 1;
 
+<<<<<<< HEAD
 class CdsIntegrationTestBase : public IncrementalXdsIntegrationTestBase,
                                public Grpc::GrpcClientIntegrationParamTest {
+=======
+class CdsIntegrationTest : public Grpc::GrpcClientIntegrationParamTest, public HttpIntegrationTest {
+>>>>>>> Fix all tests that were failing the test-base assert due to multi-inheritance order. (#5855)
 public:
   CdsIntegrationTestBase(const std::string& config)
       : IncrementalXdsIntegrationTestBase(Http::CodecClient::Type::HTTP2, ipVersion(), config) {}

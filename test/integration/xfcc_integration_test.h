@@ -19,8 +19,8 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Xfcc {
 
-class XfccIntegrationTest : public HttpIntegrationTest,
-                            public TestBaseWithParam<Network::Address::IpVersion> {
+class XfccIntegrationTest : public TestBaseWithParam<Network::Address::IpVersion>,
+                            public HttpIntegrationTest {
 public:
   const std::string previous_xfcc_ =
       "By=spiffe://lyft.com/frontend;Hash=123456;URI=spiffe://lyft.com/testclient";

@@ -7,7 +7,7 @@ namespace Envoy {
 namespace Config {
 namespace {
 
-class GrpcSubscriptionImplTest : public GrpcSubscriptionTestHarness, public TestBase {};
+class GrpcSubscriptionImplTest : public TestBase, public GrpcSubscriptionTestHarness {};
 
 // Validate that stream creation results in a timer based retry and can recover.
 TEST_F(GrpcSubscriptionImplTest, StreamCreationFailure) {

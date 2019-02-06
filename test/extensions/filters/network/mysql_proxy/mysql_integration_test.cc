@@ -26,9 +26,9 @@ namespace MySQLProxy {
 
 constexpr int SESSIONS = 5;
 
-class MySQLIntegrationTest : public MySQLTestUtils,
-                             public BaseIntegrationTest,
-                             public TestBaseWithParam<Network::Address::IpVersion> {
+class MySQLIntegrationTest : public TestBaseWithParam<Network::Address::IpVersion>,
+                             public MySQLTestUtils,
+                             public BaseIntegrationTest {
   std::string mysqlConfig() {
     return TestEnvironment::readFileToStringForTest(TestEnvironment::runfilesPath(
         "test/extensions/filters/network/mysql_proxy/mysql_test_config.yaml"));

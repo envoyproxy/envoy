@@ -14,8 +14,8 @@
 namespace Envoy {
 namespace {
 
-class LoadStatsIntegrationTest : public HttpIntegrationTest,
-                                 public TestBaseWithParam<Network::Address::IpVersion> {
+class LoadStatsIntegrationTest : public TestBaseWithParam<Network::Address::IpVersion>,
+                                 public HttpIntegrationTest {
 public:
   LoadStatsIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()) {

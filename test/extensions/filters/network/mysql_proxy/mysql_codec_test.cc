@@ -20,7 +20,7 @@ constexpr int MYSQL_UT_LAST_ID = 0;
 constexpr int MYSQL_UT_SERVER_OK = 0;
 constexpr int MYSQL_UT_SERVER_WARNINGS = 0x0001;
 
-class MySQLCodecTest : public MySQLTestUtils, public TestBase {
+class MySQLCodecTest : public TestBase, public MySQLTestUtils {
 protected:
   uint64_t offset_{0};
 };

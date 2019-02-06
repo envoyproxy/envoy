@@ -56,7 +56,7 @@ admin:
       port_value: 0
 )EOF";
 
-class AdsIntegrationTest : public HttpIntegrationTest, public Grpc::GrpcClientIntegrationParamTest {
+class AdsIntegrationTest : public Grpc::GrpcClientIntegrationParamTest, public HttpIntegrationTest {
 public:
   AdsIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), realTime(), config) {
@@ -542,8 +542,8 @@ TEST_P(AdsIntegrationTest, RdsAfterLdsWithRdsChange) {
   makeSingleRequest();
 }
 
-class AdsFailIntegrationTest : public HttpIntegrationTest,
-                               public Grpc::GrpcClientIntegrationParamTest {
+class AdsFailIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
+                               public HttpIntegrationTest {
 public:
   AdsFailIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), realTime(), config) {
@@ -582,8 +582,8 @@ TEST_P(AdsFailIntegrationTest, ConnectDisconnect) {
   xds_stream_->finishGrpcStream(Grpc::Status::Internal);
 }
 
-class AdsConfigIntegrationTest : public HttpIntegrationTest,
-                                 public Grpc::GrpcClientIntegrationParamTest {
+class AdsConfigIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
+                                 public HttpIntegrationTest {
 public:
   AdsConfigIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), realTime(), config) {

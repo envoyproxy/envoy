@@ -9,9 +9,9 @@
 
 namespace Envoy {
 
-class GzipIntegrationTest : public Event::SimulatedTimeSystem,
-                            public HttpIntegrationTest,
-                            public TestBaseWithParam<Network::Address::IpVersion> {
+class GzipIntegrationTest : public TestBaseWithParam<Network::Address::IpVersion>,
+                            public Event::SimulatedTimeSystem,
+                            public HttpIntegrationTest {
 public:
   GzipIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
 

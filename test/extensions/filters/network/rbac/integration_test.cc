@@ -15,8 +15,8 @@ std::string rbac_config;
 } // namespace
 
 class RoleBasedAccessControlNetworkFilterIntegrationTest
-    : public BaseIntegrationTest,
-      public TestBaseWithParam<Network::Address::IpVersion> {
+    : public TestBaseWithParam<Network::Address::IpVersion>,
+      public BaseIntegrationTest {
 public:
   RoleBasedAccessControlNetworkFilterIntegrationTest()
       : BaseIntegrationTest(GetParam(), realTime(), rbac_config) {}

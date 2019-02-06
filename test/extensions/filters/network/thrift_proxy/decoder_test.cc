@@ -204,8 +204,7 @@ INSTANTIATE_TEST_SUITE_P(NonValueProtocolStates, DecoderStateMachineNonValueTest
                                 ProtocolState::SetBegin, ProtocolState::SetEnd),
                          protoStateParamToString);
 
-class DecoderStateMachineTest : public DecoderStateMachineTestBase, public TestBase {};
-
+class DecoderStateMachineTest : public TestBase, public DecoderStateMachineTestBase {};
 class DecoderStateMachineValueTest : public DecoderStateMachineTestBase,
                                      public TestBaseWithParam<FieldType> {};
 

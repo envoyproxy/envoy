@@ -5,8 +5,8 @@
 
 namespace Envoy {
 
-class CorsFilterIntegrationTest : public HttpIntegrationTest,
-                                  public TestBaseWithParam<Network::Address::IpVersion> {
+class CorsFilterIntegrationTest : public TestBaseWithParam<Network::Address::IpVersion>,
+                                  public HttpIntegrationTest {
 public:
   CorsFilterIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()) {}
