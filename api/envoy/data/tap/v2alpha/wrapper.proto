@@ -6,6 +6,9 @@ import "envoy/data/tap/v2alpha/transport.proto";
 import "validate/validate.proto";
 
 package envoy.data.tap.v2alpha;
+
+option java_outer_classname = "WrapperProto";
+option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.data.tap.v2alpha";
 
 // [#protodoc-title: Tap data wrappers]

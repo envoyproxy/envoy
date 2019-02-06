@@ -11,11 +11,11 @@
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "fmt/format.h"
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Invoke;
@@ -164,7 +164,7 @@ TEST(SoloFilterConfigTest, ParsesEnvironmentInComplexTemplate) {
   EXPECT_JSON_EQ(expected_json, config.attachmentJson());
 }
 
-class SquashFilterTest : public testing::Test {
+class SquashFilterTest : public TestBase {
 public:
   SquashFilterTest() : request_(&cm_.async_client_) {}
 

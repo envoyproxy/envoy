@@ -10,11 +10,11 @@
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Invoke;
@@ -36,13 +36,13 @@ public:
   }
 };
 
-class ListenerImplTest : public testing::TestWithParam<Address::IpVersion> {
+class UdpListenerImplTest : public TestBaseWithParam<Address::IpVersion> {
 protected:
-  ListenerImplTest()
+  UdpListenerImplTest()
       : version_(GetParam()),
         alt_address_(Network::Test::findOrCheckFreePort(
             Network::Test::getCanonicalLoopbackAddress(version_), Address::SocketType::Stream)),
-        api_(Api::createApiForTest(stats_store_)), dispatcher_(test_time_.timeSystem(), *api_) {}
+        api_(Api::createApiForTest(stats_store_)), dispatcher_(*api_) {}
 
   SocketPtr getSocket(Address::SocketType type, const Address::InstanceConstSharedPtr& address,
                       const Network::Socket::OptionsSharedPtr& options, bool bind) {
@@ -120,12 +120,12 @@ protected:
   DangerousDeprecatedTestTime test_time_;
   Event::DispatcherImpl dispatcher_;
 };
-INSTANTIATE_TEST_CASE_P(IpVersions, ListenerImplTest,
+INSTANTIATE_TEST_CASE_P(IpVersions, UdpListenerImplTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 
 // Test that socket options are set after the listener is setup.
-TEST_P(ListenerImplTest, UdpSetListeningSocketOptionsSuccess) {
+TEST_P(UdpListenerImplTest, UdpSetListeningSocketOptionsSuccess) {
   Network::MockListenerCallbacks listener_callbacks;
   Network::MockConnectionHandler connection_handler;
 
@@ -138,7 +138,7 @@ TEST_P(ListenerImplTest, UdpSetListeningSocketOptionsSuccess) {
 /**
  * Tests UDP listener for actual destination and data.
  */
-TEST_P(ListenerImplTest, UseActualDstUdp) {
+TEST_P(UdpListenerImplTest, UseActualDstUdp) {
   // Setup server socket
   SocketPtr server_socket =
       getSocket(Address::SocketType::Datagram, Network::Test::getCanonicalLoopbackAddress(version_),
@@ -224,7 +224,7 @@ TEST_P(ListenerImplTest, UseActualDstUdp) {
 /**
  * Tests UDP listener for read and write callbacks with actual data.
  */
-TEST_P(ListenerImplTest, UdpEcho) {
+TEST_P(UdpListenerImplTest, UdpEcho) {
   // Setup server socket
   SocketPtr server_socket =
       getSocket(Address::SocketType::Datagram, Network::Test::getCanonicalLoopbackAddress(version_),
@@ -256,7 +256,7 @@ TEST_P(ListenerImplTest, UdpEcho) {
   getSocketAddressInfo(*client_socket.get(), server_ip->port(), server_addr, addr_len);
   ASSERT_GT(addr_len, 0);
 
-  // We send 2 packets and exptect it to echo.
+  // We send 2 packets and expect it to echo.
   const std::string first("first");
   const std::string second("second");
 
@@ -358,7 +358,7 @@ TEST_P(ListenerImplTest, UdpEcho) {
 /**
  * Tests UDP listener's `enable` and `disable` APIs.
  */
-TEST_P(ListenerImplTest, UdpListenerEnableDisable) {
+TEST_P(UdpListenerImplTest, UdpListenerEnableDisable) {
   // Setup server socket
   SocketPtr server_socket =
       getSocket(Address::SocketType::Datagram, Network::Test::getCanonicalLoopbackAddress(version_),
@@ -456,9 +456,9 @@ TEST_P(ListenerImplTest, UdpListenerEnableDisable) {
 }
 
 /**
- * Tests UDP listebe's error callback.
+ * Tests UDP listener's error callback.
  */
-TEST_P(ListenerImplTest, UdpListenerRecvFromError) {
+TEST_P(UdpListenerImplTest, UdpListenerRecvFromError) {
   // Setup server socket
   SocketPtr server_socket =
       getSocket(Address::SocketType::Datagram, Network::Test::getCanonicalLoopbackAddress(version_),

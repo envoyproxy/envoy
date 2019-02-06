@@ -8,13 +8,13 @@
 #include "common/http/headers.h"
 #include "common/protobuf/utility.h"
 
+#include "test/integration/autonomous_upstream.h"
 #include "test/integration/utility.h"
 #include "test/mocks/http/mocks.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
-
-#include "gtest/gtest.h"
 
 using Envoy::Http::Headers;
 using Envoy::Http::HeaderValueOf;
@@ -25,6 +25,28 @@ using testing::MatchesRegex;
 using testing::Not;
 
 namespace Envoy {
+
+namespace {
+
+std::string normalizeDate(const std::string& s) {
+  const std::regex date_regex("date:[^\r]+");
+  return std::regex_replace(s, date_regex, "date: Mon, 01 Jan 2017 00:00:00 GMT");
+}
+
+void setAllowAbsoluteUrl(
+    envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm) {
+  envoy::api::v2::core::Http1ProtocolOptions options;
+  options.mutable_allow_absolute_url()->set_value(true);
+  hcm.mutable_http_protocol_options()->CopyFrom(options);
+};
+
+void setAllowHttp10WithDefaultHost(
+    envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm) {
+  hcm.mutable_http_protocol_options()->set_accept_http_10(true);
+  hcm.mutable_http_protocol_options()->set_default_host_for_http_10("default.com");
+}
+
+} // namespace
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, IntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
@@ -40,7 +62,46 @@ TEST_P(IntegrationTest, RouterClusterNotFound503) { testRouterClusterNotFound503
 
 TEST_P(IntegrationTest, RouterRedirect) { testRouterRedirect(); }
 
-TEST_P(IntegrationTest, RouterDirectResponse) { testRouterDirectResponse(); }
+TEST_P(IntegrationTest, RouterDirectResponse) {
+  const std::string body = "Response body";
+  const std::string file_path = TestEnvironment::writeStringToFileForTest("test_envoy", body);
+  static const std::string domain("direct.example.com");
+  static const std::string prefix("/");
+  static const Http::Code status(Http::Code::OK);
+  config_helper_.addConfigModifier(
+      [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
+          -> void {
+        auto* route_config = hcm.mutable_route_config();
+        auto* header_value_option = route_config->mutable_response_headers_to_add()->Add();
+        header_value_option->mutable_header()->set_key("x-additional-header");
+        header_value_option->mutable_header()->set_value("example-value");
+        header_value_option->mutable_append()->set_value(false);
+        header_value_option = route_config->mutable_response_headers_to_add()->Add();
+        header_value_option->mutable_header()->set_key("content-type");
+        header_value_option->mutable_header()->set_value("text/html");
+        header_value_option->mutable_append()->set_value(false);
+        auto* virtual_host = route_config->add_virtual_hosts();
+        virtual_host->set_name(domain);
+        virtual_host->add_domains(domain);
+        virtual_host->add_routes()->mutable_match()->set_prefix(prefix);
+        virtual_host->mutable_routes(0)->mutable_direct_response()->set_status(
+            static_cast<uint32_t>(status));
+        virtual_host->mutable_routes(0)->mutable_direct_response()->mutable_body()->set_filename(
+            file_path);
+      });
+  initialize();
+
+  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+      lookupPort("http"), "GET", "/", "", downstream_protocol_, version_, "direct.example.com");
+  ASSERT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_STREQ("example-value", response->headers()
+                                    .get(Envoy::Http::LowerCaseString("x-additional-header"))
+                                    ->value()
+                                    .c_str());
+  EXPECT_STREQ("text/html", response->headers().ContentType()->value().c_str());
+  EXPECT_EQ(body, response->body());
+}
 
 TEST_P(IntegrationTest, ComputedHealthCheck) { testComputedHealthCheck(); }
 
@@ -198,37 +259,230 @@ TEST_P(IntegrationTest, HittingGrpcFilterLimitBufferingHeaders) {
 
 TEST_P(IntegrationTest, HittingEncoderFilterLimit) { testHittingEncoderFilterLimit(); }
 
-TEST_P(IntegrationTest, BadFirstline) { testBadFirstline(); }
+TEST_P(IntegrationTest, BadFirstline) {
+  initialize();
+  std::string response;
+  sendRawHttpAndWaitForResponse(lookupPort("http"), "hello", &response);
+  EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n", response);
+}
 
-TEST_P(IntegrationTest, MissingDelimiter) { testMissingDelimiter(); }
+TEST_P(IntegrationTest, MissingDelimiter) {
+  initialize();
+  std::string response;
+  sendRawHttpAndWaitForResponse(lookupPort("http"),
+                                "GET / HTTP/1.1\r\nHost: host\r\nfoo bar\r\n\r\n", &response);
+  EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n", response);
+}
 
-TEST_P(IntegrationTest, InvalidCharacterInFirstline) { testInvalidCharacterInFirstline(); }
+TEST_P(IntegrationTest, InvalidCharacterInFirstline) {
+  initialize();
+  std::string response;
+  sendRawHttpAndWaitForResponse(lookupPort("http"), "GE(T / HTTP/1.1\r\nHost: host\r\n\r\n",
+                                &response);
+  EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n", response);
+}
 
-TEST_P(IntegrationTest, InvalidVersion) { testInvalidVersion(); }
+TEST_P(IntegrationTest, InvalidVersion) {
+  initialize();
+  std::string response;
+  sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.01\r\nHost: host\r\n\r\n",
+                                &response);
+  EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n", response);
+}
 
-TEST_P(IntegrationTest, Http10Disabled) { testHttp10Disabled(); }
+TEST_P(IntegrationTest, Http10Disabled) {
+  initialize();
+  std::string response;
+  sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.0\r\n\r\n", &response, true);
+  EXPECT_TRUE(response.find("HTTP/1.1 426 Upgrade Required\r\n") == 0);
+}
 
-TEST_P(IntegrationTest, Http10DisabledWithUpgrade) { testHttp10DisabledWithUpgrade(); }
+TEST_P(IntegrationTest, Http10DisabledWithUpgrade) {
+  initialize();
+  std::string response;
+  sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.0\r\nUpgrade: h2c\r\n\r\n",
+                                &response, true);
+  EXPECT_TRUE(response.find("HTTP/1.1 426 Upgrade Required\r\n") == 0);
+}
 
-TEST_P(IntegrationTest, Http09Enabled) { testHttp09Enabled(); }
+// Turn HTTP/1.0 support on and verify 09 style requests work.
+TEST_P(IntegrationTest, Http09Enabled) {
+  autonomous_upstream_ = true;
+  config_helper_.addConfigModifier(&setAllowHttp10WithDefaultHost);
+  initialize();
+  std::string response;
+  sendRawHttpAndWaitForResponse(lookupPort("http"), "GET /\r\n\r\n", &response, false);
+  EXPECT_THAT(response, HasSubstr("HTTP/1.0 200 OK\r\n"));
+  EXPECT_THAT(response, HasSubstr("connection: close"));
+  EXPECT_THAT(response, Not(HasSubstr("transfer-encoding: chunked\r\n")));
 
-TEST_P(IntegrationTest, Http10Enabled) { testHttp10Enabled(); }
+  std::unique_ptr<Http::TestHeaderMapImpl> upstream_headers =
+      reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())->lastRequestHeaders();
+  ASSERT_TRUE(upstream_headers != nullptr);
+  EXPECT_EQ(upstream_headers->Host()->value(), "default.com");
+}
 
-TEST_P(IntegrationTest, TestInlineHeaders) { testInlineHeaders(); }
+// Turn HTTP/1.0 support on and verify the request is proxied and the default host is sent upstream.
+TEST_P(IntegrationTest, Http10Enabled) {
+  autonomous_upstream_ = true;
+  config_helper_.addConfigModifier(&setAllowHttp10WithDefaultHost);
+  initialize();
+  std::string response;
+  sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.0\r\n\r\n", &response, false);
+  EXPECT_THAT(response, HasSubstr("HTTP/1.0 200 OK\r\n"));
+  EXPECT_THAT(response, HasSubstr("connection: close"));
+  EXPECT_THAT(response, Not(HasSubstr("transfer-encoding: chunked\r\n")));
 
-TEST_P(IntegrationTest, Http10WithHostandKeepAlive) { testHttp10WithHostAndKeepAlive(); }
+  std::unique_ptr<Http::TestHeaderMapImpl> upstream_headers =
+      reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())->lastRequestHeaders();
+  ASSERT_TRUE(upstream_headers != nullptr);
+  EXPECT_EQ(upstream_headers->Host()->value(), "default.com");
 
-TEST_P(IntegrationTest, NoHost) { testNoHost(); }
+  sendRawHttpAndWaitForResponse(lookupPort("http"), "HEAD / HTTP/1.0\r\n\r\n", &response, false);
+  EXPECT_THAT(response, HasSubstr("HTTP/1.0 200 OK\r\n"));
+  EXPECT_THAT(response, HasSubstr("connection: close"));
+  EXPECT_THAT(response, Not(HasSubstr("transfer-encoding: chunked\r\n")));
+}
 
-TEST_P(IntegrationTest, BadPath) { testBadPath(); }
+TEST_P(IntegrationTest, TestInlineHeaders) {
+  autonomous_upstream_ = true;
+  config_helper_.addConfigModifier(&setAllowHttp10WithDefaultHost);
+  initialize();
+  std::string response;
+  sendRawHttpAndWaitForResponse(lookupPort("http"),
+                                "GET / HTTP/1.1\r\n"
+                                "Host: foo.com\r\n"
+                                "Foo: bar\r\n"
+                                "Cache-control: public\r\n"
+                                "Cache-control: 123\r\n"
+                                "Eep: baz\r\n\r\n",
+                                &response, true);
+  EXPECT_THAT(response, HasSubstr("HTTP/1.1 200 OK\r\n"));
 
-TEST_P(IntegrationTest, AbsolutePath) { testAbsolutePath(); }
+  std::unique_ptr<Http::TestHeaderMapImpl> upstream_headers =
+      reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())->lastRequestHeaders();
+  ASSERT_TRUE(upstream_headers != nullptr);
+  EXPECT_EQ(upstream_headers->Host()->value(), "foo.com");
+  EXPECT_EQ(upstream_headers->CacheControl()->value(), "public,123");
+  ASSERT_TRUE(upstream_headers->get(Envoy::Http::LowerCaseString("foo")) != nullptr);
+  EXPECT_STREQ("bar", upstream_headers->get(Envoy::Http::LowerCaseString("foo"))->value().c_str());
+  ASSERT_TRUE(upstream_headers->get(Envoy::Http::LowerCaseString("eep")) != nullptr);
+  EXPECT_STREQ("baz", upstream_headers->get(Envoy::Http::LowerCaseString("eep"))->value().c_str());
+}
 
-TEST_P(IntegrationTest, AbsolutePathWithPort) { testAbsolutePathWithPort(); }
+// Verify for HTTP/1.0 a keep-alive header results in no connection: close.
+// Also verify existing host headers are passed through for the HTTP/1.0 case.
+TEST_P(IntegrationTest, Http10WithHostandKeepAlive) {
+  autonomous_upstream_ = true;
+  config_helper_.addConfigModifier(&setAllowHttp10WithDefaultHost);
+  initialize();
+  std::string response;
+  sendRawHttpAndWaitForResponse(lookupPort("http"),
+                                "GET / HTTP/1.0\r\nHost: foo.com\r\nConnection:Keep-alive\r\n\r\n",
+                                &response, true);
+  EXPECT_THAT(response, HasSubstr("HTTP/1.0 200 OK\r\n"));
+  EXPECT_THAT(response, Not(HasSubstr("connection: close")));
+  EXPECT_THAT(response, Not(HasSubstr("transfer-encoding: chunked\r\n")));
 
-TEST_P(IntegrationTest, AbsolutePathWithoutPort) { testAbsolutePathWithoutPort(); }
+  std::unique_ptr<Http::TestHeaderMapImpl> upstream_headers =
+      reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())->lastRequestHeaders();
+  ASSERT_TRUE(upstream_headers != nullptr);
+  EXPECT_EQ(upstream_headers->Host()->value(), "foo.com");
+}
 
-TEST_P(IntegrationTest, Connect) { testConnect(); }
+TEST_P(IntegrationTest, NoHost) {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  Http::TestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}};
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  response->waitForEndStream();
+
+  ASSERT_TRUE(response->complete());
+  EXPECT_STREQ("400", response->headers().Status()->value().c_str());
+}
+
+TEST_P(IntegrationTest, BadPath) {
+  initialize();
+  std::string response;
+  sendRawHttpAndWaitForResponse(lookupPort("http"),
+                                "GET http://api.lyft.com HTTP/1.1\r\nHost: host\r\n\r\n", &response,
+                                true);
+  EXPECT_TRUE(response.find("HTTP/1.1 404 Not Found\r\n") == 0);
+}
+
+TEST_P(IntegrationTest, AbsolutePath) {
+  // Configure www.redirect.com to send a redirect, and ensure the redirect is
+  // encountered via absolute URL.
+  config_helper_.addRoute("www.redirect.com", "/", "cluster_0", true,
+                          envoy::api::v2::route::RouteAction::SERVICE_UNAVAILABLE,
+                          envoy::api::v2::route::VirtualHost::ALL);
+  config_helper_.addConfigModifier(&setAllowAbsoluteUrl);
+
+  initialize();
+  std::string response;
+  sendRawHttpAndWaitForResponse(lookupPort("http"),
+                                "GET http://www.redirect.com HTTP/1.1\r\nHost: host\r\n\r\n",
+                                &response, true);
+  EXPECT_FALSE(response.find("HTTP/1.1 404 Not Found\r\n") == 0);
+}
+
+TEST_P(IntegrationTest, AbsolutePathWithPort) {
+  // Configure www.namewithport.com:1234 to send a redirect, and ensure the redirect is
+  // encountered via absolute URL with a port.
+  config_helper_.addRoute("www.namewithport.com:1234", "/", "cluster_0", true,
+                          envoy::api::v2::route::RouteAction::SERVICE_UNAVAILABLE,
+                          envoy::api::v2::route::VirtualHost::ALL);
+  config_helper_.addConfigModifier(&setAllowAbsoluteUrl);
+  initialize();
+  std::string response;
+  sendRawHttpAndWaitForResponse(
+      lookupPort("http"), "GET http://www.namewithport.com:1234 HTTP/1.1\r\nHost: host\r\n\r\n",
+      &response, true);
+  EXPECT_FALSE(response.find("HTTP/1.1 404 Not Found\r\n") == 0);
+}
+
+TEST_P(IntegrationTest, AbsolutePathWithoutPort) {
+  // Add a restrictive default match, to avoid the request hitting the * / catchall.
+  config_helper_.setDefaultHostAndRoute("foo.com", "/found");
+  // Set a matcher for www.namewithport.com:1234 and verify http://www.namewithport.com does not
+  // match
+  config_helper_.addRoute("www.namewithport.com:1234", "/", "cluster_0", true,
+                          envoy::api::v2::route::RouteAction::SERVICE_UNAVAILABLE,
+                          envoy::api::v2::route::VirtualHost::ALL);
+  config_helper_.addConfigModifier(&setAllowAbsoluteUrl);
+  initialize();
+  std::string response;
+  sendRawHttpAndWaitForResponse(lookupPort("http"),
+                                "GET http://www.namewithport.com HTTP/1.1\r\nHost: host\r\n\r\n",
+                                &response, true);
+  EXPECT_TRUE(response.find("HTTP/1.1 404 Not Found\r\n") == 0) << response;
+}
+
+// Ensure that connect behaves the same with allow_absolute_url enabled and without
+TEST_P(IntegrationTest, Connect) {
+  const std::string& request = "CONNECT www.somewhere.com:80 HTTP/1.1\r\nHost: host\r\n\r\n";
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
+    // Clone the whole listener.
+    auto static_resources = bootstrap.mutable_static_resources();
+    auto* old_listener = static_resources->mutable_listeners(0);
+    auto* cloned_listener = static_resources->add_listeners();
+    cloned_listener->CopyFrom(*old_listener);
+    old_listener->set_name("http_forward");
+  });
+  // Set the first listener to allow absolute URLs.
+  config_helper_.addConfigModifier(&setAllowAbsoluteUrl);
+  initialize();
+
+  std::string response1;
+  sendRawHttpAndWaitForResponse(lookupPort("http"), request.c_str(), &response1, true);
+
+  std::string response2;
+  sendRawHttpAndWaitForResponse(lookupPort("http_forward"), request.c_str(), &response2, true);
+
+  EXPECT_EQ(normalizeDate(response1), normalizeDate(response2));
+}
 
 TEST_P(IntegrationTest, ValidZeroLengthContent) { testValidZeroLengthContent(); }
 
@@ -236,11 +490,31 @@ TEST_P(IntegrationTest, InvalidContentLength) { testInvalidContentLength(); }
 
 TEST_P(IntegrationTest, MultipleContentLengths) { testMultipleContentLengths(); }
 
-TEST_P(IntegrationTest, LargeHeadersRejected) { testLargeRequestHeaders(62, 60); }
+TEST_P(IntegrationTest, LargeHeadersRejected) { testLargeRequestHeaders(63, 60); }
 
-TEST_P(IntegrationTest, LargeHeadersAccepted) { testLargeRequestHeaders(62, 63); }
+TEST_P(IntegrationTest, LargeHeadersAcceptedIfConfigured) { testLargeRequestHeaders(63, 64); }
 
-TEST_P(IntegrationTest, UpstreamProtocolError) { testUpstreamProtocolError(); }
+TEST_P(IntegrationTest, UpstreamProtocolError) {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto encoder_decoder = codec_client_->startRequest(Http::TestHeaderMapImpl{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":authority", "host"}});
+  auto response = std::move(encoder_decoder.second);
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  // TODO(mattklein123): Waiting for exact amount of data is a hack. This needs to
+  // be fixed.
+  std::string data;
+  ASSERT_TRUE(fake_upstream_connection->waitForData(187, &data));
+  ASSERT_TRUE(fake_upstream_connection->write("bad protocol data!"));
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+  codec_client_->waitForDisconnect();
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("503", response->headers().Status()->value().c_str());
+}
 
 TEST_P(IntegrationTest, TestHead) {
   initialize();
