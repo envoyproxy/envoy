@@ -52,6 +52,8 @@ int main(int argc, char** argv) {
   RELEASE_ASSERT(argc >= 2, "");
   // Consider any file after the test path which doesn't have a - prefix to be a corpus entry.
   uint32_t input_args = 0;
+  // Ensure we cleanup API resources before we jump into the tests, the test API creates a singleton
+  // time system that we don't want to leak into gtest.
   {
     Envoy::Stats::IsolatedStoreImpl stats_store;
     Envoy::Api::ApiPtr api = Envoy::Api::createApiForTest(stats_store);
@@ -70,10 +72,10 @@ int main(int argc, char** argv) {
         Envoy::test_corpus_.emplace_back(arg);
       }
     }
-    argc -= input_args;
-    for (size_t i = 0; i < Envoy::test_corpus_.size(); ++i) {
-      argv[i + 1] = argv[i + 1 + input_args];
-    }
+  }
+  argc -= input_args;
+  for (size_t i = 0; i < Envoy::test_corpus_.size(); ++i) {
+    argv[i + 1] = argv[i + 1 + input_args];
   }
 
   testing::InitGoogleTest(&argc, argv);
