@@ -43,6 +43,10 @@ private:
     HostConstSharedPtr chooseHost(uint64_t hash) const override;
 
     std::vector<RingEntry> ring_;
+
+    static const uint64_t DEFAULT_MIN_RING_SIZE = 1024;
+    static const uint64_t DEFAULT_MAX_RING_SIZE = 1024 * 1024 * 8;
+    static const uint64_t DEFAULT_TARGET_HASHES_PER_HOST = 256;
   };
   typedef std::shared_ptr<const Ring> RingConstSharedPtr;
 

@@ -44,11 +44,11 @@ TEST(NumericTest, Abs) {
 }
 
 TEST(NumericTest, Gcd) {
-  // some simple concrete examples
+  // Some simple concrete examples
   EXPECT_EQ(1, gcd(5, 7));
   EXPECT_EQ(2, gcd(2, 4));
 
-  // definition: gcd(0, n) === gcd(n, 0) === abs(n)
+  // Definition: gcd(0, n) === gcd(n, 0) === abs(n)
   law<int32_t>(signed_ints, [](int32_t n) {
     EXPECT_EQ(abs(n), gcd(0, n));
     EXPECT_EQ(abs(n), gcd(n, 0));
@@ -58,7 +58,7 @@ TEST(NumericTest, Gcd) {
     EXPECT_EQ(n, gcd(n, 0U));
   });
 
-  // euclid's: gcd(a, b) === gcd(b, abs(b) % abs(a))
+  // Euclid's: gcd(a, b) === gcd(b, abs(b) % abs(a))
   law<int32_t>(signed_ints, [](int32_t a, int32_t b) {
     if (b != 0) {
       EXPECT_EQ(gcd(b, abs(a) % abs(b)), gcd(a, b));
@@ -70,7 +70,7 @@ TEST(NumericTest, Gcd) {
     }
   });
 
-  // associativity: gcd(a, gcd(b, c)) === gcd(gcd(a, b), c)
+  // Associativity: gcd(a, gcd(b, c)) === gcd(gcd(a, b), c)
   law<int32_t>(signed_ints, [](int32_t a, int32_t b, int32_t c) {
     EXPECT_EQ(gcd(a, gcd(b, c)), gcd(gcd(a, b), c));
   });

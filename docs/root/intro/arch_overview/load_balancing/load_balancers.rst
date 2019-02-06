@@ -56,13 +56,25 @@ weight greater than 1.
 Ring hash
 ^^^^^^^^^
 
-The ring/modulo hash load balancer implements consistent hashing to upstream hosts. The algorithm is
-based on mapping all hosts onto a circle such that the addition or removal of a host from the host
-set changes only affect 1/N requests. This technique is also commonly known as `"ketama"
-<https://github.com/RJ/ketama>`_ hashing. A consistent hashing load balancer is only effective
-when protocol routing is used that specifies a value to hash on. The minimum ring size governs the
-replication factor for each host in the ring. For example, if the minimum ring size is 1024 and
-there are 16 hosts (with no weights assigned), each host will be replicated 64 times.
+The ring/modulo hash load balancer implements consistent hashing to upstream hosts. Each host is
+mapped onto a circle (the "ring") by hashing its address; each request is then routed to a host by
+hashing some property of the request, and finding the nearest corresponding host clockwise around
+the ring. This technique is also commonly known as `"Ketama" <https://github.com/RJ/ketama>`_
+hashing, and like all hash-based load balancers, it is only effective when protocol routing is used
+that specifies a value to hash on.
+
+Each host is hashed and placed on the ring some number of times proportional to its weight. For
+example, if host A has a weight of 1 and host B has a weight of 2, then there might be three entries
+on the ring: one for host A and two for host B. This doesn't provide the desired 2:1 partitioning of
+the circle, since the computed hashes could be coincidentally be very close to one another; so it
+is necessary to multiply the number of hashes per host---for example inserting 100 entries on the
+ring for host A and 200 entries for host B---to better approximate the desired distribution. This
+replication factor can be controlled directly by configuring the
+:ref:`target_hashes_per_host<envoy_api_field_Cluster.RingHashLbConfig.target_hashes_per_host>`
+parameter, or indirectly by configuring the
+:ref:`minimum_ring_size<envoy_api_field_Cluster.RingHashLbConfig.minimum_ring_size>`. With the ring
+partitioned appropriately, the addition or removal of one host from a set of N hosts will affect the
+only 1/N requests.
 
 When priority based load balancing is in use, the priority level is also chosen by hash, so the
 endpoint selected will still be consistent when the set of backends is stable.

@@ -393,7 +393,7 @@ TEST_P(RingHashLoadBalancerTest, HostAndLocalityWeighted) {
   hostSet().runCallbacks({}, {});
 
   config_ = (envoy::api::v2::Cluster::RingHashLbConfig());
-  config_.value().mutable_minimum_ring_size()->set_value(0);
+  config_.value().mutable_minimum_ring_size()->set_value(14);
   init();
 
   // :90 should appear once, :91 should appear four times and :92 should appear nine times.

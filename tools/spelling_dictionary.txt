@@ -67,6 +67,7 @@ EOS
 EPOLLRDHUP
 EQ
 ERANGE
+Euclid
 EV
 EVAL
 EVP
@@ -279,6 +280,7 @@ args
 argv
 artisanal
 ary
+associativity
 async
 atomicly
 atomics
@@ -311,6 +313,7 @@ chrono
 chroot
 chunked
 circllhist
+cmath
 cmd
 codec
 codecs
@@ -335,6 +338,7 @@ creds
 crypto
 cryptographically
 cstate
+cstdlib
 cstring
 ctor
 ctrl
@@ -354,6 +358,7 @@ deletable
 delim
 dereference
 dereferences
+dereferencing
 deregistered
 deserialization
 deserialize

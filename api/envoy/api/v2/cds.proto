@@ -400,12 +400,13 @@ message Cluster {
   // Specific configuration for the :ref:`RingHash<arch_overview_load_balancing_types_ring_hash>`
   // load balancing policy.
   message RingHashLbConfig {
-    // Minimum hash ring size, i.e. total virtual nodes. A larger size
-    // will provide better request distribution since each host in the
-    // cluster will have more virtual nodes. Defaults to 1024. In the case
-    // that total number of hosts is greater than the minimum, each host will
-    // be allocated a single virtual node. This field is limited to 8M to bound
-    // resource use.
+    // Minimum hash ring size. The larger the ring is (that is, the more hashes there are for each
+    // provided host) the better the request distribution will reflect the desired weights. This can
+    // also be tuned more directly using
+    // :ref:`target_hashes_per_host<envoy_api_field_Cluster.RingHashLbConfig.target_hashes_per_host>`.
+    // Defaults to 1024 entries. The maximum value of this lower bound is 8M entries, to constrain
+    // resource use. See also
+    // :ref:`maximum_ring_size<envoy_api_field_Cluster.RingHashLbConfig.maximum_ring_size>`.
     google.protobuf.UInt64Value minimum_ring_size = 1 [(validate.rules).uint64.lte = 8388608];
 
     // [#not-implemented-hide:] Hide from docs.
@@ -432,6 +433,22 @@ message Cluster {
     // The hash function used to hash hosts onto the ketama ring. The value defaults to
     // :ref:`XX_HASH<envoy_api_enum_value_Cluster.RingHashLbConfig.HashFunction.XX_HASH>`.
     HashFunction hash_function = 3 [(validate.rules).enum.defined_only = true];
+
+    // Maximum hash ring size. Defaults to 8M entries, but can be lowered to further constrain
+    // resource use. See also
+    // :ref:`minimum_ring_size<envoy_api_field_Cluster.RingHashLbConfig.minimum_ring_size>`.
+    google.protobuf.UInt64Value maximum_ring_size = 4 [(validate.rules).uint64.lte = 8388608];
+
+    // In Ketama hashing, there is a tradeoff between resource use and request distribution
+    // accuracy. A lower number of hashes per host yields a smaller ring, consuming less memory and
+    // reducing lookup time, whereas a higher number of hashes per host partitions the ring space
+    // more evenly. This parameter allows a desired target to be specified directly, although the
+    // actual number of hashes per host may be limited by the
+    // :ref:`minimum_ring_size<envoy_api_field_Cluster.RingHashLbConfig.minimum_ring_size>` and
+    // :ref:`maximum_ring_size<envoy_api_field_Cluster.RingHashLbConfig.maximum_ring_size>`. The
+    // default behavior if this parameter is unspecified, for backward compatibility, is to use the
+    // smallest number of hashes per host necessary to meet the minimum_ring_size.
+    google.protobuf.UInt64Value target_hashes_per_host = 5;
   }
 
   // Specific configuration for the

@@ -72,57 +72,105 @@ RingHashLoadBalancer::Ring::Ring(
     ASSERT(locality_weights->size() == hosts_per_locality.get().size());
   }
 
-  // Currently we specify the minimum size of the ring, and determine the replication factor
-  // based on the number of hosts. It's possible we might want to support more sophisticated
-  // configuration in the future.
   // NOTE: Currently we keep a ring for healthy hosts and unhealthy hosts, and this is done per
   //       thread. This is the simplest implementation, but it's expensive from a memory
   //       standpoint and duplicates the regeneration computation. In the future we might want
   //       to generate the rings centrally and then just RCU them out to each thread. This is
   //       sufficient for getting started.
+
   const uint64_t min_ring_size =
-      config ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.value(), minimum_ring_size, 1024) : 1024;
+      config ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.value(), minimum_ring_size,
+                                               DEFAULT_MIN_RING_SIZE)
+             : DEFAULT_MIN_RING_SIZE;
+  const uint64_t max_ring_size =
+      config ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.value(), maximum_ring_size,
+                                               DEFAULT_MAX_RING_SIZE)
+             : DEFAULT_MAX_RING_SIZE;
+  const absl::optional<uint64_t> target_hashes_per_host =
+      config && config->has_target_hashes_per_host()
+          ? absl::optional<uint64_t>(config->target_hashes_per_host().value())
+          : absl::nullopt;
+
+  // Sanity-check ring size bounds.
+  if (min_ring_size > max_ring_size) {
+    ENVOY_LOG(error, "ring hash: minimum_ring_size ({}) > maximum_ring_size ({})", min_ring_size,
+              max_ring_size);
+    return;
+  }
 
   // Compute the "effective" weight of each host as the product of its own weight and the locality
   // weight, if given. Sum these effective weights and find their greatest common denominator for
-  // normalization, so that we can size the ring appropriately.
+  // normalization.
   // NOTE: GCD is associative, same as std::max() for example. To evaluate GCD(a, b, c, ...), we
   //       compute GCD(GCD(GCD(GCD(0, a), b), c), ...).
-  uint64_t sum = 0;
+  uint64_t weighted_sum = 0;
   uint32_t gcd = 0;
   std::unordered_map<HostConstSharedPtr, uint32_t> effective_weights;
   for (uint64_t i = 0; i < hosts_per_locality.get().size(); ++i) {
     for (const auto& host : hosts_per_locality.get()[i]) {
       auto host_weight = host->weight();
       ASSERT(host_weight != 0);
-      // TODO(mergeconflict): C++17 introduces std::shared_ptr::operator[], so we don't have to
-      //                      dereference locality_weights explicitly.
+      // TODO: When we move to C++17, change this to `locality_weights[i]` (i.e. use
+      //       std::shared_ptr::operator[]) rather than dereferencing locality_weights explicitly.
       auto locality_weight = locality_weights == nullptr ? 1 : (*locality_weights)[i];
       ASSERT(locality_weight != 0);
 
       auto effective_weight = host_weight * locality_weight;
-      sum += effective_weight;
+      weighted_sum += effective_weight;
       gcd = Envoy::gcd(gcd, effective_weight);
       effective_weights[host] = effective_weight;
     }
   }
 
   // We can't do anything sensible with no hosts.
-  if (sum == 0) {
+  if (weighted_sum == 0) {
     return;
   }
-  sum /= gcd;
+  weighted_sum /= gcd;
 
-  uint64_t hashes_per_host = 1;
-  if (sum < min_ring_size) {
-    hashes_per_host = min_ring_size / sum;
-    if (min_ring_size % sum != 0) {
-      hashes_per_host++;
-    }
+  // Determine the valid range of hashes per host. Note that the minimum is rounded up (to meet or
+  // exceed the min_ring_size) whereas the maximum is rounded down. If the range is invalid, it
+  // indicates unreasonably tight ring size bounds. (We shouldn't attempt any awkward math involving
+  // fractional hashes per host).
+  const uint64_t min_hashes_per_host =
+      (min_ring_size / weighted_sum) + (min_ring_size % weighted_sum != 0);
+  const uint64_t max_hashes_per_host = (max_ring_size / weighted_sum);
+  if (min_hashes_per_host > max_hashes_per_host) {
+    const uint64_t suggested_min_ring_size = max_hashes_per_host * weighted_sum;
+    const uint64_t suggested_max_ring_size = min_hashes_per_host * weighted_sum;
+    ENVOY_LOG(error,
+              "ring hash: ring size bounds are too tight, "
+              "decrease minimum to {} or increase maximum to {}",
+              suggested_min_ring_size, suggested_max_ring_size);
+    return;
   }
 
-  ENVOY_LOG(info, "ring hash: min_ring_size={} hashes_per_host={}", min_ring_size, hashes_per_host);
-  ring_.reserve(sum * hashes_per_host);
+  // Determine the actual number of hashes per host within the above bounds, which may differ from
+  // the target (if provided), and use that to finally determine the ring size.
+  uint64_t hashes_per_host;
+  if (target_hashes_per_host) {
+    // If a target is provided, try to use it and warn if not possible.
+    uint64_t target = target_hashes_per_host.value();
+    if (target < min_hashes_per_host) {
+      ENVOY_LOG(warn,
+                "ring hash: target_hashes_per_host ({}) too small for minimum_ring_size ({})");
+      hashes_per_host = min_hashes_per_host;
+    } else if (target > max_hashes_per_host) {
+      ENVOY_LOG(warn,
+                "ring hash: target_hashes_per_host ({}) too large for maximum_ring_size ({})");
+      hashes_per_host = max_hashes_per_host;
+    } else {
+      hashes_per_host = target;
+    }
+  } else {
+    // If a target isn't provided, use the old behavior for backward compatibility: size the ring
+    // as small as possible.
+    hashes_per_host = min_hashes_per_host;
+  }
+
+  const uint64_t ring_size = weighted_sum * hashes_per_host;
+  ring_.reserve(ring_size);
+  ENVOY_LOG(info, "ring hash: ring_size={} hashes_per_host={}", ring_size, hashes_per_host);
 
   const bool use_std_hash =
       config ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.value().deprecated_v1(), use_std_hash, false)

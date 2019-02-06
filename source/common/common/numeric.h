@@ -8,6 +8,7 @@ namespace Envoy {
 // loosely adapted from http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2014/n4061.pdf.
 // NOTE: std::abs() defined in <cmath> and <cstdlib> does not support arbitrary integral types
 //       including, perhaps for obvious reasons, unsigned integers.
+// TODO: When we move to C++17, please remove this implementation.
 
 template <typename T> constexpr auto abs(T n) -> std::enable_if_t<std::is_unsigned<T>::value, T> {
   return n;
