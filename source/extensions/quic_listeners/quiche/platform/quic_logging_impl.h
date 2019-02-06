@@ -21,7 +21,7 @@
 
 // If |condition| is true, use |logstream| to stream the log message and send it to spdlog.
 // If |condition| is false, |logstream| will not be instantiated.
-// The switch(0) is used to supress a compiler warning on ambiguous "else".
+// The switch(0) is used to suppress a compiler warning on ambiguous "else".
 #define QUIC_LOG_IMPL_INTERNAL(condition, logstream)                                               \
   switch (0)                                                                                       \
   default:                                                                                         \
