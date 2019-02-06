@@ -17,6 +17,7 @@
 #include "absl/base/optimization.h"
 
 // TODO(wub): Add CHECK/DCHECK and variants, which are not explicitly exposed by quic_logging.h.
+// TODO(wub): Implement quic_mock_log_impl.h for testing.
 
 // If |condition| is true, use |logstream| to stream the log message and send it to spdlog.
 // If |condition| is false, |logstream| will not be instantiated.
