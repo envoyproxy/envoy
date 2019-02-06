@@ -8,8 +8,8 @@
 namespace Envoy {
 namespace {
 
-class TapIntegrationTest : public HttpIntegrationTest,
-                           public TestBaseWithParam<Network::Address::IpVersion> {
+class TapIntegrationTest : public TestBaseWithParam<Network::Address::IpVersion>,
+                           public HttpIntegrationTest {
 public:
   TapIntegrationTest()
       // Note: This test must use HTTP/2 because of the lack of early close detection for
