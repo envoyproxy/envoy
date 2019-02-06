@@ -142,7 +142,7 @@ public:
   Buffer::OwnedImpl buffer_;
 };
 
-class ThriftObjectImplTest : public ThriftObjectImplTestBase, public TestBase {};
+class ThriftObjectImplTest : public TestBase, public ThriftObjectImplTestBase {};
 
 // Test parsing an empty struct (just a stop field).
 TEST_F(ThriftObjectImplTest, ParseEmptyStruct) {
