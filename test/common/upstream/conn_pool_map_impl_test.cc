@@ -261,9 +261,9 @@ TEST_F(ConnPoolMapImplTest, GetPoolDrainedCbOnlyClearsInvoker) {
     EXPECT_TRUE(false);
     return nullptr;
   });
-  cb1(); // clear out 1.
+  cb1(); // Clear out 1.
 
-  // get 2 again. It should succeed, but not invoke the factory.
+  // Get 2 again. It should succeed, but not invoke the factory.
   auto opt_pool2 = test_map->getPool(2, getNeverCalledFactory());
 
   EXPECT_TRUE(opt_pool.has_value());
@@ -280,7 +280,7 @@ TEST_F(ConnPoolMapImplTest, GetPoolLimitHitCbInvoked) {
 
   ASSERT_TRUE(opt_pool.has_value());
 
-  // make sure we return the pool that was created
+  // Make sure we return the pool that was created.
   EXPECT_EQ(&(opt_pool.value().get()), mock_pools_[1]);
   EXPECT_EQ(test_map->size(), 1);
 }
@@ -297,7 +297,7 @@ TEST_F(ConnPoolMapImplTest, GetPoolLimitHitCbInvokedManyCleared) {
   EXPECT_EQ(test_map->size(), 1);
 }
 
-// show that we don't clear out un-drained pools if some drain immediately
+// Show that we don't clear out un-drained pools if some drain immediately.
 TEST_F(ConnPoolMapImplTest, GetPoolLimitHitCbInvokedSomeCleared) {
   TestMapPtr test_map = makeTestMapWithLimit(3);
 
@@ -314,7 +314,7 @@ TEST_F(ConnPoolMapImplTest, GetPoolLimitHitCbInvokedSomeCleared) {
   EXPECT_EQ(test_map->size(), 2);
 }
 
-// show that we later drain a pool, it is cleared out.
+// Show that we later drain a pool, it is cleared out.
 TEST_F(ConnPoolMapImplTest, GetPoolSomeImmediateOneLaterDrain) {
   TestMapPtr test_map = makeTestMapWithLimit(3);
 
@@ -332,7 +332,7 @@ TEST_F(ConnPoolMapImplTest, GetPoolSomeImmediateOneLaterDrain) {
   EXPECT_EQ(test_map->size(), 1);
 }
 
-// show that we do not add the drained callback if we haven't hit the limit
+// Show that we do not add the drained callback if we haven't hit the limit.
 TEST_F(ConnPoolMapImplTest, GetPoolUnderLimitNeverAddsCallback) {
   TestMapPtr test_map = makeTestMapWithLimit(3);
 
@@ -343,7 +343,7 @@ TEST_F(ConnPoolMapImplTest, GetPoolUnderLimitNeverAddsCallback) {
   EXPECT_EQ(test_map->size(), 3);
 }
 
-// show that If we hit the limit once, then again with the same keys, we don't clean out the
+// Show that if we hit the limit once, then again with the same keys, we don't clean out the
 // previously cleaned entries. Essentially, ensure we clean up any state related to being full.
 TEST_F(ConnPoolMapImplTest, GetPoolFailStateIsCleared) {
   TestMapPtr test_map = makeTestMapWithLimit(2);
@@ -356,19 +356,17 @@ TEST_F(ConnPoolMapImplTest, GetPoolFailStateIsCleared) {
 
   cb1();
 
-  // at this point, 1 should be cleared out. Let's get it again, then trigger a full condition.
+  // At this point, 1 should be cleared out. Let's get it again, then trigger a full condition.
   Http::ConnectionPool::Instance::DrainedCb cb3;
   auto opt_pool = test_map->getPool(1, getFactoryExpectDrainedCb(&cb3));
   EXPECT_TRUE(opt_pool.has_value());
 
-  // we're full. Because pool 1  and 2 aren't doing an immediate cb, the next call should fail.
+  // We're full. Because pool 1  and 2 aren't doing an immediate cb, the next call should fail.
   auto opt_pool_failed = test_map->getPool(4, getNeverCalledFactory());
   EXPECT_FALSE(opt_pool_failed.has_value());
 
   EXPECT_EQ(test_map->size(), 2);
 }
-// TODO: Add test for:
-// - show that if limit isn't hit, no callback is registered
 
 // The following tests only die in debug builds, so don't run them if this isn't one.
 #if !defined(NDEBUG)
