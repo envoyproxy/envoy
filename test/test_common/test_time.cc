@@ -15,7 +15,7 @@ TestTimeSystem& GlobalTimeSystem::timeSystem() {
   auto make_real_time_system = []() -> std::unique_ptr<TestTimeSystem> {
     return std::make_unique<TestRealTimeSystem>();
   };
-  return *singleton_->timeSystem(make_real_time_system);
+  return singleton_->timeSystem(make_real_time_system);
 }
 
 void TestRealTimeSystem::sleep(const Duration& duration) { std::this_thread::sleep_for(duration); }

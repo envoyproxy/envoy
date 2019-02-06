@@ -67,9 +67,9 @@ public:
    * Returns a singleton time-system, creating a default one of there's not
    * one already. This method is thread-safe.
    *
-   * @return the thread system.
+   * @return the time system.
    */
-  TestTimeSystem* timeSystem(const MakeTimeSystemFn& make_time_system);
+  TestTimeSystem& timeSystem(const MakeTimeSystemFn& make_time_system);
 
 private:
   std::unique_ptr<TestTimeSystem> time_system_ GUARDED_BY(mutex_);
@@ -110,19 +110,22 @@ public:
 template <class TimeSystemVariant>
 class DelegatingTestTimeSystem : public DelegatingTestTimeSystemBase<TimeSystemVariant> {
 public:
-  DelegatingTestTimeSystem() {
+  DelegatingTestTimeSystem() : time_system_(initTimeSystem()) {}
+
+  TimeSystemVariant& timeSystem() override { return time_system_; }
+
+private:
+  TimeSystemVariant& initTimeSystem() {
     auto make_time_system = []() -> std::unique_ptr<TestTimeSystem> {
       return std::make_unique<TimeSystemVariant>();
     };
-    time_system_ = dynamic_cast<TimeSystemVariant*>(singleton_->timeSystem(make_time_system));
-    RELEASE_ASSERT(time_system_, "Two different types of time-systems allocated");
+    auto time_system = dynamic_cast<TimeSystemVariant*>(&singleton_->timeSystem(make_time_system));
+    RELEASE_ASSERT(time_system, "Two different types of time-systems allocated");
+    return *time_system;
   }
 
-  TimeSystemVariant& timeSystem() override { return *time_system_; }
-
-private:
-  TimeSystemVariant* time_system_;
   Test::Global<SingletonTimeSystemHelper> singleton_;
+  TimeSystemVariant& time_system_;
 };
 
 } // namespace Event
