@@ -427,6 +427,7 @@ gregs
 gzip
 hacky
 handshaker
+hd
 hdr
 healths
 healthz
