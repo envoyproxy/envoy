@@ -151,12 +151,13 @@ TEST_F(MaglevLoadBalancerTest, LocalityWeightedSameLocalityWeights) {
 // invert the Weighted effective weights).
 TEST_F(MaglevLoadBalancerTest, LocalityWeightedDifferentLocalityWeights) {
   host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", 1),
-                      makeTestHost(info_, "tcp://127.0.0.1:91", 2)};
+                      makeTestHost(info_, "tcp://127.0.0.1:91", 2),
+                      makeTestHost(info_, "tcp://127.0.0.1:92", 3)};
   host_set_.healthy_hosts_ = host_set_.hosts_;
   host_set_.hosts_per_locality_ =
-      makeHostsPerLocality({{host_set_.hosts_[0]}, {host_set_.hosts_[1]}});
+      makeHostsPerLocality({{host_set_.hosts_[0]}, {host_set_.hosts_[2]}, {host_set_.hosts_[1]}});
   host_set_.healthy_hosts_per_locality_ = host_set_.hosts_per_locality_;
-  LocalityWeightsConstSharedPtr locality_weights{new LocalityWeights{8, 2}};
+  LocalityWeightsConstSharedPtr locality_weights{new LocalityWeights{8, 0, 2}};
   host_set_.locality_weights_ = locality_weights;
   host_set_.runCallbacks({}, {});
   init(17);
