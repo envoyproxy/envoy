@@ -206,7 +206,7 @@ def envoy_cmake_external(
         lib_source = "",
         postfix_script = "",
         static_libraries = []):
-    # On Windows, we don't want to explicilty set CMAKE_BUILD_TYPE,
+    # On Windows, we don't want to explicitly set CMAKE_BUILD_TYPE,
     # rules_foreign_cc will figure it out for us
     cache_entries_no_build_type = {}
     for key in cache_entries.keys():
