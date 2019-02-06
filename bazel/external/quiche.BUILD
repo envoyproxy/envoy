@@ -114,6 +114,7 @@ cc_library(
     hdrs = [
         "quiche/quic/platform/api/quic_aligned.h",
         "quiche/quic/platform/api/quic_arraysize.h",
+        "quiche/quic/platform/api/quic_client_stats.h",
         "quiche/quic/platform/api/quic_containers.h",
         "quiche/quic/platform/api/quic_endian.h",
         "quiche/quic/platform/api/quic_estimate_memory_usage.h",
@@ -130,7 +131,6 @@ cc_library(
         "quiche/quic/platform/api/quic_uint128.h",
         # TODO: uncomment the following files as implementations are added.
         # "quiche/quic/platform/api/quic_bug_tracker.h",
-        # "quiche/quic/platform/api/quic_client_stats.h",
         # "quiche/quic/platform/api/quic_clock.h",
         # "quiche/quic/platform/api/quic_expect_bug.h",
         # "quiche/quic/platform/api/quic_exported_stats.h",
