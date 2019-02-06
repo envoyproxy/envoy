@@ -4,17 +4,16 @@
 
 #include "test/integration/http_integration.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
-
-#include "gtest/gtest.h"
 
 namespace Envoy {
 
-class GzipIntegrationTest : public HttpIntegrationTest,
-                            public testing::TestWithParam<Network::Address::IpVersion> {
+class GzipIntegrationTest : public TestBaseWithParam<Network::Address::IpVersion>,
+                            public Event::SimulatedTimeSystem,
+                            public HttpIntegrationTest {
 public:
-  GzipIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), simTime()) {}
+  GzipIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
 
   void SetUp() override { decompressor_.init(window_bits); }
   void TearDown() override { cleanupUpstreamAndDownstream(); }

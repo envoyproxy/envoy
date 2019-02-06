@@ -20,12 +20,12 @@
 #include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/test_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/match.h"
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 #include "integration.h"
 #include "utility.h"
 
@@ -41,8 +41,8 @@ const envoy::service::discovery::v2::SdsDummy _sds_dummy;
 // Sds integration base class with following support:
 // * functions to create sds upstream, and send sds response
 // * functions to create secret protobuf.
-class SdsDynamicIntegrationBaseTest : public HttpIntegrationTest,
-                                      public Grpc::GrpcClientIntegrationParamTest {
+class SdsDynamicIntegrationBaseTest : public Grpc::GrpcClientIntegrationParamTest,
+                                      public HttpIntegrationTest {
 public:
   SdsDynamicIntegrationBaseTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion(), realTime()),

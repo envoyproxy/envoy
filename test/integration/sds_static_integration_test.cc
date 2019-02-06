@@ -18,12 +18,12 @@
 #include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/test_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/match.h"
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 #include "integration.h"
 #include "utility.h"
 
@@ -33,9 +33,8 @@ using testing::Return;
 namespace Envoy {
 namespace Ssl {
 
-class SdsStaticDownstreamIntegrationTest
-    : public HttpIntegrationTest,
-      public testing::TestWithParam<Network::Address::IpVersion> {
+class SdsStaticDownstreamIntegrationTest : public TestBaseWithParam<Network::Address::IpVersion>,
+                                           public HttpIntegrationTest {
 public:
   SdsStaticDownstreamIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()) {}
@@ -106,9 +105,8 @@ TEST_P(SdsStaticDownstreamIntegrationTest, RouterRequestAndResponseWithGiantBody
   testRouterRequestAndResponseWithBody(16 * 1024 * 1024, 16 * 1024 * 1024, false, &creator);
 }
 
-class SdsStaticUpstreamIntegrationTest
-    : public HttpIntegrationTest,
-      public testing::TestWithParam<Network::Address::IpVersion> {
+class SdsStaticUpstreamIntegrationTest : public TestBaseWithParam<Network::Address::IpVersion>,
+                                         public HttpIntegrationTest {
 public:
   SdsStaticUpstreamIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()) {}

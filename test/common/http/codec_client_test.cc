@@ -18,11 +18,10 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_time.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::AtMost;
@@ -38,7 +37,7 @@ using testing::Throw;
 namespace Envoy {
 namespace Http {
 
-class CodecClientTest : public testing::Test {
+class CodecClientTest : public TestBase {
 public:
   CodecClientTest() {
     connection_ = new NiceMock<Network::MockClientConnection>();
@@ -60,7 +59,6 @@ public:
 
   ~CodecClientTest() { EXPECT_EQ(0U, client_->numActiveRequests()); }
 
-  DangerousDeprecatedTestTime test_time_;
   Event::MockDispatcher dispatcher_;
   Network::MockClientConnection* connection_;
   Http::MockClientConnection* codec_;
@@ -259,10 +257,10 @@ TEST_F(CodecClientTest, WatermarkPassthrough) {
 }
 
 // Test the codec getting input from a real TCP connection.
-class CodecNetworkTest : public testing::TestWithParam<Network::Address::IpVersion> {
+class CodecNetworkTest : public TestBaseWithParam<Network::Address::IpVersion> {
 public:
   CodecNetworkTest() : api_(Api::createApiForTest(stats_store_)) {
-    dispatcher_ = std::make_unique<Event::DispatcherImpl>(test_time_.timeSystem(), *api_);
+    dispatcher_ = std::make_unique<Event::DispatcherImpl>(*api_);
     upstream_listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true, false);
     Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
         socket_.localAddress(), source_address_, Network::Test::createRawBufferSocket(), nullptr);
@@ -330,7 +328,6 @@ public:
 protected:
   Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
-  DangerousDeprecatedTestTime test_time_;
   Event::DispatcherPtr dispatcher_;
   Network::ListenerPtr upstream_listener_;
   Network::MockListenerCallbacks listener_callbacks_;

@@ -80,7 +80,11 @@ typedef std::unique_ptr<IntegrationCodecClient> IntegrationCodecClientPtr;
 class HttpIntegrationTest : public BaseIntegrationTest {
 public:
   HttpIntegrationTest(Http::CodecClient::Type downstream_protocol,
-                      Network::Address::IpVersion version, TestTimeSystemPtr time_system,
+                      Network::Address::IpVersion version, TestTimeSystemPtr,
+                      const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG)
+      : HttpIntegrationTest(downstream_protocol, version, config) {}
+  HttpIntegrationTest(Http::CodecClient::Type downstream_protocol,
+                      Network::Address::IpVersion version,
                       const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG);
   virtual ~HttpIntegrationTest();
 
@@ -130,7 +134,6 @@ protected:
                                                     int upstream_index);
 
   void testRouterRedirect();
-  void testRouterDirectResponse();
   void testRouterNotFound();
   void testRouterNotFoundWithBody();
   void testRouterClusterNotFound404();
@@ -160,28 +163,9 @@ protected:
   void testHeadersOnlyFilterEncodingIntermediateFilters();
   void testHeadersOnlyFilterDecodingIntermediateFilters();
   void testHeadersOnlyFilterInterleaved();
-  // HTTP/1 tests
-  void testBadFirstline();
-  void testMissingDelimiter();
-  void testInvalidCharacterInFirstline();
-  void testInvalidVersion();
-  void testHttp10Disabled();
-  void testHttp10DisabledWithUpgrade();
-  void testHttp09Enabled();
-  void testHttp10Enabled();
-  void testHttp10WithHostAndKeepAlive();
-  void testUpstreamProtocolError();
-  void testBadPath();
-  void testAbsolutePath();
-  void testAbsolutePathWithPort();
-  void testAbsolutePathWithoutPort();
-  void testConnect();
-  void testInlineHeaders();
-  void testAllowAbsoluteSameRelative();
+
   // Test that a request returns the same content with both allow_absolute_urls enabled and
   // allow_absolute_urls disabled
-  void testEquivalent(const std::string& request);
-  void testNoHost();
   void testDefaultHost();
   void testValidZeroLengthContent();
   void testInvalidContentLength();
@@ -198,11 +182,6 @@ protected:
   void testRetryHostPredicateFilter();
   void testHittingDecoderFilterLimit();
   void testHittingEncoderFilterLimit();
-  void testEnvoyProxyMetadataInResponse();
-  void testEnvoyProxyMultipleMetadata();
-  void testEnvoyProxyInvalidMetadata();
-  void testResponseMetadata();
-  void testEnvoyMultipleMetadataReachSizeLimit();
   void testEnvoyHandling100Continue(bool additional_continue_from_upstream = false,
                                     const std::string& via = "");
   void testEnvoyProxying100Continue(bool continue_before_upstream_complete = false,

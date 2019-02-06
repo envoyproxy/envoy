@@ -7,7 +7,7 @@ set -e
 build_setup_args=""
 if [[ "$1" == "fix_format" || "$1" == "check_format" || "$1" == "check_repositories" || \
         "$1" == "check_spelling" || "$1" == "fix_spelling" || "$1" == "bazel.clang_tidy" || \
-        "$1" == "check_spelling_pedantic" ]]; then
+        "$1" == "check_spelling_pedantic" || "$1" == "fix_spelling_pedantic" ]]; then
   build_setup_args="-nofetch"
 fi
 
@@ -15,6 +15,10 @@ fi
 . "$(dirname "$0")"/build_setup.sh $build_setup_args
 
 echo "building using ${NUM_CPUS} CPUs"
+
+function collect_build_profile() {
+  cp -f "$(bazel info output_base)/command.profile" "${ENVOY_BUILD_PROFILE}/$1.profile" || true
+}
 
 function bazel_with_collection() {
   declare -r BAZEL_OUTPUT="${ENVOY_SRCDIR}"/bazel.output.txt
@@ -30,12 +34,14 @@ function bazel_with_collection() {
     done
     exit "${BAZEL_STATUS}"
   fi
+  collect_build_profile $1
 }
 
 function bazel_release_binary_build() {
   echo "Building..."
   cd "${ENVOY_CI_DIR}"
   bazel build ${BAZEL_BUILD_OPTIONS} -c opt //source/exe:envoy-static
+  collect_build_profile release_build
   # Copy the envoy-static binary somewhere that we can access outside of the
   # container.
   cp -f \
@@ -54,6 +60,7 @@ function bazel_debug_binary_build() {
   echo "Building..."
   cd "${ENVOY_CI_DIR}"
   bazel build ${BAZEL_BUILD_OPTIONS} -c dbg //source/exe:envoy-static
+  collect_build_profile debug_build
   # Copy the envoy-static binary somewhere that we can access outside of the
   # container.
   cp -f \
@@ -130,7 +137,7 @@ elif [[ "$1" == "bazel.asan" ]]; then
   rm -rf "${TAP_TMP}"
   mkdir -p "${TAP_TMP}"
   bazel_with_collection test ${BAZEL_TEST_OPTIONS} -c dbg --config=clang-asan \
-    @envoy//test/integration:ssl_integration_test \
+    @envoy//test/extensions/transport_sockets/tls/integration:ssl_integration_test \
     --test_env=TAP_PATH="${TAP_TMP}/tap"
   # Verify that some pb_text files have been created. We can't check for pcap,
   # since tcpdump is not available in general due to CircleCI lack of support
@@ -248,6 +255,7 @@ elif [[ "$1" == "bazel.coverage" ]]; then
   # directory. Wow.
   cd "${ENVOY_BUILD_DIR}"
   SRCDIR="${GCOVR_DIR}" "${ENVOY_SRCDIR}"/test/run_envoy_bazel_coverage.sh
+  collect_build_profile coverage
   exit 0
 elif [[ "$1" == "bazel.clang_tidy" ]]; then
   setup_clang_toolchain
@@ -304,6 +312,11 @@ elif [[ "$1" == "check_spelling_pedantic" ]]; then
   cd "${ENVOY_SRCDIR}"
   echo "check_spelling_pedantic..."
   ./tools/check_spelling_pedantic.py check
+  exit 0
+elif [[ "$1" == "fix_spelling_pedantic" ]]; then
+  cd "${ENVOY_SRCDIR}"
+  echo "fix_spelling_pedantic..."
+  ./tools/check_spelling_pedantic.py fix
   exit 0
 elif [[ "$1" == "docs" ]]; then
   echo "generating docs..."

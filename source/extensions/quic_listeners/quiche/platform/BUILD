@@ -42,6 +42,7 @@ envoy_cc_library(
     hdrs = [
         "quic_aligned_impl.h",
         "quic_arraysize_impl.h",
+        "quic_client_stats_impl.h",
         "quic_containers_impl.h",
         "quic_endian_impl.h",
         "quic_estimate_memory_usage_impl.h",
@@ -70,6 +71,8 @@ envoy_cc_library(
     name = "quic_platform_impl_lib",
     hdrs = [
         "quic_mutex_impl.h",
+        "quic_str_cat_impl.h",
+        "quic_string_utils_impl.h",
     ],
     external_deps = [
         "quiche_quic_platform_base",
