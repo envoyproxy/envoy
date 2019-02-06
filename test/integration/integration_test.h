@@ -10,4 +10,15 @@ class IntegrationTest : public HttpIntegrationTest,
 public:
   IntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()) {}
 };
+
+class UpstreamEndpointIntegrationTest
+    : public HttpIntegrationTest, public testing::TestWithParam<Network::Address::IpVersion> {
+public:
+  UpstreamEndpointIntegrationTest()
+      : HttpIntegrationTest(
+            Http::CodecClient::Type::HTTP1,
+            Network::Utility::parseInternetAddress(Network::Test::getAnyAddressString(GetParam())),
+            /*upstream_port_fn=*/[]{return 0;},
+            realTime()) {}
+};
 } // namespace Envoy

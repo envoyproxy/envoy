@@ -344,11 +344,25 @@ FakeUpstream::FakeUpstream(const std::string& uds_path, FakeHttpConnection::Type
   ENVOY_LOG(info, "starting fake server on unix domain socket {}", uds_path);
 }
 
+static Network::SocketPtr makeTcpListenSocket(
+    const Network::Address::InstanceConstSharedPtr& endpoint) {
+  return Network::SocketPtr{new Network::TcpListenSocket(endpoint, nullptr, true)};
+}
+
 static Network::SocketPtr makeTcpListenSocket(uint32_t port, Network::Address::IpVersion version) {
   return Network::SocketPtr{new Network::TcpListenSocket(
-      Network::Utility::parseInternetAddressAndPort(
-          fmt::format("{}:{}", Network::Test::getAnyAddressUrlString(version), port)),
+      Network::Utility::parseInternetAddress(Network::Test::getAnyAddressString(version), port),
       nullptr, true)};
+}
+
+FakeUpstream::FakeUpstream(const Network::Address::InstanceConstSharedPtr& endpoint,
+                           FakeHttpConnection::Type type, Event::TestTimeSystem& time_system,
+                           bool enable_half_close)
+    : FakeUpstream(Network::Test::createRawBufferSocketFactory(),
+                   makeTcpListenSocket(endpoint), type, time_system, enable_half_close) {
+  ENVOY_LOG(info, "starting fake server on socket {}:{}. Address version is {}",
+            endpoint->ip()->addressAsString(), endpoint->ip()->port(),
+            Network::Test::addressVersionAsString(endpoint->ip()->version()));
 }
 
 FakeUpstream::FakeUpstream(uint32_t port, FakeHttpConnection::Type type,

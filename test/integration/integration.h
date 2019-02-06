@@ -14,6 +14,7 @@
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_time.h"
@@ -132,11 +133,15 @@ class BaseIntegrationTest : Logger::Loggable<Logger::Id::testing> {
 public:
   using TestTimeSystemPtr = std::unique_ptr<Event::TestTimeSystem>;
 
-  BaseIntegrationTest(Network::Address::IpVersion version,
+  // Creates a test fixture with an upstream bound to INADDR_ANY on an unspecified port using the
+  // provided IP |version|.
+  BaseIntegrationTest(Network::Address::IpVersion version, TestTimeSystemPtr time_system,
                       const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG);
-  BaseIntegrationTest(Network::Address::IpVersion version, TestTimeSystemPtr,
-                      const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG)
-      : BaseIntegrationTest(version, config) {}
+  // Creates a test fixture with a specified |upstream_address| and port provider function
+  // |upstream_port_fn|. This also sets the IP version to the one used by the |upstream_address|.
+  BaseIntegrationTest(const Network::Address::InstanceConstSharedPtr& upstream_address,
+                      std::function<uint32_t()> upstream_port_fn, TestTimeSystemPtr time_system,
+                      const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG);
 
   virtual ~BaseIntegrationTest() {}
 
@@ -236,6 +241,10 @@ protected:
 
   // The IpVersion (IPv4, IPv6) to use.
   Network::Address::IpVersion version_;
+  // IP Address to use when binding sockets on upstreams.
+  Network::Address::InstanceConstSharedPtr upstream_address_;
+  // Function to use for determing port when binding sockets on upstreams.
+  std::function<uint32_t()> upstream_port_fn_;
   // The config for envoy start-up.
   ConfigHelper config_helper_;
   // Steps that should be done prior to the workers starting. E.g., xDS pre-init.

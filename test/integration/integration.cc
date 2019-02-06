@@ -227,12 +227,22 @@ void IntegrationTcpClient::ConnectionCallbacks::onEvent(Network::ConnectionEvent
 }
 
 BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version,
-                                         const std::string& config)
+                                         TestTimeSystemPtr time_system, const std::string& config)
+    : BaseIntegrationTest(
+          Network::Utility::parseInternetAddress(Network::Test::getAnyAddressString(version)),
+          /*upstream_port_fn=*/[]{return 0;}, std::move(time_system), config) {}
+
+BaseIntegrationTest::BaseIntegrationTest(
+    const Network::Address::InstanceConstSharedPtr& upstream_address,
+    std::function<uint32_t()> upstream_port_fn,
+    TestTimeSystemPtr time_system, const std::string& config)
     : api_(Api::createApiForTest(stats_store_)),
-      mock_buffer_factory_(new NiceMock<MockBufferFactory>),
-      dispatcher_(
-          new Event::DispatcherImpl(Buffer::WatermarkFactoryPtr{mock_buffer_factory_}, *api_)),
-      version_(version), config_helper_(version, *api_, config),
+      mock_buffer_factory_(new NiceMock<MockBufferFactory>), time_system_(std::move(time_system)),
+      dispatcher_(new Event::DispatcherImpl(
+          *time_system_, Buffer::WatermarkFactoryPtr{mock_buffer_factory_}, *api_)),
+      version_(upstream_address->ip()->version()), upstream_address_(upstream_address),
+      upstream_port_fn_(upstream_port_fn),
+      config_helper_(upstream_address->ip()->version(), config),
       default_log_level_(TestEnvironment::getOptions().logLevel()) {
 
   // This is a hack, but there are situations where we disconnect fake upstream connections and
@@ -272,12 +282,14 @@ void BaseIntegrationTest::initialize() {
 
 void BaseIntegrationTest::createUpstreams() {
   for (uint32_t i = 0; i < fake_upstreams_count_; ++i) {
+    auto endpoint = Network::Utility::parseInternetAddress(
+        upstream_address_->ip()->addressAsString(), upstream_port_fn_());
     if (autonomous_upstream_) {
       fake_upstreams_.emplace_back(
-          new AutonomousUpstream(0, upstream_protocol_, version_, timeSystem()));
+          new AutonomousUpstream(endpoint, upstream_protocol_, *time_system_));
     } else {
       fake_upstreams_.emplace_back(
-          new FakeUpstream(0, upstream_protocol_, version_, timeSystem(), enable_half_close_));
+          new FakeUpstream(endpoint, upstream_protocol_, *time_system_, enable_half_close_));
     }
   }
 }
