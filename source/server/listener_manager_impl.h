@@ -46,9 +46,10 @@ public:
 
   // Server::ListenerComponentFactory
   LdsApiPtr createLdsApi(const envoy::api::v2::core::ConfigSource& lds_config) override {
-    return std::make_unique<LdsApiImpl>(
-        lds_config, server_.clusterManager(), server_.dispatcher(), server_.random(),
-        server_.initManager(), server_.localInfo(), server_.stats(), server_.listenerManager());
+    return std::make_unique<LdsApiImpl>(lds_config, server_.clusterManager(), server_.dispatcher(),
+                                        server_.random(), server_.initManager(),
+                                        server_.localInfo(), server_.stats(),
+                                        server_.listenerManager(), server_.api());
   }
   std::vector<Network::FilterFactoryCb> createNetworkFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
@@ -103,7 +104,7 @@ struct ListenerManagerStats {
 class ListenerManagerImpl : public ListenerManager, Logger::Loggable<Logger::Id::config> {
 public:
   ListenerManagerImpl(Instance& server, ListenerComponentFactory& listener_factory,
-                      WorkerFactory& worker_factory, TimeSource& time_source);
+                      WorkerFactory& worker_factory);
 
   void onListenerWarmed(ListenerImpl& listener);
 
@@ -123,7 +124,6 @@ public:
   Http::Context& httpContext() { return server_.httpContext(); }
 
   Instance& server_;
-  TimeSource& time_source_;
   ListenerComponentFactory& factory_;
 
 private:
@@ -281,7 +281,7 @@ public:
   const envoy::api::v2::core::Metadata& listenerMetadata() const override {
     return config_.metadata();
   };
-  TimeSource& timeSource() override { return parent_.time_source_; }
+  TimeSource& timeSource() override { return api().timeSystem(); }
   void ensureSocketOptions() {
     if (!listen_socket_options_) {
       listen_socket_options_ =
@@ -297,6 +297,7 @@ public:
     Network::Socket::appendOptions(listen_socket_options_, options);
   }
   const Network::ListenerConfig& listenerConfig() const override { return *this; }
+  Api::Api& api() override { return parent_.server_.api(); }
 
   // Network::DrainDecision
   bool drainClose() const override;

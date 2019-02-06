@@ -80,7 +80,11 @@ typedef std::unique_ptr<IntegrationCodecClient> IntegrationCodecClientPtr;
 class HttpIntegrationTest : public BaseIntegrationTest {
 public:
   HttpIntegrationTest(Http::CodecClient::Type downstream_protocol,
-                      Network::Address::IpVersion version, TestTimeSystemPtr time_system,
+                      Network::Address::IpVersion version, TestTimeSystemPtr,
+                      const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG)
+      : HttpIntegrationTest(downstream_protocol, version, config) {}
+  HttpIntegrationTest(Http::CodecClient::Type downstream_protocol,
+                      Network::Address::IpVersion version,
                       const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG);
   virtual ~HttpIntegrationTest();
 
@@ -101,9 +105,11 @@ protected:
   //
   // Waits for the complete downstream response before returning.
   // Requires |codec_client_| to be initialized.
-  IntegrationStreamDecoderPtr sendRequestAndWaitForResponse(
-      const Http::TestHeaderMapImpl& request_headers, uint32_t request_body_size,
-      const Http::TestHeaderMapImpl& response_headers, uint32_t response_body_size);
+  IntegrationStreamDecoderPtr
+  sendRequestAndWaitForResponse(const Http::TestHeaderMapImpl& request_headers,
+                                uint32_t request_body_size,
+                                const Http::TestHeaderMapImpl& response_headers,
+                                uint32_t response_body_size, int upstream_index = 0);
 
   // Wait for the end of stream on the next upstream stream on any of the provided fake upstreams.
   // Sets fake_upstream_connection_ to the connection and upstream_request_ to stream.
@@ -115,10 +121,19 @@ protected:
   // Close |codec_client_| and |fake_upstream_connection_| cleanly.
   void cleanupUpstreamAndDownstream();
 
+  // Utility function to add filters.
+  void addFilters(std::vector<std::string> filters);
+
+  // Check for completion of upstream_request_, and a simple "200" response.
+  void checkSimpleRequestSuccess(uint64_t expected_request_size, uint64_t expected_response_size,
+                                 IntegrationStreamDecoder* response);
+
   typedef std::function<Network::ClientConnectionPtr()> ConnectionCreationFunction;
+  // Sends a simple header-only HTTP request, and waits for a response.
+  IntegrationStreamDecoderPtr makeHeaderOnlyRequest(ConnectionCreationFunction* create_connection,
+                                                    int upstream_index);
 
   void testRouterRedirect();
-  void testRouterDirectResponse();
   void testRouterNotFound();
   void testRouterNotFoundWithBody();
   void testRouterClusterNotFound404();
@@ -126,8 +141,9 @@ protected:
   void testRouterRequestAndResponseWithBody(uint64_t request_size, uint64_t response_size,
                                             bool big_header,
                                             ConnectionCreationFunction* creator = nullptr);
-  void testRouterHeaderOnlyRequestAndResponse(bool close_upstream,
-                                              ConnectionCreationFunction* creator = nullptr);
+  void testRouterHeaderOnlyRequestAndResponse(ConnectionCreationFunction* creator = nullptr,
+                                              int upstream_index = 0);
+  void testRequestAndResponseShutdownWithActiveConnection();
   void testRouterUpstreamDisconnectBeforeRequestComplete();
   void
   testRouterUpstreamDisconnectBeforeResponseComplete(ConnectionCreationFunction* creator = nullptr);
@@ -137,7 +153,7 @@ protected:
       ConnectionCreationFunction* creator = nullptr);
   void testRouterUpstreamResponseBeforeRequestComplete();
   void testTwoRequests(bool force_network_backup = false);
-  void testOverlyLongHeaders();
+  void testLargeRequestHeaders(uint32_t size, uint32_t max_size = 60);
   void testIdleTimeoutBasic();
   void testIdleTimeoutWithTwoRequests();
   void testIdleTimerDisabled();
@@ -147,28 +163,9 @@ protected:
   void testHeadersOnlyFilterEncodingIntermediateFilters();
   void testHeadersOnlyFilterDecodingIntermediateFilters();
   void testHeadersOnlyFilterInterleaved();
-  // HTTP/1 tests
-  void testBadFirstline();
-  void testMissingDelimiter();
-  void testInvalidCharacterInFirstline();
-  void testInvalidVersion();
-  void testHttp10Disabled();
-  void testHttp10DisabledWithUpgrade();
-  void testHttp09Enabled();
-  void testHttp10Enabled();
-  void testHttp10WithHostAndKeepAlive();
-  void testUpstreamProtocolError();
-  void testBadPath();
-  void testAbsolutePath();
-  void testAbsolutePathWithPort();
-  void testAbsolutePathWithoutPort();
-  void testConnect();
-  void testInlineHeaders();
-  void testAllowAbsoluteSameRelative();
+
   // Test that a request returns the same content with both allow_absolute_urls enabled and
   // allow_absolute_urls disabled
-  void testEquivalent(const std::string& request);
-  void testNoHost();
   void testDefaultHost();
   void testValidZeroLengthContent();
   void testInvalidContentLength();
@@ -185,10 +182,6 @@ protected:
   void testRetryHostPredicateFilter();
   void testHittingDecoderFilterLimit();
   void testHittingEncoderFilterLimit();
-  void testEnvoyProxyMetadataInResponse();
-  void testEnvoyProxyMultipleMetadata();
-  void testEnvoyProxyInvalidMetadata();
-  void testEnvoyMultipleMetadataReachSizeLimit();
   void testEnvoyHandling100Continue(bool additional_continue_from_upstream = false,
                                     const std::string& via = "");
   void testEnvoyProxying100Continue(bool continue_before_upstream_complete = false,

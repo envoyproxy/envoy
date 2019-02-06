@@ -11,10 +11,10 @@
 
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Property;
@@ -22,7 +22,7 @@ using testing::Property;
 namespace Envoy {
 namespace Http {
 
-class CodeUtilityTest : public testing::Test {
+class CodeUtilityTest : public TestBase {
 public:
   void addResponse(uint64_t code, bool canary, bool internal_request,
                    const std::string& request_vhost_name = EMPTY_STRING,
@@ -235,7 +235,7 @@ TEST(CodeUtilityResponseTimingTest, All) {
   code_stats.chargeResponseTiming(info);
 }
 
-class CodeStatsTest : public testing::Test {
+class CodeStatsTest : public TestBase {
 protected:
   absl::string_view stripTrailingDot(absl::string_view prefix) {
     return CodeStatsImpl::stripTrailingDot(prefix);
@@ -256,7 +256,7 @@ TEST_F(CodeStatsTest, StripTrailingDot) {
 TEST_F(CodeStatsTest, Join) {
   EXPECT_EQ("hello.world", join({"hello", "world"}));
   EXPECT_EQ("hello.world", join({"", "hello", "world"})); // leading empty token ignored.
-  EXPECT_EQ("hello.", join({"hello", ""}));               // trailign empty token not ignored.
+  EXPECT_EQ("hello.", join({"hello", ""}));               // trailing empty token not ignored.
   EXPECT_EQ("hello", join({"hello"}));
   EXPECT_EQ("", join({""}));
 }

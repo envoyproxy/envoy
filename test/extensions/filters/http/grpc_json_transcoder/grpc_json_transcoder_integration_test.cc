@@ -6,10 +6,10 @@
 #include "test/integration/http_integration.h"
 #include "test/mocks/http/mocks.h"
 #include "test/proto/bookstore.pb.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/match.h"
-#include "gtest/gtest.h"
 
 using Envoy::Protobuf::Message;
 using Envoy::Protobuf::TextFormat;
@@ -20,9 +20,8 @@ using Envoy::ProtobufWkt::Empty;
 
 namespace Envoy {
 
-class GrpcJsonTranscoderIntegrationTest
-    : public HttpIntegrationTest,
-      public testing::TestWithParam<Network::Address::IpVersion> {
+class GrpcJsonTranscoderIntegrationTest : public HttpIntegrationTest,
+                                          public TestBaseWithParam<Network::Address::IpVersion> {
 public:
   GrpcJsonTranscoderIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()) {}
@@ -154,9 +153,9 @@ protected:
   }
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, GrpcJsonTranscoderIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, GrpcJsonTranscoderIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryPost) {
   testTranscoding<bookstore::CreateShelfRequest, bookstore::Shelf>(

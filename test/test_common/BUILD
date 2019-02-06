@@ -90,6 +90,7 @@ envoy_cc_test_library(
         "abseil_strings",
     ],
     deps = [
+        ":test_time_lib",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/http:codec_interface",
         "//include/envoy/network:address_interface",
@@ -137,7 +138,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_test_library(
+envoy_cc_library(
     name = "global_lib",
     srcs = ["global.cc"],
     hdrs = ["global.h"],
@@ -155,11 +156,22 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_library(
+    name = "test_base",
+    srcs = ["test_base.cc"],
+    hdrs = ["test_base.h"],
+    deps = [
+        "//external:googletest",
+        "//test/test_common:global_lib",
+    ],
+)
+
 envoy_cc_test_library(
     name = "test_time_lib",
     srcs = ["test_time.cc"],
     hdrs = ["test_time.h"],
     deps = [
+        ":global_lib",
         ":test_time_system_interface",
         "//source/common/event:real_time_system_lib",
     ],
@@ -169,6 +181,7 @@ envoy_cc_test_library(
     name = "test_time_system_interface",
     hdrs = ["test_time_system.h"],
     deps = [
+        ":global_lib",
         "//include/envoy/event:timer_interface",
         "//source/common/common:thread_lib",
     ],
@@ -189,16 +202,16 @@ envoy_cc_test(
     srcs = ["simulated_time_system_test.cc"],
     deps = [
         ":simulated_time_system_lib",
-        "//test/test_common:utility_lib",
+        ":utility_lib",
     ],
 )
 
-envoy_cc_library(
-    name = "tls_utility_lib",
-    srcs = ["tls_utility.cc"],
-    hdrs = ["tls_utility.h"],
-    external_deps = ["ssl"],
+envoy_cc_test(
+    name = "test_time_system_test",
+    srcs = ["test_time_system_test.cc"],
     deps = [
-        "//source/common/common:assert_lib",
+        ":simulated_time_system_lib",
+        ":test_time_lib",
+        ":utility_lib",
     ],
 )

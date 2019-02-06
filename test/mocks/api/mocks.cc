@@ -3,8 +3,9 @@
 #include "common/common/assert.h"
 #include "common/common/lock_guard.h"
 
+#include "test/test_common/test_base.h"
+
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Return;
@@ -12,9 +13,13 @@ using testing::Return;
 namespace Envoy {
 namespace Api {
 
-MockApi::MockApi() { ON_CALL(*this, createFile(_, _, _)).WillByDefault(Return(file_)); }
+MockApi::MockApi() { ON_CALL(*this, fileSystem()).WillByDefault(ReturnRef(file_system_)); }
 
 MockApi::~MockApi() {}
+
+Event::DispatcherPtr MockApi::allocateDispatcher() {
+  return Event::DispatcherPtr{allocateDispatcher_(timeSystem())};
+}
 
 MockOsSysCalls::MockOsSysCalls() { num_writes_ = num_open_ = 0; }
 

@@ -7,9 +7,9 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::Return;
 using testing::ReturnPointee;
@@ -21,7 +21,7 @@ namespace Filters {
 namespace Common {
 namespace ExtAuthz {
 
-class CheckRequestUtilsTest : public testing::Test {
+class CheckRequestUtilsTest : public TestBase {
 public:
   CheckRequestUtilsTest() {
     addr_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 1111);
@@ -40,7 +40,7 @@ public:
 
 // Verify that createTcpCheck's dependencies are invoked when it's called.
 TEST_F(CheckRequestUtilsTest, BasicTcp) {
-  envoy::service::auth::v2alpha::CheckRequest request;
+  envoy::service::auth::v2::CheckRequest request;
   EXPECT_CALL(net_callbacks_, connection()).Times(2).WillRepeatedly(ReturnRef(connection_));
   EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
   EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
@@ -52,7 +52,7 @@ TEST_F(CheckRequestUtilsTest, BasicTcp) {
 // Verify that createHttpCheck's dependencies are invoked when it's called.
 TEST_F(CheckRequestUtilsTest, BasicHttp) {
   Http::HeaderMapImpl headers;
-  envoy::service::auth::v2alpha::CheckRequest request;
+  envoy::service::auth::v2::CheckRequest request;
   EXPECT_CALL(callbacks_, connection()).Times(2).WillRepeatedly(Return(&connection_));
   EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
   EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
@@ -70,7 +70,7 @@ TEST_F(CheckRequestUtilsTest, BasicHttp) {
 TEST_F(CheckRequestUtilsTest, CheckAttrContextPeer) {
   Http::TestHeaderMapImpl request_headers{{"x-envoy-downstream-service-cluster", "foo"},
                                           {":path", "/bar"}};
-  envoy::service::auth::v2alpha::CheckRequest request;
+  envoy::service::auth::v2::CheckRequest request;
   EXPECT_CALL(callbacks_, connection()).WillRepeatedly(Return(&connection_));
   EXPECT_CALL(connection_, remoteAddress()).WillRepeatedly(ReturnRef(addr_));
   EXPECT_CALL(connection_, localAddress()).WillRepeatedly(ReturnRef(addr_));

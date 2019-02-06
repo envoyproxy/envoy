@@ -21,10 +21,10 @@
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Invoke;
@@ -37,7 +37,7 @@ namespace Extensions {
 namespace Tracers {
 namespace Zipkin {
 
-class ZipkinDriverTest : public testing::Test {
+class ZipkinDriverTest : public TestBase {
 public:
   ZipkinDriverTest() : time_source_(test_time_.timeSystem()) {}
 
@@ -68,7 +68,7 @@ public:
   }
 
   // TODO(#4160): Currently time_system_ is initialized from DangerousDeprecatedTestTime, which uses
-  // real time, not mock-time. When that is switched to use mock-time intead, I think
+  // real time, not mock-time. When that is switched to use mock-time instead, I think
   // generateRandom64() may not be as random as we want, and we'll need to inject entropy
   // appropriate for the test.
   uint64_t generateRandom64() { return Util::generateRandom64(time_source_); }

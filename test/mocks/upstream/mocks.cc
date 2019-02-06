@@ -5,8 +5,9 @@
 
 #include "envoy/upstream/load_balancer.h"
 
+#include "test/test_common/test_base.h"
+
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Invoke;
@@ -23,7 +24,7 @@ MockHostSet::MockHostSet(uint32_t priority, uint32_t overprovisioning_factor)
   ON_CALL(*this, priority()).WillByDefault(Return(priority_));
   ON_CALL(*this, hosts()).WillByDefault(ReturnRef(hosts_));
   ON_CALL(*this, healthyHosts()).WillByDefault(ReturnRef(healthy_hosts_));
-  ON_CALL(*this, degradedHosts()).WillByDefault(ReturnRef(healthy_hosts_));
+  ON_CALL(*this, degradedHosts()).WillByDefault(ReturnRef(degraded_hosts_));
   ON_CALL(*this, hostsPerLocality()).WillByDefault(Invoke([this]() -> const HostsPerLocality& {
     return *hosts_per_locality_;
   }));
@@ -48,6 +49,10 @@ MockPrioritySet::MockPrioritySet() {
       .WillByDefault(Invoke([this](PrioritySet::MemberUpdateCb cb) -> Common::CallbackHandle* {
         return member_update_cb_helper_.add(cb);
       }));
+  ON_CALL(*this, addPriorityUpdateCb(_))
+      .WillByDefault(Invoke([this](PrioritySet::PriorityUpdateCb cb) -> Common::CallbackHandle* {
+        return priority_update_cb_helper_.add(cb);
+      }));
 }
 
 MockPrioritySet::~MockPrioritySet() = default;
@@ -67,7 +72,8 @@ HostSet& MockPrioritySet::getHostSet(uint32_t priority) {
 }
 void MockPrioritySet::runUpdateCallbacks(uint32_t priority, const HostVector& hosts_added,
                                          const HostVector& hosts_removed) {
-  member_update_cb_helper_.runCallbacks(priority, hosts_added, hosts_removed);
+  member_update_cb_helper_.runCallbacks(hosts_added, hosts_removed);
+  priority_update_cb_helper_.runCallbacks(priority, hosts_added, hosts_removed);
 }
 
 MockRetryPriority::~MockRetryPriority() = default;
@@ -141,6 +147,9 @@ MockClusterInfoFactory::~MockClusterInfoFactory() = default;
 
 MockRetryHostPredicate::MockRetryHostPredicate() = default;
 MockRetryHostPredicate::~MockRetryHostPredicate() = default;
+
+MockClusterManagerFactory::MockClusterManagerFactory() = default;
+MockClusterManagerFactory::~MockClusterManagerFactory() = default;
 
 } // namespace Upstream
 } // namespace Envoy

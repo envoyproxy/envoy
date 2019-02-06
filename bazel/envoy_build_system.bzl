@@ -86,6 +86,8 @@ def envoy_copts(repository, test = False):
 
 def envoy_static_link_libstdcpp_linkopts():
     return envoy_select_force_libcpp(
+        # TODO(PiotrSikora): statically link libc++ once that's possible.
+        # See: https://reviews.llvm.org/D53238
         ["-stdlib=libc++"],
         ["-static-libstdc++", "-static-libgcc"],
     )
@@ -161,7 +163,7 @@ def envoy_test_linkopts():
         # TODO(mattklein123): It's not great that we universally link against the following libs.
         # In particular, -latomic and -lrt are not needed on all platforms. Make this more granular.
         "//conditions:default": ["-pthread", "-lrt", "-ldl"],
-    }) + envoy_select_force_libcpp(["-lc++experimental"], ["-lstdc++fs", "-latomic"])
+    }) + envoy_select_force_libcpp(["-lc++fs"], ["-lstdc++fs", "-latomic"])
 
 # References to Envoy external dependencies should be wrapped with this function.
 def envoy_external_dep_path(dep):
@@ -355,10 +357,15 @@ def envoy_cc_fuzz_test(name, corpus, deps = [], tags = [], **kwargs):
         }),
         tags = tags,
     )
+
+    # This target exists only for
+    # https://github.com/google/oss-fuzz/blob/master/projects/envoy/build.sh. It won't yield
+    # anything useful on its own, as it expects to be run in an environment where the linker options
+    # provide a path to FuzzingEngine.
     native.cc_binary(
         name = name + "_driverless",
         copts = envoy_copts("@envoy", test = True),
-        linkopts = envoy_test_linkopts(),
+        linkopts = ["-lFuzzingEngine"] + envoy_test_linkopts(),
         linkstatic = 1,
         testonly = 1,
         deps = [":" + test_lib_name],
@@ -430,6 +437,7 @@ def envoy_cc_test_library(
         deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] + [
             envoy_external_dep_path("googletest"),
             repository + "//test/test_common:printers_includes",
+            repository + "//test/test_common:test_base",
         ],
         tags = tags,
         alwayslink = 1,
@@ -468,22 +476,24 @@ def envoy_sh_test(
         name,
         srcs = [],
         data = [],
+        coverage = True,
         **kargs):
-    test_runner_cc = name + "_test_runner.cc"
-    native.genrule(
-        name = name + "_gen_test_runner",
-        srcs = srcs,
-        outs = [test_runner_cc],
-        cmd = "$(location //bazel:gen_sh_test_runner.sh) $(SRCS) >> $@",
-        tools = ["//bazel:gen_sh_test_runner.sh"],
-    )
-    envoy_cc_test_library(
-        name = name + "_lib",
-        srcs = [test_runner_cc],
-        data = srcs + data,
-        tags = ["coverage_test_lib"],
-        deps = ["//test/test_common:environment_lib"],
-    )
+    if coverage:
+        test_runner_cc = name + "_test_runner.cc"
+        native.genrule(
+            name = name + "_gen_test_runner",
+            srcs = srcs,
+            outs = [test_runner_cc],
+            cmd = "$(location //bazel:gen_sh_test_runner.sh) $(SRCS) >> $@",
+            tools = ["//bazel:gen_sh_test_runner.sh"],
+        )
+        envoy_cc_test_library(
+            name = name + "_lib",
+            srcs = [test_runner_cc],
+            data = srcs + data,
+            tags = ["coverage_test_lib"],
+            deps = ["//test/test_common:environment_lib"],
+        )
     native.sh_test(
         name = name,
         srcs = ["//bazel:sh_test_wrapper.sh"],
@@ -586,4 +596,10 @@ def envoy_select_boringssl(if_fips, default = None):
     return select({
         "@envoy//bazel:boringssl_fips": if_fips,
         "//conditions:default": default or [],
+    })
+
+def envoy_select_quiche(xs, repository = ""):
+    return select({
+        repository + "//bazel:enable_quiche": xs,
+        "//conditions:default": [],
     })

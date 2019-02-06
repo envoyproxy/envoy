@@ -6,8 +6,9 @@
 #include "common/event/dispatcher_impl.h"
 #include "common/network/connection_impl.h"
 #include "common/network/utility.h"
-#include "common/ssl/context_config_impl.h"
-#include "common/ssl/context_manager_impl.h"
+
+#include "extensions/transport_sockets/tls/context_config_impl.h"
+#include "extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "test/config/integration/certs/clientcert_hash.h"
 #include "test/integration/http_integration.h"
@@ -17,12 +18,12 @@
 #include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/test_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/match.h"
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 #include "integration.h"
 #include "utility.h"
 
@@ -32,9 +33,8 @@ using testing::Return;
 namespace Envoy {
 namespace Ssl {
 
-class SdsStaticDownstreamIntegrationTest
-    : public HttpIntegrationTest,
-      public testing::TestWithParam<Network::Address::IpVersion> {
+class SdsStaticDownstreamIntegrationTest : public HttpIntegrationTest,
+                                           public TestBaseWithParam<Network::Address::IpVersion> {
 public:
   SdsStaticDownstreamIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()) {}
@@ -72,13 +72,12 @@ public:
 
     registerTestServerPorts({"http"});
 
-    client_ssl_ctx_ = createClientSslTransportSocketFactory({}, context_manager_);
+    client_ssl_ctx_ = createClientSslTransportSocketFactory({}, context_manager_, *api_);
   }
 
   void TearDown() override {
     client_ssl_ctx_.reset();
     cleanupUpstreamAndDownstream();
-    fake_upstream_connection_.reset();
     codec_client_.reset();
   }
 
@@ -90,14 +89,14 @@ public:
   }
 
 private:
-  Ssl::ContextManagerImpl context_manager_{timeSystem()};
+  Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{timeSystem()};
 
   Network::TransportSocketFactoryPtr client_ssl_ctx_;
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, SdsStaticDownstreamIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, SdsStaticDownstreamIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(SdsStaticDownstreamIntegrationTest, RouterRequestAndResponseWithGiantBodyBuffer) {
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
@@ -106,9 +105,8 @@ TEST_P(SdsStaticDownstreamIntegrationTest, RouterRequestAndResponseWithGiantBody
   testRouterRequestAndResponseWithBody(16 * 1024 * 1024, 16 * 1024 * 1024, false, &creator);
 }
 
-class SdsStaticUpstreamIntegrationTest
-    : public HttpIntegrationTest,
-      public testing::TestWithParam<Network::Address::IpVersion> {
+class SdsStaticUpstreamIntegrationTest : public HttpIntegrationTest,
+                                         public TestBaseWithParam<Network::Address::IpVersion> {
 public:
   SdsStaticUpstreamIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()) {}
@@ -138,7 +136,6 @@ public:
 
   void TearDown() override {
     cleanupUpstreamAndDownstream();
-    fake_upstream_connection_.reset();
     codec_client_.reset();
 
     test_server_.reset();
@@ -146,18 +143,18 @@ public:
   }
 
   void createUpstreams() override {
-    fake_upstreams_.emplace_back(new FakeUpstream(createUpstreamSslContext(context_manager_), 0,
-                                                  FakeHttpConnection::Type::HTTP1, version_,
+    fake_upstreams_.emplace_back(new FakeUpstream(createUpstreamSslContext(context_manager_, *api_),
+                                                  0, FakeHttpConnection::Type::HTTP1, version_,
                                                   timeSystem()));
   }
 
 private:
-  Ssl::ContextManagerImpl context_manager_{timeSystem()};
+  Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{timeSystem()};
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, SdsStaticUpstreamIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, SdsStaticUpstreamIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(SdsStaticUpstreamIntegrationTest, RouterRequestAndResponseWithGiantBodyBuffer) {
   testRouterRequestAndResponseWithBody(16 * 1024 * 1024, 16 * 1024 * 1024, false, nullptr);

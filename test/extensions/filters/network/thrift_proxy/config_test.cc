@@ -6,9 +6,9 @@
 #include "test/extensions/filters/network/thrift_proxy/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 
@@ -67,23 +67,23 @@ public:
   ThriftProxyFilterConfigFactory factory_;
 };
 
-class ThriftFilterConfigTest : public ThriftFilterConfigTestBase, public testing::Test {};
+class ThriftFilterConfigTest : public ThriftFilterConfigTestBase, public TestBase {};
 
 class ThriftFilterTransportConfigTest
     : public ThriftFilterConfigTestBase,
-      public testing::TestWithParam<
+      public TestBaseWithParam<
           envoy::config::filter::network::thrift_proxy::v2alpha1::TransportType> {};
 
-INSTANTIATE_TEST_CASE_P(TransportTypes, ThriftFilterTransportConfigTest,
-                        testing::ValuesIn(getTransportTypes()));
+INSTANTIATE_TEST_SUITE_P(TransportTypes, ThriftFilterTransportConfigTest,
+                         testing::ValuesIn(getTransportTypes()));
 
 class ThriftFilterProtocolConfigTest
     : public ThriftFilterConfigTestBase,
-      public testing::TestWithParam<
+      public TestBaseWithParam<
           envoy::config::filter::network::thrift_proxy::v2alpha1::ProtocolType> {};
 
-INSTANTIATE_TEST_CASE_P(ProtocolTypes, ThriftFilterProtocolConfigTest,
-                        testing::ValuesIn(getProtocolTypes()));
+INSTANTIATE_TEST_SUITE_P(ProtocolTypes, ThriftFilterProtocolConfigTest,
+                         testing::ValuesIn(getProtocolTypes()));
 
 TEST_F(ThriftFilterConfigTest, ValidateFail) {
   EXPECT_THROW(factory_.createFilterFactoryFromProto(

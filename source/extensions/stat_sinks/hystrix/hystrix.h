@@ -92,7 +92,7 @@ public:
   void resetRollingWindow();
 
   /**
-   * Return string represnting current state of the map. for DEBUG.
+   * Return string representing current state of the map. for DEBUG.
    */
   const std::string printRollingWindows();
 

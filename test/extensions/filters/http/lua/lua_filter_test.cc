@@ -37,7 +37,7 @@ public:
   MOCK_METHOD2(scriptLog, void(spdlog::level::level_enum level, const char* message));
 };
 
-class LuaHttpFilterTest : public testing::Test {
+class LuaHttpFilterTest : public TestBase {
 public:
   LuaHttpFilterTest() {
     // Avoid strict mock failures for the following calls. We want strict for other calls.
@@ -685,6 +685,9 @@ TEST_F(LuaHttpFilterTest, RequestAndResponse) {
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("100"))).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue,
             filter_->encode100ContinueHeaders(continue_headers));
+
+  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->encodeMetadata(metadata_map));
 
   Http::TestHeaderMapImpl response_headers{{":status", "200"}};
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("200")));

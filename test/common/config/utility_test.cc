@@ -14,10 +14,10 @@
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::AtLeast;
@@ -208,11 +208,14 @@ TEST(UtilityTest, UnixClusterStatic) {
 }
 
 TEST(UtilityTest, CheckFilesystemSubscriptionBackingPath) {
+  Stats::MockIsolatedStatsStore stats_store;
+  Api::ApiPtr api = Api::createApiForTest(stats_store);
+
   EXPECT_THROW_WITH_MESSAGE(
-      Utility::checkFilesystemSubscriptionBackingPath("foo"), EnvoyException,
+      Utility::checkFilesystemSubscriptionBackingPath("foo", *api), EnvoyException,
       "envoy::api::v2::Path must refer to an existing path in the system: 'foo' does not exist");
   std::string test_path = TestEnvironment::temporaryDirectory();
-  Utility::checkFilesystemSubscriptionBackingPath(test_path);
+  Utility::checkFilesystemSubscriptionBackingPath(test_path, *api);
 }
 
 TEST(UtilityTest, ParseDefaultRateLimitSettings) {

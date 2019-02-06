@@ -9,9 +9,8 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
-
-#include "gtest/gtest.h"
 
 using testing::Return;
 
@@ -20,7 +19,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Gzip {
 
-class GzipFilterTest : public testing::Test {
+class GzipFilterTest : public TestBase {
 protected:
   GzipFilterTest() {
     ON_CALL(runtime_.snapshot_, featureEnabled("gzip.filter_enabled", 100))
@@ -111,6 +110,8 @@ protected:
     Http::TestHeaderMapImpl continue_headers;
     EXPECT_EQ(Http::FilterHeadersStatus::Continue,
               filter_->encode100ContinueHeaders(continue_headers));
+    Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+    EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->encodeMetadata(metadata_map));
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
     EXPECT_EQ("", headers.get_("content-encoding"));
     EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data_, false));

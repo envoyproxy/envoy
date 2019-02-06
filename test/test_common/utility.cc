@@ -38,10 +38,11 @@
 #include "common/filesystem/directory.h"
 
 #include "test/test_common/printers.h"
+#include "test/test_common/test_time.h"
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using testing::GTEST_FLAG(random_seed);
 
@@ -232,15 +233,30 @@ void TestUtility::createSymlink(const std::string& target, const std::string& li
 }
 
 // static
-std::tm TestUtility::parseTimestamp(const std::string& format, const std::string& time_str) {
-  std::tm timestamp{};
-  std::istringstream text(time_str);
+absl::Time TestUtility::parseTime(const std::string& input, const std::string& input_format) {
+  absl::Time time;
+  std::string parse_error;
+  EXPECT_TRUE(absl::ParseTime(input_format, input, &time, &parse_error))
+      << " error \"" << parse_error << "\" from failing to parse timestamp \"" << input
+      << "\" with format string \"" << input_format << "\"";
+  return time;
+}
 
-  text >> std::get_time(&timestamp, format.c_str());
+// static
+std::string TestUtility::formatTime(const absl::Time input, const std::string& output_format) {
+  static const absl::TimeZone utc = absl::UTCTimeZone();
+  return absl::FormatTime(output_format, input, utc);
+}
 
-  EXPECT_FALSE(text.fail()) << " from failing to parse timestamp \"" << time_str
-                            << "\" with format string \"" << format << "\"";
-  return timestamp;
+// static
+std::string TestUtility::formatTime(const SystemTime input, const std::string& output_format) {
+  return TestUtility::formatTime(absl::FromChrono(input), output_format);
+}
+
+// static
+std::string TestUtility::convertTime(const std::string& input, const std::string& input_format,
+                                     const std::string& output_format) {
+  return TestUtility::formatTime(TestUtility::parseTime(input, input_format), output_format);
 }
 
 void ConditionalInitializer::setReady() {
@@ -271,6 +287,10 @@ void ConditionalInitializer::wait() {
 
 ScopedFdCloser::ScopedFdCloser(int fd) : fd_(fd) {}
 ScopedFdCloser::~ScopedFdCloser() { ::close(fd_); }
+
+ScopedIoHandleCloser::ScopedIoHandleCloser(Network::IoHandlePtr& io_handle)
+    : io_handle_(io_handle) {}
+ScopedIoHandleCloser::~ScopedIoHandleCloser() { io_handle_->close(); }
 
 AtomicFileUpdater::AtomicFileUpdater(const std::string& filename)
     : link_(filename), new_link_(absl::StrCat(filename, ".new")),
@@ -388,11 +408,27 @@ ThreadFactory& threadFactoryForTest() {
 
 namespace Api {
 
+class TimeSystemProvider {
+protected:
+  Event::GlobalTimeSystem global_time_system_;
+};
+
+class TestImpl : public TimeSystemProvider, public Impl {
+public:
+  TestImpl(std::chrono::milliseconds file_flush_interval_msec,
+           Thread::ThreadFactory& thread_factory, Stats::Store& stats_store)
+      : Impl(file_flush_interval_msec, thread_factory, stats_store, global_time_system_) {}
+};
+
 ApiPtr createApiForTest(Stats::Store& stat_store) {
+  return std::make_unique<TestImpl>(std::chrono::milliseconds(1000), Thread::threadFactoryForTest(),
+                                    stat_store);
+}
+
+ApiPtr createApiForTest(Stats::Store& stat_store, Event::TimeSystem& time_system) {
   return std::make_unique<Impl>(std::chrono::milliseconds(1000), Thread::threadFactoryForTest(),
-                                stat_store);
+                                stat_store, time_system);
 }
 
 } // namespace Api
-
 } // namespace Envoy

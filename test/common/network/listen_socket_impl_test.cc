@@ -1,12 +1,12 @@
+#include "common/network/io_socket_handle_impl.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/utility.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
-
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Return;
@@ -15,7 +15,7 @@ namespace Envoy {
 namespace Network {
 
 template <Network::Address::SocketType Type>
-class ListenSocketImplTest : public testing::TestWithParam<Address::IpVersion> {
+class ListenSocketImplTest : public TestBaseWithParam<Address::IpVersion> {
 protected:
   ListenSocketImplTest() : version_(GetParam()) {}
   const Address::IpVersion version_;
@@ -74,7 +74,7 @@ protected:
       // TODO (conqerAtapple): This is unfortunate. We should be able to templatize this
       // instead of if block.
       if (NetworkSocketTrait<Type>::type == Address::SocketType::Stream) {
-        EXPECT_EQ(0, listen(socket1->fd(), 0));
+        EXPECT_EQ(0, listen(socket1->ioHandle().fd(), 0));
       }
 
       EXPECT_EQ(addr->ip()->port(), socket1->localAddress()->ip()->port());
@@ -90,7 +90,8 @@ protected:
       EXPECT_THROW(createListenSocketPtr(addr, options2, true), SocketBindException);
 
       // Test the case of a socket with fd and given address and port.
-      auto socket3 = createListenSocketPtr(dup(socket1->fd()), addr, nullptr);
+      IoHandlePtr dup_handle = std::make_unique<IoSocketHandle>(dup(socket1->ioHandle().fd()));
+      auto socket3 = createListenSocketPtr(std::move(dup_handle), addr, nullptr);
       EXPECT_EQ(addr->asString(), socket3->localAddress()->asString());
 
       // Test successful.
@@ -112,13 +113,13 @@ protected:
 using ListenSocketImplTestTcp = ListenSocketImplTest<Network::Address::SocketType::Stream>;
 using ListenSocketImplTestUdp = ListenSocketImplTest<Network::Address::SocketType::Datagram>;
 
-INSTANTIATE_TEST_CASE_P(IpVersions, ListenSocketImplTestTcp,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, ListenSocketImplTestTcp,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
-INSTANTIATE_TEST_CASE_P(IpVersions, ListenSocketImplTestUdp,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, ListenSocketImplTestUdp,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(ListenSocketImplTestTcp, BindSpecificPort) { testBindSpecificPort(); }
 
@@ -128,7 +129,8 @@ TEST_P(ListenSocketImplTestTcp, BindSpecificPort) { testBindSpecificPort(); }
  */
 class TestListenSocket : public ListenSocketImpl {
 public:
-  TestListenSocket(Address::InstanceConstSharedPtr address) : ListenSocketImpl(-1, address) {}
+  TestListenSocket(Address::InstanceConstSharedPtr address)
+      : ListenSocketImpl(std::make_unique<Network::IoSocketHandle>(), address) {}
   Address::SocketType socketType() const override { return Address::SocketType::Stream; }
 };
 

@@ -2,21 +2,20 @@
 
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
-
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 namespace Envoy {
 namespace Network {
 namespace Test {
 
-class NetworkUtilityTest : public testing::TestWithParam<Address::IpVersion> {
+class NetworkUtilityTest : public TestBaseWithParam<Address::IpVersion> {
 protected:
   NetworkUtilityTest() : version_(GetParam()) {}
   const Address::IpVersion version_;
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, NetworkUtilityTest,
-                        testing::ValuesIn(TestEnvironment::getIpTestParameters()));
+INSTANTIATE_TEST_SUITE_P(IpVersions, NetworkUtilityTest,
+                         testing::ValuesIn(TestEnvironment::getIpTestParameters()));
 
 // This validates Network::Test::bindFreeLoopbackPort behaves as desired, i.e. that we don't have
 // a significant risk of flakes due to re-use of a port over short time intervals. We can't drive

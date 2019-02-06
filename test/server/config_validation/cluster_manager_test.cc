@@ -3,9 +3,11 @@
 
 #include "common/api/api_impl.h"
 #include "common/http/context_impl.h"
-#include "common/ssl/context_manager_impl.h"
+#include "common/singleton/manager_impl.h"
 
 #include "server/config_validation/cluster_manager.h"
+
+#include "extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/event/mocks.h"
@@ -17,7 +19,6 @@
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
-#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {
@@ -27,25 +28,24 @@ TEST(ValidationClusterManagerTest, MockedMethods) {
   Stats::IsolatedStoreImpl stats_store;
   Api::ApiPtr api(Api::createApiForTest(stats_store));
   NiceMock<Runtime::MockLoader> runtime;
-  Event::SimulatedTimeSystem time_system;
   NiceMock<ThreadLocal::MockInstance> tls;
   NiceMock<Runtime::MockRandomGenerator> random;
   testing::NiceMock<Secret::MockSecretManager> secret_manager;
   auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
-  Ssl::ContextManagerImpl ssl_context_manager{time_system};
+  Extensions::TransportSockets::Tls::ContextManagerImpl ssl_context_manager{api->timeSystem()};
   NiceMock<Event::MockDispatcher> dispatcher;
   LocalInfo::MockLocalInfo local_info;
   NiceMock<Server::MockAdmin> admin;
   Http::ContextImpl http_context;
-
-  ValidationClusterManagerFactory factory(runtime, stats_store, tls, random, dns_resolver,
-                                          ssl_context_manager, dispatcher, local_info,
-                                          secret_manager, *api, http_context);
-
   AccessLog::MockAccessLogManager log_manager;
+  Singleton::ManagerImpl singleton_manager{Thread::threadFactoryForTest().currentThreadId()};
+
+  ValidationClusterManagerFactory factory(
+      admin, runtime, stats_store, tls, random, dns_resolver, ssl_context_manager, dispatcher,
+      local_info, secret_manager, *api, http_context, log_manager, singleton_manager);
+
   const envoy::config::bootstrap::v2::Bootstrap bootstrap;
-  ClusterManagerPtr cluster_manager = factory.clusterManagerFromProto(
-      bootstrap, stats_store, tls, runtime, random, local_info, log_manager, admin);
+  ClusterManagerPtr cluster_manager = factory.clusterManagerFromProto(bootstrap);
   EXPECT_EQ(nullptr, cluster_manager->httpConnPoolForCluster("cluster", ResourcePriority::Default,
                                                              Http::Protocol::Http11, nullptr));
   Host::CreateConnectionData data = cluster_manager->tcpConnForCluster("cluster", nullptr, nullptr);

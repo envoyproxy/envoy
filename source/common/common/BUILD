@@ -22,6 +22,12 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "debug_recursion_checker_lib",
+    hdrs = ["debug_recursion_checker.h"],
+    deps = [":assert_lib"],
+)
+
+envoy_cc_library(
     name = "backoff_lib",
     srcs = ["backoff_strategy.cc"],
     hdrs = ["backoff_strategy.h"],
@@ -82,6 +88,7 @@ envoy_basic_cc_library(
 
 envoy_cc_library(
     name = "hash_lib",
+    srcs = ["hash.cc"],
     hdrs = ["hash.h"],
     external_deps = ["xxhash"],
 )
@@ -161,6 +168,11 @@ envoy_cc_library(
 envoy_cc_library(
     name = "non_copyable",
     hdrs = ["non_copyable.h"],
+)
+
+envoy_cc_library(
+    name = "phantom",
+    hdrs = ["phantom.h"],
 )
 
 envoy_cc_library(

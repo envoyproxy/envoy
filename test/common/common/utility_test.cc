@@ -8,13 +8,13 @@
 
 #include "common/common/utility.h"
 
+#include "test/test_common/test_base.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::ContainerEq;
 
@@ -238,6 +238,13 @@ TEST(StringUtil, toUpper) {
   EXPECT_EQ(StringUtil::toUpper("a"), "A");
   EXPECT_EQ(StringUtil::toUpper("Ba"), "BA");
   EXPECT_EQ(StringUtil::toUpper("X asdf aAf"), "X ASDF AAF");
+}
+
+TEST(StringUtil, toLower) {
+  EXPECT_EQ(StringUtil::toLower(""), "");
+  EXPECT_EQ(StringUtil::toLower("a"), "a");
+  EXPECT_EQ(StringUtil::toLower("Ba"), "ba");
+  EXPECT_EQ(StringUtil::toLower("X asdf aAf"), "x asdf aaf");
 }
 
 TEST(StringUtil, StringViewLtrim) {

@@ -5,12 +5,10 @@
 #include "test/extensions/filters/network/thrift_proxy/integration.h"
 #include "test/extensions/filters/network/thrift_proxy/utility.h"
 #include "test/test_common/network_utility.h"
-
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using testing::Combine;
-using testing::TestParamInfo;
-using testing::TestWithParam;
+using ::testing::TestParamInfo;
 using testing::Values;
 
 namespace Envoy {
@@ -20,9 +18,10 @@ namespace ThriftProxy {
 
 class ThriftTranslationIntegrationTest
     : public BaseThriftIntegrationTest,
-      public TestWithParam<std::tuple<TransportType, ProtocolType, TransportType, ProtocolType>> {
+      public TestBaseWithParam<
+          std::tuple<TransportType, ProtocolType, TransportType, ProtocolType>> {
 public:
-  static void SetUpTestCase() {
+  static void SetUpTestSuite() {
     thrift_config_ = ConfigHelper::BASE_CONFIG + R"EOF(
     filter_chains:
       filters:
@@ -108,7 +107,7 @@ static std::string paramToString(
                      protocolNameForTest(upstream_protocol));
 }
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     TransportsAndProtocols, ThriftTranslationIntegrationTest,
     Combine(Values(TransportType::Framed, TransportType::Unframed, TransportType::Header),
             Values(ProtocolType::Binary, ProtocolType::Compact),

@@ -22,35 +22,25 @@ public:
 
   /**
    * Allocate a dispatcher.
-   * @param time_source the time source.
    * @return Event::DispatcherPtr which is owned by the caller.
    */
-  virtual Event::DispatcherPtr allocateDispatcher(Event::TimeSystem& time_system) PURE;
-
-  /**
-   * Create/open a local file that supports async appending.
-   * @param path supplies the file path.
-   * @param dispatcher supplies the dispatcher uses for async flushing.
-   * @param lock supplies the lock to use for cross thread appends.
-   */
-  virtual Filesystem::FileSharedPtr createFile(const std::string& path,
-                                               Event::Dispatcher& dispatcher,
-                                               Thread::BasicLockable& lock) PURE;
-
-  /**
-   * @return bool whether a file exists and can be opened for read on disk.
-   */
-  virtual bool fileExists(const std::string& path) PURE;
-
-  /**
-   * @return file content.
-   */
-  virtual std::string fileReadToEnd(const std::string& path) PURE;
+  virtual Event::DispatcherPtr allocateDispatcher() PURE;
 
   /**
    * @return a reference to the ThreadFactory
    */
   virtual Thread::ThreadFactory& threadFactory() PURE;
+
+  /**
+   * @return a reference to the Filesystem::Instance
+   */
+  virtual Filesystem::Instance& fileSystem() PURE;
+
+  /**
+   * @return a reference to the TimeSystem
+   * TODO(jmarantz): change this to return a TimeSource.
+   */
+  virtual Event::TimeSystem& timeSystem() PURE;
 };
 
 typedef std::unique_ptr<Api> ApiPtr;

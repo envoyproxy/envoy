@@ -6,7 +6,7 @@
 #include <unordered_map>
 
 #include "envoy/event/dispatcher.h"
-#include "envoy/filesystem/filesystem.h"
+#include "envoy/filesystem/watcher.h"
 
 #include "common/common/logger.h"
 

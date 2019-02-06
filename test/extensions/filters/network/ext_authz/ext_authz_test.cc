@@ -18,9 +18,9 @@
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::InSequence;
@@ -35,7 +35,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ExtAuthz {
 
-class ExtAuthzFilterTest : public testing::Test {
+class ExtAuthzFilterTest : public TestBase {
 public:
   ExtAuthzFilterTest() {
     std::string json = R"EOF(
@@ -323,7 +323,7 @@ TEST_F(ExtAuthzFilterTest, ImmediateOK) {
 }
 
 // Test to verify that on stack denied response from the authorization service does
-// result in stopage of the filter chain.
+// result in stoppage of the filter chain.
 TEST_F(ExtAuthzFilterTest, ImmediateNOK) {
   InSequence s;
 

@@ -8,11 +8,10 @@
 #include "common/stats/isolated_store_impl.h"
 
 #include "test/mocks/common.h"
-#include "test/test_common/test_time.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::InSequence;
 
@@ -32,8 +31,7 @@ TEST(DeferredDeleteTest, DeferredDelete) {
   InSequence s;
   Stats::IsolatedStoreImpl stats_store;
   Api::ApiPtr api = Api::createApiForTest(stats_store);
-  DangerousDeprecatedTestTime test_time;
-  DispatcherImpl dispatcher(test_time.timeSystem(), *api);
+  DispatcherImpl dispatcher(*api);
   ReadyWatcher watcher1;
 
   dispatcher.deferredDelete(
@@ -61,12 +59,11 @@ TEST(DeferredDeleteTest, DeferredDelete) {
   dispatcher.clearDeferredDeleteList();
 }
 
-class DispatcherImplTest : public ::testing::Test {
+class DispatcherImplTest : public TestBase {
 protected:
   DispatcherImplTest()
       : api_(Api::createApiForTest(stat_store_)),
-        dispatcher_(std::make_unique<DispatcherImpl>(test_time_.timeSystem(), *api_)),
-        work_finished_(false) {
+        dispatcher_(std::make_unique<DispatcherImpl>(*api_)), work_finished_(false) {
     dispatcher_thread_ = api_->threadFactory().createThread([this]() {
       // Must create a keepalive timer to keep the dispatcher from exiting.
       std::chrono::milliseconds time_interval(500);
@@ -82,8 +79,6 @@ protected:
     dispatcher_->exit();
     dispatcher_thread_->join();
   }
-
-  DangerousDeprecatedTestTime test_time_;
 
   Stats::IsolatedStoreImpl stat_store_;
   Api::ApiPtr api_;

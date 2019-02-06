@@ -9,13 +9,14 @@
 #include "common/common/hash.h"
 #include "common/stats/stats_options_impl.h"
 
+#include "test/test_common/test_base.h"
+
 #include "absl/strings/string_view.h"
-#include "gtest/gtest.h"
 
 namespace Envoy {
 
 // Tests BlockMemoryHashSet.
-class BlockMemoryHashSetTest : public testing::Test {
+class BlockMemoryHashSetTest : public TestBase {
 protected:
   // TestValue that doesn't define a hash.
   struct TestValueBase {
@@ -62,7 +63,7 @@ protected:
   template <class TestValueClass>
   std::string hashSetToString(BlockMemoryHashSet<TestValueClass>& hs) {
     std::string ret;
-    static const uint32_t sentinal = BlockMemoryHashSet<TestValueClass>::Sentinal;
+    static const uint32_t sentinel = BlockMemoryHashSet<TestValueClass>::Sentinel;
     std::string control_string =
         fmt::format("{} size={} free_cell_index={}", hs.control_->hash_set_options.toString(),
                     hs.control_->size, hs.control_->free_cell_index);
@@ -70,7 +71,7 @@ protected:
                       control_string);
     for (uint32_t i = 0; i < hs.control_->hash_set_options.num_slots; ++i) {
       ret += fmt::format("slot {}:", i);
-      for (uint32_t j = hs.slots_[i]; j != sentinal; j = hs.getCell(j).next_cell_index) {
+      for (uint32_t j = hs.slots_[i]; j != sentinel; j = hs.getCell(j).next_cell_index) {
         ret += " " + std::string(hs.getCell(j).value.key());
       }
       ret += "\n";

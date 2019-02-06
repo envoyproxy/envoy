@@ -13,10 +13,10 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::InSequence;
@@ -51,6 +51,7 @@ public:
   MOCK_METHOD0(filterFactory, FilterChainFactory&());
   MOCK_METHOD0(reverseEncodeOrder, bool());
   MOCK_METHOD0(generateRequestId, bool());
+  MOCK_CONST_METHOD0(maxRequestHeadersKb, uint32_t());
   MOCK_CONST_METHOD0(idleTimeout, absl::optional<std::chrono::milliseconds>());
   MOCK_CONST_METHOD0(streamIdleTimeout, std::chrono::milliseconds());
   MOCK_CONST_METHOD0(requestTimeout, std::chrono::milliseconds());
@@ -81,7 +82,7 @@ public:
       std::make_unique<DefaultInternalAddressConfig>();
 };
 
-class ConnectionManagerUtilityTest : public testing::Test {
+class ConnectionManagerUtilityTest : public TestBase {
 public:
   ConnectionManagerUtilityTest() {
     ON_CALL(config_, userAgent()).WillByDefault(ReturnRef(user_agent_));
@@ -198,7 +199,7 @@ TEST_F(ConnectionManagerUtilityTest, SkipXffAppendUseRemoteAddress) {
   EXPECT_FALSE(headers.has(Headers::get().ForwardedFor));
 }
 
-// Verify that we pass-thru XFF when skipAffAppend(), even if using remote
+// Verify that we pass-thru XFF when skipXffAppend(), even if using remote
 // address and where the address is external.
 TEST_F(ConnectionManagerUtilityTest, SkipXffAppendPassThruUseRemoteAddress) {
   EXPECT_CALL(config_, skipXffAppend()).WillOnce(Return(true));
@@ -528,6 +529,7 @@ TEST_F(ConnectionManagerUtilityTest, ExternalAddressExternalRequestUseRemote) {
                             {"x-envoy-upstream-rq-timeout-ms", "foo"},
                             {"x-envoy-expected-rq-timeout-ms", "10"},
                             {"x-envoy-ip-tags", "bar"},
+                            {"x-envoy-original-url", "my_url"},
                             {"custom_header", "foo"}};
 
   EXPECT_EQ((MutateRequestRet{"50.0.0.1:0", false}),
@@ -544,6 +546,7 @@ TEST_F(ConnectionManagerUtilityTest, ExternalAddressExternalRequestUseRemote) {
   EXPECT_FALSE(headers.has("x-envoy-upstream-rq-timeout-ms"));
   EXPECT_FALSE(headers.has("x-envoy-expected-rq-timeout-ms"));
   EXPECT_FALSE(headers.has("x-envoy-ip-tags"));
+  EXPECT_FALSE(headers.has("x-envoy-original-url"));
   EXPECT_FALSE(headers.has("custom_header"));
 }
 
@@ -735,7 +738,7 @@ TEST_F(ConnectionManagerUtilityTest, MtlsForwardOnlyClientCert) {
             headers.get_("x-forwarded-client-cert"));
 }
 
-// The server (local) dentity is foo.com/be. The client does not set XFCC.
+// The server (local) identity is foo.com/be. The client does not set XFCC.
 TEST_F(ConnectionManagerUtilityTest, MtlsSetForwardClientCert) {
   NiceMock<Ssl::MockConnection> ssl;
   ON_CALL(ssl, peerCertificatePresented()).WillByDefault(Return(true));
@@ -769,7 +772,7 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSetForwardClientCert) {
 }
 
 // This test assumes the following scenario:
-// The client identity is foo.com/fe, and the server (local) dentity is foo.com/be. The client
+// The client identity is foo.com/fe, and the server (local) identity is foo.com/be. The client
 // also sends the XFCC header with the authentication result of the previous hop, (bar.com/be
 // calling foo.com/fe).
 TEST_F(ConnectionManagerUtilityTest, MtlsAppendForwardClientCert) {
@@ -805,7 +808,7 @@ TEST_F(ConnectionManagerUtilityTest, MtlsAppendForwardClientCert) {
 }
 
 // This test assumes the following scenario:
-// The client identity is foo.com/fe, and the server (local) dentity is foo.com/be. The client
+// The client identity is foo.com/fe, and the server (local) identity is foo.com/be. The client
 // also sends the XFCC header with the authentication result of the previous hop, (bar.com/be
 // calling foo.com/fe).
 TEST_F(ConnectionManagerUtilityTest, MtlsAppendForwardClientCertLocalSanEmpty) {
@@ -833,7 +836,7 @@ TEST_F(ConnectionManagerUtilityTest, MtlsAppendForwardClientCertLocalSanEmpty) {
 }
 
 // This test assumes the following scenario:
-// The client identity is foo.com/fe, and the server (local) dentity is foo.com/be. The client
+// The client identity is foo.com/fe, and the server (local) identity is foo.com/be. The client
 // also sends the XFCC header with the authentication result of the previous hop, (bar.com/be
 // calling foo.com/fe).
 TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCert) {
@@ -868,7 +871,7 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCert) {
 }
 
 // This test assumes the following scenario:
-// The client identity is foo.com/fe, and the server (local) dentity is foo.com/be. The client
+// The client identity is foo.com/fe, and the server (local) identity is foo.com/be. The client
 // also sends the XFCC header with the authentication result of the previous hop, (bar.com/be
 // calling foo.com/fe).
 TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCertPeerSanEmpty) {

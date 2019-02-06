@@ -12,6 +12,7 @@
 # All configuration values have a default; values that are commented out
 # serve to show the default.
 
+from datetime import datetime
 import sphinx_rtd_theme
 import sys
 import os
@@ -61,7 +62,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'envoy'
-copyright = u'2016-2018, Envoy Project Authors'
+copyright = u'2016-{}, Envoy Project Authors'.format(datetime.now().year)
 author = u'Envoy Project Authors'
 
 # The version info for the project you're documenting, acts as replacement for

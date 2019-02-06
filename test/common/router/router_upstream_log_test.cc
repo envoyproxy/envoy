@@ -16,11 +16,11 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "absl/types/optional.h"
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Invoke;
@@ -72,10 +72,8 @@ public:
   MockRetryState* retry_state_{};
 };
 
-class RouterUpstreamLogTest : public testing::Test {
+class RouterUpstreamLogTest : public TestBase {
 public:
-  RouterUpstreamLogTest() {}
-
   void init(absl::optional<envoy::config::filter::accesslog::v2::AccessLog> upstream_log) {
     envoy::config::filter::http::router::v2::Router router_proto;
 
@@ -282,9 +280,9 @@ TEST_F(RouterUpstreamLogTest, LogTimestampsAndDurations) {
   std::smatch matches;
   EXPECT_TRUE(std::regex_match(output_.front(), matches, log_regex));
 
-  std::tm timestamp = TestUtility::parseTimestamp("%Y-%m-%dT%H:%M:%S", matches[1].str());
+  const absl::Time timestamp = TestUtility::parseTime(matches[1].str(), "%Y-%m-%dT%H:%M:%S");
 
-  std::time_t log_time = std::mktime(&timestamp);
+  std::time_t log_time = absl::ToTimeT(timestamp);
   std::time_t now = std::time(nullptr);
 
   // Check that timestamp is close enough.

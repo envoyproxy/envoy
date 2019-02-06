@@ -24,7 +24,7 @@ public:
     buffer_ = &buffer;
   }
 
-  // DecoderEventHaandler
+  // DecoderEventHandler
   FilterStatus messageBegin(MessageMetadataSharedPtr metadata) override {
     proto_->writeMessageBegin(*buffer_, *metadata);
     return FilterStatus::Continue;

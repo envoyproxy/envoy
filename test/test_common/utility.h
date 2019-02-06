@@ -24,9 +24,10 @@
 #include "common/stats/raw_stat_data.h"
 
 #include "test/test_common/printers.h"
+#include "test/test_common/test_base.h"
 
+#include "absl/time/time.h"
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::AssertionFailure;
@@ -69,7 +70,7 @@ namespace Envoy {
 /*
   Macro to use instead of EXPECT_DEATH when stderr is produced by a logger.
   It temporarily installs stderr sink and restores the original logger sink after the test
-  completes and sdterr_sink object goes of of scope.
+  completes and stderr_sink object goes of of scope.
   EXPECT_DEATH(statement, regex) test passes when statement causes crash and produces error message
   matching regex. Test fails when statement does not crash or it crashes but message does not
   match regex. If a message produced during crash is redirected away from strerr, the test fails.
@@ -108,9 +109,9 @@ class TestUtility {
 public:
   /**
    * Compare 2 HeaderMaps.
-   * @param lhs supplies HeaderMaps 1.
-   * @param rhs supplies HeaderMaps 2.
-   * @return TRUE if the HeaderMapss are equal, ignoring the order of the
+   * @param lhs supplies HeaderMap 1.
+   * @param rhs supplies HeaderMap 2.
+   * @return TRUE if the HeaderMaps are equal, ignoring the order of the
    * headers, false if not.
    */
   static bool headerMapEqualIgnoreOrder(const Http::HeaderMap& lhs, const Http::HeaderMap& rhs);
@@ -127,7 +128,7 @@ public:
    * Feed a buffer with random characters.
    * @param buffer supplies the buffer to be fed.
    * @param n_char number of characters that should be added to the supplied buffer.
-   * @param seed seeds pseudo-random number genarator (default = 0).
+   * @param seed seeds pseudo-random number generator (default = 0).
    */
   static void feedBufferWithRandomCharacters(Buffer::Instance& buffer, uint64_t n_char,
                                              uint64_t seed = 0);
@@ -284,7 +285,7 @@ public:
   // Tests using this will be of the form IpVersions/SslSocketTest.HalfClose/IPv4
   // instead of IpVersions/SslSocketTest.HalfClose/1
   static std::string
-  ipTestParamsToString(const testing::TestParamInfo<Network::Address::IpVersion>& params) {
+  ipTestParamsToString(const ::testing::TestParamInfo<Network::Address::IpVersion>& params) {
     return params.param == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6";
   }
 
@@ -304,13 +305,50 @@ public:
     return result;
   }
 
-  static std::tm parseTimestamp(const std::string& format, const std::string& time_str);
+  static absl::Time parseTime(const std::string& input, const std::string& input_format);
+  static std::string formatTime(const absl::Time input, const std::string& output_format);
+  static std::string formatTime(const SystemTime input, const std::string& output_format);
+  static std::string convertTime(const std::string& input, const std::string& input_format,
+                                 const std::string& output_format);
 
   static constexpr std::chrono::milliseconds DefaultTimeout = std::chrono::milliseconds(10000);
 
   static void renameFile(const std::string& old_name, const std::string& new_name);
   static void createDirectory(const std::string& name);
   static void createSymlink(const std::string& target, const std::string& link);
+
+  /**
+   * Return a prefix string matcher.
+   * @param string prefix.
+   * @return Object StringMatcher.
+   */
+  static const envoy::type::matcher::StringMatcher createPrefixMatcher(std::string str) {
+    envoy::type::matcher::StringMatcher matcher;
+    matcher.set_prefix(str);
+    return matcher;
+  }
+
+  /**
+   * Return an exact string matcher.
+   * @param string exact.
+   * @return Object StringMatcher.
+   */
+  static const envoy::type::matcher::StringMatcher createExactMatcher(std::string str) {
+    envoy::type::matcher::StringMatcher matcher;
+    matcher.set_exact(str);
+    return matcher;
+  }
+
+  /**
+   * Return a regex string matcher.
+   * @param string exact.
+   * @return Object StringMatcher.
+   */
+  static const envoy::type::matcher::StringMatcher createRegexMatcher(std::string str) {
+    envoy::type::matcher::StringMatcher matcher;
+    matcher.set_regex(str);
+    return matcher;
+  }
 };
 
 /**
@@ -353,6 +391,19 @@ private:
   bool ready_{false};
 };
 
+// TODO(sbelair2) Perform the fd close in the close of the IoHandle-
+// i.e., ScopedIoHandleCloser should incorporate the ScopedFdCloser
+class ScopedIoHandleCloser {
+public:
+  ScopedIoHandleCloser(Network::IoHandlePtr& io_handle);
+  ~ScopedIoHandleCloser();
+
+private:
+  Network::IoHandlePtr& io_handle_;
+};
+
+// TODO(sbelair2) Clean up ScopedFdCloser everywhere IOHandle is used-
+// ScopedFdCloser should no longer be needed.
 class ScopedFdCloser {
 public:
   ScopedFdCloser(int fd);
@@ -476,6 +527,7 @@ ThreadFactory& threadFactoryForTest();
 
 namespace Api {
 ApiPtr createApiForTest(Stats::Store& stat_store);
+ApiPtr createApiForTest(Stats::Store& stat_store, Event::TimeSystem& time_system);
 } // namespace Api
 
 MATCHER_P(HeaderMapEqualIgnoreOrder, rhs, "") {

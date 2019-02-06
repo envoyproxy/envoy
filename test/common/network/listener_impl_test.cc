@@ -6,11 +6,10 @@
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
-#include "test/test_common/test_time.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Invoke;
@@ -24,8 +23,7 @@ static void errorCallbackTest(Address::IpVersion version) {
   // test in the forked process to avoid confusion when the fork happens.
   Stats::IsolatedStoreImpl stats_store;
   Api::ApiPtr api = Api::createApiForTest(stats_store);
-  DangerousDeprecatedTestTime test_time;
-  Event::DispatcherImpl dispatcher(test_time.timeSystem(), *api);
+  Event::DispatcherImpl dispatcher(*api);
 
   Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(version), nullptr,
                                   true);
@@ -55,10 +53,10 @@ static void errorCallbackTest(Address::IpVersion version) {
   dispatcher.run(Event::Dispatcher::RunType::Block);
 }
 
-class ListenerImplDeathTest : public testing::TestWithParam<Address::IpVersion> {};
-INSTANTIATE_TEST_CASE_P(IpVersions, ListenerImplDeathTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+class ListenerImplDeathTest : public TestBaseWithParam<Address::IpVersion> {};
+INSTANTIATE_TEST_SUITE_P(IpVersions, ListenerImplDeathTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 TEST_P(ListenerImplDeathTest, ErrorCallback) {
   EXPECT_DEATH_LOG_TO_STDERR(errorCallbackTest(GetParam()), ".*listener accept failure.*");
 }
@@ -73,24 +71,23 @@ public:
   MOCK_METHOD1(getLocalAddress, Address::InstanceConstSharedPtr(int fd));
 };
 
-class ListenerImplTest : public testing::TestWithParam<Address::IpVersion> {
+class ListenerImplTest : public TestBaseWithParam<Address::IpVersion> {
 protected:
   ListenerImplTest()
       : version_(GetParam()),
         alt_address_(Network::Test::findOrCheckFreePort(
             Network::Test::getCanonicalLoopbackAddress(version_), Address::SocketType::Stream)),
-        api_(Api::createApiForTest(stats_store_)), dispatcher_(test_time_.timeSystem(), *api_) {}
+        api_(Api::createApiForTest(stats_store_)), dispatcher_(*api_) {}
 
   const Address::IpVersion version_;
   const Address::InstanceConstSharedPtr alt_address_;
   Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
-  DangerousDeprecatedTestTime test_time_;
   Event::DispatcherImpl dispatcher_;
 };
-INSTANTIATE_TEST_CASE_P(IpVersions, ListenerImplTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, ListenerImplTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 // Test that socket options are set after the listener is setup.
 TEST_P(ListenerImplTest, SetListeningSocketOptionsSuccess) {
@@ -104,17 +101,6 @@ TEST_P(ListenerImplTest, SetListeningSocketOptionsSuccess) {
   EXPECT_CALL(*option, setOption(_, envoy::api::v2::core::SocketOption::STATE_LISTENING))
       .WillOnce(Return(true));
   TestListenerImpl listener(dispatcher_, socket, listener_callbacks, true, false);
-}
-
-// Test that socket options are set after the listener is setup.
-TEST_P(ListenerImplTest, UdpSetListeningSocketOptionsSuccess) {
-  Network::MockListenerCallbacks listener_callbacks;
-  Network::MockConnectionHandler connection_handler;
-
-  Network::UdpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(version_), nullptr,
-                                  true);
-  std::shared_ptr<MockSocketOption> option = std::make_shared<MockSocketOption>();
-  socket.addOption(option);
 }
 
 // Test that an exception is thrown if there is an error setting socket options.

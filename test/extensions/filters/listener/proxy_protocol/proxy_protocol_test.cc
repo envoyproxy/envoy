@@ -22,12 +22,11 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_time.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::AnyNumber;
@@ -44,13 +43,13 @@ namespace ProxyProtocol {
 
 // Build again on the basis of the connection_handler_test.cc
 
-class ProxyProtocolTest : public testing::TestWithParam<Network::Address::IpVersion>,
+class ProxyProtocolTest : public TestBaseWithParam<Network::Address::IpVersion>,
                           public Network::ListenerConfig,
                           public Network::FilterChainManager,
                           protected Logger::Loggable<Logger::Id::main> {
 public:
   ProxyProtocolTest()
-      : api_(Api::createApiForTest(stats_store_)), dispatcher_(test_time_.timeSystem(), *api_),
+      : api_(Api::createApiForTest(stats_store_)), dispatcher_(*api_),
         socket_(Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true),
         connection_handler_(new Server::ConnectionHandlerImpl(ENVOY_LOGGER(), dispatcher_)),
         name_("proxy"), filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()) {
@@ -151,7 +150,6 @@ public:
 
   Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
-  DangerousDeprecatedTestTime test_time_;
   Event::DispatcherImpl dispatcher_;
   Network::TcpListenSocket socket_;
   Network::ConnectionHandlerPtr connection_handler_;
@@ -166,9 +164,9 @@ public:
 };
 
 // Parameterize the listener socket address version.
-INSTANTIATE_TEST_CASE_P(IpVersions, ProxyProtocolTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, ProxyProtocolTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(ProxyProtocolTest, v1Basic) {
   connect();
@@ -537,7 +535,7 @@ TEST_P(ProxyProtocolTest, v2ParseExtensionsIoctlError) {
 }
 
 TEST_P(ProxyProtocolTest, v2ParseExtensionsFrag) {
-  // A well-formed ipv4/tcp header with 2 TLV/extenions, these are fragmented on delivery
+  // A well-formed ipv4/tcp header with 2 TLV/extensions, these are fragmented on delivery
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
                                 0x54, 0x0a, 0x21, 0x11, 0x00, 0x14, 0x01, 0x02, 0x03, 0x04,
                                 0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02};
@@ -865,13 +863,13 @@ TEST_P(ProxyProtocolTest, ClosedEmpty) {
   dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
 }
 
-class WildcardProxyProtocolTest : public testing::TestWithParam<Network::Address::IpVersion>,
+class WildcardProxyProtocolTest : public TestBaseWithParam<Network::Address::IpVersion>,
                                   public Network::ListenerConfig,
                                   public Network::FilterChainManager,
                                   protected Logger::Loggable<Logger::Id::main> {
 public:
   WildcardProxyProtocolTest()
-      : api_(Api::createApiForTest(stats_store_)), dispatcher_(test_time_.timeSystem(), *api_),
+      : api_(Api::createApiForTest(stats_store_)), dispatcher_(*api_),
         socket_(Network::Test::getAnyAddress(GetParam()), nullptr, true),
         local_dst_address_(Network::Utility::getAddressWithPort(
             *Network::Test::getCanonicalLoopbackAddress(GetParam()),
@@ -958,7 +956,6 @@ public:
 
   Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
-  DangerousDeprecatedTestTime test_time_;
   Event::DispatcherImpl dispatcher_;
   Network::TcpListenSocket socket_;
   Network::Address::InstanceConstSharedPtr local_dst_address_;
@@ -974,9 +971,9 @@ public:
 };
 
 // Parameterize the listener socket address version.
-INSTANTIATE_TEST_CASE_P(IpVersions, WildcardProxyProtocolTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, WildcardProxyProtocolTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(WildcardProxyProtocolTest, Basic) {
   connect();

@@ -13,9 +13,6 @@
 #include "common/config/resources.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
-#include "common/ssl/context_config_impl.h"
-#include "common/ssl/context_manager_impl.h"
-#include "common/ssl/ssl_socket.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"
@@ -23,9 +20,8 @@
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
-
-#include "gtest/gtest.h"
 
 using testing::AssertionFailure;
 using testing::AssertionResult;
@@ -60,122 +56,18 @@ admin:
       port_value: 0
 )EOF";
 
-class AdsIntegrationBaseTest : public HttpIntegrationTest {
-public:
-  AdsIntegrationBaseTest(Http::CodecClient::Type downstream_protocol,
-                         Network::Address::IpVersion version,
-                         const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG)
-      : HttpIntegrationTest(downstream_protocol, version, realTime(), config) {}
-
-  void createAdsConnection(FakeUpstream& upstream) {
-    ads_upstream_ = &upstream;
-    AssertionResult result = ads_upstream_->waitForHttpConnection(*dispatcher_, ads_connection_);
-    RELEASE_ASSERT(result, result.message());
-  }
-
-  void cleanUpAdsConnection() {
-    ASSERT(ads_upstream_ != nullptr);
-
-    // Don't ASSERT fail if an ADS reconnect ends up unparented.
-    ads_upstream_->set_allow_unexpected_disconnects(true);
-    AssertionResult result = ads_connection_->close();
-    RELEASE_ASSERT(result, result.message());
-    result = ads_connection_->waitForDisconnect();
-    RELEASE_ASSERT(result, result.message());
-    ads_connection_.reset();
-  }
-
-protected:
-  FakeHttpConnectionPtr ads_connection_;
-  FakeUpstream* ads_upstream_{};
-};
-
-class AdsIntegrationTest : public AdsIntegrationBaseTest,
-                           public Grpc::GrpcClientIntegrationParamTest {
+class AdsIntegrationTest : public HttpIntegrationTest, public Grpc::GrpcClientIntegrationParamTest {
 public:
   AdsIntegrationTest()
-      : AdsIntegrationBaseTest(Http::CodecClient::Type::HTTP2, ipVersion(), config) {}
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), realTime(), config) {
+    create_xds_upstream_ = true;
+    tls_xds_upstream_ = true;
+  }
 
   void TearDown() override {
-    cleanUpAdsConnection();
+    cleanUpXdsConnection();
     test_server_.reset();
     fake_upstreams_.clear();
-  }
-
-  void createUpstreams() override {
-    AdsIntegrationBaseTest::createUpstreams();
-    fake_upstreams_.emplace_back(new FakeUpstream(
-        createUpstreamSslContext(), 0, FakeHttpConnection::Type::HTTP2, version_, timeSystem()));
-  }
-
-  Network::TransportSocketFactoryPtr createUpstreamSslContext() {
-    envoy::api::v2::auth::DownstreamTlsContext tls_context;
-    auto* common_tls_context = tls_context.mutable_common_tls_context();
-    common_tls_context->add_alpn_protocols("h2");
-    auto* tls_cert = common_tls_context->add_tls_certificates();
-    tls_cert->mutable_certificate_chain()->set_filename(
-        TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcert.pem"));
-    tls_cert->mutable_private_key()->set_filename(
-        TestEnvironment::runfilesPath("test/config/integration/certs/upstreamkey.pem"));
-    auto cfg = std::make_unique<Ssl::ServerContextConfigImpl>(tls_context, factory_context_);
-
-    static Stats::Scope* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
-    return std::make_unique<Ssl::ServerSslSocketFactory>(
-        std::move(cfg), context_manager_, *upstream_stats_store, std::vector<std::string>{});
-  }
-
-  AssertionResult
-  compareDiscoveryRequest(const std::string& expected_type_url, const std::string& expected_version,
-                          const std::vector<std::string>& expected_resource_names,
-                          const Protobuf::int32 expected_error_code = Grpc::Status::GrpcStatus::Ok,
-                          const std::string& expected_error_message = "") {
-    envoy::api::v2::DiscoveryRequest discovery_request;
-    VERIFY_ASSERTION(ads_stream_->waitForGrpcMessage(*dispatcher_, discovery_request));
-
-    EXPECT_TRUE(discovery_request.has_node());
-    EXPECT_FALSE(discovery_request.node().id().empty());
-    EXPECT_FALSE(discovery_request.node().cluster().empty());
-
-    // TODO(PiotrSikora): Remove this hack once fixed internally.
-    if (!(expected_type_url == discovery_request.type_url())) {
-      return AssertionFailure() << fmt::format("type_url {} does not match expected {}",
-                                               discovery_request.type_url(), expected_type_url);
-    }
-    if (!(expected_error_code == discovery_request.error_detail().code())) {
-      return AssertionFailure() << fmt::format("error_code {} does not match expected {}",
-                                               discovery_request.error_detail().code(),
-                                               expected_error_code);
-    }
-    EXPECT_TRUE(
-        IsSubstring("", "", expected_error_message, discovery_request.error_detail().message()));
-    const std::vector<std::string> resource_names(discovery_request.resource_names().cbegin(),
-                                                  discovery_request.resource_names().cend());
-    if (expected_resource_names != resource_names) {
-      return AssertionFailure() << fmt::format(
-                 "resources {} do not match expected {} in {}",
-                 fmt::join(resource_names.begin(), resource_names.end(), ","),
-                 fmt::join(expected_resource_names.begin(), expected_resource_names.end(), ","),
-                 discovery_request.DebugString());
-    }
-    // TODO(PiotrSikora): Remove this hack once fixed internally.
-    if (!(expected_version == discovery_request.version_info())) {
-      return AssertionFailure() << fmt::format("version {} does not match expected {} in {}",
-                                               discovery_request.version_info(), expected_version,
-                                               discovery_request.DebugString());
-    }
-    return AssertionSuccess();
-  }
-
-  template <class T>
-  void sendDiscoveryResponse(const std::string& type_url, const std::vector<T>& messages,
-                             const std::string& version) {
-    envoy::api::v2::DiscoveryResponse discovery_response;
-    discovery_response.set_version_info(version);
-    discovery_response.set_type_url(type_url);
-    for (const auto& message : messages) {
-      discovery_response.add_resources()->PackFrom(message);
-    }
-    ads_stream_->sendGrpcMessage(discovery_response);
   }
 
   envoy::api::v2::Cluster buildCluster(const std::string& name) {
@@ -245,9 +137,8 @@ public:
 
   void makeSingleRequest() {
     registerTestServerPorts({"http"});
-    testRouterHeaderOnlyRequestAndResponse(true);
+    testRouterHeaderOnlyRequestAndResponse();
     cleanupUpstreamAndDownstream();
-    fake_upstream_connection_ = nullptr;
   }
 
   void initialize() override { initializeAds(false); }
@@ -260,7 +151,7 @@ public:
             ads_config->mutable_rate_limit_settings();
           }
           auto* grpc_service = ads_config->add_grpc_services();
-          setGrpcService(*grpc_service, "ads_cluster", fake_upstreams_.back()->localAddress());
+          setGrpcService(*grpc_service, "ads_cluster", xds_upstream_->localAddress());
           auto* ads_cluster = bootstrap.mutable_static_resources()->add_clusters();
           ads_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
           ads_cluster->set_name("ads_cluster");
@@ -278,12 +169,12 @@ public:
           }
         });
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
-    AdsIntegrationBaseTest::initialize();
-    if (ads_stream_ == nullptr) {
-      createAdsConnection(*(fake_upstreams_[1]));
-      AssertionResult result = ads_connection_->waitForNewStream(*dispatcher_, ads_stream_);
+    HttpIntegrationTest::initialize();
+    if (xds_stream_ == nullptr) {
+      createXdsConnection();
+      AssertionResult result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
       RELEASE_ASSERT(result, result.message());
-      ads_stream_->startGrpcStream();
+      xds_stream_->startGrpcStream();
     }
   }
 
@@ -410,12 +301,10 @@ public:
     return dynamic_cast<const envoy::admin::v2alpha::RoutesConfigDump&>(*message_ptr);
   }
 
-  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
-  Ssl::ContextManagerImpl context_manager_{timeSystem()};
-  FakeStreamPtr ads_stream_;
+  Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{timeSystem()};
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersionsClientType, AdsIntegrationTest, GRPC_CLIENT_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, AdsIntegrationTest, GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // Validate basic config delivery and upgrade.
 TEST_P(AdsIntegrationTest, Basic) {
@@ -653,75 +542,65 @@ TEST_P(AdsIntegrationTest, RdsAfterLdsWithRdsChange) {
   makeSingleRequest();
 }
 
-class AdsFailIntegrationTest : public AdsIntegrationBaseTest,
+class AdsFailIntegrationTest : public HttpIntegrationTest,
                                public Grpc::GrpcClientIntegrationParamTest {
 public:
   AdsFailIntegrationTest()
-      : AdsIntegrationBaseTest(Http::CodecClient::Type::HTTP2, ipVersion(), config) {}
-
-  void TearDown() override {
-    cleanUpAdsConnection();
-    test_server_.reset();
-    fake_upstreams_.clear();
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), realTime(), config) {
+    create_xds_upstream_ = true;
   }
 
-  void createUpstreams() override {
-    AdsIntegrationBaseTest::createUpstreams();
-    fake_upstreams_.emplace_back(
-        new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_, timeSystem()));
+  void TearDown() override {
+    cleanUpXdsConnection();
+    test_server_.reset();
+    fake_upstreams_.clear();
   }
 
   void initialize() override {
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
       auto* grpc_service =
           bootstrap.mutable_dynamic_resources()->mutable_ads_config()->add_grpc_services();
-      setGrpcService(*grpc_service, "ads_cluster", fake_upstreams_.back()->localAddress());
+      setGrpcService(*grpc_service, "ads_cluster", xds_upstream_->localAddress());
       auto* ads_cluster = bootstrap.mutable_static_resources()->add_clusters();
       ads_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       ads_cluster->set_name("ads_cluster");
     });
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
-    AdsIntegrationBaseTest::initialize();
+    HttpIntegrationTest::initialize();
   }
-
-  FakeStreamPtr ads_stream_;
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersionsClientType, AdsFailIntegrationTest,
-                        GRPC_CLIENT_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, AdsFailIntegrationTest,
+                         GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // Validate that we don't crash on failed ADS stream.
 TEST_P(AdsFailIntegrationTest, ConnectDisconnect) {
   initialize();
-  createAdsConnection(*fake_upstreams_[1]);
-  ASSERT_TRUE(ads_connection_->waitForNewStream(*dispatcher_, ads_stream_));
-  ads_stream_->startGrpcStream();
-  ads_stream_->finishGrpcStream(Grpc::Status::Internal);
+  createXdsConnection();
+  ASSERT_TRUE(xds_connection_->waitForNewStream(*dispatcher_, xds_stream_));
+  xds_stream_->startGrpcStream();
+  xds_stream_->finishGrpcStream(Grpc::Status::Internal);
 }
 
-class AdsConfigIntegrationTest : public AdsIntegrationBaseTest,
+class AdsConfigIntegrationTest : public HttpIntegrationTest,
                                  public Grpc::GrpcClientIntegrationParamTest {
 public:
   AdsConfigIntegrationTest()
-      : AdsIntegrationBaseTest(Http::CodecClient::Type::HTTP2, ipVersion(), config) {}
-
-  void TearDown() override {
-    cleanUpAdsConnection();
-    test_server_.reset();
-    fake_upstreams_.clear();
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), realTime(), config) {
+    create_xds_upstream_ = true;
   }
 
-  void createUpstreams() override {
-    AdsIntegrationBaseTest::createUpstreams();
-    fake_upstreams_.emplace_back(
-        new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_, timeSystem()));
+  void TearDown() override {
+    cleanUpXdsConnection();
+    test_server_.reset();
+    fake_upstreams_.clear();
   }
 
   void initialize() override {
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
       auto* grpc_service =
           bootstrap.mutable_dynamic_resources()->mutable_ads_config()->add_grpc_services();
-      setGrpcService(*grpc_service, "ads_cluster", fake_upstreams_.back()->localAddress());
+      setGrpcService(*grpc_service, "ads_cluster", xds_upstream_->localAddress());
       auto* ads_cluster = bootstrap.mutable_static_resources()->add_clusters();
       ads_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       ads_cluster->set_name("ads_cluster");
@@ -735,22 +614,20 @@ public:
       eds_config->mutable_ads();
     });
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
-    AdsIntegrationBaseTest::initialize();
+    HttpIntegrationTest::initialize();
   }
-
-  FakeStreamPtr ads_stream_;
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersionsClientType, AdsConfigIntegrationTest,
-                        GRPC_CLIENT_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, AdsConfigIntegrationTest,
+                         GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // This is s regression validating that we don't crash on EDS static Cluster that uses ADS.
 TEST_P(AdsConfigIntegrationTest, EdsClusterWithAdsConfigSource) {
   initialize();
-  createAdsConnection(*fake_upstreams_[1]);
-  ASSERT_TRUE(ads_connection_->waitForNewStream(*dispatcher_, ads_stream_));
-  ads_stream_->startGrpcStream();
-  ads_stream_->finishGrpcStream(Grpc::Status::Ok);
+  createXdsConnection();
+  ASSERT_TRUE(xds_connection_->waitForNewStream(*dispatcher_, xds_stream_));
+  xds_stream_->startGrpcStream();
+  xds_stream_->finishGrpcStream(Grpc::Status::Ok);
 }
 
 // Validates that the initial xDS request batches all resources referred to in static config
@@ -768,9 +645,9 @@ TEST_P(AdsIntegrationTest, XdsBatching) {
   });
 
   pre_worker_start_test_steps_ = [this]() {
-    createAdsConnection(*fake_upstreams_.back());
-    ASSERT_TRUE(ads_connection_->waitForNewStream(*dispatcher_, ads_stream_));
-    ads_stream_->startGrpcStream();
+    createXdsConnection();
+    ASSERT_TRUE(xds_connection_->waitForNewStream(*dispatcher_, xds_stream_));
+    xds_stream_->startGrpcStream();
 
     EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "",
                                         {"eds_cluster2", "eds_cluster"}));

@@ -54,7 +54,6 @@ envoy_cc_test(
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
-        "//test/test_common:test_time_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -220,6 +219,17 @@ envoy_cc_test(
     deps = [
         "//source/common/http:header_map_lib",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test_binary(
+    name = "header_map_impl_speed_test",
+    srcs = ["header_map_impl_speed_test.cc"],
+    external_deps = [
+        "benchmark",
+    ],
+    deps = [
+        "//source/common/http:header_map_lib",
     ],
 )
 

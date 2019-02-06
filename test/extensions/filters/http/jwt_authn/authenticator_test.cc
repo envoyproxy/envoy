@@ -9,9 +9,8 @@
 #include "test/extensions/filters/http/jwt_authn/mock.h"
 #include "test/extensions/filters/http/jwt_authn/test_common.h"
 #include "test/mocks/server/mocks.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
-
-#include "gtest/gtest.h"
 
 using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication;
 using Envoy::Extensions::HttpFilters::Common::JwksFetcher;
@@ -28,9 +27,9 @@ namespace Extensions {
 namespace HttpFilters {
 namespace JwtAuthn {
 
-class AuthenticatorTest : public ::testing::Test {
+class AuthenticatorTest : public TestBase {
 public:
-  void SetUp() {
+  void SetUp() override {
     MessageUtil::loadFromYaml(ExampleConfig, proto_config_);
     CreateAuthenticator();
   }
@@ -259,7 +258,7 @@ TEST_F(AuthenticatorTest, TestPubkeyFetchFail) {
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "401"}}}));
 }
 
-// This test verifies when a Jwks fetching is not completed yet, but onDestory() is called,
+// This test verifies when a Jwks fetching is not completed yet, but onDestroy() is called,
 // onComplete() callback should not be called, but internal request->cancel() should be called.
 // Most importantly, no crash.
 TEST_F(AuthenticatorTest, TestOnDestroy) {
@@ -278,7 +277,7 @@ TEST_F(AuthenticatorTest, TestOnDestroy) {
   auth_->onDestroy();
 }
 
-// This test verifies if "forward_playload_header" is empty, payload is not forwarded.
+// This test verifies if "forward_payload_header" is empty, payload is not forwarded.
 TEST_F(AuthenticatorTest, TestNoForwardPayloadHeader) {
   // In this config, there is no forward_payload_header
   auto& provider0 = (*proto_config_.mutable_providers())[std::string(ProviderName)];

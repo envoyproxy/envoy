@@ -39,10 +39,10 @@
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/test_time.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::AnyNumber;
@@ -60,7 +60,7 @@ using testing::Sequence;
 namespace Envoy {
 namespace Http {
 
-class HttpConnectionManagerImplTest : public testing::Test, public ConnectionManagerConfig {
+class HttpConnectionManagerImplTest : public TestBase, public ConnectionManagerConfig {
 public:
   struct RouteConfigProvider : public Router::RouteConfigProvider {
     RouteConfigProvider(TimeSource& time_source) : time_source_(time_source) {}
@@ -230,6 +230,7 @@ public:
   FilterChainFactory& filterFactory() override { return filter_factory_; }
   bool reverseEncodeOrder() override { return reverse_encode_order_; }
   bool generateRequestId() override { return true; }
+  uint32_t maxRequestHeadersKb() const override { return max_request_headers_kb_; }
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
   std::chrono::milliseconds streamIdleTimeout() const override { return stream_idle_timeout_; }
   std::chrono::milliseconds requestTimeout() const override { return request_timeout_; }
@@ -280,6 +281,7 @@ public:
   Http::ForwardClientCertType forward_client_cert_{Http::ForwardClientCertType::Sanitize};
   std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;
   absl::optional<std::string> user_agent_;
+  uint32_t max_request_headers_kb_{Http::DEFAULT_MAX_REQUEST_HEADERS_KB};
   absl::optional<std::chrono::milliseconds> idle_timeout_;
   std::chrono::milliseconds stream_idle_timeout_{};
   std::chrono::milliseconds request_timeout_{};
@@ -3593,6 +3595,51 @@ TEST_F(HttpConnectionManagerImplTest, DisableKeepAliveWhenOverloaded) {
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false);
   EXPECT_EQ(1U, stats_.named_.downstream_cx_overload_disable_keepalive_.value());
+}
+
+TEST_F(HttpConnectionManagerImplTest, OverlyLongHeadersRejected) {
+  setup(false, "");
+
+  std::string response_code;
+  std::string response_body;
+  EXPECT_CALL(*codec_, dispatch(_)).Times(1).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
+    HeaderMapPtr headers{
+        new TestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+    headers->addCopy(LowerCaseString("Foo"), std::string(60 * 1024, 'a'));
+
+    EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
+        .WillOnce(Invoke([&response_code](const HeaderMap& headers, bool) -> void {
+          response_code = headers.Status()->value().c_str();
+        }));
+    decoder->decodeHeaders(std::move(headers), true);
+    conn_manager_->newStream(response_encoder_);
+  }));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false); // kick off request
+
+  EXPECT_EQ("431", response_code);
+  EXPECT_EQ("", response_body);
+}
+
+TEST_F(HttpConnectionManagerImplTest, OverlyLongHeadersAcceptedIfConfigured) {
+  max_request_headers_kb_ = 62;
+  setup(false, "");
+
+  EXPECT_CALL(*codec_, dispatch(_)).Times(1).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
+    HeaderMapPtr headers{
+        new TestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+    headers->addCopy(LowerCaseString("Foo"), std::string(60 * 1024, 'a'));
+
+    EXPECT_CALL(response_encoder_, encodeHeaders(_, _)).Times(0);
+    decoder->decodeHeaders(std::move(headers), true);
+    conn_manager_->newStream(response_encoder_);
+  }));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false); // kick off request
 }
 
 } // namespace Http

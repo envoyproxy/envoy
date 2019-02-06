@@ -145,6 +145,7 @@ envoy_cc_library(
     deps = [
         ":admin_interface",
         "//include/envoy/access_log:access_log_interface",
+        "//include/envoy/api:api_interface",
         "//include/envoy/http:codes_interface",
         "//include/envoy/http:context_interface",
         "//include/envoy/http:filter_interface",
@@ -190,8 +191,10 @@ envoy_cc_library(
         "//include/envoy/network:transport_socket_interface",
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/secret:secret_manager_interface",
+        "//include/envoy/singleton:manager_interface",
         "//include/envoy/ssl:context_manager_interface",
         "//include/envoy/stats:stats_interface",
+        "//include/envoy/thread_local:thread_local_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/protobuf",
     ],
@@ -210,6 +213,7 @@ envoy_cc_library(
     hdrs = ["resource_monitor_config.h"],
     deps = [
         ":resource_monitor_interface",
+        "//include/envoy/api:api_interface",
         "//include/envoy/event:dispatcher_interface",
     ],
 )

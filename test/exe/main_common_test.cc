@@ -11,9 +11,8 @@
 
 #include "test/test_common/contention.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
-
-#include "gtest/gtest.h"
 
 #ifdef ENVOY_HANDLE_SIGNALS
 #include "exe/signal_action.h"
@@ -32,7 +31,7 @@ namespace Envoy {
  * an argv array that is terminated with nullptr. Identifies the config
  * file relative to $TEST_RUNDIR.
  */
-class MainCommonTest : public testing::TestWithParam<Network::Address::IpVersion> {
+class MainCommonTest : public TestBaseWithParam<Network::Address::IpVersion> {
 protected:
   MainCommonTest()
       : config_file_(TestEnvironment::temporaryFileSubstitute(
@@ -145,7 +144,7 @@ TEST_P(MainCommonDeathTest, OutOfMemoryHandler) {
         // so dynamically find a size that is too large.
         const uint64_t initial = 1 << 30;
         for (uint64_t size = initial;
-             size >= initial; // Disallow wraparound to avoid inifinite loops on failure.
+             size >= initial; // Disallow wraparound to avoid infinite loops on failure.
              size *= 1000) {
           new int[size];
         }
@@ -154,9 +153,9 @@ TEST_P(MainCommonDeathTest, OutOfMemoryHandler) {
 #endif
 }
 
-INSTANTIATE_TEST_CASE_P(IpVersions, MainCommonTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, MainCommonTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 class AdminRequestTest : public MainCommonTest {
 protected:
@@ -274,7 +273,8 @@ TEST_P(AdminRequestTest, AdminRequestContentionEnabled) {
   started_.WaitForNotification();
 
   // Induce contention to guarantee a non-zero num_contentions count.
-  Thread::TestUtil::ContentionGenerator::generateContention(MutexTracerImpl::getOrCreateTracer());
+  Thread::TestUtil::ContentionGenerator contention_generator;
+  contention_generator.generateContention(MutexTracerImpl::getOrCreateTracer());
 
   std::string response = adminRequest("/contention", "GET");
   EXPECT_THAT(response, Not(HasSubstr("not enabled")));
@@ -374,12 +374,12 @@ TEST_P(MainCommonTest, ConstructDestructLogger) {
   VERBOSE_EXPECT_NO_THROW(MainCommon main_common(argc(), argv()));
 
   const std::string logger_name = "logger";
-  spdlog::details::log_msg log_msg(&logger_name, spdlog::level::level_enum::err);
+  spdlog::details::log_msg log_msg(&logger_name, spdlog::level::level_enum::err, "error");
   Logger::Registry::getSink()->log(log_msg);
 }
 
-INSTANTIATE_TEST_CASE_P(IpVersions, AdminRequestTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, AdminRequestTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 } // namespace Envoy

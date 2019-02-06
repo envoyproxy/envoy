@@ -8,11 +8,11 @@
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "absl/strings/match.h"
 #include "absl/strings/string_view.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Invoke;
@@ -24,7 +24,7 @@ using testing::WithArg;
 namespace Envoy {
 namespace Server {
 
-class HotRestartImplTest : public testing::Test {
+class HotRestartImplTest : public TestBase {
 public:
   void setup() {
     EXPECT_CALL(os_sys_calls_, shmUnlink(_));
@@ -244,8 +244,8 @@ TEST_P(HotRestartImplAlignmentTest, objectOverlap) {
   }
 }
 
-INSTANTIATE_TEST_CASE_P(HotRestartImplAlignmentTest, HotRestartImplAlignmentTest,
-                        testing::Range(0UL, alignof(Stats::RawStatData) + 1));
+INSTANTIATE_TEST_SUITE_P(HotRestartImplAlignmentTest, HotRestartImplAlignmentTest,
+                         testing::Range(0UL, alignof(Stats::RawStatData) + 1));
 
 } // namespace Server
 } // namespace Envoy

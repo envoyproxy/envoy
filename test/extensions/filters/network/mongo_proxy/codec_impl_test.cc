@@ -7,9 +7,9 @@
 #include "extensions/filters/network/mongo_proxy/codec_impl.h"
 
 #include "test/test_common/printers.h"
+#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::Eq;
 using testing::NiceMock;
@@ -41,7 +41,7 @@ public:
   MOCK_METHOD1(decodeCommandReply_, void(CommandReplyMessagePtr& message));
 };
 
-class MongoCodecImplTest : public testing::Test {
+class MongoCodecImplTest : public TestBase {
 public:
   Buffer::OwnedImpl output_;
   EncoderImpl encoder_{output_};
@@ -90,6 +90,7 @@ TEST_F(MongoCodecImplTest, Query) {
   query.query(
       Bson::DocumentImpl::create()
           ->addString("string", "string")
+          ->addSymbol("symbol", "symbol")
           ->addDouble("double", 2.1)
           ->addDocument("document", Bson::DocumentImpl::create()->addString("hello", "world"))
           ->addArray("array", Bson::DocumentImpl::create()->addString("0", "foo"))

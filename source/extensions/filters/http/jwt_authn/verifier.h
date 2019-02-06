@@ -8,10 +8,10 @@ namespace HttpFilters {
 namespace JwtAuthn {
 
 class Verifier;
-typedef std::unique_ptr<Verifier> VerifierPtr;
+typedef std::unique_ptr<const Verifier> VerifierConstPtr;
 
 /**
- * Supports verification of JWTs with configured requirments.
+ * Supports verification of JWTs with configured requirements.
  */
 class Verifier {
 public:
@@ -60,7 +60,7 @@ public:
     virtual Callbacks* callback() const PURE;
 
     /**
-     * Cancel any pending reuqets for this context.
+     * Cancel any pending requests for this context.
      */
     virtual void cancel() PURE;
   };
@@ -71,7 +71,7 @@ public:
   virtual void verify(ContextSharedPtr context) const PURE;
 
   // Factory method for creating verifiers.
-  static VerifierPtr
+  static VerifierConstPtr
   create(const ::envoy::config::filter::http::jwt_authn::v2alpha::JwtRequirement& requirement,
          const Protobuf::Map<ProtobufTypes::String,
                              ::envoy::config::filter::http::jwt_authn::v2alpha::JwtProvider>&

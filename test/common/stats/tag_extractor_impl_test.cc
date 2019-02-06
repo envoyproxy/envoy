@@ -7,9 +7,8 @@
 #include "common/stats/tag_extractor_impl.h"
 #include "common/stats/tag_producer_impl.h"
 
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
-
-#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Stats {
@@ -110,7 +109,7 @@ public:
    * @return std::string the metric_name with tags removed.
    */
   std::string produceTagsReverse(const std::string& metric_name, std::vector<Tag>& tags) const {
-    // Note: one discrepency between this and TagProducerImpl::produceTags is that this
+    // Note: one discrepancy between this and TagProducerImpl::produceTags is that this
     // version does not add in tag_extractors_.default_tags_ into tags. That doesn't matter
     // for this test, however.
     std::list<const TagExtractor*> extractors; // Note push-front is used to reverse order.

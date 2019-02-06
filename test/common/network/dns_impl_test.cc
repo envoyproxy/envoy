@@ -26,12 +26,11 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_time.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "ares.h"
 #include "ares_dns.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::InSequence;
@@ -323,14 +322,12 @@ private:
   DnsResolverImpl* resolver_;
 };
 
-class DnsImplConstructor : public testing::Test {
+class DnsImplConstructor : public TestBase {
 protected:
-  DnsImplConstructor()
-      : api_(Api::createApiForTest(stats_store_)), dispatcher_(test_time_.timeSystem(), *api_) {}
+  DnsImplConstructor() : api_(Api::createApiForTest(stats_store_)), dispatcher_(*api_) {}
 
   Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
-  DangerousDeprecatedTestTime test_time_;
   Event::DispatcherImpl dispatcher_;
 };
 
@@ -374,7 +371,7 @@ public:
   Api::SysCallIntResult bind(int fd) const override { return instance_.bind(fd); }
   Api::SysCallIntResult connect(int fd) const override { return instance_.connect(fd); }
   const Address::Ip* ip() const override { return instance_.ip(); }
-  int socket(Address::SocketType type) const override { return instance_.socket(type); }
+  IoHandlePtr socket(Address::SocketType type) const override { return instance_.socket(type); }
   Address::Type type() const override { return instance_.type(); }
 
 private:
@@ -405,10 +402,9 @@ TEST_F(DnsImplConstructor, BadCustomResolvers) {
                             "DNS resolver 'foo' is not an IP address");
 }
 
-class DnsImplTest : public testing::TestWithParam<Address::IpVersion> {
+class DnsImplTest : public TestBaseWithParam<Address::IpVersion> {
 public:
-  DnsImplTest()
-      : api_(Api::createApiForTest(stats_store_)), dispatcher_(test_time_.timeSystem(), *api_) {}
+  DnsImplTest() : api_(Api::createApiForTest(stats_store_)), dispatcher_(*api_) {}
 
   void SetUp() override {
     resolver_ = dispatcher_.createDnsResolver({});
@@ -441,7 +437,6 @@ protected:
   Stats::IsolatedStoreImpl stats_store_;
   std::unique_ptr<Network::Listener> listener_;
   Api::ApiPtr api_;
-  DangerousDeprecatedTestTime test_time_;
   Event::DispatcherImpl dispatcher_;
   DnsResolverSharedPtr resolver_;
 };
@@ -457,9 +452,9 @@ static bool hasAddress(const std::list<Address::InstanceConstSharedPtr>& results
 }
 
 // Parameterize the DNS test server socket address.
-INSTANTIATE_TEST_CASE_P(IpVersions, DnsImplTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, DnsImplTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 // Validate that when DnsResolverImpl is destructed with outstanding requests,
 // that we don't invoke any callbacks. This is a regression test from
@@ -761,9 +756,9 @@ protected:
 };
 
 // Parameterize the DNS test server socket address.
-INSTANTIATE_TEST_CASE_P(IpVersions, DnsImplZeroTimeoutTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, DnsImplZeroTimeoutTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 // Validate that timeouts result in an empty callback.
 TEST_P(DnsImplZeroTimeoutTest, Timeout) {

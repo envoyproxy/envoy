@@ -7,9 +7,9 @@
 #include "test/mocks/common.h"
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Eq;
@@ -20,7 +20,7 @@ namespace ListenerFilters {
 namespace OriginalSrc {
 namespace {
 
-class OriginalSrcSocketOptionTest : public testing::Test {
+class OriginalSrcSocketOptionTest : public TestBase {
 public:
   std::unique_ptr<OriginalSrcSocketOption>
   makeOptionByAddress(const Network::Address::InstanceConstSharedPtr& address) {
@@ -93,6 +93,15 @@ TEST_F(OriginalSrcSocketOptionTest, TestIpv6HashKeyOther) {
   EXPECT_EQ(key_, expected_key);
 }
 
+TEST_F(OriginalSrcSocketOptionTest, TestOptionDetailsNotSupported) {
+  const auto address = Network::Utility::parseInternetAddress("255.254.253.0");
+  auto option = makeOptionByAddress(address);
+
+  auto details =
+      option->getOptionDetails(socket_, envoy::api::v2::core::SocketOption::STATE_PREBIND);
+
+  EXPECT_FALSE(details.has_value());
+}
 } // namespace
 } // namespace OriginalSrc
 } // namespace ListenerFilters

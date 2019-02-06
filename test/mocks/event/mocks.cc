@@ -1,7 +1,8 @@
 #include "mocks.h"
 
+#include "test/test_common/test_base.h"
+
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Invoke;
@@ -13,7 +14,7 @@ using testing::SaveArg;
 namespace Envoy {
 namespace Event {
 
-MockDispatcher::MockDispatcher() : time_system_(&test_time_.timeSystem()) {
+MockDispatcher::MockDispatcher() {
   ON_CALL(*this, clearDeferredDeleteList()).WillByDefault(Invoke([this]() -> void {
     to_delete_.clear();
   }));
