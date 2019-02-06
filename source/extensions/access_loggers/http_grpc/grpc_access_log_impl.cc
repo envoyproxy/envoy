@@ -155,6 +155,10 @@ void HttpGrpcAccessLog::responseFlagsToAccessLogResponseFlags(
   if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::UpstreamRetryLimitExceeded)) {
     common_access_log.mutable_response_flags()->set_upstream_retry_limit_exceeded(true);
   }
+
+  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::StreamIdleTimeout)) {
+    common_access_log.mutable_response_flags()->set_stream_idle_timeout(true);
+  }
 }
 
 void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,

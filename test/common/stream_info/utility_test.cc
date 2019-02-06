@@ -80,6 +80,7 @@ TEST(ResponseFlagsUtilsTest, toResponseFlagConversion) {
       std::make_pair("RLSE", ResponseFlag::RateLimitServiceError),
       std::make_pair("DC", ResponseFlag::DownstreamConnectionTermination),
       std::make_pair("URX", ResponseFlag::UpstreamRetryLimitExceeded),
+      std::make_pair("ST", ResponseFlag::StreamIdleTimeout),
   };
 
   EXPECT_FALSE(ResponseFlagUtils::toResponseFlag("NonExistentFlag").has_value());
