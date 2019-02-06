@@ -13,14 +13,14 @@
 #include "extensions/transport_sockets/tls/context_config_impl.h"
 #include "extensions/transport_sockets/tls/context_manager_impl.h"
 
+#include "test/integration/integration.h"
+#include "test/integration/utility.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/match.h"
 #include "gmock/gmock.h"
-#include "integration.h"
-#include "utility.h"
 
 using testing::Return;
 
