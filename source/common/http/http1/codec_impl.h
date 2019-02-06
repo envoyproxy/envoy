@@ -165,8 +165,7 @@ public:
   bool maybeDirectDispatch(Buffer::Instance& data);
 
 protected:
-  ConnectionImpl(Network::Connection& connection, http_parser_type type,
-                 const uint32_t max_request_headers_kb);
+  ConnectionImpl(Network::Connection& connection, http_parser_type type);
 
   bool resetStreamCalled() { return reset_stream_called_; }
 
@@ -282,7 +281,7 @@ private:
 class ServerConnectionImpl : public ServerConnection, public ConnectionImpl {
 public:
   ServerConnectionImpl(Network::Connection& connection, ServerConnectionCallbacks& callbacks,
-                       Http1Settings settings, const uint32_t max_request_headers_kb);
+                       Http1Settings settings);
 
   virtual bool supports_http_10() override { return codec_settings_.accept_http_10_; }
 
@@ -332,8 +331,7 @@ private:
  */
 class ClientConnectionImpl : public ClientConnection, public ConnectionImpl {
 public:
-  ClientConnectionImpl(Network::Connection& connection, ConnectionCallbacks& callbacks,
-                       const uint32_t max_request_headers_kb);
+  ClientConnectionImpl(Network::Connection& connection, ConnectionCallbacks& callbacks);
 
   // Http::ClientConnection
   StreamEncoder& newStream(StreamDecoder& response_decoder) override;

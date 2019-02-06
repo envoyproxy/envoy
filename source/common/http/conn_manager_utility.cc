@@ -44,8 +44,8 @@ ServerConnectionPtr ConnectionManagerUtility::autoCreateCodec(
     return ServerConnectionPtr{new Http2::ServerConnectionImpl(
         connection, callbacks, scope, http2_settings, max_request_headers_kb)};
   } else {
-    return ServerConnectionPtr{new Http1::ServerConnectionImpl(
-        connection, callbacks, http1_settings, max_request_headers_kb)};
+    return ServerConnectionPtr{
+        new Http1::ServerConnectionImpl(connection, callbacks, http1_settings)};
   }
 }
 
