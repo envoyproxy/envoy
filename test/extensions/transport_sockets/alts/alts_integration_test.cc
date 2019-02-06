@@ -25,8 +25,8 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Alts {
 
-class AltsIntegrationTestBase : public HttpIntegrationTest,
-                                public TestBaseWithParam<Network::Address::IpVersion> {
+class AltsIntegrationTestBase : public TestBaseWithParam<Network::Address::IpVersion>,
+                                public HttpIntegrationTest {
 public:
   AltsIntegrationTestBase(const std::string& server_peer_identity,
                           const std::string& client_peer_identity, bool server_connect_handshaker,
