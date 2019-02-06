@@ -4,6 +4,7 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
+    "envoy_select_quiche",
 )
 
 envoy_package()
@@ -39,9 +40,9 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "quic_platform_base_impl_lib",
-    srcs = [
+    srcs = envoy_select_quiche([
         "quic_logging_impl.cc",
-    ],
+    ]),
     hdrs = [
         "quic_aligned_impl.h",
         "quic_arraysize_impl.h",
@@ -69,9 +70,9 @@ envoy_cc_library(
         "abseil_node_hash_set",
     ],
     visibility = ["//visibility:public"],
-    deps = [
+    deps = envoy_select_quiche([
         "//source/common/common:assert_lib",
-    ],
+    ]),
 )
 
 envoy_cc_library(
