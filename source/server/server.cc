@@ -55,13 +55,13 @@ InstanceImpl::InstanceImpl(Options& options, Event::TimeSystem& time_system,
     : shutdown_(false), options_(options), time_system_(time_system), restarter_(restarter),
       start_time_(time(nullptr)), original_start_time_(start_time_), stats_store_(store),
       thread_local_(tls),
-      api_(new Api::Impl(options.fileFlushIntervalMsec(), thread_factory, store)),
+      api_(new Api::Impl(options.fileFlushIntervalMsec(), thread_factory, store, time_system)),
       secret_manager_(std::make_unique<Secret::SecretManagerImpl>()),
-      dispatcher_(api_->allocateDispatcher(time_system)),
+      dispatcher_(api_->allocateDispatcher()),
       singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory().currentThreadId())),
       handler_(new ConnectionHandlerImpl(ENVOY_LOGGER(), *dispatcher_)),
       random_generator_(std::move(random_generator)), listener_component_factory_(*this),
-      worker_factory_(thread_local_, *api_, hooks, time_system),
+      worker_factory_(thread_local_, *api_, hooks),
       dns_resolver_(dispatcher_->createDnsResolver({})),
       access_log_manager_(*api_, *dispatcher_, access_log_lock), terminated_(false),
       mutex_tracer_(options.mutexTracingEnabled() ? &Envoy::MutexTracerImpl::getOrCreateTracer()
@@ -171,7 +171,7 @@ bool InstanceImpl::healthCheckFailed() { return server_stats_->live_.value() == 
 
 InstanceUtil::BootstrapVersion
 InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& bootstrap,
-                                  Options& options) {
+                                  Options& options, Api::Api& api) {
   const std::string& config_path = options.configPath();
   const std::string& config_yaml = options.configYaml();
 
@@ -183,7 +183,7 @@ InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& boots
   }
 
   if (!config_path.empty()) {
-    MessageUtil::loadFromFile(config_path, bootstrap);
+    MessageUtil::loadFromFile(config_path, bootstrap, api);
   }
   if (!config_yaml.empty()) {
     envoy::config::bootstrap::v2::Bootstrap bootstrap_override;
@@ -224,7 +224,7 @@ void InstanceImpl::initialize(Options& options,
                 Configuration::UpstreamTransportSocketConfigFactory>::allFactoryNames());
 
   // Handle configuration that needs to take place prior to the main configuration load.
-  InstanceUtil::loadBootstrapConfig(bootstrap_, options);
+  InstanceUtil::loadBootstrapConfig(bootstrap_, options, api());
   bootstrap_config_update_time_ = time_system_.systemTime();
 
   // Needs to happen as early as possible in the instantiation to preempt the objects that require
@@ -285,11 +285,11 @@ void InstanceImpl::initialize(Options& options,
 
   // Initialize the overload manager early so other modules can register for actions.
   overload_manager_ = std::make_unique<OverloadManagerImpl>(dispatcher(), stats(), threadLocal(),
-                                                            bootstrap_.overload_manager());
+                                                            bootstrap_.overload_manager(), api());
 
   // Workers get created first so they register for thread local updates.
-  listener_manager_ = std::make_unique<ListenerManagerImpl>(*this, listener_component_factory_,
-                                                            worker_factory_, time_system_);
+  listener_manager_ =
+      std::make_unique<ListenerManagerImpl>(*this, listener_component_factory_, worker_factory_);
 
   // The main thread is also registered for thread local updates so that code that does not care
   // whether it runs on the main thread or on workers can still use TLS.
@@ -334,7 +334,7 @@ void InstanceImpl::initialize(Options& options,
             ->create(),
         dispatcher(), runtime(), stats(), sslContextManager(), random(), info_factory_,
         access_log_manager_, clusterManager(), localInfo(), admin(), singletonManager(),
-        threadLocal());
+        threadLocal(), api());
   }
 
   for (Stats::SinkPtr& sink : config_.statsSinks()) {
@@ -348,7 +348,7 @@ void InstanceImpl::initialize(Options& options,
 
   // GuardDog (deadlock detection) object and thread setup before workers are
   // started and before our own run() loop runs.
-  guard_dog_ = std::make_unique<Server::GuardDogImpl>(stats_store_, config_, time_system_, api());
+  guard_dog_ = std::make_unique<Server::GuardDogImpl>(stats_store_, config_, api());
 }
 
 void InstanceImpl::startWorkers() {
@@ -372,7 +372,8 @@ Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,
 
     return std::make_unique<Runtime::DiskBackedLoaderImpl>(
         server.dispatcher(), server.threadLocal(), config.runtime()->symlinkRoot(),
-        config.runtime()->subdirectory(), override_subdirectory, server.stats(), server.random());
+        config.runtime()->subdirectory(), override_subdirectory, server.stats(), server.random(),
+        server.api());
   } else {
     return std::make_unique<Runtime::LoaderImpl>(server.random(), server.stats(),
                                                  server.threadLocal());
@@ -385,7 +386,7 @@ void InstanceImpl::loadServerFlags(const absl::optional<std::string>& flags_path
   }
 
   ENVOY_LOG(info, "server flags path: {}", flags_path.value());
-  if (api_->fileExists(flags_path.value() + "/drain")) {
+  if (api_->fileSystem().fileExists(flags_path.value() + "/drain")) {
     ENVOY_LOG(info, "starting server in drain mode");
     failHealthcheck(true);
   }

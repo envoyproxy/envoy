@@ -17,9 +17,11 @@
 #include "absl/base/optimization.h"
 
 #define QUIC_LOG_IMPL_INTERNAL(condition, logstream)                                               \
-  switch (static_cast<int>(condition))                                                             \
-  case 1:                                                                                          \
-    logstream
+  switch (0)                                                                                       \
+  default:                                                                                         \
+    if (!(condition)) {                                                                            \
+    } else                                                                                         \
+      logstream
 
 #define QUIC_LOGGER() Envoy::Logger::Registry::getLog(Envoy::Logger::Id::misc)
 

@@ -4,6 +4,9 @@ syntax = "proto3";
 // Configuration for File Based Metadata Grpc Credentials Plugin
 
 package envoy.config.grpc_credential.v2alpha;
+
+option java_outer_classname = "FileBasedMetadataProto";
+option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.config.grpc_credential.v2alpha";
 option go_package = "v2alpha";
 

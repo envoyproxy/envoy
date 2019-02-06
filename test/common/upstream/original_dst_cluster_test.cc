@@ -22,10 +22,10 @@
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Invoke;
@@ -57,12 +57,14 @@ public:
   Http::HeaderMapPtr downstream_headers_;
 };
 
-class OriginalDstClusterTest : public testing::Test {
+class OriginalDstClusterTest : public TestBase {
 public:
   // cleanup timer must be created before the cluster (in setup()), so that we can set expectations
   // on it. Ownership is transferred to the cluster at the cluster constructor, so the cluster will
   // take care of destructing it!
-  OriginalDstClusterTest() : cleanup_timer_(new Event::MockTimer(&dispatcher_)) {}
+  OriginalDstClusterTest()
+      : cleanup_timer_(new Event::MockTimer(&dispatcher_)),
+        api_(Api::createApiForTest(stats_store_)) {}
 
   void setupFromJson(const std::string& json) { setup(parseClusterFromJson(json)); }
   void setupFromYaml(const std::string& yaml) { setup(parseClusterFromV2Yaml(yaml)); }
@@ -74,7 +76,7 @@ public:
                                                               : cluster_config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
         admin_, ssl_context_manager_, *scope, cm, local_info_, dispatcher_, random_, stats_store_,
-        singleton_manager_, tls_);
+        singleton_manager_, tls_, *api_);
     cluster_.reset(
         new OriginalDstCluster(cluster_config, runtime_, factory_context, std::move(scope), false));
     cluster_->prioritySet().addPriorityUpdateCb(
@@ -97,6 +99,7 @@ public:
   NiceMock<Server::MockAdmin> admin_;
   Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest().currentThreadId()};
   NiceMock<ThreadLocal::MockInstance> tls_;
+  Api::ApiPtr api_;
 };
 
 TEST(OriginalDstClusterConfigTest, BadConfig) {

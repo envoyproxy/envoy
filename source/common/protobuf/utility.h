@@ -2,6 +2,7 @@
 
 #include <numeric>
 
+#include "envoy/api/api.h"
 #include "envoy/common/exception.h"
 #include "envoy/json/json_object.h"
 #include "envoy/type/percent.pb.h"
@@ -175,7 +176,16 @@ public:
   static void loadFromJsonEx(const std::string& json, Protobuf::Message& message,
                              ProtoUnknownFieldsMode proto_unknown_fields);
   static void loadFromYaml(const std::string& yaml, Protobuf::Message& message);
-  static void loadFromFile(const std::string& path, Protobuf::Message& message);
+  static void loadFromFile(const std::string& path, Protobuf::Message& message, Api::Api& api);
+
+  /**
+   * Checks for use of deprecated fields in message and all sub-messages.
+   * @param message message to validate.
+   * @param warn_only if true, logs a warning rather than throwing an exception if deprecated fields
+   *   are in use.
+   * @throw ProtoValidationException if deprecated fields are used and warn_only is false.
+   */
+  static void checkForDeprecation(const Protobuf::Message& message, bool warn_only);
 
   /**
    * Validate protoc-gen-validate constraints on a given protobuf.
@@ -185,6 +195,9 @@ public:
    * @throw ProtoValidationException if the message does not satisfy its type constraints.
    */
   template <class MessageType> static void validate(const MessageType& message) {
+    // Log warnings if deprecated fields are in use.
+    checkForDeprecation(message, true);
+
     std::string err;
     if (!Validate(message, &err)) {
       throw ProtoValidationException(err, message);

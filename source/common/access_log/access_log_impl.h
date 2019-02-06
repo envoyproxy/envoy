@@ -109,7 +109,7 @@ public:
 };
 
 /**
- * Filter out HC requests.
+ * Filter out health check requests.
  */
 class NotHealthCheckFilter : public Filter {
 public:

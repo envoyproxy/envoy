@@ -164,12 +164,14 @@ public:
   virtual void setOutlierDetector(Outlier::DetectorHostMonitorPtr&& outlier_detector) PURE;
 
   /**
-   * @return the current load balancing weight of the host, in the range 1-100.
+   * @return the current load balancing weight of the host, in the range 1-128 (see
+   * envoy.api.v2.endpoint.Endpoint.load_balancing_weight).
    */
   virtual uint32_t weight() const PURE;
 
   /**
-   * Set the current load balancing weight of the host, in the range 1-100.
+   * Set the current load balancing weight of the host, in the range 1-128 (see
+   * envoy.api.v2.endpoint.Endpoint.load_balancing_weight).
    */
   virtual void weight(uint32_t new_weight) PURE;
 
@@ -311,7 +313,7 @@ public:
   /**
    * Updates the hosts in a given host set.
    *
-   * @param update_hosts_param supplies the list of hosts and hosts per localitiy.
+   * @param update_hosts_param supplies the list of hosts and hosts per locality.
    * @param locality_weights supplies a map from locality to associated weight.
    * @param hosts_added supplies the hosts added since the last update.
    * @param hosts_removed supplies the hosts removed since the last update.

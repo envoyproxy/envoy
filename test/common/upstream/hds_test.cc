@@ -15,10 +15,10 @@
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::AtLeast;
@@ -42,11 +42,12 @@ public:
   };
 };
 
-class HdsTest : public testing::Test {
-public:
+class HdsTest : public TestBase {
+protected:
   HdsTest()
       : retry_timer_(new Event::MockTimer()), server_response_timer_(new Event::MockTimer()),
-        async_client_(new Grpc::MockAsyncClient()) {
+        async_client_(new Grpc::MockAsyncClient()), api_(Api::createApiForTest(stats_store_)),
+        ssl_context_manager_(api_->timeSystem()) {
     node_.set_id("hds-node");
   }
 
@@ -66,7 +67,7 @@ public:
     hds_delegate_ = std::make_unique<HdsDelegate>(
         stats_store_, Grpc::AsyncClientPtr(async_client_), dispatcher_, runtime_, stats_store_,
         ssl_context_manager_, random_, test_factory_, log_manager_, cm_, local_info_, admin_,
-        singleton_manager_, tls_);
+        singleton_manager_, tls_, *api_);
   }
 
   // Creates a HealthCheckSpecifier message that contains one endpoint and one
@@ -96,6 +97,7 @@ public:
     return msg;
   }
 
+  Event::SimulatedTimeSystem time_system_;
   envoy::api::v2::core::Node node_;
   Event::MockDispatcher dispatcher_;
   Stats::IsolatedStoreImpl stats_store_;
@@ -115,8 +117,8 @@ public:
   Grpc::MockAsyncStream async_stream_;
   Grpc::MockAsyncClient* async_client_;
   Runtime::MockLoader runtime_;
-  Event::SimulatedTimeSystem time_system_;
-  Extensions::TransportSockets::Tls::ContextManagerImpl ssl_context_manager_{time_system_};
+  Api::ApiPtr api_;
+  Extensions::TransportSockets::Tls::ContextManagerImpl ssl_context_manager_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   NiceMock<Envoy::AccessLog::MockAccessLogManager> log_manager_;
   NiceMock<Upstream::MockClusterManager> cm_;

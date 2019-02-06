@@ -5,15 +5,13 @@
 #include "envoy/config/accesslog/v2/file.pb.h"
 #include "envoy/config/filter/network/tcp_proxy/v2/tcp_proxy.pb.validate.h"
 
-#include "common/filesystem/filesystem_impl.h"
 #include "common/network/utility.h"
 
 #include "extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "test/integration/ssl_utility.h"
 #include "test/integration/utility.h"
-
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using testing::_;
 using testing::Invoke;
@@ -260,7 +258,7 @@ TEST_P(TcpProxyIntegrationTest, AccessLog) {
   std::string log_result;
   // Access logs only get flushed to disk periodically, so poll until the log is non-empty
   do {
-    log_result = Filesystem::fileReadToEnd(access_log_path);
+    log_result = api_->fileSystem().fileReadToEnd(access_log_path);
   } while (log_result.empty());
 
   // Regex matching localhost:port
@@ -391,7 +389,7 @@ void TcpProxySslIntegrationTest::setupConnections() {
   // Set up the SSL client.
   Network::Address::InstanceConstSharedPtr address =
       Ssl::getSslAddress(version_, lookupPort("tcp_proxy"));
-  context_ = Ssl::createClientSslTransportSocketFactory({}, *context_manager_);
+  context_ = Ssl::createClientSslTransportSocketFactory({}, *context_manager_, *api_);
   ssl_client_ =
       dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
                                           context_->createTransportSocket(nullptr), nullptr);

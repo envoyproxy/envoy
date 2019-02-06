@@ -272,7 +272,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
         parent_.server_.admin(), parent_.server_.sslContextManager(), *listener_scope_,
         parent_.server_.clusterManager(), parent_.server_.localInfo(), parent_.server_.dispatcher(),
         parent_.server_.random(), parent_.server_.stats(), parent_.server_.singletonManager(),
-        parent_.server_.threadLocal());
+        parent_.server_.threadLocal(), parent_.server_.api());
     factory_context.setInitManager(initManager());
     addFilterChain(
         PROTOBUF_GET_WRAPPED_OR_DEFAULT(filter_chain_match, destination_port, 0), destination_ips,
@@ -665,9 +665,8 @@ void ListenerImpl::setSocket(const Network::SocketSharedPtr& socket) {
 
 ListenerManagerImpl::ListenerManagerImpl(Instance& server,
                                          ListenerComponentFactory& listener_factory,
-                                         WorkerFactory& worker_factory, TimeSource& time_source)
-    : server_(server), time_source_(time_source), factory_(listener_factory),
-      stats_(generateStats(server.stats())),
+                                         WorkerFactory& worker_factory)
+    : server_(server), factory_(listener_factory), stats_(generateStats(server.stats())),
       config_tracker_entry_(server.admin().getConfigTracker().add(
           "listeners", [this] { return dumpListenerConfigs(); })) {
   for (uint32_t i = 0; i < server.options().concurrency(); i++) {

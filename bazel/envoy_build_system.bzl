@@ -357,10 +357,15 @@ def envoy_cc_fuzz_test(name, corpus, deps = [], tags = [], **kwargs):
         }),
         tags = tags,
     )
+
+    # This target exists only for
+    # https://github.com/google/oss-fuzz/blob/master/projects/envoy/build.sh. It won't yield
+    # anything useful on its own, as it expects to be run in an environment where the linker options
+    # provide a path to FuzzingEngine.
     native.cc_binary(
         name = name + "_driverless",
         copts = envoy_copts("@envoy", test = True),
-        linkopts = envoy_test_linkopts(),
+        linkopts = ["-lFuzzingEngine"] + envoy_test_linkopts(),
         linkstatic = 1,
         testonly = 1,
         deps = [":" + test_lib_name],
@@ -432,6 +437,7 @@ def envoy_cc_test_library(
         deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] + [
             envoy_external_dep_path("googletest"),
             repository + "//test/test_common:printers_includes",
+            repository + "//test/test_common:test_base",
         ],
         tags = tags,
         alwayslink = 1,
@@ -590,4 +596,10 @@ def envoy_select_boringssl(if_fips, default = None):
     return select({
         "@envoy//bazel:boringssl_fips": if_fips,
         "//conditions:default": default or [],
+    })
+
+def envoy_select_quiche(xs, repository = ""):
+    return select({
+        repository + "//bazel:enable_quiche": xs,
+        "//conditions:default": [],
     })

@@ -19,23 +19,22 @@
 #include "common/network/connection_impl.h"
 #include "common/network/dns_impl.h"
 #include "common/network/listener_impl.h"
+#include "common/network/udp_listener_impl.h"
 
 #include "event2/event.h"
 
 namespace Envoy {
 namespace Event {
 
-DispatcherImpl::DispatcherImpl(TimeSystem& time_system, Api::Api& api)
-    : DispatcherImpl(time_system, Buffer::WatermarkFactoryPtr{new Buffer::WatermarkBufferFactory},
-                     api) {
+DispatcherImpl::DispatcherImpl(Api::Api& api)
+    : DispatcherImpl(Buffer::WatermarkFactoryPtr{new Buffer::WatermarkBufferFactory}, api) {
   // The dispatcher won't work as expected if libevent hasn't been configured to use threads.
   RELEASE_ASSERT(Libevent::Global::initialized(), "");
 }
 
-DispatcherImpl::DispatcherImpl(TimeSystem& time_system, Buffer::WatermarkFactoryPtr&& factory,
-                               Api::Api& api)
-    : api_(api), time_system_(time_system), buffer_factory_(std::move(factory)),
-      base_(event_base_new()), scheduler_(time_system_.createScheduler(base_)),
+DispatcherImpl::DispatcherImpl(Buffer::WatermarkFactoryPtr&& factory, Api::Api& api)
+    : api_(api), buffer_factory_(std::move(factory)), base_(event_base_new()),
+      scheduler_(api.timeSystem().createScheduler(base_)),
       deferred_delete_timer_(createTimer([this]() -> void { clearDeferredDeleteList(); })),
       post_timer_(createTimer([this]() -> void { runPostCallbacks(); })),
       current_to_delete_(&to_delete_1_) {
@@ -117,6 +116,12 @@ DispatcherImpl::createListener(Network::Socket& socket, Network::ListenerCallbac
   ASSERT(isThreadSafe());
   return Network::ListenerPtr{new Network::ListenerImpl(*this, socket, cb, bind_to_port,
                                                         hand_off_restored_destination_connections)};
+}
+
+Network::ListenerPtr DispatcherImpl::createUdpListener(Network::Socket& socket,
+                                                       Network::UdpListenerCallbacks& cb) {
+  ASSERT(isThreadSafe());
+  return Network::ListenerPtr{new Network::UdpListenerImpl(*this, socket, cb)};
 }
 
 TimerPtr DispatcherImpl::createTimer(TimerCb cb) {

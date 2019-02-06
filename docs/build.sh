@@ -77,6 +77,7 @@ PROTO_RST="
   /envoy/config/accesslog/v2/als/envoy/config/accesslog/v2/als.proto.rst
   /envoy/config/accesslog/v2/file/envoy/config/accesslog/v2/file.proto.rst
   /envoy/config/bootstrap/v2/bootstrap/envoy/config/bootstrap/v2/bootstrap.proto.rst
+  /envoy/config/common/tap/v2alpha/common/envoy/config/common/tap/v2alpha/common.proto.rst
   /envoy/config/ratelimit/v2/rls/envoy/config/ratelimit/v2/rls.proto.rst
   /envoy/config/metrics/v2/metrics_service/envoy/config/metrics/v2/metrics_service.proto.rst
   /envoy/config/metrics/v2/stats/envoy/config/metrics/v2/stats.proto.rst
@@ -122,6 +123,7 @@ PROTO_RST="
   /envoy/data/tap/v2alpha/transport/envoy/data/tap/v2alpha/transport.proto.rst
   /envoy/data/tap/v2alpha/http/envoy/data/tap/v2alpha/http.proto.rst
   /envoy/data/tap/v2alpha/wrapper/envoy/data/tap/v2alpha/wrapper.proto.rst
+  /envoy/data/cluster/v2alpha/outlier_detection_event/envoy/data/cluster/v2alpha/outlier_detection_event.proto.rst
   /envoy/service/accesslog/v2/als/envoy/service/accesslog/v2/als.proto.rst
   /envoy/service/auth/v2/external_auth/envoy/service/auth/v2/attribute_context.proto.rst
   /envoy/service/auth/v2/external_auth/envoy/service/auth/v2/external_auth.proto.rst

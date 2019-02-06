@@ -33,6 +33,7 @@ template <typename T> struct SysCallResult {
 typedef SysCallResult<int> SysCallIntResult;
 typedef SysCallResult<ssize_t> SysCallSizeResult;
 typedef SysCallResult<void*> SysCallPtrResult;
+typedef SysCallResult<std::string> SysCallStringResult;
 
 class OsSysCalls {
 public:

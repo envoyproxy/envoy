@@ -56,6 +56,7 @@ protected:
   static const std::string LAST_CHUNK;
 
   ConnectionImpl& connection_;
+  void setIsContentLengthAllowed(bool value) { is_content_length_allowed_ = value; }
 
 private:
   /**
@@ -75,6 +76,7 @@ private:
   bool chunk_encoding_{true};
   bool processing_100_continue_{false};
   bool is_response_to_head_request_{false};
+  bool is_content_length_allowed_{true};
 };
 
 /**
@@ -198,7 +200,7 @@ private:
   /**
    * Called when URL data is received.
    * @param data supplies the start address.
-   * @param lenth supplies the length.
+   * @param length supplies the length.
    */
   virtual void onUrl(const char* data, size_t length) PURE;
 
@@ -217,7 +219,7 @@ private:
   void onHeaderValue(const char* data, size_t length);
 
   /**
-   * Called when headers are complete. A base routine happens first then a virtual disaptch is
+   * Called when headers are complete. A base routine happens first then a virtual dispatch is
    * invoked.
    * @return 0 if no error, 1 if there should be no body.
    */

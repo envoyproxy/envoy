@@ -17,9 +17,9 @@
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::AnyNumber;
@@ -70,10 +70,10 @@ public:
   MockProtocol* protocol_{};
 };
 
-class ThriftConnectionManagerTest : public testing::Test {
+class ThriftConnectionManagerTest : public TestBase {
 public:
   ThriftConnectionManagerTest() : stats_(ThriftFilterStats::generateStats("test.", store_)) {}
-  ~ThriftConnectionManagerTest() {
+  ~ThriftConnectionManagerTest() override {
     filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
   }
 
