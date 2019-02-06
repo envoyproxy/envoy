@@ -114,11 +114,11 @@ namespace {
 class QuicLogThresholdSaver {
 public:
   QuicLogThresholdSaver()
-      : level_(QUIC_LOGGER().level()), verbosity_threshold_(quic::GetVerbosityLogThreshold()) {}
+      : level_(quic::GetLogger().level()), verbosity_threshold_(quic::GetVerbosityLogThreshold()) {}
 
   ~QuicLogThresholdSaver() {
     quic::SetVerbosityLogThreshold(verbosity_threshold_);
-    QUIC_LOGGER().set_level(level_);
+    quic::GetLogger().set_level(level_);
   }
 
 private:
@@ -131,7 +131,7 @@ TEST(QuicPlatformTest, QuicLog) {
   QuicLogThresholdSaver saver;
 
   // By default, tests emit logs at level ERROR or higher.
-  ASSERT_EQ(quic::ERROR, QUIC_LOGGER().level());
+  ASSERT_EQ(quic::ERROR, quic::GetLogger().level());
 
   int i = 0;
 
@@ -150,7 +150,7 @@ TEST(QuicPlatformTest, QuicLog) {
   EXPECT_EQ(12, i);
 
   // Set QUIC log level to INFO, since VLOG is emitted at the INFO level.
-  QUIC_LOGGER().set_level(quic::INFO);
+  quic::GetLogger().set_level(quic::INFO);
 
   ASSERT_EQ(0, quic::GetVerbosityLogThreshold());
 
@@ -178,14 +178,14 @@ TEST(QuicPlatformTest, QuicDLog) {
 
   int i = 0;
 
-  QUIC_LOGGER().set_level(quic::ERROR);
+  quic::GetLogger().set_level(quic::ERROR);
 
   QUIC_DLOG(INFO) << (i = 10);
   QUIC_DLOG_IF(INFO, false) << i++;
   QUIC_DLOG_IF(INFO, true) << i++;
   EXPECT_EQ(0, i);
 
-  QUIC_LOGGER().set_level(quic::INFO);
+  quic::GetLogger().set_level(quic::INFO);
 
   QUIC_DLOG(INFO) << (i = 10);
   QUIC_DLOG_IF(INFO, false) << i++;
@@ -213,8 +213,27 @@ TEST(QuicPlatformTest, QuicDLog) {
 
 #undef VALUE_BY_COMPILE_MODE
 
+// Test the behaviors of the cross products of
+//
+//   {QUIC_LOG, QUIC_DLOG} x {FATAL, DFATAL} x {debug, release}
+TEST(QuicPlatformTest, QuicFatalLog) {
+#ifdef NDEBUG
+  // Release build
+  EXPECT_DEATH(QUIC_LOG(FATAL) << "Should abort 0", "Should abort 0");
+  QUIC_LOG(DFATAL) << "Should not abort";
+  QUIC_DLOG(FATAL) << "Should compile out";
+  QUIC_DLOG(DFATAL) << "Should compile out";
+#else
+  // Debug build
+  EXPECT_DEATH(QUIC_LOG(FATAL) << "Should abort 1", "Should abort 1");
+  EXPECT_DEATH(QUIC_LOG(DFATAL) << "Should abort 2", "Should abort 2");
+  EXPECT_DEATH(QUIC_DLOG(FATAL) << "Should abort 3", "Should abort 3");
+  EXPECT_DEATH(QUIC_DLOG(DFATAL) << "Should abort 4", "Should abort 4");
+#endif
+}
+
 TEST(QuicPlatformTest, QuicBranchPrediction) {
-  QUIC_LOGGER().set_level(quic::INFO);
+  quic::GetLogger().set_level(quic::INFO);
 
   if (QUIC_PREDICT_FALSE(rand() % RAND_MAX == 123456789)) {
     QUIC_LOG(INFO) << "Go buy some lottery tickets.";

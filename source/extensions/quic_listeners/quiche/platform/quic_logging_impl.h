@@ -16,14 +16,17 @@
 
 #include "absl/base/optimization.h"
 
+// TODO(wub): Add CHECK/DCHECK and variants, which are not explicitly exposed by quic_logging.h.
+
+// If |condition| is true, use |logstream| to stream the log message and send it to spdlog.
+// If |condition| is false, |logstream| will not be instantiated.
+// The switch(0) is used to supress a compiler warning on ambiguous "else".
 #define QUIC_LOG_IMPL_INTERNAL(condition, logstream)                                               \
   switch (0)                                                                                       \
   default:                                                                                         \
     if (!(condition)) {                                                                            \
     } else                                                                                         \
       logstream
-
-#define QUIC_LOGGER() Envoy::Logger::Registry::getLog(Envoy::Logger::Id::misc)
 
 #define QUIC_LOG_IF_IMPL(severity, condition)                                                      \
   QUIC_LOG_IMPL_INTERNAL((condition) && quic::IsLogLevelEnabled(quic::severity),                   \
@@ -81,6 +84,13 @@ static const QuicLogLevel WARNING = spdlog::level::warn;
 static const QuicLogLevel ERROR = spdlog::level::err;
 static const QuicLogLevel FATAL = spdlog::level::critical;
 
+// DFATAL is FATAL in debug mode, ERROR in release mode.
+#ifdef NDEBUG
+static const QuicLogLevel DFATAL = ERROR;
+#else
+static const QuicLogLevel DFATAL = FATAL;
+#endif
+
 class QuicLogEmitter {
 public:
   explicit QuicLogEmitter(QuicLogLevel level);
@@ -108,7 +118,11 @@ public:
 
 template <typename T> inline NullLogStream& operator<<(NullLogStream& s, const T&) { return s; }
 
-inline bool IsLogLevelEnabled(QuicLogLevel level) { return level >= QUIC_LOGGER().level(); }
+inline spdlog::logger& GetLogger() {
+  return Envoy::Logger::Registry::getLog(Envoy::Logger::Id::misc);
+}
+
+inline bool IsLogLevelEnabled(QuicLogLevel level) { return level >= GetLogger().level(); }
 
 int GetVerbosityLogThreshold();
 void SetVerbosityLogThreshold(int new_verbosity);
