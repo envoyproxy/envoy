@@ -12,7 +12,9 @@ namespace Event {
 
 TestTimeSystem& GlobalTimeSystem::timeSystem() {
   // TODO(#4160): Switch default to SimulatedTimeSystem.
-  auto make_real_time_system = []() -> TestTimeSystem* { return new TestRealTimeSystem; };
+  auto make_real_time_system = []() -> std::unique_ptr<TestTimeSystem> {
+    return std::make_unique<TestRealTimeSystem>();
+  };
   return *singleton_->timeSystem(make_real_time_system);
 }
 

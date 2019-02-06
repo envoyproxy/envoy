@@ -10,8 +10,7 @@ namespace Event {
 TestTimeSystem* SingletonTimeSystemHelper::timeSystem(const MakeTimeSystemFn& make_time_system) {
   Thread::LockGuard lock(mutex_);
   if (time_system_.get() == nullptr) {
-    TestTimeSystem* test_time_system = make_time_system();
-    time_system_.reset(test_time_system);
+    time_system_ = make_time_system();
   }
   return time_system_.get();
 }

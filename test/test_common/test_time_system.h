@@ -61,7 +61,7 @@ class SingletonTimeSystemHelper {
 public:
   SingletonTimeSystemHelper() : time_system_(nullptr) {}
 
-  using MakeTimeSystemFn = std::function<TestTimeSystem*()>;
+  using MakeTimeSystemFn = std::function<std::unique_ptr<TestTimeSystem>()>;
 
   /**
    * Returns a singleton time-system, creating a default one of there's not
@@ -111,7 +111,9 @@ template <class TimeSystemVariant>
 class DelegatingTestTimeSystem : public DelegatingTestTimeSystemBase<TimeSystemVariant> {
 public:
   DelegatingTestTimeSystem() {
-    auto make_time_system = []() -> TestTimeSystem* { return new TimeSystemVariant; };
+    auto make_time_system = []() -> std::unique_ptr<TestTimeSystem> {
+      return std::make_unique<TimeSystemVariant>();
+    };
     time_system_ = dynamic_cast<TimeSystemVariant*>(singleton_->timeSystem(make_time_system));
     RELEASE_ASSERT(time_system_, "Two different types of time-systems allocated");
   }
