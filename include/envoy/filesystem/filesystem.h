@@ -59,7 +59,7 @@ public:
   virtual std::string errorToString(int error) PURE;
 };
 
-typedef std::unique_ptr<RawFile> RawFilePtr;
+using RawFilePtr = std::unique_ptr<RawFile>;
 
 class RawInstance {
 public:
@@ -136,7 +136,7 @@ public:
   virtual void flush() PURE;
 };
 
-typedef std::shared_ptr<File> FileSharedPtr;
+using FileSharedPtr = std::shared_ptr<File>;
 
 /**
  * Captures state, properties, and stats of a file-system.
@@ -167,8 +167,6 @@ public:
   virtual FileSharedPtr createFile(const std::string& path, Event::Dispatcher& dispatcher,
                                    Thread::BasicLockable& lock) PURE;
 };
-
-typedef std::unique_ptr<Watcher> WatcherPtr;
 
 enum class FileType { Regular, Directory, Other };
 
