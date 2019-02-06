@@ -1,3 +1,5 @@
+#include <http_parser.h>
+
 #include <memory>
 #include <string>
 
@@ -31,6 +33,7 @@ namespace Http1 {
 class Http1ServerConnectionImplTest : public TestBase {
 public:
   void initialize() {
+    http_parser_set_max_header_size(max_request_headers_kb_ * 1024);
     codec_ = std::make_unique<ServerConnectionImpl>(connection_, callbacks_, codec_settings_);
   }
 
@@ -42,6 +45,9 @@ public:
   void expectHeadersTest(Protocol p, bool allow_absolute_url, Buffer::OwnedImpl& buffer,
                          TestHeaderMapImpl& expected_headers);
   void expect400(Protocol p, bool allow_absolute_url, Buffer::OwnedImpl& buffer);
+
+protected:
+  uint32_t max_request_headers_kb_{Http::DEFAULT_MAX_REQUEST_HEADERS_KB};
 };
 
 void Http1ServerConnectionImplTest::expect400(Protocol p, bool allow_absolute_url,
