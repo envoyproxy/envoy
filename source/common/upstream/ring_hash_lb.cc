@@ -110,11 +110,11 @@ RingHashLoadBalancer::Ring::Ring(
     for (const auto& host : hosts_per_locality.get()[i]) {
       auto host_weight = host->weight();
       ASSERT(host_weight != 0);
+      // NOTE: Locality weight may be zero. In this case, all hosts in the locality are assigned
+      //       no load. When we build the ring below, such hosts will have no entries in the ring.
       // TODO: When we move to C++17, change this to `locality_weights[i]` (i.e. use
       //       std::shared_ptr::operator[]) rather than dereferencing locality_weights explicitly.
       auto locality_weight = locality_weights == nullptr ? 1 : (*locality_weights)[i];
-      ASSERT(locality_weight != 0);
-
       auto effective_weight = host_weight * locality_weight;
       weighted_sum += effective_weight;
       gcd = Envoy::gcd(gcd, effective_weight);
