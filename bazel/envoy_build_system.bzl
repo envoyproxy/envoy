@@ -1,5 +1,6 @@
 load("@com_google_protobuf//:protobuf.bzl", "cc_proto_library", "py_proto_library")
 load("@envoy_api//bazel:api_build_system.bzl", "api_proto_library")
+load("@rules_foreign_cc//tools/build_defs:cmake.bzl", "cmake_external")
 
 def envoy_package():
     native.package(default_visibility = ["//visibility:public"])
@@ -194,6 +195,40 @@ def envoy_include_prefix(path):
     if path.startswith("source/") or path.startswith("include/"):
         return "/".join(path.split("/")[1:])
     return None
+
+# External CMake C++ library targets should be specified with this function. This defaults
+# to building the dependencies with ninja
+def envoy_cmake_external(
+        name,
+        cache_entries = {},
+        cmake_options = ["-GNinja"],
+        make_commands = ["ninja", "ninja install"],
+        lib_source = "",
+        postfix_script = "",
+        static_libraries = []):
+    # On Windows, we don't want to explicilty set CMAKE_BUILD_TYPE,
+    # rules_foreign_cc will figure it out for us
+    cache_entries_no_build_type = {}
+    for key in cache_entries.keys():
+        if key != "CMAKE_BUILD_TYPE":
+            cache_entries_no_build_type[key] = cache_entries[key]
+
+    cmake_external(
+        name = name,
+        cache_entries = select({
+            "@envoy//bazel:windows_x86_64": cache_entries_no_build_type,
+            "//conditions:default": cache_entries,
+        }),
+        cmake_options = cmake_options,
+        generate_crosstool_file = select({
+            "@envoy//bazel:windows_x86_64": True,
+            "//conditions:default": False,
+        }),
+        lib_source = lib_source,
+        make_commands = make_commands,
+        postfix_script = postfix_script,
+        static_libraries = static_libraries,
+    )
 
 # Envoy C++ library targets that need no transformations or additional dependencies before being
 # passed to cc_library should be specified with this function. Note: this exists to ensure that
