@@ -26,7 +26,7 @@ MaglevTable::MaglevTable(const HostsPerLocality& hosts_per_locality,
       return host_weight;
     } else {
       auto locality_weight = (*locality_weights)[locality_index];
-      ASSERT(locality_weight != 0);
+      // This might be zero, since locality weight might not be specified.
       return host_weight * locality_weight;
     }
   };
@@ -52,10 +52,20 @@ MaglevTable::MaglevTable(const HostsPerLocality& hosts_per_locality,
   for (uint32_t i = 0; i < hosts_per_locality.get().size(); ++i) {
     for (const auto& host : hosts_per_locality.get()[i]) {
       const std::string& address = host->address()->asString();
-      table_build_entries.emplace_back(host, HashUtil::xxHash64(address) % table_size_,
-                                       (HashUtil::xxHash64(address, 1) % (table_size_ - 1)) + 1,
-                                       effective_weight(host->weight(), i));
+      const uint32_t weight = effective_weight(host->weight(), i);
+      // If weight is zero, it should be totally excluded from table building
+      // below.
+      if (weight > 0) {
+        table_build_entries.emplace_back(host, HashUtil::xxHash64(address) % table_size_,
+                                         (HashUtil::xxHash64(address, 1) % (table_size_ - 1)) + 1,
+                                         weight);
+      }
     }
+  }
+
+  // We can't do anything sensible with no table entries.
+  if (table_build_entries.empty()) {
+    return;
   }
 
   table_.resize(table_size_);
