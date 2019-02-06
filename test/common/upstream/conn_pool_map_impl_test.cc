@@ -15,6 +15,7 @@
 #include "gtest/gtest.h"
 
 using testing::Invoke;
+using testing::InvokeArgument;
 using testing::NiceMock;
 using testing::SaveArg;
 
@@ -30,6 +31,10 @@ public:
 
   TestMapPtr makeTestMap() { return std::make_unique<TestMap>(dispatcher_, absl::nullopt); }
 
+  TestMapPtr makeTestMapWithLimit(uint64_t limit) {
+    return std::make_unique<TestMap>(dispatcher_, absl::make_optional(limit));
+  }
+
   TestMap::PoolFactory getBasicFactory() {
     return [&]() {
       auto pool = std::make_unique<NiceMock<Http::ConnectionPool::MockInstance>>();
@@ -38,10 +43,35 @@ public:
     };
   }
 
+  TestMap::PoolFactory getNeverCalledFactory() {
+    return []() {
+      EXPECT_TRUE(false);
+      return nullptr;
+    };
+  }
+
   TestMap::PoolFactory getFactoryExpectDrainedCb(Http::ConnectionPool::Instance::DrainedCb* cb) {
     return [this, cb]() {
       auto pool = std::make_unique<NiceMock<Http::ConnectionPool::MockInstance>>();
       EXPECT_CALL(*pool, addDrainedCallback(_)).WillOnce(SaveArg<0>(cb));
+      mock_pools_.push_back(pool.get());
+      return pool;
+    };
+  }
+
+  TestMap::PoolFactory getFactoryImmediateInvokeCb() {
+    return [this]() {
+      auto pool = std::make_unique<NiceMock<Http::ConnectionPool::MockInstance>>();
+      EXPECT_CALL(*pool, addDrainedCallback(_)).WillOnce(InvokeArgument<0>());
+      mock_pools_.push_back(pool.get());
+      return pool;
+    };
+  }
+
+  TestMap::PoolFactory getFactoryNoDrainedCb() {
+    return [&]() {
+      auto pool = std::make_unique<NiceMock<Http::ConnectionPool::MockInstance>>();
+      EXPECT_CALL(*pool, addDrainedCallback(_)).Times(0);
       mock_pools_.push_back(pool.get());
       return pool;
     };
@@ -173,12 +203,172 @@ TEST_F(ConnPoolMapImplTest, DrainConnectionsForwarded) {
 TEST_F(ConnPoolMapImplTest, ClearDefersDelete) {
   TestMapPtr test_map = makeTestMap();
 
+  Http::ConnectionPool::Instance::DrainedCb cb1;
   test_map->getPool(1, getBasicFactory());
   test_map->getPool(2, getBasicFactory());
   test_map->clear();
 
   EXPECT_EQ(dispatcher_.to_delete_.size(), 2);
 }
+
+TEST_F(ConnPoolMapImplTest, GetPoolHittingLimitFails) {
+  TestMapPtr test_map = makeTestMapWithLimit(1);
+
+  Http::ConnectionPool::Instance::DrainedCb cb1;
+  test_map->getPool(1, getFactoryExpectDrainedCb(&cb1));
+  auto opt_pool = test_map->getPool(2, getNeverCalledFactory());
+
+  EXPECT_FALSE(opt_pool.has_value());
+  EXPECT_EQ(test_map->size(), 1);
+}
+
+TEST_F(ConnPoolMapImplTest, GetPoolHittingLimitGreaterThan1Fails) {
+  TestMapPtr test_map = makeTestMapWithLimit(2);
+
+  Http::ConnectionPool::Instance::DrainedCb cb1;
+  test_map->getPool(1, getFactoryExpectDrainedCb(&cb1));
+  Http::ConnectionPool::Instance::DrainedCb cb2;
+  test_map->getPool(2, getFactoryExpectDrainedCb(&cb2));
+  auto opt_pool = test_map->getPool(3, getNeverCalledFactory());
+
+  EXPECT_FALSE(opt_pool.has_value());
+  EXPECT_EQ(test_map->size(), 2);
+}
+
+TEST_F(ConnPoolMapImplTest, GetPoolLimitHitThenDrainedNextCallSucceeds) {
+  TestMapPtr test_map = makeTestMapWithLimit(1);
+
+  Http::ConnectionPool::Instance::DrainedCb cb1;
+  test_map->getPool(1, getFactoryExpectDrainedCb(&cb1));
+  test_map->getPool(2, getNeverCalledFactory());
+  cb1();
+
+  auto opt_pool = test_map->getPool(2, getBasicFactory());
+
+  EXPECT_TRUE(opt_pool.has_value());
+  EXPECT_EQ(test_map->size(), 1);
+}
+
+// Test that only the pools whose drained callback have been invoked are actually drained.
+TEST_F(ConnPoolMapImplTest, GetPoolDrainedCbOnlyClearsInvoker) {
+  TestMapPtr test_map = makeTestMapWithLimit(2);
+
+  Http::ConnectionPool::Instance::DrainedCb cb1;
+  Http::ConnectionPool::Instance::DrainedCb cb2;
+  test_map->getPool(1, getFactoryExpectDrainedCb(&cb1));
+  auto opt_pool = test_map->getPool(2, getFactoryExpectDrainedCb(&cb2));
+  test_map->getPool(3, []() {
+    EXPECT_TRUE(false);
+    return nullptr;
+  });
+  cb1(); // clear out 1.
+
+  // get 2 again. It should succeed, but not invoke the factory.
+  auto opt_pool2 = test_map->getPool(2, getNeverCalledFactory());
+
+  EXPECT_TRUE(opt_pool.has_value());
+  EXPECT_EQ(&(opt_pool.value().get()), &(opt_pool2.value().get()));
+  EXPECT_EQ(test_map->size(), 1);
+}
+
+// Test that if a pool's callback is invoked immediately, we get a new pool.
+TEST_F(ConnPoolMapImplTest, GetPoolLimitHitCbInvoked) {
+  TestMapPtr test_map = makeTestMapWithLimit(1);
+
+  test_map->getPool(1, getFactoryImmediateInvokeCb());
+  auto opt_pool = test_map->getPool(2, getBasicFactory());
+
+  ASSERT_TRUE(opt_pool.has_value());
+
+  // make sure we return the pool that was created
+  EXPECT_EQ(&(opt_pool.value().get()), mock_pools_[1]);
+  EXPECT_EQ(test_map->size(), 1);
+}
+
+TEST_F(ConnPoolMapImplTest, GetPoolLimitHitCbInvokedManyCleared) {
+  TestMapPtr test_map = makeTestMapWithLimit(3);
+
+  test_map->getPool(1, getFactoryImmediateInvokeCb());
+  test_map->getPool(2, getFactoryImmediateInvokeCb());
+  test_map->getPool(3, getFactoryImmediateInvokeCb());
+  auto opt_pool = test_map->getPool(4, getBasicFactory());
+
+  ASSERT_TRUE(opt_pool.has_value());
+  EXPECT_EQ(test_map->size(), 1);
+}
+
+// show that we don't clear out un-drained pools if some drain immediately
+TEST_F(ConnPoolMapImplTest, GetPoolLimitHitCbInvokedSomeCleared) {
+  TestMapPtr test_map = makeTestMapWithLimit(3);
+
+  test_map->getPool(1, getFactoryImmediateInvokeCb());
+  Http::ConnectionPool::Instance::DrainedCb cb;
+  test_map->getPool(2, getFactoryExpectDrainedCb(&cb));
+  test_map->getPool(3, getFactoryImmediateInvokeCb());
+  auto opt_pool = test_map->getPool(4, getBasicFactory());
+  auto opt_pool2 = test_map->getPool(2, getNeverCalledFactory());
+
+  ASSERT_TRUE(opt_pool.has_value());
+  ASSERT_TRUE(opt_pool2.has_value());
+  EXPECT_EQ(&(opt_pool2.value().get()), mock_pools_[1]);
+  EXPECT_EQ(test_map->size(), 2);
+}
+
+// show that we later drain a pool, it is cleared out.
+TEST_F(ConnPoolMapImplTest, GetPoolSomeImmediateOneLaterDrain) {
+  TestMapPtr test_map = makeTestMapWithLimit(3);
+
+  test_map->getPool(1, getFactoryImmediateInvokeCb());
+  Http::ConnectionPool::Instance::DrainedCb cb;
+  test_map->getPool(2, getFactoryExpectDrainedCb(&cb));
+  test_map->getPool(3, getFactoryImmediateInvokeCb());
+  auto opt_pool = test_map->getPool(4, getBasicFactory());
+
+  cb();
+
+  // The above callback should't have touched this pool.
+  auto opt_pool2 = test_map->getPool(4, getNeverCalledFactory());
+  EXPECT_EQ(&(opt_pool.value().get()), &(opt_pool2.value().get()));
+  EXPECT_EQ(test_map->size(), 1);
+}
+
+// show that we do not add the drained callback if we haven't hit the limit
+TEST_F(ConnPoolMapImplTest, GetPoolUnderLimitNeverAddsCallback) {
+  TestMapPtr test_map = makeTestMapWithLimit(3);
+
+  test_map->getPool(1, getFactoryNoDrainedCb());
+  test_map->getPool(2, getFactoryNoDrainedCb());
+  test_map->getPool(3, getFactoryNoDrainedCb());
+
+  EXPECT_EQ(test_map->size(), 3);
+}
+
+// show that If we hit the limit once, then again with the same keys, we don't clean out the
+// previously cleaned entries. Essentially, ensure we clean up any state related to being full.
+TEST_F(ConnPoolMapImplTest, GetPoolFailStateIsCleared) {
+  TestMapPtr test_map = makeTestMapWithLimit(2);
+
+  Http::ConnectionPool::Instance::DrainedCb cb1;
+  test_map->getPool(1, getFactoryImmediateInvokeCb());
+  test_map->getPool(2, getFactoryExpectDrainedCb(&cb1));
+  Http::ConnectionPool::Instance::DrainedCb cb2;
+  test_map->getPool(3, getFactoryExpectDrainedCb(&cb2));
+
+  cb1();
+
+  // at this point, 1 should be cleared out. Let's get it again, then trigger a full condition.
+  Http::ConnectionPool::Instance::DrainedCb cb3;
+  auto opt_pool = test_map->getPool(1, getFactoryExpectDrainedCb(&cb3));
+  EXPECT_TRUE(opt_pool.has_value());
+
+  // we're full. Because pool 1  and 2 aren't doing an immediate cb, the next call should fail.
+  auto opt_pool_failed = test_map->getPool(4, getNeverCalledFactory());
+  EXPECT_FALSE(opt_pool_failed.has_value());
+
+  EXPECT_EQ(test_map->size(), 2);
+}
+// TODO: Add test for:
+// - show that if limit isn't hit, no callback is registered
 
 // The following tests only die in debug builds, so don't run them if this isn't one.
 #if !defined(NDEBUG)
