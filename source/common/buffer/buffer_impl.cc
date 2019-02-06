@@ -64,20 +64,11 @@ void OwnedImpl::add(absl::string_view data) {
 }
 
 void OwnedImpl::add(const Instance& data) {
-  if (old_impl_) {
-    uint64_t num_slices = data.getRawSlices(nullptr, 0);
-    STACK_ARRAY(slices, RawSlice, num_slices);
-    data.getRawSlices(slices.begin(), num_slices);
-    for (const RawSlice& slice : slices) {
-      add(slice.mem_, slice.len_);
-    }
-  } else {
-    uint64_t num_slices = data.getRawSlices(nullptr, 0);
-    STACK_ARRAY(slices, RawSlice, num_slices);
-    data.getRawSlices(slices.begin(), num_slices);
-    for (const RawSlice& slice : slices) {
-      add(slice.mem_, slice.len_);
-    }
+  uint64_t num_slices = data.getRawSlices(nullptr, 0);
+  STACK_ARRAY(slices, RawSlice, num_slices);
+  data.getRawSlices(slices.begin(), num_slices);
+  for (const RawSlice& slice : slices) {
+    add(slice.mem_, slice.len_);
   }
 }
 
@@ -100,6 +91,7 @@ void OwnedImpl::prepend(absl::string_view data) {
 }
 
 void OwnedImpl::prepend(Instance& data) {
+  // See the comments in move() for why we do the static_cast.
   if (old_impl_) {
     int rc =
         evbuffer_prepend_buffer(buffer_.get(), static_cast<LibEventInstance&>(data).buffer().get());
