@@ -63,6 +63,11 @@ MaglevTable::MaglevTable(const HostsPerLocality& hosts_per_locality,
     }
   }
 
+  // We can't do anything sensible with no table entries.
+  if (table_build_entries.empty()) {
+    return;
+  }
+
   table_.resize(table_size_);
   uint64_t table_index = 0;
   uint32_t iteration = 1;
