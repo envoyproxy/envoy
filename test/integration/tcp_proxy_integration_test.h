@@ -9,8 +9,8 @@
 
 namespace Envoy {
 namespace {
-class TcpProxyIntegrationTest : public BaseIntegrationTest,
-                                public TestBaseWithParam<Network::Address::IpVersion> {
+class TcpProxyIntegrationTest : public TestBaseWithParam<Network::Address::IpVersion>,
+                                public BaseIntegrationTest {
 public:
   TcpProxyIntegrationTest()
       : BaseIntegrationTest(GetParam(), realTime(), ConfigHelper::TCP_PROXY_CONFIG) {
