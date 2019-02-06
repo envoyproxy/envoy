@@ -19,7 +19,7 @@ enum class BufferImplementation {
 /**
  * Base class for tests that are parameterized based on BufferImplementation.
  */
-class BufferImplementationParamTest : public testing::TestWithParam<BufferImplementation> {
+class BufferImplementationParamTest : public TestBaseWithParam<BufferImplementation> {
 protected:
   BufferImplementationParamTest() {
     OwnedImpl::useOldImplForTest(GetParam() == BufferImplementation::Old);

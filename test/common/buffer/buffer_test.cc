@@ -29,7 +29,7 @@ private:
   const std::function<void()> deletion_callback_;
 };
 
-class OwnedSliceTest : public testing::Test {
+class OwnedSliceTest : public TestBase {
 protected:
   static void expectReservationSuccess(const Slice::Reservation& reservation, const Slice& slice,
                                        uint64_t reservation_size) {
