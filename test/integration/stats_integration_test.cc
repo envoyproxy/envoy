@@ -147,6 +147,19 @@ TEST_P(StatsIntegrationTest, WithTagSpecifierWithFixedValue) {
   EXPECT_EQ(live->tags()[0].name_, "test.x");
   EXPECT_EQ(live->tags()[0].value_, "xxx");
 }
+// TODO(cmluciano) Refactor once envoyproxy/envoy#5624 is solved
+// TODO(cmluciano) Add options to measure multiple workers
+TEST_P(StatsIntegrationTest, MemoryOneClusterSizeWithStats) {
+  const size_t start_mem = Memory::Stats::totalCurrentlyAllocated() / 1000;
+  if (start_mem == 0) {
+    // Skip this test for platforms where we can't measure memory.
+    return;
+  }
+
+  uint64_t m1 = memoryConsumedWithClusters(1, true);
+  EXPECT_LT(start_mem, m1);
+  EXPECT_LT(m1 / 1000, 3450); // actual value: 3412 as of Feb 6, 2019
+}
 
 TEST_P(StatsIntegrationTest, MemoryLargeClusterSizeWithStats) {
   const size_t start_mem = Memory::Stats::totalCurrentlyAllocated() / 1000;
@@ -155,27 +168,9 @@ TEST_P(StatsIntegrationTest, MemoryLargeClusterSizeWithStats) {
     return;
   }
 
-  uint64_t m1 = memoryConsumedWithClusters(1, true);
-  uint64_t m1001 = memoryConsumedWithClusters(2, false);
-  uint64_t m_per_cluster = (m1001 - m1) / 1000;
-
-  EXPECT_LT(start_mem, m_per_cluster);
-  EXPECT_LT(m1001 / 1000, 57000); // actual value: 56635 as of Jan 7, 2019
-}
-
-TEST_P(StatsIntegrationTest, MemoryLargeClusterSizeNoStats) {
-  const size_t start_mem = Memory::Stats::totalCurrentlyAllocated() / 1000;
-  if (start_mem == 0) {
-    // Skip this test for platforms where we can't measure memory.
-    return;
-  }
-
-  uint64_t m1 = memoryConsumedWithClusters(1, false);
-  uint64_t m1001 = memoryConsumedWithClusters(1001, false);
-  uint64_t m_per_cluster = (m1001 - m1) / 1000;
-
-  EXPECT_LT(start_mem, m_per_cluster);
-  EXPECT_LT(m_per_cluster / 1000, 57000); // actual value: 56635 as of Jan 7, 2019
+  uint64_t m1001 = memoryConsumedWithClusters(1001, true);
+  EXPECT_LT(start_mem, m1001);
+  EXPECT_LT(m1001 - 3412880 / 1000, 60000000); // actual value: 59,479,348 as of Feb 6, 2019
 }
 
 } // namespace
