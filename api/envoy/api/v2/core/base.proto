@@ -241,10 +241,10 @@ message RuntimeFractionalPercent {
   string runtime_key = 2;
 }
 
-// Identifies a specific ControlPlane instance that Envoy is connected to. 
+// Identifies a specific ControlPlane instance that Envoy is connected to.
 message ControlPlane {
   // An opaque control plane identifier that uniquely identifies an instance
-  // of control plane. This can be used to identify which control plane instance, 
+  // of control plane. This can be used to identify which control plane instance,
   // the Envoy is connected to.
   string identifier = 1;
 }
