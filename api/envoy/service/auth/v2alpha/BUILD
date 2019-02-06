@@ -8,9 +8,5 @@ api_proto_library_internal(
         "external_auth.proto",
     ],
     has_services = 1,
-    deps = [
-        "//envoy/api/v2/core:base",
-        "//envoy/service/auth/v2:external_auth",
-        "//envoy/type:http_status",
-    ],
+    deps = ["//envoy/service/auth/v2:external_auth"],
 )

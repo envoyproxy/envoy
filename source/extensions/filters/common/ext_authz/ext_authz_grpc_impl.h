@@ -65,6 +65,7 @@ public:
                  Tracing::Span& span) override;
 
 private:
+  static const Protobuf::MethodDescriptor& getMethodDescriptor(bool use_alpha);
   void toAuthzResponseHeader(
       ResponsePtr& response,
       const Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption>& headers);
