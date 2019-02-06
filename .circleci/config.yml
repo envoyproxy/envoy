@@ -22,7 +22,8 @@ jobs:
        - run: ci/docker_push.sh
        - run: ci/docker_tag.sh
        - store_artifacts:
-           path: /build/envoy/generated/failed-testlogs
+           path: /build/envoy/generated
+           destination: /
    asan:
      executor: ubuntu-build
      steps:
@@ -33,7 +34,8 @@ jobs:
        - checkout
        - run: ci/do_circle_ci.sh bazel.asan
        - store_artifacts:
-           path: /build/envoy/generated/failed-testlogs
+           path: /build/envoy/generated
+           destination: /
    tsan:
      executor: ubuntu-build
      steps:
@@ -41,7 +43,9 @@ jobs:
        - checkout
        - run: ci/do_circle_ci.sh bazel.tsan
        - store_artifacts:
-           path: /build/envoy/generated/failed-testlogs
+           path: /build/envoy/generated
+           destination: /
+
    compile_time_options:
      executor: ubuntu-build
      steps:
@@ -49,7 +53,8 @@ jobs:
        - checkout
        - run: ci/do_circle_ci.sh bazel.compile_time_options
        - store_artifacts:
-           path: /build/envoy/generated/failed-testlogs
+           path: /build/envoy/generated
+           destination: /
    api:
      executor: ubuntu-build
      steps:
@@ -61,7 +66,8 @@ jobs:
              - "fb:f3:fe:be:1c:b2:ec:b6:25:f9:7b:a6:87:54:02:8c"
        - run: ci/api_mirror.sh
        - store_artifacts:
-           path: /build/envoy/generated/failed-testlogs
+           path: /build/envoy/generated
+           destination: /
    filter_example_mirror:
      executor: ubuntu-build
      steps:
@@ -105,7 +111,8 @@ jobs:
            no_output_timeout: 60m
        - run: ci/coverage_publish.sh
        - store_artifacts:
-           path: /build/envoy/generated/coverage
+           path: /build/envoy/generated
+           destination: /
 
    clang_tidy:
      executor: ubuntu-build
