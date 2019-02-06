@@ -6,6 +6,7 @@ load(
     "envoy_cc_library",
     "envoy_cc_test",
     "envoy_cc_test_library",
+    "envoy_copts",
     "envoy_package",
 )
 
@@ -156,10 +157,12 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_library(
+envoy_basic_cc_library(
     name = "test_base",
+    testonly = 1,
     srcs = ["test_base.cc"],
     hdrs = ["test_base.h"],
+    copts = envoy_copts(""),
     deps = [
         "//external:googletest",
         "//test/test_common:global_lib",
