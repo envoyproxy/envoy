@@ -203,8 +203,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   // Throws an exception on failure.
   validateScopedRoutingAndRds(config);
 
-  // If scoped RDS is enabled, avoid creating a route config provider. Route config providers will be
-  // managed by the scoped routing logic instead.
+  // If scoped RDS is enabled, avoid creating a route config provider. Route config providers will
+  // be managed by the scoped routing logic instead.
   if (config.rds().subscription_specifier_case() !=
       envoy::config::filter::network::http_connection_manager::v2::Rds::kScopedRdsTemplate) {
     route_config_provider_ = Router::RouteConfigProviderUtil::create(
