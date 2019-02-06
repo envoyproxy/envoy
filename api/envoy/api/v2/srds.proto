@@ -18,7 +18,7 @@ option (gogoproto.equal_all) = true;
 
 // [#protodoc-title: HTTP scoped routing configuration]
 // * Routing :ref:`architecture overview <arch_overview_http_routing>`
-
+//
 // .. attention::
 //
 //   The Scoped RDS API is not yet fully implemented and *should not* be enabled in
@@ -68,7 +68,7 @@ message ScopedRouteConfigurationsSet {
       // Specifies how the value of a header should be extracted.
       // The following example maps the structure of a header to the fields in this message.
       //
-      // .. parsed-literal::
+      // .. code::
       //
       //    X-Header: a,b;c,d
       //    |         || |

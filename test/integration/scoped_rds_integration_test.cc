@@ -178,7 +178,7 @@ scopes:
   test_server_->waitForGaugeEq("http.config_test.scoped_rds.foo_scope_set.version",
                                6927017134761466251UL);
 
-  // TODO(AndresGuedez): test actual scoped routing logic; only the config hanlding is implemented
+  // TODO(AndresGuedez): test actual scoped routing logic; only the config handling is implemented
   // at this point.
 }
 
