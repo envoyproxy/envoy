@@ -416,9 +416,9 @@ def envoy_cc_test(
         shard_count = shard_count,
     )
 
-# Envoy C++ test related libraries (that want gtest, gmock) should be specified
-# with this function.
-def envoy_cc_test_library(
+# Envoy C++ related test infrastructure (that want gtest, gmock, but may be
+# relied on by envoy_cc_test_library) should use this function.
+def envoy_cc_test_infrastructure_library(
         name,
         srcs = [],
         hdrs = [],
@@ -436,12 +436,36 @@ def envoy_cc_test_library(
         testonly = 1,
         deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] + [
             envoy_external_dep_path("googletest"),
-            repository + "//test/test_common:printers_includes",
-            repository + "//test/test_common:test_base",
         ],
         tags = tags,
         alwayslink = 1,
         linkstatic = 1,
+    )
+
+# Envoy C++ test related libraries (that want gtest, gmock) should be specified
+# with this function.
+def envoy_cc_test_library(
+        name,
+        srcs = [],
+        hdrs = [],
+        data = [],
+        external_deps = [],
+        deps = [],
+        repository = "",
+        tags = []):
+    deps = deps + [
+        repository + "//test/test_common:printers_includes",
+        repository + "//test/test_common:test_base",
+    ]
+    envoy_cc_test_infrastructure_library(
+        name,
+        srcs,
+        hdrs,
+        data,
+        external_deps,
+        deps,
+        repository,
+        tags,
     )
 
 # Envoy test binaries should be specified with this function.
