@@ -92,15 +92,15 @@ Users are encouraged to go to
 `DEPRECATED.md <https://github.com/envoyproxy/envoy/blob/master/DEPRECATED.md>` to see how to
 migrate to the new code path and make sure it is suitable for their use case.
 
-In the second phase the full configuration name Foo.Bar.Eep will be added to
+In the second phase the message and filename will be added to
 `runtime_features.h <https://github.com/envoyproxy/envoy/blob/master/source/common/runtime/runtime_features.h>`
 and use of that configuration field will cause the config to be rejected by default. 
-This fail-by-default mode can be overridden in runtime configuration for a proto styled
-``Foo.Bar.Eep``, by setting the runtime value ``envoy.deprecated_features.Eep true`` but use of this
-is **strongly discouraged**. Fatal-by-default configuration indicates that the removal of the
-old code paths is imminent. It is far better for both Envoy users and for Envoy contributors if any
-bugs or feature gaps with the new code paths are flushed out ahead of time, rather than after the
-code is removed!
+This fail-by-default mode can be overridden in runtime configuration. For a proto styled
+``Foo.Bar.Eep`` in ``baz.proto`` by setting the runtime value
+``baz.proto:Eep true``. Use of this override is **strongly discouraged**.
+Fatal-by-default configuration indicates that the removal of the old code paths is imminent. It is
+far better for both Envoy users and for Envoy contributors if any bugs or feature gaps with the new
+code paths are flushed out ahead of time, rather than after the code is removed!
 
 Statistics
 ----------

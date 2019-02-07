@@ -374,7 +374,7 @@ TEST_F(DeprecatedFieldsTest, IndividualFieldDeprecated) {
   base.set_is_deprecated("foo");
   // Non-fatal checks for a deprecated field should log rather than throw an exception.
   EXPECT_LOG_CONTAINS("warning",
-                      "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated'.",
+                      "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated'",
                       MessageUtil::checkForDeprecation(base));
 }
 
@@ -384,7 +384,7 @@ TEST_F(DeprecatedFieldsTest, IndividualFieldDisallowed) {
   base.set_is_deprecated_fatal("foo");
   EXPECT_THROW_WITH_REGEX(
       MessageUtil::checkForDeprecation(base), ProtoValidationException,
-      "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated_fatal'.");
+      "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated_fatal'");
 }
 
 //
@@ -395,17 +395,17 @@ TEST_F(DeprecatedFieldsTest, IndividualFieldDisallowedWithRuntimeOverride) {
   // Make sure this is set up right.
   EXPECT_THROW_WITH_REGEX(
       MessageUtil::checkForDeprecation(base), ProtoValidationException,
-      "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated_fatal'.");
+      "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated_fatal'");
   // The config will be rejected, so the feature will not be used.
   EXPECT_EQ(0, store_.gauge("runtime.deprecated_feature_use").value());
 
   // Now create a new snapshot with this feature allowed.
   Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.deprecated_feature.is_deprecated_fatal", "TrUe"}});
+      {{"deprecated.proto:is_deprecated_fatal", "TrUe"}});
 
   // Now the same deprecation check should only trigger a warning.
   EXPECT_LOG_CONTAINS(
-      "warning", "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated_fatal'.",
+      "warning", "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated_fatal'",
       MessageUtil::checkForDeprecation(base));
   EXPECT_EQ(1, store_.gauge("runtime.deprecated_feature_use").value());
 }
@@ -418,10 +418,10 @@ TEST_F(DeprecatedFieldsTest, MixOfFatalAndWarnings) {
   base.set_is_deprecated("foo");
   base.set_is_deprecated_fatal("foo");
   EXPECT_LOG_CONTAINS(
-      "warning", "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated'.", {
+      "warning", "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated'", {
         EXPECT_THROW_WITH_REGEX(
             MessageUtil::checkForDeprecation(base), ProtoValidationException,
-            "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated_fatal'.");
+            "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated_fatal'");
       });
 }
 
@@ -430,7 +430,7 @@ TEST_F(DeprecatedFieldsTest, MessageDeprecated) {
   envoy::test::deprecation_test::Base base;
   base.mutable_deprecated_message();
   EXPECT_LOG_CONTAINS(
-      "warning", "Using deprecated option 'envoy.test.deprecation_test.Base.deprecated_message'.",
+      "warning", "Using deprecated option 'envoy.test.deprecation_test.Base.deprecated_message'",
       MessageUtil::checkForDeprecation(base));
   EXPECT_EQ(1, store_.gauge("runtime.deprecated_feature_use").value());
 }
@@ -446,7 +446,7 @@ TEST_F(DeprecatedFieldsTest, InnerMessageDeprecated) {
   // Checks for a deprecated sub-message should result in a warning.
   EXPECT_LOG_CONTAINS(
       "warning",
-      "Using deprecated option 'envoy.test.deprecation_test.Base.InnerMessage.inner_deprecated'.",
+      "Using deprecated option 'envoy.test.deprecation_test.Base.InnerMessage.inner_deprecated'",
       MessageUtil::checkForDeprecation(base));
 }
 
@@ -460,7 +460,7 @@ TEST_F(DeprecatedFieldsTest, SubMessageDeprecated) {
   // Fatal checks for a repeated deprecated sub-message should result in an exception.
   EXPECT_LOG_CONTAINS("warning",
                       "Using deprecated option "
-                      "'envoy.test.deprecation_test.Base.InnerMessage.inner_deprecated'.",
+                      "'envoy.test.deprecation_test.Base.InnerMessage.inner_deprecated'",
                       MessageUtil::checkForDeprecation(base));
 }
 
@@ -472,7 +472,7 @@ TEST_F(DeprecatedFieldsTest, RepeatedMessageDeprecated) {
   // Fatal checks for a repeated deprecated sub-message should result in an exception.
   EXPECT_LOG_CONTAINS("warning",
                       "Using deprecated option "
-                      "'envoy.test.deprecation_test.Base.deprecated_repeated_message'.",
+                      "'envoy.test.deprecation_test.Base.deprecated_repeated_message'",
                       MessageUtil::checkForDeprecation(base));
 }
 

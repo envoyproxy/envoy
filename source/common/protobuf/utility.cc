@@ -8,6 +8,18 @@
 #include "absl/strings/match.h"
 
 namespace Envoy {
+namespace {
+
+absl::string_view filenameFromPath(absl::string_view full_path) {
+  size_t index = full_path.rfind("/");
+  if (index == std::string::npos || index == full_path.size()) {
+    return full_path;
+  }
+  return full_path.substr(index + 1, full_path.size());
+}
+
+} // namespace
+
 namespace ProtobufPercentHelper {
 
 uint64_t checkAndReturnDefault(uint64_t default_value, uint64_t max_value) {
@@ -119,21 +131,23 @@ void MessageUtil::checkForDeprecation(const Protobuf::Message& message, Runtime:
     }
 
     bool warn_only = true;
+    absl::string_view filename = filenameFromPath(field->file()->name());
+    std::cerr << "Truncating " << field->file()->name() << " to " << filename;
     // Allow runtime to be null both to not crash if this is called before server initialization,
     // and so proto validation works in context where runtime singleton is not set up (e.g.
     // standalone config validation utilities)
-    if (runtime && !runtime->snapshot().deprecatedFeatureEnabled(
-                       absl::StrCat("envoy.deprecated_feature.", field->name()))) {
+    if (runtime &&
+        !runtime->snapshot().deprecatedFeatureEnabled(absl::StrCat(filename, ":", field->name()))) {
       warn_only = false;
     }
 
     // If this field is deprecated, warn or throw an error.
     if (field->options().deprecated()) {
       std::string err = fmt::format(
-          "Using deprecated option '{}'. This configuration will be removed from Envoy soon. "
-          "Please see https://github.com/envoyproxy/envoy/blob/master/DEPRECATED.md for "
-          "details.",
-          field->full_name());
+          "Using deprecated option '{}' from file {}. This configuration will be removed from "
+          "Envoy soon. Please see https://github.com/envoyproxy/envoy/blob/master/DEPRECATED.md "
+          "for details.",
+          field->full_name(), filename);
       if (warn_only) {
         ENVOY_LOG_MISC(warn, "{}", err);
       } else {

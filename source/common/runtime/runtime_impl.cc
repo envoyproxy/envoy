@@ -147,7 +147,7 @@ std::string RandomGeneratorImpl::uuid() {
 }
 
 bool SnapshotImpl::deprecatedFeatureEnabled(const std::string& key) const {
-  ASSERT(absl::StartsWith(key, "envoy.deprecated_feature."));
+  std::cerr << "Checking on " << key << "\n";
   uint64_t stored = getInteger(key, 100);
   bool disallowed_by_default = DisallowedFeaturesDefaults::get().disallowedByDefault(key);
 
