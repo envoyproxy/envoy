@@ -1,7 +1,6 @@
 #include <chrono>
 #include <cstdint>
 #include <memory>
-#include <sstream>
 #include <string>
 
 #include "envoy/upstream/cluster_manager.h"
