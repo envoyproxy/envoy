@@ -34,10 +34,6 @@ private:
 // An upstream which creates AutonomousStreams for new incoming streams.
 class AutonomousHttpConnection : public FakeHttpConnection {
 public:
-  AutonomousUpstream(const Network::Address::InstanceConstSharedPtr& endpoint,
-                     FakeHttpConnection::Type type,
-                     Event::TestTimeSystem& time_system)
-      : FakeUpstream(endpoint, type, time_system) {}
   AutonomousHttpConnection(SharedConnectionWrapper& shared_connection, Stats::Store& store,
                            Type type, AutonomousUpstream& upstream);
 
@@ -53,6 +49,9 @@ typedef std::unique_ptr<AutonomousHttpConnection> AutonomousHttpConnectionPtr;
 // An upstream which creates AutonomousHttpConnection for new incoming connections.
 class AutonomousUpstream : public FakeUpstream {
 public:
+  AutonomousUpstream(const Network::Address::InstanceConstSharedPtr& endpoint,
+                     FakeHttpConnection::Type type, Event::TestTimeSystem& time_system)
+      : FakeUpstream(endpoint, type, time_system) {}
   AutonomousUpstream(uint32_t port, FakeHttpConnection::Type type,
                      Network::Address::IpVersion version, Event::TestTimeSystem& time_system)
       : FakeUpstream(port, type, version, time_system) {}

@@ -215,9 +215,8 @@ HttpIntegrationTest::HttpIntegrationTest(Http::CodecClient::Type downstream_prot
 HttpIntegrationTest::HttpIntegrationTest(
     Http::CodecClient::Type downstream_protocol,
     const Network::Address::InstanceConstSharedPtr& upstream_address,
-    std::function<uint32_t()> upstream_port_fn, TestTimeSystemPtr time_system,
-    const std::string& config)
-    : BaseIntegrationTest(upstream_address, upstream_port_fn, std::move(time_system), config),
+    std::function<uint32_t()> upstream_port_fn, const std::string& config)
+    : BaseIntegrationTest(upstream_address, upstream_port_fn, config),
       downstream_protocol_(downstream_protocol) {
   // Legacy integration tests expect the default listener to be named "http" for
   // lookupPort calls.

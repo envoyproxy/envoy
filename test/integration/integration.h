@@ -135,12 +135,12 @@ public:
 
   // Creates a test fixture with an upstream bound to INADDR_ANY on an unspecified port using the
   // provided IP |version|.
-  BaseIntegrationTest(Network::Address::IpVersion version, TestTimeSystemPtr time_system,
+  BaseIntegrationTest(Network::Address::IpVersion version,
                       const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG);
   // Creates a test fixture with a specified |upstream_address| and port provider function
   // |upstream_port_fn|. This also sets the IP version to the one used by the |upstream_address|.
   BaseIntegrationTest(const Network::Address::InstanceConstSharedPtr& upstream_address,
-                      std::function<uint32_t()> upstream_port_fn, TestTimeSystemPtr time_system,
+                      std::function<uint32_t()> upstream_port_fn,
                       const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG);
 
   virtual ~BaseIntegrationTest() {}
