@@ -32,7 +32,7 @@ public:
 
   // Map platform specific error into IoErrorCode.
   virtual IoErrorCode getErrorCode() PURE;
-  
+
   virtual std::string getErrorDetails() PURE;
 };
 
@@ -55,16 +55,9 @@ using IoHandleCallSizeResult = IoHandleCallResult<ssize_t>;
  */
 class IoHandle {
 public:
-  enum ShutdownType {
-    READ = 0,
-    WRITE,
-    BOTH
-  };
+  enum ShutdownType { READ = 0, WRITE, BOTH };
 
-  enum IoHandleFlag {
-    NONBLOCK = 1,
-    APPEND = 2
-  };
+  enum IoHandleFlag { NONBLOCK = 1, APPEND = 2 };
 
   virtual ~IoHandle() {}
 
@@ -87,13 +80,12 @@ public:
 
   virtual IoHandleCallSizeResult readv(Buffer::RawSlice* iovecs, int num_iovec) PURE;
 
-  virtual IoHandleCallIntResult recvmmsg(struct mmsghdr *msgvec, unsigned int vlen,
-                    int flags, struct timespec *timeout) PURE;
+  virtual IoHandleCallIntResult recvmmsg(struct mmsghdr* msgvec, unsigned int vlen, int flags,
+                                         struct timespec* timeout) PURE;
 
   virtual IoHandleCallSizeResult writev(const Buffer::RawSlice* iovec, int num_iovec) PURE;
 
-  virtual IoHandleCallIntResult sendmmsg(struct mmsghdr* msgvec, unsigned int vlen,
-                    int flags) PURE;
+  virtual IoHandleCallIntResult sendmmsg(struct mmsghdr* msgvec, unsigned int vlen, int flags) PURE;
 
   virtual IoHandleCallIntResult bind(const Network::Address::Instance& address) PURE;
 
