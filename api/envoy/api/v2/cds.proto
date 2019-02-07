@@ -403,7 +403,7 @@ message Cluster {
     // Minimum hash ring size. The larger the ring is (that is, the more hashes there are for each
     // provided host) the better the request distribution will reflect the desired weights. This can
     // also be tuned more directly using
-    // :ref:`target_hashes_per_host<envoy_api_field_Cluster.RingHashLbConfig.target_hashes_per_host>`.
+    // :ref:`replication_factor<envoy_api_field_Cluster.RingHashLbConfig.replication_factor>`.
     // Defaults to 1024 entries. The maximum value of this lower bound is 8M entries, to constrain
     // resource use. See also
     // :ref:`maximum_ring_size<envoy_api_field_Cluster.RingHashLbConfig.maximum_ring_size>`.
@@ -443,12 +443,12 @@ message Cluster {
     // accuracy. A lower number of hashes per host yields a smaller ring, consuming less memory and
     // reducing lookup time, whereas a higher number of hashes per host partitions the ring space
     // more evenly. This parameter allows a desired target to be specified directly, although the
-    // actual number of hashes per host may be limited by the
+    // actual replication factor may be higher or lower depending on
     // :ref:`minimum_ring_size<envoy_api_field_Cluster.RingHashLbConfig.minimum_ring_size>` and
     // :ref:`maximum_ring_size<envoy_api_field_Cluster.RingHashLbConfig.maximum_ring_size>`. The
     // default behavior if this parameter is unspecified, for backward compatibility, is to use the
     // smallest number of hashes per host necessary to meet the minimum_ring_size.
-    google.protobuf.UInt64Value target_hashes_per_host = 5;
+    google.protobuf.UInt64Value replication_factor = 5;
   }
 
   // Specific configuration for the

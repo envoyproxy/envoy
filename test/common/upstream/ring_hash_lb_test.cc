@@ -362,7 +362,7 @@ TEST_P(RingHashLoadBalancerTest, HostWeightedLargeRing) {
   hostSet().runCallbacks({}, {});
 
   config_ = (envoy::api::v2::Cluster::RingHashLbConfig());
-  config_.value().mutable_target_hashes_per_host()->set_value(1024);
+  config_.value().mutable_replication_factor()->set_value(1024);
   init();
   LoadBalancerPtr lb = lb_->factory()->create();
 
@@ -422,7 +422,7 @@ TEST_P(RingHashLoadBalancerTest, LocalityWeightedLargeRing) {
   hostSet().runCallbacks({}, {});
 
   config_ = (envoy::api::v2::Cluster::RingHashLbConfig());
-  config_.value().mutable_target_hashes_per_host()->set_value(1024);
+  config_.value().mutable_replication_factor()->set_value(1024);
   init();
   LoadBalancerPtr lb = lb_->factory()->create();
 
@@ -484,7 +484,7 @@ TEST_P(RingHashLoadBalancerTest, HostAndLocalityWeightedLargeRing) {
   hostSet().runCallbacks({}, {});
 
   config_ = (envoy::api::v2::Cluster::RingHashLbConfig());
-  config_.value().mutable_target_hashes_per_host()->set_value(1024);
+  config_.value().mutable_replication_factor()->set_value(1024);
   init();
   LoadBalancerPtr lb = lb_->factory()->create();
 

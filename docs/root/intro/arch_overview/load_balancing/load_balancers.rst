@@ -70,11 +70,16 @@ the circle, since the computed hashes could be coincidentally be very close to o
 is necessary to multiply the number of hashes per host---for example inserting 100 entries on the
 ring for host A and 200 entries for host B---to better approximate the desired distribution. This
 replication factor can be controlled directly by configuring the
-:ref:`target_hashes_per_host<envoy_api_field_Cluster.RingHashLbConfig.target_hashes_per_host>`
+:ref:`replication_factor<envoy_api_field_Cluster.RingHashLbConfig.replication_factor>`
 parameter, or indirectly by configuring the
 :ref:`minimum_ring_size<envoy_api_field_Cluster.RingHashLbConfig.minimum_ring_size>`. With the ring
-partitioned appropriately, the addition or removal of one host from a set of N hosts will affect the
+partitioned appropriately, the addition or removal of one host from a set of N hosts will affect
 only 1/N requests.
+
+To constrain resource utilization, there is also a
+:ref:`maximum_ring_size<envoy_api_field_Cluster.RingHashLbConfig.maximum_ring_size>` parameter. In
+cases where the weighted sum of all hosts exceeds the maximum ring size, the replication factor is
+scaled down, which implies some loss of granularity in the weights.
 
 When priority based load balancing is in use, the priority level is also chosen by hash, so the
 endpoint selected will still be consistent when the set of backends is stable.

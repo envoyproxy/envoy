@@ -171,11 +171,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "numeric",
-    hdrs = ["numeric.h"],
-)
-
-envoy_cc_library(
     name = "phantom",
     hdrs = ["phantom.h"],
 )

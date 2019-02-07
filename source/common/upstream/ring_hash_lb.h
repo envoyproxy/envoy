@@ -44,9 +44,8 @@ private:
 
     std::vector<RingEntry> ring_;
 
-    static const uint64_t DEFAULT_MIN_RING_SIZE = 1024;
-    static const uint64_t DEFAULT_MAX_RING_SIZE = 1024 * 1024 * 8;
-    static const uint64_t DEFAULT_TARGET_HASHES_PER_HOST = 256;
+    static const uint64_t DefaultMinRingSize = 1024;
+    static const uint64_t DefaultMaxRingSize = 1024 * 1024 * 8;
   };
   typedef std::shared_ptr<const Ring> RingConstSharedPtr;
 
