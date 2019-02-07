@@ -18,9 +18,8 @@
 
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
-
-#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Network {
@@ -107,7 +106,7 @@ void testSocketBindAndConnect(Network::Address::IpVersion ip_version, bool v6onl
 }
 } // namespace
 
-class AddressImplSocketTest : public testing::TestWithParam<IpVersion> {};
+class AddressImplSocketTest : public TestBaseWithParam<IpVersion> {};
 INSTANTIATE_TEST_SUITE_P(IpVersions, AddressImplSocketTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
@@ -417,21 +416,21 @@ TEST(AddressFromSockAddrDeathTest, Pipe) {
 struct TestCase {
   enum InstanceType { Ipv4, Ipv6, Pipe };
 
-  TestCase() : type_(Ipv4), port_(0) {}
-  TestCase(enum InstanceType type, std::string address, uint32_t port)
-      : type_(type), address_(address), port_(port) {}
-  TestCase(const TestCase& rhs) : type_(rhs.type_), address_(rhs.address_), port_(rhs.port_) {}
+  TestCase() = default;
+  TestCase(enum InstanceType type, const std::string& address, uint32_t port)
+      : address_(address), type_(type), port_(port) {}
+  TestCase(const TestCase& rhs) : address_(rhs.address_), type_(rhs.type_), port_(rhs.port_) {}
 
   bool operator==(const TestCase& rhs) {
     return (type_ == rhs.type_ && address_ == rhs.address_ && port_ == rhs.port_);
   }
 
-  enum InstanceType type_;
   std::string address_;
-  uint32_t port_; // Ignored for Pipe
+  enum InstanceType type_ { Ipv4 };
+  uint32_t port_ = 0; // Ignored for Pipe
 };
 
-class MixedAddressTest : public testing::TestWithParam<::testing::tuple<TestCase, TestCase>> {
+class MixedAddressTest : public TestBaseWithParam<::testing::tuple<TestCase, TestCase>> {
 public:
 protected:
   InstanceConstSharedPtr testCaseToInstance(const struct TestCase& test_case) {

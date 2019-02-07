@@ -15,10 +15,9 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_time.h"
+#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::DoAll;
@@ -54,7 +53,7 @@ public:
 
 class ActiveTestRequest;
 
-class Http2ConnPoolImplTest : public testing::Test {
+class Http2ConnPoolImplTest : public TestBase {
 public:
   struct TestCodecClient {
     Http::MockClientConnection* codec_;
@@ -83,8 +82,7 @@ public:
     test_client.connection_ = new NiceMock<Network::MockClientConnection>();
     test_client.codec_ = new NiceMock<Http::MockClientConnection>();
     test_client.connect_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
-    test_client.client_dispatcher_ =
-        std::make_unique<Event::DispatcherImpl>(test_time_.timeSystem(), *api_);
+    test_client.client_dispatcher_ = std::make_unique<Event::DispatcherImpl>(*api_);
     EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
         .WillOnce(Return(test_client.connection_));
     auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
@@ -120,7 +118,6 @@ public:
 
   Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
-  DangerousDeprecatedTestTime test_time_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
   Upstream::HostSharedPtr host_{Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:80")};

@@ -39,8 +39,7 @@ namespace Event {
  */
 class DispatchedThreadImpl : Logger::Loggable<Envoy::Logger::Id::main> {
 public:
-  DispatchedThreadImpl(Api::Api& api, TimeSystem& time_system)
-      : api_(api), dispatcher_(new DispatcherImpl(time_system, api_)) {}
+  explicit DispatchedThreadImpl(Api::Api& api) : api_(api), dispatcher_(new DispatcherImpl(api_)) {}
 
   /**
    * Start the thread.

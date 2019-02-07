@@ -6,7 +6,7 @@
 
 #include "common/common/perf_annotation.h"
 
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 namespace Envoy {
 

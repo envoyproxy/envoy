@@ -22,10 +22,10 @@
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::AnyNumber;
@@ -72,16 +72,16 @@ TEST(ConnectionImplUtility, updateBufferStats) {
   ConnectionImplUtility::updateBufferStats(3, 3, previous_total, counter, gauge);
 }
 
-class ConnectionImplDeathTest : public testing::TestWithParam<Address::IpVersion> {};
+class ConnectionImplDeathTest : public TestBaseWithParam<Address::IpVersion> {};
 INSTANTIATE_TEST_SUITE_P(IpVersions, ConnectionImplDeathTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
 TEST_P(ConnectionImplDeathTest, BadFd) {
   Stats::IsolatedStoreImpl stats_store;
-  Api::ApiPtr api = Api::createApiForTest(stats_store);
   Event::SimulatedTimeSystem time_system;
-  Event::DispatcherImpl dispatcher(time_system, *api);
+  Api::ApiPtr api = Api::createApiForTest(stats_store);
+  Event::DispatcherImpl dispatcher(*api);
   IoHandlePtr io_handle = std::make_unique<IoSocketHandle>();
   EXPECT_DEATH_LOG_TO_STDERR(
       ConnectionImpl(dispatcher,
@@ -90,13 +90,13 @@ TEST_P(ConnectionImplDeathTest, BadFd) {
       ".*assert failure: ioHandle\\(\\).fd\\(\\) != -1.*");
 }
 
-class ConnectionImplTest : public testing::TestWithParam<Address::IpVersion> {
+class ConnectionImplTest : public TestBaseWithParam<Address::IpVersion> {
 public:
   ConnectionImplTest() : api_(Api::createApiForTest(stats_store_)) {}
 
   void setUpBasicConnection() {
     if (dispatcher_.get() == nullptr) {
-      dispatcher_ = std::make_unique<Event::DispatcherImpl>(time_system_, *api_);
+      dispatcher_ = std::make_unique<Event::DispatcherImpl>(*api_);
     }
     listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true, false);
 
@@ -159,8 +159,8 @@ public:
     ASSERT(dispatcher_.get() == nullptr);
 
     MockBufferFactory* factory = new StrictMock<MockBufferFactory>;
-    dispatcher_ = std::make_unique<Event::DispatcherImpl>(
-        time_system_, Buffer::WatermarkFactoryPtr{factory}, *api_);
+    dispatcher_ =
+        std::make_unique<Event::DispatcherImpl>(Buffer::WatermarkFactoryPtr{factory}, *api_);
     // The first call to create a client session will get a MockBuffer.
     // Other calls for server sessions will by default get a normal OwnedImpl.
     EXPECT_CALL(*factory, create_(_, _))
@@ -272,7 +272,7 @@ TEST_P(ConnectionImplTest, CloseDuringConnectCallback) {
 }
 
 TEST_P(ConnectionImplTest, ImmediateConnectError) {
-  dispatcher_ = std::make_unique<Event::DispatcherImpl>(time_system_, *api_);
+  dispatcher_ = std::make_unique<Event::DispatcherImpl>(*api_);
 
   // Using a broadcast/multicast address as the connection destinations address causes an
   // immediate error return from connect().
@@ -886,7 +886,7 @@ TEST_P(ConnectionImplTest, BindFailureTest) {
     source_address_ = Network::Address::InstanceConstSharedPtr{
         new Network::Address::Ipv6Instance(address_string, 0)};
   }
-  dispatcher_ = std::make_unique<Event::DispatcherImpl>(time_system_, *api_);
+  dispatcher_ = std::make_unique<Event::DispatcherImpl>(*api_);
   listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true, false);
 
   client_connection_ = dispatcher_->createClientConnection(
@@ -1229,7 +1229,7 @@ public:
 private:
   ReadFilterCallbacks* callbacks_{nullptr};
 };
-class MockTransportConnectionImplTest : public testing::Test {
+class MockTransportConnectionImplTest : public TestBase {
 public:
   MockTransportConnectionImplTest() {
     EXPECT_CALL(dispatcher_.buffer_factory_, create_(_, _))
@@ -1574,7 +1574,7 @@ class ReadBufferLimitTest : public ConnectionImplTest {
 public:
   void readBufferLimitTest(uint32_t read_buffer_limit, uint32_t expected_chunk_size) {
     const uint32_t buffer_size = 256 * 1024;
-    dispatcher_ = std::make_unique<Event::DispatcherImpl>(time_system_, *api_);
+    dispatcher_ = std::make_unique<Event::DispatcherImpl>(*api_);
     listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true, false);
 
     client_connection_ = dispatcher_->createClientConnection(
@@ -1643,14 +1643,13 @@ TEST_P(ReadBufferLimitTest, SomeLimit) {
   readBufferLimitTest(read_buffer_limit, read_buffer_limit - 1 + 16384);
 }
 
-class TcpClientConnectionImplTest : public testing::TestWithParam<Address::IpVersion> {
+class TcpClientConnectionImplTest : public TestBaseWithParam<Address::IpVersion> {
 protected:
-  TcpClientConnectionImplTest()
-      : api_(Api::createApiForTest(stats_store_)), dispatcher_(time_system_, *api_) {}
+  TcpClientConnectionImplTest() : api_(Api::createApiForTest(stats_store_)), dispatcher_(*api_) {}
 
   Stats::IsolatedStoreImpl stats_store_;
-  Api::ApiPtr api_;
   Event::SimulatedTimeSystem time_system_;
+  Api::ApiPtr api_;
   Event::DispatcherImpl dispatcher_;
 };
 INSTANTIATE_TEST_SUITE_P(IpVersions, TcpClientConnectionImplTest,
@@ -1688,14 +1687,13 @@ TEST_P(TcpClientConnectionImplTest, BadConnectConnRefused) {
   dispatcher_.run(Event::Dispatcher::RunType::Block);
 }
 
-class PipeClientConnectionImplTest : public testing::Test {
+class PipeClientConnectionImplTest : public TestBase {
 protected:
-  PipeClientConnectionImplTest()
-      : api_(Api::createApiForTest(stats_store_)), dispatcher_(time_system_, *api_) {}
+  PipeClientConnectionImplTest() : api_(Api::createApiForTest(stats_store_)), dispatcher_(*api_) {}
 
   Stats::IsolatedStoreImpl stats_store_;
-  Api::ApiPtr api_;
   Event::SimulatedTimeSystem time_system_;
+  Api::ApiPtr api_;
   Event::DispatcherImpl dispatcher_;
   const std::string path_{TestEnvironment::unixDomainSocketPath("foo")};
 };

@@ -20,10 +20,10 @@
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::NiceMock;
@@ -48,7 +48,7 @@ envoy::config::filter::accesslog::v2::AccessLog parseAccessLogFromV2Yaml(const s
   return access_log;
 }
 
-class AccessLogImplTest : public testing::Test {
+class AccessLogImplTest : public TestBase {
 public:
   AccessLogImplTest() : file_(new Filesystem::MockFile()) {
     ON_CALL(context_, runtime()).WillByDefault(ReturnRef(runtime_));
@@ -351,7 +351,7 @@ TEST_F(AccessLogImplTest, healthCheckTrue) {
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromJson(json), context_);
 
   Http::TestHeaderMapImpl header_map{};
-  stream_info_.hc_request_ = true;
+  stream_info_.health_check_request_ = true;
   EXPECT_CALL(*file_, write(_)).Times(0);
 
   log->log(&header_map, &response_headers_, &response_trailers_, stream_info_);
@@ -464,7 +464,7 @@ TEST_F(AccessLogImplTest, andFilter) {
   {
     EXPECT_CALL(*file_, write(_)).Times(0);
     Http::TestHeaderMapImpl header_map{};
-    stream_info_.hc_request_ = true;
+    stream_info_.health_check_request_ = true;
     log->log(&header_map, &response_headers_, &response_trailers_, stream_info_);
   }
 }
@@ -527,7 +527,7 @@ TEST_F(AccessLogImplTest, multipleOperators) {
   {
     EXPECT_CALL(*file_, write(_)).Times(0);
     Http::TestHeaderMapImpl header_map{};
-    stream_info_.hc_request_ = true;
+    stream_info_.health_check_request_ = true;
 
     log->log(&header_map, &response_headers_, &response_trailers_, stream_info_);
   }

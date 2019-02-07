@@ -1,13 +1,12 @@
 #include "test/integration/http_integration.h"
 #include "test/mocks/http/mocks.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
-
-#include "gtest/gtest.h"
 
 namespace Envoy {
 
-class CorsFilterIntegrationTest : public HttpIntegrationTest,
-                                  public testing::TestWithParam<Network::Address::IpVersion> {
+class CorsFilterIntegrationTest : public TestBaseWithParam<Network::Address::IpVersion>,
+                                  public HttpIntegrationTest {
 public:
   CorsFilterIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()) {}

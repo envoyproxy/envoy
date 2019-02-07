@@ -9,9 +9,9 @@
 #include "test/extensions/filters/common/ext_authz/test_common.h"
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Invoke;
@@ -28,7 +28,7 @@ namespace Filters {
 namespace Common {
 namespace ExtAuthz {
 
-class ExtAuthzGrpcClientTest : public testing::Test {
+class ExtAuthzGrpcClientTest : public TestBase {
 public:
   ExtAuthzGrpcClientTest()
       : async_client_(new Grpc::MockAsyncClient()), timeout_(10),
