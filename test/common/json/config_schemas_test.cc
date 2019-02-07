@@ -4,7 +4,6 @@
 #include "common/common/fmt.h"
 #include "common/json/config_schemas.h"
 #include "common/json/json_loader.h"
-#include "common/stats/isolated_store_impl.h"
 
 #include "test/test_common/environment.h"
 #include "test/test_common/test_base.h"
@@ -29,9 +28,8 @@ std::vector<std::string> generateTestInputs() {
 
 class ConfigSchemasTest : public TestBaseWithParam<std::string> {
 protected:
-  ConfigSchemasTest() : api_(Api::createApiForTest(stats_store_)) {}
+  ConfigSchemasTest() : api_(Api::createApiForTest()) {}
 
-  Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
 };
 

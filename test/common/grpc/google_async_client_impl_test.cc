@@ -47,7 +47,7 @@ public:
 class EnvoyGoogleAsyncClientImplTest : public TestBase {
 public:
   EnvoyGoogleAsyncClientImplTest()
-      : stats_store_(new Stats::IsolatedStoreImpl), api_(Api::createApiForTest(*stats_store_)),
+      : stats_store_(new Stats::IsolatedStoreImpl), api_(Api::createApiForTest()),
         dispatcher_(*api_), scope_(stats_store_),
         method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")) {
     envoy::api::v2::core::GrpcService config;

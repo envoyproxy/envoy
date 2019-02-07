@@ -291,8 +291,8 @@ TEST_F(AccessLogManagerImplTest, reopenAllFiles) {
   AccessLogFileSharedPtr log = access_log_manager_.createAccessLog("foo");
 
   NiceMock<Filesystem::MockFile>* file2 = new NiceMock<Filesystem::MockFile>;
-    EXPECT_CALL(file_system_, createFile("bar"))
-        .WillOnce(Return(ByMove(std::unique_ptr<NiceMock<Filesystem::MockFile>>(file2))));
+  EXPECT_CALL(file_system_, createFile("bar"))
+      .WillOnce(Return(ByMove(std::unique_ptr<NiceMock<Filesystem::MockFile>>(file2))));
   EXPECT_CALL(*file2, open_()).Times(2).WillRepeatedly(Return(Api::SysCallBoolResult{true, 0}));
   AccessLogFileSharedPtr log2 = access_log_manager_.createAccessLog("bar");
 

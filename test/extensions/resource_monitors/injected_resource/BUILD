@@ -17,7 +17,6 @@ envoy_cc_test(
     srcs = ["injected_resource_monitor_test.cc"],
     deps = [
         "//source/common/event:dispatcher_lib",
-        "//source/common/stats:isolated_store_lib",
         "//source/extensions/resource_monitors/injected_resource:injected_resource_monitor",
         "//source/server:resource_monitor_config_lib",
         "//test/test_common:environment_lib",
@@ -32,7 +31,6 @@ envoy_extension_cc_test(
     deps = [
         "//include/envoy/registry",
         "//source/common/event:dispatcher_lib",
-        "//source/common/stats:isolated_store_lib",
         "//source/extensions/resource_monitors/injected_resource:config",
         "//source/server:resource_monitor_config_lib",
         "//test/test_common:environment_lib",

@@ -5,7 +5,6 @@
 
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
-#include "common/stats/isolated_store_impl.h"
 
 #include "test/proto/deprecated.pb.h"
 #include "test/test_common/environment.h"
@@ -17,9 +16,8 @@ namespace Envoy {
 
 class ProtobufUtilityTest : public TestBase {
 protected:
-  ProtobufUtilityTest() : api_(Api::createApiForTest(stats_store_)) {}
+  ProtobufUtilityTest() : api_(Api::createApiForTest()) {}
 
-  Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
 };
 

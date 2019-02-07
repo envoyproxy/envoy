@@ -1,5 +1,4 @@
 #include "common/event/dispatcher_impl.h"
-#include "common/stats/isolated_store_impl.h"
 
 #include "server/resource_monitor_config_impl.h"
 
@@ -45,7 +44,7 @@ public:
 class InjectedResourceMonitorTest : public TestBase {
 protected:
   InjectedResourceMonitorTest()
-      : api_(Api::createApiForTest(stats_store_)), dispatcher_(*api_),
+      : api_(Api::createApiForTest()), dispatcher_(*api_),
         resource_filename_(TestEnvironment::temporaryPath("injected_resource")),
         file_updater_(resource_filename_), monitor_(createMonitor()) {}
 
@@ -64,7 +63,6 @@ protected:
     return std::make_unique<TestableInjectedResourceMonitor>(config, context);
   }
 
-  Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
   Event::DispatcherImpl dispatcher_;
   const std::string resource_filename_;

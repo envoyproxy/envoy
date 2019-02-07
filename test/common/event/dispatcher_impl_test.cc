@@ -5,7 +5,6 @@
 #include "common/api/api_impl.h"
 #include "common/common/lock_guard.h"
 #include "common/event/dispatcher_impl.h"
-#include "common/stats/isolated_store_impl.h"
 
 #include "test/mocks/common.h"
 #include "test/test_common/test_base.h"
@@ -29,8 +28,7 @@ private:
 
 TEST(DeferredDeleteTest, DeferredDelete) {
   InSequence s;
-  Stats::IsolatedStoreImpl stats_store;
-  Api::ApiPtr api = Api::createApiForTest(stats_store);
+  Api::ApiPtr api = Api::createApiForTest();
   DispatcherImpl dispatcher(*api);
   ReadyWatcher watcher1;
 
@@ -62,8 +60,8 @@ TEST(DeferredDeleteTest, DeferredDelete) {
 class DispatcherImplTest : public TestBase {
 protected:
   DispatcherImplTest()
-      : api_(Api::createApiForTest(stat_store_)),
-        dispatcher_(std::make_unique<DispatcherImpl>(*api_)), work_finished_(false) {
+      : api_(Api::createApiForTest()), dispatcher_(std::make_unique<DispatcherImpl>(*api_)),
+        work_finished_(false) {
     dispatcher_thread_ = api_->threadFactory().createThread([this]() {
       // Must create a keepalive timer to keep the dispatcher from exiting.
       std::chrono::milliseconds time_interval(500);
@@ -80,7 +78,6 @@ protected:
     dispatcher_thread_->join();
   }
 
-  Stats::IsolatedStoreImpl stat_store_;
   Api::ApiPtr api_;
   Thread::ThreadPtr dispatcher_thread_;
   DispatcherPtr dispatcher_;

@@ -28,7 +28,7 @@ namespace Upstream {
 
 class CdsApiImplTest : public TestBase {
 protected:
-  CdsApiImplTest() : request_(&cm_.async_client_), api_(Api::createApiForTest(store_)) {}
+  CdsApiImplTest() : request_(&cm_.async_client_), api_(Api::createApiForTest()) {}
 
   void setup() {
     const std::string config_json = R"EOF(

@@ -15,12 +15,11 @@ public:
   }
 
 protected:
-  SslCertsTest() : api_(Api::createApiForTest(store_)) {
+  SslCertsTest() : api_(Api::createApiForTest()) {
     ON_CALL(factory_context_, api()).WillByDefault(ReturnRef(*api_));
   }
 
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
-  Stats::IsolatedStoreImpl store_;
   Api::ApiPtr api_;
 };
 } // namespace Envoy

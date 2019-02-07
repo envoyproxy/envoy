@@ -26,10 +26,9 @@ namespace Server {
 
 class GuardDogTestBase : public TestBase {
 protected:
-  GuardDogTestBase() : api_(Api::createApiForTest(stats_store_, time_system_)) {}
+  GuardDogTestBase() : api_(Api::createApiForTest(time_system_)) {}
 
   Event::SimulatedTimeSystem time_system_;
-  Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
 };
 

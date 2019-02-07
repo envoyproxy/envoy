@@ -1,7 +1,6 @@
 #include "common/grpc/google_grpc_creds_impl.h"
 
 #include "test/common/grpc/utility.h"
-#include "test/mocks/stats/mocks.h"
 #include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
@@ -16,9 +15,8 @@ namespace {
 
 class CredsUtilityTest : public TestBase {
 public:
-  CredsUtilityTest() : api_(Api::createApiForTest(stats_store_)) {}
+  CredsUtilityTest() : api_(Api::createApiForTest()) {}
 
-  Stats::MockIsolatedStatsStore stats_store_;
   Api::ApiPtr api_;
 };
 

@@ -14,7 +14,6 @@ envoy_cc_test(
     deps = [
         "//source/common/api:api_lib",
         "//source/common/event:dispatcher_lib",
-        "//source/common/stats:isolated_store_lib",
         "//source/common/thread_local:thread_local_lib",
         "//test/mocks/event:event_mocks",
     ],

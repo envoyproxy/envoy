@@ -11,7 +11,6 @@
 
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/local_info/mocks.h"
-#include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/test_base.h"
@@ -208,8 +207,7 @@ TEST(UtilityTest, UnixClusterStatic) {
 }
 
 TEST(UtilityTest, CheckFilesystemSubscriptionBackingPath) {
-  Stats::MockIsolatedStatsStore stats_store;
-  Api::ApiPtr api = Api::createApiForTest(stats_store);
+  Api::ApiPtr api = Api::createApiForTest();
 
   EXPECT_THROW_WITH_MESSAGE(
       Utility::checkFilesystemSubscriptionBackingPath("foo", *api), EnvoyException,

@@ -74,7 +74,7 @@ protected:
   OverloadManagerImplTest()
       : factory1_("envoy.resource_monitors.fake_resource1"),
         factory2_("envoy.resource_monitors.fake_resource2"), register_factory1_(factory1_),
-        register_factory2_(factory2_), api_(Api::createApiForTest(stats_)) {}
+        register_factory2_(factory2_), api_(Api::createApiForTest()) {}
 
   void setDispatcherExpectation() {
     timer_ = new NiceMock<Event::MockTimer>();

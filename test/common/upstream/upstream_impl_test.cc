@@ -45,7 +45,7 @@ namespace {
 
 class UpstreamImplTestBase {
 protected:
-  UpstreamImplTestBase() : api_(Api::createApiForTest(stats_)) {}
+  UpstreamImplTestBase() : api_(Api::createApiForTest()) {}
 
   NiceMock<Server::MockAdmin> admin_;
   Ssl::MockContextManager ssl_context_manager_;
@@ -1534,7 +1534,7 @@ TEST(PrioritySet, Extend) {
 
 class ClusterInfoImplTest : public TestBase {
 public:
-  ClusterInfoImplTest() : api_(Api::createApiForTest(stats_)) {}
+  ClusterInfoImplTest() : api_(Api::createApiForTest()) {}
 
   std::unique_ptr<StrictDnsClusterImpl> makeCluster(const std::string& yaml) {
     cluster_config_ = parseClusterFromV2Yaml(yaml);

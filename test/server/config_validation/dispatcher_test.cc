@@ -5,7 +5,6 @@
 #include "common/event/libevent.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
-#include "common/stats/isolated_store_impl.h"
 
 #include "server/config_validation/api.h"
 
@@ -24,15 +23,13 @@ public:
   ConfigValidation() {
     Event::Libevent::Global::initialize();
 
-    validation_ = std::make_unique<Api::ValidationImpl>(std::chrono::milliseconds(1000),
-                                                        Thread::threadFactoryForTest(),
-                                                        stats_store_, test_time_.timeSystem());
+    validation_ = std::make_unique<Api::ValidationImpl>(Thread::threadFactoryForTest(),
+                                                        test_time_.timeSystem());
     dispatcher_ = validation_->allocateDispatcher();
   }
 
   DangerousDeprecatedTestTime test_time_;
   Event::DispatcherPtr dispatcher_;
-  Stats::IsolatedStoreImpl stats_store_;
 
 private:
   // Using config validation API.

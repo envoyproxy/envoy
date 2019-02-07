@@ -1,6 +1,5 @@
 #include "common/common/thread.h"
 #include "common/event/dispatcher_impl.h"
-#include "common/stats/isolated_store_impl.h"
 #include "common/thread_local/thread_local_impl.h"
 
 #include "test/mocks/event/mocks.h"
@@ -116,8 +115,7 @@ TEST_F(ThreadLocalInstanceImplTest, RunOnAllThreads) {
 TEST(ThreadLocalInstanceImplDispatcherTest, Dispatcher) {
   InstanceImpl tls;
 
-  Stats::IsolatedStoreImpl stats_store;
-  Api::ApiPtr api = Api::createApiForTest(stats_store);
+  Api::ApiPtr api = Api::createApiForTest();
   Event::DispatcherImpl main_dispatcher(*api);
   Event::DispatcherImpl thread_dispatcher(*api);
 
