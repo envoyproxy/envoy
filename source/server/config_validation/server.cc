@@ -17,7 +17,7 @@
 namespace Envoy {
 namespace Server {
 
-bool validateConfig(Options& options, Network::Address::InstanceConstSharedPtr local_address,
+bool validateConfig(const Options& options, Network::Address::InstanceConstSharedPtr local_address,
                     ComponentFactory& component_factory, Thread::ThreadFactory& thread_factory) {
   Thread::MutexBasicLockable access_log_lock;
   Stats::IsolatedStoreImpl stats_store;
@@ -34,7 +34,7 @@ bool validateConfig(Options& options, Network::Address::InstanceConstSharedPtr l
   }
 }
 
-ValidationInstance::ValidationInstance(Options& options, Event::TimeSystem& time_system,
+ValidationInstance::ValidationInstance(const Options& options, Event::TimeSystem& time_system,
                                        Network::Address::InstanceConstSharedPtr local_address,
                                        Stats::IsolatedStoreImpl& store,
                                        Thread::BasicLockable& access_log_lock,
@@ -56,7 +56,7 @@ ValidationInstance::ValidationInstance(Options& options, Event::TimeSystem& time
   }
 }
 
-void ValidationInstance::initialize(Options& options,
+void ValidationInstance::initialize(const Options& options,
                                     Network::Address::InstanceConstSharedPtr local_address,
                                     ComponentFactory& component_factory) {
   // See comments on InstanceImpl::initialize() for the overall flow here.

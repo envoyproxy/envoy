@@ -40,7 +40,7 @@ static BlockMemoryHashSetOptions blockMemHashOptions(uint64_t max_stats) {
   return hash_set_options;
 }
 
-SharedMemory& SharedMemory::initialize(uint64_t stats_set_size, Options& options) {
+SharedMemory& SharedMemory::initialize(uint64_t stats_set_size, const Options& options) {
   Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
 
   const uint64_t entry_size = Stats::RawStatData::structSizeWithOptions(options.statsOptions());
@@ -122,7 +122,7 @@ std::string SharedMemory::version(uint64_t max_num_stats,
                      stats_options.maxNameLength());
 }
 
-HotRestartImpl::HotRestartImpl(Options& options)
+HotRestartImpl::HotRestartImpl(const Options& options)
     : options_(options), stats_set_options_(blockMemHashOptions(options.maxStats())),
       shmem_(SharedMemory::initialize(
           Stats::RawStatDataSet::numBytes(stats_set_options_, options_.statsOptions()), options_)),

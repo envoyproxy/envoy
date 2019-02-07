@@ -339,7 +339,7 @@ public:
   MOCK_METHOD0(initManager, Init::Manager&());
   MOCK_METHOD0(listenerManager, ListenerManager&());
   MOCK_METHOD0(mutexTracer, Envoy::MutexTracer*());
-  MOCK_METHOD0(options, Options&());
+  MOCK_METHOD0(options, const Options&());
   MOCK_METHOD0(overloadManager, OverloadManager&());
   MOCK_METHOD0(random, Runtime::RandomGenerator&());
   MOCK_METHOD0(runtime, Runtime::Loader&());
