@@ -5,8 +5,8 @@ load(
     "envoy_basic_cc_library",
     "envoy_cc_library",
     "envoy_cc_test",
-    "envoy_cc_test_library",
     "envoy_cc_test_infrastructure_library",
+    "envoy_cc_test_library",
     "envoy_package",
 )
 
