@@ -38,7 +38,8 @@ for how to update or override dependencies.
        automake \
        ninja-build \
        curl \
-       unzip
+       unzip \
+       virtualenv
     ```
 
     On Fedora (maybe also other red hat distros), run the following:
@@ -70,7 +71,6 @@ for how to update or override dependencies.
    and also for [Buildifer](https://github.com/bazelbuild/buildtools) which is used for formatting bazel BUILD files.
 1. `go get -u github.com/bazelbuild/buildtools/buildifier` to install buildifier. You may need to set `BUILDIFIER_BIN` to `$GOPATH/bin/buildifier`
    in your shell for buildifier to work.
-1. `sudo apt-get install virtualenv` to install virtualenv (needed by `buildifier`).
 1. `bazel build //source/exe:envoy-static` from the Envoy source directory.
 
 ## Building Bazel with the CI Docker image
