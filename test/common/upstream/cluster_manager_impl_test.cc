@@ -546,6 +546,30 @@ TEST_F(ClusterManagerImplTest, SubsetLoadBalancerRestriction) {
       "cluster: cluster type 'original_dst' may not be used with lb_subset_config");
 }
 
+TEST_F(ClusterManagerImplTest, SubsetLoadBalancerLocalityAware) {
+  const std::string json = R"EOF(
+  {
+    "clusters": [
+    {
+      "name": "cluster_1",
+      "connect_timeout_ms": 250,
+      "type": "static",
+      "lb_type": "round_robin",
+      "hosts": [{"url": "tcp://127.0.0.1:8000"}, {"url": "tcp://127.0.0.1:8001"}]
+    }]
+  }
+  )EOF";
+
+  envoy::config::bootstrap::v2::Bootstrap bootstrap = parseBootstrapFromJson(json);
+  envoy::api::v2::Cluster::LbSubsetConfig* subset_config =
+      bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_lb_subset_config();
+  subset_config->set_locality_weight_aware(true);
+
+  EXPECT_THROW_WITH_MESSAGE(create(bootstrap), EnvoyException,
+                            "Locality weight aware subset LB requires that a "
+                            "locality_weighted_lb_config be set in cluster_1");
+}
+
 TEST_F(ClusterManagerImplTest, RingHashLoadBalancerInitialization) {
   const std::string json = R"EOF(
   {
