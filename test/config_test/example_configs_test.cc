@@ -4,7 +4,7 @@
 #include "test/test_common/utility.h"
 
 namespace Envoy {
-TEST_F(TestBase, ExampleConfigsTest_All) {
+TEST(ExampleConfigsTest, All) {
   TestEnvironment::exec(
       {TestEnvironment::runfilesPath("test/config_test/example_configs_test_setup.sh")});
 

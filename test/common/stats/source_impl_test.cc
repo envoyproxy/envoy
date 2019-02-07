@@ -11,7 +11,7 @@ using testing::ReturnPointee;
 namespace Envoy {
 namespace Stats {
 
-TEST_F(TestBase, SourceImplTest_Caching) {
+TEST(SourceImplTest, Caching) {
   NiceMock<MockStore> store;
   std::vector<CounterSharedPtr> stored_counters;
   std::vector<GaugeSharedPtr> stored_gauges;

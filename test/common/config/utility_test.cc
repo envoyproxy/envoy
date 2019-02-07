@@ -28,7 +28,7 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Config {
 
-TEST_F(TestBase, UtilityTest_GetTypedResources) {
+TEST(UtilityTest, GetTypedResources) {
   envoy::api::v2::DiscoveryResponse response;
   EXPECT_EQ(0, Utility::getTypedResources<envoy::api::v2::ClusterLoadAssignment>(response).size());
 
@@ -46,7 +46,7 @@ TEST_F(TestBase, UtilityTest_GetTypedResources) {
   EXPECT_EQ("1", typed_resources[1].cluster_name());
 }
 
-TEST_F(TestBase, UtilityTest_GetTypedResourcesWrongType) {
+TEST(UtilityTest, GetTypedResourcesWrongType) {
   envoy::api::v2::DiscoveryResponse response;
   envoy::api::v2::ClusterLoadAssignment load_assignment_0;
   load_assignment_0.set_cluster_name("0");
@@ -56,31 +56,31 @@ TEST_F(TestBase, UtilityTest_GetTypedResourcesWrongType) {
                           EnvoyException, "Unable to unpack .*");
 }
 
-TEST_F(TestBase, UtilityTest_ComputeHashedVersion) {
+TEST(UtilityTest, ComputeHashedVersion) {
   EXPECT_EQ("hash_2e1472b57af294d1", Utility::computeHashedVersion("{}").first);
   EXPECT_EQ("hash_33bf00a859c4ba3f", Utility::computeHashedVersion("foo").first);
 }
 
-TEST_F(TestBase, UtilityTest_ApiConfigSourceRefreshDelay) {
+TEST(UtilityTest, ApiConfigSourceRefreshDelay) {
   envoy::api::v2::core::ApiConfigSource api_config_source;
   api_config_source.mutable_refresh_delay()->CopyFrom(
       Protobuf::util::TimeUtil::MillisecondsToDuration(1234));
   EXPECT_EQ(1234, Utility::apiConfigSourceRefreshDelay(api_config_source).count());
 }
 
-TEST_F(TestBase, UtilityTest_ApiConfigSourceDefaultRequestTimeout) {
+TEST(UtilityTest, ApiConfigSourceDefaultRequestTimeout) {
   envoy::api::v2::core::ApiConfigSource api_config_source;
   EXPECT_EQ(1000, Utility::apiConfigSourceRequestTimeout(api_config_source).count());
 }
 
-TEST_F(TestBase, UtilityTest_ApiConfigSourceRequestTimeout) {
+TEST(UtilityTest, ApiConfigSourceRequestTimeout) {
   envoy::api::v2::core::ApiConfigSource api_config_source;
   api_config_source.mutable_request_timeout()->CopyFrom(
       Protobuf::util::TimeUtil::MillisecondsToDuration(1234));
   EXPECT_EQ(1234, Utility::apiConfigSourceRequestTimeout(api_config_source).count());
 }
 
-TEST_F(TestBase, UtilityTest_TranslateApiConfigSource) {
+TEST(UtilityTest, TranslateApiConfigSource) {
   envoy::api::v2::core::ApiConfigSource api_config_source_rest_legacy;
   Utility::translateApiConfigSource("test_rest_legacy_cluster", 10000,
                                     ApiType::get().UnsupportedRestLegacy,
@@ -107,7 +107,7 @@ TEST_F(TestBase, UtilityTest_TranslateApiConfigSource) {
             api_config_source_grpc.grpc_services(0).envoy_grpc().cluster_name());
 }
 
-TEST_F(TestBase, UtilityTest_createTagProducer) {
+TEST(UtilityTest, createTagProducer) {
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
   auto producer = Utility::createTagProducer(bootstrap);
   ASSERT(producer != nullptr);
@@ -117,7 +117,7 @@ TEST_F(TestBase, UtilityTest_createTagProducer) {
   ASSERT_EQ(tags.size(), 1);
 }
 
-TEST_F(TestBase, UtilityTest_ObjNameLength) {
+TEST(UtilityTest, ObjNameLength) {
   Stats::StatsOptionsImpl stats_options;
   std::string name = "listenerwithareallyreallyreallyreallyreallyreallyreallyreallyreallyreallyreal"
                      "lyreallyreallyreallyreallyreallylongnamemorethanmaxcharsallowedbyschema";
@@ -176,7 +176,7 @@ TEST_F(TestBase, UtilityTest_ObjNameLength) {
   }
 }
 
-TEST_F(TestBase, UtilityTest_UnixClusterDns) {
+TEST(UtilityTest, UnixClusterDns) {
 
   std::string cluster_type;
   cluster_type = "strict_dns";
@@ -192,7 +192,7 @@ TEST_F(TestBase, UtilityTest_UnixClusterDns) {
       EnvoyException, "unresolved URL must be TCP scheme, got: unix:///test.sock");
 }
 
-TEST_F(TestBase, UtilityTest_UnixClusterStatic) {
+TEST(UtilityTest, UnixClusterStatic) {
 
   std::string cluster_type;
   cluster_type = "static";
@@ -207,7 +207,7 @@ TEST_F(TestBase, UtilityTest_UnixClusterStatic) {
   EXPECT_EQ("/test.sock", cluster.hosts(0).pipe().path());
 }
 
-TEST_F(TestBase, UtilityTest_CheckFilesystemSubscriptionBackingPath) {
+TEST(UtilityTest, CheckFilesystemSubscriptionBackingPath) {
   Stats::MockIsolatedStatsStore stats_store;
   Api::ApiPtr api = Api::createApiForTest(stats_store);
 
@@ -218,7 +218,7 @@ TEST_F(TestBase, UtilityTest_CheckFilesystemSubscriptionBackingPath) {
   Utility::checkFilesystemSubscriptionBackingPath(test_path, *api);
 }
 
-TEST_F(TestBase, UtilityTest_ParseDefaultRateLimitSettings) {
+TEST(UtilityTest, ParseDefaultRateLimitSettings) {
   envoy::api::v2::core::ApiConfigSource api_config_source;
   const RateLimitSettings& rate_limit_settings = Utility::parseRateLimitSettings(api_config_source);
   EXPECT_EQ(false, rate_limit_settings.enabled_);
@@ -226,7 +226,7 @@ TEST_F(TestBase, UtilityTest_ParseDefaultRateLimitSettings) {
   EXPECT_EQ(10, rate_limit_settings.fill_rate_);
 }
 
-TEST_F(TestBase, UtilityTest_ParseEmptyRateLimitSettings) {
+TEST(UtilityTest, ParseEmptyRateLimitSettings) {
   envoy::api::v2::core::ApiConfigSource api_config_source;
   api_config_source.mutable_rate_limit_settings();
   const RateLimitSettings& rate_limit_settings = Utility::parseRateLimitSettings(api_config_source);
@@ -235,7 +235,7 @@ TEST_F(TestBase, UtilityTest_ParseEmptyRateLimitSettings) {
   EXPECT_EQ(10, rate_limit_settings.fill_rate_);
 }
 
-TEST_F(TestBase, UtilityTest_ParseRateLimitSettings) {
+TEST(UtilityTest, ParseRateLimitSettings) {
   envoy::api::v2::core::ApiConfigSource api_config_source;
   ::envoy::api::v2::core::RateLimitSettings* rate_limits =
       api_config_source.mutable_rate_limit_settings();
@@ -249,7 +249,7 @@ TEST_F(TestBase, UtilityTest_ParseRateLimitSettings) {
 
 // TEST(UtilityTest, FactoryForGrpcApiConfigSource) should catch misconfigured
 // API configs along the dimension of ApiConfigSource type.
-TEST_F(TestBase, UtilityTest_FactoryForGrpcApiConfigSource) {
+TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
   NiceMock<Grpc::MockAsyncClientManager> async_client_manager;
   Stats::MockStore scope;
 
@@ -336,7 +336,7 @@ TEST_F(TestBase, UtilityTest_FactoryForGrpcApiConfigSource) {
   }
 }
 
-TEST_F(TestBase, CheckApiConfigSourceSubscriptionBackingClusterTest_GrpcClusterTestAcrossTypes) {
+TEST(CheckApiConfigSourceSubscriptionBackingClusterTest, GrpcClusterTestAcrossTypes) {
   envoy::api::v2::core::ConfigSource config;
   auto* api_config_source = config.mutable_api_config_source();
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
@@ -392,7 +392,7 @@ TEST_F(TestBase, CheckApiConfigSourceSubscriptionBackingClusterTest_GrpcClusterT
       "envoy::api::v2::core::ConfigSource::GRPC must not have a cluster name specified:");
 }
 
-TEST_F(TestBase, CheckApiConfigSourceSubscriptionBackingClusterTest_RestClusterTestAcrossTypes) {
+TEST(CheckApiConfigSourceSubscriptionBackingClusterTest, RestClusterTestAcrossTypes) {
   envoy::api::v2::core::ConfigSource config;
   auto* api_config_source = config.mutable_api_config_source();
   Upstream::ClusterManager::ClusterInfoMap cluster_map;

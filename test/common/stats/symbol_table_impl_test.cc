@@ -517,7 +517,7 @@ TEST_P(StatNameTest, MutexContentionOnExistingSymbols) {
 // clusters. This test shows the memory drops from almost 8M to less than
 // 2M. Note that only SymbolTableImpl is tested for memory consumption,
 // and not FakeSymbolTableImpl.
-TEST_F(TestBase, SymbolTableTest_Memory) {
+TEST(SymbolTableTest, Memory) {
   if (!TestUtil::hasDeterministicMallocStats()) {
     return;
   }

@@ -25,14 +25,14 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace AccessLog {
 
-TEST_F(TestBase, AccessLogFormatUtilsTest_protocolToString) {
+TEST(AccessLogFormatUtilsTest, protocolToString) {
   EXPECT_EQ("HTTP/1.0", AccessLogFormatUtils::protocolToString(Http::Protocol::Http10));
   EXPECT_EQ("HTTP/1.1", AccessLogFormatUtils::protocolToString(Http::Protocol::Http11));
   EXPECT_EQ("HTTP/2", AccessLogFormatUtils::protocolToString(Http::Protocol::Http2));
   EXPECT_EQ("-", AccessLogFormatUtils::protocolToString({}));
 }
 
-TEST_F(TestBase, AccessLogFormatterTest_plainStringFormatter) {
+TEST(AccessLogFormatterTest, plainStringFormatter) {
   PlainStringFormatter formatter("plain");
   Http::TestHeaderMapImpl header{{":method", "GET"}, {":path", "/"}};
   StreamInfo::MockStreamInfo stream_info;
@@ -40,7 +40,7 @@ TEST_F(TestBase, AccessLogFormatterTest_plainStringFormatter) {
   EXPECT_EQ("plain", formatter.format(header, header, header, stream_info));
 }
 
-TEST_F(TestBase, AccessLogFormatterTest_streamInfoFormatter) {
+TEST(AccessLogFormatterTest, streamInfoFormatter) {
   EXPECT_THROW(StreamInfoFormatter formatter("unknown_field"), EnvoyException);
 
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
@@ -204,7 +204,7 @@ TEST_F(TestBase, AccessLogFormatterTest_streamInfoFormatter) {
   }
 }
 
-TEST_F(TestBase, AccessLogFormatterTest_requestHeaderFormatter) {
+TEST(AccessLogFormatterTest, requestHeaderFormatter) {
   StreamInfo::MockStreamInfo stream_info;
   Http::TestHeaderMapImpl request_header{{":method", "GET"}, {":path", "/"}};
   Http::TestHeaderMapImpl response_header{{":method", "PUT"}};
@@ -235,7 +235,7 @@ TEST_F(TestBase, AccessLogFormatterTest_requestHeaderFormatter) {
   }
 }
 
-TEST_F(TestBase, AccessLogFormatterTest_responseHeaderFormatter) {
+TEST(AccessLogFormatterTest, responseHeaderFormatter) {
   StreamInfo::MockStreamInfo stream_info;
   Http::TestHeaderMapImpl request_header{{":method", "GET"}, {":path", "/"}};
   Http::TestHeaderMapImpl response_header{{":method", "PUT"}, {"test", "test"}};
@@ -266,7 +266,7 @@ TEST_F(TestBase, AccessLogFormatterTest_responseHeaderFormatter) {
   }
 }
 
-TEST_F(TestBase, AccessLogFormatterTest_responseTrailerFormatter) {
+TEST(AccessLogFormatterTest, responseTrailerFormatter) {
   StreamInfo::MockStreamInfo stream_info;
   Http::TestHeaderMapImpl request_header{{":method", "GET"}, {":path", "/"}};
   Http::TestHeaderMapImpl response_header{{":method", "PUT"}, {"test", "test"}};
@@ -316,7 +316,7 @@ void populateMetadataTestData(envoy::api::v2::core::Metadata& metadata) {
   (*metadata.mutable_filter_metadata())["com.test"] = struct_obj;
 }
 
-TEST_F(TestBase, AccessLogFormatterTest_dynamicMetadataFormatter) {
+TEST(AccessLogFormatterTest, dynamicMetadataFormatter) {
   envoy::api::v2::core::Metadata metadata;
   populateMetadataTestData(metadata);
 
@@ -362,7 +362,7 @@ TEST_F(TestBase, AccessLogFormatterTest_dynamicMetadataFormatter) {
   }
 }
 
-TEST_F(TestBase, AccessLogFormatterTest_startTimeFormatter) {
+TEST(AccessLogFormatterTest, startTimeFormatter) {
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   Http::TestHeaderMapImpl header{{":method", "GET"}, {":path", "/"}};
 
@@ -398,7 +398,7 @@ void verifyJsonOutput(std::string json_string,
   }
 }
 
-TEST_F(TestBase, AccessLogFormatterTest_JsonFormatterPlainStringTest) {
+TEST(AccessLogFormatterTest, JsonFormatterPlainStringTest) {
   StreamInfo::MockStreamInfo stream_info;
   Http::TestHeaderMapImpl request_header;
   Http::TestHeaderMapImpl response_header;
@@ -420,7 +420,7 @@ TEST_F(TestBase, AccessLogFormatterTest_JsonFormatterPlainStringTest) {
                    expected_json_map);
 }
 
-TEST_F(TestBase, AccessLogFormatterTest_JsonFormatterSingleOperatorTest) {
+TEST(AccessLogFormatterTest, JsonFormatterSingleOperatorTest) {
   StreamInfo::MockStreamInfo stream_info;
   Http::TestHeaderMapImpl request_header;
   Http::TestHeaderMapImpl response_header;
@@ -440,7 +440,7 @@ TEST_F(TestBase, AccessLogFormatterTest_JsonFormatterSingleOperatorTest) {
                    expected_json_map);
 }
 
-TEST_F(TestBase, AccessLogFormatterTest_JsonFormatterNonExistentHeaderTest) {
+TEST(AccessLogFormatterTest, JsonFormatterNonExistentHeaderTest) {
   StreamInfo::MockStreamInfo stream_info;
   Http::TestHeaderMapImpl request_header{{"some_request_header", "SOME_REQUEST_HEADER"}};
   Http::TestHeaderMapImpl response_header{{"some_response_header", "SOME_RESPONSE_HEADER"}};
@@ -466,7 +466,7 @@ TEST_F(TestBase, AccessLogFormatterTest_JsonFormatterNonExistentHeaderTest) {
                    expected_json_map);
 }
 
-TEST_F(TestBase, AccessLogFormatterTest_JsonFormatterAlternateHeaderTest) {
+TEST(AccessLogFormatterTest, JsonFormatterAlternateHeaderTest) {
   StreamInfo::MockStreamInfo stream_info;
   Http::TestHeaderMapImpl request_header{{"request_present_header", "REQUEST_PRESENT_HEADER"}};
   Http::TestHeaderMapImpl response_header{{"response_present_header", "RESPONSE_PRESENT_HEADER"}};
@@ -496,7 +496,7 @@ TEST_F(TestBase, AccessLogFormatterTest_JsonFormatterAlternateHeaderTest) {
                    expected_json_map);
 }
 
-TEST_F(TestBase, AccessLogFormatterTest_JsonFormatterDynamicMetadataTest) {
+TEST(AccessLogFormatterTest, JsonFormatterDynamicMetadataTest) {
   StreamInfo::MockStreamInfo stream_info;
   Http::TestHeaderMapImpl request_header{{"first", "GET"}, {":path", "/"}};
   Http::TestHeaderMapImpl response_header{{"second", "PUT"}, {"test", "test"}};
@@ -523,7 +523,7 @@ TEST_F(TestBase, AccessLogFormatterTest_JsonFormatterDynamicMetadataTest) {
                    expected_json_map);
 }
 
-TEST_F(TestBase, AccessLogFormatterTest_JsonFormatterStartTimeTest) {
+TEST(AccessLogFormatterTest, JsonFormatterStartTimeTest) {
   StreamInfo::MockStreamInfo stream_info;
   Http::TestHeaderMapImpl request_header;
   Http::TestHeaderMapImpl response_header;
@@ -557,7 +557,7 @@ TEST_F(TestBase, AccessLogFormatterTest_JsonFormatterStartTimeTest) {
                    expected_json_map);
 }
 
-TEST_F(TestBase, AccessLogFormatterTest_JsonFormatterMultiTokenTest) {
+TEST(AccessLogFormatterTest, JsonFormatterMultiTokenTest) {
   {
     StreamInfo::MockStreamInfo stream_info;
     Http::TestHeaderMapImpl request_header{{"some_request_header", "SOME_REQUEST_HEADER"}};
@@ -583,7 +583,7 @@ TEST_F(TestBase, AccessLogFormatterTest_JsonFormatterMultiTokenTest) {
   }
 }
 
-TEST_F(TestBase, AccessLogFormatterTest_CompositeFormatterSuccess) {
+TEST(AccessLogFormatterTest, CompositeFormatterSuccess) {
   StreamInfo::MockStreamInfo stream_info;
   Http::TestHeaderMapImpl request_header{{"first", "GET"}, {":path", "/"}};
   Http::TestHeaderMapImpl response_header{{"second", "PUT"}, {"test", "test"}};
@@ -700,7 +700,7 @@ TEST_F(TestBase, AccessLogFormatterTest_CompositeFormatterSuccess) {
   }
 }
 
-TEST_F(TestBase, AccessLogFormatterTest_ParserFailures) {
+TEST(AccessLogFormatterTest, ParserFailures) {
   AccessLogFormatParser parser;
 
   std::vector<std::string> test_cases = {

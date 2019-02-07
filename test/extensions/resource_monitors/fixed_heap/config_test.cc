@@ -15,7 +15,7 @@ namespace Extensions {
 namespace ResourceMonitors {
 namespace FixedHeapMonitor {
 
-TEST_F(TestBase, FixedHeapMonitorFactoryTest_CreateMonitor) {
+TEST(FixedHeapMonitorFactoryTest, CreateMonitor) {
   auto factory =
       Registry::FactoryRegistry<Server::Configuration::ResourceMonitorFactory>::getFactory(
           "envoy.resource_monitors.fixed_heap");

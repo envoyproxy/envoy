@@ -11,7 +11,7 @@
 namespace Envoy {
 namespace Grpc {
 
-TEST_F(TestBase, GrpcCommonTest_GetGrpcStatus) {
+TEST(GrpcCommonTest, GetGrpcStatus) {
   Http::TestHeaderMapImpl ok_trailers{{"grpc-status", "0"}};
   EXPECT_EQ(Status::Ok, Common::getGrpcStatus(ok_trailers).value());
 
@@ -28,7 +28,7 @@ TEST_F(TestBase, GrpcCommonTest_GetGrpcStatus) {
   EXPECT_EQ(Status::InvalidCode, Common::getGrpcStatus(invalid_trailers).value());
 }
 
-TEST_F(TestBase, GrpcCommonTest_GetGrpcMessage) {
+TEST(GrpcCommonTest, GetGrpcMessage) {
   Http::TestHeaderMapImpl empty_trailers;
   EXPECT_EQ("", Common::getGrpcMessage(empty_trailers));
 
@@ -39,7 +39,7 @@ TEST_F(TestBase, GrpcCommonTest_GetGrpcMessage) {
   EXPECT_EQ("", Common::getGrpcMessage(empty_error_trailers));
 }
 
-TEST_F(TestBase, GrpcCommonTest_GetGrpcTimeout) {
+TEST(GrpcCommonTest, GetGrpcTimeout) {
   Http::TestHeaderMapImpl empty_headers;
   EXPECT_EQ(std::chrono::milliseconds(0), Common::getGrpcTimeout(empty_headers));
 
@@ -74,7 +74,7 @@ TEST_F(TestBase, GrpcCommonTest_GetGrpcTimeout) {
   // so we don't test for them.
 }
 
-TEST_F(TestBase, GrpcCommonTest_ToGrpcTimeout) {
+TEST(GrpcCommonTest, ToGrpcTimeout) {
   Http::HeaderString value;
 
   Common::toGrpcTimeout(std::chrono::milliseconds(0UL), value);
@@ -99,7 +99,7 @@ TEST_F(TestBase, GrpcCommonTest_ToGrpcTimeout) {
   EXPECT_STREQ("99999999H", value.c_str());
 }
 
-TEST_F(TestBase, GrpcCommonTest_ChargeStats) {
+TEST(GrpcCommonTest, ChargeStats) {
   NiceMock<Upstream::MockClusterInfo> cluster;
   Common::chargeStat(cluster, "service", "method", true);
   EXPECT_EQ(1U, cluster.stats_store_.counter("grpc.service.method.success").value());
@@ -129,7 +129,7 @@ TEST_F(TestBase, GrpcCommonTest_ChargeStats) {
   EXPECT_EQ(4U, cluster.stats_store_.counter("grpc.service.method.total").value());
 }
 
-TEST_F(TestBase, GrpcCommonTest_PrepareHeaders) {
+TEST(GrpcCommonTest, PrepareHeaders) {
   {
     Http::MessagePtr message =
         Common::prepareHeaders("cluster", "service_name", "method_name", absl::nullopt);
@@ -202,7 +202,7 @@ TEST_F(TestBase, GrpcCommonTest_PrepareHeaders) {
   }
 }
 
-TEST_F(TestBase, GrpcCommonTest_ResolveServiceAndMethod) {
+TEST(GrpcCommonTest, ResolveServiceAndMethod) {
   std::string service;
   std::string method;
   Http::HeaderMapImpl headers;
@@ -223,7 +223,7 @@ TEST_F(TestBase, GrpcCommonTest_ResolveServiceAndMethod) {
   EXPECT_FALSE(Common::resolveServiceAndMethod(&path, &service, &method));
 }
 
-TEST_F(TestBase, GrpcCommonTest_GrpcToHttpStatus) {
+TEST(GrpcCommonTest, GrpcToHttpStatus) {
   const std::vector<std::pair<Status::GrpcStatus, uint64_t>> test_set = {
       {Status::GrpcStatus::Ok, 200},
       {Status::GrpcStatus::Canceled, 499},
@@ -249,7 +249,7 @@ TEST_F(TestBase, GrpcCommonTest_GrpcToHttpStatus) {
   }
 }
 
-TEST_F(TestBase, GrpcCommonTest_HttpToGrpcStatus) {
+TEST(GrpcCommonTest, HttpToGrpcStatus) {
   const std::vector<std::pair<uint64_t, Status::GrpcStatus>> test_set = {
       {400, Status::GrpcStatus::Internal},         {401, Status::GrpcStatus::Unauthenticated},
       {403, Status::GrpcStatus::PermissionDenied}, {404, Status::GrpcStatus::Unimplemented},
@@ -262,7 +262,7 @@ TEST_F(TestBase, GrpcCommonTest_HttpToGrpcStatus) {
   }
 }
 
-TEST_F(TestBase, GrpcCommonTest_HasGrpcContentType) {
+TEST(GrpcCommonTest, HasGrpcContentType) {
   {
     Http::TestHeaderMapImpl headers{};
     EXPECT_FALSE(Common::hasGrpcContentType(headers));
@@ -281,7 +281,7 @@ TEST_F(TestBase, GrpcCommonTest_HasGrpcContentType) {
   EXPECT_FALSE(isGrpcContentType("application/grpc-web+foo"));
 }
 
-TEST_F(TestBase, GrpcCommonTest_IsGrpcResponseHeader) {
+TEST(GrpcCommonTest, IsGrpcResponseHeader) {
   Http::TestHeaderMapImpl grpc_status_only{{":status", "500"}, {"grpc-status", "14"}};
   EXPECT_TRUE(Common::isGrpcResponseHeader(grpc_status_only, true));
   EXPECT_FALSE(Common::isGrpcResponseHeader(grpc_status_only, false));
@@ -297,7 +297,7 @@ TEST_F(TestBase, GrpcCommonTest_IsGrpcResponseHeader) {
   EXPECT_FALSE(Common::isGrpcResponseHeader(json_response_header, false));
 }
 
-TEST_F(TestBase, GrpcCommonTest_ValidateResponse) {
+TEST(GrpcCommonTest, ValidateResponse) {
   {
     Http::ResponseMessageImpl response(
         Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}});

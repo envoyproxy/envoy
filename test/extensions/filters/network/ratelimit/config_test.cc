@@ -18,14 +18,14 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace RateLimitFilter {
 
-TEST_F(TestBase, RateLimitFilterConfigTest_ValidateFail) {
+TEST(RateLimitFilterConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_THROW(RateLimitConfigFactory().createFilterFactoryFromProto(
                    envoy::config::filter::network::rate_limit::v2::RateLimit(), context),
                ProtoValidationException);
 }
 
-TEST_F(TestBase, RateLimitFilterConfigTest_RatelimitCorrectProto) {
+TEST(RateLimitFilterConfigTest, RatelimitCorrectProto) {
   const std::string yaml = R"EOF(
   stat_prefix: my_stat_prefix
   domain: fake_domain
@@ -62,7 +62,7 @@ TEST_F(TestBase, RateLimitFilterConfigTest_RatelimitCorrectProto) {
   cb(connection);
 }
 
-TEST_F(TestBase, RateLimitFilterConfigTest_RateLimitFilterEmptyProto) {
+TEST(RateLimitFilterConfigTest, RateLimitFilterEmptyProto) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   NiceMock<Server::MockInstance> instance;
   RateLimitConfigFactory factory;

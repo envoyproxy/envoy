@@ -28,7 +28,7 @@ void checkEngine(const RBAC::RoleBasedAccessControlEngineImpl& engine, bool expe
   EXPECT_EQ(expected, engine.allowed(connection, headers, metadata, policy_id));
 }
 
-TEST_F(TestBase, RoleBasedAccessControlEngineImpl_Disabled) {
+TEST(RoleBasedAccessControlEngineImpl, Disabled) {
   envoy::config::rbac::v2alpha::RBAC rbac;
   rbac.set_action(envoy::config::rbac::v2alpha::RBAC_Action::RBAC_Action_ALLOW);
   checkEngine(RBAC::RoleBasedAccessControlEngineImpl(rbac), false);
@@ -37,7 +37,7 @@ TEST_F(TestBase, RoleBasedAccessControlEngineImpl_Disabled) {
   checkEngine(RBAC::RoleBasedAccessControlEngineImpl(rbac), true);
 }
 
-TEST_F(TestBase, RoleBasedAccessControlEngineImpl_AllowedWhitelist) {
+TEST(RoleBasedAccessControlEngineImpl, AllowedWhitelist) {
   envoy::config::rbac::v2alpha::Policy policy;
   policy.add_permissions()->set_destination_port(123);
   policy.add_principals()->set_any(true);
@@ -58,7 +58,7 @@ TEST_F(TestBase, RoleBasedAccessControlEngineImpl_AllowedWhitelist) {
   checkEngine(engine, false, conn);
 }
 
-TEST_F(TestBase, RoleBasedAccessControlEngineImpl_DeniedBlacklist) {
+TEST(RoleBasedAccessControlEngineImpl, DeniedBlacklist) {
   envoy::config::rbac::v2alpha::Policy policy;
   policy.add_permissions()->set_destination_port(123);
   policy.add_principals()->set_any(true);

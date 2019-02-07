@@ -33,7 +33,7 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Tracing {
 
-TEST_F(TestBase, HttpTracerUtilityTest_IsTracing) {
+TEST(HttpTracerUtilityTest, IsTracing) {
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   NiceMock<Stats::MockStore> stats;
   Runtime::RandomGeneratorImpl random;
@@ -110,7 +110,7 @@ TEST_F(TestBase, HttpTracerUtilityTest_IsTracing) {
   }
 }
 
-TEST_F(TestBase, HttpConnManFinalizerImpl_OriginalAndLongPath) {
+TEST(HttpConnManFinalizerImpl, OriginalAndLongPath) {
   const std::string path(300, 'a');
   const std::string path_prefix = "http://";
   const std::string expected_path(128, 'a');
@@ -138,7 +138,7 @@ TEST_F(TestBase, HttpConnManFinalizerImpl_OriginalAndLongPath) {
   HttpTracerUtility::finalizeSpan(span, &request_headers, stream_info, config);
 }
 
-TEST_F(TestBase, HttpConnManFinalizerImpl_NoGeneratedId) {
+TEST(HttpConnManFinalizerImpl, NoGeneratedId) {
   const std::string path(300, 'a');
   const std::string path_prefix = "http://";
   const std::string expected_path(128, 'a');
@@ -164,7 +164,7 @@ TEST_F(TestBase, HttpConnManFinalizerImpl_NoGeneratedId) {
   HttpTracerUtility::finalizeSpan(span, &request_headers, stream_info, config);
 }
 
-TEST_F(TestBase, HttpConnManFinalizerImpl_NullRequestHeaders) {
+TEST(HttpConnManFinalizerImpl, NullRequestHeaders) {
   NiceMock<MockSpan> span;
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
 
@@ -185,7 +185,7 @@ TEST_F(TestBase, HttpConnManFinalizerImpl_NullRequestHeaders) {
   HttpTracerUtility::finalizeSpan(span, nullptr, stream_info, config);
 }
 
-TEST_F(TestBase, HttpConnManFinalizerImpl_UpstreamClusterTagSet) {
+TEST(HttpConnManFinalizerImpl, UpstreamClusterTagSet) {
   NiceMock<MockSpan> span;
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   stream_info.host_->cluster_.name_ = "my_upstream_cluster";
@@ -207,7 +207,7 @@ TEST_F(TestBase, HttpConnManFinalizerImpl_UpstreamClusterTagSet) {
   HttpTracerUtility::finalizeSpan(span, nullptr, stream_info, config);
 }
 
-TEST_F(TestBase, HttpConnManFinalizerImpl_SpanOptionalHeaders) {
+TEST(HttpConnManFinalizerImpl, SpanOptionalHeaders) {
   NiceMock<MockSpan> span;
 
   Http::TestHeaderMapImpl request_headers{{"x-request-id", "id"},
@@ -245,7 +245,7 @@ TEST_F(TestBase, HttpConnManFinalizerImpl_SpanOptionalHeaders) {
   HttpTracerUtility::finalizeSpan(span, &request_headers, stream_info, config);
 }
 
-TEST_F(TestBase, HttpConnManFinalizerImpl_SpanPopulatedFailureResponse) {
+TEST(HttpConnManFinalizerImpl, SpanPopulatedFailureResponse) {
   NiceMock<MockSpan> span;
   Http::TestHeaderMapImpl request_headers{{"x-request-id", "id"},
                                           {":path", "/test"},
@@ -301,12 +301,12 @@ TEST_F(TestBase, HttpConnManFinalizerImpl_SpanPopulatedFailureResponse) {
   HttpTracerUtility::finalizeSpan(span, &request_headers, stream_info, config);
 }
 
-TEST_F(TestBase, HttpTracerUtilityTest_operationTypeToString) {
+TEST(HttpTracerUtilityTest, operationTypeToString) {
   EXPECT_EQ("ingress", HttpTracerUtility::toString(OperationName::Ingress));
   EXPECT_EQ("egress", HttpTracerUtility::toString(OperationName::Egress));
 }
 
-TEST_F(TestBase, HttpNullTracerTest_BasicFunctionality) {
+TEST(HttpNullTracerTest, BasicFunctionality) {
   HttpNullTracer null_tracer;
   MockConfig config;
   StreamInfo::MockStreamInfo stream_info;

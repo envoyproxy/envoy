@@ -16,7 +16,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
 
-TEST_F(TestBase, AppExceptionImplTest_CopyConstructor) {
+TEST(AppExceptionImplTest, CopyConstructor) {
   AppException app_ex(AppExceptionType::InternalError, "msg");
   AppException copy(app_ex);
 
@@ -24,7 +24,7 @@ TEST_F(TestBase, AppExceptionImplTest_CopyConstructor) {
   EXPECT_STREQ("msg", copy.what());
 }
 
-TEST_F(TestBase, AppExceptionImplTest_TestEncode) {
+TEST(AppExceptionImplTest, TestEncode) {
   AppException app_ex(AppExceptionType::InternalError, "msg");
 
   MessageMetadata metadata;
@@ -56,7 +56,7 @@ TEST_F(TestBase, AppExceptionImplTest_TestEncode) {
   EXPECT_EQ(DirectResponse::ResponseType::Exception, app_ex.encode(metadata, proto, buffer));
 }
 
-TEST_F(TestBase, AppExceptionImplTest_TestEncodeEmptyMetadata) {
+TEST(AppExceptionImplTest, TestEncodeEmptyMetadata) {
   AppException app_ex(AppExceptionType::InternalError, "msg");
 
   MessageMetadata metadata;

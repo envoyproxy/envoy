@@ -14,17 +14,17 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
 
-TEST_F(TestBase, FramedTransportTest_Name) {
+TEST(FramedTransportTest, Name) {
   FramedTransportImpl transport;
   EXPECT_EQ(transport.name(), "framed");
 }
 
-TEST_F(TestBase, FramedTransportTest_Type) {
+TEST(FramedTransportTest, Type) {
   FramedTransportImpl transport;
   EXPECT_EQ(transport.type(), TransportType::Framed);
 }
 
-TEST_F(TestBase, FramedTransportTest_NotEnoughData) {
+TEST(FramedTransportTest, NotEnoughData) {
   Buffer::OwnedImpl buffer;
   FramedTransportImpl transport;
   MessageMetadata metadata;
@@ -38,7 +38,7 @@ TEST_F(TestBase, FramedTransportTest_NotEnoughData) {
   EXPECT_THAT(metadata, IsEmptyMetadata());
 }
 
-TEST_F(TestBase, FramedTransportTest_InvalidFrameSize) {
+TEST(FramedTransportTest, InvalidFrameSize) {
   FramedTransportImpl transport;
 
   {
@@ -62,7 +62,7 @@ TEST_F(TestBase, FramedTransportTest_InvalidFrameSize) {
   }
 }
 
-TEST_F(TestBase, FramedTransportTest_DecodeFrameStart) {
+TEST(FramedTransportTest, DecodeFrameStart) {
   FramedTransportImpl transport;
 
   Buffer::OwnedImpl buffer;
@@ -76,7 +76,7 @@ TEST_F(TestBase, FramedTransportTest_DecodeFrameStart) {
   EXPECT_EQ(buffer.length(), 0);
 }
 
-TEST_F(TestBase, FramedTransportTest_DecodeFrameEnd) {
+TEST(FramedTransportTest, DecodeFrameEnd) {
   FramedTransportImpl transport;
 
   Buffer::OwnedImpl buffer;
@@ -84,7 +84,7 @@ TEST_F(TestBase, FramedTransportTest_DecodeFrameEnd) {
   EXPECT_TRUE(transport.decodeFrameEnd(buffer));
 }
 
-TEST_F(TestBase, FramedTransportTest_EncodeFrame) {
+TEST(FramedTransportTest, EncodeFrame) {
   FramedTransportImpl transport;
 
   {

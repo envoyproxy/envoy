@@ -15,7 +15,7 @@ namespace RedisHealthChecker {
 
 typedef Extensions::HealthCheckers::RedisHealthChecker::RedisHealthChecker CustomRedisHealthChecker;
 
-TEST_F(TestBase, HealthCheckerFactoryTest_createRedis) {
+TEST(HealthCheckerFactoryTest, createRedis) {
   const std::string yaml = R"EOF(
     timeout: 1s
     interval: 1s
@@ -39,7 +39,7 @@ TEST_F(TestBase, HealthCheckerFactoryTest_createRedis) {
               .get()));
 }
 
-TEST_F(TestBase, HealthCheckerFactoryTest_createRedisWithoutKey) {
+TEST(HealthCheckerFactoryTest, createRedisWithoutKey) {
   const std::string yaml = R"EOF(
     timeout: 1s
     interval: 1s
@@ -62,7 +62,7 @@ TEST_F(TestBase, HealthCheckerFactoryTest_createRedisWithoutKey) {
               .get()));
 }
 
-TEST_F(TestBase, HealthCheckerFactoryTest_createRedisWithLogHCFailure) {
+TEST(HealthCheckerFactoryTest, createRedisWithLogHCFailure) {
   const std::string yaml = R"EOF(
     timeout: 1s
     interval: 1s
@@ -86,7 +86,7 @@ TEST_F(TestBase, HealthCheckerFactoryTest_createRedisWithLogHCFailure) {
               .get()));
 }
 
-TEST_F(TestBase, HealthCheckerFactoryTest_createRedisViaUpstreamHealthCheckerFactory) {
+TEST(HealthCheckerFactoryTest, createRedisViaUpstreamHealthCheckerFactory) {
   const std::string yaml = R"EOF(
     timeout: 1s
     interval: 1s
@@ -112,7 +112,7 @@ TEST_F(TestBase, HealthCheckerFactoryTest_createRedisViaUpstreamHealthCheckerFac
                              .get()));
 }
 
-TEST_F(TestBase, HealthCheckerFactoryTest_createRedisWithDeprecatedV1JsonConfig) {
+TEST(HealthCheckerFactoryTest, createRedisWithDeprecatedV1JsonConfig) {
   const std::string json = R"EOF(
     {
       "type": "redis",
@@ -137,7 +137,7 @@ TEST_F(TestBase, HealthCheckerFactoryTest_createRedisWithDeprecatedV1JsonConfig)
                              .get()));
 }
 
-TEST_F(TestBase, HealthCheckerFactoryTest_createRedisWithDeprecatedV1JsonConfigWithKey) {
+TEST(HealthCheckerFactoryTest, createRedisWithDeprecatedV1JsonConfigWithKey) {
   const std::string json = R"EOF(
     {
       "type": "redis",

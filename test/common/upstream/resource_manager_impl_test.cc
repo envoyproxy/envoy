@@ -16,7 +16,7 @@ using testing::Return;
 namespace Envoy {
 namespace Upstream {
 
-TEST_F(TestBase, ResourceManagerImplTest_RuntimeResourceManager) {
+TEST(ResourceManagerImplTest, RuntimeResourceManager) {
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Stats::MockGauge> gauge;
   NiceMock<Stats::MockStore> store;

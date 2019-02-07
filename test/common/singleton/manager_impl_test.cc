@@ -16,7 +16,7 @@ static void deathTestWorker() {
   manager.get("foo", [] { return nullptr; });
 }
 
-TEST_F(TestBase, SingletonManagerImplDeathTest_NotRegistered) {
+TEST(SingletonManagerImplDeathTest, NotRegistered) {
   EXPECT_DEATH_LOG_TO_STDERR(deathTestWorker(),
                              "invalid singleton name 'foo'. Make sure it is registered.");
 }
@@ -33,7 +33,7 @@ public:
   MOCK_METHOD0(onDestroy, void());
 };
 
-TEST_F(TestBase, SingletonManagerImplTest_Basic) {
+TEST(SingletonManagerImplTest, Basic) {
   ManagerImpl manager(Thread::threadFactoryForTest().currentThreadId());
 
   std::shared_ptr<TestSingleton> singleton = std::make_shared<TestSingleton>();

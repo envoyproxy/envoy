@@ -16,14 +16,14 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ExtAuthz {
 
-TEST_F(TestBase, ExtAuthzFilterConfigTest_ValidateFail) {
+TEST(ExtAuthzFilterConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_THROW(ExtAuthzConfigFactory().createFilterFactoryFromProto(
                    envoy::config::filter::network::ext_authz::v2::ExtAuthz(), context),
                ProtoValidationException);
 }
 
-TEST_F(TestBase, ExtAuthzFilterConfigTest_ExtAuthzCorrectProto) {
+TEST(ExtAuthzFilterConfigTest, ExtAuthzCorrectProto) {
   std::string yaml = R"EOF(
   grpc_service:
     google_grpc:

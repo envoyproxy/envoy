@@ -16,7 +16,7 @@ public:
   MOCK_METHOD1(destructor_, void(int));
 };
 
-TEST_F(TestBase, StackArray_ConstructorsAndDestructorsCalled) {
+TEST(StackArray, ConstructorsAndDestructorsCalled) {
   STACK_ARRAY(entries, TestEntry, 10);
 
   for (TestEntry& entry : entries) {
@@ -25,7 +25,7 @@ TEST_F(TestBase, StackArray_ConstructorsAndDestructorsCalled) {
   }
 }
 
-TEST_F(TestBase, StackArray_Modification) {
+TEST(StackArray, Modification) {
   STACK_ARRAY(entries, TestEntry, 10);
 
   int i = 0;

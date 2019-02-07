@@ -16,14 +16,14 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace RedisProxy {
 
-TEST_F(TestBase, RedisProxyFilterConfigFactoryTest_ValidateFail) {
+TEST(RedisProxyFilterConfigFactoryTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_THROW(RedisProxyFilterConfigFactory().createFilterFactoryFromProto(
                    envoy::config::filter::network::redis_proxy::v2::RedisProxy(), context),
                ProtoValidationException);
 }
 
-TEST_F(TestBase, RedisProxyFilterConfigFactoryTest_RedisProxyCorrectJson) {
+TEST(RedisProxyFilterConfigFactoryTest, RedisProxyCorrectJson) {
   std::string json_string = R"EOF(
   {
     "cluster_name": "fake_cluster",
@@ -43,7 +43,7 @@ TEST_F(TestBase, RedisProxyFilterConfigFactoryTest_RedisProxyCorrectJson) {
   cb(connection);
 }
 
-TEST_F(TestBase, RedisProxyFilterConfigFactoryTest_RedisProxyCorrectProto) {
+TEST(RedisProxyFilterConfigFactoryTest, RedisProxyCorrectProto) {
   std::string json_string = R"EOF(
   {
     "cluster_name": "fake_cluster",
@@ -65,7 +65,7 @@ TEST_F(TestBase, RedisProxyFilterConfigFactoryTest_RedisProxyCorrectProto) {
   cb(connection);
 }
 
-TEST_F(TestBase, RedisProxyFilterConfigFactoryTest_RedisProxyEmptyProto) {
+TEST(RedisProxyFilterConfigFactoryTest, RedisProxyEmptyProto) {
   std::string json_string = R"EOF(
   {
     "cluster_name": "fake_cluster",

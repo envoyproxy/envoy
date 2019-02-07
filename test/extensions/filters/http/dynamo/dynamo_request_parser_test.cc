@@ -15,7 +15,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Dynamo {
 
-TEST_F(TestBase, DynamoRequestParser_parseOperation) {
+TEST(DynamoRequestParser, parseOperation) {
   // Well formed x-amz-target header, in a format, Version.Operation
   {
     Http::TestHeaderMapImpl headers{{"X", "X"}, {"x-amz-target", "X.Operation"}};
@@ -41,7 +41,7 @@ TEST_F(TestBase, DynamoRequestParser_parseOperation) {
   }
 }
 
-TEST_F(TestBase, DynamoRequestParser_parseTableNameSingleOperation) {
+TEST(DynamoRequestParser, parseTableNameSingleOperation) {
   std::vector<std::string> supported_single_operations{"GetItem", "Query",      "Scan",
                                                        "PutItem", "UpdateItem", "DeleteItem"};
 
@@ -72,7 +72,7 @@ TEST_F(TestBase, DynamoRequestParser_parseTableNameSingleOperation) {
   }
 }
 
-TEST_F(TestBase, DynamoRequestParser_parseErrorType) {
+TEST(DynamoRequestParser, parseErrorType) {
   {
     EXPECT_EQ("ResourceNotFoundException",
               RequestParser::parseErrorType(*Json::Factory::loadFromString(
@@ -92,7 +92,7 @@ TEST_F(TestBase, DynamoRequestParser_parseErrorType) {
   }
 }
 
-TEST_F(TestBase, DynamoRequestParser_parseTableNameBatchOperation) {
+TEST(DynamoRequestParser, parseTableNameBatchOperation) {
   {
     std::string json_string = R"EOF(
     {
@@ -180,7 +180,7 @@ TEST_F(TestBase, DynamoRequestParser_parseTableNameBatchOperation) {
     EXPECT_TRUE(table.is_single_table);
   }
 }
-TEST_F(TestBase, DynamoRequestParser_parseBatchUnProcessedKeys) {
+TEST(DynamoRequestParser, parseBatchUnProcessedKeys) {
   {
     Json::ObjectSharedPtr json_data = Json::Factory::loadFromString("{}");
     std::vector<std::string> unprocessed_tables =
@@ -221,7 +221,7 @@ TEST_F(TestBase, DynamoRequestParser_parseBatchUnProcessedKeys) {
   }
 }
 
-TEST_F(TestBase, DynamoRequestParser_parsePartitionIds) {
+TEST(DynamoRequestParser, parsePartitionIds) {
   {
     std::vector<RequestParser::PartitionDescriptor> partitions =
         RequestParser::parsePartitions(*Json::Factory::loadFromString("{}"));

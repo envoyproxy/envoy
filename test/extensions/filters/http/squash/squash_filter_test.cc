@@ -50,7 +50,7 @@ void EXPECT_JSON_EQ(const std::string& expected, const std::string& actual) {
 
 } // namespace
 
-TEST_F(TestBase, SoloFilterConfigTest_V1ApiConversion) {
+TEST(SoloFilterConfigTest, V1ApiConversion) {
   std::string json = R"EOF(
     {
       "cluster" : "fake_cluster",
@@ -73,7 +73,7 @@ TEST_F(TestBase, SoloFilterConfigTest_V1ApiConversion) {
   EXPECT_EQ(std::chrono::milliseconds(3003), config.attachmentTimeout());
 }
 
-TEST_F(TestBase, SoloFilterConfigTest_NoCluster) {
+TEST(SoloFilterConfigTest, NoCluster) {
   std::string json = R"EOF(
     {
       "cluster" : "fake_cluster",
@@ -91,7 +91,7 @@ TEST_F(TestBase, SoloFilterConfigTest_NoCluster) {
                             "squash filter: unknown cluster 'fake_cluster' in squash config");
 }
 
-TEST_F(TestBase, SoloFilterConfigTest_ParsesEnvironment) {
+TEST(SoloFilterConfigTest, ParsesEnvironment) {
   std::string json = R"EOF(
     {
       "cluster" : "squash",
@@ -108,7 +108,7 @@ TEST_F(TestBase, SoloFilterConfigTest_ParsesEnvironment) {
   EXPECT_JSON_EQ(expected_json, config.attachmentJson());
 }
 
-TEST_F(TestBase, SoloFilterConfigTest_ParsesAndEscapesEnvironment) {
+TEST(SoloFilterConfigTest, ParsesAndEscapesEnvironment) {
   TestEnvironment::setEnvVar("ESCAPE_ENV", "\"", 1);
 
   std::string json = R"EOF(
@@ -126,7 +126,7 @@ TEST_F(TestBase, SoloFilterConfigTest_ParsesAndEscapesEnvironment) {
   auto config = constructSquashFilterConfigFromJson(*json_config, factory_context);
   EXPECT_JSON_EQ(expected_json, config.attachmentJson());
 }
-TEST_F(TestBase, SoloFilterConfigTest_TwoEnvironmentVariables) {
+TEST(SoloFilterConfigTest, TwoEnvironmentVariables) {
   TestEnvironment::setEnvVar("ENV1", "1", 1);
   TestEnvironment::setEnvVar("ENV2", "2", 1);
 
@@ -145,7 +145,7 @@ TEST_F(TestBase, SoloFilterConfigTest_TwoEnvironmentVariables) {
   EXPECT_JSON_EQ(expected_json, config.attachmentJson());
 }
 
-TEST_F(TestBase, SoloFilterConfigTest_ParsesEnvironmentInComplexTemplate) {
+TEST(SoloFilterConfigTest, ParsesEnvironmentInComplexTemplate) {
   TestEnvironment::setEnvVar("CONF_ENV", "some-config-value", 1);
 
   std::string json = R"EOF(

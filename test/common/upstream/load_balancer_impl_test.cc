@@ -1319,7 +1319,7 @@ TEST_P(RandomLoadBalancerTest, Normal) {
 
 INSTANTIATE_TEST_SUITE_P(PrimaryOrFailover, RandomLoadBalancerTest, ::testing::Values(true, false));
 
-TEST_F(TestBase, LoadBalancerSubsetInfoImplTest_DefaultConfigIsDiabled) {
+TEST(LoadBalancerSubsetInfoImplTest, DefaultConfigIsDiabled) {
   auto subset_info =
       LoadBalancerSubsetInfoImpl(envoy::api::v2::Cluster::LbSubsetConfig::default_instance());
 
@@ -1329,7 +1329,7 @@ TEST_F(TestBase, LoadBalancerSubsetInfoImplTest_DefaultConfigIsDiabled) {
   EXPECT_EQ(subset_info.subsetKeys().size(), 0);
 }
 
-TEST_F(TestBase, LoadBalancerSubsetInfoImplTest_SubsetConfig) {
+TEST(LoadBalancerSubsetInfoImplTest, SubsetConfig) {
   auto subset_value = ProtobufWkt::Value();
   subset_value.set_string_value("the value");
 

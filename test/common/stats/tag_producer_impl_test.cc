@@ -9,7 +9,7 @@
 namespace Envoy {
 namespace Stats {
 
-TEST_F(TestBase, TagProducerTest_CheckConstructor) {
+TEST(TagProducerTest, CheckConstructor) {
   envoy::config::metrics::v2::StatsConfig stats_config;
 
   // Should pass there were no tag name conflict.

@@ -16,7 +16,7 @@ namespace Extensions {
 namespace Tracers {
 namespace DynamicOt {
 
-TEST_F(TestBase, DynamicOtTracerConfigTest_DynamicOpentracingHttpTracer) {
+TEST(DynamicOtTracerConfigTest, DynamicOpentracingHttpTracer) {
   NiceMock<Server::MockInstance> server;
   EXPECT_CALL(server.cluster_manager_, get("fake_cluster"))
       .WillRepeatedly(Return(&server.cluster_manager_.thread_local_cluster_));

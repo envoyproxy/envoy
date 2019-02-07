@@ -14,7 +14,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace HealthCheck {
 
-TEST_F(TestBase, HealthCheckFilterConfig_HealthCheckFilter) {
+TEST(HealthCheckFilterConfig, HealthCheckFilter) {
   std::string json_string = R"EOF(
   {
     "pass_through_mode" : true,
@@ -31,7 +31,7 @@ TEST_F(TestBase, HealthCheckFilterConfig_HealthCheckFilter) {
   cb(filter_callback);
 }
 
-TEST_F(TestBase, HealthCheckFilterConfig_BadHealthCheckFilterConfig) {
+TEST(HealthCheckFilterConfig, BadHealthCheckFilterConfig) {
   std::string json_string = R"EOF(
   {
     "pass_through_mode" : true,
@@ -46,7 +46,7 @@ TEST_F(TestBase, HealthCheckFilterConfig_BadHealthCheckFilterConfig) {
   EXPECT_THROW(factory.createFilterFactory(*json_config, "stats", context), Json::Exception);
 }
 
-TEST_F(TestBase, HealthCheckFilterConfig_FailsWhenNotPassThroughButTimeoutSetJson) {
+TEST(HealthCheckFilterConfig, FailsWhenNotPassThroughButTimeoutSetJson) {
   HealthCheckFilterConfig healthCheckFilterConfig;
   Json::ObjectSharedPtr config = Json::Factory::loadFromString(
       "{\"pass_through_mode\":false, \"cache_time_ms\":234, \"endpoint\":\"foo\"}");
@@ -56,7 +56,7 @@ TEST_F(TestBase, HealthCheckFilterConfig_FailsWhenNotPassThroughButTimeoutSetJso
                EnvoyException);
 }
 
-TEST_F(TestBase, HealthCheckFilterConfig_NotFailingWhenNotPassThroughAndTimeoutNotSetJson) {
+TEST(HealthCheckFilterConfig, NotFailingWhenNotPassThroughAndTimeoutNotSetJson) {
   HealthCheckFilterConfig healthCheckFilterConfig;
   Json::ObjectSharedPtr config =
       Json::Factory::loadFromString("{\"pass_through_mode\":false, \"endpoint\":\"foo\"}");
@@ -65,7 +65,7 @@ TEST_F(TestBase, HealthCheckFilterConfig_NotFailingWhenNotPassThroughAndTimeoutN
   healthCheckFilterConfig.createFilterFactory(*config, "dummy_stats_prefix", context);
 }
 
-TEST_F(TestBase, HealthCheckFilterConfig_FailsWhenNotPassThroughButTimeoutSetProto) {
+TEST(HealthCheckFilterConfig, FailsWhenNotPassThroughButTimeoutSetProto) {
   HealthCheckFilterConfig healthCheckFilterConfig;
   envoy::config::filter::http::health_check::v2::HealthCheck config{};
   NiceMock<Server::Configuration::MockFactoryContext> context;
@@ -81,7 +81,7 @@ TEST_F(TestBase, HealthCheckFilterConfig_FailsWhenNotPassThroughButTimeoutSetPro
       EnvoyException);
 }
 
-TEST_F(TestBase, HealthCheckFilterConfig_NotFailingWhenNotPassThroughAndTimeoutNotSetProto) {
+TEST(HealthCheckFilterConfig, NotFailingWhenNotPassThroughAndTimeoutNotSetProto) {
   HealthCheckFilterConfig healthCheckFilterConfig;
   envoy::config::filter::http::health_check::v2::HealthCheck config{};
   NiceMock<Server::Configuration::MockFactoryContext> context;
@@ -93,7 +93,7 @@ TEST_F(TestBase, HealthCheckFilterConfig_NotFailingWhenNotPassThroughAndTimeoutN
   healthCheckFilterConfig.createFilterFactoryFromProto(config, "dummy_stats_prefix", context);
 }
 
-TEST_F(TestBase, HealthCheckFilterConfig_HealthCheckFilterWithEmptyProto) {
+TEST(HealthCheckFilterConfig, HealthCheckFilterWithEmptyProto) {
   HealthCheckFilterConfig healthCheckFilterConfig;
   NiceMock<Server::Configuration::MockFactoryContext> context;
   envoy::config::filter::http::health_check::v2::HealthCheck config =
@@ -148,7 +148,7 @@ void testHealthCheckHeaderMatch(
 }
 
 // Basic header match with two conditions should match if both conditions are satisfied.
-TEST_F(TestBase, HealthCheckFilterConfig_HealthCheckFilterHeaderMatch) {
+TEST(HealthCheckFilterConfig, HealthCheckFilterHeaderMatch) {
   envoy::config::filter::http::health_check::v2::HealthCheck config;
 
   config.mutable_pass_through_mode()->set_value(false);
@@ -166,7 +166,7 @@ TEST_F(TestBase, HealthCheckFilterConfig_HealthCheckFilterHeaderMatch) {
 }
 
 // The match should fail if a single header value fails to match.
-TEST_F(TestBase, HealthCheckFilterConfig_HealthCheckFilterHeaderMatchWrongValue) {
+TEST(HealthCheckFilterConfig, HealthCheckFilterHeaderMatchWrongValue) {
   envoy::config::filter::http::health_check::v2::HealthCheck config;
 
   config.mutable_pass_through_mode()->set_value(false);
@@ -184,7 +184,7 @@ TEST_F(TestBase, HealthCheckFilterConfig_HealthCheckFilterHeaderMatchWrongValue)
 }
 
 // If either of the specified headers is completely missing the match should fail.
-TEST_F(TestBase, HealthCheckFilterConfig_HealthCheckFilterHeaderMatchMissingHeader) {
+TEST(HealthCheckFilterConfig, HealthCheckFilterHeaderMatchMissingHeader) {
   envoy::config::filter::http::health_check::v2::HealthCheck config;
 
   config.mutable_pass_through_mode()->set_value(false);
@@ -202,7 +202,7 @@ TEST_F(TestBase, HealthCheckFilterConfig_HealthCheckFilterHeaderMatchMissingHead
 }
 
 // Conditions for the same header should match if they are both satisfied.
-TEST_F(TestBase, HealthCheckFilterConfig_HealthCheckFilterDuplicateMatch) {
+TEST(HealthCheckFilterConfig, HealthCheckFilterDuplicateMatch) {
   envoy::config::filter::http::health_check::v2::HealthCheck config;
 
   config.mutable_pass_through_mode()->set_value(false);
@@ -220,7 +220,7 @@ TEST_F(TestBase, HealthCheckFilterConfig_HealthCheckFilterDuplicateMatch) {
 }
 
 // Conditions on the same header should not match if one or more is not satisfied.
-TEST_F(TestBase, HealthCheckFilterConfig_HealthCheckFilterDuplicateNoMatch) {
+TEST(HealthCheckFilterConfig, HealthCheckFilterDuplicateNoMatch) {
   envoy::config::filter::http::health_check::v2::HealthCheck config;
 
   config.mutable_pass_through_mode()->set_value(false);

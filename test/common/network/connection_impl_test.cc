@@ -42,14 +42,14 @@ using testing::StrictMock;
 namespace Envoy {
 namespace Network {
 
-TEST_F(TestBase, RawBufferSocket_TestBasics) {
+TEST(RawBufferSocket, TestBasics) {
   TransportSocketPtr raw_buffer_socket(Network::Test::createRawBufferSocket());
   EXPECT_FALSE(raw_buffer_socket->ssl());
   EXPECT_TRUE(raw_buffer_socket->canFlushClose());
   EXPECT_EQ("", raw_buffer_socket->protocol());
 }
 
-TEST_F(TestBase, ConnectionImplUtility_updateBufferStats) {
+TEST(ConnectionImplUtility, updateBufferStats) {
   StrictMock<Stats::MockCounter> counter;
   StrictMock<Stats::MockGauge> gauge;
   uint64_t previous_total = 0;

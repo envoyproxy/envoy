@@ -4,7 +4,7 @@
 
 namespace Envoy {
 
-TEST_F(TestBase, CleanupTest_ScopeExitCallback) {
+TEST(CleanupTest, ScopeExitCallback) {
   bool callback_fired = false;
   {
     Cleanup cleanup([&callback_fired] { callback_fired = true; });

@@ -411,7 +411,7 @@ TEST_F(AccessLogImplTest, requestTracing) {
   }
 }
 
-TEST_F(TestBase, AccessLogImplTestCtor_FiltersMissingInOrAndFilter) {
+TEST(AccessLogImplTestCtor, FiltersMissingInOrAndFilter) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
   {
@@ -533,7 +533,7 @@ TEST_F(AccessLogImplTest, multipleOperators) {
   }
 }
 
-TEST_F(TestBase, AccessLogFilterTest_DurationWithRuntimeKey) {
+TEST(AccessLogFilterTest, DurationWithRuntimeKey) {
   std::string filter_json = R"EOF(
     {
       "filter": {"type": "duration", "op": ">=", "value": 1000000, "runtime_key": "key"}
@@ -567,7 +567,7 @@ TEST_F(TestBase, AccessLogFilterTest_DurationWithRuntimeKey) {
   EXPECT_FALSE(filter.evaluate(stream_info, request_headers));
 }
 
-TEST_F(TestBase, AccessLogFilterTest_StatusCodeWithRuntimeKey) {
+TEST(AccessLogFilterTest, StatusCodeWithRuntimeKey) {
   std::string filter_json = R"EOF(
     {
       "filter": {"type": "status_code", "op": ">=", "value": 300, "runtime_key": "key"}

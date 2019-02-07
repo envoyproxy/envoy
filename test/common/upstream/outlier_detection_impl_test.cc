@@ -31,7 +31,7 @@ namespace Envoy {
 namespace Upstream {
 namespace Outlier {
 
-TEST_F(TestBase, OutlierDetectorImplFactoryTest_NoDetector) {
+TEST(OutlierDetectorImplFactoryTest, NoDetector) {
   NiceMock<MockCluster> cluster;
   NiceMock<Event::MockDispatcher> dispatcher;
   NiceMock<Runtime::MockLoader> runtime;
@@ -40,7 +40,7 @@ TEST_F(TestBase, OutlierDetectorImplFactoryTest_NoDetector) {
                                                   dispatcher, runtime, nullptr));
 }
 
-TEST_F(TestBase, OutlierDetectorImplFactoryTest_Detector) {
+TEST(OutlierDetectorImplFactoryTest, Detector) {
   auto fake_cluster = defaultStaticCluster("fake_cluster");
   fake_cluster.mutable_outlier_detection();
 
@@ -762,7 +762,7 @@ TEST_F(OutlierDetectorImplTest, Consecutive_5xxAlreadyEjected) {
   loadRq(hosts_[0], 5, 500);
 }
 
-TEST_F(TestBase, DetectorHostMonitorNullImplTest_All) {
+TEST(DetectorHostMonitorNullImplTest, All) {
   DetectorHostMonitorNullImpl null_sink;
 
   EXPECT_EQ(0UL, null_sink.numEjections());
@@ -770,7 +770,7 @@ TEST_F(TestBase, DetectorHostMonitorNullImplTest_All) {
   EXPECT_FALSE(null_sink.lastUnejectionTime());
 }
 
-TEST_F(TestBase, OutlierDetectionEventLoggerImplTest_All) {
+TEST(OutlierDetectionEventLoggerImplTest, All) {
   AccessLog::MockAccessLogManager log_manager;
   std::shared_ptr<Filesystem::MockFile> file(new Filesystem::MockFile());
   NiceMock<MockClusterInfo> cluster;
@@ -846,7 +846,7 @@ TEST_F(TestBase, OutlierDetectionEventLoggerImplTest_All) {
   Json::Factory::loadFromString(log4);
 }
 
-TEST_F(TestBase, OutlierUtility_SRThreshold) {
+TEST(OutlierUtility, SRThreshold) {
   std::vector<HostSuccessRatePair> data = {
       HostSuccessRatePair(nullptr, 50),  HostSuccessRatePair(nullptr, 100),
       HostSuccessRatePair(nullptr, 100), HostSuccessRatePair(nullptr, 100),
@@ -859,7 +859,7 @@ TEST_F(TestBase, OutlierUtility_SRThreshold) {
   EXPECT_EQ(90.0, ejection_pair.success_rate_average_);
 }
 
-TEST_F(TestBase, DetectorHostMonitorImpl_resultToHttpCode) {
+TEST(DetectorHostMonitorImpl, resultToHttpCode) {
   EXPECT_EQ(Http::Code::OK, DetectorHostMonitorImpl::resultToHttpCode(Result::SUCCESS));
   EXPECT_EQ(Http::Code::GatewayTimeout, DetectorHostMonitorImpl::resultToHttpCode(Result::TIMEOUT));
   EXPECT_EQ(Http::Code::ServiceUnavailable,

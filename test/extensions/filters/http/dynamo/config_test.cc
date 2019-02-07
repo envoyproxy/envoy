@@ -12,7 +12,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Dynamo {
 
-TEST_F(TestBase, DynamoFilterConfigTest_DynamoFilter) {
+TEST(DynamoFilterConfigTest, DynamoFilter) {
   std::string json_string = R"EOF(
   {
   }

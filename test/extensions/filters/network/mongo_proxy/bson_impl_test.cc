@@ -13,12 +13,12 @@ namespace NetworkFilters {
 namespace MongoProxy {
 namespace Bson {
 
-TEST_F(TestBase, BsonImplTest_BadCast) {
+TEST(BsonImplTest, BadCast) {
   DocumentSharedPtr doc = DocumentImpl::create()->addString("hello", "world");
   EXPECT_THROW(doc->values().front()->asDouble(), EnvoyException);
 }
 
-TEST_F(TestBase, BsonImplTest_Equal) {
+TEST(BsonImplTest, Equal) {
   DocumentSharedPtr doc1 = DocumentImpl::create();
   DocumentSharedPtr doc2 = DocumentImpl::create()->addString("hello", "world");
   EXPECT_FALSE(*doc1 == *doc2);
@@ -27,13 +27,13 @@ TEST_F(TestBase, BsonImplTest_Equal) {
   EXPECT_FALSE(*doc1 == *doc2);
 }
 
-TEST_F(TestBase, BsonImplTest_InvalidMessageLength) {
+TEST(BsonImplTest, InvalidMessageLength) {
   Buffer::OwnedImpl buffer;
   BufferHelper::writeInt32(buffer, 100);
   EXPECT_THROW(DocumentImpl::create(buffer), EnvoyException);
 }
 
-TEST_F(TestBase, BsonImplTest_InvalidElementType) {
+TEST(BsonImplTest, InvalidElementType) {
   Buffer::OwnedImpl buffer;
   std::string key_name("hello");
   BufferHelper::writeInt32(buffer, 4 + 1 + key_name.size() + 1);
@@ -43,7 +43,7 @@ TEST_F(TestBase, BsonImplTest_InvalidElementType) {
   EXPECT_THROW(DocumentImpl::create(buffer), EnvoyException);
 }
 
-TEST_F(TestBase, BsonImplTest_InvalodDocumentTermination) {
+TEST(BsonImplTest, InvalodDocumentTermination) {
   Buffer::OwnedImpl buffer;
   BufferHelper::writeInt32(buffer, 5);
   uint8_t invalid_document_end = 0x1;
@@ -51,7 +51,7 @@ TEST_F(TestBase, BsonImplTest_InvalodDocumentTermination) {
   EXPECT_THROW(DocumentImpl::create(buffer), EnvoyException);
 }
 
-TEST_F(TestBase, BufferHelperTest_InvalidSize) {
+TEST(BufferHelperTest, InvalidSize) {
   {
     Buffer::OwnedImpl buffer;
     EXPECT_THROW(BufferHelper::peekInt32(buffer), EnvoyException);

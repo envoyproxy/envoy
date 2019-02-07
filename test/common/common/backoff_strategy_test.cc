@@ -8,7 +8,7 @@ using testing::Return;
 
 namespace Envoy {
 
-TEST_F(TestBase, BackOffStrategyTest_JitteredBackOffBasicFlow) {
+TEST(BackOffStrategyTest, JitteredBackOffBasicFlow) {
   NiceMock<Runtime::MockRandomGenerator> random;
   ON_CALL(random, random()).WillByDefault(Return(27));
 
@@ -17,7 +17,7 @@ TEST_F(TestBase, BackOffStrategyTest_JitteredBackOffBasicFlow) {
   EXPECT_EQ(27, jittered_back_off.nextBackOffMs());
 }
 
-TEST_F(TestBase, BackOffStrategyTest_JitteredBackOffBasicReset) {
+TEST(BackOffStrategyTest, JitteredBackOffBasicReset) {
   NiceMock<Runtime::MockRandomGenerator> random;
   ON_CALL(random, random()).WillByDefault(Return(27));
 
@@ -29,7 +29,7 @@ TEST_F(TestBase, BackOffStrategyTest_JitteredBackOffBasicReset) {
   EXPECT_EQ(2, jittered_back_off.nextBackOffMs()); // Should start from start
 }
 
-TEST_F(TestBase, BackOffStrategyTest_JitteredBackOffWithMaxInterval) {
+TEST(BackOffStrategyTest, JitteredBackOffWithMaxInterval) {
   NiceMock<Runtime::MockRandomGenerator> random;
   ON_CALL(random, random()).WillByDefault(Return(1024));
 
@@ -42,7 +42,7 @@ TEST_F(TestBase, BackOffStrategyTest_JitteredBackOffWithMaxInterval) {
   EXPECT_EQ(94, jittered_back_off.nextBackOffMs()); // Should return Max here
 }
 
-TEST_F(TestBase, BackOffStrategyTest_JitteredBackOffWithMaxIntervalReset) {
+TEST(BackOffStrategyTest, JitteredBackOffWithMaxIntervalReset) {
   NiceMock<Runtime::MockRandomGenerator> random;
   ON_CALL(random, random()).WillByDefault(Return(1024));
 

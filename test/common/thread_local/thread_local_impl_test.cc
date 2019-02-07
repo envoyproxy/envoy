@@ -113,7 +113,7 @@ TEST_F(ThreadLocalInstanceImplTest, RunOnAllThreads) {
 }
 
 // Validate ThreadLocal::InstanceImpl's dispatcher() behavior.
-TEST_F(TestBase, ThreadLocalInstanceImplDispatcherTest_Dispatcher) {
+TEST(ThreadLocalInstanceImplDispatcherTest, Dispatcher) {
   InstanceImpl tls;
 
   Stats::IsolatedStoreImpl stats_store;

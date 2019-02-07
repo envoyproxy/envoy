@@ -22,7 +22,7 @@ namespace NetworkFilters {
 namespace SniCluster {
 
 // Test that a SniCluster filter config works.
-TEST_F(TestBase, SniCluster_ConfigTest) {
+TEST(SniCluster, ConfigTest) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   SniClusterNetworkFilterConfigFactory factory;
 
@@ -34,7 +34,7 @@ TEST_F(TestBase, SniCluster_ConfigTest) {
 }
 
 // Test that per connection filter config is set if SNI is available
-TEST_F(TestBase, SniCluster_SetTcpProxyClusterOnlyIfSniIsPresent) {
+TEST(SniCluster, SetTcpProxyClusterOnlyIfSniIsPresent) {
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks;
 
   NiceMock<StreamInfo::MockStreamInfo> stream_info;

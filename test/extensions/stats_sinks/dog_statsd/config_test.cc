@@ -59,7 +59,7 @@ TEST_P(DogStatsdConfigLoopbackTest, ValidUdpIp) {
 }
 
 // Negative test for protoc-gen-validate constraints for dog_statsd.
-TEST_F(TestBase, DogStatsdConfigTest_ValidateFail) {
+TEST(DogStatsdConfigTest, ValidateFail) {
   NiceMock<Server::MockInstance> server;
   EXPECT_THROW(
       DogStatsdSinkFactory().createStatsSink(envoy::config::metrics::v2::DogStatsdSink(), server),

@@ -17,7 +17,7 @@ namespace Extensions {
 namespace ResourceMonitors {
 namespace InjectedResourceMonitor {
 
-TEST_F(TestBase, InjectedResourceMonitorFactoryTest_CreateMonitor) {
+TEST(InjectedResourceMonitorFactoryTest, CreateMonitor) {
   auto factory =
       Registry::FactoryRegistry<Server::Configuration::ResourceMonitorFactory>::getFactory(
           "envoy.resource_monitors.injected_resource");

@@ -22,7 +22,7 @@ namespace Envoy {
 // not ours instead of what this test expects. As of latest Clang this appears
 // to include abort() as well.
 #ifndef ASANITIZED
-TEST_F(TestBase, SignalsDeathTest_InvalidAddressDeathTest) {
+TEST(SignalsDeathTest, InvalidAddressDeathTest) {
   SignalAction actions;
   EXPECT_DEATH_LOG_TO_STDERR(
       []() -> void {
@@ -33,7 +33,7 @@ TEST_F(TestBase, SignalsDeathTest_InvalidAddressDeathTest) {
       "backtrace.*Segmentation fault");
 }
 
-TEST_F(TestBase, SignalsDeathTest_BusDeathTest) {
+TEST(SignalsDeathTest, BusDeathTest) {
   SignalAction actions;
   EXPECT_DEATH_LOG_TO_STDERR(
       []() -> void {
@@ -49,7 +49,7 @@ TEST_F(TestBase, SignalsDeathTest_BusDeathTest) {
       "backtrace.*Bus");
 }
 
-TEST_F(TestBase, SignalsDeathTest_BadMathDeathTest) {
+TEST(SignalsDeathTest, BadMathDeathTest) {
   SignalAction actions;
   EXPECT_DEATH_LOG_TO_STDERR(
       []() -> void {
@@ -62,7 +62,7 @@ TEST_F(TestBase, SignalsDeathTest_BadMathDeathTest) {
 
 #if defined(__x86_64__) || defined(__i386__)
 // Unfortunately we don't have a reliable way to do this on other platforms
-TEST_F(TestBase, SignalsDeathTest_IllegalInstructionDeathTest) {
+TEST(SignalsDeathTest, IllegalInstructionDeathTest) {
   SignalAction actions;
   EXPECT_DEATH_LOG_TO_STDERR(
       []() -> void {
@@ -73,12 +73,12 @@ TEST_F(TestBase, SignalsDeathTest_IllegalInstructionDeathTest) {
 }
 #endif
 
-TEST_F(TestBase, SignalsDeathTest_AbortDeathTest) {
+TEST(SignalsDeathTest, AbortDeathTest) {
   SignalAction actions;
   EXPECT_DEATH_LOG_TO_STDERR([]() -> void { abort(); }(), "backtrace.*Abort(ed)?");
 }
 
-TEST_F(TestBase, SignalsDeathTest_RestoredPreviousHandlerDeathTest) {
+TEST(SignalsDeathTest, RestoredPreviousHandlerDeathTest) {
   SignalAction action;
   {
     SignalAction inner_action;
@@ -91,19 +91,19 @@ TEST_F(TestBase, SignalsDeathTest_RestoredPreviousHandlerDeathTest) {
 }
 #endif
 
-TEST_F(TestBase, SignalsDeathTest_IllegalStackAccessDeathTest) {
+TEST(SignalsDeathTest, IllegalStackAccessDeathTest) {
   SignalAction actions;
   EXPECT_DEATH(actions.tryEvilAccessForTest(false), "");
   EXPECT_DEATH(actions.tryEvilAccessForTest(true), "");
 }
 
-TEST_F(TestBase, Signals_LegalTest) {
+TEST(Signals, LegalTest) {
   // Don't do anything wrong.
   { SignalAction actions; }
   // Nothing should happen...
 }
 
-TEST_F(TestBase, Signals_RaiseNonFatalTest) {
+TEST(Signals, RaiseNonFatalTest) {
   {
     SignalAction actions;
     // I urgently request that you do nothing please!
@@ -112,12 +112,12 @@ TEST_F(TestBase, Signals_RaiseNonFatalTest) {
   // Nothing should happen...
 }
 
-TEST_F(TestBase, Signals_LegalStackAccessTest) {
+TEST(Signals, LegalStackAccessTest) {
   SignalAction actions;
   actions.doGoodAccessForTest();
 }
 
-TEST_F(TestBase, Signals_HandlerTest) {
+TEST(Signals, HandlerTest) {
   siginfo_t fake_si;
   fake_si.si_addr = nullptr;
   SignalAction::sigHandler(SIGURG, &fake_si, nullptr);

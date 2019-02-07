@@ -16,7 +16,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
 
-TEST_F(TestBase, BufferHelperTest_DrainDouble) {
+TEST(BufferHelperTest, DrainDouble) {
   Buffer::OwnedImpl buffer;
 
   // c.f. https://en.wikipedia.org/wiki/Double-precision_floating-point_format
@@ -31,7 +31,7 @@ TEST_F(TestBase, BufferHelperTest_DrainDouble) {
   EXPECT_EQ(buffer.length(), 0);
 }
 
-TEST_F(TestBase, BufferHelperTest_PeekVarInt32) {
+TEST(BufferHelperTest, PeekVarInt32) {
   {
     Buffer::OwnedImpl buffer;
     buffer.writeByte(0);
@@ -81,7 +81,7 @@ TEST_F(TestBase, BufferHelperTest_PeekVarInt32) {
   }
 }
 
-TEST_F(TestBase, BufferHelperTest_PeekVarInt32BufferUnderflow) {
+TEST(BufferHelperTest, PeekVarInt32BufferUnderflow) {
   Buffer::OwnedImpl buffer;
   int size = 0;
 
@@ -96,7 +96,7 @@ TEST_F(TestBase, BufferHelperTest_PeekVarInt32BufferUnderflow) {
                             "invalid compact protocol varint i32");
 }
 
-TEST_F(TestBase, BufferHelperTest_PeekZigZagI32) {
+TEST(BufferHelperTest, PeekZigZagI32) {
   Buffer::OwnedImpl buffer;
   buffer.writeByte(0);                            // unzigzag(0) = 0
   buffer.writeByte(1);                            // unzigzag(1) = -1
@@ -141,7 +141,7 @@ TEST_F(TestBase, BufferHelperTest_PeekZigZagI32) {
   EXPECT_EQ(size, 5);
 }
 
-TEST_F(TestBase, BufferHelperTest_PeekZigZagI32BufferUnderflow) {
+TEST(BufferHelperTest, PeekZigZagI32BufferUnderflow) {
   Buffer::OwnedImpl buffer;
   int size = 0;
 
@@ -156,7 +156,7 @@ TEST_F(TestBase, BufferHelperTest_PeekZigZagI32BufferUnderflow) {
                             "invalid compact protocol zig-zag i32");
 }
 
-TEST_F(TestBase, BufferHelperTest_PeekZigZagI64) {
+TEST(BufferHelperTest, PeekZigZagI64) {
   Buffer::OwnedImpl buffer;
   buffer.writeByte(0);                            // unzigzag(0) = 0
   buffer.writeByte(1);                            // unzigzag(1) = -1
@@ -199,7 +199,7 @@ TEST_F(TestBase, BufferHelperTest_PeekZigZagI64) {
   EXPECT_EQ(size, 10);
 }
 
-TEST_F(TestBase, BufferHelperTest_PeekZigZagI64BufferUnderflow) {
+TEST(BufferHelperTest, PeekZigZagI64BufferUnderflow) {
   Buffer::OwnedImpl buffer;
   int size = 0;
 
@@ -214,7 +214,7 @@ TEST_F(TestBase, BufferHelperTest_PeekZigZagI64BufferUnderflow) {
                             "invalid compact protocol zig-zag i64");
 }
 
-TEST_F(TestBase, BufferHelperTest_WriteDouble) {
+TEST(BufferHelperTest, WriteDouble) {
   // See the DrainDouble test.
   {
     Buffer::OwnedImpl buffer;
@@ -229,7 +229,7 @@ TEST_F(TestBase, BufferHelperTest_WriteDouble) {
   }
 }
 
-TEST_F(TestBase, BufferHelperTest_WriteVarIntI32) {
+TEST(BufferHelperTest, WriteVarIntI32) {
   {
     Buffer::OwnedImpl buffer;
     BufferHelper::writeVarIntI32(buffer, 0);
@@ -272,7 +272,7 @@ TEST_F(TestBase, BufferHelperTest_WriteVarIntI32) {
   }
 }
 
-TEST_F(TestBase, BufferHelperTest_WriteVarIntI64) {
+TEST(BufferHelperTest, WriteVarIntI64) {
   {
     Buffer::OwnedImpl buffer;
     BufferHelper::writeVarIntI64(buffer, 0);
@@ -330,7 +330,7 @@ TEST_F(TestBase, BufferHelperTest_WriteVarIntI64) {
   }
 }
 
-TEST_F(TestBase, BufferHelperTest_WriteZigZagI32) {
+TEST(BufferHelperTest, WriteZigZagI32) {
   // zigzag(0) = 0
   {
     Buffer::OwnedImpl buffer;
@@ -388,7 +388,7 @@ TEST_F(TestBase, BufferHelperTest_WriteZigZagI32) {
   }
 }
 
-TEST_F(TestBase, BufferHelperTest_WriteZigZagI64) {
+TEST(BufferHelperTest, WriteZigZagI64) {
   // zigzag(0) = 0
   {
     Buffer::OwnedImpl buffer;

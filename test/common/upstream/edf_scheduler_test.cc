@@ -6,13 +6,13 @@ namespace Envoy {
 namespace Upstream {
 namespace {
 
-TEST_F(TestBase, EdfSchedulerTest_Empty) {
+TEST(EdfSchedulerTest, Empty) {
   EdfScheduler<uint32_t> sched;
   EXPECT_EQ(nullptr, sched.pick());
 }
 
 // Validate we get regular RR behavior when all weights are the same.
-TEST_F(TestBase, EdfSchedulerTest_Unweighted) {
+TEST(EdfSchedulerTest, Unweighted) {
   EdfScheduler<uint32_t> sched;
   constexpr uint32_t num_entries = 128;
   std::shared_ptr<uint32_t> entries[num_entries];
@@ -32,7 +32,7 @@ TEST_F(TestBase, EdfSchedulerTest_Unweighted) {
 }
 
 // Validate we get weighted RR behavior when weights are distinct.
-TEST_F(TestBase, EdfSchedulerTest_Weighted) {
+TEST(EdfSchedulerTest, Weighted) {
   EdfScheduler<uint32_t> sched;
   constexpr uint32_t num_entries = 128;
   std::shared_ptr<uint32_t> entries[num_entries];
@@ -56,7 +56,7 @@ TEST_F(TestBase, EdfSchedulerTest_Weighted) {
 }
 
 // Validate that expired entries are ignored.
-TEST_F(TestBase, EdfSchedulerTest_Expired) {
+TEST(EdfSchedulerTest, Expired) {
   EdfScheduler<uint32_t> sched;
 
   auto second_entry = std::make_shared<uint32_t>(42);

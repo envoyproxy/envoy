@@ -777,7 +777,7 @@ TEST_P(DnsImplZeroTimeoutTest, Timeout) {
 
 // Validate that the resolution timeout timer is enabled if we don't resolve
 // immediately.
-TEST_F(TestBase, DnsImplUnitTest_PendingTimerEnable) {
+TEST(DnsImplUnitTest, PendingTimerEnable) {
   InSequence s;
   Event::MockDispatcher dispatcher;
   Event::MockTimer* timer = new NiceMock<Event::MockTimer>();

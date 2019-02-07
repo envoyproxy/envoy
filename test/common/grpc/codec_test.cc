@@ -13,7 +13,7 @@
 namespace Envoy {
 namespace Grpc {
 
-TEST_F(TestBase, GrpcCodecTest_encodeHeader) {
+TEST(GrpcCodecTest, encodeHeader) {
   Encoder encoder;
   std::array<uint8_t, 5> buffer;
 
@@ -53,7 +53,7 @@ TEST_F(TestBase, GrpcCodecTest_encodeHeader) {
   EXPECT_EQ(buffer[4], 0);
 }
 
-TEST_F(TestBase, GrpcCodecTest_decodeIncompleteFrame) {
+TEST(GrpcCodecTest, decodeIncompleteFrame) {
   helloworld::HelloRequest request;
   request.set_name("hello");
   std::string request_buffer = request.SerializeAsString();
@@ -85,7 +85,7 @@ TEST_F(TestBase, GrpcCodecTest_decodeIncompleteFrame) {
   EXPECT_EQ("hello", decoded_request.name());
 }
 
-TEST_F(TestBase, GrpcCodecTest_decodeInvalidFrame) {
+TEST(GrpcCodecTest, decodeInvalidFrame) {
   helloworld::HelloRequest request;
   request.set_name("hello");
 
@@ -103,7 +103,7 @@ TEST_F(TestBase, GrpcCodecTest_decodeInvalidFrame) {
   EXPECT_EQ(size, buffer.length());
 }
 
-TEST_F(TestBase, GrpcCodecTest_decodeEmptyFrame) {
+TEST(GrpcCodecTest, decodeEmptyFrame) {
   Buffer::OwnedImpl buffer("\0\0\0\0", 5);
 
   Decoder decoder;
@@ -114,7 +114,7 @@ TEST_F(TestBase, GrpcCodecTest_decodeEmptyFrame) {
   EXPECT_EQ(0, frames[0].length_);
 }
 
-TEST_F(TestBase, GrpcCodecTest_decodeSingleFrame) {
+TEST(GrpcCodecTest, decodeSingleFrame) {
   helloworld::HelloRequest request;
   request.set_name("hello");
 
@@ -139,7 +139,7 @@ TEST_F(TestBase, GrpcCodecTest_decodeSingleFrame) {
   EXPECT_EQ("hello", result.name());
 }
 
-TEST_F(TestBase, GrpcCodecTest_decodeMultipleFrame) {
+TEST(GrpcCodecTest, decodeMultipleFrame) {
   helloworld::HelloRequest request;
   request.set_name("hello");
 

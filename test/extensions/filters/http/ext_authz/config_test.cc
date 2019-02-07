@@ -16,7 +16,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExtAuthz {
 
-TEST_F(TestBase, HttpExtAuthzConfigTest_CorrectProtoGrpc) {
+TEST(HttpExtAuthzConfigTest, CorrectProtoGrpc) {
   std::string yaml = R"EOF(
   grpc_service:
     google_grpc:
@@ -44,7 +44,7 @@ TEST_F(TestBase, HttpExtAuthzConfigTest_CorrectProtoGrpc) {
   cb(filter_callback);
 }
 
-TEST_F(TestBase, HttpExtAuthzConfigTest_CorrectProtoHttp) {
+TEST(HttpExtAuthzConfigTest, CorrectProtoHttp) {
   std::string yaml = R"EOF(
   http_service:
     server_uri:

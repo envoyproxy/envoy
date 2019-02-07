@@ -162,7 +162,7 @@ void faultFilterBadConfigHelper(const std::string& json) {
   EXPECT_THROW(Config::FilterJson::translateFaultFilter(*config, fault), EnvoyException);
 }
 
-TEST_F(TestBase, FaultFilterBadConfigTest_BadAbortPercent) {
+TEST(FaultFilterBadConfigTest, BadAbortPercent) {
   const std::string json = R"EOF(
     {
       "abort" : {
@@ -175,7 +175,7 @@ TEST_F(TestBase, FaultFilterBadConfigTest_BadAbortPercent) {
   faultFilterBadConfigHelper(json);
 }
 
-TEST_F(TestBase, FaultFilterBadConfigTest_EmptyDownstreamNodes) {
+TEST(FaultFilterBadConfigTest, EmptyDownstreamNodes) {
   const std::string json = R"EOF(
     {
       "abort" : {
@@ -189,7 +189,7 @@ TEST_F(TestBase, FaultFilterBadConfigTest_EmptyDownstreamNodes) {
   faultFilterBadConfigHelper(json);
 }
 
-TEST_F(TestBase, FaultFilterBadConfigTest_MissingHTTPStatus) {
+TEST(FaultFilterBadConfigTest, MissingHTTPStatus) {
   const std::string json = R"EOF(
     {
       "abort" : {
@@ -201,7 +201,7 @@ TEST_F(TestBase, FaultFilterBadConfigTest_MissingHTTPStatus) {
   faultFilterBadConfigHelper(json);
 }
 
-TEST_F(TestBase, FaultFilterBadConfigTest_BadDelayType) {
+TEST(FaultFilterBadConfigTest, BadDelayType) {
   const std::string json = R"EOF(
     {
       "delay" : {
@@ -215,7 +215,7 @@ TEST_F(TestBase, FaultFilterBadConfigTest_BadDelayType) {
   faultFilterBadConfigHelper(json);
 }
 
-TEST_F(TestBase, FaultFilterBadConfigTest_BadDelayPercent) {
+TEST(FaultFilterBadConfigTest, BadDelayPercent) {
   const std::string json = R"EOF(
     {
       "delay" : {
@@ -229,7 +229,7 @@ TEST_F(TestBase, FaultFilterBadConfigTest_BadDelayPercent) {
   faultFilterBadConfigHelper(json);
 }
 
-TEST_F(TestBase, FaultFilterBadConfigTest_BadDelayDuration) {
+TEST(FaultFilterBadConfigTest, BadDelayDuration) {
   const std::string json = R"EOF(
     {
       "delay" : {
@@ -243,7 +243,7 @@ TEST_F(TestBase, FaultFilterBadConfigTest_BadDelayDuration) {
   faultFilterBadConfigHelper(json);
 }
 
-TEST_F(TestBase, FaultFilterBadConfigTest_MissingDelayDuration) {
+TEST(FaultFilterBadConfigTest, MissingDelayDuration) {
   const std::string json = R"EOF(
     {
       "delay" : {

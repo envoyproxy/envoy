@@ -316,7 +316,7 @@ TEST_F(ProtobufUtilityTest, YamlLoadFromStringFail) {
                           "Unable to parse JSON as proto.*Root element must be a message.*");
 }
 
-TEST_F(TestBase, DurationUtilTest_OutOfRange) {
+TEST(DurationUtilTest, OutOfRange) {
   {
     ProtobufWkt::Duration duration;
     duration.set_seconds(-1);

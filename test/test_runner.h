@@ -48,7 +48,7 @@ public:
     int exit_status = RUN_ALL_TESTS();
 
     // Check that all singletons have been destroyed.
-    TestScope::checkSingletonQuiescensce();
+    TestBase::checkSingletonQuiescensce();
 
     return exit_status;
   }

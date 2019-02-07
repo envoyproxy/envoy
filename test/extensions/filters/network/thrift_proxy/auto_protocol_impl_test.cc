@@ -54,7 +54,7 @@ public:
   MessageMetadata metadata_;
 };
 
-TEST_F(TestBase, ProtocolNames_FromType) {
+TEST(ProtocolNames, FromType) {
   for (int i = 0; i <= static_cast<int>(ProtocolType::LastProtocolType); i++) {
     ProtocolType type = static_cast<ProtocolType>(i);
     EXPECT_NE("", ProtocolNames::get().fromType(type));

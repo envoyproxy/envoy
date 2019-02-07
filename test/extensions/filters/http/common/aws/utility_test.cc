@@ -13,7 +13,7 @@ namespace Common {
 namespace Aws {
 
 // Headers must be in alphabetical order by virtue of std::map
-TEST_F(TestBase, UtilityTest_CanonicalizeHeadersInAlphabeticalOrder) {
+TEST(UtilityTest, CanonicalizeHeadersInAlphabeticalOrder) {
   Http::TestHeaderMapImpl headers{
       {"d", "d_value"}, {"f", "f_value"}, {"b", "b_value"},
       {"e", "e_value"}, {"c", "c_value"}, {"a", "a_value"},
@@ -24,7 +24,7 @@ TEST_F(TestBase, UtilityTest_CanonicalizeHeadersInAlphabeticalOrder) {
 }
 
 // HTTP pseudo-headers should be ignored
-TEST_F(TestBase, UtilityTest_CanonicalizeHeadersSkippingPseudoHeaders) {
+TEST(UtilityTest, CanonicalizeHeadersSkippingPseudoHeaders) {
   Http::TestHeaderMapImpl headers{
       {":path", "path_value"},
       {":method", "GET"},
@@ -35,7 +35,7 @@ TEST_F(TestBase, UtilityTest_CanonicalizeHeadersSkippingPseudoHeaders) {
 }
 
 // Repeated headers are joined with commas
-TEST_F(TestBase, UtilityTest_CanonicalizeHeadersJoiningDuplicatesWithCommas) {
+TEST(UtilityTest, CanonicalizeHeadersJoiningDuplicatesWithCommas) {
   Http::TestHeaderMapImpl headers{
       {"a", "a_value1"},
       {"a", "a_value2"},
@@ -46,7 +46,7 @@ TEST_F(TestBase, UtilityTest_CanonicalizeHeadersJoiningDuplicatesWithCommas) {
 }
 
 // We canonicalize the :authority header as host
-TEST_F(TestBase, UtilityTest_CanonicalizeHeadersAuthorityToHost) {
+TEST(UtilityTest, CanonicalizeHeadersAuthorityToHost) {
   Http::TestHeaderMapImpl headers{
       {":authority", "authority_value"},
   };
@@ -55,7 +55,7 @@ TEST_F(TestBase, UtilityTest_CanonicalizeHeadersAuthorityToHost) {
 }
 
 // Ports 80 and 443 are omitted from the host headers
-TEST_F(TestBase, UtilityTest_CanonicalizeHeadersRemovingDefaultPortsFromHost) {
+TEST(UtilityTest, CanonicalizeHeadersRemovingDefaultPortsFromHost) {
   Http::TestHeaderMapImpl headers_port80{
       {":authority", "example.com:80"},
   };
@@ -70,7 +70,7 @@ TEST_F(TestBase, UtilityTest_CanonicalizeHeadersRemovingDefaultPortsFromHost) {
 }
 
 // Whitespace is trimmed from headers
-TEST_F(TestBase, UtilityTest_CanonicalizeHeadersTrimmingWhitespace) {
+TEST(UtilityTest, CanonicalizeHeadersTrimmingWhitespace) {
   Http::TestHeaderMapImpl headers{
       {"leading", "    leading value"},
       {"trailing", "trailing value    "},
@@ -84,7 +84,7 @@ TEST_F(TestBase, UtilityTest_CanonicalizeHeadersTrimmingWhitespace) {
 }
 
 // Verify the format of a minimalist canonical request
-TEST_F(TestBase, UtilityTest_MinimalCanonicalRequest) {
+TEST(UtilityTest, MinimalCanonicalRequest) {
   std::map<std::string, std::string> headers;
   const auto request = Utility::createCanonicalRequest("GET", "", headers, "content-hash");
   EXPECT_EQ(R"(GET
@@ -96,7 +96,7 @@ content-hash)",
             request);
 }
 
-TEST_F(TestBase, UtilityTest_CanonicalRequestWithQueryString) {
+TEST(UtilityTest, CanonicalRequestWithQueryString) {
   const std::map<std::string, std::string> headers;
   const auto request = Utility::createCanonicalRequest("GET", "?query", headers, "content-hash");
   EXPECT_EQ(R"(GET
@@ -108,7 +108,7 @@ content-hash)",
             request);
 }
 
-TEST_F(TestBase, UtilityTest_CanonicalRequestWithHeaders) {
+TEST(UtilityTest, CanonicalRequestWithHeaders) {
   const std::map<std::string, std::string> headers = {
       {"header1", "value1"},
       {"header2", "value2"},
@@ -128,7 +128,7 @@ content-hash)",
 }
 
 // Verify headers are joined with ";"
-TEST_F(TestBase, UtilityTest_JoinCanonicalHeaderNames) {
+TEST(UtilityTest, JoinCanonicalHeaderNames) {
   std::map<std::string, std::string> headers = {
       {"header1", "value1"},
       {"header2", "value2"},
@@ -139,7 +139,7 @@ TEST_F(TestBase, UtilityTest_JoinCanonicalHeaderNames) {
 }
 
 // Verify we return "" when there are no headers
-TEST_F(TestBase, UtilityTest_JoinCanonicalHeaderNamesWithEmptyMap) {
+TEST(UtilityTest, JoinCanonicalHeaderNamesWithEmptyMap) {
   std::map<std::string, std::string> headers;
   const auto names = Utility::joinCanonicalHeaderNames(headers);
   EXPECT_EQ("", names);

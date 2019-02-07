@@ -26,7 +26,7 @@ parseRouteConfigurationFromV2Yaml(const std::string& yaml) {
   return route_config;
 }
 
-TEST_F(TestBase, ThriftRouteMatcherTest_RouteByMethodNameWithNoInversion) {
+TEST(ThriftRouteMatcherTest, RouteByMethodNameWithNoInversion) {
   const std::string yaml = R"EOF(
 name: config
 routes:
@@ -62,7 +62,7 @@ routes:
   EXPECT_EQ("cluster2", route2->routeEntry()->clusterName());
 }
 
-TEST_F(TestBase, ThriftRouteMatcherTest_RouteByMethodNameWithInversion) {
+TEST(ThriftRouteMatcherTest, RouteByMethodNameWithInversion) {
   const std::string yaml = R"EOF(
 name: config
 routes:
@@ -106,7 +106,7 @@ routes:
   EXPECT_EQ(nullptr, route);
 }
 
-TEST_F(TestBase, ThriftRouteMatcherTest_RouteByAnyMethodNameWithNoInversion) {
+TEST(ThriftRouteMatcherTest, RouteByAnyMethodNameWithNoInversion) {
   const std::string yaml = R"EOF(
 name: config
 routes:
@@ -146,7 +146,7 @@ routes:
   }
 }
 
-TEST_F(TestBase, ThriftRouteMatcherTest_RouteByAnyMethodNameWithInversion) {
+TEST(ThriftRouteMatcherTest, RouteByAnyMethodNameWithInversion) {
   const std::string yaml = R"EOF(
 name: config
 routes:
@@ -163,7 +163,7 @@ routes:
   EXPECT_THROW(new RouteMatcher(config), EnvoyException);
 }
 
-TEST_F(TestBase, ThriftRouteMatcherTest_RouteByServiceNameWithNoInversion) {
+TEST(ThriftRouteMatcherTest, RouteByServiceNameWithNoInversion) {
   const std::string yaml = R"EOF(
 name: config
 routes:
@@ -199,7 +199,7 @@ routes:
   EXPECT_EQ("cluster2", route2->routeEntry()->clusterName());
 }
 
-TEST_F(TestBase, ThriftRouteMatcherTest_RouteByServiceNameWithInversion) {
+TEST(ThriftRouteMatcherTest, RouteByServiceNameWithInversion) {
   const std::string yaml = R"EOF(
 name: config
 routes:
@@ -243,7 +243,7 @@ routes:
   EXPECT_EQ(nullptr, route);
 }
 
-TEST_F(TestBase, ThriftRouteMatcherTest_RouteByAnyServiceNameWithNoInversion) {
+TEST(ThriftRouteMatcherTest, RouteByAnyServiceNameWithNoInversion) {
   const std::string yaml = R"EOF(
 name: config
 routes:
@@ -283,7 +283,7 @@ routes:
   }
 }
 
-TEST_F(TestBase, ThriftRouteMatcherTest_RouteByAnyServiceNameWithInversion) {
+TEST(ThriftRouteMatcherTest, RouteByAnyServiceNameWithInversion) {
   const std::string yaml = R"EOF(
 name: config
 routes:
@@ -300,7 +300,7 @@ routes:
   EXPECT_THROW(new RouteMatcher(config), EnvoyException);
 }
 
-TEST_F(TestBase, ThriftRouteMatcherTest_RouteByExactHeaderMatcher) {
+TEST(ThriftRouteMatcherTest, RouteByExactHeaderMatcher) {
   const std::string yaml = R"EOF(
 name: config
 routes:
@@ -331,7 +331,7 @@ routes:
   EXPECT_EQ("cluster1", route->routeEntry()->clusterName());
 }
 
-TEST_F(TestBase, ThriftRouteMatcherTest_RouteByRegexHeaderMatcher) {
+TEST(ThriftRouteMatcherTest, RouteByRegexHeaderMatcher) {
   const std::string yaml = R"EOF(
 name: config
 routes:
@@ -367,7 +367,7 @@ routes:
   EXPECT_EQ("cluster1", route->routeEntry()->clusterName());
 }
 
-TEST_F(TestBase, ThriftRouteMatcherTest_RouteByRangeHeaderMatcher) {
+TEST(ThriftRouteMatcherTest, RouteByRangeHeaderMatcher) {
   const std::string yaml = R"EOF(
 name: config
 routes:
@@ -405,7 +405,7 @@ routes:
   EXPECT_EQ("cluster1", route->routeEntry()->clusterName());
 }
 
-TEST_F(TestBase, ThriftRouteMatcherTest_RouteByPresentHeaderMatcher) {
+TEST(ThriftRouteMatcherTest, RouteByPresentHeaderMatcher) {
   const std::string yaml = R"EOF(
 name: config
 routes:
@@ -442,7 +442,7 @@ routes:
   EXPECT_EQ("cluster1", route->routeEntry()->clusterName());
 }
 
-TEST_F(TestBase, ThriftRouteMatcherTest_RouteByPrefixHeaderMatcher) {
+TEST(ThriftRouteMatcherTest, RouteByPrefixHeaderMatcher) {
   const std::string yaml = R"EOF(
 name: config
 routes:
@@ -478,7 +478,7 @@ routes:
   EXPECT_EQ("cluster1", route->routeEntry()->clusterName());
 }
 
-TEST_F(TestBase, ThriftRouteMatcherTest_RouteBySuffixHeaderMatcher) {
+TEST(ThriftRouteMatcherTest, RouteBySuffixHeaderMatcher) {
   const std::string yaml = R"EOF(
 name: config
 routes:
@@ -519,7 +519,7 @@ routes:
   EXPECT_EQ("cluster1", route->routeEntry()->clusterName());
 }
 
-TEST_F(TestBase, ThriftRouteMatcherTest_WeightedClusters) {
+TEST(ThriftRouteMatcherTest, WeightedClusters) {
   const std::string yaml = R"EOF(
 name: config
 routes:
@@ -575,7 +575,7 @@ routes:
   }
 }
 
-TEST_F(TestBase, ThriftRouteMatcherTest_WeightedClusterMissingWeight) {
+TEST(ThriftRouteMatcherTest, WeightedClusterMissingWeight) {
   const std::string yaml = R"EOF(
 name: config
 routes:
@@ -596,7 +596,7 @@ routes:
   EXPECT_THROW(RouteMatcher m(config), EnvoyException);
 }
 
-TEST_F(TestBase, ThriftRouteMatcherTest_RouteActionMetadataMatch) {
+TEST(ThriftRouteMatcherTest, RouteActionMetadataMatch) {
   const std::string yaml = R"EOF(
 name: config
 routes:
@@ -656,7 +656,7 @@ routes:
   }
 }
 
-TEST_F(TestBase, ThriftRouteMatcherTest_WeightedClusterMetadataMatch) {
+TEST(ThriftRouteMatcherTest, WeightedClusterMetadataMatch) {
   const std::string yaml = R"EOF(
 name: config
 routes:
@@ -744,7 +744,7 @@ routes:
   }
 }
 
-TEST_F(TestBase, ThriftRouteMatcherTest_WeightedClusterRouteActionMetadataMatchMerged) {
+TEST(ThriftRouteMatcherTest, WeightedClusterRouteActionMetadataMatchMerged) {
   const std::string yaml = R"EOF(
 name: config
 routes:

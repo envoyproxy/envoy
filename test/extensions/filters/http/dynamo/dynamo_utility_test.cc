@@ -16,7 +16,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Dynamo {
 
-TEST_F(TestBase, DynamoUtility_PartitionIdStatString) {
+TEST(DynamoUtility, PartitionIdStatString) {
   Stats::StatsOptionsImpl stats_options;
   stats_options.max_obj_name_length_ = 60;
 

@@ -11,7 +11,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace DubboProxy {
 
-TEST_F(TestBase, HessianUtilsTest_peekString) {
+TEST(HessianUtilsTest, peekString) {
   // Insufficient data
   {
     Buffer::OwnedImpl buffer;
@@ -129,7 +129,7 @@ TEST_F(TestBase, HessianUtilsTest_peekString) {
   }
 }
 
-TEST_F(TestBase, HessianUtilsTest_peekLong) {
+TEST(HessianUtilsTest, peekLong) {
   // Insufficient data
   {
     Buffer::OwnedImpl buffer;
@@ -289,7 +289,7 @@ TEST_F(TestBase, HessianUtilsTest_peekLong) {
   }
 }
 
-TEST_F(TestBase, HessianUtilsTest_peekBool) {
+TEST(HessianUtilsTest, peekBool) {
   // Incorrect type
   {
     Buffer::OwnedImpl buffer;
@@ -323,7 +323,7 @@ TEST_F(TestBase, HessianUtilsTest_peekBool) {
   }
 }
 
-TEST_F(TestBase, HessianUtilsTest_peekInt) {
+TEST(HessianUtilsTest, peekInt) {
   // Insufficient data
   {
     Buffer::OwnedImpl buffer;
@@ -466,7 +466,7 @@ TEST_F(TestBase, HessianUtilsTest_peekInt) {
   }
 }
 
-TEST_F(TestBase, HessianUtilsTest_peekDouble) {
+TEST(HessianUtilsTest, peekDouble) {
   // Insufficient data
   {
     Buffer::OwnedImpl buffer;
@@ -597,7 +597,7 @@ TEST_F(TestBase, HessianUtilsTest_peekDouble) {
   }
 }
 
-TEST_F(TestBase, HessianUtilsTest_peekNull) {
+TEST(HessianUtilsTest, peekNull) {
   // Incorrect type
   {
     Buffer::OwnedImpl buffer;
@@ -623,7 +623,7 @@ TEST_F(TestBase, HessianUtilsTest_peekNull) {
   }
 }
 
-TEST_F(TestBase, HessianUtilsTest_peekDate) {
+TEST(HessianUtilsTest, peekDate) {
   // Insufficient data
   {
     Buffer::OwnedImpl buffer;
@@ -688,7 +688,7 @@ TEST_F(TestBase, HessianUtilsTest_peekDate) {
   }
 }
 
-TEST_F(TestBase, HessianUtilsTest_peekByte) {
+TEST(HessianUtilsTest, peekByte) {
   // Insufficient data
   {
     Buffer::OwnedImpl buffer;
