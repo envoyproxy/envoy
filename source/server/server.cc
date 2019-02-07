@@ -45,7 +45,7 @@
 namespace Envoy {
 namespace Server {
 
-InstanceImpl::InstanceImpl(Options& options, Event::TimeSystem& time_system,
+InstanceImpl::InstanceImpl(const Options& options, Event::TimeSystem& time_system,
                            Network::Address::InstanceConstSharedPtr local_address, TestHooks& hooks,
                            HotRestart& restarter, Stats::StoreRoot& store,
                            Thread::BasicLockable& access_log_lock,
@@ -171,7 +171,7 @@ bool InstanceImpl::healthCheckFailed() { return server_stats_->live_.value() == 
 
 InstanceUtil::BootstrapVersion
 InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& bootstrap,
-                                  Options& options, Api::Api& api) {
+                                  const Options& options, Api::Api& api) {
   const std::string& config_path = options.configPath();
   const std::string& config_yaml = options.configYaml();
 
@@ -194,7 +194,7 @@ InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& boots
   return BootstrapVersion::V2;
 }
 
-void InstanceImpl::initialize(Options& options,
+void InstanceImpl::initialize(const Options& options,
                               Network::Address::InstanceConstSharedPtr local_address,
                               ComponentFactory& component_factory) {
   ENVOY_LOG(info, "initializing epoch {} (hot restart version={})", options.restartEpoch(),
@@ -394,7 +394,7 @@ void InstanceImpl::loadServerFlags(const absl::optional<std::string>& flags_path
 
 uint64_t InstanceImpl::numConnections() { return listener_manager_->numConnections(); }
 
-RunHelper::RunHelper(Instance& instance, Options& options, Event::Dispatcher& dispatcher,
+RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatcher& dispatcher,
                      Upstream::ClusterManager& cm, AccessLog::AccessLogManager& access_log_manager,
                      InitManagerImpl& init_manager, OverloadManager& overload_manager,
                      std::function<void()> workers_start_cb) {
