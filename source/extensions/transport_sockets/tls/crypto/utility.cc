@@ -1,4 +1,4 @@
-#include "common/crypto/utility.h"
+#include "extensions/transport_sockets/tls/crypto/utility.h"
 
 #include "common/common/assert.h"
 #include "common/common/stack_array.h"
@@ -8,7 +8,9 @@
 #include "openssl/sha.h"
 
 namespace Envoy {
-namespace Common {
+namespace Extensions {
+namespace TransportSockets {
+namespace Tls {
 namespace Crypto {
 
 std::vector<uint8_t> Utility::getSha256Digest(const Buffer::Instance& buffer) {
@@ -41,5 +43,7 @@ std::vector<uint8_t> Utility::getSha256Hmac(const std::vector<uint8_t>& key,
 }
 
 } // namespace Crypto
-} // namespace Common
+} // namespace Tls
+} // namespace TransportSockets
+} // namespace Extensions
 } // namespace Envoy

@@ -1,11 +1,14 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/hex.h"
-#include "common/crypto/utility.h"
+
+#include "extensions/transport_sockets/tls/crypto/utility.h"
 
 #include "test/test_common/test_base.h"
 
 namespace Envoy {
-namespace Common {
+namespace Extensions {
+namespace TransportSockets {
+namespace Tls {
 namespace Crypto {
 
 TEST(UtilityTest, TestSha256Digest) {
@@ -50,5 +53,7 @@ TEST(UtilityTest, TestSha256HmacWithEmptyArguments) {
 }
 
 } // namespace Crypto
-} // namespace Common
+} // namespace Tls
+} // namespace TransportSockets
+} // namespace Extensions
 } // namespace Envoy

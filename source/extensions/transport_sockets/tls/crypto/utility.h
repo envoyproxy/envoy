@@ -8,7 +8,9 @@
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
-namespace Common {
+namespace Extensions {
+namespace TransportSockets {
+namespace Tls {
 namespace Crypto {
 
 class Utility {
@@ -31,5 +33,7 @@ public:
 };
 
 } // namespace Crypto
-} // namespace Common
+} // namespace Tls
+} // namespace TransportSockets
+} // namespace Extensions
 } // namespace Envoy
