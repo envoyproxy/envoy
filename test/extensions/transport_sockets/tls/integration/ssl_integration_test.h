@@ -43,8 +43,8 @@ private:
   std::unique_ptr<ContextManager> context_manager_;
 };
 
-class SslIntegrationTest : public SslIntegrationTestBase,
-                           public TestBaseWithParam<Network::Address::IpVersion> {
+class SslIntegrationTest : public TestBaseWithParam<Network::Address::IpVersion>,
+                           public SslIntegrationTestBase {
 public:
   SslIntegrationTest() : SslIntegrationTestBase(GetParam()) {}
   void TearDown() override { SslIntegrationTestBase::TearDown(); };
