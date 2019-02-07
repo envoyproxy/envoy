@@ -54,6 +54,7 @@ envoy_cc_library(
         "quic_fallthrough_impl.h",
         "quic_flag_utils_impl.h",
         "quic_iovec_impl.h",
+        "quic_map_util_impl.h",
         "quic_prefetch_impl.h",
         "quic_ptr_util_impl.h",
         "quic_string_impl.h",
