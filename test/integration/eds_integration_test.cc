@@ -12,8 +12,8 @@ namespace {
 
 // Integration test for EDS features. EDS is consumed via filesystem
 // subscription.
-class EdsIntegrationTest : public HttpIntegrationTest,
-                           public TestBaseWithParam<Network::Address::IpVersion> {
+class EdsIntegrationTest : public TestBaseWithParam<Network::Address::IpVersion>,
+                           public HttpIntegrationTest {
 public:
   EdsIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()) {}

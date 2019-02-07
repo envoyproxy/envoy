@@ -5,6 +5,9 @@ import "envoy/config/common/tap/v2alpha/common.proto";
 import "validate/validate.proto";
 
 package envoy.config.filter.http.tap.v2alpha;
+
+option java_outer_classname = "TapProto";
+option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.config.filter.http.tap.v2alpha";
 
 // [#protodoc-title: Tap]

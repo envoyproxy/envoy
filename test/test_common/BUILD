@@ -90,6 +90,7 @@ envoy_cc_test_library(
         "abseil_strings",
     ],
     deps = [
+        ":test_time_lib",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/http:codec_interface",
         "//include/envoy/network:address_interface",

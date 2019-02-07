@@ -74,9 +74,9 @@ public:
 class ConnectionImpl : public virtual Connection, protected Logger::Loggable<Logger::Id::http2> {
 public:
   ConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
-                 const Http2Settings& http2_settings)
+                 const Http2Settings& http2_settings, const uint32_t max_request_headers_kb)
       : stats_{ALL_HTTP2_CODEC_STATS(POOL_COUNTER_PREFIX(stats, "http2."))},
-        connection_(connection),
+        connection_(connection), max_request_headers_kb_(max_request_headers_kb),
         per_stream_buffer_limit_(http2_settings.initial_stream_window_size_), dispatching_(false),
         raised_goaway_(false), pending_deferred_reset_(false) {}
 
@@ -185,11 +185,6 @@ protected:
     void pendingSendBufferHighWatermark();
     void pendingSendBufferLowWatermark();
 
-    // Max header size of 63K. This is arbitrary but makes it easier to test since nghttp2 doesn't
-    // appear to transmit headers greater than approximately 64K (NGHTTP2_MAX_HEADERSLEN) for
-    // reasons I don't fully understand.
-    static const uint64_t MAX_HEADER_SIZE = 63 * 1024;
-
     // Does any necessary WebSocket/Upgrade conversion, then passes the headers
     // to the decoder_.
     void decodeHeaders();
@@ -291,6 +286,7 @@ protected:
   nghttp2_session* session_{};
   CodecStats stats_;
   Network::Connection& connection_;
+  const uint32_t max_request_headers_kb_;
   uint32_t per_stream_buffer_limit_;
   bool allow_metadata_;
 
@@ -319,7 +315,8 @@ private:
 class ClientConnectionImpl : public ClientConnection, public ConnectionImpl {
 public:
   ClientConnectionImpl(Network::Connection& connection, ConnectionCallbacks& callbacks,
-                       Stats::Scope& stats, const Http2Settings& http2_settings);
+                       Stats::Scope& stats, const Http2Settings& http2_settings,
+                       const uint32_t max_request_headers_kb);
 
   // Http::ClientConnection
   Http::StreamEncoder& newStream(StreamDecoder& response_decoder) override;
@@ -339,7 +336,8 @@ private:
 class ServerConnectionImpl : public ServerConnection, public ConnectionImpl {
 public:
   ServerConnectionImpl(Network::Connection& connection, ServerConnectionCallbacks& callbacks,
-                       Stats::Scope& scope, const Http2Settings& http2_settings);
+                       Stats::Scope& scope, const Http2Settings& http2_settings,
+                       const uint32_t max_request_headers_kb);
 
 private:
   // ConnectionImpl

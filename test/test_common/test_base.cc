@@ -1,20 +1,18 @@
 #include "test/test_common/test_base.h"
 
 #include "common/common/assert.h"
+
 #include "test/test_common/global.h"
 
 namespace Envoy {
 
-bool TestBase::checkSingletonQuiescensce() {
+void TestScope::checkSingletonQuiescensce() {
   // Check that all singletons have been destroyed.
   std::string active_singletons = Envoy::Test::Globals::describeActiveSingletons();
-  if (!active_singletons.empty()) {
-    std::cerr << "\n\nFAIL: Active singletons exist:\n" << active_singletons << std::endl;
-    return false;
-  }
-  return true;
+  RELEASE_ASSERT(active_singletons.empty(),
+                 absl::StrCat("FAIL: Active singletons exist:\n", active_singletons));
 }
 
-TestBaseScope::~TestBaseScope() { RELEASE_ASSERT(TestBase::checkSingletonQuiescensce(), "foo"); }
+TestScope::~TestScope() { checkSingletonQuiescensce(); }
 
 } // namespace Envoy

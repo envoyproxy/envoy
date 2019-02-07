@@ -227,20 +227,21 @@ void IntegrationTcpClient::ConnectionCallbacks::onEvent(Network::ConnectionEvent
 }
 
 BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version,
-                                         TestTimeSystemPtr time_system, const std::string& config)
+                                         const std::string& config)
     : api_(Api::createApiForTest(stats_store_)),
-      mock_buffer_factory_(new NiceMock<MockBufferFactory>), time_system_(std::move(time_system)),
-      dispatcher_(new Event::DispatcherImpl(
-          *time_system_, Buffer::WatermarkFactoryPtr{mock_buffer_factory_}, *api_)),
+      mock_buffer_factory_(new NiceMock<MockBufferFactory>),
+      dispatcher_(
+          new Event::DispatcherImpl(Buffer::WatermarkFactoryPtr{mock_buffer_factory_}, *api_)),
       version_(version), config_helper_(version, *api_, config),
       default_log_level_(TestEnvironment::getOptions().logLevel()) {
+
   // This is a hack, but there are situations where we disconnect fake upstream connections and
   // then we expect the server connection pool to get the disconnect before the next test starts.
   // This does not always happen. This pause should allow the server to pick up the disconnect
   // notification and clear the pool connection if necessary. A real fix would require adding fairly
   // complex test hooks to the server and/or spin waiting on stats, neither of which I think are
   // necessary right now.
-  time_system_->sleep(std::chrono::milliseconds(10));
+  timeSystem().sleep(std::chrono::milliseconds(10));
   ON_CALL(*mock_buffer_factory_, create_(_, _))
       .WillByDefault(Invoke([](std::function<void()> below_low,
                                std::function<void()> above_high) -> Buffer::Instance* {
@@ -273,10 +274,10 @@ void BaseIntegrationTest::createUpstreams() {
   for (uint32_t i = 0; i < fake_upstreams_count_; ++i) {
     if (autonomous_upstream_) {
       fake_upstreams_.emplace_back(
-          new AutonomousUpstream(0, upstream_protocol_, version_, *time_system_));
+          new AutonomousUpstream(0, upstream_protocol_, version_, timeSystem()));
     } else {
       fake_upstreams_.emplace_back(
-          new FakeUpstream(0, upstream_protocol_, version_, *time_system_, enable_half_close_));
+          new FakeUpstream(0, upstream_protocol_, version_, timeSystem(), enable_half_close_));
     }
   }
 }
@@ -369,7 +370,7 @@ void BaseIntegrationTest::createGeneratedApiTestServer(const std::string& bootst
                                                        const std::vector<std::string>& port_names) {
   test_server_ = IntegrationTestServer::create(bootstrap_path, version_,
                                                pre_worker_start_test_steps_, deterministic_,
-                                               *time_system_, *api_, defer_listener_finalization_);
+                                               timeSystem(), *api_, defer_listener_finalization_);
   if (config_helper_.bootstrap().static_resources().listeners_size() > 0 &&
       !defer_listener_finalization_) {
     // Wait for listeners to be created before invoking registerTestServerPorts() below, as that
@@ -400,7 +401,7 @@ void BaseIntegrationTest::createTestServer(const std::string& json_path,
                                            const std::vector<std::string>& port_names) {
   test_server_ = createIntegrationTestServer(
       TestEnvironment::temporaryFileSubstitute(json_path, port_map_, version_), nullptr,
-      *time_system_);
+      timeSystem());
   registerTestServerPorts(port_names);
 }
 

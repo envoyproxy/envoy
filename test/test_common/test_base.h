@@ -4,9 +4,14 @@
 
 namespace Envoy {
 
-class TestBaseScope {
+class TestScope {
 public:
-  ~TestBaseScope();
+  ~TestScope();
+
+  // Ensures that there any test-scoped singletons created by instantiating
+  // Test::Global<T> have been destroyed, which should occur after each
+  // test method.
+  static void checkSingletonQuiescensce();
 };
 
 // Provides a common test-base class for all tests in Envoy to use. This offers
@@ -24,13 +29,17 @@ public:
 //
 // Note: nothing compute-intensive should be put in this test-class, as it will
 // be a tax paid by every test method in the codebase.
-class TestBase : public ::testing::Test, public TestBaseScope {
+class TestBase : public ::testing::Test {
 public:
-  static bool checkSingletonQuiescensce();
+ private:
+  TestScope test_scope_;
 };
 
 // Templatized version of TestBase.
 template <class T>
-class TestBaseWithParam : public ::testing::TestWithParam<T>, public TestBaseScope {};
+class TestBaseWithParam : public ::testing::TestWithParam<T> {
+ private:
+  TestScope test_scope_;
+};
 
 } // namespace Envoy

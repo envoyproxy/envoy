@@ -2,6 +2,7 @@
 
 #include "quiche/quic/platform/api/quic_aligned.h"
 #include "quiche/quic/platform/api/quic_arraysize.h"
+#include "quiche/quic/platform/api/quic_client_stats.h"
 #include "quiche/quic/platform/api/quic_containers.h"
 #include "quiche/quic/platform/api/quic_endian.h"
 #include "quiche/quic/platform/api/quic_estimate_memory_usage.h"
@@ -22,72 +23,85 @@ namespace Extensions {
 namespace QuicListeners {
 namespace Quiche {
 
-TEST_F(TestBase, QuicPlatformTest_QuicAlignOf) { EXPECT_LT(0, QUIC_ALIGN_OF(int)); }
+TEST(QuicPlatformTest, QuicAlignOf) { EXPECT_LT(0, QUIC_ALIGN_OF(int)); }
 
-TEST_F(TestBase, QuicPlatformTest_QuicArraysize) {
+TEST(QuicPlatformTest, QuicArraysize) {
   int array[] = {0, 1, 2, 3, 4};
   EXPECT_EQ(5, QUIC_ARRAYSIZE(array));
 }
 
-TEST_F(TestBase, QuicPlatformTest_QuicUnorderedMap) {
+enum class TestEnum { ZERO = 0, ONE, TWO, COUNT };
+
+TEST(QuicPlatformTest, QuicClientStats) {
+  // Just make sure they compile.
+  QUIC_CLIENT_HISTOGRAM_ENUM("my.enum.histogram", TestEnum::ONE, TestEnum::COUNT, "doc");
+  QUIC_CLIENT_HISTOGRAM_BOOL("my.bool.histogram", false, "doc");
+  QUIC_CLIENT_HISTOGRAM_TIMES("my.timing.histogram", quic::QuicTime::Delta::FromSeconds(5),
+                              quic::QuicTime::Delta::FromSeconds(1),
+                              quic::QuicTime::Delta::FromSecond(3600), 100, "doc");
+  QUIC_CLIENT_HISTOGRAM_COUNTS("my.count.histogram", 123, 0, 1000, 100, "doc");
+  quic::QuicClientSparseHistogram("my.sparse.histogram", 345);
+}
+
+TEST(QuicPlatformTest, QuicUnorderedMap) {
   quic::QuicUnorderedMap<quic::QuicString, int> umap;
   umap.insert({"foo", 2});
   EXPECT_EQ(2, umap["foo"]);
 }
 
-TEST_F(TestBase, QuicPlatformTest_QuicUnorderedSet) {
+TEST(QuicPlatformTest, QuicUnorderedSet) {
   quic::QuicUnorderedSet<quic::QuicString> uset({"foo", "bar"});
   EXPECT_EQ(1, uset.count("bar"));
   EXPECT_EQ(0, uset.count("qux"));
 }
 
-TEST_F(TestBase, QuicPlatformTest_QuicQueue) {
+TEST(QuicPlatformTest, QuicQueue) {
   quic::QuicQueue<int> queue;
   queue.push(10);
   EXPECT_EQ(10, queue.back());
 }
 
-TEST_F(TestBase, QuicPlatformTest_QuicDeque) {
+TEST(QuicPlatformTest, QuicDeque) {
   quic::QuicDeque<int> deque;
   deque.push_back(10);
   EXPECT_EQ(10, deque.back());
 }
 
-TEST_F(TestBase, QuicPlatformTest_QuicInlinedVector) {
+TEST(QuicPlatformTest, QuicInlinedVector) {
   quic::QuicInlinedVector<int, 5> vec;
   vec.push_back(3);
   EXPECT_EQ(3, vec[0]);
 }
 
-TEST_F(TestBase, QuicPlatformTest_QuicEndian) {
+TEST(QuicPlatformTest, QuicEndian) {
   EXPECT_EQ(0x1234, quic::QuicEndian::NetToHost16(quic::QuicEndian::HostToNet16(0x1234)));
   EXPECT_EQ(0x12345678, quic::QuicEndian::NetToHost32(quic::QuicEndian::HostToNet32(0x12345678)));
 }
 
-TEST_F(TestBase, QuicPlatformTest_QuicEstimateMemoryUsage) {
+TEST(QuicPlatformTest, QuicEstimateMemoryUsage) {
   quic::QuicString s = "foo";
   // Stubbed out to always return 0.
   EXPECT_EQ(0, quic::QuicEstimateMemoryUsage(s));
 }
 
-TEST_F(TestBase, QuicPlatformTest_QuicString) {
+TEST(QuicPlatformTest, QuicString) {
   quic::QuicString s = "foo";
   EXPECT_EQ('o', s[1]);
 }
 
-TEST_F(TestBase, QuicPlatformTest_QuicStringPiece) {
+TEST(QuicPlatformTest, QuicStringPiece) {
   quic::QuicString s = "bar";
   quic::QuicStringPiece sp(s);
   EXPECT_EQ('b', sp[0]);
 }
 
-TEST_F(TestBase, QuicPlatformTest_QuicUint128) {
+TEST(QuicPlatformTest, QuicUint128) {
   quic::QuicUint128 i = MakeQuicUint128(16777216, 315);
   EXPECT_EQ(315, QuicUint128Low64(i));
   EXPECT_EQ(16777216, QuicUint128High64(i));
 }
 
-TEST_F(TestBase, QuicPlatformTest_QuicPtrUtil) {
+TEST(QuicPlatformTest, QuicPtrUtil) {
   auto p = quic::QuicMakeUnique<quic::QuicString>("abc");
   EXPECT_EQ("abc", *p);
 
@@ -95,7 +109,7 @@ TEST_F(TestBase, QuicPlatformTest_QuicPtrUtil) {
   EXPECT_EQ("aaa", *p);
 }
 
-TEST_F(TestBase, QuicPlatformTest_QuicMutex) {
+TEST(QuicPlatformTest, QuicMutex) {
   quic::QuicMutex mu;
 
   quic::QuicWriterMutexLock wmu(&mu);
@@ -108,7 +122,7 @@ TEST_F(TestBase, QuicPlatformTest_QuicMutex) {
   mu.WriterLock();
 }
 
-TEST_F(TestBase, QuicPlatformTest_QuicNotification) {
+TEST(QuicPlatformTest, QuicNotification) {
   quic::QuicNotification notification;
   EXPECT_FALSE(notification.HasBeenNotified());
   notification.Notify();
