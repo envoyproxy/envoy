@@ -1,7 +1,6 @@
 #include <cstdint>
 #include <limits>
 #include <memory>
-#include <random>
 #include <string>
 #include <unordered_map>
 
@@ -367,19 +366,17 @@ TEST_P(RingHashLoadBalancerTest, HostWeightedLargeRing) {
   init();
   LoadBalancerPtr lb = lb_->factory()->create();
 
-  // Generate 6000 random hashes and populate a histogram of which hosts they mapped to...
-  std::mt19937_64 gen;
-  std::uniform_int_distribution<uint64_t> random_hash(0, std::numeric_limits<uint64_t>::max());
+  // Generate 6000 hashes around the ring and populate a histogram of which hosts they mapped to...
   uint32_t counts[3] = {0};
   for (uint32_t i = 0; i < 6000; ++i) {
-    TestLoadBalancerContext context(random_hash(gen));
+    TestLoadBalancerContext context(i * (std::numeric_limits<uint64_t>::max() / 6000));
     uint32_t port = lb->chooseHost(&context)->address()->ip()->port();
     ++counts[port - 90];
   }
 
-  EXPECT_EQ(1003, counts[0]); // :90 | ~1000 expected hits
-  EXPECT_EQ(2019, counts[1]); // :91 | ~2000 expected hits
-  EXPECT_EQ(2978, counts[2]); // :92 | ~3000 expected hits
+  EXPECT_EQ(987, counts[0]);  // :90 | ~1000 expected hits
+  EXPECT_EQ(1932, counts[1]); // :91 | ~2000 expected hits
+  EXPECT_EQ(3081, counts[2]); // :92 | ~3000 expected hits
 }
 
 TEST_P(RingHashLoadBalancerTest, LocalityWeightedTinyRing) {
@@ -429,20 +426,18 @@ TEST_P(RingHashLoadBalancerTest, LocalityWeightedLargeRing) {
   init();
   LoadBalancerPtr lb = lb_->factory()->create();
 
-  // Generate 6000 random hashes and populate a histogram of which hosts they mapped to...
-  std::mt19937_64 gen;
-  std::uniform_int_distribution<uint64_t> random_hash(0, std::numeric_limits<uint64_t>::max());
+  // Generate 6000 hashes around the ring and populate a histogram of which hosts they mapped to...
   uint32_t counts[4] = {0};
   for (uint32_t i = 0; i < 6000; ++i) {
-    TestLoadBalancerContext context(random_hash(gen));
+    TestLoadBalancerContext context(i * (std::numeric_limits<uint64_t>::max() / 6000));
     uint32_t port = lb->chooseHost(&context)->address()->ip()->port();
     ++counts[port - 90];
   }
 
-  EXPECT_EQ(1003, counts[0]); // :90 | ~1000 expected hits
-  EXPECT_EQ(2019, counts[1]); // :91 | ~2000 expected hits
-  EXPECT_EQ(2978, counts[2]); // :92 | ~3000 expected hits
-  EXPECT_EQ(0, counts[3]);    // :90 |    =0 expected hits
+  EXPECT_EQ(987, counts[0]);  // :90 | ~1000 expected hits
+  EXPECT_EQ(1932, counts[1]); // :91 | ~2000 expected hits
+  EXPECT_EQ(3081, counts[2]); // :92 | ~3000 expected hits
+  EXPECT_EQ(0, counts[3]);    // :93 |    =0 expected hits
 }
 
 TEST_P(RingHashLoadBalancerTest, HostAndLocalityWeightedSmallRing) {
@@ -493,20 +488,18 @@ TEST_P(RingHashLoadBalancerTest, HostAndLocalityWeightedLargeRing) {
   init();
   LoadBalancerPtr lb = lb_->factory()->create();
 
-  // Generate 14000 random hashes and populate a histogram of which hosts they mapped to...
-  std::mt19937_64 gen;
-  std::uniform_int_distribution<uint64_t> random_hash(0, std::numeric_limits<uint64_t>::max());
+  // Generate 14000 hashes around the ring and populate a histogram of which hosts they mapped to...
   uint32_t counts[4] = {0};
   for (uint32_t i = 0; i < 14000; ++i) {
-    TestLoadBalancerContext context(random_hash(gen));
+    TestLoadBalancerContext context(i * (std::numeric_limits<uint64_t>::max() / 14000));
     uint32_t port = lb->chooseHost(&context)->address()->ip()->port();
     ++counts[port - 90];
   }
 
-  EXPECT_EQ(954, counts[0]);  // :90 | ~1000 expected hits
-  EXPECT_EQ(3941, counts[1]); // :91 | ~4000 expected hits
-  EXPECT_EQ(9105, counts[2]); // :92 | ~9000 expected hits
-  EXPECT_EQ(0, counts[3]);    // :90 |    =0 expected hits
+  EXPECT_EQ(980, counts[0]);  // :90 | ~1000 expected hits
+  EXPECT_EQ(3928, counts[1]); // :91 | ~4000 expected hits
+  EXPECT_EQ(9092, counts[2]); // :92 | ~9000 expected hits
+  EXPECT_EQ(0, counts[3]);    // :93 |    =0 expected hits
 }
 
 } // namespace Upstream
