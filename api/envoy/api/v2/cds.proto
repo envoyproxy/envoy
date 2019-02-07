@@ -404,10 +404,9 @@ message Cluster {
     // provided host) the better the request distribution will reflect the desired weights. This can
     // also be tuned more directly using
     // :ref:`replication_factor<envoy_api_field_Cluster.RingHashLbConfig.replication_factor>`.
-    // Defaults to 1024 entries. The maximum value of this lower bound is 8M entries, to constrain
-    // resource use. See also
+    // Defaults to 1024 entries. See also
     // :ref:`maximum_ring_size<envoy_api_field_Cluster.RingHashLbConfig.maximum_ring_size>`.
-    google.protobuf.UInt64Value minimum_ring_size = 1 [(validate.rules).uint64.lte = 8388608];
+    google.protobuf.UInt64Value minimum_ring_size = 1;
 
     // [#not-implemented-hide:] Hide from docs.
     message DeprecatedV1 {
@@ -437,7 +436,7 @@ message Cluster {
     // Maximum hash ring size. Defaults to 8M entries, but can be lowered to further constrain
     // resource use. See also
     // :ref:`minimum_ring_size<envoy_api_field_Cluster.RingHashLbConfig.minimum_ring_size>`.
-    google.protobuf.UInt64Value maximum_ring_size = 4 [(validate.rules).uint64.lte = 8388608];
+    google.protobuf.UInt64Value maximum_ring_size = 4;
 
     // In Ketama hashing, there is a tradeoff between resource use and request distribution
     // accuracy. A lower number of hashes per host yields a smaller ring, consuming less memory and
