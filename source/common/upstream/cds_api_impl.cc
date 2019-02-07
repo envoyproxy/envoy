@@ -40,7 +40,7 @@ void CdsApiImpl::onConfigUpdate(const ResourceVector& resources, const std::stri
   cm_.adsMux().pause(Config::TypeUrl::get().ClusterLoadAssignment);
   Cleanup eds_resume([this] { cm_.adsMux().resume(Config::TypeUrl::get().ClusterLoadAssignment); });
 
-  std::list<EnvoyException> exceptions;
+  std::list<std::string> exception_msgs;
   std::unordered_set<std::string> cluster_names;
   for (const auto& cluster : resources) {
     if (!cluster_names.insert(cluster.name()).second) {
@@ -48,9 +48,9 @@ void CdsApiImpl::onConfigUpdate(const ResourceVector& resources, const std::stri
     }
   }
   for (const auto& cluster : resources) {
-   MessageUtil::validate(cluster);
+    MessageUtil::validate(cluster);
   }
-  //We need to keep track of which clusters we might need to remove.
+  // We need to keep track of which clusters we might need to remove.
   ClusterManager::ClusterInfoMap clusters_to_remove = cm_.clusters();
   for (auto& cluster : resources) {
     const std::string cluster_name = cluster.name();
@@ -60,7 +60,7 @@ void CdsApiImpl::onConfigUpdate(const ResourceVector& resources, const std::stri
         ENVOY_LOG(debug, "cds: add/update cluster '{}'", cluster_name);
       }
     } catch (const EnvoyException& e) {
-      exceptions.push_back(e);
+      exception_msgs.push_back(e.what());
     }
   }
 
@@ -73,12 +73,18 @@ void CdsApiImpl::onConfigUpdate(const ResourceVector& resources, const std::stri
 
   version_info_ = version_info;
   runInitializeCallbackIfAny();
-  if (!exceptions.empty()) {
-    std::stringstream message;
-    for (auto& exception : exceptions) {
-      message << exception.what() << "\n";
+  throwIfExceptionOccured(exception_msgs);
+}
+
+void CdsApiImpl::throwIfExceptionOccured(const std::list<std::string>& exception_msgs) {
+  if (!exception_msgs.empty()) {
+    std::stringstream sstream;
+    for (auto& msg : exception_msgs) {
+      sstream << msg << "\n";
     }
-    throw EnvoyException(message.str());
+    auto message = sstream.str();
+    message.pop_back();
+    throw EnvoyException(message);
   }
 }
 

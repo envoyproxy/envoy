@@ -26,10 +26,8 @@ using testing::Throw;
 
 namespace Envoy {
 namespace Upstream {
-  
-MATCHER_P(WithName, expectedName, "") {
-  return arg.name() == expectedName;
-}
+
+MATCHER_P(WithName, expectedName, "") { return arg.name() == expectedName; }
 
 class CdsApiImplTest : public TestBase {
 protected:
@@ -65,13 +63,12 @@ protected:
   }
 
   void expectAdd(const std::string& cluster_name, const std::string& version = std::string("")) {
-    EXPECT_CALL(cm_, addOrUpdateCluster(WithName(cluster_name), version))
-        .WillOnce(Return(true));
+    EXPECT_CALL(cm_, addOrUpdateCluster(WithName(cluster_name), version)).WillOnce(Return(true));
   }
 
-  void expectAddToThrow(const std::string& cluster_name) {
+  void expectAddToThrow(const std::string& cluster_name, const std::string& exception_msg) {
     EXPECT_CALL(cm_, addOrUpdateCluster(WithName(cluster_name), _))
-        .WillOnce(Throw(EnvoyException("An exception")));
+        .WillOnce(Throw(EnvoyException(exception_msg)));
   }
 
   void expectRequest() {
@@ -155,8 +152,7 @@ TEST_F(CdsApiImplTest, EmptyConfigUpdate) {
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(ClusterManager::ClusterInfoMap{}));
   EXPECT_CALL(initialized_, ready());
   EXPECT_CALL(request_, cancel());
-  
-  
+
   Protobuf::RepeatedPtrField<envoy::api::v2::Cluster> clusters;
   dynamic_cast<CdsApiImpl*>(cds_.get())->onConfigUpdate(clusters, "");
 }
@@ -170,12 +166,12 @@ TEST_F(CdsApiImplTest, ConfigUpdateWith2ValidClusters) {
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(ClusterManager::ClusterInfoMap{}));
   EXPECT_CALL(initialized_, ready());
   EXPECT_CALL(request_, cancel());
-  
+
   Protobuf::RepeatedPtrField<envoy::api::v2::Cluster> clusters;
   auto* cluster_1 = clusters.Add();
   cluster_1->set_name("cluster_1");
   expectAdd("cluster_1");
- 
+
   auto* cluster_2 = clusters.Add();
   cluster_2->set_name("cluster_2");
   expectAdd("cluster_2");
@@ -192,17 +188,18 @@ TEST_F(CdsApiImplTest, ConfigUpdateAddsSecondClusterEvenIfFirstThrows) {
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(ClusterManager::ClusterInfoMap{}));
   EXPECT_CALL(initialized_, ready());
   EXPECT_CALL(request_, cancel());
-  
+
   Protobuf::RepeatedPtrField<envoy::api::v2::Cluster> clusters;
   auto* cluster_1 = clusters.Add();
   cluster_1->set_name("cluster_1");
-  expectAddToThrow("cluster_1");
- 
+  expectAddToThrow("cluster_1", "An exception");
+
   auto* cluster_2 = clusters.Add();
   cluster_2->set_name("cluster_2");
   expectAdd("cluster_2");
 
-  EXPECT_THROW(dynamic_cast<CdsApiImpl*>(cds_.get())->onConfigUpdate(clusters, ""), EnvoyException);
+  EXPECT_THROW_WITH_MESSAGE(dynamic_cast<CdsApiImpl*>(cds_.get())->onConfigUpdate(clusters, ""),
+                            EnvoyException, "An exception");
 }
 
 TEST_F(CdsApiImplTest, InvalidOptions) {
