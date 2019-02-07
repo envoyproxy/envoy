@@ -39,7 +39,8 @@ def main():
   #
   # Similar behavior exists for Clang's `-stdlib=libc++` flag, so we handle
   # it in the same test.
-  if "-static-libstdc++" in sys.argv[1:] or "-stdlib=libc++" in sys.argv[1:]:
+  if ("-static-libstdc++" in sys.argv[1:] or "-stdlib=libc++" in sys.argv[1:] or
+      "-std=c++0x" in sys.argv[1:]):
     compiler = envoy_real_cxx
   else:
     compiler = envoy_real_cc
@@ -62,7 +63,7 @@ def main():
         # unless the user has explicitly set environment variables
         # before starting Bazel. But here in $PWD is the Bazel sandbox,
         # which will be deleted automatically after the compiler exits.
-        (flagfile_fd, flagfile_path) = tempfile.mkstemp(dir='./', suffix=".linker-params")
+        (flagfile_fd, flagfile_path) = tempfile.mkstemp(dir="./", suffix=".linker-params")
         with closing_fd(flagfile_fd):
           sanitize_flagfile(arg[len("-Wl,@"):], flagfile_fd)
         argv.append("-Wl,@" + flagfile_path)
