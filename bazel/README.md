@@ -33,9 +33,9 @@ for how to update or override dependencies.
     sudo apt-get install \
        libtool \
        cmake \
-       realpath \
        clang-format-7 \
        automake \
+       make \
        ninja-build \
        curl \
        unzip \

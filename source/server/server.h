@@ -111,7 +111,7 @@ public:
    * @return BootstrapVersion to indicate which version of the API was parsed.
    */
   static BootstrapVersion loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& bootstrap,
-                                              Options& options, Api::Api& api);
+                                              const Options& options, Api::Api& api);
 };
 
 /**
@@ -120,7 +120,7 @@ public:
  */
 class RunHelper : Logger::Loggable<Logger::Id::main> {
 public:
-  RunHelper(Instance& instance, Options& options, Event::Dispatcher& dispatcher,
+  RunHelper(Instance& instance, const Options& options, Event::Dispatcher& dispatcher,
             Upstream::ClusterManager& cm, AccessLog::AccessLogManager& access_log_manager,
             InitManagerImpl& init_manager, OverloadManager& overload_manager,
             std::function<void()> workers_start_cb);
@@ -140,7 +140,7 @@ public:
   /**
    * @throw EnvoyException if initialization fails.
    */
-  InstanceImpl(Options& options, Event::TimeSystem& time_system,
+  InstanceImpl(const Options& options, Event::TimeSystem& time_system,
                Network::Address::InstanceConstSharedPtr local_address, TestHooks& hooks,
                HotRestart& restarter, Stats::StoreRoot& store,
                Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
@@ -176,7 +176,7 @@ public:
   void shutdownAdmin() override;
   Singleton::Manager& singletonManager() override { return *singleton_manager_; }
   bool healthCheckFailed() override;
-  Options& options() override { return options_; }
+  const Options& options() override { return options_; }
   time_t startTimeCurrentEpoch() override { return start_time_; }
   time_t startTimeFirstEpoch() override { return original_start_time_; }
   Stats::Store& stats() override { return stats_store_; }
@@ -192,7 +192,7 @@ public:
 private:
   ProtobufTypes::MessagePtr dumpBootstrapConfig();
   void flushStats();
-  void initialize(Options& options, Network::Address::InstanceConstSharedPtr local_address,
+  void initialize(const Options& options, Network::Address::InstanceConstSharedPtr local_address,
                   ComponentFactory& component_factory);
   void loadServerFlags(const absl::optional<std::string>& flags_path);
   uint64_t numConnections();
@@ -200,7 +200,7 @@ private:
   void terminate();
 
   bool shutdown_;
-  Options& options_;
+  const Options& options_;
   Event::TimeSystem& time_system_;
   HotRestart& restarter_;
   const time_t start_time_;
