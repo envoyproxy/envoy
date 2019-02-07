@@ -33,6 +33,7 @@ const std::string ALPN_STRING = "h2";
 // This is not the full client magic, but it's the smallest size that should be able to
 // differentiate between HTTP/1 and HTTP/2.
 const std::string CLIENT_MAGIC_PREFIX = "PRI * HTTP/2";
+static const uint32_t NGHTTP2_MAX_SEND_HEADER_BLOCK_LENGTH = 100;
 
 /**
  * All stats for the HTTP/2 codec. @see stats_macros.h
@@ -120,7 +121,7 @@ protected:
    */
   class Http2Options {
   public:
-    Http2Options(const Http2Settings& http2_settings, const uint32_t max_request_headers_kb);
+    Http2Options(const Http2Settings& http2_settings);
     ~Http2Options();
 
     const nghttp2_option* options() { return options_; }
@@ -131,7 +132,7 @@ protected:
 
   class ClientHttp2Options : public Http2Options {
   public:
-    ClientHttp2Options(const Http2Settings& http2_settings, const uint32_t max_request_headers_kb);
+    ClientHttp2Options(const Http2Settings& http2_settings);
   };
 
   /**

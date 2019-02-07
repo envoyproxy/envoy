@@ -37,6 +37,8 @@ public:
   }
 
   void runResetCallbacks(StreamResetReason reason) {
+    std::cout << "[AUNI] " << "RUNNING RESET CALLBACKS" << "\n";
+    std::cout << "[AUNI] " << reset_callbacks_started_ << "\n";
     // Reset callbacks are a special case, and the only StreamCallbacks allowed
     // to run after local_end_stream_.
     if (reset_callbacks_started_) {
@@ -45,7 +47,9 @@ public:
 
     reset_callbacks_started_ = true;
     for (StreamCallbacks* callbacks : callbacks_) {
+      std::cout << "[AUNI] " << "found a callback" << "\n";
       if (callbacks) {
+        std::cout << "[AUNI] " << "moolah" << "\n";
         callbacks->onResetStream(reason);
       }
     }
