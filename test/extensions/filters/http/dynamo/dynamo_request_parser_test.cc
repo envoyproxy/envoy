@@ -15,7 +15,9 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Dynamo {
 
-TEST(DynamoRequestParser, parseOperation) {
+using DynamoRequestParser = TestBase;
+
+TEST_F(DynamoRequestParser, parseOperation) {
   // Well formed x-amz-target header, in a format, Version.Operation
   {
     Http::TestHeaderMapImpl headers{{"X", "X"}, {"x-amz-target", "X.Operation"}};
@@ -41,7 +43,7 @@ TEST(DynamoRequestParser, parseOperation) {
   }
 }
 
-TEST(DynamoRequestParser, parseTableNameSingleOperation) {
+TEST_F(DynamoRequestParser, parseTableNameSingleOperation) {
   std::vector<std::string> supported_single_operations{"GetItem", "Query",      "Scan",
                                                        "PutItem", "UpdateItem", "DeleteItem"};
 
@@ -72,7 +74,7 @@ TEST(DynamoRequestParser, parseTableNameSingleOperation) {
   }
 }
 
-TEST(DynamoRequestParser, parseErrorType) {
+TEST_F(DynamoRequestParser, parseErrorType) {
   {
     EXPECT_EQ("ResourceNotFoundException",
               RequestParser::parseErrorType(*Json::Factory::loadFromString(
@@ -92,7 +94,7 @@ TEST(DynamoRequestParser, parseErrorType) {
   }
 }
 
-TEST(DynamoRequestParser, parseTableNameBatchOperation) {
+TEST_F(DynamoRequestParser, parseTableNameBatchOperation) {
   {
     std::string json_string = R"EOF(
     {
@@ -180,7 +182,7 @@ TEST(DynamoRequestParser, parseTableNameBatchOperation) {
     EXPECT_TRUE(table.is_single_table);
   }
 }
-TEST(DynamoRequestParser, parseBatchUnProcessedKeys) {
+TEST_F(DynamoRequestParser, parseBatchUnProcessedKeys) {
   {
     Json::ObjectSharedPtr json_data = Json::Factory::loadFromString("{}");
     std::vector<std::string> unprocessed_tables =
@@ -221,7 +223,7 @@ TEST(DynamoRequestParser, parseBatchUnProcessedKeys) {
   }
 }
 
-TEST(DynamoRequestParser, parsePartitionIds) {
+TEST_F(DynamoRequestParser, parsePartitionIds) {
   {
     std::vector<RequestParser::PartitionDescriptor> partitions =
         RequestParser::parsePartitions(*Json::Factory::loadFromString("{}"));

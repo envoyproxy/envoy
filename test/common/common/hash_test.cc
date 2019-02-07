@@ -3,7 +3,9 @@
 #include "test/test_common/test_base.h"
 
 namespace Envoy {
-TEST(Hash, xxHash) {
+using Hash = TestBase;
+
+TEST_F(Hash, xxHash) {
   EXPECT_EQ(3728699739546630719U, HashUtil::xxHash64("foo"));
   EXPECT_EQ(5234164152756840025U, HashUtil::xxHash64("bar"));
   EXPECT_EQ(8917841378505826757U, HashUtil::xxHash64("foo\nbar"));
@@ -11,7 +13,7 @@ TEST(Hash, xxHash) {
   EXPECT_EQ(17241709254077376921U, HashUtil::xxHash64(""));
 }
 
-TEST(Hash, djb2CaseInsensitiveHash) {
+TEST_F(Hash, djb2CaseInsensitiveHash) {
   EXPECT_EQ(211616621U, HashUtil::djb2CaseInsensitiveHash("foo"));
   EXPECT_EQ(211611524U, HashUtil::djb2CaseInsensitiveHash("bar"));
   EXPECT_EQ(282790909350396U, HashUtil::djb2CaseInsensitiveHash("foo\nbar"));
@@ -19,7 +21,7 @@ TEST(Hash, djb2CaseInsensitiveHash) {
   EXPECT_EQ(5381U, HashUtil::djb2CaseInsensitiveHash(""));
 }
 
-TEST(Hash, murmurHash2_64) {
+TEST_F(Hash, murmurHash2_64) {
   EXPECT_EQ(9631199822919835226U, MurmurHash::murmurHash2_64("foo"));
   EXPECT_EQ(11474628671133349555U, MurmurHash::murmurHash2_64("bar"));
   EXPECT_EQ(16306510975912980159U, MurmurHash::murmurHash2_64("foo\nbar"));
@@ -28,7 +30,7 @@ TEST(Hash, murmurHash2_64) {
 }
 
 #if __GLIBCXX__ >= 20130411 && __GLIBCXX__ <= 20180726
-TEST(Hash, stdhash) {
+TEST_F(Hash, stdhash) {
   EXPECT_EQ(std::hash<std::string>()(std::string("foo")), MurmurHash::murmurHash2_64("foo"));
   EXPECT_EQ(std::hash<std::string>()(std::string("bar")), MurmurHash::murmurHash2_64("bar"));
   EXPECT_EQ(std::hash<std::string>()(std::string("foo\nbar")),

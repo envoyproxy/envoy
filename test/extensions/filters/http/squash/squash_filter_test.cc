@@ -50,7 +50,9 @@ void EXPECT_JSON_EQ(const std::string& expected, const std::string& actual) {
 
 } // namespace
 
-TEST(SoloFilterConfigTest, V1ApiConversion) {
+using SoloFilterConfigTest = TestBase;
+
+TEST_F(SoloFilterConfigTest, V1ApiConversion) {
   std::string json = R"EOF(
     {
       "cluster" : "fake_cluster",
@@ -73,7 +75,7 @@ TEST(SoloFilterConfigTest, V1ApiConversion) {
   EXPECT_EQ(std::chrono::milliseconds(3003), config.attachmentTimeout());
 }
 
-TEST(SoloFilterConfigTest, NoCluster) {
+TEST_F(SoloFilterConfigTest, NoCluster) {
   std::string json = R"EOF(
     {
       "cluster" : "fake_cluster",
@@ -91,7 +93,7 @@ TEST(SoloFilterConfigTest, NoCluster) {
                             "squash filter: unknown cluster 'fake_cluster' in squash config");
 }
 
-TEST(SoloFilterConfigTest, ParsesEnvironment) {
+TEST_F(SoloFilterConfigTest, ParsesEnvironment) {
   std::string json = R"EOF(
     {
       "cluster" : "squash",
@@ -108,7 +110,7 @@ TEST(SoloFilterConfigTest, ParsesEnvironment) {
   EXPECT_JSON_EQ(expected_json, config.attachmentJson());
 }
 
-TEST(SoloFilterConfigTest, ParsesAndEscapesEnvironment) {
+TEST_F(SoloFilterConfigTest, ParsesAndEscapesEnvironment) {
   TestEnvironment::setEnvVar("ESCAPE_ENV", "\"", 1);
 
   std::string json = R"EOF(
@@ -126,7 +128,7 @@ TEST(SoloFilterConfigTest, ParsesAndEscapesEnvironment) {
   auto config = constructSquashFilterConfigFromJson(*json_config, factory_context);
   EXPECT_JSON_EQ(expected_json, config.attachmentJson());
 }
-TEST(SoloFilterConfigTest, TwoEnvironmentVariables) {
+TEST_F(SoloFilterConfigTest, TwoEnvironmentVariables) {
   TestEnvironment::setEnvVar("ENV1", "1", 1);
   TestEnvironment::setEnvVar("ENV2", "2", 1);
 
@@ -145,7 +147,7 @@ TEST(SoloFilterConfigTest, TwoEnvironmentVariables) {
   EXPECT_JSON_EQ(expected_json, config.attachmentJson());
 }
 
-TEST(SoloFilterConfigTest, ParsesEnvironmentInComplexTemplate) {
+TEST_F(SoloFilterConfigTest, ParsesEnvironmentInComplexTemplate) {
   TestEnvironment::setEnvVar("CONF_ENV", "some-config-value", 1);
 
   std::string json = R"EOF(

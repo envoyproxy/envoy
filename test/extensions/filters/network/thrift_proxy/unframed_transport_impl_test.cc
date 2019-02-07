@@ -12,17 +12,19 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
 
-TEST(UnframedTransportTest, Name) {
+using UnframedTransportTest = TestBase;
+
+TEST_F(UnframedTransportTest, Name) {
   UnframedTransportImpl transport;
   EXPECT_EQ(transport.name(), "unframed");
 }
 
-TEST(UnframedTransportTest, Type) {
+TEST_F(UnframedTransportTest, Type) {
   UnframedTransportImpl transport;
   EXPECT_EQ(transport.type(), TransportType::Unframed);
 }
 
-TEST(UnframedTransportTest, DecodeFrameStart) {
+TEST_F(UnframedTransportTest, DecodeFrameStart) {
   UnframedTransportImpl transport;
 
   Buffer::OwnedImpl buffer;
@@ -35,7 +37,7 @@ TEST(UnframedTransportTest, DecodeFrameStart) {
   EXPECT_EQ(buffer.length(), 4);
 }
 
-TEST(UnframedTransportTest, DecodeFrameStartWithNoData) {
+TEST_F(UnframedTransportTest, DecodeFrameStartWithNoData) {
   UnframedTransportImpl transport;
 
   Buffer::OwnedImpl buffer;
@@ -44,14 +46,14 @@ TEST(UnframedTransportTest, DecodeFrameStartWithNoData) {
   EXPECT_THAT(metadata, IsEmptyMetadata());
 }
 
-TEST(UnframedTransportTest, DecodeFrameEnd) {
+TEST_F(UnframedTransportTest, DecodeFrameEnd) {
   UnframedTransportImpl transport;
 
   Buffer::OwnedImpl buffer;
   EXPECT_TRUE(transport.decodeFrameEnd(buffer));
 }
 
-TEST(UnframedTransportTest, EncodeFrame) {
+TEST_F(UnframedTransportTest, EncodeFrame) {
   UnframedTransportImpl transport;
 
   MessageMetadata metadata;

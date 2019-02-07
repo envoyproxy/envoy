@@ -15,14 +15,16 @@ struct MyStruct {
   uint64_t words_[ArraySize];
 };
 
-TEST(MemoryDebug, ByteSize) {
+using MemoryDebug = TestBase;
+
+TEST_F(MemoryDebug, ByteSize) {
   uint64_t before = Stats::totalCurrentlyAllocated();
   auto ptr = std::make_unique<MyStruct>();
   uint64_t after = Stats::totalCurrentlyAllocated();
   EXPECT_LE(sizeof(MyStruct), after - before);
 }
 
-TEST(MemoryDebug, ScribbleOnNew) {
+TEST_F(MemoryDebug, ScribbleOnNew) {
   auto ptr = std::make_unique<MyStruct>();
   for (int i = 0; i < ArraySize; ++i) {
     // This is the pattern written by tcmalloc's debug library.
@@ -30,7 +32,7 @@ TEST(MemoryDebug, ScribbleOnNew) {
   }
 }
 
-TEST(MemoryDebug, ScribbleOnDelete) {
+TEST_F(MemoryDebug, ScribbleOnDelete) {
   uint64_t* words;
   {
     auto ptr = std::make_unique<MyStruct>();
@@ -43,7 +45,7 @@ TEST(MemoryDebug, ScribbleOnDelete) {
   }
 }
 
-TEST(MemoryDebug, ZeroByteAlloc) { auto ptr = std::make_unique<uint8_t[]>(0); }
+TEST_F(MemoryDebug, ZeroByteAlloc) { auto ptr = std::make_unique<uint8_t[]>(0); }
 
 #endif // ENVOY_MEMORY_DEBUG_ENABLED
 

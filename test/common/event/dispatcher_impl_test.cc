@@ -27,7 +27,9 @@ private:
   std::function<void()> on_destroy_;
 };
 
-TEST(DeferredDeleteTest, DeferredDelete) {
+using DeferredDeleteTest = TestBase;
+
+TEST_F(DeferredDeleteTest, DeferredDelete) {
   InSequence s;
   Stats::IsolatedStoreImpl stats_store;
   Api::ApiPtr api = Api::createApiForTest(stats_store);

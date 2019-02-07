@@ -21,7 +21,9 @@ private:
   bool encode_complete_{};
 };
 
-TEST(StreamEncoderWrapper, HeaderOnlyEncode) {
+using StreamEncoderWrapperTest = TestBase;
+
+TEST_F(StreamEncoderWrapperTest, HeaderOnlyEncode) {
   MockStreamEncoderWrapper wrapper;
 
   EXPECT_CALL(wrapper.innerEncoder(), encodeHeaders(_, true));
@@ -29,7 +31,7 @@ TEST(StreamEncoderWrapper, HeaderOnlyEncode) {
   EXPECT_TRUE(wrapper.encodeComplete());
 }
 
-TEST(StreamEncoderWrapper, HeaderAndBodyEncode) {
+TEST_F(StreamEncoderWrapperTest, HeaderAndBodyEncode) {
   MockStreamEncoderWrapper wrapper;
 
   TestHeaderMapImpl response_headers{{":status", "200"}};
@@ -43,7 +45,7 @@ TEST(StreamEncoderWrapper, HeaderAndBodyEncode) {
   EXPECT_TRUE(wrapper.encodeComplete());
 }
 
-TEST(StreamEncoderWrapper, HeaderAndBodyAndTrailersEncode) {
+TEST_F(StreamEncoderWrapperTest, HeaderAndBodyAndTrailersEncode) {
   MockStreamEncoderWrapper wrapper;
 
   TestHeaderMapImpl response_headers{{":status", "200"}};
@@ -61,7 +63,7 @@ TEST(StreamEncoderWrapper, HeaderAndBodyAndTrailersEncode) {
   EXPECT_TRUE(wrapper.encodeComplete());
 }
 
-TEST(StreamEncoderWrapper, 100ContinueHeaderEncode) {
+TEST_F(StreamEncoderWrapperTest, 100ContinueHeaderEncode) {
   MockStreamEncoderWrapper wrapper;
 
   EXPECT_CALL(wrapper.innerEncoder(), encode100ContinueHeaders(_));

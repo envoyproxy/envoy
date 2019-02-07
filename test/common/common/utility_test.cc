@@ -20,7 +20,9 @@ using testing::ContainerEq;
 
 namespace Envoy {
 
-TEST(StringUtil, strtoul) {
+using StringUtilTest = TestBase;
+
+TEST_F(StringUtilTest, strtoul) {
   uint64_t out;
   const char* rest;
 
@@ -76,7 +78,7 @@ TEST(StringUtil, strtoul) {
   EXPECT_EQ(18446744073709551615U, out);
 }
 
-TEST(StringUtil, atoul) {
+TEST_F(StringUtilTest, atoul) {
   uint64_t out;
   EXPECT_FALSE(StringUtil::atoul("123b", out));
   EXPECT_FALSE(StringUtil::atoul("", out));
@@ -98,7 +100,7 @@ TEST(StringUtil, atoul) {
   EXPECT_EQ(18446744073709551615U, out);
 }
 
-TEST(StringUtil, atol) {
+TEST_F(StringUtilTest, atol) {
   int64_t out;
   EXPECT_FALSE(StringUtil::atol("-123b", out));
   EXPECT_FALSE(StringUtil::atol("", out));
@@ -125,13 +127,17 @@ TEST(StringUtil, atol) {
   EXPECT_EQ(INT64_MIN, out);
 }
 
-TEST(DateUtil, All) {
+using DateUtilTest = TestBase;
+
+TEST_F(DateUtilTest, All) {
   EXPECT_FALSE(DateUtil::timePointValid(SystemTime()));
   DangerousDeprecatedTestTime test_time;
   EXPECT_TRUE(DateUtil::timePointValid(test_time.timeSystem().systemTime()));
 }
 
-TEST(InputConstMemoryStream, All) {
+using InputConstMemoryStreamTest = TestBase;
+
+TEST_F(InputConstMemoryStreamTest, All) {
   {
     InputConstMemoryStream istream{nullptr, 0};
     std::string s;
@@ -150,7 +156,7 @@ TEST(InputConstMemoryStream, All) {
   }
 }
 
-TEST(StringUtil, WhitespaceChars) {
+TEST_F(StringUtilTest, WhitespaceChars) {
   EXPECT_NE(nullptr, strchr(StringUtil::WhitespaceChars, ' '));
   EXPECT_NE(nullptr, strchr(StringUtil::WhitespaceChars, '\t'));
   EXPECT_NE(nullptr, strchr(StringUtil::WhitespaceChars, '\f'));
@@ -159,7 +165,7 @@ TEST(StringUtil, WhitespaceChars) {
   EXPECT_NE(nullptr, strchr(StringUtil::WhitespaceChars, '\r'));
 }
 
-TEST(StringUtil, itoa) {
+TEST_F(StringUtilTest, itoa) {
   char buf[32];
   EXPECT_THROW(StringUtil::itoa(buf, 20, 1), std::invalid_argument);
 
@@ -176,7 +182,7 @@ TEST(StringUtil, itoa) {
   EXPECT_STREQ("18446744073709551615", buf);
 }
 
-TEST(StringUtil, strlcpy) {
+TEST_F(StringUtilTest, strlcpy) {
   {
     char dest[6];
     EXPECT_EQ(5U, StringUtil::strlcpy(dest, std::string{"hello"}.c_str(), sizeof(dest)));
@@ -212,7 +218,7 @@ TEST(StringUtil, strlcpy) {
   }
 }
 
-TEST(StringUtil, join) {
+TEST_F(StringUtilTest, join) {
   EXPECT_EQ("hello,world", StringUtil::join({"hello", "world"}, ","));
   EXPECT_EQ("hello", StringUtil::join({"hello"}, ","));
   EXPECT_EQ("", StringUtil::join({}, ","));
@@ -226,28 +232,28 @@ TEST(StringUtil, join) {
   EXPECT_EQ("", StringUtil::join({}, ",,"));
 }
 
-TEST(StringUtil, escape) {
+TEST_F(StringUtilTest, escape) {
   EXPECT_EQ(StringUtil::escape("hello world"), "hello world");
   EXPECT_EQ(StringUtil::escape("hello\nworld\n"), "hello\\nworld\\n");
   EXPECT_EQ(StringUtil::escape("\t\nworld\r\n"), "\\t\\nworld\\r\\n");
   EXPECT_EQ(StringUtil::escape("{\"linux\": \"penguin\"}"), "{\\\"linux\\\": \\\"penguin\\\"}");
 }
 
-TEST(StringUtil, toUpper) {
+TEST_F(StringUtilTest, toUpper) {
   EXPECT_EQ(StringUtil::toUpper(""), "");
   EXPECT_EQ(StringUtil::toUpper("a"), "A");
   EXPECT_EQ(StringUtil::toUpper("Ba"), "BA");
   EXPECT_EQ(StringUtil::toUpper("X asdf aAf"), "X ASDF AAF");
 }
 
-TEST(StringUtil, toLower) {
+TEST_F(StringUtilTest, toLower) {
   EXPECT_EQ(StringUtil::toLower(""), "");
   EXPECT_EQ(StringUtil::toLower("a"), "a");
   EXPECT_EQ(StringUtil::toLower("Ba"), "ba");
   EXPECT_EQ(StringUtil::toLower("X asdf aAf"), "x asdf aaf");
 }
 
-TEST(StringUtil, StringViewLtrim) {
+TEST_F(StringUtilTest, StringViewLtrim) {
   EXPECT_EQ("", StringUtil::ltrim("     "));
   EXPECT_EQ("hello \t\f\v\n\r", StringUtil::ltrim("   hello \t\f\v\n\r"));
   EXPECT_EQ("hello ", StringUtil::ltrim("\t\f\v\n\r   hello "));
@@ -256,7 +262,7 @@ TEST(StringUtil, StringViewLtrim) {
   EXPECT_EQ("", StringUtil::ltrim(""));
 }
 
-TEST(StringUtil, StringViewRtrim) {
+TEST_F(StringUtilTest, StringViewRtrim) {
   EXPECT_EQ("", StringUtil::rtrim("     "));
   EXPECT_EQ("\t\f\v\n\rhello", StringUtil::rtrim("\t\f\v\n\rhello "));
   EXPECT_EQ("\t\f\v\n\r a b", StringUtil::rtrim("\t\f\v\n\r a b \t\f\v\n\r"));
@@ -264,13 +270,13 @@ TEST(StringUtil, StringViewRtrim) {
   EXPECT_EQ("", StringUtil::rtrim(""));
 }
 
-TEST(StringUtil, StringViewTrim) {
+TEST_F(StringUtilTest, StringViewTrim) {
   EXPECT_EQ("", StringUtil::trim("   "));
   EXPECT_EQ("hello", StringUtil::trim("\t\f\v\n\r  hello   "));
   EXPECT_EQ("he llo", StringUtil::trim(" \t\f\v\n\r he llo \t\f\v\n\r"));
 }
 
-TEST(StringUtil, StringViewCaseFindToken) {
+TEST_F(StringUtilTest, StringViewCaseFindToken) {
   EXPECT_TRUE(StringUtil::caseFindToken("hello; world", ";", "HELLO"));
   EXPECT_FALSE(StringUtil::caseFindToken("hello; world", ";", "TEST"));
   EXPECT_TRUE(StringUtil::caseFindToken("heLLo; world", ";", "hello"));
@@ -283,14 +289,14 @@ TEST(StringUtil, StringViewCaseFindToken) {
   EXPECT_TRUE(StringUtil::caseFindToken("A=5", ".", "A=5"));
 }
 
-TEST(StringUtil, StringViewCaseCompare) {
+TEST_F(StringUtilTest, StringViewCaseCompare) {
   EXPECT_TRUE(StringUtil::caseCompare("HELLO world", "hello world"));
   EXPECT_TRUE(StringUtil::caseCompare("hello world", "HELLO world"));
   EXPECT_FALSE(StringUtil::caseCompare("hello world", "hello"));
   EXPECT_FALSE(StringUtil::caseCompare("hello", "hello world"));
 }
 
-TEST(StringUtil, StringViewCropRight) {
+TEST_F(StringUtilTest, StringViewCropRight) {
   EXPECT_EQ("hello", StringUtil::cropRight("hello; world\t\f\v\n\r", ";"));
   EXPECT_EQ("foo ", StringUtil::cropRight("foo ; ; ; ; ; ; ", ";"));
   EXPECT_EQ("", StringUtil::cropRight(";hello world\t\f\v\n\r", ";"));
@@ -301,7 +307,7 @@ TEST(StringUtil, StringViewCropRight) {
   EXPECT_EQ("abcd", StringUtil::cropRight("abcd", ";"));
 }
 
-TEST(StringUtil, StringViewCropLeft) {
+TEST_F(StringUtilTest, StringViewCropLeft) {
   EXPECT_EQ(" world\t\f\v\n\r", StringUtil::cropLeft("hello; world\t\f\v\n\r", ";"));
   EXPECT_EQ("hello world ", StringUtil::cropLeft(";hello world ", ";"));
   EXPECT_EQ("\t\f\v\n\ralo", StringUtil::cropLeft("\t\f\v\n\rhello\t\f\v\n\ralo", "lo"));
@@ -312,7 +318,7 @@ TEST(StringUtil, StringViewCropLeft) {
   EXPECT_EQ("", StringUtil::cropLeft("abcd", "abcd"));
 }
 
-TEST(StringUtil, StringViewFindToken) {
+TEST_F(StringUtilTest, StringViewFindToken) {
   EXPECT_TRUE(StringUtil::findToken("hello; world", ";", "hello"));
   EXPECT_TRUE(StringUtil::findToken("abc; type=text", ";=", "text"));
   EXPECT_TRUE(StringUtil::findToken("abc; type=text", ";=", "abc"));
@@ -327,17 +333,17 @@ TEST(StringUtil, StringViewFindToken) {
   EXPECT_TRUE(StringUtil::findToken("A=5", ".", "A=5"));
 }
 
-TEST(StringUtil, StringViewCaseInsensitiveHash) {
+TEST_F(StringUtilTest, StringViewCaseInsensitiveHash) {
   EXPECT_EQ(8972312556107145900U, StringUtil::CaseInsensitiveHash()("hello world"));
 }
 
-TEST(StringUtil, StringViewCaseInsensitiveCompare) {
+TEST_F(StringUtilTest, StringViewCaseInsensitiveCompare) {
   EXPECT_TRUE(StringUtil::CaseInsensitiveCompare()("hello world", "hello world"));
   EXPECT_TRUE(StringUtil::CaseInsensitiveCompare()("HELLO world", "hello world"));
   EXPECT_FALSE(StringUtil::CaseInsensitiveCompare()("hello!", "hello world"));
 }
 
-TEST(StringUtil, StringViewCaseUnorderedSet) {
+TEST_F(StringUtilTest, StringViewCaseUnorderedSet) {
   StringUtil::CaseUnorderedSet words{"Test", "hello", "WORLD", "Test"};
   EXPECT_EQ(3, words.size());
   EXPECT_EQ("Test", *(words.find("test")));
@@ -346,7 +352,7 @@ TEST(StringUtil, StringViewCaseUnorderedSet) {
   EXPECT_EQ(words.end(), words.find("hello world"));
 }
 
-TEST(StringUtil, StringViewSplit) {
+TEST_F(StringUtilTest, StringViewSplit) {
   {
     auto tokens = StringUtil::splitToken(" one , two , three ", ",", true);
     EXPECT_EQ(3, tokens.size());
@@ -395,7 +401,7 @@ TEST(StringUtil, StringViewSplit) {
   }
 }
 
-TEST(StringUtil, removeCharacters) {
+TEST_F(StringUtilTest, removeCharacters) {
   IntervalSetImpl<size_t> removals;
   removals.insert(3, 5);
   removals.insert(7, 10);
@@ -404,7 +410,9 @@ TEST(StringUtil, removeCharacters) {
   EXPECT_EQ("1256x", StringUtil::removeCharacters("0123456789x", removals));
 }
 
-TEST(AccessLogDateTimeFormatter, fromTime) {
+using AccessLogDateTimeFormatterTest = TestBase;
+
+TEST_F(AccessLogDateTimeFormatterTest, fromTime) {
   SystemTime time1(std::chrono::seconds(1522796769));
   EXPECT_EQ("2018-04-03T23:06:09.000Z", AccessLogDateTimeFormatter::fromTime(time1));
   SystemTime time2(std::chrono::milliseconds(1522796769123));
@@ -415,20 +423,24 @@ TEST(AccessLogDateTimeFormatter, fromTime) {
   EXPECT_EQ("2018-04-03T23:06:08.999Z", AccessLogDateTimeFormatter::fromTime(time4));
 }
 
-TEST(Primes, isPrime) {
+using PrimesTest = TestBase;
+
+TEST_F(PrimesTest, isPrime) {
   EXPECT_TRUE(Primes::isPrime(67));
   EXPECT_FALSE(Primes::isPrime(49));
   EXPECT_FALSE(Primes::isPrime(102));
   EXPECT_TRUE(Primes::isPrime(103));
 }
 
-TEST(Primes, findPrimeLargerThan) {
+TEST_F(PrimesTest, findPrimeLargerThan) {
   EXPECT_EQ(67, Primes::findPrimeLargerThan(62));
   EXPECT_EQ(107, Primes::findPrimeLargerThan(103));
   EXPECT_EQ(10007, Primes::findPrimeLargerThan(9991));
 }
 
-TEST(RegexUtil, parseRegex) {
+using RegexUtilTest = TestBase;
+
+TEST_F(RegexUtilTest, parseRegex) {
   EXPECT_THROW_WITH_REGEX(RegexUtil::parseRegex("(+invalid)"), EnvoyException,
                           "Invalid regex '\\(\\+invalid\\)': .+");
 
@@ -458,7 +470,9 @@ private:
 };
 typedef std::shared_ptr<WeightedClusterEntry> WeightedClusterEntrySharedPtr;
 
-TEST(WeightedClusterUtil, pickCluster) {
+using WeightedClusterUtilTest = TestBase;
+
+TEST_F(WeightedClusterUtilTest, pickCluster) {
   std::vector<WeightedClusterEntrySharedPtr> clusters;
 
   std::unique_ptr<WeightedClusterEntry> cluster1(new WeightedClusterEntry("cluster1", 10));
@@ -481,7 +495,9 @@ static std::string intervalSetIntToString(const IntervalSetImpl<int>& interval_s
   return out;
 }
 
-TEST(IntervalSet, testIntervalAccumulation) {
+using IntervalSetTest = TestBase;
+
+TEST_F(IntervalSetTest, testIntervalAccumulation) {
   IntervalSetImpl<int> interval_set;
   auto insert_and_print = [&interval_set](int left, int right) -> std::string {
     interval_set.insert(left, right);
@@ -517,7 +533,7 @@ TEST(IntervalSet, testIntervalAccumulation) {
   EXPECT_EQ("[5, 11), [25, 26)", insert_and_print(5, 11));
 }
 
-TEST(IntervalSet, testIntervalTargeted) {
+TEST_F(IntervalSetTest, testIntervalTargeted) {
   auto test = [](int left, int right) -> std::string {
     IntervalSetImpl<int> interval_set;
     interval_set.insert(15, 20);
@@ -770,7 +786,9 @@ TEST(IntervalSet, testIntervalTargeted) {
   EXPECT_EQ("[15, 20), [25, 30), [35, 40), [41, 43)", test(41, 43));
 }
 
-TEST(WelfordStandardDeviation, AllEntriesTheSame) {
+using WelfordStandardDeviationTest = TestBase;
+
+TEST_F(WelfordStandardDeviationTest, AllEntriesTheSame) {
   WelfordStandardDeviation wsd;
   wsd.update(10);
   wsd.update(10);
@@ -779,7 +797,7 @@ TEST(WelfordStandardDeviation, AllEntriesTheSame) {
   EXPECT_EQ(0, wsd.computeStandardDeviation());
 }
 
-TEST(WelfordStandardDeviation, SmallVariance) {
+TEST_F(WelfordStandardDeviationTest, SmallVariance) {
   WelfordStandardDeviation wsd;
   wsd.update(10);
   wsd.update(10);
@@ -791,7 +809,7 @@ TEST(WelfordStandardDeviation, SmallVariance) {
   EXPECT_EQ(10, wsd.mean());
 }
 
-TEST(WelfordStandardDeviation, HugeVariance) {
+TEST_F(WelfordStandardDeviationTest, HugeVariance) {
   WelfordStandardDeviation wsd;
   wsd.update(20);
   wsd.update(2000);
@@ -801,14 +819,16 @@ TEST(WelfordStandardDeviation, HugeVariance) {
   EXPECT_LT(1000, wsd.computeStandardDeviation());
 }
 
-TEST(WelfordStandardDeviation, InsufficientData) {
+TEST_F(WelfordStandardDeviationTest, InsufficientData) {
   WelfordStandardDeviation wsd;
   wsd.update(10);
   EXPECT_EQ(10, wsd.mean());
   EXPECT_TRUE(std::isnan(wsd.computeStandardDeviation()));
 }
 
-TEST(DateFormatter, FromTime) {
+using DateFormatterTest = TestBase;
+
+TEST_F(DateFormatterTest, FromTime) {
   const SystemTime time1(std::chrono::seconds(1522796769));
   EXPECT_EQ("2018-04-03T23:06:09.000Z", DateFormatter("%Y-%m-%dT%H:%M:%S.000Z").fromTime(time1));
   EXPECT_EQ("aaa23", DateFormatter(std::string(3, 'a') + "%H").fromTime(time1));
@@ -822,7 +842,7 @@ TEST(DateFormatter, FromTime) {
 // Verify that two DateFormatter patterns with the same ??? patterns but
 // different format strings don't false share cache entries. This is a
 // regression test for when they did.
-TEST(DateFormatter, FromTimeSameWildcard) {
+TEST_F(DateFormatterTest, FromTimeSameWildcard) {
   const SystemTime time1(std::chrono::seconds(1522796769) + std::chrono::milliseconds(142));
   EXPECT_EQ("2018-04-03T23:06:09.000Z142",
             DateFormatter("%Y-%m-%dT%H:%M:%S.000Z%3f").fromTime(time1));

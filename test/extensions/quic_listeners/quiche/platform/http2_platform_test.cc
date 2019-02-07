@@ -21,41 +21,43 @@ namespace Extensions {
 namespace QuicListeners {
 namespace Quiche {
 
-TEST(Http2PlatformTest, Http2Arraysize) {
+using Http2PlatformTest = TestBase;
+
+TEST_F(Http2PlatformTest, Http2Arraysize) {
   int array[] = {0, 1, 2, 3, 4};
   EXPECT_EQ(5, HTTP2_ARRAYSIZE(array));
 }
 
-TEST(Http2PlatformTest, Http2Deque) {
+TEST_F(Http2PlatformTest, Http2Deque) {
   http2::Http2Deque<int> deque;
   deque.push_back(10);
   EXPECT_EQ(10, deque.back());
 }
 
-TEST(Http2PlatformTest, Http2EstimateMemoryUsage) {
+TEST_F(Http2PlatformTest, Http2EstimateMemoryUsage) {
   http2::Http2String s = "foo";
   // Stubbed out to always return 0.
   EXPECT_EQ(0, http2::Http2EstimateMemoryUsage(s));
 }
 
-TEST(Http2PlatformTest, Http2Optional) {
+TEST_F(Http2PlatformTest, Http2Optional) {
   http2::Http2Optional<int> opt;
   EXPECT_FALSE(opt.has_value());
   opt = 3;
   EXPECT_TRUE(opt.has_value());
 }
 
-TEST(Http2PlatformTest, Http2MakeUnique) {
+TEST_F(Http2PlatformTest, Http2MakeUnique) {
   auto p = http2::Http2MakeUnique<int>(4);
   EXPECT_EQ(4, *p);
 }
 
-TEST(Http2PlatformTest, Http2String) {
+TEST_F(Http2PlatformTest, Http2String) {
   http2::Http2String s = "foo";
   EXPECT_EQ('o', s[1]);
 }
 
-TEST(Http2PlatformTest, Http2StringPiece) {
+TEST_F(Http2PlatformTest, Http2StringPiece) {
   http2::Http2String s = "bar";
   http2::Http2StringPiece sp(s);
   EXPECT_EQ('b', sp[0]);

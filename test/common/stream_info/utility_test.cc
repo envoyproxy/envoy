@@ -13,7 +13,9 @@ using testing::Return;
 namespace Envoy {
 namespace StreamInfo {
 
-TEST(ResponseFlagUtilsTest, toShortStringConversion) {
+using ResponseFlagUtilsTest = TestBase;
+
+TEST_F(ResponseFlagUtilsTest, toShortStringConversion) {
   static_assert(ResponseFlag::LastFlag == 0x8000, "A flag has been added. Fix this code.");
 
   std::vector<std::pair<ResponseFlag, std::string>> expected = {
@@ -60,7 +62,9 @@ TEST(ResponseFlagUtilsTest, toShortStringConversion) {
   }
 }
 
-TEST(ResponseFlagsUtilsTest, toResponseFlagConversion) {
+using ResponseFlagsUtilsTest = TestBase;
+
+TEST_F(ResponseFlagsUtilsTest, toResponseFlagConversion) {
   static_assert(ResponseFlag::LastFlag == 0x8000, "A flag has been added. Fix this code.");
 
   std::vector<std::pair<std::string, ResponseFlag>> expected = {
@@ -91,7 +95,9 @@ TEST(ResponseFlagsUtilsTest, toResponseFlagConversion) {
   }
 }
 
-TEST(UtilityTest, formatDownstreamAddressNoPort) {
+using UtilityTest = TestBase;
+
+TEST_F(UtilityTest, formatDownstreamAddressNoPort) {
   EXPECT_EQ("1.2.3.4",
             Utility::formatDownstreamAddressNoPort(Network::Address::Ipv4Instance("1.2.3.4")));
   EXPECT_EQ("/hello",

@@ -162,7 +162,9 @@ void faultFilterBadConfigHelper(const std::string& json) {
   EXPECT_THROW(Config::FilterJson::translateFaultFilter(*config, fault), EnvoyException);
 }
 
-TEST(FaultFilterBadConfigTest, BadAbortPercent) {
+using FaultFilterBadConfigTest = TestBase;
+
+TEST_F(FaultFilterBadConfigTest, BadAbortPercent) {
   const std::string json = R"EOF(
     {
       "abort" : {
@@ -175,7 +177,7 @@ TEST(FaultFilterBadConfigTest, BadAbortPercent) {
   faultFilterBadConfigHelper(json);
 }
 
-TEST(FaultFilterBadConfigTest, EmptyDownstreamNodes) {
+TEST_F(FaultFilterBadConfigTest, EmptyDownstreamNodes) {
   const std::string json = R"EOF(
     {
       "abort" : {
@@ -189,7 +191,7 @@ TEST(FaultFilterBadConfigTest, EmptyDownstreamNodes) {
   faultFilterBadConfigHelper(json);
 }
 
-TEST(FaultFilterBadConfigTest, MissingHTTPStatus) {
+TEST_F(FaultFilterBadConfigTest, MissingHTTPStatus) {
   const std::string json = R"EOF(
     {
       "abort" : {
@@ -201,7 +203,7 @@ TEST(FaultFilterBadConfigTest, MissingHTTPStatus) {
   faultFilterBadConfigHelper(json);
 }
 
-TEST(FaultFilterBadConfigTest, BadDelayType) {
+TEST_F(FaultFilterBadConfigTest, BadDelayType) {
   const std::string json = R"EOF(
     {
       "delay" : {
@@ -215,7 +217,7 @@ TEST(FaultFilterBadConfigTest, BadDelayType) {
   faultFilterBadConfigHelper(json);
 }
 
-TEST(FaultFilterBadConfigTest, BadDelayPercent) {
+TEST_F(FaultFilterBadConfigTest, BadDelayPercent) {
   const std::string json = R"EOF(
     {
       "delay" : {
@@ -229,7 +231,7 @@ TEST(FaultFilterBadConfigTest, BadDelayPercent) {
   faultFilterBadConfigHelper(json);
 }
 
-TEST(FaultFilterBadConfigTest, BadDelayDuration) {
+TEST_F(FaultFilterBadConfigTest, BadDelayDuration) {
   const std::string json = R"EOF(
     {
       "delay" : {
@@ -243,7 +245,7 @@ TEST(FaultFilterBadConfigTest, BadDelayDuration) {
   faultFilterBadConfigHelper(json);
 }
 
-TEST(FaultFilterBadConfigTest, MissingDelayDuration) {
+TEST_F(FaultFilterBadConfigTest, MissingDelayDuration) {
   const std::string json = R"EOF(
     {
       "delay" : {

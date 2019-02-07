@@ -3,7 +3,9 @@
 #include "test/test_common/test_base.h"
 
 namespace Envoy {
-TEST(ToLowerTableTest, All) {
+using ToLowerTableTest = TestBase;
+
+TEST_F(ToLowerTableTest, All) {
   ToLowerTable table;
 
   {

@@ -13,7 +13,9 @@ namespace Envoy {
 namespace Matcher {
 namespace {
 
-TEST(MetadataTest, MatchNullValue) {
+using MetadataTest = TestBase;
+
+TEST_F(MetadataTest, MatchNullValue) {
   envoy::api::v2::core::Metadata metadata;
   Envoy::Config::Metadata::mutableMetadataValue(metadata, "envoy.filter.a", "label")
       .set_string_value("test");
@@ -30,7 +32,7 @@ TEST(MetadataTest, MatchNullValue) {
   EXPECT_TRUE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
 }
 
-TEST(MetadataTest, MatchDoubleValue) {
+TEST_F(MetadataTest, MatchDoubleValue) {
   envoy::api::v2::core::Metadata metadata;
   Envoy::Config::Metadata::mutableMetadataValue(metadata, "envoy.filter.a", "label")
       .set_string_value("test");
@@ -64,7 +66,7 @@ TEST(MetadataTest, MatchDoubleValue) {
   EXPECT_TRUE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
 }
 
-TEST(MetadataTest, MatchStringExactValue) {
+TEST_F(MetadataTest, MatchStringExactValue) {
   envoy::api::v2::core::Metadata metadata;
   Envoy::Config::Metadata::mutableMetadataValue(metadata, "envoy.filter.a", "label")
       .set_string_value("test");
@@ -81,7 +83,7 @@ TEST(MetadataTest, MatchStringExactValue) {
   EXPECT_TRUE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
 }
 
-TEST(MetadataTest, MatchStringPrefixValue) {
+TEST_F(MetadataTest, MatchStringPrefixValue) {
   envoy::api::v2::core::Metadata metadata;
   Envoy::Config::Metadata::mutableMetadataValue(metadata, "envoy.filter.a", "label")
       .set_string_value("test");
@@ -100,7 +102,7 @@ TEST(MetadataTest, MatchStringPrefixValue) {
   EXPECT_TRUE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
 }
 
-TEST(MetadataTest, MatchStringSuffixValue) {
+TEST_F(MetadataTest, MatchStringSuffixValue) {
   envoy::api::v2::core::Metadata metadata;
   Envoy::Config::Metadata::mutableMetadataValue(metadata, "envoy.filter.a", "label")
       .set_string_value("test");
@@ -119,7 +121,7 @@ TEST(MetadataTest, MatchStringSuffixValue) {
   EXPECT_TRUE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
 }
 
-TEST(MetadataTest, MatchBoolValue) {
+TEST_F(MetadataTest, MatchBoolValue) {
   envoy::api::v2::core::Metadata metadata;
   Envoy::Config::Metadata::mutableMetadataValue(metadata, "envoy.filter.a", "label")
       .set_string_value("test");
@@ -138,7 +140,7 @@ TEST(MetadataTest, MatchBoolValue) {
   EXPECT_TRUE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
 }
 
-TEST(MetadataTest, MatchPresentValue) {
+TEST_F(MetadataTest, MatchPresentValue) {
   envoy::api::v2::core::Metadata metadata;
   Envoy::Config::Metadata::mutableMetadataValue(metadata, "envoy.filter.a", "label")
       .set_string_value("test");
@@ -166,7 +168,7 @@ envoy::type::matcher::ValueMatcher* listMatchEntry(envoy::type::matcher::Metadat
   return matcher->mutable_value()->mutable_list_match()->mutable_one_of();
 }
 
-TEST(MetadataTest, MatchStringListValue) {
+TEST_F(MetadataTest, MatchStringListValue) {
   envoy::api::v2::core::Metadata metadata;
   ProtobufWkt::Value& metadataValue =
       Envoy::Config::Metadata::mutableMetadataValue(metadata, "envoy.filter.a", "groups");
@@ -194,7 +196,7 @@ TEST(MetadataTest, MatchStringListValue) {
   metadataValue.Clear();
 }
 
-TEST(MetadataTest, MatchBoolListValue) {
+TEST_F(MetadataTest, MatchBoolListValue) {
   envoy::api::v2::core::Metadata metadata;
   ProtobufWkt::Value& metadataValue =
       Envoy::Config::Metadata::mutableMetadataValue(metadata, "envoy.filter.a", "groups");
@@ -217,7 +219,7 @@ TEST(MetadataTest, MatchBoolListValue) {
   metadataValue.Clear();
 }
 
-TEST(MetadataTest, MatchDoubleListValue) {
+TEST_F(MetadataTest, MatchDoubleListValue) {
   envoy::api::v2::core::Metadata metadata;
   ProtobufWkt::Value& metadataValue =
       Envoy::Config::Metadata::mutableMetadataValue(metadata, "envoy.filter.a", "groups");
@@ -257,7 +259,9 @@ TEST(MetadataTest, MatchDoubleListValue) {
   metadataValue.Clear();
 }
 
-TEST(LowerCaseStringMatcher, MatchExactValue) {
+using LowerCaseStringMatcher = TestBase;
+
+TEST_F(LowerCaseStringMatcher, MatchExactValue) {
   envoy::type::matcher::StringMatcher matcher;
   matcher.set_exact("Foo");
 
@@ -265,7 +269,7 @@ TEST(LowerCaseStringMatcher, MatchExactValue) {
   EXPECT_TRUE(Envoy::Matchers::LowerCaseStringMatcher(matcher).match("foo"));
 }
 
-TEST(LowerCaseStringMatcher, MatchPrefixValue) {
+TEST_F(LowerCaseStringMatcher, MatchPrefixValue) {
   envoy::type::matcher::StringMatcher matcher;
   matcher.set_prefix("Foo.");
 
@@ -273,7 +277,7 @@ TEST(LowerCaseStringMatcher, MatchPrefixValue) {
   EXPECT_FALSE(Envoy::Matchers::LowerCaseStringMatcher(matcher).match("Foo."));
 }
 
-TEST(LowerCaseStringMatcher, MatchSuffixValue) {
+TEST_F(LowerCaseStringMatcher, MatchSuffixValue) {
   envoy::type::matcher::StringMatcher matcher;
   matcher.set_suffix(".Bar");
 
@@ -281,7 +285,7 @@ TEST(LowerCaseStringMatcher, MatchSuffixValue) {
   EXPECT_FALSE(Envoy::Matchers::LowerCaseStringMatcher(matcher).match(".Bar"));
 }
 
-TEST(LowerCaseStringMatcher, MatchRegexValue) {
+TEST_F(LowerCaseStringMatcher, MatchRegexValue) {
   envoy::type::matcher::StringMatcher matcher;
   matcher.set_regex("Foo.*");
 

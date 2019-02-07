@@ -15,7 +15,9 @@ namespace Extensions {
 namespace HttpFilters {
 namespace RouterFilter {
 
-TEST(RouterFilterConfigTest, RouterFilterInJson) {
+using RouterFilterConfigTest = TestBase;
+
+TEST_F(RouterFilterConfigTest, RouterFilterInJson) {
   std::string json_string = R"EOF(
   {
     "dynamic_stats" : true,
@@ -32,7 +34,7 @@ TEST(RouterFilterConfigTest, RouterFilterInJson) {
   cb(filter_callback);
 }
 
-TEST(RouterFilterConfigTest, BadRouterFilterConfig) {
+TEST_F(RouterFilterConfigTest, BadRouterFilterConfig) {
   std::string json_string = R"EOF(
   {
     "dynamic_stats" : true,
@@ -46,7 +48,7 @@ TEST(RouterFilterConfigTest, BadRouterFilterConfig) {
   EXPECT_THROW(factory.createFilterFactory(*json_config, "stats", context), Json::Exception);
 }
 
-TEST(RouterFilterConfigTest, RouterV2Filter) {
+TEST_F(RouterFilterConfigTest, RouterV2Filter) {
   envoy::config::filter::http::router::v2::Router router_config;
   router_config.mutable_dynamic_stats()->set_value(true);
 
@@ -58,7 +60,7 @@ TEST(RouterFilterConfigTest, RouterV2Filter) {
   cb(filter_callback);
 }
 
-TEST(RouterFilterConfigTest, RouterFilterWithEmptyProtoConfig) {
+TEST_F(RouterFilterConfigTest, RouterFilterWithEmptyProtoConfig) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   RouterFilterConfig factory;
   Http::FilterFactoryCb cb =
@@ -68,7 +70,7 @@ TEST(RouterFilterConfigTest, RouterFilterWithEmptyProtoConfig) {
   cb(filter_callback);
 }
 
-TEST(RouterFilterConfigTest, DoubleRegistrationTest) {
+TEST_F(RouterFilterConfigTest, DoubleRegistrationTest) {
   EXPECT_THROW_WITH_MESSAGE(
       (Registry::RegisterFactory<RouterFilterConfig,
                                  Server::Configuration::NamedHttpFilterConfigFactory>()),

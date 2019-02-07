@@ -316,7 +316,9 @@ TEST_F(ProtobufUtilityTest, YamlLoadFromStringFail) {
                           "Unable to parse JSON as proto.*Root element must be a message.*");
 }
 
-TEST(DurationUtilTest, OutOfRange) {
+using DurationUtilTest = TestBase;
+
+TEST_F(DurationUtilTest, OutOfRange) {
   {
     ProtobufWkt::Duration duration;
     duration.set_seconds(-1);
@@ -339,14 +341,16 @@ TEST(DurationUtilTest, OutOfRange) {
   }
 }
 
-TEST(DeprecatedFields, NoErrorWhenDeprecatedFieldsUnused) {
+using DeprecatedFields = TestBase;
+
+TEST_F(DeprecatedFields, NoErrorWhenDeprecatedFieldsUnused) {
   envoy::test::deprecation_test::Base base;
   base.set_not_deprecated("foo");
   // Fatal checks for a non-deprecated field should cause no problem.
   MessageUtil::checkForDeprecation(base, true);
 }
 
-TEST(DeprecatedFields, IndividualFieldDeprecated) {
+TEST_F(DeprecatedFields, IndividualFieldDeprecated) {
   envoy::test::deprecation_test::Base base;
   base.set_is_deprecated("foo");
   // Non-fatal checks for a deprecated field should log rather than throw an exception.
@@ -359,7 +363,7 @@ TEST(DeprecatedFields, IndividualFieldDeprecated) {
       "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated'.");
 }
 
-TEST(DeprecatedFields, MessageDeprecated) {
+TEST_F(DeprecatedFields, MessageDeprecated) {
   envoy::test::deprecation_test::Base base;
   base.mutable_deprecated_message();
   // Fatal checks for a present (unused) deprecated message should result in an exception.
@@ -368,7 +372,7 @@ TEST(DeprecatedFields, MessageDeprecated) {
       "Using deprecated option 'envoy.test.deprecation_test.Base.deprecated_message'.");
 }
 
-TEST(DeprecatedFields, InnerMessageDeprecated) {
+TEST_F(DeprecatedFields, InnerMessageDeprecated) {
   envoy::test::deprecation_test::Base base;
   base.mutable_not_deprecated_message()->set_inner_not_deprecated("foo");
   // Non-fatal checks for a deprecated field shouldn't throw an exception.
@@ -382,7 +386,7 @@ TEST(DeprecatedFields, InnerMessageDeprecated) {
 }
 
 // Check that repeated sub-messages get validated.
-TEST(DeprecatedFields, SubMessageDeprecated) {
+TEST_F(DeprecatedFields, SubMessageDeprecated) {
   envoy::test::deprecation_test::Base base;
   base.add_repeated_message();
   base.add_repeated_message()->set_inner_deprecated("foo");
@@ -395,7 +399,7 @@ TEST(DeprecatedFields, SubMessageDeprecated) {
 }
 
 // Check that deprecated repeated messages trigger
-TEST(DeprecatedFields, RepeatedMessageDeprecated) {
+TEST_F(DeprecatedFields, RepeatedMessageDeprecated) {
   envoy::test::deprecation_test::Base base;
   base.add_deprecated_repeated_message();
 

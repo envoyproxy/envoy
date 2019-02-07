@@ -33,13 +33,17 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ClientSslAuth {
 
-TEST(ClientSslAuthAllowedPrincipalsTest, EmptyString) {
+using ClientSslAuthAllowedPrincipalsTest = TestBase;
+
+TEST_F(ClientSslAuthAllowedPrincipalsTest, EmptyString) {
   AllowedPrincipals principals;
   principals.add("");
   EXPECT_EQ(0UL, principals.size());
 }
 
-TEST(ClientSslAuthConfigTest, BadClientSslAuthConfig) {
+using ClientSslAuthConfigTest = TestBase;
+
+TEST_F(ClientSslAuthConfigTest, BadClientSslAuthConfig) {
   std::string json = R"EOF(
   {
     "stat_prefix": "my_stat_prefix",

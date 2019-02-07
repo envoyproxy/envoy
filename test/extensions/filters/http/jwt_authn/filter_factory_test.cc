@@ -18,7 +18,9 @@ namespace Extensions {
 namespace HttpFilters {
 namespace JwtAuthn {
 
-TEST(HttpJwtAuthnFilterFactoryTest, GoodRemoteJwks) {
+using HttpJwtAuthnFilterFactoryTest = TestBase;
+
+TEST_F(HttpJwtAuthnFilterFactoryTest, GoodRemoteJwks) {
   FilterFactory factory;
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
   MessageUtil::loadFromYaml(ExampleConfig, *proto_config);
@@ -31,7 +33,7 @@ TEST(HttpJwtAuthnFilterFactoryTest, GoodRemoteJwks) {
   cb(filter_callback);
 }
 
-TEST(HttpJwtAuthnFilterFactoryTest, GoodLocalJwks) {
+TEST_F(HttpJwtAuthnFilterFactoryTest, GoodLocalJwks) {
   JwtAuthentication proto_config;
   auto& provider = (*proto_config.mutable_providers())["provider"];
   provider.set_issuer("issuer");
@@ -45,7 +47,7 @@ TEST(HttpJwtAuthnFilterFactoryTest, GoodLocalJwks) {
   cb(filter_callback);
 }
 
-TEST(HttpJwtAuthnFilterFactoryTest, BadLocalJwks) {
+TEST_F(HttpJwtAuthnFilterFactoryTest, BadLocalJwks) {
   JwtAuthentication proto_config;
   auto& provider = (*proto_config.mutable_providers())["provider"];
   provider.set_issuer("issuer");

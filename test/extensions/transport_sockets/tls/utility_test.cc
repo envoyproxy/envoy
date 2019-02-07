@@ -18,14 +18,16 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
 
-TEST(UtilityTest, TestGetSubjectAlternateNamesWithDNS) {
+using UtilityTest = TestBase;
+
+TEST_F(UtilityTest, TestGetSubjectAlternateNamesWithDNS) {
   bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
   const std::vector<std::string>& subject_alt_names = Utility::getSubjectAltNames(*cert, GEN_DNS);
   EXPECT_EQ(1, subject_alt_names.size());
 }
 
-TEST(UtilityTest, TestMultipleGetSubjectAlternateNamesWithDNS) {
+TEST_F(UtilityTest, TestMultipleGetSubjectAlternateNamesWithDNS) {
   bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
       "{{ test_rundir "
       "}}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_cert.pem"));
@@ -33,14 +35,14 @@ TEST(UtilityTest, TestMultipleGetSubjectAlternateNamesWithDNS) {
   EXPECT_EQ(2, subject_alt_names.size());
 }
 
-TEST(UtilityTest, TestGetSubjectAlternateNamesWithUri) {
+TEST_F(UtilityTest, TestGetSubjectAlternateNamesWithUri) {
   bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"));
   const std::vector<std::string>& subject_alt_names = Utility::getSubjectAltNames(*cert, GEN_URI);
   EXPECT_EQ(1, subject_alt_names.size());
 }
 
-TEST(UtilityTest, TestGetSubjectAlternateNamesWithNoSAN) {
+TEST_F(UtilityTest, TestGetSubjectAlternateNamesWithNoSAN) {
   bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_cert.pem"));
   const std::vector<std::string>& uri_subject_alt_names =
@@ -48,20 +50,20 @@ TEST(UtilityTest, TestGetSubjectAlternateNamesWithNoSAN) {
   EXPECT_EQ(0, uri_subject_alt_names.size());
 }
 
-TEST(UtilityTest, TestGetSubject) {
+TEST_F(UtilityTest, TestGetSubject) {
   bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
   EXPECT_EQ("CN=Test Server,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US",
             Utility::getSubjectFromCertificate(*cert));
 }
 
-TEST(UtilityTest, TestGetSerialNumber) {
+TEST_F(UtilityTest, TestGetSerialNumber) {
   bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
   EXPECT_EQ(TEST_SAN_DNS_CERT_SERIAL, Utility::getSerialNumberFromCertificate(*cert));
 }
 
-TEST(UtilityTest, TestDaysUntilExpiration) {
+TEST_F(UtilityTest, TestDaysUntilExpiration) {
   bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
   // Set a known date (2033-05-18 03:33:20 UTC) so that we get fixed output from this test.
@@ -77,12 +79,12 @@ TEST(UtilityTest, TestDaysUntilExpiration) {
   EXPECT_EQ(days, Utility::getDaysUntilExpiration(cert.get(), time_source));
 }
 
-TEST(UtilityTest, TestDaysUntilExpirationWithNull) {
+TEST_F(UtilityTest, TestDaysUntilExpirationWithNull) {
   Event::SimulatedTimeSystem time_source;
   EXPECT_EQ(std::numeric_limits<int>::max(), Utility::getDaysUntilExpiration(nullptr, time_source));
 }
 
-TEST(UtilityTest, TestValidFrom) {
+TEST_F(UtilityTest, TestValidFrom) {
   bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
   const std::string formatted =
@@ -90,7 +92,7 @@ TEST(UtilityTest, TestValidFrom) {
   EXPECT_EQ(TEST_SAN_DNS_CERT_NOT_BEFORE, formatted);
 }
 
-TEST(UtilityTest, TestExpirationTime) {
+TEST_F(UtilityTest, TestExpirationTime) {
   bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
   const std::string formatted =

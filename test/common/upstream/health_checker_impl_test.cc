@@ -55,7 +55,9 @@ envoy::api::v2::core::HealthCheck createGrpcHealthCheckConfig() {
   return health_check;
 }
 
-TEST(HealthCheckerFactoryTest, GrpcHealthCheckHTTP2NotConfiguredException) {
+using HealthCheckerFactoryTest = TestBase;
+
+TEST_F(HealthCheckerFactoryTest, GrpcHealthCheckHTTP2NotConfiguredException) {
   NiceMock<Upstream::MockCluster> cluster;
   EXPECT_CALL(*cluster.info_, features()).WillRepeatedly(Return(0));
 
@@ -70,8 +72,9 @@ TEST(HealthCheckerFactoryTest, GrpcHealthCheckHTTP2NotConfiguredException) {
                             "fake_cluster cluster must support HTTP/2 for gRPC healthchecking");
 }
 
-TEST(HealthCheckerFactoryTest, createGrpc) {
+using HealthCheckerFactoryTest = TestBase;
 
+TEST_F(HealthCheckerFactoryTest, createGrpc) {
   NiceMock<Upstream::MockCluster> cluster;
   EXPECT_CALL(*cluster.info_, features())
       .WillRepeatedly(Return(Upstream::ClusterInfo::Features::HTTP2));
@@ -1908,7 +1911,9 @@ TEST_F(ProdHttpHealthCheckerTest, ProdHttpHealthCheckerH2HealthChecking) {
             health_checker_->createCodecClientForTest(std::move(connection_))->type());
 }
 
-TEST(TcpHealthCheckMatcher, loadJsonBytes) {
+using TcpHealthCheckMatcherTest = TestBase;
+
+TEST_F(TcpHealthCheckMatcherTest, loadJsonBytes) {
   {
     Protobuf::RepeatedPtrField<envoy::api::v2::core::HealthCheck::Payload> repeated_payload;
     repeated_payload.Add()->set_text("39000000");
@@ -1938,7 +1943,7 @@ static void add_uint8(Buffer::Instance& buffer, uint8_t addend) {
   buffer.add(&addend, sizeof(addend));
 }
 
-TEST(TcpHealthCheckMatcher, match) {
+TEST_F(TcpHealthCheckMatcherTest, match) {
   Protobuf::RepeatedPtrField<envoy::api::v2::core::HealthCheck::Payload> repeated_payload;
   repeated_payload.Add()->set_text("01");
   repeated_payload.Add()->set_text("02");
@@ -3485,7 +3490,9 @@ TEST_P(BadResponseGrpcHealthCheckerImplTest, GrpcBadResponse) {
   expectHostHealthy(false);
 }
 
-TEST(Printer, HealthStatePrinter) {
+using Printer = TestBase;
+
+TEST_F(Printer, HealthStatePrinter) {
   std::ostringstream healthy;
   healthy << HealthState::Healthy;
   EXPECT_EQ("Healthy", healthy.str());
@@ -3495,7 +3502,7 @@ TEST(Printer, HealthStatePrinter) {
   EXPECT_EQ("Unhealthy", unhealthy.str());
 }
 
-TEST(Printer, HealthTransitionPrinter) {
+TEST_F(Printer, HealthTransitionPrinter) {
   std::ostringstream changed;
   changed << HealthTransition::Changed;
   EXPECT_EQ("Changed", changed.str());
@@ -3505,7 +3512,9 @@ TEST(Printer, HealthTransitionPrinter) {
   EXPECT_EQ("Unchanged", unchanged.str());
 }
 
-TEST(HealthCheckEventLoggerImplTest, All) {
+using HealthCheckEventLoggerImplTest = TestBase;
+
+TEST_F(HealthCheckEventLoggerImplTest, All) {
   AccessLog::MockAccessLogManager log_manager;
   std::shared_ptr<Filesystem::MockFile> file(new Filesystem::MockFile());
   EXPECT_CALL(log_manager, createAccessLog("foo")).WillOnce(Return(file));
@@ -3565,7 +3574,9 @@ TEST(HealthCheckEventLoggerImplTest, All) {
 }
 
 // Validate that the proto constraints don't allow zero length edge durations.
-TEST(HealthCheckProto, Validation) {
+using HealthCheckProto = TestBase;
+
+TEST_F(HealthCheckProto, Validation) {
   {
     const std::string yaml = R"EOF(
     timeout: 1s

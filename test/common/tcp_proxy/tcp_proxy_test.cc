@@ -53,7 +53,9 @@ Config constructConfigFromJson(const Json::Object& json,
 }
 } // namespace
 
-TEST(ConfigTest, NoRouteConfig) {
+using ConfigTest = TestBase;
+
+TEST_F(ConfigTest, NoRouteConfig) {
   std::string json = R"EOF(
     {
       "stat_prefix": "name"
@@ -65,7 +67,7 @@ TEST(ConfigTest, NoRouteConfig) {
   EXPECT_THROW(constructConfigFromJson(*config, factory_context), EnvoyException);
 }
 
-TEST(ConfigTest, BadConfig) {
+TEST_F(ConfigTest, BadConfig) {
   std::string json_string = R"EOF(
   {
     "stat_prefix": 1,
@@ -84,7 +86,7 @@ TEST(ConfigTest, BadConfig) {
   EXPECT_THROW(constructConfigFromJson(*json_config, factory_context), Json::Exception);
 }
 
-TEST(ConfigTest, Routes) {
+TEST_F(ConfigTest, Routes) {
   std::string json = R"EOF(
     {
       "stat_prefix": "name",
@@ -299,7 +301,7 @@ TEST(ConfigTest, Routes) {
   }
 }
 
-TEST(ConfigTest, EmptyRouteConfig) {
+TEST_F(ConfigTest, EmptyRouteConfig) {
   std::string json = R"EOF(
     {
       "stat_prefix": "name",
@@ -319,7 +321,7 @@ TEST(ConfigTest, EmptyRouteConfig) {
   EXPECT_EQ(std::string(""), config_obj.getRouteFromEntries(connection));
 }
 
-TEST(ConfigTest, AccessLogConfig) {
+TEST_F(ConfigTest, AccessLogConfig) {
   envoy::config::filter::network::tcp_proxy::v2::TcpProxy config;
   envoy::config::filter::accesslog::v2::AccessLog* log = config.mutable_access_log()->Add();
   log->set_name(Extensions::AccessLoggers::AccessLogNames::get().File);

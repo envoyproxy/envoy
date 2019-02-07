@@ -14,14 +14,16 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace MongoProxy {
 
-TEST(MongoFilterConfigTest, ValidateFail) {
+using MongoFilterConfigTest = TestBase;
+
+TEST_F(MongoFilterConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_THROW(MongoProxyFilterConfigFactory().createFilterFactoryFromProto(
                    envoy::config::filter::network::mongo_proxy::v2::MongoProxy(), context),
                ProtoValidationException);
 }
 
-TEST(MongoFilterConfigTest, CorrectConfigurationNoFaults) {
+TEST_F(MongoFilterConfigTest, CorrectConfigurationNoFaults) {
   std::string json_string = R"EOF(
   {
     "stat_prefix": "my_stat_prefix",
@@ -38,7 +40,7 @@ TEST(MongoFilterConfigTest, CorrectConfigurationNoFaults) {
   cb(connection);
 }
 
-TEST(MongoFilterConfigTest, ValidProtoConfigurationNoFaults) {
+TEST_F(MongoFilterConfigTest, ValidProtoConfigurationNoFaults) {
   envoy::config::filter::network::mongo_proxy::v2::MongoProxy config{};
 
   config.set_access_log("path/to/access/log");
@@ -52,7 +54,7 @@ TEST(MongoFilterConfigTest, ValidProtoConfigurationNoFaults) {
   cb(connection);
 }
 
-TEST(MongoFilterConfigTest, MongoFilterWithEmptyProto) {
+TEST_F(MongoFilterConfigTest, MongoFilterWithEmptyProto) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   MongoProxyFilterConfigFactory factory;
   envoy::config::filter::network::mongo_proxy::v2::MongoProxy config =
@@ -75,7 +77,7 @@ void handleInvalidConfiguration(const std::string& json_string) {
   EXPECT_THROW(factory.createFilterFactory(*json_config, context), Json::Exception);
 }
 
-TEST(MongoFilterConfigTest, InvalidExtraProperty) {
+TEST_F(MongoFilterConfigTest, InvalidExtraProperty) {
   std::string json_string = R"EOF(
   {
     "stat_prefix": "my_stat_prefix",
@@ -87,9 +89,9 @@ TEST(MongoFilterConfigTest, InvalidExtraProperty) {
   handleInvalidConfiguration(json_string);
 }
 
-TEST(MongoFilterConfigTest, EmptyConfig) { handleInvalidConfiguration("{}"); }
+TEST_F(MongoFilterConfigTest, EmptyConfig) { handleInvalidConfiguration("{}"); }
 
-TEST(MongoFilterConfigTest, InvalidFaultsEmptyConfig) {
+TEST_F(MongoFilterConfigTest, InvalidFaultsEmptyConfig) {
   std::string json_string = R"EOF(
   {
     "stat_prefix": "my_stat_prefix",
@@ -100,7 +102,7 @@ TEST(MongoFilterConfigTest, InvalidFaultsEmptyConfig) {
   handleInvalidConfiguration(json_string);
 }
 
-TEST(MongoFilterConfigTest, InvalidFaultsMissingPercentage) {
+TEST_F(MongoFilterConfigTest, InvalidFaultsMissingPercentage) {
   std::string json_string = R"EOF(
   {
     "stat_prefix": "my_stat_prefix",
@@ -115,7 +117,7 @@ TEST(MongoFilterConfigTest, InvalidFaultsMissingPercentage) {
   handleInvalidConfiguration(json_string);
 }
 
-TEST(MongoFilterConfigTest, InvalidFaultsMissingMs) {
+TEST_F(MongoFilterConfigTest, InvalidFaultsMissingMs) {
   std::string json_string = R"EOF(
   {
     "stat_prefix": "my_stat_prefix",
@@ -130,7 +132,7 @@ TEST(MongoFilterConfigTest, InvalidFaultsMissingMs) {
   handleInvalidConfiguration(json_string);
 }
 
-TEST(MongoFilterConfigTest, InvalidFaultsNegativeMs) {
+TEST_F(MongoFilterConfigTest, InvalidFaultsNegativeMs) {
   std::string json_string = R"EOF(
   {
     "stat_prefix": "my_stat_prefix",
@@ -146,7 +148,7 @@ TEST(MongoFilterConfigTest, InvalidFaultsNegativeMs) {
   handleInvalidConfiguration(json_string);
 }
 
-TEST(MongoFilterConfigTest, InvalidFaultsDelayPercent) {
+TEST_F(MongoFilterConfigTest, InvalidFaultsDelayPercent) {
   {
     std::string json_string = R"EOF(
     {
@@ -180,7 +182,7 @@ TEST(MongoFilterConfigTest, InvalidFaultsDelayPercent) {
   }
 }
 
-TEST(MongoFilterConfigTest, InvalidFaultsType) {
+TEST_F(MongoFilterConfigTest, InvalidFaultsType) {
   {
     std::string json_string = R"EOF(
     {
@@ -230,7 +232,7 @@ TEST(MongoFilterConfigTest, InvalidFaultsType) {
   }
 }
 
-TEST(MongoFilterConfigTest, CorrectFaultConfiguration) {
+TEST_F(MongoFilterConfigTest, CorrectFaultConfiguration) {
   std::string json_string = R"EOF(
   {
     "stat_prefix": "my_stat_prefix",
@@ -252,7 +254,7 @@ TEST(MongoFilterConfigTest, CorrectFaultConfiguration) {
   cb(connection);
 }
 
-TEST(MongoFilterConfigTest, CorrectFaultConfigurationInProto) {
+TEST_F(MongoFilterConfigTest, CorrectFaultConfigurationInProto) {
   envoy::config::filter::network::mongo_proxy::v2::MongoProxy config{};
   config.set_stat_prefix("my_stat_prefix");
   config.mutable_delay()->mutable_percentage()->set_numerator(50);

@@ -30,7 +30,9 @@ using testing::StrictMock;
 namespace Envoy {
 namespace Server {
 
-TEST(ServerInstanceUtil, flushHelper) {
+using ServerInstanceUtil = TestBase;
+
+TEST_F(ServerInstanceUtil, flushHelper) {
   InSequence s;
 
   Stats::IsolatedStoreImpl store;

@@ -3519,7 +3519,9 @@ TEST_F(HttpConnectionManagerImplTest, MultipleFiltersWithInorderEncoders) {
   EXPECT_EQ(ssl_connection_.get(), encoder_filters_[1]->callbacks_->connection()->ssl());
 }
 
-TEST(HttpConnectionManagerTracingStatsTest, verifyTracingStats) {
+using HttpConnectionManagerTracingStatsTest = TestBase;
+
+TEST_F(HttpConnectionManagerTracingStatsTest, verifyTracingStats) {
   Stats::IsolatedStoreImpl stats;
   ConnectionManagerTracingStats tracing_stats{CONN_MAN_TRACING_STATS(POOL_COUNTER(stats))};
 

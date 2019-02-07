@@ -2225,7 +2225,9 @@ TEST_F(RouterTest, DirectResponseWithBody) {
   EXPECT_EQ(1UL, config_.stats_.rq_direct_response_.value());
 }
 
-TEST(RouterFilterUtilityTest, FinalTimeout) {
+using RouterFilterUtilityTest = TestBase;
+
+TEST_F(RouterFilterUtilityTest, FinalTimeout) {
   {
     NiceMock<MockRouteEntry> route;
     EXPECT_CALL(route, timeout()).WillOnce(Return(std::chrono::milliseconds(10)));
@@ -2456,7 +2458,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
   }
 }
 
-TEST(RouterFilterUtilityTest, FinalTimeoutSupressEnvoyHeaders) {
+TEST_F(RouterFilterUtilityTest, FinalTimeoutSupressEnvoyHeaders) {
   {
     NiceMock<MockRouteEntry> route;
     EXPECT_CALL(route, timeout()).WillOnce(Return(std::chrono::milliseconds(10)));
@@ -2468,7 +2470,7 @@ TEST(RouterFilterUtilityTest, FinalTimeoutSupressEnvoyHeaders) {
   }
 }
 
-TEST(RouterFilterUtilityTest, SetUpstreamScheme) {
+TEST_F(RouterFilterUtilityTest, SetUpstreamScheme) {
   {
     Upstream::MockClusterInfo cluster;
     Http::TestHeaderMapImpl headers;
@@ -2490,7 +2492,7 @@ TEST(RouterFilterUtilityTest, SetUpstreamScheme) {
   }
 }
 
-TEST(RouterFilterUtilityTest, ShouldShadow) {
+TEST_F(RouterFilterUtilityTest, ShouldShadow) {
   {
     TestShadowPolicy policy;
     NiceMock<Runtime::MockLoader> runtime;

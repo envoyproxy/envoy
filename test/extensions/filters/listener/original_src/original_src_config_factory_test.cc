@@ -18,7 +18,9 @@ namespace ListenerFilters {
 namespace OriginalSrc {
 namespace {
 
-TEST(OriginalSrcConfigFactoryTest, TestCreateFactory) {
+using OriginalSrcConfigFactoryTest = TestBase;
+
+TEST_F(OriginalSrcConfigFactoryTest, TestCreateFactory) {
   std::string yaml = R"EOF(
     mark: 5
     bind_port: true

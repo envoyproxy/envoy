@@ -15,7 +15,9 @@ namespace RedisHealthChecker {
 
 typedef Extensions::HealthCheckers::RedisHealthChecker::RedisHealthChecker CustomRedisHealthChecker;
 
-TEST(HealthCheckerFactoryTest, createRedis) {
+using HealthCheckerFactoryTest = TestBase;
+
+TEST_F(HealthCheckerFactoryTest, createRedis) {
   const std::string yaml = R"EOF(
     timeout: 1s
     interval: 1s
@@ -39,7 +41,7 @@ TEST(HealthCheckerFactoryTest, createRedis) {
               .get()));
 }
 
-TEST(HealthCheckerFactoryTest, createRedisWithoutKey) {
+TEST_F(HealthCheckerFactoryTest, createRedisWithoutKey) {
   const std::string yaml = R"EOF(
     timeout: 1s
     interval: 1s
@@ -62,7 +64,7 @@ TEST(HealthCheckerFactoryTest, createRedisWithoutKey) {
               .get()));
 }
 
-TEST(HealthCheckerFactoryTest, createRedisWithLogHCFailure) {
+TEST_F(HealthCheckerFactoryTest, createRedisWithLogHCFailure) {
   const std::string yaml = R"EOF(
     timeout: 1s
     interval: 1s
@@ -86,7 +88,7 @@ TEST(HealthCheckerFactoryTest, createRedisWithLogHCFailure) {
               .get()));
 }
 
-TEST(HealthCheckerFactoryTest, createRedisViaUpstreamHealthCheckerFactory) {
+TEST_F(HealthCheckerFactoryTest, createRedisViaUpstreamHealthCheckerFactory) {
   const std::string yaml = R"EOF(
     timeout: 1s
     interval: 1s
@@ -112,7 +114,7 @@ TEST(HealthCheckerFactoryTest, createRedisViaUpstreamHealthCheckerFactory) {
                              .get()));
 }
 
-TEST(HealthCheckerFactoryTest, createRedisWithDeprecatedV1JsonConfig) {
+TEST_F(HealthCheckerFactoryTest, createRedisWithDeprecatedV1JsonConfig) {
   const std::string json = R"EOF(
     {
       "type": "redis",
@@ -137,7 +139,7 @@ TEST(HealthCheckerFactoryTest, createRedisWithDeprecatedV1JsonConfig) {
                              .get()));
 }
 
-TEST(HealthCheckerFactoryTest, createRedisWithDeprecatedV1JsonConfigWithKey) {
+TEST_F(HealthCheckerFactoryTest, createRedisWithDeprecatedV1JsonConfigWithKey) {
   const std::string json = R"EOF(
     {
       "type": "redis",

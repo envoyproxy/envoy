@@ -64,7 +64,9 @@ TEST_P(RouteIpListConfigTest, TcpProxy) {
   factory.createFilterFactory(*json_config, context);
 }
 
-TEST(ConfigTest, ValidateFail) {
+using ConfigTest = TestBase;
+
+TEST_F(ConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_THROW(ConfigFactory().createFilterFactoryFromProto(
                    envoy::config::filter::network::tcp_proxy::v2::TcpProxy(), context),
@@ -72,7 +74,7 @@ TEST(ConfigTest, ValidateFail) {
 }
 
 // Test that a minimal TcpProxy v2 config works.
-TEST(ConfigTest, ConfigTest) {
+TEST_F(ConfigTest, ConfigTest) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   ConfigFactory factory;
   envoy::config::filter::network::tcp_proxy::v2::TcpProxy config =

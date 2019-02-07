@@ -12,7 +12,9 @@ namespace Extensions {
 namespace Tracers {
 namespace Zipkin {
 
-TEST(ZipkinTracerConfigTest, ZipkinHttpTracer) {
+using ZipkinTracerConfigTest = TestBase;
+
+TEST_F(ZipkinTracerConfigTest, ZipkinHttpTracer) {
   NiceMock<Server::MockInstance> server;
   EXPECT_CALL(server.cluster_manager_, get("fake_cluster"))
       .WillRepeatedly(Return(&server.cluster_manager_.thread_local_cluster_));
@@ -34,7 +36,7 @@ TEST(ZipkinTracerConfigTest, ZipkinHttpTracer) {
   EXPECT_NE(nullptr, zipkin_tracer);
 }
 
-TEST(ZipkinTracerConfigTest, ZipkinHttpTracerWithTypedConfig) {
+TEST_F(ZipkinTracerConfigTest, ZipkinHttpTracerWithTypedConfig) {
   NiceMock<Server::MockInstance> server;
   EXPECT_CALL(server.cluster_manager_, get("fake_cluster"))
       .WillRepeatedly(Return(&server.cluster_manager_.thread_local_cluster_));
@@ -57,7 +59,7 @@ TEST(ZipkinTracerConfigTest, ZipkinHttpTracerWithTypedConfig) {
   EXPECT_NE(nullptr, zipkin_tracer);
 }
 
-TEST(ZipkinTracerConfigTest, DoubleRegistrationTest) {
+TEST_F(ZipkinTracerConfigTest, DoubleRegistrationTest) {
   EXPECT_THROW_WITH_MESSAGE(
       (Registry::RegisterFactory<ZipkinTracerFactory, Server::Configuration::TracerFactory>()),
       EnvoyException, "Double registration for name: 'envoy.zipkin'");

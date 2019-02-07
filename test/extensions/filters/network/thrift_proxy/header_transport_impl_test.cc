@@ -42,12 +42,14 @@ MessageMetadataSharedPtr mkMessageMetadata(uint32_t num_headers) {
 
 } // namespace
 
-TEST(HeaderTransportTest, Name) {
+using HeaderTransportTest = TestBase;
+
+TEST_F(HeaderTransportTest, Name) {
   HeaderTransportImpl transport;
   EXPECT_EQ(transport.name(), "header");
 }
 
-TEST(HeaderTransportTest, NotEnoughData) {
+TEST_F(HeaderTransportTest, NotEnoughData) {
   HeaderTransportImpl transport;
   MessageMetadata metadata;
 
@@ -80,7 +82,7 @@ TEST(HeaderTransportTest, NotEnoughData) {
   }
 }
 
-TEST(HeaderTransportTest, InvalidFrameSize) {
+TEST_F(HeaderTransportTest, InvalidFrameSize) {
   HeaderTransportImpl transport;
   MessageMetadata metadata;
 
@@ -104,7 +106,7 @@ TEST(HeaderTransportTest, InvalidFrameSize) {
   }
 }
 
-TEST(HeaderTransportTest, InvalidMagic) {
+TEST_F(HeaderTransportTest, InvalidMagic) {
   HeaderTransportImpl transport;
   Buffer::OwnedImpl buffer;
   MessageMetadata metadata;
@@ -117,7 +119,7 @@ TEST(HeaderTransportTest, InvalidMagic) {
   EXPECT_THAT(metadata, IsEmptyMetadata());
 }
 
-TEST(HeaderTransportTest, InvalidHeaderSize) {
+TEST_F(HeaderTransportTest, InvalidHeaderSize) {
   HeaderTransportImpl transport;
   MessageMetadata metadata;
 
@@ -192,7 +194,7 @@ TEST(HeaderTransportTest, InvalidHeaderSize) {
   }
 }
 
-TEST(HeaderTransportTest, InvalidProto) {
+TEST_F(HeaderTransportTest, InvalidProto) {
   HeaderTransportImpl transport;
   MessageMetadata metadata;
 
@@ -237,7 +239,7 @@ TEST(HeaderTransportTest, InvalidProto) {
   }
 }
 
-TEST(HeaderTransportTest, NoTransformsOrInfo) {
+TEST_F(HeaderTransportTest, NoTransformsOrInfo) {
   HeaderTransportImpl transport;
 
   {
@@ -276,7 +278,7 @@ TEST(HeaderTransportTest, NoTransformsOrInfo) {
   }
 }
 
-TEST(HeaderTransportTest, TransformErrors) {
+TEST_F(HeaderTransportTest, TransformErrors) {
   MessageMetadata metadata;
 
   // Invalid number of transforms
@@ -335,7 +337,7 @@ TEST(HeaderTransportTest, TransformErrors) {
   }
 }
 
-TEST(HeaderTransportTest, InvalidInfoBlock) {
+TEST_F(HeaderTransportTest, InvalidInfoBlock) {
   // Unknown info block id
   {
     HeaderTransportImpl transport;
@@ -436,7 +438,7 @@ TEST(HeaderTransportTest, InvalidInfoBlock) {
   }
 }
 
-TEST(HeaderTransportTest, InfoBlock) {
+TEST_F(HeaderTransportTest, InfoBlock) {
   HeaderTransportImpl transport;
   Buffer::OwnedImpl buffer;
   MessageMetadata metadata;
@@ -474,13 +476,15 @@ TEST(HeaderTransportTest, InfoBlock) {
   EXPECT_EQ(buffer.length(), 0);
 }
 
-TEST(HeaderTransportTest, DecodeFrameEnd) {
+TEST_F(HeaderTransportTest, DecodeFrameEnd) {
   HeaderTransportImpl transport;
   Buffer::OwnedImpl buffer;
   EXPECT_TRUE(transport.decodeFrameEnd(buffer));
 }
 
-TEST(HeaderTransportImpl, TestEncodeFrame) {
+using HeaderTransportImplTest = TestBase;
+
+TEST_F(HeaderTransportImplTest, TestEncodeFrame) {
   HeaderTransportImpl transport;
 
   // No message

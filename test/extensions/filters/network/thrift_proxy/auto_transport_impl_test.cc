@@ -20,14 +20,18 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
 
-TEST(TransportNames, FromType) {
+using TransportNamesTest = TestBase;
+
+TEST_F(TransportNamesTest, FromType) {
   for (int i = 0; i <= static_cast<int>(TransportType::LastTransportType); i++) {
     TransportType type = static_cast<TransportType>(i);
     EXPECT_NE("", TransportNames::get().fromType(type));
   }
 }
 
-TEST(AutoTransportTest, NotEnoughData) {
+using AutoTransportTest = TestBase;
+
+TEST_F(AutoTransportTest, NotEnoughData) {
   Buffer::OwnedImpl buffer;
   AutoTransportImpl transport;
   MessageMetadata metadata;
@@ -41,7 +45,7 @@ TEST(AutoTransportTest, NotEnoughData) {
   EXPECT_THAT(metadata, IsEmptyMetadata());
 }
 
-TEST(AutoTransportTest, UnknownTransport) {
+TEST_F(AutoTransportTest, UnknownTransport) {
   AutoTransportImpl transport;
 
   // Looks like unframed, but fails protocol check.
@@ -69,7 +73,7 @@ TEST(AutoTransportTest, UnknownTransport) {
   }
 }
 
-TEST(AutoTransportTest, DecodeFrameStart) {
+TEST_F(AutoTransportTest, DecodeFrameStart) {
   // Framed transport + binary protocol
   {
     AutoTransportImpl transport;
@@ -177,7 +181,7 @@ TEST(AutoTransportTest, DecodeFrameStart) {
   }
 }
 
-TEST(AutoTransportTest, DecodeFrameEnd) {
+TEST_F(AutoTransportTest, DecodeFrameEnd) {
   AutoTransportImpl transport;
   Buffer::OwnedImpl buffer;
   buffer.writeBEInt<int32_t>(0xFF);
@@ -192,7 +196,7 @@ TEST(AutoTransportTest, DecodeFrameEnd) {
   EXPECT_TRUE(transport.decodeFrameEnd(buffer));
 }
 
-TEST(AutoTransportTest, EncodeFrame) {
+TEST_F(AutoTransportTest, EncodeFrame) {
   MockTransport* mock_transport = new NiceMock<MockTransport>();
 
   AutoTransportImpl transport;
@@ -206,12 +210,12 @@ TEST(AutoTransportTest, EncodeFrame) {
   transport.encodeFrame(buffer, metadata, message);
 }
 
-TEST(AutoTransportTest, Name) {
+TEST_F(AutoTransportTest, Name) {
   AutoTransportImpl transport;
   EXPECT_EQ(transport.name(), "auto");
 }
 
-TEST(AutoTransportTest, Type) {
+TEST_F(AutoTransportTest, Type) {
   AutoTransportImpl transport;
   EXPECT_EQ(transport.type(), TransportType::Auto);
 }

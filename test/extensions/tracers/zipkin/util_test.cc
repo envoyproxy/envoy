@@ -8,7 +8,9 @@ namespace Extensions {
 namespace Tracers {
 namespace Zipkin {
 
-TEST(ZipkinUtilTest, utilTests) {
+using ZipkinUtilTest = TestBase;
+
+TEST_F(ZipkinUtilTest, utilTests) {
   DangerousDeprecatedTestTime time;
   EXPECT_EQ(typeid(uint64_t).name(), typeid(Util::generateRandom64(time.timeSystem())).name());
 

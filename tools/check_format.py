@@ -414,6 +414,9 @@ def checkSourceLine(line, file_path, reportError):
   if file_path != './test/test_common/test_base.h' and (' testing::Test ' in line or
                                                         ' testing::TestWithParam' in line):
     reportError("Derive test classes from TestBase in test/test_common/test_base.h")
+  if file_path.startswith("./test/") and (file_path.endswith(".cc") or
+                                          file_path.endswith(".h")) and line.startswith("TEST("):
+    reportError("Use TEST_F(class_derived_from_TestBase, ...) rather than TEST(...)")
 
 
 def checkBuildLine(line, file_path, reportError):

@@ -60,7 +60,9 @@ private:
   Thread::ThreadPtr thread_;
 };
 
-TEST(ThreadSafeSingleton, BasicCreationAndMutation) {
+using ThreadSafeSingletonTest = TestBase;
+
+TEST_F(ThreadSafeSingletonTest, BasicCreationAndMutation) {
   auto& singleton = ThreadSafeSingleton<TestSingleton>::get();
   EXPECT_EQ(&singleton, &ThreadSafeSingleton<TestSingleton>::get());
   EXPECT_EQ(0, singleton.value());
@@ -75,7 +77,7 @@ TEST(ThreadSafeSingleton, BasicCreationAndMutation) {
   EXPECT_EQ(31, singleton.value());
 }
 
-TEST(ThreadSafeSingleton, Injection) {
+TEST_F(ThreadSafeSingletonTest, Injection) {
   EvilMathSingleton evil_singleton;
 
   // Sanity check that other tests didn't cause the main singleton to overflow.

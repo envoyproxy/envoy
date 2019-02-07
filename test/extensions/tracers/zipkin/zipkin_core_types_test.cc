@@ -13,7 +13,9 @@ namespace Extensions {
 namespace Tracers {
 namespace Zipkin {
 
-TEST(ZipkinCoreTypesEndpointTest, defaultConstructor) {
+using ZipkinCoreTypesEndpointTest = TestBase;
+
+TEST_F(ZipkinCoreTypesEndpointTest, defaultConstructor) {
   Endpoint ep;
 
   EXPECT_EQ("", ep.serviceName());
@@ -36,7 +38,7 @@ TEST(ZipkinCoreTypesEndpointTest, defaultConstructor) {
             ep.toJson());
 }
 
-TEST(ZipkinCoreTypesEndpointTest, customConstructor) {
+TEST_F(ZipkinCoreTypesEndpointTest, customConstructor) {
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::parseInternetAddressAndPort("127.0.0.1:3306");
   Endpoint ep(std::string("my_service"), addr);
@@ -52,7 +54,7 @@ TEST(ZipkinCoreTypesEndpointTest, customConstructor) {
             ep.toJson());
 }
 
-TEST(ZipkinCoreTypesEndpointTest, copyOperator) {
+TEST_F(ZipkinCoreTypesEndpointTest, copyOperator) {
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::parseInternetAddressAndPort("127.0.0.1:3306");
   Endpoint ep1(std::string("my_service"), addr);
@@ -65,7 +67,7 @@ TEST(ZipkinCoreTypesEndpointTest, copyOperator) {
   EXPECT_EQ(ep1.toJson(), ep2.toJson());
 }
 
-TEST(ZipkinCoreTypesEndpointTest, assignmentOperator) {
+TEST_F(ZipkinCoreTypesEndpointTest, assignmentOperator) {
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::parseInternetAddressAndPort("127.0.0.1:3306");
   Endpoint ep1(std::string("my_service"), addr);
@@ -78,7 +80,9 @@ TEST(ZipkinCoreTypesEndpointTest, assignmentOperator) {
   EXPECT_EQ(ep1.toJson(), ep2.toJson());
 }
 
-TEST(ZipkinCoreTypesAnnotationTest, defaultConstructor) {
+using ZipkinCoreTypesAnnotationTest = TestBase;
+
+TEST_F(ZipkinCoreTypesAnnotationTest, defaultConstructor) {
   Annotation ann;
 
   EXPECT_EQ(0ULL, ann.timestamp());
@@ -140,7 +144,7 @@ TEST(ZipkinCoreTypesAnnotationTest, defaultConstructor) {
   EXPECT_EQ(expected_json, ann.toJson());
 }
 
-TEST(ZipkinCoreTypesAnnotationTest, customConstructor) {
+TEST_F(ZipkinCoreTypesAnnotationTest, customConstructor) {
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::parseInternetAddressAndPort("127.0.0.1:3306");
   Endpoint ep(std::string("my_service"), addr);
@@ -165,7 +169,7 @@ TEST(ZipkinCoreTypesAnnotationTest, customConstructor) {
   EXPECT_EQ(expected_json, ann.toJson());
 }
 
-TEST(ZipkinCoreTypesAnnotationTest, copyConstructor) {
+TEST_F(ZipkinCoreTypesAnnotationTest, copyConstructor) {
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::parseInternetAddressAndPort("127.0.0.1:3306");
   Endpoint ep(std::string("my_service"), addr);
@@ -183,7 +187,7 @@ TEST(ZipkinCoreTypesAnnotationTest, copyConstructor) {
   EXPECT_EQ(ann.endpoint().serviceName(), ann2.endpoint().serviceName());
 }
 
-TEST(ZipkinCoreTypesAnnotationTest, assignmentOperator) {
+TEST_F(ZipkinCoreTypesAnnotationTest, assignmentOperator) {
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::parseInternetAddressAndPort("127.0.0.1:3306");
   Endpoint ep(std::string("my_service"), addr);
@@ -201,7 +205,9 @@ TEST(ZipkinCoreTypesAnnotationTest, assignmentOperator) {
   EXPECT_EQ(ann.endpoint().serviceName(), ann2.endpoint().serviceName());
 }
 
-TEST(ZipkinCoreTypesBinaryAnnotationTest, defaultConstructor) {
+using ZipkinCoreTypesBinaryAnnotationTest = TestBase;
+
+TEST_F(ZipkinCoreTypesBinaryAnnotationTest, defaultConstructor) {
   BinaryAnnotation ann;
 
   EXPECT_EQ("", ann.key());
@@ -252,7 +258,7 @@ TEST(ZipkinCoreTypesBinaryAnnotationTest, defaultConstructor) {
   EXPECT_EQ(expected_json, ann.toJson());
 }
 
-TEST(ZipkinCoreTypesBinaryAnnotationTest, customConstructor) {
+TEST_F(ZipkinCoreTypesBinaryAnnotationTest, customConstructor) {
   BinaryAnnotation ann("key", "value");
 
   EXPECT_EQ("key", ann.key());
@@ -263,7 +269,7 @@ TEST(ZipkinCoreTypesBinaryAnnotationTest, customConstructor) {
   EXPECT_EQ(expected_json, ann.toJson());
 }
 
-TEST(ZipkinCoreTypesBinaryAnnotationTest, copyConstructor) {
+TEST_F(ZipkinCoreTypesBinaryAnnotationTest, copyConstructor) {
   BinaryAnnotation ann("key", "value");
   BinaryAnnotation ann2(ann);
 
@@ -274,7 +280,7 @@ TEST(ZipkinCoreTypesBinaryAnnotationTest, copyConstructor) {
   EXPECT_EQ(ann.annotationType(), ann2.annotationType());
 }
 
-TEST(ZipkinCoreTypesBinaryAnnotationTest, assignmentOperator) {
+TEST_F(ZipkinCoreTypesBinaryAnnotationTest, assignmentOperator) {
   BinaryAnnotation ann("key", "value");
   BinaryAnnotation ann2 = ann;
 
@@ -285,7 +291,9 @@ TEST(ZipkinCoreTypesBinaryAnnotationTest, assignmentOperator) {
   EXPECT_EQ(ann.annotationType(), ann2.annotationType());
 }
 
-TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
+using ZipkinCoreTypesSpanTest = TestBase;
+
+TEST_F(ZipkinCoreTypesSpanTest, defaultConstructor) {
   DangerousDeprecatedTestTime test_time;
   Span span(test_time.timeSystem());
 
@@ -485,7 +493,7 @@ TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
             span.toJson());
 }
 
-TEST(ZipkinCoreTypesSpanTest, copyConstructor) {
+TEST_F(ZipkinCoreTypesSpanTest, copyConstructor) {
   DangerousDeprecatedTestTime test_time;
   Span span(test_time.timeSystem());
 
@@ -522,7 +530,7 @@ TEST(ZipkinCoreTypesSpanTest, copyConstructor) {
   EXPECT_EQ(span.isSetTraceIdHigh(), span2.isSetTraceIdHigh());
 }
 
-TEST(ZipkinCoreTypesSpanTest, assignmentOperator) {
+TEST_F(ZipkinCoreTypesSpanTest, assignmentOperator) {
   DangerousDeprecatedTestTime test_time;
   Span span(test_time.timeSystem());
 
@@ -559,7 +567,7 @@ TEST(ZipkinCoreTypesSpanTest, assignmentOperator) {
   EXPECT_EQ(span.isSetTraceIdHigh(), span2.isSetTraceIdHigh());
 }
 
-TEST(ZipkinCoreTypesSpanTest, setTag) {
+TEST_F(ZipkinCoreTypesSpanTest, setTag) {
   DangerousDeprecatedTestTime test_time;
   Span span(test_time.timeSystem());
 

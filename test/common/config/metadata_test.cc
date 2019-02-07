@@ -12,7 +12,9 @@ namespace Envoy {
 namespace Config {
 namespace {
 
-TEST(MetadataTest, MetadataValue) {
+using MetadataTest = TestBase;
+
+TEST_F(MetadataTest, MetadataValue) {
   envoy::api::v2::core::Metadata metadata;
   Metadata::mutableMetadataValue(metadata, MetadataFilters::get().ENVOY_LB,
                                  MetadataEnvoyLbKeys::get().CANARY)
@@ -25,7 +27,7 @@ TEST(MetadataTest, MetadataValue) {
       Metadata::metadataValue(metadata, MetadataFilters::get().ENVOY_LB, "bar").bool_value());
 }
 
-TEST(MetadataTest, MetadataValuePath) {
+TEST_F(MetadataTest, MetadataValuePath) {
   const std::string filter = "com.test";
   envoy::api::v2::core::Metadata metadata;
   std::vector<std::string> path{"test_obj", "inner_key"};

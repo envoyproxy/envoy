@@ -23,16 +23,18 @@ namespace Extensions {
 namespace QuicListeners {
 namespace Quiche {
 
-TEST(QuicPlatformTest, QuicAlignOf) { EXPECT_LT(0, QUIC_ALIGN_OF(int)); }
+using QuicPlatformTest = TestBase;
 
-TEST(QuicPlatformTest, QuicArraysize) {
+TEST_F(QuicPlatformTest, QuicAlignOf) { EXPECT_LT(0, QUIC_ALIGN_OF(int)); }
+
+TEST_F(QuicPlatformTest, QuicArraysize) {
   int array[] = {0, 1, 2, 3, 4};
   EXPECT_EQ(5, QUIC_ARRAYSIZE(array));
 }
 
 enum class TestEnum { ZERO = 0, ONE, TWO, COUNT };
 
-TEST(QuicPlatformTest, QuicClientStats) {
+TEST_F(QuicPlatformTest, QuicClientStats) {
   // Just make sure they compile.
   QUIC_CLIENT_HISTOGRAM_ENUM("my.enum.histogram", TestEnum::ONE, TestEnum::COUNT, "doc");
   QUIC_CLIENT_HISTOGRAM_BOOL("my.bool.histogram", false, "doc");
@@ -43,65 +45,65 @@ TEST(QuicPlatformTest, QuicClientStats) {
   quic::QuicClientSparseHistogram("my.sparse.histogram", 345);
 }
 
-TEST(QuicPlatformTest, QuicUnorderedMap) {
+TEST_F(QuicPlatformTest, QuicUnorderedMap) {
   quic::QuicUnorderedMap<quic::QuicString, int> umap;
   umap.insert({"foo", 2});
   EXPECT_EQ(2, umap["foo"]);
 }
 
-TEST(QuicPlatformTest, QuicUnorderedSet) {
+TEST_F(QuicPlatformTest, QuicUnorderedSet) {
   quic::QuicUnorderedSet<quic::QuicString> uset({"foo", "bar"});
   EXPECT_EQ(1, uset.count("bar"));
   EXPECT_EQ(0, uset.count("qux"));
 }
 
-TEST(QuicPlatformTest, QuicQueue) {
+TEST_F(QuicPlatformTest, QuicQueue) {
   quic::QuicQueue<int> queue;
   queue.push(10);
   EXPECT_EQ(10, queue.back());
 }
 
-TEST(QuicPlatformTest, QuicDeque) {
+TEST_F(QuicPlatformTest, QuicDeque) {
   quic::QuicDeque<int> deque;
   deque.push_back(10);
   EXPECT_EQ(10, deque.back());
 }
 
-TEST(QuicPlatformTest, QuicInlinedVector) {
+TEST_F(QuicPlatformTest, QuicInlinedVector) {
   quic::QuicInlinedVector<int, 5> vec;
   vec.push_back(3);
   EXPECT_EQ(3, vec[0]);
 }
 
-TEST(QuicPlatformTest, QuicEndian) {
+TEST_F(QuicPlatformTest, QuicEndian) {
   EXPECT_EQ(0x1234, quic::QuicEndian::NetToHost16(quic::QuicEndian::HostToNet16(0x1234)));
   EXPECT_EQ(0x12345678, quic::QuicEndian::NetToHost32(quic::QuicEndian::HostToNet32(0x12345678)));
 }
 
-TEST(QuicPlatformTest, QuicEstimateMemoryUsage) {
+TEST_F(QuicPlatformTest, QuicEstimateMemoryUsage) {
   quic::QuicString s = "foo";
   // Stubbed out to always return 0.
   EXPECT_EQ(0, quic::QuicEstimateMemoryUsage(s));
 }
 
-TEST(QuicPlatformTest, QuicString) {
+TEST_F(QuicPlatformTest, QuicString) {
   quic::QuicString s = "foo";
   EXPECT_EQ('o', s[1]);
 }
 
-TEST(QuicPlatformTest, QuicStringPiece) {
+TEST_F(QuicPlatformTest, QuicStringPiece) {
   quic::QuicString s = "bar";
   quic::QuicStringPiece sp(s);
   EXPECT_EQ('b', sp[0]);
 }
 
-TEST(QuicPlatformTest, QuicUint128) {
+TEST_F(QuicPlatformTest, QuicUint128) {
   quic::QuicUint128 i = MakeQuicUint128(16777216, 315);
   EXPECT_EQ(315, QuicUint128Low64(i));
   EXPECT_EQ(16777216, QuicUint128High64(i));
 }
 
-TEST(QuicPlatformTest, QuicPtrUtil) {
+TEST_F(QuicPlatformTest, QuicPtrUtil) {
   auto p = quic::QuicMakeUnique<quic::QuicString>("abc");
   EXPECT_EQ("abc", *p);
 
@@ -109,7 +111,7 @@ TEST(QuicPlatformTest, QuicPtrUtil) {
   EXPECT_EQ("aaa", *p);
 }
 
-TEST(QuicPlatformTest, QuicMutex) {
+TEST_F(QuicPlatformTest, QuicMutex) {
   quic::QuicMutex mu;
 
   quic::QuicWriterMutexLock wmu(&mu);
@@ -122,7 +124,7 @@ TEST(QuicPlatformTest, QuicMutex) {
   mu.WriterLock();
 }
 
-TEST(QuicPlatformTest, QuicNotification) {
+TEST_F(QuicPlatformTest, QuicNotification) {
   quic::QuicNotification notification;
   EXPECT_FALSE(notification.HasBeenNotified());
   notification.Notify();

@@ -14,14 +14,16 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace DubboProxy {
 
-TEST(DubboFilterConfigTest, ValidateFail) {
+using DubboFilterConfigTest = TestBase;
+
+TEST_F(DubboFilterConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_THROW(DubboProxyFilterConfigFactory().createFilterFactoryFromProto(
                    envoy::config::filter::network::dubbo_proxy::v2alpha1::DubboProxy(), context),
                ProtoValidationException);
 }
 
-TEST(DubboFilterConfigTest, ValidProtoConfiguration) {
+TEST_F(DubboFilterConfigTest, ValidProtoConfiguration) {
   envoy::config::filter::network::dubbo_proxy::v2alpha1::DubboProxy config{};
 
   config.set_stat_prefix("my_stat_prefix");
@@ -34,7 +36,7 @@ TEST(DubboFilterConfigTest, ValidProtoConfiguration) {
   cb(connection);
 }
 
-TEST(DubboFilterConfigTest, DubboProxyWithEmptyProto) {
+TEST_F(DubboFilterConfigTest, DubboProxyWithEmptyProto) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   DubboProxyFilterConfigFactory factory;
   envoy::config::filter::network::dubbo_proxy::v2alpha1::DubboProxy config =

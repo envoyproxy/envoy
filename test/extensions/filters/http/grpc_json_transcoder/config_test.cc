@@ -12,7 +12,9 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GrpcJsonTranscoder {
 
-TEST(GrpcJsonTranscoderFilterConfigTest, ValidateFail) {
+using GrpcJsonTranscoderFilterConfigTest = TestBase;
+
+TEST_F(GrpcJsonTranscoderFilterConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_THROW(
       GrpcJsonTranscoderFilterConfig().createFilterFactoryFromProto(

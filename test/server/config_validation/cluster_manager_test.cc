@@ -24,7 +24,9 @@
 namespace Envoy {
 namespace Upstream {
 
-TEST(ValidationClusterManagerTest, MockedMethods) {
+using ValidationClusterManagerTest = TestBase;
+
+TEST_F(ValidationClusterManagerTest, MockedMethods) {
   Stats::IsolatedStoreImpl stats_store;
   Api::ApiPtr api(Api::createApiForTest(stats_store));
   NiceMock<Runtime::MockLoader> runtime;

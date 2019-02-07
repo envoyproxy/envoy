@@ -34,11 +34,13 @@ envoy::api::v2::route::RateLimit parseRateLimitFromJson(const std::string& json_
   return rate_limit;
 }
 
-TEST(BadRateLimitConfiguration, MissingActions) {
+using BadRateLimitConfiguration = TestBase;
+
+TEST_F(BadRateLimitConfiguration, MissingActions) {
   EXPECT_THROW(parseRateLimitFromJson("{}"), EnvoyException);
 }
 
-TEST(BadRateLimitConfiguration, BadType) {
+TEST_F(BadRateLimitConfiguration, BadType) {
   std::string json = R"EOF(
   {
     "actions":[
@@ -52,7 +54,9 @@ TEST(BadRateLimitConfiguration, BadType) {
   EXPECT_THROW(RateLimitPolicyEntryImpl(parseRateLimitFromJson(json)), EnvoyException);
 }
 
-TEST(BadRateLimitConfiguration, ActionsMissingRequiredFields) {
+using BadRateLimitConfiguration = TestBase;
+
+TEST_F(BadRateLimitConfiguration, ActionsMissingRequiredFields) {
   std::string json_one = R"EOF(
   {
     "actions":[

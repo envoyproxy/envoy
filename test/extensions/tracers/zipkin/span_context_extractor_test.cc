@@ -17,7 +17,9 @@ const std::string span_id{"0000000000000003"};
 const std::string parent_id{"0000000000000002"};
 } // namespace
 
-TEST(ZipkinSpanContextExtractorTest, Largest) {
+using ZipkinSpanContextExtractorTest = TestBase;
+
+TEST_F(ZipkinSpanContextExtractorTest, Largest) {
   Http::TestHeaderMapImpl request_headers{
       {"b3", fmt::format("{}{}-{}-1-{}", trace_id_high, trace_id, span_id, parent_id)}};
   SpanContextExtractor extractor(request_headers);
@@ -32,7 +34,7 @@ TEST(ZipkinSpanContextExtractorTest, Largest) {
   EXPECT_TRUE(extractor.extractSampled({Tracing::Reason::Sampling, false}));
 }
 
-TEST(ZipkinSpanContextExtractorTest, WithoutParentDebug) {
+TEST_F(ZipkinSpanContextExtractorTest, WithoutParentDebug) {
   Http::TestHeaderMapImpl request_headers{
       {"b3", fmt::format("{}{}-{}-d", trace_id_high, trace_id, span_id)}};
   SpanContextExtractor extractor(request_headers);
@@ -47,7 +49,7 @@ TEST(ZipkinSpanContextExtractorTest, WithoutParentDebug) {
   EXPECT_TRUE(extractor.extractSampled({Tracing::Reason::Sampling, false}));
 }
 
-TEST(ZipkinSpanContextExtractorTest, MalformedUuid) {
+TEST_F(ZipkinSpanContextExtractorTest, MalformedUuid) {
   Http::TestHeaderMapImpl request_headers{{"b3", "b970dafd-0d95-40aa-95d8-1d8725aebe40"}};
   SpanContextExtractor extractor(request_headers);
   EXPECT_THROW_WITH_MESSAGE(extractor.extractSpanContext(true), ExtractorException,
@@ -55,7 +57,7 @@ TEST(ZipkinSpanContextExtractorTest, MalformedUuid) {
   EXPECT_TRUE(extractor.extractSampled({Tracing::Reason::Sampling, true}));
 }
 
-TEST(ZipkinSpanContextExtractorTest, MiddleOfString) {
+TEST_F(ZipkinSpanContextExtractorTest, MiddleOfString) {
   Http::TestHeaderMapImpl request_headers{
       {"b3", fmt::format("{}{}-{},", trace_id, trace_id, span_id)}};
   SpanContextExtractor extractor(request_headers);
@@ -64,7 +66,7 @@ TEST(ZipkinSpanContextExtractorTest, MiddleOfString) {
   EXPECT_TRUE(extractor.extractSampled({Tracing::Reason::Sampling, true}));
 }
 
-TEST(ZipkinSpanContextExtractorTest, DebugOnly) {
+TEST_F(ZipkinSpanContextExtractorTest, DebugOnly) {
   Http::TestHeaderMapImpl request_headers{{"b3", "d"}};
   SpanContextExtractor extractor(request_headers);
   auto context = extractor.extractSpanContext(true);
@@ -78,7 +80,7 @@ TEST(ZipkinSpanContextExtractorTest, DebugOnly) {
   EXPECT_TRUE(extractor.extractSampled({Tracing::Reason::Sampling, false}));
 }
 
-TEST(ZipkinSpanContextExtractorTest, Sampled) {
+TEST_F(ZipkinSpanContextExtractorTest, Sampled) {
   Http::TestHeaderMapImpl request_headers{{"b3", "1"}};
   SpanContextExtractor extractor(request_headers);
   auto context = extractor.extractSpanContext(true);
@@ -92,7 +94,7 @@ TEST(ZipkinSpanContextExtractorTest, Sampled) {
   EXPECT_TRUE(extractor.extractSampled({Tracing::Reason::Sampling, false}));
 }
 
-TEST(ZipkinSpanContextExtractorTest, SampledFalse) {
+TEST_F(ZipkinSpanContextExtractorTest, SampledFalse) {
   Http::TestHeaderMapImpl request_headers{{"b3", "0"}};
   SpanContextExtractor extractor(request_headers);
   auto context = extractor.extractSpanContext(true);
@@ -106,7 +108,7 @@ TEST(ZipkinSpanContextExtractorTest, SampledFalse) {
   EXPECT_FALSE(extractor.extractSampled({Tracing::Reason::Sampling, true}));
 }
 
-TEST(ZipkinSpanContextExtractorTest, IdNotYetSampled128) {
+TEST_F(ZipkinSpanContextExtractorTest, IdNotYetSampled128) {
   Http::TestHeaderMapImpl request_headers{
       {"b3", fmt::format("{}{}-{}", trace_id_high, trace_id, span_id)}};
   SpanContextExtractor extractor(request_headers);
@@ -121,7 +123,7 @@ TEST(ZipkinSpanContextExtractorTest, IdNotYetSampled128) {
   EXPECT_FALSE(extractor.extractSampled({Tracing::Reason::Sampling, false}));
 }
 
-TEST(ZipkinSpanContextExtractorTest, IdsUnsampled) {
+TEST_F(ZipkinSpanContextExtractorTest, IdsUnsampled) {
   Http::TestHeaderMapImpl request_headers{{"b3", fmt::format("{}-{}-0", trace_id, span_id)}};
   SpanContextExtractor extractor(request_headers);
   auto context = extractor.extractSpanContext(true);
@@ -135,7 +137,7 @@ TEST(ZipkinSpanContextExtractorTest, IdsUnsampled) {
   EXPECT_FALSE(extractor.extractSampled({Tracing::Reason::Sampling, true}));
 }
 
-TEST(ZipkinSpanContextExtractorTest, ParentUnsampled) {
+TEST_F(ZipkinSpanContextExtractorTest, ParentUnsampled) {
   Http::TestHeaderMapImpl request_headers{
       {"b3", fmt::format("{}-{}-0-{}", trace_id, span_id, parent_id)}};
   SpanContextExtractor extractor(request_headers);
@@ -150,7 +152,7 @@ TEST(ZipkinSpanContextExtractorTest, ParentUnsampled) {
   EXPECT_FALSE(extractor.extractSampled({Tracing::Reason::Sampling, true}));
 }
 
-TEST(ZipkinSpanContextExtractorTest, ParentDebug) {
+TEST_F(ZipkinSpanContextExtractorTest, ParentDebug) {
   Http::TestHeaderMapImpl request_headers{
       {"b3", fmt::format("{}-{}-d-{}", trace_id, span_id, parent_id)}};
   SpanContextExtractor extractor(request_headers);
@@ -165,7 +167,7 @@ TEST(ZipkinSpanContextExtractorTest, ParentDebug) {
   EXPECT_TRUE(extractor.extractSampled({Tracing::Reason::Sampling, false}));
 }
 
-TEST(ZipkinSpanContextExtractorTest, IdsWithDebug) {
+TEST_F(ZipkinSpanContextExtractorTest, IdsWithDebug) {
   Http::TestHeaderMapImpl request_headers{{"b3", fmt::format("{}-{}-d", trace_id, span_id)}};
   SpanContextExtractor extractor(request_headers);
   auto context = extractor.extractSpanContext(true);
@@ -179,7 +181,7 @@ TEST(ZipkinSpanContextExtractorTest, IdsWithDebug) {
   EXPECT_TRUE(extractor.extractSampled({Tracing::Reason::Sampling, false}));
 }
 
-TEST(ZipkinSpanContextExtractorTest, WithoutSampled) {
+TEST_F(ZipkinSpanContextExtractorTest, WithoutSampled) {
   Http::TestHeaderMapImpl request_headers{{"b3", fmt::format("{}-{}", trace_id, span_id)}};
   SpanContextExtractor extractor(request_headers);
   auto context = extractor.extractSpanContext(false);
@@ -193,7 +195,7 @@ TEST(ZipkinSpanContextExtractorTest, WithoutSampled) {
   EXPECT_TRUE(extractor.extractSampled({Tracing::Reason::Sampling, true}));
 }
 
-TEST(ZipkinSpanContextExtractorTest, TooBig) {
+TEST_F(ZipkinSpanContextExtractorTest, TooBig) {
   {
     Http::TestHeaderMapImpl request_headers{
         {"b3", fmt::format("{}{}{}-{}-{}", trace_id, trace_id, trace_id, span_id, trace_id)}};
@@ -212,14 +214,14 @@ TEST(ZipkinSpanContextExtractorTest, TooBig) {
   }
 }
 
-TEST(ZipkinSpanContextExtractorTest, Empty) {
+TEST_F(ZipkinSpanContextExtractorTest, Empty) {
   Http::TestHeaderMapImpl request_headers{{"b3", ""}};
   SpanContextExtractor extractor(request_headers);
   EXPECT_THROW_WITH_MESSAGE(extractor.extractSpanContext(true), ExtractorException,
                             "Invalid input: empty");
 }
 
-TEST(ZipkinSpanContextExtractorTest, InvalidInput) {
+TEST_F(ZipkinSpanContextExtractorTest, InvalidInput) {
   {
     Http::TestHeaderMapImpl request_headers{
         {"X-B3-TraceId", trace_id_high + trace_id.substr(0, 15) + "!"}, {"X-B3-SpanId", span_id}};
@@ -312,7 +314,7 @@ TEST(ZipkinSpanContextExtractorTest, InvalidInput) {
   }
 }
 
-TEST(ZipkinSpanContextExtractorTest, Truncated) {
+TEST_F(ZipkinSpanContextExtractorTest, Truncated) {
   {
     Http::TestHeaderMapImpl request_headers{{"b3", "-1"}};
     SpanContextExtractor extractor(request_headers);

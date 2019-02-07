@@ -12,7 +12,9 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GrpcWeb {
 
-TEST(GrpcWebFilterConfigTest, GrpcWebFilter) {
+using GrpcWebFilterConfigTest = TestBase;
+
+TEST_F(GrpcWebFilterConfigTest, GrpcWebFilter) {
   std::string json_string = R"EOF(
   {
   }

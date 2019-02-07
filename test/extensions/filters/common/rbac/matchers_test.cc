@@ -28,9 +28,13 @@ void checkMatcher(
   EXPECT_EQ(expected, matcher.matches(connection, headers, metadata));
 }
 
-TEST(AlwaysMatcher, AlwaysMatches) { checkMatcher(RBAC::AlwaysMatcher(), true); }
+using AlwaysMatcher = TestBase;
 
-TEST(AndMatcher, Permission_Set) {
+TEST_F(AlwaysMatcher, AlwaysMatches) { checkMatcher(RBAC::AlwaysMatcher(), true); }
+
+using AndMatcher = TestBase;
+
+TEST_F(AndMatcher, Permission_Set) {
   envoy::config::rbac::v2alpha::Permission_Set set;
   envoy::config::rbac::v2alpha::Permission* perm = set.add_rules();
   perm->set_any(true);
@@ -53,7 +57,7 @@ TEST(AndMatcher, Permission_Set) {
   checkMatcher(RBAC::AndMatcher(set), false, conn);
 }
 
-TEST(AndMatcher, Principal_Set) {
+TEST_F(AndMatcher, Principal_Set) {
   envoy::config::rbac::v2alpha::Principal_Set set;
   envoy::config::rbac::v2alpha::Principal* principal = set.add_ids();
   principal->set_any(true);
@@ -78,7 +82,9 @@ TEST(AndMatcher, Principal_Set) {
   checkMatcher(RBAC::AndMatcher(set), false, conn);
 }
 
-TEST(OrMatcher, Permission_Set) {
+using OrMatcher = TestBase;
+
+TEST_F(OrMatcher, Permission_Set) {
   envoy::config::rbac::v2alpha::Permission_Set set;
   envoy::config::rbac::v2alpha::Permission* perm = set.add_rules();
   perm->set_destination_port(123);
@@ -96,7 +102,7 @@ TEST(OrMatcher, Permission_Set) {
   checkMatcher(RBAC::OrMatcher(set), true, conn);
 }
 
-TEST(OrMatcher, Principal_Set) {
+TEST_F(OrMatcher, Principal_Set) {
   envoy::config::rbac::v2alpha::Principal_Set set;
   envoy::config::rbac::v2alpha::Principal* id = set.add_ids();
   auto* cidr = id->mutable_source_ip();
@@ -116,21 +122,25 @@ TEST(OrMatcher, Principal_Set) {
   checkMatcher(RBAC::OrMatcher(set), true, conn);
 }
 
-TEST(NotMatcher, Permission) {
+using NotMatcher = TestBase;
+
+TEST_F(NotMatcher, Permission) {
   envoy::config::rbac::v2alpha::Permission perm;
   perm.set_any(true);
 
   checkMatcher(RBAC::NotMatcher(perm), false, Envoy::Network::MockConnection());
 }
 
-TEST(NotMatcher, Principal) {
+TEST_F(NotMatcher, Principal) {
   envoy::config::rbac::v2alpha::Principal principal;
   principal.set_any(true);
 
   checkMatcher(RBAC::NotMatcher(principal), false, Envoy::Network::MockConnection());
 }
 
-TEST(HeaderMatcher, HeaderMatcher) {
+using HeaderMatcher = TestBase;
+
+TEST_F(HeaderMatcher, HeaderMatcher) {
   envoy::api::v2::route::HeaderMatcher config;
   config.set_name("foo");
   config.set_exact_match("bar");
@@ -151,7 +161,9 @@ TEST(HeaderMatcher, HeaderMatcher) {
   checkMatcher(matcher, false);
 }
 
-TEST(IPMatcher, IPMatcher) {
+using IPMatcherTest = TestBase;
+
+TEST_F(IPMatcherTest, IPMatcher) {
   Envoy::Network::MockConnection conn;
   Envoy::Network::Address::InstanceConstSharedPtr local =
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 123, false);
@@ -178,7 +190,9 @@ TEST(IPMatcher, IPMatcher) {
   checkMatcher(IPMatcher(remote_cidr, false), false, conn);
 }
 
-TEST(PortMatcher, PortMatcher) {
+using PortMatcherTest = TestBase;
+
+TEST_F(PortMatcherTest, PortMatcher) {
   Envoy::Network::MockConnection conn;
   Envoy::Network::Address::InstanceConstSharedPtr addr =
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 123, false);
@@ -188,7 +202,9 @@ TEST(PortMatcher, PortMatcher) {
   checkMatcher(PortMatcher(456), false, conn);
 }
 
-TEST(AuthenticatedMatcher, uriSanPeerCertificate) {
+using AuthenticatedMatcherTest = TestBase;
+
+TEST_F(AuthenticatedMatcherTest, uriSanPeerCertificate) {
   Envoy::Network::MockConnection conn;
   Envoy::Ssl::MockConnection ssl;
 
@@ -203,7 +219,7 @@ TEST(AuthenticatedMatcher, uriSanPeerCertificate) {
   checkMatcher(AuthenticatedMatcher(auth), false, conn);
 }
 
-TEST(AuthenticatedMatcher, subjectPeerCertificate) {
+TEST_F(AuthenticatedMatcherTest, subjectPeerCertificate) {
   Envoy::Network::MockConnection conn;
   Envoy::Ssl::MockConnection ssl;
 
@@ -219,7 +235,7 @@ TEST(AuthenticatedMatcher, subjectPeerCertificate) {
   checkMatcher(AuthenticatedMatcher(auth), false, conn);
 }
 
-TEST(AuthenticatedMatcher, AnySSLSubject) {
+TEST_F(AuthenticatedMatcherTest, AnySSLSubject) {
   Envoy::Network::MockConnection conn;
   Envoy::Ssl::MockConnection ssl;
   EXPECT_CALL(ssl, uriSanPeerCertificate()).WillRepeatedly(Return("foo"));
@@ -232,13 +248,15 @@ TEST(AuthenticatedMatcher, AnySSLSubject) {
   checkMatcher(AuthenticatedMatcher(auth), true, conn);
 }
 
-TEST(AuthenticatedMatcher, NoSSL) {
+TEST_F(AuthenticatedMatcherTest, NoSSL) {
   Envoy::Network::MockConnection conn;
   EXPECT_CALL(Const(conn), ssl()).WillOnce(Return(nullptr));
   checkMatcher(AuthenticatedMatcher({}), false, conn);
 }
 
-TEST(MetadataMatcher, MetadataMatcher) {
+using MetadataMatcherTest = TestBase;
+
+TEST_F(MetadataMatcherTest, MetadataMatcher) {
   Envoy::Network::MockConnection conn;
   Envoy::Http::HeaderMapImpl header;
 
@@ -259,7 +277,9 @@ TEST(MetadataMatcher, MetadataMatcher) {
   checkMatcher(MetadataMatcher(matcher), true, conn, header, metadata);
 }
 
-TEST(PolicyMatcher, PolicyMatcher) {
+using PolicyMatcherTest = TestBase;
+
+TEST_F(PolicyMatcherTest, PolicyMatcher) {
   envoy::config::rbac::v2alpha::Policy policy;
   policy.add_permissions()->set_destination_port(123);
   policy.add_permissions()->set_destination_port(456);
@@ -290,7 +310,9 @@ TEST(PolicyMatcher, PolicyMatcher) {
   checkMatcher(matcher, false, conn);
 }
 
-TEST(RequestedServerNameMatcher, ValidRequestedServerName) {
+using RequestedServerNameMatcherTest = TestBase;
+
+TEST_F(RequestedServerNameMatcherTest, ValidRequestedServerName) {
   Envoy::Network::MockConnection conn;
   EXPECT_CALL(conn, requestedServerName())
       .Times(9)
@@ -312,7 +334,7 @@ TEST(RequestedServerNameMatcher, ValidRequestedServerName) {
                conn);
 }
 
-TEST(RequestedServerNameMatcher, EmptyRequestedServerName) {
+TEST_F(RequestedServerNameMatcherTest, EmptyRequestedServerName) {
   Envoy::Network::MockConnection conn;
   EXPECT_CALL(conn, requestedServerName()).Times(3).WillRepeatedly(Return(absl::string_view("")));
 

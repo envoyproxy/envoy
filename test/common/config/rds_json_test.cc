@@ -12,7 +12,9 @@ using testing::_;
 namespace Envoy {
 namespace Config {
 
-TEST(RdsJsonTest, TestRuntimeFractionTranslation) {
+using RdsJsonTest = TestBase;
+
+TEST_F(RdsJsonTest, TestRuntimeFractionTranslation) {
   const std::string json_string = R"EOF(
   {
     "prefix": "/new_endpoint",

@@ -14,7 +14,9 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Squash {
 
-TEST(SquashFilterConfigFactoryTest, SquashFilterCorrectJson) {
+using SquashFilterConfigFactoryTest = TestBase;
+
+TEST_F(SquashFilterConfigFactoryTest, SquashFilterCorrectJson) {
   std::string json_string = R"EOF(
     {
       "cluster" : "fake_cluster",

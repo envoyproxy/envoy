@@ -7,7 +7,9 @@
 #include "test/test_common/test_base.h"
 
 namespace Envoy {
-TEST(Base64Test, EmptyBufferEncode) {
+using Base64Test = TestBase;
+
+TEST_F(Base64Test, EmptyBufferEncode) {
   {
     Buffer::OwnedImpl buffer;
     EXPECT_EQ("", Base64::encode(buffer, 0));
@@ -20,21 +22,21 @@ TEST(Base64Test, EmptyBufferEncode) {
   }
 }
 
-TEST(Base64Test, SingleSliceBufferEncode) {
+TEST_F(Base64Test, SingleSliceBufferEncode) {
   Buffer::OwnedImpl buffer;
   buffer.add("foo", 3);
   EXPECT_EQ("Zm9v", Base64::encode(buffer, 3));
   EXPECT_EQ("Zm8=", Base64::encode(buffer, 2));
 }
 
-TEST(Base64Test, EncodeString) {
+TEST_F(Base64Test, EncodeString) {
   EXPECT_EQ("", Base64::encode("", 0));
   EXPECT_EQ("AAA=", Base64::encode("\0\0", 2));
   EXPECT_EQ("Zm9v", Base64::encode("foo", 3));
   EXPECT_EQ("Zm8=", Base64::encode("fo", 2));
 }
 
-TEST(Base64Test, Decode) {
+TEST_F(Base64Test, Decode) {
   EXPECT_EQ("", Base64::decode(""));
   EXPECT_EQ("foo", Base64::decode("Zm9v"));
   EXPECT_EQ("fo", Base64::decode("Zm8="));
@@ -73,7 +75,7 @@ TEST(Base64Test, Decode) {
   }
 }
 
-TEST(Base64Test, DecodeFailure) {
+TEST_F(Base64Test, DecodeFailure) {
   EXPECT_EQ("", Base64::decode("==Zg"));
   EXPECT_EQ("", Base64::decode("=Zm8"));
   EXPECT_EQ("", Base64::decode("Zm=8"));
@@ -86,7 +88,7 @@ TEST(Base64Test, DecodeFailure) {
   EXPECT_EQ("", Base64::decode("123"));
 }
 
-TEST(Base64Test, MultiSlicesBufferEncode) {
+TEST_F(Base64Test, MultiSlicesBufferEncode) {
   Buffer::OwnedImpl buffer;
   buffer.add("foob", 4);
   buffer.add("ar", 2);
@@ -96,7 +98,7 @@ TEST(Base64Test, MultiSlicesBufferEncode) {
   EXPECT_EQ("Zm9vYmFy", Base64::encode(buffer, 7));
 }
 
-TEST(Base64Test, BinaryBufferEncode) {
+TEST_F(Base64Test, BinaryBufferEncode) {
   Buffer::OwnedImpl buffer;
   buffer.add("\0\1\2\3", 4);
   buffer.add("\b\n\t", 4);
@@ -108,14 +110,16 @@ TEST(Base64Test, BinaryBufferEncode) {
   EXPECT_EQ("AAECAwgKCQCqvN4=", Base64::encode(buffer, 30));
 }
 
-TEST(Base64UrlTest, EncodeString) {
+using Base64UrlTest = TestBase;
+
+TEST_F(Base64UrlTest, EncodeString) {
   EXPECT_EQ("", Base64Url::encode("", 0));
   EXPECT_EQ("AAA", Base64Url::encode("\0\0", 2));
   EXPECT_EQ("Zm9v", Base64Url::encode("foo", 3));
   EXPECT_EQ("Zm8", Base64Url::encode("fo", 2));
 }
 
-TEST(Base64UrlTest, Decode) {
+TEST_F(Base64UrlTest, Decode) {
   EXPECT_EQ("", Base64Url::decode(""));
   EXPECT_EQ("foo", Base64Url::decode("Zm9v"));
   EXPECT_EQ("fo", Base64Url::decode("Zm8"));
@@ -148,7 +152,7 @@ TEST(Base64UrlTest, Decode) {
   }
 }
 
-TEST(Base64UrlTest, DecodeFailure) {
+TEST_F(Base64UrlTest, DecodeFailure) {
   EXPECT_EQ("", Base64Url::decode("==Zg"));
   EXPECT_EQ("", Base64Url::decode("=Zm8"));
   EXPECT_EQ("", Base64Url::decode("Zm=8"));

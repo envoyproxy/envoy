@@ -14,14 +14,16 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Lua {
 
-TEST(LuaFilterConfigTest, ValidateFail) {
+using LuaFilterConfigTest = TestBase;
+
+TEST_F(LuaFilterConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_THROW(LuaFilterConfig().createFilterFactoryFromProto(
                    envoy::config::filter::http::lua::v2::Lua(), "stats", context),
                ProtoValidationException);
 }
 
-TEST(LuaFilterConfigTest, LuaFilterInJson) {
+TEST_F(LuaFilterConfigTest, LuaFilterInJson) {
   std::string json_string = R"EOF(
   {
     "inline_code" : "print(5)"
