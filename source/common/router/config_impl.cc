@@ -493,7 +493,7 @@ void RouteEntryImplBase::finalizePathHeader(Http::HeaderMap& headers,
     return;
   }
 
-  std::string path = headers.Path()->value().c_str();
+  std::string path = std::string(headers.Path()->value().c_str(), headers.Path()->value().size());
   if (insert_envoy_original_path) {
     headers.insertEnvoyOriginalPath().value(*headers.Path());
   }
