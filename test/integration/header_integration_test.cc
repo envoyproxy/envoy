@@ -338,7 +338,7 @@ public:
 
   void initialize() override {
     if (use_eds_) {
-      pre_worker_start_test_steps_ = [this]() {
+      on_server_init_function_ = [this]() {
         AssertionResult result =
             fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, eds_connection_);
         RELEASE_ASSERT(result, result.message());

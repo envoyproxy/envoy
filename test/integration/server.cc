@@ -67,12 +67,16 @@ IntegrationTestServer::create(const std::string& config_path,
 =======
 IntegrationTestServerPtr IntegrationTestServer::create(
     const std::string& config_path, const Network::Address::IpVersion version,
-    std::function<void()> pre_worker_start_test_steps, bool deterministic,
+    std::function<void()> on_server_init_function, bool deterministic,
     Event::TestTimeSystem& time_system, Api::Api& api, bool defer_listener_finalization) {
   IntegrationTestServerPtr server{
       std::make_unique<IntegrationTestServerImpl>(time_system, api, config_path)};
+<<<<<<< HEAD
   server->start(version, pre_worker_start_test_steps, deterministic, defer_listener_finalization);
 >>>>>>> test: Add non-aggregated CDS-over-gRPC integration test (#5228)
+=======
+  server->start(version, on_server_init_function, deterministic, defer_listener_finalization);
+>>>>>>> Modified docs and variable names (#5776)
   return server;
 }
 
@@ -87,16 +91,20 @@ void IntegrationTestServer::waitUntilListenersReady() {
 }
 
 void IntegrationTestServer::start(const Network::Address::IpVersion version,
-                                  std::function<void()> pre_worker_start_test_steps,
-                                  bool deterministic, bool defer_listener_finalization) {
+                                  std::function<void()> on_server_init_function, bool deterministic,
+                                  bool defer_listener_finalization) {
   ENVOY_LOG(info, "starting integration test server");
   ASSERT(!thread_);
   thread_ = api_.threadFactory().createThread(
       [version, deterministic, this]() -> void { threadRoutine(version, deterministic); });
 
   // If any steps need to be done prior to workers starting, do them now. E.g., xDS pre-init.
-  if (pre_worker_start_test_steps != nullptr) {
-    pre_worker_start_test_steps();
+  // Note that there is no synchronization guaranteeing this happens either
+  // before workers starting or after server start. Any needed synchronization must occur in the
+  // routines. These steps are executed at this point in the code to allow server initialization to
+  // be dependent on them (e.g. control plane peers).
+  if (on_server_init_function != nullptr) {
+    on_server_init_function();
   }
 
   // Wait for the server to be created and the number of initial listeners to wait for to be set.
