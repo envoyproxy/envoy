@@ -48,9 +48,9 @@ void CdsApiImpl::onConfigUpdate(const ResourceVector& resources, const std::stri
     }
   }
   for (const auto& cluster : resources) {
-    MessageUtil::validate(cluster);
+   MessageUtil::validate(cluster);
   }
-  // We need to keep track of which clusters we might need to remove.
+  //We need to keep track of which clusters we might need to remove.
   ClusterManager::ClusterInfoMap clusters_to_remove = cm_.clusters();
   for (auto& cluster : resources) {
     const std::string cluster_name = cluster.name();
