@@ -76,10 +76,10 @@ public:
 
   // Returns true if a deprecated feature is allowed.
   //
-  // Unlike most runtime features, deprecated features are either allowed or disallowed.
-  // They are allowed by default, or with explicit configuration to "100" via runtime configuration.
+  // Fundamentally, deprecated features are boolean values.
+  // They are allowed by default or with explicit configuration to "true" via runtime configuration.
   // They can be disallowed either by inclusion in the hard-coded disallowed_features[] list, or by
-  // configuration of a non-100 value in runtime config.
+  // configuration of "false" in runtime config.
   virtual bool deprecatedFeatureEnabled(const std::string& key) const PURE;
 
   /**

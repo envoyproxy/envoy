@@ -106,6 +106,10 @@ TEST_F(DiskBackedLoaderImplTest, All) {
   EXPECT_EQ(2UL, loader->snapshot().getInteger("file3", 1));
   EXPECT_EQ(123UL, loader->snapshot().getInteger("file4", 1));
 
+  // Boolean getting.
+  EXPECT_EQ(1UL, loader->snapshot().getInteger("file11", 10));
+  EXPECT_EQ(0UL, loader->snapshot().getInteger("file12", 10));
+
   // Files with comments.
   EXPECT_EQ(123UL, loader->snapshot().getInteger("file5", 1));
   EXPECT_EQ("/home#about-us", loader->snapshot().get("file6"));

@@ -119,6 +119,9 @@ void MessageUtil::checkForDeprecation(const Protobuf::Message& message, Runtime:
     }
 
     bool warn_only = true;
+    // Allow runtime to be null both to not crash if this is called before server initialization,
+    // and so proto validation works in context where runtime singleton is not set up (e.g.
+    // standalone config validation utilities)
     if (runtime && !runtime->snapshot().deprecatedFeatureEnabled(
                        absl::StrCat("envoy.deprecated_feature.", field->name()))) {
       warn_only = false;

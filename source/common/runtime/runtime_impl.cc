@@ -148,14 +148,16 @@ std::string RandomGeneratorImpl::uuid() {
 
 bool SnapshotImpl::deprecatedFeatureEnabled(const std::string& key) const {
   ASSERT(absl::StartsWith(key, "envoy.deprecated_feature."));
+  uint64_t stored = getInteger(key, 100);
   bool disallowed_by_default = DisallowedFeaturesDefaults::get().disallowedByDefault(key);
-  int default_value = disallowed_by_default ? 0 : 100;
-  if (getInteger(key, default_value) == 100) {
-    // It is assumed this check is called when the feature is about to be used.
-    stats_.deprecated_feature_use_.inc();
-    return true;
+
+  // If deprecated_by_default and not explicitly overriden, the feature is disabled.
+  if (stored != 1 && disallowed_by_default) {
+    return false;
   }
-  return false;
+  // It is assumed this check is called when the feature is about to be used.
+  stats_.deprecated_feature_use_.inc();
+  return true;
 }
 
 bool SnapshotImpl::featureEnabled(const std::string& key, uint64_t default_value,
@@ -251,6 +253,17 @@ SnapshotImpl::Entry SnapshotImpl::createEntry(const std::string& value) {
   resolveEntryType(entry);
 
   return entry;
+}
+
+bool SnapshotImpl::parseEntryBooleanValue(Entry& entry) {
+  if (absl::EqualsIgnoreCase(entry.raw_string_value_, "true")) {
+    entry.uint_value_ = 1;
+    return true;
+  } else if (absl::EqualsIgnoreCase(entry.raw_string_value_, "false")) {
+    entry.uint_value_ = 0;
+    return true;
+  }
+  return false;
 }
 
 bool SnapshotImpl::parseEntryUintValue(Entry& entry) {

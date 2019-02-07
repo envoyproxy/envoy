@@ -89,12 +89,16 @@ public:
 
 private:
   static void resolveEntryType(Entry& entry) {
+    if (parseEntryBooleanValue(entry)) {
+      return;
+    }
     if (parseEntryUintValue(entry)) {
       return;
     }
     parseEntryFractionalPercentValue(entry);
   }
 
+  static bool parseEntryBooleanValue(Entry& entry);
   static bool parseEntryUintValue(Entry& entry);
   static void parseEntryFractionalPercentValue(Entry& entry);
 

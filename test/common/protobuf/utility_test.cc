@@ -401,7 +401,7 @@ TEST_F(DeprecatedFieldsTest, IndividualFieldDisallowedWithRuntimeOverride) {
 
   // Now create a new snapshot with this feature allowed.
   Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.deprecated_feature.is_deprecated_fatal", "100"}});
+      {{"envoy.deprecated_feature.is_deprecated_fatal", "TrUe"}});
 
   // Now the same deprecation check should only trigger a warning.
   EXPECT_LOG_CONTAINS(
