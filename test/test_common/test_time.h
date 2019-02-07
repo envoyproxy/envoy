@@ -31,13 +31,7 @@ private:
 
 class GlobalTimeSystem : public DelegatingTestTimeSystemBase<TestTimeSystem> {
 public:
-  TestTimeSystem& timeSystem() override {
-    if (singleton_->timeSystem() == nullptr) {
-      // TODO(#4160): Switch default to SimulatedTimeSystem.
-      singleton_->set(new TestRealTimeSystem);
-    }
-    return *singleton_->timeSystem();
-  }
+  TestTimeSystem& timeSystem() override;
 
 private:
   Test::Global<SingletonTimeSystemHelper> singleton_;
