@@ -18,7 +18,6 @@ public:
       : HttpIntegrationTest(
             Http::CodecClient::Type::HTTP1,
             Network::Utility::parseInternetAddress(Network::Test::getAnyAddressString(GetParam())),
-            /*upstream_port_fn=*/[]{return 0;},
-            realTime()) {}
+            /*upstream_port_fn=*/[]{return 0;}) {}
 };
 } // namespace Envoy

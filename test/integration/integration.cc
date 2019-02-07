@@ -236,12 +236,12 @@ BaseIntegrationTest::BaseIntegrationTest(
     const Network::Address::InstanceConstSharedPtr& upstream_address,
     std::function<uint32_t()> upstream_port_fn, const std::string& config)
     : api_(Api::createApiForTest(stats_store_)),
-      mock_buffer_factory_(new NiceMock<MockBufferFactory>), time_system_(std::move(time_system)),
+      mock_buffer_factory_(new NiceMock<MockBufferFactory>),
       dispatcher_(
           new Event::DispatcherImpl( Buffer::WatermarkFactoryPtr{mock_buffer_factory_}, *api_)),
       version_(upstream_address->ip()->version()), upstream_address_(upstream_address),
       upstream_port_fn_(upstream_port_fn),
-      config_helper_(upstream_address->ip()->version(), config),
+      config_helper_(upstream_address->ip()->version(), *api_, config),
       default_log_level_(TestEnvironment::getOptions().logLevel()) {
 
   // This is a hack, but there are situations where we disconnect fake upstream connections and
