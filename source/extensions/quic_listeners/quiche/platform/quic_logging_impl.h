@@ -120,7 +120,7 @@ public:
 template <typename T> inline NullLogStream& operator<<(NullLogStream& s, const T&) { return s; }
 
 inline spdlog::logger& GetLogger() {
-  return Envoy::Logger::Registry::getLog(Envoy::Logger::Id::misc);
+  return Envoy::Logger::Registry::getLog(Envoy::Logger::Id::quic);
 }
 
 inline bool IsLogLevelEnabled(QuicLogLevel level) { return level >= GetLogger().level(); }

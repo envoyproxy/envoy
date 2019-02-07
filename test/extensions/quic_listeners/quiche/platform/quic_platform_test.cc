@@ -1,3 +1,4 @@
+#include "test/test_common/logging.h"
 #include "test/test_common/test_base.h"
 
 #include "quiche/quic/platform/api/quic_aligned.h"
@@ -140,13 +141,13 @@ TEST(QuicPlatformTest, QuicLog) {
   QUIC_LOG_IF(INFO, true) << i++;
   EXPECT_EQ(0, i);
 
-  QUIC_LOG(ERROR) << (i = 11);
+  EXPECT_LOG_CONTAINS("error", ": 11", QUIC_LOG(ERROR) << (i = 11));
   EXPECT_EQ(11, i);
 
   QUIC_LOG_IF(ERROR, false) << i++;
   EXPECT_EQ(11, i);
 
-  QUIC_LOG_IF(ERROR, true) << i++;
+  EXPECT_LOG_CONTAINS("error", ": 11", QUIC_LOG_IF(ERROR, true) << i++);
   EXPECT_EQ(12, i);
 
   // Set QUIC log level to INFO, since VLOG is emitted at the INFO level.
@@ -159,11 +160,11 @@ TEST(QuicPlatformTest, QuicLog) {
 
   quic::SetVerbosityLogThreshold(1);
 
-  QUIC_VLOG(1) << (i = 1);
+  EXPECT_LOG_CONTAINS("info", ": 1", QUIC_VLOG(1) << (i = 1));
   EXPECT_EQ(1, i);
 
   errno = EINVAL;
-  QUIC_PLOG(INFO) << (i = 3);
+  EXPECT_LOG_CONTAINS("info", ": 3:", QUIC_PLOG(INFO) << (i = 3));
   EXPECT_EQ(3, i);
 }
 
