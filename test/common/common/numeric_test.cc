@@ -9,7 +9,6 @@
 namespace Envoy {
 
 std::random_device rd;
-std::mt19937 gen(rd());
 std::uniform_int_distribution<int32_t> negative_ints(std::numeric_limits<int32_t>::min(), -1);
 std::uniform_int_distribution<int32_t> nonnegative_ints(0, std::numeric_limits<int32_t>::max());
 std::uniform_int_distribution<int32_t> signed_ints(std::numeric_limits<int32_t>::min(),
@@ -19,21 +18,21 @@ std::uniform_int_distribution<uint32_t> unsigned_ints(0, std::numeric_limits<uin
 template <typename T>
 void law(std::uniform_int_distribution<T>& distribution, std::function<void(T)> f) {
   for (int i = 0; i < 100; ++i) {
-    f(distribution(gen));
+    f(distribution(rd));
   }
 }
 
 template <typename T>
 void law(std::uniform_int_distribution<T>& distribution, std::function<void(T, T)> f) {
   for (int i = 0; i < 100; ++i) {
-    f(distribution(gen), distribution(gen));
+    f(distribution(rd), distribution(rd));
   }
 }
 
 template <typename T>
 void law(std::uniform_int_distribution<T>& distribution, std::function<void(T, T, T)> f) {
   for (int i = 0; i < 100; ++i) {
-    f(distribution(gen), distribution(gen), distribution(gen));
+    f(distribution(rd), distribution(rd), distribution(rd));
   }
 }
 

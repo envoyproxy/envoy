@@ -1,5 +1,7 @@
 #include <cstdint>
+#include <limits>
 #include <memory>
+#include <random>
 #include <string>
 #include <unordered_map>
 
@@ -327,7 +329,7 @@ TEST_P(RingHashLoadBalancerTest, UnevenHosts) {
   }
 }
 
-TEST_P(RingHashLoadBalancerTest, HostWeighted) {
+TEST_P(RingHashLoadBalancerTest, HostWeightedTinyRing) {
   // assign host weights with a greatest common denominator greater than 1, to validate that the
   // ring won't contain unnecessary duplicate entries.
   hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", 2),
@@ -336,79 +338,175 @@ TEST_P(RingHashLoadBalancerTest, HostWeighted) {
   hostSet().healthy_hosts_ = hostSet().hosts_;
   hostSet().runCallbacks({}, {});
 
+  // enforce a ring size of exactly six entries
   config_ = (envoy::api::v2::Cluster::RingHashLbConfig());
   config_.value().mutable_minimum_ring_size()->set_value(6);
+  config_.value().mutable_maximum_ring_size()->set_value(6);
   init();
+  LoadBalancerPtr lb = lb_->factory()->create();
 
   // :90 should appear once, :91 should appear twice and :92 should appear three times.
   std::unordered_map<uint64_t, uint32_t> expected{
       {928266305478181108UL, 2},  {4443673547860492590UL, 2},  {5583722120771150861UL, 1},
       {6311230543546372928UL, 1}, {13444792449719432967UL, 2}, {16117243373044804889UL, 0}};
-
-  LoadBalancerPtr lb = lb_->factory()->create();
   for (const auto& entry : expected) {
     TestLoadBalancerContext context(entry.first);
     EXPECT_EQ(hostSet().hosts_[entry.second], lb->chooseHost(&context));
   }
 }
 
-TEST_P(RingHashLoadBalancerTest, LocalityWeighted) {
-  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90"),
-                      makeTestHost(info_, "tcp://127.0.0.1:91"),
-                      makeTestHost(info_, "tcp://127.0.0.1:92")};
-  hostSet().healthy_hosts_ = hostSet().hosts_;
-  hostSet().hosts_per_locality_ =
-      makeHostsPerLocality({{hostSet().hosts_[0]}, {hostSet().hosts_[1]}, {hostSet().hosts_[2]}});
-  hostSet().healthy_hosts_per_locality_ = hostSet().hosts_per_locality_;
-  // assign locality weights with a greatest common denominator greater than 1, to validate that the
-  // ring won't contain unnecessary duplicate entries.
-  hostSet().locality_weights_ = makeLocalityWeights({2, 4, 6});
-  hostSet().runCallbacks({}, {});
-
-  config_ = (envoy::api::v2::Cluster::RingHashLbConfig());
-  config_.value().mutable_minimum_ring_size()->set_value(6);
-  init();
-
-  // :90 should appear once, :91 should appear twice and :92 should appear three times.
-  std::unordered_map<uint64_t, uint32_t> expected{
-      {928266305478181108UL, 2},  {4443673547860492590UL, 2},  {5583722120771150861UL, 1},
-      {6311230543546372928UL, 1}, {13444792449719432967UL, 2}, {16117243373044804889UL, 0}};
-
-  LoadBalancerPtr lb = lb_->factory()->create();
-  for (const auto& entry : expected) {
-    TestLoadBalancerContext context(entry.first);
-    EXPECT_EQ(hostSet().hosts_[entry.second], lb->chooseHost(&context));
-  }
-}
-
-TEST_P(RingHashLoadBalancerTest, HostAndLocalityWeighted) {
+TEST_P(RingHashLoadBalancerTest, HostWeightedLargeRing) {
   hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", 1),
                       makeTestHost(info_, "tcp://127.0.0.1:91", 2),
                       makeTestHost(info_, "tcp://127.0.0.1:92", 3)};
   hostSet().healthy_hosts_ = hostSet().hosts_;
-  hostSet().hosts_per_locality_ =
-      makeHostsPerLocality({{hostSet().hosts_[0]}, {hostSet().hosts_[1]}, {hostSet().hosts_[2]}});
-  hostSet().healthy_hosts_per_locality_ = hostSet().hosts_per_locality_;
-  hostSet().locality_weights_ = makeLocalityWeights({1, 2, 3});
   hostSet().runCallbacks({}, {});
 
   config_ = (envoy::api::v2::Cluster::RingHashLbConfig());
-  config_.value().mutable_minimum_ring_size()->set_value(14);
+  config_.value().mutable_target_hashes_per_host()->set_value(1024);
   init();
+  LoadBalancerPtr lb = lb_->factory()->create();
 
-  // :90 should appear once, :91 should appear four times and :92 should appear nine times.
+  // Generate 6000 random hashes and populate a histogram of which hosts they mapped to...
+  std::mt19937_64 gen;
+  std::uniform_int_distribution<uint64_t> random_hash(0, std::numeric_limits<uint64_t>::max());
+  uint32_t counts[3] = {0};
+  for (uint32_t i = 0; i < 6000; ++i) {
+    TestLoadBalancerContext context(random_hash(gen));
+    uint32_t port = lb->chooseHost(&context)->address()->ip()->port();
+    ++counts[port - 90];
+  }
+
+  EXPECT_EQ(1003, counts[0]); // :90 | ~1000 expected hits
+  EXPECT_EQ(2019, counts[1]); // :91 | ~2000 expected hits
+  EXPECT_EQ(2978, counts[2]); // :92 | ~3000 expected hits
+}
+
+TEST_P(RingHashLoadBalancerTest, LocalityWeightedTinyRing) {
+  hostSet().hosts_ = {
+      makeTestHost(info_, "tcp://127.0.0.1:90"), makeTestHost(info_, "tcp://127.0.0.1:91"),
+      makeTestHost(info_, "tcp://127.0.0.1:92"), makeTestHost(info_, "tcp://127.0.0.1:93")};
+  hostSet().healthy_hosts_ = hostSet().hosts_;
+  hostSet().hosts_per_locality_ = makeHostsPerLocality(
+      {{hostSet().hosts_[0]}, {hostSet().hosts_[1]}, {hostSet().hosts_[2]}, {hostSet().hosts_[3]}});
+  hostSet().healthy_hosts_per_locality_ = hostSet().hosts_per_locality_;
+  // assign locality weights with a greatest common denominator greater than 1, to validate that the
+  // ring won't contain unnecessary duplicate entries.
+  hostSet().locality_weights_ = makeLocalityWeights({2, 4, 6, 0});
+  hostSet().runCallbacks({}, {});
+
+  // enforce a ring size of exactly six entries
+  config_ = (envoy::api::v2::Cluster::RingHashLbConfig());
+  config_.value().mutable_minimum_ring_size()->set_value(6);
+  config_.value().mutable_maximum_ring_size()->set_value(6);
+  init();
+  LoadBalancerPtr lb = lb_->factory()->create();
+
+  // :90 should appear once, :91 should appear twice, :92 should appear three times,
+  // and :93 shouldn't appear at all.
+  std::unordered_map<uint64_t, uint32_t> expected{
+      {928266305478181108UL, 2},  {4443673547860492590UL, 2},  {5583722120771150861UL, 1},
+      {6311230543546372928UL, 1}, {13444792449719432967UL, 2}, {16117243373044804889UL, 0}};
+  for (const auto& entry : expected) {
+    TestLoadBalancerContext context(entry.first);
+    EXPECT_EQ(hostSet().hosts_[entry.second], lb->chooseHost(&context));
+  }
+}
+
+TEST_P(RingHashLoadBalancerTest, LocalityWeightedLargeRing) {
+  hostSet().hosts_ = {
+      makeTestHost(info_, "tcp://127.0.0.1:90"), makeTestHost(info_, "tcp://127.0.0.1:91"),
+      makeTestHost(info_, "tcp://127.0.0.1:92"), makeTestHost(info_, "tcp://127.0.0.1:93")};
+  hostSet().healthy_hosts_ = hostSet().hosts_;
+  hostSet().hosts_per_locality_ = makeHostsPerLocality(
+      {{hostSet().hosts_[0]}, {hostSet().hosts_[1]}, {hostSet().hosts_[2]}, {hostSet().hosts_[3]}});
+  hostSet().healthy_hosts_per_locality_ = hostSet().hosts_per_locality_;
+  hostSet().locality_weights_ = makeLocalityWeights({1, 2, 3, 0});
+  hostSet().runCallbacks({}, {});
+
+  config_ = (envoy::api::v2::Cluster::RingHashLbConfig());
+  config_.value().mutable_target_hashes_per_host()->set_value(1024);
+  init();
+  LoadBalancerPtr lb = lb_->factory()->create();
+
+  // Generate 6000 random hashes and populate a histogram of which hosts they mapped to...
+  std::mt19937_64 gen;
+  std::uniform_int_distribution<uint64_t> random_hash(0, std::numeric_limits<uint64_t>::max());
+  uint32_t counts[4] = {0};
+  for (uint32_t i = 0; i < 6000; ++i) {
+    TestLoadBalancerContext context(random_hash(gen));
+    uint32_t port = lb->chooseHost(&context)->address()->ip()->port();
+    ++counts[port - 90];
+  }
+
+  EXPECT_EQ(1003, counts[0]); // :90 | ~1000 expected hits
+  EXPECT_EQ(2019, counts[1]); // :91 | ~2000 expected hits
+  EXPECT_EQ(2978, counts[2]); // :92 | ~3000 expected hits
+  EXPECT_EQ(0, counts[3]);    // :90 |    =0 expected hits
+}
+
+TEST_P(RingHashLoadBalancerTest, HostAndLocalityWeightedSmallRing) {
+  hostSet().hosts_ = {
+      makeTestHost(info_, "tcp://127.0.0.1:90", 1), makeTestHost(info_, "tcp://127.0.0.1:91", 2),
+      makeTestHost(info_, "tcp://127.0.0.1:92", 3), makeTestHost(info_, "tcp://127.0.0.1:93", 4)};
+  hostSet().healthy_hosts_ = hostSet().hosts_;
+  hostSet().hosts_per_locality_ = makeHostsPerLocality(
+      {{hostSet().hosts_[0]}, {hostSet().hosts_[1]}, {hostSet().hosts_[2]}, {hostSet().hosts_[3]}});
+  hostSet().healthy_hosts_per_locality_ = hostSet().hosts_per_locality_;
+  hostSet().locality_weights_ = makeLocalityWeights({1, 2, 3, 0});
+  hostSet().runCallbacks({}, {});
+
+  // enforce a ring size of exactly 14 entries
+  config_ = (envoy::api::v2::Cluster::RingHashLbConfig());
+  config_.value().mutable_minimum_ring_size()->set_value(14);
+  config_.value().mutable_maximum_ring_size()->set_value(14);
+  init();
+  LoadBalancerPtr lb = lb_->factory()->create();
+
+  // :90 should appear once, :91 should appear four times, :92 should appear nine times,
+  // and :93 shouldn't appear at all.
   std::unordered_map<uint64_t, uint32_t> expected{
       {928266305478181108UL, 2},   {4443673547860492590UL, 2},  {4470782202023056897UL, 1},
       {5583722120771150861UL, 1},  {6311230543546372928UL, 1},  {7028796200958575341UL, 2},
       {7622568113965459810UL, 2},  {8301579928699792521UL, 1},  {8763220459450311387UL, 2},
       {13444792449719432967UL, 2}, {14054452251593525090UL, 2}, {15052576707013241299UL, 2},
       {15299362238897758650UL, 2}, {16117243373044804889UL, 0}};
-
-  LoadBalancerPtr lb = lb_->factory()->create();
   for (const auto& entry : expected) {
     TestLoadBalancerContext context(entry.first);
     EXPECT_EQ(hostSet().hosts_[entry.second], lb->chooseHost(&context));
   }
+}
+
+TEST_P(RingHashLoadBalancerTest, HostAndLocalityWeightedLargeRing) {
+  hostSet().hosts_ = {
+      makeTestHost(info_, "tcp://127.0.0.1:90", 1), makeTestHost(info_, "tcp://127.0.0.1:91", 2),
+      makeTestHost(info_, "tcp://127.0.0.1:92", 3), makeTestHost(info_, "tcp://127.0.0.1:93", 4)};
+  hostSet().healthy_hosts_ = hostSet().hosts_;
+  hostSet().hosts_per_locality_ = makeHostsPerLocality(
+      {{hostSet().hosts_[0]}, {hostSet().hosts_[1]}, {hostSet().hosts_[2]}, {hostSet().hosts_[3]}});
+  hostSet().healthy_hosts_per_locality_ = hostSet().hosts_per_locality_;
+  hostSet().locality_weights_ = makeLocalityWeights({1, 2, 3, 0});
+  hostSet().runCallbacks({}, {});
+
+  config_ = (envoy::api::v2::Cluster::RingHashLbConfig());
+  config_.value().mutable_target_hashes_per_host()->set_value(1024);
+  init();
+  LoadBalancerPtr lb = lb_->factory()->create();
+
+  // Generate 14000 random hashes and populate a histogram of which hosts they mapped to...
+  std::mt19937_64 gen;
+  std::uniform_int_distribution<uint64_t> random_hash(0, std::numeric_limits<uint64_t>::max());
+  uint32_t counts[4] = {0};
+  for (uint32_t i = 0; i < 14000; ++i) {
+    TestLoadBalancerContext context(random_hash(gen));
+    uint32_t port = lb->chooseHost(&context)->address()->ip()->port();
+    ++counts[port - 90];
+  }
+
+  EXPECT_EQ(954, counts[0]);  // :90 | ~1000 expected hits
+  EXPECT_EQ(3941, counts[1]); // :91 | ~4000 expected hits
+  EXPECT_EQ(9105, counts[2]); // :92 | ~9000 expected hits
+  EXPECT_EQ(0, counts[3]);    // :90 |    =0 expected hits
 }
 
 } // namespace Upstream
