@@ -64,7 +64,7 @@ BAZEL_OPTIONS="--package_path %workspace%:${ENVOY_SRCDIR}"
 export BAZEL_QUERY_OPTIONS="${BAZEL_OPTIONS}"
 export BAZEL_BUILD_OPTIONS="--strategy=Genrule=standalone --spawn_strategy=standalone \
   --verbose_failures ${BAZEL_OPTIONS} --action_env=HOME --action_env=PYTHONUSERBASE \
-  --jobs=${NUM_CPUS} --show_task_finish ${BAZEL_BUILD_EXTRA_OPTIONS}"
+  --jobs=${NUM_CPUS} --show_task_finish --experimental_generate_json_trace_profile ${BAZEL_BUILD_EXTRA_OPTIONS}"
 export BAZEL_TEST_OPTIONS="${BAZEL_BUILD_OPTIONS} --test_env=HOME --test_env=PYTHONUSERBASE \
   --test_env=UBSAN_OPTIONS=print_stacktrace=1 \
   --cache_test_results=no --test_output=all ${BAZEL_EXTRA_TEST_OPTIONS}"
@@ -108,6 +108,10 @@ mkdir -p "${ENVOY_COVERAGE_DIR}"
 # This is where we dump failed test logs for CI collection.
 export ENVOY_FAILED_TEST_LOGS="${ENVOY_BUILD_DIR}"/generated/failed-testlogs
 mkdir -p "${ENVOY_FAILED_TEST_LOGS}"
+
+# This is where we copy the build profile to.
+export ENVOY_BUILD_PROFILE="${ENVOY_BUILD_DIR}"/generated/build-profile
+mkdir -p "${ENVOY_BUILD_PROFILE}"
 
 # This is where we build for bazel.release* and bazel.dev.
 export ENVOY_CI_DIR="${ENVOY_SRCDIR}"/ci

@@ -149,8 +149,8 @@ route_config:
 } // namespace
 
 class HeaderIntegrationTest
-    : public HttpIntegrationTest,
-      public TestBaseWithParam<std::tuple<Network::Address::IpVersion, bool>> {
+    : public TestBaseWithParam<std::tuple<Network::Address::IpVersion, bool>>,
+      public HttpIntegrationTest {
 public:
   HeaderIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, std::get<0>(GetParam()), realTime()) {}
