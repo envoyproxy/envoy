@@ -33,9 +33,9 @@ On Ubuntu, run the following command:
 sudo apt-get install \
    libtool \
    cmake \
-   realpath \
    clang-format-7 \
    automake \
+   make \
    ninja-build \
    curl \
    unzip
