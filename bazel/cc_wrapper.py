@@ -30,7 +30,8 @@ def sanitize_flagfile(in_path, out_fd):
 def main():
   # Append CXXFLAGS to correctly detect include paths for either libstdc++ or libc++.
   if sys.argv[1:5] == ["-E", "-xc++", "-", "-v"]:
-    os.execv(envoy_real_cxx, [envoy_real_cxx] + sys.argv[1:] + shlex.split(envoy_cxxflags))
+    os.execv(envoy_real_cxx,
+             [envoy_real_cxx] + sys.argv[1:] + shlex.split(envoy_cxxflags))
 
   # `g++` and `gcc -lstdc++` have similar behavior and Bazel treats them as
   # interchangeable, but `gcc` will ignore the `-static-libstdc++` flag.
@@ -39,7 +40,8 @@ def main():
   #
   # Similar behavior exists for Clang's `-stdlib=libc++` flag, so we handle
   # it in the same test.
-  if "-static-libstdc++" in sys.argv[1:] or "-stdlib=libc++" in sys.argv[1:]:
+  if ("-static-libstdc++" in sys.argv[1:] or "-stdlib=libc++" in sys.argv[1:] or
+      "-std=c++0x" in sys.argv[1:]):
     compiler = envoy_real_cxx
   else:
     compiler = envoy_real_cc
@@ -62,7 +64,8 @@ def main():
         # unless the user has explicitly set environment variables
         # before starting Bazel. But here in $PWD is the Bazel sandbox,
         # which will be deleted automatically after the compiler exits.
-        (flagfile_fd, flagfile_path) = tempfile.mkstemp(dir='./', suffix=".linker-params")
+        (flagfile_fd, flagfile_path) = tempfile.mkstemp(
+            dir="./", suffix=".linker-params")
         with closing_fd(flagfile_fd):
           sanitize_flagfile(arg[len("-Wl,@"):], flagfile_fd)
         argv.append("-Wl,@" + flagfile_path)
