@@ -11,11 +11,8 @@ envoy_cmake_external(
         "CARES_STATIC": "on",
         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
     },
+    copy_pdb = True,
     lib_source = "@com_github_c_ares_c_ares//:all",
-    postfix_script = select({
-        "//bazel:windows_dbg_build": "cp $BUILD_TMPDIR/CMakeFiles/c-ares.dir/c-ares.pdb $INSTALLDIR/lib/c-ares.pdb",
-        "//conditions:default": "",
-    }),
     static_libraries = select({
         "//bazel:windows_x86_64": ["cares.lib"],
         "//conditions:default": ["libcares.a"],
@@ -28,6 +25,7 @@ envoy_cmake_external(
         "BENCHMARK_ENABLE_GTEST_TESTS": "OFF",
         "BENCHMARK_ENABLE_TESTING": "OFF",
     },
+    copy_pdb = True,
     lib_source = "@com_github_google_benchmark//:all",
     postfix_script = "mkdir -p $INSTALLDIR/include/testing/base/public && cp $BUILD_TMPDIR/$INSTALL_PREFIX/include/benchmark/benchmark.h $INSTALLDIR/include/testing/base/public/benchmark.h",
     static_libraries = select({
@@ -43,11 +41,8 @@ envoy_cmake_external(
         "EVENT__DISABLE_REGRESS": "on",
         "CMAKE_BUILD_TYPE": "Release",
     },
+    copy_pdb = True,
     lib_source = "@com_github_libevent_libevent//:all",
-    postfix_script = select({
-        "//bazel:windows_dbg_build": "cp $BUILD_TMPDIR/CMakeFiles/event.dir/event.pdb $INSTALLDIR/lib/event.pdb",
-        "//conditions:default": "",
-    }),
     static_libraries = select({
         "//bazel:windows_x86_64": ["event.lib"],
         "//conditions:default": ["libevent.a"],
@@ -62,11 +57,8 @@ envoy_cmake_external(
         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
         "CMAKE_INSTALL_LIBDIR": "lib",
     },
+    copy_pdb = True,
     lib_source = "@com_github_nghttp2_nghttp2//:all",
-    postfix_script = select({
-        "//bazel:windows_dbg_build": "cp $BUILD_TMPDIR/lib/CMakeFiles/nghttp2_static.dir/nghttp2_static.pdb $INSTALLDIR/lib/nghttp2_static.pdb",
-        "//conditions:default": "",
-    }),
     static_libraries = select({
         "//bazel:windows_x86_64": ["nghttp2_static.lib"],
         "//conditions:default": ["libnghttp2_static.a"],
@@ -94,11 +86,8 @@ envoy_cmake_external(
     cache_entries = {
         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
     },
+    copy_pdb = True,
     lib_source = "@com_github_madler_zlib//:all",
-    postfix_script = select({
-        "//bazel:windows_dbg_build": "cp $BUILD_TMPDIR/CMakeFiles/zlibstatic.dir/zlibstatic.pdb $INSTALLDIR/lib/zlibstatic.pdb",
-        "//conditions:default": "",
-    }),
     static_libraries = select({
         "//bazel:windows_dbg_build": ["zlibstaticd.lib"],
         "//bazel:windows_fastbuild_build": ["zlibstatic.lib"],
