@@ -21,7 +21,7 @@ namespace Envoy {
 // be a tax paid by every test method in the codebase.
 class TestBase : public ::testing::Test {
 public:
-  static bool checkSingletonQuiescensce();
+  static void checkSingletonQuiescensce();
   ~TestBase() override;
 };
 
