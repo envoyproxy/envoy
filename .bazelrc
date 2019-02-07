@@ -5,7 +5,8 @@
 # Limiting JVM heapsize here to let it do GC more when approaching the limit to
 # leave room for compiler/linker.
 startup --host_jvm_args=-Xmx512m
-build --workspace_status_command=bazel/get_workspace_status --experimental_remap_main_repo
+build --workspace_status_command=bazel/get_workspace_status
+build --experimental_remap_main_repo
 
 # Basic ASAN/UBSAN that works for gcc
 build:asan --define ENVOY_CONFIG_ASAN=1
