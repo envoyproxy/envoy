@@ -121,7 +121,7 @@ private:
 
   RdsRouteConfigSubscription(
       const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
-      const uint64_t& manager_identifier, Server::Configuration::FactoryContext& factory_context,
+      const uint64_t manager_identifier, Server::Configuration::FactoryContext& factory_context,
       const std::string& stat_prefix,
       RouteConfigProviderManagerImpl& route_config_provider_manager);
 
