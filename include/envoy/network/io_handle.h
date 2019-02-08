@@ -19,14 +19,14 @@ class Instance;
 
 class IoError {
 public:
-  enum IoErrorCode {
-    IO_NO_ERROR = 0,
-    IO_EAGAIN,
-    IO_ENOTSUP,
-    IO_EAFNOSUPPORT,
-    IO_EINPROGRESS,
-    IO_EPERM,
-    IO_UNKNOWN_ERROR
+  enum class IoErrorCode {
+    NoError = 0,
+    Again,
+    NoSupport,
+    AddressFamilyNoSupport,
+    InProgress,
+    Permission,
+    UnknownError
   };
   virtual ~IoError() {}
 
@@ -38,7 +38,7 @@ public:
 
 /**
  * Basic type for return result which has a return code and error code defined
- * according to different implementation.
+ * according to different implementations.
  */
 template <typename T> struct IoHandleCallResult {
   virtual ~IoHandleCallResult() {}
@@ -55,9 +55,9 @@ using IoHandleCallSizeResult = IoHandleCallResult<ssize_t>;
  */
 class IoHandle {
 public:
-  enum ShutdownType { READ = 0, WRITE, BOTH };
+  enum class ShutdownType { Read = 0, Write, Both };
 
-  enum IoHandleFlag { NONBLOCK = 1, APPEND = 2 };
+  enum class IoHandleFlag { NonBlock = 1, Append = 2 };
 
   virtual ~IoHandle() {}
 
