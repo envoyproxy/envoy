@@ -17,13 +17,13 @@ namespace Envoy {
 #define ASANITIZED /* Sanitized by GCC */
 #endif
 
+using SignalsDeathTest = TestBase;
+
 // Death tests that expect a particular output are disabled under address sanitizer.
 // The sanitizer does its own special signal handling and prints messages that are
 // not ours instead of what this test expects. As of latest Clang this appears
 // to include abort() as well.
 #ifndef ASANITIZED
-using SignalsDeathTest = TestBase;
-
 TEST_F(SignalsDeathTest, InvalidAddressDeathTest) {
   SignalAction actions;
   EXPECT_DEATH_LOG_TO_STDERR(
