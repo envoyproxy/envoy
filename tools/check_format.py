@@ -226,8 +226,10 @@ def whitelistedForRealTime(file_path):
 def whitelistedForGetTime(file_path):
   return file_path in GET_TIME_WHITELIST
 
+
 def whitelistedForSerializeAsString(file_path):
   return file_path in SERIALIZE_AS_STRING_WHITELIST
+
 
 def findSubstringAndReturnError(pattern, file_path, error_message):
   with open(file_path) as f:
@@ -426,6 +428,7 @@ def checkSourceLine(line, file_path, reportError):
     reportError(
         "Don't use MessageLite::SerializeAsString for generating deterministic serialization, use MessageUtil::hash instead."
     )
+
 
 def checkBuildLine(line, file_path, reportError):
   if not whitelistedForProtobufDeps(file_path) and '"protobuf"' in line:
