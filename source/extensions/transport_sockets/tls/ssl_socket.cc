@@ -361,6 +361,22 @@ std::string SslSocket::subjectLocalCertificate() const {
   return Utility::getSubjectFromCertificate(*cert);
 }
 
+SystemTime SslSocket::validFromPeerCertificate() const {
+  X509* cert = SSL_get_certificate(ssl_.get());
+  if (!cert) {
+    return SystemTime();
+  }
+  return Utility::getValidFrom(*cert);
+}
+
+SystemTime SslSocket::expirationPeerCertificate() const {
+  X509* cert = SSL_get_certificate(ssl_.get());
+  if (!cert) {
+    return SystemTime();
+  }
+  return Utility::getExpirationTime(*cert);
+}
+
 namespace {
 SslSocketFactoryStats generateStats(const std::string& prefix, Stats::Scope& store) {
   return {
