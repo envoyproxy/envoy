@@ -16,8 +16,8 @@ using testing::AssertionResult;
 namespace Envoy {
 namespace {
 
-class MetricsServiceIntegrationTest : public HttpIntegrationTest,
-                                      public Grpc::GrpcClientIntegrationParamTest {
+class MetricsServiceIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
+                                      public HttpIntegrationTest {
 public:
   MetricsServiceIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion(), realTime()) {}

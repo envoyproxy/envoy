@@ -104,8 +104,6 @@ public:
 class HttpHealthCheckerImplTest : public TestBase {
 public:
   struct TestSession {
-    TestSession() {}
-
     Event::MockTimer* interval_timer_{};
     Event::MockTimer* timeout_timer_{};
     Http::MockClientConnection* codec_{};
@@ -2753,7 +2751,7 @@ public:
   std::list<uint32_t> codec_index_{};
 };
 
-class GrpcHealthCheckerImplTest : public GrpcHealthCheckerImplTestBase, public TestBase {};
+class GrpcHealthCheckerImplTest : public TestBase, public GrpcHealthCheckerImplTestBase {};
 
 // Test single host check success.
 TEST_F(GrpcHealthCheckerImplTest, Success) { testSingleHostSuccess(absl::nullopt); }
@@ -3381,8 +3379,8 @@ TEST_F(GrpcHealthCheckerImplTest, GoAwayBetweenChecks) {
 }
 
 class BadResponseGrpcHealthCheckerImplTest
-    : public GrpcHealthCheckerImplTestBase,
-      public TestBaseWithParam<GrpcHealthCheckerImplTest::ResponseSpec> {};
+    : public TestBaseWithParam<GrpcHealthCheckerImplTest::ResponseSpec>,
+      public GrpcHealthCheckerImplTestBase {};
 
 INSTANTIATE_TEST_SUITE_P(
     BadResponse, BadResponseGrpcHealthCheckerImplTest,

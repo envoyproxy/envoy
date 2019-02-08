@@ -114,6 +114,7 @@ cc_library(
     hdrs = [
         "quiche/quic/platform/api/quic_aligned.h",
         "quiche/quic/platform/api/quic_arraysize.h",
+        "quiche/quic/platform/api/quic_client_stats.h",
         "quiche/quic/platform/api/quic_containers.h",
         "quiche/quic/platform/api/quic_endian.h",
         "quiche/quic/platform/api/quic_estimate_memory_usage.h",
@@ -121,6 +122,7 @@ cc_library(
         "quiche/quic/platform/api/quic_fallthrough.h",
         "quiche/quic/platform/api/quic_flag_utils.h",
         "quiche/quic/platform/api/quic_iovec.h",
+        "quiche/quic/platform/api/quic_logging.h",
         "quiche/quic/platform/api/quic_prefetch.h",
         "quiche/quic/platform/api/quic_ptr_util.h",
         "quiche/quic/platform/api/quic_str_cat.h",
@@ -130,7 +132,6 @@ cc_library(
         "quiche/quic/platform/api/quic_uint128.h",
         # TODO: uncomment the following files as implementations are added.
         # "quiche/quic/platform/api/quic_bug_tracker.h",
-        # "quiche/quic/platform/api/quic_client_stats.h",
         # "quiche/quic/platform/api/quic_clock.h",
         # "quiche/quic/platform/api/quic_expect_bug.h",
         # "quiche/quic/platform/api/quic_exported_stats.h",
@@ -142,7 +143,6 @@ cc_library(
         # "quiche/quic/platform/api/quic_interval.h",
         # "quiche/quic/platform/api/quic_ip_address_family.h",
         # "quiche/quic/platform/api/quic_ip_address.h",
-        # "quiche/quic/platform/api/quic_logging.h",
         # "quiche/quic/platform/api/quic_lru_cache.h",
         # "quiche/quic/platform/api/quic_map_util.h",
         # "quiche/quic/platform/api/quic_mem_slice.h",

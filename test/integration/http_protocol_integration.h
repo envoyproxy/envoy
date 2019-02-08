@@ -25,8 +25,8 @@ struct HttpProtocolTestParams {
 // TEST_P(MyTest, TestInstance) {
 // ....
 // }
-class HttpProtocolIntegrationTest : public HttpIntegrationTest,
-                                    public TestBaseWithParam<HttpProtocolTestParams> {
+class HttpProtocolIntegrationTest : public TestBaseWithParam<HttpProtocolTestParams>,
+                                    public HttpIntegrationTest {
 public:
   // By default returns 8 combinations of
   // [HTTP  upstream / HTTP  downstream] x [Ipv4, IPv6]
@@ -48,7 +48,7 @@ public:
   protocolTestParamsToString(const ::testing::TestParamInfo<HttpProtocolTestParams>& p);
 
   HttpProtocolIntegrationTest()
-      : HttpIntegrationTest(GetParam().downstream_protocol, GetParam().version, realTime()) {}
+      : HttpIntegrationTest(GetParam().downstream_protocol, GetParam().version) {}
 
   void SetUp() override {
     setDownstreamProtocol(GetParam().downstream_protocol);
