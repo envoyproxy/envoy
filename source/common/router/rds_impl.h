@@ -202,8 +202,6 @@ private:
   // TODO(jsedgwick) These two members are prime candidates for the owned-entry list/map
   // as in ConfigTracker. I.e. the ProviderImpls would have an EntryOwner for these lists
   // Then the lifetime management stuff is centralized and opaque.
-  //std::unordered_map<std::string, std::weak_ptr<RdsRouteConfigSubscription>>
-  //    route_config_subscriptions_;
   std::unordered_map<uint64_t, std::weak_ptr<RdsRouteConfigSubscription>>
       route_config_subscriptions_;
   std::unordered_set<RouteConfigProvider*> static_route_config_providers_;
