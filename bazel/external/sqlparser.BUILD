@@ -8,4 +8,8 @@ cc_library(
         "src/**/*.h",
     ]),
     visibility = ["//visibility:public"],
+    defines = select({
+        "@envoy//bazel:windows_x86_64": ["YY_NO_UNISTD_H"],
+        "//conditions:default": [],
+    }),
 )
