@@ -31,9 +31,9 @@ public:
   virtual ~IoError() {}
 
   // Map platform specific error into IoErrorCode.
-  virtual IoErrorCode getErrorCode() PURE;
+  virtual IoErrorCode getErrorCode() const PURE;
 
-  virtual std::string getErrorDetails() PURE;
+  virtual std::string getErrorDetails() const PURE;
 };
 
 /**
