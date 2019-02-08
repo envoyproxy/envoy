@@ -169,10 +169,14 @@ void setHealthFlag(Upstream::Host::HealthFlag flag, const Upstream::Host& host,
         host.healthFlagGet(Upstream::Host::HealthFlag::FAILED_OUTLIER_CHECK));
     break;
   case Upstream::Host::HealthFlag::FAILED_EDS_HEALTH:
-    health_status.set_eds_health_status(
-        host.healthFlagGet(Upstream::Host::HealthFlag::FAILED_EDS_HEALTH)
-            ? envoy::api::v2::core::HealthStatus::UNHEALTHY
-            : envoy::api::v2::core::HealthStatus::HEALTHY);
+  case Upstream::Host::HealthFlag::DEGRADED_EDS_HEALTH:
+    if (host.healthFlagGet(Upstream::Host::HealthFlag::FAILED_EDS_HEALTH)) {
+      health_status.set_eds_health_status(envoy::api::v2::core::HealthStatus::UNHEALTHY);
+    } else if (host.healthFlagGet(Upstream::Host::HealthFlag::DEGRADED_EDS_HEALTH)) {
+      health_status.set_eds_health_status(envoy::api::v2::core::HealthStatus::DEGRADED);
+    } else {
+      health_status.set_eds_health_status(envoy::api::v2::core::HealthStatus::HEALTHY);
+    }
     break;
   case Upstream::Host::HealthFlag::DEGRADED_ACTIVE_HC:
     health_status.set_failed_active_degraded_check(
