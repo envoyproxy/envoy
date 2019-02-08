@@ -7,6 +7,7 @@
 #include "envoy/stats/scope.h"
 
 #include "common/common/cleanup.h"
+#include "common/common/utility.h"
 #include "common/config/resources.h"
 #include "common/config/subscription_factory.h"
 #include "common/config/utility.h"
@@ -40,7 +41,7 @@ void CdsApiImpl::onConfigUpdate(const ResourceVector& resources, const std::stri
   cm_.adsMux().pause(Config::TypeUrl::get().ClusterLoadAssignment);
   Cleanup eds_resume([this] { cm_.adsMux().resume(Config::TypeUrl::get().ClusterLoadAssignment); });
 
-  std::list<std::string> exception_msgs;
+  std::vector<std::string> exception_msgs;
   std::unordered_set<std::string> cluster_names;
   for (const auto& cluster : resources) {
     if (!cluster_names.insert(cluster.name()).second) {
@@ -73,18 +74,8 @@ void CdsApiImpl::onConfigUpdate(const ResourceVector& resources, const std::stri
 
   version_info_ = version_info;
   runInitializeCallbackIfAny();
-  throwIfExceptionOccured(exception_msgs);
-}
-
-void CdsApiImpl::throwIfExceptionOccured(const std::list<std::string>& exception_msgs) {
   if (!exception_msgs.empty()) {
-    std::stringstream sstream;
-    for (auto& msg : exception_msgs) {
-      sstream << msg << "\n";
-    }
-    auto message = sstream.str();
-    message.pop_back();
-    throw EnvoyException(message);
+    throw EnvoyException(StringUtil::join(exception_msgs, "\n"));
   }
 }
 

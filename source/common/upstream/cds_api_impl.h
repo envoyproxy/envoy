@@ -46,7 +46,6 @@ private:
              Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
              const LocalInfo::LocalInfo& local_info, Stats::Scope& scope, Api::Api& api);
   void runInitializeCallbackIfAny();
-  void throwIfExceptionOccured(const std::list<std::string>&);
 
   ClusterManager& cm_;
   std::unique_ptr<Config::Subscription<envoy::api::v2::Cluster>> subscription_;
