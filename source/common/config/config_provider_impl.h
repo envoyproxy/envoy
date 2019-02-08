@@ -345,7 +345,6 @@ protected:
   using ConfigProviderSet = std::unordered_set<ConfigProvider*>;
   using ConfigProviderMap = std::unordered_map<ConfigProviderInstanceType,
                                                std::unique_ptr<ConfigProviderSet>, EnumClassHash>;
-
   using ConfigSubscriptionMap =
       std::unordered_map<uint64_t, std::weak_ptr<ConfigSubscriptionInstanceBase>>;
 
