@@ -206,12 +206,14 @@ HttpIntegrationTest::makeHttpConnection(Network::ClientConnectionPtr&& conn) {
 HttpIntegrationTest::HttpIntegrationTest(Http::CodecClient::Type downstream_protocol,
                                          Network::Address::IpVersion version,
                                          const std::string& config)
-    : HttpIntegrationTest::HttpIntegrationTest(
-          downstream_protocol,
-          /*upstream_address_fn=*/[version](int) {
-              return Network::Utility::parseInternetAddress(
-                  Network::Test::getAnyAddressString(version), 0);},
-          version, config) {}
+    : HttpIntegrationTest::HttpIntegrationTest(downstream_protocol,
+                                               /*upstream_address_fn=*/
+                                               [version](int) {
+                                                 return Network::Utility::parseInternetAddress(
+                                                     Network::Test::getAnyAddressString(version),
+                                                     0);
+                                               },
+                                               version, config) {}
 
 HttpIntegrationTest::HttpIntegrationTest(
     Http::CodecClient::Type downstream_protocol,

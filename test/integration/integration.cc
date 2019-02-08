@@ -227,14 +227,13 @@ void IntegrationTcpClient::ConnectionCallbacks::onEvent(Network::ConnectionEvent
 }
 
 BaseIntegrationTest::BaseIntegrationTest(
-      std::function<Network::Address::InstanceConstSharedPtr(int)> upstream_address_fn,
-      Network::Address::IpVersion version, const std::string& config)
+    std::function<Network::Address::InstanceConstSharedPtr(int)> upstream_address_fn,
+    Network::Address::IpVersion version, const std::string& config)
     : api_(Api::createApiForTest(stats_store_)),
       mock_buffer_factory_(new NiceMock<MockBufferFactory>),
       dispatcher_(
-          new Event::DispatcherImpl( Buffer::WatermarkFactoryPtr{mock_buffer_factory_}, *api_)),
-      version_(version),
-      upstream_address_fn_(upstream_address_fn),
+          new Event::DispatcherImpl(Buffer::WatermarkFactoryPtr{mock_buffer_factory_}, *api_)),
+      version_(version), upstream_address_fn_(upstream_address_fn),
       config_helper_(version, *api_, config),
       default_log_level_(TestEnvironment::getOptions().logLevel()) {
   // This is a hack, but there are situations where we disconnect fake upstream connections and
@@ -255,11 +254,12 @@ BaseIntegrationTest::BaseIntegrationTest(
 BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version,
                                          const std::string& config)
     : BaseIntegrationTest(
-          /*upstream_address_fn=*/[version](int) {
-                return Network::Utility::parseInternetAddress(
-                    Network::Test::getAnyAddressString(version), 0);},
-          version,
-          config) {}
+          /*upstream_address_fn=*/
+          [version](int) {
+            return Network::Utility::parseInternetAddress(
+                Network::Test::getAnyAddressString(version), 0);
+          },
+          version, config) {}
 
 Network::ClientConnectionPtr BaseIntegrationTest::makeClientConnection(uint32_t port) {
   Network::ClientConnectionPtr connection(dispatcher_->createClientConnection(
