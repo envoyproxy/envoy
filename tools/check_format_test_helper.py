@@ -206,6 +206,13 @@ if __name__ == "__main__":
       "version_history.rst",
       "Version history line malformed. Does not match VERSION_HISTORY_NEW_LINE_REGEX in "
       "check_format.py")
+  errors += checkUnfixableError("test_class_without_base.cc",
+                                "Derive test classes from TestBase in test/test_common/test_base.h")
+  errors += checkUnfixableError("testp_class_without_base.cc",
+                                "Derive parameterized test classes from TestBaseWithParam in " +
+                                "test/test_common/test_base.h")
+  errors += checkUnfixableError("noclass_test.cc", "Use TEST_F(class_derived_from_TestBase, ...) " +
+                                "rather than TEST(...)")
 
   errors += fixFileExpectingFailure(
       "api/missing_package.proto",
