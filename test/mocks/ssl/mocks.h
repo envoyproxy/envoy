@@ -45,6 +45,8 @@ public:
   MOCK_CONST_METHOD0(urlEncodedPemEncodedPeerCertificate, std::string&());
   MOCK_CONST_METHOD0(dnsSansPeerCertificate, std::vector<std::string>());
   MOCK_CONST_METHOD0(dnsSansLocalCertificate, std::vector<std::string>());
+  MOCK_CONST_METHOD0(validFromPeerCertificate, SystemTime());
+  MOCK_CONST_METHOD0(expirationPeerCertificate, SystemTime());
 };
 
 class MockClientContext : public ClientContext {

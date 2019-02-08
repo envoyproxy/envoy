@@ -157,6 +157,24 @@ public:
 
   const std::string& expectedPeerCert() const { return expected_peer_cert_; }
 
+  TestUtilOptions& setExpectedValidFromTimePeerCert(const std::string& expected_valid_from) {
+    expected_valid_from_peer_cert_ = expected_valid_from;
+    return *this;
+  }
+
+  const std::string& expectedValidFromTimePeerCert() const {
+    return expected_valid_from_peer_cert_;
+  }
+
+  TestUtilOptions& setExpectedExpirationTimePeerCert(const std::string& expected_expiration) {
+    expected_expiration_peer_cert_ = expected_expiration;
+    return *this;
+  }
+
+  const std::string& expectedExpirationTimePeerCert() const {
+    return expected_expiration_peer_cert_;
+  }
+
 private:
   const std::string client_ctx_yaml_;
   const std::string server_ctx_yaml_;
@@ -167,6 +185,8 @@ private:
   std::string expected_subjectl_;
   std::string expected_local_subject_;
   std::string expected_peer_cert_;
+  std::string expected_valid_from_peer_cert_;
+  std::string expected_expiration_peer_cert_;
 };
 
 void testUtil(const TestUtilOptions& options) {
@@ -259,6 +279,16 @@ void testUtil(const TestUtilOptions& options) {
         // Assert twice to ensure a cached value is returned and still valid.
         EXPECT_EQ(urlencoded, server_connection->ssl()->urlEncodedPemEncodedPeerCertificate());
         EXPECT_EQ(urlencoded, server_connection->ssl()->urlEncodedPemEncodedPeerCertificate());
+      }
+      if (!options.expectedValidFromTimePeerCert().empty()) {
+        const std::string formatted = TestUtility::formatTime(
+            server_connection->ssl()->validFromPeerCertificate(), "%b %e %H:%M:%S %Y GMT");
+        EXPECT_EQ(options.expectedValidFromTimePeerCert(), formatted);
+      }
+      if (!options.expectedExpirationTimePeerCert().empty()) {
+        const std::string formatted = TestUtility::formatTime(
+            server_connection->ssl()->expirationPeerCertificate(), "%b %e %H:%M:%S %Y GMT");
+        EXPECT_EQ(options.expectedExpirationTimePeerCert(), formatted);
       }
       server_connection->close(Network::ConnectionCloseType::NoFlush);
       client_connection->close(Network::ConnectionCloseType::NoFlush);
@@ -924,6 +954,34 @@ TEST_P(SslSocketTest, GetPeerCert) {
                .setExpectedLocalSubject(
                    "CN=Test Server,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US")
                .setExpectedPeerCert(expected_peer_cert));
+}
+
+TEST_P(SslSocketTest, GetIssueExpireTimesPeerCert) {
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_key.pem"
+)EOF";
+
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+  require_client_certificate: true
+)EOF";
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, GetParam());
+  testUtil(test_options.setExpectedSerialNumber(TEST_NO_SAN_CERT_SERIAL)
+               .setExpectedValidFromTimePeerCert(TEST_SAN_URI_CERT_NOT_BEFORE)
+               .setExpectedExpirationTimePeerCert(TEST_SAN_URI_CERT_NOT_AFTER));
 }
 
 TEST_P(SslSocketTest, FailedClientAuthCaVerificationNoClientCert) {
