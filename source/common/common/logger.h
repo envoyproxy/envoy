@@ -40,6 +40,7 @@ namespace Logger {
   FUNCTION(main)                 \
   FUNCTION(misc)                 \
   FUNCTION(mongo)                \
+  FUNCTION(quic)                 \
   FUNCTION(pool)                 \
   FUNCTION(rbac)                 \
   FUNCTION(redis)                \
