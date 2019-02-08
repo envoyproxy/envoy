@@ -254,4 +254,7 @@ enum HealthStatus {
   // Health check timed out. This is part of HDS and is interpreted by Envoy as
   // *UNHEALTHY*.
   TIMEOUT = 4;
+
+  // Degraded.
+  DEGRADED = 5;
 }

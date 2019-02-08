@@ -47,7 +47,7 @@ private:
                    parent.lbEndpoint().load_balancing_weight().value(),
                    parent.localityLbEndpoint().locality(),
                    parent.lbEndpoint().endpoint().health_check_config(),
-                   parent.localityLbEndpoint().priority()),
+                   parent.localityLbEndpoint().priority(), parent.lbEndpoint().health_status()),
           parent_(parent) {}
 
     // Upstream::Host

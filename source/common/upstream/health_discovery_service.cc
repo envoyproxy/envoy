@@ -204,11 +204,12 @@ HdsCluster::HdsCluster(Server::Admin& admin, Runtime::Loader& runtime,
                                           dispatcher, random, singleton_manager, tls, api});
 
   for (const auto& host : cluster.hosts()) {
-    initial_hosts_->emplace_back(new HostImpl(
-        info_, "", Network::Address::resolveProtoAddress(host),
-        envoy::api::v2::core::Metadata::default_instance(), 1,
-        envoy::api::v2::core::Locality().default_instance(),
-        envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance(), 0));
+    initial_hosts_->emplace_back(
+        new HostImpl(info_, "", Network::Address::resolveProtoAddress(host),
+                     envoy::api::v2::core::Metadata::default_instance(), 1,
+                     envoy::api::v2::core::Locality().default_instance(),
+                     envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance(), 0,
+                     envoy::api::v2::core::HealthStatus::UNKNOWN));
   }
   initialize([] {});
 }

@@ -162,10 +162,11 @@ public:
            const envoy::api::v2::core::Metadata& metadata, uint32_t initial_weight,
            const envoy::api::v2::core::Locality& locality,
            const envoy::api::v2::endpoint::Endpoint::HealthCheckConfig& health_check_config,
-           uint32_t priority)
+           uint32_t priority, const envoy::api::v2::core::HealthStatus health_status)
       : HostDescriptionImpl(cluster, hostname, address, metadata, locality, health_check_config,
                             priority),
         used_(true) {
+    setEdsHealthFlag(health_status);
     weight(initial_weight);
   }
 
@@ -206,7 +207,8 @@ public:
     }
 
     // Only possible option at this point is that the host is degraded.
-    ASSERT(health_flags_ == static_cast<uint32_t>(HealthFlag::DEGRADED_ACTIVE_HC));
+    ASSERT(healthFlagGet(HealthFlag::DEGRADED_ACTIVE_HC) ||
+           healthFlagGet(HealthFlag::DEGRADED_EDS_HEALTH));
     return Host::Health::Degraded;
   }
 
@@ -223,6 +225,8 @@ protected:
                    Network::TransportSocketOptionsSharedPtr transport_socket_options);
 
 private:
+  void setEdsHealthFlag(envoy::api::v2::core::HealthStatus health_status);
+
   std::atomic<uint64_t> health_flags_{};
   ActiveHealthFailureType active_health_failure_type_{};
   std::atomic<uint32_t> weight_;
@@ -666,14 +670,11 @@ public:
   registerHostForPriority(const std::string& hostname,
                           Network::Address::InstanceConstSharedPtr address,
                           const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint,
-                          const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint,
-                          const absl::optional<Upstream::Host::HealthFlag> health_checker_flag);
+                          const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint);
 
-  void
-  registerHostForPriority(const HostSharedPtr& host,
-                          const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint,
-                          const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint,
-                          const absl::optional<Upstream::Host::HealthFlag> health_checker_flag);
+  void registerHostForPriority(
+      const HostSharedPtr& host,
+      const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint);
 
   void
   updateClusterPrioritySet(const uint32_t priority, HostVectorSharedPtr&& current_hosts,
