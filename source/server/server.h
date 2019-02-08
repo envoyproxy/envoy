@@ -210,6 +210,8 @@ private:
   Assert::ActionRegistrationPtr assert_action_registration_;
   ThreadLocal::Instance& thread_local_;
   Api::ApiPtr api_;
+  // secret_manager_ must come before dispatcher_, since there may be active connections
+  // referencing it, so need to destruct these first.
   std::unique_ptr<Secret::SecretManager> secret_manager_;
   Event::DispatcherPtr dispatcher_;
   std::unique_ptr<AdminImpl> admin_;
