@@ -45,7 +45,7 @@
 namespace Envoy {
 namespace Server {
 
-InstanceImpl::InstanceImpl(Options& options, Event::TimeSystem& time_system,
+InstanceImpl::InstanceImpl(const Options& options, Event::TimeSystem& time_system,
                            Network::Address::InstanceConstSharedPtr local_address, TestHooks& hooks,
                            HotRestart& restarter, Stats::StoreRoot& store,
                            Thread::BasicLockable& access_log_lock,
@@ -55,13 +55,13 @@ InstanceImpl::InstanceImpl(Options& options, Event::TimeSystem& time_system,
     : shutdown_(false), options_(options), time_system_(time_system), restarter_(restarter),
       start_time_(time(nullptr)), original_start_time_(start_time_), stats_store_(store),
       thread_local_(tls),
-      api_(new Api::Impl(options.fileFlushIntervalMsec(), thread_factory, store)),
+      api_(new Api::Impl(options.fileFlushIntervalMsec(), thread_factory, store, time_system)),
       secret_manager_(std::make_unique<Secret::SecretManagerImpl>()),
-      dispatcher_(api_->allocateDispatcher(time_system)),
+      dispatcher_(api_->allocateDispatcher()),
       singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory().currentThreadId())),
       handler_(new ConnectionHandlerImpl(ENVOY_LOGGER(), *dispatcher_)),
       random_generator_(std::move(random_generator)), listener_component_factory_(*this),
-      worker_factory_(thread_local_, *api_, hooks, time_system),
+      worker_factory_(thread_local_, *api_, hooks),
       dns_resolver_(dispatcher_->createDnsResolver({})),
       access_log_manager_(*api_, *dispatcher_, access_log_lock), terminated_(false),
       mutex_tracer_(options.mutexTracingEnabled() ? &Envoy::MutexTracerImpl::getOrCreateTracer()
@@ -171,7 +171,7 @@ bool InstanceImpl::healthCheckFailed() { return server_stats_->live_.value() == 
 
 InstanceUtil::BootstrapVersion
 InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& bootstrap,
-                                  Options& options, Api::Api& api) {
+                                  const Options& options, Api::Api& api) {
   const std::string& config_path = options.configPath();
   const std::string& config_yaml = options.configYaml();
 
@@ -194,7 +194,7 @@ InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& boots
   return BootstrapVersion::V2;
 }
 
-void InstanceImpl::initialize(Options& options,
+void InstanceImpl::initialize(const Options& options,
                               Network::Address::InstanceConstSharedPtr local_address,
                               ComponentFactory& component_factory) {
   ENVOY_LOG(info, "initializing epoch {} (hot restart version={})", options.restartEpoch(),
@@ -288,8 +288,8 @@ void InstanceImpl::initialize(Options& options,
                                                             bootstrap_.overload_manager(), api());
 
   // Workers get created first so they register for thread local updates.
-  listener_manager_ = std::make_unique<ListenerManagerImpl>(*this, listener_component_factory_,
-                                                            worker_factory_, time_system_);
+  listener_manager_ =
+      std::make_unique<ListenerManagerImpl>(*this, listener_component_factory_, worker_factory_);
 
   // The main thread is also registered for thread local updates so that code that does not care
   // whether it runs on the main thread or on workers can still use TLS.
@@ -348,7 +348,7 @@ void InstanceImpl::initialize(Options& options,
 
   // GuardDog (deadlock detection) object and thread setup before workers are
   // started and before our own run() loop runs.
-  guard_dog_ = std::make_unique<Server::GuardDogImpl>(stats_store_, config_, time_system_, api());
+  guard_dog_ = std::make_unique<Server::GuardDogImpl>(stats_store_, config_, api());
 }
 
 void InstanceImpl::startWorkers() {
@@ -394,7 +394,7 @@ void InstanceImpl::loadServerFlags(const absl::optional<std::string>& flags_path
 
 uint64_t InstanceImpl::numConnections() { return listener_manager_->numConnections(); }
 
-RunHelper::RunHelper(Instance& instance, Options& options, Event::Dispatcher& dispatcher,
+RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatcher& dispatcher,
                      Upstream::ClusterManager& cm, AccessLog::AccessLogManager& access_log_manager,
                      InitManagerImpl& init_manager, OverloadManager& overload_manager,
                      std::function<void()> workers_start_cb) {

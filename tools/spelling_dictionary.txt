@@ -38,9 +38,12 @@ CTX
 CTXs
 CVC
 CX
+DCHECK
 DER
 DESC
+DFATAL
 DGRAM
+DLOG
 DNS
 DRYs
 DS
@@ -148,6 +151,7 @@ Nilsson
 OCSP
 OK
 OOM
+OS
 OSI
 OSS
 OSX
@@ -241,6 +245,7 @@ UTF
 UUID
 UUIDs
 VH
+VLOG
 WKT
 WRR
 WS
@@ -587,8 +592,10 @@ rebalancing
 rebuffer
 recurse
 recv
+recvmmsg
 redis
 redistributions
+reentrant
 refactored
 refactoring
 referencee

@@ -8,17 +8,16 @@
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
-
-#include "gtest/gtest.h"
 
 using testing::AssertionResult;
 
 namespace Envoy {
 namespace {
 
-class AccessLogIntegrationTest : public HttpIntegrationTest,
-                                 public Grpc::GrpcClientIntegrationParamTest {
+class AccessLogIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
+                                 public HttpIntegrationTest {
 public:
   AccessLogIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion(), realTime()) {}

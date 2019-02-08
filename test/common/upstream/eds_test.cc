@@ -15,10 +15,10 @@
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Return;
@@ -27,7 +27,7 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Upstream {
 
-class EdsTest : public testing::Test {
+class EdsTest : public TestBase {
 protected:
   EdsTest() : api_(Api::createApiForTest(stats_)) { resetCluster(); }
 
@@ -339,6 +339,7 @@ TEST_F(EdsTest, EndpointHealthStatus) {
           {envoy::api::v2::core::HealthStatus::UNHEALTHY, Host::Health::Unhealthy},
           {envoy::api::v2::core::HealthStatus::DRAINING, Host::Health::Unhealthy},
           {envoy::api::v2::core::HealthStatus::TIMEOUT, Host::Health::Unhealthy},
+          {envoy::api::v2::core::HealthStatus::DEGRADED, Host::Health::Degraded},
       };
 
   int port = 80;
@@ -423,6 +424,35 @@ TEST_F(EdsTest, EndpointHealthStatus) {
     hosts[0]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
     EXPECT_EQ(Host::Health::Healthy, hosts[0]->health());
   }
+
+  const auto rebuild_container = stats_.counter("cluster.name.update_no_rebuild").value();
+  // Now mark host 0 degraded via EDS, it should be degraded.
+  endpoints->mutable_lb_endpoints(0)->set_health_status(
+      envoy::api::v2::core::HealthStatus::DEGRADED);
+  VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources, ""));
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(Host::Health::Degraded, hosts[0]->health());
+  }
+
+  // We should rebuild the cluster since we went from healthy -> degraded.
+  EXPECT_EQ(rebuild_container, stats_.counter("cluster.name.update_no_rebuild").value());
+
+  // Now mark the host as having been degraded through active hc.
+  cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthFlagSet(
+      Host::HealthFlag::DEGRADED_ACTIVE_HC);
+
+  // Now mark host 0 healthy via EDS, it should still be degraded.
+  endpoints->mutable_lb_endpoints(0)->set_health_status(
+      envoy::api::v2::core::HealthStatus::HEALTHY);
+  VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources, ""));
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(Host::Health::Degraded, hosts[0]->health());
+  }
+
+  // Since the host health didn't change, expect no rebuild.
+  EXPECT_EQ(rebuild_container + 1, stats_.counter("cluster.name.update_no_rebuild").value());
 }
 
 // Validate that onConfigUpdate() removes endpoints that are marked as healthy

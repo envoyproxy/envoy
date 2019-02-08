@@ -8,11 +8,11 @@
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/proto/helloworld.pb.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Return;
@@ -44,11 +44,11 @@ public:
   std::shared_ptr<GoogleStub> shared_stub_{stub_};
 };
 
-class EnvoyGoogleAsyncClientImplTest : public testing::Test {
+class EnvoyGoogleAsyncClientImplTest : public TestBase {
 public:
   EnvoyGoogleAsyncClientImplTest()
       : stats_store_(new Stats::IsolatedStoreImpl), api_(Api::createApiForTest(*stats_store_)),
-        dispatcher_(test_time_.timeSystem(), *api_), scope_(stats_store_),
+        dispatcher_(*api_), scope_(stats_store_),
         method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")) {
     envoy::api::v2::core::GrpcService config;
     auto* google_grpc = config.mutable_google_grpc();

@@ -17,7 +17,7 @@
 namespace Envoy {
 namespace Server {
 
-bool validateConfig(Options& options, Network::Address::InstanceConstSharedPtr local_address,
+bool validateConfig(const Options& options, Network::Address::InstanceConstSharedPtr local_address,
                     ComponentFactory& component_factory, Thread::ThreadFactory& thread_factory) {
   Thread::MutexBasicLockable access_log_lock;
   Stats::IsolatedStoreImpl stats_store;
@@ -34,15 +34,16 @@ bool validateConfig(Options& options, Network::Address::InstanceConstSharedPtr l
   }
 }
 
-ValidationInstance::ValidationInstance(Options& options, Event::TimeSystem& time_system,
+ValidationInstance::ValidationInstance(const Options& options, Event::TimeSystem& time_system,
                                        Network::Address::InstanceConstSharedPtr local_address,
                                        Stats::IsolatedStoreImpl& store,
                                        Thread::BasicLockable& access_log_lock,
                                        ComponentFactory& component_factory,
                                        Thread::ThreadFactory& thread_factory)
-    : options_(options), time_system_(time_system), stats_store_(store),
-      api_(new Api::ValidationImpl(options.fileFlushIntervalMsec(), thread_factory, store)),
-      dispatcher_(api_->allocateDispatcher(time_system)),
+    : options_(options), stats_store_(store),
+      api_(new Api::ValidationImpl(options.fileFlushIntervalMsec(), thread_factory, store,
+                                   time_system)),
+      dispatcher_(api_->allocateDispatcher()),
       singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory().currentThreadId())),
       access_log_manager_(*api_, *dispatcher_, access_log_lock), mutex_tracer_(nullptr) {
   try {
@@ -55,7 +56,7 @@ ValidationInstance::ValidationInstance(Options& options, Event::TimeSystem& time
   }
 }
 
-void ValidationInstance::initialize(Options& options,
+void ValidationInstance::initialize(const Options& options,
                                     Network::Address::InstanceConstSharedPtr local_address,
                                     ComponentFactory& component_factory) {
   // See comments on InstanceImpl::initialize() for the overall flow here.
@@ -69,7 +70,7 @@ void ValidationInstance::initialize(Options& options,
   // be ready to serve, then the config has passed validation.
   // Handle configuration that needs to take place prior to the main configuration load.
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
-  InstanceUtil::loadBootstrapConfig(bootstrap, options, api());
+  InstanceUtil::loadBootstrapConfig(bootstrap, options, *api_);
 
   Config::Utility::createTagProducer(bootstrap);
 
@@ -81,16 +82,16 @@ void ValidationInstance::initialize(Options& options,
 
   Configuration::InitialImpl initial_config(bootstrap);
   overload_manager_ = std::make_unique<OverloadManagerImpl>(dispatcher(), stats(), threadLocal(),
-                                                            bootstrap.overload_manager(), api());
-  listener_manager_ = std::make_unique<ListenerManagerImpl>(*this, *this, *this, time_system_);
+                                                            bootstrap.overload_manager(), *api_);
+  listener_manager_ = std::make_unique<ListenerManagerImpl>(*this, *this, *this);
   thread_local_.registerThread(*dispatcher_, true);
   runtime_loader_ = component_factory.createRuntime(*this, initial_config);
   secret_manager_ = std::make_unique<Secret::SecretManagerImpl>();
   ssl_context_manager_ =
-      std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(time_system_);
+      std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(api_->timeSystem());
   cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
       admin(), runtime(), stats(), threadLocal(), random(), dnsResolver(), sslContextManager(),
-      dispatcher(), localInfo(), *secret_manager_, api(), http_context_, accessLogManager(),
+      dispatcher(), localInfo(), *secret_manager_, *api_, http_context_, accessLogManager(),
       singletonManager());
   config_.initialize(bootstrap, *this, *cluster_manager_factory_);
   http_context_.setTracer(config_.httpTracer());

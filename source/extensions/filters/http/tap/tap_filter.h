@@ -86,9 +86,7 @@ public:
   Http::FilterDataStatus decodeData(Buffer::Instance&, bool) override {
     return Http::FilterDataStatus::Continue;
   }
-  Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap&) override {
-    return Http::FilterTrailersStatus::Continue;
-  }
+  Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap& trailers) override;
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
     HttpTapConfigSharedPtr config = config_->currentConfig();
     tapper_ = config ? config->createPerRequestTapper(callbacks.streamId()) : nullptr;
@@ -102,9 +100,7 @@ public:
   Http::FilterDataStatus encodeData(Buffer::Instance&, bool) override {
     return Http::FilterDataStatus::Continue;
   }
-  Http::FilterTrailersStatus encodeTrailers(Http::HeaderMap&) override {
-    return Http::FilterTrailersStatus::Continue;
-  }
+  Http::FilterTrailersStatus encodeTrailers(Http::HeaderMap& trailers) override;
   Http::FilterMetadataStatus encodeMetadata(Http::MetadataMap&) override {
     return Http::FilterMetadataStatus::Continue;
   }
@@ -118,6 +114,7 @@ public:
 private:
   FilterConfigSharedPtr config_;
   HttpPerRequestTapperPtr tapper_;
+  const Http::HeaderMap* request_trailers_{};
 };
 
 } // namespace TapFilter

@@ -27,7 +27,7 @@
 #include "test/test_common/network_utility.h"
 
 #include "absl/strings/match.h"
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
@@ -124,7 +124,7 @@ absl::optional<std::string> TestEnvironment::getOptionalEnvVar(const std::string
 
 std::string TestEnvironment::getCheckedEnvVar(const std::string& var) {
   auto optional = getOptionalEnvVar(var);
-  RELEASE_ASSERT(optional.has_value(), "");
+  RELEASE_ASSERT(optional.has_value(), var);
   return optional.value();
 }
 

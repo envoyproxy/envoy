@@ -18,7 +18,6 @@ envoy_cc_test(
         "//source/server/config_validation:dns_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/upstream:upstream_mocks",
-        "//test/test_common:test_time_lib",
     ],
 )
 

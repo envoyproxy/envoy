@@ -20,9 +20,8 @@
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
-
-#include "gtest/gtest.h"
 
 using testing::AssertionFailure;
 using testing::AssertionResult;
@@ -57,7 +56,7 @@ admin:
       port_value: 0
 )EOF";
 
-class AdsIntegrationTest : public HttpIntegrationTest, public Grpc::GrpcClientIntegrationParamTest {
+class AdsIntegrationTest : public Grpc::GrpcClientIntegrationParamTest, public HttpIntegrationTest {
 public:
   AdsIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), realTime(), config) {
@@ -543,8 +542,8 @@ TEST_P(AdsIntegrationTest, RdsAfterLdsWithRdsChange) {
   makeSingleRequest();
 }
 
-class AdsFailIntegrationTest : public HttpIntegrationTest,
-                               public Grpc::GrpcClientIntegrationParamTest {
+class AdsFailIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
+                               public HttpIntegrationTest {
 public:
   AdsFailIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), realTime(), config) {
@@ -583,8 +582,8 @@ TEST_P(AdsFailIntegrationTest, ConnectDisconnect) {
   xds_stream_->finishGrpcStream(Grpc::Status::Internal);
 }
 
-class AdsConfigIntegrationTest : public HttpIntegrationTest,
-                                 public Grpc::GrpcClientIntegrationParamTest {
+class AdsConfigIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
+                                 public HttpIntegrationTest {
 public:
   AdsConfigIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), realTime(), config) {
@@ -645,7 +644,7 @@ TEST_P(AdsIntegrationTest, XdsBatching) {
     static_resources->add_listeners()->MergeFrom(buildListener("rds_listener2", "route_config2"));
   });
 
-  pre_worker_start_test_steps_ = [this]() {
+  on_server_init_function_ = [this]() {
     createXdsConnection();
     ASSERT_TRUE(xds_connection_->waitForNewStream(*dispatcher_, xds_stream_));
     xds_stream_->startGrpcStream();
