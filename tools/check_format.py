@@ -423,7 +423,9 @@ def checkSourceLine(line, file_path, reportError):
   if not whitelistedForSerializeAsString(file_path) and 'SerializeAsString' in line:
     # The MessageLite::SerializeAsString doesn't generate deterministic serialization,
     # use MessageUtil::hash instead.
-    reportError("Don't use MessageLite::SerializeAsString for generating deterministic serialization, use MessageUtil::hash instead.")
+    reportError(
+        "Don't use MessageLite::SerializeAsString for generating deterministic serialization, use MessageUtil::hash instead."
+    )
 
 def checkBuildLine(line, file_path, reportError):
   if not whitelistedForProtobufDeps(file_path) and '"protobuf"' in line:
