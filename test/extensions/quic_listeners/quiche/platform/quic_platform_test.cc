@@ -278,6 +278,7 @@ TEST(QuicPlatformTest, QuicCertUtils) {
   bssl::UniquePtr<X509> x509_cert =
       TransportSockets::Tls::readCertFromFile(TestEnvironment::substitute(
           "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
+  // Encode X509 cert with DER encoding.
   int len = i2d_X509(x509_cert.get(), nullptr);
   unsigned char* der = static_cast<unsigned char*>(OPENSSL_malloc(len));
   unsigned char* p = der;
