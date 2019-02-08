@@ -226,24 +226,17 @@ void IntegrationTcpClient::ConnectionCallbacks::onEvent(Network::ConnectionEvent
   }
 }
 
-BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version,
-                                         const std::string& config)
-    : BaseIntegrationTest(
-          Network::Utility::parseInternetAddress(Network::Test::getAnyAddressString(version)),
-          /*upstream_port_fn=*/[]{return 0;}, config) {}
-
 BaseIntegrationTest::BaseIntegrationTest(
-    const Network::Address::InstanceConstSharedPtr& upstream_address,
-    std::function<uint32_t()> upstream_port_fn, const std::string& config)
+      std::function<Network::Address::InstanceConstSharedPtr(int)> upstream_address_fn,
+      Network::Address::IpVersion version, const std::string& config)
     : api_(Api::createApiForTest(stats_store_)),
       mock_buffer_factory_(new NiceMock<MockBufferFactory>),
       dispatcher_(
           new Event::DispatcherImpl( Buffer::WatermarkFactoryPtr{mock_buffer_factory_}, *api_)),
-      version_(upstream_address->ip()->version()), upstream_address_(upstream_address),
-      upstream_port_fn_(upstream_port_fn),
-      config_helper_(upstream_address->ip()->version(), *api_, config),
+      version_(version),
+      upstream_address_fn_(upstream_address_fn),
+      config_helper_(version, *api_, config),
       default_log_level_(TestEnvironment::getOptions().logLevel()) {
-
   // This is a hack, but there are situations where we disconnect fake upstream connections and
   // then we expect the server connection pool to get the disconnect before the next test starts.
   // This does not always happen. This pause should allow the server to pick up the disconnect
@@ -258,6 +251,15 @@ BaseIntegrationTest::BaseIntegrationTest(
       }));
   ON_CALL(factory_context_, api()).WillByDefault(ReturnRef(*api_));
 }
+
+BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version,
+                                         const std::string& config)
+    : BaseIntegrationTest(
+          /*upstream_address_fn=*/[version](int) {
+                return Network::Utility::parseInternetAddress(
+                    Network::Test::getAnyAddressString(version), 0);},
+          version,
+          config) {}
 
 Network::ClientConnectionPtr BaseIntegrationTest::makeClientConnection(uint32_t port) {
   Network::ClientConnectionPtr connection(dispatcher_->createClientConnection(
@@ -281,8 +283,7 @@ void BaseIntegrationTest::initialize() {
 
 void BaseIntegrationTest::createUpstreams() {
   for (uint32_t i = 0; i < fake_upstreams_count_; ++i) {
-    auto endpoint = Network::Utility::parseInternetAddress(
-        upstream_address_->ip()->addressAsString(), upstream_port_fn_());
+    auto endpoint = upstream_address_fn_(i);
     if (autonomous_upstream_) {
       fake_upstreams_.emplace_back(
           new AutonomousUpstream(endpoint, upstream_protocol_, *time_system_));

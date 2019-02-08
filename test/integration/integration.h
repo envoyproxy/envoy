@@ -139,12 +139,13 @@ public:
                       const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG);
   BaseIntegrationTest(Network::Address::IpVersion version, TestTimeSystemPtr,
                       const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG)
-      : BaseIntegrationTest(version, config) {}  
-  // Creates a test fixture with a specified |upstream_address| and port provider function
-  // |upstream_port_fn|. This also sets the IP version to the one used by the |upstream_address|.
-  BaseIntegrationTest(const Network::Address::InstanceConstSharedPtr& upstream_address,
-                      std::function<uint32_t()> upstream_port_fn,
-                      const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG);
+      : BaseIntegrationTest(version, config) {}
+  // Creates a test fixture with a specified |upstream_address| function that provides the IP and
+  // port to use.
+  BaseIntegrationTest(
+      std::function<Network::Address::InstanceConstSharedPtr(int)> upstream_address_fn,
+      Network::Address::IpVersion version,
+      const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG);
 
   virtual ~BaseIntegrationTest() {}
 
@@ -245,9 +246,7 @@ protected:
   // The IpVersion (IPv4, IPv6) to use.
   Network::Address::IpVersion version_;
   // IP Address to use when binding sockets on upstreams.
-  Network::Address::InstanceConstSharedPtr upstream_address_;
-  // Function to use for determing port when binding sockets on upstreams.
-  std::function<uint32_t()> upstream_port_fn_;
+  std::function<Network::Address::InstanceConstSharedPtr(int)> upstream_address_fn_;
   // The config for envoy start-up.
   ConfigHelper config_helper_;
   // Steps that should be done prior to the workers starting. E.g., xDS pre-init.

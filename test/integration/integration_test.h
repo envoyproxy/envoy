@@ -17,7 +17,9 @@ public:
   UpstreamEndpointIntegrationTest()
       : HttpIntegrationTest(
             Http::CodecClient::Type::HTTP1,
-            Network::Utility::parseInternetAddress(Network::Test::getAnyAddressString(GetParam())),
-            /*upstream_port_fn=*/[]{return 0;}) {}
+            /*upstream_address_fn=*/[](int) {
+                return Network::Utility::parseInternetAddress(
+                   Network::Test::getAnyAddressString(GetParam()), 0);},
+            GetParam()) {}
 };
 } // namespace Envoy

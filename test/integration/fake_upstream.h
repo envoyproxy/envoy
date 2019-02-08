@@ -511,8 +511,8 @@ public:
   // Creates a fake upstream bound to the specified unix domain socket path.
   FakeUpstream(const std::string& uds_path, FakeHttpConnection::Type type,
                Event::TestTimeSystem& time_system);
-  // Creates a fake upstream bound to the specified |endpoint|.
-  FakeUpstream(const Network::Address::InstanceConstSharedPtr& endpoint,
+  // Creates a fake upstream bound to the specified |address|.
+  FakeUpstream(const Network::Address::InstanceConstSharedPtr& address,
                FakeHttpConnection::Type type, Event::TestTimeSystem& time_system,
                bool enable_half_close = false);
   // Creates a fake upstream bound to INADDR_ANY and the specified |port|.

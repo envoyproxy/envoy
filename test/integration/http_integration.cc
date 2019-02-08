@@ -206,17 +206,18 @@ HttpIntegrationTest::makeHttpConnection(Network::ClientConnectionPtr&& conn) {
 HttpIntegrationTest::HttpIntegrationTest(Http::CodecClient::Type downstream_protocol,
                                          Network::Address::IpVersion version,
                                          const std::string& config)
-    : BaseIntegrationTest(version, config), downstream_protocol_(downstream_protocol) {
-  // Legacy integration tests expect the default listener to be named "http" for lookupPort calls.
-  config_helper_.renameListener("http");
-  config_helper_.setClientCodec(typeToCodecType(downstream_protocol_));
-}
+    : HttpIntegrationTest::HttpIntegrationTest(
+          downstream_protocol,
+          /*upstream_address_fn=*/[version](int) {
+              return Network::Utility::parseInternetAddress(
+                  Network::Test::getAnyAddressString(version), 0);},
+          version, config) {}
 
 HttpIntegrationTest::HttpIntegrationTest(
     Http::CodecClient::Type downstream_protocol,
-    const Network::Address::InstanceConstSharedPtr& upstream_address,
-    std::function<uint32_t()> upstream_port_fn, const std::string& config)
-    : BaseIntegrationTest(upstream_address, upstream_port_fn, config),
+    std::function<Network::Address::InstanceConstSharedPtr(int)> upstream_address_fn,
+    Network::Address::IpVersion version, const std::string& config)
+    : BaseIntegrationTest(upstream_address_fn, version, config),
       downstream_protocol_(downstream_protocol) {
   // Legacy integration tests expect the default listener to be named "http" for
   // lookupPort calls.

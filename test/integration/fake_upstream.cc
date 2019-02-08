@@ -355,14 +355,14 @@ static Network::SocketPtr makeTcpListenSocket(uint32_t port, Network::Address::I
       nullptr, true)};
 }
 
-FakeUpstream::FakeUpstream(const Network::Address::InstanceConstSharedPtr& endpoint,
+FakeUpstream::FakeUpstream(const Network::Address::InstanceConstSharedPtr& address,
                            FakeHttpConnection::Type type, Event::TestTimeSystem& time_system,
                            bool enable_half_close)
     : FakeUpstream(Network::Test::createRawBufferSocketFactory(),
-                   makeTcpListenSocket(endpoint), type, time_system, enable_half_close) {
+                   makeTcpListenSocket(address), type, time_system, enable_half_close) {
   ENVOY_LOG(info, "starting fake server on socket {}:{}. Address version is {}",
-            endpoint->ip()->addressAsString(), endpoint->ip()->port(),
-            Network::Test::addressVersionAsString(endpoint->ip()->version()));
+            address->ip()->addressAsString(), address->ip()->port(),
+            Network::Test::addressVersionAsString(address->ip()->version()));
 }
 
 FakeUpstream::FakeUpstream(uint32_t port, FakeHttpConnection::Type type,
