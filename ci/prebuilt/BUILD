@@ -2,17 +2,9 @@ licenses(["notice"])  # Apache 2
 
 package(default_visibility = ["//visibility:public"])
 
-config_setting(
-    name = "windows_x86_64",
-    values = {"cpu": "x64_windows"},
-)
-
 cc_library(
     name = "luajit",
-    srcs = select({
-        ":windows_x86_64": ["thirdparty_build/lib/luajit.lib"],
-        "//conditions:default": ["thirdparty_build/lib/libluajit-5.1.a"],
-    }),
+    srcs = ["thirdparty_build/lib/libluajit-5.1.a"],
     hdrs = glob(["thirdparty_build/include/luajit-2.1/*"]),
     includes = ["thirdparty_build/include"],
     # TODO(mattklein123): We should strip luajit-2.1 here for consumers. However, if we do that

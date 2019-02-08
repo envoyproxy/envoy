@@ -51,12 +51,15 @@ def _repository_impl(name, **kwargs):
     )
 
 def _build_recipe_repository_impl(ctxt):
+    # on Windows, all deps use rules_foreign_cc
+    if ctxt.os.name.upper().startswith("WINDOWS"):
+        return
+
     # modify the recipes list based on the build context
     recipes = _apply_dep_blacklist(ctxt, ctxt.attr.recipes)
 
     # Setup the build directory with links to the relevant files.
     ctxt.symlink(Label("//bazel:repositories.sh"), "repositories.sh")
-    ctxt.symlink(Label("//bazel:repositories.bat"), "repositories.bat")
     ctxt.symlink(
         Label("//ci/build_container:build_and_install_deps.sh"),
         "build_and_install_deps.sh",
@@ -71,25 +74,9 @@ def _build_recipe_repository_impl(ctxt):
     ctxt.symlink(Label("//ci/prebuilt:BUILD"), "BUILD")
 
     # Run the build script.
-    command = []
-    env = {}
-    if ctxt.os.name.upper().startswith("WINDOWS"):
-        vc_path = find_vc_path(ctxt)
-        current_path = get_env_var(ctxt, "PATH", None, False)
-        env = setup_vc_env_vars(ctxt, vc_path)
-        env["PATH"] += (";%s" % current_path)
-        env["CC"] = "cl"
-        env["CXX"] = "cl"
-        env["CXXFLAGS"] = "-DNDEBUG"
-        env["CFLAGS"] = "-DNDEBUG"
-        command = ["./repositories.bat"] + recipes
-    else:
-        command = ["./repositories.sh"] + recipes
-
     print("Fetching external dependencies...")
     result = ctxt.execute(
-        command,
-        environment = env,
+        ["./repositories.sh"] + recipes,
         quiet = False,
     )
     print(result.stdout)
@@ -478,7 +465,6 @@ def _com_github_nghttp2_nghttp2():
         name = "com_github_nghttp2_nghttp2",
         build_file_content = BUILD_ALL_CONTENT,
         patch_args = ["-p1"],
-        patch_cmds = ["find . -name '*.sh' -exec sed -i.orig '1s|#!/usr/bin/env sh\$|/bin/sh\$|' {} +"],
         patches = ["@envoy//bazel/foreign_cc:nghttp2.patch"],
         **location
     )
