@@ -206,18 +206,17 @@ def envoy_cmake_external(
         lib_source = "",
         postfix_script = "",
         static_libraries = [],
-        copy_pdb = False):
+        copy_pdb = False,
+        pdb_name = "",
+        cmake_files_dir = "$BUILD_TMPDIR/CMakeFiles"):
     # On Windows, we don't want to explicitly set CMAKE_BUILD_TYPE,
     # rules_foreign_cc will figure it out for us
     cache_entries_no_build_type = {key: cache_entries[key] for key in cache_entries.keys() if key != "CMAKE_BUILD_TYPE"}
 
     pf = ""
     if copy_pdb:
-        name_to_pdb = {"ares": "c-ares", "nghttp2": "nghttp2_static", "zlib": "zlibstatic"}
-        pdb_name = name_to_pdb.get(name, name)
-
-        name_to_cmake_files_dir = {"nghttp2": "$BUILD_TMPDIR/lib/CMakeFiles"}
-        cmake_files_dir = name_to_cmake_files_dir.get(name, "$BUILD_TMPDIR/CMakeFiles")
+        if pdb_name == "":
+            pdb_name = name
 
         copy_command = "cp {cmake_files_dir}/{pdb_name}.dir/{pdb_name}.pdb $INSTALLDIR/lib/{pdb_name}.pdb".format(cmake_files_dir = cmake_files_dir, pdb_name = pdb_name)
         if postfix_script != "":

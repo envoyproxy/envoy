@@ -13,6 +13,7 @@ envoy_cmake_external(
     },
     copy_pdb = True,
     lib_source = "@com_github_c_ares_c_ares//:all",
+    pdb_name = "c-ares",
     static_libraries = select({
         "//bazel:windows_x86_64": ["cares.lib"],
         "//conditions:default": ["libcares.a"],
@@ -57,8 +58,10 @@ envoy_cmake_external(
         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
         "CMAKE_INSTALL_LIBDIR": "lib",
     },
+    cmake_files_dir = "$BUILD_TMPDIR/lib/CMakeFiles",
     copy_pdb = True,
     lib_source = "@com_github_nghttp2_nghttp2//:all",
+    pdb_name = "nghttp2_static",
     static_libraries = select({
         "//bazel:windows_x86_64": ["nghttp2_static.lib"],
         "//conditions:default": ["libnghttp2_static.a"],
@@ -88,6 +91,7 @@ envoy_cmake_external(
     },
     copy_pdb = True,
     lib_source = "@com_github_madler_zlib//:all",
+    pdb_name = "zlibstatic",
     static_libraries = select({
         "//bazel:windows_dbg_build": ["zlibstaticd.lib"],
         "//bazel:windows_fastbuild_build": ["zlibstatic.lib"],
