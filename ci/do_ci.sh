@@ -125,10 +125,12 @@ elif [[ "$1" == "bazel.debug.server_only" ]]; then
   exit 0
 elif [[ "$1" == "bazel.asan" ]]; then
   setup_clang_toolchain
-  echo "bazel ASAN/UBSAN debug build with tests..."
+  echo "bazel ASAN/UBSAN debug build with tests"
+  echo "Building and testing envoy tests..."
+  bazel_with_collection test ${BAZEL_TEST_OPTIONS} -c dbg --config=clang-asan //test/...
   cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
-  echo "Building and testing..."
-  bazel_with_collection test ${BAZEL_TEST_OPTIONS} -c dbg --config=clang-asan @envoy//test/... \
+  echo "Building and testing envoy-filter-example tests..."
+  bazel_with_collection test ${BAZEL_TEST_OPTIONS} -c dbg --config=clang-asan \
     //:echo2_integration_test //:envoy_binary_test
   # Also validate that integration test traffic tapping (useful when debugging etc.)
   # works. This requires that we set TAP_PATH. We do this under bazel.asan to
@@ -146,10 +148,12 @@ elif [[ "$1" == "bazel.asan" ]]; then
   exit 0
 elif [[ "$1" == "bazel.tsan" ]]; then
   setup_clang_toolchain
-  echo "bazel TSAN debug build with tests..."
+  echo "bazel TSAN debug build with tests"
+  echo "Building and testing envoy tests..."
+  bazel_with_collection test ${BAZEL_TEST_OPTIONS} -c dbg --config=clang-tsan //test/...
   cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
-  echo "Building and testing..."
-  bazel_with_collection test ${BAZEL_TEST_OPTIONS} -c dbg --config=clang-tsan @envoy//test/... \
+  echo "Building and testing envoy-filter-example tests..."
+  bazel_with_collection test ${BAZEL_TEST_OPTIONS} -c dbg --config=clang-tsan \
     //:echo2_integration_test //:envoy_binary_test
   exit 0
 elif [[ "$1" == "bazel.dev" ]]; then
