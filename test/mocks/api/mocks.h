@@ -26,7 +26,8 @@ public:
 
   // Api::Api
   Event::DispatcherPtr allocateDispatcher() override;
-  Event::TimeSystem& timeSystem() override { return time_system_; }
+  Event::TimeSystem& timeSystemForDispatcher() override { return time_system_; }
+  TimeSource& timeSource() override { return time_system_; }
 
   MOCK_METHOD1(allocateDispatcher_, Event::Dispatcher*(Event::TimeSystem&));
   MOCK_METHOD0(fileSystem, Filesystem::Instance&());

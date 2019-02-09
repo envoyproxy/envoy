@@ -1063,7 +1063,7 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
       stats_(Http::ConnectionManagerImpl::generateStats("http.admin.", server_.stats())),
       tracing_stats_(
           Http::ConnectionManagerImpl::generateTracingStats("http.admin.", no_op_store_)),
-      route_config_provider_(server.timeSystem()),
+      route_config_provider_(server.timeSource()),
       // TODO(jsedgwick) add /runtime_reset endpoint that removes all admin-set values
       handlers_{
           {"/", "Admin home page", MAKE_ADMIN_HANDLER(handlerAdminHome), false, false},
@@ -1103,7 +1103,7 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
           {"/runtime_modify", "modify runtime values", MAKE_ADMIN_HANDLER(handlerRuntimeModify),
            false, true},
       },
-      date_provider_(server.dispatcher().timeSystem()),
+      date_provider_(server.dispatcher().timeSource()),
       admin_filter_chain_(std::make_shared<AdminFilterChain>()) {}
 
 Http::ServerConnectionPtr AdminImpl::createCodec(Network::Connection& connection,
@@ -1120,7 +1120,7 @@ bool AdminImpl::createNetworkFilterChain(Network::Connection& connection,
   // the envoy is overloaded.
   connection.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(
       *this, server_.drainManager(), server_.random(), server_.httpContext(), server_.runtime(),
-      server_.localInfo(), server_.clusterManager(), nullptr, server_.timeSystem())});
+      server_.localInfo(), server_.clusterManager(), nullptr, server_.timeSource())});
   return true;
 }
 

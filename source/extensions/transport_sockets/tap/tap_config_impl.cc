@@ -36,7 +36,7 @@ void PerSocketTapperImpl::onRead(const Buffer::Instance& data, uint32_t bytes_re
   auto* event = trace_->mutable_socket_buffered_trace()->add_events();
   event->mutable_timestamp()->MergeFrom(Protobuf::util::TimeUtil::NanosecondsToTimestamp(
       std::chrono::duration_cast<std::chrono::nanoseconds>(
-          config_->time_system_.systemTime().time_since_epoch())
+          config_->time_source_.systemTime().time_since_epoch())
           .count()));
   // TODO(mattklein123): Avoid linearize/toString here.
   const std::string linearized_data = data.toString();
@@ -53,7 +53,7 @@ void PerSocketTapperImpl::onWrite(const Buffer::Instance& data, uint32_t bytes_w
   auto* event = trace_->mutable_socket_buffered_trace()->add_events();
   event->mutable_timestamp()->MergeFrom(Protobuf::util::TimeUtil::NanosecondsToTimestamp(
       std::chrono::duration_cast<std::chrono::nanoseconds>(
-          config_->time_system_.systemTime().time_since_epoch())
+          config_->time_source_.systemTime().time_since_epoch())
           .count()));
   // TODO(mattklein123): Avoid linearize/toString here.
   const std::string linearized_data = data.toString();
