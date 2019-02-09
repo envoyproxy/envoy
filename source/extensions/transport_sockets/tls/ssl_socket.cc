@@ -362,7 +362,7 @@ std::string SslSocket::subjectLocalCertificate() const {
 }
 
 SystemTime SslSocket::validFromPeerCertificate() const {
-  X509* cert = SSL_get_certificate(ssl_.get());
+  X509* cert = SSL_get_peer_certificate(ssl_.get());
   if (!cert) {
     return std::chrono::system_clock::from_time_t(0);
   }
@@ -370,7 +370,7 @@ SystemTime SslSocket::validFromPeerCertificate() const {
 }
 
 SystemTime SslSocket::expirationPeerCertificate() const {
-  X509* cert = SSL_get_certificate(ssl_.get());
+  X509* cert = SSL_get_peer_certificate(ssl_.get());
   if (!cert) {
     return std::chrono::system_clock::from_time_t(0);
   }

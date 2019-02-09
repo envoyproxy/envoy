@@ -980,8 +980,8 @@ TEST_P(SslSocketTest, GetIssueExpireTimesPeerCert) {
 )EOF";
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, GetParam());
   testUtil(test_options.setExpectedSerialNumber(TEST_NO_SAN_CERT_SERIAL)
-               .setExpectedValidFromTimePeerCert(TEST_SAN_URI_CERT_NOT_BEFORE)
-               .setExpectedExpirationTimePeerCert(TEST_SAN_URI_CERT_NOT_AFTER));
+               .setExpectedValidFromTimePeerCert(TEST_NO_SAN_CERT_NOT_BEFORE)
+               .setExpectedExpirationTimePeerCert(TEST_NO_SAN_CERT_NOT_AFTER));
 }
 
 TEST_P(SslSocketTest, FailedClientAuthCaVerificationNoClientCert) {
