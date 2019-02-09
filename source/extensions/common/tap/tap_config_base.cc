@@ -15,6 +15,9 @@ namespace Tap {
 
 void Utility::addBufferToProtoBytes(envoy::data::tap::v2alpha::Body& output_bytes,
                                     uint32_t max_buffered_bytes, const Buffer::Instance& data) {
+  // TODO(mattklein123): Figure out if we can use the buffer API here directly in some way. This is
+  // is not trivial if we want to avoid extra copies since we end up appending to the existing
+  // protobuf string.
   const uint64_t num_slices = data.getRawSlices(nullptr, 0);
   STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
   data.getRawSlices(slices.begin(), num_slices);
@@ -60,7 +63,7 @@ TapConfigBaseImpl::TapConfigBaseImpl(envoy::service::tap::v2alpha::TapConfig&& p
   buildMatcher(proto_config.match_config(), matchers_);
 }
 
-Matcher& TapConfigBaseImpl::rootMatcher() {
+Matcher& TapConfigBaseImpl::rootMatcher() const {
   ASSERT(matchers_.size() >= 1);
   return *matchers_[0];
 }
@@ -114,14 +117,14 @@ void FilePerTapSink::submitBufferedTrace(
   std::string path = fmt::format("{}_{}", config_.path_prefix(), trace_id);
   switch (format) {
   case envoy::service::tap::v2alpha::OutputSink::PROTO_BINARY:
-    path += ".pb";
+    path += MessageUtil::FileExtensions::get().ProtoBinary;
     break;
   case envoy::service::tap::v2alpha::OutputSink::PROTO_TEXT:
-    path += ".pb_text";
+    path += MessageUtil::FileExtensions::get().ProtoText;
     break;
   case envoy::service::tap::v2alpha::OutputSink::JSON_BODY_AS_BYTES:
   case envoy::service::tap::v2alpha::OutputSink::JSON_BODY_AS_STRING:
-    path += ".json";
+    path += MessageUtil::FileExtensions::get().Json;
     break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;

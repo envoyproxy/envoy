@@ -48,6 +48,7 @@ private:
   HttpTapConfigImplSharedPtr config_;
   const uint64_t stream_id_;
   std::vector<bool> statuses_;
+  // Must be a shared_ptr because of submitBufferedTrace().
   std::shared_ptr<envoy::data::tap::v2alpha::BufferedTraceWrapper> trace_;
 };
 

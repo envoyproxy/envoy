@@ -29,10 +29,10 @@ public:
  */
 class TapConfigBaseImpl {
 public:
-  uint32_t maxBufferedRxBytes() { return max_buffered_rx_bytes_; }
-  uint32_t maxBufferedTxBytes() { return max_buffered_tx_bytes_; }
-  size_t numMatchers() { return matchers_.size(); }
-  Matcher& rootMatcher();
+  uint32_t maxBufferedRxBytes() const { return max_buffered_rx_bytes_; }
+  uint32_t maxBufferedTxBytes() const { return max_buffered_tx_bytes_; }
+  size_t numMatchers() const { return matchers_.size(); }
+  Matcher& rootMatcher() const;
   void
   submitBufferedTrace(const std::shared_ptr<envoy::data::tap::v2alpha::BufferedTraceWrapper>& trace,
                       uint64_t trace_id);
