@@ -13,6 +13,7 @@
 #include "common/network/address_impl.h"
 #include "common/router/router.h"
 #include "common/upstream/host_utility.h"
+#include "common/upstream/http_status_checker.h"
 
 // TODO(dio): Remove dependency to extension health checkers when redis_health_check is removed.
 #include "extensions/health_checkers/well_known_names.h"
@@ -94,6 +95,8 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
       request_headers_parser_(
           Router::HeaderParser::configure(config.http_health_check().request_headers_to_add(),
                                           config.http_health_check().request_headers_to_remove())),
+      http_status_checker_(HttpStatusChecker::configure(
+          config.http_health_check().expected_statuses(), static_cast<uint64_t>(Http::Code::OK))),
       codec_client_type_(codecClientType(config.http_health_check().use_http2())) {
   if (!config.http_health_check().service_name().empty()) {
     service_name_ = config.http_health_check().service_name();
@@ -181,7 +184,7 @@ HttpHealthCheckerImpl::HttpActiveHealthCheckSession::healthCheckResult() {
   ENVOY_CONN_LOG(debug, "hc response={} health_flags={}", *client_, response_code,
                  HostUtility::healthFlagsToString(*host_));
 
-  if (response_code != enumToInt(Http::Code::OK)) {
+  if (!parent_.http_status_checker_->isExpected(response_code)) {
     return HealthCheckResult::Failed;
   }
 

@@ -116,6 +116,7 @@ envoy_cc_library(
         "//include/envoy/server:health_checker_config_interface",
         "//source/common/grpc:codec_lib",
         "//source/common/http:codec_client_lib",
+        "//source/common/upstream:http_status_checker_lib",
         "//source/common/upstream:host_utility_lib",
         # TODO(dio): Remove dependency to health checkers extension when redis_health_check is removed.
         "//source/extensions/health_checkers:well_known_names",
@@ -127,6 +128,17 @@ envoy_cc_library(
     srcs = ["host_utility.cc"],
     hdrs = ["host_utility.h"],
     deps = ["//include/envoy/upstream:upstream_interface"],
+)
+
+envoy_cc_library(
+    name = "http_status_checker_lib",
+    srcs = ["http_status_checker.cc"],
+    hdrs = ["http_status_checker.h"],
+    deps = [
+        "//source/common/access_log:access_log_formatter_lib",
+        "//source/common/protobuf",
+        "@envoy_api//envoy/api/v2/core:health_check_cc",
+    ],
 )
 
 envoy_cc_library(

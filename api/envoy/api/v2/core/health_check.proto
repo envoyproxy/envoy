@@ -7,6 +7,7 @@ option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.api.v2.core";
 
 import "envoy/api/v2/core/base.proto";
+import "envoy/type/range.proto";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
@@ -84,7 +85,7 @@ message HealthCheck {
     }
   }
 
-  // [#comment:next free field: 9]
+  // [#comment:next free field: 10]
   message HttpHealthCheck {
     // The value of the host header in the HTTP health check request. If
     // left empty (default value), the name of the cluster this health check is associated
@@ -119,6 +120,10 @@ message HealthCheck {
 
     // If set, health checks will be made using http/2.
     bool use_http2 = 7;
+
+    // Specifies a list of HTTP response statuses considered healthy. If empty, only 200 will be
+    // accepted.
+    repeated envoy.type.Int64Range expected_statuses = 9;
   }
 
   message TcpHealthCheck {

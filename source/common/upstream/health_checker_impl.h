@@ -10,6 +10,7 @@
 #include "common/router/header_parser.h"
 #include "common/stream_info/stream_info_impl.h"
 #include "common/upstream/health_checker_base_impl.h"
+#include "common/upstream/http_status_checker.h"
 
 #include "src/proto/grpc/health/v1/health.pb.h"
 
@@ -121,6 +122,7 @@ private:
   const std::string host_value_;
   absl::optional<std::string> service_name_;
   Router::HeaderParserPtr request_headers_parser_;
+  HttpStatusCheckerPtr http_status_checker_;
 
 protected:
   const Http::CodecClient::Type codec_client_type_;

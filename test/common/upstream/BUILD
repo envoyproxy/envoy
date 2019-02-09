@@ -136,6 +136,18 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "http_status_checker_test",
+    srcs = ["http_status_checker_test.cc"],
+    deps = [
+        ":utility_lib",
+        "//source/common/protobuf:utility_lib",
+        "//source/common/upstream:upstream_includes",
+        "//source/common/upstream:upstream_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "load_balancer_impl_test",
     srcs = ["load_balancer_impl_test.cc"],
     deps = [
