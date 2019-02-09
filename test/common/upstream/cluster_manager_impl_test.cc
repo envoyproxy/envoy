@@ -116,7 +116,7 @@ public:
   NiceMock<Runtime::MockRandomGenerator> random_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   Extensions::TransportSockets::Tls::ContextManagerImpl ssl_context_manager_{
-      dispatcher_.timeSystem()};
+      dispatcher_.timeSource()};
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Server::MockAdmin> admin_;
   NiceMock<Secret::MockSecretManager> secret_manager_;

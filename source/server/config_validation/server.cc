@@ -88,7 +88,7 @@ void ValidationInstance::initialize(const Options& options,
   runtime_loader_ = component_factory.createRuntime(*this, initial_config);
   secret_manager_ = std::make_unique<Secret::SecretManagerImpl>();
   ssl_context_manager_ =
-      std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(api_->timeSystem());
+      std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(api_->timeSource());
   cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
       admin(), runtime(), stats(), threadLocal(), random(), dnsResolver(), sslContextManager(),
       dispatcher(), localInfo(), *secret_manager_, *api_, http_context_, accessLogManager(),
