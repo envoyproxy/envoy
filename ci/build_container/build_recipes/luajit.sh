@@ -4,6 +4,9 @@ set -e
 
 VERSION=2.1.0-beta3
 SHA256=409f7fe570d3c16558e594421c47bdd130238323c9d6fd6c83dedd2aaeb082a8
+if [[ "${OS}" == "Windows_NT" ]]; then
+  exit 0
+fi
 
 curl https://github.com/LuaJIT/LuaJIT/archive/v"$VERSION".tar.gz -sLo LuaJIT-"$VERSION".tar.gz \
   && echo "$SHA256" LuaJIT-"$VERSION".tar.gz | sha256sum --check
@@ -58,21 +61,10 @@ index f56465d..3f4f2fa 100644
 EOF
 
 cd LuaJIT-"$VERSION"
+patch -p1 < ../luajit_make.diff
 
-if [[ "${OS}" == "Windows_NT" ]]; then
-  cd src
-  ./msvcbuild.bat debug
-
-  mkdir -p "$THIRDPARTY_BUILD/include/luajit-2.1"
-  cp *.h* "$THIRDPARTY_BUILD/include/luajit-2.1"
-  cp luajit.lib "$THIRDPARTY_BUILD/lib"
-  cp *.pdb "$THIRDPARTY_BUILD/lib"
-else
-  patch -p1 < ../luajit_make.diff
-
-  # Default MACOSX_DEPLOYMENT_TARGET is 10.4, which will fail the build at link time on macOS 10.14:
-  # ld: library not found for -lgcc_s.10.4
-  # This doesn't affect other platforms
-  MACOSX_DEPLOYMENT_TARGET=10.6 DEFAULT_CC=${CC} TARGET_CFLAGS=${CFLAGS} TARGET_LDFLAGS=${CFLAGS} \
-    CFLAGS="" make V=1 PREFIX="$THIRDPARTY_BUILD" install
-fi
+# Default MACOSX_DEPLOYMENT_TARGET is 10.4, which will fail the build at link time on macOS 10.14:
+# ld: library not found for -lgcc_s.10.4
+# This doesn't affect other platforms
+MACOSX_DEPLOYMENT_TARGET=10.6 DEFAULT_CC=${CC} TARGET_CFLAGS=${CFLAGS} TARGET_LDFLAGS=${CFLAGS} \
+  CFLAGS="" make V=1 PREFIX="$THIRDPARTY_BUILD" install

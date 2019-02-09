@@ -37,10 +37,16 @@ public:
   virtual Filesystem::Instance& fileSystem() PURE;
 
   /**
-   * @return a reference to the TimeSystem
-   * TODO(jmarantz): change this to return a TimeSource.
+   * @return a reference to the TimeSource
    */
-  virtual Event::TimeSystem& timeSystem() PURE;
+  virtual TimeSource& timeSource() PURE;
+
+  /**
+   * TODO(jmarantz): This is exposed for now only for the dispatcher. We will
+   * do a refactor in the future to remove the need for this accessor.
+   * @return a reference to the time-system
+   */
+  virtual Event::TimeSystem& timeSystemForDispatcher() PURE;
 };
 
 typedef std::unique_ptr<Api> ApiPtr;

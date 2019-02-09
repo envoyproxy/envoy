@@ -29,7 +29,8 @@ static HostSharedPtr newTestHost(Upstream::ClusterInfoConstSharedPtr cluster,
   return HostSharedPtr{
       new HostImpl(cluster, "", Network::Utility::resolveUrl(url),
                    envoy::api::v2::core::Metadata::default_instance(), weight, locality,
-                   envoy::api::v2::endpoint::Endpoint::HealthCheckConfig::default_instance(), 0)};
+                   envoy::api::v2::endpoint::Endpoint::HealthCheckConfig::default_instance(), 0,
+                   envoy::api::v2::core::HealthStatus::UNKNOWN)};
 }
 
 // Simulate weighted LR load balancer.
