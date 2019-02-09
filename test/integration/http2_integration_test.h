@@ -4,8 +4,8 @@
 #include "test/test_common/test_base.h"
 
 namespace Envoy {
-class Http2IntegrationTest : public HttpIntegrationTest,
-                             public TestBaseWithParam<Network::Address::IpVersion> {
+class Http2IntegrationTest : public TestBaseWithParam<Network::Address::IpVersion>,
+                             public HttpIntegrationTest {
 public:
   Http2IntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam(), realTime()) {}

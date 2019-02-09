@@ -196,7 +196,7 @@ public:
   }
 
 protected:
-  ConfigSubscriptionInstanceBase(const std::string& name, const std::string& manager_identifier,
+  ConfigSubscriptionInstanceBase(const std::string& name, const uint64_t manager_identifier,
                                  ConfigProviderManagerImplBase& config_provider_manager,
                                  TimeSource& time_source, const SystemTime& last_updated,
                                  const LocalInfo::LocalInfo& local_info)
@@ -222,7 +222,7 @@ private:
   const std::string name_;
   std::function<void()> initialize_callback_;
   std::unordered_set<MutableConfigProviderImplBase*> mutable_config_providers_;
-  const std::string manager_identifier_;
+  const uint64_t manager_identifier_;
   ConfigProviderManagerImplBase& config_provider_manager_;
   TimeSource& time_source_;
   SystemTime last_updated_;
@@ -346,7 +346,7 @@ protected:
   using ConfigProviderMap = std::unordered_map<ConfigProviderInstanceType,
                                                std::unique_ptr<ConfigProviderSet>, EnumClassHash>;
   using ConfigSubscriptionMap =
-      std::unordered_map<std::string, std::weak_ptr<ConfigSubscriptionInstanceBase>>;
+      std::unordered_map<uint64_t, std::weak_ptr<ConfigSubscriptionInstanceBase>>;
 
   ConfigProviderManagerImplBase(Server::Admin& admin, const std::string& config_name);
 
@@ -369,15 +369,15 @@ protected:
    * @return std::shared_ptr<T> an existing (if a match is found) or newly allocated subscription.
    */
   template <typename T>
-  std::shared_ptr<T> getSubscription(
-      const Protobuf::Message& config_source_proto, Init::Manager& init_manager,
-      const std::function<ConfigSubscriptionInstanceBaseSharedPtr(
-          const std::string&, ConfigProviderManagerImplBase&)>& subscription_factory_fn) {
+  std::shared_ptr<T>
+  getSubscription(const Protobuf::Message& config_source_proto, Init::Manager& init_manager,
+                  const std::function<ConfigSubscriptionInstanceBaseSharedPtr(
+                      const uint64_t, ConfigProviderManagerImplBase&)>& subscription_factory_fn) {
     static_assert(std::is_base_of<ConfigSubscriptionInstanceBase, T>::value,
                   "T must be a subclass of ConfigSubscriptionInstanceBase");
 
     ConfigSubscriptionInstanceBaseSharedPtr subscription;
-    const std::string manager_identifier = config_source_proto.SerializeAsString();
+    const uint64_t manager_identifier = MessageUtil::hash(config_source_proto);
 
     auto it = config_subscriptions_.find(manager_identifier);
     if (it == config_subscriptions_.end()) {
@@ -401,12 +401,12 @@ protected:
   }
 
 private:
-  void bindSubscription(const std::string& manager_identifier,
+  void bindSubscription(const uint64_t manager_identifier,
                         ConfigSubscriptionInstanceBaseSharedPtr& subscription) {
     config_subscriptions_.insert({manager_identifier, subscription});
   }
 
-  void unbindSubscription(const std::string& manager_identifier) {
+  void unbindSubscription(const uint64_t manager_identifier) {
     config_subscriptions_.erase(manager_identifier);
   }
 
