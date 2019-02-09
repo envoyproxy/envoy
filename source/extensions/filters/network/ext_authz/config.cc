@@ -31,7 +31,7 @@ Network::FilterFactoryCb ExtAuthzConfigFactory::createFilterFactoryFromProtoType
             grpc_service, context.scope(), true);
 
     auto client = std::make_unique<Filters::Common::ExtAuthz::GrpcClientImpl>(
-        async_client_factory->create(), std::chrono::milliseconds(timeout_ms));
+        async_client_factory->create(), std::chrono::milliseconds(timeout_ms), false);
     filter_manager.addReadFilter(Network::ReadFilterSharedPtr{
         std::make_shared<Filter>(ext_authz_config, std::move(client))});
   };
