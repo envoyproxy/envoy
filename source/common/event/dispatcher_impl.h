@@ -33,7 +33,7 @@ public:
   event_base& base() { return *base_; }
 
   // Event::Dispatcher
-  TimeSystem& timeSystem() override { return api_.timeSystem(); }
+  TimeSource& timeSource() override { return api_.timeSource(); }
   void clearDeferredDeleteList() override;
   Network::ConnectionPtr
   createServerConnection(Network::ConnectionSocketPtr&& socket,

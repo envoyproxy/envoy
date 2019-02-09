@@ -24,7 +24,7 @@ public:
              const RateLimitSettings& rate_limit_settings)
       : async_client_(std::move(async_client)), service_method_(service_method),
         control_plane_stats_(generateControlPlaneStats(scope)), random_(random),
-        time_source_(dispatcher.timeSystem()),
+        time_source_(dispatcher.timeSource()),
         rate_limiting_enabled_(rate_limit_settings.enabled_) {
     retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
     if (rate_limiting_enabled_) {

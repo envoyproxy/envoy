@@ -47,7 +47,7 @@ std::atomic<uint64_t> ConnectionImpl::next_global_id_;
 ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPtr&& socket,
                                TransportSocketPtr&& transport_socket, bool connected)
     : transport_socket_(std::move(transport_socket)), socket_(std::move(socket)),
-      filter_manager_(*this, *this), stream_info_(dispatcher.timeSystem()),
+      filter_manager_(*this, *this), stream_info_(dispatcher.timeSource()),
       write_buffer_(
           dispatcher.getWatermarkFactory().create([this]() -> void { this->onLowWatermark(); },
                                                   [this]() -> void { this->onHighWatermark(); })),

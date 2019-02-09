@@ -493,7 +493,7 @@ void Filter::maybeDoShadowing() {
 void Filter::onRequestComplete() {
   downstream_end_stream_ = true;
   Event::Dispatcher& dispatcher = callbacks_->dispatcher();
-  downstream_request_complete_time_ = dispatcher.timeSystem().monotonicTime();
+  downstream_request_complete_time_ = dispatcher.timeSource().monotonicTime();
 
   // Possible that we got an immediate reset.
   if (upstream_request_) {
@@ -719,7 +719,7 @@ void Filter::onUpstreamHeaders(const uint64_t response_code, Http::HeaderMapPtr&
   // premature response.
   if (DateUtil::timePointValid(downstream_request_complete_time_)) {
     Event::Dispatcher& dispatcher = callbacks_->dispatcher();
-    MonotonicTime response_received_time = dispatcher.timeSystem().monotonicTime();
+    MonotonicTime response_received_time = dispatcher.timeSource().monotonicTime();
     std::chrono::milliseconds ms = std::chrono::duration_cast<std::chrono::milliseconds>(
         response_received_time - downstream_request_complete_time_);
     if (!config_.suppress_envoy_headers_) {
@@ -792,7 +792,7 @@ void Filter::onUpstreamComplete() {
       DateUtil::timePointValid(downstream_request_complete_time_)) {
     Event::Dispatcher& dispatcher = callbacks_->dispatcher();
     std::chrono::milliseconds response_time = std::chrono::duration_cast<std::chrono::milliseconds>(
-        dispatcher.timeSystem().monotonicTime() - downstream_request_complete_time_);
+        dispatcher.timeSource().monotonicTime() - downstream_request_complete_time_);
 
     upstream_request_->upstream_host_->outlierDetector().putResponseTime(response_time);
 
@@ -925,7 +925,7 @@ void Filter::doRetry() {
 
 Filter::UpstreamRequest::UpstreamRequest(Filter& parent, Http::ConnectionPool::Instance& pool)
     : parent_(parent), conn_pool_(pool), grpc_rq_success_deferred_(false),
-      stream_info_(pool.protocol(), parent_.callbacks_->dispatcher().timeSystem()),
+      stream_info_(pool.protocol(), parent_.callbacks_->dispatcher().timeSource()),
       calling_encode_headers_(false), upstream_canary_(false), encode_complete_(false),
       encode_trailers_(false) {
 

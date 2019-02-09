@@ -24,7 +24,7 @@ Network::FilterFactoryCb MongoProxyFilterConfigFactory::createFilterFactoryFromP
   AccessLogSharedPtr access_log;
   if (!proto_config.access_log().empty()) {
     access_log.reset(new AccessLog(proto_config.access_log(), context.accessLogManager(),
-                                   context.dispatcher().timeSystem()));
+                                   context.dispatcher().timeSource()));
   }
 
   FaultConfigSharedPtr fault_config;
@@ -39,7 +39,7 @@ Network::FilterFactoryCb MongoProxyFilterConfigFactory::createFilterFactoryFromP
           emit_dynamic_metadata](Network::FilterManager& filter_manager) -> void {
     filter_manager.addFilter(std::make_shared<ProdProxyFilter>(
         stat_prefix, context.scope(), context.runtime(), access_log, fault_config,
-        context.drainDecision(), context.random(), context.dispatcher().timeSystem(),
+        context.drainDecision(), context.random(), context.dispatcher().timeSource(),
         emit_dynamic_metadata));
   };
 }

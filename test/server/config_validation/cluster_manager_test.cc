@@ -32,7 +32,7 @@ TEST(ValidationClusterManagerTest, MockedMethods) {
   NiceMock<Runtime::MockRandomGenerator> random;
   testing::NiceMock<Secret::MockSecretManager> secret_manager;
   auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
-  Extensions::TransportSockets::Tls::ContextManagerImpl ssl_context_manager{api->timeSystem()};
+  Extensions::TransportSockets::Tls::ContextManagerImpl ssl_context_manager{api->timeSource()};
   NiceMock<Event::MockDispatcher> dispatcher;
   LocalInfo::MockLocalInfo local_info;
   NiceMock<Server::MockAdmin> admin;

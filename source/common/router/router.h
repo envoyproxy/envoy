@@ -112,7 +112,7 @@ public:
                      context.runtime(), context.random(), std::move(shadow_writer),
                      PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, dynamic_stats, true),
                      config.start_child_span(), config.suppress_envoy_headers(),
-                     context.api().timeSystem(), context.httpContext()) {
+                     context.api().timeSource(), context.httpContext()) {
     for (const auto& upstream_log : config.upstream_log()) {
       upstream_logs_.push_back(AccessLog::AccessLogFactory::fromProto(upstream_log, context));
     }

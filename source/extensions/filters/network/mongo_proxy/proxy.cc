@@ -58,11 +58,11 @@ ProxyFilter::ProxyFilter(const std::string& stat_prefix, Stats::Scope& scope,
                          Runtime::Loader& runtime, AccessLogSharedPtr access_log,
                          const FaultConfigSharedPtr& fault_config,
                          const Network::DrainDecision& drain_decision,
-                         Runtime::RandomGenerator& generator, Event::TimeSystem& time_system,
+                         Runtime::RandomGenerator& generator, TimeSource& time_source,
                          bool emit_dynamic_metadata)
     : stat_prefix_(stat_prefix), scope_(scope), stats_(generateStats(stat_prefix, scope)),
       runtime_(runtime), drain_decision_(drain_decision), generator_(generator),
-      access_log_(access_log), fault_config_(fault_config), time_system_(time_system),
+      access_log_(access_log), fault_config_(fault_config), time_source_(time_source),
       emit_dynamic_metadata_(emit_dynamic_metadata) {
   if (!runtime_.snapshot().featureEnabled(MongoRuntimeConfig::get().ConnectionLoggingEnabled,
                                           100)) {
@@ -283,7 +283,7 @@ void ProxyFilter::chargeReplyStats(ActiveQuery& active_query, const std::string&
   scope_.histogram(fmt::format("{}.reply_size", prefix)).recordValue(reply_documents_byte_size);
   scope_.histogram(fmt::format("{}.reply_time_ms", prefix))
       .recordValue(std::chrono::duration_cast<std::chrono::milliseconds>(
-                       time_system_.monotonicTime() - active_query.start_time_)
+                       time_source_.monotonicTime() - active_query.start_time_)
                        .count());
 }
 

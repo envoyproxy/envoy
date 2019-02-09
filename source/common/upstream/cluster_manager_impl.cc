@@ -179,7 +179,7 @@ ClusterManagerImpl::ClusterManagerImpl(
       init_helper_([this](Cluster& cluster) { onClusterInit(cluster); }),
       config_tracker_entry_(
           admin.getConfigTracker().add("clusters", [this] { return dumpClusterConfigs(); })),
-      time_source_(main_thread_dispatcher.timeSystem()), dispatcher_(main_thread_dispatcher),
+      time_source_(main_thread_dispatcher.timeSource()), dispatcher_(main_thread_dispatcher),
       http_context_(http_context) {
   async_client_manager_ =
       std::make_unique<Grpc::AsyncClientManagerImpl>(*this, tls, time_source_, api);

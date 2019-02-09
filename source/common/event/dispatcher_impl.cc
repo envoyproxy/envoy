@@ -34,7 +34,7 @@ DispatcherImpl::DispatcherImpl(Api::Api& api)
 
 DispatcherImpl::DispatcherImpl(Buffer::WatermarkFactoryPtr&& factory, Api::Api& api)
     : api_(api), buffer_factory_(std::move(factory)), base_(event_base_new()),
-      scheduler_(api.timeSystem().createScheduler(base_)),
+      scheduler_(api.timeSystemForDispatcher().createScheduler(base_)),
       deferred_delete_timer_(createTimer([this]() -> void { clearDeferredDeleteList(); })),
       post_timer_(createTimer([this]() -> void { runPostCallbacks(); })),
       current_to_delete_(&to_delete_1_) {

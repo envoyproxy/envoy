@@ -128,7 +128,7 @@ public:
   ProxyFilter(const std::string& stat_prefix, Stats::Scope& scope, Runtime::Loader& runtime,
               AccessLogSharedPtr access_log, const FaultConfigSharedPtr& fault_config,
               const Network::DrainDecision& drain_decision, Runtime::RandomGenerator& generator,
-              Event::TimeSystem& time_system, bool emit_dynamic_metadata);
+              TimeSource& time_system, bool emit_dynamic_metadata);
   ~ProxyFilter();
 
   virtual DecoderPtr createDecoder(DecoderCallbacks& callbacks) PURE;
@@ -163,7 +163,7 @@ public:
 private:
   struct ActiveQuery {
     ActiveQuery(ProxyFilter& parent, const QueryMessage& query)
-        : parent_(parent), query_info_(query), start_time_(parent_.time_system_.monotonicTime()) {
+        : parent_(parent), query_info_(query), start_time_(parent_.time_source_.monotonicTime()) {
       parent_.stats_.op_query_active_.inc();
     }
 
@@ -208,7 +208,7 @@ private:
   const FaultConfigSharedPtr fault_config_;
   Event::TimerPtr delay_timer_;
   Event::TimerPtr drain_close_timer_;
-  Event::TimeSystem& time_system_;
+  TimeSource& time_source_;
   const bool emit_dynamic_metadata_;
 };
 

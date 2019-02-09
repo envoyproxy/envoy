@@ -38,9 +38,9 @@ class SocketTapConfigImpl : public Extensions::Common::Tap::TapConfigBaseImpl,
                             public std::enable_shared_from_this<SocketTapConfigImpl> {
 public:
   SocketTapConfigImpl(envoy::service::tap::v2alpha::TapConfig&& proto_config,
-                      Extensions::Common::Tap::Sink* admin_streamer, Event::TimeSystem& time_system)
+                      Extensions::Common::Tap::Sink* admin_streamer, TimeSource& time_system)
       : Extensions::Common::Tap::TapConfigBaseImpl(std::move(proto_config), admin_streamer),
-        time_system_(time_system) {}
+        time_source_(time_system) {}
 
   // SocketTapConfig
   PerSocketTapperPtr createPerSocketTapper(const Network::Connection& connection) override {
@@ -48,7 +48,7 @@ public:
   }
 
 private:
-  Event::TimeSystem& time_system_;
+  TimeSource& time_source_;
 
   friend class PerSocketTapperImpl;
 };

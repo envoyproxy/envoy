@@ -183,7 +183,7 @@ public:
   Http::Context& httpContext() override { return http_context_; }
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
   const LocalInfo::LocalInfo& localInfo() override { return *local_info_; }
-  Event::TimeSystem& timeSystem() override { return time_system_; }
+  TimeSource& timeSource() override { return time_source_; }
 
   std::chrono::milliseconds statsFlushInterval() const override {
     return config_.statsFlushInterval();
@@ -201,7 +201,7 @@ private:
 
   bool shutdown_;
   const Options& options_;
-  Event::TimeSystem& time_system_;
+  TimeSource& time_source_;
   HotRestart& restarter_;
   const time_t start_time_;
   time_t original_start_time_;

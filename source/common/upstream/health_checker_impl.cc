@@ -52,7 +52,7 @@ HealthCheckerFactory::create(const envoy::api::v2::core::HealthCheck& health_che
   HealthCheckEventLoggerPtr event_logger;
   if (!health_check_config.event_log_path().empty()) {
     event_logger = std::make_unique<HealthCheckEventLoggerImpl>(
-        log_manager, dispatcher.timeSystem(), health_check_config.event_log_path());
+        log_manager, dispatcher.timeSource(), health_check_config.event_log_path());
   }
   switch (health_check_config.health_checker_case()) {
   case envoy::api::v2::core::HealthCheck::HealthCheckerCase::kHttpHealthCheck:
@@ -156,7 +156,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
       {Http::Headers::get().Path, parent_.path_},
       {Http::Headers::get().UserAgent, Http::Headers::get().UserAgentValues.EnvoyHealthChecker}};
   Router::FilterUtility::setUpstreamScheme(request_headers, *parent_.cluster_.info());
-  StreamInfo::StreamInfoImpl stream_info(protocol_, parent_.dispatcher_.timeSystem());
+  StreamInfo::StreamInfoImpl stream_info(protocol_, parent_.dispatcher_.timeSource());
   stream_info.setDownstreamLocalAddress(local_address_);
   stream_info.setDownstreamRemoteAddress(local_address_);
   stream_info.onUpstreamHostSelected(host_);

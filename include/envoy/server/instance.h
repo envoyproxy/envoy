@@ -199,9 +199,9 @@ public:
   virtual const LocalInfo::LocalInfo& localInfo() PURE;
 
   /**
-   * @return the time system used for the server.
+   * @return the time source used for the server.
    */
-  virtual Event::TimeSystem& timeSystem() PURE;
+  virtual TimeSource& timeSource() PURE;
 
   /**
    * @return the flush interval of stats sinks.

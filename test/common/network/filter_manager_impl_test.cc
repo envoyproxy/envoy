@@ -244,7 +244,7 @@ TEST_F(NetworkFilterManagerTest, RateLimitAndTcpProxy) {
   TcpProxy::ConfigSharedPtr tcp_proxy_config(new TcpProxy::Config(tcp_proxy, factory_context));
   manager.addReadFilter(
       std::make_shared<TcpProxy::Filter>(tcp_proxy_config, factory_context.cluster_manager_,
-                                         factory_context.dispatcher().timeSystem()));
+                                         factory_context.dispatcher().timeSource()));
 
   Extensions::Filters::Common::RateLimit::RequestCallbacks* request_callbacks{};
   EXPECT_CALL(*rl_client, limit(_, "foo",
