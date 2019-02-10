@@ -419,7 +419,8 @@ public:
 };
 
 ApiPtr createApiForTest() {
-  return std::make_unique<TestImpl>(std::chrono::milliseconds(1000), Thread::threadFactoryForTest());
+  return std::make_unique<TestImpl>(std::chrono::milliseconds(1000),
+                                    Thread::threadFactoryForTest());
 }
 
 ApiPtr createApiForTest(Stats::Store& stat_store) {
