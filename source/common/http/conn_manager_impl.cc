@@ -47,7 +47,7 @@ void recordLatestDataFilter(const typename FilterList<T>::iterator current_filte
                             T** latest_filter, const FilterList<T>& filters) {
   // If this is the first time we're calling onData, just record the current filter.
   if (*latest_filter == nullptr) {
-    *latest_filter = &**current_filter;
+    *latest_filter = current_filter->get();
     return;
   }
 
@@ -55,8 +55,8 @@ void recordLatestDataFilter(const typename FilterList<T>::iterator current_filte
   // onData callback. To do so, we compare the current latest with the *previous* filter. If they
   // match, then we must be processing a new filter for the first time. We omit this check if we're
   // the first filter, since the above check handles that case.
-  if (current_filter != filters.begin() && *latest_filter == &**std::prev(current_filter)) {
-    *latest_filter = &**current_filter;
+  if (current_filter != filters.begin() && *latest_filter == std::prev(current_filter)->get()) {
+    *latest_filter = current_filter->get();
   }
 }
 
