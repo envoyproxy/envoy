@@ -18,6 +18,7 @@ api_proto_library_internal(
         "external_auth.proto",
     ],
     has_services = 1,
+    visibility = ["//visibility:public"],
     deps = [
         ":attribute_context",
         "//envoy/api/v2/core:base",

@@ -21,21 +21,6 @@ envoy_cmake_external(
 )
 
 envoy_cmake_external(
-    name = "benchmark",
-    cache_entries = {
-        "BENCHMARK_ENABLE_GTEST_TESTS": "OFF",
-        "BENCHMARK_ENABLE_TESTING": "OFF",
-    },
-    copy_pdb = True,
-    lib_source = "@com_github_google_benchmark//:all",
-    postfix_script = "mkdir -p $INSTALLDIR/include/testing/base/public && cp $BUILD_TMPDIR/$INSTALL_PREFIX/include/benchmark/benchmark.h $INSTALLDIR/include/testing/base/public/benchmark.h",
-    static_libraries = select({
-        "//bazel:windows_x86_64": ["benchmark.lib"],
-        "//conditions:default": ["libbenchmark.a"],
-    }),
-)
-
-envoy_cmake_external(
     name = "event",
     cache_entries = {
         "EVENT__DISABLE_OPENSSL": "on",

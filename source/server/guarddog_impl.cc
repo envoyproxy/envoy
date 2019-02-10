@@ -18,7 +18,7 @@ namespace Server {
 
 GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuration::Main& config,
                            Api::Api& api)
-    : time_system_(api.timeSystem()), miss_timeout_(config.wdMissTimeout()),
+    : time_source_(api.timeSource()), miss_timeout_(config.wdMissTimeout()),
       megamiss_timeout_(config.wdMegaMissTimeout()), kill_timeout_(config.wdKillTimeout()),
       multi_kill_timeout_(config.wdMultiKillTimeout()),
       loop_interval_([&]() -> std::chrono::milliseconds {
@@ -40,7 +40,7 @@ GuardDogImpl::~GuardDogImpl() { stop(); }
 
 void GuardDogImpl::threadRoutine() {
   do {
-    const auto now = time_system_.monotonicTime();
+    const auto now = time_source_.monotonicTime();
     bool seen_one_multi_timeout(false);
     Thread::LockGuard guard(wd_lock_);
     for (auto& watched_dog : watched_dogs_) {
@@ -85,11 +85,11 @@ void GuardDogImpl::threadRoutine() {
 WatchDogSharedPtr GuardDogImpl::createWatchDog(Thread::ThreadIdPtr&& thread_id) {
   // Timer started by WatchDog will try to fire at 1/2 of the interval of the
   // minimum timeout specified. loop_interval_ is const so all shared state
-  // accessed out of the locked section below is const (time_system_ has no
+  // accessed out of the locked section below is const (time_source_ has no
   // state).
   auto wd_interval = loop_interval_ / 2;
   WatchDogSharedPtr new_watchdog =
-      std::make_shared<WatchDogImpl>(std::move(thread_id), time_system_, wd_interval);
+      std::make_shared<WatchDogImpl>(std::move(thread_id), time_source_, wd_interval);
   WatchedDog watched_dog;
   watched_dog.dog_ = new_watchdog;
   {
