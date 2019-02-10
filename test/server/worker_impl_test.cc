@@ -32,6 +32,13 @@ public:
     no_exit_timer_->enableTimer(std::chrono::hours(1));
   }
 
+  ~WorkerImplTest() override {
+    // We init no_exit_timer_ before worker_ because the dispatcher will be
+    // moved into the worker. However we need to destruct no_exit_timer_ before
+    // destructing the worker, otherwise the timer will outlive its dispatcher.
+    no_exit_timer_.reset();
+  }
+
   Stats::IsolatedStoreImpl stats_store_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   Network::MockConnectionHandler* handler_ = new Network::MockConnectionHandler();
@@ -39,8 +46,8 @@ public:
   NiceMock<MockOverloadManager> overload_manager_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
-  Event::TimerPtr no_exit_timer_;
   DefaultTestHooks hooks_;
+  Event::TimerPtr no_exit_timer_;
   WorkerImpl worker_;
 };
 
