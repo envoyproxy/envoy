@@ -16,10 +16,10 @@ public:
   Http::FilterDataStatus decodeData(Buffer::Instance&, bool end_stream) {
     if (end_stream) {
       decoder_callbacks_->modifyDecodingBuffer([](auto& buffer) {
-          // Append the buffer with itself.
-          buffer.add(buffer);
-          });
-    return Http::FilterDataStatus::Continue;
+        // Append the buffer with itself.
+        buffer.add(buffer);
+      });
+      return Http::FilterDataStatus::Continue;
     }
 
     return Http::FilterDataStatus::StopIterationAndBuffer;
@@ -28,18 +28,17 @@ public:
   Http::FilterDataStatus encodeData(Buffer::Instance&, bool end_stream) {
     if (end_stream) {
       encoder_callbacks_->modifyEncodingBuffer([](auto& buffer) {
-          // Append the buffer with itself.
-          buffer.add(buffer);
-          });
-    return Http::FilterDataStatus::Continue;
+        // Append the buffer with itself.
+        buffer.add(buffer);
+      });
+      return Http::FilterDataStatus::Continue;
     }
 
     return Http::FilterDataStatus::StopIterationAndBuffer;
   }
 };
 
-class ModifyBuffferFilterConfig
-    : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
+class ModifyBuffferFilterConfig : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
 public:
   ModifyBuffferFilterConfig() : EmptyHttpFilterConfig("modify-buffer-filter") {}
 
@@ -55,4 +54,4 @@ static Registry::RegisterFactory<ModifyBuffferFilterConfig,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
     register_;
 
-    }
+} // namespace Envoy

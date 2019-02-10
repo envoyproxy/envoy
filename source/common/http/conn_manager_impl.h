@@ -398,7 +398,6 @@ private:
       // Used to track which filter is the latest filter that has received data.
       ActiveStreamEncoderFilter* latest_data_encoding_filter_{};
       ActiveStreamDecoderFilter* latest_data_decoding_filter_{};
-      
     };
 
     // Possibly increases buffer_limit_ to the value of limit.

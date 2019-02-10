@@ -36,7 +36,6 @@ envoy_cc_test_library(
     ],
 )
 
-
 envoy_cc_test_library(
     name = "passthrough_filter_config_lib",
     srcs = [
