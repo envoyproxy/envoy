@@ -534,8 +534,10 @@ void Filter::onResponseTimeout() {
 void Filter::onUpstreamReset(UpstreamResetType type,
                              const absl::optional<Http::StreamResetReason>& reset_reason) {
   ASSERT(type == UpstreamResetType::GlobalTimeout || upstream_request_);
+  const std::string reset_reason_str =
+      reset_reason ? resetReasonToString(reset_reason.value()) : "";
   if (type == UpstreamResetType::Reset) {
-    ENVOY_STREAM_LOG(debug, "upstream reset", *callbacks_);
+    ENVOY_STREAM_LOG(debug, "upstream reset: reset reason {}", *callbacks_, reset_reason_str);
   }
 
   Upstream::HostDescriptionConstSharedPtr upstream_host;
@@ -583,7 +585,7 @@ void Filter::onUpstreamReset(UpstreamResetType type,
     // This will destroy any created retry timers.
     cleanup();
     Http::Code code;
-    const char* body;
+    std::string body;
     if (type == UpstreamResetType::GlobalTimeout || type == UpstreamResetType::PerTryTimeout) {
       callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamRequestTimeout);
 
@@ -594,7 +596,9 @@ void Filter::onUpstreamReset(UpstreamResetType type,
           streamResetReasonToResponseFlag(reset_reason.value());
       callbacks_->streamInfo().setResponseFlag(response_flags);
       code = Http::Code::ServiceUnavailable;
-      body = "upstream connect error or disconnect/reset before headers";
+      body =
+          absl::StrCat("upstream connect error or disconnect/reset before headers. reset reason: ",
+                       reset_reason_str);
     }
 
     const bool dropped = reset_reason && reset_reason.value() == Http::StreamResetReason::Overflow;
@@ -606,7 +610,7 @@ void Filter::onUpstreamReset(UpstreamResetType type,
     if (upstream_host != nullptr && !Http::CodeUtility::is5xx(enumToInt(code))) {
       upstream_host->stats().rq_error_.inc();
     }
-    callbacks_->sendLocalReply(code, body,
+    callbacks_->sendLocalReply(code, body.c_str(),
                                [dropped, this](Http::HeaderMap& headers) {
                                  if (dropped && !config_.suppress_envoy_headers_) {
                                    headers.insertEnvoyOverloaded().value(
@@ -632,6 +636,27 @@ Filter::streamResetReasonToResponseFlag(Http::StreamResetReason reset_reason) {
   case Http::StreamResetReason::RemoteReset:
   case Http::StreamResetReason::RemoteRefusedStreamReset:
     return StreamInfo::ResponseFlag::UpstreamRemoteReset;
+  }
+
+  throw std::invalid_argument("Unknown reset_reason");
+}
+
+const std::string Filter::resetReasonToString(Http::StreamResetReason reset_reason) const {
+  switch (reset_reason) {
+  case Http::StreamResetReason::ConnectionFailure:
+    return "connection failure";
+  case Http::StreamResetReason::ConnectionTermination:
+    return "connection termination";
+  case Http::StreamResetReason::LocalReset:
+    return "local reset";
+  case Http::StreamResetReason::LocalRefusedStreamReset:
+    return "local refused stream reset";
+  case Http::StreamResetReason::Overflow:
+    return "overflow";
+  case Http::StreamResetReason::RemoteReset:
+    return "remote reset";
+  case Http::StreamResetReason::RemoteRefusedStreamReset:
+    return "remote refused stream reset";
   }
 
   throw std::invalid_argument("Unknown reset_reason");

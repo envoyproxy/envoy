@@ -355,6 +355,8 @@ private:
 
   StreamInfo::ResponseFlag streamResetReasonToResponseFlag(Http::StreamResetReason reset_reason);
 
+  const std::string resetReasonToString(Http::StreamResetReason reset_reason) const;
+
   static const std::string upstreamZone(Upstream::HostDescriptionConstSharedPtr upstream_host);
   void chargeUpstreamCode(uint64_t response_status_code, const Http::HeaderMap& response_headers,
                           Upstream::HostDescriptionConstSharedPtr upstream_host, bool dropped);
