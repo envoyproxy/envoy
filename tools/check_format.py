@@ -16,7 +16,7 @@ import traceback
 
 EXCLUDED_PREFIXES = ("./generated/", "./thirdparty/", "./build", "./.git/", "./bazel-", "./.cache",
                      "./source/extensions/extensions_build_config.bzl",
-                     "./tools/testdata/check_format/")
+                     "./tools/testdata/check_format/", "./tools/pyformat/")
 SUFFIXES = (".cc", ".h", "BUILD", "WORKSPACE", ".bzl", ".md", ".rst", ".proto")
 DOCS_SUFFIX = (".md", ".rst")
 PROTO_SUFFIX = (".proto")
@@ -42,6 +42,10 @@ REAL_TIME_WHITELIST = ('./source/common/common/utility.h',
 # Files in these paths can use std::get_time
 GET_TIME_WHITELIST = ('./test/test_common/utility.cc')
 
+# Files in these paths can use MessageLite::SerializeAsString
+SERIALIZE_AS_STRING_WHITELIST = ('./test/common/protobuf/utility_test.cc',
+                                 './test/common/grpc/codec_test.cc')
+
 CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-7")
 BUILDIFIER_PATH = os.getenv("BUILDIFIER_BIN", "$GOPATH/bin/buildifier")
 ENVOY_BUILD_FIXER_PATH = os.path.join(
@@ -50,7 +54,10 @@ HEADER_ORDER_PATH = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), 
 SUBDIR_SET = set(common.includeDirOrder())
 INCLUDE_ANGLE = "#include <"
 INCLUDE_ANGLE_LEN = len(INCLUDE_ANGLE)
-PROTO_PACKAGE_REGEX = re.compile("package (.*);")
+PROTO_PACKAGE_REGEX = re.compile(r"^package (\S+);\n*", re.MULTILINE)
+PROTO_OPTION_JAVA_PACKAGE = "option java_package = \""
+PROTO_OPTION_JAVA_OUTER_CLASSNAME = "option java_outer_classname = \""
+PROTO_OPTION_JAVA_MULTIPLE_FILES = "option java_multiple_files = "
 
 # yapf: disable
 PROTOBUF_TYPE_ERRORS = {
@@ -147,37 +154,58 @@ def checkNamespace(file_path):
   return []
 
 
-def fixJavaProtoOptions(file_path):
+# If the substring is not found in the file, then insert to_add
+def insertProtoOptionIfNotFound(substring, file_path, to_add):
+  text = None
+  with open(file_path) as f:
+    text = f.read()
+
+  if not substring in text:
+
+    def repl(m):
+      return m.group(0).rstrip() + "\n\n" + to_add + "\n"
+
+    with open(file_path, "w") as f:
+      f.write(re.sub(PROTO_PACKAGE_REGEX, repl, text))
+
+
+def packageNameForProto(file_path):
   package_name = None
-  for line in fileinput.FileInput(file_path):
-    if line.startswith("package "):
-      result = PROTO_PACKAGE_REGEX.search(line)
-      if result is None or len(result.groups()) != 1:
-        continue
-
+  error_message = []
+  with open(file_path) as f:
+    result = PROTO_PACKAGE_REGEX.search(f.read())
+    if result is not None and len(result.groups()) == 1:
       package_name = result.group(1)
-    if "option java_package = \"io.envoyproxy.envoy" in line:
-      return []
+    if package_name is None:
+      error_message = ["Unable to find package name for proto file: %s" % file_path]
 
-  if package_name is None:
-    return ["Unable to find package name for proto file: %s" % file_path]
+  return [package_name, error_message]
 
-  to_add = "option java_package = \"io.envoyproxy.{}\";\n".format(package_name)
 
-  for line in fileinput.FileInput(file_path, inplace=True):
-    if line.startswith("package "):
-      line = line.replace(line, line + to_add)
-    sys.stdout.write(line)
-
+def fixJavaPackageProtoOption(file_path):
+  package_name = packageNameForProto(file_path)[0]
+  to_add = PROTO_OPTION_JAVA_PACKAGE + "io.envoyproxy.{}\";".format(package_name)
+  insertProtoOptionIfNotFound("\n" + PROTO_OPTION_JAVA_PACKAGE, file_path, to_add)
   return []
 
 
-def checkJavaProtoOptions(file_path):
-  for line in fileinput.FileInput(file_path):
-    if "option java_package = \"io.envoyproxy.envoy" in line:
-      return []
+# Add "option java_outer_classname = FooBarProto;" for foo_bar.proto
+def fixJavaOuterClassnameProtoOption(file_path):
+  file_name = os.path.basename(file_path)[:-len(".proto")]
+  if "-" in file_name or "." in file_name or not file_name.islower():
+    return ["Unable to decide java_outer_classname for proto file: %s" % file_path]
 
-  return ["Java proto option 'java_package' not set correctly for file: %s" % file_path]
+  to_add = PROTO_OPTION_JAVA_OUTER_CLASSNAME \
+       + "".join(x.title() for x in file_name.split("_")) \
+       + "Proto\";"
+  insertProtoOptionIfNotFound("\n" + PROTO_OPTION_JAVA_OUTER_CLASSNAME, file_path, to_add)
+  return []
+
+
+def fixJavaMultipleFilesProtoOption(file_path):
+  to_add = PROTO_OPTION_JAVA_MULTIPLE_FILES + "true;"
+  insertProtoOptionIfNotFound("\n" + PROTO_OPTION_JAVA_MULTIPLE_FILES, file_path, to_add)
+  return []
 
 
 # To avoid breaking the Lyft import, we just check for path inclusion here.
@@ -199,6 +227,10 @@ def whitelistedForGetTime(file_path):
   return file_path in GET_TIME_WHITELIST
 
 
+def whitelistedForSerializeAsString(file_path):
+  return file_path in SERIALIZE_AS_STRING_WHITELIST
+
+
 def findSubstringAndReturnError(pattern, file_path, error_message):
   with open(file_path) as f:
     text = f.read()
@@ -209,6 +241,11 @@ def findSubstringAndReturnError(pattern, file_path, error_message):
           error_messages.append("  %s:%s" % (file_path, i + 1))
       return error_messages
     return []
+
+
+def errorIfNoSubstringFound(pattern, file_path, error_message):
+  with open(file_path) as f:
+    return [] if pattern in f.read() else [file_path + ": " + error_message]
 
 
 def isApiFile(file_path):
@@ -380,6 +417,17 @@ def checkSourceLine(line, file_path, reportError):
     reportError("Don't use the '?:' operator, it is a non-standard GCC extension")
   if line.startswith('using testing::Test;'):
     reportError("Don't use 'using testing::Test;, elaborate the type instead")
+  if line.startswith('using testing::TestWithParams;'):
+    reportError("Don't use 'using testing::Test;, elaborate the type instead")
+  if file_path != './test/test_common/test_base.h' and (' testing::Test ' in line or
+                                                        ' testing::TestWithParam' in line):
+    reportError("Derive test classes from TestBase in test/test_common/test_base.h")
+  if not whitelistedForSerializeAsString(file_path) and 'SerializeAsString' in line:
+    # The MessageLite::SerializeAsString doesn't generate deterministic serialization,
+    # use MessageUtil::hash instead.
+    reportError(
+        "Don't use MessageLite::SerializeAsString for generating deterministic serialization, use MessageUtil::hash instead."
+    )
 
 
 def checkBuildLine(line, file_path, reportError):
@@ -435,7 +483,13 @@ def fixSourcePath(file_path):
       error_messages += fixHeaderOrder(file_path)
     error_messages += clangFormat(file_path)
   if file_path.endswith(PROTO_SUFFIX) and isApiFile(file_path):
-    error_messages += fixJavaProtoOptions(file_path)
+    package_name, error_message = packageNameForProto(file_path)
+    if package_name is None:
+      error_messages += error_message
+    else:
+      error_messages += fixJavaMultipleFilesProtoOption(file_path)
+      error_messages += fixJavaOuterClassnameProtoOption(file_path)
+      error_messages += fixJavaPackageProtoOption(file_path)
   return error_messages
 
 
@@ -451,7 +505,16 @@ def checkSourcePath(file_path):
     error_messages += executeCommand(command, "clang-format check failed", file_path)
 
   if file_path.endswith(PROTO_SUFFIX) and isApiFile(file_path):
-    error_messages += checkJavaProtoOptions(file_path)
+    package_name, error_message = packageNameForProto(file_path)
+    if package_name is None:
+      error_messages += error_message
+    else:
+      error_messages += errorIfNoSubstringFound("\n" + PROTO_OPTION_JAVA_PACKAGE, file_path,
+                                                "Java proto option 'java_package' not set")
+      error_messages += errorIfNoSubstringFound("\n" + PROTO_OPTION_JAVA_OUTER_CLASSNAME, file_path,
+                                                "Java proto option 'java_outer_classname' not set")
+      error_messages += errorIfNoSubstringFound("\n" + PROTO_OPTION_JAVA_MULTIPLE_FILES, file_path,
+                                                "Java proto option 'java_multiple_files' not set")
   return error_messages
 
 

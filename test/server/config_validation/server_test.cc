@@ -11,7 +11,7 @@ namespace Envoy {
 namespace Server {
 
 // Test param is the path to the config file to validate.
-class ValidationServerTest : public testing::TestWithParam<std::string> {
+class ValidationServerTest : public TestBaseWithParam<std::string> {
 public:
   static void SetupTestDirectory() {
     TestEnvironment::exec(

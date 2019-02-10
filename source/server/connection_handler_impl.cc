@@ -259,7 +259,7 @@ void ConnectionHandlerImpl::ActiveListener::onNewConnection(
   // If the connection is already closed, we can just let this connection immediately die.
   if (new_connection->state() != Network::Connection::State::Closed) {
     ActiveConnectionPtr active_connection(
-        new ActiveConnection(*this, std::move(new_connection), parent_.dispatcher_.timeSystem()));
+        new ActiveConnection(*this, std::move(new_connection), parent_.dispatcher_.timeSource()));
     active_connection->moveIntoList(std::move(active_connection), connections_);
     parent_.num_connections_++;
   }
@@ -267,9 +267,9 @@ void ConnectionHandlerImpl::ActiveListener::onNewConnection(
 
 ConnectionHandlerImpl::ActiveConnection::ActiveConnection(ActiveListener& listener,
                                                           Network::ConnectionPtr&& new_connection,
-                                                          Event::TimeSystem& time_system)
+                                                          TimeSource& time_source)
     : listener_(listener), connection_(std::move(new_connection)),
-      conn_length_(new Stats::Timespan(listener_.stats_.downstream_cx_length_ms_, time_system)) {
+      conn_length_(new Stats::Timespan(listener_.stats_.downstream_cx_length_ms_, time_source)) {
   // We just universally set no delay on connections. Theoretically we might at some point want
   // to make this configurable.
   connection_->noDelay(true);

@@ -26,12 +26,11 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_time.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "ares.h"
 #include "ares_dns.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::InSequence;
@@ -323,14 +322,12 @@ private:
   DnsResolverImpl* resolver_;
 };
 
-class DnsImplConstructor : public testing::Test {
+class DnsImplConstructor : public TestBase {
 protected:
-  DnsImplConstructor()
-      : api_(Api::createApiForTest(stats_store_)), dispatcher_(test_time_.timeSystem(), *api_) {}
+  DnsImplConstructor() : api_(Api::createApiForTest(stats_store_)), dispatcher_(*api_) {}
 
   Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
-  DangerousDeprecatedTestTime test_time_;
   Event::DispatcherImpl dispatcher_;
 };
 
@@ -405,10 +402,9 @@ TEST_F(DnsImplConstructor, BadCustomResolvers) {
                             "DNS resolver 'foo' is not an IP address");
 }
 
-class DnsImplTest : public testing::TestWithParam<Address::IpVersion> {
+class DnsImplTest : public TestBaseWithParam<Address::IpVersion> {
 public:
-  DnsImplTest()
-      : api_(Api::createApiForTest(stats_store_)), dispatcher_(test_time_.timeSystem(), *api_) {}
+  DnsImplTest() : api_(Api::createApiForTest(stats_store_)), dispatcher_(*api_) {}
 
   void SetUp() override {
     resolver_ = dispatcher_.createDnsResolver({});
@@ -441,7 +437,6 @@ protected:
   Stats::IsolatedStoreImpl stats_store_;
   std::unique_ptr<Network::Listener> listener_;
   Api::ApiPtr api_;
-  DangerousDeprecatedTestTime test_time_;
   Event::DispatcherImpl dispatcher_;
   DnsResolverSharedPtr resolver_;
 };

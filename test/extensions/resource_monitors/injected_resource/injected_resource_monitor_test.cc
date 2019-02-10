@@ -6,13 +6,12 @@
 #include "extensions/resource_monitors/injected_resource/injected_resource_monitor.h"
 
 #include "test/test_common/environment.h"
-#include "test/test_common/test_time.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -43,10 +42,10 @@ public:
   MOCK_METHOD1(onFailure, void(const EnvoyException&));
 };
 
-class InjectedResourceMonitorTest : public testing::Test {
+class InjectedResourceMonitorTest : public TestBase {
 protected:
   InjectedResourceMonitorTest()
-      : api_(Api::createApiForTest(stats_store_)), dispatcher_(test_time_.timeSystem(), *api_),
+      : api_(Api::createApiForTest(stats_store_)), dispatcher_(*api_),
         resource_filename_(TestEnvironment::temporaryPath("injected_resource")),
         file_updater_(resource_filename_), monitor_(createMonitor()) {}
 
@@ -67,7 +66,6 @@ protected:
 
   Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
-  DangerousDeprecatedTestTime test_time_;
   Event::DispatcherImpl dispatcher_;
   const std::string resource_filename_;
   AtomicFileUpdater file_updater_;
@@ -99,7 +97,7 @@ TEST_F(InjectedResourceMonitorTest, ReportsErrorForOutOfRangePressure) {
 }
 
 TEST_F(InjectedResourceMonitorTest, ReportsErrorOnFileRead) {
-  EXPECT_CALL(cb_, onFailure(ExceptionContains("unable to read file")));
+  EXPECT_CALL(cb_, onFailure(ExceptionContains("Invalid path")));
   monitor_->updateResourceUsage(cb_);
 }
 

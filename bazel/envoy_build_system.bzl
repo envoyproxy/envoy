@@ -1,5 +1,6 @@
 load("@com_google_protobuf//:protobuf.bzl", "cc_proto_library", "py_proto_library")
 load("@envoy_api//bazel:api_build_system.bzl", "api_proto_library")
+load("@rules_foreign_cc//tools/build_defs:cmake.bzl", "cmake_external")
 
 def envoy_package():
     native.package(default_visibility = ["//visibility:public"])
@@ -195,6 +196,56 @@ def envoy_include_prefix(path):
         return "/".join(path.split("/")[1:])
     return None
 
+# External CMake C++ library targets should be specified with this function. This defaults
+# to building the dependencies with ninja
+def envoy_cmake_external(
+        name,
+        cache_entries = {},
+        cmake_options = ["-GNinja"],
+        make_commands = ["ninja", "ninja install"],
+        lib_source = "",
+        postfix_script = "",
+        static_libraries = [],
+        copy_pdb = False,
+        pdb_name = "",
+        cmake_files_dir = "$BUILD_TMPDIR/CMakeFiles"):
+    # On Windows, we don't want to explicitly set CMAKE_BUILD_TYPE,
+    # rules_foreign_cc will figure it out for us
+    cache_entries_no_build_type = {key: cache_entries[key] for key in cache_entries.keys() if key != "CMAKE_BUILD_TYPE"}
+
+    pf = ""
+    if copy_pdb:
+        if pdb_name == "":
+            pdb_name = name
+
+        copy_command = "cp {cmake_files_dir}/{pdb_name}.dir/{pdb_name}.pdb $INSTALLDIR/lib/{pdb_name}.pdb".format(cmake_files_dir = cmake_files_dir, pdb_name = pdb_name)
+        if postfix_script != "":
+            copy_command = copy_command + " && " + postfix_script
+
+        pf = select({
+            "@envoy//bazel:windows_dbg_build": copy_command,
+            "//conditions:default": postfix_script,
+        })
+    else:
+        pf = postfix_script
+
+    cmake_external(
+        name = name,
+        cache_entries = select({
+            "@envoy//bazel:windows_x86_64": cache_entries_no_build_type,
+            "//conditions:default": cache_entries,
+        }),
+        cmake_options = cmake_options,
+        generate_crosstool_file = select({
+            "@envoy//bazel:windows_x86_64": True,
+            "//conditions:default": False,
+        }),
+        lib_source = lib_source,
+        make_commands = make_commands,
+        postfix_script = pf,
+        static_libraries = static_libraries,
+    )
+
 # Envoy C++ library targets that need no transformations or additional dependencies before being
 # passed to cc_library should be specified with this function. Note: this exists to ensure that
 # all envoy targets pass through an envoy-declared skylark function where they can be modified
@@ -357,10 +408,15 @@ def envoy_cc_fuzz_test(name, corpus, deps = [], tags = [], **kwargs):
         }),
         tags = tags,
     )
+
+    # This target exists only for
+    # https://github.com/google/oss-fuzz/blob/master/projects/envoy/build.sh. It won't yield
+    # anything useful on its own, as it expects to be run in an environment where the linker options
+    # provide a path to FuzzingEngine.
     native.cc_binary(
         name = name + "_driverless",
         copts = envoy_copts("@envoy", test = True),
-        linkopts = envoy_test_linkopts(),
+        linkopts = ["-lFuzzingEngine"] + envoy_test_linkopts(),
         linkstatic = 1,
         testonly = 1,
         deps = [":" + test_lib_name],
@@ -411,9 +467,9 @@ def envoy_cc_test(
         shard_count = shard_count,
     )
 
-# Envoy C++ test related libraries (that want gtest, gmock) should be specified
-# with this function.
-def envoy_cc_test_library(
+# Envoy C++ related test infrastructure (that want gtest, gmock, but may be
+# relied on by envoy_cc_test_library) should use this function.
+def envoy_cc_test_infrastructure_library(
         name,
         srcs = [],
         hdrs = [],
@@ -431,11 +487,36 @@ def envoy_cc_test_library(
         testonly = 1,
         deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] + [
             envoy_external_dep_path("googletest"),
-            repository + "//test/test_common:printers_includes",
         ],
         tags = tags,
         alwayslink = 1,
         linkstatic = 1,
+    )
+
+# Envoy C++ test related libraries (that want gtest, gmock) should be specified
+# with this function.
+def envoy_cc_test_library(
+        name,
+        srcs = [],
+        hdrs = [],
+        data = [],
+        external_deps = [],
+        deps = [],
+        repository = "",
+        tags = []):
+    deps = deps + [
+        repository + "//test/test_common:printers_includes",
+        repository + "//test/test_common:test_base",
+    ]
+    envoy_cc_test_infrastructure_library(
+        name,
+        srcs,
+        hdrs,
+        data,
+        external_deps,
+        deps,
+        repository,
+        tags,
     )
 
 # Envoy test binaries should be specified with this function.
@@ -590,4 +671,10 @@ def envoy_select_boringssl(if_fips, default = None):
     return select({
         "@envoy//bazel:boringssl_fips": if_fips,
         "//conditions:default": default or [],
+    })
+
+def envoy_select_quiche(xs, repository = ""):
+    return select({
+        repository + "//bazel:enable_quiche": xs,
+        "//conditions:default": [],
     })

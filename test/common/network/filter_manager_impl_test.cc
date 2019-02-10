@@ -20,9 +20,9 @@
 #include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::InSequence;
@@ -34,7 +34,7 @@ using testing::WithArgs;
 namespace Envoy {
 namespace Network {
 
-class NetworkFilterManagerTest : public testing::Test, public BufferSource {
+class NetworkFilterManagerTest : public TestBase, public BufferSource {
 public:
   StreamBuffer getReadBuffer() override { return {read_buffer_, read_end_stream_}; }
   StreamBuffer getWriteBuffer() override { return {write_buffer_, write_end_stream_}; }
@@ -244,7 +244,7 @@ TEST_F(NetworkFilterManagerTest, RateLimitAndTcpProxy) {
   TcpProxy::ConfigSharedPtr tcp_proxy_config(new TcpProxy::Config(tcp_proxy, factory_context));
   manager.addReadFilter(
       std::make_shared<TcpProxy::Filter>(tcp_proxy_config, factory_context.cluster_manager_,
-                                         factory_context.dispatcher().timeSystem()));
+                                         factory_context.dispatcher().timeSource()));
 
   Extensions::Filters::Common::RateLimit::RequestCallbacks* request_callbacks{};
   EXPECT_CALL(*rl_client, limit(_, "foo",

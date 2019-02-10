@@ -132,20 +132,15 @@ class BaseIntegrationTest : Logger::Loggable<Logger::Id::testing> {
 public:
   using TestTimeSystemPtr = std::unique_ptr<Event::TestTimeSystem>;
 
-  BaseIntegrationTest(Network::Address::IpVersion version, TestTimeSystemPtr time_system,
+  BaseIntegrationTest(Network::Address::IpVersion version,
                       const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG);
+  BaseIntegrationTest(Network::Address::IpVersion version, TestTimeSystemPtr,
+                      const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG)
+      : BaseIntegrationTest(version, config) {}
 
   virtual ~BaseIntegrationTest() {}
 
-  /**
-   * Helper function to create a simulated time integration test during construction.
-   */
-  static TestTimeSystemPtr simTime() { return std::make_unique<Event::SimulatedTimeSystem>(); }
-
-  /**
-   * Helper function to create a wall-clock time integration test during construction.
-   */
-  static TestTimeSystemPtr realTime() { return std::make_unique<Event::TestRealTimeSystem>(); }
+  static TestTimeSystemPtr realTime() { return TestTimeSystemPtr(); }
 
   // Initialize the basic proto configuration, create fake upstreams, and start Envoy.
   virtual void initialize();
@@ -182,7 +177,7 @@ public:
   void createApiTestServer(const ApiFilesystemConfig& api_filesystem_config,
                            const std::vector<std::string>& port_names);
 
-  Event::TestTimeSystem& timeSystem() { return *time_system_; }
+  Event::TestTimeSystem& timeSystem() { return time_system_; }
 
   Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
@@ -210,7 +205,7 @@ public:
   }
 
 private:
-  TestTimeSystemPtr time_system_;
+  Event::GlobalTimeSystem time_system_;
 
 public:
   Event::DispatcherPtr dispatcher_;
@@ -234,7 +229,7 @@ protected:
   // Will not return until that server is listening.
   virtual IntegrationTestServerPtr
   createIntegrationTestServer(const std::string& bootstrap_path,
-                              std::function<void()> pre_worker_start_steps,
+                              std::function<void()> on_server_init_function,
                               Event::TestTimeSystem& time_system);
 
   bool initialized() const { return initialized_; }
@@ -243,8 +238,10 @@ protected:
   Network::Address::IpVersion version_;
   // The config for envoy start-up.
   ConfigHelper config_helper_;
-  // Steps that should be done prior to the workers starting. E.g., xDS pre-init.
-  std::function<void()> pre_worker_start_test_steps_;
+
+  // Steps that should be done in parallel with the envoy server starting. E.g., xDS
+  // pre-init, control plane synchronization needed for server start.
+  std::function<void()> on_server_init_function_;
 
   std::vector<std::unique_ptr<FakeUpstream>> fake_upstreams_;
   // Target number of upstreams.

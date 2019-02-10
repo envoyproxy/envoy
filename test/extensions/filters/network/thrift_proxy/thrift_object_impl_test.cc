@@ -5,10 +5,10 @@
 #include "test/extensions/filters/network/thrift_proxy/mocks.h"
 #include "test/extensions/filters/network/thrift_proxy/utility.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::AnyNumber;
 using testing::Expectation;
@@ -18,7 +18,6 @@ using testing::NiceMock;
 using testing::Ref;
 using testing::Return;
 using testing::ReturnRef;
-using testing::TestWithParam;
 using testing::Values;
 
 namespace Envoy {
@@ -143,7 +142,7 @@ public:
   Buffer::OwnedImpl buffer_;
 };
 
-class ThriftObjectImplTest : public ThriftObjectImplTestBase, public testing::Test {};
+class ThriftObjectImplTest : public TestBase, public ThriftObjectImplTestBase {};
 
 // Test parsing an empty struct (just a stop field).
 TEST_F(ThriftObjectImplTest, ParseEmptyStruct) {
@@ -163,7 +162,7 @@ TEST_F(ThriftObjectImplTest, ParseEmptyStruct) {
 }
 
 class ThriftObjectImplValueTest : public ThriftObjectImplTestBase,
-                                  public TestWithParam<FieldType> {};
+                                  public TestBaseWithParam<FieldType> {};
 
 INSTANTIATE_TEST_SUITE_P(PrimitiveFieldTypes, ThriftObjectImplValueTest,
                          Values(FieldType::Bool, FieldType::Byte, FieldType::Double, FieldType::I16,
