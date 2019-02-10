@@ -13,12 +13,16 @@ namespace Filters {
 namespace Common {
 namespace ExtAuthz {
 
+// Values used for selecting service paths.
+// TODO(gsagula): keep only V2 when V2Alpha gets deprecated.
+constexpr char V2[] = "envoy.service.auth.v2.Authorization.Check";
+constexpr char V2alpha[] = "envoy.service.auth.v2alpha.Authorization.Check";
+
 GrpcClientImpl::GrpcClientImpl(Grpc::AsyncClientPtr&& async_client,
-                               const absl::optional<std::chrono::milliseconds>& timeout)
-    : service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-          // TODO(dio): Define the following service method name as a constant value.
-          "envoy.service.auth.v2.Authorization.Check")),
-      async_client_(std::move(async_client)), timeout_(timeout) {}
+                               const absl::optional<std::chrono::milliseconds>& timeout,
+                               bool use_alpha)
+    : service_method_(getMethodDescriptor(use_alpha)), async_client_(std::move(async_client)),
+      timeout_(timeout) {}
 
 GrpcClientImpl::~GrpcClientImpl() { ASSERT(!callbacks_); }
 
@@ -87,6 +91,14 @@ void GrpcClientImpl::toAuthzResponseHeader(
                                             header.header().value());
     }
   }
+}
+
+const Protobuf::MethodDescriptor& GrpcClientImpl::getMethodDescriptor(bool use_alpha) {
+  const auto* descriptor =
+      use_alpha ? Protobuf::DescriptorPool::generated_pool()->FindMethodByName(V2alpha)
+                : Protobuf::DescriptorPool::generated_pool()->FindMethodByName(V2);
+  ASSERT(descriptor != nullptr);
+  return *descriptor;
 }
 
 } // namespace ExtAuthz

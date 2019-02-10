@@ -19,7 +19,7 @@ Network::FilterFactoryCb DubboProxyFilterConfigFactory::createFilterFactoryFromP
   return [stat_prefix, &proto_config, &context](Network::FilterManager& filter_manager) -> void {
     filter_manager.addFilter(std::make_shared<Filter>(
         stat_prefix, proto_config.protocol_type(), proto_config.serialization_type(),
-        context.scope(), context.dispatcher().timeSystem()));
+        context.scope(), context.dispatcher().timeSource()));
   };
 }
 
