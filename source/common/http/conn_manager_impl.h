@@ -396,8 +396,8 @@ private:
       bool is_internally_created_ : 1;
 
       // Used to track which filter is the latest filter that has received data.
-      ActiveStreamEncoderFilter* latest_data_encoding_filter_;
-      ActiveStreamDecoderFilter* latest_data_decoding_filter_;
+      ActiveStreamEncoderFilter* latest_data_encoding_filter_{};
+      ActiveStreamDecoderFilter* latest_data_decoding_filter_{};
       
     };
 
