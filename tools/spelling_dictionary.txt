@@ -142,6 +142,7 @@ NBF
 NDEBUG
 NGHTTP
 NOLINT
+NOLINTNEXTLINE
 NS
 NUL
 Nilsson
@@ -351,6 +352,7 @@ deduplicate
 deflateInit
 deletable
 delim
+deque
 dereference
 dereferences
 deregistered
@@ -603,6 +605,7 @@ reparse
 reperform
 repicked
 repo
+reservable
 resize
 resized
 resizes
@@ -672,6 +675,7 @@ tmp
 tokenizing
 traceid
 trie
+tuple
 typeid
 ucontext
 uint
@@ -698,6 +702,7 @@ unordered
 unowned
 unparented
 unpause
+unpopulated
 unprotect
 unref
 unreferenced

@@ -320,15 +320,10 @@ TEST_P(OwnedImplTest, Search) {
   // Populate a buffer with a string split across many small slices, to
   // exercise edge cases in the search implementation.
   static const char* Inputs[] = {"ab", "a", "", "aaa", "b", "a", "aaa", "ab", "a"};
-  std::vector<std::unique_ptr<BufferFragmentImpl>> fragments;
-  for (const char* input : Inputs) {
-    fragments.emplace_back(std::make_unique<BufferFragmentImpl>(input, strlen(input), nullptr));
-  }
-
   Buffer::OwnedImpl buffer;
   verifyImplementation(buffer);
-  for (const auto& fragment : fragments) {
-    buffer.addBufferFragment(*fragment);
+  for (const auto& input : Inputs) {
+    buffer.appendSliceForTest(input);
   }
   EXPECT_STREQ("abaaaabaaaaaba", buffer.toString().c_str());
 
@@ -361,6 +356,32 @@ TEST_P(OwnedImplTest, ToString) {
   std::string long_string(5000, 'A');
   append(long_string);
   EXPECT_EQ(absl::StrCat("Hello, world!" + long_string), buffer.toString());
+}
+
+TEST_P(OwnedImplTest, AppendSliceForTest) {
+  static constexpr size_t NumInputs = 3;
+  static constexpr const char* Inputs[] = {"one", "2",
+                                           ""
+                                           "four",
+                                           ""};
+  Buffer::OwnedImpl buffer;
+  RawSlice slices[NumInputs];
+  EXPECT_EQ(0, buffer.getRawSlices(slices, NumInputs));
+  for (const auto& input : Inputs) {
+    buffer.appendSliceForTest(input);
+  }
+  // getRawSlices will only return the 3 slices with nonzero length.
+  EXPECT_EQ(3, buffer.getRawSlices(slices, NumInputs));
+
+  auto expectSlice = [](const RawSlice& slice, const char* expected) {
+    size_t length = strlen(expected);
+    EXPECT_EQ(length, slice.len_);
+    EXPECT_EQ(0, memcmp(slice.mem_, expected, length));
+  };
+
+  expectSlice(slices[0], "one");
+  expectSlice(slices[1], "2");
+  expectSlice(slices[2], "four");
 }
 
 } // namespace

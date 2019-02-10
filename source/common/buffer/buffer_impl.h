@@ -510,6 +510,19 @@ public:
   Event::Libevent::BufferPtr& buffer() override { return buffer_; }
   virtual void postProcess() override;
 
+  /**
+   * Create a new slice at the end of the buffer, and copy the supplied content into it.
+   * @param data start of the content to copy.
+   *
+   */
+  void appendSliceForTest(const void* data, uint64_t size);
+
+  /**
+   * Create a new slice at the end of the buffer, and copy the supplied string into it.
+   * @param data the string to append to the buffer.
+   */
+  void appendSliceForTest(absl::string_view data);
+
   // Support for choosing the buffer implementation at runtime.
   // TODO(brian-pane) remove this once the new implementation has been
   // running in production for a while.

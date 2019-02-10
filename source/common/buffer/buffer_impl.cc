@@ -670,6 +670,20 @@ std::string OwnedImpl::toString() const {
 
 void OwnedImpl::postProcess() {}
 
+void OwnedImpl::appendSliceForTest(const void* data, uint64_t size) {
+  if (old_impl_) {
+    OwnedImpl rhs(data, size);
+    move(rhs);
+  } else {
+    slices_.emplace_back(OwnedSlice::create(data, size));
+    length_ += size;
+  }
+}
+
+void OwnedImpl::appendSliceForTest(absl::string_view data) {
+  appendSliceForTest(data.data(), data.size());
+}
+
 void OwnedImpl::useOldImpl(bool use_old_impl) {
   static bool called_already = false;
   if (use_old_impl != use_old_impl_) {
