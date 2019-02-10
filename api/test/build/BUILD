@@ -1,4 +1,4 @@
-load("//bazel:api_build_system.bzl", "api_cc_test", "api_go_test")
+load("@envoy_api//bazel:api_build_system.bzl", "api_cc_test", "api_go_test")
 
 licenses(["notice"])  # Apache 2
 
