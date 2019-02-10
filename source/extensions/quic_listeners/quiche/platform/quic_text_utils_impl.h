@@ -7,7 +7,6 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
 #include "absl/strings/str_split.h"
-
 #include "quiche/quic/platform/api/quic_string.h"
 #include "quiche/quic/platform/api/quic_string_piece.h"
 
@@ -63,15 +62,11 @@ public:
 
   static QuicString Uint64ToString(uint64_t in) { return absl::StrCat(in); }
 
-  static QuicString HexEncode(QuicStringPiece data) {
-    return absl::BytesToHexString(data);
-  }
+  static QuicString HexEncode(QuicStringPiece data) { return absl::BytesToHexString(data); }
 
   static QuicString Hex(uint32_t v) { return absl::StrCat(absl::Hex(v)); }
 
-  static QuicString HexDecode(QuicStringPiece data) {
-    return absl::HexStringToBytes(data);
-  }
+  static QuicString HexDecode(QuicStringPiece data) { return absl::HexStringToBytes(data); }
 
   static void Base64Encode(const uint8_t* data, size_t data_len, QuicString* output) {
     absl::Base64Escape(QuicString(reinterpret_cast<const char*>(data), data_len), output);

@@ -17,5 +17,4 @@ class ScopedEnvironmentForThreadsImpl {};
 
 using QuicTestImpl = ::testing::Test;
 
-template <class T>
-using QuicTestWithParamImpl = ::testing::TestWithParam<T>;
+template <class T> using QuicTestWithParamImpl = ::testing::TestWithParam<T>;
