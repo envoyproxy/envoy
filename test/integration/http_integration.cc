@@ -527,6 +527,26 @@ config: {}
   }
 }
 
+void HttpIntegrationTest::testModifyBuffer() {
+  config_helper_.addFilter(R"EOF(
+name: modify-buffer-filter
+)EOF");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeRequestWithBody(default_request_headers_, 128);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "503"}}, false);
+  upstream_request_->encodeData(128, true);
+  response->waitForEndStream();
+
+  // The upstream request body should be twice the size of the downstream request body sent.
+  EXPECT_EQ(256, upstream_request_->body().length());
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("503", response->headers().Status()->value().c_str());
+  EXPECT_EQ(256, response->body().length());
+}
+
 // Add a health check filter and verify correct behavior when draining.
 void HttpIntegrationTest::testDrainClose() {
   config_helper_.addFilter(ConfigHelper::DEFAULT_HEALTH_CHECK_FILTER);

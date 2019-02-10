@@ -42,6 +42,8 @@ TEST_P(Http2IntegrationTest, ComputedHealthCheck) { testComputedHealthCheck(); }
 
 TEST_P(Http2IntegrationTest, AddEncodedTrailers) { testAddEncodedTrailers(); }
 
+TEST_P(Http2IntegrationTest, ModifyBuffers) { testModifyBuffer(); }
+
 TEST_P(Http2IntegrationTest, DrainClose) { testDrainClose(); }
 
 TEST_P(Http2IntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {

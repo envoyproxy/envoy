@@ -181,6 +181,7 @@ public:
     // TODO(mattklein123): Add ability to see warming clusters in admin output.
     ClusterInfoMap clusters_map;
     for (auto& cluster : active_clusters_) {
+      std::cerr << cluster.second->cluster_ << std::endl;
       clusters_map.emplace(cluster.first, *cluster.second->cluster_);
     }
 

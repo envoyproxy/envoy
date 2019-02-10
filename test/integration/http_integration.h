@@ -188,6 +188,7 @@ protected:
   void testMultipleContentLengths();
   void testComputedHealthCheck();
   void testAddEncodedTrailers();
+  void testModifyBuffer();
   void testDrainClose();
   void testRetry();
   void testRetryHittingBufferLimit();
