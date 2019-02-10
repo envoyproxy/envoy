@@ -1521,6 +1521,26 @@ TEST_F(SubsetLoadBalancerTest, EnabledScaleLocalityWeightsRounding) {
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][1], lb_->chooseHost(&context));
 }
 
+// Regression for bug where missing locality weights crashed scaling and locality aware subset LBs.
+TEST_F(SubsetLoadBalancerTest, ScaleLocalityWeightsWithNoLocalityWeights) {
+  std::vector<std::set<std::string>> subset_keys = {{"version"}};
+  EXPECT_CALL(subset_info_, subsetKeys()).WillRepeatedly(ReturnRef(subset_keys));
+  EXPECT_CALL(subset_info_, isEnabled()).WillRepeatedly(Return(true));
+  EXPECT_CALL(subset_info_, localityWeightAware()).WillRepeatedly(Return(true));
+  EXPECT_CALL(subset_info_, scaleLocalityWeight()).WillRepeatedly(Return(true));
+
+  configureHostSet(
+      {
+          {"tcp://127.0.0.1:80", {{"version", "1.0"}}},
+          {"tcp://127.0.0.1:81", {{"version", "1.1"}}},
+      },
+      host_set_);
+
+  lb_.reset(new SubsetLoadBalancer(lb_type_, priority_set_, nullptr, stats_, runtime_, random_,
+                                   subset_info_, ring_hash_lb_config_, least_request_lb_config_,
+                                   common_config_));
+}
+
 TEST_P(SubsetLoadBalancerTest, GaugesUpdatedOnDestroy) {
   EXPECT_CALL(subset_info_, fallbackPolicy())
       .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::ANY_ENDPOINT));

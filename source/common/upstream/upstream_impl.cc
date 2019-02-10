@@ -504,6 +504,13 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
+  if (config.lb_subset_config().locality_weight_aware() &&
+      !config.common_lb_config().has_locality_weighted_lb_config()) {
+    throw EnvoyException(fmt::format(
+        "Locality weight aware subset LB requires that a locality_weighted_lb_config be set in {}",
+        name_));
+  }
+
   if (config.protocol_selection() == envoy::api::v2::Cluster::USE_CONFIGURED_PROTOCOL) {
     // Make sure multiple protocol configurations are not present
     if (config.has_http_protocol_options() && config.has_http2_protocol_options()) {

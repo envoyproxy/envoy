@@ -563,6 +563,11 @@ LocalityWeightsConstSharedPtr SubsetLoadBalancer::HostSubsetImpl::determineLocal
   if (locality_weight_aware_) {
     if (scale_locality_weight_) {
       const auto& original_hosts_per_locality = original_host_set_.hostsPerLocality().get();
+      // E.g. we can be here in static clusters with actual locality weighting before pre-init
+      // completes.
+      if (!original_host_set_.localityWeights()) {
+        return {};
+      }
       const auto& original_weights = *original_host_set_.localityWeights();
 
       auto scaled_locality_weights = std::make_shared<LocalityWeights>(original_weights.size());
