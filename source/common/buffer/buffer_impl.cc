@@ -93,12 +93,14 @@ void OwnedImpl::prepend(absl::string_view data) {
 void OwnedImpl::prepend(Instance& data) {
   // See the comments in move() for why we do the static_cast.
   if (old_impl_) {
+    ASSERT(dynamic_cast<LibEventInstance*>(&data) != nullptr);
     int rc =
         evbuffer_prepend_buffer(buffer_.get(), static_cast<LibEventInstance&>(data).buffer().get());
     ASSERT(rc == 0);
     ASSERT(data.length() == 0);
     static_cast<LibEventInstance&>(data).postProcess();
   } else {
+    ASSERT(dynamic_cast<OwnedImpl*>(&data) != nullptr);
     OwnedImpl& other = static_cast<OwnedImpl&>(data);
     while (!other.slices_.empty()) {
       uint64_t slice_size = other.slices_.back()->dataSize();
@@ -295,6 +297,7 @@ void OwnedImpl::move(Instance& rhs) {
     // now and this is safe. Using the evbuffer move routines require having access to both
     // evbuffers. This is a reasonable compromise in a high performance path where we want to
     // maintain an abstraction in case we get rid of evbuffer later.
+    ASSERT(dynamic_cast<LibEventInstance*>(&rhs) != nullptr);
     int rc = evbuffer_add_buffer(buffer_.get(), static_cast<LibEventInstance&>(rhs).buffer().get());
     ASSERT(rc == 0);
     static_cast<LibEventInstance&>(rhs).postProcess();
