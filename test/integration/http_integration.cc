@@ -474,17 +474,34 @@ name: modify-buffer-filter
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto response = codec_client_->makeRequestWithBody(default_request_headers_, 128);
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  codec_client_->sendData(*request_encoder_, 64, false);
+  codec_client_->sendData(*request_encoder_, 64, true);
+
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "503"}}, false);
-  upstream_request_->encodeData(128, true);
+  upstream_request_->encodeData(64, false);
+  upstream_request_->encodeData(64, true);
   response->waitForEndStream();
 
-  // The upstream request body should be twice the size of the downstream request body sent.
-  EXPECT_EQ(256, upstream_request_->body().length());
+  // When using HTTP2 we get end_stream=true with the second onData callback, so the buffered
+  // data is only 64 bytes. With HTTP1 we get end_stream=true on a third onData callback,
+  // so the buffered data is 128 bytes. Since we double the buffered data when we get
+  // end_stream=true, the resulting data therefore vary based on whether we're using HTTP1 or HTTP2.
+  if (downstream_protocol_ == Http::CodecClient::Type::HTTP2) {
+    EXPECT_EQ(64 + 2 * 64, upstream_request_->body().length());
+  } else {
+    EXPECT_EQ(256, upstream_request_->body().length());
+  }
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("503", response->headers().Status()->value().c_str());
-  EXPECT_EQ(256, response->body().length());
+  if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP2) {
+    EXPECT_EQ(64 + 2 * 64, response->body().length());
+  } else {
+    EXPECT_EQ(256, response->body().length());
+  }
 }
 
 // Add a health check filter and verify correct behavior when draining.
