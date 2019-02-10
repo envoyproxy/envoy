@@ -22,7 +22,11 @@ namespace Server {
 
 class WorkerImplTest : public TestBase {
 public:
-  WorkerImplTest() : api_(Api::createApiForTest(stats_store_)) {
+  WorkerImplTest()
+      : api_(Api::createApiForTest(stats_store_)), dispatcher_(api_->allocateDispatcher()),
+        no_exit_timer_(dispatcher_->createTimer([]() -> void {})),
+        worker_(tls_, hooks_, std::move(dispatcher_), Network::ConnectionHandlerPtr{handler_},
+                overload_manager_, *api_) {
     // In the real worker the watchdog has timers that prevent exit. Here we need to prevent event
     // loop exit since we use mock timers.
     no_exit_timer_->enableTimer(std::chrono::hours(1));
@@ -34,15 +38,10 @@ public:
   NiceMock<MockGuardDog> guard_dog_;
   NiceMock<MockOverloadManager> overload_manager_;
   Api::ApiPtr api_;
-  Event::DispatcherImpl* dispatcher_ = new Event::DispatcherImpl(*api_);
+  Event::DispatcherPtr dispatcher_;
+  Event::TimerPtr no_exit_timer_;
   DefaultTestHooks hooks_;
-  WorkerImpl worker_{tls_,
-                     hooks_,
-                     Event::DispatcherPtr{dispatcher_},
-                     Network::ConnectionHandlerPtr{handler_},
-                     overload_manager_,
-                     *api_};
-  Event::TimerPtr no_exit_timer_ = dispatcher_->createTimer([]() -> void {});
+  WorkerImpl worker_;
 };
 
 TEST_F(WorkerImplTest, BasicFlow) {
