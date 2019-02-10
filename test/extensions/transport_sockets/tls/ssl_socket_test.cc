@@ -32,7 +32,6 @@
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
-#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
@@ -173,7 +172,7 @@ void testUtil(const TestUtilOptions& options) {
   Event::SimulatedTimeSystem time_system;
 
   Stats::IsolatedStoreImpl server_stats_store;
-  Api::ApiPtr server_api = Api::createApiForTest(server_stats_store);
+  Api::ApiPtr server_api = Api::createApiForTest(server_stats_store, time_system);
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
       server_factory_context;
   ON_CALL(server_factory_context, api()).WillByDefault(ReturnRef(*server_api));
@@ -199,7 +198,7 @@ void testUtil(const TestUtilOptions& options) {
                             client_tls_context);
 
   Stats::IsolatedStoreImpl client_stats_store;
-  Api::ApiPtr client_api = Api::createApiForTest(client_stats_store);
+  Api::ApiPtr client_api = Api::createApiForTest(client_stats_store, time_system);
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
       client_factory_context;
   ON_CALL(client_factory_context, api()).WillByDefault(ReturnRef(*client_api));
@@ -403,7 +402,7 @@ const std::string testUtilV2(const TestUtilOptionsV2& options) {
   std::vector<std::string> server_names(filter_chain.filter_chain_match().server_names().begin(),
                                         filter_chain.filter_chain_match().server_names().end());
   Stats::IsolatedStoreImpl server_stats_store;
-  Api::ApiPtr server_api = Api::createApiForTest(server_stats_store);
+  Api::ApiPtr server_api = Api::createApiForTest(server_stats_store, time_system);
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
       server_factory_context;
   ON_CALL(server_factory_context, api()).WillByDefault(ReturnRef(*server_api));
@@ -421,7 +420,7 @@ const std::string testUtilV2(const TestUtilOptionsV2& options) {
   Network::ListenerPtr listener = dispatcher->createListener(socket, callbacks, true, false);
 
   Stats::IsolatedStoreImpl client_stats_store;
-  Api::ApiPtr client_api = Api::createApiForTest(client_stats_store);
+  Api::ApiPtr client_api = Api::createApiForTest(client_stats_store, time_system);
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
       client_factory_context;
   ON_CALL(client_factory_context, api()).WillByDefault(ReturnRef(*client_api));
@@ -594,7 +593,6 @@ protected:
                                    const std::string& client_ctx_yaml, bool expect_reuse,
                                    const Network::Address::IpVersion version);
 
-  Event::SimulatedTimeSystem time_system_;
   Event::DispatcherPtr dispatcher_;
 };
 
@@ -2106,7 +2104,7 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
   ContextManagerImpl manager(*time_system);
 
   Stats::IsolatedStoreImpl server_stats_store;
-  Api::ApiPtr server_api = Api::createApiForTest(server_stats_store);
+  Api::ApiPtr server_api = Api::createApiForTest(server_stats_store, time_system);
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
       server_factory_context;
   ON_CALL(server_factory_context, api()).WillByDefault(ReturnRef(*server_api));
@@ -2139,7 +2137,7 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
   MessageUtil::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml), client_tls_context);
 
   Stats::IsolatedStoreImpl client_stats_store;
-  Api::ApiPtr client_api = Api::createApiForTest(client_stats_store);
+  Api::ApiPtr client_api = Api::createApiForTest(client_stats_store, time_system);
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
       client_factory_context;
   ON_CALL(client_factory_context, api()).WillByDefault(ReturnRef(*client_api));
@@ -2637,7 +2635,7 @@ void SslSocketTest::testClientSessionResumption(const std::string& server_ctx_ya
   ContextManagerImpl manager(time_system_);
 
   Stats::IsolatedStoreImpl server_stats_store;
-  Api::ApiPtr server_api = Api::createApiForTest(server_stats_store);
+  Api::ApiPtr server_api = Api::createApiForTest(server_stats_store, time_system_);
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
       server_factory_context;
   ON_CALL(server_factory_context, api()).WillByDefault(ReturnRef(*server_api));
@@ -2653,7 +2651,7 @@ void SslSocketTest::testClientSessionResumption(const std::string& server_ctx_ya
                                   true);
   NiceMock<Network::MockListenerCallbacks> callbacks;
   Network::MockConnectionHandler connection_handler;
-  Api::ApiPtr api = Api::createApiForTest(server_stats_store);
+  Api::ApiPtr api = Api::createApiForTest(server_stats_store, time_system_);
   Event::DispatcherPtr dispatcher(server_api->allocateDispatcher());
   Network::ListenerPtr listener = dispatcher->createListener(socket, callbacks, true, false);
 
@@ -2664,7 +2662,7 @@ void SslSocketTest::testClientSessionResumption(const std::string& server_ctx_ya
   MessageUtil::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml), client_ctx_proto);
 
   Stats::IsolatedStoreImpl client_stats_store;
-  Api::ApiPtr client_api = Api::createApiForTest(client_stats_store);
+  Api::ApiPtr client_api = Api::createApiForTest(client_stats_store, time_system_);
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
       client_factory_context;
   ON_CALL(client_factory_context, api()).WillByDefault(ReturnRef(*client_api));

@@ -1,5 +1,7 @@
 #include "server/config_validation/api.h"
 
+#include "common/common/assert.h"
+
 #include "server/config_validation/dispatcher.h"
 
 namespace Envoy {
@@ -13,6 +15,11 @@ ValidationImpl::ValidationImpl(std::chrono::milliseconds file_flush_interval_mse
 
 Event::DispatcherPtr ValidationImpl::allocateDispatcher() {
   return Event::DispatcherPtr{new Event::ValidationDispatcher(*this, time_system_)};
+}
+
+Event::DispatcherPtr ValidationImpl::allocateDispatcher(Buffer::WatermarkFactoryPtr&&) {
+  RELEASE_ASSERT(false, "validation dispatchers with custom watermark factory not supported");
+  return Event::DispatcherPtr{};
 }
 
 } // namespace Api

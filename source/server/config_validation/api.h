@@ -20,6 +20,7 @@ public:
                  Event::TimeSystem& time_system);
 
   Event::DispatcherPtr allocateDispatcher() override;
+  Event::DispatcherPtr allocateDispatcher(Buffer::WatermarkFactoryPtr&& watermark_factory) override;
 
 private:
   Event::TimeSystem& time_system_;

@@ -5,7 +5,6 @@
 
 #include "envoy/common/time.h"
 #include "envoy/event/dispatcher.h"
-#include "envoy/event/timer.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/stats/store.h"
 #include "envoy/thread/thread.h"
