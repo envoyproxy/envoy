@@ -338,7 +338,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       direct_response_body_(ConfigUtility::parseDirectResponseBody(route, factory_context.api())),
       per_filter_configs_(route.typed_per_filter_config(), route.per_filter_config(),
                           factory_context),
-      time_system_(factory_context.dispatcher().timeSystem()),
+      time_source_(factory_context.dispatcher().timeSource()),
       internal_redirect_action_(convertInternalRedirectAction(route.route())) {
   if (route.route().has_metadata_match()) {
     const auto filter_it = route.route().metadata_match().filter_metadata().find(
@@ -493,7 +493,7 @@ void RouteEntryImplBase::finalizePathHeader(Http::HeaderMap& headers,
     return;
   }
 
-  std::string path = headers.Path()->value().c_str();
+  std::string path = std::string(headers.Path()->value().c_str(), headers.Path()->value().size());
   if (insert_envoy_original_path) {
     headers.insertEnvoyOriginalPath().value(*headers.Path());
   }

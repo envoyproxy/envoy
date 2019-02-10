@@ -123,8 +123,8 @@ MockWorker::MockWorker() {
 MockWorker::~MockWorker() = default;
 
 MockInstance::MockInstance()
-    : secret_manager_(new Secret::SecretManagerImpl()), cluster_manager_(timeSystem()),
-      ssl_context_manager_(timeSystem()), singleton_manager_(new Singleton::ManagerImpl(
+    : secret_manager_(new Secret::SecretManagerImpl()), cluster_manager_(timeSource()),
+      ssl_context_manager_(timeSource()), singleton_manager_(new Singleton::ManagerImpl(
                                               Thread::threadFactoryForTest().currentThreadId())) {
   ON_CALL(*this, threadLocal()).WillByDefault(ReturnRef(thread_local_));
   ON_CALL(*this, stats()).WillByDefault(ReturnRef(stats_store_));
