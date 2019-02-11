@@ -534,10 +534,9 @@ void Filter::onResponseTimeout() {
 void Filter::onUpstreamReset(UpstreamResetType type,
                              const absl::optional<Http::StreamResetReason>& reset_reason) {
   ASSERT(type == UpstreamResetType::GlobalTimeout || upstream_request_);
-  const std::string reset_reason_str =
-      reset_reason ? resetReasonToString(reset_reason.value()) : "";
   if (type == UpstreamResetType::Reset) {
-    ENVOY_STREAM_LOG(debug, "upstream reset: reset reason {}", *callbacks_, reset_reason_str);
+    ENVOY_STREAM_LOG(debug, "upstream reset: reset reason {}", *callbacks_,
+                     reset_reason ? Http::Utility::resetReasonToString(reset_reason.value()) : "");
   }
 
   Upstream::HostDescriptionConstSharedPtr upstream_host;
@@ -596,9 +595,9 @@ void Filter::onUpstreamReset(UpstreamResetType type,
           streamResetReasonToResponseFlag(reset_reason.value());
       callbacks_->streamInfo().setResponseFlag(response_flags);
       code = Http::Code::ServiceUnavailable;
-      body =
-          absl::StrCat("upstream connect error or disconnect/reset before headers. reset reason: ",
-                       reset_reason_str);
+      body = absl::StrCat(
+          "upstream connect error or disconnect/reset before headers. reset reason: ",
+          reset_reason ? Http::Utility::resetReasonToString(reset_reason.value()) : "");
     }
 
     const bool dropped = reset_reason && reset_reason.value() == Http::StreamResetReason::Overflow;
@@ -638,28 +637,7 @@ Filter::streamResetReasonToResponseFlag(Http::StreamResetReason reset_reason) {
     return StreamInfo::ResponseFlag::UpstreamRemoteReset;
   }
 
-  throw std::invalid_argument("Unknown reset_reason");
-}
-
-const std::string Filter::resetReasonToString(Http::StreamResetReason reset_reason) const {
-  switch (reset_reason) {
-  case Http::StreamResetReason::ConnectionFailure:
-    return "connection failure";
-  case Http::StreamResetReason::ConnectionTermination:
-    return "connection termination";
-  case Http::StreamResetReason::LocalReset:
-    return "local reset";
-  case Http::StreamResetReason::LocalRefusedStreamReset:
-    return "local refused stream reset";
-  case Http::StreamResetReason::Overflow:
-    return "overflow";
-  case Http::StreamResetReason::RemoteReset:
-    return "remote reset";
-  case Http::StreamResetReason::RemoteRefusedStreamReset:
-    return "remote refused stream reset";
-  }
-
-  throw std::invalid_argument("Unknown reset_reason");
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 void Filter::handleNon5xxResponseHeaders(const Http::HeaderMap& headers, bool end_stream) {
