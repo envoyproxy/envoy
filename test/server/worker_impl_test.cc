@@ -23,7 +23,7 @@ namespace Server {
 class WorkerImplTest : public TestBase {
 public:
   WorkerImplTest()
-      : api_(Api::createApiForTest(stats_store_)), dispatcher_(api_->allocateDispatcher()),
+      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()),
         no_exit_timer_(dispatcher_->createTimer([]() -> void {})),
         worker_(tls_, hooks_, std::move(dispatcher_), Network::ConnectionHandlerPtr{handler_},
                 overload_manager_, *api_) {
@@ -39,7 +39,6 @@ public:
     no_exit_timer_.reset();
   }
 
-  Stats::IsolatedStoreImpl stats_store_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   Network::MockConnectionHandler* handler_ = new Network::MockConnectionHandler();
   NiceMock<MockGuardDog> guard_dog_;

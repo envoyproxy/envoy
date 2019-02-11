@@ -29,8 +29,7 @@ private:
 
 TEST(DeferredDeleteTest, DeferredDelete) {
   InSequence s;
-  Stats::IsolatedStoreImpl stats_store;
-  Api::ApiPtr api = Api::createApiForTest(stats_store);
+  Api::ApiPtr api = Api::createApiForTest();
   DispatcherPtr dispatcher(api->allocateDispatcher());
   ReadyWatcher watcher1;
 
@@ -62,7 +61,7 @@ TEST(DeferredDeleteTest, DeferredDelete) {
 class DispatcherImplTest : public TestBase {
 protected:
   DispatcherImplTest()
-      : api_(Api::createApiForTest(stat_store_)), dispatcher_(api_->allocateDispatcher()),
+      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()),
         work_finished_(false) {
     dispatcher_thread_ = api_->threadFactory().createThread([this]() {
       // Must create a keepalive timer to keep the dispatcher from exiting.
@@ -80,7 +79,6 @@ protected:
     dispatcher_thread_->join();
   }
 
-  Stats::IsolatedStoreImpl stat_store_;
   Api::ApiPtr api_;
   Thread::ThreadPtr dispatcher_thread_;
   DispatcherPtr dispatcher_;

@@ -78,8 +78,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ConnectionImplDeathTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(ConnectionImplDeathTest, BadFd) {
-  Stats::IsolatedStoreImpl stats_store;
-  Api::ApiPtr api = Api::createApiForTest(stats_store);
+  Api::ApiPtr api = Api::createApiForTest();
   Event::DispatcherPtr dispatcher(api->allocateDispatcher());
   IoHandlePtr io_handle = std::make_unique<IoSocketHandle>();
   EXPECT_DEATH_LOG_TO_STDERR(
@@ -90,8 +89,8 @@ TEST_P(ConnectionImplDeathTest, BadFd) {
 }
 
 class ConnectionImplTest : public TestBaseWithParam<Address::IpVersion> {
-public:
-  ConnectionImplTest() : api_(Api::createApiForTest(stats_store_, time_system_)) {}
+protected:
+  ConnectionImplTest() : api_(Api::createApiForTest(time_system_)) {}
 
   void setUpBasicConnection() {
     if (dispatcher_.get() == nullptr) {
@@ -205,7 +204,6 @@ protected:
   }
 
   Event::SimulatedTimeSystem time_system_;
-  Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   Network::TcpListenSocket socket_{Network::Test::getAnyAddress(GetParam()), nullptr, true};
@@ -1644,9 +1642,8 @@ TEST_P(ReadBufferLimitTest, SomeLimit) {
 class TcpClientConnectionImplTest : public TestBaseWithParam<Address::IpVersion> {
 protected:
   TcpClientConnectionImplTest()
-      : api_(Api::createApiForTest(stats_store_)), dispatcher_(api_->allocateDispatcher()) {}
+      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()) {}
 
-  Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
 };
@@ -1688,9 +1685,8 @@ TEST_P(TcpClientConnectionImplTest, BadConnectConnRefused) {
 class PipeClientConnectionImplTest : public TestBase {
 protected:
   PipeClientConnectionImplTest()
-      : api_(Api::createApiForTest(stats_store_)), dispatcher_(api_->allocateDispatcher()) {}
+      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()) {}
 
-  Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   const std::string path_{TestEnvironment::unixDomainSocketPath("foo")};
