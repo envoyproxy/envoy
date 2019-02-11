@@ -12,9 +12,8 @@ namespace Json {
 
 class JsonLoaderTest : public TestBase {
 protected:
-  JsonLoaderTest() : api_(Api::createApiForTest(stats_store_)) {}
+  JsonLoaderTest() : api_(Api::createApiForTest()) {}
 
-  Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
 };
 

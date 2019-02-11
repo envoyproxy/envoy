@@ -46,7 +46,7 @@ public:
                       NiceMock<Event::MockTimer>* upstream_ready_timer)
       : ConnPoolImpl(dispatcher, Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"),
                      Upstream::ResourcePriority::Default, nullptr),
-        api_(Api::createApiForTest(stats_store_)), mock_dispatcher_(dispatcher),
+        api_(Api::createApiForTest()), mock_dispatcher_(dispatcher),
         mock_upstream_ready_timer_(upstream_ready_timer) {}
 
   ~ConnPoolImplForTest() {
@@ -111,7 +111,6 @@ public:
     EXPECT_FALSE(upstream_ready_enabled_);
   }
 
-  Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
   Event::MockDispatcher& mock_dispatcher_;
   NiceMock<Event::MockTimer>* mock_upstream_ready_timer_;

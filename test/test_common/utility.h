@@ -526,6 +526,7 @@ ThreadFactory& threadFactoryForTest();
 } // namespace Thread
 
 namespace Api {
+ApiPtr createApiForTest();
 ApiPtr createApiForTest(Stats::Store& stat_store);
 ApiPtr createApiForTest(Stats::Store& stat_store, Event::TimeSystem& time_system);
 } // namespace Api

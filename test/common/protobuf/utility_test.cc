@@ -17,9 +17,8 @@ namespace Envoy {
 
 class ProtobufUtilityTest : public TestBase {
 protected:
-  ProtobufUtilityTest() : api_(Api::createApiForTest(stats_store_)) {}
+  ProtobufUtilityTest() : api_(Api::createApiForTest()) {}
 
-  Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
 };
 

@@ -165,7 +165,7 @@ envoy::config::bootstrap::v2::Bootstrap parseBootstrapFromV2Yaml(const std::stri
 
 class ClusterManagerImplTest : public TestBase {
 public:
-  ClusterManagerImplTest() : api_(Api::createApiForTest(stats_store_)) {}
+  ClusterManagerImplTest() : api_(Api::createApiForTest()) {}
 
   void create(const envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
     cluster_manager_ = std::make_unique<ClusterManagerImpl>(
@@ -239,7 +239,6 @@ public:
     return metadata;
   }
 
-  Stats::IsolatedStoreImpl stats_store_;
   Event::SimulatedTimeSystem time_system_;
   Api::ApiPtr api_;
   NiceMock<TestClusterManagerFactory> factory_;

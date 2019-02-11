@@ -2,7 +2,6 @@
 #include "envoy/registry/registry.h"
 
 #include "common/event/dispatcher_impl.h"
-#include "common/stats/isolated_store_impl.h"
 
 #include "server/resource_monitor_config_impl.h"
 
@@ -25,8 +24,7 @@ TEST(InjectedResourceMonitorFactoryTest, CreateMonitor) {
 
   envoy::config::resource_monitor::injected_resource::v2alpha::InjectedResourceConfig config;
   config.set_filename(TestEnvironment::temporaryPath("injected_resource"));
-  Stats::IsolatedStoreImpl stats_store;
-  Api::ApiPtr api = Api::createApiForTest(stats_store);
+  Api::ApiPtr api = Api::createApiForTest();
   Event::DispatcherImpl dispatcher(*api);
   Server::Configuration::ResourceMonitorFactoryContextImpl context(dispatcher, *api);
   Server::ResourceMonitorPtr monitor = factory->createResourceMonitor(config, context);

@@ -15,7 +15,7 @@ namespace Event {
 
 class FileEventImplTest : public TestBase {
 public:
-  FileEventImplTest() : api_(Api::createApiForTest(stats_store_)), dispatcher_(*api_) {}
+  FileEventImplTest() : api_(Api::createApiForTest()), dispatcher_(*api_) {}
 
   void SetUp() override {
     int rc = socketpair(AF_UNIX, SOCK_DGRAM, 0, fds_);
@@ -32,7 +32,6 @@ public:
 
 protected:
   int fds_[2];
-  Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
   DispatcherImpl dispatcher_;
 };
@@ -52,8 +51,7 @@ TEST_P(FileEventImplActivateTest, Activate) {
   }
   ASSERT_NE(-1, fd);
 
-  Stats::IsolatedStoreImpl stats_store;
-  Api::ApiPtr api = Api::createApiForTest(stats_store);
+  Api::ApiPtr api = Api::createApiForTest();
   DispatcherImpl dispatcher(*api);
   ReadyWatcher read_event;
   EXPECT_CALL(read_event, ready()).Times(1);

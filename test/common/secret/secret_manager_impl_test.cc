@@ -24,9 +24,8 @@ namespace {
 
 class SecretManagerImplTest : public TestBase {
 protected:
-  SecretManagerImplTest() : api_(Api::createApiForTest(stats_store_)) {}
+  SecretManagerImplTest() : api_(Api::createApiForTest()) {}
 
-  Stats::MockIsolatedStatsStore stats_store_;
   Api::ApiPtr api_;
 };
 

@@ -78,9 +78,8 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ConnectionImplDeathTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(ConnectionImplDeathTest, BadFd) {
-  Stats::IsolatedStoreImpl stats_store;
   Event::SimulatedTimeSystem time_system;
-  Api::ApiPtr api = Api::createApiForTest(stats_store);
+  Api::ApiPtr api = Api::createApiForTest();
   Event::DispatcherImpl dispatcher(*api);
   IoHandlePtr io_handle = std::make_unique<IoSocketHandle>();
   EXPECT_DEATH_LOG_TO_STDERR(
@@ -92,7 +91,7 @@ TEST_P(ConnectionImplDeathTest, BadFd) {
 
 class ConnectionImplTest : public TestBaseWithParam<Address::IpVersion> {
 public:
-  ConnectionImplTest() : api_(Api::createApiForTest(stats_store_)) {}
+  ConnectionImplTest() : api_(Api::createApiForTest()) {}
 
   void setUpBasicConnection() {
     if (dispatcher_.get() == nullptr) {
@@ -208,7 +207,6 @@ protected:
 
   Event::SimulatedTimeSystem time_system_;
   Event::DispatcherPtr dispatcher_;
-  Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
   Network::TcpListenSocket socket_{Network::Test::getAnyAddress(GetParam()), nullptr, true};
   Network::MockListenerCallbacks listener_callbacks_;
@@ -1645,9 +1643,8 @@ TEST_P(ReadBufferLimitTest, SomeLimit) {
 
 class TcpClientConnectionImplTest : public TestBaseWithParam<Address::IpVersion> {
 protected:
-  TcpClientConnectionImplTest() : api_(Api::createApiForTest(stats_store_)), dispatcher_(*api_) {}
+  TcpClientConnectionImplTest() : api_(Api::createApiForTest()), dispatcher_(*api_) {}
 
-  Stats::IsolatedStoreImpl stats_store_;
   Event::SimulatedTimeSystem time_system_;
   Api::ApiPtr api_;
   Event::DispatcherImpl dispatcher_;
@@ -1689,9 +1686,8 @@ TEST_P(TcpClientConnectionImplTest, BadConnectConnRefused) {
 
 class PipeClientConnectionImplTest : public TestBase {
 protected:
-  PipeClientConnectionImplTest() : api_(Api::createApiForTest(stats_store_)), dispatcher_(*api_) {}
+  PipeClientConnectionImplTest() : api_(Api::createApiForTest()), dispatcher_(*api_) {}
 
-  Stats::IsolatedStoreImpl stats_store_;
   Event::SimulatedTimeSystem time_system_;
   Api::ApiPtr api_;
   Event::DispatcherImpl dispatcher_;

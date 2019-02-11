@@ -262,9 +262,8 @@ TEST(LoaderImplTest, All) {
 
 class DiskLayerTest : public TestBase {
 protected:
-  DiskLayerTest() : api_(Api::createApiForTest(store_)) {}
+  DiskLayerTest() : api_(Api::createApiForTest()) {}
 
-  Stats::IsolatedStoreImpl store_;
   Api::ApiPtr api_;
 };
 

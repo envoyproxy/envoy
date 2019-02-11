@@ -15,8 +15,7 @@ TEST(ValidationAsyncClientTest, MockedMethods) {
   MockAsyncClientCallbacks callbacks;
   MockAsyncClientStreamCallbacks stream_callbacks;
 
-  Stats::IsolatedStoreImpl stats_store;
-  Api::ApiPtr api = Api::createApiForTest(stats_store);
+  Api::ApiPtr api = Api::createApiForTest();
   ValidationAsyncClient client(*api);
   EXPECT_EQ(nullptr, client.send(std::move(message), callbacks, AsyncClient::RequestOptions()));
   EXPECT_EQ(nullptr, client.start(stream_callbacks, AsyncClient::StreamOptions()));

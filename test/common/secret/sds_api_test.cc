@@ -28,9 +28,8 @@ namespace {
 
 class SdsApiTest : public TestBase {
 protected:
-  SdsApiTest() : api_(Api::createApiForTest(stats_store_)) {}
+  SdsApiTest() : api_(Api::createApiForTest()) {}
 
-  Stats::MockIsolatedStatsStore stats_store_;
   Api::ApiPtr api_;
 };
 

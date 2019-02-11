@@ -21,8 +21,7 @@ namespace Network {
 static void errorCallbackTest(Address::IpVersion version) {
   // Force the error callback to fire by closing the socket under the listener. We run this entire
   // test in the forked process to avoid confusion when the fork happens.
-  Stats::IsolatedStoreImpl stats_store;
-  Api::ApiPtr api = Api::createApiForTest(stats_store);
+  Api::ApiPtr api = Api::createApiForTest();
   Event::DispatcherImpl dispatcher(*api);
 
   Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(version), nullptr,
@@ -77,11 +76,10 @@ protected:
       : version_(GetParam()),
         alt_address_(Network::Test::findOrCheckFreePort(
             Network::Test::getCanonicalLoopbackAddress(version_), Address::SocketType::Stream)),
-        api_(Api::createApiForTest(stats_store_)), dispatcher_(*api_) {}
+        api_(Api::createApiForTest()), dispatcher_(*api_) {}
 
   const Address::IpVersion version_;
   const Address::InstanceConstSharedPtr alt_address_;
-  Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
   Event::DispatcherImpl dispatcher_;
 };
@@ -121,7 +119,6 @@ TEST_P(ListenerImplTest, SetListeningSocketOptionsError) {
 }
 
 TEST_P(ListenerImplTest, UseActualDst) {
-  Stats::IsolatedStoreImpl stats_store;
   Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(version_), nullptr,
                                   true);
   Network::TcpListenSocket socketDst(alt_address_, nullptr, false);
@@ -158,7 +155,6 @@ TEST_P(ListenerImplTest, UseActualDst) {
 }
 
 TEST_P(ListenerImplTest, WildcardListenerUseActualDst) {
-  Stats::IsolatedStoreImpl stats_store;
   Network::TcpListenSocket socket(Network::Test::getAnyAddress(version_), nullptr, true);
   Network::MockListenerCallbacks listener_callbacks;
   Network::MockConnectionHandler connection_handler;
@@ -196,7 +192,6 @@ TEST_P(ListenerImplTest, WildcardListenerUseActualDst) {
 // local and remote addresses of the connection should be IPv4 instances, as the connection really
 // is an IPv4 connection.
 TEST_P(ListenerImplTest, WildcardListenerIpv4Compat) {
-  Stats::IsolatedStoreImpl stats_store;
   auto option = std::make_unique<MockSocketOption>();
   auto options = std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>();
   EXPECT_CALL(*option, setOption(_, envoy::api::v2::core::SocketOption::STATE_PREBIND))
