@@ -328,11 +328,11 @@ public:
   NiceMock<Network::MockClientConnection> upstream_connection_;
 };
 
-class ThriftRouterTest : public ThriftRouterTestBase, public TestBase {
+class ThriftRouterTest : public TestBase, public ThriftRouterTestBase {
 public:
 };
 
-class ThriftRouterFieldTypeTest : public ThriftRouterTestBase, public TestBaseWithParam<FieldType> {
+class ThriftRouterFieldTypeTest : public TestBaseWithParam<FieldType>, public ThriftRouterTestBase {
 public:
 };
 
@@ -341,7 +341,7 @@ INSTANTIATE_TEST_SUITE_P(PrimitiveFieldTypes, ThriftRouterFieldTypeTest,
                                 FieldType::I64, FieldType::Double, FieldType::String),
                          fieldTypeParamToString);
 
-class ThriftRouterContainerTest : public ThriftRouterTestBase, public TestBaseWithParam<FieldType> {
+class ThriftRouterContainerTest : public TestBaseWithParam<FieldType>, public ThriftRouterTestBase {
 public:
 };
 

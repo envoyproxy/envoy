@@ -22,13 +22,12 @@ namespace Server {
 
 class WorkerImplTest : public TestBase {
 public:
-  WorkerImplTest() : api_(Api::createApiForTest(stats_store_)) {
+  WorkerImplTest() : api_(Api::createApiForTest()) {
     // In the real worker the watchdog has timers that prevent exit. Here we need to prevent event
     // loop exit since we use mock timers.
     no_exit_timer_->enableTimer(std::chrono::hours(1));
   }
 
-  Stats::IsolatedStoreImpl stats_store_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   Network::MockConnectionHandler* handler_ = new Network::MockConnectionHandler();
   NiceMock<MockGuardDog> guard_dog_;

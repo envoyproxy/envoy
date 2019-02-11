@@ -61,9 +61,9 @@ def Tap2Pcap(tap_path, pcap_path):
   dumps = []
   for event in trace.events:
     if event.HasField('read'):
-      dumps.append(DumpEvent('I', event.timestamp, event.read.data))
+      dumps.append(DumpEvent('I', event.timestamp, event.read.data.as_bytes))
     elif event.HasField('write'):
-      dumps.append(DumpEvent('O', event.timestamp, event.write.data))
+      dumps.append(DumpEvent('O', event.timestamp, event.write.data.as_bytes))
 
   ipv6 = False
   try:

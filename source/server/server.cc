@@ -45,14 +45,14 @@
 namespace Envoy {
 namespace Server {
 
-InstanceImpl::InstanceImpl(Options& options, Event::TimeSystem& time_system,
+InstanceImpl::InstanceImpl(const Options& options, Event::TimeSystem& time_system,
                            Network::Address::InstanceConstSharedPtr local_address, TestHooks& hooks,
                            HotRestart& restarter, Stats::StoreRoot& store,
                            Thread::BasicLockable& access_log_lock,
                            ComponentFactory& component_factory,
                            Runtime::RandomGeneratorPtr&& random_generator,
                            ThreadLocal::Instance& tls, Thread::ThreadFactory& thread_factory)
-    : shutdown_(false), options_(options), time_system_(time_system), restarter_(restarter),
+    : shutdown_(false), options_(options), time_source_(time_system), restarter_(restarter),
       start_time_(time(nullptr)), original_start_time_(start_time_), stats_store_(store),
       thread_local_(tls),
       api_(new Api::Impl(options.fileFlushIntervalMsec(), thread_factory, store, time_system)),
@@ -171,7 +171,7 @@ bool InstanceImpl::healthCheckFailed() { return server_stats_->live_.value() == 
 
 InstanceUtil::BootstrapVersion
 InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& bootstrap,
-                                  Options& options, Api::Api& api) {
+                                  const Options& options, Api::Api& api) {
   const std::string& config_path = options.configPath();
   const std::string& config_yaml = options.configYaml();
 
@@ -194,7 +194,7 @@ InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& boots
   return BootstrapVersion::V2;
 }
 
-void InstanceImpl::initialize(Options& options,
+void InstanceImpl::initialize(const Options& options,
                               Network::Address::InstanceConstSharedPtr local_address,
                               ComponentFactory& component_factory) {
   ENVOY_LOG(info, "initializing epoch {} (hot restart version={})", options.restartEpoch(),
@@ -225,7 +225,7 @@ void InstanceImpl::initialize(Options& options,
 
   // Handle configuration that needs to take place prior to the main configuration load.
   InstanceUtil::loadBootstrapConfig(bootstrap_, options, api());
-  bootstrap_config_update_time_ = time_system_.systemTime();
+  bootstrap_config_update_time_ = time_source_.systemTime();
 
   // Needs to happen as early as possible in the instantiation to preempt the objects that require
   // stats.
@@ -304,7 +304,7 @@ void InstanceImpl::initialize(Options& options,
 
   // Once we have runtime we can initialize the SSL context manager.
   ssl_context_manager_ =
-      std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(time_system_);
+      std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(time_source_);
 
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
       admin(), runtime(), stats(), threadLocal(), random(), dnsResolver(), sslContextManager(),
@@ -327,7 +327,7 @@ void InstanceImpl::initialize(Options& options,
   if (bootstrap_.has_hds_config()) {
     const auto& hds_config = bootstrap_.hds_config();
     async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(
-        clusterManager(), thread_local_, time_system_, api());
+        clusterManager(), thread_local_, time_source_, api());
     hds_delegate_ = std::make_unique<Upstream::HdsDelegate>(
         stats(),
         Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, hds_config, stats())
@@ -394,7 +394,7 @@ void InstanceImpl::loadServerFlags(const absl::optional<std::string>& flags_path
 
 uint64_t InstanceImpl::numConnections() { return listener_manager_->numConnections(); }
 
-RunHelper::RunHelper(Instance& instance, Options& options, Event::Dispatcher& dispatcher,
+RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatcher& dispatcher,
                      Upstream::ClusterManager& cm, AccessLog::AccessLogManager& access_log_manager,
                      InitManagerImpl& init_manager, OverloadManager& overload_manager,
                      std::function<void()> workers_start_cb) {
