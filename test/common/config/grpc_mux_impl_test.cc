@@ -491,6 +491,9 @@ TEST_F(GrpcMuxImplTest, TooManyRequestsWithCustomRateLimitSettings) {
   // Validate that drain requests call when there are multiple requests in queue.
   time_system_.setMonotonicTime(std::chrono::seconds(10));
   drain_timer_cb();
+
+  // Check that the pending_requests stat is updated with the queue drain.
+  EXPECT_EQ(0, stats_.counter("control_plane.pending_requests").value());
 }
 
 //  Verifies that a messsage with no resources is accepted.
