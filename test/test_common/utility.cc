@@ -42,6 +42,7 @@
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
+#include "test/mocks/stats/mocks.h"
 #include "test/test_common/test_base.h"
 
 using testing::GTEST_FLAG(random_seed);
@@ -401,17 +402,26 @@ ThreadFactory& threadFactoryForTest() {
 
 namespace Api {
 
-class TimeSystemProvider {
+class TestImplProvider {
 protected:
   Event::GlobalTimeSystem global_time_system_;
+  testing::NiceMock<Stats::MockIsolatedStatsStore> default_stats_store_;
 };
 
-class TestImpl : public TimeSystemProvider, public Impl {
+class TestImpl : public TestImplProvider, public Impl {
 public:
   TestImpl(std::chrono::milliseconds file_flush_interval_msec,
            Thread::ThreadFactory& thread_factory, Stats::Store& stats_store)
       : Impl(file_flush_interval_msec, thread_factory, stats_store, global_time_system_) {}
+  TestImpl(std::chrono::milliseconds file_flush_interval_msec,
+           Thread::ThreadFactory& thread_factory)
+      : Impl(file_flush_interval_msec, thread_factory, default_stats_store_, global_time_system_) {}
 };
+
+ApiPtr createApiForTest() {
+  return std::make_unique<TestImpl>(std::chrono::milliseconds(1000),
+                                    Thread::threadFactoryForTest());
+}
 
 ApiPtr createApiForTest(Stats::Store& stat_store) {
   return std::make_unique<TestImpl>(std::chrono::milliseconds(1000), Thread::threadFactoryForTest(),
