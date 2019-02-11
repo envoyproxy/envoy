@@ -58,7 +58,7 @@ void recordLatestDataFilter(const typename FilterList<T>::iterator current_filte
   //
   // We compare against the previous filter to avoid multiple filter iterations from reseting the
   // pointer: If we just set latest to current, then the first onData filter iteration would
-  // correctly iterate over the the filters and set latest, but on subsequent onData iterations
+  // correctly iterate over the filters and set latest, but on subsequent onData iterations
   // we'd start from the beginning again, potentially allowing filter N to modify the buffer even
   // though filter M > N was the filter that inserted data into the buffer.
   if (current_filter != filters.begin() && latest_filter == std::prev(current_filter)->get()) {
