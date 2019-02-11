@@ -8,6 +8,7 @@
 
 #include "server/config_validation/api.h"
 
+#include "test/mocks/stats/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/test_time.h"
@@ -24,10 +25,11 @@ public:
     Event::Libevent::Global::initialize();
 
     validation_ = std::make_unique<Api::ValidationImpl>(Thread::threadFactoryForTest(),
-                                                        test_time_.timeSystem());
+                                                        stats_store_, test_time_.timeSystem());
     dispatcher_ = validation_->allocateDispatcher();
   }
 
+  testing::NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   DangerousDeprecatedTestTime test_time_;
   Event::DispatcherPtr dispatcher_;
 

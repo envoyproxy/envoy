@@ -18,7 +18,7 @@ namespace Api {
  */
 class Impl : public Api {
 public:
-  Impl(Thread::ThreadFactory& thread_factory, Event::TimeSystem& time_system);
+  Impl(Thread::ThreadFactory& thread_factory, Stats::Store&, Event::TimeSystem& time_system);
 
   // Api::Api
   Event::DispatcherPtr allocateDispatcher() override;

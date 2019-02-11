@@ -61,8 +61,8 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
                                    const std::string& host, const std::string& content_type) {
 
   Event::GlobalTimeSystem time_system;
-  Api::Impl api(Thread::threadFactoryForTest(), time_system);
-  Event::DispatcherPtr dispatcher(api.allocateDispatcher());
+  Api::ApiPtr api = Api::createApiForTest(time_system);
+  Event::DispatcherPtr dispatcher(api->allocateDispatcher());
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
   Upstream::HostDescriptionConstSharedPtr host_description{
       Upstream::makeTestHostDescription(cluster, "tcp://127.0.0.1:80")};

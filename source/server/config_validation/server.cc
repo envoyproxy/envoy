@@ -41,7 +41,7 @@ ValidationInstance::ValidationInstance(const Options& options, Event::TimeSystem
                                        ComponentFactory& component_factory,
                                        Thread::ThreadFactory& thread_factory)
     : options_(options), stats_store_(store),
-      api_(new Api::ValidationImpl(thread_factory, time_system)),
+      api_(new Api::ValidationImpl(thread_factory, store, time_system)),
       dispatcher_(api_->allocateDispatcher()),
       singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory().currentThreadId())),
       access_log_manager_(options.fileFlushIntervalMsec(), *api_, *dispatcher_, access_log_lock,

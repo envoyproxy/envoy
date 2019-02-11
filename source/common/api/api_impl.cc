@@ -9,7 +9,7 @@
 namespace Envoy {
 namespace Api {
 
-Impl::Impl(Thread::ThreadFactory& thread_factory, Event::TimeSystem& time_system)
+Impl::Impl(Thread::ThreadFactory& thread_factory, Stats::Store&, Event::TimeSystem& time_system)
     : thread_factory_(thread_factory), time_system_(time_system) {}
 
 Event::DispatcherPtr Impl::allocateDispatcher() {

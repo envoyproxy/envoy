@@ -405,17 +405,20 @@ namespace Api {
 class TestImplProvider {
 protected:
   Event::GlobalTimeSystem global_time_system_;
+  testing::NiceMock<Stats::MockIsolatedStatsStore> default_stats_store_;
 };
 
 class TestImpl : public TestImplProvider, public Impl {
 public:
-  TestImpl(Thread::ThreadFactory& thread_factory) : Impl(thread_factory, global_time_system_) {}
+  TestImpl() : Impl(Thread::threadFactoryForTest(), default_stats_store_, global_time_system_) {}
+  TestImpl(Event::TimeSystem& time_system)
+      : Impl(Thread::threadFactoryForTest(), default_stats_store_, time_system) {}
 };
 
-ApiPtr createApiForTest() { return std::make_unique<TestImpl>(Thread::threadFactoryForTest()); }
+ApiPtr createApiForTest() { return std::make_unique<TestImpl>(); }
 
 ApiPtr createApiForTest(Event::TimeSystem& time_system) {
-  return std::make_unique<Impl>(Thread::threadFactoryForTest(), time_system);
+  return std::make_unique<TestImpl>(time_system);
 }
 
 } // namespace Api
