@@ -9,14 +9,13 @@
 
 #include <functional>
 
-#include "codec_impl_test_util.h"
-
 #include "common/common/assert.h"
 #include "common/common/logger.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/http2/codec_impl.h"
 
-#include "test/common/http/http2/codec_impl_fuzz.pb.h"
+#include "test/common/http/codec_impl_fuzz.pb.h"
+#include "test/common/http/http2/codec_impl_test_util.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/fuzz/utility.h"
 #include "test/mocks/http/mocks.h"
@@ -30,10 +29,9 @@ using testing::InvokeWithoutArgs;
 
 namespace Envoy {
 namespace Http {
-namespace Http2 {
 
 // Convert from test proto Http2Settings to Http2Settings.
-Http2Settings fromHttp2Settings(const test::common::http::http2::Http2Settings& settings) {
+Http2Settings fromHttp2Settings(const test::common::http::Http2Settings& settings) {
   Http2Settings h2_settings;
   // We apply an offset and modulo interpretation to settings to ensure that
   // they are valid. Rejecting invalid settings is orthogonal to the fuzzed
@@ -57,7 +55,7 @@ Http2Settings fromHttp2Settings(const test::common::http::http2::Http2Settings& 
 
 // Internal representation of stream state. Encapsulates the stream state, mocks
 // and encoders for both the request/response.
-class Stream : public LinkedObject<Stream> {
+class HttpStream : public LinkedObject<HttpStream> {
 public:
   // We track stream state here to prevent illegal operations, e.g. applying an
   // encodeData() to the codec after encodeTrailers(). This is necessary to
@@ -75,8 +73,8 @@ public:
     uint32_t read_disable_count_{};
   } request_, response_;
 
-  Stream(TestClientConnectionImpl& client, const TestHeaderMapImpl& request_headers,
-         bool end_stream) {
+  HttpStream(Http2::TestClientConnectionImpl& client, const TestHeaderMapImpl& request_headers,
+             bool end_stream) {
     request_.encoder_ = &client.newStream(response_.decoder_);
     ON_CALL(request_.stream_callbacks_, onResetStream(_)).WillByDefault(InvokeWithoutArgs([this] {
       ENVOY_LOG_MISC(trace, "reset request for stream index {}", stream_index_);
@@ -98,11 +96,11 @@ public:
 
   // Some stream action applied in either the request or response direction.
   void directionalAction(DirectionalState& state,
-                         const test::common::http::http2::DirectionalAction& directional_action) {
+                         const test::common::http::DirectionalAction& directional_action) {
     const bool end_stream = directional_action.end_stream();
     const bool response = &state == &response_;
     switch (directional_action.directional_action_selector_case()) {
-    case test::common::http::http2::DirectionalAction::kContinueHeaders: {
+    case test::common::http::DirectionalAction::kContinueHeaders: {
       if (state.stream_state_ == StreamState::PendingHeaders) {
         Http::TestHeaderMapImpl headers = Fuzz::fromHeaders(directional_action.continue_headers());
         headers.setReferenceKey(Headers::get().Status, "100");
@@ -110,7 +108,7 @@ public:
       }
       break;
     }
-    case test::common::http::http2::DirectionalAction::kHeaders: {
+    case test::common::http::DirectionalAction::kHeaders: {
       if (state.stream_state_ == StreamState::PendingHeaders) {
         auto headers = Fuzz::fromHeaders(directional_action.headers());
         if (response && headers.Status() == nullptr) {
@@ -121,7 +119,7 @@ public:
       }
       break;
     }
-    case test::common::http::http2::DirectionalAction::kData: {
+    case test::common::http::DirectionalAction::kData: {
       if (state.stream_state_ == StreamState::PendingDataOrTrailers) {
         Buffer::OwnedImpl buf(std::string(directional_action.data() % (1024 * 1024), 'a'));
         state.encoder_->encodeData(buf, end_stream);
@@ -129,14 +127,14 @@ public:
       }
       break;
     }
-    case test::common::http::http2::DirectionalAction::kTrailers: {
+    case test::common::http::DirectionalAction::kTrailers: {
       if (state.stream_state_ == StreamState::PendingDataOrTrailers) {
         state.encoder_->encodeTrailers(Fuzz::fromHeaders(directional_action.trailers()));
         state.stream_state_ = StreamState::Closed;
       }
       break;
     }
-    case test::common::http::http2::DirectionalAction::kResetStream: {
+    case test::common::http::DirectionalAction::kResetStream: {
       if (state.stream_state_ != StreamState::Closed) {
         state.encoder_->getStream().resetStream(
             static_cast<Http::StreamResetReason>(directional_action.reset_stream()));
@@ -144,7 +142,7 @@ public:
       }
       break;
     }
-    case test::common::http::http2::DirectionalAction::kReadDisable: {
+    case test::common::http::DirectionalAction::kReadDisable: {
       if (state.stream_state_ != StreamState::Closed) {
         const bool disable = directional_action.read_disable();
         if (state.read_disable_count_ == 0 && !disable) {
@@ -165,13 +163,13 @@ public:
     }
   }
 
-  void streamAction(const test::common::http::http2::StreamAction& stream_action) {
+  void streamAction(const test::common::http::StreamAction& stream_action) {
     switch (stream_action.stream_action_selector_case()) {
-    case test::common::http::http2::StreamAction::kRequest: {
+    case test::common::http::StreamAction::kRequest: {
       directionalAction(request_, stream_action.request());
       break;
     }
-    case test::common::http::http2::StreamAction::kResponse: {
+    case test::common::http::StreamAction::kResponse: {
       directionalAction(response_, stream_action.response());
       break;
     }
@@ -189,7 +187,7 @@ public:
 // the buffer via swap() or modified with mutate().
 class ReorderBuffer {
 public:
-  ReorderBuffer(ConnectionImpl& connection) : connection_(connection) {}
+  ReorderBuffer(Http2::ConnectionImpl& connection) : connection_(connection) {}
 
   void add(const Buffer::Instance& data) { bufs_.emplace_back(data); }
 
@@ -232,28 +230,28 @@ public:
 
   bool empty() const { return bufs_.empty(); }
 
-  ConnectionImpl& connection_;
+  Http2::ConnectionImpl& connection_;
   std::deque<Buffer::OwnedImpl> bufs_;
 };
 
-typedef std::unique_ptr<Stream> StreamPtr;
+typedef std::unique_ptr<HttpStream> HttpStreamPtr;
 
 // Fuzz the H2 codec implementation.
-DEFINE_PROTO_FUZZER(const test::common::http::http2::CodecImplFuzzTestCase& input) {
+DEFINE_PROTO_FUZZER(const test::common::http::CodecImplFuzzTestCase& input) {
   Stats::IsolatedStoreImpl stats_store;
   NiceMock<Network::MockConnection> client_connection;
-  const Http2Settings client_http2settings{fromHttp2Settings(input.client_settings())};
+  const Http2Settings client_http2settings{fromHttp2Settings(input.h2_settings().client())};
   NiceMock<MockConnectionCallbacks> client_callbacks;
   uint32_t max_request_headers_kb = Http::DEFAULT_MAX_REQUEST_HEADERS_KB;
 
-  TestClientConnectionImpl client(client_connection, client_callbacks, stats_store,
-                                  client_http2settings, max_request_headers_kb);
+  Http2::TestClientConnectionImpl client(client_connection, client_callbacks, stats_store,
+                                         client_http2settings, max_request_headers_kb);
 
   NiceMock<Network::MockConnection> server_connection;
-  const Http2Settings server_http2settings{fromHttp2Settings(input.server_settings())};
+  const Http2Settings server_http2settings{fromHttp2Settings(input.h2_settings().server())};
   NiceMock<MockServerConnectionCallbacks> server_callbacks;
-  TestServerConnectionImpl server(server_connection, server_callbacks, stats_store,
-                                  server_http2settings, max_request_headers_kb);
+  Http2::TestServerConnectionImpl server(server_connection, server_callbacks, stats_store,
+                                         server_http2settings, max_request_headers_kb);
 
   ReorderBuffer client_write_buf{server};
   ReorderBuffer server_write_buf{client};
@@ -272,8 +270,8 @@ DEFINE_PROTO_FUZZER(const test::common::http::http2::CodecImplFuzzTestCase& inpu
   // We hold Streams in pending_streams between the request encodeHeaders in the
   // Stream constructor and server newStream() callback, where we learn about
   // the response encoder and can complete Stream initialization.
-  std::list<StreamPtr> pending_streams;
-  std::list<StreamPtr> streams;
+  std::list<HttpStreamPtr> pending_streams;
+  std::list<HttpStreamPtr> streams;
   // For new streams when we aren't expecting one (e.g. as a result of a mutation).
   NiceMock<MockStreamDecoder> orphan_request_decoder;
 
@@ -283,7 +281,7 @@ DEFINE_PROTO_FUZZER(const test::common::http::http2::CodecImplFuzzTestCase& inpu
           return orphan_request_decoder;
         }
         auto stream_ptr = pending_streams.front()->removeFromList(pending_streams);
-        Stream* const stream = stream_ptr.get();
+        HttpStream* const stream = stream_ptr.get();
         stream_ptr->moveIntoListBack(std::move(stream_ptr), streams);
         stream->response_.encoder_ = &encoder;
         encoder.getStream().addCallbacks(stream->response_.stream_callbacks_);
@@ -295,14 +293,14 @@ DEFINE_PROTO_FUZZER(const test::common::http::http2::CodecImplFuzzTestCase& inpu
     for (const auto& action : input.actions()) {
       ENVOY_LOG_MISC(trace, "action {} with {} streams", action.DebugString(), streams.size());
       switch (action.action_selector_case()) {
-      case test::common::http::http2::Action::kNewStream: {
-        StreamPtr stream = std::make_unique<Stream>(
+      case test::common::http::Action::kNewStream: {
+        HttpStreamPtr stream = std::make_unique<HttpStream>(
             client, Fuzz::fromHeaders(action.new_stream().request_headers()),
             action.new_stream().end_stream());
         stream->moveIntoListBack(std::move(stream), pending_streams);
         break;
       }
-      case test::common::http::http2::Action::kStreamAction: {
+      case test::common::http::Action::kStreamAction: {
         const auto& stream_action = action.stream_action();
         if (streams.empty()) {
           break;
@@ -312,27 +310,27 @@ DEFINE_PROTO_FUZZER(const test::common::http::http2::CodecImplFuzzTestCase& inpu
         (*std::next(streams.begin(), stream_id))->streamAction(stream_action);
         break;
       }
-      case test::common::http::http2::Action::kMutate: {
+      case test::common::http::Action::kMutate: {
         const auto& mutate = action.mutate();
         ReorderBuffer& write_buf = mutate.server() ? server_write_buf : client_write_buf;
         write_buf.mutate(mutate.buffer(), mutate.offset(), mutate.value());
         break;
       }
-      case test::common::http::http2::Action::kSwapBuffer: {
+      case test::common::http::Action::kSwapBuffer: {
         const auto& swap_buffer = action.swap_buffer();
         ReorderBuffer& write_buf = swap_buffer.server() ? server_write_buf : client_write_buf;
         write_buf.swap(swap_buffer.buffer());
         break;
       }
-      case test::common::http::http2::Action::kClientDrain: {
+      case test::common::http::Action::kClientDrain: {
         client_write_buf.drain();
         break;
       }
-      case test::common::http::http2::Action::kServerDrain: {
+      case test::common::http::Action::kServerDrain: {
         server_write_buf.drain();
         break;
       }
-      case test::common::http::http2::Action::kQuiesceDrain: {
+      case test::common::http::Action::kQuiesceDrain: {
         while (!client_write_buf.empty() || !server_write_buf.empty()) {
           client_write_buf.drain();
           server_write_buf.drain();
@@ -350,6 +348,5 @@ DEFINE_PROTO_FUZZER(const test::common::http::http2::CodecImplFuzzTestCase& inpu
   }
 }
 
-} // namespace Http2
 } // namespace Http
 } // namespace Envoy

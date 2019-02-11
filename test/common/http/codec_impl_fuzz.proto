@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package test.common.http.http2;
+package test.common.http;
 
 import "google/protobuf/empty.proto";
 
@@ -71,6 +71,16 @@ message Action {
   }
 }
 
+message Http1ServerSettings {
+  bool allow_absolute_url = 1;
+  bool accept_http_10 = 2;
+  string default_host_for_http_10 = 3;
+}
+
+message Http1ClientServerSettings {
+  Http1ServerSettings server = 2;
+}
+
 // Setting X below is interpreted as min_valid_setting + X % (1 +
 // max_valid_setting - min_valid_setting).
 message Http2Settings {
@@ -80,8 +90,15 @@ message Http2Settings {
   uint32 initial_connection_window_size = 4;
 }
 
+message Http2ClientServerSettings {
+  Http2Settings client = 1;
+  Http2Settings server = 2;
+}
+
 message CodecImplFuzzTestCase {
-  Http2Settings client_settings = 1;
-  Http2Settings server_settings = 2;
+  oneof settings_selector {
+    Http1ClientServerSettings h1_settings = 1;
+    Http2ClientServerSettings h2_settings = 2;
+  }
   repeated Action actions = 3;
 }
