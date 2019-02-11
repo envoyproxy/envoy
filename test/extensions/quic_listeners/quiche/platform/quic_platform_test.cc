@@ -279,11 +279,9 @@ TEST(QuicPlatformTest, QuicCertUtils) {
       TransportSockets::Tls::readCertFromFile(TestEnvironment::substitute(
           "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
   // Encode X509 cert with DER encoding.
-  int len = i2d_X509(x509_cert.get(), nullptr);
-  unsigned char* der = static_cast<unsigned char*>(OPENSSL_malloc(len));
-  unsigned char* p = der;
-  i2d_X509(x509_cert.get(), &p);
-  EXPECT_EQ(p - der, len);
+  unsigned char* der = nullptr;
+  int len = i2d_X509(x509_cert.get(), &der);
+  ASSERT_GT(len, 0);
   quic::QuicStringPiece out;
   quic::QuicCertUtils::ExtractSubjectNameFromDERCert(
       quic::QuicStringPiece(reinterpret_cast<const char*>(der), len), &out);
