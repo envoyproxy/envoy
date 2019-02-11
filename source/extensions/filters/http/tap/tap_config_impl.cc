@@ -25,7 +25,7 @@ void HttpPerRequestTapperImpl::onRequestHeaders(const Http::HeaderMap& headers) 
 void HttpPerRequestTapperImpl::onRequestBody(const Buffer::Instance& data) {
   Extensions::Common::Tap::Utility::addBufferToProtoBytes(
       *trace_->mutable_http_buffered_trace()->mutable_request()->mutable_body(),
-      config_->maxBufferedRxBytes(), data);
+      config_->maxBufferedRxBytes(), data, 0, data.length());
 }
 
 void HttpPerRequestTapperImpl::onRequestTrailers(const Http::HeaderMap& trailers) {
@@ -39,7 +39,7 @@ void HttpPerRequestTapperImpl::onResponseHeaders(const Http::HeaderMap& headers)
 void HttpPerRequestTapperImpl::onResponseBody(const Buffer::Instance& data) {
   Extensions::Common::Tap::Utility::addBufferToProtoBytes(
       *trace_->mutable_http_buffered_trace()->mutable_response()->mutable_body(),
-      config_->maxBufferedTxBytes(), data);
+      config_->maxBufferedTxBytes(), data, 0, data.length());
 }
 
 void HttpPerRequestTapperImpl::onResponseTrailers(const Http::HeaderMap& trailers) {

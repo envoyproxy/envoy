@@ -13,23 +13,31 @@ namespace Extensions {
 namespace Common {
 namespace Tap {
 
-void Utility::addBufferToProtoBytes(envoy::data::tap::v2alpha::Body& output_bytes,
-                                    uint32_t max_buffered_bytes, const Buffer::Instance& data) {
+bool Utility::addBufferToProtoBytes(envoy::data::tap::v2alpha::Body& output_bytes,
+                                    uint32_t max_buffered_bytes, const Buffer::Instance& data,
+                                    uint32_t buffer_start_offset, uint32_t buffer_length_to_copy) {
   // TODO(mattklein123): Figure out if we can use the buffer API here directly in some way. This is
   // is not trivial if we want to avoid extra copies since we end up appending to the existing
   // protobuf string.
+  ASSERT(buffer_start_offset + buffer_length_to_copy <= data.length());
+  bool truncated = false;
+
   const uint64_t num_slices = data.getRawSlices(nullptr, 0);
   STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
   data.getRawSlices(slices.begin(), num_slices);
+  trimSlices(slices, buffer_start_offset, buffer_length_to_copy);
   for (const Buffer::RawSlice& slice : slices) {
     if (slice.len_ > max_buffered_bytes - output_bytes.as_bytes().size()) {
       output_bytes.set_truncated(true);
+      truncated = true;
     }
 
     output_bytes.mutable_as_bytes()->append(
         static_cast<const char*>(slice.mem_),
         std::min(slice.len_, max_buffered_bytes - output_bytes.as_bytes().size()));
   }
+
+  return truncated;
 }
 
 TapConfigBaseImpl::TapConfigBaseImpl(envoy::service::tap::v2alpha::TapConfig&& proto_config,
