@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "absl/base/call_once.h"
 
 namespace Envoy {

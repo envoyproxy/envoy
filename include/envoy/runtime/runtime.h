@@ -49,6 +49,7 @@ public:
     std::string raw_string_value_;
     absl::optional<uint64_t> uint_value_;
     absl::optional<envoy::type::FractionalPercent> fractional_percent_value_;
+    absl::optional<bool> bool_value_;
   };
 
   typedef std::unordered_map<std::string, Entry> EntryMap;
@@ -212,7 +213,7 @@ public:
   virtual void mergeValues(const std::unordered_map<std::string, std::string>& values) PURE;
 };
 
-typedef std::unique_ptr<Loader> LoaderPtr;
+using LoaderPtr = std::unique_ptr<Loader>;
 
 // To make the runtime generally accessible, we make use of the dreaded
 // singleton class. For Envoy, the runtime will be created and cleaned up by the
@@ -221,8 +222,8 @@ typedef std::unique_ptr<Loader> LoaderPtr;
 // This makes it possible for call sites to easily make use of runtime values to
 // determine if a given feature is on or off, as well as various deprecated configuration
 // protos being enabled or disabled by default.
-typedef InjectableSingleton<Loader> LoaderSingleton;
-typedef ScopedInjectableLoader<Loader> ScopedLoaderSingleton;
+using LoaderSingleton = InjectableSingleton<Loader>;
+using ScopedLoaderSingleton = ScopedInjectableLoader<Loader>;
 
 } // namespace Runtime
 } // namespace Envoy

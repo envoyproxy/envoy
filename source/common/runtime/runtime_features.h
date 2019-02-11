@@ -18,8 +18,8 @@ const char* disallowed_features[] = {
 class DisallowedFeatures {
 public:
   DisallowedFeatures() {
-    for (uint32_t i = 0; i < ABSL_ARRAYSIZE(disallowed_features); ++i) {
-      disallowed_features_.insert(disallowed_features[i]);
+    for (auto& feature : disallowed_features) {
+      disallowed_features_.insert(feature);
     }
   }
 
@@ -31,7 +31,7 @@ private:
   absl::flat_hash_set<std::string> disallowed_features_;
 };
 
-typedef ConstSingleton<DisallowedFeatures> DisallowedFeaturesDefaults;
+using DisallowedFeaturesDefaults = ConstSingleton<DisallowedFeatures>;
 
 } // namespace Runtime
 } // namespace Envoy

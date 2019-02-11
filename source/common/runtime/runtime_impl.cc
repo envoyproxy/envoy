@@ -147,15 +147,20 @@ std::string RandomGeneratorImpl::uuid() {
 }
 
 bool SnapshotImpl::deprecatedFeatureEnabled(const std::string& key) const {
-  std::cerr << "Checking on " << key << "\n";
-  uint64_t stored = getInteger(key, 100);
-  bool disallowed_by_default = DisallowedFeaturesDefaults::get().disallowedByDefault(key);
+  bool allowed = false;
+  // See if this value is explicitly set as a runtime boolean.
+  bool stored = getBoolean(key, allowed);
+  // If not, the default value is based on disallowedByDefault.
+  if (!stored) {
+    allowed = !DisallowedFeaturesDefaults::get().disallowedByDefault(key);
+  }
 
-  // If deprecated_by_default and not explicitly overriden, the feature is disabled.
-  if (stored != 1 && disallowed_by_default) {
+  if (!allowed) {
+    // If either disallowed by default or configured off, the feature is not enabled.
     return false;
   }
-  // It is assumed this check is called when the feature is about to be used.
+  // The feature is allowed. It is assumed this check is called when the feaure
+  // is about to be used, so increment the feature use stat.
   stats_.deprecated_feature_use_.inc();
   return true;
 }
@@ -228,6 +233,15 @@ uint64_t SnapshotImpl::getInteger(const std::string& key, uint64_t default_value
   }
 }
 
+bool SnapshotImpl::getBoolean(const std::string& key, bool& value) const {
+  auto entry = values_.find(key);
+  if (entry != values_.end() && entry->second.bool_value_) {
+    value = entry->second.bool_value_.value();
+    return true;
+  }
+  return false;
+}
+
 const std::vector<Snapshot::OverrideLayerConstPtr>& SnapshotImpl::getLayers() const {
   return layers_;
 }
@@ -256,11 +270,14 @@ SnapshotImpl::Entry SnapshotImpl::createEntry(const std::string& value) {
 }
 
 bool SnapshotImpl::parseEntryBooleanValue(Entry& entry) {
-  if (absl::EqualsIgnoreCase(entry.raw_string_value_, "true")) {
-    entry.uint_value_ = 1;
+  absl::string_view stripped = entry.raw_string_value_;
+  stripped = absl::StripAsciiWhitespace(stripped);
+
+  if (absl::EqualsIgnoreCase(stripped, "true")) {
+    entry.bool_value_ = true;
     return true;
-  } else if (absl::EqualsIgnoreCase(entry.raw_string_value_, "false")) {
-    entry.uint_value_ = 0;
+  } else if (absl::EqualsIgnoreCase(stripped, "false")) {
+    entry.bool_value_ = 0;
     return true;
   }
   return false;

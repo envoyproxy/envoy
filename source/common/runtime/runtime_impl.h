@@ -24,7 +24,7 @@
 namespace Envoy {
 namespace Runtime {
 
-typedef ThreadSafeSingleton<Loader> RuntimeSingleton;
+using RuntimeSingleton = ThreadSafeSingleton<Loader>;
 
 /**
  * Implementation of RandomGenerator that uses per-thread RANLUX generators seeded with current
@@ -86,6 +86,10 @@ public:
   const std::vector<OverrideLayerConstPtr>& getLayers() const override;
 
   static Entry createEntry(const std::string& value);
+
+  // Returns true and sets 'value' to the key if found.
+  // Returns false if the key is not a boolean value.
+  bool getBoolean(const std::string& key, bool& value) const;
 
 private:
   static void resolveEntryType(Entry& entry) {
