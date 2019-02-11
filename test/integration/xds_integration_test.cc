@@ -6,8 +6,8 @@ namespace Envoy {
 namespace {
 
 // This is a minimal litmus test for the v2 xDS APIs.
-class XdsIntegrationTest : public HttpIntegrationTest,
-                           public TestBaseWithParam<Network::Address::IpVersion> {
+class XdsIntegrationTest : public TestBaseWithParam<Network::Address::IpVersion>,
+                           public HttpIntegrationTest {
 public:
   XdsIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam(), realTime()) {

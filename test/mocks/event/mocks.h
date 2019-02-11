@@ -31,7 +31,7 @@ public:
   ~MockDispatcher();
 
   // Dispatcher
-  TimeSystem& timeSystem() override { return time_system_; }
+  TimeSource& timeSource() override { return time_system_; }
   Network::ConnectionPtr
   createServerConnection(Network::ConnectionSocketPtr&& socket,
                          Network::TransportSocketPtr&& transport_socket) override {

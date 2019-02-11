@@ -42,6 +42,7 @@
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
+#include "test/mocks/stats/mocks.h"
 #include "test/test_common/test_base.h"
 
 using testing::GTEST_FLAG(random_seed);
@@ -401,12 +402,12 @@ ThreadFactory& threadFactoryForTest() {
 
 namespace Api {
 
-class TimeSystemProvider {
+class TestImplProvider {
 protected:
   Event::GlobalTimeSystem global_time_system_;
 };
 
-class TestImpl : public TimeSystemProvider, public Impl {
+class TestImpl : public TestImplProvider, public Impl {
 public:
   TestImpl(Thread::ThreadFactory& thread_factory) : Impl(thread_factory, global_time_system_) {}
 };

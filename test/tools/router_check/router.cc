@@ -157,7 +157,7 @@ bool RouterCheckTool::compareVirtualHost(ToolConfig& tool_config, const std::str
 bool RouterCheckTool::compareRewritePath(ToolConfig& tool_config, const std::string& expected) {
   std::string actual = "";
   Envoy::StreamInfo::StreamInfoImpl stream_info(Envoy::Http::Protocol::Http11,
-                                                factory_context_->dispatcher().timeSystem());
+                                                factory_context_->dispatcher().timeSource());
   if (tool_config.route_->routeEntry() != nullptr) {
     tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_, stream_info,
                                                              true);
@@ -169,7 +169,7 @@ bool RouterCheckTool::compareRewritePath(ToolConfig& tool_config, const std::str
 bool RouterCheckTool::compareRewriteHost(ToolConfig& tool_config, const std::string& expected) {
   std::string actual = "";
   Envoy::StreamInfo::StreamInfoImpl stream_info(Envoy::Http::Protocol::Http11,
-                                                factory_context_->dispatcher().timeSystem());
+                                                factory_context_->dispatcher().timeSource());
   if (tool_config.route_->routeEntry() != nullptr) {
     tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_, stream_info,
                                                              true);
@@ -197,7 +197,7 @@ bool RouterCheckTool::compareCustomHeaderField(ToolConfig& tool_config, const st
                                                const std::string& expected) {
   std::string actual = "";
   Envoy::StreamInfo::StreamInfoImpl stream_info(Envoy::Http::Protocol::Http11,
-                                                factory_context_->dispatcher().timeSystem());
+                                                factory_context_->dispatcher().timeSource());
   stream_info.setDownstreamRemoteAddress(Network::Utility::getCanonicalIpv4LoopbackAddress());
   if (tool_config.route_->routeEntry() != nullptr) {
     tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_, stream_info,
