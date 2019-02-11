@@ -59,7 +59,10 @@ envoy_cc_library(
         "quic_string_impl.h",
         "quic_string_piece_impl.h",
         "quic_uint128_impl.h",
-    ] + envoy_select_quiche(["quic_logging_impl.h"]),
+    ] + envoy_select_quiche([
+        "quic_logging_impl.h",
+        "quic_stack_trace_impl.h",
+    ]),
     external_deps = [
         "abseil_base",
         "abseil_hash",
@@ -71,6 +74,7 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = envoy_select_quiche([
         "//source/common/common:assert_lib",
+        "//source/server:backtrace_lib",
     ]),
 )
 
