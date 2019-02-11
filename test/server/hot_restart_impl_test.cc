@@ -36,7 +36,8 @@ public:
     EXPECT_CALL(os_sys_calls_, mmap(_, _, _, _, _, _)).WillOnce(InvokeWithoutArgs([this]() {
       return Api::SysCallPtrResult{buffer_.data(), 0};
     }));
-    EXPECT_CALL(os_sys_calls_, bind(_, _, _));
+    // We bind two sockets: one to talk to parent, one to talk to our (hypothetical eventual) child
+    EXPECT_CALL(os_sys_calls_, bind(_, _, _)).Times(2);
     EXPECT_CALL(options_, statsOptions()).WillRepeatedly(ReturnRef(stats_options_));
 
     // Test we match the correct stat with empty-slots before, after, or both.
@@ -129,7 +130,7 @@ TEST_F(HotRestartImplTest, crossAlloc) {
   EXPECT_CALL(os_sys_calls_, shmOpen(_, _, _));
   EXPECT_CALL(os_sys_calls_, mmap(_, _, _, _, _, _))
       .WillOnce(Return(Api::SysCallPtrResult{buffer_.data(), 0}));
-  EXPECT_CALL(os_sys_calls_, bind(_, _, _));
+  EXPECT_CALL(os_sys_calls_, bind(_, _, _)).Times(2);
   HotRestartImpl hot_restart2(options_);
   Stats::RawStatData* stat1_prime = hot_restart2.statsAllocator().alloc("stat1");
   Stats::RawStatData* stat3_prime = hot_restart2.statsAllocator().alloc("stat3");

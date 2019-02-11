@@ -52,9 +52,9 @@ public:
   virtual void getParentStats(GetParentStatsInfo& info) PURE;
 
   /**
-   * Initialize the restarter after primary server initialization begins. The hot restart
-   * implementation needs to be created early to deal with shared memory, logging, etc. so
-   * late initialization of needed interfaces is done here.
+   * Initialize the parent logic of our restarter. Meant to be called after initialization of a
+   * new child has begun. The hot restart implementation needs to be created early to deal with
+   * shared memory, logging, etc. so late initialization of needed interfaces is done here.
    */
   virtual void initialize(Event::Dispatcher& dispatcher, Server::Instance& server) PURE;
 
@@ -66,12 +66,12 @@ public:
   virtual void shutdownParentAdmin(ShutdownParentAdminInfo& info) PURE;
 
   /**
-   * Tell our parent to gracefully terminate itself.
+   * Tell our parent process to gracefully terminate itself.
    */
   virtual void terminateParent() PURE;
 
   /**
-   * Shutdown the hot restarter.
+   * Shutdown the half of our hot restarter that acts as a parent.
    */
   virtual void shutdown() PURE;
 
