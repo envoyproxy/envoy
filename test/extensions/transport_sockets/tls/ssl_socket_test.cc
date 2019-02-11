@@ -282,12 +282,12 @@ void testUtil(const TestUtilOptions& options) {
       }
       if (!options.expectedValidFromTimePeerCert().empty()) {
         const std::string formatted = TestUtility::formatTime(
-            server_connection->ssl()->validFromPeerCertificate(), "%b %e %H:%M:%S %Y GMT");
+            server_connection->ssl()->validFromPeerCertificate().value(), "%b %e %H:%M:%S %Y GMT");
         EXPECT_EQ(options.expectedValidFromTimePeerCert(), formatted);
       }
       if (!options.expectedExpirationTimePeerCert().empty()) {
         const std::string formatted = TestUtility::formatTime(
-            server_connection->ssl()->expirationPeerCertificate(), "%b %e %H:%M:%S %Y GMT");
+            server_connection->ssl()->expirationPeerCertificate().value(), "%b %e %H:%M:%S %Y GMT");
         EXPECT_EQ(options.expectedExpirationTimePeerCert(), formatted);
       }
       server_connection->close(Network::ConnectionCloseType::NoFlush);

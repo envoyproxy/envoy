@@ -11,6 +11,7 @@ envoy_package()
 envoy_cc_library(
     name = "connection_interface",
     hdrs = ["connection.h"],
+    external_deps = ["abseil_optional"],
     deps = [
         "//include/envoy/common:time_interface",
     ],
