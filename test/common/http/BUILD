@@ -58,6 +58,27 @@ envoy_cc_test(
     ],
 )
 
+envoy_proto_library(
+    name = "codec_impl_fuzz_proto",
+    srcs = ["codec_impl_fuzz.proto"],
+    deps = ["//test/fuzz:common_proto"],
+)
+
+envoy_cc_fuzz_test(
+    name = "codec_impl_fuzz_test",
+    srcs = ["codec_impl_fuzz_test.cc"],
+    corpus = "codec_impl_corpus",
+    deps = [
+        ":codec_impl_fuzz_proto_cc",
+        "//source/common/http:header_map_lib",
+        "//source/common/http/http2:codec_lib",
+        "//test/common/http/http2:codec_impl_test_util",
+        "//test/fuzz:utility_lib",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/network:network_mocks",
+    ],
+)
+
 envoy_cc_test(
     name = "codec_wrappers_test",
     srcs = ["codec_wrappers_test.cc"],
