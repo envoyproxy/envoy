@@ -64,7 +64,11 @@ class IoHandle {
 public:
   enum class ShutdownType { Read = 0, Write, Both };
 
-  enum class IoHandleFlag { NonBlock = 0b1, Append = 0b10 };
+  enum class IoHandleFlag {
+    // Each of these maps to a unique bit.
+    NonBlock = 0b01,
+    Append = 0b10
+  };
 
   virtual ~IoHandle() {}
 
