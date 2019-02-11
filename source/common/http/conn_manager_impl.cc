@@ -44,10 +44,10 @@ template <class T> using FilterList = std::list<std::unique_ptr<T>>;
 // Shared helper for recording the latest filter used.
 template <class T>
 void recordLatestDataFilter(const typename FilterList<T>::iterator current_filter,
-                            T** latest_filter, const FilterList<T>& filters) {
+                            T*& latest_filter, const FilterList<T>& filters) {
   // If this is the first time we're calling onData, just record the current filter.
-  if (*latest_filter == nullptr) {
-    *latest_filter = current_filter->get();
+  if (latest_filter == nullptr) {
+    latest_filter = current_filter->get();
     return;
   }
 
@@ -55,8 +55,14 @@ void recordLatestDataFilter(const typename FilterList<T>::iterator current_filte
   // onData callback. To do so, we compare the current latest with the *previous* filter. If they
   // match, then we must be processing a new filter for the first time. We omit this check if we're
   // the first filter, since the above check handles that case.
-  if (current_filter != filters.begin() && *latest_filter == std::prev(current_filter)->get()) {
-    *latest_filter = current_filter->get();
+  //
+  // We compare against the previous filter to avoid multiple filter iterations from reseting the
+  // pointer: If we just set latest to current, then the first onData filter iteration would
+  // correctly iterate over the the filters and set latest, but on subsequent onData iterations
+  // we'd start from the beginning again, potentially allowing filter N to modify the buffer even
+  // though filter M > N was the filter that inserted data into the buffer.
+  if (current_filter != filters.begin() && latest_filter == std::prev(current_filter)->get()) {
+    latest_filter = current_filter->get();
   }
 }
 
@@ -900,7 +906,7 @@ void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* 
       state_.filter_call_state_ |= FilterCallState::LastDataFrame;
     }
 
-    recordLatestDataFilter(entry, &state_.latest_data_decoding_filter_, decoder_filters_);
+    recordLatestDataFilter(entry, state_.latest_data_decoding_filter_, decoder_filters_);
 
     state_.filter_call_state_ |= FilterCallState::DecodeData;
     (*entry)->end_stream_ = end_stream && !request_trailers_;
@@ -1354,7 +1360,7 @@ void ConnectionManagerImpl::ActiveStream::encodeData(ActiveStreamEncoderFilter* 
       state_.filter_call_state_ |= FilterCallState::LastDataFrame;
     }
 
-    recordLatestDataFilter(entry, &state_.latest_data_encoding_filter_, encoder_filters_);
+    recordLatestDataFilter(entry, state_.latest_data_encoding_filter_, encoder_filters_);
 
     (*entry)->end_stream_ = end_stream && !response_trailers_;
     FilterDataStatus status = (*entry)->handle_->encodeData(data, (*entry)->end_stream_);
