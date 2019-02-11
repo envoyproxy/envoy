@@ -7,12 +7,12 @@ executors:
       - image: envoyproxy/envoy-build:698009170e362f9ca0594f2b1927fbbee199bf98
     resource_class: xlarge
     working_directory: /source
-    environment:
-      BAZEL_REMOTE_CACHE: https://storage.googleapis.com/envoy-circleci-bazel-cache/
 
 jobs:
    release:
      executor: ubuntu-build
+     environment:
+       BAZEL_REMOTE_CACHE: https://storage.googleapis.com/envoy-circleci-bazel-cache/
      steps:
        - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
        - checkout
