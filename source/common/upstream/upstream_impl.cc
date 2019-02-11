@@ -410,28 +410,13 @@ void PrioritySetImpl::updateHosts(uint32_t priority, UpdateHostsParams&& update_
                                   absl::optional<uint32_t> overprovisioning_factor) {
   // Ensure that we have a HostSet for the given priority.
   getOrCreateHostSet(priority, overprovisioning_factor);
-  static_cast<const PrioritySetImpl*>(this)->updateHosts(priority, std::move(update_hosts_params),
-                                                         std::move(locality_weights), hosts_added,
-                                                         hosts_removed, overprovisioning_factor);
-  // TODO(snowp): We only run this for the non-const overload, which might be errorprone. This is
-  // only used in test, so there's probably a better way of exposing that doesn't expose the HostSet
-  // directly.
-  runUpdateCallbacks(hosts_added, hosts_removed);
-}
-
-void PrioritySetImpl::updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
-                                  LocalityWeightsConstSharedPtr locality_weights,
-                                  const HostVector& hosts_added, const HostVector& hosts_removed,
-                                  absl::optional<uint32_t> overprovisioning_factor) const {
-  // If we're modifying through the const accessor, we can't make a new HostSet, so just ASSERT.
-  ASSERT(host_sets_.size() >= priority);
-  //
   // TODO(snowp): Add a batched update mode that allows updating multiple HostSet and invoke the
   // membership update cb for the resulting host diff.
-
   static_cast<HostSetImpl*>(host_sets_[priority].get())
       ->updateHosts(std::move(update_hosts_params), std::move(locality_weights), hosts_added,
                     hosts_removed, overprovisioning_factor);
+
+  runUpdateCallbacks(hosts_added, hosts_removed);
 }
 
 ClusterStats ClusterInfoImpl::generateStats(Stats::Scope& scope) {

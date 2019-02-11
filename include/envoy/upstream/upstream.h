@@ -376,20 +376,6 @@ public:
                            LocalityWeightsConstSharedPtr locality_weights,
                            const HostVector& hosts_added, const HostVector& hosts_removed,
                            absl::optional<uint32_t> overprovisioning_factor) PURE;
-  /**
-   * Updates the hosts in a given host set.
-   *
-   * @param priority the priority of the host set to update.
-   * @param update_hosts_param supplies the list of hosts and hosts per locality.
-   * @param locality_weights supplies a map from locality to associated weight.
-   * @param hosts_added supplies the hosts added since the last update.
-   * @param hosts_removed supplies the hosts removed since the last update.
-   * @param overprovisioning_factor if presents, overwrites the current overprovisioning_factor.
-   */
-  virtual void updateHosts(uint32_t priority, UpdateHostsParams&& update_host_params,
-                           LocalityWeightsConstSharedPtr locality_weights,
-                           const HostVector& hosts_added, const HostVector& hosts_removed,
-                           absl::optional<uint32_t> overprovisioning_factor) const PURE;
 };
 
 /**
