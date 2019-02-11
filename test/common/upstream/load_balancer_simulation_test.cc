@@ -52,9 +52,10 @@ TEST(DISABLED_LeastRequestLoadBalancerWeightTest, Weight) {
   }
   HostVectorConstSharedPtr updated_hosts{new HostVector(hosts)};
   HostsPerLocalitySharedPtr updated_locality_hosts{new HostsPerLocalityImpl(hosts)};
-  priority_set.updateHosts(0, HostSetImpl::updateHostsParams(updated_hosts, updated_locality_hosts,
-                                                      updated_hosts, updated_locality_hosts),
-                       {}, hosts, {}, absl::nullopt);
+  priority_set.updateHosts(0,
+                           HostSetImpl::updateHostsParams(updated_hosts, updated_locality_hosts,
+                                                          updated_hosts, updated_locality_hosts),
+                           {}, hosts, {}, absl::nullopt);
 
   Stats::IsolatedStoreImpl stats_store;
   ClusterStats stats{ClusterInfoImpl::generateStats(stats_store)};
@@ -155,7 +156,8 @@ public:
         per_zone_local.push_back(local_per_zone_hosts->get()[zone]);
       }
       auto per_zone_local_shared = makeHostsPerLocality(std::move(per_zone_local));
-      local_priority_set_->updateHosts(0,
+      local_priority_set_->updateHosts(
+          0,
           HostSetImpl::updateHostsParams(originating_hosts, per_zone_local_shared,
                                          originating_hosts, per_zone_local_shared),
           {}, empty_vector_, empty_vector_, absl::nullopt);
