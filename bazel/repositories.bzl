@@ -324,6 +324,9 @@ def _com_github_circonus_labs_libcircllhist():
     _repository_impl(
         name = "com_github_circonus_labs_libcircllhist",
         build_file = "@envoy//bazel/external:libcircllhist.BUILD",
+        # TODO(sesmith177) remove patch once https://github.com/circonus-labs/libcircllhist/pull/43 is merged
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel/external:libcircllhist.patch"],
     )
     native.bind(
         name = "libcircllhist",
