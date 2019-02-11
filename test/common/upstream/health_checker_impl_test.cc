@@ -121,7 +121,8 @@ public:
       HostWithHealthCheckMap;
 
   HttpHealthCheckerImplTest()
-      : cluster_(new NiceMock<MockClusterMockPrioritySet>()), event_logger_(new MockHealthCheckEventLogger()) {}
+      : cluster_(new NiceMock<MockClusterMockPrioritySet>()),
+        event_logger_(new MockHealthCheckEventLogger()) {}
 
   void setupNoServiceValidationHCWithHttp2() {
     const std::string yaml = R"EOF(
@@ -314,8 +315,9 @@ public:
     return config;
   }
 
-  void appendTestHosts(std::shared_ptr<MockClusterMockPrioritySet> cluster, const HostWithHealthCheckMap& hosts,
-                       const std::string& protocol = "tcp://", const uint32_t priority = 0) {
+  void appendTestHosts(std::shared_ptr<MockClusterMockPrioritySet> cluster,
+                       const HostWithHealthCheckMap& hosts, const std::string& protocol = "tcp://",
+                       const uint32_t priority = 0) {
     for (const auto& host : hosts) {
       cluster->prioritySet().getMockHostSet(priority)->hosts_.emplace_back(
           makeTestHost(cluster->info_, fmt::format("{}{}", protocol, host.first), host.second));
@@ -1972,7 +1974,8 @@ TEST(TcpHealthCheckMatcher, match) {
 class TcpHealthCheckerImplTest : public testing::Test {
 public:
   TcpHealthCheckerImplTest()
-      : cluster_(new NiceMock<MockClusterMockPrioritySet>()), event_logger_(new MockHealthCheckEventLogger()) {}
+      : cluster_(new NiceMock<MockClusterMockPrioritySet>()),
+        event_logger_(new MockHealthCheckEventLogger()) {}
 
   void setupData() {
     std::string json = R"EOF(
@@ -2474,7 +2477,8 @@ public:
   };
 
   GrpcHealthCheckerImplTestBase()
-      : cluster_(new NiceMock<MockClusterMockPrioritySet>()), event_logger_(new MockHealthCheckEventLogger()) {
+      : cluster_(new NiceMock<MockClusterMockPrioritySet>()),
+        event_logger_(new MockHealthCheckEventLogger()) {
     EXPECT_CALL(*cluster_->info_, features())
         .WillRepeatedly(Return(Upstream::ClusterInfo::Features::HTTP2));
   }

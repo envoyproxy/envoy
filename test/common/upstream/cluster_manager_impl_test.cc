@@ -143,7 +143,7 @@ public:
     for (auto& cluster : active_clusters_) {
       clusters.emplace(cluster.first, *cluster.second->cluster_);
     }
-    return clusters; 
+    return clusters;
   }
 };
 
@@ -152,15 +152,17 @@ public:
 class MockedUpdatedClusterManagerImpl : public TestClusterManagerImpl {
 public:
   MockedUpdatedClusterManagerImpl(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,
-                         ClusterManagerFactory& factory, Stats::Store& stats,
-                         ThreadLocal::Instance& tls, Runtime::Loader& runtime,
-                         Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
-                         AccessLog::AccessLogManager& log_manager,
-                         Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
-                         Api::Api& api, MockLocalClusterUpdate& local_cluster_update)
-      : TestClusterManagerImpl(bootstrap, factory, stats, tls, runtime, random, local_info, log_manager,
-                           main_thread_dispatcher, admin, api, http_context_),
+                                  ClusterManagerFactory& factory, Stats::Store& stats,
+                                  ThreadLocal::Instance& tls, Runtime::Loader& runtime,
+                                  Runtime::RandomGenerator& random,
+                                  const LocalInfo::LocalInfo& local_info,
+                                  AccessLog::AccessLogManager& log_manager,
+                                  Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
+                                  Api::Api& api, MockLocalClusterUpdate& local_cluster_update)
+      : TestClusterManagerImpl(bootstrap, factory, stats, tls, runtime, random, local_info,
+                               log_manager, main_thread_dispatcher, admin, api, http_context_),
         local_cluster_update_(local_cluster_update) {}
+
 protected:
   void postThreadLocalClusterUpdate(const Cluster&, uint32_t priority,
                                     const HostVector& hosts_added,
@@ -782,7 +784,9 @@ TEST_F(ClusterManagerImplTest, ShutdownOrder) {
   Cluster& cluster = cluster_manager_->activeClusters().begin()->second;
   EXPECT_EQ("cluster_1", cluster.info()->name());
   EXPECT_EQ(cluster.info(), cluster_manager_->get("cluster_1")->info());
-  EXPECT_EQ(1UL, cluster_manager_->get("cluster_1")->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ(
+      1UL,
+      cluster_manager_->get("cluster_1")->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0],
             cluster_manager_->get("cluster_1")->loadBalancer().chooseHost(nullptr));
 

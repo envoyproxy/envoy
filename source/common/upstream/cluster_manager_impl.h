@@ -423,8 +423,10 @@ private:
   Stats::Store& stats_;
   ThreadLocal::SlotPtr tls_;
   Runtime::RandomGenerator& random_;
+
 protected:
   ClusterMap active_clusters_;
+
 private:
   ClusterMap warming_clusters_;
   envoy::api::v2::core::BindConfig bind_config_;

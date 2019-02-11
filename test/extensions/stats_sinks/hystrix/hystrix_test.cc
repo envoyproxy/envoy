@@ -136,7 +136,8 @@ public:
     return buffer;
   }
 
-  void addClusterToMap(const std::string& cluster_name, NiceMock<Upstream::MockClusterMockPrioritySet>& cluster) {
+  void addClusterToMap(const std::string& cluster_name,
+                       NiceMock<Upstream::MockClusterMockPrioritySet>& cluster) {
     cluster_map_.emplace(cluster_name, cluster);
     // Redefining since cluster_map_ is returned by value.
     ON_CALL(cluster_manager_, clusters()).WillByDefault(Return(cluster_map_));
