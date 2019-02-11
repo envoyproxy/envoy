@@ -67,8 +67,8 @@ private:
   Event::Dispatcher& thread_local_dispatcher_;
   std::vector<DrainedCb> cached_callbacks_;
   Common::DebugRecursionChecker recursion_checker_;
-  absl::optional<uint64_t> max_size_;
-  bool adding_pool_ = false;
+  const absl::optional<uint64_t> max_size_;
+  bool adding_callbacks_ = false;
 };
 
 } // namespace Upstream

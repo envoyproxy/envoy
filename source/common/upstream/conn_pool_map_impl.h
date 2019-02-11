@@ -25,16 +25,28 @@ ConnPoolMap<KEY_TYPE, POOL_TYPE>::getPool(KEY_TYPE key, const PoolFactory& facto
     return std::ref(*(pool_iter->second));
   }
 
-  // We need a new element. If we can, create a pool and add it to the map. Tell it about any cached
-  // callbacks.
-  if (max_size_.has_value() && size() >= max_size_) {
+  // We need a new pool. Check if we have room.
+  if (max_size_.has_value() && size() >= max_size_.value()) {
+    // We have hit the maximum number of connection pools. Ask the tracked pools to inform us when
+    // we can free them.
     registerFullCallbacks();
+
+    // At this point, all the pools have had drained callbacks registered. Some of them may have
+    // immediately invoked the callback. Clean up any that did. If none did, then we cannot allocate
+    // a new pool, so we return a failure. Future calls to `getPool` will hopefully be invoked after
+    // some pools have drained. Those calls will succeed.
     if (!cleanDrainedPools()) {
-      // nothing free. :( Return failure.
+      // Nothing free. Return failure.
       return absl::nullopt;
     }
+
+    // TODO(klarose): Consider some simple hysteresis here. How can we prevent draining all pools
+    // when we only need to free a small percentage? If we start draining once we cross a threshold,
+    // then stop after we cross another, we could potentially avoid bouncing pools which shouldn't
+    // be freed.
   }
 
+  // We have room for a new pool. Allocate one and let it know about any cached callbacks.
   auto new_pool = factory();
   for (const auto& cb : cached_callbacks_) {
     new_pool->addDrainedCallback(cb);
@@ -78,7 +90,11 @@ void ConnPoolMap<KEY_TYPE, POOL_TYPE>::drainConnections() {
 
 template <typename KEY_TYPE, typename POOL_TYPE>
 void ConnPoolMap<KEY_TYPE, POOL_TYPE>::poolDrained(const KEY_TYPE& key) {
-  if (adding_pool_) {
+  // If we are in the middle of adding the callbacks when the drain callback comes in, do not free
+  // the now idle pool yet. Instead, push its key on to a list which will be cleaned up later once
+  // we've finished adding the callbacks. This avoids mutating `active_pools_` while iterating over
+  // it.
+  if (adding_callbacks_) {
     drained_pools_.push_back(key);
   } else {
     active_pools_.erase(key);
@@ -101,12 +117,16 @@ bool ConnPoolMap<KEY_TYPE, POOL_TYPE>::cleanDrainedPools() {
 
 template <typename KEY_TYPE, typename POOL_TYPE>
 void ConnPoolMap<KEY_TYPE, POOL_TYPE>::registerFullCallbacks() {
-  adding_pool_ = true;
+  // Here we add drained callbacks to each pool we're tracking so that we can free them up when it
+  // is possible. We guard against immediate callbacks by tracking whether we're in the middle of
+  // adding them. This is necessary to avoid mutating the `active_pools_` container while we are
+  // iterating over it.
+  adding_callbacks_ = true;
   for (const auto& pool_pair : active_pools_) {
     KEY_TYPE key = pool_pair.first;
     pool_pair.second->addDrainedCallback([this, key]() { this->poolDrained(key); });
   }
-  adding_pool_ = false;
+  adding_callbacks_ = false;
 }
 } // namespace Upstream
 } // namespace Envoy
