@@ -64,17 +64,15 @@ class IoHandle {
 public:
   enum class ShutdownType { Read = 0, Write, Both };
 
-  enum class IoHandleFlag { NonBlock = 1, Append = 2 };
+  enum class IoHandleFlag { NonBlock = 0b1, Append = 0b10 };
 
   virtual ~IoHandle() {}
 
   /**
    * Return data associated with IoHandle.
    *
-   * TODO(sbelair2) remove fd() method
-   * We probably still need some method similar to this one for
-   * evconnlistener_new(). Or We can move it to IoSocketHandle and down cast the
-   * IoHandle to IoSocketHandle wherever needed.
+   * TODO(danzh) move it to IoSocketHandle after replacing the calls to it with
+   * calls to IoHandle API's everywhere.
    */
   virtual int fd() const PURE;
 
@@ -121,10 +119,7 @@ public:
 
   /**
    * Wrap fcntl(fd_, F_SETFL...)
-   * @param flag each bit stands for a flag in enum IoHandleFlag. From low bit
-   * to high bit:
-   * 1st -- NonBlock
-   * 2nd -- Append
+   * @param flag each bit stands for a flag in enum IoHandleFlag.
    */
   virtual IoHandleCallIntResult setIoHandleFlag(std::bitset<2> flag) PURE;
   /**
