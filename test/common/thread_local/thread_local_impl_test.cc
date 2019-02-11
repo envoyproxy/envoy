@@ -118,8 +118,7 @@ using ThreadLocalInstanceImplDispatcherTest = TestBase;
 TEST_F(ThreadLocalInstanceImplDispatcherTest, Dispatcher) {
   InstanceImpl tls;
 
-  Stats::IsolatedStoreImpl stats_store;
-  Api::ApiPtr api = Api::createApiForTest(stats_store);
+  Api::ApiPtr api = Api::createApiForTest();
   Event::DispatcherImpl main_dispatcher(*api);
   Event::DispatcherImpl thread_dispatcher(*api);
 

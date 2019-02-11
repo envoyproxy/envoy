@@ -44,9 +44,8 @@ namespace GrpcJsonTranscoder {
 
 class GrpcJsonTranscoderFilterTestBase {
 protected:
-  GrpcJsonTranscoderFilterTestBase() : api_(Api::createApiForTest(stats_)) {}
+  GrpcJsonTranscoderFilterTestBase() : api_(Api::createApiForTest()) {}
 
-  Stats::IsolatedStoreImpl stats_;
   Api::ApiPtr api_;
 };
 

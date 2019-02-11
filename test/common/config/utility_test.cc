@@ -210,8 +210,7 @@ TEST_F(UtilityTest, UnixClusterStatic) {
 }
 
 TEST_F(UtilityTest, CheckFilesystemSubscriptionBackingPath) {
-  Stats::MockIsolatedStatsStore stats_store;
-  Api::ApiPtr api = Api::createApiForTest(stats_store);
+  Api::ApiPtr api = Api::createApiForTest();
 
   EXPECT_THROW_WITH_MESSAGE(
       Utility::checkFilesystemSubscriptionBackingPath("foo", *api), EnvoyException,
