@@ -9,7 +9,7 @@ namespace Envoy {
 
 namespace Buffer {
 struct RawSlice;
-}
+} // namespace Buffer
 
 namespace Network {
 
@@ -20,12 +20,19 @@ class Instance;
 class IoError {
 public:
   enum class IoErrorCode {
+    // Success.
     NoError = 0,
+    // No data available right now, try again later.
     Again,
+    // Not supported.
     NoSupport,
+    // Address family not supported.
     AddressFamilyNoSupport,
+    // During non-blocking connect, the connection cannot be completed immediately.
     InProgress,
+    // Permission denied.
     Permission,
+    // Other error codes cannot be mapped to any one above in getErrorCode().
     UnknownError
   };
   virtual ~IoError() {}
@@ -114,6 +121,10 @@ public:
 
   /**
    * Wrap fcntl(fd_, F_SETFL...)
+   * @param flag each bit stands for a flag in enum IoHandleFlag. From low bit
+   * to high bit:
+   * 1st -- NonBlock
+   * 2nd -- Append
    */
   virtual IoHandleCallIntResult setIoHandleFlag(std::bitset<2> flag) PURE;
   /**
