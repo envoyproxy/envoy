@@ -22,12 +22,24 @@ void HttpPerRequestTapperImpl::onRequestHeaders(const Http::HeaderMap& headers) 
   config_->rootMatcher().onHttpRequestHeaders(headers, statuses_);
 }
 
+void HttpPerRequestTapperImpl::onRequestBody(const Buffer::Instance& data) {
+  Extensions::Common::Tap::Utility::addBufferToProtoBytes(
+      *trace_->mutable_http_buffered_trace()->mutable_request()->mutable_body(),
+      config_->maxBufferedRxBytes(), data);
+}
+
 void HttpPerRequestTapperImpl::onRequestTrailers(const Http::HeaderMap& trailers) {
   config_->rootMatcher().onHttpRequestTrailers(trailers, statuses_);
 }
 
 void HttpPerRequestTapperImpl::onResponseHeaders(const Http::HeaderMap& headers) {
   config_->rootMatcher().onHttpResponseHeaders(headers, statuses_);
+}
+
+void HttpPerRequestTapperImpl::onResponseBody(const Buffer::Instance& data) {
+  Extensions::Common::Tap::Utility::addBufferToProtoBytes(
+      *trace_->mutable_http_buffered_trace()->mutable_response()->mutable_body(),
+      config_->maxBufferedTxBytes(), data);
 }
 
 void HttpPerRequestTapperImpl::onResponseTrailers(const Http::HeaderMap& trailers) {
@@ -53,8 +65,7 @@ bool HttpPerRequestTapperImpl::onDestroyLog(const Http::HeaderMap* request_heade
     return false;
   }
 
-  auto trace = std::make_shared<envoy::data::tap::v2alpha::BufferedTraceWrapper>();
-  auto& http_trace = *trace->mutable_http_buffered_trace();
+  auto& http_trace = *trace_->mutable_http_buffered_trace();
   request_headers->iterate(fillHeaderList, http_trace.mutable_request()->mutable_headers());
   if (request_trailers != nullptr) {
     request_trailers->iterate(fillHeaderList, http_trace.mutable_request()->mutable_trailers());
@@ -67,7 +78,7 @@ bool HttpPerRequestTapperImpl::onDestroyLog(const Http::HeaderMap* request_heade
   }
 
   ENVOY_LOG(debug, "submitting buffered trace sink");
-  config_->sink().submitBufferedTrace(trace, stream_id_);
+  config_->submitBufferedTrace(trace_, stream_id_);
   return true;
 }
 

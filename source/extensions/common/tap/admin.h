@@ -50,8 +50,10 @@ public:
   void unregisterConfig(ExtensionConfig& config);
 
   // Extensions::Common::Tap::Sink
-  void submitBufferedTrace(std::shared_ptr<envoy::data::tap::v2alpha::BufferedTraceWrapper> trace,
-                           uint64_t trace_id) override;
+  void
+  submitBufferedTrace(const std::shared_ptr<envoy::data::tap::v2alpha::BufferedTraceWrapper>& trace,
+                      envoy::service::tap::v2alpha::OutputSink::Format format,
+                      uint64_t trace_id) override;
 
 private:
   struct AttachedRequest {

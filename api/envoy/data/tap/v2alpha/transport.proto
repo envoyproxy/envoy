@@ -12,6 +12,7 @@ option java_package = "io.envoyproxy.envoy.data.tap.v2alpha";
 option go_package = "v2";
 
 import "envoy/api/v2/core/address.proto";
+import "envoy/data/tap/v2alpha/common.proto";
 
 import "google/protobuf/timestamp.proto";
 
@@ -20,8 +21,10 @@ message Connection {
   // Global unique connection ID for Envoy session. Matches connection IDs used
   // in Envoy logs.
   uint64 id = 1;
+
   // Local address.
   envoy.api.v2.core.Address local_address = 2;
+
   // Remote address.
   envoy.api.v2.core.Address remote_address = 3;
 }
@@ -30,19 +33,24 @@ message Connection {
 message SocketEvent {
   // Timestamp for event.
   google.protobuf.Timestamp timestamp = 1;
+
   // Data read by Envoy from the transport socket.
   message Read {
     // Binary data read.
-    bytes data = 1;
+    Body data = 1;
+
     // TODO(htuch): Half-close for reads.
   }
+
   // Data written by Envoy to the transport socket.
   message Write {
     // Binary data written.
-    bytes data = 1;
+    Body data = 1;
+
     // Stream was half closed after this write.
     bool end_stream = 2;
   }
+
   // Read or write with content as bytes string.
   oneof event_selector {
     Read read = 2;
@@ -56,6 +64,7 @@ message SocketEvent {
 message SocketTrace {
   // Connection properties.
   Connection connection = 1;
+
   // Sequence of observed events.
   repeated SocketEvent events = 2;
 }

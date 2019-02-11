@@ -2,6 +2,8 @@ syntax = "proto3";
 
 import "envoy/api/v2/route/route.proto";
 
+import "google/protobuf/wrappers.proto";
+
 import "validate/validate.proto";
 
 package envoy.service.tap.v2alpha;
@@ -77,11 +79,55 @@ message OutputConfig {
   // sink types are supported this constraint will be relaxed.
   repeated OutputSink sinks = 1 [(validate.rules).repeated = {min_items: 1, max_items: 1}];
 
-  // [#comment:TODO(mattklein123): Output filtering. E.g., certain headers, truncated body, etc.]
+  // For buffered tapping, the maximum amount of received body that will be buffered prior to
+  // truncation. If truncation occurs, the :ref:`truncated
+  // <envoy_api_field_data.tap.v2alpha.Body.truncated>` field will be set. If not specified, the
+  // default is 1KiB.
+  google.protobuf.UInt32Value max_buffered_rx_bytes = 2;
+
+  // For buffered tapping, the maximum amount of transmitted body that will be buffered prior to
+  // truncation. If truncation occurs, the :ref:`truncated
+  // <envoy_api_field_data.tap.v2alpha.Body.truncated>` field will be set. If not specified, the
+  // default is 1KiB.
+  google.protobuf.UInt32Value max_buffered_tx_bytes = 3;
 }
 
 // Tap output sink configuration.
 message OutputSink {
+  // Output format. All output is in the form of one or more :ref:`BufferedTraceWrapper
+  // <envoy_api_msg_data.tap.v2alpha.BufferedTraceWrapper>` messages. This enumeration indicates
+  // how those messages are written. Note that not all sinks support all output formats. See
+  // individual sink documentation for more information.
+  enum Format {
+    // Each message will be written as JSON. Any :ref:`body <envoy_api_msg_data.tap.v2alpha.Body>`
+    // data will be present in the :ref:`as_bytes
+    // <envoy_api_field_data.tap.v2alpha.Body.as_bytes>` field. This means that body data will be
+    // base64 encoded as per the `proto3 JSON mappings
+    // <https://developers.google.com/protocol-buffers/docs/proto3#json>`_.
+    JSON_BODY_AS_BYTES = 0;
+
+    // Each message will be written as JSON. Any :ref:`body <envoy_api_msg_data.tap.v2alpha.Body>`
+    // data will be present in the :ref:`as_string
+    // <envoy_api_field_data.tap.v2alpha.Body.as_string>` field. This means that body data will be
+    // string encoded as per the `proto3 JSON mappings
+    // <https://developers.google.com/protocol-buffers/docs/proto3#json>`_. This format type is
+    // useful when it is known that that body is human readable (e.g., JSON over HTTP) and the
+    // user wishes to view it directly without being forced to base64 decode the body.
+    JSON_BODY_AS_STRING = 1;
+
+    // Binary proto format. Note that binary proto is not self-delimiting. If a sink writes
+    // multiple binary messages without any length information the data stream will not be
+    // useful. However, for certain sinks that are self-delimiting (e.g., one message per file)
+    // this output format makes consumption simpler.
+    PROTO_BINARY = 2;
+
+    // Text proto format.
+    PROTO_TEXT = 3;
+  }
+
+  // Sink output format.
+  Format format = 1 [(validate.rules).enum.defined_only = true];
+
   oneof output_sink_type {
     option (validate.required) = true;
 
@@ -93,10 +139,10 @@ message OutputSink {
     //   configured from the :http:post:`/tap` admin endpoint. Thus, if an extension has
     //   been configured to receive tap configuration from some other source (e.g., static
     //   file, XDS, etc.) configuring the streaming admin output type will fail.
-    StreamingAdminSink streaming_admin = 1;
+    StreamingAdminSink streaming_admin = 2;
 
     // Tap output will be written to a file per tap sink.
-    FilePerTapSink file_per_tap = 2;
+    FilePerTapSink file_per_tap = 3;
   }
 }
 
@@ -110,13 +156,4 @@ message FilePerTapSink {
   // identifier distinguishing the recorded trace for stream instances (the Envoy
   // connection ID, HTTP stream ID, etc.).
   string path_prefix = 1 [(validate.rules).string.min_bytes = 1];
-
-  // File format.
-  enum Format {
-    // Binary proto format.
-    PROTO_BINARY = 0;
-    // Text proto format.
-    PROTO_TEXT = 1;
-  }
-  Format format = 2 [(validate.rules).enum.defined_only = true];
 }

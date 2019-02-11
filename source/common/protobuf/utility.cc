@@ -82,7 +82,7 @@ void MessageUtil::loadFromYaml(const std::string& yaml, Protobuf::Message& messa
 void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& message, Api::Api& api) {
   const std::string contents = api.fileSystem().fileReadToEnd(path);
   // If the filename ends with .pb, attempt to parse it as a binary proto.
-  if (absl::EndsWith(path, ".pb")) {
+  if (absl::EndsWith(path, FileExtensions::get().ProtoBinary)) {
     // Attempt to parse the binary format.
     if (message.ParseFromString(contents)) {
       MessageUtil::checkUnknownFields(message);
@@ -92,14 +92,14 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
                          message.GetTypeName() + ")");
   }
   // If the filename ends with .pb_text, attempt to parse it as a text proto.
-  if (absl::EndsWith(path, ".pb_text")) {
+  if (absl::EndsWith(path, FileExtensions::get().ProtoText)) {
     if (Protobuf::TextFormat::ParseFromString(contents, &message)) {
       return;
     }
     throw EnvoyException("Unable to parse file \"" + path + "\" as a text protobuf (type " +
                          message.GetTypeName() + ")");
   }
-  if (absl::EndsWith(path, ".yaml")) {
+  if (absl::EndsWith(path, FileExtensions::get().Yaml)) {
     loadFromYaml(contents, message);
   } else {
     loadFromJson(contents, message);

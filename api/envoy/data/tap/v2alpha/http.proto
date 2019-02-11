@@ -7,6 +7,7 @@ option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.data.tap.v2alpha";
 
 import "envoy/api/v2/core/base.proto";
+import "envoy/data/tap/v2alpha/common.proto";
 
 // [#protodoc-title: HTTP tap data]
 
@@ -17,8 +18,11 @@ message HttpBufferedTrace {
     // Message headers.
     repeated api.v2.core.HeaderValue headers = 1;
 
+    // Message body.
+    Body body = 2;
+
     // Message trailers.
-    repeated api.v2.core.HeaderValue trailers = 2;
+    repeated api.v2.core.HeaderValue trailers = 3;
   }
 
   // Request message.

@@ -250,18 +250,18 @@ void ConfigHelper::setTapTransportSocket(const std::string& tap_path, const std:
       ->mutable_static_config()
       ->mutable_match_config()
       ->set_any_match(true);
-  auto* file_sink = tap_config.mutable_common_config()
-                        ->mutable_static_config()
-                        ->mutable_output_config()
-                        ->mutable_sinks()
-                        ->Add()
-                        ->mutable_file_per_tap();
+  auto* output_sink = tap_config.mutable_common_config()
+                          ->mutable_static_config()
+                          ->mutable_output_config()
+                          ->mutable_sinks()
+                          ->Add();
+  output_sink->set_format(envoy::service::tap::v2alpha::OutputSink::PROTO_TEXT);
   const ::testing::TestInfo* const test_info =
       ::testing::UnitTest::GetInstance()->current_test_info();
   const std::string test_id =
       std::string(test_info->name()) + "_" + std::string(test_info->test_case_name()) + "_" + type;
-  file_sink->set_path_prefix(tap_path + "_" + absl::StrReplaceAll(test_id, {{"/", "_"}}));
-  file_sink->set_format(envoy::service::tap::v2alpha::FilePerTapSink::PROTO_TEXT);
+  output_sink->mutable_file_per_tap()->set_path_prefix(tap_path + "_" +
+                                                       absl::StrReplaceAll(test_id, {{"/", "_"}}));
   tap_config.mutable_transport_socket()->MergeFrom(inner_transport_socket);
   transport_socket.mutable_typed_config()->PackFrom(tap_config);
 }

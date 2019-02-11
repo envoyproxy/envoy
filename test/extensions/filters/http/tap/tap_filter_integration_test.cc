@@ -40,21 +40,37 @@ public:
   }
 
   void makeRequest(const Http::TestHeaderMapImpl& request_headers,
+                   const std::vector<std::string>& request_body_chunks,
                    const Http::TestHeaderMapImpl* request_trailers,
                    const Http::TestHeaderMapImpl& response_headers,
+                   const std::vector<std::string>& response_body_chunks,
                    const Http::TestHeaderMapImpl* response_trailers) {
     IntegrationStreamDecoderPtr decoder;
-    if (request_trailers == nullptr) {
+    if (request_trailers == nullptr && request_body_chunks.empty()) {
       decoder = codec_client_->makeHeaderOnlyRequest(request_headers);
     } else {
       auto result = codec_client_->startRequest(request_headers);
       decoder = std::move(result.second);
-      result.first.encodeTrailers(*request_trailers);
+
+      for (uint64_t index = 0; index < request_body_chunks.size(); index++) {
+        Buffer::OwnedImpl data(request_body_chunks[index]);
+        result.first.encodeData(data, index == request_body_chunks.size() - 1 &&
+                                          request_trailers == nullptr);
+      }
+      if (request_trailers != nullptr) {
+        result.first.encodeTrailers(*request_trailers);
+      }
     }
 
     waitForNextUpstreamRequest();
 
-    upstream_request_->encodeHeaders(response_headers, response_trailers == nullptr);
+    upstream_request_->encodeHeaders(response_headers,
+                                     response_trailers == nullptr && response_body_chunks.empty());
+    for (uint64_t index = 0; index < response_body_chunks.size(); index++) {
+      Buffer::OwnedImpl data(response_body_chunks[index]);
+      upstream_request_->encodeData(data, index == response_body_chunks.size() - 1 &&
+                                              response_trailers == nullptr);
+    }
     if (response_trailers != nullptr) {
       upstream_request_->encodeTrailers(*response_trailers);
     }
@@ -114,7 +130,8 @@ config:
         any_match: true
       output_config:
         sinks:
-          - file_per_tap:
+          - format: PROTO_BINARY
+            file_per_tap:
               path_prefix: {}
 )EOF";
 
@@ -125,7 +142,7 @@ config:
 
   // Initial request/response with tap.
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
-  makeRequest(request_headers_tap_, nullptr, response_headers_no_tap_, nullptr);
+  makeRequest(request_headers_tap_, {}, nullptr, response_headers_no_tap_, {}, nullptr);
   codec_client_->close();
   test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
 
@@ -146,7 +163,7 @@ TEST_P(TapIntegrationTest, AdminBasicFlow) {
 
   // Initial request/response with no tap.
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
-  makeRequest(request_headers_tap_, nullptr, response_headers_no_tap_, nullptr);
+  makeRequest(request_headers_tap_, {}, nullptr, response_headers_no_tap_, {}, nullptr);
 
   const std::string admin_request_yaml =
       R"EOF(
@@ -174,13 +191,13 @@ tap_config:
   test_server_->waitForGaugeEq("http.admin.downstream_rq_active", 0);
 
   // Second request/response with no tap.
-  makeRequest(request_headers_tap_, nullptr, response_headers_no_tap_, nullptr);
+  makeRequest(request_headers_tap_, {}, nullptr, response_headers_no_tap_, {}, nullptr);
 
   // Setup the tap again and leave it open.
   startAdminRequest(admin_request_yaml);
 
   // Do a request which should tap, matching on request headers.
-  makeRequest(request_headers_tap_, nullptr, response_headers_no_tap_, nullptr);
+  makeRequest(request_headers_tap_, {}, nullptr, response_headers_no_tap_, {}, nullptr);
 
   // Wait for the tap message.
   admin_response_->waitForBodyData(1);
@@ -191,10 +208,10 @@ tap_config:
   admin_response_->clearBody();
 
   // Do a request which should not tap.
-  makeRequest(request_headers_no_tap_, nullptr, response_headers_no_tap_, nullptr);
+  makeRequest(request_headers_no_tap_, {}, nullptr, response_headers_no_tap_, {}, nullptr);
 
   // Do a request which should tap, matching on response headers.
-  makeRequest(request_headers_no_tap_, nullptr, response_headers_tap_, nullptr);
+  makeRequest(request_headers_no_tap_, {}, nullptr, response_headers_tap_, {}, nullptr);
 
   // Wait for the tap message.
   admin_response_->waitForBodyData(1);
@@ -234,13 +251,13 @@ tap_config:
   startAdminRequest(admin_request_yaml2);
 
   // Do a request that matches, but the response does not match. No tap.
-  makeRequest(request_headers_tap_, nullptr, response_headers_no_tap_, nullptr);
+  makeRequest(request_headers_tap_, {}, nullptr, response_headers_no_tap_, {}, nullptr);
 
   // Do a request that doesn't match, but the response does match. No tap.
-  makeRequest(request_headers_no_tap_, nullptr, response_headers_tap_, nullptr);
+  makeRequest(request_headers_no_tap_, {}, nullptr, response_headers_tap_, {}, nullptr);
 
   // Do a request that matches and a response that matches. Should tap.
-  makeRequest(request_headers_tap_, nullptr, response_headers_tap_, nullptr);
+  makeRequest(request_headers_tap_, {}, nullptr, response_headers_tap_, {}, nullptr);
 
   // Wait for the tap message.
   admin_response_->waitForBodyData(1);
@@ -279,7 +296,7 @@ tap_config:
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   const Http::TestHeaderMapImpl request_trailers{{"foo_trailer", "bar"}};
   const Http::TestHeaderMapImpl response_trailers{{"bar_trailer", "baz"}};
-  makeRequest(request_headers_no_tap_, &request_trailers, response_headers_no_tap_,
+  makeRequest(request_headers_no_tap_, {}, &request_trailers, response_headers_no_tap_, {},
               &response_trailers);
 
   envoy::data::tap::v2alpha::BufferedTraceWrapper trace;
@@ -289,6 +306,102 @@ tap_config:
             findHeader("foo_trailer", trace.http_buffered_trace().request().trailers())->value());
   EXPECT_EQ("baz",
             findHeader("bar_trailer", trace.http_buffered_trace().response().trailers())->value());
+
+  admin_client_->close();
+}
+
+// Verify admin tapping with request/response body as bytes.
+TEST_P(TapIntegrationTest, AdminBodyAsBytes) {
+  initializeFilter(admin_filter_config_);
+
+  const std::string admin_request_yaml =
+      R"EOF(
+config_id: test_config_id
+tap_config:
+  match_config:
+    any_match: true
+  output_config:
+    sinks:
+      - streaming_admin: {}
+)EOF";
+
+  startAdminRequest(admin_request_yaml);
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  makeRequest(request_headers_no_tap_, {{"hello"}}, nullptr, response_headers_no_tap_, {{"world"}},
+              nullptr);
+  envoy::data::tap::v2alpha::BufferedTraceWrapper trace;
+  admin_response_->waitForBodyData(1);
+  MessageUtil::loadFromYaml(admin_response_->body(), trace);
+  EXPECT_EQ("hello", trace.http_buffered_trace().request().body().as_bytes());
+  EXPECT_FALSE(trace.http_buffered_trace().request().body().truncated());
+  EXPECT_EQ("world", trace.http_buffered_trace().response().body().as_bytes());
+  EXPECT_FALSE(trace.http_buffered_trace().response().body().truncated());
+
+  admin_client_->close();
+}
+
+// Verify admin tapping with request/response body as strings.
+TEST_P(TapIntegrationTest, AdminBodyAsString) {
+  initializeFilter(admin_filter_config_);
+
+  const std::string admin_request_yaml =
+      R"EOF(
+config_id: test_config_id
+tap_config:
+  match_config:
+    any_match: true
+  output_config:
+    sinks:
+      - format: JSON_BODY_AS_STRING
+        streaming_admin: {}
+)EOF";
+
+  startAdminRequest(admin_request_yaml);
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  makeRequest(request_headers_no_tap_, {{"hello"}}, nullptr, response_headers_no_tap_, {{"world"}},
+              nullptr);
+  envoy::data::tap::v2alpha::BufferedTraceWrapper trace;
+  admin_response_->waitForBodyData(1);
+  MessageUtil::loadFromYaml(admin_response_->body(), trace);
+  EXPECT_EQ("hello", trace.http_buffered_trace().request().body().as_string());
+  EXPECT_FALSE(trace.http_buffered_trace().request().body().truncated());
+  EXPECT_EQ("world", trace.http_buffered_trace().response().body().as_string());
+  EXPECT_FALSE(trace.http_buffered_trace().response().body().truncated());
+
+  admin_client_->close();
+}
+
+// Verify admin tapping with truncated request/response body.
+TEST_P(TapIntegrationTest, AdminBodyAsBytesTruncated) {
+  initializeFilter(admin_filter_config_);
+
+  const std::string admin_request_yaml =
+      R"EOF(
+config_id: test_config_id
+tap_config:
+  match_config:
+    any_match: true
+  output_config:
+    max_buffered_rx_bytes: 3
+    max_buffered_tx_bytes: 4
+    sinks:
+      - streaming_admin: {}
+)EOF";
+
+  startAdminRequest(admin_request_yaml);
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  makeRequest(request_headers_no_tap_, {{"hello"}}, nullptr, response_headers_no_tap_, {{"world"}},
+              nullptr);
+  envoy::data::tap::v2alpha::BufferedTraceWrapper trace;
+  admin_response_->waitForBodyData(1);
+  MessageUtil::loadFromYaml(admin_response_->body(), trace);
+  EXPECT_EQ("hel", trace.http_buffered_trace().request().body().as_bytes());
+  EXPECT_TRUE(trace.http_buffered_trace().request().body().truncated());
+  EXPECT_EQ("worl", trace.http_buffered_trace().response().body().as_bytes());
+  EXPECT_TRUE(trace.http_buffered_trace().response().body().truncated());
 
   admin_client_->close();
 }

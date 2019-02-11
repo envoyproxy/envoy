@@ -11,6 +11,7 @@
 #include "common/common/utility.h"
 #include "common/json/json_loader.h"
 #include "common/protobuf/protobuf.h"
+#include "common/singleton/const_singleton.h"
 
 // Obtain the value of a wrapped field (e.g. google.protobuf.UInt32Value) if set. Otherwise, return
 // the default value.
@@ -146,6 +147,16 @@ public:
   bool operator()(const Protobuf::Message& lhs, const Protobuf::Message& rhs) const {
     return Protobuf::util::MessageDifferencer::Equivalent(lhs, rhs);
   }
+
+  class FileExtensionValues {
+  public:
+    const std::string ProtoBinary = ".pb";
+    const std::string ProtoText = ".pb_text";
+    const std::string Json = ".json";
+    const std::string Yaml = ".yaml";
+  };
+
+  typedef ConstSingleton<FileExtensionValues> FileExtensions;
 
   static std::size_t hash(const Protobuf::Message& message) {
     // Use Protobuf::io::CodedOutputStream to force deterministic serialization, so that the same
