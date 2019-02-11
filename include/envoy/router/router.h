@@ -411,6 +411,26 @@ public:
                AddCookieCallback add_cookie) const PURE;
 };
 
+/**
+ * Route level hedging policy.
+ */
+class HedgePolicy {
+public:
+  virtual ~HedgePolicy() {}
+
+  /**
+   * @return number of upstream requests that should be sent initially.
+   */
+  virtual float initialRequests() const PURE;
+
+  /**
+   * @return bool indicating whether request hedging should occur when a request
+   * is retried due to a per try timeout. The alternative is the original request
+   * will be canceled immediately.
+   */
+  virtual bool hedgeOnPerTryTimeout() const PURE;
+};
+
 class MetadataMatchCriterion {
 public:
   virtual ~MetadataMatchCriterion() {}
@@ -527,6 +547,12 @@ public:
    * @return const HashPolicy* the optional hash policy for the route.
    */
   virtual const HashPolicy* hashPolicy() const PURE;
+
+  /**
+   * @return const HedgePolicy& the hedge policy for the route. All routes have a hedge policy even
+   *         if it is empty and does not allow for hedged requests.
+   */
+  virtual const HedgePolicy& hedgePolicy() const PURE;
 
   /**
    * @return the priority of the route.

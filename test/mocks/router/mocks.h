@@ -66,6 +66,16 @@ public:
   bool shadow_enabled_{};
 };
 
+class TestHedgePolicy : public HedgePolicy {
+public:
+  // Router::HedgePolicy
+  float initialRequests() const override { return initial_requests_; }
+  bool hedgeOnPerTryTimeout() const override { return hedge_on_per_try_timeout; }
+
+  float initial_requests_{};
+  bool hedge_on_per_try_timeout{};
+};
+
 class TestRetryPolicy : public RetryPolicy {
 public:
   // Router::RetryPolicy
@@ -244,6 +254,7 @@ public:
   MOCK_CONST_METHOD2(finalizeResponseHeaders,
                      void(Http::HeaderMap& headers, const StreamInfo::StreamInfo& stream_info));
   MOCK_CONST_METHOD0(hashPolicy, const HashPolicy*());
+  MOCK_CONST_METHOD0(hedgePolicy, const HedgePolicy&());
   MOCK_CONST_METHOD0(metadataMatchCriteria, const Router::MetadataMatchCriteria*());
   MOCK_CONST_METHOD0(priority, Upstream::ResourcePriority());
   MOCK_CONST_METHOD0(rateLimitPolicy, const RateLimitPolicy&());
@@ -271,6 +282,7 @@ public:
   std::multimap<std::string, std::string> opaque_config_;
   TestVirtualCluster virtual_cluster_;
   TestRetryPolicy retry_policy_;
+  TestHedgePolicy hedge_policy_;
   testing::NiceMock<MockRateLimitPolicy> rate_limit_policy_;
   TestShadowPolicy shadow_policy_;
   testing::NiceMock<MockVirtualHost> virtual_host_;

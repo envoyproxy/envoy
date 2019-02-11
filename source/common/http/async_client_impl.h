@@ -109,6 +109,12 @@ private:
     static const absl::optional<bool> allow_credentials_;
   };
 
+  struct NullHedgePolicy : public Router::HedgePolicy {
+    // Router::HedgePolicy
+    float initialRequests() const override { return 1; }
+    bool hedgeOnPerTryTimeout() const override { return false; }
+  };
+
   struct NullRateLimitPolicy : public Router::RateLimitPolicy {
     // Router::RateLimitPolicy
     const std::vector<std::reference_wrapper<const Router::RateLimitPolicyEntry>>&
@@ -200,6 +206,7 @@ private:
                                 bool) const override {}
     void finalizeResponseHeaders(Http::HeaderMap&, const StreamInfo::StreamInfo&) const override {}
     const Router::HashPolicy* hashPolicy() const override { return nullptr; }
+    const Router::HedgePolicy& hedgePolicy() const override { return hedge_policy_; }
     const Router::MetadataMatchCriteria* metadataMatchCriteria() const override { return nullptr; }
     Upstream::ResourcePriority priority() const override {
       return Upstream::ResourcePriority::Default;
@@ -243,6 +250,7 @@ private:
       return Router::InternalRedirectAction::PassThrough;
     }
 
+    static const NullHedgePolicy hedge_policy_;
     static const NullRateLimitPolicy rate_limit_policy_;
     static const NullRetryPolicy retry_policy_;
     static const NullShadowPolicy shadow_policy_;
