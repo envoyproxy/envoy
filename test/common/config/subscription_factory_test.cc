@@ -202,7 +202,7 @@ TEST_F(SubscriptionFactoryTest, LegacySubscription) {
   api_config_source->set_api_type(envoy::api::v2::core::ApiConfigSource::UNSUPPORTED_REST_LEGACY);
   api_config_source->add_cluster_names("static_cluster");
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
-  Upstream::MockCluster cluster;
+  Upstream::MockClusterMockPrioritySet cluster;
   cluster_map.emplace("static_cluster", cluster);
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
   EXPECT_CALL(cluster, info()).Times(2);
@@ -220,7 +220,7 @@ TEST_F(SubscriptionFactoryTest, HttpSubscriptionCustomRequestTimeout) {
   api_config_source->mutable_refresh_delay()->set_seconds(1);
   api_config_source->mutable_request_timeout()->set_seconds(5);
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
-  Upstream::MockCluster cluster;
+  Upstream::MockClusterMockPrioritySet cluster;
   cluster_map.emplace("static_cluster", cluster);
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
   EXPECT_CALL(cluster, info()).Times(2);
@@ -240,7 +240,7 @@ TEST_F(SubscriptionFactoryTest, HttpSubscription) {
   api_config_source->add_cluster_names("static_cluster");
   api_config_source->mutable_refresh_delay()->set_seconds(1);
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
-  Upstream::MockCluster cluster;
+  Upstream::MockClusterMockPrioritySet cluster;
   cluster_map.emplace("static_cluster", cluster);
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
   EXPECT_CALL(cluster, info()).Times(2);
@@ -267,7 +267,7 @@ TEST_F(SubscriptionFactoryTest, HttpSubscriptionNoRefreshDelay) {
   api_config_source->set_api_type(envoy::api::v2::core::ApiConfigSource::REST);
   api_config_source->add_cluster_names("static_cluster");
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
-  Upstream::MockCluster cluster;
+  Upstream::MockClusterMockPrioritySet cluster;
   cluster_map.emplace("static_cluster", cluster);
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
   EXPECT_CALL(cluster, info()).Times(2);
@@ -338,7 +338,7 @@ TEST_P(SubscriptionFactoryTestApiConfigSource, DynamicCluster) {
     api_config_source->add_cluster_names("static_cluster");
   }
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
-  Upstream::MockCluster cluster;
+  Upstream::MockClusterMockPrioritySet cluster;
   cluster_map.emplace("static_cluster", cluster);
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
   EXPECT_CALL(cluster, info());
@@ -360,7 +360,7 @@ TEST_P(SubscriptionFactoryTestApiConfigSource, EDSClusterBackingEDSCluster) {
     api_config_source->add_cluster_names("static_cluster");
   }
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
-  Upstream::MockCluster cluster;
+  Upstream::MockClusterMockPrioritySet cluster;
   cluster_map.emplace("static_cluster", cluster);
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
   EXPECT_CALL(cluster, info()).Times(2);
