@@ -123,17 +123,46 @@ RingHashLoadBalancer::Ring::Ring(
 
   // Determine the valid range of replication factors given the weighted sum and ring size bounds,
   // and the actual replication factor within that range. This may differ from the configured
-  // replication factor if provided. Note that we use floating point math here and round up when
-  // adding hosts to the ring, rather than trying to preserve exact integer ratios. This is good
-  // enough, since the distribution of hosts around the ring wouldn't exactly match the given
-  // weights anyway, even with a good hash function.
-  const double min_replication_factor =
+  // replication factor if provided. Note that there's some subtle but important considerations
+  // for proper consistent hashing behavior here. First, we find the absolute minimum and maximum
+  // replication factors that would fit the configured ring size bounds. These will work out to be
+  // weird fractions most of the time (e.g. 123.45 hashes per host), which doesn't make sense, of
+  // course, there's no such thing as a fractional entry on the ring...
+  double min_replication_factor =
       static_cast<double>(min_ring_size) / static_cast<double>(weighted_sum);
-  const double max_replication_factor =
+  double max_replication_factor =
       static_cast<double>(max_ring_size) / static_cast<double>(weighted_sum);
+
+  // ... So, we find the closest whole number replication factors by rounding up the minimum and
+  // rounding down the maximum. These will be good most of the time, but there is still an edge
+  // case: suppose the user sets minimum_ring_size and maximum_ring_size both to exactly the same
+  // number, such as 1024 entries (which is something they should probably be allowed to do), and
+  // then has a weighted_sum of hosts that doesn't divide evenly into 1024, such as 5. The exact
+  // fractional replication factor computed above would be 204.8. So here we'd say that the
+  // min_whole_replication_factor would be 205 and the max would be 204, which is no good. Our
+  // policy is to try and use whole number replication factors when possible, and only use
+  // fractional replication factors when we absolutely have to.
+  const double min_whole_replication_factor = std::ceil(min_replication_factor);
+  const double max_whole_replication_factor = std::floor(max_replication_factor);
+  if (min_whole_replication_factor > max_whole_replication_factor) {
+    // This is worth logging a warning about here, since it defeats consistent hashing to some
+    // degree (mostly at low replication factors). More comments on that issue further down, where
+    // the ring is populated...
+    ENVOY_LOG(warn,
+              "ring hash: Configured ring size bounds (min={}, max={}) are too tight, which has "
+              "forced a non-integer replication factor. This may cause in some jitter when hosts "
+              "are added and removed from the host set.",
+              min_ring_size, max_ring_size);
+  } else {
+    min_replication_factor = min_whole_replication_factor;
+    max_replication_factor = max_whole_replication_factor;
+  }
+
+  // Determine the actual replication factor we will use. If the configuration includes a
+  // replication factor, try to use it and warn if not possible. Otherwise, fall back to the old
+  // behavior for backward compatibility: size the ring as small as possible.
   double replication_factor;
   if (configured_replication_factor) {
-    // If the configuration includes a replication factor, try to use it and warn if not possible.
     replication_factor = static_cast<double>(configured_replication_factor.value());
     if (replication_factor < min_replication_factor) {
       ENVOY_LOG(warn, "ring hash: replication_factor ({}) too small for minimum_ring_size ({})",
@@ -145,25 +174,13 @@ RingHashLoadBalancer::Ring::Ring(
       replication_factor = max_replication_factor;
     }
   } else {
-    // If a replication factor isn't provided, use the old behavior for backward compatibility: size
-    // the ring as small as possible while maintaining integer weights.
-    replication_factor = std::ceil(min_replication_factor);
+    replication_factor = min_replication_factor;
   }
 
-  // Adjust the ring entry weights by multiplying the entry weights with the replication factor,
-  // rounding up to avoid losing entries with weights less than 1, and sum these to determine the
-  // actual ring size.
-  // NOTE: This rounding changes the effective replication factor from what was determined above.
-  //       In some contrived cases, we could actually exceed the configured max ring size, but this
-  //       is probably better behavior than rounding down and losing entries.
-  uint64_t ring_size = 0;
-  for (auto& entry : effective_weights) {
-    entry.second = static_cast<uint64_t>(std::ceil(entry.second * replication_factor));
-    ring_size += entry.second;
-  }
+  // Reserve memory for the entire ring up front.
+  uint64_t ring_size = std::ceil(weighted_sum * replication_factor);
   ring_.reserve(ring_size);
-  ENVOY_LOG(info, "ring hash: ring_size={} replication_factor={}", ring_size,
-            static_cast<double>(ring_size) / static_cast<double>(weighted_sum));
+  ENVOY_LOG(info, "ring hash: ring_size={} replication_factor={}", ring_size, replication_factor);
 
   const bool use_std_hash =
       config ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.value().deprecated_v1(), use_std_hash, false)
@@ -173,10 +190,40 @@ RingHashLoadBalancer::Ring::Ring(
       config ? config.value().hash_function()
              : HashFunction::Cluster_RingHashLbConfig_HashFunction_XX_HASH;
 
+  // Populate the hash ring by walking through the (host, weight) entries in the effective_weights
+  // map, and generating (replication_factor * weight) hashes for each host. This would be
+  // straightforward if we always had integer replication factors, but if the replication factor
+  // is fractional (for reasons described above), it gets slightly more complicated. We maintain
+  // running sums -- current_replicas and target_replicas -- which allows us to handle fractional
+  // replication_factors in a somewhat stable way.
+  //
+  // For example, suppose we have N hosts, each with a weight of 1, and a replication factor of 1.5
+  // hashes per host. We start the outer loop with current_replicas = 0 and target_replicas = 0.
+  //   - For the first host, we set target_replicas = 1.5. After one run of the inner loop,
+  //     current_replicas = 1. After another run, current_replicas = 2, so the inner loop ends.
+  //   - For the second host, target_replicas becomes 3.0, and current_replicas is 2 from before.
+  //     After only one run of the inner loop, current_replicas = 3, so the inner loop ends.
+  // This continues with all even-numbered hosts getting two entries in the ring, and all odd-
+  // numbered hosts getting one entry, which averages out to 1.5 hashes per host. This math still
+  // works in the extreme case where the replication_factor is less than 1 (that is, there are more
+  // weighted hosts than capacity in the ring): some hosts will get no entries in the ring.
+  //
+  // Aside from trying to maintain an average replication factor strictly within the ring size
+  // bounds, the other goal of this algorithm is to provide fair consistent hashing behavior even
+  // when non-integer replication factors are used. For example, suppose the user specifies a fixed
+  // ring size, min=max=1024, and there are initially 512 hosts in the ring, giving a replication
+  // factor of 2. If one host becomes unhealthy, the replication factor becomes ~2.004; two of the
+  // remaining 511 healthy hosts will end up with three replicas, and all the others will still have
+  // two as before.
+  //
+  // Having said all this, it's almost always vastly preferable for the user to avoid this situation
+  // and simply specify a fixed replication factor, with ring size bounds that can accommodate some
+  // variation in the number of hosts.
   char hash_key_buffer[196];
+  double current_replicas = 0.0;
+  double target_replicas = 0.0;
   for (const auto& entry : effective_weights) {
-    auto host = entry.first;
-    auto replicas = entry.second;
+    const auto& host = entry.first;
     const std::string& address_string = host->address()->asString();
     uint64_t offset_start = address_string.size();
 
@@ -191,7 +238,12 @@ RingHashLoadBalancer::Ring::Ring(
         address_string.size() + 1 + StringUtil::MIN_ITOA_OUT_LEN <= sizeof(hash_key_buffer), "");
     memcpy(hash_key_buffer, address_string.c_str(), offset_start);
     hash_key_buffer[offset_start++] = '_';
-    for (uint64_t i = 0; i < replicas; i++) {
+
+    // Inner loop as noted above: maintain current_replicas and target_replicas as running sums
+    // across the entire host set. `i` is needed only to construct the hash key.
+    target_replicas += replication_factor * entry.second;
+    uint64_t i = 0;
+    while (current_replicas < target_replicas) {
       const uint64_t total_hash_key_len =
           offset_start +
           StringUtil::itoa(hash_key_buffer + offset_start, StringUtil::MIN_ITOA_OUT_LEN, i);
@@ -208,6 +260,8 @@ RingHashLoadBalancer::Ring::Ring(
 
       ENVOY_LOG(trace, "ring hash: hash_key={} hash={}", hash_key.data(), hash);
       ring_.push_back({hash, host});
+      ++i;
+      ++current_replicas;
     }
   }
 

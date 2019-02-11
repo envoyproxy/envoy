@@ -73,6 +73,13 @@ TEST_P(RingHashLoadBalancerTest, NoHost) {
   EXPECT_EQ(nullptr, lb_->factory()->create()->chooseHost(nullptr));
 };
 
+TEST_P(RingHashLoadBalancerTest, BadRingSizeBounds) {
+  config_ = (envoy::api::v2::Cluster::RingHashLbConfig());
+  config_.value().mutable_minimum_ring_size()->set_value(20);
+  config_.value().mutable_maximum_ring_size()->set_value(10);
+  EXPECT_THROW(init(), EnvoyException);
+}
+
 TEST_P(RingHashLoadBalancerTest, Basic) {
   hostSet().hosts_ = {
       makeTestHost(info_, "tcp://127.0.0.1:90"), makeTestHost(info_, "tcp://127.0.0.1:91"),
@@ -500,6 +507,59 @@ TEST_P(RingHashLoadBalancerTest, HostAndLocalityWeightedLargeRing) {
   EXPECT_EQ(3928, counts[1]); // :91 | ~4000 expected hits
   EXPECT_EQ(9092, counts[2]); // :92 | ~9000 expected hits
   EXPECT_EQ(0, counts[3]);    // :93 |    =0 expected hits
+}
+
+TEST_P(RingHashLoadBalancerTest, SmallFractionalReplicationFactor) {
+  hostSet().hosts_ = {
+    makeTestHost(info_, "tcp://127.0.0.1:90"), makeTestHost(info_, "tcp://127.0.0.1:91"),
+    makeTestHost(info_, "tcp://127.0.0.1:92"), makeTestHost(info_, "tcp://127.0.0.1:93")};
+  hostSet().healthy_hosts_ = hostSet().hosts_;
+  hostSet().runCallbacks({}, {});
+
+  config_ = (envoy::api::v2::Cluster::RingHashLbConfig());
+  config_.value().mutable_minimum_ring_size()->set_value(2);
+  config_.value().mutable_maximum_ring_size()->set_value(2);
+  init();
+  LoadBalancerPtr lb = lb_->factory()->create();
+
+  // Generate some reasonable number of hashes around the ring and populate a histogram of which
+  // hosts they mapped to. Here we don't care about the distribution (because the replication factor
+  // is intentionally stupidly low), other than to verify that two of the hosts are absent.
+  uint32_t counts[4] = {0};
+  for (uint32_t i = 0; i < 1024; ++i) {
+    TestLoadBalancerContext context(i * (std::numeric_limits<uint64_t>::max() / 1024));
+    uint32_t port = lb->chooseHost(&context)->address()->ip()->port();
+    ++counts[port - 90];
+  }
+
+  EXPECT_EQ(681, counts[0]); // :90 | ~512 expected hits
+  EXPECT_EQ(0, counts[1]);   // :91 |   =0 expected hits
+  EXPECT_EQ(0, counts[2]);   // :92 |   =0 expected hits
+  EXPECT_EQ(343, counts[3]); // :93 | ~512 expected hits
+}
+
+TEST_P(RingHashLoadBalancerTest, LargeFractionalReplicationFactor) {
+  hostSet().hosts_ = {
+    makeTestHost(info_, "tcp://127.0.0.1:90"), makeTestHost(info_, "tcp://127.0.0.1:91")};
+  hostSet().healthy_hosts_ = hostSet().hosts_;
+  hostSet().runCallbacks({}, {});
+
+  config_ = (envoy::api::v2::Cluster::RingHashLbConfig());
+  config_.value().mutable_minimum_ring_size()->set_value(1023);
+  config_.value().mutable_maximum_ring_size()->set_value(1023);
+  init();
+  LoadBalancerPtr lb = lb_->factory()->create();
+
+  // Generate 1023 hashes around the ring and populate a histogram of which hosts they mapped to...
+  uint32_t counts[2] = {0};
+  for (uint32_t i = 0; i < 1023; ++i) {
+    TestLoadBalancerContext context(i * (std::numeric_limits<uint64_t>::max() / 1023));
+    uint32_t port = lb->chooseHost(&context)->address()->ip()->port();
+    ++counts[port - 90];
+  }
+
+  EXPECT_EQ(526, counts[0]); // :90 | ~512 expected hits
+  EXPECT_EQ(497, counts[1]); // :91 | ~511 expected hits
 }
 
 } // namespace Upstream
