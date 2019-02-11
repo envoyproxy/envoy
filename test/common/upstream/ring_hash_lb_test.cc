@@ -511,8 +511,8 @@ TEST_P(RingHashLoadBalancerTest, HostAndLocalityWeightedLargeRing) {
 
 TEST_P(RingHashLoadBalancerTest, SmallFractionalReplicationFactor) {
   hostSet().hosts_ = {
-    makeTestHost(info_, "tcp://127.0.0.1:90"), makeTestHost(info_, "tcp://127.0.0.1:91"),
-    makeTestHost(info_, "tcp://127.0.0.1:92"), makeTestHost(info_, "tcp://127.0.0.1:93")};
+      makeTestHost(info_, "tcp://127.0.0.1:90"), makeTestHost(info_, "tcp://127.0.0.1:91"),
+      makeTestHost(info_, "tcp://127.0.0.1:92"), makeTestHost(info_, "tcp://127.0.0.1:93")};
   hostSet().healthy_hosts_ = hostSet().hosts_;
   hostSet().runCallbacks({}, {});
 
@@ -539,8 +539,8 @@ TEST_P(RingHashLoadBalancerTest, SmallFractionalReplicationFactor) {
 }
 
 TEST_P(RingHashLoadBalancerTest, LargeFractionalReplicationFactor) {
-  hostSet().hosts_ = {
-    makeTestHost(info_, "tcp://127.0.0.1:90"), makeTestHost(info_, "tcp://127.0.0.1:91")};
+  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90"),
+                      makeTestHost(info_, "tcp://127.0.0.1:91")};
   hostSet().healthy_hosts_ = hostSet().hosts_;
   hostSet().runCallbacks({}, {});
 
