@@ -25,7 +25,7 @@ void PerSocketTapperImpl::closeSocket(Network::ConnectionEvent) {
                                              *connection->mutable_local_address());
   Network::Utility::addressToProtobufAddress(*connection_.remoteAddress(),
                                              *connection->mutable_remote_address());
-  config_->sink().submitBufferedTrace(trace_, connection_.id());
+  config_->submitBufferedTrace(trace_, connection_.id());
 }
 
 void PerSocketTapperImpl::onRead(const Buffer::Instance& data, uint32_t bytes_read) {
@@ -39,9 +39,11 @@ void PerSocketTapperImpl::onRead(const Buffer::Instance& data, uint32_t bytes_re
           config_->time_source_.systemTime().time_since_epoch())
           .count()));
   // TODO(mattklein123): Avoid linearize/toString here.
+  // TODO(mattklein123): Implement truncation configuration. Also figure out how/if truncation
+  // applies to multiple event messages if we are above our limit.
   const std::string linearized_data = data.toString();
-  event->mutable_read()->set_data(linearized_data.data() + (linearized_data.size() - bytes_read),
-                                  bytes_read);
+  event->mutable_read()->mutable_data()->set_as_bytes(
+      linearized_data.data() + (linearized_data.size() - bytes_read), bytes_read);
 }
 
 void PerSocketTapperImpl::onWrite(const Buffer::Instance& data, uint32_t bytes_written,
@@ -56,8 +58,10 @@ void PerSocketTapperImpl::onWrite(const Buffer::Instance& data, uint32_t bytes_w
           config_->time_source_.systemTime().time_since_epoch())
           .count()));
   // TODO(mattklein123): Avoid linearize/toString here.
+  // TODO(mattklein123): Implement truncation configuration. Also figure out how/if truncation
+  // applies to multiple event messages if we are above our limit.
   const std::string linearized_data = data.toString();
-  event->mutable_write()->set_data(linearized_data.data(), bytes_written);
+  event->mutable_write()->mutable_data()->set_as_bytes(linearized_data.data(), bytes_written);
   event->mutable_write()->set_end_stream(end_stream);
 }
 

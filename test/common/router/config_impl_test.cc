@@ -102,11 +102,10 @@ envoy::api::v2::RouteConfiguration parseRouteConfigurationFromV2Yaml(const std::
 
 class ConfigImplTestBase {
 protected:
-  ConfigImplTestBase() : api_(Api::createApiForTest(stats_)) {
+  ConfigImplTestBase() : api_(Api::createApiForTest()) {
     ON_CALL(factory_context_, api()).WillByDefault(ReturnRef(*api_));
   }
 
-  Stats::IsolatedStoreImpl stats_;
   Api::ApiPtr api_;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
 };
