@@ -140,7 +140,6 @@ protected:
 
   NiceMock<Configuration::MockMain> config_miss_;
   NiceMock<Configuration::MockMain> config_mega_;
-  Stats::IsolatedStoreImpl stats_store_;
 };
 
 TEST_F(GuardDogMissTest, MissTest) {

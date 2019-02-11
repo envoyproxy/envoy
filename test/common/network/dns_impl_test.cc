@@ -324,9 +324,8 @@ private:
 
 class DnsImplConstructor : public TestBase {
 protected:
-  DnsImplConstructor() : api_(Api::createApiForTest(stats_store_)), dispatcher_(*api_) {}
+  DnsImplConstructor() : api_(Api::createApiForTest()), dispatcher_(*api_) {}
 
-  Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
   Event::DispatcherImpl dispatcher_;
 };
@@ -404,7 +403,7 @@ TEST_F(DnsImplConstructor, BadCustomResolvers) {
 
 class DnsImplTest : public TestBaseWithParam<Address::IpVersion> {
 public:
-  DnsImplTest() : api_(Api::createApiForTest(stats_store_)), dispatcher_(*api_) {}
+  DnsImplTest() : api_(Api::createApiForTest()), dispatcher_(*api_) {}
 
   void SetUp() override {
     resolver_ = dispatcher_.createDnsResolver({});
@@ -434,7 +433,6 @@ protected:
   std::unique_ptr<DnsResolverImplPeer> peer_;
   Network::MockConnectionHandler connection_handler_;
   Network::TcpListenSocketPtr socket_;
-  Stats::IsolatedStoreImpl stats_store_;
   std::unique_ptr<Network::Listener> listener_;
   Api::ApiPtr api_;
   Event::DispatcherImpl dispatcher_;
