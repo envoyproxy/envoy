@@ -430,7 +430,7 @@ TEST_F(DeprecatedFieldsTest, DisallowViaRuntime) {
 
 // Note that given how Envoy config parsing works, the first time we hit a
 // 'fatal' error and throw, we won't log future warnings. That said, this tests
-// the case of the warning occuring before the fatal error.
+// the case of the warning occurring before the fatal error.
 TEST_F(DeprecatedFieldsTest, MixOfFatalAndWarnings) {
   envoy::test::deprecation_test::Base base;
   base.set_is_deprecated("foo");

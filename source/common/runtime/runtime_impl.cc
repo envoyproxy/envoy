@@ -159,7 +159,7 @@ bool SnapshotImpl::deprecatedFeatureEnabled(const std::string& key) const {
     // If either disallowed by default or configured off, the feature is not enabled.
     return false;
   }
-  // The feature is allowed. It is assumed this check is called when the feaure
+  // The feature is allowed. It is assumed this check is called when the feature
   // is about to be used, so increment the feature use stat.
   stats_.deprecated_feature_use_.inc();
   return true;
@@ -277,7 +277,7 @@ bool SnapshotImpl::parseEntryBooleanValue(Entry& entry) {
     entry.bool_value_ = true;
     return true;
   } else if (absl::EqualsIgnoreCase(stripped, "false")) {
-    entry.bool_value_ = 0;
+    entry.bool_value_ = false;
     return true;
   }
   return false;

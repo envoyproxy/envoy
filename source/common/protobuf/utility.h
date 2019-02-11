@@ -198,7 +198,7 @@ public:
    * @throw ProtoValidationException if the message does not satisfy its type constraints.
    */
   template <class MessageType> static void validate(const MessageType& message) {
-    // Log warnings if deprecated fields are in use.
+    // Log warnings or throw errors if deprecated fields are in use.
     checkForDeprecation(message);
 
     std::string err;
