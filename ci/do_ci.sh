@@ -186,6 +186,7 @@ elif [[ "$1" == "bazel.compile_time_options" ]]; then
     --define boringssl=fips \
     --define log_debug_assert_in_release=enabled \
     --define tcmalloc=debug \
+    --define quiche=enabled \
   "
   setup_clang_toolchain
   # This doesn't go into CI but is available for developer convenience.
