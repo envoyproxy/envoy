@@ -416,12 +416,7 @@ protected:
     return std::make_unique<HostSetImpl>(priority, overprovisioning_factor);
   }
 
-  // Get the host set for this priority level, creating it if necessary.
-  HostSet&
-  getOrCreateMutableHostSet(uint32_t priority,
-                            absl::optional<uint32_t> overprovisioning_factor = absl::nullopt);
-
-private:
+protected:
   virtual void runUpdateCallbacks(const HostVector& hosts_added, const HostVector& hosts_removed) {
     member_update_cb_helper_.runCallbacks(hosts_added, hosts_removed);
   }
@@ -433,6 +428,8 @@ private:
   // It will expand as host sets are added but currently does not shrink to
   // avoid any potential lifetime issues.
   std::vector<std::unique_ptr<HostSet>> host_sets_;
+
+private:
   // TODO(mattklein123): Remove mutable.
   mutable Common::CallbackManager<const HostVector&, const HostVector&> member_update_cb_helper_;
   mutable Common::CallbackManager<uint32_t, const HostVector&, const HostVector&>

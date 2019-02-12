@@ -397,13 +397,6 @@ PrioritySetImpl::getOrCreateHostSet(uint32_t priority,
   return *host_sets_[priority];
 }
 
-HostSet&
-PrioritySetImpl::getOrCreateMutableHostSet(uint32_t priority,
-                                           absl::optional<uint32_t> overprovisioning_factor) {
-  getOrCreateHostSet(priority, overprovisioning_factor);
-  return *host_sets_[priority];
-}
-
 void PrioritySetImpl::updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
                                   LocalityWeightsConstSharedPtr locality_weights,
                                   const HostVector& hosts_added, const HostVector& hosts_removed,
