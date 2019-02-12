@@ -84,7 +84,7 @@ public:
     EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
         .WillOnce(Invoke([=](Http::HeaderMap& headers, bool) {
           uint64_t code;
-          StringUtil::atoul(headers.Status()->value().c_str(), code);
+          StringUtil::atoull(headers.Status()->value().c_str(), code);
           EXPECT_EQ(static_cast<uint64_t>(expected_code), code);
         }));
     EXPECT_CALL(decoder_callbacks_, encodeData(_, _))

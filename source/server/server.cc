@@ -246,7 +246,7 @@ void InstanceImpl::initialize(const Options& options,
   failHealthcheck(false);
 
   uint64_t version_int;
-  if (!StringUtil::atoul(VersionInfo::revision().substr(0, 6).c_str(), version_int, 16)) {
+  if (!StringUtil::atoull(VersionInfo::revision().substr(0, 6).c_str(), version_int, 16)) {
     throw EnvoyException("compiled GIT SHA is invalid. Invalid build.");
   }
 
