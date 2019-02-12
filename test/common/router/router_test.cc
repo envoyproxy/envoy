@@ -284,7 +284,7 @@ TEST_F(RouterTest, PoolFailureWithPriority) {
       }));
 
   Http::TestHeaderMapImpl response_headers{
-      {":status", "503"}, {"content-length", "57"}, {"content-type", "text/plain"}};
+      {":status", "503"}, {"content-length", "91"}, {"content-type", "text/plain"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
   EXPECT_CALL(callbacks_, encodeData(_, true));
   EXPECT_CALL(callbacks_.stream_info_,
