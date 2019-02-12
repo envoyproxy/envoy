@@ -12,7 +12,7 @@ namespace Runtime {
 const char* disallowed_features[] = {
     // Acts as both a test entry for deprecated.proto and a marker for the Envoy
     // deprecation scripts.
-    "deprecated.proto:is_deprecated_fatal",
+    "envoy.deprecated_features.deprecated.proto:is_deprecated_fatal",
 };
 
 class DisallowedFeatures {

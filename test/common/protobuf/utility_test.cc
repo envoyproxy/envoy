@@ -400,7 +400,7 @@ TEST_F(DeprecatedFieldsTest, IndividualFieldDisallowedWithRuntimeOverride) {
 
   // Now create a new snapshot with this feature allowed.
   Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"deprecated.proto:is_deprecated_fatal", "TrUe "}});
+      {{"envoy.deprecated_features.deprecated.proto:is_deprecated_fatal", "TrUe "}});
 
   // Now the same deprecation check should only trigger a warning.
   EXPECT_LOG_CONTAINS(
@@ -420,7 +420,7 @@ TEST_F(DeprecatedFieldsTest, DisallowViaRuntime) {
 
   // Now create a new snapshot with this feature disallowed.
   Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"deprecated.proto:is_deprecated", " false"}});
+      {{"envoy.deprecated_features.deprecated.proto:is_deprecated", " false"}});
 
   EXPECT_THROW_WITH_REGEX(
       MessageUtil::checkForDeprecation(base), ProtoValidationException,
