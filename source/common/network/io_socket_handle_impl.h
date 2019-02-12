@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/network/io_handle.h"
 #include "envoy/api/os_sys_calls.h"
+#include "envoy/network/io_handle.h"
 
 namespace Envoy {
 namespace Network {
@@ -15,7 +15,6 @@ public:
   std::string getErrorDetails() const override;
 };
 
-
 /**
  * IoHandle derivative for sockets
  */
@@ -23,6 +22,7 @@ class IoSocketHandleImpl : public IoHandle {
 public:
   explicit IoSocketHandleImpl(int fd = -1) : fd_(fd) {}
 
+  // Close underlying socket if close() hasn't been call yet.
   ~IoSocketHandleImpl() override;
 
   // TODO(sbelair2)  To be removed when the fd is fully abstracted from clients.
@@ -30,7 +30,7 @@ public:
 
   IoHandleCallIntResult close() override;
 
-  bool isClosed() const override;
+  bool isOpen() const override;
 
 private:
   int fd_;

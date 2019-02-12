@@ -27,10 +27,9 @@ public:
   IoHandle& ioHandle() override { return *io_handle_; }
   const IoHandle& ioHandle() const override { return *io_handle_; }
   void close() override {
-    if (io_handle_->isClosed()) {
-      return;
+    if (io_handle_->isOpen()) {
+      io_handle_->close();
     }
-    io_handle_->close();
   }
   void ensureOptions() {
     if (!options_) {

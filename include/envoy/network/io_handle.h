@@ -8,7 +8,7 @@ namespace Envoy {
 namespace Network {
 
 /**
- * Base class for any IO error.
+ * Base class for any I/O error.
  */
 class IoError {
 public:
@@ -42,7 +42,7 @@ public:
  */
 template <typename T> struct IoHandleCallResult {
   IoHandleCallResult(T rc, std::unique_ptr<IoError> err) : rc_(rc), err_(std::move(err)) {}
-  
+
   IoHandleCallResult(IoHandleCallResult<T>&& result)
       : rc_(result.rc_), err_(std::move(result.err_)) {}
 
@@ -75,7 +75,10 @@ public:
    */
   virtual IoHandleCallIntResult close() PURE;
 
-  virtual bool isClosed() const PURE;
+  /**
+   * Return true if close() hasn't been called.
+   */
+  virtual bool isOpen() const PURE;
 };
 
 typedef std::unique_ptr<IoHandle> IoHandlePtr;
