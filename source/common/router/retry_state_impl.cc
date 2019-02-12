@@ -66,7 +66,7 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap&
   if (retry_on_ != 0 && request_headers.EnvoyMaxRetries()) {
     const char* max_retries = request_headers.EnvoyMaxRetries()->value().c_str();
     uint64_t temp;
-    if (StringUtil::atoul(max_retries, temp)) {
+    if (StringUtil::atoull(max_retries, temp)) {
       retries_remaining_ = temp;
     }
   }
@@ -74,7 +74,7 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap&
     for (const auto code : StringUtil::splitToken(
              request_headers.EnvoyRetriableStatusCodes()->value().getStringView(), ",")) {
       uint64_t out;
-      if (StringUtil::atoul(std::string(code).c_str(), out)) {
+      if (StringUtil::atoull(std::string(code).c_str(), out)) {
         retriable_status_codes_.emplace_back(out);
       }
     }

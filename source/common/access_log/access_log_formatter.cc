@@ -151,7 +151,7 @@ void AccessLogFormatParser::parseCommand(const std::string& token, const size_t 
     std::string length_str = token.substr(end_request + 2);
     uint64_t length_value;
 
-    if (!StringUtil::atoul(length_str.c_str(), length_value)) {
+    if (!StringUtil::atoull(length_str.c_str(), length_value)) {
       throw EnvoyException(fmt::format("Length must be an integer, given: {}", length_str));
     }
 

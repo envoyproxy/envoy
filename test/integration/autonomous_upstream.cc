@@ -8,7 +8,7 @@ void HeaderToInt(const char header_name[], int32_t& return_int, Http::TestHeader
   std::string header_value = headers.get_(header_name);
   if (!header_value.empty()) {
     uint64_t parsed_value;
-    RELEASE_ASSERT(StringUtil::atoul(header_value.c_str(), parsed_value, 10) &&
+    RELEASE_ASSERT(StringUtil::atoull(header_value.c_str(), parsed_value, 10) &&
                        parsed_value < std::numeric_limits<int32_t>::max(),
                    "");
     return_int = parsed_value;

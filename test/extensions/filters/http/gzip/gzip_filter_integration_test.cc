@@ -27,7 +27,8 @@ public:
   void doRequestAndCompression(Http::TestHeaderMapImpl&& request_headers,
                                Http::TestHeaderMapImpl&& response_headers) {
     uint64_t content_length;
-    ASSERT_TRUE(StringUtil::atoul(response_headers.get_("content-length").c_str(), content_length));
+    ASSERT_TRUE(
+        StringUtil::atoull(response_headers.get_("content-length").c_str(), content_length));
     const Buffer::OwnedImpl expected_response{std::string(content_length, 'a')};
     auto response =
         sendRequestAndWaitForResponse(request_headers, 0, response_headers, content_length);
@@ -52,7 +53,8 @@ public:
   void doRequestAndNoCompression(Http::TestHeaderMapImpl&& request_headers,
                                  Http::TestHeaderMapImpl&& response_headers) {
     uint64_t content_length;
-    ASSERT_TRUE(StringUtil::atoul(response_headers.get_("content-length").c_str(), content_length));
+    ASSERT_TRUE(
+        StringUtil::atoull(response_headers.get_("content-length").c_str(), content_length));
     auto response =
         sendRequestAndWaitForResponse(request_headers, 0, response_headers, content_length);
     EXPECT_TRUE(upstream_request_->complete());

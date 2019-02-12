@@ -149,19 +149,19 @@ public:
    * Convert a string to an unsigned long, checking for error.
    * @return pointer to the remainder of 'str' if successful, nullptr otherwise.
    */
-  static const char* strtoul(const char* str, uint64_t& out, int base = 10);
+  static const char* strtoull(const char* str, uint64_t& out, int base = 10);
 
   /**
    * Convert a string to an unsigned long, checking for error.
    * @param return true if successful, false otherwise.
    */
-  static bool atoul(const char* str, uint64_t& out, int base = 10);
+  static bool atoull(const char* str, uint64_t& out, int base = 10);
 
   /**
    * Convert a string to a long, checking for error.
    * @param return true if successful, false otherwise.
    */
-  static bool atol(const char* str, int64_t& out, int base = 10);
+  static bool atoll(const char* str, int64_t& out, int base = 10);
 
   /**
    * Convert an unsigned integer to a base 10 string as fast as possible.

@@ -20,108 +20,108 @@ using testing::ContainerEq;
 
 namespace Envoy {
 
-TEST(StringUtil, strtoul) {
+TEST(StringUtil, strtoull) {
   uint64_t out;
   const char* rest;
 
   static const char* test_str = "12345b";
-  rest = StringUtil::strtoul(test_str, out);
+  rest = StringUtil::strtoull(test_str, out);
   EXPECT_NE(nullptr, rest);
   EXPECT_EQ('b', *rest);
   EXPECT_EQ(&test_str[5], rest);
   EXPECT_EQ(12345U, out);
 
-  EXPECT_EQ(nullptr, StringUtil::strtoul("", out));
-  EXPECT_EQ(nullptr, StringUtil::strtoul("b123", out));
+  EXPECT_EQ(nullptr, StringUtil::strtoull("", out));
+  EXPECT_EQ(nullptr, StringUtil::strtoull("b123", out));
 
-  rest = StringUtil::strtoul("123", out);
+  rest = StringUtil::strtoull("123", out);
   EXPECT_NE(nullptr, rest);
   EXPECT_EQ('\0', *rest);
   EXPECT_EQ(123U, out);
 
-  EXPECT_NE(nullptr, StringUtil::strtoul("  456", out));
+  EXPECT_NE(nullptr, StringUtil::strtoull("  456", out));
   EXPECT_EQ(456U, out);
 
-  EXPECT_NE(nullptr, StringUtil::strtoul("00789", out));
+  EXPECT_NE(nullptr, StringUtil::strtoull("00789", out));
   EXPECT_EQ(789U, out);
 
   // Hex
-  rest = StringUtil::strtoul("0x1234567890abcdefg", out, 16);
+  rest = StringUtil::strtoull("0x1234567890abcdefg", out, 16);
   EXPECT_NE(nullptr, rest);
   EXPECT_EQ('g', *rest);
   EXPECT_EQ(0x1234567890abcdefU, out);
 
   // Explicit decimal
-  rest = StringUtil::strtoul("01234567890A", out, 10);
+  rest = StringUtil::strtoull("01234567890A", out, 10);
   EXPECT_NE(nullptr, rest);
   EXPECT_EQ('A', *rest);
   EXPECT_EQ(1234567890U, out);
 
   // Octal
-  rest = StringUtil::strtoul("012345678", out, 8);
+  rest = StringUtil::strtoull("012345678", out, 8);
   EXPECT_NE(nullptr, rest);
   EXPECT_EQ('8', *rest);
   EXPECT_EQ(01234567U, out);
 
   // Binary
-  rest = StringUtil::strtoul("01010101012", out, 2);
+  rest = StringUtil::strtoull("01010101012", out, 2);
   EXPECT_NE(nullptr, rest);
   EXPECT_EQ('2', *rest);
   EXPECT_EQ(0b101010101U, out);
 
-  // Verify subsequent call to strtoul succeeds after the first one
+  // Verify subsequent call to strtoull succeeds after the first one
   // failed due to errno ERANGE
-  EXPECT_EQ(nullptr, StringUtil::strtoul("18446744073709551616", out));
-  EXPECT_NE(nullptr, StringUtil::strtoul("18446744073709551615", out));
+  EXPECT_EQ(nullptr, StringUtil::strtoull("18446744073709551616", out));
+  EXPECT_NE(nullptr, StringUtil::strtoull("18446744073709551615", out));
   EXPECT_EQ(18446744073709551615U, out);
 }
 
-TEST(StringUtil, atoul) {
+TEST(StringUtil, atoull) {
   uint64_t out;
-  EXPECT_FALSE(StringUtil::atoul("123b", out));
-  EXPECT_FALSE(StringUtil::atoul("", out));
-  EXPECT_FALSE(StringUtil::atoul("b123", out));
+  EXPECT_FALSE(StringUtil::atoull("123b", out));
+  EXPECT_FALSE(StringUtil::atoull("", out));
+  EXPECT_FALSE(StringUtil::atoull("b123", out));
 
-  EXPECT_TRUE(StringUtil::atoul("123", out));
+  EXPECT_TRUE(StringUtil::atoull("123", out));
   EXPECT_EQ(123U, out);
 
-  EXPECT_TRUE(StringUtil::atoul("  456", out));
+  EXPECT_TRUE(StringUtil::atoull("  456", out));
   EXPECT_EQ(456U, out);
 
-  EXPECT_TRUE(StringUtil::atoul("00789", out));
+  EXPECT_TRUE(StringUtil::atoull("00789", out));
   EXPECT_EQ(789U, out);
 
-  // Verify subsequent call to atoul succeeds after the first one
+  // Verify subsequent call to atoull succeeds after the first one
   // failed due to errno ERANGE
-  EXPECT_FALSE(StringUtil::atoul("18446744073709551616", out));
-  EXPECT_TRUE(StringUtil::atoul("18446744073709551615", out));
+  EXPECT_FALSE(StringUtil::atoull("18446744073709551616", out));
+  EXPECT_TRUE(StringUtil::atoull("18446744073709551615", out));
   EXPECT_EQ(18446744073709551615U, out);
 }
 
-TEST(StringUtil, atol) {
+TEST(StringUtil, atoll) {
   int64_t out;
-  EXPECT_FALSE(StringUtil::atol("-123b", out));
-  EXPECT_FALSE(StringUtil::atol("", out));
-  EXPECT_FALSE(StringUtil::atol("b123", out));
+  EXPECT_FALSE(StringUtil::atoll("-123b", out));
+  EXPECT_FALSE(StringUtil::atoll("", out));
+  EXPECT_FALSE(StringUtil::atoll("b123", out));
 
-  EXPECT_TRUE(StringUtil::atol("123", out));
+  EXPECT_TRUE(StringUtil::atoll("123", out));
   EXPECT_EQ(123, out);
-  EXPECT_TRUE(StringUtil::atol("-123", out));
+  EXPECT_TRUE(StringUtil::atoll("-123", out));
   EXPECT_EQ(-123, out);
-  EXPECT_TRUE(StringUtil::atol("+123", out));
+  EXPECT_TRUE(StringUtil::atoll("+123", out));
   EXPECT_EQ(123, out);
 
-  EXPECT_TRUE(StringUtil::atol("  456", out));
+  EXPECT_TRUE(StringUtil::atoll("  456", out));
   EXPECT_EQ(456, out);
 
-  EXPECT_TRUE(StringUtil::atol("00789", out));
+  EXPECT_TRUE(StringUtil::atoll("00789", out));
   EXPECT_EQ(789, out);
 
   // INT64_MAX + 1
-  EXPECT_FALSE(StringUtil::atol("9223372036854775808", out));
+  EXPECT_FALSE(StringUtil::atoll("9223372036854775808", out));
 
   // INT64_MIN
-  EXPECT_TRUE(StringUtil::atol("-9223372036854775808", out));
+  EXPECT_TRUE(StringUtil::atoll("-9223372036854775808", out));
   EXPECT_EQ(INT64_MIN, out);
 }
 
