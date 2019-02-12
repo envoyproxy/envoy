@@ -12,17 +12,40 @@ using Envoy::Api::SysCallSizeResult;
 namespace Envoy {
 namespace Network {
 
+IoError::IoErrorCode IoSocketError::getErrorCode() const {
+  switch(errno) {
+    case 0:
+      return IoErrorCode::NoError;
+    case EAGAIN:
+      return IoErrorCode::Again;
+    case ENOTSUP:
+      return IoErrorCode::NoSupport;
+    case EAFNOSUPPORT:
+      return IoErrorCode::AddressFamilyNoSupport;
+    case EINPROGRESS:
+      return IoErrorCode::InProgress;
+    case EPERM:
+      return IoErrorCode::Permission;
+    default:
+      return IoErrorCode::UnknownError;
+  }
+}
+
+std::string IoSocketError::getErrorDetails() const {
+  return ::strerror(errno);
+}
+
 IoSocketHandleImpl::~IoSocketHandleImpl() {
   if (fd_ != -1) {
     close();
   }
 }
 
-SysCallIntResult IoSocketHandleImpl::close() {
+IoHandleCallIntResult IoSocketHandleImpl::close() {
   ASSERT(fd_ != -1);
   const int rc = ::close(fd_);
   fd_ = -1;
-  return {rc, errno};
+  return IoHandleCallResult<int>(rc, std::unique_ptr<IoSocketError>());
 }
 
 bool IoSocketHandleImpl::isClosed() const { return fd_ == -1; }
