@@ -39,8 +39,8 @@ public:
   RingHashLoadBalancerTest() : stats_(ClusterInfoImpl::generateStats(stats_store_)) {}
 
   void init() {
-    lb_ = std::make_unique<RingHashLoadBalancer>(priority_set_, stats_, runtime_, random_, config_,
-                                                 common_config_);
+    lb_ = std::make_unique<RingHashLoadBalancer>(priority_set_, stats_, stats_store_, runtime_,
+                                                 random_, config_, common_config_);
     lb_->initialize();
   }
 
@@ -92,6 +92,10 @@ TEST_P(RingHashLoadBalancerTest, Basic) {
   config_.value().mutable_minimum_ring_size()->set_value(12);
 
   init();
+  EXPECT_EQ("ring_hash_lb.size", lb_->stats().size_.name());
+  EXPECT_EQ("ring_hash_lb.replication_factor", lb_->stats().replication_factor_.name());
+  EXPECT_EQ(12, lb_->stats().size_.value());
+  EXPECT_EQ(2, lb_->stats().replication_factor_.value());
 
   // hash ring:
   // port | position
@@ -157,6 +161,8 @@ TEST_P(RingHashFailoverTest, BasicFailover) {
   config_ = (envoy::api::v2::Cluster::RingHashLbConfig());
   config_.value().mutable_minimum_ring_size()->set_value(12);
   init();
+  EXPECT_EQ(12, lb_->stats().size_.value());
+  EXPECT_EQ(12, lb_->stats().replication_factor_.value());
 
   LoadBalancerPtr lb = lb_->factory()->create();
   EXPECT_EQ(failover_host_set_.healthy_hosts_[0], lb->chooseHost(nullptr));
@@ -201,6 +207,8 @@ TEST_P(RingHashLoadBalancerTest, BasicWithStdHash) {
   config_.value().mutable_deprecated_v1()->mutable_use_std_hash()->set_value(true);
   config_.value().mutable_minimum_ring_size()->set_value(12);
   init();
+  EXPECT_EQ(12, lb_->stats().size_.value());
+  EXPECT_EQ(2, lb_->stats().replication_factor_.value());
 
   // This is the hash ring built using the default hash (probably murmur2) on GCC 5.4.
   // ring hash: host=127.0.0.1:85 hash=1358027074129602068
@@ -253,6 +261,8 @@ TEST_P(RingHashLoadBalancerTest, BasicWithMurmur2) {
                                         Cluster_RingHashLbConfig_HashFunction_MURMUR_HASH_2);
   config_.value().mutable_minimum_ring_size()->set_value(12);
   init();
+  EXPECT_EQ(12, lb_->stats().size_.value());
+  EXPECT_EQ(2, lb_->stats().replication_factor_.value());
 
   // This is the hash ring built using murmur2 hash.
   // ring hash: host=127.0.0.1:85 hash=1358027074129602068
@@ -300,6 +310,8 @@ TEST_P(RingHashLoadBalancerTest, UnevenHosts) {
   config_ = (envoy::api::v2::Cluster::RingHashLbConfig());
   config_.value().mutable_minimum_ring_size()->set_value(3);
   init();
+  EXPECT_EQ(4, lb_->stats().size_.value());
+  EXPECT_EQ(2, lb_->stats().replication_factor_.value());
 
   // hash ring:
   // port | position
@@ -336,11 +348,9 @@ TEST_P(RingHashLoadBalancerTest, UnevenHosts) {
 }
 
 TEST_P(RingHashLoadBalancerTest, HostWeightedTinyRing) {
-  // assign host weights with a greatest common denominator greater than 1, to validate that the
-  // ring won't contain unnecessary duplicate entries.
-  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", 2),
-                      makeTestHost(info_, "tcp://127.0.0.1:91", 4),
-                      makeTestHost(info_, "tcp://127.0.0.1:92", 6)};
+  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", 1),
+                      makeTestHost(info_, "tcp://127.0.0.1:91", 2),
+                      makeTestHost(info_, "tcp://127.0.0.1:92", 3)};
   hostSet().healthy_hosts_ = hostSet().hosts_;
   hostSet().runCallbacks({}, {});
 
@@ -349,6 +359,8 @@ TEST_P(RingHashLoadBalancerTest, HostWeightedTinyRing) {
   config_.value().mutable_minimum_ring_size()->set_value(6);
   config_.value().mutable_maximum_ring_size()->set_value(6);
   init();
+  EXPECT_EQ(6, lb_->stats().size_.value());
+  EXPECT_EQ(1, lb_->stats().replication_factor_.value());
   LoadBalancerPtr lb = lb_->factory()->create();
 
   // :90 should appear once, :91 should appear twice and :92 should appear three times.
@@ -371,6 +383,8 @@ TEST_P(RingHashLoadBalancerTest, HostWeightedLargeRing) {
   config_ = (envoy::api::v2::Cluster::RingHashLbConfig());
   config_.value().mutable_replication_factor()->set_value(1024);
   init();
+  EXPECT_EQ(6144, lb_->stats().size_.value());
+  EXPECT_EQ(1024, lb_->stats().replication_factor_.value());
   LoadBalancerPtr lb = lb_->factory()->create();
 
   // Generate 6000 hashes around the ring and populate a histogram of which hosts they mapped to...
@@ -394,9 +408,7 @@ TEST_P(RingHashLoadBalancerTest, LocalityWeightedTinyRing) {
   hostSet().hosts_per_locality_ = makeHostsPerLocality(
       {{hostSet().hosts_[0]}, {hostSet().hosts_[1]}, {hostSet().hosts_[2]}, {hostSet().hosts_[3]}});
   hostSet().healthy_hosts_per_locality_ = hostSet().hosts_per_locality_;
-  // assign locality weights with a greatest common denominator greater than 1, to validate that the
-  // ring won't contain unnecessary duplicate entries.
-  hostSet().locality_weights_ = makeLocalityWeights({2, 4, 6, 0});
+  hostSet().locality_weights_ = makeLocalityWeights({1, 2, 3, 0});
   hostSet().runCallbacks({}, {});
 
   // enforce a ring size of exactly six entries
@@ -404,6 +416,8 @@ TEST_P(RingHashLoadBalancerTest, LocalityWeightedTinyRing) {
   config_.value().mutable_minimum_ring_size()->set_value(6);
   config_.value().mutable_maximum_ring_size()->set_value(6);
   init();
+  EXPECT_EQ(6, lb_->stats().size_.value());
+  EXPECT_EQ(1, lb_->stats().replication_factor_.value());
   LoadBalancerPtr lb = lb_->factory()->create();
 
   // :90 should appear once, :91 should appear twice, :92 should appear three times,
@@ -431,6 +445,8 @@ TEST_P(RingHashLoadBalancerTest, LocalityWeightedLargeRing) {
   config_ = (envoy::api::v2::Cluster::RingHashLbConfig());
   config_.value().mutable_replication_factor()->set_value(1024);
   init();
+  EXPECT_EQ(6144, lb_->stats().size_.value());
+  EXPECT_EQ(1024, lb_->stats().replication_factor_.value());
   LoadBalancerPtr lb = lb_->factory()->create();
 
   // Generate 6000 hashes around the ring and populate a histogram of which hosts they mapped to...
@@ -463,6 +479,8 @@ TEST_P(RingHashLoadBalancerTest, HostAndLocalityWeightedSmallRing) {
   config_.value().mutable_minimum_ring_size()->set_value(14);
   config_.value().mutable_maximum_ring_size()->set_value(14);
   init();
+  EXPECT_EQ(14, lb_->stats().size_.value());
+  EXPECT_EQ(1, lb_->stats().replication_factor_.value());
   LoadBalancerPtr lb = lb_->factory()->create();
 
   // :90 should appear once, :91 should appear four times, :92 should appear nine times,
@@ -493,6 +511,8 @@ TEST_P(RingHashLoadBalancerTest, HostAndLocalityWeightedLargeRing) {
   config_ = (envoy::api::v2::Cluster::RingHashLbConfig());
   config_.value().mutable_replication_factor()->set_value(1024);
   init();
+  EXPECT_EQ(14336, lb_->stats().size_.value());
+  EXPECT_EQ(1024, lb_->stats().replication_factor_.value());
   LoadBalancerPtr lb = lb_->factory()->create();
 
   // Generate 14000 hashes around the ring and populate a histogram of which hosts they mapped to...
@@ -520,6 +540,8 @@ TEST_P(RingHashLoadBalancerTest, SmallFractionalReplicationFactor) {
   config_.value().mutable_minimum_ring_size()->set_value(2);
   config_.value().mutable_maximum_ring_size()->set_value(2);
   init();
+  EXPECT_EQ(2, lb_->stats().size_.value());
+  EXPECT_EQ(0, lb_->stats().replication_factor_.value()); // rounded down from 0.5
   LoadBalancerPtr lb = lb_->factory()->create();
 
   // Generate some reasonable number of hashes around the ring and populate a histogram of which
@@ -548,6 +570,8 @@ TEST_P(RingHashLoadBalancerTest, LargeFractionalReplicationFactor) {
   config_.value().mutable_minimum_ring_size()->set_value(1023);
   config_.value().mutable_maximum_ring_size()->set_value(1023);
   init();
+  EXPECT_EQ(1023, lb_->stats().size_.value());
+  EXPECT_EQ(511, lb_->stats().replication_factor_.value()); // rounded down from 511.5
   LoadBalancerPtr lb = lb_->factory()->create();
 
   // Generate 1023 hashes around the ring and populate a histogram of which hosts they mapped to...

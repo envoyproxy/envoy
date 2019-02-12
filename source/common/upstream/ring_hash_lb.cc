@@ -16,12 +16,16 @@ namespace Envoy {
 namespace Upstream {
 
 RingHashLoadBalancer::RingHashLoadBalancer(
-    const PrioritySet& priority_set, ClusterStats& stats, Runtime::Loader& runtime,
-    Runtime::RandomGenerator& random,
+    const PrioritySet& priority_set, ClusterStats& stats, Stats::Scope& scope,
+    Runtime::Loader& runtime, Runtime::RandomGenerator& random,
     const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig>& config,
     const envoy::api::v2::Cluster::CommonLbConfig& common_config)
     : ThreadAwareLoadBalancerBase(priority_set, stats, runtime, random, common_config),
-      config_(config) {}
+      config_(config), scope_(scope.createScope("ring_hash_lb.")), stats_(generateStats(*scope_)) {}
+
+RingHashLoadBalancerStats RingHashLoadBalancer::generateStats(Stats::Scope& scope) {
+  return {ALL_RING_HASH_LOAD_BALANCER_STATS(POOL_GAUGE(scope))};
+}
 
 HostConstSharedPtr RingHashLoadBalancer::Ring::chooseHost(uint64_t h) const {
   if (ring_.empty()) {
@@ -64,7 +68,9 @@ using HashFunction = envoy::api::v2::Cluster_RingHashLbConfig_HashFunction;
 RingHashLoadBalancer::Ring::Ring(
     const HostsPerLocality& hosts_per_locality,
     const LocalityWeightsConstSharedPtr& locality_weights,
-    const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig>& config) {
+    const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig>& config,
+    RingHashLoadBalancerStats& stats)
+    : stats_(stats) {
   ENVOY_LOG(trace, "ring hash: building ring");
 
   // Sanity-check that the locality weights, if provided, line up with the hosts per locality.
@@ -144,43 +150,27 @@ RingHashLoadBalancer::Ring::Ring(
   // fractional replication factors when we absolutely have to.
   const double min_whole_replication_factor = std::ceil(min_replication_factor);
   const double max_whole_replication_factor = std::floor(max_replication_factor);
-  if (min_whole_replication_factor > max_whole_replication_factor) {
-    // This is worth logging a warning about here, since it defeats consistent hashing to some
-    // degree (mostly at low replication factors). More comments on that issue further down, where
-    // the ring is populated...
-    ENVOY_LOG(warn,
-              "ring hash: Configured ring size bounds (min={}, max={}) are too tight, which has "
-              "forced a non-integer replication factor. This may cause in some jitter when hosts "
-              "are added and removed from the host set.",
-              min_ring_size, max_ring_size);
-  } else {
+  if (min_whole_replication_factor <= max_whole_replication_factor) {
     min_replication_factor = min_whole_replication_factor;
     max_replication_factor = max_whole_replication_factor;
   }
 
   // Determine the actual replication factor we will use. If the configuration includes a
-  // replication factor, try to use it and warn if not possible. Otherwise, fall back to the old
-  // behavior for backward compatibility: size the ring as small as possible.
-  double replication_factor;
-  if (configured_replication_factor) {
-    replication_factor = static_cast<double>(configured_replication_factor.value());
-    if (replication_factor < min_replication_factor) {
-      ENVOY_LOG(warn, "ring hash: replication_factor ({}) too small for minimum_ring_size ({})",
-                replication_factor, min_ring_size);
-      replication_factor = min_replication_factor;
-    } else if (replication_factor > max_replication_factor) {
-      ENVOY_LOG(warn, "ring hash: replication_factor ({}) too large for maximum_ring_size ({})",
-                replication_factor, max_ring_size);
-      replication_factor = max_replication_factor;
-    }
-  } else {
-    replication_factor = min_replication_factor;
-  }
+  // replication factor, try to use it (or whatever value is closest to it within bounds).
+  // Otherwise, fall back to the old behavior for backward compatibility: size the ring as small as
+  // possible.
+  const double replication_factor =
+      configured_replication_factor
+          ? std::min(std::max(static_cast<double>(configured_replication_factor.value()),
+                              min_replication_factor),
+                     max_replication_factor)
+          : min_replication_factor;
 
   // Reserve memory for the entire ring up front.
   uint64_t ring_size = std::ceil(weighted_sum * replication_factor);
   ring_.reserve(ring_size);
-  ENVOY_LOG(info, "ring hash: ring_size={} replication_factor={}", ring_size, replication_factor);
+  stats_.size_.set(ring_size);
+  stats_.replication_factor_.set(replication_factor);
 
   const bool use_std_hash =
       config ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.value().deprecated_v1(), use_std_hash, false)
