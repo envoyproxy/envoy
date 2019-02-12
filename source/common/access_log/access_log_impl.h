@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 #include "envoy/access_log/access_log.h"
@@ -9,6 +10,7 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/access_log_config.h"
 
+#include "common/grpc/status.h"
 #include "common/http/header_utility.h"
 #include "common/protobuf/protobuf.h"
 
@@ -51,8 +53,9 @@ public:
       : ComparisonFilter(config.comparison(), runtime) {}
 
   // AccessLog::Filter
-  bool evaluate(const StreamInfo::StreamInfo& info,
-                const Http::HeaderMap& request_headers) override;
+  bool evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap& request_headers,
+                const Http::HeaderMap& response_headers,
+                const Http::HeaderMap& response_trailers) override;
 };
 
 /**
@@ -65,8 +68,9 @@ public:
       : ComparisonFilter(config.comparison(), runtime) {}
 
   // AccessLog::Filter
-  bool evaluate(const StreamInfo::StreamInfo& info,
-                const Http::HeaderMap& request_headers) override;
+  bool evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap& request_headers,
+                const Http::HeaderMap& response_headers,
+                const Http::HeaderMap& response_trailers) override;
 };
 
 /**
@@ -91,8 +95,9 @@ public:
             Runtime::RandomGenerator& random);
 
   // AccessLog::Filter
-  bool evaluate(const StreamInfo::StreamInfo& info,
-                const Http::HeaderMap& request_headers) override;
+  bool evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap& request_headers,
+                const Http::HeaderMap& response_headers,
+                const Http::HeaderMap& response_trailers) override;
 };
 
 /**
@@ -104,8 +109,9 @@ public:
            Runtime::RandomGenerator& random);
 
   // AccessLog::Filter
-  bool evaluate(const StreamInfo::StreamInfo& info,
-                const Http::HeaderMap& request_headers) override;
+  bool evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap& request_headers,
+                const Http::HeaderMap& response_headers,
+                const Http::HeaderMap& response_trailers) override;
 };
 
 /**
@@ -116,8 +122,9 @@ public:
   NotHealthCheckFilter() {}
 
   // AccessLog::Filter
-  bool evaluate(const StreamInfo::StreamInfo& info,
-                const Http::HeaderMap& request_headers) override;
+  bool evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap& request_headers,
+                const Http::HeaderMap& response_headers,
+                const Http::HeaderMap& response_trailers) override;
 };
 
 /**
@@ -126,8 +133,9 @@ public:
 class TraceableRequestFilter : public Filter {
 public:
   // AccessLog::Filter
-  bool evaluate(const StreamInfo::StreamInfo& info,
-                const Http::HeaderMap& request_headers) override;
+  bool evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap& request_headers,
+                const Http::HeaderMap& response_headers,
+                const Http::HeaderMap& response_trailers) override;
 };
 
 /**
@@ -139,8 +147,9 @@ public:
                 Runtime::Loader& runtime, Runtime::RandomGenerator& random);
 
   // AccessLog::Filter
-  bool evaluate(const StreamInfo::StreamInfo& info,
-                const Http::HeaderMap& request_headers) override;
+  bool evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap& request_headers,
+                const Http::HeaderMap& response_headers,
+                const Http::HeaderMap& response_trailers) override;
 
 private:
   Runtime::Loader& runtime_;
@@ -158,8 +167,9 @@ public:
   HeaderFilter(const envoy::config::filter::accesslog::v2::HeaderFilter& config);
 
   // AccessLog::Filter
-  bool evaluate(const StreamInfo::StreamInfo& info,
-                const Http::HeaderMap& request_headers) override;
+  bool evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap& request_headers,
+                const Http::HeaderMap& response_headers,
+                const Http::HeaderMap& response_trailers) override;
 
 private:
   std::vector<Http::HeaderUtility::HeaderData> header_data_;
@@ -173,11 +183,38 @@ public:
   ResponseFlagFilter(const envoy::config::filter::accesslog::v2::ResponseFlagFilter& config);
 
   // AccessLog::Filter
-  bool evaluate(const StreamInfo::StreamInfo& info,
-                const Http::HeaderMap& request_headers) override;
+  bool evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap& request_headers,
+                const Http::HeaderMap& response_headers,
+                const Http::HeaderMap& response_trailers) override;
 
 private:
   uint64_t configured_flags_{};
+};
+
+/**
+ * Filters requests that have a response with a gRPC status. Because the gRPC protocol does not
+ * guarantee a gRPC status code, if a gRPC status code is not available, then the filter will infer
+ * the gRPC status code from an HTTP status code if available.
+ */
+class GrpcStatusFilter : public Filter {
+public:
+  GrpcStatusFilter(const envoy::config::filter::accesslog::v2::GrpcStatusFilter& config);
+
+  // AccessLog::Filter
+  bool evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap& request_headers,
+                const Http::HeaderMap& response_headers,
+                const Http::HeaderMap& response_trailers) override;
+
+private:
+  std::unordered_set<Grpc::Status::GrpcStatus> statuses_;
+  bool exclude_;
+
+  /**
+   * Converts a Protobuf representation of a gRPC status into the equivalent code version of a gRPC
+   * status.
+   */
+  Grpc::Status::GrpcStatus
+  protoToGrpcStatus(envoy::config::filter::accesslog::v2::GrpcStatusFilter_Status status) const;
 };
 
 /**

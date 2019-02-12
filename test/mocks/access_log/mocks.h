@@ -18,8 +18,10 @@ public:
   ~MockFilter();
 
   // AccessLog::Filter
-  MOCK_METHOD2(evaluate,
-               bool(const StreamInfo::StreamInfo& info, const Http::HeaderMap& request_headers));
+  MOCK_METHOD4(evaluate,
+               bool(const StreamInfo::StreamInfo& info, const Http::HeaderMap& request_headers,
+                    const Http::HeaderMap& response_headers,
+                    const Http::HeaderMap& response_trailers));
 };
 
 class MockAccessLogManager : public AccessLogManager {
