@@ -233,8 +233,9 @@ BaseIntegrationTest::BaseIntegrationTest(
       mock_buffer_factory_(new NiceMock<MockBufferFactory>),
       dispatcher_(
           new Event::DispatcherImpl(Buffer::WatermarkFactoryPtr{mock_buffer_factory_}, *api_)),
-      version_(version), upstream_address_fn_(upstream_address_fn),
+      version_(version),
       config_helper_(version, *api_, config),
+      upstream_address_fn_(upstream_address_fn),
       default_log_level_(TestEnvironment::getOptions().logLevel()) {
   // This is a hack, but there are situations where we disconnect fake upstream connections and
   // then we expect the server connection pool to get the disconnect before the next test starts.
