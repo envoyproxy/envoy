@@ -161,6 +161,7 @@ private:
   std::unique_ptr<OverloadManager> overload_manager_;
   MutexTracer* mutex_tracer_;
   Http::ContextImpl http_context_;
+  Event::TimeSystem& time_system_;
 };
 
 } // namespace Server
