@@ -110,7 +110,9 @@ public:
                  "rq_success {} does not match expected {}",
                  cm_.conn_pool_.host_->stats_store_.counter("rq_success").value(), success);
     }
-    if (error != cm_.conn_pool_.host_->stats_store_.counter("rq_error").value()) {
+    if (error != cm_.conn_pool_.host_->stats_store_.counter("rq_error").value() &&
+        error != cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_error")
+                     .value()) {
       return AssertionFailure() << fmt::format(
                  "rq_error {} does not match expected {}",
                  cm_.conn_pool_.host_->stats_store_.counter("rq_error").value(), error);
