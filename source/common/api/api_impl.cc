@@ -17,7 +17,11 @@ Impl::Impl(std::chrono::milliseconds file_flush_interval_msec,
       time_system_(time_system) {}
 
 Event::DispatcherPtr Impl::allocateDispatcher() {
-  return std::make_unique<Event::DispatcherImpl>(*this);
+  return std::make_unique<Event::DispatcherImpl>(*this, time_system_);
+}
+
+Event::DispatcherPtr Impl::allocateDispatcher(Buffer::WatermarkFactoryPtr&& factory) {
+  return std::make_unique<Event::DispatcherImpl>(std::move(factory), *this, time_system_);
 }
 
 } // namespace Api

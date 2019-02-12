@@ -260,7 +260,7 @@ TEST_F(CodecClientTest, WatermarkPassthrough) {
 class CodecNetworkTest : public TestBaseWithParam<Network::Address::IpVersion> {
 public:
   CodecNetworkTest() : api_(Api::createApiForTest()) {
-    dispatcher_ = std::make_unique<Event::DispatcherImpl>(*api_);
+    dispatcher_ = api_->allocateDispatcher();
     upstream_listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true, false);
     Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
         socket_.localAddress(), source_address_, Network::Test::createRawBufferSocket(), nullptr);

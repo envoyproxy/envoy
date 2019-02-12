@@ -6,12 +6,12 @@
 #include "common/network/udp_listener_impl.h"
 #include "common/network/utility.h"
 
+#include "test/common/network/listener_impl_test_base.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/test_base.h"
-#include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -36,14 +36,8 @@ public:
   }
 };
 
-class UdpListenerImplTest : public TestBaseWithParam<Address::IpVersion> {
+class UdpListenerImplTest : public ListenerImplTestBase {
 protected:
-  UdpListenerImplTest()
-      : version_(GetParam()),
-        alt_address_(Network::Test::findOrCheckFreePort(
-            Network::Test::getCanonicalLoopbackAddress(version_), Address::SocketType::Stream)),
-        api_(Api::createApiForTest()), dispatcher_(*api_) {}
-
   SocketPtr getSocket(Address::SocketType type, const Address::InstanceConstSharedPtr& address,
                       const Network::Socket::OptionsSharedPtr& options, bool bind) {
     if (type == Address::SocketType::Stream) {
@@ -112,12 +106,6 @@ protected:
 
     getSocketAddressInfo(address->ip(), port, addr, sz);
   }
-
-  const Address::IpVersion version_;
-  const Address::InstanceConstSharedPtr alt_address_;
-  Api::ApiPtr api_;
-  DangerousDeprecatedTestTime test_time_;
-  Event::DispatcherImpl dispatcher_;
 };
 INSTANTIATE_TEST_CASE_P(IpVersions, UdpListenerImplTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
@@ -150,7 +138,7 @@ TEST_P(UdpListenerImplTest, UseActualDstUdp) {
 
   // Setup callback handler and listener.
   Network::MockUdpListenerCallbacks listener_callbacks;
-  Network::TestUdpListenerImpl listener(dispatcher_, *server_socket.get(), listener_callbacks);
+  Network::TestUdpListenerImpl listener(dispatcherImpl(), *server_socket.get(), listener_callbacks);
 
   EXPECT_CALL(listener, doRecvFrom(_, _))
       .WillRepeatedly(Invoke([&](sockaddr_storage& peer_addr, socklen_t& addr_len) {
@@ -209,7 +197,7 @@ TEST_P(UdpListenerImplTest, UseActualDstUdp) {
 
         EXPECT_EQ(data.buffer_->toString(), second);
 
-        dispatcher_.exit();
+        dispatcher_->exit();
       }));
 
   EXPECT_CALL(listener_callbacks, onWriteReady_(_))
@@ -217,7 +205,7 @@ TEST_P(UdpListenerImplTest, UseActualDstUdp) {
         EXPECT_EQ(socket.ioHandle().fd(), server_socket->ioHandle().fd());
       }));
 
-  dispatcher_.run(Event::Dispatcher::RunType::Block);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
 /**
@@ -236,7 +224,7 @@ TEST_P(UdpListenerImplTest, UdpEcho) {
 
   // Setup callback handler and listener.
   Network::MockUdpListenerCallbacks listener_callbacks;
-  Network::TestUdpListenerImpl listener(dispatcher_, *server_socket.get(), listener_callbacks);
+  Network::TestUdpListenerImpl listener(dispatcherImpl(), *server_socket.get(), listener_callbacks);
 
   EXPECT_CALL(listener, doRecvFrom(_, _))
       .WillRepeatedly(Invoke([&](sockaddr_storage& peer_addr, socklen_t& addr_len) {
@@ -284,7 +272,7 @@ TEST_P(UdpListenerImplTest, UdpEcho) {
     EXPECT_EQ(*local_address, *server_socket->localAddress());
   };
 
-  Event::TimerPtr timer = dispatcher_.createTimer([&] { dispatcher_.exit(); });
+  Event::TimerPtr timer = dispatcher_->createTimer([&] { dispatcher_->exit(); });
 
   timer->enableTimer(std::chrono::milliseconds(2000));
 
@@ -351,7 +339,7 @@ TEST_P(UdpListenerImplTest, UdpEcho) {
         server_received_data.clear();
       }));
 
-  dispatcher_.run(Event::Dispatcher::RunType::Block);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
 /**
@@ -370,7 +358,7 @@ TEST_P(UdpListenerImplTest, UdpListenerEnableDisable) {
 
   // Setup callback handler and listener.
   Network::MockUdpListenerCallbacks listener_callbacks;
-  Network::TestUdpListenerImpl listener(dispatcher_, *server_socket.get(), listener_callbacks);
+  Network::TestUdpListenerImpl listener(dispatcherImpl(), *server_socket.get(), listener_callbacks);
 
   EXPECT_CALL(listener, doRecvFrom(_, _))
       .WillRepeatedly(Invoke([&](sockaddr_storage& peer_addr, socklen_t& addr_len) {
@@ -423,7 +411,7 @@ TEST_P(UdpListenerImplTest, UdpListenerEnableDisable) {
     EXPECT_EQ(*local_address, *server_socket->localAddress());
   };
 
-  Event::TimerPtr timer = dispatcher_.createTimer([&] { dispatcher_.exit(); });
+  Event::TimerPtr timer = dispatcher_->createTimer([&] { dispatcher_->exit(); });
 
   timer->enableTimer(std::chrono::milliseconds(2000));
 
@@ -431,7 +419,7 @@ TEST_P(UdpListenerImplTest, UdpListenerEnableDisable) {
 
   EXPECT_CALL(listener_callbacks, onWriteReady_(_)).Times(0);
 
-  dispatcher_.run(Event::Dispatcher::RunType::Block);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   listener.enable();
 
@@ -443,7 +431,7 @@ TEST_P(UdpListenerImplTest, UdpListenerEnableDisable) {
 
         EXPECT_EQ(data.buffer_->toString(), second);
 
-        dispatcher_.exit();
+        dispatcher_->exit();
       }));
 
   EXPECT_CALL(listener_callbacks, onWriteReady_(_))
@@ -451,7 +439,7 @@ TEST_P(UdpListenerImplTest, UdpListenerEnableDisable) {
         EXPECT_EQ(socket.ioHandle().fd(), server_socket->ioHandle().fd());
       }));
 
-  dispatcher_.run(Event::Dispatcher::RunType::Block);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
 /**
@@ -470,7 +458,7 @@ TEST_P(UdpListenerImplTest, UdpListenerRecvFromError) {
 
   // Setup callback handler and listener.
   Network::MockUdpListenerCallbacks listener_callbacks;
-  Network::TestUdpListenerImpl listener(dispatcher_, *server_socket.get(), listener_callbacks);
+  Network::TestUdpListenerImpl listener(dispatcherImpl(), *server_socket.get(), listener_callbacks);
 
   EXPECT_CALL(listener, doRecvFrom(_, _)).WillRepeatedly(Invoke([&](sockaddr_storage&, socklen_t&) {
     return UdpListenerImpl::ReceiveResult{{-1, -1}, nullptr};
@@ -510,10 +498,10 @@ TEST_P(UdpListenerImplTest, UdpListenerRecvFromError) {
         ASSERT_EQ(err_code, UdpListenerCallbacks::ErrorCode::SyscallError);
         ASSERT_EQ(err, -1);
 
-        dispatcher_.exit();
+        dispatcher_->exit();
       }));
 
-  dispatcher_.run(Event::Dispatcher::RunType::Block);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
 } // namespace Network

@@ -39,7 +39,7 @@ public:
   }
 
   void initThreading() {
-    dispatcher_ = std::make_unique<Event::DispatcherImpl>(*api_);
+    dispatcher_ = api_->allocateDispatcher();
     tls_ = std::make_unique<ThreadLocal::InstanceImpl>();
     store_.initializeThreading(*dispatcher_, *tls_);
   }
@@ -50,7 +50,7 @@ private:
   Stats::HeapStatDataAllocator heap_alloc_;
   Stats::ThreadLocalStoreImpl store_;
   Api::ApiPtr api_;
-  std::unique_ptr<Event::DispatcherImpl> dispatcher_;
+  Event::DispatcherPtr dispatcher_;
   std::unique_ptr<ThreadLocal::InstanceImpl> tls_;
   envoy::config::metrics::v2::StatsConfig stats_config_;
 };

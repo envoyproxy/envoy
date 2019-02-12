@@ -19,6 +19,7 @@
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {
@@ -26,7 +27,8 @@ namespace Upstream {
 
 TEST(ValidationClusterManagerTest, MockedMethods) {
   Stats::IsolatedStoreImpl stats_store;
-  Api::ApiPtr api(Api::createApiForTest(stats_store));
+  Event::SimulatedTimeSystem time_system;
+  Api::ApiPtr api(Api::createApiForTest(stats_store, time_system));
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<ThreadLocal::MockInstance> tls;
   NiceMock<Runtime::MockRandomGenerator> random;
@@ -42,7 +44,7 @@ TEST(ValidationClusterManagerTest, MockedMethods) {
 
   ValidationClusterManagerFactory factory(
       admin, runtime, stats_store, tls, random, dns_resolver, ssl_context_manager, dispatcher,
-      local_info, secret_manager, *api, http_context, log_manager, singleton_manager);
+      local_info, secret_manager, *api, http_context, log_manager, singleton_manager, time_system);
 
   const envoy::config::bootstrap::v2::Bootstrap bootstrap;
   ClusterManagerPtr cluster_manager = factory.clusterManagerFromProto(bootstrap);

@@ -30,38 +30,38 @@ private:
 TEST(DeferredDeleteTest, DeferredDelete) {
   InSequence s;
   Api::ApiPtr api = Api::createApiForTest();
-  DispatcherImpl dispatcher(*api);
+  DispatcherPtr dispatcher(api->allocateDispatcher());
   ReadyWatcher watcher1;
 
-  dispatcher.deferredDelete(
+  dispatcher->deferredDelete(
       DeferredDeletablePtr{new TestDeferredDeletable([&]() -> void { watcher1.ready(); })});
 
   // The first one will get deleted inline.
   EXPECT_CALL(watcher1, ready());
-  dispatcher.clearDeferredDeleteList();
+  dispatcher->clearDeferredDeleteList();
 
   // This one does a nested deferred delete. We should need two clear calls to actually get
   // rid of it with the vector swapping. We also test that inline clear() call does nothing.
   ReadyWatcher watcher2;
   ReadyWatcher watcher3;
-  dispatcher.deferredDelete(DeferredDeletablePtr{new TestDeferredDeletable([&]() -> void {
+  dispatcher->deferredDelete(DeferredDeletablePtr{new TestDeferredDeletable([&]() -> void {
     watcher2.ready();
-    dispatcher.deferredDelete(
+    dispatcher->deferredDelete(
         DeferredDeletablePtr{new TestDeferredDeletable([&]() -> void { watcher3.ready(); })});
-    dispatcher.clearDeferredDeleteList();
+    dispatcher->clearDeferredDeleteList();
   })});
 
   EXPECT_CALL(watcher2, ready());
-  dispatcher.clearDeferredDeleteList();
+  dispatcher->clearDeferredDeleteList();
 
   EXPECT_CALL(watcher3, ready());
-  dispatcher.clearDeferredDeleteList();
+  dispatcher->clearDeferredDeleteList();
 }
 
 class DispatcherImplTest : public TestBase {
 protected:
   DispatcherImplTest()
-      : api_(Api::createApiForTest()), dispatcher_(std::make_unique<DispatcherImpl>(*api_)),
+      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()),
         work_finished_(false) {
     dispatcher_thread_ = api_->threadFactory().createThread([this]() {
       // Must create a keepalive timer to keep the dispatcher from exiting.

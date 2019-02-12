@@ -218,7 +218,8 @@ class GrpcClientIntegrationTest : public GrpcClientIntegrationParamTest {
 public:
   GrpcClientIntegrationTest()
       : method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")),
-        api_(Api::createApiForTest(*stats_store_, test_time_.timeSystem())), dispatcher_(*api_) {}
+        api_(Api::createApiForTest(*stats_store_, test_time_.timeSystem())),
+        dispatcher_(api_->allocateDispatcher()) {}
 
   virtual void initialize() {
     if (fake_upstream_ == nullptr) {
@@ -236,9 +237,9 @@ public:
     }
     // Setup a test timeout (also needed to maintain an active event in the dispatcher so that
     // .run() will block until timeout rather than exit immediately).
-    timeout_timer_ = dispatcher_.createTimer([this] {
+    timeout_timer_ = dispatcher_->createTimer([this] {
       FAIL() << "Test timeout";
-      dispatcher_.exit();
+      dispatcher_->exit();
     });
     timeout_timer_->enableTimer(std::chrono::milliseconds(10000));
   }
@@ -265,7 +266,7 @@ public:
   // infrastructure to initiate a loopback TCP connection to fake_upstream_.
   AsyncClientPtr createAsyncClientImpl() {
     client_connection_ = std::make_unique<Network::ClientConnectionImpl>(
-        dispatcher_, fake_upstream_->localAddress(), nullptr,
+        *dispatcher_, fake_upstream_->localAddress(), nullptr,
         std::move(async_client_transport_socket_), nullptr);
     ON_CALL(*mock_cluster_info_, connectTimeout())
         .WillByDefault(Return(std::chrono::milliseconds(1000)));
@@ -278,11 +279,11 @@ public:
     EXPECT_CALL(*mock_host_, cluster()).WillRepeatedly(ReturnRef(*cluster_info_ptr_));
     EXPECT_CALL(*mock_host_description_, locality()).WillRepeatedly(ReturnRef(host_locality_));
     http_conn_pool_ = std::make_unique<Http::Http2::ProdConnPoolImpl>(
-        dispatcher_, host_ptr_, Upstream::ResourcePriority::Default, nullptr);
+        *dispatcher_, host_ptr_, Upstream::ResourcePriority::Default, nullptr);
     EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
         .WillRepeatedly(Return(http_conn_pool_.get()));
     http_async_client_ = std::make_unique<Http::AsyncClientImpl>(
-        cluster_info_ptr_, *stats_store_, dispatcher_, local_info_, cm_, runtime_, random_,
+        cluster_info_ptr_, *stats_store_, *dispatcher_, local_info_, cm_, runtime_, random_,
         std::move(shadow_writer_ptr_), http_context_);
     EXPECT_CALL(cm_, httpAsyncClientForCluster(fake_cluster_name_))
         .WillRepeatedly(ReturnRef(*http_async_client_));
@@ -290,7 +291,7 @@ public:
     envoy::api::v2::core::GrpcService config;
     config.mutable_envoy_grpc()->set_cluster_name(fake_cluster_name_);
     fillServiceWideInitialMetadata(config);
-    return std::make_unique<AsyncClientImpl>(cm_, config, dispatcher_.timeSource());
+    return std::make_unique<AsyncClientImpl>(cm_, config, dispatcher_->timeSource());
   }
 
   virtual envoy::api::v2::core::GrpcService createGoogleGrpcConfig() {
@@ -306,7 +307,7 @@ public:
 #ifdef ENVOY_GOOGLE_GRPC
     google_tls_ = std::make_unique<GoogleAsyncClientThreadLocal>(*api_);
     GoogleGenericStubFactory stub_factory;
-    return std::make_unique<GoogleAsyncClientImpl>(dispatcher_, *google_tls_, stub_factory,
+    return std::make_unique<GoogleAsyncClientImpl>(*dispatcher_, *google_tls_, stub_factory,
                                                    stats_scope_, createGoogleGrpcConfig(), *api_);
 #else
     NOT_REACHED_GCOVR_EXCL_LINE;
@@ -357,11 +358,12 @@ public:
     EXPECT_NE(request->grpc_request_, nullptr);
 
     if (!fake_connection_) {
-      AssertionResult result = fake_upstream_->waitForHttpConnection(dispatcher_, fake_connection_);
+      AssertionResult result =
+          fake_upstream_->waitForHttpConnection(*dispatcher_, fake_connection_);
       RELEASE_ASSERT(result, result.message());
     }
     fake_streams_.emplace_back();
-    AssertionResult result = fake_connection_->waitForNewStream(dispatcher_, fake_streams_.back());
+    AssertionResult result = fake_connection_->waitForNewStream(*dispatcher_, fake_streams_.back());
     RELEASE_ASSERT(result, result.message());
     auto& fake_stream = *fake_streams_.back();
     request->fake_stream_ = &fake_stream;
@@ -370,7 +372,7 @@ public:
     expectExtraHeaders(fake_stream);
 
     helloworld::HelloRequest received_msg;
-    result = fake_stream.waitForGrpcMessage(dispatcher_, received_msg);
+    result = fake_stream.waitForGrpcMessage(*dispatcher_, received_msg);
     RELEASE_ASSERT(result, result.message());
     EXPECT_THAT(request_msg, ProtoEq(received_msg));
 
@@ -390,11 +392,12 @@ public:
     EXPECT_NE(stream->grpc_stream_, nullptr);
 
     if (!fake_connection_) {
-      AssertionResult result = fake_upstream_->waitForHttpConnection(dispatcher_, fake_connection_);
+      AssertionResult result =
+          fake_upstream_->waitForHttpConnection(*dispatcher_, fake_connection_);
       RELEASE_ASSERT(result, result.message());
     }
     fake_streams_.emplace_back();
-    AssertionResult result = fake_connection_->waitForNewStream(dispatcher_, fake_streams_.back());
+    AssertionResult result = fake_connection_->waitForNewStream(*dispatcher_, fake_streams_.back());
     RELEASE_ASSERT(result, result.message());
     auto& fake_stream = *fake_streams_.back();
     stream->fake_stream_ = &fake_stream;
@@ -412,8 +415,8 @@ public:
   const Protobuf::MethodDescriptor* method_descriptor_;
   Stats::IsolatedStoreImpl* stats_store_ = new Stats::IsolatedStoreImpl();
   Api::ApiPtr api_;
-  Event::DispatcherImpl dispatcher_;
-  DispatcherHelper dispatcher_helper_{dispatcher_};
+  Event::DispatcherPtr dispatcher_;
+  DispatcherHelper dispatcher_helper_{*dispatcher_};
   Stats::ScopeSharedPtr stats_scope_{stats_store_};
   TestMetadata service_wide_initial_metadata_;
 #ifdef ENVOY_GOOGLE_GRPC

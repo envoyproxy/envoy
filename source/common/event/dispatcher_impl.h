@@ -23,8 +23,9 @@ namespace Event {
  */
 class DispatcherImpl : Logger::Loggable<Logger::Id::main>, public Dispatcher {
 public:
-  explicit DispatcherImpl(Api::Api& api);
-  DispatcherImpl(Buffer::WatermarkFactoryPtr&& factory, Api::Api& api);
+  DispatcherImpl(Api::Api& api, Event::TimeSystem& time_system);
+  DispatcherImpl(Buffer::WatermarkFactoryPtr&& factory, Api::Api& api,
+                 Event::TimeSystem& time_system);
   ~DispatcherImpl();
 
   /**
