@@ -32,6 +32,10 @@ Version history
 * redis: migrate hash function for host selection to `MurmurHash2 <https://sites.google.com/site/murmurhash>`_ from std::hash. MurmurHash2 is compatible with std::hash in GNU libstdc++ 3.4.20 or above. This is typically the case when compiled on Linux and not macOS.
 * router: added ability to configure a :ref:`retry policy <envoy_api_msg_route.RetryPolicy>` at the
   virtual host level.
+* server: changed protocol that hot restart children/parents use; now protobuf based.
+* server: stats are now preserved across hot restart by being explicitly communicated through the hot
+          restart protocol, rather than living in shared memory.
+* server: hot restart version incremented to 11.
 * stats: added support for histograms in prometheus
 * stats: added usedonly flag to prometheus stats to only output metrics which have been
   updated at least once.
