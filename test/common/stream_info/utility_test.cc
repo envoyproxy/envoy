@@ -14,7 +14,7 @@ namespace Envoy {
 namespace StreamInfo {
 
 TEST(ResponseFlagUtilsTest, toShortStringConversion) {
-  static_assert(ResponseFlag::LastFlag == 0x8000, "A flag has been added. Fix this code.");
+  static_assert(ResponseFlag::LastFlag == 0x10000, "A flag has been added. Fix this code.");
 
   std::vector<std::pair<ResponseFlag, std::string>> expected = {
       std::make_pair(ResponseFlag::FailedLocalHealthCheck, "LH"),
@@ -33,6 +33,7 @@ TEST(ResponseFlagUtilsTest, toShortStringConversion) {
       std::make_pair(ResponseFlag::RateLimitServiceError, "RLSE"),
       std::make_pair(ResponseFlag::DownstreamConnectionTermination, "DC"),
       std::make_pair(ResponseFlag::UpstreamRetryLimitExceeded, "URX"),
+      std::make_pair(ResponseFlag::StreamIdleTimeout, "SI"),
   };
 
   for (const auto& test_case : expected) {
@@ -61,7 +62,7 @@ TEST(ResponseFlagUtilsTest, toShortStringConversion) {
 }
 
 TEST(ResponseFlagsUtilsTest, toResponseFlagConversion) {
-  static_assert(ResponseFlag::LastFlag == 0x8000, "A flag has been added. Fix this code.");
+  static_assert(ResponseFlag::LastFlag == 0x10000, "A flag has been added. Fix this code.");
 
   std::vector<std::pair<std::string, ResponseFlag>> expected = {
       std::make_pair("LH", ResponseFlag::FailedLocalHealthCheck),
@@ -80,6 +81,7 @@ TEST(ResponseFlagsUtilsTest, toResponseFlagConversion) {
       std::make_pair("RLSE", ResponseFlag::RateLimitServiceError),
       std::make_pair("DC", ResponseFlag::DownstreamConnectionTermination),
       std::make_pair("URX", ResponseFlag::UpstreamRetryLimitExceeded),
+      std::make_pair("SI", ResponseFlag::StreamIdleTimeout),
   };
 
   EXPECT_FALSE(ResponseFlagUtils::toResponseFlag("NonExistentFlag").has_value());

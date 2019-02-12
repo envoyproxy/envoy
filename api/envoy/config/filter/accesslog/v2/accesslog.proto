@@ -187,7 +187,8 @@ message ResponseFlagFilter {
       "UAEX",
       "RLSE",
       "DC",
-      "URX"
+      "URX",
+      "SI"
     ]
   }];
 }

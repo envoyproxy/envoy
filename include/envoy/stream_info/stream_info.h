@@ -56,8 +56,10 @@ enum ResponseFlag {
   DownstreamConnectionTermination = 0x4000,
   // Exceeded upstream retry limit.
   UpstreamRetryLimitExceeded = 0x8000,
+  // Request hit the stream idle timeout, triggering a 408.
+  StreamIdleTimeout = 0x10000,
   // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST FLAG.
-  LastFlag = UpstreamRetryLimitExceeded
+  LastFlag = StreamIdleTimeout
 };
 
 /**
