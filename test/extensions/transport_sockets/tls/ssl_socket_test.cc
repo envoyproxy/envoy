@@ -94,7 +94,7 @@ public:
   TestUtilOptions(const std::string& client_ctx_yaml, const std::string& server_ctx_yaml,
                   bool expect_success, Network::Address::IpVersion version)
       : TestUtilOptionsBase(expect_success, version), client_ctx_yaml_(client_ctx_yaml),
-        server_ctx_yaml_(server_ctx_yaml) {
+        server_ctx_yaml_(server_ctx_yaml), expect_no_cert_(false) {
     if (expect_success) {
       setExpectedServerStats("ssl.handshake");
     } else {
