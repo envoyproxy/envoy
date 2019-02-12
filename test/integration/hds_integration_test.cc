@@ -16,15 +16,15 @@
 #include "test/config/utility.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace {
 
-class HdsIntegrationTest : public HttpIntegrationTest,
-                           public testing::TestWithParam<Network::Address::IpVersion> {
+class HdsIntegrationTest : public TestBaseWithParam<Network::Address::IpVersion>,
+                           public HttpIntegrationTest {
 public:
   HdsIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()) {}
@@ -167,9 +167,9 @@ public:
     health_check->mutable_health_checks(0)->mutable_interval()->set_seconds(MaxTimeout);
     health_check->mutable_health_checks(0)->mutable_unhealthy_threshold()->set_value(2);
     health_check->mutable_health_checks(0)->mutable_healthy_threshold()->set_value(2);
-    auto* tcp_hc = health_check->mutable_health_checks(0)->mutable_tcp_health_check();
-    tcp_hc->mutable_send()->set_text("50696E67");
-    tcp_hc->add_receive()->set_text("506F6E67");
+    auto* tcp_health_check = health_check->mutable_health_checks(0)->mutable_tcp_health_check();
+    tcp_health_check->mutable_send()->set_text("50696E67");
+    tcp_health_check->add_receive()->set_text("506F6E67");
 
     return server_health_check_specifier_;
   }

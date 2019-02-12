@@ -48,7 +48,9 @@ public:
   /* The host is currently marked as unhealthy by EDS. */                        \
   m(FAILED_EDS_HEALTH, 0x04)                                                     \
   /* The host is currently marked as degraded through active health checking. */ \
-  m(DEGRADED_ACTIVE_HC, 0x08)
+  m(DEGRADED_ACTIVE_HC, 0x08)                                                    \
+  /* The host is currently marked as degraded by EDS. */                         \
+  m(DEGRADED_EDS_HEALTH, 0x10)
   // clang-format on
 
 #define DECLARE_ENUM(name, value) name = value,
@@ -164,12 +166,14 @@ public:
   virtual void setOutlierDetector(Outlier::DetectorHostMonitorPtr&& outlier_detector) PURE;
 
   /**
-   * @return the current load balancing weight of the host, in the range 1-100.
+   * @return the current load balancing weight of the host, in the range 1-128 (see
+   * envoy.api.v2.endpoint.Endpoint.load_balancing_weight).
    */
   virtual uint32_t weight() const PURE;
 
   /**
-   * Set the current load balancing weight of the host, in the range 1-100.
+   * Set the current load balancing weight of the host, in the range 1-128 (see
+   * envoy.api.v2.endpoint.Endpoint.load_balancing_weight).
    */
   virtual void weight(uint32_t new_weight) PURE;
 

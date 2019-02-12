@@ -7,10 +7,10 @@
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "absl/synchronization/blocking_counter.h"
-#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Stats {
@@ -28,7 +28,7 @@ enum class SymbolTableType {
   Fake,
 };
 
-class StatNameTest : public testing::TestWithParam<SymbolTableType> {
+class StatNameTest : public TestBaseWithParam<SymbolTableType> {
 protected:
   StatNameTest() {
     switch (GetParam()) {
@@ -367,6 +367,8 @@ TEST_P(StatNameTest, JoinAllEmpty) {
   EXPECT_EQ("", table_->toString(StatName(joined.get())));
 }
 
+// Validates that we don't get tsan or other errors when concurrently creating
+// a large number of stats.
 TEST_P(StatNameTest, RacingSymbolCreation) {
   Thread::ThreadFactory& thread_factory = Thread::threadFactoryForTest();
   MutexTracerImpl& mutex_tracer = MutexTracerImpl::getOrCreateTracer();
@@ -406,20 +408,8 @@ TEST_P(StatNameTest, RacingSymbolCreation) {
   int64_t create_contentions = mutex_tracer.numContentions();
   ENVOY_LOG_MISC(info, "Number of contentions: {}", create_contentions);
 
-  // But when we access the already-existing symbols, we guarantee that no
-  // further mutex contentions occur.
-  int64_t start_contentions = mutex_tracer.numContentions();
   access.setReady();
   accesses.Wait();
-
-  // With fake symbol tables, there are no contentions as there are is no state
-  // in the symbol table to lock. This is why fake symbol tables are a safe way
-  // to transition the codebase to use the SymbolTable API without impacting
-  // hot-path performance.
-  if (GetParam() == SymbolTableType::Fake) {
-    EXPECT_EQ(create_contentions, mutex_tracer.numContentions());
-    EXPECT_EQ(start_contentions, create_contentions);
-  }
 
   // In a perfect world, we could use reader-locks in the SymbolTable
   // implementation, and there should be zero additional contentions

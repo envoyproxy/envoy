@@ -3,9 +3,9 @@
 #include "server/drain_manager_impl.h"
 
 #include "test/mocks/server/mocks.h"
+#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::InSequence;
@@ -15,7 +15,7 @@ using testing::SaveArg;
 namespace Envoy {
 namespace Server {
 
-class DrainManagerImplTest : public testing::Test {
+class DrainManagerImplTest : public TestBase {
 public:
   DrainManagerImplTest() {
     ON_CALL(server_.options_, drainTime()).WillByDefault(Return(std::chrono::seconds(600)));

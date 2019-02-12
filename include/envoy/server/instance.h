@@ -135,7 +135,7 @@ public:
   /**
    * @return the server's CLI options.
    */
-  virtual Options& options() PURE;
+  virtual const Options& options() PURE;
 
   /**
    * @return RandomGenerator& the random generator for the server.

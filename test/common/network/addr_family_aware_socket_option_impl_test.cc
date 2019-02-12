@@ -19,6 +19,15 @@ TEST_F(AddrFamilyAwareSocketOptionImplTest, SetOptionFailure) {
   EXPECT_LOG_CONTAINS("warning", "Failed to set IP socket option on non-IP socket",
                       EXPECT_FALSE(socket_option.setOption(
                           socket_, envoy::api::v2::core::SocketOption::STATE_PREBIND)));
+
+  Address::InstanceConstSharedPtr pipe_address =
+      std::make_shared<Network::Address::PipeInstance>("/foo");
+  {
+    EXPECT_CALL(socket_, localAddress).WillRepeatedly(testing::ReturnRef(pipe_address));
+    EXPECT_LOG_CONTAINS("warning", "Failed to set IP socket option on non-IP socket",
+                        EXPECT_FALSE(socket_option.setOption(
+                            socket_, envoy::api::v2::core::SocketOption::STATE_PREBIND)));
+  }
 }
 
 // If a platform supports IPv4 socket option variant for an IPv4 address, it works

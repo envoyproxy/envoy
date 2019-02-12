@@ -11,10 +11,9 @@
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
-
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Assign;
@@ -54,9 +53,9 @@ TEST(ServerInstanceUtil, flushHelper) {
   InstanceUtil::flushMetricsToSinks(sinks, source);
 }
 
-class RunHelperTest : public testing::Test {
+class RunHelperTest : public TestBase {
 public:
-  RunHelperTest() : shutdown_(false) {
+  RunHelperTest() {
     InSequence s;
 
     sigterm_ = new Event::MockSignalEvent(&dispatcher_);
@@ -113,7 +112,7 @@ TEST_F(RunHelperTest, ShutdownBeforeInitManagerInit) {
 }
 
 // Class creates minimally viable server instance for testing.
-class ServerInstanceImplTest : public testing::TestWithParam<Network::Address::IpVersion> {
+class ServerInstanceImplTest : public TestBaseWithParam<Network::Address::IpVersion> {
 protected:
   ServerInstanceImplTest() : version_(GetParam()) {}
 

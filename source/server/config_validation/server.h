@@ -34,7 +34,7 @@ namespace Server {
  * validateConfig() takes over from main() for a config-validation run of Envoy. It returns true if
  * the config is valid, false if invalid.
  */
-bool validateConfig(Options& options, Network::Address::InstanceConstSharedPtr local_address,
+bool validateConfig(const Options& options, Network::Address::InstanceConstSharedPtr local_address,
                     ComponentFactory& component_factory, Thread::ThreadFactory& thread_factory);
 
 /**
@@ -54,7 +54,7 @@ class ValidationInstance : Logger::Loggable<Logger::Id::main>,
                            public ListenerComponentFactory,
                            public WorkerFactory {
 public:
-  ValidationInstance(Options& options, Event::TimeSystem& time_system,
+  ValidationInstance(const Options& options, Event::TimeSystem& time_system,
                      Network::Address::InstanceConstSharedPtr local_address,
                      Stats::IsolatedStoreImpl& store, Thread::BasicLockable& access_log_lock,
                      ComponentFactory& component_factory, Thread::ThreadFactory& thread_factory);
@@ -85,14 +85,14 @@ public:
   Singleton::Manager& singletonManager() override { return *singleton_manager_; }
   OverloadManager& overloadManager() override { return *overload_manager_; }
   bool healthCheckFailed() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-  Options& options() override { return options_; }
+  const Options& options() override { return options_; }
   time_t startTimeCurrentEpoch() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   time_t startTimeFirstEpoch() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   Stats::Store& stats() override { return stats_store_; }
   Http::Context& httpContext() override { return http_context_; }
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
   const LocalInfo::LocalInfo& localInfo() override { return *local_info_; }
-  Event::TimeSystem& timeSystem() override { return time_system_; }
+  Event::TimeSystem& timeSystem() override { return api_->timeSystem(); }
   Envoy::MutexTracer* mutexTracer() override { return mutex_tracer_; }
 
   std::chrono::milliseconds statsFlushInterval() const override {
@@ -136,11 +136,10 @@ public:
   }
 
 private:
-  void initialize(Options& options, Network::Address::InstanceConstSharedPtr local_address,
+  void initialize(const Options& options, Network::Address::InstanceConstSharedPtr local_address,
                   ComponentFactory& component_factory);
 
-  Options& options_;
-  Event::TimeSystem& time_system_;
+  const Options& options_;
   Stats::IsolatedStoreImpl& stats_store_;
   ThreadLocal::InstanceImpl thread_local_;
   Api::ApiPtr api_;
@@ -155,8 +154,10 @@ private:
   AccessLog::AccessLogManagerImpl access_log_manager_;
   std::unique_ptr<Upstream::ValidationClusterManagerFactory> cluster_manager_factory_;
   InitManagerImpl init_manager_;
-  std::unique_ptr<ListenerManagerImpl> listener_manager_;
+  // secret_manager_ must come before listener_manager_, since there may be active filter chains
+  // referencing it, so need to destruct these first.
   std::unique_ptr<Secret::SecretManager> secret_manager_;
+  std::unique_ptr<ListenerManagerImpl> listener_manager_;
   std::unique_ptr<OverloadManager> overload_manager_;
   MutexTracer* mutex_tracer_;
   Http::ContextImpl http_context_;

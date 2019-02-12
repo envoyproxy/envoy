@@ -2,9 +2,8 @@
 
 #include "common/common/assert.h"
 
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
-
-#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Grpc {
@@ -39,11 +38,11 @@ public:
 
 class GrpcClientIntegrationParamTest
     : public BaseGrpcClientIntegrationParamTest,
-      public testing::TestWithParam<std::tuple<Network::Address::IpVersion, ClientType>> {
+      public TestBaseWithParam<std::tuple<Network::Address::IpVersion, ClientType>> {
 public:
-  ~GrpcClientIntegrationParamTest() {}
+  ~GrpcClientIntegrationParamTest() override = default;
   static std::string protocolTestParamsToString(
-      const testing::TestParamInfo<std::tuple<Network::Address::IpVersion, ClientType>>& p) {
+      const ::testing::TestParamInfo<std::tuple<Network::Address::IpVersion, ClientType>>& p) {
     return absl::StrCat(
         (std::get<0>(p.param) == Network::Address::IpVersion::v4 ? "IPv4_" : "IPv6_"),
         (std::get<1>(p.param) == ClientType::GoogleGrpc ? "GoogleGrpc" : "EnvoyGrpc"));

@@ -61,15 +61,19 @@ class SingletonTimeSystemHelper {
 public:
   SingletonTimeSystemHelper() : time_system_(nullptr) {}
 
-  void set(TestTimeSystem* time_system) {
-    RELEASE_ASSERT(time_system_ == nullptr, "Unexpected reset of SingletonTimeSystemHelper");
-    time_system_.reset(time_system);
-  }
+  using MakeTimeSystemFn = std::function<std::unique_ptr<TestTimeSystem>()>;
 
-  TestTimeSystem* timeSystem() { return time_system_.get(); }
+  /**
+   * Returns a singleton time-system, creating a default one of there's not
+   * one already. This method is thread-safe.
+   *
+   * @return the time system.
+   */
+  TestTimeSystem& timeSystem(const MakeTimeSystemFn& make_time_system);
 
 private:
-  std::unique_ptr<TestTimeSystem> time_system_;
+  std::unique_ptr<TestTimeSystem> time_system_ GUARDED_BY(mutex_);
+  Thread::MutexBasicLockable mutex_;
 };
 
 // Implements the TestTimeSystem interface, delegating implementation of all
@@ -106,22 +110,22 @@ public:
 template <class TimeSystemVariant>
 class DelegatingTestTimeSystem : public DelegatingTestTimeSystemBase<TimeSystemVariant> {
 public:
-  DelegatingTestTimeSystem() {
-    TestTimeSystem* time_system = singleton_->timeSystem();
-    if (time_system == nullptr) {
-      time_system_ = new TimeSystemVariant;
-      singleton_->set(time_system_);
-    } else {
-      time_system_ = dynamic_cast<TimeSystemVariant*>(time_system);
-      RELEASE_ASSERT(time_system_, "Two different types of time-systems allocated");
-    }
-  }
+  DelegatingTestTimeSystem() : time_system_(initTimeSystem()) {}
 
-  TimeSystemVariant& timeSystem() override { return *time_system_; }
+  TimeSystemVariant& timeSystem() override { return time_system_; }
 
 private:
-  TimeSystemVariant* time_system_;
+  TimeSystemVariant& initTimeSystem() {
+    auto make_time_system = []() -> std::unique_ptr<TestTimeSystem> {
+      return std::make_unique<TimeSystemVariant>();
+    };
+    auto time_system = dynamic_cast<TimeSystemVariant*>(&singleton_->timeSystem(make_time_system));
+    RELEASE_ASSERT(time_system, "Two different types of time-systems allocated");
+    return *time_system;
+  }
+
   Test::Global<SingletonTimeSystemHelper> singleton_;
+  TimeSystemVariant& time_system_;
 };
 
 } // namespace Event

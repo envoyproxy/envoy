@@ -106,6 +106,46 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
   }
 }
 
+void MessageUtil::checkForDeprecation(const Protobuf::Message& message, bool warn_only) {
+  const Protobuf::Descriptor* descriptor = message.GetDescriptor();
+  const Protobuf::Reflection* reflection = message.GetReflection();
+  for (int i = 0; i < descriptor->field_count(); ++i) {
+    const auto* field = descriptor->field(i);
+
+    // If this field is not in use, continue.
+    if ((field->is_repeated() && reflection->FieldSize(message, field) == 0) ||
+        (!field->is_repeated() && !reflection->HasField(message, field))) {
+      continue;
+    }
+
+    // If this field is deprecated, warn or throw an error.
+    if (field->options().deprecated()) {
+      std::string err = fmt::format(
+          "Using deprecated option '{}'. This configuration will be removed from Envoy soon. "
+          "Please see https://github.com/envoyproxy/envoy/blob/master/DEPRECATED.md for "
+          "details.",
+          field->full_name());
+      if (warn_only) {
+        ENVOY_LOG_MISC(warn, "{}", err);
+      } else {
+        throw ProtoValidationException(err, message);
+      }
+    }
+
+    // If this is a message, recurse to check for deprecated fields in the sub-message.
+    if (field->cpp_type() == Protobuf::FieldDescriptor::CPPTYPE_MESSAGE) {
+      if (field->is_repeated()) {
+        const int size = reflection->FieldSize(message, field);
+        for (int j = 0; j < size; ++j) {
+          checkForDeprecation(reflection->GetRepeatedMessage(message, field, j), warn_only);
+        }
+      } else {
+        checkForDeprecation(reflection->GetMessage(message, field), warn_only);
+      }
+    }
+  }
+}
+
 std::string MessageUtil::getJsonStringFromMessage(const Protobuf::Message& message,
                                                   const bool pretty_print,
                                                   const bool always_print_primitive_fields) {

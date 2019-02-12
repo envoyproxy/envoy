@@ -1,6 +1,9 @@
 syntax = "proto3";
 
 package envoy.api.v2.core;
+
+option java_outer_classname = "HealthCheckProto";
+option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.api.v2.core";
 
 import "envoy/api/v2/core/base.proto";
@@ -251,4 +254,7 @@ enum HealthStatus {
   // Health check timed out. This is part of HDS and is interpreted by Envoy as
   // *UNHEALTHY*.
   TIMEOUT = 4;
+
+  // Degraded.
+  DEGRADED = 5;
 }

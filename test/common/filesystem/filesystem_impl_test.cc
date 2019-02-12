@@ -13,11 +13,11 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/filesystem/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::InSequence;
@@ -30,7 +30,7 @@ using testing::Throw;
 
 namespace Envoy {
 
-class FileSystemImplTest : public testing::Test {
+class FileSystemImplTest : public TestBase {
 protected:
   FileSystemImplTest()
       : file_system_(std::chrono::milliseconds(10000), Thread::threadFactoryForTest(),
@@ -95,6 +95,12 @@ TEST_F(FileSystemImplTest, fileReadToEndDoesNotExist) {
   unlink(TestEnvironment::temporaryPath("envoy_this_not_exist").c_str());
   EXPECT_THROW(file_system_.fileReadToEnd(TestEnvironment::temporaryPath("envoy_this_not_exist")),
                EnvoyException);
+}
+
+TEST_F(FileSystemImplTest, fileReadToEndBlacklisted) {
+  EXPECT_THROW(file_system_.fileReadToEnd("/dev/urandom"), EnvoyException);
+  EXPECT_THROW(file_system_.fileReadToEnd("/proc/cpuinfo"), EnvoyException);
+  EXPECT_THROW(file_system_.fileReadToEnd("/sys/block/sda/dev"), EnvoyException);
 }
 
 TEST_F(FileSystemImplTest, CanonicalPathSuccess) {
