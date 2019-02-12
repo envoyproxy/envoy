@@ -208,6 +208,7 @@ The following command operators are supported:
     * **RL**: The request was ratelimited locally by the :ref:`HTTP rate limit filter <config_http_filters_rate_limit>` in addition to 429 response code.
     * **UAEX**: The request was denied by the external authorization service.
     * **RLSE**: The request was rejected because there was an error in rate limit service.
+    * **SI**: Stream idle timeout in addition to 408 response code.
 
 %RESPONSE_TX_DURATION%
   HTTP

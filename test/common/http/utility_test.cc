@@ -579,6 +579,20 @@ TEST(HttpUtility, QueryParamsToString) {
             Utility::queryParamsToString(Utility::QueryParams({{"a", "1"}, {"b", "2"}})));
 }
 
+TEST(HttpUtility, ResetReasonToString) {
+  EXPECT_EQ("connection failure",
+            Utility::resetReasonToString(Http::StreamResetReason::ConnectionFailure));
+  EXPECT_EQ("connection termination",
+            Utility::resetReasonToString(Http::StreamResetReason::ConnectionTermination));
+  EXPECT_EQ("local reset", Utility::resetReasonToString(Http::StreamResetReason::LocalReset));
+  EXPECT_EQ("local refused stream reset",
+            Utility::resetReasonToString(Http::StreamResetReason::LocalRefusedStreamReset));
+  EXPECT_EQ("overflow", Utility::resetReasonToString(Http::StreamResetReason::Overflow));
+  EXPECT_EQ("remote reset", Utility::resetReasonToString(Http::StreamResetReason::RemoteReset));
+  EXPECT_EQ("remote refused stream reset",
+            Utility::resetReasonToString(Http::StreamResetReason::RemoteRefusedStreamReset));
+}
+
 // Verify that it resolveMostSpecificPerFilterConfigGeneric works with nil routes.
 TEST(HttpUtility, ResolveMostSpecificPerFilterConfigNilRoute) {
   EXPECT_EQ(nullptr, Utility::resolveMostSpecificPerFilterConfigGeneric("envoy.filter", nullptr));
