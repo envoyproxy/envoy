@@ -76,7 +76,7 @@ private:
     bool megamiss_alerted_{};
   };
 
-  Event::TimeSystem& time_system_;
+  TimeSource& time_source_;
   const std::chrono::milliseconds miss_timeout_;
   const std::chrono::milliseconds megamiss_timeout_;
   const std::chrono::milliseconds kill_timeout_;

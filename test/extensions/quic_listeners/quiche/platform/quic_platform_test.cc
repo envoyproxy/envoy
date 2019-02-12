@@ -1,6 +1,7 @@
 #include "test/test_common/logging.h"
 #include "test/test_common/test_base.h"
 
+#include "gmock/gmock.h"
 #include "quiche/quic/platform/api/quic_aligned.h"
 #include "quiche/quic/platform/api/quic_arraysize.h"
 #include "quiche/quic/platform/api/quic_client_stats.h"
@@ -11,9 +12,12 @@
 #include "quiche/quic/platform/api/quic_map_util.h"
 #include "quiche/quic/platform/api/quic_mutex.h"
 #include "quiche/quic/platform/api/quic_ptr_util.h"
+#include "quiche/quic/platform/api/quic_stack_trace.h"
 #include "quiche/quic/platform/api/quic_string.h"
 #include "quiche/quic/platform/api/quic_string_piece.h"
 #include "quiche/quic/platform/api/quic_uint128.h"
+
+using testing::HasSubstr;
 
 // Basic tests to validate functioning of the QUICHE quic platform
 // implementation. For platform APIs in which the implementation is a simple
@@ -103,6 +107,10 @@ TEST(QuicPlatformTest, QuicMapUtil) {
   std::vector<int> stdvec = {1, 2, 3};
   EXPECT_TRUE(quic::QuicContainsValue(stdvec, 1));
   EXPECT_FALSE(quic::QuicContainsValue(stdvec, 0));
+}
+
+TEST(QuicPlatformTest, QuicStackTraceTest) {
+  EXPECT_THAT(quic::QuicStackTrace(), HasSubstr("QuicStackTraceTest"));
 }
 
 TEST(QuicPlatformTest, QuicString) {
