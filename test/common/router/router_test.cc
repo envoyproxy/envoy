@@ -110,9 +110,7 @@ public:
                  "rq_success {} does not match expected {}",
                  cm_.conn_pool_.host_->stats_store_.counter("rq_success").value(), success);
     }
-    if (error != cm_.conn_pool_.host_->stats_store_.counter("rq_error").value() &&
-        error != cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_error")
-                     .value()) {
+    if (error != cm_.conn_pool_.host_->stats_store_.counter("rq_error").value()) {
       return AssertionFailure() << fmt::format(
                  "rq_error {} does not match expected {}",
                  cm_.conn_pool_.host_->stats_store_.counter("rq_error").value(), error);
@@ -1035,6 +1033,7 @@ TEST_F(RouterTest, GrpcReset) {
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(503));
   encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
+  EXPECT_EQ(1UL, stats_store_.counter("test.rq_reset_after_downstream_response_started").value());
 }
 
 // Validate gRPC OK response stats are sane when response is not trailers only.
