@@ -84,9 +84,11 @@ envoy_cc_library(
 envoy_cc_library(
     name = "quic_platform_impl_lib",
     srcs = [
+        "quic_cert_utils_impl.cc",
         "quic_text_utils_impl.cc",
     ],
     hdrs = [
+        "quic_cert_utils_impl.h",
         "quic_mutex_impl.h",
         "quic_str_cat_impl.h",
         "quic_string_utils_impl.h",
@@ -96,6 +98,7 @@ envoy_cc_library(
         "quiche_quic_platform_base",
         "abseil_str_format",
         "abseil_synchronization",
+        "ssl",
     ],
     visibility = ["//visibility:public"],
 )
