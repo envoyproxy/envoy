@@ -444,6 +444,27 @@ std::string Utility::queryParamsToString(const QueryParams& params) {
   return out;
 }
 
+const std::string Utility::resetReasonToString(const Http::StreamResetReason reset_reason) {
+  switch (reset_reason) {
+  case Http::StreamResetReason::ConnectionFailure:
+    return "connection failure";
+  case Http::StreamResetReason::ConnectionTermination:
+    return "connection termination";
+  case Http::StreamResetReason::LocalReset:
+    return "local reset";
+  case Http::StreamResetReason::LocalRefusedStreamReset:
+    return "local refused stream reset";
+  case Http::StreamResetReason::Overflow:
+    return "overflow";
+  case Http::StreamResetReason::RemoteReset:
+    return "remote reset";
+  case Http::StreamResetReason::RemoteRefusedStreamReset:
+    return "remote refused stream reset";
+  }
+
+  NOT_REACHED_GCOVR_EXCL_LINE;
+}
+
 void Utility::transformUpgradeRequestFromH1toH2(HeaderMap& headers) {
   ASSERT(Utility::isUpgrade(headers));
 
