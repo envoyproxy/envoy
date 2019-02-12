@@ -28,10 +28,10 @@ bool QuicCertUtilsImpl::ExtractSubjectNameFromDERCert(QuicStringPiece cert,
 }
 
 // static
-bool QuicCertUtilsImpl::SeekToSubject(absl::string_view cert, CBS* tbs_certificate) {
+bool QuicCertUtilsImpl::SeekToSubject(QuicStringPiece cert, CBS* tbs_certificate) {
   CBS der;
   CBS_init(&der, reinterpret_cast<const uint8_t*>(cert.data()), cert.size());
-  CBS certificate, opt_version, serial, signature, issuer, validity;
+  CBS certificate;
   // From RFC 5280, section 4.1
   //    Certificate  ::=  SEQUENCE  {
   //      tbsCertificate       TBSCertificate,
@@ -49,12 +49,17 @@ bool QuicCertUtilsImpl::SeekToSubject(absl::string_view cert, CBS* tbs_certifica
   if (!CBS_get_asn1(&der, &certificate, CBS_ASN1_SEQUENCE) ||
       CBS_len(&der) != 0 || // We don't allow junk after the certificate.
       !CBS_get_asn1(&certificate, tbs_certificate, CBS_ASN1_SEQUENCE) ||
-      !CBS_get_optional_asn1(tbs_certificate, &opt_version, nullptr,
+      // version.
+      !CBS_get_optional_asn1(tbs_certificate, nullptr, nullptr,
                              CBS_ASN1_CONSTRUCTED | CBS_ASN1_CONTEXT_SPECIFIC | 0) ||
-      !CBS_get_asn1(tbs_certificate, &serial, CBS_ASN1_INTEGER) ||
-      !CBS_get_asn1(tbs_certificate, &signature, CBS_ASN1_SEQUENCE) ||
-      !CBS_get_asn1(tbs_certificate, &issuer, CBS_ASN1_SEQUENCE) ||
-      !CBS_get_asn1(tbs_certificate, &validity, CBS_ASN1_SEQUENCE)) {
+      // Serial number.
+      !CBS_get_asn1(tbs_certificate, nullptr, CBS_ASN1_INTEGER) ||
+      // Signature.
+      !CBS_get_asn1(tbs_certificate, nullptr, CBS_ASN1_SEQUENCE) ||
+      // Issuer.
+      !CBS_get_asn1(tbs_certificate, nullptr, CBS_ASN1_SEQUENCE) ||
+      // Validity.
+      !CBS_get_asn1(tbs_certificate, nullptr, CBS_ASN1_SEQUENCE)) {
     return false;
   }
   return true;

@@ -16,7 +16,7 @@ public:
   static bool ExtractSubjectNameFromDERCert(QuicStringPiece cert, QuicStringPiece* subject_out);
 
 private:
-  static bool SeekToSubject(absl::string_view cert, CBS* tbs_certificate);
+  static bool SeekToSubject(QuicStringPiece cert, CBS* tbs_certificate);
 };
 
 } // namespace quic
