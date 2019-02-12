@@ -345,14 +345,13 @@ FakeUpstream::FakeUpstream(const std::string& uds_path, FakeHttpConnection::Type
 }
 
 static Network::SocketPtr
-makeTcpListenSocket(const Network::Address::InstanceConstSharedPtr& endpoint) {
-  return Network::SocketPtr{new Network::TcpListenSocket(endpoint, nullptr, true)};
+makeTcpListenSocket(const Network::Address::InstanceConstSharedPtr& address) {
+  return Network::SocketPtr{new Network::TcpListenSocket(address, nullptr, true)};
 }
 
 static Network::SocketPtr makeTcpListenSocket(uint32_t port, Network::Address::IpVersion version) {
-  return Network::SocketPtr{new Network::TcpListenSocket(
-      Network::Utility::parseInternetAddress(Network::Test::getAnyAddressString(version), port),
-      nullptr, true)};
+  return makeTcpListenSocket(
+      Network::Utility::parseInternetAddress(Network::Test::getAnyAddressString(version), port));
 }
 
 FakeUpstream::FakeUpstream(const Network::Address::InstanceConstSharedPtr& address,
