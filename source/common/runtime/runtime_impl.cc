@@ -241,7 +241,7 @@ SnapshotImpl::Entry SnapshotImpl::createEntry(const std::string& value) {
 
 bool SnapshotImpl::parseEntryUintValue(Entry& entry) {
   uint64_t converted_uint64;
-  if (StringUtil::atoul(entry.raw_string_value_.c_str(), converted_uint64)) {
+  if (StringUtil::atoull(entry.raw_string_value_.c_str(), converted_uint64)) {
     entry.uint_value_ = converted_uint64;
     return true;
   }

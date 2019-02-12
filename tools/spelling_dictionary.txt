@@ -285,7 +285,7 @@ ary
 async
 atomicly
 atomics
-atoul
+atoull
 aud
 auth
 authenticator
@@ -653,7 +653,7 @@ stmt
 str
 strftime
 stringified
-strtoul
+strtoull
 struct
 structs
 subexpr
