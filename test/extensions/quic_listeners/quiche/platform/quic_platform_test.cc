@@ -1,9 +1,11 @@
+#include "test/extensions/transport_sockets/tls/ssl_test_utility.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
 #include "quiche/quic/platform/api/quic_aligned.h"
 #include "quiche/quic/platform/api/quic_arraysize.h"
+#include "quiche/quic/platform/api/quic_cert_utils.h"
 #include "quiche/quic/platform/api/quic_client_stats.h"
 #include "quiche/quic/platform/api/quic_containers.h"
 #include "quiche/quic/platform/api/quic_endian.h"
@@ -297,6 +299,27 @@ TEST(QuicPlatformTest, QuicNotification) {
   notification.Notify();
   notification.WaitForNotification();
   EXPECT_TRUE(notification.HasBeenNotified());
+}
+
+TEST(QuicPlatformTest, QuicCertUtils) {
+  bssl::UniquePtr<X509> x509_cert =
+      TransportSockets::Tls::readCertFromFile(TestEnvironment::substitute(
+          "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
+  // Encode X509 cert with DER encoding.
+  unsigned char* der = nullptr;
+  int len = i2d_X509(x509_cert.get(), &der);
+  ASSERT_GT(len, 0);
+  quic::QuicStringPiece out;
+  quic::QuicCertUtils::ExtractSubjectNameFromDERCert(
+      quic::QuicStringPiece(reinterpret_cast<const char*>(der), len), &out);
+  EXPECT_EQ("0z1\v0\t\x6\x3U\x4\x6\x13\x2US1\x13"
+            "0\x11\x6\x3U\x4\b\f\nCalifornia1\x16"
+            "0\x14\x6\x3U\x4\a\f\rSan Francisco1\r"
+            "0\v\x6\x3U\x4\n\f\x4Lyft1\x19"
+            "0\x17\x6\x3U\x4\v\f\x10Lyft Engineering1\x14"
+            "0\x12\x6\x3U\x4\x3\f\vTest Server",
+            out);
+  OPENSSL_free(static_cast<void*>(der));
 }
 
 } // namespace Quiche

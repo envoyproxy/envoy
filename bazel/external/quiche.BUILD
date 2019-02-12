@@ -100,6 +100,7 @@ cc_library(
     name = "quic_platform",
     srcs = ["quiche/quic/platform/api/quic_mutex.cc"],
     hdrs = [
+        "quiche/quic/platform/api/quic_cert_utils.h",
         "quiche/quic/platform/api/quic_mutex.h",
     ],
     visibility = ["//visibility:public"],
