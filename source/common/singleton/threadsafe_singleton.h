@@ -31,25 +31,12 @@ public:
   }
 
 protected:
-  template <typename A> friend class NonThreadSafeCreationInjector;
   template <typename A> friend class TestThreadsafeSingletonInjector;
 
   static void Create() { instance_ = new T(); }
 
   static absl::once_flag create_once_;
   static T* instance_;
-};
-
-template <class T> class NonThreadSafeCreationInjector {
-public:
-  NonThreadSafeCreationInjector(T* instance) {
-    absl::call_once(ThreadSafeSingleton<T>::create_once_, &NonThreadSafeCreationInjector<T>::Noop);
-    ThreadSafeSingleton<T>::instance_ = instance;
-  }
-  static void Noop() {}
-
-private:
-  T* latched_instance_;
 };
 
 template <class T> absl::once_flag ThreadSafeSingleton<T>::create_once_;

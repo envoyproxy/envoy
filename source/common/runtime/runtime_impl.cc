@@ -235,7 +235,7 @@ uint64_t SnapshotImpl::getInteger(const std::string& key, uint64_t default_value
 
 bool SnapshotImpl::getBoolean(const std::string& key, bool& value) const {
   auto entry = values_.find(key);
-  if (entry != values_.end() && entry->second.bool_value_) {
+  if (entry != values_.end() && entry->second.bool_value_.has_value()) {
     value = entry->second.bool_value_.value();
     return true;
   }

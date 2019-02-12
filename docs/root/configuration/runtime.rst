@@ -84,23 +84,26 @@ Using runtime overrides for deprecated features
 
 The Envoy runtime is also a part of the Envoy feature deprecation process.
 
-As described in the Envoy `breaking change policy <//github.com/envoyproxy/envoy/blob/master/CONTRIBUTING.md#breaking-change-policy>`_,
+As described in the Envoy :repo:`breaking change policy <CONTRIBUTING.md#breaking-change-policy>`,
 feature deprecation in Envoy is in 3 phases: warn-by-default, fail-by-default, and code removal.
 
-In the first phase, Envoy simply logs a warning to the warning log that the feature is deprecated.
-Users are encouraged to go to
-`DEPRECATED.md <https://github.com/envoyproxy/envoy/blob/master/DEPRECATED.md>` to see how to
+In the first phase, Envoy logs a warning to the warning log that the feature is deprecated and
+increments the :ref:`deprecated_feature_use <runtime_stats>` runtime stat.
+Users are encouraged to go to :repo:`DEPRECATED.md <DEPRECATED.md>` to see how to
 migrate to the new code path and make sure it is suitable for their use case.
 
 In the second phase the message and filename will be added to
-`runtime_features.h <https://github.com/envoyproxy/envoy/blob/master/source/common/runtime/runtime_features.h>`
+:repo:`runtime_features.h <source/common/runtime/runtime_features.h>`
 and use of that configuration field will cause the config to be rejected by default. 
-This fail-by-default mode can be overridden in runtime configuration. For a proto styled
-``Foo.Bar.Eep`` in ``baz.proto`` by setting the runtime value
-``baz.proto:Eep true``. Use of this override is **strongly discouraged**.
+This fail-by-default mode can be overridden in runtime configuration by setting
+filename.proto:fieldname to true. For example, for a deprecated field
+``Foo.Bar.Eep`` in ``baz.proto`` set ``baz.proto:Eep`` to `` true``. Use of this override
+is **strongly discouraged**.
 Fatal-by-default configuration indicates that the removal of the old code paths is imminent. It is
 far better for both Envoy users and for Envoy contributors if any bugs or feature gaps with the new
 code paths are flushed out ahead of time, rather than after the code is removed!
+
+.. _runtime_stats:
 
 Statistics
 ----------
@@ -117,6 +120,3 @@ The file system runtime provider emits some statistics in the *runtime.* namespa
   load_success, Counter, Total number of load attempts that were successful
   deprecated_feature_use, Counter, Total number of times deprecated features were used.
   num_keys, Gauge, Number of keys currently loaded
-
-
-
