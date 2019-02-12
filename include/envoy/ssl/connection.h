@@ -4,6 +4,9 @@
 #include <vector>
 
 #include "envoy/common/pure.h"
+#include "envoy/common/time.h"
+
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Ssl {
@@ -73,6 +76,18 @@ public:
    *         Returns {} if there is no local certificate, or no SAN field, or no DNS.
    **/
   virtual std::vector<std::string> dnsSansLocalCertificate() const PURE;
+
+  /**
+   * @return absl::optional<SystemTime> the time that the peer certificate was issued and should be
+   *         considered valid from. Returns empty absl::optional if there is no peer certificate.
+   **/
+  virtual absl::optional<SystemTime> validFromPeerCertificate() const PURE;
+
+  /**
+   * @return absl::optional<SystemTime> the time that the peer certificate expires and should not be
+   *         considered valid after. Returns empty absl::optional if there is no peer certificate.
+   **/
+  virtual absl::optional<SystemTime> expirationPeerCertificate() const PURE;
 };
 
 } // namespace Ssl

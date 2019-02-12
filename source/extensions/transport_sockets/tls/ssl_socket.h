@@ -15,6 +15,7 @@
 #include "extensions/transport_sockets/tls/utility.h"
 
 #include "absl/synchronization/mutex.h"
+#include "absl/types/optional.h"
 #include "openssl/ssl.h"
 
 namespace Envoy {
@@ -56,6 +57,8 @@ public:
   const std::string& urlEncodedPemEncodedPeerCertificate() const override;
   std::vector<std::string> dnsSansPeerCertificate() const override;
   std::vector<std::string> dnsSansLocalCertificate() const override;
+  absl::optional<SystemTime> validFromPeerCertificate() const override;
+  absl::optional<SystemTime> expirationPeerCertificate() const override;
 
   // Network::TransportSocket
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override;
