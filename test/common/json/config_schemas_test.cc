@@ -29,9 +29,8 @@ std::vector<std::string> generateTestInputs() {
 
 class ConfigSchemasTest : public TestBaseWithParam<std::string> {
 protected:
-  ConfigSchemasTest() : api_(Api::createApiForTest(stats_store_)) {}
+  ConfigSchemasTest() : api_(Api::createApiForTest()) {}
 
-  Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
 };
 

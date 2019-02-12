@@ -4,11 +4,9 @@
 #include "common/common/assert.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/filesystem/watcher_impl.h"
-#include "common/stats/isolated_store_impl.h"
 
 #include "test/test_common/environment.h"
 #include "test/test_common/test_base.h"
-#include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -18,12 +16,9 @@ namespace Filesystem {
 
 class WatcherImplTest : public TestBase {
 protected:
-  WatcherImplTest()
-      : api_(Api::createApiForTest(stats_store_)), dispatcher_(test_time_.timeSystem(), *api_) {}
+  WatcherImplTest() : api_(Api::createApiForTest()), dispatcher_(*api_) {}
 
-  Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
-  DangerousDeprecatedTestTime test_time_;
   Event::DispatcherImpl dispatcher_;
 };
 

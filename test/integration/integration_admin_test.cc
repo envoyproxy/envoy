@@ -416,7 +416,7 @@ TEST_P(IntegrationAdminTest, AdminCpuProfilerStart) {
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 }
 
-class IntegrationAdminIpv4Ipv6Test : public HttpIntegrationTest, public TestBase {
+class IntegrationAdminIpv4Ipv6Test : public TestBase, public HttpIntegrationTest {
 public:
   IntegrationAdminIpv4Ipv6Test()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, Network::Address::IpVersion::v4,
@@ -450,12 +450,12 @@ TEST_F(IntegrationAdminIpv4Ipv6Test, Ipv4Ipv6Listen) {
 // Testing the behavior of StatsMatcher, which allows/denies the  instantiation of stats based on
 // restrictions on their names.
 class StatsMatcherIntegrationTest
-    : public HttpIntegrationTest,
-      public TestBase,
+    : public TestBase,
+      public Event::SimulatedTimeSystem,
+      public HttpIntegrationTest,
       public testing::WithParamInterface<Network::Address::IpVersion> {
 public:
-  StatsMatcherIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), simTime()) {}
+  StatsMatcherIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
 
   void initialize() override {
     config_helper_.addConfigModifier(

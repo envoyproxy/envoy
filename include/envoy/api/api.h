@@ -22,10 +22,9 @@ public:
 
   /**
    * Allocate a dispatcher.
-   * @param time_source the time source.
    * @return Event::DispatcherPtr which is owned by the caller.
    */
-  virtual Event::DispatcherPtr allocateDispatcher(Event::TimeSystem& time_system) PURE;
+  virtual Event::DispatcherPtr allocateDispatcher() PURE;
 
   /**
    * @return a reference to the ThreadFactory
@@ -36,6 +35,18 @@ public:
    * @return a reference to the Filesystem::Instance
    */
   virtual Filesystem::Instance& fileSystem() PURE;
+
+  /**
+   * @return a reference to the TimeSource
+   */
+  virtual TimeSource& timeSource() PURE;
+
+  /**
+   * TODO(jmarantz): This is exposed for now only for the dispatcher. We will
+   * do a refactor in the future to remove the need for this accessor.
+   * @return a reference to the time-system
+   */
+  virtual Event::TimeSystem& timeSystemForDispatcher() PURE;
 };
 
 typedef std::unique_ptr<Api> ApiPtr;

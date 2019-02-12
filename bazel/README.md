@@ -27,49 +27,51 @@ up-to-date with the latest security patches. See
 for how to update or override dependencies.
 
 1. Install the latest version of [Bazel](https://bazel.build/versions/master/docs/install.html) in your environment.
-2. Install external dependencies libtool, cmake, ninja, realpath and curl libraries separately.
-On Ubuntu, run the following command:
-```
-sudo apt-get install \
-   libtool \
-   cmake \
-   realpath \
-   clang-format-7 \
-   automake \
-   ninja-build \
-   curl \
-   unzip
-```
+1. Install external dependencies libtool, cmake, ninja, realpath and curl libraries separately.
+    On Ubuntu, run the following command:
+    ```
+    sudo apt-get install \
+       libtool \
+       cmake \
+       clang-format-7 \
+       automake \
+       make \
+       ninja-build \
+       curl \
+       unzip \
+       virtualenv
+    ```
 
-On Fedora (maybe also other red hat distros), run the following:
-```
-dnf install cmake libtool libstdc++ ninja-build lld patch
-```
+    On Fedora (maybe also other red hat distros), run the following:
+    ```
+    dnf install cmake libtool libstdc++ ninja-build lld patch
+    ```
 
-On macOS, you'll need to install several dependencies. This can be accomplished via [Homebrew](https://brew.sh/):
-```
-brew install coreutils wget cmake libtool go bazel automake ninja llvm@7
-```
-_notes_: `coreutils` is used for `realpath`, `gmd5sum` and `gsha256sum`; `llvm@7` is used for `clang-format`
+    On macOS, you'll need to install several dependencies. This can be accomplished via [Homebrew](https://brew.sh/):
+    ```
+    brew install coreutils wget cmake libtool go bazel automake ninja llvm@7
+    ```
+    _notes_: `coreutils` is used for `realpath`, `gmd5sum` and `gsha256sum`; `llvm@7` is used for `clang-format`
 
-Envoy compiles and passes tests with the version of clang installed by XCode 9.3.0:
-Apple LLVM version 9.1.0 (clang-902.0.30).
+    Envoy compiles and passes tests with the version of clang installed by XCode 9.3.0:
+    Apple LLVM version 9.1.0 (clang-902.0.30).
 
-In order for bazel to be aware of the tools installed by brew, the PATH
-variable must be set for bazel builds. This can be accomplished by setting
-this in your `$HOME/.bazelrc` file:
+    In order for bazel to be aware of the tools installed by brew, the PATH
+    variable must be set for bazel builds. This can be accomplished by setting
+    this in your `$HOME/.bazelrc` file:
 
-```
-build --action_env=PATH="/usr/local/bin:/opt/local/bin:/usr/bin:/bin"
-```
+    ```
+    build --action_env=PATH="/usr/local/bin:/opt/local/bin:/usr/bin:/bin"
+    ```
 
-Alternatively, you can pass `--action_env` on the command line when running
-`bazel build`/`bazel test`.
+    Alternatively, you can pass `--action_env` on the command line when running
+    `bazel build`/`bazel test`.
 
-3. Install Golang on your machine. This is required as part of building [BoringSSL](https://boringssl.googlesource.com/boringssl/+/HEAD/BUILDING.md)
-and also for [Buildifer](https://github.com/bazelbuild/buildtools) which is used for formatting bazel BUILD files.
-4. `go get github.com/bazelbuild/buildtools/buildifier` to install buildifier
-5. `bazel build //source/exe:envoy-static` from the Envoy source directory.
+1. Install Golang on your machine. This is required as part of building [BoringSSL](https://boringssl.googlesource.com/boringssl/+/HEAD/BUILDING.md)
+   and also for [Buildifer](https://github.com/bazelbuild/buildtools) which is used for formatting bazel BUILD files.
+1. `go get -u github.com/bazelbuild/buildtools/buildifier` to install buildifier. You may need to set `BUILDIFIER_BIN` to `$GOPATH/bin/buildifier`
+   in your shell for buildifier to work.
+1. `bazel build //source/exe:envoy-static` from the Envoy source directory.
 
 ## Building Bazel with the CI Docker image
 

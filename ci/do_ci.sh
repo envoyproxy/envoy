@@ -16,6 +16,10 @@ fi
 
 echo "building using ${NUM_CPUS} CPUs"
 
+function collect_build_profile() {
+  cp -f "$(bazel info output_base)/command.profile" "${ENVOY_BUILD_PROFILE}/$1.profile" || true
+}
+
 function bazel_with_collection() {
   declare -r BAZEL_OUTPUT="${ENVOY_SRCDIR}"/bazel.output.txt
   bazel $* | tee "${BAZEL_OUTPUT}"
@@ -30,12 +34,14 @@ function bazel_with_collection() {
     done
     exit "${BAZEL_STATUS}"
   fi
+  collect_build_profile $1
 }
 
 function bazel_release_binary_build() {
   echo "Building..."
   cd "${ENVOY_CI_DIR}"
   bazel build ${BAZEL_BUILD_OPTIONS} -c opt //source/exe:envoy-static
+  collect_build_profile release_build
   # Copy the envoy-static binary somewhere that we can access outside of the
   # container.
   cp -f \
@@ -54,6 +60,7 @@ function bazel_debug_binary_build() {
   echo "Building..."
   cd "${ENVOY_CI_DIR}"
   bazel build ${BAZEL_BUILD_OPTIONS} -c dbg //source/exe:envoy-static
+  collect_build_profile debug_build
   # Copy the envoy-static binary somewhere that we can access outside of the
   # container.
   cp -f \
@@ -118,19 +125,24 @@ elif [[ "$1" == "bazel.debug.server_only" ]]; then
   exit 0
 elif [[ "$1" == "bazel.asan" ]]; then
   setup_clang_toolchain
-  echo "bazel ASAN/UBSAN debug build with tests..."
+  echo "bazel ASAN/UBSAN debug build with tests"
+  echo "Building and testing envoy tests..."
+  cd "${ENVOY_SRCDIR}"
+  bazel_with_collection test ${BAZEL_TEST_OPTIONS} -c dbg --config=clang-asan //test/...
+  echo "Building and testing envoy-filter-example tests..."
   cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
-  echo "Building and testing..."
-  bazel_with_collection test ${BAZEL_TEST_OPTIONS} -c dbg --config=clang-asan @envoy//test/... \
+  bazel_with_collection test ${BAZEL_TEST_OPTIONS} -c dbg --config=clang-asan \
     //:echo2_integration_test //:envoy_binary_test
   # Also validate that integration test traffic tapping (useful when debugging etc.)
   # works. This requires that we set TAP_PATH. We do this under bazel.asan to
   # ensure a debug build in CI.
+  echo "Validating integration test traffic tapping..."
   TAP_TMP=/tmp/tap/
   rm -rf "${TAP_TMP}"
   mkdir -p "${TAP_TMP}"
+  cd "${ENVOY_SRCDIR}"
   bazel_with_collection test ${BAZEL_TEST_OPTIONS} -c dbg --config=clang-asan \
-    @envoy//test/integration:ssl_integration_test \
+    //test/extensions/transport_sockets/tls/integration:ssl_integration_test \
     --test_env=TAP_PATH="${TAP_TMP}/tap"
   # Verify that some pb_text files have been created. We can't check for pcap,
   # since tcpdump is not available in general due to CircleCI lack of support
@@ -139,10 +151,13 @@ elif [[ "$1" == "bazel.asan" ]]; then
   exit 0
 elif [[ "$1" == "bazel.tsan" ]]; then
   setup_clang_toolchain
-  echo "bazel TSAN debug build with tests..."
+  echo "bazel TSAN debug build with tests"
+  echo "Building and testing envoy tests..."
+  cd "${ENVOY_SRCDIR}"
+  bazel_with_collection test ${BAZEL_TEST_OPTIONS} -c dbg --config=clang-tsan //test/...
+  echo "Building and testing envoy-filter-example tests..."
   cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
-  echo "Building and testing..."
-  bazel_with_collection test ${BAZEL_TEST_OPTIONS} -c dbg --config=clang-tsan @envoy//test/... \
+  bazel_with_collection test ${BAZEL_TEST_OPTIONS} -c dbg --config=clang-tsan \
     //:echo2_integration_test //:envoy_binary_test
   exit 0
 elif [[ "$1" == "bazel.dev" ]]; then
@@ -248,6 +263,7 @@ elif [[ "$1" == "bazel.coverage" ]]; then
   # directory. Wow.
   cd "${ENVOY_BUILD_DIR}"
   SRCDIR="${GCOVR_DIR}" "${ENVOY_SRCDIR}"/test/run_envoy_bazel_coverage.sh
+  collect_build_profile coverage
   exit 0
 elif [[ "$1" == "bazel.clang_tidy" ]]; then
   setup_clang_toolchain

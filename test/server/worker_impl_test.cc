@@ -7,7 +7,6 @@
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/test_base.h"
-#include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
 using testing::_;
@@ -23,20 +22,18 @@ namespace Server {
 
 class WorkerImplTest : public TestBase {
 public:
-  WorkerImplTest() : api_(Api::createApiForTest(stats_store_)) {
+  WorkerImplTest() : api_(Api::createApiForTest()) {
     // In the real worker the watchdog has timers that prevent exit. Here we need to prevent event
     // loop exit since we use mock timers.
     no_exit_timer_->enableTimer(std::chrono::hours(1));
   }
 
-  Stats::IsolatedStoreImpl stats_store_;
   NiceMock<ThreadLocal::MockInstance> tls_;
-  DangerousDeprecatedTestTime test_time;
   Network::MockConnectionHandler* handler_ = new Network::MockConnectionHandler();
   NiceMock<MockGuardDog> guard_dog_;
   NiceMock<MockOverloadManager> overload_manager_;
   Api::ApiPtr api_;
-  Event::DispatcherImpl* dispatcher_ = new Event::DispatcherImpl(test_time.timeSystem(), *api_);
+  Event::DispatcherImpl* dispatcher_ = new Event::DispatcherImpl(*api_);
   DefaultTestHooks hooks_;
   WorkerImpl worker_{tls_,
                      hooks_,

@@ -8,7 +8,6 @@
 #include "test/mocks/common.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/test_base.h"
-#include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {
@@ -16,8 +15,7 @@ namespace Event {
 
 class FileEventImplTest : public TestBase {
 public:
-  FileEventImplTest()
-      : api_(Api::createApiForTest(stats_store_)), dispatcher_(test_time_.timeSystem(), *api_) {}
+  FileEventImplTest() : api_(Api::createApiForTest()), dispatcher_(*api_) {}
 
   void SetUp() override {
     int rc = socketpair(AF_UNIX, SOCK_DGRAM, 0, fds_);
@@ -34,9 +32,7 @@ public:
 
 protected:
   int fds_[2];
-  Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
-  DangerousDeprecatedTestTime test_time_;
   DispatcherImpl dispatcher_;
 };
 
@@ -55,10 +51,8 @@ TEST_P(FileEventImplActivateTest, Activate) {
   }
   ASSERT_NE(-1, fd);
 
-  DangerousDeprecatedTestTime test_time;
-  Stats::IsolatedStoreImpl stats_store;
-  Api::ApiPtr api = Api::createApiForTest(stats_store);
-  DispatcherImpl dispatcher(test_time.timeSystem(), *api);
+  Api::ApiPtr api = Api::createApiForTest();
+  DispatcherImpl dispatcher(*api);
   ReadyWatcher read_event;
   EXPECT_CALL(read_event, ready()).Times(1);
   ReadyWatcher write_event;

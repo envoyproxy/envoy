@@ -111,8 +111,8 @@ message LocalityLbEndpoints {
   // Locality weights are only considered when :ref:`locality weighted load
   // balancing <arch_overview_load_balancing_locality_weighted_lb>` is
   // configured. These weights are ignored otherwise. If no weights are
-  // specified when locality weighted load balancing is enabled, the cluster is
-  // assumed to have a weight of 1.
+  // specified when locality weighted load balancing is enabled, the locality is
+  // assigned no load.
   //
   // .. attention::
   //

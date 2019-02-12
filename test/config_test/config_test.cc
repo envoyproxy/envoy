@@ -43,8 +43,7 @@ OptionsImpl asConfigYaml(const OptionsImpl& src, Api::Api& api) {
 
 class ConfigTest {
 public:
-  ConfigTest(const OptionsImpl& options)
-      : api_(Api::createApiForTest(stats_store_)), options_(options) {
+  ConfigTest(const OptionsImpl& options) : api_(Api::createApiForTest()), options_(options) {
     ON_CALL(server_, options()).WillByDefault(ReturnRef(options_));
     ON_CALL(server_, random()).WillByDefault(ReturnRef(random_));
     ON_CALL(server_, sslContextManager()).WillByDefault(ReturnRef(ssl_context_manager_));
@@ -98,7 +97,6 @@ public:
     server_.thread_local_.shutdownThread();
   }
 
-  Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
   NiceMock<Server::MockInstance> server_;
   NiceMock<Ssl::MockContextManager> ssl_context_manager_;
@@ -106,8 +104,7 @@ public:
   std::unique_ptr<Upstream::ProdClusterManagerFactory> cluster_manager_factory_;
   NiceMock<Server::MockListenerComponentFactory> component_factory_;
   NiceMock<Server::MockWorkerFactory> worker_factory_;
-  Server::ListenerManagerImpl listener_manager_{server_, component_factory_, worker_factory_,
-                                                server_.timeSystem()};
+  Server::ListenerManagerImpl listener_manager_{server_, component_factory_, worker_factory_};
   Runtime::RandomGeneratorImpl random_;
   NiceMock<Api::MockOsSysCalls> os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls_};
@@ -115,8 +112,7 @@ public:
 };
 
 void testMerge() {
-  Stats::IsolatedStoreImpl stats;
-  Api::ApiPtr api = Api::createApiForTest(stats);
+  Api::ApiPtr api = Api::createApiForTest();
 
   const std::string overlay = "static_resources: { clusters: [{name: 'foo'}]}";
   OptionsImpl options(Server::createTestOptionsImpl("google_com_proxy.v2.yaml", overlay,
@@ -128,8 +124,7 @@ void testMerge() {
 
 uint32_t run(const std::string& directory) {
   uint32_t num_tested = 0;
-  Stats::IsolatedStoreImpl stats;
-  Api::ApiPtr api = Api::createApiForTest(stats);
+  Api::ApiPtr api = Api::createApiForTest();
   for (const std::string& filename : TestUtility::listFiles(directory, false)) {
     ENVOY_LOG_MISC(info, "testing {}.\n", filename);
     OptionsImpl options(
