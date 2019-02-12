@@ -275,7 +275,7 @@ HostsPerLocalityImpl::filter(std::function<bool(const Host&)> predicate) const {
   return shared_filtered_clone;
 }
 
-void HostSetImpl::updateHosts(UpdateHostsParams&& update_hosts_params,
+void HostSetImpl::updateHosts(PrioritySet::UpdateHostsParams&& update_hosts_params,
                               LocalityWeightsConstSharedPtr locality_weights,
                               const HostVector& hosts_added, const HostVector& hosts_removed,
                               absl::optional<uint32_t> overprovisioning_factor) {
@@ -356,14 +356,14 @@ absl::optional<uint32_t> HostSetImpl::chooseLocality() {
   return locality->index_;
 }
 
-HostSetImpl::UpdateHostsParams
+PrioritySet::UpdateHostsParams
 HostSetImpl::updateHostsParams(HostVectorConstSharedPtr hosts,
                                HostsPerLocalityConstSharedPtr hosts_per_locality) {
   return updateHostsParams(std::move(hosts), std::move(hosts_per_locality),
                            std::make_shared<const HostVector>(), HostsPerLocalityImpl::empty());
 }
 
-HostSetImpl::UpdateHostsParams
+PrioritySet::UpdateHostsParams
 HostSetImpl::updateHostsParams(HostVectorConstSharedPtr hosts,
                                HostsPerLocalityConstSharedPtr hosts_per_locality,
                                HostVectorConstSharedPtr healthy_hosts,
@@ -373,22 +373,22 @@ HostSetImpl::updateHostsParams(HostVectorConstSharedPtr hosts,
                            std::make_shared<const HostVector>(), HostsPerLocalityImpl::empty());
 }
 
-HostSetImpl::UpdateHostsParams
+PrioritySet::UpdateHostsParams
 HostSetImpl::updateHostsParams(HostVectorConstSharedPtr hosts,
                                HostsPerLocalityConstSharedPtr hosts_per_locality,
                                HostVectorConstSharedPtr healthy_hosts,
                                HostsPerLocalityConstSharedPtr healthy_hosts_per_locality,
                                HostVectorConstSharedPtr degraded_hosts,
                                HostsPerLocalityConstSharedPtr degraded_hosts_per_locality) {
-  return UpdateHostsParams{std::move(hosts),
-                           std::move(healthy_hosts),
-                           std::move(degraded_hosts),
-                           std::move(hosts_per_locality),
-                           std::move(healthy_hosts_per_locality),
-                           std::move(degraded_hosts_per_locality)};
+  return PrioritySet::UpdateHostsParams{std::move(hosts),
+                                        std::move(healthy_hosts),
+                                        std::move(degraded_hosts),
+                                        std::move(hosts_per_locality),
+                                        std::move(healthy_hosts_per_locality),
+                                        std::move(degraded_hosts_per_locality)};
 }
 
-HostSetImpl::UpdateHostsParams
+PrioritySet::UpdateHostsParams
 HostSetImpl::partitionHosts(HostVectorConstSharedPtr hosts,
                             HostsPerLocalityConstSharedPtr hosts_per_locality) {
   auto healthy_hosts = ClusterImplBase::createHostList(*hosts, Host::Health::Healthy);
@@ -423,20 +423,35 @@ double HostSetImpl::effectiveLocalityWeight(uint32_t index,
   return weight * effective_locality_availability_ratio;
 }
 
-HostSet& PrioritySetImpl::getOrCreateHostSet(uint32_t priority,
-                                             absl::optional<uint32_t> overprovisioning_factor) {
+const HostSet&
+PrioritySetImpl::getOrCreateHostSet(uint32_t priority,
+                                    absl::optional<uint32_t> overprovisioning_factor) {
   if (host_sets_.size() < priority + 1) {
     for (size_t i = host_sets_.size(); i <= priority; ++i) {
       HostSetImplPtr host_set = createHostSet(i, overprovisioning_factor);
       host_set->addPriorityUpdateCb([this](uint32_t priority, const HostVector& hosts_added,
                                            const HostVector& hosts_removed) {
-        runUpdateCallbacks(hosts_added, hosts_removed);
         runReferenceUpdateCallbacks(priority, hosts_added, hosts_removed);
       });
       host_sets_.push_back(std::move(host_set));
     }
   }
   return *host_sets_[priority];
+}
+
+void PrioritySetImpl::updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
+                                  LocalityWeightsConstSharedPtr locality_weights,
+                                  const HostVector& hosts_added, const HostVector& hosts_removed,
+                                  absl::optional<uint32_t> overprovisioning_factor) {
+  // Ensure that we have a HostSet for the given priority.
+  getOrCreateHostSet(priority, overprovisioning_factor);
+  // TODO(snowp): Add a batched update mode that allows updating multiple HostSet and invoke the
+  // membership update cb for the resulting host diff.
+  static_cast<HostSetImpl*>(host_sets_[priority].get())
+      ->updateHosts(std::move(update_hosts_params), std::move(locality_weights), hosts_added,
+                    hosts_removed, overprovisioning_factor);
+
+  runUpdateCallbacks(hosts_added, hosts_removed);
 }
 
 ClusterStats ClusterInfoImpl::generateStats(Stats::Scope& scope) {
@@ -807,12 +822,15 @@ void ClusterImplBase::reloadHealthyHosts() {
     return;
   }
 
-  for (auto& host_set : prioritySet().hostSetsPerPriority()) {
+  const auto& host_sets = prioritySet().hostSetsPerPriority();
+  for (size_t priority = 0; priority < host_sets.size(); ++priority) {
+    const auto& host_set = host_sets[priority];
     // TODO(htuch): Can we skip these copies by exporting out const shared_ptr from HostSet?
     HostVectorConstSharedPtr hosts_copy(new HostVector(host_set->hosts()));
     HostsPerLocalityConstSharedPtr hosts_per_locality_copy = host_set->hostsPerLocality().clone();
-    host_set->updateHosts(HostSetImpl::partitionHosts(hosts_copy, hosts_per_locality_copy),
-                          host_set->localityWeights(), {}, {}, absl::nullopt);
+    prioritySet().updateHosts(priority,
+                              HostSetImpl::partitionHosts(hosts_copy, hosts_per_locality_copy),
+                              host_set->localityWeights(), {}, {}, absl::nullopt);
   }
 }
 
@@ -995,11 +1013,10 @@ void PriorityStateManager::updateClusterPrioritySet(
   auto per_locality_shared =
       std::make_shared<HostsPerLocalityImpl>(std::move(per_locality), non_empty_local_locality);
 
-  auto& host_set = static_cast<PrioritySetImpl&>(parent_.prioritySet())
-                       .getOrCreateHostSet(priority, overprovisioning_factor);
-  host_set.updateHosts(HostSetImpl::partitionHosts(hosts, per_locality_shared),
-                       std::move(locality_weights), hosts_added.value_or(*hosts),
-                       hosts_removed.value_or<HostVector>({}), overprovisioning_factor);
+  parent_.prioritySet().updateHosts(
+      priority, HostSetImpl::partitionHosts(hosts, per_locality_shared),
+      std::move(locality_weights), hosts_added.value_or(*hosts),
+      hosts_removed.value_or<HostVector>({}), overprovisioning_factor);
 }
 
 StaticClusterImpl::StaticClusterImpl(
