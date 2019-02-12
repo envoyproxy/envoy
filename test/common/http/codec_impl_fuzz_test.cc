@@ -1,17 +1,18 @@
 #include "envoy/stats/scope.h"
 
-// Fuzzer for the H2 codec. This is similar in structure to
+// Fuzzer for the H1/H2 codecs. This is similar in structure to
 // //test/common/http/http2:codec_impl_test, where a client H2 codec is wired
 // via shared memory to a server H2 codec and stream actions are applied. We
-// fuzz the various client/server H2 codec API operations and in addition apply
-// fuzzing at the wire level by modeling explicit mutation, reordering and drain
-// operations on the connection buffers between client and server.
+// fuzz the various client/server H1/H2 codec API operations and in addition
+// apply fuzzing at the wire level by modeling explicit mutation, reordering and
+// drain operations on the connection buffers between client and server.
 
 #include <functional>
 
 #include "common/common/assert.h"
 #include "common/common/logger.h"
 #include "common/http/header_map_impl.h"
+#include "common/http/http1/codec_impl.h"
 #include "common/http/http2/codec_impl.h"
 
 #include "test/common/http/codec_impl_fuzz.pb.h"
@@ -29,6 +30,17 @@ using testing::InvokeWithoutArgs;
 
 namespace Envoy {
 namespace Http {
+
+// Convert from test proto Http1ServerSettings to Http1Settings.
+Http1Settings fromHttp1Settings(const test::common::http::Http1ServerSettings& settings) {
+  Http1Settings h1_settings;
+
+  h1_settings.allow_absolute_url_ = settings.allow_absolute_url();
+  h1_settings.accept_http_10_ = settings.accept_http_10();
+  h1_settings.default_host_for_http_10_ = settings.default_host_for_http_10();
+
+  return h1_settings;
+}
 
 // Convert from test proto Http2Settings to Http2Settings.
 Http2Settings fromHttp2Settings(const test::common::http::Http2Settings& settings) {
@@ -73,8 +85,7 @@ public:
     uint32_t read_disable_count_{};
   } request_, response_;
 
-  HttpStream(Http2::TestClientConnectionImpl& client, const TestHeaderMapImpl& request_headers,
-             bool end_stream) {
+  HttpStream(ClientConnection& client, const TestHeaderMapImpl& request_headers, bool end_stream) {
     request_.encoder_ = &client.newStream(response_.decoder_);
     ON_CALL(request_.stream_callbacks_, onResetStream(_)).WillByDefault(InvokeWithoutArgs([this] {
       ENVOY_LOG_MISC(trace, "reset request for stream index {}", stream_index_);
@@ -182,14 +193,17 @@ public:
   int32_t stream_index_{-1};
 };
 
-// Buffer between client and server H2 codecs. This models each write operation
+// Buffer between client and server H1/H2 codecs. This models each write operation
 // as adding a distinct fragment that might be reordered with other fragments in
 // the buffer via swap() or modified with mutate().
 class ReorderBuffer {
 public:
-  ReorderBuffer(Http2::ConnectionImpl& connection) : connection_(connection) {}
+  ReorderBuffer(Connection& connection) : connection_(connection) {}
 
-  void add(const Buffer::Instance& data) { bufs_.emplace_back(data); }
+  void add(Buffer::Instance& data) {
+    bufs_.emplace_back();
+    bufs_.back().move(data);
+  }
 
   void drain() {
     while (!bufs_.empty()) {
@@ -230,31 +244,46 @@ public:
 
   bool empty() const { return bufs_.empty(); }
 
-  Http2::ConnectionImpl& connection_;
+  Connection& connection_;
   std::deque<Buffer::OwnedImpl> bufs_;
 };
 
 typedef std::unique_ptr<HttpStream> HttpStreamPtr;
 
-// Fuzz the H2 codec implementation.
-DEFINE_PROTO_FUZZER(const test::common::http::CodecImplFuzzTestCase& input) {
+namespace {
+
+void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, bool http2) {
   Stats::IsolatedStoreImpl stats_store;
   NiceMock<Network::MockConnection> client_connection;
   const Http2Settings client_http2settings{fromHttp2Settings(input.h2_settings().client())};
   NiceMock<MockConnectionCallbacks> client_callbacks;
   uint32_t max_request_headers_kb = Http::DEFAULT_MAX_REQUEST_HEADERS_KB;
+  ClientConnectionPtr client;
+  ServerConnectionPtr server;
 
-  Http2::TestClientConnectionImpl client(client_connection, client_callbacks, stats_store,
-                                         client_http2settings, max_request_headers_kb);
+  if (http2) {
+    client = absl::make_unique<Http2::TestClientConnectionImpl>(client_connection, client_callbacks,
+                                                                stats_store, client_http2settings,
+                                                                max_request_headers_kb);
+  } else {
+    client = absl::make_unique<Http1::ClientConnectionImpl>(client_connection, client_callbacks);
+  }
 
   NiceMock<Network::MockConnection> server_connection;
-  const Http2Settings server_http2settings{fromHttp2Settings(input.h2_settings().server())};
   NiceMock<MockServerConnectionCallbacks> server_callbacks;
-  Http2::TestServerConnectionImpl server(server_connection, server_callbacks, stats_store,
-                                         server_http2settings, max_request_headers_kb);
+  if (http2) {
+    const Http2Settings server_http2settings{fromHttp2Settings(input.h2_settings().server())};
+    server = absl::make_unique<Http2::TestServerConnectionImpl>(server_connection, server_callbacks,
+                                                                stats_store, server_http2settings,
+                                                                max_request_headers_kb);
+  } else {
+    const Http1Settings server_http1settings{fromHttp1Settings(input.h1_settings().server())};
+    server = absl::make_unique<Http1::ServerConnectionImpl>(server_connection, server_callbacks,
+                                                            server_http1settings);
+  }
 
-  ReorderBuffer client_write_buf{server};
-  ReorderBuffer server_write_buf{client};
+  ReorderBuffer client_write_buf{*server};
+  ReorderBuffer server_write_buf{*client};
 
   ON_CALL(client_connection, write(_, _))
       .WillByDefault(Invoke([&](Buffer::Instance& data, bool) -> void {
@@ -295,7 +324,7 @@ DEFINE_PROTO_FUZZER(const test::common::http::CodecImplFuzzTestCase& input) {
       switch (action.action_selector_case()) {
       case test::common::http::Action::kNewStream: {
         HttpStreamPtr stream = std::make_unique<HttpStream>(
-            client, Fuzz::fromHeaders(action.new_stream().request_headers()),
+            *client, Fuzz::fromHeaders(action.new_stream().request_headers()),
             action.new_stream().end_stream());
         stream->moveIntoListBack(std::move(stream), pending_streams);
         break;
@@ -342,10 +371,20 @@ DEFINE_PROTO_FUZZER(const test::common::http::CodecImplFuzzTestCase& input) {
         break;
       }
     }
-    client.goAway();
-    server.goAway();
+    if (http2) {
+      dynamic_cast<Http2::TestClientConnectionImpl&>(*client).goAway();
+      dynamic_cast<Http2::TestServerConnectionImpl&>(*server).goAway();
+    }
   } catch (EnvoyException&) {
   }
+}
+
+} // namespace
+
+// Fuzz the H1/H2 codec implementations.
+DEFINE_PROTO_FUZZER(const test::common::http::CodecImplFuzzTestCase& input) {
+  codecFuzz(input, false);
+  codecFuzz(input, true);
 }
 
 } // namespace Http
