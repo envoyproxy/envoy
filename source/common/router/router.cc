@@ -576,6 +576,7 @@ void Filter::onUpstreamReset(UpstreamResetType type,
   if (downstream_response_started_) {
     if (upstream_request_ != nullptr && upstream_request_->grpc_rq_success_deferred_) {
       upstream_request_->upstream_host_->stats().rq_error_.inc();
+      config_.stats_.rq_reset_after_downstream_response_started_.inc();
     }
     // This will destroy any created retry timers.
     cleanup();
