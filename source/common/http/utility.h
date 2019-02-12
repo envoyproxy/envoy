@@ -230,6 +230,11 @@ MessagePtr prepareHeaders(const ::envoy::api::v2::core::HttpUri& http_uri);
 std::string queryParamsToString(const QueryParams& query_params);
 
 /**
+ * Returns string representation of StreamResetReason.
+ */
+const std::string resetReasonToString(const Http::StreamResetReason reset_reason);
+
+/**
  * Transforms the supplied headers from an HTTP/1 Upgrade request to an H2 style upgrade.
  * Changes the method to connection, moves the Upgrade to a :protocol header,
  * @param headers the headers to convert.
