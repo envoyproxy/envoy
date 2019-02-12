@@ -127,7 +127,7 @@ void HttpTracerUtility::finalizeSpan(Span& span, const Http::HeaderMap* request_
 
   const auto start_time = stream_info.startTime();
   if (stream_info.lastDownstreamRxByteReceived()) {
-    span.log(start_time + std::chron::duration_cast<SystemTime::duration>(
+    span.log(start_time + std::chrono::duration_cast<SystemTime::duration>(
                               *stream_info.lastDownstreamRxByteReceived()),
              Tracing::Logs::get().LAST_DOWNSTREAM_RX_BYTE_RECEIVED);
   }
