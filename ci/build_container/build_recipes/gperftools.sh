@@ -6,14 +6,17 @@ if [[ "${OS}" == "Windows_NT" ]]; then
   exit 0
 fi
 
+# TODO(cmluciano): Bump to release 2.8
+# This sha is specifically chosen to fix ppc64le builds that require inclusion
+# of asm/ptrace.h
 VERSION=fc00474ddc21fff618fc3f009b46590e241e425e
-SHA256=a2b6da3562addd0ffba2cc7731867033cd0f548888053a22dc358226ad005912
+SHA256=18574813a062eee487bc1b761e8024a346075a7cb93da19607af362dc09565ef
 
-curl https://api.github.com/repos/gperftools/gperftools/tarball/"$VERSION" -sLo gperftools-"$VERSION".tar.gz \
+curl https://github.com/gperftools/gperftools/archive/${VERSION}.tar.gz -sLo gperftools-"$VERSION".tar.gz \
   && echo "$SHA256" gperftools-"$VERSION".tar.gz | sha256sum --check
 
 tar xf gperftools-"$VERSION".tar.gz
-cd gperftools-gperftools-"${VERSION:0:7}"
+cd gperftools-"${VERSION}"
 
 ./autogen.sh
 
