@@ -554,10 +554,17 @@ TEST_P(RingHashLoadBalancerTest, SmallFractionalReplicationFactor) {
     ++counts[port - 90];
   }
 
-  EXPECT_EQ(681, counts[0]); // :90 | ~512 expected hits
-  EXPECT_EQ(0, counts[1]);   // :91 |   =0 expected hits
-  EXPECT_EQ(0, counts[2]);   // :92 |   =0 expected hits
-  EXPECT_EQ(343, counts[3]); // :93 | ~512 expected hits
+  uint32_t zeroes = 0;
+  uint32_t sum = 0;
+  for (auto count : counts) {
+    if (count == 0) {
+      ++zeroes;
+    } else {
+      sum += count;
+    }
+  }
+  EXPECT_EQ(2, zeroes); // two hosts (we don't care which ones) should get no traffic
+  EXPECT_EQ(1024, sum); // the other two hosts should get all the traffic
 }
 
 TEST_P(RingHashLoadBalancerTest, LargeFractionalReplicationFactor) {
