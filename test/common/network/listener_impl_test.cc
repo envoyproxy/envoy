@@ -2,6 +2,7 @@
 #include "common/network/listener_impl.h"
 #include "common/network/utility.h"
 
+#include "test/common/network/listener_impl_test_base.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
@@ -70,25 +71,7 @@ public:
   MOCK_METHOD1(getLocalAddress, Address::InstanceConstSharedPtr(int fd));
 };
 
-class ListenerImplTest : public TestBaseWithParam<Address::IpVersion> {
-protected:
-  ListenerImplTest()
-      : version_(GetParam()),
-        alt_address_(Network::Test::findOrCheckFreePort(
-            Network::Test::getCanonicalLoopbackAddress(version_), Address::SocketType::Stream)),
-        api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()) {}
-
-  Event::DispatcherImpl& dispatcherImpl() {
-    Event::DispatcherImpl* impl = dynamic_cast<Event::DispatcherImpl*>(dispatcher_.get());
-    RELEASE_ASSERT(impl, "dispatcher dynamic-cast to DispatcherImpl failed");
-    return *impl;
-  }
-
-  const Address::IpVersion version_;
-  const Address::InstanceConstSharedPtr alt_address_;
-  Api::ApiPtr api_;
-  Event::DispatcherPtr dispatcher_;
-};
+using ListenerImplTest = ListenerImplTestBase;
 INSTANTIATE_TEST_SUITE_P(IpVersions, ListenerImplTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);

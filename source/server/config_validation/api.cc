@@ -18,8 +18,7 @@ Event::DispatcherPtr ValidationImpl::allocateDispatcher() {
 }
 
 Event::DispatcherPtr ValidationImpl::allocateDispatcher(Buffer::WatermarkFactoryPtr&&) {
-  RELEASE_ASSERT(false, "validation dispatchers with custom watermark factory not supported");
-  return Event::DispatcherPtr{};
+  NOT_REACHED_GCOVR_EXCL_LINE
 }
 
 } // namespace Api

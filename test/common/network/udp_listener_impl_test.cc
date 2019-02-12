@@ -6,12 +6,12 @@
 #include "common/network/udp_listener_impl.h"
 #include "common/network/utility.h"
 
+#include "test/common/network/listener_impl_test_base.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/test_base.h"
-#include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -36,14 +36,8 @@ public:
   }
 };
 
-class UdpListenerImplTest : public TestBaseWithParam<Address::IpVersion> {
+class UdpListenerImplTest : public ListenerImplTestBase {
 protected:
-  UdpListenerImplTest()
-      : version_(GetParam()),
-        alt_address_(Network::Test::findOrCheckFreePort(
-            Network::Test::getCanonicalLoopbackAddress(version_), Address::SocketType::Stream)),
-        api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()) {}
-
   SocketPtr getSocket(Address::SocketType type, const Address::InstanceConstSharedPtr& address,
                       const Network::Socket::OptionsSharedPtr& options, bool bind) {
     if (type == Address::SocketType::Stream) {
@@ -112,18 +106,6 @@ protected:
 
     getSocketAddressInfo(address->ip(), port, addr, sz);
   }
-
-  Event::DispatcherImpl& dispatcherImpl() {
-    Event::DispatcherImpl* impl = dynamic_cast<Event::DispatcherImpl*>(dispatcher_.get());
-    RELEASE_ASSERT(impl, "dispatcher dynamic-cast to DispatcherImpl failed");
-    return *impl;
-  }
-
-  const Address::IpVersion version_;
-  const Address::InstanceConstSharedPtr alt_address_;
-  Api::ApiPtr api_;
-  DangerousDeprecatedTestTime test_time_;
-  Event::DispatcherPtr dispatcher_;
 };
 INSTANTIATE_TEST_CASE_P(IpVersions, UdpListenerImplTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
