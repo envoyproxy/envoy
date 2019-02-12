@@ -32,10 +32,10 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/c-ares/c-ares/archive/cares-1_15_0.tar.gz"],
     ),
     com_github_circonus_labs_libcircllhist = dict(
-        sha256 = "9949e2864b8ad00ee5c3e9c1c3c01e51b6b68bb442a919652fc66b9776477987",
-        strip_prefix = "libcircllhist-fd8a14463739d247b414825cc56ca3946792a3b9",
-        # 2018-09-17
-        urls = ["https://github.com/circonus-labs/libcircllhist/archive/fd8a14463739d247b414825cc56ca3946792a3b9.tar.gz"],
+        sha256 = "8165aa25e529d7d4b9ae849d3bf30371255a99d6db0421516abcff23214cdc2c",
+        strip_prefix = "libcircllhist-63a16dd6f2fc7bc841bb17ff92be8318df60e2e1",
+        # 2018-02-11
+        urls = ["https://github.com/circonus-labs/libcircllhist/archive/63a16dd6f2fc7bc841bb17ff92be8318df60e2e1.tar.gz"],
     ),
     com_github_cyan4973_xxhash = dict(
         sha256 = "19030315f4fc1b4b2cdb9d7a317069a109f90e39d1fe4c9159b7aaa39030eb95",
