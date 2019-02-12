@@ -364,7 +364,7 @@ std::string SslSocket::subjectLocalCertificate() const {
 absl::optional<SystemTime> SslSocket::validFromPeerCertificate() const {
   bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
   if (!cert) {
-    return absl::optional<SystemTime>();
+    return absl::nullopt;
   }
   return Utility::getValidFrom(*cert);
 }
@@ -372,7 +372,7 @@ absl::optional<SystemTime> SslSocket::validFromPeerCertificate() const {
 absl::optional<SystemTime> SslSocket::expirationPeerCertificate() const {
   bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
   if (!cert) {
-    return absl::optional<SystemTime>();
+    return absl::nullopt;
   }
   return Utility::getExpirationTime(*cert);
 }

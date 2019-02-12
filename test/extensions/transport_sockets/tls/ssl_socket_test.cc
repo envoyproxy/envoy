@@ -110,6 +110,13 @@ public:
     return *this;
   }
 
+  bool expectNoCert() const { return expect_no_cert_; }
+
+  TestUtilOptions& setExpectNoCert() {
+    expect_no_cert_ = true;
+    return *this;
+  }
+
   TestUtilOptions& setExpectedClientCertUri(const std::string& expected_client_cert_uri) {
     TestUtilOptionsBase::setExpectedClientCertUri(expected_client_cert_uri);
     return *this;
@@ -179,6 +186,7 @@ private:
   const std::string client_ctx_yaml_;
   const std::string server_ctx_yaml_;
 
+  bool expect_no_cert_;
   std::string expected_digest_;
   std::string expected_local_uri_;
   std::string expected_serial_number_;
@@ -290,6 +298,16 @@ void testUtil(const TestUtilOptions& options) {
             server_connection->ssl()->expirationPeerCertificate().value(), "%b %e %H:%M:%S %Y GMT");
         EXPECT_EQ(options.expectedExpirationTimePeerCert(), formatted);
       }
+      if (options.expectNoCert()) {
+        EXPECT_FALSE(server_connection->ssl()->peerCertificatePresented());
+        EXPECT_FALSE(server_connection->ssl()->validFromPeerCertificate().has_value());
+        EXPECT_FALSE(server_connection->ssl()->expirationPeerCertificate().has_value());
+        EXPECT_EQ(EMPTY_STRING, server_connection->ssl()->sha256PeerCertificateDigest());
+        EXPECT_EQ(EMPTY_STRING, server_connection->ssl()->urlEncodedPemEncodedPeerCertificate());
+        EXPECT_EQ(EMPTY_STRING, server_connection->ssl()->subjectPeerCertificate());
+        EXPECT_EQ(std::vector<std::string>{}, server_connection->ssl()->dnsSansPeerCertificate());
+      }
+
       server_connection->close(Network::ConnectionCloseType::NoFlush);
       client_connection->close(Network::ConnectionCloseType::NoFlush);
       dispatcher.exit();
@@ -827,7 +845,7 @@ TEST_P(SslSocketTest, NoCert) {
 )EOF";
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, GetParam());
-  testUtil(test_options.setExpectedServerStats("ssl.no_certificate"));
+  testUtil(test_options.setExpectedServerStats("ssl.no_certificate").setExpectNoCert());
 }
 
 // Prefer ECDSA certificate when multiple RSA certificates are present and the
