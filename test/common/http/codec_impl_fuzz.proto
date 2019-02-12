@@ -96,9 +96,9 @@ message Http2ClientServerSettings {
 }
 
 message CodecImplFuzzTestCase {
-  oneof settings_selector {
-    Http1ClientServerSettings h1_settings = 1;
-    Http2ClientServerSettings h2_settings = 2;
-  }
+  // The fuzzer will run actions on both H1 and H2 codecs. The settings below
+  // provide codec-specific parameters.
+  Http1ClientServerSettings h1_settings = 1;
+  Http2ClientServerSettings h2_settings = 2;
   repeated Action actions = 3;
 }

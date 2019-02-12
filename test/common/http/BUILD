@@ -71,6 +71,7 @@ envoy_cc_fuzz_test(
     deps = [
         ":codec_impl_fuzz_proto_cc",
         "//source/common/http:header_map_lib",
+        "//source/common/http/http1:codec_lib",
         "//source/common/http/http2:codec_lib",
         "//test/common/http/http2:codec_impl_test_util",
         "//test/fuzz:utility_lib",
