@@ -125,6 +125,36 @@ void HttpTracerUtility::finalizeSpan(Span& span, const Http::HeaderMap* request_
   span.setTag(Tracing::Tags::get().RESPONSE_FLAGS,
               StreamInfo::ResponseFlagUtils::toShortString(stream_info));
 
+  const auto start_time = stream_info.startTime();
+  if (stream_info.lastDownstreamRxByteReceived()) {
+    span.log(start_time + *stream_info.lastDownstreamRxByteReceived(),
+             Tracing::Logs::get().LAST_DOWNSTREAM_RX_BYTE_RECEIVED);
+  }
+  if (stream_info.firstUpstreamTxByteSent()) {
+    span.log(start_time + *stream_info.firstUpstreamTxByteSent(),
+             Tracing::Logs::get().FIRST_UPSTREAM_TX_BYTE_SENT);
+  }
+  if (stream_info.lastUpstreamTxByteSent()) {
+    span.log(start_time + *stream_info.lastUpstreamTxByteSent(),
+             Tracing::Logs::get().LAST_UPSTREAM_TX_BYTE_SENT);
+  }
+  if (stream_info.firstUpstreamRxByteReceived()) {
+    span.log(start_time + *stream_info.firstUpstreamRxByteReceived(),
+             Tracing::Logs::get().FIRST_UPSTREAM_RX_BYTE_RECEIVED);
+  }
+  if (stream_info.lastUpstreamRxByteReceived()) {
+    span.log(start_time + *stream_info.lastUpstreamRxByteReceived(),
+             Tracing::Logs::get().LAST_UPSTREAM_RX_BYTE_RECEIVED);
+  }
+  if (stream_info.firstDownstreamTxByteSent()) {
+    span.log(start_time + *stream_info.firstDownstreamTxByteSent(),
+             Tracing::Logs::get().FIRST_DOWNSTREAM_TX_BYTE_SENT);
+  }
+  if (stream_info.lastDownstreamTxByteSent()) {
+    span.log(start_time + *stream_info.lastDownstreamTxByteSent(),
+             Tracing::Logs::get().LAST_DOWNSTREAM_TX_BYTE_SENT);
+  }
+
   if (!stream_info.responseCode() || Http::CodeUtility::is5xx(stream_info.responseCode().value())) {
     span.setTag(Tracing::Tags::get().ERROR, Tracing::Tags::get().TRUE);
   }

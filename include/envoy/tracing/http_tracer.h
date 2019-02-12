@@ -79,6 +79,13 @@ public:
   virtual void setTag(const std::string& name, const std::string& value) PURE;
 
   /**
+   * Record an event associated with a span, to be handled in an implementation-dependent fashion.
+   * @param timestamp the time of the event.
+   * @param event the name of the event.
+   */
+  virtual void log(SystemTime timestamp, const std::string& event) PURE;
+
+  /**
    * Capture the final duration for this Span and carry out any work necessary to complete it.
    * Once this method is called, the Span may be safely discarded.
    */
