@@ -178,6 +178,7 @@ elif [[ "$1" == "bazel.dev" ]]; then
 elif [[ "$1" == "bazel.compile_time_options" ]]; then
   # Right now, none of the available compile-time options conflict with each other. If this
   # changes, this build type may need to be broken up.
+  # TODO(mpwarres): remove quiche=enabled once QUICHE is built by default.
   COMPILE_TIME_OPTIONS="\
     --config libc++ \
     --define signal_trace=disabled \
