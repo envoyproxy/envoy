@@ -14,7 +14,6 @@
 
 #include "common/common/assert.h"
 #include "common/common/logger.h"
-#include "common/stats/isolated_store_impl.h"
 
 #include "test/fuzz/fuzz_runner.h"
 #include "test/test_common/environment.h"
@@ -29,9 +28,8 @@ std::vector<std::string> test_corpus_;
 
 class FuzzerCorpusTest : public TestBaseWithParam<std::string> {
 protected:
-  FuzzerCorpusTest() : api_(Api::createApiForTest(stats_store_)) {}
+  FuzzerCorpusTest() : api_(Api::createApiForTest()) {}
 
-  Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
 };
 
@@ -55,8 +53,7 @@ int main(int argc, char** argv) {
   // Ensure we cleanup API resources before we jump into the tests, the test API creates a singleton
   // time system that we don't want to leak into gtest.
   {
-    Envoy::Stats::IsolatedStoreImpl stats_store;
-    Envoy::Api::ApiPtr api = Envoy::Api::createApiForTest(stats_store);
+    Envoy::Api::ApiPtr api = Envoy::Api::createApiForTest();
     for (int i = 1; i < argc; ++i) {
       const std::string arg{argv[i]};
       if (arg.empty() || arg[0] == '-') {
