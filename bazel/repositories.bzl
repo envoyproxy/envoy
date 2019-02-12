@@ -572,6 +572,10 @@ def _com_google_absl():
         actual = "@com_google_absl//absl/container:node_hash_set",
     )
     native.bind(
+        name = "abseil_str_format",
+        actual = "@com_google_absl//absl/strings:str_format",
+    )
+    native.bind(
         name = "abseil_strings",
         actual = "@com_google_absl//absl/strings:strings",
     )
