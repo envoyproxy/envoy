@@ -493,7 +493,7 @@ void Filter::maybeDoShadowing() {
 void Filter::onRequestComplete() {
   downstream_end_stream_ = true;
   Event::Dispatcher& dispatcher = callbacks_->dispatcher();
-  downstream_request_complete_time_ = dispatcher.timeSystem().monotonicTime();
+  downstream_request_complete_time_ = dispatcher.timeSource().monotonicTime();
 
   // Possible that we got an immediate reset.
   if (upstream_request_) {
@@ -535,7 +535,8 @@ void Filter::onUpstreamReset(UpstreamResetType type,
                              const absl::optional<Http::StreamResetReason>& reset_reason) {
   ASSERT(type == UpstreamResetType::GlobalTimeout || upstream_request_);
   if (type == UpstreamResetType::Reset) {
-    ENVOY_STREAM_LOG(debug, "upstream reset", *callbacks_);
+    ENVOY_STREAM_LOG(debug, "upstream reset: reset reason {}", *callbacks_,
+                     reset_reason ? Http::Utility::resetReasonToString(reset_reason.value()) : "");
   }
 
   Upstream::HostDescriptionConstSharedPtr upstream_host;
@@ -583,7 +584,7 @@ void Filter::onUpstreamReset(UpstreamResetType type,
     // This will destroy any created retry timers.
     cleanup();
     Http::Code code;
-    const char* body;
+    std::string body;
     if (type == UpstreamResetType::GlobalTimeout || type == UpstreamResetType::PerTryTimeout) {
       callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamRequestTimeout);
 
@@ -594,7 +595,9 @@ void Filter::onUpstreamReset(UpstreamResetType type,
           streamResetReasonToResponseFlag(reset_reason.value());
       callbacks_->streamInfo().setResponseFlag(response_flags);
       code = Http::Code::ServiceUnavailable;
-      body = "upstream connect error or disconnect/reset before headers";
+      body = absl::StrCat(
+          "upstream connect error or disconnect/reset before headers. reset reason: ",
+          reset_reason ? Http::Utility::resetReasonToString(reset_reason.value()) : "");
     }
 
     const bool dropped = reset_reason && reset_reason.value() == Http::StreamResetReason::Overflow;
@@ -606,7 +609,7 @@ void Filter::onUpstreamReset(UpstreamResetType type,
     if (upstream_host != nullptr && !Http::CodeUtility::is5xx(enumToInt(code))) {
       upstream_host->stats().rq_error_.inc();
     }
-    callbacks_->sendLocalReply(code, body,
+    callbacks_->sendLocalReply(code, body.c_str(),
                                [dropped, this](Http::HeaderMap& headers) {
                                  if (dropped && !config_.suppress_envoy_headers_) {
                                    headers.insertEnvoyOverloaded().value(
@@ -634,7 +637,7 @@ Filter::streamResetReasonToResponseFlag(Http::StreamResetReason reset_reason) {
     return StreamInfo::ResponseFlag::UpstreamRemoteReset;
   }
 
-  throw std::invalid_argument("Unknown reset_reason");
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 void Filter::handleNon5xxResponseHeaders(const Http::HeaderMap& headers, bool end_stream) {
@@ -719,7 +722,7 @@ void Filter::onUpstreamHeaders(const uint64_t response_code, Http::HeaderMapPtr&
   // premature response.
   if (DateUtil::timePointValid(downstream_request_complete_time_)) {
     Event::Dispatcher& dispatcher = callbacks_->dispatcher();
-    MonotonicTime response_received_time = dispatcher.timeSystem().monotonicTime();
+    MonotonicTime response_received_time = dispatcher.timeSource().monotonicTime();
     std::chrono::milliseconds ms = std::chrono::duration_cast<std::chrono::milliseconds>(
         response_received_time - downstream_request_complete_time_);
     if (!config_.suppress_envoy_headers_) {
@@ -792,7 +795,7 @@ void Filter::onUpstreamComplete() {
       DateUtil::timePointValid(downstream_request_complete_time_)) {
     Event::Dispatcher& dispatcher = callbacks_->dispatcher();
     std::chrono::milliseconds response_time = std::chrono::duration_cast<std::chrono::milliseconds>(
-        dispatcher.timeSystem().monotonicTime() - downstream_request_complete_time_);
+        dispatcher.timeSource().monotonicTime() - downstream_request_complete_time_);
 
     upstream_request_->upstream_host_->outlierDetector().putResponseTime(response_time);
 
@@ -925,7 +928,7 @@ void Filter::doRetry() {
 
 Filter::UpstreamRequest::UpstreamRequest(Filter& parent, Http::ConnectionPool::Instance& pool)
     : parent_(parent), conn_pool_(pool), grpc_rq_success_deferred_(false),
-      stream_info_(pool.protocol(), parent_.callbacks_->dispatcher().timeSystem()),
+      stream_info_(pool.protocol(), parent_.callbacks_->dispatcher().timeSource()),
       calling_encode_headers_(false), upstream_canary_(false), encode_complete_(false),
       encode_trailers_(false) {
 
