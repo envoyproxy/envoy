@@ -8,6 +8,7 @@ Version history
 * access log: added a new flag for stream idle timeout.
 * admin: the admin server can now be accessed via HTTP/2 (prior knowledge).
 * buffer: fix vulnerabilities when allocation fails.
+* build: releases are built with GCC-7 and linked with LLD.
 * config: added support of using google.protobuf.Any in opaque configs for extensions.
 * config: logging warnings when deprecated fields are in use.
 * config: removed deprecated --v2-config-only from command line config.

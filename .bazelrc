@@ -26,7 +26,6 @@ build:asan --test_env=ASAN_SYMBOLIZER_PATH
 
 # Clang ASAN/UBSAN
 build:clang-asan --config=asan
-build:clang-asan --linkopt -fuse-ld=lld
 
 # macOS ASAN/UBSAN
 build:macos-asan --config=asan
@@ -39,7 +38,6 @@ build:clang-tsan --define ENVOY_CONFIG_TSAN=1
 build:clang-tsan --copt -fsanitize=thread
 build:clang-tsan --linkopt -fsanitize=thread
 build:clang-tsan --define tcmalloc=disabled
-build:clang-tsan --linkopt -fuse-ld=lld
 
 # Clang MSAN - broken today since we need to rebuild lib[std]c++ and external deps with MSAN
 # support (see https://github.com/envoyproxy/envoy/issues/443).
@@ -48,7 +46,6 @@ build:clang-msan --copt -fsanitize=memory
 build:clang-msan --linkopt -fsanitize=memory
 build:clang-msan --define tcmalloc=disabled
 build:clang-msan --copt -fsanitize-memory-track-origins=2
-build:clang-msan --linkopt -fuse-ld=lld
 
 # Clang with libc++
 build:libc++ --action_env=CC
@@ -56,7 +53,6 @@ build:libc++ --action_env=CXX
 build:libc++ --action_env=CXXFLAGS=-stdlib=libc++
 build:libc++ --action_env=PATH
 build:libc++ --define force_libcpp=enabled
-build:libc++ --linkopt -fuse-ld=lld
 
 # Test options
 test --test_env=HEAPCHECK=normal --test_env=PPROF_PATH
