@@ -55,7 +55,6 @@ private:
   std::string version_info_;
   std::function<void()> initialize_callback_;
   Stats::ScopePtr scope_;
-  unsigned in_flight_warming_clusters_;
 };
 
 } // namespace Upstream

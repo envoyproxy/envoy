@@ -219,6 +219,8 @@ public:
 
   ClusterManagerFactory& clusterManagerFactory() override { return factory_; }
 
+  std::size_t warmingClusterCount() const override { return warming_clusters_.size(); }
+
 protected:
   virtual void postThreadLocalClusterUpdate(const Cluster& cluster, uint32_t priority,
                                             const HostVector& hosts_added,

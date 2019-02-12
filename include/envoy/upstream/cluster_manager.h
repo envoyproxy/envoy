@@ -233,6 +233,8 @@ public:
   addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks& callbacks) PURE;
 
   virtual ClusterManagerFactory& clusterManagerFactory() PURE;
+
+  virtual std::size_t warmingClusterCount() const PURE;
 };
 
 typedef std::unique_ptr<ClusterManager> ClusterManagerPtr;

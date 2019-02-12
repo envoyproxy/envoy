@@ -121,11 +121,18 @@ protected:
           }));
     }
 
+    void expectWarmingClusterCount() {
+      EXPECT_CALL(*this, warmingClusterCount()).WillOnce(Invoke([this]() {
+        return warming_cbs_.size();
+      }));
+    }
+
     void finishClusterWarming() {
       for (const auto& cluster : clusters_to_warm_up_) {
         EXPECT_NE(warming_cbs_.cend(), warming_cbs_.find(cluster));
-        warming_cbs_[cluster](cluster, ClusterManager::ClusterWarmingState::FINISHED);
+        auto callback = warming_cbs_[cluster];
         warming_cbs_.erase(cluster);
+        callback(cluster, ClusterManager::ClusterWarmingState::FINISHED);
       }
       clusters_to_warm_up_.clear();
     }
@@ -316,13 +323,19 @@ TEST_F(CdsApiImplTest, CdsPauseOnWarming) {
   message->body() = std::make_unique<Buffer::OwnedImpl>(response1_json);
 
   EXPECT_CALL(cm_.ads_mux_, pause(Config::TypeUrl::get().ClusterLoadAssignment)).Times(1);
+  cm_.expectWarmingClusterCount(); // entry
   EXPECT_CALL(cm_.ads_mux_, pause(Config::TypeUrl::get().Cluster)).Times(1);
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(ClusterManager::ClusterInfoMap{}));
   cm_.expectAddWithWarming("cluster1", "0");
+  cm_.expectWarmingClusterCount(); // start warming
   cm_.expectAddWithWarming("cluster2", "0");
+  cm_.expectWarmingClusterCount(); // start warming
   EXPECT_CALL(initialized_, ready());
+  cm_.expectWarmingClusterCount(); // finish warming
+  cm_.expectWarmingClusterCount(); // finish warming
   EXPECT_CALL(cm_.ads_mux_, resume(Config::TypeUrl::get().Cluster)).Times(1);
   EXPECT_CALL(cm_.ads_mux_, resume(Config::TypeUrl::get().ClusterLoadAssignment)).Times(1);
+  cm_.expectWarmingClusterCount(); // exit
   EXPECT_CALL(cm_.ads_mux_, resume(Config::TypeUrl::get().Cluster)).Times(1);
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   cm_.clustersToWarmUp({"cluster1", "cluster2"});
@@ -357,12 +370,17 @@ TEST_F(CdsApiImplTest, CdsPauseOnWarming) {
   message->body() = std::make_unique<Buffer::OwnedImpl>(response2_json);
 
   EXPECT_CALL(cm_.ads_mux_, pause(Config::TypeUrl::get().ClusterLoadAssignment)).Times(1);
+  cm_.expectWarmingClusterCount(); // entry
   EXPECT_CALL(cm_.ads_mux_, pause(Config::TypeUrl::get().Cluster)).Times(1);
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(ClusterManager::ClusterInfoMap{}));
   cm_.expectAddWithWarming("cluster1", "1");
+  cm_.expectWarmingClusterCount(); // start warming
   cm_.expectAddWithWarming("cluster3", "1");
+  cm_.expectWarmingClusterCount(); // start warming
   EXPECT_CALL(initialized_, ready());
+  cm_.expectWarmingClusterCount(); // finish warming
   EXPECT_CALL(cm_.ads_mux_, resume(Config::TypeUrl::get().ClusterLoadAssignment)).Times(1);
+  cm_.expectWarmingClusterCount(); // exit
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   resetCdsInitializedCb();
   cm_.clustersToWarmUp({"cluster1"});
@@ -391,11 +409,16 @@ TEST_F(CdsApiImplTest, CdsPauseOnWarming) {
   message->body() = std::make_unique<Buffer::OwnedImpl>(response3_json);
 
   EXPECT_CALL(cm_.ads_mux_, pause(Config::TypeUrl::get().ClusterLoadAssignment)).Times(1);
+  cm_.expectWarmingClusterCount(); // entry
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(ClusterManager::ClusterInfoMap{}));
   cm_.expectAddWithWarming("cluster4", "2");
+  cm_.expectWarmingClusterCount(); // start warming
   EXPECT_CALL(initialized_, ready());
+  cm_.expectWarmingClusterCount(); // finish warming
+  cm_.expectWarmingClusterCount(); // finish warming
   EXPECT_CALL(cm_.ads_mux_, resume(Config::TypeUrl::get().Cluster)).Times(1);
   EXPECT_CALL(cm_.ads_mux_, resume(Config::TypeUrl::get().ClusterLoadAssignment)).Times(1);
+  cm_.expectWarmingClusterCount(); // exit
   EXPECT_CALL(cm_.ads_mux_, resume(Config::TypeUrl::get().Cluster)).Times(1);
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   resetCdsInitializedCb();

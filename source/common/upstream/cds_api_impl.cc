@@ -26,7 +26,7 @@ CdsApiPtr CdsApiImpl::create(const envoy::api::v2::core::ConfigSource& cds_confi
 CdsApiImpl::CdsApiImpl(const envoy::api::v2::core::ConfigSource& cds_config, ClusterManager& cm,
                        Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
                        const LocalInfo::LocalInfo& local_info, Stats::Scope& scope, Api::Api& api)
-    : cm_(cm), scope_(scope.createScope("cluster_manager.cds.")), in_flight_warming_clusters_(0) {
+    : cm_(cm), scope_(scope.createScope("cluster_manager.cds.")) {
   Config::Utility::checkLocalInfo("cds", local_info);
 
   subscription_ =
@@ -37,13 +37,13 @@ CdsApiImpl::CdsApiImpl(const envoy::api::v2::core::ConfigSource& cds_config, Clu
 }
 
 void CdsApiImpl::pauseCdsDuringWarming() {
-  if (in_flight_warming_clusters_ == 0) {
+  if (cm_.warmingClusterCount() == 0) {
     cm_.adsMux().pause(Config::TypeUrl::get().Cluster);
   }
 }
 
 void CdsApiImpl::resumeCdsAfterWarming() {
-  if (in_flight_warming_clusters_ == 0) {
+  if (cm_.warmingClusterCount() == 0) {
     cm_.adsMux().resume(Config::TypeUrl::get().Cluster);
   }
 }
@@ -71,12 +71,8 @@ void CdsApiImpl::onConfigUpdate(const ResourceVector& resources, const std::stri
   for (auto& cluster : resources) {
     const std::string cluster_name = cluster.name();
     clusters_to_remove.erase(cluster_name);
-    if (cm_.addOrUpdateCluster(cluster, version_info, [this](auto, auto warming_state) {
-          in_flight_warming_clusters_ +=
-              (warming_state == ClusterManager::ClusterWarmingState::STARTED) ? 1 : -1;
-          ENVOY_LOG(debug, "cds: in flight warming clusters: {}", in_flight_warming_clusters_);
-          resumeCdsAfterWarming();
-        })) {
+    if (cm_.addOrUpdateCluster(cluster, version_info,
+                               [this](auto, auto) { resumeCdsAfterWarming(); })) {
       ENVOY_LOG(debug, "cds: add/update cluster '{}'", cluster_name);
     }
   }

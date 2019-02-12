@@ -1084,6 +1084,7 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
         last_warming_state = state;
       }));
   checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 0 /*active*/, 1 /*warming*/);
+  EXPECT_EQ(1, cluster_manager_->warmingClusterCount());
   EXPECT_EQ(nullptr, cluster_manager_->get("fake_cluster"));
   EXPECT_EQ(1, warming_cb_calls);
   EXPECT_EQ(ClusterManager::ClusterWarmingState::STARTED, last_warming_state);
@@ -1091,6 +1092,7 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
 
   EXPECT_EQ(cluster1->info_, cluster_manager_->get("fake_cluster")->info());
   checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 1 /*active*/, 0 /*warming*/);
+  EXPECT_EQ(0, cluster_manager_->warmingClusterCount());
   EXPECT_EQ(2, warming_cb_calls);
   EXPECT_EQ(ClusterManager::ClusterWarmingState::FINISHED, last_warming_state);
 
