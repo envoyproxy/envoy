@@ -52,7 +52,7 @@ protected:
     local_info_.node_.mutable_locality()->set_zone("us-east-1a");
     eds_cluster_ = parseClusterFromV2Yaml(yaml_config);
     Upstream::ClusterManager::ClusterInfoMap cluster_map;
-    Upstream::MockCluster cluster;
+    Upstream::MockClusterMockPrioritySet cluster;
     cluster_map.emplace("eds", cluster);
     EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
     EXPECT_CALL(cluster, info()).Times(2);

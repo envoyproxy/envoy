@@ -146,11 +146,12 @@ OriginalDstCluster::OriginalDstCluster(
 void OriginalDstCluster::addHost(HostSharedPtr& host) {
   // Given the current config, only EDS clusters support multiple priorities.
   ASSERT(priority_set_.hostSetsPerPriority().size() == 1);
-  auto& first_host_set = priority_set_.getOrCreateHostSet(0);
+  const auto& first_host_set = priority_set_.getOrCreateHostSet(0);
   HostVectorSharedPtr new_hosts(new HostVector(first_host_set.hosts()));
   new_hosts->emplace_back(host);
-  first_host_set.updateHosts(HostSetImpl::partitionHosts(new_hosts, HostsPerLocalityImpl::empty()),
-                             {}, {std::move(host)}, {}, absl::nullopt);
+  priority_set_.updateHosts(0,
+                            HostSetImpl::partitionHosts(new_hosts, HostsPerLocalityImpl::empty()),
+                            {}, {std::move(host)}, {}, absl::nullopt);
 }
 
 void OriginalDstCluster::cleanup() {
@@ -158,7 +159,7 @@ void OriginalDstCluster::cleanup() {
   HostVector to_be_removed;
   // Given the current config, only EDS clusters support multiple priorities.
   ASSERT(priority_set_.hostSetsPerPriority().size() == 1);
-  auto& host_set = priority_set_.getOrCreateHostSet(0);
+  const auto& host_set = priority_set_.getOrCreateHostSet(0);
 
   ENVOY_LOG(debug, "Cleaning up stale original dst hosts.");
   for (const HostSharedPtr& host : host_set.hosts()) {
@@ -173,8 +174,9 @@ void OriginalDstCluster::cleanup() {
   }
 
   if (to_be_removed.size() > 0) {
-    host_set.updateHosts(HostSetImpl::partitionHosts(new_hosts, HostsPerLocalityImpl::empty()), {},
-                         {}, to_be_removed, absl::nullopt);
+    priority_set_.updateHosts(0,
+                              HostSetImpl::partitionHosts(new_hosts, HostsPerLocalityImpl::empty()),
+                              {}, {}, to_be_removed, absl::nullopt);
   }
 
   cleanup_timer_->enableTimer(cleanup_interval_ms_);

@@ -22,8 +22,6 @@ public:
 
   // We weight the first weighted_subset_percent of hosts with weight.
   BaseTester(uint64_t num_hosts, uint32_t weighted_subset_percent, uint32_t weight) {
-    HostSet& host_set = priority_set_.getOrCreateHostSet(0);
-
     HostVector hosts;
     ASSERT(num_hosts < 65536);
     for (uint64_t i = 0; i < num_hosts; i++) {
@@ -32,9 +30,9 @@ public:
                                    should_weight ? weight : 1));
     }
     HostVectorConstSharedPtr updated_hosts{new HostVector(hosts)};
-    host_set.updateHosts(
-        HostSetImpl::updateHostsParams(updated_hosts, nullptr, updated_hosts, nullptr), {}, hosts,
-        {}, absl::nullopt);
+    priority_set_.updateHosts(
+        0, HostSetImpl::updateHostsParams(updated_hosts, nullptr, updated_hosts, nullptr), {},
+        hosts, {}, absl::nullopt);
   }
 
   PrioritySetImpl priority_set_;

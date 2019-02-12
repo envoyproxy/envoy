@@ -69,14 +69,22 @@ private:
 
     bool empty() { return empty_; }
 
-    HostSubsetImpl* getOrCreateHostSubset(uint32_t priority) {
-      return reinterpret_cast<HostSubsetImpl*>(&getOrCreateHostSet(priority));
+    const HostSubsetImpl* getOrCreateHostSubset(uint32_t priority) {
+      return reinterpret_cast<const HostSubsetImpl*>(&getOrCreateHostSet(priority));
     }
 
     void triggerCallbacks() {
       for (size_t i = 0; i < hostSetsPerPriority().size(); ++i) {
-        getOrCreateHostSubset(i)->triggerCallbacks();
+        runReferenceUpdateCallbacks(i, {}, {});
       }
+    }
+
+    void updateSubset(uint32_t priority, const HostVector& hosts_added,
+                      const HostVector& hosts_removed, HostPredicate predicate) {
+      reinterpret_cast<HostSubsetImpl*>(host_sets_[priority].get())
+          ->update(hosts_added, hosts_removed, predicate);
+
+      runUpdateCallbacks(hosts_added, hosts_removed);
     }
 
     // Thread aware LB if applicable.

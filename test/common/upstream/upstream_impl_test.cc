@@ -786,7 +786,7 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasicMultiplePriorities) {
 }
 
 TEST(HostImplTest, HostCluster) {
-  MockCluster cluster;
+  MockClusterMockPrioritySet cluster;
   HostSharedPtr host = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 1);
   EXPECT_EQ(cluster.info_.get(), &host->cluster());
   EXPECT_EQ("", host->hostname());
@@ -795,7 +795,7 @@ TEST(HostImplTest, HostCluster) {
 }
 
 TEST(HostImplTest, Weight) {
-  MockCluster cluster;
+  MockClusterMockPrioritySet cluster;
 
   EXPECT_EQ(1U, makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 0)->weight());
   EXPECT_EQ(128U, makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 128)->weight());
@@ -812,7 +812,7 @@ TEST(HostImplTest, Weight) {
 }
 
 TEST(HostImplTest, HostnameCanaryAndLocality) {
-  MockCluster cluster;
+  MockClusterMockPrioritySet cluster;
   envoy::api::v2::core::Metadata metadata;
   Config::Metadata::mutableMetadataValue(metadata, Config::MetadataFilters::get().ENVOY_LB,
                                          Config::MetadataEnvoyLbKeys::get().CANARY)
@@ -835,7 +835,7 @@ TEST(HostImplTest, HostnameCanaryAndLocality) {
 }
 
 TEST(HostImplTest, HealthFlags) {
-  MockCluster cluster;
+  MockClusterMockPrioritySet cluster;
   HostSharedPtr host = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 1);
 
   // To begin with, no flags are set so we're healthy.
@@ -1575,8 +1575,8 @@ TEST(PrioritySet, Extend) {
   HostVector hosts_added{hosts->front()};
   HostVector hosts_removed{};
 
-  priority_set.hostSetsPerPriority()[1]->updateHosts(
-      HostSetImpl::updateHostsParams(hosts, hosts_per_locality, hosts, hosts_per_locality), {},
+  priority_set.updateHosts(
+      1, HostSetImpl::updateHostsParams(hosts, hosts_per_locality, hosts, hosts_per_locality), {},
       hosts_added, hosts_removed, absl::nullopt);
   EXPECT_EQ(1, priority_changes);
   EXPECT_EQ(1, membership_changes);
@@ -1985,7 +1985,7 @@ TEST(HostsPerLocalityImpl, Cons) {
     EXPECT_EQ(0, hosts_per_locality.get().size());
   }
 
-  MockCluster cluster;
+  MockClusterMockPrioritySet cluster;
   HostSharedPtr host_0 = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 1);
   HostSharedPtr host_1 = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 1);
 
@@ -2007,7 +2007,7 @@ TEST(HostsPerLocalityImpl, Cons) {
 }
 
 TEST(HostsPerLocalityImpl, Filter) {
-  MockCluster cluster;
+  MockClusterMockPrioritySet cluster;
   HostSharedPtr host_0 = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 1);
   HostSharedPtr host_1 = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 1);
 

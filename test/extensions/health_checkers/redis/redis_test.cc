@@ -29,7 +29,7 @@ class RedisHealthCheckerTest
       public Extensions::NetworkFilters::RedisProxy::ConnPool::ClientFactory {
 public:
   RedisHealthCheckerTest()
-      : cluster_(new NiceMock<Upstream::MockCluster>()),
+      : cluster_(new NiceMock<Upstream::MockClusterMockPrioritySet>()),
         event_logger_(new Upstream::MockHealthCheckEventLogger()) {}
 
   void setup() {
@@ -150,7 +150,7 @@ public:
     EXPECT_CALL(*timeout_timer_, enableTimer(_));
   }
 
-  std::shared_ptr<Upstream::MockCluster> cluster_;
+  std::shared_ptr<Upstream::MockClusterMockPrioritySet> cluster_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Runtime::MockRandomGenerator> random_;

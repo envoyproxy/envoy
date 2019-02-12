@@ -45,7 +45,7 @@ protected:
     cds_config.mutable_api_config_source()->set_api_type(
         envoy::api::v2::core::ApiConfigSource::REST);
     Upstream::ClusterManager::ClusterInfoMap cluster_map;
-    Upstream::MockCluster cluster;
+    Upstream::MockClusterMockPrioritySet cluster;
     cluster_map.emplace("foo_cluster", cluster);
     EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
     EXPECT_CALL(cluster, info());

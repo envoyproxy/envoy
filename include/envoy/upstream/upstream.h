@@ -301,32 +301,6 @@ public:
   virtual absl::optional<uint32_t> chooseLocality() PURE;
 
   /**
-   * Parameter class for updateHosts.
-   */
-  struct UpdateHostsParams {
-    HostVectorConstSharedPtr hosts;
-    HostVectorConstSharedPtr healthy_hosts;
-    HostVectorConstSharedPtr degraded_hosts;
-    HostsPerLocalityConstSharedPtr hosts_per_locality;
-    HostsPerLocalityConstSharedPtr healthy_hosts_per_locality;
-    HostsPerLocalityConstSharedPtr degraded_hosts_per_locality;
-  };
-
-  /**
-   * Updates the hosts in a given host set.
-   *
-   * @param update_hosts_param supplies the list of hosts and hosts per locality.
-   * @param locality_weights supplies a map from locality to associated weight.
-   * @param hosts_added supplies the hosts added since the last update.
-   * @param hosts_removed supplies the hosts removed since the last update.
-   * @param overprovisioning_factor if presents, overwrites the current overprovisioning_factor.
-   */
-  virtual void updateHosts(UpdateHostsParams&& update_host_params,
-                           LocalityWeightsConstSharedPtr locality_weights,
-                           const HostVector& hosts_added, const HostVector& hosts_removed,
-                           absl::optional<uint32_t> overprovisioning_factor) PURE;
-
-  /**
    * @return uint32_t the priority of this host set.
    */
   virtual uint32_t priority() const PURE;
@@ -376,17 +350,36 @@ public:
   virtual Common::CallbackHandle* addPriorityUpdateCb(PriorityUpdateCb callback) const PURE;
 
   /**
-   * Returns the host sets for this priority set, ordered by priority.
-   * The first element in the vector is the host set for priority 0, and so on.
-   *
-   * @return std::vector<HostSetPtr>& the host sets for this priority set.
-   */
-  virtual std::vector<HostSetPtr>& hostSetsPerPriority() PURE;
-
-  /**
    * @return const std::vector<HostSetPtr>& the host sets, ordered by priority.
    */
   virtual const std::vector<HostSetPtr>& hostSetsPerPriority() const PURE;
+
+  /**
+   * Parameter class for updateHosts.
+   */
+  struct UpdateHostsParams {
+    HostVectorConstSharedPtr hosts;
+    HostVectorConstSharedPtr healthy_hosts;
+    HostVectorConstSharedPtr degraded_hosts;
+    HostsPerLocalityConstSharedPtr hosts_per_locality;
+    HostsPerLocalityConstSharedPtr healthy_hosts_per_locality;
+    HostsPerLocalityConstSharedPtr degraded_hosts_per_locality;
+  };
+
+  /**
+   * Updates the hosts in a given host set.
+   *
+   * @param priority the priority of the host set to update.
+   * @param update_hosts_param supplies the list of hosts and hosts per locality.
+   * @param locality_weights supplies a map from locality to associated weight.
+   * @param hosts_added supplies the hosts added since the last update.
+   * @param hosts_removed supplies the hosts removed since the last update.
+   * @param overprovisioning_factor if presents, overwrites the current overprovisioning_factor.
+   */
+  virtual void updateHosts(uint32_t priority, UpdateHostsParams&& update_host_params,
+                           LocalityWeightsConstSharedPtr locality_weights,
+                           const HostVector& hosts_added, const HostVector& hosts_removed,
+                           absl::optional<uint32_t> overprovisioning_factor) PURE;
 };
 
 /**

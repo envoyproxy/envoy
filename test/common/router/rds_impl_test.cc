@@ -104,7 +104,7 @@ public:
     )EOF";
 
     Upstream::ClusterManager::ClusterInfoMap cluster_map;
-    Upstream::MockCluster cluster;
+    Upstream::MockClusterMockPrioritySet cluster;
     cluster_map.emplace("foo_cluster", cluster);
     EXPECT_CALL(factory_context_.cluster_manager_, clusters()).WillOnce(Return(cluster_map));
     EXPECT_CALL(cluster, info());
@@ -378,7 +378,7 @@ public:
 
     // Get a RouteConfigProvider. This one should create an entry in the RouteConfigProviderManager.
     Upstream::ClusterManager::ClusterInfoMap cluster_map;
-    Upstream::MockCluster cluster;
+    Upstream::MockClusterMockPrioritySet cluster;
     cluster_map.emplace("foo_cluster", cluster);
     EXPECT_CALL(factory_context_.cluster_manager_, clusters()).WillOnce(Return(cluster_map));
     EXPECT_CALL(cluster, info()).Times(2);
@@ -567,7 +567,7 @@ virtual_hosts:
   Envoy::Config::Utility::translateRdsConfig(*config2, rds2, stats_options_);
 
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
-  Upstream::MockCluster cluster;
+  Upstream::MockClusterMockPrioritySet cluster;
   cluster_map.emplace("bar_cluster", cluster);
   EXPECT_CALL(factory_context_.cluster_manager_, clusters()).WillOnce(Return(cluster_map));
   EXPECT_CALL(cluster, info()).Times(2);

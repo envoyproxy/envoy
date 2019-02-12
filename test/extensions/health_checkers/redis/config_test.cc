@@ -100,7 +100,7 @@ TEST(HealthCheckerFactoryTest, createRedisViaUpstreamHealthCheckerFactory) {
         key: foo
     )EOF";
 
-  NiceMock<Upstream::MockCluster> cluster;
+  NiceMock<Upstream::MockClusterMockPrioritySet> cluster;
   Runtime::MockLoader runtime;
   Runtime::MockRandomGenerator random;
   Event::MockDispatcher dispatcher;
@@ -123,7 +123,7 @@ TEST(HealthCheckerFactoryTest, createRedisWithDeprecatedV1JsonConfig) {
     }
     )EOF";
 
-  NiceMock<Upstream::MockCluster> cluster;
+  NiceMock<Upstream::MockClusterMockPrioritySet> cluster;
   Runtime::MockLoader runtime;
   Runtime::MockRandomGenerator random;
   Event::MockDispatcher dispatcher;
@@ -149,7 +149,7 @@ TEST(HealthCheckerFactoryTest, createRedisWithDeprecatedV1JsonConfigWithKey) {
     }
     )EOF";
 
-  NiceMock<Upstream::MockCluster> cluster;
+  NiceMock<Upstream::MockClusterMockPrioritySet> cluster;
   Runtime::MockLoader runtime;
   Runtime::MockRandomGenerator random;
   Event::MockDispatcher dispatcher;
