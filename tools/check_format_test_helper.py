@@ -203,6 +203,9 @@ if __name__ == "__main__":
   errors += checkUnfixableError("testing_test.cc",
                                 "Don't use 'using testing::Test;, elaborate the type instead")
   errors += checkUnfixableError(
+      "serialize_as_string.cc",
+      "Don't use MessageLite::SerializeAsString for generating deterministic serialization")
+  errors += checkUnfixableError(
       "version_history.rst",
       "Version history line malformed. Does not match VERSION_HISTORY_NEW_LINE_REGEX in "
       "check_format.py")

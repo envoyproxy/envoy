@@ -52,7 +52,7 @@ InstanceImpl::InstanceImpl(const Options& options, Event::TimeSystem& time_syste
                            ComponentFactory& component_factory,
                            Runtime::RandomGeneratorPtr&& random_generator,
                            ThreadLocal::Instance& tls, Thread::ThreadFactory& thread_factory)
-    : shutdown_(false), options_(options), time_system_(time_system), restarter_(restarter),
+    : shutdown_(false), options_(options), time_source_(time_system), restarter_(restarter),
       start_time_(time(nullptr)), original_start_time_(start_time_), stats_store_(store),
       thread_local_(tls),
       api_(new Api::Impl(options.fileFlushIntervalMsec(), thread_factory, store, time_system)),
@@ -225,7 +225,7 @@ void InstanceImpl::initialize(const Options& options,
 
   // Handle configuration that needs to take place prior to the main configuration load.
   InstanceUtil::loadBootstrapConfig(bootstrap_, options, api());
-  bootstrap_config_update_time_ = time_system_.systemTime();
+  bootstrap_config_update_time_ = time_source_.systemTime();
 
   // Needs to happen as early as possible in the instantiation to preempt the objects that require
   // stats.
@@ -304,7 +304,7 @@ void InstanceImpl::initialize(const Options& options,
 
   // Once we have runtime we can initialize the SSL context manager.
   ssl_context_manager_ =
-      std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(time_system_);
+      std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(time_source_);
 
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
       admin(), runtime(), stats(), threadLocal(), random(), dnsResolver(), sslContextManager(),
@@ -327,7 +327,7 @@ void InstanceImpl::initialize(const Options& options,
   if (bootstrap_.has_hds_config()) {
     const auto& hds_config = bootstrap_.hds_config();
     async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(
-        clusterManager(), thread_local_, time_system_, api());
+        clusterManager(), thread_local_, time_source_, api());
     hds_delegate_ = std::make_unique<Upstream::HdsDelegate>(
         stats(),
         Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, hds_config, stats())
