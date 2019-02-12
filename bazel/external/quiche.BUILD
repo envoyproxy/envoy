@@ -130,6 +130,8 @@ cc_library(
         "quiche/quic/platform/api/quic_string.h",
         "quiche/quic/platform/api/quic_string_piece.h",
         "quiche/quic/platform/api/quic_string_utils.h",
+        "quiche/quic/platform/api/quic_test.h",
+        "quiche/quic/platform/api/quic_text_utils.h",
         "quiche/quic/platform/api/quic_uint128.h",
         # TODO: uncomment the following files as implementations are added.
         # "quiche/quic/platform/api/quic_bug_tracker.h",
@@ -156,11 +158,11 @@ cc_library(
         # "quiche/quic/platform/api/quic_singleton.h",
         # "quiche/quic/platform/api/quic_sleep.h",
         # "quiche/quic/platform/api/quic_socket_address.h",
+        # "quiche/quic/platform/api/quic_stack_trace.h",
         # "quiche/quic/platform/api/quic_test.h",
         # "quiche/quic/platform/api/quic_test_loopback.h",
         # "quiche/quic/platform/api/quic_test_mem_slice_vector.h",
         # "quiche/quic/platform/api/quic_test_output.h",
-        # "quiche/quic/platform/api/quic_text_utils.h",
         # "quiche/quic/platform/api/quic_thread.h",
     ],
     visibility = ["//visibility:public"],
@@ -171,7 +173,10 @@ cc_library(
 
 envoy_cc_test(
     name = "quic_platform_test",
-    srcs = ["quiche/quic/platform/api/quic_string_utils_test.cc"],
+    srcs = [
+        "quiche/quic/platform/api/quic_string_utils_test.cc",
+        "quiche/quic/platform/api/quic_text_utils_test.cc",
+    ],
     repository = "@envoy",
     deps = [
         ":quic_platform",
