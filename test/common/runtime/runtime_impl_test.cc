@@ -106,6 +106,19 @@ TEST_F(DiskBackedLoaderImplTest, All) {
   EXPECT_EQ(2UL, loader->snapshot().getInteger("file3", 1));
   EXPECT_EQ(123UL, loader->snapshot().getInteger("file4", 1));
 
+  // Boolean getting.
+  bool value;
+  SnapshotImpl* snapshot = reinterpret_cast<SnapshotImpl*>(&loader->snapshot());
+
+  EXPECT_EQ(true, snapshot->getBoolean("file11", value));
+  EXPECT_EQ(true, value);
+  EXPECT_EQ(true, snapshot->getBoolean("file12", value));
+  EXPECT_EQ(false, value);
+  EXPECT_EQ(true, snapshot->getBoolean("file13", value));
+  EXPECT_EQ(true, value);
+  // File1 is not a boolean.
+  EXPECT_EQ(false, snapshot->getBoolean("file1", value));
+
   // Files with comments.
   EXPECT_EQ(123UL, loader->snapshot().getInteger("file5", 1));
   EXPECT_EQ("/home#about-us", loader->snapshot().get("file6"));

@@ -330,6 +330,7 @@ owning HTTP connection manager.
   rq_redirect, Counter, Total requests that resulted in a redirect response
   rq_direct_response, Counter, Total requests that resulted in a direct response
   rq_total, Counter, Total routed requests
+  rq_reset_after_downstream_response_started, Counter, Total requests that were reset after downstream response had started.
 
 Virtual cluster statistics are output in the
 *vhost.<virtual host name>.vcluster.<virtual cluster name>.* namespace and include the following

@@ -317,7 +317,7 @@ private:
     void drainTcpConnPools(HostSharedPtr old_host, TcpConnPoolsContainer& container);
     void removeTcpConn(const HostConstSharedPtr& host, Network::ClientConnection& connection);
     static void updateClusterMembership(const std::string& name, uint32_t priority,
-                                        HostSet::UpdateHostsParams&& update_hosts_params,
+                                        PrioritySet::UpdateHostsParams&& update_hosts_params,
                                         LocalityWeightsConstSharedPtr locality_weights,
                                         const HostVector& hosts_added,
                                         const HostVector& hosts_removed, ThreadLocal::Slot& tls);
@@ -433,7 +433,11 @@ private:
   Stats::Store& stats_;
   ThreadLocal::SlotPtr tls_;
   Runtime::RandomGenerator& random_;
+
+protected:
   ClusterMap active_clusters_;
+
+private:
   ClusterMap warming_clusters_;
   envoy::api::v2::core::BindConfig bind_config_;
   Outlier::EventLoggerSharedPtr outlier_event_logger_;

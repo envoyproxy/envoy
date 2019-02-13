@@ -252,10 +252,8 @@ void HdsCluster::initialize(std::function<void()> callback) {
     host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
   }
 
-  auto& first_host_set = priority_set_.getOrCreateHostSet(0);
-
-  first_host_set.updateHosts(
-      HostSetImpl::partitionHosts(initial_hosts_, HostsPerLocalityImpl::empty()), {},
+  priority_set_.updateHosts(
+      0, HostSetImpl::partitionHosts(initial_hosts_, HostsPerLocalityImpl::empty()), {},
       *initial_hosts_, {}, absl::nullopt);
 }
 
