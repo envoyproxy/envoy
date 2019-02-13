@@ -54,10 +54,12 @@ envoy_cc_library(
         "quic_fallthrough_impl.h",
         "quic_flag_utils_impl.h",
         "quic_iovec_impl.h",
+        "quic_map_util_impl.h",
         "quic_prefetch_impl.h",
         "quic_ptr_util_impl.h",
         "quic_string_impl.h",
         "quic_string_piece_impl.h",
+        "quic_test_impl.h",
         "quic_uint128_impl.h",
     ] + envoy_select_quiche([
         "quic_logging_impl.h",
@@ -70,6 +72,7 @@ envoy_cc_library(
         "abseil_memory",
         "abseil_node_hash_map",
         "abseil_node_hash_set",
+        "googletest",
     ],
     visibility = ["//visibility:public"],
     deps = envoy_select_quiche([
@@ -80,14 +83,22 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "quic_platform_impl_lib",
+    srcs = [
+        "quic_cert_utils_impl.cc",
+        "quic_text_utils_impl.cc",
+    ],
     hdrs = [
+        "quic_cert_utils_impl.h",
         "quic_mutex_impl.h",
         "quic_str_cat_impl.h",
         "quic_string_utils_impl.h",
+        "quic_text_utils_impl.h",
     ],
     external_deps = [
         "quiche_quic_platform_base",
+        "abseil_str_format",
         "abseil_synchronization",
+        "ssl",
     ],
     visibility = ["//visibility:public"],
 )
