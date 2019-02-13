@@ -7,7 +7,7 @@
 namespace Envoy {
 namespace Test {
 
-class GlobalTest : public TestBase {
+class GlobalTest : public testing::Test {
 protected:
 };
 

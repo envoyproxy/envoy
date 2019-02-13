@@ -22,7 +22,7 @@ namespace Envoy {
 namespace Secret {
 namespace {
 
-class SecretManagerImplTest : public TestBase {
+class SecretManagerImplTest : public testing::Test {
 protected:
   SecretManagerImplTest() : api_(Api::createApiForTest()) {}
 

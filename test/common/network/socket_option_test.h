@@ -18,7 +18,7 @@ namespace Envoy {
 namespace Network {
 namespace {
 
-class SocketOptionTest : public TestBase {
+class SocketOptionTest : public testing::Test {
 public:
   SocketOptionTest() { socket_.local_address_.reset(); }
 

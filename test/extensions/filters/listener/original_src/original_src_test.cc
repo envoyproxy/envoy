@@ -24,7 +24,7 @@ namespace ListenerFilters {
 namespace OriginalSrc {
 namespace {
 
-class OriginalSrcTest : public TestBase {
+class OriginalSrcTest : public testing::Test {
 public:
   std::unique_ptr<OriginalSrcFilter> makeDefaultFilter() {
     Config default_config;

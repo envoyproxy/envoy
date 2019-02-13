@@ -28,7 +28,7 @@ namespace Envoy {
 namespace Http {
 namespace Http1 {
 
-class Http1ServerConnectionImplTest : public TestBase {
+class Http1ServerConnectionImplTest : public testing::Test {
 public:
   void initialize() {
     codec_ = std::make_unique<ServerConnectionImpl>(connection_, callbacks_, codec_settings_);
@@ -671,7 +671,7 @@ TEST_F(Http1ServerConnectionImplTest, WatermarkTest) {
       ->onUnderlyingConnectionBelowWriteBufferLowWatermark();
 }
 
-class Http1ClientConnectionImplTest : public TestBase {
+class Http1ClientConnectionImplTest : public testing::Test {
 public:
   void initialize() { codec_ = std::make_unique<ClientConnectionImpl>(connection_, callbacks_); }
 

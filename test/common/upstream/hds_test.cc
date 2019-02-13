@@ -42,7 +42,7 @@ public:
   };
 };
 
-class HdsTest : public TestBase {
+class HdsTest : public testing::Test {
 protected:
   HdsTest()
       : retry_timer_(new Event::MockTimer()), server_response_timer_(new Event::MockTimer()),

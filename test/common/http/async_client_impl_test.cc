@@ -34,7 +34,7 @@ namespace Envoy {
 namespace Http {
 namespace {
 
-class AsyncClientImplTest : public TestBase {
+class AsyncClientImplTest : public testing::Test {
 public:
   AsyncClientImplTest()
       : client_(cm_.thread_local_cluster_.cluster_.info_, stats_store_, dispatcher_, local_info_,

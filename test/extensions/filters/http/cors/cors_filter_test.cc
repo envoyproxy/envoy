@@ -24,7 +24,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Cors {
 
-class CorsFilterTest : public TestBase {
+class CorsFilterTest : public testing::Test {
 public:
   CorsFilterTest() : config_(new CorsFilterConfig("test.", stats_)), filter_(config_) {
     cors_policy_ = std::make_unique<Router::TestCorsPolicy>();

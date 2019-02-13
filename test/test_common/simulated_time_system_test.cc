@@ -11,7 +11,7 @@ namespace Envoy {
 namespace Event {
 namespace Test {
 
-class SimulatedTimeSystemTest : public TestBase {
+class SimulatedTimeSystemTest : public testing::Test {
 protected:
   SimulatedTimeSystemTest()
       : event_system_(event_base_new()), scheduler_(time_system_.createScheduler(event_system_)),

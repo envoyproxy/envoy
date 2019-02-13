@@ -47,7 +47,7 @@ parseHttpConnectionManagerFromJson(const std::string& json_string, const Stats::
   return http_connection_manager;
 }
 
-class RdsTestBase : public TestBase {
+class RdsTestBase : public testing::Test {
 public:
   RdsTestBase() : request_(&factory_context_.cluster_manager_.async_client_) {}
 

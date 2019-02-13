@@ -10,7 +10,7 @@ namespace Envoy {
 namespace Compressor {
 namespace {
 
-class ZlibCompressorImplTest : public TestBase {
+class ZlibCompressorImplTest : public testing::Test {
 protected:
   void expectValidFlushedBuffer(const Buffer::OwnedImpl& output_buffer) {
     uint64_t num_comp_slices = output_buffer.getRawSlices(nullptr, 0);

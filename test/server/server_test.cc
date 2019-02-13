@@ -53,7 +53,7 @@ TEST(ServerInstanceUtil, flushHelper) {
   InstanceUtil::flushMetricsToSinks(sinks, source);
 }
 
-class RunHelperTest : public TestBase {
+class RunHelperTest : public testing::Test {
 public:
   RunHelperTest() {
     InSequence s;
@@ -112,7 +112,7 @@ TEST_F(RunHelperTest, ShutdownBeforeInitManagerInit) {
 }
 
 // Class creates minimally viable server instance for testing.
-class ServerInstanceImplTest : public TestBaseWithParam<Network::Address::IpVersion> {
+class ServerInstanceImplTest : public testing::TestWithParam<Network::Address::IpVersion> {
 protected:
   ServerInstanceImplTest() : version_(GetParam()) {}
 

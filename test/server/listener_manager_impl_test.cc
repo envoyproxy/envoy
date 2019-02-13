@@ -55,7 +55,7 @@ public:
   Configuration::FactoryContext* context_{};
 };
 
-class ListenerManagerImplTest : public TestBase {
+class ListenerManagerImplTest : public testing::Test {
 protected:
   ListenerManagerImplTest() : api_(Api::createApiForTest()) {
     ON_CALL(server_, api()).WillByDefault(ReturnRef(*api_));

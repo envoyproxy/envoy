@@ -21,7 +21,7 @@ namespace Filters {
 namespace Common {
 namespace ExtAuthz {
 
-class CheckRequestUtilsTest : public TestBase {
+class CheckRequestUtilsTest : public testing::Test {
 public:
   CheckRequestUtilsTest() {
     addr_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 1111);

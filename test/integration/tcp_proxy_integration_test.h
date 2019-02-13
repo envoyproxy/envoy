@@ -9,7 +9,7 @@
 
 namespace Envoy {
 namespace {
-class TcpProxyIntegrationTest : public TestBaseWithParam<Network::Address::IpVersion>,
+class TcpProxyIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                 public BaseIntegrationTest {
 public:
   TcpProxyIntegrationTest()

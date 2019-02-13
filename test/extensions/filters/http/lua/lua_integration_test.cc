@@ -7,7 +7,7 @@
 namespace Envoy {
 namespace {
 
-class LuaIntegrationTest : public TestBaseWithParam<Network::Address::IpVersion>,
+class LuaIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                            public HttpIntegrationTest {
 public:
   LuaIntegrationTest()

@@ -18,7 +18,7 @@ namespace Filesystem {
 // as it looks like some versions of libstdc++ have a bug in
 // std::experimental::filesystem::remove_all where it fails with nested directories:
 // https://gcc.gnu.org/bugzilla/show_bug.cgi?id=71313
-class DirectoryTest : public TestBase {
+class DirectoryTest : public testing::Test {
 public:
   DirectoryTest() : dir_path_(TestEnvironment::temporaryPath("envoy_test")) {
     files_to_remove_.push(dir_path_);

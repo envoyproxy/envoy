@@ -53,7 +53,7 @@ public:
 
 class ActiveTestRequest;
 
-class Http2ConnPoolImplTest : public TestBase {
+class Http2ConnPoolImplTest : public testing::Test {
 public:
   struct TestCodecClient {
     Http::MockClientConnection* codec_;

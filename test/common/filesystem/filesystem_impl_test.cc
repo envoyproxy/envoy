@@ -30,7 +30,7 @@ using testing::Throw;
 
 namespace Envoy {
 
-class FileSystemImplTest : public TestBase {
+class FileSystemImplTest : public testing::Test {
 protected:
   FileSystemImplTest()
       : file_system_(std::chrono::milliseconds(10000), Thread::threadFactoryForTest(),

@@ -91,7 +91,7 @@ TEST(DISABLED_LeastRequestLoadBalancerWeightTest, Weight) {
 /**
  * This test is for simulation only and should not be run as part of unit tests.
  */
-class DISABLED_SimulationTest : public TestBase {
+class DISABLED_SimulationTest : public testing::Test {
 public:
   DISABLED_SimulationTest() : stats_(ClusterInfoImpl::generateStats(stats_store_)) {
     ON_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50U))

@@ -67,10 +67,10 @@ public:
   ThriftProxyFilterConfigFactory factory_;
 };
 
-class ThriftFilterConfigTest : public TestBase, public ThriftFilterConfigTestBase {};
+class ThriftFilterConfigTest : public testing::Test, public ThriftFilterConfigTestBase {};
 
 class ThriftFilterTransportConfigTest
-    : public TestBaseWithParam<
+    : public testing::TestWithParam<
           envoy::config::filter::network::thrift_proxy::v2alpha1::TransportType>,
       public ThriftFilterConfigTestBase {};
 
@@ -78,7 +78,7 @@ INSTANTIATE_TEST_SUITE_P(TransportTypes, ThriftFilterTransportConfigTest,
                          testing::ValuesIn(getTransportTypes()));
 
 class ThriftFilterProtocolConfigTest
-    : public TestBaseWithParam<
+    : public testing::TestWithParam<
           envoy::config::filter::network::thrift_proxy::v2alpha1::ProtocolType>,
       public ThriftFilterConfigTestBase {};
 

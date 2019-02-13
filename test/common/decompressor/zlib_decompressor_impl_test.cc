@@ -10,7 +10,7 @@ namespace Envoy {
 namespace Decompressor {
 namespace {
 
-class ZlibDecompressorImplTest : public TestBase {
+class ZlibDecompressorImplTest : public testing::Test {
 protected:
   void drainBuffer(Buffer::OwnedImpl& buffer) { buffer.drain(buffer.length()); }
 

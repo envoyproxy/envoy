@@ -19,7 +19,7 @@ namespace Envoy {
 namespace Grpc {
 namespace {
 
-class EnvoyAsyncClientImplTest : public TestBase {
+class EnvoyAsyncClientImplTest : public testing::Test {
 public:
   EnvoyAsyncClientImplTest()
       : method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")) {

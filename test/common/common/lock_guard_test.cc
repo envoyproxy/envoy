@@ -6,7 +6,7 @@
 namespace Envoy {
 namespace Thread {
 
-class ThreadTest : public TestBase {
+class ThreadTest : public testing::Test {
 protected:
   ThreadTest() : a_(0), b_(0) {}
   int a_ GUARDED_BY(a_mutex_);

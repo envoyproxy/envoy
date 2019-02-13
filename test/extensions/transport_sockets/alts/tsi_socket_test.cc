@@ -18,7 +18,7 @@ using testing::Return;
 using testing::ReturnRef;
 using testing::StrictMock;
 
-class TsiSocketTest : public TestBase {
+class TsiSocketTest : public testing::Test {
 protected:
   TsiSocketTest() {
     server_.handshaker_factory_ = [](Event::Dispatcher& dispatcher,
@@ -382,7 +382,7 @@ TEST_F(TsiSocketTest, HandshakeWithInternalError) {
   raw_handshaker->vtable = vtable;
 }
 
-class TsiSocketFactoryTest : public TestBase {
+class TsiSocketFactoryTest : public testing::Test {
 protected:
   void SetUp() override {
     auto handshaker_factory = [](Event::Dispatcher& dispatcher,

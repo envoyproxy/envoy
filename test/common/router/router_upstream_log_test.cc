@@ -72,7 +72,7 @@ public:
   MockRetryState* retry_state_{};
 };
 
-class RouterUpstreamLogTest : public TestBase {
+class RouterUpstreamLogTest : public testing::Test {
 public:
   void init(absl::optional<envoy::config::filter::accesslog::v2::AccessLog> upstream_log) {
     envoy::config::filter::http::router::v2::Router router_proto;

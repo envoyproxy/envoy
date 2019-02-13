@@ -13,7 +13,7 @@ namespace Envoy {
 namespace Network {
 
 // Captures common infrastructure needed by both ListenerImplTest and UdpListenerImplTest.
-class ListenerImplTestBase : public TestBaseWithParam<Address::IpVersion> {
+class ListenerImplTestBase : public testing::TestWithParam<Address::IpVersion> {
 protected:
   ListenerImplTestBase()
       : version_(GetParam()),

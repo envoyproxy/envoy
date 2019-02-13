@@ -322,7 +322,7 @@ private:
   DnsResolverImpl* resolver_;
 };
 
-class DnsImplConstructor : public TestBase {
+class DnsImplConstructor : public testing::Test {
 protected:
   DnsImplConstructor() : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()) {}
 
@@ -401,7 +401,7 @@ TEST_F(DnsImplConstructor, BadCustomResolvers) {
                             "DNS resolver 'foo' is not an IP address");
 }
 
-class DnsImplTest : public TestBaseWithParam<Address::IpVersion> {
+class DnsImplTest : public testing::TestWithParam<Address::IpVersion> {
 public:
   DnsImplTest() : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()) {}
 

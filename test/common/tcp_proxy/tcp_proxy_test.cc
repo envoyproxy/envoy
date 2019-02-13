@@ -346,7 +346,7 @@ TEST(ConfigTest, AccessLogConfig) {
   EXPECT_EQ(2, config_obj.accessLogs().size());
 }
 
-class TcpProxyTest : public TestBase {
+class TcpProxyTest : public testing::Test {
 public:
   TcpProxyTest() {
     ON_CALL(*factory_context_.access_log_manager_.file_, write(_))
@@ -1076,7 +1076,7 @@ TEST_F(TcpProxyTest, UpstreamFlushReceiveUpstreamData) {
   upstream_callbacks_->onUpstreamData(buffer, false);
 }
 
-class TcpProxyRoutingTest : public TestBase {
+class TcpProxyRoutingTest : public testing::Test {
 public:
   TcpProxyRoutingTest() {
     std::string json = R"EOF(

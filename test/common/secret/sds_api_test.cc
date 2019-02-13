@@ -26,7 +26,7 @@ namespace Envoy {
 namespace Secret {
 namespace {
 
-class SdsApiTest : public TestBase {
+class SdsApiTest : public testing::Test {
 protected:
   SdsApiTest() : api_(Api::createApiForTest()) {}
 

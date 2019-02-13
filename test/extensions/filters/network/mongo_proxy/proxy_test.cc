@@ -60,7 +60,7 @@ public:
   DecoderCallbacks* callbacks_{};
 };
 
-class MongoProxyFilterTest : public TestBase {
+class MongoProxyFilterTest : public testing::Test {
 public:
   MongoProxyFilterTest() { setup(); }
 

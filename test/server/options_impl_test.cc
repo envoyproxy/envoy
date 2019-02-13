@@ -19,7 +19,7 @@ using testing::HasSubstr;
 
 namespace Envoy {
 
-class OptionsImplTest : public TestBase {
+class OptionsImplTest : public testing::Test {
 
 public:
   // Do the ugly work of turning a std::string into a char** and create an OptionsImpl. Args are

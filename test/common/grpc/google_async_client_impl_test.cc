@@ -44,7 +44,7 @@ public:
   std::shared_ptr<GoogleStub> shared_stub_{stub_};
 };
 
-class EnvoyGoogleAsyncClientImplTest : public TestBase {
+class EnvoyGoogleAsyncClientImplTest : public testing::Test {
 public:
   EnvoyGoogleAsyncClientImplTest()
       : stats_store_(new Stats::IsolatedStoreImpl), api_(Api::createApiForTest(*stats_store_)),

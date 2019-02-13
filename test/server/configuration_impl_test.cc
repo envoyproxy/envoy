@@ -50,7 +50,7 @@ TEST(FilterChainUtility, buildFilterChainFailWithBadFilters) {
   EXPECT_EQ(FilterChainUtility::buildFilterChain(connection, factories), false);
 }
 
-class ConfigurationImplTest : public TestBase {
+class ConfigurationImplTest : public testing::Test {
 protected:
   ConfigurationImplTest()
       : api_(Api::createApiForTest()),

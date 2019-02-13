@@ -27,7 +27,7 @@ std::chrono::nanoseconds checkDuration(std::chrono::nanoseconds last,
   return timing.value();
 }
 
-class StreamInfoImplTest : public TestBase {
+class StreamInfoImplTest : public testing::Test {
 protected:
   DangerousDeprecatedTestTime test_time_;
 };

@@ -18,7 +18,7 @@ namespace Extensions {
 namespace Tracers {
 namespace DynamicOt {
 
-class DynamicOpenTracingDriverTest : public TestBase {
+class DynamicOpenTracingDriverTest : public testing::Test {
 public:
   void setup(const std::string& library, const std::string& tracer_config) {
     driver_ = std::make_unique<DynamicOpenTracingDriver>(stats_, library, tracer_config);

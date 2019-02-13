@@ -28,7 +28,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace BufferFilter {
 
-class BufferFilterTest : public TestBase {
+class BufferFilterTest : public testing::Test {
 public:
   BufferFilterConfigSharedPtr setupConfig() {
     envoy::config::filter::http::buffer::v2::Buffer proto_config;

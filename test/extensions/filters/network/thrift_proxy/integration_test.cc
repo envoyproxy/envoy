@@ -15,7 +15,7 @@ namespace NetworkFilters {
 namespace ThriftProxy {
 
 class ThriftConnManagerIntegrationTest
-    : public TestBaseWithParam<std::tuple<TransportType, ProtocolType, bool>>,
+    : public testing::TestWithParam<std::tuple<TransportType, ProtocolType, bool>>,
       public BaseThriftIntegrationTest {
 public:
   static void SetUpTestSuite() {

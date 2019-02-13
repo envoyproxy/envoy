@@ -10,7 +10,7 @@
 namespace Envoy {
 namespace Json {
 
-class JsonLoaderTest : public TestBase {
+class JsonLoaderTest : public testing::Test {
 protected:
   JsonLoaderTest() : api_(Api::createApiForTest()) {}
 

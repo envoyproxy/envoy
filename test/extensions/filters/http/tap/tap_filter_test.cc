@@ -48,7 +48,7 @@ public:
                     const Http::HeaderMap* response_trailers));
 };
 
-class TapFilterTest : public TestBase {
+class TapFilterTest : public testing::Test {
 public:
   void setup(bool has_config) {
     if (has_config) {

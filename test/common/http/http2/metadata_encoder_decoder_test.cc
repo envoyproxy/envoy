@@ -81,7 +81,7 @@ static ssize_t send_callback(nghttp2_session* session, const uint8_t* buf, size_
 }
 } // namespace
 
-class MetadataEncoderDecoderTest : public TestBase {
+class MetadataEncoderDecoderTest : public testing::Test {
 public:
   void initialize(MetadataCallback cb) {
     decoder_ = std::make_unique<MetadataDecoder>(cb);

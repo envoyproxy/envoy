@@ -25,7 +25,7 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Server {
 
-class ConnectionHandlerTest : public TestBase, protected Logger::Loggable<Logger::Id::main> {
+class ConnectionHandlerTest : public testing::Test, protected Logger::Loggable<Logger::Id::main> {
 public:
   ConnectionHandlerTest()
       : handler_(new ConnectionHandlerImpl(ENVOY_LOGGER(), dispatcher_)),

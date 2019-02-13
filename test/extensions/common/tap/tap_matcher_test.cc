@@ -11,7 +11,7 @@ namespace Common {
 namespace Tap {
 namespace {
 
-class TapMatcherTest : public TestBase {
+class TapMatcherTest : public testing::Test {
 public:
   std::vector<MatcherPtr> matchers_;
   std::vector<bool> statuses_;

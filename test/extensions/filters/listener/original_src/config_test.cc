@@ -15,7 +15,7 @@ namespace {
 
 // In keeping with the class under test, it would have made sense to call this ConfigTest. However,
 // when running coverage tests, that conflicts with tests elsewhere in the codebase.
-class OriginalSrcConfigTest : public TestBase {
+class OriginalSrcConfigTest : public testing::Test {
 public:
   Config makeConfigFromProto(
       const envoy::config::filter::listener::original_src::v2alpha1::OriginalSrc& proto_config) {

@@ -24,7 +24,7 @@ using testing::NiceMock;
 namespace Envoy {
 namespace Server {
 
-class GuardDogTestBase : public TestBase {
+class GuardDogTestBase : public testing::Test {
 protected:
   GuardDogTestBase() : api_(Api::createApiForTest(stats_store_, time_system_)) {}
 

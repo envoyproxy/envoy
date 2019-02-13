@@ -14,7 +14,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
 
-class BinaryProtocolTest : public TestBase {
+class BinaryProtocolTest : public testing::Test {
 public:
   void resetMetadata() {
     metadata_.setMethodName("-");

@@ -7,7 +7,7 @@
 
 namespace Envoy {
 
-class TokenBucketImplTest : public TestBase {
+class TokenBucketImplTest : public testing::Test {
 protected:
   Event::SimulatedTimeSystem time_system_;
 };

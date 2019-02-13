@@ -8,7 +8,7 @@
 #include "test/test_common/test_base.h"
 
 namespace Envoy {
-class ProxyProtoIntegrationTest : public TestBaseWithParam<Network::Address::IpVersion>,
+class ProxyProtoIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                   public HttpIntegrationTest {
 public:
   ProxyProtoIntegrationTest()

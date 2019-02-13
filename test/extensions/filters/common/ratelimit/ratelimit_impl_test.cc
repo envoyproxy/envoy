@@ -41,7 +41,7 @@ public:
   MOCK_METHOD2(complete_, void(LimitStatus status, const Http::HeaderMap* headers));
 };
 
-class RateLimitGrpcClientTest : public TestBase {
+class RateLimitGrpcClientTest : public testing::Test {
 public:
   RateLimitGrpcClientTest()
       : async_client_(new Grpc::MockAsyncClient()),

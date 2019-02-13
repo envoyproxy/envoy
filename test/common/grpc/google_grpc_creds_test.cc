@@ -14,7 +14,7 @@ namespace {
 // of getting at the underlying state, we can at best just make sure we don't
 // crash, compare with nullptr and/or look at vector lengths.
 
-class CredsUtilityTest : public TestBase {
+class CredsUtilityTest : public testing::Test {
 public:
   CredsUtilityTest() : api_(Api::createApiForTest()) {}
 

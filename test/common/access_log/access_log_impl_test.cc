@@ -48,7 +48,7 @@ envoy::config::filter::accesslog::v2::AccessLog parseAccessLogFromV2Yaml(const s
   return access_log;
 }
 
-class AccessLogImplTest : public TestBase {
+class AccessLogImplTest : public testing::Test {
 public:
   AccessLogImplTest() : file_(new Filesystem::MockFile()) {
     ON_CALL(context_, runtime()).WillByDefault(ReturnRef(runtime_));

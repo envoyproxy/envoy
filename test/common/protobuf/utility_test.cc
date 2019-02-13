@@ -17,7 +17,7 @@
 
 namespace Envoy {
 
-class ProtobufUtilityTest : public TestBase {
+class ProtobufUtilityTest : public testing::Test {
 protected:
   ProtobufUtilityTest() : api_(Api::createApiForTest()) {}
 
@@ -340,7 +340,7 @@ TEST(DurationUtilTest, OutOfRange) {
   }
 }
 
-class DeprecatedFieldsTest : public TestBase {
+class DeprecatedFieldsTest : public testing::Test {
 protected:
   DeprecatedFieldsTest()
       : loader_(new Runtime::ScopedLoaderSingleton(
@@ -493,7 +493,7 @@ TEST_F(DeprecatedFieldsTest, RepeatedMessageDeprecated) {
                       MessageUtil::checkForDeprecation(base));
 }
 
-class TimestampUtilTest : public TestBase, public ::testing::WithParamInterface<int64_t> {};
+class TimestampUtilTest : public testing::Test, public ::testing::WithParamInterface<int64_t> {};
 
 TEST_P(TimestampUtilTest, SystemClockToTimestampTest) {
   // Generate an input time_point<system_clock>,

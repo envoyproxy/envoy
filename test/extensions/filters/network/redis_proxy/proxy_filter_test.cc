@@ -40,7 +40,7 @@ parseProtoFromJson(const std::string& json_string) {
   return config;
 }
 
-class RedisProxyFilterConfigTest : public TestBase {
+class RedisProxyFilterConfigTest : public testing::Test {
 public:
   Stats::IsolatedStoreImpl store_;
   Network::MockDrainDecision drain_decision_;
@@ -73,7 +73,7 @@ TEST_F(RedisProxyFilterConfigTest, BadRedisProxyConfig) {
   EXPECT_THROW(parseProtoFromJson(json_string), Json::Exception);
 }
 
-class RedisProxyFilterTest : public TestBase, public DecoderFactory {
+class RedisProxyFilterTest : public testing::Test, public DecoderFactory {
 public:
   RedisProxyFilterTest() {
     std::string json_string = R"EOF(

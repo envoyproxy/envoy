@@ -323,7 +323,7 @@ TEST(HttpNullTracerTest, BasicFunctionality) {
   EXPECT_NE(nullptr, span_ptr->spawnChild(config, "foo", SystemTime()));
 }
 
-class HttpTracerImplTest : public TestBase {
+class HttpTracerImplTest : public testing::Test {
 public:
   HttpTracerImplTest() {
     driver_ = new MockDriver();

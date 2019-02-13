@@ -63,7 +63,7 @@ TEST(UUID, sanityCheckOfUniqueness) {
   EXPECT_EQ(num_of_uuids, uuids.size());
 }
 
-class DiskBackedLoaderImplTest : public TestBase {
+class DiskBackedLoaderImplTest : public testing::Test {
 protected:
   DiskBackedLoaderImplTest() : api_(Api::createApiForTest(store)) {}
 
@@ -273,7 +273,7 @@ TEST(LoaderImplTest, All) {
   testNewOverrides(loader, store);
 }
 
-class DiskLayerTest : public TestBase {
+class DiskLayerTest : public testing::Test {
 protected:
   DiskLayerTest() : api_(Api::createApiForTest()) {}
 

@@ -16,7 +16,7 @@ namespace Envoy {
 namespace Grpc {
 namespace {
 
-class AsyncClientManagerImplTest : public TestBase {
+class AsyncClientManagerImplTest : public testing::Test {
 public:
   AsyncClientManagerImplTest() : api_(Api::createApiForTest()) {}
 

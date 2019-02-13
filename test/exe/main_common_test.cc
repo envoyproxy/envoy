@@ -31,7 +31,7 @@ namespace Envoy {
  * an argv array that is terminated with nullptr. Identifies the config
  * file relative to $TEST_RUNDIR.
  */
-class MainCommonTest : public TestBaseWithParam<Network::Address::IpVersion> {
+class MainCommonTest : public testing::TestWithParam<Network::Address::IpVersion> {
 protected:
   MainCommonTest()
       : config_file_(TestEnvironment::temporaryFileSubstitute(

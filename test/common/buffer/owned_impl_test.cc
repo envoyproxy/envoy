@@ -15,7 +15,7 @@ namespace Envoy {
 namespace Buffer {
 namespace {
 
-class OwnedImplTest : public TestBase {
+class OwnedImplTest : public testing::Test {
 public:
   bool release_callback_called_ = false;
 };

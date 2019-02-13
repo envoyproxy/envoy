@@ -28,7 +28,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace HealthCheck {
 
-class HealthCheckFilterTest : public TestBase {
+class HealthCheckFilterTest : public testing::Test {
 public:
   HealthCheckFilterTest(bool pass_through, bool caching)
       : request_headers_{{":path", "/healthcheck"}}, request_headers_no_hc_{{":path", "/foo"}} {

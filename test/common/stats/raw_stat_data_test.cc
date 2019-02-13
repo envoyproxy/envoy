@@ -10,7 +10,7 @@
 namespace Envoy {
 namespace Stats {
 
-class RawStatDataTest : public TestBase {
+class RawStatDataTest : public testing::Test {
 public:
   RawStatDataTest() : allocator_(stats_options_) {}
 

@@ -120,7 +120,7 @@ public:
 /**
  * Test fixture for all connection pool tests.
  */
-class Http1ConnPoolImplTest : public TestBase {
+class Http1ConnPoolImplTest : public testing::Test {
 public:
   Http1ConnPoolImplTest()
       : upstream_ready_timer_(new NiceMock<Event::MockTimer>(&dispatcher_)),

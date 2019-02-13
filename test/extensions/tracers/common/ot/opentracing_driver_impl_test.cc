@@ -44,7 +44,7 @@ private:
   std::shared_ptr<opentracing::mocktracer::MockTracer> tracer_;
 };
 
-class OpenTracingDriverTest : public TestBase {
+class OpenTracingDriverTest : public testing::Test {
 public:
   void
   setupValidDriver(OpenTracingDriver::PropagationMode propagation_mode =

@@ -97,7 +97,7 @@ static Http::TestHeaderMapImpl genHeaders(const std::string& host, const std::st
   return Http::TestHeaderMapImpl{{":authority", host}, {":path", path}, {":method", method}};
 }
 
-class RateLimitConfiguration : public TestBase {
+class RateLimitConfiguration : public testing::Test {
 public:
   void setupTest(const std::string& json) {
     envoy::api::v2::RouteConfiguration route_config;
@@ -343,7 +343,7 @@ TEST_F(RateLimitConfiguration, Stages) {
   EXPECT_TRUE(rate_limits.empty());
 }
 
-class RateLimitPolicyEntryTest : public TestBase {
+class RateLimitPolicyEntryTest : public testing::Test {
 public:
   void setupTest(const std::string& json) {
     rate_limit_entry_ = std::make_unique<RateLimitPolicyEntryImpl>(parseRateLimitFromJson(json));

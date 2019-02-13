@@ -23,10 +23,4 @@ class TestListener : public ::testing::EmptyTestEventListener {
   void OnTestEnd(const ::testing::TestInfo& test_info) override;
 };
 
-// TODO(jmarantz): Before Alyssa found this TestListener hook for me, we had
-// merged a PR that added the same functionality via common TestBase classes.
-// These should be removed.
-using TestBase = ::testing::Test;
-template <class T> using TestBaseWithParam = ::testing::TestWithParam<T>;
-
 } // namespace Envoy

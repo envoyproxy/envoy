@@ -39,7 +39,7 @@ namespace RateLimitFilter {
 
 using namespace Envoy::Extensions::NetworkFilters;
 
-class ThriftRateLimitFilterTest : public TestBase {
+class ThriftRateLimitFilterTest : public testing::Test {
 public:
   ThriftRateLimitFilterTest() {
     ON_CALL(runtime_.snapshot_, featureEnabled("ratelimit.thrift_filter_enabled", 100))

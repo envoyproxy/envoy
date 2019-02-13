@@ -26,7 +26,7 @@ namespace Extensions {
 namespace StatSinks {
 namespace DogStatsd {
 
-class DogStatsdConfigLoopbackTest : public TestBaseWithParam<Network::Address::IpVersion> {};
+class DogStatsdConfigLoopbackTest : public testing::TestWithParam<Network::Address::IpVersion> {};
 INSTANTIATE_TEST_SUITE_P(IpVersions, DogStatsdConfigLoopbackTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);

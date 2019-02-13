@@ -205,7 +205,7 @@ DummyConfigSubscription::DummyConfigSubscription(
           "DummyDS", manager_identifier, config_provider_manager, factory_context.timeSource(),
           factory_context.timeSource().systemTime(), factory_context.localInfo()) {}
 
-class ConfigProviderImplTest : public TestBase {
+class ConfigProviderImplTest : public testing::Test {
 public:
   ConfigProviderImplTest() {
     EXPECT_CALL(factory_context_.admin_.config_tracker_, add_("dummy", _));

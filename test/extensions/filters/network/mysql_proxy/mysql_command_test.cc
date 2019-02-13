@@ -16,7 +16,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace MySQLProxy {
 
-class MySQLCommandTest : public TestBase, public MySQLTestUtils {
+class MySQLCommandTest : public testing::Test, public MySQLTestUtils {
 public:
   int encodeQuery(std::string query, hsql::SQLParserResult& result) {
     Command mysql_cmd_encode{};

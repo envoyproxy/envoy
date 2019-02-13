@@ -14,7 +14,7 @@
 namespace Envoy {
 namespace {
 
-class LoadStatsIntegrationTest : public TestBaseWithParam<Network::Address::IpVersion>,
+class LoadStatsIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                  public HttpIntegrationTest {
 public:
   LoadStatsIntegrationTest()

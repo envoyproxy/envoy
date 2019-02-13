@@ -10,7 +10,7 @@ namespace HttpFilters {
 namespace GrpcJsonTranscoder {
 namespace {
 
-class TranscoderInputStreamTest : public TestBase {
+class TranscoderInputStreamTest : public testing::Test {
 public:
   TranscoderInputStreamTest() {
     Buffer::OwnedImpl buffer{"abcd"};

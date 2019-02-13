@@ -24,7 +24,7 @@ using testing::WithArg;
 namespace Envoy {
 namespace Server {
 
-class HotRestartImplTest : public TestBase {
+class HotRestartImplTest : public testing::Test {
 public:
   void setup() {
     EXPECT_CALL(os_sys_calls_, shmUnlink(_));

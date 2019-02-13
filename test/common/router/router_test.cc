@@ -74,7 +74,7 @@ public:
   bool reject_all_hosts_ = false;
 };
 
-class RouterTestBase : public TestBase {
+class RouterTestBase : public testing::Test {
 public:
   RouterTestBase(bool start_child_span, bool suppress_envoy_headers)
       : shadow_writer_(new MockShadowWriter()),

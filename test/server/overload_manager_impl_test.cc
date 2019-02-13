@@ -69,7 +69,7 @@ public:
   FakeResourceMonitor* monitor_; // not owned
 };
 
-class OverloadManagerImplTest : public TestBase {
+class OverloadManagerImplTest : public testing::Test {
 protected:
   OverloadManagerImplTest()
       : factory1_("envoy.resource_monitors.fake_resource1"),

@@ -38,7 +38,7 @@ namespace Extensions {
 namespace Tracers {
 namespace Datadog {
 
-class DatadogDriverTest : public TestBase {
+class DatadogDriverTest : public testing::Test {
 public:
   void setup(envoy::config::trace::v2::DatadogConfig& datadog_config, bool init_timer) {
     ON_CALL(cm_, httpAsyncClientForCluster("fake_cluster"))

@@ -28,7 +28,7 @@ namespace Extensions {
 namespace ListenerFilters {
 namespace TlsInspector {
 
-class TlsInspectorTest : public TestBase {
+class TlsInspectorTest : public testing::Test {
 public:
   TlsInspectorTest()
       : cfg_(std::make_shared<Config>(store_)),

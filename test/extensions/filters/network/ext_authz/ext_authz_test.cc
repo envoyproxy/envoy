@@ -35,7 +35,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ExtAuthz {
 
-class ExtAuthzFilterTest : public TestBase {
+class ExtAuthzFilterTest : public testing::Test {
 public:
   ExtAuthzFilterTest() {
     std::string json = R"EOF(

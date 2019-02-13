@@ -26,7 +26,7 @@ namespace {
 // List of paths for files in the test corpus.
 std::vector<std::string> test_corpus_;
 
-class FuzzerCorpusTest : public TestBaseWithParam<std::string> {
+class FuzzerCorpusTest : public testing::TestWithParam<std::string> {
 protected:
   FuzzerCorpusTest() : api_(Api::createApiForTest()) {}
 

@@ -25,7 +25,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
 
-class AutoProtocolTest : public TestBase {
+class AutoProtocolTest : public testing::Test {
 public:
   void resetMetadata() {
     metadata_.setMethodName("-");

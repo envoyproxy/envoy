@@ -8,7 +8,7 @@ namespace Envoy {
 namespace Network {
 namespace Test {
 
-class NetworkUtilityTest : public TestBaseWithParam<Address::IpVersion> {
+class NetworkUtilityTest : public testing::TestWithParam<Address::IpVersion> {
 protected:
   NetworkUtilityTest() : version_(GetParam()) {}
   const Address::IpVersion version_;

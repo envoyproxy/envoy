@@ -20,7 +20,7 @@ using testing::Throw;
 namespace Envoy {
 namespace Server {
 
-class WorkerImplTest : public TestBase {
+class WorkerImplTest : public testing::Test {
 public:
   WorkerImplTest()
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()),

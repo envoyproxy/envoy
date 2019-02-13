@@ -11,7 +11,7 @@ using testing::IsTrue;
 namespace Envoy {
 namespace Stats {
 
-class StatsMatcherTest : public TestBase {
+class StatsMatcherTest : public testing::Test {
 protected:
   envoy::type::matcher::StringMatcher* inclusionList() {
     return stats_config_.mutable_stats_matcher()->mutable_inclusion_list()->add_patterns();

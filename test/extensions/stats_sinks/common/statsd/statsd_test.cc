@@ -29,7 +29,7 @@ namespace StatSinks {
 namespace Common {
 namespace Statsd {
 
-class TcpStatsdSinkTest : public TestBase {
+class TcpStatsdSinkTest : public testing::Test {
 public:
   TcpStatsdSinkTest() {
     sink_ = std::make_unique<TcpStatsdSink>(

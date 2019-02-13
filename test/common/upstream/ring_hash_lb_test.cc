@@ -33,7 +33,7 @@ public:
   absl::optional<uint64_t> hash_key_;
 };
 
-class RingHashLoadBalancerTest : public TestBaseWithParam<bool> {
+class RingHashLoadBalancerTest : public testing::TestWithParam<bool> {
 public:
   RingHashLoadBalancerTest() : stats_(ClusterInfoImpl::generateStats(stats_store_)) {}
 

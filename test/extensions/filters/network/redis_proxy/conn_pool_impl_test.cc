@@ -40,7 +40,7 @@ createConnPoolSettings() {
   return setting;
 }
 
-class RedisClientImplTest : public TestBase, public DecoderFactory {
+class RedisClientImplTest : public testing::Test, public DecoderFactory {
 public:
   // RedisProxy::DecoderFactory
   DecoderPtr create(DecoderCallbacks& callbacks) override {
@@ -382,7 +382,7 @@ TEST(RedisClientFactoryImplTest, Basic) {
   client->close();
 }
 
-class RedisConnPoolImplTest : public TestBase, public ClientFactory {
+class RedisConnPoolImplTest : public testing::Test, public ClientFactory {
 public:
   void setup(bool cluster_exists = true) {
     EXPECT_CALL(cm_, addThreadLocalClusterUpdateCallbacks_(_))

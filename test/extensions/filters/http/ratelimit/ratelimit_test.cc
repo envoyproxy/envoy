@@ -37,7 +37,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace RateLimitFilter {
 
-class HttpRateLimitFilterTest : public TestBase {
+class HttpRateLimitFilterTest : public testing::Test {
 public:
   HttpRateLimitFilterTest() {
     ON_CALL(runtime_.snapshot_, featureEnabled("ratelimit.http_filter_enabled", 100))

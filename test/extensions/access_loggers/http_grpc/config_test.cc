@@ -19,7 +19,7 @@ namespace Extensions {
 namespace AccessLoggers {
 namespace HttpGrpc {
 
-class HttpGrpcAccessLogConfigTest : public TestBase {
+class HttpGrpcAccessLogConfigTest : public testing::Test {
 public:
   void SetUp() override {
     factory_ =

@@ -11,7 +11,7 @@ namespace {
 
 const char TEN_BYTES[] = "0123456789";
 
-class WatermarkBufferTest : public TestBase {
+class WatermarkBufferTest : public testing::Test {
 public:
   WatermarkBufferTest() { buffer_.setWatermarks(5, 10); }
 

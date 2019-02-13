@@ -30,7 +30,7 @@ namespace Filters {
 namespace Common {
 namespace ExtAuthz {
 
-class ExtAuthzHttpClientTest : public TestBase {
+class ExtAuthzHttpClientTest : public testing::Test {
 public:
   ExtAuthzHttpClientTest()
       : async_request_{&async_client_}, config_{createConfig()}, client_{cm_, config_} {

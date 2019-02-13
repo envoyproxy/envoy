@@ -21,7 +21,7 @@ public:
                void(envoy::service::tap::v2alpha::TapConfig&& proto_config, Sink* admin_streamer));
 };
 
-class AdminHandlerTest : public TestBase {
+class AdminHandlerTest : public testing::Test {
 public:
   AdminHandlerTest() {
     EXPECT_CALL(admin_, addHandler("/tap", "tap filter control", _, true, true))

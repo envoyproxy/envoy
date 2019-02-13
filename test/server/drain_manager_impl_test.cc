@@ -15,7 +15,7 @@ using testing::SaveArg;
 namespace Envoy {
 namespace Server {
 
-class DrainManagerImplTest : public TestBase {
+class DrainManagerImplTest : public testing::Test {
 public:
   DrainManagerImplTest() {
     ON_CALL(server_.options_, drainTime()).WillByDefault(Return(std::chrono::seconds(600)));

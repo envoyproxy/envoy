@@ -26,7 +26,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Dynamo {
 
-class DynamoFilterTest : public TestBase {
+class DynamoFilterTest : public testing::Test {
 public:
   void setup(bool enabled) {
     ON_CALL(loader_.snapshot_, featureEnabled("dynamodb.filter_enabled", 100))

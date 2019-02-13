@@ -55,7 +55,7 @@ TEST(ClientSslAuthConfigTest, BadClientSslAuthConfig) {
                Json::Exception);
 }
 
-class ClientSslAuthFilterTest : public TestBase {
+class ClientSslAuthFilterTest : public testing::Test {
 protected:
   ClientSslAuthFilterTest()
       : request_(&cm_.async_client_), interval_timer_(new Event::MockTimer(&dispatcher_)),

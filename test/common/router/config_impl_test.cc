@@ -110,7 +110,7 @@ protected:
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
 };
 
-class RouteMatcherTest : public TestBase, public ConfigImplTestBase {};
+class RouteMatcherTest : public testing::Test, public ConfigImplTestBase {};
 
 TEST_F(RouteMatcherTest, TestRoutes) {
   const std::string json = R"EOF(
@@ -1381,7 +1381,7 @@ virtual_hosts:
       EnvoyException, "Invalid regex");
 }
 
-class RouterMatcherHashPolicyTest : public TestBase, public ConfigImplTestBase {
+class RouterMatcherHashPolicyTest : public testing::Test, public ConfigImplTestBase {
 protected:
   RouterMatcherHashPolicyTest()
       : add_cookie_nop_(
@@ -2219,7 +2219,7 @@ TEST_F(RouteMatcherTest, Shadow) {
                     .runtimeKey());
 }
 
-class RouteConfigurationV2 : public TestBase, public ConfigImplTestBase {};
+class RouteConfigurationV2 : public testing::Test, public ConfigImplTestBase {};
 
 TEST_F(RouteConfigurationV2, RequestMirrorPolicy) {
   const std::string yaml = R"EOF(
@@ -3628,7 +3628,7 @@ TEST(NullConfigImplTest, All) {
   EXPECT_EQ("", config.name());
 }
 
-class BadHttpRouteConfigurationsTest : public TestBase, public ConfigImplTestBase {};
+class BadHttpRouteConfigurationsTest : public testing::Test, public ConfigImplTestBase {};
 
 TEST_F(BadHttpRouteConfigurationsTest, BadRouteConfig) {
   const std::string json = R"EOF(
@@ -3874,7 +3874,7 @@ TEST_F(RouteMatcherTest, TestOpaqueConfig) {
   EXPECT_EQ(opaque_config.find("name2")->second, "value2");
 }
 
-class RoutePropertyTest : public TestBase, public ConfigImplTestBase {};
+class RoutePropertyTest : public testing::Test, public ConfigImplTestBase {};
 
 TEST_F(RoutePropertyTest, excludeVHRateLimits) {
   std::string json = R"EOF(
@@ -4224,7 +4224,7 @@ TEST_F(RouteMatcherTest, Decorator) {
   }
 }
 
-class CustomRequestHeadersTest : public TestBase, public ConfigImplTestBase {};
+class CustomRequestHeadersTest : public testing::Test, public ConfigImplTestBase {};
 
 TEST_F(CustomRequestHeadersTest, AddNewHeader) {
   const std::string json = R"EOF(
@@ -4405,7 +4405,7 @@ TEST(MetadataMatchCriteriaImpl, Merge) {
   EXPECT_EQ((*it)->value().value().string_value(), "override3");
 }
 
-class RouteEntryMetadataMatchTest : public TestBase, public ConfigImplTestBase {};
+class RouteEntryMetadataMatchTest : public testing::Test, public ConfigImplTestBase {};
 
 TEST_F(RouteEntryMetadataMatchTest, ParsesMetadata) {
   auto route_config = envoy::api::v2::RouteConfiguration();
@@ -4517,7 +4517,7 @@ TEST_F(RouteEntryMetadataMatchTest, ParsesMetadata) {
   }
 }
 
-class ConfigUtilityTest : public TestBase, public ConfigImplTestBase {};
+class ConfigUtilityTest : public testing::Test, public ConfigImplTestBase {};
 
 TEST_F(ConfigUtilityTest, ParseResponseCode) {
   const std::vector<
@@ -5246,7 +5246,7 @@ virtual_hosts:
   EXPECT_NE(predicates1, predicates2);
 }
 
-class PerFilterConfigsTest : public TestBase, public ConfigImplTestBase {
+class PerFilterConfigsTest : public testing::Test, public ConfigImplTestBase {
 public:
   PerFilterConfigsTest()
       : registered_factory_(factory_), registered_default_factory_(default_factory_) {}

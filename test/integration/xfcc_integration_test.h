@@ -19,7 +19,7 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Xfcc {
 
-class XfccIntegrationTest : public TestBaseWithParam<Network::Address::IpVersion>,
+class XfccIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                             public HttpIntegrationTest {
 public:
   const std::string previous_xfcc_ =

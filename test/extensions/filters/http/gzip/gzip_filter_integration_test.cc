@@ -9,7 +9,7 @@
 
 namespace Envoy {
 
-class GzipIntegrationTest : public TestBaseWithParam<Network::Address::IpVersion>,
+class GzipIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                             public Event::SimulatedTimeSystem,
                             public HttpIntegrationTest {
 public:

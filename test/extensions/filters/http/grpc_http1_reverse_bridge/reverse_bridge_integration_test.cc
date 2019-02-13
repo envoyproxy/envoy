@@ -17,7 +17,7 @@ namespace Envoy {
 
 // Tests a downstream HTTP2 client sending gRPC requests that are converted into HTTP/1.1 for a
 // HTTP1 upstream.
-class ReverseBridgeIntegrationTest : public TestBaseWithParam<Network::Address::IpVersion>,
+class ReverseBridgeIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                      public HttpIntegrationTest {
 public:
   ReverseBridgeIntegrationTest()

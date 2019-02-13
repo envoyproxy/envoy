@@ -28,7 +28,7 @@ enum class SymbolTableType {
   Fake,
 };
 
-class StatNameTest : public TestBaseWithParam<SymbolTableType> {
+class StatNameTest : public testing::TestWithParam<SymbolTableType> {
 protected:
   StatNameTest() {
     switch (GetParam()) {

@@ -38,7 +38,7 @@ public:
 
 class GrpcClientIntegrationParamTest
     : public BaseGrpcClientIntegrationParamTest,
-      public TestBaseWithParam<std::tuple<Network::Address::IpVersion, ClientType>> {
+      public testing::TestWithParam<std::tuple<Network::Address::IpVersion, ClientType>> {
 public:
   ~GrpcClientIntegrationParamTest() override = default;
   static std::string protocolTestParamsToString(

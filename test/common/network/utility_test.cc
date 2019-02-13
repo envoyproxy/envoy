@@ -153,7 +153,7 @@ TEST(NetworkUtility, ParseInternetAddressAndPort) {
   EXPECT_EQ("[::1]:0", Utility::parseInternetAddressAndPort("[::1]:0")->asString());
 }
 
-class NetworkUtilityGetLocalAddress : public TestBaseWithParam<Address::IpVersion> {};
+class NetworkUtilityGetLocalAddress : public testing::TestWithParam<Address::IpVersion> {};
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, NetworkUtilityGetLocalAddress,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),

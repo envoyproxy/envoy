@@ -38,7 +38,7 @@ namespace {
 
 // We test some mux specific stuff below, other unit test coverage for singleton use of GrpcMuxImpl
 // is provided in [grpc_]subscription_impl_test.cc.
-class GrpcMuxImplTestBase : public TestBase {
+class GrpcMuxImplTestBase : public testing::Test {
 public:
   GrpcMuxImplTestBase() : async_client_(new Grpc::MockAsyncClient()) {}
 

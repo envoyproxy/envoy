@@ -23,7 +23,7 @@ const std::string header = R"EOF(
 
 } // namespace
 
-class RoleBasedAccessControlNetworkFilterConfigFactoryTest : public TestBase {
+class RoleBasedAccessControlNetworkFilterConfigFactoryTest : public testing::Test {
 public:
   void validateRule(const std::string& policy_json) {
     checkRule(fmt::sprintf(policy_json, header));

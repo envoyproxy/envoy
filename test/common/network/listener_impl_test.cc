@@ -53,7 +53,7 @@ static void errorCallbackTest(Address::IpVersion version) {
   dispatcher->run(Event::Dispatcher::RunType::Block);
 }
 
-class ListenerImplDeathTest : public TestBaseWithParam<Address::IpVersion> {};
+class ListenerImplDeathTest : public testing::TestWithParam<Address::IpVersion> {};
 INSTANTIATE_TEST_SUITE_P(IpVersions, ListenerImplDeathTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);

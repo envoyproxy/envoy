@@ -57,7 +57,7 @@ public:
   Http::HeaderMapPtr downstream_headers_;
 };
 
-class OriginalDstClusterTest : public TestBase {
+class OriginalDstClusterTest : public testing::Test {
 public:
   // cleanup timer must be created before the cluster (in setup()), so that we can set expectations
   // on it. Ownership is transferred to the cluster at the cluster constructor, so the cluster will

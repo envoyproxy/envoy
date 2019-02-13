@@ -35,7 +35,7 @@ namespace NetworkFilters {
 namespace RedisProxy {
 namespace CommandSplitter {
 
-class RedisCommandSplitterImplTest : public TestBase {
+class RedisCommandSplitterImplTest : public testing::Test {
 public:
   void makeBulkStringArray(RespValue& value, const std::vector<std::string>& strings) {
     std::vector<RespValue> values(strings.size());

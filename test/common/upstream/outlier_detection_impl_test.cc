@@ -56,7 +56,7 @@ public:
   MOCK_METHOD1(check, void(HostSharedPtr host));
 };
 
-class OutlierDetectorImplTest : public TestBase {
+class OutlierDetectorImplTest : public testing::Test {
 public:
   OutlierDetectorImplTest() {
     ON_CALL(runtime_.snapshot_, featureEnabled("outlier_detection.enforcing_consecutive_5xx", 100))

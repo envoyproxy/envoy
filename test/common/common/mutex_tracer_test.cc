@@ -11,7 +11,7 @@
 
 namespace Envoy {
 
-class MutexTracerTest : public TestBase {
+class MutexTracerTest : public testing::Test {
 protected:
   void SetUp() override { tracer_.reset(); }
 

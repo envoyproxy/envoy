@@ -12,7 +12,7 @@ using testing::_;
 namespace Envoy {
 namespace Network {
 
-class SocketOptionFactoryTest : public TestBase {
+class SocketOptionFactoryTest : public testing::Test {
 public:
   SocketOptionFactoryTest() = default;
 

@@ -33,8 +33,9 @@ using testing::Return;
 namespace Envoy {
 namespace Ssl {
 
-class SdsStaticDownstreamIntegrationTest : public TestBaseWithParam<Network::Address::IpVersion>,
-                                           public HttpIntegrationTest {
+class SdsStaticDownstreamIntegrationTest
+    : public testing::TestWithParam<Network::Address::IpVersion>,
+      public HttpIntegrationTest {
 public:
   SdsStaticDownstreamIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()) {}
@@ -105,7 +106,7 @@ TEST_P(SdsStaticDownstreamIntegrationTest, RouterRequestAndResponseWithGiantBody
   testRouterRequestAndResponseWithBody(16 * 1024 * 1024, 16 * 1024 * 1024, false, &creator);
 }
 
-class SdsStaticUpstreamIntegrationTest : public TestBaseWithParam<Network::Address::IpVersion>,
+class SdsStaticUpstreamIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                          public HttpIntegrationTest {
 public:
   SdsStaticUpstreamIntegrationTest()

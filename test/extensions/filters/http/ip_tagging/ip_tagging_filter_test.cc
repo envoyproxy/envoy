@@ -25,7 +25,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace IpTagging {
 
-class IpTaggingFilterTest : public TestBase {
+class IpTaggingFilterTest : public testing::Test {
 public:
   IpTaggingFilterTest() {
     ON_CALL(runtime_.snapshot_, featureEnabled("ip_tagging.http_filter_enabled", 100))

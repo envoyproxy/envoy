@@ -17,7 +17,7 @@ namespace Extensions {
 namespace Retry {
 namespace Priority {
 
-class RetryPriorityTest : public TestBase {
+class RetryPriorityTest : public testing::Test {
 public:
   void initialize(const Upstream::HealthyLoad& original_healthy_priority_load,
                   const Upstream::DegradedLoad& original_degraded_priority_load) {

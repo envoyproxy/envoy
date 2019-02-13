@@ -20,7 +20,7 @@ namespace ListenerFilters {
 namespace OriginalSrc {
 namespace {
 
-class OriginalSrcSocketOptionTest : public TestBase {
+class OriginalSrcSocketOptionTest : public testing::Test {
 public:
   std::unique_ptr<OriginalSrcSocketOption>
   makeOptionByAddress(const Network::Address::InstanceConstSharedPtr& address) {

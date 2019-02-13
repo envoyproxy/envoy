@@ -33,7 +33,7 @@ static envoy::api::v2::route::Route parseRouteFromV2Yaml(const std::string& yaml
   return route;
 }
 
-class StreamInfoHeaderFormatterTest : public TestBase {
+class StreamInfoHeaderFormatterTest : public testing::Test {
 public:
   void testFormatting(const Envoy::StreamInfo::MockStreamInfo& stream_info,
                       const std::string& variable, const std::string& expected_output) {

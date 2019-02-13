@@ -20,8 +20,9 @@ using Envoy::ProtobufWkt::Empty;
 
 namespace Envoy {
 
-class GrpcJsonTranscoderIntegrationTest : public TestBaseWithParam<Network::Address::IpVersion>,
-                                          public HttpIntegrationTest {
+class GrpcJsonTranscoderIntegrationTest
+    : public testing::TestWithParam<Network::Address::IpVersion>,
+      public HttpIntegrationTest {
 public:
   GrpcJsonTranscoderIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()) {}

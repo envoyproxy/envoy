@@ -33,7 +33,7 @@ public:
   MOCK_CONST_METHOD1(findVerifier, const Verifier*(const Http::HeaderMap& headers));
 };
 
-class FilterTest : public TestBase {
+class FilterTest : public testing::Test {
 public:
   void SetUp() override {
     mock_config_ = ::std::make_shared<MockFilterConfig>(proto_config_, "", mock_context_);

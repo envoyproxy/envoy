@@ -47,7 +47,7 @@ TEST(MetadataTest, MetadataValuePath) {
             ProtobufWkt::Value::KindCase::KIND_NOT_SET);
 }
 
-class TypedMetadataTest : public TestBase {
+class TypedMetadataTest : public testing::Test {
 public:
   TypedMetadataTest() : registered_factory_(foo_factory_) {}
 

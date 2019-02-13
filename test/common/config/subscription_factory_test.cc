@@ -26,7 +26,7 @@ using ::testing::Return;
 namespace Envoy {
 namespace Config {
 
-class SubscriptionFactoryTest : public TestBase {
+class SubscriptionFactoryTest : public testing::Test {
 public:
   SubscriptionFactoryTest()
       : http_request_(&cm_.async_client_), api_(Api::createApiForTest(stats_store_)) {}

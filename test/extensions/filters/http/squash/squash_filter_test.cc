@@ -164,7 +164,7 @@ TEST(SoloFilterConfigTest, ParsesEnvironmentInComplexTemplate) {
   EXPECT_JSON_EQ(expected_json, config.attachmentJson());
 }
 
-class SquashFilterTest : public TestBase {
+class SquashFilterTest : public testing::Test {
 public:
   SquashFilterTest() : request_(&cm_.async_client_) {}
 

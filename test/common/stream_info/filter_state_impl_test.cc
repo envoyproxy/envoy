@@ -43,7 +43,7 @@ private:
   int value_;
 };
 
-class FilterStateImplTest : public TestBase {
+class FilterStateImplTest : public testing::Test {
 public:
   FilterStateImplTest() { resetFilterState(); }
 

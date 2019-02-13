@@ -149,7 +149,7 @@ route_config:
 } // namespace
 
 class HeaderIntegrationTest
-    : public TestBaseWithParam<std::tuple<Network::Address::IpVersion, bool>>,
+    : public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>>,
       public HttpIntegrationTest {
 public:
   HeaderIntegrationTest()

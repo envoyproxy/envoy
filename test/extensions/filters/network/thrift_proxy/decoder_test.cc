@@ -189,7 +189,7 @@ public:
 };
 
 class DecoderStateMachineNonValueTest : public DecoderStateMachineTestBase,
-                                        public TestBaseWithParam<ProtocolState> {};
+                                        public testing::TestWithParam<ProtocolState> {};
 
 static std::string protoStateParamToString(const TestParamInfo<ProtocolState>& params) {
   return ProtocolStateNameValues::name(params.param);
@@ -204,9 +204,9 @@ INSTANTIATE_TEST_SUITE_P(NonValueProtocolStates, DecoderStateMachineNonValueTest
                                 ProtocolState::SetBegin, ProtocolState::SetEnd),
                          protoStateParamToString);
 
-class DecoderStateMachineTest : public TestBase, public DecoderStateMachineTestBase {};
+class DecoderStateMachineTest : public testing::Test, public DecoderStateMachineTestBase {};
 class DecoderStateMachineValueTest : public DecoderStateMachineTestBase,
-                                     public TestBaseWithParam<FieldType> {};
+                                     public testing::TestWithParam<FieldType> {};
 
 INSTANTIATE_TEST_SUITE_P(PrimitiveFieldTypes, DecoderStateMachineValueTest,
                          Values(FieldType::Bool, FieldType::Byte, FieldType::Double, FieldType::I16,
@@ -215,7 +215,7 @@ INSTANTIATE_TEST_SUITE_P(PrimitiveFieldTypes, DecoderStateMachineValueTest,
 
 class DecoderStateMachineNestingTest
     : public DecoderStateMachineTestBase,
-      public TestBaseWithParam<std::tuple<FieldType, FieldType, FieldType>> {};
+      public testing::TestWithParam<std::tuple<FieldType, FieldType, FieldType>> {};
 
 static std::string nestedFieldTypesParamToString(
     const TestParamInfo<std::tuple<FieldType, FieldType, FieldType>>& params) {

@@ -81,11 +81,12 @@ public:
   }
 };
 
-class HttpFilterTest : public HttpFilterTestBase<TestBase> {};
+class HttpFilterTest : public HttpFilterTestBase<testing::Test> {};
 
 using CreateFilterConfigFunc = envoy::config::filter::http::ext_authz::v2::ExtAuthz();
 
-class HttpFilterTestParam : public HttpFilterTestBase<TestBaseWithParam<CreateFilterConfigFunc*>> {
+class HttpFilterTestParam
+    : public HttpFilterTestBase<testing::TestWithParam<CreateFilterConfigFunc*>> {
 public:
   void SetUp() override { initialize(""); }
 };

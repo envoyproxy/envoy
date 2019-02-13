@@ -175,7 +175,7 @@ TEST_P(SslIntegrationTest, AdminCertEndpoint) {
 
 // Validate certificate selection across different certificate types and client TLS versions.
 class SslCertficateIntegrationTest
-    : public TestBaseWithParam<
+    : public testing::TestWithParam<
           std::tuple<Network::Address::IpVersion, envoy::api::v2::auth::TlsParameters_TlsProtocol>>,
       public SslIntegrationTestBase {
 public:

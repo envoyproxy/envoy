@@ -12,7 +12,7 @@ namespace {
 
 // Integration test for EDS features. EDS is consumed via filesystem
 // subscription.
-class EdsIntegrationTest : public TestBaseWithParam<Network::Address::IpVersion>,
+class EdsIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                            public HttpIntegrationTest {
 public:
   EdsIntegrationTest()

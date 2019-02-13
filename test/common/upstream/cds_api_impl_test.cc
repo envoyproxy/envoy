@@ -26,7 +26,7 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Upstream {
 
-class CdsApiImplTest : public TestBase {
+class CdsApiImplTest : public testing::Test {
 protected:
   CdsApiImplTest() : request_(&cm_.async_client_), api_(Api::createApiForTest(store_)) {}
 

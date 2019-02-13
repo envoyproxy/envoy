@@ -152,7 +152,7 @@ protected:
 /**
  * Test fixture for connection pool tests.
  */
-class TcpConnPoolImplTest : public TestBase {
+class TcpConnPoolImplTest : public testing::Test {
 public:
   TcpConnPoolImplTest()
       : upstream_ready_timer_(new NiceMock<Event::MockTimer>(&dispatcher_)),
@@ -175,7 +175,7 @@ public:
 /**
  * Test fixture for connection pool destructor tests.
  */
-class TcpConnPoolImplDestructorTest : public TestBase {
+class TcpConnPoolImplDestructorTest : public testing::Test {
 public:
   TcpConnPoolImplDestructorTest()
       : upstream_ready_timer_(new NiceMock<Event::MockTimer>(&dispatcher_)),

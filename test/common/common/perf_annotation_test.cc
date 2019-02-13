@@ -13,7 +13,7 @@
 
 namespace Envoy {
 
-class PerfAnnotationTest : public TestBase {
+class PerfAnnotationTest : public testing::Test {
 protected:
   void TearDown() override { PERF_CLEAR(); }
 };

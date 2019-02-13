@@ -116,7 +116,7 @@ private:
   histogram_t* histogram_;
 };
 
-class HystrixSinkTest : public TestBase {
+class HystrixSinkTest : public testing::Test {
 public:
   HystrixSinkTest() { sink_ = std::make_unique<HystrixSink>(server_, window_size_); }
 

@@ -26,7 +26,7 @@ namespace MySQLProxy {
 
 constexpr int SESSIONS = 5;
 
-class MySQLIntegrationTest : public TestBaseWithParam<Network::Address::IpVersion>,
+class MySQLIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                              public MySQLTestUtils,
                              public BaseIntegrationTest {
   std::string mysqlConfig() {

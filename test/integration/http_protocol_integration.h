@@ -25,7 +25,7 @@ struct HttpProtocolTestParams {
 // TEST_P(MyTest, TestInstance) {
 // ....
 // }
-class HttpProtocolIntegrationTest : public TestBaseWithParam<HttpProtocolTestParams>,
+class HttpProtocolIntegrationTest : public testing::TestWithParam<HttpProtocolTestParams>,
                                     public HttpIntegrationTest {
 public:
   // By default returns 8 combinations of

@@ -58,7 +58,7 @@ TEST(DeferredDeleteTest, DeferredDelete) {
   dispatcher->clearDeferredDeleteList();
 }
 
-class DispatcherImplTest : public TestBase {
+class DispatcherImplTest : public testing::Test {
 protected:
   DispatcherImplTest()
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()),

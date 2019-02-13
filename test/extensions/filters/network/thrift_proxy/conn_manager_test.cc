@@ -70,7 +70,7 @@ public:
   MockProtocol* protocol_{};
 };
 
-class ThriftConnectionManagerTest : public TestBase {
+class ThriftConnectionManagerTest : public testing::Test {
 public:
   ThriftConnectionManagerTest() : stats_(ThriftFilterStats::generateStats("test.", store_)) {}
   ~ThriftConnectionManagerTest() override {

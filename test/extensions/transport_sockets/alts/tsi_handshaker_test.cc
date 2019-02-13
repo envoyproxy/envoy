@@ -32,7 +32,7 @@ public:
   }
 };
 
-class TsiHandshakerTest : public TestBase {
+class TsiHandshakerTest : public testing::Test {
 public:
   TsiHandshakerTest()
       : server_handshaker_({tsi_create_fake_handshaker(0)}, dispatcher_),

@@ -7,7 +7,7 @@ namespace Envoy {
 namespace Buffer {
 namespace {
 
-class ZeroCopyInputStreamTest : public TestBase {
+class ZeroCopyInputStreamTest : public testing::Test {
 public:
   ZeroCopyInputStreamTest() {
     Buffer::OwnedImpl buffer{"abcd"};

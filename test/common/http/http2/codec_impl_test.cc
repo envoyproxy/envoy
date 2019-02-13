@@ -34,7 +34,7 @@ namespace Http2 {
 using Http2SettingsTuple = ::testing::tuple<uint32_t, uint32_t, uint32_t, uint32_t>;
 using Http2SettingsTestParam = ::testing::tuple<Http2SettingsTuple, Http2SettingsTuple>;
 
-class Http2CodecImplTest : public TestBaseWithParam<Http2SettingsTestParam> {
+class Http2CodecImplTest : public testing::TestWithParam<Http2SettingsTestParam> {
 public:
   struct ConnectionWrapper {
     void dispatch(const Buffer::Instance& data, ConnectionImpl& connection) {

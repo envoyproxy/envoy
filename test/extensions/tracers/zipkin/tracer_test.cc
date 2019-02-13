@@ -36,7 +36,7 @@ private:
   std::vector<Span> reported_spans_;
 };
 
-class ZipkinTracerTest : public TestBase {
+class ZipkinTracerTest : public testing::Test {
 protected:
   Event::SimulatedTimeSystem time_system_;
 };

@@ -37,7 +37,7 @@ namespace Extensions {
 namespace Tracers {
 namespace Zipkin {
 
-class ZipkinDriverTest : public TestBase {
+class ZipkinDriverTest : public testing::Test {
 public:
   ZipkinDriverTest() : time_source_(test_time_.timeSystem()) {}
 

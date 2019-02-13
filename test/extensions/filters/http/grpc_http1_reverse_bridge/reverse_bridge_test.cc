@@ -27,7 +27,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GrpcHttp1ReverseBridge {
 
-class ReverseBridgeTest : public TestBase {
+class ReverseBridgeTest : public testing::Test {
 protected:
   void initialize(bool withhold_grpc_headers = true) {
     filter_ = std::make_unique<Filter>("application/x-protobuf", withhold_grpc_headers);

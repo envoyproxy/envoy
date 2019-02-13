@@ -8,7 +8,7 @@ namespace Envoy {
 namespace Event {
 namespace Test {
 
-class TestTimeSystemTest : public TestBase {
+class TestTimeSystemTest : public testing::Test {
 protected:
 };
 

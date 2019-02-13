@@ -33,7 +33,7 @@ using testing::Return;
 namespace Envoy {
 namespace Stats {
 
-class StatsThreadLocalStoreTest : public TestBase {
+class StatsThreadLocalStoreTest : public testing::Test {
 public:
   void SetUp() override {
     alloc_ = std::make_unique<MockedTestAllocator>(options_);
@@ -71,7 +71,7 @@ private:
   histogram_t* histogram_;
 };
 
-class HistogramTest : public TestBase {
+class HistogramTest : public testing::Test {
 public:
   using NameHistogramMap = std::map<std::string, ParentHistogramSharedPtr>;
 

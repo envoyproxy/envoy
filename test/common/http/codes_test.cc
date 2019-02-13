@@ -22,7 +22,7 @@ using testing::Property;
 namespace Envoy {
 namespace Http {
 
-class CodeUtilityTest : public TestBase {
+class CodeUtilityTest : public testing::Test {
 public:
   void addResponse(uint64_t code, bool canary, bool internal_request,
                    const std::string& request_vhost_name = EMPTY_STRING,
@@ -235,7 +235,7 @@ TEST(CodeUtilityResponseTimingTest, All) {
   code_stats.chargeResponseTiming(info);
 }
 
-class CodeStatsTest : public TestBase {
+class CodeStatsTest : public testing::Test {
 protected:
   absl::string_view stripTrailingDot(absl::string_view prefix) {
     return CodeStatsImpl::stripTrailingDot(prefix);

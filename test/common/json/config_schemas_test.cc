@@ -27,7 +27,7 @@ std::vector<std::string> generateTestInputs() {
   return file_list;
 }
 
-class ConfigSchemasTest : public TestBaseWithParam<std::string> {
+class ConfigSchemasTest : public testing::TestWithParam<std::string> {
 protected:
   ConfigSchemasTest() : api_(Api::createApiForTest()) {}
 

@@ -27,7 +27,7 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Upstream {
 
-class EdsTest : public TestBase {
+class EdsTest : public testing::Test {
 protected:
   EdsTest() : api_(Api::createApiForTest(stats_)) { resetCluster(); }
 

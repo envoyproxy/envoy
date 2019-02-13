@@ -20,7 +20,7 @@
 namespace Envoy {
 namespace Network {
 namespace Address {
-class IpResolverTest : public TestBase {
+class IpResolverTest : public testing::Test {
 public:
   Resolver* resolver_{Registry::FactoryRegistry<Resolver>::getFactory("envoy.ip")};
 };

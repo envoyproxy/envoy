@@ -18,7 +18,7 @@ using testing::Return;
 namespace Envoy {
 namespace Router {
 
-class ShadowWriterImplTest : public TestBase {
+class ShadowWriterImplTest : public testing::Test {
 public:
   void expectShadowWriter(absl::string_view host, absl::string_view shadowed_host) {
     Http::MessagePtr message(new Http::RequestMessageImpl());

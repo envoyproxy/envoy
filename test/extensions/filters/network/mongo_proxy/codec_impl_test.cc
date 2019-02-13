@@ -41,7 +41,7 @@ public:
   MOCK_METHOD1(decodeCommandReply_, void(CommandReplyMessagePtr& message));
 };
 
-class MongoCodecImplTest : public TestBase {
+class MongoCodecImplTest : public testing::Test {
 public:
   Buffer::OwnedImpl output_;
   EncoderImpl encoder_{output_};

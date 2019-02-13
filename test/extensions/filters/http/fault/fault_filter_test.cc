@@ -36,7 +36,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Fault {
 
-class FaultFilterTest : public TestBase {
+class FaultFilterTest : public testing::Test {
 public:
   const std::string fixed_delay_and_abort_nodes_json = R"EOF(
     {

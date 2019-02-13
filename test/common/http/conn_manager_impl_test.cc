@@ -60,7 +60,7 @@ using testing::Sequence;
 namespace Envoy {
 namespace Http {
 
-class HttpConnectionManagerImplTest : public TestBase, public ConnectionManagerConfig {
+class HttpConnectionManagerImplTest : public testing::Test, public ConnectionManagerConfig {
 public:
   struct RouteConfigProvider : public Router::RouteConfigProvider {
     RouteConfigProvider(TimeSource& time_source) : time_source_(time_source) {}

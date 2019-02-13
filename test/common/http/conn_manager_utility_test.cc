@@ -82,7 +82,7 @@ public:
       std::make_unique<DefaultInternalAddressConfig>();
 };
 
-class ConnectionManagerUtilityTest : public TestBase {
+class ConnectionManagerUtilityTest : public testing::Test {
 public:
   ConnectionManagerUtilityTest() {
     ON_CALL(config_, userAgent()).WillByDefault(ReturnRef(user_agent_));

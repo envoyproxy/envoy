@@ -22,7 +22,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GrpcHttp1Bridge {
 
-class GrpcHttp1BridgeFilterTest : public TestBase {
+class GrpcHttp1BridgeFilterTest : public testing::Test {
 public:
   GrpcHttp1BridgeFilterTest() {
     filter_.setDecoderFilterCallbacks(decoder_callbacks_);

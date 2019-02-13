@@ -142,7 +142,7 @@ public:
   Buffer::OwnedImpl buffer_;
 };
 
-class ThriftObjectImplTest : public TestBase, public ThriftObjectImplTestBase {};
+class ThriftObjectImplTest : public testing::Test, public ThriftObjectImplTestBase {};
 
 // Test parsing an empty struct (just a stop field).
 TEST_F(ThriftObjectImplTest, ParseEmptyStruct) {
@@ -162,7 +162,7 @@ TEST_F(ThriftObjectImplTest, ParseEmptyStruct) {
 }
 
 class ThriftObjectImplValueTest : public ThriftObjectImplTestBase,
-                                  public TestBaseWithParam<FieldType> {};
+                                  public testing::TestWithParam<FieldType> {};
 
 INSTANTIATE_TEST_SUITE_P(PrimitiveFieldTypes, ThriftObjectImplValueTest,
                          Values(FieldType::Bool, FieldType::Byte, FieldType::Double, FieldType::I16,

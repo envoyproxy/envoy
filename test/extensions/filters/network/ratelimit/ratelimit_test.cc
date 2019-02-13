@@ -32,7 +32,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace RateLimitFilter {
 
-class RateLimitFilterTest : public TestBase {
+class RateLimitFilterTest : public testing::Test {
 public:
   void SetUpTest(const std::string& yaml) {
     ON_CALL(runtime_.snapshot_, featureEnabled("ratelimit.tcp_filter_enabled", 100))

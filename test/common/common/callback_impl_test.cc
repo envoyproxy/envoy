@@ -9,7 +9,7 @@ using testing::InSequence;
 namespace Envoy {
 namespace Common {
 
-class CallbackManagerTest : public TestBase {
+class CallbackManagerTest : public testing::Test {
 public:
   MOCK_METHOD1(called, void(int arg));
 };

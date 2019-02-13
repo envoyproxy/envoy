@@ -16,7 +16,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
 
-class CompactProtocolTest : public TestBase {
+class CompactProtocolTest : public testing::Test {
 public:
   void resetMetadata() {
     metadata_.setMethodName("-");
@@ -996,7 +996,7 @@ TEST_F(CompactProtocolTest, ReadBinary) {
   EXPECT_EQ(buffer.length(), 0);
 }
 
-class CompactProtocolFieldTypeTest : public TestBaseWithParam<uint8_t> {};
+class CompactProtocolFieldTypeTest : public testing::TestWithParam<uint8_t> {};
 
 TEST_P(CompactProtocolFieldTypeTest, ConvertsToFieldType) {
   uint8_t compact_field_type = GetParam();

@@ -34,7 +34,7 @@ using testing::WithArgs;
 namespace Envoy {
 namespace Network {
 
-class NetworkFilterManagerTest : public TestBase, public BufferSource {
+class NetworkFilterManagerTest : public testing::Test, public BufferSource {
 public:
   StreamBuffer getReadBuffer() override { return {read_buffer_, read_end_stream_}; }
   StreamBuffer getWriteBuffer() override { return {write_buffer_, write_end_stream_}; }

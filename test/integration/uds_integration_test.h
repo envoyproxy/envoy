@@ -14,7 +14,7 @@
 namespace Envoy {
 
 class UdsUpstreamIntegrationTest
-    : public TestBaseWithParam<std::tuple<Network::Address::IpVersion, bool>>,
+    : public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>>,
       public HttpIntegrationTest {
 public:
   UdsUpstreamIntegrationTest()
@@ -45,7 +45,7 @@ protected:
 };
 
 class UdsListenerIntegrationTest
-    : public TestBaseWithParam<std::tuple<Network::Address::IpVersion, bool>>,
+    : public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>>,
       public HttpIntegrationTest {
 public:
   UdsListenerIntegrationTest()

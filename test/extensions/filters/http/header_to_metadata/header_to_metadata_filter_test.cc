@@ -17,7 +17,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace HeaderToMetadataFilter {
 
-class HeaderToMetadataTest : public TestBase {
+class HeaderToMetadataTest : public testing::Test {
 public:
   const std::string request_config_yaml = R"EOF(
 request_rules:

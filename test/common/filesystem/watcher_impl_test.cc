@@ -14,7 +14,7 @@
 namespace Envoy {
 namespace Filesystem {
 
-class WatcherImplTest : public TestBase {
+class WatcherImplTest : public testing::Test {
 protected:
   WatcherImplTest() : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()) {}
 

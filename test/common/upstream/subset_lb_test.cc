@@ -106,7 +106,7 @@ private:
 
 enum UpdateOrder { REMOVES_FIRST, SIMULTANEOUS };
 
-class SubsetLoadBalancerTest : public TestBaseWithParam<UpdateOrder> {
+class SubsetLoadBalancerTest : public testing::TestWithParam<UpdateOrder> {
 public:
   SubsetLoadBalancerTest() : stats_(ClusterInfoImpl::generateStats(stats_store_)) {
     stats_.max_host_weight_.set(1UL);

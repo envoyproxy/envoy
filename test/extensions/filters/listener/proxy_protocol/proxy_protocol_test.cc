@@ -43,7 +43,7 @@ namespace ProxyProtocol {
 
 // Build again on the basis of the connection_handler_test.cc
 
-class ProxyProtocolTest : public TestBaseWithParam<Network::Address::IpVersion>,
+class ProxyProtocolTest : public testing::TestWithParam<Network::Address::IpVersion>,
                           public Network::ListenerConfig,
                           public Network::FilterChainManager,
                           protected Logger::Loggable<Logger::Id::main> {
@@ -863,7 +863,7 @@ TEST_P(ProxyProtocolTest, ClosedEmpty) {
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 }
 
-class WildcardProxyProtocolTest : public TestBaseWithParam<Network::Address::IpVersion>,
+class WildcardProxyProtocolTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                   public Network::ListenerConfig,
                                   public Network::FilterChainManager,
                                   protected Logger::Loggable<Logger::Id::main> {

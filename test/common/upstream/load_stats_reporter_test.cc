@@ -26,7 +26,7 @@ using testing::Return;
 namespace Envoy {
 namespace Upstream {
 
-class LoadStatsReporterTest : public TestBase {
+class LoadStatsReporterTest : public testing::Test {
 public:
   LoadStatsReporterTest()
       : retry_timer_(new Event::MockTimer()), response_timer_(new Event::MockTimer()),

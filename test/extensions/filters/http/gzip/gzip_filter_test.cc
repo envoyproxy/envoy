@@ -19,7 +19,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Gzip {
 
-class GzipFilterTest : public TestBase {
+class GzipFilterTest : public testing::Test {
 protected:
   GzipFilterTest() {
     ON_CALL(runtime_.snapshot_, featureEnabled("gzip.filter_enabled", 100))

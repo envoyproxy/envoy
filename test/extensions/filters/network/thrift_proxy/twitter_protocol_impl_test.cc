@@ -35,7 +35,7 @@ public:
   }
 };
 
-class TwitterProtocolTest : public TestBase {
+class TwitterProtocolTest : public testing::Test {
 public:
   void clearMetadata() { metadata_.reset(new MessageMetadata()); }
 

@@ -16,7 +16,7 @@
 namespace Envoy {
 
 // Tests BlockMemoryHashSet.
-class BlockMemoryHashSetTest : public TestBase {
+class BlockMemoryHashSetTest : public testing::Test {
 protected:
   // TestValue that doesn't define a hash.
   struct TestValueBase {

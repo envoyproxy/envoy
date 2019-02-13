@@ -42,7 +42,7 @@ public:
   MOCK_METHOD1(onFailure, void(const EnvoyException&));
 };
 
-class InjectedResourceMonitorTest : public TestBase {
+class InjectedResourceMonitorTest : public testing::Test {
 protected:
   InjectedResourceMonitorTest()
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()),

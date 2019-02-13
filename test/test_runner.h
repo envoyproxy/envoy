@@ -33,8 +33,8 @@ public:
     // (https://github.com/google/googletest/blob/master/googletest/docs/AdvancedGuide.md#logging-additional-information),
     // they are available in the test XML.
     // TODO(htuch): Log these as well?
-    TestBase::RecordProperty("TemporaryDirectory", TestEnvironment::temporaryDirectory());
-    TestBase::RecordProperty("RunfilesDirectory", TestEnvironment::runfilesDirectory());
+    testing::Test::RecordProperty("TemporaryDirectory", TestEnvironment::temporaryDirectory());
+    testing::Test::RecordProperty("RunfilesDirectory", TestEnvironment::runfilesDirectory());
 
     TestEnvironment::setEnvVar("TEST_UDSDIR", TestEnvironment::unixDomainSocketDirectory(), 1);
 

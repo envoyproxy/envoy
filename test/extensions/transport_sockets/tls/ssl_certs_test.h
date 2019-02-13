@@ -8,7 +8,7 @@
 using testing::ReturnRef;
 
 namespace Envoy {
-class SslCertsTest : public TestBase {
+class SslCertsTest : public testing::Test {
 public:
   static void SetUpTestSuite() {
     TestEnvironment::exec({TestEnvironment::runfilesPath(

@@ -23,7 +23,7 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Upstream {
 
-class LoadBalancerTestBase : public TestBaseWithParam<bool> {
+class LoadBalancerTestBase : public testing::TestWithParam<bool> {
 protected:
   // Run all tests against both priority 0 and priority 1 host sets, to ensure
   // all the load balancers have equivalent functonality for failover host sets.

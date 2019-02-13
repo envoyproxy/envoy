@@ -17,7 +17,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ClientSslAuth {
 
-class IpWhiteListConfigTest : public TestBaseWithParam<std::string> {};
+class IpWhiteListConfigTest : public testing::TestWithParam<std::string> {};
 
 INSTANTIATE_TEST_SUITE_P(IpList, IpWhiteListConfigTest,
                          ::testing::Values(R"EOF(["192.168.3.0/24"])EOF",

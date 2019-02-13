@@ -23,7 +23,7 @@ using testing::Return;
 namespace Envoy {
 namespace Router {
 
-class RouterRetryStateImplTest : public TestBase {
+class RouterRetryStateImplTest : public testing::Test {
 public:
   RouterRetryStateImplTest() : callback_([this]() -> void { callback_ready_.ready(); }) {
     ON_CALL(runtime_.snapshot_, featureEnabled("upstream.use_retry", 100))

@@ -8,7 +8,7 @@
 namespace Envoy {
 namespace {
 
-class TapIntegrationTest : public TestBaseWithParam<Network::Address::IpVersion>,
+class TapIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                            public HttpIntegrationTest {
 public:
   TapIntegrationTest()

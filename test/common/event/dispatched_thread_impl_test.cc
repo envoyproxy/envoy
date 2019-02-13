@@ -20,7 +20,7 @@ using testing::NiceMock;
 namespace Envoy {
 namespace Event {
 
-class DispatchedThreadTest : public TestBase {
+class DispatchedThreadTest : public testing::Test {
 protected:
   DispatchedThreadTest()
       : config_(1000, 1000, 1000, 1000), api_(Api::createApiForTest(fakestats_)), thread_(*api_),
