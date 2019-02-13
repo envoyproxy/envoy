@@ -226,9 +226,9 @@ void IntegrationTcpClient::ConnectionCallbacks::onEvent(Network::ConnectionEvent
   }
 }
 
-BaseIntegrationTest::BaseIntegrationTest(
-    InstanceConstSharedPtrFn upstream_address_fn,
-    Network::Address::IpVersion version, const std::string& config)
+BaseIntegrationTest::BaseIntegrationTest(InstanceConstSharedPtrFn upstream_address_fn,
+                                         Network::Address::IpVersion version,
+                                         const std::string& config)
     : api_(Api::createApiForTest(stats_store_)),
       mock_buffer_factory_(new NiceMock<MockBufferFactory>),
       dispatcher_(

@@ -215,10 +215,10 @@ HttpIntegrationTest::HttpIntegrationTest(Http::CodecClient::Type downstream_prot
                                                },
                                                version, config) {}
 
-HttpIntegrationTest::HttpIntegrationTest(
-    Http::CodecClient::Type downstream_protocol,
-    InstanceConstSharedPtrFn upstream_address_fn,
-    Network::Address::IpVersion version, const std::string& config)
+HttpIntegrationTest::HttpIntegrationTest(Http::CodecClient::Type downstream_protocol,
+                                         InstanceConstSharedPtrFn upstream_address_fn,
+                                         Network::Address::IpVersion version,
+                                         const std::string& config)
     : BaseIntegrationTest(upstream_address_fn, version, config),
       downstream_protocol_(downstream_protocol) {
   // Legacy integration tests expect the default listener to be named "http" for
