@@ -37,6 +37,6 @@ TEST(IoSocketHandleImplTest, TestIoSocketError) {
   EXPECT_EQ(::strerror(123), error7.getErrorDetails());
 }
 
-}  // namespace
-}  // namespace Network
-}  // namespace Envoy
+} // namespace
+} // namespace Network
+} // namespace Envoy
