@@ -45,13 +45,13 @@ public:
 class InjectedResourceMonitorTest : public TestBase {
 protected:
   InjectedResourceMonitorTest()
-      : api_(Api::createApiForTest()), dispatcher_(*api_),
+      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()),
         resource_filename_(TestEnvironment::temporaryPath("injected_resource")),
         file_updater_(resource_filename_), monitor_(createMonitor()) {}
 
   void updateResource(const std::string& contents) {
     file_updater_.update(contents);
-    dispatcher_.run(Event::Dispatcher::RunType::Block);
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
     monitor_->updateResourceUsage(cb_);
   }
 
@@ -60,12 +60,12 @@ protected:
   std::unique_ptr<InjectedResourceMonitor> createMonitor() {
     envoy::config::resource_monitor::injected_resource::v2alpha::InjectedResourceConfig config;
     config.set_filename(resource_filename_);
-    Server::Configuration::ResourceMonitorFactoryContextImpl context(dispatcher_, *api_);
+    Server::Configuration::ResourceMonitorFactoryContextImpl context(*dispatcher_, *api_);
     return std::make_unique<TestableInjectedResourceMonitor>(config, context);
   }
 
   Api::ApiPtr api_;
-  Event::DispatcherImpl dispatcher_;
+  Event::DispatcherPtr dispatcher_;
   const std::string resource_filename_;
   AtomicFileUpdater file_updater_;
   MockedCallbacks cb_;

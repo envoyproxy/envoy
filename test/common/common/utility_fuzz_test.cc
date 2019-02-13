@@ -12,7 +12,7 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   {
     uint64_t out;
     const std::string string_buffer(reinterpret_cast<const char*>(buf), len);
-    StringUtil::atoul(string_buffer.c_str(), out);
+    StringUtil::atoull(string_buffer.c_str(), out);
   }
   {
     const std::string string_buffer(reinterpret_cast<const char*>(buf), len);

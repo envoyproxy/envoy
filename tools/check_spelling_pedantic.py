@@ -538,7 +538,8 @@ if __name__ == "__main__":
 
   if args.operation_type == 'check':
     if not rv:
-      print("ERROR: spell check failed. Run 'tool/check_spelling_pedantic.py fix'")
+      print("ERROR: spell check failed. Run 'tools/check_spelling_pedantic.py fix and/or add new "
+            "words to tools/spelling_dictionary.txt'")
       sys.exit(1)
 
     print("PASS")

@@ -513,7 +513,9 @@ void HttpIntegrationTest::testRouterUpstreamDisconnectBeforeRequestComplete() {
 
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("503", response->headers().Status()->value().c_str());
-  EXPECT_EQ("upstream connect error or disconnect/reset before headers", response->body());
+  EXPECT_EQ("upstream connect error or disconnect/reset before headers. reset reason: connection "
+            "termination",
+            response->body());
 }
 
 void HttpIntegrationTest::testRouterUpstreamDisconnectBeforeResponseComplete(

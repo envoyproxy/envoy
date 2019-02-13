@@ -275,11 +275,6 @@ public:
         hosts_(new HostVector()), healthy_hosts_(new HostVector()),
         degraded_hosts_(new HostVector()) {}
 
-  void updateHosts(UpdateHostsParams&& update_hosts_params,
-                   LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
-                   const HostVector& hosts_removed,
-                   absl::optional<uint32_t> overprovisioning_factor = absl::nullopt) override;
-
   /**
    * Install a callback that will be invoked when the host set membership changes.
    * @param callback supplies the callback to invoke.
@@ -306,22 +301,28 @@ public:
   uint32_t overprovisioningFactor() const override { return overprovisioning_factor_; }
 
   // Utility methods for creating UpdateHostsParams.
-  static UpdateHostsParams updateHostsParams(HostVectorConstSharedPtr hosts,
-                                             HostsPerLocalityConstSharedPtr hosts_per_locality);
-  static UpdateHostsParams
+  static PrioritySet::UpdateHostsParams
+  updateHostsParams(HostVectorConstSharedPtr hosts,
+                    HostsPerLocalityConstSharedPtr hosts_per_locality);
+  static PrioritySet::UpdateHostsParams
   updateHostsParams(HostVectorConstSharedPtr hosts,
                     HostsPerLocalityConstSharedPtr hosts_per_locality,
                     HostVectorConstSharedPtr healthy_hosts,
                     HostsPerLocalityConstSharedPtr healthy_hosts_per_locality);
-  static UpdateHostsParams
+  static PrioritySet::UpdateHostsParams
   updateHostsParams(HostVectorConstSharedPtr hosts,
                     HostsPerLocalityConstSharedPtr hosts_per_locality,
                     HostVectorConstSharedPtr healthy_hosts,
                     HostsPerLocalityConstSharedPtr healthy_hosts_per_locality,
                     HostVectorConstSharedPtr degraded_hosts,
                     HostsPerLocalityConstSharedPtr degraded_hosts_per_locality);
-  static UpdateHostsParams partitionHosts(HostVectorConstSharedPtr hosts,
-                                          HostsPerLocalityConstSharedPtr hosts_per_locality);
+  static PrioritySet::UpdateHostsParams
+  partitionHosts(HostVectorConstSharedPtr hosts, HostsPerLocalityConstSharedPtr hosts_per_locality);
+
+  void updateHosts(PrioritySet::UpdateHostsParams&& update_hosts_params,
+                   LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
+                   const HostVector& hosts_removed,
+                   absl::optional<uint32_t> overprovisioning_factor = absl::nullopt);
 
 protected:
   virtual void runUpdateCallbacks(const HostVector& hosts_added, const HostVector& hosts_removed) {
@@ -402,10 +403,15 @@ public:
   const std::vector<std::unique_ptr<HostSet>>& hostSetsPerPriority() const override {
     return host_sets_;
   }
-  std::vector<std::unique_ptr<HostSet>>& hostSetsPerPriority() override { return host_sets_; }
   // Get the host set for this priority level, creating it if necessary.
-  HostSet& getOrCreateHostSet(uint32_t priority,
-                              absl::optional<uint32_t> overprovisioning_factor = absl::nullopt);
+  const HostSet&
+  getOrCreateHostSet(uint32_t priority,
+                     absl::optional<uint32_t> overprovisioning_factor = absl::nullopt);
+
+  void updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
+                   LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
+                   const HostVector& hosts_removed,
+                   absl::optional<uint32_t> overprovisioning_factor = absl::nullopt) override;
 
 protected:
   // Allows subclasses of PrioritySetImpl to create their own type of HostSetImpl.
@@ -414,7 +420,7 @@ protected:
     return std::make_unique<HostSetImpl>(priority, overprovisioning_factor);
   }
 
-private:
+protected:
   virtual void runUpdateCallbacks(const HostVector& hosts_added, const HostVector& hosts_removed) {
     member_update_cb_helper_.runCallbacks(hosts_added, hosts_removed);
   }
@@ -426,6 +432,8 @@ private:
   // It will expand as host sets are added but currently does not shrink to
   // avoid any potential lifetime issues.
   std::vector<std::unique_ptr<HostSet>> host_sets_;
+
+private:
   // TODO(mattklein123): Remove mutable.
   mutable Common::CallbackManager<const HostVector&, const HostVector&> member_update_cb_helper_;
   mutable Common::CallbackManager<uint32_t, const HostVector&, const HostVector&>

@@ -56,7 +56,7 @@ protected:
   void expectEqualInputSize(const std::string& footer_bytes, const uint32_t input_size) {
     const std::string size_bytes = footer_bytes.substr(footer_bytes.size() - 8, 8);
     uint64_t size;
-    StringUtil::atoul(size_bytes.c_str(), size, 16);
+    StringUtil::atoull(size_bytes.c_str(), size, 16);
     EXPECT_EQ(TestUtility::flipOrder<uint32_t>(size), input_size);
   }
 
