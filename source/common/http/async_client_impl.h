@@ -300,7 +300,7 @@ private:
   }
   const Buffer::Instance* decodingBuffer() override { return buffered_body_.get(); }
   void modifyDecodingBuffer(std::function<void(Buffer::Instance&)> callback) override {
-    callback(*buffered_body_.get());
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
   void sendLocalReply(Code code, absl::string_view body,
                       std::function<void(HeaderMap& headers)> modify_headers,
@@ -374,7 +374,7 @@ private:
   }
   const Buffer::Instance* decodingBuffer() override { return request_->body().get(); }
   void modifyDecodingBuffer(std::function<void(Buffer::Instance&)> callback) override {
-    callback(*request_->body().get());
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
 
   MessagePtr request_;
