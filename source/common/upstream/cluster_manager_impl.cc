@@ -29,7 +29,6 @@
 #include "common/protobuf/utility.h"
 #include "common/router/shadow_writer_impl.h"
 #include "common/tcp/conn_pool.h"
-#include "common/upstream/cds_api_delta_impl.h"
 #include "common/upstream/cds_api_impl.h"
 #include "common/upstream/load_balancer_impl.h"
 #include "common/upstream/maglev_lb.h"
@@ -1204,6 +1203,7 @@ CdsApiPtr ProdClusterManagerFactory::createCds(const envoy::api::v2::core::Confi
                                                ClusterManager& cm) {
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
   return CdsApiImpl::create(cds_config, cm, main_thread_dispatcher_, random_, local_info_, stats_);
 =======
   return CdsApiImpl::create(cds_config, cm, main_thread_dispatcher_, random_, local_info_, stats_,
@@ -1241,6 +1241,10 @@ CdsApiPtr ProdClusterManagerFactory::createIncrementalCds(
   return CdsApiIncrementalImpl::create(cds_config, cm, main_thread_dispatcher_, random_,
                                        local_info_, stats_);
 >>>>>>> snapshot
+=======
+  return CdsApiImpl::create(cds_config, cm, main_thread_dispatcher_, random_, local_info_, stats_,
+                            api_);
+>>>>>>> consolidate CdsApiImpl
 }
 
 } // namespace Upstream

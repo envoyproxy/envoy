@@ -27,11 +27,22 @@ public:
                           const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
                           Api::Api& api);
 
+<<<<<<< HEAD
+=======
+  // Upstream::CdsApi
+  void initialize() override { subscription_->start({}, *this); }
+  void setInitializedCb(std::function<void()> callback) override {
+    initialize_callback_ = callback;
+  }
+  const std::string versionInfo() const override { return whole_update_version_info_; }
+
+>>>>>>> consolidate CdsApiImpl
   // Config::SubscriptionCallbacks
 <<<<<<< HEAD
   // TODO(fredlas) deduplicate
   void onConfigUpdate(const ResourceVector& resources, const std::string& version_info) override;
   void onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>&,
+<<<<<<< HEAD
                       const Protobuf::RepeatedPtrField<std::string>&, const std::string&) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
@@ -41,6 +52,9 @@ public:
   void onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Cluster>& resources,
                       const std::string& version_info) override;
 >>>>>>> snapshot
+=======
+                      const Protobuf::RepeatedPtrField<std::string>&, const std::string&) override;
+>>>>>>> consolidate CdsApiImpl
   void onConfigUpdateFailed(const EnvoyException* e) override;
   std::string resourceName(const ProtobufWkt::Any& resource) override {
     return MessageUtil::anyConvert<envoy::api::v2::Cluster>(resource).name();
@@ -57,7 +71,7 @@ private:
 >>>>>>> filesystem: convert free functions to object methods (#5692)
 
   std::unique_ptr<Config::Subscription<envoy::api::v2::Cluster>> subscription_;
-  std::string version_info_;
+  std::string whole_update_version_info_;
   std::function<void()> initialize_callback_;
 };
 

@@ -37,7 +37,7 @@ CdsApiImpl::CdsApiImpl(const envoy::api::v2::core::ConfigSource& cds_config, Clu
       Config::SubscriptionFactory::subscriptionFromConfigSource<envoy::api::v2::Cluster>(
           cds_config, local_info, dispatcher, cm, random, *scope_,
           "envoy.api.v2.ClusterDiscoveryService.FetchClusters",
-          "envoy.api.v2.ClusterDiscoveryService.StreamClusters", api);
+          "envoy.api.v2.ClusterDiscoveryService.DeltaClusters", api);
 }
 
 void CdsApiImpl::onConfigUpdate(const ResourceVector& resources, const std::string& version_info) {
@@ -76,7 +76,39 @@ void CdsApiImpl::onConfigUpdate(
     *removed_clusters.Add() = cluster;
   }
 
+<<<<<<< HEAD
   onIncrementalConfigUpdate(added_clusters, removed_clusters, version_info);
+=======
+  whole_update_version_info_ = version_info;
+  runInitializeCallbackIfAny();
+}
+
+void CdsApiImpl::onConfigUpdate(
+    const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
+    const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+    const std::string& system_version_info) {
+  cm_.adsMux().pause(Config::TypeUrl::get().ClusterLoadAssignment);
+  Cleanup eds_resume([this] { cm_.adsMux().resume(Config::TypeUrl::get().ClusterLoadAssignment); });
+
+  for (const auto& resource : added_resources) {
+    envoy::api::v2::Cluster cluster =
+        MessageUtil::anyConvert<envoy::api::v2::Cluster>(resource.resource());
+    MessageUtil::validate(cluster);
+    if (cm_.addOrUpdateCluster(cluster, resource.version())) {
+      ENVOY_LOG(debug, "cds: add/update cluster '{}'", cluster.name());
+    }
+    // TODO(fredlas) catch exceptions from this block, and add the offending resource to a "resource
+    // updates that had problems" pile, to go into a larger partial rejection exception.
+  }
+  for (auto resource_name : removed_resources) {
+    if (cm_.removeCluster(resource_name)) {
+      ENVOY_LOG(debug, "cds: remove cluster '{}'", resource_name);
+    }
+  }
+
+  whole_update_version_info_ = system_version_info;
+  runInitializeCallbackIfAny();
+>>>>>>> consolidate CdsApiImpl
 }
 
 void CdsApiImpl::onConfigUpdateFailed(const EnvoyException*) {

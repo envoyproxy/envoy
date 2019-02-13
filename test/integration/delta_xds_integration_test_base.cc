@@ -1,8 +1,7 @@
 #include "test/integration/delta_xds_integration_test_base.h"
 
 #include "envoy/api/v2/discovery.pb.h"
-
-#inc lude "envoy/grpc/status.h"
+#include "envoy/grpc/status.h"
 #include "envoy/stats/scope.h"
 
 #include "common/config/resources.h"

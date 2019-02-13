@@ -33,6 +33,7 @@ envoy_cc_library(
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
     name = "cds_incremental_lib",
     srcs = ["cds_incremental.cc"],
     hdrs = ["cds_incremental.h"],
@@ -92,11 +93,12 @@ envoy_cc_library(
 >>>>>>> config: removing the legacy rest API (#5522)
 =======
 >>>>>>> trim unused cds_subscription_lib from BUILD
+=======
+>>>>>>> consolidate CdsApiImpl
     name = "cluster_manager_lib",
     srcs = ["cluster_manager_impl.cc"],
     hdrs = ["cluster_manager_impl.h"],
     deps = [
-        ":cds_api_delta_lib",
         ":cds_api_lib",
         ":load_balancer_lib",
         ":load_stats_reporter_lib",

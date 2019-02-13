@@ -223,6 +223,7 @@ public:
     response.set_system_version_info("system_version_info_this_is_a_test");
     for (const auto& message : added_or_updated) {
       auto* resource = response.add_resources();
+      resource->set_name(message.name());
       resource->set_version(version);
       resource->mutable_resource()->PackFrom(message);
     }
