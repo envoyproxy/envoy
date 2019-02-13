@@ -47,7 +47,11 @@ message Tracing {
 
       google.protobuf.Any typed_config = 3;
     }
+
+    // Whether to attach logs for streaming events to spans.
+    bool log_stream_events = 4;
   }
+
   // Provides configuration for the HTTP tracer.
   Http http = 1;
 }

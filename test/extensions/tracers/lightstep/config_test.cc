@@ -33,8 +33,8 @@ TEST(LightstepTracerConfigTest, LightstepHttpTracer) {
 
   LightstepTracerFactory factory;
   auto message = Config::Utility::translateToFactoryConfig(configuration.http(), factory);
-  Tracing::HttpTracerPtr lightstep_tracer = factory.createHttpTracer(*message, server);
-  EXPECT_NE(nullptr, lightstep_tracer);
+  Tracing::DriverPtr lightstep_driver = factory.createDriver(*message, server);
+  EXPECT_NE(nullptr, lightstep_driver);
 }
 
 } // namespace Lightstep

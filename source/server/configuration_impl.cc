@@ -102,7 +102,9 @@ void MainImpl::initializeTracers(const envoy::config::trace::v2::Tracing& config
   auto& factory = Config::Utility::getAndCheckFactory<TracerFactory>(type);
   ProtobufTypes::MessagePtr message =
       Config::Utility::translateToFactoryConfig(configuration.http(), factory);
-  http_tracer_ = factory.createHttpTracer(*message, server);
+  auto driver = factory.createDriver(*message, server);
+  driver->setDropLogs(!configuration.http().log_stream_events());
+  http_tracer_ = std::make_unique<Tracing::HttpTracerImpl>(std::move(driver), server.localInfo());
 }
 
 void MainImpl::initializeStatsSinks(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,

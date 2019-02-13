@@ -30,8 +30,8 @@ TEST(ZipkinTracerConfigTest, ZipkinHttpTracer) {
 
   ZipkinTracerFactory factory;
   auto message = Config::Utility::translateToFactoryConfig(configuration.http(), factory);
-  Tracing::HttpTracerPtr zipkin_tracer = factory.createHttpTracer(*message, server);
-  EXPECT_NE(nullptr, zipkin_tracer);
+  Tracing::DriverPtr zipkin_driver = factory.createDriver(*message, server);
+  EXPECT_NE(nullptr, zipkin_driver);
 }
 
 TEST(ZipkinTracerConfigTest, ZipkinHttpTracerWithTypedConfig) {
@@ -53,8 +53,8 @@ TEST(ZipkinTracerConfigTest, ZipkinHttpTracerWithTypedConfig) {
 
   ZipkinTracerFactory factory;
   auto message = Config::Utility::translateToFactoryConfig(configuration.http(), factory);
-  Tracing::HttpTracerPtr zipkin_tracer = factory.createHttpTracer(*message, server);
-  EXPECT_NE(nullptr, zipkin_tracer);
+  Tracing::DriverPtr zipkin_driver = factory.createDriver(*message, server);
+  EXPECT_NE(nullptr, zipkin_driver);
 }
 
 TEST(ZipkinTracerConfigTest, DoubleRegistrationTest) {

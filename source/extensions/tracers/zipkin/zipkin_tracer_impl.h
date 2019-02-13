@@ -28,6 +28,8 @@ struct ZipkinTracerStats {
   ZIPKIN_TRACER_STATS(GENERATE_COUNTER_STRUCT)
 };
 
+class Driver;
+
 /**
  * Class for Zipkin spans, wrapping a Zipkin::Span object.
  */
@@ -38,7 +40,7 @@ public:
    *
    * @param span to be wrapped.
    */
-  ZipkinSpan(Zipkin::Span& span, Zipkin::Tracer& tracer);
+  ZipkinSpan(Zipkin::Span& span, Zipkin::Tracer& tracer, Zipkin::Driver& driver);
 
   /**
    * Calls Zipkin::Span::finishSpan() to perform all actions needed to finalize the span.
@@ -62,10 +64,7 @@ public:
    */
   void setTag(const std::string& name, const std::string& value) override;
 
-  /**
-   * Do nothing for now. Log records could potentially be translated to tags in the future.
-   */
-  void log(SystemTime /*timestamp*/, const std::string& /*event*/) override {}
+  void log(SystemTime timestamp, const std::string& event) override;
 
   void injectContext(Http::HeaderMap& request_headers) override;
   Tracing::SpanPtr spawnChild(const Tracing::Config&, const std::string& name,
@@ -81,6 +80,7 @@ public:
 private:
   Zipkin::Span span_;
   Zipkin::Tracer& tracer_;
+  Zipkin::Driver& driver_;
 };
 
 typedef std::unique_ptr<ZipkinSpan> ZipkinSpanPtr;
@@ -100,6 +100,8 @@ public:
          const LocalInfo::LocalInfo& localinfo, Runtime::RandomGenerator& random_generator,
          TimeSource& time_source);
 
+  bool dropLogs() const { return drop_logs_; }
+
   /**
    * This function is inherited from the abstract Driver class.
    *
@@ -113,6 +115,8 @@ public:
   Tracing::SpanPtr startSpan(const Tracing::Config&, Http::HeaderMap& request_headers,
                              const std::string&, SystemTime start_time,
                              const Tracing::Decision tracing_decision) override;
+
+  void setDropLogs(bool drop_logs) override { drop_logs_ = drop_logs; }
 
   // Getters to return the ZipkinDriver's key members.
   Upstream::ClusterManager& clusterManager() { return cm_; }
@@ -138,6 +142,7 @@ private:
   Runtime::Loader& runtime_;
   const LocalInfo::LocalInfo& local_info_;
   TimeSource& time_source_;
+  bool drop_logs_{true};
 };
 
 /**

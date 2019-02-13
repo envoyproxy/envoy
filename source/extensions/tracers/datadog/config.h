@@ -20,9 +20,8 @@ public:
 
 private:
   // FactoryBase
-  Tracing::HttpTracerPtr
-  createHttpTracerTyped(const envoy::config::trace::v2::DatadogConfig& proto_config,
-                        Server::Instance& server) override;
+  Tracing::DriverPtr createDriverTyped(const envoy::config::trace::v2::DatadogConfig& proto_config,
+                                       Server::Instance& server) override;
 };
 
 } // namespace Datadog

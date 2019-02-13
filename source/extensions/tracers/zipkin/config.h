@@ -18,9 +18,8 @@ public:
 
 private:
   // FactoryBase
-  Tracing::HttpTracerPtr
-  createHttpTracerTyped(const envoy::config::trace::v2::ZipkinConfig& proto_config,
-                        Server::Instance& server) override;
+  Tracing::DriverPtr createDriverTyped(const envoy::config::trace::v2::ZipkinConfig& proto_config,
+                                       Server::Instance& server) override;
 };
 
 } // namespace Zipkin

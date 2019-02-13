@@ -84,12 +84,19 @@ TEST_F(OpenTracingDriverTest, FlushSpanWithTag) {
 TEST_F(OpenTracingDriverTest, FlushSpanWithLog) {
   setupValidDriver();
 
+  driver_->setDropLogs(false);
   Tracing::SpanPtr first_span = driver_->startSpan(config_, request_headers_, operation_name_,
                                                    start_time_, {Tracing::Reason::Sampling, true});
   const auto timestamp =
       SystemTime{std::chrono::duration_cast<SystemTime::duration>(std::chrono::hours{123})};
   first_span->log(timestamp, "abc");
   first_span->finishSpan();
+
+  driver_->setDropLogs(true);
+  Tracing::SpanPtr second_span = driver_->startSpan(config_, request_headers_, operation_name_,
+                                                    start_time_, {Tracing::Reason::Sampling, true});
+  second_span->log(timestamp, "xyz");
+  second_span->finishSpan();
 
   const std::vector<opentracing::LogRecord> expected_logs = {
       {timestamp, {{"event", std::string{"abc"}}}}};
