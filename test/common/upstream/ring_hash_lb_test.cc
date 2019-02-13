@@ -77,7 +77,8 @@ TEST_P(RingHashLoadBalancerTest, BadRingSizeBounds) {
   config_ = (envoy::api::v2::Cluster::RingHashLbConfig());
   config_.value().mutable_minimum_ring_size()->set_value(20);
   config_.value().mutable_maximum_ring_size()->set_value(10);
-  EXPECT_THROW(init(), EnvoyException);
+  EXPECT_THROW_WITH_MESSAGE(init(), EnvoyException,
+                            "ring hash: minimum_ring_size (20) > maximum_ring_size (10)");
 }
 
 TEST_P(RingHashLoadBalancerTest, Basic) {

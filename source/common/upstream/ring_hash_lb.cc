@@ -111,14 +111,16 @@ RingHashLoadBalancer::Ring::Ring(
     for (const auto& host : hosts_per_locality.get()[i]) {
       auto host_weight = host->weight();
       ASSERT(host_weight != 0);
-      // NOTE: Locality weight may be zero. In this case, all hosts in the locality are assigned
-      //       no load. When we build the ring below, such hosts will have no entries in the ring.
+      // NOTE: Locality weight may be explicitly set to zero, meaning any hosts in the locality
+      //       should be assigned no load.
       // TODO: When we move to C++17, change this to `locality_weights[i]` (i.e. use
       //       std::shared_ptr::operator[]) rather than dereferencing locality_weights explicitly.
       auto locality_weight = locality_weights == nullptr ? 1 : (*locality_weights)[i];
-      auto effective_weight = host_weight * locality_weight;
-      weighted_sum += effective_weight;
-      effective_weights[host] = effective_weight;
+      if (locality_weight != 0) {
+        const auto effective_weight = host_weight * locality_weight;
+        weighted_sum += effective_weight;
+        effective_weights[host] = effective_weight;
+      }
     }
   }
 
@@ -167,7 +169,7 @@ RingHashLoadBalancer::Ring::Ring(
           : min_replication_factor;
 
   // Reserve memory for the entire ring up front.
-  uint64_t ring_size = std::ceil(weighted_sum * replication_factor);
+  const uint64_t ring_size = std::ceil(weighted_sum * replication_factor);
   ring_.reserve(ring_size);
   stats_.size_.set(ring_size);
   stats_.replication_factor_.set(replication_factor);
