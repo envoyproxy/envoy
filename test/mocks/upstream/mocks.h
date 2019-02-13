@@ -168,7 +168,7 @@ public:
 // Note that we could template the two implementations below, but to avoid having to define the
 // ctor/dtor (which is fairly expensive for mocks) in the header file we duplicate the code instead.
 
-// Use this when interaction with a real PrioritySet is neeeded, e.g. when update callbacks
+// Use this when interaction with a real PrioritySet is needed, e.g. when update callbacks
 // needs to be triggered.
 class MockClusterRealPrioritySet : public MockCluster {
 public:
