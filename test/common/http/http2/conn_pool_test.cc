@@ -114,14 +114,16 @@ public:
   // Asserts that the provided requests receives onPoolFailure.
   void expectStreamReset(ActiveTestRequest& r);
 
-  /** Closes a test client
-   *
+  /**
+   * Closes a test client.
    */
   void closeClient(size_t index);
+
   /**
    * Completes an active request. Useful when this flow is not part of the main test assertions.
    */
   void completeRequest(ActiveTestRequest& r);
+
   /**
    * Completes an active request and closes the upstream connection. Useful when this flow is
    * not part of the main test assertions.

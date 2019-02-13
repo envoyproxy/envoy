@@ -726,7 +726,6 @@ TEST_F(Http1ConnPoolImplTest, NoActiveConnectionsByDefault) {
 }
 
 TEST_F(Http1ConnPoolImplTest, ActiveRequestHasActiveConnectionsTrue) {
-
   ActiveTestRequest r1(*this, 0, ActiveTestRequest::Type::CreateConnection);
   r1.startRequest();
 
@@ -740,7 +739,6 @@ TEST_F(Http1ConnPoolImplTest, ActiveRequestHasActiveConnectionsTrue) {
 }
 
 TEST_F(Http1ConnPoolImplTest, ResponseCompletedConnectionReadyNoActiveConnections) {
-
   ActiveTestRequest r1(*this, 0, ActiveTestRequest::Type::CreateConnection);
   r1.startRequest();
   r1.completeResponse(false);

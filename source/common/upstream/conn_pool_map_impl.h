@@ -27,10 +27,8 @@ ConnPoolMap<KEY_TYPE, POOL_TYPE>::getPool(KEY_TYPE key, const PoolFactory& facto
 
   // We need a new pool. Check if we have room.
   if (max_size_.has_value() && size() >= max_size_.value()) {
-
     // We're full. Try to free up a pool. If we can't, bail out.
     if (!freeOnePool()) {
-      // Nothing free. Return failure.
       return absl::nullopt;
     }
 
