@@ -18,6 +18,7 @@ message DirectionalAction {
     test.fuzz.Headers continue_headers = 1;
     test.fuzz.Headers headers = 2;
     uint32 data = 3;
+    string data_value = 8;
     test.fuzz.Headers trailers = 4;
     uint32 reset_stream = 5;
     bool read_disable = 6;
