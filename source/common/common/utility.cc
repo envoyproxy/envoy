@@ -217,23 +217,23 @@ bool DateUtil::timePointValid(MonotonicTime time_point) {
 
 const char StringUtil::WhitespaceChars[] = " \t\f\v\n\r";
 
-const char* StringUtil::strtoul(const char* str, uint64_t& out, int base) {
+const char* StringUtil::strtoull(const char* str, uint64_t& out, int base) {
   if (strlen(str) == 0) {
     return nullptr;
   }
 
   char* end_ptr;
   errno = 0;
-  out = ::strtoul(str, &end_ptr, base);
-  if (end_ptr == str || (out == ULONG_MAX && errno == ERANGE)) {
+  out = std::strtoull(str, &end_ptr, base);
+  if (end_ptr == str || (out == ULLONG_MAX && errno == ERANGE)) {
     return nullptr;
   } else {
     return end_ptr;
   }
 }
 
-bool StringUtil::atoul(const char* str, uint64_t& out, int base) {
-  const char* end_ptr = StringUtil::strtoul(str, out, base);
+bool StringUtil::atoull(const char* str, uint64_t& out, int base) {
+  const char* end_ptr = StringUtil::strtoull(str, out, base);
   if (end_ptr == nullptr || *end_ptr != '\0') {
     return false;
   } else {
@@ -241,15 +241,15 @@ bool StringUtil::atoul(const char* str, uint64_t& out, int base) {
   }
 }
 
-bool StringUtil::atol(const char* str, int64_t& out, int base) {
+bool StringUtil::atoll(const char* str, int64_t& out, int base) {
   if (strlen(str) == 0) {
     return false;
   }
 
   char* end_ptr;
   errno = 0;
-  out = strtol(str, &end_ptr, base);
-  if (*end_ptr != '\0' || ((out == LONG_MAX || out == LONG_MIN) && errno == ERANGE)) {
+  out = std::strtoll(str, &end_ptr, base);
+  if (*end_ptr != '\0' || ((out == LLONG_MAX || out == LLONG_MIN) && errno == ERANGE)) {
     return false;
   } else {
     return true;

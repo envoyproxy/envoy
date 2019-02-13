@@ -1033,6 +1033,7 @@ TEST_F(RouterTest, GrpcReset) {
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(503));
   encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
+  EXPECT_EQ(1UL, stats_store_.counter("test.rq_reset_after_downstream_response_started").value());
 }
 
 // Validate gRPC OK response stats are sane when response is not trailers only.
