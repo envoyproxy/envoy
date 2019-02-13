@@ -246,7 +246,7 @@ private:
   struct ThreadLocalClusterManagerImpl : public ThreadLocal::ThreadLocalObject {
     struct ConnPoolsContainer {
       ConnPoolsContainer(Event::Dispatcher& dispatcher)
-          : pools_{std::make_shared<ConnPools>(dispatcher)} {}
+          : pools_{std::make_shared<ConnPools>(dispatcher, absl::nullopt)} {}
 
       typedef ConnPoolMap<std::vector<uint8_t>, Http::ConnectionPool::Instance> ConnPools;
 

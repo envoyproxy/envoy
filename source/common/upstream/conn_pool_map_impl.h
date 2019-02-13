@@ -6,30 +6,48 @@ namespace Envoy {
 namespace Upstream {
 
 template <typename KEY_TYPE, typename POOL_TYPE>
-ConnPoolMap<KEY_TYPE, POOL_TYPE>::ConnPoolMap(Envoy::Event::Dispatcher& dispatcher)
-    : thread_local_dispatcher_(dispatcher) {}
+ConnPoolMap<KEY_TYPE, POOL_TYPE>::ConnPoolMap(Envoy::Event::Dispatcher& dispatcher,
+                                              absl::optional<uint64_t> max_size)
+    : thread_local_dispatcher_(dispatcher), max_size_(max_size) {}
 
 template <typename KEY_TYPE, typename POOL_TYPE>
 ConnPoolMap<KEY_TYPE, POOL_TYPE>::~ConnPoolMap() = default;
 
 template <typename KEY_TYPE, typename POOL_TYPE>
-POOL_TYPE& ConnPoolMap<KEY_TYPE, POOL_TYPE>::getPool(KEY_TYPE key, const PoolFactory& factory) {
+typename ConnPoolMap<KEY_TYPE, POOL_TYPE>::OptPoolRef
+ConnPoolMap<KEY_TYPE, POOL_TYPE>::getPool(KEY_TYPE key, const PoolFactory& factory) {
   Common::AutoDebugRecursionChecker assert_not_in(recursion_checker_);
   // TODO(klarose): Consider how we will change the connection pool's configuration in the future.
   // The plan is to change the downstream socket options... We may want to take those as a parameter
   // here. Maybe we'll pass them to the factory function?
-  auto inserted = active_pools_.emplace(key, nullptr);
-
-  // If we inserted a new element, create a pool and assign it to the iterator. Tell it about any
-  // cached callbacks.
-  if (inserted.second) {
-    inserted.first->second = factory();
-    for (const auto& cb : cached_callbacks_) {
-      inserted.first->second->addDrainedCallback(cb);
-    }
+  auto pool_iter = active_pools_.find(key);
+  if (pool_iter != active_pools_.end()) {
+    return std::ref(*(pool_iter->second));
   }
 
-  return *inserted.first->second;
+  // We need a new pool. Check if we have room.
+  if (max_size_.has_value() && size() >= max_size_.value()) {
+    // We're full. Try to free up a pool. If we can't, bail out.
+    if (!freeOnePool()) {
+      return absl::nullopt;
+    }
+
+    ASSERT(size() < max_size_.value(), "Freeing a pool should reduce the size to below the max.");
+    // TODO(klarose): Consider some simple hysteresis here. How can we prevent iterating over all
+    // pools when we're at the limit every time we want to allocate a new one, even if most of the
+    // pools are not busy, while balancing that with not unnecessarily freeing all pools? If we
+    // start freeing once we cross a threshold, then stop after we cross another, we could
+    // achieve that balance.
+  }
+
+  // We have room for a new pool. Allocate one and let it know about any cached callbacks.
+  auto new_pool = factory();
+  for (const auto& cb : cached_callbacks_) {
+    new_pool->addDrainedCallback(cb);
+  }
+
+  auto inserted = active_pools_.emplace(key, std::move(new_pool));
+  return std::ref(*inserted.first->second);
 }
 
 template <typename KEY_TYPE, typename POOL_TYPE>
@@ -63,5 +81,26 @@ void ConnPoolMap<KEY_TYPE, POOL_TYPE>::drainConnections() {
     pool_pair.second->drainConnections();
   }
 }
+
+template <typename KEY_TYPE, typename POOL_TYPE>
+bool ConnPoolMap<KEY_TYPE, POOL_TYPE>::freeOnePool() {
+  // Try to find a pool that isn't doing anything.
+  auto pool_iter = active_pools_.begin();
+  while (pool_iter != active_pools_.end()) {
+    if (!pool_iter->second->hasActiveConnections()) {
+      break;
+    }
+    ++pool_iter;
+  }
+
+  if (pool_iter != active_pools_.end()) {
+    // We found one. Free it up, and let the caller know.
+    active_pools_.erase(pool_iter);
+    return true;
+  }
+
+  return false;
+}
+
 } // namespace Upstream
 } // namespace Envoy
