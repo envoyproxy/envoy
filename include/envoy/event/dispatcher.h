@@ -37,7 +37,7 @@ public:
   /**
    * Returns a time-source to use with this dispatcher.
    */
-  virtual TimeSystem& timeSystem() PURE;
+  virtual TimeSource& timeSource() PURE;
 
   /**
    * Clear any items in the deferred deletion queue.

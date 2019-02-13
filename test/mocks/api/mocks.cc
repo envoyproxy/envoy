@@ -18,7 +18,11 @@ MockApi::MockApi() { ON_CALL(*this, fileSystem()).WillByDefault(ReturnRef(file_s
 MockApi::~MockApi() {}
 
 Event::DispatcherPtr MockApi::allocateDispatcher() {
-  return Event::DispatcherPtr{allocateDispatcher_(timeSystem())};
+  return Event::DispatcherPtr{allocateDispatcher_(time_system_)};
+}
+
+Event::DispatcherPtr MockApi::allocateDispatcher(Buffer::WatermarkFactoryPtr&& watermark_factory) {
+  return Event::DispatcherPtr{allocateDispatcher_(std::move(watermark_factory), time_system_)};
 }
 
 MockOsSysCalls::MockOsSysCalls() { num_writes_ = num_open_ = 0; }

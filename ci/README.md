@@ -36,7 +36,6 @@ An example basic invocation to build a developer version of the Envoy static bin
 ```
 
 The build image defaults to `envoyproxy/envoy-build-ubuntu`, but you can choose build image by setting `IMAGE_NAME` in the environment.
-```
 
 In case your setup is behind a proxy, set `http_proxy` and `https_proxy` to the proxy servers before invoking the build.
 

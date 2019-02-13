@@ -38,9 +38,12 @@ CTX
 CTXs
 CVC
 CX
+DCHECK
 DER
 DESC
+DFATAL
 DGRAM
+DLOG
 DNS
 DRYs
 DS
@@ -135,6 +138,7 @@ MB
 MD
 MGET
 MSET
+MSVC
 MTLS
 MiB
 NACK
@@ -243,6 +247,7 @@ UTF
 UUID
 UUIDs
 VH
+VLOG
 WKT
 WRR
 WS
@@ -282,7 +287,7 @@ ary
 async
 atomicly
 atomics
-atoul
+atoull
 aud
 auth
 authenticator
@@ -370,6 +375,7 @@ dirname
 djb
 downcasted
 downstream
+dtor
 dubbo
 dup
 durations
@@ -650,7 +656,7 @@ stmt
 str
 strftime
 stringified
-strtoul
+strtoull
 struct
 structs
 subexpr

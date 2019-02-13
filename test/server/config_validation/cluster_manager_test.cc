@@ -19,6 +19,7 @@
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {
@@ -26,13 +27,14 @@ namespace Upstream {
 
 TEST(ValidationClusterManagerTest, MockedMethods) {
   Stats::IsolatedStoreImpl stats_store;
-  Api::ApiPtr api(Api::createApiForTest(stats_store));
+  Event::SimulatedTimeSystem time_system;
+  Api::ApiPtr api(Api::createApiForTest(stats_store, time_system));
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<ThreadLocal::MockInstance> tls;
   NiceMock<Runtime::MockRandomGenerator> random;
   testing::NiceMock<Secret::MockSecretManager> secret_manager;
   auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
-  Extensions::TransportSockets::Tls::ContextManagerImpl ssl_context_manager{api->timeSystem()};
+  Extensions::TransportSockets::Tls::ContextManagerImpl ssl_context_manager{api->timeSource()};
   NiceMock<Event::MockDispatcher> dispatcher;
   LocalInfo::MockLocalInfo local_info;
   NiceMock<Server::MockAdmin> admin;
@@ -42,7 +44,7 @@ TEST(ValidationClusterManagerTest, MockedMethods) {
 
   ValidationClusterManagerFactory factory(
       admin, runtime, stats_store, tls, random, dns_resolver, ssl_context_manager, dispatcher,
-      local_info, secret_manager, *api, http_context, log_manager, singleton_manager);
+      local_info, secret_manager, *api, http_context, log_manager, singleton_manager, time_system);
 
   const envoy::config::bootstrap::v2::Bootstrap bootstrap;
   ClusterManagerPtr cluster_manager = factory.clusterManagerFromProto(bootstrap);
