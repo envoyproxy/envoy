@@ -38,9 +38,12 @@ CTX
 CTXs
 CVC
 CX
+DCHECK
 DER
 DESC
+DFATAL
 DGRAM
+DLOG
 DNS
 DRYs
 DS
@@ -148,6 +151,7 @@ Nilsson
 OCSP
 OK
 OOM
+OS
 OSI
 OSS
 OSX
@@ -241,6 +245,7 @@ UTF
 UUID
 UUIDs
 VH
+VLOG
 WKT
 WRR
 WS
@@ -280,7 +285,7 @@ ary
 async
 atomicly
 atomics
-atoul
+atoull
 aud
 auth
 authenticator
@@ -368,6 +373,7 @@ dirname
 djb
 downcasted
 downstream
+dtor
 dubbo
 dup
 durations
@@ -587,8 +593,10 @@ rebalancing
 rebuffer
 recurse
 recv
+recvmmsg
 redis
 redistributions
+reentrant
 refactored
 refactoring
 referencee
@@ -646,7 +654,7 @@ stmt
 str
 strftime
 stringified
-strtoul
+strtoull
 struct
 structs
 subexpr

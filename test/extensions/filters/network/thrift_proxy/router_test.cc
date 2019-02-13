@@ -17,9 +17,9 @@
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::ContainsRegex;
@@ -29,7 +29,6 @@ using testing::NiceMock;
 using testing::Ref;
 using testing::Return;
 using testing::ReturnRef;
-using testing::TestWithParam;
 using testing::Values;
 
 namespace Envoy {
@@ -329,11 +328,11 @@ public:
   NiceMock<Network::MockClientConnection> upstream_connection_;
 };
 
-class ThriftRouterTest : public ThriftRouterTestBase, public testing::Test {
+class ThriftRouterTest : public TestBase, public ThriftRouterTestBase {
 public:
 };
 
-class ThriftRouterFieldTypeTest : public ThriftRouterTestBase, public TestWithParam<FieldType> {
+class ThriftRouterFieldTypeTest : public TestBaseWithParam<FieldType>, public ThriftRouterTestBase {
 public:
 };
 
@@ -342,7 +341,7 @@ INSTANTIATE_TEST_SUITE_P(PrimitiveFieldTypes, ThriftRouterFieldTypeTest,
                                 FieldType::I64, FieldType::Double, FieldType::String),
                          fieldTypeParamToString);
 
-class ThriftRouterContainerTest : public ThriftRouterTestBase, public TestWithParam<FieldType> {
+class ThriftRouterContainerTest : public TestBaseWithParam<FieldType>, public ThriftRouterTestBase {
 public:
 };
 

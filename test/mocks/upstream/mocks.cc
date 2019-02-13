@@ -5,8 +5,9 @@
 
 #include "envoy/upstream/load_balancer.h"
 
+#include "test/test_common/test_base.h"
+
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Invoke;
@@ -78,8 +79,6 @@ void MockPrioritySet::runUpdateCallbacks(uint32_t priority, const HostVector& ho
 MockRetryPriority::~MockRetryPriority() = default;
 
 MockCluster::MockCluster() {
-  ON_CALL(*this, prioritySet()).WillByDefault(ReturnRef(priority_set_));
-  ON_CALL(testing::Const(*this), prioritySet()).WillByDefault(ReturnRef(priority_set_));
   ON_CALL(*this, info()).WillByDefault(Return(info_));
   ON_CALL(*this, initialize(_))
       .WillByDefault(Invoke([this](std::function<void()> callback) -> void {
@@ -89,6 +88,12 @@ MockCluster::MockCluster() {
 }
 
 MockCluster::~MockCluster() = default;
+
+MockClusterRealPrioritySet::MockClusterRealPrioritySet() = default;
+MockClusterRealPrioritySet::~MockClusterRealPrioritySet() = default;
+
+MockClusterMockPrioritySet::MockClusterMockPrioritySet() = default;
+MockClusterMockPrioritySet::~MockClusterMockPrioritySet() = default;
 
 MockLoadBalancer::MockLoadBalancer() { ON_CALL(*this, chooseHost(_)).WillByDefault(Return(host_)); }
 

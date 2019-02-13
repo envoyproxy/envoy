@@ -10,10 +10,10 @@
 
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::Return;
 using testing::ReturnRef;
@@ -22,11 +22,10 @@ namespace Envoy {
 namespace Secret {
 namespace {
 
-class SecretManagerImplTest : public testing::Test {
+class SecretManagerImplTest : public TestBase {
 protected:
-  SecretManagerImplTest() : api_(Api::createApiForTest(stats_store_)) {}
+  SecretManagerImplTest() : api_(Api::createApiForTest()) {}
 
-  Stats::MockIsolatedStatsStore stats_store_;
   Api::ApiPtr api_;
 };
 

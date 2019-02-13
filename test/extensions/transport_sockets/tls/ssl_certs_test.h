@@ -2,13 +2,13 @@
 
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
-
-#include "gtest/gtest.h"
+#include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_base.h"
 
 using testing::ReturnRef;
 
 namespace Envoy {
-class SslCertsTest : public testing::Test {
+class SslCertsTest : public TestBase {
 public:
   static void SetUpTestSuite() {
     TestEnvironment::exec({TestEnvironment::runfilesPath(
@@ -16,10 +16,11 @@ public:
   }
 
 protected:
-  SslCertsTest() : api_(Api::createApiForTest(store_)) {
+  SslCertsTest() : api_(Api::createApiForTest(store_, time_system_)) {
     ON_CALL(factory_context_, api()).WillByDefault(ReturnRef(*api_));
   }
 
+  Event::SimulatedTimeSystem time_system_;
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
   Stats::IsolatedStoreImpl store_;
   Api::ApiPtr api_;

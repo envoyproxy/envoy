@@ -18,11 +18,11 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::AtLeast;
@@ -38,7 +38,7 @@ namespace {
 
 // We test some mux specific stuff below, other unit test coverage for singleton use of GrpcMuxImpl
 // is provided in [grpc_]subscription_impl_test.cc.
-class GrpcMuxImplTestBase : public testing::Test {
+class GrpcMuxImplTestBase : public TestBase {
 public:
   GrpcMuxImplTestBase() : async_client_(new Grpc::MockAsyncClient()) {}
 
@@ -491,6 +491,9 @@ TEST_F(GrpcMuxImplTest, TooManyRequestsWithCustomRateLimitSettings) {
   // Validate that drain requests call when there are multiple requests in queue.
   time_system_.setMonotonicTime(std::chrono::seconds(10));
   drain_timer_cb();
+
+  // Check that the pending_requests stat is updated with the queue drain.
+  EXPECT_EQ(0, stats_.counter("control_plane.pending_requests").value());
 }
 
 //  Verifies that a messsage with no resources is accepted.

@@ -13,17 +13,25 @@ MaglevTable::MaglevTable(const HostsPerLocality& hosts_per_locality,
   // not good!).
   ASSERT(Primes::isPrime(table_size));
 
+  // Sanity-check that the locality weights, if provided, line up with the hosts per locality.
+  if (locality_weights != nullptr) {
+    ASSERT(locality_weights->size() == hosts_per_locality.get().size());
+  }
+
   // Compute host weight combined with locality weight where applicable.
   const auto effective_weight = [&locality_weights](uint32_t host_weight,
                                                     uint32_t locality_index) -> uint32_t {
-    if (locality_weights == nullptr || locality_weights->empty()) {
+    ASSERT(host_weight != 0);
+    if (locality_weights == nullptr) {
       return host_weight;
     } else {
-      return host_weight * (*locality_weights)[locality_index];
+      auto locality_weight = (*locality_weights)[locality_index];
+      // This might be zero, since locality weight might not be specified.
+      return host_weight * locality_weight;
     }
   };
 
-  // Compute maximum host weight. If this is zero, we are doing unweighted Maglev.
+  // Compute maximum host weight.
   uint32_t max_host_weight = 0;
   uint32_t total_hosts = 0;
   for (uint32_t i = 0; i < hosts_per_locality.get().size(); ++i) {
@@ -44,11 +52,20 @@ MaglevTable::MaglevTable(const HostsPerLocality& hosts_per_locality,
   for (uint32_t i = 0; i < hosts_per_locality.get().size(); ++i) {
     for (const auto& host : hosts_per_locality.get()[i]) {
       const std::string& address = host->address()->asString();
-      table_build_entries.emplace_back(host, HashUtil::xxHash64(address) % table_size_,
-                                       (HashUtil::xxHash64(address, 1) % (table_size_ - 1)) + 1,
-                                       max_host_weight > 0 ? effective_weight(host->weight(), i)
-                                                           : 0);
+      const uint32_t weight = effective_weight(host->weight(), i);
+      // If weight is zero, it should be totally excluded from table building
+      // below.
+      if (weight > 0) {
+        table_build_entries.emplace_back(host, HashUtil::xxHash64(address) % table_size_,
+                                         (HashUtil::xxHash64(address, 1) % (table_size_ - 1)) + 1,
+                                         weight);
+      }
     }
+  }
+
+  // We can't do anything sensible with no table entries.
+  if (table_build_entries.empty()) {
+    return;
   }
 
   table_.resize(table_size_);
@@ -57,18 +74,16 @@ MaglevTable::MaglevTable(const HostsPerLocality& hosts_per_locality,
   while (true) {
     for (uint64_t i = 0; i < table_build_entries.size(); i++) {
       TableBuildEntry& entry = table_build_entries[i];
-      // Only consider weight if we are doing weighted Maglev.
-      if (max_host_weight > 0) {
-        // Counts are in units of max_host_weight. To understand how counts_ and
-        // weight_ are used below, consider a host with weight equal to
-        // max_host_weight. This would be picked on every single iteration. If
-        // it had weight equal to backend_weight_scale / 3, then this would only
-        // happen every 3 iterations, etc.
-        if (iteration * entry.weight_ < entry.counts_) {
-          continue;
-        }
-        entry.counts_ += max_host_weight;
+      // Counts are in units of max_host_weight. To understand how counts_ and
+      // weight_ are used below, consider a host with weight equal to
+      // max_host_weight. This would be picked on every single iteration. If
+      // it had weight equal to backend_weight_scale / 3, then this would only
+      // happen every 3 iterations, etc.
+      if (iteration * entry.weight_ < entry.counts_) {
+        ASSERT(max_host_weight > 1);
+        continue;
       }
+      entry.counts_ += max_host_weight;
       uint64_t c = permutation(entry);
       while (table_[c] != nullptr) {
         entry.next_++;

@@ -18,9 +18,9 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::AnyNumber;
@@ -60,7 +60,7 @@ public:
   DecoderCallbacks* callbacks_{};
 };
 
-class MongoProxyFilterTest : public testing::Test {
+class MongoProxyFilterTest : public TestBase {
 public:
   MongoProxyFilterTest() { setup(); }
 
@@ -78,13 +78,13 @@ public:
         .WillRepeatedly(ReturnRef(stream_info_));
 
     EXPECT_CALL(log_manager_, createAccessLog(_)).WillOnce(Return(file_));
-    access_log_.reset(new AccessLog("test", log_manager_, dispatcher_.timeSystem()));
+    access_log_.reset(new AccessLog("test", log_manager_, dispatcher_.timeSource()));
   }
 
   void initializeFilter(bool emit_dynamic_metadata = false) {
     filter_ = std::make_unique<TestProxyFilter>("test.", store_, runtime_, access_log_,
                                                 fault_config_, drain_decision_, generator_,
-                                                dispatcher_.timeSystem(), emit_dynamic_metadata);
+                                                dispatcher_.timeSource(), emit_dynamic_metadata);
     filter_->initializeReadFilterCallbacks(read_filter_callbacks_);
     filter_->onNewConnection();
 

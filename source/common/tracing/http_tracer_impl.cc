@@ -55,7 +55,7 @@ const std::string& HttpTracerUtility::toString(OperationName operation_name) {
 
 Decision HttpTracerUtility::isTracing(const StreamInfo::StreamInfo& stream_info,
                                       const Http::HeaderMap& request_headers) {
-  // Exclude HC requests immediately.
+  // Exclude health check requests immediately.
   if (stream_info.healthCheck()) {
     return {Reason::HealthCheck, false};
   }

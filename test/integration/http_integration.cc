@@ -30,8 +30,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/registry.h"
-
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using testing::_;
 using testing::AnyNumber;
@@ -205,9 +204,8 @@ HttpIntegrationTest::makeHttpConnection(Network::ClientConnectionPtr&& conn) {
 
 HttpIntegrationTest::HttpIntegrationTest(Http::CodecClient::Type downstream_protocol,
                                          Network::Address::IpVersion version,
-                                         TestTimeSystemPtr time_system, const std::string& config)
-    : BaseIntegrationTest(version, std::move(time_system), config),
-      downstream_protocol_(downstream_protocol) {
+                                         const std::string& config)
+    : BaseIntegrationTest(version, config), downstream_protocol_(downstream_protocol) {
   // Legacy integration tests expect the default listener to be named "http" for lookupPort calls.
   config_helper_.renameListener("http");
   config_helper_.setClientCodec(typeToCodecType(downstream_protocol_));
@@ -380,7 +378,9 @@ void HttpIntegrationTest::testRouterUpstreamDisconnectBeforeRequestComplete() {
 
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("503", response->headers().Status()->value().c_str());
-  EXPECT_EQ("upstream connect error or disconnect/reset before headers", response->body());
+  EXPECT_EQ("upstream connect error or disconnect/reset before headers. reset reason: connection "
+            "termination",
+            response->body());
 }
 
 void HttpIntegrationTest::testRouterUpstreamDisconnectBeforeResponseComplete(

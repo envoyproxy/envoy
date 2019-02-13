@@ -12,10 +12,10 @@
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::InSequence;
@@ -26,7 +26,7 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Upstream {
 
-class CdsApiImplTest : public testing::Test {
+class CdsApiImplTest : public TestBase {
 protected:
   CdsApiImplTest() : request_(&cm_.async_client_), api_(Api::createApiForTest(store_)) {}
 
@@ -45,7 +45,7 @@ protected:
     cds_config.mutable_api_config_source()->set_api_type(
         envoy::api::v2::core::ApiConfigSource::REST);
     Upstream::ClusterManager::ClusterInfoMap cluster_map;
-    Upstream::MockCluster cluster;
+    Upstream::MockClusterMockPrioritySet cluster;
     cluster_map.emplace("foo_cluster", cluster);
     EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
     EXPECT_CALL(cluster, info());

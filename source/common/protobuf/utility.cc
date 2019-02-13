@@ -8,6 +8,18 @@
 #include "absl/strings/match.h"
 
 namespace Envoy {
+namespace {
+
+absl::string_view filenameFromPath(absl::string_view full_path) {
+  size_t index = full_path.rfind("/");
+  if (index == std::string::npos || index == full_path.size()) {
+    return full_path;
+  }
+  return full_path.substr(index + 1, full_path.size());
+}
+
+} // namespace
+
 namespace ProtobufPercentHelper {
 
 uint64_t checkAndReturnDefault(uint64_t default_value, uint64_t max_value) {
@@ -82,7 +94,7 @@ void MessageUtil::loadFromYaml(const std::string& yaml, Protobuf::Message& messa
 void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& message, Api::Api& api) {
   const std::string contents = api.fileSystem().fileReadToEnd(path);
   // If the filename ends with .pb, attempt to parse it as a binary proto.
-  if (absl::EndsWith(path, ".pb")) {
+  if (absl::EndsWith(path, FileExtensions::get().ProtoBinary)) {
     // Attempt to parse the binary format.
     if (message.ParseFromString(contents)) {
       MessageUtil::checkUnknownFields(message);
@@ -92,17 +104,72 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
                          message.GetTypeName() + ")");
   }
   // If the filename ends with .pb_text, attempt to parse it as a text proto.
-  if (absl::EndsWith(path, ".pb_text")) {
+  if (absl::EndsWith(path, FileExtensions::get().ProtoText)) {
     if (Protobuf::TextFormat::ParseFromString(contents, &message)) {
       return;
     }
     throw EnvoyException("Unable to parse file \"" + path + "\" as a text protobuf (type " +
                          message.GetTypeName() + ")");
   }
-  if (absl::EndsWith(path, ".yaml")) {
+  if (absl::EndsWith(path, FileExtensions::get().Yaml)) {
     loadFromYaml(contents, message);
   } else {
     loadFromJson(contents, message);
+  }
+}
+
+void MessageUtil::checkForDeprecation(const Protobuf::Message& message, Runtime::Loader* runtime) {
+  const Protobuf::Descriptor* descriptor = message.GetDescriptor();
+  const Protobuf::Reflection* reflection = message.GetReflection();
+  for (int i = 0; i < descriptor->field_count(); ++i) {
+    const auto* field = descriptor->field(i);
+
+    // If this field is not in use, continue.
+    if ((field->is_repeated() && reflection->FieldSize(message, field) == 0) ||
+        (!field->is_repeated() && !reflection->HasField(message, field))) {
+      continue;
+    }
+
+    bool warn_only = true;
+    absl::string_view filename = filenameFromPath(field->file()->name());
+    // Allow runtime to be null both to not crash if this is called before server initialization,
+    // and so proto validation works in context where runtime singleton is not set up (e.g.
+    // standalone config validation utilities)
+    if (runtime && !runtime->snapshot().deprecatedFeatureEnabled(
+                       absl::StrCat("envoy.deprecated_features.", filename, ":", field->name()))) {
+      warn_only = false;
+    }
+
+    // If this field is deprecated, warn or throw an error.
+    if (field->options().deprecated()) {
+      std::string err = fmt::format(
+          "Using deprecated option '{}' from file {}. This configuration will be removed from "
+          "Envoy soon. Please see https://github.com/envoyproxy/envoy/blob/master/DEPRECATED.md "
+          "for details.",
+          field->full_name(), filename);
+      if (warn_only) {
+        ENVOY_LOG_MISC(warn, "{}", err);
+      } else {
+        const char fatal_error[] =
+            " If continued use of this field is absolutely necessary, see "
+            "https://www.envoyproxy.io/docs/envoy/latest/configuration/runtime"
+            "#using-runtime-overrides-for-deprecated-features for how to apply a temporary and"
+            "highly discouraged override.";
+        throw ProtoValidationException(err + fatal_error, message);
+      }
+    }
+
+    // If this is a message, recurse to check for deprecated fields in the sub-message.
+    if (field->cpp_type() == Protobuf::FieldDescriptor::CPPTYPE_MESSAGE) {
+      if (field->is_repeated()) {
+        const int size = reflection->FieldSize(message, field);
+        for (int j = 0; j < size; ++j) {
+          checkForDeprecation(reflection->GetRepeatedMessage(message, field, j), runtime);
+        }
+      } else {
+        checkForDeprecation(reflection->GetMessage(message, field), runtime);
+      }
+    }
   }
 }
 

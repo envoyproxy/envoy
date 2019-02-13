@@ -24,11 +24,11 @@
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::AssertionFailure;
@@ -74,7 +74,7 @@ public:
   bool reject_all_hosts_ = false;
 };
 
-class RouterTestBase : public testing::Test {
+class RouterTestBase : public TestBase {
 public:
   RouterTestBase(bool start_child_span, bool suppress_envoy_headers)
       : shadow_writer_(new MockShadowWriter()),
@@ -284,7 +284,7 @@ TEST_F(RouterTest, PoolFailureWithPriority) {
       }));
 
   Http::TestHeaderMapImpl response_headers{
-      {":status", "503"}, {"content-length", "57"}, {"content-type", "text/plain"}};
+      {":status", "503"}, {"content-length", "91"}, {"content-type", "text/plain"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
   EXPECT_CALL(callbacks_, encodeData(_, true));
   EXPECT_CALL(callbacks_.stream_info_,
@@ -1033,6 +1033,7 @@ TEST_F(RouterTest, GrpcReset) {
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(503));
   encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
+  EXPECT_EQ(1UL, stats_store_.counter("test.rq_reset_after_downstream_response_started").value());
 }
 
 // Validate gRPC OK response stats are sane when response is not trailers only.

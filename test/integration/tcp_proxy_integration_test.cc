@@ -11,8 +11,7 @@
 
 #include "test/integration/ssl_utility.h"
 #include "test/integration/utility.h"
-
-#include "gtest/gtest.h"
+#include "test/test_common/test_base.h"
 
 using testing::_;
 using testing::Invoke;
@@ -184,6 +183,7 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamFlush) {
   test_server_->waitForGaugeEq("tcp.tcp_stats.upstream_flush_active", 1);
   ASSERT_TRUE(fake_upstream_connection->readDisable(false));
   ASSERT_TRUE(fake_upstream_connection->waitForData(data.size()));
+  ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
   tcp_client->waitForHalfClose();
 

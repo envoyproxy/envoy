@@ -30,6 +30,7 @@
 #include "common/access_log/access_log_impl.h"
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
+#include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
 #include "common/common/mutex_tracer_impl.h"
@@ -168,10 +169,14 @@ void setHealthFlag(Upstream::Host::HealthFlag flag, const Upstream::Host& host,
         host.healthFlagGet(Upstream::Host::HealthFlag::FAILED_OUTLIER_CHECK));
     break;
   case Upstream::Host::HealthFlag::FAILED_EDS_HEALTH:
-    health_status.set_eds_health_status(
-        host.healthFlagGet(Upstream::Host::HealthFlag::FAILED_EDS_HEALTH)
-            ? envoy::api::v2::core::HealthStatus::UNHEALTHY
-            : envoy::api::v2::core::HealthStatus::HEALTHY);
+  case Upstream::Host::HealthFlag::DEGRADED_EDS_HEALTH:
+    if (host.healthFlagGet(Upstream::Host::HealthFlag::FAILED_EDS_HEALTH)) {
+      health_status.set_eds_health_status(envoy::api::v2::core::HealthStatus::UNHEALTHY);
+    } else if (host.healthFlagGet(Upstream::Host::HealthFlag::DEGRADED_EDS_HEALTH)) {
+      health_status.set_eds_health_status(envoy::api::v2::core::HealthStatus::DEGRADED);
+    } else {
+      health_status.set_eds_health_status(envoy::api::v2::core::HealthStatus::HEALTHY);
+    }
     break;
   case Upstream::Host::HealthFlag::DEGRADED_ACTIVE_HC:
     health_status.set_failed_active_degraded_check(
@@ -658,7 +663,7 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
     std::multimap<std::string, std::string> all_histograms;
     for (const Stats::ParentHistogramSharedPtr& histogram : server_.stats().histograms()) {
       if (shouldShowMetric(histogram, used_only, regex)) {
-        all_histograms.emplace(histogram->name(), histogram->summary());
+        all_histograms.emplace(histogram->name(), histogram->quantileSummary());
       }
     }
     for (auto histogram : all_histograms) {
@@ -668,10 +673,12 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
   return rc;
 }
 
-Http::Code AdminImpl::handlerPrometheusStats(absl::string_view, Http::HeaderMap&,
+Http::Code AdminImpl::handlerPrometheusStats(absl::string_view path_and_query, Http::HeaderMap&,
                                              Buffer::Instance& response, AdminStream&) {
+  const Http::Utility::QueryParams params = Http::Utility::parseQueryString(path_and_query);
+  const bool used_only = params.find("usedonly") != params.end();
   PrometheusStatsFormatter::statsAsPrometheus(server_.stats().counters(), server_.stats().gauges(),
-                                              response);
+                                              server_.stats().histograms(), response, used_only);
   return Http::Code::OK;
 }
 
@@ -701,13 +708,17 @@ std::string PrometheusStatsFormatter::metricName(const std::string& extractedNam
   return sanitizeName(fmt::format("envoy_{0}", extractedName));
 }
 
-// TODO(ramaraochavali): Add summary histogram output for Prometheus.
-uint64_t
-PrometheusStatsFormatter::statsAsPrometheus(const std::vector<Stats::CounterSharedPtr>& counters,
-                                            const std::vector<Stats::GaugeSharedPtr>& gauges,
-                                            Buffer::Instance& response) {
+uint64_t PrometheusStatsFormatter::statsAsPrometheus(
+    const std::vector<Stats::CounterSharedPtr>& counters,
+    const std::vector<Stats::GaugeSharedPtr>& gauges,
+    const std::vector<Stats::ParentHistogramSharedPtr>& histograms, Buffer::Instance& response,
+    const bool used_only) {
   std::unordered_set<std::string> metric_type_tracker;
   for (const auto& counter : counters) {
+    if (!shouldShowMetric(counter, used_only)) {
+      continue;
+    }
+
     const std::string tags = formattedTags(counter->tags());
     const std::string metric_name = metricName(counter->tagExtractedName());
     if (metric_type_tracker.find(metric_name) == metric_type_tracker.end()) {
@@ -718,6 +729,10 @@ PrometheusStatsFormatter::statsAsPrometheus(const std::vector<Stats::CounterShar
   }
 
   for (const auto& gauge : gauges) {
+    if (!shouldShowMetric(gauge, used_only)) {
+      continue;
+    }
+
     const std::string tags = formattedTags(gauge->tags());
     const std::string metric_name = metricName(gauge->tagExtractedName());
     if (metric_type_tracker.find(metric_name) == metric_type_tracker.end()) {
@@ -726,6 +741,42 @@ PrometheusStatsFormatter::statsAsPrometheus(const std::vector<Stats::CounterShar
     }
     response.add(fmt::format("{0}{{{1}}} {2}\n", metric_name, tags, gauge->value()));
   }
+
+  for (const auto& histogram : histograms) {
+    if (!shouldShowMetric(histogram, used_only)) {
+      continue;
+    }
+
+    const std::string tags = formattedTags(histogram->tags());
+    const std::string hist_tags = histogram->tags().empty() ? EMPTY_STRING : (tags + ",");
+
+    const std::string metric_name = metricName(histogram->tagExtractedName());
+    if (metric_type_tracker.find(metric_name) == metric_type_tracker.end()) {
+      metric_type_tracker.insert(metric_name);
+      response.add(fmt::format("# TYPE {0} histogram\n", metric_name));
+    }
+
+    const Stats::HistogramStatistics& stats = histogram->cumulativeStatistics();
+    const std::vector<double>& supported_buckets = stats.supportedBuckets();
+    const std::vector<uint64_t>& computed_buckets = stats.computedBuckets();
+    for (size_t i = 0; i < supported_buckets.size(); ++i) {
+      double bucket = supported_buckets[i];
+      uint64_t value = computed_buckets[i];
+      // We want to print the bucket in a fixed point (non-scientific) format. The fmt library
+      // doesn't have a specific modifier to format as a fixed-point value only so we use the
+      // 'g' operator which prints the number in general fixed point format or scientific format
+      // with precision 50 to round the number up to 32 significant digits in fixed point format
+      // which should cover pretty much all cases
+      response.add(fmt::format("{0}_bucket{{{1}le=\"{2:.32g}\"}} {3}\n", metric_name, hist_tags,
+                               bucket, value));
+    }
+
+    response.add(fmt::format("{0}_bucket{{{1}le=\"+Inf\"}} {2}\n", metric_name, hist_tags,
+                             stats.sampleCount()));
+    response.add(fmt::format("{0}_sum{{{1}}} {2}\n", metric_name, tags, stats.sampleSum()));
+    response.add(fmt::format("{0}_count{{{1}}} {2}\n", metric_name, tags, stats.sampleCount()));
+  }
+
   return metric_type_tracker.size();
 }
 
@@ -1012,7 +1063,7 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
       stats_(Http::ConnectionManagerImpl::generateStats("http.admin.", server_.stats())),
       tracing_stats_(
           Http::ConnectionManagerImpl::generateTracingStats("http.admin.", no_op_store_)),
-      route_config_provider_(server.timeSystem()),
+      route_config_provider_(server.timeSource()),
       // TODO(jsedgwick) add /runtime_reset endpoint that removes all admin-set values
       handlers_{
           {"/", "Admin home page", MAKE_ADMIN_HANDLER(handlerAdminHome), false, false},
@@ -1052,14 +1103,15 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
           {"/runtime_modify", "modify runtime values", MAKE_ADMIN_HANDLER(handlerRuntimeModify),
            false, true},
       },
-      date_provider_(server.dispatcher().timeSystem()),
+      date_provider_(server.dispatcher().timeSource()),
       admin_filter_chain_(std::make_shared<AdminFilterChain>()) {}
 
 Http::ServerConnectionPtr AdminImpl::createCodec(Network::Connection& connection,
                                                  const Buffer::Instance& data,
                                                  Http::ServerConnectionCallbacks& callbacks) {
   return Http::ConnectionManagerUtility::autoCreateCodec(
-      connection, data, callbacks, server_.stats(), Http::Http1Settings(), Http::Http2Settings());
+      connection, data, callbacks, server_.stats(), Http::Http1Settings(), Http::Http2Settings(),
+      maxRequestHeadersKb());
 }
 
 bool AdminImpl::createNetworkFilterChain(Network::Connection& connection,
@@ -1068,7 +1120,7 @@ bool AdminImpl::createNetworkFilterChain(Network::Connection& connection,
   // the envoy is overloaded.
   connection.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(
       *this, server_.drainManager(), server_.random(), server_.httpContext(), server_.runtime(),
-      server_.localInfo(), server_.clusterManager(), nullptr, server_.timeSystem())});
+      server_.localInfo(), server_.clusterManager(), nullptr, server_.timeSource())});
   return true;
 }
 

@@ -12,15 +12,17 @@
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
-#include "testing/base/public/benchmark.h"
+#include "benchmark/benchmark.h"
 
 namespace Envoy {
 
 class ThreadLocalStorePerf {
 public:
-  ThreadLocalStorePerf() : store_(options_, heap_alloc_), api_(Api::createApiForTest(store_)) {
+  ThreadLocalStorePerf()
+      : store_(options_, heap_alloc_), api_(Api::createApiForTest(store_, time_system_)) {
     store_.setTagProducer(std::make_unique<Stats::TagProducerImpl>(stats_config_));
   }
 
@@ -37,18 +39,18 @@ public:
   }
 
   void initThreading() {
-    dispatcher_ = std::make_unique<Event::DispatcherImpl>(time_system_, *api_);
+    dispatcher_ = api_->allocateDispatcher();
     tls_ = std::make_unique<ThreadLocal::InstanceImpl>();
     store_.initializeThreading(*dispatcher_, *tls_);
   }
 
 private:
+  Event::SimulatedTimeSystem time_system_;
   Stats::StatsOptionsImpl options_;
   Stats::HeapStatDataAllocator heap_alloc_;
   Stats::ThreadLocalStoreImpl store_;
   Api::ApiPtr api_;
-  Event::SimulatedTimeSystem time_system_;
-  std::unique_ptr<Event::DispatcherImpl> dispatcher_;
+  Event::DispatcherPtr dispatcher_;
   std::unique_ptr<ThreadLocal::InstanceImpl> tls_;
   envoy::config::metrics::v2::StatsConfig stats_config_;
 };

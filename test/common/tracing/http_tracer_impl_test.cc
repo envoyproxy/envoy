@@ -18,10 +18,10 @@
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Invoke;
@@ -72,7 +72,7 @@ TEST(HttpTracerUtilityTest, IsTracing) {
     EXPECT_TRUE(result.traced);
   }
 
-  // HC request.
+  // Health Check request.
   {
     Http::TestHeaderMapImpl traceable_header_hc{{"x-request-id", forced_guid}};
     EXPECT_CALL(stream_info, healthCheck()).WillOnce(Return(true));
@@ -323,7 +323,7 @@ TEST(HttpNullTracerTest, BasicFunctionality) {
   EXPECT_NE(nullptr, span_ptr->spawnChild(config, "foo", SystemTime()));
 }
 
-class HttpTracerImplTest : public testing::Test {
+class HttpTracerImplTest : public TestBase {
 public:
   HttpTracerImplTest() {
     driver_ = new MockDriver();

@@ -41,6 +41,12 @@ envoy_cc_library(
         "//source/common/network:utility_lib",
         "//source/common/protobuf",
         "//source/common/tracing:http_tracer_lib",
+
+        # TODO(gsagula): Descriptor pool requires this dependence in runtime only. It should NOT be
+        # removed unless v2alpha is fully deprecated, otherwise linker will drop the object file
+        # associated with v2alpha/external_auth.pb.cc causing FindMessageTypeByName() to always return
+        # nullptr when looking up for envoy.service.auth.v2alpha.Authorization.Check.
+        "@envoy_api//envoy/service/auth/v2alpha:external_auth_cc",
     ],
 )
 

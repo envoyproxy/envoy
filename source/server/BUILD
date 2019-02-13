@@ -13,7 +13,7 @@ envoy_cc_library(
     name = "backtrace_lib",
     hdrs = ["backtrace.h"],
     external_deps = [
-        "backward",
+        "abseil_stacktrace",
         "abseil_symbolize",
     ],
     tags = ["backtrace"],

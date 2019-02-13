@@ -153,7 +153,7 @@ void HystrixSink::addHystrixCommand(ClusterStatsCache& cluster_stats_cache,
                                     std::chrono::milliseconds rolling_window_ms,
                                     const QuantileLatencyMap& histogram, std::stringstream& ss) {
 
-  std::time_t currentTime = std::chrono::system_clock::to_time_t(server_.timeSystem().systemTime());
+  std::time_t currentTime = std::chrono::system_clock::to_time_t(server_.timeSource().systemTime());
 
   ss << "data: {";
   addStringToStream("type", "HystrixCommand", ss, true);
@@ -290,7 +290,7 @@ Http::Code HystrixSink::handlerHystrixEventStream(absl::string_view,
       AccessControlAllowHeadersValue.AllowHeadersHystrix);
   response_headers.insertAccessControlAllowOrigin().value().setReference(
       Http::Headers::get().AccessControlAllowOriginValue.All);
-  response_headers.insertNoChunks().value().setReference("0");
+  response_headers.insertNoChunks().value().setInteger(0);
 
   Http::StreamDecoderFilterCallbacks& stream_decoder_filter_callbacks =
       admin_stream.getDecoderFilterCallbacks();

@@ -29,10 +29,21 @@ maximize the chances of your PR being merged.
   etc.), and CLI switches. We will also try to not change behavioral semantics
   (e.g., HTTP header processing order), though this is harder to outright
   guarantee.
-* We reserve the right to deprecate configuration, and at the beginning of the following release
-  cycle remove the deprecated configuration. For example, all deprecations between 1.3.0 and
-  1.4.0 will be deleted soon AFTER 1.4.0 is tagged and released (at the beginning of the 1.5.0
-  release cycle).
+* We reserve the right to deprecate configuration, after two release cycles. For example, all
+  deprecations between 1.3.0 and 1.4.0 will be deleted soon AFTER 1.5.0 is tagged and released
+  (at the beginning of the 1.6.0 release cycle). This results in a three to six month window for
+  migrating from deprecated code paths to new code paths.
+* Unless the community and Envoy maintainer team agrees on an exception, during the
+  first release cycle after a feature has been deprecated, use of that feature
+  will cause a logged warning, and incrementing the
+  [runtime](https://www.envoyproxy.io/docs/envoy/latest/configuration/runtime#config-runtime)
+  runtime.deprecated_feature_use stat.
+  During the second release cycle, use of the deprecated configuration will
+  cause a configuration load failure, unless the feature in question is
+  explicitly overridden in
+  [runtime](https://www.envoyproxy.io/docs/envoy/latest/configuration/runtime#config-runtime)
+  config. Finally during the third release cycle the code and configuration will be removed
+  entirely.
 * This policy means that organizations deploying master should have some time to get ready for
   breaking changes, but we make no guarantees about the length of time.
 * The breaking change policy also applies to source level extensions (e.g., filters). Code that
@@ -63,8 +74,9 @@ maximize the chances of your PR being merged.
 * For configuration deprecations that are not covered by the above semantic
   replacement policy, any deprecation will only take place after
   community consultation on mailing lists, Slack and GitHub, over the period of
-  a minimum of two Envoy release cycles (~6 months). This includes where a
-  feature is outright deleted with no replacement.
+  a minimum of two Envoy release cycles (~6 months). Cases where a feature is
+  outright deleted with no replacement will get an additional two Envoy release
+  cycles (~12 months) before removal.
 
 # Release cadence
 

@@ -264,7 +264,7 @@ public:
           callback_ready_event.notifyOne();
         });
     Event::TestTimeSystem& time_system =
-        dynamic_cast<Event::TestTimeSystem&>(connection_.dispatcher().timeSystem());
+        dynamic_cast<Event::TestTimeSystem&>(connection_.dispatcher().timeSource());
     Thread::CondVar::WaitStatus status = time_system.waitFor(lock_, callback_ready_event, timeout);
     if (status == Thread::CondVar::WaitStatus::Timeout) {
       return testing::AssertionFailure() << "Timed out while executing on dispatcher.";

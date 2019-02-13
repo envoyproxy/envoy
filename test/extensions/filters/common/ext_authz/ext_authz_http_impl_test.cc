@@ -10,9 +10,9 @@
 #include "test/extensions/filters/common/ext_authz/mocks.h"
 #include "test/extensions/filters/common/ext_authz/test_common.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::AllOf;
@@ -30,11 +30,10 @@ namespace Filters {
 namespace Common {
 namespace ExtAuthz {
 
-class ExtAuthzHttpClientTest : public testing::Test {
+class ExtAuthzHttpClientTest : public TestBase {
 public:
   ExtAuthzHttpClientTest()
-      : cm_{}, async_client_{},
-        async_request_{&async_client_}, config_{createConfig()}, client_{cm_, config_} {
+      : async_request_{&async_client_}, config_{createConfig()}, client_{cm_, config_} {
     ON_CALL(cm_, httpAsyncClientForCluster(config_->cluster()))
         .WillByDefault(ReturnRef(async_client_));
   }

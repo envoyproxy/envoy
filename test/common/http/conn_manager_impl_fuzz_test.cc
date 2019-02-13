@@ -91,7 +91,7 @@ public:
   FilterChainFactory& filterFactory() override { return filter_factory_; }
   bool reverseEncodeOrder() override { return true; }
   bool generateRequestId() override { return true; }
-  uint32_t maxRequestHeadersSizeKb() const override { return max_request_headers_size_kb_; }
+  uint32_t maxRequestHeadersKb() const override { return max_request_headers_kb_; }
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
   std::chrono::milliseconds streamIdleTimeout() const override { return stream_idle_timeout_; }
   std::chrono::milliseconds requestTimeout() const override { return request_timeout_; }
@@ -132,7 +132,7 @@ public:
   ConnectionManagerStats stats_;
   ConnectionManagerTracingStats tracing_stats_;
   ConnectionManagerListenerStats listener_stats_;
-  uint32_t max_request_headers_size_kb_{Http::DEFAULT_MAX_REQUEST_HEADERS_SIZE_KB};
+  uint32_t max_request_headers_kb_{Http::DEFAULT_MAX_REQUEST_HEADERS_KB};
   absl::optional<std::chrono::milliseconds> idle_timeout_;
   std::chrono::milliseconds stream_idle_timeout_{};
   std::chrono::milliseconds request_timeout_{};

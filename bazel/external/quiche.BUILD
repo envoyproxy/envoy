@@ -15,11 +15,8 @@ licenses(["notice"])  # Apache 2
 # source files in group 3 (the Platform impl). Unfortunately, QUICHE does not
 # yet provide a built-in way to customize this dependency, e.g. to override the
 # directory or namespace in which Platform impl types are defined. Hence the
-# gross hacks in this file.
-#
-# Transformations to QUICHE tarball performed here:
-# - Move subtree under quiche/ base dir, for clarity in #include statements.
-# - Rewrite include directives for platform/impl files.
+# gross hacks in quiche.genrule_cmd, invoked from here to tweak QUICHE source
+# files into a form usable by Envoy.
 #
 # The mechanics of this will change as QUICHE evolves, supplies its own Bazel
 # buildfiles, and provides a built-in way to override platform impl directory
@@ -27,6 +24,12 @@ licenses(["notice"])  # Apache 2
 # quiche/{http2,quic,spdy}/, with the Envoy-specific implementation of the
 # QUICHE platform APIs in //source/extensions/quic_listeners/quiche/platform/,
 # should remain largely the same.
+
+load(":genrule_cmd.bzl", "genrule_cmd")
+load(
+    "@envoy//bazel:envoy_build_system.bzl",
+    "envoy_cc_test",
+)
 
 src_files = glob([
     "**/*.h",
@@ -36,27 +39,13 @@ src_files = glob([
     "**/*.proto",
 ])
 
-# TODO(mpwarres): remove use of sed once QUICHE provides a cleaner way to
-#   override platform impl directory location.
 genrule(
     name = "quiche_files",
     srcs = src_files,
     outs = ["quiche/" + f for f in src_files],
-    cmd = "\n".join(
-        ["sed -e '/^#include/ s!net/[^/]*/platform/impl/!extensions/quic_listeners/quiche/platform/!' $(location %s) > $(location :%s)" % (
-            f,
-            "quiche/" + f,
-        ) for f in src_files],
-    ),
+    cmd = genrule_cmd("@envoy//bazel/external:quiche.genrule_cmd"),
     visibility = ["//visibility:private"],
 )
-
-# Note: in dependencies below that reference Envoy build targets in the main
-# repository (particularly for QUICHE platform libs), use '@' instead of
-# '@envoy' as the repository identifier. Otherwise, Bazel generates duplicate
-# object files for the same build target (one under
-# bazel-out/.../bin/external/, and one under bazel-out/.../bin/), eventually
-# resulting in link-time errors.
 
 cc_library(
     name = "http2_platform",
@@ -109,9 +98,24 @@ cc_library(
 
 cc_library(
     name = "quic_platform",
+    srcs = ["quiche/quic/platform/api/quic_mutex.cc"],
+    hdrs = [
+        "quiche/quic/platform/api/quic_cert_utils.h",
+        "quiche/quic/platform/api/quic_mutex.h",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":quic_platform_base",
+        "@envoy//source/extensions/quic_listeners/quiche/platform:quic_platform_impl_lib",
+    ],
+)
+
+cc_library(
+    name = "quic_platform_base",
     hdrs = [
         "quiche/quic/platform/api/quic_aligned.h",
         "quiche/quic/platform/api/quic_arraysize.h",
+        "quiche/quic/platform/api/quic_client_stats.h",
         "quiche/quic/platform/api/quic_containers.h",
         "quiche/quic/platform/api/quic_endian.h",
         "quiche/quic/platform/api/quic_estimate_memory_usage.h",
@@ -119,13 +123,20 @@ cc_library(
         "quiche/quic/platform/api/quic_fallthrough.h",
         "quiche/quic/platform/api/quic_flag_utils.h",
         "quiche/quic/platform/api/quic_iovec.h",
+        "quiche/quic/platform/api/quic_logging.h",
+        "quiche/quic/platform/api/quic_map_util.h",
         "quiche/quic/platform/api/quic_prefetch.h",
+        "quiche/quic/platform/api/quic_ptr_util.h",
+        "quiche/quic/platform/api/quic_stack_trace.h",
+        "quiche/quic/platform/api/quic_str_cat.h",
         "quiche/quic/platform/api/quic_string.h",
         "quiche/quic/platform/api/quic_string_piece.h",
-        "quiche/quic/platform/api/quic_ptr_util.h",
+        "quiche/quic/platform/api/quic_string_utils.h",
+        "quiche/quic/platform/api/quic_test.h",
+        "quiche/quic/platform/api/quic_text_utils.h",
+        "quiche/quic/platform/api/quic_uint128.h",
         # TODO: uncomment the following files as implementations are added.
         # "quiche/quic/platform/api/quic_bug_tracker.h",
-        # "quiche/quic/platform/api/quic_client_stats.h",
         # "quiche/quic/platform/api/quic_clock.h",
         # "quiche/quic/platform/api/quic_expect_bug.h",
         # "quiche/quic/platform/api/quic_exported_stats.h",
@@ -137,14 +148,11 @@ cc_library(
         # "quiche/quic/platform/api/quic_interval.h",
         # "quiche/quic/platform/api/quic_ip_address_family.h",
         # "quiche/quic/platform/api/quic_ip_address.h",
-        # "quiche/quic/platform/api/quic_logging.h",
         # "quiche/quic/platform/api/quic_lru_cache.h",
-        # "quiche/quic/platform/api/quic_map_util.h",
         # "quiche/quic/platform/api/quic_mem_slice.h",
         # "quiche/quic/platform/api/quic_mem_slice_span.h",
         # "quiche/quic/platform/api/quic_mem_slice_storage.h",
         # "quiche/quic/platform/api/quic_mock_log.h",
-        # "quiche/quic/platform/api/quic_mutex.h",
         # "quiche/quic/platform/api/quic_pcc_sender.h",
         # "quiche/quic/platform/api/quic_reference_counted.h",
         # "quiche/quic/platform/api/quic_server_stats.h",
@@ -152,18 +160,26 @@ cc_library(
         # "quiche/quic/platform/api/quic_sleep.h",
         # "quiche/quic/platform/api/quic_socket_address.h",
         # "quiche/quic/platform/api/quic_stack_trace.h",
-        # "quiche/quic/platform/api/quic_str_cat.h",
-        # "quiche/quic/platform/api/quic_string_utils.h",
         # "quiche/quic/platform/api/quic_test.h",
         # "quiche/quic/platform/api/quic_test_loopback.h",
         # "quiche/quic/platform/api/quic_test_mem_slice_vector.h",
         # "quiche/quic/platform/api/quic_test_output.h",
-        # "quiche/quic/platform/api/quic_text_utils.h",
         # "quiche/quic/platform/api/quic_thread.h",
-        # "quiche/quic/platform/api/quic_uint128.h",
     ],
     visibility = ["//visibility:public"],
     deps = [
-        "@envoy//source/extensions/quic_listeners/quiche/platform:quic_platform_impl_lib",
+        "@envoy//source/extensions/quic_listeners/quiche/platform:quic_platform_base_impl_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "quic_platform_test",
+    srcs = [
+        "quiche/quic/platform/api/quic_string_utils_test.cc",
+        "quiche/quic/platform/api/quic_text_utils_test.cc",
+    ],
+    repository = "@envoy",
+    deps = [
+        ":quic_platform",
     ],
 )

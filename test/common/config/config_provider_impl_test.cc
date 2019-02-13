@@ -6,9 +6,9 @@
 #include "test/common/config/dummy_config.pb.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Config {
@@ -42,7 +42,7 @@ class DummyConfigSubscription
     : public ConfigSubscriptionInstanceBase,
       Envoy::Config::SubscriptionCallbacks<test::common::config::DummyConfig> {
 public:
-  DummyConfigSubscription(const std::string& manager_identifier,
+  DummyConfigSubscription(const uint64_t manager_identifier,
                           Server::Configuration::FactoryContext& factory_context,
                           DummyConfigProviderManager& config_provider_manager);
 
@@ -162,7 +162,7 @@ public:
                                             const std::string&) override {
     DummyConfigSubscriptionSharedPtr subscription = getSubscription<DummyConfigSubscription>(
         config_source_proto, factory_context.initManager(),
-        [&factory_context](const std::string& manager_identifier,
+        [&factory_context](const uint64_t manager_identifier,
                            ConfigProviderManagerImplBase& config_provider_manager)
             -> ConfigSubscriptionInstanceBaseSharedPtr {
           return std::make_shared<DummyConfigSubscription>(
@@ -199,13 +199,13 @@ StaticDummyConfigProvider::StaticDummyConfigProvider(
       config_(std::make_shared<DummyConfig>(config_proto)), config_proto_(config_proto) {}
 
 DummyConfigSubscription::DummyConfigSubscription(
-    const std::string& manager_identifier, Server::Configuration::FactoryContext& factory_context,
+    const uint64_t manager_identifier, Server::Configuration::FactoryContext& factory_context,
     DummyConfigProviderManager& config_provider_manager)
     : ConfigSubscriptionInstanceBase(
           "DummyDS", manager_identifier, config_provider_manager, factory_context.timeSource(),
           factory_context.timeSource().systemTime(), factory_context.localInfo()) {}
 
-class ConfigProviderImplTest : public testing::Test {
+class ConfigProviderImplTest : public TestBase {
 public:
   ConfigProviderImplTest() {
     EXPECT_CALL(factory_context_.admin_.config_tracker_, add_("dummy", _));

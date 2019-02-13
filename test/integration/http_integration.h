@@ -80,7 +80,11 @@ typedef std::unique_ptr<IntegrationCodecClient> IntegrationCodecClientPtr;
 class HttpIntegrationTest : public BaseIntegrationTest {
 public:
   HttpIntegrationTest(Http::CodecClient::Type downstream_protocol,
-                      Network::Address::IpVersion version, TestTimeSystemPtr time_system,
+                      Network::Address::IpVersion version, TestTimeSystemPtr,
+                      const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG)
+      : HttpIntegrationTest(downstream_protocol, version, config) {}
+  HttpIntegrationTest(Http::CodecClient::Type downstream_protocol,
+                      Network::Address::IpVersion version,
                       const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG);
   virtual ~HttpIntegrationTest();
 
@@ -155,6 +159,7 @@ protected:
   void testRetryAttemptCountHeader();
   void testGrpcRouterNotFound();
   void testGrpcRetry();
+
   void testEnvoyHandling100Continue(bool additional_continue_from_upstream = false,
                                     const std::string& via = "");
   void testEnvoyProxying100Continue(bool continue_before_upstream_complete = false,

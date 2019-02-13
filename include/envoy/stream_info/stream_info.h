@@ -56,8 +56,10 @@ enum ResponseFlag {
   DownstreamConnectionTermination = 0x4000,
   // Exceeded upstream retry limit.
   UpstreamRetryLimitExceeded = 0x8000,
+  // Request hit the stream idle timeout, triggering a 408.
+  StreamIdleTimeout = 0x10000,
   // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST FLAG.
-  LastFlag = UpstreamRetryLimitExceeded
+  LastFlag = StreamIdleTimeout
 };
 
 /**
@@ -260,9 +262,9 @@ public:
   virtual bool healthCheck() const PURE;
 
   /**
-   * @param is_hc whether the request is a health check request or not.
+   * @param is_health_check whether the request is a health check request or not.
    */
-  virtual void healthCheck(bool is_hc) PURE;
+  virtual void healthCheck(bool is_health_check) PURE;
 
   /**
    * @param downstream_local_address sets the local address of the downstream connection. Note that

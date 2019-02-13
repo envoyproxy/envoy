@@ -5,6 +5,7 @@ load(
     "envoy_basic_cc_library",
     "envoy_cc_library",
     "envoy_cc_test",
+    "envoy_cc_test_infrastructure_library",
     "envoy_cc_test_library",
     "envoy_package",
 )
@@ -90,6 +91,7 @@ envoy_cc_test_library(
         "abseil_strings",
     ],
     deps = [
+        ":test_time_lib",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/http:codec_interface",
         "//include/envoy/network:address_interface",
@@ -107,6 +109,7 @@ envoy_cc_test_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/stats:stats_lib",
         "//source/common/stats:stats_options_lib",
+        "//test/mocks/stats:stats_mocks",
         "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
     ],
 )
@@ -137,7 +140,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_test_library(
+envoy_cc_library(
     name = "global_lib",
     srcs = ["global.cc"],
     hdrs = ["global.h"],
@@ -155,6 +158,15 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test_infrastructure_library(
+    name = "test_base",
+    srcs = ["test_base.cc"],
+    hdrs = ["test_base.h"],
+    deps = [
+        "//test/test_common:global_lib",
+    ],
+)
+
 envoy_cc_test_library(
     name = "test_time_lib",
     srcs = ["test_time.cc"],
@@ -168,6 +180,7 @@ envoy_cc_test_library(
 
 envoy_cc_test_library(
     name = "test_time_system_interface",
+    srcs = ["test_time_system.cc"],
     hdrs = ["test_time_system.h"],
     deps = [
         ":global_lib",
