@@ -198,8 +198,12 @@ TEST_F(CdsApiImplTest, ConfigUpdateAddsSecondClusterEvenIfFirstThrows) {
   cluster_2->set_name("cluster_2");
   expectAdd("cluster_2");
 
+  auto* cluster_3 = clusters.Add();
+  cluster_3->set_name("cluster_3");
+  expectAddToThrow("cluster_3", "Another exception");
+
   EXPECT_THROW_WITH_MESSAGE(dynamic_cast<CdsApiImpl*>(cds_.get())->onConfigUpdate(clusters, ""),
-                            EnvoyException, "An exception");
+                            EnvoyException, "An exception\nAnother exception");
 }
 
 TEST_F(CdsApiImplTest, InvalidOptions) {
