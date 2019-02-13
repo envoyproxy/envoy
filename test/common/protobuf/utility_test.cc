@@ -5,8 +5,10 @@
 
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
+#include "common/runtime/runtime_impl.h"
 #include "common/stats/isolated_store_impl.h"
 
+#include "test/mocks/server/mocks.h"
 #include "test/proto/deprecated.pb.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
@@ -338,70 +340,157 @@ TEST(DurationUtilTest, OutOfRange) {
   }
 }
 
-TEST(DeprecatedFields, NoErrorWhenDeprecatedFieldsUnused) {
+class DeprecatedFieldsTest : public TestBase {
+protected:
+  DeprecatedFieldsTest()
+      : loader_(new Runtime::ScopedLoaderSingleton(
+            Runtime::LoaderPtr{new Runtime::LoaderImpl(rand_, store_, tls_)})) {}
+
+  NiceMock<ThreadLocal::MockInstance> tls_;
+  Stats::IsolatedStoreImpl store_;
+  Runtime::MockRandomGenerator rand_;
+  std::unique_ptr<Runtime::ScopedLoaderSingleton> loader_;
+};
+
+TEST_F(DeprecatedFieldsTest, NoCrashIfRuntimeMissing) {
+  loader_.reset();
+
   envoy::test::deprecation_test::Base base;
   base.set_not_deprecated("foo");
   // Fatal checks for a non-deprecated field should cause no problem.
-  MessageUtil::checkForDeprecation(base, true);
+  MessageUtil::checkForDeprecation(base);
 }
 
-TEST(DeprecatedFields, IndividualFieldDeprecated) {
+TEST_F(DeprecatedFieldsTest, NoErrorWhenDeprecatedFieldsUnused) {
+  envoy::test::deprecation_test::Base base;
+  base.set_not_deprecated("foo");
+  // Fatal checks for a non-deprecated field should cause no problem.
+  MessageUtil::checkForDeprecation(base);
+}
+
+TEST_F(DeprecatedFieldsTest, IndividualFieldDeprecated) {
   envoy::test::deprecation_test::Base base;
   base.set_is_deprecated("foo");
   // Non-fatal checks for a deprecated field should log rather than throw an exception.
   EXPECT_LOG_CONTAINS("warning",
-                      "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated'.",
-                      MessageUtil::checkForDeprecation(base, true));
-  // Fatal checks for a deprecated field should result in an exception.
-  EXPECT_THROW_WITH_REGEX(
-      MessageUtil::checkForDeprecation(base, false), ProtoValidationException,
-      "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated'.");
+                      "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated'",
+                      MessageUtil::checkForDeprecation(base));
 }
 
-TEST(DeprecatedFields, MessageDeprecated) {
+// Use of a deprecated and disallowed field should result in an exception.
+TEST_F(DeprecatedFieldsTest, IndividualFieldDisallowed) {
+  envoy::test::deprecation_test::Base base;
+  base.set_is_deprecated_fatal("foo");
+  EXPECT_THROW_WITH_REGEX(
+      MessageUtil::checkForDeprecation(base), ProtoValidationException,
+      "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated_fatal'");
+}
+
+TEST_F(DeprecatedFieldsTest, IndividualFieldDisallowedWithRuntimeOverride) {
+  envoy::test::deprecation_test::Base base;
+  base.set_is_deprecated_fatal("foo");
+
+  // Make sure this is set up right.
+  EXPECT_THROW_WITH_REGEX(
+      MessageUtil::checkForDeprecation(base), ProtoValidationException,
+      "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated_fatal'");
+  // The config will be rejected, so the feature will not be used.
+  EXPECT_EQ(0, store_.gauge("runtime.deprecated_feature_use").value());
+
+  // Now create a new snapshot with this feature allowed.
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.deprecated_features.deprecated.proto:is_deprecated_fatal", "TrUe "}});
+
+  // Now the same deprecation check should only trigger a warning.
+  EXPECT_LOG_CONTAINS(
+      "warning", "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated_fatal'",
+      MessageUtil::checkForDeprecation(base));
+  EXPECT_EQ(1, store_.gauge("runtime.deprecated_feature_use").value());
+}
+
+TEST_F(DeprecatedFieldsTest, DisallowViaRuntime) {
+  envoy::test::deprecation_test::Base base;
+  base.set_is_deprecated("foo");
+
+  EXPECT_LOG_CONTAINS("warning",
+                      "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated'",
+                      MessageUtil::checkForDeprecation(base));
+  EXPECT_EQ(1, store_.gauge("runtime.deprecated_feature_use").value());
+
+  // Now create a new snapshot with this feature disallowed.
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.deprecated_features.deprecated.proto:is_deprecated", " false"}});
+
+  EXPECT_THROW_WITH_REGEX(
+      MessageUtil::checkForDeprecation(base), ProtoValidationException,
+      "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated'");
+  EXPECT_EQ(1, store_.gauge("runtime.deprecated_feature_use").value());
+}
+
+// Note that given how Envoy config parsing works, the first time we hit a
+// 'fatal' error and throw, we won't log future warnings. That said, this tests
+// the case of the warning occurring before the fatal error.
+TEST_F(DeprecatedFieldsTest, MixOfFatalAndWarnings) {
+  envoy::test::deprecation_test::Base base;
+  base.set_is_deprecated("foo");
+  base.set_is_deprecated_fatal("foo");
+  EXPECT_LOG_CONTAINS(
+      "warning", "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated'", {
+        EXPECT_THROW_WITH_REGEX(
+            MessageUtil::checkForDeprecation(base), ProtoValidationException,
+            "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated_fatal'");
+      });
+}
+
+// Present (unused) deprecated messages should be detected as deprecated.
+TEST_F(DeprecatedFieldsTest, MessageDeprecated) {
   envoy::test::deprecation_test::Base base;
   base.mutable_deprecated_message();
-  // Fatal checks for a present (unused) deprecated message should result in an exception.
-  EXPECT_THROW_WITH_REGEX(
-      MessageUtil::checkForDeprecation(base, false), ProtoValidationException,
-      "Using deprecated option 'envoy.test.deprecation_test.Base.deprecated_message'.");
+  EXPECT_LOG_CONTAINS(
+      "warning", "Using deprecated option 'envoy.test.deprecation_test.Base.deprecated_message'",
+      MessageUtil::checkForDeprecation(base));
+  EXPECT_EQ(1, store_.gauge("runtime.deprecated_feature_use").value());
 }
 
-TEST(DeprecatedFields, InnerMessageDeprecated) {
+TEST_F(DeprecatedFieldsTest, InnerMessageDeprecated) {
   envoy::test::deprecation_test::Base base;
   base.mutable_not_deprecated_message()->set_inner_not_deprecated("foo");
-  // Non-fatal checks for a deprecated field shouldn't throw an exception.
-  MessageUtil::checkForDeprecation(base, true);
+  // Checks for a non-deprecated field shouldn't trigger warnings
+  EXPECT_LOG_NOT_CONTAINS("warning", "Using deprecated option",
+                          MessageUtil::checkForDeprecation(base));
 
   base.mutable_not_deprecated_message()->set_inner_deprecated("bar");
-  // Fatal checks for a deprecated sub-message should result in an exception.
-  EXPECT_THROW_WITH_REGEX(MessageUtil::checkForDeprecation(base, false), ProtoValidationException,
-                          "Using deprecated option "
-                          "'envoy.test.deprecation_test.Base.InnerMessage.inner_deprecated'.");
+  // Checks for a deprecated sub-message should result in a warning.
+  EXPECT_LOG_CONTAINS(
+      "warning",
+      "Using deprecated option 'envoy.test.deprecation_test.Base.InnerMessage.inner_deprecated'",
+      MessageUtil::checkForDeprecation(base));
 }
 
 // Check that repeated sub-messages get validated.
-TEST(DeprecatedFields, SubMessageDeprecated) {
+TEST_F(DeprecatedFieldsTest, SubMessageDeprecated) {
   envoy::test::deprecation_test::Base base;
   base.add_repeated_message();
   base.add_repeated_message()->set_inner_deprecated("foo");
   base.add_repeated_message();
 
   // Fatal checks for a repeated deprecated sub-message should result in an exception.
-  EXPECT_THROW_WITH_REGEX(MessageUtil::checkForDeprecation(base, false), ProtoValidationException,
-                          "Using deprecated option "
-                          "'envoy.test.deprecation_test.Base.InnerMessage.inner_deprecated'.");
+  EXPECT_LOG_CONTAINS("warning",
+                      "Using deprecated option "
+                      "'envoy.test.deprecation_test.Base.InnerMessage.inner_deprecated'",
+                      MessageUtil::checkForDeprecation(base));
 }
 
 // Check that deprecated repeated messages trigger
-TEST(DeprecatedFields, RepeatedMessageDeprecated) {
+TEST_F(DeprecatedFieldsTest, RepeatedMessageDeprecated) {
   envoy::test::deprecation_test::Base base;
   base.add_deprecated_repeated_message();
 
   // Fatal checks for a repeated deprecated sub-message should result in an exception.
-  EXPECT_THROW_WITH_REGEX(
-      MessageUtil::checkForDeprecation(base, false), ProtoValidationException,
-      "Using deprecated option 'envoy.test.deprecation_test.Base.deprecated_repeated_message'.");
+  EXPECT_LOG_CONTAINS("warning",
+                      "Using deprecated option "
+                      "'envoy.test.deprecation_test.Base.deprecated_repeated_message'",
+                      MessageUtil::checkForDeprecation(base));
 }
 
 class TimestampUtilTest : public TestBase, public ::testing::WithParamInterface<int64_t> {};

@@ -300,7 +300,8 @@ void InstanceImpl::initialize(const Options& options,
 
   // Runtime gets initialized before the main configuration since during main configuration
   // load things may grab a reference to the loader for later use.
-  runtime_loader_ = component_factory.createRuntime(*this, initial_config);
+  runtime_singleton_ = std::make_unique<Runtime::ScopedLoaderSingleton>(
+      component_factory.createRuntime(*this, initial_config));
 
   // Once we have runtime we can initialize the SSL context manager.
   ssl_context_manager_ =
@@ -513,7 +514,7 @@ void InstanceImpl::terminate() {
   ENVOY_FLUSH_LOG();
 }
 
-Runtime::Loader& InstanceImpl::runtime() { return *runtime_loader_; }
+Runtime::Loader& InstanceImpl::runtime() { return Runtime::LoaderSingleton::get(); }
 
 void InstanceImpl::shutdown() {
   shutdown_ = true;
