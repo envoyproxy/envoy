@@ -11,11 +11,12 @@ namespace Network {
 namespace {
 
 class AddrFamilyAwareSocketOptionImplTest : public SocketOptionTest {
- protected:
+protected:
   void SetUp() override {
-    EXPECT_CALL(os_sys_calls_, socket).WillRepeatedly(Invoke([](int domain, int type, int protocol) {
-      return Api::SysCallIntResult{::socket(domain, type, protocol), 0};
-    }));
+    EXPECT_CALL(os_sys_calls_, socket)
+        .WillRepeatedly(Invoke([](int domain, int type, int protocol) {
+          return Api::SysCallIntResult{::socket(domain, type, protocol), 0};
+        }));
   }
 };
 
