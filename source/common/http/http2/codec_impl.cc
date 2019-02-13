@@ -37,6 +37,17 @@ bool Utility::reconstituteCrumbledCookies(const HeaderString& key, const HeaderS
   return true;
 }
 
+void initializeNghttp2Logging() {
+  nghttp2_set_debug_vprintf_callback([](const char* format, va_list args) {
+    char buf[2048];
+    const int n = ::vsnprintf(buf, sizeof(buf), format, args);
+    if (n >= 1 && buf[n - 1] == '\n') {
+      buf[n - 1] = '\0';
+    }
+    ENVOY_LOG_TO_LOGGER(Logger::Registry::getLog(Logger::Id::http2), trace, "nghttp2: {}", buf);
+  });
+}
+
 ConnectionImpl::Http2Callbacks ConnectionImpl::http2_callbacks_;
 
 /**
@@ -532,7 +543,8 @@ int ConnectionImpl::onFrameSend(const nghttp2_frame* frame) {
 }
 
 int ConnectionImpl::onInvalidFrame(int32_t stream_id, int error_code) {
-  ENVOY_CONN_LOG(debug, "invalid frame: {}", connection_, nghttp2_strerror(error_code));
+  ENVOY_CONN_LOG(debug, "invalid frame: {} on stream {}", connection_, nghttp2_strerror(error_code),
+                 stream_id);
 
   // The stream is about to be closed due to an invalid header or messaging. Don't kill the
   // entire connection if one stream has bad headers or messaging.
