@@ -4,7 +4,7 @@
 
 namespace Envoy {
 
-// Provides a common test-base class for all tests in Envoy to use. This offers
+// Provides a test listener to be called after each test method. This offers
 // a place to put hooks we'd like to run on every test. There's currently a
 // check that all test-scoped singletons have been destroyed. A test-scoped
 // singleton might remain at the end of a test if it's transitively referenced
@@ -17,18 +17,16 @@ namespace Envoy {
 //     than there were at the start of it. This is likely to fail in a few
 //     places when introduced, but we could add known test overrides for this.
 //
-// Note: nothing compute-intensive should be put in this test-class, as it will
+// Note: nothing compute-intensive should be put in this class, as it will
 // be a tax paid by every test method in the codebase.
-class TestBase : public ::testing::Test {
-public:
-  static void checkSingletonQuiescensce();
-  ~TestBase() override;
+class TestListener : public ::testing::EmptyTestEventListener {
+  void OnTestEnd(const ::testing::TestInfo& test_info) override;
 };
 
-// Templatized version of TestBase. See above notes.
-template <class T> class TestBaseWithParam : public ::testing::TestWithParam<T> {
-public:
-  ~TestBaseWithParam() { TestBase::checkSingletonQuiescensce(); }
-};
+// TODO(jmarantz): Before Alyssa found this TestListener hook for me, we had
+// merged a PR that added the same functionality via common TestBase classes.
+// These should be removed.
+using TestBase = ::testing::Test;
+template <class T> using TestBaseWithParam = ::testing::TestWithParam<T>;
 
 } // namespace Envoy

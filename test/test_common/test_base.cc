@@ -6,13 +6,12 @@
 
 namespace Envoy {
 
-void TestBase::checkSingletonQuiescensce() {
+void TestListener::OnTestEnd(const ::testing::TestInfo& test_info) {
   // Check that all singletons have been destroyed.
   std::string active_singletons = Envoy::Test::Globals::describeActiveSingletons();
   RELEASE_ASSERT(active_singletons.empty(),
-                 absl::StrCat("FAIL: Active singletons exist:\n", active_singletons));
+                 absl::StrCat("FAIL [", test_info.test_suite_name(), ".", test_info.name(),
+                              "]: Active singletons exist:\n", active_singletons));
 }
-
-TestBase::~TestBase() { checkSingletonQuiescensce(); }
 
 } // namespace Envoy

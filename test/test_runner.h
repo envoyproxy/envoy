@@ -18,6 +18,13 @@ public:
     ::testing::InitGoogleMock(&argc, argv);
     Event::Libevent::Global::initialize();
 
+    // Add a test-listener so we can call a hook where we can do a quiescence
+    // check after each method. See
+    // https://github.com/google/googletest/blob/master/googletest/docs/advanced.md
+    // for details.
+    ::testing::TestEventListeners& listeners = ::testing::UnitTest::GetInstance()->listeners();
+    listeners.Append(new TestListener);
+
     // Use the recommended, but not default, "threadsafe" style for the Death Tests.
     // See: https://github.com/google/googletest/commit/84ec2e0365d791e4ebc7ec249f09078fb5ab6caa
     ::testing::FLAGS_gtest_death_test_style = "threadsafe";
@@ -45,12 +52,7 @@ public:
       file_logger = std::make_unique<Logger::FileSinkDelegate>(
           TestEnvironment::getOptions().logPath(), access_log_manager, Logger::Registry::getSink());
     }
-    int exit_status = RUN_ALL_TESTS();
-
-    // Check that all singletons have been destroyed.
-    TestBase::checkSingletonQuiescensce();
-
-    return exit_status;
+    return RUN_ALL_TESTS();
   }
 };
 } // namespace Envoy
