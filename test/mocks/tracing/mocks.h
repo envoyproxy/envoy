@@ -74,6 +74,7 @@ public:
   MOCK_METHOD5(startSpan_, Span*(const Config& config, Http::HeaderMap& request_headers,
                                  const std::string& operation_name, SystemTime start_time,
                                  const Tracing::Decision tracing_decision));
+  MOCK_METHOD1(setDropLogs, void(bool));
 };
 
 } // namespace Tracing
