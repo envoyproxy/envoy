@@ -43,7 +43,7 @@ IoHandleCallIntResult IoSocketHandleImpl::close() {
   ASSERT(fd_ != -1);
   const int rc = ::close(fd_);
   fd_ = -1;
-  return IoHandleCallResult<int>(rc, std::unique_ptr<IoSocketError>(errno));
+  return IoHandleCallResult<int>(rc, std::make_unique<IoSocketError>(errno));
 }
 
 bool IoSocketHandleImpl::isOpen() const { return fd_ != -1; }

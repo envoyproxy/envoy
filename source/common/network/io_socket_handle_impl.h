@@ -8,7 +8,7 @@ namespace Network {
 
 class IoSocketError : public IoError {
 public:
-  IoSocketError(int errno) : errno_(errno) {}
+  explicit IoSocketError(int sys_errno) : errno_(sys_errno) {}
 
   ~IoSocketError() override {}
 
