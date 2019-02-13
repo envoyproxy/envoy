@@ -88,12 +88,10 @@ public:
 
     request_.clear_resource_names_subscribe();
     request_.clear_resource_names_unsubscribe();
-    std::copy(
-        diff.added_.begin(), diff.added_.end(),
-        ::google::protobuf::RepeatedFieldBackInserter(request_.mutable_resource_names_subscribe()));
+    std::copy(diff.added_.begin(), diff.added_.end(),
+              Protobuf::RepeatedFieldBackInserter(request_.mutable_resource_names_subscribe()));
     std::copy(diff.removed_.begin(), diff.removed_.end(),
-              ::google::protobuf::RepeatedFieldBackInserter(
-                  request_.mutable_resource_names_unsubscribe()));
+              Protobuf::RepeatedFieldBackInserter(request_.mutable_resource_names_unsubscribe()));
 
     ENVOY_LOG(trace, "Sending DiscoveryRequest for {}: {}", type_url_, request_.DebugString());
     sendMessage(request_);
