@@ -13,7 +13,11 @@ Impl::Impl(Thread::ThreadFactory& thread_factory, Stats::Store&, Event::TimeSyst
     : thread_factory_(thread_factory), time_system_(time_system) {}
 
 Event::DispatcherPtr Impl::allocateDispatcher() {
-  return std::make_unique<Event::DispatcherImpl>(*this);
+  return std::make_unique<Event::DispatcherImpl>(*this, time_system_);
+}
+
+Event::DispatcherPtr Impl::allocateDispatcher(Buffer::WatermarkFactoryPtr&& factory) {
+  return std::make_unique<Event::DispatcherImpl>(std::move(factory), *this, time_system_);
 }
 
 } // namespace Api

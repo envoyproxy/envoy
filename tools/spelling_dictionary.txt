@@ -287,7 +287,7 @@ ary
 async
 atomicly
 atomics
-atoul
+atoull
 aud
 auth
 authenticator
@@ -375,6 +375,7 @@ dirname
 djb
 downcasted
 downstream
+dtor
 dubbo
 dup
 durations
@@ -655,7 +656,7 @@ stmt
 str
 strftime
 stringified
-strtoul
+strtoull
 struct
 structs
 subexpr
