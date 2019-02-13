@@ -132,6 +132,8 @@ protected:
   // Sends a simple header-only HTTP request, and waits for a response.
   IntegrationStreamDecoderPtr makeHeaderOnlyRequest(ConnectionCreationFunction* create_connection,
                                                     int upstream_index);
+  void testRouterNotFound();
+  void testRouterNotFoundWithBody();
 
   void testRouterRequestAndResponseWithBody(uint64_t request_size, uint64_t response_size,
                                             bool big_header,
@@ -157,7 +159,6 @@ protected:
   void testRetry();
   void testRetryHittingBufferLimit();
   void testRetryAttemptCountHeader();
-  void testGrpcRouterNotFound();
   void testGrpcRetry();
 
   void testEnvoyHandling100Continue(bool additional_continue_from_upstream = false,

@@ -62,25 +62,11 @@ TEST_P(ProtocolIntegrationTest, ShutdownWithActiveConnPoolConnections) {
 }
 
 // Change the default route to be restrictive, and send a request to an alternate route.
-TEST_P(ProtocolIntegrationTest, RouterNotFound) {
-  config_helper_.setDefaultHostAndRoute("foo.com", "/found");
-  initialize();
-
-  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-      lookupPort("http"), "GET", "/notfound", "", downstream_protocol_, version_);
-  ASSERT_TRUE(response->complete());
-  EXPECT_STREQ("404", response->headers().Status()->value().c_str());
-}
+TEST_P(ProtocolIntegrationTest, RouterNotFound) { testRouterNotFound(); }
 
 // Change the default route to be restrictive, and send a POST to an alternate route.
 TEST_P(DownstreamProtocolIntegrationTest, RouterNotFoundBodyNoBuffer) {
-  config_helper_.setDefaultHostAndRoute("foo.com", "/found");
-  initialize();
-
-  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-      lookupPort("http"), "POST", "/notfound", "foo", downstream_protocol_, version_);
-  ASSERT_TRUE(response->complete());
-  EXPECT_STREQ("404", response->headers().Status()->value().c_str());
+  testRouterNotFoundWithBody();
 }
 
 // Add a route that uses unknown cluster (expect 404 Not Found).

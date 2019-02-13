@@ -352,6 +352,28 @@ void HttpIntegrationTest::testRouterHeaderOnlyRequestAndResponse(
   checkSimpleRequestSuccess(0U, 0U, response.get());
 }
 
+// Change the default route to be restrictive, and send a request to an alternate route.
+void HttpIntegrationTest::testRouterNotFound() {
+  config_helper_.setDefaultHostAndRoute("foo.com", "/found");
+  initialize();
+
+  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+      lookupPort("http"), "GET", "/notfound", "", downstream_protocol_, version_);
+  ASSERT_TRUE(response->complete());
+  EXPECT_STREQ("404", response->headers().Status()->value().c_str());
+}
+
+// Change the default route to be restrictive, and send a POST to an alternate route.
+void HttpIntegrationTest::testRouterNotFoundWithBody() {
+  config_helper_.setDefaultHostAndRoute("foo.com", "/found");
+  initialize();
+
+  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+      lookupPort("http"), "POST", "/notfound", "foo", downstream_protocol_, version_);
+  ASSERT_TRUE(response->complete());
+  EXPECT_STREQ("404", response->headers().Status()->value().c_str());
+}
+
 void HttpIntegrationTest::testRouterUpstreamDisconnectBeforeRequestComplete() {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -577,21 +599,6 @@ void HttpIntegrationTest::testRetryAttemptCountHeader() {
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
   EXPECT_EQ(512U, response->body().size());
-}
-
-// Change the default route to be restrictive, and send a request to an alternate route.
-void HttpIntegrationTest::testGrpcRouterNotFound() {
-  config_helper_.setDefaultHostAndRoute("foo.com", "/found");
-  initialize();
-
-  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-      lookupPort("http"), "POST", "/service/notfound", "", downstream_protocol_, version_, "host",
-      Http::Headers::get().ContentTypeValues.Grpc);
-  ASSERT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
-  EXPECT_EQ(Http::Headers::get().ContentTypeValues.Grpc,
-            response->headers().ContentType()->value().c_str());
-  EXPECT_STREQ("12", response->headers().GrpcStatus()->value().c_str());
 }
 
 void HttpIntegrationTest::testGrpcRetry() {
