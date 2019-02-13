@@ -115,7 +115,7 @@ public:
 class HttpGrpcAccessLogTest : public TestBase {
 public:
   void init() {
-    ON_CALL(*filter_, evaluate(_, _)).WillByDefault(Return(true));
+    ON_CALL(*filter_, evaluate(_, _, _, _)).WillByDefault(Return(true));
     config_.mutable_common_config()->set_log_name("hello_log");
     access_log_ =
         std::make_unique<HttpGrpcAccessLog>(AccessLog::FilterPtr{filter_}, config_, streamer_);

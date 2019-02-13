@@ -98,6 +98,10 @@ actions {
           key: ":status"
           value: "200"
         }
+        headers {
+          key: "content-length"
+          value: "5"
+        }
       }
     }
   }
