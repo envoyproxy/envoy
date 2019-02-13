@@ -17,6 +17,7 @@
 using testing::Invoke;
 using testing::InvokeArgument;
 using testing::NiceMock;
+using testing::Return;
 using testing::SaveArg;
 
 namespace Envoy {
@@ -38,11 +39,21 @@ public:
   TestMap::PoolFactory getBasicFactory() {
     return [&]() {
       auto pool = std::make_unique<NiceMock<Http::ConnectionPool::MockInstance>>();
+      ON_CALL(*pool, hasActiveConnections).WillByDefault(Return(false));
       mock_pools_.push_back(pool.get());
       return pool;
     };
   }
 
+  // Returns a pool which claims it has active connections.
+  TestMap::PoolFactory getActivePoolFactory() {
+    return [&]() {
+      auto pool = std::make_unique<NiceMock<Http::ConnectionPool::MockInstance>>();
+      ON_CALL(*pool, hasActiveConnections).WillByDefault(Return(true));
+      mock_pools_.push_back(pool.get());
+      return pool;
+    };
+  }
   TestMap::PoolFactory getNeverCalledFactory() {
     return []() {
       EXPECT_TRUE(false);
@@ -54,24 +65,6 @@ public:
     return [this, cb]() {
       auto pool = std::make_unique<NiceMock<Http::ConnectionPool::MockInstance>>();
       EXPECT_CALL(*pool, addDrainedCallback(_)).WillOnce(SaveArg<0>(cb));
-      mock_pools_.push_back(pool.get());
-      return pool;
-    };
-  }
-
-  TestMap::PoolFactory getFactoryImmediateInvokeCb() {
-    return [this]() {
-      auto pool = std::make_unique<NiceMock<Http::ConnectionPool::MockInstance>>();
-      EXPECT_CALL(*pool, addDrainedCallback(_)).WillOnce(InvokeArgument<0>());
-      mock_pools_.push_back(pool.get());
-      return pool;
-    };
-  }
-
-  TestMap::PoolFactory getFactoryNoDrainedCb() {
-    return [&]() {
-      auto pool = std::make_unique<NiceMock<Http::ConnectionPool::MockInstance>>();
-      EXPECT_CALL(*pool, addDrainedCallback(_)).Times(0);
       mock_pools_.push_back(pool.get());
       return pool;
     };
@@ -214,8 +207,8 @@ TEST_F(ConnPoolMapImplTest, ClearDefersDelete) {
 TEST_F(ConnPoolMapImplTest, GetPoolHittingLimitFails) {
   TestMapPtr test_map = makeTestMapWithLimit(1);
 
-  Http::ConnectionPool::Instance::DrainedCb cb1;
-  test_map->getPool(1, getFactoryExpectDrainedCb(&cb1));
+  test_map->getPool(1, getBasicFactory());
+  ON_CALL(*mock_pools_[0], hasActiveConnections()).WillByDefault(Return(true));
   auto opt_pool = test_map->getPool(2, getNeverCalledFactory());
 
   EXPECT_FALSE(opt_pool.has_value());
@@ -225,23 +218,21 @@ TEST_F(ConnPoolMapImplTest, GetPoolHittingLimitFails) {
 TEST_F(ConnPoolMapImplTest, GetPoolHittingLimitGreaterThan1Fails) {
   TestMapPtr test_map = makeTestMapWithLimit(2);
 
-  Http::ConnectionPool::Instance::DrainedCb cb1;
-  test_map->getPool(1, getFactoryExpectDrainedCb(&cb1));
-  Http::ConnectionPool::Instance::DrainedCb cb2;
-  test_map->getPool(2, getFactoryExpectDrainedCb(&cb2));
+  test_map->getPool(1, getActivePoolFactory());
+  test_map->getPool(2, getActivePoolFactory());
   auto opt_pool = test_map->getPool(3, getNeverCalledFactory());
 
   EXPECT_FALSE(opt_pool.has_value());
   EXPECT_EQ(test_map->size(), 2);
 }
 
-TEST_F(ConnPoolMapImplTest, GetPoolLimitHitThenDrainedNextCallSucceeds) {
+TEST_F(ConnPoolMapImplTest, GetPoolLimitHitThenOneFreesUpNextCallSucceeds) {
   TestMapPtr test_map = makeTestMapWithLimit(1);
 
-  Http::ConnectionPool::Instance::DrainedCb cb1;
-  test_map->getPool(1, getFactoryExpectDrainedCb(&cb1));
+  test_map->getPool(1, getActivePoolFactory());
   test_map->getPool(2, getNeverCalledFactory());
-  cb1();
+
+  ON_CALL(*mock_pools_[0], hasActiveConnections()).WillByDefault(Return(false));
 
   auto opt_pool = test_map->getPool(2, getBasicFactory());
 
@@ -249,97 +240,38 @@ TEST_F(ConnPoolMapImplTest, GetPoolLimitHitThenDrainedNextCallSucceeds) {
   EXPECT_EQ(test_map->size(), 1);
 }
 
-// Test that only the pools whose drained callback have been invoked are actually drained.
-TEST_F(ConnPoolMapImplTest, GetPoolDrainedCbOnlyClearsInvoker) {
+// Test that only the pool which are idle are actually cleared
+TEST_F(ConnPoolMapImplTest, GetOnePoolIdleOnlyClearsThatOne) {
   TestMapPtr test_map = makeTestMapWithLimit(2);
 
-  Http::ConnectionPool::Instance::DrainedCb cb1;
-  Http::ConnectionPool::Instance::DrainedCb cb2;
-  test_map->getPool(1, getFactoryExpectDrainedCb(&cb1));
-  auto opt_pool = test_map->getPool(2, getFactoryExpectDrainedCb(&cb2));
-  test_map->getPool(3, []() {
-    EXPECT_TRUE(false);
-    return nullptr;
-  });
-  cb1(); // Clear out 1.
+  // Get a pool which says it's not active.
+  test_map->getPool(1, getBasicFactory());
+
+  // Get one that *is* active.
+  auto opt_pool = test_map->getPool(2, getActivePoolFactory());
+
+  // this should force out #1
+  auto new_pool = test_map->getPool(3, getBasicFactory());
 
   // Get 2 again. It should succeed, but not invoke the factory.
   auto opt_pool2 = test_map->getPool(2, getNeverCalledFactory());
 
   EXPECT_TRUE(opt_pool.has_value());
+  EXPECT_TRUE(new_pool.has_value());
   EXPECT_EQ(&(opt_pool.value().get()), &(opt_pool2.value().get()));
-  EXPECT_EQ(test_map->size(), 1);
-}
-
-// Test that if a pool's callback is invoked immediately, we get a new pool.
-TEST_F(ConnPoolMapImplTest, GetPoolLimitHitCbInvoked) {
-  TestMapPtr test_map = makeTestMapWithLimit(1);
-
-  test_map->getPool(1, getFactoryImmediateInvokeCb());
-  auto opt_pool = test_map->getPool(2, getBasicFactory());
-
-  ASSERT_TRUE(opt_pool.has_value());
-
-  // Make sure we return the pool that was created.
-  EXPECT_EQ(&(opt_pool.value().get()), mock_pools_[1]);
-  EXPECT_EQ(test_map->size(), 1);
-}
-
-TEST_F(ConnPoolMapImplTest, GetPoolLimitHitCbInvokedManyCleared) {
-  TestMapPtr test_map = makeTestMapWithLimit(3);
-
-  test_map->getPool(1, getFactoryImmediateInvokeCb());
-  test_map->getPool(2, getFactoryImmediateInvokeCb());
-  test_map->getPool(3, getFactoryImmediateInvokeCb());
-  auto opt_pool = test_map->getPool(4, getBasicFactory());
-
-  ASSERT_TRUE(opt_pool.has_value());
-  EXPECT_EQ(test_map->size(), 1);
-}
-
-// Show that we don't clear out un-drained pools if some drain immediately.
-TEST_F(ConnPoolMapImplTest, GetPoolLimitHitCbInvokedSomeCleared) {
-  TestMapPtr test_map = makeTestMapWithLimit(3);
-
-  test_map->getPool(1, getFactoryImmediateInvokeCb());
-  Http::ConnectionPool::Instance::DrainedCb cb;
-  test_map->getPool(2, getFactoryExpectDrainedCb(&cb));
-  test_map->getPool(3, getFactoryImmediateInvokeCb());
-  auto opt_pool = test_map->getPool(4, getBasicFactory());
-  auto opt_pool2 = test_map->getPool(2, getNeverCalledFactory());
-
-  ASSERT_TRUE(opt_pool.has_value());
-  ASSERT_TRUE(opt_pool2.has_value());
-  EXPECT_EQ(&(opt_pool2.value().get()), mock_pools_[1]);
   EXPECT_EQ(test_map->size(), 2);
 }
 
-// Show that we later drain a pool, it is cleared out.
-TEST_F(ConnPoolMapImplTest, GetPoolSomeImmediateOneLaterDrain) {
+// Show that even if all pools are idle, we only free up one as necessary
+TEST_F(ConnPoolMapImplTest, GetPoolLimitHitManyIdleOnlyOneFreed) {
   TestMapPtr test_map = makeTestMapWithLimit(3);
 
-  test_map->getPool(1, getFactoryImmediateInvokeCb());
-  Http::ConnectionPool::Instance::DrainedCb cb;
-  test_map->getPool(2, getFactoryExpectDrainedCb(&cb));
-  test_map->getPool(3, getFactoryImmediateInvokeCb());
+  test_map->getPool(1, getBasicFactory());
+  test_map->getPool(2, getBasicFactory());
+  test_map->getPool(3, getBasicFactory());
   auto opt_pool = test_map->getPool(4, getBasicFactory());
 
-  cb();
-
-  // The above callback should't have touched this pool.
-  auto opt_pool2 = test_map->getPool(4, getNeverCalledFactory());
-  EXPECT_EQ(&(opt_pool.value().get()), &(opt_pool2.value().get()));
-  EXPECT_EQ(test_map->size(), 1);
-}
-
-// Show that we do not add the drained callback if we haven't hit the limit.
-TEST_F(ConnPoolMapImplTest, GetPoolUnderLimitNeverAddsCallback) {
-  TestMapPtr test_map = makeTestMapWithLimit(3);
-
-  test_map->getPool(1, getFactoryNoDrainedCb());
-  test_map->getPool(2, getFactoryNoDrainedCb());
-  test_map->getPool(3, getFactoryNoDrainedCb());
-
+  ASSERT_TRUE(opt_pool.has_value());
   EXPECT_EQ(test_map->size(), 3);
 }
 
@@ -348,20 +280,15 @@ TEST_F(ConnPoolMapImplTest, GetPoolUnderLimitNeverAddsCallback) {
 TEST_F(ConnPoolMapImplTest, GetPoolFailStateIsCleared) {
   TestMapPtr test_map = makeTestMapWithLimit(2);
 
-  Http::ConnectionPool::Instance::DrainedCb cb1;
-  test_map->getPool(1, getFactoryImmediateInvokeCb());
-  test_map->getPool(2, getFactoryExpectDrainedCb(&cb1));
-  Http::ConnectionPool::Instance::DrainedCb cb2;
-  test_map->getPool(3, getFactoryExpectDrainedCb(&cb2));
-
-  cb1();
+  test_map->getPool(1, getBasicFactory());
+  test_map->getPool(2, getActivePoolFactory());
+  test_map->getPool(3, getBasicFactory());
 
   // At this point, 1 should be cleared out. Let's get it again, then trigger a full condition.
-  Http::ConnectionPool::Instance::DrainedCb cb3;
-  auto opt_pool = test_map->getPool(1, getFactoryExpectDrainedCb(&cb3));
+  auto opt_pool = test_map->getPool(1, getActivePoolFactory());
   EXPECT_TRUE(opt_pool.has_value());
 
-  // We're full. Because pool 1  and 2 aren't doing an immediate cb, the next call should fail.
+  // We're full. Because pool 1  and 2 are busy, the next call should fail.
   auto opt_pool_failed = test_map->getPool(4, getNeverCalledFactory());
   EXPECT_FALSE(opt_pool_failed.has_value());
 

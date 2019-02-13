@@ -54,21 +54,17 @@ public:
   void drainConnections();
 
 private:
-  void poolDrained(const KEY_TYPE& key);
-  void registerFullCallbacks();
   /**
-   * Removes resources allocated to any drained pools.
-   * @return false if no pools were drained.
+   * Frees the first idle pool in `active_pools_`.
+   * @return false if no pool was freed.
    */
-  bool cleanDrainedPools();
+  bool freeOnePool();
 
   absl::flat_hash_map<KEY_TYPE, std::unique_ptr<POOL_TYPE>> active_pools_;
-  std::vector<KEY_TYPE> drained_pools_;
   Event::Dispatcher& thread_local_dispatcher_;
   std::vector<DrainedCb> cached_callbacks_;
   Common::DebugRecursionChecker recursion_checker_;
   const absl::optional<uint64_t> max_size_;
-  bool adding_callbacks_ = false;
 };
 
 } // namespace Upstream
