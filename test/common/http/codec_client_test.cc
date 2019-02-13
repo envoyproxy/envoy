@@ -259,8 +259,8 @@ TEST_F(CodecClientTest, WatermarkPassthrough) {
 // Test the codec getting input from a real TCP connection.
 class CodecNetworkTest : public TestBaseWithParam<Network::Address::IpVersion> {
 public:
-  CodecNetworkTest() : api_(Api::createApiForTest(stats_store_)) {
-    dispatcher_ = std::make_unique<Event::DispatcherImpl>(*api_);
+  CodecNetworkTest() : api_(Api::createApiForTest()) {
+    dispatcher_ = api_->allocateDispatcher();
     upstream_listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true, false);
     Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
         socket_.localAddress(), source_address_, Network::Test::createRawBufferSocket(), nullptr);
@@ -326,7 +326,6 @@ public:
   }
 
 protected:
-  Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   Network::ListenerPtr upstream_listener_;

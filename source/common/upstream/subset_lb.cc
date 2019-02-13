@@ -563,6 +563,11 @@ LocalityWeightsConstSharedPtr SubsetLoadBalancer::HostSubsetImpl::determineLocal
   if (locality_weight_aware_) {
     if (scale_locality_weight_) {
       const auto& original_hosts_per_locality = original_host_set_.hostsPerLocality().get();
+      // E.g. we can be here in static clusters with actual locality weighting before pre-init
+      // completes.
+      if (!original_host_set_.localityWeights()) {
+        return {};
+      }
       const auto& original_weights = *original_host_set_.localityWeights();
 
       auto scaled_locality_weights = std::make_shared<LocalityWeights>(original_weights.size());
@@ -603,10 +608,10 @@ HostSetImplPtr SubsetLoadBalancer::PrioritySubsetImpl::createHostSet(
 void SubsetLoadBalancer::PrioritySubsetImpl::update(uint32_t priority,
                                                     const HostVector& hosts_added,
                                                     const HostVector& hosts_removed) {
-  HostSubsetImpl* host_subset = getOrCreateHostSubset(priority);
-  host_subset->update(hosts_added, hosts_removed, predicate_);
+  const auto& host_subset = getOrCreateHostSet(priority);
+  updateSubset(priority, hosts_added, hosts_removed, predicate_);
 
-  if (host_subset->hosts().empty() != empty_) {
+  if (host_subset.hosts().empty() != empty_) {
     empty_ = true;
     for (auto& host_set : hostSetsPerPriority()) {
       empty_ &= host_set->hosts().empty();

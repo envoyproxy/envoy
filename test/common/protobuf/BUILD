@@ -15,6 +15,7 @@ envoy_cc_test(
     deps = [
         "//source/common/protobuf:utility_lib",
         "//source/common/stats:isolated_store_lib",
+        "//test/mocks/server:server_mocks",
         "//test/proto:deprecated_proto_cc",
         "//test/test_common:environment_lib",
         "//test/test_common:logging_lib",

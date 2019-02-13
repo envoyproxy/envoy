@@ -1,0 +1,12 @@
+static_resources {
+  listeners {
+    address {
+      pipe {
+      }
+    }
+    filter_chains {
+    }
+    freebind {
+    }
+  }
+}

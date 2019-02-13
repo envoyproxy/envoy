@@ -30,8 +30,8 @@ class FilesystemSubscriptionTestHarness : public SubscriptionTestHarness {
 public:
   FilesystemSubscriptionTestHarness()
       : path_(TestEnvironment::temporaryPath("eds.json")),
-        api_(Api::createApiForTest(stats_store_)), dispatcher_(*api_),
-        subscription_(dispatcher_, path_, stats_, *api_) {}
+        api_(Api::createApiForTest(stats_store_)), dispatcher_(api_->allocateDispatcher()),
+        subscription_(*dispatcher_, path_, stats_, *api_) {}
 
   ~FilesystemSubscriptionTestHarness() { EXPECT_EQ(0, ::unlink(path_.c_str())); }
 
@@ -51,7 +51,7 @@ public:
     const std::string temp_path = TestEnvironment::writeStringToFileForTest("eds.json.tmp", json);
     TestUtility::renameFile(temp_path, path_);
     if (run_dispatcher) {
-      dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+      dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
     }
   }
 
@@ -99,7 +99,7 @@ public:
   std::string version_;
   Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
-  Event::DispatcherImpl dispatcher_;
+  Event::DispatcherPtr dispatcher_;
   NiceMock<Config::MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment>> callbacks_;
   FilesystemEdsSubscriptionImpl subscription_;
   bool file_at_start_{false};

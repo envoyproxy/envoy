@@ -5,12 +5,14 @@
 #include "envoy/api/api.h"
 #include "envoy/common/exception.h"
 #include "envoy/json/json_object.h"
+#include "envoy/runtime/runtime.h"
 #include "envoy/type/percent.pb.h"
 
 #include "common/common/hash.h"
 #include "common/common/utility.h"
 #include "common/json/json_loader.h"
 #include "common/protobuf/protobuf.h"
+#include "common/singleton/const_singleton.h"
 
 // Obtain the value of a wrapped field (e.g. google.protobuf.UInt32Value) if set. Otherwise, return
 // the default value.
@@ -147,6 +149,16 @@ public:
     return Protobuf::util::MessageDifferencer::Equivalent(lhs, rhs);
   }
 
+  class FileExtensionValues {
+  public:
+    const std::string ProtoBinary = ".pb";
+    const std::string ProtoText = ".pb_text";
+    const std::string Json = ".json";
+    const std::string Yaml = ".yaml";
+  };
+
+  typedef ConstSingleton<FileExtensionValues> FileExtensions;
+
   static std::size_t hash(const Protobuf::Message& message) {
     // Use Protobuf::io::CodedOutputStream to force deterministic serialization, so that the same
     // message doesn't hash to different values.
@@ -181,11 +193,13 @@ public:
   /**
    * Checks for use of deprecated fields in message and all sub-messages.
    * @param message message to validate.
-   * @param warn_only if true, logs a warning rather than throwing an exception if deprecated fields
-   *   are in use.
-   * @throw ProtoValidationException if deprecated fields are used and warn_only is false.
+   * @param loader optional a pointer to the runtime loader for live deprecation status.
+   * @throw ProtoValidationException if deprecated fields are used and listed
+   *   Runtime::DisallowedFeatures
    */
-  static void checkForDeprecation(const Protobuf::Message& message, bool warn_only);
+  static void
+  checkForDeprecation(const Protobuf::Message& message,
+                      Runtime::Loader* loader = Runtime::LoaderSingleton::getExisting());
 
   /**
    * Validate protoc-gen-validate constraints on a given protobuf.
@@ -195,8 +209,8 @@ public:
    * @throw ProtoValidationException if the message does not satisfy its type constraints.
    */
   template <class MessageType> static void validate(const MessageType& message) {
-    // Log warnings if deprecated fields are in use.
-    checkForDeprecation(message, true);
+    // Log warnings or throw errors if deprecated fields are in use.
+    checkForDeprecation(message);
 
     std::string err;
     if (!Validate(message, &err)) {

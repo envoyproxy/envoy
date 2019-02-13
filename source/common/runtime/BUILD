@@ -11,7 +11,10 @@ envoy_package()
 envoy_cc_library(
     name = "runtime_lib",
     srcs = ["runtime_impl.cc"],
-    hdrs = ["runtime_impl.h"],
+    hdrs = [
+        "runtime_features.h",
+        "runtime_impl.h",
+    ],
     external_deps = ["ssl"],
     deps = [
         "//include/envoy/event:dispatcher_interface",

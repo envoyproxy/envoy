@@ -23,8 +23,8 @@
 namespace Envoy {
 namespace {
 
-class HdsIntegrationTest : public HttpIntegrationTest,
-                           public TestBaseWithParam<Network::Address::IpVersion> {
+class HdsIntegrationTest : public TestBaseWithParam<Network::Address::IpVersion>,
+                           public HttpIntegrationTest {
 public:
   HdsIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()) {}
