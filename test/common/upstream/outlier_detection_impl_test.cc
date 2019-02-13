@@ -34,7 +34,7 @@ namespace Outlier {
 using OutlierDetectorImplFactoryTest = TestBase;
 
 TEST_F(OutlierDetectorImplFactoryTest, NoDetector) {
-  NiceMock<MockCluster> cluster;
+  NiceMock<MockClusterMockPrioritySet> cluster;
   NiceMock<Event::MockDispatcher> dispatcher;
   NiceMock<Runtime::MockLoader> runtime;
   EXPECT_EQ(nullptr,
@@ -46,7 +46,7 @@ TEST_F(OutlierDetectorImplFactoryTest, Detector) {
   auto fake_cluster = defaultStaticCluster("fake_cluster");
   fake_cluster.mutable_outlier_detection();
 
-  NiceMock<MockCluster> cluster;
+  NiceMock<MockClusterMockPrioritySet> cluster;
   NiceMock<Event::MockDispatcher> dispatcher;
   NiceMock<Runtime::MockLoader> runtime;
   EXPECT_NE(nullptr, DetectorImplFactory::createForCluster(cluster, fake_cluster, dispatcher,
@@ -92,7 +92,7 @@ public:
     }
   }
 
-  NiceMock<MockCluster> cluster_;
+  NiceMock<MockClusterMockPrioritySet> cluster_;
   HostVector& hosts_ = cluster_.prioritySet().getMockHostSet(0)->hosts_;
   HostVector& failover_hosts_ = cluster_.prioritySet().getMockHostSet(1)->hosts_;
   NiceMock<Event::MockDispatcher> dispatcher_;

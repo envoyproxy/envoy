@@ -100,6 +100,7 @@ cc_library(
     name = "quic_platform",
     srcs = ["quiche/quic/platform/api/quic_mutex.cc"],
     hdrs = [
+        "quiche/quic/platform/api/quic_cert_utils.h",
         "quiche/quic/platform/api/quic_mutex.h",
     ],
     visibility = ["//visibility:public"],
@@ -123,6 +124,7 @@ cc_library(
         "quiche/quic/platform/api/quic_flag_utils.h",
         "quiche/quic/platform/api/quic_iovec.h",
         "quiche/quic/platform/api/quic_logging.h",
+        "quiche/quic/platform/api/quic_map_util.h",
         "quiche/quic/platform/api/quic_prefetch.h",
         "quiche/quic/platform/api/quic_ptr_util.h",
         "quiche/quic/platform/api/quic_stack_trace.h",
@@ -147,7 +149,6 @@ cc_library(
         # "quiche/quic/platform/api/quic_ip_address_family.h",
         # "quiche/quic/platform/api/quic_ip_address.h",
         # "quiche/quic/platform/api/quic_lru_cache.h",
-        # "quiche/quic/platform/api/quic_map_util.h",
         # "quiche/quic/platform/api/quic_mem_slice.h",
         # "quiche/quic/platform/api/quic_mem_slice_span.h",
         # "quiche/quic/platform/api/quic_mem_slice_storage.h",

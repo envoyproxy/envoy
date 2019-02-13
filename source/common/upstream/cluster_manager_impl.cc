@@ -926,7 +926,8 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::removeTcpConn(
 }
 
 void ClusterManagerImpl::ThreadLocalClusterManagerImpl::updateClusterMembership(
-    const std::string& name, uint32_t priority, HostSet::UpdateHostsParams&& update_hosts_params,
+    const std::string& name, uint32_t priority,
+    PrioritySet::UpdateHostsParams&& update_hosts_params,
     LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
     const HostVector& hosts_removed, ThreadLocal::Slot& tls) {
 
@@ -936,9 +937,9 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::updateClusterMembership(
   const auto& cluster_entry = config.thread_local_clusters_[name];
   ENVOY_LOG(debug, "membership update for TLS cluster {} added {} removed {}", name,
             hosts_added.size(), hosts_removed.size());
-  cluster_entry->priority_set_.getOrCreateHostSet(priority).updateHosts(
-      std::move(update_hosts_params), std::move(locality_weights), hosts_added, hosts_removed,
-      absl::nullopt);
+  cluster_entry->priority_set_.updateHosts(priority, std::move(update_hosts_params),
+                                           std::move(locality_weights), hosts_added, hosts_removed,
+                                           absl::nullopt);
 
   // If an LB is thread aware, create a new worker local LB on membership changes.
   if (cluster_entry->lb_factory_ != nullptr) {

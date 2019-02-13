@@ -14,6 +14,7 @@
 #include "test/integration/server.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/ssl/mocks.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_base.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
@@ -43,7 +44,8 @@ OptionsImpl asConfigYaml(const OptionsImpl& src, Api::Api& api) {
 
 class ConfigTest {
 public:
-  ConfigTest(const OptionsImpl& options) : api_(Api::createApiForTest()), options_(options) {
+  ConfigTest(const OptionsImpl& options)
+      : api_(Api::createApiForTest(time_system_)), options_(options) {
     ON_CALL(server_, options()).WillByDefault(ReturnRef(options_));
     ON_CALL(server_, random()).WillByDefault(ReturnRef(random_));
     ON_CALL(server_, sslContextManager()).WillByDefault(ReturnRef(ssl_context_manager_));
@@ -64,7 +66,7 @@ public:
         server_.admin(), server_.runtime(), server_.stats(), server_.threadLocal(),
         server_.random(), server_.dnsResolver(), ssl_context_manager_, server_.dispatcher(),
         server_.localInfo(), server_.secretManager(), *api_, server_.httpContext(),
-        server_.accessLogManager(), server_.singletonManager());
+        server_.accessLogManager(), server_.singletonManager(), time_system_);
 
     ON_CALL(server_, clusterManager()).WillByDefault(Invoke([&]() -> Upstream::ClusterManager& {
       return *main_config.clusterManager();
@@ -97,6 +99,7 @@ public:
     server_.thread_local_.shutdownThread();
   }
 
+  Event::SimulatedTimeSystem time_system_;
   Api::ApiPtr api_;
   NiceMock<Server::MockInstance> server_;
   NiceMock<Ssl::MockContextManager> ssl_context_manager_;
