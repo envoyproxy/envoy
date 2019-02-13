@@ -299,7 +299,7 @@ private:
     ASSERT(buffered_body_ != nullptr);
   }
   const Buffer::Instance* decodingBuffer() override { return buffered_body_.get(); }
-  void modifyDecodingBuffer(std::function<void(Buffer::Instance&)> callback) override {
+  void modifyDecodingBuffer(std::function<void(Buffer::Instance&)>) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
   void sendLocalReply(Code code, absl::string_view body,
@@ -373,7 +373,7 @@ private:
     // internal use of the router filter which uses this function for buffering.
   }
   const Buffer::Instance* decodingBuffer() override { return request_->body().get(); }
-  void modifyDecodingBuffer(std::function<void(Buffer::Instance&)> callback) override {
+  void modifyDecodingBuffer(std::function<void(Buffer::Instance&)>) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
 
