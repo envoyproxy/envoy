@@ -213,6 +213,8 @@ TEST_P(IntegrationTest, DecodingHeaderOnlyResponseIntermediateFilters) {
 
 TEST_P(IntegrationTest, DecodingHeaderOnlyInterleaved) { testHeadersOnlyFilterInterleaved(); }
 
+TEST_P(IntegrationTest, testDecodeHeadersReturnsStopAll) { testDecodeHeadersReturnsStopAll(); }
+
 TEST_P(IntegrationTest, RetryHittingBufferLimit) { testRetryHittingBufferLimit(); }
 
 TEST_P(IntegrationTest, HittingDecoderFilterLimit) { testHittingDecoderFilterLimit(); }

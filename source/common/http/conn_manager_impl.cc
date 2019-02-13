@@ -1498,6 +1498,7 @@ void ConnectionManagerImpl::ActiveStreamFilterBase::commonContinue() {
                    static_cast<const void*>(this));
   ASSERT(stopped_);
   stopped_ = false;
+  stopped_all_ = false;
 
   // Only resume with do100ContinueHeaders() if we've actually seen a 100-Continue.
   if (parent_.has_continue_headers_ && !continue_headers_continued_) {
@@ -1553,6 +1554,10 @@ bool ConnectionManagerImpl::ActiveStreamFilterBase::commonHandleAfterHeadersCall
   if (status == FilterHeadersStatus::StopIteration) {
     stopped_ = true;
     return false;
+  } else if (status == FilterHeadersStatus::StopAllTypesIteration) {
+    stopped_ = true;
+    stopped_all_ = true;
+    return false;
   } else if (status == FilterHeadersStatus::ContinueAndEndStream) {
     // Set headers_only to true so we know to end early if necessary,
     // but continue filter iteration so we actually write the headers/run the cleanup code.
@@ -1589,7 +1594,9 @@ bool ConnectionManagerImpl::ActiveStreamFilterBase::commonHandleAfterDataCallbac
   if (status == FilterDataStatus::Continue) {
     if (stopped_) {
       commonHandleBufferData(provided_data);
-      commonContinue();
+      if (!stopped_all_) {
+        commonContinue();
+      }
       return false;
     } else {
       ASSERT(headers_continued_);
@@ -1613,7 +1620,9 @@ bool ConnectionManagerImpl::ActiveStreamFilterBase::commonHandleAfterTrailersCal
 
   if (status == FilterTrailersStatus::Continue) {
     if (stopped_) {
-      commonContinue();
+      if (!stopped_all_) {
+        commonContinue();
+      }
       return false;
     } else {
       ASSERT(headers_continued_);

@@ -96,7 +96,7 @@ private:
   struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks {
     ActiveStreamFilterBase(ActiveStream& parent, bool dual_filter)
         : parent_(parent), headers_continued_(false), continue_headers_continued_(false),
-          stopped_(false), end_stream_(false), dual_filter_(dual_filter) {}
+          stopped_(false), stopped_all_(false), end_stream_(false), dual_filter_(dual_filter) {}
 
     bool commonHandleAfter100ContinueHeadersCallback(FilterHeadersStatus status);
     bool commonHandleAfterHeadersCallback(FilterHeadersStatus status, bool& headers_only);
@@ -132,6 +132,9 @@ private:
     bool headers_continued_ : 1;
     bool continue_headers_continued_ : 1;
     bool stopped_ : 1;
+    // If true, filter iteration has been stopped for this filter and all the filters followed on
+    // all frame types.
+    bool stopped_all_ : 1;
     // If true, end_stream is called for this filter.
     bool end_stream_ : 1;
     const bool dual_filter_ : 1;

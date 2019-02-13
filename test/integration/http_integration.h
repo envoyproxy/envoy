@@ -163,6 +163,7 @@ protected:
   void testHeadersOnlyFilterEncodingIntermediateFilters();
   void testHeadersOnlyFilterDecodingIntermediateFilters();
   void testHeadersOnlyFilterInterleaved();
+  void testDecodeHeadersReturnsStopAll();
 
   // Test that a request returns the same content with both allow_absolute_urls enabled and
   // allow_absolute_urls disabled

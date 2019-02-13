@@ -477,6 +477,8 @@ TEST_P(Http2IntegrationTest, DecodingHeaderOnlyResponse) { testHeadersOnlyFilter
 
 TEST_P(Http2IntegrationTest, DecodingHeaderOnlyInterleaved) { testHeadersOnlyFilterInterleaved(); }
 
+TEST_P(Http2IntegrationTest, DecodeHeadersReturnsStopAll) { testDecodeHeadersReturnsStopAll(); }
+
 TEST_P(Http2IntegrationTest, DownstreamResetBeforeResponseComplete) {
   testDownstreamResetBeforeResponseComplete();
 }

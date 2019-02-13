@@ -1636,4 +1636,58 @@ std::string HttpIntegrationTest::listenerStatPrefix(const std::string& stat_name
   return "listener.[__1]_0." + stat_name;
 }
 
+// Tests StopAllTypesIteration. decode-headers-return-stop-all-filter returns StopAllTypesIteration
+// for headers. As a result, call-decodedata-once-filter that follows headers-return-stop-all-filter
+// will stop processing headers, data and trailer until the iteration resumes. Verifies decodeData()
+// is called multiple times in decode-headers-return-stop-all-filter, and only called once in
+// call-decodedata-once-filter after iteration resumes.
+void HttpIntegrationTest::testDecodeHeadersReturnsStopAll() {
+  config_helper_.addFilter(R"EOF(
+name: call-decodedata-once-filter
+)EOF");
+  config_helper_.addFilter(R"EOF(
+name: decode-headers-return-stop-all-filter
+)EOF");
+  config_helper_.addFilter(R"EOF(
+name: passthrough-filter
+)EOF");
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Sends a request with headers and data.
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  const int count = 10;
+  const int size = 100;
+  for (int i = 0; i < count; i++) {
+    codec_client_->sendData(*request_encoder_, size, false);
+  }
+  codec_client_->sendData(*request_encoder_, size, true);
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ((count + 1) * size, upstream_request_->bodyLength());
+  EXPECT_EQ(true, upstream_request_->complete());
+
+  // Sends a request with headers, data, and trailers.
+  auto encoder_decoder_2 = codec_client_->startRequest(default_request_headers_);
+  request_encoder_ = &encoder_decoder_2.first;
+  response = std::move(encoder_decoder_2.second);
+  for (int i = 0; i < count; i++) {
+    codec_client_->sendData(*request_encoder_, size, false);
+  }
+  Http::TestHeaderMapImpl request_trailers{{"trailer", "trailer"}};
+  codec_client_->sendTrailers(*request_encoder_, request_trailers);
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  response->waitForEndStream();
+  EXPECT_EQ(count * size, upstream_request_->bodyLength());
+  EXPECT_EQ(true, upstream_request_->complete());
+}
+
 } // namespace Envoy

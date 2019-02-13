@@ -33,7 +33,16 @@ enum class FilterHeadersStatus {
   StopIteration,
   // Continue iteration to remaining filters, but ignore any subsequent data or trailers. This
   // results in creating a header only request/response.
-  ContinueAndEndStream
+  ContinueAndEndStream,
+  // Stop iterations for headers as well as the other frame types that need filter process.
+  // Returning StopAllTypesIteration means the filter that returns the value and all the filters
+  // following that filter stop processing. The filters before are not impacted. continueDecoding()
+  // or continueEncoding() MUST be called if continued filter iteration is desired. To avoid
+  // buffering large amount of data, a rate-limiting filter can be added before the filter that can
+  // return StopAllTypesIteration.
+  // Only used in decoding path. TODO(soya3129): add tests for encoding path, and remove the
+  // condition.
+  StopAllTypesIteration
 };
 
 /**
