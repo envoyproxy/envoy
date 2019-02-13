@@ -41,7 +41,7 @@ where the extension reflects the underlying v2 config representation.
 
 The :ref:`Bootstrap <envoy_api_msg_config.bootstrap.v2.Bootstrap>` message is the root of the
 configuration. A key concept in the :ref:`Bootstrap <envoy_api_msg_config.bootstrap.v2.Bootstrap>`
-message is the distinction between static and dynamic resouces. Resources such
+message is the distinction between static and dynamic resources. Resources such
 as a :ref:`Listener <envoy_api_msg_Listener>` or :ref:`Cluster
 <envoy_api_msg_Cluster>` may be supplied either statically in
 :ref:`static_resources <envoy_api_field_config.bootstrap.v2.Bootstrap.static_resources>` or have
@@ -507,7 +507,7 @@ the management of multiple streams and connections to distinct management
 servers.
 
 ADS will allow for hitless updates of configuration by appropriate sequencing.
-For example, suppose *foo.com* was mappped to cluster *X*. We wish to change the
+For example, suppose *foo.com* was mapped to cluster *X*. We wish to change the
 mapping in the route table to point *foo.com* at cluster *Y*. In order to do
 this, a CDS/EDS update must first be delivered containing both clusters *X* and
 *Y*.
