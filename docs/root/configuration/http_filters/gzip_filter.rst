@@ -56,7 +56,7 @@ By *default* compression will be *skipped* when:
 - Neither *content-length* nor *transfer-encoding* headers are present in
   the response.
 - Response size is smaller than 30 bytes (only applicable when *transfer-encoding*
-  is not chuncked).
+  is not chunked).
 
 When compression is *applied*:
 

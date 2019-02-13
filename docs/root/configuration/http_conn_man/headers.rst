@@ -131,7 +131,7 @@ should be replaced by backslash-double-quote (\").
 The following keys are supported:
 
 1. ``By`` The Subject Alternative Name (URI type) of the current proxy's certificate.
-2. ``Hash`` The SHA 256 diguest of the current client certificate.
+2. ``Hash`` The SHA 256 digest of the current client certificate.
 3. ``Cert`` The entire client certificate in URL encoded PEM format.
 4. ``Subject`` The Subject field of the current client certificate. The value is always double-quoted.
 5. ``URI`` The URI type Subject Alternative Name field of the current client certificate.
