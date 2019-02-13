@@ -18,8 +18,10 @@ envoy_cc_test_library(
     name = "main",
     srcs = [
         "main.cc",
+        "test_listener.cc",
         "test_runner.h",
     ],
+    hdrs = ["test_listener.h"],
     external_deps = [
         "abseil_symbolize",
     ],
@@ -32,7 +34,6 @@ envoy_cc_test_library(
         "//test/test_common:environment_lib",
         "//test/test_common:global_lib",
         "//test/test_common:printers_lib",
-        "//test/test_common:test_base_lib",
     ] + select({
         "//bazel:disable_signal_trace": [],
         "//conditions:default": ["//source/exe:sigaction_lib"],
