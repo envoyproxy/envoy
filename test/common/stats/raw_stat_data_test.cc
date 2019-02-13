@@ -4,8 +4,9 @@
 #include "common/stats/stats_options_impl.h"
 
 #include "test/test_common/logging.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
+
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Stats {

@@ -1,7 +1,8 @@
 #pragma once
 
 #include "test/integration/http_integration.h"
-#include "test/test_common/test_base.h"
+
+#include "gtest/gtest.h"
 
 // A test class for testing HTTP/1.1 upstream and downstreams
 namespace Envoy {

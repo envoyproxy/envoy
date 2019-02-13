@@ -4,7 +4,7 @@
 
 #include "common/protobuf/utility.h"
 
-#include "test/test_common/test_base.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Invoke;

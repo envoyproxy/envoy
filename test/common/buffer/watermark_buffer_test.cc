@@ -3,7 +3,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/buffer/watermark_buffer.h"
 
-#include "test/test_common/test_base.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Buffer {

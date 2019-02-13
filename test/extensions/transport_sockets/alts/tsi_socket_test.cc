@@ -3,9 +3,9 @@
 #include "extensions/transport_sockets/alts/tsi_socket.h"
 
 #include "test/mocks/network/mocks.h"
-#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 #include "src/core/tsi/fake_transport_security.h"
 
 namespace Envoy {

@@ -3,8 +3,9 @@
 #include "common/common/stack_array.h"
 #include "common/compressor/zlib_compressor_impl.h"
 
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
+
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Compressor {

@@ -2,8 +2,9 @@
 
 #include "common/stats/stats_matcher_impl.h"
 
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
+
+#include "gtest/gtest.h"
 
 using testing::IsFalse;
 using testing::IsTrue;

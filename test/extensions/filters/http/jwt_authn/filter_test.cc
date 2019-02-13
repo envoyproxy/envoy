@@ -3,10 +3,10 @@
 
 #include "test/extensions/filters/http/jwt_authn/mock.h"
 #include "test/mocks/server/mocks.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication;
 using ::google::jwt_verify::Status;

@@ -1,5 +1,6 @@
 #include "test/common/config/grpc_subscription_test_harness.h"
-#include "test/test_common/test_base.h"
+
+#include "gtest/gtest.h"
 
 using testing::InSequence;
 

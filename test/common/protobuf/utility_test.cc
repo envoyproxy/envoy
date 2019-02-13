@@ -12,8 +12,9 @@
 #include "test/proto/deprecated.pb.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
+
+#include "gtest/gtest.h"
 
 namespace Envoy {
 

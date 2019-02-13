@@ -5,9 +5,9 @@
 #include "common/common/mutex_tracer_impl.h"
 
 #include "test/test_common/contention.h"
-#include "test/test_common/test_base.h"
 
 #include "absl/synchronization/mutex.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 

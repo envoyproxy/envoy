@@ -10,10 +10,10 @@
 #include "extensions/filters/network/thrift_proxy/thrift.h"
 
 #include "test/common/buffer/utility.h"
-#include "test/test_common/test_base.h"
 
 #include "absl/strings/ascii.h"
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using ::testing::TestParamInfo;
 

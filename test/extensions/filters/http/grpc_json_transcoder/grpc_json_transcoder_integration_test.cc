@@ -6,10 +6,10 @@
 #include "test/integration/http_integration.h"
 #include "test/mocks/http/mocks.h"
 #include "test/proto/bookstore.pb.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/match.h"
+#include "gtest/gtest.h"
 
 using Envoy::Protobuf::Message;
 using Envoy::Protobuf::TextFormat;

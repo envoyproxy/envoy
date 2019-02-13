@@ -2,9 +2,9 @@
 #include "common/stream_info/utility.h"
 
 #include "test/mocks/stream_info/mocks.h"
-#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::NiceMock;

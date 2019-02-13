@@ -5,9 +5,8 @@
 #include "extensions/filters/network/mysql_proxy/mysql_codec_greeting.h"
 #include "extensions/filters/network/mysql_proxy/mysql_utils.h"
 
-#include "test/test_common/test_base.h"
-
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 #include "include/sqlparser/SQLParser.h"
 #include "mysql_test_utils.h"
 
