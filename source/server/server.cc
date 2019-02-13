@@ -287,6 +287,8 @@ void InstanceImpl::initialize(const Options& options,
   overload_manager_ = std::make_unique<OverloadManagerImpl>(dispatcher(), stats(), threadLocal(),
                                                             bootstrap_.overload_manager(), api());
 
+  heap_shrinker_ = std::make_unique<Memory::HeapShrinker>(dispatcher(), overloadManager(), stats());
+
   // Workers get created first so they register for thread local updates.
   listener_manager_ =
       std::make_unique<ListenerManagerImpl>(*this, listener_component_factory_, worker_factory_);
