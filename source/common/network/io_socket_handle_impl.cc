@@ -13,7 +13,7 @@ namespace Envoy {
 namespace Network {
 
 IoError::IoErrorCode IoSocketError::getErrorCode() const {
-  switch (errno) {
+  switch (errno_) {
   case 0:
     return IoErrorCode::NoError;
   case EAGAIN:
@@ -31,7 +31,7 @@ IoError::IoErrorCode IoSocketError::getErrorCode() const {
   }
 }
 
-std::string IoSocketError::getErrorDetails() const { return ::strerror(errno); }
+std::string IoSocketError::getErrorDetails() const { return ::strerror(errno_); }
 
 IoSocketHandleImpl::~IoSocketHandleImpl() {
   if (fd_ != -1) {
@@ -43,7 +43,7 @@ IoHandleCallIntResult IoSocketHandleImpl::close() {
   ASSERT(fd_ != -1);
   const int rc = ::close(fd_);
   fd_ = -1;
-  return IoHandleCallResult<int>(rc, std::unique_ptr<IoSocketError>());
+  return IoHandleCallResult<int>(rc, std::unique_ptr<IoSocketError>(errno));
 }
 
 bool IoSocketHandleImpl::isOpen() const { return fd_ != -1; }

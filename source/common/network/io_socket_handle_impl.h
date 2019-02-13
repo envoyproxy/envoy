@@ -8,11 +8,16 @@ namespace Network {
 
 class IoSocketError : public IoError {
 public:
+  IoSocketError(int errno) : errno_(errno) {}
+
   ~IoSocketError() override {}
 
   IoErrorCode getErrorCode() const override;
 
   std::string getErrorDetails() const override;
+
+private:
+  int errno_;
 };
 
 /**
