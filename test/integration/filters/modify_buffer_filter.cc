@@ -13,7 +13,9 @@ namespace Envoy {
 // the content of the filter buffer.
 class ModifyBufferStreamFilter : public Http::PassThroughFilter {
 public:
-  Http::FilterDataStatus decodeData(Buffer::Instance&, bool end_stream) {
+  Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) {
+    decoder_callbacks_->addDecodedData(data, true);
+
     if (end_stream) {
       decoder_callbacks_->modifyDecodingBuffer([](auto& buffer) {
         // Append the buffer with itself.
@@ -25,7 +27,9 @@ public:
     return Http::FilterDataStatus::StopIterationAndBuffer;
   }
 
-  Http::FilterDataStatus encodeData(Buffer::Instance&, bool end_stream) {
+  Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) {
+    encoder_callbacks_->addEncodedData(data, true);
+
     if (end_stream) {
       encoder_callbacks_->modifyEncodingBuffer([](auto& buffer) {
         // Append the buffer with itself.

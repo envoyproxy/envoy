@@ -486,22 +486,10 @@ name: modify-buffer-filter
   upstream_request_->encodeData(64, true);
   response->waitForEndStream();
 
-  // When using HTTP2 we get end_stream=true with the second onData callback, so the buffered
-  // data is only 64 bytes. With HTTP1 we get end_stream=true on a third onData callback,
-  // so the buffered data is 128 bytes. Since we double the buffered data when we get
-  // end_stream=true, the resulting data therefore vary based on whether we're using HTTP1 or HTTP2.
-  if (downstream_protocol_ == Http::CodecClient::Type::HTTP2) {
-    EXPECT_EQ(64 + 2 * 64, upstream_request_->body().length());
-  } else {
-    EXPECT_EQ(256, upstream_request_->body().length());
-  }
+  EXPECT_EQ(256, upstream_request_->body().length());
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("503", response->headers().Status()->value().c_str());
-  if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP2) {
-    EXPECT_EQ(64 + 2 * 64, response->body().length());
-  } else {
-    EXPECT_EQ(256, response->body().length());
-  }
+  EXPECT_EQ(256, response->body().length());
 }
 
 // Add a health check filter and verify correct behavior when draining.
