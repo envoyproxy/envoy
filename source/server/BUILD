@@ -126,6 +126,7 @@ envoy_cc_library(
         "//source/common/network:utility_lib",
         "//source/common/stats:raw_stat_data_lib",
         "//source/common/stats:stats_options_lib",
+        "@envoy_api//envoy/admin/v2alpha:hot_restart_cc",
     ],
 )
 

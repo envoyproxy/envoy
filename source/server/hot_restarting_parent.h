@@ -16,7 +16,6 @@ public:
 
 private:
   void onSocketEvent();
-  void onGetListenSocket(RpcGetListenSocketRequest& rpc);
 
   const int restart_epoch_;
   sockaddr_un child_address_;

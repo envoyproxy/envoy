@@ -23,7 +23,7 @@ public:
   struct GetParentStatsInfo {
     uint64_t memory_allocated_;
     uint64_t num_connections_;
-  };
+  }; // TODO(fredlas) remove once we've switched to sending ALL stats by RPC
 
   struct ShutdownParentAdminInfo {
     time_t original_start_time_;

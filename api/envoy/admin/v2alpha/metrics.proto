@@ -13,6 +13,8 @@ message SimpleMetric {
   enum Type {
     COUNTER = 0;
     GAUGE = 1;
+    BOOL = 2;
+    STRING = 3;
   }
 
   // Type of the metric represented.
@@ -20,6 +22,8 @@ message SimpleMetric {
 
   // Current metric value.
   uint64 value = 2;
+  bool value_bool = 4;
+  string value_string = 5;
 
   // Name of the metric.
   string name = 3;

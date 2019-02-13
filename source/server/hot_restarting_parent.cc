@@ -7,6 +7,8 @@
 namespace Envoy {
 namespace Server {
 
+using HotRestartMessage = envoy::admin::v2alpha::HotRestartMessage;
+
 HotRestartingParent::HotRestartingParent(int base_id, int restart_epoch)
     : HotRestartingBase(base_id), restart_epoch_(restart_epoch) {
   child_address_ = createDomainSocketAddress(restart_epoch_ + 1, "child");
@@ -24,97 +26,60 @@ void HotRestartingParent::initialize(Event::Dispatcher& dispatcher, Server::Inst
   server_ = &server;
 }
 
-void HotRestartingParent::onGetListenSocket(RpcGetListenSocketRequest& rpc) {
-  RpcGetListenSocketReply reply;
-  reply.fd_ = -1;
-
-  Network::Address::InstanceConstSharedPtr addr =
-      Network::Utility::resolveUrl(std::string(rpc.address_));
-  for (const auto& listener : server_->listenerManager().listeners()) {
-    if (*listener.get().socket().localAddress() == *addr) {
-      reply.fd_ = listener.get().socket().ioHandle().fd();
-      break;
-    }
-  }
-
-  if (reply.fd_ == -1) {
-    // In this case there is no fd to duplicate so we just send a normal message.
-    sendMessage(child_address_, reply);
-  } else {
-    iovec iov[1];
-    iov[0].iov_base = &reply;
-    iov[0].iov_len = reply.length_;
-
-    uint8_t control_buffer[CMSG_SPACE(sizeof(int))];
-    memset(control_buffer, 0, CMSG_SPACE(sizeof(int)));
-
-    msghdr message;
-    memset(&message, 0, sizeof(message));
-    message.msg_name = &child_address_;
-    message.msg_namelen = sizeof(child_address_);
-    message.msg_iov = iov;
-    message.msg_iovlen = 1;
-    message.msg_control = control_buffer;
-    message.msg_controllen = CMSG_SPACE(sizeof(int));
-
-    cmsghdr* control_message = CMSG_FIRSTHDR(&message);
-    control_message->cmsg_level = SOL_SOCKET;
-    control_message->cmsg_type = SCM_RIGHTS;
-    control_message->cmsg_len = CMSG_LEN(sizeof(int));
-    *reinterpret_cast<int*>(CMSG_DATA(control_message)) = reply.fd_;
-
-    int rc = sendmsg(my_domain_socket(), &message, 0);
-    RELEASE_ASSERT(rc != -1, "");
-  }
-}
-
 void HotRestartingParent::onSocketEvent() {
-  while (true) {
-    RpcBase* base_message = receiveRpc(false);
-    if (!base_message) {
-      return;
-    }
-
-    switch (base_message->type_) {
-    case RpcMessageType::ShutdownAdminRequest: {
+  std::unique_ptr<HotRestartMessage> wrapped_request;
+  while ((wrapped_request = receiveHotRestartMessage(/*blocking=*/false))) {
+    switch (wrapped_request->request_case()) {
+    case HotRestartMessage::kShutdownAdminRequest: {
       server_->shutdownAdmin();
-      RpcShutdownAdminReply rpc;
-      rpc.original_start_time_ = server_->startTimeFirstEpoch();
-      sendMessage(child_address_, rpc);
+      HotRestartMessage wrapped_reply;
+      wrapped_reply.mutable_shutdown_admin_reply()->set_original_start_time(
+          server_->startTimeFirstEpoch());
+      sendHotRestartMessage(child_address_, wrapped_reply);
       break;
     }
 
-    case RpcMessageType::GetListenSocketRequest: {
-      RpcGetListenSocketRequest* message =
-          reinterpret_cast<RpcGetListenSocketRequest*>(base_message);
-      onGetListenSocket(*message);
+    case HotRestartMessage::kPassListenSocketRequest: {
+      HotRestartMessage wrapped_reply;
+      wrapped_reply.mutable_pass_listen_socket_reply()->set_fd(-1);
+      Network::Address::InstanceConstSharedPtr addr =
+          Network::Utility::resolveUrl(wrapped_request->pass_listen_socket_request().address());
+      for (const auto& listener : server_->listenerManager().listeners()) {
+        if (*listener.get().socket().localAddress() == *addr) {
+          wrapped_reply.mutable_pass_listen_socket_reply()->set_fd(
+              listener.get().socket().ioHandle().fd());
+          break;
+        }
+      }
+      sendHotRestartMessage(child_address_, wrapped_reply);
       break;
     }
 
-    case RpcMessageType::GetStatsRequest: {
+    case HotRestartMessage::kStatsRequest: {
       HotRestart::GetParentStatsInfo info;
       server_->getParentStats(info);
-      RpcGetStatsReply rpc;
-      rpc.memory_allocated_ = info.memory_allocated_;
-      rpc.num_connections_ = info.num_connections_;
-      sendMessage(child_address_, rpc);
+      HotRestartMessage wrapped_reply;
+      wrapped_reply.mutable_stats_reply()->set_memory_allocated(info.memory_allocated_);
+      wrapped_reply.mutable_stats_reply()->set_num_connections(info.num_connections_);
+      sendHotRestartMessage(child_address_, wrapped_reply);
       break;
     }
 
-    case RpcMessageType::DrainListenersRequest: {
+    case HotRestartMessage::kDrainListenersRequest: {
       server_->drainListeners();
       break;
     }
 
-    case RpcMessageType::TerminateRequest: {
+    case HotRestartMessage::kTerminateRequest: {
       ENVOY_LOG(info, "shutting down due to child request");
       kill(getpid(), SIGTERM);
       break;
     }
 
     default: {
-      RpcBase rpc(RpcMessageType::UnknownRequestReply);
-      sendMessage(child_address_, rpc);
+      HotRestartMessage wrapped_reply;
+      wrapped_reply.set_didnt_recognize_your_last_message(true);
+      sendHotRestartMessage(child_address_, wrapped_reply);
       break;
     }
     }

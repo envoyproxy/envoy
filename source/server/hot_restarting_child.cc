@@ -5,6 +5,8 @@
 namespace Envoy {
 namespace Server {
 
+using HotRestartMessage = envoy::admin::v2alpha::HotRestartMessage;
+
 HotRestartingChild::HotRestartingChild(int base_id, int restart_epoch)
     : HotRestartingBase(base_id), restart_epoch_(restart_epoch) {
   initDomainSocketAddress(&parent_address_);
@@ -19,13 +21,15 @@ int HotRestartingChild::duplicateParentListenSocket(const std::string& address) 
     return -1;
   }
 
-  RpcGetListenSocketRequest rpc;
-  ASSERT(address.length() < sizeof(rpc.address_));
-  StringUtil::strlcpy(rpc.address_, address.c_str(), sizeof(rpc.address_));
-  sendMessage(parent_address_, rpc);
-  RpcGetListenSocketReply* reply =
-      receiveTypedRpc<RpcGetListenSocketReply, RpcMessageType::GetListenSocketReply>();
-  return reply->fd_;
+  HotRestartMessage wrapped_request;
+  wrapped_request.mutable_pass_listen_socket_request()->set_address(address);
+  sendHotRestartMessage(parent_address_, wrapped_request);
+
+  std::unique_ptr<HotRestartMessage> wrapped_reply = receiveHotRestartMessage(/*blocking=*/true);
+  if (!wrapped_reply || wrapped_reply->reply_case() != HotRestartMessage::kPassListenSocketReply) {
+    return -1;
+  }
+  return wrapped_reply->pass_listen_socket_reply().fd();
 }
 
 void HotRestartingChild::getParentStats(HotRestart::GetParentStatsInfo& info) {
@@ -34,18 +38,24 @@ void HotRestartingChild::getParentStats(HotRestart::GetParentStatsInfo& info) {
     return;
   }
 
-  RpcBase rpc(RpcMessageType::GetStatsRequest);
-  sendMessage(parent_address_, rpc);
-  RpcGetStatsReply* reply = receiveTypedRpc<RpcGetStatsReply, RpcMessageType::GetStatsReply>();
-  info.memory_allocated_ = reply->memory_allocated_;
-  info.num_connections_ = reply->num_connections_;
+  HotRestartMessage wrapped_request;
+  wrapped_request.mutable_stats_request();
+  sendHotRestartMessage(parent_address_, wrapped_request);
+
+  std::unique_ptr<HotRestartMessage> wrapped_reply = receiveHotRestartMessage(/*blocking=*/true);
+  RELEASE_ASSERT(wrapped_reply && wrapped_reply->reply_case() == HotRestartMessage::kStatsReply,
+                 "Did not get a StatsReply for our StatsRequest.");
+  // TODO(fredlas) this is where the stat transferring, to be added later in this PR, will go.
+  info.memory_allocated_ = wrapped_reply->stats_reply().memory_allocated();
+  info.num_connections_ = wrapped_reply->stats_reply().num_connections();
 }
 
 void HotRestartingChild::drainParentListeners() {
   if (restart_epoch_ > 0) {
     // No reply expected.
-    RpcBase rpc(RpcMessageType::DrainListenersRequest);
-    sendMessage(parent_address_, rpc);
+    HotRestartMessage wrapped_request;
+    wrapped_request.mutable_drain_listeners_request();
+    sendHotRestartMessage(parent_address_, wrapped_request);
   }
 }
 
@@ -54,20 +64,24 @@ void HotRestartingChild::shutdownParentAdmin(HotRestart::ShutdownParentAdminInfo
     return;
   }
 
-  RpcBase rpc(RpcMessageType::ShutdownAdminRequest);
-  sendMessage(parent_address_, rpc);
-  RpcShutdownAdminReply* reply =
-      receiveTypedRpc<RpcShutdownAdminReply, RpcMessageType::ShutdownAdminReply>();
-  info.original_start_time_ = reply->original_start_time_;
+  HotRestartMessage wrapped_request;
+  wrapped_request.mutable_shutdown_admin_request();
+  sendHotRestartMessage(parent_address_, wrapped_request);
+
+  std::unique_ptr<HotRestartMessage> wrapped_reply = receiveHotRestartMessage(/*blocking=*/true);
+  RELEASE_ASSERT(wrapped_reply &&
+                     wrapped_reply->reply_case() == HotRestartMessage::kShutdownAdminReply,
+                 "Parent did not respond as expected to ShutdownParentAdmin.");
+  info.original_start_time_ = wrapped_reply->shutdown_admin_reply().original_start_time();
 }
 
 void HotRestartingChild::terminateParent() {
   if (restart_epoch_ == 0 || parent_terminated_) {
     return;
   }
-
-  RpcBase rpc(RpcMessageType::TerminateRequest);
-  sendMessage(parent_address_, rpc);
+  HotRestartMessage wrapped_request;
+  wrapped_request.mutable_terminate_request();
+  sendHotRestartMessage(parent_address_, wrapped_request);
   parent_terminated_ = true;
 }
 

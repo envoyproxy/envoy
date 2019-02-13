@@ -6,6 +6,8 @@
 namespace Envoy {
 namespace Server {
 
+using HotRestartMessage = envoy::admin::v2alpha::HotRestartMessage;
+
 void HotRestartingBase::initDomainSocketAddress(sockaddr_un* address) {
   memset(address, 0, sizeof(*address));
   address->sun_family = AF_UNIX;
@@ -41,77 +43,171 @@ void HotRestartingBase::bindDomainSocket(uint64_t id, const std::string& role) {
   }
 }
 
-void HotRestartingBase::sendMessage(sockaddr_un& address, RpcBase& rpc) {
-  iovec iov[1];
-  iov[0].iov_base = &rpc;
-  iov[0].iov_len = rpc.length_;
+void HotRestartingBase::sendHotRestartMessage(sockaddr_un& address,
+                                              const HotRestartMessage& proto) {
+  uint64_t serialized_size = proto.ByteSizeLong();
+  uint64_t total_size = sizeof(uint64_t) + serialized_size;
+  // Fill with uint64_t 'length' followed by the serialized HotRestartMessage.
+  std::vector<uint8_t> send_buf;
+  send_buf.resize(total_size);
+  *reinterpret_cast<uint64_t*>(send_buf.data()) = serialized_size;
+  RELEASE_ASSERT(proto.SerializeToArray(send_buf.data() + 8, serialized_size),
+                 "failed to serialize a HotRestartMessage");
 
-  msghdr message;
-  memset(&message, 0, sizeof(message));
-  message.msg_name = &address;
-  message.msg_namelen = sizeof(address);
-  message.msg_iov = iov;
-  message.msg_iovlen = 1;
-  int rc = sendmsg(my_domain_socket_, &message, 0);
-  RELEASE_ASSERT(rc != -1, "");
+  bool turned_on_blocking = false;
+  uint8_t* next_byte_to_send = send_buf.data();
+  uint64_t sent = 0;
+  while (sent < total_size) {
+    uint64_t cur_chunk_size =
+        MaxSendmsgSize < total_size - sent ? MaxSendmsgSize : total_size - sent;
+    iovec iov[1];
+    iov[0].iov_base = next_byte_to_send;
+    iov[0].iov_len = cur_chunk_size;
+    next_byte_to_send += cur_chunk_size;
+    sent += cur_chunk_size;
+    msghdr message;
+    memset(&message, 0, sizeof(message));
+    message.msg_name = &address;
+    message.msg_namelen = sizeof(address);
+    message.msg_iov = iov;
+    message.msg_iovlen = 1;
+
+    // Control data stuff, only relevant for the fd passing done with PassListenSocketReply.
+    uint8_t control_buffer[CMSG_SPACE(sizeof(int))];
+    if (proto.reply_case() == HotRestartMessage::kPassListenSocketReply &&
+        proto.pass_listen_socket_reply().fd() != -1) {
+      memset(control_buffer, 0, CMSG_SPACE(sizeof(int)));
+      message.msg_control = control_buffer;
+      message.msg_controllen = CMSG_SPACE(sizeof(int));
+      cmsghdr* control_message = CMSG_FIRSTHDR(&message);
+      control_message->cmsg_level = SOL_SOCKET;
+      control_message->cmsg_type = SCM_RIGHTS;
+      control_message->cmsg_len = CMSG_LEN(sizeof(int));
+      *reinterpret_cast<int*>(CMSG_DATA(control_message)) = proto.pass_listen_socket_reply().fd();
+      ASSERT(sent == total_size, "an fd passing message was too long for one sendmsg().");
+    }
+
+    int rc = sendmsg(my_domain_socket_, &message, 0);
+    if (rc == -1 && errno == EAGAIN) {
+      // Let's deal with the possibility of a sendmsg() WOULDBLOCK by just... turning blocking on.
+      // Since the parent wants its recvmsg()s non-blocking, it would be bad to just *always* turn
+      // it on when sending. However, selectively turning it on is ok, because there is only one
+      // case where a sendmsg() could WOULDBLOCK: sending a large StatsReply. But, while we're
+      // sending that, the child is blocked on receiving it, so it wouldn't be sending to us.
+      turned_on_blocking = true;
+      RELEASE_ASSERT(fcntl(my_domain_socket_, F_SETFL, 0) != -1,
+                     fmt::format("Set domain socket blocking failed, errno = {}", errno));
+      // Try again - this time it will work!
+      rc = sendmsg(my_domain_socket_, &message, 0);
+    }
+    RELEASE_ASSERT(rc == static_cast<int>(cur_chunk_size),
+                   fmt::format("hot restart sendmsg() failed: returned {}, errno {}", rc, errno));
+  }
+  // Turn non-blocking back on if we made it blocking.
+  if (turned_on_blocking) {
+    RELEASE_ASSERT(fcntl(my_domain_socket_, F_SETFL, O_NONBLOCK) != -1,
+                   fmt::format("Set domain socket nonblocking failed, errno = {}", errno));
+  }
 }
 
-HotRestartingBase::RpcBase* HotRestartingBase::receiveRpc(bool block) {
+// Both arguments should include the first 8 'length' bytes in their totals.
+void HotRestartingBase::resizeRecvBuf(uint64_t new_size, uint64_t cur_bytes_used) {
+  recv_buf_.resize(new_size);
+  receive_next_byte_here_ = recv_buf_.data() + cur_bytes_used;
+  partial_proto_bytes_ = cur_bytes_used > sizeof(uint64_t) ? cur_bytes_used - sizeof(uint64_t) : 0;
+}
+
+// Pull the cloned fd, if present, out of the control data and write it into the
+// PassListenSocketReply proto; the higher level code will see a listening fd that Just Works. We
+// should only get control data in a PassListenSocketReply, it should only be the fd passing type,
+// and there should only be one at a time. Crash on any other control data.
+void HotRestartingBase::getPassedFdIfPresent(HotRestartMessage* out, msghdr* message) {
+  cmsghdr* cmsg = CMSG_FIRSTHDR(message);
+  if (cmsg != nullptr) {
+    RELEASE_ASSERT(cmsg->cmsg_level == SOL_SOCKET && cmsg->cmsg_type == SCM_RIGHTS &&
+                       out->reply_case() == HotRestartMessage::kPassListenSocketReply,
+                   "recvmsg() came with control data when the message's purpose was not to pass a "
+                   "file descriptor.");
+
+    out->mutable_pass_listen_socket_reply()->set_fd(*reinterpret_cast<int*>(CMSG_DATA(cmsg)));
+
+    RELEASE_ASSERT(CMSG_NXTHDR(message, cmsg) == nullptr,
+                   "More than one control data on a single hot restart recvmsg().");
+  }
+}
+
+std::unique_ptr<HotRestartMessage> HotRestartingBase::receiveHotRestartMessage(bool block) {
   // By default the domain socket is non blocking. If we need to block, make it blocking first.
   if (block) {
-    int rc = fcntl(my_domain_socket_, F_SETFL, 0);
-    RELEASE_ASSERT(rc != -1, "");
+    RELEASE_ASSERT(fcntl(my_domain_socket_, F_SETFL, 0) != -1,
+                   fmt::format("Set domain socket blocking failed, errno = {}", errno));
+  }
+  if (recv_buf_.size() < MaxSendmsgSize) {
+    resizeRecvBuf(MaxSendmsgSize, 0);
   }
 
   iovec iov[1];
-  iov[0].iov_base = &rpc_buffer_[0];
-  iov[0].iov_len = rpc_buffer_.size();
-
-  // We always setup to receive an FD even though most messages do not pass one.
-  uint8_t control_buffer[CMSG_SPACE(sizeof(int))];
-  memset(control_buffer, 0, CMSG_SPACE(sizeof(int)));
-
   msghdr message;
-  memset(&message, 0, sizeof(message));
-  message.msg_iov = iov;
-  message.msg_iovlen = 1;
-  message.msg_control = control_buffer;
-  message.msg_controllen = CMSG_SPACE(sizeof(int));
+  uint8_t control_buffer[CMSG_SPACE(sizeof(int))];
+  std::unique_ptr<HotRestartMessage> ret = nullptr;
+  while (!ret) {
+    iov[0].iov_base = receive_next_byte_here_;
+    iov[0].iov_len = MaxSendmsgSize;
 
-  int rc = recvmsg(my_domain_socket_, &message, 0);
-  if (!block && rc == -1 && errno == EAGAIN) {
-    return nullptr;
-  }
+    // We always setup to receive an FD even though most messages do not pass one.
+    memset(control_buffer, 0, CMSG_SPACE(sizeof(int)));
+    memset(&message, 0, sizeof(message));
+    message.msg_iov = iov;
+    message.msg_iovlen = 1;
+    message.msg_control = control_buffer;
+    message.msg_controllen = CMSG_SPACE(sizeof(int));
 
-  RELEASE_ASSERT(rc != -1, "");
-  RELEASE_ASSERT(message.msg_flags == 0, "");
+    int recvmsg_rc = recvmsg(my_domain_socket_, &message, 0);
+    if (!block && recvmsg_rc == -1 && errno == EAGAIN) {
+      return nullptr;
+    }
+    RELEASE_ASSERT(recvmsg_rc != -1, fmt::format("recvmsg() returned -1, errno = {}", errno));
+    RELEASE_ASSERT(message.msg_flags == 0,
+                   fmt::format("recvmsg() left msg_flags = {}", message.msg_flags));
+    receive_next_byte_here_ += recvmsg_rc;
 
-  // Turn non-blocking back on if we made it blocking.
-  if (block) {
-    int rc = fcntl(my_domain_socket_, F_SETFL, O_NONBLOCK);
-    RELEASE_ASSERT(rc != -1, "");
-  }
+    // If we're in the middle of receiving a protobuf, the whole recvmsg() was protobuf data.
+    // Otherwise, the first 8 bytes was 'length'.
+    partial_proto_bytes_ +=
+        expected_message_length_.has_value() ? recvmsg_rc : recvmsg_rc - sizeof(uint64_t);
 
-  RpcBase* rpc = reinterpret_cast<RpcBase*>(&rpc_buffer_[0]);
-  RELEASE_ASSERT(static_cast<uint64_t>(rc) == rpc->length_, "");
+    // If we don't already know 'length', we're at the start of a new length+protobuf message!
+    if (!expected_message_length_.has_value()) {
+      // We are not ok with messages so fragmented that the length doesn't even come in one piece.
+      RELEASE_ASSERT(recvmsg_rc >= 8, "received a brokenly tiny message fragment.");
 
-  // We should only get control data in a GetListenSocketReply. If that's the case, pull the
-  // cloned fd out of the control data and stick it into the RPC so that higher level code does
-  // need to deal with any of this.
-  for (cmsghdr* cmsg = CMSG_FIRSTHDR(&message); cmsg != nullptr;
-       cmsg = CMSG_NXTHDR(&message, cmsg)) {
+      expected_message_length_ = *reinterpret_cast<uint64_t*>(recv_buf_.data());
+      // Expand the buffer from its default 4096 if this message is going to be longer.
+      if (expected_message_length_.value() > MaxSendmsgSize - sizeof(uint64_t)) {
+        resizeRecvBuf(expected_message_length_.value() + sizeof(uint64_t), recvmsg_rc);
+      }
+    }
+    // If we have received beyond the end of the current in-flight proto, then next is misaligned.
+    RELEASE_ASSERT(partial_proto_bytes_ <= expected_message_length_.value(),
+                   "received a length+protobuf message not aligned to start of sendmsg().");
 
-    if (cmsg->cmsg_level == SOL_SOCKET && cmsg->cmsg_type == SCM_RIGHTS &&
-        rpc->type_ == RpcMessageType::GetListenSocketReply) {
-
-      reinterpret_cast<RpcGetListenSocketReply*>(rpc)->fd_ =
-          *reinterpret_cast<int*>(CMSG_DATA(cmsg));
-    } else {
-      RELEASE_ASSERT(false, "");
+    if (partial_proto_bytes_ == expected_message_length_.value()) {
+      ret = std::make_unique<HotRestartMessage>();
+      RELEASE_ASSERT(ret->ParseFromArray(recv_buf_.data() + sizeof(uint64_t),
+                                         expected_message_length_.value()),
+                     "failed to parse a HotRestartMessage.");
+      resizeRecvBuf(0, 0);
+      expected_message_length_.reset();
     }
   }
 
-  return rpc;
+  // Turn non-blocking back on if we made it blocking.
+  if (block) {
+    RELEASE_ASSERT(fcntl(my_domain_socket_, F_SETFL, O_NONBLOCK) != -1,
+                   fmt::format("Set domain socket nonblocking failed, errno = {}", errno));
+  }
+  getPassedFdIfPresent(ret.get(), &message);
+  return ret;
 }
 
 } // namespace Server

@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <string>
 
+#include "envoy/admin/v2alpha/hot_restart.pb.h"
 #include "envoy/common/platform.h"
 #include "envoy/server/hot_restart.h"
 #include "envoy/server/options.h"
@@ -27,77 +28,55 @@ class HotRestartingBase {
 protected:
   HotRestartingBase(int base_id) : base_id_(base_id) {}
 
-  enum class RpcMessageType {
-    DrainListenersRequest = 1,
-    GetListenSocketRequest = 2,
-    GetListenSocketReply = 3,
-    ShutdownAdminRequest = 4,
-    ShutdownAdminReply = 5,
-    TerminateRequest = 6,
-    UnknownRequestReply = 7,
-    GetStatsRequest = 8,
-    GetStatsReply = 9
-  };
-
-  PACKED_STRUCT(struct RpcBase {
-    RpcBase(RpcMessageType type, uint64_t length = sizeof(RpcBase))
-        : type_(type), length_(length) {}
-
-    RpcMessageType type_;
-    uint64_t length_;
-  });
-
-  PACKED_STRUCT(struct RpcGetListenSocketRequest
-                : public RpcBase {
-                  RpcGetListenSocketRequest()
-                      : RpcBase(RpcMessageType::GetListenSocketRequest, sizeof(*this)) {}
-
-                  char address_[256]{0};
-                });
-
-  PACKED_STRUCT(struct RpcGetListenSocketReply
-                : public RpcBase {
-                  RpcGetListenSocketReply()
-                      : RpcBase(RpcMessageType::GetListenSocketReply, sizeof(*this)) {}
-
-                  int fd_{0};
-                });
-
-  PACKED_STRUCT(struct RpcShutdownAdminReply
-                : public RpcBase {
-                  RpcShutdownAdminReply()
-                      : RpcBase(RpcMessageType::ShutdownAdminReply, sizeof(*this)) {}
-
-                  uint64_t original_start_time_{0};
-                });
-
-  PACKED_STRUCT(struct RpcGetStatsReply
-                : public RpcBase {
-                  RpcGetStatsReply() : RpcBase(RpcMessageType::GetStatsReply, sizeof(*this)) {}
-
-                  uint64_t memory_allocated_{0};
-                  uint64_t num_connections_{0};
-                  uint64_t unused_[16]{0};
-                });
-
-  template <class rpc_class, RpcMessageType rpc_type> rpc_class* receiveTypedRpc() {
-    RpcBase* base_message = receiveRpc(true);
-    RELEASE_ASSERT(base_message->length_ == sizeof(rpc_class), "");
-    RELEASE_ASSERT(base_message->type_ == rpc_type, "");
-    return reinterpret_cast<rpc_class*>(base_message);
-  }
-
   void initDomainSocketAddress(sockaddr_un* address);
   sockaddr_un createDomainSocketAddress(uint64_t id, const std::string& role);
   void bindDomainSocket(uint64_t id, const std::string& role);
   int my_domain_socket() const { return my_domain_socket_; }
-  void sendMessage(sockaddr_un& address, RpcBase& rpc);
-  RpcBase* receiveRpc(bool block);
+
+  // Protocol description:
+  //
+  // In each direction between parent<-->child, a series of pairs of:
+  //   A uint64 'length' (bytes in host order),
+  //   followed by 'length' bytes of a serialized HotRestartMessage.
+  // Each new message must start in a new sendmsg datagram, i.e. 'length' must always start at byte
+  // 0. Each sendmsg datagram can be up to 4096 bytes (including 'length' if present). When the
+  // serialized protobuf is longer than 4096-8 bytes, and so cannot fit in just one datagram, it is
+  // delivered by a series of datagrams. In each of these continuation datagrams, the protobuf data
+  // starts at byte 0.
+  //
+  // There is no mechanism to explicitly pair responses to requests. However, the child initiates
+  // all exchanges, and blocks until a reply is received, so there is implicit pairing.
+  void sendHotRestartMessage(sockaddr_un& address,
+                             const envoy::admin::v2alpha::HotRestartMessage& proto);
+  // Receive data, possibly enough to build one of our protocol messages.
+  // If block is true, blocks until a full protocol message is available.
+  // If block is false, returns nullptr if we run out of data to receive before a full protocol
+  // message is available. In either case, the HotRestartingBase may end up buffering some data for
+  // the next protocol message, even if the function returns a protobuf.
+  std::unique_ptr<envoy::admin::v2alpha::HotRestartMessage> receiveHotRestartMessage(bool block);
 
 private:
+  void resizeRecvBuf(uint64_t new_size, uint64_t cur_bytes_used);
+  void getPassedFdIfPresent(envoy::admin::v2alpha::HotRestartMessage* out, msghdr* message);
+
   const int base_id_;
   int my_domain_socket_{-1};
-  std::array<uint8_t, 4096> rpc_buffer_;
+
+  const uint64_t MaxSendmsgSize = 4096;
+
+  // State for the receiving half of the protocol.
+  //
+  // When filled, the size in bytes that the in-flight HotRestartMessage should be.
+  // When empty, we're ready to start receiving a new message (starting with a uint64_t 'length').
+  absl::optional<uint64_t> expected_message_length_{};
+  // How much of the current in-flight HotRestartMessage we have received. Once this equals
+  // expected_message_length_, we're ready to parse the HotRestartMessage.
+  uint64_t partial_proto_bytes_{};
+  // When not empty, the first 8 bytes will always be the raw bytes of the current value of
+  // expected_message_length_. The protobuf partial data starts at byte 8.
+  std::vector<uint8_t> recv_buf_;
+  // The byte after the last occupied byte of recv_buf_, i.e. the next byte to recvmsg() into.
+  uint8_t* receive_next_byte_here_{};
 };
 
 } // namespace Server
