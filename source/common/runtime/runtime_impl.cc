@@ -14,7 +14,9 @@
 #include "common/common/utility.h"
 #include "common/filesystem/directory.h"
 #include "common/protobuf/utility.h"
+#include "common/runtime/runtime_features.h"
 
+#include "absl/strings/match.h"
 #include "openssl/rand.h"
 
 namespace Envoy {
@@ -144,6 +146,25 @@ std::string RandomGeneratorImpl::uuid() {
   return std::string(uuid, UUID_LENGTH);
 }
 
+bool SnapshotImpl::deprecatedFeatureEnabled(const std::string& key) const {
+  bool allowed = false;
+  // See if this value is explicitly set as a runtime boolean.
+  bool stored = getBoolean(key, allowed);
+  // If not, the default value is based on disallowedByDefault.
+  if (!stored) {
+    allowed = !DisallowedFeaturesDefaults::get().disallowedByDefault(key);
+  }
+
+  if (!allowed) {
+    // If either disallowed by default or configured off, the feature is not enabled.
+    return false;
+  }
+  // The feature is allowed. It is assumed this check is called when the feature
+  // is about to be used, so increment the feature use stat.
+  stats_.deprecated_feature_use_.inc();
+  return true;
+}
+
 bool SnapshotImpl::featureEnabled(const std::string& key, uint64_t default_value,
                                   uint64_t random_value, uint64_t num_buckets) const {
   return random_value % num_buckets < std::min(getInteger(key, default_value), num_buckets);
@@ -212,13 +233,22 @@ uint64_t SnapshotImpl::getInteger(const std::string& key, uint64_t default_value
   }
 }
 
+bool SnapshotImpl::getBoolean(const std::string& key, bool& value) const {
+  auto entry = values_.find(key);
+  if (entry != values_.end() && entry->second.bool_value_.has_value()) {
+    value = entry->second.bool_value_.value();
+    return true;
+  }
+  return false;
+}
+
 const std::vector<Snapshot::OverrideLayerConstPtr>& SnapshotImpl::getLayers() const {
   return layers_;
 }
 
 SnapshotImpl::SnapshotImpl(RandomGenerator& generator, RuntimeStats& stats,
                            std::vector<OverrideLayerConstPtr>&& layers)
-    : layers_{std::move(layers)}, generator_{generator} {
+    : layers_{std::move(layers)}, generator_{generator}, stats_{stats} {
   for (const auto& layer : layers_) {
     for (const auto& kv : layer->values()) {
       values_.erase(kv.first);
@@ -237,6 +267,20 @@ SnapshotImpl::Entry SnapshotImpl::createEntry(const std::string& value) {
   resolveEntryType(entry);
 
   return entry;
+}
+
+bool SnapshotImpl::parseEntryBooleanValue(Entry& entry) {
+  absl::string_view stripped = entry.raw_string_value_;
+  stripped = absl::StripAsciiWhitespace(stripped);
+
+  if (absl::EqualsIgnoreCase(stripped, "true")) {
+    entry.bool_value_ = true;
+    return true;
+  } else if (absl::EqualsIgnoreCase(stripped, "false")) {
+    entry.bool_value_ = false;
+    return true;
+  }
+  return false;
 }
 
 bool SnapshotImpl::parseEntryUintValue(Entry& entry) {

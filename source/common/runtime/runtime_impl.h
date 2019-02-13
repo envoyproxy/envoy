@@ -17,11 +17,14 @@
 #include "common/common/empty_string.h"
 #include "common/common/logger.h"
 #include "common/common/thread.h"
+#include "common/singleton/threadsafe_singleton.h"
 
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
 namespace Runtime {
+
+using RuntimeSingleton = ThreadSafeSingleton<Loader>;
 
 /**
  * Implementation of RandomGenerator that uses per-thread RANLUX generators seeded with current
@@ -45,6 +48,7 @@ public:
   COUNTER(override_dir_not_exists)                                                                 \
   COUNTER(override_dir_exists)                                                                     \
   COUNTER(load_success)                                                                            \
+  COUNTER(deprecated_feature_use)                                                                \
   GAUGE  (num_keys)                                                                                \
   GAUGE  (admin_overrides_active)
 // clang-format on
@@ -67,6 +71,7 @@ public:
                std::vector<OverrideLayerConstPtr>&& layers);
 
   // Runtime::Snapshot
+  bool deprecatedFeatureEnabled(const std::string& key) const override;
   bool featureEnabled(const std::string& key, uint64_t default_value, uint64_t random_value,
                       uint64_t num_buckets) const override;
   bool featureEnabled(const std::string& key, uint64_t default_value) const override;
@@ -82,20 +87,29 @@ public:
 
   static Entry createEntry(const std::string& value);
 
+  // Returns true and sets 'value' to the key if found.
+  // Returns false if the key is not a boolean value.
+  bool getBoolean(const std::string& key, bool& value) const;
+
 private:
   static void resolveEntryType(Entry& entry) {
+    if (parseEntryBooleanValue(entry)) {
+      return;
+    }
     if (parseEntryUintValue(entry)) {
       return;
     }
     parseEntryFractionalPercentValue(entry);
   }
 
+  static bool parseEntryBooleanValue(Entry& entry);
   static bool parseEntryUintValue(Entry& entry);
   static void parseEntryFractionalPercentValue(Entry& entry);
 
   const std::vector<OverrideLayerConstPtr> layers_;
   EntryMap values_;
   RandomGenerator& generator_;
+  RuntimeStats& stats_;
 };
 
 /**
