@@ -1,6 +1,6 @@
 #pragma once
 
-#include <list>
+#include <unordered_set>
 
 #include "envoy/init/init.h"
 
@@ -22,7 +22,7 @@ public:
 private:
   void initializeTarget(Init::Target& target);
 
-  std::list<Init::Target*> targets_;
+  std::unordered_set<Init::Target*> targets_;
   State state_{State::NotInitialized};
   std::function<void()> callback_;
 };

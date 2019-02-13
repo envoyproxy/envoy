@@ -28,7 +28,7 @@ void InitManagerImpl::initialize(std::function<void()> callback) {
 void InitManagerImpl::initializeTarget(Init::Target& target) {
   target.initialize([this, &target]() -> void {
     ASSERT(std::find(targets_.begin(), targets_.end(), &target) != targets_.end());
-    targets_.remove(&target);
+    targets_.erase(&target);
     if (targets_.empty()) {
       state_ = State::Initialized;
       callback_();
@@ -38,7 +38,7 @@ void InitManagerImpl::initializeTarget(Init::Target& target) {
 
 void InitManagerImpl::registerTarget(Init::Target& target) {
   ASSERT(state_ != State::Initialized);
-  targets_.push_back(&target);
+  targets_.insert(&target);
   if (state_ == State::Initializing) {
     initializeTarget(target);
   }
