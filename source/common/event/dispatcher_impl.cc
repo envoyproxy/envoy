@@ -26,15 +26,16 @@
 namespace Envoy {
 namespace Event {
 
-DispatcherImpl::DispatcherImpl(Api::Api& api)
-    : DispatcherImpl(Buffer::WatermarkFactoryPtr{new Buffer::WatermarkBufferFactory}, api) {
+DispatcherImpl::DispatcherImpl(Api::Api& api, Event::TimeSystem& time_system)
+    : DispatcherImpl(std::make_unique<Buffer::WatermarkBufferFactory>(), api, time_system) {
   // The dispatcher won't work as expected if libevent hasn't been configured to use threads.
   RELEASE_ASSERT(Libevent::Global::initialized(), "");
 }
 
-DispatcherImpl::DispatcherImpl(Buffer::WatermarkFactoryPtr&& factory, Api::Api& api)
+DispatcherImpl::DispatcherImpl(Buffer::WatermarkFactoryPtr&& factory, Api::Api& api,
+                               Event::TimeSystem& time_system)
     : api_(api), buffer_factory_(std::move(factory)), base_(event_base_new()),
-      scheduler_(api.timeSystemForDispatcher().createScheduler(base_)),
+      scheduler_(time_system.createScheduler(base_)),
       deferred_delete_timer_(createTimer([this]() -> void { clearDeferredDeleteList(); })),
       post_timer_(createTimer([this]() -> void { runPostCallbacks(); })),
       current_to_delete_(&to_delete_1_) {

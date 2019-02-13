@@ -11,6 +11,8 @@ executors:
 jobs:
    release:
      executor: ubuntu-build
+     environment:
+       BAZEL_REMOTE_CACHE: https://storage.googleapis.com/envoy-circleci-bazel-cache/
      steps:
        - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
        - checkout
@@ -162,6 +164,8 @@ jobs:
    mac:
      macos:
        xcode: "9.3.0"
+     environment:
+       BAZEL_REMOTE_CACHE: https://storage.googleapis.com/envoy-circleci-bazel-cache/
      steps:
        - run: sudo ntpdate -vu time.apple.com
        - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken

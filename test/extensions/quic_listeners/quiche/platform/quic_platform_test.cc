@@ -1,14 +1,17 @@
+#include "test/extensions/transport_sockets/tls/ssl_test_utility.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
 #include "quiche/quic/platform/api/quic_aligned.h"
 #include "quiche/quic/platform/api/quic_arraysize.h"
+#include "quiche/quic/platform/api/quic_cert_utils.h"
 #include "quiche/quic/platform/api/quic_client_stats.h"
 #include "quiche/quic/platform/api/quic_containers.h"
 #include "quiche/quic/platform/api/quic_endian.h"
 #include "quiche/quic/platform/api/quic_estimate_memory_usage.h"
 #include "quiche/quic/platform/api/quic_logging.h"
+#include "quiche/quic/platform/api/quic_map_util.h"
 #include "quiche/quic/platform/api/quic_mutex.h"
 #include "quiche/quic/platform/api/quic_ptr_util.h"
 #include "quiche/quic/platform/api/quic_stack_trace.h"
@@ -88,6 +91,24 @@ TEST(QuicPlatformTest, QuicEstimateMemoryUsage) {
   quic::QuicString s = "foo";
   // Stubbed out to always return 0.
   EXPECT_EQ(0, quic::QuicEstimateMemoryUsage(s));
+}
+
+TEST(QuicPlatformTest, QuicMapUtil) {
+  std::map<std::string, int> stdmap = {{"one", 1}, {"two", 2}, {"three", 3}};
+  EXPECT_TRUE(quic::QuicContainsKey(stdmap, "one"));
+  EXPECT_FALSE(quic::QuicContainsKey(stdmap, "zero"));
+
+  quic::QuicUnorderedMap<int, int> umap = {{1, 1}, {2, 4}, {3, 9}};
+  EXPECT_TRUE(quic::QuicContainsKey(umap, 2));
+  EXPECT_FALSE(quic::QuicContainsKey(umap, 10));
+
+  quic::QuicUnorderedSet<quic::QuicString> uset({"foo", "bar"});
+  EXPECT_TRUE(quic::QuicContainsKey(uset, "foo"));
+  EXPECT_FALSE(quic::QuicContainsKey(uset, "abc"));
+
+  std::vector<int> stdvec = {1, 2, 3};
+  EXPECT_TRUE(quic::QuicContainsValue(stdvec, 1));
+  EXPECT_FALSE(quic::QuicContainsValue(stdvec, 0));
 }
 
 TEST(QuicPlatformTest, QuicStackTraceTest) {
@@ -278,6 +299,27 @@ TEST(QuicPlatformTest, QuicNotification) {
   notification.Notify();
   notification.WaitForNotification();
   EXPECT_TRUE(notification.HasBeenNotified());
+}
+
+TEST(QuicPlatformTest, QuicCertUtils) {
+  bssl::UniquePtr<X509> x509_cert =
+      TransportSockets::Tls::readCertFromFile(TestEnvironment::substitute(
+          "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
+  // Encode X509 cert with DER encoding.
+  unsigned char* der = nullptr;
+  int len = i2d_X509(x509_cert.get(), &der);
+  ASSERT_GT(len, 0);
+  quic::QuicStringPiece out;
+  quic::QuicCertUtils::ExtractSubjectNameFromDERCert(
+      quic::QuicStringPiece(reinterpret_cast<const char*>(der), len), &out);
+  EXPECT_EQ("0z1\v0\t\x6\x3U\x4\x6\x13\x2US1\x13"
+            "0\x11\x6\x3U\x4\b\f\nCalifornia1\x16"
+            "0\x14\x6\x3U\x4\a\f\rSan Francisco1\r"
+            "0\v\x6\x3U\x4\n\f\x4Lyft1\x19"
+            "0\x17\x6\x3U\x4\v\f\x10Lyft Engineering1\x14"
+            "0\x12\x6\x3U\x4\x3\f\vTest Server",
+            out);
+  OPENSSL_free(static_cast<void*>(der));
 }
 
 } // namespace Quiche
