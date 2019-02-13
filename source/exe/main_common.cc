@@ -7,6 +7,7 @@
 #include "common/common/compiler_requirements.h"
 #include "common/common/perf_annotation.h"
 #include "common/event/libevent.h"
+#include "common/http/http2/codec_impl.h"
 #include "common/network/utility.h"
 #include "common/stats/thread_local_store.h"
 
@@ -50,6 +51,7 @@ MainCommonBase::MainCommonBase(const OptionsImpl& options, Event::TimeSystem& ti
   ares_library_init(ARES_LIB_INIT_ALL);
   Event::Libevent::Global::initialize();
   RELEASE_ASSERT(Envoy::Server::validateProtoDescriptors(), "");
+  Http::Http2::initializeNghttp2Logging();
 
   switch (options_.mode()) {
   case Server::Mode::InitOnly:
