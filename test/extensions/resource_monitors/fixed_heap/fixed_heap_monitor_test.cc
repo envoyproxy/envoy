@@ -36,9 +36,7 @@ private:
   absl::optional<EnvoyException> error_;
 };
 
-using FixedHeapMonitorTest = TestBase;
-
-TEST_F(FixedHeapMonitorTest, ComputesCorrectUsage) {
+TEST(FixedHeapMonitorTest, ComputesCorrectUsage) {
   envoy::config::resource_monitor::fixed_heap::v2alpha::FixedHeapConfig config;
   config.set_max_heap_size_bytes(1000);
   auto stats_reader = std::make_unique<MockMemoryStatsReader>();

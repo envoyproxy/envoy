@@ -17,9 +17,7 @@
 namespace Envoy {
 namespace Network {
 
-using NetworkUtility = TestBase;
-
-TEST_F(NetworkUtility, Url) {
+TEST(NetworkUtility, Url) {
   EXPECT_EQ("foo", Utility::hostFromTcpUrl("tcp://foo:1234"));
   EXPECT_EQ(1234U, Utility::portFromTcpUrl("tcp://foo:1234"));
   EXPECT_THROW(Utility::hostFromTcpUrl("bogus://foo:1234"), EnvoyException);
@@ -33,7 +31,7 @@ TEST_F(NetworkUtility, Url) {
   EXPECT_THROW(Utility::portFromTcpUrl("tcp://foo:999999999999"), EnvoyException);
 }
 
-TEST_F(NetworkUtility, udpUrl) {
+TEST(NetworkUtility, udpUrl) {
   EXPECT_EQ("foo", Utility::hostFromUdpUrl("udp://foo:1234"));
   EXPECT_EQ(1234U, Utility::portFromUdpUrl("udp://foo:1234"));
   EXPECT_THROW(Utility::hostFromUdpUrl("bogus://foo:1234"), EnvoyException);
@@ -44,7 +42,7 @@ TEST_F(NetworkUtility, udpUrl) {
   EXPECT_THROW(Utility::portFromUdpUrl("udp://foo:999999999999"), EnvoyException);
 }
 
-TEST_F(NetworkUtility, resolveUrl) {
+TEST(NetworkUtility, resolveUrl) {
   EXPECT_THROW(Utility::resolveUrl("foo"), EnvoyException);
   EXPECT_THROW(Utility::resolveUrl("abc://foo"), EnvoyException);
   EXPECT_THROW(Utility::resolveUrl("tcp://1.2.3.4:1234/"), EnvoyException);
@@ -97,7 +95,7 @@ TEST_F(NetworkUtility, resolveUrl) {
   EXPECT_EQ("[a:b:c:d::]:0", Utility::resolveUrl("udp://[a:b:c:d::]:0")->asString());
 }
 
-TEST_F(NetworkUtility, ParseInternetAddress) {
+TEST(NetworkUtility, ParseInternetAddress) {
   EXPECT_THROW(Utility::parseInternetAddress(""), EnvoyException);
   EXPECT_THROW(Utility::parseInternetAddress("1.2.3"), EnvoyException);
   EXPECT_THROW(Utility::parseInternetAddress("1.2.3.4.5"), EnvoyException);
@@ -120,7 +118,7 @@ TEST_F(NetworkUtility, ParseInternetAddress) {
   EXPECT_EQ("[a:b:c:d::]:0", Utility::parseInternetAddress("a:b:c:d::")->asString());
 }
 
-TEST_F(NetworkUtility, ParseInternetAddressAndPort) {
+TEST(NetworkUtility, ParseInternetAddressAndPort) {
   EXPECT_THROW(Utility::parseInternetAddressAndPort("1.2.3.4"), EnvoyException);
   EXPECT_THROW(Utility::parseInternetAddressAndPort("1.2.3.4:"), EnvoyException);
   EXPECT_THROW(Utility::parseInternetAddressAndPort("1.2.3.4::1"), EnvoyException);
@@ -165,9 +163,9 @@ TEST_P(NetworkUtilityGetLocalAddress, GetLocalAddress) {
   EXPECT_NE(nullptr, Utility::getLocalAddress(GetParam()));
 }
 
-TEST_F(NetworkUtility, GetOriginalDst) { EXPECT_EQ(nullptr, Utility::getOriginalDst(-1)); }
+TEST(NetworkUtility, GetOriginalDst) { EXPECT_EQ(nullptr, Utility::getOriginalDst(-1)); }
 
-TEST_F(NetworkUtility, LocalConnection) {
+TEST(NetworkUtility, LocalConnection) {
   Network::Address::InstanceConstSharedPtr local_addr;
   Network::Address::InstanceConstSharedPtr remote_addr;
 
@@ -207,7 +205,7 @@ TEST_F(NetworkUtility, LocalConnection) {
   EXPECT_FALSE(Utility::isLocalConnection(socket));
 }
 
-TEST_F(NetworkUtility, InternalAddress) {
+TEST(NetworkUtility, InternalAddress) {
   EXPECT_TRUE(Utility::isInternalAddress(Address::Ipv4Instance("127.0.0.1")));
   EXPECT_TRUE(Utility::isInternalAddress(Address::Ipv4Instance("10.0.0.1")));
   EXPECT_TRUE(Utility::isInternalAddress(Address::Ipv4Instance("192.168.0.0")));
@@ -231,7 +229,7 @@ TEST_F(NetworkUtility, InternalAddress) {
   EXPECT_FALSE(Utility::isInternalAddress(Address::PipeInstance("/hello")));
 }
 
-TEST_F(NetworkUtility, LoopbackAddress) {
+TEST(NetworkUtility, LoopbackAddress) {
   {
     Address::Ipv4Instance address("127.0.0.1");
     EXPECT_TRUE(Utility::isLoopbackAddress(address));
@@ -256,7 +254,7 @@ TEST_F(NetworkUtility, LoopbackAddress) {
   EXPECT_EQ("[::1]:0", Utility::getIpv6LoopbackAddress()->asString());
 }
 
-TEST_F(NetworkUtility, AnyAddress) {
+TEST(NetworkUtility, AnyAddress) {
   {
     Address::InstanceConstSharedPtr any = Utility::getIpv4AnyAddress();
     ASSERT_NE(any, nullptr);
@@ -275,7 +273,7 @@ TEST_F(NetworkUtility, AnyAddress) {
   }
 }
 
-TEST_F(NetworkUtility, ParseProtobufAddress) {
+TEST(NetworkUtility, ParseProtobufAddress) {
   {
     envoy::api::v2::core::Address proto_address;
     proto_address.mutable_socket_address()->set_address("127.0.0.1");
@@ -303,7 +301,7 @@ TEST_F(NetworkUtility, ParseProtobufAddress) {
 #endif
 }
 
-TEST_F(NetworkUtility, AddressToProtobufAddress) {
+TEST(NetworkUtility, AddressToProtobufAddress) {
   {
     envoy::api::v2::core::Address proto_address;
     Address::Ipv4Instance address("127.0.0.1");
@@ -321,7 +319,7 @@ TEST_F(NetworkUtility, AddressToProtobufAddress) {
   }
 }
 
-TEST_F(NetworkUtility, ProtobufAddressSocketType) {
+TEST(NetworkUtility, ProtobufAddressSocketType) {
   {
     envoy::api::v2::core::Address proto_address;
     proto_address.mutable_socket_address();
@@ -344,9 +342,7 @@ TEST_F(NetworkUtility, ProtobufAddressSocketType) {
   }
 }
 
-using PortRangeListTest = TestBase;
-
-TEST_F(PortRangeListTest, Errors) {
+TEST(PortRangeListTest, Errors) {
   {
     std::string port_range_str = "a1";
     std::list<PortRange> port_range_list;
@@ -382,7 +378,7 @@ static Address::Ipv4Instance makeFromPort(uint32_t port) {
   return Address::Ipv4Instance("0.0.0.0", port);
 }
 
-TEST_F(PortRangeListTest, Normal) {
+TEST(PortRangeListTest, Normal) {
   {
     std::string port_range_str = "1";
     std::list<PortRange> port_range_list;
@@ -423,9 +419,7 @@ TEST_F(PortRangeListTest, Normal) {
 
 // TODO(ccaraman): Support big-endian. These tests operate under the assumption that the machine
 // byte order is little-endian.
-using AbslUint128 = TestBase;
-
-TEST_F(AbslUint128, TestByteOrder) {
+TEST(AbslUint128, TestByteOrder) {
   {
     Address::Ipv6Instance address("::1");
     uint64_t high = 0x100000000000000;

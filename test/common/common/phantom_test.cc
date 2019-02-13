@@ -4,17 +4,15 @@
 
 namespace Envoy {
 
-struct PhantomTest1 {};
+struct PhantomTest {};
 struct PhantomTest2 {};
 
-typedef Phantom<uint32_t, PhantomTest1> PhantomIntTest1;
+typedef Phantom<uint32_t, PhantomTest> PhantomIntTest;
 typedef Phantom<uint32_t, PhantomTest2> PhantomIntTest2;
 
-using PhantomTest = TestBase;
-
-TEST_F(PhantomTest, TypeBehavior) {
+TEST(PhantomTest, TypeBehavior) {
   // Should not be possible to implicitly convert from two phantoms with different markers.
-  static_assert(!std::is_convertible<PhantomIntTest1, PhantomTest2>::value,
+  static_assert(!std::is_convertible<PhantomIntTest, PhantomTest2>::value,
                 "should not be convertible");
 }
 

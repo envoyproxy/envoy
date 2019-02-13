@@ -9,9 +9,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
 
-using MessageMetadataTest = TestBase;
-
-TEST_F(MessageMetadataTest, Fields) {
+TEST(MessageMetadataTest, Fields) {
   MessageMetadata metadata;
 
   EXPECT_FALSE(metadata.hasFrameSize());
@@ -53,7 +51,7 @@ TEST_F(MessageMetadataTest, Fields) {
   EXPECT_EQ("oops", metadata.appExceptionMessage());
 }
 
-TEST_F(MessageMetadataTest, Headers) {
+TEST(MessageMetadataTest, Headers) {
   MessageMetadata metadata;
 
   EXPECT_EQ(metadata.headers().size(), 0);

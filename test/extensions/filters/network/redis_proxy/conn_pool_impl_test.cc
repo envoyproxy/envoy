@@ -370,9 +370,7 @@ TEST_F(RedisClientImplTest, OpTimeout) {
   EXPECT_EQ(1UL, host_->stats_.rq_timeout_.value());
 }
 
-using RedisClientFactoryImplTest = TestBase;
-
-TEST_F(RedisClientFactoryImplTest, Basic) {
+TEST(RedisClientFactoryImplTest, Basic) {
   ClientFactoryImpl factory;
   Upstream::MockHost::MockCreateConnectionData conn_info;
   conn_info.connection_ = new NiceMock<Network::MockClientConnection>();

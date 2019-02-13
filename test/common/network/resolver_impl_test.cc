@@ -43,9 +43,7 @@ TEST_F(IpResolverTest, DisallowsNamedPort) {
                                         envoy::api::v2::core::SocketAddress::kNamedPort));
 }
 
-using ResolverTest = TestBase;
-
-TEST_F(ResolverTest, FromProtoAddress) {
+TEST(ResolverTest, FromProtoAddress) {
   envoy::api::v2::core::Address ipv4_address;
   ipv4_address.mutable_socket_address()->set_address("1.2.3.4");
   ipv4_address.mutable_socket_address()->set_port_value(5);
@@ -62,7 +60,7 @@ TEST_F(ResolverTest, FromProtoAddress) {
 }
 
 // Validate correct handling of ipv4_compat field.
-TEST_F(ResolverTest, FromProtoAddressV4Compat) {
+TEST(ResolverTest, FromProtoAddressV4Compat) {
   {
     envoy::api::v2::core::Address ipv6_address;
     ipv6_address.mutable_socket_address()->set_address("1::1");
@@ -124,7 +122,7 @@ private:
   std::map<std::string, std::string> name_mappings_;
 };
 
-TEST_F(ResolverTest, NonStandardResolver) {
+TEST(ResolverTest, NonStandardResolver) {
   TestResolver test_resolver;
   test_resolver.addMapping("foo", "1.2.3.4");
   test_resolver.addMapping("bar", "4.3.2.1");
@@ -152,13 +150,13 @@ TEST_F(ResolverTest, NonStandardResolver) {
   }
 }
 
-TEST_F(ResolverTest, UninitializedAddress) {
+TEST(ResolverTest, UninitializedAddress) {
   envoy::api::v2::core::Address address;
   EXPECT_THROW_WITH_MESSAGE(resolveProtoAddress(address), EnvoyException,
                             "Address must be a socket or pipe: ");
 }
 
-TEST_F(ResolverTest, NoSuchResolver) {
+TEST(ResolverTest, NoSuchResolver) {
   envoy::api::v2::core::Address address;
   auto socket = address.mutable_socket_address();
   socket->set_address("foo");

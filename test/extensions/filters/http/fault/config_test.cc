@@ -15,9 +15,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Fault {
 
-using FaultFilterConfigTest = TestBase;
-
-TEST_F(FaultFilterConfigTest, ValidateFail) {
+TEST(FaultFilterConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   envoy::config::filter::http::fault::v2::HTTPFault fault;
   fault.mutable_abort();
@@ -25,7 +23,7 @@ TEST_F(FaultFilterConfigTest, ValidateFail) {
                ProtoValidationException);
 }
 
-TEST_F(FaultFilterConfigTest, FaultFilterCorrectJson) {
+TEST(FaultFilterConfigTest, FaultFilterCorrectJson) {
   std::string json_string = R"EOF(
   {
     "delay" : {
@@ -45,7 +43,7 @@ TEST_F(FaultFilterConfigTest, FaultFilterCorrectJson) {
   cb(filter_callback);
 }
 
-TEST_F(FaultFilterConfigTest, FaultFilterCorrectProto) {
+TEST(FaultFilterConfigTest, FaultFilterCorrectProto) {
   envoy::config::filter::http::fault::v2::HTTPFault config{};
   config.mutable_delay()->mutable_percentage()->set_numerator(100);
   config.mutable_delay()->mutable_percentage()->set_denominator(
@@ -60,7 +58,7 @@ TEST_F(FaultFilterConfigTest, FaultFilterCorrectProto) {
   cb(filter_callback);
 }
 
-TEST_F(FaultFilterConfigTest, FaultFilterEmptyProto) {
+TEST(FaultFilterConfigTest, FaultFilterEmptyProto) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   FaultFilterFactory factory;
   Http::FilterFactoryCb cb =

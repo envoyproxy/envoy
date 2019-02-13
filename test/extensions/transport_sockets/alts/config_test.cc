@@ -19,9 +19,7 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Alts {
 
-using UpstreamAltsConfigTest = TestBase;
-
-TEST_F(UpstreamAltsConfigTest, CreateSocketFactory) {
+TEST(UpstreamAltsConfigTest, CreateSocketFactory) {
   MockTransportSocketFactoryContext factory_context;
   UpstreamAltsTransportSocketConfigFactory factory;
 
@@ -39,9 +37,7 @@ TEST_F(UpstreamAltsConfigTest, CreateSocketFactory) {
   EXPECT_TRUE(socket_factory->implementsSecureTransport());
 }
 
-using DownstreamAltsConfigTest = TestBase;
-
-TEST_F(DownstreamAltsConfigTest, CreateSocketFactory) {
+TEST(DownstreamAltsConfigTest, CreateSocketFactory) {
   MockTransportSocketFactoryContext factory_context;
   DownstreamAltsTransportSocketConfigFactory factory;
 

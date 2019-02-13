@@ -831,9 +831,7 @@ INSTANTIATE_TEST_SUITE_P(Http2CodecImplTestEdgeSettings, Http2CodecImplTest,
                          ::testing::Combine(HTTP2SETTINGS_EDGE_COMBINE,
                                             HTTP2SETTINGS_EDGE_COMBINE));
 
-using Http2CodecUtility = TestBase;
-
-TEST_F(Http2CodecUtility, reconstituteCrumbledCookies) {
+TEST(Http2CodecUtility, reconstituteCrumbledCookies) {
   {
     HeaderString key;
     HeaderString value;

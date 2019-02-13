@@ -25,9 +25,7 @@
 namespace Envoy {
 namespace Upstream {
 
-using ValidationClusterManagerTest = TestBase;
-
-TEST_F(ValidationClusterManagerTest, MockedMethods) {
+TEST(ValidationClusterManagerTest, MockedMethods) {
   Stats::IsolatedStoreImpl stats_store;
   Event::SimulatedTimeSystem time_system;
   Api::ApiPtr api(Api::createApiForTest(stats_store, time_system));

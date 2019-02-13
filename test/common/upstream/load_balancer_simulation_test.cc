@@ -34,9 +34,7 @@ static HostSharedPtr newTestHost(Upstream::ClusterInfoConstSharedPtr cluster,
 }
 
 // Simulate weighted LR load balancer.
-using DISABLED_LeastRequestLoadBalancerWeightTest = TestBase;
-
-TEST_F(DISABLED_LeastRequestLoadBalancerWeightTest, Weight) {
+TEST(DISABLED_LeastRequestLoadBalancerWeightTest, Weight) {
   const uint64_t num_hosts = 4;
   const uint64_t weighted_subset_percent = 50;
   const uint64_t weight = 2;          // weighted_subset_percent of hosts will have this weight.

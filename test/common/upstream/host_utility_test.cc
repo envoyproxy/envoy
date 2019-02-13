@@ -9,9 +9,7 @@
 namespace Envoy {
 namespace Upstream {
 
-using HostUtilityTest = TestBase;
-
-TEST_F(HostUtilityTest, All) {
+TEST(HostUtilityTest, All) {
   ClusterInfoConstSharedPtr cluster{new MockClusterInfo()};
   HostSharedPtr host = makeTestHost(cluster, "tcp://127.0.0.1:80");
   EXPECT_EQ("healthy", HostUtility::healthFlagsToString(*host));

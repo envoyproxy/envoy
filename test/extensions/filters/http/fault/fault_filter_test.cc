@@ -162,9 +162,7 @@ void faultFilterBadConfigHelper(const std::string& json) {
   EXPECT_THROW(Config::FilterJson::translateFaultFilter(*config, fault), EnvoyException);
 }
 
-using FaultFilterBadConfigTest = TestBase;
-
-TEST_F(FaultFilterBadConfigTest, BadAbortPercent) {
+TEST(FaultFilterBadConfigTest, BadAbortPercent) {
   const std::string json = R"EOF(
     {
       "abort" : {
@@ -177,7 +175,7 @@ TEST_F(FaultFilterBadConfigTest, BadAbortPercent) {
   faultFilterBadConfigHelper(json);
 }
 
-TEST_F(FaultFilterBadConfigTest, EmptyDownstreamNodes) {
+TEST(FaultFilterBadConfigTest, EmptyDownstreamNodes) {
   const std::string json = R"EOF(
     {
       "abort" : {
@@ -191,7 +189,7 @@ TEST_F(FaultFilterBadConfigTest, EmptyDownstreamNodes) {
   faultFilterBadConfigHelper(json);
 }
 
-TEST_F(FaultFilterBadConfigTest, MissingHTTPStatus) {
+TEST(FaultFilterBadConfigTest, MissingHTTPStatus) {
   const std::string json = R"EOF(
     {
       "abort" : {
@@ -203,7 +201,7 @@ TEST_F(FaultFilterBadConfigTest, MissingHTTPStatus) {
   faultFilterBadConfigHelper(json);
 }
 
-TEST_F(FaultFilterBadConfigTest, BadDelayType) {
+TEST(FaultFilterBadConfigTest, BadDelayType) {
   const std::string json = R"EOF(
     {
       "delay" : {
@@ -217,7 +215,7 @@ TEST_F(FaultFilterBadConfigTest, BadDelayType) {
   faultFilterBadConfigHelper(json);
 }
 
-TEST_F(FaultFilterBadConfigTest, BadDelayPercent) {
+TEST(FaultFilterBadConfigTest, BadDelayPercent) {
   const std::string json = R"EOF(
     {
       "delay" : {
@@ -231,7 +229,7 @@ TEST_F(FaultFilterBadConfigTest, BadDelayPercent) {
   faultFilterBadConfigHelper(json);
 }
 
-TEST_F(FaultFilterBadConfigTest, BadDelayDuration) {
+TEST(FaultFilterBadConfigTest, BadDelayDuration) {
   const std::string json = R"EOF(
     {
       "delay" : {
@@ -245,7 +243,7 @@ TEST_F(FaultFilterBadConfigTest, BadDelayDuration) {
   faultFilterBadConfigHelper(json);
 }
 
-TEST_F(FaultFilterBadConfigTest, MissingDelayDuration) {
+TEST(FaultFilterBadConfigTest, MissingDelayDuration) {
   const std::string json = R"EOF(
     {
       "delay" : {

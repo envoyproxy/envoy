@@ -5,9 +5,7 @@
 
 namespace Envoy {
 
-using TerminateHandlerDeathTest = TestBase;
-
-TEST_F(TerminateHandlerDeathTest, HandlerInstalledTest) {
+TEST(TerminateHandlerDeathTest, HandlerInstalledTest) {
   TerminateHandler handler;
   EXPECT_DEATH_LOG_TO_STDERR([]() -> void { std::terminate(); }(), ".*std::terminate called!.*");
 }

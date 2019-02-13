@@ -20,18 +20,14 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
 
-using TransportNamesTest = TestBase;
-
-TEST_F(TransportNamesTest, FromType) {
+TEST(TransportNames, FromType) {
   for (int i = 0; i <= static_cast<int>(TransportType::LastTransportType); i++) {
     TransportType type = static_cast<TransportType>(i);
     EXPECT_NE("", TransportNames::get().fromType(type));
   }
 }
 
-using AutoTransportTest = TestBase;
-
-TEST_F(AutoTransportTest, NotEnoughData) {
+TEST(AutoTransportTest, NotEnoughData) {
   Buffer::OwnedImpl buffer;
   AutoTransportImpl transport;
   MessageMetadata metadata;
@@ -45,7 +41,7 @@ TEST_F(AutoTransportTest, NotEnoughData) {
   EXPECT_THAT(metadata, IsEmptyMetadata());
 }
 
-TEST_F(AutoTransportTest, UnknownTransport) {
+TEST(AutoTransportTest, UnknownTransport) {
   AutoTransportImpl transport;
 
   // Looks like unframed, but fails protocol check.
@@ -73,7 +69,7 @@ TEST_F(AutoTransportTest, UnknownTransport) {
   }
 }
 
-TEST_F(AutoTransportTest, DecodeFrameStart) {
+TEST(AutoTransportTest, DecodeFrameStart) {
   // Framed transport + binary protocol
   {
     AutoTransportImpl transport;
@@ -181,7 +177,7 @@ TEST_F(AutoTransportTest, DecodeFrameStart) {
   }
 }
 
-TEST_F(AutoTransportTest, DecodeFrameEnd) {
+TEST(AutoTransportTest, DecodeFrameEnd) {
   AutoTransportImpl transport;
   Buffer::OwnedImpl buffer;
   buffer.writeBEInt<int32_t>(0xFF);
@@ -196,7 +192,7 @@ TEST_F(AutoTransportTest, DecodeFrameEnd) {
   EXPECT_TRUE(transport.decodeFrameEnd(buffer));
 }
 
-TEST_F(AutoTransportTest, EncodeFrame) {
+TEST(AutoTransportTest, EncodeFrame) {
   MockTransport* mock_transport = new NiceMock<MockTransport>();
 
   AutoTransportImpl transport;
@@ -210,12 +206,12 @@ TEST_F(AutoTransportTest, EncodeFrame) {
   transport.encodeFrame(buffer, metadata, message);
 }
 
-TEST_F(AutoTransportTest, Name) {
+TEST(AutoTransportTest, Name) {
   AutoTransportImpl transport;
   EXPECT_EQ(transport.name(), "auto");
 }
 
-TEST_F(AutoTransportTest, Type) {
+TEST(AutoTransportTest, Type) {
   AutoTransportImpl transport;
   EXPECT_EQ(transport.type(), TransportType::Auto);
 }

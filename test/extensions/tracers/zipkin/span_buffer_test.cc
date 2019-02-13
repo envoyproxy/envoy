@@ -8,9 +8,7 @@ namespace Extensions {
 namespace Tracers {
 namespace Zipkin {
 
-using ZipkinSpanBufferTest = TestBase;
-
-TEST_F(ZipkinSpanBufferTest, defaultConstructorEndToEnd) {
+TEST(ZipkinSpanBufferTest, defaultConstructorEndToEnd) {
   DangerousDeprecatedTestTime test_time;
   SpanBuffer buffer;
 
@@ -63,9 +61,7 @@ TEST_F(ZipkinSpanBufferTest, defaultConstructorEndToEnd) {
   EXPECT_EQ("[]", buffer.toStringifiedJsonArray());
 }
 
-using ZipkinSpanBufferTest = TestBase;
-
-TEST_F(ZipkinSpanBufferTest, sizeConstructorEndtoEnd) {
+TEST(ZipkinSpanBufferTest, sizeConstructorEndtoEnd) {
   DangerousDeprecatedTestTime test_time;
   SpanBuffer buffer(2);
 

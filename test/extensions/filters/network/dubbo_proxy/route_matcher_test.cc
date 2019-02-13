@@ -35,9 +35,7 @@ parseDubboProxyFromV2Yaml(const std::string& yaml) {
 
 } // namespace
 
-using DubboRouteMatcherTest = TestBase;
-
-TEST_F(DubboRouteMatcherTest, RouteByServiceNameWithAnyMethod) {
+TEST(DubboRouteMatcherTest, RouteByServiceNameWithAnyMethod) {
   {
     const std::string yaml = R"EOF(
 name: local_route
@@ -182,7 +180,7 @@ routes:
   }
 }
 
-TEST_F(DubboRouteMatcherTest, RouteByMethodWithExactMatch) {
+TEST(DubboRouteMatcherTest, RouteByMethodWithExactMatch) {
   const std::string yaml = R"EOF(
 name: local_route
 interface: org.apache.dubbo.demo.DemoService
@@ -210,7 +208,7 @@ routes:
   EXPECT_EQ("user_service_dubbo_server", matcher.route(metadata, 0)->routeEntry()->clusterName());
 }
 
-TEST_F(DubboRouteMatcherTest, RouteByMethodWithSuffixMatch) {
+TEST(DubboRouteMatcherTest, RouteByMethodWithSuffixMatch) {
   const std::string yaml = R"EOF(
 name: local_route
 interface: org.apache.dubbo.demo.DemoService
@@ -238,7 +236,7 @@ routes:
   EXPECT_EQ("user_service_dubbo_server", matcher.route(metadata, 0)->routeEntry()->clusterName());
 }
 
-TEST_F(DubboRouteMatcherTest, RouteByMethodWithPrefixMatch) {
+TEST(DubboRouteMatcherTest, RouteByMethodWithPrefixMatch) {
   const std::string yaml = R"EOF(
 name: local_route
 interface: org.apache.dubbo.demo.DemoService
@@ -269,7 +267,7 @@ routes:
   EXPECT_EQ("user_service_dubbo_server", matcher.route(metadata, 0)->routeEntry()->clusterName());
 }
 
-TEST_F(DubboRouteMatcherTest, RouteByMethodWithRegexMatch) {
+TEST(DubboRouteMatcherTest, RouteByMethodWithRegexMatch) {
   const std::string yaml = R"EOF(
 name: local_route
 interface: org.apache.dubbo.demo.DemoService
@@ -300,7 +298,7 @@ routes:
   EXPECT_EQ(nullptr, matcher.route(metadata, 0));
 }
 
-TEST_F(DubboRouteMatcherTest, RouteByParameterWithRangeMatch) {
+TEST(DubboRouteMatcherTest, RouteByParameterWithRangeMatch) {
   const std::string yaml = R"EOF(
 name: local_route
 interface: org.apache.dubbo.demo.DemoService
@@ -329,7 +327,7 @@ routes:
   EXPECT_EQ("user_service_dubbo_server", matcher.route(metadata, 0)->routeEntry()->clusterName());
 }
 
-TEST_F(DubboRouteMatcherTest, RouteByParameterWithExactMatch) {
+TEST(DubboRouteMatcherTest, RouteByParameterWithExactMatch) {
   const std::string yaml = R"EOF(
 name: local_route
 interface: org.apache.dubbo.demo.DemoService
@@ -356,7 +354,7 @@ routes:
   EXPECT_EQ("user_service_dubbo_server", matcher.route(metadata, 0)->routeEntry()->clusterName());
 }
 
-TEST_F(DubboRouteMatcherTest, RouteWithHeaders) {
+TEST(DubboRouteMatcherTest, RouteWithHeaders) {
   const std::string yaml = R"EOF(
 name: local_route
 interface: org.apache.dubbo.demo.DemoService
@@ -396,9 +394,7 @@ routes:
   EXPECT_EQ(nullptr, matcher.route(metadata, 0));
 }
 
-using MultiDubboRouteMatcherTest = TestBase;
-
-TEST_F(MultiDubboRouteMatcherTest, Route) {
+TEST(MultiDubboRouteMatcherTest, Route) {
   const std::string yaml = R"EOF(
 stat_prefix: dubbo_incomming_stats
 protocol_type: Dubbo

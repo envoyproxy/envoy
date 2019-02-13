@@ -15,9 +15,7 @@ namespace HttpFilters {
 namespace RBACFilter {
 namespace {
 
-using RoleBasedAccessControlFilterConfigFactoryTest = TestBase;
-
-TEST_F(RoleBasedAccessControlFilterConfigFactoryTest, ValidProto) {
+TEST(RoleBasedAccessControlFilterConfigFactoryTest, ValidProto) {
   envoy::config::rbac::v2alpha::Policy policy;
   policy.add_permissions()->set_any(true);
   policy.add_principals()->set_any(true);
@@ -32,21 +30,21 @@ TEST_F(RoleBasedAccessControlFilterConfigFactoryTest, ValidProto) {
   cb(filter_callbacks);
 }
 
-TEST_F(RoleBasedAccessControlFilterConfigFactoryTest, EmptyProto) {
+TEST(RoleBasedAccessControlFilterConfigFactoryTest, EmptyProto) {
   RoleBasedAccessControlFilterConfigFactory factory;
   auto* config = dynamic_cast<envoy::config::filter::http::rbac::v2::RBAC*>(
       factory.createEmptyConfigProto().get());
   EXPECT_NE(nullptr, config);
 }
 
-TEST_F(RoleBasedAccessControlFilterConfigFactoryTest, EmptyRouteProto) {
+TEST(RoleBasedAccessControlFilterConfigFactoryTest, EmptyRouteProto) {
   RoleBasedAccessControlFilterConfigFactory factory;
   auto* config = dynamic_cast<envoy::config::filter::http::rbac::v2::RBACPerRoute*>(
       factory.createEmptyRouteConfigProto().get());
   EXPECT_NE(nullptr, config);
 }
 
-TEST_F(RoleBasedAccessControlFilterConfigFactoryTest, RouteSpecificConfig) {
+TEST(RoleBasedAccessControlFilterConfigFactoryTest, RouteSpecificConfig) {
   RoleBasedAccessControlFilterConfigFactory factory;
   NiceMock<Server::Configuration::MockFactoryContext> context;
 

@@ -113,9 +113,7 @@ TEST_F(ThreadLocalInstanceImplTest, RunOnAllThreads) {
 }
 
 // Validate ThreadLocal::InstanceImpl's dispatcher() behavior.
-using ThreadLocalInstanceImplDispatcherTest = TestBase;
-
-TEST_F(ThreadLocalInstanceImplDispatcherTest, Dispatcher) {
+TEST(ThreadLocalInstanceImplDispatcherTest, Dispatcher) {
   InstanceImpl tls;
 
   Api::ApiPtr api = Api::createApiForTest();

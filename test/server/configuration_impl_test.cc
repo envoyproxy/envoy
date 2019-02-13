@@ -30,9 +30,7 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-using FilterChainUtilityTest = TestBase;
-
-TEST_F(FilterChainUtilityTest, buildFilterChain) {
+TEST(FilterChainUtility, buildFilterChain) {
   Network::MockConnection connection;
   std::vector<Network::FilterFactoryCb> factories;
   ReadyWatcher watcher;
@@ -45,7 +43,7 @@ TEST_F(FilterChainUtilityTest, buildFilterChain) {
   EXPECT_EQ(FilterChainUtility::buildFilterChain(connection, factories), true);
 }
 
-TEST_F(FilterChainUtilityTest, buildFilterChainFailWithBadFilters) {
+TEST(FilterChainUtility, buildFilterChainFailWithBadFilters) {
   Network::MockConnection connection;
   std::vector<Network::FilterFactoryCb> factories;
   EXPECT_CALL(connection, initializeReadFilters()).WillOnce(Return(false));

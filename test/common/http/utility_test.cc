@@ -21,9 +21,7 @@ using testing::Return;
 namespace Envoy {
 namespace Http {
 
-using HttpUtility = TestBase;
-
-TEST_F(HttpUtility, parseQueryString) {
+TEST(HttpUtility, parseQueryString) {
   EXPECT_EQ(Utility::QueryParams(), Utility::parseQueryString("/hello"));
   EXPECT_EQ(Utility::QueryParams(), Utility::parseQueryString("/hello?"));
   EXPECT_EQ(Utility::QueryParams({{"hello", ""}}), Utility::parseQueryString("/hello?hello"));
@@ -37,12 +35,12 @@ TEST_F(HttpUtility, parseQueryString) {
             Utility::parseQueryString("/logging?name=admin&level=trace"));
 }
 
-TEST_F(HttpUtility, getResponseStatus) {
+TEST(HttpUtility, getResponseStatus) {
   EXPECT_THROW(Utility::getResponseStatus(TestHeaderMapImpl{}), CodecClientException);
   EXPECT_EQ(200U, Utility::getResponseStatus(TestHeaderMapImpl{{":status", "200"}}));
 }
 
-TEST_F(HttpUtility, isWebSocketUpgradeRequest) {
+TEST(HttpUtility, isWebSocketUpgradeRequest) {
   EXPECT_FALSE(Utility::isWebSocketUpgradeRequest(TestHeaderMapImpl{}));
   EXPECT_FALSE(Utility::isWebSocketUpgradeRequest(TestHeaderMapImpl{{"connection", "upgrade"}}));
   EXPECT_FALSE(Utility::isWebSocketUpgradeRequest(TestHeaderMapImpl{{"upgrade", "websocket"}}));
@@ -59,7 +57,7 @@ TEST_F(HttpUtility, isWebSocketUpgradeRequest) {
       TestHeaderMapImpl{{"connection", "Upgrade"}, {"upgrade", "WebSocket"}}));
 }
 
-TEST_F(HttpUtility, isUpgrade) {
+TEST(HttpUtility, isUpgrade) {
   EXPECT_FALSE(Utility::isUpgrade(TestHeaderMapImpl{}));
   EXPECT_FALSE(Utility::isUpgrade(TestHeaderMapImpl{{"connection", "upgrade"}}));
   EXPECT_FALSE(Utility::isUpgrade(TestHeaderMapImpl{{"upgrade", "foo"}}));
@@ -77,7 +75,7 @@ TEST_F(HttpUtility, isUpgrade) {
 }
 
 // Start with H1 style websocket request headers. Transform to H2 and back.
-TEST_F(HttpUtility, H1H2H1Request) {
+TEST(HttpUtility, H1H2H1Request) {
   TestHeaderMapImpl converted_headers = {
       {":method", "GET"}, {"Upgrade", "foo"}, {"Connection", "upgrade"}};
   const TestHeaderMapImpl original_headers(converted_headers);
@@ -96,7 +94,7 @@ TEST_F(HttpUtility, H1H2H1Request) {
 }
 
 // Start with H2 style websocket request headers. Transform to H1 and back.
-TEST_F(HttpUtility, H2H1H2Request) {
+TEST(HttpUtility, H2H1H2Request) {
   TestHeaderMapImpl converted_headers = {{":method", "CONNECT"}, {":protocol", "websocket"}};
   const TestHeaderMapImpl original_headers(converted_headers);
 
@@ -115,7 +113,7 @@ TEST_F(HttpUtility, H2H1H2Request) {
 }
 
 // Start with H1 style websocket response headers. Transform to H2 and back.
-TEST_F(HttpUtility, H1H2H1Response) {
+TEST(HttpUtility, H1H2H1Response) {
   TestHeaderMapImpl converted_headers = {
       {":status", "101"}, {"upgrade", "websocket"}, {"connection", "upgrade"}};
   const TestHeaderMapImpl original_headers(converted_headers);
@@ -133,7 +131,7 @@ TEST_F(HttpUtility, H1H2H1Response) {
 // Users of the transformation functions should not expect the results to be
 // identical. Because the headers are always added in a set order, the original
 // header order may not be preserved.
-TEST_F(HttpUtility, OrderNotPreserved) {
+TEST(HttpUtility, OrderNotPreserved) {
   TestHeaderMapImpl expected_headers = {
       {":method", "GET"}, {"Upgrade", "foo"}, {"Connection", "upgrade"}};
 
@@ -149,7 +147,7 @@ TEST_F(HttpUtility, OrderNotPreserved) {
 // WebSocket is always GET but the method for other upgrades is allowed to be a
 // POST. This is a documented weakness in Envoy docs and can be addressed with
 // a custom x-envoy-original-method header if it is ever needed.
-TEST_F(HttpUtility, MethodNotPreserved) {
+TEST(HttpUtility, MethodNotPreserved) {
   TestHeaderMapImpl expected_headers = {
       {":method", "GET"}, {"Upgrade", "foo"}, {"Connection", "upgrade"}};
 
@@ -161,7 +159,7 @@ TEST_F(HttpUtility, MethodNotPreserved) {
   EXPECT_EQ(converted_headers, expected_headers);
 }
 
-TEST_F(HttpUtility, ContentLengthMangling) {
+TEST(HttpUtility, ContentLengthMangling) {
   // Content-Length of 0 is removed on the request path.
   {
     TestHeaderMapImpl request_headers = {
@@ -199,7 +197,7 @@ TEST_F(HttpUtility, ContentLengthMangling) {
   }
 }
 
-TEST_F(HttpUtility, appendXff) {
+TEST(HttpUtility, appendXff) {
   {
     TestHeaderMapImpl headers;
     Network::Address::Ipv4Instance address("127.0.0.1");
@@ -222,7 +220,7 @@ TEST_F(HttpUtility, appendXff) {
   }
 }
 
-TEST_F(HttpUtility, appendVia) {
+TEST(HttpUtility, appendVia) {
   {
     TestHeaderMapImpl headers;
     Utility::appendVia(headers, "foo");
@@ -236,7 +234,7 @@ TEST_F(HttpUtility, appendVia) {
   }
 }
 
-TEST_F(HttpUtility, createSslRedirectPath) {
+TEST(HttpUtility, createSslRedirectPath) {
   {
     TestHeaderMapImpl headers{{":authority", "www.lyft.com"}, {":path", "/hello"}};
     EXPECT_EQ("https://www.lyft.com/hello", Utility::createSslRedirectPath(headers));
@@ -255,7 +253,7 @@ Http2Settings parseHttp2SettingsFromJson(const std::string& json_string) {
 
 } // namespace
 
-TEST_F(HttpUtility, parseHttp2Settings) {
+TEST(HttpUtility, parseHttp2Settings) {
   {
     auto http2_settings = parseHttp2SettingsFromJson("{}");
     EXPECT_EQ(Http2Settings::DEFAULT_HPACK_TABLE_SIZE, http2_settings.hpack_table_size_);
@@ -283,7 +281,7 @@ TEST_F(HttpUtility, parseHttp2Settings) {
   }
 }
 
-TEST_F(HttpUtility, getLastAddressFromXFF) {
+TEST(HttpUtility, getLastAddressFromXFF) {
   {
     const std::string first_address = "192.0.2.10";
     const std::string second_address = "192.0.2.1";
@@ -374,7 +372,7 @@ TEST_F(HttpUtility, getLastAddressFromXFF) {
   }
 }
 
-TEST_F(HttpUtility, TestParseCookie) {
+TEST(HttpUtility, TestParseCookie) {
   TestHeaderMapImpl headers{
       {"someheader", "10.0.0.1"},
       {"cookie", "somekey=somevalue; someotherkey=someothervalue"},
@@ -386,7 +384,7 @@ TEST_F(HttpUtility, TestParseCookie) {
   EXPECT_EQ(value, "abc123");
 }
 
-TEST_F(HttpUtility, TestParseCookieBadValues) {
+TEST(HttpUtility, TestParseCookieBadValues) {
   TestHeaderMapImpl headers{{"cookie", "token1=abc123; = "},
                             {"cookie", "token2=abc123;   "},
                             {"cookie", "; token3=abc123;"},
@@ -398,7 +396,7 @@ TEST_F(HttpUtility, TestParseCookieBadValues) {
   EXPECT_EQ(Utility::parseCookieValue(headers, "token4"), "abc123");
 }
 
-TEST_F(HttpUtility, TestParseCookieWithQuotes) {
+TEST(HttpUtility, TestParseCookieWithQuotes) {
   TestHeaderMapImpl headers{
       {"someheader", "10.0.0.1"},
       {"cookie", "dquote=\"; quoteddquote=\"\"\""},
@@ -411,7 +409,7 @@ TEST_F(HttpUtility, TestParseCookieWithQuotes) {
   EXPECT_EQ(Utility::parseCookieValue(headers, "leadingdquote"), "\"foobar");
 }
 
-TEST_F(HttpUtility, TestHasSetCookie) {
+TEST(HttpUtility, TestHasSetCookie) {
   TestHeaderMapImpl headers{{"someheader", "10.0.0.1"},
                             {"set-cookie", "somekey=somevalue"},
                             {"set-cookie", "abc=def; Expires=Wed, 09 Jun 2021 10:18:14 GMT"},
@@ -422,7 +420,7 @@ TEST_F(HttpUtility, TestHasSetCookie) {
   EXPECT_FALSE(Utility::hasSetCookie(headers, "ghi"));
 }
 
-TEST_F(HttpUtility, TestHasSetCookieBadValues) {
+TEST(HttpUtility, TestHasSetCookieBadValues) {
   TestHeaderMapImpl headers{{"someheader", "10.0.0.1"},
                             {"set-cookie", "somekey =somevalue"},
                             {"set-cookie", "abc"},
@@ -432,7 +430,7 @@ TEST_F(HttpUtility, TestHasSetCookieBadValues) {
   EXPECT_TRUE(Utility::hasSetCookie(headers, "key2"));
 }
 
-TEST_F(HttpUtility, TestMakeSetCookieValue) {
+TEST(HttpUtility, TestMakeSetCookieValue) {
   EXPECT_EQ("name=\"value\"; Max-Age=10",
             Utility::makeSetCookieValue("name", "value", "", std::chrono::seconds(10), false));
   EXPECT_EQ("name=\"value\"",
@@ -452,7 +450,7 @@ TEST_F(HttpUtility, TestMakeSetCookieValue) {
             Utility::makeSetCookieValue("name", "value", "/", std::chrono::seconds::zero(), true));
 }
 
-TEST_F(HttpUtility, SendLocalReply) {
+TEST(HttpUtility, SendLocalReply) {
   MockStreamDecoderFilterCallbacks callbacks;
   bool is_reset = false;
 
@@ -462,7 +460,7 @@ TEST_F(HttpUtility, SendLocalReply) {
                           absl::nullopt, false);
 }
 
-TEST_F(HttpUtility, SendLocalGrpcReply) {
+TEST(HttpUtility, SendLocalGrpcReply) {
   MockStreamDecoderFilterCallbacks callbacks;
   bool is_reset = false;
 
@@ -479,7 +477,7 @@ TEST_F(HttpUtility, SendLocalGrpcReply) {
                           absl::nullopt, false);
 }
 
-TEST_F(HttpUtility, RateLimitedGrpcStatus) {
+TEST(HttpUtility, RateLimitedGrpcStatus) {
   MockStreamDecoderFilterCallbacks callbacks;
 
   EXPECT_CALL(callbacks, encodeHeaders_(_, true))
@@ -503,7 +501,7 @@ TEST_F(HttpUtility, RateLimitedGrpcStatus) {
       false);
 }
 
-TEST_F(HttpUtility, SendLocalReplyDestroyedEarly) {
+TEST(HttpUtility, SendLocalReplyDestroyedEarly) {
   MockStreamDecoderFilterCallbacks callbacks;
   bool is_reset = false;
 
@@ -515,7 +513,7 @@ TEST_F(HttpUtility, SendLocalReplyDestroyedEarly) {
                           absl::nullopt, false);
 }
 
-TEST_F(HttpUtility, SendLocalReplyHeadRequest) {
+TEST(HttpUtility, SendLocalReplyHeadRequest) {
   MockStreamDecoderFilterCallbacks callbacks;
   bool is_reset = false;
   EXPECT_CALL(callbacks, encodeHeaders_(_, true))
@@ -527,7 +525,7 @@ TEST_F(HttpUtility, SendLocalReplyHeadRequest) {
                           absl::nullopt, true);
 }
 
-TEST_F(HttpUtility, TestExtractHostPathFromUri) {
+TEST(HttpUtility, TestExtractHostPathFromUri) {
   absl::string_view host, path;
 
   // FQDN
@@ -564,7 +562,7 @@ TEST_F(HttpUtility, TestExtractHostPathFromUri) {
   EXPECT_EQ(path, "/:/adsf");
 }
 
-TEST_F(HttpUtility, TestPrepareHeaders) {
+TEST(HttpUtility, TestPrepareHeaders) {
   envoy::api::v2::core::HttpUri http_uri;
   http_uri.set_uri("scheme://dns.name/x/y/z");
 
@@ -574,14 +572,14 @@ TEST_F(HttpUtility, TestPrepareHeaders) {
   EXPECT_STREQ("dns.name", message->headers().Host()->value().c_str());
 }
 
-TEST_F(HttpUtility, QueryParamsToString) {
+TEST(HttpUtility, QueryParamsToString) {
   EXPECT_EQ("", Utility::queryParamsToString(Utility::QueryParams({})));
   EXPECT_EQ("?a=1", Utility::queryParamsToString(Utility::QueryParams({{"a", "1"}})));
   EXPECT_EQ("?a=1&b=2",
             Utility::queryParamsToString(Utility::QueryParams({{"a", "1"}, {"b", "2"}})));
 }
 
-TEST_F(HttpUtility, ResetReasonToString) {
+TEST(HttpUtility, ResetReasonToString) {
   EXPECT_EQ("connection failure",
             Utility::resetReasonToString(Http::StreamResetReason::ConnectionFailure));
   EXPECT_EQ("connection termination",
@@ -596,7 +594,7 @@ TEST_F(HttpUtility, ResetReasonToString) {
 }
 
 // Verify that it resolveMostSpecificPerFilterConfigGeneric works with nil routes.
-TEST_F(HttpUtility, ResolveMostSpecificPerFilterConfigNilRoute) {
+TEST(HttpUtility, ResolveMostSpecificPerFilterConfigNilRoute) {
   EXPECT_EQ(nullptr, Utility::resolveMostSpecificPerFilterConfigGeneric("envoy.filter", nullptr));
 }
 
@@ -607,7 +605,7 @@ public:
 };
 
 // Verify that resolveMostSpecificPerFilterConfig works and we get back the original type.
-TEST_F(HttpUtility, ResolveMostSpecificPerFilterConfig) {
+TEST(HttpUtility, ResolveMostSpecificPerFilterConfig) {
   TestConfig testConfig;
 
   const std::string filter_name = "envoy.filter";
@@ -625,7 +623,7 @@ TEST_F(HttpUtility, ResolveMostSpecificPerFilterConfig) {
 
 // Verify that resolveMostSpecificPerFilterConfigGeneric indeed returns the most specific per filter
 // config.
-TEST_F(HttpUtility, ResolveMostSpecificPerFilterConfigGeneric) {
+TEST(HttpUtility, ResolveMostSpecificPerFilterConfigGeneric) {
   const std::string filter_name = "envoy.filter";
   NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks;
 
@@ -660,7 +658,7 @@ TEST_F(HttpUtility, ResolveMostSpecificPerFilterConfigGeneric) {
 }
 
 // Verify that traversePerFilterConfigGeneric traverses in the order of specificity.
-TEST_F(HttpUtility, TraversePerFilterConfigIteratesInOrder) {
+TEST(HttpUtility, TraversePerFilterConfigIteratesInOrder) {
   const std::string filter_name = "envoy.filter";
   NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks;
 
@@ -696,7 +694,7 @@ TEST_F(HttpUtility, TraversePerFilterConfigIteratesInOrder) {
 }
 
 // Verify that traversePerFilterConfig works and we get back the original type.
-TEST_F(HttpUtility, TraversePerFilterConfigTyped) {
+TEST(HttpUtility, TraversePerFilterConfigTyped) {
   TestConfig testConfig;
 
   const std::string filter_name = "envoy.filter";
@@ -716,7 +714,7 @@ TEST_F(HttpUtility, TraversePerFilterConfigTyped) {
 }
 
 // Verify that merging works as expected and we get back the merged result.
-TEST_F(HttpUtility, GetMergedPerFilterConfig) {
+TEST(HttpUtility, GetMergedPerFilterConfig) {
   TestConfig baseTestConfig, routeTestConfig;
 
   baseTestConfig.state_ = 1;
@@ -741,9 +739,7 @@ TEST_F(HttpUtility, GetMergedPerFilterConfig) {
   EXPECT_EQ(2, merged_cfg.value().state_);
 }
 
-using Url = TestBase;
-
-TEST_F(Url, ParsingFails) {
+TEST(Url, ParsingFails) {
   Utility::Url url;
   EXPECT_FALSE(url.initialize(""));
   EXPECT_FALSE(url.initialize("foo"));
@@ -760,7 +756,7 @@ void ValidateUrl(absl::string_view raw_url, absl::string_view expected_scheme,
   EXPECT_EQ(url.path(), expected_path);
 }
 
-TEST_F(Url, ParsingTest) {
+TEST(Url, ParsingTest) {
   // Test url with no explicit path (with and without port)
   ValidateUrl("http://www.host.com", "http", "www.host.com", "/");
   ValidateUrl("http://www.host.com:80", "http", "www.host.com:80", "/");

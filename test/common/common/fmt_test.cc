@@ -7,9 +7,7 @@
 
 namespace Envoy {
 
-using FormatHelpersTest = TestBase;
-
-TEST_F(FormatHelpersTest, Format) {
+TEST(FormatHelpersTest, Format) {
   absl::string_view sv = "This is my string.";
   absl::string_view my_string = sv.substr(8, 9);
   absl::string_view is = sv.substr(5, 2);
@@ -19,7 +17,7 @@ TEST_F(FormatHelpersTest, Format) {
   EXPECT_EQ("**is**", fmt::format("{:*^6}", is));
 }
 
-TEST_F(FormatHelpersTest, FormatLogMessages) {
+TEST(FormatHelpersTest, FormatLogMessages) {
   absl::string_view sv = "formatted";
   ENVOY_LOG_MISC(info, "fake {} message", sv);
 }

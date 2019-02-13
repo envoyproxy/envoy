@@ -21,20 +21,18 @@ namespace Extensions {
 namespace QuicListeners {
 namespace Quiche {
 
-using SpdyPlatformTest = TestBase;
-
-TEST_F(SpdyPlatformTest, SpdyArraysize) {
+TEST(SpdyPlatformTest, SpdyArraysize) {
   int array[] = {0, 1, 2, 3, 4};
   EXPECT_EQ(5, SPDY_ARRAYSIZE(array));
 }
 
-TEST_F(SpdyPlatformTest, SpdyHashMap) {
+TEST(SpdyPlatformTest, SpdyHashMap) {
   spdy::SpdyHashMap<spdy::SpdyString, int> hmap;
   hmap.insert({"foo", 2});
   EXPECT_EQ(2, hmap["foo"]);
 }
 
-TEST_F(SpdyPlatformTest, SpdyHashSet) {
+TEST(SpdyPlatformTest, SpdyHashSet) {
   spdy::SpdyHashSet<spdy::SpdyString, spdy::SpdyHash<spdy::SpdyString>,
                     std::equal_to<spdy::SpdyString>>
       hset({"foo", "bar"});
@@ -42,33 +40,33 @@ TEST_F(SpdyPlatformTest, SpdyHashSet) {
   EXPECT_EQ(0, hset.count("qux"));
 }
 
-TEST_F(SpdyPlatformTest, SpdyEndianness) {
+TEST(SpdyPlatformTest, SpdyEndianness) {
   EXPECT_EQ(0x1234, spdy::SpdyNetToHost16(spdy::SpdyHostToNet16(0x1234)));
   EXPECT_EQ(0x12345678, spdy::SpdyNetToHost32(spdy::SpdyHostToNet32(0x12345678)));
 }
 
-TEST_F(SpdyPlatformTest, SpdyEstimateMemoryUsage) {
+TEST(SpdyPlatformTest, SpdyEstimateMemoryUsage) {
   spdy::SpdyString s = "foo";
   // Stubbed out to always return 0.
   EXPECT_EQ(0, spdy::SpdyEstimateMemoryUsage(s));
 }
 
-TEST_F(SpdyPlatformTest, SpdyMakeUnique) {
+TEST(SpdyPlatformTest, SpdyMakeUnique) {
   auto p = spdy::SpdyMakeUnique<int>(4);
   EXPECT_EQ(4, *p);
 }
 
-TEST_F(SpdyPlatformTest, SpdyWrapUnique) {
+TEST(SpdyPlatformTest, SpdyWrapUnique) {
   auto p = spdy::SpdyWrapUnique(new int(6));
   EXPECT_EQ(6, *p);
 }
 
-TEST_F(SpdyPlatformTest, SpdyString) {
+TEST(SpdyPlatformTest, SpdyString) {
   spdy::SpdyString s = "foo";
   EXPECT_EQ('o', s[1]);
 }
 
-TEST_F(SpdyPlatformTest, SpdyStringPiece) {
+TEST(SpdyPlatformTest, SpdyStringPiece) {
   spdy::SpdyString s = "bar";
   spdy::SpdyStringPiece sp(s);
   EXPECT_EQ('b', sp[0]);

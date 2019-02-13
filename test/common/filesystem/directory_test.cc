@@ -24,6 +24,7 @@ public:
     files_to_remove_.push(dir_path_);
   }
 
+protected:
   void SetUp() override { TestUtility::createDirectory(dir_path_); }
 
   void TearDown() override {
@@ -194,9 +195,7 @@ TEST_F(DirectoryTest, DirectoryWithEmptyDirectory) {
 }
 
 // Test that the constructor throws an exception when given a non-existing path
-using DirectoryIteratorImplTest = TestBase;
-
-TEST_F(DirectoryIteratorImplTest, NonExistingDir) {
+TEST(DirectoryIteratorImpl, NonExistingDir) {
   const std::string dir_path("some/non/existing/dir");
 
 #ifdef WIN32
@@ -210,9 +209,8 @@ TEST_F(DirectoryIteratorImplTest, NonExistingDir) {
 #endif
 }
 
-using DirectoryTest2 = TestBase;
-
-TEST_F(DirectoryTest2, DirectoryHasTrailingPathSeparator) {
+// Test that we correctly handle trailing path separators
+TEST(Directory, DirectoryHasTrailingPathSeparator) {
 #ifdef WIN32
   const std::string dir_path(TestEnvironment::temporaryPath("envoy_test") + "\\");
 #else

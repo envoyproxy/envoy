@@ -13,9 +13,7 @@ namespace Envoy {
 namespace Buffer {
 namespace {
 
-using BufferHelperTest = TestBase;
-
-TEST_F(BufferHelperTest, PeekI8) {
+TEST(BufferHelperTest, PeekI8) {
   {
     Buffer::OwnedImpl buffer;
     addSeq(buffer, {0, 1, 0xFE});
@@ -38,7 +36,7 @@ TEST_F(BufferHelperTest, PeekI8) {
   }
 }
 
-TEST_F(BufferHelperTest, PeekLEI16) {
+TEST(BufferHelperTest, PeekLEI16) {
   {
     Buffer::OwnedImpl buffer;
     addSeq(buffer, {0, 1, 2, 3, 0xFF, 0xFF});
@@ -62,7 +60,7 @@ TEST_F(BufferHelperTest, PeekLEI16) {
   }
 }
 
-TEST_F(BufferHelperTest, PeekLEI32) {
+TEST(BufferHelperTest, PeekLEI32) {
   {
     Buffer::OwnedImpl buffer;
     addSeq(buffer, {0, 1, 2, 3, 0xFF, 0xFF, 0xFF, 0xFF});
@@ -85,7 +83,7 @@ TEST_F(BufferHelperTest, PeekLEI32) {
   }
 }
 
-TEST_F(BufferHelperTest, PeekLEI64) {
+TEST(BufferHelperTest, PeekLEI64) {
   {
     Buffer::OwnedImpl buffer;
     addSeq(buffer, {0, 1, 2, 3, 4, 5, 6, 7, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF});
@@ -134,7 +132,7 @@ TEST_F(BufferHelperTest, PeekLEI64) {
   }
 }
 
-TEST_F(BufferHelperTest, PeekLEU16) {
+TEST(BufferHelperTest, PeekLEU16) {
   {
     Buffer::OwnedImpl buffer;
     addSeq(buffer, {0, 1, 2, 3, 0xFF, 0xFF});
@@ -157,7 +155,7 @@ TEST_F(BufferHelperTest, PeekLEU16) {
   }
 }
 
-TEST_F(BufferHelperTest, PeekLEU32) {
+TEST(BufferHelperTest, PeekLEU32) {
   {
     Buffer::OwnedImpl buffer;
     addSeq(buffer, {0, 1, 2, 3, 0xFF, 0xFF, 0xFF, 0xFF});
@@ -180,7 +178,7 @@ TEST_F(BufferHelperTest, PeekLEU32) {
   }
 }
 
-TEST_F(BufferHelperTest, PeekLEU64) {
+TEST(BufferHelperTest, PeekLEU64) {
   {
     Buffer::OwnedImpl buffer;
     addSeq(buffer, {0, 1, 2, 3, 4, 5, 6, 7, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF});
@@ -203,7 +201,7 @@ TEST_F(BufferHelperTest, PeekLEU64) {
   }
 }
 
-TEST_F(BufferHelperTest, PeekBEI16) {
+TEST(BufferHelperTest, PeekBEI16) {
   {
     Buffer::OwnedImpl buffer;
     addSeq(buffer, {0, 1, 2, 3, 0xFF, 0xFF});
@@ -227,7 +225,7 @@ TEST_F(BufferHelperTest, PeekBEI16) {
   }
 }
 
-TEST_F(BufferHelperTest, PeekBEI32) {
+TEST(BufferHelperTest, PeekBEI32) {
   {
     Buffer::OwnedImpl buffer;
     addSeq(buffer, {0, 1, 2, 3, 0xFF, 0xFF, 0xFF, 0xFF});
@@ -250,7 +248,7 @@ TEST_F(BufferHelperTest, PeekBEI32) {
   }
 }
 
-TEST_F(BufferHelperTest, PeekBEI64) {
+TEST(BufferHelperTest, PeekBEI64) {
   {
     Buffer::OwnedImpl buffer;
     addSeq(buffer, {0, 1, 2, 3, 4, 5, 6, 7, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF});
@@ -298,7 +296,7 @@ TEST_F(BufferHelperTest, PeekBEI64) {
   }
 }
 
-TEST_F(BufferHelperTest, PeekBEU16) {
+TEST(BufferHelperTest, PeekBEU16) {
   {
     Buffer::OwnedImpl buffer;
     addSeq(buffer, {0, 1, 2, 3, 0xFF, 0xFF});
@@ -321,7 +319,7 @@ TEST_F(BufferHelperTest, PeekBEU16) {
   }
 }
 
-TEST_F(BufferHelperTest, PeekBEU32) {
+TEST(BufferHelperTest, PeekBEU32) {
   {
     Buffer::OwnedImpl buffer;
     addSeq(buffer, {0, 1, 2, 3, 0xFF, 0xFF, 0xFF, 0xFF});
@@ -344,7 +342,7 @@ TEST_F(BufferHelperTest, PeekBEU32) {
   }
 }
 
-TEST_F(BufferHelperTest, PeekBEU64) {
+TEST(BufferHelperTest, PeekBEU64) {
   {
     Buffer::OwnedImpl buffer;
     addSeq(buffer, {0, 1, 2, 3, 4, 5, 6, 7, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF});
@@ -367,7 +365,7 @@ TEST_F(BufferHelperTest, PeekBEU64) {
   }
 }
 
-TEST_F(BufferHelperTest, DrainI8) {
+TEST(BufferHelperTest, DrainI8) {
   Buffer::OwnedImpl buffer;
   addSeq(buffer, {0, 1, 0xFE});
   EXPECT_EQ(buffer.drainInt<int8_t>(), 0);
@@ -376,7 +374,7 @@ TEST_F(BufferHelperTest, DrainI8) {
   EXPECT_EQ(buffer.length(), 0);
 }
 
-TEST_F(BufferHelperTest, DrainLEI16) {
+TEST(BufferHelperTest, DrainLEI16) {
   Buffer::OwnedImpl buffer;
   addSeq(buffer, {0, 1, 2, 3, 0xFF, 0xFF});
   EXPECT_EQ(buffer.drainLEInt<int16_t>(), 0x0100);
@@ -385,7 +383,7 @@ TEST_F(BufferHelperTest, DrainLEI16) {
   EXPECT_EQ(buffer.length(), 0);
 }
 
-TEST_F(BufferHelperTest, DrainLEI32) {
+TEST(BufferHelperTest, DrainLEI32) {
   Buffer::OwnedImpl buffer;
   addSeq(buffer, {0, 1, 2, 3, 0xFF, 0xFF, 0xFF, 0xFF});
   EXPECT_EQ(buffer.drainLEInt<int32_t>(), 0x03020100);
@@ -393,7 +391,7 @@ TEST_F(BufferHelperTest, DrainLEI32) {
   EXPECT_EQ(buffer.length(), 0);
 }
 
-TEST_F(BufferHelperTest, DrainLEI64) {
+TEST(BufferHelperTest, DrainLEI64) {
   Buffer::OwnedImpl buffer;
   addSeq(buffer, {0, 1, 2, 3, 4, 5, 6, 7, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF});
   EXPECT_EQ(buffer.drainLEInt<int64_t>(), 0x0706050403020100);
@@ -401,7 +399,7 @@ TEST_F(BufferHelperTest, DrainLEI64) {
   EXPECT_EQ(buffer.length(), 0);
 }
 
-TEST_F(BufferHelperTest, DrainLEU32) {
+TEST(BufferHelperTest, DrainLEU32) {
   Buffer::OwnedImpl buffer;
   addSeq(buffer, {0, 1, 2, 3, 0xFF, 0xFF, 0xFF, 0xFF});
   EXPECT_EQ(buffer.drainLEInt<uint32_t>(), 0x03020100);
@@ -409,7 +407,7 @@ TEST_F(BufferHelperTest, DrainLEU32) {
   EXPECT_EQ(buffer.length(), 0);
 }
 
-TEST_F(BufferHelperTest, DrainLEU64) {
+TEST(BufferHelperTest, DrainLEU64) {
   Buffer::OwnedImpl buffer;
   addSeq(buffer, {0, 1, 2, 3, 4, 5, 6, 7, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF});
   EXPECT_EQ(buffer.drainLEInt<uint64_t>(), 0x0706050403020100);
@@ -417,7 +415,7 @@ TEST_F(BufferHelperTest, DrainLEU64) {
   EXPECT_EQ(buffer.length(), 0);
 }
 
-TEST_F(BufferHelperTest, DrainBEI16) {
+TEST(BufferHelperTest, DrainBEI16) {
   Buffer::OwnedImpl buffer;
   addSeq(buffer, {0, 1, 2, 3, 0xFF, 0xFF});
   EXPECT_EQ(buffer.drainBEInt<int16_t>(), 1);
@@ -426,7 +424,7 @@ TEST_F(BufferHelperTest, DrainBEI16) {
   EXPECT_EQ(buffer.length(), 0);
 }
 
-TEST_F(BufferHelperTest, DrainBEI32) {
+TEST(BufferHelperTest, DrainBEI32) {
   Buffer::OwnedImpl buffer;
   addSeq(buffer, {0, 1, 2, 3, 0xFF, 0xFF, 0xFF, 0xFF});
   EXPECT_EQ(buffer.drainBEInt<int32_t>(), 0x00010203);
@@ -434,7 +432,7 @@ TEST_F(BufferHelperTest, DrainBEI32) {
   EXPECT_EQ(buffer.length(), 0);
 }
 
-TEST_F(BufferHelperTest, DrainBEI64) {
+TEST(BufferHelperTest, DrainBEI64) {
   Buffer::OwnedImpl buffer;
   addSeq(buffer, {0, 1, 2, 3, 4, 5, 6, 7, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF});
   EXPECT_EQ(buffer.drainBEInt<int64_t>(), 0x0001020304050607);
@@ -442,7 +440,7 @@ TEST_F(BufferHelperTest, DrainBEI64) {
   EXPECT_EQ(buffer.length(), 0);
 }
 
-TEST_F(BufferHelperTest, DrainBEU32) {
+TEST(BufferHelperTest, DrainBEU32) {
   Buffer::OwnedImpl buffer;
   addSeq(buffer, {0, 1, 2, 3, 0xFF, 0xFF, 0xFF, 0xFF});
   EXPECT_EQ(buffer.drainBEInt<uint32_t>(), 0x00010203);
@@ -450,7 +448,7 @@ TEST_F(BufferHelperTest, DrainBEU32) {
   EXPECT_EQ(buffer.length(), 0);
 }
 
-TEST_F(BufferHelperTest, DrainBEU64) {
+TEST(BufferHelperTest, DrainBEU64) {
   Buffer::OwnedImpl buffer;
   addSeq(buffer, {0, 1, 2, 3, 4, 5, 6, 7, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF});
   EXPECT_EQ(buffer.drainBEInt<uint64_t>(), 0x0001020304050607);
@@ -458,7 +456,7 @@ TEST_F(BufferHelperTest, DrainBEU64) {
   EXPECT_EQ(buffer.length(), 0);
 }
 
-TEST_F(BufferHelperTest, WriteI8) {
+TEST(BufferHelperTest, WriteI8) {
   Buffer::OwnedImpl buffer;
   buffer.writeByte(-128);
   buffer.writeByte(-1);
@@ -469,7 +467,7 @@ TEST_F(BufferHelperTest, WriteI8) {
   EXPECT_EQ(std::string("\x80\xFF\0\x1\x7F", 5), buffer.toString());
 }
 
-TEST_F(BufferHelperTest, WriteLEI16) {
+TEST(BufferHelperTest, WriteLEI16) {
   {
     Buffer::OwnedImpl buffer;
     buffer.writeLEInt<int16_t>(std::numeric_limits<int16_t>::min());
@@ -492,7 +490,7 @@ TEST_F(BufferHelperTest, WriteLEI16) {
   }
 }
 
-TEST_F(BufferHelperTest, WriteLEU16) {
+TEST(BufferHelperTest, WriteLEU16) {
   {
     Buffer::OwnedImpl buffer;
     buffer.writeLEInt<uint16_t>(0);
@@ -515,7 +513,7 @@ TEST_F(BufferHelperTest, WriteLEU16) {
   }
 }
 
-TEST_F(BufferHelperTest, WriteLEI32) {
+TEST(BufferHelperTest, WriteLEI32) {
   {
     Buffer::OwnedImpl buffer;
     buffer.writeLEInt<int32_t>(std::numeric_limits<int32_t>::min());
@@ -538,7 +536,7 @@ TEST_F(BufferHelperTest, WriteLEI32) {
   }
 }
 
-TEST_F(BufferHelperTest, WriteLEU32) {
+TEST(BufferHelperTest, WriteLEU32) {
   {
     Buffer::OwnedImpl buffer;
     buffer.writeLEInt<uint32_t>(0);
@@ -560,7 +558,7 @@ TEST_F(BufferHelperTest, WriteLEU32) {
     EXPECT_EQ("\xFF\xFF\xFF\xFF", buffer.toString());
   }
 }
-TEST_F(BufferHelperTest, WriteLEI64) {
+TEST(BufferHelperTest, WriteLEI64) {
   {
     Buffer::OwnedImpl buffer;
     buffer.writeLEInt<int64_t>(std::numeric_limits<int64_t>::min());
@@ -583,7 +581,7 @@ TEST_F(BufferHelperTest, WriteLEI64) {
   }
 }
 
-TEST_F(BufferHelperTest, WriteBEI16) {
+TEST(BufferHelperTest, WriteBEI16) {
   {
     Buffer::OwnedImpl buffer;
     buffer.writeBEInt<int16_t>(std::numeric_limits<int16_t>::min());
@@ -606,7 +604,7 @@ TEST_F(BufferHelperTest, WriteBEI16) {
   }
 }
 
-TEST_F(BufferHelperTest, WriteBEU16) {
+TEST(BufferHelperTest, WriteBEU16) {
   {
     Buffer::OwnedImpl buffer;
     buffer.writeBEInt<uint16_t>(0);
@@ -629,7 +627,7 @@ TEST_F(BufferHelperTest, WriteBEU16) {
   }
 }
 
-TEST_F(BufferHelperTest, WriteBEI32) {
+TEST(BufferHelperTest, WriteBEI32) {
   {
     Buffer::OwnedImpl buffer;
     buffer.writeBEInt<int32_t>(std::numeric_limits<int32_t>::min());
@@ -652,7 +650,7 @@ TEST_F(BufferHelperTest, WriteBEI32) {
   }
 }
 
-TEST_F(BufferHelperTest, WriteBEU32) {
+TEST(BufferHelperTest, WriteBEU32) {
   {
     Buffer::OwnedImpl buffer;
     buffer.writeBEInt<uint32_t>(0);
@@ -674,7 +672,7 @@ TEST_F(BufferHelperTest, WriteBEU32) {
     EXPECT_EQ("\xFF\xFF\xFF\xFF", buffer.toString());
   }
 }
-TEST_F(BufferHelperTest, WriteBEI64) {
+TEST(BufferHelperTest, WriteBEI64) {
   {
     Buffer::OwnedImpl buffer;
     buffer.writeBEInt<int64_t>(std::numeric_limits<int64_t>::min());

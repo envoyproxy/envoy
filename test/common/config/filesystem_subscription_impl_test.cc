@@ -33,9 +33,7 @@ TEST_F(FilesystemSubscriptionImplTest, InitialFile) {
 }
 
 // Validate that if we fail to set a watch, we get a sensible warning.
-using MiscFilesystemSubscriptionImplTest = TestBase;
-
-TEST_F(MiscFilesystemSubscriptionImplTest, BadWatch) {
+TEST(MiscFilesystemSubscriptionImplTest, BadWatch) {
   Event::MockDispatcher dispatcher;
   Stats::MockIsolatedStatsStore stats_store;
   Api::ApiPtr api = Api::createApiForTest(stats_store);

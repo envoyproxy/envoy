@@ -30,9 +30,7 @@ namespace Envoy {
 namespace Network {
 namespace Address {
 
-using TruncateIpAddressAndLength = TestBase;
-
-TEST_F(TruncateIpAddressAndLength, Various) {
+TEST(TruncateIpAddressAndLength, Various) {
   std::map<std::pair<std::string, int>, std::pair<std::string, int>> test_cases = {
       // IPv4
       {{"1.2.3.5", -100}, {"", -1}},
@@ -87,9 +85,7 @@ TEST_F(TruncateIpAddressAndLength, Various) {
   }
 }
 
-using IsInRange = TestBase;
-
-TEST_F(IsInRange, Various) {
+TEST(IsInRange, Various) {
   {
     CidrRange rng = CidrRange::create("foo");
     EXPECT_FALSE(rng.isValid());
@@ -176,9 +172,7 @@ TEST_F(IsInRange, Various) {
   }
 }
 
-using CidrRangeTest = TestBase;
-
-TEST_F(CidrRangeTest, OperatorIsEqual) {
+TEST(CidrRangeTest, OperatorIsEqual) {
   {
     CidrRange rng1 = CidrRange::create("192.0.0.0/8");
     CidrRange rng2 = CidrRange::create("192.168.0.0/16");
@@ -216,7 +210,7 @@ TEST_F(CidrRangeTest, OperatorIsEqual) {
   }
 }
 
-TEST_F(CidrRangeTest, InvalidCidrRange) {
+TEST(CidrRangeTest, InvalidCidrRange) {
   CidrRange rng1 = CidrRange::create("foo");
   EXPECT_EQ(nullptr, rng1.ip());
   EXPECT_EQ("/-1", rng1.asString());
@@ -227,9 +221,7 @@ TEST_F(CidrRangeTest, InvalidCidrRange) {
   EXPECT_FALSE(rng1 == rng2);
 }
 
-using Ipv4CidrRangeTest = TestBase;
-
-TEST_F(Ipv4CidrRangeTest, InstanceConstSharedPtrAndLengthCtor) {
+TEST(Ipv4CidrRangeTest, InstanceConstSharedPtrAndLengthCtor) {
   InstanceConstSharedPtr ptr = Utility::parseInternetAddress("1.2.3.5");
   CidrRange rng(CidrRange::create(ptr, 31)); // Copy ctor.
   EXPECT_TRUE(rng.isValid());
@@ -249,7 +241,7 @@ TEST_F(Ipv4CidrRangeTest, InstanceConstSharedPtrAndLengthCtor) {
   EXPECT_FALSE(rng3.isValid());
 }
 
-TEST_F(Ipv4CidrRangeTest, StringAndLengthCtor) {
+TEST(Ipv4CidrRangeTest, StringAndLengthCtor) {
   CidrRange rng;
   rng = CidrRange::create("1.2.3.4", 31); // Assignment operator.
   EXPECT_TRUE(rng.isValid());
@@ -267,7 +259,7 @@ TEST_F(Ipv4CidrRangeTest, StringAndLengthCtor) {
   EXPECT_THROW(CidrRange::create("bogus", 31), EnvoyException); // Invalid address.
 }
 
-TEST_F(Ipv4CidrRangeTest, StringCtor) {
+TEST(Ipv4CidrRangeTest, StringCtor) {
   CidrRange rng = CidrRange::create("1.2.3.4/31");
   EXPECT_TRUE(rng.isValid());
   EXPECT_EQ(rng.asString(), "1.2.3.4/31");
@@ -290,7 +282,7 @@ TEST_F(Ipv4CidrRangeTest, StringCtor) {
   EXPECT_FALSE(rng5.isValid());
 }
 
-TEST_F(Ipv4CidrRangeTest, BigRange) {
+TEST(Ipv4CidrRangeTest, BigRange) {
   CidrRange rng = CidrRange::create("10.255.255.255/8");
   EXPECT_TRUE(rng.isValid());
   EXPECT_EQ(rng.asString(), "10.0.0.0/8");
@@ -307,9 +299,7 @@ TEST_F(Ipv4CidrRangeTest, BigRange) {
   EXPECT_FALSE(rng.isInRange(Ipv4Instance("11.0.0.0")));
 }
 
-using Ipv6CidrRange = TestBase;
-
-TEST_F(Ipv6CidrRange, InstanceConstSharedPtrAndLengthCtor) {
+TEST(Ipv6CidrRange, InstanceConstSharedPtrAndLengthCtor) {
   InstanceConstSharedPtr ptr = Utility::parseInternetAddress("abcd::0345");
   CidrRange rng(CidrRange::create(ptr, 127)); // Copy ctor.
   EXPECT_TRUE(rng.isValid());
@@ -329,7 +319,7 @@ TEST_F(Ipv6CidrRange, InstanceConstSharedPtrAndLengthCtor) {
   EXPECT_FALSE(rng3.isValid());
 }
 
-TEST_F(Ipv6CidrRange, StringAndLengthCtor) {
+TEST(Ipv6CidrRange, StringAndLengthCtor) {
   CidrRange rng;
   rng = CidrRange::create("ff::ffff", 122); // Assignment operator.
   EXPECT_TRUE(rng.isValid());
@@ -347,7 +337,7 @@ TEST_F(Ipv6CidrRange, StringAndLengthCtor) {
   EXPECT_THROW(CidrRange::create("bogus", 122), EnvoyException); // Invalid address.
 }
 
-TEST_F(Ipv6CidrRange, StringCtor) {
+TEST(Ipv6CidrRange, StringCtor) {
   CidrRange rng = CidrRange::create("ff::fc1f/118");
   EXPECT_TRUE(rng.isValid());
   EXPECT_EQ(rng.asString(), "ff::fc00/118");
@@ -370,7 +360,7 @@ TEST_F(Ipv6CidrRange, StringCtor) {
   EXPECT_FALSE(rng5.isValid());
 }
 
-TEST_F(Ipv6CidrRange, BigRange) {
+TEST(Ipv6CidrRange, BigRange) {
   std::string prefix = "2001:0db8:85a3:0000";
   CidrRange rng = CidrRange::create(prefix + "::/64");
   EXPECT_TRUE(rng.isValid());
@@ -388,9 +378,7 @@ TEST_F(Ipv6CidrRange, BigRange) {
   EXPECT_FALSE(rng.isInRange(Ipv6Instance("2001:0db8:85a4::")));
 }
 
-using IpListTest = TestBase;
-
-TEST_F(IpListTest, Errors) {
+TEST(IpListTest, Errors) {
   {
     std::string json = R"EOF(
     {
@@ -447,7 +435,7 @@ TEST_F(IpListTest, Errors) {
   }
 }
 
-TEST_F(IpListTest, SpecificAddressAllowed) {
+TEST(IpListTest, SpecificAddressAllowed) {
   std::string json = R"EOF(
   {
     "ip_white_list": ["192.168.1.1/24"]
@@ -464,7 +452,7 @@ TEST_F(IpListTest, SpecificAddressAllowed) {
   EXPECT_FALSE(wl.contains(Address::Ipv4Instance("192.168.0.0")));
 }
 
-TEST_F(IpListTest, Normal) {
+TEST(IpListTest, Normal) {
   std::string json = R"EOF(
   {
     "ip_white_list": [
@@ -498,7 +486,7 @@ TEST_F(IpListTest, Normal) {
   EXPECT_FALSE(wl.contains(Address::PipeInstance("foo")));
 }
 
-TEST_F(IpListTest, AddressVersionMix) {
+TEST(IpListTest, AddressVersionMix) {
   std::string json = R"EOF(
   {
     "ip_white_list": [
@@ -532,7 +520,7 @@ TEST_F(IpListTest, AddressVersionMix) {
   EXPECT_FALSE(wl.contains(Address::PipeInstance("foo")));
 }
 
-TEST_F(IpListTest, MatchAny) {
+TEST(IpListTest, MatchAny) {
   std::string json = R"EOF(
   {
     "ip_white_list": [
@@ -555,7 +543,7 @@ TEST_F(IpListTest, MatchAny) {
   EXPECT_FALSE(wl.contains(Address::PipeInstance("foo")));
 }
 
-TEST_F(IpListTest, MatchAnyAll) {
+TEST(IpListTest, MatchAnyAll) {
   std::string json = R"EOF(
   {
     "ip_white_list": [

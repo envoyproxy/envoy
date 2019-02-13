@@ -50,9 +50,7 @@ void EXPECT_JSON_EQ(const std::string& expected, const std::string& actual) {
 
 } // namespace
 
-using SoloFilterConfigTest = TestBase;
-
-TEST_F(SoloFilterConfigTest, V1ApiConversion) {
+TEST(SoloFilterConfigTest, V1ApiConversion) {
   std::string json = R"EOF(
     {
       "cluster" : "fake_cluster",
@@ -75,7 +73,7 @@ TEST_F(SoloFilterConfigTest, V1ApiConversion) {
   EXPECT_EQ(std::chrono::milliseconds(3003), config.attachmentTimeout());
 }
 
-TEST_F(SoloFilterConfigTest, NoCluster) {
+TEST(SoloFilterConfigTest, NoCluster) {
   std::string json = R"EOF(
     {
       "cluster" : "fake_cluster",
@@ -93,7 +91,7 @@ TEST_F(SoloFilterConfigTest, NoCluster) {
                             "squash filter: unknown cluster 'fake_cluster' in squash config");
 }
 
-TEST_F(SoloFilterConfigTest, ParsesEnvironment) {
+TEST(SoloFilterConfigTest, ParsesEnvironment) {
   std::string json = R"EOF(
     {
       "cluster" : "squash",
@@ -110,7 +108,7 @@ TEST_F(SoloFilterConfigTest, ParsesEnvironment) {
   EXPECT_JSON_EQ(expected_json, config.attachmentJson());
 }
 
-TEST_F(SoloFilterConfigTest, ParsesAndEscapesEnvironment) {
+TEST(SoloFilterConfigTest, ParsesAndEscapesEnvironment) {
   TestEnvironment::setEnvVar("ESCAPE_ENV", "\"", 1);
 
   std::string json = R"EOF(
@@ -128,7 +126,7 @@ TEST_F(SoloFilterConfigTest, ParsesAndEscapesEnvironment) {
   auto config = constructSquashFilterConfigFromJson(*json_config, factory_context);
   EXPECT_JSON_EQ(expected_json, config.attachmentJson());
 }
-TEST_F(SoloFilterConfigTest, TwoEnvironmentVariables) {
+TEST(SoloFilterConfigTest, TwoEnvironmentVariables) {
   TestEnvironment::setEnvVar("ENV1", "1", 1);
   TestEnvironment::setEnvVar("ENV2", "2", 1);
 
@@ -147,7 +145,7 @@ TEST_F(SoloFilterConfigTest, TwoEnvironmentVariables) {
   EXPECT_JSON_EQ(expected_json, config.attachmentJson());
 }
 
-TEST_F(SoloFilterConfigTest, ParsesEnvironmentInComplexTemplate) {
+TEST(SoloFilterConfigTest, ParsesEnvironmentInComplexTemplate) {
   TestEnvironment::setEnvVar("CONF_ENV", "some-config-value", 1);
 
   std::string json = R"EOF(

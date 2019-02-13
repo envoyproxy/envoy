@@ -97,7 +97,7 @@ public:
 
 class MetricsServiceSinkTest : public TestBase {};
 
-TEST_F(MetricsServiceSinkTest, CheckSendCall) {
+TEST(MetricsServiceSinkTest, CheckSendCall) {
   NiceMock<Stats::MockSource> source;
   Event::SimulatedTimeSystem time_system;
   std::shared_ptr<MockGrpcMetricsStreamer> streamer_{new MockGrpcMetricsStreamer()};
@@ -125,7 +125,7 @@ TEST_F(MetricsServiceSinkTest, CheckSendCall) {
   sink.flush(source);
 }
 
-TEST_F(MetricsServiceSinkTest, CheckStatsCount) {
+TEST(MetricsServiceSinkTest, CheckStatsCount) {
   NiceMock<Stats::MockSource> source;
   Event::SimulatedTimeSystem time_system;
   std::shared_ptr<TestGrpcMetricsStreamer> streamer_{new TestGrpcMetricsStreamer()};

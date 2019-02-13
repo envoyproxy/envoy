@@ -27,9 +27,7 @@ private:
   std::function<void()> on_destroy_;
 };
 
-using DeferredDeleteTest = TestBase;
-
-TEST_F(DeferredDeleteTest, DeferredDelete) {
+TEST(DeferredDeleteTest, DeferredDelete) {
   InSequence s;
   Api::ApiPtr api = Api::createApiForTest();
   DispatcherPtr dispatcher(api->allocateDispatcher());

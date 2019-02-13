@@ -419,14 +419,9 @@ def checkSourceLine(line, file_path, reportError):
     reportError("Don't use 'using testing::Test;, elaborate the type instead")
   if line.startswith('using testing::TestWithParams;'):
     reportError("Don't use 'using testing::Test;, elaborate the type instead")
-  if file_path != './test/test_common/test_base.h':
-    if ' testing::Test ' in line:
-      reportError("Derive test classes from TestBase in test/test_common/test_base.h")
-    elif ' testing::TestWithParam' in line:
-      reportError("Derive parameterized test classes from TestBaseWithParam in " +
-                  "test/test_common/test_base.h")
-  if file_path.endswith("_test.cc") and line.startswith("TEST("):
-    reportError("Use TEST_F(class_derived_from_TestBase, ...) rather than TEST(...)")
+  if file_path != './test/test_common/test_base.h' and (' testing::Test ' in line or
+                                                        ' testing::TestWithParam' in line):
+    reportError("Derive test classes from TestBase in test/test_common/test_base.h")
   if not whitelistedForSerializeAsString(file_path) and 'SerializeAsString' in line:
     # The MessageLite::SerializeAsString doesn't generate deterministic serialization,
     # use MessageUtil::hash instead.

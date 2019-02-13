@@ -197,9 +197,7 @@ TEST_F(CodeUtilityTest, PerZoneStats) {
   EXPECT_EQ(1U, cluster_scope_.counter("prefix.zone.from_az.to_az.upstream_rq_2xx").value());
 }
 
-using CodeUtilityResponseTimingTest = TestBase;
-
-TEST_F(CodeUtilityResponseTimingTest, All) {
+TEST(CodeUtilityResponseTimingTest, All) {
   Stats::MockStore global_store;
   Stats::MockStore cluster_scope;
 

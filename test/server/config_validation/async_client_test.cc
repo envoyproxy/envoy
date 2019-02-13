@@ -11,9 +11,7 @@
 namespace Envoy {
 namespace Http {
 
-using ValidationAsyncClientTest = TestBase;
-
-TEST_F(ValidationAsyncClientTest, MockedMethods) {
+TEST(ValidationAsyncClientTest, MockedMethods) {
   MessagePtr message{new RequestMessageImpl()};
   MockAsyncClientCallbacks callbacks;
   MockAsyncClientStreamCallbacks stream_callbacks;

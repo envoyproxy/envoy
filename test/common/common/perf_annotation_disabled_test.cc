@@ -10,9 +10,7 @@
 
 namespace Envoy {
 
-using PerfAnnotationDisabled = TestBase;
-
-TEST_F(PerfAnnotationDisabled, testPerfAnnotation) {
+TEST(PerfAnnotationDisabled, testPerfAnnotation) {
   PERF_OPERATION(perf);
   PERF_RECORD(perf, "alpha", "0");
   PERF_RECORD(perf, "beta", "1");

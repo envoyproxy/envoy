@@ -12,9 +12,7 @@ using ::testing::InSequence;
 namespace Envoy {
 namespace Http {
 
-using HeaderStringTest = TestBase;
-
-TEST_F(HeaderStringTest, All) {
+TEST(HeaderStringTest, All) {
   // Static LowerCaseString constructor
   {
     LowerCaseString static_string("hello");
@@ -286,9 +284,7 @@ TEST_F(HeaderStringTest, All) {
   }
 }
 
-using HeaderMapImplTest = TestBase;
-
-TEST_F(HeaderMapImplTest, InlineInsert) {
+TEST(HeaderMapImplTest, InlineInsert) {
   HeaderMapImpl headers;
   EXPECT_EQ(nullptr, headers.Host());
   headers.insertHost().value(std::string("hello"));
@@ -297,7 +293,7 @@ TEST_F(HeaderMapImplTest, InlineInsert) {
   EXPECT_STREQ("hello", headers.get(Headers::get().Host)->value().c_str());
 }
 
-TEST_F(HeaderMapImplTest, MoveIntoInline) {
+TEST(HeaderMapImplTest, MoveIntoInline) {
   HeaderMapImpl headers;
   HeaderString key;
   key.setCopy(Headers::get().CacheControl.get().c_str(), Headers::get().CacheControl.get().size());
@@ -316,7 +312,7 @@ TEST_F(HeaderMapImplTest, MoveIntoInline) {
   EXPECT_STREQ("hello,there", headers.CacheControl()->value().c_str());
 }
 
-TEST_F(HeaderMapImplTest, Remove) {
+TEST(HeaderMapImplTest, Remove) {
   HeaderMapImpl headers;
 
   // Add random header and then remove by name.
@@ -347,7 +343,7 @@ TEST_F(HeaderMapImplTest, Remove) {
   EXPECT_EQ(0UL, headers.size());
 }
 
-TEST_F(HeaderMapImplTest, RemoveRegex) {
+TEST(HeaderMapImplTest, RemoveRegex) {
   // These will match.
   LowerCaseString key1 = LowerCaseString("X-prefix-foo");
   LowerCaseString key3 = LowerCaseString("X-Prefix-");
@@ -384,7 +380,7 @@ TEST_F(HeaderMapImplTest, RemoveRegex) {
   EXPECT_EQ(nullptr, headers.ContentLength());
 }
 
-TEST_F(HeaderMapImplTest, SetRemovesAllValues) {
+TEST(HeaderMapImplTest, SetRemovesAllValues) {
   HeaderMapImpl headers;
 
   LowerCaseString key1("hello");
@@ -437,7 +433,7 @@ TEST_F(HeaderMapImplTest, SetRemovesAllValues) {
   }
 }
 
-TEST_F(HeaderMapImplTest, DoubleInlineAdd) {
+TEST(HeaderMapImplTest, DoubleInlineAdd) {
   {
     HeaderMapImpl headers;
     const std::string foo("foo");
@@ -471,7 +467,7 @@ TEST_F(HeaderMapImplTest, DoubleInlineAdd) {
   }
 }
 
-TEST_F(HeaderMapImplTest, DoubleInlineSet) {
+TEST(HeaderMapImplTest, DoubleInlineSet) {
   HeaderMapImpl headers;
   headers.setReferenceKey(Headers::get().ContentType, "blah");
   headers.setReferenceKey(Headers::get().ContentType, "text/html");
@@ -479,7 +475,7 @@ TEST_F(HeaderMapImplTest, DoubleInlineSet) {
   EXPECT_EQ(1UL, headers.size());
 }
 
-TEST_F(HeaderMapImplTest, AddReferenceKey) {
+TEST(HeaderMapImplTest, AddReferenceKey) {
   HeaderMapImpl headers;
   LowerCaseString foo("hello");
   headers.addReferenceKey(foo, "world");
@@ -487,7 +483,7 @@ TEST_F(HeaderMapImplTest, AddReferenceKey) {
   EXPECT_STREQ("world", headers.get(foo)->value().c_str());
 }
 
-TEST_F(HeaderMapImplTest, SetReferenceKey) {
+TEST(HeaderMapImplTest, SetReferenceKey) {
   HeaderMapImpl headers;
   LowerCaseString foo("hello");
   headers.setReferenceKey(foo, "world");
@@ -499,7 +495,7 @@ TEST_F(HeaderMapImplTest, SetReferenceKey) {
   EXPECT_STREQ("monde", headers.get(foo)->value().c_str());
 }
 
-TEST_F(HeaderMapImplTest, AddCopy) {
+TEST(HeaderMapImplTest, AddCopy) {
   HeaderMapImpl headers;
 
   // Start with a string value.
@@ -568,7 +564,7 @@ TEST_F(HeaderMapImplTest, AddCopy) {
                headers.get(cache_control)->value().c_str());
 }
 
-TEST_F(HeaderMapImplTest, Equality) {
+TEST(HeaderMapImplTest, Equality) {
   TestHeaderMapImpl headers1;
   TestHeaderMapImpl headers2;
   EXPECT_EQ(headers1, headers2);
@@ -580,7 +576,7 @@ TEST_F(HeaderMapImplTest, Equality) {
   EXPECT_FALSE(headers1 == headers2);
 }
 
-TEST_F(HeaderMapImplTest, LargeCharInHeader) {
+TEST(HeaderMapImplTest, LargeCharInHeader) {
   HeaderMapImpl headers;
   LowerCaseString static_key("\x90hello");
   std::string ref_value("value");
@@ -588,7 +584,7 @@ TEST_F(HeaderMapImplTest, LargeCharInHeader) {
   EXPECT_STREQ("value", headers.get(static_key)->value().c_str());
 }
 
-TEST_F(HeaderMapImplTest, Iterate) {
+TEST(HeaderMapImplTest, Iterate) {
   TestHeaderMapImpl headers;
   headers.addCopy("hello", "world");
   headers.addCopy("foo", "xxx");
@@ -611,7 +607,7 @@ TEST_F(HeaderMapImplTest, Iterate) {
       &cb);
 }
 
-TEST_F(HeaderMapImplTest, IterateReverse) {
+TEST(HeaderMapImplTest, IterateReverse) {
   TestHeaderMapImpl headers;
   headers.addCopy("hello", "world");
   headers.addCopy("foo", "bar");
@@ -637,7 +633,7 @@ TEST_F(HeaderMapImplTest, IterateReverse) {
       &cb);
 }
 
-TEST_F(HeaderMapImplTest, Lookup) {
+TEST(HeaderMapImplTest, Lookup) {
   TestHeaderMapImpl headers;
   headers.addCopy("hello", "world");
   headers.insertContentLength().value(5);
@@ -664,7 +660,7 @@ TEST_F(HeaderMapImplTest, Lookup) {
   }
 }
 
-TEST_F(HeaderMapImplTest, Get) {
+TEST(HeaderMapImplTest, Get) {
   {
     const TestHeaderMapImpl headers{{":path", "/"}, {"hello", "world"}};
     EXPECT_STREQ("/", headers.get(LowerCaseString(":path"))->value().c_str());
@@ -682,7 +678,7 @@ TEST_F(HeaderMapImplTest, Get) {
   }
 }
 
-TEST_F(HeaderMapImplTest, TestAppendHeader) {
+TEST(HeaderMapImplTest, TestAppendHeader) {
   // Test appending to a string with a value.
   {
     HeaderString value1;
@@ -717,9 +713,7 @@ TEST_F(HeaderMapImplTest, TestAppendHeader) {
   }
 }
 
-using HeaderMapImplDeathTest = TestBase;
-
-TEST_F(HeaderMapImplDeathTest, TestHeaderLengthChecks) {
+TEST(HeaderMapImplDeathTest, TestHeaderLengthChecks) {
   HeaderString value;
   value.setCopy("some;", 5);
   EXPECT_DEATH_LOG_TO_STDERR(value.append(nullptr, std::numeric_limits<uint32_t>::max()),
@@ -732,7 +726,7 @@ TEST_F(HeaderMapImplDeathTest, TestHeaderLengthChecks) {
                              "Trying to allocate overly large headers.");
 }
 
-TEST_F(HeaderMapImplTest, PseudoHeaderOrder) {
+TEST(HeaderMapImplTest, PseudoHeaderOrder) {
   typedef testing::MockFunction<void(const std::string&, const std::string&)> MockCb;
   MockCb cb;
 
@@ -920,7 +914,7 @@ TEST_F(HeaderMapImplTest, PseudoHeaderOrder) {
 // Validate that TestHeaderMapImpl copy construction and assignment works. This is a
 // regression for where we were missing a valid copy constructor and had the
 // default (dangerous) move semantics takeover.
-TEST_F(HeaderMapImplTest, TestHeaderMapImplyCopy) {
+TEST(HeaderMapImplTest, TestHeaderMapImplyCopy) {
   TestHeaderMapImpl foo;
   foo.addCopy(LowerCaseString("foo"), "bar");
   auto headers = std::make_unique<TestHeaderMapImpl>(foo);

@@ -18,9 +18,7 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace AccessLog {
 
-using AccessLogManagerImplTest = TestBase;
-
-TEST_F(AccessLogManagerImplTest, reopenAllFiles) {
+TEST(AccessLogManagerImpl, reopenAllFiles) {
   Api::MockApi api;
   Filesystem::MockInstance file_system;
   EXPECT_CALL(api, fileSystem()).WillRepeatedly(ReturnRef(file_system));

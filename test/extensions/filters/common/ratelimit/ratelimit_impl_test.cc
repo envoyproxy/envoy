@@ -132,9 +132,7 @@ TEST_F(RateLimitGrpcClientTest, Cancel) {
   client_.cancel();
 }
 
-using RateLimitGrpcFactoryTest = TestBase;
-
-TEST_F(RateLimitGrpcFactoryTest, Create) {
+TEST(RateLimitGrpcFactoryTest, Create) {
   envoy::config::ratelimit::v2::RateLimitServiceConfig config;
   config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("foo");
   Grpc::MockAsyncClientManager async_client_manager;
@@ -148,9 +146,7 @@ TEST_F(RateLimitGrpcFactoryTest, Create) {
   factory.create(absl::optional<std::chrono::milliseconds>());
 }
 
-using RateLimitNullFactoryTest = TestBase;
-
-TEST_F(RateLimitNullFactoryTest, Basic) {
+TEST(RateLimitNullFactoryTest, Basic) {
   NullFactoryImpl factory;
   ClientPtr client = factory.create(absl::optional<std::chrono::milliseconds>());
   MockRequestCallbacks request_callbacks;

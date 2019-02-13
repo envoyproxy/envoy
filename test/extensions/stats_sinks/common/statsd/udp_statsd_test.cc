@@ -121,9 +121,7 @@ TEST_P(UdpStatsdSinkWithTagsTest, InitWithIpAddress) {
   tls_.shutdownThread();
 }
 
-using UdpStatsdSinkTest2 = TestBase;
-
-TEST_F(UdpStatsdSinkTest2, CheckActualStats) {
+TEST(UdpStatsdSinkTest, CheckActualStats) {
   NiceMock<Stats::MockSource> source;
   auto writer_ptr = std::make_shared<NiceMock<MockWriter>>();
   NiceMock<ThreadLocal::MockInstance> tls_;
@@ -159,7 +157,7 @@ TEST_F(UdpStatsdSinkTest2, CheckActualStats) {
   tls_.shutdownThread();
 }
 
-TEST_F(UdpStatsdSinkTest2, CheckActualStatsWithCustomPrefix) {
+TEST(UdpStatsdSinkTest, CheckActualStatsWithCustomPrefix) {
   NiceMock<Stats::MockSource> source;
   auto writer_ptr = std::make_shared<NiceMock<MockWriter>>();
   NiceMock<ThreadLocal::MockInstance> tls_;
@@ -179,9 +177,7 @@ TEST_F(UdpStatsdSinkTest2, CheckActualStatsWithCustomPrefix) {
   tls_.shutdownThread();
 }
 
-using UdpStatsdSinkWithTagsTest2 = TestBase;
-
-TEST_F(UdpStatsdSinkWithTagsTest2, CheckActualStats) {
+TEST(UdpStatsdSinkWithTagsTest, CheckActualStats) {
   NiceMock<Stats::MockSource> source;
   auto writer_ptr = std::make_shared<NiceMock<MockWriter>>();
   NiceMock<ThreadLocal::MockInstance> tls_;

@@ -30,9 +30,7 @@ parseTcpProxyFromJson(const std::string& json_string) {
 
 } // namespace
 
-using FilterJsonTest = TestBase;
-
-TEST_F(FilterJsonTest, TranslateRouter) {
+TEST(FilterJsonTest, TranslateRouter) {
   std::string json_string = R"EOF(
     {
       "dynamic_stats": false,
@@ -45,22 +43,20 @@ TEST_F(FilterJsonTest, TranslateRouter) {
   EXPECT_TRUE(router.start_child_span());
 }
 
-using FilterJsonTest = TestBase;
-
-TEST_F(FilterJsonTest, TranslateRouterDefaults) {
+TEST(FilterJsonTest, TranslateRouterDefaults) {
   std::string json_string = "{}";
   auto router = parseRouterFromJson(json_string);
   EXPECT_TRUE(router.dynamic_stats().value());
   EXPECT_FALSE(router.start_child_span());
 }
 
-TEST_F(FilterJsonTest, TranslateTcpProxyEmptyConfig) {
+TEST(FilterJsonTest, TranslateTcpProxyEmptyConfig) {
   // Simulates what happens when deprecated_v1 = true, but no value key is given.
   EXPECT_THROW_WITH_REGEX(parseTcpProxyFromJson("{}"), EnvoyException,
                           ".*deprecated_v1.*requires a value field.*");
 }
 
-TEST_F(FilterJsonTest, TranslateTcpProxy) {
+TEST(FilterJsonTest, TranslateTcpProxy) {
   std::string json_string = R"EOF(
     {
       "stat_prefix": "stats",
