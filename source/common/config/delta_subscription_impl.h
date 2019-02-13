@@ -65,7 +65,7 @@ public:
                         resources.end(), std::inserter(diff.removed_, diff.removed_.begin()));
 
     for (const auto& added : diff.added_) {
-      resources_[added] = "0";
+      resources_[added] = "";
       resource_names_.insert(added);
     }
     for (const auto& removed : diff.removed_) {
@@ -133,10 +133,17 @@ public:
   void onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
                       const Protobuf::RepeatedPtrField<std::string>& removed_resources,
                       const std::string& version_info) {
+<<<<<<< HEAD
     callbacks_->onIncrementalConfigUpdate(added_resources, removed_resources, version_info);
     // TODO update versions of added_resources and removed_resources into resources_.... well,
     // i guess removed_resources just get removed? since there's no provision for "it got removed"
     // to have a version associated here; it's just a list of string resource names.
+=======
+    callbacks_->onConfigUpdate(added_resources, removed_resources, version_info);
+    for (const auto& resource : added_resources) {
+      resources_[resource.name()] = resource.version();
+    }
+>>>>>>> add name field to Resource proto
     stats_.update_success_.inc();
     stats_.update_attempt_.inc();
     stats_.version_.set(HashUtil::xxHash64(version_info));
