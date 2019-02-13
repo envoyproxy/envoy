@@ -18,21 +18,9 @@ namespace Buffer {
 
 /**
  * A raw memory data slice including location and length.
- * @note The mem_ field is purposely immutable, in support of Buffer::Instance's
- *       reserve()/commit() idiom:
- *
- *          RawSlice slices[num_slices];
- *          num_slices_used = buffer.reserve(length, slices, num_slices);
- *          // fill the slices using readv(2)
- *          // then update the len_ of each slice to indicate the number of bytes filled
- *          buffer.commit(slices, num_slices_used);
- *
- *      Because the mem_ field of each slice is immutable, a buffer's commit() implementation
- *      can use it as a key to map the slices back to whatever internal data structures
- *      the buffer implementation is using.
  */
 struct RawSlice {
-  void* const mem_ = nullptr;
+  void* mem_ = nullptr;
   size_t len_ = 0;
 };
 

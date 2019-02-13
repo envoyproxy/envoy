@@ -12,18 +12,6 @@
 namespace Envoy {
 namespace Buffer {
 
-/**
- * Copy a Reservation to a RawSlice. The public interface of RawSlice makes specific
- * fields immutable (the comments in the declaration of RawSlice explain why), so this
- * is a convenience function that encapsulates the required casting.
- * @param lhs the slice to be overwritten with a copy of rhs.
- * @param rhs the reservation to copy.
- */
-static inline void Copy(RawSlice& lhs, const Slice::Reservation& rhs) {
-  *(const_cast<void**>(&(lhs.mem_))) = rhs.mem_;
-  lhs.len_ = rhs.len_;
-}
-
 void OwnedImpl::add(const void* data, uint64_t size) {
   if (old_impl_) {
     evbuffer_add(buffer_.get(), data, size);
@@ -218,11 +206,7 @@ uint64_t OwnedImpl::getRawSlices(RawSlice* out, uint64_t out_size) const {
         continue;
       }
       if (i < out_size) {
-        // The cumbersome cast here allows RawSlice::mem_ to remain immutable by everything
-        // outside OwnedImpl. The comments accompanying the RawSlice declaration in
-        // include/envoy/buffer/buffer.h provide more context on why the immutability
-        // is important.
-        *(const_cast<void**>(&(out[i].mem_))) = slice->data();
+        out[i].mem_ = slice->data();
         out[i].len_ = slice->dataSize();
       }
       i++;
@@ -476,7 +460,7 @@ uint64_t OwnedImpl::reserve(uint64_t length, RawSlice* iovecs, uint64_t num_iove
         // reservation.
         break;
       }
-      Copy(iovecs[num_slices_used], slice->reserve(reservation_size));
+      iovecs[num_slices_used] = slice->reserve(reservation_size);
       bytes_remaining -= iovecs[num_slices_used].len_;
       num_slices_used++;
       slice_index++;
@@ -485,7 +469,7 @@ uint64_t OwnedImpl::reserve(uint64_t length, RawSlice* iovecs, uint64_t num_iove
     // If needed, allocate one more slice at the end to provide the remainder of the reservation.
     if (bytes_remaining != 0) {
       slices_.emplace_back(OwnedSlice::create(bytes_remaining));
-      Copy(iovecs[num_slices_used], slices_.back()->reserve(bytes_remaining));
+      iovecs[num_slices_used] = slices_.back()->reserve(bytes_remaining);
       bytes_remaining -= iovecs[num_slices_used].len_;
       num_slices_used++;
     }
