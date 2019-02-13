@@ -286,25 +286,23 @@ admin:
 
 ```
 
-### Delta xDS
+### Incremental xDS
 
-Delta xDS is a separate xDS endpoint available for ADS, CDS and RDS that
-allows:
+Incremental xDS is a separate xDS endpoint available for ADS, CDS and RDS that:
 
-  * Delta updates of the list of tracked resources by the xDS client.
-    This supports Envoy on-demand / lazily requesting additional resources. For
-    example, this may occur when a request corresponding to an unknown cluster
-    arrives.
-  * The xDS server can incrementally update the resources on the client.
-    This supports the goal of scalability of xDS resources. Rather than deliver
-    all 100k clusters when a single cluster is modified, the management server
-    only needs to deliver the single cluster that changed.
+  * Allows the protocol to communicate on the wire in terms of resource/resource
+    name deltas ("Delta xDS"). This supports the goal of scalability of xDS
+    resources. Rather than deliver all 100k clusters when a single cluster is
+    modified, the management server only needs to deliver the single cluster
+    that changed.
+  * Allows the Envoy to on-demand / lazily request additional resources. For
+    example, requesting a cluster only when a request for that cluster arrives.
 
-An xDS delta session is always in the context of a gRPC bidirectional
+An Incremental xDS session is always in the context of a gRPC bidirectional
 stream. This allows the xDS server to keep track of the state of xDS clients
-connected to it. There is no REST version of Delta xDS.
+connected to it. There is no REST version of Incremental xDS.
 
-In delta xDS the nonce field is required and used to pair a
+In the delta xDS wire protocol, the nonce field is required and used to pair a
 [`DeltaDiscoveryResponse`](https://www.envoyproxy.io/docs/envoy/latest/api-v2/api/v2/discovery.proto#discoveryrequest)
 to a [`DeltaDiscoveryRequest`](https://www.envoyproxy.io/docs/envoy/latest/api-v2/api/v2/discovery.proto#discoveryrequest)
 ACK or NACK.
@@ -324,12 +322,12 @@ In this first example the client connects and receives a first update that it
 ACKs. The second update fails and the client NACKs the update. Later the xDS
 client spontaneously requests the "wc" resource.
 
-![Delta session example](diagrams/incremental.svg)
+![Incremental session example](diagrams/incremental.svg)
 
-On reconnect the xDS Delta client may tell the server of its known resources
-to avoid resending them over the network.
+On reconnect the Incremental xDS client may tell the server of its known
+resources to avoid resending them over the network.
 
-![Delta reconnect example](diagrams/incremental-reconnect.svg)
+![Incremental reconnect example](diagrams/incremental-reconnect.svg)
 
 ## REST-JSON polling subscriptions
 
