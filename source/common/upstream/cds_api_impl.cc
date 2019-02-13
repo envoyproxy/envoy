@@ -36,7 +36,7 @@ CdsApiImpl::CdsApiImpl(const envoy::api::v2::core::ConfigSource& cds_config, Clu
           "envoy.api.v2.ClusterDiscoveryService.StreamClusters", api);
 }
 
-void CdsApiImpl::pauseCdsDuringWarming() {
+void CdsApiImpl::pauseCdsWhileWarming() {
   if (cm_.warmingClusterCount() == 0) {
     cm_.adsMux().pause(Config::TypeUrl::get().Cluster);
   }
@@ -50,7 +50,7 @@ void CdsApiImpl::resumeCdsAfterWarming() {
 
 void CdsApiImpl::onConfigUpdate(const ResourceVector& resources, const std::string& version_info) {
   cm_.adsMux().pause(Config::TypeUrl::get().ClusterLoadAssignment);
-  pauseCdsDuringWarming();
+  pauseCdsWhileWarming();
 
   Cleanup resume_discovery([this] {
     cm_.adsMux().resume(Config::TypeUrl::get().ClusterLoadAssignment);
@@ -71,8 +71,14 @@ void CdsApiImpl::onConfigUpdate(const ResourceVector& resources, const std::stri
   for (auto& cluster : resources) {
     const std::string cluster_name = cluster.name();
     clusters_to_remove.erase(cluster_name);
-    if (cm_.addOrUpdateCluster(cluster, version_info,
-                               [this](auto, auto) { resumeCdsAfterWarming(); })) {
+    if (cm_.addOrUpdateCluster(cluster, version_info, [this](auto, auto state) {
+          if (cm_.warmingClusterCount() == 0) {
+            ASSERT(state == ClusterManager::ClusterWarmingState::Finished);
+          }
+          if (state == ClusterManager::ClusterWarmingState::Finished) {
+            resumeCdsAfterWarming();
+          }
+        })) {
       ENVOY_LOG(debug, "cds: add/update cluster '{}'", cluster_name);
     }
   }

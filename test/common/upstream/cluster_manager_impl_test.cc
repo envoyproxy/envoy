@@ -1072,7 +1072,7 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   std::shared_ptr<MockCluster> cluster1(new NiceMock<MockCluster>());
   int warming_cb_calls = 0;
   ClusterManager::ClusterWarmingState last_warming_state =
-      ClusterManager::ClusterWarmingState::INVALID;
+      ClusterManager::ClusterWarmingState::Starting;
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster1));
   EXPECT_CALL(*cluster1, initializePhase()).Times(0);
   EXPECT_CALL(*cluster1, initialize(_));
@@ -1087,14 +1087,14 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   EXPECT_EQ(1, cluster_manager_->warmingClusterCount());
   EXPECT_EQ(nullptr, cluster_manager_->get("fake_cluster"));
   EXPECT_EQ(1, warming_cb_calls);
-  EXPECT_EQ(ClusterManager::ClusterWarmingState::STARTED, last_warming_state);
+  EXPECT_EQ(ClusterManager::ClusterWarmingState::Starting, last_warming_state);
   cluster1->initialize_callback_();
 
   EXPECT_EQ(cluster1->info_, cluster_manager_->get("fake_cluster")->info());
   checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 1 /*active*/, 0 /*warming*/);
   EXPECT_EQ(0, cluster_manager_->warmingClusterCount());
   EXPECT_EQ(2, warming_cb_calls);
-  EXPECT_EQ(ClusterManager::ClusterWarmingState::FINISHED, last_warming_state);
+  EXPECT_EQ(ClusterManager::ClusterWarmingState::Finished, last_warming_state);
 
   // Now try to update again but with the same hash.
   EXPECT_FALSE(cluster_manager_->addOrUpdateCluster(defaultStaticCluster("fake_cluster"), "",

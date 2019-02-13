@@ -47,7 +47,7 @@ private:
              const LocalInfo::LocalInfo& local_info, Stats::Scope& scope, Api::Api& api);
   void runInitializeCallbackIfAny();
 
-  void pauseCdsDuringWarming();
+  void pauseCdsWhileWarming();
   void resumeCdsAfterWarming();
 
   ClusterManager& cm_;

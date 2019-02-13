@@ -469,7 +469,7 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::api::v2::Cluster& clust
   } else {
     auto& cluster_entry = warming_clusters_.at(cluster_name);
     ENVOY_LOG(info, "add/update cluster {} starting warming", cluster_name);
-    cluster_warming_cb(cluster_name, ClusterWarmingState::STARTED);
+    cluster_warming_cb(cluster_name, ClusterWarmingState::Starting);
     cluster_entry->cluster_->initialize([this, cluster_name, cluster_warming_cb] {
       auto warming_it = warming_clusters_.find(cluster_name);
       auto& cluster_entry = *warming_it->second;
@@ -484,7 +484,7 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::api::v2::Cluster& clust
       ENVOY_LOG(info, "warming cluster {} complete", cluster_name);
       createOrUpdateThreadLocalCluster(cluster_entry);
       onClusterInit(*cluster_entry.cluster_);
-      cluster_warming_cb(cluster_name, ClusterWarmingState::FINISHED);
+      cluster_warming_cb(cluster_name, ClusterWarmingState::Finished);
       updateGauges();
     });
   }

@@ -76,12 +76,13 @@ public:
   virtual ~ClusterManager() {}
 
   /**
-   * Warming state a cluster is currently in.
+   * Warming state a cluster is currently in. Used as an argument for the ClusterWarmingCallback.
    */
-  enum class ClusterWarmingState : int {
-    INVALID = 0,
-    FINISHED = 1,
-    STARTED = 2,
+  enum class ClusterWarmingState {
+    // Sent after cluster warming has finished.
+    Finished = 0,
+    // Sent just before cluster warming is about to start.
+    Starting = 1,
   };
 
   /**
