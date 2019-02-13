@@ -1,0 +1,146 @@
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":method"
+        value: "GET"
+      }
+      headers {
+        key: ":path"
+        value: "/"
+      }
+      headers {
+        key: ":scheme"
+        value: "http"
+      }
+      headers {
+        key: ":authority"
+        value: "foo.com"
+      }
+      headers {
+        key: "connection"
+        value: "upgrade"
+      }
+      headers {
+        key: "upgrade"
+        value: "WebSocket"
+      }
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 0
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 0
+    request {
+      data: 54
+    }
+  }
+}
+actions { quiesce_drain {} }
+actions {
+  stream_action {
+    stream_id: 0
+    request {
+      data: 54
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 0
+    response {
+      headers {
+        headers {
+          key: "connection"
+          value: "upgrade"
+        }
+        headers {
+          key: "upgrade"
+          value: "WebSocket"
+        }
+        headers {
+          key: ":status"
+          value: "200"
+        }
+        headers {
+          key: "content-length"
+          value: "5"
+        }
+      }
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 0
+    response {
+      data: 5
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 0
+    request {
+      read_disable: true
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 0
+    request {
+      read_disable: false
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 0
+    request {
+      read_disable: true
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 0
+    request {
+      trailers {
+        headers {
+          key: "foo"
+          value: "bar"
+        }
+      }
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 0
+    request {
+      read_disable: false
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 0
+    response {
+      trailers {
+        headers {
+          key: "foo"
+          value: "bar"
+        }
+      }
+    }
+  }
+}
