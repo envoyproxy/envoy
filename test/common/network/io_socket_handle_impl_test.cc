@@ -31,7 +31,7 @@ TEST(IoSocketHandleImplTest, TestIoSocketError) {
   EXPECT_EQ(IoSocketError::IoErrorCode::Permission, error6.getErrorCode());
   EXPECT_EQ(::strerror(EPERM), error6.getErrorDetails());
 
-  // Random unknow error.
+  // Random unknown error.
   IoSocketError error7(123);
   EXPECT_EQ(IoSocketError::IoErrorCode::UnknownError, error7.getErrorCode());
   EXPECT_EQ(::strerror(123), error7.getErrorDetails());
