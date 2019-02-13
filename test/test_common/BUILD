@@ -159,7 +159,7 @@ envoy_cc_test(
 )
 
 envoy_cc_test_infrastructure_library(
-    name = "test_base",
+    name = "test_base_lib",
     srcs = ["test_base.cc"],
     hdrs = ["test_base.h"],
     deps = [
