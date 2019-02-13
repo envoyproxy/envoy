@@ -24,7 +24,7 @@ public:
       return Http::FilterDataStatus::Continue;
     }
 
-    return Http::FilterDataStatus::StopIterationAndBuffer;
+    return Http::FilterDataStatus::StopIterationNoBuffer;
   }
 
   Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) {
@@ -38,7 +38,7 @@ public:
       return Http::FilterDataStatus::Continue;
     }
 
-    return Http::FilterDataStatus::StopIterationAndBuffer;
+    return Http::FilterDataStatus::StopIterationNoBuffer;
   }
 };
 
