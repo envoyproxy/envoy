@@ -37,7 +37,7 @@ enum class ConfigType { V2_YAML, V1_JSON };
 
 class LogicalDnsClusterTest : public TestBase {
 protected:
-  LogicalDnsClusterTest() : api_(Api::createApiForTest()) {}
+  LogicalDnsClusterTest() : api_(Api::createApiForTest(stats_store_)) {}
 
   void setupFromV1Json(const std::string& json) {
     resolve_timer_ = new Event::MockTimer(&dispatcher_);

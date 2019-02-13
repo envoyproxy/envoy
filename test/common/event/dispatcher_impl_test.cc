@@ -5,6 +5,7 @@
 #include "common/api/api_impl.h"
 #include "common/common/lock_guard.h"
 #include "common/event/dispatcher_impl.h"
+#include "common/stats/isolated_store_impl.h"
 
 #include "test/mocks/common.h"
 #include "test/test_common/test_base.h"

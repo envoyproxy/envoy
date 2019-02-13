@@ -23,7 +23,7 @@ namespace Event {
 class DispatchedThreadTest : public TestBase {
 protected:
   DispatchedThreadTest()
-      : config_(1000, 1000, 1000, 1000), api_(Api::createApiForTest()), thread_(*api_),
+      : config_(1000, 1000, 1000, 1000), api_(Api::createApiForTest(fakestats_)), thread_(*api_),
         guard_dog_(fakestats_, config_, *api_) {}
 
   void SetUp() override { thread_.start(guard_dog_); }

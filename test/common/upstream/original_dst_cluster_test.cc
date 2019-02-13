@@ -63,7 +63,8 @@ public:
   // on it. Ownership is transferred to the cluster at the cluster constructor, so the cluster will
   // take care of destructing it!
   OriginalDstClusterTest()
-      : cleanup_timer_(new Event::MockTimer(&dispatcher_)), api_(Api::createApiForTest()) {}
+      : cleanup_timer_(new Event::MockTimer(&dispatcher_)),
+        api_(Api::createApiForTest(stats_store_)) {}
 
   void setupFromJson(const std::string& json) { setup(parseClusterFromJson(json)); }
   void setupFromYaml(const std::string& yaml) { setup(parseClusterFromV2Yaml(yaml)); }

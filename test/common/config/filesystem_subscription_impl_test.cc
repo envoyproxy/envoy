@@ -36,7 +36,7 @@ TEST_F(FilesystemSubscriptionImplTest, InitialFile) {
 TEST(MiscFilesystemSubscriptionImplTest, BadWatch) {
   Event::MockDispatcher dispatcher;
   Stats::MockIsolatedStatsStore stats_store;
-  Api::ApiPtr api = Api::createApiForTest();
+  Api::ApiPtr api = Api::createApiForTest(stats_store);
   SubscriptionStats stats{Utility::generateStats(stats_store)};
   auto* watcher = new Filesystem::MockWatcher();
   EXPECT_CALL(dispatcher, createFilesystemWatcher_()).WillOnce(Return(watcher));

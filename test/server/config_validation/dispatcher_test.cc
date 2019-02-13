@@ -5,10 +5,10 @@
 #include "common/event/libevent.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
+#include "common/stats/isolated_store_impl.h"
 
 #include "server/config_validation/api.h"
 
-#include "test/mocks/stats/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/test_time.h"
@@ -29,9 +29,9 @@ public:
     dispatcher_ = validation_->allocateDispatcher();
   }
 
-  testing::NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   DangerousDeprecatedTestTime test_time_;
   Event::DispatcherPtr dispatcher_;
+  Stats::IsolatedStoreImpl stats_store_;
 
 private:
   // Using config validation API.

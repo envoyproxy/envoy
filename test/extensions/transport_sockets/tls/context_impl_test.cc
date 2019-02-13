@@ -38,7 +38,6 @@ class SslContextImplTest : public SslCertsTest {
 protected:
   Event::SimulatedTimeSystem time_system_;
   ContextManagerImpl manager_{time_system_};
-  Stats::IsolatedStoreImpl store_;
 };
 
 TEST_F(SslContextImplTest, TestdNSNameMatching) {

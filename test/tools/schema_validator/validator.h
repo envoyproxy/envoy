@@ -58,7 +58,7 @@ private:
  */
 class Validator {
 public:
-  Validator() : api_(Api::createApiForTest()) {}
+  Validator() : api_(Api::createApiForTest(stats_)) {}
   /**
    * Validates the JSON at config_path against schema_type.
    * An EnvoyException is thrown in several cases:
@@ -70,6 +70,7 @@ public:
   void validate(const std::string& json_path, Schema::Type schema_type);
 
 private:
+  Stats::IsolatedStoreImpl stats_;
   Api::ApiPtr api_;
 };
 

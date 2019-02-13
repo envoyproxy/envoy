@@ -1,5 +1,6 @@
 #include "common/common/thread.h"
 #include "common/event/dispatcher_impl.h"
+#include "common/stats/isolated_store_impl.h"
 #include "common/thread_local/thread_local_impl.h"
 
 #include "test/mocks/event/mocks.h"

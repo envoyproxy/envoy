@@ -2,6 +2,7 @@
 #include <vector>
 
 #include "common/json/json_loader.h"
+#include "common/stats/isolated_store_impl.h"
 
 #include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"

@@ -3,6 +3,7 @@
 #include "envoy/event/file_event.h"
 
 #include "common/event/dispatcher_impl.h"
+#include "common/stats/isolated_store_impl.h"
 
 #include "test/mocks/common.h"
 #include "test/test_common/environment.h"

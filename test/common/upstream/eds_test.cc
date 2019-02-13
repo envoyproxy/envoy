@@ -29,7 +29,7 @@ namespace Upstream {
 
 class EdsTest : public TestBase {
 protected:
-  EdsTest() : api_(Api::createApiForTest()) { resetCluster(); }
+  EdsTest() : api_(Api::createApiForTest(stats_)) { resetCluster(); }
 
   void resetCluster() {
     resetCluster(R"EOF(

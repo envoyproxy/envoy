@@ -410,15 +410,26 @@ protected:
 
 class TestImpl : public TestImplProvider, public Impl {
 public:
-  TestImpl() : Impl(Thread::threadFactoryForTest(), default_stats_store_, global_time_system_) {}
-  TestImpl(Event::TimeSystem& time_system)
-      : Impl(Thread::threadFactoryForTest(), default_stats_store_, time_system) {}
+  TestImpl(Thread::ThreadFactory& thread_factory, Stats::Store& stats_store)
+      : Impl(thread_factory, stats_store, global_time_system_) {}
+  TestImpl(Thread::ThreadFactory& thread_factory, Event::TimeSystem& time_system)
+      : Impl(thread_factory, default_stats_store_, time_system) {}
+  TestImpl(Thread::ThreadFactory& thread_factory)
+      : Impl(thread_factory, default_stats_store_, global_time_system_) {}
 };
 
-ApiPtr createApiForTest() { return std::make_unique<TestImpl>(); }
+ApiPtr createApiForTest() { return std::make_unique<TestImpl>(Thread::threadFactoryForTest()); }
+
+ApiPtr createApiForTest(Stats::Store& stat_store) {
+  return std::make_unique<TestImpl>(Thread::threadFactoryForTest(), stat_store);
+}
 
 ApiPtr createApiForTest(Event::TimeSystem& time_system) {
-  return std::make_unique<TestImpl>(time_system);
+  return std::make_unique<TestImpl>(Thread::threadFactoryForTest(), time_system);
+}
+
+ApiPtr createApiForTest(Stats::Store& stat_store, Event::TimeSystem& time_system) {
+  return std::make_unique<Impl>(Thread::threadFactoryForTest(), stat_store, time_system);
 }
 
 } // namespace Api

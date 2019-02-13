@@ -24,7 +24,7 @@ namespace Server {
 
 class LdsApiTest : public TestBase {
 public:
-  LdsApiTest() : request_(&cluster_manager_.async_client_), api_(Api::createApiForTest()) {}
+  LdsApiTest() : request_(&cluster_manager_.async_client_), api_(Api::createApiForTest(store_)) {}
 
   void setup() {
     const std::string config_json = R"EOF(

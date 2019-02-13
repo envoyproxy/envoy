@@ -28,7 +28,8 @@ namespace Config {
 
 class SubscriptionFactoryTest : public TestBase {
 public:
-  SubscriptionFactoryTest() : http_request_(&cm_.async_client_), api_(Api::createApiForTest()) {}
+  SubscriptionFactoryTest()
+      : http_request_(&cm_.async_client_), api_(Api::createApiForTest(stats_store_)) {}
 
   std::unique_ptr<Subscription<envoy::api::v2::ClusterLoadAssignment>>
   subscriptionFromConfigSource(const envoy::api::v2::core::ConfigSource& config) {

@@ -218,7 +218,7 @@ class GrpcClientIntegrationTest : public GrpcClientIntegrationParamTest {
 public:
   GrpcClientIntegrationTest()
       : method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")),
-        api_(Api::createApiForTest(test_time_.timeSystem())),
+        api_(Api::createApiForTest(*stats_store_, test_time_.timeSystem())),
         dispatcher_(api_->allocateDispatcher()) {}
 
   virtual void initialize() {

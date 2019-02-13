@@ -228,7 +228,8 @@ void IntegrationTcpClient::ConnectionCallbacks::onEvent(Network::ConnectionEvent
 
 BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version,
                                          const std::string& config)
-    : api_(Api::createApiForTest()), mock_buffer_factory_(new NiceMock<MockBufferFactory>),
+    : api_(Api::createApiForTest(stats_store_)),
+      mock_buffer_factory_(new NiceMock<MockBufferFactory>),
       dispatcher_(api_->allocateDispatcher(Buffer::WatermarkFactoryPtr{mock_buffer_factory_})),
       version_(version), config_helper_(version, *api_, config),
       default_log_level_(TestEnvironment::getOptions().logLevel()) {

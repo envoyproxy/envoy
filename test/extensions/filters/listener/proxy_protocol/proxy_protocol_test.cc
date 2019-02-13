@@ -49,7 +49,7 @@ class ProxyProtocolTest : public TestBaseWithParam<Network::Address::IpVersion>,
                           protected Logger::Loggable<Logger::Id::main> {
 public:
   ProxyProtocolTest()
-      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()),
+      : api_(Api::createApiForTest(stats_store_)), dispatcher_(api_->allocateDispatcher()),
         socket_(Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true),
         connection_handler_(new Server::ConnectionHandlerImpl(ENVOY_LOGGER(), *dispatcher_)),
         name_("proxy"), filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()) {
@@ -869,7 +869,7 @@ class WildcardProxyProtocolTest : public TestBaseWithParam<Network::Address::IpV
                                   protected Logger::Loggable<Logger::Id::main> {
 public:
   WildcardProxyProtocolTest()
-      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()),
+      : api_(Api::createApiForTest(stats_store_)), dispatcher_(api_->allocateDispatcher()),
         socket_(Network::Test::getAnyAddress(GetParam()), nullptr, true),
         local_dst_address_(Network::Utility::getAddressWithPort(
             *Network::Test::getCanonicalLoopbackAddress(GetParam()),

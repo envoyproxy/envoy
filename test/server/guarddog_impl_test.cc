@@ -26,9 +26,10 @@ namespace Server {
 
 class GuardDogTestBase : public TestBase {
 protected:
-  GuardDogTestBase() : api_(Api::createApiForTest(time_system_)) {}
+  GuardDogTestBase() : api_(Api::createApiForTest(stats_store_, time_system_)) {}
 
   Event::SimulatedTimeSystem time_system_;
+  Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
 };
 
@@ -139,7 +140,6 @@ protected:
 
   NiceMock<Configuration::MockMain> config_miss_;
   NiceMock<Configuration::MockMain> config_mega_;
-  Stats::IsolatedStoreImpl stats_store_;
 };
 
 TEST_F(GuardDogMissTest, MissTest) {

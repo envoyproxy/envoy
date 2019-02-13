@@ -56,7 +56,7 @@ namespace {
 // the expectations when needed.
 class TestClusterManagerFactory : public ClusterManagerFactory {
 public:
-  TestClusterManagerFactory() : api_(Api::createApiForTest()) {
+  TestClusterManagerFactory() : api_(Api::createApiForTest(stats_)) {
     ON_CALL(*this, clusterFromProto_(_, _, _, _))
         .WillByDefault(Invoke([&](const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
                                   Outlier::EventLoggerSharedPtr outlier_event_logger,
