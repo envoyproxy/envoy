@@ -35,10 +35,11 @@ ConnPoolMap<KEY_TYPE, POOL_TYPE>::getPool(KEY_TYPE key, const PoolFactory& facto
     }
 
     ASSERT(size() < max_size_.value(), "Freeing a pool should reduce the size to below the max.");
-    // TODO(klarose): Consider some simple hysteresis here. How can we prevent draining all pools
-    // when we only need to free a small percentage? If we start draining once we cross a threshold,
-    // then stop after we cross another, we could potentially avoid bouncing pools which shouldn't
-    // be freed.
+    // TODO(klarose): Consider some simple hysteresis here. How can we prevent iterating over all
+    // pools when we're at the limit every time we want to allocate a new one, even if most of the
+    // pools are not busy, while balancing that with not unnecessarily freeing all pools? If we
+    // start freeing once we cross a threshold, then stop after we cross another, we could
+    // achieve that balance.
   }
 
   // We have room for a new pool. Allocate one and let it know about any cached callbacks.
