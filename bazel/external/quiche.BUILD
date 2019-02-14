@@ -102,6 +102,7 @@ cc_library(
     hdrs = [
         "quiche/quic/platform/api/quic_cert_utils.h",
         "quiche/quic/platform/api/quic_mutex.h",
+        "quiche/quic/platform/api/quic_str_cat.h",
     ],
     visibility = ["//visibility:public"],
     deps = [
@@ -128,7 +129,6 @@ cc_library(
         "quiche/quic/platform/api/quic_prefetch.h",
         "quiche/quic/platform/api/quic_ptr_util.h",
         "quiche/quic/platform/api/quic_stack_trace.h",
-        "quiche/quic/platform/api/quic_str_cat.h",
         "quiche/quic/platform/api/quic_string.h",
         "quiche/quic/platform/api/quic_string_piece.h",
         "quiche/quic/platform/api/quic_string_utils.h",
