@@ -59,10 +59,12 @@ std::string SslRedirector::newPath(const Http::HeaderMap& headers) const {
 
 HedgePolicyImpl::HedgePolicyImpl(const envoy::api::v2::route::HedgePolicy& hedge_policy)
     : initial_requests_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(hedge_policy, initial_requests, 1)),
-      additional_request_chance_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(hedge_policy, additional_request_chance, 0)),
+      additional_request_chance_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(hedge_policy, additional_request_chance, 0)),
       hedge_on_per_try_timeout_(hedge_policy.hedge_on_per_try_timeout()) {}
 
-HedgePolicyImpl::HedgePolicyImpl() : initial_requests_(1), additional_request_chance_(0), hedge_on_per_try_timeout_(false) {}
+HedgePolicyImpl::HedgePolicyImpl()
+    : initial_requests_(1), additional_request_chance_(0), hedge_on_per_try_timeout_(false) {}
 
 RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::route::RetryPolicy& retry_policy) {
   per_try_timeout_ =

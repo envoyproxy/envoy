@@ -2533,9 +2533,9 @@ virtual_hosts:
                        ->hedgePolicy()
                        .hedgeOnPerTryTimeout());
   EXPECT_DOUBLE_EQ(0.4, config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
-                       ->routeEntry()
-                       ->hedgePolicy()
-                       .additionalRequestChance());
+                            ->routeEntry()
+                            ->hedgePolicy()
+                            .additionalRequestChance());
 
   EXPECT_EQ(1, config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
                    ->routeEntry()
@@ -2546,9 +2546,9 @@ virtual_hosts:
                        ->hedgePolicy()
                        .hedgeOnPerTryTimeout());
   EXPECT_DOUBLE_EQ(0, config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
-                       ->routeEntry()
-                       ->hedgePolicy()
-                       .additionalRequestChance());
+                          ->routeEntry()
+                          ->hedgePolicy()
+                          .additionalRequestChance());
 
   EXPECT_EQ(5, config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
                    ->routeEntry()
@@ -2559,9 +2559,9 @@ virtual_hosts:
                       ->hedgePolicy()
                       .hedgeOnPerTryTimeout());
   EXPECT_DOUBLE_EQ(40, config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
-                      ->routeEntry()
-                      ->hedgePolicy()
-                      .additionalRequestChance());
+                           ->routeEntry()
+                           ->hedgePolicy()
+                           .additionalRequestChance());
 }
 
 TEST_F(RouteMatcherTest, HedgeVirtualHostLevel) {
@@ -2596,9 +2596,9 @@ virtual_hosts:
                       ->hedgePolicy()
                       .hedgeOnPerTryTimeout());
   EXPECT_DOUBLE_EQ(0, config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
-                      ->routeEntry()
-                      ->hedgePolicy()
-                      .additionalRequestChance());
+                          ->routeEntry()
+                          ->hedgePolicy()
+                          .additionalRequestChance());
 
   // Virtual Host level hedge policy kicks in.
   EXPECT_EQ(1, config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
@@ -2610,9 +2610,9 @@ virtual_hosts:
                        ->hedgePolicy()
                        .hedgeOnPerTryTimeout());
   EXPECT_DOUBLE_EQ(30, config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
-                      ->routeEntry()
-                      ->hedgePolicy()
-                      .additionalRequestChance());
+                           ->routeEntry()
+                           ->hedgePolicy()
+                           .additionalRequestChance());
 
   EXPECT_EQ(3, config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
                    ->routeEntry()
@@ -2623,9 +2623,9 @@ virtual_hosts:
                        ->hedgePolicy()
                        .hedgeOnPerTryTimeout());
   EXPECT_DOUBLE_EQ(0, config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
-                      ->routeEntry()
-                      ->hedgePolicy()
-                      .additionalRequestChance());
+                          ->routeEntry()
+                          ->hedgePolicy()
+                          .additionalRequestChance());
 }
 
 TEST_F(RouteMatcherTest, TestBadDefaultConfig) {
