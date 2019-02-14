@@ -208,8 +208,7 @@ TEST(UtilityTest, UnixClusterStatic) {
 }
 
 TEST(UtilityTest, CheckFilesystemSubscriptionBackingPath) {
-  Stats::MockIsolatedStatsStore stats_store;
-  Api::ApiPtr api = Api::createApiForTest(stats_store);
+  Api::ApiPtr api = Api::createApiForTest();
 
   EXPECT_THROW_WITH_MESSAGE(
       Utility::checkFilesystemSubscriptionBackingPath("foo", *api), EnvoyException,
@@ -358,7 +357,7 @@ TEST(CheckApiConfigSourceSubscriptionBackingClusterTest, GrpcClusterTestAcrossTy
       "'foo_cluster' does not exist, was added via api, or is an EDS cluster");
 
   // Dynamic Cluster.
-  Upstream::MockCluster cluster;
+  Upstream::MockClusterMockPrioritySet cluster;
   cluster_map.emplace("foo_cluster", cluster);
   EXPECT_CALL(cluster, info());
   EXPECT_CALL(*cluster.info_, addedViaApi()).WillOnce(Return(true));
@@ -407,7 +406,7 @@ TEST(CheckApiConfigSourceSubscriptionBackingClusterTest, RestClusterTestAcrossTy
       "'foo_cluster' does not exist, was added via api, or is an EDS cluster");
 
   // Dynamic Cluster.
-  Upstream::MockCluster cluster;
+  Upstream::MockClusterMockPrioritySet cluster;
   cluster_map.emplace("foo_cluster", cluster);
   EXPECT_CALL(cluster, info());
   EXPECT_CALL(*cluster.info_, addedViaApi()).WillOnce(Return(true));

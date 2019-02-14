@@ -14,6 +14,7 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
 
+#include "common/common/assert.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
@@ -179,7 +180,7 @@ ClusterManagerImpl::ClusterManagerImpl(
       init_helper_([this](Cluster& cluster) { onClusterInit(cluster); }),
       config_tracker_entry_(
           admin.getConfigTracker().add("clusters", [this] { return dumpClusterConfigs(); })),
-      time_source_(main_thread_dispatcher.timeSystem()), dispatcher_(main_thread_dispatcher),
+      time_source_(main_thread_dispatcher.timeSource()), dispatcher_(main_thread_dispatcher),
       http_context_(http_context) {
   async_client_manager_ =
       std::make_unique<Grpc::AsyncClientManagerImpl>(*this, tls, time_source_, api);
@@ -926,7 +927,8 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::removeTcpConn(
 }
 
 void ClusterManagerImpl::ThreadLocalClusterManagerImpl::updateClusterMembership(
-    const std::string& name, uint32_t priority, HostSet::UpdateHostsParams&& update_hosts_params,
+    const std::string& name, uint32_t priority,
+    PrioritySet::UpdateHostsParams&& update_hosts_params,
     LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
     const HostVector& hosts_removed, ThreadLocal::Slot& tls) {
 
@@ -936,9 +938,9 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::updateClusterMembership(
   const auto& cluster_entry = config.thread_local_clusters_[name];
   ENVOY_LOG(debug, "membership update for TLS cluster {} added {} removed {}", name,
             hosts_added.size(), hosts_removed.size());
-  cluster_entry->priority_set_.getOrCreateHostSet(priority).updateHosts(
-      std::move(update_hosts_params), std::move(locality_weights), hosts_added, hosts_removed,
-      absl::nullopt);
+  cluster_entry->priority_set_.updateHosts(priority, std::move(update_hosts_params),
+                                           std::move(locality_weights), hosts_added, hosts_removed,
+                                           absl::nullopt);
 
   // If an LB is thread aware, create a new worker local LB on membership changes.
   if (cluster_entry->lb_factory_ != nullptr) {
@@ -1120,13 +1122,16 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
 
   // Note: to simplify this, we assume that the factory is only called in the scope of this
   // function. Otherwise, we'd need to capture a few of these variables by value.
-  Http::ConnectionPool::Instance& pool = container.pools_->getPool(hash_key, [&]() {
+  ConnPoolsContainer::ConnPools::OptPoolRef pool = container.pools_->getPool(hash_key, [&]() {
     return parent_.parent_.factory_.allocateConnPool(
         parent_.thread_local_dispatcher_, host, priority, protocol,
         have_options ? context->downstreamConnection()->socketOptions() : nullptr);
   });
-
-  return &pool;
+  // The Connection Pool tracking is a work in progress. We plan for it to eventually have the
+  // ability to fail, but until we add upper layer handling for failures, it should not. So, assert
+  // that we don't accidentally add conditions that could allow it to fail.
+  ASSERT(pool.has_value(), "Pool allocation should never fail");
+  return &(pool.value().get());
 }
 
 Tcp::ConnectionPool::Instance*

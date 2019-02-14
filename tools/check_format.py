@@ -42,6 +42,10 @@ REAL_TIME_WHITELIST = ('./source/common/common/utility.h',
 # Files in these paths can use std::get_time
 GET_TIME_WHITELIST = ('./test/test_common/utility.cc')
 
+# Files in these paths can use MessageLite::SerializeAsString
+SERIALIZE_AS_STRING_WHITELIST = ('./test/common/protobuf/utility_test.cc',
+                                 './test/common/grpc/codec_test.cc')
+
 CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-7")
 BUILDIFIER_PATH = os.getenv("BUILDIFIER_BIN", "$GOPATH/bin/buildifier")
 ENVOY_BUILD_FIXER_PATH = os.path.join(
@@ -221,6 +225,10 @@ def whitelistedForRealTime(file_path):
 
 def whitelistedForGetTime(file_path):
   return file_path in GET_TIME_WHITELIST
+
+
+def whitelistedForSerializeAsString(file_path):
+  return file_path in SERIALIZE_AS_STRING_WHITELIST
 
 
 def findSubstringAndReturnError(pattern, file_path, error_message):
@@ -414,6 +422,12 @@ def checkSourceLine(line, file_path, reportError):
   if file_path != './test/test_common/test_base.h' and (' testing::Test ' in line or
                                                         ' testing::TestWithParam' in line):
     reportError("Derive test classes from TestBase in test/test_common/test_base.h")
+  if not whitelistedForSerializeAsString(file_path) and 'SerializeAsString' in line:
+    # The MessageLite::SerializeAsString doesn't generate deterministic serialization,
+    # use MessageUtil::hash instead.
+    reportError(
+        "Don't use MessageLite::SerializeAsString for generating deterministic serialization, use MessageUtil::hash instead."
+    )
 
 
 def checkBuildLine(line, file_path, reportError):

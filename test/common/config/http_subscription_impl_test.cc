@@ -7,7 +7,7 @@ namespace Envoy {
 namespace Config {
 namespace {
 
-class HttpSubscriptionImplTest : public HttpSubscriptionTestHarness, public TestBase {};
+class HttpSubscriptionImplTest : public TestBase, public HttpSubscriptionTestHarness {};
 
 // Validate that the client can recover from a remote fetch failure.
 TEST_F(HttpSubscriptionImplTest, OnRequestReset) {

@@ -46,7 +46,7 @@ parseHttpConnectionManagerFromV2Yaml(const std::string& yaml) {
 class HttpConnectionManagerConfigTest : public TestBase {
 public:
   NiceMock<Server::Configuration::MockFactoryContext> context_;
-  Http::SlowDateProviderImpl date_provider_{context_.dispatcher().timeSystem()};
+  Http::SlowDateProviderImpl date_provider_{context_.dispatcher().timeSource()};
   NiceMock<Router::MockRouteConfigProviderManager> route_config_provider_manager_;
 };
 
