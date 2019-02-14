@@ -4,6 +4,7 @@
 #include "common/common/logger_delegates.h"
 #include "common/common/thread.h"
 #include "common/event/libevent.h"
+#include "common/http/http2/codec_impl.h"
 
 #include "test/mocks/access_log/mocks.h"
 #include "test/test_common/environment.h"
@@ -17,6 +18,7 @@ public:
   static int RunTests(int argc, char** argv) {
     ::testing::InitGoogleMock(&argc, argv);
     Event::Libevent::Global::initialize();
+    Http::Http2::initializeNghttp2Logging();
 
     // Add a test-listener so we can call a hook where we can do a quiescence
     // check after each method. See

@@ -721,6 +721,48 @@ TEST_F(Http1ConnPoolImplTest, RemoteCloseToCompleteResponse) {
   dispatcher_.clearDeferredDeleteList();
 }
 
+TEST_F(Http1ConnPoolImplTest, NoActiveConnectionsByDefault) {
+  EXPECT_FALSE(conn_pool_.hasActiveConnections());
+}
+
+TEST_F(Http1ConnPoolImplTest, ActiveRequestHasActiveConnectionsTrue) {
+  ActiveTestRequest r1(*this, 0, ActiveTestRequest::Type::CreateConnection);
+  r1.startRequest();
+
+  EXPECT_TRUE(conn_pool_.hasActiveConnections());
+
+  // cleanup
+  r1.completeResponse(false);
+  conn_pool_.drainConnections();
+  EXPECT_CALL(conn_pool_, onClientDestroy());
+  dispatcher_.clearDeferredDeleteList();
+}
+
+TEST_F(Http1ConnPoolImplTest, ResponseCompletedConnectionReadyNoActiveConnections) {
+  ActiveTestRequest r1(*this, 0, ActiveTestRequest::Type::CreateConnection);
+  r1.startRequest();
+  r1.completeResponse(false);
+
+  EXPECT_FALSE(conn_pool_.hasActiveConnections());
+
+  conn_pool_.drainConnections();
+  EXPECT_CALL(conn_pool_, onClientDestroy());
+  dispatcher_.clearDeferredDeleteList();
+}
+
+TEST_F(Http1ConnPoolImplTest, PendingRequestIsConsideredActive) {
+  conn_pool_.expectClientCreate();
+  ActiveTestRequest r1(*this, 0, ActiveTestRequest::Type::Pending);
+
+  EXPECT_TRUE(conn_pool_.hasActiveConnections());
+
+  EXPECT_CALL(conn_pool_, onClientDestroy());
+  r1.handle_->cancel();
+  conn_pool_.drainConnections();
+  conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  dispatcher_.clearDeferredDeleteList();
+}
+
 } // namespace Http1
 } // namespace Http
 } // namespace Envoy
