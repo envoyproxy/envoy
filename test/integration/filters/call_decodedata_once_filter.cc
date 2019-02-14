@@ -19,7 +19,8 @@ public:
   }
 
   Http::FilterDataStatus decodeData(Buffer::Instance&, bool) override {
-    ASSERT(call_count_++ == 0);
+    ASSERT(call_count_ == 0);
+    call_count_++;
     return Http::FilterDataStatus::Continue;
   }
 
