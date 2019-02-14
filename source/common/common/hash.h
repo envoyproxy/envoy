@@ -57,10 +57,18 @@ public:
    */
   static uint64_t murmurHash2_64(absl::string_view key, uint64_t seed = STD_HASH_SEED);
 
+#ifdef _MSC_VER
+#pragma intrinsic(memcpy)
+#endif
+
 private:
   static inline uint64_t unaligned_load(const char* p) {
     uint64_t result;
+#ifdef _MSC_VER
+    memcpy(&result, p, sizeof(result));
+#else
     __builtin_memcpy(&result, p, sizeof(result));
+#endif
     return result;
   }
 
