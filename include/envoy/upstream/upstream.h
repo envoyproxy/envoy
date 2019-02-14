@@ -380,6 +380,19 @@ public:
                            LocalityWeightsConstSharedPtr locality_weights,
                            const HostVector& hosts_added, const HostVector& hosts_removed,
                            absl::optional<uint32_t> overprovisioning_factor) PURE;
+
+  typedef std::function<void(uint32_t, UpdateHostsParams&&, LocalityWeightsConstSharedPtr,
+                             const HostVector&, const HostVector&, absl::optional<uint32_t>)>
+      UpdateHostsCb;
+
+  /**
+   * Allows updating hosts for multiple priorities at once, deferring the MemberUpdateCb from
+   * triggering until all priorities have been updated. The resulting callback will take into
+   * account hosts moved from one priority to another.
+   *
+   * @param callback callback to use to add hosts.
+   */
+  virtual void batchHostUpdate(std::function<void(UpdateHostsCb)> callback) PURE;
 };
 
 /**

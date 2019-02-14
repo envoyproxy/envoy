@@ -194,6 +194,23 @@ bool updateHealthFlag(const Host& updated_host, Host& existing_host, Host::Healt
   return false;
 }
 
+// Converts a set of hosts into a HostVector, excluding certain hosts.
+// @param hosts hosts to convert
+// @param excluded_hosts hosts to exlcude from the resulting vector.
+HostVector filterHosts(const std::unordered_set<HostSharedPtr>& hosts,
+                       const std::unordered_set<HostSharedPtr>& excluded_hosts) {
+  HostVector net_hosts;
+  net_hosts.reserve(hosts.size());
+
+  for (const auto& host : hosts) {
+    if (excluded_hosts.find(host) == excluded_hosts.end()) {
+      net_hosts.emplace_back(host);
+    }
+  }
+
+  return net_hosts;
+}
+
 } // namespace
 
 Host::CreateConnectionData HostImpl::createConnection(
@@ -451,7 +468,48 @@ void PrioritySetImpl::updateHosts(uint32_t priority, UpdateHostsParams&& update_
       ->updateHosts(std::move(update_hosts_params), std::move(locality_weights), hosts_added,
                     hosts_removed, overprovisioning_factor);
 
-  runUpdateCallbacks(hosts_added, hosts_removed);
+  if (!batch_update_) {
+    runUpdateCallbacks(hosts_added, hosts_removed);
+  }
+}
+
+void PrioritySetImpl::batchHostUpdate(std::function<void(UpdateHostsCb)> callback) {
+  ASSERT(!batch_update_);
+  batch_update_ = true;
+
+  std::unordered_set<uint32_t> priorities;
+  std::unordered_set<HostSharedPtr> all_hosts_added;
+  std::unordered_set<HostSharedPtr> all_hosts_removed;
+
+  // We wrap the update call with a lambda that tracks all the hosts that have been added/removed.
+  callback([&](auto p, auto&& params, auto locality_weight, const auto& hosts_added,
+               const auto& hosts_removed, auto overprovisioning_factor) {
+    // We assume that each call updates a different priority.
+    ASSERT(priorities.find(p) == priorities.end());
+    priorities.insert(p);
+
+    for (const auto& host : hosts_added) {
+      all_hosts_added.insert(host);
+    }
+
+    for (const auto& host : hosts_removed) {
+      all_hosts_removed.insert(host);
+    }
+
+    updateHosts(p, std::move(params), locality_weight, hosts_added, hosts_removed,
+                overprovisioning_factor);
+  });
+
+  // TODO(snowp): Use RAII to make this exception safe?
+  batch_update_ = false;
+
+  // Now that all the updates have been complete, we can compute the diff.
+
+  // TODO(snowp): Would computing the union of added/removed first be more efficient?
+  HostVector net_hosts_added = filterHosts(all_hosts_added, all_hosts_removed);
+  HostVector net_hosts_removed = filterHosts(all_hosts_removed, all_hosts_added);
+
+  runUpdateCallbacks(net_hosts_added, net_hosts_removed);
 }
 
 ClusterStats ClusterInfoImpl::generateStats(Stats::Scope& scope) {

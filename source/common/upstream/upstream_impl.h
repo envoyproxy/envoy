@@ -393,6 +393,7 @@ typedef std::unique_ptr<HostSetImpl> HostSetImplPtr;
 
 class PrioritySetImpl : public PrioritySet {
 public:
+  PrioritySetImpl() : batch_update_(false) {}
   // From PrioritySet
   Common::CallbackHandle* addMemberUpdateCb(MemberUpdateCb callback) const override {
     return member_update_cb_helper_.add(callback);
@@ -412,6 +413,8 @@ public:
                    LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
                    const HostVector& hosts_removed,
                    absl::optional<uint32_t> overprovisioning_factor = absl::nullopt) override;
+
+  void batchHostUpdate(std::function<void(UpdateHostsCb)> callback) override;
 
 protected:
   // Allows subclasses of PrioritySetImpl to create their own type of HostSetImpl.
@@ -438,6 +441,7 @@ private:
   mutable Common::CallbackManager<const HostVector&, const HostVector&> member_update_cb_helper_;
   mutable Common::CallbackManager<uint32_t, const HostVector&, const HostVector&>
       priority_update_cb_helper_;
+  bool batch_update_ : 1;
 };
 
 /**

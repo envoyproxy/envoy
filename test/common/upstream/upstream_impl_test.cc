@@ -1572,12 +1572,14 @@ TEST(PrioritySet, Extend) {
   std::shared_ptr<MockClusterInfo> info{new NiceMock<MockClusterInfo>()};
   HostVectorSharedPtr hosts(new HostVector({makeTestHost(info, "tcp://127.0.0.1:80")}));
   HostsPerLocalitySharedPtr hosts_per_locality = std::make_shared<HostsPerLocalityImpl>();
-  HostVector hosts_added{hosts->front()};
-  HostVector hosts_removed{};
+  {
+    HostVector hosts_added{hosts->front()};
+    HostVector hosts_removed{};
 
-  priority_set.updateHosts(
-      1, HostSetImpl::updateHostsParams(hosts, hosts_per_locality, hosts, hosts_per_locality), {},
-      hosts_added, hosts_removed, absl::nullopt);
+    priority_set.updateHosts(
+        1, HostSetImpl::updateHostsParams(hosts, hosts_per_locality, hosts, hosts_per_locality), {},
+        hosts_added, hosts_removed, absl::nullopt);
+  }
   EXPECT_EQ(1, priority_changes);
   EXPECT_EQ(1, membership_changes);
   EXPECT_EQ(last_priority, 1);
@@ -1588,6 +1590,41 @@ TEST(PrioritySet, Extend) {
   for (auto& host_set : priority_set.hostSetsPerPriority()) {
     EXPECT_EQ(host_set.get(), priority_set.hostSetsPerPriority()[i++].get());
   }
+
+  // Test batch host updates. Verify that we can move a host without triggering intermediate host
+  // updates.
+
+  // We're going to do a noop host change, so add a callback to assert that we're not announcing any
+  // host changes.
+  priority_set.addMemberUpdateCb([&](const HostVector& added, const HostVector& removed) -> void {
+    EXPECT_TRUE(added.empty() && removed.empty());
+  });
+
+  priority_set.batchHostUpdate([&](auto update_hosts) {
+    // Add the host from P1 to P0.
+    {
+      HostVector hosts_added{hosts->front()};
+      HostVector hosts_removed{};
+      update_hosts(
+          0, HostSetImpl::updateHostsParams(hosts, hosts_per_locality, hosts, hosts_per_locality),
+          {}, hosts_added, hosts_removed, absl::nullopt);
+    }
+
+    // Remove the host from P1.
+    {
+      HostVectorSharedPtr empty_hosts = std::make_shared<HostVector>();
+      HostVector hosts_added{};
+      HostVector hosts_removed{hosts->front()};
+      update_hosts(1,
+                   HostSetImpl::updateHostsParams(empty_hosts, HostsPerLocalityImpl::empty(),
+                                                  empty_hosts, HostsPerLocalityImpl::empty()),
+                   {}, hosts_added, hosts_removed, absl::nullopt);
+    }
+  });
+
+  // We expect to see two priority changes, but only one membership change.
+  EXPECT_EQ(3, priority_changes);
+  EXPECT_EQ(2, membership_changes);
 }
 
 class ClusterInfoImplTest : public TestBase {
