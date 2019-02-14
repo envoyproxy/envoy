@@ -84,7 +84,7 @@ public:
 
   struct DirectionalState {
     // The request encode and response decoder belong to the client, the
-    // response enoder and request decoder belong to the server.
+    // response encoder and request decoder belong to the server.
     StreamEncoder* encoder_;
     NiceMock<MockStreamDecoder> decoder_;
     NiceMock<MockStreamCallbacks> stream_callbacks_;
@@ -127,7 +127,6 @@ public:
     }));
     ON_CALL(request_.decoder_, decodeData(_, true)).WillByDefault(InvokeWithoutArgs([this] {
       // The HTTP/1 codec needs this to cleanup any latent stream resources.
-      ENVOY_LOG_MISC(debug, "HTD decodeData 2");
       response_.encoder_->getStream().resetStream(StreamResetReason::LocalReset);
       request_.closeRemote();
     }));
