@@ -6,6 +6,7 @@
 #include "common/config/well_known_names.h"
 #include "common/memory/stats.h"
 
+#include "test/config/utility.h"
 #include "test/integration/integration.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"
@@ -26,22 +27,10 @@ public:
   }
 
   void initialize() override { BaseIntegrationTest::initialize(); }
+};
 
-  uint64_t memoryConsumedWithClusters(int num_clusters, bool allow_stats) {
-    config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
-      if (!allow_stats) {
-        bootstrap.mutable_stats_config()->mutable_stats_matcher()->set_reject_all(true);
-      }
-      for (int i = 1; i < num_clusters; i++) {
-        auto* c = bootstrap.mutable_static_resources()->add_clusters();
-        c->set_name(fmt::format("cluster_{}", i));
-      }
-    });
-    initialize();
-
-    uint64_t end_mem = Memory::Stats::totalCurrentlyAllocated();
-    return end_mem;
-  };
+class ClusterMemoryUtilization : public TestBaseWithParam<Network::Address::IpVersion> {
+public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, StatsIntegrationTest,
@@ -147,30 +136,59 @@ TEST_P(StatsIntegrationTest, WithTagSpecifierWithFixedValue) {
   EXPECT_EQ(live->tags()[0].name_, "test.x");
   EXPECT_EQ(live->tags()[0].value_, "xxx");
 }
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, ClusterMemoryUtilization,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+//uint64_t memoryConsumedWithClusters(int num_clusters, bool allow_stats) {
+//    config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+//        if (!allow_stats) {
+//            bootstrap.mutable_stats_config()->mutable_stats_matcher()->set_reject_all(true);
+//        }
+//        for (int i = 1; i < num_clusters; i++) {
+//            auto* c = bootstrap.mutable_static_resources()->add_clusters();
+//            c->set_name(fmt::format("cluster_{}", i));
+//        }
+//    });
+//
+//};
+
 // TODO(cmluciano) Refactor once envoyproxy/envoy#5624 is solved
 // TODO(cmluciano) Add options to measure multiple workers
-TEST_P(StatsIntegrationTest, MemoryOneClusterSizeWithStats) {
-  const size_t start_mem = Memory::Stats::totalCurrentlyAllocated() / 1000;
-  if (start_mem == 0) {
-    // Skip this test for platforms where we can't measure memory.
-    return;
-  }
+TEST_P(ClusterMemoryUtilization, MemoryLargeClusterSizeWithStats) {
+    const size_t start_mem = Memory::Stats::totalCurrentlyAllocated() / 1000;
+    if (start_mem == 0) {
+        // Skip this test for platforms where we can't measure memory.
+        return;
+    }
 
-  uint64_t m1 = memoryConsumedWithClusters(1, true);
-  EXPECT_LT(start_mem, m1);
-  EXPECT_LT(m1 / 1000, 3450); // actual value: 3412 as of Feb 6, 2019
-}
+    auto IpVersions = TestBaseWithParam<Network::Address::IpVersion>::GetParam();
 
-TEST_P(StatsIntegrationTest, MemoryLargeClusterSizeWithStats) {
-  const size_t start_mem = Memory::Stats::totalCurrentlyAllocated() / 1000;
-  if (start_mem == 0) {
-    // Skip this test for platforms where we can't measure memory.
-    return;
-  }
+    // HTTP_PROXY_CONFIG with 1 cluster
+    auto* t1 = new BaseIntegrationTest(IpVersions);
+    t1->initialize();
+    size_t m1 = Memory::Stats::totalCurrentlyAllocated();
+    EXPECT_LT(start_mem, m1);
+    EXPECT_EQ(m1, 57000);
+    delete t1;
 
-  uint64_t m1001 = memoryConsumedWithClusters(1001, true);
-  EXPECT_LT(start_mem, m1001);
-  EXPECT_LT(m1001 - 3412880 / 1000, 60000000); // actual value: 59,479,348 as of Feb 6, 2019
+    // HTTP_PROXY_CONFIG with 1001 clusters
+    std::string config = ConfigHelper::HTTP_PROXY_CONFIG;
+    auto* t2 = new BaseIntegrationTest(IpVersions,config);
+//    t2->config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+//        for (int i = 1; i < 1001; i++) {
+//            auto* c = bootstrap.mutable_static_resources()->add_clusters();
+//            c->set_name(fmt::format("cluster_{}", i));
+//        }
+//    });
+    t2->initialize();
+    size_t m2 = Memory::Stats::totalCurrentlyAllocated();
+    EXPECT_LT(start_mem, m2);
+    EXPECT_EQ(m2, 57000);
+    size_t m_per_cluster = (m2 - m1) / 1000;
+    EXPECT_EQ(m_per_cluster, 57000);
+    delete t2;
 }
 
 } // namespace
