@@ -374,14 +374,7 @@ message HttpConnectionManager {
   };
   repeated UpgradeConfig upgrade_configs = 23;
 
-  // If true, the order of encoder filters will be reversed to that of filters
-  // configured in the HTTP filter chain. Otherwise, it will keep the existing
-  // order.
-  // Note: this is a bug fix for Envoy, which is designed to have the reversed
-  // order of encode filters to that of decode ones, (see
-  // https://github.com/envoyproxy/envoy/issues/4599 for details). When we remove this field, envoy
-  // will have the same behavior when it sets true.
-  google.protobuf.BoolValue bugfix_reverse_encode_order = 27 [deprecated = true];
+  reserved 27;
 }
 
 message Rds {
