@@ -60,7 +60,6 @@ protected:
   bool isExpectedType(const envoy::api::v2::core::HotRestartMessage* proto, int oneof_type);
 
 private:
-  void resizeRecvBuf(uint64_t new_size, uint64_t cur_bytes_used);
   void getPassedFdIfPresent(envoy::api::v2::core::HotRestartMessage* out, msghdr* message);
 
   const int base_id_;

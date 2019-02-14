@@ -109,12 +109,6 @@ void HotRestartingBase::sendHotRestartMessage(sockaddr_un& address,
   }
 }
 
-// Both arguments should include the first 8 'length' bytes in their totals.
-void HotRestartingBase::resizeRecvBuf(uint64_t new_size, uint64_t cur_bytes_used) {
-  recv_buf_.resize(new_size);
-  cur_msg_recvd_bytes_ = cur_bytes_used;
-}
-
 // Pull the cloned fd, if present, out of the control data and write it into the
 // PassListenSocketReply proto; the higher level code will see a listening fd that Just Works. We
 // should only get control data in a PassListenSocketReply, it should only be the fd passing type,
