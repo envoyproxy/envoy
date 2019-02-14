@@ -28,7 +28,10 @@ void InitManagerImpl::initialize(std::function<void()> callback) {
 void InitManagerImpl::initializeTarget(Init::Target& target) {
   target.initialize([this, &target]() -> void {
     ASSERT(std::find(targets_.begin(), targets_.end(), &target) != targets_.end());
-    targets_.erase(&target);
+    // TODO: This remove() is O(n), which makes iteration through the full list of targets in
+    //       InitManagerImpl::initialize() O(n^2). If this ever becomes more than just a theoretical
+    //       performance issue, we should use a linked hash set or similar instead of a list.
+    targets_.remove(&target);
     if (targets_.empty()) {
       state_ = State::Initialized;
       callback_();
@@ -38,7 +41,9 @@ void InitManagerImpl::initializeTarget(Init::Target& target) {
 
 void InitManagerImpl::registerTarget(Init::Target& target) {
   ASSERT(state_ != State::Initialized);
-  targets_.insert(&target);
+  ASSERT(std::find(targets_.begin(), targets_.end(), &target) == targets_.end(),
+         "Registered duplicate Init::Target");
+  targets_.push_back(&target);
   if (state_ == State::Initializing) {
     initializeTarget(target);
   }

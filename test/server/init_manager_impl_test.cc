@@ -63,17 +63,5 @@ TEST_F(InitManagerImplTest, TargetAfterInitializing) {
   target1.callback_();
 }
 
-TEST_F(InitManagerImplTest, DuplicateTargets) {
-  InSequence s;
-  Init::MockTarget target;
-
-  manager_.registerTarget(target);
-  manager_.registerTarget(target);
-  EXPECT_CALL(target, initialize(_))
-      .WillRepeatedly(Invoke([](std::function<void()> callback) -> void { callback(); }));
-  EXPECT_CALL(initialized_, ready());
-  manager_.initialize([&]() -> void { initialized_.ready(); });
-}
-
 } // namespace Server
 } // namespace Envoy
