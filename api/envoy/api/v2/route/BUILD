@@ -8,6 +8,7 @@ api_proto_library_internal(
     visibility = ["//envoy/api/v2:friends"],
     deps = [
         "//envoy/api/v2/core:base",
+        "//envoy/type:percent",
         "//envoy/type:range",
     ],
 )

@@ -421,7 +421,13 @@ public:
   /**
    * @return number of upstream requests that should be sent initially.
    */
-  virtual float initialRequests() const PURE;
+  virtual uint32_t initialRequests() const PURE;
+
+  /**
+   * @return percent chance that an additional upstream request should be sent
+   * on top of the value from initialRequests().
+   */
+  virtual double additionalRequestChance() const PURE;
 
   /**
    * @return bool indicating whether request hedging should occur when a request

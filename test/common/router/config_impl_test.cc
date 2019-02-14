@@ -2506,7 +2506,10 @@ virtual_hosts:
   - match: {prefix: /foo}
     route:
       cluster: www
-      hedge_policy: {initial_requests: 3.2}
+      hedge_policy:
+        initial_requests: 3
+        additional_request_chance:
+          value: 0.4
   - match: {prefix: /bar}
     route: {cluster: www}
   - match: {prefix: /}
@@ -2514,12 +2517,14 @@ virtual_hosts:
       cluster: www
       hedge_policy:
         hedge_on_per_try_timeout: true
-        initial_requests: 5.0
+        initial_requests: 5
+        additional_request_chance:
+          value: 40
   )EOF";
 
   TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
 
-  EXPECT_FLOAT_EQ(3.2, config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+  EXPECT_EQ(3, config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
                    ->routeEntry()
                    ->hedgePolicy()
                    .initialRequests());
@@ -2527,6 +2532,10 @@ virtual_hosts:
                        ->routeEntry()
                        ->hedgePolicy()
                        .hedgeOnPerTryTimeout());
+  EXPECT_DOUBLE_EQ(0.4, config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+                       ->routeEntry()
+                       ->hedgePolicy()
+                       .additionalRequestChance());
 
   EXPECT_EQ(1, config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
                    ->routeEntry()
@@ -2536,6 +2545,10 @@ virtual_hosts:
                        ->routeEntry()
                        ->hedgePolicy()
                        .hedgeOnPerTryTimeout());
+  EXPECT_DOUBLE_EQ(0, config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
+                       ->routeEntry()
+                       ->hedgePolicy()
+                       .additionalRequestChance());
 
   EXPECT_EQ(5, config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
                    ->routeEntry()
@@ -2545,6 +2558,10 @@ virtual_hosts:
                       ->routeEntry()
                       ->hedgePolicy()
                       .hedgeOnPerTryTimeout());
+  EXPECT_DOUBLE_EQ(40, config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
+                      ->routeEntry()
+                      ->hedgePolicy()
+                      .additionalRequestChance());
 }
 
 TEST_F(RouteMatcherTest, HedgeVirtualHostLevel) {
@@ -2560,7 +2577,9 @@ virtual_hosts:
       cluster: www
       hedge_policy: {hedge_on_per_try_timeout: true}
   - match: {prefix: /bar}
-    route: {cluster: www}
+    route:
+      hedge_policy: {additional_request_chance: {value: 30.0}}
+      cluster: www
   - match: {prefix: /}
     route: {cluster: www}
   )EOF";
@@ -2576,9 +2595,13 @@ virtual_hosts:
                       ->routeEntry()
                       ->hedgePolicy()
                       .hedgeOnPerTryTimeout());
+  EXPECT_DOUBLE_EQ(0, config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+                      ->routeEntry()
+                      ->hedgePolicy()
+                      .additionalRequestChance());
 
   // Virtual Host level hedge policy kicks in.
-  EXPECT_EQ(3, config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
+  EXPECT_EQ(1, config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
                    ->routeEntry()
                    ->hedgePolicy()
                    .initialRequests());
@@ -2586,6 +2609,10 @@ virtual_hosts:
                        ->routeEntry()
                        ->hedgePolicy()
                        .hedgeOnPerTryTimeout());
+  EXPECT_DOUBLE_EQ(30, config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
+                      ->routeEntry()
+                      ->hedgePolicy()
+                      .additionalRequestChance());
 
   EXPECT_EQ(3, config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
                    ->routeEntry()
@@ -2595,6 +2622,10 @@ virtual_hosts:
                        ->routeEntry()
                        ->hedgePolicy()
                        .hedgeOnPerTryTimeout());
+  EXPECT_DOUBLE_EQ(0, config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
+                      ->routeEntry()
+                      ->hedgePolicy()
+                      .additionalRequestChance());
 }
 
 TEST_F(RouteMatcherTest, TestBadDefaultConfig) {

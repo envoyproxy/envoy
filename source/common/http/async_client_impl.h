@@ -111,7 +111,8 @@ private:
 
   struct NullHedgePolicy : public Router::HedgePolicy {
     // Router::HedgePolicy
-    float initialRequests() const override { return 1; }
+    uint32_t initialRequests() const override { return 1; }
+    double additionalRequestChance() const override { return 0; }
     bool hedgeOnPerTryTimeout() const override { return false; }
   };
 

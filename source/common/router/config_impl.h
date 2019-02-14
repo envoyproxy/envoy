@@ -302,11 +302,13 @@ public:
   HedgePolicyImpl();
 
   // Router::HedgePolicy
-  float initialRequests() const override { return initial_requests_; }
+  uint32_t initialRequests() const override { return initial_requests_; }
+  double additionalRequestChance() const override { return additional_request_chance_; }
   bool hedgeOnPerTryTimeout() const override { return hedge_on_per_try_timeout_; }
 
 private:
-  const float initial_requests_;
+  const uint32_t initial_requests_;
+  const double additional_request_chance_;
   const bool hedge_on_per_try_timeout_;
 };
 
