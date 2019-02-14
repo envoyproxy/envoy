@@ -119,6 +119,10 @@ TEST_F(DiskBackedLoaderImplTest, All) {
   // File1 is not a boolean.
   EXPECT_EQ(false, snapshot->getBoolean("file1", value));
 
+  // Feature defaults.
+  EXPECT_EQ(false, snapshot->runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
+  EXPECT_EQ(true, snapshot->runtimeFeatureEnabled("envoy.reloadable_features.test_feature_true"));
+
   // Files with comments.
   EXPECT_EQ(123UL, loader->snapshot().getInteger("file5", 1));
   EXPECT_EQ("/home#about-us", loader->snapshot().get("file6"));

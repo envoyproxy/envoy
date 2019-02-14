@@ -137,6 +137,56 @@ maximize the chances of your PR being merged.
   [envoy-filter-example](https://github.com/envoyproxy/envoy-filter-example) (for example making a new
   branch so that CI can pass) it is your responsibility to follow through with merging those
   changes back to master once the CI dance is done.
+* If your PR is a high risk change, the reviewer may ask that you runtime guard
+  it. See the section on runtime guarding below.
+
+
+# Runtime guarding
+
+Some high risk changes in Envoy are deemed worthy of runtime guarding. Instead of just replacing
+old code with new code, both code paths are supported for between one Envoy release (if it is
+guarded due to performance concerns) and a full deprecation cycle (if it is a high risk behavioral
+change).
+
+The canonican way to runtime guard a feature is
+```
+if (Runtime::LoaderSingleton::getExisting() &&
+    Runtime::LoaderSingleton::getExisting()->snapshot()->runtimeFeatureEnabled("
+       envoy.reloadable_features.my_feature_name")) {
+  [new code path]
+} else {
+  [old_code_path]
+}
+```
+Runtime guarded features named with the "envoy.reloadable_features." prefix must be safe to flip
+true or false on running Envoy instances. In some situations, for example the buffer rewrite in
+[#5441](https://github.com/envoyproxy/envoy/pull/5441), it may make more sense to
+latch the value in a member variable on class creation, for example:
+
+```
+bool use_new_code_path_ = Runtime::LoaderSingleton::getExisting() &&
+  Runtime::LoaderSingleton::getExisting()->snapshot()->runtimeFeatureEnabled(
+      "envoy.reloadable_features.my_feature_name"));
+```
+
+Runtime guarded features may either set true (running the new code by default) in the initial PR,
+after a testing interval, or during the next release cycle, at the PR author's and reviewing
+maintainer's discretion. Generally all runtime guarded features will be set true when a
+release is cut, and the old code path will be deprecated at that time. Runtime features
+are set true by default by inclusion in
+[source/common/runtime/runtime_features.h](https://github.com/envoyproxy/envoy/blob/master/source/common/runtime/runtime_features.h)
+
+There are three options for testing new runtime features:
+
+1. Create a per-test Runtime::LoaderSingleton as done in [DeprecatedFieldsTest.IndividualFieldDisallowedWithRuntimeOverride](https://github.com/envoyproxy/envoy/blob/master/test/common/protobuf/utility_test.cc)
+2. Set up integration tests with custom runtime defaults as documented in the
+   [integration test README](https://github.com/envoyproxy/envoy/blob/master/test/integration/README.md)
+3. Run a given unit test with the new runtime value explicitly set true as done
+   for [runtime_flag_override_test](https://github.com/envoyproxy/envoy/blob/master/test/common/runtime/BUILD) 
+
+Runtime code is held to the same standard as regular Envoy code, so both the old
+path and the new should have 100% coverage both with the feature defaulting true
+and false.
 
 # PR review policy for maintainers
 

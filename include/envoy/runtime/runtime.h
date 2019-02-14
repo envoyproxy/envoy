@@ -83,6 +83,13 @@ public:
   // configuration of "false" in runtime config.
   virtual bool deprecatedFeatureEnabled(const std::string& key) const PURE;
 
+  // Returns true if a runtime feature is enabled.
+  //
+  // Runtime features are used to easily allow switching between old and new code paths for high
+  // risk changes. The intent is for the old code path to be short lived - the old code path is
+  // deprecated as the feature is defaulted true, and removed with the following Envoy release.
+  virtual bool runtimeFeatureEnabled(const std::string& key) const PURE;
+
   /**
    * Test if a feature is enabled using the built in random generator. This is done by generating
    * a random number in the range 0-99 and seeing if this number is < the value stored in the
