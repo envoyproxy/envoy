@@ -102,6 +102,9 @@ or you can subscribe to the iCal feed
   following version. E.g., "1.7.0 (pending)".
 * Run the deprecate_versions.py script (e.g. `sh tools/deprecate_version/deprecate_version.sh 1.8.0 1.10.0`)
   to file tracking issues for code which can be removed.
+* Run the deprecate_features.py script (e.g. `sh tools/deprecate_version/deprecate_features.sh`)
+  to make the last release's deprecated features fatal-by-default. Submit the resultant PR and send
+  an email to envoy-announce.
 
 ## When does a maintainer lose maintainer status
 
