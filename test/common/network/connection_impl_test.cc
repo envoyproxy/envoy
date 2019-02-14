@@ -428,8 +428,8 @@ TEST_P(ConnectionImplTest, ConnectionStats) {
 
   std::shared_ptr<MockWriteFilter> write_filter(new MockWriteFilter());
   std::shared_ptr<MockFilter> filter(new MockFilter());
-  client_connection_->addWriteFilter(write_filter);
   client_connection_->addFilter(filter);
+  client_connection_->addWriteFilter(write_filter);
 
   Sequence s1;
   EXPECT_CALL(*write_filter, onWrite(_, _))
@@ -1523,8 +1523,8 @@ TEST_F(MockTransportConnectionImplTest, WriteEndStreamStopIteration) {
   std::shared_ptr<MockWriteFilter> write_filter1(new StrictMock<MockWriteFilter>());
   std::shared_ptr<MockWriteFilter> write_filter2(new StrictMock<MockWriteFilter>());
   connection_->enableHalfClose(true);
-  connection_->addWriteFilter(write_filter1);
   connection_->addWriteFilter(write_filter2);
+  connection_->addWriteFilter(write_filter1);
 
   EXPECT_CALL(*write_filter1, onWrite(BufferStringEqual(val), true))
       .WillOnce(Return(FilterStatus::StopIteration));
