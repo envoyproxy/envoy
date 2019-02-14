@@ -6,13 +6,19 @@ if [[ "${OS}" == "Windows_NT" ]]; then
   exit 0
 fi
 
-VERSION=2.7
-SHA256=1ee8c8699a0eff6b6a203e59b43330536b22bbcbe6448f54c7091e5efb0763c9
+# TODO(cmluciano): Bump to release 2.8
+# This sha is specifically chosen to fix ppc64le builds that require inclusion
+# of asm/ptrace.h
+VERSION=fc00474ddc21fff618fc3f009b46590e241e425e
+SHA256=18574813a062eee487bc1b761e8024a346075a7cb93da19607af362dc09565ef
 
-curl https://github.com/gperftools/gperftools/releases/download/gperftools-"$VERSION"/gperftools-"$VERSION".tar.gz -sLo gperftools-"$VERSION".tar.gz \
+curl https://github.com/gperftools/gperftools/archive/${VERSION}.tar.gz -sLo gperftools-"$VERSION".tar.gz \
   && echo "$SHA256" gperftools-"$VERSION".tar.gz | sha256sum --check
+
 tar xf gperftools-"$VERSION".tar.gz
-cd gperftools-"$VERSION"
+cd gperftools-"${VERSION}"
+
+./autogen.sh
 
 export LDFLAGS="${LDFLAGS} -lpthread"
 ./configure --prefix="$THIRDPARTY_BUILD" --enable-shared=no --enable-frame-pointers --disable-libunwind
