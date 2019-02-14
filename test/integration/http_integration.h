@@ -132,12 +132,9 @@ protected:
   // Sends a simple header-only HTTP request, and waits for a response.
   IntegrationStreamDecoderPtr makeHeaderOnlyRequest(ConnectionCreationFunction* create_connection,
                                                     int upstream_index);
-
-  void testRouterRedirect();
   void testRouterNotFound();
   void testRouterNotFoundWithBody();
-  void testRouterClusterNotFound404();
-  void testRouterClusterNotFound503();
+
   void testRouterRequestAndResponseWithBody(uint64_t request_size, uint64_t response_size,
                                             bool big_header,
                                             ConnectionCreationFunction* creator = nullptr);
@@ -149,7 +146,12 @@ protected:
   void testRouterHeaderOnlyRequestAndResponse(ConnectionCreationFunction* creator = nullptr,
                                               int upstream_index = 0);
   void testRequestAndResponseShutdownWithActiveConnection();
+<<<<<<< HEAD
 >>>>>>> test: Add non-aggregated CDS-over-gRPC integration test (#5228)
+=======
+
+  // Disconnect tests
+>>>>>>> test: moving H1/H2 shared tests into their own file. (#5941)
   void testRouterUpstreamDisconnectBeforeRequestComplete();
   void
   testRouterUpstreamDisconnectBeforeResponseComplete(ConnectionCreationFunction* creator = nullptr);
@@ -158,36 +160,16 @@ protected:
   void testRouterDownstreamDisconnectBeforeResponseComplete(
       ConnectionCreationFunction* creator = nullptr);
   void testRouterUpstreamResponseBeforeRequestComplete();
+
   void testTwoRequests(bool force_network_backup = false);
   void testLargeRequestHeaders(uint32_t size, uint32_t max_size = 60);
-  void testIdleTimeoutBasic();
-  void testIdleTimeoutWithTwoRequests();
-  void testIdleTimerDisabled();
-  void testUpstreamDisconnectWithTwoRequests();
-  void testHeadersOnlyFilterEncoding();
-  void testHeadersOnlyFilterDecoding();
-  void testHeadersOnlyFilterEncodingIntermediateFilters();
-  void testHeadersOnlyFilterDecodingIntermediateFilters();
-  void testHeadersOnlyFilterInterleaved();
 
-  // Test that a request returns the same content with both allow_absolute_urls enabled and
-  // allow_absolute_urls disabled
-  void testDefaultHost();
-  void testValidZeroLengthContent();
-  void testInvalidContentLength();
-  void testMultipleContentLengths();
-  void testComputedHealthCheck();
   void testAddEncodedTrailers();
-  void testDrainClose();
   void testRetry();
   void testRetryHittingBufferLimit();
   void testRetryAttemptCountHeader();
-  void testGrpcRouterNotFound();
   void testGrpcRetry();
-  void testRetryPriority();
-  void testRetryHostPredicateFilter();
-  void testHittingDecoderFilterLimit();
-  void testHittingEncoderFilterLimit();
+
   void testEnvoyHandling100Continue(bool additional_continue_from_upstream = false,
                                     const std::string& via = "");
   void testEnvoyProxying100Continue(bool continue_before_upstream_complete = false,

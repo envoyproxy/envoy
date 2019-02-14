@@ -52,16 +52,6 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, IntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-TEST_P(IntegrationTest, RouterNotFound) { testRouterNotFound(); }
-
-TEST_P(IntegrationTest, RouterNotFoundBodyNoBuffer) { testRouterNotFoundWithBody(); }
-
-TEST_P(IntegrationTest, RouterClusterNotFound404) { testRouterClusterNotFound404(); }
-
-TEST_P(IntegrationTest, RouterClusterNotFound503) { testRouterClusterNotFound503(); }
-
-TEST_P(IntegrationTest, RouterRedirect) { testRouterRedirect(); }
-
 TEST_P(IntegrationTest, RouterDirectResponse) {
   const std::string body = "Response body";
   const std::string file_path = TestEnvironment::writeStringToFileForTest("test_envoy", body);
@@ -103,12 +93,6 @@ TEST_P(IntegrationTest, RouterDirectResponse) {
   EXPECT_EQ(body, response->body());
 }
 
-TEST_P(IntegrationTest, ComputedHealthCheck) { testComputedHealthCheck(); }
-
-TEST_P(IntegrationTest, AddEncodedTrailers) { testAddEncodedTrailers(); }
-
-TEST_P(IntegrationTest, DrainClose) { testDrainClose(); }
-
 TEST_P(IntegrationTest, ConnectionClose) {
   config_helper_.addFilter(ConfigHelper::DEFAULT_HEALTH_CHECK_FILTER);
   initialize();
@@ -143,10 +127,6 @@ TEST_P(IntegrationTest, RouterHeaderOnlyRequestAndResponseNoBuffer) {
   testRouterHeaderOnlyRequestAndResponse();
 }
 
-TEST_P(IntegrationTest, ShutdownWithActiveConnPoolConnections) {
-  testRequestAndResponseShutdownWithActiveConnection();
-}
-
 TEST_P(IntegrationTest, RouterUpstreamDisconnectBeforeRequestcomplete) {
   testRouterUpstreamDisconnectBeforeRequestComplete();
 }
@@ -167,22 +147,6 @@ TEST_P(IntegrationTest, RouterUpstreamResponseBeforeRequestComplete) {
   testRouterUpstreamResponseBeforeRequestComplete();
 }
 
-TEST_P(IntegrationTest, Retry) { testRetry(); }
-
-TEST_P(IntegrationTest, RetryAttemptCount) { testRetryAttemptCountHeader(); }
-
-TEST_P(IntegrationTest, RetryHostPredicateFilter) { testRetryHostPredicateFilter(); }
-
-TEST_P(IntegrationTest, RetryPriority) { testRetryPriority(); }
-
-TEST_P(IntegrationTest, EnvoyHandling100Continue) { testEnvoyHandling100Continue(); }
-
-TEST_P(IntegrationTest, EnvoyHandlingDuplicate100Continues) { testEnvoyHandling100Continue(true); }
-
-TEST_P(IntegrationTest, EnvoyProxyingEarly100Continue) { testEnvoyProxying100Continue(true); }
-
-TEST_P(IntegrationTest, EnvoyProxyingLate100Continue) { testEnvoyProxying100Continue(false); }
-
 TEST_P(IntegrationTest, EnvoyProxyingEarly100ContinueWithEncoderFilter) {
   testEnvoyProxying100Continue(true, true);
 }
@@ -191,39 +155,61 @@ TEST_P(IntegrationTest, EnvoyProxyingLate100ContinueWithEncoderFilter) {
   testEnvoyProxying100Continue(false, true);
 }
 
-TEST_P(IntegrationTest, TwoRequests) { testTwoRequests(); }
-
-TEST_P(IntegrationTest, TwoRequestsWithForcedBackup) { testTwoRequests(true); }
-
+// This is a regression for https://github.com/envoyproxy/envoy/issues/2715 and validates that a
+// pending request is not sent on a connection that has been half-closed.
 TEST_P(IntegrationTest, UpstreamDisconnectWithTwoRequests) {
-  testUpstreamDisconnectWithTwoRequests();
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    auto* static_resources = bootstrap.mutable_static_resources();
+    auto* cluster = static_resources->mutable_clusters(0);
+    // Ensure we only have one connection upstream, one request active at a time.
+    cluster->mutable_max_requests_per_connection()->set_value(1);
+    auto* circuit_breakers = cluster->mutable_circuit_breakers();
+    circuit_breakers->add_thresholds()->mutable_max_connections()->set_value(1);
+  });
+  initialize();
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Request 1.
+  auto response = codec_client_->makeRequestWithBody(default_request_headers_, 1024);
+  waitForNextUpstreamRequest();
+
+  // Request 2.
+  IntegrationCodecClientPtr codec_client2 = makeHttpConnection(lookupPort("http"));
+  auto response2 = codec_client2->makeRequestWithBody(default_request_headers_, 512);
+
+  // Validate one request active, the other pending.
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 1);
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_pending_active", 1);
+
+  // Response 1.
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  upstream_request_->encodeData(512, true);
+  ASSERT_TRUE(fake_upstream_connection_->close());
+  response->waitForEndStream();
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 1);
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_200", 1);
+
+  // Response 2.
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  fake_upstream_connection_.reset();
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  upstream_request_->encodeData(1024, true);
+  response2->waitForEndStream();
+  codec_client2->close();
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response2->complete());
+  EXPECT_STREQ("200", response2->headers().Status()->value().c_str());
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 2);
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_200", 2);
 }
-
-TEST_P(IntegrationTest, EncodingHeaderOnlyResponse) { testHeadersOnlyFilterEncoding(); }
-
-TEST_P(IntegrationTest, DecodingHeaderOnlyResponse) { testHeadersOnlyFilterDecoding(); }
-
-TEST_P(IntegrationTest, EncodingHeaderOnlyResponseIntermediateFilters) {
-  testHeadersOnlyFilterEncodingIntermediateFilters();
-}
-
-TEST_P(IntegrationTest, DecodingHeaderOnlyResponseIntermediateFilters) {
-  testHeadersOnlyFilterDecodingIntermediateFilters();
-}
-
-TEST_P(IntegrationTest, DecodingHeaderOnlyInterleaved) { testHeadersOnlyFilterInterleaved(); }
-
-TEST_P(IntegrationTest, RetryHittingBufferLimit) { testRetryHittingBufferLimit(); }
-
-TEST_P(IntegrationTest, HittingDecoderFilterLimit) { testHittingDecoderFilterLimit(); }
-
-// Tests idle timeout behaviour with single request and validates that idle timer kicks in
-// after given timeout.
-TEST_P(IntegrationTest, IdleTimoutBasic) { testIdleTimeoutBasic(); }
-
-// Tests idle timeout behaviour with multiple requests and validates that idle timer kicks in
-// after both the requests are done.
-TEST_P(IntegrationTest, IdleTimeoutWithTwoRequests) { testIdleTimeoutWithTwoRequests(); }
 
 // Test hitting the bridge filter with too many response bytes to buffer. Given
 // the headers are not proxied, the connection manager will send a local error reply.
@@ -256,8 +242,6 @@ TEST_P(IntegrationTest, HittingGrpcFilterLimitBufferingHeaders) {
   EXPECT_THAT(response->headers(),
               HeaderValueOf(Headers::get().GrpcStatus, "2")); // Unknown gRPC error
 }
-
-TEST_P(IntegrationTest, HittingEncoderFilterLimit) { testHittingEncoderFilterLimit(); }
 
 TEST_P(IntegrationTest, BadFirstline) {
   initialize();
@@ -484,15 +468,9 @@ TEST_P(IntegrationTest, Connect) {
   EXPECT_EQ(normalizeDate(response1), normalizeDate(response2));
 }
 
-TEST_P(IntegrationTest, ValidZeroLengthContent) { testValidZeroLengthContent(); }
+TEST_P(IntegrationTest, LargeHeadersRejected) { testLargeRequestHeaders(62, 60); }
 
-TEST_P(IntegrationTest, InvalidContentLength) { testInvalidContentLength(); }
-
-TEST_P(IntegrationTest, MultipleContentLengths) { testMultipleContentLengths(); }
-
-TEST_P(IntegrationTest, LargeHeadersRejected) { testLargeRequestHeaders(63, 60); }
-
-TEST_P(IntegrationTest, LargeHeadersAcceptedIfConfigured) { testLargeRequestHeaders(63, 64); }
+TEST_P(IntegrationTest, LargeHeadersAccepted) { testLargeRequestHeaders(62, 63); }
 
 TEST_P(IntegrationTest, UpstreamProtocolError) {
   initialize();

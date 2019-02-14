@@ -15,16 +15,6 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, Http2UpstreamIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-TEST_P(Http2UpstreamIntegrationTest, RouterNotFound) { testRouterNotFound(); }
-
-TEST_P(Http2UpstreamIntegrationTest, RouterRedirect) { testRouterRedirect(); }
-
-TEST_P(Http2UpstreamIntegrationTest, ComputedHealthCheck) { testComputedHealthCheck(); }
-
-TEST_P(Http2UpstreamIntegrationTest, AddEncodedTrailers) { testAddEncodedTrailers(); }
-
-TEST_P(Http2UpstreamIntegrationTest, DrainClose) { testDrainClose(); }
-
 TEST_P(Http2UpstreamIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
   testRouterRequestAndResponseWithBody(1024, 512, false);
 }
@@ -57,31 +47,9 @@ TEST_P(Http2UpstreamIntegrationTest, RouterUpstreamResponseBeforeRequestComplete
   testRouterUpstreamResponseBeforeRequestComplete();
 }
 
-TEST_P(Http2UpstreamIntegrationTest, TwoRequests) { testTwoRequests(); }
-
 TEST_P(Http2UpstreamIntegrationTest, Retry) { testRetry(); }
 
-TEST_P(Http2UpstreamIntegrationTest, EnvoyHandling100Continue) { testEnvoyHandling100Continue(); }
-
-TEST_P(Http2UpstreamIntegrationTest, EnvoyHandlingDuplicate100Continue) {
-  testEnvoyHandling100Continue(true);
-}
-
-TEST_P(Http2UpstreamIntegrationTest, EnvoyProxyingEarly100Continue) {
-  testEnvoyProxying100Continue(true);
-}
-
-TEST_P(Http2UpstreamIntegrationTest, EnvoyProxyingLate100Continue) {
-  testEnvoyProxying100Continue(false);
-}
-
-TEST_P(Http2UpstreamIntegrationTest, RetryHittingBufferLimit) { testRetryHittingBufferLimit(); }
-
 TEST_P(Http2UpstreamIntegrationTest, GrpcRetry) { testGrpcRetry(); }
-
-TEST_P(Http2UpstreamIntegrationTest, DownstreamResetBeforeResponseComplete) {
-  testDownstreamResetBeforeResponseComplete();
-}
 
 TEST_P(Http2UpstreamIntegrationTest, Trailers) { testTrailers(1024, 2048); }
 
