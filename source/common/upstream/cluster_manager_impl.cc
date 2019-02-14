@@ -14,6 +14,7 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
 
+#include "common/common/assert.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
@@ -1121,13 +1122,16 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
 
   // Note: to simplify this, we assume that the factory is only called in the scope of this
   // function. Otherwise, we'd need to capture a few of these variables by value.
-  Http::ConnectionPool::Instance& pool = container.pools_->getPool(hash_key, [&]() {
+  ConnPoolsContainer::ConnPools::OptPoolRef pool = container.pools_->getPool(hash_key, [&]() {
     return parent_.parent_.factory_.allocateConnPool(
         parent_.thread_local_dispatcher_, host, priority, protocol,
         have_options ? context->downstreamConnection()->socketOptions() : nullptr);
   });
-
-  return &pool;
+  // The Connection Pool tracking is a work in progress. We plan for it to eventually have the
+  // ability to fail, but until we add upper layer handling for failures, it should not. So, assert
+  // that we don't accidentally add conditions that could allow it to fail.
+  ASSERT(pool.has_value(), "Pool allocation should never fail");
+  return &(pool.value().get());
 }
 
 Tcp::ConnectionPool::Instance*

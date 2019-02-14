@@ -208,7 +208,8 @@ def envoy_cmake_external(
         static_libraries = [],
         copy_pdb = False,
         pdb_name = "",
-        cmake_files_dir = "$BUILD_TMPDIR/CMakeFiles"):
+        cmake_files_dir = "$BUILD_TMPDIR/CMakeFiles",
+        **kwargs):
     # On Windows, we don't want to explicitly set CMAKE_BUILD_TYPE,
     # rules_foreign_cc will figure it out for us
     cache_entries_no_build_type = {key: cache_entries[key] for key in cache_entries.keys() if key != "CMAKE_BUILD_TYPE"}
@@ -244,6 +245,7 @@ def envoy_cmake_external(
         make_commands = make_commands,
         postfix_script = pf,
         static_libraries = static_libraries,
+        **kwargs
     )
 
 # Envoy C++ library targets that need no transformations or additional dependencies before being
