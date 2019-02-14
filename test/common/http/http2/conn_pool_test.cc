@@ -114,6 +114,22 @@ public:
   // Asserts that the provided requests receives onPoolFailure.
   void expectStreamReset(ActiveTestRequest& r);
 
+  /**
+   * Closes a test client.
+   */
+  void closeClient(size_t index);
+
+  /**
+   * Completes an active request. Useful when this flow is not part of the main test assertions.
+   */
+  void completeRequest(ActiveTestRequest& r);
+
+  /**
+   * Completes an active request and closes the upstream connection. Useful when this flow is
+   * not part of the main test assertions.
+   */
+  void completeRequestCloseUpstream(size_t index, ActiveTestRequest& r);
+
   MOCK_METHOD0(onClientDestroy, void());
 
   Stats::IsolatedStoreImpl stats_store_;
@@ -165,6 +181,24 @@ void Http2ConnPoolImplTest::expectClientReset(size_t index, ActiveTestRequest& r
 
 void Http2ConnPoolImplTest::expectStreamReset(ActiveTestRequest& r) {
   EXPECT_CALL(r.callbacks_.pool_failure_, ready());
+}
+
+void Http2ConnPoolImplTest::closeClient(size_t index) {
+  test_clients_[index].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  EXPECT_CALL(*this, onClientDestroy());
+  dispatcher_.clearDeferredDeleteList();
+}
+
+void Http2ConnPoolImplTest::completeRequest(ActiveTestRequest& r) {
+  EXPECT_CALL(r.inner_encoder_, encodeHeaders(_, true));
+  r.callbacks_.outer_encoder_->encodeHeaders(HeaderMapImpl{}, true);
+  EXPECT_CALL(r.decoder_, decodeHeaders_(_, true));
+  r.inner_decoder_->decodeHeaders(HeaderMapPtr{new HeaderMapImpl{}}, true);
+}
+
+void Http2ConnPoolImplTest::completeRequestCloseUpstream(size_t index, ActiveTestRequest& r) {
+  completeRequest(r);
+  closeClient(index);
 }
 
 /**
@@ -626,6 +660,72 @@ TEST_F(Http2ConnPoolImplTest, GoAway) {
   EXPECT_EQ(1U, cluster_->stats_.upstream_cx_close_notify_.value());
 }
 
+TEST_F(Http2ConnPoolImplTest, NoActiveConnectionsByDefault) {
+  EXPECT_FALSE(pool_.hasActiveConnections());
+}
+
+// Show that an active request on the primary connection is considered active.
+TEST_F(Http2ConnPoolImplTest, ActiveConnectionsHasActiveRequestsTrue) {
+  expectClientCreate();
+  ActiveTestRequest r1(*this, 0, false);
+  expectClientConnect(0, r1);
+
+  EXPECT_TRUE(pool_.hasActiveConnections());
+
+  completeRequestCloseUpstream(0, r1);
+}
+
+// Show that pending requests are considered active.
+TEST_F(Http2ConnPoolImplTest, PendingRequestsConsideredActive) {
+  expectClientCreate();
+  ActiveTestRequest r1(*this, 0, false);
+
+  EXPECT_TRUE(pool_.hasActiveConnections());
+
+  expectClientConnect(0, r1);
+  completeRequestCloseUpstream(0, r1);
+}
+
+// Show that even if there is a primary client still, if all of its requests have completed, then it
+// does not have any active connections.
+TEST_F(Http2ConnPoolImplTest, ResponseCompletedConnectionReadyNoActiveConnections) {
+  expectClientCreate();
+  ActiveTestRequest r1(*this, 0, false);
+  expectClientConnect(0, r1);
+  completeRequest(r1);
+
+  EXPECT_FALSE(pool_.hasActiveConnections());
+
+  closeClient(0);
+}
+
+// Show that if connections are draining, they're still considered active.
+TEST_F(Http2ConnPoolImplTest, DrainingConnectionsConsideredActive) {
+  pool_.max_streams_ = 1;
+  expectClientCreate();
+  ActiveTestRequest r1(*this, 0, false);
+  expectClientConnect(0, r1);
+  pool_.drainConnections();
+
+  EXPECT_TRUE(pool_.hasActiveConnections());
+
+  completeRequest(r1);
+  closeClient(0);
+}
+
+// Show that once we've drained all connections, there are no longer any active.
+TEST_F(Http2ConnPoolImplTest, DrainedConnectionsNotActive) {
+  pool_.max_streams_ = 1;
+  expectClientCreate();
+  ActiveTestRequest r1(*this, 0, false);
+  expectClientConnect(0, r1);
+  pool_.drainConnections();
+  completeRequest(r1);
+
+  EXPECT_FALSE(pool_.hasActiveConnections());
+
+  closeClient(0);
+}
 } // namespace Http2
 } // namespace Http
 } // namespace Envoy

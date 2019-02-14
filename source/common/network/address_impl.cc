@@ -160,8 +160,10 @@ IoHandlePtr InstanceBase::socketFromSocketType(SocketType socketType) const {
     domain = AF_UNIX;
   }
 
-  IoHandlePtr io_handle = std::make_unique<IoSocketHandle>(::socket(domain, flags, 0));
-  RELEASE_ASSERT(io_handle->fd() != -1, "");
+  const Api::SysCallIntResult result = Api::OsSysCallsSingleton::get().socket(domain, flags, 0);
+  RELEASE_ASSERT(result.rc_ != -1,
+                 fmt::format("socket(2) failed, got error: {}", strerror(result.errno_)));
+  IoHandlePtr io_handle = std::make_unique<IoSocketHandle>(result.rc_);
 
 #ifdef __APPLE__
   // Cannot set SOCK_NONBLOCK as a ::socket flag.
