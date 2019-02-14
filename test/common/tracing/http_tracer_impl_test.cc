@@ -195,9 +195,9 @@ TEST(HttpConnManFinalizerImpl, StreamInfoLogs) {
   absl::optional<uint32_t> response_code;
   EXPECT_CALL(stream_info, responseCode()).WillRepeatedly(ReturnPointee(&response_code));
   EXPECT_CALL(stream_info, upstreamHost()).Times(2);
-  const auto start_time =
+  const auto start_timestamp =
       SystemTime{std::chrono::duration_cast<SystemTime::duration>(std::chrono::hours{123})};
-  EXPECT_CALL(stream_info, startTime()).WillRepeatedly(Return(start_time));
+  EXPECT_CALL(stream_info, startTime()).WillRepeatedly(Return(start_timestamp));
 
   const absl::optional<std::chrono::nanoseconds> nanoseconds = std::chrono::nanoseconds{10};
   EXPECT_CALL(stream_info, lastDownstreamRxByteReceived()).WillRepeatedly(Return(nanoseconds));
@@ -208,20 +208,15 @@ TEST(HttpConnManFinalizerImpl, StreamInfoLogs) {
   EXPECT_CALL(stream_info, firstDownstreamTxByteSent()).WillRepeatedly(Return(nanoseconds));
   EXPECT_CALL(stream_info, lastDownstreamTxByteSent()).WillRepeatedly(Return(nanoseconds));
 
-  EXPECT_CALL(
-      span, log(start_time + *nanoseconds, Tracing::Logs::get().LAST_DOWNSTREAM_RX_BYTE_RECEIVED));
-  EXPECT_CALL(span,
-              log(start_time + *nanoseconds, Tracing::Logs::get().FIRST_UPSTREAM_TX_BYTE_SENT));
-  EXPECT_CALL(span,
-              log(start_time + *nanoseconds, Tracing::Logs::get().LAST_UPSTREAM_TX_BYTE_SENT));
-  EXPECT_CALL(span,
-              log(start_time + *nanoseconds, Tracing::Logs::get().FIRST_UPSTREAM_RX_BYTE_RECEIVED));
-  EXPECT_CALL(span,
-              log(start_time + *nanoseconds, Tracing::Logs::get().LAST_UPSTREAM_RX_BYTE_RECEIVED));
-  EXPECT_CALL(span,
-              log(start_time + *nanoseconds, Tracing::Logs::get().FIRST_DOWNSTREAM_TX_BYTE_SENT));
-  EXPECT_CALL(span,
-              log(start_time + *nanoseconds, Tracing::Logs::get().LAST_DOWNSTREAM_TX_BYTE_SENT));
+  const auto log_timestamp =
+      start_timestamp + std::chrono::duration_cast<SystemTime::duration>(*nanoseconds);
+  EXPECT_CALL(span, log(log_timestamp, Tracing::Logs::get().LAST_DOWNSTREAM_RX_BYTE_RECEIVED));
+  EXPECT_CALL(span, log(log_timestamp, Tracing::Logs::get().FIRST_UPSTREAM_TX_BYTE_SENT));
+  EXPECT_CALL(span, log(log_timestamp, Tracing::Logs::get().LAST_UPSTREAM_TX_BYTE_SENT));
+  EXPECT_CALL(span, log(log_timestamp, Tracing::Logs::get().FIRST_UPSTREAM_RX_BYTE_RECEIVED));
+  EXPECT_CALL(span, log(log_timestamp, Tracing::Logs::get().LAST_UPSTREAM_RX_BYTE_RECEIVED));
+  EXPECT_CALL(span, log(log_timestamp, Tracing::Logs::get().FIRST_DOWNSTREAM_TX_BYTE_SENT));
+  EXPECT_CALL(span, log(log_timestamp, Tracing::Logs::get().LAST_DOWNSTREAM_TX_BYTE_SENT));
 
   NiceMock<MockConfig> config;
   HttpTracerUtility::finalizeSpan(span, nullptr, stream_info, config);
