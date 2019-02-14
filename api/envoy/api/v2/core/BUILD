@@ -49,21 +49,6 @@ api_go_proto_library(
 )
 
 api_proto_library_internal(
-    name = "health_check",
-    srcs = ["health_check.proto"],
-    visibility = [
-        ":friends",
-    ],
-    deps = [":base"],
-)
-
-api_go_proto_library(
-    name = "health_check",
-    proto = ":health_check",
-    deps = [":base_go_proto"],
-)
-
-api_proto_library_internal(
     name = "config_source",
     srcs = ["config_source.proto"],
     visibility = [
@@ -82,6 +67,27 @@ api_go_proto_library(
         ":base_go_proto",
         ":grpc_service_go_proto",
     ],
+)
+
+api_proto_library_internal(
+    name = "health_check",
+    srcs = ["health_check.proto"],
+    visibility = [
+        ":friends",
+    ],
+    deps = [":base"],
+)
+
+api_go_proto_library(
+    name = "health_check",
+    proto = ":health_check",
+    deps = [":base_go_proto"],
+)
+
+api_proto_library_internal(
+    name = "hot_restart",
+    srcs = ["hot_restart.proto"],
+    deps = ["//envoy/admin/v2alpha:metrics"],
 )
 
 api_go_proto_library(

@@ -8,7 +8,7 @@
 #include <cstdint>
 #include <string>
 
-#include "envoy/admin/v2alpha/hot_restart.pb.h"
+#include "envoy/api/v2/core/hot_restart.pb.h"
 #include "envoy/common/platform.h"
 #include "envoy/server/hot_restart.h"
 #include "envoy/server/options.h"
@@ -36,7 +36,7 @@ protected:
   // Protocol description:
   //
   // In each direction between parent<-->child, a series of pairs of:
-  //   A uint64 'length' (bytes in host order),
+  //   A uint64 'length' (bytes in network order),
   //   followed by 'length' bytes of a serialized HotRestartMessage.
   // Each new message must start in a new sendmsg datagram, i.e. 'length' must always start at byte
   // 0. Each sendmsg datagram can be up to 4096 bytes (including 'length' if present). When the
@@ -47,17 +47,21 @@ protected:
   // There is no mechanism to explicitly pair responses to requests. However, the child initiates
   // all exchanges, and blocks until a reply is received, so there is implicit pairing.
   void sendHotRestartMessage(sockaddr_un& address,
-                             const envoy::admin::v2alpha::HotRestartMessage& proto);
+                             const envoy::api::v2::core::HotRestartMessage& proto);
+
+  enum class Blocking { Yes, No };
   // Receive data, possibly enough to build one of our protocol messages.
   // If block is true, blocks until a full protocol message is available.
   // If block is false, returns nullptr if we run out of data to receive before a full protocol
   // message is available. In either case, the HotRestartingBase may end up buffering some data for
   // the next protocol message, even if the function returns a protobuf.
-  std::unique_ptr<envoy::admin::v2alpha::HotRestartMessage> receiveHotRestartMessage(bool block);
+  std::unique_ptr<envoy::api::v2::core::HotRestartMessage> receiveHotRestartMessage(Blocking block);
+
+  bool isExpectedType(const envoy::api::v2::core::HotRestartMessage* proto, int oneof_type);
 
 private:
   void resizeRecvBuf(uint64_t new_size, uint64_t cur_bytes_used);
-  void getPassedFdIfPresent(envoy::admin::v2alpha::HotRestartMessage* out, msghdr* message);
+  void getPassedFdIfPresent(envoy::api::v2::core::HotRestartMessage* out, msghdr* message);
 
   const int base_id_;
   int my_domain_socket_{-1};
@@ -68,15 +72,14 @@ private:
   //
   // When filled, the size in bytes that the in-flight HotRestartMessage should be.
   // When empty, we're ready to start receiving a new message (starting with a uint64_t 'length').
-  absl::optional<uint64_t> expected_message_length_{};
-  // How much of the current in-flight HotRestartMessage we have received. Once this equals
-  // expected_message_length_, we're ready to parse the HotRestartMessage.
-  uint64_t partial_proto_bytes_{};
+  absl::optional<uint64_t> expected_proto_length_;
+  // How much of the current in-flight message (uint64_t 'length', plus 'length' bytes of
+  // HotRestartMessage) we have received. Once this equals
+  // expected_message_length_ - sizeof(uint64_t), we're ready to parse the HotRestartMessage.
+  uint64_t cur_msg_recvd_bytes_{};
   // When not empty, the first 8 bytes will always be the raw bytes of the current value of
   // expected_message_length_. The protobuf partial data starts at byte 8.
   std::vector<uint8_t> recv_buf_;
-  // The byte after the last occupied byte of recv_buf_, i.e. the next byte to recvmsg() into.
-  uint8_t* receive_next_byte_here_{};
 };
 
 } // namespace Server

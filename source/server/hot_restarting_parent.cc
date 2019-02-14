@@ -7,7 +7,7 @@
 namespace Envoy {
 namespace Server {
 
-using HotRestartMessage = envoy::admin::v2alpha::HotRestartMessage;
+using HotRestartMessage = envoy::api::v2::core::HotRestartMessage;
 
 HotRestartingParent::HotRestartingParent(int base_id, int restart_epoch)
     : HotRestartingBase(base_id), restart_epoch_(restart_epoch) {
@@ -28,25 +28,32 @@ void HotRestartingParent::initialize(Event::Dispatcher& dispatcher, Server::Inst
 
 void HotRestartingParent::onSocketEvent() {
   std::unique_ptr<HotRestartMessage> wrapped_request;
-  while ((wrapped_request = receiveHotRestartMessage(/*blocking=*/false))) {
-    switch (wrapped_request->request_case()) {
-    case HotRestartMessage::kShutdownAdminRequest: {
+  while ((wrapped_request = receiveHotRestartMessage(Blocking::No))) {
+    if (wrapped_request->requestreply_case() == HotRestartMessage::kReply) {
+      ENVOY_LOG(error, "child sent us a reply type HotRestartMessage; ignoring.");
+      HotRestartMessage wrapped_reply;
+      wrapped_reply.set_didnt_recognize_your_last_message(true);
+      sendHotRestartMessage(child_address_, wrapped_reply);
+      continue;
+    }
+    switch (wrapped_request->request().request_case()) {
+    case HotRestartMessage::Request::kShutdownAdmin: {
       server_->shutdownAdmin();
       HotRestartMessage wrapped_reply;
-      wrapped_reply.mutable_shutdown_admin_reply()->set_original_start_time(
+      wrapped_reply.mutable_reply()->mutable_shutdown_admin()->set_original_start_time(
           server_->startTimeFirstEpoch());
       sendHotRestartMessage(child_address_, wrapped_reply);
       break;
     }
 
-    case HotRestartMessage::kPassListenSocketRequest: {
+    case HotRestartMessage::Request::kPassListenSocket: {
       HotRestartMessage wrapped_reply;
-      wrapped_reply.mutable_pass_listen_socket_reply()->set_fd(-1);
+      wrapped_reply.mutable_reply()->mutable_pass_listen_socket()->set_fd(-1);
       Network::Address::InstanceConstSharedPtr addr =
-          Network::Utility::resolveUrl(wrapped_request->pass_listen_socket_request().address());
+          Network::Utility::resolveUrl(wrapped_request->request().pass_listen_socket().address());
       for (const auto& listener : server_->listenerManager().listeners()) {
         if (*listener.get().socket().localAddress() == *addr) {
-          wrapped_reply.mutable_pass_listen_socket_reply()->set_fd(
+          wrapped_reply.mutable_reply()->mutable_pass_listen_socket()->set_fd(
               listener.get().socket().ioHandle().fd());
           break;
         }
@@ -55,22 +62,22 @@ void HotRestartingParent::onSocketEvent() {
       break;
     }
 
-    case HotRestartMessage::kStatsRequest: {
+    case HotRestartMessage::Request::kStats: {
       HotRestart::GetParentStatsInfo info;
       server_->getParentStats(info);
       HotRestartMessage wrapped_reply;
-      wrapped_reply.mutable_stats_reply()->set_memory_allocated(info.memory_allocated_);
-      wrapped_reply.mutable_stats_reply()->set_num_connections(info.num_connections_);
+      wrapped_reply.mutable_reply()->mutable_stats()->set_memory_allocated(info.memory_allocated_);
+      wrapped_reply.mutable_reply()->mutable_stats()->set_num_connections(info.num_connections_);
       sendHotRestartMessage(child_address_, wrapped_reply);
       break;
     }
 
-    case HotRestartMessage::kDrainListenersRequest: {
+    case HotRestartMessage::Request::kDrainListeners: {
       server_->drainListeners();
       break;
     }
 
-    case HotRestartMessage::kTerminateRequest: {
+    case HotRestartMessage::Request::kTerminate: {
       ENVOY_LOG(info, "shutting down due to child request");
       kill(getpid(), SIGTERM);
       break;

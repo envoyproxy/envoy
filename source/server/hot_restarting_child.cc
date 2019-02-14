@@ -5,7 +5,7 @@
 namespace Envoy {
 namespace Server {
 
-using HotRestartMessage = envoy::admin::v2alpha::HotRestartMessage;
+using HotRestartMessage = envoy::api::v2::core::HotRestartMessage;
 
 HotRestartingChild::HotRestartingChild(int base_id, int restart_epoch)
     : HotRestartingBase(base_id), restart_epoch_(restart_epoch) {
@@ -22,14 +22,14 @@ int HotRestartingChild::duplicateParentListenSocket(const std::string& address) 
   }
 
   HotRestartMessage wrapped_request;
-  wrapped_request.mutable_pass_listen_socket_request()->set_address(address);
+  wrapped_request.mutable_request()->mutable_pass_listen_socket()->set_address(address);
   sendHotRestartMessage(parent_address_, wrapped_request);
 
-  std::unique_ptr<HotRestartMessage> wrapped_reply = receiveHotRestartMessage(/*blocking=*/true);
-  if (!wrapped_reply || wrapped_reply->reply_case() != HotRestartMessage::kPassListenSocketReply) {
+  std::unique_ptr<HotRestartMessage> wrapped_reply = receiveHotRestartMessage(Blocking::Yes);
+  if (!isExpectedType(wrapped_reply.get(), HotRestartMessage::Reply::kPassListenSocket)) {
     return -1;
   }
-  return wrapped_reply->pass_listen_socket_reply().fd();
+  return wrapped_reply->reply().pass_listen_socket().fd();
 }
 
 void HotRestartingChild::getParentStats(HotRestart::GetParentStatsInfo& info) {
@@ -39,22 +39,22 @@ void HotRestartingChild::getParentStats(HotRestart::GetParentStatsInfo& info) {
   }
 
   HotRestartMessage wrapped_request;
-  wrapped_request.mutable_stats_request();
+  wrapped_request.mutable_request()->mutable_stats();
   sendHotRestartMessage(parent_address_, wrapped_request);
 
-  std::unique_ptr<HotRestartMessage> wrapped_reply = receiveHotRestartMessage(/*blocking=*/true);
-  RELEASE_ASSERT(wrapped_reply && wrapped_reply->reply_case() == HotRestartMessage::kStatsReply,
+  std::unique_ptr<HotRestartMessage> wrapped_reply = receiveHotRestartMessage(Blocking::Yes);
+  RELEASE_ASSERT(isExpectedType(wrapped_reply.get(), HotRestartMessage::Reply::kStats),
                  "Did not get a StatsReply for our StatsRequest.");
   // TODO(fredlas) this is where the stat transferring, to be added later in this PR, will go.
-  info.memory_allocated_ = wrapped_reply->stats_reply().memory_allocated();
-  info.num_connections_ = wrapped_reply->stats_reply().num_connections();
+  info.memory_allocated_ = wrapped_reply->reply().stats().memory_allocated();
+  info.num_connections_ = wrapped_reply->reply().stats().num_connections();
 }
 
 void HotRestartingChild::drainParentListeners() {
   if (restart_epoch_ > 0) {
     // No reply expected.
     HotRestartMessage wrapped_request;
-    wrapped_request.mutable_drain_listeners_request();
+    wrapped_request.mutable_request()->mutable_drain_listeners();
     sendHotRestartMessage(parent_address_, wrapped_request);
   }
 }
@@ -65,14 +65,13 @@ void HotRestartingChild::shutdownParentAdmin(HotRestart::ShutdownParentAdminInfo
   }
 
   HotRestartMessage wrapped_request;
-  wrapped_request.mutable_shutdown_admin_request();
+  wrapped_request.mutable_request()->mutable_shutdown_admin();
   sendHotRestartMessage(parent_address_, wrapped_request);
 
-  std::unique_ptr<HotRestartMessage> wrapped_reply = receiveHotRestartMessage(/*blocking=*/true);
-  RELEASE_ASSERT(wrapped_reply &&
-                     wrapped_reply->reply_case() == HotRestartMessage::kShutdownAdminReply,
+  std::unique_ptr<HotRestartMessage> wrapped_reply = receiveHotRestartMessage(Blocking::Yes);
+  RELEASE_ASSERT(isExpectedType(wrapped_reply.get(), HotRestartMessage::Reply::kShutdownAdmin),
                  "Parent did not respond as expected to ShutdownParentAdmin.");
-  info.original_start_time_ = wrapped_reply->shutdown_admin_reply().original_start_time();
+  info.original_start_time_ = wrapped_reply->reply().shutdown_admin().original_start_time();
 }
 
 void HotRestartingChild::terminateParent() {
@@ -80,7 +79,7 @@ void HotRestartingChild::terminateParent() {
     return;
   }
   HotRestartMessage wrapped_request;
-  wrapped_request.mutable_terminate_request();
+  wrapped_request.mutable_request()->mutable_terminate();
   sendHotRestartMessage(parent_address_, wrapped_request);
   parent_terminated_ = true;
 }

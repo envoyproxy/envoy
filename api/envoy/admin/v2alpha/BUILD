@@ -27,13 +27,6 @@ api_proto_library_internal(
 )
 
 api_proto_library_internal(
-    name = "hot_restart",
-    srcs = ["hot_restart.proto"],
-    visibility = ["//visibility:public"],
-    deps = [":metrics"],
-)
-
-api_proto_library_internal(
     name = "metrics",
     srcs = ["metrics.proto"],
     visibility = ["//visibility:public"],

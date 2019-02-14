@@ -6,7 +6,7 @@
 namespace Envoy {
 namespace Server {
 
-using HotRestartMessage = envoy::admin::v2alpha::HotRestartMessage;
+using HotRestartMessage = envoy::api::v2::core::HotRestartMessage;
 
 void HotRestartingBase::initDomainSocketAddress(sockaddr_un* address) {
   memset(address, 0, sizeof(*address));
@@ -45,21 +45,20 @@ void HotRestartingBase::bindDomainSocket(uint64_t id, const std::string& role) {
 
 void HotRestartingBase::sendHotRestartMessage(sockaddr_un& address,
                                               const HotRestartMessage& proto) {
-  uint64_t serialized_size = proto.ByteSizeLong();
-  uint64_t total_size = sizeof(uint64_t) + serialized_size;
+  const uint64_t serialized_size = proto.ByteSizeLong();
+  const uint64_t total_size = sizeof(uint64_t) + serialized_size;
   // Fill with uint64_t 'length' followed by the serialized HotRestartMessage.
   std::vector<uint8_t> send_buf;
   send_buf.resize(total_size);
-  *reinterpret_cast<uint64_t*>(send_buf.data()) = serialized_size;
-  RELEASE_ASSERT(proto.SerializeToArray(send_buf.data() + 8, serialized_size),
+  *reinterpret_cast<uint64_t*>(send_buf.data()) = htobe64(serialized_size);
+  RELEASE_ASSERT(proto.SerializeToArray(send_buf.data() + sizeof(uint64_t), serialized_size),
                  "failed to serialize a HotRestartMessage");
 
   bool turned_on_blocking = false;
   uint8_t* next_byte_to_send = send_buf.data();
   uint64_t sent = 0;
   while (sent < total_size) {
-    uint64_t cur_chunk_size =
-        MaxSendmsgSize < total_size - sent ? MaxSendmsgSize : total_size - sent;
+    const uint64_t cur_chunk_size = std::min(MaxSendmsgSize, total_size - sent);
     iovec iov[1];
     iov[0].iov_base = next_byte_to_send;
     iov[0].iov_len = cur_chunk_size;
@@ -74,8 +73,8 @@ void HotRestartingBase::sendHotRestartMessage(sockaddr_un& address,
 
     // Control data stuff, only relevant for the fd passing done with PassListenSocketReply.
     uint8_t control_buffer[CMSG_SPACE(sizeof(int))];
-    if (proto.reply_case() == HotRestartMessage::kPassListenSocketReply &&
-        proto.pass_listen_socket_reply().fd() != -1) {
+    if (isExpectedType(&proto, HotRestartMessage::Reply::kPassListenSocket) &&
+        proto.reply().pass_listen_socket().fd() != -1) {
       memset(control_buffer, 0, CMSG_SPACE(sizeof(int)));
       message.msg_control = control_buffer;
       message.msg_controllen = CMSG_SPACE(sizeof(int));
@@ -83,7 +82,7 @@ void HotRestartingBase::sendHotRestartMessage(sockaddr_un& address,
       control_message->cmsg_level = SOL_SOCKET;
       control_message->cmsg_type = SCM_RIGHTS;
       control_message->cmsg_len = CMSG_LEN(sizeof(int));
-      *reinterpret_cast<int*>(CMSG_DATA(control_message)) = proto.pass_listen_socket_reply().fd();
+      *reinterpret_cast<int*>(CMSG_DATA(control_message)) = proto.reply().pass_listen_socket().fd();
       ASSERT(sent == total_size, "an fd passing message was too long for one sendmsg().");
     }
 
@@ -113,8 +112,7 @@ void HotRestartingBase::sendHotRestartMessage(sockaddr_un& address,
 // Both arguments should include the first 8 'length' bytes in their totals.
 void HotRestartingBase::resizeRecvBuf(uint64_t new_size, uint64_t cur_bytes_used) {
   recv_buf_.resize(new_size);
-  receive_next_byte_here_ = recv_buf_.data() + cur_bytes_used;
-  partial_proto_bytes_ = cur_bytes_used > sizeof(uint64_t) ? cur_bytes_used - sizeof(uint64_t) : 0;
+  cur_msg_recvd_bytes_ = cur_bytes_used;
 }
 
 // Pull the cloned fd, if present, out of the control data and write it into the
@@ -125,25 +123,27 @@ void HotRestartingBase::getPassedFdIfPresent(HotRestartMessage* out, msghdr* mes
   cmsghdr* cmsg = CMSG_FIRSTHDR(message);
   if (cmsg != nullptr) {
     RELEASE_ASSERT(cmsg->cmsg_level == SOL_SOCKET && cmsg->cmsg_type == SCM_RIGHTS &&
-                       out->reply_case() == HotRestartMessage::kPassListenSocketReply,
+                       isExpectedType(out, HotRestartMessage::Reply::kPassListenSocket),
                    "recvmsg() came with control data when the message's purpose was not to pass a "
                    "file descriptor.");
 
-    out->mutable_pass_listen_socket_reply()->set_fd(*reinterpret_cast<int*>(CMSG_DATA(cmsg)));
+    out->mutable_reply()->mutable_pass_listen_socket()->set_fd(
+        *reinterpret_cast<int*>(CMSG_DATA(cmsg)));
 
     RELEASE_ASSERT(CMSG_NXTHDR(message, cmsg) == nullptr,
                    "More than one control data on a single hot restart recvmsg().");
   }
 }
 
-std::unique_ptr<HotRestartMessage> HotRestartingBase::receiveHotRestartMessage(bool block) {
+std::unique_ptr<HotRestartMessage> HotRestartingBase::receiveHotRestartMessage(Blocking block) {
   // By default the domain socket is non blocking. If we need to block, make it blocking first.
-  if (block) {
+  if (block == Blocking::Yes) {
     RELEASE_ASSERT(fcntl(my_domain_socket_, F_SETFL, 0) != -1,
                    fmt::format("Set domain socket blocking failed, errno = {}", errno));
   }
   if (recv_buf_.size() < MaxSendmsgSize) {
-    resizeRecvBuf(MaxSendmsgSize, 0);
+    recv_buf_.resize(MaxSendmsgSize);
+    cur_msg_recvd_bytes_ = 0;
   }
 
   iovec iov[1];
@@ -151,7 +151,7 @@ std::unique_ptr<HotRestartMessage> HotRestartingBase::receiveHotRestartMessage(b
   uint8_t control_buffer[CMSG_SPACE(sizeof(int))];
   std::unique_ptr<HotRestartMessage> ret = nullptr;
   while (!ret) {
-    iov[0].iov_base = receive_next_byte_here_;
+    iov[0].iov_base = recv_buf_.data() + cur_msg_recvd_bytes_;
     iov[0].iov_len = MaxSendmsgSize;
 
     // We always setup to receive an FD even though most messages do not pass one.
@@ -162,52 +162,54 @@ std::unique_ptr<HotRestartMessage> HotRestartingBase::receiveHotRestartMessage(b
     message.msg_control = control_buffer;
     message.msg_controllen = CMSG_SPACE(sizeof(int));
 
-    int recvmsg_rc = recvmsg(my_domain_socket_, &message, 0);
-    if (!block && recvmsg_rc == -1 && errno == EAGAIN) {
+    const int recvmsg_rc = recvmsg(my_domain_socket_, &message, 0);
+    if (block == Blocking::No && recvmsg_rc == -1 && errno == EAGAIN) {
       return nullptr;
     }
     RELEASE_ASSERT(recvmsg_rc != -1, fmt::format("recvmsg() returned -1, errno = {}", errno));
     RELEASE_ASSERT(message.msg_flags == 0,
                    fmt::format("recvmsg() left msg_flags = {}", message.msg_flags));
-    receive_next_byte_here_ += recvmsg_rc;
-
-    // If we're in the middle of receiving a protobuf, the whole recvmsg() was protobuf data.
-    // Otherwise, the first 8 bytes was 'length'.
-    partial_proto_bytes_ +=
-        expected_message_length_.has_value() ? recvmsg_rc : recvmsg_rc - sizeof(uint64_t);
+    cur_msg_recvd_bytes_ += recvmsg_rc;
 
     // If we don't already know 'length', we're at the start of a new length+protobuf message!
-    if (!expected_message_length_.has_value()) {
+    if (!expected_proto_length_.has_value()) {
       // We are not ok with messages so fragmented that the length doesn't even come in one piece.
       RELEASE_ASSERT(recvmsg_rc >= 8, "received a brokenly tiny message fragment.");
 
-      expected_message_length_ = *reinterpret_cast<uint64_t*>(recv_buf_.data());
+      expected_proto_length_ = be64toh(*reinterpret_cast<uint64_t*>(recv_buf_.data()));
       // Expand the buffer from its default 4096 if this message is going to be longer.
-      if (expected_message_length_.value() > MaxSendmsgSize - sizeof(uint64_t)) {
-        resizeRecvBuf(expected_message_length_.value() + sizeof(uint64_t), recvmsg_rc);
+      if (expected_proto_length_.value() > MaxSendmsgSize - sizeof(uint64_t)) {
+        recv_buf_.resize(expected_proto_length_.value() + sizeof(uint64_t));
+        cur_msg_recvd_bytes_ = recvmsg_rc;
       }
     }
     // If we have received beyond the end of the current in-flight proto, then next is misaligned.
-    RELEASE_ASSERT(partial_proto_bytes_ <= expected_message_length_.value(),
+    RELEASE_ASSERT(cur_msg_recvd_bytes_ <= sizeof(uint64_t) + expected_proto_length_.value(),
                    "received a length+protobuf message not aligned to start of sendmsg().");
 
-    if (partial_proto_bytes_ == expected_message_length_.value()) {
+    if (cur_msg_recvd_bytes_ == sizeof(uint64_t) + expected_proto_length_.value()) {
       ret = std::make_unique<HotRestartMessage>();
-      RELEASE_ASSERT(ret->ParseFromArray(recv_buf_.data() + sizeof(uint64_t),
-                                         expected_message_length_.value()),
-                     "failed to parse a HotRestartMessage.");
-      resizeRecvBuf(0, 0);
-      expected_message_length_.reset();
+      RELEASE_ASSERT(
+          ret->ParseFromArray(recv_buf_.data() + sizeof(uint64_t), expected_proto_length_.value()),
+          "failed to parse a HotRestartMessage.");
+      recv_buf_.resize(0);
+      cur_msg_recvd_bytes_ = 0;
+      expected_proto_length_.reset();
     }
   }
 
   // Turn non-blocking back on if we made it blocking.
-  if (block) {
+  if (block == Blocking::Yes) {
     RELEASE_ASSERT(fcntl(my_domain_socket_, F_SETFL, O_NONBLOCK) != -1,
                    fmt::format("Set domain socket nonblocking failed, errno = {}", errno));
   }
   getPassedFdIfPresent(ret.get(), &message);
   return ret;
+}
+
+bool HotRestartingBase::isExpectedType(const HotRestartMessage* proto, int oneof_type) {
+  return proto != nullptr && proto->requestreply_case() == HotRestartMessage::kReply &&
+         proto->reply().reply_case() == oneof_type;
 }
 
 } // namespace Server
