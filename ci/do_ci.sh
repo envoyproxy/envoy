@@ -222,12 +222,6 @@ elif [[ "$1" == "bazel.coverage" ]]; then
   setup_gcc_toolchain
   echo "bazel coverage build with tests..."
 
-  # gcovr is a pain to run with `bazel run`, so package it up into a
-  # relocatable and hermetic-ish .par file.
-  bazel build @com_github_gcovr_gcovr//:gcovr.par
-  export GCOVR="/tmp/gcovr.par"
-  cp -f "${ENVOY_SRCDIR}/bazel-bin/external/com_github_gcovr_gcovr/gcovr.par" ${GCOVR}
-
   # Reduce the amount of memory and number of cores Bazel tries to use to
   # prevent it from launching too many subprocesses. This should prevent the
   # system from running out of memory and killing tasks. See discussion on
