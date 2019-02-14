@@ -92,17 +92,20 @@ TEST_F(OpenTracingDriverTest, FlushSpanWithLog) {
   first_span->log(timestamp, "abc");
   first_span->finishSpan();
 
+  const std::vector<opentracing::LogRecord> expected_logs = {
+      {timestamp, {{"event", std::string{"abc"}}}}};
+
+  EXPECT_EQ(1, driver_->recorder().spans().size());
+  EXPECT_EQ(expected_logs, driver_->recorder().top().logs);
+
   driver_->setDropLogs(true);
   Tracing::SpanPtr second_span = driver_->startSpan(config_, request_headers_, operation_name_,
                                                     start_time_, {Tracing::Reason::Sampling, true});
   second_span->log(timestamp, "xyz");
   second_span->finishSpan();
 
-  const std::vector<opentracing::LogRecord> expected_logs = {
-      {timestamp, {{"event", std::string{"abc"}}}}};
-
-  EXPECT_EQ(1, driver_->recorder().spans().size());
-  EXPECT_EQ(expected_logs, driver_->recorder().top().logs);
+  EXPECT_EQ(2, driver_->recorder().spans().size());
+  EXPECT_TRUE(driver_->recorder().top().logs.empty());
 }
 
 TEST_F(OpenTracingDriverTest, TagSamplingFalseByDecision) {
