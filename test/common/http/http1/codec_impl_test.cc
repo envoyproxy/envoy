@@ -1052,6 +1052,25 @@ TEST_F(Http1ServerConnectionImplTest, TestLargeHeadersAcceptedIfConfigured) {
   codec_->dispatch(buffer);
 }
 
+TEST_F(Http1ServerConnectionImplTest, TestLargeHeadersMaxConfigurable) {
+  max_request_headers_kb_ = 96;
+  initialize();
+
+  NiceMock<Http::MockStreamDecoder> decoder;
+  Http::StreamEncoder* response_encoder = nullptr;
+  EXPECT_CALL(callbacks_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamEncoder& encoder, bool) -> Http::StreamDecoder& {
+        response_encoder = &encoder;
+        return decoder;
+      }));
+
+  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n");
+  codec_->dispatch(buffer);
+  std::string long_string = "big: " + std::string(95 * 1024, 'q') + "\r\n";
+  buffer = Buffer::OwnedImpl(long_string);
+  codec_->dispatch(buffer);
+}
+
 } // namespace Http1
 } // namespace Http
 } // namespace Envoy

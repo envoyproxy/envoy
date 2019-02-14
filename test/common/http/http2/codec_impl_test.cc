@@ -66,7 +66,7 @@ public:
     setupDefaultConnectionMocks();
 
     EXPECT_CALL(server_callbacks_, newStream(_, _))
-        .WillOnce(Invoke([&](StreamEncoder& encoder, bool) -> StreamDecoder& {
+        .WillRepeatedly(Invoke([&](StreamEncoder& encoder, bool) -> StreamDecoder& {
           response_encoder_ = &encoder;
           encoder.getStream().addCallbacks(server_stream_callbacks_);
           return request_decoder_;
@@ -914,7 +914,7 @@ TEST_P(Http2CodecImplTest, TestLargeHeadersAtLimitAccepted) {
 }
 
 TEST_P(Http2CodecImplTest, TestLargeHeadersOverDefaultCodecLimit) {
-  max_request_headers_kb_ = 100;
+  max_request_headers_kb_ = 66;
   initialize();
 
   TestHeaderMapImpl request_headers;
@@ -927,8 +927,28 @@ TEST_P(Http2CodecImplTest, TestLargeHeadersOverDefaultCodecLimit) {
   request_encoder_->encodeHeaders(request_headers, true);
 }
 
-TEST_P(Http2CodecImplTest, TestManyLargeHeadersWayOverDefaultCodecLimit) {
-  max_request_headers_kb_ = 100;
+TEST_P(Http2CodecImplTest, TestLargeHeadersExceedPerHeaderLimit) {
+  // The name-value pair max is set by NGHTTP2_HD_MAX_NV in lib/nghttp2_hd.h to 64KB, and
+  // creates a per-request header limit for us in h2. Note that the nghttp2
+  // calculated byte size will differ from envoy due to H2 compression and frames.
+
+  max_request_headers_kb_ = 81;
+  initialize();
+
+  TestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  std::string long_string = std::string(80 * 1024, 'q');
+  request_headers.addCopy("big", long_string);
+
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, _)).Times(0);
+  EXPECT_CALL(client_callbacks_, onGoAway());
+  server_->shutdownNotice();
+  server_->goAway();
+  request_encoder_->encodeHeaders(request_headers, true);
+}
+
+TEST_P(Http2CodecImplTest, TestManyLargeHeadersUnderPerHeaderLimit) {
+  max_request_headers_kb_ = 81;
   initialize();
 
   TestHeaderMapImpl request_headers;
@@ -943,18 +963,16 @@ TEST_P(Http2CodecImplTest, TestManyLargeHeadersWayOverDefaultCodecLimit) {
   request_encoder_->encodeHeaders(request_headers, true);
 }
 
-TEST_P(Http2CodecImplTest, TestSingleLargeHeadersWayOverDefaultCodecLimit) {
-  // this fails unexpectedly due to the arbitrarily-set NGHTTP2_HD_MAX_NV in lib/nghttp2_hd.h
-  // TODO(auni53) turn up this test once that issue is resolved.
-  return;
-
-  max_request_headers_kb_ = 100;
+TEST_P(Http2CodecImplTest, TestLargeHeadersAtMaxConfigurable) {
+  max_request_headers_kb_ = 96;
   initialize();
 
   TestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
-  std::string long_string = std::string(80 * 1024, 'q');
-  request_headers.addCopy("big", long_string);
+  std::string long_string = std::string(1024, 'q');
+  for (int i = 0; i < 95; i++) {
+    request_headers.addCopy(fmt::format("{}", i), long_string);
+  }
 
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, _)).Times(1);
   EXPECT_CALL(server_stream_callbacks_, onResetStream(_)).Times(0);
