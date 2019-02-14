@@ -20,24 +20,23 @@ bool Utility::addBufferToProtoBytes(envoy::data::tap::v2alpha::Body& output_byte
   // is not trivial if we want to avoid extra copies since we end up appending to the existing
   // protobuf string.
   ASSERT(buffer_start_offset + buffer_length_to_copy <= data.length());
-  bool truncated = false;
+  const uint32_t final_bytes_to_copy =
+      std::min(max_buffered_bytes, buffer_length_to_copy - buffer_start_offset);
 
   const uint64_t num_slices = data.getRawSlices(nullptr, 0);
   STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
   data.getRawSlices(slices.begin(), num_slices);
-  trimSlices(slices, buffer_start_offset, buffer_length_to_copy);
+  trimSlices(slices, buffer_start_offset, final_bytes_to_copy);
   for (const Buffer::RawSlice& slice : slices) {
-    if (slice.len_ > max_buffered_bytes - output_bytes.as_bytes().size()) {
-      output_bytes.set_truncated(true);
-      truncated = true;
-    }
-
-    output_bytes.mutable_as_bytes()->append(
-        static_cast<const char*>(slice.mem_),
-        std::min(slice.len_, max_buffered_bytes - output_bytes.as_bytes().size()));
+    output_bytes.mutable_as_bytes()->append(static_cast<const char*>(slice.mem_), slice.len_);
   }
 
-  return truncated;
+  if (final_bytes_to_copy < data.length()) {
+    output_bytes.set_truncated(true);
+    return true;
+  } else {
+    return false;
+  }
 }
 
 TapConfigBaseImpl::TapConfigBaseImpl(envoy::service::tap::v2alpha::TapConfig&& proto_config,

@@ -48,6 +48,33 @@ TEST(TrimSlice, All) {
                                                  {reinterpret_cast<void*>(0x1), 3}};
     EXPECT_EQ(expected, slices);
   }
+
+  {
+    std::vector<Buffer::RawSlice> slices = {{0x0, 5}, {0x0, 4}};
+    Utility::trimSlices(slices, 0, 0);
+
+    const std::vector<Buffer::RawSlice> expected{{reinterpret_cast<void*>(0x0), 0},
+                                                 {reinterpret_cast<void*>(0x0), 0}};
+    EXPECT_EQ(expected, slices);
+  }
+
+  {
+    std::vector<Buffer::RawSlice> slices = {{0x0, 5}, {0x0, 4}};
+    Utility::trimSlices(slices, 0, 3);
+
+    const std::vector<Buffer::RawSlice> expected{{reinterpret_cast<void*>(0x0), 3},
+                                                 {reinterpret_cast<void*>(0x0), 0}};
+    EXPECT_EQ(expected, slices);
+  }
+
+  {
+    std::vector<Buffer::RawSlice> slices = {{0x0, 5}, {0x0, 4}};
+    Utility::trimSlices(slices, 1, 3);
+
+    const std::vector<Buffer::RawSlice> expected{{reinterpret_cast<void*>(0x1), 3},
+                                                 {reinterpret_cast<void*>(0x0), 0}};
+    EXPECT_EQ(expected, slices);
+  }
 }
 
 } // namespace
