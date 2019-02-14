@@ -117,9 +117,7 @@ TEST(QuicPlatformTest, QuicStackTraceTest) {
   EXPECT_THAT(quic::QuicStackTrace(), HasSubstr("QuicStackTraceTest"));
 }
 
-TEST(QuicPlatformTest, QuicSleep) {
-  quic::QuicSleep(quic::QuicTime::Delta::FromMilliseconds(20));
-}
+TEST(QuicPlatformTest, QuicSleep) { quic::QuicSleep(quic::QuicTime::Delta::FromMilliseconds(20)); }
 
 TEST(QuicPlatformTest, QuicString) {
   quic::QuicString s = "foo";

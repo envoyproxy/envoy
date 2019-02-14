@@ -127,7 +127,6 @@ cc_library(
         "quiche/quic/platform/api/quic_map_util.h",
         "quiche/quic/platform/api/quic_prefetch.h",
         "quiche/quic/platform/api/quic_ptr_util.h",
-	"quiche/quic/platform/api/quic_sleep.h",
         "quiche/quic/platform/api/quic_stack_trace.h",
         "quiche/quic/platform/api/quic_str_cat.h",
         "quiche/quic/platform/api/quic_string.h",
@@ -169,6 +168,29 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "@envoy//source/extensions/quic_listeners/quiche/platform:quic_platform_base_impl_lib",
+    ],
+)
+
+cc_library(
+    name = "quic_platform_sleep",
+    hdrs = ["quiche/quic/platform/api/quic_sleep.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "@envoy//source/extensions/quic_listeners/quiche/platform:quic_platform_sleep_impl_lib",
+    ],
+)
+
+cc_library(
+    name = "quic_time_lib",
+    srcs = [
+        "quiche/quic/core/quic_time.cc",
+    ],
+    hdrs = [
+        "quiche/quic/core/quic_time.h",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":quic_platform",
     ],
 )
 
