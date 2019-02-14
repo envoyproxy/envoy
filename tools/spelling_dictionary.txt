@@ -311,6 +311,7 @@ canonicalize
 canonicalized
 cardinality
 casted
+ceil
 chrono
 chroot
 chunked
