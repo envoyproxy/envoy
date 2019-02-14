@@ -66,9 +66,9 @@ that specifies a value to hash on.
 Each host is hashed and placed on the ring some number of times proportional to its weight. For
 example, if host A has a weight of 1 and host B has a weight of 2, then there might be three entries
 on the ring: one for host A and two for host B. This doesn't provide the desired 2:1 partitioning of
-the circle, since the computed hashes could be coincidentally be very close to one another; so it
-is necessary to multiply the number of hashes per host---for example inserting 100 entries on the
-ring for host A and 200 entries for host B---to better approximate the desired distribution. This
+the circle, since the computed hashes could be coincidentally very close to one another; so it is
+necessary to multiply the number of hashes per host---for example inserting 100 entries on the ring
+for host A and 200 entries for host B---to better approximate the desired distribution. This
 replication factor can be controlled directly by configuring the
 :ref:`replication_factor<envoy_api_field_Cluster.RingHashLbConfig.replication_factor>`
 parameter, or indirectly by configuring the
