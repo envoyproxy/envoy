@@ -8,6 +8,7 @@
 
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
+#include "quiche/quic/core/quic_time.h"
 
 namespace quic {
 
