@@ -104,6 +104,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "quic_platform_sleep_impl_lib",
+    hdrs = ["quic_sleep_impl.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "@com_googlesource_quiche//:quic_time_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "spdy_platform_impl_lib",
     hdrs = [
         "spdy_arraysize_impl.h",

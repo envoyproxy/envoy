@@ -33,6 +33,7 @@ envoy_cc_test(
         "//test/extensions/transport_sockets/tls:ssl_test_utils",
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
+        "@com_googlesource_quiche//:quic_platform_sleep",
     ],
 )
 

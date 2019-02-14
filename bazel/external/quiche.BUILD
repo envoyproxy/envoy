@@ -102,6 +102,7 @@ cc_library(
     hdrs = [
         "quiche/quic/platform/api/quic_cert_utils.h",
         "quiche/quic/platform/api/quic_mutex.h",
+        "quiche/quic/platform/api/quic_str_cat.h",
     ],
     visibility = ["//visibility:public"],
     deps = [
@@ -128,7 +129,6 @@ cc_library(
         "quiche/quic/platform/api/quic_prefetch.h",
         "quiche/quic/platform/api/quic_ptr_util.h",
         "quiche/quic/platform/api/quic_stack_trace.h",
-        "quiche/quic/platform/api/quic_str_cat.h",
         "quiche/quic/platform/api/quic_string.h",
         "quiche/quic/platform/api/quic_string_piece.h",
         "quiche/quic/platform/api/quic_string_utils.h",
@@ -157,7 +157,6 @@ cc_library(
         # "quiche/quic/platform/api/quic_reference_counted.h",
         # "quiche/quic/platform/api/quic_server_stats.h",
         # "quiche/quic/platform/api/quic_singleton.h",
-        # "quiche/quic/platform/api/quic_sleep.h",
         # "quiche/quic/platform/api/quic_socket_address.h",
         # "quiche/quic/platform/api/quic_stack_trace.h",
         # "quiche/quic/platform/api/quic_test.h",
@@ -169,6 +168,29 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "@envoy//source/extensions/quic_listeners/quiche/platform:quic_platform_base_impl_lib",
+    ],
+)
+
+cc_library(
+    name = "quic_platform_sleep",
+    hdrs = ["quiche/quic/platform/api/quic_sleep.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "@envoy//source/extensions/quic_listeners/quiche/platform:quic_platform_sleep_impl_lib",
+    ],
+)
+
+cc_library(
+    name = "quic_time_lib",
+    srcs = [
+        "quiche/quic/core/quic_time.cc",
+    ],
+    hdrs = [
+        "quiche/quic/core/quic_time.h",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":quic_platform",
     ],
 )
 
