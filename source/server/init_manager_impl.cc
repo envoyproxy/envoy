@@ -28,9 +28,6 @@ void InitManagerImpl::initialize(std::function<void()> callback) {
 void InitManagerImpl::initializeTarget(Init::Target& target) {
   target.initialize([this, &target]() -> void {
     ASSERT(std::find(targets_.begin(), targets_.end(), &target) != targets_.end());
-    // TODO: This remove() is O(n), which makes iteration through the full list of targets in
-    //       InitManagerImpl::initialize() O(n^2). If this ever becomes more than just a theoretical
-    //       performance issue, we should use a linked hash set or similar instead of a list.
     targets_.remove(&target);
     if (targets_.empty()) {
       state_ = State::Initialized;
