@@ -80,9 +80,11 @@ public:
   // course, it's the codecs must be robust to wire-level violations. We
   // explore these violations via MutateAction and SwapAction at the connection
   // buffer level.
-  enum class StreamState { PendingHeaders, PendingDataOrTrailers, Closed };
+  enum class StreamState : int { PendingHeaders, PendingDataOrTrailers, Closed };
 
   struct DirectionalState {
+    // The request encode and response decoder belong to the client, the
+    // response encoder and request decoder belong to the server.
     StreamEncoder* encoder_;
     NiceMock<MockStreamDecoder> decoder_;
     NiceMock<MockStreamCallbacks> stream_callbacks_;
@@ -119,27 +121,27 @@ public:
       resetStream();
     }));
     ON_CALL(request_.decoder_, decodeHeaders_(_, true)).WillByDefault(InvokeWithoutArgs([this] {
+      // The HTTP/1 codec needs this to cleanup any latent stream resources.
+      response_.encoder_->getStream().resetStream(StreamResetReason::LocalReset);
       request_.closeRemote();
     }));
     ON_CALL(request_.decoder_, decodeData(_, true)).WillByDefault(InvokeWithoutArgs([this] {
+      // The HTTP/1 codec needs this to cleanup any latent stream resources.
+      response_.encoder_->getStream().resetStream(StreamResetReason::LocalReset);
       request_.closeRemote();
     }));
     ON_CALL(request_.decoder_, decodeTrailers_(_)).WillByDefault(InvokeWithoutArgs([this] {
+      // The HTTP/1 codec needs this to cleanup any latent stream resources.
+      response_.encoder_->getStream().resetStream(StreamResetReason::LocalReset);
       request_.closeRemote();
     }));
     ON_CALL(response_.decoder_, decodeHeaders_(_, true)).WillByDefault(InvokeWithoutArgs([this] {
-      // The HTTP/1 codec needs this to cleanup any latent stream resources.
-      response_.encoder_->getStream().resetStream(StreamResetReason::LocalReset);
       response_.closeRemote();
     }));
     ON_CALL(response_.decoder_, decodeData(_, true)).WillByDefault(InvokeWithoutArgs([this] {
-      // The HTTP/1 codec needs this to cleanup any latent stream resources.
-      response_.encoder_->getStream().resetStream(StreamResetReason::LocalReset);
       response_.closeRemote();
     }));
     ON_CALL(response_.decoder_, decodeTrailers_(_)).WillByDefault(InvokeWithoutArgs([this] {
-      // The HTTP/1 codec needs this to cleanup any latent stream resources.
-      response_.encoder_->getStream().resetStream(StreamResetReason::LocalReset);
       response_.closeRemote();
     }));
     request_.encoder_->encodeHeaders(request_headers, end_stream);
@@ -246,10 +248,16 @@ public:
   void streamAction(const test::common::http::StreamAction& stream_action) {
     switch (stream_action.stream_action_selector_case()) {
     case test::common::http::StreamAction::kRequest: {
+      ENVOY_LOG_MISC(debug, "Request stream action on {} in state {} {}", stream_index_,
+                     static_cast<int>(request_.stream_state_),
+                     static_cast<int>(response_.stream_state_));
       directionalAction(request_, stream_action.request());
       break;
     }
     case test::common::http::StreamAction::kResponse: {
+      ENVOY_LOG_MISC(debug, "Response stream action on {} in state {} {}", stream_index_,
+                     static_cast<int>(request_.stream_state_),
+                     static_cast<int>(response_.stream_state_));
       directionalAction(response_, stream_action.response());
       break;
     }
@@ -257,6 +265,7 @@ public:
       // Maybe nothing is set?
       break;
     }
+    ENVOY_LOG_MISC(debug, "Stream action complete");
   }
 
   bool active() const {
@@ -428,6 +437,7 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
         if (streams.empty()) {
           break;
         }
+        // Index into list of created streams (not HTTP/2 level stream ID).
         const uint32_t stream_id = stream_action.stream_id() % streams.size();
         ENVOY_LOG_MISC(trace, "action for stream index {}", stream_id);
         (*std::next(streams.begin(), stream_id))->streamAction(stream_action);
