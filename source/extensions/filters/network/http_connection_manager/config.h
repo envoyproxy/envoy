@@ -99,7 +99,6 @@ public:
   Http::DateProvider& dateProvider() override { return date_provider_; }
   std::chrono::milliseconds drainTimeout() override { return drain_timeout_; }
   FilterChainFactory& filterFactory() override { return *this; }
-  bool reverseEncodeOrder() override { return reverse_encode_order_; }
   bool generateRequestId() override { return generate_request_id_; }
   uint32_t maxRequestHeadersKb() const override { return max_request_headers_kb_; }
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
@@ -139,7 +138,6 @@ private:
   Server::Configuration::FactoryContext& context_;
   FilterFactoriesList filter_factories_;
   std::map<std::string, FilterConfig> upgrade_filter_factories_;
-  const bool reverse_encode_order_{};
   std::list<AccessLog::InstanceSharedPtr> access_logs_;
   const std::string stats_prefix_;
   Http::ConnectionManagerStats stats_;
