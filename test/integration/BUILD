@@ -163,6 +163,8 @@ envoy_cc_test(
     srcs = [
         "protocol_integration_test.cc",
     ],
+    # As this test has many H1/H2/v4/v6 tests it takes a while to run.
+    # Shard it enough to bring the run time in line with other integration tests.
     shard_count = 3,
     deps = [
         ":http_protocol_integration_lib",
@@ -261,6 +263,8 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "idle_timeout_integration_test",
     srcs = ["idle_timeout_integration_test.cc"],
+    # As this test has many pauses for idle timeouts, it takes a while to run.
+    # Shard it enough to bring the run time in line with other integration tests.
     shard_count = 2,
     deps = [
         ":http_protocol_integration_lib",
