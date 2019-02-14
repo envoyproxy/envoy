@@ -463,15 +463,15 @@ TEST_F(ZipkinDriverTest, ZipkinSpanTest) {
       SystemTime{std::chrono::duration_cast<SystemTime::duration>(std::chrono::hours{123})};
   const auto timestamp_count =
       std::chrono::duration_cast<std::chrono::microseconds>(timestamp.time_since_epoch()).count();
-  span4.log(timestamp, "abc");
+  span4->log(timestamp, "abc");
   driver_->setDropLogs(true);
-  span4.log(timestamp, "xyz");
+  span4->log(timestamp, "xyz");
 
   ZipkinSpanPtr zipkin_span4(dynamic_cast<ZipkinSpan*>(span4.release()));
   Span& zipkin_zipkin_span4 = zipkin_span4->span();
   EXPECT_FALSE(zipkin_zipkin_span4.annotations().empty());
-  EXPECT_EQ(timestamp_count, zipkin_zipkin_span4.annotations.back().timestamp());
-  EXPECT_EQ("abc", zipkin_zipkin_span4.annotations.back().value());
+  EXPECT_EQ(timestamp_count, zipkin_zipkin_span4.annotations().back().timestamp());
+  EXPECT_EQ("abc", zipkin_zipkin_span4.annotations().back().value());
 }
 
 TEST_F(ZipkinDriverTest, ZipkinSpanContextFromB3HeadersTest) {
