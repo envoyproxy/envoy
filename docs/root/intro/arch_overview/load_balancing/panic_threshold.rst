@@ -18,7 +18,7 @@ finding enough available hosts in lower priorities, Envoy will disregard panic t
 mathematical terms, if normalized total availability across all priority levels is 100%, Envoy
 disregards panic thresholds and continues to distribute traffic load across priorities according to
 the algorithm described :ref:`here <arch_overview_load_balancing_priority_levels>`.
-However, when normalized total availablility drops below 100%, Envoy assumes that there are not enough
+However, when normalized total availability drops below 100%, Envoy assumes that there are not enough
 available hosts across all priority levels. It continues to distribute traffic load across priorities,
 but if a given priority level's availability is below the panic threshold, traffic will go to all hosts
 in that priority level regardless of their availability.

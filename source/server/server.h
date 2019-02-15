@@ -183,7 +183,7 @@ public:
   Http::Context& httpContext() override { return http_context_; }
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
   const LocalInfo::LocalInfo& localInfo() override { return *local_info_; }
-  Event::TimeSystem& timeSystem() override { return time_system_; }
+  TimeSource& timeSource() override { return time_source_; }
 
   std::chrono::milliseconds statsFlushInterval() const override {
     return config_.statsFlushInterval();
@@ -201,7 +201,7 @@ private:
 
   bool shutdown_;
   const Options& options_;
-  Event::TimeSystem& time_system_;
+  TimeSource& time_source_;
   HotRestart& restarter_;
   const time_t start_time_;
   time_t original_start_time_;
@@ -218,7 +218,7 @@ private:
   Singleton::ManagerPtr singleton_manager_;
   Network::ConnectionHandlerPtr handler_;
   Runtime::RandomGeneratorPtr random_generator_;
-  Runtime::LoaderPtr runtime_loader_;
+  std::unique_ptr<Runtime::ScopedLoaderSingleton> runtime_singleton_;
   std::unique_ptr<Extensions::TransportSockets::Tls::ContextManagerImpl> ssl_context_manager_;
   ProdListenerComponentFactory listener_component_factory_;
   ProdWorkerFactory worker_factory_;

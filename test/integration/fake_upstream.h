@@ -264,7 +264,7 @@ public:
           callback_ready_event.notifyOne();
         });
     Event::TestTimeSystem& time_system =
-        dynamic_cast<Event::TestTimeSystem&>(connection_.dispatcher().timeSystem());
+        dynamic_cast<Event::TestTimeSystem&>(connection_.dispatcher().timeSource());
     Thread::CondVar::WaitStatus status = time_system.waitFor(lock_, callback_ready_event, timeout);
     if (status == Thread::CondVar::WaitStatus::Timeout) {
       return testing::AssertionFailure() << "Timed out while executing on dispatcher.";
@@ -584,7 +584,6 @@ private:
     Stats::Scope& listenerScope() override { return parent_.stats_store_; }
     uint64_t listenerTag() const override { return 0; }
     const std::string& name() const override { return name_; }
-    bool reverseWriteFilterOrder() const override { return true; }
 
     FakeUpstream& parent_;
     std::string name_;

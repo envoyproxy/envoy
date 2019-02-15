@@ -45,7 +45,8 @@ ValidationInstance::ValidationInstance(const Options& options, Event::TimeSystem
                                    time_system)),
       dispatcher_(api_->allocateDispatcher()),
       singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory().currentThreadId())),
-      access_log_manager_(*api_, *dispatcher_, access_log_lock), mutex_tracer_(nullptr) {
+      access_log_manager_(*api_, *dispatcher_, access_log_lock), mutex_tracer_(nullptr),
+      time_system_(time_system) {
   try {
     initialize(options, local_address, component_factory);
   } catch (const EnvoyException& e) {
@@ -88,11 +89,11 @@ void ValidationInstance::initialize(const Options& options,
   runtime_loader_ = component_factory.createRuntime(*this, initial_config);
   secret_manager_ = std::make_unique<Secret::SecretManagerImpl>();
   ssl_context_manager_ =
-      std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(api_->timeSystem());
+      std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(api_->timeSource());
   cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
       admin(), runtime(), stats(), threadLocal(), random(), dnsResolver(), sslContextManager(),
       dispatcher(), localInfo(), *secret_manager_, *api_, http_context_, accessLogManager(),
-      singletonManager());
+      singletonManager(), time_system_);
   config_.initialize(bootstrap, *this, *cluster_manager_factory_);
   http_context_.setTracer(config_.httpTracer());
   clusterManager().setInitializedCb(

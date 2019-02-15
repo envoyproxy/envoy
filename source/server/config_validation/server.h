@@ -92,7 +92,7 @@ public:
   Http::Context& httpContext() override { return http_context_; }
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
   const LocalInfo::LocalInfo& localInfo() override { return *local_info_; }
-  Event::TimeSystem& timeSystem() override { return api_->timeSystem(); }
+  TimeSource& timeSource() override { return api_->timeSource(); }
   Envoy::MutexTracer* mutexTracer() override { return mutex_tracer_; }
 
   std::chrono::milliseconds statsFlushInterval() const override {
@@ -161,6 +161,7 @@ private:
   std::unique_ptr<OverloadManager> overload_manager_;
   MutexTracer* mutex_tracer_;
   Http::ContextImpl http_context_;
+  Event::TimeSystem& time_system_;
 };
 
 } // namespace Server

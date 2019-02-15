@@ -355,7 +355,7 @@ public:
   MOCK_METHOD0(localInfo, const LocalInfo::LocalInfo&());
   MOCK_CONST_METHOD0(statsFlushInterval, std::chrono::milliseconds());
 
-  Event::TestTimeSystem& timeSystem() override { return time_system_; }
+  TimeSource& timeSource() override { return time_system_; }
 
   std::unique_ptr<Secret::SecretManager> secret_manager_;
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
@@ -512,7 +512,7 @@ public:
     return Upstream::HealthCheckEventLoggerPtr(eventLogger_());
   }
 
-  testing::NiceMock<Upstream::MockCluster> cluster_;
+  testing::NiceMock<Upstream::MockClusterMockPrioritySet> cluster_;
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
   testing::NiceMock<Envoy::Runtime::MockRandomGenerator> random_;
   testing::NiceMock<Envoy::Runtime::MockLoader> runtime_;

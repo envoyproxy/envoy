@@ -46,7 +46,7 @@ parseHttpConnectionManagerFromV2Yaml(const std::string& yaml) {
 class HttpConnectionManagerConfigTest : public TestBase {
 public:
   NiceMock<Server::Configuration::MockFactoryContext> context_;
-  Http::SlowDateProviderImpl date_provider_{context_.dispatcher().timeSystem()};
+  Http::SlowDateProviderImpl date_provider_{context_.dispatcher().timeSource()};
   NiceMock<Router::MockRouteConfigProviderManager> route_config_provider_manager_;
 };
 
@@ -435,20 +435,6 @@ TEST_F(HttpConnectionManagerConfigTest, BadAccessLogNestedTypes) {
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   HttpConnectionManagerFilterConfigFactory factory;
   EXPECT_THROW(factory.createFilterFactory(*json_config, context_), Json::Exception);
-}
-
-TEST_F(HttpConnectionManagerConfigTest, ReversedEncodeOrderConfig) {
-  const std::string yaml_string = R"EOF(
-  stat_prefix: ingress_http
-  route_config:
-    name: local_route
-  http_filters:
-  - name: envoy.router
-  )EOF";
-
-  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_);
-  EXPECT_TRUE(config.reverseEncodeOrder());
 }
 
 class FilterChainTest : public HttpConnectionManagerConfigTest {
