@@ -15,8 +15,8 @@ void InitManagerImpl::initialize(std::function<void()> callback) {
   } else {
     callback_ = callback;
     state_ = State::Initializing;
-    // Target::initialize(...) method can modify the list to remove the item currently
-    // being initialized, so we increment the iterator before calling initialize.
+    // InitManager::initialize(...) method can modify the list to remove the item currently
+    // being initialized, so we increase the iterator before calling initialize.
     for (auto iter = targets_.begin(); iter != targets_.end();) {
       Init::Target* target = *iter;
       ++iter;
@@ -39,7 +39,7 @@ void InitManagerImpl::initializeTarget(Init::Target& target) {
 void InitManagerImpl::registerTarget(Init::Target& target) {
   ASSERT(state_ != State::Initialized);
   ASSERT(std::find(targets_.begin(), targets_.end(), &target) == targets_.end(),
-         "Registered duplicate Init::Target");
+         "Cannot Register a duplicate Init::Target");
   targets_.push_back(&target);
   if (state_ == State::Initializing) {
     initializeTarget(target);
