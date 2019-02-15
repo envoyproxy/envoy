@@ -18,6 +18,7 @@ class Utility {
 public:
   /**
    * Add body data to a tapped body message, taking into account the maximum bytes to buffer.
+   * @param output_body supplies the body message to buffer to.
    * @param max_buffered_bytes supplies the maximum bytes to store, if truncation occurs the
    *        truncation flag will be set.
    * @param data supplies the data to buffer.
