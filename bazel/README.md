@@ -264,7 +264,7 @@ will need to override a few environment variables to set up the remote docker. T
 can be found in the [Documentation](https://docs.docker.com/engine/reference/commandline/cli/).
 
 Use `LOCAL_MOUNT=yes` when you are not building with the envoy build container. This will ensure
-that the libraries against which the tests dynmically link will be available and of the correct
+that the libraries against which the tests dynamically link will be available and of the correct
 version.
 
 ## Examples

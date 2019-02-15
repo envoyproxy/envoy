@@ -288,6 +288,7 @@ admin:
 
 ### Incremental xDS
 
+<<<<<<< HEAD
 Incremental xDS is a separate xDS endpoint that:
 
   * Allows the protocol to communicate on the wire in terms of resource/resource
@@ -299,6 +300,21 @@ Incremental xDS is a separate xDS endpoint that:
     example, requesting a cluster only when a request for that cluster arrives.
 
 An Incremental xDS session is always in the context of a gRPC bidirectional
+=======
+Incremental xDS is a separate xDS endpoint available for ADS, CDS and RDS that
+allows:
+
+  * Incremental updates of the list of tracked resources by the xDS client.
+    This supports Envoy on-demand / lazily requesting additional resources. For
+    example, this may occur when a request corresponding to an unknown cluster
+    arrives.
+  * The xDS server can incrementally update the resources on the client.
+    This supports the goal of scalability of xDS resources. Rather than deliver
+    all 100k clusters when a single cluster is modified, the management server
+    only needs to deliver the single cluster that changed.
+
+An xDS incremental session is always in the context of a gRPC bidirectional
+>>>>>>> Fix some typos (#5968)
 stream. This allows the xDS server to keep track of the state of xDS clients
 connected to it. There is no REST version of Incremental xDS yet.
 
