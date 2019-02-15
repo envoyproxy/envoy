@@ -93,8 +93,8 @@ export CXX=clang++
 bazel build --config=libc++ //source/exe:envoy-static
 ```
 Note: this assumes that both: clang compiler and libc++ library are installed in the system,
-and that `clang` and `clang++` are available in `$PATH`. On some systems, exports might need
-to be changed to versioned binaries, e.g. `CC=clang-7` and `CXX=clang++-7`.
+and that `clang` and `clang++` are available in `$PATH`. On some systems, you might need to
+include them in the search path, e.g. `export PATH=/usr/lib/llvm-7/bin:$PATH`.
 
 You might also need to ensure libc++ is installed correctly on your system, e.g. on Ubuntu this
 might look like `sudo apt-get install libc++abi-7-dev libc++-7-dev`.
