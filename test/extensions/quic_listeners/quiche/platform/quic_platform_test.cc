@@ -14,6 +14,7 @@
 #include "quiche/quic/platform/api/quic_map_util.h"
 #include "quiche/quic/platform/api/quic_mutex.h"
 #include "quiche/quic/platform/api/quic_ptr_util.h"
+#include "quiche/quic/platform/api/quic_sleep.h"
 #include "quiche/quic/platform/api/quic_stack_trace.h"
 #include "quiche/quic/platform/api/quic_string.h"
 #include "quiche/quic/platform/api/quic_string_piece.h"
@@ -114,6 +115,8 @@ TEST(QuicPlatformTest, QuicMapUtil) {
 TEST(QuicPlatformTest, QuicStackTraceTest) {
   EXPECT_THAT(quic::QuicStackTrace(), HasSubstr("QuicStackTraceTest"));
 }
+
+TEST(QuicPlatformTest, QuicSleep) { quic::QuicSleep(quic::QuicTime::Delta::FromMilliseconds(20)); }
 
 TEST(QuicPlatformTest, QuicString) {
   quic::QuicString s = "foo";
