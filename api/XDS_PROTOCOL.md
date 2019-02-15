@@ -288,7 +288,7 @@ admin:
 
 ### Incremental xDS
 
-Incremental xDS is a separate xDS endpoint available for ADS, CDS and RDS that:
+Incremental xDS is a separate xDS endpoint that:
 
   * Allows the protocol to communicate on the wire in terms of resource/resource
     name deltas ("Delta xDS"). This supports the goal of scalability of xDS
@@ -300,7 +300,7 @@ Incremental xDS is a separate xDS endpoint available for ADS, CDS and RDS that:
 
 An Incremental xDS session is always in the context of a gRPC bidirectional
 stream. This allows the xDS server to keep track of the state of xDS clients
-connected to it. There is no REST version of Incremental xDS.
+connected to it. There is no REST version of Incremental xDS yet.
 
 In the delta xDS wire protocol, the nonce field is required and used to pair a
 [`DeltaDiscoveryResponse`](https://www.envoyproxy.io/docs/envoy/latest/api-v2/api/v2/discovery.proto#discoveryrequest)

@@ -77,13 +77,13 @@ public:
 
   void sendDiscoveryRequest(const ResourceNameDiff& diff) override {
     if (!grpcStreamAvailable()) {
-      // Don't immediately try to reconnect: we rely on retry_timer_ for that.
       ENVOY_LOG(debug, "No stream available to sendDiscoveryRequest for {}", type_url_);
-      return;
+      return; // Drop this request; the reconnect will enqueue a new one.
     }
     if (paused_) {
       ENVOY_LOG(trace, "API {} paused during sendDiscoveryRequest().", type_url_);
-      return;
+      pending_ = diff;
+      return; // The unpause will send this request.
     }
 
     request_.clear_resource_names_subscribe();
@@ -102,14 +102,6 @@ public:
 <<<<<<< HEAD
   void subscribe(const std::vector<std::string>& resources) {
     ENVOY_LOG(debug, "delta subscribe for " + type_url_);
-
-    // Lazily kick off the requests based on first subscription. This has the
-    // convenient side-effect that we order messages on the channel based on
-    // Envoy's internal dependency ordering.
-    if (!subscribed_) {
-
-      subscribed_ = true;
-    }
     buildAndQueueDiscoveryRequest(resources);
   }
 
@@ -125,6 +117,10 @@ public:
     ENVOY_LOG(debug, "Resuming discovery requests for {}", type_url_);
     ASSERT(paused_);
     paused_ = false;
+    if (pending_.has_value()) {
+      queueDiscoveryRequest(pending_.value());
+      pending_.reset();
+    }
   }
 
   // Config::SubscriptionCallbacks
@@ -162,9 +158,13 @@ public:
       stats_.update_rejected_.inc();
       ENVOY_LOG(warn, "delta config for {} rejected: {}", type_url_, e.what());
       stats_.update_attempt_.inc();
+<<<<<<< HEAD
       if (callbacks_) {
         callbacks_->onIncrementalConfigUpdateFailed(&e);
       }
+=======
+      callbacks_->onConfigUpdateFailed(&e);
+>>>>>>> address comments
       ::google::rpc::Status* error_detail = request_.mutable_error_detail();
       error_detail->set_code(Grpc::Status::GrpcStatus::Internal);
       error_detail->set_message(e.what());
@@ -190,9 +190,13 @@ public:
     stats_.update_failure_.inc();
     ENVOY_LOG(debug, "delta update for {} failed", type_url_);
     stats_.update_attempt_.inc();
+<<<<<<< HEAD
     if (callbacks_) {
       callbacks_->onIncrementalConfigUpdateFailed(nullptr);
     }
+=======
+    callbacks_->onConfigUpdateFailed(nullptr);
+>>>>>>> address comments
   }
 
   // Config::DeltaSubscription
@@ -228,11 +232,18 @@ private:
   envoy::api::v2::DeltaDiscoveryRequest request_;
   // Paused via pause()?
   bool paused_{};
+<<<<<<< HEAD
 
   std::queue<ResourceNameDiff> request_queue_;
   // Detects when Envoy is making too many requests.
 
 <<<<<<< HEAD
+=======
+  absl::optional<ResourceNameDiff> pending_;
+
+  const LocalInfo::LocalInfo& local_info_;
+
+>>>>>>> address comments
   SubscriptionStats stats_;
 =======
   IncrementalSubscriptionStats stats_;
