@@ -49,11 +49,10 @@ std::vector<Network::FilterFactoryCb> ProdListenerComponentFactory::createNetwor
     const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
     Configuration::FactoryContext& context) {
   std::vector<Network::FilterFactoryCb> ret;
-  for (ssize_t i = 0; i < filters.size(); i++) {
+  for (auto i = 0; i < filters.size(); i++) {
     const auto& proto_config = filters[i];
     const ProtobufTypes::String string_name = proto_config.name();
-    ENVOY_LOG(debug, "  filter #{}:", i);
-    ENVOY_LOG(debug, "    name: {}", string_name);
+    ENVOY_LOG(debug, "  filter #{}, name: {}", i, string_name);
     const Json::ObjectSharedPtr filter_config =
         MessageUtil::getJsonObjectFromMessage(proto_config.config());
     ENVOY_LOG(debug, "  config: {}", filter_config->asJsonString());
@@ -79,11 +78,10 @@ ProdListenerComponentFactory::createListenerFilterFactoryList_(
     const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>& filters,
     Configuration::ListenerFactoryContext& context) {
   std::vector<Network::ListenerFilterFactoryCb> ret;
-  for (ssize_t i = 0; i < filters.size(); i++) {
+  for (auto i = 0; i < filters.size(); i++) {
     const auto& proto_config = filters[i];
     const ProtobufTypes::String string_name = proto_config.name();
-    ENVOY_LOG(debug, "  filter #{}:", i);
-    ENVOY_LOG(debug, "    name: {}", string_name);
+    ENVOY_LOG(debug, "  filter #{}, name: {}", i, string_name);
     const Json::ObjectSharedPtr filter_config =
         MessageUtil::getJsonObjectFromMessage(proto_config.config());
     ENVOY_LOG(debug, "  config: {}", filter_config->asJsonString());
