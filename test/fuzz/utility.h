@@ -14,7 +14,9 @@ namespace Fuzz {
 inline Http::TestHeaderMapImpl fromHeaders(const test::fuzz::Headers& headers) {
   Http::TestHeaderMapImpl header_map;
   for (const auto& header : headers.headers()) {
-    header_map.addCopy(header.key(), header.value());
+    // When we are injecting headers, we don't allow the key to ever be empty,
+    // since calling code is not supposed to do this.
+    header_map.addCopy(header.key().empty() ? "not-empty" : header.key(), header.value());
   }
   return header_map;
 }

@@ -36,6 +36,26 @@ namespace Http {
 // debugging.
 constexpr bool DebugMode = false;
 
+Http::TestHeaderMapImpl fromSanitizedHeaders(const test::fuzz::Headers& headers) {
+  // When we are injecting headers, we don't allow the key to ever be empty,
+  // since calling code is not supposed to do this. Also disallowed
+  // transfer-encoding.
+  test::fuzz::Headers sanitized_headers;
+  for (const auto& header : headers.headers()) {
+    const std::string key = StringUtil::toLower(header.key());
+
+    if (key == "transfer-encoding") {
+      continue;
+    }
+
+    auto* sane_header = sanitized_headers.add_headers();
+    sane_header->set_key(key.empty() ? "non-empty" : key);
+    sane_header->set_value(header.value());
+  }
+
+  return Fuzz::fromHeaders(sanitized_headers);
+}
+
 // Convert from test proto Http1ServerSettings to Http1Settings.
 Http1Settings fromHttp1Settings(const test::common::http::Http1ServerSettings& settings) {
   Http1Settings h1_settings;
@@ -167,7 +187,8 @@ public:
     switch (directional_action.directional_action_selector_case()) {
     case test::common::http::DirectionalAction::kContinueHeaders: {
       if (state.isLocalOpen() && state.stream_state_ == StreamState::PendingHeaders) {
-        Http::TestHeaderMapImpl headers = Fuzz::fromHeaders(directional_action.continue_headers());
+        Http::TestHeaderMapImpl headers =
+            fromSanitizedHeaders(directional_action.continue_headers());
         headers.setReferenceKey(Headers::get().Status, "100");
         state.encoder_->encode100ContinueHeaders(headers);
       }
@@ -175,7 +196,7 @@ public:
     }
     case test::common::http::DirectionalAction::kHeaders: {
       if (state.isLocalOpen() && state.stream_state_ == StreamState::PendingHeaders) {
-        auto headers = Fuzz::fromHeaders(directional_action.headers());
+        auto headers = fromSanitizedHeaders(directional_action.headers());
         if (response && headers.Status() == nullptr) {
           headers.setReferenceKey(Headers::get().Status, "200");
         }
@@ -210,7 +231,7 @@ public:
     }
     case test::common::http::DirectionalAction::kTrailers: {
       if (state.isLocalOpen() && state.stream_state_ == StreamState::PendingDataOrTrailers) {
-        state.encoder_->encodeTrailers(Fuzz::fromHeaders(directional_action.trailers()));
+        state.encoder_->encodeTrailers(fromSanitizedHeaders(directional_action.trailers()));
         state.stream_state_ = StreamState::Closed;
         state.closeLocal();
       }
@@ -427,7 +448,7 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
           }
         }
         HttpStreamPtr stream = std::make_unique<HttpStream>(
-            *client, Fuzz::fromHeaders(action.new_stream().request_headers()),
+            *client, fromSanitizedHeaders(action.new_stream().request_headers()),
             action.new_stream().end_stream());
         stream->moveIntoListBack(std::move(stream), pending_streams);
         break;
