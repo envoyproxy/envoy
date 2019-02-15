@@ -4,8 +4,16 @@
 
 #include "envoy/common/pure.h"
 
+#include "common/common/assert.h"
+
 namespace Envoy {
 namespace Network {
+
+// IoErrorCode::Again is used frequently. Define it to be a distinguishable address to avoid
+// frequent memory allocation of IoError instance.
+// If this is used, IoHandleCallResult has to be instantiated with a deleter that does not
+// deallocate memory for this error.
+#define ENVOY_ERROR_AGAIN reinterpret_cast<IoError*>(1)
 
 /**
  * Base class for any I/O error.
@@ -13,8 +21,6 @@ namespace Network {
 class IoError {
 public:
   enum class IoErrorCode {
-    // Success.
-    NoError = 0,
     // No data available right now, try again later.
     Again,
     // Not supported.
@@ -31,17 +37,37 @@ public:
   virtual ~IoError() {}
 
   // Map platform specific error into IoErrorCode.
-  virtual IoErrorCode getErrorCode() const PURE;
+  // Needed to hide errorCode() in case of ENVOY_ERROR_AGAIN.
+  static IoErrorCode getErrorCode(const IoError* err) {
+    ASSERT(err != nullptr);
+    if (err == ENVOY_ERROR_AGAIN) {
+      return IoErrorCode::Again;
+    }
+    return err->errorCode();
+  }
 
-  virtual std::string getErrorDetails() const PURE;
+  static std::string getErrorDetails(const IoError* err) {
+    ASSERT(err != nullptr);
+    if (err == ENVOY_ERROR_AGAIN) {
+      return "Try again later";
+    }
+    return err->errorDetails();
+  }
+
+protected:
+  virtual IoErrorCode errorCode() const PURE;
+  virtual std::string errorDetails() const PURE;
 };
+
+using IoErrorDeleterType = void (*)(IoError*);
+using IoErrorPtr = std::unique_ptr<IoError, IoErrorDeleterType>;
 
 /**
  * Basic type for return result which has a return code and error code defined
  * according to different implementations.
  */
 template <typename T> struct IoHandleCallResult {
-  IoHandleCallResult(T rc, std::unique_ptr<IoError> err) : rc_(rc), err_(std::move(err)) {}
+  IoHandleCallResult(T rc, IoErrorPtr err) : rc_(rc), err_(std::move(err)) {}
 
   IoHandleCallResult(IoHandleCallResult<T>&& result)
       : rc_(result.rc_), err_(std::move(result.err_)) {}
@@ -49,7 +75,7 @@ template <typename T> struct IoHandleCallResult {
   virtual ~IoHandleCallResult() {}
 
   T rc_;
-  std::unique_ptr<IoError> err_;
+  IoErrorPtr err_;
 };
 
 using IoHandleCallIntResult = IoHandleCallResult<int>;

@@ -12,11 +12,11 @@ public:
 
   ~IoSocketError() override {}
 
-  IoErrorCode getErrorCode() const override;
-
-  std::string getErrorDetails() const override;
-
 private:
+  IoErrorCode errorCode() const override;
+
+  std::string errorDetails() const override;
+
   int errno_;
 };
 

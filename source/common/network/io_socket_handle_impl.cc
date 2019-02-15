@@ -4,19 +4,16 @@
 
 #include <iostream>
 
-#include "common/common/assert.h"
-
 using Envoy::Api::SysCallIntResult;
 using Envoy::Api::SysCallSizeResult;
 
 namespace Envoy {
 namespace Network {
 
-IoError::IoErrorCode IoSocketError::getErrorCode() const {
+IoError::IoErrorCode IoSocketError::errorCode() const {
   switch (errno_) {
-  case 0:
-    return IoErrorCode::NoError;
   case EAGAIN:
+    RELEASE_ASSERT(false, "EAGAIN should use specific error ENVOY_ERROR_AGAIN");
     return IoErrorCode::Again;
   case ENOTSUP:
     return IoErrorCode::NoSupport;
@@ -31,7 +28,7 @@ IoError::IoErrorCode IoSocketError::getErrorCode() const {
   }
 }
 
-std::string IoSocketError::getErrorDetails() const { return ::strerror(errno_); }
+std::string IoSocketError::errorDetails() const { return ::strerror(errno_); }
 
 IoSocketHandleImpl::~IoSocketHandleImpl() {
   if (fd_ != -1) {
@@ -39,11 +36,28 @@ IoSocketHandleImpl::~IoSocketHandleImpl() {
   }
 }
 
+// Deallocate memory only if the error is not ENVOY_ERROR_AGAIN.
+void deleteIoError(IoError* err) {
+  ASSERT(err != nullptr);
+  if (err != ENVOY_ERROR_AGAIN) {
+    delete err;
+  }
+}
+
 IoHandleCallIntResult IoSocketHandleImpl::close() {
   ASSERT(fd_ != -1);
   const int rc = ::close(fd_);
   fd_ = -1;
-  return IoHandleCallResult<int>(rc, std::make_unique<IoSocketError>(errno));
+  IoErrorPtr err(nullptr, deleteIoError);
+  if (rc == -1) {
+    // Sytem call failed.
+    err = (errno == EAGAIN
+               // EAGAIN is frequent enough that its memory allocation should be avoided.
+               ? std::unique_ptr<IoError, IoErrorDeleterType>(ENVOY_ERROR_AGAIN, deleteIoError)
+               : std::unique_ptr<IoError, IoErrorDeleterType>(new IoSocketError(errno),
+                                                              deleteIoError));
+  }
+  return IoHandleCallResult<int>(rc, std::move(err));
 }
 
 bool IoSocketHandleImpl::isOpen() const { return fd_ != -1; }

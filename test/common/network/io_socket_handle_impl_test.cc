@@ -7,34 +7,33 @@ namespace Network {
 namespace {
 
 TEST(IoSocketHandleImplTest, TestIoSocketError) {
-  IoSocketError error1(0);
-  EXPECT_EQ(IoSocketError::IoErrorCode::NoError, error1.getErrorCode());
-  EXPECT_EQ(::strerror(0), error1.getErrorDetails());
+  IoSocketError error1(EAGAIN);
+  EXPECT_DEATH(
+      IoError::getErrorCode(&error1),
+      "assert failure: false. Details: EAGAIN should use specific error ENVOY_ERROR_AGAIN");
 
-  IoSocketError error2(EAGAIN);
-  EXPECT_EQ(IoSocketError::IoErrorCode::Again, error2.getErrorCode());
-  EXPECT_EQ(::strerror(EAGAIN), error2.getErrorDetails());
+  EXPECT_EQ("Try again later", IoError::getErrorDetails(ENVOY_ERROR_AGAIN));
 
   IoSocketError error3(ENOTSUP);
-  EXPECT_EQ(IoSocketError::IoErrorCode::NoSupport, error3.getErrorCode());
-  EXPECT_EQ(::strerror(ENOTSUP), error3.getErrorDetails());
+  EXPECT_EQ(IoSocketError::IoErrorCode::NoSupport, IoError::getErrorCode(&error3));
+  EXPECT_EQ(::strerror(ENOTSUP), IoError::getErrorDetails(&error3));
 
   IoSocketError error4(EAFNOSUPPORT);
-  EXPECT_EQ(IoSocketError::IoErrorCode::AddressFamilyNoSupport, error4.getErrorCode());
-  EXPECT_EQ(::strerror(EAFNOSUPPORT), error4.getErrorDetails());
+  EXPECT_EQ(IoSocketError::IoErrorCode::AddressFamilyNoSupport, IoError::getErrorCode(&error4));
+  EXPECT_EQ(::strerror(EAFNOSUPPORT), IoError::getErrorDetails(&error4));
 
   IoSocketError error5(EINPROGRESS);
-  EXPECT_EQ(IoSocketError::IoErrorCode::InProgress, error5.getErrorCode());
-  EXPECT_EQ(::strerror(EINPROGRESS), error5.getErrorDetails());
+  EXPECT_EQ(IoSocketError::IoErrorCode::InProgress, IoError::getErrorCode(&error5));
+  EXPECT_EQ(::strerror(EINPROGRESS), IoError::getErrorDetails(&error5));
 
   IoSocketError error6(EPERM);
-  EXPECT_EQ(IoSocketError::IoErrorCode::Permission, error6.getErrorCode());
-  EXPECT_EQ(::strerror(EPERM), error6.getErrorDetails());
+  EXPECT_EQ(IoSocketError::IoErrorCode::Permission, IoError::getErrorCode(&error6));
+  EXPECT_EQ(::strerror(EPERM), IoError::getErrorDetails(&error6));
 
   // Random unknown error.
   IoSocketError error7(123);
-  EXPECT_EQ(IoSocketError::IoErrorCode::UnknownError, error7.getErrorCode());
-  EXPECT_EQ(::strerror(123), error7.getErrorDetails());
+  EXPECT_EQ(IoSocketError::IoErrorCode::UnknownError, IoError::getErrorCode(&error7));
+  EXPECT_EQ(::strerror(123), IoError::getErrorDetails(&error7));
 }
 
 } // namespace
