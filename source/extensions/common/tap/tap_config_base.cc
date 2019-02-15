@@ -20,8 +20,7 @@ bool Utility::addBufferToProtoBytes(envoy::data::tap::v2alpha::Body& output_byte
   // is not trivial if we want to avoid extra copies since we end up appending to the existing
   // protobuf string.
   ASSERT(buffer_start_offset + buffer_length_to_copy <= data.length());
-  const uint32_t final_bytes_to_copy =
-      std::min(max_buffered_bytes, buffer_length_to_copy - buffer_start_offset);
+  const uint32_t final_bytes_to_copy = std::min(max_buffered_bytes, buffer_length_to_copy);
 
   const uint64_t num_slices = data.getRawSlices(nullptr, 0);
   STACK_ARRAY(slices, Buffer::RawSlice, num_slices);

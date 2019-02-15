@@ -33,6 +33,9 @@ public:
    * Trim a container that contains buffer raw slices so that the slices start at an offset and
    * only contain a specific length. No slices are removed from the container, but their length
    * may be reduced to 0.
+   * TODO(mattklein123): This is split out to ease testing and also because we should ultimately
+   * move this directly into the buffer API. I would rather wait until the new buffer code merges
+   * before we do that.
    */
   template <typename T> static void trimSlices(T& slices, uint32_t start_offset, uint32_t length) {
     for (auto& slice : slices) {

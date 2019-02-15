@@ -1,3 +1,5 @@
+#include "common/buffer/buffer_impl.h"
+
 #include "extensions/common/tap/tap_config_base.h"
 
 #include "gtest/gtest.h"
@@ -7,6 +9,32 @@ namespace Extensions {
 namespace Common {
 namespace Tap {
 namespace {
+
+TEST(AddBufferToProtoBytes, All) {
+  {
+    Buffer::OwnedImpl data("hello");
+    envoy::data::tap::v2alpha::Body body;
+    Utility::addBufferToProtoBytes(body, 5, data, 4, 1);
+    EXPECT_EQ("o", body.as_bytes());
+    EXPECT_TRUE(body.truncated());
+  }
+
+  {
+    Buffer::OwnedImpl data("hello");
+    envoy::data::tap::v2alpha::Body body;
+    Utility::addBufferToProtoBytes(body, 3, data, 0, 5);
+    EXPECT_EQ("hel", body.as_bytes());
+    EXPECT_TRUE(body.truncated());
+  }
+
+  {
+    Buffer::OwnedImpl data("hello");
+    envoy::data::tap::v2alpha::Body body;
+    Utility::addBufferToProtoBytes(body, 100, data, 0, 5);
+    EXPECT_EQ("hello", body.as_bytes());
+    EXPECT_FALSE(body.truncated());
+  }
+}
 
 TEST(TrimSlice, All) {
   {
