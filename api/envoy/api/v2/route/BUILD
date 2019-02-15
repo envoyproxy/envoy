@@ -18,6 +18,7 @@ api_go_proto_library(
     proto = ":route",
     deps = [
         "//envoy/api/v2/core:base_go_proto",
+        "//envoy/type:percent_go_proto",
         "//envoy/type:range_go_proto",
     ],
 )
