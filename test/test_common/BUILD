@@ -169,9 +169,6 @@ envoy_cc_test_infrastructure_library(
 envoy_cc_test(
     name = "test_base_test",
     srcs = ["test_base_test.cc"],
-    deps = [
-        ":test_base",
-    ],
 )
 
 envoy_cc_test_library(
