@@ -98,9 +98,9 @@ Network::FilterStatus Router::messageEnd(MessageMetadataSharedPtr metadata) {
 
   ENVOY_STREAM_LOG(debug, "dubbo router: decoding request", *callbacks_);
 
-  upstream_request_.reset(new UpstreamRequest(*this, *conn_pool, metadata,
-                                              callbacks_->downstreamSerializationType(),
-                                              callbacks_->downstreamProtocolType()));
+  upstream_request_ = std::make_unique<UpstreamRequest>(*this, *conn_pool, metadata,
+                                                        callbacks_->downstreamSerializationType(),
+                                                        callbacks_->downstreamProtocolType());
   return upstream_request_->start();
 }
 
