@@ -54,7 +54,9 @@ void HotRestartingBase::sendHotRestartMessage(sockaddr_un& address,
   RELEASE_ASSERT(proto.SerializeToArray(send_buf.data() + sizeof(uint64_t), serialized_size),
                  "failed to serialize a HotRestartMessage");
 
-  bool turned_on_blocking = false;
+  RELEASE_ASSERT(fcntl(my_domain_socket_, F_SETFL, 0) != -1,
+                 fmt::format("Set domain socket blocking failed, errno = {}", errno));
+
   uint8_t* next_byte_to_send = send_buf.data();
   uint64_t sent = 0;
   while (sent < total_size) {
@@ -87,26 +89,17 @@ void HotRestartingBase::sendHotRestartMessage(sockaddr_un& address,
     }
 
     int rc = sendmsg(my_domain_socket_, &message, 0);
-    if (rc == -1 && errno == EAGAIN) {
-      // Let's deal with the possibility of a sendmsg() WOULDBLOCK by just... turning blocking on.
-      // Since the parent wants its recvmsg()s non-blocking, it would be bad to just *always* turn
-      // it on when sending. However, selectively turning it on is ok, because there is only one
-      // case where a sendmsg() could WOULDBLOCK: sending a large StatsReply. But, while we're
-      // sending that, the child is blocked on receiving it, so it wouldn't be sending to us.
-      turned_on_blocking = true;
-      RELEASE_ASSERT(fcntl(my_domain_socket_, F_SETFL, 0) != -1,
-                     fmt::format("Set domain socket blocking failed, errno = {}", errno));
-      // Try again - this time it will work!
-      rc = sendmsg(my_domain_socket_, &message, 0);
-    }
     RELEASE_ASSERT(rc == static_cast<int>(cur_chunk_size),
                    fmt::format("hot restart sendmsg() failed: returned {}, errno {}", rc, errno));
   }
-  // Turn non-blocking back on if we made it blocking.
-  if (turned_on_blocking) {
-    RELEASE_ASSERT(fcntl(my_domain_socket_, F_SETFL, O_NONBLOCK) != -1,
-                   fmt::format("Set domain socket nonblocking failed, errno = {}", errno));
-  }
+  RELEASE_ASSERT(fcntl(my_domain_socket_, F_SETFL, O_NONBLOCK) != -1,
+                 fmt::format("Set domain socket nonblocking failed, errno = {}", errno));
+}
+
+bool HotRestartingBase::replyIsExpectedType(const HotRestartMessage* proto,
+                                            HotRestartMessage::Reply::ReplyCase oneof_type) {
+  return proto != nullptr && proto->requestreply_case() == HotRestartMessage::kReply &&
+         proto->reply().reply_case() == oneof_type;
 }
 
 // Pull the cloned fd, if present, out of the control data and write it into the
@@ -199,12 +192,6 @@ std::unique_ptr<HotRestartMessage> HotRestartingBase::receiveHotRestartMessage(B
   }
   getPassedFdIfPresent(ret.get(), &message);
   return ret;
-}
-
-bool HotRestartingBase::replyIsExpectedType(const HotRestartMessage* proto,
-                                            HotRestartMessage::Reply::ReplyCase oneof_type) {
-  return proto != nullptr && proto->requestreply_case() == HotRestartMessage::kReply &&
-         proto->reply().reply_case() == oneof_type;
 }
 
 } // namespace Server
