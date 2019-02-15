@@ -52,7 +52,7 @@ Network::FilterStatus Router::messageEnd(MessageMetadataSharedPtr metadata) {
   if (!route_) {
     ENVOY_STREAM_LOG(debug, "dubbo router: no cluster match for interface '{}'", *callbacks_,
                      metadata->service_name());
-    callbacks_->sendLocalReply(AppException(AppExceptionType::ServiceNotFound,
+    callbacks_->sendLocalReply(AppException(ResponseStatus::ServiceNotFound,
                                             fmt::format("dubbo router: no route for interface '{}'",
                                                         metadata->service_name())),
                                true);
@@ -65,10 +65,10 @@ Network::FilterStatus Router::messageEnd(MessageMetadataSharedPtr metadata) {
   if (!cluster) {
     ENVOY_STREAM_LOG(debug, "dubbo router: unknown cluster '{}'", *callbacks_,
                      route_entry_->clusterName());
-    callbacks_->sendLocalReply(AppException(AppExceptionType::ServerError,
-                                            fmt::format("dubbo router: unknown cluster '{}'",
-                                                        route_entry_->clusterName())),
-                               true);
+    callbacks_->sendLocalReply(
+        AppException(ResponseStatus::ServerError, fmt::format("dubbo router: unknown cluster '{}'",
+                                                              route_entry_->clusterName())),
+        true);
     return Network::FilterStatus::StopIteration;
   }
 
@@ -78,7 +78,7 @@ Network::FilterStatus Router::messageEnd(MessageMetadataSharedPtr metadata) {
 
   if (cluster_->maintenanceMode()) {
     callbacks_->sendLocalReply(
-        AppException(AppExceptionType::ServerError,
+        AppException(ResponseStatus::ServerError,
                      fmt::format("dubbo router: maintenance mode for cluster '{}'",
                                  route_entry_->clusterName())),
         true);
@@ -90,7 +90,7 @@ Network::FilterStatus Router::messageEnd(MessageMetadataSharedPtr metadata) {
   if (!conn_pool) {
     callbacks_->sendLocalReply(
         AppException(
-            AppExceptionType::ServerError,
+            ResponseStatus::ServerError,
             fmt::format("dubbo router: no healthy upstream for '{}'", route_entry_->clusterName())),
         true);
     return Network::FilterStatus::StopIteration;
@@ -288,10 +288,10 @@ void Router::UpstreamRequest::onResetStream(Tcp::ConnectionPool::PoolFailureReas
   switch (reason) {
   case Tcp::ConnectionPool::PoolFailureReason::Overflow:
     parent_.callbacks_->sendLocalReply(
-        AppException(AppExceptionType::ServerError,
+        AppException(ResponseStatus::ServerError,
                      fmt::format("dubbo upstream request: too many connections to '{}'",
                                  upstream_host_->address()->asString())),
-        true);
+        false);
     break;
   case Tcp::ConnectionPool::PoolFailureReason::LocalConnectionFailure:
     // Should only happen if we closed the connection, due to an error condition, in which case
@@ -302,10 +302,10 @@ void Router::UpstreamRequest::onResetStream(Tcp::ConnectionPool::PoolFailureReas
   case Tcp::ConnectionPool::PoolFailureReason::Timeout:
     if (!response_started_) {
       parent_.callbacks_->sendLocalReply(
-          AppException(AppExceptionType::ServerError,
+          AppException(ResponseStatus::ServerError,
                        fmt::format("dubbo upstream request: connection failure '{}'",
                                    upstream_host_->address()->asString())),
-          true);
+          false);
       return;
     }
 

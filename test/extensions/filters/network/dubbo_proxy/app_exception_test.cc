@@ -28,7 +28,7 @@ public:
 
 TEST_F(AppExceptionTest, Encode) {
   std::string mock_message("invalid method name 'Sub'");
-  AppException app_exception(AppExceptionType::ServiceNotFound, mock_message);
+  AppException app_exception(ResponseStatus::ServiceNotFound, mock_message);
 
   Buffer::OwnedImpl buffer;
   metadata_->setSerializationType(SerializationType::Hessian);

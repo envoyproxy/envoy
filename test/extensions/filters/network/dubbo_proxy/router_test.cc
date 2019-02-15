@@ -55,9 +55,9 @@ public:
 
 } // namespace
 
-class RouterTestBase {
+class DubboRouterTestBase {
 public:
-  RouterTestBase()
+  DubboRouterTestBase()
       : deserializer_factory_([&]() -> MockDeserializer* {
           ASSERT(deserializer_ == nullptr);
           deserializer_ = new NiceMock<MockDeserializer>();
@@ -224,20 +224,17 @@ public:
   NiceMock<Network::MockClientConnection> upstream_connection_;
 };
 
-class RouterTest : public RouterTestBase, public TestBase {
-public:
-  RouterTest() {}
-};
+class DubboRouterTest : public DubboRouterTestBase, public TestBase {};
 
-TEST_F(RouterTest, PoolRemoteConnectionFailure) {
+TEST_F(DubboRouterTest, PoolRemoteConnectionFailure) {
   initializeRouter();
 
   EXPECT_CALL(callbacks_, sendLocalReply(_, _))
       .WillOnce(Invoke([&](const DubboFilters::DirectResponse& response, bool end_stream) -> void {
         auto& app_ex = dynamic_cast<const AppException&>(response);
-        EXPECT_EQ(AppExceptionType::ServerError, app_ex.type_);
+        EXPECT_EQ(ResponseStatus::ServerError, app_ex.status_);
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*connection failure.*"));
-        EXPECT_TRUE(end_stream);
+        EXPECT_FALSE(end_stream);
       }));
   startRequest(MessageType::Request);
 
@@ -245,15 +242,15 @@ TEST_F(RouterTest, PoolRemoteConnectionFailure) {
       Tcp::ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
 }
 
-TEST_F(RouterTest, PoolTimeout) {
+TEST_F(DubboRouterTest, PoolTimeout) {
   initializeRouter();
 
   EXPECT_CALL(callbacks_, sendLocalReply(_, _))
       .WillOnce(Invoke([&](const DubboFilters::DirectResponse& response, bool end_stream) -> void {
         auto& app_ex = dynamic_cast<const AppException&>(response);
-        EXPECT_EQ(AppExceptionType::ServerError, app_ex.type_);
+        EXPECT_EQ(ResponseStatus::ServerError, app_ex.status_);
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*connection failure.*"));
-        EXPECT_TRUE(end_stream);
+        EXPECT_FALSE(end_stream);
       }));
   startRequest(MessageType::Request);
 
@@ -261,15 +258,15 @@ TEST_F(RouterTest, PoolTimeout) {
       Tcp::ConnectionPool::PoolFailureReason::Timeout);
 }
 
-TEST_F(RouterTest, PoolOverflowFailure) {
+TEST_F(DubboRouterTest, PoolOverflowFailure) {
   initializeRouter();
 
   EXPECT_CALL(callbacks_, sendLocalReply(_, _))
       .WillOnce(Invoke([&](const DubboFilters::DirectResponse& response, bool end_stream) -> void {
         auto& app_ex = dynamic_cast<const AppException&>(response);
-        EXPECT_EQ(AppExceptionType::ServerError, app_ex.type_);
+        EXPECT_EQ(ResponseStatus::ServerError, app_ex.status_);
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*too many connections.*"));
-        EXPECT_TRUE(end_stream);
+        EXPECT_FALSE(end_stream);
       }));
   startRequest(MessageType::Request);
 
@@ -277,7 +274,7 @@ TEST_F(RouterTest, PoolOverflowFailure) {
       Tcp::ConnectionPool::PoolFailureReason::Overflow);
 }
 
-TEST_F(RouterTest, ClusterMaintenanceMode) {
+TEST_F(DubboRouterTest, ClusterMaintenanceMode) {
   initializeRouter();
   initializeMetadata(MessageType::Request);
 
@@ -290,14 +287,14 @@ TEST_F(RouterTest, ClusterMaintenanceMode) {
   EXPECT_CALL(callbacks_, sendLocalReply(_, _))
       .WillOnce(Invoke([&](const DubboFilters::DirectResponse& response, bool end_stream) -> void {
         auto& app_ex = dynamic_cast<const AppException&>(response);
-        EXPECT_EQ(AppExceptionType::ServerError, app_ex.type_);
+        EXPECT_EQ(ResponseStatus::ServerError, app_ex.status_);
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*maintenance mode.*"));
         EXPECT_TRUE(end_stream);
       }));
   EXPECT_EQ(Network::FilterStatus::StopIteration, router_->messageEnd(metadata_));
 }
 
-TEST_F(RouterTest, NoHealthyHosts) {
+TEST_F(DubboRouterTest, NoHealthyHosts) {
   initializeRouter();
   initializeMetadata(MessageType::Request);
 
@@ -310,7 +307,7 @@ TEST_F(RouterTest, NoHealthyHosts) {
   EXPECT_CALL(callbacks_, sendLocalReply(_, _))
       .WillOnce(Invoke([&](const DubboFilters::DirectResponse& response, bool end_stream) -> void {
         auto& app_ex = dynamic_cast<const AppException&>(response);
-        EXPECT_EQ(AppExceptionType::ServerError, app_ex.type_);
+        EXPECT_EQ(ResponseStatus::ServerError, app_ex.status_);
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*no healthy upstream.*"));
         EXPECT_TRUE(end_stream);
       }));
@@ -318,7 +315,7 @@ TEST_F(RouterTest, NoHealthyHosts) {
   EXPECT_EQ(Network::FilterStatus::StopIteration, router_->messageEnd(metadata_));
 }
 
-TEST_F(RouterTest, PoolConnectionFailureWithOnewayMessage) {
+TEST_F(DubboRouterTest, PoolConnectionFailureWithOnewayMessage) {
   initializeRouter();
   initializeMetadata(MessageType::Oneway);
 
@@ -334,7 +331,7 @@ TEST_F(RouterTest, PoolConnectionFailureWithOnewayMessage) {
   destroyRouter();
 }
 
-TEST_F(RouterTest, NoRoute) {
+TEST_F(DubboRouterTest, NoRoute) {
   initializeRouter();
   initializeMetadata(MessageType::Request);
 
@@ -342,14 +339,14 @@ TEST_F(RouterTest, NoRoute) {
   EXPECT_CALL(callbacks_, sendLocalReply(_, _))
       .WillOnce(Invoke([&](const DubboFilters::DirectResponse& response, bool end_stream) -> void {
         auto& app_ex = dynamic_cast<const AppException&>(response);
-        EXPECT_EQ(AppExceptionType::ServiceNotFound, app_ex.type_);
+        EXPECT_EQ(ResponseStatus::ServiceNotFound, app_ex.status_);
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*no route.*"));
         EXPECT_TRUE(end_stream);
       }));
   EXPECT_EQ(Network::FilterStatus::StopIteration, router_->messageEnd(metadata_));
 }
 
-TEST_F(RouterTest, NoCluster) {
+TEST_F(DubboRouterTest, NoCluster) {
   initializeRouter();
   initializeMetadata(MessageType::Request);
 
@@ -360,14 +357,14 @@ TEST_F(RouterTest, NoCluster) {
   EXPECT_CALL(callbacks_, sendLocalReply(_, _))
       .WillOnce(Invoke([&](const DubboFilters::DirectResponse& response, bool end_stream) -> void {
         auto& app_ex = dynamic_cast<const AppException&>(response);
-        EXPECT_EQ(AppExceptionType::ServerError, app_ex.type_);
+        EXPECT_EQ(ResponseStatus::ServerError, app_ex.status_);
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*unknown cluster.*"));
         EXPECT_TRUE(end_stream);
       }));
   EXPECT_EQ(Network::FilterStatus::StopIteration, router_->messageEnd(metadata_));
 }
 
-TEST_F(RouterTest, UnexpectedRouterDestroy) {
+TEST_F(DubboRouterTest, UnexpectedRouterDestroy) {
   initializeRouter();
   initializeMetadata(MessageType::Request);
   EXPECT_CALL(upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
@@ -381,15 +378,15 @@ TEST_F(RouterTest, UnexpectedRouterDestroy) {
   destroyRouter();
 }
 
-TEST_F(RouterTest, UpstreamRemoteCloseMidResponse) {
+TEST_F(DubboRouterTest, UpstreamRemoteCloseMidResponse) {
   initializeRouter();
 
   EXPECT_CALL(callbacks_, sendLocalReply(_, _))
       .WillOnce(Invoke([&](const DubboFilters::DirectResponse& response, bool end_stream) -> void {
         auto& app_ex = dynamic_cast<const AppException&>(response);
-        EXPECT_EQ(AppExceptionType::ServerError, app_ex.type_);
+        EXPECT_EQ(ResponseStatus::ServerError, app_ex.status_);
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*connection failure.*"));
-        EXPECT_TRUE(end_stream);
+        EXPECT_FALSE(end_stream);
       }));
   startRequest(MessageType::Request);
   connectUpstream();
@@ -397,7 +394,7 @@ TEST_F(RouterTest, UpstreamRemoteCloseMidResponse) {
   destroyRouter();
 }
 
-TEST_F(RouterTest, UpstreamLocalCloseMidResponse) {
+TEST_F(DubboRouterTest, UpstreamLocalCloseMidResponse) {
   initializeRouter();
   startRequest(MessageType::Request);
   connectUpstream();
@@ -406,7 +403,7 @@ TEST_F(RouterTest, UpstreamLocalCloseMidResponse) {
   destroyRouter();
 }
 
-TEST_F(RouterTest, OneWay) {
+TEST_F(DubboRouterTest, OneWay) {
   initializeRouter();
   initializeMetadata(MessageType::Oneway);
 
@@ -418,7 +415,7 @@ TEST_F(RouterTest, OneWay) {
   destroyRouter();
 }
 
-TEST_F(RouterTest, Call) {
+TEST_F(DubboRouterTest, Call) {
   initializeRouter();
   initializeMetadata(MessageType::Request);
 
@@ -433,7 +430,7 @@ TEST_F(RouterTest, Call) {
   destroyRouter();
 }
 
-TEST_F(RouterTest, DecoderFilterCallbacks) {
+TEST_F(DubboRouterTest, DecoderFilterCallbacks) {
   initializeRouter();
   initializeMetadata(MessageType::Request);
 

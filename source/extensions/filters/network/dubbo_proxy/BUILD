@@ -168,8 +168,6 @@ envoy_cc_library(
     hdrs = ["app_exception.h"],
     deps = [
         ":deserializer_interface",
-        ":hessian_deserializer_impl_lib",
-        ":hessian_utils_lib",
         ":message_lib",
         ":metadata_lib",
         ":protocol_interface",

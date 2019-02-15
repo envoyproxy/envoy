@@ -12,32 +12,17 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace DubboProxy {
 
-/**
- * Dubbo Application Exception types.
- */
-enum class AppExceptionType {
-  ClientTimeout,
-  ServerTimeout,
-  BadRequest,
-  BadResponse,
-  ServiceNotFound,
-  ServiceError,
-  ServerError,
-  ClientError,
-  ServerThreadpoolExhaustedError,
-};
-
 struct AppException : public EnvoyException,
                       public DubboFilters::DirectResponse,
                       Logger::Loggable<Logger::Id::dubbo> {
-  AppException(AppExceptionType type, const std::string& what);
+  AppException(ResponseStatus status, const std::string& what);
   AppException(const AppException& ex);
 
   using ResponseType = DubboFilters::DirectResponse::ResponseType;
   ResponseType encode(MessageMetadata& metadata, Protocol& protocol, Deserializer& deserializer,
                       Buffer::Instance& buffer) const override;
 
-  const AppExceptionType type_;
+  const ResponseStatus status_;
   RpcResponseType response_type_;
 };
 

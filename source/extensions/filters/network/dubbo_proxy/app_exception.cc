@@ -11,10 +11,12 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace DubboProxy {
 
-AppException::AppException(AppExceptionType type, const std::string& what)
-    : EnvoyException(what), type_(type), response_type_(RpcResponseType::ResponseWithException) {}
+AppException::AppException(ResponseStatus status, const std::string& what)
+    : EnvoyException(what), status_(status),
+      response_type_(RpcResponseType::ResponseWithException) {}
 
-AppException::AppException(const AppException& ex) : EnvoyException(ex.what()), type_(ex.type_) {}
+AppException::AppException(const AppException& ex)
+    : EnvoyException(ex.what()), status_(ex.status_) {}
 
 AppException::ResponseType AppException::encode(MessageMetadata& metadata,
                                                 DubboProxy::Protocol& protocol,
@@ -22,38 +24,7 @@ AppException::ResponseType AppException::encode(MessageMetadata& metadata,
                                                 Buffer::Instance& buffer) const {
   ENVOY_LOG(debug, "err {}", what());
 
-  switch (type_) {
-  case AppExceptionType::ClientTimeout:
-    metadata.setResponseStatus(ResponseStatus::ClientTimeout);
-    break;
-  case AppExceptionType::ServerTimeout:
-    metadata.setResponseStatus(ResponseStatus::ServerTimeout);
-    break;
-  case AppExceptionType::BadRequest:
-    metadata.setResponseStatus(ResponseStatus::BadRequest);
-    break;
-  case AppExceptionType::BadResponse:
-    metadata.setResponseStatus(ResponseStatus::BadResponse);
-    break;
-  case AppExceptionType::ServiceNotFound:
-    metadata.setResponseStatus(ResponseStatus::ServiceNotFound);
-    break;
-  case AppExceptionType::ServiceError:
-    metadata.setResponseStatus(ResponseStatus::ServiceError);
-    break;
-  case AppExceptionType::ServerError:
-    metadata.setResponseStatus(ResponseStatus::ServerError);
-    break;
-  case AppExceptionType::ClientError:
-    metadata.setResponseStatus(ResponseStatus::ClientError);
-    break;
-  case AppExceptionType::ServerThreadpoolExhaustedError:
-    metadata.setResponseStatus(ResponseStatus::ServerThreadpoolExhaustedError);
-    break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE
-  }
-
+  metadata.setResponseStatus(status_);
   metadata.setMessageType(MessageType::Response);
 
   const std::string& response = what();
