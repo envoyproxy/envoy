@@ -67,9 +67,11 @@ public:
 
   class MockHealthCheckCluster : public NiceMock<Upstream::MockThreadLocalCluster> {
   public:
-    MockHealthCheckCluster(uint64_t membership_total, uint64_t membership_healthy) {
+    MockHealthCheckCluster(uint64_t membership_total, uint64_t membership_healthy,
+                           uint64_t membership_degraded = 0) {
       info()->stats().membership_total_.set(membership_total);
       info()->stats().membership_healthy_.set(membership_healthy);
+      info()->stats().membership_degraded_.set(membership_degraded);
     }
   };
 };
@@ -180,6 +182,20 @@ TEST_F(HealthCheckFilterNoPassThroughTest, ComputedHealth) {
     Http::TestHeaderMapImpl health_check_response{{":status", "200"}};
     MockHealthCheckCluster cluster_www1(0, 0);
     MockHealthCheckCluster cluster_www2(1000, 0);
+    EXPECT_CALL(context_, healthCheckFailed()).WillOnce(Return(false));
+    EXPECT_CALL(context_, clusterManager());
+    EXPECT_CALL(context_.cluster_manager_, get("www1")).WillRepeatedly(Return(&cluster_www1));
+    EXPECT_CALL(context_.cluster_manager_, get("www2")).WillRepeatedly(Return(&cluster_www2));
+    EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&health_check_response), true));
+    EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+              filter_->decodeHeaders(request_headers_, true));
+  }
+  {
+    // This should succeed, because each cluster has degraded + healthy hosts greater than the
+    // threshold.
+    Http::TestHeaderMapImpl health_check_response{{":status", "200"}};
+    MockHealthCheckCluster cluster_www1(100, 40, 20);
+    MockHealthCheckCluster cluster_www2(1000, 0, 800);
     EXPECT_CALL(context_, healthCheckFailed()).WillOnce(Return(false));
     EXPECT_CALL(context_, clusterManager());
     EXPECT_CALL(context_.cluster_manager_, get("www1")).WillRepeatedly(Return(&cluster_www1));
