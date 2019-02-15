@@ -34,10 +34,6 @@ uint64_t convertPercent(double percent, uint64_t max_value) {
 }
 
 bool evaluateFractionalPercent(envoy::type::FractionalPercent percent, uint64_t random_value) {
-  if (percent.numerator() == 0) {
-    return false;
-  }
-
   return random_value % fractionalPercentDenominatorToInt(percent.denominator()) <
          percent.numerator();
 }
