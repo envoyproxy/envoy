@@ -32,10 +32,11 @@ A sample filter configuration could be:
 
   filters:
     - name: envoy.ext_authz
-      stat_prefix: ext_authz
-      grpc_service:
-        envoy_grpc:
-          cluster_name: ext-authz
+      config:
+        stat_prefix: ext_authz
+        grpc_service:
+          envoy_grpc:
+            cluster_name: ext-authz
 
   clusters:
     - name: ext-authz
