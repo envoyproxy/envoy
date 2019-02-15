@@ -865,7 +865,7 @@ TEST(Http2CodecUtility, reconstituteCrumbledCookies) {
   }
 }
 
-TEST_P(Http2CodecImplTest, TestLargeHeadersInvokeResetStream) {
+TEST_P(Http2CodecImplTest, TestLargeRequestHeadersInvokeResetStream) {
   initialize();
 
   TestHeaderMapImpl request_headers;
@@ -876,7 +876,7 @@ TEST_P(Http2CodecImplTest, TestLargeHeadersInvokeResetStream) {
   request_encoder_->encodeHeaders(request_headers, false);
 }
 
-TEST_P(Http2CodecImplTest, TestLargeHeadersAcceptedIfConfigured) {
+TEST_P(Http2CodecImplTest, TestLargeRequestHeadersAccepted) {
   max_request_headers_kb_ = 64;
   initialize();
 
@@ -890,7 +890,7 @@ TEST_P(Http2CodecImplTest, TestLargeHeadersAcceptedIfConfigured) {
   request_encoder_->encodeHeaders(request_headers, false);
 }
 
-TEST_P(Http2CodecImplTest, TestLargeHeadersAtLimitAccepted) {
+TEST_P(Http2CodecImplTest, TestLargeRequestHeadersAtLimitAccepted) {
   uint32_t codec_limit_kb = 64;
   max_request_headers_kb_ = codec_limit_kb;
   initialize();
@@ -913,7 +913,7 @@ TEST_P(Http2CodecImplTest, TestLargeHeadersAtLimitAccepted) {
   request_encoder_->encodeHeaders(request_headers, true);
 }
 
-TEST_P(Http2CodecImplTest, TestLargeHeadersOverDefaultCodecLimit) {
+TEST_P(Http2CodecImplTest, TestLargeRequestHeadersOverDefaultCodecLibraryLimit) {
   max_request_headers_kb_ = 66;
   initialize();
 
@@ -927,7 +927,7 @@ TEST_P(Http2CodecImplTest, TestLargeHeadersOverDefaultCodecLimit) {
   request_encoder_->encodeHeaders(request_headers, true);
 }
 
-TEST_P(Http2CodecImplTest, TestLargeHeadersExceedPerHeaderLimit) {
+TEST_P(Http2CodecImplTest, TestLargeRequestHeadersExceedPerHeaderLimit) {
   // The name-value pair max is set by NGHTTP2_HD_MAX_NV in lib/nghttp2_hd.h to 64KB, and
   // creates a per-request header limit for us in h2. Note that the nghttp2
   // calculated byte size will differ from envoy due to H2 compression and frames.
@@ -947,7 +947,7 @@ TEST_P(Http2CodecImplTest, TestLargeHeadersExceedPerHeaderLimit) {
   request_encoder_->encodeHeaders(request_headers, true);
 }
 
-TEST_P(Http2CodecImplTest, TestManyLargeHeadersUnderPerHeaderLimit) {
+TEST_P(Http2CodecImplTest, TestManyLargeRequestHeadersUnderPerHeaderLimit) {
   max_request_headers_kb_ = 81;
   initialize();
 
@@ -963,7 +963,7 @@ TEST_P(Http2CodecImplTest, TestManyLargeHeadersUnderPerHeaderLimit) {
   request_encoder_->encodeHeaders(request_headers, true);
 }
 
-TEST_P(Http2CodecImplTest, TestLargeHeadersAtMaxConfigurable) {
+TEST_P(Http2CodecImplTest, TestLargeRequestHeadersAtMaxConfigurable) {
   max_request_headers_kb_ = 96;
   initialize();
 

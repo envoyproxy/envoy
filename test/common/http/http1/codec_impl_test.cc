@@ -33,7 +33,7 @@ namespace Http1 {
 class Http1ServerConnectionImplTest : public TestBase {
 public:
   void initialize() {
-    http_parser_set_max_header_size(max_request_headers_kb_ * 1024);
+    // http_parser_set_max_header_size(max_request_headers_kb_ * 1024);
     codec_ = std::make_unique<ServerConnectionImpl>(connection_, callbacks_, codec_settings_);
   }
 
@@ -1013,7 +1013,7 @@ TEST_F(Http1ClientConnectionImplTest, HighwatermarkMultipleResponses) {
       ->onUnderlyingConnectionBelowWriteBufferLowWatermark();
 }
 
-TEST_F(Http1ServerConnectionImplTest, TestLargeHeadersRejected) {
+TEST_F(Http1ServerConnectionImplTest, TestLargeRequestHeadersRejected) {
   initialize();
 
   std::string exception_reason;
@@ -1033,7 +1033,7 @@ TEST_F(Http1ServerConnectionImplTest, TestLargeHeadersRejected) {
                             "http/1.1 protocol error: HPE_HEADER_OVERFLOW");
 }
 
-TEST_F(Http1ServerConnectionImplTest, TestLargeHeadersAcceptedIfConfigured) {
+TEST_F(Http1ServerConnectionImplTest, TestLargeRequestHeadersAccepted) {
   max_request_headers_kb_ = 65;
   initialize();
 
@@ -1052,7 +1052,7 @@ TEST_F(Http1ServerConnectionImplTest, TestLargeHeadersAcceptedIfConfigured) {
   codec_->dispatch(buffer);
 }
 
-TEST_F(Http1ServerConnectionImplTest, TestLargeHeadersMaxConfigurable) {
+TEST_F(Http1ServerConnectionImplTest, TestLargeRequestHeadersAcceptedMaxConfigurable) {
   max_request_headers_kb_ = 96;
   initialize();
 

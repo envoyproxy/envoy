@@ -719,6 +719,10 @@ name: decode-headers-only
   EXPECT_EQ(0, upstream_request_->body().length());
 }
 
+TEST_P(DownstreamProtocolIntegrationTest, LargeRequestHeadersRejected) { testLargeRequestHeaders(85, 60); }
+
+TEST_P(DownstreamProtocolIntegrationTest, LargeRequestHeadersAccepted) { testLargeRequestHeaders(62, 64); }
+
 // For tests which focus on downstream-to-Envoy behavior, and don't need to be
 // run with both HTTP/1 and HTTP/2 upstreams.
 INSTANTIATE_TEST_SUITE_P(Protocols, DownstreamProtocolIntegrationTest,
@@ -730,5 +734,6 @@ INSTANTIATE_TEST_SUITE_P(Protocols, DownstreamProtocolIntegrationTest,
 INSTANTIATE_TEST_SUITE_P(Protocols, ProtocolIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
+
 
 } // namespace Envoy
