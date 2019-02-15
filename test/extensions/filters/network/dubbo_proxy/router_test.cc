@@ -20,8 +20,6 @@ using testing::NiceMock;
 using testing::Ref;
 using testing::Return;
 using testing::ReturnRef;
-using testing::Test;
-using testing::TestWithParam;
 using testing::Values;
 
 namespace Envoy {
