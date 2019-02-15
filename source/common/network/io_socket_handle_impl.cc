@@ -50,7 +50,7 @@ IoHandleCallUintResult IoSocketHandleImpl::close() {
   fd_ = -1;
   IoErrorPtr err(nullptr, deleteIoError);
   if (rc == -1) {
-    // Sytem call failed.
+    // System call failed.
     err = (errno == EAGAIN
                // EAGAIN is frequent enough that its memory allocation should be avoided.
                ? std::unique_ptr<IoError, IoErrorDeleterType>(ENVOY_ERROR_AGAIN, deleteIoError)
