@@ -20,6 +20,11 @@ enum class SerializationType : uint8_t {
 enum class MessageType : uint8_t {
   Response = 0,
   Request = 1,
+  Oneway = 2,
+  Exception = 3,
+
+  // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST MESSAGE TYPE
+  LastMessageType = Exception,
 };
 
 /**
@@ -37,6 +42,15 @@ enum class ResponseStatus : uint8_t {
   ServerError = 80,
   ClientError = 90,
   ServerThreadpoolExhaustedError = 100,
+};
+
+enum class RpcResponseType : uint8_t {
+  ResponseWithException = 0,
+  ResponseWithValue = 1,
+  ResponseWithNullValue = 2,
+  ResponseWithExceptionWithAttachments = 3,
+  ResponseValueWithAttachments = 4,
+  ResponseNullValueWithAttachments = 5,
 };
 
 class Message {

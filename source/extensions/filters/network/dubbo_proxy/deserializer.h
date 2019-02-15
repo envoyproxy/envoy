@@ -107,6 +107,18 @@ public:
    * @throws EnvoyException if the data is not valid for this serialization
    */
   virtual RpcResultPtr deserializeRpcResult(Buffer::Instance& buffer, size_t body_size) PURE;
+
+  /**
+   * serialize result of an rpc call
+   * If successful, the output_buffer is written to the serialized data
+   *
+   * @param output_buffer store the serialized data
+   * @param content the rpc response content
+   * @param type the rpc response type
+   * @throws EnvoyException if the data is not valid for this serialization
+   */
+  virtual void serializeRpcResult(Buffer::Instance& output_buffer, const std::string& content,
+                                  RpcResponseType type) PURE;
 };
 
 typedef std::unique_ptr<Deserializer> DeserializerPtr;

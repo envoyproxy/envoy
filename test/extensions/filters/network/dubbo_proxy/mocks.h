@@ -50,8 +50,29 @@ public:
   ~MockProtocol();
 
   MOCK_CONST_METHOD0(name, const std::string&());
+  MOCK_CONST_METHOD0(type, ProtocolType());
   MOCK_METHOD2(decode, bool(Buffer::Instance&, Context*));
+  MOCK_METHOD3(decode, bool(Buffer::Instance&, Protocol::Context*, MessageMetadataSharedPtr));
+  MOCK_METHOD3(encode, bool(Buffer::Instance&, int32_t, const MessageMetadata&));
+
   std::string name_{"MockProtocol"};
+  ProtocolType type_{ProtocolType::Dubbo};
+};
+
+class MockDeserializer : public Deserializer {
+public:
+  MockDeserializer();
+  ~MockDeserializer();
+
+  // DubboProxy::Deserializer
+  MOCK_CONST_METHOD0(name, const std::string&());
+  MOCK_CONST_METHOD0(type, SerializationType());
+  MOCK_METHOD2(deserializeRpcInvocation, RpcInvocationPtr(Buffer::Instance&, size_t));
+  MOCK_METHOD2(deserializeRpcResult, RpcResultPtr(Buffer::Instance&, size_t));
+  MOCK_METHOD3(serializeRpcResult, void(Buffer::Instance&, const std::string&, RpcResponseType));
+
+  std::string name_{"mockDeserializer"};
+  SerializationType type_{SerializationType::Hessian};
 };
 
 namespace Router {

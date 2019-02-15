@@ -14,15 +14,6 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace DubboProxy {
 
-enum class RpcResponseType : uint8_t {
-  ResponseWithException = 0,
-  ResponseWithValue = 1,
-  ResponseWithNullValue = 2,
-  ResponseWithExceptionWithAttachments = 3,
-  ResponseValueWithAttachments = 4,
-  ResponseNullValueWithAttachments = 5,
-};
-
 RpcInvocationPtr HessianDeserializerImpl::deserializeRpcInvocation(Buffer::Instance& buffer,
                                                                    size_t body_size) {
   ASSERT(buffer.length() >= body_size);
@@ -60,6 +51,8 @@ RpcResultPtr HessianDeserializerImpl::deserializeRpcResult(Buffer::Instance& buf
     result = std::make_unique<RpcResultImpl>(true);
     break;
   case RpcResponseType::ResponseWithValue:
+    result = std::make_unique<RpcResultImpl>(true);
+    break;
   case RpcResponseType::ResponseWithNullValue:
     has_value = false;
     FALLTHRU;
@@ -83,6 +76,14 @@ RpcResultPtr HessianDeserializerImpl::deserializeRpcResult(Buffer::Instance& buf
   }
   buffer.drain(body_size);
   return result;
+}
+
+void HessianDeserializerImpl::serializeRpcResult(Buffer::Instance& output_buffer,
+                                                 const std::string& content, RpcResponseType type) {
+  uint8_t response_type_code = static_cast<uint8_t>(type);
+  uint8_t base_code = 0x90;
+  output_buffer.writeByte(static_cast<uint8_t>(base_code + response_type_code));
+  HessianUtils::writeString(output_buffer, content);
 }
 
 class HessianDeserializerConfigFactory : public DeserializerFactoryBase<HessianDeserializerImpl> {

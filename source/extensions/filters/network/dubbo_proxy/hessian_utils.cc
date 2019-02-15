@@ -24,6 +24,48 @@ typename std::enable_if<std::is_signed<T>::value, T>::type leftShift(T left, uin
   return left << bit_number;
 }
 
+inline void addByte(Buffer::Instance& buffer, const uint8_t value) { buffer.add(&value, 1); }
+
+void addSeq(Buffer::Instance& buffer, const std::initializer_list<uint8_t> values) {
+  for (const int8_t& value : values) {
+    buffer.add(&value, 1);
+  }
+}
+
+void doWriteString(Buffer::Instance& instance, absl::string_view str_view) {
+  const size_t length = str_view.length();
+  constexpr size_t str_max_length = 0xffff;
+  constexpr size_t two_octet_max_lenth = 1024;
+
+  if (length < 32) {
+    addByte(instance, static_cast<uint8_t>(length));
+    instance.add(str_view.data(), str_view.length());
+    return;
+  }
+
+  if (length < two_octet_max_lenth) {
+    uint8_t code = length / 256; // 0x30 + length / 0x100 must less than 0x34
+    uint8_t remain = length % 256;
+    addSeq(instance, {static_cast<uint8_t>(0x30 + code), remain});
+    instance.add(str_view.data(), str_view.length());
+    return;
+  }
+
+  if (length <= str_max_length) {
+    uint8_t code = length / 256;
+    uint8_t remain = length % 256;
+    addSeq(instance, {'S', code, remain});
+    instance.add(str_view.data(), str_view.length());
+    return;
+  }
+
+  addSeq(instance, {0x52, 0xff, 0xff});
+  instance.add(str_view.data(), str_max_length);
+  doWriteString(instance,
+                absl::string_view(str_view.data() + str_max_length, length - str_max_length));
+  return;
+}
+
 } // namespace
 
 /*
@@ -514,6 +556,12 @@ std::string HessianUtils::readByte(Buffer::Instance& buffer) {
   std::string result(peekByte(buffer, &size));
   buffer.drain(size);
   return result;
+}
+
+void HessianUtils::writeString(Buffer::Instance& buffer, const std::string& str) {
+  absl::string_view str_view(str);
+  doWriteString(buffer, str_view);
+  return;
 }
 
 } // namespace DubboProxy

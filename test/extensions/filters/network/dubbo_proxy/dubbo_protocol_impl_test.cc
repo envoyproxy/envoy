@@ -19,7 +19,7 @@ using testing::StrictMock;
 TEST(DubboProtocolImplTest, NotEnoughData) {
   Buffer::OwnedImpl buffer;
   MockProtocolCallbacks cb;
-  DubboProtocolImpl dubbo_protocol(cb);
+  DubboProtocolImpl dubbo_protocol(&cb);
   Protocol::Context context;
   EXPECT_FALSE(dubbo_protocol.decode(buffer, &context));
   buffer.add(std::string(15, 0x00));
@@ -28,13 +28,13 @@ TEST(DubboProtocolImplTest, NotEnoughData) {
 
 TEST(DubboProtocolImplTest, Name) {
   MockProtocolCallbacks cb;
-  DubboProtocolImpl dubbo_protocol(cb);
+  DubboProtocolImpl dubbo_protocol(&cb);
   EXPECT_EQ(dubbo_protocol.name(), "dubbo");
 }
 
 TEST(DubboProtocolImplTest, Normal) {
   MockProtocolCallbacks cb;
-  DubboProtocolImpl dubbo_protocol(cb);
+  DubboProtocolImpl dubbo_protocol(&cb);
   // Normal dubbo request message
   {
     Buffer::OwnedImpl buffer;
@@ -64,7 +64,7 @@ TEST(DubboProtocolImplTest, Normal) {
 
 TEST(DubboProtocolImplTest, InvalidProtocol) {
   MockProtocolCallbacks cb;
-  DubboProtocolImpl dubbo_protocol(cb);
+  DubboProtocolImpl dubbo_protocol(&cb);
   Protocol::Context context;
 
   // Invalid dubbo magic number
