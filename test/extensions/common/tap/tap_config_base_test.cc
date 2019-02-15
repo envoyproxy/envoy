@@ -16,7 +16,7 @@ TEST(AddBufferToProtoBytes, All) {
     envoy::data::tap::v2alpha::Body body;
     Utility::addBufferToProtoBytes(body, 5, data, 4, 1);
     EXPECT_EQ("o", body.as_bytes());
-    EXPECT_TRUE(body.truncated());
+    EXPECT_FALSE(body.truncated());
   }
 
   {
