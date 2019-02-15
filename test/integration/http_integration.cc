@@ -216,7 +216,7 @@ HttpIntegrationTest::HttpIntegrationTest(Http::CodecClient::Type downstream_prot
                                                version, config) {}
 
 HttpIntegrationTest::HttpIntegrationTest(Http::CodecClient::Type downstream_protocol,
-                                         InstanceConstSharedPtrFn upstream_address_fn,
+                                         const InstanceConstSharedPtrFn& upstream_address_fn,
                                          Network::Address::IpVersion version,
                                          const std::string& config)
     : BaseIntegrationTest(upstream_address_fn, version, config),

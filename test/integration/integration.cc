@@ -226,7 +226,7 @@ void IntegrationTcpClient::ConnectionCallbacks::onEvent(Network::ConnectionEvent
   }
 }
 
-BaseIntegrationTest::BaseIntegrationTest(InstanceConstSharedPtrFn upstream_address_fn,
+BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstream_address_fn,
                                          Network::Address::IpVersion version,
                                          const std::string& config)
     : api_(Api::createApiForTest(stats_store_)),

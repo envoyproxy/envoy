@@ -87,7 +87,7 @@ public:
                       Network::Address::IpVersion version,
                       const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG);
   HttpIntegrationTest(Http::CodecClient::Type downstream_protocol,
-                      InstanceConstSharedPtrFn upstream_address_fn,
+                      const InstanceConstSharedPtrFn& upstream_address_fn,
                       Network::Address::IpVersion version,
                       const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG);
   virtual ~HttpIntegrationTest();

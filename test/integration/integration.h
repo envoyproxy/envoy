@@ -143,7 +143,7 @@ public:
       : BaseIntegrationTest(version, config) {}
   // Creates a test fixture with a specified |upstream_address| function that provides the IP and
   // port to use.
-  BaseIntegrationTest(InstanceConstSharedPtrFn upstream_address_fn,
+  BaseIntegrationTest(const InstanceConstSharedPtrFn& upstream_address_fn,
                       Network::Address::IpVersion version,
                       const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG);
 
