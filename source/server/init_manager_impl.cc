@@ -38,6 +38,8 @@ void InitManagerImpl::initializeTarget(Init::Target& target) {
 
 void InitManagerImpl::registerTarget(Init::Target& target) {
   ASSERT(state_ != State::Initialized);
+  ASSERT(std::find(targets_.begin(), targets_.end(), &target) == targets_.end(),
+         "Registered duplicate Init::Target");
   targets_.push_back(&target);
   if (state_ == State::Initializing) {
     initializeTarget(target);

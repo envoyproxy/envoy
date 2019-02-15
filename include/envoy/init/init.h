@@ -30,8 +30,8 @@ public:
   virtual ~Manager() {}
 
   /**
-   * Register a target to be initialized in the future. The manager will call initialize() on
-   * each target at some point in the future.
+   * Register a target to be initialized in the future. The manager will call initialize() on each
+   * target at some point in the future. It is an error to register the same target more than once.
    */
   virtual void registerTarget(Target& target) PURE;
 
