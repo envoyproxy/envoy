@@ -18,7 +18,7 @@ HeapShrinker::HeapShrinker(Event::Dispatcher& dispatcher, Server::OverloadManage
                                          [this](Server::OverloadActionState state) {
                                            active_ = (state == Server::OverloadActionState::Active);
                                          })) {
-    shrink_gauge_ = &stats.gauge(absl::StrCat("overload.", action_name, ".shrink_count"));
+    shrink_counter_ = &stats.counter(absl::StrCat("overload.", action_name, ".shrink_count"));
     timer_ = dispatcher.createTimer([this] {
       shrinkHeap();
       timer_->enableTimer(kTimerInterval);
@@ -30,7 +30,7 @@ HeapShrinker::HeapShrinker(Event::Dispatcher& dispatcher, Server::OverloadManage
 void HeapShrinker::shrinkHeap() {
   if (active_) {
     Utils::ReleaseFreeMemory();
-    shrink_gauge_->inc();
+    shrink_counter_->inc();
   }
 }
 

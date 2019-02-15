@@ -43,24 +43,24 @@ TEST_F(HeapShrinkerTest, DoNotShrinkWhenNotConfigured) {
 }
 
 TEST_F(HeapShrinkerTest, ShrinkWhenTriggered) {
-  Server::OverloadActionCb actionCb;
+  Server::OverloadActionCb action_cb;
   EXPECT_CALL(overload_manager_, registerForAction(_, _, _))
       .WillOnce(Invoke([&](const std::string&, Event::Dispatcher&, Server::OverloadActionCb cb) {
-        actionCb = cb;
+        action_cb = cb;
         return true;
       }));
 
   HeapShrinker h(dispatcher_, overload_manager_, stats_);
 
-  Stats::Gauge& shrink_count =
-      stats_.gauge("overload.envoy.overload_actions.shrink_heap.shrink_count");
-  actionCb(Server::OverloadActionState::Active);
+  Stats::Counter& shrink_count =
+      stats_.counter("overload.envoy.overload_actions.shrink_heap.shrink_count");
+  action_cb(Server::OverloadActionState::Active);
   step();
   EXPECT_EQ(1, shrink_count.value());
   step();
   EXPECT_EQ(2, shrink_count.value());
 
-  actionCb(Server::OverloadActionState::Inactive);
+  action_cb(Server::OverloadActionState::Inactive);
   step();
   step();
   EXPECT_EQ(2, shrink_count.value());

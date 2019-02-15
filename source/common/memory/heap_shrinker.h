@@ -20,7 +20,7 @@ private:
   void shrinkHeap();
 
   bool active_;
-  Stats::Gauge* shrink_gauge_;
+  Stats::Counter* shrink_counter_;
   Event::TimerPtr timer_;
 };
 
