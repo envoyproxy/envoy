@@ -23,9 +23,9 @@ rm "./${BAZEL_INSTALLER}"
 echo "/opt/rh/httpd24/root/usr/lib64" > /etc/ld.so.conf.d/httpd24.conf
 ldconfig
 
-# CentOS toolchains doesn't have C++11 ABI so needs ignore, also punting PATH into system bazelrc.
-echo "build --copt=-DENVOY_IGNORE_GLIBCXX_USE_CXX11_ABI_ERROR=1 --action_env=PATH=/opt/rh/devtoolset-7/root/usr/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" >> /etc/bazel.bazelrc
-
 export PATH=/opt/rh/devtoolset-7/root/usr/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# CentOS toolchains doesn't have C++11 ABI so needs ignore, also punting PATH into system bazelrc.
+echo "build --copt=-DENVOY_IGNORE_GLIBCXX_USE_CXX11_ABI_ERROR=1 --action_env=PATH=${PATH}" >> /etc/bazel.bazelrc
 
 ./build_container_common.sh
