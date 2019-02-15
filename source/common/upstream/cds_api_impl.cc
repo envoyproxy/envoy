@@ -36,26 +36,9 @@ CdsApiImpl::CdsApiImpl(const envoy::api::v2::core::ConfigSource& cds_config, Clu
           "envoy.api.v2.ClusterDiscoveryService.StreamClusters", api);
 }
 
-void CdsApiImpl::pauseCdsWhileWarming() {
-  if (cm_.warmingClusterCount() == 0) {
-    cm_.adsMux().pause(Config::TypeUrl::get().Cluster);
-  }
-}
-
-void CdsApiImpl::resumeCdsAfterWarming() {
-  if (cm_.warmingClusterCount() == 0) {
-    cm_.adsMux().resume(Config::TypeUrl::get().Cluster);
-  }
-}
-
 void CdsApiImpl::onConfigUpdate(const ResourceVector& resources, const std::string& version_info) {
   cm_.adsMux().pause(Config::TypeUrl::get().ClusterLoadAssignment);
-  pauseCdsWhileWarming();
-
-  Cleanup resume_discovery([this] {
-    cm_.adsMux().resume(Config::TypeUrl::get().ClusterLoadAssignment);
-    resumeCdsAfterWarming();
-  });
+  Cleanup eds_resume([this] { cm_.adsMux().resume(Config::TypeUrl::get().ClusterLoadAssignment); });
 
   std::unordered_set<std::string> cluster_names;
   for (const auto& cluster : resources) {
@@ -72,11 +55,13 @@ void CdsApiImpl::onConfigUpdate(const ResourceVector& resources, const std::stri
     const std::string cluster_name = cluster.name();
     clusters_to_remove.erase(cluster_name);
     if (cm_.addOrUpdateCluster(cluster, version_info, [this](auto, auto state) {
-          if (cm_.warmingClusterCount() == 0) {
-            ASSERT(state == ClusterManager::ClusterWarmingState::Finished);
-          }
-          if (state == ClusterManager::ClusterWarmingState::Finished) {
-            resumeCdsAfterWarming();
+          // Keep CDS paused as long as there is at least one cluster in the warming state.
+          if (state == ClusterManager::ClusterWarmingState::Starting &&
+              cm_.warmingClusterCount() == 1) {
+            cm_.adsMux().pause(Config::TypeUrl::get().Cluster);
+          } else if (state == ClusterManager::ClusterWarmingState::Finished &&
+                     cm_.warmingClusterCount() == 0) {
+            cm_.adsMux().resume(Config::TypeUrl::get().Cluster);
           }
         })) {
       ENVOY_LOG(debug, "cds: add/update cluster '{}'", cluster_name);
