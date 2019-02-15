@@ -176,7 +176,7 @@ actions {
 }
 actions {
   stream_action {
-    stream_id: 2
+    stream_id: 1
     request {
       data: 3000000
     }
@@ -184,7 +184,7 @@ actions {
 }
 actions {
   stream_action {
-    stream_id: 2
+    stream_id: 1
     request {
       data: 54
     }
@@ -193,7 +193,7 @@ actions {
 actions { quiesce_drain {} }
 actions {
   stream_action {
-    stream_id: 2
+    stream_id: 1
     request {
       data: 54
     }
@@ -201,7 +201,7 @@ actions {
 }
 actions {
   stream_action {
-    stream_id: 2
+    stream_id: 1
     response {
       headers {
         headers {
@@ -218,7 +218,7 @@ actions {
 }
 actions {
   stream_action {
-    stream_id: 2
+    stream_id: 1
     response {
       data: 5
       end_stream: true

@@ -3,6 +3,7 @@
 #include "common/common/thread.h"
 #include "common/common/utility.h"
 #include "common/event/libevent.h"
+#include "common/http/http2/codec_impl.h"
 
 #include "test/test_common/environment.h"
 
@@ -24,6 +25,7 @@ PerTestEnvironment::~PerTestEnvironment() { TestEnvironment::removePath(test_tmp
 
 void Runner::setupEnvironment(int argc, char** argv, spdlog::level::level_enum default_log_level) {
   Event::Libevent::Global::initialize();
+  Http::Http2::initializeNghttp2Logging();
 
   TestEnvironment::initializeOptions(argc, argv);
 

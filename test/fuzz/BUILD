@@ -38,6 +38,7 @@ envoy_cc_test_library(
         "//source/common/common:thread_lib",
         "//source/common/common:utility_lib",
         "//source/common/event:libevent_lib",
+        "//source/common/http/http2:codec_lib",
         "//test/test_common:environment_lib",
     ],
 )
