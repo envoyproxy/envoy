@@ -26,7 +26,7 @@ int HotRestartingChild::duplicateParentListenSocket(const std::string& address) 
   sendHotRestartMessage(parent_address_, wrapped_request);
 
   std::unique_ptr<HotRestartMessage> wrapped_reply = receiveHotRestartMessage(Blocking::Yes);
-  if (!isExpectedType(wrapped_reply.get(), HotRestartMessage::Reply::kPassListenSocket)) {
+  if (!replyIsExpectedType(wrapped_reply.get(), HotRestartMessage::Reply::kPassListenSocket)) {
     return -1;
   }
   return wrapped_reply->reply().pass_listen_socket().fd();
@@ -43,7 +43,7 @@ void HotRestartingChild::getParentStats(HotRestart::GetParentStatsInfo& info) {
   sendHotRestartMessage(parent_address_, wrapped_request);
 
   std::unique_ptr<HotRestartMessage> wrapped_reply = receiveHotRestartMessage(Blocking::Yes);
-  RELEASE_ASSERT(isExpectedType(wrapped_reply.get(), HotRestartMessage::Reply::kStats),
+  RELEASE_ASSERT(replyIsExpectedType(wrapped_reply.get(), HotRestartMessage::Reply::kStats),
                  "Did not get a StatsReply for our StatsRequest.");
   // TODO(fredlas) this is where the stat transferring, to be added later in this PR, will go.
   info.memory_allocated_ = wrapped_reply->reply().stats().memory_allocated();
@@ -69,7 +69,7 @@ void HotRestartingChild::shutdownParentAdmin(HotRestart::ShutdownParentAdminInfo
   sendHotRestartMessage(parent_address_, wrapped_request);
 
   std::unique_ptr<HotRestartMessage> wrapped_reply = receiveHotRestartMessage(Blocking::Yes);
-  RELEASE_ASSERT(isExpectedType(wrapped_reply.get(), HotRestartMessage::Reply::kShutdownAdmin),
+  RELEASE_ASSERT(replyIsExpectedType(wrapped_reply.get(), HotRestartMessage::Reply::kShutdownAdmin),
                  "Parent did not respond as expected to ShutdownParentAdmin.");
   info.original_start_time_ = wrapped_reply->reply().shutdown_admin().original_start_time();
 }

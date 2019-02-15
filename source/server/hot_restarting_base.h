@@ -57,7 +57,8 @@ protected:
   // the next protocol message, even if the function returns a protobuf.
   std::unique_ptr<envoy::api::v2::core::HotRestartMessage> receiveHotRestartMessage(Blocking block);
 
-  bool isExpectedType(const envoy::api::v2::core::HotRestartMessage* proto, int oneof_type);
+  bool replyIsExpectedType(const envoy::api::v2::core::HotRestartMessage* proto,
+                           envoy::api::v2::core::HotRestartMessage::Reply::ReplyCase oneof_type);
 
 private:
   void getPassedFdIfPresent(envoy::api::v2::core::HotRestartMessage* out, msghdr* message);

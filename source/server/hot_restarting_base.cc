@@ -73,7 +73,7 @@ void HotRestartingBase::sendHotRestartMessage(sockaddr_un& address,
 
     // Control data stuff, only relevant for the fd passing done with PassListenSocketReply.
     uint8_t control_buffer[CMSG_SPACE(sizeof(int))];
-    if (isExpectedType(&proto, HotRestartMessage::Reply::kPassListenSocket) &&
+    if (replyIsExpectedType(&proto, HotRestartMessage::Reply::kPassListenSocket) &&
         proto.reply().pass_listen_socket().fd() != -1) {
       memset(control_buffer, 0, CMSG_SPACE(sizeof(int)));
       message.msg_control = control_buffer;
@@ -117,7 +117,7 @@ void HotRestartingBase::getPassedFdIfPresent(HotRestartMessage* out, msghdr* mes
   cmsghdr* cmsg = CMSG_FIRSTHDR(message);
   if (cmsg != nullptr) {
     RELEASE_ASSERT(cmsg->cmsg_level == SOL_SOCKET && cmsg->cmsg_type == SCM_RIGHTS &&
-                       isExpectedType(out, HotRestartMessage::Reply::kPassListenSocket),
+                       replyIsExpectedType(out, HotRestartMessage::Reply::kPassListenSocket),
                    "recvmsg() came with control data when the message's purpose was not to pass a "
                    "file descriptor.");
 
@@ -201,7 +201,8 @@ std::unique_ptr<HotRestartMessage> HotRestartingBase::receiveHotRestartMessage(B
   return ret;
 }
 
-bool HotRestartingBase::isExpectedType(const HotRestartMessage* proto, int oneof_type) {
+bool HotRestartingBase::replyIsExpectedType(const HotRestartMessage* proto,
+                                            HotRestartMessage::Reply::ReplyCase oneof_type) {
   return proto != nullptr && proto->requestreply_case() == HotRestartMessage::kReply &&
          proto->reply().reply_case() == oneof_type;
 }
