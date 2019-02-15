@@ -5,7 +5,7 @@ namespace Memory {
 
 class Utils {
 public:
-  static void ReleaseFreeMemory();
+  static void releaseFreeMemory();
 };
 
 } // namespace Memory

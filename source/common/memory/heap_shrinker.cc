@@ -29,7 +29,7 @@ HeapShrinker::HeapShrinker(Event::Dispatcher& dispatcher, Server::OverloadManage
 
 void HeapShrinker::shrinkHeap() {
   if (active_) {
-    Utils::ReleaseFreeMemory();
+    Utils::releaseFreeMemory();
     shrink_counter_->inc();
   }
 }

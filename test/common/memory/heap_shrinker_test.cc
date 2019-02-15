@@ -1,5 +1,6 @@
 #include "common/event/dispatcher_impl.h"
 #include "common/memory/heap_shrinker.h"
+#include "common/memory/stats.h"
 
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/server/mocks.h"
@@ -27,7 +28,7 @@ protected:
     dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
   }
 
-  Stats::IsolatedStoreImpl stats_;
+  Envoy::Stats::IsolatedStoreImpl stats_;
   Event::SimulatedTimeSystem time_system_;
   Api::ApiPtr api_;
   Event::DispatcherImpl dispatcher_;
@@ -52,11 +53,24 @@ TEST_F(HeapShrinkerTest, ShrinkWhenTriggered) {
 
   HeapShrinker h(dispatcher_, overload_manager_, stats_);
 
-  Stats::Counter& shrink_count =
+  auto data = std::make_unique<char[]>(5000000);
+  const uint64_t physical_mem_before_shrink =
+      Stats::totalCurrentlyReserved() - Stats::totalPageHeapUnmapped();
+  data.reset();
+
+  Envoy::Stats::Counter& shrink_count =
       stats_.counter("overload.envoy.overload_actions.shrink_heap.shrink_count");
   action_cb(Server::OverloadActionState::Active);
   step();
   EXPECT_EQ(1, shrink_count.value());
+
+#ifdef TCMALLOC
+  const uint64_t physical_mem_after_shrink =
+      Stats::totalCurrentlyReserved() - Stats::totalPageHeapUnmapped();
+  EXPECT_GT(physical_mem_before_shrink, physical_mem_after_shrink);
+  Stats::dumpStatsToLog();
+#endif
+
   step();
   EXPECT_EQ(2, shrink_count.value());
 

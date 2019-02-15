@@ -13,6 +13,9 @@ envoy_cc_library(
     srcs = ["stats.cc"],
     hdrs = ["stats.h"],
     tcmalloc_dep = 1,
+    deps = [
+        "//source/common/common:logger_lib",
+    ],
 )
 
 envoy_cc_library(

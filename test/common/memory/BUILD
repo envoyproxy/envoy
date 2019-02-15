@@ -20,6 +20,7 @@ envoy_cc_test(
     deps = [
         "//source/common/event:dispatcher_lib",
         "//source/common/memory:heap_shrinker_lib",
+        "//source/common/memory:stats_lib",
         "//source/common/stats:isolated_store_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/server:server_mocks",

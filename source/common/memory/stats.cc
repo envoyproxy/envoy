@@ -2,6 +2,8 @@
 
 #include <cstdint>
 
+#include "common/common/logger.h"
+
 #ifdef TCMALLOC
 
 #include "gperftools/malloc_extension.h"
@@ -40,6 +42,13 @@ uint64_t Stats::totalPageHeapUnmapped() {
   return value;
 }
 
+void Stats::dumpStatsToLog() {
+  static const int kBufferSize = 3 << 20;
+  auto buffer = std::make_unique<char[]>(kBufferSize);
+  MallocExtension::instance()->GetStats(buffer.get(), kBufferSize);
+  ENVOY_LOG_MISC(info, "TCMalloc stats:\n{}", buffer.get());
+}
+
 } // namespace Memory
 } // namespace Envoy
 
@@ -53,6 +62,7 @@ uint64_t Stats::totalThreadCacheBytes() { return 0; }
 uint64_t Stats::totalCurrentlyReserved() { return 0; }
 uint64_t Stats::totalPageHeapUnmapped() { return 0; }
 uint64_t Stats::totalPageHeapFree() { return 0; }
+void Stats::dumpStatsToLog() {}
 
 } // namespace Memory
 } // namespace Envoy

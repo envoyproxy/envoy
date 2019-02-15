@@ -7,7 +7,7 @@
 namespace Envoy {
 namespace Memory {
 
-void Utils::ReleaseFreeMemory() {
+void Utils::releaseFreeMemory() {
 #ifdef TCMALLOC
   MallocExtension::instance()->ReleaseFreeMemory();
 #endif
