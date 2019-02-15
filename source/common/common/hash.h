@@ -60,7 +60,7 @@ public:
 private:
   static inline uint64_t unaligned_load(const char* p) {
     uint64_t result;
-    __builtin_memcpy(&result, p, sizeof(result));
+    memcpy(&result, p, sizeof(result));
     return result;
   }
 
