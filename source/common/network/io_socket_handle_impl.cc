@@ -44,7 +44,7 @@ void deleteIoError(IoError* err) {
   }
 }
 
-IoHandleCallIntResult IoSocketHandleImpl::close() {
+IoHandleCallUintResult IoSocketHandleImpl::close() {
   ASSERT(fd_ != -1);
   const int rc = ::close(fd_);
   fd_ = -1;
@@ -56,8 +56,9 @@ IoHandleCallIntResult IoSocketHandleImpl::close() {
                ? std::unique_ptr<IoError, IoErrorDeleterType>(ENVOY_ERROR_AGAIN, deleteIoError)
                : std::unique_ptr<IoError, IoErrorDeleterType>(new IoSocketError(errno),
                                                               deleteIoError));
+    return IoHandleCallResult<uint64_t>(0, std::move(err));
   }
-  return IoHandleCallResult<int>(rc, std::move(err));
+  return IoHandleCallResult<uint64_t>(rc, std::move(err));
 }
 
 bool IoSocketHandleImpl::isOpen() const { return fd_ != -1; }

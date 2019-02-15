@@ -78,8 +78,7 @@ template <typename T> struct IoHandleCallResult {
   IoErrorPtr err_;
 };
 
-using IoHandleCallIntResult = IoHandleCallResult<int>;
-using IoHandleCallSizeResult = IoHandleCallResult<ssize_t>;
+using IoHandleCallUintResult = IoHandleCallResult<uint64_t>;
 
 /**
  * IoHandle: an abstract interface for all I/O operations
@@ -99,7 +98,7 @@ public:
   /**
    * Clean up IoHandle resources
    */
-  virtual IoHandleCallIntResult close() PURE;
+  virtual IoHandleCallUintResult close() PURE;
 
   /**
    * Return true if close() hasn't been called.

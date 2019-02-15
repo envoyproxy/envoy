@@ -30,7 +30,7 @@ Writer::Writer(Network::Address::InstanceConstSharedPtr address)
 
 Writer::~Writer() {
   if (io_handle_->isOpen()) {
-    RELEASE_ASSERT(io_handle_->close().rc_ == 0, "");
+    RELEASE_ASSERT(io_handle_->close().err_ == nullptr, "");
   }
 }
 

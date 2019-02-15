@@ -33,7 +33,7 @@ public:
   // TODO(sbelair2)  To be removed when the fd is fully abstracted from clients.
   int fd() const override { return fd_; }
 
-  IoHandleCallIntResult close() override;
+  IoHandleCallUintResult close() override;
 
   bool isOpen() const override;
 

@@ -151,10 +151,10 @@ bool supportsIpVersion(const Address::IpVersion version) {
   IoHandlePtr io_handle = addr->socket(Address::SocketType::Stream);
   if (0 != addr->bind(io_handle->fd()).rc_) {
     // Socket bind failed.
-    RELEASE_ASSERT(io_handle->close().rc_ == 0, "");
+    RELEASE_ASSERT(io_handle->close().err_ == nullptr, "");
     return false;
   }
-  RELEASE_ASSERT(io_handle->close().rc_ == 0, "");
+  RELEASE_ASSERT(io_handle->close().err_ == nullptr, "");
   return true;
 }
 

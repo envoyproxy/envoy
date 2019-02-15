@@ -49,7 +49,7 @@ protected:
       ASSERT_LT(0U, addr->ip()->port());
 
       // Release the socket and re-bind it.
-      EXPECT_EQ(0, io_handle->close().rc_);
+      EXPECT_EQ(nullptr, io_handle->close().err_);
 
       auto option = std::make_unique<MockSocketOption>();
       auto options = std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>();
