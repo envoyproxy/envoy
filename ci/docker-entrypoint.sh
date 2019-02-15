@@ -1,6 +1,11 @@
 #!/usr/bin/env sh
 set -e
 
+if [ $# == 0 ]; then
+   echo 'Not enough arguments'
+   exit 1
+fi
+
 # if the first argument look like a parameter (i.e. start with '-'), run Envoy
 if [ "${1#-}" != "$1" ]; then
 	set -- envoy "$@"

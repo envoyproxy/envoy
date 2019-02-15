@@ -3,6 +3,11 @@
 # Cleanup network namespace after testing Envoy original_dst cluster
 #
 
+if [ $# != 2 ]; then
+   echo 'Not enough arguments'
+   exit 1
+fi
+
 NETNS=$1
 TARGET_IP=$2
 ENVOY_PORT=10000

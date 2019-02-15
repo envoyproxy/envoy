@@ -31,8 +31,8 @@ def term_all_children():
     print("sending TERM to PID={}".format(pid))
     try:
       os.kill(pid, signal.SIGTERM)
-    except OSError:
-      print("error sending TERM to PID={} continuing".format(pid))
+    except OSError as e:
+      print("error sending TERM to PID={} continuing for {}".format(pid, e))
 
   all_exited = False
 
@@ -72,8 +72,8 @@ def force_kill_all_children():
     print("force killing PID={}".format(pid))
     try:
       os.kill(pid, signal.SIGKILL)
-    except OSError:
-      print("error force killing PID={} continuing".format(pid))
+    except OSError as e:
+      print("error force killing PID={} continuing for ".format(pid, e))
 
   pid_list = []
 
@@ -113,8 +113,8 @@ def sigusr1_handler(signum, frame):
     print("sending SIGUSR1 to PID={}".format(pid))
     try:
       os.kill(pid, signal.SIGUSR1)
-    except OSError:
-      print("error in SIGUSR1 to PID={} continuing".format(pid))
+    except OSError as e:
+      print("error in SIGUSR1 to PID={} continuing for {}".format(pid, e))
 
 
 def sigchld_handler(signum, frame):
@@ -189,7 +189,9 @@ def fork_and_exec():
 def main():
   """ Script main. This script is designed so that a process watcher like runit or monit can watch
       this process and take corrective action if it ever goes away. """
-
+  
+  if len(sys.argv) < 1:
+      print("invalid arguments for hot-restarter")
   print("starting hot-restarter with target: {}".format(sys.argv[1]))
 
   signal.signal(signal.SIGTERM, sigterm_handler)

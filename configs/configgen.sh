@@ -2,6 +2,11 @@
 
 set -e
 
+if [ $# != 1 ]; then
+   echo 'Not enough arguments'
+   exit 1
+fi
+
 CONFIGGEN="$1"
 shift
 OUT_DIR="$1"

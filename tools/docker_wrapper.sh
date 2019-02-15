@@ -3,6 +3,12 @@
 # Wraps a test invocation in docker.
 
 set -e
+
+if [ $# < 5 ]; then
+   echo 'Not enough arguments'
+   exit 1
+fi
+
 IMAGE=$1
 RUN_REMOTE=$2
 LOCAL_MOUNT=$3

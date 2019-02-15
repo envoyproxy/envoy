@@ -2,6 +2,11 @@
 
 set -e
 
+if [ $# == 0 ]; then
+   echo 'Not enough arguments'
+   exit 1
+fi
+
 verify() {
   echo $1
   CONTAINER_ID="$(docker ps -aqf name=$1)"

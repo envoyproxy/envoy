@@ -3,6 +3,11 @@
 # Installs the dependencies required for a macOS build via homebrew.
 # Tools are not upgraded to new versions.
 
+if [ $# == 0 ]; then
+   echo 'Not enough arguments'
+   exit 1
+fi
+
 # Setup bazelbuild tap
 brew tap bazelbuild/tap
 brew tap-pin bazelbuild/tap

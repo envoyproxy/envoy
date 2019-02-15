@@ -1,8 +1,6 @@
-from flask import Flask
-from flask import request
+from flask import Flask, request
 import socket
 import os
-import sys
 import requests
 
 app = Flask(__name__)

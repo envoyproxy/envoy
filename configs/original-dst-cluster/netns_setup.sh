@@ -7,6 +7,11 @@
 #
 set -e
 
+if [ $# != 2 ]; then
+   echo 'Not enough arguments'
+   exit 1
+fi
+
 # name of the network namespace
 NETNS=$1 
 

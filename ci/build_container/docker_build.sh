@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e 
+
 [[ -z "${LINUX_DISTRO}" ]] && LINUX_DISTRO="ubuntu"
 [[ -z "${IMAGE_NAME}" ]] && IMAGE_NAME=envoyproxy/envoy-build-"${LINUX_DISTRO}"
 
