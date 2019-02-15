@@ -112,8 +112,12 @@ private:
   struct NullHedgePolicy : public Router::HedgePolicy {
     // Router::HedgePolicy
     uint32_t initialRequests() const override { return 1; }
-    double additionalRequestChance() const override { return 0; }
+    const envoy::type::FractionalPercent& additionalRequestChance() const override {
+      return additional_request_chance_;
+    }
     bool hedgeOnPerTryTimeout() const override { return false; }
+
+    const envoy::type::FractionalPercent additional_request_chance_;
   };
 
   struct NullRateLimitPolicy : public Router::RateLimitPolicy {

@@ -868,8 +868,9 @@ message HedgePolicy {
   google.protobuf.UInt32Value initial_requests = 1 [(validate.rules).uint32.gte = 1];
 
   // Specifies a probability that an additional upstream request should be sent
-  // on top of what is specified by initial_requests. Defaults to 0.
-  envoy.type.Percent additional_request_chance = 2;
+  // on top of what is specified by initial_requests.
+  // Defaults to 0.
+  envoy.type.FractionalPercent additional_request_chance = 2;
 
   // Indicates that a hedged request should be sent when the per-try timeout
   // is hit. This will only occur if the retry policy also indicates that a

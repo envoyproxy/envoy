@@ -70,11 +70,13 @@ class TestHedgePolicy : public HedgePolicy {
 public:
   // Router::HedgePolicy
   uint32_t initialRequests() const override { return initial_requests_; }
-  double additionalRequestChance() const override { return additional_request_chance_; }
+  const envoy::type::FractionalPercent& additionalRequestChance() const override {
+    return additional_request_chance_;
+  }
   bool hedgeOnPerTryTimeout() const override { return hedge_on_per_try_timeout; }
 
   uint32_t initial_requests_{};
-  double additional_request_chance_{};
+  envoy::type::FractionalPercent additional_request_chance_{};
   bool hedge_on_per_try_timeout{};
 };
 

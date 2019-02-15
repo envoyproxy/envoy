@@ -427,7 +427,7 @@ public:
    * @return percent chance that an additional upstream request should be sent
    * on top of the value from initialRequests().
    */
-  virtual double additionalRequestChance() const PURE;
+  virtual const envoy::type::FractionalPercent& additionalRequestChance() const PURE;
 
   /**
    * @return bool indicating whether request hedging should occur when a request
