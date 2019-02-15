@@ -348,6 +348,16 @@ public:
   // Note that HttpConnectionManager sanitization will *not* be performed on the
   // recreated stream, as it is assumed that sanitization has already been done.
   virtual bool recreateStream() PURE;
+
+  /**
+   * Called at the end of the stream, when all data has been encoded.
+   */
+  virtual void onEncodeComplete() PURE;
+
+  /**
+   * Called at the end of the stream, when all data has been decoded.
+   */
+  virtual void onDecodeComplete() PURE;
 };
 
 /**

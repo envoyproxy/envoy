@@ -68,6 +68,7 @@ TEST_F(ReverseBridgeTest, InvalidGrcpRequest) {
       EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().GrpcStatus, "2"));
       EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().GrpcMessage, "invalid request body"));
     }));
+    EXPECT_CALL(decoder_callbacks_, onEncodeComplete());
     EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, false));
   }
 }

@@ -456,6 +456,7 @@ TEST(HttpUtility, SendLocalReply) {
 
   EXPECT_CALL(callbacks, encodeHeaders_(_, false));
   EXPECT_CALL(callbacks, encodeData(_, true));
+  EXPECT_CALL(callbacks, onEncodeComplete());
   Utility::sendLocalReply(false, callbacks, is_reset, Http::Code::PayloadTooLarge, "large",
                           absl::nullopt, false);
 }
@@ -473,6 +474,7 @@ TEST(HttpUtility, SendLocalGrpcReply) {
         EXPECT_NE(headers.GrpcMessage(), nullptr);
         EXPECT_STREQ(headers.GrpcMessage()->value().c_str(), "large");
       }));
+  EXPECT_CALL(callbacks, onEncodeComplete());
   Utility::sendLocalReply(true, callbacks, is_reset, Http::Code::PayloadTooLarge, "large",
                           absl::nullopt, false);
 }
@@ -486,6 +488,7 @@ TEST(HttpUtility, RateLimitedGrpcStatus) {
         EXPECT_EQ(headers.GrpcStatus()->value().c_str(),
                   std::to_string(enumToInt(Grpc::Status::GrpcStatus::Unavailable)));
       }));
+  EXPECT_CALL(callbacks, onEncodeComplete());
   Utility::sendLocalReply(true, callbacks, false, Http::Code::TooManyRequests, "", absl::nullopt,
                           false);
 
@@ -495,6 +498,7 @@ TEST(HttpUtility, RateLimitedGrpcStatus) {
         EXPECT_EQ(headers.GrpcStatus()->value().c_str(),
                   std::to_string(enumToInt(Grpc::Status::GrpcStatus::ResourceExhausted)));
       }));
+  EXPECT_CALL(callbacks, onEncodeComplete());
   Utility::sendLocalReply(
       true, callbacks, false, Http::Code::TooManyRequests, "",
       absl::make_optional<Grpc::Status::GrpcStatus>(Grpc::Status::GrpcStatus::ResourceExhausted),
@@ -521,6 +525,7 @@ TEST(HttpUtility, SendLocalReplyHeadRequest) {
         EXPECT_STREQ(headers.ContentLength()->value().c_str(),
                      fmt::format("{}", strlen("large")).c_str());
       }));
+  EXPECT_CALL(callbacks, onEncodeComplete());
   Utility::sendLocalReply(false, callbacks, is_reset, Http::Code::PayloadTooLarge, "large",
                           absl::nullopt, true);
 }

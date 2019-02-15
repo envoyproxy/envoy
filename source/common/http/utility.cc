@@ -288,9 +288,15 @@ void Utility::sendLocalReply(bool is_grpc, StreamDecoderFilterCallbacks& callbac
   sendLocalReply(is_grpc,
                  [&](HeaderMapPtr&& headers, bool end_stream) -> void {
                    callbacks.encodeHeaders(std::move(headers), end_stream);
+                   if (end_stream) {
+                     callbacks.onEncodeComplete();
+                   }
                  },
                  [&](Buffer::Instance& data, bool end_stream) -> void {
                    callbacks.encodeData(data, end_stream);
+                   if (end_stream) {
+                     callbacks.onEncodeComplete();
+                   }
                  },
                  is_reset, response_code, body_text, grpc_status, is_head_request);
 }

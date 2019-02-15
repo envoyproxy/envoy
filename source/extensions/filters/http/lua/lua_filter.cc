@@ -551,8 +551,11 @@ void Filter::scriptLog(spdlog::level::level_enum level, const char* message) {
 void Filter::DecoderCallbacks::respond(Http::HeaderMapPtr&& headers, Buffer::Instance* body,
                                        lua_State*) {
   callbacks_->encodeHeaders(std::move(headers), body == nullptr);
-  if (body && !parent_.destroyed_) {
+  if (body == nullptr) {
+    callbacks_->onEncodeComplete();
+  } else if (!parent_.destroyed_) {
     callbacks_->encodeData(*body, true);
+    callbacks_->onEncodeComplete();
   }
 }
 
