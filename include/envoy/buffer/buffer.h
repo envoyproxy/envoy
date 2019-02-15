@@ -22,6 +22,8 @@ namespace Buffer {
 struct RawSlice {
   void* mem_ = nullptr;
   size_t len_ = 0;
+
+  bool operator==(const RawSlice& rhs) const { return mem_ == rhs.mem_ && len_ == rhs.len_; }
 };
 
 /**

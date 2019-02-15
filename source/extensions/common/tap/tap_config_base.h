@@ -18,9 +18,38 @@ class Utility {
 public:
   /**
    * Add body data to a tapped body message, taking into account the maximum bytes to buffer.
+   * @param output_body supplies the body message to buffer to.
+   * @param max_buffered_bytes supplies the maximum bytes to store, if truncation occurs the
+   *        truncation flag will be set.
+   * @param data supplies the data to buffer.
+   * @param buffer_start_offset supplies the offset within data to start buffering.
+   * @param buffer_length_to_copy supplies the length of the data to buffer.
+   * @return whether the buffered data was truncated or not.
    */
-  static void addBufferToProtoBytes(envoy::data::tap::v2alpha::Body& output_body,
-                                    uint32_t max_buffered_bytes, const Buffer::Instance& data);
+  static bool addBufferToProtoBytes(envoy::data::tap::v2alpha::Body& output_body,
+                                    uint32_t max_buffered_bytes, const Buffer::Instance& data,
+                                    uint32_t buffer_start_offset, uint32_t buffer_length_to_copy);
+
+  /**
+   * Trim a container that contains buffer raw slices so that the slices start at an offset and
+   * only contain a specific length. No slices are removed from the container, but their length
+   * may be reduced to 0.
+   * TODO(mattklein123): This is split out to ease testing and also because we should ultimately
+   * move this directly into the buffer API. I would rather wait until the new buffer code merges
+   * before we do that.
+   */
+  template <typename T> static void trimSlices(T& slices, uint32_t start_offset, uint32_t length) {
+    for (auto& slice : slices) {
+      const uint32_t start_offset_trim = std::min<uint32_t>(start_offset, slice.len_);
+      slice.len_ -= start_offset_trim;
+      start_offset -= start_offset_trim;
+      slice.mem_ = static_cast<char*>(slice.mem_) + start_offset_trim;
+
+      const uint32_t final_length = std::min<uint32_t>(length, slice.len_);
+      slice.len_ = final_length;
+      length -= final_length;
+    }
+  }
 };
 
 /**

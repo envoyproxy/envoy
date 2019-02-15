@@ -1,5 +1,6 @@
 #include "extensions/transport_sockets/tap/tap_config_impl.h"
 
+#include "common/common/assert.h"
 #include "common/network/utility.h"
 
 namespace Envoy {
@@ -28,22 +29,31 @@ void PerSocketTapperImpl::closeSocket(Network::ConnectionEvent) {
   config_->submitBufferedTrace(trace_, connection_.id());
 }
 
-void PerSocketTapperImpl::onRead(const Buffer::Instance& data, uint32_t bytes_read) {
-  if (!config_->rootMatcher().matches(statuses_)) {
-    return;
-  }
-
+envoy::data::tap::v2alpha::SocketEvent& PerSocketTapperImpl::createEvent() {
   auto* event = trace_->mutable_socket_buffered_trace()->add_events();
   event->mutable_timestamp()->MergeFrom(Protobuf::util::TimeUtil::NanosecondsToTimestamp(
       std::chrono::duration_cast<std::chrono::nanoseconds>(
           config_->time_source_.systemTime().time_since_epoch())
           .count()));
-  // TODO(mattklein123): Avoid linearize/toString here.
-  // TODO(mattklein123): Implement truncation configuration. Also figure out how/if truncation
-  // applies to multiple event messages if we are above our limit.
-  const std::string linearized_data = data.toString();
-  event->mutable_read()->mutable_data()->set_as_bytes(
-      linearized_data.data() + (linearized_data.size() - bytes_read), bytes_read);
+  return *event;
+}
+
+void PerSocketTapperImpl::onRead(const Buffer::Instance& data, uint32_t bytes_read) {
+  if (!config_->rootMatcher().matches(statuses_)) {
+    return;
+  }
+
+  if (trace_->socket_buffered_trace().read_truncated()) {
+    return;
+  }
+
+  auto& event = createEvent();
+  ASSERT(rx_bytes_buffered_ <= config_->maxBufferedRxBytes());
+  trace_->mutable_socket_buffered_trace()->set_read_truncated(
+      Extensions::Common::Tap::Utility::addBufferToProtoBytes(
+          *event.mutable_read()->mutable_data(), config_->maxBufferedRxBytes() - rx_bytes_buffered_,
+          data, data.length() - bytes_read, bytes_read));
+  rx_bytes_buffered_ += event.read().data().as_bytes().size();
 }
 
 void PerSocketTapperImpl::onWrite(const Buffer::Instance& data, uint32_t bytes_written,
@@ -52,17 +62,19 @@ void PerSocketTapperImpl::onWrite(const Buffer::Instance& data, uint32_t bytes_w
     return;
   }
 
-  auto* event = trace_->mutable_socket_buffered_trace()->add_events();
-  event->mutable_timestamp()->MergeFrom(Protobuf::util::TimeUtil::NanosecondsToTimestamp(
-      std::chrono::duration_cast<std::chrono::nanoseconds>(
-          config_->time_source_.systemTime().time_since_epoch())
-          .count()));
-  // TODO(mattklein123): Avoid linearize/toString here.
-  // TODO(mattklein123): Implement truncation configuration. Also figure out how/if truncation
-  // applies to multiple event messages if we are above our limit.
-  const std::string linearized_data = data.toString();
-  event->mutable_write()->mutable_data()->set_as_bytes(linearized_data.data(), bytes_written);
-  event->mutable_write()->set_end_stream(end_stream);
+  if (trace_->socket_buffered_trace().write_truncated()) {
+    return;
+  }
+
+  auto& event = createEvent();
+  ASSERT(tx_bytes_buffered_ <= config_->maxBufferedTxBytes());
+  trace_->mutable_socket_buffered_trace()->set_write_truncated(
+      Extensions::Common::Tap::Utility::addBufferToProtoBytes(
+          *event.mutable_write()->mutable_data(),
+          config_->maxBufferedTxBytes() - tx_bytes_buffered_, data, 0, bytes_written));
+  tx_bytes_buffered_ += event.write().data().as_bytes().size();
+
+  event.mutable_write()->set_end_stream(end_stream);
 }
 
 } // namespace Tap

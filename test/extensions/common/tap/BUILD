@@ -25,3 +25,11 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "tap_config_base_test",
+    srcs = ["tap_config_base_test.cc"],
+    deps = [
+        "//source/extensions/common/tap:tap_config_base",
+    ],
+)

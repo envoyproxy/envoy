@@ -15,10 +15,11 @@ Envoy currently provides two experimental extensions that can tap traffic:
 Tap transport socket configuration
 ----------------------------------
 
-.. warning::
-  This feature is experimental and has a known limitation that it will OOM for large traces on a
-  given socket. It can also be disabled in the build if there are security concerns, see
-  https://github.com/envoyproxy/envoy/blob/master/bazel/README.md#disabling-extensions.
+.. attention::
+
+  The tap transport socket is experimental and is currently under active development. There is
+  currently a very limited set of match conditions, output configuration, output sinks, etc.
+  Capabilities will be expanded over time and the configuration structures are likely to change.
 
 Tapping can be configured on :ref:`Listener
 <envoy_api_field_listener.FilterChain.transport_socket>` and :ref:`Cluster
@@ -73,6 +74,20 @@ TLS configuration on the listener or cluster, respectively.
 
 Each unique socket instance will generate a trace file prefixed with `path_prefix`. E.g.
 `/some/tap/path_0.pb`.
+
+Buffered data limits
+--------------------
+
+For buffered socket taps, Envoy will limit the amount of body data that is tapped to avoid OOM
+situations. The default limit is 1KiB for both received and transmitted data.
+This is configurable via the :ref:`max_buffered_rx_bytes
+<envoy_api_field_service.tap.v2alpha.OutputConfig.max_buffered_rx_bytes>` and
+:ref:`max_buffered_tx_bytes
+<envoy_api_field_service.tap.v2alpha.OutputConfig.max_buffered_tx_bytes>` settings. When a buffered
+socket tap is truncated, the trace will indicate truncation via the :ref:`read_truncated
+<envoy_api_field_data.tap.v2alpha.SocketTrace.read_truncated>` and :ref:`write_truncated
+<envoy_api_field_data.tap.v2alpha.SocketTrace.write_truncated>` fields as well as the body
+:ref:`truncated <envoy_api_field_data.tap.v2alpha.Body.truncated>` field.
 
 PCAP generation
 ---------------

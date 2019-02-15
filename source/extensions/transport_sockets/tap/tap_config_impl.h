@@ -23,14 +23,14 @@ public:
   void onWrite(const Buffer::Instance& data, uint32_t bytes_written, bool end_stream) override;
 
 private:
+  envoy::data::tap::v2alpha::SocketEvent& createEvent();
+
   SocketTapConfigImplSharedPtr config_;
   const Network::Connection& connection_;
   std::vector<bool> statuses_;
-  // TODO(mattklein123): Buffering the entire trace until socket close won't scale to
-  // long lived connections or large transfers. We could emit multiple tap
-  // files with bounded size, with identical connection ID to allow later
-  // reassembly.
   std::shared_ptr<envoy::data::tap::v2alpha::BufferedTraceWrapper> trace_;
+  uint32_t rx_bytes_buffered_{};
+  uint32_t tx_bytes_buffered_{};
 };
 
 class SocketTapConfigImpl : public Extensions::Common::Tap::TapConfigBaseImpl,

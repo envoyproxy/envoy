@@ -67,4 +67,12 @@ message SocketTrace {
 
   // Sequence of observed events.
   repeated SocketEvent events = 2;
+
+  // Set to true if read events were truncated due to the :ref:`max_buffered_rx_bytes
+  // <envoy_api_field_service.tap.v2alpha.OutputConfig.max_buffered_rx_bytes>` setting.
+  bool read_truncated = 3;
+
+  // Set to true if write events were truncated due to the :ref:`max_buffered_tx_bytes
+  // <envoy_api_field_service.tap.v2alpha.OutputConfig.max_buffered_tx_bytes>` setting.
+  bool write_truncated = 4;
 }
