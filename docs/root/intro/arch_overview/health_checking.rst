@@ -13,7 +13,7 @@ unhealthy, successes required before marking a host healthy, etc.):
 
 * **HTTP**: During HTTP health checking Envoy will send an HTTP request to the upstream host. By
   default, it expects a 200 response if the host is healthy. Expected response codes are
-  :ref:`configurable <envoy_api_msg_core.HealthCheck.HttpHealthCheck.expected_statuses>`. The
+  :ref:`configurable <envoy_api_msg_core.HealthCheck.HttpHealthCheck>`. The
   upstream host can return 503 if it wants to immediately notify downstream hosts to no longer
   forward traffic to it.
 * **L3/L4**: During L3/L4 health checking, Envoy will send a configurable byte buffer to the
