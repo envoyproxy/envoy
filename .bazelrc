@@ -63,3 +63,48 @@ build:libc++ --define force_libcpp=enabled
 
 # Test options
 test --test_env=HEAPCHECK=normal --test_env=PPROF_PATH
+
+# Remote execution: https://docs.bazel.build/versions/master/remote-execution.html
+build:remote --host_javabase=@envoy//bazel/toolchains:jdk8
+build:remote --javabase=@envoy//bazel/toolchains:jdk8
+build:remote --host_java_toolchain=@bazel_tools//tools/jdk:toolchain_hostjdk8
+build:remote --java_toolchain=@bazel_tools//tools/jdk:toolchain_hostjdk8
+build:remote --host_platform=@envoy//bazel/toolchains:rbe-envoy-build-ubuntu
+build:remote --platforms=@envoy//bazel/toolchains:rbe-envoy-build-ubuntu
+build:remote --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
+build:remote --spawn_strategy=remote
+build:remote --strategy=Javac=remote
+build:remote --strategy=Closure=remote
+build:remote --strategy=Genrule=remote
+build:remote --define=EXECUTOR=remote
+build:remote --remote_cache=remotebuildexecution.googleapis.com
+build:remote --remote_executor=remotebuildexecution.googleapis.com
+build:remote --tls_enabled=true
+build:remote --remote_timeout=3600
+build:remote --auth_enabled=true
+build:remote --linkopt=-fuse-ld=lld
+
+build:remote-clang --config=remote
+build:remote-clang --crosstool_top=@envoy//bazel/toolchains/clang:toolchain
+build:remote-clang --extra_toolchains=@envoy//bazel/toolchains/cpp:cc-toolchain-clang-x86_64-default
+
+build:remote-gcc --config=remote
+build:remote-gcc --crosstool_top=@envoy//bazel/toolchains/gcc:toolchain
+build:remote-gcc --extra_toolchains=@envoy//bazel/toolchains/cpp:cc-toolchain-gcc-x86_64-default
+
+# Docker sandbox
+build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build:cfc514546bc0284536893cca5fa43d7128edcd35
+build:docker-sandbox --spawn_strategy=docker
+build:docker-sandbox --strategy=Javac=docker
+build:docker-sandbox --strategy=Closure=docker
+build:docker-sandbox --strategy=Genrule=docker
+build:docker-sandbox --define=EXECUTOR=remote
+build:docker-sandbox --experimental_docker_verbose
+build:docker-sandbox --experimental_enable_docker_sandbox
+build:docker-sandbox --linkopt=-fuse-ld=lld
+
+build:docker-clang --config=docker-sandbox
+build:docker-clang --crosstool_top=@envoy//bazel/toolchains/clang:toolchain
+
+build:docker-gcc --config=docker-sandbox
+build:docker-gcc --crosstool_top=@envoy//bazel/toolchains/gcc:toolchain
