@@ -223,10 +223,10 @@ public:
    */
   static SlicePtr create(const void* data, uint64_t size) {
     uint64_t slice_capacity = sliceSize(size);
-    auto slice = new (slice_capacity) OwnedSlice(slice_capacity);
+    std::unique_ptr<OwnedSlice> slice(new (slice_capacity) OwnedSlice(slice_capacity));
     memcpy(slice->base_, data, size);
     slice->reservable_ = size;
-    return SlicePtr(slice);
+    return slice;
   }
 
   // Custom delete operator to keep C++14 from using the global operator delete(void*, size_t),
@@ -265,14 +265,7 @@ private:
  */
 class SliceDeque {
 public:
-  SliceDeque() : ring_(inline_ring_), capacity_(InlineRingCapacity) {
-    /*
-    external_ring_ = std::make_unique<SlicePtr[]>(InlineRingCapacity);
-    ring_ = external_ring_.get();
-    */
-    ASSERT(nullptr == external_ring_);
-    ASSERT(ring_ == &(inline_ring_[0]));
-  }
+  SliceDeque() : ring_(inline_ring_), capacity_(InlineRingCapacity) {}
 
   SliceDeque(SliceDeque&& rhs) noexcept {
     // This custom move constructor is needed so that ring_ will be updated properly.

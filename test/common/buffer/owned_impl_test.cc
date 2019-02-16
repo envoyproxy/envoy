@@ -360,10 +360,7 @@ TEST_P(OwnedImplTest, ToString) {
 
 TEST_P(OwnedImplTest, AppendSliceForTest) {
   static constexpr size_t NumInputs = 3;
-  static constexpr const char* Inputs[] = {"one", "2",
-                                           ""
-                                           "four",
-                                           ""};
+  static constexpr const char* Inputs[] = {"one", "2", "", "four", ""};
   Buffer::OwnedImpl buffer;
   RawSlice slices[NumInputs];
   EXPECT_EQ(0, buffer.getRawSlices(slices, NumInputs));

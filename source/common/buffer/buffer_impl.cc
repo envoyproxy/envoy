@@ -151,21 +151,27 @@ void OwnedImpl::copyOut(size_t start, uint64_t size, void* data) const {
     ev_ssize_t copied = evbuffer_copyout_from(buffer_.get(), &start_ptr, data, size);
     ASSERT(static_cast<uint64_t>(copied) == size);
   } else {
+    uint64_t bytes_to_skip = start;
     uint8_t* dest = static_cast<uint8_t*>(data);
     for (const auto& slice : slices_) {
       if (size == 0) {
         break;
       }
       uint64_t data_size = slice->dataSize();
-      if (data_size <= start) {
-        start -= data_size;
+      if (data_size <= bytes_to_skip) {
+        // The offset where the caller wants to start copying is after the end of this slice,
+        // so just skip over this slice completely.
+        bytes_to_skip -= data_size;
         continue;
       }
-      uint64_t copy_size = std::min(size, data_size - start);
-      memcpy(dest, slice->data() + start, copy_size);
+      uint64_t copy_size = std::min(size, data_size - bytes_to_skip);
+      memcpy(dest, slice->data() + bytes_to_skip, copy_size);
       size -= copy_size;
       dest += copy_size;
-      start = 0;
+      // Now that we've started copying, there are no bytes left to skip over. If there
+      // is any more data to be copied, the next iteration can start copying from the very
+      // beginning of the next slice.
+      bytes_to_skip = 0;
     }
     ASSERT(size == 0);
   }
