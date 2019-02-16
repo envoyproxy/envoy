@@ -47,7 +47,7 @@ HttpStatusCheckerPtr HttpStatusChecker::configure(
   return httpStatusChecker;
 }
 
-bool HttpStatusChecker::isExpected(uint64_t http_status) const {
+bool HttpStatusChecker::inRange(uint64_t http_status) const {
   for (const auto& range : ranges_) {
     if (http_status >= range.first && http_status < range.second) {
       return true;

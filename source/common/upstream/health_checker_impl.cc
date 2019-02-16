@@ -184,7 +184,7 @@ HttpHealthCheckerImpl::HttpActiveHealthCheckSession::healthCheckResult() {
   ENVOY_CONN_LOG(debug, "hc response={} health_flags={}", *client_, response_code,
                  HostUtility::healthFlagsToString(*host_));
 
-  if (!parent_.http_status_checker_->isExpected(response_code)) {
+  if (!parent_.http_status_checker_->inRange(response_code)) {
     return HealthCheckResult::Failed;
   }
 

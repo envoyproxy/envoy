@@ -18,8 +18,8 @@ TEST(HttpStatusChecker, Default) {
   auto http_status_checker = HttpStatusChecker::configure(
       parseHealthCheckFromV2Yaml(yaml).http_health_check().expected_statuses(), 200);
 
-  EXPECT_TRUE(http_status_checker->isExpected(200));
-  EXPECT_FALSE(http_status_checker->isExpected(204));
+  EXPECT_TRUE(http_status_checker->inRange(200));
+  EXPECT_FALSE(http_status_checker->inRange(204));
 }
 
 TEST(HttpStatusChecker, Single100) {
@@ -35,11 +35,11 @@ TEST(HttpStatusChecker, Single100) {
   auto http_status_checker = HttpStatusChecker::configure(
       parseHealthCheckFromV2Yaml(yaml).http_health_check().expected_statuses(), 200);
 
-  EXPECT_FALSE(http_status_checker->isExpected(200));
+  EXPECT_FALSE(http_status_checker->inRange(200));
 
-  EXPECT_FALSE(http_status_checker->isExpected(99));
-  EXPECT_TRUE(http_status_checker->isExpected(100));
-  EXPECT_FALSE(http_status_checker->isExpected(101));
+  EXPECT_FALSE(http_status_checker->inRange(99));
+  EXPECT_TRUE(http_status_checker->inRange(100));
+  EXPECT_FALSE(http_status_checker->inRange(101));
 }
 
 TEST(HttpStatusChecker, Single599) {
@@ -55,11 +55,11 @@ TEST(HttpStatusChecker, Single599) {
   auto http_status_checker = HttpStatusChecker::configure(
       parseHealthCheckFromV2Yaml(yaml).http_health_check().expected_statuses(), 200);
 
-  EXPECT_FALSE(http_status_checker->isExpected(200));
+  EXPECT_FALSE(http_status_checker->inRange(200));
 
-  EXPECT_FALSE(http_status_checker->isExpected(598));
-  EXPECT_TRUE(http_status_checker->isExpected(599));
-  EXPECT_FALSE(http_status_checker->isExpected(600));
+  EXPECT_FALSE(http_status_checker->inRange(598));
+  EXPECT_TRUE(http_status_checker->inRange(599));
+  EXPECT_FALSE(http_status_checker->inRange(600));
 }
 
 TEST(HttpStatusChecker, Ranges_204_304) {
@@ -77,14 +77,14 @@ TEST(HttpStatusChecker, Ranges_204_304) {
   auto http_status_checker = HttpStatusChecker::configure(
       parseHealthCheckFromV2Yaml(yaml).http_health_check().expected_statuses(), 200);
 
-  EXPECT_FALSE(http_status_checker->isExpected(200));
+  EXPECT_FALSE(http_status_checker->inRange(200));
 
-  EXPECT_FALSE(http_status_checker->isExpected(203));
-  EXPECT_TRUE(http_status_checker->isExpected(204));
-  EXPECT_FALSE(http_status_checker->isExpected(205));
-  EXPECT_FALSE(http_status_checker->isExpected(303));
-  EXPECT_TRUE(http_status_checker->isExpected(304));
-  EXPECT_FALSE(http_status_checker->isExpected(305));
+  EXPECT_FALSE(http_status_checker->inRange(203));
+  EXPECT_TRUE(http_status_checker->inRange(204));
+  EXPECT_FALSE(http_status_checker->inRange(205));
+  EXPECT_FALSE(http_status_checker->inRange(303));
+  EXPECT_TRUE(http_status_checker->inRange(304));
+  EXPECT_FALSE(http_status_checker->inRange(305));
 }
 
 TEST(HttpStatusChecker, Below100) {

@@ -21,7 +21,7 @@ public:
   configure(const Protobuf::RepeatedPtrField<envoy::type::Int64Range>& expected_statuses,
             uint64_t default_expected_status);
 
-  bool isExpected(uint64_t http_status) const;
+  bool inRange(uint64_t http_status) const;
 
 protected:
   HttpStatusChecker() {}

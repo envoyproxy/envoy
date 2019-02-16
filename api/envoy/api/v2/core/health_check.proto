@@ -122,7 +122,8 @@ message HealthCheck {
     bool use_http2 = 7;
 
     // Specifies a list of HTTP response statuses considered healthy. If provided, replaces default
-    // 200-only policy - 200 must be included explicitly as needed.
+    // 200-only policy - 200 must be included explicitly as needed. Ranges follow half-open
+    // semantics of :ref:`Int64Range <envoy_api_msg_type.Int64Range>`.
     repeated envoy.type.Int64Range expected_statuses = 9;
   }
 
