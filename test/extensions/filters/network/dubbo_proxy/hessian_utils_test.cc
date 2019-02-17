@@ -3,8 +3,9 @@
 #include "extensions/filters/network/dubbo_proxy/hessian_utils.h"
 
 #include "test/test_common/printers.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
+
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Extensions {

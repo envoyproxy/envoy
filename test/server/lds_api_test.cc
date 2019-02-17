@@ -22,7 +22,7 @@ using testing::Throw;
 namespace Envoy {
 namespace Server {
 
-class LdsApiTest : public TestBase {
+class LdsApiTest : public testing::Test {
 public:
   LdsApiTest() : request_(&cluster_manager_.async_client_), api_(Api::createApiForTest(store_)) {}
 

@@ -5,8 +5,9 @@
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
+
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Return;
@@ -15,7 +16,7 @@ namespace Envoy {
 namespace Network {
 
 template <Network::Address::SocketType Type>
-class ListenSocketImplTest : public TestBaseWithParam<Address::IpVersion> {
+class ListenSocketImplTest : public testing::TestWithParam<Address::IpVersion> {
 protected:
   ListenSocketImplTest() : version_(GetParam()) {}
   const Address::IpVersion version_;

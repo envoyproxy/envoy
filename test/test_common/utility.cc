@@ -43,7 +43,7 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "test/mocks/stats/mocks.h"
-#include "test/test_common/test_base.h"
+#include "gtest/gtest.h"
 
 using testing::GTEST_FLAG(random_seed);
 

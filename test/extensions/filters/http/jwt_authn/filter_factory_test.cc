@@ -4,9 +4,9 @@
 
 #include "test/extensions/filters/http/jwt_authn/test_common.h"
 #include "test/mocks/server/mocks.h"
-#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication;
 using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtProvider;

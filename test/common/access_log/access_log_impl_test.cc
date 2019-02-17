@@ -20,10 +20,10 @@
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::NiceMock;
@@ -48,7 +48,7 @@ envoy::config::filter::accesslog::v2::AccessLog parseAccessLogFromV2Yaml(const s
   return access_log;
 }
 
-class AccessLogImplTest : public TestBase {
+class AccessLogImplTest : public testing::Test {
 public:
   AccessLogImplTest() : file_(new Filesystem::MockFile()) {
     ON_CALL(context_, runtime()).WillByDefault(ReturnRef(runtime_));

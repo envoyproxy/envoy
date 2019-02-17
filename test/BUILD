@@ -18,8 +18,10 @@ envoy_cc_test_library(
     name = "main",
     srcs = [
         "main.cc",
+        "test_listener.cc",
         "test_runner.h",
     ],
+    hdrs = ["test_listener.h"],
     external_deps = [
         "abseil_symbolize",
     ],

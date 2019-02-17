@@ -49,7 +49,7 @@ timeout:
   seconds: 5
 )";
 
-class JwksFetcherTest : public TestBase {
+class JwksFetcherTest : public testing::Test {
 public:
   void SetUp() override { MessageUtil::loadFromYaml(JwksUri, uri_); }
   HttpUri uri_;

@@ -12,9 +12,9 @@
 #include "test/common/upstream/utility.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
-#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::NiceMock;
@@ -33,7 +33,7 @@ public:
   absl::optional<uint64_t> hash_key_;
 };
 
-class RingHashLoadBalancerTest : public TestBaseWithParam<bool> {
+class RingHashLoadBalancerTest : public testing::TestWithParam<bool> {
 public:
   RingHashLoadBalancerTest() : stats_(ClusterInfoImpl::generateStats(stats_store_)) {}
 

@@ -2,8 +2,9 @@
 
 #include "test/common/grpc/utility.h"
 #include "test/mocks/stats/mocks.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
+
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Grpc {
@@ -14,7 +15,7 @@ namespace {
 // of getting at the underlying state, we can at best just make sure we don't
 // crash, compare with nullptr and/or look at vector lengths.
 
-class CredsUtilityTest : public TestBase {
+class CredsUtilityTest : public testing::Test {
 public:
   CredsUtilityTest() : api_(Api::createApiForTest()) {}
 

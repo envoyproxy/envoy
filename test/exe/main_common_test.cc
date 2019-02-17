@@ -11,8 +11,9 @@
 
 #include "test/test_common/contention.h"
 #include "test/test_common/environment.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
+
+#include "gtest/gtest.h"
 
 #ifdef ENVOY_HANDLE_SIGNALS
 #include "exe/signal_action.h"
@@ -31,7 +32,7 @@ namespace Envoy {
  * an argv array that is terminated with nullptr. Identifies the config
  * file relative to $TEST_RUNDIR.
  */
-class MainCommonTest : public TestBaseWithParam<Network::Address::IpVersion> {
+class MainCommonTest : public testing::TestWithParam<Network::Address::IpVersion> {
 protected:
   MainCommonTest()
       : config_file_(TestEnvironment::temporaryFileSubstitute(

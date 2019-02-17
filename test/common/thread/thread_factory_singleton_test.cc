@@ -2,15 +2,14 @@
 
 #include "common/common/assert.h"
 
-#include "test/test_common/test_base.h"
-
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Thread {
 namespace {
 
-class ThreadFactorySingletonTest : public TestBase {
+class ThreadFactorySingletonTest : public testing::Test {
 protected:
   ThreadFactorySingletonTest()
       : run_tid_(Envoy::Thread::ThreadFactorySingleton::get().currentThreadId()) {}

@@ -7,10 +7,10 @@
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Invoke;
@@ -53,7 +53,7 @@ static void errorCallbackTest(Address::IpVersion version) {
   dispatcher->run(Event::Dispatcher::RunType::Block);
 }
 
-class ListenerImplDeathTest : public TestBaseWithParam<Address::IpVersion> {};
+class ListenerImplDeathTest : public testing::TestWithParam<Address::IpVersion> {};
 INSTANTIATE_TEST_SUITE_P(IpVersions, ListenerImplDeathTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);

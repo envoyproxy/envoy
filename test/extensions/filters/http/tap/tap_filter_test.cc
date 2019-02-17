@@ -2,10 +2,10 @@
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::InSequence;
 using testing::Return;
@@ -48,7 +48,7 @@ public:
                     const Http::HeaderMap* response_trailers));
 };
 
-class TapFilterTest : public TestBase {
+class TapFilterTest : public testing::Test {
 public:
   void setup(bool has_config) {
     if (has_config) {

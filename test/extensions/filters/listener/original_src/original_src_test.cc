@@ -10,9 +10,9 @@
 #include "test/mocks/common.h"
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Exactly;
@@ -24,7 +24,7 @@ namespace ListenerFilters {
 namespace OriginalSrc {
 namespace {
 
-class OriginalSrcTest : public TestBase {
+class OriginalSrcTest : public testing::Test {
 public:
   std::unique_ptr<OriginalSrcFilter> makeDefaultFilter() {
     Config default_config;

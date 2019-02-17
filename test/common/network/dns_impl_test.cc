@@ -26,11 +26,11 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "ares.h"
 #include "ares_dns.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::InSequence;
@@ -322,7 +322,7 @@ private:
   DnsResolverImpl* resolver_;
 };
 
-class DnsImplConstructor : public TestBase {
+class DnsImplConstructor : public testing::Test {
 protected:
   DnsImplConstructor() : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()) {}
 
@@ -401,7 +401,7 @@ TEST_F(DnsImplConstructor, BadCustomResolvers) {
                             "DNS resolver 'foo' is not an IP address");
 }
 
-class DnsImplTest : public TestBaseWithParam<Address::IpVersion> {
+class DnsImplTest : public testing::TestWithParam<Address::IpVersion> {
 public:
   DnsImplTest() : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()) {}
 

@@ -13,9 +13,9 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::InSequence;
@@ -28,7 +28,7 @@ namespace Envoy {
 namespace Http {
 namespace Http1 {
 
-class Http1ServerConnectionImplTest : public TestBase {
+class Http1ServerConnectionImplTest : public testing::Test {
 public:
   void initialize() {
     codec_ = std::make_unique<ServerConnectionImpl>(connection_, callbacks_, codec_settings_);
@@ -671,7 +671,7 @@ TEST_F(Http1ServerConnectionImplTest, WatermarkTest) {
       ->onUnderlyingConnectionBelowWriteBufferLowWatermark();
 }
 
-class Http1ClientConnectionImplTest : public TestBase {
+class Http1ClientConnectionImplTest : public testing::Test {
 public:
   void initialize() { codec_ = std::make_unique<ClientConnectionImpl>(connection_, callbacks_); }
 

@@ -9,7 +9,8 @@
 #include "common/event/libevent.h"
 
 #include "test/config_test/config_test.h"
-#include "test/test_common/test_base.h"
+
+#include "gtest/gtest.h"
 
 int main(int argc, char* argv[]) {
   if (argc != 2) {

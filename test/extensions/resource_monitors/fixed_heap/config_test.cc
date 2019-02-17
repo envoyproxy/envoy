@@ -6,7 +6,8 @@
 #include "extensions/resource_monitors/fixed_heap/config.h"
 
 #include "test/mocks/event/mocks.h"
-#include "test/test_common/test_base.h"
+
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Extensions {

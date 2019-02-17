@@ -4,8 +4,8 @@
 #include <vector>
 
 #include "test/test_common/environment.h"
-#include "test/test_common/test_base.h"
 
+#include "gtest/gtest.h"
 #include "openssl/ssl.h"
 #include "openssl/x509v3.h"
 

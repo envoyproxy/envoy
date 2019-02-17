@@ -7,7 +7,7 @@ namespace Envoy {
 
 std::string echo_config;
 
-class EchoIntegrationTest : public TestBaseWithParam<Network::Address::IpVersion>,
+class EchoIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                             public BaseIntegrationTest {
 public:
   EchoIntegrationTest() : BaseIntegrationTest(GetParam(), echo_config) {}

@@ -2,13 +2,14 @@
 
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
-#include "test/test_common/test_base.h"
+
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Network {
 namespace Test {
 
-class NetworkUtilityTest : public TestBaseWithParam<Address::IpVersion> {
+class NetworkUtilityTest : public testing::TestWithParam<Address::IpVersion> {
 protected:
   NetworkUtilityTest() : version_(GetParam()) {}
   const Address::IpVersion version_;

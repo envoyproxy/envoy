@@ -18,10 +18,10 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::AtMost;
@@ -37,7 +37,7 @@ using testing::Throw;
 namespace Envoy {
 namespace Http {
 
-class CodecClientTest : public TestBase {
+class CodecClientTest : public testing::Test {
 public:
   CodecClientTest() {
     connection_ = new NiceMock<Network::MockClientConnection>();
@@ -257,7 +257,7 @@ TEST_F(CodecClientTest, WatermarkPassthrough) {
 }
 
 // Test the codec getting input from a real TCP connection.
-class CodecNetworkTest : public TestBaseWithParam<Network::Address::IpVersion> {
+class CodecNetworkTest : public testing::TestWithParam<Network::Address::IpVersion> {
 public:
   CodecNetworkTest() : api_(Api::createApiForTest()) {
     dispatcher_ = api_->allocateDispatcher();

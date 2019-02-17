@@ -12,10 +12,10 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Combine;
@@ -45,7 +45,7 @@ const size_t TRAILERS_SIZE = sizeof(TRAILERS) - 1;
 
 } // namespace
 
-class GrpcWebFilterTest : public TestBaseWithParam<std::tuple<std::string, std::string>> {
+class GrpcWebFilterTest : public testing::TestWithParam<std::tuple<std::string, std::string>> {
 public:
   GrpcWebFilterTest() {
     filter_.setDecoderFilterCallbacks(decoder_callbacks_);

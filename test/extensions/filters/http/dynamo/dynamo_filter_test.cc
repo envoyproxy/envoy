@@ -10,10 +10,10 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::NiceMock;
@@ -26,7 +26,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Dynamo {
 
-class DynamoFilterTest : public TestBase {
+class DynamoFilterTest : public testing::Test {
 public:
   void setup(bool enabled) {
     ON_CALL(loader_.snapshot_, featureEnabled("dynamodb.filter_enabled", 100))

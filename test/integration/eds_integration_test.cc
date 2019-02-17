@@ -5,14 +5,15 @@
 #include "test/config/utility.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/network_utility.h"
-#include "test/test_common/test_base.h"
+
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace {
 
 // Integration test for EDS features. EDS is consumed via filesystem
 // subscription.
-class EdsIntegrationTest : public TestBaseWithParam<Network::Address::IpVersion>,
+class EdsIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                            public HttpIntegrationTest {
 public:
   EdsIntegrationTest()

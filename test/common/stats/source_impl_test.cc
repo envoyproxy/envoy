@@ -3,7 +3,8 @@
 #include "common/stats/source_impl.h"
 
 #include "test/mocks/stats/mocks.h"
-#include "test/test_common/test_base.h"
+
+#include "gtest/gtest.h"
 
 using testing::NiceMock;
 using testing::ReturnPointee;

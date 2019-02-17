@@ -12,7 +12,7 @@ using testing::Invoke;
 namespace Envoy {
 namespace Server {
 
-class InitManagerImplTest : public TestBase {
+class InitManagerImplTest : public testing::Test {
 public:
   InitManagerImpl manager_;
   ReadyWatcher initialized_;

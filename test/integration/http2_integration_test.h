@@ -1,10 +1,11 @@
 #pragma once
 
 #include "test/integration/http_integration.h"
-#include "test/test_common/test_base.h"
+
+#include "gtest/gtest.h"
 
 namespace Envoy {
-class Http2IntegrationTest : public TestBaseWithParam<Network::Address::IpVersion>,
+class Http2IntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                              public HttpIntegrationTest {
 public:
   Http2IntegrationTest()

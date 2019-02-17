@@ -5,8 +5,9 @@
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/simulated_time_system.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
+
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::NiceMock;

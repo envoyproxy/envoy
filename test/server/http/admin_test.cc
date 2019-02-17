@@ -26,11 +26,11 @@
 #include "test/test_common/logging.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/match.h"
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::AllOf;
@@ -48,7 +48,7 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Server {
 
-class AdminStatsTest : public TestBaseWithParam<Network::Address::IpVersion> {
+class AdminStatsTest : public testing::TestWithParam<Network::Address::IpVersion> {
 public:
   AdminStatsTest() : alloc_(options_) {
     store_ = std::make_unique<Stats::ThreadLocalStoreImpl>(options_, alloc_);
@@ -71,7 +71,7 @@ public:
   std::unique_ptr<Stats::ThreadLocalStoreImpl> store_;
 };
 
-class AdminFilterTest : public TestBaseWithParam<Network::Address::IpVersion> {
+class AdminFilterTest : public testing::TestWithParam<Network::Address::IpVersion> {
 public:
   AdminFilterTest()
       : admin_(TestEnvironment::temporaryPath("envoy.prof"), server_),
@@ -588,7 +588,7 @@ TEST_P(AdminFilterTest, Trailers) {
   EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_.decodeTrailers(request_headers_));
 }
 
-class AdminInstanceTest : public TestBaseWithParam<Network::Address::IpVersion> {
+class AdminInstanceTest : public testing::TestWithParam<Network::Address::IpVersion> {
 public:
   AdminInstanceTest()
       : address_out_path_(TestEnvironment::temporaryPath("admin.address")),
@@ -1223,7 +1223,7 @@ private:
   histogram_t* histogram_;
 };
 
-class PrometheusStatsFormatterTest : public TestBase {
+class PrometheusStatsFormatterTest : public testing::Test {
 protected:
   void addCounter(const std::string& name, std::vector<Stats::Tag> cluster_tags) {
     std::string tname = std::string(name);

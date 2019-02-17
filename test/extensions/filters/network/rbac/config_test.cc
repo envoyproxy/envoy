@@ -3,10 +3,10 @@
 #include "extensions/filters/network/rbac/config.h"
 
 #include "test/mocks/server/mocks.h"
-#include "test/test_common/test_base.h"
 
 #include "fmt/printf.h"
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::NiceMock;
@@ -23,7 +23,7 @@ const std::string header = R"EOF(
 
 } // namespace
 
-class RoleBasedAccessControlNetworkFilterConfigFactoryTest : public TestBase {
+class RoleBasedAccessControlNetworkFilterConfigFactoryTest : public testing::Test {
 public:
   void validateRule(const std::string& policy_json) {
     checkRule(fmt::sprintf(policy_json, header));

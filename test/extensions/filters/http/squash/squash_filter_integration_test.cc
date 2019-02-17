@@ -16,7 +16,7 @@ using Envoy::Protobuf::util::MessageDifferencer;
 
 namespace Envoy {
 
-class SquashFilterIntegrationTest : public TestBaseWithParam<Network::Address::IpVersion>,
+class SquashFilterIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                     public HttpIntegrationTest {
 public:
   SquashFilterIntegrationTest()

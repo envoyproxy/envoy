@@ -12,11 +12,11 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "codec_impl_test_util.h"
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::AnyNumber;
@@ -34,7 +34,7 @@ namespace Http2 {
 using Http2SettingsTuple = ::testing::tuple<uint32_t, uint32_t, uint32_t, uint32_t>;
 using Http2SettingsTestParam = ::testing::tuple<Http2SettingsTuple, Http2SettingsTuple>;
 
-class Http2CodecImplTest : public TestBaseWithParam<Http2SettingsTestParam> {
+class Http2CodecImplTest : public testing::TestWithParam<Http2SettingsTestParam> {
 public:
   struct ConnectionWrapper {
     void dispatch(const Buffer::Instance& data, ConnectionImpl& connection) {

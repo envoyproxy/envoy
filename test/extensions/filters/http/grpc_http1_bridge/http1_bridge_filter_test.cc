@@ -6,10 +6,10 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::NiceMock;
@@ -22,7 +22,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GrpcHttp1Bridge {
 
-class GrpcHttp1BridgeFilterTest : public TestBase {
+class GrpcHttp1BridgeFilterTest : public testing::Test {
 public:
   GrpcHttp1BridgeFilterTest() {
     filter_.setDecoderFilterCallbacks(decoder_callbacks_);
