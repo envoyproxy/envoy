@@ -2466,7 +2466,7 @@ TEST_F(RouteMatcherTest, GrpcRetry) {
                 .retryOn());
 
   EXPECT_EQ(std::chrono::milliseconds(0),
-            config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+            config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
                 ->routeEntry()
                 ->retryPolicy()
                 .perTryTimeout());
@@ -2494,6 +2494,151 @@ TEST_F(RouteMatcherTest, GrpcRetry) {
                 ->routeEntry()
                 ->retryPolicy()
                 .retryOn());
+}
+
+TEST_F(RouteMatcherTest, HedgeRouteLevel) {
+  const std::string yaml = R"EOF(
+name: HedgeRouteLevel
+virtual_hosts:
+- domains: [www.lyft.com]
+  name: www
+  routes:
+  - match: {prefix: /foo}
+    route:
+      cluster: www
+      hedge_policy:
+        initial_requests: 3
+        additional_request_chance:
+          numerator: 4
+          denominator: HUNDRED
+  - match: {prefix: /bar}
+    route: {cluster: www}
+  - match: {prefix: /}
+    route:
+      cluster: www
+      hedge_policy:
+        hedge_on_per_try_timeout: true
+        initial_requests: 5
+        additional_request_chance:
+          numerator: 40
+          denominator: HUNDRED
+  )EOF";
+
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
+
+  EXPECT_EQ(3, config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+                   ->routeEntry()
+                   ->hedgePolicy()
+                   .initialRequests());
+  EXPECT_EQ(false, config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+                       ->routeEntry()
+                       ->hedgePolicy()
+                       .hedgeOnPerTryTimeout());
+  envoy::type::FractionalPercent percent =
+      config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+          ->routeEntry()
+          ->hedgePolicy()
+          .additionalRequestChance();
+  EXPECT_EQ(4, percent.numerator());
+  EXPECT_EQ(100, ProtobufPercentHelper::fractionalPercentDenominatorToInt(percent.denominator()));
+
+  EXPECT_EQ(1, config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
+                   ->routeEntry()
+                   ->hedgePolicy()
+                   .initialRequests());
+  EXPECT_EQ(false, config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
+                       ->routeEntry()
+                       ->hedgePolicy()
+                       .hedgeOnPerTryTimeout());
+  percent = config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
+                ->routeEntry()
+                ->hedgePolicy()
+                .additionalRequestChance();
+  EXPECT_EQ(0, percent.numerator());
+
+  EXPECT_EQ(5, config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
+                   ->routeEntry()
+                   ->hedgePolicy()
+                   .initialRequests());
+  EXPECT_EQ(true, config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
+                      ->routeEntry()
+                      ->hedgePolicy()
+                      .hedgeOnPerTryTimeout());
+  percent = config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
+                ->routeEntry()
+                ->hedgePolicy()
+                .additionalRequestChance();
+  EXPECT_EQ(40, percent.numerator());
+  EXPECT_EQ(100, ProtobufPercentHelper::fractionalPercentDenominatorToInt(percent.denominator()));
+}
+
+TEST_F(RouteMatcherTest, HedgeVirtualHostLevel) {
+  const std::string yaml = R"EOF(
+name: HedgeVirtualHostLevel
+virtual_hosts:
+- domains: [www.lyft.com]
+  name: www
+  hedge_policy: {initial_requests: 3}
+  routes:
+  - match: {prefix: /foo}
+    route:
+      cluster: www
+      hedge_policy: {hedge_on_per_try_timeout: true}
+  - match: {prefix: /bar}
+    route:
+      hedge_policy: {additional_request_chance: {numerator: 30.0, denominator: HUNDRED}}
+      cluster: www
+  - match: {prefix: /}
+    route: {cluster: www}
+  )EOF";
+
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
+
+  // Route level hedge policy takes precedence.
+  EXPECT_EQ(1, config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+                   ->routeEntry()
+                   ->hedgePolicy()
+                   .initialRequests());
+  EXPECT_EQ(true, config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+                      ->routeEntry()
+                      ->hedgePolicy()
+                      .hedgeOnPerTryTimeout());
+  envoy::type::FractionalPercent percent =
+      config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+          ->routeEntry()
+          ->hedgePolicy()
+          .additionalRequestChance();
+  EXPECT_EQ(0, percent.numerator());
+
+  // Virtual Host level hedge policy kicks in.
+  EXPECT_EQ(1, config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
+                   ->routeEntry()
+                   ->hedgePolicy()
+                   .initialRequests());
+  EXPECT_EQ(false, config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
+                       ->routeEntry()
+                       ->hedgePolicy()
+                       .hedgeOnPerTryTimeout());
+  percent = config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
+                ->routeEntry()
+                ->hedgePolicy()
+                .additionalRequestChance();
+  EXPECT_EQ(30, percent.numerator());
+  EXPECT_EQ(100, ProtobufPercentHelper::fractionalPercentDenominatorToInt(percent.denominator()));
+
+  EXPECT_EQ(3, config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
+                   ->routeEntry()
+                   ->hedgePolicy()
+                   .initialRequests());
+  EXPECT_EQ(false, config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
+                       ->routeEntry()
+                       ->hedgePolicy()
+                       .hedgeOnPerTryTimeout());
+  percent = config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
+                ->routeEntry()
+                ->hedgePolicy()
+                .additionalRequestChance();
+  EXPECT_EQ(0, percent.numerator());
 }
 
 TEST_F(RouteMatcherTest, TestBadDefaultConfig) {
