@@ -9,9 +9,9 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/environment.h"
-#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Invoke;
@@ -63,7 +63,7 @@ TEST(UUID, sanityCheckOfUniqueness) {
   EXPECT_EQ(num_of_uuids, uuids.size());
 }
 
-class DiskBackedLoaderImplTest : public TestBase {
+class DiskBackedLoaderImplTest : public testing::Test {
 protected:
   DiskBackedLoaderImplTest() : api_(Api::createApiForTest(store)) {}
 
@@ -273,7 +273,7 @@ TEST(LoaderImplTest, All) {
   testNewOverrides(loader, store);
 }
 
-class DiskLayerTest : public TestBase {
+class DiskLayerTest : public testing::Test {
 protected:
   DiskLayerTest() : api_(Api::createApiForTest()) {}
 
