@@ -17,7 +17,7 @@ GDB_RUNNER_SCRIPT = string.Template("""#!/usr/bin/env python
 import os
 
 env = ${b64env}
-for k, v in env.iteritems():
+for k, v in env.items():
   os.environ[k] = v
 
 os.system("${gdb} --fullname --args ${test_args}")
