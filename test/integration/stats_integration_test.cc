@@ -141,54 +141,42 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ClusterMemoryUtilization,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-//uint64_t memoryConsumedWithClusters(int num_clusters, bool allow_stats) {
-//    config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
-//        if (!allow_stats) {
-//            bootstrap.mutable_stats_config()->mutable_stats_matcher()->set_reject_all(true);
-//        }
-//        for (int i = 1; i < num_clusters; i++) {
-//            auto* c = bootstrap.mutable_static_resources()->add_clusters();
-//            c->set_name(fmt::format("cluster_{}", i));
-//        }
-//    });
-//
-//};
-
 // TODO(cmluciano) Refactor once envoyproxy/envoy#5624 is solved
 // TODO(cmluciano) Add options to measure multiple workers
 TEST_P(ClusterMemoryUtilization, MemoryLargeClusterSizeWithStats) {
-    const size_t start_mem = Memory::Stats::totalCurrentlyAllocated() / 1000;
-    if (start_mem == 0) {
-        // Skip this test for platforms where we can't measure memory.
-        return;
-    }
 
-    auto IpVersions = TestBaseWithParam<Network::Address::IpVersion>::GetParam();
+  const size_t start_mem = Memory::Stats::totalCurrentlyAllocated() / 1000;
+  if (start_mem == 0) {
+    // Skip this test for platforms where we can't measure memory.
+    return;
+  }
 
-    // HTTP_PROXY_CONFIG with 1 cluster
-    auto* t1 = new BaseIntegrationTest(IpVersions);
-    t1->initialize();
-    size_t m1 = Memory::Stats::totalCurrentlyAllocated();
-    EXPECT_LT(start_mem, m1);
-    EXPECT_EQ(m1, 57000);
-    delete t1;
+  auto IpVersions = TestBaseWithParam<Network::Address::IpVersion>::GetParam();
 
-    // HTTP_PROXY_CONFIG with 1001 clusters
-    std::string config = ConfigHelper::HTTP_PROXY_CONFIG;
-    auto* t2 = new BaseIntegrationTest(IpVersions,config);
-//    t2->config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
-//        for (int i = 1; i < 1001; i++) {
-//            auto* c = bootstrap.mutable_static_resources()->add_clusters();
-//            c->set_name(fmt::format("cluster_{}", i));
-//        }
-//    });
-    t2->initialize();
-    size_t m2 = Memory::Stats::totalCurrentlyAllocated();
-    EXPECT_LT(start_mem, m2);
-    EXPECT_EQ(m2, 57000);
-    size_t m_per_cluster = (m2 - m1) / 1000;
-    EXPECT_EQ(m_per_cluster, 57000);
-    delete t2;
+  auto t1 = std::make_unique<BaseIntegrationTest>(IpVersions);
+  t1->initialize();
+  size_t m1 = Memory::Stats::totalCurrentlyAllocated();
+  EXPECT_LT(start_mem, m1);
+  EXPECT_EQ(m1, 57000);
+  t1.reset(nullptr);
+
+  // HTTP_PROXY_CONFIG with 1001 clusters
+  std::string config = ConfigHelper::HTTP_PROXY_CONFIG;
+  auto t2 = std::make_unique<BaseIntegrationTest>(IpVersions, config);
+  //    t2->config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap)
+  //    {
+  //        for (int i = 1; i < 1001; i++) {
+  //            auto* c = bootstrap.mutable_static_resources()->add_clusters();
+  //            c->set_name(fmt::format("cluster_{}", i));
+  //        }
+  //    });
+  t2->initialize();
+  size_t m2 = Memory::Stats::totalCurrentlyAllocated();
+  EXPECT_LT(start_mem, m2);
+  EXPECT_EQ(m2, 57000);
+  size_t m_per_cluster = (m2 - m1) / 1000;
+  EXPECT_EQ(m_per_cluster, 57000);
+  t2.reset(nullptr);
 }
 
 } // namespace
