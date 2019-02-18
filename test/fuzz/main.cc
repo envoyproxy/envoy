@@ -72,8 +72,8 @@ int main(int argc, char** argv) {
     }
   }
   argc -= input_args;
-  for (size_t i = 0; i < Envoy::test_corpus_.size(); ++i) {
-    argv[i + 1] = argv[i + 1 + input_args];
+  for (ssize_t i = 1; i < argc; ++i) {
+    argv[i] = argv[i + input_args];
   }
 
   testing::InitGoogleTest(&argc, argv);
