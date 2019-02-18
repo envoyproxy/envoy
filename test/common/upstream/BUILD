@@ -40,6 +40,7 @@ envoy_cc_test(
         "//source/common/network:transport_socket_options_lib",
         "//source/common/network:utility_lib",
         "//source/common/stats:stats_lib",
+        "//source/common/upstream:cluster_factory_lib",
         "//source/common/upstream:cluster_manager_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/tls:context_lib",

@@ -51,10 +51,12 @@ envoy_cc_mock(
     deps = [
         ":load_balancer_context_mock",
         "//include/envoy/http:async_client_interface",
+        "//include/envoy/upstream:cluster_factory_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "//include/envoy/upstream:health_checker_interface",
         "//include/envoy/upstream:load_balancer_interface",
         "//include/envoy/upstream:upstream_interface",
+        "//source/common/upstream:cluster_factory_lib",
         "//source/common/upstream:health_discovery_service_lib",
         "//source/common/upstream:upstream_lib",
         "//test/mocks/config:config_mocks",

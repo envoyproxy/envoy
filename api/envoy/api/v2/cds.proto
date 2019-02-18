@@ -51,7 +51,7 @@ service ClusterDiscoveryService {
 // [#protodoc-title: Clusters]
 
 // Configuration for a single upstream cluster.
-// [#comment:next free field: 38]
+// [#comment:next free field: 40]
 message Cluster {
   // Supplies the name of the cluster which must be unique across all clusters.
   // The cluster name is used when emitting
@@ -563,6 +563,13 @@ message Cluster {
   // If this flag is not set to true, Envoy will wait until the hosts fail active health
   // checking before removing it from the cluster.
   bool drain_connections_on_host_removal = 32;
+
+  // The type of the cluster to instantiate. The name must match a supported cluster type.
+  string cluster_type = 38;
+
+  // Cluster specific configuration which depends on the cluster being instantiated.
+  // See the supported cluster for further documentation.
+  google.protobuf.Struct cluster_config = 39;
 }
 
 // An extensible structure containing the address Envoy should bind to when

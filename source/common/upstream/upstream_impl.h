@@ -656,6 +656,8 @@ private:
   uint64_t pending_initialize_health_checks_{};
 };
 
+typedef std::shared_ptr<ClusterImplBase> ClusterImplBaseSharedPtr;
+
 /**
  * Manages PriorityState of a cluster. PriorityState is a per-priority binding of a set of hosts
  * with its corresponding locality weight map. This is useful to store priorities/hosts/localities

@@ -147,3 +147,25 @@ envoy_cc_library(
         "//include/envoy/ssl:context_manager_interface",
     ],
 )
+
+envoy_cc_library(
+    name = "cluster_factory_interface",
+    hdrs = ["cluster_factory.h"],
+    deps = [
+        ":cluster_manager_interface",
+        ":health_check_host_monitor_interface",
+        ":load_balancer_type_interface",
+        ":locality_lib",
+        ":resource_manager_interface",
+        ":upstream_interface",
+        "//include/envoy/common:callback",
+        "//include/envoy/config:typed_metadata_interface",
+        "//include/envoy/http:codec_interface",
+        "//include/envoy/network:connection_interface",
+        "//include/envoy/network:transport_socket_interface",
+        "//include/envoy/runtime:runtime_interface",
+        "//include/envoy/ssl:context_interface",
+        "//include/envoy/ssl:context_manager_interface",
+        "@envoy_api//envoy/api/v2:cds_cc",
+    ],
+)
