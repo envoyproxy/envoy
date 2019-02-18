@@ -4,8 +4,8 @@
 #include "envoy/config/filter/network/zookeeper_proxy/v1alpha1/zookeeper_proxy.pb.validate.h"
 
 #include "extensions/filters/network/common/factory_base.h"
-#include "extensions/filters/network/zookeeper_proxy/zookeeper_filter.h"
 #include "extensions/filters/network/well_known_names.h"
+#include "extensions/filters/network/zookeeper_proxy/zookeeper_filter.h"
 
 namespace Envoy {
 namespace Extensions {

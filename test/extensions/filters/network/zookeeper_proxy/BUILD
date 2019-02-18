@@ -25,4 +25,3 @@ envoy_extension_cc_test(
         "//test/mocks/network:network_mocks",
     ],
 )
-
