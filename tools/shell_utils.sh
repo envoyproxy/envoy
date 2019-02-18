@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 source_venv() {
   VENV_DIR=$1
   if [[ "$VIRTUAL_ENV" == "" ]]; then

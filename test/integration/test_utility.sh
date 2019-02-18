@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Helper script for bash integration tests, intended to be source'd from the
 # _test.sh.
 #
