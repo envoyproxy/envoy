@@ -36,7 +36,7 @@ public:
   static std::chrono::milliseconds readDate(Buffer::Instance& buffer);
   static std::string readByte(Buffer::Instance& buffer);
 
-  static void writeString(Buffer::Instance& buffer, const std::string& str);
+  static void writeString(Buffer::Instance& buffer, const absl::string_view& str);
 };
 
 } // namespace DubboProxy

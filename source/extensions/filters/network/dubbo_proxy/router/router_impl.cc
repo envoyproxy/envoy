@@ -194,11 +194,13 @@ Network::FilterStatus Router::UpstreamRequest::start() {
 
 void Router::UpstreamRequest::resetStream() {
   if (conn_pool_handle_) {
+    ASSERT(!conn_data_);
     conn_pool_handle_->cancel(Tcp::ConnectionPool::CancelPolicy::Default);
     conn_pool_handle_ = nullptr;
   }
 
-  if (conn_data_ != nullptr) {
+  if (conn_data_) {
+    ASSERT(!conn_pool_handle_);
     conn_data_->connection().close(Network::ConnectionCloseType::NoFlush);
     conn_data_.reset();
   }
@@ -297,21 +299,25 @@ void Router::UpstreamRequest::onResetStream(Tcp::ConnectionPool::PoolFailureReas
   case Tcp::ConnectionPool::PoolFailureReason::LocalConnectionFailure:
     // Should only happen if we closed the connection, due to an error condition, in which case
     // we've already handled any possible downstream response.
-    parent_.callbacks_->resetDownstreamConnection();
+    parent_.callbacks_->sendLocalReply(
+        AppException(ResponseStatus::ServerError,
+                     fmt::format("dubbo upstream request: local connection failure '{}'",
+                                 upstream_host_->address()->asString())),
+        false);
     break;
   case Tcp::ConnectionPool::PoolFailureReason::RemoteConnectionFailure:
+    parent_.callbacks_->sendLocalReply(
+        AppException(ResponseStatus::ServerError,
+                     fmt::format("dubbo upstream request: remote connection failure '{}'",
+                                 upstream_host_->address()->asString())),
+        false);
+    break;
   case Tcp::ConnectionPool::PoolFailureReason::Timeout:
-    if (!response_started_) {
-      parent_.callbacks_->sendLocalReply(
-          AppException(ResponseStatus::ServerError,
-                       fmt::format("dubbo upstream request: connection failure '{}'",
-                                   upstream_host_->address()->asString())),
-          false);
-      return;
-    }
-
-    // Error occurred after a partial response, propagate the reset to the downstream.
-    parent_.callbacks_->resetDownstreamConnection();
+    parent_.callbacks_->sendLocalReply(
+        AppException(ResponseStatus::ServerError,
+                     fmt::format("dubbo upstream request: connection failure '{}' due to timeout",
+                                 upstream_host_->address()->asString())),
+        false);
     break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
