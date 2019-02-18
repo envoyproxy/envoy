@@ -64,8 +64,6 @@ void DecoderImpl::decode(Buffer::Instance& data, uint64_t& offset) {
 }
 
 void DecoderImpl::parseConnect(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
-  bool readonly{};
-
   if (len < 28) {
     return;
   }
@@ -76,6 +74,7 @@ void DecoderImpl::parseConnect(Buffer::Instance& data, uint64_t& offset, uint32_
   BufferHelper::peekString(data, offset, passwd);
 
   // Read readonly flag, if it's there.
+  bool readonly{};
   BufferHelper::peekBool(data, offset, readonly);
 
   callbacks_.onConnect(readonly);
