@@ -123,7 +123,7 @@ void bufferAction(Context& ctxt, Buffer::OwnedImpl buffers[],
         break;
       }
       shrink_length -= available;
-      --allocated_slices;
+      slices[allocated_slices - 1].len_ = 0;
     }
     target_buffer.commit(slices, allocated_slices);
     ASSERT(previous_length + target_length == target_buffer.length());
