@@ -12,7 +12,7 @@
 
 namespace quic {
 
-/** The implementation fo reference counted object is merely wrapping
+/** The implementation of reference counted object is merely wrapping
  * std::shared_ptr. So QuicReferenceCountedImpl class does not do anything
  * related to reference counting as shared_ptr already takes care of that. But
  * it customizes destruction to provide a interface for shared_ptr to destroy
