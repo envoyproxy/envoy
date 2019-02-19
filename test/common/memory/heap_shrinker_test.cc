@@ -69,7 +69,7 @@ TEST_F(HeapShrinkerTest, ShrinkWhenTriggered) {
 #ifdef TCMALLOC
   EXPECT_GT(physical_mem_before_shrink, physical_mem_after_shrink);
 #else
-  EXPECT_GE(physical_mem_before_shrink, physical_mem_after_shrink);
+  EXPECT_EQ(physical_mem_before_shrink, physical_mem_after_shrink);
 #endif
   Stats::dumpStatsToLog();
 

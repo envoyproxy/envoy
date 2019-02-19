@@ -43,10 +43,10 @@ uint64_t Stats::totalPageHeapUnmapped() {
 }
 
 void Stats::dumpStatsToLog() {
-  static const int kBufferSize = 3 << 20;
-  auto buffer = std::make_unique<char[]>(kBufferSize);
-  MallocExtension::instance()->GetStats(buffer.get(), kBufferSize);
-  ENVOY_LOG_MISC(info, "TCMalloc stats:\n{}", buffer.get());
+  constexpr int buffer_size = 3 << 20;
+  auto buffer = std::make_unique<char[]>(buffer_size);
+  MallocExtension::instance()->GetStats(buffer.get(), buffer_size);
+  ENVOY_LOG_MISC(debug, "TCMalloc stats:\n{}", buffer.get());
 }
 
 } // namespace Memory
