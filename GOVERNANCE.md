@@ -64,8 +64,7 @@
   being actively covered by someone.
 * The on-call rotation is tracked at Opsgenie. The calendar is visible
 [here](https://calendar.google.com/calendar/embed?src=ms6efr2erlvum9aolnvg1688cd3mu85e%40import.calendar.google.com&ctz=America%2FNew_York)
-or you can subscribe to the iCal feed
-[here] (https://app.opsgenie.com/webcal/getRecentSchedule?webcalToken=75f2990470ca21de1033ecf4586bea1e40bae32bf3c39e2289f6186da1904ee0&scheduleId=a3505963-c064-4c97-8865-947dfcb06060)
+or you can subscribe to the iCal feed [here](https://app.opsgenie.com/webcal/getRecentSchedule?webcalToken=75f2990470ca21de1033ecf4586bea1e40bae32bf3c39e2289f6186da1904ee0&scheduleId=a3505963-c064-4c97-8865-947dfcb06060)
 
 ## Cutting a release
 
