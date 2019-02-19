@@ -105,25 +105,27 @@ void bufferAction(Context& ctxt, Buffer::OwnedImpl buffers[],
     }
     constexpr uint32_t reserve_slices = 16;
     Buffer::RawSlice slices[reserve_slices];
-    uint32_t allocated_slices = target_buffer.reserve(reserve_length, slices, reserve_slices);
+    const uint32_t allocated_slices = target_buffer.reserve(reserve_length, slices, reserve_slices);
     uint32_t allocated_length = 0;
     for (uint32_t i = 0; i < allocated_slices; ++i) {
       ::memset(slices[i].mem_, 'c', slices[i].len_);
       allocated_length += slices[i].len_;
     }
+    ASSERT(reserve_length <= allocated_length);
     const uint32_t target_length =
-        std::min(allocated_length, action.reserve_commit().commit_length());
+        std::min(reserve_length, action.reserve_commit().commit_length());
     uint32_t shrink_length = allocated_length;
+    int32_t shrink_slice = allocated_slices - 1;
     while (shrink_length > target_length) {
-      ASSERT(allocated_slices > 0);
-      const uint32_t available = slices[allocated_slices - 1].len_;
+      ASSERT(shrink_slice >= 0);
+      const uint32_t available = slices[shrink_slice].len_;
       const uint32_t remainder = shrink_length - target_length;
-      if (available > remainder) {
-        slices[allocated_slices - 1].len_ -= remainder;
+      if (available >= remainder) {
+        slices[shrink_slice].len_ -= remainder;
         break;
       }
       shrink_length -= available;
-      slices[allocated_slices - 1].len_ = 0;
+      slices[shrink_slice--].len_ = 0;
     }
     target_buffer.commit(slices, allocated_slices);
     ASSERT(previous_length + target_length == target_buffer.length());
@@ -229,6 +231,7 @@ DEFINE_PROTO_FUZZER(const test::common::buffer::BufferFuzzTestCase& input) {
     bufferAction(ctxt, linear_buffers, action);
     // Verification pass, only non-mutating methods for buffers.
     for (uint32_t j = 0; j < BufferCount; ++j) {
+      ASSERT(buffers[j].toString() == linear_buffers[j].toString());
       // Linearize shadow buffer, compare equal toString() and size().
       linear_buffers[j].linearize(linear_buffers[j].length());
       if (buffers[j].toString() != linear_buffers[j].toString()) {
