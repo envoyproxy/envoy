@@ -207,7 +207,6 @@ HttpIntegrationTest::HttpIntegrationTest(Http::CodecClient::Type downstream_prot
                                          Network::Address::IpVersion version,
                                          const std::string& config)
     : HttpIntegrationTest::HttpIntegrationTest(downstream_protocol,
-                                               /*upstream_address_fn=*/
                                                [version](int) {
                                                  return Network::Utility::parseInternetAddress(
                                                      Network::Test::getAnyAddressString(version),

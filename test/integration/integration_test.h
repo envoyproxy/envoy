@@ -16,7 +16,6 @@ class UpstreamEndpointIntegrationTest : public TestBaseWithParam<Network::Addres
 public:
   UpstreamEndpointIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1,
-                            /*upstream_address_fn=*/
                             [](int) {
                               return Network::Utility::parseInternetAddress(
                                   Network::Test::getAnyAddressString(GetParam()), 0);
