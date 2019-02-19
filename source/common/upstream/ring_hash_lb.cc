@@ -70,8 +70,10 @@ HostConstSharedPtr RingHashLoadBalancer::Ring::chooseHost(uint64_t h) const {
 //                      Maglev LB can use it (see #5982).
 namespace {
 
+typedef std::vector<std::pair<HostConstSharedPtr, double>> NormalizedHostWeightVector;
+
 void normalizeHostWeights(const HostVector& hosts, double normalized_locality_weight,
-                          std::unordered_map<HostConstSharedPtr, double>& normalized_weights,
+                          NormalizedHostWeightVector& normalized_weights,
                           double& min_normalized_weight) {
   uint32_t sum = 0;
   for (const auto& host : hosts) {
@@ -80,14 +82,14 @@ void normalizeHostWeights(const HostVector& hosts, double normalized_locality_we
 
   for (const auto& host : hosts) {
     const double weight = host->weight() * normalized_locality_weight / sum;
-    normalized_weights[host] = weight;
+    normalized_weights.push_back({host, weight});
     min_normalized_weight = std::min(min_normalized_weight, weight);
   }
 }
 
 void normalizeLocalityWeights(const HostsPerLocality& hosts_per_locality,
                               const LocalityWeights& locality_weights,
-                              std::unordered_map<HostConstSharedPtr, double>& normalized_weights,
+                              NormalizedHostWeightVector& normalized_weights,
                               double& min_normalized_weight) {
   ASSERT(locality_weights.size() == hosts_per_locality.get().size());
 
@@ -114,7 +116,7 @@ void normalizeLocalityWeights(const HostsPerLocality& hosts_per_locality,
 }
 
 void normalizeWeights(const HostSet& host_set, bool in_panic,
-                      std::unordered_map<HostConstSharedPtr, double>& normalized_weights,
+                      NormalizedHostWeightVector& normalized_weights,
                       double& min_normalized_weight) {
   if (host_set.localityWeights() == nullptr || host_set.localityWeights()->empty()) {
     // If we're not dealing with locality weights, just normalize weights for the flat set of hosts.
@@ -155,7 +157,7 @@ RingHashLoadBalancer::Ring::Ring(
   }
 
   // Normalize weights, such that the sum of all weights = 1.
-  std::unordered_map<HostConstSharedPtr, double> normalized_weights;
+  NormalizedHostWeightVector normalized_weights;
   double min_normalized_weight = 1.0;
   normalizeWeights(host_set, in_panic, normalized_weights, min_normalized_weight);
 
