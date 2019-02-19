@@ -25,7 +25,7 @@ namespace HealthCheckers {
 namespace RedisHealthChecker {
 
 class RedisHealthCheckerTest
-    : public TestBase,
+    : public testing::Test,
       public Extensions::NetworkFilters::RedisProxy::ConnPool::ClientFactory {
 public:
   RedisHealthCheckerTest()

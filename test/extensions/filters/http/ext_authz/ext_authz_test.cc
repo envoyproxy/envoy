@@ -25,10 +25,10 @@
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::InSequence;
@@ -81,11 +81,12 @@ public:
   }
 };
 
-class HttpFilterTest : public HttpFilterTestBase<TestBase> {};
+class HttpFilterTest : public HttpFilterTestBase<testing::Test> {};
 
 using CreateFilterConfigFunc = envoy::config::filter::http::ext_authz::v2::ExtAuthz();
 
-class HttpFilterTestParam : public HttpFilterTestBase<TestBaseWithParam<CreateFilterConfigFunc*>> {
+class HttpFilterTestParam
+    : public HttpFilterTestBase<testing::TestWithParam<CreateFilterConfigFunc*>> {
 public:
   void SetUp() override { initialize(""); }
 };

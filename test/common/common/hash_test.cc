@@ -1,6 +1,6 @@
 #include "common/common/hash.h"
 
-#include "test/test_common/test_base.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 TEST(Hash, xxHash) {

@@ -1,5 +1,6 @@
 #include "test/common/config/grpc_subscription_test_harness.h"
-#include "test/test_common/test_base.h"
+
+#include "gtest/gtest.h"
 
 using testing::InSequence;
 
@@ -7,7 +8,7 @@ namespace Envoy {
 namespace Config {
 namespace {
 
-class GrpcSubscriptionImplTest : public TestBase, public GrpcSubscriptionTestHarness {};
+class GrpcSubscriptionImplTest : public testing::Test, public GrpcSubscriptionTestHarness {};
 
 // Validate that stream creation results in a timer based retry and can recover.
 TEST_F(GrpcSubscriptionImplTest, StreamCreationFailure) {
