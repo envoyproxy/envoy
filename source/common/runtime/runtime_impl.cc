@@ -209,15 +209,16 @@ bool SnapshotImpl::featureEnabled(const std::string& key,
   if (entry != values_.end() && entry->second.fractional_percent_value_.has_value()) {
     percent = entry->second.fractional_percent_value_.value();
   } else if (entry != values_.end() && entry->second.uint_value_.has_value()) {
-    // The runtime value must have been specified as an integer rather than a
-    // fractional percent proto. To preserve legacy semantics, we'll assume
-    // this represents a percentage (i.e. denominator of 100).
+    // Check for > 100 because the runtime value is assumed to be specified as
+    // an integer, and it also ensures that truncating the uint64_t runtime
+    // value into a uint32_t percent numerator later is safe
     if (entry->second.uint_value_.value() > 100) {
       return true;
     }
 
-    // Putting the uint64_t runtime value into the uint32_t numerator is safe
-    // because of the > 100 check above
+    // The runtime value was specified as an integer rather than a fractional
+    // percent proto. To preserve legacy semantics, we treat it as a percentage
+    // (i.e. denominator of 100).
     percent.set_numerator(entry->second.uint_value_.value());
     percent.set_denominator(envoy::type::FractionalPercent::HUNDRED);
   } else {
