@@ -1,8 +1,8 @@
 #include "test/extensions/transport_sockets/tls/ssl_test_utility.h"
 #include "test/test_common/logging.h"
-#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 #include "quiche/quic/platform/api/quic_aligned.h"
 #include "quiche/quic/platform/api/quic_arraysize.h"
 #include "quiche/quic/platform/api/quic_cert_utils.h"

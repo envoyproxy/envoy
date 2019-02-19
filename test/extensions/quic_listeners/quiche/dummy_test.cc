@@ -1,7 +1,6 @@
 #include "extensions/quic_listeners/quiche/dummy.h"
 
-#include "test/test_common/test_base.h"
-
+#include "gtest/gtest.h"
 #include "quiche/http2/platform/api/http2_string.h"
 
 namespace Envoy {
