@@ -1,13 +1,14 @@
 #include "extensions/filters/http/well_known_names.h"
 
 #include "test/integration/http_integration.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
+
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace {
 
-class LuaIntegrationTest : public TestBaseWithParam<Network::Address::IpVersion>,
+class LuaIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                            public HttpIntegrationTest {
 public:
   LuaIntegrationTest()

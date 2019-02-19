@@ -128,6 +128,7 @@ cc_library(
         "quiche/quic/platform/api/quic_map_util.h",
         "quiche/quic/platform/api/quic_prefetch.h",
         "quiche/quic/platform/api/quic_ptr_util.h",
+        "quiche/quic/platform/api/quic_reference_counted.h",
         "quiche/quic/platform/api/quic_stack_trace.h",
         "quiche/quic/platform/api/quic_string.h",
         "quiche/quic/platform/api/quic_string_piece.h",
@@ -154,7 +155,6 @@ cc_library(
         # "quiche/quic/platform/api/quic_mem_slice_storage.h",
         # "quiche/quic/platform/api/quic_mock_log.h",
         # "quiche/quic/platform/api/quic_pcc_sender.h",
-        # "quiche/quic/platform/api/quic_reference_counted.h",
         # "quiche/quic/platform/api/quic_server_stats.h",
         # "quiche/quic/platform/api/quic_singleton.h",
         # "quiche/quic/platform/api/quic_socket_address.h",
@@ -197,6 +197,7 @@ cc_library(
 envoy_cc_test(
     name = "quic_platform_test",
     srcs = [
+        "quiche/quic/platform/api/quic_reference_counted_test.cc",
         "quiche/quic/platform/api/quic_string_utils_test.cc",
         "quiche/quic/platform/api/quic_text_utils_test.cc",
     ],

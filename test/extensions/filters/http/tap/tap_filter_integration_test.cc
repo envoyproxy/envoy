@@ -1,14 +1,14 @@
 #include "envoy/data/tap/v2alpha/wrapper.pb.h"
 
 #include "test/integration/http_integration.h"
-#include "test/test_common/test_base.h"
 
 #include "absl/strings/match.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace {
 
-class TapIntegrationTest : public TestBaseWithParam<Network::Address::IpVersion>,
+class TapIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                            public HttpIntegrationTest {
 public:
   TapIntegrationTest()

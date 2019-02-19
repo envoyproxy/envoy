@@ -39,6 +39,11 @@ public:
    *                  swapped out by the OS, they also count towards physical memory usage.
    */
   static uint64_t totalPageHeapFree();
+
+  /**
+   * Log detailed stats about current memory allocation. Intended for debugging purposes.
+   */
+  static void dumpStatsToLog();
 };
 
 } // namespace Memory
