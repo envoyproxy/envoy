@@ -10,6 +10,7 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/http/header_map.h"
+#include "envoy/network/address.h"
 #include "envoy/registry/registry.h"
 
 #include "common/api/api_impl.h"
@@ -206,8 +207,22 @@ HttpIntegrationTest::makeHttpConnection(Network::ClientConnectionPtr&& conn) {
 HttpIntegrationTest::HttpIntegrationTest(Http::CodecClient::Type downstream_protocol,
                                          Network::Address::IpVersion version,
                                          const std::string& config)
-    : BaseIntegrationTest(version, config), downstream_protocol_(downstream_protocol) {
-  // Legacy integration tests expect the default listener to be named "http" for lookupPort calls.
+    : HttpIntegrationTest::HttpIntegrationTest(downstream_protocol,
+                                               [version](int) {
+                                                 return Network::Utility::parseInternetAddress(
+                                                     Network::Test::getAnyAddressString(version),
+                                                     0);
+                                               },
+                                               version, config) {}
+
+HttpIntegrationTest::HttpIntegrationTest(Http::CodecClient::Type downstream_protocol,
+                                         const InstanceConstSharedPtrFn& upstream_address_fn,
+                                         Network::Address::IpVersion version,
+                                         const std::string& config)
+    : BaseIntegrationTest(upstream_address_fn, version, config),
+      downstream_protocol_(downstream_protocol) {
+  // Legacy integration tests expect the default listener to be named "http" for
+  // lookupPort calls.
   config_helper_.renameListener("http");
   config_helper_.setClientCodec(typeToCodecType(downstream_protocol_));
 }
