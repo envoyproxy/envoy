@@ -155,6 +155,7 @@ Api::SysCallIntResult OwnedImpl::read(int fd, uint64_t max_length) {
 }
 
 uint64_t OwnedImpl::reserve(uint64_t length, RawSlice* iovecs, uint64_t num_iovecs) {
+  ASSERT(length > 0);
   int ret = evbuffer_reserve_space(buffer_.get(), length, reinterpret_cast<evbuffer_iovec*>(iovecs),
                                    num_iovecs);
   RELEASE_ASSERT(ret >= 1, "Failure to allocate may result in callers writing to uninitialized "

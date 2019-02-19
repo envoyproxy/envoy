@@ -1,3 +1,6 @@
+#include <fcntl.h>
+#include <unistd.h>
+
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 #include "common/common/logger.h"
@@ -28,8 +31,9 @@ constexpr uint32_t MaxAllocation = 16 * 1024 * 1024;
 
 uint32_t clampSize(uint32_t size) { return std::min(size, MaxAllocation); }
 
-const std::function<void(const void*, size_t, const Buffer::BufferFragmentImpl*)>
-    DoNotReleaseFragment = nullptr;
+void releaseFragmentAllocation(const void* p, size_t, const Buffer::BufferFragmentImpl*) {
+  ::free(const_cast<void*>(p));
+}
 
 // Process a single buffer operation.
 void bufferAction(Context& ctxt, Buffer::OwnedImpl buffers[],
@@ -41,13 +45,14 @@ void bufferAction(Context& ctxt, Buffer::OwnedImpl buffers[],
   case test::common::buffer::Action::kAddBufferFragment: {
     const uint32_t size = clampSize(action.add_buffer_fragment());
     void* p = ::malloc(size);
-    ASSERT_NE(p, nullptr);
+    ASSERT(p != nullptr);
     ::memset(p, 'b', size);
-    auto fragment = std::make_unique<Buffer::BufferFragmentImpl>(p, size, DoNotReleaseFragment);
+    auto fragment =
+        std::make_unique<Buffer::BufferFragmentImpl>(p, size, releaseFragmentAllocation);
     ctxt.fragments_.emplace_back(std::move(fragment));
     const uint32_t previous_length = target_buffer.length();
     target_buffer.addBufferFragment(*ctxt.fragments_.back());
-    ASSERT_EQ(previous_length, target_buffer.search(p, size, 0));
+    ASSERT(previous_length == target_buffer.search(p, size, previous_length));
     break;
   }
   case test::common::buffer::Action::kAddString: {
@@ -56,7 +61,8 @@ void bufferAction(Context& ctxt, Buffer::OwnedImpl buffers[],
     ctxt.strings_.emplace_back(std::move(string));
     const uint32_t previous_length = target_buffer.length();
     target_buffer.add(absl::string_view(*ctxt.strings_.back()));
-    ASSERT_EQ(previous_length, target_buffer.search(ctxt.strings_.back()->data(), size, 0));
+    ASSERT(previous_length ==
+           target_buffer.search(ctxt.strings_.back()->data(), size, previous_length));
     break;
   }
   case test::common::buffer::Action::kAddBuffer: {
@@ -68,8 +74,8 @@ void bufferAction(Context& ctxt, Buffer::OwnedImpl buffers[],
     const std::string source_contents = source_buffer.toString();
     const uint32_t previous_length = target_buffer.length();
     target_buffer.add(source_buffer);
-    ASSERT_EQ(previous_length,
-              target_buffer.search(source_contents.data(), source_contents.size(), 0));
+    ASSERT(previous_length ==
+           target_buffer.search(source_contents.data(), source_contents.size(), previous_length));
     break;
   }
   case test::common::buffer::Action::kPrependString: {
@@ -77,7 +83,7 @@ void bufferAction(Context& ctxt, Buffer::OwnedImpl buffers[],
     auto string = std::make_unique<std::string>(size, 'a');
     ctxt.strings_.emplace_back(std::move(string));
     target_buffer.prepend(absl::string_view(*ctxt.strings_.back()));
-    ASSERT_EQ(0, target_buffer.search(ctxt.strings_.back()->data(), size, 0));
+    ASSERT(target_buffer.search(ctxt.strings_.back()->data(), size, 0) == 0);
     break;
   }
   case test::common::buffer::Action::kPrependBuffer: {
@@ -88,12 +94,15 @@ void bufferAction(Context& ctxt, Buffer::OwnedImpl buffers[],
     Buffer::OwnedImpl& source_buffer = buffers[source_index];
     const std::string source_contents = source_buffer.toString();
     target_buffer.prepend(source_buffer);
-    ASSERT_EQ(0, target_buffer.search(source_contents.data(), source_contents.size(), 0));
+    ASSERT(target_buffer.search(source_contents.data(), source_contents.size(), 0) == 0);
     break;
   }
   case test::common::buffer::Action::kReserveCommit: {
     const uint32_t previous_length = target_buffer.length();
     const uint32_t reserve_length = clampSize(action.reserve_commit().reserve_length());
+    if (reserve_length == 0) {
+      break;
+    }
     constexpr uint32_t reserve_slices = 16;
     Buffer::RawSlice slices[reserve_slices];
     uint32_t allocated_slices = target_buffer.reserve(reserve_length, slices, reserve_slices);
@@ -117,18 +126,19 @@ void bufferAction(Context& ctxt, Buffer::OwnedImpl buffers[],
       --allocated_slices;
     }
     target_buffer.commit(slices, allocated_slices);
-    ASSERT_EQ(previous_length + target_length, target_buffer.length());
+    ASSERT(previous_length + target_length == target_buffer.length());
     break;
   }
   case test::common::buffer::Action::kCopyOut: {
-    const uint32_t start = action.copy_out().start() % target_buffer.length();
+    const uint32_t start =
+        std::min(action.copy_out().start(), static_cast<uint32_t>(target_buffer.length()));
     uint8_t copy_buffer[2 * 1024 * 1024];
     const uint32_t length =
-        std::min(static_cast<uint32_t>(target_buffer.length()),
+        std::min(static_cast<uint32_t>(target_buffer.length() - start),
                  std::min(action.copy_out().length(), static_cast<uint32_t>(sizeof(copy_buffer))));
     target_buffer.copyOut(start, length, copy_buffer);
     const std::string contents = target_buffer.toString();
-    ASSERT_EQ(0, ::memcmp(copy_buffer, contents.data(), length));
+    ASSERT(::memcmp(copy_buffer, contents.data() + start, length) == 0);
     break;
   }
   case test::common::buffer::Action::kDrain: {
@@ -136,12 +146,19 @@ void bufferAction(Context& ctxt, Buffer::OwnedImpl buffers[],
     const uint32_t drain_length =
         std::min(static_cast<uint32_t>(target_buffer.length()), action.drain());
     target_buffer.drain(drain_length);
-    ASSERT_EQ(previous_length - drain_length, target_buffer.length());
+    ASSERT(previous_length - drain_length == target_buffer.length());
     break;
   }
   case test::common::buffer::Action::kLinearize: {
-    target_buffer.linearize(
-        std::min(static_cast<uint32_t>(target_buffer.length()), action.linearize()));
+    const uint32_t linearize_size =
+        std::min(static_cast<uint32_t>(target_buffer.length()), action.linearize());
+    target_buffer.linearize(linearize_size);
+    Buffer::RawSlice slices[1];
+    const uint64_t slices_used = target_buffer.getRawSlices(slices, 1);
+    if (linearize_size > 0) {
+      ASSERT(slices_used == 1);
+      ASSERT(slices[0].len_ >= linearize_size);
+    }
     break;
   }
   case test::common::buffer::Action::kMove: {
@@ -159,25 +176,32 @@ void bufferAction(Context& ctxt, Buffer::OwnedImpl buffers[],
     break;
   }
   case test::common::buffer::Action::kRead: {
-    int pipe_fds[2] = {0, 0};
-    ASSERT_EQ(0, pipe(pipe_fds));
     const uint32_t max_length = clampSize(action.read());
+    if (max_length == 0) {
+      break;
+    }
+    int pipe_fds[2] = {0, 0};
+    ASSERT(::pipe(pipe_fds) == 0);
+    ASSERT(::fcntl(pipe_fds[0], F_SETFL, O_NONBLOCK) == 0);
+    ASSERT(::fcntl(pipe_fds[1], F_SETFL, O_NONBLOCK) == 0);
     std::string data(max_length, 'd');
-    const uint32_t previous_length = target_buffer.length();
-    ASSERT_GT(::write(pipe_fds[1], data.data(), max_length), 0);
-    ASSERT_EQ(target_buffer.read(pipe_fds[0], max_length).rc_, max_length);
-    ASSERT_EQ(previous_length, target_buffer.search(data.data(), data.size(), 0));
-    ASSERT_EQ(::close(pipe_fds[0]), 0);
-    ASSERT_EQ(::close(pipe_fds[1]), 0);
+    const int rc = ::write(pipe_fds[1], data.data(), max_length);
+    ASSERT(rc > 0);
+    ASSERT(target_buffer.read(pipe_fds[0], max_length).rc_ == rc);
+    ASSERT(::close(pipe_fds[0]) == 0);
+    ASSERT(::close(pipe_fds[1]) == 0);
     break;
   }
   case test::common::buffer::Action::kWrite: {
     int pipe_fds[2] = {0, 0};
-    ASSERT_EQ(0, pipe(pipe_fds));
-    const uint32_t previous_length = target_buffer.length();
-    ASSERT_EQ(target_buffer.write(pipe_fds[1]).rc_, previous_length);
-    ASSERT_EQ(::close(pipe_fds[0]), 0);
-    ASSERT_EQ(::close(pipe_fds[1]), 0);
+    ASSERT(::pipe(pipe_fds) == 0);
+    ASSERT(::fcntl(pipe_fds[0], F_SETFL, O_NONBLOCK) == 0);
+    ASSERT(::fcntl(pipe_fds[1], F_SETFL, O_NONBLOCK) == 0);
+    const bool empty = target_buffer.length() == 0;
+    const int rc = target_buffer.write(pipe_fds[1]).rc_;
+    ASSERT(empty ? rc == 0 : rc > 0);
+    ASSERT(::close(pipe_fds[0]) == 0);
+    ASSERT(::close(pipe_fds[1]) == 0);
     break;
   }
   default:
@@ -207,13 +231,18 @@ DEFINE_PROTO_FUZZER(const test::common::buffer::BufferFuzzTestCase& input) {
     for (uint32_t j = 0; j < BufferCount; ++j) {
       // Linearize shadow buffer, compare equal toString() and size().
       linear_buffers[j].linearize(linear_buffers[j].length());
-      ASSERT_EQ(buffers[j].length(), linear_buffers[j].length());
-      ASSERT_EQ(buffers[j].toString(), linear_buffers[j].toString());
+      if (buffers[j].toString() != linear_buffers[j].toString()) {
+        ENVOY_LOG_MISC(debug, "Mismatched buffers at index {}", j);
+        ENVOY_LOG_MISC(debug, "B: {}", buffers[j].toString());
+        ENVOY_LOG_MISC(debug, "L: {}", linear_buffers[j].toString());
+        ASSERT(false);
+      }
+      ASSERT(buffers[j].length() == linear_buffers[j].length());
       constexpr uint32_t max_slices = 16;
       Buffer::RawSlice slices[max_slices];
       buffers[j].getRawSlices(slices, max_slices);
       std::string garbage{"_garbage"};
-      ASSERT_EQ(buffers[j].search(garbage.data(), garbage.size(), 0), -1);
+      ASSERT(buffers[j].search(garbage.data(), garbage.size(), 0) == -1);
     }
   }
 }
