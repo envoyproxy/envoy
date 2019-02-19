@@ -253,7 +253,6 @@ BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstrea
 BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version,
                                          const std::string& config)
     : BaseIntegrationTest(
-          /*upstream_address_fn=*/
           [version](int) {
             return Network::Utility::parseInternetAddress(
                 Network::Test::getAnyAddressString(version), 0);
