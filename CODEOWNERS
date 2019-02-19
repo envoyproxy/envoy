@@ -23,4 +23,4 @@
 # quic extension
 /*/extensions/quic_listeners/ @alyssawilk @danzh2010 @mattklein123 @mpwarres @wu-bin
 # zookeeper_proxy extension
-/*/extensions/filters/network/zookeeper_proxy @rgs1
+/*/extensions/filters/network/zookeeper_proxy @rgs1 @snowp
