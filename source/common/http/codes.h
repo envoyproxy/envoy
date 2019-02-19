@@ -60,7 +60,6 @@ private:
   const absl::string_view internal_upstream_rq_{"internal.upstream_rq_"};
   const absl::string_view upstream_rq_completed_{"upstream_rq_completed"};
   const absl::string_view upstream_rq_time_{"upstream_rq_time"};
-  const absl::string_view upstream_rq_time{"upstream_rq_time"};
   const absl::string_view upstream_rq_{"upstream_rq_"};
   const absl::string_view vcluster_{"vcluster"};
   const absl::string_view vhost_{"vhost"};
