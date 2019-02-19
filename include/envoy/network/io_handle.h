@@ -9,11 +9,13 @@
 namespace Envoy {
 namespace Network {
 
+class IoError;
+
 // IoErrorCode::Again is used frequently. Define it to be a distinguishable address to avoid
 // frequent memory allocation of IoError instance.
 // If this is used, IoHandleCallResult has to be instantiated with a deleter that does not
 // deallocate memory for this error.
-#define ENVOY_ERROR_AGAIN reinterpret_cast<IoError*>(1)
+#define ENVOY_ERROR_AGAIN reinterpret_cast<IoError*>(0x01)
 
 /**
  * Base class for any I/O error.

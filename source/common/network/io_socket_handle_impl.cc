@@ -4,6 +4,8 @@
 
 #include <iostream>
 
+#include "common/common/assert.h"
+
 using Envoy::Api::SysCallIntResult;
 using Envoy::Api::SysCallSizeResult;
 
@@ -13,8 +15,8 @@ namespace Network {
 IoError::IoErrorCode IoSocketError::errorCode() const {
   switch (errno_) {
   case EAGAIN:
-    RELEASE_ASSERT(false, "EAGAIN should use specific error ENVOY_ERROR_AGAIN");
-    return IoErrorCode::Again;
+    // EAGAIN should use specific error ENVOY_ERROR_AGAIN.
+    NOT_REACHED_GCOVR_EXCL_LINE;
   case ENOTSUP:
     return IoErrorCode::NoSupport;
   case EAFNOSUPPORT:

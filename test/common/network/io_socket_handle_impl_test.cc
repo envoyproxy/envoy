@@ -8,9 +8,7 @@ namespace {
 
 TEST(IoSocketHandleImplTest, TestIoSocketError) {
   IoSocketError error1(EAGAIN);
-  EXPECT_DEATH(
-      IoError::getErrorCode(&error1),
-      "assert failure: false. Details: EAGAIN should use specific error ENVOY_ERROR_AGAIN");
+  EXPECT_DEATH(IoError::getErrorCode(&error1), "");
 
   EXPECT_EQ("Try again later", IoError::getErrorDetails(ENVOY_ERROR_AGAIN));
 
