@@ -67,7 +67,7 @@ TEST_F(HeapShrinkerTest, ShrinkWhenTriggered) {
   const uint64_t physical_mem_after_shrink =
       Stats::totalCurrentlyReserved() - Stats::totalPageHeapUnmapped();
 #ifdef TCMALLOC
-  EXPECT_GT(physical_mem_before_shrink, physical_mem_after_shrink);
+  EXPECT_GE(physical_mem_before_shrink, physical_mem_after_shrink);
 #else
   EXPECT_EQ(physical_mem_before_shrink, physical_mem_after_shrink);
 #endif
