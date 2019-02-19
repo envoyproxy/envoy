@@ -14,19 +14,6 @@ load(
 envoy_package()
 
 envoy_extension_cc_test(
-    name = "codec_impl_test",
-    srcs = ["codec_impl_test.cc"],
-    extension_name = "envoy.filters.network.redis_proxy",
-    deps = [
-        ":redis_mocks",
-        "//source/common/buffer:buffer_lib",
-        "//source/common/common:assert_lib",
-        "//source/extensions/filters/network/redis_proxy:codec_lib",
-        "//test/test_common:utility_lib",
-    ],
-)
-
-envoy_extension_cc_test(
     name = "command_splitter_impl_test",
     srcs = ["command_splitter_impl_test.cc"],
     extension_name = "envoy.filters.network.redis_proxy",
