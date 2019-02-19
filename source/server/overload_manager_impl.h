@@ -58,7 +58,7 @@ public:
 
   // Server::OverloadManager
   void start() override;
-  void registerForAction(const std::string& action, Event::Dispatcher& dispatcher,
+  bool registerForAction(const std::string& action, Event::Dispatcher& dispatcher,
                          OverloadActionCb callback) override;
   ThreadLocalOverloadState& getThreadLocalOverloadState() override;
 
