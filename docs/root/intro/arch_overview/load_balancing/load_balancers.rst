@@ -65,21 +65,16 @@ that specifies a value to hash on.
 
 Each host is hashed and placed on the ring some number of times proportional to its weight. For
 example, if host A has a weight of 1 and host B has a weight of 2, then there might be three entries
-on the ring: one for host A and two for host B. This doesn't provide the desired 2:1 partitioning of
-the circle, since the computed hashes could be coincidentally very close to one another; so it is
-necessary to multiply the number of hashes per host---for example inserting 100 entries on the ring
-for host A and 200 entries for host B---to better approximate the desired distribution. This
-replication factor can be controlled directly by configuring the
-:ref:`replication_factor<envoy_api_field_Cluster.RingHashLbConfig.replication_factor>`
-parameter, or indirectly by configuring the
-:ref:`minimum_ring_size<envoy_api_field_Cluster.RingHashLbConfig.minimum_ring_size>`. With the ring
+on the ring: one for host A and two for host B. This doesn't actually provide the desired 2:1
+partitioning of the circle, however, since the computed hashes could be coincidentally very close to
+one another; so it is necessary to multiply the number of hashes per host---for example inserting
+100 entries on the ring for host A and 200 entries for host B---to better approximate the desired
+distribution. Best practice is to explicitly set
+:ref:`minimum_ring_size<envoy_api_field_Cluster.RingHashLbConfig.minimum_ring_size>` and
+:ref:`maximum_ring_size<envoy_api_field_Cluster.RingHashLbConfig.maximum_ring_size>`, and monitor
+the min_hashes_per_host and max_hashes_per_host gauges to ensure good distribution. With the ring
 partitioned appropriately, the addition or removal of one host from a set of N hosts will affect
 only 1/N requests.
-
-To constrain resource utilization, there is also a
-:ref:`maximum_ring_size<envoy_api_field_Cluster.RingHashLbConfig.maximum_ring_size>` parameter. In
-cases where the weighted sum of all hosts exceeds the maximum ring size, the replication factor is
-scaled down, which implies some loss of granularity in the weights.
 
 When priority based load balancing is in use, the priority level is also chosen by hash, so the
 endpoint selected will still be consistent when the set of backends is stable.

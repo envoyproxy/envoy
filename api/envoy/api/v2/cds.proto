@@ -401,10 +401,8 @@ message Cluster {
   // load balancing policy.
   message RingHashLbConfig {
     // Minimum hash ring size. The larger the ring is (that is, the more hashes there are for each
-    // provided host) the better the request distribution will reflect the desired weights. This can
-    // also be tuned more directly using
-    // :ref:`replication_factor<envoy_api_field_Cluster.RingHashLbConfig.replication_factor>`.
-    // Defaults to 1024 entries. See also
+    // provided host) the better the request distribution will reflect the desired weights. Defaults
+    // to 1024 entries. See also
     // :ref:`maximum_ring_size<envoy_api_field_Cluster.RingHashLbConfig.maximum_ring_size>`.
     google.protobuf.UInt64Value minimum_ring_size = 1;
 
@@ -437,17 +435,6 @@ message Cluster {
     // resource use. See also
     // :ref:`minimum_ring_size<envoy_api_field_Cluster.RingHashLbConfig.minimum_ring_size>`.
     google.protobuf.UInt64Value maximum_ring_size = 4;
-
-    // In Ketama hashing, there is a tradeoff between resource use and request distribution
-    // accuracy. A lower number of hashes per host yields a smaller ring, consuming less memory and
-    // reducing lookup time, whereas a higher number of hashes per host partitions the ring space
-    // more evenly. This parameter allows a desired target to be specified directly, although the
-    // actual replication factor may be higher or lower depending on
-    // :ref:`minimum_ring_size<envoy_api_field_Cluster.RingHashLbConfig.minimum_ring_size>` and
-    // :ref:`maximum_ring_size<envoy_api_field_Cluster.RingHashLbConfig.maximum_ring_size>`. The
-    // default behavior if this parameter is unspecified, for backward compatibility, is to use the
-    // smallest number of hashes per host necessary to meet the minimum_ring_size.
-    google.protobuf.UInt64Value replication_factor = 5;
   }
 
   // Specific configuration for the

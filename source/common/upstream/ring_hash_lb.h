@@ -1,5 +1,6 @@
 #pragma once
 
+#include <unordered_map>
 #include <vector>
 
 #include "envoy/runtime/runtime.h"
@@ -18,8 +19,9 @@ namespace Upstream {
  */
 // clang-format off
 #define ALL_RING_HASH_LOAD_BALANCER_STATS(GAUGE)                                                   \
-  GAUGE(size)                                                                                 \
-  GAUGE(replication_factor)
+  GAUGE(size)                                                                                      \
+  GAUGE(min_hashes_per_host)                                                                       \
+  GAUGE(max_hashes_per_host)
 // clang-format on
 
 /**
@@ -55,8 +57,7 @@ private:
   };
 
   struct Ring : public HashingLoadBalancer {
-    Ring(const HostsPerLocality& hosts_per_locality,
-         const LocalityWeightsConstSharedPtr& locality_weights,
+    Ring(const HostSet& host_set, bool in_panic,
          const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig>& config,
          RingHashLoadBalancerStats& stats);
 
@@ -74,28 +75,7 @@ private:
 
   // ThreadAwareLoadBalancerBase
   HashingLoadBalancerSharedPtr createLoadBalancer(const HostSet& host_set, bool in_panic) override {
-    // Note that we only compute global panic on host set refresh. Given that the runtime setting
-    // will rarely change, this is a reasonable compromise to avoid creating extra LBs when we only
-    // need to create one per priority level.
-    const bool has_locality =
-        host_set.localityWeights() != nullptr && !host_set.localityWeights()->empty();
-    if (in_panic) {
-      if (!has_locality) {
-        return std::make_shared<Ring>(HostsPerLocalityImpl(host_set.hosts(), false), nullptr,
-                                      config_, stats_);
-      } else {
-        return std::make_shared<Ring>(host_set.hostsPerLocality(), host_set.localityWeights(),
-                                      config_, stats_);
-      }
-    } else {
-      if (!has_locality) {
-        return std::make_shared<Ring>(HostsPerLocalityImpl(host_set.healthyHosts(), false), nullptr,
-                                      config_, stats_);
-      } else {
-        return std::make_shared<Ring>(host_set.healthyHostsPerLocality(),
-                                      host_set.localityWeights(), config_, stats_);
-      }
-    }
+    return std::make_shared<Ring>(host_set, in_panic, config_, stats_);
   }
 
   static RingHashLoadBalancerStats generateStats(Stats::Scope& scope);
