@@ -782,7 +782,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, UpstreamEndpointIntegrationTest,
 TEST_P(UpstreamEndpointIntegrationTest, TestUpstreamEndpointAddress) {
   initialize();
   EXPECT_STREQ(fake_upstreams_[0]->localAddress()->ip()->addressAsString().c_str(),
-               Network::Test::getAnyAddressString(GetParam()).c_str());
+               Network::Test::getLoopbackAddressString(GetParam()).c_str());
 }
 
 } // namespace Envoy

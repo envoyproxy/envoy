@@ -18,7 +18,7 @@ public:
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1,
                             [](int) {
                               return Network::Utility::parseInternetAddress(
-                                  Network::Test::getAnyAddressString(GetParam()), 0);
+                                  Network::Test::getLoopbackAddressString(GetParam()), 0);
                             },
                             GetParam()) {}
 };
