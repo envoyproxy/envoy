@@ -1,6 +1,7 @@
 #include "extensions/filters/network/http_connection_manager/config.h"
 
 #include <chrono>
+#include <http_parser.h>
 #include <memory>
 #include <string>
 #include <vector>
@@ -156,6 +157,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 
   route_config_provider_ = Router::RouteConfigProviderUtil::create(config, context_, stats_prefix_,
                                                                    route_config_provider_manager_);
+
+  std::cout << "[AUNI] " << "SETTING HTTP PARSER MAX HEADER: " << max_request_headers_kb_ * 1024 << "\n";
+  http_parser_set_max_header_size(max_request_headers_kb_ * 1024);
 
   switch (config.forward_client_cert_details()) {
   case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::SANITIZE:
