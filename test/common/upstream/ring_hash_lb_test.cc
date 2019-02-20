@@ -68,11 +68,13 @@ INSTANTIATE_TEST_SUITE_P(RingHashPrimaryOrFailover, RingHashLoadBalancerTest,
                          ::testing::Values(true, false));
 INSTANTIATE_TEST_SUITE_P(RingHashPrimaryOrFailover, RingHashFailoverTest, ::testing::Values(true));
 
+// Given no hosts, expect chooseHost to return null.
 TEST_P(RingHashLoadBalancerTest, NoHost) {
   init();
   EXPECT_EQ(nullptr, lb_->factory()->create()->chooseHost(nullptr));
 };
 
+// Given minimum_ring_size > maximum_ring_size, expect an exception.
 TEST_P(RingHashLoadBalancerTest, BadRingSizeBounds) {
   config_ = envoy::api::v2::Cluster::RingHashLbConfig();
   config_.value().mutable_minimum_ring_size()->set_value(20);
@@ -253,6 +255,7 @@ TEST_P(RingHashLoadBalancerTest, BasicWithStdHash) {
 }
 #endif
 
+// Expect reasonable results with Murmur2 hash.
 TEST_P(RingHashLoadBalancerTest, BasicWithMurmur2) {
   hostSet().hosts_ = {
       makeTestHost(info_, "tcp://127.0.0.1:80"), makeTestHost(info_, "tcp://127.0.0.1:81"),
@@ -307,6 +310,7 @@ TEST_P(RingHashLoadBalancerTest, BasicWithMurmur2) {
   EXPECT_EQ(0UL, stats_.lb_healthy_panic_.value());
 }
 
+// Given 2 hosts and a minimum ring size of 3, expect 2 hashes per host and a ring size of 4.
 TEST_P(RingHashLoadBalancerTest, UnevenHosts) {
   hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80"),
                       makeTestHost(info_, "tcp://127.0.0.1:81")};
@@ -354,6 +358,8 @@ TEST_P(RingHashLoadBalancerTest, UnevenHosts) {
   }
 }
 
+// Given hosts with weights 1, 2 and 3, and a ring size of exactly 6, expect the correct number of
+// hashes for each host.
 TEST_P(RingHashLoadBalancerTest, HostWeightedTinyRing) {
   hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", 1),
                       makeTestHost(info_, "tcp://127.0.0.1:91", 2),
@@ -381,6 +387,8 @@ TEST_P(RingHashLoadBalancerTest, HostWeightedTinyRing) {
   }
 }
 
+// Given hosts with weights 1, 2 and 3, and a sufficiently large ring, expect that requests will
+// distribute to the hosts with approximately the right proportion.
 TEST_P(RingHashLoadBalancerTest, HostWeightedLargeRing) {
   hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", 1),
                       makeTestHost(info_, "tcp://127.0.0.1:91", 2),
@@ -409,6 +417,7 @@ TEST_P(RingHashLoadBalancerTest, HostWeightedLargeRing) {
   EXPECT_EQ(3081, counts[2]); // :92 | ~3000 expected hits
 }
 
+// Given locality weights all 0, expect the same behavior as if no hosts were provided at all.
 TEST_P(RingHashLoadBalancerTest, ZeroLocalityWeights) {
   hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90"),
                       makeTestHost(info_, "tcp://127.0.0.1:91")};
@@ -423,6 +432,8 @@ TEST_P(RingHashLoadBalancerTest, ZeroLocalityWeights) {
   EXPECT_EQ(nullptr, lb_->factory()->create()->chooseHost(nullptr));
 }
 
+// Given localities with weights 1, 2, 3 and 0, and a ring size of exactly 6, expect the correct
+// number of hashes for each host.
 TEST_P(RingHashLoadBalancerTest, LocalityWeightedTinyRing) {
   hostSet().hosts_ = {
       makeTestHost(info_, "tcp://127.0.0.1:90"), makeTestHost(info_, "tcp://127.0.0.1:91"),
@@ -455,6 +466,8 @@ TEST_P(RingHashLoadBalancerTest, LocalityWeightedTinyRing) {
   }
 }
 
+// Given localities with weights 1, 2, 3 and 0, and a sufficiently large ring, expect that requests
+// will distribute to the hosts with approximately the right proportion.
 TEST_P(RingHashLoadBalancerTest, LocalityWeightedLargeRing) {
   hostSet().hosts_ = {
       makeTestHost(info_, "tcp://127.0.0.1:90"), makeTestHost(info_, "tcp://127.0.0.1:91"),
@@ -488,6 +501,7 @@ TEST_P(RingHashLoadBalancerTest, LocalityWeightedLargeRing) {
   EXPECT_EQ(0, counts[3]);    // :93 |    =0 expected hits
 }
 
+// Given both host weights and locality weights, expect the correct number of hashes for each host.
 TEST_P(RingHashLoadBalancerTest, HostAndLocalityWeightedTinyRing) {
   // :90 and :91 have a 1:2 ratio within the first locality, :92 and :93 have a 1:2 ratio within the
   // second locality, and the two localities have a 1:2 ratio overall.
@@ -523,6 +537,8 @@ TEST_P(RingHashLoadBalancerTest, HostAndLocalityWeightedTinyRing) {
   }
 }
 
+// Given both host weights and locality weights, and a sufficiently large ring, expect that requests
+// will distribute to the hosts with approximately the right proportion.
 TEST_P(RingHashLoadBalancerTest, HostAndLocalityWeightedLargeRing) {
   // :90 and :91 have a 1:2 ratio within the first locality, :92 and :93 have a 1:2 ratio within the
   // second locality, and the two localities have a 1:2 ratio overall.
@@ -558,6 +574,8 @@ TEST_P(RingHashLoadBalancerTest, HostAndLocalityWeightedLargeRing) {
   EXPECT_EQ(4014, counts[3]); // :93 | ~4000 expected hits
 }
 
+// Given 4 hosts and a ring size of exactly 2, expect that 2 hosts will be present in the ring and
+// the other 2 hosts will be absent.
 TEST_P(RingHashLoadBalancerTest, SmallFractionalScale) {
   hostSet().hosts_ = {
       makeTestHost(info_, "tcp://127.0.0.1:90"), makeTestHost(info_, "tcp://127.0.0.1:91"),
@@ -597,6 +615,8 @@ TEST_P(RingHashLoadBalancerTest, SmallFractionalScale) {
   EXPECT_EQ(1024, sum); // the other two hosts should get all the traffic
 }
 
+// Given 2 hosts and a ring size of exactly 1023, expect that one host will have 511 entries and the
+// other will have 512.
 TEST_P(RingHashLoadBalancerTest, LargeFractionalScale) {
   hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90"),
                       makeTestHost(info_, "tcp://127.0.0.1:91")};
