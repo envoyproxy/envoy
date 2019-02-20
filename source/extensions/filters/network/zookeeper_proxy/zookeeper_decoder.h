@@ -4,6 +4,7 @@
 #include "envoy/common/platform.h"
 
 #include "common/buffer/buffer_impl.h"
+#include "common/common/enum_to_int.h"
 #include "common/common/logger.h"
 
 namespace Envoy {
@@ -16,8 +17,6 @@ const int WATCH_XID = -1;
 const int PING_XID = -2;
 const int AUTH_XID = -4;
 const int SET_WATCHES_XID = -8;
-
-template <typename T> constexpr int enumToInt(T val) { return static_cast<int>(val); }
 
 enum class Opcodes {
   CONNECT = 0,
