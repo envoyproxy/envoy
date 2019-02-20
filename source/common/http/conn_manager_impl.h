@@ -176,6 +176,12 @@ private:
     const Buffer::Instance* decodingBuffer() override {
       return parent_.buffered_request_data_.get();
     }
+
+    void modifyDecodingBuffer(std::function<void(Buffer::Instance&)> callback) override {
+      ASSERT(parent_.state_.latest_data_decoding_filter_ == this);
+      callback(*parent_.buffered_request_data_.get());
+    }
+
     void sendLocalReply(Code code, absl::string_view body,
                         std::function<void(HeaderMap& headers)> modify_headers,
                         const absl::optional<Grpc::Status::GrpcStatus> grpc_status) override {
@@ -251,6 +257,10 @@ private:
     void continueEncoding() override;
     const Buffer::Instance* encodingBuffer() override {
       return parent_.buffered_response_data_.get();
+    }
+    void modifyEncodingBuffer(std::function<void(Buffer::Instance&)> callback) override {
+      ASSERT(parent_.state_.latest_data_encoding_filter_ == this);
+      callback(*parent_.buffered_response_data_.get());
     }
 
     void responseDataTooLarge();
@@ -384,6 +394,10 @@ private:
       // True if this stream is internally created. Currently only used for
       // internal redirects or other streams created via recreateStream().
       bool is_internally_created_ : 1;
+
+      // Used to track which filter is the latest filter that has received data.
+      ActiveStreamEncoderFilter* latest_data_encoding_filter_{};
+      ActiveStreamDecoderFilter* latest_data_decoding_filter_{};
     };
 
     // Possibly increases buffer_limit_ to the value of limit.
