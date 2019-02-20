@@ -19,7 +19,7 @@ namespace quic {
  * the object, because according to the API declared in QuicReferenceCounted,
  * this class has to hide its destructor.
  */
-class QUIC_EXPORT_PRIVATE QuicReferenceCountedImpl {
+class QuicReferenceCountedImpl {
 public:
   QuicReferenceCountedImpl() {}
 
@@ -34,7 +34,7 @@ protected:
 template <typename T> class QuicReferenceCountedPointerImpl {
 public:
   static_assert(std::is_base_of<QuicReferenceCountedImpl, T>::value,
-                "T must derive from QuicReferenceCountedImpl");
+                "T must derive from QuicReferenceCounted");
   QuicReferenceCountedPointerImpl() : refptr_(nullptr, T::destroy) {}
   QuicReferenceCountedPointerImpl(T* p) : refptr_(p, T::destroy) {}
   QuicReferenceCountedPointerImpl(std::nullptr_t) : refptr_(nullptr, T::destroy) {}
@@ -47,9 +47,9 @@ public:
 
   // Move constructor.
   template <typename U>
-  QuicReferenceCountedPointerImpl(QuicReferenceCountedPointerImpl<U>&& other)
+  QuicReferenceCountedPointerImpl(QuicReferenceCountedPointerImpl<U>&& other) noexcept
       : refptr_(std::move(other.refptr())) {}
-  QuicReferenceCountedPointerImpl(QuicReferenceCountedPointerImpl&& other)
+  QuicReferenceCountedPointerImpl(QuicReferenceCountedPointerImpl&& other) noexcept
       : refptr_(std::move(other.refptr())) {}
 
   ~QuicReferenceCountedPointerImpl() = default;
@@ -60,18 +60,18 @@ public:
     return *this;
   }
   template <typename U>
-  QuicReferenceCountedPointerImpl<T>& operator=(const QuicReferenceCountedPointerImpl<U>& other) {
+  QuicReferenceCountedPointerImpl& operator=(const QuicReferenceCountedPointerImpl<U>& other) {
     refptr_ = other.refptr();
     return *this;
   }
 
   // Move assignments.
-  QuicReferenceCountedPointerImpl& operator=(QuicReferenceCountedPointerImpl&& other) {
+  QuicReferenceCountedPointerImpl& operator=(QuicReferenceCountedPointerImpl&& other) noexcept {
     refptr_ = std::move(other.refptr());
     return *this;
   }
   template <typename U>
-  QuicReferenceCountedPointerImpl<T>& operator=(QuicReferenceCountedPointerImpl<U>&& other) {
+  QuicReferenceCountedPointerImpl& operator=(QuicReferenceCountedPointerImpl<U>&& other) noexcept {
     refptr_ = std::move(other.refptr());
     return *this;
   }
@@ -86,7 +86,10 @@ public:
 
   // Accessors for the referenced object.
   // operator* and operator-> will assert() if there is no current object.
-  T& operator*() const { return *refptr_; }
+  T& operator*() const {
+    assert(refptr_ != nullptr);
+    return *refptr_;
+  }
   T* operator->() const {
     assert(refptr_ != nullptr);
     return refptr_.get();

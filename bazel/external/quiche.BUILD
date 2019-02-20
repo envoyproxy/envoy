@@ -112,6 +112,17 @@ cc_library(
 )
 
 cc_library(
+    name = "quic_platform_export",
+    hdrs = [
+        "quiche/quic/platform/api/quic_export.h",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "@envoy//source/extensions/quic_listeners/quiche/platform:quic_platform_export_impl_lib",
+    ],
+)
+
+cc_library(
     name = "quic_platform_base",
     hdrs = [
         "quiche/quic/platform/api/quic_aligned.h",
@@ -120,7 +131,6 @@ cc_library(
         "quiche/quic/platform/api/quic_containers.h",
         "quiche/quic/platform/api/quic_endian.h",
         "quiche/quic/platform/api/quic_estimate_memory_usage.h",
-        "quiche/quic/platform/api/quic_export.h",
         "quiche/quic/platform/api/quic_fallthrough.h",
         "quiche/quic/platform/api/quic_flag_utils.h",
         "quiche/quic/platform/api/quic_iovec.h",
@@ -167,6 +177,7 @@ cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
+        ":quic_platform_export",
         "@envoy//source/extensions/quic_listeners/quiche/platform:quic_platform_base_impl_lib",
     ],
 )

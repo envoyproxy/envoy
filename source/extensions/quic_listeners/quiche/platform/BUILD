@@ -39,6 +39,14 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "quic_platform_export_impl_lib",
+    hdrs = [
+        "quic_export_impl.h",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+envoy_cc_library(
     name = "quic_platform_base_impl_lib",
     srcs = envoy_select_quiche([
         "quic_logging_impl.cc",
@@ -50,7 +58,6 @@ envoy_cc_library(
         "quic_containers_impl.h",
         "quic_endian_impl.h",
         "quic_estimate_memory_usage_impl.h",
-        "quic_export_impl.h",
         "quic_fallthrough_impl.h",
         "quic_flag_utils_impl.h",
         "quic_iovec_impl.h",
@@ -79,6 +86,7 @@ envoy_cc_library(
     deps = envoy_select_quiche([
         "//source/common/common:assert_lib",
         "//source/server:backtrace_lib",
+        "@com_googlesource_quiche//:quic_platform_export",
     ]),
 )
 
