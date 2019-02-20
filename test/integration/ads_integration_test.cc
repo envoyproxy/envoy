@@ -504,6 +504,69 @@ TEST_P(AdsIntegrationTest, DuplicateWarmingClusters) {
   test_server_->waitForCounterGe("cluster_manager.cds.update_rejected", 1);
 }
 
+// Verify CDS is paused during cluster warming.
+TEST_P(AdsIntegrationTest, CdsPausedDuringWarming) {
+  initialize();
+
+  // Send initial configuration, validate we can process a request.
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}));
+  sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster,
+                                                 {buildCluster("cluster_0")}, "1");
+  EXPECT_TRUE(
+      compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "", {"cluster_0"}));
+
+  sendDiscoveryResponse<envoy::api::v2::ClusterLoadAssignment>(
+      Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("cluster_0")}, "1");
+
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {}));
+  sendDiscoveryResponse<envoy::api::v2::Listener>(
+      Config::TypeUrl::get().Listener, {buildListener("listener_0", "route_config_0")}, "1");
+
+  EXPECT_TRUE(
+      compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1", {"cluster_0"}));
+  EXPECT_TRUE(
+      compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "", {"route_config_0"}));
+  sendDiscoveryResponse<envoy::api::v2::RouteConfiguration>(
+      Config::TypeUrl::get().RouteConfiguration, {buildRouteConfig("route_config_0", "cluster_0")},
+      "1");
+
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "1", {}));
+  EXPECT_TRUE(
+      compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "1", {"route_config_0"}));
+
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  makeSingleRequest();
+
+  // Send the first warming cluster.
+  sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster,
+                                                 {buildCluster("warming_cluster_1")}, "2");
+  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1",
+                                      {"warming_cluster_1"}));
+
+  // Send the second warming cluster.
+  sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster,
+                                                 {buildCluster("warming_cluster_2")}, "3");
+  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 2);
+  // We would've got a Cluster discovery request with version 2 here, had the CDS not been paused.
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1",
+                                      {"warming_cluster_2", "warming_cluster_1"}));
+
+  // Finish warming the first cluster.
+  sendDiscoveryResponse<envoy::api::v2::ClusterLoadAssignment>(
+      Config::TypeUrl::get().ClusterLoadAssignment,
+      {buildClusterLoadAssignment("warming_cluster_1")}, "2");
+
+  // Envoy will finish warming of the second cluster too because of the missing load assignments.
+  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
+
+  // CDS is resumed. Also, warming_cluster_1 was not removed as it was in the warming state.
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "3", {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "2",
+                                      {"warming_cluster_2", "warming_cluster_1"}));
+}
+
 // Regression test for the use-after-free crash when processing RDS update (#3953).
 TEST_P(AdsIntegrationTest, RdsAfterLdsWithRdsChange) {
   initialize();

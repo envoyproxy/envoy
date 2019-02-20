@@ -437,7 +437,8 @@ void ClusterManagerImpl::applyUpdates(const Cluster& cluster, uint32_t priority,
 }
 
 bool ClusterManagerImpl::addOrUpdateCluster(const envoy::api::v2::Cluster& cluster,
-                                            const std::string& version_info) {
+                                            const std::string& version_info,
+                                            ClusterWarmingCallback cluster_warming_cb) {
   // First we need to see if this new config is new or an update to an existing dynamic cluster.
   // We don't allow updates to statically configured clusters in the main configuration. We check
   // both the warming clusters and the active clusters to see if we need an update or the update
@@ -485,7 +486,8 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::api::v2::Cluster& clust
   } else {
     auto& cluster_entry = warming_clusters_.at(cluster_name);
     ENVOY_LOG(info, "add/update cluster {} starting warming", cluster_name);
-    cluster_entry->cluster_->initialize([this, cluster_name] {
+    cluster_warming_cb(cluster_name, ClusterWarmingState::Starting);
+    cluster_entry->cluster_->initialize([this, cluster_name, cluster_warming_cb] {
       auto warming_it = warming_clusters_.find(cluster_name);
       auto& cluster_entry = *warming_it->second;
 
@@ -499,6 +501,7 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::api::v2::Cluster& clust
       ENVOY_LOG(info, "warming cluster {} complete", cluster_name);
       createOrUpdateThreadLocalCluster(cluster_entry);
       onClusterInit(*cluster_entry.cluster_);
+      cluster_warming_cb(cluster_name, ClusterWarmingState::Finished);
       updateGauges();
     });
   }
