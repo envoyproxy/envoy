@@ -35,6 +35,7 @@ for how to update or override dependencies.
        cmake \
        clang-format-7 \
        automake \
+       autoconf \
        make \
        ninja-build \
        curl \
@@ -49,7 +50,7 @@ for how to update or override dependencies.
 
     On macOS, you'll need to install several dependencies. This can be accomplished via [Homebrew](https://brew.sh/):
     ```
-    brew install coreutils wget cmake libtool go bazel automake ninja llvm@7
+    brew install coreutils wget cmake libtool go bazel automake ninja llvm@7 autoconf
     ```
     _notes_: `coreutils` is used for `realpath`, `gmd5sum` and `gsha256sum`; `llvm@7` is used for `clang-format`
 
