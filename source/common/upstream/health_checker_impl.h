@@ -47,6 +47,20 @@ public:
                         Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                         Runtime::RandomGenerator& random, HealthCheckEventLoggerPtr&& event_logger);
 
+  /**
+   * Utility class checking if given http status matches configured expectations.
+   */
+  class HttpStatusChecker {
+  public:
+    HttpStatusChecker(const Protobuf::RepeatedPtrField<envoy::type::Int64Range>& expected_statuses,
+                      uint64_t default_expected_status);
+
+    bool inRange(uint64_t http_status) const;
+
+  private:
+    std::vector<std::pair<uint64_t, uint64_t>> ranges_;
+  };
+
 private:
   struct HttpActiveHealthCheckSession : public ActiveHealthCheckSession,
                                         public Http::StreamDecoder,
@@ -121,6 +135,7 @@ private:
   const std::string host_value_;
   absl::optional<std::string> service_name_;
   Router::HeaderParserPtr request_headers_parser_;
+  const HttpStatusChecker http_status_checker_;
 
 protected:
   const Http::CodecClient::Type codec_client_type_;
