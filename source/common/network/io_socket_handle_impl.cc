@@ -50,7 +50,7 @@ IoHandleCallUintResult IoSocketHandleImpl::close() {
   ASSERT(fd_ != -1);
   const int rc = ::close(fd_);
   fd_ = -1;
-  return IoHandleCallResult<uint64_t>(rc,  IoErrorPtr(nullptr, deleteIoError));
+  return IoHandleCallResult<uint64_t>(rc, IoErrorPtr(nullptr, deleteIoError));
 }
 
 bool IoSocketHandleImpl::isOpen() const { return fd_ != -1; }
