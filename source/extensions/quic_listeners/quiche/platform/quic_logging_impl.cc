@@ -11,10 +11,7 @@
 namespace quic {
 
 namespace {
-std::atomic<int>& VerbosityLogThreshold() {
-  static std::atomic<int> threshold(0);
-  return threshold;
-}
+std::atomic<int> g_verbosity_threshold;
 
 std::atomic<QuicLogSink*> g_quic_log_sink;
 absl::Mutex g_quic_log_sink_mutex;
@@ -29,6 +26,7 @@ QuicLogEmitter::~QuicLogEmitter() {
   }
   GetLogger().log(level_, "{}", stream_.str().c_str());
 
+  // Normally there is no log sink and we can avoid acquiring the lock.
   if (g_quic_log_sink.load(std::memory_order_relaxed) != nullptr) {
     absl::MutexLock lock(&g_quic_log_sink_mutex);
     QuicLogSink* sink = g_quic_log_sink.load(std::memory_order_relaxed);
@@ -42,10 +40,10 @@ QuicLogEmitter::~QuicLogEmitter() {
   }
 }
 
-int GetVerbosityLogThreshold() { return VerbosityLogThreshold().load(std::memory_order_relaxed); }
+int GetVerbosityLogThreshold() { return g_verbosity_threshold.load(std::memory_order_relaxed); }
 
 void SetVerbosityLogThreshold(int new_verbosity) {
-  VerbosityLogThreshold().store(new_verbosity, std::memory_order_relaxed);
+  g_verbosity_threshold.store(new_verbosity, std::memory_order_relaxed);
 }
 
 QuicLogSink* SetLogSink(QuicLogSink* new_sink) {

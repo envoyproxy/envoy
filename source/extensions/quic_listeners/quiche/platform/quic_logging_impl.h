@@ -133,12 +133,18 @@ inline bool IsVerboseLogEnabled(int verbosity) {
   return IsLogLevelEnabled(INFO) && verbosity <= GetVerbosityLogThreshold();
 }
 
+// QuicLogSink is used to capture logs emitted from the QUIC_LOG... macros.
 class QuicLogSink {
 public:
   virtual ~QuicLogSink() = default;
+
+  // Called when |message| is emitted at |level|.
   virtual void Log(QuicLogLevel level, const std::string& message) = 0;
 };
 
+// Only one QuicLogSink can capture log at a time. SetLogSink causes future logs
+// to be captured by the |new_sink|.
+// Return the previous sink.
 QuicLogSink* SetLogSink(QuicLogSink* new_sink);
 
 } // namespace quic
