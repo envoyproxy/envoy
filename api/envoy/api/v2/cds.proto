@@ -51,7 +51,7 @@ service ClusterDiscoveryService {
 // [#protodoc-title: Clusters]
 
 // Configuration for a single upstream cluster.
-// [#comment:next free field: 40]
+// [#comment:next free field: 41]
 message Cluster {
   // Supplies the name of the cluster which must be unique across all clusters.
   // The cluster name is used when emitting
@@ -569,7 +569,11 @@ message Cluster {
 
   // Cluster specific configuration which depends on the cluster being instantiated.
   // See the supported cluster for further documentation.
-  google.protobuf.Struct cluster_config = 39;
+  oneof config_type {
+    google.protobuf.Struct config = 39 [deprecated = true];
+
+    google.protobuf.Any typed_config = 40;
+  }
 }
 
 // An extensible structure containing the address Envoy should bind to when

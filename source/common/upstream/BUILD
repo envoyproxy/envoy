@@ -451,6 +451,7 @@ envoy_cc_library(
         "//source/common/common:enum_to_int",
         "//source/common/common:minimal_logger_lib",
         "//source/common/config:metadata_lib",
+        "//source/common/config:utility_lib",
         "//source/common/config:well_known_names",
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",

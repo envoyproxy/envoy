@@ -35,7 +35,9 @@
 #include "common/common/logger.h"
 #include "common/config/metadata.h"
 #include "common/config/well_known_names.h"
+#include "common/config/utility.h"
 #include "common/network/utility.h"
+#include "common/protobuf/utility.h"
 #include "common/stats/isolated_store_impl.h"
 #include "common/upstream/upstream_impl.h"
 #include "common/upstream/load_balancer_impl.h"
@@ -143,6 +145,41 @@ public:
   ClusterImplBaseSharedPtr createClusterImpl(const envoy::api::v2::Cluster& cluster,
                                              ClusterFactoryContext& context, Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
                                              Stats::ScopePtr&& stats_scope) override;
+};
+
+template <class ConfigProto>
+class ConfigurableClusterFactoryBase : public ClusterFactoryImplBase {
+
+public:
+  virtual ClusterImplBaseSharedPtr createClusterImpl(const envoy::api::v2::Cluster& cluster,
+                                                     ClusterFactoryContext& context,
+                                                     Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
+                                                     Stats::ScopePtr&& stats_scope) override {
+    ProtobufTypes::MessagePtr config = createEmptyConfigProto();
+    Config::Utility::translateOpaqueConfig(cluster.typed_config(), cluster.config(), *config);
+    return createClusterWithConfig(cluster, MessageUtil::downcastAndValidate<const ConfigProto&>(*config), context,
+      socket_factory_context, std::move(stats_scope));
+  }
+
+  /**
+ * @return ProtobufTypes::MessagePtr create empty config proto message for v2. The filter
+ *         config, which arrives in an opaque google.protobuf.Struct message, will be converted to
+ *         JSON and then parsed into this empty proto. Optional today, will be compulsory when v1
+ *         is deprecated.
+ */
+  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() {
+    return std::make_unique<ConfigProto>();
+  }
+
+protected:
+  ConfigurableClusterFactoryBase(std::string name):ClusterFactoryImplBase(name) { }
+
+private:
+  virtual ClusterImplBaseSharedPtr createClusterWithConfig(const envoy::api::v2::Cluster& cluster,
+                                                           const ConfigProto& proto_config,
+                                                           ClusterFactoryContext& context,
+                                                           Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
+                                                           Stats::ScopePtr&& stats_scope) PURE;
 };
 
 } // namespace Upstream

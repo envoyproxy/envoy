@@ -39,3 +39,8 @@ envoy_proto_descriptor(
         "well_known_protos",
     ],
 )
+
+envoy_proto_library(
+    name = "cluster_factory_config_proto",
+    srcs = [":cluster_factory_config.proto"],
+)

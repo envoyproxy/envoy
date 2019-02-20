@@ -61,7 +61,7 @@ public:
     ON_CALL(*this, clusterFromProto_(_, _, _, _))
         .WillByDefault(Invoke([&](const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
                                   Outlier::EventLoggerSharedPtr outlier_event_logger,
-                                  bool added_via_api) -> ClusterSharedPtr {
+                                  bool Fdded_via_api) -> ClusterSharedPtr {
           return ClusterFactoryImplBase::create(cluster, cm, stats_, tls_, dns_resolver_,
                                          ssl_context_manager_, runtime_, random_, dispatcher_,
                                          log_manager_, local_info_, admin_, singleton_manager_,
