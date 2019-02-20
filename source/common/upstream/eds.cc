@@ -75,7 +75,7 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources, const std::
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
       priority_state_manager.registerHostForPriority(
           "", resolveProtoAddress(lb_endpoint.endpoint().address()), locality_lb_endpoint,
-          lb_endpoint, Host::HealthFlag::FAILED_EDS_HEALTH);
+          lb_endpoint);
     }
   }
 

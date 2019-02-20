@@ -16,11 +16,11 @@
 #include "test/integration/integration.h"
 #include "test/integration/utility.h"
 #include "test/test_common/network_utility.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/match.h"
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::Return;
 
@@ -175,9 +175,9 @@ TEST_P(SslIntegrationTest, AdminCertEndpoint) {
 
 // Validate certificate selection across different certificate types and client TLS versions.
 class SslCertficateIntegrationTest
-    : public SslIntegrationTestBase,
-      public TestBaseWithParam<std::tuple<Network::Address::IpVersion,
-                                          envoy::api::v2::auth::TlsParameters_TlsProtocol>> {
+    : public testing::TestWithParam<
+          std::tuple<Network::Address::IpVersion, envoy::api::v2::auth::TlsParameters_TlsProtocol>>,
+      public SslIntegrationTestBase {
 public:
   SslCertficateIntegrationTest() : SslIntegrationTestBase(std::get<0>(GetParam())) {
     server_tlsv1_3_ = true;
@@ -358,16 +358,18 @@ public:
           ->mutable_static_config()
           ->mutable_match_config()
           ->set_any_match(true);
-      auto* file_sink = tap_config.mutable_common_config()
-                            ->mutable_static_config()
-                            ->mutable_output_config()
-                            ->mutable_sinks()
-                            ->Add()
-                            ->mutable_file_per_tap();
-      file_sink->set_path_prefix(path_prefix_);
-      file_sink->set_format(text_format_
-                                ? envoy::service::tap::v2alpha::FilePerTapSink::PROTO_TEXT
-                                : envoy::service::tap::v2alpha::FilePerTapSink::PROTO_BINARY);
+      auto* output_config =
+          tap_config.mutable_common_config()->mutable_static_config()->mutable_output_config();
+      if (max_rx_bytes_.has_value()) {
+        output_config->mutable_max_buffered_rx_bytes()->set_value(max_rx_bytes_.value());
+      }
+      if (max_tx_bytes_.has_value()) {
+        output_config->mutable_max_buffered_tx_bytes()->set_value(max_tx_bytes_.value());
+      }
+
+      auto* output_sink = output_config->mutable_sinks()->Add();
+      output_sink->set_format(format_);
+      output_sink->mutable_file_per_tap()->set_path_prefix(path_prefix_);
       tap_config.mutable_transport_socket()->MergeFrom(ssl_transport_socket);
       MessageUtil::jsonConvert(tap_config, *transport_socket->mutable_config());
       // Nuke TLS context from legacy location.
@@ -380,7 +382,10 @@ public:
   }
 
   std::string path_prefix_ = TestEnvironment::temporaryPath("ssl_trace");
-  bool text_format_{};
+  envoy::service::tap::v2alpha::OutputSink::Format format_{
+      envoy::service::tap::v2alpha::OutputSink::PROTO_BINARY};
+  absl::optional<uint64_t> max_rx_bytes_;
+  absl::optional<uint64_t> max_tx_bytes_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, SslTapIntegrationTest,
@@ -425,10 +430,12 @@ TEST_P(SslTapIntegrationTest, TwoRequestsWithBinaryProto) {
   EXPECT_THAT(expected_remote_address,
               ProtoEq(trace.socket_buffered_trace().connection().remote_address()));
   ASSERT_GE(trace.socket_buffered_trace().events().size(), 2);
-  EXPECT_TRUE(absl::StartsWith(trace.socket_buffered_trace().events(0).read().data(),
+  EXPECT_TRUE(absl::StartsWith(trace.socket_buffered_trace().events(0).read().data().as_bytes(),
                                "POST /test/long/url HTTP/1.1"));
-  EXPECT_TRUE(
-      absl::StartsWith(trace.socket_buffered_trace().events(1).write().data(), "HTTP/1.1 200 OK"));
+  EXPECT_TRUE(absl::StartsWith(trace.socket_buffered_trace().events(1).write().data().as_bytes(),
+                               "HTTP/1.1 200 OK"));
+  EXPECT_FALSE(trace.socket_buffered_trace().read_truncated());
+  EXPECT_FALSE(trace.socket_buffered_trace().write_truncated());
 
   // Verify a second request hits a different file.
   const uint64_t second_id = Network::ConnectionImpl::nextGlobalIdForTest() + 1;
@@ -450,15 +457,61 @@ TEST_P(SslTapIntegrationTest, TwoRequestsWithBinaryProto) {
   // Validate second connection ID.
   EXPECT_EQ(second_id, trace.socket_buffered_trace().connection().id());
   ASSERT_GE(trace.socket_buffered_trace().events().size(), 2);
-  EXPECT_TRUE(absl::StartsWith(trace.socket_buffered_trace().events(0).read().data(),
+  EXPECT_TRUE(absl::StartsWith(trace.socket_buffered_trace().events(0).read().data().as_bytes(),
                                "GET /test/long/url HTTP/1.1"));
-  EXPECT_TRUE(
-      absl::StartsWith(trace.socket_buffered_trace().events(1).write().data(), "HTTP/1.1 200 OK"));
+  EXPECT_TRUE(absl::StartsWith(trace.socket_buffered_trace().events(1).write().data().as_bytes(),
+                               "HTTP/1.1 200 OK"));
+  EXPECT_FALSE(trace.socket_buffered_trace().read_truncated());
+  EXPECT_FALSE(trace.socket_buffered_trace().write_truncated());
+}
+
+// Verify that truncation works correctly across multiple transport socket frames.
+TEST_P(SslTapIntegrationTest, TruncationWithMultipleDataFrames) {
+  max_rx_bytes_ = 4;
+  max_tx_bytes_ = 5;
+
+  initialize();
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection({});
+  };
+
+  const uint64_t id = Network::ConnectionImpl::nextGlobalIdForTest() + 1;
+  codec_client_ = makeHttpConnection(creator());
+  const Http::TestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+  auto result = codec_client_->startRequest(request_headers);
+  auto decoder = std::move(result.second);
+  Buffer::OwnedImpl data1("one");
+  result.first.encodeData(data1, false);
+  Buffer::OwnedImpl data2("two");
+  result.first.encodeData(data2, true);
+  waitForNextUpstreamRequest();
+  const Http::TestHeaderMapImpl response_headers{{":status", "200"}};
+  upstream_request_->encodeHeaders(response_headers, false);
+  Buffer::OwnedImpl data3("three");
+  upstream_request_->encodeData(data3, false);
+  decoder->waitForBodyData(5);
+  Buffer::OwnedImpl data4("four");
+  upstream_request_->encodeData(data4, true);
+  decoder->waitForEndStream();
+
+  checkStats();
+  codec_client_->close();
+  test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
+
+  envoy::data::tap::v2alpha::BufferedTraceWrapper trace;
+  MessageUtil::loadFromFile(fmt::format("{}_{}.pb", path_prefix_, id), trace, *api_);
+
+  ASSERT_EQ(trace.socket_buffered_trace().events().size(), 2);
+  EXPECT_TRUE(trace.socket_buffered_trace().events(0).read().data().truncated());
+  EXPECT_TRUE(trace.socket_buffered_trace().events(1).write().data().truncated());
+  EXPECT_TRUE(trace.socket_buffered_trace().read_truncated());
+  EXPECT_TRUE(trace.socket_buffered_trace().write_truncated());
 }
 
 // Validate a single request with text proto output.
 TEST_P(SslTapIntegrationTest, RequestWithTextProto) {
-  text_format_ = true;
+  format_ = envoy::service::tap::v2alpha::OutputSink::PROTO_TEXT;
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection({});
   };
@@ -470,10 +523,35 @@ TEST_P(SslTapIntegrationTest, RequestWithTextProto) {
   envoy::data::tap::v2alpha::BufferedTraceWrapper trace;
   MessageUtil::loadFromFile(fmt::format("{}_{}.pb_text", path_prefix_, id), trace, *api_);
   // Test some obvious properties.
-  EXPECT_TRUE(absl::StartsWith(trace.socket_buffered_trace().events(0).read().data(),
+  EXPECT_TRUE(absl::StartsWith(trace.socket_buffered_trace().events(0).read().data().as_bytes(),
                                "POST /test/long/url HTTP/1.1"));
-  EXPECT_TRUE(
-      absl::StartsWith(trace.socket_buffered_trace().events(1).write().data(), "HTTP/1.1 200 OK"));
+  EXPECT_TRUE(absl::StartsWith(trace.socket_buffered_trace().events(1).write().data().as_bytes(),
+                               "HTTP/1.1 200 OK"));
+  EXPECT_TRUE(trace.socket_buffered_trace().read_truncated());
+  EXPECT_FALSE(trace.socket_buffered_trace().write_truncated());
+}
+
+// Validate a single request with JSON (body as string) output.
+TEST_P(SslTapIntegrationTest, RequestWithJsonBodyAsString) {
+  max_rx_bytes_ = 4;
+  max_tx_bytes_ = 5;
+
+  format_ = envoy::service::tap::v2alpha::OutputSink::JSON_BODY_AS_STRING;
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection({});
+  };
+  const uint64_t id = Network::ConnectionImpl::nextGlobalIdForTest() + 1;
+  testRouterRequestAndResponseWithBody(512, 1024, false, &creator);
+  checkStats();
+  codec_client_->close();
+  test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
+  envoy::data::tap::v2alpha::BufferedTraceWrapper trace;
+  MessageUtil::loadFromFile(fmt::format("{}_{}.json", path_prefix_, id), trace, *api_);
+  // Test some obvious properties.
+  EXPECT_EQ(trace.socket_buffered_trace().events(0).read().data().as_string(), "POST");
+  EXPECT_EQ(trace.socket_buffered_trace().events(1).write().data().as_string(), "HTTP/");
+  EXPECT_TRUE(trace.socket_buffered_trace().read_truncated());
+  EXPECT_TRUE(trace.socket_buffered_trace().write_truncated());
 }
 
 } // namespace Ssl

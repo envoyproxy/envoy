@@ -24,10 +24,10 @@
 #include "common/stats/raw_stat_data.h"
 
 #include "test/test_common/printers.h"
-#include "test/test_common/test_base.h"
 
 #include "absl/time/time.h"
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::AssertionFailure;
@@ -527,7 +527,9 @@ ThreadFactory& threadFactoryForTest();
 } // namespace Thread
 
 namespace Api {
+ApiPtr createApiForTest();
 ApiPtr createApiForTest(Stats::Store& stat_store);
+ApiPtr createApiForTest(Event::TimeSystem& time_system);
 ApiPtr createApiForTest(Stats::Store& stat_store, Event::TimeSystem& time_system);
 } // namespace Api
 

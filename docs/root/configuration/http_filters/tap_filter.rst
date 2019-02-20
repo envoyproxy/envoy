@@ -121,6 +121,42 @@ Another example POST body:
 The preceding configuration instructs the tap filter to match any HTTP requests. All requests will
 be tapped and streamed out the admin endpoint.
 
+Output format
+-------------
+
+Each output sink has an associated :ref:`format
+<envoy_api_enum_service.tap.v2alpha.OutputSink.Format>`. The default format is
+:ref:`JSON_BODY_AS_BYTES
+<envoy_api_enum_value_service.tap.v2alpha.OutputSink.Format.JSON_BODY_AS_BYTES>`. This format is
+easy to read JSON, but has the downside that body data is base64 encoded. In the case that the tap
+is known to be on human readable data, the :ref:`JSON_BODY_AS_STRING
+<envoy_api_enum_value_service.tap.v2alpha.OutputSink.Format.JSON_BODY_AS_STRING>` format may be
+more user friendly. See the reference documentation for more information on other available formats.
+
+An example of a streaming admin tap configuration that uses the :ref:`JSON_BODY_AS_STRING
+<envoy_api_enum_value_service.tap.v2alpha.OutputSink.Format.JSON_BODY_AS_STRING>` format:
+
+.. code-block:: yaml
+
+  config_id: test_config_id
+  tap_config:
+    match_config:
+      any_match: true
+    output_config:
+      sinks:
+        - format: JSON_BODY_AS_STRING
+          streaming_admin: {}
+
+Buffered body limits
+--------------------
+
+For buffered taps, Envoy will limit the amount of body data that is tapped to avoid OOM situations.
+The default limit is 1KiB for both received (request) and transmitted (response) data. This is
+configurable via the :ref:`max_buffered_rx_bytes
+<envoy_api_field_service.tap.v2alpha.OutputConfig.max_buffered_rx_bytes>` and
+:ref:`max_buffered_tx_bytes
+<envoy_api_field_service.tap.v2alpha.OutputConfig.max_buffered_tx_bytes>` settings.
+
 Streaming matching
 ------------------
 

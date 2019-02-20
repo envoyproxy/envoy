@@ -15,10 +15,10 @@
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/simulated_time_system.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::AtLeast;
@@ -42,12 +42,12 @@ public:
   };
 };
 
-class HdsTest : public TestBase {
+class HdsTest : public testing::Test {
 protected:
   HdsTest()
       : retry_timer_(new Event::MockTimer()), server_response_timer_(new Event::MockTimer()),
         async_client_(new Grpc::MockAsyncClient()), api_(Api::createApiForTest(stats_store_)),
-        ssl_context_manager_(api_->timeSystem()) {
+        ssl_context_manager_(api_->timeSource()) {
     node_.set_id("hds-node");
   }
 

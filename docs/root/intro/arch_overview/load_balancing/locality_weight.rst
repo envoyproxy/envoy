@@ -19,7 +19,7 @@ this. As with :ref:`priority levels
 <arch_overview_load_balancing_priority_levels>`, we assume an
 :ref:`over-provision factor <arch_overview_load_balancing_overprovisioning_factor>`
 (default value 1.4), which means we do not perform any weight
-adjustment when only a small number of endpoints in a locality are unavilable.
+adjustment when only a small number of endpoints in a locality are unavailable.
 
 Assume a simple set-up with 2 localities X and Y, where X has a locality weight
 of 1 and Y has a locality weight of 2, L=Y 100% available,

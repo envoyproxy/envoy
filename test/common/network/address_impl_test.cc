@@ -18,8 +18,9 @@
 
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
+
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Network {
@@ -106,7 +107,7 @@ void testSocketBindAndConnect(Network::Address::IpVersion ip_version, bool v6onl
 }
 } // namespace
 
-class AddressImplSocketTest : public TestBaseWithParam<IpVersion> {};
+class AddressImplSocketTest : public testing::TestWithParam<IpVersion> {};
 INSTANTIATE_TEST_SUITE_P(IpVersions, AddressImplSocketTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
@@ -430,7 +431,7 @@ struct TestCase {
   uint32_t port_ = 0; // Ignored for Pipe
 };
 
-class MixedAddressTest : public TestBaseWithParam<::testing::tuple<TestCase, TestCase>> {
+class MixedAddressTest : public testing::TestWithParam<::testing::tuple<TestCase, TestCase>> {
 public:
 protected:
   InstanceConstSharedPtr testCaseToInstance(const struct TestCase& test_case) {

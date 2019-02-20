@@ -16,10 +16,10 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/simulated_time_system.h"
-#include "test/test_common/test_base.h"
 
 #include "absl/types/optional.h"
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::NiceMock;
@@ -32,7 +32,7 @@ namespace Upstream {
 namespace Outlier {
 
 TEST(OutlierDetectorImplFactoryTest, NoDetector) {
-  NiceMock<MockCluster> cluster;
+  NiceMock<MockClusterMockPrioritySet> cluster;
   NiceMock<Event::MockDispatcher> dispatcher;
   NiceMock<Runtime::MockLoader> runtime;
   EXPECT_EQ(nullptr,
@@ -44,7 +44,7 @@ TEST(OutlierDetectorImplFactoryTest, Detector) {
   auto fake_cluster = defaultStaticCluster("fake_cluster");
   fake_cluster.mutable_outlier_detection();
 
-  NiceMock<MockCluster> cluster;
+  NiceMock<MockClusterMockPrioritySet> cluster;
   NiceMock<Event::MockDispatcher> dispatcher;
   NiceMock<Runtime::MockLoader> runtime;
   EXPECT_NE(nullptr, DetectorImplFactory::createForCluster(cluster, fake_cluster, dispatcher,
@@ -56,7 +56,7 @@ public:
   MOCK_METHOD1(check, void(HostSharedPtr host));
 };
 
-class OutlierDetectorImplTest : public TestBase {
+class OutlierDetectorImplTest : public testing::Test {
 public:
   OutlierDetectorImplTest() {
     ON_CALL(runtime_.snapshot_, featureEnabled("outlier_detection.enforcing_consecutive_5xx", 100))
@@ -90,7 +90,7 @@ public:
     }
   }
 
-  NiceMock<MockCluster> cluster_;
+  NiceMock<MockClusterMockPrioritySet> cluster_;
   HostVector& hosts_ = cluster_.prioritySet().getMockHostSet(0)->hosts_;
   HostVector& failover_hosts_ = cluster_.prioritySet().getMockHostSet(1)->hosts_;
   NiceMock<Event::MockDispatcher> dispatcher_;

@@ -11,6 +11,13 @@ namespace Envoy {
 namespace Network {
 
 namespace {
+Address::IpVersion getVersionFromAddress(Address::InstanceConstSharedPtr addr) {
+  if (addr->ip() != nullptr) {
+    return addr->ip()->version();
+  }
+  throw EnvoyException("Unable to set socket option on non-IP sockets");
+}
+
 absl::optional<Address::IpVersion> getVersionFromSocket(const Socket& socket) {
   try {
     // We have local address when the socket is used in a listener but have to
@@ -18,10 +25,10 @@ absl::optional<Address::IpVersion> getVersionFromSocket(const Socket& socket) {
     // TODO(htuch): Figure out a way to obtain a consistent interface for IP
     // version from socket.
     if (socket.localAddress()) {
-      return absl::optional<Address::IpVersion>(socket.localAddress()->ip()->version());
+      return absl::optional<Address::IpVersion>(getVersionFromAddress(socket.localAddress()));
     } else {
       return absl::optional<Address::IpVersion>(
-          Address::addressFromFd(socket.ioHandle().fd())->ip()->version());
+          getVersionFromAddress(Address::addressFromFd(socket.ioHandle().fd())));
     }
   } catch (const EnvoyException&) {
     // Ignore, we get here because we failed in getsockname().

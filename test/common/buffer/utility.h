@@ -4,7 +4,7 @@
 
 #include "common/buffer/buffer_impl.h"
 
-#include "test/test_common/test_base.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Buffer {
@@ -19,7 +19,7 @@ enum class BufferImplementation {
 /**
  * Base class for tests that are parameterized based on BufferImplementation.
  */
-class BufferImplementationParamTest : public TestBaseWithParam<BufferImplementation> {
+class BufferImplementationParamTest : public testing::TestWithParam<BufferImplementation> {
 protected:
   BufferImplementationParamTest() {
     OwnedImpl::useOldImplForTest(GetParam() == BufferImplementation::Old);
