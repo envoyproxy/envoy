@@ -135,7 +135,7 @@ private:
   const std::string host_value_;
   absl::optional<std::string> service_name_;
   Router::HeaderParserPtr request_headers_parser_;
-  const std::unique_ptr<HttpStatusChecker> http_status_checker_;
+  const HttpStatusChecker http_status_checker_;
 
 protected:
   const Http::CodecClient::Type codec_client_type_;

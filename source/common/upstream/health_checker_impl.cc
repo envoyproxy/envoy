@@ -94,8 +94,8 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
       request_headers_parser_(
           Router::HeaderParser::configure(config.http_health_check().request_headers_to_add(),
                                           config.http_health_check().request_headers_to_remove())),
-      http_status_checker_(std::make_unique<HttpStatusChecker>(
-          config.http_health_check().expected_statuses(), static_cast<uint64_t>(Http::Code::OK))),
+      http_status_checker_(config.http_health_check().expected_statuses(),
+                           static_cast<uint64_t>(Http::Code::OK)),
       codec_client_type_(codecClientType(config.http_health_check().use_http2())) {
   if (!config.http_health_check().service_name().empty()) {
     service_name_ = config.http_health_check().service_name();
@@ -106,8 +106,8 @@ HttpHealthCheckerImpl::HttpStatusChecker::HttpStatusChecker(
     const Protobuf::RepeatedPtrField<envoy::type::Int64Range>& expected_statuses,
     uint64_t default_expected_status) {
   for (const auto& status_range : expected_statuses) {
-    auto start = status_range.start();
-    auto end = status_range.end();
+    const auto start = status_range.start();
+    const auto end = status_range.end();
 
     if (start >= end) {
       throw EnvoyException(fmt::format(
@@ -224,7 +224,7 @@ HttpHealthCheckerImpl::HttpActiveHealthCheckSession::healthCheckResult() {
   ENVOY_CONN_LOG(debug, "hc response={} health_flags={}", *client_, response_code,
                  HostUtility::healthFlagsToString(*host_));
 
-  if (!parent_.http_status_checker_->inRange(response_code)) {
+  if (!parent_.http_status_checker_.inRange(response_code)) {
     return HealthCheckResult::Failed;
   }
 
