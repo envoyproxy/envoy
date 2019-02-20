@@ -231,7 +231,7 @@ private:
   DrainManagerPtr drain_manager_;
   AccessLog::AccessLogManagerImpl access_log_manager_;
   std::unique_ptr<Upstream::ClusterManagerFactory> cluster_manager_factory_;
-  InitManagerImpl init_manager_;
+  InitManagerImpl init_manager_{"Server"};
   std::unique_ptr<Server::GuardDog> guard_dog_;
   bool terminated_;
   std::unique_ptr<Logger::FileSinkDelegate> file_logger_;

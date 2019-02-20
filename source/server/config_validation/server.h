@@ -153,7 +153,7 @@ private:
   LocalInfo::LocalInfoPtr local_info_;
   AccessLog::AccessLogManagerImpl access_log_manager_;
   std::unique_ptr<Upstream::ValidationClusterManagerFactory> cluster_manager_factory_;
-  InitManagerImpl init_manager_;
+  InitManagerImpl init_manager_{"Validation server"};
   // secret_manager_ must come before listener_manager_, since there may be active filter chains
   // referencing it, so need to destruct these first.
   std::unique_ptr<Secret::SecretManager> secret_manager_;
