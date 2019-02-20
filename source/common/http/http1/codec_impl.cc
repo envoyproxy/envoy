@@ -316,13 +316,10 @@ const ToLowerTable& ConnectionImpl::toLowerTable() {
   return *table;
 }
 
-ConnectionImpl::ConnectionImpl(Network::Connection& connection, http_parser_type type,
-                               const uint32_t max_request_headers_kb)
+ConnectionImpl::ConnectionImpl(Network::Connection& connection, http_parser_type type)
     : connection_(connection), output_buffer_([&]() -> void { this->onBelowLowWatermark(); },
                                               [&]() -> void { this->onAboveHighWatermark(); }) {
   output_buffer_.setWatermarks(connection.bufferLimit());
-
-  http_parser_set_max_header_size(max_request_headers_kb * 1024);
   http_parser_init(&parser_, type);
   parser_.data = this;
 }
@@ -474,10 +471,8 @@ void ConnectionImpl::onResetStreamBase(StreamResetReason reason) {
 
 ServerConnectionImpl::ServerConnectionImpl(Network::Connection& connection,
                                            ServerConnectionCallbacks& callbacks,
-                                           Http1Settings settings,
-                                           const uint32_t max_request_headers_kb)
-    : ConnectionImpl(connection, HTTP_REQUEST, max_request_headers_kb), callbacks_(callbacks),
-      codec_settings_(settings) {}
+                                           Http1Settings settings)
+    : ConnectionImpl(connection, HTTP_REQUEST), callbacks_(callbacks), codec_settings_(settings) {}
 
 void ServerConnectionImpl::onEncodeComplete() {
   ASSERT(active_request_);
@@ -647,9 +642,8 @@ void ServerConnectionImpl::onBelowLowWatermark() {
   }
 }
 
-ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection, ConnectionCallbacks&,
-                                           const uint32_t max_request_headers_kb)
-    : ConnectionImpl(connection, HTTP_RESPONSE, max_request_headers_kb) {}
+ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection, ConnectionCallbacks&)
+    : ConnectionImpl(connection, HTTP_RESPONSE) {}
 
 bool ClientConnectionImpl::cannotHaveBody() {
   if ((!pending_responses_.empty() && pending_responses_.front().head_request_) ||

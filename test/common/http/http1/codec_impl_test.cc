@@ -33,8 +33,8 @@ namespace Http1 {
 class Http1ServerConnectionImplTest : public TestBase {
 public:
   void initialize() {
-    codec_ = std::make_unique<ServerConnectionImpl>(connection_, callbacks_, codec_settings_,
-                                                    max_request_headers_kb_);
+    // http_parser_set_max_header_size(max_request_headers_kb_ * 1024);
+    codec_ = std::make_unique<ServerConnectionImpl>(connection_, callbacks_, codec_settings_);
   }
 
   NiceMock<Network::MockConnection> connection_;
@@ -47,7 +47,7 @@ public:
   void expect400(Protocol p, bool allow_absolute_url, Buffer::OwnedImpl& buffer);
 
 protected:
-  uint32_t max_request_headers_kb_ = Http::DEFAULT_MAX_REQUEST_HEADERS_KB;
+  uint32_t max_request_headers_kb_{Http::DEFAULT_MAX_REQUEST_HEADERS_KB};
 };
 
 void Http1ServerConnectionImplTest::expect400(Protocol p, bool allow_absolute_url,
@@ -59,8 +59,7 @@ void Http1ServerConnectionImplTest::expect400(Protocol p, bool allow_absolute_ur
 
   if (allow_absolute_url) {
     codec_settings_.allow_absolute_url_ = allow_absolute_url;
-    codec_ = std::make_unique<ServerConnectionImpl>(connection_, callbacks_, codec_settings_,
-                                                    max_request_headers_kb_);
+    codec_ = std::make_unique<ServerConnectionImpl>(connection_, callbacks_, codec_settings_);
   }
 
   Http::MockStreamDecoder decoder;
@@ -79,8 +78,7 @@ void Http1ServerConnectionImplTest::expectHeadersTest(Protocol p, bool allow_abs
   // Make a new 'codec' with the right settings
   if (allow_absolute_url) {
     codec_settings_.allow_absolute_url_ = allow_absolute_url;
-    codec_ = std::make_unique<ServerConnectionImpl>(connection_, callbacks_, codec_settings_,
-                                                    max_request_headers_kb_);
+    codec_ = std::make_unique<ServerConnectionImpl>(connection_, callbacks_, codec_settings_);
   }
 
   Http::MockStreamDecoder decoder;
@@ -681,10 +679,7 @@ TEST_F(Http1ServerConnectionImplTest, WatermarkTest) {
 
 class Http1ClientConnectionImplTest : public TestBase {
 public:
-  void initialize() {
-    codec_ = std::make_unique<ClientConnectionImpl>(connection_, callbacks_,
-                                                    Http::DEFAULT_MAX_REQUEST_HEADERS_KB);
-  }
+  void initialize() { codec_ = std::make_unique<ClientConnectionImpl>(connection_, callbacks_); }
 
   NiceMock<Network::MockConnection> connection_;
   NiceMock<Http::MockConnectionCallbacks> callbacks_;

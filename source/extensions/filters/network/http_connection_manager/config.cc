@@ -322,8 +322,8 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
                                          Http::ServerConnectionCallbacks& callbacks) {
   switch (codec_type_) {
   case CodecType::HTTP1:
-    return Http::ServerConnectionPtr{new Http::Http1::ServerConnectionImpl(
-        connection, callbacks, http1_settings_, maxRequestHeadersKb())};
+    return Http::ServerConnectionPtr{
+        new Http::Http1::ServerConnectionImpl(connection, callbacks, http1_settings_)};
   case CodecType::HTTP2:
     return Http::ServerConnectionPtr{new Http::Http2::ServerConnectionImpl(
         connection, callbacks, context_.scope(), http2_settings_, maxRequestHeadersKb())};

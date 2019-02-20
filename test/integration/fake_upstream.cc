@@ -211,9 +211,8 @@ FakeHttpConnection::FakeHttpConnection(SharedConnectionWrapper& shared_connectio
                                        Event::TestTimeSystem& time_system)
     : FakeConnectionBase(shared_connection, time_system) {
   if (type == Type::HTTP1) {
-    codec_ = std::make_unique<Http::Http1::ServerConnectionImpl>(
-        shared_connection_.connection(), *this, Http::Http1Settings(),
-        Http::DEFAULT_MAX_REQUEST_HEADERS_KB);
+    codec_ = std::make_unique<Http::Http1::ServerConnectionImpl>(shared_connection_.connection(),
+                                                                 *this, Http::Http1Settings());
   } else {
     auto settings = Http::Http2Settings();
     settings.allow_connect_ = true;
