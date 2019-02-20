@@ -287,6 +287,7 @@ def envoy_dependencies(path = "@envoy_deps//", skip_targets = []):
     _com_github_grpc_grpc()
     _com_github_google_benchmark()
     _com_github_google_jwt_verify()
+    _com_github_gperftools_gperftools()
     _com_github_jbeder_yaml_cpp()
     _com_github_libevent_libevent()
     _com_github_madler_zlib()
@@ -717,6 +718,20 @@ def _com_github_google_jwt_verify():
     native.bind(
         name = "jwt_verify_lib",
         actual = "@com_github_google_jwt_verify//:jwt_verify_lib",
+    )
+
+def _com_github_gperftools_gperftools():
+    location = REPOSITORY_LOCATIONS["com_github_gperftools_gperftools"]
+    http_archive(
+        name = "com_github_gperftools_gperftools",
+        build_file_content = BUILD_ALL_CONTENT,
+        patch_cmds = ["./autogen.sh"],
+        **location
+    )
+
+    native.bind(
+        name = "gperftools",
+        actual = "@envoy//bazel/foreign_cc:gperftools",
     )
 
 def _foreign_cc_dependencies():
