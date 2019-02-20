@@ -34,7 +34,9 @@ const std::string ALPN_STRING = "h2";
 // differentiate between HTTP/1 and HTTP/2.
 const std::string CLIENT_MAGIC_PREFIX = "PRI * HTTP/2";
 
-// This setting will be passed to the nghttp2 library's max request headers check. It is set to an arbitrarily high number so as to never trigger the check, as we check request headers length in codec_impl::saveHeader.
+// This setting will be passed to the nghttp2 library's max request headers check. It is set to an
+// arbitrarily high number so as to never trigger the check, as we check request headers length in
+// codec_impl::saveHeader.
 static const uint32_t NGHTTP2_MAX_SEND_HEADER_BLOCK_LENGTH = 100;
 
 /**
