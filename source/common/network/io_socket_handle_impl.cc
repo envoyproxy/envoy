@@ -50,17 +50,7 @@ IoHandleCallUintResult IoSocketHandleImpl::close() {
   ASSERT(fd_ != -1);
   const int rc = ::close(fd_);
   fd_ = -1;
-  IoErrorPtr err(nullptr, deleteIoError);
-  if (rc == -1) {
-    // System call failed.
-    err = (errno == EAGAIN
-               // EAGAIN is frequent enough that its memory allocation should be avoided.
-               ? std::unique_ptr<IoError, IoErrorDeleterType>(ENVOY_ERROR_AGAIN, deleteIoError)
-               : std::unique_ptr<IoError, IoErrorDeleterType>(new IoSocketError(errno),
-                                                              deleteIoError));
-    return IoHandleCallResult<uint64_t>(0, std::move(err));
-  }
-  return IoHandleCallResult<uint64_t>(rc, std::move(err));
+  return IoHandleCallResult<uint64_t>(rc,  IoErrorPtr(nullptr, deleteIoError));
 }
 
 bool IoSocketHandleImpl::isOpen() const { return fd_ != -1; }
