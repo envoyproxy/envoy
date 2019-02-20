@@ -2110,14 +2110,9 @@ TEST_F(ClusterManagerImplTest, MergedUpdates) {
       }));
 
   EXPECT_CALL(local_hosts_removed_, post(_))
-      .WillOnce(Invoke([](const auto& hosts_removed) {
-        // 1st removal.
-        EXPECT_EQ(1, hosts_removed.size());
-      }))
-      .WillOnce(Invoke([](const auto& hosts_removed) {
-        // 2nd removal.
-        EXPECT_EQ(1, hosts_removed.size());
-      }));
+      .Times(2)
+      .WillRepeatedly(
+          Invoke([](const auto& hosts_removed) { EXPECT_EQ(1, hosts_removed.size()); }));
 
   Event::MockTimer* timer = new NiceMock<Event::MockTimer>(&factory_.dispatcher_);
   Cluster& cluster = cluster_manager_->activeClusters().begin()->second;
