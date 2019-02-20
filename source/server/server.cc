@@ -224,11 +224,11 @@ void InstanceImpl::initialize(Options& options,
             Registry::FactoryRegistry<
                 Configuration::UpstreamTransportSocketConfigFactory>::allFactoryNames());
 
-  // If the old buffer implementation has been specified via command-line arg, switch it on
-  // early in the initialization, before any buffers can be created.
-  if (options.libeventBufferEnabled()) {
-    Buffer::OwnedImpl::useOldImpl(true);
-  }
+  // Enable the selected buffer implementation (old libevent evbuffer version or new native
+  // version) early in the initialization, before any buffers can be created.
+  Buffer::OwnedImpl::useOldImpl(options.libeventBufferEnabled());
+  ENVOY_LOG(info, "buffer implementation: {}",
+            Buffer::OwnedImpl().usesOldImpl() ? "old (libevent)" : "new");
 
   // Handle configuration that needs to take place prior to the main configuration load.
   InstanceUtil::loadBootstrapConfig(bootstrap_, options, api());

@@ -84,6 +84,7 @@ TEST_F(OptionsImplTest, All) {
   EXPECT_EQ(std::chrono::seconds(60), options->drainTime());
   EXPECT_EQ(std::chrono::seconds(90), options->parentShutdownTime());
   EXPECT_EQ(true, options->hotRestartDisabled());
+  EXPECT_EQ(true, options->libeventBufferEnabled());
 
   options = createOptionsImpl("envoy --mode init_only");
   EXPECT_EQ(Server::Mode::InitOnly, options->mode());

@@ -118,8 +118,9 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
   TCLAP::SwitchArg enable_mutex_tracing(
       "", "enable-mutex-tracing", "Enable mutex contention tracing functionality", cmd, false);
 
-  TCLAP::SwitchArg use_libevent_buffer(
-      "", "use-libevent-buffers", "Use the original libevent buffer implementation", cmd, false);
+  TCLAP::ValueArg<bool> use_libevent_buffer("", "use-libevent-buffers",
+                                            "Use the original libevent buffer implementation",
+                                            false, true, "bool", cmd);
 
   cmd.setExceptionHandling(false);
   try {
