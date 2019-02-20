@@ -479,6 +479,15 @@ TEST_P(Http2IntegrationTest, DecodingHeaderOnlyInterleaved) { testHeadersOnlyFil
 
 TEST_P(Http2IntegrationTest, DecodeHeadersReturnsStopAll) { testDecodeHeadersReturnsStopAll(); }
 
+TEST_P(Http2IntegrationTest, DecodeHeadersReturnsStopAllWatermark) {
+  // TODO(soya3129): uncomment below.
+  // testDecodeHeadersReturnsStopAllWatermark();
+}
+
+TEST_P(Http2IntegrationTest, TwoFiltersDecodeHeadersReturnsStopAll) {
+  testTwoFiltersDecodeHeadersReturnsStopAll();
+}
+
 TEST_P(Http2IntegrationTest, DownstreamResetBeforeResponseComplete) {
   testDownstreamResetBeforeResponseComplete();
 }

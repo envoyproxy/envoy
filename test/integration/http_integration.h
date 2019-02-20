@@ -164,6 +164,8 @@ protected:
   void testHeadersOnlyFilterDecodingIntermediateFilters();
   void testHeadersOnlyFilterInterleaved();
   void testDecodeHeadersReturnsStopAll();
+  void testTwoFiltersDecodeHeadersReturnsStopAll();
+  void testDecodeHeadersReturnsStopAllWatermark();
 
   // Test that a request returns the same content with both allow_absolute_urls enabled and
   // allow_absolute_urls disabled

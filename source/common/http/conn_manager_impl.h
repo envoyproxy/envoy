@@ -96,7 +96,7 @@ private:
   struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks {
     ActiveStreamFilterBase(ActiveStream& parent, bool dual_filter)
         : parent_(parent), headers_continued_(false), continue_headers_continued_(false),
-          stopped_(false), stopped_all_(false), end_stream_(false), dual_filter_(dual_filter) {}
+          stopped_(false), end_stream_(false), dual_filter_(dual_filter) {}
 
     bool commonHandleAfter100ContinueHeadersCallback(FilterHeadersStatus status);
     bool commonHandleAfterHeadersCallback(FilterHeadersStatus status, bool& headers_only);
@@ -104,6 +104,7 @@ private:
     bool commonHandleAfterDataCallback(FilterDataStatus status, Buffer::Instance& provided_data,
                                        bool& buffer_was_streaming);
     bool commonHandleAfterTrailersCallback(FilterTrailersStatus status);
+    void commonHandleDataAfterStopAll(Buffer::Instance& provided_data, bool& buffer_was_streaming);
 
     void commonContinue();
     virtual bool canContinue() PURE;
@@ -132,9 +133,17 @@ private:
     bool headers_continued_ : 1;
     bool continue_headers_continued_ : 1;
     bool stopped_ : 1;
-    // If true, filter iteration has been stopped for this filter and all the filters followed on
-    // all frame types.
-    bool stopped_all_ : 1;
+    // Return status of decodeHeaders().
+    enum class StopAllState {
+      None,  // Iteration has not stopped for all frame types.
+      StopAllBuffer,  // Iteration has stopped for all, and data should be buffered.
+      StopAllWatermark,  // Iteration has stopped for all, and data should be buffered until high
+                         // watermark is reached.
+    };
+    // If true, ActiveStream::decodeData/Trailers should start iterating with the current filter
+    // instead of the next one.
+    bool iterate_from_current_filter_{false};
+    StopAllState stop_all_state_{StopAllState::None};
     // If true, end_stream is called for this filter.
     bool end_stream_ : 1;
     const bool dual_filter_ : 1;

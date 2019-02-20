@@ -213,7 +213,15 @@ TEST_P(IntegrationTest, DecodingHeaderOnlyResponseIntermediateFilters) {
 
 TEST_P(IntegrationTest, DecodingHeaderOnlyInterleaved) { testHeadersOnlyFilterInterleaved(); }
 
-TEST_P(IntegrationTest, testDecodeHeadersReturnsStopAll) { testDecodeHeadersReturnsStopAll(); }
+TEST_P(IntegrationTest, DecodeHeadersReturnsStopAll) { testDecodeHeadersReturnsStopAll(); }
+
+TEST_P(IntegrationTest, DecodeHeadersReturnsStopAllWatermark) {
+  testDecodeHeadersReturnsStopAllWatermark();
+}
+
+TEST_P(IntegrationTest, TwoFiltersDecodeHeadersReturnsStopAll) {
+  testTwoFiltersDecodeHeadersReturnsStopAll();
+}
 
 TEST_P(IntegrationTest, RetryHittingBufferLimit) { testRetryHittingBufferLimit(); }
 

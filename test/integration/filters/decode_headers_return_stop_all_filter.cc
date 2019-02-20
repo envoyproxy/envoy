@@ -5,58 +5,52 @@
 #include "envoy/http/filter.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
+#include "common/buffer/buffer_impl.h"
 
 #include "extensions/filters/http/common/empty_http_filter_config.h"
 #include "extensions/filters/http/common/pass_through_filter.h"
 
 #include "test/integration/filters/common.h"
+#include "test/test_common/test_base.h"
 
 namespace Envoy {
 
-// A filter returns StopAllTypesIteration for headers. The iteration continues when end_stream is
-// received.
+// A filter returns StopAllIterationAndBuffer for headers. The iteration continues after 5s.
 class DecodeHeadersReturnStopAllFilter : public Http::PassThroughFilter {
 public:
   constexpr static char name[] = "decode-headers-return-stop-all-filter";
 
-  // Returns Http::FilterHeadersStatus::StopAllTypesIteration for headers.
+  // Returns Http::FilterHeadersStatus::StopAllIterationAndBuffer for headers. Triggers a timer to
+  // continue iteration after 5s.
   Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap&, bool) override {
-    return Http::FilterHeadersStatus::StopAllTypesIteration;
+    createTimerForContinue();
+    return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
   }
 
-  // Continues the iteration 2s after end_stream is received.
-  Http::FilterDataStatus decodeData(Buffer::Instance&, bool end_stream) override {
-    call_count_++;
-    if (end_stream) {
-      // Verifies decodeData() is called more than once.
-      ASSERT(call_count_ > 1);
-      continued_ = true;
-      createTimerForContinue();
-    }
+  Http::FilterDataStatus decodeData(Buffer::Instance& data, bool) override {
+    // decodeData will only be called once after iteration resumes.
+    EXPECT_EQ(data.length(), 5000);
+    Buffer::OwnedImpl added_data("a");
+    decoder_callbacks_->addDecodedData(added_data, false);
     return Http::FilterDataStatus::Continue;
   }
 
-  // Continues the iteration 2s after trailers are received.
   Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap&) override {
-    if (!continued_) {
-      // Verifies decodeData() is called more than once.
-      ASSERT(call_count_ > 1);
-      createTimerForContinue();
-    }
+    Buffer::OwnedImpl data("a");
+    decoder_callbacks_->addDecodedData(data, false);
     return Http::FilterTrailersStatus::Continue;
   }
 
 private:
-  // Creates a timer to continue iteration after 2s.
+  // Creates a timer to continue iteration after 5s.
   void createTimerForContinue() {
     delay_timer_ = decoder_callbacks_->dispatcher().createTimer(
         [this]() -> void { decoder_callbacks_->continueDecoding(); });
-    delay_timer_->enableTimer(std::chrono::seconds(2));
+    delay_timer_->enableTimer(std::chrono::seconds(5));
   }
 
   Event::TimerPtr delay_timer_;
   int call_count_ = 0;
-  bool continued_ = false;
 };
 
 constexpr char DecodeHeadersReturnStopAllFilter::name[];

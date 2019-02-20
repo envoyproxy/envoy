@@ -830,10 +830,19 @@ void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* 
   if (!filter) {
     entry = decoder_filters_.begin();
   } else {
-    entry = std::next(filter->entry());
+    if ((*(filter->entry()))->iterate_from_current_filter_) {
+      // (*entry)->decodeData() has not be called. Call it now.
+      entry = filter->entry();
+    } else {
+      entry = std::next(filter->entry());
+    }
   }
 
   for (; entry != decoder_filters_.end(); entry++) {
+    if ((*entry)->stop_all_state_ != ActiveStreamFilterBase::StopAllState::None) {
+      (*entry)->commonHandleDataAfterStopAll(data, state_.decoder_filters_streaming_);
+      return;
+    }
     // If end_stream_ is marked for a filter, the data is not for this filter and filters after.
     //
     // In following case, ActiveStreamFilterBase::commonContinue() could be called recursively and
@@ -934,7 +943,12 @@ void ConnectionManagerImpl::ActiveStream::addDecodedData(ActiveStreamDecoderFilt
   } else if (state_.filter_call_state_ & FilterCallState::DecodeTrailers) {
     // In this case we need to inline dispatch the data to further filters. If those filters
     // choose to buffer/stop iteration that's fine.
+    // We should ignore iterate_from_current_filter_ because data should always be passed to the
+    // next filter.
+    bool saved_value = (*(filter.entry()))->iterate_from_current_filter_;
+    (*(filter.entry()))->iterate_from_current_filter_ = false;
     decodeData(&filter, data, false);
+    (*(filter.entry()))->iterate_from_current_filter_ = saved_value;
   } else {
     // TODO(mattklein123): Formalize error handling for filters and add tests. Should probably
     // throw an exception here.
@@ -965,10 +979,18 @@ void ConnectionManagerImpl::ActiveStream::decodeTrailers(ActiveStreamDecoderFilt
   if (!filter) {
     entry = decoder_filters_.begin();
   } else {
-    entry = std::next(filter->entry());
+    if ((*(filter->entry()))->iterate_from_current_filter_) {
+      // (*entry)->decodeTrailers() has not be called. Call it now.
+      entry = filter->entry();
+    } else {
+      entry = std::next(filter->entry());
+    }
   }
 
   for (; entry != decoder_filters_.end(); entry++) {
+    if ((*entry)->stop_all_state_ != ActiveStreamFilterBase::StopAllState::None) {
+      return;
+    }
     ASSERT(!(state_.filter_call_state_ & FilterCallState::DecodeTrailers));
     state_.filter_call_state_ |= FilterCallState::DecodeTrailers;
     FilterTrailersStatus status = (*entry)->handle_->decodeTrailers(trailers);
@@ -1498,7 +1520,11 @@ void ConnectionManagerImpl::ActiveStreamFilterBase::commonContinue() {
                    static_cast<const void*>(this));
   ASSERT(stopped_);
   stopped_ = false;
-  stopped_all_ = false;
+
+  if (stop_all_state_ != ActiveStreamFilterBase::StopAllState::None) {
+    // Resets StopAllState.
+    stop_all_state_ = ActiveStreamFilterBase::StopAllState::None;
+  }
 
   // Only resume with do100ContinueHeaders() if we've actually seen a 100-Continue.
   if (parent_.has_continue_headers_ && !continue_headers_continued_) {
@@ -1528,6 +1554,8 @@ void ConnectionManagerImpl::ActiveStreamFilterBase::commonContinue() {
   if (trailers()) {
     doTrailers();
   }
+
+  iterate_from_current_filter_ =  false;
 }
 
 bool ConnectionManagerImpl::ActiveStreamFilterBase::commonHandleAfter100ContinueHeadersCallback(
@@ -1554,9 +1582,15 @@ bool ConnectionManagerImpl::ActiveStreamFilterBase::commonHandleAfterHeadersCall
   if (status == FilterHeadersStatus::StopIteration) {
     stopped_ = true;
     return false;
-  } else if (status == FilterHeadersStatus::StopAllTypesIteration) {
+  } else if (status == FilterHeadersStatus::StopAllIterationAndBuffer) {
     stopped_ = true;
-    stopped_all_ = true;
+    stop_all_state_ = StopAllState::StopAllBuffer;
+    iterate_from_current_filter_ = true;
+    return false;
+  } else if (status == FilterHeadersStatus::StopAllIterationAndWatermark) {
+    stopped_ = true;
+    stop_all_state_ = StopAllState::StopAllWatermark;
+    iterate_from_current_filter_ = true;
     return false;
   } else if (status == FilterHeadersStatus::ContinueAndEndStream) {
     // Set headers_only to true so we know to end early if necessary,
@@ -1594,9 +1628,7 @@ bool ConnectionManagerImpl::ActiveStreamFilterBase::commonHandleAfterDataCallbac
   if (status == FilterDataStatus::Continue) {
     if (stopped_) {
       commonHandleBufferData(provided_data);
-      if (!stopped_all_) {
-        commonContinue();
-      }
+      commonContinue();
       return false;
     } else {
       ASSERT(headers_continued_);
@@ -1620,9 +1652,7 @@ bool ConnectionManagerImpl::ActiveStreamFilterBase::commonHandleAfterTrailersCal
 
   if (status == FilterTrailersStatus::Continue) {
     if (stopped_) {
-      if (!stopped_all_) {
-        commonContinue();
-      }
+      commonContinue();
       return false;
     } else {
       ASSERT(headers_continued_);
@@ -1632,6 +1662,13 @@ bool ConnectionManagerImpl::ActiveStreamFilterBase::commonHandleAfterTrailersCal
   }
 
   return true;
+}
+
+void ConnectionManagerImpl::ActiveStreamFilterBase::commonHandleDataAfterStopAll(
+    Buffer::Instance& provided_data, bool& buffer_was_streaming) {
+  ASSERT(stopped_);
+  buffer_was_streaming = stop_all_state_ == StopAllState::StopAllWatermark;
+  commonHandleBufferData(provided_data);
 }
 
 const Network::Connection* ConnectionManagerImpl::ActiveStreamFilterBase::connection() {

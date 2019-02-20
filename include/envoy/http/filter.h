@@ -34,14 +34,25 @@ enum class FilterHeadersStatus {
   // Continue iteration to remaining filters, but ignore any subsequent data or trailers. This
   // results in creating a header only request/response.
   ContinueAndEndStream,
-  // Stop iterations for headers as well as data and trailers that follows the headers. Returning
-  // StopAllTypesIteration means the filter that returns the status and all the filters following
-  // that filter stop processing. The filters before are not impacted. continueDecoding() MUST be
-  // called if continued filter iteration is desired. To avoid buffering large amount of data, a
-  // rate-limiting filter can be added before the filter that can return StopAllTypesIteration.
+  // Do not iterate for headers as well as data and trailers for the current filter and the filters
+  // following, and buffer body data for later dispatching. ContinueDecoding() MUST
+  // be called if continued filter iteration is desired.
+  //
+  // If buffering the request causes buffered data to exceed the configured buffer limit, a 413 will
+  // be sent to the user. On the response path exceeding buffer limits will result in a 500.
+  //
   // Only used in decoding path.
   // TODO(soya3129): add tests for encoding path, and remove the decoding path condition.
-  StopAllTypesIteration
+  StopAllIterationAndBuffer,
+  // Do not iterate for headers as well as data and trailers for the current filter and the filters
+  // following, and buffer body data for later dispatching. continueDecoding() MUST
+  // be called if continued filter iteration is desired.
+  //
+  // This will cause the flow of incoming data to cease until continueDecoding() function is called.
+  //
+  // Only used in decoding path.
+  // TODO(soya3129): add tests for encoding path, and remove the decoding path condition.
+  StopAllIterationAndWatermark,
 };
 
 /**

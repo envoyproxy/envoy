@@ -5,11 +5,11 @@
 #include "extensions/filters/http/common/pass_through_filter.h"
 
 #include "test/integration/filters/common.h"
+#include "test/test_common/test_base.h"
 
 namespace Envoy {
 
-// A filter that only allows decodeData() to be called once. Multiple calls will result in assert
-// failure.
+// A filter that only allows decodeData() to be called once with fixed data length.
 class CallDecodeDataOnceFilter : public Http::PassThroughFilter {
 public:
   constexpr static char name[] = "call-decodedata-once-filter";
@@ -18,18 +18,16 @@ public:
     return Http::FilterHeadersStatus::Continue;
   }
 
-  Http::FilterDataStatus decodeData(Buffer::Instance&, bool) override {
-    ASSERT(call_count_ == 0);
-    call_count_++;
+  Http::FilterDataStatus decodeData(Buffer::Instance& data, bool) override {
+    // Request data length (size 5000) + data from addDecodedData() called in dataDecode (size 1).
+    // Or data from addDecodedData() called in dataTrailers (size 1)
+    EXPECT_TRUE(data.length() == 5001 || data.length() == 1);
     return Http::FilterDataStatus::Continue;
   }
 
   Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap&) override {
     return Http::FilterTrailersStatus::Continue;
   }
-
-private:
-  int call_count_ = 0;
 };
 
 constexpr char CallDecodeDataOnceFilter::name[];
