@@ -74,7 +74,7 @@ typedef std::unique_ptr<Decoder> DecoderPtr;
 
 class DecoderImpl : public Decoder, Logger::Loggable<Logger::Id::filter> {
 public:
-  DecoderImpl(DecoderCallbacks& callbacks) : callbacks_(callbacks) {}
+  explicit DecoderImpl(DecoderCallbacks& callbacks) : callbacks_(callbacks) {}
 
   // ZooKeeperProxy::Decoder
   void onData(Buffer::Instance& data) override;
