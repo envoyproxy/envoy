@@ -12,7 +12,7 @@ public:
   IntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()) {}
 };
 
-class UpstreamEndpointIntegrationTest : public TestBaseWithParam<Network::Address::IpVersion>,
+class UpstreamEndpointIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                         public HttpIntegrationTest {
 public:
   UpstreamEndpointIntegrationTest()
