@@ -11,4 +11,16 @@ class IntegrationTest : public testing::TestWithParam<Network::Address::IpVersio
 public:
   IntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()) {}
 };
+
+class UpstreamEndpointIntegrationTest : public TestBaseWithParam<Network::Address::IpVersion>,
+                                        public HttpIntegrationTest {
+public:
+  UpstreamEndpointIntegrationTest()
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1,
+                            [](int) {
+                              return Network::Utility::parseInternetAddress(
+                                  Network::Test::getLoopbackAddressString(GetParam()), 0);
+                            },
+                            GetParam()) {}
+};
 } // namespace Envoy
