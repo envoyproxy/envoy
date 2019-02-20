@@ -139,6 +139,7 @@ envoy_cc_test_library(
         "//source/extensions/filters/http/common:pass_through_filter_lib",
     ],
 )
+
 envoy_cc_test_library(
     name = "decode_headers_return_stop_all_watermark_filter_config_lib",
     srcs = [

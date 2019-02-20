@@ -1555,7 +1555,7 @@ void ConnectionManagerImpl::ActiveStreamFilterBase::commonContinue() {
     doTrailers();
   }
 
-  iterate_from_current_filter_ =  false;
+  iterate_from_current_filter_ = false;
 }
 
 bool ConnectionManagerImpl::ActiveStreamFilterBase::commonHandleAfter100ContinueHeadersCallback(

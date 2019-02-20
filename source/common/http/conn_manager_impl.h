@@ -135,10 +135,10 @@ private:
     bool stopped_ : 1;
     // Return status of decodeHeaders().
     enum class StopAllState {
-      None,  // Iteration has not stopped for all frame types.
-      StopAllBuffer,  // Iteration has stopped for all, and data should be buffered.
-      StopAllWatermark,  // Iteration has stopped for all, and data should be buffered until high
-                         // watermark is reached.
+      None,             // Iteration has not stopped for all frame types.
+      StopAllBuffer,    // Iteration has stopped for all, and data should be buffered.
+      StopAllWatermark, // Iteration has stopped for all, and data should be buffered until high
+                        // watermark is reached.
     };
     // If true, ActiveStream::decodeData/Trailers should start iterating with the current filter
     // instead of the next one.

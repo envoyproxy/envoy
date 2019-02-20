@@ -1,11 +1,12 @@
 #include "test/integration/http_integration.h"
 
+#include <unistd.h>
+
 #include <functional>
 #include <list>
 #include <memory>
 #include <regex>
 #include <string>
-#include <unistd.h>
 #include <vector>
 
 #include "envoy/buffer/buffer.h"
@@ -1761,7 +1762,7 @@ name: passthrough-filter
   EXPECT_EQ(true, upstream_request_->complete());
 }
 
-// Test two filters that return StopAllIterationAndBuffer back-to-back. Verifies 
+// Test two filters that return StopAllIterationAndBuffer back-to-back. Verifies
 void HttpIntegrationTest::testTwoFiltersDecodeHeadersReturnsStopAll() {
   config_helper_.addFilter(R"EOF(
 name: decode-headers-return-stop-all-filter-2
