@@ -33,6 +33,11 @@ uint64_t convertPercent(double percent, uint64_t max_value) {
   return max_value * (percent / 100.0);
 }
 
+bool evaluateFractionalPercent(envoy::type::FractionalPercent percent, uint64_t random_value) {
+  return random_value % fractionalPercentDenominatorToInt(percent.denominator()) <
+         percent.numerator();
+}
+
 uint64_t fractionalPercentDenominatorToInt(
     const envoy::type::FractionalPercent::DenominatorType& denominator) {
   switch (denominator) {
