@@ -10,14 +10,15 @@
 #include <cstring>
 #include <iostream>
 #include <sstream>
+#include <string>
 
 #include "common/common/assert.h"
 #include "common/common/logger.h"
 
 #include "absl/base/optimization.h"
+#include "absl/synchronization/mutex.h"
 
 // TODO(wub): Add CHECK/DCHECK and variants, which are not explicitly exposed by quic_logging.h.
-// TODO(wub): Implement quic_mock_log_impl.h for testing.
 
 // If |condition| is true, use |logstream| to stream the log message and send it to spdlog.
 // If |condition| is false, |logstream| will not be instantiated.
@@ -131,5 +132,13 @@ void SetVerbosityLogThreshold(int new_verbosity);
 inline bool IsVerboseLogEnabled(int verbosity) {
   return IsLogLevelEnabled(INFO) && verbosity <= GetVerbosityLogThreshold();
 }
+
+class QuicLogSink {
+public:
+  virtual ~QuicLogSink() = default;
+  virtual void Log(QuicLogLevel level, const std::string& message) = 0;
+};
+
+QuicLogSink* SetLogSink(QuicLogSink* new_sink);
 
 } // namespace quic
