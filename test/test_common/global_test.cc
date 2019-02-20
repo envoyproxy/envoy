@@ -2,12 +2,13 @@
 #include <vector>
 
 #include "test/test_common/global.h"
-#include "test/test_common/test_base.h"
+
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Test {
 
-class GlobalTest : public TestBase {
+class GlobalTest : public testing::Test {
 protected:
 };
 

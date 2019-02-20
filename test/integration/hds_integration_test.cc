@@ -16,14 +16,14 @@
 #include "test/config/utility.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/network_utility.h"
-#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace {
 
-class HdsIntegrationTest : public TestBaseWithParam<Network::Address::IpVersion>,
+class HdsIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                            public HttpIntegrationTest {
 public:
   HdsIntegrationTest()

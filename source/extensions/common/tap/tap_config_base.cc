@@ -13,22 +13,31 @@ namespace Extensions {
 namespace Common {
 namespace Tap {
 
-void Utility::addBufferToProtoBytes(envoy::data::tap::v2alpha::Body& output_bytes,
-                                    uint32_t max_buffered_bytes, const Buffer::Instance& data) {
+bool Utility::addBufferToProtoBytes(envoy::data::tap::v2alpha::Body& output_body,
+                                    uint32_t max_buffered_bytes, const Buffer::Instance& data,
+                                    uint32_t buffer_start_offset, uint32_t buffer_length_to_copy) {
   // TODO(mattklein123): Figure out if we can use the buffer API here directly in some way. This is
   // is not trivial if we want to avoid extra copies since we end up appending to the existing
   // protobuf string.
+
+  // Note that max_buffered_bytes is assumed to include any data already contained in output_bytes.
+  // This is to account for callers that may be tracking this over multiple body objects.
+  ASSERT(buffer_start_offset + buffer_length_to_copy <= data.length());
+  const uint32_t final_bytes_to_copy = std::min(max_buffered_bytes, buffer_length_to_copy);
+
   const uint64_t num_slices = data.getRawSlices(nullptr, 0);
   STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
   data.getRawSlices(slices.begin(), num_slices);
+  trimSlices(slices, buffer_start_offset, final_bytes_to_copy);
   for (const Buffer::RawSlice& slice : slices) {
-    if (slice.len_ > max_buffered_bytes - output_bytes.as_bytes().size()) {
-      output_bytes.set_truncated(true);
-    }
+    output_body.mutable_as_bytes()->append(static_cast<const char*>(slice.mem_), slice.len_);
+  }
 
-    output_bytes.mutable_as_bytes()->append(
-        static_cast<const char*>(slice.mem_),
-        std::min(slice.len_, max_buffered_bytes - output_bytes.as_bytes().size()));
+  if (final_bytes_to_copy < buffer_length_to_copy) {
+    output_body.set_truncated(true);
+    return true;
+  } else {
+    return false;
   }
 }
 

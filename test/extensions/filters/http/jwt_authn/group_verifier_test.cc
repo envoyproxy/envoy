@@ -64,7 +64,7 @@ typedef std::unordered_map<std::string, const Status&> StatusMap;
 
 constexpr auto allowfailed = "_allow_failed_";
 
-class GroupVerifierTest : public TestBase {
+class GroupVerifierTest : public testing::Test {
 public:
   void createVerifier() {
     ON_CALL(mock_factory_, create(_, _, _))

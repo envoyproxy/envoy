@@ -162,18 +162,19 @@ void OverloadManagerImpl::stop() {
   resources_.clear();
 }
 
-void OverloadManagerImpl::registerForAction(const std::string& action,
+bool OverloadManagerImpl::registerForAction(const std::string& action,
                                             Event::Dispatcher& dispatcher,
                                             OverloadActionCb callback) {
   ASSERT(!started_);
 
   if (actions_.find(action) == actions_.end()) {
     ENVOY_LOG(debug, "No overload action is configured for {}.", action);
-    return;
+    return false;
   }
 
   action_to_callbacks_.emplace(std::piecewise_construct, std::forward_as_tuple(action),
                                std::forward_as_tuple(dispatcher, callback));
+  return true;
 }
 
 ThreadLocalOverloadState& OverloadManagerImpl::getThreadLocalOverloadState() {

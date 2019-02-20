@@ -109,7 +109,7 @@ static_resources:
           route_config:
             name: local_route
             virtual_hosts:
-            {% for service, options in internal_virtual_hosts.iteritems() %}
+            {% for service, options in internal_virtual_hosts.items() %}
             - name: {{ service }}
               domains:
               - {{ service }}
@@ -281,7 +281,7 @@ static_resources:
               {% endif %}
   {% if (mongos_servers|length > 0) or (mongos_servers|length == 0 and not loop.last ) %}{% endif -%}
   {% endfor -%}
-  {% for key, value in mongos_servers.iteritems() -%}
+  {% for key, value in mongos_servers.items() -%}
   - name : "{{ value['address'] }}"
     address:
       socket_address:
@@ -310,7 +310,7 @@ static_resources:
       {% endif %}
   {% endfor -%}
   clusters:
-  {% for service, options in internal_virtual_hosts.iteritems() -%}
+  {% for service, options in internal_virtual_hosts.items() -%}
   - {{ helper.internal_cluster_definition(service, options)|indent(2)}}
   {% endfor -%}
   {% for mapping in external_virtual_hosts -%}
@@ -341,7 +341,7 @@ static_resources:
         protocol: {{ host['protocol'] }}
   {% endfor -%}
   {% endfor -%}
-  {% for key, value in mongos_servers.iteritems() -%}
+  {% for key, value in mongos_servers.items() -%}
   - name: mongo_{{ key }}
     connect_timeout: 0.25s
     type: STRICT_DNS

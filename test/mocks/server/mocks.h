@@ -39,11 +39,11 @@
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/mocks.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/test_time_system.h"
 
 #include "absl/strings/string_view.h"
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
@@ -309,7 +309,7 @@ public:
 
   // OverloadManager
   MOCK_METHOD0(start, void());
-  MOCK_METHOD3(registerForAction, void(const std::string& action, Event::Dispatcher& dispatcher,
+  MOCK_METHOD3(registerForAction, bool(const std::string& action, Event::Dispatcher& dispatcher,
                                        OverloadActionCb callback));
   MOCK_METHOD0(getThreadLocalOverloadState, ThreadLocalOverloadState&());
 
