@@ -83,10 +83,11 @@ envoy_cc_library(
         "googletest",
     ],
     visibility = ["//visibility:public"],
-    deps = envoy_select_quiche([
+    deps = [
+        "@com_googlesource_quiche//:quic_platform_export",
+    ] + envoy_select_quiche([
         "//source/common/common:assert_lib",
         "//source/server:backtrace_lib",
-        "@com_googlesource_quiche//:quic_platform_export",
     ]),
 )
 

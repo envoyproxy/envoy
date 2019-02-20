@@ -21,14 +21,14 @@ namespace quic {
  */
 class QuicReferenceCountedImpl {
 public:
-  QuicReferenceCountedImpl() {}
+  QuicReferenceCountedImpl() = default;
 
   // Expose destructor through this method.
   static void destroy(QuicReferenceCountedImpl* impl) { delete impl; }
 
 protected:
   // Non-public destructor to match API declared in QuicReferenceCounted.
-  virtual ~QuicReferenceCountedImpl() {}
+  virtual ~QuicReferenceCountedImpl() = default;
 };
 
 template <typename T> class QuicReferenceCountedPointerImpl {
