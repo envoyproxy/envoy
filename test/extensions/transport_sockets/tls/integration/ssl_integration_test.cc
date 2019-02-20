@@ -16,11 +16,11 @@
 #include "test/integration/integration.h"
 #include "test/integration/utility.h"
 #include "test/test_common/network_utility.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/match.h"
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::Return;
 
@@ -175,7 +175,7 @@ TEST_P(SslIntegrationTest, AdminCertEndpoint) {
 
 // Validate certificate selection across different certificate types and client TLS versions.
 class SslCertficateIntegrationTest
-    : public TestBaseWithParam<
+    : public testing::TestWithParam<
           std::tuple<Network::Address::IpVersion, envoy::api::v2::auth::TlsParameters_TlsProtocol>>,
       public SslIntegrationTestBase {
 public:

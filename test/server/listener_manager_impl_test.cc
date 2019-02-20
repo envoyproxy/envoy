@@ -25,12 +25,12 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/simulated_time_system.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/escaping.h"
 #include "absl/strings/match.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::InSequence;
@@ -55,7 +55,7 @@ public:
   Configuration::FactoryContext* context_{};
 };
 
-class ListenerManagerImplTest : public TestBase {
+class ListenerManagerImplTest : public testing::Test {
 protected:
   ListenerManagerImplTest() : api_(Api::createApiForTest()) {
     ON_CALL(server_, api()).WillByDefault(ReturnRef(*api_));

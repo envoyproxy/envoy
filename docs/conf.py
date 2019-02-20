@@ -13,9 +13,9 @@
 # serve to show the default.
 
 from datetime import datetime
+import os
 import sphinx_rtd_theme
 import sys
-import os
 
 
 def setup(app):
