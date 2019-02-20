@@ -22,9 +22,8 @@ bool BufferHelper::peekBool(Buffer::Instance& buffer, uint64_t& offset, bool& va
 
   try {
     std::string str;
-    str.assign(std::string(static_cast<char*>(buffer.linearize(1 + offset)), 1 + offset));
-    str = str.substr(offset);
-    val = static_cast<bool>(str[0] & 255);
+    char byte = buffer.peekInt<char, ByteOrder::Host, 1>(offset);
+    val = static_cast<bool>(byte & 255);
     offset += 1;
     return true;
   } catch (EnvoyException& e) {
