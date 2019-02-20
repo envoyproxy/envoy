@@ -409,6 +409,20 @@ TEST_P(RingHashLoadBalancerTest, HostWeightedLargeRing) {
   EXPECT_EQ(3081, counts[2]); // :92 | ~3000 expected hits
 }
 
+TEST_P(RingHashLoadBalancerTest, ZeroLocalityWeights) {
+  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90"),
+                      makeTestHost(info_, "tcp://127.0.0.1:91")};
+  hostSet().healthy_hosts_ = hostSet().hosts_;
+  hostSet().hosts_per_locality_ =
+      makeHostsPerLocality({{hostSet().hosts_[0]}, {hostSet().hosts_[1]}});
+  hostSet().healthy_hosts_per_locality_ = hostSet().hosts_per_locality_;
+  hostSet().locality_weights_ = makeLocalityWeights({0, 0});
+  hostSet().runCallbacks({}, {});
+
+  init();
+  EXPECT_EQ(nullptr, lb_->factory()->create()->chooseHost(nullptr));
+}
+
 TEST_P(RingHashLoadBalancerTest, LocalityWeightedTinyRing) {
   hostSet().hosts_ = {
       makeTestHost(info_, "tcp://127.0.0.1:90"), makeTestHost(info_, "tcp://127.0.0.1:91"),
