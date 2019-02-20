@@ -4,6 +4,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 #include "common/common/logger.h"
+#include "common/common/stack_array.h"
 
 #include "test/common/buffer/buffer_fuzz.pb.h"
 #include "test/fuzz/fuzz_runner.h"
@@ -35,11 +36,120 @@ void releaseFragmentAllocation(const void* p, size_t, const Buffer::BufferFragme
   ::free(const_cast<void*>(p));
 }
 
+// Really simple string implementation of Buffer.
+class StringBuffer : public Buffer::Instance {
+public:
+  ~StringBuffer() {
+    // We don't really know when we are done with a buffer fragment, so just
+    // wait until the test is over.
+    for (auto* f : fragments_) {
+      f->done();
+    }
+  }
+
+  void add(const void* data, uint64_t size) override {
+    data_ += std::string(static_cast<const char*>(data), size);
+  }
+
+  void addBufferFragment(Buffer::BufferFragment& fragment) override {
+    add(fragment.data(), fragment.size());
+    fragments_.emplace_back(&fragment);
+  }
+
+  void add(absl::string_view data) override { add(data.data(), data.size()); }
+
+  void add(const Buffer::Instance& data) override {
+    const StringBuffer& src = dynamic_cast<const StringBuffer&>(data);
+    data_ += src.data_;
+  }
+
+  void prepend(absl::string_view data) override { data_ = std::string(data) + data_; }
+
+  void prepend(Instance& data) override {
+    StringBuffer& src = dynamic_cast<StringBuffer&>(data);
+    data_ = src.data_ + data_;
+    src.data_.clear();
+  }
+
+  void commit(Buffer::RawSlice* iovecs, uint64_t num_iovecs) override {
+    ASSERT(num_iovecs == 1);
+    ASSERT(reserve_buf_.get() == iovecs[0].mem_);
+    data_ += std::string(reserve_buf_.get(), iovecs[0].len_);
+  }
+
+  void copyOut(size_t start, uint64_t size, void* data) const override {
+    ::memcpy(data, data_.data() + start, size);
+  }
+
+  void drain(uint64_t size) override { data_ = data_.substr(size); }
+
+  uint64_t getRawSlices(Buffer::RawSlice* out, uint64_t out_size) const override {
+    ASSERT(out_size > 0);
+    // Sketchy, but probably will work for test purposes.
+    out->mem_ = const_cast<char*>(data_.data());
+    out->len_ = data_.size();
+    return 1;
+  }
+
+  uint64_t length() const override { return data_.size(); }
+
+  void* linearize(uint32_t /*size*/) override {
+    // Sketchy, but probably will work for test purposes.
+    return const_cast<char*>(data_.data());
+  }
+
+  void move(Buffer::Instance& rhs) override { move(rhs, rhs.length()); }
+
+  void move(Buffer::Instance& rhs, uint64_t length) override {
+    StringBuffer& src = dynamic_cast<StringBuffer&>(rhs);
+    data_ += src.data_.substr(0, length);
+    src.data_ = src.data_.substr(length);
+  }
+
+  Api::SysCallIntResult read(int fd, uint64_t max_length) override {
+    ASSERT(max_length <= MaxAllocation);
+    Api::SysCallIntResult result;
+    result.rc_ = ::read(fd, reserve_buf_.get(), max_length);
+    result.errno_ = errno;
+    ASSERT(result.rc_ > 0);
+    data_ += std::string(reserve_buf_.get(), result.rc_);
+    return result;
+  }
+
+  uint64_t reserve(uint64_t length, Buffer::RawSlice* iovecs, uint64_t num_iovecs) override {
+    ASSERT(num_iovecs > 0);
+    ASSERT(length <= MaxAllocation);
+    iovecs[0].mem_ = reserve_buf_.get();
+    iovecs[0].len_ = length;
+    return 1;
+  }
+
+  ssize_t search(const void* data, uint64_t size, size_t start) const override {
+    return data_.find(std::string(static_cast<const char*>(data), size), start);
+  }
+
+  std::string toString() const override { return data_; }
+
+  Api::SysCallIntResult write(int fd) override {
+    Api::SysCallIntResult result;
+    result.rc_ = ::write(fd, data_.data(), data_.size());
+    result.errno_ = errno;
+    ASSERT(result.rc_ >= 0);
+    data_ = data_.substr(result.rc_);
+    return result;
+  }
+
+  std::string data_;
+  std::unique_ptr<char[]> reserve_buf_{new char[MaxAllocation]};
+  std::vector<Buffer::BufferFragment*> fragments_;
+};
+
+typedef std::vector<std::unique_ptr<Buffer::Instance>> BufferList;
+
 // Process a single buffer operation.
-void bufferAction(Context& ctxt, Buffer::OwnedImpl buffers[],
-                  const test::common::buffer::Action& action) {
+void bufferAction(Context& ctxt, BufferList& buffers, const test::common::buffer::Action& action) {
   const uint32_t target_index = action.target_index() % BufferCount;
-  Buffer::OwnedImpl& target_buffer = buffers[target_index];
+  Buffer::Instance& target_buffer = *buffers[target_index];
 
   switch (action.action_selector_case()) {
   case test::common::buffer::Action::kAddBufferFragment: {
@@ -70,7 +180,7 @@ void bufferAction(Context& ctxt, Buffer::OwnedImpl buffers[],
     if (target_index == source_index) {
       break;
     }
-    Buffer::OwnedImpl& source_buffer = buffers[source_index];
+    Buffer::Instance& source_buffer = *buffers[source_index];
     const std::string source_contents = source_buffer.toString();
     const uint32_t previous_length = target_buffer.length();
     target_buffer.add(source_buffer);
@@ -91,7 +201,7 @@ void bufferAction(Context& ctxt, Buffer::OwnedImpl buffers[],
     if (target_index == source_index) {
       break;
     }
-    Buffer::OwnedImpl& source_buffer = buffers[source_index];
+    Buffer::Instance& source_buffer = *buffers[source_index];
     const std::string source_contents = source_buffer.toString();
     target_buffer.prepend(source_buffer);
     ASSERT(target_buffer.search(source_contents.data(), source_contents.size(), 0) == 0);
@@ -168,7 +278,7 @@ void bufferAction(Context& ctxt, Buffer::OwnedImpl buffers[],
     if (target_index == source_index) {
       break;
     }
-    Buffer::OwnedImpl& source_buffer = buffers[source_index];
+    Buffer::Instance& source_buffer = *buffers[source_index];
     if (action.move().length() == 0) {
       target_buffer.move(source_buffer);
     } else {
@@ -189,9 +299,11 @@ void bufferAction(Context& ctxt, Buffer::OwnedImpl buffers[],
     std::string data(max_length, 'd');
     const int rc = ::write(pipe_fds[1], data.data(), max_length);
     ASSERT(rc > 0);
+    const uint32_t previous_length = target_buffer.length();
     ASSERT(target_buffer.read(pipe_fds[0], max_length).rc_ == rc);
     ASSERT(::close(pipe_fds[0]) == 0);
     ASSERT(::close(pipe_fds[1]) == 0);
+    ASSERT(previous_length == target_buffer.search(data.data(), rc, previous_length));
     break;
   }
   case test::common::buffer::Action::kWrite: {
@@ -200,8 +312,16 @@ void bufferAction(Context& ctxt, Buffer::OwnedImpl buffers[],
     ASSERT(::fcntl(pipe_fds[0], F_SETFL, O_NONBLOCK) == 0);
     ASSERT(::fcntl(pipe_fds[1], F_SETFL, O_NONBLOCK) == 0);
     const bool empty = target_buffer.length() == 0;
+    const std::string previous_data = target_buffer.toString();
     const int rc = target_buffer.write(pipe_fds[1]).rc_;
-    ASSERT(empty ? rc == 0 : rc > 0);
+    if (empty) {
+      ASSERT(rc == 0);
+    } else {
+      ASSERT(rc > 0);
+      STACK_ARRAY(buf, char, rc);
+      ASSERT(::read(pipe_fds[0], buf.begin(), rc) == rc);
+      ASSERT(::memcmp(buf.begin(), previous_data.data(), rc) == 0);
+    }
     ASSERT(::close(pipe_fds[0]) == 0);
     ASSERT(::close(pipe_fds[1]) == 0);
     break;
@@ -218,34 +338,41 @@ void bufferAction(Context& ctxt, Buffer::OwnedImpl buffers[],
 DEFINE_PROTO_FUZZER(const test::common::buffer::BufferFuzzTestCase& input) {
   Context ctxt;
   // Fuzzed buffers.
-  Buffer::OwnedImpl buffers[BufferCount];
-  // Shadows of buffers that are linearized at the end of each operation. This
-  // is an approximation of a simple buffer implementation without buffer
-  // slices.
-  Buffer::OwnedImpl linear_buffers[BufferCount];
+  BufferList buffers;
+  // Shaddow buffers based on SimpleString;
+  BufferList linear_buffers;
+  for (uint32_t i = 0; i < BufferCount; ++i) {
+    buffers.emplace_back(new Buffer::OwnedImpl());
+    linear_buffers.emplace_back(new StringBuffer());
+  }
 
   for (int i = 0; i < input.actions().size(); ++i) {
     const auto& action = input.actions(i);
     ENVOY_LOG_MISC(debug, "Action {}", action.DebugString());
     bufferAction(ctxt, buffers, action);
     bufferAction(ctxt, linear_buffers, action);
+    // When tracing, dump everything.
+    for (uint32_t j = 0; j < BufferCount; ++j) {
+      ENVOY_LOG_MISC(trace, "Buffer at index {}", j);
+      ENVOY_LOG_MISC(trace, "B: {}", buffers[j]->toString());
+      ENVOY_LOG_MISC(trace, "L: {}", linear_buffers[j]->toString());
+    }
     // Verification pass, only non-mutating methods for buffers.
     for (uint32_t j = 0; j < BufferCount; ++j) {
-      ASSERT(buffers[j].toString() == linear_buffers[j].toString());
-      // Linearize shadow buffer, compare equal toString() and size().
-      linear_buffers[j].linearize(linear_buffers[j].length());
-      if (buffers[j].toString() != linear_buffers[j].toString()) {
+      if (buffers[j]->toString() != linear_buffers[j]->toString()) {
         ENVOY_LOG_MISC(debug, "Mismatched buffers at index {}", j);
-        ENVOY_LOG_MISC(debug, "B: {}", buffers[j].toString());
-        ENVOY_LOG_MISC(debug, "L: {}", linear_buffers[j].toString());
+        ENVOY_LOG_MISC(debug, "B: {}", buffers[j]->toString());
+        ENVOY_LOG_MISC(debug, "L: {}", linear_buffers[j]->toString());
         ASSERT(false);
       }
-      ASSERT(buffers[j].length() == linear_buffers[j].length());
+      ASSERT(buffers[j]->length() == linear_buffers[j]->length());
       constexpr uint32_t max_slices = 16;
       Buffer::RawSlice slices[max_slices];
-      buffers[j].getRawSlices(slices, max_slices);
+      buffers[j]->getRawSlices(slices, max_slices);
+      // This string should never appear (e.g. we don't synthesize _g as a
+      // pattern), verify that it's never found.
       std::string garbage{"_garbage"};
-      ASSERT(buffers[j].search(garbage.data(), garbage.size(), 0) == -1);
+      ASSERT(buffers[j]->search(garbage.data(), garbage.size(), 0) == -1);
     }
   }
 }

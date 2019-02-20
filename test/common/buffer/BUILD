@@ -33,6 +33,7 @@ envoy_cc_fuzz_test(
     deps = [
         ":buffer_fuzz_proto_cc",
         "//source/common/buffer:buffer_lib",
+        "//source/common/common:stack_array",
     ],
 )
 
