@@ -246,7 +246,7 @@ void InstanceImpl::initialize(const Options& options,
   failHealthcheck(false);
 
   uint64_t version_int;
-  if (!StringUtil::atoul(VersionInfo::revision().substr(0, 6).c_str(), version_int, 16)) {
+  if (!StringUtil::atoull(VersionInfo::revision().substr(0, 6).c_str(), version_int, 16)) {
     throw EnvoyException("compiled GIT SHA is invalid. Invalid build.");
   }
 
@@ -287,6 +287,8 @@ void InstanceImpl::initialize(const Options& options,
   overload_manager_ = std::make_unique<OverloadManagerImpl>(dispatcher(), stats(), threadLocal(),
                                                             bootstrap_.overload_manager(), api());
 
+  heap_shrinker_ = std::make_unique<Memory::HeapShrinker>(dispatcher(), overloadManager(), stats());
+
   // Workers get created first so they register for thread local updates.
   listener_manager_ =
       std::make_unique<ListenerManagerImpl>(*this, listener_component_factory_, worker_factory_);
@@ -300,7 +302,8 @@ void InstanceImpl::initialize(const Options& options,
 
   // Runtime gets initialized before the main configuration since during main configuration
   // load things may grab a reference to the loader for later use.
-  runtime_loader_ = component_factory.createRuntime(*this, initial_config);
+  runtime_singleton_ = std::make_unique<Runtime::ScopedLoaderSingleton>(
+      component_factory.createRuntime(*this, initial_config));
 
   // Once we have runtime we can initialize the SSL context manager.
   ssl_context_manager_ =
@@ -513,7 +516,7 @@ void InstanceImpl::terminate() {
   ENVOY_FLUSH_LOG();
 }
 
-Runtime::Loader& InstanceImpl::runtime() { return *runtime_loader_; }
+Runtime::Loader& InstanceImpl::runtime() { return Runtime::LoaderSingleton::get(); }
 
 void InstanceImpl::shutdown() {
   shutdown_ = true;

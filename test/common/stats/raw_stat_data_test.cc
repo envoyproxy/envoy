@@ -4,13 +4,14 @@
 #include "common/stats/stats_options_impl.h"
 
 #include "test/test_common/logging.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
+
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Stats {
 
-class RawStatDataTest : public TestBase {
+class RawStatDataTest : public testing::Test {
 public:
   RawStatDataTest() : allocator_(stats_options_) {}
 

@@ -64,19 +64,6 @@ public:
 
   bool grpcStreamAvailable() const { return stream_ != nullptr; }
 
-  bool checkRateLimitAllowsDrain(int queue_size) {
-    if (!rate_limiting_enabled_ || limit_request_->consume()) {
-      return true;
-    }
-    ASSERT(drain_request_timer_ != nullptr);
-    control_plane_stats_.rate_limit_enforced_.inc();
-    control_plane_stats_.pending_requests_.set(queue_size);
-    // Enable the drain request timer.
-    drain_request_timer_->enableTimer(
-        std::chrono::milliseconds(limit_request_->nextTokenAvailableMs()));
-    return false;
-  }
-
   void sendMessage(const RequestProto& request) { stream_->sendMessage(request, false); }
 
   // Grpc::AsyncStreamCallbacks
@@ -109,11 +96,33 @@ public:
 private:
   void drainRequests() {
     ENVOY_LOG(trace, "draining discovery requests {}", request_queue_.size());
-    while (!request_queue_.empty() && checkRateLimitAllowsDrain(request_queue_.size())) {
+    while (!request_queue_.empty() && checkRateLimitAllowsDrain()) {
       // Process the request, if rate limiting is not enabled at all or if it is under rate limit.
       sendDiscoveryRequest(request_queue_.front());
       request_queue_.pop();
     }
+    // Although request_queue_.push() happens elsewhere, the only time the queue is non-transiently
+    // non-empty is when it remains non-empty after a drain attempt. (The push() doesn't matter
+    // because we always attempt this drain immediately after the push). Basically, a change in
+    // queue length is not "meaningful" until it has persisted until here. We need the
+    // if(>0 || used) to keep this stat from being wrongly marked interesting by a pointless set(0)
+    // and needlessly taking up space. The first time we set(123), used becomes true, and so we will
+    // subsequently always do the set (including set(0)).
+    if (request_queue_.size() > 0 || control_plane_stats_.pending_requests_.used()) {
+      control_plane_stats_.pending_requests_.set(request_queue_.size());
+    }
+  }
+
+  bool checkRateLimitAllowsDrain() {
+    if (!rate_limiting_enabled_ || limit_request_->consume()) {
+      return true;
+    }
+    ASSERT(drain_request_timer_ != nullptr);
+    control_plane_stats_.rate_limit_enforced_.inc();
+    // Enable the drain request timer.
+    drain_request_timer_->enableTimer(
+        std::chrono::milliseconds(limit_request_->nextTokenAvailableMs()));
+    return false;
   }
 
   void setRetryTimer() {
@@ -130,8 +139,6 @@ private:
   const uint32_t RETRY_INITIAL_DELAY_MS = 500;
   const uint32_t RETRY_MAX_DELAY_MS = 30000; // Do not cross more than 30s
 
-  std::queue<RequestQueueItem> request_queue_;
-
   Grpc::AsyncClientPtr async_client_;
   Grpc::AsyncStream* stream_{};
   const Protobuf::MethodDescriptor& service_method_;
@@ -147,6 +154,9 @@ private:
   TokenBucketPtr limit_request_;
   const bool rate_limiting_enabled_;
   Event::TimerPtr drain_request_timer_;
+  // A queue to store requests while rate limited. Note that when requests cannot be sent due to the
+  // gRPC stream being down, this queue does not store them; rather, they are simply dropped.
+  std::queue<RequestQueueItem> request_queue_;
 };
 
 } // namespace Config

@@ -19,7 +19,7 @@
 namespace Envoy {
 
 // Define fixture which allocates ValidationDispatcher.
-class ConfigValidation : public TestBaseWithParam<Network::Address::IpVersion> {
+class ConfigValidation : public testing::TestWithParam<Network::Address::IpVersion> {
 public:
   ConfigValidation() {
     Event::Libevent::Global::initialize();

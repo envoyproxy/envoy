@@ -15,10 +15,10 @@
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/mocks.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Return;
@@ -27,7 +27,7 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Upstream {
 
-class EdsTest : public TestBase {
+class EdsTest : public testing::Test {
 protected:
   EdsTest() : api_(Api::createApiForTest(stats_)) { resetCluster(); }
 
@@ -52,7 +52,7 @@ protected:
     local_info_.node_.mutable_locality()->set_zone("us-east-1a");
     eds_cluster_ = parseClusterFromV2Yaml(yaml_config);
     Upstream::ClusterManager::ClusterInfoMap cluster_map;
-    Upstream::MockCluster cluster;
+    Upstream::MockClusterMockPrioritySet cluster;
     cluster_map.emplace("eds", cluster);
     EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
     EXPECT_CALL(cluster, info()).Times(2);

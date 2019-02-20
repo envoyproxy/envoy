@@ -489,6 +489,7 @@ void ConnectionManagerImpl::ActiveStream::onIdleTimeout() {
     // or gRPC status code, and/or set H2 RST_STREAM error.
     connection_manager_.doEndStream(*this);
   } else {
+    stream_info_.setResponseFlag(StreamInfo::ResponseFlag::StreamIdleTimeout);
     sendLocalReply(
         request_headers_ != nullptr && Grpc::Common::hasGrpcContentType(*request_headers_),
         Http::Code::RequestTimeout, "stream timeout", nullptr, is_head_request_, absl::nullopt);
@@ -513,11 +514,7 @@ void ConnectionManagerImpl::ActiveStream::addStreamEncoderFilterWorker(
     StreamEncoderFilterSharedPtr filter, bool dual_filter) {
   ActiveStreamEncoderFilterPtr wrapper(new ActiveStreamEncoderFilter(*this, filter, dual_filter));
   filter->setEncoderFilterCallbacks(*wrapper);
-  if (connection_manager_.config_.reverseEncodeOrder()) {
-    wrapper->moveIntoList(std::move(wrapper), encoder_filters_);
-  } else {
-    wrapper->moveIntoListBack(std::move(wrapper), encoder_filters_);
-  }
+  wrapper->moveIntoList(std::move(wrapper), encoder_filters_);
 }
 
 void ConnectionManagerImpl::ActiveStream::addAccessLogHandler(

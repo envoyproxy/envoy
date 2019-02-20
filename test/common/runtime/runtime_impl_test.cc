@@ -9,9 +9,9 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/environment.h"
-#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Invoke;
@@ -63,7 +63,7 @@ TEST(UUID, sanityCheckOfUniqueness) {
   EXPECT_EQ(num_of_uuids, uuids.size());
 }
 
-class DiskBackedLoaderImplTest : public TestBase {
+class DiskBackedLoaderImplTest : public testing::Test {
 protected:
   DiskBackedLoaderImplTest() : api_(Api::createApiForTest(store)) {}
 
@@ -105,6 +105,19 @@ TEST_F(DiskBackedLoaderImplTest, All) {
   EXPECT_EQ(1UL, loader->snapshot().getInteger("file1", 1));
   EXPECT_EQ(2UL, loader->snapshot().getInteger("file3", 1));
   EXPECT_EQ(123UL, loader->snapshot().getInteger("file4", 1));
+
+  // Boolean getting.
+  bool value;
+  SnapshotImpl* snapshot = reinterpret_cast<SnapshotImpl*>(&loader->snapshot());
+
+  EXPECT_EQ(true, snapshot->getBoolean("file11", value));
+  EXPECT_EQ(true, value);
+  EXPECT_EQ(true, snapshot->getBoolean("file12", value));
+  EXPECT_EQ(false, value);
+  EXPECT_EQ(true, snapshot->getBoolean("file13", value));
+  EXPECT_EQ(true, value);
+  // File1 is not a boolean.
+  EXPECT_EQ(false, snapshot->getBoolean("file1", value));
 
   // Files with comments.
   EXPECT_EQ(123UL, loader->snapshot().getInteger("file5", 1));
@@ -260,11 +273,10 @@ TEST(LoaderImplTest, All) {
   testNewOverrides(loader, store);
 }
 
-class DiskLayerTest : public TestBase {
+class DiskLayerTest : public testing::Test {
 protected:
-  DiskLayerTest() : api_(Api::createApiForTest(store_)) {}
+  DiskLayerTest() : api_(Api::createApiForTest()) {}
 
-  Stats::IsolatedStoreImpl store_;
   Api::ApiPtr api_;
 };
 

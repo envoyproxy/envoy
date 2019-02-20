@@ -45,6 +45,10 @@ envoy_cmake_external(
     },
     cmake_files_dir = "$BUILD_TMPDIR/lib/CMakeFiles",
     copy_pdb = True,
+    env_vars = select({
+        "//bazel:opt_build": {},
+        "//conditions:default": {"CFLAGS": "-DDEBUGBUILD"},
+    }),
     lib_source = "@com_github_nghttp2_nghttp2//:all",
     pdb_name = "nghttp2_static",
     static_libraries = select({

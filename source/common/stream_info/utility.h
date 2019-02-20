@@ -37,6 +37,7 @@ private:
   const static std::string RATE_LIMITED;
   const static std::string UNAUTHORIZED_EXTERNAL_SERVICE;
   const static std::string RATELIMIT_SERVICE_ERROR;
+  const static std::string STREAM_IDLE_TIMEOUT;
 };
 
 /**

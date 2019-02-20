@@ -3,9 +3,8 @@
 #include "common/common/assert.h"
 #include "common/common/lock_guard.h"
 
-#include "test/test_common/test_base.h"
-
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Return;
@@ -19,6 +18,10 @@ MockApi::~MockApi() {}
 
 Event::DispatcherPtr MockApi::allocateDispatcher() {
   return Event::DispatcherPtr{allocateDispatcher_(time_system_)};
+}
+
+Event::DispatcherPtr MockApi::allocateDispatcher(Buffer::WatermarkFactoryPtr&& watermark_factory) {
+  return Event::DispatcherPtr{allocateDispatcher_(std::move(watermark_factory), time_system_)};
 }
 
 MockOsSysCalls::MockOsSysCalls() { num_writes_ = num_open_ = 0; }

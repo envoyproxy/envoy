@@ -3,7 +3,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/buffer/watermark_buffer.h"
 
-#include "test/test_common/test_base.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Buffer {
@@ -11,7 +11,7 @@ namespace {
 
 const char TEN_BYTES[] = "0123456789";
 
-class WatermarkBufferTest : public TestBase {
+class WatermarkBufferTest : public testing::Test {
 public:
   WatermarkBufferTest() { buffer_.setWatermarks(5, 10); }
 

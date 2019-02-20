@@ -26,10 +26,13 @@ public:
 
   // Api::Api
   Event::DispatcherPtr allocateDispatcher() override;
-  Event::TimeSystem& timeSystemForDispatcher() override { return time_system_; }
+  Event::DispatcherPtr allocateDispatcher(Buffer::WatermarkFactoryPtr&& watermark_factory) override;
   TimeSource& timeSource() override { return time_system_; }
 
   MOCK_METHOD1(allocateDispatcher_, Event::Dispatcher*(Event::TimeSystem&));
+  MOCK_METHOD2(allocateDispatcher_,
+               Event::Dispatcher*(Buffer::WatermarkFactoryPtr&& watermark_factory,
+                                  Event::TimeSystem&));
   MOCK_METHOD0(fileSystem, Filesystem::Instance&());
   MOCK_METHOD0(threadFactory, Thread::ThreadFactory&());
 

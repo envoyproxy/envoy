@@ -32,6 +32,13 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool) 
   return Http::FilterHeadersStatus::Continue;
 }
 
+Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool) {
+  if (tapper_ != nullptr) {
+    tapper_->onRequestBody(data);
+  }
+  return Http::FilterDataStatus::Continue;
+}
+
 Http::FilterTrailersStatus Filter::decodeTrailers(Http::HeaderMap& trailers) {
   // TODO(mattklein123): Why is this not provided in the log callback? Do a follow-up to make it so.
   request_trailers_ = &trailers;
@@ -46,6 +53,13 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::HeaderMap& headers, bool) 
     tapper_->onResponseHeaders(headers);
   }
   return Http::FilterHeadersStatus::Continue;
+}
+
+Http::FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool) {
+  if (tapper_ != nullptr) {
+    tapper_->onResponseBody(data);
+  }
+  return Http::FilterDataStatus::Continue;
 }
 
 Http::FilterTrailersStatus Filter::encodeTrailers(Http::HeaderMap& trailers) {

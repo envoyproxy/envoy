@@ -11,9 +11,9 @@
 #include "test/integration/utility.h"
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/network_utility.h"
-#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 #include "mysql_test_utils.h"
 #include "rapidjson/document.h"
 
@@ -26,7 +26,7 @@ namespace MySQLProxy {
 
 constexpr int SESSIONS = 5;
 
-class MySQLIntegrationTest : public TestBaseWithParam<Network::Address::IpVersion>,
+class MySQLIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                              public MySQLTestUtils,
                              public BaseIntegrationTest {
   std::string mysqlConfig() {

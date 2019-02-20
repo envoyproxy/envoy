@@ -25,12 +25,12 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/simulated_time_system.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/escaping.h"
 #include "absl/strings/match.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::InSequence;
@@ -55,9 +55,9 @@ public:
   Configuration::FactoryContext* context_{};
 };
 
-class ListenerManagerImplTest : public TestBase {
+class ListenerManagerImplTest : public testing::Test {
 protected:
-  ListenerManagerImplTest() : api_(Api::createApiForTest(stats_)) {
+  ListenerManagerImplTest() : api_(Api::createApiForTest()) {
     ON_CALL(server_, api()).WillByDefault(ReturnRef(*api_));
     EXPECT_CALL(worker_factory_, createWorker_()).WillOnce(Return(worker_));
     manager_ = std::make_unique<ListenerManagerImpl>(server_, listener_factory_, worker_factory_);
@@ -122,7 +122,6 @@ protected:
   std::unique_ptr<ListenerManagerImpl> manager_;
   NiceMock<MockGuardDog> guard_dog_;
   Event::SimulatedTimeSystem time_system_;
-  Stats::IsolatedStoreImpl stats_;
   Api::ApiPtr api_;
 };
 
@@ -490,20 +489,6 @@ TEST_F(ListenerManagerImplTest, NotDefaultListenerFiltersTimeout) {
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(json), "", true));
   EXPECT_EQ(std::chrono::milliseconds(),
             manager_->listeners().front().get().listenerFiltersTimeout());
-}
-
-TEST_F(ListenerManagerImplTest, ReversedWriteFilterOrder) {
-  const std::string json = R"EOF(
-    name: "foo"
-    address:
-      socket_address: { address: 127.0.0.1, port_value: 10000 }
-    filter_chains:
-    - filters:
-  )EOF";
-
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true));
-  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(json), "", true));
-  EXPECT_TRUE(manager_->listeners().front().get().reverseWriteFilterOrder());
 }
 
 TEST_F(ListenerManagerImplTest, ModifyOnlyDrainType) {

@@ -106,6 +106,7 @@ HV
 IAM
 IANA
 IDL
+INADDR
 INET
 IO
 IOS
@@ -137,6 +138,7 @@ MB
 MD
 MGET
 MSET
+MSVC
 MTLS
 MiB
 NACK
@@ -285,7 +287,7 @@ ary
 async
 atomicly
 atomics
-atoul
+atoull
 aud
 auth
 authenticator
@@ -373,6 +375,7 @@ dirname
 djb
 downcasted
 downstream
+dtor
 dubbo
 dup
 durations
@@ -653,7 +656,7 @@ stmt
 str
 strftime
 stringified
-strtoul
+strtoull
 struct
 structs
 subexpr

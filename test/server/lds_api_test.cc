@@ -22,7 +22,7 @@ using testing::Throw;
 namespace Envoy {
 namespace Server {
 
-class LdsApiTest : public TestBase {
+class LdsApiTest : public testing::Test {
 public:
   LdsApiTest() : request_(&cluster_manager_.async_client_), api_(Api::createApiForTest(store_)) {}
 
@@ -41,7 +41,7 @@ public:
     lds_config.mutable_api_config_source()->set_api_type(
         envoy::api::v2::core::ApiConfigSource::REST);
     Upstream::ClusterManager::ClusterInfoMap cluster_map;
-    Upstream::MockCluster cluster;
+    Upstream::MockClusterMockPrioritySet cluster;
     cluster_map.emplace("foo_cluster", cluster);
     EXPECT_CALL(cluster_manager_, clusters()).WillOnce(Return(cluster_map));
     EXPECT_CALL(cluster, info());
@@ -218,7 +218,7 @@ TEST_F(LdsApiTest, BadLocalInfo) {
   envoy::api::v2::core::ConfigSource lds_config;
   Config::Utility::translateLdsConfig(*config, lds_config);
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
-  Upstream::MockCluster cluster;
+  Upstream::MockClusterMockPrioritySet cluster;
   cluster_map.emplace("foo_cluster", cluster);
   EXPECT_CALL(cluster_manager_, clusters()).WillOnce(Return(cluster_map));
   EXPECT_CALL(cluster, info()).Times(2);
