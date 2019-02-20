@@ -40,6 +40,8 @@ Network::FilterStatus Router::transportEnd() {
     cleanup();
   }
 
+  filter_complete_ = true;
+
   return Network::FilterStatus::Continue;
 }
 
@@ -55,7 +57,7 @@ Network::FilterStatus Router::messageEnd(MessageMetadataSharedPtr metadata) {
     callbacks_->sendLocalReply(AppException(ResponseStatus::ServiceNotFound,
                                             fmt::format("dubbo router: no route for interface '{}'",
                                                         metadata->service_name())),
-                               true);
+                               false);
     return Network::FilterStatus::StopIteration;
   }
 
@@ -68,7 +70,7 @@ Network::FilterStatus Router::messageEnd(MessageMetadataSharedPtr metadata) {
     callbacks_->sendLocalReply(
         AppException(ResponseStatus::ServerError, fmt::format("dubbo router: unknown cluster '{}'",
                                                               route_entry_->clusterName())),
-        true);
+        false);
     return Network::FilterStatus::StopIteration;
   }
 
@@ -81,7 +83,7 @@ Network::FilterStatus Router::messageEnd(MessageMetadataSharedPtr metadata) {
         AppException(ResponseStatus::ServerError,
                      fmt::format("dubbo router: maintenance mode for cluster '{}'",
                                  route_entry_->clusterName())),
-        true);
+        false);
     return Network::FilterStatus::StopIteration;
   }
 
@@ -92,7 +94,7 @@ Network::FilterStatus Router::messageEnd(MessageMetadataSharedPtr metadata) {
         AppException(
             ResponseStatus::ServerError,
             fmt::format("dubbo router: no healthy upstream for '{}'", route_entry_->clusterName())),
-        true);
+        false);
     return Network::FilterStatus::StopIteration;
   }
 
@@ -124,6 +126,10 @@ void Router::onUpstreamData(Buffer::Instance& data, bool end_stream) {
     return;
   } else if (status == DubboFilters::UpstreamResponseStatus::Reset) {
     ENVOY_STREAM_LOG(debug, "dubbo router: upstream reset", *callbacks_);
+    // When the upstreamData function returns Reset,
+    // the current stream is already released from the upper layer,
+    // so there is no need to call callbacks_->resetStream() to notify
+    // the upper layer to release the stream.
     upstream_request_->resetStream();
     return;
   }
@@ -131,9 +137,9 @@ void Router::onUpstreamData(Buffer::Instance& data, bool end_stream) {
   if (end_stream) {
     // Response is incomplete, but no more data is coming.
     ENVOY_STREAM_LOG(debug, "dubbo router: response underflow", *callbacks_);
-    upstream_request_->onResponseComplete();
     upstream_request_->onResetStream(
         Tcp::ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
+    upstream_request_->onResponseComplete();
     cleanup();
   }
 }
@@ -233,7 +239,6 @@ void Router::UpstreamRequest::onPoolFailure(Tcp::ConnectionPool::PoolFailureReas
   onUpstreamHostSelected(host);
   onResetStream(reason);
 
-  conn_pool_handle_ = nullptr;
   parent_.upstream_request_buffer_.drain(parent_.upstream_request_buffer_.length());
 }
 
@@ -288,6 +293,8 @@ void Router::UpstreamRequest::onResetStream(Tcp::ConnectionPool::PoolFailureReas
     return;
   }
 
+  // When the filter's callback does not end, the sendLocalReply function call
+  // triggers the release of the current stream at the end of the filter's callback.
   switch (reason) {
   case Tcp::ConnectionPool::PoolFailureReason::Overflow:
     parent_.callbacks_->sendLocalReply(
@@ -321,6 +328,13 @@ void Router::UpstreamRequest::onResetStream(Tcp::ConnectionPool::PoolFailureReas
     break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
+  }
+
+  if (parent_.filter_complete_ && !response_complete_) {
+    // When the filter's callback has ended and the reply message has not been processed,
+    // call resetStream to release the current stream.
+    // the resetStream eventually triggers the onDestroy function call.
+    parent_.callbacks_->resetStream();
   }
 }
 

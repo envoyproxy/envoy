@@ -125,6 +125,7 @@ public:
   MOCK_METHOD1(upstreamData, UpstreamResponseStatus(Buffer::Instance&));
   MOCK_METHOD0(resetDownstreamConnection, void());
   MOCK_METHOD0(streamInfo, StreamInfo::StreamInfo&());
+  MOCK_METHOD0(resetStream, void());
 
   uint64_t stream_id_{1};
   NiceMock<Network::MockConnection> connection_;

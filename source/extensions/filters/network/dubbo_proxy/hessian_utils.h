@@ -37,6 +37,7 @@ public:
   static std::string readByte(Buffer::Instance& buffer);
 
   static void writeString(Buffer::Instance& buffer, const absl::string_view& str);
+  static void writeInt(Buffer::Instance& buffer, uint8_t value);
 };
 
 } // namespace DubboProxy

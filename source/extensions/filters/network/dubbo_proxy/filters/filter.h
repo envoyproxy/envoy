@@ -132,6 +132,11 @@ public:
    * @return StreamInfo for logging purposes.
    */
   virtual StreamInfo::StreamInfo& streamInfo() PURE;
+
+  /**
+   * Reset the underlying stream.
+   */
+  virtual void resetStream() PURE;
 };
 
 /**

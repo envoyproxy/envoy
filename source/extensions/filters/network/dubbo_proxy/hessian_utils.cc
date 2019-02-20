@@ -563,6 +563,11 @@ void HessianUtils::writeString(Buffer::Instance& buffer, const absl::string_view
   return;
 }
 
+void HessianUtils::writeInt(Buffer::Instance& buffer, uint8_t value) {
+  // Compact int
+  buffer.writeByte(0x90 + value);
+}
+
 } // namespace DubboProxy
 } // namespace NetworkFilters
 } // namespace Extensions

@@ -289,7 +289,7 @@ TEST_F(DubboRouterTest, ClusterMaintenanceMode) {
         auto& app_ex = dynamic_cast<const AppException&>(response);
         EXPECT_EQ(ResponseStatus::ServerError, app_ex.status_);
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*maintenance mode.*"));
-        EXPECT_TRUE(end_stream);
+        EXPECT_FALSE(end_stream);
       }));
   EXPECT_EQ(Network::FilterStatus::StopIteration, router_->messageEnd(metadata_));
 }
@@ -309,7 +309,7 @@ TEST_F(DubboRouterTest, NoHealthyHosts) {
         auto& app_ex = dynamic_cast<const AppException&>(response);
         EXPECT_EQ(ResponseStatus::ServerError, app_ex.status_);
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*no healthy upstream.*"));
-        EXPECT_TRUE(end_stream);
+        EXPECT_FALSE(end_stream);
       }));
 
   EXPECT_EQ(Network::FilterStatus::StopIteration, router_->messageEnd(metadata_));
@@ -341,7 +341,7 @@ TEST_F(DubboRouterTest, NoRoute) {
         auto& app_ex = dynamic_cast<const AppException&>(response);
         EXPECT_EQ(ResponseStatus::ServiceNotFound, app_ex.status_);
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*no route.*"));
-        EXPECT_TRUE(end_stream);
+        EXPECT_FALSE(end_stream);
       }));
   EXPECT_EQ(Network::FilterStatus::StopIteration, router_->messageEnd(metadata_));
 }
@@ -359,7 +359,7 @@ TEST_F(DubboRouterTest, NoCluster) {
         auto& app_ex = dynamic_cast<const AppException&>(response);
         EXPECT_EQ(ResponseStatus::ServerError, app_ex.status_);
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*unknown cluster.*"));
-        EXPECT_TRUE(end_stream);
+        EXPECT_FALSE(end_stream);
       }));
   EXPECT_EQ(Network::FilterStatus::StopIteration, router_->messageEnd(metadata_));
 }

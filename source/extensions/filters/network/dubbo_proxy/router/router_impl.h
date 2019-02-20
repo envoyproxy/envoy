@@ -95,6 +95,8 @@ private:
 
   std::unique_ptr<UpstreamRequest> upstream_request_;
   Envoy::Buffer::OwnedImpl upstream_request_buffer_;
+
+  bool filter_complete_{false};
 };
 
 } // namespace Router
