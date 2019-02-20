@@ -196,7 +196,7 @@ bool updateHealthFlag(const Host& updated_host, Host& existing_host, Host::Healt
 
 // Converts a set of hosts into a HostVector, excluding certain hosts.
 // @param hosts hosts to convert
-// @param excluded_hosts hosts to exlcude from the resulting vector.
+// @param excluded_hosts hosts to exclude from the resulting vector.
 HostVector filterHosts(const std::unordered_set<HostSharedPtr>& hosts,
                        const std::unordered_set<HostSharedPtr>& excluded_hosts) {
   HostVector net_hosts;
