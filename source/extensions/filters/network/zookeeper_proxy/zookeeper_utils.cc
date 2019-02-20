@@ -39,8 +39,9 @@ bool BufferHelper::peekString(Buffer::Instance& buffer, uint64_t& offset, std::s
     return false;
   }
 
-  str.assign(std::string(static_cast<char*>(buffer.linearize(len + offset)), len + offset));
-  str = str.substr(offset);
+  std::unique_ptr<char[]> data(new char[len]);
+  buffer.copyOut(offset, len, data.get());
+  str.assign(data.get(), len);
   offset += len;
 
   return true;
