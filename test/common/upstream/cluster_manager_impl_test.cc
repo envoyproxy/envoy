@@ -13,8 +13,8 @@
 #include "common/network/transport_socket_options_impl.h"
 #include "common/network/utility.h"
 #include "common/singleton/manager_impl.h"
-#include "common/upstream/cluster_manager_impl.h"
 #include "common/upstream/cluster_factory_impl.h"
+#include "common/upstream/cluster_manager_impl.h"
 
 #include "extensions/transport_sockets/tls/context_manager_impl.h"
 
@@ -62,10 +62,10 @@ public:
         .WillByDefault(Invoke([&](const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
                                   Outlier::EventLoggerSharedPtr outlier_event_logger,
                                   bool Fdded_via_api) -> ClusterSharedPtr {
-          return ClusterFactoryImplBase::create(cluster, cm, stats_, tls_, dns_resolver_,
-                                         ssl_context_manager_, runtime_, random_, dispatcher_,
-                                         log_manager_, local_info_, admin_, singleton_manager_,
-                                         outlier_event_logger, added_via_api, *api_);
+          return ClusterFactoryImplBase::create(
+              cluster, cm, stats_, tls_, dns_resolver_, ssl_context_manager_, runtime_, random_,
+              dispatcher_, log_manager_, local_info_, admin_, singleton_manager_,
+              outlier_event_logger, added_via_api, *api_);
         }));
   }
 

@@ -35,8 +35,8 @@ public:
   const std::string OriginalDst = "envoy.cluster.original_dst";
 };
 
-typedef ConstSingleton <ClusterTypeValues> ClusterTypes;
+typedef ConstSingleton<ClusterTypeValues> ClusterTypes;
 
-} // namespace NetworkFilters
+} // namespace Clusters
 } // namespace Extensions
 } // namespace Envoy

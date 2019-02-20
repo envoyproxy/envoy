@@ -159,11 +159,13 @@ private:
 
 class LogicalDnsClusterFactory : public ClusterFactoryImplBase {
 public:
-  LogicalDnsClusterFactory() : ClusterFactoryImplBase(Extensions::Clusters::ClusterTypes::get().LogicalDns) { }
+  LogicalDnsClusterFactory()
+      : ClusterFactoryImplBase(Extensions::Clusters::ClusterTypes::get().LogicalDns) {}
 
-  ClusterImplBaseSharedPtr createClusterImpl(const envoy::api::v2::Cluster& cluster,
-                                             ClusterFactoryContext& context, Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
-                                             Stats::ScopePtr&& stats_scope) override;
+  ClusterImplBaseSharedPtr
+  createClusterImpl(const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context,
+                    Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
+                    Stats::ScopePtr&& stats_scope) override;
 };
 
 } // namespace Upstream

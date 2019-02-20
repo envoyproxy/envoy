@@ -58,11 +58,12 @@ private:
 
 class EdsClusterFactory : public ClusterFactoryImplBase {
 public:
-  EdsClusterFactory() : ClusterFactoryImplBase(Extensions::Clusters::ClusterTypes::get().Eds) { }
+  EdsClusterFactory() : ClusterFactoryImplBase(Extensions::Clusters::ClusterTypes::get().Eds) {}
 
-  ClusterImplBaseSharedPtr createClusterImpl(const envoy::api::v2::Cluster& cluster,
-                                             ClusterFactoryContext& context, Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
-                                             Stats::ScopePtr&& stats_scope) override;
+  ClusterImplBaseSharedPtr
+  createClusterImpl(const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context,
+                    Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
+                    Stats::ScopePtr&& stats_scope) override;
 };
 
 } // namespace Upstream

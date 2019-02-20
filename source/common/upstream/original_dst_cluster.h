@@ -121,11 +121,13 @@ private:
 
 class OriginalDstClusterFactory : public ClusterFactoryImplBase {
 public:
-  OriginalDstClusterFactory() : ClusterFactoryImplBase(Extensions::Clusters::ClusterTypes::get().OriginalDst) { }
+  OriginalDstClusterFactory()
+      : ClusterFactoryImplBase(Extensions::Clusters::ClusterTypes::get().OriginalDst) {}
 
-  ClusterImplBaseSharedPtr createClusterImpl(const envoy::api::v2::Cluster& cluster,
-                                             ClusterFactoryContext& context, Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
-                                             Stats::ScopePtr&& stats_scope) override;
+  ClusterImplBaseSharedPtr
+  createClusterImpl(const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context,
+                    Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
+                    Stats::ScopePtr&& stats_scope) override;
 };
 
 } // namespace Upstream

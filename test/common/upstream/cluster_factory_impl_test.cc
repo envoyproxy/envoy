@@ -9,14 +9,16 @@
 #include "envoy/http/codec.h"
 #include "envoy/stats/scope.h"
 #include "envoy/upstream/cluster_manager.h"
+#include "envoy/upstream/outlier_detection.h"
+#include "envoy/upstream/upstream.h"
 
 #include "common/config/metadata.h"
 #include "common/json/config_schemas.h"
 #include "common/json/json_loader.h"
 #include "common/network/utility.h"
 #include "common/singleton/manager_impl.h"
-#include "common/upstream/upstream_impl.h"
 #include "common/upstream/cluster_factory_impl.h"
+#include "common/upstream/upstream_impl.h"
 
 #include "server/transport_socket_config_impl.h"
 
@@ -35,8 +37,6 @@
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "envoy/upstream/outlier_detection.h"
-#include "envoy/upstream/upstream.h"
 
 using testing::_;
 using testing::ContainerEq;
@@ -52,13 +52,14 @@ class TestStaticClusterImpl : public ClusterImplBase {
 public:
   TestStaticClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
                         Server::Configuration::TransportSocketFactoryContext& factory_context,
-                        Stats::ScopePtr&& stats_scope, bool added_via_api) :
-                        TestStaticClusterImpl(cluster, runtime, factory_context, std::move(stats_scope), added_via_api, 1) { }
+                        Stats::ScopePtr&& stats_scope, bool added_via_api)
+      : TestStaticClusterImpl(cluster, runtime, factory_context, std::move(stats_scope),
+                              added_via_api, 1) {}
   TestStaticClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
-                    Server::Configuration::TransportSocketFactoryContext& factory_context,
-                    Stats::ScopePtr&& stats_scope, bool added_via_api, uint32_t priority) :
-                    ClusterImplBase(cluster, runtime, factory_context, std::move(stats_scope), added_via_api),
-                    priority_(priority) { }
+                        Server::Configuration::TransportSocketFactoryContext& factory_context,
+                        Stats::ScopePtr&& stats_scope, bool added_via_api, uint32_t priority)
+      : ClusterImplBase(cluster, runtime, factory_context, std::move(stats_scope), added_via_api),
+        priority_(priority) {}
 
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
 
@@ -71,41 +72,45 @@ private:
     HostVector hosts_removed{};
 
     this->prioritySet().updateHosts(
-      priority_, HostSetImpl::updateHostsParams(hosts, hosts_per_locality, hosts, hosts_per_locality), {},
-      hosts_added, hosts_removed, absl::nullopt);
+        priority_,
+        HostSetImpl::updateHostsParams(hosts, hosts_per_locality, hosts, hosts_per_locality), {},
+        hosts_added, hosts_removed, absl::nullopt);
   }
-  const uint32_t  priority_;
+  const uint32_t priority_;
 };
 
 class TestStaticClusterFactory : public ClusterFactoryImplBase {
 public:
-  TestStaticClusterFactory() : ClusterFactoryImplBase("envoy.clusters.test_static") { }
+  TestStaticClusterFactory() : ClusterFactoryImplBase("envoy.clusters.test_static") {}
 
-  ClusterImplBaseSharedPtr createClusterImpl(const envoy::api::v2::Cluster& cluster,
-                                             ClusterFactoryContext& context, Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
-                                             Stats::ScopePtr&& stats_scope) override {
-    return std::make_unique<TestStaticClusterImpl>(cluster, context.runtime(), socket_factory_context,
-                                               std::move(stats_scope), context.addedViaApi());
+  ClusterImplBaseSharedPtr
+  createClusterImpl(const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context,
+                    Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
+                    Stats::ScopePtr&& stats_scope) override {
+    return std::make_unique<TestStaticClusterImpl>(cluster, context.runtime(),
+                                                   socket_factory_context, std::move(stats_scope),
+                                                   context.addedViaApi());
   }
 };
 
-//REGISTER_FACTORY(TestStaticClusterFactory, ClusterFactory);
+// REGISTER_FACTORY(TestStaticClusterFactory, ClusterFactory);
 
-class ConfigurableTestStaticClusterFactory : public ConfigurableClusterFactoryBase<test::common::upstream::TestStaticConfig> {
+class ConfigurableTestStaticClusterFactory
+    : public ConfigurableClusterFactoryBase<test::common::upstream::TestStaticConfig> {
 public:
-  ConfigurableTestStaticClusterFactory() : ConfigurableClusterFactoryBase("envoy.clusters.test_static_config") { }
+  ConfigurableTestStaticClusterFactory()
+      : ConfigurableClusterFactoryBase("envoy.clusters.test_static_config") {}
+
 private:
-  ClusterImplBaseSharedPtr createClusterWithConfig(const envoy::api::v2::Cluster& cluster,
-              const test::common::upstream::TestStaticConfig& proto_config,
-                                                           ClusterFactoryContext& context,
-                                                           Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
-                                                           Stats::ScopePtr&& stats_scope) override {
-    return std::make_unique<TestStaticClusterImpl>(cluster, context.runtime(), socket_factory_context,
-                                                   std::move(stats_scope), context.addedViaApi(), proto_config.priority());
-
+  ClusterImplBaseSharedPtr createClusterWithConfig(
+      const envoy::api::v2::Cluster& cluster,
+      const test::common::upstream::TestStaticConfig& proto_config, ClusterFactoryContext& context,
+      Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
+      Stats::ScopePtr&& stats_scope) override {
+    return std::make_unique<TestStaticClusterImpl>(cluster, context.runtime(),
+                                                   socket_factory_context, std::move(stats_scope),
+                                                   context.addedViaApi(), proto_config.priority());
   }
-
-
 };
 
 class ClusterFactoryTestBase {
@@ -150,9 +155,10 @@ TEST_F(TestStaticClusterImplTest, createWithoutConfig) {
   Registry::InjectFactory<ClusterFactory> registered_factory(factory);
 
   const envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
-  auto cluster = ClusterFactoryImplBase::create(cluster_config, cm_, stats_, tls_, dns_resolver_,
-  ssl_context_manager_, runtime_, random_, dispatcher_, log_manager_, local_info_, admin_, singleton_manager_,
-  std::move(outlier_event_logger_), false, *api_);
+  auto cluster = ClusterFactoryImplBase::create(
+      cluster_config, cm_, stats_, tls_, dns_resolver_, ssl_context_manager_, runtime_, random_,
+      dispatcher_, log_manager_, local_info_, admin_, singleton_manager_,
+      std::move(outlier_event_logger_), false, *api_);
   cluster->initialize([] {});
 
   EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[1]->healthyHosts().size());
@@ -179,15 +185,16 @@ TEST_F(TestStaticClusterImplTest, createWithConfig) {
   Registry::InjectFactory<ClusterFactory> registered_factory(factory);
 
   const envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
-  auto cluster = ClusterFactoryImplBase::create(cluster_config, cm_, stats_, tls_, dns_resolver_,
-                                                ssl_context_manager_, runtime_, random_, dispatcher_, log_manager_, local_info_, admin_, singleton_manager_,
-                                                std::move(outlier_event_logger_), false, *api_);
+  auto cluster = ClusterFactoryImplBase::create(
+      cluster_config, cm_, stats_, tls_, dns_resolver_, ssl_context_manager_, runtime_, random_,
+      dispatcher_, log_manager_, local_info_, admin_, singleton_manager_,
+      std::move(outlier_event_logger_), false, *api_);
   cluster->initialize([] {});
 
   EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[10]->healthyHosts().size());
   EXPECT_EQ("", cluster->prioritySet().hostSetsPerPriority()[10]->hosts()[0]->hostname());
   EXPECT_FALSE(cluster->info()->addedViaApi());
 }
-}
-}
-}
+} // namespace
+} // namespace Upstream
+} // namespace Envoy
