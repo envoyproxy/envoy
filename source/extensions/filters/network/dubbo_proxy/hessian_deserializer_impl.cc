@@ -84,8 +84,7 @@ void HessianDeserializerImpl::serializeRpcResult(Buffer::Instance& output_buffer
   HessianUtils::writeInt(output_buffer, static_cast<uint8_t>(type));
 
   // Serialized response content.
-  absl::string_view str_view(content);
-  HessianUtils::writeString(output_buffer, str_view);
+  HessianUtils::writeString(output_buffer, content);
 }
 
 class HessianDeserializerConfigFactory : public DeserializerFactoryBase<HessianDeserializerImpl> {

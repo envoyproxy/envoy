@@ -39,7 +39,6 @@ envoy_cc_library(
     hdrs = ["config.h"],
     deps = [
         ":router_lib",
-        ":router_matcher",
         "//include/envoy/registry",
         "//source/extensions/filters/network/dubbo_proxy/filters:factory_base_lib",
         "//source/extensions/filters/network/dubbo_proxy/filters:filter_config_interface",

@@ -1,8 +1,6 @@
 #include "extensions/filters/network/dubbo_proxy/app_exception.h"
 
 #include "common/buffer/buffer_impl.h"
-#include "common/common/byte_order.h"
-#include "common/common/hex.h"
 
 #include "extensions/filters/network/dubbo_proxy/message.h"
 

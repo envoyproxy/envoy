@@ -173,7 +173,6 @@ envoy_cc_library(
         ":protocol_interface",
         "//include/envoy/buffer:buffer_interface",
         "//source/common/buffer:buffer_lib",
-        "//source/common/common:byte_order_lib",
         "//source/extensions/filters/network/dubbo_proxy/filters:filter_interface",
     ],
 )

@@ -32,7 +32,7 @@ Network::FilterStatus Router::transportBegin() {
 Network::FilterStatus Router::transportEnd() {
   ASSERT(upstream_request_);
 
-  upstream_request_->encodeData(upstream_request_buffer_, true);
+  upstream_request_->encodeData(upstream_request_buffer_);
 
   if (upstream_request_->metadata_->message_type() == MessageType::Oneway) {
     // No response expected
@@ -212,7 +212,7 @@ void Router::UpstreamRequest::resetStream() {
   }
 }
 
-void Router::UpstreamRequest::encodeData(Buffer::Instance& data, bool end_stream) {
+void Router::UpstreamRequest::encodeData(Buffer::Instance& data) {
   if (!conn_data_) {
     ENVOY_STREAM_LOG(trace, "buffering {} bytes", *parent_.callbacks_, data.length());
     if (!buffered_request_body_) {
@@ -223,9 +223,6 @@ void Router::UpstreamRequest::encodeData(Buffer::Instance& data, bool end_stream
   } else {
     ENVOY_STREAM_LOG(trace, "proxying {} bytes", *parent_.callbacks_, data.length());
     conn_data_->connection().write(data, false);
-    if (end_stream) {
-      parent_.callbacks_->streamInfo().onLastUpstreamTxByteSent();
-    }
   }
 }
 

@@ -54,7 +54,7 @@ private:
 
     Network::FilterStatus start();
     void resetStream();
-    void encodeData(Buffer::Instance& data, bool end_stream);
+    void encodeData(Buffer::Instance& data);
 
     // Tcp::ConnectionPool::Callbacks
     void onPoolFailure(Tcp::ConnectionPool::PoolFailureReason reason,
