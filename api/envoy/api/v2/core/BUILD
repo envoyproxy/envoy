@@ -54,13 +54,19 @@ api_proto_library_internal(
     visibility = [
         ":friends",
     ],
-    deps = [":base"],
+    deps = [
+        ":base",
+        "//envoy/type:range",
+    ],
 )
 
 api_go_proto_library(
     name = "health_check",
     proto = ":health_check",
-    deps = [":base_go_proto"],
+    deps = [
+        ":base_go_proto",
+        "//envoy/type:range_go_proto",
+    ],
 )
 
 api_proto_library_internal(
