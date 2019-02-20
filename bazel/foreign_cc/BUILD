@@ -12,9 +12,9 @@ configure_make(
         "--enable-frame-pointers",
         "--disable-libunwind",
     ],
+    lib_source = "@com_github_gperftools_gperftools//:all",
     linkopts = ["-lpthread"],
     make_commands = ["make install-libLTLIBRARIES install-perftoolsincludeHEADERS"],
-    lib_source = "@com_github_gperftools_gperftools//:all",
     static_libraries = select({
         "//bazel:debug_tcmalloc": ["libtcmalloc_debug.a"],
         "//conditions:default": ["libtcmalloc_and_profiler.a"],
