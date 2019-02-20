@@ -190,6 +190,12 @@ public:
   virtual const Buffer::Instance* decodingBuffer() PURE;
 
   /**
+   * Allows modifying the decoding buffer. May only be called before any data has been continued
+   * past the calling filter.
+   */
+  virtual void modifyDecodingBuffer(std::function<void(Buffer::Instance&)> callback) PURE;
+
+  /**
    * Add buffered body data. This method is used in advanced cases where returning
    * StopIterationAndBuffer from decodeData() is not sufficient.
    *
@@ -429,6 +435,12 @@ public:
    *         previous ones in the filter chain. May be nullptr if nothing has been buffered yet.
    */
   virtual const Buffer::Instance* encodingBuffer() PURE;
+
+  /**
+   * Allows modifying the encoding buffer. May only be called before any data has been continued
+   * past the calling filter.
+   */
+  virtual void modifyEncodingBuffer(std::function<void(Buffer::Instance&)> callback) PURE;
 
   /**
    * Add buffered body data. This method is used in advanced cases where returning
