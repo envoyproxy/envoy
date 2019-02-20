@@ -619,7 +619,7 @@ likely to be at least partially implemented in Envoy but may have wire format
 breaking changes made prior to freezing.
 
 Protos tagged *experimental*, have the same caveats as draft protos
-and may have have major changes made prior to Envoy implementation and freezing.
+and may have major changes made prior to Envoy implementation and freezing.
 
 The current open v2 API issues are tracked `here
 <https://github.com/envoyproxy/envoy/issues?q=is%3Aopen+is%3Aissue+label%3A%22v2+API%22>`_.
