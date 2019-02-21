@@ -21,7 +21,8 @@ namespace {
 
 // The number of buffers tracked. Each buffer fuzzer action references one or
 // more of these. We don't need a ton of buffers to capture the range of
-// possible behaviors, let's assume only 3 for now.
+// possible behaviors, at least two to properly model move operations, let's
+// assume only 3 for now.
 constexpr uint32_t BufferCount = 3;
 
 // These data are exogenous to the buffer, we don't need to worry about their
@@ -367,7 +368,7 @@ DEFINE_PROTO_FUZZER(const test::common::buffer::BufferFuzzTestCase& input) {
       constexpr uint32_t max_slices = 16;
       Buffer::RawSlice slices[max_slices];
       buffers[j]->getRawSlices(slices, max_slices);
-      // This string should never appear (e.g. we don't synthesize _g as a
+      // This string should never appear (e.g. we don't synthesize _garbage as a
       // pattern), verify that it's never found.
       std::string garbage{"_garbage"};
       FUZZ_ASSERT(buffers[j]->search(garbage.data(), garbage.size(), 0) == -1);
