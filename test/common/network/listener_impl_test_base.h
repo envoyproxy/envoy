@@ -5,15 +5,16 @@
 #include "common/network/utility.h"
 
 #include "test/test_common/network_utility.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
+
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Network {
 
 // Captures common infrastructure needed by both ListenerImplTest and UdpListenerImplTest.
-class ListenerImplTestBase : public TestBaseWithParam<Address::IpVersion> {
+class ListenerImplTestBase : public testing::TestWithParam<Address::IpVersion> {
 protected:
   ListenerImplTestBase()
       : version_(GetParam()),

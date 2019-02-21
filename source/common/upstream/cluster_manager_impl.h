@@ -173,8 +173,8 @@ public:
                      Http::Context& http_context);
 
   // Upstream::ClusterManager
-  bool addOrUpdateCluster(const envoy::api::v2::Cluster& cluster,
-                          const std::string& version_info) override;
+  bool addOrUpdateCluster(const envoy::api::v2::Cluster& cluster, const std::string& version_info,
+                          ClusterWarmingCallback cluster_warming_cb) override;
   void setInitializedCb(std::function<void()> callback) override {
     init_helper_.setInitializedCb(callback);
   }
@@ -219,6 +219,8 @@ public:
 
   ClusterManagerFactory& clusterManagerFactory() override { return factory_; }
 
+  std::size_t warmingClusterCount() const override { return warming_clusters_.size(); }
+
 protected:
   virtual void postThreadLocalClusterUpdate(const Cluster& cluster, uint32_t priority,
                                             const HostVector& hosts_added,
@@ -233,7 +235,7 @@ private:
   struct ThreadLocalClusterManagerImpl : public ThreadLocal::ThreadLocalObject {
     struct ConnPoolsContainer {
       ConnPoolsContainer(Event::Dispatcher& dispatcher)
-          : pools_{std::make_shared<ConnPools>(dispatcher)} {}
+          : pools_{std::make_shared<ConnPools>(dispatcher, absl::nullopt)} {}
 
       typedef ConnPoolMap<std::vector<uint8_t>, Http::ConnectionPool::Instance> ConnPools;
 

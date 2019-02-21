@@ -1,8 +1,8 @@
 #include "test/extensions/transport_sockets/tls/ssl_test_utility.h"
 #include "test/test_common/logging.h"
-#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 #include "quiche/quic/platform/api/quic_aligned.h"
 #include "quiche/quic/platform/api/quic_arraysize.h"
 #include "quiche/quic/platform/api/quic_cert_utils.h"
@@ -14,6 +14,7 @@
 #include "quiche/quic/platform/api/quic_map_util.h"
 #include "quiche/quic/platform/api/quic_mutex.h"
 #include "quiche/quic/platform/api/quic_ptr_util.h"
+#include "quiche/quic/platform/api/quic_sleep.h"
 #include "quiche/quic/platform/api/quic_stack_trace.h"
 #include "quiche/quic/platform/api/quic_string.h"
 #include "quiche/quic/platform/api/quic_string_piece.h"
@@ -114,6 +115,8 @@ TEST(QuicPlatformTest, QuicMapUtil) {
 TEST(QuicPlatformTest, QuicStackTraceTest) {
   EXPECT_THAT(quic::QuicStackTrace(), HasSubstr("QuicStackTraceTest"));
 }
+
+TEST(QuicPlatformTest, QuicSleep) { quic::QuicSleep(quic::QuicTime::Delta::FromMilliseconds(20)); }
 
 TEST(QuicPlatformTest, QuicString) {
   quic::QuicString s = "foo";

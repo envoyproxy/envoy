@@ -174,8 +174,7 @@ def envoy_external_dep_path(dep):
 def tcmalloc_external_dep(repository):
     return select({
         repository + "//bazel:disable_tcmalloc": None,
-        repository + "//bazel:debug_tcmalloc": envoy_external_dep_path("tcmalloc_debug"),
-        "//conditions:default": envoy_external_dep_path("tcmalloc_and_profiler"),
+        "//conditions:default": envoy_external_dep_path("gperftools"),
     })
 
 # As above, but wrapped in list form for adding to dep lists. This smell seems needed as
@@ -184,8 +183,7 @@ def tcmalloc_external_dep(repository):
 def tcmalloc_external_deps(repository):
     return select({
         repository + "//bazel:disable_tcmalloc": [],
-        repository + "//bazel:debug_tcmalloc": [envoy_external_dep_path("tcmalloc_debug")],
-        "//conditions:default": [envoy_external_dep_path("tcmalloc_and_profiler")],
+        "//conditions:default": [envoy_external_dep_path("gperftools")],
     })
 
 # Transform the package path (e.g. include/envoy/common) into a path for
@@ -208,7 +206,8 @@ def envoy_cmake_external(
         static_libraries = [],
         copy_pdb = False,
         pdb_name = "",
-        cmake_files_dir = "$BUILD_TMPDIR/CMakeFiles"):
+        cmake_files_dir = "$BUILD_TMPDIR/CMakeFiles",
+        **kwargs):
     # On Windows, we don't want to explicitly set CMAKE_BUILD_TYPE,
     # rules_foreign_cc will figure it out for us
     cache_entries_no_build_type = {key: cache_entries[key] for key in cache_entries.keys() if key != "CMAKE_BUILD_TYPE"}
@@ -244,6 +243,7 @@ def envoy_cmake_external(
         make_commands = make_commands,
         postfix_script = pf,
         static_libraries = static_libraries,
+        **kwargs
     )
 
 # Envoy C++ library targets that need no transformations or additional dependencies before being
