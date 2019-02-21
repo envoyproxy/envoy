@@ -1245,7 +1245,8 @@ TEST_F(ClusterManagerImplTest, WarmingClusterWithEmptyHosts) {
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster1));
   EXPECT_CALL(*cluster1, initializePhase()).Times(0);
   EXPECT_CALL(*cluster1, initialize(_));
-  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(defaultStaticCluster("fake_cluster"), ""));
+  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(defaultStaticCluster("fake_cluster"), "",
+                                                   dummyWarmingCb));
   checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 0 /*active*/, 1 /*warming*/);
   EXPECT_EQ(nullptr, cluster_manager_->get("fake_cluster"));
   cluster1->initialize_callback_();
@@ -1260,7 +1261,7 @@ TEST_F(ClusterManagerImplTest, WarmingClusterWithEmptyHosts) {
   std::shared_ptr<MockClusterRealPrioritySet> cluster2(new NiceMock<MockClusterRealPrioritySet>());
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster2));
   EXPECT_CALL(*cluster2, initializePhase()).Times(0);
-  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(update_cluster, ""));
+  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(update_cluster, "", dummyWarmingCb));
   checkStats(1 /*added*/, 1 /*modified*/, 0 /*removed*/, 1 /*active*/, 1 /*warming*/);
   cluster2->initialize_callback_();
 
