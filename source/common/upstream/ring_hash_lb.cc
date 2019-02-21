@@ -1,10 +1,8 @@
 #include "common/upstream/ring_hash_lb.h"
 
-#include <cmath>
 #include <cstdint>
 #include <iostream>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 #include "common/common/assert.h"

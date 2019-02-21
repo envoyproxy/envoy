@@ -1,6 +1,5 @@
 #pragma once
 
-#include <unordered_map>
 #include <vector>
 
 #include "envoy/runtime/runtime.h"
@@ -9,7 +8,6 @@
 
 #include "common/common/logger.h"
 #include "common/upstream/thread_aware_lb_impl.h"
-#include "common/upstream/upstream_impl.h"
 
 namespace Envoy {
 namespace Upstream {

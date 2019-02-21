@@ -271,7 +271,6 @@ envoy_cc_library(
     hdrs = ["ring_hash_lb.h"],
     deps = [
         ":thread_aware_lb_lib",
-        ":upstream_lib",
         "//source/common/common:minimal_logger_lib",
     ],
 )
