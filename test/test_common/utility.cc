@@ -279,13 +279,6 @@ void ConditionalInitializer::wait() {
   }
 }
 
-ScopedFdCloser::ScopedFdCloser(int fd) : fd_(fd) {}
-ScopedFdCloser::~ScopedFdCloser() { ::close(fd_); }
-
-ScopedIoHandleCloser::ScopedIoHandleCloser(Network::IoHandlePtr& io_handle)
-    : io_handle_(io_handle) {}
-ScopedIoHandleCloser::~ScopedIoHandleCloser() { io_handle_->close(); }
-
 AtomicFileUpdater::AtomicFileUpdater(const std::string& filename)
     : link_(filename), new_link_(absl::StrCat(filename, ".new")),
       target1_(absl::StrCat(filename, ".target1")), target2_(absl::StrCat(filename, ".target2")),
