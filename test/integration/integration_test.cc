@@ -166,7 +166,6 @@ TEST_P(IntegrationTest, TwoFiltersDecodeHeadersReturnsStopAll) {
   testTwoFiltersDecodeHeadersReturnsStopAll();
 }
 
-
 // This is a regression for https://github.com/envoyproxy/envoy/issues/2715 and validates that a
 // pending request is not sent on a connection that has been half-closed.
 TEST_P(IntegrationTest, UpstreamDisconnectWithTwoRequests) {
