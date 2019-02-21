@@ -15,6 +15,8 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace Kafka {
 
+const int32_t FAILED_DESERIALIZER_STEP = 13;
+
 class BufferBasedTest : public testing::Test {
 public:
   Buffer::OwnedImpl& buffer() { return buffer_; }
@@ -60,7 +62,7 @@ TEST_F(BufferBasedTest, RequestStartParserTestShouldReturnRequestHeaderParser) {
 
 class MockParser : public Parser {
 public:
-  ParseResponse parse(const char*&, uint64_t&) {
+  ParseResponse parse(const char*&, uint64_t&) override {
     throw new EnvoyException("should not be invoked");
   }
 };
@@ -111,11 +113,18 @@ TEST_F(BufferBasedTest, RequestHeaderParserShouldHandleDeserializerExceptionsDur
   // throws during feeding
   class ThrowingRequestHeaderDeserializer : public RequestHeaderDeserializer {
   public:
-    size_t feed(const char*&, uint64_t&) { throw EnvoyException("feed"); };
+    size_t feed(const char*& buffer, uint64_t& remaining) override {
+      // move some pointers to simulate data consumption
+      buffer += FAILED_DESERIALIZER_STEP;
+      remaining -= FAILED_DESERIALIZER_STEP;
+      throw EnvoyException("feed");
+    };
 
-    bool ready() const { throw std::runtime_error("should not be invoked at all"); };
+    bool ready() const override { throw std::runtime_error("should not be invoked at all"); };
 
-    RequestHeader get() const { throw std::runtime_error("should not be invoked at all"); };
+    RequestHeader get() const override {
+      throw std::runtime_error("should not be invoked at all");
+    };
   };
 
   const MockRequestParserResolver parser_resolver;
@@ -135,26 +144,34 @@ TEST_F(BufferBasedTest, RequestHeaderParserShouldHandleDeserializerExceptionsDur
 
   // then
   ASSERT_EQ(result.hasData(), true);
-  ASSERT_EQ(result.next_parser_, nullptr);
-  ASSERT_NE(std::dynamic_pointer_cast<UnknownRequest>(result.message_), nullptr);
+  ASSERT_NE(std::dynamic_pointer_cast<SentinelParser>(result.next_parser_), nullptr);
+  ASSERT_EQ(result.message_, nullptr);
 
-  ASSERT_EQ(bytes, orig_bytes + request_size);
-  ASSERT_EQ(remaining, orig_remaining - request_size);
+  ASSERT_EQ(bytes, orig_bytes + FAILED_DESERIALIZER_STEP);
+  ASSERT_EQ(remaining, orig_remaining - FAILED_DESERIALIZER_STEP);
 
-  ASSERT_EQ(testee.contextForTest()->remaining_request_size_, 0);
+  ASSERT_EQ(testee.contextForTest()->remaining_request_size_,
+            request_size - FAILED_DESERIALIZER_STEP);
 }
 
 TEST_F(BufferBasedTest, RequestParserShouldHandleDeserializerExceptionsDuringFeeding) {
   // given
 
+  const int32_t move = FAILED_DESERIALIZER_STEP;
+
   // throws during feeding
   class ThrowingDeserializer : public Deserializer<int32_t> {
   public:
-    size_t feed(const char*&, uint64_t&) { throw EnvoyException("feed"); };
+    size_t feed(const char*& buffer, uint64_t& remaining) override {
+      // move some pointers to simulate data consumption
+      buffer += move;
+      remaining -= move;
+      throw EnvoyException("feed");
+    };
 
-    bool ready() const { throw std::runtime_error("should not be invoked at all"); };
+    bool ready() const override { throw std::runtime_error("should not be invoked at all"); };
 
-    int32_t get() const { throw std::runtime_error("should not be invoked at all"); };
+    int32_t get() const override { throw std::runtime_error("should not be invoked at all"); };
   };
 
   const int32_t request_size = 1024; // there are still 1024 bytes to read to complete the request
@@ -172,25 +189,28 @@ TEST_F(BufferBasedTest, RequestParserShouldHandleDeserializerExceptionsDuringFee
 
   // then
   ASSERT_EQ(result.hasData(), true);
-  ASSERT_EQ(result.next_parser_, nullptr);
-  ASSERT_NE(std::dynamic_pointer_cast<UnknownRequest>(result.message_), nullptr);
+  ASSERT_NE(std::dynamic_pointer_cast<SentinelParser>(result.next_parser_), nullptr);
+  ASSERT_EQ(result.message_, nullptr);
 
-  ASSERT_EQ(bytes, orig_bytes + request_size);
-  ASSERT_EQ(remaining, orig_remaining - request_size);
+  ASSERT_EQ(bytes, orig_bytes + FAILED_DESERIALIZER_STEP);
+  ASSERT_EQ(remaining, orig_remaining - FAILED_DESERIALIZER_STEP);
+
+  ASSERT_EQ(testee.contextForTest()->remaining_request_size_,
+            request_size - FAILED_DESERIALIZER_STEP);
 }
 
-// deserializer that consumes 4 bytes and returns 0
-class FourBytesDeserializer : public Deserializer<int32_t> {
+// deserializer that consumes FAILED_DESERIALIZER_STEP bytes and returns 0
+class SomeBytesDeserializer : public Deserializer<int32_t> {
 public:
-  size_t feed(const char*& buffer, uint64_t& remaining) {
-    buffer += 4;
-    remaining -= 4;
-    return 4;
+  size_t feed(const char*& buffer, uint64_t& remaining) override {
+    buffer += FAILED_DESERIALIZER_STEP;
+    remaining -= FAILED_DESERIALIZER_STEP;
+    return FAILED_DESERIALIZER_STEP;
   };
 
-  bool ready() const { return true; };
+  bool ready() const override { return true; };
 
-  int32_t get() const { return 0; };
+  int32_t get() const override { return 0; };
 };
 
 TEST_F(BufferBasedTest, RequestParserShouldHandleDeserializerClaimingItsReadyButLeavingData) {
@@ -198,7 +218,7 @@ TEST_F(BufferBasedTest, RequestParserShouldHandleDeserializerClaimingItsReadyBut
   const int32_t request_size = 1024; // there are still 1024 bytes to read to complete the request
   RequestContextSharedPtr request_context{new RequestContext{request_size, {}}};
 
-  RequestParser<int32_t, FourBytesDeserializer> testee{request_context};
+  RequestParser<int32_t, SomeBytesDeserializer> testee{request_context};
 
   const char* bytes = getBytes();
   const char* orig_bytes = bytes;
@@ -210,11 +230,14 @@ TEST_F(BufferBasedTest, RequestParserShouldHandleDeserializerClaimingItsReadyBut
 
   // then
   ASSERT_EQ(result.hasData(), true);
-  ASSERT_EQ(result.next_parser_, nullptr);
-  ASSERT_NE(std::dynamic_pointer_cast<UnknownRequest>(result.message_), nullptr);
+  ASSERT_NE(std::dynamic_pointer_cast<SentinelParser>(result.next_parser_), nullptr);
+  ASSERT_EQ(result.message_, nullptr);
 
-  ASSERT_EQ(bytes, orig_bytes + request_size);
-  ASSERT_EQ(remaining, orig_remaining - request_size);
+  ASSERT_EQ(bytes, orig_bytes + FAILED_DESERIALIZER_STEP);
+  ASSERT_EQ(remaining, orig_remaining - FAILED_DESERIALIZER_STEP);
+
+  ASSERT_EQ(testee.contextForTest()->remaining_request_size_,
+            request_size - FAILED_DESERIALIZER_STEP);
 }
 
 TEST_F(BufferBasedTest, SentinelParserShouldConsumeDataUntilEndOfRequest) {

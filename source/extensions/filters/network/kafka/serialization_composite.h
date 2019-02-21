@@ -44,11 +44,11 @@ class CompositeDeserializerWith0Delegates : public Deserializer<ResponseType> {
 public:
   CompositeDeserializerWith0Delegates(){};
 
-  size_t feed(const char*&, uint64_t&) { return 0; }
+  size_t feed(const char*&, uint64_t&) override { return 0; }
 
-  bool ready() const { return true; }
+  bool ready() const override { return true; }
 
-  ResponseType get() const { return {}; }
+  ResponseType get() const override { return {}; }
 
 protected:
 };
@@ -69,15 +69,15 @@ class CompositeDeserializerWith1Delegates : public Deserializer<ResponseType> {
 public:
   CompositeDeserializerWith1Delegates(){};
 
-  size_t feed(const char*& buffer, uint64_t& remaining) {
+  size_t feed(const char*& buffer, uint64_t& remaining) override {
     size_t consumed = 0;
     consumed += delegate1_.feed(buffer, remaining);
     return consumed;
   }
 
-  bool ready() const { return delegate1_.ready(); }
+  bool ready() const override { return delegate1_.ready(); }
 
-  ResponseType get() const { return {delegate1_.get()}; }
+  ResponseType get() const override { return {delegate1_.get()}; }
 
 protected:
   DeserializerType1 delegate1_;
@@ -100,16 +100,16 @@ class CompositeDeserializerWith2Delegates : public Deserializer<ResponseType> {
 public:
   CompositeDeserializerWith2Delegates(){};
 
-  size_t feed(const char*& buffer, uint64_t& remaining) {
+  size_t feed(const char*& buffer, uint64_t& remaining) override {
     size_t consumed = 0;
     consumed += delegate1_.feed(buffer, remaining);
     consumed += delegate2_.feed(buffer, remaining);
     return consumed;
   }
 
-  bool ready() const { return delegate2_.ready(); }
+  bool ready() const override { return delegate2_.ready(); }
 
-  ResponseType get() const { return {delegate1_.get(), delegate2_.get()}; }
+  ResponseType get() const override { return {delegate1_.get(), delegate2_.get()}; }
 
 protected:
   DeserializerType1 delegate1_;
@@ -135,7 +135,7 @@ class CompositeDeserializerWith3Delegates : public Deserializer<ResponseType> {
 public:
   CompositeDeserializerWith3Delegates(){};
 
-  size_t feed(const char*& buffer, uint64_t& remaining) {
+  size_t feed(const char*& buffer, uint64_t& remaining) override {
     size_t consumed = 0;
     consumed += delegate1_.feed(buffer, remaining);
     consumed += delegate2_.feed(buffer, remaining);
@@ -143,9 +143,11 @@ public:
     return consumed;
   }
 
-  bool ready() const { return delegate3_.ready(); }
+  bool ready() const override { return delegate3_.ready(); }
 
-  ResponseType get() const { return {delegate1_.get(), delegate2_.get(), delegate3_.get()}; }
+  ResponseType get() const override {
+    return {delegate1_.get(), delegate2_.get(), delegate3_.get()};
+  }
 
 protected:
   DeserializerType1 delegate1_;
@@ -173,7 +175,7 @@ class CompositeDeserializerWith4Delegates : public Deserializer<ResponseType> {
 public:
   CompositeDeserializerWith4Delegates(){};
 
-  size_t feed(const char*& buffer, uint64_t& remaining) {
+  size_t feed(const char*& buffer, uint64_t& remaining) override {
     size_t consumed = 0;
     consumed += delegate1_.feed(buffer, remaining);
     consumed += delegate2_.feed(buffer, remaining);
@@ -182,9 +184,9 @@ public:
     return consumed;
   }
 
-  bool ready() const { return delegate4_.ready(); }
+  bool ready() const override { return delegate4_.ready(); }
 
-  ResponseType get() const {
+  ResponseType get() const override {
     return {delegate1_.get(), delegate2_.get(), delegate3_.get(), delegate4_.get()};
   }
 
@@ -216,7 +218,7 @@ class CompositeDeserializerWith5Delegates : public Deserializer<ResponseType> {
 public:
   CompositeDeserializerWith5Delegates(){};
 
-  size_t feed(const char*& buffer, uint64_t& remaining) {
+  size_t feed(const char*& buffer, uint64_t& remaining) override {
     size_t consumed = 0;
     consumed += delegate1_.feed(buffer, remaining);
     consumed += delegate2_.feed(buffer, remaining);
@@ -226,9 +228,9 @@ public:
     return consumed;
   }
 
-  bool ready() const { return delegate5_.ready(); }
+  bool ready() const override { return delegate5_.ready(); }
 
-  ResponseType get() const {
+  ResponseType get() const override {
     return {delegate1_.get(), delegate2_.get(), delegate3_.get(), delegate4_.get(),
             delegate5_.get()};
   }
@@ -264,7 +266,7 @@ class CompositeDeserializerWith6Delegates : public Deserializer<ResponseType> {
 public:
   CompositeDeserializerWith6Delegates(){};
 
-  size_t feed(const char*& buffer, uint64_t& remaining) {
+  size_t feed(const char*& buffer, uint64_t& remaining) override {
     size_t consumed = 0;
     consumed += delegate1_.feed(buffer, remaining);
     consumed += delegate2_.feed(buffer, remaining);
@@ -275,9 +277,9 @@ public:
     return consumed;
   }
 
-  bool ready() const { return delegate6_.ready(); }
+  bool ready() const override { return delegate6_.ready(); }
 
-  ResponseType get() const {
+  ResponseType get() const override {
     return {delegate1_.get(), delegate2_.get(), delegate3_.get(),
             delegate4_.get(), delegate5_.get(), delegate6_.get()};
   }
@@ -315,7 +317,7 @@ class CompositeDeserializerWith7Delegates : public Deserializer<ResponseType> {
 public:
   CompositeDeserializerWith7Delegates(){};
 
-  size_t feed(const char*& buffer, uint64_t& remaining) {
+  size_t feed(const char*& buffer, uint64_t& remaining) override {
     size_t consumed = 0;
     consumed += delegate1_.feed(buffer, remaining);
     consumed += delegate2_.feed(buffer, remaining);
@@ -327,9 +329,9 @@ public:
     return consumed;
   }
 
-  bool ready() const { return delegate7_.ready(); }
+  bool ready() const override { return delegate7_.ready(); }
 
-  ResponseType get() const {
+  ResponseType get() const override {
     return {delegate1_.get(), delegate2_.get(), delegate3_.get(), delegate4_.get(),
             delegate5_.get(), delegate6_.get(), delegate7_.get()};
   }
@@ -369,7 +371,7 @@ class CompositeDeserializerWith8Delegates : public Deserializer<ResponseType> {
 public:
   CompositeDeserializerWith8Delegates(){};
 
-  size_t feed(const char*& buffer, uint64_t& remaining) {
+  size_t feed(const char*& buffer, uint64_t& remaining) override {
     size_t consumed = 0;
     consumed += delegate1_.feed(buffer, remaining);
     consumed += delegate2_.feed(buffer, remaining);
@@ -382,9 +384,9 @@ public:
     return consumed;
   }
 
-  bool ready() const { return delegate8_.ready(); }
+  bool ready() const override { return delegate8_.ready(); }
 
-  ResponseType get() const {
+  ResponseType get() const override {
     return {delegate1_.get(), delegate2_.get(), delegate3_.get(), delegate4_.get(),
             delegate5_.get(), delegate6_.get(), delegate7_.get(), delegate8_.get()};
   }
@@ -427,7 +429,7 @@ class CompositeDeserializerWith9Delegates : public Deserializer<ResponseType> {
 public:
   CompositeDeserializerWith9Delegates(){};
 
-  size_t feed(const char*& buffer, uint64_t& remaining) {
+  size_t feed(const char*& buffer, uint64_t& remaining) override {
     size_t consumed = 0;
     consumed += delegate1_.feed(buffer, remaining);
     consumed += delegate2_.feed(buffer, remaining);
@@ -441,9 +443,9 @@ public:
     return consumed;
   }
 
-  bool ready() const { return delegate9_.ready(); }
+  bool ready() const override { return delegate9_.ready(); }
 
-  ResponseType get() const {
+  ResponseType get() const override {
     return {delegate1_.get(), delegate2_.get(), delegate3_.get(),
             delegate4_.get(), delegate5_.get(), delegate6_.get(),
             delegate7_.get(), delegate8_.get(), delegate9_.get()};

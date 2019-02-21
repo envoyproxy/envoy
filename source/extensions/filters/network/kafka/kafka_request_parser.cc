@@ -17,16 +17,16 @@ ParseResponse RequestStartParser::parse(const char*& buffer, uint64_t& remaining
 }
 
 ParseResponse RequestHeaderParser::parse(const char*& buffer, uint64_t& remaining) {
+  const uint64_t orig_remaining = remaining;
   try {
     context_->remaining_request_size_ -= deserializer_->feed(buffer, remaining);
   } catch (const EnvoyException& e) {
-    buffer += context_->remaining_request_size_;
-    remaining -= context_->remaining_request_size_;
-    context_->remaining_request_size_ = 0;
-
-    const RequestHeader header{-1, -1, -1, absl::nullopt};
-    return ParseResponse::parsedMessage(
-        std::make_shared<UnknownRequest>(context_->request_header_));
+    // unable to compute request header, but we still need to consume rest of request (some of the
+    // data might have been consumed)
+    const int32_t consumed = static_cast<int32_t>(orig_remaining - remaining);
+    context_->remaining_request_size_ -= consumed;
+    context_->request_header_ = {-1, -1, -1, absl::nullopt};
+    return ParseResponse::nextParser(std::make_shared<SentinelParser>(context_));
   }
 
   if (deserializer_->ready()) {

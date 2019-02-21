@@ -83,6 +83,9 @@ envoy_cc_library(
     hdrs = [
         "message.h",
     ],
+    deps = [
+        "//include/envoy/buffer:buffer_interface",
+    ],
 )
 
 envoy_cc_library(

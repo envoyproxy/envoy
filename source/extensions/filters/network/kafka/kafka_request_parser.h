@@ -117,6 +117,26 @@ private:
 };
 
 /**
+ * Sentinel parser that is responsible for consuming message bytes for messages that had unsupported
+ * api_key & api_version. It does not attempt to capture any data, just throws it away until end of
+ * message
+ */
+class SentinelParser : public Parser {
+public:
+  SentinelParser(RequestContextSharedPtr context) : context_{context} {};
+
+  /**
+   * Returns UnknownRequest
+   */
+  ParseResponse parse(const char*& buffer, uint64_t& remaining) override;
+
+  const RequestContextSharedPtr contextForTest() const { return context_; }
+
+private:
+  const RequestContextSharedPtr context_;
+};
+
+/**
  * Request parser uses a single deserializer to construct a request object
  * This parser is responsible for consuming request-specific data (e.g. topic names) and always
  * returns a parsed message
@@ -137,13 +157,15 @@ public:
    * Fill in request's header with data stored in context
    */
   ParseResponse parse(const char*& buffer, uint64_t& remaining) override {
+    const uint64_t orig_remaining = remaining;
     try {
       context_->remaining_request_size_ -= deserializer.feed(buffer, remaining);
     } catch (const EnvoyException&) {
       // treat the whole request as invalid, throw away the rest of the data
-      ignoreRestOfRequest(buffer, remaining);
-      return ParseResponse::parsedMessage(
-          std::make_shared<UnknownRequest>(context_->request_header_));
+      const int32_t consumed = static_cast<int32_t>(orig_remaining - remaining);
+      context_->remaining_request_size_ -=
+          consumed; // some of the data might have been consumed by throwing deserializer
+      return ParseResponse::nextParser(std::make_shared<SentinelParser>(context_));
     }
 
     if (deserializer.ready()) {
@@ -155,47 +177,18 @@ public:
       } else {
         // the message makes no sense, the deserializer that matches the schema consumed all
         // necessary data, but there's still unconsumed bytes
-        ignoreRestOfRequest(buffer, remaining);
-        return ParseResponse::parsedMessage(
-            std::make_shared<UnknownRequest>(context_->request_header_));
+        return ParseResponse::nextParser(std::make_shared<SentinelParser>(context_));
       }
     } else {
       return ParseResponse::stillWaiting();
     }
   }
 
+  const RequestContextSharedPtr contextForTest() const { return context_; }
+
 protected:
   RequestContextSharedPtr context_;
   DeserializerType deserializer; // underlying request-specific deserializer
-
-private:
-  // moves the pointers until the end of request, so that the data that does not match the
-  // deserializers gets ignored
-  void ignoreRestOfRequest(const char*& buffer, uint64_t& remaining) {
-    buffer += context_->remaining_request_size_;
-    remaining -= context_->remaining_request_size_;
-    context_->remaining_request_size_ = 0;
-  }
-};
-
-/**
- * Sentinel parser that is responsible for consuming message bytes for messages that had unsupported
- * api_key & api_version. It does not attempt to capture any data, just throws it away until end of
- * message
- */
-class SentinelParser : public Parser {
-public:
-  SentinelParser(RequestContextSharedPtr context) : context_{context} {};
-
-  /**
-   * Returns UnknownRequest
-   */
-  ParseResponse parse(const char*& buffer, uint64_t& remaining) override;
-
-  const RequestContextSharedPtr contextForTest() const { return context_; }
-
-private:
-  const RequestContextSharedPtr context_;
 };
 
 } // namespace Kafka

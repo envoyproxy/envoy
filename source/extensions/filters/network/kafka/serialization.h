@@ -60,7 +60,7 @@ template <typename T> class IntDeserializer : public Deserializer<T> {
 public:
   IntDeserializer() : written_{0}, ready_(false){};
 
-  size_t feed(const char*& buffer, uint64_t& remaining) {
+  size_t feed(const char*& buffer, uint64_t& remaining) override {
     const size_t available = std::min<size_t>(sizeof(buf_) - written_, remaining);
     memcpy(buf_ + written_, buffer, available);
     written_ += available;
@@ -75,12 +75,12 @@ public:
     return available;
   }
 
-  bool ready() const { return ready_; }
+  bool ready() const override { return ready_; }
 
 protected:
   char buf_[sizeof(T) / sizeof(char)];
   size_t written_;
-  bool ready_;
+  bool ready_{false};
 };
 
 /**
@@ -88,7 +88,7 @@ protected:
  */
 class Int8Deserializer : public IntDeserializer<int8_t> {
 public:
-  int8_t get() const {
+  int8_t get() const override {
     int8_t result;
     memcpy(&result, buf_, sizeof(result));
     return result;
@@ -100,7 +100,7 @@ public:
  */
 class Int16Deserializer : public IntDeserializer<int16_t> {
 public:
-  int16_t get() const {
+  int16_t get() const override {
     int16_t result;
     memcpy(&result, buf_, sizeof(result));
     return be16toh(result);
@@ -112,7 +112,7 @@ public:
  */
 class Int32Deserializer : public IntDeserializer<int32_t> {
 public:
-  int32_t get() const {
+  int32_t get() const override {
     int32_t result;
     memcpy(&result, buf_, sizeof(result));
     return be32toh(result);
@@ -124,7 +124,7 @@ public:
  */
 class UInt32Deserializer : public IntDeserializer<uint32_t> {
 public:
-  uint32_t get() const {
+  uint32_t get() const override {
     uint32_t result;
     memcpy(&result, buf_, sizeof(result));
     return be32toh(result);
@@ -136,7 +136,7 @@ public:
  */
 class Int64Deserializer : public IntDeserializer<int64_t> {
 public:
-  int64_t get() const {
+  int64_t get() const override {
     int64_t result;
     memcpy(&result, buf_, sizeof(result));
     return be64toh(result);
@@ -157,11 +157,13 @@ class BooleanDeserializer : public Deserializer<bool> {
 public:
   BooleanDeserializer(){};
 
-  size_t feed(const char*& buffer, uint64_t& remaining) { return buffer_.feed(buffer, remaining); }
+  size_t feed(const char*& buffer, uint64_t& remaining) override {
+    return buffer_.feed(buffer, remaining);
+  }
 
-  bool ready() const { return buffer_.ready(); }
+  bool ready() const override { return buffer_.ready(); }
 
-  bool get() const { return 0 != buffer_.get(); }
+  bool get() const override { return 0 != buffer_.get(); }
 
 private:
   Int8Deserializer buffer_;
@@ -181,7 +183,7 @@ public:
   /**
    * Can throw EnvoyException if given string length is not valid
    */
-  size_t feed(const char*& buffer, uint64_t& remaining) {
+  size_t feed(const char*& buffer, uint64_t& remaining) override {
     const size_t length_consumed = length_buf_.feed(buffer, remaining);
     if (!length_buf_.ready()) {
       // break early: we still need to fill in length buffer
@@ -213,9 +215,9 @@ public:
     return length_consumed + data_consumed;
   }
 
-  bool ready() const { return ready_; }
+  bool ready() const override { return ready_; }
 
-  std::string get() const { return std::string(data_buf_.begin(), data_buf_.end()); }
+  std::string get() const override { return std::string(data_buf_.begin(), data_buf_.end()); }
 
 private:
   Int16Deserializer length_buf_;
@@ -243,7 +245,7 @@ public:
   /**
    * Can throw EnvoyException if given string length is not valid
    */
-  size_t feed(const char*& buffer, uint64_t& remaining) {
+  size_t feed(const char*& buffer, uint64_t& remaining) override {
     const size_t length_consumed = length_buf_.feed(buffer, remaining);
     if (!length_buf_.ready()) {
       // break early: we still need to fill in length buffer
@@ -285,9 +287,9 @@ public:
     return length_consumed + data_consumed;
   }
 
-  bool ready() const { return ready_; }
+  bool ready() const override { return ready_; }
 
-  NullableString get() const {
+  NullableString get() const override {
     return required_ >= 0 ? absl::make_optional(std::string(data_buf_.begin(), data_buf_.end()))
                           : absl::nullopt;
   }
@@ -316,7 +318,7 @@ public:
   /**
    * Can throw EnvoyException if given bytes length is not valid
    */
-  size_t feed(const char*& buffer, uint64_t& remaining) {
+  size_t feed(const char*& buffer, uint64_t& remaining) override {
     const size_t length_consumed = length_buf_.feed(buffer, remaining);
     if (!length_buf_.ready()) {
       // break early: we still need to fill in length buffer
@@ -348,9 +350,9 @@ public:
     return length_consumed + data_consumed;
   }
 
-  bool ready() const { return ready_; }
+  bool ready() const override { return ready_; }
 
-  Bytes get() const { return data_buf_; }
+  Bytes get() const override { return data_buf_; }
 
 private:
   Int32Deserializer length_buf_;
@@ -376,7 +378,7 @@ public:
   /**
    * Can throw EnvoyException if given bytes length is not valid
    */
-  size_t feed(const char*& buffer, uint64_t& remaining) {
+  size_t feed(const char*& buffer, uint64_t& remaining) override {
     const size_t length_consumed = length_buf_.feed(buffer, remaining);
     if (!length_buf_.ready()) {
       // break early: we still need to fill in length buffer
@@ -418,9 +420,9 @@ public:
     return length_consumed + data_consumed;
   }
 
-  bool ready() const { return ready_; }
+  bool ready() const override { return ready_; }
 
-  NullableBytes get() const {
+  NullableBytes get() const override {
     if (NULL_BYTES_LENGTH == required_) {
       return absl::nullopt;
     } else {
@@ -459,7 +461,7 @@ public:
   /**
    * Can throw EnvoyException if array length is invalid or if DeserializerType can throw
    */
-  size_t feed(const char*& buffer, uint64_t& remaining) {
+  size_t feed(const char*& buffer, uint64_t& remaining) override {
 
     const size_t length_consumed = length_buf_.feed(buffer, remaining);
     if (!length_buf_.ready()) {
@@ -495,9 +497,9 @@ public:
     return length_consumed + child_consumed;
   }
 
-  bool ready() const { return ready_; }
+  bool ready() const override { return ready_; }
 
-  std::vector<ResponseType> get() const {
+  std::vector<ResponseType> get() const override {
     std::vector<ResponseType> result{};
     result.reserve(children_.size());
     for (const DeserializerType& child : children_) {
@@ -536,7 +538,7 @@ public:
   /**
    * Can throw EnvoyException if array length is invalid or if DeserializerType can throw
    */
-  size_t feed(const char*& buffer, uint64_t& remaining) {
+  size_t feed(const char*& buffer, uint64_t& remaining) override {
 
     const size_t length_consumed = length_buf_.feed(buffer, remaining);
     if (!length_buf_.ready()) {
@@ -578,9 +580,9 @@ public:
     return length_consumed + child_consumed;
   }
 
-  bool ready() const { return ready_; }
+  bool ready() const override { return ready_; }
 
-  NullableArray<ResponseType> get() const {
+  NullableArray<ResponseType> get() const override {
     if (NULL_ARRAY_LENGTH != required_) {
       std::vector<ResponseType> result{};
       result.reserve(children_.size());
