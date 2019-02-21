@@ -39,7 +39,4 @@ chgrp pcap /usr/sbin/tcpdump
 chmod 750 /usr/sbin/tcpdump
 setcap cap_net_raw,cap_net_admin=eip /usr/sbin/tcpdump
 
-# CentOS toolchains doesn't have C++11 ABI so needs ignore, also punting PATH into system bazelrc.
-echo "build --copt=-DENVOY_IGNORE_GLIBCXX_USE_CXX11_ABI_ERROR=1 --action_env=PATH=${PATH}" >> /etc/bazel.bazelrc
-
 ./build_container_common.sh
