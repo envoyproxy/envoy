@@ -5,7 +5,6 @@
 #include "common/filesystem/filesystem_impl.h"
 
 #include "test/test_common/environment.h"
-#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -13,7 +12,7 @@
 namespace Envoy {
 namespace Filesystem {
 
-class FileSystemImplTest : public TestBase {
+class FileSystemImplTest : public testing::Test {
 protected:
   int getFd(File* file) {
     auto file_impl = dynamic_cast<FileImpl*>(file);

@@ -14,10 +14,10 @@
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/environment.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using ::testing::_;
 using ::testing::Invoke;
@@ -26,7 +26,7 @@ using ::testing::Return;
 namespace Envoy {
 namespace Config {
 
-class SubscriptionFactoryTest : public TestBase {
+class SubscriptionFactoryTest : public testing::Test {
 public:
   SubscriptionFactoryTest()
       : http_request_(&cm_.async_client_), api_(Api::createApiForTest(stats_store_)) {}

@@ -162,6 +162,9 @@ public:
   const absl::optional<envoy::api::v2::route::RetryPolicy>& retryPolicy() const {
     return retry_policy_;
   }
+  const absl::optional<envoy::api::v2::route::HedgePolicy>& hedgePolicy() const {
+    return hedge_policy_;
+  }
 
 private:
   enum class SslRequirements { NONE, EXTERNAL_ONLY, ALL };
@@ -200,6 +203,7 @@ private:
   PerFilterConfigs per_filter_configs_;
   const bool include_attempt_count_;
   absl::optional<envoy::api::v2::route::RetryPolicy> retry_policy_;
+  absl::optional<envoy::api::v2::route::HedgePolicy> hedge_policy_;
 };
 
 typedef std::shared_ptr<VirtualHostImpl> VirtualHostSharedPtr;
@@ -289,6 +293,28 @@ private:
 };
 
 /**
+ * Implementation of HedgePolicy that reads from the proto route or virtual host config.
+ */
+class HedgePolicyImpl : public HedgePolicy {
+
+public:
+  explicit HedgePolicyImpl(const envoy::api::v2::route::HedgePolicy& hedge_policy);
+  HedgePolicyImpl();
+
+  // Router::HedgePolicy
+  uint32_t initialRequests() const override { return initial_requests_; }
+  const envoy::type::FractionalPercent& additionalRequestChance() const override {
+    return additional_request_chance_;
+  }
+  bool hedgeOnPerTryTimeout() const override { return hedge_on_per_try_timeout_; }
+
+private:
+  const uint32_t initial_requests_;
+  const envoy::type::FractionalPercent additional_request_chance_;
+  const bool hedge_on_per_try_timeout_;
+};
+
+/**
  * Implementation of Decorator that reads from the proto route decorator.
  */
 class DecoratorImpl : public Decorator {
@@ -345,6 +371,8 @@ public:
   void finalizeResponseHeaders(Http::HeaderMap& headers,
                                const StreamInfo::StreamInfo& stream_info) const override;
   const HashPolicy* hashPolicy() const override { return hash_policy_.get(); }
+
+  const HedgePolicy& hedgePolicy() const override { return hedge_policy_; }
 
   const MetadataMatchCriteria* metadataMatchCriteria() const override {
     return metadata_match_criteria_.get();
@@ -437,6 +465,7 @@ private:
 
     const CorsPolicy* corsPolicy() const override { return parent_->corsPolicy(); }
     const HashPolicy* hashPolicy() const override { return parent_->hashPolicy(); }
+    const HedgePolicy& hedgePolicy() const override { return parent_->hedgePolicy(); }
     Upstream::ResourcePriority priority() const override { return parent_->priority(); }
     const RateLimitPolicy& rateLimitPolicy() const override { return parent_->rateLimitPolicy(); }
     const RetryPolicy& retryPolicy() const override { return parent_->retryPolicy(); }
@@ -550,6 +579,10 @@ private:
 
   bool evaluateRuntimeMatch(const uint64_t random_value) const;
 
+  HedgePolicyImpl
+  buildHedgePolicy(const absl::optional<envoy::api::v2::route::HedgePolicy>& vhost_hedge_policy,
+                   const envoy::api::v2::route::RouteAction& route_config) const;
+
   RetryPolicyImpl
   buildRetryPolicy(const absl::optional<envoy::api::v2::route::RetryPolicy>& vhost_retry_policy,
                    const envoy::api::v2::route::RouteAction& route_config) const;
@@ -576,6 +609,7 @@ private:
   const bool https_redirect_;
   const std::string prefix_rewrite_redirect_;
   const bool strip_query_;
+  const HedgePolicyImpl hedge_policy_;
   const RetryPolicyImpl retry_policy_;
   const RateLimitPolicyImpl rate_limit_policy_;
   const ShadowPolicyImpl shadow_policy_;

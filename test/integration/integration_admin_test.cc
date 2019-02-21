@@ -9,9 +9,9 @@
 #include "common/stats/stats_matcher_impl.h"
 
 #include "test/integration/utility.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
+#include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
@@ -416,7 +416,7 @@ TEST_P(IntegrationAdminTest, AdminCpuProfilerStart) {
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 }
 
-class IntegrationAdminIpv4Ipv6Test : public TestBase, public HttpIntegrationTest {
+class IntegrationAdminIpv4Ipv6Test : public testing::Test, public HttpIntegrationTest {
 public:
   IntegrationAdminIpv4Ipv6Test()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, Network::Address::IpVersion::v4,
@@ -450,7 +450,7 @@ TEST_F(IntegrationAdminIpv4Ipv6Test, Ipv4Ipv6Listen) {
 // Testing the behavior of StatsMatcher, which allows/denies the  instantiation of stats based on
 // restrictions on their names.
 class StatsMatcherIntegrationTest
-    : public TestBase,
+    : public testing::Test,
       public Event::SimulatedTimeSystem,
       public HttpIntegrationTest,
       public testing::WithParamInterface<Network::Address::IpVersion> {

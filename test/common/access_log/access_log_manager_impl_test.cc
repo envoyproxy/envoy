@@ -7,9 +7,9 @@
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/filesystem/mocks.h"
-#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::NiceMock;
@@ -21,7 +21,7 @@ using testing::Sequence;
 namespace Envoy {
 namespace AccessLog {
 
-class AccessLogManagerImplTest : public TestBase {
+class AccessLogManagerImplTest : public testing::Test {
 protected:
   AccessLogManagerImplTest()
       : file_(new NiceMock<Filesystem::MockFile>), thread_factory_(Thread::threadFactoryForTest()),

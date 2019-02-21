@@ -35,6 +35,7 @@ for how to update or override dependencies.
        cmake \
        clang-format-7 \
        automake \
+       autoconf \
        make \
        ninja-build \
        curl \
@@ -49,7 +50,7 @@ for how to update or override dependencies.
 
     On macOS, you'll need to install several dependencies. This can be accomplished via [Homebrew](https://brew.sh/):
     ```
-    brew install coreutils wget cmake libtool go bazel automake ninja llvm@7
+    brew install coreutils wget cmake libtool go bazel automake ninja llvm@7 autoconf
     ```
     _notes_: `coreutils` is used for `realpath`, `gmd5sum` and `gsha256sum`; `llvm@7` is used for `clang-format`
 
@@ -93,8 +94,8 @@ export CXX=clang++
 bazel build --config=libc++ //source/exe:envoy-static
 ```
 Note: this assumes that both: clang compiler and libc++ library are installed in the system,
-and that `clang` and `clang++` are available in `$PATH`. On some systems, exports might need
-to be changed to versioned binaries, e.g. `CC=clang-7` and `CXX=clang++-7`.
+and that `clang` and `clang++` are available in `$PATH`. On some systems, you might need to
+include them in the search path, e.g. `export PATH=/usr/lib/llvm-7/bin:$PATH`.
 
 You might also need to ensure libc++ is installed correctly on your system, e.g. on Ubuntu this
 might look like `sudo apt-get install libc++abi-7-dev libc++-7-dev`.
@@ -264,7 +265,7 @@ will need to override a few environment variables to set up the remote docker. T
 can be found in the [Documentation](https://docs.docker.com/engine/reference/commandline/cli/).
 
 Use `LOCAL_MOUNT=yes` when you are not building with the envoy build container. This will ensure
-that the libraries against which the tests dynmically link will be available and of the correct
+that the libraries against which the tests dynamically link will be available and of the correct
 version.
 
 ## Examples

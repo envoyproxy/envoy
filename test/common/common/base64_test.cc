@@ -4,7 +4,8 @@
 #include "common/common/base64.h"
 
 #include "test/test_common/printers.h"
-#include "test/test_common/test_base.h"
+
+#include "gtest/gtest.h"
 
 namespace Envoy {
 TEST(Base64Test, EmptyBufferEncode) {
