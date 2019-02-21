@@ -648,14 +648,14 @@ TEST_P(RingHashLoadBalancerTest, LargeFractionalScale) {
 // expect that the correct proportion of hosts will be present in the ring.
 TEST_P(RingHashLoadBalancerTest, LopsidedWeightSmallScale) {
   hostSet().hosts_.clear();
-  HostVector heavyButSparse, lightButDense;
+  HostVector heavy_but_sparse, light_but_dense;
   for (uint32_t i = 0; i < 1024; ++i) {
-    auto host(makeTestHost(info_, absl::StrCat("tcp://127.0.0.1:", i)));
+    auto host(makeTestHost(info_, fmt::format("tcp://127.0.0.1:{}", i)));
     hostSet().hosts_.push_back(host);
-    (i == 0 ? heavyButSparse : lightButDense).push_back(host);
+    (i == 0 ? heavy_but_sparse : light_but_dense).push_back(host);
   }
   hostSet().healthy_hosts_ = hostSet().hosts_;
-  hostSet().hosts_per_locality_ = makeHostsPerLocality({heavyButSparse, lightButDense});
+  hostSet().hosts_per_locality_ = makeHostsPerLocality({heavy_but_sparse, light_but_dense});
   hostSet().healthy_hosts_per_locality_ = hostSet().hosts_per_locality_;
   hostSet().locality_weights_ = makeLocalityWeights({127, 1});
   hostSet().runCallbacks({}, {});
