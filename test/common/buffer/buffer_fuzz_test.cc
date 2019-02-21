@@ -39,21 +39,13 @@ void releaseFragmentAllocation(const void* p, size_t, const Buffer::BufferFragme
 // Really simple string implementation of Buffer.
 class StringBuffer : public Buffer::Instance {
 public:
-  ~StringBuffer() {
-    // We don't really know when we are done with a buffer fragment, so just
-    // wait until the test is over.
-    for (auto* f : fragments_) {
-      f->done();
-    }
-  }
-
   void add(const void* data, uint64_t size) override {
-    data_ += std::string(static_cast<const char*>(data), size);
+    data_ += std::string(std::string(static_cast<const char*>(data), size));
   }
 
   void addBufferFragment(Buffer::BufferFragment& fragment) override {
     add(fragment.data(), fragment.size());
-    fragments_.emplace_back(&fragment);
+    fragment.done();
   }
 
   void add(absl::string_view data) override { add(data.data(), data.size()); }
@@ -73,8 +65,8 @@ public:
 
   void commit(Buffer::RawSlice* iovecs, uint64_t num_iovecs) override {
     ASSERT(num_iovecs == 1);
-    ASSERT(reserve_buf_.get() == iovecs[0].mem_);
-    data_ += std::string(reserve_buf_.get(), iovecs[0].len_);
+    ASSERT(tmp_buf_.get() == iovecs[0].mem_);
+    data_ += std::string(tmp_buf_.get(), iovecs[0].len_);
   }
 
   void copyOut(size_t start, uint64_t size, void* data) const override {
@@ -109,17 +101,17 @@ public:
   Api::SysCallIntResult read(int fd, uint64_t max_length) override {
     ASSERT(max_length <= MaxAllocation);
     Api::SysCallIntResult result;
-    result.rc_ = ::read(fd, reserve_buf_.get(), max_length);
+    result.rc_ = ::read(fd, tmp_buf_.get(), max_length);
     result.errno_ = errno;
     ASSERT(result.rc_ > 0);
-    data_ += std::string(reserve_buf_.get(), result.rc_);
+    data_ += std::string(tmp_buf_.get(), result.rc_);
     return result;
   }
 
   uint64_t reserve(uint64_t length, Buffer::RawSlice* iovecs, uint64_t num_iovecs) override {
     ASSERT(num_iovecs > 0);
     ASSERT(length <= MaxAllocation);
-    iovecs[0].mem_ = reserve_buf_.get();
+    iovecs[0].mem_ = tmp_buf_.get();
     iovecs[0].len_ = length;
     return 1;
   }
@@ -140,14 +132,14 @@ public:
   }
 
   std::string data_;
-  std::unique_ptr<char[]> reserve_buf_{new char[MaxAllocation]};
-  std::vector<Buffer::BufferFragment*> fragments_;
+  std::unique_ptr<char[]> tmp_buf_{new char[MaxAllocation]};
 };
 
 typedef std::vector<std::unique_ptr<Buffer::Instance>> BufferList;
 
 // Process a single buffer operation.
-void bufferAction(Context& ctxt, BufferList& buffers, const test::common::buffer::Action& action) {
+void bufferAction(Context& ctxt, char insert_value, BufferList& buffers,
+                  const test::common::buffer::Action& action) {
   const uint32_t target_index = action.target_index() % BufferCount;
   Buffer::Instance& target_buffer = *buffers[target_index];
 
@@ -156,18 +148,19 @@ void bufferAction(Context& ctxt, BufferList& buffers, const test::common::buffer
     const uint32_t size = clampSize(action.add_buffer_fragment());
     void* p = ::malloc(size);
     ASSERT(p != nullptr);
-    ::memset(p, 'b', size);
+    ::memset(p, insert_value, size);
     auto fragment =
         std::make_unique<Buffer::BufferFragmentImpl>(p, size, releaseFragmentAllocation);
     ctxt.fragments_.emplace_back(std::move(fragment));
     const uint32_t previous_length = target_buffer.length();
+    const std::string new_value{static_cast<char*>(p), size};
     target_buffer.addBufferFragment(*ctxt.fragments_.back());
-    ASSERT(previous_length == target_buffer.search(p, size, previous_length));
+    ASSERT(previous_length == target_buffer.search(new_value.data(), size, previous_length));
     break;
   }
   case test::common::buffer::Action::kAddString: {
     const uint32_t size = clampSize(action.add_string());
-    auto string = std::make_unique<std::string>(size, 'a');
+    auto string = std::make_unique<std::string>(size, insert_value);
     ctxt.strings_.emplace_back(std::move(string));
     const uint32_t previous_length = target_buffer.length();
     target_buffer.add(absl::string_view(*ctxt.strings_.back()));
@@ -190,7 +183,7 @@ void bufferAction(Context& ctxt, BufferList& buffers, const test::common::buffer
   }
   case test::common::buffer::Action::kPrependString: {
     const uint32_t size = clampSize(action.prepend_string());
-    auto string = std::make_unique<std::string>(size, 'a');
+    auto string = std::make_unique<std::string>(size, insert_value);
     ctxt.strings_.emplace_back(std::move(string));
     target_buffer.prepend(absl::string_view(*ctxt.strings_.back()));
     ASSERT(target_buffer.search(ctxt.strings_.back()->data(), size, 0) == 0);
@@ -218,7 +211,7 @@ void bufferAction(Context& ctxt, BufferList& buffers, const test::common::buffer
     const uint32_t allocated_slices = target_buffer.reserve(reserve_length, slices, reserve_slices);
     uint32_t allocated_length = 0;
     for (uint32_t i = 0; i < allocated_slices; ++i) {
-      ::memset(slices[i].mem_, 'c', slices[i].len_);
+      ::memset(slices[i].mem_, insert_value, slices[i].len_);
       allocated_length += slices[i].len_;
     }
     ASSERT(reserve_length <= allocated_length);
@@ -296,7 +289,7 @@ void bufferAction(Context& ctxt, BufferList& buffers, const test::common::buffer
     ASSERT(::pipe(pipe_fds) == 0);
     ASSERT(::fcntl(pipe_fds[0], F_SETFL, O_NONBLOCK) == 0);
     ASSERT(::fcntl(pipe_fds[1], F_SETFL, O_NONBLOCK) == 0);
-    std::string data(max_length, 'd');
+    std::string data(max_length, insert_value);
     const int rc = ::write(pipe_fds[1], data.data(), max_length);
     ASSERT(rc > 0);
     const uint32_t previous_length = target_buffer.length();
@@ -339,7 +332,7 @@ DEFINE_PROTO_FUZZER(const test::common::buffer::BufferFuzzTestCase& input) {
   Context ctxt;
   // Fuzzed buffers.
   BufferList buffers;
-  // Shaddow buffers based on SimpleString;
+  // Shadow buffers based on SimpleString.
   BufferList linear_buffers;
   for (uint32_t i = 0; i < BufferCount; ++i) {
     buffers.emplace_back(new Buffer::OwnedImpl());
@@ -347,10 +340,11 @@ DEFINE_PROTO_FUZZER(const test::common::buffer::BufferFuzzTestCase& input) {
   }
 
   for (int i = 0; i < input.actions().size(); ++i) {
+    const char insert_value = 'a' + i % 26;
     const auto& action = input.actions(i);
     ENVOY_LOG_MISC(debug, "Action {}", action.DebugString());
-    bufferAction(ctxt, buffers, action);
-    bufferAction(ctxt, linear_buffers, action);
+    bufferAction(ctxt, insert_value, buffers, action);
+    bufferAction(ctxt, insert_value, linear_buffers, action);
     // When tracing, dump everything.
     for (uint32_t j = 0; j < BufferCount; ++j) {
       ENVOY_LOG_MISC(trace, "Buffer at index {}", j);
