@@ -478,7 +478,7 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::api::v2::Cluster& clust
       updates_map_.erase(cluster_name);
 
       // If the active cluster has priority sets and the warming cluster does not have them, it
-      // means that onConfigUpdate is triggered of EDS type of cluster is triggered with no
+      // means that onConfigUpdate is triggered for EDS type of cluster is triggered with no
       // reference to this cluster. In such cases, copy the active cluster priority set to the
       // warming cluster otherwise the active cluster hosts will be cleared after warming is
       // completed. See https://github.com/envoyproxy/envoy/issues/5168 for more context.

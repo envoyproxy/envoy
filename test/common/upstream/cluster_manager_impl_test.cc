@@ -1268,7 +1268,7 @@ TEST_F(ClusterManagerImplTest, WarmingClusterWithEmptyHosts) {
 TEST_F(ClusterManagerImplTest, addOrUpdateClusterStaticExists) {
   const std::string json =
       fmt::sprintf("{%s}", clustersJson({defaultStaticClusterJson("some_cluster")}));
-  std::shared_ptr<MockClusterRealPrioritySet> cluster1(new NiceMock<MockClusterRealPrioritySet>());
+  std::shared_ptr<MockClusterMockPrioritySet> cluster1(new NiceMock<MockClusterMockPrioritySet>());
   InSequence s;
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster1));
   ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
