@@ -6,7 +6,8 @@ set -e
 yum install -y centos-release-scl epel-release
 yum update -y
 yum install -y devtoolset-7-gcc devtoolset-7-gcc-c++ devtoolset-7-binutils java-1.8.0-openjdk-headless rsync \
-    rh-git218 wget unzip which make cmake3 patch ninja-build devtoolset-7-libatomic-devel openssl python27
+    rh-git218 wget unzip which make cmake3 patch ninja-build devtoolset-7-libatomic-devel openssl python27 \
+    libtool autoconf tcpdump
 
 ln -s /usr/bin/cmake3 /usr/bin/cmake
 ln -s /usr/bin/ninja-build /usr/bin/ninja
@@ -31,6 +32,12 @@ rm "./${LLVM_RELEASE}.tar.xz"
 echo "/opt/rh/httpd24/root/usr/lib64" > /etc/ld.so.conf.d/httpd24.conf
 echo "/opt/llvm/lib" > /etc/ld.so.conf.d/llvm.conf
 ldconfig
+
+# Setup tcpdump for non-root.
+groupadd pcap
+chgrp pcap /usr/sbin/tcpdump
+chmod 750 /usr/sbin/tcpdump
+setcap cap_net_raw,cap_net_admin=eip /usr/sbin/tcpdump
 
 # CentOS toolchains doesn't have C++11 ABI so needs ignore, also punting PATH into system bazelrc.
 echo "build --copt=-DENVOY_IGNORE_GLIBCXX_USE_CXX11_ABI_ERROR=1 --action_env=PATH=${PATH}" >> /etc/bazel.bazelrc
