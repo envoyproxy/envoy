@@ -181,21 +181,10 @@ TEST_F(FileSystemImplTest, Close) {
   ::unlink(new_file_path.c_str());
 
   FilePtr file = file_system_.createFile(new_file_path);
-  const Api::SysCallBoolResult result = file->close();
+  Api::SysCallBoolResult result = file->open();
   EXPECT_TRUE(result.rc_);
-  EXPECT_FALSE(file->isOpen());
-}
+  EXPECT_TRUE(file->isOpen());
 
-TEST_F(FileSystemImplTest, CloseTwice) {
-  const std::string new_file_path = TestEnvironment::temporaryPath("envoy_this_not_exist");
-  ::unlink(new_file_path.c_str());
-
-  FilePtr file = file_system_.createFile(new_file_path);
-  Api::SysCallBoolResult result = file->close();
-  EXPECT_TRUE(result.rc_);
-  EXPECT_FALSE(file->isOpen());
-
-  // check that closing an already closed file doesn't error
   result = file->close();
   EXPECT_TRUE(result.rc_);
   EXPECT_FALSE(file->isOpen());

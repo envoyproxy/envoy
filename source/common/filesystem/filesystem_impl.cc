@@ -25,8 +25,10 @@ namespace Filesystem {
 FileImpl::FileImpl(const std::string& path) : fd_(-1), path_(path) {}
 
 FileImpl::~FileImpl() {
-  const Api::SysCallBoolResult result = close();
-  ASSERT(result.rc_);
+  if (isOpen()) {
+    const Api::SysCallBoolResult result = close();
+    ASSERT(result.rc_);
+  }
 }
 
 Api::SysCallBoolResult FileImpl::open() {
@@ -50,9 +52,7 @@ Api::SysCallSizeResult FileImpl::write(absl::string_view buffer) {
 }
 
 Api::SysCallBoolResult FileImpl::close() {
-  if (!isOpen()) {
-    return {true, 0};
-  }
+  ASSERT(isOpen());
 
   const int rc = ::close(fd_);
   if (rc == -1) {
