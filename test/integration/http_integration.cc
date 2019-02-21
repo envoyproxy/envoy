@@ -924,7 +924,6 @@ void HttpIntegrationTest::testTrailers(uint64_t request_size, uint64_t response_
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(request_size, upstream_request_->bodyLength());
   if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP2) {
-    ENVOY_LOG_MISC(error, "++++++++ check trailers");
     EXPECT_THAT(*upstream_request_->trailers(), HeaderMapEqualRef(&request_trailers));
   }
 
