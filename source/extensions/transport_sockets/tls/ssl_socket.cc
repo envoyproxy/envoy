@@ -165,10 +165,9 @@ void SslSocket::drainErrorQueue() {
     if (failure_reason_.empty()) {
       failure_reason_ = "SSL error:";
     }
-    failure_reason_.append(absl::StrCat(
-        " ", err, ":", ERR_lib_error_string(err), ":", ERR_func_error_string(err),
-        ":", ERR_reason_error_string(err)));
-
+    failure_reason_.append(absl::StrCat(" ", err, ":", ERR_lib_error_string(err), ":",
+                                        ERR_func_error_string(err), ":",
+                                        ERR_reason_error_string(err)));
   }
   ENVOY_CONN_LOG(debug, "{}", callbacks_->connection(), failure_reason_);
   if (saw_error && !saw_counted_error) {
@@ -343,9 +342,7 @@ std::string SslSocket::protocol() const {
   return std::string(reinterpret_cast<const char*>(proto), proto_len);
 }
 
-std::string SslSocket::failureReason() const {
-  return failure_reason_;
-}
+std::string SslSocket::failureReason() const { return failure_reason_; }
 
 std::string SslSocket::serialNumberPeerCertificate() const {
   bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));

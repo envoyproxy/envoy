@@ -528,15 +528,18 @@ void Filter::onResponseTimeout() {
     upstream_request_->resetStream();
   }
 
-  onUpstreamReset(UpstreamResetType::GlobalTimeout, absl::optional<Http::StreamResetReason>());
+  onUpstreamReset(UpstreamResetType::GlobalTimeout, absl::optional<Http::StreamResetReason>(),
+                  absl::string_view());
 }
 
 void Filter::onUpstreamReset(UpstreamResetType type,
-                             const absl::optional<Http::StreamResetReason>& reset_reason) {
+                             const absl::optional<Http::StreamResetReason>& reset_reason,
+                             absl::string_view transport_failure) {
   ASSERT(type == UpstreamResetType::GlobalTimeout || upstream_request_);
   if (type == UpstreamResetType::Reset) {
-    ENVOY_STREAM_LOG(debug, "upstream reset: reset reason {}", *callbacks_,
-                     reset_reason ? Http::Utility::resetReasonToString(reset_reason.value()) : "");
+    ENVOY_STREAM_LOG(debug, "upstream reset: reset reason {}, transport failure {}", *callbacks_,
+                     reset_reason ? Http::Utility::resetReasonToString(reset_reason.value()) : "",
+                     transport_failure);
   }
 
   Upstream::HostDescriptionConstSharedPtr upstream_host;
@@ -1059,7 +1062,7 @@ void Filter::UpstreamRequest::onResetStream(Http::StreamResetReason reason) {
   if (!calling_encode_headers_) {
     stream_info_.setResponseFlag(parent_.streamResetReasonToResponseFlag(reason));
     parent_.onUpstreamReset(UpstreamResetType::Reset,
-                            absl::optional<Http::StreamResetReason>(reason));
+                            absl::optional<Http::StreamResetReason>(reason), absl::string_view());
   } else {
     deferred_reset_reason_ = reason;
   }
@@ -1102,7 +1105,8 @@ void Filter::UpstreamRequest::onPerTryTimeout() {
     stream_info_.setResponseFlag(StreamInfo::ResponseFlag::UpstreamRequestTimeout);
     parent_.onUpstreamReset(
         UpstreamResetType::PerTryTimeout,
-        absl::optional<Http::StreamResetReason>(Http::StreamResetReason::LocalReset));
+        absl::optional<Http::StreamResetReason>(Http::StreamResetReason::LocalReset),
+        absl::string_view());
   } else {
     ENVOY_STREAM_LOG(debug,
                      "ignored upstream per try timeout due to already started downstream response",
@@ -1111,6 +1115,7 @@ void Filter::UpstreamRequest::onPerTryTimeout() {
 }
 
 void Filter::UpstreamRequest::onPoolFailure(Http::ConnectionPool::PoolFailureReason reason,
+                                            absl::string_view reason_details,
                                             Upstream::HostDescriptionConstSharedPtr host) {
   Http::StreamResetReason reset_reason = Http::StreamResetReason::ConnectionFailure;
   switch (reason) {
@@ -1122,6 +1127,7 @@ void Filter::UpstreamRequest::onPoolFailure(Http::ConnectionPool::PoolFailureRea
     break;
   }
 
+  UNREFERENCED_PARAMETER(reason_details);
   // Mimic an upstream reset.
   onUpstreamHostSelected(host);
   onResetStream(reset_reason);
