@@ -264,7 +264,7 @@ public:
 
   /**
    * @return std::string the failure reason of the underlying transport socket, if no failure
-   *         occured an empty string is returned.
+   *         occurred an empty string is returned.
    */
   virtual std::string transportFailureReason() const PURE;
 };
