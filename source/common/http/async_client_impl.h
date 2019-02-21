@@ -326,9 +326,7 @@ private:
           }
           encodeHeaders(std::move(headers), end_stream);
         },
-        [this](Buffer::Instance& data, bool end_stream) -> void {
-          encodeData(data, end_stream);
-        },
+        [this](Buffer::Instance& data, bool end_stream) -> void { encodeData(data, end_stream); },
         remote_closed_, code, body, grpc_status, is_head_request_);
   }
   // The async client won't pause if sending an Expect: 100-Continue so simply
