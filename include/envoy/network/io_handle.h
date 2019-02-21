@@ -40,20 +40,18 @@ public:
 
   // Map platform specific error into IoErrorCode.
   // Needed to hide errorCode() in case of ENVOY_ERROR_AGAIN.
-  static IoErrorCode getErrorCode(const IoError* err) {
-    ASSERT(err != nullptr);
-    if (err == ENVOY_ERROR_AGAIN) {
+  static IoErrorCode getErrorCode(const IoError& err) {
+    if (&err == ENVOY_ERROR_AGAIN) {
       return IoErrorCode::Again;
     }
-    return err->errorCode();
+    return err.errorCode();
   }
 
-  static std::string getErrorDetails(const IoError* err) {
-    ASSERT(err != nullptr);
-    if (err == ENVOY_ERROR_AGAIN) {
+  static std::string getErrorDetails(const IoError& err) {
+    if (&err == ENVOY_ERROR_AGAIN) {
       return "Try again later";
     }
-    return err->errorDetails();
+    return err.errorDetails();
   }
 
 protected:
