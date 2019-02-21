@@ -79,7 +79,7 @@ void LdsApiImpl::onConfigUpdate(const ResourceVector& resources, const std::stri
       exception_msgs.push_back(fmt::format("{}: {}", listener_name, e.what()));
     }
   }
-  
+
   version_info_ = version_info;
   runInitializeCallbackIfAny();
   if (!exception_msgs.empty()) {
