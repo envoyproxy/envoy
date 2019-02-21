@@ -72,9 +72,10 @@ one another; so it is necessary to multiply the number of hashes per host---for 
 distribution. Best practice is to explicitly set
 :ref:`minimum_ring_size<envoy_api_field_Cluster.RingHashLbConfig.minimum_ring_size>` and
 :ref:`maximum_ring_size<envoy_api_field_Cluster.RingHashLbConfig.maximum_ring_size>`, and monitor
-the min_hashes_per_host and max_hashes_per_host gauges to ensure good distribution. With the ring
-partitioned appropriately, the addition or removal of one host from a set of N hosts will affect
-only 1/N requests.
+the :ref:`min_hashes_per_host and max_hashes_per_host
+gauges<config_cluster_manager_cluster_stats_ring_hash_lb>` to ensure good distribution. With the
+ring partitioned appropriately, the addition or removal of one host from a set of N hosts will
+affect only 1/N requests.
 
 When priority based load balancing is in use, the priority level is also chosen by hash, so the
 endpoint selected will still be consistent when the set of backends is stable.
