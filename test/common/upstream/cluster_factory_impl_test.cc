@@ -205,9 +205,9 @@ TEST_F(TestStaticClusterImplTest, createWithTypedConfig) {
 
   const envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
   auto cluster = ClusterFactoryImplBase::create(
-    cluster_config, cm_, stats_, tls_, dns_resolver_, ssl_context_manager_, runtime_, random_,
-    dispatcher_, log_manager_, local_info_, admin_, singleton_manager_,
-    std::move(outlier_event_logger_), false, *api_);
+      cluster_config, cm_, stats_, tls_, dns_resolver_, ssl_context_manager_, runtime_, random_,
+      dispatcher_, log_manager_, local_info_, admin_, singleton_manager_,
+      std::move(outlier_event_logger_), false, *api_);
   cluster->initialize([] {});
 
   EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[10]->healthyHosts().size());

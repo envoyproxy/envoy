@@ -105,7 +105,6 @@ message Cluster {
     // Cluster specific configuration which depends on the cluster being instantiated.
     // See the supported cluster for further documentation.
     google.protobuf.Any typed_config = 2;
-
   }
 
   oneof cluster_discovery_type {
@@ -581,7 +580,6 @@ message Cluster {
   // If this flag is not set to true, Envoy will wait until the hosts fail active health
   // checking before removing it from the cluster.
   bool drain_connections_on_host_removal = 32;
-
 }
 
 // An extensible structure containing the address Envoy should bind to when

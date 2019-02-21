@@ -115,7 +115,7 @@ public:
          Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api, Api::Api& api);
 
   virtual ClusterSharedPtr create(const envoy::api::v2::Cluster& cluster,
-                          ClusterFactoryContext& context) override;
+                                  ClusterFactoryContext& context) override;
 
   Network::DnsResolverSharedPtr selectDnsResolver(const envoy::api::v2::Cluster& cluster,
                                                   ClusterFactoryContext& context);
@@ -149,6 +149,7 @@ class StrictDnsClusterFactory : public ClusterFactoryImplBase {
 public:
   StrictDnsClusterFactory()
       : ClusterFactoryImplBase(Extensions::Clusters::ClusterTypes::get().StrictDns) {}
+
 private:
   ClusterImplBaseSharedPtr
   createClusterImpl(const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context,
@@ -159,7 +160,6 @@ private:
 template <class ConfigProto> class ConfigurableClusterFactoryBase : public ClusterFactoryImplBase {
 
 public:
-
   /**
    * @return ProtobufTypes::MessagePtr create empty config proto message for v2. The filter
    *         config, which arrives in an opaque google.protobuf.Struct message, will be converted to
@@ -174,13 +174,13 @@ protected:
   ConfigurableClusterFactoryBase(std::string name) : ClusterFactoryImplBase(name) {}
 
 private:
-
   virtual ClusterImplBaseSharedPtr
   createClusterImpl(const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context,
                     Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
                     Stats::ScopePtr&& stats_scope) override {
     ProtobufTypes::MessagePtr config = createEmptyConfigProto();
-    Config::Utility::translateOpaqueConfig(cluster.cluster_type().typed_config(), ProtobufWkt::Struct::default_instance(), *config);
+    Config::Utility::translateOpaqueConfig(cluster.cluster_type().typed_config(),
+                                           ProtobufWkt::Struct::default_instance(), *config);
     return createClusterWithConfig(cluster,
                                    MessageUtil::downcastAndValidate<const ConfigProto&>(*config),
                                    context, socket_factory_context, std::move(stats_scope));
