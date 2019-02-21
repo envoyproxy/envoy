@@ -11,6 +11,10 @@
 
 #include "gtest/gtest.h"
 
+// Strong assertion that applies across all compilation modes and doesn't rely
+// on gtest, which only provides soft fails that don't trip oss-fuzz failures.
+#define FUZZ_ASSERT(x) RELEASE_ASSERT(x, "")
+
 namespace Envoy {
 
 namespace {
@@ -64,8 +68,8 @@ public:
   }
 
   void commit(Buffer::RawSlice* iovecs, uint64_t num_iovecs) override {
-    ASSERT(num_iovecs == 1);
-    ASSERT(tmp_buf_.get() == iovecs[0].mem_);
+    FUZZ_ASSERT(num_iovecs == 1);
+    FUZZ_ASSERT(tmp_buf_.get() == iovecs[0].mem_);
     data_ += std::string(tmp_buf_.get(), iovecs[0].len_);
   }
 
@@ -76,7 +80,7 @@ public:
   void drain(uint64_t size) override { data_ = data_.substr(size); }
 
   uint64_t getRawSlices(Buffer::RawSlice* out, uint64_t out_size) const override {
-    ASSERT(out_size > 0);
+    FUZZ_ASSERT(out_size > 0);
     // Sketchy, but probably will work for test purposes.
     out->mem_ = const_cast<char*>(data_.data());
     out->len_ = data_.size();
@@ -99,18 +103,18 @@ public:
   }
 
   Api::SysCallIntResult read(int fd, uint64_t max_length) override {
-    ASSERT(max_length <= MaxAllocation);
+    FUZZ_ASSERT(max_length <= MaxAllocation);
     Api::SysCallIntResult result;
     result.rc_ = ::read(fd, tmp_buf_.get(), max_length);
     result.errno_ = errno;
-    ASSERT(result.rc_ > 0);
+    FUZZ_ASSERT(result.rc_ > 0);
     data_ += std::string(tmp_buf_.get(), result.rc_);
     return result;
   }
 
   uint64_t reserve(uint64_t length, Buffer::RawSlice* iovecs, uint64_t num_iovecs) override {
-    ASSERT(num_iovecs > 0);
-    ASSERT(length <= MaxAllocation);
+    FUZZ_ASSERT(num_iovecs > 0);
+    FUZZ_ASSERT(length <= MaxAllocation);
     iovecs[0].mem_ = tmp_buf_.get();
     iovecs[0].len_ = length;
     return 1;
@@ -126,7 +130,7 @@ public:
     Api::SysCallIntResult result;
     result.rc_ = ::write(fd, data_.data(), data_.size());
     result.errno_ = errno;
-    ASSERT(result.rc_ >= 0);
+    FUZZ_ASSERT(result.rc_ >= 0);
     data_ = data_.substr(result.rc_);
     return result;
   }
@@ -147,7 +151,7 @@ void bufferAction(Context& ctxt, char insert_value, BufferList& buffers,
   case test::common::buffer::Action::kAddBufferFragment: {
     const uint32_t size = clampSize(action.add_buffer_fragment());
     void* p = ::malloc(size);
-    ASSERT(p != nullptr);
+    FUZZ_ASSERT(p != nullptr);
     ::memset(p, insert_value, size);
     auto fragment =
         std::make_unique<Buffer::BufferFragmentImpl>(p, size, releaseFragmentAllocation);
@@ -155,7 +159,7 @@ void bufferAction(Context& ctxt, char insert_value, BufferList& buffers,
     const uint32_t previous_length = target_buffer.length();
     const std::string new_value{static_cast<char*>(p), size};
     target_buffer.addBufferFragment(*ctxt.fragments_.back());
-    ASSERT(previous_length == target_buffer.search(new_value.data(), size, previous_length));
+    FUZZ_ASSERT(previous_length == target_buffer.search(new_value.data(), size, previous_length));
     break;
   }
   case test::common::buffer::Action::kAddString: {
@@ -164,8 +168,8 @@ void bufferAction(Context& ctxt, char insert_value, BufferList& buffers,
     ctxt.strings_.emplace_back(std::move(string));
     const uint32_t previous_length = target_buffer.length();
     target_buffer.add(absl::string_view(*ctxt.strings_.back()));
-    ASSERT(previous_length ==
-           target_buffer.search(ctxt.strings_.back()->data(), size, previous_length));
+    FUZZ_ASSERT(previous_length ==
+                target_buffer.search(ctxt.strings_.back()->data(), size, previous_length));
     break;
   }
   case test::common::buffer::Action::kAddBuffer: {
@@ -177,8 +181,8 @@ void bufferAction(Context& ctxt, char insert_value, BufferList& buffers,
     const std::string source_contents = source_buffer.toString();
     const uint32_t previous_length = target_buffer.length();
     target_buffer.add(source_buffer);
-    ASSERT(previous_length ==
-           target_buffer.search(source_contents.data(), source_contents.size(), previous_length));
+    FUZZ_ASSERT(previous_length == target_buffer.search(source_contents.data(),
+                                                        source_contents.size(), previous_length));
     break;
   }
   case test::common::buffer::Action::kPrependString: {
@@ -186,7 +190,7 @@ void bufferAction(Context& ctxt, char insert_value, BufferList& buffers,
     auto string = std::make_unique<std::string>(size, insert_value);
     ctxt.strings_.emplace_back(std::move(string));
     target_buffer.prepend(absl::string_view(*ctxt.strings_.back()));
-    ASSERT(target_buffer.search(ctxt.strings_.back()->data(), size, 0) == 0);
+    FUZZ_ASSERT(target_buffer.search(ctxt.strings_.back()->data(), size, 0) == 0);
     break;
   }
   case test::common::buffer::Action::kPrependBuffer: {
@@ -197,7 +201,7 @@ void bufferAction(Context& ctxt, char insert_value, BufferList& buffers,
     Buffer::Instance& source_buffer = *buffers[source_index];
     const std::string source_contents = source_buffer.toString();
     target_buffer.prepend(source_buffer);
-    ASSERT(target_buffer.search(source_contents.data(), source_contents.size(), 0) == 0);
+    FUZZ_ASSERT(target_buffer.search(source_contents.data(), source_contents.size(), 0) == 0);
     break;
   }
   case test::common::buffer::Action::kReserveCommit: {
@@ -214,13 +218,13 @@ void bufferAction(Context& ctxt, char insert_value, BufferList& buffers,
       ::memset(slices[i].mem_, insert_value, slices[i].len_);
       allocated_length += slices[i].len_;
     }
-    ASSERT(reserve_length <= allocated_length);
+    FUZZ_ASSERT(reserve_length <= allocated_length);
     const uint32_t target_length =
         std::min(reserve_length, action.reserve_commit().commit_length());
     uint32_t shrink_length = allocated_length;
     int32_t shrink_slice = allocated_slices - 1;
     while (shrink_length > target_length) {
-      ASSERT(shrink_slice >= 0);
+      FUZZ_ASSERT(shrink_slice >= 0);
       const uint32_t available = slices[shrink_slice].len_;
       const uint32_t remainder = shrink_length - target_length;
       if (available >= remainder) {
@@ -231,7 +235,7 @@ void bufferAction(Context& ctxt, char insert_value, BufferList& buffers,
       slices[shrink_slice--].len_ = 0;
     }
     target_buffer.commit(slices, allocated_slices);
-    ASSERT(previous_length + target_length == target_buffer.length());
+    FUZZ_ASSERT(previous_length + target_length == target_buffer.length());
     break;
   }
   case test::common::buffer::Action::kCopyOut: {
@@ -243,7 +247,7 @@ void bufferAction(Context& ctxt, char insert_value, BufferList& buffers,
                  std::min(action.copy_out().length(), static_cast<uint32_t>(sizeof(copy_buffer))));
     target_buffer.copyOut(start, length, copy_buffer);
     const std::string contents = target_buffer.toString();
-    ASSERT(::memcmp(copy_buffer, contents.data() + start, length) == 0);
+    FUZZ_ASSERT(::memcmp(copy_buffer, contents.data() + start, length) == 0);
     break;
   }
   case test::common::buffer::Action::kDrain: {
@@ -251,7 +255,7 @@ void bufferAction(Context& ctxt, char insert_value, BufferList& buffers,
     const uint32_t drain_length =
         std::min(static_cast<uint32_t>(target_buffer.length()), action.drain());
     target_buffer.drain(drain_length);
-    ASSERT(previous_length - drain_length == target_buffer.length());
+    FUZZ_ASSERT(previous_length - drain_length == target_buffer.length());
     break;
   }
   case test::common::buffer::Action::kLinearize: {
@@ -261,8 +265,8 @@ void bufferAction(Context& ctxt, char insert_value, BufferList& buffers,
     Buffer::RawSlice slices[1];
     const uint64_t slices_used = target_buffer.getRawSlices(slices, 1);
     if (linearize_size > 0) {
-      ASSERT(slices_used == 1);
-      ASSERT(slices[0].len_ >= linearize_size);
+      FUZZ_ASSERT(slices_used == 1);
+      FUZZ_ASSERT(slices[0].len_ >= linearize_size);
     }
     break;
   }
@@ -286,37 +290,37 @@ void bufferAction(Context& ctxt, char insert_value, BufferList& buffers,
       break;
     }
     int pipe_fds[2] = {0, 0};
-    ASSERT(::pipe(pipe_fds) == 0);
-    ASSERT(::fcntl(pipe_fds[0], F_SETFL, O_NONBLOCK) == 0);
-    ASSERT(::fcntl(pipe_fds[1], F_SETFL, O_NONBLOCK) == 0);
+    FUZZ_ASSERT(::pipe(pipe_fds) == 0);
+    FUZZ_ASSERT(::fcntl(pipe_fds[0], F_SETFL, O_NONBLOCK) == 0);
+    FUZZ_ASSERT(::fcntl(pipe_fds[1], F_SETFL, O_NONBLOCK) == 0);
     std::string data(max_length, insert_value);
     const int rc = ::write(pipe_fds[1], data.data(), max_length);
-    ASSERT(rc > 0);
+    FUZZ_ASSERT(rc > 0);
     const uint32_t previous_length = target_buffer.length();
-    ASSERT(target_buffer.read(pipe_fds[0], max_length).rc_ == rc);
-    ASSERT(::close(pipe_fds[0]) == 0);
-    ASSERT(::close(pipe_fds[1]) == 0);
-    ASSERT(previous_length == target_buffer.search(data.data(), rc, previous_length));
+    FUZZ_ASSERT(target_buffer.read(pipe_fds[0], max_length).rc_ == rc);
+    FUZZ_ASSERT(::close(pipe_fds[0]) == 0);
+    FUZZ_ASSERT(::close(pipe_fds[1]) == 0);
+    FUZZ_ASSERT(previous_length == target_buffer.search(data.data(), rc, previous_length));
     break;
   }
   case test::common::buffer::Action::kWrite: {
     int pipe_fds[2] = {0, 0};
-    ASSERT(::pipe(pipe_fds) == 0);
-    ASSERT(::fcntl(pipe_fds[0], F_SETFL, O_NONBLOCK) == 0);
-    ASSERT(::fcntl(pipe_fds[1], F_SETFL, O_NONBLOCK) == 0);
+    FUZZ_ASSERT(::pipe(pipe_fds) == 0);
+    FUZZ_ASSERT(::fcntl(pipe_fds[0], F_SETFL, O_NONBLOCK) == 0);
+    FUZZ_ASSERT(::fcntl(pipe_fds[1], F_SETFL, O_NONBLOCK) == 0);
     const bool empty = target_buffer.length() == 0;
     const std::string previous_data = target_buffer.toString();
     const int rc = target_buffer.write(pipe_fds[1]).rc_;
     if (empty) {
-      ASSERT(rc == 0);
+      FUZZ_ASSERT(rc == 0);
     } else {
-      ASSERT(rc > 0);
+      FUZZ_ASSERT(rc > 0);
       STACK_ARRAY(buf, char, rc);
-      ASSERT(::read(pipe_fds[0], buf.begin(), rc) == rc);
-      ASSERT(::memcmp(buf.begin(), previous_data.data(), rc) == 0);
+      FUZZ_ASSERT(::read(pipe_fds[0], buf.begin(), rc) == rc);
+      FUZZ_ASSERT(::memcmp(buf.begin(), previous_data.data(), rc) == 0);
     }
-    ASSERT(::close(pipe_fds[0]) == 0);
-    ASSERT(::close(pipe_fds[1]) == 0);
+    FUZZ_ASSERT(::close(pipe_fds[0]) == 0);
+    FUZZ_ASSERT(::close(pipe_fds[1]) == 0);
     break;
   }
   default:
@@ -357,16 +361,16 @@ DEFINE_PROTO_FUZZER(const test::common::buffer::BufferFuzzTestCase& input) {
         ENVOY_LOG_MISC(debug, "Mismatched buffers at index {}", j);
         ENVOY_LOG_MISC(debug, "B: {}", buffers[j]->toString());
         ENVOY_LOG_MISC(debug, "L: {}", linear_buffers[j]->toString());
-        ASSERT(false);
+        FUZZ_ASSERT(false);
       }
-      ASSERT(buffers[j]->length() == linear_buffers[j]->length());
+      FUZZ_ASSERT(buffers[j]->length() == linear_buffers[j]->length());
       constexpr uint32_t max_slices = 16;
       Buffer::RawSlice slices[max_slices];
       buffers[j]->getRawSlices(slices, max_slices);
       // This string should never appear (e.g. we don't synthesize _g as a
       // pattern), verify that it's never found.
       std::string garbage{"_garbage"};
-      ASSERT(buffers[j]->search(garbage.data(), garbage.size(), 0) == -1);
+      FUZZ_ASSERT(buffers[j]->search(garbage.data(), garbage.size(), 0) == -1);
     }
   }
 }
