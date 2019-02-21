@@ -123,9 +123,6 @@ void AsyncStreamImpl::sendHeaders(HeaderMap& headers, bool end_stream) {
     Utility::appendXff(headers, *parent_.config_.local_info_.address());
   }
   router_.decodeHeaders(headers, end_stream);
-  if (end_stream) {
-    onDecodeComplete();
-  }
   closeLocal(end_stream);
 }
 
@@ -138,9 +135,6 @@ void AsyncStreamImpl::sendData(Buffer::Instance& data, bool end_stream) {
   }
 
   router_.decodeData(data, end_stream);
-  if (end_stream) {
-    onDecodeComplete();
-  }
   closeLocal(end_stream);
 }
 

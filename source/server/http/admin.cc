@@ -1027,15 +1027,9 @@ void AdminFilter::onComplete() {
   populateFallbackResponseHeaders(code, *header_map);
   callbacks_->encodeHeaders(std::move(header_map),
                             end_stream_on_complete_ && response.length() == 0);
-  if (end_stream_on_complete_ && response.length() == 0) {
-    callbacks_->onEncodeComplete();
-  }
 
   if (response.length() > 0) {
     callbacks_->encodeData(response, end_stream_on_complete_);
-    if (end_stream_on_complete_) {
-      callbacks_->onEncodeComplete();
-    }
   }
 }
 

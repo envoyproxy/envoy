@@ -309,15 +309,9 @@ private:
             modify_headers(*headers);
           }
           encodeHeaders(std::move(headers), end_stream);
-          if (end_stream) {
-            onEncodeComplete();
-          }
         },
         [this](Buffer::Instance& data, bool end_stream) -> void {
           encodeData(data, end_stream);
-          if (end_stream) {
-            onEncodeComplete();
-          }
         },
         remote_closed_, code, body, grpc_status, is_head_request_);
   }
@@ -335,8 +329,6 @@ private:
   void setDecoderBufferLimit(uint32_t) override {}
   uint32_t decoderBufferLimit() override { return 0; }
   bool recreateStream() override { return false; }
-  void onEncodeComplete() override {}
-  void onDecodeComplete() override {}
 
   AsyncClient::StreamCallbacks& stream_callbacks_;
   const uint64_t stream_id_;

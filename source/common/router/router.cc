@@ -755,9 +755,6 @@ void Filter::onUpstreamHeaders(const uint64_t response_code, Http::HeaderMapPtr&
   }
 
   callbacks_->encodeHeaders(std::move(headers), end_stream);
-  if (end_stream) {
-    callbacks_->onEncodeComplete();
-  }
 }
 
 void Filter::onUpstreamData(Buffer::Instance& data, bool end_stream) {
@@ -770,9 +767,6 @@ void Filter::onUpstreamData(Buffer::Instance& data, bool end_stream) {
   }
 
   callbacks_->encodeData(data, end_stream);
-  if (end_stream) {
-    callbacks_->onEncodeComplete();
-  }
 }
 
 void Filter::onUpstreamTrailers(Http::HeaderMapPtr&& trailers) {

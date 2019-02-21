@@ -86,7 +86,6 @@ Http::FilterHeadersStatus CorsFilter::decodeHeaders(Http::HeaderMap& headers, bo
   }
 
   decoder_callbacks_->encodeHeaders(std::move(response_headers), true);
-  decoder_callbacks_->onEncodeComplete();
 
   return Http::FilterHeadersStatus::StopIteration;
 }

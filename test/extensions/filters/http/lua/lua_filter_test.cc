@@ -986,7 +986,6 @@ TEST_F(LuaHttpFilterTest, HttpCallImmediateResponse) {
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
   Http::TestHeaderMapImpl expected_headers{{":status", "403"}};
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), true));
-  EXPECT_CALL(decoder_callbacks_, onEncodeComplete());
   callbacks->onSuccess(std::move(response_message));
 }
 
@@ -1261,7 +1260,6 @@ TEST_F(LuaHttpFilterTest, ImmediateResponse) {
     Http::TestHeaderMapImpl expected_headers{{":status", "503"}, {"content-length", "4"}};
     EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), false));
     EXPECT_CALL(decoder_callbacks_, encodeData(_, true));
-    EXPECT_CALL(decoder_callbacks_, onEncodeComplete());
     EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
               filter_->decodeHeaders(request_headers, false));
     filter_->onDestroy();

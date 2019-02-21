@@ -196,19 +196,13 @@ private:
     void setDecoderBufferLimit(uint32_t limit) override { parent_.setBufferLimit(limit); }
     uint32_t decoderBufferLimit() override { return parent_.buffer_limit_; }
     bool recreateStream() override;
-    void onEncodeComplete() override {}
-    void onDecodeComplete() override {}
 
     // Each decoder filter instance checks if the request passed to the filter is gRPC
     // so that we can issue gRPC local responses to gRPC requests. Filter's decodeHeaders()
     // called here may change the content type, so we must check it before the call.
     FilterHeadersStatus decodeHeaders(HeaderMap& headers, bool end_stream) {
       is_grpc_request_ = Grpc::Common::hasGrpcContentType(headers);
-      FilterHeadersStatus status = handle_->decodeHeaders(headers, end_stream);
-      if (end_stream) {
-        onDecodeComplete();
-      }
-      return status;
+      return handle_->decodeHeaders(headers, end_stream);
     }
 
     void requestDataTooLarge();

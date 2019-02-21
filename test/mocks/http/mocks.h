@@ -148,8 +148,6 @@ public:
   MOCK_METHOD1(setDecoderBufferLimit, void(uint32_t));
   MOCK_METHOD0(decoderBufferLimit, uint32_t());
   MOCK_METHOD0(recreateStream, bool());
-  MOCK_METHOD0(onEncodeComplete, void());
-  MOCK_METHOD0(onDecodeComplete, void());
 
   // Http::StreamDecoderFilterCallbacks
   void sendLocalReply(Code code, absl::string_view body,
@@ -162,16 +160,8 @@ public:
             modify_headers(*headers);
           }
           encodeHeaders(std::move(headers), end_stream);
-          if (end_stream) {
-            onEncodeComplete();
-          }
         },
-        [this](Buffer::Instance& data, bool end_stream) -> void {
-          encodeData(data, end_stream);
-          if (end_stream) {
-            onEncodeComplete();
-          }
-        },
+        [this](Buffer::Instance& data, bool end_stream) -> void { encodeData(data, end_stream); },
         stream_destroyed_, code, body, grpc_status, is_head_request_);
   }
   void encode100ContinueHeaders(HeaderMapPtr&& headers) override {

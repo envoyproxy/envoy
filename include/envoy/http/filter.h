@@ -348,16 +348,6 @@ public:
   // Note that HttpConnectionManager sanitization will *not* be performed on the
   // recreated stream, as it is assumed that sanitization has already been done.
   virtual bool recreateStream() PURE;
-
-  /**
-   * Called at the end of the stream, when all data has been encoded.
-   */
-  virtual void onEncodeComplete() PURE;
-
-  /**
-   * Called at the end of the stream, when all data has been decoded.
-   */
-  virtual void onDecodeComplete() PURE;
 };
 
 /**
@@ -411,6 +401,11 @@ public:
    * filter should use. Callbacks will not be invoked by the filter after onDestroy() is called.
    */
   virtual void setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbacks) PURE;
+
+  /**
+   * Called at the end of the stream, when all data has been decoded.
+   */
+  virtual void decodeComplete() {}
 };
 
 typedef std::shared_ptr<StreamDecoderFilter> StreamDecoderFilterSharedPtr;
@@ -559,6 +554,11 @@ public:
    * use. Callbacks will not be invoked by the filter after onDestroy() is called.
    */
   virtual void setEncoderFilterCallbacks(StreamEncoderFilterCallbacks& callbacks) PURE;
+
+  /**
+   * Called at the end of the stream, when all data has been encoded.
+   */
+  virtual void encodeComplete() {}
 };
 
 typedef std::shared_ptr<StreamEncoderFilter> StreamEncoderFilterSharedPtr;
