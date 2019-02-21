@@ -332,7 +332,7 @@ DEFINE_PROTO_FUZZER(const test::common::buffer::BufferFuzzTestCase& input) {
   Context ctxt;
   // Fuzzed buffers.
   BufferList buffers;
-  // Shadow buffers based on SimpleString.
+  // Shadow buffers based on StringBuffer.
   BufferList linear_buffers;
   for (uint32_t i = 0; i < BufferCount; ++i) {
     buffers.emplace_back(new Buffer::OwnedImpl());
