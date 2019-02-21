@@ -18,7 +18,7 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "router_matcher",
+    name = "route_matcher",
     srcs = ["route_matcher.cc"],
     hdrs = ["route_matcher.h"],
     deps = [
