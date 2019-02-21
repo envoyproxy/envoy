@@ -114,16 +114,11 @@ public:
          Server::Admin& admin, Singleton::Manager& singleton_manager,
          Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api, Api::Api& api);
 
-  ClusterSharedPtr create(const envoy::api::v2::Cluster& cluster,
+  virtual ClusterSharedPtr create(const envoy::api::v2::Cluster& cluster,
                           ClusterFactoryContext& context) override;
 
   Network::DnsResolverSharedPtr selectDnsResolver(const envoy::api::v2::Cluster& cluster,
                                                   ClusterFactoryContext& context);
-
-  virtual ClusterImplBaseSharedPtr
-  createClusterImpl(const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context,
-                    Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
-                    Stats::ScopePtr&& stats_scope) PURE;
 
   std::string name() override { return name_; }
 
@@ -131,6 +126,10 @@ protected:
   ClusterFactoryImplBase(const std::string name) : name_(name) {}
 
 private:
+  virtual ClusterImplBaseSharedPtr
+  createClusterImpl(const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context,
+                    Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
+                    Stats::ScopePtr&& stats_scope) PURE;
   const std::string name_;
 };
 
@@ -139,6 +138,7 @@ public:
   StaticClusterFactory()
       : ClusterFactoryImplBase(Extensions::Clusters::ClusterTypes::get().Static) {}
 
+private:
   ClusterImplBaseSharedPtr
   createClusterImpl(const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context,
                     Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
@@ -149,7 +149,7 @@ class StrictDnsClusterFactory : public ClusterFactoryImplBase {
 public:
   StrictDnsClusterFactory()
       : ClusterFactoryImplBase(Extensions::Clusters::ClusterTypes::get().StrictDns) {}
-
+private:
   ClusterImplBaseSharedPtr
   createClusterImpl(const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context,
                     Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
@@ -159,16 +159,6 @@ public:
 template <class ConfigProto> class ConfigurableClusterFactoryBase : public ClusterFactoryImplBase {
 
 public:
-  virtual ClusterImplBaseSharedPtr
-  createClusterImpl(const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context,
-                    Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
-                    Stats::ScopePtr&& stats_scope) override {
-    ProtobufTypes::MessagePtr config = createEmptyConfigProto();
-    Config::Utility::translateOpaqueConfig(cluster.typed_config(), cluster.config(), *config);
-    return createClusterWithConfig(cluster,
-                                   MessageUtil::downcastAndValidate<const ConfigProto&>(*config),
-                                   context, socket_factory_context, std::move(stats_scope));
-  }
 
   /**
    * @return ProtobufTypes::MessagePtr create empty config proto message for v2. The filter
@@ -184,6 +174,18 @@ protected:
   ConfigurableClusterFactoryBase(std::string name) : ClusterFactoryImplBase(name) {}
 
 private:
+
+  virtual ClusterImplBaseSharedPtr
+  createClusterImpl(const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context,
+                    Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
+                    Stats::ScopePtr&& stats_scope) override {
+    ProtobufTypes::MessagePtr config = createEmptyConfigProto();
+    Config::Utility::translateOpaqueConfig(cluster.cluster_type().typed_config(), ProtobufWkt::Struct::default_instance(), *config);
+    return createClusterWithConfig(cluster,
+                                   MessageUtil::downcastAndValidate<const ConfigProto&>(*config),
+                                   context, socket_factory_context, std::move(stats_scope));
+  }
+
   virtual ClusterImplBaseSharedPtr createClusterWithConfig(
       const envoy::api::v2::Cluster& cluster, const ConfigProto& proto_config,
       ClusterFactoryContext& context,

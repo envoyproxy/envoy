@@ -190,7 +190,7 @@ envoy_cc_library(
     srcs = ["logical_dns_cluster.cc"],
     hdrs = ["logical_dns_cluster.h"],
     deps = [
-        ":cluster_factory_includes",
+        ":cluster_factory_lib",
         ":upstream_includes",
         "//include/envoy/thread_local:thread_local_interface",
         "//include/envoy/upstream:cluster_factory_interface",
@@ -209,7 +209,7 @@ envoy_cc_library(
     srcs = ["original_dst_cluster.cc"],
     hdrs = ["original_dst_cluster.h"],
     deps = [
-        ":cluster_factory_includes",
+        ":cluster_factory_lib",
         ":upstream_includes",
         "//include/envoy/secret:secret_manager_interface",
         "//include/envoy/upstream:cluster_factory_interface",
@@ -286,7 +286,7 @@ envoy_cc_library(
     srcs = ["eds.cc"],
     hdrs = ["eds.h"],
     deps = [
-        ":cluster_factory_includes",
+        ":cluster_factory_lib",
         ":upstream_includes",
         "//include/envoy/config:grpc_mux_interface",
         "//include/envoy/config:subscription_interface",
@@ -398,10 +398,7 @@ envoy_cc_library(
     srcs = ["cluster_factory_impl.cc"],
     deps = [
         ":cluster_factory_includes",
-        ":eds_lib",
         ":health_checker_lib",
-        ":logical_dns_cluster_lib",
-        ":original_dst_cluster_lib",
         ":upstream_includes",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:timer_interface",

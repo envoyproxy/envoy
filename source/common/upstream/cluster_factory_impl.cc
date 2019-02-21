@@ -1,45 +1,12 @@
 #include "common/upstream/cluster_factory_impl.h"
 
-#include <chrono>
-#include <cstdint>
-#include <list>
-#include <memory>
-#include <string>
-#include <unordered_set>
-#include <vector>
-
-#include "envoy/event/dispatcher.h"
-#include "envoy/event/timer.h"
-#include "envoy/network/dns.h"
-#include "envoy/secret/secret_manager.h"
-#include "envoy/server/filter_config.h"
-#include "envoy/server/transport_socket_config.h"
-#include "envoy/ssl/context_manager.h"
-#include "envoy/stats/scope.h"
-#include "envoy/upstream/cluster_factory.h"
-#include "envoy/upstream/health_checker.h"
-
-#include "common/common/enum_to_int.h"
-#include "common/common/fmt.h"
-#include "common/common/utility.h"
-#include "common/config/protocol_json.h"
-#include "common/config/tls_context_json.h"
-#include "common/config/utility.h"
 #include "common/http/utility.h"
 #include "common/network/address_impl.h"
 #include "common/network/resolver_impl.h"
 #include "common/network/socket_option_factory.h"
-#include "common/protobuf/protobuf.h"
-#include "common/protobuf/utility.h"
-#include "common/upstream/eds.h"
 #include "common/upstream/health_checker_impl.h"
-#include "common/upstream/logical_dns_cluster.h"
-#include "common/upstream/original_dst_cluster.h"
 
 #include "server/transport_socket_config_impl.h"
-
-#include "extensions/clusters/well_known_names.h"
-#include "extensions/transport_sockets/well_known_names.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -62,9 +29,9 @@ ClusterSharedPtr ClusterFactoryImplBase::create(
     Server::Admin& admin, Singleton::Manager& singleton_manager,
     Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api, Api::Api& api) {
 
-  auto cluster_type = cluster.cluster_type();
+  std::string cluster_type;
 
-  if (cluster.cluster_type().empty()) {
+  if (!cluster.has_cluster_type()) {
     switch (cluster.type()) {
     case envoy::api::v2::Cluster::STATIC:
       cluster_type = Extensions::Clusters::ClusterTypes::get().Static;
@@ -84,6 +51,8 @@ ClusterSharedPtr ClusterFactoryImplBase::create(
     default:
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
+  } else {
+    cluster_type = cluster.cluster_type().name();
   }
   ClusterFactory* factory = Registry::FactoryRegistry<ClusterFactory>::getFactory(cluster_type);
 

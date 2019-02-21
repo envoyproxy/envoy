@@ -61,7 +61,7 @@ public:
     ON_CALL(*this, clusterFromProto_(_, _, _, _))
         .WillByDefault(Invoke([&](const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
                                   Outlier::EventLoggerSharedPtr outlier_event_logger,
-                                  bool Fdded_via_api) -> ClusterSharedPtr {
+                                  bool added_via_api) -> ClusterSharedPtr {
           return ClusterFactoryImplBase::create(
               cluster, cm, stats_, tls_, dns_resolver_, ssl_context_manager_, runtime_, random_,
               dispatcher_, log_manager_, local_info_, admin_, singleton_manager_,
@@ -899,6 +899,7 @@ version_info: version3
 static_clusters:
   - cluster:
       name: "cds_cluster"
+      type: "STATIC"
       connect_timeout: 0.25s
       hosts:
       - socket_address:
@@ -910,6 +911,7 @@ static_clusters:
       nanos: 234000000
   - cluster:
       name: "fake_cluster"
+      type: "STATIC"
       connect_timeout: 0.25s
       hosts:
       - socket_address:
@@ -921,6 +923,7 @@ static_clusters:
       nanos: 234000000
   - cluster:
       name: "fake_cluster2"
+      type: "STATIC"
       connect_timeout: 0.25s
       hosts:
       - socket_address:
@@ -934,6 +937,7 @@ dynamic_active_clusters:
   - version_info: "version1"
     cluster:
       name: "cluster3"
+      type: "STATIC"
       connect_timeout: 0.25s
       hosts:
       - socket_address:
@@ -946,6 +950,7 @@ dynamic_active_clusters:
   - version_info: "version2"
     cluster:
       name: "cluster4"
+      type: "STATIC"
       connect_timeout: 0.25s
       hosts:
       - socket_address:
@@ -958,6 +963,7 @@ dynamic_active_clusters:
   - version_info: "version3"
     cluster:
       name: "cluster5"
+      type: "STATIC"
       connect_timeout: 0.25s
       hosts:
       - socket_address:
@@ -1071,6 +1077,7 @@ dynamic_warming_clusters:
   - version_info: "version1"
     cluster:
       name: "fake_cluster"
+      type: STATIC
       connect_timeout: 0.25s
       hosts:
       - socket_address:

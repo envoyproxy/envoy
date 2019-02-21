@@ -162,6 +162,7 @@ public:
   LogicalDnsClusterFactory()
       : ClusterFactoryImplBase(Extensions::Clusters::ClusterTypes::get().LogicalDns) {}
 
+private:
   ClusterImplBaseSharedPtr
   createClusterImpl(const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context,
                     Server::Configuration::TransportSocketFactoryContext& socket_factory_context,

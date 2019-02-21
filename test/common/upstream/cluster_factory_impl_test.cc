@@ -1,5 +1,4 @@
 #include <chrono>
-#include <cstdint>
 #include <list>
 #include <string>
 #include <tuple>
@@ -7,18 +6,11 @@
 
 #include "envoy/api/api.h"
 #include "envoy/http/codec.h"
-#include "envoy/stats/scope.h"
 #include "envoy/upstream/cluster_manager.h"
-#include "envoy/upstream/outlier_detection.h"
-#include "envoy/upstream/upstream.h"
 
-#include "common/config/metadata.h"
-#include "common/json/config_schemas.h"
-#include "common/json/json_loader.h"
 #include "common/network/utility.h"
 #include "common/singleton/manager_impl.h"
 #include "common/upstream/cluster_factory_impl.h"
-#include "common/upstream/upstream_impl.h"
 
 #include "server/transport_socket_config_impl.h"
 
@@ -26,17 +18,11 @@
 #include "test/mocks/common.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/ssl/mocks.h"
-#include "test/mocks/upstream/mocks.h"
 #include "test/proto/cluster_factory_config.pb.h"
 #include "test/proto/cluster_factory_config.pb.validate.h"
 #include "test/test_common/registry.h"
-#include "test/test_common/test_base.h"
-#include "test/test_common/utility.h"
-
-#include "gmock/gmock.h"
 
 using testing::_;
 using testing::ContainerEq;
@@ -142,13 +128,13 @@ TEST_F(TestStaticClusterImplTest, createWithoutConfig) {
   const std::string yaml = R"EOF(
       name: staticcluster
       connect_timeout: 0.25s
-      type: STATIC
       lb_policy: ROUND_ROBIN
       hosts:
       - socket_address:
           address: 10.0.0.1
           port_value: 443
-      cluster_type: envoy.clusters.test_static
+      cluster_type:
+        name: envoy.clusters.test_static
     )EOF";
 
   TestStaticClusterFactory factory;
@@ -166,19 +152,21 @@ TEST_F(TestStaticClusterImplTest, createWithoutConfig) {
   EXPECT_FALSE(cluster->info()->addedViaApi());
 }
 
-TEST_F(TestStaticClusterImplTest, createWithConfig) {
+TEST_F(TestStaticClusterImplTest, createWithStructConfig) {
   const std::string yaml = R"EOF(
       name: staticcluster
       connect_timeout: 0.25s
-      type: STATIC
       lb_policy: ROUND_ROBIN
       hosts:
       - socket_address:
           address: 10.0.0.1
           port_value: 443
-      cluster_type: envoy.clusters.test_static_config
-      config:
-        priority: 10
+      cluster_type:
+          name: envoy.clusters.test_static_config
+          typed_config:
+            "@type": type.googleapis.com/google.protobuf.Struct
+            value:
+              priority: 10
     )EOF";
 
   ConfigurableTestStaticClusterFactory factory;
@@ -195,6 +183,38 @@ TEST_F(TestStaticClusterImplTest, createWithConfig) {
   EXPECT_EQ("", cluster->prioritySet().hostSetsPerPriority()[10]->hosts()[0]->hostname());
   EXPECT_FALSE(cluster->info()->addedViaApi());
 }
+
+TEST_F(TestStaticClusterImplTest, createWithTypedConfig) {
+  const std::string yaml = R"EOF(
+      name: staticcluster
+      connect_timeout: 0.25s
+      lb_policy: ROUND_ROBIN
+      hosts:
+      - socket_address:
+          address: 10.0.0.1
+          port_value: 443
+      cluster_type:
+          name: envoy.clusters.test_static_config
+          typed_config:
+            "@type": type.googleapis.com/test.common.upstream.TestStaticConfig
+            priority: 10
+    )EOF";
+
+  ConfigurableTestStaticClusterFactory factory;
+  Registry::InjectFactory<ClusterFactory> registered_factory(factory);
+
+  const envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
+  auto cluster = ClusterFactoryImplBase::create(
+    cluster_config, cm_, stats_, tls_, dns_resolver_, ssl_context_manager_, runtime_, random_,
+    dispatcher_, log_manager_, local_info_, admin_, singleton_manager_,
+    std::move(outlier_event_logger_), false, *api_);
+  cluster->initialize([] {});
+
+  EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[10]->healthyHosts().size());
+  EXPECT_EQ("", cluster->prioritySet().hostSetsPerPriority()[10]->hosts()[0]->hostname());
+  EXPECT_FALSE(cluster->info()->addedViaApi());
+}
+
 } // namespace
 } // namespace Upstream
 } // namespace Envoy
