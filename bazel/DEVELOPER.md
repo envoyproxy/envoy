@@ -59,7 +59,7 @@ envoy_cc_library(
 This declares a new target `bar_interface`, where the convention is that pure
 virtual interfaces have their targets suffixed with `_interface`. The header
 `bar.h` is exported to other targets that depend on
-`//incude/envoy/foo:bar_interface`. The interface target itself depends on
+`//include/envoy/foo:bar_interface`. The interface target itself depends on
 `baz_interface` (in the same directory, hence the relative Bazel label) and
 `buffer_interface`.
 
