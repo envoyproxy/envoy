@@ -1,8 +1,33 @@
 licenses(["notice"])  # Apache 2
 
 load("//bazel:envoy_build_system.bzl", "envoy_cmake_external", "envoy_package")
+load("@rules_foreign_cc//tools/build_defs:configure.bzl", "configure_make")
 
 envoy_package()
+
+configure_make(
+    name = "gperftools_build",
+    configure_options = [
+        "--enable-shared=no",
+        "--enable-frame-pointers",
+        "--disable-libunwind",
+    ],
+    lib_source = "@com_github_gperftools_gperftools//:all",
+    linkopts = ["-lpthread"],
+    make_commands = ["make install-libLTLIBRARIES install-perftoolsincludeHEADERS"],
+    static_libraries = select({
+        "//bazel:debug_tcmalloc": ["libtcmalloc_debug.a"],
+        "//conditions:default": ["libtcmalloc_and_profiler.a"],
+    }),
+)
+
+# Workaround for https://github.com/bazelbuild/rules_foreign_cc/issues/227
+cc_library(
+    name = "gperftools",
+    deps = [
+        "gperftools_build",
+    ],
+)
 
 envoy_cmake_external(
     name = "ares",

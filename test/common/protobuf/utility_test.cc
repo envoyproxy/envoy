@@ -34,6 +34,83 @@ TEST_F(ProtobufUtilityTest, convertPercentNaN) {
                EnvoyException);
 }
 
+namespace ProtobufPercentHelper {
+
+TEST_F(ProtobufUtilityTest, evaluateFractionalPercent) {
+  { // 0/100 (default)
+    envoy::type::FractionalPercent percent;
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 0));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 50));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 100));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 1000));
+  }
+  { // 5/100
+    envoy::type::FractionalPercent percent;
+    percent.set_numerator(5);
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 0));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 4));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 5));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 50));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 100));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 104));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 105));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 204));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 1000));
+  }
+  { // 75/100
+    envoy::type::FractionalPercent percent;
+    percent.set_numerator(75);
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 0));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 4));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 5));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 74));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 80));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 100));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 104));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 105));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 200));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 274));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 280));
+  }
+  { // 5/10000
+    envoy::type::FractionalPercent percent;
+    percent.set_denominator(envoy::type::FractionalPercent::TEN_THOUSAND);
+    percent.set_numerator(5);
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 0));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 4));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 5));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 50));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 100));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 9000));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 10000));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 10004));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 10005));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 20004));
+  }
+  { // 5/MILLION
+    envoy::type::FractionalPercent percent;
+    percent.set_denominator(envoy::type::FractionalPercent::MILLION);
+    percent.set_numerator(5);
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 0));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 4));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 5));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 50));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 100));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 9000));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 10000));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 10004));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 10005));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 900005));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 900000));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 1000000));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 1000004));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 1000005));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 2000004));
+  }
+}
+
+} // namespace ProtobufPercentHelper
+
 TEST_F(ProtobufUtilityTest, RepeatedPtrUtilDebugString) {
   Protobuf::RepeatedPtrField<ProtobufWkt::UInt32Value> repeated;
   EXPECT_EQ("[]", RepeatedPtrUtil::debugString(repeated));

@@ -57,7 +57,34 @@ void CdsApiImpl::onConfigUpdate(const ResourceVector& resources, const std::stri
     const std::string cluster_name = cluster.name();
     try {
       clusters_to_remove.erase(cluster_name);
-      if (cm_.addOrUpdateCluster(cluster, version_info)) {
+      if (cm_.addOrUpdateCluster(
+              cluster, version_info,
+              [this](const std::string&, ClusterManager::ClusterWarmingState state) {
+                // Following if/else block implements a control flow mechanism that can be used
+                // by an ADS implementation to properly sequence CDS and RDS update. It is not
+                // enforcing on ADS. ADS can use it to detect when a previously sent cluster becomes
+                // warm before sending routes that depend on it. This can improve incidence of HTTP
+                // 503 responses from Envoy when a route is used before it's supporting cluster is
+                // ready.
+                //
+                // We achieve that by leaving CDS in the paused state as long as there is at least
+                // one cluster in the warming state. This prevents CDS ACK from being sent to ADS.
+                // Once cluster is warmed up, CDS is resumed, and ACK is sent to ADS, providing a
+                // signal to ADS to proceed with RDS updates.
+                //
+                // Major concern with this approach is CDS being left in the paused state forever.
+                // As long as ClusterManager::removeCluster() is not called on a warming cluster
+                // this is not an issue. CdsApiImpl takes care of doing this properly, and there
+                // is no other component removing clusters from the ClusterManagerImpl. If this
+                // ever changes, we would need to correct the following logic.
+                if (state == ClusterManager::ClusterWarmingState::Starting &&
+                    cm_.warmingClusterCount() == 1) {
+                  cm_.adsMux().pause(Config::TypeUrl::get().Cluster);
+                } else if (state == ClusterManager::ClusterWarmingState::Finished &&
+                           cm_.warmingClusterCount() == 0) {
+                  cm_.adsMux().resume(Config::TypeUrl::get().Cluster);
+                }
+              })) {
         ENVOY_LOG(debug, "cds: add/update cluster '{}'", cluster_name);
       }
     } catch (const EnvoyException& e) {

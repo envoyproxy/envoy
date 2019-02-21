@@ -1910,6 +1910,151 @@ TEST_F(ProdHttpHealthCheckerTest, ProdHttpHealthCheckerH2HealthChecking) {
             health_checker_->createCodecClientForTest(std::move(connection_))->type());
 }
 
+TEST(HttpStatusChecker, Default) {
+  const std::string yaml = R"EOF(
+  http_health_check:
+    service_name: locations
+    path: /healthcheck
+  )EOF";
+
+  HttpHealthCheckerImpl::HttpStatusChecker http_status_checker(
+      parseHealthCheckFromV2Yaml(yaml).http_health_check().expected_statuses(), 200);
+
+  EXPECT_TRUE(http_status_checker.inRange(200));
+  EXPECT_FALSE(http_status_checker.inRange(204));
+}
+
+TEST(HttpStatusChecker, Single100) {
+  const std::string yaml = R"EOF(
+  http_health_check:
+    service_name: locations
+    path: /healthcheck
+    expected_statuses:
+      - start: 100
+        end: 101
+  )EOF";
+
+  HttpHealthCheckerImpl::HttpStatusChecker http_status_checker(
+      parseHealthCheckFromV2Yaml(yaml).http_health_check().expected_statuses(), 200);
+
+  EXPECT_FALSE(http_status_checker.inRange(200));
+
+  EXPECT_FALSE(http_status_checker.inRange(99));
+  EXPECT_TRUE(http_status_checker.inRange(100));
+  EXPECT_FALSE(http_status_checker.inRange(101));
+}
+
+TEST(HttpStatusChecker, Single599) {
+  const std::string yaml = R"EOF(
+  http_health_check:
+    service_name: locations
+    path: /healthcheck
+    expected_statuses:
+      - start: 599
+        end: 600
+  )EOF";
+
+  HttpHealthCheckerImpl::HttpStatusChecker http_status_checker(
+      parseHealthCheckFromV2Yaml(yaml).http_health_check().expected_statuses(), 200);
+
+  EXPECT_FALSE(http_status_checker.inRange(200));
+
+  EXPECT_FALSE(http_status_checker.inRange(598));
+  EXPECT_TRUE(http_status_checker.inRange(599));
+  EXPECT_FALSE(http_status_checker.inRange(600));
+}
+
+TEST(HttpStatusChecker, Ranges_204_304) {
+  const std::string yaml = R"EOF(
+  http_health_check:
+    service_name: locations
+    path: /healthcheck
+    expected_statuses:
+      - start: 204
+        end: 205
+      - start: 304
+        end: 305
+  )EOF";
+
+  HttpHealthCheckerImpl::HttpStatusChecker http_status_checker(
+      parseHealthCheckFromV2Yaml(yaml).http_health_check().expected_statuses(), 200);
+
+  EXPECT_FALSE(http_status_checker.inRange(200));
+
+  EXPECT_FALSE(http_status_checker.inRange(203));
+  EXPECT_TRUE(http_status_checker.inRange(204));
+  EXPECT_FALSE(http_status_checker.inRange(205));
+  EXPECT_FALSE(http_status_checker.inRange(303));
+  EXPECT_TRUE(http_status_checker.inRange(304));
+  EXPECT_FALSE(http_status_checker.inRange(305));
+}
+
+TEST(HttpStatusChecker, Below100) {
+  const std::string yaml = R"EOF(
+  http_health_check:
+    service_name: locations
+    path: /healthcheck
+    expected_statuses:
+      - start: 99
+        end: 100
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      HttpHealthCheckerImpl::HttpStatusChecker http_status_checker(
+          parseHealthCheckFromV2Yaml(yaml).http_health_check().expected_statuses(), 200),
+      EnvoyException, "Invalid http status range: expecting start >= 100, but found start=99");
+}
+
+TEST(HttpStatusChecker, Above599) {
+  const std::string yaml = R"EOF(
+  http_health_check:
+    service_name: locations
+    path: /healthchecka
+    expected_statuses:
+      - start: 600
+        end: 601
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      HttpHealthCheckerImpl::HttpStatusChecker http_status_checker(
+          parseHealthCheckFromV2Yaml(yaml).http_health_check().expected_statuses(), 200),
+      EnvoyException, "Invalid http status range: expecting end <= 600, but found end=601");
+}
+
+TEST(HttpStatusChecker, InvalidRange) {
+  const std::string yaml = R"EOF(
+  http_health_check:
+    service_name: locations
+    path: /healthchecka
+    expected_statuses:
+      - start: 200
+        end: 200
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      HttpHealthCheckerImpl::HttpStatusChecker http_status_checker(
+          parseHealthCheckFromV2Yaml(yaml).http_health_check().expected_statuses(), 200),
+      EnvoyException,
+      "Invalid http status range: expecting start < end, but found start=200 and end=200");
+}
+
+TEST(HttpStatusChecker, InvalidRange2) {
+  const std::string yaml = R"EOF(
+  http_health_check:
+    service_name: locations
+    path: /healthchecka
+    expected_statuses:
+      - start: 201
+        end: 200
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      HttpHealthCheckerImpl::HttpStatusChecker http_status_checker(
+          parseHealthCheckFromV2Yaml(yaml).http_health_check().expected_statuses(), 200),
+      EnvoyException,
+      "Invalid http status range: expecting start < end, but found start=201 and end=200");
+}
+
 TEST(TcpHealthCheckMatcher, loadJsonBytes) {
   {
     Protobuf::RepeatedPtrField<envoy::api::v2::core::HealthCheck::Payload> repeated_payload;
