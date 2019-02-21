@@ -51,7 +51,6 @@ private:
   }
 
   Event::TimerPtr delay_timer_;
-  int call_count_ = 0;
 };
 
 constexpr char DecodeHeadersReturnStopAllFilter::name[];
