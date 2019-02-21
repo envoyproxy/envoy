@@ -77,7 +77,6 @@ private:
     Upstream::HostDescriptionConstSharedPtr upstream_host_;
     DeserializerPtr deserializer_;
     ProtocolPtr protocol_;
-    Buffer::InstancePtr buffered_request_body_;
 
     bool request_complete_ : 1;
     bool response_started_ : 1;

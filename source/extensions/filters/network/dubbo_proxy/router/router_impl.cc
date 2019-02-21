@@ -30,7 +30,11 @@ Network::FilterStatus Router::transportBegin() {
 }
 
 Network::FilterStatus Router::transportEnd() {
+  // If the connection fails, the callback of the filter will be suspended,
+  // so it is impossible to call the transportEnd interface.
+  // the encodeData function will be called only if the connection is successful.
   ASSERT(upstream_request_);
+  ASSERT(upstream_request_->conn_data_);
 
   upstream_request_->encodeData(upstream_request_buffer_);
 
@@ -213,17 +217,11 @@ void Router::UpstreamRequest::resetStream() {
 }
 
 void Router::UpstreamRequest::encodeData(Buffer::Instance& data) {
-  if (!conn_data_) {
-    ENVOY_STREAM_LOG(trace, "buffering {} bytes", *parent_.callbacks_, data.length());
-    if (!buffered_request_body_) {
-      buffered_request_body_ = std::make_unique<Envoy::Buffer::OwnedImpl>();
-    }
+  ASSERT(conn_data_);
+  ASSERT(!conn_pool_handle_);
 
-    buffered_request_body_->move(data);
-  } else {
-    ENVOY_STREAM_LOG(trace, "proxying {} bytes", *parent_.callbacks_, data.length());
-    conn_data_->connection().write(data, false);
-  }
+  ENVOY_STREAM_LOG(trace, "proxying {} bytes", *parent_.callbacks_, data.length());
+  conn_data_->connection().write(data, false);
 }
 
 void Router::UpstreamRequest::onPoolFailure(Tcp::ConnectionPool::PoolFailureReason reason,
@@ -267,11 +265,6 @@ void Router::UpstreamRequest::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr
 void Router::UpstreamRequest::onRequestStart(bool continue_decoding) {
   ENVOY_LOG(debug, "dubbo upstream request: start sending data to the server {}",
             upstream_host_->address()->asString());
-
-  if (buffered_request_body_) {
-    conn_data_->connection().write(*buffered_request_body_, false);
-    parent_.callbacks_->streamInfo().onLastUpstreamTxByteSent();
-  }
 
   if (continue_decoding) {
     parent_.callbacks_->continueDecoding();
