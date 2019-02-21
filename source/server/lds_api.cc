@@ -76,13 +76,14 @@ void LdsApiImpl::onConfigUpdate(const ResourceVector& resources, const std::stri
         ENVOY_LOG(debug, "lds: add/update listener '{}' skipped", listener_name);
       }
     } catch (const EnvoyException& e) {
-      exception_msgs.push_back(fmt::format("Error adding/updating listener {}: {}", listener_name, e.what()));
-  }
+      exception_msgs.push_back(fmt::format("{}: {}", listener_name, e.what()));
+    }
   }
   version_info_ = version_info;
   runInitializeCallbackIfAny();
-    if (!exception_msgs.empty()) {
-    throw EnvoyException(StringUtil::join(exception_msgs, "\n"));
+  if (!exception_msgs.empty()) {
+    throw EnvoyException(fmt::format("Error adding/updating listener(s) {}",
+                                     StringUtil::join(exception_msgs, ", ")));
   }
 }
 
