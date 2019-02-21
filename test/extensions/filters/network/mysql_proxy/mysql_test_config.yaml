@@ -25,6 +25,7 @@ static_resources:
             config:
               stat_prefix: mysql_stats
           - name: envoy.tcp_proxy
-            config:
+            typed_config:
+              "@type": type.googleapis.com/envoy.config.filter.network.tcp_proxy.v2.TcpProxy
               stat_prefix: tcp_stats
               cluster: cluster_0

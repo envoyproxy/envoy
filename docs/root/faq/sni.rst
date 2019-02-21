@@ -30,7 +30,8 @@ The following is a YAML example of the above requirement.
           private_key: { filename: "example_com_key.pem" }
     filters:
     - name: envoy.http_connection_manager
-      config:
+      typed_config:
+        "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
         stat_prefix: ingress_http
         route_config:
           virtual_hosts:
@@ -48,7 +49,8 @@ The following is a YAML example of the above requirement.
           private_key: { filename: "api_example_com_key.pem" }
     filters:
     - name: envoy.http_connection_manager
-      config:
+      typed_config:
+        "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
         stat_prefix: ingress_http
         route_config:
           virtual_hosts:

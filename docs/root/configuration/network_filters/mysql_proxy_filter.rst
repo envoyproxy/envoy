@@ -31,7 +31,8 @@ in the configuration snippet below:
       config:
         stat_prefix: mysql
     - name: envoy.tcp_proxy
-      config:
+      typed_config:
+        "@type": type.googleapis.com/envoy.config.filter.network.tcp_proxy.v2.TcpProxy
         stat_prefix: tcp
         cluster: ...
 
@@ -110,6 +111,7 @@ _catalog_ table in the _productdb_ database.
               principals:
               - any: true
     - name: envoy.tcp_proxy
-      config:
+      typed_config:
+        "@type": type.googleapis.com/envoy.config.filter.network.tcp_proxy.v2.TcpProxy
         stat_prefix: tcp
         cluster: mysql
