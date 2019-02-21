@@ -477,6 +477,37 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::api::v2::Cluster& clust
       // Otherwise, applyUpdates() will fire with a dangling cluster reference.
       updates_map_.erase(cluster_name);
 
+      // If the active cluster has priority sets and the warming cluster does not have them, it
+      // means that onConfigUpdate is triggered of EDS type of cluster is triggered with no
+      // reference to this cluster. In such cases, copy the active cluster priority set to the
+      // warming cluster otherwise the active cluster hosts will be cleared after warming is
+      // completed. See https://github.com/envoyproxy/envoy/issues/5168 for more context.
+      const auto active_it = active_clusters_.find(cluster_name);
+      if (active_it != active_clusters_.end()) {
+        auto& active_cluster_entry = *active_it->second;
+        if (active_cluster_entry.cluster_->prioritySet().hostSetsPerPriority().size() != 0 &&
+            (cluster_entry.cluster_->prioritySet().hostSetsPerPriority().size() == 0 ||
+             (cluster_entry.cluster_->prioritySet().hostSetsPerPriority().size() == 1 &&
+              cluster_entry.cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size() ==
+                  0))) {
+          ENVOY_LOG(
+              debug,
+              "copying host set from active cluster {} as warming cluster does not have host set",
+              cluster_name);
+
+          const auto& host_sets =
+              active_cluster_entry.cluster_->prioritySet().hostSetsPerPriority();
+          for (size_t priority = 0; priority < host_sets.size(); ++priority) {
+            const auto& host_set = host_sets[priority];
+            HostVectorConstSharedPtr hosts_copy(new HostVector(host_set->hosts()));
+            HostsPerLocalityConstSharedPtr hosts_per_locality_copy =
+                host_set->hostsPerLocality().clone();
+            cluster_entry.cluster_->prioritySet().updateHosts(
+                priority, HostSetImpl::partitionHosts(hosts_copy, hosts_per_locality_copy),
+                host_set->localityWeights(), {}, {}, absl::nullopt);
+          }
+        }
+      }
       active_clusters_[cluster_name] = std::move(warming_it->second);
       warming_clusters_.erase(warming_it);
 
