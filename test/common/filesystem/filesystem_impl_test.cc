@@ -13,11 +13,11 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/filesystem/mocks.h"
 #include "test/test_common/environment.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::InSequence;
@@ -30,7 +30,7 @@ using testing::Throw;
 
 namespace Envoy {
 
-class FileSystemImplTest : public TestBase {
+class FileSystemImplTest : public testing::Test {
 protected:
   FileSystemImplTest()
       : file_system_(std::chrono::milliseconds(10000), Thread::threadFactoryForTest(),
