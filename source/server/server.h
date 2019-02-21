@@ -200,6 +200,16 @@ private:
   void startWorkers();
   void terminate();
 
+  // init_manager_ must come before any member that participates in initialization, and destructed
+  // only after referencing members are gone, since initialization continuation can potentially
+  // occur at any point during member lifetime.
+  InitManagerImpl init_manager_;
+  // secret_manager_ must come before listener_manager_, config_ and dispatcher_, and destructed
+  // only after these members can no longer reference it, since:
+  // - There may be active filter chains referencing it in listener_manager_.
+  // - There may be active clusters referencing it in config_.cluster_manager_.
+  // - There may be active connections referencing it.
+  std::unique_ptr<Secret::SecretManager> secret_manager_;
   bool shutdown_;
   const Options& options_;
   TimeSource& time_source_;
@@ -211,9 +221,6 @@ private:
   Assert::ActionRegistrationPtr assert_action_registration_;
   ThreadLocal::Instance& thread_local_;
   Api::ApiPtr api_;
-  // secret_manager_ must come before dispatcher_, since there may be active connections
-  // referencing it, so need to destruct these first.
-  std::unique_ptr<Secret::SecretManager> secret_manager_;
   Event::DispatcherPtr dispatcher_;
   std::unique_ptr<AdminImpl> admin_;
   Singleton::ManagerPtr singleton_manager_;
@@ -231,7 +238,6 @@ private:
   DrainManagerPtr drain_manager_;
   AccessLog::AccessLogManagerImpl access_log_manager_;
   std::unique_ptr<Upstream::ClusterManagerFactory> cluster_manager_factory_;
-  InitManagerImpl init_manager_;
   std::unique_ptr<Server::GuardDog> guard_dog_;
   bool terminated_;
   std::unique_ptr<Logger::FileSinkDelegate> file_logger_;

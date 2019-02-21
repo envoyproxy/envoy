@@ -139,6 +139,16 @@ private:
   void initialize(const Options& options, Network::Address::InstanceConstSharedPtr local_address,
                   ComponentFactory& component_factory);
 
+  // init_manager_ must come before any member that participates in initialization, and destructed
+  // only after referencing members are gone, since initialization continuation can potentially
+  // occur at any point during member lifetime.
+  InitManagerImpl init_manager_;
+  // secret_manager_ must come before listener_manager_, config_ and dispatcher_, and destructed
+  // only after these members can no longer reference it, since:
+  // - There may be active filter chains referencing it in listener_manager_.
+  // - There may be active clusters referencing it in config_.cluster_manager_.
+  // - There may be active connections referencing it.
+  std::unique_ptr<Secret::SecretManager> secret_manager_;
   const Options& options_;
   Stats::IsolatedStoreImpl& stats_store_;
   ThreadLocal::InstanceImpl thread_local_;
@@ -153,10 +163,6 @@ private:
   LocalInfo::LocalInfoPtr local_info_;
   AccessLog::AccessLogManagerImpl access_log_manager_;
   std::unique_ptr<Upstream::ValidationClusterManagerFactory> cluster_manager_factory_;
-  InitManagerImpl init_manager_;
-  // secret_manager_ must come before listener_manager_, since there may be active filter chains
-  // referencing it, so need to destruct these first.
-  std::unique_ptr<Secret::SecretManager> secret_manager_;
   std::unique_ptr<ListenerManagerImpl> listener_manager_;
   std::unique_ptr<OverloadManager> overload_manager_;
   MutexTracer* mutex_tracer_;
