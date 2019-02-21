@@ -145,6 +145,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/init:init_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:logger_lib",
     ],
 )
 

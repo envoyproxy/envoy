@@ -39,7 +39,7 @@ TEST_F(SdsApiTest, BasicTest) {
   const envoy::service::discovery::v2::SdsDummy dummy;
   NiceMock<Server::MockInstance> server;
   NiceMock<Init::MockManager> init_manager;
-  EXPECT_CALL(init_manager, registerTarget(_));
+  EXPECT_CALL(init_manager, registerTarget(_, _));
 
   envoy::api::v2::core::ConfigSource config_source;
   config_source.mutable_api_config_source()->set_api_type(

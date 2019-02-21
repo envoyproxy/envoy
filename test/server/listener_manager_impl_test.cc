@@ -84,7 +84,7 @@ protected:
               std::shared_ptr<ListenerHandle> notifier(raw_listener);
               raw_listener->context_ = &context;
               if (need_init) {
-                context.initManager().registerTarget(notifier->target_);
+                context.initManager().registerTarget(notifier->target_, "");
               }
               return {[notifier](Network::FilterManager&) -> void {}};
             }));

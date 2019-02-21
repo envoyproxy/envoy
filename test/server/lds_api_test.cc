@@ -49,7 +49,7 @@ public:
     EXPECT_CALL(cluster, info());
     EXPECT_CALL(*cluster.info_, type());
     interval_timer_ = new Event::MockTimer(&dispatcher_);
-    EXPECT_CALL(init_, registerTarget(_));
+    EXPECT_CALL(init_, registerTarget(_, _));
     lds_ = std::make_unique<LdsApiImpl>(lds_config, cluster_manager_, dispatcher_, random_, init_,
                                         local_info_, store_, listener_manager_, *api_);
 

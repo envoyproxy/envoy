@@ -27,7 +27,7 @@ LdsApiImpl::LdsApiImpl(const envoy::api::v2::core::ConfigSource& lds_config,
           "envoy.api.v2.ListenerDiscoveryService.FetchListeners",
           "envoy.api.v2.ListenerDiscoveryService.StreamListeners", api);
   Config::Utility::checkLocalInfo("lds", local_info);
-  init_manager.registerTarget(*this);
+  init_manager.registerTarget(*this, "LDS");
 }
 
 void LdsApiImpl::initialize(std::function<void()> callback) {
