@@ -52,11 +52,11 @@ InstanceImpl::InstanceImpl(const Options& options, Event::TimeSystem& time_syste
                            ComponentFactory& component_factory,
                            Runtime::RandomGeneratorPtr&& random_generator,
                            ThreadLocal::Instance& tls, Thread::ThreadFactory& thread_factory)
-    : shutdown_(false), options_(options), time_source_(time_system), restarter_(restarter),
+    : secret_manager_(std::make_unique<Secret::SecretManagerImpl>()), shutdown_(false),
+      options_(options), time_source_(time_system), restarter_(restarter),
       start_time_(time(nullptr)), original_start_time_(start_time_), stats_store_(store),
       thread_local_(tls),
       api_(new Api::Impl(options.fileFlushIntervalMsec(), thread_factory, store, time_system)),
-      secret_manager_(std::make_unique<Secret::SecretManagerImpl>()),
       dispatcher_(api_->allocateDispatcher()),
       singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory().currentThreadId())),
       handler_(new ConnectionHandlerImpl(ENVOY_LOGGER(), *dispatcher_)),
