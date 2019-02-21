@@ -437,7 +437,7 @@ TEST_P(Http2IntegrationTest, LargeHeadersAcceptedIfConfigured) { testLargeReques
 TEST_P(Http2IntegrationTest, DecodeHeadersReturnsStopAll) { testDecodeHeadersReturnsStopAll(); }
 
 TEST_P(Http2IntegrationTest, DecodeHeadersReturnsStopAllWatermark) {
-  // TODO(soya3129): uncomment below.
+  // TODO(soya3129): enable h2 for this test.
   // testDecodeHeadersReturnsStopAllWatermark();
 }
 
