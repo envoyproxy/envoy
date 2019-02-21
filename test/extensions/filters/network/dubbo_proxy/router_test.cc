@@ -322,7 +322,7 @@ TEST_F(DubboRouterTest, PoolConnectionFailureWithOnewayMessage) {
   EXPECT_CALL(callbacks_, downstreamSerializationType())
       .WillOnce(Return(SerializationType::Hessian));
   EXPECT_CALL(callbacks_, sendLocalReply(_, _)).Times(0);
-  EXPECT_CALL(callbacks_, resetDownstreamConnection()).Times(1);
+  EXPECT_CALL(callbacks_, resetStream()).Times(1);
   EXPECT_EQ(Network::FilterStatus::StopIteration, router_->messageEnd(metadata_));
 
   context_.cluster_manager_.tcp_conn_pool_.poolFailure(

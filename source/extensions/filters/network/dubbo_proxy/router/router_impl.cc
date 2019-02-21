@@ -237,6 +237,16 @@ void Router::UpstreamRequest::onPoolFailure(Tcp::ConnectionPool::PoolFailureReas
   onResetStream(reason);
 
   parent_.upstream_request_buffer_.drain(parent_.upstream_request_buffer_.length());
+
+  // If it is a connection error, it means that the connection pool returned
+  // the error asynchronously and the upper layer needs to be notified to continue decoding.
+  // If it is a non-connection error, it is returned synchronously from the connection pool
+  // and is still in the callback at the current Filter, nothing to do.
+  if (reason == Tcp::ConnectionPool::PoolFailureReason::Timeout ||
+      reason == Tcp::ConnectionPool::PoolFailureReason::LocalConnectionFailure ||
+      reason == Tcp::ConnectionPool::PoolFailureReason::RemoteConnectionFailure) {
+    parent_.callbacks_->continueDecoding();
+  }
 }
 
 void Router::UpstreamRequest::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data,
@@ -285,8 +295,8 @@ void Router::UpstreamRequest::onResetStream(Tcp::ConnectionPool::PoolFailureReas
   if (metadata_->message_type() == MessageType::Oneway) {
     // For oneway requests, we should not attempt a response. Reset the downstream to signal
     // an error.
-    ENVOY_LOG(debug, "dubbo upstream request: the request is oneway, reset downstream connection");
-    parent_.callbacks_->resetDownstreamConnection();
+    ENVOY_LOG(debug, "dubbo upstream request: the request is oneway, reset downstream stream");
+    parent_.callbacks_->resetStream();
     return;
   }
 
