@@ -123,14 +123,23 @@ TEST(QuicPlatformTest, QuicMockLog) {
     QUIC_LOG(ERROR) << "This should be logged but not captured by the mock.";
   }
 
+  // Test nested mock logs.
+  CREATE_QUIC_MOCK_LOG(outer_log);
+  outer_log.StartCapturingLogs();
+
   {
     // Test a mock log that captures logs.
-    CREATE_QUIC_MOCK_LOG(log);
-    log.StartCapturingLogs();
+    CREATE_QUIC_MOCK_LOG(inner_log);
+    inner_log.StartCapturingLogs();
 
-    EXPECT_QUIC_LOG_CALL_CONTAINS(log, ERROR, "also captured");
-    QUIC_LOG(ERROR) << "This should be logged and also captured by the mock.";
+    EXPECT_QUIC_LOG_CALL_CONTAINS(inner_log, ERROR, "Inner log message");
+    QUIC_LOG(ERROR) << "Inner log message should be captured.";
+
+    // Destruction of inner_log should restore the QUIC log sink to outer_log.
   }
+
+  EXPECT_QUIC_LOG_CALL_CONTAINS(outer_log, ERROR, "Outer log message");
+  QUIC_LOG(ERROR) << "Outer log message should be captured.";
 }
 
 TEST(QuicPlatformTest, QuicStackTraceTest) {

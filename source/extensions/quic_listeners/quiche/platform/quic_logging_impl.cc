@@ -13,6 +13,9 @@ namespace quic {
 namespace {
 std::atomic<int> g_verbosity_threshold;
 
+// Pointer to the global log sink, usually it is nullptr.
+// If not nullptr, as in some tests, the sink will receive a copy of the log message right after the
+// message is emitted from the QUIC_LOG... macros.
 std::atomic<QuicLogSink*> g_quic_log_sink;
 absl::Mutex g_quic_log_sink_mutex;
 } // namespace

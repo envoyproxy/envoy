@@ -16,6 +16,8 @@
 
 namespace quic {
 
+// A QuicEnvoyMockLog object captures QUIC_LOG() messages emitted between StartCapturingLogs() and
+// destruction(or StopCapturingLogs()).
 class QuicEnvoyMockLog : public QuicLogSink {
 public:
   QuicEnvoyMockLog() : is_capturing_(false) {}
