@@ -261,6 +261,12 @@ public:
    * @return std::chrono::milliseconds The delayed close timeout value.
    */
   virtual std::chrono::milliseconds delayedCloseTimeout() const PURE;
+
+  /**
+   * @return std::string the failure reason of the underlying transport socket, if no failure
+   *         occured an empty string is returned.
+   */
+  virtual std::string transportFailureReason() const PURE;
 };
 
 typedef std::unique_ptr<Connection> ConnectionPtr;

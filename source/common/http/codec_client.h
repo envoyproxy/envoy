@@ -79,6 +79,11 @@ public:
   uint64_t id() { return connection_->id(); }
 
   /**
+   * @return the underlying connection error.
+   */
+  std::string connectionFailureReason() { return connection_->transportFailureReason(); }
+
+  /**
    * @return size_t the number of outstanding requests that have not completed or been reset.
    */
   size_t numActiveRequests() { return active_requests_.size(); }

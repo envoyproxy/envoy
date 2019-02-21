@@ -165,7 +165,8 @@ void ConnPoolImpl::onConnectionEvent(ActiveClient& client, Network::ConnectionEv
       // do with the request.
       // NOTE: We move the existing pending requests to a temporary list. This is done so that
       //       if retry logic submits a new request to the pool, we don't fail it inline.
-      purgePendingRequests(client.real_host_description_);
+      purgePendingRequests(client.real_host_description_, 
+                           client.client_->connectionFailureReason());
     }
 
     if (&client == primary_client_.get()) {

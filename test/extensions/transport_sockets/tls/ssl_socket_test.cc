@@ -600,6 +600,14 @@ const std::string testUtilV2(const TestUtilOptionsV2& options) {
     EXPECT_EQ(1UL, client_stats_store.counter(options.expectedClientStats()).value());
   }
 
+  if (options.expectSuccess()) {
+    EXPECT_EQ("", client_connection->transportFailureReason());
+    EXPECT_EQ("", server_connection->transportFailureReason());
+  } else {
+    EXPECT_NE("", client_connection->transportFailureReason());
+    EXPECT_NE("", server_connection->transportFailureReason());
+  }
+
   return new_session;
 }
 

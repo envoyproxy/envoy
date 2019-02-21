@@ -594,6 +594,10 @@ void ConnectionImpl::onDelayedCloseTimeout() {
   closeSocket(ConnectionEvent::LocalClose);
 }
 
+std::string ConnectionImpl::transportFailureReason() const {
+  return transport_socket_->failureReason();
+}
+
 ClientConnectionImpl::ClientConnectionImpl(
     Event::Dispatcher& dispatcher, const Address::InstanceConstSharedPtr& remote_address,
     const Network::Address::InstanceConstSharedPtr& source_address,

@@ -80,6 +80,7 @@ public:
   MOCK_CONST_METHOD0(streamInfo, const StreamInfo::StreamInfo&());
   MOCK_METHOD1(setDelayedCloseTimeout, void(std::chrono::milliseconds));
   MOCK_CONST_METHOD0(delayedCloseTimeout, std::chrono::milliseconds());
+  MOCK_CONST_METHOD0(transportFailureReason, std::string());
 };
 
 /**
@@ -123,6 +124,7 @@ public:
   MOCK_CONST_METHOD0(streamInfo, const StreamInfo::StreamInfo&());
   MOCK_METHOD1(setDelayedCloseTimeout, void(std::chrono::milliseconds));
   MOCK_CONST_METHOD0(delayedCloseTimeout, std::chrono::milliseconds());
+  MOCK_CONST_METHOD0(transportFailureReason, std::string());
 
   // Network::ClientConnection
   MOCK_METHOD0(connect, void());

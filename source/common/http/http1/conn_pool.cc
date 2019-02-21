@@ -158,7 +158,8 @@ void ConnPoolImpl::onConnectionEvent(ActiveClient& client, Network::ConnectionEv
       // that is behaving badly, requests can get stuck here in the pending state. If we see a
       // connect failure, we purge all pending requests so that calling code can determine what to
       // do with the request.
-      purgePendingRequests(client.real_host_description_);
+      purgePendingRequests(client.real_host_description_),
+                           client.codec_client_->connectionFailureReason());
     }
 
     dispatcher_.deferredDelete(std::move(removed));
