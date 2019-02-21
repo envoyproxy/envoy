@@ -3656,7 +3656,7 @@ TEST(Printer, HealthTransitionPrinter) {
 
 TEST(HealthCheckEventLoggerImplTest, All) {
   AccessLog::MockAccessLogManager log_manager;
-  std::shared_ptr<Filesystem::MockFile> file(new Filesystem::MockFile());
+  std::shared_ptr<AccessLog::MockAccessLogFile> file(new AccessLog::MockAccessLogFile());
   EXPECT_CALL(log_manager, createAccessLog("foo")).WillOnce(Return(file));
 
   std::shared_ptr<MockHostDescription> host(new NiceMock<MockHostDescription>());

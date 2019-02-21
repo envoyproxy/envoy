@@ -772,7 +772,7 @@ TEST(DetectorHostMonitorNullImplTest, All) {
 
 TEST(OutlierDetectionEventLoggerImplTest, All) {
   AccessLog::MockAccessLogManager log_manager;
-  std::shared_ptr<Filesystem::MockFile> file(new Filesystem::MockFile());
+  std::shared_ptr<AccessLog::MockAccessLogFile> file(new AccessLog::MockAccessLogFile());
   NiceMock<MockClusterInfo> cluster;
   std::shared_ptr<MockHostDescription> host(new NiceMock<MockHostDescription>());
   ON_CALL(*host, cluster()).WillByDefault(ReturnRef(cluster));

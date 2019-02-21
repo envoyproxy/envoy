@@ -34,6 +34,7 @@ typedef SysCallResult<int> SysCallIntResult;
 typedef SysCallResult<ssize_t> SysCallSizeResult;
 typedef SysCallResult<void*> SysCallPtrResult;
 typedef SysCallResult<std::string> SysCallStringResult;
+typedef SysCallResult<bool> SysCallBoolResult;
 
 class OsSysCalls {
 public:
@@ -48,18 +49,6 @@ public:
    * @see ioctl (man 2 ioctl)
    */
   virtual SysCallIntResult ioctl(int sockfd, unsigned long int request, void* argp) PURE;
-
-  /**
-   * Open file by full_path with given flags and mode.
-   * @return file descriptor.
-   */
-  virtual SysCallIntResult open(const std::string& full_path, int flags, int mode) PURE;
-
-  /**
-   * Write num_bytes to fd from buffer.
-   * @return number of bytes written if non negative, otherwise error code.
-   */
-  virtual SysCallSizeResult write(int fd, const void* buffer, size_t num_bytes) PURE;
 
   /**
    * @see writev (man 2 writev)
