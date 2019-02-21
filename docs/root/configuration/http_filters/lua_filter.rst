@@ -74,7 +74,7 @@ more details on the supported API.
 
   -- Called on the response path.
   function envoy_on_response(response_handle)
-    -- Wait for the entire response body and a response header with the the body size.
+    -- Wait for the entire response body and a response header with the body size.
     response_handle:headers():add("response_body_size", response_handle:body():length())
     -- Remove a response header named 'foo'
     response_handle:headers():remove("foo")
