@@ -644,5 +644,44 @@ TEST_P(RingHashLoadBalancerTest, LargeFractionalScale) {
   EXPECT_EQ(497, counts[1]); // :91 | ~511 expected hits
 }
 
+// Given extremely lopsided locality weights, and a ring that isn't large enough to fit all hosts,
+// expect that the correct proportion of hosts will be present in the ring.
+TEST_P(RingHashLoadBalancerTest, LopsidedWeightSmallScale) {
+  hostSet().hosts_.clear();
+  HostVector heavyButSparse, lightButDense;
+  for (uint32_t i = 0; i < 1024; ++i) {
+    auto host(makeTestHost(info_, absl::StrCat("tcp://127.0.0.1:", i)));
+    hostSet().hosts_.push_back(host);
+    (i == 0 ? heavyButSparse : lightButDense).push_back(host);
+  }
+  hostSet().healthy_hosts_ = hostSet().hosts_;
+  hostSet().hosts_per_locality_ = makeHostsPerLocality({heavyButSparse, lightButDense});
+  hostSet().healthy_hosts_per_locality_ = hostSet().hosts_per_locality_;
+  hostSet().locality_weights_ = makeLocalityWeights({127, 1});
+  hostSet().runCallbacks({}, {});
+
+  config_ = envoy::api::v2::Cluster::RingHashLbConfig();
+  config_.value().mutable_minimum_ring_size()->set_value(1024);
+  config_.value().mutable_maximum_ring_size()->set_value(1024);
+  init();
+  EXPECT_EQ(1024, lb_->stats().size_.value());
+  EXPECT_EQ(0, lb_->stats().min_hashes_per_host_.value());
+  // Host :0, from the heavy-but-sparse locality, should have 1016 out of the 1024 entries on the
+  // ring, which gives us the right ratio of 127/128.
+  EXPECT_EQ(1016, lb_->stats().max_hashes_per_host_.value());
+  LoadBalancerPtr lb = lb_->factory()->create();
+
+  // Every 128th host in the light-but-dense locality should have an entry on the ring, for a total
+  // of 8 entries. This gives us the right ratio of 1/128.
+  std::unordered_map<uint64_t, uint32_t> expected{
+      {11664790346325243808UL, 1},   {15894554872961148518UL, 128}, {13958138884277627155UL, 256},
+      {15803774069438192949UL, 384}, {3829253010855396576UL, 512},  {17918147347826565154UL, 640},
+      {6442769608292299103UL, 768},  {5881074926069334434UL, 896}};
+  for (const auto& entry : expected) {
+    TestLoadBalancerContext context(entry.first);
+    EXPECT_EQ(hostSet().hosts_[entry.second], lb->chooseHost(&context));
+  }
+}
+
 } // namespace Upstream
 } // namespace Envoy
