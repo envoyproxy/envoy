@@ -85,7 +85,7 @@ size_t HessianDeserializerImpl::serializeRpcResult(Buffer::Instance& output_buff
 
   // The serialized response type is compact int.
   size_t serialized_size = HessianUtils::writeInt(
-      output_buffer, static_cast<std::underlying_type<SerializationType>::type>(type));
+      output_buffer, static_cast<std::underlying_type<RpcResponseType>::type>(type));
 
   // Serialized response content.
   serialized_size += HessianUtils::writeString(output_buffer, content);

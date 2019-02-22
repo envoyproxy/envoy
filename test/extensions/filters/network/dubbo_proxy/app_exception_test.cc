@@ -38,83 +38,28 @@ TEST_F(AppExceptionTest, Encode) {
   metadata_->setSerializationType(SerializationType::Hessian);
   metadata_->setRequestId(0);
 
-  {
-    EXPECT_EQ(app_exception.encode(*(metadata_.get()), protocol_, deserializer_, buffer),
-              DubboFilters::DirectResponse::ResponseType::Exception);
-    MessageMetadataSharedPtr metadata = std::make_shared<MessageMetadata>();
-    EXPECT_TRUE(protocol_.decode(buffer, &context_, metadata));
-    EXPECT_EQ(expect_body_size, context_.body_size_);
-    EXPECT_EQ(metadata->message_type(), MessageType::Response);
-    buffer.drain(context_.header_size_);
+  EXPECT_EQ(app_exception.encode(*(metadata_.get()), protocol_, deserializer_, buffer),
+            DubboFilters::DirectResponse::ResponseType::Exception);
+  MessageMetadataSharedPtr metadata = std::make_shared<MessageMetadata>();
+  EXPECT_TRUE(protocol_.decode(buffer, &context_, metadata));
+  EXPECT_EQ(expect_body_size, context_.body_size_);
+  EXPECT_EQ(metadata->message_type(), MessageType::Response);
+  buffer.drain(context_.header_size_);
 
-    // Verify the response type and content.
-    size_t hessian_int_size;
-    int type_value = HessianUtils::peekInt(buffer, &hessian_int_size);
-    EXPECT_EQ(static_cast<uint8_t>(app_exception.response_type_), static_cast<uint8_t>(type_value));
+  // Verify the response type and content.
+  size_t hessian_int_size;
+  int type_value = HessianUtils::peekInt(buffer, &hessian_int_size);
+  EXPECT_EQ(static_cast<uint8_t>(app_exception.response_type_), static_cast<uint8_t>(type_value));
 
-    size_t hessian_string_size;
-    std::string message = HessianUtils::peekString(buffer, &hessian_string_size, sizeof(uint8_t));
-    EXPECT_EQ(mock_message, message);
+  size_t hessian_string_size;
+  std::string message = HessianUtils::peekString(buffer, &hessian_string_size, sizeof(uint8_t));
+  EXPECT_EQ(mock_message, message);
 
-    EXPECT_EQ(buffer.length(), hessian_int_size + hessian_string_size);
+  EXPECT_EQ(buffer.length(), hessian_int_size + hessian_string_size);
 
-    auto result = deserializer_.deserializeRpcResult(buffer, context_.body_size_);
-    EXPECT_TRUE(result->hasException());
-    buffer.drain(buffer.length());
-  }
-
-  {
-    app_exception.response_type_ = RpcResponseType::ResponseValueWithAttachments;
-    EXPECT_EQ(app_exception.encode(*(metadata_.get()), protocol_, deserializer_, buffer),
-              DubboFilters::DirectResponse::ResponseType::Exception);
-
-    MessageMetadataSharedPtr metadata = std::make_shared<MessageMetadata>();
-    EXPECT_TRUE(protocol_.decode(buffer, &context_, metadata));
-    EXPECT_EQ(expect_body_size, context_.body_size_);
-    EXPECT_EQ(metadata->message_type(), MessageType::Response);
-    buffer.drain(context_.header_size_);
-
-    // Verify the response type and content.
-    size_t hessian_int_size;
-    int type_value = HessianUtils::peekInt(buffer, &hessian_int_size);
-    EXPECT_EQ(static_cast<uint8_t>(app_exception.response_type_), static_cast<uint8_t>(type_value));
-
-    size_t hessian_string_size;
-    std::string message = HessianUtils::peekString(buffer, &hessian_string_size, sizeof(uint8_t));
-    EXPECT_EQ(mock_message, message);
-
-    EXPECT_EQ(buffer.length(), hessian_int_size + hessian_string_size);
-
-    auto result = deserializer_.deserializeRpcResult(buffer, context_.body_size_);
-    EXPECT_FALSE(result->hasException());
-    buffer.drain(buffer.length());
-  }
-
-  {
-    app_exception.response_type_ = RpcResponseType::ResponseWithValue;
-    EXPECT_EQ(app_exception.encode(*(metadata_.get()), protocol_, deserializer_, buffer),
-              DubboFilters::DirectResponse::ResponseType::Exception);
-
-    MessageMetadataSharedPtr metadata = std::make_shared<MessageMetadata>();
-    EXPECT_TRUE(protocol_.decode(buffer, &context_, metadata));
-    EXPECT_EQ(expect_body_size, context_.body_size_);
-    EXPECT_EQ(metadata->message_type(), MessageType::Response);
-    buffer.drain(context_.header_size_);
-
-    // Verify the response type and content.
-    size_t hessian_int_size;
-    int type_value = HessianUtils::peekInt(buffer, &hessian_int_size);
-    EXPECT_EQ(static_cast<uint8_t>(app_exception.response_type_), static_cast<uint8_t>(type_value));
-
-    size_t hessian_string_size;
-    std::string message = HessianUtils::peekString(buffer, &hessian_string_size, sizeof(uint8_t));
-    EXPECT_EQ(mock_message, message);
-
-    EXPECT_EQ(buffer.length(), hessian_int_size + hessian_string_size);
-
-    auto result = deserializer_.deserializeRpcResult(buffer, context_.body_size_);
-    EXPECT_TRUE(result->hasException());
-  }
+  auto result = deserializer_.deserializeRpcResult(buffer, context_.body_size_);
+  EXPECT_TRUE(result->hasException());
+  buffer.drain(buffer.length());
 }
 
 } // namespace DubboProxy

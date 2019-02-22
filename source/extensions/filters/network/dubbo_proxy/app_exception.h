@@ -23,7 +23,7 @@ struct AppException : public EnvoyException,
                       Buffer::Instance& buffer) const override;
 
   const ResponseStatus status_;
-  RpcResponseType response_type_;
+  const RpcResponseType response_type_;
 };
 
 } // namespace DubboProxy
