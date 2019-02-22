@@ -9,7 +9,7 @@ using testing::_;
 namespace Envoy {
 namespace Server {
 
-class ConfigTrackerImplTest : public TestBase {
+class ConfigTrackerImplTest : public testing::Test {
 public:
   ConfigTrackerImplTest() : cbs_map(tracker.getCallbacksMap()) {
     EXPECT_TRUE(cbs_map.empty());

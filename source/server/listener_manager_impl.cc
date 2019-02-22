@@ -118,8 +118,8 @@ Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
     }
     const std::string addr = fmt::format("unix://{}", address->asString());
     const int fd = server_.hotRestart().duplicateParentListenSocket(addr);
-    Network::IoHandlePtr io_handle = std::make_unique<Network::IoSocketHandle>(fd);
-    if (io_handle->fd() != -1) {
+    Network::IoHandlePtr io_handle = std::make_unique<Network::IoSocketHandleImpl>(fd);
+    if (io_handle->isOpen()) {
       ENVOY_LOG(debug, "obtained socket for address {} from parent", addr);
       return std::make_shared<Network::UdsListenSocket>(std::move(io_handle), address);
     }
@@ -133,7 +133,7 @@ Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
   const int fd = server_.hotRestart().duplicateParentListenSocket(addr);
   if (fd != -1) {
     ENVOY_LOG(debug, "obtained socket for address {} from parent", addr);
-    Network::IoHandlePtr io_handle = std::make_unique<Network::IoSocketHandle>(fd);
+    Network::IoHandlePtr io_handle = std::make_unique<Network::IoSocketHandleImpl>(fd);
     if (socket_type == Network::Address::SocketType::Stream) {
       return std::make_shared<Network::TcpListenSocket>(std::move(io_handle), address, options);
     } else {
@@ -165,10 +165,9 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_original_dst, false)),
       per_connection_buffer_limit_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
-      listener_tag_(parent_.factory_.nextListenerTag()), name_(name),
-      reverse_write_filter_order_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, bugfix_reverse_write_filter_order, true)),
-      modifiable_(modifiable), workers_started_(workers_started), hash_(hash),
+      listener_tag_(parent_.factory_.nextListenerTag()), name_(name), modifiable_(modifiable),
+      workers_started_(workers_started), hash_(hash),
+      dynamic_init_manager_(fmt::format("Listener {}", name)),
       local_drain_manager_(parent.factory_.createDrainManager(config.drain_type())),
       config_(config), version_info_(version_info),
       listener_filters_timeout_(

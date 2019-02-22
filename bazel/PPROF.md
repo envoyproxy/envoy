@@ -92,6 +92,26 @@ Build the binary using bazel, and run the binary without any environment variabl
 
 This will dump your profiler output to the working directory.
 
+## Memory Profiling in Tests
+To support memory leaks detection, tests are built with gperftools dependencies enabled by default. 
+
+### Enabling Memory Profiling in Tests
+Use `HeapProfilerStart()`, `HeapProfilerStop()`, and `HeapProfilerDump()` to start, stop, and persist
+memory dumps, respectively. Please see [above](#adding-tcmalloc_dep-to-envoy) for more details.
+
+### Bazel Configuration
+By default, bazel executes tests in a sandbox, which will be deleted together with memory dumps 
+after the test run. To preserve memory dumps, bazel can be forced to run tests without
+sandboxing, by setting the ```TestRunner``` parameter to ```standalone```:
+```
+bazel test --strategy=TestRunner=standalone ...
+```
+
+An alternative is to set ```HEAPPROFILE``` environment variable for the test runner:
+```
+bazel test --test_env=HEAPPROFILE=/tmp/testprofile ...
+```
+
 # Methodology
 
 For consistent testing, it makes sense to run Envoy for a constant amount of

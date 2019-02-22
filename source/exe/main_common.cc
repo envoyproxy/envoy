@@ -7,6 +7,7 @@
 #include "common/common/compiler_requirements.h"
 #include "common/common/perf_annotation.h"
 #include "common/event/libevent.h"
+#include "common/http/http2/codec_impl.h"
 #include "common/network/utility.h"
 #include "common/stats/thread_local_store.h"
 
@@ -41,7 +42,7 @@ Runtime::LoaderPtr ProdComponentFactory::createRuntime(Server::Instance& server,
   return Server::InstanceUtil::createRuntime(server, config);
 }
 
-MainCommonBase::MainCommonBase(OptionsImpl& options, Event::TimeSystem& time_system,
+MainCommonBase::MainCommonBase(const OptionsImpl& options, Event::TimeSystem& time_system,
                                TestHooks& test_hooks, Server::ComponentFactory& component_factory,
                                std::unique_ptr<Runtime::RandomGenerator>&& random_generator,
                                Thread::ThreadFactory& thread_factory)
@@ -50,6 +51,7 @@ MainCommonBase::MainCommonBase(OptionsImpl& options, Event::TimeSystem& time_sys
   ares_library_init(ARES_LIB_INIT_ALL);
   Event::Libevent::Global::initialize();
   RELEASE_ASSERT(Envoy::Server::validateProtoDescriptors(), "");
+  Http::Http2::initializeNghttp2Logging();
 
   switch (options_.mode()) {
   case Server::Mode::InitOnly:

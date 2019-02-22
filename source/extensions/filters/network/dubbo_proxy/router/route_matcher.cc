@@ -71,7 +71,7 @@ bool ParameterRouteEntryImpl::matchParameter(const std::string& request_data,
     return config_data.value_.empty() || request_data == config_data.value_;
   case Http::HeaderUtility::HeaderMatchType::Range: {
     int64_t value = 0;
-    return StringUtil::atol(request_data.c_str(), value, 10) &&
+    return StringUtil::atoll(request_data.c_str(), value, 10) &&
            value >= config_data.range_.start() && value < config_data.range_.end();
   }
   default:

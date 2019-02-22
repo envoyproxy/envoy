@@ -120,6 +120,7 @@ PROTO_RST="
   /envoy/config/transport_socket/tap/v2alpha/tap/envoy/config/transport_socket/tap/v2alpha/tap.proto.rst
   /envoy/data/accesslog/v2/accesslog/envoy/data/accesslog/v2/accesslog.proto.rst
   /envoy/data/core/v2alpha/health_check_event/envoy/data/core/v2alpha/health_check_event.proto.rst
+  /envoy/data/tap/v2alpha/common/envoy/data/tap/v2alpha/common.proto.rst
   /envoy/data/tap/v2alpha/transport/envoy/data/tap/v2alpha/transport.proto.rst
   /envoy/data/tap/v2alpha/http/envoy/data/tap/v2alpha/http.proto.rst
   /envoy/data/tap/v2alpha/wrapper/envoy/data/tap/v2alpha/wrapper.proto.rst

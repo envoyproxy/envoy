@@ -1,20 +1,20 @@
 # Envoy Stats System
 
 Envoy statistics track numeric metrics on an Envoy instance, optionally spanning
-binary restarts. The metrics are tracked as:
+binary program restarts. The metrics are tracked as:
 
  * Counters: strictly increasing 64-bit integers.
  * Gauges: 64-bit integers that can rise and fall.
  * Histograms: mapping ranges of values to frequency. The ranges are auto-adjusted as
    data accumulates. Unliked counters and gauges, histogram data is not retained across
-   binary restarts.
+   binary program restarts.
 
 ## Hot-restart: `RawStatData` vs `HeapStatData`
 
-In order to support restarting the Envoy binary without losing counter and gauge
+In order to support restarting the Envoy binary program without losing counter and gauge
 values, they are stored in a shared-memory block, including stats that are
 created dynamically at runtime in response to discovery of new clusters at
-runtime. To simplify memmory management, each stat is allocated a fixed amount
+runtime. To simplify memory management, each stat is allocated a fixed amount
 of storage, controlled via [command-line
 flags](https://www.envoyproxy.io/docs/envoy/latest/operations/cli):
 `--max-stats` and `--max-obj-name-len`, which determine the size of the pre-allocated
@@ -26,7 +26,7 @@ it easy to correlate stats across restarts even as the dynamic cluster
 configuration changes.
 
 One challenge with this fixed memory allocation strategy is that it limits
-cluster scalabilty. A deployment wishing to use a single Envoy instance to
+cluster scalability. A deployment wishing to use a single Envoy instance to
 manage tens of thousands of clusters, each with its own set of scoped stats,
 will use more memory than is ideal.
 

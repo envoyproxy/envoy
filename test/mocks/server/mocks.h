@@ -39,11 +39,11 @@
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/mocks.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/test_time_system.h"
 
 #include "absl/strings/string_view.h"
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
@@ -309,7 +309,7 @@ public:
 
   // OverloadManager
   MOCK_METHOD0(start, void());
-  MOCK_METHOD3(registerForAction, void(const std::string& action, Event::Dispatcher& dispatcher,
+  MOCK_METHOD3(registerForAction, bool(const std::string& action, Event::Dispatcher& dispatcher,
                                        OverloadActionCb callback));
   MOCK_METHOD0(getThreadLocalOverloadState, ThreadLocalOverloadState&());
 
@@ -339,7 +339,7 @@ public:
   MOCK_METHOD0(initManager, Init::Manager&());
   MOCK_METHOD0(listenerManager, ListenerManager&());
   MOCK_METHOD0(mutexTracer, Envoy::MutexTracer*());
-  MOCK_METHOD0(options, Options&());
+  MOCK_METHOD0(options, const Options&());
   MOCK_METHOD0(overloadManager, OverloadManager&());
   MOCK_METHOD0(random, Runtime::RandomGenerator&());
   MOCK_METHOD0(runtime, Runtime::Loader&());
@@ -355,7 +355,7 @@ public:
   MOCK_METHOD0(localInfo, const LocalInfo::LocalInfo&());
   MOCK_CONST_METHOD0(statsFlushInterval, std::chrono::milliseconds());
 
-  Event::TestTimeSystem& timeSystem() override { return time_system_; }
+  TimeSource& timeSource() override { return time_system_; }
 
   std::unique_ptr<Secret::SecretManager> secret_manager_;
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
@@ -512,7 +512,7 @@ public:
     return Upstream::HealthCheckEventLoggerPtr(eventLogger_());
   }
 
-  testing::NiceMock<Upstream::MockCluster> cluster_;
+  testing::NiceMock<Upstream::MockClusterMockPrioritySet> cluster_;
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
   testing::NiceMock<Envoy::Runtime::MockRandomGenerator> random_;
   testing::NiceMock<Envoy::Runtime::MockLoader> runtime_;

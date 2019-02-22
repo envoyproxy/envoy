@@ -30,7 +30,8 @@
 #include "test/integration/utility.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
-#include "test/test_common/test_base.h"
+
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::AnyNumber;
@@ -226,15 +227,15 @@ void IntegrationTcpClient::ConnectionCallbacks::onEvent(Network::ConnectionEvent
   }
 }
 
-BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version,
+BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstream_address_fn,
+                                         Network::Address::IpVersion version,
                                          const std::string& config)
     : api_(Api::createApiForTest(stats_store_)),
       mock_buffer_factory_(new NiceMock<MockBufferFactory>),
-      dispatcher_(
-          new Event::DispatcherImpl(Buffer::WatermarkFactoryPtr{mock_buffer_factory_}, *api_)),
-      version_(version), config_helper_(version, *api_, config),
+      dispatcher_(api_->allocateDispatcher(Buffer::WatermarkFactoryPtr{mock_buffer_factory_})),
+      version_(version), upstream_address_fn_(upstream_address_fn),
+      config_helper_(version, *api_, config),
       default_log_level_(TestEnvironment::getOptions().logLevel()) {
-
   // This is a hack, but there are situations where we disconnect fake upstream connections and
   // then we expect the server connection pool to get the disconnect before the next test starts.
   // This does not always happen. This pause should allow the server to pick up the disconnect
@@ -249,6 +250,15 @@ BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version,
       }));
   ON_CALL(factory_context_, api()).WillByDefault(ReturnRef(*api_));
 }
+
+BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version,
+                                         const std::string& config)
+    : BaseIntegrationTest(
+          [version](int) {
+            return Network::Utility::parseInternetAddress(
+                Network::Test::getAnyAddressString(version), 0);
+          },
+          version, config) {}
 
 Network::ClientConnectionPtr BaseIntegrationTest::makeClientConnection(uint32_t port) {
   Network::ClientConnectionPtr connection(dispatcher_->createClientConnection(
@@ -272,12 +282,13 @@ void BaseIntegrationTest::initialize() {
 
 void BaseIntegrationTest::createUpstreams() {
   for (uint32_t i = 0; i < fake_upstreams_count_; ++i) {
+    auto endpoint = upstream_address_fn_(i);
     if (autonomous_upstream_) {
       fake_upstreams_.emplace_back(
-          new AutonomousUpstream(0, upstream_protocol_, version_, timeSystem()));
+          new AutonomousUpstream(endpoint, upstream_protocol_, *time_system_));
     } else {
       fake_upstreams_.emplace_back(
-          new FakeUpstream(0, upstream_protocol_, version_, timeSystem(), enable_half_close_));
+          new FakeUpstream(endpoint, upstream_protocol_, *time_system_, enable_half_close_));
     }
   }
 }
@@ -368,9 +379,9 @@ void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>
 
 void BaseIntegrationTest::createGeneratedApiTestServer(const std::string& bootstrap_path,
                                                        const std::vector<std::string>& port_names) {
-  test_server_ = IntegrationTestServer::create(bootstrap_path, version_,
-                                               pre_worker_start_test_steps_, deterministic_,
-                                               timeSystem(), *api_, defer_listener_finalization_);
+  test_server_ = IntegrationTestServer::create(bootstrap_path, version_, on_server_init_function_,
+                                               deterministic_, timeSystem(), *api_,
+                                               defer_listener_finalization_);
   if (config_helper_.bootstrap().static_resources().listeners_size() > 0 &&
       !defer_listener_finalization_) {
     // Wait for listeners to be created before invoking registerTestServerPorts() below, as that
@@ -424,9 +435,9 @@ void BaseIntegrationTest::sendRawHttpAndWaitForResponse(int port, const char* ra
 
 IntegrationTestServerPtr
 BaseIntegrationTest::createIntegrationTestServer(const std::string& bootstrap_path,
-                                                 std::function<void()> pre_worker_start_test_steps,
+                                                 std::function<void()> on_server_init_function,
                                                  Event::TestTimeSystem& time_system) {
-  return IntegrationTestServer::create(bootstrap_path, version_, pre_worker_start_test_steps,
+  return IntegrationTestServer::create(bootstrap_path, version_, on_server_init_function,
                                        deterministic_, time_system, *api_,
                                        defer_listener_finalization_);
 }

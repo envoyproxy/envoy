@@ -257,7 +257,6 @@ public:
   Stats::Scope& listenerScope() override { return *listener_scope_; }
   uint64_t listenerTag() const override { return listener_tag_; }
   const std::string& name() const override { return name_; }
-  bool reverseWriteFilterOrder() const override { return reverse_write_filter_order_; }
 
   // Server::Configuration::ListenerFactoryContext
   AccessLog::AccessLogManager& accessLogManager() override {
@@ -281,7 +280,7 @@ public:
   const envoy::api::v2::core::Metadata& listenerMetadata() const override {
     return config_.metadata();
   };
-  TimeSource& timeSource() override { return api().timeSystem(); }
+  TimeSource& timeSource() override { return api().timeSource(); }
   void ensureSocketOptions() {
     if (!listen_socket_options_) {
       listen_socket_options_ =
@@ -398,7 +397,6 @@ private:
   const uint32_t per_connection_buffer_limit_bytes_;
   const uint64_t listener_tag_;
   const std::string name_;
-  const bool reverse_write_filter_order_;
   const bool modifiable_;
   const bool workers_started_;
   const uint64_t hash_;

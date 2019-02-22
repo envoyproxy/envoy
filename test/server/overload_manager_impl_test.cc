@@ -10,10 +10,10 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/registry.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Invoke;
@@ -69,7 +69,7 @@ public:
   FakeResourceMonitor* monitor_; // not owned
 };
 
-class OverloadManagerImplTest : public TestBase {
+class OverloadManagerImplTest : public testing::Test {
 protected:
   OverloadManagerImplTest()
       : factory1_("envoy.resource_monitors.fake_resource1"),

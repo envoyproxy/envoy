@@ -11,9 +11,11 @@ even when using the other service discovery types. Envoy supports three differen
 checking along with various settings (check interval, failures required before marking a host
 unhealthy, successes required before marking a host healthy, etc.):
 
-* **HTTP**: During HTTP health checking Envoy will send an HTTP request to the upstream host. It
-  expects a 200 response if the host is healthy. The upstream host can return 503 if it wants to
-  immediately notify downstream hosts to no longer forward traffic to it.
+* **HTTP**: During HTTP health checking Envoy will send an HTTP request to the upstream host. By
+  default, it expects a 200 response if the host is healthy. Expected response codes are
+  :ref:`configurable <envoy_api_msg_core.HealthCheck.HttpHealthCheck>`. The
+  upstream host can return 503 if it wants to immediately notify downstream hosts to no longer
+  forward traffic to it.
 * **L3/L4**: During L3/L4 health checking, Envoy will send a configurable byte buffer to the
   upstream host. It expects the byte buffer to be echoed in the response if the host is to be
   considered healthy. Envoy also supports connect only L3/L4 health checking.

@@ -5,7 +5,6 @@
 
 #include "envoy/common/time.h"
 #include "envoy/event/dispatcher.h"
-#include "envoy/event/timer.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/stats/store.h"
 #include "envoy/thread/thread.h"
@@ -27,6 +26,14 @@ public:
   virtual Event::DispatcherPtr allocateDispatcher() PURE;
 
   /**
+   * Allocate a dispatcher.
+   * @param watermark_factory the watermark factory, ownership is transferred to the dispatcher.
+   * @return Event::DispatcherPtr which is owned by the caller.
+   */
+  virtual Event::DispatcherPtr
+  allocateDispatcher(Buffer::WatermarkFactoryPtr&& watermark_factory) PURE;
+
+  /**
    * @return a reference to the ThreadFactory
    */
   virtual Thread::ThreadFactory& threadFactory() PURE;
@@ -37,10 +44,9 @@ public:
   virtual Filesystem::Instance& fileSystem() PURE;
 
   /**
-   * @return a reference to the TimeSystem
-   * TODO(jmarantz): change this to return a TimeSource.
+   * @return a reference to the TimeSource
    */
-  virtual Event::TimeSystem& timeSystem() PURE;
+  virtual TimeSource& timeSource() PURE;
 };
 
 typedef std::unique_ptr<Api> ApiPtr;

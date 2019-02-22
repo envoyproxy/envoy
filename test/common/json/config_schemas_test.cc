@@ -7,10 +7,10 @@
 #include "common/stats/isolated_store_impl.h"
 
 #include "test/test_common/environment.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 
@@ -27,11 +27,10 @@ std::vector<std::string> generateTestInputs() {
   return file_list;
 }
 
-class ConfigSchemasTest : public TestBaseWithParam<std::string> {
+class ConfigSchemasTest : public testing::TestWithParam<std::string> {
 protected:
-  ConfigSchemasTest() : api_(Api::createApiForTest(stats_store_)) {}
+  ConfigSchemasTest() : api_(Api::createApiForTest()) {}
 
-  Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
 };
 

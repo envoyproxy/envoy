@@ -104,7 +104,7 @@ To configure retries to attempt other priorities during retries, the built-in
       config:
         update_frequency: 2
 
-This will target priorites in subsequent retry attempts that haven't been already used. The ``update_frequency`` parameter decides how
+This will target priorities in subsequent retry attempts that haven't been already used. The ``update_frequency`` parameter decides how
 often the priority load should be recalculated.
 
 These plugins can be combined, which will exclude both previously attempted hosts as well as
