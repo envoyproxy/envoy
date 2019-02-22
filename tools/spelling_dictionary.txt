@@ -362,6 +362,7 @@ deleter
 delim
 dereference
 dereferences
+dereferencing
 deregistered
 deserialization
 deserialize
