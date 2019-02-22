@@ -7,6 +7,7 @@ cc_library(
         "http_parser.h",
     ],
     hdrs = ["http_parser.h"],
+    copts = ["-DHTTP_MAX_HEADER_SIZE=0x7fffffff"],
     includes = ["."],
     visibility = ["//visibility:public"],
 )

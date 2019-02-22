@@ -720,11 +720,11 @@ name: decode-headers-only
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, LargeRequestHeadersRejected) {
-  testLargeRequestHeaders(85, 60);
+  testLargeRequestHeaders(85, 64);
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, LargeRequestHeadersAccepted) {
-  testLargeRequestHeaders(62, 64);
+  testLargeRequestHeaders(85, 96);
 }
 
 // For tests which focus on downstream-to-Envoy behavior, and don't need to be

@@ -828,8 +828,7 @@ void HttpIntegrationTest::testLargeRequestHeaders(uint32_t size, uint32_t max_si
     if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
       codec_client_->waitForDisconnect();
       EXPECT_TRUE(response->complete());
-      // TODO(auni53) these errors should be 431!
-      EXPECT_STREQ("400", response->headers().Status()->value().c_str());
+      EXPECT_STREQ("431", response->headers().Status()->value().c_str());
     } else {
       response->waitForReset();
       codec_client_->close();
