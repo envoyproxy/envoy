@@ -17,6 +17,10 @@ would be used.
 *Title*: *One line description*
 
 *Description*:
+>What version of envoy are you using?
+>Environment information:
+- Operating system (output of `cat /etc/os-release`)
+- Kernel version (output of `uname -r`)
 >What issue is being seen? Describe what should be happening instead of
 the bug, for example: Envoy should not crash, the expected value isn't
 returned, etc.
