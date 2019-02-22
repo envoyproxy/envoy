@@ -418,6 +418,15 @@ void ListenerImpl::addFilterChainForSourceTypes(
     SourceTypesArray& source_types_array,
     const envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType source_type,
     const Network::FilterChainSharedPtr& filter_chain) {
+  if (source_types_array[source_type] != nullptr) {
+    // We should never get here once all fields in FilterChainMatch are implemented. At this point,
+    // this can become an ASSERT. In principle, we could verify the various missing fields earlier,
+    // but best to have defense-in-depth here, since any mistake leads to potential
+    // heap-use-after-free when filter chains are unexpectedly destructed.
+    throw EnvoyException(fmt::format("error adding listener '{}': multiple filter chains with "
+                                     "effectively equivalent matching rules are defined",
+                                     address_->asString()));
+  }
   source_types_array[source_type] = filter_chain;
 }
 
