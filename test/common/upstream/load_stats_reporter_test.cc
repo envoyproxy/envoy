@@ -10,10 +10,10 @@
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/simulated_time_system.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::InSequence;
@@ -26,7 +26,7 @@ using testing::Return;
 namespace Envoy {
 namespace Upstream {
 
-class LoadStatsReporterTest : public TestBase {
+class LoadStatsReporterTest : public testing::Test {
 public:
   LoadStatsReporterTest()
       : retry_timer_(new Event::MockTimer()), response_timer_(new Event::MockTimer()),
@@ -115,9 +115,9 @@ TEST_F(LoadStatsReporterTest, ExistingClusters) {
   createLoadStatsReporter();
   time_system_.setMonotonicTime(std::chrono::microseconds(3));
   // Start reporting on foo.
-  NiceMock<MockCluster> foo_cluster;
+  NiceMock<MockClusterMockPrioritySet> foo_cluster;
   foo_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(2);
-  NiceMock<MockCluster> bar_cluster;
+  NiceMock<MockClusterMockPrioritySet> bar_cluster;
   MockClusterManager::ClusterInfoMap cluster_info{{"foo", foo_cluster}, {"bar", bar_cluster}};
   ON_CALL(cm_, clusters()).WillByDefault(Return(cluster_info));
   deliverLoadStatsResponse({"foo"});

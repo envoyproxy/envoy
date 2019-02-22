@@ -33,6 +33,17 @@ maximize the chances of your PR being merged.
   deprecations between 1.3.0 and 1.4.0 will be deleted soon AFTER 1.5.0 is tagged and released
   (at the beginning of the 1.6.0 release cycle). This results in a three to six month window for
   migrating from deprecated code paths to new code paths.
+* Unless the community and Envoy maintainer team agrees on an exception, during the
+  first release cycle after a feature has been deprecated, use of that feature
+  will cause a logged warning, and incrementing the
+  [runtime](https://www.envoyproxy.io/docs/envoy/latest/configuration/runtime#config-runtime)
+  runtime.deprecated_feature_use stat.
+  During the second release cycle, use of the deprecated configuration will
+  cause a configuration load failure, unless the feature in question is
+  explicitly overridden in
+  [runtime](https://www.envoyproxy.io/docs/envoy/latest/configuration/runtime#config-runtime)
+  config. Finally during the third release cycle the code and configuration will be removed
+  entirely.
 * This policy means that organizations deploying master should have some time to get ready for
   breaking changes, but we make no guarantees about the length of time.
 * The breaking change policy also applies to source level extensions (e.g., filters). Code that

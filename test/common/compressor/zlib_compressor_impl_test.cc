@@ -3,14 +3,15 @@
 #include "common/common/stack_array.h"
 #include "common/compressor/zlib_compressor_impl.h"
 
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
+
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Compressor {
 namespace {
 
-class ZlibCompressorImplTest : public TestBase {
+class ZlibCompressorImplTest : public testing::Test {
 protected:
   void expectValidFlushedBuffer(const Buffer::OwnedImpl& output_buffer) {
     uint64_t num_comp_slices = output_buffer.getRawSlices(nullptr, 0);
@@ -56,7 +57,7 @@ protected:
   void expectEqualInputSize(const std::string& footer_bytes, const uint32_t input_size) {
     const std::string size_bytes = footer_bytes.substr(footer_bytes.size() - 8, 8);
     uint64_t size;
-    StringUtil::atoul(size_bytes.c_str(), size, 16);
+    StringUtil::atoull(size_bytes.c_str(), size, 16);
     EXPECT_EQ(TestUtility::flipOrder<uint32_t>(size), input_size);
   }
 

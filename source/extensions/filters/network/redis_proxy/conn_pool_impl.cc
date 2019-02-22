@@ -15,7 +15,8 @@ namespace ConnPool {
 
 ConfigImpl::ConfigImpl(
     const envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings& config)
-    : op_timeout_(PROTOBUF_GET_MS_REQUIRED(config, op_timeout)) {}
+    : op_timeout_(PROTOBUF_GET_MS_REQUIRED(config, op_timeout)),
+      enable_hashtagging_(config.enable_hashtagging()) {}
 
 ClientPtr ClientImpl::create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
                              EncoderPtr&& encoder, DecoderFactory& decoder_factory,
@@ -199,9 +200,9 @@ InstanceImpl::InstanceImpl(
   });
 }
 
-PoolRequest* InstanceImpl::makeRequest(const std::string& hash_key, const RespValue& value,
+PoolRequest* InstanceImpl::makeRequest(const std::string& key, const RespValue& value,
                                        PoolCallbacks& callbacks) {
-  return tls_->getTyped<ThreadLocalPool>().makeRequest(hash_key, value, callbacks);
+  return tls_->getTyped<ThreadLocalPool>().makeRequest(key, value, callbacks);
 }
 
 InstanceImpl::ThreadLocalPool::ThreadLocalPool(InstanceImpl& parent, Event::Dispatcher& dispatcher,
@@ -272,7 +273,7 @@ void InstanceImpl::ThreadLocalPool::onHostsRemoved(
   }
 }
 
-PoolRequest* InstanceImpl::ThreadLocalPool::makeRequest(const std::string& hash_key,
+PoolRequest* InstanceImpl::ThreadLocalPool::makeRequest(const std::string& key,
                                                         const RespValue& request,
                                                         PoolCallbacks& callbacks) {
   if (cluster_ == nullptr) {
@@ -281,7 +282,7 @@ PoolRequest* InstanceImpl::ThreadLocalPool::makeRequest(const std::string& hash_
     return nullptr;
   }
 
-  LbContextImpl lb_context(hash_key);
+  LbContextImpl lb_context(key, parent_.config_.enableHashtagging());
   Upstream::HostConstSharedPtr host = cluster_->loadBalancer().chooseHost(&lb_context);
   if (!host) {
     return nullptr;
@@ -306,6 +307,26 @@ void InstanceImpl::ThreadLocalActiveClient::onEvent(Network::ConnectionEvent eve
     parent_.dispatcher_.deferredDelete(std::move(client_to_delete->second->redis_client_));
     parent_.client_map_.erase(client_to_delete);
   }
+}
+
+// Inspired by the redis-cluster hashtagging algorithm
+// https://redis.io/topics/cluster-spec#keys-hash-tags
+absl::string_view InstanceImpl::LbContextImpl::hashtag(absl::string_view v, bool enabled) {
+  if (!enabled) {
+    return v;
+  }
+
+  auto start = v.find('{');
+  if (start == std::string::npos) {
+    return v;
+  }
+
+  auto end = v.find('}', start);
+  if (end == std::string::npos || end == start + 1) {
+    return v;
+  }
+
+  return v.substr(start + 1, end - start - 1);
 }
 
 } // namespace ConnPool

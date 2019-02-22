@@ -11,9 +11,10 @@
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/environment.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
+
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Assign;
@@ -53,9 +54,9 @@ TEST(ServerInstanceUtil, flushHelper) {
   InstanceUtil::flushMetricsToSinks(sinks, source);
 }
 
-class RunHelperTest : public TestBase {
+class RunHelperTest : public testing::Test {
 public:
-  RunHelperTest() : shutdown_(false) {
+  RunHelperTest() {
     InSequence s;
 
     sigterm_ = new Event::MockSignalEvent(&dispatcher_);
@@ -77,7 +78,7 @@ public:
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
   NiceMock<MockOverloadManager> overload_manager_;
-  InitManagerImpl init_manager_;
+  InitManagerImpl init_manager_{""};
   ReadyWatcher start_workers_;
   std::unique_ptr<RunHelper> helper_;
   std::function<void()> cm_init_callback_;
@@ -103,7 +104,7 @@ TEST_F(RunHelperTest, ShutdownBeforeCmInitialize) {
 TEST_F(RunHelperTest, ShutdownBeforeInitManagerInit) {
   EXPECT_CALL(start_workers_, ready()).Times(0);
   Init::MockTarget target;
-  init_manager_.registerTarget(target);
+  init_manager_.registerTarget(target, "");
   EXPECT_CALL(target, initialize(_));
   cm_init_callback_();
   sigterm_->callback_();
@@ -112,7 +113,7 @@ TEST_F(RunHelperTest, ShutdownBeforeInitManagerInit) {
 }
 
 // Class creates minimally viable server instance for testing.
-class ServerInstanceImplTest : public TestBaseWithParam<Network::Address::IpVersion> {
+class ServerInstanceImplTest : public testing::TestWithParam<Network::Address::IpVersion> {
 protected:
   ServerInstanceImplTest() : version_(GetParam()) {}
 

@@ -145,6 +145,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/init:init_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:logger_lib",
     ],
 )
 
@@ -293,6 +294,7 @@ envoy_cc_library(
         "//source/common/http:codes_lib",
         "//source/common/http:context_lib",
         "//source/common/local_info:local_info_lib",
+        "//source/common/memory:heap_shrinker_lib",
         "//source/common/memory:stats_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/router:rds_lib",

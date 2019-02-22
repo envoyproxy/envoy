@@ -1,7 +1,8 @@
 #include "common/common/backoff_strategy.h"
 
 #include "test/mocks/runtime/mocks.h"
-#include "test/test_common/test_base.h"
+
+#include "gtest/gtest.h"
 
 using testing::NiceMock;
 using testing::Return;

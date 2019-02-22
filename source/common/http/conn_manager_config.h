@@ -212,12 +212,6 @@ public:
   virtual FilterChainFactory& filterFactory() PURE;
 
   /**
-   * @return whether the connection manager will reverse the order of encoder
-   * filters in the HTTP filter chain.
-   */
-  virtual bool reverseEncodeOrder() PURE;
-
-  /**
    * @return whether the connection manager will generate a fresh x-request-id if the request does
    *         not have one.
    */
@@ -231,7 +225,7 @@ public:
   /**
    * @return maximum request headers size the connection manager will accept.
    */
-  virtual uint32_t maxRequestHeadersSizeKb() const PURE;
+  virtual uint32_t maxRequestHeadersKb() const PURE;
 
   /**
    * @return per-stream idle timeout for incoming connection manager connections. Zero indicates a

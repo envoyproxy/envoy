@@ -137,7 +137,7 @@ input
 
 validate
   *(required, object)* The validate object specifies the returned route parameters to match. At least one
-  test parameter must be specificed. Use "" (empty string) to indicate that no return value is expected.
+  test parameter must be specified. Use "" (empty string) to indicate that no return value is expected.
   For example, to test that no cluster match is expected use {"cluster_name": ""}.
 
   cluster_name
@@ -161,7 +161,7 @@ validate
   header_fields
     *(optional, array)*  Match the listed header fields. Examples header fields include the ":path", "cookie",
     and "date" fields. The header fields are checked after all other test cases. Thus, the header fields checked
-    will be those of the redirected or rewriten routes when applicable.
+    will be those of the redirected or rewritten routes when applicable.
 
     field
       *(required, string)* The name of the header field to match.

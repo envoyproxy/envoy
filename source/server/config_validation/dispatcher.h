@@ -16,7 +16,8 @@ namespace Event {
  */
 class ValidationDispatcher : public DispatcherImpl {
 public:
-  ValidationDispatcher(TimeSystem& time_system, Api::Api& api) : DispatcherImpl(time_system, api) {}
+  ValidationDispatcher(Api::Api& api, Event::TimeSystem& time_system)
+      : DispatcherImpl(api, time_system) {}
 
   Network::ClientConnectionPtr
   createClientConnection(Network::Address::InstanceConstSharedPtr,

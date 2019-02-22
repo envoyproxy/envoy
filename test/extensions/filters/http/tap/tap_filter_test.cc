@@ -2,10 +2,10 @@
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::InSequence;
 using testing::Return;
@@ -37,8 +37,10 @@ public:
 class MockHttpPerRequestTapper : public HttpPerRequestTapper {
 public:
   MOCK_METHOD1(onRequestHeaders, void(const Http::HeaderMap& headers));
+  MOCK_METHOD1(onRequestBody, void(const Buffer::Instance& data));
   MOCK_METHOD1(onRequestTrailers, void(const Http::HeaderMap& headers));
   MOCK_METHOD1(onResponseHeaders, void(const Http::HeaderMap& headers));
+  MOCK_METHOD1(onResponseBody, void(const Buffer::Instance& data));
   MOCK_METHOD1(onResponseTrailers, void(const Http::HeaderMap& headers));
   MOCK_METHOD4(onDestroyLog,
                bool(const Http::HeaderMap* request_headers, const Http::HeaderMap* request_trailers,
@@ -46,7 +48,7 @@ public:
                     const Http::HeaderMap* response_trailers));
 };
 
-class TapFilterTest : public TestBase {
+class TapFilterTest : public testing::Test {
 public:
   void setup(bool has_config) {
     if (has_config) {
@@ -109,6 +111,7 @@ TEST_F(TapFilterTest, Config) {
   EXPECT_CALL(*http_per_request_tapper_, onRequestHeaders(_));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
   Buffer::OwnedImpl request_body;
+  EXPECT_CALL(*http_per_request_tapper_, onRequestBody(_));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(request_body, false));
   Http::TestHeaderMapImpl request_trailers;
   EXPECT_CALL(*http_per_request_tapper_, onRequestTrailers(_));
@@ -120,6 +123,7 @@ TEST_F(TapFilterTest, Config) {
   EXPECT_CALL(*http_per_request_tapper_, onResponseHeaders(_));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
   Buffer::OwnedImpl response_body;
+  EXPECT_CALL(*http_per_request_tapper_, onResponseBody(_));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_body, false));
   Http::TestHeaderMapImpl response_trailers;
   EXPECT_CALL(*http_per_request_tapper_, onResponseTrailers(_));

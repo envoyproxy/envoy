@@ -97,10 +97,9 @@ public:
   Http::DateProvider& dateProvider() override { return date_provider_; }
   std::chrono::milliseconds drainTimeout() override { return std::chrono::milliseconds(100); }
   Http::FilterChainFactory& filterFactory() override { return *this; }
-  bool reverseEncodeOrder() override { return false; }
   bool generateRequestId() override { return false; }
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
-  uint32_t maxRequestHeadersSizeKb() const override { return max_request_headers_size_kb_; }
+  uint32_t maxRequestHeadersKb() const override { return max_request_headers_kb_; }
   std::chrono::milliseconds streamIdleTimeout() const override { return {}; }
   std::chrono::milliseconds requestTimeout() const override { return {}; }
   std::chrono::milliseconds delayedCloseTimeout() const override { return {}; }
@@ -268,7 +267,6 @@ private:
     Stats::Scope& listenerScope() override { return *scope_; }
     uint64_t listenerTag() const override { return 0; }
     const std::string& name() const override { return name_; }
-    bool reverseWriteFilterOrder() const override { return false; }
 
     AdminImpl& parent_;
     const std::string name_;
@@ -305,7 +303,7 @@ private:
   Http::ConnectionManagerTracingStats tracing_stats_;
   NullRouteConfigProvider route_config_provider_;
   std::list<UrlHandler> handlers_;
-  uint32_t max_request_headers_size_kb_{Http::DEFAULT_MAX_REQUEST_HEADERS_SIZE_KB};
+  const uint32_t max_request_headers_kb_{Http::DEFAULT_MAX_REQUEST_HEADERS_KB};
   absl::optional<std::chrono::milliseconds> idle_timeout_;
   absl::optional<std::string> user_agent_;
   Http::SlowDateProviderImpl date_provider_;

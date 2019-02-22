@@ -18,8 +18,9 @@
 
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
+
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Network {
@@ -53,8 +54,6 @@ void testSocketBindAndConnect(Network::Address::IpVersion ip_version, bool v6onl
   // Create a socket on which we'll listen for connections from clients.
   IoHandlePtr io_handle = addr_port->socket(SocketType::Stream);
   ASSERT_GE(io_handle->fd(), 0) << addr_port->asString();
-  ScopedFdCloser fd_closer1(io_handle->fd());
-  ScopedIoHandleCloser io_handle_closer1(io_handle);
 
   // Check that IPv6 sockets accept IPv6 connections only.
   if (addr_port->ip()->version() == IpVersion::v6) {
@@ -78,8 +77,6 @@ void testSocketBindAndConnect(Network::Address::IpVersion ip_version, bool v6onl
     // Create a client socket and connect to the server.
     IoHandlePtr client_handle = addr_port->socket(SocketType::Stream);
     ASSERT_GE(client_handle->fd(), 0) << addr_port->asString();
-    ScopedFdCloser fd_closer2(client_handle->fd());
-    ScopedIoHandleCloser io_handle_closer2(client_handle);
 
     // Instance::socket creates a non-blocking socket, which that extends all the way to the
     // operation of ::connect(), so connect returns with errno==EWOULDBLOCK before the tcp
@@ -106,7 +103,7 @@ void testSocketBindAndConnect(Network::Address::IpVersion ip_version, bool v6onl
 }
 } // namespace
 
-class AddressImplSocketTest : public TestBaseWithParam<IpVersion> {};
+class AddressImplSocketTest : public testing::TestWithParam<IpVersion> {};
 INSTANTIATE_TEST_SUITE_P(IpVersions, AddressImplSocketTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
@@ -331,8 +328,6 @@ TEST(PipeInstanceTest, UnlinksExistingFile) {
     PipeInstance address(path);
     IoHandlePtr io_handle = address.socket(SocketType::Stream);
     ASSERT_GE(io_handle->fd(), 0) << address.asString();
-    ScopedFdCloser fd_closer(io_handle->fd());
-    ScopedIoHandleCloser io_handle_closer(io_handle);
 
     const Api::SysCallIntResult result = address.bind(io_handle->fd());
     ASSERT_EQ(result.rc_, 0) << address.asString() << "\nerror: " << strerror(result.errno_)
@@ -416,21 +411,21 @@ TEST(AddressFromSockAddrDeathTest, Pipe) {
 struct TestCase {
   enum InstanceType { Ipv4, Ipv6, Pipe };
 
-  TestCase() : type_(Ipv4), port_(0) {}
-  TestCase(enum InstanceType type, std::string address, uint32_t port)
-      : type_(type), address_(address), port_(port) {}
-  TestCase(const TestCase& rhs) : type_(rhs.type_), address_(rhs.address_), port_(rhs.port_) {}
+  TestCase() = default;
+  TestCase(enum InstanceType type, const std::string& address, uint32_t port)
+      : address_(address), type_(type), port_(port) {}
+  TestCase(const TestCase& rhs) : address_(rhs.address_), type_(rhs.type_), port_(rhs.port_) {}
 
   bool operator==(const TestCase& rhs) {
     return (type_ == rhs.type_ && address_ == rhs.address_ && port_ == rhs.port_);
   }
 
-  enum InstanceType type_;
   std::string address_;
-  uint32_t port_; // Ignored for Pipe
+  enum InstanceType type_ { Ipv4 };
+  uint32_t port_ = 0; // Ignored for Pipe
 };
 
-class MixedAddressTest : public TestBaseWithParam<::testing::tuple<TestCase, TestCase>> {
+class MixedAddressTest : public testing::TestWithParam<::testing::tuple<TestCase, TestCase>> {
 public:
 protected:
   InstanceConstSharedPtr testCaseToInstance(const struct TestCase& test_case) {

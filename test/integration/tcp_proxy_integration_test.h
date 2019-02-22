@@ -5,19 +5,20 @@
 
 #include "test/integration/integration.h"
 #include "test/mocks/secret/mocks.h"
-#include "test/test_common/test_base.h"
+
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace {
-class TcpProxyIntegrationTest : public BaseIntegrationTest,
-                                public TestBaseWithParam<Network::Address::IpVersion> {
+class TcpProxyIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+                                public BaseIntegrationTest {
 public:
   TcpProxyIntegrationTest()
       : BaseIntegrationTest(GetParam(), realTime(), ConfigHelper::TCP_PROXY_CONFIG) {
     enable_half_close_ = true;
   }
 
-  ~TcpProxyIntegrationTest() {
+  ~TcpProxyIntegrationTest() override {
     test_server_.reset();
     fake_upstreams_.clear();
   }

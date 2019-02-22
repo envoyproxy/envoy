@@ -38,10 +38,12 @@
 #include "common/filesystem/directory.h"
 
 #include "test/test_common/printers.h"
+#include "test/test_common/test_time.h"
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
-#include "test/test_common/test_base.h"
+#include "test/mocks/stats/mocks.h"
+#include "gtest/gtest.h"
 
 using testing::GTEST_FLAG(random_seed);
 
@@ -277,13 +279,6 @@ void ConditionalInitializer::wait() {
   }
 }
 
-ScopedFdCloser::ScopedFdCloser(int fd) : fd_(fd) {}
-ScopedFdCloser::~ScopedFdCloser() { ::close(fd_); }
-
-ScopedIoHandleCloser::ScopedIoHandleCloser(Network::IoHandlePtr& io_handle)
-    : io_handle_(io_handle) {}
-ScopedIoHandleCloser::~ScopedIoHandleCloser() { io_handle_->close(); }
-
 AtomicFileUpdater::AtomicFileUpdater(const std::string& filename)
     : link_(filename), new_link_(absl::StrCat(filename, ".new")),
       target1_(absl::StrCat(filename, ".target1")), target2_(absl::StrCat(filename, ".target2")),
@@ -400,11 +395,35 @@ ThreadFactory& threadFactoryForTest() {
 
 namespace Api {
 
+class TestImplProvider {
+protected:
+  Event::GlobalTimeSystem global_time_system_;
+  testing::NiceMock<Stats::MockIsolatedStatsStore> default_stats_store_;
+};
+
+class TestImpl : public TestImplProvider, public Impl {
+public:
+  TestImpl(Thread::ThreadFactory& thread_factory, Stats::Store& stats_store)
+      : Impl(thread_factory, stats_store, global_time_system_) {}
+  TestImpl(Thread::ThreadFactory& thread_factory, Event::TimeSystem& time_system)
+      : Impl(thread_factory, default_stats_store_, time_system) {}
+  TestImpl(Thread::ThreadFactory& thread_factory)
+      : Impl(thread_factory, default_stats_store_, global_time_system_) {}
+};
+
+ApiPtr createApiForTest() { return std::make_unique<TestImpl>(Thread::threadFactoryForTest()); }
+
 ApiPtr createApiForTest(Stats::Store& stat_store) {
-  return std::make_unique<Impl>(std::chrono::milliseconds(1000), Thread::threadFactoryForTest(),
-                                stat_store);
+  return std::make_unique<TestImpl>(Thread::threadFactoryForTest(), stat_store);
+}
+
+ApiPtr createApiForTest(Event::TimeSystem& time_system) {
+  return std::make_unique<TestImpl>(Thread::threadFactoryForTest(), time_system);
+}
+
+ApiPtr createApiForTest(Stats::Store& stat_store, Event::TimeSystem& time_system) {
+  return std::make_unique<Impl>(Thread::threadFactoryForTest(), stat_store, time_system);
 }
 
 } // namespace Api
-
 } // namespace Envoy
