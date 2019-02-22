@@ -23,7 +23,7 @@ namespace exporter {
 
 class SpanExporterTestPeer {
 public:
-  static constexpr auto& ExportForTesting = SpanExporter::ExportForTesting;
+  static constexpr auto& exportForTesting = SpanExporter::ExportForTesting;
 };
 
 } // namespace exporter
@@ -40,6 +40,8 @@ using ::opencensus::trace::exporter::SpanExporter;
 
 namespace {
 
+// Custom export handler. We register this as an OpenCensus trace exporter, and
+// use it to catch the spans we produce.
 class SpanCatcher : public SpanExporter::Handler {
 public:
   void Export(const std::vector<SpanData>& spans) override {
@@ -49,9 +51,11 @@ public:
     }
   }
 
-  // Force export, return generated spandata, and clear the catcher.
-  std::vector<SpanData> Catch() {
-    opencensus::trace::exporter::SpanExporterTestPeer::ExportForTesting();
+  // Returns generated SpanData, and clears the catcher.
+  std::vector<SpanData> catchSpans() {
+    // OpenCensus's trace exporter is running in a background thread, waiting
+    // for a periodic export. Force it to flush right now.
+    opencensus::trace::exporter::SpanExporterTestPeer::exportForTesting();
     absl::MutexLock lock(&mu_);
     std::vector<SpanData> ret = std::move(spans_);
     spans_.clear();
@@ -64,18 +68,18 @@ private:
 };
 
 // Use a Singleton SpanCatcher.
-SpanCatcher* GetSpanCatcher() {
+SpanCatcher* getSpanCatcher() {
   static auto g_span_catcher = new SpanCatcher();
   return g_span_catcher;
 }
 
 // Call this before generating spans to register the exporter that catches them.
-void RegisterSpanCatcher() {
+void registerSpanCatcher() {
   static bool done_once = false;
   if (done_once) {
     return;
   }
-  SpanExporter::RegisterHandler(absl::WrapUnique(GetSpanCatcher()));
+  SpanExporter::RegisterHandler(absl::WrapUnique(getSpanCatcher()));
   done_once = true;
 }
 
@@ -84,7 +88,7 @@ void RegisterSpanCatcher() {
 // Create a Span via the driver, test all of the Tracing::Span API, and verify
 // the produced SpanData.
 TEST(OpenCensusTracerTest, Span) {
-  RegisterSpanCatcher();
+  registerSpanCatcher();
   envoy::config::trace::v2::OpenCensusConfig oc_config;
   std::unique_ptr<Tracing::Driver> driver_(new OpenCensus::Driver(oc_config));
 
@@ -105,7 +109,8 @@ TEST(OpenCensusTracerTest, Span) {
     span->finishSpan();
   }
 
-  std::vector<SpanData> spans = GetSpanCatcher()->Catch();
+  // Retrieve SpanData from the OpenCensus trace exporter.
+  std::vector<SpanData> spans = getSpanCatcher()->catchSpans();
   ASSERT_EQ(1, spans.size());
   const auto& sd = spans[0];
   std::cerr << sd.DebugString() << "\n";
