@@ -7,6 +7,7 @@ import tempfile
 
 envoy_real_cc = {ENVOY_REAL_CC}
 envoy_real_cxx = {ENVOY_REAL_CXX}
+envoy_cflags = {ENVOY_CFLAGS}
 envoy_cxxflags = {ENVOY_CXXFLAGS}
 
 
@@ -42,18 +43,17 @@ def main():
   if ("-static-libstdc++" in sys.argv[1:] or "-stdlib=libc++" in sys.argv[1:] or
       "-std=c++0x" in sys.argv[1:]):
     compiler = envoy_real_cxx
+    # Append CXXFLAGS to all C++ targets (this is mostly for dependencies).
+    argv = shlex.split(envoy_cxxflags)
   else:
     compiler = envoy_real_cc
+    # Append CFLAGS to all C targets (this is mostly for dependencies).
+    argv = shlex.split(envoy_cflags)
 
   # Either:
   # a) remove all occurrences of -lstdc++ (when statically linking against libstdc++),
   # b) replace all occurrences of -lstdc++ with -lc++ (when linking against libc++).
   if "-static-libstdc++" in sys.argv[1:] or "-stdlib=libc++" in envoy_cxxflags:
-    # Append CXXFLAGS to all C++ targets (this is mostly for dependencies).
-    if envoy_cxxflags and "-std=c++" in str(sys.argv[1:]):
-      argv = shlex.split(envoy_cxxflags)
-    else:
-      argv = []
     for arg in sys.argv[1:]:
       if arg == "-lstdc++":
         if "-stdlib=libc++" in envoy_cxxflags:
@@ -70,7 +70,7 @@ def main():
       else:
         argv.append(arg)
   else:
-    argv = sys.argv[1:]
+    argv += sys.argv[1:]
 
   # Add compiler-specific options
   if "clang" in compiler:
