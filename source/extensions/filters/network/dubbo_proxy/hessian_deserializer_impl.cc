@@ -78,14 +78,21 @@ RpcResultPtr HessianDeserializerImpl::deserializeRpcResult(Buffer::Instance& buf
   return result;
 }
 
-void HessianDeserializerImpl::serializeRpcResult(Buffer::Instance& output_buffer,
-                                                 const std::string& content, RpcResponseType type) {
+size_t HessianDeserializerImpl::serializeRpcResult(Buffer::Instance& output_buffer,
+                                                   const std::string& content,
+                                                   RpcResponseType type) {
+  size_t origin_length = output_buffer.length();
+
   // The serialized response type is compact int.
-  HessianUtils::writeInt(output_buffer,
-                         static_cast<std::underlying_type<SerializationType>::type>(type));
+  size_t serialized_size = HessianUtils::writeInt(
+      output_buffer, static_cast<std::underlying_type<SerializationType>::type>(type));
 
   // Serialized response content.
-  HessianUtils::writeString(output_buffer, content);
+  serialized_size += HessianUtils::writeString(output_buffer, content);
+
+  ASSERT(output_buffer.length() - origin_length == serialized_size);
+
+  return serialized_size;
 }
 
 class HessianDeserializerConfigFactory : public DeserializerFactoryBase<HessianDeserializerImpl> {

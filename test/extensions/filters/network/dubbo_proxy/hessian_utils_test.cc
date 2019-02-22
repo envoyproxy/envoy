@@ -775,6 +775,64 @@ TEST(HessianUtilsTest, peekByte) {
   }
 }
 
+TEST(HessianUtilsTest, writeString) {
+  const size_t max = 65535;
+  const size_t segment_mark_length = 3;
+
+  {
+    const std::string append_content("b");
+    const size_t append_content_hessian_length = 1;
+    std::string message(max, 'a');
+    message.append(append_content);
+    size_t expect_serialized_size =
+        max + segment_mark_length + append_content_hessian_length + append_content.size();
+
+    Buffer::OwnedImpl buffer;
+    size_t size = HessianUtils::writeString(buffer, message);
+    EXPECT_EQ(size, expect_serialized_size);
+  }
+
+  {
+    const std::string append_content(33, 'b');
+    const size_t append_content_hessian_length = 2;
+    std::string message(max, 'a');
+    message.append(append_content);
+    size_t expect_serialized_size =
+        max + segment_mark_length + append_content_hessian_length + append_content.size();
+
+    Buffer::OwnedImpl buffer;
+    size_t size = HessianUtils::writeString(buffer, message);
+    EXPECT_EQ(size, expect_serialized_size);
+  }
+
+  {
+    const std::string append_content(1025, 'b');
+    const size_t append_content_hessian_length = 3;
+    std::string message(max, 'a');
+    message.append(append_content);
+    size_t expect_serialized_size =
+        max + segment_mark_length + append_content_hessian_length + append_content.size();
+
+    Buffer::OwnedImpl buffer;
+    size_t size = HessianUtils::writeString(buffer, message);
+    EXPECT_EQ(size, expect_serialized_size);
+  }
+
+  {
+    const std::string append_content(1025, 'b');
+    const size_t append_content_hessian_length = 3;
+    const size_t max_size = 2 * max;
+    std::string message(max_size, 'a');
+    message.append(append_content);
+    size_t expect_serialized_size =
+        max * 2 + segment_mark_length * 2 + append_content_hessian_length + append_content.size();
+
+    Buffer::OwnedImpl buffer;
+    size_t size = HessianUtils::writeString(buffer, message);
+    EXPECT_EQ(size, expect_serialized_size);
+  }
+}
+
 } // namespace DubboProxy
 } // namespace NetworkFilters
 } // namespace Extensions

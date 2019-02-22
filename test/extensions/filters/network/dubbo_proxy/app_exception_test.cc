@@ -28,9 +28,13 @@ public:
 TEST_F(AppExceptionTest, Encode) {
   std::string mock_message("invalid method name 'Sub'");
   AppException app_exception(ResponseStatus::ServiceNotFound, mock_message);
-  size_t expect_body_size = mock_message.size() + sizeof(app_exception.response_type_);
 
   Buffer::OwnedImpl buffer;
+  size_t expect_body_size =
+      HessianUtils::writeString(buffer, mock_message) +
+      HessianUtils::writeInt(buffer, static_cast<uint8_t>(app_exception.response_type_));
+  buffer.drain(buffer.length());
+
   metadata_->setSerializationType(SerializationType::Hessian);
   metadata_->setRequestId(0);
 
@@ -39,7 +43,7 @@ TEST_F(AppExceptionTest, Encode) {
               DubboFilters::DirectResponse::ResponseType::Exception);
     MessageMetadataSharedPtr metadata = std::make_shared<MessageMetadata>();
     EXPECT_TRUE(protocol_.decode(buffer, &context_, metadata));
-    EXPECT_EQ(context_.body_size_, expect_body_size);
+    EXPECT_EQ(expect_body_size, context_.body_size_);
     EXPECT_EQ(metadata->message_type(), MessageType::Response);
     buffer.drain(context_.header_size_);
 
@@ -66,7 +70,7 @@ TEST_F(AppExceptionTest, Encode) {
 
     MessageMetadataSharedPtr metadata = std::make_shared<MessageMetadata>();
     EXPECT_TRUE(protocol_.decode(buffer, &context_, metadata));
-    EXPECT_EQ(context_.body_size_, expect_body_size);
+    EXPECT_EQ(expect_body_size, context_.body_size_);
     EXPECT_EQ(metadata->message_type(), MessageType::Response);
     buffer.drain(context_.header_size_);
 
@@ -93,7 +97,7 @@ TEST_F(AppExceptionTest, Encode) {
 
     MessageMetadataSharedPtr metadata = std::make_shared<MessageMetadata>();
     EXPECT_TRUE(protocol_.decode(buffer, &context_, metadata));
-    EXPECT_EQ(context_.body_size_, expect_body_size);
+    EXPECT_EQ(expect_body_size, context_.body_size_);
     EXPECT_EQ(metadata->message_type(), MessageType::Response);
     buffer.drain(context_.header_size_);
 

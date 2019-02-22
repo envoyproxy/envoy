@@ -69,7 +69,7 @@ public:
   MOCK_CONST_METHOD0(type, SerializationType());
   MOCK_METHOD2(deserializeRpcInvocation, RpcInvocationPtr(Buffer::Instance&, size_t));
   MOCK_METHOD2(deserializeRpcResult, RpcResultPtr(Buffer::Instance&, size_t));
-  MOCK_METHOD3(serializeRpcResult, void(Buffer::Instance&, const std::string&, RpcResponseType));
+  MOCK_METHOD3(serializeRpcResult, size_t(Buffer::Instance&, const std::string&, RpcResponseType));
 
   std::string name_{"mockDeserializer"};
   SerializationType type_{SerializationType::Hessian};

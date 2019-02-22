@@ -20,17 +20,23 @@ AppException::ResponseType AppException::encode(MessageMetadata& metadata,
                                                 DubboProxy::Protocol& protocol,
                                                 Deserializer& deserializer,
                                                 Buffer::Instance& buffer) const {
+  ASSERT(buffer.length() == 0);
+
   ENVOY_LOG(debug, "err {}", what());
+
+  // Serialize the response content to get the serialized response length.
+  const std::string& response = what();
+  size_t serialized_body_size = deserializer.serializeRpcResult(buffer, response, response_type_);
 
   metadata.setResponseStatus(status_);
   metadata.setMessageType(MessageType::Response);
 
-  const std::string& response = what();
-  if (!protocol.encode(buffer, response.size() + sizeof(response_type_), metadata)) {
+  Buffer::OwnedImpl protocol_buffer;
+  if (!protocol.encode(protocol_buffer, serialized_body_size, metadata)) {
     throw EnvoyException("failed to encode local reply message");
   }
 
-  deserializer.serializeRpcResult(buffer, response, response_type_);
+  buffer.prepend(protocol_buffer);
 
   return DirectResponse::ResponseType::Exception;
 }
