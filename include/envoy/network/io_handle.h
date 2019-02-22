@@ -5,15 +5,22 @@
 #include "envoy/common/pure.h"
 
 namespace Envoy {
-namespace Network {
-
-class IoError;
 
 // IoErrorCode::Again is used frequently. Define it to be a distinguishable address to avoid
 // frequent memory allocation of IoError instance.
 // If this is used, IoHandleCallResult has to be instantiated with a deleter that does not
 // deallocate memory for this error.
-#define ENVOY_ERROR_AGAIN reinterpret_cast<IoError*>(0x01)
+#define ENVOY_ERROR_AGAIN reinterpret_cast<Network::IoError*>(0x01)
+
+namespace Buffer {
+struct RawSlice;
+} // namespace Buffer
+
+namespace Network {
+
+namespace Address {
+class Instance;
+} // namespace Address
 
 /**
  * Base class for any I/O error.
@@ -23,6 +30,8 @@ public:
   enum class IoErrorCode {
     // No data available right now, try again later.
     Again,
+    // The IoHandle is in invalid state.
+    BadHandle,
     // Not supported.
     NoSupport,
     // Address family not supported.
@@ -63,6 +72,9 @@ using IoErrorPtr = std::unique_ptr<IoError, IoErrorDeleterType>;
 /**
  * Basic type for return result which has a return code and error code defined
  * according to different implementations.
+ * If the call succeeds, |err_| is nullptr and |rc_| is valid. Otherwise |err_|
+ * can be passed into IoError::getErrorCode() to extract the error. In this
+ * case, |rc_| is invalid.
  */
 template <typename T> struct IoHandleCallResult {
   IoHandleCallResult(T rc, IoErrorPtr err) : rc_(rc), err_(std::move(err)) {}
@@ -71,6 +83,12 @@ template <typename T> struct IoHandleCallResult {
       : rc_(result.rc_), err_(std::move(result.err_)) {}
 
   virtual ~IoHandleCallResult() {}
+
+  IoHandleCallResult& operator=(IoHandleCallResult&& result) {
+    rc_ = result.rc_;
+    err_ = std::move(result.err_);
+    return *this;
+  }
 
   T rc_;
   IoErrorPtr err_;
@@ -102,6 +120,11 @@ public:
    * Return true if close() hasn't been called.
    */
   virtual bool isOpen() const PURE;
+
+  virtual IoHandleCallUintResult readv(uint64_t max_length, Buffer::RawSlice* slices,
+                                       uint64_t num_slice) PURE;
+
+  virtual IoHandleCallUintResult writev(const Buffer::RawSlice* slices, uint64_t num_slice) PURE;
 };
 
 typedef std::unique_ptr<IoHandle> IoHandlePtr;

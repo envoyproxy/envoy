@@ -37,7 +37,15 @@ public:
 
   bool isOpen() const override;
 
+  IoHandleCallUintResult readv(uint64_t max_length, Buffer::RawSlice* slices,
+                               uint64_t num_slice) override;
+
+  IoHandleCallUintResult writev(const Buffer::RawSlice* slices, uint64_t num_slice) override;
+
 private:
+  // Converts a SysCallSizeResult to IoHandleCallUintResult.
+  IoHandleCallUintResult sysCallResultToIoHandleCallResult(const Api::SysCallSizeResult& result);
+
   int fd_;
 };
 

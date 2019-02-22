@@ -107,9 +107,11 @@ envoy_cc_library(
     srcs = ["io_socket_handle_impl.cc"],
     hdrs = ["io_socket_handle_impl.h"],
     deps = [
+        "//include/envoy/buffer:buffer_interface",
         "//include/envoy/network:io_handle_interface",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:assert_lib",
+        "//source/common/common:stack_array",
     ],
 )
 
