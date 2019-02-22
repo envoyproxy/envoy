@@ -462,8 +462,6 @@ void PrioritySetImpl::updateHosts(uint32_t priority, UpdateHostsParams&& update_
                                   absl::optional<uint32_t> overprovisioning_factor) {
   // Ensure that we have a HostSet for the given priority.
   getOrCreateHostSet(priority, overprovisioning_factor);
-  // TODO(snowp): Add a batched update mode that allows updating multiple HostSet and invoke the
-  // membership update cb for the resulting host diff.
   static_cast<HostSetImpl*>(host_sets_[priority].get())
       ->updateHosts(std::move(update_hosts_params), std::move(locality_weights), hosts_added,
                     hosts_removed, overprovisioning_factor);
@@ -504,8 +502,6 @@ void PrioritySetImpl::batchHostUpdate(std::function<void(UpdateHostsCb)> callbac
   batch_update_ = false;
 
   // Now that all the updates have been complete, we can compute the diff.
-
-  // TODO(snowp): Would computing the union of added/removed first be more efficient?
   HostVector net_hosts_added = filterHosts(all_hosts_added, all_hosts_removed);
   HostVector net_hosts_removed = filterHosts(all_hosts_removed, all_hosts_added);
 
