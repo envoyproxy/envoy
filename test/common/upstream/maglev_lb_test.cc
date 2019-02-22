@@ -243,5 +243,41 @@ TEST_F(MaglevLoadBalancerTest, LocalityWeightedGlobalPanic) {
   }
 }
 
+// Given extremely lopsided locality weights, and a table that isn't large enough to fit all hosts,
+// expect that the least-weighted hosts appear once, and the most-weighted host fills the remainder.
+TEST_F(MaglevLoadBalancerTest, LocalityWeightedLopsided) {
+  host_set_.hosts_.clear();
+  HostVector heavy_but_sparse, light_but_dense;
+  for (uint32_t i = 0; i < 1024; ++i) {
+    auto host(makeTestHost(info_, fmt::format("tcp://127.0.0.1:{}", i)));
+    host_set_.hosts_.push_back(host);
+    (i == 0 ? heavy_but_sparse : light_but_dense).push_back(host);
+  }
+  host_set_.healthy_hosts_ = {};
+  host_set_.hosts_per_locality_ = makeHostsPerLocality({heavy_but_sparse, light_but_dense});
+  host_set_.healthy_hosts_per_locality_ = host_set_.hosts_per_locality_;
+  host_set_.locality_weights_ = makeLocalityWeights({127, 1});
+  host_set_.runCallbacks({}, {});
+  init(MaglevTable::DefaultTableSize);
+
+  LoadBalancerPtr lb = lb_->factory()->create();
+
+  // Populate a histogram of the number of table entries for each host...
+  uint32_t counts[1024] = {0};
+  for (uint32_t i = 0; i < MaglevTable::DefaultTableSize; ++i) {
+    TestLoadBalancerContext context(i);
+    uint32_t port = lb->chooseHost(&context)->address()->ip()->port();
+    ++counts[port];
+  }
+
+  // Each of the light_but_dense hosts should appear in the table once.
+  for (uint32_t i = 1; i < 1024; ++i) {
+    EXPECT_EQ(1, counts[i]);
+  }
+
+  // The heavy_but_sparse host should occupy the remainder of the table.
+  EXPECT_EQ(MaglevTable::DefaultTableSize - 1023, counts[0]);
+}
+
 } // namespace Upstream
 } // namespace Envoy
