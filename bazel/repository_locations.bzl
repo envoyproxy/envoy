@@ -18,7 +18,7 @@ REPOSITORY_LOCATIONS = dict(
     com_google_absl = dict(
         sha256 = "3ad76de484192b2d5afd49d90492b5ed0bc59eb1a4e8e0deecc7a2a077a90251",
         strip_prefix = "abseil-cpp-f197d7c72a54064cfde5a2058f1513a4a0ee36fb",
-        # 2018-10-31
+        # 2018-12-07
         urls = ["https://github.com/abseil/abseil-cpp/archive/f197d7c72a54064cfde5a2058f1513a4a0ee36fb.tar.gz"],
     ),
     com_github_apache_thrift = dict(
