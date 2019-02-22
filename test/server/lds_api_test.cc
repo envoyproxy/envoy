@@ -198,6 +198,22 @@ TEST_F(LdsApiTest, MisconfiguredListenerNameIsPresentInException) {
   EXPECT_CALL(request_, cancel());
 }
 
+TEST_F(LdsApiTest, EmptyListenersUpdate) {
+  InSequence s;
+
+  setup();
+
+  Protobuf::RepeatedPtrField<envoy::api::v2::Listener> listeners;
+  std::vector<std::reference_wrapper<Network::ListenerConfig>> existing_listeners;
+
+  EXPECT_CALL(listener_manager_, listeners()).WillOnce(Return(existing_listeners));
+
+  EXPECT_CALL(init_.initialized_, ready());
+  EXPECT_CALL(request_, cancel());
+
+  lds_->onConfigUpdate(listeners, "");
+}
+
 TEST_F(LdsApiTest, ListenerCreationContinuesEvenAfterException) {
   InSequence s;
 
