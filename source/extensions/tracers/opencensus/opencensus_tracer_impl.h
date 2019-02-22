@@ -25,7 +25,7 @@ public:
                              const Tracing::Decision tracing_decision) override;
 
 private:
-  void ApplyTraceConfig(const opencensus::proto::trace::v1::TraceConfig& config);
+  void applyTraceConfig(const opencensus::proto::trace::v1::TraceConfig& config);
 
   const envoy::config::trace::v2::OpenCensusConfig oc_config_;
 };

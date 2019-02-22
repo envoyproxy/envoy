@@ -114,7 +114,7 @@ void Span::setSampled(bool sampled) { span_.AddAnnotation("setSampled", {{"sampl
 Driver::Driver(const envoy::config::trace::v2::OpenCensusConfig& oc_config)
     : oc_config_(oc_config) {
   if (oc_config.has_trace_config()) {
-    ApplyTraceConfig(oc_config.trace_config());
+    applyTraceConfig(oc_config.trace_config());
   }
   if (oc_config.stdout_exporter_enabled()) {
     ::opencensus::exporters::trace::StdoutExporter::Register();
@@ -131,7 +131,7 @@ Driver::Driver(const envoy::config::trace::v2::OpenCensusConfig& oc_config)
   }
 }
 
-void Driver::ApplyTraceConfig(const opencensus::proto::trace::v1::TraceConfig& config) {
+void Driver::applyTraceConfig(const opencensus::proto::trace::v1::TraceConfig& config) {
   using SamplerCase = opencensus::proto::trace::v1::TraceConfig::SamplerCase;
   constexpr double kDefaultSamplingProbability = 1e-4;
   double probability = kDefaultSamplingProbability;
