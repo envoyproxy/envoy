@@ -287,7 +287,7 @@ The following command operators are supported:
 %DYNAMIC_METADATA(NAMESPACE:KEY*):Z%
   HTTP
     :ref:`Dynamic Metadata <envoy_api_msg_core.Metadata>` info,
-    where NAMESPACE is the the filter namespace used when setting the metadata, KEY is an optional
+    where NAMESPACE is the filter namespace used when setting the metadata, KEY is an optional
     lookup up key in the namespace with the option of specifying nested keys separated by ':',
     and Z is an optional parameter denoting string truncation up to Z characters long. Dynamic Metadata
     can be set by filters using the :repo:`StreamInfo <include/envoy/stream_info/stream_info.h>` API:

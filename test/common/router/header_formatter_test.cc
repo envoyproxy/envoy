@@ -15,10 +15,10 @@
 #include "test/common/stream_info/test_int_accessor.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/upstream/mocks.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::NiceMock;
 using testing::Return;
@@ -33,7 +33,7 @@ static envoy::api::v2::route::Route parseRouteFromV2Yaml(const std::string& yaml
   return route;
 }
 
-class StreamInfoHeaderFormatterTest : public TestBase {
+class StreamInfoHeaderFormatterTest : public testing::Test {
 public:
   void testFormatting(const Envoy::StreamInfo::MockStreamInfo& stream_info,
                       const std::string& variable, const std::string& expected_output) {

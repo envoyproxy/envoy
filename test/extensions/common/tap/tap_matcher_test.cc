@@ -2,8 +2,9 @@
 
 #include "extensions/common/tap/tap_matcher.h"
 
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
+
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -11,7 +12,7 @@ namespace Common {
 namespace Tap {
 namespace {
 
-class TapMatcherTest : public TestBase {
+class TapMatcherTest : public testing::Test {
 public:
   std::vector<MatcherPtr> matchers_;
   std::vector<bool> statuses_;

@@ -93,7 +93,7 @@ public:
 
 private:
   TimeSource& time_source_;
-  Filesystem::FileSharedPtr file_;
+  Envoy::AccessLog::AccessLogFileSharedPtr file_;
 };
 
 typedef std::shared_ptr<AccessLog> AccessLogSharedPtr;

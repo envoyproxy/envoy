@@ -24,10 +24,10 @@
 #include "common/stats/raw_stat_data.h"
 
 #include "test/test_common/printers.h"
-#include "test/test_common/test_base.h"
 
 #include "absl/time/time.h"
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::AssertionFailure;
@@ -389,28 +389,6 @@ private:
   Thread::CondVar cv_;
   Thread::MutexBasicLockable mutex_;
   bool ready_{false};
-};
-
-// TODO(sbelair2) Perform the fd close in the close of the IoHandle-
-// i.e., ScopedIoHandleCloser should incorporate the ScopedFdCloser
-class ScopedIoHandleCloser {
-public:
-  ScopedIoHandleCloser(Network::IoHandlePtr& io_handle);
-  ~ScopedIoHandleCloser();
-
-private:
-  Network::IoHandlePtr& io_handle_;
-};
-
-// TODO(sbelair2) Clean up ScopedFdCloser everywhere IOHandle is used-
-// ScopedFdCloser should no longer be needed.
-class ScopedFdCloser {
-public:
-  ScopedFdCloser(int fd);
-  ~ScopedFdCloser();
-
-private:
-  int fd_;
 };
 
 /**
