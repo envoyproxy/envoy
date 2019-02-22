@@ -73,6 +73,7 @@ envoy_extension_cc_test(
         ":mocks_lib",
         ":utility_lib",
         "//source/extensions/filters/network/dubbo_proxy:hessian_deserializer_impl_lib",
+        "//source/extensions/filters/network/dubbo_proxy:hessian_utils_lib",
         "//test/mocks/server:server_mocks",
     ],
 )
@@ -145,6 +146,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/network/dubbo_proxy:app_exception_lib",
         "//source/extensions/filters/network/dubbo_proxy:dubbo_protocol_impl_lib",
         "//source/extensions/filters/network/dubbo_proxy:hessian_deserializer_impl_lib",
+        "//source/extensions/filters/network/dubbo_proxy:hessian_utils_lib",
         "//source/extensions/filters/network/dubbo_proxy:metadata_lib",
     ],
 )

@@ -81,7 +81,8 @@ RpcResultPtr HessianDeserializerImpl::deserializeRpcResult(Buffer::Instance& buf
 void HessianDeserializerImpl::serializeRpcResult(Buffer::Instance& output_buffer,
                                                  const std::string& content, RpcResponseType type) {
   // The serialized response type is compact int.
-  HessianUtils::writeInt(output_buffer, static_cast<uint8_t>(type));
+  HessianUtils::writeInt(output_buffer,
+                         static_cast<std::underlying_type<SerializationType>::type>(type));
 
   // Serialized response content.
   HessianUtils::writeString(output_buffer, content);

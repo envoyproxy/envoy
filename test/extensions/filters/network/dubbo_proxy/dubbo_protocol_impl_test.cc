@@ -116,6 +116,29 @@ TEST(DubboProtocolImplTest, DubboProtocolConfigFactory) {
   EXPECT_EQ(protocol->type(), ProtocolType::Dubbo);
 }
 
+TEST(DubboProtocolImplTest, encode) {
+  MessageMetadata metadata;
+  metadata.setMessageType(MessageType::Response);
+  metadata.setResponseStatus(ResponseStatus::ServiceNotFound);
+  metadata.setSerializationType(SerializationType::Hessian);
+  metadata.setRequestId(100);
+
+  Buffer::OwnedImpl buffer;
+  DubboProtocolImpl dubbo_protocol;
+  int32_t expect_body_size = 100;
+  EXPECT_TRUE(dubbo_protocol.encode(buffer, expect_body_size, metadata));
+
+  Protocol::Context context;
+  MessageMetadataSharedPtr output_metadata = std::make_shared<MessageMetadata>();
+  EXPECT_TRUE(dubbo_protocol.decode(buffer, &context, output_metadata));
+
+  EXPECT_EQ(metadata.message_type(), output_metadata->message_type());
+  EXPECT_EQ(metadata.response_status().value(), output_metadata->response_status().value());
+  EXPECT_EQ(metadata.serialization_type(), output_metadata->serialization_type());
+  EXPECT_EQ(metadata.request_id(), output_metadata->request_id());
+  EXPECT_EQ(context.body_size_, expect_body_size);
+}
+
 } // namespace DubboProxy
 } // namespace NetworkFilters
 } // namespace Extensions

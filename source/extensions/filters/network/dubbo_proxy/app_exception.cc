@@ -26,7 +26,7 @@ AppException::ResponseType AppException::encode(MessageMetadata& metadata,
   metadata.setMessageType(MessageType::Response);
 
   const std::string& response = what();
-  if (!protocol.encode(buffer, response.size(), metadata)) {
+  if (!protocol.encode(buffer, response.size() + sizeof(response_type_), metadata)) {
     throw EnvoyException("failed to encode local reply message");
   }
 
