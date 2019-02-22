@@ -6,6 +6,7 @@
 #include "common/config/well_known_names.h"
 #include "common/memory/stats.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/config/utility.h"
 #include "test/integration/integration.h"
 #include "test/test_common/network_utility.h"
@@ -29,7 +30,7 @@ public:
   void initialize() override { BaseIntegrationTest::initialize(); }
 };
 
-class ClusterMemoryUtilization : public TestBaseWithParam<Network::Address::IpVersion>,
+class ClusterMemoryUtilization : public testing::TestWithParam<Network::Address::IpVersion>,
                                  public BaseIntegrationTest {
 public:
   ClusterMemoryUtilization() : BaseIntegrationTest(GetParam(), realTime()) {}
@@ -53,8 +54,7 @@ public:
     });
     initialize();
 
-    size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
-    return end_mem;
+    return Memory::Stats::totalCurrentlyAllocated();
   };
 };
 
@@ -169,23 +169,22 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ClusterMemoryUtilization,
 // TODO(cmluciano) Refactor once envoyproxy/envoy#5624 is solved
 // TODO(cmluciano) Add options to measure multiple workers & without stats
 TEST_P(ClusterMemoryUtilization, MemoryLargeClusterSizeWithStats) {
-
-  const size_t start_mem = Memory::Stats::totalCurrentlyAllocated() / 1000;
-  if (start_mem == 0) {
-    // Skip this test for platforms where we can't measure memory.
-    return;
+  // Skip test if we cannot measure memory with TCMALLOC
+  if (!Stats::TestUtil::hasDeterministicMallocStats()) {
+      return;
   }
+  const size_t start_mem = Memory::Stats::totalCurrentlyAllocated() / 1000;
 
-  auto IpVersions = TestBaseWithParam<Network::Address::IpVersion>::GetParam();
+  auto IpVersions = testing::TestWithParam<Network::Address::IpVersion>::GetParam();
 
   auto t1 = std::make_unique<BaseIntegrationTest>(IpVersions);
   t1->initialize();
-  size_t m1 = Memory::Stats::totalCurrentlyAllocated();
+  const size_t m1 = Memory::Stats::totalCurrentlyAllocated();
   EXPECT_LT(start_mem, m1 / 1000);
   EXPECT_LT(m1 / 1000, 3500); // actual value: 3427 as of Feb 19, 2019
   t1.reset(nullptr);
 
-  size_t m1001 = memoryConsumedWithClusters(1001, true);
+  const size_t m1001 = memoryConsumedWithClusters(1001, true);
   EXPECT_LT(start_mem / 1000, m1001 / 1000);
   size_t m_per_cluster = (m1001 - m1) / 1000;
   EXPECT_LT(m_per_cluster, 57900); // actual value: 57872 as of Feb 19, 2019
