@@ -62,6 +62,8 @@ private:
     // Extensions::NetworkFilters::RedisProxy::ConnPool::PoolCallbacks
     void onResponse(NetworkFilters::Common::Redis::RespValuePtr&& value) override;
     void onFailure() override;
+    bool onMovedRedirection(NetworkFilters::Common::Redis::RespValue& value) override;
+    bool onAskRedirection(NetworkFilters::Common::Redis::RespValue& value) override;
 
     // Network::ConnectionCallbacks
     void onEvent(Network::ConnectionEvent event) override;

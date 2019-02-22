@@ -99,6 +99,16 @@ void RedisHealthChecker::RedisActiveHealthCheckSession::onFailure() {
   handleFailure(envoy::data::core::v2alpha::HealthCheckFailureType::NETWORK);
 }
 
+bool RedisHealthChecker::RedisActiveHealthCheckSession::onMovedRedirection(
+    NetworkFilters::Common::Redis::RespValue&) {
+  return false;
+}
+
+bool RedisHealthChecker::RedisActiveHealthCheckSession::onAskRedirection(
+    NetworkFilters::Common::Redis::RespValue&) {
+  return false;
+}
+
 void RedisHealthChecker::RedisActiveHealthCheckSession::onTimeout() {
   current_request_->cancel();
   current_request_ = nullptr;

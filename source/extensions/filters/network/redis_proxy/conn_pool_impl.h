@@ -16,6 +16,7 @@
 #include "common/common/hash.h"
 #include "common/network/filter_impl.h"
 #include "common/protobuf/utility.h"
+#include "common/singleton/const_singleton.h"
 #include "common/upstream/load_balancer_impl.h"
 
 #include "extensions/filters/network/common/redis/codec_impl.h"
@@ -29,6 +30,13 @@ namespace ConnPool {
 
 // TODO(mattklein123): Circuit breaking
 // TODO(rshriram): Fault injection
+
+struct RedirectionValues {
+  const std::string ASK = "ASK";
+  const std::string MOVED = "MOVED";
+};
+
+typedef ConstSingleton<RedirectionValues> RedirectionResponse;
 
 class ConfigImpl : public Config {
 public:
@@ -135,6 +143,9 @@ public:
   // RedisProxy::ConnPool::Instance
   PoolRequest* makeRequest(const std::string& key, const Common::Redis::RespValue& request,
                            PoolCallbacks& callbacks) override;
+  PoolRequest* redirectRequest(const std::string& host_address,
+                               const Common::Redis::RespValue& request,
+                               PoolCallbacks& callbacks) override;
 
 private:
   struct ThreadLocalPool;
@@ -160,6 +171,8 @@ private:
     ~ThreadLocalPool();
     PoolRequest* makeRequest(const std::string& key, const Common::Redis::RespValue& request,
                              PoolCallbacks& callbacks);
+    PoolRequest* redirectRequest(const std::string& host_address,
+                                 const Common::Redis::RespValue& request, PoolCallbacks& callbacks);
     void onClusterAddOrUpdateNonVirtual(Upstream::ThreadLocalCluster& cluster);
     void onHostsRemoved(const std::vector<Upstream::HostSharedPtr>& hosts_removed);
 
@@ -176,6 +189,7 @@ private:
     Upstream::ThreadLocalCluster* cluster_{};
     std::unordered_map<Upstream::HostConstSharedPtr, ThreadLocalActiveClientPtr> client_map_;
     Envoy::Common::CallbackHandle* host_set_member_update_cb_handle_{};
+    std::unordered_map<std::string, Upstream::HostConstSharedPtr> host_address_map_;
   };
 
   struct LbContextImpl : public Upstream::LoadBalancerContextBase {

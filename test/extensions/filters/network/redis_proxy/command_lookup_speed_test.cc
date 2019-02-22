@@ -35,6 +35,10 @@ class NullInstanceImpl : public ConnPool::Instance {
                                      ConnPool::PoolCallbacks&) override {
     return nullptr;
   }
+  ConnPool::PoolRequest* redirectRequest(const std::string&, const Common::Redis::RespValue&,
+                                         ConnPool::PoolCallbacks&) override {
+    return nullptr;
+  }
 };
 
 class CommandLookUpSpeedTest {

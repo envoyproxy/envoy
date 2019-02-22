@@ -27,6 +27,10 @@ public:
   RespValue() : type_(RespType::Null) {}
   ~RespValue() { cleanup(); }
 
+  RespValue(const RespValue& other);     // copy constructor
+  RespValue& operator=(RespValue other); // copy assignment
+  RespValue(RespValue&& other) noexcept; // move constructor
+
   /**
    * Convert a RESP value to a string for debugging purposes.
    */

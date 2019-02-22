@@ -406,6 +406,7 @@ public:
     Common::Redis::RespValue value;
     MockPoolCallbacks callbacks;
     MockPoolRequest active_request;
+    EXPECT_CALL(*cm_.thread_local_cluster_.lb_.host_, address());
     EXPECT_CALL(*client_, makeRequest(Ref(value), Ref(callbacks)))
         .WillOnce(Return(&active_request));
     PoolRequest* request = conn_pool_->makeRequest("hash_key", value, callbacks);
@@ -445,6 +446,7 @@ TEST_F(RedisConnPoolImplTest, Basic) {
         return cm_.thread_local_cluster_.lb_.host_;
       }));
   EXPECT_CALL(*this, create_(_)).WillOnce(Return(client));
+  EXPECT_CALL(*cm_.thread_local_cluster_.lb_.host_, address());
   EXPECT_CALL(*client, makeRequest(Ref(value), Ref(callbacks))).WillOnce(Return(&active_request));
   PoolRequest* request = conn_pool_->makeRequest("hash_key", value, callbacks);
   EXPECT_EQ(&active_request, request);
@@ -537,8 +539,8 @@ TEST_F(RedisConnPoolImplTest, HostRemove) {
 
   MockPoolCallbacks callbacks;
   Common::Redis::RespValue value;
-  std::shared_ptr<Upstream::Host> host1(new Upstream::MockHost());
-  std::shared_ptr<Upstream::Host> host2(new Upstream::MockHost());
+  std::shared_ptr<Upstream::MockHost> host1(new Upstream::MockHost());
+  std::shared_ptr<Upstream::MockHost> host2(new Upstream::MockHost());
   MockClient* client1 = new NiceMock<MockClient>();
   MockClient* client2 = new NiceMock<MockClient>();
 
@@ -546,6 +548,7 @@ TEST_F(RedisConnPoolImplTest, HostRemove) {
   EXPECT_CALL(*this, create_(Eq(host1))).WillOnce(Return(client1));
 
   MockPoolRequest active_request1;
+  EXPECT_CALL(*host1, address());
   EXPECT_CALL(*client1, makeRequest(Ref(value), Ref(callbacks))).WillOnce(Return(&active_request1));
   PoolRequest* request1 = conn_pool_->makeRequest("hash_key", value, callbacks);
   EXPECT_EQ(&active_request1, request1);
@@ -554,15 +557,22 @@ TEST_F(RedisConnPoolImplTest, HostRemove) {
   EXPECT_CALL(*this, create_(Eq(host2))).WillOnce(Return(client2));
 
   MockPoolRequest active_request2;
+  EXPECT_CALL(*host2, address());
   EXPECT_CALL(*client2, makeRequest(Ref(value), Ref(callbacks))).WillOnce(Return(&active_request2));
   PoolRequest* request2 = conn_pool_->makeRequest("bar", value, callbacks);
   EXPECT_EQ(&active_request2, request2);
 
   EXPECT_CALL(*client2, close());
+  EXPECT_CALL(*host2, address());
   cm_.thread_local_cluster_.cluster_.prioritySet().getMockHostSet(0)->runCallbacks({}, {host2});
 
   EXPECT_CALL(*client1, close());
   tls_.shutdownThread();
+
+  ASSERT_TRUE(testing::Mock::VerifyAndClearExpectations(host1.get()));
+  ASSERT_TRUE(testing::Mock::VerifyAndClearExpectations(host2.get()));
+  testing::Mock::AllowLeak(host1.get());
+  testing::Mock::AllowLeak(host2.get());
 }
 
 TEST_F(RedisConnPoolImplTest, DeleteFollowedByClusterUpdateCallback) {
@@ -599,6 +609,7 @@ TEST_F(RedisConnPoolImplTest, RemoteClose) {
 
   EXPECT_CALL(cm_.thread_local_cluster_.lb_, chooseHost(_));
   EXPECT_CALL(*this, create_(_)).WillOnce(Return(client));
+  EXPECT_CALL(*cm_.thread_local_cluster_.lb_.host_, address());
   EXPECT_CALL(*client, makeRequest(Ref(value), Ref(callbacks))).WillOnce(Return(&active_request));
   conn_pool_->makeRequest("hash_key", value, callbacks);
 

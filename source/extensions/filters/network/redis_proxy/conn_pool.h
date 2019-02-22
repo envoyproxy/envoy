@@ -44,6 +44,20 @@ public:
    * Called when a network/protocol error occurs and there is no response.
    */
   virtual void onFailure() PURE;
+
+  /**
+   * Called when a MOVED redirection error is received, and the request must be retried.
+   * @param value supplies the MOVED error response
+   * @return bool true if the request is successfully redirected, false otherwise
+   */
+  virtual bool onMovedRedirection(Common::Redis::RespValue& value) PURE;
+
+  /**
+   * Called when an ASK redirection error is received, and the request must be retried.
+   * @param value supplies the ASK error response
+   * @return bool true if the request is succesfully redirected, false otherwise
+   */
+  virtual bool onAskRedirection(Common::Redis::RespValue& value) PURE;
 };
 
 /**
@@ -140,6 +154,18 @@ public:
   virtual PoolRequest* makeRequest(const std::string& hash_key,
                                    const Common::Redis::RespValue& request,
                                    PoolCallbacks& callbacks) PURE;
+
+  /**
+   * Redirects a redis request (moved/ask cluster redirection).
+   * @param host_address the address of the host to receive the request
+   * @param request supplies the request to make.
+   * @param callbacks supplies the request completion callbacks.
+   * @return PoolRequest* a handle to the active request or nullptr if the request could not be made
+   *         for some reason.
+   */
+  virtual PoolRequest* redirectRequest(const std::string& host_address,
+                                       const Common::Redis::RespValue& request,
+                                       PoolCallbacks& callbacks) PURE;
 };
 
 typedef std::unique_ptr<Instance> InstancePtr;

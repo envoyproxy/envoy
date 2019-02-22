@@ -116,6 +116,73 @@ void RespValue::type(RespType type) {
   }
 }
 
+RespValue::RespValue(const RespValue& other) {
+  this->type(other.type());
+  switch (type_) {
+  case RespType::Array: {
+    this->asArray() = other.asArray();
+    break;
+  }
+  case RespType::SimpleString:
+  case RespType::BulkString:
+  case RespType::Error: {
+    this->asString() = other.asString();
+    break;
+  }
+  case RespType::Integer: {
+    this->asInteger() = other.asInteger();
+    break;
+  }
+  case RespType::Null:
+    break;
+  }
+}
+
+RespValue& RespValue::operator=(RespValue other) {
+  this->type(other.type());
+  switch (type_) {
+  case RespType::Array: {
+    this->asArray() = other.asArray();
+    break;
+  }
+  case RespType::SimpleString:
+  case RespType::BulkString:
+  case RespType::Error: {
+    this->asString() = other.asString();
+    break;
+  }
+  case RespType::Integer: {
+    this->asInteger() = other.asInteger();
+    break;
+  }
+  case RespType::Null:
+    break;
+  }
+  return *this;
+}
+
+RespValue::RespValue(RespValue&& other) noexcept {
+  this->type(other.type());
+  switch (type_) {
+  case RespType::Array: {
+    this->asArray().swap(other.asArray());
+    break;
+  }
+  case RespType::SimpleString:
+  case RespType::BulkString:
+  case RespType::Error: {
+    this->asString().swap(other.asString());
+    break;
+  }
+  case RespType::Integer: {
+    this->asInteger() = other.asInteger();
+    break;
+  }
+  case RespType::Null:
+    break;
+  }
+}
+
 void DecoderImpl::decode(Buffer::Instance& data) {
   uint64_t num_slices = data.getRawSlices(nullptr, 0);
   STACK_ARRAY(slices, Buffer::RawSlice, num_slices);

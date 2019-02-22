@@ -57,6 +57,7 @@ envoy_cc_library(
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
+        "//source/common/common:utility_lib",
         "//source/common/network:filter_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/upstream:load_balancer_lib",

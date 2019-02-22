@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "common/common/assert.h"
+#include "common/common/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -145,11 +146,36 @@ void ClientImpl::onEvent(Network::ConnectionEvent event) {
 void ClientImpl::onRespValue(Common::Redis::RespValuePtr&& value) {
   ASSERT(!pending_requests_.empty());
   PendingRequest& request = pending_requests_.front();
-  if (!request.canceled_) {
-    request.callbacks_.onResponse(std::move(value));
-  } else {
+
+  if (request.canceled_) {
     host_->cluster().stats().upstream_rq_cancelled_.inc();
+  } else if (value->type() == Common::Redis::RespType::Error) {
+    std::vector<absl::string_view> err = StringUtil::splitToken(value->asString(), " ", false);
+    bool redirected = false;
+    if (err.size() == 3) {
+      if (err[0] == RedirectionResponse::get().MOVED) {
+        redirected = request.callbacks_.onMovedRedirection(*value);
+        if (redirected) {
+          host_->cluster().stats().upstream_internal_redirect_succeeded_total_.inc();
+        } else {
+          host_->cluster().stats().upstream_internal_redirect_failed_total_.inc();
+        }
+      } else if (err[0] == RedirectionResponse::get().ASK) {
+        redirected = request.callbacks_.onAskRedirection(*value);
+        if (redirected) {
+          host_->cluster().stats().upstream_internal_redirect_succeeded_total_.inc();
+        } else {
+          host_->cluster().stats().upstream_internal_redirect_failed_total_.inc();
+        }
+      }
+    }
+    if (!redirected) {
+      request.callbacks_.onResponse(std::move(value));
+    }
+  } else {
+    request.callbacks_.onResponse(std::move(value));
   }
+
   pending_requests_.pop_front();
 
   // If there are no remaining ops in the pipeline we need to disable the timer.
@@ -209,6 +235,12 @@ PoolRequest* InstanceImpl::makeRequest(const std::string& key,
   return tls_->getTyped<ThreadLocalPool>().makeRequest(key, value, callbacks);
 }
 
+PoolRequest* InstanceImpl::redirectRequest(const std::string& host_address,
+                                           const Common::Redis::RespValue& value,
+                                           PoolCallbacks& callbacks) {
+  return tls_->getTyped<ThreadLocalPool>().redirectRequest(host_address, value, callbacks);
+}
+
 InstanceImpl::ThreadLocalPool::ThreadLocalPool(InstanceImpl& parent, Event::Dispatcher& dispatcher,
                                                std::string cluster_name)
     : parent_(parent), dispatcher_(dispatcher), cluster_name_(std::move(cluster_name)) {
@@ -248,6 +280,15 @@ void InstanceImpl::ThreadLocalPool::onClusterAddOrUpdateNonVirtual(
              const std::vector<Upstream::HostSharedPtr>& hosts_removed) -> void {
         onHostsRemoved(hosts_removed);
       });
+
+  ASSERT(host_address_map_.empty());
+  for (unsigned int i = 0; i < cluster_->prioritySet().hostSetsPerPriority().size(); i++) {
+    for (auto& host : cluster_->prioritySet().hostSetsPerPriority()[i]->hosts()) {
+      if (host->address()) {
+        host_address_map_[host->address()->asString()] = host;
+      }
+    }
+  }
 }
 
 void InstanceImpl::ThreadLocalPool::onClusterRemoval(const std::string& cluster_name) {
@@ -263,6 +304,7 @@ void InstanceImpl::ThreadLocalPool::onClusterRemoval(const std::string& cluster_
 
   cluster_ = nullptr;
   host_set_member_update_cb_handle_ = nullptr;
+  host_address_map_.clear();
 }
 
 void InstanceImpl::ThreadLocalPool::onHostsRemoved(
@@ -273,6 +315,9 @@ void InstanceImpl::ThreadLocalPool::onHostsRemoved(
       // We don't currently support any type of draining for redis connections. If a host is gone,
       // we just close the connection. This will fail any pending requests.
       it->second->redis_client_->close();
+    }
+    if (host->address()) {
+      host_address_map_.erase(host->address()->asString());
     }
   }
 }
@@ -297,6 +342,40 @@ PoolRequest* InstanceImpl::ThreadLocalPool::makeRequest(const std::string& key,
     client = std::make_unique<ThreadLocalActiveClient>(*this);
     client->host_ = host;
     client->redis_client_ = parent_.client_factory_.create(host, dispatcher_, parent_.config_);
+    client->redis_client_->addConnectionCallbacks(*client);
+  }
+
+  // cache host for quick lookup via address for redirection support
+  if (host->address()) {
+    auto hostCachedByAddress = host_address_map_.find(host->address()->asString());
+    if (hostCachedByAddress == host_address_map_.end()) {
+      host_address_map_[host->address()->asString()] = host;
+    }
+  }
+
+  return client->redis_client_->makeRequest(request, callbacks);
+}
+
+PoolRequest* InstanceImpl::ThreadLocalPool::redirectRequest(const std::string& host_address,
+                                                            const Common::Redis::RespValue& request,
+                                                            PoolCallbacks& callbacks) {
+  if (cluster_ == nullptr) {
+    ASSERT(client_map_.empty());
+    ASSERT(host_set_member_update_cb_handle_ == nullptr);
+    return nullptr;
+  }
+
+  auto it = host_address_map_.find(host_address);
+  if (it == host_address_map_.end()) {
+    return nullptr;
+  }
+
+  ThreadLocalActiveClientPtr& client = client_map_[it->second];
+  if (!client) {
+    client = std::make_unique<ThreadLocalActiveClient>(*this);
+    client->host_ = it->second;
+    client->redis_client_ =
+        parent_.client_factory_.create(it->second, dispatcher_, parent_.config_);
     client->redis_client_->addConnectionCallbacks(*client);
   }
 

@@ -86,6 +86,8 @@ public:
 
   MOCK_METHOD1(onResponse_, void(Common::Redis::RespValuePtr& value));
   MOCK_METHOD0(onFailure, void());
+  MOCK_METHOD1(onMovedRedirection, bool(Common::Redis::RespValue& value));
+  MOCK_METHOD1(onAskRedirection, bool(Common::Redis::RespValue& value));
 };
 
 class MockInstance : public Instance {
@@ -96,6 +98,9 @@ public:
   MOCK_METHOD3(makeRequest,
                PoolRequest*(const std::string& hash_key, const Common::Redis::RespValue& request,
                             PoolCallbacks& callbacks));
+  MOCK_METHOD3(redirectRequest,
+               PoolRequest*(const std::string& host_address,
+                            const Common::Redis::RespValue& request, PoolCallbacks& callbacks));
 };
 
 } // namespace ConnPool
@@ -128,6 +133,11 @@ public:
   SplitRequestPtr makeRequest(const Common::Redis::RespValue& request,
                               SplitCallbacks& callbacks) override {
     return SplitRequestPtr{makeRequest_(request, callbacks)};
+  }
+
+  SplitRequestPtr makeRequest(Common::Redis::RespValuePtr&& request,
+                              SplitCallbacks& callbacks) override {
+    return SplitRequestPtr{makeRequest_(*request, callbacks)};
   }
 
   MOCK_METHOD2(makeRequest_,
