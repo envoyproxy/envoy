@@ -518,6 +518,20 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test(
+    name = "redis_proxy_integration_test",
+    size = "small",
+    srcs = [
+        "redis_proxy_integration_test.cc",
+        "redis_proxy_integration_test.h",
+    ],
+    deps = [
+        ":integration_lib",
+        "//source/extensions/filters/network/common/redis:codec_lib",
+        "//source/extensions/filters/network/redis_proxy:config",
+    ],
+)
+
 envoy_cc_test_library(
     name = "server_stats_interface",
     hdrs = ["server_stats.h"],

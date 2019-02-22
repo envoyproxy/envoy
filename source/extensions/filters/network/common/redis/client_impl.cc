@@ -10,7 +10,8 @@ namespace Client {
 ConfigImpl::ConfigImpl(
     const envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings& config)
     : op_timeout_(PROTOBUF_GET_MS_REQUIRED(config, op_timeout)),
-      enable_hashtagging_(config.enable_hashtagging()) {}
+      enable_hashtagging_(config.enable_hashtagging()),
+      enable_redirection_(config.enable_redirection()) {}
 
 ClientPtr ClientImpl::create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
                              EncoderPtr&& encoder, DecoderFactory& decoder_factory,
@@ -137,11 +138,36 @@ void ClientImpl::onEvent(Network::ConnectionEvent event) {
 void ClientImpl::onRespValue(RespValuePtr&& value) {
   ASSERT(!pending_requests_.empty());
   PendingRequest& request = pending_requests_.front();
-  if (!request.canceled_) {
-    request.callbacks_.onResponse(std::move(value));
-  } else {
+
+  if (request.canceled_) {
     host_->cluster().stats().upstream_rq_cancelled_.inc();
+  } else if (config_.enableRedirection() && (value->type() == Common::Redis::RespType::Error)) {
+    std::vector<absl::string_view> err = StringUtil::splitToken(value->asString(), " ", false);
+    bool redirected = false;
+    if (err.size() == 3) {
+      if (err[0] == RedirectionResponse::get().MOVED) {
+        redirected = request.callbacks_.onMovedRedirection(*value);
+        if (redirected) {
+          host_->cluster().stats().upstream_internal_redirect_succeeded_total_.inc();
+        } else {
+          host_->cluster().stats().upstream_internal_redirect_failed_total_.inc();
+        }
+      } else if (err[0] == RedirectionResponse::get().ASK) {
+        redirected = request.callbacks_.onAskRedirection(*value);
+        if (redirected) {
+          host_->cluster().stats().upstream_internal_redirect_succeeded_total_.inc();
+        } else {
+          host_->cluster().stats().upstream_internal_redirect_failed_total_.inc();
+        }
+      }
+    }
+    if (!redirected) {
+      request.callbacks_.onResponse(std::move(value));
+    }
+  } else {
+    request.callbacks_.onResponse(std::move(value));
   }
+
   pending_requests_.pop_front();
 
   // If there are no remaining ops in the pipeline we need to disable the timer.
