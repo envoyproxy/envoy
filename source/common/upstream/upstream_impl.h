@@ -413,6 +413,15 @@ public:
                    const HostVector& hosts_removed,
                    absl::optional<uint32_t> overprovisioning_factor = absl::nullopt) override;
 
+  bool empty() const override {
+    for (auto const& host_set : host_sets_) {
+      if (host_set->hosts().size() > 0) {
+        return false;
+      }
+    }
+    return true;
+  }
+
 protected:
   // Allows subclasses of PrioritySetImpl to create their own type of HostSetImpl.
   virtual HostSetImplPtr createHostSet(uint32_t priority,

@@ -355,6 +355,11 @@ public:
   virtual const std::vector<HostSetPtr>& hostSetsPerPriority() const PURE;
 
   /**
+   * @return true if the priority set does have any hosts in any priorities.
+   */
+  virtual bool empty() const PURE;
+
+  /**
    * Parameter class for updateHosts.
    */
   struct UpdateHostsParams {

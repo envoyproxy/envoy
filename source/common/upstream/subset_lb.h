@@ -67,7 +67,7 @@ private:
 
     void update(uint32_t priority, const HostVector& hosts_added, const HostVector& hosts_removed);
 
-    bool empty() { return empty_; }
+    bool empty() const override { return empty_; }
 
     const HostSubsetImpl* getOrCreateHostSubset(uint32_t priority) {
       return reinterpret_cast<const HostSubsetImpl*>(&getOrCreateHostSet(priority));

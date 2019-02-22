@@ -1240,7 +1240,7 @@ TEST_F(ClusterManagerImplTest, WarmingClusterWithEmptyHosts) {
 
   cluster1->priority_set_.updateHosts(
       0, HostSetImpl::partitionHosts(hosts_ptr, HostsPerLocalityImpl::empty()), nullptr, hosts, {},
-      {});
+      200);
 
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster1));
   EXPECT_CALL(*cluster1, initializePhase()).Times(0);

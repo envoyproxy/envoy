@@ -473,40 +473,35 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::api::v2::Cluster& clust
     cluster_warming_cb(cluster_name, ClusterWarmingState::Starting);
     cluster_entry->cluster_->initialize([this, cluster_name, cluster_warming_cb] {
       auto warming_it = warming_clusters_.find(cluster_name);
-      auto& cluster_entry = *warming_it->second;
+      auto& warming_cluster_entry = *warming_it->second;
 
       // If the cluster is being updated, we need to cancel any pending merged updates.
       // Otherwise, applyUpdates() will fire with a dangling cluster reference.
       updates_map_.erase(cluster_name);
 
-      // If the active cluster has priority sets and the warming cluster does not have them, it
-      // means that onConfigUpdate is triggered for EDS type of cluster is triggered with no
-      // reference to this cluster. In such cases, copy the active cluster priority set to the
-      // warming cluster otherwise the active cluster hosts will be cleared after warming is
-      // completed. See https://github.com/envoyproxy/envoy/issues/5168 for more context.
+      // If the active cluster has hosts in priority set and the warming cluster does not have them,
+      // means that onConfigUpdate was triggered by an EDS update that had no references to this
+      // cluster. In such cases, copy the active cluster priority set to the warming cluster to
+      // prevent the hosts from being cleared after warming. See
+      // https://github.com/envoyproxy/envoy/issues/5168 for more context.
       const auto active_it = active_clusters_.find(cluster_name);
       if (active_it != active_clusters_.end()) {
-        auto& active_cluster_entry = *active_it->second;
-        if (active_cluster_entry.cluster_->prioritySet().hostSetsPerPriority().size() != 0 &&
-            (cluster_entry.cluster_->prioritySet().hostSetsPerPriority().size() == 0 ||
-             (cluster_entry.cluster_->prioritySet().hostSetsPerPriority().size() == 1 &&
-              cluster_entry.cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size() ==
-                  0))) {
-          ENVOY_LOG(
-              debug,
-              "copying host set from active cluster {} as warming cluster does not have host set",
-              cluster_name);
-
-          const auto& host_sets =
+        const auto& active_cluster_entry = *active_it->second;
+        if (!active_cluster_entry.cluster_->prioritySet().empty() &&
+            warming_cluster_entry.cluster_->prioritySet().empty()) {
+          ENVOY_LOG(debug, "copying host set from active cluster {} to warming cluster",
+                    cluster_name);
+          const auto& active_host_sets =
               active_cluster_entry.cluster_->prioritySet().hostSetsPerPriority();
-          for (size_t priority = 0; priority < host_sets.size(); ++priority) {
-            const auto& host_set = host_sets[priority];
-            HostVectorConstSharedPtr hosts_copy(new HostVector(host_set->hosts()));
+          for (size_t priority = 0; priority < active_host_sets.size(); ++priority) {
+            const auto& active_host_set = active_host_sets[priority];
+            HostVectorConstSharedPtr hosts_copy(new HostVector(active_host_set->hosts()));
             HostsPerLocalityConstSharedPtr hosts_per_locality_copy =
-                host_set->hostsPerLocality().clone();
-            cluster_entry.cluster_->prioritySet().updateHosts(
+                active_host_set->hostsPerLocality().clone();
+            warming_cluster_entry.cluster_->prioritySet().updateHosts(
                 priority, HostSetImpl::partitionHosts(hosts_copy, hosts_per_locality_copy),
-                host_set->localityWeights(), {}, {}, absl::nullopt);
+                active_host_set->localityWeights(), {}, {},
+                active_host_set->overprovisioningFactor());
           }
         }
       }
@@ -514,8 +509,8 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::api::v2::Cluster& clust
       warming_clusters_.erase(warming_it);
 
       ENVOY_LOG(info, "warming cluster {} complete", cluster_name);
-      createOrUpdateThreadLocalCluster(cluster_entry);
-      onClusterInit(*cluster_entry.cluster_);
+      createOrUpdateThreadLocalCluster(warming_cluster_entry);
+      onClusterInit(*warming_cluster_entry.cluster_);
       cluster_warming_cb(cluster_name, ClusterWarmingState::Finished);
       updateGauges();
     });
