@@ -55,7 +55,7 @@ private:
   };
 
   struct Ring : public HashingLoadBalancer {
-    Ring(const HostSet& host_set, bool in_panic,
+    Ring(const NormalizedHostWeightVector& normalized_host_weights, double min_normalized_weight,
          const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig>& config,
          RingHashLoadBalancerStats& stats);
 
@@ -72,8 +72,10 @@ private:
   typedef std::shared_ptr<const Ring> RingConstSharedPtr;
 
   // ThreadAwareLoadBalancerBase
-  HashingLoadBalancerSharedPtr createLoadBalancer(const HostSet& host_set, bool in_panic) override {
-    return std::make_shared<Ring>(host_set, in_panic, config_, stats_);
+  HashingLoadBalancerSharedPtr
+  createLoadBalancer(const NormalizedHostWeightVector& normalized_host_weights,
+                     double min_normalized_weight, double /* max_normalized_weight */) override {
+    return std::make_shared<Ring>(normalized_host_weights, min_normalized_weight, config_, stats_);
   }
 
   static RingHashLoadBalancerStats generateStats(Stats::Scope& scope);

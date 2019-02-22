@@ -128,18 +128,18 @@ TEST_F(MaglevLoadBalancerTest, LocalityWeightedSameLocalityWeights) {
   // maglev: i=5 host=127.0.0.1:91
   // maglev: i=6 host=127.0.0.1:91
   // maglev: i=7 host=127.0.0.1:90
-  // maglev: i=8 host=127.0.0.1:91
+  // maglev: i=8 host=127.0.0.1:90
   // maglev: i=9 host=127.0.0.1:91
-  // maglev: i=10 host=127.0.0.1:91
+  // maglev: i=10 host=127.0.0.1:90
   // maglev: i=11 host=127.0.0.1:91
-  // maglev: i=12 host=127.0.0.1:91
+  // maglev: i=12 host=127.0.0.1:90
   // maglev: i=13 host=127.0.0.1:90
   // maglev: i=14 host=127.0.0.1:91
   // maglev: i=15 host=127.0.0.1:90
   // maglev: i=16 host=127.0.0.1:91
   LoadBalancerPtr lb = lb_->factory()->create();
-  const std::vector<uint32_t> expected_assignments{1, 0, 0, 1, 0, 1, 1, 0, 1,
-                                                   1, 1, 1, 1, 0, 1, 0, 1};
+  const std::vector<uint32_t> expected_assignments{1, 0, 0, 1, 0, 1, 1, 0, 0,
+                                                   1, 0, 1, 0, 0, 1, 0, 1};
   for (uint32_t i = 0; i < 3 * expected_assignments.size(); ++i) {
     TestLoadBalancerContext context(i);
     EXPECT_EQ(host_set_.hosts_[expected_assignments[i % expected_assignments.size()]],
@@ -164,9 +164,9 @@ TEST_F(MaglevLoadBalancerTest, LocalityWeightedDifferentLocalityWeights) {
   // maglev: i=0 host=127.0.0.1:91
   // maglev: i=1 host=127.0.0.1:90
   // maglev: i=2 host=127.0.0.1:90
-  // maglev: i=3 host=127.0.0.1:91
+  // maglev: i=3 host=127.0.0.1:90
   // maglev: i=4 host=127.0.0.1:90
-  // maglev: i=5 host=127.0.0.1:91
+  // maglev: i=5 host=127.0.0.1:90
   // maglev: i=6 host=127.0.0.1:91
   // maglev: i=7 host=127.0.0.1:90
   // maglev: i=8 host=127.0.0.1:90
@@ -179,7 +179,7 @@ TEST_F(MaglevLoadBalancerTest, LocalityWeightedDifferentLocalityWeights) {
   // maglev: i=15 host=127.0.0.1:90
   // maglev: i=16 host=127.0.0.1:90
   LoadBalancerPtr lb = lb_->factory()->create();
-  const std::vector<uint32_t> expected_assignments{1, 0, 0, 1, 0, 1, 1, 0, 0,
+  const std::vector<uint32_t> expected_assignments{1, 0, 0, 0, 0, 0, 1, 0, 0,
                                                    1, 0, 1, 0, 0, 0, 0, 0};
   for (uint32_t i = 0; i < 3 * expected_assignments.size(); ++i) {
     TestLoadBalancerContext context(i);
@@ -224,18 +224,18 @@ TEST_F(MaglevLoadBalancerTest, LocalityWeightedGlobalPanic) {
   // maglev: i=5 host=127.0.0.1:91
   // maglev: i=6 host=127.0.0.1:91
   // maglev: i=7 host=127.0.0.1:90
-  // maglev: i=8 host=127.0.0.1:91
+  // maglev: i=8 host=127.0.0.1:90
   // maglev: i=9 host=127.0.0.1:91
-  // maglev: i=10 host=127.0.0.1:91
+  // maglev: i=10 host=127.0.0.1:90
   // maglev: i=11 host=127.0.0.1:91
-  // maglev: i=12 host=127.0.0.1:91
+  // maglev: i=12 host=127.0.0.1:90
   // maglev: i=13 host=127.0.0.1:90
   // maglev: i=14 host=127.0.0.1:91
   // maglev: i=15 host=127.0.0.1:90
   // maglev: i=16 host=127.0.0.1:91
   LoadBalancerPtr lb = lb_->factory()->create();
-  const std::vector<uint32_t> expected_assignments{1, 0, 0, 1, 0, 1, 1, 0, 1,
-                                                   1, 1, 1, 1, 0, 1, 0, 1};
+  const std::vector<uint32_t> expected_assignments{1, 0, 0, 1, 0, 1, 1, 0, 0,
+                                                   1, 0, 1, 0, 0, 1, 0, 1};
   for (uint32_t i = 0; i < 3 * expected_assignments.size(); ++i) {
     TestLoadBalancerContext context(i);
     EXPECT_EQ(host_set_.hosts_[expected_assignments[i % expected_assignments.size()]],

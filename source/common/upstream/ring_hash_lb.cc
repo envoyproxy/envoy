@@ -62,78 +62,9 @@ HostConstSharedPtr RingHashLoadBalancer::Ring::chooseHost(uint64_t h) const {
   }
 }
 
-// TODO(mergeconflict): Determine whether the locality weights we get here are already adjusted
-//                      for partial availability (as in HostSetImpl::effectiveLocalityWeight), and
-//                      promote this into ThreadAwareLoadBalancerBase or HashingLoadBalancer so
-//                      Maglev LB can use it (see #5982).
-namespace {
-
-typedef std::vector<std::pair<HostConstSharedPtr, double>> NormalizedHostWeightVector;
-
-void normalizeHostWeights(const HostVector& hosts, double normalized_locality_weight,
-                          NormalizedHostWeightVector& normalized_weights,
-                          double& min_normalized_weight) {
-  uint32_t sum = 0;
-  for (const auto& host : hosts) {
-    sum += host->weight();
-  }
-
-  for (const auto& host : hosts) {
-    const double weight = host->weight() * normalized_locality_weight / sum;
-    normalized_weights.push_back({host, weight});
-    min_normalized_weight = std::min(min_normalized_weight, weight);
-  }
-}
-
-void normalizeLocalityWeights(const HostsPerLocality& hosts_per_locality,
-                              const LocalityWeights& locality_weights,
-                              NormalizedHostWeightVector& normalized_weights,
-                              double& min_normalized_weight) {
-  ASSERT(locality_weights.size() == hosts_per_locality.get().size());
-
-  uint32_t sum = 0;
-  for (const auto weight : locality_weights) {
-    sum += weight;
-  }
-
-  // Locality weights (unlike host weights) may be 0. If _all_ locality weights were 0, bail out.
-  if (sum == 0) {
-    return;
-  }
-
-  // Compute normalized weights for all hosts in each locality. If a locality was assigned zero
-  // weight, all hosts in that locality will be skipped.
-  for (LocalityWeights::size_type i = 0; i < locality_weights.size(); ++i) {
-    if (locality_weights[i] != 0) {
-      const HostVector& hosts = hosts_per_locality.get()[i];
-      const double normalized_locality_weight = static_cast<double>(locality_weights[i]) / sum;
-      normalizeHostWeights(hosts, normalized_locality_weight, normalized_weights,
-                           min_normalized_weight);
-    }
-  }
-}
-
-void normalizeWeights(const HostSet& host_set, bool in_panic,
-                      NormalizedHostWeightVector& normalized_weights,
-                      double& min_normalized_weight) {
-  if (host_set.localityWeights() == nullptr || host_set.localityWeights()->empty()) {
-    // If we're not dealing with locality weights, just normalize weights for the flat set of hosts.
-    const auto& hosts = in_panic ? host_set.hosts() : host_set.healthyHosts();
-    normalizeHostWeights(hosts, 1.0, normalized_weights, min_normalized_weight);
-  } else {
-    // Otherwise, normalize weights across all localities.
-    const auto& hosts_per_locality =
-        in_panic ? host_set.hostsPerLocality() : host_set.healthyHostsPerLocality();
-    normalizeLocalityWeights(hosts_per_locality, *(host_set.localityWeights()), normalized_weights,
-                             min_normalized_weight);
-  }
-}
-
-} // namespace
-
 using HashFunction = envoy::api::v2::Cluster_RingHashLbConfig_HashFunction;
 RingHashLoadBalancer::Ring::Ring(
-    const HostSet& host_set, bool in_panic,
+    const NormalizedHostWeightVector& normalized_host_weights, double min_normalized_weight,
     const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig>& config,
     RingHashLoadBalancerStats& stats)
     : stats_(stats) {
@@ -154,13 +85,8 @@ RingHashLoadBalancer::Ring::Ring(
                                      min_ring_size, max_ring_size));
   }
 
-  // Normalize weights, such that the sum of all weights = 1.
-  NormalizedHostWeightVector normalized_weights;
-  double min_normalized_weight = 1.0;
-  normalizeWeights(host_set, in_panic, normalized_weights, min_normalized_weight);
-
   // We can't do anything sensible with no hosts.
-  if (normalized_weights.empty()) {
+  if (normalized_host_weights.empty()) {
     return;
   }
 
@@ -185,8 +111,8 @@ RingHashLoadBalancer::Ring::Ring(
       config ? config.value().hash_function()
              : HashFunction::Cluster_RingHashLbConfig_HashFunction_XX_HASH;
 
-  // Populate the hash ring by walking through the (host, weight) entries in the normalized_weights
-  // map, and generating (scale * weight) hashes for each host. Since these aren't necessarily whole
+  // Populate the hash ring by walking through the (host, weight) pairs in normalized_host_weights,
+  // and generating (scale * weight) hashes for each host. Since these aren't necessarily whole
   // numbers, we maintain running sums -- current_hashes and target_hashes -- which allows us to
   // populate the ring in a mostly stable way.
   //
@@ -207,7 +133,7 @@ RingHashLoadBalancer::Ring::Ring(
   double target_hashes = 0.0;
   uint64_t min_hashes_per_host = ring_size;
   uint64_t max_hashes_per_host = 0;
-  for (const auto& entry : normalized_weights) {
+  for (const auto& entry : normalized_host_weights) {
     const auto& host = entry.first;
     const std::string& address_string = host->address()->asString();
     uint64_t offset_start = address_string.size();
