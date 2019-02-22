@@ -78,7 +78,7 @@ public:
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
   NiceMock<MockOverloadManager> overload_manager_;
-  InitManagerImpl init_manager_;
+  InitManagerImpl init_manager_{""};
   ReadyWatcher start_workers_;
   std::unique_ptr<RunHelper> helper_;
   std::function<void()> cm_init_callback_;
@@ -104,7 +104,7 @@ TEST_F(RunHelperTest, ShutdownBeforeCmInitialize) {
 TEST_F(RunHelperTest, ShutdownBeforeInitManagerInit) {
   EXPECT_CALL(start_workers_, ready()).Times(0);
   Init::MockTarget target;
-  init_manager_.registerTarget(target);
+  init_manager_.registerTarget(target, "");
   EXPECT_CALL(target, initialize(_));
   cm_init_callback_();
   sigterm_->callback_();

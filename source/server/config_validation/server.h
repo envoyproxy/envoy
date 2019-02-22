@@ -142,7 +142,7 @@ private:
   // init_manager_ must come before any member that participates in initialization, and destructed
   // only after referencing members are gone, since initialization continuation can potentially
   // occur at any point during member lifetime.
-  InitManagerImpl init_manager_;
+  InitManagerImpl init_manager_{"Validation server"};
   // secret_manager_ must come before listener_manager_, config_ and dispatcher_, and destructed
   // only after these members can no longer reference it, since:
   // - There may be active filter chains referencing it in listener_manager_.
