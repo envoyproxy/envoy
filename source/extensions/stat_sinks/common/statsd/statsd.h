@@ -30,7 +30,7 @@ class Writer : public ThreadLocal::ThreadLocalObject {
 public:
   Writer(Network::Address::InstanceConstSharedPtr address);
   // For testing.
-  Writer() : io_handle_(std::make_unique<Network::IoSocketHandle>()) {}
+  Writer() : io_handle_(std::make_unique<Network::IoSocketHandleImpl>()) {}
   virtual ~Writer();
 
   virtual void write(const std::string& message);

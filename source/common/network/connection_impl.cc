@@ -70,7 +70,7 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
 }
 
 ConnectionImpl::~ConnectionImpl() {
-  ASSERT(ioHandle().fd() == -1 && delayed_close_timer_ == nullptr,
+  ASSERT(!ioHandle().isOpen() && delayed_close_timer_ == nullptr,
          "ConnectionImpl was unexpectedly torn down without being closed.");
 
   // In general we assume that owning code has called close() previously to the destructor being
@@ -93,7 +93,7 @@ void ConnectionImpl::addReadFilter(ReadFilterSharedPtr filter) {
 bool ConnectionImpl::initializeReadFilters() { return filter_manager_.initializeReadFilters(); }
 
 void ConnectionImpl::close(ConnectionCloseType type) {
-  if (ioHandle().fd() == -1) {
+  if (!ioHandle().isOpen()) {
     return;
   }
 
@@ -160,7 +160,7 @@ void ConnectionImpl::close(ConnectionCloseType type) {
 }
 
 Connection::State ConnectionImpl::state() const {
-  if (ioHandle().fd() == -1) {
+  if (!ioHandle().isOpen()) {
     return State::Closed;
   } else if (delayed_close_) {
     return State::Closing;
@@ -170,7 +170,7 @@ Connection::State ConnectionImpl::state() const {
 }
 
 void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
-  if (ioHandle().fd() == -1) {
+  if (!ioHandle().isOpen()) {
     return;
   }
 
@@ -204,7 +204,7 @@ void ConnectionImpl::noDelay(bool enable) {
   // invalid. For this call instead of plumbing through logic that will immediately indicate that a
   // connect failed, we will just ignore the noDelay() call if the socket is invalid since error is
   // going to be raised shortly anyway and it makes the calling code simpler.
-  if (ioHandle().fd() == -1) {
+  if (!ioHandle().isOpen()) {
     return;
   }
 
@@ -469,7 +469,7 @@ void ConnectionImpl::onFileEvent(uint32_t events) {
 
   // It's possible for a write event callback to close the socket (which will cause fd_ to be -1).
   // In this case ignore write event processing.
-  if (ioHandle().fd() != -1 && (events & Event::FileReadyType::Read)) {
+  if (ioHandle().isOpen() && (events & Event::FileReadyType::Read)) {
     onReadReady();
   }
 }
@@ -547,7 +547,7 @@ void ConnectionImpl::onWriteReady() {
       cb(result.bytes_processed_);
 
       // If a callback closes the socket, stop iterating.
-      if (ioHandle().fd() == -1) {
+      if (!ioHandle().isOpen()) {
         return;
       }
     }
