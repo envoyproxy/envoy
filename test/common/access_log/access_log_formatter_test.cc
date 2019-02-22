@@ -529,13 +529,13 @@ TEST(AccessLogFormatterTest, JsonFormatterStartTimeTest) {
   Http::TestHeaderMapImpl response_header;
   Http::TestHeaderMapImpl response_trailer;
 
-  time_t test_epoch = 1522280158;
-  SystemTime time = std::chrono::system_clock::from_time_t(test_epoch);
+  time_t expected_time_in_epoch = 1522280158;
+  SystemTime time = std::chrono::system_clock::from_time_t(expected_time_in_epoch);
   EXPECT_CALL(stream_info, startTime()).WillRepeatedly(Return(time));
 
   std::unordered_map<std::string, std::string> expected_json_map = {
       {"simple_date", "2018/03/28"},
-      {"test_time", fmt::format("{}", test_epoch)},
+      {"test_time", fmt::format("{}", expected_time_in_epoch)},
       {"bad_format", "bad_format"},
       {"default", "2018-03-28T23:35:58.000Z"},
       {"all_zeroes", "000000000.0.00.000"}};
@@ -632,13 +632,13 @@ TEST(AccessLogFormatterTest, CompositeFormatterSuccess) {
     const std::string format = "%START_TIME(%Y/%m/%d)%|%START_TIME(%s)%|%START_TIME(bad_format)%|"
                                "%START_TIME%|%START_TIME(%f.%1f.%2f.%3f)%";
 
-    time_t test_epoch = 1522280158;
-    SystemTime time = std::chrono::system_clock::from_time_t(test_epoch);
+    time_t expected_time_in_epoch = 1522280158;
+    SystemTime time = std::chrono::system_clock::from_time_t(expected_time_in_epoch);
     EXPECT_CALL(stream_info, startTime()).WillRepeatedly(Return(time));
     FormatterImpl formatter(format);
 
     EXPECT_EQ(fmt::format("2018/03/28|{}|bad_format|2018-03-28T23:35:58.000Z|000000000.0.00.000",
-                          test_epoch),
+                          expected_time_in_epoch),
               formatter.format(request_header, response_header, response_trailer, stream_info));
   }
 
