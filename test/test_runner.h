@@ -32,7 +32,7 @@ public:
     ::testing::FLAGS_gtest_death_test_style = "threadsafe";
 
     // Set gtest properties
-    // (https://github.com/google/googletest/blob/master/googletest/docs/AdvancedGuide.md#logging-additional-information),
+    // (https://github.com/google/googletest/blob/master/googletest/docs/advanced.md#logging-additional-information),
     // they are available in the test XML.
     // TODO(htuch): Log these as well?
     testing::Test::RecordProperty("TemporaryDirectory", TestEnvironment::temporaryDirectory());
