@@ -80,4 +80,4 @@ The ZooKeeper filter emits the following dynamic metadata for each message parse
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
-  <path>, string, The path associated with the request or response or event.
+  <path>, string, "The path associated with the request, response or event"
