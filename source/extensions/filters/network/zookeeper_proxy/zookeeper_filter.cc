@@ -124,6 +124,11 @@ void ZooKeeperFilter::onSetAclRequest(const std::string&, const int32_t) {
   // TODO: set metadata.
 }
 
+void ZooKeeperFilter::onSyncRequest(const std::string&) {
+  config_->stats_.sync_rq_.inc();
+  // TODO: set metadata.
+}
+
 } // namespace ZooKeeperProxy
 } // namespace NetworkFilters
 } // namespace Extensions

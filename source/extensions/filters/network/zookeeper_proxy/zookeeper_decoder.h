@@ -62,6 +62,7 @@ public:
   virtual void onExistsRequest(const std::string& path, const bool watch) PURE;
   virtual void onGetAclRequest(const std::string& path) PURE;
   virtual void onSetAclRequest(const std::string& path, const int32_t version) PURE;
+  virtual void onSyncRequest(const std::string& path) PURE;
 };
 
 /**
@@ -97,6 +98,7 @@ private:
   void parseExistsRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
   void parseGetAclRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
   void parseSetAclRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
+  void parseSyncRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
 
   DecoderCallbacks& callbacks_;
 };

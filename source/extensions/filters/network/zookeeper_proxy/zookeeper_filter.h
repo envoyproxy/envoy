@@ -102,6 +102,7 @@ public:
   void onExistsRequest(const std::string& path, const bool watch) override;
   void onGetAclRequest(const std::string& path) override;
   void onSetAclRequest(const std::string& path, const int32_t version) override;
+  void onSyncRequest(const std::string& path) override;
 
   void doDecode(Buffer::Instance& buffer);
   DecoderPtr createDecoder(DecoderCallbacks& callbacks);

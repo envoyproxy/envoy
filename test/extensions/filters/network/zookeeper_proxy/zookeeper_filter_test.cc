@@ -359,6 +359,16 @@ TEST_F(ZooKeeperFilterTest, SetAclRequest) {
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
 }
 
+TEST_F(ZooKeeperFilterTest, SyncRequest) {
+  initialize();
+
+  Buffer::InstancePtr data(new Buffer::OwnedImpl(encodePath("/foo", enumToInt(OpCodes::SYNC))));
+
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*data, false));
+  EXPECT_EQ(1UL, config_->stats().sync_rq_.value());
+  EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
+}
+
 } // namespace ZooKeeperProxy
 } // namespace NetworkFilters
 } // namespace Extensions

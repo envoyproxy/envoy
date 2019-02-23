@@ -71,6 +71,7 @@ void DecoderImpl::decode(Buffer::Instance& data, uint64_t& offset) {
     parseSetAclRequest(data, offset, len);
     break;
   case enumToInt(OpCodes::SYNC):
+    parseSyncRequest(data, offset, len);
     break;
   case enumToInt(OpCodes::CHECK):
     break;
@@ -255,6 +256,17 @@ void DecoderImpl::parseSetAclRequest(Buffer::Instance& data, uint64_t& offset, u
   BufferHelper::peekInt32(data, offset, version);
 
   callbacks_.onSetAclRequest(path, version);
+}
+
+void DecoderImpl::parseSyncRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
+  CHECK_LENGTH(len, 8);
+
+  // Skip opcode.
+  offset += 4;
+  std::string path;
+  BufferHelper::peekString(data, offset, path);
+
+  callbacks_.onSyncRequest(path);
 }
 
 void DecoderImpl::onData(Buffer::Instance& data) {
