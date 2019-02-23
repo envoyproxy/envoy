@@ -46,7 +46,7 @@ public:
     reset_callbacks_started_ = true;
     for (StreamCallbacks* callbacks : callbacks_) {
       if (callbacks) {
-        callbacks->onResetStream(reason);
+        callbacks->onResetStream(reason, absl::string_view());
       }
     }
   }

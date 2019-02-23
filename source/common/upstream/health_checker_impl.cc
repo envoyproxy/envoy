@@ -208,7 +208,8 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
   request_encoder_ = nullptr;
 }
 
-void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onResetStream(Http::StreamResetReason) {
+void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onResetStream(Http::StreamResetReason,
+                                                                        absl::string_view) {
   if (expect_reset_) {
     return;
   }
@@ -569,7 +570,8 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onInterval() {
   request_encoder_->encodeData(*Grpc::Common::serializeBody(request), true);
 }
 
-void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onResetStream(Http::StreamResetReason) {
+void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onResetStream(Http::StreamResetReason,
+                                                                        absl::string_view) {
   const bool expected_reset = expect_reset_;
   resetState();
 

@@ -184,7 +184,9 @@ private:
         : StreamDecoderWrapper(inner), parent_(parent) {}
 
     // StreamCallbacks
-    void onResetStream(StreamResetReason reason) override { parent_.onReset(*this, reason); }
+    void onResetStream(StreamResetReason reason, absl::string_view) override {
+      parent_.onReset(*this, reason);
+    }
     void onAboveWriteBufferHighWatermark() override {}
     void onBelowWriteBufferLowWatermark() override {}
 

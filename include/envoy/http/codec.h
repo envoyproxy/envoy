@@ -135,7 +135,8 @@ public:
    * Fires when a stream has been remote reset.
    * @param reason supplies the reset reason.
    */
-  virtual void onResetStream(StreamResetReason reason) PURE;
+  virtual void onResetStream(StreamResetReason reason,
+                             absl::string_view transport_failure_reason) PURE;
 
   /**
    * Fires when a stream, or the connection the stream is sending to, goes over its high watermark.

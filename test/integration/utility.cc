@@ -52,7 +52,10 @@ void BufferingStreamDecoder::onComplete() {
   on_complete_cb_();
 }
 
-void BufferingStreamDecoder::onResetStream(Http::StreamResetReason) { ADD_FAILURE(); }
+void BufferingStreamDecoder::onResetStream(Http::StreamResetReason,
+                                           absl::string_view transport_failure_reason) {
+  ADD_FAILURE();
+}
 
 BufferingStreamDecoderPtr
 IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPtr& addr,

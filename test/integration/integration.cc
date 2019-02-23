@@ -132,7 +132,8 @@ void IntegrationStreamDecoder::decodeMetadata(Http::MetadataMapPtr&& metadata_ma
   }
 }
 
-void IntegrationStreamDecoder::onResetStream(Http::StreamResetReason reason) {
+void IntegrationStreamDecoder::onResetStream(Http::StreamResetReason reason,
+                                             absl::string_view transport_failure_reason) {
   saw_reset_ = true;
   reset_reason_ = reason;
   if (waiting_for_reset_) {

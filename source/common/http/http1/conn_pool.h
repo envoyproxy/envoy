@@ -65,7 +65,9 @@ protected:
     void onDecodeComplete() override;
 
     // Http::StreamCallbacks
-    void onResetStream(StreamResetReason) override { parent_.parent_.onDownstreamReset(parent_); }
+    void onResetStream(StreamResetReason, absl::string_view) override {
+      parent_.parent_.onDownstreamReset(parent_);
+    }
     void onAboveWriteBufferHighWatermark() override {}
     void onBelowWriteBufferLowWatermark() override {}
 

@@ -598,6 +598,7 @@ void Filter::onUpstreamReset(UpstreamResetType type,
       StreamInfo::ResponseFlag response_flags =
           streamResetReasonToResponseFlag(reset_reason.value());
       callbacks_->streamInfo().setResponseFlag(response_flags);
+      callbacks_->streamInfo().setUpstreamTransportFailureReason(transport_failure);
       code = Http::Code::ServiceUnavailable;
       body = absl::StrCat(
           "upstream connect error or disconnect/reset before headers. reset reason: ",
@@ -1057,12 +1058,14 @@ void Filter::UpstreamRequest::encodeTrailers(const Http::HeaderMap& trailers) {
   }
 }
 
-void Filter::UpstreamRequest::onResetStream(Http::StreamResetReason reason) {
+void Filter::UpstreamRequest::onResetStream(Http::StreamResetReason reason,
+                                            absl::string_view transport_failure_reason) {
   clearRequestEncoder();
   if (!calling_encode_headers_) {
     stream_info_.setResponseFlag(parent_.streamResetReasonToResponseFlag(reason));
     parent_.onUpstreamReset(UpstreamResetType::Reset,
-                            absl::optional<Http::StreamResetReason>(reason), absl::string_view());
+                            absl::optional<Http::StreamResetReason>(reason),
+                            transport_failure_reason);
   } else {
     deferred_reset_reason_ = reason;
   }
@@ -1127,10 +1130,9 @@ void Filter::UpstreamRequest::onPoolFailure(Http::ConnectionPool::PoolFailureRea
     break;
   }
 
-  UNREFERENCED_PARAMETER(reason_details);
   // Mimic an upstream reset.
   onUpstreamHostSelected(host);
-  onResetStream(reset_reason);
+  onResetStream(reset_reason, reason_details);
 }
 
 void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
@@ -1166,7 +1168,7 @@ void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
   // specific example of a case where this happens is if we try to encode a total header size that
   // is too big in HTTP/2 (64K currently).
   if (deferred_reset_reason_) {
-    onResetStream(deferred_reset_reason_.value());
+    onResetStream(deferred_reset_reason_.value(), absl::string_view());
   } else {
     if (buffered_request_body_) {
       stream_info_.addBytesSent(buffered_request_body_->length());

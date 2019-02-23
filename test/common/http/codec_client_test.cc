@@ -384,7 +384,7 @@ TEST_P(CodecNetworkTest, SendHeadersAndClose) {
   // would not be finished.
   EXPECT_CALL(inner_encoder_.stream_, resetStream(_)).WillOnce(InvokeWithoutArgs([&]() -> void {
     for (auto callbacks : inner_encoder_.stream_.callbacks_) {
-      callbacks->onResetStream(StreamResetReason::RemoteReset);
+      callbacks->onResetStream(StreamResetReason::RemoteReset, absl::string_view());
     }
     dispatcher_->exit();
   }));
@@ -413,7 +413,7 @@ TEST_P(CodecNetworkTest, SendHeadersAndCloseUnderReadDisable) {
       .WillOnce(Invoke([&](Buffer::Instance& data) -> void { EXPECT_EQ("", data.toString()); }));
   EXPECT_CALL(inner_encoder_.stream_, resetStream(_)).WillOnce(InvokeWithoutArgs([&]() -> void {
     for (auto callbacks : inner_encoder_.stream_.callbacks_) {
-      callbacks->onResetStream(StreamResetReason::RemoteReset);
+      callbacks->onResetStream(StreamResetReason::RemoteReset, absl::string_view());
     }
     dispatcher_->exit();
   }));
