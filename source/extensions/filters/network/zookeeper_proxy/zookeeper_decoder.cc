@@ -23,13 +23,13 @@ void DecoderImpl::decode(Buffer::Instance& data, uint64_t& offset) {
 
   // "Special" requests.
   switch (xid) {
-  case enumToInt(XidCodes::CONNECT_XID):
+  case enumToIntSigned(XidCodes::CONNECT_XID):
     parseConnect(data, offset, len);
     return;
-  case enumToInt(XidCodes::PING_XID):
+  case enumToIntSigned(XidCodes::PING_XID):
     callbacks_.onPing();
     return;
-  case enumToInt(XidCodes::AUTH_XID):
+  case enumToIntSigned(XidCodes::AUTH_XID):
     parseAuthRequest(data, offset, len);
     return;
   default:
