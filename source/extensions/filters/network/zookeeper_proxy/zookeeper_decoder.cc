@@ -58,6 +58,28 @@ void DecoderImpl::decode(Buffer::Instance& data, uint64_t& offset) {
   case enumToInt(OpCodes::GETCHILDREN2):
     parseGetChildrenRequest(data, offset, len, true);
     break;
+  case enumToInt(OpCodes::DELETE):
+    parseDeleteRequest(data, offset, len);
+    break;
+  case enumToInt(OpCodes::EXISTS):
+    parseExistsRequest(data, offset, len);
+    break;
+  case enumToInt(OpCodes::GETACL):
+    break;
+  case enumToInt(OpCodes::SETACL):
+    break;
+  case enumToInt(OpCodes::SYNC):
+    break;
+  case enumToInt(OpCodes::CHECK):
+    break;
+  case enumToInt(OpCodes::MULTI):
+    break;
+  case enumToInt(OpCodes::RECONFIG):
+    break;
+  case enumToInt(OpCodes::SETWATCHES):
+    break;
+  case enumToIntSigned(OpCodes::CLOSE):
+    break;
   default:
     break;
   }
@@ -177,6 +199,33 @@ void DecoderImpl::parseGetChildrenRequest(Buffer::Instance& data, uint64_t& offs
   BufferHelper::peekBool(data, offset, watch);
 
   callbacks_.onGetChildrenRequest(path, watch, two);
+}
+
+void DecoderImpl::parseDeleteRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
+  CHECK_LENGTH(len, 16);
+
+  // Skip opcode.
+  offset += 4;
+  std::string path;
+  BufferHelper::peekString(data, offset, path);
+  // Version.
+  int32_t version;
+  BufferHelper::peekInt32(data, offset, version);
+
+  callbacks_.onDeleteRequest(path, version);
+}
+
+void DecoderImpl::parseExistsRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
+  CHECK_LENGTH(len, 13);
+
+  // Skip opcode.
+  offset += 4;
+  std::string path;
+  BufferHelper::peekString(data, offset, path);
+  bool watch;
+  BufferHelper::peekBool(data, offset, watch);
+
+  callbacks_.onExistsRequest(path, watch);
 }
 
 void DecoderImpl::onData(Buffer::Instance& data) {

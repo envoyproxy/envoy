@@ -87,15 +87,13 @@ public:
     return buffer;
   }
 
-  Buffer::OwnedImpl encodeGetData(const std::string& path, const bool watch,
-                                  const bool getchildren = false) const {
+  Buffer::OwnedImpl encodePathWatch(const std::string& path, const bool watch,
+                                    const int32_t opcode = enumToInt(OpCodes::GETDATA)) const {
     Buffer::OwnedImpl buffer;
 
     buffer.writeBEInt<int32_t>(13 + path.length());
     buffer.writeBEInt<int32_t>(1000);
     // Opcode.
-    const int32_t opcode =
-        getchildren ? enumToInt(OpCodes::GETCHILDREN) : enumToInt(OpCodes::GETDATA);
     buffer.writeBEInt<int32_t>(opcode);
     // Path.
     buffer.writeBEInt<int32_t>(path.length());
@@ -150,6 +148,22 @@ public:
     // Data.
     buffer.writeBEInt<int32_t>(data.length());
     buffer.add(data);
+    // Version.
+    buffer.writeBEInt<int32_t>(version);
+
+    return buffer;
+  }
+
+  Buffer::OwnedImpl encodeDeleteRequest(const std::string& path, const int32_t version) const {
+    Buffer::OwnedImpl buffer;
+
+    buffer.writeBEInt<int32_t>(16 + path.length());
+    buffer.writeBEInt<int32_t>(1000);
+    // Opcode.
+    buffer.writeBEInt<int32_t>(enumToInt(OpCodes::DELETE));
+    // Path.
+    buffer.writeBEInt<int32_t>(path.length());
+    buffer.add(path);
     // Version.
     buffer.writeBEInt<int32_t>(version);
 
@@ -221,7 +235,7 @@ TEST_F(ZooKeeperFilterTest, AuthRequest) {
 TEST_F(ZooKeeperFilterTest, GetDataRequest) {
   initialize();
 
-  Buffer::InstancePtr data(new Buffer::OwnedImpl(encodeGetData("/foo", true)));
+  Buffer::InstancePtr data(new Buffer::OwnedImpl(encodePathWatch("/foo", true)));
 
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*data, false));
   EXPECT_EQ(1UL, config_->stats().getdata_rq_.value());
@@ -251,10 +265,32 @@ TEST_F(ZooKeeperFilterTest, SetRequest) {
 TEST_F(ZooKeeperFilterTest, GetChildrenRequest) {
   initialize();
 
-  Buffer::InstancePtr data(new Buffer::OwnedImpl(encodeGetData("/foo", false, true)));
+  Buffer::InstancePtr data(
+      new Buffer::OwnedImpl(encodePathWatch("/foo", false, enumToInt(OpCodes::GETCHILDREN))));
 
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*data, false));
   EXPECT_EQ(1UL, config_->stats().getchildren_rq_.value());
+  EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
+}
+
+TEST_F(ZooKeeperFilterTest, DeleteRequest) {
+  initialize();
+
+  Buffer::InstancePtr data(new Buffer::OwnedImpl(encodeDeleteRequest("/foo", -1)));
+
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*data, false));
+  EXPECT_EQ(1UL, config_->stats().remove_rq_.value());
+  EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
+}
+
+TEST_F(ZooKeeperFilterTest, ExistsRequest) {
+  initialize();
+
+  Buffer::InstancePtr data(
+      new Buffer::OwnedImpl(encodePathWatch("/foo", false, enumToInt(OpCodes::EXISTS))));
+
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*data, false));
+  EXPECT_EQ(1UL, config_->stats().exists_rq_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
 }
 

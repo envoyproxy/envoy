@@ -104,6 +104,16 @@ void ZooKeeperFilter::onGetChildrenRequest(const std::string&, const bool, const
   // TODO: set metadata.
 }
 
+void ZooKeeperFilter::onDeleteRequest(const std::string&, const int32_t) {
+  config_->stats_.remove_rq_.inc();
+  // TODO: set metadata.
+}
+
+void ZooKeeperFilter::onExistsRequest(const std::string&, const bool) {
+  config_->stats_.exists_rq_.inc();
+  // TODO: set metadata.
+}
+
 } // namespace ZooKeeperProxy
 } // namespace NetworkFilters
 } // namespace Extensions

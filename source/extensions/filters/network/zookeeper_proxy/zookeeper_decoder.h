@@ -58,6 +58,8 @@ public:
                                const bool two) PURE;
   virtual void onSetRequest(const std::string& path) PURE;
   virtual void onGetChildrenRequest(const std::string& path, const bool watch, const bool two) PURE;
+  virtual void onDeleteRequest(const std::string& path, const int32_t version) PURE;
+  virtual void onExistsRequest(const std::string& path, const bool watch) PURE;
 };
 
 /**
@@ -89,6 +91,8 @@ private:
   void parseSetRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
   void parseGetChildrenRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len,
                                const bool two);
+  void parseDeleteRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
+  void parseExistsRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
 
   DecoderCallbacks& callbacks_;
 };
