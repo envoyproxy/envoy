@@ -1286,6 +1286,77 @@ TEST_F(ClusterManagerImplTest, WarmingClusterWithEmptyHosts) {
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster2.get()));
 }
 
+// Validates that TLS updates are triggered correctly when warming cluster has empty hosts.
+TEST_F(ClusterManagerImplTest, WarmingClusterWithEmptyHostsTriggersTlsUpdatesCorrectly) {
+  createWithLocalClusterUpdate();
+
+  InSequence s;
+  ReadyWatcher initialized;
+  EXPECT_CALL(initialized, ready());
+  cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
+
+  std::shared_ptr<MockClusterRealPrioritySet> cluster1(new NiceMock<MockClusterRealPrioritySet>());
+
+  // Set up the HostSet with 1 healthy, 1 degraded and 1 unhealthy for active cluster.
+  HostSharedPtr host1 = makeTestHost(cluster1->info_, "tcp://127.0.0.1:80");
+  host1->healthFlagSet(HostImpl::HealthFlag::DEGRADED_ACTIVE_HC);
+  HostSharedPtr host2 = makeTestHost(cluster1->info_, "tcp://127.0.0.1:80");
+  host2->healthFlagSet(HostImpl::HealthFlag::FAILED_ACTIVE_HC);
+  HostSharedPtr host3 = makeTestHost(cluster1->info_, "tcp://127.0.0.1:80");
+
+  HostVector hosts{host1, host2, host3};
+  auto hosts_ptr = std::make_shared<HostVector>(hosts);
+
+  cluster1->priority_set_.updateHosts(
+      0, HostSetImpl::partitionHosts(hosts_ptr, HostsPerLocalityImpl::empty()), nullptr, hosts, {},
+      200);
+
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster1));
+  EXPECT_CALL(*cluster1, initializePhase()).Times(0);
+  EXPECT_CALL(*cluster1, initialize(_));
+
+  // Validate that TLS updates are triggered correctly.
+  EXPECT_CALL(local_cluster_update_, post(_, _, _))
+      .WillOnce(Invoke([](uint32_t priority, const HostVector& hosts_added,
+                          const HostVector& hosts_removed) -> void {
+        EXPECT_EQ(0, priority);
+        EXPECT_EQ(3, hosts_added.size());
+        EXPECT_EQ(0, hosts_removed.size());
+      }));
+
+  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(defaultStaticCluster("fake_cluster"), "",
+                                                   dummyWarmingCb));
+  EXPECT_EQ(nullptr, cluster_manager_->get("fake_cluster"));
+  cluster1->initialize_callback_();
+
+  EXPECT_EQ(cluster1->info_, cluster_manager_->get("fake_cluster")->info());
+
+  // Now trigger warming of this cluster with no hosts.
+  auto update_cluster = defaultStaticCluster("fake_cluster");
+  update_cluster.mutable_per_connection_buffer_limit_bytes()->set_value(12345);
+
+  std::shared_ptr<MockClusterRealPrioritySet> cluster2(new NiceMock<MockClusterRealPrioritySet>());
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster2));
+  EXPECT_CALL(*cluster2, initializePhase()).Times(0);
+
+  // Validate that TLS updates are triggered correctly after warming.
+  EXPECT_CALL(local_cluster_update_, post(_, _, _))
+      .WillOnce(Invoke([](uint32_t priority, const HostVector& hosts_added,
+                          const HostVector& hosts_removed) -> void {
+        EXPECT_EQ(0, priority);
+        EXPECT_EQ(3, hosts_added.size());
+        EXPECT_EQ(0, hosts_removed.size());
+      }));
+
+  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(update_cluster, "", dummyWarmingCb));
+  cluster2->initialize_callback_();
+
+  EXPECT_EQ(cluster2->info_, cluster_manager_->get("fake_cluster")->info());
+
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster2.get()));
+}
+
 TEST_F(ClusterManagerImplTest, addOrUpdateClusterStaticExists) {
   const std::string json =
       fmt::sprintf("{%s}", clustersJson({defaultStaticClusterJson("some_cluster")}));

@@ -495,6 +495,8 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::api::v2::Cluster& clust
               active_cluster_entry.cluster_->prioritySet().hostSetsPerPriority();
           for (size_t priority = 0; priority < active_host_sets.size(); ++priority) {
             const auto& active_host_set = active_host_sets[priority];
+            // TODO(ramaraochavali): Can we skip these copies by exporting out const shared_ptr from
+            // HostSet?
             HostVectorConstSharedPtr hosts_copy(new HostVector(active_host_set->hosts()));
             HostsPerLocalityConstSharedPtr hosts_per_locality_copy =
                 active_host_set->hostsPerLocality().clone();
