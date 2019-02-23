@@ -170,7 +170,7 @@ TEST_F(ZooKeeperFilterTest, Connect) {
   Buffer::InstancePtr data(encodeConnect());
 
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*data, false));
-  EXPECT_EQ(1UL, config_->stats().connect_.value());
+  EXPECT_EQ(1UL, config_->stats().connect_rq_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
 }
 
@@ -181,8 +181,8 @@ TEST_F(ZooKeeperFilterTest, ConnectReadonly) {
   Buffer::InstancePtr data(encodeConnect(true));
 
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*data, false));
-  EXPECT_EQ(0UL, config_->stats().connect_.value());
-  EXPECT_EQ(1UL, config_->stats().connect_readonly_.value());
+  EXPECT_EQ(0UL, config_->stats().connect_rq_.value());
+  EXPECT_EQ(1UL, config_->stats().connect_readonly_rq_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
 }
 
@@ -193,8 +193,8 @@ TEST_F(ZooKeeperFilterTest, Fallback) {
   Buffer::InstancePtr data(encodeBadMessage());
 
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*data, false));
-  EXPECT_EQ(0UL, config_->stats().connect_.value());
-  EXPECT_EQ(0UL, config_->stats().connect_readonly_.value());
+  EXPECT_EQ(0UL, config_->stats().connect_rq_.value());
+  EXPECT_EQ(0UL, config_->stats().connect_readonly_rq_.value());
   EXPECT_EQ(2UL, config_->stats().decoder_error_.value());
 }
 
@@ -204,7 +204,7 @@ TEST_F(ZooKeeperFilterTest, PingRequest) {
   Buffer::InstancePtr data(encodePing());
 
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*data, false));
-  EXPECT_EQ(1UL, config_->stats().ping_.value());
+  EXPECT_EQ(1UL, config_->stats().ping_rq_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
 }
 

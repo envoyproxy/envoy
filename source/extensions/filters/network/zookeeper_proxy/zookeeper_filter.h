@@ -22,27 +22,25 @@ namespace ZooKeeperProxy {
 // clang-format off
 #define ALL_ZOOKEEPER_PROXY_STATS(COUNTER)                              \
   COUNTER(decoder_error)                                                \
-  COUNTER(connect)                                                      \
-  COUNTER(connect_readonly)                                             \
+  COUNTER(connect_rq)                                                   \
+  COUNTER(connect_readonly_rq)                                          \
   COUNTER(getdata_rq)                                                   \
   COUNTER(create_rq)                                                    \
   COUNTER(create2_rq)                                                   \
   COUNTER(setdata_rq)                                                   \
   COUNTER(getchildren_rq)                                               \
   COUNTER(getchildren2_rq)                                              \
-  COUNTER(remove)                                                       \
-  COUNTER(exists)                                                       \
-  COUNTER(getacl)                                                       \
-  COUNTER(setacl)                                                       \
-  COUNTER(sync)                                                         \
-  COUNTER(ping)                                                         \
-  COUNTER(multi)                                                        \
-  COUNTER(create2)                                                      \
-  COUNTER(reconfig)                                                     \
-  COUNTER(createsession)                                                \
-  COUNTER(close)                                                        \
-  COUNTER(setauth)                                                      \
-  COUNTER(setwatches)                                                   \
+  COUNTER(remove_rq)                                                    \
+  COUNTER(exists_rq)                                                    \
+  COUNTER(getacl_rq)                                                    \
+  COUNTER(setacl_rq)                                                    \
+  COUNTER(sync_rq)                                                      \
+  COUNTER(ping_rq)                                                      \
+  COUNTER(multi_rq)                                                     \
+  COUNTER(reconfig_rq)                                                  \
+  COUNTER(close_rq)                                                     \
+  COUNTER(setauth_rq)                                                   \
+  COUNTER(setwatches_rq)                                                \
 // clang-format on
 
 /**

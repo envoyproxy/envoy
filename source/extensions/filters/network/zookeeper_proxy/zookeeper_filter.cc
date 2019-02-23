@@ -60,9 +60,9 @@ DecoderPtr ZooKeeperFilter::createDecoder(DecoderCallbacks& callbacks) {
 
 void ZooKeeperFilter::onConnect(const bool readonly) {
   if (readonly) {
-    config_->stats_.connect_readonly_.inc();
+    config_->stats_.connect_readonly_rq_.inc();
   } else {
-    config_->stats_.connect_.inc();
+    config_->stats_.connect_rq_.inc();
   }
 
   // TODO: set dynamic metadata.
@@ -70,7 +70,7 @@ void ZooKeeperFilter::onConnect(const bool readonly) {
 
 void ZooKeeperFilter::onDecodeError() { config_->stats_.decoder_error_.inc(); }
 
-void ZooKeeperFilter::onPing() { config_->stats_.ping_.inc(); }
+void ZooKeeperFilter::onPing() { config_->stats_.ping_rq_.inc(); }
 
 void ZooKeeperFilter::onAuthRequest(const std::string& scheme) {
   config_->scope_.counter(fmt::format("{}.auth.{}_rq", config_->stat_prefix_, scheme)).inc();

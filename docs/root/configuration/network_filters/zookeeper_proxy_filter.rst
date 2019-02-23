@@ -49,25 +49,25 @@ following statistics:
   :widths: 1, 1, 2
 
   decoder_error, Counter, Number of times a message wasn't decoded
-  connect, Counter, Number of connect requests
-  connect_readonly, Counter, Number of connect requests with the readonly flag set
-  ping, Counter, Number of ping requests
+  connect_rq, Counter, Number of connect requests
+  connect_readonly_rq, Counter, Number of connect requests with the readonly flag set
+  ping_rq, Counter, Number of ping requests
   auth.<type>_rq, Counter, Number of auth requests for a given type
   getdata_rq, Counter, Number of getdata requests
   create_rq, Counter, Number of create requests
   create2_rq, Counter, Number of create2 requests
   setdata_rq, Counter, Number of setdata requests
   getchildren_rq, Counter, Number of getchildren requests
-  getchildren2, Counter, Number of getchildren2 requests
-  remove, Counter, Number of delete requests
-  exists, Counter, Number of stat requests
-  getacl, Counter, Number of getacl requests
-  setacl, Counter, Number of setacl requests
-  sync, Counter, Number of sync requests
-  multi, Counter, Number of multi transaction requests
-  reconfig, Counter, Number of reconfig requests
-  close, Counter, Number of close requests
-  setwatches, Counter, Number of setwatches requests
+  getchildren2_rq, Counter, Number of getchildren2 requests
+  remove_rq, Counter, Number of delete requests
+  exists_rq, Counter, Number of stat requests
+  getacl_rq, Counter, Number of getacl requests
+  setacl_rq, Counter, Number of setacl requests
+  sync_rq, Counter, Number of sync requests
+  multi_rq, Counter, Number of multi transaction requests
+  reconfig_rq, Counter, Number of reconfig requests
+  close_rq, Counter, Number of close requests
+  setwatches_rq, Counter, Number of setwatches requests
 
 .. _config_network_filters_zookeeper_proxy_dynamic_metadata:
 
