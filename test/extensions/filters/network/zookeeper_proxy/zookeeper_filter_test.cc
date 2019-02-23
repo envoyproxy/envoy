@@ -105,6 +105,20 @@ public:
     return buffer;
   }
 
+  Buffer::OwnedImpl encodePath(const std::string& path, const int32_t opcode) const {
+    Buffer::OwnedImpl buffer;
+
+    buffer.writeBEInt<int32_t>(8 + path.length());
+    buffer.writeBEInt<int32_t>(1000);
+    // Opcode.
+    buffer.writeBEInt<int32_t>(opcode);
+    // Path.
+    buffer.writeBEInt<int32_t>(path.length());
+    buffer.add(path);
+
+    return buffer;
+  }
+
   Buffer::OwnedImpl encodeCreateRequest(const std::string& path, const std::string& data,
                                         const bool ephemeral, const bool sequence) const {
     Buffer::OwnedImpl buffer;
@@ -164,6 +178,36 @@ public:
     // Path.
     buffer.writeBEInt<int32_t>(path.length());
     buffer.add(path);
+    // Version.
+    buffer.writeBEInt<int32_t>(version);
+
+    return buffer;
+  }
+
+  Buffer::OwnedImpl encodeSetAclRequest(const std::string& path, const std::string& scheme,
+                                        const std::string& credential,
+                                        const int32_t version) const {
+    Buffer::OwnedImpl buffer;
+
+    buffer.writeBEInt<int32_t>(32 + path.length() + scheme.length() + credential.length());
+    buffer.writeBEInt<int32_t>(1000);
+    // Opcode.
+    buffer.writeBEInt<int32_t>(enumToInt(OpCodes::SETACL));
+    // Path.
+    buffer.writeBEInt<int32_t>(path.length());
+    buffer.add(path);
+
+    // Acls.
+    buffer.writeBEInt<int32_t>(1);
+    // Type.
+    buffer.writeBEInt<int32_t>(0);
+    // Scheme.
+    buffer.writeBEInt<uint32_t>(scheme.length());
+    buffer.add(scheme);
+    // Credential.
+    buffer.writeBEInt<uint32_t>(credential.length());
+    buffer.add(credential);
+
     // Version.
     buffer.writeBEInt<int32_t>(version);
 
@@ -291,6 +335,27 @@ TEST_F(ZooKeeperFilterTest, ExistsRequest) {
 
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*data, false));
   EXPECT_EQ(1UL, config_->stats().exists_rq_.value());
+  EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
+}
+
+TEST_F(ZooKeeperFilterTest, GetAclRequest) {
+  initialize();
+
+  Buffer::InstancePtr data(new Buffer::OwnedImpl(encodePath("/foo", enumToInt(OpCodes::GETACL))));
+
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*data, false));
+  EXPECT_EQ(1UL, config_->stats().getacl_rq_.value());
+  EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
+}
+
+TEST_F(ZooKeeperFilterTest, SetAclRequest) {
+  initialize();
+
+  Buffer::InstancePtr data(
+      new Buffer::OwnedImpl(encodeSetAclRequest("/foo", "digest", "passwd", -1)));
+
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*data, false));
+  EXPECT_EQ(1UL, config_->stats().setacl_rq_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
 }
 

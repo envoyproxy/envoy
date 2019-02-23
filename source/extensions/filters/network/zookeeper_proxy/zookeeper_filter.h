@@ -100,6 +100,8 @@ public:
   void onGetChildrenRequest(const std::string& path, const bool watch, const bool two) override;
   void onDeleteRequest(const std::string& path, const int32_t version) override;
   void onExistsRequest(const std::string& path, const bool watch) override;
+  void onGetAclRequest(const std::string& path) override;
+  void onSetAclRequest(const std::string& path, const int32_t version) override;
 
   void doDecode(Buffer::Instance& buffer);
   DecoderPtr createDecoder(DecoderCallbacks& callbacks);
