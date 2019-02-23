@@ -41,6 +41,7 @@ namespace ZooKeeperProxy {
   COUNTER(close_rq)                                                     \
   COUNTER(setauth_rq)                                                   \
   COUNTER(setwatches_rq)                                                \
+  COUNTER(check_rq)                                                     \
 // clang-format on
 
 /**
@@ -103,6 +104,7 @@ public:
   void onGetAclRequest(const std::string& path) override;
   void onSetAclRequest(const std::string& path, const int32_t version) override;
   void onSyncRequest(const std::string& path) override;
+  void onCheckRequest(const std::string& path, const int32_t version) override;
 
   void doDecode(Buffer::Instance& buffer);
   DecoderPtr createDecoder(DecoderCallbacks& callbacks);

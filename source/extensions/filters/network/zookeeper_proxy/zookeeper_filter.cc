@@ -129,6 +129,11 @@ void ZooKeeperFilter::onSyncRequest(const std::string&) {
   // TODO: set metadata.
 }
 
+void ZooKeeperFilter::onCheckRequest(const std::string&, const int32_t) {
+  config_->stats_.check_rq_.inc();
+  // TODO: set metadata.
+}
+
 } // namespace ZooKeeperProxy
 } // namespace NetworkFilters
 } // namespace Extensions

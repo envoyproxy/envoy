@@ -74,6 +74,7 @@ void DecoderImpl::decode(Buffer::Instance& data, uint64_t& offset) {
     parseSyncRequest(data, offset, len);
     break;
   case enumToInt(OpCodes::CHECK):
+    parseCheckRequest(data, offset, len);
     break;
   case enumToInt(OpCodes::MULTI):
     break;
@@ -267,6 +268,20 @@ void DecoderImpl::parseSyncRequest(Buffer::Instance& data, uint64_t& offset, uin
   BufferHelper::peekString(data, offset, path);
 
   callbacks_.onSyncRequest(path);
+}
+
+void DecoderImpl::parseCheckRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
+  CHECK_LENGTH(len, 8);
+
+  // Skip opcode.
+  offset += 4;
+  std::string path;
+  BufferHelper::peekString(data, offset, path);
+  // Version.
+  int32_t version;
+  BufferHelper::peekInt32(data, offset, version);
+
+  callbacks_.onCheckRequest(path, version);
 }
 
 void DecoderImpl::onData(Buffer::Instance& data) {

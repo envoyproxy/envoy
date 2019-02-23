@@ -105,6 +105,23 @@ public:
     return buffer;
   }
 
+  Buffer::OwnedImpl encodePathVersion(const std::string& path, const int32_t version,
+                                      const int32_t opcode = enumToInt(OpCodes::GETDATA)) const {
+    Buffer::OwnedImpl buffer;
+
+    buffer.writeBEInt<int32_t>(16 + path.length());
+    buffer.writeBEInt<int32_t>(1000);
+    // Opcode.
+    buffer.writeBEInt<int32_t>(opcode);
+    // Path.
+    buffer.writeBEInt<int32_t>(path.length());
+    buffer.add(path);
+    // Version
+    buffer.writeBEInt<int32_t>(version);
+
+    return buffer;
+  }
+
   Buffer::OwnedImpl encodePath(const std::string& path, const int32_t opcode) const {
     Buffer::OwnedImpl buffer;
 
@@ -366,6 +383,17 @@ TEST_F(ZooKeeperFilterTest, SyncRequest) {
 
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*data, false));
   EXPECT_EQ(1UL, config_->stats().sync_rq_.value());
+  EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
+}
+
+TEST_F(ZooKeeperFilterTest, CheckRequest) {
+  initialize();
+
+  Buffer::InstancePtr data(
+      new Buffer::OwnedImpl(encodePathVersion("/foo", 100, enumToInt(OpCodes::CHECK))));
+
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*data, false));
+  EXPECT_EQ(1UL, config_->stats().check_rq_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
 }
 
