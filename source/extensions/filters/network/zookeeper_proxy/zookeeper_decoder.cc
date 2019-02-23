@@ -63,10 +63,14 @@ void DecoderImpl::decode(Buffer::Instance& data, uint64_t& offset) {
   }
 }
 
-void DecoderImpl::parseConnect(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
-  if (len < 28) {
-    return;
+#define CHECK_LENGTH(LEN, MINL)                                                                    \
+  if (LEN < MINL) {                                                                                \
+    callbacks_.onDecodeError();                                                                    \
+    return;                                                                                        \
   }
+
+void DecoderImpl::parseConnect(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
+  CHECK_LENGTH(len, 28);
 
   // Read password - skip zxid, timeout, and session id.
   std::string passwd;
@@ -81,9 +85,7 @@ void DecoderImpl::parseConnect(Buffer::Instance& data, uint64_t& offset, uint32_
 }
 
 void DecoderImpl::parseAuthRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
-  if (len < 20) {
-    return;
-  }
+  CHECK_LENGTH(len, 20);
 
   // Skip opcode & type.
   std::string scheme;
@@ -96,9 +98,7 @@ void DecoderImpl::parseAuthRequest(Buffer::Instance& data, uint64_t& offset, uin
 }
 
 void DecoderImpl::parseGetDataRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
-  if (len < 14) {
-    return;
-  }
+  CHECK_LENGTH(len, 14);
 
   // Skip opcode.
   offset += 4;
@@ -126,9 +126,7 @@ void DecoderImpl::skipAcls(Buffer::Instance& data, uint64_t& offset) const {
 
 void DecoderImpl::parseCreateRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len,
                                      const bool two) {
-  if (len < 25) {
-    return;
-  }
+  CHECK_LENGTH(len, 25);
 
   // Skip opcode.
   offset += 4;
@@ -150,9 +148,7 @@ void DecoderImpl::parseCreateRequest(Buffer::Instance& data, uint64_t& offset, u
 }
 
 void DecoderImpl::parseSetRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
-  if (len < 20) {
-    return;
-  }
+  CHECK_LENGTH(len, 20);
 
   // Skip opcode.
   offset += 4;
@@ -171,9 +167,7 @@ void DecoderImpl::parseSetRequest(Buffer::Instance& data, uint64_t& offset, uint
 
 void DecoderImpl::parseGetChildrenRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len,
                                           const bool two) {
-  if (len < 14) {
-    return;
-  }
+  CHECK_LENGTH(len, 14);
 
   // Skip opcode.
   offset += 4;
