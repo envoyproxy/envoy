@@ -37,7 +37,6 @@ enum class OpCodes {
   MULTI = 14,
   CREATE2 = 15,
   RECONFIG = 16,
-  CREATESESSION = -10,
   CLOSE = -11,
   SETAUTH = 100,
   SETWATCHES = 101
