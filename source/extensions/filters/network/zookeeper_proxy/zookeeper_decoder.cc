@@ -23,13 +23,13 @@ void DecoderImpl::decode(Buffer::Instance& data, uint64_t& offset) {
 
   // "Special" requests.
   switch (xid) {
-  case CONNECT_XID:
+  case enumToInt(XidCodes::CONNECT_XID):
     parseConnect(data, offset, len);
     return;
-  case PING_XID:
+  case enumToInt(XidCodes::PING_XID):
     callbacks_.onPing();
     return;
-  case AUTH_XID:
+  case enumToInt(XidCodes::AUTH_XID):
     parseAuthRequest(data, offset, len);
     return;
   default:
@@ -40,22 +40,22 @@ void DecoderImpl::decode(Buffer::Instance& data, uint64_t& offset) {
   int32_t opcode;
   BufferHelper::peekInt32(data, offset, opcode);
   switch (opcode) {
-  case enumToInt(Opcodes::GETDATA):
+  case enumToInt(OpCodes::GETDATA):
     parseGetDataRequest(data, offset, len);
     break;
-  case enumToInt(Opcodes::CREATE):
+  case enumToInt(OpCodes::CREATE):
     parseCreateRequest(data, offset, len, false);
     break;
-  case enumToInt(Opcodes::CREATE2):
+  case enumToInt(OpCodes::CREATE2):
     parseCreateRequest(data, offset, len, true);
     break;
-  case enumToInt(Opcodes::SETDATA):
+  case enumToInt(OpCodes::SETDATA):
     parseSetRequest(data, offset, len);
     break;
-  case enumToInt(Opcodes::GETCHILDREN):
+  case enumToInt(OpCodes::GETCHILDREN):
     parseGetChildrenRequest(data, offset, len, false);
     break;
-  case enumToInt(Opcodes::GETCHILDREN2):
+  case enumToInt(OpCodes::GETCHILDREN2):
     parseGetChildrenRequest(data, offset, len, true);
     break;
   default:

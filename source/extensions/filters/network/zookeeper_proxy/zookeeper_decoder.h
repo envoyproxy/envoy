@@ -12,13 +12,15 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ZooKeeperProxy {
 
-const int CONNECT_XID = 0;
-const int WATCH_XID = -1;
-const int PING_XID = -2;
-const int AUTH_XID = -4;
-const int SET_WATCHES_XID = -8;
+enum class XidCodes {
+  CONNECT_XID = 0,
+  WATCH_XID = -1,
+  PING_XID = -2,
+  AUTH_XID = -4,
+  SET_WATCHES_XID = -8
+};
 
-enum class Opcodes {
+enum class OpCodes {
   CONNECT = 0,
   CREATE = 1,
   DELETE = 2,

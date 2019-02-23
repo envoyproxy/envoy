@@ -63,7 +63,7 @@ public:
     Buffer::OwnedImpl* buffer = new Buffer::OwnedImpl();
 
     buffer->writeBEInt<uint32_t>(8);
-    buffer->writeBEInt<int32_t>(PING_XID);
+    buffer->writeBEInt<int32_t>(enumToInt(XidCodes::PING_XID));
 
     return buffer;
   }
@@ -72,9 +72,9 @@ public:
     Buffer::OwnedImpl* buffer = new Buffer::OwnedImpl();
 
     buffer->writeBEInt<uint32_t>(28 + scheme.length());
-    buffer->writeBEInt<int32_t>(AUTH_XID);
+    buffer->writeBEInt<int32_t>(enumToInt(XidCodes::AUTH_XID));
     // Opcode.
-    buffer->writeBEInt<int32_t>(100);
+    buffer->writeBEInt<int32_t>(enumToInt(OpCodes::SETAUTH));
     // Type.
     buffer->writeBEInt<int32_t>(0);
     // Scheme.
@@ -95,7 +95,7 @@ public:
     buffer->writeBEInt<int32_t>(1000);
     // Opcode.
     const int32_t opcode =
-        getchildren ? enumToInt(Opcodes::GETCHILDREN) : enumToInt(Opcodes::GETDATA);
+        getchildren ? enumToInt(OpCodes::GETCHILDREN) : enumToInt(OpCodes::GETDATA);
     buffer->writeBEInt<int32_t>(opcode);
     // Path.
     buffer->writeBEInt<int32_t>(path.length());
@@ -114,7 +114,7 @@ public:
     buffer->writeBEInt<int32_t>(24 + path.length() + data.length());
     buffer->writeBEInt<int32_t>(1000);
     // Opcode.
-    buffer->writeBEInt<int32_t>(enumToInt(Opcodes::CREATE));
+    buffer->writeBEInt<int32_t>(enumToInt(OpCodes::CREATE));
     // Path.
     buffer->writeBEInt<int32_t>(path.length());
     buffer->add(path);
@@ -143,7 +143,7 @@ public:
     buffer->writeBEInt<int32_t>(20 + path.length() + data.length());
     buffer->writeBEInt<int32_t>(1000);
     // Opcode.
-    buffer->writeBEInt<int32_t>(enumToInt(Opcodes::SETDATA));
+    buffer->writeBEInt<int32_t>(enumToInt(OpCodes::SETDATA));
     // Path.
     buffer->writeBEInt<int32_t>(path.length());
     buffer->add(path);
