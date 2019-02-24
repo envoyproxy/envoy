@@ -31,16 +31,15 @@ def sanitize_flagfile(in_path, out_fd):
 # Is the arg a flag indicating that we're building for C++ (rather than C)?
 def is_cpp_flag(arg):
   return arg in [
-      "-static-libstdc++", "-stdlib=libc++", "-std=c++0x", "-std=c++",
-      "-std=gnu++", "-lstdc++", "-lc++"
+      "-static-libstdc++", "-stdlib=libc++", "-std=c++0x", "-std=c++", "-std=gnu++", "-lstdc++",
+      "-lc++"
   ]
 
 
 def main():
   # Append CXXFLAGS to correctly detect include paths for either libstdc++ or libc++.
   if sys.argv[1:5] == ["-E", "-xc++", "-", "-v"]:
-    os.execv(envoy_real_cxx,
-             [envoy_real_cxx] + sys.argv[1:] + shlex.split(envoy_cxxflags))
+    os.execv(envoy_real_cxx, [envoy_real_cxx] + sys.argv[1:] + shlex.split(envoy_cxxflags))
 
   # Detect if we're building for C++ or vanilla C.
   if any(map(is_cpp_flag, sys.argv[1:])):
@@ -65,8 +64,7 @@ def main():
         # unless the user has explicitly set environment variables
         # before starting Bazel. But here in $PWD is the Bazel sandbox,
         # which will be deleted automatically after the compiler exits.
-        (flagfile_fd, flagfile_path) = tempfile.mkstemp(
-            dir="./", suffix=".linker-params")
+        (flagfile_fd, flagfile_path) = tempfile.mkstemp(dir="./", suffix=".linker-params")
         with closing_fd(flagfile_fd):
           sanitize_flagfile(arg[len("-Wl,@"):], flagfile_fd)
         argv.append("-Wl,@" + flagfile_path)
