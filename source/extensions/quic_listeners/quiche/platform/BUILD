@@ -71,6 +71,7 @@ envoy_cc_library(
         "quic_uint128_impl.h",
     ] + envoy_select_quiche([
         "quic_logging_impl.h",
+        "quic_mock_log_impl.h",
         "quic_stack_trace_impl.h",
     ]),
     external_deps = [
