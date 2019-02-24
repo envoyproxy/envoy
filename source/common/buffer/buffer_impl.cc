@@ -44,6 +44,16 @@ void OwnedImpl::add(const Instance& data) {
 }
 
 void OwnedImpl::prepend(absl::string_view data) {
+  // Prepending an empty string seems to mess up libevent internally.
+  // evbuffer_prepend doesn't have a check for empty (unlike
+  // evbuffer_prepend_buffer which does). This then results in an allocation of
+  // an empty chain, which causes problems with a following move/append. This
+  // only seems to happen the the original buffer was created via
+  // addBufferFragment(), this forces the code execution path in
+  // evbuffer_prepend related to immutable buffers.
+  if (data.size() == 0) {
+    return;
+  }
   evbuffer_prepend(buffer_.get(), data.data(), data.size());
 }
 
