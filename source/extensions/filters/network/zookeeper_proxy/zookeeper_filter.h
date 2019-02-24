@@ -108,6 +108,7 @@ public:
   void onMultiRequest() override;
   void onReconfigRequest() override;
   void onSetWatchesRequest() override;
+  void onCloseRequest() override;
 
   void doDecode(Buffer::Instance& buffer);
   DecoderPtr createDecoder(DecoderCallbacks& callbacks);

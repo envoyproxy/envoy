@@ -86,6 +86,7 @@ void DecoderImpl::decode(Buffer::Instance& data, uint64_t& offset) {
     parseSetWatchesRequest(data, offset, len);
     break;
   case enumToIntSigned(OpCodes::CLOSE):
+    callbacks_.onCloseRequest();
     break;
   default:
     break;

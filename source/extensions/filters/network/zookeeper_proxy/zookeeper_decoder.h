@@ -67,6 +67,7 @@ public:
   virtual void onMultiRequest() PURE;
   virtual void onReconfigRequest() PURE;
   virtual void onSetWatchesRequest() PURE;
+  virtual void onCloseRequest() PURE;
 };
 
 /**

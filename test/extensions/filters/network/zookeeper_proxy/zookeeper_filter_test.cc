@@ -67,6 +67,16 @@ public:
     return buffer;
   }
 
+  Buffer::OwnedImpl encodeCloseRequest() const {
+    Buffer::OwnedImpl buffer;
+
+    buffer.writeBEInt<uint32_t>(8);
+    buffer.writeBEInt<int32_t>(1000);
+    buffer.writeBEInt<int32_t>(enumToInt(OpCodes::CLOSE));
+
+    return buffer;
+  }
+
   Buffer::OwnedImpl encodeAuth(const std::string& scheme) const {
     Buffer::OwnedImpl buffer;
 
@@ -500,6 +510,16 @@ TEST_F(ZooKeeperFilterTest, SetWatchesRequest) {
 
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*data, false));
   EXPECT_EQ(1UL, config_->stats().setwatches_rq_.value());
+  EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
+}
+
+TEST_F(ZooKeeperFilterTest, CloseRequest) {
+  initialize();
+
+  Buffer::InstancePtr data(new Buffer::OwnedImpl(encodeCloseRequest()));
+
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*data, false));
+  EXPECT_EQ(1UL, config_->stats().close_rq_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
 }
 
