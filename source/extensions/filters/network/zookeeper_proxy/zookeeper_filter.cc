@@ -139,6 +139,11 @@ void ZooKeeperFilter::onMultiRequest() {
   // TODO: set metadata.
 }
 
+void ZooKeeperFilter::onReconfigRequest() {
+  config_->stats_.reconfig_rq_.inc();
+  // TODO: set metadata.
+}
+
 } // namespace ZooKeeperProxy
 } // namespace NetworkFilters
 } // namespace Extensions

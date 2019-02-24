@@ -65,6 +65,7 @@ public:
   virtual void onSyncRequest(const std::string& path) PURE;
   virtual void onCheckRequest(const std::string& path, const int32_t version) PURE;
   virtual void onMultiRequest() PURE;
+  virtual void onReconfigRequest() PURE;
 };
 
 /**
@@ -103,6 +104,7 @@ private:
   void parseSyncRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
   void parseCheckRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
   void parseMultiRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
+  void parseReconfigRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
 
   DecoderCallbacks& callbacks_;
 };

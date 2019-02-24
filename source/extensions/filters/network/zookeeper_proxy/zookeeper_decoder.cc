@@ -80,6 +80,7 @@ void DecoderImpl::decode(Buffer::Instance& data, uint64_t& offset) {
     parseMultiRequest(data, offset, len);
     break;
   case enumToInt(OpCodes::RECONFIG):
+    parseReconfigRequest(data, offset, len);
     break;
   case enumToInt(OpCodes::SETWATCHES):
     break;
@@ -271,11 +272,22 @@ void DecoderImpl::parseMultiRequest(Buffer::Instance& data, uint64_t& offset, ui
 
   while (true) {
     int32_t type;
-    BufferHelper::peekInt32(data, offset, type);
+    if (!BufferHelper::peekInt32(data, offset, type)) {
+      callbacks_.onDecodeError();
+      return;
+    }
+
     bool done{};
-    BufferHelper::peekBool(data, offset, done);
+    if (!BufferHelper::peekBool(data, offset, done)) {
+      callbacks_.onDecodeError();
+      return;
+    }
+
     int32_t error;
-    BufferHelper::peekInt32(data, offset, error);
+    if (!BufferHelper::peekInt32(data, offset, error)) {
+      callbacks_.onDecodeError();
+      return;
+    }
 
     if (done) {
       break;
@@ -299,6 +311,26 @@ void DecoderImpl::parseMultiRequest(Buffer::Instance& data, uint64_t& offset, ui
   }
 
   callbacks_.onMultiRequest();
+}
+
+void DecoderImpl::parseReconfigRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
+  CHECK_LENGTH(len, 28);
+
+  // Skip joining.
+  int32_t datalen;
+  BufferHelper::peekInt32(data, offset, datalen);
+  offset += datalen;
+  // Skip leaving.
+  BufferHelper::peekInt32(data, offset, datalen);
+  offset += datalen;
+  // Skip new members.
+  BufferHelper::peekInt32(data, offset, datalen);
+  offset += datalen;
+  // Read config id.
+  int64_t config_id;
+  BufferHelper::peekInt64(data, offset, config_id);
+
+  callbacks_.onReconfigRequest();
 }
 
 void DecoderImpl::onData(Buffer::Instance& data) {

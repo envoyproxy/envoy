@@ -37,11 +37,10 @@ public:
     buffer.writeBEInt<uint64_t>(zxid);
     buffer.writeBEInt<uint32_t>(session_timeout);
     buffer.writeBEInt<uint64_t>(session_id);
-    buffer.writeBEInt<uint32_t>(passwd.length());
-    buffer.add(passwd);
+    addString(buffer, passwd);
 
     if (readonly) {
-      char readonly_flag = 0b1;
+      const char readonly_flag = 0b1;
       buffer.add(std::string(1, readonly_flag));
     }
 
@@ -78,11 +77,9 @@ public:
     // Type.
     buffer.writeBEInt<int32_t>(0);
     // Scheme.
-    buffer.writeBEInt<uint32_t>(scheme.length());
-    buffer.add(scheme);
+    addString(buffer, scheme);
     // Credential.
-    buffer.writeBEInt<uint32_t>(6);
-    buffer.add("p@sswd");
+    addString(buffer, "p@sswd");
 
     return buffer;
   }
@@ -96,10 +93,9 @@ public:
     // Opcode.
     buffer.writeBEInt<int32_t>(opcode);
     // Path.
-    buffer.writeBEInt<int32_t>(path.length());
-    buffer.add(path);
+    addString(buffer, path);
     // Watch.
-    char watch_flag = watch ? 0b1 : 0b0;
+    const char watch_flag = watch ? 0b1 : 0b0;
     buffer.add(std::string(1, watch_flag));
 
     return buffer;
@@ -114,8 +110,7 @@ public:
     // Opcode.
     buffer.writeBEInt<int32_t>(opcode);
     // Path.
-    buffer.writeBEInt<int32_t>(path.length());
-    buffer.add(path);
+    addString(buffer, path);
     // Version
     buffer.writeBEInt<int32_t>(version);
 
@@ -130,8 +125,7 @@ public:
     // Opcode.
     buffer.writeBEInt<int32_t>(opcode);
     // Path.
-    buffer.writeBEInt<int32_t>(path.length());
-    buffer.add(path);
+    addString(buffer, path);
 
     return buffer;
   }
@@ -148,11 +142,9 @@ public:
     }
 
     // Path.
-    buffer.writeBEInt<int32_t>(path.length());
-    buffer.add(path);
+    addString(buffer, path);
     // Data.
-    buffer.writeBEInt<int32_t>(data.length());
-    buffer.add(data);
+    addString(buffer, data);
     // Acls.
     buffer.writeBEInt<int32_t>(0);
     // Flags.
@@ -177,11 +169,9 @@ public:
     // Opcode.
     buffer.writeBEInt<int32_t>(enumToInt(OpCodes::SETDATA));
     // Path.
-    buffer.writeBEInt<int32_t>(path.length());
-    buffer.add(path);
+    addString(buffer, path);
     // Data.
-    buffer.writeBEInt<int32_t>(data.length());
-    buffer.add(data);
+    addString(buffer, data);
     // Version.
     buffer.writeBEInt<int32_t>(version);
 
@@ -196,8 +186,7 @@ public:
     // Opcode.
     buffer.writeBEInt<int32_t>(enumToInt(OpCodes::DELETE));
     // Path.
-    buffer.writeBEInt<int32_t>(path.length());
-    buffer.add(path);
+    addString(buffer, path);
     // Version.
     buffer.writeBEInt<int32_t>(version);
 
@@ -214,22 +203,34 @@ public:
     // Opcode.
     buffer.writeBEInt<int32_t>(enumToInt(OpCodes::SETACL));
     // Path.
-    buffer.writeBEInt<int32_t>(path.length());
-    buffer.add(path);
+    addString(buffer, path);
 
     // Acls.
     buffer.writeBEInt<int32_t>(1);
     // Type.
     buffer.writeBEInt<int32_t>(0);
     // Scheme.
-    buffer.writeBEInt<uint32_t>(scheme.length());
-    buffer.add(scheme);
+    addString(buffer, scheme);
     // Credential.
-    buffer.writeBEInt<uint32_t>(credential.length());
-    buffer.add(credential);
+    addString(buffer, credential);
 
     // Version.
     buffer.writeBEInt<int32_t>(version);
+
+    return buffer;
+  }
+
+  Buffer::OwnedImpl encodeReconfigRequest(const std::string& joining, const std::string& leaving,
+                                          const std::string& new_members, int64_t config_id) const {
+    Buffer::OwnedImpl buffer;
+
+    buffer.writeBEInt<int32_t>(28 + joining.length() + leaving.length() + new_members.length());
+    buffer.writeBEInt<int32_t>(1000);
+    buffer.writeBEInt<int32_t>(enumToInt(OpCodes::RECONFIG));
+    addString(buffer, joining);
+    addString(buffer, leaving);
+    addString(buffer, new_members);
+    buffer.writeBEInt<int64_t>(config_id);
 
     return buffer;
   }
@@ -263,6 +264,11 @@ public:
     buffer.add(requests);
 
     return buffer;
+  }
+
+  void addString(Buffer::OwnedImpl& buffer, const std::string& str) const {
+    buffer.writeBEInt<uint32_t>(str.length());
+    buffer.add(str);
   }
 
   ZooKeeperFilterConfigSharedPtr config_;
@@ -444,6 +450,16 @@ TEST_F(ZooKeeperFilterTest, MultiRequest) {
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*data, false));
   EXPECT_EQ(1UL, config_->stats().multi_rq_.value());
   EXPECT_EQ(2UL, config_->stats().create_rq_.value());
+  EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
+}
+
+TEST_F(ZooKeeperFilterTest, ReconfigRequest) {
+  initialize();
+
+  Buffer::InstancePtr data(new Buffer::OwnedImpl(encodeReconfigRequest("s1", "s2", "s3", 1000)));
+
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*data, false));
+  EXPECT_EQ(1UL, config_->stats().reconfig_rq_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
 }
 

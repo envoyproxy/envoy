@@ -15,6 +15,16 @@ bool BufferHelper::peekInt32(Buffer::Instance& buffer, uint64_t& offset, int32_t
   }
 }
 
+bool BufferHelper::peekInt64(Buffer::Instance& buffer, uint64_t& offset, int64_t& val) {
+  try {
+    val = buffer.peekBEInt<int64_t>(offset);
+    offset += sizeof(int64_t);
+    return true;
+  } catch (EnvoyException& e) {
+    return false;
+  }
+}
+
 bool BufferHelper::peekBool(Buffer::Instance& buffer, uint64_t& offset, bool& val) {
   if (buffer.length() < (offset + 1)) {
     return false;

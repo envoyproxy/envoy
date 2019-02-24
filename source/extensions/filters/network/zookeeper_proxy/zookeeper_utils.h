@@ -18,6 +18,7 @@ namespace ZooKeeperProxy {
 class BufferHelper : public Logger::Loggable<Logger::Id::filter> {
 public:
   static bool peekInt32(Buffer::Instance& buffer, uint64_t& offset, int32_t& val);
+  static bool peekInt64(Buffer::Instance& buffer, uint64_t& offset, int64_t& val);
   static bool peekString(Buffer::Instance& buffer, uint64_t& offset, std::string& str);
   static bool peekBool(Buffer::Instance& buffer, uint64_t& offset, bool& val);
 };
