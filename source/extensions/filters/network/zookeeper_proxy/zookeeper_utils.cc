@@ -8,7 +8,7 @@ namespace ZooKeeperProxy {
 bool BufferHelper::peekInt32(Buffer::Instance& buffer, uint64_t& offset, int32_t& val) {
   try {
     val = buffer.peekBEInt<int32_t>(offset);
-    offset += sizeof(uint32_t);
+    offset += sizeof(int32_t);
     return true;
   } catch (EnvoyException& e) {
     return false;

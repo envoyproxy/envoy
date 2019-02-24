@@ -77,6 +77,7 @@ void DecoderImpl::decode(Buffer::Instance& data, uint64_t& offset) {
     parseCheckRequest(data, offset, len);
     break;
   case enumToInt(OpCodes::MULTI):
+    parseMultiRequest(data, offset, len);
     break;
   case enumToInt(OpCodes::RECONFIG):
     break;
@@ -113,9 +114,9 @@ void DecoderImpl::parseConnect(Buffer::Instance& data, uint64_t& offset, uint32_
 void DecoderImpl::parseAuthRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
   CHECK_LENGTH(len, 20);
 
-  // Skip opcode & type.
-  std::string scheme;
+  // Skip opcode + type.
   offset += 8;
+  std::string scheme;
   BufferHelper::peekString(data, offset, scheme);
   std::string credential;
   BufferHelper::peekString(data, offset, credential);
@@ -124,10 +125,8 @@ void DecoderImpl::parseAuthRequest(Buffer::Instance& data, uint64_t& offset, uin
 }
 
 void DecoderImpl::parseGetDataRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
-  CHECK_LENGTH(len, 14);
+  CHECK_LENGTH(len, 13);
 
-  // Skip opcode.
-  offset += 4;
   std::string path;
   BufferHelper::peekString(data, offset, path);
   bool watch;
@@ -152,10 +151,8 @@ void DecoderImpl::skipAcls(Buffer::Instance& data, uint64_t& offset) const {
 
 void DecoderImpl::parseCreateRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len,
                                      const bool two) {
-  CHECK_LENGTH(len, 25);
+  CHECK_LENGTH(len, 20);
 
-  // Skip opcode.
-  offset += 4;
   std::string path;
   BufferHelper::peekString(data, offset, path);
   // Skip data.
@@ -176,8 +173,6 @@ void DecoderImpl::parseCreateRequest(Buffer::Instance& data, uint64_t& offset, u
 void DecoderImpl::parseSetRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
   CHECK_LENGTH(len, 20);
 
-  // Skip opcode.
-  offset += 4;
   std::string path;
   BufferHelper::peekString(data, offset, path);
   // Skip data.
@@ -195,8 +190,6 @@ void DecoderImpl::parseGetChildrenRequest(Buffer::Instance& data, uint64_t& offs
                                           const bool two) {
   CHECK_LENGTH(len, 14);
 
-  // Skip opcode.
-  offset += 4;
   std::string path;
   BufferHelper::peekString(data, offset, path);
   bool watch;
@@ -208,8 +201,6 @@ void DecoderImpl::parseGetChildrenRequest(Buffer::Instance& data, uint64_t& offs
 void DecoderImpl::parseDeleteRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
   CHECK_LENGTH(len, 16);
 
-  // Skip opcode.
-  offset += 4;
   std::string path;
   BufferHelper::peekString(data, offset, path);
   // Version.
@@ -222,8 +213,6 @@ void DecoderImpl::parseDeleteRequest(Buffer::Instance& data, uint64_t& offset, u
 void DecoderImpl::parseExistsRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
   CHECK_LENGTH(len, 13);
 
-  // Skip opcode.
-  offset += 4;
   std::string path;
   BufferHelper::peekString(data, offset, path);
   bool watch;
@@ -235,8 +224,6 @@ void DecoderImpl::parseExistsRequest(Buffer::Instance& data, uint64_t& offset, u
 void DecoderImpl::parseGetAclRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
   CHECK_LENGTH(len, 8);
 
-  // Skip opcode.
-  offset += 4;
   std::string path;
   BufferHelper::peekString(data, offset, path);
 
@@ -246,8 +233,6 @@ void DecoderImpl::parseGetAclRequest(Buffer::Instance& data, uint64_t& offset, u
 void DecoderImpl::parseSetAclRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
   CHECK_LENGTH(len, 8);
 
-  // Skip opcode.
-  offset += 4;
   std::string path;
   BufferHelper::peekString(data, offset, path);
   // Skip acls.
@@ -262,8 +247,6 @@ void DecoderImpl::parseSetAclRequest(Buffer::Instance& data, uint64_t& offset, u
 void DecoderImpl::parseSyncRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
   CHECK_LENGTH(len, 8);
 
-  // Skip opcode.
-  offset += 4;
   std::string path;
   BufferHelper::peekString(data, offset, path);
 
@@ -273,8 +256,6 @@ void DecoderImpl::parseSyncRequest(Buffer::Instance& data, uint64_t& offset, uin
 void DecoderImpl::parseCheckRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
   CHECK_LENGTH(len, 8);
 
-  // Skip opcode.
-  offset += 4;
   std::string path;
   BufferHelper::peekString(data, offset, path);
   // Version.
@@ -282,6 +263,42 @@ void DecoderImpl::parseCheckRequest(Buffer::Instance& data, uint64_t& offset, ui
   BufferHelper::peekInt32(data, offset, version);
 
   callbacks_.onCheckRequest(path, version);
+}
+
+void DecoderImpl::parseMultiRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
+  // Treat empty transactions as a decoding error, there should be at least 1 header.
+  CHECK_LENGTH(len, 17);
+
+  while (true) {
+    int32_t type;
+    BufferHelper::peekInt32(data, offset, type);
+    bool done{};
+    BufferHelper::peekBool(data, offset, done);
+    int32_t error;
+    BufferHelper::peekInt32(data, offset, error);
+
+    if (done) {
+      break;
+    }
+
+    switch (type) {
+    case enumToInt(OpCodes::CREATE):
+      parseCreateRequest(data, offset, len, false);
+      break;
+    case enumToInt(OpCodes::SETDATA):
+      parseSetRequest(data, offset, len);
+      break;
+    case enumToInt(OpCodes::CHECK):
+      parseCheckRequest(data, offset, len);
+      break;
+    default:
+      // Should not happen.
+      callbacks_.onDecodeError();
+      break;
+    }
+  }
+
+  callbacks_.onMultiRequest();
 }
 
 void DecoderImpl::onData(Buffer::Instance& data) {

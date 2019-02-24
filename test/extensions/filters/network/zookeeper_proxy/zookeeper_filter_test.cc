@@ -137,13 +137,16 @@ public:
   }
 
   Buffer::OwnedImpl encodeCreateRequest(const std::string& path, const std::string& data,
-                                        const bool ephemeral, const bool sequence) const {
+                                        const bool ephemeral, const bool sequence,
+                                        const bool txn = false) const {
     Buffer::OwnedImpl buffer;
 
-    buffer.writeBEInt<int32_t>(24 + path.length() + data.length());
-    buffer.writeBEInt<int32_t>(1000);
-    // Opcode.
-    buffer.writeBEInt<int32_t>(enumToInt(OpCodes::CREATE));
+    if (!txn) {
+      buffer.writeBEInt<int32_t>(24 + path.length() + data.length());
+      buffer.writeBEInt<int32_t>(1000);
+      buffer.writeBEInt<int32_t>(enumToInt(OpCodes::CREATE));
+    }
+
     // Path.
     buffer.writeBEInt<int32_t>(path.length());
     buffer.add(path);
@@ -227,6 +230,37 @@ public:
 
     // Version.
     buffer.writeBEInt<int32_t>(version);
+
+    return buffer;
+  }
+
+  Buffer::OwnedImpl
+  encodeMultiRequest(const std::vector<std::pair<int32_t, Buffer::OwnedImpl>>& ops) const {
+    Buffer::OwnedImpl buffer;
+    Buffer::OwnedImpl requests;
+
+    for (const auto& op_pair : ops) {
+      // Header.
+      requests.writeBEInt<int32_t>(op_pair.first);
+      requests.add(std::string(1, 0b0));
+      requests.writeBEInt<int32_t>(-1);
+
+      // Payload.
+      requests.add(op_pair.second);
+    }
+
+    // Done header.
+    requests.writeBEInt<int32_t>(-1);
+    requests.add(std::string(1, 0b1));
+    requests.writeBEInt<int32_t>(-1);
+
+    // Multi prefix.
+    buffer.writeBEInt<int32_t>(8 + requests.length());
+    buffer.writeBEInt<int32_t>(1000);
+    buffer.writeBEInt<int32_t>(enumToInt(OpCodes::MULTI));
+
+    // Requests.
+    buffer.add(requests);
 
     return buffer;
   }
@@ -394,6 +428,22 @@ TEST_F(ZooKeeperFilterTest, CheckRequest) {
 
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*data, false));
   EXPECT_EQ(1UL, config_->stats().check_rq_.value());
+  EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
+}
+
+TEST_F(ZooKeeperFilterTest, MultiRequest) {
+  initialize();
+
+  Buffer::OwnedImpl create1 = encodeCreateRequest("/foo", "1", false, false, true);
+  Buffer::OwnedImpl create2 = encodeCreateRequest("/bar", "1", false, false, true);
+  std::vector<std::pair<int32_t, Buffer::OwnedImpl>> ops;
+  ops.push_back(std::make_pair(enumToInt(OpCodes::CREATE), std::move(create1)));
+  ops.push_back(std::make_pair(enumToInt(OpCodes::CREATE), std::move(create2)));
+  Buffer::InstancePtr data(new Buffer::OwnedImpl(encodeMultiRequest(ops)));
+
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*data, false));
+  EXPECT_EQ(1UL, config_->stats().multi_rq_.value());
+  EXPECT_EQ(2UL, config_->stats().create_rq_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
 }
 
