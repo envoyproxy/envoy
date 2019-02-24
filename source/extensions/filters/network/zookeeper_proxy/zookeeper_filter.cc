@@ -149,9 +149,7 @@ void ZooKeeperFilter::onSetWatchesRequest() {
   // TODO: set metadata.
 }
 
-void ZooKeeperFilter::onCloseRequest() {
-  config_->stats_.close_rq_.inc();
-}
+void ZooKeeperFilter::onCloseRequest() { config_->stats_.close_rq_.inc(); }
 
 } // namespace ZooKeeperProxy
 } // namespace NetworkFilters
