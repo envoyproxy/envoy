@@ -28,7 +28,8 @@ in the configuration snippet below:
   filter_chains:
   - filters:
     - name: envoy.filters.network.mysql_proxy
-      config:
+      typed_config:
+        "@type": type.googleapis.com/envoy.config.filter.network.mysql_proxy.v1alpha1.MySQLProxy
         stat_prefix: mysql
     - name: envoy.tcp_proxy
       typed_config:
@@ -89,10 +90,12 @@ _catalog_ table in the _productdb_ database.
   filter_chains:
   - filters:
     - name: envoy.filters.network.mysql_proxy
-      config:
+      typed_config:
+        "@type": type.googleapis.com/envoy.config.filter.network.mysql_proxy.v1alpha1.MySQLProxy
         stat_prefix: mysql
     - name: envoy.filters.network.rbac
-      config:
+      typed_config:
+        "@type": type.googleapis.com/envoy.config.filter.network.rbac.v2.RBAC
         stat_prefix: rbac
         rules:
           action: DENY
