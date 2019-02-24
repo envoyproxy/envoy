@@ -66,6 +66,7 @@ public:
   virtual void onCheckRequest(const std::string& path, const int32_t version) PURE;
   virtual void onMultiRequest() PURE;
   virtual void onReconfigRequest() PURE;
+  virtual void onSetWatchesRequest() PURE;
 };
 
 /**
@@ -105,6 +106,8 @@ private:
   void parseCheckRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
   void parseMultiRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
   void parseReconfigRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
+  void parseSetWatchesRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
+  void skipStrings(Buffer::Instance& data, uint64_t& offset) const;
 
   DecoderCallbacks& callbacks_;
 };

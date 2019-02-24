@@ -235,6 +235,24 @@ public:
     return buffer;
   }
 
+  Buffer::OwnedImpl encodeSetWatchesRequest(const std::vector<std::string>& dataw,
+                                            const std::vector<std::string>& existw,
+                                            const std::vector<std::string>& childw) const {
+    Buffer::OwnedImpl buffer;
+    Buffer::OwnedImpl watches_buffer;
+
+    addStrings(watches_buffer, dataw);
+    addStrings(watches_buffer, existw);
+    addStrings(watches_buffer, childw);
+
+    buffer.writeBEInt<int32_t>(8 + watches_buffer.length());
+    buffer.writeBEInt<int32_t>(1000);
+    buffer.writeBEInt<int32_t>(enumToInt(OpCodes::SETWATCHES));
+    buffer.add(watches_buffer);
+
+    return buffer;
+  }
+
   Buffer::OwnedImpl
   encodeMultiRequest(const std::vector<std::pair<int32_t, Buffer::OwnedImpl>>& ops) const {
     Buffer::OwnedImpl buffer;
@@ -269,6 +287,14 @@ public:
   void addString(Buffer::OwnedImpl& buffer, const std::string& str) const {
     buffer.writeBEInt<uint32_t>(str.length());
     buffer.add(str);
+  }
+
+  void addStrings(Buffer::OwnedImpl& buffer, const std::vector<std::string>& watches) const {
+    buffer.writeBEInt<uint32_t>(watches.size());
+
+    for (const auto& watch : watches) {
+      addString(buffer, watch);
+    }
   }
 
   ZooKeeperFilterConfigSharedPtr config_;
@@ -460,6 +486,20 @@ TEST_F(ZooKeeperFilterTest, ReconfigRequest) {
 
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*data, false));
   EXPECT_EQ(1UL, config_->stats().reconfig_rq_.value());
+  EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
+}
+
+TEST_F(ZooKeeperFilterTest, SetWatchesRequest) {
+  initialize();
+
+  const std::vector<std::string> dataw = {"/foo", "/bar"};
+  const std::vector<std::string> existw = {"/foo1", "/bar1"};
+  const std::vector<std::string> childw = {"/foo2", "/bar2"};
+
+  Buffer::InstancePtr data(new Buffer::OwnedImpl(encodeSetWatchesRequest(dataw, existw, childw)));
+
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*data, false));
+  EXPECT_EQ(1UL, config_->stats().setwatches_rq_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
 }
 

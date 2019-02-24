@@ -83,6 +83,7 @@ void DecoderImpl::decode(Buffer::Instance& data, uint64_t& offset) {
     parseReconfigRequest(data, offset, len);
     break;
   case enumToInt(OpCodes::SETWATCHES):
+    parseSetWatchesRequest(data, offset, len);
     break;
   case enumToIntSigned(OpCodes::CLOSE):
     break;
@@ -331,6 +332,30 @@ void DecoderImpl::parseReconfigRequest(Buffer::Instance& data, uint64_t& offset,
   BufferHelper::peekInt64(data, offset, config_id);
 
   callbacks_.onReconfigRequest();
+}
+
+void DecoderImpl::parseSetWatchesRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
+  CHECK_LENGTH(len, 12);
+
+  // Data watches.
+  skipStrings(data, offset);
+  // Exist watches.
+  skipStrings(data, offset);
+  // Child watches.
+  skipStrings(data, offset);
+
+  callbacks_.onSetWatchesRequest();
+}
+
+void DecoderImpl::skipStrings(Buffer::Instance& data, uint64_t& offset) const {
+  int32_t count;
+  BufferHelper::peekInt32(data, offset, count);
+
+  for (int i = 0; i < count; ++i) {
+    int32_t len;
+    BufferHelper::peekInt32(data, offset, len);
+    offset += len;
+  }
 }
 
 void DecoderImpl::onData(Buffer::Instance& data) {

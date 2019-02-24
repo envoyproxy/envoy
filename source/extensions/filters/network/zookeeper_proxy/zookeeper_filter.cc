@@ -144,6 +144,11 @@ void ZooKeeperFilter::onReconfigRequest() {
   // TODO: set metadata.
 }
 
+void ZooKeeperFilter::onSetWatchesRequest() {
+  config_->stats_.setwatches_rq_.inc();
+  // TODO: set metadata.
+}
+
 } // namespace ZooKeeperProxy
 } // namespace NetworkFilters
 } // namespace Extensions
