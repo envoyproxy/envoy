@@ -41,29 +41,27 @@ public:
   void setSampled(bool sampled) override;
 
 private:
-  // TODO: Do we take the sampling decision from StartSpan, or use the sampler
-  // configured in TraceConfig?
-  ::opencensus::trace::Sampler* GetSampler(bool is_sampled) {
-    static ::opencensus::trace::AlwaysSampler always_sampler;
-    static ::opencensus::trace::NeverSampler never_sampler;
-    if (is_sampled) {
-      return &always_sampler;
-    }
-    return &never_sampler;
-  }
-
   ::opencensus::trace::Span span_;
   const envoy::config::trace::v2::OpenCensusConfig* oc_config_;
 };
+
+::opencensus::trace::Span StartSpan(const std::string& name, bool traced) {
+  ::opencensus::trace::AlwaysSampler always_sampler;
+  ::opencensus::trace::NeverSampler never_sampler;
+  ::opencensus::trace::StartSpanOptions opts{&never_sampler};
+  if (traced) {
+    // opts.sampler = static_cast<::opencensus::trace::Sampler*>(traced ? &always_sampler :
+    // &never_sampler);
+    opts.sampler = &always_sampler;
+  }
+  return ::opencensus::trace::Span::StartSpan(name, /*parent=*/nullptr, opts);
+}
 
 Span::Span(const Tracing::Config& config,
            const envoy::config::trace::v2::OpenCensusConfig* oc_config,
            Http::HeaderMap& /*request_headers*/, const std::string& operation_name,
            SystemTime /*start_time*/, const Tracing::Decision tracing_decision)
-    : span_(::opencensus::trace::Span::StartSpan(
-          operation_name, /*parent=*/nullptr,
-          ::opencensus::trace::StartSpanOptions(GetSampler(tracing_decision.traced)))),
-      oc_config_(oc_config) {
+    : span_(StartSpan(operation_name, tracing_decision.traced)), oc_config_(oc_config) {
   span_.AddAttribute("OperationName", config.operationName() == Tracing::OperationName::Ingress
                                           ? "Ingress"
                                           : "Egress");
