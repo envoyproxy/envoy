@@ -463,6 +463,7 @@ void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callb
 }
 
 void Filter::cleanup() {
+  callbacks_->streamInfo().setUpstreamTiming(upstream_request_->upstream_timing_);
   upstream_request_.reset();
   retry_state_.reset();
   if (response_timeout_) {
@@ -857,7 +858,6 @@ bool Filter::setupRetry(bool end_stream) {
   }
 
   upstream_request_.reset();
-  callbacks_->streamInfo().resetUpstreamTimings();
   return true;
 }
 
@@ -930,8 +930,8 @@ void Filter::doRetry() {
 Filter::UpstreamRequest::UpstreamRequest(Filter& parent, Http::ConnectionPool::Instance& pool)
     : parent_(parent), conn_pool_(pool), grpc_rq_success_deferred_(false),
       stream_info_(pool.protocol(), parent_.callbacks_->dispatcher().timeSource()),
-      calling_encode_headers_(false), upstream_canary_(false), encode_complete_(false),
-      encode_trailers_(false) {
+      upstream_timing_(), calling_encode_headers_(false), upstream_canary_(false),
+      encode_complete_(false), encode_trailers_(false) {
 
   if (parent_.config_.start_child_span_) {
     span_ = parent_.callbacks_->activeSpan().spawnChild(
@@ -954,6 +954,7 @@ Filter::UpstreamRequest::~UpstreamRequest() {
   }
   clearRequestEncoder();
 
+  stream_info_.setUpstreamTiming(upstream_timing_);
   stream_info_.onRequestComplete();
   for (const auto& upstream_log : parent_.config_.upstream_logs_) {
     upstream_log->log(parent_.downstream_headers_, upstream_headers_, upstream_trailers_,
@@ -968,8 +969,7 @@ void Filter::UpstreamRequest::decode100ContinueHeaders(Http::HeaderMapPtr&& head
 
 void Filter::UpstreamRequest::decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
   // TODO(rodaine): This is actually measuring after the headers are parsed and not the first byte.
-  stream_info_.onFirstUpstreamRxByteReceived();
-  parent_.callbacks_->streamInfo().onFirstUpstreamRxByteReceived();
+  upstream_timing_.onFirstUpstreamRxByteReceived(parent_.callbacks_->dispatcher().timeSource());
   maybeEndDecode(end_stream);
 
   upstream_headers_ = headers.get();
@@ -996,8 +996,7 @@ void Filter::UpstreamRequest::decodeMetadata(Http::MetadataMapPtr&& metadata_map
 
 void Filter::UpstreamRequest::maybeEndDecode(bool end_stream) {
   if (end_stream) {
-    stream_info_.onLastUpstreamRxByteReceived();
-    parent_.callbacks_->streamInfo().onLastUpstreamRxByteReceived();
+    upstream_timing_.onLastUpstreamRxByteReceived(parent_.callbacks_->dispatcher().timeSource());
   }
 }
 
@@ -1033,8 +1032,7 @@ void Filter::UpstreamRequest::encodeData(Buffer::Instance& data, bool end_stream
     stream_info_.addBytesSent(data.length());
     request_encoder_->encodeData(data, end_stream);
     if (end_stream) {
-      stream_info_.onLastUpstreamTxByteSent();
-      parent_.callbacks_->streamInfo().onLastUpstreamTxByteSent();
+      upstream_timing_.onLastUpstreamTxByteSent(parent_.callbacks_->dispatcher().timeSource());
     }
   }
 }
@@ -1049,8 +1047,7 @@ void Filter::UpstreamRequest::encodeTrailers(const Http::HeaderMap& trailers) {
   } else {
     ENVOY_STREAM_LOG(trace, "proxying trailers", *parent_.callbacks_);
     request_encoder_->encodeTrailers(trailers);
-    stream_info_.onLastUpstreamTxByteSent();
-    parent_.callbacks_->streamInfo().onLastUpstreamTxByteSent();
+    upstream_timing_.onLastUpstreamTxByteSent(parent_.callbacks_->dispatcher().timeSource());
   }
 }
 
@@ -1148,8 +1145,7 @@ void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
     span_->injectContext(*parent_.downstream_headers_);
   }
 
-  stream_info_.onFirstUpstreamTxByteSent();
-  parent_.callbacks_->streamInfo().onFirstUpstreamTxByteSent();
+  upstream_timing_.onFirstUpstreamTxByteSent(parent_.callbacks_->dispatcher().timeSource());
   request_encoder.encodeHeaders(*parent_.downstream_headers_,
                                 !buffered_request_body_ && encode_complete_ && !encode_trailers_);
   calling_encode_headers_ = false;
@@ -1172,8 +1168,7 @@ void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
     }
 
     if (encode_complete_) {
-      stream_info_.onLastUpstreamTxByteSent();
-      parent_.callbacks_->streamInfo().onLastUpstreamTxByteSent();
+      upstream_timing_.onLastUpstreamTxByteSent(parent_.callbacks_->dispatcher().timeSource());
     }
   }
 }

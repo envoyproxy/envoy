@@ -341,6 +341,7 @@ private:
     DownstreamWatermarkManager downstream_watermark_manager_{*this};
     Tracing::SpanPtr span_;
     StreamInfo::StreamInfoImpl stream_info_;
+    StreamInfo::UpstreamTiming upstream_timing_;
     Http::HeaderMap* upstream_headers_{};
     Http::HeaderMap* upstream_trailers_{};
 
