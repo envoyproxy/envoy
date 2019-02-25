@@ -63,6 +63,7 @@ def _build_envoy_cc_wrapper(repository_ctx):
     # and escaping will be handled correctly.
     repository_ctx.template("extra_tools/envoy_cc_wrapper", repository_ctx.attr._envoy_cc_wrapper, {
         "{ENVOY_REAL_CC}": repr(str(real_cc)),
+        "{ENVOY_CFLAGS}": repr(str(repository_ctx.os.environ.get("CFLAGS", ""))),
         "{ENVOY_REAL_CXX}": repr(str(real_cxx)),
         "{ENVOY_CXXFLAGS}": repr(str(repository_ctx.os.environ.get("CXXFLAGS", ""))),
     })
@@ -106,6 +107,7 @@ cc_autoconf = repository_rule(
         "BAZEL_LLVM",
         "USE_CLANG_CL",
         "CC",
+        "CFLAGS",
         "CXX",
         "CXXFLAGS",
         "CC_CONFIGURE_DEBUG",
