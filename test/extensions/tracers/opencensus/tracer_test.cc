@@ -113,7 +113,7 @@ TEST(OpenCensusTracerTest, Span) {
   std::vector<SpanData> spans = getSpanCatcher()->catchSpans();
   ASSERT_EQ(1, spans.size());
   const auto& sd = spans[0];
-  std::cerr << sd.DebugString() << "\n";
+  ENVOY_LOG_MISC(debug, "{}", sd.DebugString());
 
   EXPECT_EQ("my_operation_1", sd.name());
   EXPECT_TRUE(sd.context().IsValid());
