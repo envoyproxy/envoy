@@ -414,7 +414,7 @@ public:
                    const HostVector& hosts_removed,
                    absl::optional<uint32_t> overprovisioning_factor = absl::nullopt) override;
 
-  void batchHostUpdate(std::function<void(UpdateHostsCb)> callback) override;
+  void batchHostUpdate(BatchUpdateCb& callback) override;
 
 protected:
   // Allows subclasses of PrioritySetImpl to create their own type of HostSetImpl.
@@ -443,8 +443,10 @@ private:
       priority_update_cb_helper_;
   bool batch_update_ : 1;
 
-  // Helper class that ensures that we're always reseting the batch_update_ flag.
-  class BatchUpdateScope {
+  // Helper class to maintain state as we perform multiple host updates. Keeps track of all hosts
+  // that have been added/removed throughout the batch update, and ensures that we properly manage
+  // the batch_update_ flag.
+  class BatchUpdateScope : public HostUpdateCb {
   public:
     explicit BatchUpdateScope(PrioritySetImpl& parent) : parent_(parent) {
       ASSERT(!parent_.batch_update_);
@@ -452,8 +454,33 @@ private:
     }
     ~BatchUpdateScope() { parent_.batch_update_ = false; }
 
+    virtual void updateHosts(uint32_t priority,
+                             PrioritySet::UpdateHostsParams&& update_hosts_params,
+                             LocalityWeightsConstSharedPtr locality_weights,
+                             const HostVector& hosts_added, const HostVector& hosts_removed,
+                             absl::optional<uint32_t> overprovisioning_factor) override {
+      // We assume that each call updates a different priority.
+      ASSERT(priorities_.find(priority) == priorities_.end());
+      priorities_.insert(priority);
+
+      for (const auto& host : hosts_added) {
+        all_hosts_added_.insert(host);
+      }
+
+      for (const auto& host : hosts_removed) {
+        all_hosts_removed_.insert(host);
+      }
+
+      parent_.updateHosts(priority, std::move(update_hosts_params), locality_weights, hosts_added,
+                          hosts_removed, overprovisioning_factor);
+    }
+
+    std::unordered_set<HostSharedPtr> all_hosts_added_;
+    std::unordered_set<HostSharedPtr> all_hosts_removed_;
+
   private:
     PrioritySetImpl& parent_;
+    std::unordered_set<uint32_t> priorities_;
   };
 };
 

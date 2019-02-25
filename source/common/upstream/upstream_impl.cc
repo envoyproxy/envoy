@@ -471,35 +471,15 @@ void PrioritySetImpl::updateHosts(uint32_t priority, UpdateHostsParams&& update_
   }
 }
 
-void PrioritySetImpl::batchHostUpdate(std::function<void(UpdateHostsCb)> callback) {
+void PrioritySetImpl::batchHostUpdate(BatchUpdateCb& callback) {
   BatchUpdateScope scope(*this);
 
-  std::unordered_set<uint32_t> priorities;
-  std::unordered_set<HostSharedPtr> all_hosts_added;
-  std::unordered_set<HostSharedPtr> all_hosts_removed;
-
   // We wrap the update call with a lambda that tracks all the hosts that have been added/removed.
-  callback([&](auto p, auto&& params, auto locality_weight, const auto& hosts_added,
-               const auto& hosts_removed, auto overprovisioning_factor) {
-    // We assume that each call updates a different priority.
-    ASSERT(priorities.find(p) == priorities.end());
-    priorities.insert(p);
-
-    for (const auto& host : hosts_added) {
-      all_hosts_added.insert(host);
-    }
-
-    for (const auto& host : hosts_removed) {
-      all_hosts_removed.insert(host);
-    }
-
-    updateHosts(p, std::move(params), locality_weight, hosts_added, hosts_removed,
-                overprovisioning_factor);
-  });
+  callback.batchUpdate(scope);
 
   // Now that all the updates have been complete, we can compute the diff.
-  HostVector net_hosts_added = filterHosts(all_hosts_added, all_hosts_removed);
-  HostVector net_hosts_removed = filterHosts(all_hosts_removed, all_hosts_added);
+  HostVector net_hosts_added = filterHosts(scope.all_hosts_added_, scope.all_hosts_removed_);
+  HostVector net_hosts_removed = filterHosts(scope.all_hosts_removed_, scope.all_hosts_added_);
 
   runUpdateCallbacks(net_hosts_added, net_hosts_removed);
 }

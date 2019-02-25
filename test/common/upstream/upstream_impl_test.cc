@@ -1534,6 +1534,39 @@ TEST_F(ClusterImplTest, CloseConnectionsOnHostHealthFailure) {
               ClusterInfo::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE);
 }
 
+class TestBatchUpdateCb : public PrioritySet::BatchUpdateCb {
+public:
+  TestBatchUpdateCb(HostVectorSharedPtr hosts, HostsPerLocalitySharedPtr hosts_per_locality)
+      : hosts_(hosts), hosts_per_locality_(hosts_per_locality) {}
+
+  void batchUpdate(PrioritySet::HostUpdateCb& host_update_cb) override {
+    // Add the host from P1 to P0.
+    {
+      HostVector hosts_added{hosts_->front()};
+      HostVector hosts_removed{};
+      host_update_cb.updateHosts(
+          0,
+          HostSetImpl::updateHostsParams(hosts_, hosts_per_locality_, hosts_, hosts_per_locality_),
+          {}, hosts_added, hosts_removed, absl::nullopt);
+    }
+
+    // Remove the host from P1.
+    {
+      HostVectorSharedPtr empty_hosts = std::make_shared<HostVector>();
+      HostVector hosts_added{};
+      HostVector hosts_removed{hosts_->front()};
+      host_update_cb.updateHosts(
+          1,
+          HostSetImpl::updateHostsParams(empty_hosts, HostsPerLocalityImpl::empty(), empty_hosts,
+                                         HostsPerLocalityImpl::empty()),
+          {}, hosts_added, hosts_removed, absl::nullopt);
+    }
+  }
+
+  HostVectorSharedPtr hosts_;
+  HostsPerLocalitySharedPtr hosts_per_locality_;
+};
+
 // Test creating and extending a priority set.
 TEST(PrioritySet, Extend) {
   PrioritySetImpl priority_set;
@@ -1600,27 +1633,8 @@ TEST(PrioritySet, Extend) {
     EXPECT_TRUE(added.empty() && removed.empty());
   });
 
-  priority_set.batchHostUpdate([&](auto update_hosts) {
-    // Add the host from P1 to P0.
-    {
-      HostVector hosts_added{hosts->front()};
-      HostVector hosts_removed{};
-      update_hosts(
-          0, HostSetImpl::updateHostsParams(hosts, hosts_per_locality, hosts, hosts_per_locality),
-          {}, hosts_added, hosts_removed, absl::nullopt);
-    }
-
-    // Remove the host from P1.
-    {
-      HostVectorSharedPtr empty_hosts = std::make_shared<HostVector>();
-      HostVector hosts_added{};
-      HostVector hosts_removed{hosts->front()};
-      update_hosts(1,
-                   HostSetImpl::updateHostsParams(empty_hosts, HostsPerLocalityImpl::empty(),
-                                                  empty_hosts, HostsPerLocalityImpl::empty()),
-                   {}, hosts_added, hosts_removed, absl::nullopt);
-    }
-  });
+  TestBatchUpdateCb batch_update(hosts, hosts_per_locality);
+  priority_set.batchHostUpdate(batch_update);
 
   // We expect to see two priority changes, but only one membership change.
   EXPECT_EQ(3, priority_changes);
