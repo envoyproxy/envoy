@@ -208,7 +208,11 @@ private:
     // called here may change the content type, so we must check it before the call.
     FilterHeadersStatus decodeHeaders(HeaderMap& headers, bool end_stream) {
       is_grpc_request_ = Grpc::Common::hasGrpcContentType(headers);
-      return handle_->decodeHeaders(headers, end_stream);
+      FilterHeadersStatus status = handle_->decodeHeaders(headers, end_stream);
+      if (end_stream) {
+        handle_->decodeComplete();
+      }
+      return status;
     }
 
     void requestDataTooLarge();

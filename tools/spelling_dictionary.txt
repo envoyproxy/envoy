@@ -154,6 +154,7 @@ Nilsson
 OCSP
 OK
 OOM
+OOMs
 OS
 OSI
 OSS

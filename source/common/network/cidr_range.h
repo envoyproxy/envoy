@@ -78,7 +78,7 @@ public:
    * TODO(ccaraman): Update CidrRange::create to support only constructing valid ranges.
    * @return a CidrRange instance with the specified address and length, modified so that the only
    *         bits that might be non-zero are in the high-order length bits, and so that length is
-   *         in the appropriate range (0 to 32 for IPv4, 0 to 128 for IPv6). If the the address or
+   *         in the appropriate range (0 to 32 for IPv4, 0 to 128 for IPv6). If the address or
    *         length is invalid, then the range will be invalid (i.e. length == -1).
    */
   static CidrRange create(InstanceConstSharedPtr address, int length);
