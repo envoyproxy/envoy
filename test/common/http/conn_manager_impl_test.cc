@@ -181,6 +181,7 @@ public:
           decoder_filters_[0]->callbacks_->addDecodedData(data, true);
           return FilterHeadersStatus::Continue;
         }));
+    EXPECT_CALL(*decoder_filters_[0], decodeComplete());
   }
 
   Event::MockTimer* setUpTimer() {
@@ -195,6 +196,7 @@ public:
     auto status = streaming_filter_ ? FilterDataStatus::StopIterationAndWatermark
                                     : FilterDataStatus::StopIterationAndBuffer;
     EXPECT_CALL(*decoder_filters_[1], decodeData(_, true)).WillOnce(Return(status));
+    EXPECT_CALL(*decoder_filters_[1], decodeComplete());
 
     // Kick off the incoming data. |fake_input| is not sent, but instead kicks
     // off sending the headers and |data| queued up in setUpEncoderAndDecoder().
@@ -2090,6 +2092,7 @@ TEST_F(HttpConnectionManagerImplTest, IntermediateBufferingEarlyResponse) {
       .WillOnce(Return(FilterHeadersStatus::StopIteration));
   EXPECT_CALL(*decoder_filters_[0], decodeData(_, true))
       .WillOnce(Return(FilterDataStatus::StopIterationAndBuffer));
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
 
   // Kick off the incoming data.
   Buffer::OwnedImpl fake_input("1234");
@@ -2133,6 +2136,7 @@ TEST_F(HttpConnectionManagerImplTest, DoubleBuffering) {
       .WillOnce(Return(FilterHeadersStatus::StopIteration));
   EXPECT_CALL(*decoder_filters_[0], decodeData(_, true))
       .WillOnce(Return(FilterDataStatus::StopIterationAndBuffer));
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
 
   // Kick off the incoming data.
   Buffer::OwnedImpl fake_input("1234");
@@ -2143,6 +2147,7 @@ TEST_F(HttpConnectionManagerImplTest, DoubleBuffering) {
       .WillOnce(Return(FilterHeadersStatus::StopIteration));
   EXPECT_CALL(*decoder_filters_[1], decodeData(_, true))
       .WillOnce(Return(FilterDataStatus::StopIterationAndBuffer));
+  EXPECT_CALL(*decoder_filters_[1], decodeComplete());
   decoder_filters_[0]->callbacks_->continueDecoding();
 
   // Continue iteration. We expect the 3rd filter to not receive double data but for the buffered
@@ -2151,6 +2156,7 @@ TEST_F(HttpConnectionManagerImplTest, DoubleBuffering) {
       .WillOnce(Return(FilterHeadersStatus::StopIteration));
   EXPECT_CALL(*decoder_filters_[2], decodeData(BufferEqual(&fake_data_copy), true))
       .WillOnce(Return(FilterDataStatus::StopIterationNoBuffer));
+  EXPECT_CALL(*decoder_filters_[2], decodeComplete());
   decoder_filters_[1]->callbacks_->continueDecoding();
 }
 
@@ -2183,12 +2189,14 @@ TEST_F(HttpConnectionManagerImplTest, ZeroByteDataFiltering) {
   // Stop zero byte data.
   EXPECT_CALL(*decoder_filters_[0], decodeData(_, true))
       .WillOnce(Return(FilterDataStatus::StopIterationAndBuffer));
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
   Buffer::OwnedImpl zero;
   decoder->decodeData(zero, true);
 
   // Continue.
   EXPECT_CALL(*decoder_filters_[1], decodeData(_, true))
       .WillOnce(Return(FilterDataStatus::StopIterationNoBuffer));
+  EXPECT_CALL(*decoder_filters_[1], decodeComplete());
   decoder_filters_[0]->callbacks_->continueDecoding();
 }
 
@@ -2219,6 +2227,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddTrailersInTrailersCallback) {
       .WillOnce(Return(FilterDataStatus::StopIterationAndBuffer));
   EXPECT_CALL(*decoder_filters_[0], decodeTrailers(_))
       .WillOnce(Return(FilterTrailersStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
   EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, false))
       .WillOnce(Return(FilterHeadersStatus::StopIteration));
   EXPECT_CALL(*decoder_filters_[1], decodeData(_, false))
@@ -2229,6 +2238,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddTrailersInTrailersCallback) {
         EXPECT_EQ(trailers.get(key), nullptr);
         return FilterTrailersStatus::Continue;
       }));
+  EXPECT_CALL(*decoder_filters_[1], decodeComplete());
 
   // Kick off the incoming data.
   Buffer::OwnedImpl fake_input("1234");
@@ -2258,6 +2268,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddTrailersInTrailersCallback) {
   // set up encodeTrailer expectations
   EXPECT_CALL(*encoder_filters_[1], encodeTrailers(_))
       .WillOnce(Return(FilterTrailersStatus::Continue));
+  EXPECT_CALL(*encoder_filters_[1], encodeComplete());
 
   EXPECT_CALL(*encoder_filters_[0], encodeTrailers(_))
       .WillOnce(Invoke([&](Http::HeaderMap& trailers) -> FilterTrailersStatus {
@@ -2266,6 +2277,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddTrailersInTrailersCallback) {
         EXPECT_EQ(trailers.get(key), nullptr);
         return FilterTrailersStatus::Continue;
       }));
+  EXPECT_CALL(*encoder_filters_[0], encodeComplete());
   EXPECT_CALL(response_encoder_, encodeTrailers(_));
   expectOnDestroy();
 
@@ -2301,6 +2313,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddTrailersInDataCallbackNoTrailers)
         decoder_filters_[0]->callbacks_->addDecodedTrailers().addCopy(trailer_key, trailers_data);
         return FilterDataStatus::Continue;
       }));
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
 
   // ensure that the second decodeData call sees end_stream = false
   EXPECT_CALL(*decoder_filters_[1], decodeData(_, false))
@@ -2315,6 +2328,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddTrailersInDataCallbackNoTrailers)
     EXPECT_EQ(t->value(), trailers_data.c_str());
     return FilterTrailersStatus::Continue;
   }));
+  EXPECT_CALL(*decoder_filters_[1], decodeComplete());
 
   // Kick off the incoming data.
   Buffer::OwnedImpl fake_input("1234");
@@ -2337,6 +2351,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddTrailersInDataCallbackNoTrailers)
         encoder_filters_[1]->callbacks_->addEncodedTrailers().addCopy(trailer_key, trailers_data);
         return FilterDataStatus::Continue;
       }));
+  EXPECT_CALL(*encoder_filters_[1], encodeComplete());
   // ensure encodeData calls after setting header sees end_stream = false
   EXPECT_CALL(*encoder_filters_[0], encodeData(_, false))
       .WillOnce(Return(FilterDataStatus::Continue));
@@ -2351,6 +2366,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddTrailersInDataCallbackNoTrailers)
     EXPECT_EQ(t->value(), trailers_data.c_str());
     return FilterTrailersStatus::Continue;
   }));
+  EXPECT_CALL(*encoder_filters_[0], encodeComplete());
 
   // Ensure that we call encodeTrailers
   EXPECT_CALL(response_encoder_, encodeTrailers(_));
@@ -2396,8 +2412,10 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddBodyInTrailersCallback) {
       }));
   EXPECT_CALL(*decoder_filters_[1], decodeData(Ref(trailers_data), false))
       .WillOnce(Return(FilterDataStatus::StopIterationAndBuffer));
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
   EXPECT_CALL(*decoder_filters_[1], decodeTrailers(_))
       .WillOnce(Return(FilterTrailersStatus::StopIteration));
+  EXPECT_CALL(*decoder_filters_[1], decodeComplete());
 
   // Kick off the incoming data.
   Buffer::OwnedImpl fake_input("1234");
@@ -2428,8 +2446,10 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddBodyInTrailersCallback) {
   EXPECT_CALL(*encoder_filters_[0], encodeData(Ref(trailers_data), false))
       .WillOnce(Return(FilterDataStatus::Continue));
   EXPECT_CALL(response_encoder_, encodeData(_, false));
+  EXPECT_CALL(*encoder_filters_[1], encodeComplete());
   EXPECT_CALL(*encoder_filters_[0], encodeTrailers(_))
       .WillOnce(Return(FilterTrailersStatus::Continue));
+  EXPECT_CALL(*encoder_filters_[0], encodeComplete());
   EXPECT_CALL(response_encoder_, encodeTrailers(_));
   expectOnDestroy();
 
@@ -2467,10 +2487,12 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddBodyDuringDecodeData) {
         EXPECT_EQ(decoder_filters_[0]->callbacks_->decodingBuffer()->toString(), "helloworld");
         return FilterDataStatus::Continue;
       }));
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
   EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, false))
       .WillOnce(Return(FilterHeadersStatus::Continue));
   EXPECT_CALL(*decoder_filters_[1], decodeData(_, true))
       .WillOnce(Return(FilterDataStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[1], decodeComplete());
 
   // Kick off the incoming data.
   Buffer::OwnedImpl fake_input("1234");
@@ -2486,11 +2508,13 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddBodyDuringDecodeData) {
         EXPECT_EQ(encoder_filters_[1]->callbacks_->encodingBuffer()->toString(), "goodbye");
         return FilterDataStatus::Continue;
       }));
+  EXPECT_CALL(*encoder_filters_[1], encodeComplete());
   EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, false))
       .WillOnce(Return(FilterHeadersStatus::Continue));
   EXPECT_CALL(response_encoder_, encodeHeaders(_, false));
   EXPECT_CALL(*encoder_filters_[0], encodeData(_, true))
       .WillOnce(Return(FilterDataStatus::Continue));
+  EXPECT_CALL(*encoder_filters_[0], encodeComplete());
   EXPECT_CALL(response_encoder_, encodeData(_, true));
   expectOnDestroy();
 
@@ -2521,10 +2545,12 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddBodyInline) {
         decoder_filters_[0]->callbacks_->addDecodedData(data, true);
         return FilterHeadersStatus::Continue;
       }));
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
   EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, false))
       .WillOnce(Return(FilterHeadersStatus::StopIteration));
   EXPECT_CALL(*decoder_filters_[1], decodeData(_, true))
       .WillOnce(Return(FilterDataStatus::StopIterationAndBuffer));
+  EXPECT_CALL(*decoder_filters_[1], decodeComplete());
 
   // Kick off the incoming data.
   Buffer::OwnedImpl fake_input("1234");
@@ -2537,11 +2563,13 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddBodyInline) {
         EXPECT_EQ(5UL, encoder_filters_[0]->callbacks_->encodingBuffer()->length());
         return FilterHeadersStatus::Continue;
       }));
+  EXPECT_CALL(*encoder_filters_[1], encodeComplete());
   EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, false))
       .WillOnce(Return(FilterHeadersStatus::Continue));
   EXPECT_CALL(response_encoder_, encodeHeaders(_, false));
   EXPECT_CALL(*encoder_filters_[0], encodeData(_, true))
       .WillOnce(Return(FilterDataStatus::Continue));
+  EXPECT_CALL(*encoder_filters_[0], encodeComplete());
   EXPECT_CALL(response_encoder_, encodeData(_, true));
   expectOnDestroy();
 
@@ -2587,6 +2615,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterClearRouteCache) {
         decoder_filters_[0]->callbacks_->clearRouteCache();
         return FilterHeadersStatus::Continue;
       }));
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
   EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, true))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
         EXPECT_EQ(route2, decoder_filters_[1]->callbacks_->route());
@@ -2596,6 +2625,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterClearRouteCache) {
         decoder_filters_[1]->callbacks_->clearRouteCache();
         return FilterHeadersStatus::Continue;
       }));
+  EXPECT_CALL(*decoder_filters_[1], decodeComplete());
   EXPECT_CALL(*decoder_filters_[2], decodeHeaders(_, true))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
         EXPECT_EQ(nullptr, decoder_filters_[2]->callbacks_->clusterInfo());
@@ -2603,6 +2633,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterClearRouteCache) {
         EXPECT_EQ(nullptr, decoder_filters_[2]->callbacks_->streamInfo().routeEntry());
         return FilterHeadersStatus::StopIteration;
       }));
+  EXPECT_CALL(*decoder_filters_[2], decodeComplete());
 
   // Kick off the incoming data.
   Buffer::OwnedImpl fake_input("1234");
@@ -2640,7 +2671,9 @@ TEST_F(HttpConnectionManagerImplTest, UpstreamWatermarkCallbacks) {
 
   // Send a full response.
   EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, true));
+  EXPECT_CALL(*encoder_filters_[0], encodeComplete());
   EXPECT_CALL(*encoder_filters_[1], encodeHeaders(_, true));
+  EXPECT_CALL(*encoder_filters_[1], encodeComplete());
   EXPECT_CALL(response_encoder_, encodeHeaders(_, true));
   // When the stream ends, the manager should check to see if the connection is
   // read disabled, and keep calling readDisable(false) until readEnabled()
@@ -2700,6 +2733,7 @@ TEST_F(HttpConnectionManagerImplTest, UnderlyingConnectionWatermarksPassedOnWith
           decoder_filters_[0]->callbacks_->addDecodedData(data, true);
           return FilterHeadersStatus::Continue;
         }));
+    EXPECT_CALL(*decoder_filters_[0], decodeComplete());
     sendRequestHeadersAndData();
     ASSERT_GE(decoder_filters_.size(), 1);
     MockDownstreamWatermarkCallbacks callbacks;
@@ -2760,6 +2794,7 @@ TEST_F(HttpConnectionManagerImplTest, UnderlyingConnectionWatermarksUnwoundWithL
           decoder_filters_[0]->callbacks_->addDecodedData(data, true);
           return FilterHeadersStatus::Continue;
         }));
+    EXPECT_CALL(*decoder_filters_[0], decodeComplete());
     sendRequestHeadersAndData();
     ASSERT_GE(decoder_filters_.size(), 1);
     MockDownstreamWatermarkCallbacks callbacks;
@@ -2852,6 +2887,7 @@ TEST_F(HttpConnectionManagerImplTest, HitRequestBufferLimits) {
       .WillOnce(Return(FilterHeadersStatus::StopIteration));
   EXPECT_CALL(*encoder_filters_[1], encodeData(_, true))
       .WillOnce(Return(FilterDataStatus::StopIterationAndWatermark));
+  EXPECT_CALL(*encoder_filters_[1], encodeComplete());
   Buffer::OwnedImpl data("A longer string");
   decoder_filters_[0]->callbacks_->addDecodedData(data, false);
 }
@@ -2884,12 +2920,14 @@ TEST_F(HttpConnectionManagerImplTest, HitRequestBufferLimitsIntermediateFilter) 
       .WillOnce(Return(FilterDataStatus::StopIterationAndBuffer));
   EXPECT_CALL(*decoder_filters_[0], decodeData(_, true))
       .WillOnce(Return(FilterDataStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
   Http::TestHeaderMapImpl response_headers{
       {":status", "413"}, {"content-length", "17"}, {"content-type", "text/plain"}};
   EXPECT_CALL(*encoder_filters_[0], encodeHeaders(HeaderMapEqualRef(&response_headers), false))
       .WillOnce(Return(FilterHeadersStatus::StopIteration));
   EXPECT_CALL(*encoder_filters_[0], encodeData(_, true))
       .WillOnce(Return(FilterDataStatus::StopIterationAndWatermark));
+  EXPECT_CALL(*encoder_filters_[0], encodeComplete());
 
   // Kick off the incoming data.
   Buffer::OwnedImpl fake_input("1234");
@@ -2984,8 +3022,10 @@ TEST_F(HttpConnectionManagerImplTest, FilterHeadReply) {
         EXPECT_STREQ("11", headers.ContentLength()->value().c_str());
         return FilterHeadersStatus::Continue;
       }));
+  EXPECT_CALL(*encoder_filters_[0], encodeComplete());
   EXPECT_CALL(response_encoder_, encodeHeaders(_, true));
   expectOnDestroy();
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
   // Kick off the incoming data.
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false);
@@ -3009,6 +3049,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterContinueAndEndStreamHeaders) {
       .WillOnce(Return(FilterHeadersStatus::ContinueAndEndStream));
   EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, true))
       .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[1], decodeComplete());
 
   // Kick off the incoming data.
   Buffer::OwnedImpl fake_input("1234");
@@ -3016,8 +3057,10 @@ TEST_F(HttpConnectionManagerImplTest, FilterContinueAndEndStreamHeaders) {
 
   EXPECT_CALL(*encoder_filters_[1], encodeHeaders(_, true))
       .WillOnce(Return(FilterHeadersStatus::ContinueAndEndStream));
+  EXPECT_CALL(*encoder_filters_[1], encodeComplete());
   EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, true))
       .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*encoder_filters_[0], encodeComplete());
   EXPECT_CALL(response_encoder_, encodeHeaders(_, true));
 
   expectOnDestroy();
@@ -3047,6 +3090,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterContinueAndEndStreamData) {
       .WillOnce(Return(FilterHeadersStatus::ContinueAndEndStream));
   EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, true))
       .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[1], decodeComplete());
 
   // Kick off the incoming data.
   Buffer::OwnedImpl fake_input("1234");
@@ -3056,6 +3100,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterContinueAndEndStreamData) {
       .WillOnce(Return(FilterHeadersStatus::ContinueAndEndStream));
   EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, true))
       .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*encoder_filters_[0], encodeComplete());
   EXPECT_CALL(response_encoder_, encodeHeaders(_, true));
 
   expectOnDestroy();
@@ -3088,6 +3133,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterContinueAndEndStreamTrailers) {
       .WillOnce(Return(FilterHeadersStatus::ContinueAndEndStream));
   EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, true))
       .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[1], decodeComplete());
 
   // Kick off the incoming data.
   Buffer::OwnedImpl fake_input("1234");
@@ -3097,6 +3143,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterContinueAndEndStreamTrailers) {
       .WillOnce(Return(FilterHeadersStatus::ContinueAndEndStream));
   EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, true))
       .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*encoder_filters_[0], encodeComplete());
   EXPECT_CALL(response_encoder_, encodeHeaders(_, true));
 
   expectOnDestroy();
@@ -3125,6 +3172,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddBodyContinuation) {
 
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
       .WillOnce(Return(FilterHeadersStatus::StopIteration));
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
 
   // Kick off the incoming data.
   Buffer::OwnedImpl fake_input("1234");
@@ -3134,6 +3182,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddBodyContinuation) {
       .WillOnce(Return(FilterHeadersStatus::Continue));
   EXPECT_CALL(*decoder_filters_[1], decodeData(_, true))
       .WillOnce(Return(FilterDataStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[1], decodeComplete());
 
   Buffer::OwnedImpl data("hello");
   decoder_filters_[0]->callbacks_->addDecodedData(data, true);
@@ -3141,6 +3190,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddBodyContinuation) {
 
   EXPECT_CALL(*encoder_filters_[1], encodeHeaders(_, true))
       .WillOnce(Return(FilterHeadersStatus::StopIteration));
+  EXPECT_CALL(*encoder_filters_[1], encodeComplete());
 
   decoder_filters_[1]->callbacks_->encodeHeaders(
       HeaderMapPtr{new TestHeaderMapImpl{{":status", "200"}}}, true);
@@ -3150,6 +3200,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddBodyContinuation) {
   EXPECT_CALL(response_encoder_, encodeHeaders(_, false));
   EXPECT_CALL(*encoder_filters_[0], encodeData(_, true))
       .WillOnce(Return(FilterDataStatus::Continue));
+  EXPECT_CALL(*encoder_filters_[0], encodeComplete());
   EXPECT_CALL(response_encoder_, encodeData(_, true));
   expectOnDestroy();
 
@@ -3206,6 +3257,7 @@ TEST_F(HttpConnectionManagerImplTest, AddDataWithAllContinue) {
 
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
       .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
 
   EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, true))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
@@ -3213,11 +3265,13 @@ TEST_F(HttpConnectionManagerImplTest, AddDataWithAllContinue) {
         decoder_filters_[1]->callbacks_->addDecodedData(data2, true);
         return FilterHeadersStatus::Continue;
       }));
+  EXPECT_CALL(*decoder_filters_[1], decodeComplete());
 
   EXPECT_CALL(*decoder_filters_[2], decodeHeaders(_, false))
       .WillOnce(Return(FilterHeadersStatus::Continue));
   EXPECT_CALL(*decoder_filters_[2], decodeData(_, true))
       .WillOnce(Return(FilterDataStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[2], decodeComplete());
 
   EXPECT_CALL(*decoder_filters_[0], decodeData(_, true)).Times(0);
   EXPECT_CALL(*decoder_filters_[1], decodeData(_, true)).Times(0);
@@ -3229,6 +3283,7 @@ TEST_F(HttpConnectionManagerImplTest, AddDataWithAllContinue) {
   // For encode direction
   EXPECT_CALL(*encoder_filters_[2], encodeHeaders(_, true))
       .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*encoder_filters_[2], encodeComplete());
 
   EXPECT_CALL(*encoder_filters_[1], encodeHeaders(_, true))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
@@ -3236,12 +3291,14 @@ TEST_F(HttpConnectionManagerImplTest, AddDataWithAllContinue) {
         encoder_filters_[1]->callbacks_->addEncodedData(data2, true);
         return FilterHeadersStatus::Continue;
       }));
+  EXPECT_CALL(*encoder_filters_[1], encodeComplete());
 
   EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, false))
       .WillOnce(Return(FilterHeadersStatus::Continue));
   EXPECT_CALL(response_encoder_, encodeHeaders(_, false));
   EXPECT_CALL(*encoder_filters_[0], encodeData(_, true))
       .WillOnce(Return(FilterDataStatus::Continue));
+  EXPECT_CALL(*encoder_filters_[0], encodeComplete());
   EXPECT_CALL(response_encoder_, encodeData(_, true));
   expectOnDestroy();
 
@@ -3302,6 +3359,7 @@ TEST_F(HttpConnectionManagerImplTest, AddDataWithStopAndContinue) {
 
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
       .WillOnce(Return(FilterHeadersStatus::StopIteration));
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
 
   // Kick off the incoming data.
   Buffer::OwnedImpl fake_input("1234");
@@ -3313,12 +3371,14 @@ TEST_F(HttpConnectionManagerImplTest, AddDataWithStopAndContinue) {
         decoder_filters_[1]->callbacks_->addDecodedData(data2, true);
         return FilterHeadersStatus::Continue;
       }));
+  EXPECT_CALL(*decoder_filters_[1], decodeComplete());
 
   EXPECT_CALL(*decoder_filters_[2], decodeHeaders(_, false))
       .WillOnce(Return(FilterHeadersStatus::Continue));
   // This fail, it is called twice.
   EXPECT_CALL(*decoder_filters_[2], decodeData(_, true))
       .WillOnce(Return(FilterDataStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[2], decodeComplete());
 
   EXPECT_CALL(*decoder_filters_[0], decodeData(_, true)).Times(0);
   // This fail, it is called once
@@ -3329,6 +3389,7 @@ TEST_F(HttpConnectionManagerImplTest, AddDataWithStopAndContinue) {
   // For encode direction
   EXPECT_CALL(*encoder_filters_[2], encodeHeaders(_, true))
       .WillOnce(Return(FilterHeadersStatus::StopIteration));
+  EXPECT_CALL(*encoder_filters_[2], encodeComplete());
 
   decoder_filters_[2]->callbacks_->encodeHeaders(
       HeaderMapPtr{new TestHeaderMapImpl{{":status", "200"}}}, true);
@@ -3339,6 +3400,7 @@ TEST_F(HttpConnectionManagerImplTest, AddDataWithStopAndContinue) {
         encoder_filters_[1]->callbacks_->addEncodedData(data2, true);
         return FilterHeadersStatus::Continue;
       }));
+  EXPECT_CALL(*encoder_filters_[1], encodeComplete());
 
   EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, false))
       .WillOnce(Return(FilterHeadersStatus::Continue));
@@ -3346,6 +3408,7 @@ TEST_F(HttpConnectionManagerImplTest, AddDataWithStopAndContinue) {
 
   EXPECT_CALL(*encoder_filters_[0], encodeData(_, true))
       .WillOnce(Return(FilterDataStatus::Continue));
+  EXPECT_CALL(*encoder_filters_[0], encodeComplete());
   EXPECT_CALL(response_encoder_, encodeData(_, true));
   expectOnDestroy();
 
@@ -3387,6 +3450,7 @@ TEST_F(HttpConnectionManagerImplTest, MultipleFilters) {
       .WillOnce(Return(FilterDataStatus::StopIterationAndBuffer));
   EXPECT_CALL(*decoder_filters_[0], decodeData(_, true))
       .WillOnce(Return(FilterDataStatus::StopIterationAndBuffer));
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
 
   // Kick off the incoming data.
   Buffer::OwnedImpl fake_input("1234");
@@ -3403,10 +3467,12 @@ TEST_F(HttpConnectionManagerImplTest, MultipleFilters) {
       }));
   EXPECT_CALL(*decoder_filters_[1], decodeData(_, true))
       .WillOnce(Return(FilterDataStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[1], decodeComplete());
   EXPECT_CALL(*decoder_filters_[2], decodeHeaders(_, false))
       .WillOnce(Return(FilterHeadersStatus::StopIteration));
   EXPECT_CALL(*decoder_filters_[2], decodeData(_, true))
       .WillOnce(Return(FilterDataStatus::StopIterationNoBuffer));
+  EXPECT_CALL(*decoder_filters_[2], decodeComplete());
   decoder_filters_[0]->callbacks_->continueDecoding();
 
   // Now start encoding and mimic trapping in the encoding filter.
@@ -3416,6 +3482,7 @@ TEST_F(HttpConnectionManagerImplTest, MultipleFilters) {
       .WillOnce(Return(FilterDataStatus::StopIterationAndBuffer));
   EXPECT_CALL(*encoder_filters_[1], encodeTrailers(_))
       .WillOnce(Return(FilterTrailersStatus::StopIteration));
+  EXPECT_CALL(*encoder_filters_[1], encodeComplete());
   EXPECT_EQ(ssl_connection_.get(), encoder_filters_[1]->callbacks_->connection()->ssl());
   decoder_filters_[2]->callbacks_->encodeHeaders(
       HeaderMapPtr{new TestHeaderMapImpl{{":status", "200"}}}, false);
@@ -3434,6 +3501,7 @@ TEST_F(HttpConnectionManagerImplTest, MultipleFilters) {
   EXPECT_CALL(response_encoder_, encodeData(_, false));
   EXPECT_CALL(*encoder_filters_[0], encodeTrailers(_))
       .WillOnce(Return(FilterTrailersStatus::Continue));
+  EXPECT_CALL(*encoder_filters_[0], encodeComplete());
   EXPECT_CALL(response_encoder_, encodeTrailers(_));
   expectOnDestroy();
   encoder_filters_[1]->callbacks_->continueEncoding();
