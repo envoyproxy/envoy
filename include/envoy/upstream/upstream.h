@@ -702,6 +702,11 @@ public:
    */
   virtual bool drainConnectionsOnHostRemoval() const PURE;
 
+  /**
+   * @return eds cluster service_name of the cluster.
+   */
+  virtual absl::optional<std::string> eds_service_name() const PURE;
+
 protected:
   /**
    * Invoked by extensionProtocolOptionsTyped.
