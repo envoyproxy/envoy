@@ -279,7 +279,11 @@ TEST(HttpConnManFinalizerImpl, SpanOptionalHeaders) {
   EXPECT_CALL(span, setTag(Tracing::Tags::get().RESPONSE_FLAGS, "-"));
   EXPECT_CALL(span, setTag(Tracing::Tags::get().UPSTREAM_CLUSTER, _)).Times(0);
 
-  NiceMock<MockConfig> config;
+  NiceMock<MockConfig> config{[] {
+    MockConfig result;
+    result.verbose_ = true;
+    return result;
+  }()};
   HttpTracerUtility::finalizeSpan(span, &request_headers, stream_info, config);
 }
 
