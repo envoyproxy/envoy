@@ -13,6 +13,10 @@ build:asan --define ENVOY_CONFIG_ASAN=1
 build:asan --copt -fsanitize=address,undefined
 build:asan --linkopt -fsanitize=address,undefined
 build:asan --copt -fno-sanitize=vptr
+# TODO(htuch): these are temporary workarounds, remove when
+# https://github.com/bazelbuild/rules_foreign_cc/issues/154#issuecomment-466504751 is resolved.
+build:asan --action_env=CFLAGS="-fsanitize=address,undefined -fno-sanitize=vptr"
+build:asan --action_env=CXXFLAGS="-fsanitize=address,undefined -fno-sanitize=vptr"
 build:asan --linkopt -fno-sanitize=vptr
 build:asan --linkopt -ldl
 build:asan --define tcmalloc=disabled
@@ -36,6 +40,10 @@ build:macos-asan --copt -D_FORTIFY_SOURCE=0
 # Clang TSAN
 build:clang-tsan --define ENVOY_CONFIG_TSAN=1
 build:clang-tsan --copt -fsanitize=thread
+# TODO(htuch): these are temporary workarounds, remove when
+# https://github.com/bazelbuild/rules_foreign_cc/issues/154#issuecomment-466504751 is resolved.
+build:clang-tsan --action_env=CFLAGS="-fsanitize=thread"
+build:clang-tsan --action_env=CXXFLAGS="-fsanitize=thread"
 build:clang-tsan --linkopt -fsanitize=thread
 build:clang-tsan --define tcmalloc=disabled
 
