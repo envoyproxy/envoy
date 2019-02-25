@@ -19,7 +19,25 @@ RingHashLoadBalancer::RingHashLoadBalancer(
     const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig>& config,
     const envoy::api::v2::Cluster::CommonLbConfig& common_config)
     : ThreadAwareLoadBalancerBase(priority_set, stats, runtime, random, common_config),
-      config_(config), scope_(scope.createScope("ring_hash_lb.")), stats_(generateStats(*scope_)) {}
+      scope_(scope.createScope("ring_hash_lb.")), stats_(generateStats(*scope_)),
+      min_ring_size_(config ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.value(), minimum_ring_size,
+                                                              DefaultMinRingSize)
+                            : DefaultMinRingSize),
+      max_ring_size_(config ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.value(), maximum_ring_size,
+                                                              DefaultMaxRingSize)
+                            : DefaultMaxRingSize),
+      use_std_hash_(config ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.value().deprecated_v1(),
+                                                             use_std_hash, false)
+                           : false),
+      hash_function_(config ? config.value().hash_function()
+                            : HashFunction::Cluster_RingHashLbConfig_HashFunction_XX_HASH) {
+  // It's important to do any config validation here, rather than deferring to Ring's ctor, because
+  // any exceptions thrown here will be caught and handled properly.
+  if (min_ring_size_ > max_ring_size_) {
+    throw EnvoyException(fmt::format("ring hash: minimum_ring_size ({}) > maximum_ring_size ({})",
+                                     min_ring_size_, max_ring_size_));
+  }
+}
 
 RingHashLoadBalancerStats RingHashLoadBalancer::generateStats(Stats::Scope& scope) {
   return {ALL_RING_HASH_LOAD_BALANCER_STATS(POOL_GAUGE(scope))};
@@ -63,27 +81,12 @@ HostConstSharedPtr RingHashLoadBalancer::Ring::chooseHost(uint64_t h) const {
 }
 
 using HashFunction = envoy::api::v2::Cluster_RingHashLbConfig_HashFunction;
-RingHashLoadBalancer::Ring::Ring(
-    const NormalizedHostWeightVector& normalized_host_weights, double min_normalized_weight,
-    const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig>& config,
-    RingHashLoadBalancerStats& stats)
+RingHashLoadBalancer::Ring::Ring(const NormalizedHostWeightVector& normalized_host_weights,
+                                 double min_normalized_weight, uint64_t min_ring_size,
+                                 uint64_t max_ring_size, bool use_std_hash,
+                                 HashFunction hash_function, RingHashLoadBalancerStats& stats)
     : stats_(stats) {
   ENVOY_LOG(trace, "ring hash: building ring");
-
-  const uint64_t min_ring_size =
-      config
-          ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.value(), minimum_ring_size, DefaultMinRingSize)
-          : DefaultMinRingSize;
-  const uint64_t max_ring_size =
-      config
-          ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.value(), maximum_ring_size, DefaultMaxRingSize)
-          : DefaultMaxRingSize;
-
-  // Sanity-check ring size bounds.
-  if (min_ring_size > max_ring_size) {
-    throw EnvoyException(fmt::format("ring hash: minimum_ring_size ({}) > maximum_ring_size ({})",
-                                     min_ring_size, max_ring_size));
-  }
 
   // We can't do anything sensible with no hosts.
   if (normalized_host_weights.empty()) {
@@ -102,14 +105,6 @@ RingHashLoadBalancer::Ring::Ring(
   // Reserve memory for the entire ring up front.
   const uint64_t ring_size = std::ceil(scale);
   ring_.reserve(ring_size);
-
-  const bool use_std_hash =
-      config ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.value().deprecated_v1(), use_std_hash, false)
-             : false;
-
-  const HashFunction hash_function =
-      config ? config.value().hash_function()
-             : HashFunction::Cluster_RingHashLbConfig_HashFunction_XX_HASH;
 
   // Populate the hash ring by walking through the (host, weight) pairs in normalized_host_weights,
   // and generating (scale * weight) hashes for each host. Since these aren't necessarily whole

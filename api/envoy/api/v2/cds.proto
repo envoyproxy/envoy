@@ -402,9 +402,9 @@ message Cluster {
   message RingHashLbConfig {
     // Minimum hash ring size. The larger the ring is (that is, the more hashes there are for each
     // provided host) the better the request distribution will reflect the desired weights. Defaults
-    // to 1024 entries. See also
+    // to 1024 entries, and limited to 8M entries. See also
     // :ref:`maximum_ring_size<envoy_api_field_Cluster.RingHashLbConfig.maximum_ring_size>`.
-    google.protobuf.UInt64Value minimum_ring_size = 1;
+    google.protobuf.UInt64Value minimum_ring_size = 1 [(validate.rules).uint64.lte = 8388608];
 
     // [#not-implemented-hide:] Hide from docs.
     message DeprecatedV1 {
@@ -431,10 +431,10 @@ message Cluster {
     // :ref:`XX_HASH<envoy_api_enum_value_Cluster.RingHashLbConfig.HashFunction.XX_HASH>`.
     HashFunction hash_function = 3 [(validate.rules).enum.defined_only = true];
 
-    // Maximum hash ring size. Defaults to 8M entries, but can be lowered to further constrain
-    // resource use. See also
+    // Maximum hash ring size. Defaults to 8M entries, and limited to 8M entries, but can be lowered
+    // to further constrain resource use. See also
     // :ref:`minimum_ring_size<envoy_api_field_Cluster.RingHashLbConfig.minimum_ring_size>`.
-    google.protobuf.UInt64Value maximum_ring_size = 4;
+    google.protobuf.UInt64Value maximum_ring_size = 4 [(validate.rules).uint64.lte = 8388608];
   }
 
   // Specific configuration for the
