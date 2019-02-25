@@ -131,7 +131,7 @@ public:
   std::string toString() const override { return data_; }
 
   Network::IoHandleCallUintResult write(Network::IoHandle& io_handle) override {
-    const Buffer::RawSlice slice {const_cast<char*>(data_.data()), data_.size()};
+    const Buffer::RawSlice slice{const_cast<char*>(data_.data()), data_.size()};
     Network::IoHandleCallUintResult result = io_handle.writev(&slice, 1);
     FUZZ_ASSERT(result.err_ == nullptr);
     data_ = data_.substr(result.rc_);
