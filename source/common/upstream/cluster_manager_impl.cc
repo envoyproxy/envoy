@@ -479,17 +479,15 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::api::v2::Cluster& clust
       // Otherwise, applyUpdates() will fire with a dangling cluster reference.
       updates_map_.erase(cluster_name);
 
-      // If the active cluster has hosts in priority set and the warming cluster does not have them,
-      // means that onConfigUpdate was triggered by an EDS update that had no references to this
-      // cluster. In such cases, copy the active cluster priority set to the warming cluster to
-      // prevent the hosts from being cleared after warming. See
+      // If onConfigUpdate was triggered by an EDS update that had no references to this
+      // cluster and active cluster has some hosts, copy the active cluster priority set to the
+      // warming cluster to prevent the hosts from being cleared after warming. See
       // https://github.com/envoyproxy/envoy/issues/5168 for more context.
       const auto active_it = active_clusters_.find(cluster_name);
       if (active_it != active_clusters_.end()) {
         const auto& active_cluster_entry = *active_it->second;
         if (warming_cluster_entry.cluster_->isBeingInitializedByEmptyConfigUpdate() &&
-            !active_cluster_entry.cluster_->prioritySet().empty() &&
-            warming_cluster_entry.cluster_->prioritySet().empty()) {
+            !active_cluster_entry.cluster_->prioritySet().empty()) {
           ENVOY_LOG(debug, "copying host set from active cluster {} to warming cluster",
                     cluster_name);
           const auto& active_host_sets =
