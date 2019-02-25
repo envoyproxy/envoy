@@ -33,9 +33,11 @@ struct Context {
 };
 
 // Bound the maximum allocation size.
-constexpr uint32_t MaxAllocation = 16 * 1024 * 1024;
+constexpr uint32_t MaxAllocation = 2 * 1024 * 1024;
 
-uint32_t clampSize(uint32_t size) { return std::min(size, MaxAllocation); }
+uint32_t clampSize(uint32_t size, uint32_t max_alloc) {
+  return std::min(size, std::min(MaxAllocation, max_alloc));
+}
 
 void releaseFragmentAllocation(const void* p, size_t, const Buffer::BufferFragmentImpl*) {
   ::free(const_cast<void*>(p));
@@ -143,14 +145,16 @@ public:
 typedef std::vector<std::unique_ptr<Buffer::Instance>> BufferList;
 
 // Process a single buffer operation.
-void bufferAction(Context& ctxt, char insert_value, BufferList& buffers,
-                  const test::common::buffer::Action& action) {
+uint32_t bufferAction(Context& ctxt, char insert_value, uint32_t max_alloc, BufferList& buffers,
+                      const test::common::buffer::Action& action) {
   const uint32_t target_index = action.target_index() % BufferCount;
   Buffer::Instance& target_buffer = *buffers[target_index];
+  uint32_t allocated = 0;
 
   switch (action.action_selector_case()) {
   case test::common::buffer::Action::kAddBufferFragment: {
-    const uint32_t size = clampSize(action.add_buffer_fragment());
+    const uint32_t size = clampSize(action.add_buffer_fragment(), max_alloc);
+    allocated += size;
     void* p = ::malloc(size);
     FUZZ_ASSERT(p != nullptr);
     ::memset(p, insert_value, size);
@@ -164,7 +168,8 @@ void bufferAction(Context& ctxt, char insert_value, BufferList& buffers,
     break;
   }
   case test::common::buffer::Action::kAddString: {
-    const uint32_t size = clampSize(action.add_string());
+    const uint32_t size = clampSize(action.add_string(), max_alloc);
+    allocated += size;
     auto string = std::make_unique<std::string>(size, insert_value);
     ctxt.strings_.emplace_back(std::move(string));
     const uint32_t previous_length = target_buffer.length();
@@ -187,7 +192,8 @@ void bufferAction(Context& ctxt, char insert_value, BufferList& buffers,
     break;
   }
   case test::common::buffer::Action::kPrependString: {
-    const uint32_t size = clampSize(action.prepend_string());
+    const uint32_t size = clampSize(action.prepend_string(), max_alloc);
+    allocated += size;
     auto string = std::make_unique<std::string>(size, insert_value);
     ctxt.strings_.emplace_back(std::move(string));
     target_buffer.prepend(absl::string_view(*ctxt.strings_.back()));
@@ -207,7 +213,8 @@ void bufferAction(Context& ctxt, char insert_value, BufferList& buffers,
   }
   case test::common::buffer::Action::kReserveCommit: {
     const uint32_t previous_length = target_buffer.length();
-    const uint32_t reserve_length = clampSize(action.reserve_commit().reserve_length());
+    const uint32_t reserve_length = clampSize(action.reserve_commit().reserve_length(), max_alloc);
+    allocated += reserve_length;
     if (reserve_length == 0) {
       break;
     }
@@ -286,7 +293,8 @@ void bufferAction(Context& ctxt, char insert_value, BufferList& buffers,
     break;
   }
   case test::common::buffer::Action::kRead: {
-    const uint32_t max_length = clampSize(action.read());
+    const uint32_t max_length = clampSize(action.read(), max_alloc);
+    allocated += max_length;
     if (max_length == 0) {
       break;
     }
@@ -309,17 +317,23 @@ void bufferAction(Context& ctxt, char insert_value, BufferList& buffers,
     FUZZ_ASSERT(::pipe(pipe_fds) == 0);
     FUZZ_ASSERT(::fcntl(pipe_fds[0], F_SETFL, O_NONBLOCK) == 0);
     FUZZ_ASSERT(::fcntl(pipe_fds[1], F_SETFL, O_NONBLOCK) == 0);
-    const bool empty = target_buffer.length() == 0;
-    const std::string previous_data = target_buffer.toString();
-    const int rc = target_buffer.write(pipe_fds[1]).rc_;
-    if (empty) {
-      FUZZ_ASSERT(rc == 0);
-    } else {
-      FUZZ_ASSERT(rc > 0);
-      STACK_ARRAY(buf, char, rc);
-      FUZZ_ASSERT(::read(pipe_fds[0], buf.begin(), rc) == rc);
-      FUZZ_ASSERT(::memcmp(buf.begin(), previous_data.data(), rc) == 0);
-    }
+    int rc;
+    do {
+      const bool empty = target_buffer.length() == 0;
+      const std::string previous_data = target_buffer.toString();
+      const auto result = target_buffer.write(pipe_fds[1]);
+      rc = result.rc_;
+      ENVOY_LOG_MISC(trace, "Write rc: {} errno: {} ({})", rc, ::strerror(result.errno_),
+                     result.errno_);
+      if (empty) {
+        FUZZ_ASSERT(rc == 0);
+      } else {
+        FUZZ_ASSERT(rc > 0);
+        STACK_ARRAY(buf, char, rc);
+        FUZZ_ASSERT(::read(pipe_fds[0], buf.begin(), rc) == rc);
+        FUZZ_ASSERT(::memcmp(buf.begin(), previous_data.data(), rc) == 0);
+      }
+    } while (rc > 0);
     FUZZ_ASSERT(::close(pipe_fds[0]) == 0);
     FUZZ_ASSERT(::close(pipe_fds[1]) == 0);
     break;
@@ -328,6 +342,8 @@ void bufferAction(Context& ctxt, char insert_value, BufferList& buffers,
     // Maybe nothing is set?
     break;
   }
+
+  return allocated;
 }
 
 } // namespace
@@ -344,12 +360,19 @@ DEFINE_PROTO_FUZZER(const test::common::buffer::BufferFuzzTestCase& input) {
     linear_buffers.emplace_back(new StringBuffer());
   }
 
+  // Soft bound on the available memory for allocation to avoid OOMs and
+  // timeouts.
+  uint32_t available_alloc = 2 * MaxAllocation;
   for (int i = 0; i < input.actions().size(); ++i) {
     const char insert_value = 'a' + i % 26;
     const auto& action = input.actions(i);
     ENVOY_LOG_MISC(debug, "Action {}", action.DebugString());
-    bufferAction(ctxt, insert_value, buffers, action);
-    bufferAction(ctxt, insert_value, linear_buffers, action);
+    const uint32_t allocated = bufferAction(ctxt, insert_value, available_alloc, buffers, action);
+    const uint32_t linear_allocated =
+        bufferAction(ctxt, insert_value, available_alloc, linear_buffers, action);
+    FUZZ_ASSERT(allocated == linear_allocated);
+    FUZZ_ASSERT(allocated <= available_alloc);
+    available_alloc -= allocated;
     // When tracing, dump everything.
     for (uint32_t j = 0; j < BufferCount; ++j) {
       ENVOY_LOG_MISC(trace, "Buffer at index {}", j);
