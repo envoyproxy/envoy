@@ -505,6 +505,8 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
     ENVOY_LOG_MISC(debug, "CodecProtocolException {}", e.what());
   } catch (CodecClientException& e) {
     ENVOY_LOG_MISC(debug, "CodecClientException {}", e.what());
+  } catch (PrematureResponseException& e) {
+    ENVOY_LOG_MISC(debug, "PrematureResponseException {}", e.what());
   }
 }
 
