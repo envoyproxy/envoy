@@ -8,6 +8,30 @@ buffer limits in Envoy are considered soft limits. When the buffer eventually dr
 half of the high watermark to avoid thrashing back and forth) the low watermark callback will
 fire, informing the sender it can resume sending data.
 
+### Configuration
+
+There are two knobs for configuring Envoy flow control:
+listener limits, `per_connection_buffer_limit_bytes` in the
+[Listener config](https://www.envoyproxy.io/docs/envoy/latest/api-v2/api/v2/lds.proto.html#envoy-api-msg-listener),
+and cluster limits, `per_connection_buffer_limit_bytes` in the
+[Cluster config](https://www.envoyproxy.io/docs/envoy/latest/api-v2/api/v2/cds.proto.html#clusters), both
+of which default to 1 MiB (1024 * 1024)
+
+The listener limits apply to how much raw data will be read per read() call from
+downstream, as well as how much data may be buffered in userspace between Envoy
+and downstream.
+
+The listener limits are also propogated to the HttpConnectionManager, and applied on a per-stream
+basis to the various L7 buffers described below. As such they limit the size of HTTP requests and
+response bodies that can be buffered. Note that Envoy can and will proxy arbitrarily large bodies
+on routes where all L7 filters are streaming, but many filters such as the transcoder or buffer
+filters require the full HTTP body to be buffered, so limit the request and response size based on
+the listener
+limit.
+
+The cluster limits affect how much raw data will be read per read() call from upstream, as
+well as how much data may be buffered in userspace between Envoy and upstream.
+
 ### TCP implementation details
 
 Flow control for TCP and TCP-with-TLS-termination are handled by coordination
