@@ -128,7 +128,7 @@ TEST_F(LoadStatsReporterTest, ExistingClusters) {
   {
     envoy::api::v2::endpoint::ClusterStats foo_cluster_stats;
     foo_cluster_stats.set_cluster_name("foo");
-    foo_cluster_stats.set_cluster_eds_service_name("bar");
+    foo_cluster_stats.set_cluster_service_name("bar");
     foo_cluster_stats.set_total_dropped_requests(5);
     foo_cluster_stats.mutable_load_report_interval()->MergeFrom(
         Protobuf::util::TimeUtil::MicrosecondsToDuration(1));
@@ -151,7 +151,7 @@ TEST_F(LoadStatsReporterTest, ExistingClusters) {
   {
     envoy::api::v2::endpoint::ClusterStats foo_cluster_stats;
     foo_cluster_stats.set_cluster_name("foo");
-    foo_cluster_stats.set_cluster_eds_service_name("bar");
+    foo_cluster_stats.set_cluster_service_name("bar");
     foo_cluster_stats.set_total_dropped_requests(2);
     foo_cluster_stats.mutable_load_report_interval()->MergeFrom(
         Protobuf::util::TimeUtil::MicrosecondsToDuration(24));
@@ -200,7 +200,7 @@ TEST_F(LoadStatsReporterTest, ExistingClusters) {
   {
     envoy::api::v2::endpoint::ClusterStats foo_cluster_stats;
     foo_cluster_stats.set_cluster_name("foo");
-    foo_cluster_stats.set_cluster_eds_service_name("bar");
+    foo_cluster_stats.set_cluster_service_name("bar");
     foo_cluster_stats.set_total_dropped_requests(1);
     foo_cluster_stats.mutable_load_report_interval()->MergeFrom(
         Protobuf::util::TimeUtil::MicrosecondsToDuration(4));

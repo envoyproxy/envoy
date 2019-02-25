@@ -125,7 +125,7 @@ message ClusterStats {
   // The eds_cluster_config service_name of the cluster.
   // It's possible that two clusters send the same service_name to EDS,
   // in that case, the management server is supposed to do aggregation on the load reports.
-  string cluster_eds_service_name = 6;
+  string cluster_service_name = 6;
 
   // Need at least one.
   repeated UpstreamLocalityStats upstream_locality_stats = 2

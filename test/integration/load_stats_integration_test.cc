@@ -216,7 +216,7 @@ public:
       auto* cluster_stats = expected_cluster_stats.Add();
       cluster_stats->set_cluster_name("cluster_0");
       // Verify the eds service_name is passed back.
-      cluster_stats->set_cluster_eds_service_name("service_name_0");
+      cluster_stats->set_cluster_service_name("service_name_0");
       if (dropped > 0) {
         cluster_stats->set_total_dropped_requests(dropped);
       }
