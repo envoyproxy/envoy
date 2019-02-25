@@ -6,8 +6,8 @@
 
 namespace Envoy {
 
-class CorsFilterIntegrationTest : public HttpIntegrationTest,
-                                  public testing::TestWithParam<Network::Address::IpVersion> {
+class CorsFilterIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+                                  public HttpIntegrationTest {
 public:
   CorsFilterIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()) {}
@@ -108,9 +108,9 @@ protected:
   }
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, CorsFilterIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, CorsFilterIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(CorsFilterIntegrationTest, TestVHostConfigSuccess) {
   testPreflight(

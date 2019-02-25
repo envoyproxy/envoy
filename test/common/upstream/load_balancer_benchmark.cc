@@ -10,7 +10,7 @@
 #include "test/common/upstream/utility.h"
 #include "test/mocks/upstream/mocks.h"
 
-#include "testing/base/public/benchmark.h"
+#include "benchmark/benchmark.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -22,8 +22,6 @@ public:
 
   // We weight the first weighted_subset_percent of hosts with weight.
   BaseTester(uint64_t num_hosts, uint32_t weighted_subset_percent, uint32_t weight) {
-    HostSet& host_set = priority_set_.getOrCreateHostSet(0);
-
     HostVector hosts;
     ASSERT(num_hosts < 65536);
     for (uint64_t i = 0; i < num_hosts; i++) {
@@ -32,8 +30,9 @@ public:
                                    should_weight ? weight : 1));
     }
     HostVectorConstSharedPtr updated_hosts{new HostVector(hosts)};
-    host_set.updateHosts(updated_hosts, updated_hosts, nullptr, nullptr, {}, hosts, {},
-                         absl::nullopt);
+    priority_set_.updateHosts(
+        0, HostSetImpl::updateHostsParams(updated_hosts, nullptr, updated_hosts, nullptr), {},
+        hosts, {}, absl::nullopt);
   }
 
   PrioritySetImpl priority_set_;
@@ -45,8 +44,8 @@ public:
   RingHashTester(uint64_t num_hosts, uint64_t min_ring_size) : BaseTester(num_hosts) {
     config_ = (envoy::api::v2::Cluster::RingHashLbConfig());
     config_.value().mutable_minimum_ring_size()->set_value(min_ring_size);
-    ring_hash_lb_ = std::make_unique<RingHashLoadBalancer>(priority_set_, stats_, runtime_, random_,
-                                                           config_, common_config_);
+    ring_hash_lb_ = std::make_unique<RingHashLoadBalancer>(
+        priority_set_, stats_, stats_store_, runtime_, random_, config_, common_config_);
   }
 
   Stats::IsolatedStoreImpl stats_store_;

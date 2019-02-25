@@ -1,9 +1,8 @@
 #!/bin/bash -e
 
-VERSION=0.17.2
-SHA256=1cf35c463944003ceb3c3716d7fc489d3d70625e34a8127dfd8b272afad7e0fd
-
 # buildifier
+VERSION=0.20.0
+SHA256=92c74a3c2331a12f578fcf9c5ace645b7537e1a18f02f91d0fdbb6f0655e8493
 curl --location --output /usr/local/bin/buildifier https://github.com/bazelbuild/buildtools/releases/download/"$VERSION"/buildifier \
   && echo "$SHA256" '/usr/local/bin/buildifier' | sha256sum --check \
   && chmod +x /usr/local/bin/buildifier
@@ -11,11 +10,6 @@ curl --location --output /usr/local/bin/buildifier https://github.com/bazelbuild
 # GCC for everything.
 export CC=gcc
 export CXX=g++
-CXX_VERSION="$(${CXX} --version | grep ^g++)"
-if [[ "${CXX_VERSION}" != "${EXPECTED_CXX_VERSION}" ]]; then
-  echo "Unexpected compiler version: ${CXX_VERSION}"
-  exit 1
-fi
 
 export THIRDPARTY_DEPS=/tmp
 export THIRDPARTY_SRC=/thirdparty

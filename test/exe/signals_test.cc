@@ -23,18 +23,18 @@ namespace Envoy {
 // not ours instead of what this test expects. As of latest Clang this appears
 // to include abort() as well.
 #ifndef ASANITIZED
-TEST(Signals, InvalidAddressDeathTest) {
+TEST(SignalsDeathTest, InvalidAddressDeathTest) {
   SignalAction actions;
   EXPECT_DEATH_LOG_TO_STDERR(
       []() -> void {
-        // Oooooops!
+        // Oops!
         volatile int* nasty_ptr = reinterpret_cast<int*>(0x0);
         *(nasty_ptr) = 0;
       }(),
       "backtrace.*Segmentation fault");
 }
 
-TEST(Signals, BusDeathTest) {
+TEST(SignalsDeathTest, BusDeathTest) {
   SignalAction actions;
   EXPECT_DEATH_LOG_TO_STDERR(
       []() -> void {
@@ -50,7 +50,7 @@ TEST(Signals, BusDeathTest) {
       "backtrace.*Bus");
 }
 
-TEST(Signals, BadMathDeathTest) {
+TEST(SignalsDeathTest, BadMathDeathTest) {
   SignalAction actions;
   EXPECT_DEATH_LOG_TO_STDERR(
       []() -> void {
@@ -63,7 +63,7 @@ TEST(Signals, BadMathDeathTest) {
 
 #if defined(__x86_64__) || defined(__i386__)
 // Unfortunately we don't have a reliable way to do this on other platforms
-TEST(Signals, IllegalInstructionDeathTest) {
+TEST(SignalsDeathTest, IllegalInstructionDeathTest) {
   SignalAction actions;
   EXPECT_DEATH_LOG_TO_STDERR(
       []() -> void {
@@ -74,12 +74,12 @@ TEST(Signals, IllegalInstructionDeathTest) {
 }
 #endif
 
-TEST(Signals, AbortDeathTest) {
+TEST(SignalsDeathTest, AbortDeathTest) {
   SignalAction actions;
   EXPECT_DEATH_LOG_TO_STDERR([]() -> void { abort(); }(), "backtrace.*Abort(ed)?");
 }
 
-TEST(Signals, RestoredPreviousHandlerDeathTest) {
+TEST(SignalsDeathTest, RestoredPreviousHandlerDeathTest) {
   SignalAction action;
   {
     SignalAction inner_action;
@@ -92,7 +92,7 @@ TEST(Signals, RestoredPreviousHandlerDeathTest) {
 }
 #endif
 
-TEST(Signals, IllegalStackAccessDeathTest) {
+TEST(SignalsDeathTest, IllegalStackAccessDeathTest) {
   SignalAction actions;
   EXPECT_DEATH(actions.tryEvilAccessForTest(false), "");
   EXPECT_DEATH(actions.tryEvilAccessForTest(true), "");

@@ -2,6 +2,10 @@ syntax = "proto3";
 
 package envoy.service.discovery.v2;
 
+option java_outer_classname = "HdsProto";
+option java_multiple_files = true;
+option java_package = "io.envoyproxy.envoy.service.discovery.v2";
+
 option java_generic_services = true;
 
 import "envoy/api/v2/core/base.proto";
@@ -34,7 +38,7 @@ service HealthDiscoveryService {
   //    it to endpoint(ip:port) of Host 1 and 2. Based on the HealthCheck
   //    configuration Envoy waits upon the arrival of the probe response and
   //    looks at the content of the response to decide whether the endpoint is
-  //    healthy or not. If a response hasn’t been received within the timeout
+  //    healthy or not. If a response hasn't been received within the timeout
   //    interval, the endpoint health status is considered TIMEOUT.
   // 4. Envoy reports results back in an EndpointHealthResponse message.
   //    Envoy streams responses as often as the interval configured by the

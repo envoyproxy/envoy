@@ -10,6 +10,7 @@
 #include "envoy/tracing/http_tracer.h"
 
 #include "common/common/linked_object.h"
+#include "common/common/thread.h"
 #include "common/common/thread_annotations.h"
 #include "common/tracing/http_tracer_impl.h"
 
@@ -155,7 +156,7 @@ class GoogleAsyncClientImpl final : public AsyncClient, Logger::Loggable<Logger:
 public:
   GoogleAsyncClientImpl(Event::Dispatcher& dispatcher, GoogleAsyncClientThreadLocal& tls,
                         GoogleStubFactory& stub_factory, Stats::ScopeSharedPtr scope,
-                        const envoy::api::v2::core::GrpcService& config);
+                        const envoy::api::v2::core::GrpcService& config, Api::Api& api);
   ~GoogleAsyncClientImpl() override;
 
   // Grpc::AsyncClient
@@ -166,7 +167,7 @@ public:
   AsyncStream* start(const Protobuf::MethodDescriptor& service_method,
                      AsyncStreamCallbacks& callbacks) override;
 
-  TimeSource& timeSource() { return dispatcher_.timeSystem(); }
+  TimeSource& timeSource() { return dispatcher_.timeSource(); }
 
 private:
   static std::shared_ptr<grpc::Channel>

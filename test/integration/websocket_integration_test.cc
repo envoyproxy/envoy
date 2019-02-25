@@ -4,7 +4,6 @@
 
 #include "envoy/config/accesslog/v2/file.pb.h"
 
-#include "common/filesystem/filesystem_impl.h"
 #include "common/http/header_map_impl.h"
 #include "common/protobuf/utility.h"
 
@@ -101,15 +100,15 @@ void WebsocketIntegrationTest::commonValidate(Http::HeaderMap& proxied_headers,
       proxied_headers.Connection()->value() == "upgrade" &&
       original_headers.Connection() != nullptr &&
       original_headers.Connection()->value() == "keep-alive, upgrade") {
-    // The keep-alive is implicit for HTTP/1.1, so Enovy only sets the upgrade
+    // The keep-alive is implicit for HTTP/1.1, so Envoy only sets the upgrade
     // header when converting from HTTP/1.1 to H2
     proxied_headers.Connection()->value().setCopy("keep-alive, upgrade", 19);
   }
 }
 
-INSTANTIATE_TEST_CASE_P(Protocols, WebsocketIntegrationTest,
-                        testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
-                        HttpProtocolIntegrationTest::protocolTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(Protocols, WebsocketIntegrationTest,
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 ConfigHelper::HttpModifierFunction setRouteUsingWebsocket() {
   return
@@ -282,7 +281,7 @@ TEST_P(WebsocketIntegrationTest, WebSocketConnectionIdleTimeout) {
   ASSERT_TRUE(waitForUpstreamDisconnectOrReset());
 }
 
-// Technically not a websocket tests, but verfies normal upgrades have parity
+// Technically not a websocket tests, but verifies normal upgrades have parity
 // with websocket upgrades
 TEST_P(WebsocketIntegrationTest, NonWebsocketUpgrade) {
   config_helper_.addConfigModifier(
@@ -293,6 +292,36 @@ TEST_P(WebsocketIntegrationTest, NonWebsocketUpgrade) {
       });
 
   config_helper_.addConfigModifier(setRouteUsingWebsocket());
+  initialize();
+
+  performUpgrade(upgradeRequestHeaders("foo", 0), upgradeResponseHeaders("foo"));
+  sendBidirectionalData();
+  codec_client_->sendData(*request_encoder_, "bye!", false);
+  if (downstreamProtocol() == Http::CodecClient::Type::HTTP1) {
+    codec_client_->close();
+  } else {
+    codec_client_->sendReset(*request_encoder_);
+  }
+
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, "hellobye!"));
+  ASSERT_TRUE(waitForUpstreamDisconnectOrReset());
+
+  auto upgrade_response_headers(upgradeResponseHeaders("foo"));
+  validateUpgradeResponseHeaders(response_->headers(), upgrade_response_headers);
+  codec_client_->close();
+}
+
+TEST_P(WebsocketIntegrationTest, RouteSpecificUpgrade) {
+  config_helper_.addConfigModifier(
+      [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
+          -> void {
+        auto* foo_upgrade = hcm.add_upgrade_configs();
+        foo_upgrade->set_upgrade_type("foo");
+        foo_upgrade->mutable_enabled()->set_value(false);
+      });
+  config_helper_.addRoute("host", "/websocket/test", "cluster_0", false,
+                          envoy::api::v2::route::RouteAction::NOT_FOUND,
+                          envoy::api::v2::route::VirtualHost::NONE, {}, false, "foo");
   initialize();
 
   performUpgrade(upgradeRequestHeaders("foo", 0), upgradeResponseHeaders("foo"));
@@ -414,7 +443,7 @@ TEST_P(WebsocketIntegrationTest, BidirectionalChunkedData) {
   codec_client_->sendData(*request_encoder_, "FinalClientPayload", false);
   ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, request_payload + "FinalClientPayload"));
   upstream_request_->encodeData("FinalServerPayload", false);
-  response_->waitForBodyData(5);
+  response_->waitForBodyData(response_->body().size() + 5);
   EXPECT_EQ(response_payload + "FinalServerPayload", response_->body());
 
   // Clean up.

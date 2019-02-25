@@ -12,10 +12,10 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace TcpProxy {
 
-class RouteIpListConfigTest : public ::testing::TestWithParam<std::string> {};
+class RouteIpListConfigTest : public testing::TestWithParam<std::string> {};
 
-INSTANTIATE_TEST_CASE_P(IpList, RouteIpListConfigTest,
-                        ::testing::Values(R"EOF("destination_ip_list": [
+INSTANTIATE_TEST_SUITE_P(IpList, RouteIpListConfigTest,
+                         ::testing::Values(R"EOF("destination_ip_list": [
                                                   "192.168.1.1/32",
                                                   "192.168.1.0/24"
                                                 ],
@@ -24,7 +24,7 @@ INSTANTIATE_TEST_CASE_P(IpList, RouteIpListConfigTest,
                                                   "192.0.0.0/8",
                                                   "127.0.0.0/8"
                                                 ],)EOF",
-                                          R"EOF("destination_ip_list": [
+                                           R"EOF("destination_ip_list": [
                                                   "2001:abcd::/64",
                                                   "2002:ffff::/32"
                                                 ],

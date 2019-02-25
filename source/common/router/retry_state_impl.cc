@@ -66,7 +66,7 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap&
   if (retry_on_ != 0 && request_headers.EnvoyMaxRetries()) {
     const char* max_retries = request_headers.EnvoyMaxRetries()->value().c_str();
     uint64_t temp;
-    if (StringUtil::atoul(max_retries, temp)) {
+    if (StringUtil::atoull(max_retries, temp)) {
       retries_remaining_ = temp;
     }
   }
@@ -74,7 +74,7 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap&
     for (const auto code : StringUtil::splitToken(
              request_headers.EnvoyRetriableStatusCodes()->value().getStringView(), ",")) {
       uint64_t out;
-      if (StringUtil::atoul(std::string(code).c_str(), out)) {
+      if (StringUtil::atoull(std::string(code).c_str(), out)) {
         retriable_status_codes_.emplace_back(out);
       }
     }
@@ -160,7 +160,7 @@ RetryStatus RetryStateImpl::shouldRetry(const Http::HeaderMap* response_headers,
   resetRetry();
 
   if (retries_remaining_ == 0) {
-    return RetryStatus::No;
+    return RetryStatus::NoRetryLimitExceeded;
   }
 
   retries_remaining_--;
@@ -254,7 +254,7 @@ bool RetryStateImpl::wouldRetryFromReset(const Http::StreamResetReason& reset_re
 bool RetryStateImpl::wouldRetry(const Http::HeaderMap* response_headers,
                                 const absl::optional<Http::StreamResetReason>& reset_reason) {
   // First check "never retry" conditions so we can short circuit, then delegate to
-  // helper methods for checks dependant on retry policy.
+  // helper methods for checks dependent on retry policy.
 
   // we never retry if the reset reason is overflow.
   if (reset_reason && reset_reason.value() == Http::StreamResetReason::Overflow) {

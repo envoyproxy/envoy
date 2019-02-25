@@ -5,6 +5,7 @@
 #include <list>
 #include <string>
 
+#include "envoy/api/v2/cluster/outlier_detection.pb.h"
 #include "envoy/upstream/upstream.h"
 
 #include "test/mocks/upstream/cluster_info.h"
@@ -35,9 +36,10 @@ public:
   MockEventLogger();
   ~MockEventLogger();
 
-  MOCK_METHOD4(logEject, void(HostDescriptionConstSharedPtr host, Detector& detector,
-                              EjectionType type, bool enforced));
-  MOCK_METHOD1(logUneject, void(HostDescriptionConstSharedPtr host));
+  MOCK_METHOD4(logEject,
+               void(const HostDescriptionConstSharedPtr& host, Detector& detector,
+                    envoy::data::cluster::v2alpha::OutlierEjectionType type, bool enforced));
+  MOCK_METHOD1(logUneject, void(const HostDescriptionConstSharedPtr& host));
 };
 
 class MockDetector : public Detector {
@@ -108,9 +110,9 @@ public:
   MockHost();
   ~MockHost();
 
-  CreateConnectionData
-  createConnection(Event::Dispatcher& dispatcher,
-                   const Network::ConnectionSocket::OptionsSharedPtr& options) const override {
+  CreateConnectionData createConnection(Event::Dispatcher& dispatcher,
+                                        const Network::ConnectionSocket::OptionsSharedPtr& options,
+                                        Network::TransportSocketOptionsSharedPtr) const override {
     MockCreateConnectionData data = createConnection_(dispatcher, options);
     return {Network::ClientConnectionPtr{data.connection_}, data.host_description_};
   }
@@ -148,7 +150,7 @@ public:
   MOCK_CONST_METHOD0(getActiveHealthFailureType, ActiveHealthFailureType());
   MOCK_METHOD1(healthFlagSet, void(HealthFlag flag));
   MOCK_METHOD1(setActiveHealthFailureType, void(ActiveHealthFailureType type));
-  MOCK_CONST_METHOD0(healthy, bool());
+  MOCK_CONST_METHOD0(health, Host::Health());
   MOCK_CONST_METHOD0(hostname, const std::string&());
   MOCK_CONST_METHOD0(outlierDetector, Outlier::DetectorHostMonitor&());
   MOCK_METHOD1(setHealthChecker_, void(HealthCheckHostMonitorPtr& health_checker));

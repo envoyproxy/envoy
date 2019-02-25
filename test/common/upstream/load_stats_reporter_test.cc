@@ -30,9 +30,7 @@ class LoadStatsReporterTest : public testing::Test {
 public:
   LoadStatsReporterTest()
       : retry_timer_(new Event::MockTimer()), response_timer_(new Event::MockTimer()),
-        async_client_(new Grpc::MockAsyncClient()) {
-    dispatcher_.setTimeSystem(time_system_);
-  }
+        async_client_(new Grpc::MockAsyncClient()) {}
 
   void createLoadStatsReporter() {
     InSequence s;
@@ -68,6 +66,7 @@ public:
     load_stats_reporter_->onReceiveMessage(std::move(response));
   }
 
+  Event::SimulatedTimeSystem time_system_;
   NiceMock<Upstream::MockClusterManager> cm_;
   Event::MockDispatcher dispatcher_;
   Stats::IsolatedStoreImpl stats_store_;
@@ -78,7 +77,6 @@ public:
   Event::TimerCb response_timer_cb_;
   Grpc::MockAsyncStream async_stream_;
   Grpc::MockAsyncClient* async_client_;
-  Event::SimulatedTimeSystem time_system_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
 };
 
@@ -117,9 +115,9 @@ TEST_F(LoadStatsReporterTest, ExistingClusters) {
   createLoadStatsReporter();
   time_system_.setMonotonicTime(std::chrono::microseconds(3));
   // Start reporting on foo.
-  NiceMock<MockCluster> foo_cluster;
+  NiceMock<MockClusterMockPrioritySet> foo_cluster;
   foo_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(2);
-  NiceMock<MockCluster> bar_cluster;
+  NiceMock<MockClusterMockPrioritySet> bar_cluster;
   MockClusterManager::ClusterInfoMap cluster_info{{"foo", foo_cluster}, {"bar", bar_cluster}};
   ON_CALL(cm_, clusters()).WillByDefault(Return(cluster_info));
   deliverLoadStatsResponse({"foo"});

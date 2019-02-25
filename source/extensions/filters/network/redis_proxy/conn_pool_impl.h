@@ -13,6 +13,7 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/buffer/buffer_impl.h"
+#include "common/common/hash.h"
 #include "common/network/filter_impl.h"
 #include "common/protobuf/utility.h"
 #include "common/upstream/load_balancer_impl.h"
@@ -36,9 +37,11 @@ public:
 
   bool disableOutlierEvents() const override { return false; }
   std::chrono::milliseconds opTimeout() const override { return op_timeout_; }
+  bool enableHashtagging() const override { return enable_hashtagging_; }
 
 private:
   const std::chrono::milliseconds op_timeout_;
+  const bool enable_hashtagging_;
 };
 
 class ClientImpl : public Client, public DecoderCallbacks, public Network::ConnectionCallbacks {
@@ -126,7 +129,7 @@ public:
       const envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings& config);
 
   // RedisProxy::ConnPool::Instance
-  PoolRequest* makeRequest(const std::string& hash_key, const RespValue& request,
+  PoolRequest* makeRequest(const std::string& key, const RespValue& request,
                            PoolCallbacks& callbacks) override;
 
 private:
@@ -151,7 +154,7 @@ private:
                            public Upstream::ClusterUpdateCallbacks {
     ThreadLocalPool(InstanceImpl& parent, Event::Dispatcher& dispatcher, std::string cluster_name);
     ~ThreadLocalPool();
-    PoolRequest* makeRequest(const std::string& hash_key, const RespValue& request,
+    PoolRequest* makeRequest(const std::string& key, const RespValue& request,
                              PoolCallbacks& callbacks);
     void onClusterAddOrUpdateNonVirtual(Upstream::ThreadLocalCluster& cluster);
     void onHostsRemoved(const std::vector<Upstream::HostSharedPtr>& hosts_removed);
@@ -172,10 +175,12 @@ private:
   };
 
   struct LbContextImpl : public Upstream::LoadBalancerContextBase {
-    LbContextImpl(const std::string& hash_key) : hash_key_(std::hash<std::string>()(hash_key)) {}
-    // TODO(danielhochman): convert to HashUtil::xxHash64 when we have a migration strategy.
-    // Upstream::LoadBalancerContext
+    LbContextImpl(const std::string& key, bool enabled_hashtagging)
+        : hash_key_(MurmurHash::murmurHash2_64(hashtag(key, enabled_hashtagging))) {}
+
     absl::optional<uint64_t> computeHashKey() override { return hash_key_; }
+
+    absl::string_view hashtag(absl::string_view v, bool enabled);
 
     const absl::optional<uint64_t> hash_key_;
   };

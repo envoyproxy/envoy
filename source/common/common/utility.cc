@@ -217,23 +217,23 @@ bool DateUtil::timePointValid(MonotonicTime time_point) {
 
 const char StringUtil::WhitespaceChars[] = " \t\f\v\n\r";
 
-const char* StringUtil::strtoul(const char* str, uint64_t& out, int base) {
+const char* StringUtil::strtoull(const char* str, uint64_t& out, int base) {
   if (strlen(str) == 0) {
     return nullptr;
   }
 
   char* end_ptr;
   errno = 0;
-  out = ::strtoul(str, &end_ptr, base);
-  if (end_ptr == str || (out == ULONG_MAX && errno == ERANGE)) {
+  out = std::strtoull(str, &end_ptr, base);
+  if (end_ptr == str || (out == ULLONG_MAX && errno == ERANGE)) {
     return nullptr;
   } else {
     return end_ptr;
   }
 }
 
-bool StringUtil::atoul(const char* str, uint64_t& out, int base) {
-  const char* end_ptr = StringUtil::strtoul(str, out, base);
+bool StringUtil::atoull(const char* str, uint64_t& out, int base) {
+  const char* end_ptr = StringUtil::strtoull(str, out, base);
   if (end_ptr == nullptr || *end_ptr != '\0') {
     return false;
   } else {
@@ -241,15 +241,15 @@ bool StringUtil::atoul(const char* str, uint64_t& out, int base) {
   }
 }
 
-bool StringUtil::atol(const char* str, int64_t& out, int base) {
+bool StringUtil::atoll(const char* str, int64_t& out, int base) {
   if (strlen(str) == 0) {
     return false;
   }
 
   char* end_ptr;
   errno = 0;
-  out = strtol(str, &end_ptr, base);
-  if (*end_ptr != '\0' || ((out == LONG_MAX || out == LONG_MIN) && errno == ERANGE)) {
+  out = std::strtoll(str, &end_ptr, base);
+  if (*end_ptr != '\0' || ((out == LLONG_MAX || out == LLONG_MIN) && errno == ERANGE)) {
     return false;
   } else {
     return true;
@@ -451,23 +451,6 @@ std::string AccessLogDateTimeFormatter::fromTime(const SystemTime& time) {
   return cached_time.formatted_time;
 }
 
-bool StringUtil::endsWith(const std::string& source, const std::string& end) {
-  if (source.length() < end.length()) {
-    return false;
-  }
-
-  size_t start_position = source.length() - end.length();
-  return std::equal(source.begin() + start_position, source.end(), end.begin());
-}
-
-bool StringUtil::startsWith(const char* source, const std::string& start, bool case_sensitive) {
-  if (case_sensitive) {
-    return strncmp(source, start.c_str(), start.size()) == 0;
-  } else {
-    return strncasecmp(source, start.c_str(), start.size()) == 0;
-  }
-}
-
 const std::string& StringUtil::nonEmptyStringOrDefault(const std::string& s,
                                                        const std::string& default_value) {
   return s.empty() ? default_value : s;
@@ -478,6 +461,13 @@ std::string StringUtil::toUpper(absl::string_view s) {
   upper_s.reserve(s.size());
   std::transform(s.cbegin(), s.cend(), std::back_inserter(upper_s), absl::ascii_toupper);
   return upper_s;
+}
+
+std::string StringUtil::toLower(absl::string_view s) {
+  std::string lower_s;
+  lower_s.reserve(s.size());
+  std::transform(s.cbegin(), s.cend(), std::back_inserter(lower_s), absl::ascii_tolower);
+  return lower_s;
 }
 
 bool StringUtil::CaseInsensitiveCompare::operator()(absl::string_view lhs,

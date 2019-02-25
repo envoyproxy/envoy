@@ -12,6 +12,8 @@
 #include "extensions/filters/network/thrift_proxy/app_exception_impl.h"
 #include "extensions/filters/network/well_known_names.h"
 
+#include "absl/strings/match.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -114,7 +116,7 @@ ServiceNameRouteEntryImpl::ServiceNameRouteEntryImpl(
     throw EnvoyException("Cannot have an empty service name with inversion enabled");
   }
 
-  if (!service_name.empty() && !StringUtil::endsWith(service_name, ":")) {
+  if (!service_name.empty() && !absl::EndsWith(service_name, ":")) {
     service_name_ = service_name + ":";
   } else {
     service_name_ = service_name;
@@ -124,9 +126,9 @@ ServiceNameRouteEntryImpl::ServiceNameRouteEntryImpl(
 RouteConstSharedPtr ServiceNameRouteEntryImpl::matches(const MessageMetadata& metadata,
                                                        uint64_t random_value) const {
   if (RouteEntryImplBase::headersMatch(metadata.headers())) {
-    bool matches = service_name_.empty() ||
-                   (metadata.hasMethodName() &&
-                    StringUtil::startsWith(metadata.methodName().c_str(), service_name_));
+    bool matches =
+        service_name_.empty() ||
+        (metadata.hasMethodName() && absl::StartsWith(metadata.methodName(), service_name_));
 
     if (matches ^ invert_) {
       return clusterEntry(random_value);
@@ -195,7 +197,7 @@ FilterStatus Router::transportEnd() {
 
 FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
   // TODO(zuercher): route stats (e.g., no_route, no_cluster, upstream_rq_maintenance_mode, no
-  // healtthy upstream)
+  // healthy upstream)
 
   route_ = callbacks_->route();
   if (!route_) {
@@ -246,7 +248,7 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
   ASSERT(protocol != ProtocolType::Auto);
 
   Tcp::ConnectionPool::Instance* conn_pool = cluster_manager_.tcpConnPoolForCluster(
-      route_entry_->clusterName(), Upstream::ResourcePriority::Default, this);
+      route_entry_->clusterName(), Upstream::ResourcePriority::Default, this, nullptr);
   if (!conn_pool) {
     callbacks_->sendLocalReply(
         AppException(AppExceptionType::InternalError,

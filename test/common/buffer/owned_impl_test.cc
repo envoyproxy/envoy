@@ -17,8 +17,6 @@ namespace {
 
 class OwnedImplTest : public testing::Test {
 public:
-  OwnedImplTest() {}
-
   bool release_callback_called_ = false;
 };
 

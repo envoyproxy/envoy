@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package envoy.test.deprecation_test;
+
+message Base {
+  string not_deprecated = 1;
+  string is_deprecated = 2 [deprecated = true];
+  string is_deprecated_fatal = 3 [deprecated = true];
+  message InnerMessage {
+    string inner_not_deprecated = 1;
+    string inner_deprecated = 2 [deprecated = true];
+    string inner_deprecated_fatal = 3 [deprecated = true];
+  }
+  InnerMessage deprecated_message = 4 [deprecated = true];
+  InnerMessage not_deprecated_message = 5;
+  repeated InnerMessage repeated_message = 6;
+  repeated InnerMessage deprecated_repeated_message = 7 [deprecated = true];
+}

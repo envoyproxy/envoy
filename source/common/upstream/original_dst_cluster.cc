@@ -29,7 +29,7 @@ OriginalDstCluster::LoadBalancer::LoadBalancer(
       info_(parent->info()), use_http_header_(config ? config.value().use_http_header() : false) {
   // priority_set_ is initially empty.
   priority_set_.addMemberUpdateCb(
-      [this](uint32_t, const HostVector& hosts_added, const HostVector& hosts_removed) -> void {
+      [this](const HostVector& hosts_added, const HostVector& hosts_removed) -> void {
         // Update the hosts map
         // TODO(ramaraochavali): use cluster stats and move the log lines to debug.
         for (const HostSharedPtr& host : hosts_removed) {
@@ -77,11 +77,12 @@ HostConstSharedPtr OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerCont
         Network::Address::InstanceConstSharedPtr host_ip_port(
             Network::Utility::copyInternetAddressAndPort(*dst_ip));
         // Create a host we can use immediately.
-        host.reset(new HostImpl(
-            info_, info_->name() + dst_addr.asString(), std::move(host_ip_port),
-            envoy::api::v2::core::Metadata::default_instance(), 1,
-            envoy::api::v2::core::Locality().default_instance(),
-            envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance(), 0));
+        host.reset(
+            new HostImpl(info_, info_->name() + dst_addr.asString(), std::move(host_ip_port),
+                         envoy::api::v2::core::Metadata::default_instance(), 1,
+                         envoy::api::v2::core::Locality().default_instance(),
+                         envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance(),
+                         0, envoy::api::v2::core::HealthStatus::UNKNOWN));
 
         ENVOY_LOG(debug, "Created host {}.", host->address()->asString());
         // Add the new host to the map. We just failed to find it in
@@ -145,12 +146,12 @@ OriginalDstCluster::OriginalDstCluster(
 void OriginalDstCluster::addHost(HostSharedPtr& host) {
   // Given the current config, only EDS clusters support multiple priorities.
   ASSERT(priority_set_.hostSetsPerPriority().size() == 1);
-  auto& first_host_set = priority_set_.getOrCreateHostSet(0);
+  const auto& first_host_set = priority_set_.getOrCreateHostSet(0);
   HostVectorSharedPtr new_hosts(new HostVector(first_host_set.hosts()));
   new_hosts->emplace_back(host);
-  first_host_set.updateHosts(new_hosts, createHealthyHostList(*new_hosts),
-                             HostsPerLocalityImpl::empty(), HostsPerLocalityImpl::empty(), {},
-                             {std::move(host)}, {}, absl::nullopt);
+  priority_set_.updateHosts(0,
+                            HostSetImpl::partitionHosts(new_hosts, HostsPerLocalityImpl::empty()),
+                            {}, {std::move(host)}, {}, absl::nullopt);
 }
 
 void OriginalDstCluster::cleanup() {
@@ -158,7 +159,7 @@ void OriginalDstCluster::cleanup() {
   HostVector to_be_removed;
   // Given the current config, only EDS clusters support multiple priorities.
   ASSERT(priority_set_.hostSetsPerPriority().size() == 1);
-  auto& host_set = priority_set_.getOrCreateHostSet(0);
+  const auto& host_set = priority_set_.getOrCreateHostSet(0);
 
   ENVOY_LOG(debug, "Cleaning up stale original dst hosts.");
   for (const HostSharedPtr& host : host_set.hosts()) {
@@ -173,9 +174,9 @@ void OriginalDstCluster::cleanup() {
   }
 
   if (to_be_removed.size() > 0) {
-    host_set.updateHosts(new_hosts, createHealthyHostList(*new_hosts),
-                         HostsPerLocalityImpl::empty(), HostsPerLocalityImpl::empty(), {}, {},
-                         to_be_removed, absl::nullopt);
+    priority_set_.updateHosts(0,
+                              HostSetImpl::partitionHosts(new_hosts, HostsPerLocalityImpl::empty()),
+                              {}, {}, to_be_removed, absl::nullopt);
   }
 
   cleanup_timer_->enableTimer(cleanup_interval_ms_);

@@ -49,16 +49,16 @@ struct BlockMemoryHashSetOptions {
 template <class Value> class BlockMemoryHashSet : public Logger::Loggable<Logger::Id::config> {
 public:
   /**
-   * Sentinal used for next_cell links to indicate end-of-list.
+   * Sentinel used for next_cell links to indicate end-of-list.
    */
-  static const uint32_t Sentinal = 0xffffffff;
+  static const uint32_t Sentinel = 0xffffffff;
 
   /** Type used by put() to indicate the value at a key, and whether it was created */
   typedef std::pair<Value*, bool> ValueCreatedPair;
 
   /**
    * Constructs a map control structure given a set of options, which cannot be changed.
-   * @param hash_set_options describes the parameters comtrolling set layout.
+   * @param hash_set_options describes the parameters controlling set layout.
    * @param init true if the memory should be initialized on construction. If false,
    *             the data in the table will be sanity checked, and an exception thrown if
    *             it is incoherent or mismatches the passed-in options.
@@ -112,7 +112,7 @@ public:
     for (uint32_t slot = 0; slot < control_->hash_set_options.num_slots; ++slot) {
       uint32_t next = 0; // initialized to silence compilers.
       for (uint32_t cell_index = slots_[slot];
-           (cell_index != Sentinal) && (num_values <= control_->size); cell_index = next) {
+           (cell_index != Sentinel) && (num_values <= control_->size); cell_index = next) {
         RELEASE_ASSERT(cell_index < control_->hash_set_options.capacity, "");
         Cell& cell = getCell(cell_index);
         absl::string_view key = cell.value.key();
@@ -128,7 +128,7 @@ public:
 
     // Don't infinite-loop with a corruption; break when we see there's a problem.
     for (uint32_t cell_index = control_->free_cell_index;
-         (cell_index != Sentinal) && (num_free_entries <= expected_free_entries);
+         (cell_index != Sentinel) && (num_free_entries <= expected_free_entries);
          cell_index = getCell(cell_index).next_cell_index) {
       ++num_free_entries;
     }
@@ -177,7 +177,7 @@ public:
   bool remove(absl::string_view key) {
     const uint32_t slot = computeSlot(key);
     uint32_t* next = nullptr;
-    for (uint32_t* cptr = &slots_[slot]; *cptr != Sentinal; cptr = next) {
+    for (uint32_t* cptr = &slots_[slot]; *cptr != Sentinel; cptr = next) {
       const uint32_t cell_index = *cptr;
       Cell& cell = getCell(cell_index);
       if (cell.value.key() == key) {
@@ -205,7 +205,7 @@ public:
    */
   Value* get(absl::string_view key) {
     const uint32_t slot = computeSlot(key);
-    for (uint32_t c = slots_[slot]; c != Sentinal; c = getCell(c).next_cell_index) {
+    for (uint32_t c = slots_[slot]; c != Sentinel; c = getCell(c).next_cell_index) {
       Cell& cell = getCell(c);
       if (cell.value.key() == key) {
         return &cell.value;
@@ -239,7 +239,7 @@ private:
 
     // Initialize all the slots;
     for (uint32_t slot = 0; slot < hash_set_options.num_slots; ++slot) {
-      slots_[slot] = Sentinal;
+      slots_[slot] = Sentinel;
     }
 
     // Initialize the free-cell list.
@@ -248,7 +248,7 @@ private:
       Cell& cell = getCell(cell_index);
       cell.next_cell_index = cell_index + 1;
     }
-    getCell(last_cell).next_cell_index = Sentinal;
+    getCell(last_cell).next_cell_index = Sentinel;
   }
 
   /**
@@ -303,7 +303,7 @@ private:
    * Represents a value-cell, which is stored in a linked-list from each slot.
    */
   struct Cell {
-    uint32_t next_cell_index; // Index of next cell in map->cells_, terminated with Sentinal.
+    uint32_t next_cell_index; // Index of next cell in map->cells_, terminated with Sentinel.
     Value value;              // Templated value field.
   };
 
@@ -337,7 +337,7 @@ private:
    * Returns a reference to a Cell at the specified index.
    */
   Cell& getCell(uint32_t cell_index) {
-    // Because the key-size is parameteriziable, an array-lookup on sizeof(Cell) does not work.
+    // Because the key-size is parameterizable, an array-lookup on sizeof(Cell) does not work.
     char* ptr = reinterpret_cast<char*>(cells_) + cellOffset(cell_index, stats_options_);
     RELEASE_ASSERT((reinterpret_cast<uint64_t>(ptr) & (calculateAlignment() - 1)) == 0, "");
     return *reinterpret_cast<Cell*>(ptr);
@@ -355,7 +355,7 @@ private:
   }
 
   // Pointers into memory. Cells go first, because Value may need a more aggressive
-  // aligmnment.
+  // alignment.
   Cell* cells_;
   Control* control_;
   uint32_t* slots_;

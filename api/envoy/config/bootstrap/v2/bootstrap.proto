@@ -6,6 +6,10 @@
 syntax = "proto3";
 
 package envoy.config.bootstrap.v2;
+
+option java_outer_classname = "BootstrapProto";
+option java_multiple_files = true;
+option java_package = "io.envoyproxy.envoy.config.bootstrap.v2";
 option go_package = "v2";
 
 import "envoy/api/v2/core/address.proto";
@@ -69,14 +73,7 @@ message Bootstrap {
     // streamed on the ADS channel.
     envoy.api.v2.core.ApiConfigSource ads_config = 3;
 
-    // [#not-implemented-hide:] Hide from docs.
-    message DeprecatedV1 {
-      // Deprecated service discovery service config for when using API v1 REST.
-      envoy.api.v2.core.ConfigSource sds_config = 1;
-    }
-
-    // [#not-implemented-hide:] Hide from docs.
-    DeprecatedV1 deprecated_v1 = 4 [deprecated = true];
+    reserved 4;
   }
   // xDS configuration sources.
   DynamicResources dynamic_resources = 3;
@@ -114,7 +111,7 @@ message Bootstrap {
   // Configuration for an external rate limit service provider. If not
   // specified, any calls to the rate limit service will immediately return
   // success.
-  envoy.config.ratelimit.v2.RateLimitServiceConfig rate_limit_service = 10;
+  envoy.config.ratelimit.v2.RateLimitServiceConfig rate_limit_service = 10 [deprecated = true];
 
   // Configuration for the runtime configuration provider. If not specified, a
   // “null” provider will be used which will result in all defaults being used.

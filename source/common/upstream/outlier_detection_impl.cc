@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/data/cluster/v2alpha/outlier_detection_event.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/stats/scope.h"
 
@@ -24,8 +25,9 @@ DetectorSharedPtr DetectorImplFactory::createForCluster(
     Cluster& cluster, const envoy::api::v2::Cluster& cluster_config, Event::Dispatcher& dispatcher,
     Runtime::Loader& runtime, EventLoggerSharedPtr event_logger) {
   if (cluster_config.has_outlier_detection()) {
+
     return DetectorImpl::create(cluster, cluster_config.outlier_detection(), dispatcher, runtime,
-                                dispatcher.timeSystem(), std::move(event_logger));
+                                dispatcher.timeSource(), std::move(event_logger));
   } else {
     return nullptr;
   }
@@ -164,7 +166,7 @@ void DetectorImpl::initialize(const Cluster& cluster) {
     }
   }
   cluster.prioritySet().addMemberUpdateCb(
-      [this](uint32_t, const HostVector& hosts_added, const HostVector& hosts_removed) -> void {
+      [this](const HostVector& hosts_added, const HostVector& hosts_removed) -> void {
         for (const HostSharedPtr& host : hosts_added) {
           addHostMonitor(host);
         }
@@ -221,39 +223,47 @@ void DetectorImpl::checkHostForUneject(HostSharedPtr host, DetectorHostMonitorIm
   }
 }
 
-bool DetectorImpl::enforceEjection(EjectionType type) {
+bool DetectorImpl::enforceEjection(envoy::data::cluster::v2alpha::OutlierEjectionType type) {
   switch (type) {
-  case EjectionType::Consecutive5xx:
+  case envoy::data::cluster::v2alpha::OutlierEjectionType::CONSECUTIVE_5XX:
     return runtime_.snapshot().featureEnabled("outlier_detection.enforcing_consecutive_5xx",
                                               config_.enforcingConsecutive5xx());
-  case EjectionType::ConsecutiveGatewayFailure:
+  case envoy::data::cluster::v2alpha::OutlierEjectionType::CONSECUTIVE_GATEWAY_FAILURE:
     return runtime_.snapshot().featureEnabled(
         "outlier_detection.enforcing_consecutive_gateway_failure",
         config_.enforcingConsecutiveGatewayFailure());
-  case EjectionType::SuccessRate:
+  case envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE:
     return runtime_.snapshot().featureEnabled("outlier_detection.enforcing_success_rate",
                                               config_.enforcingSuccessRate());
+  default:
+    // Checked by schema.
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
-void DetectorImpl::updateEnforcedEjectionStats(EjectionType type) {
+void DetectorImpl::updateEnforcedEjectionStats(
+    envoy::data::cluster::v2alpha::OutlierEjectionType type) {
   stats_.ejections_enforced_total_.inc();
   switch (type) {
-  case EjectionType::SuccessRate:
+  case envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE:
     stats_.ejections_enforced_success_rate_.inc();
     break;
-  case EjectionType::Consecutive5xx:
+  case envoy::data::cluster::v2alpha::OutlierEjectionType::CONSECUTIVE_5XX:
     stats_.ejections_enforced_consecutive_5xx_.inc();
     break;
-  case EjectionType::ConsecutiveGatewayFailure:
+  case envoy::data::cluster::v2alpha::OutlierEjectionType::CONSECUTIVE_GATEWAY_FAILURE:
     stats_.ejections_enforced_consecutive_gateway_failure_.inc();
     break;
+  default:
+    // Checked by schema.
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
-void DetectorImpl::ejectHost(HostSharedPtr host, EjectionType type) {
+void DetectorImpl::ejectHost(HostSharedPtr host,
+                             envoy::data::cluster::v2alpha::OutlierEjectionType type) {
   uint64_t max_ejection_percent = std::min<uint64_t>(
       100, runtime_.snapshot().getInteger("outlier_detection.max_ejection_percent",
                                           config_.maxEjectionPercent()));
@@ -261,7 +271,8 @@ void DetectorImpl::ejectHost(HostSharedPtr host, EjectionType type) {
   // Note this is not currently checked per-priority level, so it is possible
   // for outlier detection to eject all hosts at any given priority level.
   if (ejected_percent < max_ejection_percent) {
-    if (type == EjectionType::Consecutive5xx || type == EjectionType::SuccessRate) {
+    if (type == envoy::data::cluster::v2alpha::OutlierEjectionType::CONSECUTIVE_5XX ||
+        type == envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE) {
       // Deprecated counter, preserving old behaviour until it's removed.
       stats_.ejections_total_.inc();
     }
@@ -270,7 +281,6 @@ void DetectorImpl::ejectHost(HostSharedPtr host, EjectionType type) {
       updateEnforcedEjectionStats(type);
       host_monitors_[host]->eject(time_source_.monotonicTime());
       runCallbacks(host);
-
       if (event_logger_) {
         event_logger_->logEject(host, *this, type, true);
       }
@@ -290,7 +300,8 @@ DetectionStats DetectorImpl::generateStats(Stats::Scope& scope) {
                                       POOL_GAUGE_PREFIX(scope, prefix))};
 }
 
-void DetectorImpl::notifyMainThreadConsecutiveError(HostSharedPtr host, EjectionType type) {
+void DetectorImpl::notifyMainThreadConsecutiveError(
+    HostSharedPtr host, envoy::data::cluster::v2alpha::OutlierEjectionType type) {
   // This event will come from all threads, so we synchronize with a post to the main thread.
   // NOTE: Unfortunately consecutive errors are complicated from a threading perspective because
   //       we catch consecutive errors on worker threads and then post back to the main thread.
@@ -311,14 +322,17 @@ void DetectorImpl::notifyMainThreadConsecutiveError(HostSharedPtr host, Ejection
 }
 
 void DetectorImpl::onConsecutive5xx(HostSharedPtr host) {
-  notifyMainThreadConsecutiveError(host, EjectionType::Consecutive5xx);
+  notifyMainThreadConsecutiveError(
+      host, envoy::data::cluster::v2alpha::OutlierEjectionType::CONSECUTIVE_5XX);
 }
 
 void DetectorImpl::onConsecutiveGatewayFailure(HostSharedPtr host) {
-  notifyMainThreadConsecutiveError(host, EjectionType::ConsecutiveGatewayFailure);
+  notifyMainThreadConsecutiveError(
+      host, envoy::data::cluster::v2alpha::OutlierEjectionType::CONSECUTIVE_GATEWAY_FAILURE);
 }
 
-void DetectorImpl::onConsecutiveErrorWorker(HostSharedPtr host, EjectionType type) {
+void DetectorImpl::onConsecutiveErrorWorker(
+    HostSharedPtr host, envoy::data::cluster::v2alpha::OutlierEjectionType type) {
   // Ejections come in cross thread. There is a chance that the host has already been removed from
   // the set. If so, just ignore it.
   if (host_monitors_.count(host) == 0) {
@@ -331,18 +345,20 @@ void DetectorImpl::onConsecutiveErrorWorker(HostSharedPtr host, EjectionType typ
   // We also reset the appropriate counter here to allow the monitor to detect a bout of consecutive
   // error responses even if the monitor is not charged with an interleaved non-error code.
   switch (type) {
-  case EjectionType::Consecutive5xx:
+  case envoy::data::cluster::v2alpha::OutlierEjectionType::CONSECUTIVE_5XX:
     stats_.ejections_consecutive_5xx_.inc(); // Deprecated
     stats_.ejections_detected_consecutive_5xx_.inc();
-    ejectHost(host, EjectionType::Consecutive5xx);
+    ejectHost(host, envoy::data::cluster::v2alpha::OutlierEjectionType::CONSECUTIVE_5XX);
     host_monitors_[host]->resetConsecutive5xx();
     break;
-  case EjectionType::ConsecutiveGatewayFailure:
+  case envoy::data::cluster::v2alpha::OutlierEjectionType::CONSECUTIVE_GATEWAY_FAILURE:
     stats_.ejections_detected_consecutive_gateway_failure_.inc();
-    ejectHost(host, EjectionType::ConsecutiveGatewayFailure);
+    ejectHost(host,
+              envoy::data::cluster::v2alpha::OutlierEjectionType::CONSECUTIVE_GATEWAY_FAILURE);
     host_monitors_[host]->resetConsecutiveGatewayFailure();
     break;
-  case EjectionType::SuccessRate:
+  default:
+    // Checked by schema.
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
@@ -426,7 +442,8 @@ void DetectorImpl::processSuccessRateEjections() {
       if (host_success_rate_pair.success_rate_ < success_rate_ejection_threshold_) {
         stats_.ejections_success_rate_.inc(); // Deprecated.
         stats_.ejections_detected_success_rate_.inc();
-        ejectHost(host_success_rate_pair.host_, EjectionType::SuccessRate);
+        ejectHost(host_success_rate_pair.host_,
+                  envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE);
       }
     }
   }
@@ -456,100 +473,61 @@ void DetectorImpl::runCallbacks(HostSharedPtr host) {
   }
 }
 
-void EventLoggerImpl::logEject(HostDescriptionConstSharedPtr host, Detector& detector,
-                               EjectionType type, bool enforced) {
-  // TODO(mattklein123): Log friendly host name (e.g., instance ID or DNS name).
-  // clang-format off
-  static const std::string json_5xx =
-    std::string("{{") +
-    "\"time\": \"{}\", " +
-    "\"secs_since_last_action\": \"{}\", " +
-    "\"cluster\": \"{}\", " +
-    "\"upstream_url\": \"{}\", " +
-    "\"action\": \"eject\", " +
-    "\"type\": \"{}\", " +
-    "\"num_ejections\": {}, " +
-    "\"enforced\": \"{}\"" +
-    "}}\n";
+void EventLoggerImpl::logEject(const HostDescriptionConstSharedPtr& host, Detector& detector,
+                               envoy::data::cluster::v2alpha::OutlierEjectionType type,
+                               bool enforced) {
+  envoy::data::cluster::v2alpha::OutlierDetectionEvent event;
+  event.set_type(type);
 
-  static const std::string json_success_rate =
-    std::string("{{") +
-    "\"time\": \"{}\", " +
-    "\"secs_since_last_action\": \"{}\", " +
-    "\"cluster\": \"{}\", " +
-    "\"upstream_url\": \"{}\", " +
-    "\"action\": \"eject\", " +
-    "\"type\": \"{}\", " +
-    "\"num_ejections\": {}, " +
-    "\"enforced\": \"{}\", " +
-    "\"host_success_rate\": \"{}\", " +
-    "\"cluster_average_success_rate\": \"{}\", " +
-    "\"cluster_success_rate_ejection_threshold\": \"{}\"" +
-    "}}\n";
-  // clang-format on
-  SystemTime now = time_source_.systemTime();
+  absl::optional<MonotonicTime> time = host->outlierDetector().lastUnejectionTime();
+  setCommonEventParams(event, host, time);
+
+  event.set_action(envoy::data::cluster::v2alpha::Action::EJECT);
+
+  event.set_enforced(enforced);
+
+  if (type == envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE) {
+    event.mutable_eject_success_rate_event()->set_cluster_average_success_rate(
+        detector.successRateAverage());
+    event.mutable_eject_success_rate_event()->set_cluster_success_rate_ejection_threshold(
+        detector.successRateEjectionThreshold());
+    event.mutable_eject_success_rate_event()->set_host_success_rate(
+        host->outlierDetector().successRate());
+  } else {
+    event.mutable_eject_consecutive_event();
+  }
+
+  const auto json = MessageUtil::getJsonStringFromMessage(event, /* pretty_print */ false,
+                                                          /* always_print_primitive_fields */ true);
+  file_->write(fmt::format("{}\n", json));
+}
+
+void EventLoggerImpl::logUneject(const HostDescriptionConstSharedPtr& host) {
+  envoy::data::cluster::v2alpha::OutlierDetectionEvent event;
+
+  absl::optional<MonotonicTime> time = host->outlierDetector().lastEjectionTime();
+  setCommonEventParams(event, host, time);
+
+  event.set_action(envoy::data::cluster::v2alpha::Action::UNEJECT);
+
+  const auto json = MessageUtil::getJsonStringFromMessage(event, /* pretty_print */ false,
+                                                          /* always_print_primitive_fields */ true);
+  file_->write(fmt::format("{}\n", json));
+}
+
+void EventLoggerImpl::setCommonEventParams(
+    envoy::data::cluster::v2alpha::OutlierDetectionEvent& event,
+    const HostDescriptionConstSharedPtr& host, absl::optional<MonotonicTime> time) {
   MonotonicTime monotonic_now = time_source_.monotonicTime();
-
-  switch (type) {
-  case EjectionType::Consecutive5xx:
-  case EjectionType::ConsecutiveGatewayFailure:
-    file_->write(fmt::format(
-        json_5xx, AccessLogDateTimeFormatter::fromTime(now),
-        secsSinceLastAction(host->outlierDetector().lastUnejectionTime(), monotonic_now),
-        host->cluster().name(), host->address()->asString(), typeToString(type),
-        host->outlierDetector().numEjections(), enforced));
-    break;
-  case EjectionType::SuccessRate:
-    file_->write(fmt::format(
-        json_success_rate, AccessLogDateTimeFormatter::fromTime(now),
-        secsSinceLastAction(host->outlierDetector().lastUnejectionTime(), monotonic_now),
-        host->cluster().name(), host->address()->asString(), typeToString(type),
-        host->outlierDetector().numEjections(), enforced, host->outlierDetector().successRate(),
-        detector.successRateAverage(), detector.successRateEjectionThreshold()));
-    break;
+  if (time) {
+    std::chrono::seconds secsFromLastAction =
+        std::chrono::duration_cast<std::chrono::seconds>(monotonic_now - time.value());
+    event.mutable_secs_since_last_action()->set_value(secsFromLastAction.count());
   }
-}
-
-void EventLoggerImpl::logUneject(HostDescriptionConstSharedPtr host) {
-  // TODO(mattklein123): Log friendly host name (e.g., instance ID or DNS name).
-  // clang-format off
-  static const std::string json =
-    std::string("{{") +
-    "\"time\": \"{}\", " +
-    "\"secs_since_last_action\": \"{}\", " +
-    "\"cluster\": \"{}\", " +
-    "\"upstream_url\": \"{}\", " +
-    "\"action\": \"uneject\", " +
-    "\"num_ejections\": {}" +
-    "}}\n";
-  // clang-format on
-  SystemTime now = time_source_.systemTime();
-  MonotonicTime monotonic_now = time_source_.monotonicTime();
-  file_->write(fmt::format(
-      json, AccessLogDateTimeFormatter::fromTime(now),
-      secsSinceLastAction(host->outlierDetector().lastEjectionTime(), monotonic_now),
-      host->cluster().name(), host->address()->asString(), host->outlierDetector().numEjections()));
-}
-
-std::string EventLoggerImpl::typeToString(EjectionType type) {
-  switch (type) {
-  case EjectionType::Consecutive5xx:
-    return "5xx";
-  case EjectionType::ConsecutiveGatewayFailure:
-    return "GatewayFailure";
-  case EjectionType::SuccessRate:
-    return "SuccessRate";
-  }
-
-  NOT_REACHED_GCOVR_EXCL_LINE;
-}
-
-int EventLoggerImpl::secsSinceLastAction(const absl::optional<MonotonicTime>& lastActionTime,
-                                         MonotonicTime now) {
-  if (lastActionTime) {
-    return std::chrono::duration_cast<std::chrono::seconds>(now - lastActionTime.value()).count();
-  }
-  return -1;
+  event.set_cluster_name(host->cluster().name());
+  event.set_upstream_url(host->address()->asString());
+  event.set_num_ejections(host->outlierDetector().numEjections());
+  TimestampUtil::systemClockToTimestamp(time_source_.systemTime(), *event.mutable_timestamp());
 }
 
 SuccessRateAccumulatorBucket* SuccessRateAccumulator::updateCurrentWriter() {

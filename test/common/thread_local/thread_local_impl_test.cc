@@ -1,9 +1,9 @@
-#include "common/api/api_impl.h"
+#include "common/common/thread.h"
 #include "common/event/dispatcher_impl.h"
+#include "common/stats/isolated_store_impl.h"
 #include "common/thread_local/thread_local_impl.h"
 
 #include "test/mocks/event/mocks.h"
-#include "test/test_common/test_time.h"
 
 #include "gmock/gmock.h"
 
@@ -116,29 +116,29 @@ TEST_F(ThreadLocalInstanceImplTest, RunOnAllThreads) {
 TEST(ThreadLocalInstanceImplDispatcherTest, Dispatcher) {
   InstanceImpl tls;
 
-  Api::Impl api;
-  DangerousDeprecatedTestTime test_time;
-  Event::DispatcherImpl main_dispatcher(test_time.timeSystem());
-  Event::DispatcherImpl thread_dispatcher(test_time.timeSystem());
+  Api::ApiPtr api = Api::createApiForTest();
+  Event::DispatcherPtr main_dispatcher(api->allocateDispatcher());
+  Event::DispatcherPtr thread_dispatcher(api->allocateDispatcher());
 
-  tls.registerThread(main_dispatcher, true);
-  tls.registerThread(thread_dispatcher, false);
+  tls.registerThread(*main_dispatcher, true);
+  tls.registerThread(*thread_dispatcher, false);
 
   // Ensure that the dispatcher update in tls posted during the above registerThread happens.
-  main_dispatcher.run(Event::Dispatcher::RunType::NonBlock);
+  main_dispatcher->run(Event::Dispatcher::RunType::NonBlock);
   // Verify we have the expected dispatcher for the main thread.
-  EXPECT_EQ(&main_dispatcher, &tls.dispatcher());
+  EXPECT_EQ(main_dispatcher.get(), &tls.dispatcher());
 
-  Thread::ThreadPtr thread = api.createThread([&thread_dispatcher, &tls]() {
-    // Ensure that the dispatcher update in tls posted during the above registerThread happens.
-    thread_dispatcher.run(Event::Dispatcher::RunType::NonBlock);
-    // Verify we have the expected dispatcher for the new thread thread.
-    EXPECT_EQ(&thread_dispatcher, &tls.dispatcher());
-  });
+  Thread::ThreadPtr thread =
+      Thread::threadFactoryForTest().createThread([&thread_dispatcher, &tls]() {
+        // Ensure that the dispatcher update in tls posted during the above registerThread happens.
+        thread_dispatcher->run(Event::Dispatcher::RunType::NonBlock);
+        // Verify we have the expected dispatcher for the new thread thread.
+        EXPECT_EQ(thread_dispatcher.get(), &tls.dispatcher());
+      });
   thread->join();
 
   // Verify we still have the expected dispatcher for the main thread.
-  EXPECT_EQ(&main_dispatcher, &tls.dispatcher());
+  EXPECT_EQ(main_dispatcher.get(), &tls.dispatcher());
 
   tls.shutdownGlobalThreading();
   tls.shutdownThread();

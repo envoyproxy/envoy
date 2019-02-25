@@ -69,7 +69,6 @@ DEFINE_PROTO_FUZZER(const envoy::config::bootstrap::v2::Bootstrap& input) {
     std::ofstream bootstrap_file(bootstrap_path);
     bootstrap_file << makeHermeticPathsAndPorts(test_env, input).DebugString();
     options.config_path_ = bootstrap_path;
-    options.v2_config_only_ = true;
     options.log_level_ = Fuzz::Runner::logLevel();
   }
 
@@ -79,7 +78,7 @@ DEFINE_PROTO_FUZZER(const envoy::config::bootstrap::v2::Bootstrap& input) {
         options, test_time.timeSystem(),
         std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"), hooks, restart, stats_store,
         fakelock, component_factory, std::make_unique<Runtime::RandomGeneratorImpl>(),
-        thread_local_instance);
+        thread_local_instance, Thread::threadFactoryForTest());
   } catch (const EnvoyException& ex) {
     ENVOY_LOG_MISC(debug, "Controlled EnvoyException exit: {}", ex.what());
     return;

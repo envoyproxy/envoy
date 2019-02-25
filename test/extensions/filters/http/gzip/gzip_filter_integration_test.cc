@@ -10,11 +10,11 @@
 
 namespace Envoy {
 
-class GzipIntegrationTest : public HttpIntegrationTest,
-                            public testing::TestWithParam<Network::Address::IpVersion> {
+class GzipIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+                            public Event::SimulatedTimeSystem,
+                            public HttpIntegrationTest {
 public:
-  GzipIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), simTime()) {}
+  GzipIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
 
   void SetUp() override { decompressor_.init(window_bits); }
   void TearDown() override { cleanupUpstreamAndDownstream(); }
@@ -28,7 +28,8 @@ public:
   void doRequestAndCompression(Http::TestHeaderMapImpl&& request_headers,
                                Http::TestHeaderMapImpl&& response_headers) {
     uint64_t content_length;
-    ASSERT_TRUE(StringUtil::atoul(response_headers.get_("content-length").c_str(), content_length));
+    ASSERT_TRUE(
+        StringUtil::atoull(response_headers.get_("content-length").c_str(), content_length));
     const Buffer::OwnedImpl expected_response{std::string(content_length, 'a')};
     auto response =
         sendRequestAndWaitForResponse(request_headers, 0, response_headers, content_length);
@@ -53,7 +54,8 @@ public:
   void doRequestAndNoCompression(Http::TestHeaderMapImpl&& request_headers,
                                  Http::TestHeaderMapImpl&& response_headers) {
     uint64_t content_length;
-    ASSERT_TRUE(StringUtil::atoul(response_headers.get_("content-length").c_str(), content_length));
+    ASSERT_TRUE(
+        StringUtil::atoull(response_headers.get_("content-length").c_str(), content_length));
     auto response =
         sendRequestAndWaitForResponse(request_headers, 0, response_headers, content_length);
     EXPECT_TRUE(upstream_request_->complete());
@@ -86,9 +88,9 @@ public:
   Decompressor::ZlibDecompressorImpl decompressor_{};
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, GzipIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, GzipIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 /**
  * Exercises gzip compression with default configuration.

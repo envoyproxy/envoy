@@ -3,8 +3,8 @@
 namespace Envoy {
 namespace Http {
 
-ValidationAsyncClient::ValidationAsyncClient(Event::TimeSystem& time_system)
-    : dispatcher_(time_system) {}
+ValidationAsyncClient::ValidationAsyncClient(Api::Api& api, Event::TimeSystem& time_system)
+    : dispatcher_(api, time_system) {}
 
 AsyncClient::Request* ValidationAsyncClient::send(MessagePtr&&, Callbacks&, const RequestOptions&) {
   return nullptr;

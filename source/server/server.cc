@@ -26,6 +26,7 @@
 #include "common/config/bootstrap_json.h"
 #include "common/config/resources.h"
 #include "common/config/utility.h"
+#include "common/http/codes.h"
 #include "common/local_info/local_info_impl.h"
 #include "common/memory/stats.h"
 #include "common/network/address_impl.h"
@@ -44,24 +45,26 @@
 namespace Envoy {
 namespace Server {
 
-InstanceImpl::InstanceImpl(Options& options, Event::TimeSystem& time_system,
+InstanceImpl::InstanceImpl(const Options& options, Event::TimeSystem& time_system,
                            Network::Address::InstanceConstSharedPtr local_address, TestHooks& hooks,
                            HotRestart& restarter, Stats::StoreRoot& store,
                            Thread::BasicLockable& access_log_lock,
                            ComponentFactory& component_factory,
                            Runtime::RandomGeneratorPtr&& random_generator,
-                           ThreadLocal::Instance& tls)
-    : shutdown_(false), options_(options), time_system_(time_system), restarter_(restarter),
+                           ThreadLocal::Instance& tls, Thread::ThreadFactory& thread_factory)
+    : secret_manager_(std::make_unique<Secret::SecretManagerImpl>()), shutdown_(false),
+      options_(options), time_source_(time_system), restarter_(restarter),
       start_time_(time(nullptr)), original_start_time_(start_time_), stats_store_(store),
-      thread_local_(tls), api_(new Api::Impl(options.fileFlushIntervalMsec())),
-      secret_manager_(std::make_unique<Secret::SecretManagerImpl>()),
-      dispatcher_(api_->allocateDispatcher(time_system)),
-      singleton_manager_(new Singleton::ManagerImpl()),
+      thread_local_(tls), api_(new Api::Impl(thread_factory, store, time_system)),
+      dispatcher_(api_->allocateDispatcher()),
+      singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory().currentThreadId())),
       handler_(new ConnectionHandlerImpl(ENVOY_LOGGER(), *dispatcher_)),
       random_generator_(std::move(random_generator)), listener_component_factory_(*this),
-      worker_factory_(thread_local_, *api_, hooks, time_system),
+      worker_factory_(thread_local_, *api_, hooks),
       dns_resolver_(dispatcher_->createDnsResolver({})),
-      access_log_manager_(*api_, *dispatcher_, access_log_lock, store), terminated_(false),
+      access_log_manager_(options.fileFlushIntervalMsec(), *api_, *dispatcher_, access_log_lock,
+                          store),
+      terminated_(false),
       mutex_tracer_(options.mutexTracingEnabled() ? &Envoy::MutexTracerImpl::getOrCreateTracer()
                                                   : nullptr) {
 
@@ -114,9 +117,7 @@ InstanceImpl::~InstanceImpl() {
   listener_manager_.reset();
 }
 
-Upstream::ClusterManager& InstanceImpl::clusterManager() { return *config_->clusterManager(); }
-
-Tracing::HttpTracer& InstanceImpl::httpTracer() { return config_->httpTracer(); }
+Upstream::ClusterManager& InstanceImpl::clusterManager() { return *config_.clusterManager(); }
 
 void InstanceImpl::drainListeners() {
   ENVOY_LOG(info, "closing and draining listeners");
@@ -154,10 +155,10 @@ void InstanceImpl::flushStats() {
     server_stats_->total_connections_.set(numConnections() + info.num_connections_);
     server_stats_->days_until_first_cert_expiring_.set(
         sslContextManager().daysUntilFirstCertExpires());
-    InstanceUtil::flushMetricsToSinks(config_->statsSinks(), stats_store_.source());
+    InstanceUtil::flushMetricsToSinks(config_.statsSinks(), stats_store_.source());
     // TODO(ramaraochavali): consider adding different flush interval for histograms.
     if (stat_flush_timer_ != nullptr) {
-      stat_flush_timer_->enableTimer(config_->statsFlushInterval());
+      stat_flush_timer_->enableTimer(config_.statsFlushInterval());
     }
   });
 }
@@ -171,35 +172,30 @@ bool InstanceImpl::healthCheckFailed() { return server_stats_->live_.value() == 
 
 InstanceUtil::BootstrapVersion
 InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& bootstrap,
-                                  Options& options) {
-  try {
-    if (!options.configPath().empty()) {
-      MessageUtil::loadFromFile(options.configPath(), bootstrap);
-    }
-    if (!options.configYaml().empty()) {
-      envoy::config::bootstrap::v2::Bootstrap bootstrap_override;
-      MessageUtil::loadFromYaml(options.configYaml(), bootstrap_override);
-      bootstrap.MergeFrom(bootstrap_override);
-    }
-    MessageUtil::validate(bootstrap);
-    return BootstrapVersion::V2;
-  } catch (const EnvoyException& e) {
-    if (options.v2ConfigOnly()) {
-      throw;
-    }
-    // TODO(htuch): When v1 is deprecated, make this a warning encouraging config upgrade.
-    ENVOY_LOG(debug, "Unable to initialize config as v2, will retry as v1: {}", e.what());
+                                  const Options& options, Api::Api& api) {
+  const std::string& config_path = options.configPath();
+  const std::string& config_yaml = options.configYaml();
+
+  // Exactly one of config_path and config_yaml should be specified.
+  if (config_path.empty() && config_yaml.empty()) {
+    const std::string message =
+        "At least one of --config-path and --config-yaml should be non-empty";
+    throw EnvoyException(message);
   }
-  if (!options.configYaml().empty()) {
-    throw EnvoyException("V1 config (detected) with --config-yaml is not supported");
+
+  if (!config_path.empty()) {
+    MessageUtil::loadFromFile(config_path, bootstrap, api);
   }
-  Json::ObjectSharedPtr config_json = Json::Factory::loadFromFile(options.configPath());
-  Config::BootstrapJson::translateBootstrap(*config_json, bootstrap, options.statsOptions());
+  if (!config_yaml.empty()) {
+    envoy::config::bootstrap::v2::Bootstrap bootstrap_override;
+    MessageUtil::loadFromYaml(config_yaml, bootstrap_override);
+    bootstrap.MergeFrom(bootstrap_override);
+  }
   MessageUtil::validate(bootstrap);
-  return BootstrapVersion::V1;
+  return BootstrapVersion::V2;
 }
 
-void InstanceImpl::initialize(Options& options,
+void InstanceImpl::initialize(const Options& options,
                               Network::Address::InstanceConstSharedPtr local_address,
                               ComponentFactory& component_factory) {
   ENVOY_LOG(info, "initializing epoch {} (hot restart version={})", options.restartEpoch(),
@@ -229,24 +225,29 @@ void InstanceImpl::initialize(Options& options,
                 Configuration::UpstreamTransportSocketConfigFactory>::allFactoryNames());
 
   // Handle configuration that needs to take place prior to the main configuration load.
-  InstanceUtil::loadBootstrapConfig(bootstrap_, options);
-  bootstrap_config_update_time_ = time_system_.systemTime();
+  InstanceUtil::loadBootstrapConfig(bootstrap_, options, api());
+  bootstrap_config_update_time_ = time_source_.systemTime();
 
   // Needs to happen as early as possible in the instantiation to preempt the objects that require
   // stats.
   stats_store_.setTagProducer(Config::Utility::createTagProducer(bootstrap_));
   stats_store_.setStatsMatcher(Config::Utility::createStatsMatcher(bootstrap_));
 
+  const std::string server_stats_prefix = "server.";
   server_stats_ = std::make_unique<ServerStats>(
-      ServerStats{ALL_SERVER_STATS(POOL_GAUGE_PREFIX(stats_store_, "server."))});
+      ServerStats{ALL_SERVER_STATS(POOL_COUNTER_PREFIX(stats_store_, server_stats_prefix),
+                                   POOL_GAUGE_PREFIX(stats_store_, server_stats_prefix))});
 
   server_stats_->concurrency_.set(options_.concurrency());
   server_stats_->hot_restart_epoch_.set(options_.restartEpoch());
 
+  assert_action_registration_ = Assert::setDebugAssertionFailureRecordAction(
+      [this]() { server_stats_->debug_assertion_failures_.inc(); });
+
   failHealthcheck(false);
 
   uint64_t version_int;
-  if (!StringUtil::atoul(VersionInfo::revision().substr(0, 6).c_str(), version_int, 16)) {
+  if (!StringUtil::atoull(VersionInfo::revision().substr(0, 6).c_str(), version_int, 16)) {
     throw EnvoyException("compiled GIT SHA is invalid. Invalid build.");
   }
 
@@ -285,11 +286,13 @@ void InstanceImpl::initialize(Options& options,
 
   // Initialize the overload manager early so other modules can register for actions.
   overload_manager_ = std::make_unique<OverloadManagerImpl>(dispatcher(), stats(), threadLocal(),
-                                                            bootstrap_.overload_manager());
+                                                            bootstrap_.overload_manager(), api());
+
+  heap_shrinker_ = std::make_unique<Memory::HeapShrinker>(dispatcher(), overloadManager(), stats());
 
   // Workers get created first so they register for thread local updates.
-  listener_manager_ = std::make_unique<ListenerManagerImpl>(*this, listener_component_factory_,
-                                                            worker_factory_, time_system_);
+  listener_manager_ =
+      std::make_unique<ListenerManagerImpl>(*this, listener_component_factory_, worker_factory_);
 
   // The main thread is also registered for thread local updates so that code that does not care
   // whether it runs on the main thread or on workers can still use TLS.
@@ -300,20 +303,24 @@ void InstanceImpl::initialize(Options& options,
 
   // Runtime gets initialized before the main configuration since during main configuration
   // load things may grab a reference to the loader for later use.
-  runtime_loader_ = component_factory.createRuntime(*this, initial_config);
+  runtime_singleton_ = std::make_unique<Runtime::ScopedLoaderSingleton>(
+      component_factory.createRuntime(*this, initial_config));
 
   // Once we have runtime we can initialize the SSL context manager.
-  ssl_context_manager_ = std::make_unique<Ssl::ContextManagerImpl>(time_system_);
+  ssl_context_manager_ =
+      std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(time_source_);
 
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
-      runtime(), stats(), threadLocal(), random(), dnsResolver(), sslContextManager(), dispatcher(),
-      localInfo(), secretManager(), api());
+      admin(), runtime(), stats(), threadLocal(), random(), dnsResolver(), sslContextManager(),
+      dispatcher(), localInfo(), secretManager(), api(), http_context_, accessLogManager(),
+      singletonManager());
 
-  // Now the configuration gets parsed. The configuration may start setting thread local data
-  // per above. See MainImpl::initialize() for why we do this pointer dance.
-  Configuration::MainImpl* main_config = new Configuration::MainImpl();
-  config_.reset(main_config);
-  main_config->initialize(bootstrap_, *this, *cluster_manager_factory_);
+  // Now the configuration gets parsed. The configuration may start setting
+  // thread local data per above. See MainImpl::initialize() for why ConfigImpl
+  // is constructed as part of the InstanceImpl and then populated once
+  // cluster_manager_factory_ is available.
+  config_.initialize(bootstrap_, *this, *cluster_manager_factory_);
+  http_context_.setTracer(config_.httpTracer());
 
   // Instruct the listener manager to create the LDS provider if needed. This must be done later
   // because various items do not yet exist when the listener manager is created.
@@ -324,27 +331,28 @@ void InstanceImpl::initialize(Options& options,
   if (bootstrap_.has_hds_config()) {
     const auto& hds_config = bootstrap_.hds_config();
     async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(
-        clusterManager(), thread_local_, time_system_, api());
+        clusterManager(), thread_local_, time_source_, api());
     hds_delegate_ = std::make_unique<Upstream::HdsDelegate>(
-        bootstrap_.node(), stats(),
+        stats(),
         Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, hds_config, stats())
             ->create(),
         dispatcher(), runtime(), stats(), sslContextManager(), random(), info_factory_,
-        access_log_manager_, clusterManager(), localInfo());
+        access_log_manager_, clusterManager(), localInfo(), admin(), singletonManager(),
+        threadLocal(), api());
   }
 
-  for (Stats::SinkPtr& sink : main_config->statsSinks()) {
+  for (Stats::SinkPtr& sink : config_.statsSinks()) {
     stats_store_.addSink(*sink);
   }
 
   // Some of the stat sinks may need dispatcher support so don't flush until the main loop starts.
   // Just setup the timer.
   stat_flush_timer_ = dispatcher_->createTimer([this]() -> void { flushStats(); });
-  stat_flush_timer_->enableTimer(config_->statsFlushInterval());
+  stat_flush_timer_->enableTimer(config_.statsFlushInterval());
 
   // GuardDog (deadlock detection) object and thread setup before workers are
   // started and before our own run() loop runs.
-  guard_dog_ = std::make_unique<Server::GuardDogImpl>(stats_store_, *config_, time_system_, api());
+  guard_dog_ = std::make_unique<Server::GuardDogImpl>(stats_store_, config_, api());
 }
 
 void InstanceImpl::startWorkers() {
@@ -368,7 +376,8 @@ Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,
 
     return std::make_unique<Runtime::DiskBackedLoaderImpl>(
         server.dispatcher(), server.threadLocal(), config.runtime()->symlinkRoot(),
-        config.runtime()->subdirectory(), override_subdirectory, server.stats(), server.random());
+        config.runtime()->subdirectory(), override_subdirectory, server.stats(), server.random(),
+        server.api());
   } else {
     return std::make_unique<Runtime::LoaderImpl>(server.random(), server.stats(),
                                                  server.threadLocal());
@@ -381,7 +390,7 @@ void InstanceImpl::loadServerFlags(const absl::optional<std::string>& flags_path
   }
 
   ENVOY_LOG(info, "server flags path: {}", flags_path.value());
-  if (api_->fileExists(flags_path.value() + "/drain")) {
+  if (api_->fileSystem().fileExists(flags_path.value() + "/drain")) {
     ENVOY_LOG(info, "starting server in drain mode");
     failHealthcheck(true);
   }
@@ -389,7 +398,7 @@ void InstanceImpl::loadServerFlags(const absl::optional<std::string>& flags_path
 
 uint64_t InstanceImpl::numConnections() { return listener_manager_->numConnections(); }
 
-RunHelper::RunHelper(Instance& instance, Options& options, Event::Dispatcher& dispatcher,
+RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatcher& dispatcher,
                      Upstream::ClusterManager& cm, AccessLog::AccessLogManager& access_log_manager,
                      InitManagerImpl& init_manager, OverloadManager& overload_manager,
                      std::function<void()> workers_start_cb) {
@@ -398,6 +407,11 @@ RunHelper::RunHelper(Instance& instance, Options& options, Event::Dispatcher& di
   if (options.signalHandlingEnabled()) {
     sigterm_ = dispatcher.listenForSignal(SIGTERM, [&instance]() {
       ENVOY_LOG(warn, "caught SIGTERM");
+      instance.shutdown();
+    });
+
+    sigint_ = dispatcher.listenForSignal(SIGINT, [&instance]() {
+      ENVOY_LOG(warn, "caught SIGINT");
       instance.shutdown();
     });
 
@@ -410,6 +424,9 @@ RunHelper::RunHelper(Instance& instance, Options& options, Event::Dispatcher& di
       ENVOY_LOG(warn, "caught and eating SIGHUP. See documentation for how to hot restart.");
     });
   }
+
+  // Start overload manager before workers.
+  overload_manager.start();
 
   // Register for cluster manager init notification. We don't start serving worker traffic until
   // upstream clusters are initialized which may involve running the event loop. Note however that
@@ -428,7 +445,7 @@ RunHelper::RunHelper(Instance& instance, Options& options, Event::Dispatcher& di
 
     ENVOY_LOG(info, "all clusters initialized. initializing init manager");
 
-    // Note: the lamda below should not capture "this" since the RunHelper object may
+    // Note: the lambda below should not capture "this" since the RunHelper object may
     // have been destructed by the time it gets executed.
     init_manager.initialize([&instance, workers_start_cb]() {
       if (instance.isShutdown()) {
@@ -442,8 +459,6 @@ RunHelper::RunHelper(Instance& instance, Options& options, Event::Dispatcher& di
     // as we've subscribed to all the statically defined RDS resources.
     cm.adsMux().resume(Config::TypeUrl::get().RouteConfiguration);
   });
-
-  overload_manager.start();
 }
 
 void InstanceImpl::run() {
@@ -455,7 +470,7 @@ void InstanceImpl::run() {
 
   // Run the main dispatch loop waiting to exit.
   ENVOY_LOG(info, "starting main dispatch loop");
-  auto watchdog = guard_dog_->createWatchDog(Thread::currentThreadId());
+  auto watchdog = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId());
   watchdog->startWatchdog(*dispatcher_);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   ENVOY_LOG(info, "main dispatch loop exited");
@@ -492,8 +507,8 @@ void InstanceImpl::terminate() {
     flushStats();
   }
 
-  if (config_ != nullptr && config_->clusterManager() != nullptr) {
-    config_->clusterManager()->shutdown();
+  if (config_.clusterManager() != nullptr) {
+    config_.clusterManager()->shutdown();
   }
   handler_.reset();
   thread_local_.shutdownThread();
@@ -502,7 +517,7 @@ void InstanceImpl::terminate() {
   ENVOY_FLUSH_LOG();
 }
 
-Runtime::Loader& InstanceImpl::runtime() { return *runtime_loader_; }
+Runtime::Loader& InstanceImpl::runtime() { return Runtime::LoaderSingleton::get(); }
 
 void InstanceImpl::shutdown() {
   shutdown_ = true;

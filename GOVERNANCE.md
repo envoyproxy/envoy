@@ -62,7 +62,9 @@
   forward. To reiterate, it is *not* the responsibility of the on-call maintainer to answer all
   questions and do all reviews, but it is their responsibility to make sure that everything is
   being actively covered by someone.
-* The on-call rotation is tracked at PagerDuty. The calendar is visible [here](https://pagerduty.github.io/addons/PDcal/index.html?iCalURL=https://cncf.pagerduty.com/private/e44caf2604ce6c5ccc616b7b84f99b94dc801dba4cceb8d71fb128338f75b9af/feed/PXU9KPH) or you can subscribe to the iCal feed [here](https://cncf.pagerduty.com/private/e44caf2604ce6c5ccc616b7b84f99b94dc801dba4cceb8d71fb128338f75b9af/feed/PXU9KPH).
+* The on-call rotation is tracked at Opsgenie. The calendar is visible
+[here](https://calendar.google.com/calendar/embed?src=ms6efr2erlvum9aolnvg1688cd3mu85e%40import.calendar.google.com&ctz=America%2FNew_York)
+or you can subscribe to the iCal feed [here](https://app.opsgenie.com/webcal/getRecentSchedule?webcalToken=75f2990470ca21de1033ecf4586bea1e40bae32bf3c39e2289f6186da1904ee0&scheduleId=a3505963-c064-4c97-8865-947dfcb06060)
 
 ## Cutting a release
 
@@ -97,8 +99,11 @@
   the same time, also add a new empty "pending" section to the [release
   notes](docs/root/intro/version_history.rst) and to [DEPRECATED.md](DEPRECATED.md) for the
   following version. E.g., "1.7.0 (pending)".
-* Run the deprecate_versions.py script to file tracking issues for code which
-  can be removed.
+* Run the deprecate_versions.py script (e.g. `sh tools/deprecate_version/deprecate_version.sh 1.8.0 1.10.0`)
+  to file tracking issues for code which can be removed.
+* Run the deprecate_features.py script (e.g. `sh tools/deprecate_version/deprecate_features.sh`)
+  to make the last release's deprecated features fatal-by-default. Submit the resultant PR and send
+  an email to envoy-announce.
 
 ## When does a maintainer lose maintainer status
 

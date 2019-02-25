@@ -53,6 +53,7 @@ public:
   const std::string& maxAge() const override { return max_age_; };
   const absl::optional<bool>& allowCredentials() const override { return allow_credentials_; };
   bool enabled() const override { return enabled_; };
+  bool shadowEnabled() const override { return shadow_enabled_; };
 
   std::list<std::string> allow_origin_{};
   std::list<std::regex> allow_origin_regex_{};
@@ -61,7 +62,22 @@ public:
   std::string expose_headers_{};
   std::string max_age_{};
   absl::optional<bool> allow_credentials_{};
-  bool enabled_{false};
+  bool enabled_{};
+  bool shadow_enabled_{};
+};
+
+class TestHedgePolicy : public HedgePolicy {
+public:
+  // Router::HedgePolicy
+  uint32_t initialRequests() const override { return initial_requests_; }
+  const envoy::type::FractionalPercent& additionalRequestChance() const override {
+    return additional_request_chance_;
+  }
+  bool hedgeOnPerTryTimeout() const override { return hedge_on_per_try_timeout; }
+
+  uint32_t initial_requests_{};
+  envoy::type::FractionalPercent additional_request_chance_{};
+  bool hedge_on_per_try_timeout{};
 };
 
 class TestRetryPolicy : public RetryPolicy {
@@ -97,8 +113,9 @@ public:
                                         DoRetryCallback callback));
   MOCK_METHOD1(onHostAttempted, void(Upstream::HostDescriptionConstSharedPtr));
   MOCK_METHOD1(shouldSelectAnotherHost, bool(const Upstream::Host& host));
-  MOCK_METHOD2(priorityLoadForRetry, Upstream::PriorityLoad&(const Upstream::PrioritySet&,
-                                                             const Upstream::PriorityLoad&));
+  MOCK_METHOD2(priorityLoadForRetry,
+               const Upstream::HealthyAndDegradedLoad&(const Upstream::PrioritySet&,
+                                                       const Upstream::HealthyAndDegradedLoad&));
   MOCK_CONST_METHOD0(hostSelectionMaxAttempts, uint32_t());
 
   DoRetryCallback callback_;
@@ -141,9 +158,11 @@ public:
   // Router::ShadowPolicy
   const std::string& cluster() const override { return cluster_; }
   const std::string& runtimeKey() const override { return runtime_key_; }
+  const envoy::type::FractionalPercent& defaultValue() const override { return default_value_; }
 
   std::string cluster_;
   std::string runtime_key_;
+  envoy::type::FractionalPercent default_value_;
 };
 
 class MockShadowWriter : public ShadowWriter {
@@ -239,6 +258,7 @@ public:
   MOCK_CONST_METHOD2(finalizeResponseHeaders,
                      void(Http::HeaderMap& headers, const StreamInfo::StreamInfo& stream_info));
   MOCK_CONST_METHOD0(hashPolicy, const HashPolicy*());
+  MOCK_CONST_METHOD0(hedgePolicy, const HedgePolicy&());
   MOCK_CONST_METHOD0(metadataMatchCriteria, const Router::MetadataMatchCriteria*());
   MOCK_CONST_METHOD0(priority, Upstream::ResourcePriority());
   MOCK_CONST_METHOD0(rateLimitPolicy, const RateLimitPolicy&());
@@ -259,11 +279,14 @@ public:
   MOCK_CONST_METHOD0(pathMatchCriterion, const PathMatchCriterion&());
   MOCK_CONST_METHOD1(perFilterConfig, const RouteSpecificFilterConfig*(const std::string&));
   MOCK_CONST_METHOD0(includeAttemptCount, bool());
+  MOCK_CONST_METHOD0(upgradeMap, const UpgradeMap&());
+  MOCK_CONST_METHOD0(internalRedirectAction, InternalRedirectAction());
 
   std::string cluster_name_{"fake_cluster"};
   std::multimap<std::string, std::string> opaque_config_;
   TestVirtualCluster virtual_cluster_;
   TestRetryPolicy retry_policy_;
+  TestHedgePolicy hedge_policy_;
   testing::NiceMock<MockRateLimitPolicy> rate_limit_policy_;
   TestShadowPolicy shadow_policy_;
   testing::NiceMock<MockVirtualHost> virtual_host_;
@@ -272,6 +295,7 @@ public:
   TestCorsPolicy cors_policy_;
   testing::NiceMock<MockPathMatchCriterion> path_match_criterion_;
   envoy::api::v2::core::Metadata metadata_;
+  UpgradeMap upgrade_map_;
 };
 
 class MockDecorator : public Decorator {

@@ -67,7 +67,9 @@ envoy_cc_library(
         ":stat_data_allocator_lib",
         "//include/envoy/stats:stats_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:block_memory_hash_set_lib",
         "//source/common/common:hash_lib",
+        "//source/common/common:thread_lib",
     ],
 )
 
@@ -127,9 +129,16 @@ envoy_cc_library(
     deps = [
         "//include/envoy/stats:symbol_table_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:logger_lib",
         "//source/common/common:thread_lib",
         "//source/common/common:utility_lib",
     ],
+)
+
+envoy_cc_library(
+    name = "fake_symbol_table_lib",
+    hdrs = ["fake_symbol_table_impl.h"],
+    deps = [":symbol_table_lib"],
 )
 
 envoy_cc_library(

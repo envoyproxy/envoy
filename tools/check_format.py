@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+from __future__ import print_function
+
 import argparse
 import common
 import fileinput
@@ -12,11 +14,10 @@ import stat
 import sys
 import traceback
 
-EXCLUDED_PREFIXES = ("./generated/", "./thirdparty/", "./build", "./.git/", "./bazel-",
-                     "./bazel/external", "./.cache",
+EXCLUDED_PREFIXES = ("./generated/", "./thirdparty/", "./build", "./.git/", "./bazel-", "./.cache",
                      "./source/extensions/extensions_build_config.bzl",
-                     "./tools/testdata/check_format/")
-SUFFIXES = (".cc", ".h", "BUILD", ".bzl", ".md", ".rst", ".proto")
+                     "./tools/testdata/check_format/", "./tools/pyformat/")
+SUFFIXES = (".cc", ".h", "BUILD", "WORKSPACE", ".bzl", ".md", ".rst", ".proto")
 DOCS_SUFFIX = (".md", ".rst")
 PROTO_SUFFIX = (".proto")
 
@@ -38,6 +39,13 @@ REAL_TIME_WHITELIST = ('./source/common/common/utility.h',
                        './test/test_common/utility.cc', './test/test_common/utility.h',
                        './test/integration/integration.h')
 
+# Files in these paths can use std::get_time
+GET_TIME_WHITELIST = ('./test/test_common/utility.cc')
+
+# Files in these paths can use MessageLite::SerializeAsString
+SERIALIZE_AS_STRING_WHITELIST = ('./test/common/protobuf/utility_test.cc',
+                                 './test/common/grpc/codec_test.cc')
+
 CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-7")
 BUILDIFIER_PATH = os.getenv("BUILDIFIER_BIN", "$GOPATH/bin/buildifier")
 ENVOY_BUILD_FIXER_PATH = os.path.join(
@@ -46,6 +54,10 @@ HEADER_ORDER_PATH = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), 
 SUBDIR_SET = set(common.includeDirOrder())
 INCLUDE_ANGLE = "#include <"
 INCLUDE_ANGLE_LEN = len(INCLUDE_ANGLE)
+PROTO_PACKAGE_REGEX = re.compile(r"^package (\S+);\n*", re.MULTILINE)
+PROTO_OPTION_JAVA_PACKAGE = "option java_package = \""
+PROTO_OPTION_JAVA_OUTER_CLASSNAME = "option java_outer_classname = \""
+PROTO_OPTION_JAVA_MULTIPLE_FILES = "option java_multiple_files = "
 
 # yapf: disable
 PROTOBUF_TYPE_ERRORS = {
@@ -109,7 +121,8 @@ def checkTools():
         "PATH, please use CLANG_FORMAT environment variable to specify the path. "
         "Examples:\n"
         "    export CLANG_FORMAT=clang-format-7.0.0\n"
-        "    export CLANG_FORMAT=/opt/bin/clang-format-7".format(CLANG_FORMAT_PATH))
+        "    export CLANG_FORMAT=/opt/bin/clang-format-7\n"
+        "    export CLANG_FORMAT=/usr/local/opt/llvm@7/bin/clang-format".format(CLANG_FORMAT_PATH))
 
   buildifier_abs_path = lookPath(BUILDIFIER_PATH)
   if buildifier_abs_path:
@@ -124,7 +137,7 @@ def checkTools():
     error_messages.append(
         "Command {} not found. If you have buildifier installed, but the binary "
         "name is different or it's not available in $GOPATH/bin, please use "
-        "BUILDIFIER_BIN environment variable to specify the path. Example:"
+        "BUILDIFIER_BIN environment variable to specify the path. Example:\n"
         "    export BUILDIFIER_BIN=/opt/bin/buildifier\n"
         "If you don't have buildifier installed, you can install it by:\n"
         "    go get -u github.com/bazelbuild/buildtools/buildifier".format(BUILDIFIER_PATH))
@@ -141,6 +154,60 @@ def checkNamespace(file_path):
   return []
 
 
+# If the substring is not found in the file, then insert to_add
+def insertProtoOptionIfNotFound(substring, file_path, to_add):
+  text = None
+  with open(file_path) as f:
+    text = f.read()
+
+  if not substring in text:
+
+    def repl(m):
+      return m.group(0).rstrip() + "\n\n" + to_add + "\n"
+
+    with open(file_path, "w") as f:
+      f.write(re.sub(PROTO_PACKAGE_REGEX, repl, text))
+
+
+def packageNameForProto(file_path):
+  package_name = None
+  error_message = []
+  with open(file_path) as f:
+    result = PROTO_PACKAGE_REGEX.search(f.read())
+    if result is not None and len(result.groups()) == 1:
+      package_name = result.group(1)
+    if package_name is None:
+      error_message = ["Unable to find package name for proto file: %s" % file_path]
+
+  return [package_name, error_message]
+
+
+def fixJavaPackageProtoOption(file_path):
+  package_name = packageNameForProto(file_path)[0]
+  to_add = PROTO_OPTION_JAVA_PACKAGE + "io.envoyproxy.{}\";".format(package_name)
+  insertProtoOptionIfNotFound("\n" + PROTO_OPTION_JAVA_PACKAGE, file_path, to_add)
+  return []
+
+
+# Add "option java_outer_classname = FooBarProto;" for foo_bar.proto
+def fixJavaOuterClassnameProtoOption(file_path):
+  file_name = os.path.basename(file_path)[:-len(".proto")]
+  if "-" in file_name or "." in file_name or not file_name.islower():
+    return ["Unable to decide java_outer_classname for proto file: %s" % file_path]
+
+  to_add = PROTO_OPTION_JAVA_OUTER_CLASSNAME \
+       + "".join(x.title() for x in file_name.split("_")) \
+       + "Proto\";"
+  insertProtoOptionIfNotFound("\n" + PROTO_OPTION_JAVA_OUTER_CLASSNAME, file_path, to_add)
+  return []
+
+
+def fixJavaMultipleFilesProtoOption(file_path):
+  to_add = PROTO_OPTION_JAVA_MULTIPLE_FILES + "true;"
+  insertProtoOptionIfNotFound("\n" + PROTO_OPTION_JAVA_MULTIPLE_FILES, file_path, to_add)
+  return []
+
+
 # To avoid breaking the Lyft import, we just check for path inclusion here.
 def whitelistedForProtobufDeps(file_path):
   return (file_path.endswith(PROTO_SUFFIX) or file_path.endswith(REPOSITORIES_BZL) or \
@@ -151,7 +218,17 @@ def whitelistedForProtobufDeps(file_path):
 # specific cases. They should be passed down from where they are instantied to where
 # they need to be used, e.g. through the ServerInstance, Dispatcher, or ClusterManager.
 def whitelistedForRealTime(file_path):
+  if file_path.endswith(".md"):
+    return True
   return file_path in REAL_TIME_WHITELIST
+
+
+def whitelistedForGetTime(file_path):
+  return file_path in GET_TIME_WHITELIST
+
+
+def whitelistedForSerializeAsString(file_path):
+  return file_path in SERIALIZE_AS_STRING_WHITELIST
 
 
 def findSubstringAndReturnError(pattern, file_path, error_message):
@@ -166,6 +243,11 @@ def findSubstringAndReturnError(pattern, file_path, error_message):
     return []
 
 
+def errorIfNoSubstringFound(pattern, file_path, error_message):
+  with open(file_path) as f:
+    return [] if pattern in f.read() else [file_path + ": " + error_message]
+
+
 def isApiFile(file_path):
   return file_path.startswith(args.api_prefix)
 
@@ -177,8 +259,16 @@ def isBuildFile(file_path):
   return False
 
 
+def isExternalBuildFile(file_path):
+  return isBuildFile(file_path) and file_path.startswith("./bazel/external/")
+
+
 def isSkylarkFile(file_path):
   return file_path.endswith(".bzl")
+
+
+def isWorkspaceFile(file_path):
+  return os.path.basename(file_path) == "WORKSPACE"
 
 
 def hasInvalidAngleBracketDirectory(line):
@@ -192,8 +282,41 @@ def hasInvalidAngleBracketDirectory(line):
   return subdir in SUBDIR_SET
 
 
+VERSION_HISTORY_NEW_LINE_REGEX = re.compile('\* [a-z \-_]*: [a-z:`]')
+VERSION_HISTORY_NEW_RELEASE_REGEX = re.compile('^====[=]+$')
+
+
+def checkCurrentReleaseNotes(file_path, error_messages):
+  in_current_release = False
+
+  file_handle = fileinput.input(file_path)
+  for line_number, line in enumerate(file_handle):
+
+    def reportError(message):
+      error_messages.append("%s:%d: %s" % (file_path, line_number + 1, message))
+
+    if VERSION_HISTORY_NEW_RELEASE_REGEX.match(line):
+      # If we were in the section for the current release this means we have passed it.
+      if in_current_release:
+        break
+      # If we see a version marker we are now in the section for the current release.
+      in_current_release = True
+
+    if line.startswith('*') and not VERSION_HISTORY_NEW_LINE_REGEX.match(line):
+      reportError("Version history line malformed. "
+                  "Does not match VERSION_HISTORY_NEW_LINE_REGEX in check_format.py\n %s" % line)
+  file_handle.close()
+
+
 def checkFileContents(file_path, checker):
   error_messages = []
+
+  if file_path.endswith("version_history.rst"):
+    # Version file checking has enough special cased logic to merit its own checks.
+    # This only validates entries for the current release as very old release
+    # notes have a different format.
+    checkCurrentReleaseNotes(file_path, error_messages)
+
   for line_number, line in enumerate(fileinput.input(file_path)):
 
     def reportError(message):
@@ -269,6 +392,12 @@ def checkSourceLine(line, file_path, reportError):
        'std::chrono::system_clock::now' in line or 'std::chrono::steady_clock::now' in line or \
        'std::this_thread::sleep_for' in line or hasCondVarWaitFor(line):
       reportError("Don't reference real-world time sources from production code; use injection")
+  if not whitelistedForGetTime(file_path):
+    if "std::get_time" in line:
+      if "test/" in file_path:
+        reportError("Don't use std::get_time; use TestUtility::parseTime in tests")
+      else:
+        reportError("Don't use std::get_time; use the injectable time system")
   if 'std::atomic_' in line:
     # The std::atomic_* free functions are functionally equivalent to calling
     # operations on std::atomic<T> objects, so prefer to use that instead.
@@ -286,18 +415,30 @@ def checkSourceLine(line, file_path, reportError):
   if ' ?: ' in line:
     # The ?: operator is non-standard, it is a GCC extension
     reportError("Don't use the '?:' operator, it is a non-standard GCC extension")
+  if line.startswith('using testing::Test;'):
+    reportError("Don't use 'using testing::Test;, elaborate the type instead")
+  if line.startswith('using testing::TestWithParams;'):
+    reportError("Don't use 'using testing::Test;, elaborate the type instead")
+  if not whitelistedForSerializeAsString(file_path) and 'SerializeAsString' in line:
+    # The MessageLite::SerializeAsString doesn't generate deterministic serialization,
+    # use MessageUtil::hash instead.
+    reportError(
+        "Don't use MessageLite::SerializeAsString for generating deterministic serialization, use MessageUtil::hash instead."
+    )
 
 
 def checkBuildLine(line, file_path, reportError):
   if not whitelistedForProtobufDeps(file_path) and '"protobuf"' in line:
     reportError("unexpected direct external dependency on protobuf, use "
                 "//source/common/protobuf instead.")
-  if envoy_build_rule_check and not isSkylarkFile(file_path) and '@envoy//' in line:
+  if (envoy_build_rule_check and not isSkylarkFile(file_path) and not isWorkspaceFile(file_path) and
+      not isExternalBuildFile(file_path) and '@envoy//' in line):
     reportError("Superfluous '@envoy//' prefix")
 
 
 def fixBuildLine(line, file_path):
-  if envoy_build_rule_check and not isSkylarkFile(file_path):
+  if (envoy_build_rule_check and not isSkylarkFile(file_path) and not isWorkspaceFile(file_path) and
+      not isExternalBuildFile(file_path)):
     line = line.replace('@envoy//', '//')
   return line
 
@@ -308,7 +449,7 @@ def fixBuildPath(file_path):
 
   error_messages = []
   # TODO(htuch): Add API specific BUILD fixer script.
-  if not isApiFile(file_path) and not isSkylarkFile(file_path):
+  if not isApiFile(file_path) and not isSkylarkFile(file_path) and not isWorkspaceFile(file_path):
     if os.system("%s %s %s" % (ENVOY_BUILD_FIXER_PATH, file_path, file_path)) != 0:
       error_messages += ["envoy_build_fixer rewrite failed for file: %s" % file_path]
 
@@ -319,7 +460,7 @@ def fixBuildPath(file_path):
 
 def checkBuildPath(file_path):
   error_messages = []
-  if not isApiFile(file_path) and not isSkylarkFile(file_path):
+  if not isApiFile(file_path) and not isSkylarkFile(file_path) and not isWorkspaceFile(file_path):
     command = "%s %s | diff %s -" % (ENVOY_BUILD_FIXER_PATH, file_path, file_path)
     error_messages += executeCommand(command, "envoy_build_fixer check failed", file_path)
 
@@ -338,6 +479,14 @@ def fixSourcePath(file_path):
     if not file_path.endswith(PROTO_SUFFIX):
       error_messages += fixHeaderOrder(file_path)
     error_messages += clangFormat(file_path)
+  if file_path.endswith(PROTO_SUFFIX) and isApiFile(file_path):
+    package_name, error_message = packageNameForProto(file_path)
+    if package_name is None:
+      error_messages += error_message
+    else:
+      error_messages += fixJavaMultipleFilesProtoOption(file_path)
+      error_messages += fixJavaOuterClassnameProtoOption(file_path)
+      error_messages += fixJavaPackageProtoOption(file_path)
   return error_messages
 
 
@@ -352,6 +501,17 @@ def checkSourcePath(file_path):
     command = ("%s %s | diff %s -" % (CLANG_FORMAT_PATH, file_path, file_path))
     error_messages += executeCommand(command, "clang-format check failed", file_path)
 
+  if file_path.endswith(PROTO_SUFFIX) and isApiFile(file_path):
+    package_name, error_message = packageNameForProto(file_path)
+    if package_name is None:
+      error_messages += error_message
+    else:
+      error_messages += errorIfNoSubstringFound("\n" + PROTO_OPTION_JAVA_PACKAGE, file_path,
+                                                "Java proto option 'java_package' not set")
+      error_messages += errorIfNoSubstringFound("\n" + PROTO_OPTION_JAVA_OUTER_CLASSNAME, file_path,
+                                                "Java proto option 'java_outer_classname' not set")
+      error_messages += errorIfNoSubstringFound("\n" + PROTO_OPTION_JAVA_MULTIPLE_FILES, file_path,
+                                                "Java proto option 'java_multiple_files' not set")
   return error_messages
 
 
@@ -404,7 +564,7 @@ def checkFormat(file_path):
   # Apply fixes first, if asked, and then run checks. If we wind up attempting to fix
   # an issue, but there's still an error, that's a problem.
   try_to_fix = operation_type == "fix"
-  if isBuildFile(file_path) or isSkylarkFile(file_path):
+  if isBuildFile(file_path) or isSkylarkFile(file_path) or isWorkspaceFile(file_path):
     if try_to_fix:
       error_messages += fixBuildPath(file_path)
     error_messages += checkBuildPath(file_path)
@@ -450,7 +610,7 @@ def checkFormatVisitor(arg, dir_name, names):
 def checkErrorMessages(error_messages):
   if error_messages:
     for e in error_messages:
-      print "ERROR: %s" % e
+      print("ERROR: %s" % e)
     return True
   return False
 
@@ -510,8 +670,8 @@ if __name__ == "__main__":
     error_messages = sum((r.get() for r in results), [])
 
   if checkErrorMessages(error_messages):
-    print "ERROR: check format failed. run 'tools/check_format.py fix'"
+    print("ERROR: check format failed. run 'tools/check_format.py fix'")
     sys.exit(1)
 
   if operation_type == "check":
-    print "PASS"
+    print("PASS")

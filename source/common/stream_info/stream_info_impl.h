@@ -152,9 +152,9 @@ struct StreamInfoImpl : public StreamInfo {
     return upstream_local_address_;
   }
 
-  bool healthCheck() const override { return hc_request_; }
+  bool healthCheck() const override { return health_check_request_; }
 
-  void healthCheck(bool is_hc) override { hc_request_ = is_hc; }
+  void healthCheck(bool is_health_check) override { health_check_request_ = is_health_check; }
 
   void setDownstreamLocalAddress(
       const Network::Address::InstanceConstSharedPtr& downstream_local_address) override {
@@ -163,6 +163,15 @@ struct StreamInfoImpl : public StreamInfo {
 
   const Network::Address::InstanceConstSharedPtr& downstreamLocalAddress() const override {
     return downstream_local_address_;
+  }
+
+  void setDownstreamDirectRemoteAddress(
+      const Network::Address::InstanceConstSharedPtr& downstream_direct_remote_address) override {
+    downstream_direct_remote_address_ = downstream_direct_remote_address;
+  }
+
+  const Network::Address::InstanceConstSharedPtr& downstreamDirectRemoteAddress() const override {
+    return downstream_direct_remote_address_;
   }
 
   void setDownstreamRemoteAddress(
@@ -176,6 +185,7 @@ struct StreamInfoImpl : public StreamInfo {
 
   const Router::RouteEntry* routeEntry() const override { return route_entry_; }
 
+  envoy::api::v2::core::Metadata& dynamicMetadata() override { return metadata_; };
   const envoy::api::v2::core::Metadata& dynamicMetadata() const override { return metadata_; };
 
   void setDynamicMetadata(const std::string& name, const ProtobufWkt::Struct& value) override {
@@ -208,7 +218,7 @@ struct StreamInfoImpl : public StreamInfo {
   absl::optional<uint32_t> response_code_;
   uint64_t response_flags_{};
   Upstream::HostDescriptionConstSharedPtr upstream_host_{};
-  bool hc_request_{};
+  bool health_check_request_{};
   const Router::RouteEntry* route_entry_{};
   envoy::api::v2::core::Metadata metadata_{};
   FilterStateImpl filter_state_{};
@@ -218,6 +228,7 @@ private:
   uint64_t bytes_sent_{};
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
   Network::Address::InstanceConstSharedPtr downstream_local_address_;
+  Network::Address::InstanceConstSharedPtr downstream_direct_remote_address_;
   Network::Address::InstanceConstSharedPtr downstream_remote_address_;
   std::string requested_server_name_;
 };

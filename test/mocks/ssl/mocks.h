@@ -45,6 +45,8 @@ public:
   MOCK_CONST_METHOD0(urlEncodedPemEncodedPeerCertificate, std::string&());
   MOCK_CONST_METHOD0(dnsSansPeerCertificate, std::vector<std::string>());
   MOCK_CONST_METHOD0(dnsSansLocalCertificate, std::vector<std::string>());
+  MOCK_CONST_METHOD0(validFromPeerCertificate, absl::optional<SystemTime>());
+  MOCK_CONST_METHOD0(expirationPeerCertificate, absl::optional<SystemTime>());
 };
 
 class MockClientContext : public ClientContext {
@@ -54,7 +56,7 @@ public:
 
   MOCK_CONST_METHOD0(daysUntilFirstCertExpires, size_t());
   MOCK_CONST_METHOD0(getCaCertInformation, CertificateDetailsPtr());
-  MOCK_CONST_METHOD0(getCertChainInformation, CertificateDetailsPtr());
+  MOCK_CONST_METHOD0(getCertChainInformation, std::vector<CertificateDetailsPtr>());
 };
 
 } // namespace Ssl

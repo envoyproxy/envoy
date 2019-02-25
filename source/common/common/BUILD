@@ -4,16 +4,27 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_basic_cc_library",
     "envoy_cc_library",
+    "envoy_cc_platform_dep",
+    "envoy_cc_posix_library",
+    "envoy_cc_win32_library",
     "envoy_include_prefix",
     "envoy_package",
+    "envoy_select_boringssl",
 )
 
 envoy_package()
 
 envoy_cc_library(
     name = "assert_lib",
+    srcs = ["assert.cc"],
     hdrs = ["assert.h"],
     deps = [":minimal_logger_lib"],
+)
+
+envoy_cc_library(
+    name = "debug_recursion_checker_lib",
+    hdrs = ["debug_recursion_checker.h"],
+    deps = [":assert_lib"],
 )
 
 envoy_cc_library(
@@ -72,11 +83,12 @@ envoy_cc_library(
 envoy_basic_cc_library(
     name = "fmt_lib",
     hdrs = ["fmt.h"],
-    include_prefix = envoy_include_prefix(PACKAGE_NAME),
+    include_prefix = envoy_include_prefix(package_name()),
 )
 
 envoy_cc_library(
     name = "hash_lib",
+    srcs = ["hash.cc"],
     hdrs = ["hash.h"],
     external_deps = ["xxhash"],
 )
@@ -128,7 +140,6 @@ envoy_cc_library(
         ":macros",
         ":minimal_logger_lib",
         "//include/envoy/access_log:access_log_interface",
-        "//include/envoy/filesystem:filesystem_interface",
     ],
 )
 
@@ -159,6 +170,11 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "phantom",
+    hdrs = ["phantom.h"],
+)
+
+envoy_cc_library(
     name = "stl_helpers",
     hdrs = ["stl_helpers.h"],
 )
@@ -179,12 +195,29 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "thread_lib",
-    srcs = ["thread.cc"],
     hdrs = ["thread.h"],
     external_deps = ["abseil_synchronization"],
+    deps = envoy_cc_platform_dep("thread_impl_lib"),
+)
+
+envoy_cc_posix_library(
+    name = "thread_impl_lib",
+    srcs = ["posix/thread_impl.cc"],
+    hdrs = ["posix/thread_impl.h"],
+    strip_include_prefix = "posix",
     deps = [
         ":assert_lib",
-        ":macros",
+        "//include/envoy/thread:thread_interface",
+    ],
+)
+
+envoy_cc_win32_library(
+    name = "thread_impl_lib",
+    srcs = ["win32/thread_impl.cc"],
+    hdrs = ["win32/thread_impl.h"],
+    strip_include_prefix = "win32",
+    deps = [
+        ":assert_lib",
         "//include/envoy/thread:thread_interface",
     ],
 )
@@ -229,6 +262,10 @@ envoy_cc_library(
 envoy_cc_library(
     name = "version_lib",
     srcs = ["version.cc"],
+    copts = envoy_select_boringssl(
+        ["-DENVOY_SSL_VERSION=\\\"BoringSSL-FIPS\\\""],
+        ["-DENVOY_SSL_VERSION=\\\"BoringSSL\\\""],
+    ),
     linkstamp = "version_linkstamp.cc",
     deps = [
         ":version_includes",
@@ -271,6 +308,11 @@ envoy_cc_library(
         ":thread_lib",
         ":utility_lib",
     ],
+)
+
+envoy_cc_library(
+    name = "scalar_to_byte_vector_lib",
+    hdrs = ["scalar_to_byte_vector.h"],
 )
 
 envoy_cc_library(

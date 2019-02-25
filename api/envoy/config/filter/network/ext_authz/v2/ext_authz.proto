@@ -1,6 +1,10 @@
 syntax = "proto3";
 
 package envoy.config.filter.network.ext_authz.v2;
+
+option java_outer_classname = "ExtAuthzProto";
+option java_multiple_files = true;
+option java_package = "io.envoyproxy.envoy.config.filter.network.ext_authz.v2";
 option go_package = "v2";
 
 import "envoy/api/v2/core/grpc_service.proto";
@@ -13,7 +17,7 @@ import "validate/validate.proto";
 
 // External Authorization filter calls out to an external service over the
 // gRPC Authorization API defined by
-// :ref:`CheckRequest <envoy_api_msg_service.auth.v2alpha.CheckRequest>`.
+// :ref:`CheckRequest <envoy_api_msg_service.auth.v2.CheckRequest>`.
 // A failed check will cause this filter to close the TCP connection.
 message ExtAuthz {
   // The prefix to use when emitting statistics.

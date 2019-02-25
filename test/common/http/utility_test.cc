@@ -580,6 +580,20 @@ TEST(HttpUtility, QueryParamsToString) {
             Utility::queryParamsToString(Utility::QueryParams({{"a", "1"}, {"b", "2"}})));
 }
 
+TEST(HttpUtility, ResetReasonToString) {
+  EXPECT_EQ("connection failure",
+            Utility::resetReasonToString(Http::StreamResetReason::ConnectionFailure));
+  EXPECT_EQ("connection termination",
+            Utility::resetReasonToString(Http::StreamResetReason::ConnectionTermination));
+  EXPECT_EQ("local reset", Utility::resetReasonToString(Http::StreamResetReason::LocalReset));
+  EXPECT_EQ("local refused stream reset",
+            Utility::resetReasonToString(Http::StreamResetReason::LocalRefusedStreamReset));
+  EXPECT_EQ("overflow", Utility::resetReasonToString(Http::StreamResetReason::Overflow));
+  EXPECT_EQ("remote reset", Utility::resetReasonToString(Http::StreamResetReason::RemoteReset));
+  EXPECT_EQ("remote refused stream reset",
+            Utility::resetReasonToString(Http::StreamResetReason::RemoteRefusedStreamReset));
+}
+
 // Verify that it resolveMostSpecificPerFilterConfigGeneric works with nil routes.
 TEST(HttpUtility, ResolveMostSpecificPerFilterConfigNilRoute) {
   EXPECT_EQ(nullptr, Utility::resolveMostSpecificPerFilterConfigGeneric("envoy.filter", nullptr));
@@ -724,6 +738,40 @@ TEST(HttpUtility, GetMergedPerFilterConfig) {
   // make sure that the callback was called (which means that the dynamic_cast worked.)
   ASSERT_TRUE(merged_cfg.has_value());
   EXPECT_EQ(2, merged_cfg.value().state_);
+}
+
+TEST(Url, ParsingFails) {
+  Utility::Url url;
+  EXPECT_FALSE(url.initialize(""));
+  EXPECT_FALSE(url.initialize("foo"));
+  EXPECT_FALSE(url.initialize("http://"));
+  EXPECT_FALSE(url.initialize("random_scheme://host.com/path"));
+}
+
+void ValidateUrl(absl::string_view raw_url, absl::string_view expected_scheme,
+                 absl::string_view expected_host_port, absl::string_view expected_path) {
+  Utility::Url url;
+  ASSERT_TRUE(url.initialize(raw_url)) << "Failed to initialize " << raw_url;
+  EXPECT_EQ(url.scheme(), expected_scheme);
+  EXPECT_EQ(url.host_and_port(), expected_host_port);
+  EXPECT_EQ(url.path(), expected_path);
+}
+
+TEST(Url, ParsingTest) {
+  // Test url with no explicit path (with and without port)
+  ValidateUrl("http://www.host.com", "http", "www.host.com", "/");
+  ValidateUrl("http://www.host.com:80", "http", "www.host.com:80", "/");
+
+  // Test url with "/" path.
+  ValidateUrl("http://www.host.com:80/", "http", "www.host.com:80", "/");
+  ValidateUrl("http://www.host.com/", "http", "www.host.com", "/");
+
+  // Test url with multi-character path
+  ValidateUrl("http://www.host.com:80/path", "http", "www.host.com:80", "/path");
+  ValidateUrl("http://www.host.com/path", "http", "www.host.com", "/path");
+
+  // Test https scheme
+  ValidateUrl("https://www.host.com", "https", "www.host.com", "/");
 }
 
 } // namespace Http

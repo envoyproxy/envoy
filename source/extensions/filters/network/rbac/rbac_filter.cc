@@ -10,20 +10,12 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace RBACFilter {
 
-class DynamicMetadataKeys {
-public:
-  const std::string EngineResultAllowed{"allowed"};
-  const std::string EngineResultDenied{"denied"};
-  const std::string ShadowEngineResultField{"shadow_engine_result"};
-};
-
-typedef ConstSingleton<DynamicMetadataKeys> DynamicMetadataKeysSingleton;
-
 RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
     const envoy::config::filter::network::rbac::v2::RBAC& proto_config, Stats::Scope& scope)
     : stats_(Filters::Common::RBAC::generateStats(proto_config.stat_prefix(), scope)),
       engine_(Filters::Common::RBAC::createEngine(proto_config)),
-      shadow_engine_(Filters::Common::RBAC::createShadowEngine(proto_config)) {}
+      shadow_engine_(Filters::Common::RBAC::createShadowEngine(proto_config)),
+      enforcement_type_(proto_config.enforcement_type()) {}
 
 Network::FilterStatus RoleBasedAccessControlFilter::onData(Buffer::Instance&, bool) {
   ENVOY_LOG(
@@ -40,15 +32,20 @@ Network::FilterStatus RoleBasedAccessControlFilter::onData(Buffer::Instance&, bo
           : "none",
       callbacks_->connection().streamInfo().dynamicMetadata().DebugString());
 
-  if (shadow_engine_result_ == Unknown) {
-    // TODO(quanlin): Pass the shadow engine results to other filters.
-    // Only check the engine and increase stats for the first time call to onData(), any following
-    // calls to onData() could just use the cached result and no need to increase the stats anymore.
+  // When the enforcement type is continuous always do the RBAC checks. If it is a one time check,
+  // run the check once and skip it for subsequent onData calls.
+  if (config_->enforcementType() == envoy::config::filter::network::rbac::v2::RBAC::CONTINUOUS) {
     shadow_engine_result_ = checkEngine(Filters::Common::RBAC::EnforcementMode::Shadow);
-  }
-
-  if (engine_result_ == Unknown) {
     engine_result_ = checkEngine(Filters::Common::RBAC::EnforcementMode::Enforced);
+  } else {
+    if (shadow_engine_result_ == Unknown) {
+      // TODO(quanlin): Pass the shadow engine results to other filters.
+      shadow_engine_result_ = checkEngine(Filters::Common::RBAC::EnforcementMode::Shadow);
+    }
+
+    if (engine_result_ == Unknown) {
+      engine_result_ = checkEngine(Filters::Common::RBAC::EnforcementMode::Enforced);
+    }
   }
 
   if (engine_result_ == Allow) {
@@ -67,11 +64,11 @@ void RoleBasedAccessControlFilter::setDynamicMetadata(std::string shadow_engine_
   ProtobufWkt::Struct metrics;
   auto& fields = *metrics.mutable_fields();
   if (!shadow_policy_id.empty()) {
-    *fields[Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().ShadowPolicyIdField]
+    *fields[Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().ShadowEffectivePolicyIdField]
          .mutable_string_value() = shadow_policy_id;
   }
-  *fields[DynamicMetadataKeysSingleton::get().ShadowEngineResultField].mutable_string_value() =
-      shadow_engine_result;
+  *fields[Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().ShadowEngineResultField]
+       .mutable_string_value() = shadow_engine_result;
   callbacks_->connection().streamInfo().setDynamicMetadata(NetworkFilterNames::get().Rbac, metrics);
 }
 
@@ -86,8 +83,9 @@ RoleBasedAccessControlFilter::checkEngine(Filters::Common::RBAC::EnforcementMode
       if (mode == Filters::Common::RBAC::EnforcementMode::Shadow) {
         ENVOY_LOG(debug, "shadow allowed");
         config_->stats().shadow_allowed_.inc();
-        setDynamicMetadata(DynamicMetadataKeysSingleton::get().EngineResultAllowed,
-                           effective_policy_id);
+        setDynamicMetadata(
+            Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().EngineResultAllowed,
+            effective_policy_id);
       } else if (mode == Filters::Common::RBAC::EnforcementMode::Enforced) {
         ENVOY_LOG(debug, "enforced allowed");
         config_->stats().allowed_.inc();
@@ -97,8 +95,9 @@ RoleBasedAccessControlFilter::checkEngine(Filters::Common::RBAC::EnforcementMode
       if (mode == Filters::Common::RBAC::EnforcementMode::Shadow) {
         ENVOY_LOG(debug, "shadow denied");
         config_->stats().shadow_denied_.inc();
-        setDynamicMetadata(DynamicMetadataKeysSingleton::get().EngineResultDenied,
-                           effective_policy_id);
+        setDynamicMetadata(
+            Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().EngineResultDenied,
+            effective_policy_id);
       } else if (mode == Filters::Common::RBAC::EnforcementMode::Enforced) {
         ENVOY_LOG(debug, "enforced denied");
         config_->stats().denied_.inc();

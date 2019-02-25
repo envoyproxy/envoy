@@ -42,7 +42,6 @@ public:
   void setConcurrency(uint32_t concurrency) { concurrency_ = concurrency; }
   void setConfigPath(const std::string& config_path) { config_path_ = config_path; }
   void setConfigYaml(const std::string& config_yaml) { config_yaml_ = config_yaml; }
-  void setV2ConfigOnly(bool v2_config_only) { v2_config_only_ = v2_config_only; }
   void setAdminAddressPath(const std::string& admin_address_path) {
     admin_address_path_ = admin_address_path;
   }
@@ -80,7 +79,6 @@ public:
   uint32_t concurrency() const override { return concurrency_; }
   const std::string& configPath() const override { return config_path_; }
   const std::string& configYaml() const override { return config_yaml_; }
-  bool v2ConfigOnly() const override { return v2_config_only_; }
   const std::string& adminAddressPath() const override { return admin_address_path_; }
   Network::Address::IpVersion localAddressIpVersion() const override {
     return local_address_ip_version_;
@@ -108,18 +106,17 @@ public:
   bool signalHandlingEnabled() const override { return signal_handling_enabled_; }
   bool mutexTracingEnabled() const override { return mutex_tracing_enabled_; }
   virtual Server::CommandLineOptionsPtr toCommandLineOptions() const override;
+  void parseComponentLogLevels(const std::string& component_log_levels);
+  uint32_t count() const;
 
 private:
-  void parseComponentLogLevels(const std::string& component_log_levels);
   void logError(const std::string& error) const;
-  uint32_t count() const;
 
   uint64_t base_id_;
   uint32_t concurrency_;
   std::string config_path_;
   std::string config_yaml_;
   bool allow_unknown_fields_{false};
-  bool v2_config_only_;
   std::string admin_address_path_;
   Network::Address::IpVersion local_address_ip_version_;
   spdlog::level::level_enum log_level_;
@@ -141,8 +138,6 @@ private:
   bool signal_handling_enabled_;
   bool mutex_tracing_enabled_;
   uint32_t count_;
-
-  friend class OptionsImplTest;
 };
 
 /**

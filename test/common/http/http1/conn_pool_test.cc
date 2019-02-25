@@ -17,7 +17,6 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -47,7 +46,8 @@ public:
                       NiceMock<Event::MockTimer>* upstream_ready_timer)
       : ConnPoolImpl(dispatcher, Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"),
                      Upstream::ResourcePriority::Default, nullptr),
-        mock_dispatcher_(dispatcher), mock_upstream_ready_timer_(upstream_ready_timer) {}
+        api_(Api::createApiForTest()), mock_dispatcher_(dispatcher),
+        mock_upstream_ready_timer_(upstream_ready_timer) {}
 
   ~ConnPoolImplForTest() {
     EXPECT_EQ(0U, ready_clients_.size());
@@ -80,8 +80,7 @@ public:
     test_client.codec_ = new NiceMock<Http::MockClientConnection>();
     test_client.connect_timer_ = new NiceMock<Event::MockTimer>(&mock_dispatcher_);
     std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
-    test_client.client_dispatcher_ =
-        std::make_unique<Event::DispatcherImpl>(test_time_.timeSystem());
+    test_client.client_dispatcher_ = api_->allocateDispatcher();
     Network::ClientConnectionPtr connection{test_client.connection_};
     test_client.codec_client_ = new CodecClientForTest(
         std::move(connection), test_client.codec_,
@@ -112,7 +111,7 @@ public:
     EXPECT_FALSE(upstream_ready_enabled_);
   }
 
-  DangerousDeprecatedTestTime test_time_;
+  Api::ApiPtr api_;
   Event::MockDispatcher& mock_dispatcher_;
   NiceMock<Event::MockTimer>* mock_upstream_ready_timer_;
   std::vector<TestCodecClient> test_clients_;
@@ -718,6 +717,48 @@ TEST_F(Http1ConnPoolImplTest, RemoteCloseToCompleteResponse) {
   EXPECT_CALL(*conn_pool_.test_clients_[0].connection_,
               close(Network::ConnectionCloseType::NoFlush));
   EXPECT_CALL(conn_pool_, onClientDestroy());
+  conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  dispatcher_.clearDeferredDeleteList();
+}
+
+TEST_F(Http1ConnPoolImplTest, NoActiveConnectionsByDefault) {
+  EXPECT_FALSE(conn_pool_.hasActiveConnections());
+}
+
+TEST_F(Http1ConnPoolImplTest, ActiveRequestHasActiveConnectionsTrue) {
+  ActiveTestRequest r1(*this, 0, ActiveTestRequest::Type::CreateConnection);
+  r1.startRequest();
+
+  EXPECT_TRUE(conn_pool_.hasActiveConnections());
+
+  // cleanup
+  r1.completeResponse(false);
+  conn_pool_.drainConnections();
+  EXPECT_CALL(conn_pool_, onClientDestroy());
+  dispatcher_.clearDeferredDeleteList();
+}
+
+TEST_F(Http1ConnPoolImplTest, ResponseCompletedConnectionReadyNoActiveConnections) {
+  ActiveTestRequest r1(*this, 0, ActiveTestRequest::Type::CreateConnection);
+  r1.startRequest();
+  r1.completeResponse(false);
+
+  EXPECT_FALSE(conn_pool_.hasActiveConnections());
+
+  conn_pool_.drainConnections();
+  EXPECT_CALL(conn_pool_, onClientDestroy());
+  dispatcher_.clearDeferredDeleteList();
+}
+
+TEST_F(Http1ConnPoolImplTest, PendingRequestIsConsideredActive) {
+  conn_pool_.expectClientCreate();
+  ActiveTestRequest r1(*this, 0, ActiveTestRequest::Type::Pending);
+
+  EXPECT_TRUE(conn_pool_.hasActiveConnections());
+
+  EXPECT_CALL(conn_pool_, onClientDestroy());
+  r1.handle_->cancel();
+  conn_pool_.drainConnections();
   conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   dispatcher_.clearDeferredDeleteList();
 }

@@ -1,16 +1,6 @@
-load("//bazel:api_build_system.bzl", "api_go_proto_library", "api_proto_library_internal")
+load("@envoy_api//bazel:api_build_system.bzl", "api_go_proto_library", "api_proto_library_internal")
 
 licenses(["notice"])  # Apache 2
-
-api_proto_library_internal(
-    name = "attribute_context",
-    srcs = [
-        "attribute_context.proto",
-    ],
-    deps = [
-        "//envoy/api/v2/core:address",
-    ],
-)
 
 api_proto_library_internal(
     name = "external_auth",
@@ -18,9 +8,5 @@ api_proto_library_internal(
         "external_auth.proto",
     ],
     has_services = 1,
-    deps = [
-        ":attribute_context",
-        "//envoy/api/v2/core:base",
-        "//envoy/type:http_status",
-    ],
+    deps = ["//envoy/service/auth/v2:external_auth"],
 )

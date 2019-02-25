@@ -16,6 +16,8 @@
 #include "common/network/utility.h"
 #include "common/upstream/upstream_impl.h"
 
+#include "absl/strings/match.h"
+
 namespace Envoy {
 namespace Http {
 namespace Http1 {
@@ -55,6 +57,10 @@ void ConnPoolImpl::drainConnections() {
 void ConnPoolImpl::addDrainedCallback(DrainedCb cb) {
   drained_callbacks_.push_back(cb);
   checkForDrained();
+}
+
+bool ConnPoolImpl::hasActiveConnections() const {
+  return !pending_requests_.empty() || !busy_clients_.empty();
 }
 
 void ConnPoolImpl::attachRequestToClient(ActiveClient& client, StreamDecoder& response_decoder,
@@ -263,8 +269,8 @@ void ConnPoolImpl::StreamWrapper::onEncodeComplete() { encode_complete_ = true; 
 
 void ConnPoolImpl::StreamWrapper::decodeHeaders(HeaderMapPtr&& headers, bool end_stream) {
   if (headers->Connection() &&
-      0 == StringUtil::caseInsensitiveCompare(headers->Connection()->value().c_str(),
-                                              Headers::get().ConnectionValues.Close.c_str())) {
+      absl::EqualsIgnoreCase(headers->Connection()->value().getStringView(),
+                             Headers::get().ConnectionValues.Close)) {
     saw_close_header_ = true;
     parent_.parent_.host_->cluster().stats().upstream_cx_close_notify_.inc();
   }
@@ -283,9 +289,9 @@ ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
       remaining_requests_(parent_.host_->cluster().maxRequestsPerConnection()) {
 
   parent_.conn_connect_ms_ = std::make_unique<Stats::Timespan>(
-      parent_.host_->cluster().stats().upstream_cx_connect_ms_, parent_.dispatcher_.timeSystem());
+      parent_.host_->cluster().stats().upstream_cx_connect_ms_, parent_.dispatcher_.timeSource());
   Upstream::Host::CreateConnectionData data =
-      parent_.host_->createConnection(parent_.dispatcher_, parent_.socket_options_);
+      parent_.host_->createConnection(parent_.dispatcher_, parent_.socket_options_, nullptr);
   real_host_description_ = data.host_description_;
   codec_client_ = parent_.createCodecClient(data);
   codec_client_->addConnectionCallbacks(*this);
@@ -296,7 +302,7 @@ ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
   parent_.host_->stats().cx_total_.inc();
   parent_.host_->stats().cx_active_.inc();
   conn_length_ = std::make_unique<Stats::Timespan>(
-      parent_.host_->cluster().stats().upstream_cx_length_ms_, parent_.dispatcher_.timeSystem());
+      parent_.host_->cluster().stats().upstream_cx_length_ms_, parent_.dispatcher_.timeSource());
   connect_timer_->enableTimer(parent_.host_->cluster().connectTimeout());
   parent_.host_->cluster().resourceManager(parent_.priority_).connections().inc();
 

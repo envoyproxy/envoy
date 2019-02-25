@@ -5,6 +5,7 @@ Rate limit
 
 * Global rate limiting :ref:`architecture overview <arch_overview_rate_limit>`
 * :ref:`v2 API reference <envoy_api_msg_config.filter.http.rate_limit.v2.RateLimit>`
+* This filter should be configured with the name *envoy.rate_limit*.
 
 The HTTP rate limit filter will call the rate limit service when the request's route or virtual host
 has one or more :ref:`rate limit configurations<envoy_api_field_route.VirtualHost.rate_limits>`
@@ -77,7 +78,7 @@ the following descriptor is generated:
 Statistics
 ----------
 
-The buffer filter outputs statistics in the *cluster.<route target cluster>.ratelimit.* namespace.
+The rate limit filter outputs statistics in the *cluster.<route target cluster>.ratelimit.* namespace.
 429 responses are emitted to the normal cluster :ref:`dynamic HTTP statistics
 <config_cluster_manager_cluster_stats_dynamic_http>`.
 

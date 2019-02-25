@@ -8,7 +8,7 @@ namespace Envoy {
 namespace Config {
 namespace {
 
-class GrpcSubscriptionImplTest : public GrpcSubscriptionTestHarness, public testing::Test {};
+class GrpcSubscriptionImplTest : public testing::Test, public GrpcSubscriptionTestHarness {};
 
 // Validate that stream creation results in a timer based retry and can recover.
 TEST_F(GrpcSubscriptionImplTest, StreamCreationFailure) {
@@ -39,17 +39,18 @@ TEST_F(GrpcSubscriptionImplTest, RemoteStreamClose) {
   verifyStats(1, 0, 0, 0, 0);
   Http::HeaderMapPtr trailers{new Http::TestHeaderMapImpl{}};
   subscription_->grpcMux().onReceiveTrailingMetadata(std::move(trailers));
+  EXPECT_CALL(callbacks_, onConfigUpdateFailed(_));
   EXPECT_CALL(*timer_, enableTimer(_));
   EXPECT_CALL(random_, random());
   subscription_->grpcMux().onRemoteClose(Grpc::Status::GrpcStatus::Canceled, "");
-  verifyStats(1, 0, 0, 0, 0);
+  verifyStats(2, 0, 0, 1, 0);
   verifyControlPlaneStats(0);
 
   // Retry and succeed.
   EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
   expectSendMessage({"cluster0", "cluster1"}, "");
   timer_cb_();
-  verifyStats(1, 0, 0, 0, 0);
+  verifyStats(2, 0, 0, 1, 0);
 }
 
 // Validate that When the management server gets multiple requests for the same version, it can

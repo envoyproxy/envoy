@@ -11,7 +11,7 @@
 #include "common/common/c_smart_ptr.h"
 #include "common/common/logger.h"
 
-#include "luajit-2.0/lua.hpp"
+#include "luajit-2.1/lua.hpp"
 
 namespace Envoy {
 namespace Extensions {
@@ -295,7 +295,7 @@ public:
 };
 
 /**
- * This is a wraper for a Lua coroutine. Lua intermixes coroutine and "thread." Lua does not have
+ * This is a wrapper for a Lua coroutine. Lua intermixes coroutine and "thread." Lua does not have
  * real threads, only cooperatively scheduled coroutines.
  */
 class Coroutine : Logger::Loggable<Logger::Id::lua> {
@@ -312,7 +312,7 @@ public:
    *        ThreadLocalState::registerGlobal().
    * @param num_args supplies the number of arguments to start the coroutine with. They should be
    *        on the stack already.
-   * @param yield_callback supplies a callback that wil be invoked if the coroutine yields.
+   * @param yield_callback supplies a callback that will be invoked if the coroutine yields.
    */
   void start(int function_ref, int num_args, const std::function<void()>& yield_callback);
 
@@ -320,7 +320,7 @@ public:
    * Resume a previously yielded coroutine.
    * @param num_args supplies the number of arguments to resume the coroutine with. They should be
    *        on the stack already.
-   * @param yield_callback supplies a callback that wil be invoked if the coroutine yields.
+   * @param yield_callback supplies a callback that will be invoked if the coroutine yields.
    */
   void resume(int num_args, const std::function<void()>& yield_callback);
 

@@ -1,7 +1,7 @@
 #include "common/network/address_impl.h"
 
 #include <arpa/inet.h>
-#include <netinet/ip.h>
+#include <netinet/in.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 
@@ -15,6 +15,7 @@
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
+#include "common/network/io_socket_handle_impl.h"
 
 namespace Envoy {
 namespace Network {
@@ -132,7 +133,7 @@ InstanceConstSharedPtr peerAddressFromFd(int fd) {
   return addressFromSockAddr(ss, ss_len);
 }
 
-int InstanceBase::socketFromSocketType(SocketType socketType) const {
+IoHandlePtr InstanceBase::socketFromSocketType(SocketType socketType) const {
 #if defined(__APPLE__)
   int flags = 0;
 #else
@@ -159,23 +160,29 @@ int InstanceBase::socketFromSocketType(SocketType socketType) const {
     domain = AF_UNIX;
   }
 
-  int fd = ::socket(domain, flags, 0);
-  RELEASE_ASSERT(fd != -1, "");
+  const Api::SysCallIntResult result = Api::OsSysCallsSingleton::get().socket(domain, flags, 0);
+  RELEASE_ASSERT(result.rc_ != -1,
+                 fmt::format("socket(2) failed, got error: {}", strerror(result.errno_)));
+  IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>(result.rc_);
 
 #ifdef __APPLE__
   // Cannot set SOCK_NONBLOCK as a ::socket flag.
-  RELEASE_ASSERT(fcntl(fd, F_SETFL, O_NONBLOCK) != -1, "");
+  RELEASE_ASSERT(fcntl(io_handle->fd(), F_SETFL, O_NONBLOCK) != -1, "");
 #endif
 
-  return fd;
+  return io_handle;
 }
 
 Ipv4Instance::Ipv4Instance(const sockaddr_in* address) : InstanceBase(Type::Ip) {
   ip_.ipv4_.address_ = *address;
-  char str[INET_ADDRSTRLEN];
-  inet_ntop(AF_INET, &address->sin_addr, str, INET_ADDRSTRLEN);
-  friendly_name_ = fmt::format("{}:{}", str, ntohs(address->sin_port));
-  ip_.friendly_address_ = str;
+  ip_.friendly_address_ = sockaddrToString(*address);
+
+  // Based on benchmark testing, this reserve+append implementation runs faster than absl::StrCat.
+  fmt::format_int port(ntohs(address->sin_port));
+  friendly_name_.reserve(ip_.friendly_address_.size() + 1 + port.size());
+  friendly_name_.append(ip_.friendly_address_);
+  friendly_name_.push_back(':');
+  friendly_name_.append(port.data(), port.size());
   validateIpv4Supported(friendly_name_);
 }
 
@@ -223,7 +230,33 @@ Api::SysCallIntResult Ipv4Instance::connect(int fd) const {
   return {rc, errno};
 }
 
-int Ipv4Instance::socket(SocketType type) const { return socketFromSocketType(type); }
+IoHandlePtr Ipv4Instance::socket(SocketType type) const { return socketFromSocketType(type); }
+
+std::string Ipv4Instance::sockaddrToString(const sockaddr_in& addr) {
+  static constexpr size_t BufferSize = 16; // enough space to hold an IPv4 address in string form
+  char str[BufferSize];
+  // Write backwards from the end of the buffer for simplicity.
+  char* start = str + BufferSize;
+  uint32_t ipv4_addr = ntohl(addr.sin_addr.s_addr);
+  for (unsigned i = 4; i != 0; i--, ipv4_addr >>= 8) {
+    uint32_t octet = ipv4_addr & 0xff;
+    if (octet == 0) {
+      ASSERT(start > str);
+      *--start = '0';
+    } else {
+      do {
+        ASSERT(start > str);
+        *--start = '0' + (octet % 10);
+        octet /= 10;
+      } while (octet != 0);
+    }
+    if (i != 1) {
+      ASSERT(start > str);
+      *--start = '.';
+    }
+  }
+  return std::string(start, str + BufferSize - start);
+}
 
 absl::uint128 Ipv6Instance::Ipv6Helper::address() const {
   absl::uint128 result{0};
@@ -288,12 +321,13 @@ Api::SysCallIntResult Ipv6Instance::connect(int fd) const {
   return {rc, errno};
 }
 
-int Ipv6Instance::socket(SocketType type) const {
-  const int fd = socketFromSocketType(type);
-  // Setting IPV6_V6ONLY resticts the IPv6 socket to IPv6 connections only.
+IoHandlePtr Ipv6Instance::socket(SocketType type) const {
+  IoHandlePtr io_handle = socketFromSocketType(type);
+  // Setting IPV6_V6ONLY restricts the IPv6 socket to IPv6 connections only.
   const int v6only = ip_.v6only_;
-  RELEASE_ASSERT(::setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, &v6only, sizeof(v6only)) != -1, "");
-  return fd;
+  RELEASE_ASSERT(
+      ::setsockopt(io_handle->fd(), IPPROTO_IPV6, IPV6_V6ONLY, &v6only, sizeof(v6only)) != -1, "");
+  return io_handle;
 }
 
 PipeInstance::PipeInstance(const sockaddr_un* address, socklen_t ss_len)
@@ -359,7 +393,7 @@ Api::SysCallIntResult PipeInstance::connect(int fd) const {
   return {rc, errno};
 }
 
-int PipeInstance::socket(SocketType type) const { return socketFromSocketType(type); }
+IoHandlePtr PipeInstance::socket(SocketType type) const { return socketFromSocketType(type); }
 
 } // namespace Address
 } // namespace Network

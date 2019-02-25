@@ -7,13 +7,13 @@ namespace Envoy {
 
 std::string echo_config;
 
-class EchoIntegrationTest : public BaseIntegrationTest,
-                            public testing::TestWithParam<Network::Address::IpVersion> {
+class EchoIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+                            public BaseIntegrationTest {
 public:
-  EchoIntegrationTest() : BaseIntegrationTest(GetParam(), realTime(), echo_config) {}
+  EchoIntegrationTest() : BaseIntegrationTest(GetParam(), echo_config) {}
 
   // Called once by the gtest framework before any EchoIntegrationTests are run.
-  static void SetUpTestCase() {
+  static void SetUpTestSuite() {
     echo_config = ConfigHelper::BASE_CONFIG + R"EOF(
     filter_chains:
       filters:
@@ -42,9 +42,9 @@ public:
   }
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, EchoIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, EchoIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(EchoIntegrationTest, Hello) {
   Buffer::OwnedImpl buffer("hello");
@@ -131,7 +131,7 @@ TEST_P(EchoIntegrationTest, AddRemoveListener) {
         new_listener_port, buffer,
         [&](Network::ClientConnection&, const Buffer::Instance&) -> void { FAIL(); }, version_);
     while (connection2.connecting()) {
-      // Don't busy loop, but OS X often needs a moment to decide this connection isn't happening.
+      // Don't busy loop, but macOS often needs a moment to decide this connection isn't happening.
       timeSystem().sleep(std::chrono::milliseconds(10));
 
       connection2.run(Event::Dispatcher::RunType::NonBlock);

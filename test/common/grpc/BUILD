@@ -71,6 +71,7 @@ envoy_cc_test(
         "//test/mocks/tracing:tracing_mocks",
         "//test/proto:helloworld_proto_cc",
         "//test/test_common:test_time_lib",
+        "//test/test_common:utility_lib",
     ] + envoy_select_google_grpc(["//source/common/grpc:google_async_client_lib"]),
 )
 
@@ -79,6 +80,8 @@ envoy_cc_test(
     srcs = envoy_select_google_grpc(["google_grpc_creds_test.cc"]),
     deps = [
         ":utility_lib",
+        "//test/mocks/stats:stats_mocks",
+        "//test/test_common:utility_lib",
     ] + envoy_select_google_grpc(["//source/common/grpc:google_grpc_creds_lib"]),
 )
 
@@ -106,6 +109,7 @@ envoy_cc_test_library(
         "//test/mocks/server:server_mocks",
         "//test/proto:helloworld_proto_cc",
         "//test/test_common:test_time_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 

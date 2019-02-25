@@ -7,49 +7,41 @@
 #include "envoy/stats/scope.h"
 
 #include "common/common/cleanup.h"
+#include "common/common/utility.h"
 #include "common/config/resources.h"
 #include "common/config/subscription_factory.h"
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
-#include "common/upstream/cds_subscription.h"
 
 namespace Envoy {
 namespace Upstream {
 
 CdsApiPtr CdsApiImpl::create(const envoy::api::v2::core::ConfigSource& cds_config,
-                             const absl::optional<envoy::api::v2::core::ConfigSource>& eds_config,
                              ClusterManager& cm, Event::Dispatcher& dispatcher,
                              Runtime::RandomGenerator& random,
-                             const LocalInfo::LocalInfo& local_info, Stats::Scope& scope) {
-  return CdsApiPtr{
-      new CdsApiImpl(cds_config, eds_config, cm, dispatcher, random, local_info, scope)};
+                             const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
+                             Api::Api& api) {
+  return CdsApiPtr{new CdsApiImpl(cds_config, cm, dispatcher, random, local_info, scope, api)};
 }
 
-CdsApiImpl::CdsApiImpl(const envoy::api::v2::core::ConfigSource& cds_config,
-                       const absl::optional<envoy::api::v2::core::ConfigSource>& eds_config,
-                       ClusterManager& cm, Event::Dispatcher& dispatcher,
-                       Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
-                       Stats::Scope& scope)
+CdsApiImpl::CdsApiImpl(const envoy::api::v2::core::ConfigSource& cds_config, ClusterManager& cm,
+                       Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
+                       const LocalInfo::LocalInfo& local_info, Stats::Scope& scope, Api::Api& api)
     : cm_(cm), scope_(scope.createScope("cluster_manager.cds.")) {
   Config::Utility::checkLocalInfo("cds", local_info);
 
   subscription_ =
       Config::SubscriptionFactory::subscriptionFromConfigSource<envoy::api::v2::Cluster>(
           cds_config, local_info, dispatcher, cm, random, *scope_,
-          [this, &cds_config, &eds_config, &cm, &dispatcher, &random, &local_info,
-           &scope]() -> Config::Subscription<envoy::api::v2::Cluster>* {
-            return new CdsSubscription(Config::Utility::generateStats(*scope_), cds_config,
-                                       eds_config, cm, dispatcher, random, local_info,
-                                       scope.statsOptions());
-          },
           "envoy.api.v2.ClusterDiscoveryService.FetchClusters",
-          "envoy.api.v2.ClusterDiscoveryService.StreamClusters");
+          "envoy.api.v2.ClusterDiscoveryService.StreamClusters", api);
 }
 
 void CdsApiImpl::onConfigUpdate(const ResourceVector& resources, const std::string& version_info) {
   cm_.adsMux().pause(Config::TypeUrl::get().ClusterLoadAssignment);
   Cleanup eds_resume([this] { cm_.adsMux().resume(Config::TypeUrl::get().ClusterLoadAssignment); });
 
+  std::vector<std::string> exception_msgs;
   std::unordered_set<std::string> cluster_names;
   for (const auto& cluster : resources) {
     if (!cluster_names.insert(cluster.name()).second) {
@@ -63,9 +55,40 @@ void CdsApiImpl::onConfigUpdate(const ResourceVector& resources, const std::stri
   ClusterManager::ClusterInfoMap clusters_to_remove = cm_.clusters();
   for (auto& cluster : resources) {
     const std::string cluster_name = cluster.name();
-    clusters_to_remove.erase(cluster_name);
-    if (cm_.addOrUpdateCluster(cluster, version_info)) {
-      ENVOY_LOG(debug, "cds: add/update cluster '{}'", cluster_name);
+    try {
+      clusters_to_remove.erase(cluster_name);
+      if (cm_.addOrUpdateCluster(
+              cluster, version_info,
+              [this](const std::string&, ClusterManager::ClusterWarmingState state) {
+                // Following if/else block implements a control flow mechanism that can be used
+                // by an ADS implementation to properly sequence CDS and RDS update. It is not
+                // enforcing on ADS. ADS can use it to detect when a previously sent cluster becomes
+                // warm before sending routes that depend on it. This can improve incidence of HTTP
+                // 503 responses from Envoy when a route is used before it's supporting cluster is
+                // ready.
+                //
+                // We achieve that by leaving CDS in the paused state as long as there is at least
+                // one cluster in the warming state. This prevents CDS ACK from being sent to ADS.
+                // Once cluster is warmed up, CDS is resumed, and ACK is sent to ADS, providing a
+                // signal to ADS to proceed with RDS updates.
+                //
+                // Major concern with this approach is CDS being left in the paused state forever.
+                // As long as ClusterManager::removeCluster() is not called on a warming cluster
+                // this is not an issue. CdsApiImpl takes care of doing this properly, and there
+                // is no other component removing clusters from the ClusterManagerImpl. If this
+                // ever changes, we would need to correct the following logic.
+                if (state == ClusterManager::ClusterWarmingState::Starting &&
+                    cm_.warmingClusterCount() == 1) {
+                  cm_.adsMux().pause(Config::TypeUrl::get().Cluster);
+                } else if (state == ClusterManager::ClusterWarmingState::Finished &&
+                           cm_.warmingClusterCount() == 0) {
+                  cm_.adsMux().resume(Config::TypeUrl::get().Cluster);
+                }
+              })) {
+        ENVOY_LOG(debug, "cds: add/update cluster '{}'", cluster_name);
+      }
+    } catch (const EnvoyException& e) {
+      exception_msgs.push_back(e.what());
     }
   }
 
@@ -78,6 +101,9 @@ void CdsApiImpl::onConfigUpdate(const ResourceVector& resources, const std::stri
 
   version_info_ = version_info;
   runInitializeCallbackIfAny();
+  if (!exception_msgs.empty()) {
+    throw EnvoyException(StringUtil::join(exception_msgs, "\n"));
+  }
 }
 
 void CdsApiImpl::onConfigUpdateFailed(const EnvoyException*) {

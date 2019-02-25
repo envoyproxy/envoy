@@ -17,9 +17,9 @@ namespace Extensions {
 namespace HttpFilters {
 namespace JwtAuthn {
 
-class AllVerifierTest : public ::testing::Test {
+class AllVerifierTest : public testing::Test {
 public:
-  void SetUp() { MessageUtil::loadFromYaml(ExampleConfig, proto_config_); }
+  void SetUp() override { MessageUtil::loadFromYaml(ExampleConfig, proto_config_); }
 
   void createVerifier() {
     filter_config_ = ::std::make_shared<FilterConfig>(proto_config_, "", mock_factory_ctx_);
@@ -29,7 +29,7 @@ public:
 
   JwtAuthentication proto_config_;
   FilterConfigSharedPtr filter_config_;
-  VerifierPtr verifier_;
+  VerifierConstPtr verifier_;
   NiceMock<Server::Configuration::MockFactoryContext> mock_factory_ctx_;
   ContextSharedPtr context_;
   MockVerifierCallbacks mock_cb_;

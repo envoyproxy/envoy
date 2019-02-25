@@ -2,6 +2,10 @@ syntax = "proto3";
 
 package envoy.admin.v2alpha;
 
+option java_outer_classname = "ClustersProto";
+option java_multiple_files = true;
+option java_package = "io.envoyproxy.envoy.admin.v2alpha";
+
 import "envoy/admin/v2alpha/metrics.proto";
 import "envoy/api/v2/core/address.proto";
 import "envoy/api/v2/core/health_check.proto";
@@ -58,6 +62,9 @@ message HostStatus {
   // success rate or the cluster did not have enough hosts to run through success rate outlier
   // ejection.
   envoy.type.Percent success_rate = 4;
+
+  // The host's weight. If not configured, the value defaults to 1.
+  uint32 weight = 5;
 }
 
 // Health status for a host.
@@ -67,6 +74,9 @@ message HostHealthStatus {
 
   // The host is currently considered an outlier and has been ejected.
   bool failed_outlier_check = 2;
+
+  // The host is currently being marked as degraded through active health checking.
+  bool failed_active_degraded_check = 4;
 
   // Health status as reported by EDS. Note: only HEALTHY and UNHEALTHY are currently supported
   // here.

@@ -2,14 +2,17 @@
 
 #include "envoy/service/discovery/v2/hds.pb.h"
 
-#include "common/ssl/context_manager_impl.h"
+#include "common/singleton/manager_impl.h"
 #include "common/upstream/health_discovery_service.h"
+
+#include "extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/server/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
@@ -18,12 +21,12 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::AtLeast;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
-
-using ::testing::AtLeast;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Upstream {
@@ -40,11 +43,12 @@ public:
 };
 
 class HdsTest : public testing::Test {
-public:
+protected:
   HdsTest()
       : retry_timer_(new Event::MockTimer()), server_response_timer_(new Event::MockTimer()),
-        async_client_(new Grpc::MockAsyncClient()) {
-    node_.set_id("foo");
+        async_client_(new Grpc::MockAsyncClient()), api_(Api::createApiForTest(stats_store_)),
+        ssl_context_manager_(api_->timeSource()) {
+    node_.set_id("hds-node");
   }
 
   // Creates an HdsDelegate
@@ -61,8 +65,9 @@ public:
           return server_response_timer_;
         }));
     hds_delegate_ = std::make_unique<HdsDelegate>(
-        node_, stats_store_, Grpc::AsyncClientPtr(async_client_), dispatcher_, runtime_,
-        stats_store_, ssl_context_manager_, random_, test_factory_, log_manager_, cm_, local_info_);
+        stats_store_, Grpc::AsyncClientPtr(async_client_), dispatcher_, runtime_, stats_store_,
+        ssl_context_manager_, random_, test_factory_, log_manager_, cm_, local_info_, admin_,
+        singleton_manager_, tls_, *api_);
   }
 
   // Creates a HealthCheckSpecifier message that contains one endpoint and one
@@ -92,6 +97,7 @@ public:
     return msg;
   }
 
+  Event::SimulatedTimeSystem time_system_;
   envoy::api::v2::core::Node node_;
   Event::MockDispatcher dispatcher_;
   Stats::IsolatedStoreImpl stats_store_;
@@ -111,13 +117,31 @@ public:
   Grpc::MockAsyncStream async_stream_;
   Grpc::MockAsyncClient* async_client_;
   Runtime::MockLoader runtime_;
-  Event::SimulatedTimeSystem time_system_;
-  Ssl::ContextManagerImpl ssl_context_manager_{time_system_};
+  Api::ApiPtr api_;
+  Extensions::TransportSockets::Tls::ContextManagerImpl ssl_context_manager_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   NiceMock<Envoy::AccessLog::MockAccessLogManager> log_manager_;
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  NiceMock<Server::MockAdmin> admin_;
+  Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest().currentThreadId()};
+  NiceMock<ThreadLocal::MockInstance> tls_;
 };
+
+// Test that HdsDelegate builds and sends initial message correctly
+TEST_F(HdsTest, HealthCheckRequest) {
+  envoy::service::discovery::v2::HealthCheckRequestOrEndpointHealthResponse request;
+  request.mutable_health_check_request()->mutable_node()->set_id("hds-node");
+  request.mutable_health_check_request()->mutable_capability()->add_health_check_protocols(
+      envoy::service::discovery::v2::Capability::HTTP);
+  request.mutable_health_check_request()->mutable_capability()->add_health_check_protocols(
+      envoy::service::discovery::v2::Capability::TCP);
+
+  EXPECT_CALL(local_info_, node()).WillOnce(ReturnRef(node_));
+  EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(async_stream_, sendMessage(ProtoEq(request), false));
+  createHdsDelegate();
+}
 
 // Test if processMessage processes endpoints from a HealthCheckSpecifier
 // message correctly
@@ -143,7 +167,7 @@ TEST_F(HdsTest, TestProcessMessageEndpoints) {
   }
 
   // Process message
-  EXPECT_CALL(test_factory_, createClusterInfo(_, _, _, _, _, _, _, _, _, _)).Times(2);
+  EXPECT_CALL(test_factory_, createClusterInfo(_)).Times(2);
   hds_delegate_friend_.processPrivateMessage(*hds_delegate_, std::move(message));
 
   // Check Correctness
@@ -186,8 +210,7 @@ TEST_F(HdsTest, TestProcessMessageHealthChecks) {
   }
 
   // Process message
-  EXPECT_CALL(test_factory_, createClusterInfo(_, _, _, _, _, _, _, _, _, _))
-      .WillRepeatedly(Return(cluster_info_));
+  EXPECT_CALL(test_factory_, createClusterInfo(_)).WillRepeatedly(Return(cluster_info_));
 
   hds_delegate_friend_.processPrivateMessage(*hds_delegate_, std::move(message));
 
@@ -274,8 +297,7 @@ TEST_F(HdsTest, TestSendResponseOneEndpointTimeout) {
   EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _)).WillRepeatedly(Return(connection_));
   EXPECT_CALL(*server_response_timer_, enableTimer(_)).Times(2);
   EXPECT_CALL(async_stream_, sendMessage(_, false));
-  EXPECT_CALL(test_factory_, createClusterInfo(_, _, _, _, _, _, _, _, _, _))
-      .WillOnce(Return(cluster_info_));
+  EXPECT_CALL(test_factory_, createClusterInfo(_)).WillOnce(Return(cluster_info_));
   EXPECT_CALL(*connection_, setBufferLimits(_));
   EXPECT_CALL(dispatcher_, deferredDelete_(_));
   // Process message

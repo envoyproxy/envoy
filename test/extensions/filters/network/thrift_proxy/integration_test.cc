@@ -7,8 +7,7 @@
 #include "gtest/gtest.h"
 
 using testing::Combine;
-using testing::TestParamInfo;
-using testing::TestWithParam;
+using ::testing::TestParamInfo;
 using testing::Values;
 
 namespace Envoy {
@@ -17,10 +16,10 @@ namespace NetworkFilters {
 namespace ThriftProxy {
 
 class ThriftConnManagerIntegrationTest
-    : public BaseThriftIntegrationTest,
-      public TestWithParam<std::tuple<TransportType, ProtocolType, bool>> {
+    : public testing::TestWithParam<std::tuple<TransportType, ProtocolType, bool>>,
+      public BaseThriftIntegrationTest {
 public:
-  static void SetUpTestCase() {
+  static void SetUpTestSuite() {
     thrift_config_ = ConfigHelper::BASE_CONFIG + R"EOF(
     filter_chains:
       filters:
@@ -165,7 +164,7 @@ paramToString(const TestParamInfo<std::tuple<TransportType, ProtocolType, bool>>
   return fmt::format("{}{}", transport_name, protocol_name);
 }
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     TransportAndProtocol, ThriftConnManagerIntegrationTest,
     Combine(Values(TransportType::Framed, TransportType::Unframed, TransportType::Header),
             Values(ProtocolType::Binary, ProtocolType::Compact), Values(false, true)),
@@ -364,10 +363,10 @@ TEST_P(ThriftConnManagerIntegrationTest, OnewayEarlyClosePartialRequest) {
 
 class ThriftTwitterConnManagerIntegrationTest : public ThriftConnManagerIntegrationTest {};
 
-INSTANTIATE_TEST_CASE_P(FramedTwitter, ThriftTwitterConnManagerIntegrationTest,
-                        Combine(Values(TransportType::Framed), Values(ProtocolType::Twitter),
-                                Values(false, true)),
-                        paramToString);
+INSTANTIATE_TEST_SUITE_P(FramedTwitter, ThriftTwitterConnManagerIntegrationTest,
+                         Combine(Values(TransportType::Framed), Values(ProtocolType::Twitter),
+                                 Values(false, true)),
+                         paramToString);
 
 // Because of the protocol upgrade requests and the difficulty of separating them, we test this
 // protocol independently.

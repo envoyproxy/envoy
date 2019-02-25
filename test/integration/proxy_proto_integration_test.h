@@ -9,8 +9,8 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-class ProxyProtoIntegrationTest : public HttpIntegrationTest,
-                                  public testing::TestWithParam<Network::Address::IpVersion> {
+class ProxyProtoIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+                                  public HttpIntegrationTest {
 public:
   ProxyProtoIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()) {

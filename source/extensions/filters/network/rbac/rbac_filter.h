@@ -31,11 +31,16 @@ public:
     return mode == Filters::Common::RBAC::EnforcementMode::Enforced ? engine_ : shadow_engine_;
   }
 
+  envoy::config::filter::network::rbac::v2::RBAC::EnforcementType enforcementType() const {
+    return enforcement_type_;
+  }
+
 private:
   Filters::Common::RBAC::RoleBasedAccessControlFilterStats stats_;
 
   const absl::optional<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl> engine_;
   const absl::optional<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl> shadow_engine_;
+  const envoy::config::filter::network::rbac::v2::RBAC::EnforcementType enforcement_type_;
 };
 
 typedef std::shared_ptr<RoleBasedAccessControlFilterConfig>

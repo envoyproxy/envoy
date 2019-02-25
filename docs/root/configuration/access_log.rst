@@ -195,7 +195,9 @@ The following command operators are supported:
     * **UF**: Upstream connection failure in addition to 503 response code.
     * **UO**: Upstream overflow (:ref:`circuit breaking <arch_overview_circuit_break>`) in addition to 503 response code.
     * **NR**: No :ref:`route configured <arch_overview_http_routing>` for a given request in addition to 404 response code.
+    * **URX**: The request was rejected because the :ref:`upstream retry limit (HTTP) <envoy_api_field_route.RetryPolicy.num_retries>`  or :ref:`maximum connect attempts (TCP) <envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.max_connect_attempts>` was reached.
   HTTP only
+    * **DC**: Downstream connection termination.
     * **LH**: Local service failed :ref:`health check request <arch_overview_health_checking>` in addition to 503 response code.
     * **UT**: Upstream request timeout in addition to 504 response code.
     * **LR**: Connection local reset in addition to 503 response code.
@@ -204,6 +206,9 @@ The following command operators are supported:
     * **DI**: The request processing was delayed for a period specified via :ref:`fault injection <config_http_filters_fault_injection>`.
     * **FI**: The request was aborted with a response code specified via :ref:`fault injection <config_http_filters_fault_injection>`.
     * **RL**: The request was ratelimited locally by the :ref:`HTTP rate limit filter <config_http_filters_rate_limit>` in addition to 429 response code.
+    * **UAEX**: The request was denied by the external authorization service.
+    * **RLSE**: The request was rejected because there was an error in rate limit service.
+    * **SI**: Stream idle timeout in addition to 408 response code.
 
 %RESPONSE_TX_DURATION%
   HTTP
@@ -282,7 +287,7 @@ The following command operators are supported:
 %DYNAMIC_METADATA(NAMESPACE:KEY*):Z%
   HTTP
     :ref:`Dynamic Metadata <envoy_api_msg_core.Metadata>` info,
-    where NAMESPACE is the the filter namespace used when setting the metadata, KEY is an optional
+    where NAMESPACE is the filter namespace used when setting the metadata, KEY is an optional
     lookup up key in the namespace with the option of specifying nested keys separated by ':',
     and Z is an optional parameter denoting string truncation up to Z characters long. Dynamic Metadata
     can be set by filters using the :repo:`StreamInfo <include/envoy/stream_info/stream_info.h>` API:

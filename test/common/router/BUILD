@@ -67,6 +67,7 @@ envoy_cc_test(
         "//test/mocks/server:server_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -154,6 +155,7 @@ envoy_cc_test(
     srcs = ["router_test.cc"],
     deps = [
         "//source/common/buffer:buffer_lib",
+        "//source/common/http:context_lib",
         "//source/common/network:utility_lib",
         "//source/common/router:router_lib",
         "//source/common/upstream:upstream_includes",

@@ -24,7 +24,7 @@ Network::FilterFactoryCb MongoProxyFilterConfigFactory::createFilterFactoryFromP
   AccessLogSharedPtr access_log;
   if (!proto_config.access_log().empty()) {
     access_log.reset(new AccessLog(proto_config.access_log(), context.accessLogManager(),
-                                   context.dispatcher().timeSystem()));
+                                   context.dispatcher().timeSource()));
   }
 
   FaultConfigSharedPtr fault_config;
@@ -34,11 +34,13 @@ Network::FilterFactoryCb MongoProxyFilterConfigFactory::createFilterFactoryFromP
     fault_config = std::make_shared<FaultConfig>(proto_config.delay());
   }
 
-  return [stat_prefix, &context, access_log,
-          fault_config](Network::FilterManager& filter_manager) -> void {
+  const bool emit_dynamic_metadata = proto_config.emit_dynamic_metadata();
+  return [stat_prefix, &context, access_log, fault_config,
+          emit_dynamic_metadata](Network::FilterManager& filter_manager) -> void {
     filter_manager.addFilter(std::make_shared<ProdProxyFilter>(
         stat_prefix, context.scope(), context.runtime(), access_log, fault_config,
-        context.drainDecision(), context.random(), context.dispatcher().timeSystem()));
+        context.drainDecision(), context.random(), context.dispatcher().timeSource(),
+        emit_dynamic_metadata));
   };
 }
 
@@ -53,9 +55,8 @@ MongoProxyFilterConfigFactory::createFilterFactory(const Json::Object& json_conf
 /**
  * Static registration for the mongo filter. @see RegisterFactory.
  */
-static Registry::RegisterFactory<MongoProxyFilterConfigFactory,
-                                 Server::Configuration::NamedNetworkFilterConfigFactory>
-    registered_;
+REGISTER_FACTORY(MongoProxyFilterConfigFactory,
+                 Server::Configuration::NamedNetworkFilterConfigFactory);
 
 } // namespace MongoProxy
 } // namespace NetworkFilters

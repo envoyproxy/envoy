@@ -15,7 +15,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::TestParamInfo;
+using ::testing::TestParamInfo;
 
 namespace Envoy {
 namespace Extensions {

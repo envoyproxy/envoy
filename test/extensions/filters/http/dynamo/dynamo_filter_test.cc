@@ -34,7 +34,7 @@ public:
     EXPECT_CALL(loader_.snapshot_, featureEnabled("dynamodb.filter_enabled", 100));
 
     filter_ = std::make_unique<DynamoFilter>(loader_, stat_prefix_, stats_,
-                                             decoder_callbacks_.dispatcher().timeSystem());
+                                             decoder_callbacks_.dispatcher().timeSource());
 
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
@@ -61,6 +61,9 @@ TEST_F(DynamoFilterTest, operatorPresent) {
   Http::TestHeaderMapImpl continue_headers{{":status", "100"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue,
             filter_->encode100ContinueHeaders(continue_headers));
+
+  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->encodeMetadata(metadata_map));
 
   Http::TestHeaderMapImpl response_headers{{":status", "200"}};
   EXPECT_CALL(stats_, counter("prefix.dynamodb.operation_missing")).Times(0);

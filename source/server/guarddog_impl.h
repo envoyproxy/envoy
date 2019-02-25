@@ -10,10 +10,10 @@
 #include "envoy/server/watchdog.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
-#include "envoy/thread/thread.h"
 
 #include "common/common/lock_guard.h"
 #include "common/common/logger.h"
+#include "common/common/thread.h"
 #include "common/event/libevent.h"
 
 #include "absl/types/optional.h"
@@ -39,8 +39,7 @@ public:
    *
    * See the configuration documentation for details on the timeout settings.
    */
-  GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuration::Main& config,
-               Event::TimeSystem& time_system, Api::Api& api);
+  GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuration::Main& config, Api::Api& api);
   ~GuardDogImpl();
 
   /**
@@ -54,7 +53,7 @@ public:
   }
 
   // Server::GuardDog
-  WatchDogSharedPtr createWatchDog(int32_t thread_id) override;
+  WatchDogSharedPtr createWatchDog(Thread::ThreadIdPtr&& thread_id) override;
   void stopWatching(WatchDogSharedPtr wd) override;
 
 private:
@@ -77,7 +76,7 @@ private:
     bool megamiss_alerted_{};
   };
 
-  Event::TimeSystem& time_system_;
+  TimeSource& time_source_;
   const std::chrono::milliseconds miss_timeout_;
   const std::chrono::milliseconds megamiss_timeout_;
   const std::chrono::milliseconds kill_timeout_;

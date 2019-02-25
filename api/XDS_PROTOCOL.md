@@ -16,7 +16,7 @@ proto payload in all methods. We discuss each type of subscription below.
 The simplest approach to delivering dynamic configuration is to place it at a
 well known path specified in the
 [`ConfigSource`](https://www.envoyproxy.io/docs/envoy/latest/api-v2/api/v2/core/config_source.proto#core-configsource).
-Envoy will use `inotify` (`kqueue` on Mac OS X) to monitor the file for changes
+Envoy will use `inotify` (`kqueue` on macOS) to monitor the file for changes
 and parse the `DiscoveryResponse` proto in the file on update. Binary
 protobufs, JSON, YAML and proto text are supported formats for the
 `DiscoveryResponse`.
@@ -295,7 +295,7 @@ allows:
     This supports Envoy on-demand / lazily requesting additional resources. For
     example, this may occur when a request corresponding to an unknown cluster
     arrives.
-  * The xDS server can incremetally update the resources on the client.
+  * The xDS server can incrementally update the resources on the client.
     This supports the goal of scalability of xDS resources. Rather than deliver
     all 100k clusters when a single cluster is modified, the management server
     only needs to deliver the single cluster that changed.

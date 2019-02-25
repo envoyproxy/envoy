@@ -38,14 +38,26 @@ public:
     HostDescriptionConstSharedPtr host_description_;
   };
 
-  enum class HealthFlag {
-    // The host is currently failing active health checks.
-    FAILED_ACTIVE_HC = 0x1,
-    // The host is currently considered an outlier and has been ejected.
-    FAILED_OUTLIER_CHECK = 0x02,
-    // The host is currently marked as unhealthy by EDS.
-    FAILED_EDS_HEALTH = 0x04,
-  };
+  // We use an X-macro here to make it easier to verify that all the enum values are accounted for.
+  // clang-format off
+#define HEALTH_FLAG_ENUM_VALUES(m)                                               \
+  /* The host is currently failing active health checks. */                      \
+  m(FAILED_ACTIVE_HC, 0x1)                                                       \
+  /* The host is currently considered an outlier and has been ejected. */        \
+  m(FAILED_OUTLIER_CHECK, 0x02)                                                  \
+  /* The host is currently marked as unhealthy by EDS. */                        \
+  m(FAILED_EDS_HEALTH, 0x04)                                                     \
+  /* The host is currently marked as degraded through active health checking. */ \
+  m(DEGRADED_ACTIVE_HC, 0x08)                                                    \
+  /* The host is currently marked as degraded by EDS. */                         \
+  m(DEGRADED_EDS_HEALTH, 0x10)
+  // clang-format on
+
+#define DECLARE_ENUM(name, value) name = value,
+
+  enum class HealthFlag { HEALTH_FLAG_ENUM_VALUES(DECLARE_ENUM) };
+
+#undef DECLARE_ENUM
 
   enum class ActiveHealthFailureType {
     // The failure type is unknown, all hosts' failure types are initialized as UNKNOWN
@@ -73,7 +85,8 @@ public:
    */
   virtual CreateConnectionData
   createConnection(Event::Dispatcher& dispatcher,
-                   const Network::ConnectionSocket::OptionsSharedPtr& options) const PURE;
+                   const Network::ConnectionSocket::OptionsSharedPtr& options,
+                   Network::TransportSocketOptionsSharedPtr transport_socket_options) const PURE;
 
   /**
    * Create a health check connection for this host.
@@ -103,11 +116,28 @@ public:
    */
   virtual void healthFlagSet(HealthFlag flag) PURE;
 
+  enum class Health {
+    /**
+     * Host is unhealthy and is not able to serve traffic. A host may be marked as unhealthy either
+     * through EDS or through active health checking.
+     */
+    Unhealthy,
+    /**
+     * Host is healthy, but degraded. It is able to serve traffic, but hosts that aren't degraded
+     * should be preferred. A host may be marked as degraded either through EDS or through active
+     * health checking.
+     */
+    Degraded,
+    /**
+     * Host is healthy and is able to serve traffic.
+     */
+    Healthy,
+  };
+
   /**
-   * @return whether in aggregate a host is healthy and routable. Multiple health flags and other
-   *         information may be considered.
+   * @return the health of the host.
    */
-  virtual bool healthy() const PURE;
+  virtual Health health() const PURE;
 
   /**
    * Returns the host's ActiveHealthFailureType. Types are specified in ActiveHealthFailureType.
@@ -136,12 +166,14 @@ public:
   virtual void setOutlierDetector(Outlier::DetectorHostMonitorPtr&& outlier_detector) PURE;
 
   /**
-   * @return the current load balancing weight of the host, in the range 1-100.
+   * @return the current load balancing weight of the host, in the range 1-128 (see
+   * envoy.api.v2.endpoint.Endpoint.load_balancing_weight).
    */
   virtual uint32_t weight() const PURE;
 
   /**
-   * Set the current load balancing weight of the host, in the range 1-100.
+   * Set the current load balancing weight of the host, in the range 1-128 (see
+   * envoy.api.v2.endpoint.Endpoint.load_balancing_weight).
    */
   virtual void weight(uint32_t new_weight) PURE;
 
@@ -159,6 +191,7 @@ public:
 typedef std::shared_ptr<const Host> HostConstSharedPtr;
 
 typedef std::vector<HostSharedPtr> HostVector;
+typedef std::unordered_map<std::string, Upstream::HostSharedPtr> HostMap;
 typedef std::shared_ptr<HostVector> HostVectorSharedPtr;
 typedef std::shared_ptr<const HostVector> HostVectorConstSharedPtr;
 
@@ -235,6 +268,14 @@ public:
   virtual const HostVector& healthyHosts() const PURE;
 
   /**
+   * @return all degraded hosts contained in the set at the current time. NOTE: This set is
+   *         eventually consistent. There is a time window where a host in this set may become
+   *         undegraded and calling degraded() on it will return false. Code should be written to
+   *         deal with this case if it matters.
+   */
+  virtual const HostVector& degradedHosts() const PURE;
+
+  /**
    * @return hosts per locality.
    */
   virtual const HostsPerLocality& hostsPerLocality() const PURE;
@@ -243,6 +284,11 @@ public:
    * @return same as hostsPerLocality but only contains healthy hosts.
    */
   virtual const HostsPerLocality& healthyHostsPerLocality() const PURE;
+
+  /**
+   * @return same as hostsPerLocality but only contains degraded hosts.
+   */
+  virtual const HostsPerLocality& degradedHostsPerLocality() const PURE;
 
   /**
    * @return weights for each locality in the host set.
@@ -255,25 +301,6 @@ public:
   virtual absl::optional<uint32_t> chooseLocality() PURE;
 
   /**
-   * Updates the hosts in a given host set.
-   *
-   * @param hosts supplies the (usually new) list of hosts in the host set.
-   * @param healthy hosts supplies the subset of hosts which are healthy.
-   * @param hosts_per_locality supplies the hosts subdivided by locality.
-   * @param hosts_per_locality supplies the healthy hosts subdivided by locality.
-   * @param locality_weights supplies a map from locality to associated weight.
-   * @param hosts_added supplies the hosts added since the last update.
-   * @param hosts_removed supplies the hosts removed since the last update.
-   * @param overprovisioning_factor if presents, overwrites the current overprovisioning_factor.
-   */
-  virtual void updateHosts(HostVectorConstSharedPtr hosts, HostVectorConstSharedPtr healthy_hosts,
-                           HostsPerLocalityConstSharedPtr hosts_per_locality,
-                           HostsPerLocalityConstSharedPtr healthy_hosts_per_locality,
-                           LocalityWeightsConstSharedPtr locality_weights,
-                           const HostVector& hosts_added, const HostVector& hosts_removed,
-                           absl::optional<uint32_t> overprovisioning_factor) PURE;
-
-  /**
    * @return uint32_t the priority of this host set.
    */
   virtual uint32_t priority() const PURE;
@@ -281,7 +308,7 @@ public:
   /**
    * @return uint32_t the overprovisioning factor of this host set.
    */
-  virtual uint32_t overprovisioning_factor() const PURE;
+  virtual uint32_t overprovisioningFactor() const PURE;
 };
 
 typedef std::unique_ptr<HostSet> HostSetPtr;
@@ -292,14 +319,19 @@ typedef std::unique_ptr<HostSet> HostSetPtr;
  */
 class PrioritySet {
 public:
+  typedef std::function<void(const HostVector& hosts_added, const HostVector& hosts_removed)>
+      MemberUpdateCb;
+
   typedef std::function<void(uint32_t priority, const HostVector& hosts_added,
                              const HostVector& hosts_removed)>
-      MemberUpdateCb;
+      PriorityUpdateCb;
 
   virtual ~PrioritySet() {}
 
   /**
    * Install a callback that will be invoked when any of the HostSets in the PrioritySet changes.
+   * hosts_added and hosts_removed will only be populated when a host is added or completely removed
+   * from the PrioritySet.
    * This includes when a new HostSet is created.
    *
    * @param callback supplies the callback to invoke.
@@ -308,17 +340,46 @@ public:
   virtual Common::CallbackHandle* addMemberUpdateCb(MemberUpdateCb callback) const PURE;
 
   /**
-   * Returns the host sets for this priority set, ordered by priority.
-   * The first element in the vector is the host set for priority 0, and so on.
+   * Install a callback that will be invoked when a host set changes. Triggers when any change
+   * happens to the hosts within the host set. If hosts are added/removed from the host set, the
+   * added/removed hosts will be passed to the callback.
    *
-   * @return std::vector<HostSetPtr>& the host sets for this priority set.
+   * @param callback supplies the callback to invoke.
+   * @return Common::CallbackHandle* a handle which can be used to unregister the callback.
    */
-  virtual std::vector<HostSetPtr>& hostSetsPerPriority() PURE;
+  virtual Common::CallbackHandle* addPriorityUpdateCb(PriorityUpdateCb callback) const PURE;
 
   /**
    * @return const std::vector<HostSetPtr>& the host sets, ordered by priority.
    */
   virtual const std::vector<HostSetPtr>& hostSetsPerPriority() const PURE;
+
+  /**
+   * Parameter class for updateHosts.
+   */
+  struct UpdateHostsParams {
+    HostVectorConstSharedPtr hosts;
+    HostVectorConstSharedPtr healthy_hosts;
+    HostVectorConstSharedPtr degraded_hosts;
+    HostsPerLocalityConstSharedPtr hosts_per_locality;
+    HostsPerLocalityConstSharedPtr healthy_hosts_per_locality;
+    HostsPerLocalityConstSharedPtr degraded_hosts_per_locality;
+  };
+
+  /**
+   * Updates the hosts in a given host set.
+   *
+   * @param priority the priority of the host set to update.
+   * @param update_hosts_param supplies the list of hosts and hosts per locality.
+   * @param locality_weights supplies a map from locality to associated weight.
+   * @param hosts_added supplies the hosts added since the last update.
+   * @param hosts_removed supplies the hosts removed since the last update.
+   * @param overprovisioning_factor if presents, overwrites the current overprovisioning_factor.
+   */
+  virtual void updateHosts(uint32_t priority, UpdateHostsParams&& update_host_params,
+                           LocalityWeightsConstSharedPtr locality_weights,
+                           const HostVector& hosts_added, const HostVector& hosts_removed,
+                           absl::optional<uint32_t> overprovisioning_factor) PURE;
 };
 
 /**
@@ -386,10 +447,13 @@ public:
   COUNTER  (upstream_flow_control_resumed_reading_total)                                           \
   COUNTER  (upstream_flow_control_backed_up_total)                                                 \
   COUNTER  (upstream_flow_control_drained_total)                                                   \
+  COUNTER  (upstream_internal_redirect_failed_total)                                               \
+  COUNTER  (upstream_internal_redirect_succeeded_total)                                            \
   COUNTER  (bind_errors)                                                                           \
   GAUGE    (max_host_weight)                                                                       \
   COUNTER  (membership_change)                                                                     \
   GAUGE    (membership_healthy)                                                                    \
+  GAUGE    (membership_degraded)                                                                   \
   GAUGE    (membership_total)                                                                      \
   COUNTER  (retry_or_shadow_abandoned)                                                             \
   COUNTER  (update_attempt)                                                                        \

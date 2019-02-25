@@ -19,9 +19,9 @@ config:
 
 typedef HttpProtocolIntegrationTest RBACIntegrationTest;
 
-INSTANTIATE_TEST_CASE_P(Protocols, RBACIntegrationTest,
-                        testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
-                        HttpProtocolIntegrationTest::protocolTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(Protocols, RBACIntegrationTest,
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 TEST_P(RBACIntegrationTest, Allowed) {
   config_helper_.addFilter(RBAC_CONFIG);

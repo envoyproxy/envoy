@@ -4,13 +4,20 @@
 #include <vector>
 
 #include "envoy/api/v2/core/base.pb.h"
+#include "envoy/common/exception.h"
 #include "envoy/common/pure.h"
 #include "envoy/network/address.h"
+#include "envoy/network/io_handle.h"
 
 #include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Network {
+
+// Optional variant of setsockopt(2) optname. The idea here is that if the option is not supported
+// on a platform, we can make this the empty value. This allows us to avoid proliferation of #ifdef.
+typedef absl::optional<std::pair<int, int>> SocketOptionName;
 
 /**
  * Base class for Sockets
@@ -25,9 +32,28 @@ public:
   virtual const Address::InstanceConstSharedPtr& localAddress() const PURE;
 
   /**
-   * @return fd the socket's file descriptor.
+   * Set the local address of the socket. On accepted sockets the local address defaults to the
+   * one at which the connection was received at, which is the same as the listener's address, if
+   * the listener is bound to a specific address.
+   *
+   * @param local_address the new local address.
    */
-  virtual int fd() const PURE;
+  virtual void setLocalAddress(const Address::InstanceConstSharedPtr& local_address) PURE;
+
+  /**
+   * @return IoHandle for the underlying connection
+   */
+  virtual IoHandle& ioHandle() PURE;
+
+  /**
+   * @return const IoHandle for the underlying connection
+   */
+  virtual const IoHandle& ioHandle() const PURE;
+
+  /**
+   * @return the type (stream or datagram) of the socket.
+   */
+  virtual Address::SocketType socketType() const PURE;
 
   /**
    * Close the underlying socket.
@@ -56,7 +82,29 @@ public:
      *        not be modified.
      */
     virtual void hashKey(std::vector<uint8_t>& key) const PURE;
+
+    /**
+     * Contains details about what this option applies to a socket.
+     */
+    struct Details {
+      SocketOptionName name_;
+      std::string value_; ///< Binary string representation of an option's value.
+
+      bool operator==(const Details& other) const {
+        return name_ == other.name_ && value_ == other.value_;
+      }
+    };
+
+    /**
+     * @param socket The socket for which we want to know the options that would be applied.
+     * @param state The state at which we would apply the options.
+     * @return What we would apply to the socket at the provided state. Empty if we'd apply nothing.
+     */
+    virtual absl::optional<Details>
+    getOptionDetails(const Socket& socket,
+                     envoy::api::v2::core::SocketOption::SocketState state) const PURE;
   };
+
   typedef std::shared_ptr<const Option> OptionConstSharedPtr;
   typedef std::vector<OptionConstSharedPtr> Options;
   typedef std::shared_ptr<Options> OptionsSharedPtr;
@@ -115,19 +163,16 @@ public:
   virtual const Address::InstanceConstSharedPtr& remoteAddress() const PURE;
 
   /**
-   * Set the local address of the socket. On accepted sockets the local address defaults to the
+   * Restores the local address of the socket. On accepted sockets the local address defaults to the
    * one at which the connection was received at, which is the same as the listener's address, if
-   * the listener is bound to a specific address.
+   * the listener is bound to a specific address. Call this to restore the address to a value
+   * different from the one the socket was initially accepted at. This should only be called when
+   * restoring the original destination address of a connection redirected by iptables REDIRECT. The
+   * caller is responsible for making sure the new address is actually different.
    *
    * @param local_address the new local address.
-   * @param restored a flag marking the local address as being restored to a value that is
-   *        different from the one the socket was initially accepted at. This should only be set
-   *        to 'true' when restoring the original destination address of a connection redirected
-   *        by iptables REDIRECT. The caller is responsible for making sure the new address is
-   *        actually different when passing restored as 'true'.
    */
-  virtual void setLocalAddress(const Address::InstanceConstSharedPtr& local_address,
-                               bool restored) PURE;
+  virtual void restoreLocalAddress(const Address::InstanceConstSharedPtr& local_address) PURE;
 
   /**
    * Set the remote address of the socket.
@@ -173,6 +218,21 @@ public:
 };
 
 typedef std::unique_ptr<ConnectionSocket> ConnectionSocketPtr;
+
+/**
+ * Thrown when there is a runtime error binding a socket.
+ */
+class SocketBindException : public EnvoyException {
+public:
+  SocketBindException(const std::string& what, int error_number)
+      : EnvoyException(what), error_number_(error_number) {}
+
+  // This can't be called errno because otherwise the standard errno macro expansion replaces it.
+  int errorNumber() const { return error_number_; }
+
+private:
+  const int error_number_;
+};
 
 } // namespace Network
 } // namespace Envoy

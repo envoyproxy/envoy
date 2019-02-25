@@ -9,28 +9,11 @@ namespace Envoy {
 constexpr int SignalAction::FATAL_SIGS[];
 
 void SignalAction::sigHandler(int sig, siginfo_t* info, void* context) {
-  void* error_pc = 0;
-
-  const ucontext_t* ucontext = reinterpret_cast<const ucontext_t*>(context);
-  if (ucontext != nullptr) {
-#ifdef REG_RIP
-    // x86_64
-    error_pc = reinterpret_cast<void*>(ucontext->uc_mcontext.gregs[REG_RIP]);
-#elif defined(__APPLE__) && defined(__x86_64__)
-    error_pc = reinterpret_cast<void*>(ucontext->uc_mcontext->__ss.__rip);
-#elif defined(__powerpc__)
-    error_pc = reinterpret_cast<void*>(ucontext->uc_mcontext.regs->nip);
-#else
-#warning "Please enable and test PC retrieval code for your arch in signal_action.cc"
-// x86 Classic: reinterpret_cast<void*>(ucontext->uc_mcontext.gregs[REG_EIP]);
-// ARM: reinterpret_cast<void*>(ucontext->uc_mcontext.arm_pc);
-#endif
-  }
-
   BackwardsTrace tracer;
+
   tracer.logFault(strsignal(sig), info->si_addr);
-  if (error_pc != 0) {
-    tracer.captureFrom(error_pc);
+  if (context != nullptr) {
+    tracer.captureFrom(context);
   } else {
     tracer.capture();
   }

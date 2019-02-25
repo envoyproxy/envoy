@@ -29,11 +29,12 @@ void OwnedImpl::addBufferFragment(BufferFragment& fragment) {
       [](const void*, size_t, void* arg) { static_cast<BufferFragment*>(arg)->done(); }, &fragment);
 }
 
-void OwnedImpl::add(const std::string& data) {
-  evbuffer_add(buffer_.get(), data.c_str(), data.size());
+void OwnedImpl::add(absl::string_view data) {
+  evbuffer_add(buffer_.get(), data.data(), data.size());
 }
 
 void OwnedImpl::add(const Instance& data) {
+  ASSERT(&data != this);
   uint64_t num_slices = data.getRawSlices(nullptr, 0);
   STACK_ARRAY(slices, RawSlice, num_slices);
   data.getRawSlices(slices.begin(), num_slices);
@@ -47,6 +48,7 @@ void OwnedImpl::prepend(absl::string_view data) {
 }
 
 void OwnedImpl::prepend(Instance& data) {
+  ASSERT(&data != this);
   int rc =
       evbuffer_prepend_buffer(buffer_.get(), static_cast<LibEventInstance&>(data).buffer().get());
   ASSERT(rc == 0);
@@ -86,10 +88,14 @@ uint64_t OwnedImpl::length() const { return evbuffer_get_length(buffer_.get()); 
 
 void* OwnedImpl::linearize(uint32_t size) {
   ASSERT(size <= length());
-  return evbuffer_pullup(buffer_.get(), size);
+  void* const ret = evbuffer_pullup(buffer_.get(), size);
+  RELEASE_ASSERT(ret != nullptr || size == 0,
+                 "Failure to linearize may result in buffer overflow by the caller.");
+  return ret;
 }
 
 void OwnedImpl::move(Instance& rhs) {
+  ASSERT(&rhs != this);
   // We do the static cast here because in practice we only have one buffer implementation right
   // now and this is safe. Using the evbuffer move routines require having access to both evbuffers.
   // This is a reasonable compromise in a high performance path where we want to maintain an
@@ -100,6 +106,7 @@ void OwnedImpl::move(Instance& rhs) {
 }
 
 void OwnedImpl::move(Instance& rhs, uint64_t length) {
+  ASSERT(&rhs != this);
   // See move() above for why we do the static cast.
   int rc = evbuffer_remove_buffer(static_cast<LibEventInstance&>(rhs).buffer().get(), buffer_.get(),
                                   length);
@@ -148,10 +155,12 @@ Api::SysCallIntResult OwnedImpl::read(int fd, uint64_t max_length) {
 }
 
 uint64_t OwnedImpl::reserve(uint64_t length, RawSlice* iovecs, uint64_t num_iovecs) {
-  uint64_t ret = evbuffer_reserve_space(buffer_.get(), length,
-                                        reinterpret_cast<evbuffer_iovec*>(iovecs), num_iovecs);
-  ASSERT(ret >= 1);
-  return ret;
+  ASSERT(length > 0);
+  int ret = evbuffer_reserve_space(buffer_.get(), length, reinterpret_cast<evbuffer_iovec*>(iovecs),
+                                   num_iovecs);
+  RELEASE_ASSERT(ret >= 1, "Failure to allocate may result in callers writing to uninitialized "
+                           "memory, buffer overflows, etc");
+  return static_cast<uint64_t>(ret);
 }
 
 ssize_t OwnedImpl::search(const void* data, uint64_t size, size_t start) const {
@@ -191,7 +200,7 @@ Api::SysCallIntResult OwnedImpl::write(int fd) {
 
 OwnedImpl::OwnedImpl() : buffer_(evbuffer_new()) {}
 
-OwnedImpl::OwnedImpl(const std::string& data) : OwnedImpl() { add(data); }
+OwnedImpl::OwnedImpl(absl::string_view data) : OwnedImpl() { add(data); }
 
 OwnedImpl::OwnedImpl(const Instance& data) : OwnedImpl() { add(data); }
 

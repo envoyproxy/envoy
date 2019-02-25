@@ -2,10 +2,12 @@
 
 #include <iostream>
 #include <memory>
+#include <new>
 
 #include "common/common/compiler_requirements.h"
 #include "common/common/perf_annotation.h"
 #include "common/event/libevent.h"
+#include "common/http/http2/codec_impl.h"
 #include "common/network/utility.h"
 #include "common/stats/thread_local_store.h"
 
@@ -40,13 +42,16 @@ Runtime::LoaderPtr ProdComponentFactory::createRuntime(Server::Instance& server,
   return Server::InstanceUtil::createRuntime(server, config);
 }
 
-MainCommonBase::MainCommonBase(OptionsImpl& options, Event::TimeSystem& time_system,
+MainCommonBase::MainCommonBase(const OptionsImpl& options, Event::TimeSystem& time_system,
                                TestHooks& test_hooks, Server::ComponentFactory& component_factory,
-                               std::unique_ptr<Runtime::RandomGenerator>&& random_generator)
-    : options_(options), component_factory_(component_factory) {
+                               std::unique_ptr<Runtime::RandomGenerator>&& random_generator,
+                               Thread::ThreadFactory& thread_factory)
+    : options_(options), component_factory_(component_factory), thread_factory_(thread_factory) {
+  Thread::ThreadFactorySingleton::set(&thread_factory_);
   ares_library_init(ARES_LIB_INIT_ALL);
   Event::Libevent::Global::initialize();
   RELEASE_ASSERT(Envoy::Server::validateProtoDescriptors(), "");
+  Http::Http2::initializeNghttp2Logging();
 
   switch (options_.mode()) {
   case Server::Mode::InitOnly:
@@ -69,12 +74,16 @@ MainCommonBase::MainCommonBase(OptionsImpl& options, Event::TimeSystem& time_sys
 
     configureComponentLogLevels();
 
+    // Provide consistent behavior for out-of-memory, regardless of whether it occurs in a try/catch
+    // block or not.
+    std::set_new_handler([]() { PANIC("out of memory"); });
+
     stats_store_ = std::make_unique<Stats::ThreadLocalStoreImpl>(options_.statsOptions(),
                                                                  restarter_->statsAllocator());
 
     server_ = std::make_unique<Server::InstanceImpl>(
         options_, time_system, local_address, test_hooks, *restarter_, *stats_store_,
-        access_log_lock, component_factory, std::move(random_generator), *tls_);
+        access_log_lock, component_factory, std::move(random_generator), *tls_, thread_factory);
 
     break;
   }
@@ -86,7 +95,10 @@ MainCommonBase::MainCommonBase(OptionsImpl& options, Event::TimeSystem& time_sys
   }
 }
 
-MainCommonBase::~MainCommonBase() { ares_library_cleanup(); }
+MainCommonBase::~MainCommonBase() {
+  Thread::ThreadFactorySingleton::set(nullptr);
+  ares_library_cleanup();
+}
 
 void MainCommonBase::configureComponentLogLevels() {
   for (auto& component_log_level : options_.componentLogLevels()) {
@@ -103,7 +115,7 @@ bool MainCommonBase::run() {
     return true;
   case Server::Mode::Validate: {
     auto local_address = Network::Utility::getLocalAddress(options_.localAddressIpVersion());
-    return Server::validateConfig(options_, local_address, component_factory_);
+    return Server::validateConfig(options_, local_address, component_factory_, thread_factory_);
   }
   case Server::Mode::InitOnly:
     PERF_DUMP();
@@ -127,7 +139,7 @@ void MainCommonBase::adminRequest(absl::string_view path_and_query, absl::string
 MainCommon::MainCommon(int argc, const char* const* argv)
     : options_(argc, argv, &MainCommon::hotRestartVersion, spdlog::level::info),
       base_(options_, real_time_system_, default_test_hooks_, prod_component_factory_,
-            std::make_unique<Runtime::RandomGeneratorImpl>()) {}
+            std::make_unique<Runtime::RandomGeneratorImpl>(), platform_impl_.threadFactory()) {}
 
 std::string MainCommon::hotRestartVersion(uint64_t max_num_stats, uint64_t max_stat_name_len,
                                           bool hot_restart_enabled) {
@@ -141,25 +153,6 @@ std::string MainCommon::hotRestartVersion(uint64_t max_num_stats, uint64_t max_s
   UNREFERENCED_PARAMETER(max_stat_name_len);
 #endif
   return "disabled";
-}
-
-// Legacy implementation of main_common.
-//
-// TODO(jmarantz): Remove this when all callers are removed. At that time, MainCommonBase
-// and MainCommon can be merged. The current theory is that only Google calls this.
-int main_common(OptionsImpl& options) {
-  try {
-    Event::RealTimeSystem real_time_system_;
-    DefaultTestHooks default_test_hooks_;
-    ProdComponentFactory prod_component_factory_;
-    MainCommonBase main_common(options, real_time_system_, default_test_hooks_,
-                               prod_component_factory_,
-                               std::make_unique<Runtime::RandomGeneratorImpl>());
-    return main_common.run() ? EXIT_SUCCESS : EXIT_FAILURE;
-  } catch (EnvoyException& e) {
-    return EXIT_FAILURE;
-  }
-  return EXIT_SUCCESS;
 }
 
 } // namespace Envoy

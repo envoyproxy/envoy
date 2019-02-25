@@ -10,15 +10,15 @@
 
 namespace Envoy {
 namespace {
-class TcpProxyIntegrationTest : public BaseIntegrationTest,
-                                public testing::TestWithParam<Network::Address::IpVersion> {
+class TcpProxyIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+                                public BaseIntegrationTest {
 public:
   TcpProxyIntegrationTest()
       : BaseIntegrationTest(GetParam(), realTime(), ConfigHelper::TCP_PROXY_CONFIG) {
     enable_half_close_ = true;
   }
 
-  ~TcpProxyIntegrationTest() {
+  ~TcpProxyIntegrationTest() override {
     test_server_.reset();
     fake_upstreams_.clear();
   }

@@ -19,7 +19,7 @@ public:
     directory_ = TestEnvironment::temporaryDirectory() + "/test/config_test/";
   }
 
-  static void SetUpTestCase() { SetupTestDirectory(); }
+  static void SetUpTestSuite() { SetupTestDirectory(); }
 
 protected:
   ValidationServerTest() : options_(directory_ + GetParam()) {}
@@ -49,26 +49,29 @@ public:
 };
 
 TEST_P(ValidationServerTest, Validate) {
-  EXPECT_TRUE(
-      validateConfig(options_, Network::Address::InstanceConstSharedPtr(), component_factory_));
+  EXPECT_TRUE(validateConfig(options_, Network::Address::InstanceConstSharedPtr(),
+                             component_factory_, Thread::threadFactoryForTest()));
 }
 
 // TODO(rlazarus): We'd like use this setup to replace //test/config_test (that is, run it against
 // all the example configs) but can't until light validation is implemented, mocking out access to
 // the filesystem for TLS certs, etc. In the meantime, these are the example configs that work
 // as-is.
-INSTANTIATE_TEST_CASE_P(ValidConfigs, ValidationServerTest,
-                        ::testing::Values("front-envoy.yaml", "google_com_proxy.v2.yaml",
-                                          "s2s-grpc-envoy.yaml", "service-envoy.yaml"));
+INSTANTIATE_TEST_SUITE_P(ValidConfigs, ValidationServerTest,
+                         ::testing::Values("front-proxy_front-envoy.yaml",
+                                           "google_com_proxy.v2.yaml",
+                                           "grpc-bridge_config_s2s-grpc-envoy.yaml",
+                                           "front-proxy_service-envoy.yaml"));
 
 // Just make sure that all configs can be ingested without a crash. Processing of config files
 // may not be successful, but there should be no crash.
 TEST_P(ValidationServerTest_1, RunWithoutCrash) {
-  validateConfig(options_, Network::Address::InstanceConstSharedPtr(), component_factory_);
+  validateConfig(options_, Network::Address::InstanceConstSharedPtr(), component_factory_,
+                 Thread::threadFactoryForTest());
   SUCCEED();
 }
 
-INSTANTIATE_TEST_CASE_P(AllConfigs, ValidationServerTest_1,
-                        ::testing::ValuesIn(ValidationServerTest_1::GetAllConfigFiles()));
+INSTANTIATE_TEST_SUITE_P(AllConfigs, ValidationServerTest_1,
+                         ::testing::ValuesIn(ValidationServerTest_1::GetAllConfigFiles()));
 } // namespace Server
 } // namespace Envoy

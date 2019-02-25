@@ -13,6 +13,9 @@
 namespace Envoy {
 namespace Http {
 
+// Legacy default value of 60K is safely under both codec default limits.
+static const uint32_t DEFAULT_MAX_REQUEST_HEADERS_KB = 60;
+
 class Stream;
 
 /**
@@ -55,10 +58,10 @@ public:
   virtual Stream& getStream() PURE;
 
   /**
-   * Encode METADATA.
-   * @param metadata_map is the METADATA to encode.
+   * Encode metadata.
+   * @param metadata_map_vector is the vector of metadata maps to encode.
    */
-  virtual void encodeMetadata(const MetadataMap& metadata_map) PURE;
+  virtual void encodeMetadata(const MetadataMapVector& metadata_map_vector) PURE;
 };
 
 /**
@@ -204,7 +207,7 @@ public:
  * HTTP/1.* Codec settings
  */
 struct Http1Settings {
-  // Enable codec to parse absolute uris. This enables forward/explicit proxy support for non TLS
+  // Enable codec to parse absolute URIs. This enables forward/explicit proxy support for non TLS
   // traffic
   bool allow_absolute_url_{false};
   // Allow HTTP/1.0 from downstream.
@@ -339,9 +342,12 @@ public:
    * Invoked when a new request stream is initiated by the remote.
    * @param response_encoder supplies the encoder to use for creating the response. The request and
    *                         response are backed by the same Stream object.
+   * @param is_internally_created indicates if this stream was originated by a
+   *   client, or was created by Envoy, by example as part of an internal redirect.
    * @return StreamDecoder& supplies the decoder callbacks to fire into for stream decoding events.
    */
-  virtual StreamDecoder& newStream(StreamEncoder& response_encoder) PURE;
+  virtual StreamDecoder& newStream(StreamEncoder& response_encoder,
+                                   bool is_internally_created = false) PURE;
 };
 
 /**

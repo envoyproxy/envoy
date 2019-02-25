@@ -1,6 +1,10 @@
 syntax = "proto3";
 
 package envoy.config.filter.network.http_connection_manager.v2;
+
+option java_outer_classname = "HttpConnectionManagerProto";
+option java_multiple_files = true;
+option java_package = "io.envoyproxy.envoy.config.filter.network.http_connection_manager.v2";
 option go_package = "v2";
 
 import "envoy/api/v2/core/config_source.proto";
@@ -20,7 +24,7 @@ import "gogoproto/gogo.proto";
 // [#protodoc-title: HTTP connection manager]
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 
-// [#comment:next free field: 29]
+// [#comment:next free field: 30]
 message HttpConnectionManager {
   enum CodecType {
     option (gogoproto.goproto_enum_prefix) = false;
@@ -129,6 +133,15 @@ message HttpConnectionManager {
   // header in responses. If not set, the default is *envoy*.
   string server_name = 10;
 
+  // The maximum request headers size for incoming connections. The default max
+  // is 60K, based on default settings for http codecs. For HTTP1, the current
+  // limit set by http_parser is 80K. for HTTP2, the default allowed header
+  // block in nghttp2 is 64K. The max configurable setting is 64K in order to
+  // stay under both codec limits.
+  // Requests that exceed this size will receive a 431 response.
+  google.protobuf.UInt32Value max_request_headers_kb = 29
+      [(validate.rules).uint32.gt = 0, (validate.rules).uint32.lte = 64];
+
   // The idle timeout for connections managed by the connection manager. The
   // idle timeout is defined as the period in which there are no active
   // requests. If not set, there is no idle timeout. When the idle timeout is
@@ -187,7 +200,7 @@ message HttpConnectionManager {
   // during which Envoy will flush the write buffers for the connection and await the peer to close
   // (i.e., a TCP FIN/RST is received by Envoy from the downstream connection).
   //
-  // Delaying Envoy's connection close and giving the peer the opportunity to initate the close
+  // Delaying Envoy's connection close and giving the peer the opportunity to initiate the close
   // sequence mitigates a race condition that exists when downstream clients do not drain/process
   // data in a connection's receive buffer after a remote close has been detected via a socket
   // write(). This race leads to such clients failing to process the response code sent by Envoy,
@@ -353,17 +366,15 @@ message HttpConnectionManager {
     // this type of upgrade. If no filters are present, the filter chain for
     // HTTP connections will be used for this upgrade type.
     repeated HttpFilter filters = 2;
+    // Determines if upgrades are enabled or disabled by default. Defaults to true.
+    // This can be overridden on a per-route basis with :ref:`cluster
+    // <envoy_api_field_route.RouteAction.upgrade_configs>` as documented in the
+    // :ref:`upgrade documentation <arch_overview_websocket>`.
+    google.protobuf.BoolValue enabled = 3;
   };
   repeated UpgradeConfig upgrade_configs = 23;
 
-  // If true, the order of encoder filters will be reversed to that of filters
-  // configured in the HTTP filter chain. Otherwise, it will keep the existing
-  // order.
-  // Note: this is a bug fix for Envoy, which is designed to have the reversed
-  // order of encode filters to that of decode ones, (see
-  // https://github.com/envoyproxy/envoy/issues/4599 for details). When we remove this field, envoy
-  // will have the same behavior when it sets true.
-  google.protobuf.BoolValue bugfix_reverse_encode_order = 27 [deprecated = true];
+  reserved 27;
 }
 
 message Rds {
@@ -403,9 +414,8 @@ message HttpFilter {
   // Filter specific configuration which depends on the filter being instantiated. See the supported
   // filters for further documentation.
   oneof config_type {
-    google.protobuf.Struct config = 2;
+    google.protobuf.Struct config = 2 [deprecated = true];
 
-    // [#not-implemented-hide:]
     google.protobuf.Any typed_config = 4;
   }
 

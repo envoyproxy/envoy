@@ -11,8 +11,10 @@ namespace Tcp {
 
 ConnPoolImpl::ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                            Upstream::ResourcePriority priority,
-                           const Network::ConnectionSocket::OptionsSharedPtr& options)
+                           const Network::ConnectionSocket::OptionsSharedPtr& options,
+                           Network::TransportSocketOptionsSharedPtr transport_socket_options)
     : dispatcher_(dispatcher), host_(host), priority_(priority), socket_options_(options),
+      transport_socket_options_(transport_socket_options),
       upstream_ready_timer_(dispatcher_.createTimer([this]() { onUpstreamReady(); })) {}
 
 ConnPoolImpl::~ConnPoolImpl() {
@@ -354,10 +356,10 @@ ConnPoolImpl::ActiveConn::ActiveConn(ConnPoolImpl& parent)
       remaining_requests_(parent_.host_->cluster().maxRequestsPerConnection()), timed_out_(false) {
 
   parent_.conn_connect_ms_ = std::make_unique<Stats::Timespan>(
-      parent_.host_->cluster().stats().upstream_cx_connect_ms_, parent_.dispatcher_.timeSystem());
+      parent_.host_->cluster().stats().upstream_cx_connect_ms_, parent_.dispatcher_.timeSource());
 
-  Upstream::Host::CreateConnectionData data =
-      parent_.host_->createConnection(parent_.dispatcher_, parent_.socket_options_);
+  Upstream::Host::CreateConnectionData data = parent_.host_->createConnection(
+      parent_.dispatcher_, parent_.socket_options_, parent_.transport_socket_options_);
   real_host_description_ = data.host_description_;
 
   conn_ = std::move(data.connection_);
@@ -374,7 +376,7 @@ ConnPoolImpl::ActiveConn::ActiveConn(ConnPoolImpl& parent)
   parent_.host_->stats().cx_total_.inc();
   parent_.host_->stats().cx_active_.inc();
   conn_length_ = std::make_unique<Stats::Timespan>(
-      parent_.host_->cluster().stats().upstream_cx_length_ms_, parent_.dispatcher_.timeSystem());
+      parent_.host_->cluster().stats().upstream_cx_length_ms_, parent_.dispatcher_.timeSource());
   connect_timer_->enableTimer(parent_.host_->cluster().connectTimeout());
   parent_.host_->cluster().resourceManager(parent_.priority_).connections().inc();
 

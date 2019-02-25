@@ -134,6 +134,11 @@ public:
    * @return bool Whether CORS is enabled for the route or virtual host.
    */
   virtual bool enabled() const PURE;
+
+  /**
+   * @return bool Whether CORS policies are evaluated when filter is off.
+   */
+  virtual bool shadowEnabled() const PURE;
 };
 
 /**
@@ -201,7 +206,12 @@ public:
 /**
  * RetryStatus whether request should be retried or not.
  */
-enum class RetryStatus { No, NoOverflow, Yes };
+enum class RetryStatus { No, NoOverflow, NoRetryLimitExceeded, Yes };
+
+/**
+ * InternalRedirectAction from the route configuration.
+ */
+enum class InternalRedirectAction { PassThrough, Handle };
 
 /**
  * Wraps retry state for an active routed request.
@@ -250,12 +260,12 @@ public:
   /**
    * Returns a reference to the PriorityLoad that should be used for the next retry.
    * @param priority_set current priority set.
-   * @param priority_load original priority load.
-   * @return PriorityLoad that should be used to select a priority for the next retry.
+   * @param original_priority_load original priority load.
+   * @return HealthyAndDegradedLoad that should be used to select a priority for the next retry.
    */
-  virtual const Upstream::PriorityLoad&
+  virtual const Upstream::HealthyAndDegradedLoad&
   priorityLoadForRetry(const Upstream::PrioritySet& priority_set,
-                       const Upstream::PriorityLoad& priority_load) PURE;
+                       const Upstream::HealthyAndDegradedLoad& original_priority_load) PURE;
   /**
    * return how many times host selection should be reattempted during host selection.
    */
@@ -284,6 +294,12 @@ public:
    *         increments.
    */
   virtual const std::string& runtimeKey() const PURE;
+
+  /**
+   * @return the default fraction of traffic the should be shadowed, if the runtime key is not
+   *         present.
+   */
+  virtual const envoy::type::FractionalPercent& defaultValue() const PURE;
 };
 
 /**
@@ -393,6 +409,32 @@ public:
   virtual absl::optional<uint64_t>
   generateHash(const Network::Address::Instance* downstream_address, const Http::HeaderMap& headers,
                AddCookieCallback add_cookie) const PURE;
+};
+
+/**
+ * Route level hedging policy.
+ */
+class HedgePolicy {
+public:
+  virtual ~HedgePolicy() {}
+
+  /**
+   * @return number of upstream requests that should be sent initially.
+   */
+  virtual uint32_t initialRequests() const PURE;
+
+  /**
+   * @return percent chance that an additional upstream request should be sent
+   * on top of the value from initialRequests().
+   */
+  virtual const envoy::type::FractionalPercent& additionalRequestChance() const PURE;
+
+  /**
+   * @return bool indicating whether request hedging should occur when a request
+   * is retried due to a per try timeout. The alternative is the original request
+   * will be canceled immediately.
+   */
+  virtual bool hedgeOnPerTryTimeout() const PURE;
 };
 
 class MetadataMatchCriterion {
@@ -513,6 +555,12 @@ public:
   virtual const HashPolicy* hashPolicy() const PURE;
 
   /**
+   * @return const HedgePolicy& the hedge policy for the route. All routes have a hedge policy even
+   *         if it is empty and does not allow for hedged requests.
+   */
+  virtual const HedgePolicy& hedgePolicy() const PURE;
+
+  /**
    * @return the priority of the route.
    */
   virtual Upstream::ResourcePriority priority() const PURE;
@@ -624,6 +672,17 @@ public:
    * @return bool whether x-envoy-attempt-count should be included on the upstream request.
    */
   virtual bool includeAttemptCount() const PURE;
+
+  typedef std::map<std::string, bool> UpgradeMap;
+  /**
+   * @return a map of route-specific upgrades to their enabled/disabled status.
+   */
+  virtual const UpgradeMap& upgradeMap() const PURE;
+
+  /**
+   * @returns the internal redirect action which should be taken on this route.
+   */
+  virtual InternalRedirectAction internalRedirectAction() const PURE;
 };
 
 /**

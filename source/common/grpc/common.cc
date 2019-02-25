@@ -18,33 +18,20 @@
 #include "common/http/utility.h"
 #include "common/protobuf/protobuf.h"
 
+#include "absl/strings/match.h"
+
 namespace Envoy {
 namespace Grpc {
 
 bool Common::hasGrpcContentType(const Http::HeaderMap& headers) {
   const Http::HeaderEntry* content_type = headers.ContentType();
-  if (content_type == nullptr) {
-    return false;
-  }
-  // Fail fast if this is not gRPC.
-  if (!StringUtil::startsWith(content_type->value().c_str(),
-                              Http::Headers::get().ContentTypeValues.Grpc)) {
-    return false;
-  }
-  // Exact match with application/grpc. This and the above case are likely the
-  // two most common encountered.
-  if (content_type->value() == Http::Headers::get().ContentTypeValues.Grpc.c_str()) {
-    return true;
-  }
-  // Prefix match with application/grpc+. It's not sufficient to rely on the an
-  // application/grpc prefix match, since there are related content types such as
-  // application/grpc-web.
-  if (content_type->value().size() > Http::Headers::get().ContentTypeValues.Grpc.size() &&
-      content_type->value().c_str()[Http::Headers::get().ContentTypeValues.Grpc.size()] == '+') {
-    return true;
-  }
-  // This must be something like application/grpc-web.
-  return false;
+  // Content type is gRPC if it is exactly "application/grpc" or starts with
+  // "application/grpc+". Specifically, something like application/grpc-web is not gRPC.
+  return content_type != nullptr &&
+         absl::StartsWith(content_type->value().getStringView(),
+                          Http::Headers::get().ContentTypeValues.Grpc) &&
+         (content_type->value().size() == Http::Headers::get().ContentTypeValues.Grpc.size() ||
+          content_type->value().c_str()[Http::Headers::get().ContentTypeValues.Grpc.size()] == '+');
 }
 
 bool Common::isGrpcResponseHeader(const Http::HeaderMap& headers, bool end_stream) {
@@ -70,7 +57,7 @@ void Common::chargeStat(const Upstream::ClusterInfo& cluster, const std::string&
       .inc();
   uint64_t grpc_status_code;
   const bool success =
-      StringUtil::atoul(grpc_status->value().c_str(), grpc_status_code) && grpc_status_code == 0;
+      StringUtil::atoull(grpc_status->value().c_str(), grpc_status_code) && grpc_status_code == 0;
   chargeStat(cluster, protocol, grpc_service, grpc_method, success);
 }
 
@@ -98,8 +85,8 @@ absl::optional<Status::GrpcStatus> Common::getGrpcStatus(const Http::HeaderMap& 
   if (!grpc_status_header || grpc_status_header->value().empty()) {
     return absl::optional<Status::GrpcStatus>();
   }
-  if (!StringUtil::atoul(grpc_status_header->value().c_str(), grpc_status_code) ||
-      grpc_status_code > Status::GrpcStatus::Unauthenticated) {
+  if (!StringUtil::atoull(grpc_status_header->value().c_str(), grpc_status_code) ||
+      grpc_status_code > Status::GrpcStatus::MaximumValid) {
     return absl::optional<Status::GrpcStatus>(Status::GrpcStatus::InvalidCode);
   }
   return absl::optional<Status::GrpcStatus>(static_cast<Status::GrpcStatus>(grpc_status_code));
@@ -152,7 +139,7 @@ std::chrono::milliseconds Common::getGrpcTimeout(Http::HeaderMap& request_header
   if (header_grpc_timeout_entry) {
     uint64_t grpc_timeout;
     const char* unit =
-        StringUtil::strtoul(header_grpc_timeout_entry->value().c_str(), grpc_timeout);
+        StringUtil::strtoull(header_grpc_timeout_entry->value().c_str(), grpc_timeout);
     if (unit != nullptr && *unit != '\0') {
       switch (*unit) {
       case 'H':

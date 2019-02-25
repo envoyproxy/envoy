@@ -32,6 +32,7 @@ public:
   const std::string& get() const { return string_; }
   bool operator==(const LowerCaseString& rhs) const { return string_ == rhs.string_; }
   bool operator!=(const LowerCaseString& rhs) const { return string_ != rhs.string_; }
+  bool operator<(const LowerCaseString& rhs) const { return string_.compare(rhs.string_) < 0; }
 
 private:
   void lower() { std::transform(string_.begin(), string_.end(), string_.begin(), tolower); }
@@ -50,6 +51,12 @@ struct LowerCaseStringHash {
  * Convenient type for unordered set of lower case string.
  */
 typedef std::unordered_set<LowerCaseString, LowerCaseStringHash> LowerCaseStrUnorderedSet;
+
+/**
+ * Convenient type for a vector of lower case string and string pair.
+ */
+typedef std::vector<std::pair<const Http::LowerCaseString, const std::string>>
+    LowerCaseStrPairVector;
 
 /**
  * This is a string implementation for use in header processing. It is heavily optimized for
@@ -187,14 +194,16 @@ public:
   virtual const HeaderString& key() const PURE;
 
   /**
-   * Set the header value by copying data into it.
+   * Set the header value by copying data into it (deprecated, use absl::string_view variant
+   * instead).
+   * TODO(htuch): Cleanup deprecated call sites.
    */
   virtual void value(const char* value, uint32_t size) PURE;
 
   /**
    * Set the header value by copying data into it.
    */
-  virtual void value(const std::string& value) PURE;
+  virtual void value(absl::string_view value) PURE;
 
   /**
    * Set the header value by copying an integer into it.
@@ -245,6 +254,7 @@ private:
   HEADER_FUNC(ContentType)                                                                         \
   HEADER_FUNC(Date)                                                                                \
   HEADER_FUNC(EnvoyAttemptCount)                                                                   \
+  HEADER_FUNC(EnvoyDegraded)                                                                       \
   HEADER_FUNC(EnvoyDecoratorOperation)                                                             \
   HEADER_FUNC(EnvoyDownstreamServiceCluster)                                                       \
   HEADER_FUNC(EnvoyDownstreamServiceNode)                                                          \
@@ -256,6 +266,7 @@ private:
   HEADER_FUNC(EnvoyIpTags)                                                                         \
   HEADER_FUNC(EnvoyMaxRetries)                                                                     \
   HEADER_FUNC(EnvoyOriginalPath)                                                                   \
+  HEADER_FUNC(EnvoyOriginalUrl)                                                                    \
   HEADER_FUNC(EnvoyOverloaded)                                                                     \
   HEADER_FUNC(EnvoyRateLimited)                                                                    \
   HEADER_FUNC(EnvoyRetryOn)                                                                        \
@@ -280,6 +291,7 @@ private:
   HEADER_FUNC(Host)                                                                                \
   HEADER_FUNC(KeepAlive)                                                                           \
   HEADER_FUNC(LastModified)                                                                        \
+  HEADER_FUNC(Location)                                                                            \
   HEADER_FUNC(Method)                                                                              \
   HEADER_FUNC(NoChunks)                                                                            \
   HEADER_FUNC(Origin)                                                                              \

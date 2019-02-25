@@ -8,7 +8,7 @@ void HeaderToInt(const char header_name[], int32_t& return_int, Http::TestHeader
   std::string header_value = headers.get_(header_name);
   if (!header_value.empty()) {
     uint64_t parsed_value;
-    RELEASE_ASSERT(StringUtil::atoul(header_value.c_str(), parsed_value, 10) &&
+    RELEASE_ASSERT(StringUtil::atoull(header_value.c_str(), parsed_value, 10) &&
                        parsed_value < std::numeric_limits<int32_t>::max(),
                    "");
     return_int = parsed_value;
@@ -66,7 +66,8 @@ AutonomousHttpConnection::AutonomousHttpConnection(SharedConnectionWrapper& shar
     : FakeHttpConnection(shared_connection, store, type, upstream.timeSystem()),
       upstream_(upstream) {}
 
-Http::StreamDecoder& AutonomousHttpConnection::newStream(Http::StreamEncoder& response_encoder) {
+Http::StreamDecoder& AutonomousHttpConnection::newStream(Http::StreamEncoder& response_encoder,
+                                                         bool) {
   auto stream = new AutonomousStream(*this, response_encoder, upstream_);
   streams_.push_back(FakeStreamPtr{stream});
   return *(stream);

@@ -73,7 +73,7 @@ private:
 
 class HistogramTest : public testing::Test {
 public:
-  typedef std::map<std::string, ParentHistogramSharedPtr> NameHistogramMap;
+  using NameHistogramMap = std::map<std::string, ParentHistogramSharedPtr>;
 
   HistogramTest() : alloc_(options_) {}
 
@@ -129,13 +129,21 @@ public:
 
     NameHistogramMap name_histogram_map = makeHistogramMap(histogram_list);
     const ParentHistogramSharedPtr& h1 = name_histogram_map["h1"];
-    EXPECT_EQ(h1->cumulativeStatistics().summary(), h1_cumulative_statistics.summary());
-    EXPECT_EQ(h1->intervalStatistics().summary(), h1_interval_statistics.summary());
+    EXPECT_EQ(h1->cumulativeStatistics().quantileSummary(),
+              h1_cumulative_statistics.quantileSummary());
+    EXPECT_EQ(h1->intervalStatistics().quantileSummary(), h1_interval_statistics.quantileSummary());
+    EXPECT_EQ(h1->cumulativeStatistics().bucketSummary(), h1_cumulative_statistics.bucketSummary());
+    EXPECT_EQ(h1->intervalStatistics().bucketSummary(), h1_interval_statistics.bucketSummary());
 
     if (histogram_list.size() > 1) {
       const ParentHistogramSharedPtr& h2 = name_histogram_map["h2"];
-      EXPECT_EQ(h2->cumulativeStatistics().summary(), h2_cumulative_statistics.summary());
-      EXPECT_EQ(h2->intervalStatistics().summary(), h2_interval_statistics.summary());
+      EXPECT_EQ(h2->cumulativeStatistics().quantileSummary(),
+                h2_cumulative_statistics.quantileSummary());
+      EXPECT_EQ(h2->intervalStatistics().quantileSummary(),
+                h2_interval_statistics.quantileSummary());
+      EXPECT_EQ(h2->cumulativeStatistics().bucketSummary(),
+                h2_cumulative_statistics.bucketSummary());
+      EXPECT_EQ(h2->intervalStatistics().bucketSummary(), h2_interval_statistics.bucketSummary());
     }
 
     h1_interval_values_.clear();
@@ -630,6 +638,36 @@ public:
   HeapStatDataAllocator heap_alloc_;
 };
 
+TEST_F(HeapStatsThreadLocalStoreTest, RemoveRejectedStats) {
+  Counter& counter = store_->counter("c1");
+  Gauge& gauge = store_->gauge("g1");
+  Histogram& histogram = store_->histogram("h1");
+  ASSERT_EQ(2, store_->counters().size()); // "stats.overflow" and "c1".
+  EXPECT_TRUE(&counter == store_->counters()[0].get() ||
+              &counter == store_->counters()[1].get()); // counters() order is non-deterministic.
+  ASSERT_EQ(1, store_->gauges().size());
+  EXPECT_EQ("g1", store_->gauges()[0]->name());
+  ASSERT_EQ(1, store_->histograms().size());
+  EXPECT_EQ("h1", store_->histograms()[0]->name());
+
+  // Will effectively block all stats, and remove all the non-matching stats.
+  envoy::config::metrics::v2::StatsConfig stats_config;
+  stats_config.mutable_stats_matcher()->mutable_inclusion_list()->add_patterns()->set_exact(
+      "no-such-stat");
+  store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config));
+
+  // They can no longer be found.
+  EXPECT_EQ(0, store_->counters().size());
+  EXPECT_EQ(0, store_->gauges().size());
+  EXPECT_EQ(0, store_->histograms().size());
+
+  // However, referencing the previously allocated stats will not crash.
+  counter.inc();
+  gauge.inc();
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(histogram), 42));
+  histogram.recordValue(42);
+}
+
 TEST_F(HeapStatsThreadLocalStoreTest, NonHotRestartNoTruncation) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
@@ -641,7 +679,7 @@ TEST_F(HeapStatsThreadLocalStoreTest, NonHotRestartNoTruncation) {
   store_->counter(name_1);
 
   // This works fine, and we can find it by its long name because heap-stats do not
-  // get truncsated.
+  // get truncated.
   EXPECT_NE(nullptr, TestUtility::findCounter(*store_, name_1).get());
 }
 
@@ -820,8 +858,18 @@ TEST_F(HistogramTest, BasicHistogramSummaryValidate) {
   const std::string h1_expected_summary =
       "P0: 1, P25: 1.025, P50: 1.05, P75: 1.075, P90: 1.09, P95: 1.095, "
       "P99: 1.099, P99.5: 1.0995, P99.9: 1.0999, P100: 1.1";
-  const std::string h2_expected_summary = "P0: 0, P25: 25, P50: 50, P75: 75, P90: 90, P95: 95, "
-                                          "P99: 99, P99.5: 99.5, P99.9: 99.9, P100: 100";
+  const std::string h2_expected_summary =
+      "P0: 0, P25: 25, P50: 50, P75: 75, P90: 90, P95: 95, P99: 99, "
+      "P99.5: 99.5, P99.9: 99.9, P100: 100";
+
+  const std::string h1_expected_buckets =
+      "B0.5: 0, B1: 0, B5: 1, B10: 1, B25: 1, B50: 1, B100: 1, B250: 1, "
+      "B500: 1, B1000: 1, B2500: 1, B5000: 1, B10000: 1, B30000: 1, B60000: 1, "
+      "B300000: 1, B600000: 1, B1.8e+06: 1, B3.6e+06: 1";
+  const std::string h2_expected_buckets =
+      "B0.5: 1, B1: 1, B5: 5, B10: 10, B25: 25, B50: 50, B100: 100, B250: 100, "
+      "B500: 100, B1000: 100, B2500: 100, B5000: 100, B10000: 100, B30000: 100, "
+      "B60000: 100, B300000: 100, B600000: 100, B1.8e+06: 100, B3.6e+06: 100";
 
   for (size_t i = 0; i < 100; ++i) {
     expectCallAndAccumulate(h2, i);
@@ -830,8 +878,12 @@ TEST_F(HistogramTest, BasicHistogramSummaryValidate) {
   EXPECT_EQ(2, validateMerge());
 
   NameHistogramMap name_histogram_map = makeHistogramMap(store_->histograms());
-  EXPECT_EQ(h1_expected_summary, name_histogram_map["h1"]->cumulativeStatistics().summary());
-  EXPECT_EQ(h2_expected_summary, name_histogram_map["h2"]->cumulativeStatistics().summary());
+  EXPECT_EQ(h1_expected_summary,
+            name_histogram_map["h1"]->cumulativeStatistics().quantileSummary());
+  EXPECT_EQ(h2_expected_summary,
+            name_histogram_map["h2"]->cumulativeStatistics().quantileSummary());
+  EXPECT_EQ(h1_expected_buckets, name_histogram_map["h1"]->cumulativeStatistics().bucketSummary());
+  EXPECT_EQ(h2_expected_buckets, name_histogram_map["h2"]->cumulativeStatistics().bucketSummary());
 }
 
 // Validates the summary after known value merge in to same histogram.
@@ -850,9 +902,15 @@ TEST_F(HistogramTest, BasicHistogramMergeSummary) {
 
   const std::string expected_summary = "P0: 0, P25: 25, P50: 50, P75: 75, P90: 90, P95: 95, P99: "
                                        "99, P99.5: 99.5, P99.9: 99.9, P100: 100";
+  const std::string expected_bucket_summary =
+      "B0.5: 1, B1: 1, B5: 5, B10: 10, B25: 25, B50: 50, B100: 100, B250: 100, "
+      "B500: 100, B1000: 100, B2500: 100, B5000: 100, B10000: 100, B30000: 100, "
+      "B60000: 100, B300000: 100, B600000: 100, B1.8e+06: 100, B3.6e+06: 100";
 
   NameHistogramMap name_histogram_map = makeHistogramMap(store_->histograms());
-  EXPECT_EQ(expected_summary, name_histogram_map["h1"]->cumulativeStatistics().summary());
+  EXPECT_EQ(expected_summary, name_histogram_map["h1"]->cumulativeStatistics().quantileSummary());
+  EXPECT_EQ(expected_bucket_summary,
+            name_histogram_map["h1"]->cumulativeStatistics().bucketSummary());
 }
 
 TEST_F(HistogramTest, BasicHistogramUsed) {
@@ -884,6 +942,58 @@ TEST_F(HistogramTest, BasicHistogramUsed) {
   for (const ParentHistogramSharedPtr& histogram : store_->histograms()) {
     EXPECT_TRUE(histogram->used());
   }
+}
+
+class TruncatingAllocTest : public HeapStatsThreadLocalStoreTest {
+protected:
+  TruncatingAllocTest() : test_alloc_(options_), long_name_(options_.maxNameLength() + 1, 'A') {}
+
+  void SetUp() override {
+    store_ = std::make_unique<ThreadLocalStoreImpl>(options_, test_alloc_);
+    // Do not call superclass SetUp.
+  }
+
+  TestAllocator test_alloc_;
+  std::string long_name_;
+};
+
+TEST_F(TruncatingAllocTest, CounterNotTruncated) {
+  EXPECT_NO_LOGS({
+    Counter& counter = store_->counter("simple");
+    EXPECT_EQ(&counter, &store_->counter("simple"));
+  });
+}
+
+TEST_F(TruncatingAllocTest, GaugeNotTruncated) {
+  EXPECT_NO_LOGS({
+    Gauge& gauge = store_->gauge("simple");
+    EXPECT_EQ(&gauge, &store_->gauge("simple"));
+  });
+}
+
+TEST_F(TruncatingAllocTest, CounterTruncated) {
+  Counter* counter = nullptr;
+  EXPECT_LOG_CONTAINS("warning", "is too long with", {
+    Counter& c = store_->counter(long_name_);
+    counter = &c;
+  });
+  EXPECT_NO_LOGS(EXPECT_EQ(counter, &store_->counter(long_name_)));
+}
+
+TEST_F(TruncatingAllocTest, GaugeTruncated) {
+  Gauge* gauge = nullptr;
+  EXPECT_LOG_CONTAINS("warning", "is too long with", {
+    Gauge& g = store_->gauge(long_name_);
+    gauge = &g;
+  });
+  EXPECT_NO_LOGS(EXPECT_EQ(gauge, &store_->gauge(long_name_)));
+}
+
+TEST_F(TruncatingAllocTest, HistogramWithLongNameNotTruncated) {
+  EXPECT_NO_LOGS({
+    Histogram& histogram = store_->histogram(long_name_);
+    EXPECT_EQ(&histogram, &store_->histogram(long_name_));
+  });
 }
 
 } // namespace Stats

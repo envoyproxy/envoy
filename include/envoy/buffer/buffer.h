@@ -22,6 +22,8 @@ namespace Buffer {
 struct RawSlice {
   void* mem_ = nullptr;
   size_t len_ = 0;
+
+  bool operator==(const RawSlice& rhs) const { return mem_ == rhs.mem_ && len_ == rhs.len_; }
 };
 
 /**
@@ -41,7 +43,7 @@ public:
   virtual size_t size() const PURE;
 
   /**
-   * Called by a buffer when the refernced data is no longer needed.
+   * Called by a buffer when the referenced data is no longer needed.
    */
   virtual void done() PURE;
 
@@ -57,7 +59,9 @@ public:
   virtual ~Instance() {}
 
   /**
-   * Copy data into the buffer.
+   * Copy data into the buffer (deprecated, use absl::string_view variant
+   * instead).
+   * TODO(htuch): Cleanup deprecated call sites.
    * @param data supplies the data address.
    * @param size supplies the data size.
    */
@@ -74,7 +78,7 @@ public:
    * Copy a string into the buffer.
    * @param data supplies the string to copy.
    */
-  virtual void add(const std::string& data) PURE;
+  virtual void add(absl::string_view data) PURE;
 
   /**
    * Copy another buffer into this buffer.
@@ -96,8 +100,10 @@ public:
   virtual void prepend(Instance& data) PURE;
 
   /**
-   * Commit a set of slices originally obtained from reserve(). The number of slices can be
-   * different from the number obtained from reserve(). The size of each slice can also be altered.
+   * Commit a set of slices originally obtained from reserve(). The number of slices should match
+   * the number obtained from reserve(). The size of each slice can also be altered. Commit must
+   * occur following a reserve() without any mutating operations in between other than to the iovecs
+   * len_ fields.
    * @param iovecs supplies the array of slices to commit.
    * @param num_iovecs supplies the size of the slices array.
    */
@@ -244,10 +250,14 @@ public:
     constexpr const auto most_significant_read_byte =
         Endianness == ByteOrder::BigEndian ? displacement : Size - 1;
 
+    // If Size == sizeof(T), we need to make sure we don't generate an invalid left shift
+    // (e.g. int32 << 32), even though we know that that branch of the conditional will.
+    // not be taken. Size % sizeof(T) gives us the correct left shift when Size < sizeof(T),
+    // and generates a left shift of 0 bits when Size == sizeof(T)
     const auto sign_extension_bits =
         std::is_signed<T>::value && Size < sizeof(T) && bytes[most_significant_read_byte] < 0
             ? static_cast<T>(static_cast<typename std::make_unsigned<T>::type>(all_bits_enabled)
-                             << (Size * CHAR_BIT))
+                             << ((Size % sizeof(T)) * CHAR_BIT))
             : static_cast<T>(0);
 
     return fromEndianness<Endianness>(static_cast<T>(result)) | sign_extension_bits;

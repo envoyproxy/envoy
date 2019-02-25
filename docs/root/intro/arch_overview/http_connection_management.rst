@@ -48,24 +48,37 @@ table <arch_overview_http_routing>`. The route table can be specified in one of 
 Retry plugin configuration
 --------------------------
 
-Normally during retries, hosts selected for retry attempts will be selected the same way the
-initial request is selected. To modify this behavior retry plugins can be used, which fall into
-two categories:
+Normally during retries, hosts selection follows the same process as the original request. To modify 
+this behavior retry plugins can be used, which fall into two categories:
 
-* :ref:`Retry host predicate <envoy_api_field_route.RouteAction.RetryPolicy.retry_host_predicate>`.
-  These can be used to "reject" a host, which will cause host selection to be reattempted. If one or
-  more predicates have been configured, host selection will continue until either the host predicates
-  accept the host or a configurable
-  :ref:`max attempts <envoy_api_field_route.RouteAction.RetryPolicy.host_selection_retry_max_attempts>`
-  has been reached. Any number of these predicates can be specified, and the host will be rejected if
-  any of the predicates reject the host.
-* :ref:`Retry priority <envoy_api_field_route.RouteAction.RetryPolicy.retry_priority>`. These can
+* :ref:`Host Predicates <envoy_api_field_route.RetryPolicy.retry_host_predicate>`:
+  These predicates can be used to "reject" a host, which will cause host selection to be reattempted. 
+  Any number of these predicates can be specified, and the host will be rejected if any of the predicates reject the host. 
+
+  Envoy supports the following built-in host predicates
+
+  * *envoy.retry_host_predicates.previous_hosts*: This will keep track of previously attempted hosts, and rejects
+    hosts that have already been attempted.
+  
+* :ref:`Priority Predicates<envoy_api_field_route.RetryPolicy.retry_priority>`: These predicates can
   be used to adjust the priority load used when selecting a priority for a retry attempt. Only one such
-  plugin may be specified.
+  predicate may be specified.
 
-These plugins can be combined to affect both host selection and priority load.
+  Envoy supports the following built-in priority predicates
 
-For example, to configure retries to prefer hosts that haven't been attempted already, the builtin
+  * *envoy.retry_priority.previous_priorities*: This will keep track of previously attempted priorities, 
+    and adjust the priority load such that other priorities will be targeted in subsequent retry attempts.
+
+Host selection will continue until either the configured predicates accept the host or a configurable
+:ref:`max attempts <envoy_api_field_route.RetryPolicy.host_selection_retry_max_attempts>` has been reached. 
+
+These plugins can be combined to affect both host selection and priority load. Envoy can also be extended 
+with custom retry plugins similar to how custom filters can be added.
+
+
+**Configuration Example**
+
+For example, to configure retries to prefer hosts that haven't been attempted already, the built-in
 ``envoy.retry_host_predicates.previous_hosts`` predicate can be used:
 
 .. code-block:: yaml
@@ -80,7 +93,7 @@ on attempts is necessary in order to deal with scenarios in which finding an acc
 impossible (no hosts satisfy the predicate) or very unlikely (the only suitable host has a very low
 relative weight).
 
-To configure retries to attempt other priorities during retries, the built in
+To configure retries to attempt other priorities during retries, the built-in
 ``envoy.retry_priority.previous_priorities`` can be used.
 
 .. code-block:: yaml
@@ -91,8 +104,7 @@ To configure retries to attempt other priorities during retries, the built in
       config:
         update_frequency: 2
 
-This will keep track of previously attempted priorities, and adjust the priority load such that other
-priorites will be targeted in subsequent retry attempts. The ``update_frequency`` parameter decides how
+This will target priorities in subsequent retry attempts that haven't been already used. The ``update_frequency`` parameter decides how
 often the priority load should be recalculated.
 
 These plugins can be combined, which will exclude both previously attempted hosts as well as
@@ -109,7 +121,55 @@ previously attempted priorities.
       config:
         update_frequency: 2
 
-Envoy can be extended with custom retry plugins similar to how custom filters can be added.
+.. _arch_overview_internal_redirects:
+
+Internal redirects
+--------------------------
+
+Envoy supports handling 302 redirects internally, that is capturing a 302 redirect response,
+synthesizing a new request, sending it to the upstream specified by the new route match, and
+returning the redirected response as the response to the original request.
+
+Internal redirects are configured via the ref:`redirect action
+<envoy_api_field_route.RouteAction.redirect_action>` field in
+route configuration. When redirect handling is on, any 302 response from upstream is
+subject to the redirect being handled by Envoy.
+
+For a redirect to be handled successfully it must pass the following checks:
+
+1. Be a 302 response.
+2. Have a *location* header with a valid, fully qualified URL matching the scheme of the original request.
+3. The request must have been fully processed by Envoy.
+4. The request must not have a body.
+5. The request must have not been previously redirected, as determined by the presence of an x-envoy-original-url header.
+
+Any failure will result in redirect being passed downstream instead.
+
+Once the redirect has passed these checks, the request headers which were shipped to the original
+upstream will be modified by:
+
+1. Putting the fully qualified original request URL in the x-envoy-original-url header.
+2. Replacing the Authority/Host, Scheme, and Path headers with the values from the Location header.
+
+The altered request headers will then have a new route selected, be sent through a new filter chain,
+and then shipped upstream with all of the normal Envoy request sanitization taking place. 
+
+.. warning::
+  Note that HTTP connection manager sanitization such as clearing untrusted headers will only be
+  applied once. Per-route header modifications will be applied on both the original route and the
+  second route, even if they are the same, so be careful configuring header modification rules to
+  avoid duplicating undesired header values.
+
+A sample redirect flow might look like this:
+
+1. Client sends a GET request for *\http://foo.com/bar*
+2. Upstream 1 sends a 302 with  *"location: \http://baz.com/eep"*
+3. Envoy is configured to allow redirects on the original route, and sends a new GET request to
+   Upstream 2, to fetch *\http://baz.com/eep* with the additional request header
+   *"x-envoy-original-url: \http://foo.com/bar"*
+4. Envoy proxies the response data for *\http://baz.com/eep* to the client as the response to the original
+   request.
+
 
 Timeouts
 --------
@@ -130,7 +190,7 @@ Various configurable timeouts apply to an HTTP connection and its constituent st
 * Stream-level :ref:`per-route upstream timeout <envoy_api_field_route.RouteAction.timeout>`: this
   applies to the upstream response, i.e. a maximum bound on the time from the end of the downstream
   request until the end of the upstream response. This may also be specified at the :ref:`per-retry
-  <envoy_api_field_route.RouteAction.RetryPolicy.per_try_timeout>` granularity.
+  <envoy_api_field_route.RetryPolicy.per_try_timeout>` granularity.
 * Stream-level :ref:`per-route gRPC max timeout
   <envoy_api_field_route.RouteAction.max_grpc_timeout>`: this bounds the upstream timeout and allows
   the timeout to be overridden via the *grpc-timeout* request header.

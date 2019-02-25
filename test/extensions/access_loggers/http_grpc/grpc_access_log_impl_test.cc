@@ -24,9 +24,9 @@ namespace HttpGrpc {
 
 class GrpcAccessLogStreamerImplTest : public testing::Test {
 public:
-  typedef Grpc::MockAsyncStream MockAccessLogStream;
-  typedef Grpc::TypedAsyncStreamCallbacks<envoy::service::accesslog::v2::StreamAccessLogsResponse>
-      AccessLogCallbacks;
+  using MockAccessLogStream = Grpc::MockAsyncStream;
+  using AccessLogCallbacks =
+      Grpc::TypedAsyncStreamCallbacks<envoy::service::accesslog::v2::StreamAccessLogsResponse>;
 
   GrpcAccessLogStreamerImplTest() {
     EXPECT_CALL(*factory_, create()).WillOnce(Invoke([this] {
@@ -115,7 +115,7 @@ public:
 class HttpGrpcAccessLogTest : public testing::Test {
 public:
   void init() {
-    ON_CALL(*filter_, evaluate(_, _)).WillByDefault(Return(true));
+    ON_CALL(*filter_, evaluate(_, _, _, _)).WillByDefault(Return(true));
     config_.mutable_common_config()->set_log_name("hello_log");
     access_log_ =
         std::make_unique<HttpGrpcAccessLog>(AccessLog::FilterPtr{filter_}, config_, streamer_);
@@ -441,6 +441,9 @@ TEST(responseFlagsToAccessLogResponseFlagsTest, All) {
       envoy::data::accesslog::v2::ResponseFlags_Unauthorized_Reason::
           ResponseFlags_Unauthorized_Reason_EXTERNAL_SERVICE);
   common_access_log_expected.mutable_response_flags()->set_rate_limit_service_error(true);
+  common_access_log_expected.mutable_response_flags()->set_downstream_connection_termination(true);
+  common_access_log_expected.mutable_response_flags()->set_upstream_retry_limit_exceeded(true);
+  common_access_log_expected.mutable_response_flags()->set_stream_idle_timeout(true);
 
   EXPECT_EQ(common_access_log_expected.DebugString(), common_access_log.DebugString());
 }

@@ -4,9 +4,10 @@ namespace Envoy {
 namespace Extensions {
 namespace Retry {
 namespace Priority {
-const Upstream::PriorityLoad& PreviousPrioritiesRetryPriority::determinePriorityLoad(
+
+const Upstream::HealthyAndDegradedLoad& PreviousPrioritiesRetryPriority::determinePriorityLoad(
     const Upstream::PrioritySet& priority_set,
-    const Upstream::PriorityLoad& original_priority_load) {
+    const Upstream::HealthyAndDegradedLoad& original_priority_load) {
   // If we've not seen enough retries to modify the priority load, just
   // return the original.
   // If this retry should trigger an update, recalculate the priority load by excluding attempted
@@ -36,41 +37,59 @@ bool PreviousPrioritiesRetryPriority::adjustForAttemptedPriorities(
     recalculatePerPriorityState(host_set->priority(), priority_set);
   }
 
-  auto adjustedHealthAndSum = adjustedHealth();
-  // If there are no healthy priorities left, we reset the attempted priorities and recompute the
-  // adjusted health.
-  // This allows us to fall back to the unmodified priority load when we run out of priorites
+  std::vector<uint32_t> adjusted_per_priority_health(per_priority_health_.get().size(), 0);
+  std::vector<uint32_t> adjusted_per_priority_degraded(per_priority_degraded_.get().size(), 0);
+  auto total_availability =
+      adjustedAvailability(adjusted_per_priority_health, adjusted_per_priority_degraded);
+
+  // If there are no available priorities left, we reset the attempted priorities and recompute the
+  // adjusted availability.
+  // This allows us to fall back to the unmodified priority load when we run out of priorities
   // instead of failing to route requests.
-  if (adjustedHealthAndSum.second == 0) {
+  if (total_availability == 0) {
     for (size_t i = 0; i < excluded_priorities_.size(); ++i) {
       excluded_priorities_[i] = false;
     }
     attempted_priorities_.clear();
-    adjustedHealthAndSum = adjustedHealth();
+    total_availability =
+        adjustedAvailability(adjusted_per_priority_health, adjusted_per_priority_degraded);
   }
 
-  const auto& adjusted_per_priority_health = adjustedHealthAndSum.first;
-  auto total_health = adjustedHealthAndSum.second;
-
-  // If total health is still zero at this point, it must mean that all clusters are
-  // completely unhealthy. If so, fall back to using the original priority set. This mantains
-  // whatever handling the default LB uses when all priorities are unhealthy.
-  if (total_health == 0) {
+  // If total availability is still zero at this point, it must mean that all clusters are
+  // completely unavailable. If so, fall back to using the original priority loads. This maintains
+  // whatever handling the default LB uses when all priorities are unavailable.
+  if (total_availability == 0) {
     return false;
   }
 
-  std::fill(per_priority_load_.begin(), per_priority_load_.end(), 0);
-  // We then adjust the load by rebalancing priorities with the adjusted health values.
+  std::fill(per_priority_load_.healthy_priority_load_.get().begin(),
+            per_priority_load_.healthy_priority_load_.get().end(), 0);
+  std::fill(per_priority_load_.degraded_priority_load_.get().begin(),
+            per_priority_load_.degraded_priority_load_.get().end(), 0);
+
+  // TODO(snowp): This code is basically distributeLoad from load_balancer_impl.cc, should probably
+  // reuse that.
+
+  // We then adjust the load by rebalancing priorities with the adjusted availability values.
   size_t total_load = 100;
   // The outer loop is used to eliminate rounding errors: any remaining load will be assigned to the
-  // first healthy priority.
+  // first availability priority.
   while (total_load != 0) {
     for (size_t i = 0; i < adjusted_per_priority_health.size(); ++i) {
       // Now assign as much load as possible to the high priority levels and cease assigning load
       // when total_load runs out.
-      auto delta =
-          std::min<uint32_t>(total_load, adjusted_per_priority_health[i] * 100 / total_health);
-      per_priority_load_[i] += delta;
+      const auto delta = std::min<uint32_t>(total_load, adjusted_per_priority_health[i] * 100 /
+                                                            total_availability);
+      per_priority_load_.healthy_priority_load_.get()[i] += delta;
+      total_load -= delta;
+    }
+
+    for (size_t i = 0; i < adjusted_per_priority_degraded.size(); ++i) {
+      // Now assign as much load as possible to the high priority levels and cease assigning load
+      // when total_load runs out.
+      const auto delta = std::min<uint32_t>(total_load, adjusted_per_priority_degraded[i] * 100 /
+                                                            total_availability);
+      per_priority_load_.degraded_priority_load_.get()[i] += delta;
       total_load -= delta;
     }
   }
@@ -78,20 +97,29 @@ bool PreviousPrioritiesRetryPriority::adjustForAttemptedPriorities(
   return true;
 }
 
-std::pair<std::vector<uint32_t>, uint32_t> PreviousPrioritiesRetryPriority::adjustedHealth() const {
+uint32_t PreviousPrioritiesRetryPriority::adjustedAvailability(
+    std::vector<uint32_t>& adjusted_per_priority_health,
+    std::vector<uint32_t>& adjusted_per_priority_degraded) const {
+  // Create an adjusted view of the priorities, where attempted priorities are given a zero load.
   // Create an adjusted health view of the priorities, where attempted priorities are
   // given a zero weight.
-  uint32_t total_health = 0;
-  std::vector<uint32_t> adjusted_per_priority_health(per_priority_health_.size(), 0);
+  uint32_t total_availability = 0;
 
-  for (size_t i = 0; i < per_priority_health_.size(); ++i) {
+  ASSERT(per_priority_health_.get().size() == per_priority_degraded_.get().size());
+
+  for (size_t i = 0; i < per_priority_health_.get().size(); ++i) {
     if (!excluded_priorities_[i]) {
-      adjusted_per_priority_health[i] = per_priority_health_[i];
-      total_health += per_priority_health_[i];
+      adjusted_per_priority_health[i] = per_priority_health_.get()[i];
+      adjusted_per_priority_degraded[i] = per_priority_degraded_.get()[i];
+      total_availability += per_priority_health_.get()[i];
+      total_availability += per_priority_degraded_.get()[i];
+    } else {
+      adjusted_per_priority_health[i] = 0;
+      adjusted_per_priority_degraded[i] = 0;
     }
   }
 
-  return {std::move(adjusted_per_priority_health), std::min(total_health, 100u)};
+  return std::min(total_availability, 100u);
 }
 
 } // namespace Priority

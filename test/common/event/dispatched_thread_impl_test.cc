@@ -9,7 +9,7 @@
 #include "test/mocks/common.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/stats/mocks.h"
-#include "test/test_common/test_time.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -23,15 +23,14 @@ namespace Event {
 class DispatchedThreadTest : public testing::Test {
 protected:
   DispatchedThreadTest()
-      : config_(1000, 1000, 1000, 1000), api_(std::chrono::milliseconds(1000)),
-        thread_(api_, test_time_.timeSystem()),
-        guard_dog_(fakestats_, config_, test_time_.timeSystem(), api_) {}
+      : config_(1000, 1000, 1000, 1000), api_(Api::createApiForTest(fakestats_)), thread_(*api_),
+        guard_dog_(fakestats_, config_, *api_) {}
 
-  void SetUp() { thread_.start(guard_dog_); }
+  void SetUp() override { thread_.start(guard_dog_); }
+
   NiceMock<Server::Configuration::MockMain> config_;
-  NiceMock<Stats::MockStore> fakestats_;
-  DangerousDeprecatedTestTime test_time_;
-  Api::Impl api_;
+  Stats::IsolatedStoreImpl fakestats_;
+  Api::ApiPtr api_;
   DispatchedThreadImpl thread_;
   Envoy::Server::GuardDogImpl guard_dog_;
 };

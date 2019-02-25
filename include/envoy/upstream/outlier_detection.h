@@ -7,6 +7,7 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
+#include "envoy/data/cluster/v2alpha/outlier_detection_event.pb.h"
 
 #include "absl/types/optional.h"
 
@@ -140,14 +141,15 @@ public:
    * @param type supplies the type of the event.
    * @param enforced is true if the ejection took place; false, if only logging took place.
    */
-  virtual void logEject(HostDescriptionConstSharedPtr host, Detector& detector, EjectionType type,
+  virtual void logEject(const HostDescriptionConstSharedPtr& host, Detector& detector,
+                        envoy::data::cluster::v2alpha::OutlierEjectionType type,
                         bool enforced) PURE;
 
   /**
    * Log an unejection event.
    * @param host supplies the host that generated the event.
    */
-  virtual void logUneject(HostDescriptionConstSharedPtr host) PURE;
+  virtual void logUneject(const HostDescriptionConstSharedPtr& host) PURE;
 };
 
 typedef std::shared_ptr<EventLogger> EventLoggerSharedPtr;

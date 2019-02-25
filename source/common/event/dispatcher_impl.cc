@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/api.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
 
@@ -18,21 +19,23 @@
 #include "common/network/connection_impl.h"
 #include "common/network/dns_impl.h"
 #include "common/network/listener_impl.h"
+#include "common/network/udp_listener_impl.h"
 
 #include "event2/event.h"
 
 namespace Envoy {
 namespace Event {
 
-DispatcherImpl::DispatcherImpl(TimeSystem& time_system)
-    : DispatcherImpl(time_system, Buffer::WatermarkFactoryPtr{new Buffer::WatermarkBufferFactory}) {
+DispatcherImpl::DispatcherImpl(Api::Api& api, Event::TimeSystem& time_system)
+    : DispatcherImpl(std::make_unique<Buffer::WatermarkBufferFactory>(), api, time_system) {
   // The dispatcher won't work as expected if libevent hasn't been configured to use threads.
   RELEASE_ASSERT(Libevent::Global::initialized(), "");
 }
 
-DispatcherImpl::DispatcherImpl(TimeSystem& time_system, Buffer::WatermarkFactoryPtr&& factory)
-    : time_system_(time_system), buffer_factory_(std::move(factory)), base_(event_base_new()),
-      scheduler_(time_system_.createScheduler(base_)),
+DispatcherImpl::DispatcherImpl(Buffer::WatermarkFactoryPtr&& factory, Api::Api& api,
+                               Event::TimeSystem& time_system)
+    : api_(api), buffer_factory_(std::move(factory)), base_(event_base_new()),
+      scheduler_(time_system.createScheduler(base_)),
       deferred_delete_timer_(createTimer([this]() -> void { clearDeferredDeleteList(); })),
       post_timer_(createTimer([this]() -> void { runPostCallbacks(); })),
       current_to_delete_(&to_delete_1_) {
@@ -116,6 +119,12 @@ DispatcherImpl::createListener(Network::Socket& socket, Network::ListenerCallbac
                                                         hand_off_restored_destination_connections)};
 }
 
+Network::ListenerPtr DispatcherImpl::createUdpListener(Network::Socket& socket,
+                                                       Network::UdpListenerCallbacks& cb) {
+  ASSERT(isThreadSafe());
+  return Network::ListenerPtr{new Network::UdpListenerImpl(*this, socket, cb)};
+}
+
 TimerPtr DispatcherImpl::createTimer(TimerCb cb) {
   ASSERT(isThreadSafe());
   return scheduler_->createTimer(cb);
@@ -151,7 +160,7 @@ void DispatcherImpl::post(std::function<void()> callback) {
 }
 
 void DispatcherImpl::run(RunType type) {
-  run_tid_ = Thread::currentThreadId();
+  run_tid_ = api_.threadFactory().currentThreadId();
 
   // Flush all post callbacks before we run the event loop. We do this because there are post
   // callbacks that have to get run before the initial event loop starts running. libevent does

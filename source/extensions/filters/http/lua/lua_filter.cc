@@ -118,7 +118,7 @@ int StreamHandleWrapper::luaRespond(lua_State* state) {
 
   uint64_t status;
   if (headers->Status() == nullptr ||
-      !StringUtil::atoul(headers->Status()->value().c_str(), status) || status < 200 ||
+      !StringUtil::atoull(headers->Status()->value().c_str(), status) || status < 200 ||
       status >= 600) {
     luaL_error(state, ":status must be between 200-599");
   }

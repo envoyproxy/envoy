@@ -13,7 +13,6 @@
 #include "common/common/fmt.h"
 #include "common/common/hash.h"
 #include "common/common/utility.h"
-#include "common/filesystem/filesystem_impl.h"
 
 // Do not let RapidJson leak outside of this file.
 #include "rapidjson/document.h"
@@ -24,6 +23,7 @@
 #include "rapidjson/stringbuffer.h"
 #include "rapidjson/writer.h"
 
+#include "absl/strings/match.h"
 #include "yaml-cpp/yaml.h"
 
 namespace Envoy {
@@ -181,7 +181,7 @@ private:
  * Custom stream to allow access to the line number for each object.
  */
 class LineCountingStringStream : public rapidjson::StringStream {
-  // Ch is typdef in parent class to handle character encoding.
+  // Ch is typedef in parent class to handle character encoding.
 public:
   LineCountingStringStream(const Ch* src) : rapidjson::StringStream(src), line_number_(1) {}
   Ch Take() {
@@ -682,11 +682,11 @@ bool ObjectHandler::handleValueEvent(FieldSharedPtr ptr) {
 
 } // namespace
 
-ObjectSharedPtr Factory::loadFromFile(const std::string& file_path) {
+ObjectSharedPtr Factory::loadFromFile(const std::string& file_path, Api::Api& api) {
   try {
-    const std::string contents = Filesystem::fileReadToEnd(file_path);
-    return StringUtil::endsWith(file_path, ".yaml") ? loadFromYamlString(contents)
-                                                    : loadFromString(contents);
+    const std::string contents = api.fileSystem().fileReadToEnd(file_path);
+    return absl::EndsWith(file_path, ".yaml") ? loadFromYamlString(contents)
+                                              : loadFromString(contents);
   } catch (EnvoyException& e) {
     throw Exception(e.what());
   }
