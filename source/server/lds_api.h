@@ -49,6 +49,8 @@ private:
   Stats::ScopePtr scope_;
   Upstream::ClusterManager& cm_;
   std::function<void()> initialize_callback_;
+  Event::TimerPtr initialization_timeout_timer_;
+  std::chrono::milliseconds initialization_timeout_;
 };
 
 } // namespace Server

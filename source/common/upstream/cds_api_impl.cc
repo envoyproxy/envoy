@@ -35,6 +35,23 @@ CdsApiImpl::CdsApiImpl(const envoy::api::v2::core::ConfigSource& cds_config, Clu
           cds_config, local_info, dispatcher, cm, random, *scope_,
           "envoy.api.v2.ClusterDiscoveryService.FetchClusters",
           "envoy.api.v2.ClusterDiscoveryService.StreamClusters", api);
+
+  initialization_timeout_ =
+      std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cds_config, initial_fetch_timeout, 0));
+  if (initialization_timeout_.count() > 0) {
+    initialization_timeout_timer_ = dispatcher.createTimer([this]() -> void {
+      ENVOY_LOG(warn, "cds: initialization timed out");
+      onConfigUpdateFailed(nullptr);
+    });
+  }
+}
+
+void CdsApiImpl::initialize() {
+  if (initialization_timeout_.count() > 0) {
+    ASSERT(initialization_timeout_timer_);
+    initialization_timeout_timer_->enableTimer(initialization_timeout_);
+  }
+  subscription_->start({}, *this);
 }
 
 void CdsApiImpl::onConfigUpdate(const ResourceVector& resources, const std::string& version_info) {
@@ -116,6 +133,10 @@ void CdsApiImpl::runInitializeCallbackIfAny() {
   if (initialize_callback_) {
     initialize_callback_();
     initialize_callback_ = nullptr;
+  }
+  if (initialization_timeout_timer_) {
+    initialization_timeout_timer_->disableTimer();
+    initialization_timeout_timer_.reset();
   }
 }
 

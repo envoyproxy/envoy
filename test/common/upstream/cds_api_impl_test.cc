@@ -34,6 +34,20 @@ protected:
   CdsApiImplTest() : request_(&cm_.async_client_), api_(Api::createApiForTest(store_)) {}
 
   void setup() {
+    envoy::api::v2::core::ConfigSource cds_config;
+    setupConfig(cds_config);
+    Upstream::ClusterManager::ClusterInfoMap cluster_map;
+    Upstream::MockClusterMockPrioritySet cluster;
+    setupClusters(cluster_map, cluster);
+
+    cds_ = CdsApiImpl::create(cds_config, cm_, dispatcher_, random_, local_info_, store_, *api_);
+    resetCdsInitializedCb();
+
+    expectRequest();
+    cds_->initialize();
+  }
+
+  void setupConfig(envoy::api::v2::core::ConfigSource& cds_config) {
     const std::string config_json = R"EOF(
     {
       "cluster": {
@@ -43,23 +57,19 @@ protected:
     )EOF";
 
     Json::ObjectSharedPtr config = Json::Factory::loadFromString(config_json);
-    envoy::api::v2::core::ConfigSource cds_config;
     Config::Utility::translateCdsConfig(*config, cds_config);
     cds_config.mutable_api_config_source()->set_api_type(
         envoy::api::v2::core::ApiConfigSource::REST);
-    Upstream::ClusterManager::ClusterInfoMap cluster_map;
-    Upstream::MockClusterMockPrioritySet cluster;
+  }
+
+  void setupClusters(Upstream::ClusterManager::ClusterInfoMap& cluster_map,
+                     Upstream::MockClusterMockPrioritySet& cluster) {
     cluster_map.emplace("foo_cluster", cluster);
     EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
     EXPECT_CALL(cluster, info());
     EXPECT_CALL(*cluster.info_, addedViaApi());
     EXPECT_CALL(cluster, info());
     EXPECT_CALL(*cluster.info_, type());
-    cds_ = CdsApiImpl::create(cds_config, cm_, dispatcher_, random_, local_info_, store_, *api_);
-    resetCdsInitializedCb();
-
-    expectRequest();
-    cds_->initialize();
   }
 
   void resetCdsInitializedCb() {
@@ -173,6 +183,7 @@ protected:
   Http::MockAsyncClientRequest request_;
   CdsApiPtr cds_;
   Event::MockTimer* interval_timer_;
+  Event::MockTimer* initialization_timeout_timer_;
   Http::AsyncClient::Callbacks* callbacks_{};
   ReadyWatcher initialized_;
   Api::ApiPtr api_;
@@ -541,6 +552,33 @@ resources:
   // Validate that the schema error increments update_rejected stat.
   EXPECT_EQ(1UL, store_.counter("cluster_manager.cds.update_rejected").value());
   EXPECT_EQ(0UL, store_.gauge("cluster_manager.cds.version").value());
+}
+
+TEST_F(CdsApiImplTest, InitializationTimeout) {
+  initialization_timeout_timer_ = new Event::MockTimer(&dispatcher_);
+  interval_timer_ = new Event::MockTimer(&dispatcher_);
+
+  envoy::api::v2::core::ConfigSource cds_config;
+  setupConfig(cds_config);
+  cds_config.mutable_initial_fetch_timeout()->set_seconds(10);
+
+  Upstream::ClusterManager::ClusterInfoMap cluster_map;
+  Upstream::MockClusterMockPrioritySet cluster;
+  {
+    InSequence s;
+    setupClusters(cluster_map, cluster);
+  }
+
+  auto cds = CdsApiImpl::create(cds_config, cm_, dispatcher_, random_, local_info_, store_, *api_);
+  cds->setInitializedCb([this]() -> void { initialized_.ready(); });
+
+  EXPECT_CALL(*initialization_timeout_timer_, enableTimer(std::chrono::milliseconds(10 * 1000)));
+  EXPECT_CALL(initialized_, ready()).Times(0);
+  cds->initialize();
+
+  EXPECT_CALL(initialized_, ready());
+  EXPECT_CALL(*initialization_timeout_timer_, disableTimer());
+  initialization_timeout_timer_->callback_();
 }
 
 } // namespace Upstream

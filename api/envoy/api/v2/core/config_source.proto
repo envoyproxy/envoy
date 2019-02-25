@@ -104,4 +104,11 @@ message ConfigSource {
     // source in the bootstrap configuration is used.
     AggregatedConfigSource ads = 3;
   }
+
+  // Optional initialization timeout.
+  // When this timeout is specified, the xDS API will be considered initialized after the specified
+  // time, even if the first config is not delivered yet. The timer is activated when the xDS API
+  // starts initializing, and is disarmed when it is initialized (successfully or not). 0 means no
+  // timeout - Envoy will wait indefinitely for the first xDS config. Default 0.
+  google.protobuf.Duration initial_fetch_timeout = 4;
 }
