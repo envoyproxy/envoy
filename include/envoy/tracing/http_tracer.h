@@ -53,6 +53,11 @@ public:
    * @return list of headers to populate tags on the active span.
    */
   virtual const std::vector<Http::LowerCaseString>& requestHeadersForTags() const PURE;
+
+  /**
+   * @return true if spans should be annotated with more detailed information.
+   */
+  virtual bool verbose() const PURE;
 };
 
 class Span;

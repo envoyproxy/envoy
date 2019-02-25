@@ -114,6 +114,7 @@ public:
   const std::vector<Http::LowerCaseString>& requestHeadersForTags() const override {
     return request_headers_for_tags_;
   }
+  bool verbose() const override { return false; }
 
 private:
   const std::vector<Http::LowerCaseString> request_headers_for_tags_;

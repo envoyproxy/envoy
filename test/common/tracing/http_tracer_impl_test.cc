@@ -219,6 +219,7 @@ TEST(HttpConnManFinalizerImpl, StreamInfoLogs) {
   EXPECT_CALL(span, log(log_timestamp, Tracing::Logs::get().LAST_DOWNSTREAM_TX_BYTE_SENT));
 
   NiceMock<MockConfig> config;
+  config.verbose_ = true;
   HttpTracerUtility::finalizeSpan(span, nullptr, stream_info, config);
 }
 
