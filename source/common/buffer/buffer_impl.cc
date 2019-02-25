@@ -133,7 +133,7 @@ Network::IoHandleCallUintResult OwnedImpl::read(Network::IoHandle& io_handle, ui
   const uint64_t num_slices = reserve(max_length, slices, MaxSlices);
   Network::IoHandleCallUintResult result = io_handle.readv(max_length, slices, num_slices);
   if (result.err_ == nullptr) {
-    // Read succeedsed.
+    // Read succeeded.
     uint64_t num_slices_to_commit = 0;
     uint64_t bytes_to_commit = result.rc_;
     ASSERT(bytes_to_commit <= max_length);
