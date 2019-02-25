@@ -117,6 +117,7 @@ TEST_F(LoadStatsReporterTest, ExistingClusters) {
   // Start reporting on foo.
   NiceMock<MockClusterMockPrioritySet> foo_cluster;
   foo_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(2);
+  foo_cluster.info_->eds_service_name_ = "bar";
   NiceMock<MockClusterMockPrioritySet> bar_cluster;
   MockClusterManager::ClusterInfoMap cluster_info{{"foo", foo_cluster}, {"bar", bar_cluster}};
   ON_CALL(cm_, clusters()).WillByDefault(Return(cluster_info));
@@ -127,6 +128,7 @@ TEST_F(LoadStatsReporterTest, ExistingClusters) {
   {
     envoy::api::v2::endpoint::ClusterStats foo_cluster_stats;
     foo_cluster_stats.set_cluster_name("foo");
+    foo_cluster_stats.set_cluster_service_name("bar");
     foo_cluster_stats.set_total_dropped_requests(5);
     foo_cluster_stats.mutable_load_report_interval()->MergeFrom(
         Protobuf::util::TimeUtil::MicrosecondsToDuration(1));
@@ -149,6 +151,7 @@ TEST_F(LoadStatsReporterTest, ExistingClusters) {
   {
     envoy::api::v2::endpoint::ClusterStats foo_cluster_stats;
     foo_cluster_stats.set_cluster_name("foo");
+    foo_cluster_stats.set_cluster_service_name("bar");
     foo_cluster_stats.set_total_dropped_requests(2);
     foo_cluster_stats.mutable_load_report_interval()->MergeFrom(
         Protobuf::util::TimeUtil::MicrosecondsToDuration(24));
@@ -197,6 +200,7 @@ TEST_F(LoadStatsReporterTest, ExistingClusters) {
   {
     envoy::api::v2::endpoint::ClusterStats foo_cluster_stats;
     foo_cluster_stats.set_cluster_name("foo");
+    foo_cluster_stats.set_cluster_service_name("bar");
     foo_cluster_stats.set_total_dropped_requests(1);
     foo_cluster_stats.mutable_load_report_interval()->MergeFrom(
         Protobuf::util::TimeUtil::MicrosecondsToDuration(4));

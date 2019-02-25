@@ -508,6 +508,8 @@ public:
 
   bool drainConnectionsOnHostRemoval() const override { return drain_connections_on_host_removal_; }
 
+  absl::optional<std::string> eds_service_name() const override { return eds_service_name_; }
+
 private:
   struct ResourceManagers {
     ResourceManagers(const envoy::api::v2::Cluster& config, Runtime::Loader& runtime,
@@ -550,6 +552,7 @@ private:
   const envoy::api::v2::Cluster::CommonLbConfig common_lb_config_;
   const Network::ConnectionSocket::OptionsSharedPtr cluster_socket_options_;
   const bool drain_connections_on_host_removal_;
+  absl::optional<std::string> eds_service_name_;
 };
 
 /**
