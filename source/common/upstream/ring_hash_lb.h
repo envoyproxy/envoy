@@ -49,23 +49,21 @@ public:
   const RingHashLoadBalancerStats& stats() const { return stats_; }
 
 private:
+  using HashFunction = envoy::api::v2::Cluster_RingHashLbConfig_HashFunction;
+
   struct RingEntry {
     uint64_t hash_;
     HostConstSharedPtr host_;
   };
 
   struct Ring : public HashingLoadBalancer {
-    Ring(const HostSet& host_set, bool in_panic,
-         const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig>& config,
-         RingHashLoadBalancerStats& stats);
+    Ring(const HostSet& host_set, bool in_panic, uint64_t min_ring_size, uint64_t max_ring_size,
+         bool use_std_hash, HashFunction hash_function, RingHashLoadBalancerStats& stats);
 
     // ThreadAwareLoadBalancerBase::HashingLoadBalancer
     HostConstSharedPtr chooseHost(uint64_t hash) const override;
 
     std::vector<RingEntry> ring_;
-
-    static const uint64_t DefaultMinRingSize = 1024;
-    static const uint64_t DefaultMaxRingSize = 1024 * 1024 * 8;
 
     RingHashLoadBalancerStats& stats_;
   };
@@ -73,14 +71,21 @@ private:
 
   // ThreadAwareLoadBalancerBase
   HashingLoadBalancerSharedPtr createLoadBalancer(const HostSet& host_set, bool in_panic) override {
-    return std::make_shared<Ring>(host_set, in_panic, config_, stats_);
+    return std::make_shared<Ring>(host_set, in_panic, min_ring_size_, max_ring_size_, use_std_hash_,
+                                  hash_function_, stats_);
   }
 
   static RingHashLoadBalancerStats generateStats(Stats::Scope& scope);
 
-  const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig>& config_;
   Stats::ScopePtr scope_;
   RingHashLoadBalancerStats stats_;
+
+  static const uint64_t DefaultMinRingSize = 1024;
+  static const uint64_t DefaultMaxRingSize = 1024 * 1024 * 8;
+  const uint64_t min_ring_size_;
+  const uint64_t max_ring_size_;
+  const bool use_std_hash_;
+  const HashFunction hash_function_;
 };
 
 } // namespace Upstream
