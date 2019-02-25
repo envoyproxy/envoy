@@ -442,6 +442,19 @@ private:
   mutable Common::CallbackManager<uint32_t, const HostVector&, const HostVector&>
       priority_update_cb_helper_;
   bool batch_update_ : 1;
+
+  // Helper class that ensures that we're always reseting the batch_update_ flag.
+  class BatchUpdateScope {
+  public:
+    explicit BatchUpdateScope(PrioritySetImpl& parent) : parent_(parent) {
+      ASSERT(!parent_.batch_update_);
+      parent_.batch_update_ = true;
+    }
+    ~BatchUpdateScope() { parent_.batch_update_ = false; }
+
+  private:
+    PrioritySetImpl& parent_;
+  };
 };
 
 /**

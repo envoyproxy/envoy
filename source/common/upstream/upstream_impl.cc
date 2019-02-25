@@ -472,8 +472,7 @@ void PrioritySetImpl::updateHosts(uint32_t priority, UpdateHostsParams&& update_
 }
 
 void PrioritySetImpl::batchHostUpdate(std::function<void(UpdateHostsCb)> callback) {
-  ASSERT(!batch_update_);
-  batch_update_ = true;
+  BatchUpdateScope scope(*this);
 
   std::unordered_set<uint32_t> priorities;
   std::unordered_set<HostSharedPtr> all_hosts_added;
@@ -497,9 +496,6 @@ void PrioritySetImpl::batchHostUpdate(std::function<void(UpdateHostsCb)> callbac
     updateHosts(p, std::move(params), locality_weight, hosts_added, hosts_removed,
                 overprovisioning_factor);
   });
-
-  // TODO(snowp): Use RAII to make this exception safe?
-  batch_update_ = false;
 
   // Now that all the updates have been complete, we can compute the diff.
   HostVector net_hosts_added = filterHosts(all_hosts_added, all_hosts_removed);
