@@ -82,3 +82,8 @@ The ZooKeeper filter emits the following dynamic metadata for each message parse
   :widths: 1, 1, 2
 
   <path>, string, "The path associated with the request, response or event"
+  <opname>, string, "The opname for the request, response or event"
+  <watch>, string, "True if a watch is being set, false otherwise"
+  <ephemeral>, string, "True if the create znode will be ephemeral, false otherwise"
+  <sequence>, string, "True if the create znode will be sequential, false otherwise"
+  <version>, string, "The version parameter, if any, given with the request"

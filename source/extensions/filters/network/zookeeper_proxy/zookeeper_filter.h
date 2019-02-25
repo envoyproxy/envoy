@@ -112,6 +112,8 @@ public:
 
   void doDecode(Buffer::Instance& buffer);
   DecoderPtr createDecoder(DecoderCallbacks& callbacks);
+  void setDynamicMetadata(const std::string& key, const std::string& value);
+  void setDynamicMetadata(const std::vector<std::pair<const std::string, const std::string>>& data);
 
 private:
   Network::ReadFilterCallbacks* read_callbacks_{};
