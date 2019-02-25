@@ -1209,9 +1209,9 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(callbacks.get()));
 }
 
-// This test validates that if warming cluster's initialization is triggered with empty hosts, it
-// does not clear the active cluster hosts. Regression to test to validate the behaviour observed in
-// https://github.com/envoyproxy/envoy/issues/5168.
+// This test validates that if warming cluster's initialization is triggered via empty config
+// update, it does not clear the active cluster hosts. Regression to test to validate the behaviour
+// observed in https://github.com/envoyproxy/envoy/issues/5168.
 TEST_F(ClusterManagerImplTest, WarmingClusterWithEmptyConfigUpdate) {
   const std::string json = R"EOF(
   {
@@ -1287,6 +1287,8 @@ TEST_F(ClusterManagerImplTest, WarmingClusterWithEmptyConfigUpdate) {
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster2.get()));
 }
 
+// Validates the behaviour when warming cluster's initialization is triggered with empty hosts EDS
+// update.
 TEST_F(ClusterManagerImplTest, WarmingClusterWithEmptyHosts) {
   const std::string json = R"EOF(
   {
@@ -1329,9 +1331,8 @@ TEST_F(ClusterManagerImplTest, WarmingClusterWithEmptyHosts) {
   EXPECT_EQ(cluster1->info_, cluster_manager_->get("fake_cluster")->info());
   checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 1 /*active*/, 0 /*warming*/);
 
-  // Now trigger warming of the again with empty hosts. This validates the intentional empty
-  // hosts sent by management server are processed. auto update_cluster =
-  // defaultStaticCluster("fake_cluster");
+  // Now trigger warming of the cluster with empty hosts. This validates the intentional empty
+  // hosts update sent by management server is processed correctly.
   auto update_cluster = defaultStaticCluster("fake_cluster");
   update_cluster.mutable_per_connection_buffer_limit_bytes()->set_value(12345);
 
@@ -1359,7 +1360,7 @@ TEST_F(ClusterManagerImplTest, WarmingClusterWithEmptyHosts) {
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster2.get()));
 }
 
-// Validates that TLS updates are triggered correctly when warming cluster has empty hosts.
+// Validates that TLS updates are triggered correctly when warming cluster is initialized with empty config update.
 TEST_F(ClusterManagerImplTest, WarmingClusterWithEmptyConfigUpdateTriggersTlsUpdatesCorrectly) {
   createWithLocalClusterUpdate();
 

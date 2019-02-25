@@ -481,7 +481,7 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::api::v2::Cluster& clust
 
       // If onConfigUpdate was triggered by an EDS update that had no references to this
       // cluster and active cluster has some hosts, copy the active cluster priority set to the
-      // warming cluster to prevent the hosts from being cleared after warming. 
+      // warming cluster to prevent the hosts from being cleared after warming.
       // See https://github.com/envoyproxy/envoy/issues/5168 for more context.
       const auto active_it = active_clusters_.find(cluster_name);
       if (active_it != active_clusters_.end()) {
