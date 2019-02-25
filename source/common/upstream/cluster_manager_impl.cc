@@ -298,6 +298,17 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
   }
 
   // Now setup for cross-thread updates.
+  cluster.prioritySet().addMemberUpdateCb(
+      [&cluster, this](const HostVector&, const HostVector& hosts_removed) -> void {
+        // TODO(snowp): Should this be subject to merge windows?
+
+        // Whenever hosts are removed from the cluster, we make each TLS cluster drain it's
+        // connection pools for the removed hosts.
+        if (!hosts_removed.empty()) {
+          postThreadLocalHostRemoval(cluster, hosts_removed);
+        }
+      });
+
   cluster.prioritySet().addPriorityUpdateCb([&cluster, this](uint32_t priority,
                                                              const HostVector& hosts_added,
                                                              const HostVector& hosts_removed) {
@@ -652,6 +663,13 @@ Tcp::ConnectionPool::Instance* ClusterManagerImpl::tcpConnPoolForCluster(
   return entry->second->tcpConnPool(priority, context, transport_socket_options);
 }
 
+void ClusterManagerImpl::postThreadLocalHostRemoval(const Cluster& cluster,
+                                                    const HostVector& hosts_removed) {
+  tls_->runOnAllThreads([this, name = cluster.info()->name(), hosts_removed]() {
+    ThreadLocalClusterManagerImpl::removeHosts(name, hosts_removed, *tls_);
+  });
+}
+
 void ClusterManagerImpl::postThreadLocalClusterUpdate(const Cluster& cluster, uint32_t priority,
                                                       const HostVector& hosts_added,
                                                       const HostVector& hosts_removed) {
@@ -930,6 +948,21 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::removeTcpConn(
   }
 }
 
+void ClusterManagerImpl::ThreadLocalClusterManagerImpl::removeHosts(const std::string& name,
+                                                                    const HostVector& hosts_removed,
+                                                                    ThreadLocal::Slot& tls) {
+  ThreadLocalClusterManagerImpl& config = tls.getTyped<ThreadLocalClusterManagerImpl>();
+
+  ASSERT(config.thread_local_clusters_.find(name) != config.thread_local_clusters_.end());
+  const auto& cluster_entry = config.thread_local_clusters_[name];
+  ENVOY_LOG(debug, "removing hosts for TLS cluster {} removed {}", name, hosts_removed.size());
+
+  // We need to go through and purge any connection pools for hosts that got deleted.
+  // Even if two hosts actually point to the same address this will be safe, since if a
+  // host is readded it will be a different physical HostSharedPtr.
+  cluster_entry->parent_.drainConnPools(hosts_removed);
+}
+
 void ClusterManagerImpl::ThreadLocalClusterManagerImpl::updateClusterMembership(
     const std::string& name, uint32_t priority,
     PrioritySet::UpdateHostsParams&& update_hosts_params,
@@ -1073,14 +1106,6 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
     }
     }
   }
-
-  priority_set_.addMemberUpdateCb(
-      [this](const HostVector&, const HostVector& hosts_removed) -> void {
-        // We need to go through and purge any connection pools for hosts that got deleted.
-        // Even if two hosts actually point to the same address this will be safe, since if a
-        // host is readded it will be a different physical HostSharedPtr.
-        parent_.drainConnPools(hosts_removed);
-      });
 }
 
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::~ClusterEntry() {
