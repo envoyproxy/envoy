@@ -182,7 +182,7 @@ public:
   void mergeValues(const std::unordered_map<std::string, std::string>& values) override;
 
 protected:
-  // Identical the the public constructor but does not call loadSnapshot(). Subclasses must call
+  // Identical the public constructor but does not call loadSnapshot(). Subclasses must call
   // loadSnapshot() themselves to create the initial snapshot, since loadSnapshot calls the virtual
   // function createNewSnapshot() and is therefore unsuitable for use in a superclass constructor.
   struct DoNotLoadSnapshot {};
