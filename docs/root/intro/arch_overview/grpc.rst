@@ -3,7 +3,7 @@
 gRPC
 ====
 
-`gRPC <http://www.grpc.io/>`_ is an RPC framework from Google. It uses protocol buffers as the
+`gRPC <https://www.grpc.io/>`_ is an RPC framework from Google. It uses protocol buffers as the
 underlying serialization/IDL format. At the transport layer it uses HTTP/2 for request/response
 multiplexing. Envoy has first class support for gRPC both at the transport layer as well as at the
 application layer:

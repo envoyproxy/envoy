@@ -34,7 +34,7 @@ weight greater than 1.
 * *all weights 1*: An O(1) algorithm which selects N random available hosts as specified in the
   :ref:`configuration <envoy_api_msg_Cluster.LeastRequestLbConfig>` (2 by default) and picks the
   host which has the fewest active requests (`Research
-  <http://www.eecs.harvard.edu/~michaelm/postscripts/handbook2001.pdf>`_ has shown that this
+  <https://www.eecs.harvard.edu/~michaelm/postscripts/handbook2001.pdf>`_ has shown that this
   approach is nearly as good as an O(N) full scan). This is also known as P2C (power of two
   choices). The P2C load balancer has the property that a host with the highest number of active
   requests in the cluster will never receive new requests. It will be allowed to drain until it is
