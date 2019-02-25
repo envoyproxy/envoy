@@ -15,6 +15,7 @@
 #include "quiche/quic/platform/api/quic_mock_log.h"
 #include "quiche/quic/platform/api/quic_mutex.h"
 #include "quiche/quic/platform/api/quic_ptr_util.h"
+#include "quiche/quic/platform/api/quic_server_stats.h"
 #include "quiche/quic/platform/api/quic_sleep.h"
 #include "quiche/quic/platform/api/quic_stack_trace.h"
 #include "quiche/quic/platform/api/quic_string.h"
@@ -140,6 +141,16 @@ TEST(QuicPlatformTest, QuicMockLog) {
 
   EXPECT_QUIC_LOG_CALL_CONTAINS(outer_log, ERROR, "Outer log message");
   QUIC_LOG(ERROR) << "Outer log message should be captured.";
+}
+
+TEST(QuicPlatformTest, QuicServerStats) {
+  // Just make sure they compile.
+  QUIC_SERVER_HISTOGRAM_ENUM("my.enum.histogram", TestEnum::ONE, TestEnum::COUNT, "doc");
+  QUIC_SERVER_HISTOGRAM_BOOL("my.bool.histogram", false, "doc");
+  QUIC_SERVER_HISTOGRAM_TIMES("my.timing.histogram", quic::QuicTime::Delta::FromSeconds(5),
+                              quic::QuicTime::Delta::FromSeconds(1),
+                              quic::QuicTime::Delta::FromSecond(3600), 100, "doc");
+  QUIC_SERVER_HISTOGRAM_COUNTS("my.count.histogram", 123, 0, 1000, 100, "doc");
 }
 
 TEST(QuicPlatformTest, QuicStackTraceTest) {
