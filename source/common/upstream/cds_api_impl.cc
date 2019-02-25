@@ -149,7 +149,7 @@ void CdsApiImpl::onConfigUpdate(
         ENVOY_LOG(debug, "cds: add/update cluster '{}'", cluster.name());
       }
     } catch (const EnvoyException& e) {
-      exception_msgs.push_back(e.what());
+      exception_msgs.push_back(fmt::format("{}: {}", cluster_name, e.what()));
     }
 >>>>>>> cds: continue with remaining clusters if one addOrUpdateCluster fails (#5806)
   }
@@ -163,7 +163,8 @@ void CdsApiImpl::onConfigUpdate(
   whole_update_version_info_ = version_info;
   runInitializeCallbackIfAny();
   if (!exception_msgs.empty()) {
-    throw EnvoyException(StringUtil::join(exception_msgs, "\n"));
+    throw EnvoyException(
+        fmt::format("Error adding/updating cluster(s) {}", StringUtil::join(exception_msgs, ", ")));
   }
 }
 
