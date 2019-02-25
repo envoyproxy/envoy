@@ -27,8 +27,8 @@ proxy:
   run a mix of nginx and haproxy. A single proxy solution at every hop is substantially simpler from
   an operations perspective.
 
-`haproxy <http://www.haproxy.org/>`_
-------------------------------------
+`haproxy <https://www.haproxy.org/>`_
+-------------------------------------
 
 haproxy is the canonical modern software load balancer. It also supports basic HTTP reverse proxy
 features. Envoy provides the following main advantages over haproxy as a load balancer:
@@ -60,8 +60,8 @@ well as basic HTTP L7 request routing to multiple backend clusters. The feature 
 compared to Envoy and performance and stability are unknown, but it's clear that AWS will continue
 to invest in this area in the future.
 
-`SmartStack <http://nerds.airbnb.com/smartstack-service-discovery-cloud/>`_
----------------------------------------------------------------------------
+`SmartStack <https://nerds.airbnb.com/smartstack-service-discovery-cloud/>`_
+----------------------------------------------------------------------------
 
 SmartStack is an interesting solution which provides additional service discovery and health
 checking support on top of haproxy. At a high level, SmartStack has most of the same goals as
@@ -94,8 +94,8 @@ proxygen to obtain high performance as an HTTP library/proxy. Beyond that howeve
 are not really comparable as Envoy is a complete self contained server with a large feature set
 versus a library that must be built into something by each project individually.
 
-`gRPC <http://www.grpc.io/>`_
------------------------------
+`gRPC <https://www.grpc.io/>`_
+------------------------------
 
 gRPC is a new multi-platform message passing system out of Google. It uses an IDL to describe an RPC
 library and then implements application specific runtimes for a variety of different languages. The

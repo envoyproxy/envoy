@@ -13,7 +13,7 @@ If a listener server certificate needs to be fetched by SDS remotely, it will NO
 
 Upstream clusters are handled in a similar way, if a cluster client certificate needs to be fetched by SDS remotely, it will NOT be marked as active and it will not be used before the certificates are fetched. If Envoy fails to fetch the certificates due to connection failures, or bad response data, the cluster will be marked as active, it can be used to handle the requests, but the requests routed to that cluster will be rejected.
 
-If a static cluster is using SDS, and it needs to define a SDS cluster (unless Google gRPC is used which doens't need a cluster), the SDS cluster has to be defined before the static clusters using it.
+If a static cluster is using SDS, and it needs to define a SDS cluster (unless Google gRPC is used which doesn't need a cluster), the SDS cluster has to be defined before the static clusters using it.
 
 The connection between Envoy proxy and SDS server has to be secure. One option is to run the SDS server on the same host and use Unix Domain Socket for the connection. Otherwise it requires mTLS between the proxy and SDS server. In this case, the client certificates for the SDS connection must be statically configured.
 
