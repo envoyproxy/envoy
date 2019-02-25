@@ -18,7 +18,7 @@ static_resources:
     address:
       socket_address:
         address: 0.0.0.0
-        port_value: 3307
+        port_value: 0
     filter_chains:
       - filters:
           - name: envoy.filters.network.mysql_proxy
