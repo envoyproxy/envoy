@@ -132,6 +132,11 @@ public:
                           const HostVector& hosts_removed));
 };
 
+class MockLocalHostsRemoved {
+public:
+  MOCK_METHOD1(post, void(const HostVector&));
+};
+
 // A test version of ClusterManagerImpl that provides a way to get a non-const handle to the
 // clusters, which is necessary in order to call updateHosts on the priority set.
 class TestClusterManagerImpl : public ClusterManagerImpl {
@@ -158,10 +163,11 @@ public:
                                   const LocalInfo::LocalInfo& local_info,
                                   AccessLog::AccessLogManager& log_manager,
                                   Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
-                                  Api::Api& api, MockLocalClusterUpdate& local_cluster_update)
+                                  Api::Api& api, MockLocalClusterUpdate& local_cluster_update,
+                                  MockLocalHostsRemoved& local_hosts_removed)
       : TestClusterManagerImpl(bootstrap, factory, stats, tls, runtime, random, local_info,
                                log_manager, main_thread_dispatcher, admin, api, http_context_),
-        local_cluster_update_(local_cluster_update) {}
+        local_cluster_update_(local_cluster_update), local_hosts_removed_(local_hosts_removed) {}
 
 protected:
   void postThreadLocalClusterUpdate(const Cluster&, uint32_t priority,
@@ -169,8 +175,14 @@ protected:
                                     const HostVector& hosts_removed) override {
     local_cluster_update_.post(priority, hosts_added, hosts_removed);
   }
+
+  void postThreadLocalHostRemoval(const Cluster&, const HostVector& hosts_removed) override {
+    local_hosts_removed_.post(hosts_removed);
+  }
+
   Http::ContextImpl http_context_;
   MockLocalClusterUpdate& local_cluster_update_;
+  MockLocalHostsRemoved& local_hosts_removed_;
 };
 
 envoy::config::bootstrap::v2::Bootstrap parseBootstrapFromV2Yaml(const std::string& yaml) {
@@ -223,7 +235,7 @@ public:
     cluster_manager_ = std::make_unique<MockedUpdatedClusterManagerImpl>(
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.random_,
         factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, *api_,
-        local_cluster_update_);
+        local_cluster_update_, local_hosts_removed_);
   }
 
   void checkStats(uint64_t added, uint64_t modified, uint64_t removed, uint64_t active,
@@ -264,6 +276,7 @@ public:
   AccessLog::MockAccessLogManager log_manager_;
   NiceMock<Server::MockAdmin> admin_;
   MockLocalClusterUpdate local_cluster_update_;
+  MockLocalHostsRemoved local_hosts_removed_;
   Http::ContextImpl http_context_;
 };
 
@@ -2117,6 +2130,11 @@ TEST_F(ClusterManagerImplTest, MergedUpdates) {
         EXPECT_EQ(1, hosts_removed.size());
       }));
 
+  EXPECT_CALL(local_hosts_removed_, post(_))
+      .Times(2)
+      .WillRepeatedly(
+          Invoke([](const auto& hosts_removed) { EXPECT_EQ(1, hosts_removed.size()); }));
+
   Event::MockTimer* timer = new NiceMock<Event::MockTimer>(&factory_.dispatcher_);
   Cluster& cluster = cluster_manager_->activeClusters().begin()->second;
   HostVectorSharedPtr hosts(
@@ -2310,6 +2328,11 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesDestroyedOnUpdate) {
         EXPECT_EQ(0, hosts_added.size());
         EXPECT_EQ(1, hosts_removed.size());
       }));
+
+  EXPECT_CALL(local_hosts_removed_, post(_)).WillOnce(Invoke([](const auto& hosts_removed) {
+    // 1st removal.
+    EXPECT_EQ(1, hosts_removed.size());
+  }));
 
   Event::MockTimer* timer = new NiceMock<Event::MockTimer>(&factory_.dispatcher_);
 
