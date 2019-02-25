@@ -1360,7 +1360,8 @@ TEST_F(ClusterManagerImplTest, WarmingClusterWithEmptyHosts) {
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster2.get()));
 }
 
-// Validates that TLS updates are triggered correctly when warming cluster is initialized with empty config update.
+// Validates that TLS updates are triggered correctly when warming cluster is initialized with empty
+// config update.
 TEST_F(ClusterManagerImplTest, WarmingClusterWithEmptyConfigUpdateTriggersTlsUpdatesCorrectly) {
   createWithLocalClusterUpdate();
 
