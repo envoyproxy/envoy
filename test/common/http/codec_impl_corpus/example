@@ -66,7 +66,7 @@ actions {
 }
 actions {
   stream_action {
-    stream_id: 2
+    stream_id: 1
     request {
       data: 3000000
     }
@@ -74,7 +74,7 @@ actions {
 }
 actions {
   stream_action {
-    stream_id: 2
+    stream_id: 1
     request {
       data: 54
     }
@@ -83,7 +83,7 @@ actions {
 actions { quiesce_drain {} }
 actions {
   stream_action {
-    stream_id: 2
+    stream_id: 1
     request {
       data: 54
     }
@@ -91,12 +91,16 @@ actions {
 }
 actions {
   stream_action {
-    stream_id: 2
+    stream_id: 1
     response {
       headers {
         headers {
           key: ":status"
           value: "200"
+        }
+        headers {
+          key: "content-length"
+          value: "5"
         }
       }
     }
@@ -104,7 +108,7 @@ actions {
 }
 actions {
   stream_action {
-    stream_id: 2
+    stream_id: 1
     response {
       data: 5
     }
@@ -112,7 +116,7 @@ actions {
 }
 actions {
   stream_action {
-    stream_id: 2
+    stream_id: 1
     request {
       read_disable: true
     }
@@ -120,7 +124,7 @@ actions {
 }
 actions {
   stream_action {
-    stream_id: 2
+    stream_id: 1
     request {
       read_disable: false
     }
@@ -128,7 +132,7 @@ actions {
 }
 actions {
   stream_action {
-    stream_id: 2
+    stream_id: 1
     request {
       read_disable: true
     }
@@ -136,7 +140,7 @@ actions {
 }
 actions {
   stream_action {
-    stream_id: 2
+    stream_id: 1
     request {
       trailers {
         headers {
@@ -149,7 +153,7 @@ actions {
 }
 actions {
   stream_action {
-    stream_id: 2
+    stream_id: 1
     request {
       read_disable: false
     }
@@ -157,7 +161,7 @@ actions {
 }
 actions {
   stream_action {
-    stream_id: 2
+    stream_id: 1
     response {
       trailers {
         headers {
@@ -170,7 +174,7 @@ actions {
 }
 actions {
   stream_action {
-    stream_id: 2
+    stream_id: 1
     response {
       data: 2
     }
@@ -178,7 +182,7 @@ actions {
 }
 actions {
   stream_action {
-    stream_id: 2
+    stream_id: 1
     response {
       trailers {
         headers {

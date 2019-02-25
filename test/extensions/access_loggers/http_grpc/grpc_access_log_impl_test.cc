@@ -22,7 +22,7 @@ namespace Extensions {
 namespace AccessLoggers {
 namespace HttpGrpc {
 
-class GrpcAccessLogStreamerImplTest : public TestBase {
+class GrpcAccessLogStreamerImplTest : public testing::Test {
 public:
   using MockAccessLogStream = Grpc::MockAsyncStream;
   using AccessLogCallbacks =
@@ -112,10 +112,10 @@ public:
                           const std::string& log_name));
 };
 
-class HttpGrpcAccessLogTest : public TestBase {
+class HttpGrpcAccessLogTest : public testing::Test {
 public:
   void init() {
-    ON_CALL(*filter_, evaluate(_, _)).WillByDefault(Return(true));
+    ON_CALL(*filter_, evaluate(_, _, _, _)).WillByDefault(Return(true));
     config_.mutable_common_config()->set_log_name("hello_log");
     access_log_ =
         std::make_unique<HttpGrpcAccessLog>(AccessLog::FilterPtr{filter_}, config_, streamer_);
@@ -443,6 +443,7 @@ TEST(responseFlagsToAccessLogResponseFlagsTest, All) {
   common_access_log_expected.mutable_response_flags()->set_rate_limit_service_error(true);
   common_access_log_expected.mutable_response_flags()->set_downstream_connection_termination(true);
   common_access_log_expected.mutable_response_flags()->set_upstream_retry_limit_exceeded(true);
+  common_access_log_expected.mutable_response_flags()->set_stream_idle_timeout(true);
 
   EXPECT_EQ(common_access_log_expected.DebugString(), common_access_log.DebugString());
 }

@@ -731,7 +731,7 @@ LcTrie<T>::LcTrieInternal<IpType, address_size>::getData(const IpType& ip_addres
   }
 
   // The path taken through the trie to match the ip_address may have contained skips,
-  // so it is necessary to check whether the the matched prefix really contains the
+  // so it is necessary to check whether the matched prefix really contains the
   // ip_address.
   const auto& prefix = ip_prefixes_[address];
   if (prefix.contains(ip_address)) {

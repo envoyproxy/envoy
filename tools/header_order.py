@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Enforce header order in a a given file. This will only reorder in the first sequence of contiguous
+# Enforce header order in a given file. This will only reorder in the first sequence of contiguous
 # #include statements, so it will not play well with #ifdef.
 #
 # This attempts to enforce the guidelines at

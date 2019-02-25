@@ -41,11 +41,12 @@ ValidationInstance::ValidationInstance(const Options& options, Event::TimeSystem
                                        ComponentFactory& component_factory,
                                        Thread::ThreadFactory& thread_factory)
     : options_(options), stats_store_(store),
-      api_(new Api::ValidationImpl(options.fileFlushIntervalMsec(), thread_factory, store,
-                                   time_system)),
+      api_(new Api::ValidationImpl(thread_factory, store, time_system)),
       dispatcher_(api_->allocateDispatcher()),
       singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory().currentThreadId())),
-      access_log_manager_(*api_, *dispatcher_, access_log_lock), mutex_tracer_(nullptr) {
+      access_log_manager_(options.fileFlushIntervalMsec(), *api_, *dispatcher_, access_log_lock,
+                          store),
+      mutex_tracer_(nullptr), time_system_(time_system) {
   try {
     initialize(options, local_address, component_factory);
   } catch (const EnvoyException& e) {
@@ -92,7 +93,7 @@ void ValidationInstance::initialize(const Options& options,
   cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
       admin(), runtime(), stats(), threadLocal(), random(), dnsResolver(), sslContextManager(),
       dispatcher(), localInfo(), *secret_manager_, *api_, http_context_, accessLogManager(),
-      singletonManager());
+      singletonManager(), time_system_);
   config_.initialize(bootstrap, *this, *cluster_manager_factory_);
   http_context_.setTracer(config_.httpTracer());
   clusterManager().setInitializedCb(

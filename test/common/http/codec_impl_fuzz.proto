@@ -18,6 +18,7 @@ message DirectionalAction {
     test.fuzz.Headers continue_headers = 1;
     test.fuzz.Headers headers = 2;
     uint32 data = 3;
+    string data_value = 8;
     test.fuzz.Headers trailers = 4;
     uint32 reset_stream = 5;
     bool read_disable = 6;
@@ -26,6 +27,7 @@ message DirectionalAction {
 }
 
 message StreamAction {
+  // Index into list of created streams (not HTTP/2 level stream ID).
   uint32 stream_id = 1;
   oneof stream_action_selector {
     DirectionalAction request = 2;
@@ -96,9 +98,9 @@ message Http2ClientServerSettings {
 }
 
 message CodecImplFuzzTestCase {
-  oneof settings_selector {
-    Http1ClientServerSettings h1_settings = 1;
-    Http2ClientServerSettings h2_settings = 2;
-  }
+  // The fuzzer will run actions on both H1 and H2 codecs. The settings below
+  // provide codec-specific parameters.
+  Http1ClientServerSettings h1_settings = 1;
+  Http2ClientServerSettings h2_settings = 2;
   repeated Action actions = 3;
 }

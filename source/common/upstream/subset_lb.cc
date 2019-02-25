@@ -19,14 +19,14 @@ namespace Upstream {
 
 SubsetLoadBalancer::SubsetLoadBalancer(
     LoadBalancerType lb_type, PrioritySet& priority_set, const PrioritySet* local_priority_set,
-    ClusterStats& stats, Runtime::Loader& runtime, Runtime::RandomGenerator& random,
-    const LoadBalancerSubsetInfo& subsets,
+    ClusterStats& stats, Stats::Scope& scope, Runtime::Loader& runtime,
+    Runtime::RandomGenerator& random, const LoadBalancerSubsetInfo& subsets,
     const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig>& lb_ring_hash_config,
     const absl::optional<envoy::api::v2::Cluster::LeastRequestLbConfig>& least_request_config,
     const envoy::api::v2::Cluster::CommonLbConfig& common_config)
     : lb_type_(lb_type), lb_ring_hash_config_(lb_ring_hash_config),
       least_request_config_(least_request_config), common_config_(common_config), stats_(stats),
-      runtime_(runtime), random_(random), fallback_policy_(subsets.fallbackPolicy()),
+      scope_(scope), runtime_(runtime), random_(random), fallback_policy_(subsets.fallbackPolicy()),
       default_subset_metadata_(subsets.defaultSubset().fields().begin(),
                                subsets.defaultSubset().fields().end()),
       subset_keys_(subsets.subsetKeys()), original_priority_set_(priority_set),
@@ -458,7 +458,7 @@ SubsetLoadBalancer::PrioritySubsetImpl::PrioritySubsetImpl(const SubsetLoadBalan
     // We should make the subset LB thread aware since the calculations are costly, and then we
     // can also use a thread aware sub-LB properly. The following works fine but is not optimal.
     thread_aware_lb_ = std::make_unique<RingHashLoadBalancer>(
-        *this, subset_lb.stats_, subset_lb.runtime_, subset_lb.random_,
+        *this, subset_lb.stats_, subset_lb.scope_, subset_lb.runtime_, subset_lb.random_,
         subset_lb.lb_ring_hash_config_, subset_lb.common_config_);
     thread_aware_lb_->initialize();
     lb_ = thread_aware_lb_->factory()->create();
@@ -608,10 +608,10 @@ HostSetImplPtr SubsetLoadBalancer::PrioritySubsetImpl::createHostSet(
 void SubsetLoadBalancer::PrioritySubsetImpl::update(uint32_t priority,
                                                     const HostVector& hosts_added,
                                                     const HostVector& hosts_removed) {
-  HostSubsetImpl* host_subset = getOrCreateHostSubset(priority);
-  host_subset->update(hosts_added, hosts_removed, predicate_);
+  const auto& host_subset = getOrCreateHostSet(priority);
+  updateSubset(priority, hosts_added, hosts_removed, predicate_);
 
-  if (host_subset->hosts().empty() != empty_) {
+  if (host_subset.hosts().empty() != empty_) {
     empty_ = true;
     for (auto& host_set : hostSetsPerPriority()) {
       empty_ &= host_set->hosts().empty();

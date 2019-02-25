@@ -33,6 +33,17 @@ maximize the chances of your PR being merged.
   deprecations between 1.3.0 and 1.4.0 will be deleted soon AFTER 1.5.0 is tagged and released
   (at the beginning of the 1.6.0 release cycle). This results in a three to six month window for
   migrating from deprecated code paths to new code paths.
+* Unless the community and Envoy maintainer team agrees on an exception, during the
+  first release cycle after a feature has been deprecated, use of that feature
+  will cause a logged warning, and incrementing the
+  [runtime](https://www.envoyproxy.io/docs/envoy/latest/configuration/runtime#config-runtime)
+  runtime.deprecated_feature_use stat.
+  During the second release cycle, use of the deprecated configuration will
+  cause a configuration load failure, unless the feature in question is
+  explicitly overridden in
+  [runtime](https://www.envoyproxy.io/docs/envoy/latest/configuration/runtime#config-runtime)
+  config. Finally during the third release cycle the code and configuration will be removed
+  entirely.
 * This policy means that organizations deploying master should have some time to get ready for
   breaking changes, but we make no guarantees about the length of time.
 * The breaking change policy also applies to source level extensions (e.g., filters). Code that
@@ -169,7 +180,7 @@ The sign-off is a simple line at the end of the explanation for the
 patch, which certifies that you wrote it or otherwise have the right to
 pass it on as an open-source patch. The rules are pretty simple: if you
 can certify the below (from
-[developercertificate.org](http://developercertificate.org/)):
+[developercertificate.org](https://developercertificate.org/)):
 
 ```
 Developer Certificate of Origin
@@ -228,7 +239,7 @@ git config --add alias.c "commit -s"
 ## Fixing DCO
 
 If your PR fails the DCO check, it's necessary to fix the entire commit history in the PR. Best
-practice is to [squash](http://gitready.com/advanced/2009/02/10/squashing-commits-with-rebase.html)
+practice is to [squash](https://gitready.com/advanced/2009/02/10/squashing-commits-with-rebase.html)
 the commit history to a single commit, append the DCO sign-off as described above, and [force
 push](https://git-scm.com/docs/git-push#git-push---force). For example, if you have 2 commits in
 your history:

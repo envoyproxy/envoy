@@ -29,6 +29,7 @@ CPU
 CQ
 CR
 CRC
+CREAT
 CRL
 CRLFs
 CRT
@@ -106,6 +107,7 @@ HV
 IAM
 IANA
 IDL
+INADDR
 INET
 IO
 IOS
@@ -137,6 +139,7 @@ MB
 MD
 MGET
 MSET
+MSVC
 MTLS
 MiB
 NACK
@@ -151,6 +154,7 @@ Nilsson
 OCSP
 OK
 OOM
+OOMs
 OS
 OSI
 OSS
@@ -177,6 +181,7 @@ RBAC
 RCU
 RDN
 RDS
+RDWR
 REQ
 RFC
 RHS
@@ -285,7 +290,7 @@ ary
 async
 atomicly
 atomics
-atoul
+atoull
 aud
 auth
 authenticator
@@ -354,9 +359,11 @@ dedupe
 deduplicate
 deflateInit
 deletable
+deleter
 delim
 dereference
 dereferences
+dereferencing
 deregistered
 deserialization
 deserialize
@@ -373,6 +380,7 @@ dirname
 djb
 downcasted
 downstream
+dtor
 dubbo
 dup
 durations
@@ -653,7 +661,7 @@ stmt
 str
 strftime
 stringified
-strtoul
+strtoull
 struct
 structs
 subexpr

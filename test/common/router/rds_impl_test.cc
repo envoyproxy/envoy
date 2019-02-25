@@ -21,10 +21,10 @@
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/simulated_time_system.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::InSequence;
@@ -47,7 +47,7 @@ parseHttpConnectionManagerFromJson(const std::string& json_string, const Stats::
   return http_connection_manager;
 }
 
-class RdsTestBase : public TestBase {
+class RdsTestBase : public testing::Test {
 public:
   RdsTestBase() : request_(&factory_context_.cluster_manager_.async_client_) {}
 
@@ -104,7 +104,7 @@ public:
     )EOF";
 
     Upstream::ClusterManager::ClusterInfoMap cluster_map;
-    Upstream::MockCluster cluster;
+    Upstream::MockClusterMockPrioritySet cluster;
     cluster_map.emplace("foo_cluster", cluster);
     EXPECT_CALL(factory_context_.cluster_manager_, clusters()).WillOnce(Return(cluster_map));
     EXPECT_CALL(cluster, info());
@@ -112,7 +112,7 @@ public:
     EXPECT_CALL(cluster, info());
     EXPECT_CALL(*cluster.info_, type());
     interval_timer_ = new Event::MockTimer(&factory_context_.dispatcher_);
-    EXPECT_CALL(factory_context_.init_manager_, registerTarget(_));
+    EXPECT_CALL(factory_context_.init_manager_, registerTarget(_, _));
     rds_ =
         RouteConfigProviderUtil::create(parseHttpConnectionManagerFromJson(config_json, scope_),
                                         factory_context_, "foo.", *route_config_provider_manager_);
@@ -378,7 +378,7 @@ public:
 
     // Get a RouteConfigProvider. This one should create an entry in the RouteConfigProviderManager.
     Upstream::ClusterManager::ClusterInfoMap cluster_map;
-    Upstream::MockCluster cluster;
+    Upstream::MockClusterMockPrioritySet cluster;
     cluster_map.emplace("foo_cluster", cluster);
     EXPECT_CALL(factory_context_.cluster_manager_, clusters()).WillOnce(Return(cluster_map));
     EXPECT_CALL(cluster, info()).Times(2);
@@ -567,7 +567,7 @@ virtual_hosts:
   Envoy::Config::Utility::translateRdsConfig(*config2, rds2, stats_options_);
 
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
-  Upstream::MockCluster cluster;
+  Upstream::MockClusterMockPrioritySet cluster;
   cluster_map.emplace("bar_cluster", cluster);
   EXPECT_CALL(factory_context_.cluster_manager_, clusters()).WillOnce(Return(cluster_map));
   EXPECT_CALL(cluster, info()).Times(2);
