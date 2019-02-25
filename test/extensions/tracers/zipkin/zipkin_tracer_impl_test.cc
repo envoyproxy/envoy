@@ -458,14 +458,11 @@ TEST_F(ZipkinDriverTest, ZipkinSpanTest) {
 
   Tracing::SpanPtr span4 = driver_->startSpan(config_, request_headers_, operation_name_,
                                               start_time_, {Tracing::Reason::Sampling, true});
-  driver_->setDropLogs(false);
   const auto timestamp =
       SystemTime{std::chrono::duration_cast<SystemTime::duration>(std::chrono::hours{123})};
   const auto timestamp_count =
       std::chrono::duration_cast<std::chrono::microseconds>(timestamp.time_since_epoch()).count();
   span4->log(timestamp, "abc");
-  driver_->setDropLogs(true);
-  span4->log(timestamp, "xyz");
 
   ZipkinSpanPtr zipkin_span4(dynamic_cast<ZipkinSpan*>(span4.release()));
   Span& zipkin_zipkin_span4 = zipkin_span4->span();

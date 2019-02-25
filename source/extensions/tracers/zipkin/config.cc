@@ -15,12 +15,13 @@ namespace Zipkin {
 
 ZipkinTracerFactory::ZipkinTracerFactory() : FactoryBase(TracerNames::get().Zipkin) {}
 
-Tracing::DriverPtr
-ZipkinTracerFactory::createDriverTyped(const envoy::config::trace::v2::ZipkinConfig& proto_config,
-                                       Server::Instance& server) {
-  return std::make_unique<Zipkin::Driver>(proto_config, server.clusterManager(), server.stats(),
-                                          server.threadLocal(), server.runtime(),
-                                          server.localInfo(), server.random(), server.timeSource());
+Tracing::HttpTracerPtr ZipkinTracerFactory::createHttpTracerTyped(
+    const envoy::config::trace::v2::ZipkinConfig& proto_config, Server::Instance& server) {
+  Tracing::DriverPtr zipkin_driver = std::make_unique<Zipkin::Driver>(
+      proto_config, server.clusterManager(), server.stats(), server.threadLocal(), server.runtime(),
+      server.localInfo(), server.random(), server.timeSource());
+
+  return std::make_unique<Tracing::HttpTracerImpl>(std::move(zipkin_driver), server.localInfo());
 }
 
 /**

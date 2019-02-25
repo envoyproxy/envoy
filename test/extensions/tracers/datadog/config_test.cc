@@ -33,8 +33,8 @@ TEST(DatadogTracerConfigTest, DatadogHttpTracer) {
 
   DatadogTracerFactory factory;
   auto message = Config::Utility::translateToFactoryConfig(configuration.http(), factory);
-  Tracing::DriverPtr datadog_driver = factory.createDriver(*message, server);
-  EXPECT_NE(nullptr, datadog_driver);
+  Tracing::HttpTracerPtr datadog_tracer = factory.createHttpTracer(*message, server);
+  EXPECT_NE(nullptr, datadog_tracer);
 }
 
 } // namespace Datadog

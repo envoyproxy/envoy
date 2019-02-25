@@ -84,7 +84,6 @@ TEST_F(OpenTracingDriverTest, FlushSpanWithTag) {
 TEST_F(OpenTracingDriverTest, FlushSpanWithLog) {
   setupValidDriver();
 
-  driver_->setDropLogs(false);
   Tracing::SpanPtr first_span = driver_->startSpan(config_, request_headers_, operation_name_,
                                                    start_time_, {Tracing::Reason::Sampling, true});
   const auto timestamp =
@@ -97,15 +96,6 @@ TEST_F(OpenTracingDriverTest, FlushSpanWithLog) {
 
   EXPECT_EQ(1, driver_->recorder().spans().size());
   EXPECT_EQ(expected_logs, driver_->recorder().top().logs);
-
-  driver_->setDropLogs(true);
-  Tracing::SpanPtr second_span = driver_->startSpan(config_, request_headers_, operation_name_,
-                                                    start_time_, {Tracing::Reason::Sampling, true});
-  second_span->log(timestamp, "xyz");
-  second_span->finishSpan();
-
-  EXPECT_EQ(2, driver_->recorder().spans().size());
-  EXPECT_TRUE(driver_->recorder().top().logs.empty());
 }
 
 TEST_F(OpenTracingDriverTest, TagSamplingFalseByDecision) {

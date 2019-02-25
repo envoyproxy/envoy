@@ -18,8 +18,8 @@ namespace Extensions {
 namespace Tracers {
 namespace Zipkin {
 
-ZipkinSpan::ZipkinSpan(Zipkin::Span& span, Zipkin::Tracer& tracer, Zipkin::Driver& driver)
-    : span_(span), tracer_(tracer), driver_(driver) {}
+ZipkinSpan::ZipkinSpan(Zipkin::Span& span, Zipkin::Tracer& tracer)
+    : span_(span), tracer_(tracer) {}
 
 void ZipkinSpan::finishSpan() { span_.finish(); }
 
@@ -30,9 +30,6 @@ void ZipkinSpan::setTag(const std::string& name, const std::string& value) {
 }
 
 void ZipkinSpan::log(SystemTime timestamp, const std::string& event) {
-  if (driver_.dropLogs()) {
-    return;
-  }
   span_.log(timestamp, event);
 }
 
@@ -60,7 +57,7 @@ Tracing::SpanPtr ZipkinSpan::spawnChild(const Tracing::Config& config, const std
                                         SystemTime start_time) {
   SpanContext context(span_);
   return Tracing::SpanPtr{
-      new ZipkinSpan(*tracer_.startSpan(config, name, start_time, context), tracer_, driver_)};
+      new ZipkinSpan(*tracer_.startSpan(config, name, start_time, context), tracer_)};
 }
 
 Driver::TlsTracer::TlsTracer(TracerPtr&& tracer, Driver& driver)
@@ -121,7 +118,7 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config, Http::HeaderMa
     return Tracing::SpanPtr(new Tracing::NullSpan());
   }
 
-  ZipkinSpanPtr active_span(new ZipkinSpan(*new_zipkin_span, tracer, *this));
+  ZipkinSpanPtr active_span(new ZipkinSpan(*new_zipkin_span, tracer));
   return std::move(active_span);
 }
 

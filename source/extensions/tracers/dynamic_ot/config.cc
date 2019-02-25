@@ -16,11 +16,13 @@ namespace DynamicOt {
 DynamicOpenTracingTracerFactory::DynamicOpenTracingTracerFactory()
     : FactoryBase(TracerNames::get().DynamicOt) {}
 
-Tracing::DriverPtr DynamicOpenTracingTracerFactory::createDriverTyped(
+Tracing::HttpTracerPtr DynamicOpenTracingTracerFactory::createHttpTracerTyped(
     const envoy::config::trace::v2::DynamicOtConfig& proto_config, Server::Instance& server) {
   const std::string library = proto_config.library();
   const std::string config = MessageUtil::getJsonStringFromMessage(proto_config.config());
-  return std::make_unique<DynamicOpenTracingDriver>(server.stats(), library, config);
+  Tracing::DriverPtr dynamic_driver =
+      std::make_unique<DynamicOpenTracingDriver>(server.stats(), library, config);
+  return std::make_unique<Tracing::HttpTracerImpl>(std::move(dynamic_driver), server.localInfo());
 }
 
 /**

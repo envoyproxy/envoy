@@ -17,11 +17,12 @@ namespace Datadog {
 
 DatadogTracerFactory::DatadogTracerFactory() : FactoryBase(TracerNames::get().Datadog) {}
 
-Tracing::DriverPtr
-DatadogTracerFactory::createDriverTyped(const envoy::config::trace::v2::DatadogConfig& proto_config,
-                                        Server::Instance& server) {
-  return std::make_unique<Driver>(proto_config, server.clusterManager(), server.stats(),
-                                  server.threadLocal(), server.runtime());
+Tracing::HttpTracerPtr DatadogTracerFactory::createHttpTracerTyped(
+    const envoy::config::trace::v2::DatadogConfig& proto_config, Server::Instance& server) {
+  Tracing::DriverPtr datadog_driver =
+      std::make_unique<Driver>(proto_config, server.clusterManager(), server.stats(),
+                               server.threadLocal(), server.runtime());
+  return std::make_unique<Tracing::HttpTracerImpl>(std::move(datadog_driver), server.localInfo());
 }
 
 /**

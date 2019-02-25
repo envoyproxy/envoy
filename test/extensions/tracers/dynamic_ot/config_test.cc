@@ -37,8 +37,8 @@ TEST(DynamicOtTracerConfigTest, DynamicOpentracingHttpTracer) {
 
   DynamicOpenTracingTracerFactory factory;
   auto message = Config::Utility::translateToFactoryConfig(configuration.http(), factory);
-  const Tracing::DriverPtr driver = factory.createDriver(*message, server);
-  EXPECT_NE(nullptr, driver);
+  const Tracing::HttpTracerPtr tracer = factory.createHttpTracer(*message, server);
+  EXPECT_NE(nullptr, tracer);
 }
 
 } // namespace DynamicOt

@@ -129,12 +129,6 @@ public:
   virtual SpanPtr startSpan(const Config& config, Http::HeaderMap& request_headers,
                             const std::string& operation_name, SystemTime start_time,
                             const Tracing::Decision tracing_decision) PURE;
-
-  /**
-   * Determines whether events logged to spans are dropped.
-   * @param drop_logs whether to drop events logged to spans created from this driver.
-   */
-  virtual void setDropLogs(bool drop_logs) PURE;
 };
 
 typedef std::unique_ptr<Driver> DriverPtr;

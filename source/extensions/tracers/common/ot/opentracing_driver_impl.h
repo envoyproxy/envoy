@@ -57,14 +57,10 @@ class OpenTracingDriver : public Tracing::Driver, protected Logger::Loggable<Log
 public:
   explicit OpenTracingDriver(Stats::Store& stats);
 
-  bool dropLogs() const { return drop_logs_; }
-
   // Tracer::TracingDriver
   Tracing::SpanPtr startSpan(const Tracing::Config& config, Http::HeaderMap& request_headers,
                              const std::string& operation_name, SystemTime start_time,
                              const Tracing::Decision tracing_decision) override;
-
-  void setDropLogs(bool drop_logs) override { drop_logs_ = drop_logs; }
 
   virtual opentracing::Tracer& tracer() PURE;
 
@@ -81,7 +77,6 @@ public:
 
 private:
   OpenTracingTracerStats tracer_stats_;
-  bool drop_logs_{true};
 };
 } // namespace Ot
 } // namespace Common
