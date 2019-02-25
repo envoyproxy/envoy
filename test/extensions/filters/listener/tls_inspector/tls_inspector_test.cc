@@ -32,7 +32,7 @@ class TlsInspectorTest : public testing::Test {
 public:
   TlsInspectorTest()
       : cfg_(std::make_shared<Config>(store_)),
-        io_handle_(std::make_unique<Network::IoSocketHandle>(42)) {}
+        io_handle_(std::make_unique<Network::IoSocketHandleImpl>(42)) {}
   ~TlsInspectorTest() { io_handle_->close(); }
 
   void init() {

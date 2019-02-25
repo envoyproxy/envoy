@@ -118,6 +118,11 @@ inline HostsPerLocalitySharedPtr makeHostsPerLocality(std::vector<HostVector>&& 
       std::move(locality_hosts), !force_no_local_locality && !locality_hosts.empty());
 }
 
+inline LocalityWeightsSharedPtr
+makeLocalityWeights(std::initializer_list<uint32_t> locality_weights) {
+  return std::make_shared<LocalityWeights>(locality_weights);
+}
+
 inline envoy::api::v2::core::HealthCheck
 parseHealthCheckFromV2Yaml(const std::string& yaml_string) {
   envoy::api::v2::core::HealthCheck health_check;

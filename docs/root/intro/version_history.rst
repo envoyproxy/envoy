@@ -48,6 +48,7 @@ Version history
 * upstream: add hash_function to specify the hash function for :ref:`ring hash<envoy_api_msg_Cluster.RingHashLbConfig>` as either xxHash or `murmurHash2 <https://sites.google.com/site/murmurhash>`_. MurmurHash2 is compatible with std::hash in GNU libstdc++ 3.4.20 or above. This is typically the case when compiled on Linux and not macOS.
 * upstream: added :ref:`degraded health value<arch_overview_load_balancing_degraded>` which allows
   routing to certain hosts only when there are insufficient healthy hosts available.
+* upstream: added support for host weighting and :ref:`locality weighting <arch_overview_load_balancing_locality_weighted_lb>` in the :ref:`ring hash load balancer <arch_overview_load_balancing_types_ring_hash>`, and added a :ref:`maximum_ring_size<envoy_api_field_Cluster.RingHashLbConfig.maximum_ring_size>` config parameter to strictly bound the ring size.
 
 1.9.0 (Dec 20, 2018)
 ====================
@@ -238,7 +239,7 @@ Version history
   <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.tracing>`.
 * upstream: added configuration option to the subset load balancer to take locality weights into account when
   selecting a host from a subset.
-* upstream: require opt-in to use the :ref:`x-envoy-orignal-dst-host <config_http_conn_man_headers_x-envoy-original-dst-host>` header
+* upstream: require opt-in to use the :ref:`x-envoy-original-dst-host <config_http_conn_man_headers_x-envoy-original-dst-host>` header
   for overriding destination address when using the :ref:`Original Destination <arch_overview_load_balancing_types_original_destination>`
   load balancing policy.
 
