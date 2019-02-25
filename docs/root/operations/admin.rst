@@ -374,7 +374,7 @@ explanation of the output.
 
   This endpoint is intended to be used as the stream source for
   `Hystrix dashboard <https://github.com/Netflix-Skunkworks/hystrix-dashboard/wiki>`_.
-  a GET to this endpoint will trriger a stream of statistics from envoy in
+  a GET to this endpoint will trigger a stream of statistics from envoy in
   `text/event-stream <https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events>`_
   format, as expected by the Hystrix dashboard.
 
