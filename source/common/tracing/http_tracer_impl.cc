@@ -119,7 +119,6 @@ static void annotateVerbose(Span& span, const StreamInfo::StreamInfo& stream_inf
                               *stream_info.lastDownstreamTxByteSent()),
              Tracing::Logs::get().LAST_DOWNSTREAM_TX_BYTE_SENT);
   }
-
 }
 
 void HttpTracerUtility::finalizeSpan(Span& span, const Http::HeaderMap* request_headers,

@@ -18,8 +18,7 @@ namespace Extensions {
 namespace Tracers {
 namespace Zipkin {
 
-ZipkinSpan::ZipkinSpan(Zipkin::Span& span, Zipkin::Tracer& tracer)
-    : span_(span), tracer_(tracer) {}
+ZipkinSpan::ZipkinSpan(Zipkin::Span& span, Zipkin::Tracer& tracer) : span_(span), tracer_(tracer) {}
 
 void ZipkinSpan::finishSpan() { span_.finish(); }
 

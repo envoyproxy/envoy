@@ -329,7 +329,7 @@ private:
     // Tracing::TracingConfig
     Tracing::OperationName operationName() const override;
     const std::vector<Http::LowerCaseString>& requestHeadersForTags() const override;
-    bool verbose() const override; 
+    bool verbose() const override;
 
     void traceRequest();
 
