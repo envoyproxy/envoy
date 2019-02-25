@@ -30,10 +30,8 @@ def sanitize_flagfile(in_path, out_fd):
 
 # Is the arg a flag indicating that we're building for C++ (rather than C)?
 def is_cpp_flag(arg):
-  return arg in [
-      "-static-libstdc++", "-stdlib=libc++", "-std=c++0x", "-std=c++", "-std=gnu++", "-lstdc++",
-      "-lc++"
-  ]
+  return arg in ["-static-libstdc++", "-stdlib=libc++", "-lstdc++", "-lc++"
+                ] or arg.startswith("-std=c++") or arg.startswith("-std=gnu++")
 
 
 def main():
