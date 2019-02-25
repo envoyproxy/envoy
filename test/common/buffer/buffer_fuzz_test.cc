@@ -308,7 +308,6 @@ uint32_t bufferAction(Context& ctxt, char insert_value, uint32_t max_alloc, Buff
     FUZZ_ASSERT(rc > 0);
     const uint32_t previous_length = target_buffer.length();
     Network::IoHandleCallUintResult result = target_buffer.read(io_handle, max_length);
-    std::cerr << "result.rc_ = " << result.rc_ << " rc = " << rc << "\n";
     FUZZ_ASSERT(result.rc_ == static_cast<uint64_t>(rc));
     FUZZ_ASSERT(::close(pipe_fds[1]) == 0);
     FUZZ_ASSERT(previous_length == target_buffer.search(data.data(), rc, previous_length));
