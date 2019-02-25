@@ -47,8 +47,7 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources, const std::
   if (resources.empty()) {
     ENVOY_LOG(debug, "Missing ClusterLoadAssignment for {} in onConfigUpdate()", cluster_name_);
     info_->stats().update_empty_.inc();
-    update_empty_ = true;
-    onPreInitComplete();
+    onPreInitComplete(true);
     return;
   }
   if (resources.size() != 1) {
@@ -121,7 +120,7 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources, const std::
 
   // If we didn't setup to initialize when our first round of health checking is complete, just
   // do it now.
-  onPreInitComplete();
+  onPreInitComplete(false);
 }
 
 bool EdsClusterImpl::updateHostsPerLocality(
@@ -164,7 +163,7 @@ bool EdsClusterImpl::updateHostsPerLocality(
 void EdsClusterImpl::onConfigUpdateFailed(const EnvoyException* e) {
   UNREFERENCED_PARAMETER(e);
   // We need to allow server startup to continue, even if we have a bad config.
-  onPreInitComplete();
+  onPreInitComplete(false);
 }
 
 } // namespace Upstream

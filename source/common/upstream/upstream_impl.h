@@ -415,7 +415,7 @@ public:
 
   bool empty() const override {
     for (auto const& host_set : host_sets_) {
-      if (host_set->hosts().empty()) {
+      if (!host_set->hosts().empty()) {
         return false;
       }
     }
@@ -587,6 +587,7 @@ public:
   // Upstream::Cluster
   PrioritySet& prioritySet() override { return priority_set_; }
   const PrioritySet& prioritySet() const override { return priority_set_; }
+  bool isBeingInitializedByEmptyConfigUpdate() const override { return empty_update_; }
 
   /**
    * Optionally set the health checker for the primary cluster. This is done after cluster
@@ -620,7 +621,6 @@ public:
   Outlier::Detector* outlierDetector() override { return outlier_detector_.get(); }
   const Outlier::Detector* outlierDetector() const override { return outlier_detector_.get(); }
   void initialize(std::function<void()> callback) override;
-  bool update_empty_{false};
 
 protected:
   ClusterImplBase(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
@@ -637,8 +637,10 @@ protected:
    * Called by every concrete cluster when pre-init is complete. At this point,
    * shared init starts init_manager_ initialization and determines if there
    * is an initial health check pass needed, etc.
+   *
+   * @param empty_update indicates that onPreInitComplete is triggered via empty update.
    */
-  void onPreInitComplete();
+  void onPreInitComplete(const bool empty_update);
 
   /**
    * Called by every concrete cluster after all targets registered at init manager are
@@ -664,6 +666,7 @@ private:
   bool initialization_started_{};
   std::function<void()> initialization_complete_callback_;
   uint64_t pending_initialize_health_checks_{};
+  bool empty_update_{};
 };
 
 /**

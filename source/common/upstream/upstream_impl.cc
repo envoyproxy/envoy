@@ -741,13 +741,13 @@ void ClusterImplBase::initialize(std::function<void()> callback) {
   startPreInit();
 }
 
-void ClusterImplBase::onPreInitComplete() {
+void ClusterImplBase::onPreInitComplete(const bool empty_update) {
   // Protect against multiple calls.
   if (initialization_started_) {
     return;
   }
   initialization_started_ = true;
-
+  empty_update_ = empty_update;
   ENVOY_LOG(debug, "initializing secondary cluster {} completed", info()->name());
   init_manager_.initialize([this]() { onInitDone(); });
 }
@@ -1059,7 +1059,7 @@ void StaticClusterImpl::startPreInit() {
   }
   priority_state_manager_.reset();
 
-  onPreInitComplete();
+  onPreInitComplete(false);
 }
 
 bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
@@ -1372,7 +1372,7 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
         // multiple DNS names, this will return initialized after a single DNS resolution
         // completes. This is not perfect but is easier to code and unclear if the extra
         // complexity is needed so will start with this.
-        parent_.onPreInitComplete();
+        parent_.onPreInitComplete(false);
         resolve_timer_->enableTimer(parent_.dns_refresh_rate_ms_);
       });
 }

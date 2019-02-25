@@ -109,7 +109,7 @@ private:
   void cleanup();
 
   // ClusterImplBase
-  void startPreInit() override { onPreInitComplete(); }
+  void startPreInit() override { onPreInitComplete(false); }
 
   Event::Dispatcher& dispatcher_;
   const std::chrono::milliseconds cleanup_interval_ms_;
