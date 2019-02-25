@@ -20,6 +20,13 @@ std::ostream& operator<<(std::ostream& os, const TraceWrapper& trace) {
 
 namespace Envoy {
 namespace Extensions {
+
+MATCHER_P(TraceEqual, rhs, "") {
+  envoy::data::tap::v2alpha::TraceWrapper expected_trace;
+  MessageUtil::loadFromYaml(rhs, expected_trace);
+  return arg.DebugString() == expected_trace.DebugString();
+}
+
 namespace Common {
 namespace Tap {
 
