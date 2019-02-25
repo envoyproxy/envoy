@@ -19,6 +19,7 @@
 #include "quiche/quic/platform/api/quic_stack_trace.h"
 #include "quiche/quic/platform/api/quic_string.h"
 #include "quiche/quic/platform/api/quic_string_piece.h"
+#include "quiche/quic/platform/api/quic_test_output.h"
 #include "quiche/quic/platform/api/quic_uint128.h"
 
 using testing::HasSubstr;
@@ -353,6 +354,16 @@ TEST(QuicPlatformTest, QuicCertUtils) {
             "0\x12\x6\x3U\x4\x3\f\vTest Server",
             out);
   OPENSSL_free(static_cast<void*>(der));
+}
+
+TEST(QuicPlatformTest, QuicTestOutput) {
+  QuicLogThresholdSaver saver;
+
+  // Set log level to INFO to see the test output path in log.
+  quic::GetLogger().set_level(quic::INFO);
+
+  quic::QuicRecordTestOutput("quic_test_output.1", "output 1 content\n");
+  quic::QuicRecordTestOutput("quic_test_output.2", "output 2 content\n");
 }
 
 } // namespace Quiche

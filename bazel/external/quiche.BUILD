@@ -145,6 +145,7 @@ cc_library(
         "quiche/quic/platform/api/quic_string_piece.h",
         "quiche/quic/platform/api/quic_string_utils.h",
         "quiche/quic/platform/api/quic_test.h",
+        "quiche/quic/platform/api/quic_test_output.h",
         "quiche/quic/platform/api/quic_text_utils.h",
         "quiche/quic/platform/api/quic_uint128.h",
         # TODO: uncomment the following files as implementations are added.
@@ -172,7 +173,6 @@ cc_library(
         # "quiche/quic/platform/api/quic_test.h",
         # "quiche/quic/platform/api/quic_test_loopback.h",
         # "quiche/quic/platform/api/quic_test_mem_slice_vector.h",
-        # "quiche/quic/platform/api/quic_test_output.h",
         # "quiche/quic/platform/api/quic_thread.h",
     ],
     visibility = ["//visibility:public"],
