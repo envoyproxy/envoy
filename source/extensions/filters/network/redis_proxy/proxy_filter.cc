@@ -27,7 +27,7 @@ ProxyStats ProxyFilterConfig::generateStats(const std::string& prefix, Stats::Sc
 }
 
 ProxyFilter::ProxyFilter(Common::Redis::DecoderFactory& factory, Common::Redis::EncoderPtr&& encoder,
-                         CommandSplitter::Instance& splitter, ProxyFilterConfigSharedPtr config)
+                         Common::Redis::CommandSplitter::Instance& splitter, ProxyFilterConfigSharedPtr config)
     : decoder_(factory.create(*this)), encoder_(std::move(encoder)), splitter_(splitter),
       config_(config) {
   config_->stats_.downstream_cx_total_.inc();
@@ -52,7 +52,7 @@ void ProxyFilter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& ca
 void ProxyFilter::onRespValue(Common::Redis::RespValuePtr&& value) {
   pending_requests_.emplace_back(*this);
   PendingRequest& request = pending_requests_.back();
-  CommandSplitter::SplitRequestPtr split = splitter_.makeRequest(*value, request);
+  Common::Redis::CommandSplitter::SplitRequestPtr split = splitter_.makeRequest(*value, request);
   if (split) {
     // The splitter can immediately respond and destroy the pending request. Only store the handle
     // if the request is still alive.

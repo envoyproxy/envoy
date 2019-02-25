@@ -4,9 +4,9 @@
 #include <list>
 #include <string>
 
-#include "extensions/filters/network/redis_proxy/codec_impl.h"
-#include "extensions/filters/network/redis_proxy/command_splitter.h"
-#include "extensions/filters/network/redis_proxy/conn_pool.h"
+#include "extensions/filters/network/common/redis/codec_impl.h"
+#include "extensions/filters/network/common/redis/command_splitter.h"
+#include "extensions/filters/network/common/redis/conn_pool.h"
 
 #include "test/test_common/printers.h"
 
@@ -15,7 +15,8 @@
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
-namespace RedisProxy {
+namespace Common {
+namespace Redis {
 
 /**
  * Pretty print const RespValue& value
@@ -139,7 +140,8 @@ public:
 };
 
 } // namespace CommandSplitter
-} // namespace RedisProxy
+} // namespace Redis
+} // namespace Common 
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy

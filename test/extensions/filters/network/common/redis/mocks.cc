@@ -13,7 +13,8 @@ using testing::Invoke;
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
-namespace RedisProxy {
+namespace Common {
+namespace Redis {
 
 void PrintTo(const RespValue& value, std::ostream* os) { *os << value.toString(); }
 
@@ -102,7 +103,8 @@ MockInstance::MockInstance() {}
 MockInstance::~MockInstance() {}
 
 } // namespace CommandSplitter
-} // namespace RedisProxy
+} // namespace Redis 
+} // namespace Common 
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy

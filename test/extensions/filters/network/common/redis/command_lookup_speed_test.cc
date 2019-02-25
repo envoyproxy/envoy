@@ -9,8 +9,8 @@
 #include "common/common/fmt.h"
 #include "common/stats/isolated_store_impl.h"
 
-#include "extensions/filters/network/redis_proxy/command_splitter_impl.h"
-#include "extensions/filters/network/redis_proxy/supported_commands.h"
+#include "extensions/filters/network/common/redis/command_splitter_impl.h"
+#include "extensions/filters/network/common/redis/supported_commands.h"
 
 #include "test/test_common/printers.h"
 #include "test/test_common/simulated_time_system.h"
@@ -20,7 +20,8 @@
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
-namespace RedisProxy {
+namespace Common {
+namespace Redis {
 
 class NoOpSplitCallbacks : public CommandSplitter::SplitCallbacks {
 public:
@@ -72,13 +73,14 @@ public:
   CommandSplitter::SplitRequestPtr handle_;
 };
 
-} // namespace RedisProxy
+} // namespace Redis
+} // namespace Common 
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy
 
 static void BM_MakeRequests(benchmark::State& state) {
-  Envoy::Extensions::NetworkFilters::RedisProxy::CommandLookUpSpeedTest context;
+  Envoy::Extensions::NetworkFilters::Common::Redis::CommandLookUpSpeedTest context;
 
   for (auto _ : state) {
     context.makeRequests();

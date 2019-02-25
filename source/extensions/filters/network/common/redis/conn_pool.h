@@ -11,7 +11,8 @@
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
-namespace RedisProxy {
+namespace Common {
+namespace Redis {
 namespace ConnPool {
 
 /**
@@ -38,7 +39,7 @@ public:
    * Called when a pipelined response is received.
    * @param value supplies the response which is now owned by the callee.
    */
-  virtual void onResponse(Common::Redis::RespValuePtr&& value) PURE;
+  virtual void onResponse(RespValuePtr&& value) PURE;
 
   /**
    * Called when a network/protocol error occurs and there is no response.
@@ -70,7 +71,7 @@ public:
    * @return PoolRequest* a handle to the active request or nullptr if the request could not be made
    *         for some reason.
    */
-  virtual PoolRequest* makeRequest(const Common::Redis::RespValue& request, PoolCallbacks& callbacks) PURE;
+  virtual PoolRequest* makeRequest(const RespValue& request, PoolCallbacks& callbacks) PURE;
 };
 
 typedef std::unique_ptr<Client> ClientPtr;
@@ -136,14 +137,15 @@ public:
    * @return PoolRequest* a handle to the active request or nullptr if the request could not be made
    *         for some reason.
    */
-  virtual PoolRequest* makeRequest(const std::string& hash_key, const Common::Redis::RespValue& request,
+  virtual PoolRequest* makeRequest(const std::string& hash_key, const RespValue& request,
                                    PoolCallbacks& callbacks) PURE;
 };
 
 typedef std::unique_ptr<Instance> InstancePtr;
 
 } // namespace ConnPool
-} // namespace RedisProxy
+} // namespace Redis
+} // namespace Common 
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy

@@ -9,7 +9,8 @@
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
-namespace RedisProxy {
+namespace Common {
+namespace Redis {
 namespace CommandSplitter {
 
 /**
@@ -60,8 +61,9 @@ public:
   virtual SplitRequestPtr makeRequest(const Common::Redis::RespValue& request, SplitCallbacks& callbacks) PURE;
 };
 
-} // namespace CommandSplitter
-} // namespace RedisProxy
+} // namespace CommandSplitter 
+} // namespace Redis 
+} // namespace Common 
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy
