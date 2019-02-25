@@ -207,11 +207,11 @@ public:
   using Matcher::Matcher;
 
   // Extensions::Common::Tap::Matcher
-  void onNewStream(MatchStatusVector&) const {}
-  void onHttpRequestHeaders(const Http::HeaderMap&, MatchStatusVector&) const {}
-  void onHttpRequestTrailers(const Http::HeaderMap&, MatchStatusVector&) const {}
-  void onHttpResponseHeaders(const Http::HeaderMap&, MatchStatusVector&) const {}
-  void onHttpResponseTrailers(const Http::HeaderMap&, MatchStatusVector&) const {}
+  void onNewStream(MatchStatusVector&) const override {}
+  void onHttpRequestHeaders(const Http::HeaderMap&, MatchStatusVector&) const override {}
+  void onHttpRequestTrailers(const Http::HeaderMap&, MatchStatusVector&) const override {}
+  void onHttpResponseHeaders(const Http::HeaderMap&, MatchStatusVector&) const override {}
+  void onHttpResponseTrailers(const Http::HeaderMap&, MatchStatusVector&) const override {}
 };
 
 /**
