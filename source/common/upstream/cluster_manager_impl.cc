@@ -487,6 +487,15 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::api::v2::Cluster& clust
       const auto active_it = active_clusters_.find(cluster_name);
       if (active_it != active_clusters_.end()) {
         const auto& active_cluster_entry = *active_it->second;
+        std::cout<<"before get"<<"\n";
+        ClusterImplBase* cluster_impl_base = dynamic_cast<ClusterImplBase*>(warming_cluster_entry.cluster_.get());
+        std::cout<<"after get"<<"\n";
+        if (cluster_impl_base) {
+          std::cout<<"cluster impl base is bot null" <<"\n";
+        } else {
+          std::cout<<"cluster impl base is  null" <<"\n";
+        }
+        std::cout<<"upate empty ::"<<cluster_impl_base->update_empty_<<"\n";
         if (!active_cluster_entry.cluster_->prioritySet().empty() &&
             warming_cluster_entry.cluster_->prioritySet().empty()) {
           ENVOY_LOG(debug, "copying host set from active cluster {} to warming cluster",

@@ -415,7 +415,7 @@ public:
 
   bool empty() const override {
     for (auto const& host_set : host_sets_) {
-      if (host_set->hosts().size() > 0) {
+      if (host_set->hosts().empty()) {
         return false;
       }
     }
@@ -620,6 +620,7 @@ public:
   Outlier::Detector* outlierDetector() override { return outlier_detector_.get(); }
   const Outlier::Detector* outlierDetector() const override { return outlier_detector_.get(); }
   void initialize(std::function<void()> callback) override;
+  bool update_empty_{false};
 
 protected:
   ClusterImplBase(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
