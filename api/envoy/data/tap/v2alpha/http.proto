@@ -32,7 +32,7 @@ message HttpBufferedTrace {
   Message response = 2;
 }
 
-// A streamed trace segment. Mulitple segments make up a full trace.
+// A streamed trace segment. Multiple segments make up a full trace.
 message HttpStreamedTraceSegment {
   // Wrapper for a set of headers.
   message HeaderMap {
