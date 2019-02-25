@@ -112,7 +112,7 @@ public:
     EXPECT_CALL(cluster, info());
     EXPECT_CALL(*cluster.info_, type());
     interval_timer_ = new Event::MockTimer(&factory_context_.dispatcher_);
-    EXPECT_CALL(factory_context_.init_manager_, registerTarget(_));
+    EXPECT_CALL(factory_context_.init_manager_, registerTarget(_, _));
     rds_ =
         RouteConfigProviderUtil::create(parseHttpConnectionManagerFromJson(config_json, scope_),
                                         factory_context_, "foo.", *route_config_provider_manager_);

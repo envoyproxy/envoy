@@ -400,13 +400,11 @@ message Cluster {
   // Specific configuration for the :ref:`RingHash<arch_overview_load_balancing_types_ring_hash>`
   // load balancing policy.
   message RingHashLbConfig {
-    // Minimum hash ring size, i.e. total virtual nodes. A larger size
-    // will provide better request distribution since each host in the
-    // cluster will have more virtual nodes. Defaults to 1024. In the case
-    // that total number of hosts is greater than the minimum, each host will
-    // be allocated a single virtual node. This field is limited to 8M to bound
-    // resource use.
-    google.protobuf.UInt64Value minimum_ring_size = 1 [(validate.rules).uint64.lte = 8388608];
+    // Minimum hash ring size. The larger the ring is (that is, the more hashes there are for each
+    // provided host) the better the request distribution will reflect the desired weights. Defaults
+    // to 1024 entries. See also
+    // :ref:`maximum_ring_size<envoy_api_field_Cluster.RingHashLbConfig.maximum_ring_size>`.
+    google.protobuf.UInt64Value minimum_ring_size = 1;
 
     // [#not-implemented-hide:] Hide from docs.
     message DeprecatedV1 {
@@ -432,6 +430,11 @@ message Cluster {
     // The hash function used to hash hosts onto the ketama ring. The value defaults to
     // :ref:`XX_HASH<envoy_api_enum_value_Cluster.RingHashLbConfig.HashFunction.XX_HASH>`.
     HashFunction hash_function = 3 [(validate.rules).enum.defined_only = true];
+
+    // Maximum hash ring size. Defaults to 8M entries, but can be lowered to further constrain
+    // resource use. See also
+    // :ref:`minimum_ring_size<envoy_api_field_Cluster.RingHashLbConfig.minimum_ring_size>`.
+    google.protobuf.UInt64Value maximum_ring_size = 4;
   }
 
   // Specific configuration for the

@@ -17,9 +17,9 @@ namespace {
 class TestTransportSocketCallbacks : public Network::TransportSocketCallbacks {
 public:
   explicit TestTransportSocketCallbacks(Network::Connection& connection)
-      : io_handle_(std::make_unique<Network::IoSocketHandle>(1)), connection_(connection) {}
+      : io_handle_(std::make_unique<Network::IoSocketHandleImpl>()), connection_(connection) {}
 
-  ~TestTransportSocketCallbacks() { io_handle_->close(); }
+  ~TestTransportSocketCallbacks() override {}
   Network::IoHandle& ioHandle() override { return *io_handle_; }
   const Network::IoHandle& ioHandle() const override { return *io_handle_; }
   Network::Connection& connection() override { return connection_; }
@@ -48,7 +48,7 @@ protected:
 };
 
 TEST_F(NoOpTransportSocketCallbacksTest, TestAllCallbacks) {
-  EXPECT_EQ(wrapper_callbacks_.ioHandle().fd(), wrapped_callbacks_.ioHandle().fd());
+  EXPECT_EQ(&wrapper_callbacks_.ioHandle(), &wrapped_callbacks_.ioHandle());
   EXPECT_EQ(&connection_, &wrapped_callbacks_.connection());
   EXPECT_FALSE(wrapped_callbacks_.shouldDrainReadBuffer());
 
