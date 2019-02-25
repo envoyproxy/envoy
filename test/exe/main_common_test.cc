@@ -63,7 +63,7 @@ protected:
    * The PID is needed to isolate namespaces between concurrent
    * processes in CI. The random number generator is needed
    * sequentially executed test methods fail with an error in
-   * bindDomainSocket if the the same base-id is re-used.
+   * bindDomainSocket if the same base-id is re-used.
    *
    * @return uint32_t a unique numeric ID based on the PID and a random number.
    */
