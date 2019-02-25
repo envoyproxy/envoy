@@ -92,15 +92,15 @@ TEST(OpenCensusTracerTest, Span) {
   envoy::config::trace::v2::OpenCensusConfig oc_config;
   std::unique_ptr<Tracing::Driver> driver_(new OpenCensus::Driver(oc_config));
 
-  NiceMock<Tracing::MockConfig> config_;
-  Http::TestHeaderMapImpl request_headers_{
+  NiceMock<Tracing::MockConfig> config;
+  Http::TestHeaderMapImpl request_headers{
       {":path", "/"}, {":method", "GET"}, {"x-request-id", "foo"}};
-  const std::string operation_name_{"my_operation_1"};
-  SystemTime start_time_;
+  const std::string operation_name{"my_operation_1"};
+  SystemTime start_time;
 
   {
-    Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
-                                               start_time_, {Tracing::Reason::Sampling, true});
+    Tracing::SpanPtr span = driver_->startSpan(config, request_headers, operation_name,
+                                               start_time, {Tracing::Reason::Sampling, true});
     span->setOperation("my_operation_2");
     span->setTag("my_key", "my_value");
     // TODO: injectContext.
