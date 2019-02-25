@@ -4,6 +4,7 @@
 AAAA
 ACK
 AES
+AFAICT
 ALPN
 ALS
 AMZ
@@ -683,6 +684,8 @@ tmp
 tokenizing
 traceid
 trie
+tuple
+tuples
 typeid
 ucontext
 uint
