@@ -635,7 +635,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, AdminInstanceTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-TEST_P(AdminInstanceTest, AdminProfiler) {
+TEST_P(AdminInstanceTest, AdminCpuProfiler) {
   Buffer::OwnedImpl data;
   Http::HeaderMapImpl header_map;
 
@@ -652,6 +652,23 @@ TEST_P(AdminInstanceTest, AdminProfiler) {
 
   EXPECT_EQ(Http::Code::OK, postCallback("/cpuprofiler?enable=n", header_map, data));
   EXPECT_FALSE(Profiler::Cpu::profilerEnabled());
+}
+
+TEST_P(AdminInstanceTest, AdminHeapProfiler) {
+  Buffer::OwnedImpl data;
+  Http::HeaderMapImpl header_map;
+
+#ifdef PROFILER_AVAILABLE
+  EXPECT_EQ(Http::Code::OK, postCallback("/heapprofiler?enable=y", header_map, data));
+  EXPECT_TRUE(Profiler::Heap::profilerEnabled());
+#else
+  EXPECT_EQ(Http::Code::InternalServerError,
+            postCallback("/heapprofiler?enable=y", header_map, data));
+  EXPECT_FALSE(Profiler::Heap::profilerEnabled());
+#endif
+
+  EXPECT_EQ(Http::Code::OK, postCallback("/heapprofiler?enable=n", header_map, data));
+  EXPECT_FALSE(Profiler::Heap::profilerEnabled());
 }
 
 TEST_P(AdminInstanceTest, MutatesErrorWithGet) {
