@@ -491,7 +491,6 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
       common_lb_config_(config.common_lb_config()),
       cluster_socket_options_(parseClusterSocketOptions(config, bind_config)),
       drain_connections_on_host_removal_(config.drain_connections_on_host_removal()) {
-
   switch (config.lb_policy()) {
   case envoy::api::v2::Cluster::ROUND_ROBIN:
     lb_type_ = LoadBalancerType::RoundRobin;
@@ -537,6 +536,12 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
   if (config.common_http_protocol_options().has_idle_timeout()) {
     idle_timeout_ = std::chrono::milliseconds(
         DurationUtil::durationToMilliseconds(config.common_http_protocol_options().idle_timeout()));
+  }
+  if (config.has_eds_cluster_config()) {
+    if (config.type() != envoy::api::v2::Cluster::EDS) {
+      throw EnvoyException("eds_cluster_config set in a non-EDS cluster");
+    }
+    eds_service_name_ = config.eds_cluster_config().service_name();
   }
 
   // TODO(htuch): Remove this temporary workaround when we have
@@ -679,7 +684,7 @@ ClusterImplBase::ClusterImplBase(
     const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
     Server::Configuration::TransportSocketFactoryContext& factory_context,
     Stats::ScopePtr&& stats_scope, bool added_via_api)
-    : runtime_(runtime) {
+    : runtime_(runtime), init_manager_(fmt::format("Cluster {}", cluster.name())) {
   factory_context.setInitManager(init_manager_);
   auto socket_factory = createTransportSocketFactory(cluster, factory_context);
   info_ = std::make_unique<ClusterInfoImpl>(cluster, factory_context.clusterManager().bindConfig(),

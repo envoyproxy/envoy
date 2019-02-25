@@ -596,7 +596,8 @@ void ClusterManagerImpl::loadCluster(const envoy::api::v2::Cluster& cluster,
   // finishes.
   if (cluster_reference.info()->lbType() == LoadBalancerType::RingHash) {
     cluster_entry_it->second->thread_aware_lb_ = std::make_unique<RingHashLoadBalancer>(
-        cluster_reference.prioritySet(), cluster_reference.info()->stats(), runtime_, random_,
+        cluster_reference.prioritySet(), cluster_reference.info()->stats(),
+        cluster_reference.info()->statsScope(), runtime_, random_,
         cluster_reference.info()->lbRingHashConfig(), cluster_reference.info()->lbConfig());
   } else if (cluster_reference.info()->lbType() == LoadBalancerType::Maglev) {
     cluster_entry_it->second->thread_aware_lb_ = std::make_unique<MaglevLoadBalancer>(
@@ -1031,8 +1032,9 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
   if (cluster->lbSubsetInfo().isEnabled()) {
     lb_ = std::make_unique<SubsetLoadBalancer>(
         cluster->lbType(), priority_set_, parent_.local_priority_set_, cluster->stats(),
-        parent.parent_.runtime_, parent.parent_.random_, cluster->lbSubsetInfo(),
-        cluster->lbRingHashConfig(), cluster->lbLeastRequestConfig(), cluster->lbConfig());
+        cluster->statsScope(), parent.parent_.runtime_, parent.parent_.random_,
+        cluster->lbSubsetInfo(), cluster->lbRingHashConfig(), cluster->lbLeastRequestConfig(),
+        cluster->lbConfig());
   } else {
     switch (cluster->lbType()) {
     case LoadBalancerType::LeastRequest: {
