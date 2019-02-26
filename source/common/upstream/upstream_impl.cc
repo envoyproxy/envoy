@@ -200,13 +200,9 @@ bool updateHealthFlag(const Host& updated_host, Host& existing_host, Host::Healt
 HostVector filterHosts(const std::unordered_set<HostSharedPtr>& hosts,
                        const std::unordered_set<HostSharedPtr>& excluded_hosts) {
   HostVector net_hosts;
-  net_hosts.reserve(hosts.size());
 
-  for (const auto& host : hosts) {
-    if (excluded_hosts.find(host) == excluded_hosts.end()) {
-      net_hosts.emplace_back(host);
-    }
-  }
+  std::set_difference(hosts.begin(), hosts.end(), excluded_hosts.begin(), excluded_hosts.end(),
+                      net_hosts.begin());
 
   return net_hosts;
 }
@@ -482,6 +478,26 @@ void PrioritySetImpl::batchHostUpdate(BatchUpdateCb& callback) {
   HostVector net_hosts_removed = filterHosts(scope.all_hosts_removed_, scope.all_hosts_added_);
 
   runUpdateCallbacks(net_hosts_added, net_hosts_removed);
+}
+
+void PrioritySetImpl::BatchUpdateScope::updateHosts(
+    uint32_t priority, PrioritySet::UpdateHostsParams&& update_hosts_params,
+    LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
+    const HostVector& hosts_removed, absl::optional<uint32_t> overprovisioning_factor) {
+  // We assume that each call updates a different priority.
+  ASSERT(priorities_.find(priority) == priorities_.end());
+  priorities_.insert(priority);
+
+  for (const auto& host : hosts_added) {
+    all_hosts_added_.insert(host);
+  }
+
+  for (const auto& host : hosts_removed) {
+    all_hosts_removed_.insert(host);
+  }
+
+  parent_.updateHosts(priority, std::move(update_hosts_params), locality_weights, hosts_added,
+                      hosts_removed, overprovisioning_factor);
 }
 
 ClusterStats ClusterInfoImpl::generateStats(Stats::Scope& scope) {

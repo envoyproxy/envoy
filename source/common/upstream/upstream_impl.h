@@ -458,22 +458,7 @@ private:
                              PrioritySet::UpdateHostsParams&& update_hosts_params,
                              LocalityWeightsConstSharedPtr locality_weights,
                              const HostVector& hosts_added, const HostVector& hosts_removed,
-                             absl::optional<uint32_t> overprovisioning_factor) override {
-      // We assume that each call updates a different priority.
-      ASSERT(priorities_.find(priority) == priorities_.end());
-      priorities_.insert(priority);
-
-      for (const auto& host : hosts_added) {
-        all_hosts_added_.insert(host);
-      }
-
-      for (const auto& host : hosts_removed) {
-        all_hosts_removed_.insert(host);
-      }
-
-      parent_.updateHosts(priority, std::move(update_hosts_params), locality_weights, hosts_added,
-                          hosts_removed, overprovisioning_factor);
-    }
+                             absl::optional<uint32_t> overprovisioning_factor) override;
 
     std::unordered_set<HostSharedPtr> all_hosts_added_;
     std::unordered_set<HostSharedPtr> all_hosts_removed_;
