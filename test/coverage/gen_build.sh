@@ -61,6 +61,7 @@ EOF
     ],
     tags = ["manual"],
     coverage = False,
+    shard_count = 5,  # arbitrary: increasing shards cuts down run time but increases flake risk.
     # Needed when invoking external shell tests etc.
     local = True,
 )
