@@ -10,24 +10,28 @@ fire, informing the sender it can resume sending data.
 
 ### Configuration
 
-There are two knobs for configuring Envoy flow control:
+There are three knobs for configuring Envoy flow control:
 listener limits, `per_connection_buffer_limit_bytes` in the
 [Listener config](https://www.envoyproxy.io/docs/envoy/latest/api-v2/api/v2/lds.proto.html#envoy-api-msg-listener),
 and cluster limits, `per_connection_buffer_limit_bytes` in the
 [Cluster config](https://www.envoyproxy.io/docs/envoy/latest/api-v2/api/v2/cds.proto.html#clusters), both
-of which default to 1 MiB (1024 * 1024)
+of which default to 1 MiB (1024 * 1024), and
+Http2 stream limits, `initial_connection_window_size` in
+[Http2ProtocolOptions](https://www.envoyproxy.io/docs/envoy/latest/api-v2/api/v2/core/protocol.proto#core-http2protocoloptions)
+which defaults to 256 Mib (256 * 1024 * 1024)
 
 The listener limits apply to how much raw data will be read per read() call from
 downstream, as well as how much data may be buffered in userspace between Envoy
 and downstream.
 
 The listener limits are also propogated to the HttpConnectionManager, and applied on a per-stream
-basis to the various L7 buffers described below. As such they limit the size of HTTP requests and
-response bodies that can be buffered. Note that Envoy can and will proxy arbitrarily large bodies
-on routes where all L7 filters are streaming, but many filters such as the transcoder or buffer
-filters require the full HTTP body to be buffered, so limit the request and response size based on
-the listener
-limit.
+basis to HTTP/1.1 L7 buffers described below. As such they limit the size of HTTP/1 requests and
+response bodies that can be buffered. For HTTP/2, as many streams can be multiplexed over one TCP
+connection, the L7 and L4 buffer limits can be tuned separately, and the configuration option
+initial_connection_window_size is applied to all of the L7 buffers. Note that for both HTTP/1 and
+HTTP/2 Envoy can and will proxy arbitrarily large bodies on routes where all L7 filters are
+streaming, but many filters such as the transcoder or buffer filters require the full HTTP body to
+be buffered, so limit the request and response size based on the listener limit.
 
 The cluster limits affect how much raw data will be read per read() call from upstream, as
 well as how much data may be buffered in userspace between Envoy and upstream.
