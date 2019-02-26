@@ -1,8 +1,12 @@
 How can I configure flow control
 ================================
 
-This often comes up when Envoy serves 413s due to a combination of non-streaming L7 filters, and
-L7 buffer limits not accommodating large enough bodies.
+Flow control may cause problems where Envoy is using non-streaming L7 filters, and request or
+response bodies exceed the L7 buffer limits. For requests where the body must be buffered and
+exceeds the configured limits, Envoy will serve a 413 to the user and increment the
+`downstream_rq_too_large metric`. On the response path if the response body must be buffered and
+exceeds the limit, Envoy will increment the `rs_too_large` metric and either disconnect mid-response
+(if headers have already been sent downstream) or send a 500 response.
 
 There are three knobs for configuring Envoy flow control:
 :ref:`listener limits <envoy_api_field_Listener.per_connection_buffer_limit_bytes>`,
