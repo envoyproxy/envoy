@@ -1,3 +1,5 @@
+#include <http_parser.h>
+
 #include <memory>
 #include <string>
 
@@ -31,7 +33,12 @@ namespace Http1 {
 class Http1ServerConnectionImplTest : public TestBase {
 public:
   void initialize() {
+    http_parser_set_max_header_size(max_request_headers_kb_ * 1024);
     codec_ = std::make_unique<ServerConnectionImpl>(connection_, callbacks_, codec_settings_);
+  }
+
+  void TearDown() override {
+    http_parser_set_max_header_size(Http::DEFAULT_MAX_REQUEST_HEADERS_KB * 1024);
   }
 
   NiceMock<Network::MockConnection> connection_;
@@ -42,6 +49,9 @@ public:
   void expectHeadersTest(Protocol p, bool allow_absolute_url, Buffer::OwnedImpl& buffer,
                          TestHeaderMapImpl& expected_headers);
   void expect400(Protocol p, bool allow_absolute_url, Buffer::OwnedImpl& buffer);
+
+protected:
+  uint32_t max_request_headers_kb_{Http::DEFAULT_MAX_REQUEST_HEADERS_KB};
 };
 
 void Http1ServerConnectionImplTest::expect400(Protocol p, bool allow_absolute_url,
@@ -1007,7 +1017,28 @@ TEST_F(Http1ClientConnectionImplTest, HighwatermarkMultipleResponses) {
       ->onUnderlyingConnectionBelowWriteBufferLowWatermark();
 }
 
+TEST_F(Http1ServerConnectionImplTest, TestLargeRequestHeadersRejected) {
+  initialize();
+
+  std::string exception_reason;
+  NiceMock<Http::MockStreamDecoder> decoder;
+  Http::StreamEncoder* response_encoder = nullptr;
+  EXPECT_CALL(callbacks_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamEncoder& encoder, bool) -> Http::StreamDecoder& {
+        response_encoder = &encoder;
+        return decoder;
+      }));
+
+  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n");
+  codec_->dispatch(buffer);
+  std::string long_string = "big: " + std::string(64 * 1024, 'q') + "\r\n";
+  buffer = Buffer::OwnedImpl(long_string);
+  EXPECT_THROW_WITH_MESSAGE(codec_->dispatch(buffer), EnvoyException,
+                            "http/1.1 protocol error: HPE_HEADER_OVERFLOW");
+}
+
 TEST_F(Http1ServerConnectionImplTest, TestLargeRequestHeadersAccepted) {
+  max_request_headers_kb_ = 65;
   initialize();
 
   NiceMock<Http::MockStreamDecoder> decoder;
@@ -1026,6 +1057,7 @@ TEST_F(Http1ServerConnectionImplTest, TestLargeRequestHeadersAccepted) {
 }
 
 TEST_F(Http1ServerConnectionImplTest, TestLargeRequestHeadersAcceptedMaxConfigurable) {
+  max_request_headers_kb_ = 96;
   initialize();
 
   NiceMock<Http::MockStreamDecoder> decoder;
