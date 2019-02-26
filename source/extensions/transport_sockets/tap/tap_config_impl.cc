@@ -16,7 +16,7 @@ PerSocketTapperImpl::PerSocketTapperImpl(SocketTapConfigImplSharedPtr config,
 }
 
 void PerSocketTapperImpl::closeSocket(Network::ConnectionEvent) {
-  if (!config_->rootMatcher().matches(statuses_)) {
+  if (!config_->rootMatcher().matchStatus(statuses_).matches_) {
     return;
   }
 
@@ -39,7 +39,7 @@ envoy::data::tap::v2alpha::SocketEvent& PerSocketTapperImpl::createEvent() {
 }
 
 void PerSocketTapperImpl::onRead(const Buffer::Instance& data, uint32_t bytes_read) {
-  if (!config_->rootMatcher().matches(statuses_)) {
+  if (!config_->rootMatcher().matchStatus(statuses_).matches_) {
     return;
   }
 
@@ -58,7 +58,7 @@ void PerSocketTapperImpl::onRead(const Buffer::Instance& data, uint32_t bytes_re
 
 void PerSocketTapperImpl::onWrite(const Buffer::Instance& data, uint32_t bytes_written,
                                   bool end_stream) {
-  if (!config_->rootMatcher().matches(statuses_)) {
+  if (!config_->rootMatcher().matchStatus(statuses_).matches_) {
     return;
   }
 

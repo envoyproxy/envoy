@@ -27,7 +27,7 @@ private:
 
   SocketTapConfigImplSharedPtr config_;
   const Network::Connection& connection_;
-  std::vector<bool> statuses_;
+  Extensions::Common::Tap::Matcher::MatchStatusVector statuses_;
   std::shared_ptr<envoy::data::tap::v2alpha::BufferedTraceWrapper> trace_;
   uint32_t rx_bytes_buffered_{};
   uint32_t tx_bytes_buffered_{};

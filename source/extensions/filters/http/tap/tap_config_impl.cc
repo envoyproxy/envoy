@@ -61,7 +61,7 @@ bool HttpPerRequestTapperImpl::onDestroyLog(const Http::HeaderMap* request_heade
                                             const Http::HeaderMap* request_trailers,
                                             const Http::HeaderMap* response_headers,
                                             const Http::HeaderMap* response_trailers) {
-  if (!config_->rootMatcher().matches(statuses_)) {
+  if (!config_->rootMatcher().matchStatus(statuses_).matches_) {
     return false;
   }
 
