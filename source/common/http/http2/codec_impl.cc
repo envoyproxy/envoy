@@ -867,8 +867,10 @@ ConnectionImpl::Http2Options::Http2Options(const Http2Settings& http2_settings) 
   // of kept alive HTTP/2 connections.
   nghttp2_option_set_no_closed_streams(options_, 1);
   nghttp2_option_set_no_auto_window_update(options_, 1);
-  nghttp2_option_set_max_send_header_block_length(options_,
-                                                  NGHTTP2_MAX_SEND_HEADER_BLOCK_LENGTH * 1024);
+
+  // The max send header block length is configured to an arbitrarily high number so as to never
+  // trigger the check within nghttp2, as we check request headers length in codec_impl::saveHeader.
+  nghttp2_option_set_max_send_header_block_length(options_, 0x7fffffff);
 
   if (http2_settings.hpack_table_size_ != NGHTTP2_DEFAULT_HEADER_TABLE_SIZE) {
     nghttp2_option_set_max_deflate_dynamic_table_size(options_, http2_settings.hpack_table_size_);

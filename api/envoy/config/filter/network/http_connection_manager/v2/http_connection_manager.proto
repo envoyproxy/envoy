@@ -133,14 +133,9 @@ message HttpConnectionManager {
   // header in responses. If not set, the default is *envoy*.
   string server_name = 10;
 
-  // The maximum request headers size for incoming connections. The default max
-  // is 60 KiB, based on default settings for http codecs. For HTTP1, the currentB
-  // limit set by http_parser is 80 KiB. for HTTP2, the default allowed header
-  // block in nghttp2 is 64 KiB. The max configurable setting is 64K in order to
-  // stay under both codec limits.
-  // The maximum per-header limit, i.e. for each key-value pair, is 64 KiB in
-  // http2.
-  // Requests that exceed this size will receive a 431 response.
+  // The maximum request headers size for incoming connections.
+  // If unconfigured, the default max request headers allowed is 60 KiB.
+  // Requests that exceed this limit will receive a 431 response.
   google.protobuf.UInt32Value max_request_headers_kb = 29
       [(validate.rules).uint32.gt = 0, (validate.rules).uint32.lte = 96];
 
