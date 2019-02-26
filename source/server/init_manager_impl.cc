@@ -53,10 +53,10 @@ void InitManagerImpl::initializeTarget(TargetWithDescription& target) {
 void InitManagerImpl::registerTarget(Init::Target& target, absl::string_view description) {
   TRACE_INIT_MANAGER("registerTarget {}", description);
   ASSERT(state_ != State::Initialized);
-  ASSERT(std::find(targets_.begin(), targets_.end(), TargetWithDescription{&target, description}) ==
-             targets_.end(),
+  ASSERT(std::find(targets_.begin(), targets_.end(),
+                   TargetWithDescription{&target, std::string(description)}) == targets_.end(),
          "Registered duplicate Init::Target");
-  targets_.emplace_back(&target, description);
+  targets_.emplace_back(&target, std::string(description));
   if (state_ == State::Initializing) {
     initializeTarget(targets_.back());
   }
