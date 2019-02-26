@@ -248,7 +248,7 @@ message CertificateValidationContext {
   google.protobuf.BoolValue require_signed_certificate_timestamp = 6;
 
   // An optional `certificate revocation list
-  // <http://https://en.wikipedia.org/wiki/Certificate_revocation_list>`_
+  // <https://en.wikipedia.org/wiki/Certificate_revocation_list>`_
   // (in PEM format). If specified, Envoy will verify that the presented peer
   // certificate has not been revoked by this CRL. If this DataSource contains
   // multiple CRLs, all of them will be used.

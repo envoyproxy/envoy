@@ -587,7 +587,7 @@ Management Server has a statistics tree rooted at *control_plane.* with the foll
    :header: Name, Type, Description
    :widths: 1, 1, 2
 
-   connected_state, Gauge, A boolan (1 for connected and 0 for disconnected) that indicates the current connection state with management server
+   connected_state, Gauge, A boolean (1 for connected and 0 for disconnected) that indicates the current connection state with management server
    rate_limit_enforced, Counter, Total number of times rate limit was enforced for management server requests
    pending_requests, Gauge, Total number of pending requests when the rate limit was enforced
    
@@ -619,7 +619,7 @@ likely to be at least partially implemented in Envoy but may have wire format
 breaking changes made prior to freezing.
 
 Protos tagged *experimental*, have the same caveats as draft protos
-and may have have major changes made prior to Envoy implementation and freezing.
+and may have major changes made prior to Envoy implementation and freezing.
 
 The current open v2 API issues are tracked `here
 <https://github.com/envoyproxy/envoy/issues?q=is%3Aopen+is%3Aissue+label%3A%22v2+API%22>`_.

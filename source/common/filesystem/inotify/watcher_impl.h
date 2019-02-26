@@ -16,7 +16,7 @@ namespace Filesystem {
 /**
  * Implementation of Watcher that uses inotify. inotify is an awful API. In order to make this work
  * in a somewhat sane way we always watch the directory that owns the thing being watched, and then
- * filter for events that are relevant to the the thing being watched.
+ * filter for events that are relevant to the thing being watched.
  */
 class WatcherImpl : public Watcher, Logger::Loggable<Logger::Id::file> {
 public:

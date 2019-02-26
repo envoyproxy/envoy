@@ -1,15 +1,14 @@
 #include "common/common/callback_impl.h"
 
-#include "test/test_common/test_base.h"
-
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::InSequence;
 
 namespace Envoy {
 namespace Common {
 
-class CallbackManagerTest : public TestBase {
+class CallbackManagerTest : public testing::Test {
 public:
   MOCK_METHOD1(called, void(int arg));
 };

@@ -28,10 +28,10 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/registry.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::ContainerEq;
@@ -134,7 +134,7 @@ std::vector<StrictDnsConfigTuple> generateStrictDnsParams() {
   return dns_config;
 }
 
-class StrictDnsParamTest : public TestBaseWithParam<StrictDnsConfigTuple>,
+class StrictDnsParamTest : public testing::TestWithParam<StrictDnsConfigTuple>,
                            public UpstreamImplTestBase {};
 
 INSTANTIATE_TEST_SUITE_P(DnsParam, StrictDnsParamTest,
@@ -176,7 +176,7 @@ TEST_P(StrictDnsParamTest, ImmediateResolve) {
   EXPECT_EQ(2UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
 }
 
-class StrictDnsClusterImplTest : public TestBase, public UpstreamImplTestBase {
+class StrictDnsClusterImplTest : public testing::Test, public UpstreamImplTestBase {
 protected:
   std::shared_ptr<Network::MockDnsResolver> dns_resolver_ =
       std::make_shared<Network::MockDnsResolver>();
@@ -866,7 +866,7 @@ TEST(HostImplTest, HealthFlags) {
   EXPECT_EQ(Host::Health::Unhealthy, host->health());
 }
 
-class StaticClusterImplTest : public TestBase, public UpstreamImplTestBase {};
+class StaticClusterImplTest : public testing::Test, public UpstreamImplTestBase {};
 
 TEST_F(StaticClusterImplTest, InitialHosts) {
   const std::string yaml = R"EOF(
@@ -1504,7 +1504,7 @@ TEST_F(StaticClusterImplTest, SourceAddressPriority) {
   }
 }
 
-class ClusterImplTest : public TestBase, public UpstreamImplTestBase {};
+class ClusterImplTest : public testing::Test, public UpstreamImplTestBase {};
 
 // Test that the correct feature() is set when close_connections_on_host_health_failure is
 // configured.
@@ -1590,7 +1590,7 @@ TEST(PrioritySet, Extend) {
   }
 }
 
-class ClusterInfoImplTest : public TestBase {
+class ClusterInfoImplTest : public testing::Test {
 public:
   ClusterInfoImplTest() : api_(Api::createApiForTest(stats_)) {}
 
@@ -1671,6 +1671,39 @@ TEST_F(ClusterInfoImplTest, Metadata) {
                 .string_value());
   EXPECT_EQ(0.3, cluster->info()->lbConfig().healthy_panic_threshold().value());
   EXPECT_EQ(LoadBalancerType::Maglev, cluster->info()->lbType());
+}
+
+// Eds service_name is populated.
+TEST_F(ClusterInfoImplTest, EdsServiceNamePopulation) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: EDS
+    lb_policy: MAGLEV
+    eds_cluster_config:
+      service_name: service_foo
+    hosts: [{ socket_address: { address: foo.bar.com, port_value: 443 }}]
+    common_lb_config:
+      healthy_panic_threshold:
+        value: 0.3
+  )EOF";
+  auto cluster = makeCluster(yaml);
+  EXPECT_EQ(cluster->info()->eds_service_name(), "service_foo");
+
+  const std::string unexpected_eds_config_yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: MAGLEV
+    eds_cluster_config:
+      service_name: service_foo
+    hosts: [{ socket_address: { address: foo.bar.com, port_value: 443 }}]
+    common_lb_config:
+      healthy_panic_threshold:
+        value: 0.3
+  )EOF";
+  EXPECT_THROW_WITH_MESSAGE(makeCluster(unexpected_eds_config_yaml), EnvoyException,
+                            "eds_cluster_config set in a non-EDS cluster");
 }
 
 // Typed metadata loading throws exception.
@@ -2034,7 +2067,7 @@ TEST(HostsPerLocalityImpl, Filter) {
   }
 }
 
-class HostSetImplLocalityTest : public TestBase {
+class HostSetImplLocalityTest : public testing::Test {
 public:
   LocalityWeightsConstSharedPtr locality_weights_;
   HostSetImpl host_set_{0, kDefaultOverProvisioningFactor};

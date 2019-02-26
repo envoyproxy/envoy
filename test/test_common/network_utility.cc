@@ -27,8 +27,6 @@ Address::InstanceConstSharedPtr findOrCheckFreePort(Address::InstanceConstShared
     return nullptr;
   }
   IoHandlePtr io_handle = addr_port->socket(type);
-  ScopedFdCloser fd_closer(io_handle->fd());
-  ScopedIoHandleCloser io_handle_closer(io_handle);
   // Not setting REUSEADDR, therefore if the address has been recently used we won't reuse it here.
   // However, because we're going to use the address while checking if it is available, we'll need
   // to set REUSEADDR on listener sockets created by tests using an address validated by this means.
@@ -153,29 +151,26 @@ bool supportsIpVersion(const Address::IpVersion version) {
   IoHandlePtr io_handle = addr->socket(Address::SocketType::Stream);
   if (0 != addr->bind(io_handle->fd()).rc_) {
     // Socket bind failed.
-    RELEASE_ASSERT(::close(io_handle->fd()) == 0, "");
-    io_handle->close();
+    RELEASE_ASSERT(io_handle->close().err_ == nullptr, "");
     return false;
   }
-  RELEASE_ASSERT(::close(io_handle->fd()) == 0, "");
-  io_handle->close();
+  RELEASE_ASSERT(io_handle->close().err_ == nullptr, "");
   return true;
 }
 
-std::pair<Address::InstanceConstSharedPtr, int> bindFreeLoopbackPort(Address::IpVersion version,
-                                                                     Address::SocketType type) {
+std::pair<Address::InstanceConstSharedPtr, Network::IoHandlePtr>
+bindFreeLoopbackPort(Address::IpVersion version, Address::SocketType type) {
   Address::InstanceConstSharedPtr addr = getCanonicalLoopbackAddress(version);
   IoHandlePtr io_handle = addr->socket(type);
-  ScopedIoHandleCloser closer(io_handle);
   Api::SysCallIntResult result = addr->bind(io_handle->fd());
   if (0 != result.rc_) {
-    close(io_handle->fd());
+    io_handle->close();
     std::string msg = fmt::format("bind failed for address {} with error: {} ({})",
                                   addr->asString(), strerror(result.errno_), result.errno_);
     ADD_FAILURE() << msg;
     throw EnvoyException(msg);
   }
-  return std::make_pair(Address::addressFromFd(io_handle->fd()), io_handle->fd());
+  return std::make_pair(Address::addressFromFd(io_handle->fd()), std::move(io_handle));
 }
 
 TransportSocketPtr createRawBufferSocket() { return std::make_unique<RawBufferSocket>(); }

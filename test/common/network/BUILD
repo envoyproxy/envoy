@@ -279,3 +279,11 @@ envoy_cc_binary(
         "//source/common/network:utility_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "io_socket_handle_impl_test",
+    srcs = ["io_socket_handle_impl_test.cc"],
+    deps = [
+        "//source/common/network:io_socket_handle_lib",
+    ],
+)

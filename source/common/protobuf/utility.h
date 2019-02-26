@@ -60,6 +60,15 @@ uint64_t checkAndReturnDefault(uint64_t default_value, uint64_t max_value);
 uint64_t convertPercent(double percent, uint64_t max_value);
 
 /**
+ * Given a fractional percent chance of a given event occurring, evaluate to a yes/no decision
+ * based on a provided random value.
+ * @param percent the chance of a given event happening.
+ * @param random_value supplies a numerical value to use to evaluate the event.
+ * @return bool decision about whether the event should occur.
+ */
+bool evaluateFractionalPercent(envoy::type::FractionalPercent percent, uint64_t random_value);
+
+/**
  * Convert a fractional percent denominator enum into an integer.
  * @param denominator supplies denominator to convert.
  * @return the converted denominator.

@@ -27,6 +27,7 @@ message DirectionalAction {
 }
 
 message StreamAction {
+  // Index into list of created streams (not HTTP/2 level stream ID).
   uint32 stream_id = 1;
   oneof stream_action_selector {
     DirectionalAction request = 2;

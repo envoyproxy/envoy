@@ -66,21 +66,29 @@ SetLogicMatcher::SetLogicMatcher(
   }
 }
 
-bool SetLogicMatcher::updateLocalStatus(std::vector<bool>& statuses,
+void SetLogicMatcher::updateLocalStatus(MatchStatusVector& statuses,
                                         const UpdateFunctor& functor) const {
-  for (size_t index : indexes_) {
-    statuses[index] = functor(*matchers_[index], statuses);
+  if (!statuses[my_index_].might_change_status_) {
+    return;
   }
 
-  auto predicate = [&statuses](size_t index) { return statuses[index]; };
+  for (size_t index : indexes_) {
+    functor(*matchers_[index], statuses);
+  }
+
+  auto predicate = [&statuses](size_t index) { return statuses[index].matches_; };
   if (type_ == Type::And) {
-    statuses[my_index_] = std::all_of(indexes_.begin(), indexes_.end(), predicate);
+    statuses[my_index_].matches_ = std::all_of(indexes_.begin(), indexes_.end(), predicate);
   } else {
     ASSERT(type_ == Type::Or);
-    statuses[my_index_] = std::any_of(indexes_.begin(), indexes_.end(), predicate);
+    statuses[my_index_].matches_ = std::any_of(indexes_.begin(), indexes_.end(), predicate);
   }
 
-  return statuses[my_index_];
+  // TODO(mattklein123): We can potentially short circuit this even further if we git a single false
+  // in an AND set or a single true in an OR set.
+  statuses[my_index_].might_change_status_ =
+      std::any_of(indexes_.begin(), indexes_.end(),
+                  [&statuses](size_t index) { return statuses[index].might_change_status_; });
 }
 
 NotMatcher::NotMatcher(const envoy::service::tap::v2alpha::MatchPredicate& config,
@@ -89,10 +97,15 @@ NotMatcher::NotMatcher(const envoy::service::tap::v2alpha::MatchPredicate& confi
   buildMatcher(config, matchers);
 }
 
-bool NotMatcher::updateLocalStatus(std::vector<bool>& statuses,
+void NotMatcher::updateLocalStatus(MatchStatusVector& statuses,
                                    const UpdateFunctor& functor) const {
-  statuses[my_index_] = !functor(*matchers_[not_index_], statuses);
-  return statuses[my_index_];
+  if (!statuses[my_index_].might_change_status_) {
+    return;
+  }
+
+  functor(*matchers_[not_index_], statuses);
+  statuses[my_index_].matches_ = !statuses[not_index_].matches_;
+  statuses[my_index_].might_change_status_ = statuses[not_index_].might_change_status_;
 }
 
 HttpHeaderMatcherBase::HttpHeaderMatcherBase(
@@ -104,10 +117,11 @@ HttpHeaderMatcherBase::HttpHeaderMatcherBase(
   }
 }
 
-bool HttpHeaderMatcherBase::matchHeaders(const Http::HeaderMap& headers,
-                                         std::vector<bool>& statuses) const {
-  statuses[my_index_] = Http::HeaderUtility::matchHeaders(headers, headers_to_match_);
-  return statuses[my_index_];
+void HttpHeaderMatcherBase::matchHeaders(const Http::HeaderMap& headers,
+                                         MatchStatusVector& statuses) const {
+  ASSERT(statuses[my_index_].might_change_status_);
+  statuses[my_index_].matches_ = Http::HeaderUtility::matchHeaders(headers, headers_to_match_);
+  statuses[my_index_].might_change_status_ = false;
 }
 
 } // namespace Tap

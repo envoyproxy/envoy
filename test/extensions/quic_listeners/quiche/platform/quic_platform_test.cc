@@ -1,8 +1,8 @@
 #include "test/extensions/transport_sockets/tls/ssl_test_utility.h"
 #include "test/test_common/logging.h"
-#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 #include "quiche/quic/platform/api/quic_aligned.h"
 #include "quiche/quic/platform/api/quic_arraysize.h"
 #include "quiche/quic/platform/api/quic_cert_utils.h"
@@ -12,8 +12,10 @@
 #include "quiche/quic/platform/api/quic_estimate_memory_usage.h"
 #include "quiche/quic/platform/api/quic_logging.h"
 #include "quiche/quic/platform/api/quic_map_util.h"
+#include "quiche/quic/platform/api/quic_mock_log.h"
 #include "quiche/quic/platform/api/quic_mutex.h"
 #include "quiche/quic/platform/api/quic_ptr_util.h"
+#include "quiche/quic/platform/api/quic_sleep.h"
 #include "quiche/quic/platform/api/quic_stack_trace.h"
 #include "quiche/quic/platform/api/quic_string.h"
 #include "quiche/quic/platform/api/quic_string_piece.h"
@@ -111,9 +113,40 @@ TEST(QuicPlatformTest, QuicMapUtil) {
   EXPECT_FALSE(quic::QuicContainsValue(stdvec, 0));
 }
 
+TEST(QuicPlatformTest, QuicMockLog) {
+  ASSERT_EQ(quic::ERROR, quic::GetLogger().level());
+
+  {
+    // Test a mock log that is not capturing logs.
+    CREATE_QUIC_MOCK_LOG(log);
+    EXPECT_QUIC_LOG_CALL(log).Times(0);
+    QUIC_LOG(ERROR) << "This should be logged but not captured by the mock.";
+  }
+
+  // Test nested mock logs.
+  CREATE_QUIC_MOCK_LOG(outer_log);
+  outer_log.StartCapturingLogs();
+
+  {
+    // Test a mock log that captures logs.
+    CREATE_QUIC_MOCK_LOG(inner_log);
+    inner_log.StartCapturingLogs();
+
+    EXPECT_QUIC_LOG_CALL_CONTAINS(inner_log, ERROR, "Inner log message");
+    QUIC_LOG(ERROR) << "Inner log message should be captured.";
+
+    // Destruction of inner_log should restore the QUIC log sink to outer_log.
+  }
+
+  EXPECT_QUIC_LOG_CALL_CONTAINS(outer_log, ERROR, "Outer log message");
+  QUIC_LOG(ERROR) << "Outer log message should be captured.";
+}
+
 TEST(QuicPlatformTest, QuicStackTraceTest) {
   EXPECT_THAT(quic::QuicStackTrace(), HasSubstr("QuicStackTraceTest"));
 }
+
+TEST(QuicPlatformTest, QuicSleep) { quic::QuicSleep(quic::QuicTime::Delta::FromMilliseconds(20)); }
 
 TEST(QuicPlatformTest, QuicString) {
   quic::QuicString s = "foo";
@@ -170,13 +203,13 @@ TEST(QuicPlatformTest, QuicLog) {
   QUIC_LOG_IF(INFO, true) << i++;
   EXPECT_EQ(0, i);
 
-  EXPECT_LOG_CONTAINS("error", ": 11", QUIC_LOG(ERROR) << (i = 11));
+  EXPECT_LOG_CONTAINS("error", "i=11", QUIC_LOG(ERROR) << "i=" << (i = 11));
   EXPECT_EQ(11, i);
 
   QUIC_LOG_IF(ERROR, false) << i++;
   EXPECT_EQ(11, i);
 
-  EXPECT_LOG_CONTAINS("error", ": 11", QUIC_LOG_IF(ERROR, true) << i++);
+  EXPECT_LOG_CONTAINS("error", "i=11", QUIC_LOG_IF(ERROR, true) << "i=" << i++);
   EXPECT_EQ(12, i);
 
   // Set QUIC log level to INFO, since VLOG is emitted at the INFO level.
@@ -189,11 +222,11 @@ TEST(QuicPlatformTest, QuicLog) {
 
   quic::SetVerbosityLogThreshold(1);
 
-  EXPECT_LOG_CONTAINS("info", ": 1", QUIC_VLOG(1) << (i = 1));
+  EXPECT_LOG_CONTAINS("info", "i=1", QUIC_VLOG(1) << "i=" << (i = 1));
   EXPECT_EQ(1, i);
 
   errno = EINVAL;
-  EXPECT_LOG_CONTAINS("info", ": 3:", QUIC_PLOG(INFO) << (i = 3));
+  EXPECT_LOG_CONTAINS("info", "i=3:", QUIC_PLOG(INFO) << "i=" << (i = 3));
   EXPECT_EQ(3, i);
 }
 

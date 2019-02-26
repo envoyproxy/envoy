@@ -23,9 +23,9 @@ void HttpPerRequestTapperImpl::onRequestHeaders(const Http::HeaderMap& headers) 
 }
 
 void HttpPerRequestTapperImpl::onRequestBody(const Buffer::Instance& data) {
+  auto& body = *trace_->mutable_http_buffered_trace()->mutable_request()->mutable_body();
   Extensions::Common::Tap::Utility::addBufferToProtoBytes(
-      *trace_->mutable_http_buffered_trace()->mutable_request()->mutable_body(),
-      config_->maxBufferedRxBytes(), data);
+      body, config_->maxBufferedRxBytes() - body.as_bytes().size(), data, 0, data.length());
 }
 
 void HttpPerRequestTapperImpl::onRequestTrailers(const Http::HeaderMap& trailers) {
@@ -37,9 +37,9 @@ void HttpPerRequestTapperImpl::onResponseHeaders(const Http::HeaderMap& headers)
 }
 
 void HttpPerRequestTapperImpl::onResponseBody(const Buffer::Instance& data) {
+  auto& body = *trace_->mutable_http_buffered_trace()->mutable_response()->mutable_body();
   Extensions::Common::Tap::Utility::addBufferToProtoBytes(
-      *trace_->mutable_http_buffered_trace()->mutable_response()->mutable_body(),
-      config_->maxBufferedTxBytes(), data);
+      body, config_->maxBufferedTxBytes() - body.as_bytes().size(), data, 0, data.length());
 }
 
 void HttpPerRequestTapperImpl::onResponseTrailers(const Http::HeaderMap& trailers) {
@@ -61,7 +61,7 @@ bool HttpPerRequestTapperImpl::onDestroyLog(const Http::HeaderMap* request_heade
                                             const Http::HeaderMap* request_trailers,
                                             const Http::HeaderMap* response_headers,
                                             const Http::HeaderMap* response_trailers) {
-  if (!config_->rootMatcher().matches(statuses_)) {
+  if (!config_->rootMatcher().matchStatus(statuses_).matches_) {
     return false;
   }
 
