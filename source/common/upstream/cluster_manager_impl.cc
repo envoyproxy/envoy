@@ -612,7 +612,8 @@ void ClusterManagerImpl::loadCluster(const envoy::api::v2::Cluster& cluster,
         cluster_reference.info()->lbRingHashConfig(), cluster_reference.info()->lbConfig());
   } else if (cluster_reference.info()->lbType() == LoadBalancerType::Maglev) {
     cluster_entry_it->second->thread_aware_lb_ = std::make_unique<MaglevLoadBalancer>(
-        cluster_reference.prioritySet(), cluster_reference.info()->stats(), runtime_, random_,
+        cluster_reference.prioritySet(), cluster_reference.info()->stats(),
+        cluster_reference.info()->statsScope(), runtime_, random_,
         cluster_reference.info()->lbConfig());
   }
 
