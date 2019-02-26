@@ -93,7 +93,7 @@ private:
 
 /**
  * Helps manage classes that need to be instantiated once per server. In
- * production they must be be plumbed through call/class hierarchy, but
+ * production they must be plumbed through call/class hierarchy, but
  * in test-code the zero-arg-constructor Mock pattern makes this impractical.
  * Instead we use self-cleaning singletons.
  *
