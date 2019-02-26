@@ -35,7 +35,8 @@ namespace Server {
  * the config is valid, false if invalid.
  */
 bool validateConfig(const Options& options, Network::Address::InstanceConstSharedPtr local_address,
-                    ComponentFactory& component_factory, Thread::ThreadFactory& thread_factory);
+                    ComponentFactory& component_factory, Thread::ThreadFactory& thread_factory,
+                    Filesystem::Instance& file_system);
 
 /**
  * ValidationInstance does the bulk of the work for config-validation runs of Envoy. It implements
@@ -57,7 +58,8 @@ public:
   ValidationInstance(const Options& options, Event::TimeSystem& time_system,
                      Network::Address::InstanceConstSharedPtr local_address,
                      Stats::IsolatedStoreImpl& store, Thread::BasicLockable& access_log_lock,
-                     ComponentFactory& component_factory, Thread::ThreadFactory& thread_factory);
+                     ComponentFactory& component_factory, Thread::ThreadFactory& thread_factory,
+                     Filesystem::Instance& file_system);
 
   // Server::Instance
   Admin& admin() override { return admin_; }

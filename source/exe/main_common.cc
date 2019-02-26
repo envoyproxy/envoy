@@ -45,8 +45,10 @@ Runtime::LoaderPtr ProdComponentFactory::createRuntime(Server::Instance& server,
 MainCommonBase::MainCommonBase(const OptionsImpl& options, Event::TimeSystem& time_system,
                                TestHooks& test_hooks, Server::ComponentFactory& component_factory,
                                std::unique_ptr<Runtime::RandomGenerator>&& random_generator,
-                               Thread::ThreadFactory& thread_factory)
-    : options_(options), component_factory_(component_factory), thread_factory_(thread_factory) {
+                               Thread::ThreadFactory& thread_factory,
+                               Filesystem::Instance& file_system)
+    : options_(options), component_factory_(component_factory), thread_factory_(thread_factory),
+      file_system_(file_system) {
   Thread::ThreadFactorySingleton::set(&thread_factory_);
   ares_library_init(ARES_LIB_INIT_ALL);
   Event::Libevent::Global::initialize();
@@ -83,7 +85,8 @@ MainCommonBase::MainCommonBase(const OptionsImpl& options, Event::TimeSystem& ti
 
     server_ = std::make_unique<Server::InstanceImpl>(
         options_, time_system, local_address, test_hooks, *restarter_, *stats_store_,
-        access_log_lock, component_factory, std::move(random_generator), *tls_, thread_factory);
+        access_log_lock, component_factory, std::move(random_generator), *tls_, thread_factory_,
+        file_system_);
 
     break;
   }
@@ -115,7 +118,8 @@ bool MainCommonBase::run() {
     return true;
   case Server::Mode::Validate: {
     auto local_address = Network::Utility::getLocalAddress(options_.localAddressIpVersion());
-    return Server::validateConfig(options_, local_address, component_factory_, thread_factory_);
+    return Server::validateConfig(options_, local_address, component_factory_, thread_factory_,
+                                  file_system_);
   }
   case Server::Mode::InitOnly:
     PERF_DUMP();
@@ -139,7 +143,8 @@ void MainCommonBase::adminRequest(absl::string_view path_and_query, absl::string
 MainCommon::MainCommon(int argc, const char* const* argv)
     : options_(argc, argv, &MainCommon::hotRestartVersion, spdlog::level::info),
       base_(options_, real_time_system_, default_test_hooks_, prod_component_factory_,
-            std::make_unique<Runtime::RandomGeneratorImpl>(), platform_impl_.threadFactory()) {}
+            std::make_unique<Runtime::RandomGeneratorImpl>(), platform_impl_.threadFactory(),
+            platform_impl_.fileSystem()) {}
 
 std::string MainCommon::hotRestartVersion(uint64_t max_num_stats, uint64_t max_stat_name_len,
                                           bool hot_restart_enabled) {

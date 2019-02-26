@@ -503,6 +503,10 @@ namespace Thread {
 ThreadFactory& threadFactoryForTest();
 } // namespace Thread
 
+namespace Filesystem {
+Instance& fileSystemForTest();
+} // namespace Filesystem
+
 namespace Api {
 ApiPtr createApiForTest();
 ApiPtr createApiForTest(Stats::Store& stat_store);

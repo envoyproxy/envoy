@@ -18,17 +18,9 @@ public:
   MockFile();
   ~MockFile();
 
-  // Filesystem::File
-  Api::SysCallBoolResult open() override;
-  Api::SysCallSizeResult write(absl::string_view buffer) override;
-  Api::SysCallBoolResult close() override;
-  bool isOpen() override { return is_open_; };
-  MOCK_METHOD0(path, std::string());
-  MOCK_METHOD1(errorToString, std::string(int));
-
-  MOCK_METHOD0(open_, Api::SysCallBoolResult());
-  MOCK_METHOD1(write_, Api::SysCallSizeResult(absl::string_view buffer));
-  MOCK_METHOD0(close_, Api::SysCallBoolResult());
+  MOCK_METHOD0(open_, bool());
+  MOCK_METHOD1(write_, ssize_t(absl::string_view buffer));
+  MOCK_METHOD0(close_, bool());
 
   size_t num_opens_;
   size_t num_writes_;
@@ -37,8 +29,14 @@ public:
   Thread::CondVar open_event_;
   Thread::CondVar write_event_;
 
+protected:
+  // Filesystem::File
+  void openFile() override;
+  ssize_t writeFile(absl::string_view buffer) override;
+  bool closeFile() override;
+
 private:
-  bool is_open_;
+  void setFileOpen(bool is_open);
 };
 
 class MockInstance : public Instance {
@@ -52,7 +50,6 @@ public:
   MOCK_METHOD1(directoryExists, bool(const std::string&));
   MOCK_METHOD1(fileSize, ssize_t(const std::string&));
   MOCK_METHOD1(fileReadToEnd, std::string(const std::string&));
-  MOCK_METHOD1(canonicalPath, Api::SysCallStringResult(const std::string&));
   MOCK_METHOD1(illegalPath, bool(const std::string&));
 };
 

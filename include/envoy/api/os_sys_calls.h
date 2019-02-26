@@ -1,15 +1,19 @@
 #pragma once
 
+#ifndef WIN32
 #include <sys/ioctl.h>
 #include <sys/mman.h>   // for mode_t
 #include <sys/socket.h> // for sockaddr
 #include <sys/stat.h>
 #include <sys/uio.h> // for iovec
 
+#endif
+
 #include <memory>
 #include <string>
 
 #include "envoy/common/pure.h"
+#include "envoy/common/platform.h"
 
 namespace Envoy {
 namespace Api {
@@ -34,7 +38,6 @@ typedef SysCallResult<int> SysCallIntResult;
 typedef SysCallResult<ssize_t> SysCallSizeResult;
 typedef SysCallResult<void*> SysCallPtrResult;
 typedef SysCallResult<std::string> SysCallStringResult;
-typedef SysCallResult<bool> SysCallBoolResult;
 
 class OsSysCalls {
 public:

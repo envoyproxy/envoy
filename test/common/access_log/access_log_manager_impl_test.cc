@@ -46,22 +46,21 @@ protected:
 
 TEST_F(AccessLogManagerImplTest, BadFile) {
   EXPECT_CALL(dispatcher_, createTimer_(_));
-  EXPECT_CALL(*file_, open_()).WillOnce(Return(Api::SysCallBoolResult{false, 0}));
+  EXPECT_CALL(*file_, open_()).WillOnce(Return(false));
   EXPECT_THROW(access_log_manager_.createAccessLog("foo"), EnvoyException);
 }
 
 TEST_F(AccessLogManagerImplTest, flushToLogFilePeriodically) {
   NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&dispatcher_);
 
-  EXPECT_CALL(*file_, open_()).WillOnce(Return(Api::SysCallBoolResult{true, 0}));
+  EXPECT_CALL(*file_, open_()).WillOnce(Return(true));
   AccessLogFileSharedPtr log_file = access_log_manager_.createAccessLog("foo");
 
   EXPECT_CALL(*timer, enableTimer(timeout_40ms_));
-  EXPECT_CALL(*file_, write_(_))
-      .WillOnce(Invoke([](absl::string_view data) -> Api::SysCallSizeResult {
-        EXPECT_EQ(0, data.compare("test"));
-        return {static_cast<ssize_t>(data.length()), 0};
-      }));
+  EXPECT_CALL(*file_, write_(_)).WillOnce(Invoke([](absl::string_view data) -> ssize_t {
+    EXPECT_EQ(0, data.compare("test"));
+    return static_cast<ssize_t>(data.length());
+  }));
 
   log_file->write("test");
 
@@ -72,11 +71,10 @@ TEST_F(AccessLogManagerImplTest, flushToLogFilePeriodically) {
     }
   }
 
-  EXPECT_CALL(*file_, write_(_))
-      .WillOnce(Invoke([](absl::string_view data) -> Api::SysCallSizeResult {
-        EXPECT_EQ(0, data.compare("test2"));
-        return {static_cast<ssize_t>(data.length()), 0};
-      }));
+  EXPECT_CALL(*file_, write_(_)).WillOnce(Invoke([](absl::string_view data) -> ssize_t {
+    EXPECT_EQ(0, data.compare("test2"));
+    return static_cast<ssize_t>(data.length());
+  }));
 
   // make sure timer is re-enabled on callback call
   log_file->write("test2");
@@ -89,13 +87,13 @@ TEST_F(AccessLogManagerImplTest, flushToLogFilePeriodically) {
       file_->write_event_.wait(file_->write_mutex_);
     }
   }
-  EXPECT_CALL(*file_, close_()).WillOnce(Return(Api::SysCallBoolResult{true, 0}));
+  EXPECT_CALL(*file_, close_()).WillOnce(Return(true));
 }
 
 TEST_F(AccessLogManagerImplTest, flushToLogFileOnDemand) {
   NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&dispatcher_);
 
-  EXPECT_CALL(*file_, open_()).WillOnce(Return(Api::SysCallBoolResult{true, 0}));
+  EXPECT_CALL(*file_, open_()).WillOnce(Return(true));
   AccessLogFileSharedPtr log_file = access_log_manager_.createAccessLog("foo");
 
   EXPECT_CALL(*timer, enableTimer(timeout_40ms_));
@@ -103,10 +101,9 @@ TEST_F(AccessLogManagerImplTest, flushToLogFileOnDemand) {
   // The first write to a given file will start the flush thread, which can flush
   // immediately (race on whether it will or not). So do a write and flush to
   // get that state out of the way, then test that small writes don't trigger a flush.
-  EXPECT_CALL(*file_, write_(_))
-      .WillOnce(Invoke([](absl::string_view data) -> Api::SysCallSizeResult {
-        return {static_cast<ssize_t>(data.length()), 0};
-      }));
+  EXPECT_CALL(*file_, write_(_)).WillOnce(Invoke([](absl::string_view data) -> ssize_t {
+    return static_cast<ssize_t>(data.length());
+  }));
   log_file->write("prime-it");
   log_file->flush();
   uint32_t expected_writes = 1;
@@ -115,11 +112,10 @@ TEST_F(AccessLogManagerImplTest, flushToLogFileOnDemand) {
     EXPECT_EQ(expected_writes, file_->num_writes_);
   }
 
-  EXPECT_CALL(*file_, write_(_))
-      .WillOnce(Invoke([](absl::string_view data) -> Api::SysCallSizeResult {
-        EXPECT_EQ(0, data.compare("test"));
-        return {static_cast<ssize_t>(data.length()), 0};
-      }));
+  EXPECT_CALL(*file_, write_(_)).WillOnce(Invoke([](absl::string_view data) -> ssize_t {
+    EXPECT_EQ(0, data.compare("test"));
+    return static_cast<ssize_t>(data.length());
+  }));
 
   log_file->write("test");
 
@@ -135,11 +131,10 @@ TEST_F(AccessLogManagerImplTest, flushToLogFileOnDemand) {
     EXPECT_EQ(expected_writes, file_->num_writes_);
   }
 
-  EXPECT_CALL(*file_, write_(_))
-      .WillOnce(Invoke([](absl::string_view data) -> Api::SysCallSizeResult {
-        EXPECT_EQ(0, data.compare("test2"));
-        return {static_cast<ssize_t>(data.length()), 0};
-      }));
+  EXPECT_CALL(*file_, write_(_)).WillOnce(Invoke([](absl::string_view data) -> ssize_t {
+    EXPECT_EQ(0, data.compare("test2"));
+    return static_cast<ssize_t>(data.length());
+  }));
 
   // make sure timer is re-enabled on callback call
   log_file->write("test2");
@@ -153,21 +148,21 @@ TEST_F(AccessLogManagerImplTest, flushToLogFileOnDemand) {
       file_->write_event_.wait(file_->write_mutex_);
     }
   }
-  EXPECT_CALL(*file_, close_()).WillOnce(Return(Api::SysCallBoolResult{true, 0}));
+  EXPECT_CALL(*file_, close_()).WillOnce(Return(true));
 }
 
 TEST_F(AccessLogManagerImplTest, reopenFile) {
   NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&dispatcher_);
 
   Sequence sq;
-  EXPECT_CALL(*file_, open_()).InSequence(sq).WillOnce(Return(Api::SysCallBoolResult{true, 0}));
+  EXPECT_CALL(*file_, open_()).InSequence(sq).WillOnce(Return(true));
   AccessLogFileSharedPtr log_file = access_log_manager_.createAccessLog("foo");
 
   EXPECT_CALL(*file_, write_(_))
       .InSequence(sq)
-      .WillOnce(Invoke([](absl::string_view data) -> Api::SysCallSizeResult {
+      .WillOnce(Invoke([](absl::string_view data) -> ssize_t {
         EXPECT_EQ(0, data.compare("before"));
-        return {static_cast<ssize_t>(data.length()), 0};
+        return static_cast<ssize_t>(data.length());
       }));
 
   log_file->write("before");
@@ -180,17 +175,17 @@ TEST_F(AccessLogManagerImplTest, reopenFile) {
     }
   }
 
-  EXPECT_CALL(*file_, close_()).InSequence(sq).WillOnce(Return(Api::SysCallBoolResult{true, 0}));
-  EXPECT_CALL(*file_, open_()).InSequence(sq).WillOnce(Return(Api::SysCallBoolResult{true, 0}));
+  EXPECT_CALL(*file_, close_()).InSequence(sq).WillOnce(Return(true));
+  EXPECT_CALL(*file_, open_()).InSequence(sq).WillOnce(Return(true));
 
   EXPECT_CALL(*file_, write_(_))
       .InSequence(sq)
-      .WillOnce(Invoke([](absl::string_view data) -> Api::SysCallSizeResult {
+      .WillOnce(Invoke([](absl::string_view data) -> ssize_t {
         EXPECT_EQ(0, data.compare("reopened"));
-        return {static_cast<ssize_t>(data.length()), 0};
+        return static_cast<ssize_t>(data.length());
       }));
 
-  EXPECT_CALL(*file_, close_()).InSequence(sq).WillOnce(Return(Api::SysCallBoolResult{true, 0}));
+  EXPECT_CALL(*file_, close_()).InSequence(sq).WillOnce(Return(true));
 
   log_file->reopen();
   log_file->write("reopened");
@@ -207,17 +202,16 @@ TEST_F(AccessLogManagerImplTest, reopenFile) {
 TEST_F(AccessLogManagerImplTest, reopenThrows) {
   NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&dispatcher_);
 
-  EXPECT_CALL(*file_, write_(_))
-      .WillRepeatedly(Invoke([](absl::string_view data) -> Api::SysCallSizeResult {
-        return {static_cast<ssize_t>(data.length()), 0};
-      }));
+  EXPECT_CALL(*file_, write_(_)).WillRepeatedly(Invoke([](absl::string_view data) -> ssize_t {
+    return static_cast<ssize_t>(data.length());
+  }));
 
   Sequence sq;
-  EXPECT_CALL(*file_, open_()).InSequence(sq).WillOnce(Return(Api::SysCallBoolResult{true, 0}));
+  EXPECT_CALL(*file_, open_()).InSequence(sq).WillOnce(Return(true));
 
   AccessLogFileSharedPtr log_file = access_log_manager_.createAccessLog("foo");
-  EXPECT_CALL(*file_, close_()).InSequence(sq).WillOnce(Return(Api::SysCallBoolResult{true, 0}));
-  EXPECT_CALL(*file_, open_()).InSequence(sq).WillOnce(Return(Api::SysCallBoolResult{false, 0}));
+  EXPECT_CALL(*file_, close_()).InSequence(sq).WillOnce(Return(true));
+  EXPECT_CALL(*file_, open_()).InSequence(sq).WillOnce(Return(false));
 
   log_file->write("test write");
   timer->callback_();
@@ -245,14 +239,13 @@ TEST_F(AccessLogManagerImplTest, reopenThrows) {
 }
 
 TEST_F(AccessLogManagerImplTest, bigDataChunkShouldBeFlushedWithoutTimer) {
-  EXPECT_CALL(*file_, open_()).WillOnce(Return(Api::SysCallBoolResult{true, 0}));
+  EXPECT_CALL(*file_, open_()).WillOnce(Return(true));
   AccessLogFileSharedPtr log_file = access_log_manager_.createAccessLog("foo");
 
-  EXPECT_CALL(*file_, write_(_))
-      .WillOnce(Invoke([](absl::string_view data) -> Api::SysCallSizeResult {
-        EXPECT_EQ(0, data.compare("a"));
-        return {static_cast<ssize_t>(data.length()), 0};
-      }));
+  EXPECT_CALL(*file_, write_(_)).WillOnce(Invoke([](absl::string_view data) -> ssize_t {
+    EXPECT_EQ(0, data.compare("a"));
+    return static_cast<ssize_t>(data.length());
+  }));
 
   log_file->write("a");
 
@@ -265,12 +258,11 @@ TEST_F(AccessLogManagerImplTest, bigDataChunkShouldBeFlushedWithoutTimer) {
 
   // First write happens without waiting on thread_flush_. Now make a big string and it should be
   // flushed even when timer is not enabled
-  EXPECT_CALL(*file_, write_(_))
-      .WillOnce(Invoke([](absl::string_view data) -> Api::SysCallSizeResult {
-        std::string expected(1024 * 64 + 1, 'b');
-        EXPECT_EQ(0, data.compare(expected));
-        return {static_cast<ssize_t>(data.length()), 0};
-      }));
+  EXPECT_CALL(*file_, write_(_)).WillOnce(Invoke([](absl::string_view data) -> ssize_t {
+    std::string expected(1024 * 64 + 1, 'b');
+    EXPECT_EQ(0, data.compare(expected));
+    return static_cast<ssize_t>(data.length());
+  }));
 
   std::string big_string(1024 * 64 + 1, 'b');
   log_file->write(big_string);
@@ -281,38 +273,36 @@ TEST_F(AccessLogManagerImplTest, bigDataChunkShouldBeFlushedWithoutTimer) {
       file_->write_event_.wait(file_->write_mutex_);
     }
   }
-  EXPECT_CALL(*file_, close_()).WillOnce(Return(Api::SysCallBoolResult{true, 0}));
+  EXPECT_CALL(*file_, close_()).WillOnce(Return(true));
 }
 
 TEST_F(AccessLogManagerImplTest, reopenAllFiles) {
   EXPECT_CALL(dispatcher_, createTimer_(_)).WillRepeatedly(ReturnNew<NiceMock<Event::MockTimer>>());
 
-  EXPECT_CALL(*file_, open_()).Times(2).WillRepeatedly(Return(Api::SysCallBoolResult{true, 0}));
+  EXPECT_CALL(*file_, open_()).Times(2).WillRepeatedly(Return(true));
   AccessLogFileSharedPtr log = access_log_manager_.createAccessLog("foo");
 
   NiceMock<Filesystem::MockFile>* file2 = new NiceMock<Filesystem::MockFile>;
   EXPECT_CALL(file_system_, createFile("bar"))
       .WillOnce(Return(ByMove(std::unique_ptr<NiceMock<Filesystem::MockFile>>(file2))));
-  EXPECT_CALL(*file2, open_()).Times(2).WillRepeatedly(Return(Api::SysCallBoolResult{true, 0}));
+  EXPECT_CALL(*file2, open_()).Times(2).WillRepeatedly(Return(true));
   AccessLogFileSharedPtr log2 = access_log_manager_.createAccessLog("bar");
 
   // Make sure that getting the access log with the same name returns the same underlying file.
   EXPECT_EQ(log, access_log_manager_.createAccessLog("foo"));
   EXPECT_EQ(log2, access_log_manager_.createAccessLog("bar"));
 
-  EXPECT_CALL(*file_, close_()).Times(2).WillRepeatedly(Return(Api::SysCallBoolResult{true, 0}));
-  EXPECT_CALL(*file2, close_()).Times(2).WillRepeatedly(Return(Api::SysCallBoolResult{true, 0}));
+  EXPECT_CALL(*file_, close_()).Times(2).WillRepeatedly(Return(true));
+  EXPECT_CALL(*file2, close_()).Times(2).WillRepeatedly(Return(true));
 
   // Test that reopen reopens all of the files
-  EXPECT_CALL(*file_, write_(_))
-      .WillRepeatedly(Invoke([](absl::string_view data) -> Api::SysCallSizeResult {
-        return {static_cast<ssize_t>(data.length()), 0};
-      }));
+  EXPECT_CALL(*file_, write_(_)).WillRepeatedly(Invoke([](absl::string_view data) -> ssize_t {
+    return static_cast<ssize_t>(data.length());
+  }));
 
-  EXPECT_CALL(*file2, write_(_))
-      .WillRepeatedly(Invoke([](absl::string_view data) -> Api::SysCallSizeResult {
-        return {static_cast<ssize_t>(data.length()), 0};
-      }));
+  EXPECT_CALL(*file2, write_(_)).WillRepeatedly(Invoke([](absl::string_view data) -> ssize_t {
+    return static_cast<ssize_t>(data.length());
+  }));
 
   access_log_manager_.reopen();
 

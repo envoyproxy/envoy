@@ -3,31 +3,28 @@
 #include <cstdint>
 #include <string>
 
+#include "envoy/api/os_sys_calls.h"
 #include "envoy/filesystem/filesystem.h"
 
 namespace Envoy {
 namespace Filesystem {
 
-class FileImpl : public File {
+class FileImplPosix : public File {
 public:
-  FileImpl(const std::string& path);
-  ~FileImpl();
+  FileImplPosix(const std::string& path) : File(path) {}
+  ~FileImplPosix();
 
+protected:
   // Filesystem::File
-  Api::SysCallBoolResult open() override;
-  Api::SysCallSizeResult write(absl::string_view buffer) override;
-  Api::SysCallBoolResult close() override;
-  bool isOpen() override;
-  std::string path() override;
-  std::string errorToString(int error) override;
+  void openFile() override;
+  ssize_t writeFile(absl::string_view buffer) override;
+  bool closeFile() override;
 
 private:
-  int fd_;
-  const std::string path_;
   friend class FileSystemImplTest;
 };
 
-class InstanceImpl : public Instance {
+class InstanceImplPosix : public Instance {
 public:
   // Filesystem::Instance
   FilePtr createFile(const std::string& path) override;
@@ -35,8 +32,11 @@ public:
   bool directoryExists(const std::string& path) override;
   ssize_t fileSize(const std::string& path) override;
   std::string fileReadToEnd(const std::string& path) override;
-  Api::SysCallStringResult canonicalPath(const std::string& path) override;
   bool illegalPath(const std::string& path) override;
+
+private:
+  Api::SysCallStringResult canonicalPath(const std::string& path);
+  friend class FileSystemImplTest;
 };
 
 } // namespace Filesystem

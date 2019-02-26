@@ -1,43 +1,40 @@
 #include "test/mocks/filesystem/mocks.h"
 
+#include "common/common/assert.h"
 #include "common/common/lock_guard.h"
 
 namespace Envoy {
 namespace Filesystem {
 
-MockFile::MockFile() : num_opens_(0), num_writes_(0), is_open_(false) {}
+MockFile::MockFile() : File(""), num_opens_(0), num_writes_(0) {}
 MockFile::~MockFile() {}
 
-Api::SysCallBoolResult MockFile::open() {
+void MockFile::openFile() {
   Thread::LockGuard lock(open_mutex_);
 
-  const Api::SysCallBoolResult result = open_();
-  is_open_ = result.rc_;
+  const bool result = open_();
+  setFileOpen(result);
   num_opens_++;
   open_event_.notifyOne();
-
-  return result;
 }
 
-Api::SysCallSizeResult MockFile::write(absl::string_view buffer) {
+ssize_t MockFile::writeFile(absl::string_view buffer) {
   Thread::LockGuard lock(write_mutex_);
-  if (!is_open_) {
-    return {-1, EBADF};
+  if (!isOpen()) {
+    errno = EBADF;
+    return -1;
   }
 
-  const Api::SysCallSizeResult result = write_(buffer);
+  const ssize_t result = write_(buffer);
   num_writes_++;
   write_event_.notifyOne();
 
   return result;
 }
 
-Api::SysCallBoolResult MockFile::close() {
-  const Api::SysCallBoolResult result = close_();
-  is_open_ = !result.rc_;
+bool MockFile::closeFile() { return close_(); }
 
-  return result;
-}
+void MockFile::setFileOpen(bool is_open) { fd_ = is_open ? 1 : -1; }
 
 MockInstance::MockInstance() {}
 MockInstance::~MockInstance() {}
