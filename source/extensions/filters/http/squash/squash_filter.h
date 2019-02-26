@@ -103,7 +103,7 @@ private:
   const SquashFilterConfigSharedPtr config_;
 
   // Current state of the squash filter. If is_squashing_ is true, Hold the request while we
-  // communicate with the squash server to attach a debugger. If it is false, let the the request
+  // communicate with the squash server to attach a debugger. If it is false, let the request
   // pass-through.
   bool is_squashing_;
   // The API path of the created debug attachment (used for polling its state).
