@@ -91,7 +91,7 @@ public:
     router_.downstream_connection_.remote_address_ =
         Network::Utility::parseInternetAddressAndPort("1.2.3.4:80");
 
-    // make the "system time" non-zero, because 0 is considered invalid by DateUtil
+    // Make the "system time" non-zero, because 0 is considered invalid by DateUtil.
     test_time_.setMonotonicTime(std::chrono::milliseconds(50));
   }
 
