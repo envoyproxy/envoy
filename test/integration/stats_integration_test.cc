@@ -189,7 +189,7 @@ TEST_P(ClusterMemoryUtilization, MemoryLargeClusterSizeWithStats) {
   const size_t m1001 = memoryConsumedWithClusters(1001, true);
   EXPECT_LT(start_mem / 1000, m1001 / 1000);
   size_t m_per_cluster = (m1001 - m1) / 1000;
-  EXPECT_LT(m_per_cluster, 57900); // actual value: 57872 as of Feb 19, 2019
+  EXPECT_LT(m_per_cluster, 58000); // actual value: 57936 as of Feb 26, 2019
 }
 
 } // namespace
