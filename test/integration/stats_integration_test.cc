@@ -2,11 +2,11 @@
 
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/config/metrics/v2/stats.pb.h"
+#include "envoy/stats/scope.h"
+#include "envoy/stats/stats.h"
 
 #include "common/config/well_known_names.h"
 #include "common/memory/stats.h"
-#include "envoy/stats/stats.h"
-#include "envoy/stats/scope.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/config/utility.h"
@@ -173,7 +173,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ClusterMemoryUtilization,
 TEST_P(ClusterMemoryUtilization, MemoryLargeClusterSizeWithStats) {
   // Skip test if we cannot measure memory with TCMALLOC
   if (!Stats::TestUtil::hasDeterministicMallocStats()) {
-      return;
+    return;
   }
   const size_t start_mem = Memory::Stats::totalCurrentlyAllocated() / 1000;
 
