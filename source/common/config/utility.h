@@ -225,17 +225,6 @@ public:
   }
 
   /**
-   * Generate a SubscriptionStats object from stats scope.
-   * @param scope for stats.
-   * @return SubscriptionStats for scope.
-   */
-  static ControlPlaneStats generateControlPlaneStats(Stats::Scope& scope) {
-    const std::string control_plane_prefix = "control_plane.";
-    return {ALL_CONTROL_PLANE_STATS(POOL_COUNTER_PREFIX(scope, control_plane_prefix),
-                                    POOL_GAUGE_PREFIX(scope, control_plane_prefix))};
-  }
-
-  /**
    * Get a Factory from the registry with a particular name (and templated type) with error checking
    * to ensure the name and factory are valid.
    * @param name string identifier for the particular implementation. Note: this is a proto string

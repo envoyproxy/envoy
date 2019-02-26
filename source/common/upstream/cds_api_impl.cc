@@ -42,6 +42,7 @@ CdsApiImpl::CdsApiImpl(const envoy::api::v2::core::ConfigSource& cds_config, Clu
 }
 
 void CdsApiImpl::onConfigUpdate(const ResourceVector& resources, const std::string& version_info) {
+<<<<<<< HEAD
   cm_.adsMux().pause(Config::TypeUrl::get().ClusterLoadAssignment);
   Cleanup eds_resume([this] { cm_.adsMux().resume(Config::TypeUrl::get().ClusterLoadAssignment); });
 >>>>>>> filesystem: convert free functions to object methods (#5692)
@@ -80,8 +81,45 @@ void CdsApiImpl::onConfigUpdate(
 =======
     try {
       clusters_to_remove.erase(cluster_name);
+=======
+  ClusterManager::ClusterInfoMap clusters_to_remove = cm_.clusters();
+  for (const auto& cluster : resources) {
+    clusters_to_remove.erase(cluster.name());
+  }
+  Protobuf::RepeatedPtrField<std::string> to_remove_repeated;
+  for (const auto& cluster : clusters_to_remove) {
+    *to_remove_repeated.Add() = cluster.first;
+  }
+  Protobuf::RepeatedPtrField<envoy::api::v2::Resource> to_add_repeated;
+  for (const auto& cluster : resources) {
+    envoy::api::v2::Resource* to_add = to_add_repeated.Add();
+    to_add->set_name(cluster.name());
+    to_add->set_version(version_info);
+    to_add->mutable_resource()->PackFrom(cluster);
+  }
+  onConfigUpdate(to_add_repeated, to_remove_repeated, version_info);
+}
+
+void CdsApiImpl::onConfigUpdate(
+    const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
+    const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+    const std::string& system_version_info) {
+  cm_.adsMux().pause(Config::TypeUrl::get().ClusterLoadAssignment);
+  Cleanup eds_resume([this] { cm_.adsMux().resume(Config::TypeUrl::get().ClusterLoadAssignment); });
+
+  std::vector<std::string> exception_msgs;
+  std::unordered_set<std::string> cluster_names;
+  for (const auto& resource : added_resources) {
+    try {
+      envoy::api::v2::Cluster cluster =
+          MessageUtil::anyConvert<envoy::api::v2::Cluster>(resource.resource());
+      MessageUtil::validate(cluster);
+      if (!cluster_names.insert(cluster.name()).second) {
+        throw EnvoyException(fmt::format("duplicate cluster {} found", cluster.name()));
+      }
+>>>>>>> snapshot
       if (cm_.addOrUpdateCluster(
-              cluster, version_info,
+              cluster, resource.version(),
               [this](const std::string&, ClusterManager::ClusterWarmingState state) {
                 // Following if/else block implements a control flow mechanism that can be used
                 // by an ADS implementation to properly sequence CDS and RDS update. It is not
@@ -108,7 +146,7 @@ void CdsApiImpl::onConfigUpdate(
                   cm_.adsMux().resume(Config::TypeUrl::get().Cluster);
                 }
               })) {
-        ENVOY_LOG(debug, "cds: add/update cluster '{}'", cluster_name);
+        ENVOY_LOG(debug, "cds: add/update cluster '{}'", cluster.name());
       }
     } catch (const EnvoyException& e) {
       exception_msgs.push_back(e.what());
@@ -152,9 +190,15 @@ void CdsApiImpl::onConfigUpdate(
     }
   }
 
-  whole_update_version_info_ = system_version_info;
   runInitializeCallbackIfAny();
+<<<<<<< HEAD
 >>>>>>> consolidate CdsApiImpl
+=======
+  if (!exception_msgs.empty()) {
+    throw EnvoyException(StringUtil::join(exception_msgs, "\n"));
+  }
+  whole_update_version_info_ = system_version_info;
+>>>>>>> snapshot
 }
 
 void CdsApiImpl::onConfigUpdateFailed(const EnvoyException*) {

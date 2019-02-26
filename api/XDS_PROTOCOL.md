@@ -288,7 +288,6 @@ admin:
 
 ### Incremental xDS
 
-<<<<<<< HEAD
 Incremental xDS is a separate xDS endpoint that:
 
   * Allows the protocol to communicate on the wire in terms of resource/resource
@@ -300,6 +299,7 @@ Incremental xDS is a separate xDS endpoint that:
     example, requesting a cluster only when a request for that cluster arrives.
 
 An Incremental xDS session is always in the context of a gRPC bidirectional
+<<<<<<< HEAD
 =======
 Incremental xDS is a separate xDS endpoint available for ADS, CDS and RDS that
 allows:
@@ -315,6 +315,8 @@ allows:
 
 An xDS incremental session is always in the context of a gRPC bidirectional
 >>>>>>> Fix some typos (#5968)
+=======
+>>>>>>> snapshot
 stream. This allows the xDS server to keep track of the state of xDS clients
 connected to it. There is no REST version of Incremental xDS yet.
 

@@ -18,6 +18,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::AnyNumber;
 using testing::InSequence;
 using testing::Invoke;
 using testing::Return;
@@ -47,14 +48,12 @@ protected:
     Config::Utility::translateCdsConfig(*config, cds_config);
     cds_config.mutable_api_config_source()->set_api_type(
         envoy::api::v2::core::ApiConfigSource::REST);
-    Upstream::ClusterManager::ClusterInfoMap cluster_map;
-    Upstream::MockClusterMockPrioritySet cluster;
-    cluster_map.emplace("foo_cluster", cluster);
-    EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
-    EXPECT_CALL(cluster, info());
-    EXPECT_CALL(*cluster.info_, addedViaApi());
-    EXPECT_CALL(cluster, info());
-    EXPECT_CALL(*cluster.info_, type());
+    cluster_map_.emplace("foo_cluster", mock_cluster_);
+    EXPECT_CALL(cm_, clusters()).WillRepeatedly(Return(cluster_map_));
+    EXPECT_CALL(mock_cluster_, info()).Times(AnyNumber());
+    EXPECT_CALL(*mock_cluster_.info_, addedViaApi());
+    EXPECT_CALL(mock_cluster_, info()).Times(AnyNumber());
+    EXPECT_CALL(*mock_cluster_.info_, type());
     cds_ = CdsApiImpl::create(cds_config, cm_, dispatcher_, random_, local_info_, store_, *api_);
     resetCdsInitializedCb();
 
@@ -166,6 +165,8 @@ protected:
   };
 
   NiceMock<MockWarmingClusterManager> cm_;
+  Upstream::ClusterManager::ClusterInfoMap cluster_map_;
+  Upstream::MockClusterMockPrioritySet mock_cluster_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
@@ -187,8 +188,9 @@ TEST_F(CdsApiImplTest, ValidateFail) {
   Protobuf::RepeatedPtrField<envoy::api::v2::Cluster> clusters;
   clusters.Add();
 
-  EXPECT_THROW(dynamic_cast<CdsApiImpl*>(cds_.get())->onConfigUpdate(clusters, ""),
-               ProtoValidationException);
+  EXPECT_CALL(cm_, clusters()).WillRepeatedly(Return(cluster_map_));
+  EXPECT_CALL(initialized_, ready());
+  EXPECT_THROW(dynamic_cast<CdsApiImpl*>(cds_.get())->onConfigUpdate(clusters, ""), EnvoyException);
   EXPECT_CALL(request_, cancel());
 }
 
@@ -205,6 +207,8 @@ TEST_F(CdsApiImplTest, ValidateDuplicateClusters) {
   auto* cluster_2 = clusters.Add();
   cluster_2->set_name("duplicate_cluster");
 
+  EXPECT_CALL(cm_, clusters()).WillRepeatedly(Return(cluster_map_));
+  EXPECT_CALL(initialized_, ready());
   EXPECT_THROW_WITH_MESSAGE(dynamic_cast<CdsApiImpl*>(cds_.get())->onConfigUpdate(clusters, ""),
                             EnvoyException, "duplicate cluster duplicate_cluster found");
   EXPECT_CALL(request_, cancel());
@@ -360,6 +364,7 @@ resources:
 
 TEST_F(CdsApiImplTest, CdsPauseOnWarming) {
   interval_timer_ = new Event::MockTimer(&dispatcher_);
+  EXPECT_CALL(cm_, clusters()).WillRepeatedly(Return(ClusterManager::ClusterInfoMap{}));
   InSequence s;
 
   setup();
@@ -383,7 +388,6 @@ resources:
 
   // Two clusters updated, both warmed up.
   EXPECT_CALL(cm_.ads_mux_, pause(Config::TypeUrl::get().ClusterLoadAssignment)).Times(1);
-  EXPECT_CALL(cm_, clusters()).WillOnce(Return(ClusterManager::ClusterInfoMap{}));
   cm_.expectAddWithWarming("cluster1", "0");
   cm_.expectWarmingClusterCount();
   EXPECT_CALL(cm_.ads_mux_, pause(Config::TypeUrl::get().Cluster)).Times(1);
@@ -419,7 +423,6 @@ resources:
 )EOF";
 
   EXPECT_CALL(cm_.ads_mux_, pause(Config::TypeUrl::get().ClusterLoadAssignment)).Times(1);
-  EXPECT_CALL(cm_, clusters()).WillOnce(Return(ClusterManager::ClusterInfoMap{}));
   cm_.expectAddWithWarming("cluster1", "1");
   cm_.expectWarmingClusterCount();
   EXPECT_CALL(cm_.ads_mux_, pause(Config::TypeUrl::get().Cluster)).Times(1);
@@ -449,7 +452,6 @@ resources:
 )EOF";
 
   EXPECT_CALL(cm_.ads_mux_, pause(Config::TypeUrl::get().ClusterLoadAssignment)).Times(1);
-  EXPECT_CALL(cm_, clusters()).WillOnce(Return(ClusterManager::ClusterInfoMap{}));
   cm_.expectAddWithWarming("cluster4", "2");
   cm_.expectWarmingClusterCount();
   EXPECT_CALL(initialized_, ready());
@@ -483,7 +485,6 @@ resources:
 
   // Two clusters updated, first one warmed up before processing of the second one starts.
   EXPECT_CALL(cm_.ads_mux_, pause(Config::TypeUrl::get().ClusterLoadAssignment)).Times(1);
-  EXPECT_CALL(cm_, clusters()).WillOnce(Return(ClusterManager::ClusterInfoMap{}));
   cm_.expectAddWithWarming("cluster5", "3", true);
   cm_.expectWarmingClusterCount();
   EXPECT_CALL(cm_.ads_mux_, pause(Config::TypeUrl::get().Cluster)).Times(1);
@@ -525,6 +526,7 @@ resources:
       path: eds path
 )EOF";
 
+  EXPECT_CALL(cm_, clusters()).WillRepeatedly(Return(cluster_map_));
   EXPECT_CALL(initialized_, ready());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   callbacks_->onSuccess(parseResponseMessageFromYaml(response_yaml));
