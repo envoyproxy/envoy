@@ -5,6 +5,8 @@
 
 #include "common/config/well_known_names.h"
 #include "common/memory/stats.h"
+#include "envoy/stats/stats.h"
+#include "envoy/stats/scope.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/config/utility.h"
