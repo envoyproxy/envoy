@@ -182,7 +182,8 @@ TEST_F(WatermarkBufferTest, WatermarkFdFunctions) {
   while (bytes_written_total < 20) {
     Network::IoHandleCallUintResult result = buffer_.write(io_handle1);
     if (result.err_ != nullptr) {
-      ASSERT_EQ(Network::IoError::IoErrorCode::Again, Network::IoError::getErrorCode(*result.err_));
+      ASSERT_EQ(Network::IoError::IoErrorCode::Again,
+                Network::IoError::getErrorCode(result.err_.get()));
     } else {
       bytes_written_total += result.rc_;
     }
