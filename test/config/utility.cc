@@ -16,7 +16,6 @@
 
 #include "absl/strings/str_replace.h"
 #include "gtest/gtest.h"
-#include "yaml-cpp/yaml.h"
 
 namespace Envoy {
 
@@ -490,33 +489,6 @@ void ConfigHelper::addConfigModifier(HttpModifierFunction function) {
     function(hcm_config);
     storeHttpConnectionManager(hcm_config);
   });
-}
-
-void blockFormat(YAML::Node node) {
-  node.SetStyle(YAML::EmitterStyle::Block);
-
-  if (node.Type() == YAML::NodeType::Sequence) {
-    for (auto it : node) {
-      blockFormat(it);
-    }
-  }
-  if (node.Type() == YAML::NodeType::Map) {
-    for (auto it : node) {
-      blockFormat(it.second);
-    }
-  }
-}
-
-const std::string ConfigHelper::bootstrapAsYaml() {
-  std::string json;
-  const auto status = Protobuf::util::MessageToJsonString(bootstrap_, &json);
-  RELEASE_ASSERT(status.ok(), "Failed to convert bootstrap to Json");
-  auto node = YAML::Load(json);
-  blockFormat(node);
-
-  YAML::Emitter out;
-  out << node;
-  return out.c_str();
 }
 
 EdsHelper::EdsHelper() : eds_path_(TestEnvironment::writeStringToFileForTest("eds.pb_text", "")) {

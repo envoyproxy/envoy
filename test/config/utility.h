@@ -142,9 +142,6 @@ public:
   // Return the bootstrap configuration for hand-off to Envoy.
   const envoy::config::bootstrap::v2::Bootstrap& bootstrap() { return bootstrap_; }
 
-  // Return a debug string of the bootstrap proto in yaml form.
-  const std::string bootstrapAsYaml();
-
 private:
   // Load the first HCM struct from the first listener into a parsed proto.
   bool loadHttpConnectionManager(
