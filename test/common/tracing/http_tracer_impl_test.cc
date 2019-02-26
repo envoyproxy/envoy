@@ -322,6 +322,7 @@ TEST(HttpConnManFinalizerImpl, SpanPopulatedFailureResponse) {
   EXPECT_CALL(span, setTag("aa", "a"));
   EXPECT_CALL(span, setTag("cc", "c"));
   EXPECT_CALL(config, requestHeadersForTags());
+  EXPECT_CALL(config, verbose).WillOnce(Return(false));
 
   absl::optional<uint32_t> response_code(503);
   EXPECT_CALL(stream_info, responseCode()).WillRepeatedly(ReturnPointee(&response_code));
