@@ -9,8 +9,8 @@ import functools
 import os
 import pstats
 import StringIO
-import sys
 import re
+import sys
 
 from google.protobuf.compiler import plugin_pb2
 from validate import validate_pb2
