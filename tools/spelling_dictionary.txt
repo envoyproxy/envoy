@@ -685,6 +685,7 @@ uint
 un
 unary
 unconfigurable
+unconfigured
 uncontended
 undef
 undegraded
