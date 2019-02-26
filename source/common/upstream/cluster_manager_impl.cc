@@ -490,9 +490,9 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::api::v2::Cluster& clust
       // some hosts, copy the active cluster priority set to the warming cluster to prevent the
       // hosts from being cleared after warming.
       // See https://github.com/envoyproxy/envoy/issues/5168 for more context.
-      // This also ensures that we adhere to the clause "When a requested resource is missing in a RDS 
-      // or EDS update, Envoy will retain the last known value for this resource." as documented in 
-      // https://github.com/envoyproxy/data-plane-api/blob/master/XDS_PROTOCOL.md.
+      // This also ensures that we adhere to the clause "When a requested resource is missing in a
+      // RDS or EDS update, Envoy will retain the last known value for this resource." as documented
+      // in https://github.com/envoyproxy/data-plane-api/blob/master/XDS_PROTOCOL.md.
       const auto active_it = active_clusters_.find(cluster_name);
       if (active_it != active_clusters_.end()) {
         const auto& active_cluster_entry = *active_it->second;
