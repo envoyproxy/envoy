@@ -110,9 +110,9 @@ void CdsApiImpl::onConfigUpdate(
   std::vector<std::string> exception_msgs;
   std::unordered_set<std::string> cluster_names;
   for (const auto& resource : added_resources) {
+    envoy::api::v2::Cluster cluster;
     try {
-      envoy::api::v2::Cluster cluster =
-          MessageUtil::anyConvert<envoy::api::v2::Cluster>(resource.resource());
+      cluster = MessageUtil::anyConvert<envoy::api::v2::Cluster>(resource.resource());
       MessageUtil::validate(cluster);
       if (!cluster_names.insert(cluster.name()).second) {
         throw EnvoyException(fmt::format("duplicate cluster {} found", cluster.name()));
@@ -149,7 +149,7 @@ void CdsApiImpl::onConfigUpdate(
         ENVOY_LOG(debug, "cds: add/update cluster '{}'", cluster.name());
       }
     } catch (const EnvoyException& e) {
-      exception_msgs.push_back(fmt::format("{}: {}", cluster_name, e.what()));
+      exception_msgs.push_back(fmt::format("{}: {}", cluster.name(), e.what()));
     }
 >>>>>>> cds: continue with remaining clusters if one addOrUpdateCluster fails (#5806)
   }

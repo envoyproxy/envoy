@@ -210,7 +210,9 @@ TEST_F(CdsApiImplTest, ValidateDuplicateClusters) {
   EXPECT_CALL(cm_, clusters()).WillRepeatedly(Return(cluster_map_));
   EXPECT_CALL(initialized_, ready());
   EXPECT_THROW_WITH_MESSAGE(dynamic_cast<CdsApiImpl*>(cds_.get())->onConfigUpdate(clusters, ""),
-                            EnvoyException, "duplicate cluster duplicate_cluster found");
+                            EnvoyException,
+                            "Error adding/updating cluster(s) duplicate_cluster: duplicate cluster "
+                            "duplicate_cluster found");
   EXPECT_CALL(request_, cancel());
 }
 
