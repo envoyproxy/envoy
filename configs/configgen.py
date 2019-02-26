@@ -2,8 +2,8 @@ import jinja2
 import json
 from collections import OrderedDict
 import os
-import sys
 import shutil
+import sys
 
 SCRIPT_DIR = os.path.dirname(__file__)
 OUT_DIR = sys.argv[1]
