@@ -1224,7 +1224,7 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
         new Http::Http2::ProdConnPoolImpl(dispatcher, host, priority, options)};
   } else {
     return Http::ConnectionPool::InstancePtr{
-        new Http::Http1::ConnPoolImplProd(dispatcher, host, priority, options)};
+        new Http::Http1::ProdConnPoolImpl(dispatcher, host, priority, options)};
   }
 }
 
