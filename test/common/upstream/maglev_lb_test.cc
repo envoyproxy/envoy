@@ -25,8 +25,8 @@ public:
   MaglevLoadBalancerTest() : stats_(ClusterInfoImpl::generateStats(stats_store_)) {}
 
   void init(uint32_t table_size) {
-    lb_ = std::make_unique<MaglevLoadBalancer>(priority_set_, stats_, runtime_, random_,
-                                               common_config_, table_size);
+    lb_ = std::make_unique<MaglevLoadBalancer>(priority_set_, stats_, stats_store_, runtime_,
+                                               random_, common_config_, table_size);
     lb_->initialize();
   }
 
@@ -57,6 +57,11 @@ TEST_F(MaglevLoadBalancerTest, Basic) {
   host_set_.runCallbacks({}, {});
   init(7);
 
+  EXPECT_EQ("maglev_lb.min_entries_per_host", lb_->stats().min_entries_per_host_.name());
+  EXPECT_EQ("maglev_lb.max_entries_per_host", lb_->stats().max_entries_per_host_.name());
+  EXPECT_EQ(1, lb_->stats().min_entries_per_host_.value());
+  EXPECT_EQ(2, lb_->stats().max_entries_per_host_.value());
+
   // maglev: i=0 host=127.0.0.1:92
   // maglev: i=1 host=127.0.0.1:94
   // maglev: i=2 host=127.0.0.1:90
@@ -80,6 +85,9 @@ TEST_F(MaglevLoadBalancerTest, Weighted) {
   host_set_.healthy_hosts_ = host_set_.hosts_;
   host_set_.runCallbacks({}, {});
   init(17);
+  EXPECT_EQ(6, lb_->stats().min_entries_per_host_.value());
+  EXPECT_EQ(11, lb_->stats().max_entries_per_host_.value());
+
   // maglev: i=0 host=127.0.0.1:91
   // maglev: i=1 host=127.0.0.1:90
   // maglev: i=2 host=127.0.0.1:90
@@ -107,8 +115,8 @@ TEST_F(MaglevLoadBalancerTest, Weighted) {
   }
 }
 
-// Locality weighted sanity test when localities have the same weights (no
-// different to Weighted above).
+// Locality weighted sanity test when localities have the same weights. Host weights for hosts in
+// different localities shouldn't matter.
 TEST_F(MaglevLoadBalancerTest, LocalityWeightedSameLocalityWeights) {
   host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", 1),
                       makeTestHost(info_, "tcp://127.0.0.1:91", 2)};
@@ -120,6 +128,9 @@ TEST_F(MaglevLoadBalancerTest, LocalityWeightedSameLocalityWeights) {
   host_set_.locality_weights_ = locality_weights;
   host_set_.runCallbacks({}, {});
   init(17);
+  EXPECT_EQ(8, lb_->stats().min_entries_per_host_.value());
+  EXPECT_EQ(9, lb_->stats().max_entries_per_host_.value());
+
   // maglev: i=0 host=127.0.0.1:91
   // maglev: i=1 host=127.0.0.1:90
   // maglev: i=2 host=127.0.0.1:90
@@ -147,8 +158,8 @@ TEST_F(MaglevLoadBalancerTest, LocalityWeightedSameLocalityWeights) {
   }
 }
 
-// Locality weighted sanity test when localities have different weights (we
-// invert the Weighted effective weights).
+// Locality weighted sanity test when localities have different weights. Host weights for hosts in
+// different localities shouldn't matter.
 TEST_F(MaglevLoadBalancerTest, LocalityWeightedDifferentLocalityWeights) {
   host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", 1),
                       makeTestHost(info_, "tcp://127.0.0.1:91", 2),
@@ -161,6 +172,9 @@ TEST_F(MaglevLoadBalancerTest, LocalityWeightedDifferentLocalityWeights) {
   host_set_.locality_weights_ = locality_weights;
   host_set_.runCallbacks({}, {});
   init(17);
+  EXPECT_EQ(4, lb_->stats().min_entries_per_host_.value());
+  EXPECT_EQ(13, lb_->stats().max_entries_per_host_.value());
+
   // maglev: i=0 host=127.0.0.1:91
   // maglev: i=1 host=127.0.0.1:90
   // maglev: i=2 host=127.0.0.1:90
@@ -216,6 +230,9 @@ TEST_F(MaglevLoadBalancerTest, LocalityWeightedGlobalPanic) {
   host_set_.locality_weights_ = locality_weights;
   host_set_.runCallbacks({}, {});
   init(17);
+  EXPECT_EQ(8, lb_->stats().min_entries_per_host_.value());
+  EXPECT_EQ(9, lb_->stats().max_entries_per_host_.value());
+
   // maglev: i=0 host=127.0.0.1:91
   // maglev: i=1 host=127.0.0.1:90
   // maglev: i=2 host=127.0.0.1:90
@@ -259,6 +276,8 @@ TEST_F(MaglevLoadBalancerTest, LocalityWeightedLopsided) {
   host_set_.locality_weights_ = makeLocalityWeights({127, 1});
   host_set_.runCallbacks({}, {});
   init(MaglevTable::DefaultTableSize);
+  EXPECT_EQ(1, lb_->stats().min_entries_per_host_.value());
+  EXPECT_EQ(MaglevTable::DefaultTableSize - 1023, lb_->stats().max_entries_per_host_.value());
 
   LoadBalancerPtr lb = lb_->factory()->create();
 

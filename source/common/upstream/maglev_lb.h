@@ -1,10 +1,29 @@
 #pragma once
 
+#include "envoy/stats/scope.h"
+#include "envoy/stats/stats_macros.h"
+
 #include "common/upstream/thread_aware_lb_impl.h"
 #include "common/upstream/upstream_impl.h"
 
 namespace Envoy {
 namespace Upstream {
+
+/**
+ * All Maglev load balancer stats. @see stats_macros.h
+ */
+// clang-format off
+#define ALL_MAGLEV_LOAD_BALANCER_STATS(GAUGE)                                                      \
+  GAUGE(min_entries_per_host)                                                                      \
+  GAUGE(max_entries_per_host)
+// clang-format on
+
+/**
+ * Struct definition for all Maglev load balancer stats. @see stats_macros.h
+ */
+struct MaglevLoadBalancerStats {
+  ALL_MAGLEV_LOAD_BALANCER_STATS(GENERATE_GAUGE_STRUCT)
+};
 
 /**
  * This is an implementation of Maglev consistent hashing as described in:
@@ -16,7 +35,7 @@ class MaglevTable : public ThreadAwareLoadBalancerBase::HashingLoadBalancer,
                     Logger::Loggable<Logger::Id::upstream> {
 public:
   MaglevTable(const NormalizedHostWeightVector& normalized_host_weights,
-              double max_normalized_weight, uint64_t table_size = DefaultTableSize);
+              double max_normalized_weight, uint64_t table_size, MaglevLoadBalancerStats& stats);
 
   // ThreadAwareLoadBalancerBase::HashingLoadBalancer
   HostConstSharedPtr chooseHost(uint64_t hash) const override;
@@ -33,14 +52,16 @@ private:
     const uint64_t offset_;
     const uint64_t skip_;
     const double weight_;
-    double counts_{};
+    double target_weight_{};
     uint64_t next_{};
+    uint64_t count_{};
   };
 
   uint64_t permutation(const TableBuildEntry& entry);
 
   const uint64_t table_size_;
   std::vector<HostConstSharedPtr> table_;
+  MaglevLoadBalancerStats& stats_;
 };
 
 /**
@@ -48,12 +69,12 @@ private:
  */
 class MaglevLoadBalancer : public ThreadAwareLoadBalancerBase {
 public:
-  MaglevLoadBalancer(const PrioritySet& priority_set, ClusterStats& stats, Runtime::Loader& runtime,
-                     Runtime::RandomGenerator& random,
+  MaglevLoadBalancer(const PrioritySet& priority_set, ClusterStats& stats, Stats::Scope& scope,
+                     Runtime::Loader& runtime, Runtime::RandomGenerator& random,
                      const envoy::api::v2::Cluster::CommonLbConfig& common_config,
-                     uint64_t table_size = MaglevTable::DefaultTableSize)
-      : ThreadAwareLoadBalancerBase(priority_set, stats, runtime, random, common_config),
-        table_size_(table_size) {}
+                     uint64_t table_size = MaglevTable::DefaultTableSize);
+
+  const MaglevLoadBalancerStats& stats() const { return stats_; }
 
 private:
   // ThreadAwareLoadBalancerBase
@@ -61,9 +82,13 @@ private:
   createLoadBalancer(const NormalizedHostWeightVector& normalized_host_weights,
                      double /* min_normalized_weight */, double max_normalized_weight) override {
     return std::make_shared<MaglevTable>(normalized_host_weights, max_normalized_weight,
-                                         table_size_);
+                                         table_size_, stats_);
   }
 
+  static MaglevLoadBalancerStats generateStats(Stats::Scope& scope);
+
+  Stats::ScopePtr scope_;
+  MaglevLoadBalancerStats stats_;
   const uint64_t table_size_;
 };
 
