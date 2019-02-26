@@ -28,7 +28,7 @@ public:
 
   Network::IoHandleCallUintResult trackWrites(Network::IoHandle& io_handle) {
     Network::IoHandleCallUintResult result = BaseClass::write(io_handle);
-    if (result.err_ != nullptr && result.rc_ > 0) {
+    if (result.err_ == nullptr && result.rc_ > 0) {
       bytes_written_ += result.rc_;
     }
     return result;
