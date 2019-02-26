@@ -30,6 +30,7 @@ build-setup = rm -rf "$@.build" && \
 	mkdir -p "$(THIRDPARTY_BUILD)/$(DISTINCT_PATH)/lib" && \
 	mkdir -p "$(THIRDPARTY_BUILD)/$(DISTINCT_PATH)/include" && \
 	cd "$@.build" && \
+	ln -sf "$$(dirname $(realpath $<))"/data . && \
 	echo "Building in $@.build, logs at $@.log"
 
 build-complete = rm -rf "$@.build" && \

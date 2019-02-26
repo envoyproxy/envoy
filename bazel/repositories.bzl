@@ -72,6 +72,9 @@ def _build_recipe_repository_impl(ctxt):
             "build_recipes/" + r + ".sh",
         )
     ctxt.symlink(Label("//ci/prebuilt:BUILD"), "BUILD")
+    # Data files for build recipes
+    for f in ["gperftools.patch.gz"]:
+      ctxt.symlink(Label("//ci/build_container/build_recipes/data:" + f), "data/" +f)
 
     # Run the build script.
     print("Fetching external dependencies...")

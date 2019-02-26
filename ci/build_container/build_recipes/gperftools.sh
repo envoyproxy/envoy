@@ -18,7 +18,8 @@ curl https://github.com/gperftools/gperftools/archive/${VERSION}.tar.gz -sLo gpe
 tar xf gperftools-"$VERSION".tar.gz
 cd gperftools-"${VERSION}"
 
-./autogen.sh
+gunzip -c ../data/gperftools.patch.gz | patch -p1
+chmod u+x configure
 
 export LDFLAGS="${LDFLAGS} -lpthread"
 ./configure --prefix="$THIRDPARTY_BUILD" --enable-shared=no --enable-frame-pointers --disable-libunwind
