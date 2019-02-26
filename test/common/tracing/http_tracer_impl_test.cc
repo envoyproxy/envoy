@@ -219,7 +219,7 @@ TEST(HttpConnManFinalizerImpl, StreamInfoLogs) {
   EXPECT_CALL(span, log(log_timestamp, Tracing::Logs::get().LAST_DOWNSTREAM_TX_BYTE_SENT));
 
   NiceMock<MockConfig> config;
-  config.verbose_ = true;
+  EXPECT_CALL(config, verbose).WillOnce(Return(true));
   HttpTracerUtility::finalizeSpan(span, nullptr, stream_info, config);
 }
 
@@ -280,7 +280,6 @@ TEST(HttpConnManFinalizerImpl, SpanOptionalHeaders) {
   EXPECT_CALL(span, setTag(Tracing::Tags::get().UPSTREAM_CLUSTER, _)).Times(0);
 
   NiceMock<MockConfig> config;
-  EXPECT_CALL(config, verbose).WillOnce(Return(true));
   HttpTracerUtility::finalizeSpan(span, &request_headers, stream_info, config);
 }
 
