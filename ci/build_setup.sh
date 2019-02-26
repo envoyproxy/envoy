@@ -17,7 +17,6 @@ function setup_gcc_toolchain() {
 }
 
 function setup_clang_toolchain() {
-  export PATH=/usr/lib/llvm-7/bin:$PATH
   export CC=clang
   export CXX=clang++
   export ASAN_SYMBOLIZER_PATH=/usr/lib/llvm-7/bin/llvm-symbolizer
@@ -62,7 +61,8 @@ export BAZEL="bazel"
 # Not sandboxing, since non-privileged Docker can't do nested namespaces.
 BAZEL_OPTIONS="--package_path %workspace%:${ENVOY_SRCDIR}"
 export BAZEL_QUERY_OPTIONS="${BAZEL_OPTIONS}"
-export BAZEL_BUILD_OPTIONS="--action_env=PATH=/bin:/usr/bin:/usr/lib/llvm-7/bin --linkopt=-fuse-ld=lld \
+export PATH=/usr/lib/llvm-7/bin:$PATH
+export BAZEL_BUILD_OPTIONS="--action_env=PATH --linkopt=-fuse-ld=lld \
   --host_linkopt=-fuse-ld=lld \
   --strategy=Genrule=standalone --spawn_strategy=standalone \
   --verbose_failures ${BAZEL_OPTIONS} --action_env=HOME --action_env=PYTHONUSERBASE \
