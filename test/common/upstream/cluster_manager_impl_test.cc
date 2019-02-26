@@ -1261,7 +1261,7 @@ TEST_F(ClusterManagerImplTest, WarmingClusterWithEmptyConfigUpdate) {
   std::shared_ptr<MockClusterRealPrioritySet> cluster2(new NiceMock<MockClusterRealPrioritySet>());
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster2));
   EXPECT_CALL(*cluster2, initializePhase()).Times(0);
-  EXPECT_CALL(*cluster2, isBeingInitializedByEmptyConfigUpdate()).WillOnce(Return(true));
+  EXPECT_CALL(*cluster2, initializedByEmptyConfig()).WillOnce(Return(true));
   EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(update_cluster, "", dummyWarmingCb));
   checkStats(1 /*added*/, 1 /*modified*/, 0 /*removed*/, 1 /*active*/, 1 /*warming*/);
   cluster2->initialize_callback_();
@@ -1339,7 +1339,7 @@ TEST_F(ClusterManagerImplTest, WarmingClusterWithEmptyHosts) {
   std::shared_ptr<MockClusterRealPrioritySet> cluster2(new NiceMock<MockClusterRealPrioritySet>());
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster2));
   EXPECT_CALL(*cluster2, initializePhase()).Times(0);
-  EXPECT_CALL(*cluster2, isBeingInitializedByEmptyConfigUpdate()).WillOnce(Return(false));
+  EXPECT_CALL(*cluster2, initializedByEmptyConfig()).WillOnce(Return(false));
   EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(update_cluster, "", dummyWarmingCb));
   checkStats(1 /*added*/, 1 /*modified*/, 0 /*removed*/, 1 /*active*/, 1 /*warming*/);
   cluster2->initialize_callback_();
@@ -1413,7 +1413,7 @@ TEST_F(ClusterManagerImplTest, WarmingClusterWithEmptyConfigUpdateTriggersTlsUpd
   std::shared_ptr<MockClusterRealPrioritySet> cluster2(new NiceMock<MockClusterRealPrioritySet>());
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster2));
   EXPECT_CALL(*cluster2, initializePhase()).Times(0);
-  EXPECT_CALL(*cluster2, isBeingInitializedByEmptyConfigUpdate()).WillOnce(Return(true));
+  EXPECT_CALL(*cluster2, initializedByEmptyConfig()).WillOnce(Return(true));
 
   // Validate that TLS updates are triggered correctly after warming.
   EXPECT_CALL(local_cluster_update_, post(_, _, _))

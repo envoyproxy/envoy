@@ -778,9 +778,9 @@ public:
   virtual const PrioritySet& prioritySet() const PURE;
 
   /**
-   * @return true, if this cluster is being initialized by empty config update.
+   * @return true, if this cluster is initialized by empty config update.
    */
-  virtual bool isBeingInitializedByEmptyConfigUpdate() const PURE;
+  virtual bool initializedByEmptyConfig() const PURE;
 };
 
 typedef std::shared_ptr<Cluster> ClusterSharedPtr;

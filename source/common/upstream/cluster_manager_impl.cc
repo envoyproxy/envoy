@@ -479,14 +479,21 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::api::v2::Cluster& clust
       // Otherwise, applyUpdates() will fire with a dangling cluster reference.
       updates_map_.erase(cluster_name);
 
-      // If onConfigUpdate was triggered by an EDS update that had no references to this
-      // cluster and active cluster has some hosts, copy the active cluster priority set to the
-      // warming cluster to prevent the hosts from being cleared after warming.
+      // If management server sends a EDS response, for any other cluster grpc_mux_impl calls
+      // onConfigUpdate on this cluster with empty resources.
+      // See
+      // https://github.com/envoyproxy/envoy/blob/master/source/common/config/grpc_mux_impl.cc#L161
+      // for more details. If the cluster is in fully initialized state, that would just increment
+      // update_empty stat. However, if the cluster is in warming state the initialization call back
+      // would be triggered and warming cluster would not have any hosts. So if onConfigUpdate was
+      // triggered by an EDS update that had no references to this cluster and active cluster has
+      // some hosts, copy the active cluster priority set to the warming cluster to prevent the
+      // hosts from being cleared after warming.
       // See https://github.com/envoyproxy/envoy/issues/5168 for more context.
       const auto active_it = active_clusters_.find(cluster_name);
       if (active_it != active_clusters_.end()) {
         const auto& active_cluster_entry = *active_it->second;
-        if (warming_cluster_entry.cluster_->isBeingInitializedByEmptyConfigUpdate() &&
+        if (warming_cluster_entry.cluster_->initializedByEmptyConfig() &&
             !active_cluster_entry.cluster_->prioritySet().empty()) {
           ENVOY_LOG(debug, "copying host set from active cluster {} to warming cluster",
                     cluster_name);

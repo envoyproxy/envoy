@@ -587,7 +587,7 @@ public:
   // Upstream::Cluster
   PrioritySet& prioritySet() override { return priority_set_; }
   const PrioritySet& prioritySet() const override { return priority_set_; }
-  bool isBeingInitializedByEmptyConfigUpdate() const override { return empty_update_; }
+  bool initializedByEmptyConfig() const override { return empty_update_; }
 
   /**
    * Optionally set the health checker for the primary cluster. This is done after cluster

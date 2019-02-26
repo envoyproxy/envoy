@@ -160,7 +160,7 @@ public:
   MOCK_METHOD1(initialize, void(std::function<void()> callback));
   MOCK_CONST_METHOD0(initializePhase, InitializePhase());
   MOCK_CONST_METHOD0(sourceAddress, const Network::Address::InstanceConstSharedPtr&());
-  MOCK_CONST_METHOD0(isBeingInitializedByEmptyConfigUpdate, bool());
+  MOCK_CONST_METHOD0(initializedByEmptyConfig, bool());
 
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
   std::function<void()> initialize_callback_;
