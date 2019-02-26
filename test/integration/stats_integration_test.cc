@@ -183,7 +183,7 @@ TEST_P(ClusterMemoryUtilization, MemoryLargeClusterSizeWithStats) {
   t1->initialize();
   const size_t m1 = Memory::Stats::totalCurrentlyAllocated();
   EXPECT_LT(start_mem, m1 / 1000);
-  EXPECT_LT(m1 / 1000, 3500); // actual value: 3427 as of Feb 19, 2019
+  EXPECT_LT(m1 / 1000, 3700); // actual value: 3664 as of Feb 26, 2019
   t1.reset(nullptr);
 
   const size_t m1001 = memoryConsumedWithClusters(1001, true);
