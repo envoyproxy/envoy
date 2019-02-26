@@ -55,7 +55,7 @@ void RequestDecoder::doParse(ParserSharedPtr& parser, const Buffer::RawSlice& sl
 
 void MessageEncoderImpl::encode(const Message& message) {
   Buffer::OwnedImpl data_buffer;
-  // TODO (adam.kotwasinski) precompute the size instead of using temporary
+  // TODO precompute the size instead of using temporary
   // also, when we have 'computeSize' method, then we can push encoding request's size into
   // Request::encode
   int32_t data_len = message.encode(data_buffer); // encode data computing data length

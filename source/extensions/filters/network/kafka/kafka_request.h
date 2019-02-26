@@ -86,8 +86,8 @@ public:
   UnknownRequest(const RequestHeader& request_header) : AbstractRequest{request_header} {};
 
   // this isn't the prettiest, as we have thrown away the data
-  // XXX(adam.kotwasinski) discuss capturing the data as-is, and simply putting it back
-  //   this would add ability to forward unknown types of requests in cluster-proxy
+  // XXX discuss capturing the data as-is, and simply putting it back
+  // this would add ability to forward unknown types of requests in cluster-proxy
   size_t encode(Buffer::Instance&) const override {
     throw EnvoyException("cannot serialize unknown request");
   }

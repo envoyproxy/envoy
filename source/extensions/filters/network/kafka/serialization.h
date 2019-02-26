@@ -613,10 +613,10 @@ private:
  * In case of composite types, this is done by calling 'encode' on provided argument
  *
  * This object also carries extra information that is used while traversing the request
- * structure-tree during encryping (currently api_version, as different request versions serialize
+ * structure-tree during encoding (currently api_version, as different request versions serialize
  * differently)
  */
-// XXX (adam.kotwasinski) that class might be split into Request/ResponseEncodingContext in future,
+// XXX that class might be split into Request/ResponseEncodingContext in future,
 // but leaving it as it is now
 class EncodingContext {
 public:
@@ -760,7 +760,7 @@ size_t EncodingContext::encode(const NullableArray<T>& arg, Buffer::Instance& ds
     size_t written{0};
     for (const T& el : *arg) {
       // for each of array elements, resolve the correct method again
-      // elements could be primitives or complex types, so calling `el.encode()` won't work
+      // elements could be primitives or complex types, so calling encode() on object won't work
       written += encode(el, dst);
     }
     return header_length + written;

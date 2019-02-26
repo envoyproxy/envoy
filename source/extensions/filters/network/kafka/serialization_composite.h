@@ -1,5 +1,4 @@
-// FIXME(adam.kotwasinski) this file can be generated, as it's repeating the same code for 0..9
-// delegates
+// XXX this file can be generated, as it's repeating the same code for 0..9 delegates
 #pragma once
 
 #include <algorithm>

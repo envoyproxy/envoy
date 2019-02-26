@@ -1,5 +1,4 @@
-// FIXME(adam.kotwasinski) this file can be generated, as it's repeating the same code for 0..9
-// delegates
+// XXX this file can be generated, as it's repeating the same code for 0..9 delegates
 #include "common/common/stack_array.h"
 
 #include "extensions/filters/network/kafka/serialization.h"

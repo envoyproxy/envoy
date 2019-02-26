@@ -146,7 +146,7 @@ template <typename BT, typename AT> void serializeThenDeserializeAndCheckEqualit
   serializeThenDeserializeAndCheckEqualityWithChunks<BT>(expected);
 }
 
-// macroed out test for numeric buffers
+// extracted test for numeric buffers
 #define TEST_DeserializerShouldDeserialize(BufferClass, DataClass, Value)                          \
   TEST(DataClass, ShouldConsumeCorrectAmountOfData) {                                              \
     /* given */                                                                                    \
