@@ -93,7 +93,7 @@ any place in which consistent hashing is desired. Like the ring hash load balanc
 hashing load balancer is only effective when protocol routing is used that specifies a value to
 hash on.
 
-The table construction algorithm places each host on in the table some number of times proportional
+The table construction algorithm places each host in the table some number of times proportional
 to its weight, until the table is completely filled. For example, if host A has a weight of 1 and
 host B has a host of 2, then host A will have 21,846 entries and host B will have 43,691 entries
 (totaling 65,537 entries). The algorithm attempts to place each host in the table at least once,
