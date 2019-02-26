@@ -92,7 +92,7 @@ public:
         Network::Utility::parseInternetAddressAndPort("1.2.3.4:80");
 
     // make the "system time" non-zero, because 0 is considered invalid by DateUtil
-    test_time_.sleep(std::chrono::milliseconds(50));
+    test_time_.setMonotonicTime(std::chrono::milliseconds(50));
   }
 
   void expectResponseTimerCreate() {
