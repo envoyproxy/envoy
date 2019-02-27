@@ -119,6 +119,7 @@ socket_streamed_trace_segment:
     write:
       data:
         as_bytes: d29ybGQ=
+      end_stream: true
 )EOF")));
   time_system_.setSystemTime(std::chrono::seconds(1));
   tapper_->onWrite(Buffer::OwnedImpl("world"), 5, true);

@@ -99,6 +99,7 @@ void PerSocketTapperImpl::onWrite(const Buffer::Instance& data, uint32_t bytes_w
     TapCommon::Utility::addBufferToProtoBytes(*event.mutable_write()->mutable_data(),
                                               config_->maxBufferedTxBytes(), data, 0,
                                               bytes_written);
+    event.mutable_write()->set_end_stream(end_stream);
     sink_handle_->submitTrace(trace);
   } else {
     if (buffered_trace_ != nullptr && buffered_trace_->socket_buffered_trace().write_truncated()) {
@@ -114,7 +115,6 @@ void PerSocketTapperImpl::onWrite(const Buffer::Instance& data, uint32_t bytes_w
             *event.mutable_write()->mutable_data(),
             config_->maxBufferedTxBytes() - tx_bytes_buffered_, data, 0, bytes_written));
     tx_bytes_buffered_ += event.write().data().as_bytes().size();
-
     event.mutable_write()->set_end_stream(end_stream);
   }
 }
