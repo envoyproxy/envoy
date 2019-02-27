@@ -47,6 +47,8 @@ TapConfigBaseImpl::TapConfigBaseImpl(envoy::service::tap::v2alpha::TapConfig&& p
           proto_config.output_config(), max_buffered_tx_bytes, DefaultMaxBufferedBytes)),
       streaming_(proto_config.output_config().streaming()) {
   ASSERT(proto_config.output_config().sinks().size() == 1);
+  // TODO(mattklein123): Add per-sink checks to make sure format makes sense. I.e., when using
+  // streaming, we should require the length delimited version of binary proto, etc.
   sink_format_ = proto_config.output_config().sinks()[0].format();
   switch (proto_config.output_config().sinks()[0].output_sink_type_case()) {
   case envoy::service::tap::v2alpha::OutputSink::kStreamingAdmin:

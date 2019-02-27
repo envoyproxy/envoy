@@ -77,13 +77,16 @@ void HttpPerRequestTapperImpl::onRequestBody(const Buffer::Instance& data) {
       }
       auto& body = *buffered_streamed_request_body_->mutable_http_streamed_trace_segment()
                         ->mutable_request_body_chunk();
+      ASSERT(body.as_bytes().size() <= config_->maxBufferedRxBytes());
       TapCommon::Utility::addBufferToProtoBytes(
           body, config_->maxBufferedRxBytes() - body.as_bytes().size(), data, 0, data.length());
     }
   } else {
+    // If we are not streaming, buffer the request body up to our limit.
     makeBufferedFullTraceIfNeeded();
     auto& body =
         *buffered_full_trace_->mutable_http_buffered_trace()->mutable_request()->mutable_body();
+    ASSERT(body.as_bytes().size() <= config_->maxBufferedRxBytes());
     TapCommon::Utility::addBufferToProtoBytes(
         body, config_->maxBufferedRxBytes() - body.as_bytes().size(), data, 0, data.length());
   }
@@ -153,6 +156,7 @@ void HttpPerRequestTapperImpl::onResponseBody(const Buffer::Instance& data) {
     ASSERT(started_streaming_trace_ || !match_status.matches_);
 
     if (started_streaming_trace_) {
+      // If we have already started streaming, flush a body segment now.
       TapCommon::TraceWrapperSharedPtr trace = makeTraceSegment();
       TapCommon::Utility::addBufferToProtoBytes(
           *trace->mutable_http_streamed_trace_segment()->mutable_response_body_chunk(),
@@ -165,13 +169,16 @@ void HttpPerRequestTapperImpl::onResponseBody(const Buffer::Instance& data) {
       }
       auto& body = *buffered_streamed_response_body_->mutable_http_streamed_trace_segment()
                         ->mutable_response_body_chunk();
+      ASSERT(body.as_bytes().size() <= config_->maxBufferedTxBytes());
       TapCommon::Utility::addBufferToProtoBytes(
           body, config_->maxBufferedTxBytes() - body.as_bytes().size(), data, 0, data.length());
     }
   } else {
+    // If we are not streaming, buffer the response body up to our limit.
     makeBufferedFullTraceIfNeeded();
     auto& body =
         *buffered_full_trace_->mutable_http_buffered_trace()->mutable_response()->mutable_body();
+    ASSERT(body.as_bytes().size() <= config_->maxBufferedTxBytes());
     TapCommon::Utility::addBufferToProtoBytes(
         body, config_->maxBufferedTxBytes() - body.as_bytes().size(), data, 0, data.length());
   }
