@@ -386,7 +386,7 @@ message Cluster {
     // subset predicate.
     bool scale_locality_weight = 5;
 
-    // If a fallback policy is set but still no host is selected, chose any.
+    // If a fallback policy is set but still no host is selected, select any.
     bool panic_mode_any = 6;
   }
 
