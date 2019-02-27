@@ -90,7 +90,7 @@ void registerSpanCatcher() {
 TEST(OpenCensusTracerTest, Span) {
   registerSpanCatcher();
   envoy::config::trace::v2::OpenCensusConfig oc_config;
-  std::unique_ptr<Tracing::Driver> driver_(new OpenCensus::Driver(oc_config));
+  std::unique_ptr<Tracing::Driver> driver(new OpenCensus::Driver(oc_config));
 
   NiceMock<Tracing::MockConfig> config;
   Http::TestHeaderMapImpl request_headers{
@@ -99,7 +99,7 @@ TEST(OpenCensusTracerTest, Span) {
   SystemTime start_time;
 
   {
-    Tracing::SpanPtr span = driver_->startSpan(config, request_headers, operation_name, start_time,
+    Tracing::SpanPtr span = driver->startSpan(config, request_headers, operation_name, start_time,
                                                {Tracing::Reason::Sampling, true});
     span->setOperation("my_operation_2");
     span->setTag("my_key", "my_value");
