@@ -1,7 +1,7 @@
 # protoc plugin to map from FileDescriptorProtos to Envoy doc style RST.
 # See https://github.com/google/protobuf/blob/master/src/google/protobuf/descriptor.proto
 # for the underlying protos mentioned in this file. See
-# http://www.sphinx-doc.org/en/stable/rest.html for Sphinx RST syntax.
+# https://www.sphinx-doc.org/en/master/usage/restructuredtext/basics.html for Sphinx RST syntax.
 
 from collections import defaultdict
 import cProfile

@@ -9,7 +9,7 @@ option java_package = "io.envoyproxy.envoy.type";
 import "validate/validate.proto";
 
 // HTTP response codes supported in Envoy.
-// For more details: http://www.iana.org/assignments/http-status-codes/http-status-codes.xhtml
+// For more details: https://www.iana.org/assignments/http-status-codes/http-status-codes.xhtml
 enum StatusCode {
   // Empty - This code not part of the HTTP status code specification, but it is needed for proto
   // `enum` type.
