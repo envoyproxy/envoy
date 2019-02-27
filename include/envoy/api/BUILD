@@ -19,6 +19,11 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "io_error_interface",
+    hdrs = ["io_error.h"],
+)
+
+envoy_cc_library(
     name = "os_sys_calls_interface",
     hdrs = ["os_sys_calls.h"],
 )
