@@ -109,6 +109,7 @@ struct TracingConnectionManagerConfig {
   uint64_t client_sampling_;
   uint64_t random_sampling_;
   uint64_t overall_sampling_;
+  bool verbose_;
 };
 
 typedef std::unique_ptr<TracingConnectionManagerConfig> TracingConnectionManagerConfigPtr;

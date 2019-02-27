@@ -341,8 +341,9 @@ private:
     void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) override;
 
     // Tracing::TracingConfig
-    virtual Tracing::OperationName operationName() const override;
-    virtual const std::vector<Http::LowerCaseString>& requestHeadersForTags() const override;
+    Tracing::OperationName operationName() const override;
+    const std::vector<Http::LowerCaseString>& requestHeadersForTags() const override;
+    bool verbose() const override;
 
     void traceRequest();
 

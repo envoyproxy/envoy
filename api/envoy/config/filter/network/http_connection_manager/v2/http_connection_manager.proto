@@ -116,6 +116,10 @@ message HttpConnectionManager {
     // :ref:`HTTP Connection Manager <config_http_conn_man_runtime>`.
     // Default: 100%
     envoy.type.Percent overall_sampling = 5;
+
+    // Whether to annotate spans with additional data. If true, spans will include logs for stream
+    // events.
+    bool verbose = 6;
   }
 
   // Presence of the object defines whether the connection manager
