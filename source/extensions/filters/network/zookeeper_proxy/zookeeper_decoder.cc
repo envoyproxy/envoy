@@ -162,9 +162,7 @@ void DecoderImpl::parseCreateRequest(Buffer::Instance& data, uint64_t& offset, u
   int32_t datalen;
   BufferHelper::peekInt32(data, offset, datalen);
   offset += datalen;
-  // Skip acls.
   skipAcls(data, offset);
-  // Flags.
   int32_t flags;
   BufferHelper::peekInt32(data, offset, flags);
   const bool ephemeral = (flags & 0x1) == 1;
@@ -182,7 +180,6 @@ void DecoderImpl::parseSetRequest(Buffer::Instance& data, uint64_t& offset, uint
   int32_t datalen;
   BufferHelper::peekInt32(data, offset, datalen);
   offset += datalen;
-  // Version.
   int32_t version;
   BufferHelper::peekInt32(data, offset, version);
 
@@ -206,7 +203,6 @@ void DecoderImpl::parseDeleteRequest(Buffer::Instance& data, uint64_t& offset, u
 
   std::string path;
   BufferHelper::peekString(data, offset, path);
-  // Version.
   int32_t version;
   BufferHelper::peekInt32(data, offset, version);
 
@@ -238,9 +234,7 @@ void DecoderImpl::parseSetAclRequest(Buffer::Instance& data, uint64_t& offset, u
 
   std::string path;
   BufferHelper::peekString(data, offset, path);
-  // Skip acls.
   skipAcls(data, offset);
-  // Version.
   int32_t version;
   BufferHelper::peekInt32(data, offset, version);
 
@@ -261,7 +255,6 @@ void DecoderImpl::parseCheckRequest(Buffer::Instance& data, uint64_t& offset, ui
 
   std::string path;
   BufferHelper::peekString(data, offset, path);
-  // Version.
   int32_t version;
   BufferHelper::peekInt32(data, offset, version);
 
