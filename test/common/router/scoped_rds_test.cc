@@ -109,7 +109,7 @@ TEST_F(ScopedRdsTest, ValidateFail) {
   ScopedRdsConfigSubscription& subscription =
       dynamic_cast<ScopedRdsConfigProvider&>(*provider_).subscription();
 
-  // 'name' validation
+  // 'name' validation: value must be > 1 byte.
   const std::string config_yaml = R"EOF(
 name:
 scope_key_builder:
@@ -125,7 +125,7 @@ scopes:
   parseScopedRoutesConfigFromYaml(*resources.Add(), config_yaml);
   EXPECT_THROW(subscription.onConfigUpdate(resources, "1"), ProtoValidationException);
 
-  // 'scope_key_builder.fragments' validation
+  // 'scope_key_builder.fragments' validation: must define at least 1 item in the repeated field.
   const std::string config_yaml2 = R"EOF(
 name: foo_scope_set
 scope_key_builder:
@@ -140,7 +140,7 @@ scopes:
   parseScopedRoutesConfigFromYaml(*resources2.Add(), config_yaml2);
   EXPECT_THROW(subscription.onConfigUpdate(resources2, "1"), ProtoValidationException);
 
-  // 'scopes.fragments' validation
+  // 'scopes.fragments' validation: must define at least 1 item in the repeated field.
   const std::string config_yaml3 = R"EOF(
 name: foo_scope_set
 scope_key_builder:
@@ -232,7 +232,7 @@ public:
   ~ScopedRoutesConfigProviderManagerTest() override = default;
 };
 
-// Tests that the /configdump handler returns the corresponding scoped routing config.
+// Tests that the /config_dump handler returns the corresponding scoped routing config.
 TEST_F(ScopedRoutesConfigProviderManagerTest, ConfigDump) {
   auto message_ptr =
       factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"]();

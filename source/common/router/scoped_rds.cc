@@ -85,7 +85,7 @@ void ScopedRdsConfigSubscription::onConfigUpdate(const ResourceVector& resources
   const auto& scoped_routes_config = resources[0];
   MessageUtil::validate(scoped_routes_config);
   // The name we receive in the config must match the name requested.
-  if (!(scoped_routes_config.name() == scoped_routes_config_name_)) {
+  if (scoped_routes_config.name() != scoped_routes_config_name_) {
     throw EnvoyException(fmt::format("Unexpected SRDS configuration (expecting {}): {}",
                                      scoped_routes_config_name_, scoped_routes_config.name()));
   }

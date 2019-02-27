@@ -17,7 +17,7 @@ public:
 
   /**
    * Based on the incoming HTTP request headers, returns the configuration to use for selecting a
-   * target route (to either a route entry or a direct response entry).
+   * target route.
    * @param headers the request headers to match the scoped routing configuration against.
    * @return ConfigConstSharedPtr the router's Config matching the request headers.
    */

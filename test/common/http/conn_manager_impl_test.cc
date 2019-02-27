@@ -26,6 +26,7 @@
 
 #include "extensions/access_loggers/file/file_access_log_impl.h"
 
+#include "test/common/http/conn_manager_impl_common.h"
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/common.h"
@@ -62,34 +63,6 @@ namespace Http {
 
 class HttpConnectionManagerImplTest : public TestBase, public ConnectionManagerConfig {
 public:
-  struct RouteConfigProvider : public Router::RouteConfigProvider {
-    RouteConfigProvider(TimeSource& time_source) : time_source_(time_source) {}
-
-    // Router::RouteConfigProvider
-    Router::ConfigConstSharedPtr config() override { return route_config_; }
-    absl::optional<ConfigInfo> configInfo() const override { return {}; }
-    SystemTime lastUpdated() const override { return time_source_.systemTime(); }
-
-    TimeSource& time_source_;
-    std::shared_ptr<Router::MockConfig> route_config_{new NiceMock<Router::MockConfig>()};
-  };
-
-  struct ScopedRouteConfigProvider : public Config::ConfigProvider {
-    ScopedRouteConfigProvider(TimeSource& time_source)
-        : config_(std::make_shared<Router::MockScopedConfig>()), time_source_(time_source) {}
-
-    ~ScopedRouteConfigProvider() override = default;
-
-    // Config::ConfigProvider
-    SystemTime lastUpdated() const override { return time_source_.systemTime(); }
-    const Protobuf::Message* getConfigProto() const override { return nullptr; }
-    std::string getConfigVersion() const override { return ""; }
-    ConfigConstSharedPtr getConfig() const override { return config_; }
-
-    std::shared_ptr<Router::MockScopedConfig> config_;
-    TimeSource& time_source_;
-  };
-
   HttpConnectionManagerImplTest()
       : route_config_provider_(test_time_.timeSystem()),
         scoped_route_config_provider_(test_time_.timeSystem()), access_log_path_("dummy_path"),
@@ -278,8 +251,8 @@ public:
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
 
   DangerousDeprecatedTestTime test_time_;
-  RouteConfigProvider route_config_provider_;
-  ScopedRouteConfigProvider scoped_route_config_provider_;
+  ConnectionManagerImplHelper::RouteConfigProvider route_config_provider_;
+  ConnectionManagerImplHelper::ScopedRouteConfigProvider scoped_route_config_provider_;
   NiceMock<Tracing::MockHttpTracer> tracer_;
   Http::ContextImpl http_context_;
   NiceMock<Runtime::MockLoader> runtime_;

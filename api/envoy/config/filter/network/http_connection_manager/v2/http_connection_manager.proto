@@ -409,7 +409,10 @@ message Rds {
 
     // Must be set to true when scoped RDS is enabled.
     // If this is enabled, RDS subscriptions will be triggered by scoped RDS config updates using
-    // this configuration as a template.
+    // this configuration as a template; i.e., the
+    // :ref:`config_source<envoy_api_field_config.filter.network.http_connection_manager.v2.Rds.config_source>`
+    // from this message will be used to specify the config source for subscriptions initiated by
+    // scoped RDS.
     bool scoped_rds_template = 3;
   }
 }

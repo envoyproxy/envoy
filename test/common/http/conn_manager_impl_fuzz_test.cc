@@ -20,6 +20,7 @@
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
 
+#include "test/common/http/conn_manager_impl_common.h"
 #include "test/common/http/conn_manager_impl_fuzz.pb.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/fuzz/utility.h"
@@ -44,34 +45,6 @@ namespace Http {
 
 class FuzzConfig : public ConnectionManagerConfig {
 public:
-  struct RouteConfigProvider : public Router::RouteConfigProvider {
-    RouteConfigProvider(TimeSource& time_source) : time_source_(time_source) {}
-
-    // Router::RouteConfigProvider
-    Router::ConfigConstSharedPtr config() override { return route_config_; }
-    absl::optional<ConfigInfo> configInfo() const override { return {}; }
-    SystemTime lastUpdated() const override { return time_source_.systemTime(); }
-
-    TimeSource& time_source_;
-    std::shared_ptr<Router::MockConfig> route_config_{new NiceMock<Router::MockConfig>()};
-  };
-
-  struct ScopedRouteConfigProvider : public Config::ConfigProvider {
-    ScopedRouteConfigProvider(TimeSource& time_source)
-        : config_(std::make_shared<Router::MockScopedConfig>()), time_source_(time_source) {}
-
-    ~ScopedRouteConfigProvider() override = default;
-
-    // Config::ConfigProvider
-    SystemTime lastUpdated() const override { return time_source_.systemTime(); }
-    const Protobuf::Message* getConfigProto() const override { return nullptr; }
-    std::string getConfigVersion() const override { return ""; }
-    ConfigConstSharedPtr getConfig() const override { return config_; }
-
-    std::shared_ptr<Router::MockScopedConfig> config_;
-    TimeSource& time_source_;
-  };
-
   FuzzConfig()
       : route_config_provider_(time_system_), scoped_route_config_provider_(time_system_),
         stats_{{ALL_HTTP_CONN_MAN_STATS(POOL_COUNTER(fake_stats_), POOL_GAUGE(fake_stats_),
@@ -145,8 +118,8 @@ public:
   NiceMock<MockFilterChainFactory> filter_factory_;
   Event::SimulatedTimeSystem time_system_;
   SlowDateProviderImpl date_provider_{time_system_};
-  RouteConfigProvider route_config_provider_;
-  ScopedRouteConfigProvider scoped_route_config_provider_;
+  ConnectionManagerImplHelper::RouteConfigProvider route_config_provider_;
+  ConnectionManagerImplHelper::ScopedRouteConfigProvider scoped_route_config_provider_;
   std::string server_name_;
   Stats::IsolatedStoreImpl fake_stats_;
   ConnectionManagerStats stats_;

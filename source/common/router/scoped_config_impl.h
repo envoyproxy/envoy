@@ -21,8 +21,6 @@ public:
   ScopedConfigImpl(const envoy::api::v2::ScopedRouteConfigurationsSet& config_proto)
       : name_(config_proto.name()) {}
 
-  ~ScopedConfigImpl() override = default;
-
   Router::ConfigConstSharedPtr getRouterConfig(const Http::HeaderMap& headers) const override;
 
 private:
@@ -34,10 +32,6 @@ private:
  */
 class NullScopedConfigImpl : public ScopedConfig {
 public:
-  NullScopedConfigImpl() = default;
-
-  ~NullScopedConfigImpl() override = default;
-
   Router::ConfigConstSharedPtr getRouterConfig(const Http::HeaderMap&) const override {
     return std::make_shared<const NullConfigImpl>();
   }

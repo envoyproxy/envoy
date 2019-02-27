@@ -200,7 +200,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
                                                                          context_.listenerScope())),
       proxy_100_continue_(config.proxy_100_continue()),
       delayed_close_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, delayed_close_timeout, 1000)) {
-  // Throws an exception on failure.
+  // Throws an exception on invalid config.
   validateScopedRoutingAndRds(config);
 
   // If scoped RDS is enabled, avoid creating a route config provider. Route config providers will

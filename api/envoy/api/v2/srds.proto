@@ -23,10 +23,14 @@ option (gogoproto.equal_all) = true;
 //
 //   The Scoped RDS API is not yet fully implemented and *should not* be enabled in
 //   :ref:`envoy_api_msg_config.filter.network.http_connection_manager.v2.HttpConnectionManager`.
+//
+// TODO(AndresGuedez): Update :ref:`arch_overview_http_routing` with scoped routing overview and
+// configuration details.
 
-// The resource_names field in DiscoveryRequest specifies a set of route configuration scopes. Each
-// scope points to a route_configuration_name which will be used to request a
-// :ref:`RouteConfiguration<envoy_api_msg_Route.RouteConfiguration>` via the RDS API.
+// The `ref:resource_names<envoy_api_field_DiscoveryRequest.resource_names>` field in
+// DiscoveryRequest specifies a set of route configuration scopes. Each scope points to a
+// route_configuration_name which will be used to request a
+// :ref:`RouteConfiguration<envoy_api_msg_RouteConfiguration>` via the RDS API.
 service ScopedRoutesDiscoveryService {
   rpc StreamScopedRoutes(stream DiscoveryRequest) returns (stream DiscoveryResponse) {
   }
@@ -43,10 +47,62 @@ service ScopedRoutesDiscoveryService {
   }
 }
 
-// This configuration represents a set of "scopes", each containing independent routing
-// configuration (see :ref:`routing architecture overview <arch_overview_http_routing>`). A scope is
-// assigned to each request based on request attributes, such as the value of a header designated
-// via this configuration.
+// This configuration represents a set of routing 'scopes', each containing independent routing
+// configuration (see :ref:`routing architecture overview <arch_overview_http_routing>`).
+//
+// A ScopedRouteConfigurationsSet is associated with an
+// :ref:`HttpConnectionManager<envoy_api_msg_config.filter.network.http_connection_manager.v2.HttpConnectionManager>`
+// via the
+// :ref:`scoped_rds<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.scoped_rds>`
+// or 
+// :ref:`scoped_routes_config<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.scoped_routes_config>`
+// fields. When scoped routing is enabled, the Envoy router will first attempt to determine the
+// routing scope assigned to a request by building a
+// :ref:`Scope.Key<envoy_api_msg_ScopedRouteConfigurationsSet.Scope.Key>` based on request header
+// attributes (such as the value of a header field) defined by the 
+// :ref:`ScopeKeyBuilder<envoy_api_msg_ScopedRouteConfigurationsSet.ScopeKeyBuilder>`
+// this message.
+//
+// The key will be looked up in a table maintained by the router, containing the 
+// :ref:`Scope.Key<envoy_api_msg_ScopedRouteConfigurationsSet.Scope.Key>` to
+// :ref:`RouteConfiguration<envoy_api_msg_RouteConfiguration>` mappings specified by the
+// :ref:`scopes<envoy_api_field_ScopedRouteConfigurationsSet.scopes>` field in this message. The
+// routing rules specified by the resulting RouteConfiguration will be used to determine the route
+// for the request.
+//
+// For example, with the following YAML configuration:
+//
+// .. code::
+//
+//   scope_key_builder:
+//     fragments:
+//       - header_element:
+//         name: X-Route-Selector
+//         element_separator: ,
+//         element:
+//           separator: =
+//           key: vip
+//   scopes:
+//     - route_configuration_name: route-config1
+//       key:
+//          fragments:
+//            - string_key: 172.10.10.20
+//      - route_configuration_name: route-config2
+//        key:
+//          fragments:
+//            - string_key: 172.20.20.30
+//
+// A request from a client such as:
+//
+// .. code::
+//
+//     GET / HTTP/1.1
+//     Host: foo.com
+//     X-Route-Selector: vip=172.10.10.20
+//
+// Would result in the `route-config1` RouteConfiguration being assigned to the request/stream,
+// which Envoy would fetch via RDS.
+//
 // [#comment:next free field: 4]
 message ScopedRouteConfigurationsSet {
   // The name of the set of route configuration scopes. This will be the
@@ -61,7 +117,7 @@ message ScopedRouteConfigurationsSet {
   // Upon receiving a request's headers, the Router will build a key using the algorithm specified
   // by this message. This key will be used to look up a corresponding
   // :ref:`Scope <envoy_api_msg_ScopedRouteConfigurationsSet.Scope>` in a table containing the set
-  // of :ref:`scopes <envoy_api_field_ScopedRouteConfigurationsSet.scopes>`.
+  // of :ref:`scopes <envoy_api_field_ScopedRouteConfigurationsSet.scopes>` in this message.
   message ScopeKeyBuilder {
     // Specifies the mechanism for constructing fragments which are composed into keys.
     message FragmentBuilder {
@@ -70,23 +126,25 @@ message ScopedRouteConfigurationsSet {
       //
       // .. code::
       //
-      //    X-Header: a,b;c,d
+      //    X-Header: a=b;c=d
       //    |         || |
-      //    |         || \\----> <element_separator>
+      //    |         || \----> <element_separator>
       //    |         ||
-      //    |         |\\----> <element.separator>
+      //    |         |\----> <element.separator>
       //    |         |
-      //    |         \\----> <element.key>
+      //    |         \----> <element.key>
       //    |
-      //    \\----> <name>
+      //    \----> <name>
+      //
+      //    Each 'a=b' key-value pair constitutes an 'element' of the header field.
       message HeaderValueExtractor {
-        // The name of the header to extract the value from.
+        // The name of the header field to extract the value from.
         string name = 1 [(validate.rules).string.min_bytes = 1];
 
         // The element separator (e.g., ';' separates 'a;b;c;d').
         string element_separator = 2;
 
-        // Specifies a key value pair to match on.
+        // Specifies a header field's key value pair to match on.
         message KvElement {
           // The separator between key and value (e.g., '=' separates 'k=v;...').
           string separator = 1;
@@ -112,7 +170,7 @@ message ScopedRouteConfigurationsSet {
       }
     }
 
-    // The constructed key consists of the union of these fragments.
+    // The constructed key consists of the ordered union of these fragments.
     repeated FragmentBuilder fragments = 1 [(validate.rules).repeated .min_items = 1];
   }
 
@@ -123,7 +181,7 @@ message ScopedRouteConfigurationsSet {
   // :ref:`Key <envoy_api_msg_ScopedRouteConfigurationsSet.Scope.Key>` which is matched against
   // each HTTP request.
   message Scope {
-    // Specifies a key which is matched against by the output of a :ref:`ScopeKeyBuilder
+    // Specifies a key which is matched against the output of a :ref:`ScopeKeyBuilder
     // <envoy_api_msg_ScopedRouteConfigurationsSet.ScopeKeyBuilder>`.
     message Key {
       message Fragment {
@@ -147,7 +205,7 @@ message ScopedRouteConfigurationsSet {
     Key key = 2 [(validate.rules).message.required = true];
   }
 
-  // The set of scopes containing :ref:`Key <envoy_api_msg_ScopedRouteConfigurationsSet.Scope.Key>`
+  // The set of scopes, containing :ref:`Key <envoy_api_msg_ScopedRouteConfigurationsSet.Scope.Key>`
   // to :ref:`envoy_api_msg_RouteConfiguration` mappings.
   repeated Scope scopes = 3 [(validate.rules).repeated .min_items = 1];
 }
