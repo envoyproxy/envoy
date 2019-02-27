@@ -463,7 +463,9 @@ void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callb
 }
 
 void Filter::cleanup() {
-  callbacks_->streamInfo().setUpstreamTiming(upstream_request_->upstream_timing_);
+  if (upstream_request_) {
+    callbacks_->streamInfo().setUpstreamTiming(upstream_request_->upstream_timing_);
+  }
   upstream_request_.reset();
   retry_state_.reset();
   if (response_timeout_) {
