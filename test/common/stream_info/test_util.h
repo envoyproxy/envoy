@@ -132,11 +132,8 @@ public:
 
   void onRequestComplete() override { end_time_ = timeSystem().monotonicTime(); }
 
-  void resetUpstreamTimings() override {
-    first_upstream_tx_byte_sent_ = absl::optional<MonotonicTime>{};
-    last_upstream_tx_byte_sent_ = absl::optional<MonotonicTime>{};
-    first_upstream_rx_byte_received_ = absl::optional<MonotonicTime>{};
-    last_upstream_rx_byte_received_ = absl::optional<MonotonicTime>{};
+  void setUpstreamTiming(const UpstreamTiming& upstream_timing) override {
+    upstream_timing_ = upstream_timing);
   }
 
   absl::optional<std::chrono::nanoseconds> requestComplete() const override {
