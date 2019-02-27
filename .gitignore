@@ -23,3 +23,5 @@ TAGS
 .vs
 .vscode
 .idea/
+# OSX trash
+.DS_Store
