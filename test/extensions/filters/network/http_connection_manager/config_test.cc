@@ -550,9 +550,10 @@ http_filters:
   - name: envoy.router
 )EOF";
 
-  HttpConnectionManagerConfig(parseHttpConnectionManagerFromV2Yaml(config_yaml), context_,
-                              date_provider_, route_config_provider_manager_,
-                              scoped_routes_config_provider_manager_);
+  EXPECT_NO_THROW(HttpConnectionManagerConfig(parseHttpConnectionManagerFromV2Yaml(config_yaml),
+                                              context_, date_provider_,
+                                              route_config_provider_manager_,
+                                              scoped_routes_config_provider_manager_));
 
   const std::string config_yaml2 = R"EOF(
 rds:
@@ -567,9 +568,10 @@ http_filters:
   - name: envoy.router
 )EOF";
 
-  HttpConnectionManagerConfig(parseHttpConnectionManagerFromV2Yaml(config_yaml2), context_,
-                              date_provider_, route_config_provider_manager_,
-                              scoped_routes_config_provider_manager_);
+  EXPECT_NO_THROW(HttpConnectionManagerConfig(parseHttpConnectionManagerFromV2Yaml(config_yaml2),
+                                              context_, date_provider_,
+                                              route_config_provider_manager_,
+                                              scoped_routes_config_provider_manager_));
 }
 
 TEST_F(HttpConnectionManagerConfigTest, ScopedRdsAndStatic) {
