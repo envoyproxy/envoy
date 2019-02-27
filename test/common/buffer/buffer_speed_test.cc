@@ -5,7 +5,6 @@
 #include "benchmark/benchmark.h"
 
 namespace Envoy {
-namespace {
 static constexpr uint64_t MaxBufferLength = 1024 * 1024;
 
 // No-op release callback for use in BufferFragmentImpl instances.
@@ -318,7 +317,6 @@ static void BufferSearchPartialMatch(benchmark::State& state) {
 BENCHMARK(BufferSearchPartialMatch)->Arg(1)->Arg(4096)->Arg(16384)->Arg(65536);
 
 } // namespace Envoy
-} // namespace
 // Boilerplate main(), which discovers benchmarks in the same file and runs them.
 int main(int argc, char** argv) {
   benchmark::Initialize(&argc, argv);

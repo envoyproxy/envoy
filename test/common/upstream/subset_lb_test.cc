@@ -30,7 +30,6 @@ using testing::ReturnRef;
 
 namespace Envoy {
 namespace Upstream {
-namespace {
 class SubsetLoadBalancerDescribeMetadataTester {
 public:
   SubsetLoadBalancerDescribeMetadataTester(std::shared_ptr<SubsetLoadBalancer> lb) : lb_(lb) {}
@@ -1568,7 +1567,6 @@ TEST_P(SubsetLoadBalancerTest, GaugesUpdatedOnDestroy) {
 INSTANTIATE_TEST_SUITE_P(UpdateOrderings, SubsetLoadBalancerTest,
                          testing::ValuesIn({REMOVES_FIRST, SIMULTANEOUS}));
 
-} // namespace
 } // namespace SubsetLoadBalancerTest
 } // namespace Upstream
 } // namespace Envoy

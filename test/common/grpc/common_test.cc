@@ -11,7 +11,6 @@
 
 namespace Envoy {
 namespace Grpc {
-namespace  {
 TEST(GrpcCommonTest, GetGrpcStatus) {
   Http::TestHeaderMapImpl ok_trailers{{"grpc-status", "0"}};
   EXPECT_EQ(Status::Ok, Common::getGrpcStatus(ok_trailers).value());
@@ -348,6 +347,5 @@ TEST(GrpcCommonTest, ValidateResponse) {
     EXPECT_THROW_WITH_MESSAGE(Common::validateResponse(response), Exception, "custom error");
   }
 }
-} // namespace
 } // namespace Grpc
 } // namespace Envoy
