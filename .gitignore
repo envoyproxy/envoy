@@ -2,6 +2,7 @@
 BROWSE
 /build
 /build_*
+*.bzlc
 .cache
 /ci/bazel-*
 /ci/prebuilt/thirdparty
@@ -22,3 +23,4 @@ TAGS
 .vimrc
 .vs
 .vscode
+.idea/

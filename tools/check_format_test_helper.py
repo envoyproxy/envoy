@@ -8,9 +8,9 @@
 from __future__ import print_function
 
 import argparse
+import logging
 import os
 import shutil
-import logging
 import subprocess
 import sys
 
