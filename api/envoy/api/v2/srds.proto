@@ -54,16 +54,16 @@ service ScopedRoutesDiscoveryService {
 // :ref:`HttpConnectionManager<envoy_api_msg_config.filter.network.http_connection_manager.v2.HttpConnectionManager>`
 // via the
 // :ref:`scoped_rds<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.scoped_rds>`
-// or 
+// or
 // :ref:`scoped_routes_config<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.scoped_routes_config>`
 // fields. When scoped routing is enabled, the Envoy router will first attempt to determine the
 // routing scope assigned to a request by building a
 // :ref:`Scope.Key<envoy_api_msg_ScopedRouteConfigurationsSet.Scope.Key>` based on request header
-// attributes (such as the value of a header field) defined by the 
+// attributes (such as the value of a header field) defined by the
 // :ref:`ScopeKeyBuilder<envoy_api_msg_ScopedRouteConfigurationsSet.ScopeKeyBuilder>`
 // this message.
 //
-// The key will be looked up in a table maintained by the router, containing the 
+// The key will be looked up in a table maintained by the router, containing the
 // :ref:`Scope.Key<envoy_api_msg_ScopedRouteConfigurationsSet.Scope.Key>` to
 // :ref:`RouteConfiguration<envoy_api_msg_RouteConfiguration>` mappings specified by the
 // :ref:`scopes<envoy_api_field_ScopedRouteConfigurationsSet.scopes>` field in this message. The
