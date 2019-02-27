@@ -132,8 +132,8 @@ public:
 
   void onRequestComplete() override { end_time_ = timeSystem().monotonicTime(); }
 
-  void setUpstreamTiming(const UpstreamTiming& upstream_timing) override {
-    upstream_timing_ = upstream_timing);
+  void setUpstreamTiming(const Envoy::StreamInfo::UpstreamTiming& upstream_timing) override {
+    upstream_timing_ = upstream_timing;
   }
 
   absl::optional<std::chrono::nanoseconds> requestComplete() const override {
