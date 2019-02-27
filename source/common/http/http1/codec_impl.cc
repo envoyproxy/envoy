@@ -417,6 +417,10 @@ void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
     return;
   }
 
+  if (current_header_field_.size() + length + current_header_map_->byteSize() > 60 * 1024) {
+    throw CodecProtocolException("http/1.1 protocol error: HPE_HEADER_OVERFLOW");
+  }
+
   header_parsing_state_ = HeaderParsingState::Value;
   current_header_value_.append(data, length);
 }

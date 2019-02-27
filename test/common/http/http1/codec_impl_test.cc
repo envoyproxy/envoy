@@ -33,12 +33,7 @@ namespace Http1 {
 class Http1ServerConnectionImplTest : public TestBase {
 public:
   void initialize() {
-    http_parser_set_max_header_size(max_request_headers_kb_ * 1024);
     codec_ = std::make_unique<ServerConnectionImpl>(connection_, callbacks_, codec_settings_);
-  }
-
-  void TearDown() override {
-    http_parser_set_max_header_size(Http::DEFAULT_MAX_REQUEST_HEADERS_KB * 1024);
   }
 
   NiceMock<Network::MockConnection> connection_;
@@ -1031,8 +1026,33 @@ TEST_F(Http1ServerConnectionImplTest, TestLargeRequestHeadersRejected) {
 
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n");
   codec_->dispatch(buffer);
-  std::string long_string = "big: " + std::string(64 * 1024, 'q') + "\r\n";
+  std::string long_string = "big: " + std::string(60 * 1024, 'q') + "\r\n";
   buffer = Buffer::OwnedImpl(long_string);
+  EXPECT_THROW_WITH_MESSAGE(codec_->dispatch(buffer), EnvoyException,
+                            "http/1.1 protocol error: HPE_HEADER_OVERFLOW");
+}
+
+TEST_F(Http1ServerConnectionImplTest, TestLargeRequestHeadersSplitRejected) {
+  initialize();
+
+  std::string exception_reason;
+  NiceMock<Http::MockStreamDecoder> decoder;
+  Http::StreamEncoder* response_encoder = nullptr;
+  EXPECT_CALL(callbacks_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamEncoder& encoder, bool) -> Http::StreamDecoder& {
+        response_encoder = &encoder;
+        return decoder;
+      }));
+  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n");
+  codec_->dispatch(buffer);
+
+  std::string long_string = std::string(1024, 'q');
+  for (int i = 0; i < 59; i++) {
+    buffer = Buffer::OwnedImpl(fmt::format("big: {}\r\n", long_string));
+    codec_->dispatch(buffer);
+  }
+  // the 60th 1kb header should induce overflow
+  buffer = Buffer::OwnedImpl(fmt::format("big: {}\r\n", long_string));
   EXPECT_THROW_WITH_MESSAGE(codec_->dispatch(buffer), EnvoyException,
                             "http/1.1 protocol error: HPE_HEADER_OVERFLOW");
 }
