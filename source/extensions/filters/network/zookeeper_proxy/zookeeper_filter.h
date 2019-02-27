@@ -79,8 +79,7 @@ using ZooKeeperFilterConfigSharedPtr = std::shared_ptr<ZooKeeperFilterConfig>;
  */
 class ZooKeeperFilter : public Network::Filter, DecoderCallbacks, Logger::Loggable<Logger::Id::filter> {
 public:
-  ZooKeeperFilter(ZooKeeperFilterConfigSharedPtr config);
-  ~ZooKeeperFilter() override = default;
+  explicit ZooKeeperFilter(ZooKeeperFilterConfigSharedPtr config);
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;
