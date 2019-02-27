@@ -76,8 +76,7 @@ See [here](CONTRIBUTING.md#api-changes) for the v2 API change process.
 Unless otherwise stated, the APIs with the same names as v1 APIs have a similar role.
 
 * [Cluster Discovery Service (CDS)](envoy/api/v2/cds.proto).
-* [Endpoint Discovery Service (EDS)](envoy/api/v2/eds.proto). This has the same role as SDS in the [v1 API](https://www.envoyproxy.io/docs/envoy/latest/api-v1/cluster_manager/sds),
-  the new name better describes what the API does in practice. Advanced global load balancing capable of utilizing N-dimensional upstream metrics is now supported.
+* [Endpoint Discovery Service (EDS)](envoy/api/v2/eds.proto). The new name better describes what the API does in practice. Advanced global load balancing capable of utilizing N-dimensional upstream metrics is now supported.
 * [Health Discovery Service (HDS)](envoy/service/discovery/v2/hds.proto). This new API supports efficient endpoint health discovery by the management server via the Envoy instances it manages. Individual Envoy instances
   will typically receive HDS instructions to health check a subset of all
   endpoints. The health check subset may not be a subset of the Envoy instance's
