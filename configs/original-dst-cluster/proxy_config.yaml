@@ -28,7 +28,6 @@ static_resources:
     listener_filters:
     - name: envoy.listener.original_dst
       typed_config: {}
-    name: original_dst
   clusters:
   - name: cluster1
     type: ORIGINAL_DST
