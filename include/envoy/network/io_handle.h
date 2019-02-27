@@ -10,7 +10,7 @@ namespace Envoy {
 // frequent memory allocation of IoError instance.
 // If this is used, IoHandleCallResult has to be instantiated with a deleter that does not
 // deallocate memory for this error.
-#define ENVOY_ERROR_AGAIN reinterpret_cast<Network::IoError*>(0x01)
+#define ENVOY_ERROR_AGAIN reinterpret_cast<Network::IoError*>(alignof(Network::IoError))
 
 namespace Buffer {
 struct RawSlice;
