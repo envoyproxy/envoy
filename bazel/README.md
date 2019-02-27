@@ -529,7 +529,7 @@ to run clang-format scripts on your workstation directly:
  * Type-ahead doesn't always work when waiting running a command through docker
 To run the tools directly, you must install the correct version of clang. This
 may change over time but as of January 2019,
-[clang+llvm-7.0.0](http://releases.llvm.org/download.html) works well. You must
+[clang+llvm-7.0.0](https://releases.llvm.org/download.html) works well. You must
 also have 'buildifier' installed from the bazel distribution.
 
 Edit the paths shown here to reflect the installation locations on your system:
