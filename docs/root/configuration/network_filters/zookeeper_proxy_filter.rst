@@ -49,7 +49,7 @@ following statistics:
   :widths: 1, 1, 2
 
   decoder_error, Counter, Number of times a message wasn't decoded
-  connect_rq, Counter, Number of connect requests
+  connect_rq, Counter, Number of regular connect (non-readonly) requests
   connect_readonly_rq, Counter, Number of connect requests with the readonly flag set
   ping_rq, Counter, Number of ping requests
   auth.<type>_rq, Counter, Number of auth requests for a given type
