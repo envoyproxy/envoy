@@ -34,13 +34,14 @@ namespace Envoy {
 namespace Upstream {
 namespace {
 
+static const uint32_t DEFAULT_PRIORITY = 1;
+static const uint32_t PRIORITY = 10;
+static const std::string STATIC_ADDRESS = "127.0.0.1";
+static const uint32_t STATIC_PORT = 80;
+static const std::string STATIC_URL = fmt::format("tcp://{}:{}", STATIC_ADDRESS, STATIC_PORT);
+
 class TestStaticClusterImpl : public ClusterImplBase {
 public:
-  TestStaticClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
-                        Server::Configuration::TransportSocketFactoryContext& factory_context,
-                        Stats::ScopePtr&& stats_scope, bool added_via_api)
-      : TestStaticClusterImpl(cluster, runtime, factory_context, std::move(stats_scope),
-                              added_via_api, 1) {}
   TestStaticClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
                         Server::Configuration::TransportSocketFactoryContext& factory_context,
                         Stats::ScopePtr&& stats_scope, bool added_via_api, uint32_t priority)
@@ -52,7 +53,7 @@ public:
 private:
   // ClusterImplBase
   void startPreInit() override {
-    HostVectorSharedPtr hosts(new HostVector({makeTestHost(this->info(), "tcp://127.0.0.1:80")}));
+    HostVectorSharedPtr hosts(new HostVector({makeTestHost(this->info(), STATIC_URL)}));
     HostsPerLocalitySharedPtr hosts_per_locality = std::make_shared<HostsPerLocalityImpl>();
     HostVector hosts_added{hosts->front()};
     HostVector hosts_removed{};
@@ -75,14 +76,12 @@ public:
                     Stats::ScopePtr&& stats_scope) override {
     return std::make_unique<TestStaticClusterImpl>(cluster, context.runtime(),
                                                    socket_factory_context, std::move(stats_scope),
-                                                   context.addedViaApi());
+                                                   context.addedViaApi(), DEFAULT_PRIORITY);
   }
 };
 
-// REGISTER_FACTORY(TestStaticClusterFactory, ClusterFactory);
-
 class ConfigurableTestStaticClusterFactory
-    : public ConfigurableClusterFactoryBase<test::common::upstream::TestStaticConfig> {
+    : public ConfigurableClusterFactoryBase<test::common::upstream::CustomStaticConfig> {
 public:
   ConfigurableTestStaticClusterFactory()
       : ConfigurableClusterFactoryBase("envoy.clusters.test_static_config") {}
@@ -90,7 +89,8 @@ public:
 private:
   ClusterImplBaseSharedPtr createClusterWithConfig(
       const envoy::api::v2::Cluster& cluster,
-      const test::common::upstream::TestStaticConfig& proto_config, ClusterFactoryContext& context,
+      const test::common::upstream::CustomStaticConfig& proto_config,
+      ClusterFactoryContext& context,
       Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
       Stats::ScopePtr&& stats_scope) override {
     return std::make_unique<TestStaticClusterImpl>(cluster, context.runtime(),
@@ -147,8 +147,22 @@ TEST_F(TestStaticClusterImplTest, createWithoutConfig) {
       std::move(outlier_event_logger_), false, *api_);
   cluster->initialize([] {});
 
-  EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[1]->healthyHosts().size());
-  EXPECT_EQ("", cluster->prioritySet().hostSetsPerPriority()[1]->hosts()[0]->hostname());
+  EXPECT_EQ(1UL,
+            cluster->prioritySet().hostSetsPerPriority()[DEFAULT_PRIORITY]->healthyHosts().size());
+  EXPECT_EQ("",
+            cluster->prioritySet().hostSetsPerPriority()[DEFAULT_PRIORITY]->hosts()[0]->hostname());
+  EXPECT_EQ(STATIC_ADDRESS, cluster->prioritySet()
+                                .hostSetsPerPriority()[DEFAULT_PRIORITY]
+                                ->hosts()[0]
+                                ->address()
+                                ->ip()
+                                ->addressAsString());
+  EXPECT_EQ(STATIC_PORT, cluster->prioritySet()
+                             .hostSetsPerPriority()[DEFAULT_PRIORITY]
+                             ->hosts()[0]
+                             ->address()
+                             ->ip()
+                             ->port());
   EXPECT_FALSE(cluster->info()->addedViaApi());
 }
 
@@ -179,8 +193,17 @@ TEST_F(TestStaticClusterImplTest, createWithStructConfig) {
       std::move(outlier_event_logger_), false, *api_);
   cluster->initialize([] {});
 
-  EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[10]->healthyHosts().size());
-  EXPECT_EQ("", cluster->prioritySet().hostSetsPerPriority()[10]->hosts()[0]->hostname());
+  EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[PRIORITY]->healthyHosts().size());
+  EXPECT_EQ("", cluster->prioritySet().hostSetsPerPriority()[PRIORITY]->hosts()[0]->hostname());
+  EXPECT_EQ(STATIC_ADDRESS, cluster->prioritySet()
+                                .hostSetsPerPriority()[PRIORITY]
+                                ->hosts()[0]
+                                ->address()
+                                ->ip()
+                                ->addressAsString());
+  EXPECT_EQ(
+      STATIC_PORT,
+      cluster->prioritySet().hostSetsPerPriority()[PRIORITY]->hosts()[0]->address()->ip()->port());
   EXPECT_FALSE(cluster->info()->addedViaApi());
 }
 
@@ -196,7 +219,7 @@ TEST_F(TestStaticClusterImplTest, createWithTypedConfig) {
       cluster_type:
           name: envoy.clusters.test_static_config
           typed_config:
-            "@type": type.googleapis.com/test.common.upstream.TestStaticConfig
+            "@type": type.googleapis.com/test.common.upstream.CustomStaticConfig
             priority: 10
     )EOF";
 
@@ -210,8 +233,17 @@ TEST_F(TestStaticClusterImplTest, createWithTypedConfig) {
       std::move(outlier_event_logger_), false, *api_);
   cluster->initialize([] {});
 
-  EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[10]->healthyHosts().size());
-  EXPECT_EQ("", cluster->prioritySet().hostSetsPerPriority()[10]->hosts()[0]->hostname());
+  EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[PRIORITY]->healthyHosts().size());
+  EXPECT_EQ("", cluster->prioritySet().hostSetsPerPriority()[PRIORITY]->hosts()[0]->hostname());
+  EXPECT_EQ(STATIC_ADDRESS, cluster->prioritySet()
+                                .hostSetsPerPriority()[PRIORITY]
+                                ->hosts()[0]
+                                ->address()
+                                ->ip()
+                                ->addressAsString());
+  EXPECT_EQ(
+      STATIC_PORT,
+      cluster->prioritySet().hostSetsPerPriority()[PRIORITY]->hosts()[0]->address()->ip()->port());
   EXPECT_FALSE(cluster->info()->addedViaApi());
 }
 
