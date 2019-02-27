@@ -175,21 +175,29 @@ TEST_P(ClusterMemoryUtilization, MemoryLargeClusterSizeWithStats) {
   if (!Stats::TestUtil::hasDeterministicMallocStats()) {
     return;
   }
-  const size_t start_mem = Memory::Stats::totalCurrentlyAllocated() / 1000;
+  const size_t start_mem = Memory::Stats::totalCurrentlyAllocated();
 
   auto IpVersions = testing::TestWithParam<Network::Address::IpVersion>::GetParam();
 
   auto t1 = std::make_unique<BaseIntegrationTest>(IpVersions);
   t1->initialize();
   const size_t m1 = Memory::Stats::totalCurrentlyAllocated();
-  EXPECT_LT(start_mem, m1 / 1000);
-  EXPECT_LT(m1 / 1000, 3700); // actual value: 3664 as of Feb 26, 2019
+  EXPECT_LT(start_mem, m1);
   t1.reset(nullptr);
 
   const size_t m1001 = memoryConsumedWithClusters(1001, true);
-  EXPECT_LT(start_mem / 1000, m1001 / 1000);
+  EXPECT_LT(start_mem, m1001);
   size_t m_per_cluster = (m1001 - m1) / 1000;
-  EXPECT_LT(m_per_cluster, 58000); // actual value: 57936 as of Feb 26, 2019
+  // Make sure we don't regress. Data as of 2019/02/27:
+  //
+  // libstdc++:
+  // ----------
+  // m_per_cluster: 56119
+  //
+  // libc++:
+  // -------
+  // m_per_cluster: 52249
+  EXPECT_LT(m_per_cluster, 58000);
 }
 
 } // namespace
