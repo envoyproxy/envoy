@@ -567,6 +567,9 @@ createTransportSocketFactory(const envoy::api::v2::Cluster& config,
 class ClusterImplBase : public Cluster, protected Logger::Loggable<Logger::Id::upstream> {
 
 public:
+  /**
+   * TODO(hyang): deprecate this api
+   */
   static ClusterSharedPtr
   create(const envoy::api::v2::Cluster& cluster, ClusterManager& cm, Stats::Store& stats,
          ThreadLocal::Instance& tls, Network::DnsResolverSharedPtr dns_resolver,

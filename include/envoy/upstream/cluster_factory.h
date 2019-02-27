@@ -28,38 +28,114 @@
 namespace Envoy {
 namespace Upstream {
 
+/**
+ * Context passed to cluster factory to access envoy resources. Cluster factory should only access
+ * the rest of the server through this context object.
+ */
 class ClusterFactoryContext {
 
 public:
   virtual ~ClusterFactoryContext(){};
 
-  virtual ClusterManager& clusterManager() PURE;
-  virtual Stats::Store& stats() PURE;
-  virtual ThreadLocal::Instance& tls() PURE;
-  virtual Network::DnsResolverSharedPtr dnsResolver() PURE;
-  virtual Ssl::ContextManager& sslContextManager() PURE;
-  virtual Runtime::Loader& runtime() PURE;
-  virtual Runtime::RandomGenerator& random() PURE;
-  virtual Event::Dispatcher& dispatcher() PURE;
-  virtual AccessLog::AccessLogManager& logManager() PURE;
-  virtual const LocalInfo::LocalInfo& localInfo() PURE;
-  virtual Server::Admin& admin() PURE;
-  virtual Singleton::Manager& singletonManager() PURE;
-  virtual Outlier::EventLoggerSharedPtr outlierEventLogger() PURE;
+  /**
+   * @return bool flag indicating whether the cluster is added via api.
+   */
   virtual bool addedViaApi() PURE;
+
+  /**
+   * @return Server::Admin& the server's admin interface.
+   */
+  virtual Server::Admin& admin() PURE;
+
+  /**
+   * @return Api::Api& a reference to the api object.
+   */
   virtual Api::Api& api() PURE;
+
+  /**
+   * @return Upstream::ClusterManager& singleton for use by the entire server.
+   */
+  virtual ClusterManager& clusterManager() PURE;
+
+  /**
+   * @return Event::Dispatcher& the main thread's dispatcher. This dispatcher should be used
+   *         for all singleton processing.
+   */
+  virtual Event::Dispatcher& dispatcher() PURE;
+
+  /**
+   * @return Network::DnsResolverSharedPtr the dns resolver for the server.
+   */
+  virtual Network::DnsResolverSharedPtr dnsResolver() PURE;
+
+  /**
+   * @return information about the local environment the server is running in.
+   */
+  virtual const LocalInfo::LocalInfo& localInfo() PURE;
+
+  /**
+   * @return AccessLogManager for use by the entire server.
+   */
+  virtual AccessLog::AccessLogManager& logManager() PURE;
+
+  /**
+   * @return RandomGenerator& the random generator for the server.
+   */
+  virtual Runtime::RandomGenerator& random() PURE;
+
+  /**
+   * @return Runtime::Loader& the singleton runtime loader for the server.
+   */
+  virtual Runtime::Loader& runtime() PURE;
+
+  /**
+   * @return Singleton::Manager& the server-wide singleton manager.
+   */
+  virtual Singleton::Manager& singletonManager() PURE;
+
+  /**
+   * @return Ssl::ContextManager& the SSL context manager.
+   */
+  virtual Ssl::ContextManager& sslContextManager() PURE;
+
+  /**
+   * @return the server-wide stats store.
+   */
+  virtual Stats::Store& stats() PURE;
+
+  /**
+   * @return the server's TLS slot allocator.
+   */
+  virtual ThreadLocal::Instance& tls() PURE;
+
+  /**
+   * @return Outlier::EventLoggerSharedPtr sink for outlier detection event logs.
+   */
+  virtual Outlier::EventLoggerSharedPtr outlierEventLogger() PURE;
 };
 
+/**
+ * Implemented by cluster and registered via Registry::registerFactory() or the convenience class
+ * RegisterFactory.
+ */
 class ClusterFactory {
 public:
   virtual ~ClusterFactory(){};
 
+  /**
+   * Create a new instance of cluster. If the implementation is unable to produce a cluster instance
+   * with the provided parameters, it should throw an EnvoyException in the case of general error or
+   * a Json::Exception if the json configuration is erroneous.
+   * @param cluster supplies the general protobuf configuration for the cluster
+   * @param context supplies the cluster's context.
+   * @return ClusterSharedPtr the cluster instance. The returned ClusterSharedPtr should not be
+   * null.
+   */
   virtual ClusterSharedPtr create(const envoy::api::v2::Cluster& cluster,
                                   ClusterFactoryContext& context) PURE;
 
   /**
-   * @return std::string the identifying name for a particular implementation of a cluster
-   * produced by the factory.
+   * @return std::string the identifying name for a particular implementation of a cluster factory.
    */
   virtual std::string name() PURE;
 };

@@ -103,8 +103,16 @@ private:
   Api::Api& api_;
 };
 
+/**
+ * Base class for all cluster factory implementation. This class can be directly extended if the
+ * custom cluster does not have any custom configuration. For custom cluster with custom
+ * configuration, use ConfigurableClusterFactoryBase instead.
+ */
 class ClusterFactoryImplBase : public ClusterFactory {
 public:
+  /**
+   * Static method to get the registered cluster factory and create an instance of cluster.
+   */
   static ClusterSharedPtr
   create(const envoy::api::v2::Cluster& cluster, ClusterManager& cluster_manager,
          Stats::Store& stats, ThreadLocal::Instance& tls,
@@ -114,18 +122,24 @@ public:
          Server::Admin& admin, Singleton::Manager& singleton_manager,
          Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api, Api::Api& api);
 
-  virtual ClusterSharedPtr create(const envoy::api::v2::Cluster& cluster,
-                                  ClusterFactoryContext& context) override;
-
+  /**
+   * Create a dns resolver to be used by the cluster.
+   */
   Network::DnsResolverSharedPtr selectDnsResolver(const envoy::api::v2::Cluster& cluster,
                                                   ClusterFactoryContext& context);
 
+  // Upstream::ClusterFactory
+  virtual ClusterSharedPtr create(const envoy::api::v2::Cluster& cluster,
+                                  ClusterFactoryContext& context) override;
   std::string name() override { return name_; }
 
 protected:
   ClusterFactoryImplBase(const std::string name) : name_(name) {}
 
 private:
+  /**
+   * Create an instance of ClusterImplBase.
+   */
   virtual ClusterImplBaseSharedPtr
   createClusterImpl(const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context,
                     Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
@@ -133,6 +147,9 @@ private:
   const std::string name_;
 };
 
+/**
+ * Factory for StaticClusterImpl cluster.
+ */
 class StaticClusterFactory : public ClusterFactoryImplBase {
 public:
   StaticClusterFactory()
@@ -145,6 +162,9 @@ private:
                     Stats::ScopePtr&& stats_scope) override;
 };
 
+/**
+ * Factory for StrictDnsClusterImpl
+ */
 class StrictDnsClusterFactory : public ClusterFactoryImplBase {
 public:
   StrictDnsClusterFactory()
@@ -157,6 +177,10 @@ private:
                     Stats::ScopePtr&& stats_scope) override;
 };
 
+/**
+ * Common base class for custom cluster factory with custom configuration.
+ * @tparam ConfigProto is the configuration protobuf.
+ */
 template <class ConfigProto> class ConfigurableClusterFactoryBase : public ClusterFactoryImplBase {
 
 public:

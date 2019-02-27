@@ -13,6 +13,7 @@ A logged warning is expected for each deprecated item that is in deprecation win
   Set the `filter_enabled` field instead.
 * Use of google.protobuf.Struct for extension opaque configs is deprecated. Use google.protobuf.Any instead or pack
 google.protobuf.Struct in google.protobuf.Any.
+* Use of Envoy::Upstream::ClusterImplBase::create(...) static function.
 
 ## Version 1.9.0 (Dec 20, 2018)
 
