@@ -4,6 +4,9 @@
 
 #include "test/mocks/server/mocks.h"
 
+#include "opencensus/trace/sampler.h"
+#include "opencensus/trace/trace_config.h"
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -53,6 +56,9 @@ TEST(OpenCensusTracerConfigTest, OpenCensusHttpTracerWithTypedConfig) {
   auto message = Config::Utility::translateToFactoryConfig(configuration.http(), factory);
   Tracing::HttpTracerPtr tracer = factory.createHttpTracer(*message, server);
   EXPECT_NE(nullptr, tracer);
+
+  // Reset TraceParams back to default.
+  ::opencensus::trace::TraceConfig::SetCurrentTraceParams({32, 32, 128, 32, ::opencensus::trace::ProbabilitySampler(1e-4)});
 }
 
 TEST(OpenCensusTracerConfigTest, DoubleRegistrationTest) {
