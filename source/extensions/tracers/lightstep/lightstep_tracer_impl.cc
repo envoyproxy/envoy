@@ -78,7 +78,6 @@ void LightStepDriver::LightStepTransporter::onSuccess(Http::MessagePtr&& respons
     active_request_ = nullptr;
     Grpc::Common::validateResponse(*response);
 
-    // http://www.grpc.io/docs/guides/wire.html
     // First 5 bytes contain the message header.
     response->body()->drain(5);
     Buffer::ZeroCopyInputStreamImpl stream{std::move(response->body())};
