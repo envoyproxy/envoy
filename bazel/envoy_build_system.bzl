@@ -201,6 +201,7 @@ def envoy_include_prefix(path):
 def envoy_cmake_external(
         name,
         cache_entries = {},
+        debug_cache_entries = {},
         cmake_options = ["-GNinja"],
         make_commands = ["ninja", "ninja install"],
         lib_source = "",
@@ -213,6 +214,11 @@ def envoy_cmake_external(
     # On Windows, we don't want to explicitly set CMAKE_BUILD_TYPE,
     # rules_foreign_cc will figure it out for us
     cache_entries_no_build_type = {key: cache_entries[key] for key in cache_entries.keys() if key != "CMAKE_BUILD_TYPE"}
+    cache_entries_no_build_type_debug = dict(cache_entries_no_build_type)
+    cache_entries_debug = dict(cache_entries)
+    for key in debug_cache_entries.keys():
+        cache_entries_no_build_type_debug[key] = debug_cache_entries[key]
+        cache_entries_debug[key] = debug_cache_entries[key]
 
     pf = ""
     if copy_pdb:
@@ -233,8 +239,10 @@ def envoy_cmake_external(
     cmake_external(
         name = name,
         cache_entries = select({
-            "@envoy//bazel:windows_x86_64": cache_entries_no_build_type,
-            "//conditions:default": cache_entries,
+            "@envoy//bazel:windows_opt_build": cache_entries_no_build_type,
+            "@envoy//bazel:windows_x86_64": cache_entries_no_build_type_debug,
+            "@envoy//bazel:opt_build": cache_entries,
+            "//conditions:default": cache_entries_debug,
         }),
         cmake_options = cmake_options,
         generate_crosstool_file = select({
