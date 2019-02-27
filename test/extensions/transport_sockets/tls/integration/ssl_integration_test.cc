@@ -421,7 +421,7 @@ TEST_P(SslTapIntegrationTest, TwoRequestsWithBinaryProto) {
                                              expected_remote_address);
   codec_client_->close();
   test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
-  envoy::data::tap::v2alpha::BufferedTraceWrapper trace;
+  envoy::data::tap::v2alpha::TraceWrapper trace;
   MessageUtil::loadFromFile(fmt::format("{}_{}.pb", path_prefix_, first_id), trace, *api_);
   // Validate general expected properties in the trace.
   EXPECT_EQ(first_id, trace.socket_buffered_trace().connection().id());
@@ -499,7 +499,7 @@ TEST_P(SslTapIntegrationTest, TruncationWithMultipleDataFrames) {
   codec_client_->close();
   test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
 
-  envoy::data::tap::v2alpha::BufferedTraceWrapper trace;
+  envoy::data::tap::v2alpha::TraceWrapper trace;
   MessageUtil::loadFromFile(fmt::format("{}_{}.pb", path_prefix_, id), trace, *api_);
 
   ASSERT_EQ(trace.socket_buffered_trace().events().size(), 2);
@@ -520,7 +520,7 @@ TEST_P(SslTapIntegrationTest, RequestWithTextProto) {
   checkStats();
   codec_client_->close();
   test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
-  envoy::data::tap::v2alpha::BufferedTraceWrapper trace;
+  envoy::data::tap::v2alpha::TraceWrapper trace;
   MessageUtil::loadFromFile(fmt::format("{}_{}.pb_text", path_prefix_, id), trace, *api_);
   // Test some obvious properties.
   EXPECT_TRUE(absl::StartsWith(trace.socket_buffered_trace().events(0).read().data().as_bytes(),
@@ -545,7 +545,7 @@ TEST_P(SslTapIntegrationTest, RequestWithJsonBodyAsString) {
   checkStats();
   codec_client_->close();
   test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
-  envoy::data::tap::v2alpha::BufferedTraceWrapper trace;
+  envoy::data::tap::v2alpha::TraceWrapper trace;
   MessageUtil::loadFromFile(fmt::format("{}_{}.json", path_prefix_, id), trace, *api_);
   // Test some obvious properties.
   EXPECT_EQ(trace.socket_buffered_trace().events(0).read().data().as_string(), "POST");

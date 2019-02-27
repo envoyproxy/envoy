@@ -13,16 +13,19 @@ option java_package = "io.envoyproxy.envoy.data.tap.v2alpha";
 
 // [#protodoc-title: Tap data wrappers]
 
-// Wrapper for all fully buffered tap traces that Envoy emits. This is required for sending traces
-// over gRPC APIs or more easily persisting binary messages to files.
-message BufferedTraceWrapper {
+// Wrapper for all fully buffered and streamed tap traces that Envoy emits. This is required for
+// sending traces over gRPC APIs or more easily persisting binary messages to files.
+message TraceWrapper {
   oneof trace {
     option (validate.required) = true;
 
     // An HTTP buffered tap trace.
     HttpBufferedTrace http_buffered_trace = 1;
 
-    // A buffered socket tap trace.
-    SocketTrace socket_buffered_trace = 2;
+    // An HTTP streamed tap trace segment.
+    HttpStreamedTraceSegment http_streamed_trace_segment = 2;
+
+    // A socket buffered tap trace.
+    SocketBufferedTrace socket_buffered_trace = 3;
   }
 }

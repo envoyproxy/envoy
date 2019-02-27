@@ -9,7 +9,7 @@ Envoy currently provides two experimental extensions that can tap traffic:
     information.
   * :ref:`Tap transport socket extension <envoy_api_msg_core.TransportSocket>` that can intercept
     traffic and write to a :ref:`protobuf trace file
-    <envoy_api_msg_data.tap.v2alpha.BufferedTraceWrapper>`. The remainder of this document describes
+    <envoy_api_msg_data.tap.v2alpha.TraceWrapper>`. The remainder of this document describes
     the configuration of the tap transport socket.
 
 Tap transport socket configuration
@@ -85,8 +85,8 @@ This is configurable via the :ref:`max_buffered_rx_bytes
 :ref:`max_buffered_tx_bytes
 <envoy_api_field_service.tap.v2alpha.OutputConfig.max_buffered_tx_bytes>` settings. When a buffered
 socket tap is truncated, the trace will indicate truncation via the :ref:`read_truncated
-<envoy_api_field_data.tap.v2alpha.SocketTrace.read_truncated>` and :ref:`write_truncated
-<envoy_api_field_data.tap.v2alpha.SocketTrace.write_truncated>` fields as well as the body
+<envoy_api_field_data.tap.v2alpha.SocketBufferedTrace.read_truncated>` and :ref:`write_truncated
+<envoy_api_field_data.tap.v2alpha.SocketBufferedTrace.write_truncated>` fields as well as the body
 :ref:`truncated <envoy_api_field_data.tap.v2alpha.Body.truncated>` field.
 
 PCAP generation

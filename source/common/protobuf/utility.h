@@ -161,6 +161,7 @@ public:
   class FileExtensionValues {
   public:
     const std::string ProtoBinary = ".pb";
+    const std::string ProtoBinaryLengthDelimited = ".pb_length_delimited";
     const std::string ProtoText = ".pb_text";
     const std::string Json = ".json";
     const std::string Yaml = ".yaml";
