@@ -1,6 +1,6 @@
 licenses(["notice"])  # Apache 2
 
-# Stats sink for the basic version of the hystrix protocol (https://github.com/b/hystrix_spec).
+# Stats sink for the basic version of the hystrix protocol.
 
 load(
     "//bazel:envoy_build_system.bzl",
