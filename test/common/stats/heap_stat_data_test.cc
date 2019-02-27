@@ -9,7 +9,7 @@
 
 namespace Envoy {
 namespace Stats {
-
+namespace {
 // No truncation occurs in the implementation of HeapStatData.
 // Note: a similar test using RawStatData* is in raw_stat_data_test.cc.
 TEST(HeapStatDataTest, HeapNoTruncate) {
@@ -38,6 +38,6 @@ TEST(HeapStatDataTest, HeapAlloc) {
   alloc.free(*stat_2);
   alloc.free(*stat_3);
 }
-
+} // namespace
 } // namespace Stats
 } // namespace Envoy

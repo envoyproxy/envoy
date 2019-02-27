@@ -12,7 +12,7 @@ using ::testing::InSequence;
 
 namespace Envoy {
 namespace Http {
-
+namespace {
 TEST(HeaderStringTest, All) {
   // Static LowerCaseString constructor
   {
@@ -927,6 +927,6 @@ TEST(HeaderMapImplTest, TestHeaderMapImplyCopy) {
   baz = baz2;
   EXPECT_STREQ("bar", baz.get(LowerCaseString("foo"))->value().c_str());
 }
-
+} // namespace
 } // namespace Http
 } // namespace Envoy

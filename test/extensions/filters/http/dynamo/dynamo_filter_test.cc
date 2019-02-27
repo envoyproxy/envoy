@@ -25,7 +25,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Dynamo {
-
+namespace {
 class DynamoFilterTest : public testing::Test {
 public:
   void setup(bool enabled) {
@@ -794,7 +794,7 @@ TEST_F(DynamoFilterTest, PartitionIdStatsForSingleTableBatchOperation) {
   EXPECT_CALL(encoder_callbacks_, encodingBuffer()).WillOnce(Return(response_data.get()));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(empty_data, true));
 }
-
+} // namespace
 } // namespace Dynamo
 } // namespace HttpFilters
 } // namespace Extensions

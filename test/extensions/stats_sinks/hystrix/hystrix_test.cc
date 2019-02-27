@@ -28,7 +28,7 @@ namespace Envoy {
 namespace Extensions {
 namespace StatSinks {
 namespace Hystrix {
-
+namespace {
 class ClusterTestInfo {
 
 public:
@@ -543,7 +543,7 @@ TEST_F(HystrixSinkTest, HystrixEventStreamHandler) {
       std::string(response_headers.AccessControlAllowHeaders()->value().getStringView());
   EXPECT_THAT(access_control_allow_headers, HasSubstr("Accept"));
 }
-
+} // namespace
 } // namespace Hystrix
 } // namespace StatSinks
 } // namespace Extensions

@@ -8,7 +8,7 @@ using testing::_;
 
 namespace Envoy {
 namespace Server {
-
+namespace {
 class ConfigTrackerImplTest : public testing::Test {
 public:
   ConfigTrackerImplTest() : cbs_map(tracker.getCallbacksMap()) {
@@ -79,6 +79,6 @@ TEST_F(ConfigTrackerImplTest, OperationsWithinCallback) {
   EXPECT_EQ(1, cbs_map.size());
   EXPECT_EQ(0, cbs_map.count("test_key"));
 }
-
+} // namespace
 } // namespace Server
 } // namespace Envoy

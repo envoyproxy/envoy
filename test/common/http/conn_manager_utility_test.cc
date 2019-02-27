@@ -27,7 +27,7 @@ using testing::ReturnRef;
 
 namespace Envoy {
 namespace Http {
-
+namespace {
 class MockInternalAddressConfig : public Http::InternalAddressConfig {
 public:
   MOCK_CONST_METHOD1(isInternalAddress, bool(const Network::Address::Instance&));
@@ -1092,6 +1092,6 @@ TEST_F(ConnectionManagerUtilityTest, RemovesProxyResponseHeaders) {
   EXPECT_FALSE(response_headers.has("keep-alive"));
   EXPECT_FALSE(response_headers.has("proxy-connection"));
 }
-
+} // namespace
 } // namespace Http
 } // namespace Envoy

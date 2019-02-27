@@ -16,7 +16,7 @@ namespace Extensions {
 namespace Tracers {
 namespace Common {
 namespace Ot {
-
+namespace {
 class TestDriver : public OpenTracingDriver {
 public:
   TestDriver(OpenTracingDriver::PropagationMode propagation_mode,
@@ -182,7 +182,7 @@ TEST_F(OpenTracingDriverTest, ExtractWithUnindexedHeader) {
   auto spans = driver_->recorder().spans();
   EXPECT_EQ(spans.at(1).span_context.span_id, spans.at(0).references.at(0).span_id);
 }
-
+} // namespace
 } // namespace Ot
 } // namespace Common
 } // namespace Tracers

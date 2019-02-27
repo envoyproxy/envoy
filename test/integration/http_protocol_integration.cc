@@ -3,6 +3,7 @@
 #include "absl/strings/str_cat.h"
 
 namespace Envoy {
+namespace {
 std::vector<HttpProtocolTestParams> HttpProtocolIntegrationTest::getProtocolTestParams(
     const std::vector<Http::CodecClient::Type>& downstream_protocols,
     const std::vector<FakeHttpConnection::Type>& upstream_protocols) {
@@ -27,5 +28,5 @@ std::string HttpProtocolIntegrationTest::protocolTestParamsToString(
       (params.param.upstream_protocol == FakeHttpConnection::Type::HTTP2 ? "Http2Upstream"
                                                                          : "HttpUpstream"));
 }
-
+} // namespace
 } // namespace Envoy

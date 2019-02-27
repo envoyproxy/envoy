@@ -33,7 +33,7 @@ namespace Envoy {
 namespace Extensions {
 namespace QuicListeners {
 namespace Quiche {
-
+namespace {
 TEST(QuicPlatformTest, QuicAlignOf) { EXPECT_LT(0, QUIC_ALIGN_OF(int)); }
 
 TEST(QuicPlatformTest, QuicArraysize) {
@@ -354,7 +354,7 @@ TEST(QuicPlatformTest, QuicCertUtils) {
             out);
   OPENSSL_free(static_cast<void*>(der));
 }
-
+} // namespace
 } // namespace Quiche
 } // namespace QuicListeners
 } // namespace Extensions

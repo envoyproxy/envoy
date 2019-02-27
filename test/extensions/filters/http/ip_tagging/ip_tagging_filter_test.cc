@@ -24,7 +24,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace IpTagging {
-
+namespace {
 class IpTaggingFilterTest : public testing::Test {
 public:
   IpTaggingFilterTest() {
@@ -279,7 +279,7 @@ TEST_F(IpTaggingFilterTest, ClearRouteCache) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
   EXPECT_FALSE(request_headers.has(Http::Headers::get().EnvoyIpTags));
 }
-
+} // namespace
 } // namespace IpTagging
 } // namespace HttpFilters
 } // namespace Extensions

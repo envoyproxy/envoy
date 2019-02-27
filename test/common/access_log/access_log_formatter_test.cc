@@ -24,6 +24,7 @@ using testing::ReturnRef;
 
 namespace Envoy {
 namespace AccessLog {
+namespace {
 
 TEST(AccessLogFormatUtilsTest, protocolToString) {
   EXPECT_EQ("HTTP/1.0", AccessLogFormatUtils::protocolToString(Http::Protocol::Http10));
@@ -731,6 +732,6 @@ TEST(AccessLogFormatterTest, ParserFailures) {
     EXPECT_THROW(parser.parse(test_case), EnvoyException) << test_case;
   }
 }
-
+}} // namespace
 } // namespace AccessLog
 } // namespace Envoy

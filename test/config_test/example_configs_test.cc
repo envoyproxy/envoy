@@ -5,6 +5,7 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
+namespace {
 TEST(ExampleConfigsTest, All) {
   TestEnvironment::exec(
       {TestEnvironment::runfilesPath("test/config_test/example_configs_test_setup.sh")});
@@ -27,4 +28,5 @@ TEST(ExampleConfigsTest, All) {
   // Return to the original working directory, otherwise "bazel.coverage" breaks (...but why?).
   RELEASE_ASSERT(::chdir(cwd) == 0, "");
 }
+} // namespace
 } // namespace Envoy

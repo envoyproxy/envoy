@@ -12,7 +12,7 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-
+namespace {
 class PerfAnnotationTest : public testing::Test {
 protected:
   void TearDown() override { PERF_CLEAR(); }
@@ -56,5 +56,5 @@ TEST_F(PerfAnnotationTest, testFormat) {
       "          87        3     29000        1000    28000    30000  beta      3          \n",
       context->toString());
 }
-
+} // namespace
 } // namespace Envoy

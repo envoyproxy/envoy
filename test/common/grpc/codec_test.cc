@@ -13,7 +13,7 @@
 
 namespace Envoy {
 namespace Grpc {
-
+namespace {
 TEST(GrpcCodecTest, encodeHeader) {
   Encoder encoder;
   std::array<uint8_t, 5> buffer;
@@ -167,6 +167,6 @@ TEST(GrpcCodecTest, decodeMultipleFrame) {
     EXPECT_EQ("hello", result.name());
   }
 }
-
+} // namespace
 } // namespace Grpc
 } // namespace Envoy

@@ -40,7 +40,7 @@ using testing::Invoke;
 using testing::Not;
 
 namespace Envoy {
-
+namespace {
 // Tests for DownstreamProtocolIntegrationTest will be run with all protocols
 // (H1/H2 downstream) but only H1 upstreams.
 //
@@ -750,5 +750,5 @@ INSTANTIATE_TEST_SUITE_P(Protocols, DownstreamProtocolIntegrationTest,
 INSTANTIATE_TEST_SUITE_P(Protocols, ProtocolIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
-
+} // namespace
 } // namespace Envoy

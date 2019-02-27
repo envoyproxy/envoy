@@ -10,7 +10,7 @@
 namespace Envoy {
 namespace Event {
 namespace Test {
-
+namespace {
 class SimulatedTimeSystemTest : public testing::Test {
 protected:
   SimulatedTimeSystemTest()
@@ -193,7 +193,7 @@ TEST_F(SimulatedTimeSystemTest, DeleteTime) {
   sleepMsAndLoop(1);
   EXPECT_EQ("36", output_);
 }
-
+} // namespace
 } // namespace Test
 } // namespace Event
 } // namespace Envoy

@@ -41,7 +41,7 @@ using testing::SaveArg;
 
 namespace Envoy {
 namespace TcpProxy {
-
+namespace {
 using ::Envoy::Network::UpstreamServerName;
 
 namespace {
@@ -1202,6 +1202,6 @@ TEST_F(TcpProxyRoutingTest, UpstreamServerName) {
 
   filter_->onNewConnection();
 }
-
+} // namespace
 } // namespace TcpProxy
 } // namespace Envoy

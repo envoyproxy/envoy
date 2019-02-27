@@ -20,7 +20,7 @@ using testing::Throw;
 
 namespace Envoy {
 namespace Server {
-
+namespace {
 class WorkerImplTest : public testing::Test {
 public:
   WorkerImplTest()
@@ -142,6 +142,6 @@ TEST_F(WorkerImplTest, ListenerException) {
   worker_.start(guard_dog_);
   worker_.stop();
 }
-
+} // namespace
 } // namespace Server
 } // namespace Envoy

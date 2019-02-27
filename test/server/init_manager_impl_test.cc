@@ -11,7 +11,7 @@ using testing::Invoke;
 
 namespace Envoy {
 namespace Server {
-
+namespace {
 class InitManagerImplTest : public testing::Test {
 public:
   InitManagerImpl manager_{"test"};
@@ -62,6 +62,6 @@ TEST_F(InitManagerImplTest, TargetAfterInitializing) {
   EXPECT_CALL(initialized_, ready());
   target1.callback_();
 }
-
+} // namespace
 } // namespace Server
 } // namespace Envoy

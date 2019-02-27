@@ -23,7 +23,7 @@ using testing::NiceMock;
 
 namespace Envoy {
 namespace Server {
-
+namespace {
 class GuardDogTestBase : public testing::Test {
 protected:
   GuardDogTestBase() : api_(Api::createApiForTest(stats_store_, time_system_)) {}
@@ -261,6 +261,6 @@ TEST_F(GuardDogTestBase, AtomicIsAtomicTest) {
   std::atomic<std::chrono::steady_clock::duration> atomic_time;
   ASSERT_EQ(atomic_time.is_lock_free(), true);
 }
-
+} // namespace
 } // namespace Server
 } // namespace Envoy

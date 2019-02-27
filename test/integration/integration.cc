@@ -45,7 +45,7 @@ using testing::NiceMock;
 using testing::ReturnRef;
 
 namespace Envoy {
-
+namespace {
 IntegrationStreamDecoder::IntegrationStreamDecoder(Event::Dispatcher& dispatcher)
     : dispatcher_(dispatcher) {}
 
@@ -525,4 +525,5 @@ AssertionResult BaseIntegrationTest::compareDiscoveryRequest(
   }
   return AssertionSuccess();
 }
+} // namespace
 } // namespace Envoy

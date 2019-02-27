@@ -10,7 +10,7 @@ namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
 namespace Alts {
-
+namespace {
 using testing::_;
 using testing::InSequence;
 using testing::Invoke;
@@ -162,7 +162,7 @@ TEST_F(TsiHandshakerTest, DeleteOnDone) {
   EXPECT_EQ(dispatcher_.to_delete_.back().get(), handshaker.get());
   handshaker.release();
 }
-
+} // namespace
 } // namespace Alts
 } // namespace TransportSockets
 } // namespace Extensions

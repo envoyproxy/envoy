@@ -21,7 +21,7 @@ using testing::SaveArg;
 
 namespace Envoy {
 namespace Upstream {
-
+namespace {
 class ConnPoolMapImplTest : public testing::Test {
 public:
   // Note, we could test with Http::ConnectionPool::MockInstance here, which would simplify the
@@ -345,5 +345,6 @@ TEST_F(ConnPoolMapImplDeathTest, ReentryAddDrainedCallbackTripsAssert) {
       ".*Details: A resource should only be entered once");
 }
 #endif // !defined(NDEBUG)
+} // namespace
 } // namespace Upstream
 } // namespace Envoy

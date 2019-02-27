@@ -16,7 +16,7 @@ namespace Envoy {
 namespace Extensions {
 namespace ResourceMonitors {
 namespace InjectedResourceMonitor {
-
+namespace {
 TEST(InjectedResourceMonitorFactoryTest, CreateMonitor) {
   auto factory =
       Registry::FactoryRegistry<Server::Configuration::ResourceMonitorFactory>::getFactory(
@@ -31,7 +31,7 @@ TEST(InjectedResourceMonitorFactoryTest, CreateMonitor) {
   Server::ResourceMonitorPtr monitor = factory->createResourceMonitor(config, context);
   EXPECT_NE(monitor, nullptr);
 }
-
+} // namespace
 } // namespace InjectedResourceMonitor
 } // namespace ResourceMonitors
 } // namespace Extensions

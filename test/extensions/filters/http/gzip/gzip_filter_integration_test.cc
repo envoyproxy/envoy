@@ -9,7 +9,7 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-
+namespace {
 class GzipIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                             public Event::SimulatedTimeSystem,
                             public HttpIntegrationTest {
@@ -303,4 +303,5 @@ TEST_P(GzipIntegrationTest, AcceptanceFullConfigVeryHeader) {
   ASSERT_STREQ("gzip", response->headers().ContentEncoding()->value().c_str());
   ASSERT_STREQ("Cookie, Accept-Encoding", response->headers().Vary()->value().c_str());
 }
+} // namespace
 } // namespace Envoy

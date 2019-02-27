@@ -13,7 +13,7 @@
 
 namespace Envoy {
 namespace Event {
-
+namespace {
 class FileEventImplTest : public testing::Test {
 public:
   FileEventImplTest() : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()) {}
@@ -164,6 +164,6 @@ TEST_F(FileEventImplTest, SetEnabled) {
   file_event->setEnabled(FileReadyType::Read | FileReadyType::Write);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 }
-
+} // namespace
 } // namespace Event
 } // namespace Envoy

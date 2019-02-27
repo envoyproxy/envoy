@@ -3,7 +3,7 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-
+namespace {
 struct PhantomTest {};
 struct PhantomTest2 {};
 
@@ -15,5 +15,5 @@ TEST(PhantomTest, TypeBehavior) {
   static_assert(!std::is_convertible<PhantomIntTest, PhantomTest2>::value,
                 "should not be convertible");
 }
-
+} // namespace
 } // namespace Envoy

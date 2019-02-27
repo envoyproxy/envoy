@@ -13,7 +13,7 @@ namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace Datadog {
-
+namespace {
 TEST(DatadogTracerConfigTest, DatadogHttpTracer) {
   NiceMock<Server::MockInstance> server;
   EXPECT_CALL(server.cluster_manager_, get("fake_cluster"))
@@ -36,7 +36,7 @@ TEST(DatadogTracerConfigTest, DatadogHttpTracer) {
   Tracing::HttpTracerPtr datadog_tracer = factory.createHttpTracer(*message, server);
   EXPECT_NE(nullptr, datadog_tracer);
 }
-
+} // namespace
 } // namespace Datadog
 } // namespace Tracers
 } // namespace Extensions

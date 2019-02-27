@@ -13,7 +13,7 @@ namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
-
+namespace {
 inline bssl::UniquePtr<X509> readCertFromFile(const std::string& path) {
   const std::string& file_content = TestEnvironment::readFileToStringForTest(path);
   bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(file_content.c_str(), file_content.size()));
@@ -21,7 +21,7 @@ inline bssl::UniquePtr<X509> readCertFromFile(const std::string& path) {
   EXPECT_NE(cert, nullptr);
   return cert;
 }
-
+} // namespace
 } // namespace Tls
 } // namespace TransportSockets
 } // namespace Extensions

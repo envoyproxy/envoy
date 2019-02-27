@@ -22,7 +22,7 @@ namespace Extensions {
 namespace StatSinks {
 namespace Common {
 namespace Statsd {
-
+namespace {
 class MockWriter : public Writer {
 public:
   MOCK_METHOD1(write, void(const std::string& message));
@@ -216,7 +216,7 @@ TEST(UdpStatsdSinkWithTagsTest, CheckActualStats) {
 
   tls_.shutdownThread();
 }
-
+} // namespace
 } // namespace Statsd
 } // namespace Common
 } // namespace StatSinks

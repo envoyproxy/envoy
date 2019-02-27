@@ -27,7 +27,7 @@ namespace Envoy {
 namespace Extensions {
 namespace ListenerFilters {
 namespace TlsInspector {
-
+namespace {
 class TlsInspectorTest : public testing::Test {
 public:
   TlsInspectorTest()
@@ -229,7 +229,7 @@ TEST_F(TlsInspectorTest, NotSsl) {
   file_event_callback_(Event::FileReadyType::Read);
   EXPECT_EQ(1, cfg_->stats().tls_not_found_.value());
 }
-
+} // namespace
 } // namespace TlsInspector
 } // namespace ListenerFilters
 } // namespace Extensions

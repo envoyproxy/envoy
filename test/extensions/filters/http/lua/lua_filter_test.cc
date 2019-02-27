@@ -29,6 +29,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Lua {
+namespace {
 
 class TestFilter : public Filter {
 public:
@@ -1575,7 +1576,7 @@ TEST_F(LuaHttpFilterTest, CheckConnection) {
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("secure")));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
-
+} // namespace
 } // namespace Lua
 } // namespace HttpFilters
 } // namespace Extensions

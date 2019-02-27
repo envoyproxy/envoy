@@ -59,7 +59,7 @@ using testing::Sequence;
 
 namespace Envoy {
 namespace Http {
-
+namespace  {
 class HttpConnectionManagerImplTest : public testing::Test, public ConnectionManagerConfig {
 public:
   struct RouteConfigProvider : public Router::RouteConfigProvider {
@@ -3631,6 +3631,6 @@ TEST_F(HttpConnectionManagerImplTest, OverlyLongHeadersAcceptedIfConfigured) {
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false); // kick off request
 }
-
+} // namespace
 } // namespace Http
 } // namespace Envoy

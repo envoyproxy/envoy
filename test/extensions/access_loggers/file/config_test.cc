@@ -17,7 +17,7 @@ namespace Envoy {
 namespace Extensions {
 namespace AccessLoggers {
 namespace File {
-
+namespace {
 TEST(FileAccessLogConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
@@ -154,7 +154,7 @@ TEST(FileAccessLogConfigTest, FileAccessLogJsonWithNestedKeyTest) {
                               "Only string values are supported in the JSON access log format.");
   }
 }
-
+} // namespace
 } // namespace File
 } // namespace AccessLoggers
 } // namespace Extensions

@@ -24,7 +24,7 @@ namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
 namespace Alts {
-
+namespace {
 class AltsIntegrationTestBase : public testing::TestWithParam<Network::Address::IpVersion>,
                                 public HttpIntegrationTest {
 public:
@@ -241,7 +241,7 @@ TEST_P(AltsIntegrationTestClientWrongHandshaker, ConnectToWrongHandshakerAddress
   codec_client_ = makeRawHttpConnection(makeAltsConnection());
   EXPECT_FALSE(codec_client_->connected());
 }
-
+} // namespace
 } // namespace Alts
 } // namespace TransportSockets
 } // namespace Extensions

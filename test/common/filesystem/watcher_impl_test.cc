@@ -13,7 +13,7 @@
 
 namespace Envoy {
 namespace Filesystem {
-
+namespace {
 class WatcherImplTest : public testing::Test {
 protected:
   WatcherImplTest() : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()) {}
@@ -126,6 +126,6 @@ TEST_F(WatcherImplTest, RootDirectoryPath) {
 
   EXPECT_NO_THROW(watcher->addWatch("/", Watcher::Events::MovedTo, [&](uint32_t) -> void {}));
 }
-
+} // namespace
 } // namespace Filesystem
 } // namespace Envoy

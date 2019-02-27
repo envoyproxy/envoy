@@ -14,7 +14,7 @@ using testing::Return;
 
 namespace Envoy {
 namespace Network {
-
+namespace {
 template <Network::Address::SocketType Type>
 class ListenSocketImplTest : public testing::TestWithParam<Address::IpVersion> {
 protected:
@@ -157,6 +157,6 @@ TEST_P(ListenSocketImplTestUdp, BindSpecificPort) { testBindSpecificPort(); }
 TEST_P(ListenSocketImplTestTcp, BindPortZero) { testBindPortZero(); }
 
 TEST_P(ListenSocketImplTestUdp, BindPortZero) { testBindPortZero(); }
-
+} // namespace
 } // namespace Network
 } // namespace Envoy

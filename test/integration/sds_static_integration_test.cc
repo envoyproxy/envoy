@@ -32,7 +32,7 @@ using testing::Return;
 
 namespace Envoy {
 namespace Ssl {
-
+namespace {
 class SdsStaticDownstreamIntegrationTest
     : public testing::TestWithParam<Network::Address::IpVersion>,
       public HttpIntegrationTest {
@@ -160,6 +160,6 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, SdsStaticUpstreamIntegrationTest,
 TEST_P(SdsStaticUpstreamIntegrationTest, RouterRequestAndResponseWithGiantBodyBuffer) {
   testRouterRequestAndResponseWithBody(16 * 1024 * 1024, 16 * 1024 * 1024, false, nullptr);
 }
-
+} // namespace
 } // namespace Ssl
 } // namespace Envoy

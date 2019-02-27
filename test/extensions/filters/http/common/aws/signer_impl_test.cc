@@ -16,7 +16,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Common {
 namespace Aws {
-
+namespace {
 class SignerImplTest : public testing::Test {
 public:
   SignerImplTest()
@@ -159,7 +159,7 @@ TEST_F(SignerImplTest, SignHostHeader) {
                "Signature=60216ee44dd651322ea10cc6747308dd30e582aaa773f6c1b1354e486385c021",
                message_->headers().Authorization()->value().c_str());
 }
-
+} // namespace
 } // namespace Aws
 } // namespace Common
 } // namespace HttpFilters

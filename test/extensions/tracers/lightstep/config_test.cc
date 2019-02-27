@@ -13,7 +13,7 @@ namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace Lightstep {
-
+namespace {
 TEST(LightstepTracerConfigTest, LightstepHttpTracer) {
   NiceMock<Server::MockInstance> server;
   EXPECT_CALL(server.cluster_manager_, get("fake_cluster"))
@@ -36,7 +36,7 @@ TEST(LightstepTracerConfigTest, LightstepHttpTracer) {
   Tracing::HttpTracerPtr lightstep_tracer = factory.createHttpTracer(*message, server);
   EXPECT_NE(nullptr, lightstep_tracer);
 }
-
+} // namespace
 } // namespace Lightstep
 } // namespace Tracers
 } // namespace Extensions

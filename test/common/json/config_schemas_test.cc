@@ -16,7 +16,7 @@ using testing::_;
 
 namespace Envoy {
 namespace Json {
-
+namespace {
 std::vector<std::string> generateTestInputs() {
   TestEnvironment::exec({TestEnvironment::runfilesPath(
       "test/common/json/config_schemas_test_data/generate_test_data")});
@@ -69,5 +69,6 @@ TEST_P(ConfigSchemasTest, CheckValidationExpectation) {
 }
 
 INSTANTIATE_TEST_SUITE_P(Default, ConfigSchemasTest, testing::ValuesIn(generateTestInputs()));
+} // namespace
 } // namespace Json
 } // namespace Envoy

@@ -8,7 +8,7 @@
 
 namespace Envoy {
 namespace Singleton {
-
+namespace {
 // Must be a dedicated function so that TID is within the death test.
 static void deathTestWorker() {
   ManagerImpl manager(Thread::threadFactoryForTest().currentThreadId());
@@ -44,6 +44,6 @@ TEST(SingletonManagerImplTest, Basic) {
   EXPECT_CALL(*singleton, onDestroy());
   singleton.reset();
 }
-
+} // namespace
 } // namespace Singleton
 } // namespace Envoy

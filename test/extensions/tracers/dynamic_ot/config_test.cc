@@ -15,7 +15,7 @@ namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace DynamicOt {
-
+namespace {
 TEST(DynamicOtTracerConfigTest, DynamicOpentracingHttpTracer) {
   NiceMock<Server::MockInstance> server;
   EXPECT_CALL(server.cluster_manager_, get("fake_cluster"))
@@ -40,7 +40,7 @@ TEST(DynamicOtTracerConfigTest, DynamicOpentracingHttpTracer) {
   const Tracing::HttpTracerPtr tracer = factory.createHttpTracer(*message, server);
   EXPECT_NE(nullptr, tracer);
 }
-
+} // namespace
 } // namespace DynamicOt
 } // namespace Tracers
 } // namespace Extensions

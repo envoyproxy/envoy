@@ -20,7 +20,7 @@ using testing::Sequence;
 
 namespace Envoy {
 namespace AccessLog {
-
+namespace {
 class AccessLogManagerImplTest : public testing::Test {
 protected:
   AccessLogManagerImplTest()
@@ -333,6 +333,6 @@ TEST_F(AccessLogManagerImplTest, reopenAllFiles) {
     }
   }
 }
-
+} // namespace
 } // namespace AccessLog
 } // namespace Envoy

@@ -17,7 +17,7 @@
 #include "gmock/gmock.h"
 
 namespace Envoy {
-
+namespace {
 // Define fixture which allocates ValidationDispatcher.
 class ConfigValidation : public testing::TestWithParam<Network::Address::IpVersion> {
 public:
@@ -64,5 +64,5 @@ TEST_F(ConfigValidation, SharedDnsResolver) {
 INSTANTIATE_TEST_SUITE_P(IpVersions, ConfigValidation,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
-
+} // namespace
 } // namespace Envoy

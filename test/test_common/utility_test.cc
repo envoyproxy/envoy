@@ -5,7 +5,7 @@
 using Envoy::Http::HeaderMap;
 
 namespace Envoy {
-
+namespace {
 TEST(headerMapEqualIgnoreOrder, ActuallyEqual) {
   Http::TestHeaderMapImpl lhs{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
   Http::TestHeaderMapImpl rhs{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
@@ -26,4 +26,5 @@ TEST(headerMapEqualIgnoreOrder, NotEqual) {
   Http::TestHeaderMapImpl rhs{{":method", "GET"}, {":authority", "host"}};
   EXPECT_FALSE(TestUtility::headerMapEqualIgnoreOrder(lhs, rhs));
 }
+} // namespace
 } // namespace Envoy

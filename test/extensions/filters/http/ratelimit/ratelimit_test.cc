@@ -36,7 +36,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace RateLimitFilter {
-
+namespace {
 class HttpRateLimitFilterTest : public testing::Test {
 public:
   HttpRateLimitFilterTest() {
@@ -768,7 +768,7 @@ TEST_F(HttpRateLimitFilterTest, DefaultConfigValueTest) {
   EXPECT_EQ("foo", config_->domain());
   EXPECT_EQ(FilterRequestType::Both, config_->requestType());
 }
-
+} // namespace
 } // namespace RateLimitFilter
 } // namespace HttpFilters
 } // namespace Extensions

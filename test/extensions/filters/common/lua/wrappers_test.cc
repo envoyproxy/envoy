@@ -12,7 +12,7 @@ namespace Extensions {
 namespace Filters {
 namespace Common {
 namespace Lua {
-
+namespace {
 class LuaBufferWrapperTest : public LuaWrappersTestBase<BufferWrapper> {};
 
 class LuaMetadataMapWrapperTest : public LuaWrappersTestBase<MetadataMapWrapper> {
@@ -266,7 +266,7 @@ TEST_F(LuaConnectionWrapperTest, Secure) {
   expectSecureConnection(true);
   expectSecureConnection(false);
 }
-
+} // namespace
 } // namespace Lua
 } // namespace Common
 } // namespace Filters

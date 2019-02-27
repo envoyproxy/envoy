@@ -23,7 +23,7 @@ using testing::Return;
 
 namespace Envoy {
 namespace Upstream {
-
+namespace {
 class TestLoadBalancerContext : public LoadBalancerContextBase {
 public:
   TestLoadBalancerContext(uint64_t hash_key) : hash_key_(hash_key) {}
@@ -682,6 +682,6 @@ TEST_P(RingHashLoadBalancerTest, LopsidedWeightSmallScale) {
     EXPECT_EQ(hostSet().hosts_[entry.second], lb->chooseHost(&context));
   }
 }
-
+} // namespace
 } // namespace Upstream
 } // namespace Envoy

@@ -10,7 +10,7 @@
 
 namespace Envoy {
 namespace Json {
-
+namespace {
 class JsonLoaderTest : public testing::Test {
 protected:
   JsonLoaderTest() : api_(Api::createApiForTest()) {}
@@ -473,6 +473,6 @@ admin:
   EXPECT_THROW_WITHOUT_REGEX(Json::Factory::loadFromYamlString(bad_yaml), EnvoyException,
                              "Unexpected YAML exception");
 }
-
+} // namespace
 } // namespace Json
 } // namespace Envoy

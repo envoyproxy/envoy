@@ -11,7 +11,7 @@ using testing::ReturnPointee;
 
 namespace Envoy {
 namespace Stats {
-
+namespace {
 TEST(SourceImplTest, Caching) {
   NiceMock<MockStore> store;
   std::vector<CounterSharedPtr> stored_counters;
@@ -46,6 +46,6 @@ TEST(SourceImplTest, Caching) {
   EXPECT_EQ(source.cachedGauges(), stored_gauges);
   EXPECT_EQ(source.cachedHistograms(), stored_histograms);
 }
-
+} // namespace
 } // namespace Stats
 } // namespace Envoy

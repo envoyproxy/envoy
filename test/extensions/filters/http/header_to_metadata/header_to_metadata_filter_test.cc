@@ -16,7 +16,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace HeaderToMetadataFilter {
-
+namespace {
 class HeaderToMetadataTest : public testing::Test {
 public:
   const std::string request_config_yaml = R"EOF(
@@ -272,7 +272,7 @@ request_rules:
   EXPECT_CALL(req_info_, setDynamicMetadata(_, _)).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
 }
-
+} // namespace
 } // namespace HeaderToMetadataFilter
 } // namespace HttpFilters
 } // namespace Extensions

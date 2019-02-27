@@ -18,7 +18,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace JwtAuthn {
-
+namespace {
 class MockMatcher : public Matcher {
 public:
   MOCK_CONST_METHOD1(matches, bool(const Http::HeaderMap& headers));
@@ -186,7 +186,7 @@ TEST_F(FilterTest, TestNoRouteMatched) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(headers));
 }
-
+} // namespace
 } // namespace JwtAuthn
 } // namespace HttpFilters
 } // namespace Extensions

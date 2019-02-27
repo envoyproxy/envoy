@@ -10,7 +10,7 @@ using testing::_;
 
 namespace Envoy {
 namespace Config {
-
+namespace {
 TEST(RdsJsonTest, TestRuntimeFractionTranslation) {
   const std::string json_string = R"EOF(
   {
@@ -38,6 +38,6 @@ TEST(RdsJsonTest, TestRuntimeFractionTranslation) {
             envoy::type::FractionalPercent::HUNDRED);
   EXPECT_EQ(route.match().runtime_fraction().runtime_key(), "some_key");
 }
-
+} // namespace
 } // namespace Config
 } // namespace Envoy

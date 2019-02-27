@@ -26,7 +26,7 @@
 
 namespace Envoy {
 namespace Xfcc {
-
+namespace {
 void XfccIntegrationTest::TearDown() {
   test_server_.reset();
   client_mtls_ssl_ctx_.reset();
@@ -748,5 +748,6 @@ TEST_P(XfccIntegrationTest, TagExtractedNameGenerationTest) {
     test_name_against_mapping(tag_extracted_gauge_map, *gauge);
   }
 }
+} // namespace
 } // namespace Xfcc
 } // namespace Envoy

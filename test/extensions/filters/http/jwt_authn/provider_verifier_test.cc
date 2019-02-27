@@ -17,7 +17,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace JwtAuthn {
-
+namespace {
 ProtobufWkt::Struct getExpectedPayload(const std::string& name) {
   ProtobufWkt::Struct expected_payload;
   MessageUtil::loadFromJson(ExpectedPayloadJSON, expected_payload);
@@ -146,7 +146,7 @@ TEST_F(ProviderVerifierTest, TestRequiresNonexistentProvider) {
   EXPECT_THROW(::std::make_shared<FilterConfig>(proto_config_, "", mock_factory_ctx_),
                EnvoyException);
 }
-
+} // namespace
 } // namespace JwtAuthn
 } // namespace HttpFilters
 } // namespace Extensions

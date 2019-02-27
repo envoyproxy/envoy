@@ -26,7 +26,7 @@ using testing::ReturnRef;
 
 namespace Envoy {
 namespace Upstream {
-
+namespace {
 class EdsTest : public testing::Test {
 protected:
   EdsTest() : api_(Api::createApiForTest(stats_)) { resetCluster(); }
@@ -1466,6 +1466,6 @@ TEST_F(EdsTest, MalformedIP) {
                             "malformed IP address: foo.bar.com. Consider setting resolver_name or "
                             "setting cluster type to 'STRICT_DNS' or 'LOGICAL_DNS'");
 }
-
+} // namespace
 } // namespace Upstream
 } // namespace Envoy

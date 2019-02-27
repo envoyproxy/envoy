@@ -18,7 +18,7 @@ using testing::Return;
 
 namespace Envoy {
 namespace Network {
-
+namespace {
 static void errorCallbackTest(Address::IpVersion version) {
   // Force the error callback to fire by closing the socket under the listener. We run this entire
   // test in the forked process to avoid confusion when the fork happens.
@@ -268,6 +268,6 @@ TEST_P(ListenerImplTest, DisableAndEnableListener) {
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
-
+} // namespace
 } // namespace Network
 } // namespace Envoy

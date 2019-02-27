@@ -36,6 +36,7 @@ namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace Zipkin {
+namespace {
 
 class ZipkinDriverTest : public testing::Test {
 public:
@@ -612,6 +613,7 @@ TEST_F(ZipkinDriverTest, DuplicatedHeader) {
       },
       &dup_callback);
 }
+} // namespace
 } // namespace Zipkin
 } // namespace Tracers
 } // namespace Extensions

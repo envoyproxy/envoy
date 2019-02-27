@@ -7,7 +7,7 @@
 
 namespace Envoy {
 namespace Fuzz {
-
+namespace {
 DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   {
     uint64_t out;
@@ -59,6 +59,6 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
     }
   }
 }
-
+} // namespace
 } // namespace Fuzz
 } // namespace Envoy

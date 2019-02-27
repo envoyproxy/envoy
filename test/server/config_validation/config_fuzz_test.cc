@@ -13,6 +13,7 @@
 
 namespace Envoy {
 namespace Server {
+namespace {
 // Derived from //test/server:server_fuzz_test.cc, but starts the server in configuration validation
 // mode (quits upon validation of the given config)
 DEFINE_PROTO_FUZZER(const envoy::config::bootstrap::v2::Bootstrap& input) {
@@ -35,6 +36,6 @@ DEFINE_PROTO_FUZZER(const envoy::config::bootstrap::v2::Bootstrap& input) {
     ENVOY_LOG_MISC(debug, "Controlled EnvoyException exit: {}", ex.what());
   }
 }
-
+} // namespace
 } // namespace Server
 } // namespace Envoy

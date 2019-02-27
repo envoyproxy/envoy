@@ -26,7 +26,7 @@ using testing::Throw;
 
 namespace Envoy {
 namespace Upstream {
-
+namespace {
 MATCHER_P(WithName, expectedName, "") { return arg.name() == expectedName; }
 
 class CdsApiImplTest : public testing::Test {
@@ -543,6 +543,6 @@ resources:
   EXPECT_EQ(1UL, store_.counter("cluster_manager.cds.update_rejected").value());
   EXPECT_EQ(0UL, store_.gauge("cluster_manager.cds.version").value());
 }
-
+} // namespace
 } // namespace Upstream
 } // namespace Envoy

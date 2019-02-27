@@ -25,7 +25,7 @@ using testing::Return;
 // for the happy path for LoadStatsReporter is provided in //test/integration:load_stats_reporter.
 namespace Envoy {
 namespace Upstream {
-
+namespace {
 class LoadStatsReporterTest : public testing::Test {
 public:
   LoadStatsReporterTest()
@@ -227,6 +227,6 @@ TEST_F(LoadStatsReporterTest, RemoteStreamClose) {
   expectSendMessage({});
   retry_timer_cb_();
 }
-
+} // namespace
 } // namespace Upstream
 } // namespace Envoy

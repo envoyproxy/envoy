@@ -15,7 +15,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Dynamo {
-
+namespace {
 TEST(DynamoUtility, PartitionIdStatString) {
   Stats::StatsOptionsImpl stats_options;
   stats_options.max_obj_name_length_ = 60;
@@ -63,7 +63,7 @@ TEST(DynamoUtility, PartitionIdStatString) {
     EXPECT_TRUE(partition_stat_string.size() <= stats_options.maxNameLength());
   }
 }
-
+} // namespace
 } // namespace Dynamo
 } // namespace HttpFilters
 } // namespace Extensions

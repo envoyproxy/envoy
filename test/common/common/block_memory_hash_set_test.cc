@@ -13,7 +13,7 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-
+namespace {
 // Tests BlockMemoryHashSet.
 class BlockMemoryHashSetTest : public testing::Test {
 protected:
@@ -213,5 +213,5 @@ TEST_F(BlockMemoryHashSetDeathTest, sanityCheckZeroedMemoryDeathTest) {
   memset(memory_.get(), 0, hash_set1.numBytes(stats_options_));
   EXPECT_DEATH(hash_set1.sanityCheck(), "");
 }
-
+} // namespace
 } // namespace Envoy

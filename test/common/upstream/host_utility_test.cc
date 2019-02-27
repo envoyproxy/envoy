@@ -9,7 +9,7 @@
 
 namespace Envoy {
 namespace Upstream {
-
+namespace {
 TEST(HostUtilityTest, All) {
   ClusterInfoConstSharedPtr cluster{new MockClusterInfo()};
   HostSharedPtr host = makeTestHost(cluster, "tcp://127.0.0.1:80");
@@ -30,6 +30,6 @@ TEST(HostUtilityTest, All) {
   host->healthFlagClear(Host::HealthFlag::FAILED_EDS_HEALTH);
   EXPECT_EQ("/failed_outlier_check", HostUtility::healthFlagsToString(*host));
 }
-
+} // namespace
 } // namespace Upstream
 } // namespace Envoy

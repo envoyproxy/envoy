@@ -16,7 +16,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace JwtAuthn {
-
+namespace {
 class AllVerifierTest : public testing::Test {
 public:
   void SetUp() override { MessageUtil::loadFromYaml(ExampleConfig, proto_config_); }
@@ -74,7 +74,7 @@ TEST_F(AllVerifierTest, TestAllowFailed) {
   EXPECT_TRUE(headers.has("b"));
   EXPECT_TRUE(headers.has("c"));
 }
-
+} // namespace
 } // namespace JwtAuthn
 } // namespace HttpFilters
 } // namespace Extensions

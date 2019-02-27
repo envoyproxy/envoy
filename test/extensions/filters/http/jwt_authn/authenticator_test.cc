@@ -27,7 +27,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace JwtAuthn {
-
+namespace {
 class AuthenticatorTest : public testing::Test {
 public:
   void SetUp() override {
@@ -409,7 +409,7 @@ TEST_F(AuthenticatorTest, TestInvalidPubkeyKey) {
   auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
   expectVerifyStatus(Status::JwksPemBadBase64, headers);
 }
-
+} // namespace
 } // namespace JwtAuthn
 } // namespace HttpFilters
 } // namespace Extensions

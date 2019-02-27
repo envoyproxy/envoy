@@ -17,7 +17,7 @@ using testing::Return;
 
 namespace Envoy {
 namespace Router {
-
+namespace {
 class ShadowWriterImplTest : public testing::Test {
 public:
   void expectShadowWriter(absl::string_view host, absl::string_view shadowed_host) {
@@ -68,6 +68,6 @@ TEST_F(ShadowWriterImplTest, NoCluster) {
   EXPECT_CALL(cm_, httpAsyncClientForCluster("foo")).Times(0);
   writer_.shadow("foo", std::move(message), std::chrono::milliseconds(5));
 }
-
+} // namespace
 } // namespace Router
 } // namespace Envoy

@@ -35,7 +35,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Fault {
-
+namespace {
 class FaultFilterTest : public testing::Test {
 public:
   const std::string fixed_delay_and_abort_nodes_json = R"EOF(
@@ -851,7 +851,7 @@ TEST_F(FaultFilterTest, RouteFaultOverridesListenerFault) {
     TestPerFilterConfigFault(&delay_fault, &abort_fault);
   }
 }
-
+} // namespace
 } // namespace Fault
 } // namespace HttpFilters
 } // namespace Extensions

@@ -17,7 +17,7 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-
+namespace {
 class ProtobufUtilityTest : public testing::Test {
 protected:
   ProtobufUtilityTest() : api_(Api::createApiForTest()) {}
@@ -606,4 +606,5 @@ INSTANTIATE_TEST_SUITE_P(TimestampUtilTestAcrossRange, TimestampUtilTest,
                                            1000 * 60 * 60 * 24 * 7 // week
                                            ));
 
+} // namespace
 } // namespace Envoy

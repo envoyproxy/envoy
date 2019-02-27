@@ -3,7 +3,7 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-
+namespace {
 class TestTimeSystemTest : public TestBase {
 protected:
 };
@@ -12,5 +12,5 @@ protected:
 // depend on TestBase for an interim time period. This test, as well
 // as test_base.h, will be removed in a future PR.
 TEST_F(TestBase, GracePeriod) {}
-
+} // namespace
 } // namespace Envoy

@@ -3,6 +3,7 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
+namespace {
 TEST(ToLowerTableTest, All) {
   ToLowerTable table;
 
@@ -27,4 +28,5 @@ TEST(ToLowerTableTest, All) {
     EXPECT_EQ(input, "\x90hello\x90");
   }
 }
+} // namespace
 } // namespace Envoy

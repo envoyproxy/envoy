@@ -13,7 +13,7 @@
 
 namespace Envoy {
 namespace Filesystem {
-
+namespace {
 // we are using this class to clean up all the files we create,
 // as it looks like some versions of libstdc++ have a bug in
 // std::experimental::filesystem::remove_all where it fails with nested directories:
@@ -225,6 +225,6 @@ TEST(Directory, DirectoryHasTrailingPathSeparator) {
   EXPECT_EQ(expected, getDirectoryContents(dir_path, false));
   TestEnvironment::removePath(dir_path);
 }
-
+} // namespace
 } // namespace Filesystem
 } // namespace Envoy

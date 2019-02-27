@@ -24,7 +24,7 @@ std::unique_ptr<Envoy::Network::LcTrie::LcTrie<std::string>> lc_trie_minimal;
 } // namespace
 
 namespace Envoy {
-
+namespace {
 static void BM_LcTrieConstruct(benchmark::State& state) {
   std::unique_ptr<Envoy::Network::LcTrie::LcTrie<std::string>> trie;
   for (auto _ : state) {
@@ -94,7 +94,7 @@ static void BM_LcTrieLookupMinimal(benchmark::State& state) {
 }
 
 BENCHMARK(BM_LcTrieLookupMinimal);
-
+} // namespace
 } // namespace Envoy
 
 // Boilerplate main(), which discovers benchmarks in the same file and runs them.
