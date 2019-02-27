@@ -1,55 +1,37 @@
 #include "server/options_impl_platform_linux.h"
 
-#include <sys/types.h>
-#include <unistd.h>
+#include <sched.h>
 
-#include <bitset>
-#include <fstream>
-#include <iostream>
-#include <string>
 #include <thread>
 
 #include "server/options_impl_platform.h"
 
 namespace Envoy {
 
-uint32_t OptionsImplPlatformLinux::getCpuCountFromPath(std::string& path, unsigned int hw_threads) {
-  std::string key("Cpus_allowed:");
-  std::ifstream file(path);
-  if (!file) {
+uint32_t OptionsImplPlatformLinux::getCpuAffinityCount(unsigned int hw_threads) {
+  unsigned int threads = 0;
+  pid_t pid = getpid();
+  cpu_set_t mask;
+
+  CPU_ZERO(&mask);
+  if (sched_getaffinity(pid, sizeof(cpu_set_t), &mask) == -1) {
     // Fall back to number of hardware threads.
     return hw_threads;
   }
 
-  std::string statusLine;
-  unsigned int threads = 0;
+  threads = CPU_COUNT(&mask);
 
-  while (std::getline(file, statusLine)) {
-    if (statusLine.compare(0, key.size(), key, 0, key.size()) == 0) {
-      std::string value = statusLine.substr(key.size());
-      for (std::string::iterator iter = value.begin(); iter != value.end(); iter++) {
-        if (std::isxdigit(*iter)) {
-          char buf[2];
-          buf[0] = *iter;
-          buf[1] = '\0';
-          std::bitset<4> cpus(strtol(buf, NULL, 16));
-          threads += cpus.count();
-        }
-      }
-      break;
-    }
-  }
   // Sanity check.
   if (threads > 0 && threads <= hw_threads) {
     return threads;
   }
+
   return hw_threads;
 }
 
 uint32_t OptionsImplPlatform::getCpuCount() {
-  std::string path("/proc/self/status");
   unsigned int hw_threads = std::max(1U, std::thread::hardware_concurrency());
-  return OptionsImplPlatformLinux::getCpuCountFromPath(path, hw_threads);
+  return OptionsImplPlatformLinux::getCpuAffinityCount(hw_threads);
 }
 
 } // namespace Envoy

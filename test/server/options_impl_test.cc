@@ -317,113 +317,37 @@ TEST_F(OptionsImplTest, SaneTestConstructor) {
   EXPECT_EQ(regular_options_impl->cpusetThreadsEnabled(), test_options_impl.cpusetThreadsEnabled());
 }
 
+#if defined(__linux__)
+
 class OptionsImplPlatformLinuxTest : public testing::Test {
 public:
 };
 
-TEST_F(OptionsImplPlatformLinuxTest, ReadStatusFile1) {
-  // Success case 1. 16 CPUs from status, 32 from hardware.
-  std::string statusFile = "Foo: bar\nCpus_allowed:   ffff\nBar: foo\n";
+TEST_F(OptionsImplPlatformLinuxTest, AffinityTest1) {
+  // Success case: cpuset size and hardware thread count are the same.
+  unsigned int fake_cpuset_size = std::thread::hardware_concurrency();
+  unsigned int fake_hw_threads = fake_cpuset_size;
 
-  std::string dirName = TestEnvironment::temporaryPath("envoy_cpu_status_test");
-  TestUtility::createDirectory(dirName);
-
-  std::string fileName = dirName + std::string("/status1");
-  std::ofstream file(fileName);
-
-  file << statusFile;
-  file.close();
-
-  EXPECT_EQ(OptionsImplPlatformLinux::getCpuCountFromPath(fileName, 16), 16);
-
-  TestEnvironment::removePath(fileName);
-  TestEnvironment::removePath(dirName);
+  EXPECT_EQ(OptionsImplPlatformLinux::getCpuAffinityCount(fake_hw_threads), fake_cpuset_size);
 }
 
-TEST_F(OptionsImplPlatformLinuxTest, ReadStatusFile2) {
-  // Success case 2. 29 CPUs from status, 32 from hardware.
-  // Core count: 1+1+2+1+3+3+2+3+3+3+3+4 = 29
-  //             1 2 3 4 d e a d b e e f
-  std::string statusFile = "Foo: bar\nCpus_allowed: 1234,dead,beef\nBar: foo\n";
-  std::string dirName = TestEnvironment::temporaryPath("envoy_cpu_status_test");
-  TestUtility::createDirectory(dirName);
+TEST_F(OptionsImplPlatformLinuxTest, AffinityTest2) {
+  // Success case: cpuset size is half of the hardware thread count.
+  unsigned int fake_cpuset_size = std::thread::hardware_concurrency();
+  unsigned int fake_hw_threads = 2 * fake_cpuset_size;
 
-  std::string fileName = dirName + std::string("/status2");
-  std::ofstream file(fileName);
-
-  file << statusFile;
-  file.close();
-
-  EXPECT_EQ(OptionsImplPlatformLinux::getCpuCountFromPath(fileName, 32), 29);
-
-  TestEnvironment::removePath(fileName);
-  TestEnvironment::removePath(dirName);
+  EXPECT_EQ(OptionsImplPlatformLinux::getCpuAffinityCount(fake_hw_threads), fake_cpuset_size);
 }
 
-TEST_F(OptionsImplPlatformLinuxTest, ReadStatusFile3) {
-  // Failure case 1. More CPUs than hardware threads (16 vs. 8).
-  std::string statusFile = "Foo: bar\nCpus_allowed:   ffff\nBar: foo\n";
+TEST_F(OptionsImplPlatformLinuxTest, AffinityTest3) {
+  // Failure case: cpuset size is bigger than the hardware thread count.
+  unsigned int fake_cpuset_size = std::thread::hardware_concurrency();
+  unsigned int fake_hw_threads = fake_cpuset_size - 1;
 
-  std::string dirName = TestEnvironment::temporaryPath("envoy_cpu_status_test");
-  TestUtility::createDirectory(dirName);
-
-  std::string fileName = dirName + std::string("/status3");
-  std::ofstream file(fileName);
-
-  file << statusFile;
-  file.close();
-
-  EXPECT_EQ(OptionsImplPlatformLinux::getCpuCountFromPath(fileName, 8), 8);
-
-  TestEnvironment::removePath(fileName);
-  TestEnvironment::removePath(dirName);
+  EXPECT_EQ(OptionsImplPlatformLinux::getCpuAffinityCount(fake_hw_threads), fake_hw_threads);
 }
 
-TEST_F(OptionsImplPlatformLinuxTest, ReadStatusFile4) {
-  // Failure case 2. Missing line.
-  std::string statusFile = "Foo: bar\nBar: foo\n";
-
-  std::string dirName = TestEnvironment::temporaryPath("envoy_cpu_status_test");
-  TestUtility::createDirectory(dirName);
-
-  std::string fileName = dirName + std::string("/status4");
-  std::ofstream file(fileName);
-
-  file << statusFile;
-  file.close();
-
-  EXPECT_EQ(OptionsImplPlatformLinux::getCpuCountFromPath(fileName, 8), 8);
-
-  TestEnvironment::removePath(fileName);
-  TestEnvironment::removePath(dirName);
-}
-
-TEST_F(OptionsImplPlatformLinuxTest, ReadStatusFile5) {
-  // Failure case 3. Corrupted line.
-  std::string statusFile = "Foo: bar\nCpus_allowed:   xyz\nBar: foo\n";
-
-  std::string dirName = TestEnvironment::temporaryPath("envoy_cpu_status_test");
-  TestUtility::createDirectory(dirName);
-
-  std::string fileName = dirName + std::string("/status5");
-  std::ofstream file(fileName);
-
-  file << statusFile;
-  file.close();
-
-  EXPECT_EQ(OptionsImplPlatformLinux::getCpuCountFromPath(fileName, 8), 8);
-
-  TestEnvironment::removePath(fileName);
-  TestEnvironment::removePath(dirName);
-}
-
-TEST_F(OptionsImplPlatformLinuxTest, ReadStatusFile6) {
-  // Failure case 4. Missing file.
-  std::string dirName = TestEnvironment::temporaryPath("envoy_cpu_status_test");
-  std::string fileName = dirName + std::string("/status6");
-
-  EXPECT_EQ(OptionsImplPlatformLinux::getCpuCountFromPath(fileName, 8), 8);
-}
+#endif
 
 } // namespace
 } // namespace Envoy

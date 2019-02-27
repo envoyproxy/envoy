@@ -6,6 +6,6 @@
 namespace Envoy {
 class OptionsImplPlatformLinux {
 public:
-  static uint32_t getCpuCountFromPath(std::string& file, unsigned int hw_threads);
+  static uint32_t getCpuAffinityCount(unsigned int hw_threads);
 };
 } // namespace Envoy
