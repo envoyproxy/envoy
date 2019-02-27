@@ -93,6 +93,7 @@ public:
                                  LocalityWeightsConstSharedPtr locality_weights,
                                  const HostVector& hosts_added, const HostVector& hosts_removed,
                                  absl::optional<uint32_t> overprovisioning_factor));
+  MOCK_METHOD1(batchHostUpdate, void(BatchUpdateCb&));
   MOCK_CONST_METHOD6(updateHosts,
                      void(uint32_t priority, UpdateHostsParams&& update_hosts_params,
                           LocalityWeightsConstSharedPtr locality_weights,

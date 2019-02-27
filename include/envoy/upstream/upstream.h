@@ -380,6 +380,51 @@ public:
                            LocalityWeightsConstSharedPtr locality_weights,
                            const HostVector& hosts_added, const HostVector& hosts_removed,
                            absl::optional<uint32_t> overprovisioning_factor) PURE;
+
+  /**
+   * Callback provided during batch updates that can be used to update hosts.
+   */
+  class HostUpdateCb {
+  public:
+    virtual ~HostUpdateCb() {}
+    /**
+     * Updates the hosts in a given host set.
+     *
+     * @param priority the priority of the host set to update.
+     * @param update_hosts_param supplies the list of hosts and hosts per locality.
+     * @param locality_weights supplies a map from locality to associated weight.
+     * @param hosts_added supplies the hosts added since the last update.
+     * @param hosts_removed supplies the hosts removed since the last update.
+     * @param overprovisioning_factor if presents, overwrites the current overprovisioning_factor.
+     */
+    virtual void updateHosts(uint32_t priority, UpdateHostsParams&& update_host_params,
+                             LocalityWeightsConstSharedPtr locality_weights,
+                             const HostVector& hosts_added, const HostVector& hosts_removed,
+                             absl::optional<uint32_t> overprovisioning_factor) PURE;
+  };
+
+  /**
+   * Callback that provides the mechanism for performing batch host updates for a PrioritySet.
+   */
+  class BatchUpdateCb {
+  public:
+    virtual ~BatchUpdateCb() {}
+
+    /**
+     * Performs a batch host update. Implementors should use the provided callback to update hosts
+     * in the PrioritySet.
+     */
+    virtual void batchUpdate(HostUpdateCb& host_update_cb) PURE;
+  };
+
+  /**
+   * Allows updating hosts for multiple priorities at once, deferring the MemberUpdateCb from
+   * triggering until all priorities have been updated. The resulting callback will take into
+   * account hosts moved from one priority to another.
+   *
+   * @param callback callback to use to add hosts.
+   */
+  virtual void batchHostUpdate(BatchUpdateCb& callback) PURE;
 };
 
 /**
