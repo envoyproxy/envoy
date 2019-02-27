@@ -472,17 +472,16 @@ TEST_F(SubsetLoadBalancerTest, FallbackDefaultSubset) {
 
 TEST_F(SubsetLoadBalancerTest, FallbackPanicModeSubset) {
   EXPECT_CALL(subset_info_, fallbackPolicy())
-    .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::DEFAULT_SUBSET));
-  EXPECT_CALL(subset_info_, panicModeAny())
-    .WillRepeatedly(Return(true));
+      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::DEFAULT_SUBSET));
+  EXPECT_CALL(subset_info_, panicModeAny()).WillRepeatedly(Return(true));
 
   const ProtobufWkt::Struct default_subset = makeDefaultSubset({{"version", "none"}});
   EXPECT_CALL(subset_info_, defaultSubset()).WillRepeatedly(ReturnRef(default_subset));
 
   init({
-        {"tcp://127.0.0.1:80", {{"version", "new"}}},
-        {"tcp://127.0.0.1:81", {{"version", "default"}}},
-    });
+      {"tcp://127.0.0.1:80", {{"version", "new"}}},
+      {"tcp://127.0.0.1:81", {{"version", "default"}}},
+  });
 
   EXPECT_TRUE(lb_->chooseHost(nullptr) != nullptr);
   EXPECT_EQ(1U, stats_.lb_subsets_fallback_panic_.value());
