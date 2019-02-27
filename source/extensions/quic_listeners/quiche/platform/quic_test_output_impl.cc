@@ -17,6 +17,7 @@
 #include "quiche/quic/platform/api/quic_logging.h"
 
 namespace quic {
+namespace {
 
 void QuicRecordTestOutputToFile(const std::string& filename, QuicStringPiece data) {
   const char* output_dir_env = std::getenv("QUIC_TEST_OUTPUT_DIR");
@@ -56,6 +57,7 @@ void QuicRecordTestOutputToFile(const std::string& filename, QuicStringPiece dat
 
   file->close();
 }
+} // namespace
 
 void QuicRecordTestOutputImpl(QuicStringPiece identifier, QuicStringPiece data) {
   const testing::TestInfo* test_info = testing::UnitTest::GetInstance()->current_test_info();
