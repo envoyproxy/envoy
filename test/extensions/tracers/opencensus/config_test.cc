@@ -38,6 +38,10 @@ TEST(OpenCensusTracerConfigTest, OpenCensusHttpTracerWithTypedConfig) {
       trace_config:
         constant_sampler:
           decision: true
+        max_number_of_attributes: 12
+        max_number_of_annotations: 34
+        max_number_of_message_events: 56
+        max_number_of_links: 78
       stdout_exporter_enabled: true
       propagate_trace_context: true
   )EOF";
