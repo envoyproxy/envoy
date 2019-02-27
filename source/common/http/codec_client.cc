@@ -140,7 +140,8 @@ CodecClientProd::CodecClientProd(Type type, Network::ClientConnectionPtr&& conne
     : CodecClient(type, std::move(connection), host, dispatcher) {
   switch (type) {
   case Type::HTTP1: {
-    codec_ = std::make_unique<Http1::ClientConnectionImpl>(*connection_, *this);
+    codec_ = std::make_unique<Http1::ClientConnectionImpl>(*connection_, *this,
+                                                           Http::DEFAULT_MAX_REQUEST_HEADERS_KB);
     break;
   }
   case Type::HTTP2: {

@@ -316,9 +316,11 @@ const ToLowerTable& ConnectionImpl::toLowerTable() {
   return *table;
 }
 
-ConnectionImpl::ConnectionImpl(Network::Connection& connection, http_parser_type type)
+ConnectionImpl::ConnectionImpl(Network::Connection& connection, http_parser_type type,
+                               uint32_t max_request_headers_kb)
     : connection_(connection), output_buffer_([&]() -> void { this->onBelowLowWatermark(); },
-                                              [&]() -> void { this->onAboveHighWatermark(); }) {
+                                              [&]() -> void { this->onAboveHighWatermark(); }),
+      max_request_headers_kb_(max_request_headers_kb) {
   output_buffer_.setWatermarks(connection.bufferLimit());
   http_parser_init(&parser_, type);
   parser_.data = this;
@@ -417,7 +419,8 @@ void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
     return;
   }
 
-  if (current_header_field_.size() + length + current_header_map_->byteSize() > 60 * 1024) {
+  if (current_header_field_.size() + length + current_header_map_->byteSize() >
+      max_request_headers_kb_ * 1024) {
     throw CodecProtocolException("http/1.1 protocol error: HPE_HEADER_OVERFLOW");
   }
 
@@ -475,8 +478,9 @@ void ConnectionImpl::onResetStreamBase(StreamResetReason reason) {
 
 ServerConnectionImpl::ServerConnectionImpl(Network::Connection& connection,
                                            ServerConnectionCallbacks& callbacks,
-                                           Http1Settings settings)
-    : ConnectionImpl(connection, HTTP_REQUEST), callbacks_(callbacks), codec_settings_(settings) {}
+                                           Http1Settings settings, uint32_t max_request_headers_kb)
+    : ConnectionImpl(connection, HTTP_REQUEST, max_request_headers_kb), callbacks_(callbacks),
+      codec_settings_(settings) {}
 
 void ServerConnectionImpl::onEncodeComplete() {
   ASSERT(active_request_);
@@ -646,8 +650,9 @@ void ServerConnectionImpl::onBelowLowWatermark() {
   }
 }
 
-ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection, ConnectionCallbacks&)
-    : ConnectionImpl(connection, HTTP_RESPONSE) {}
+ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection, ConnectionCallbacks&,
+                                           uint32_t max_request_headers_kb)
+    : ConnectionImpl(connection, HTTP_RESPONSE, max_request_headers_kb) {}
 
 bool ClientConnectionImpl::cannotHaveBody() {
   if ((!pending_responses_.empty() && pending_responses_.front().head_request_) ||
