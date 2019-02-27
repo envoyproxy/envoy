@@ -258,6 +258,14 @@ void Span::setTag(const std::string& name, const std::string& value) {
   }
 }
 
+void Span::log(SystemTime timestamp, const std::string& event) {
+  Annotation annotation;
+  annotation.setTimestamp(
+      std::chrono::duration_cast<std::chrono::microseconds>(timestamp.time_since_epoch()).count());
+  annotation.setValue(event);
+  addAnnotation(std::move(annotation));
+}
+
 } // namespace Zipkin
 } // namespace Tracers
 } // namespace Extensions
