@@ -24,7 +24,7 @@
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_time.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -90,6 +90,9 @@ public:
     router_.downstream_connection_.local_address_ = host_address_;
     router_.downstream_connection_.remote_address_ =
         Network::Utility::parseInternetAddressAndPort("1.2.3.4:80");
+
+    // Make the "system time" non-zero, because 0 is considered invalid by DateUtil.
+    test_time_.setMonotonicTime(std::chrono::milliseconds(50));
   }
 
   void expectResponseTimerCreate() {
@@ -206,7 +209,7 @@ public:
     ON_CALL(callbacks_, connection()).WillByDefault(Return(&connection_));
   }
 
-  DangerousDeprecatedTestTime test_time_;
+  Event::SimulatedTimeSystem test_time_;
   std::string upstream_zone_{"to_az"};
   envoy::api::v2::core::Locality upstream_locality_;
   Stats::IsolatedStoreImpl stats_store_;
@@ -755,8 +758,6 @@ TEST_F(RouterTest, EnvoyUpstreamServiceTime) {
 
   Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl{{":status", "200"}});
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(200));
-  Http::TestHeaderMapImpl downstream_response_headers{{":status", "200"},
-                                                      {"x-envoy-upstream-service-time", "0"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(_, true))
       .WillOnce(Invoke([](Http::HeaderMap& headers, bool) {
         EXPECT_NE(nullptr, headers.get(Http::Headers::get().EnvoyUpstreamServiceTime));
