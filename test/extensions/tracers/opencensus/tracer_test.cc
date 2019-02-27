@@ -100,7 +100,7 @@ TEST(OpenCensusTracerTest, Span) {
 
   {
     Tracing::SpanPtr span = driver->startSpan(config, request_headers, operation_name, start_time,
-                                               {Tracing::Reason::Sampling, true});
+                                              {Tracing::Reason::Sampling, true});
     span->setOperation("my_operation_2");
     span->setTag("my_key", "my_value");
     // TODO: injectContext.

@@ -4,11 +4,10 @@
 
 #include "test/mocks/server/mocks.h"
 
-#include "opencensus/trace/sampler.h"
-#include "opencensus/trace/trace_config.h"
-
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "opencensus/trace/sampler.h"
+#include "opencensus/trace/trace_config.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -58,7 +57,8 @@ TEST(OpenCensusTracerConfigTest, OpenCensusHttpTracerWithTypedConfig) {
   EXPECT_NE(nullptr, tracer);
 
   // Reset TraceParams back to default.
-  ::opencensus::trace::TraceConfig::SetCurrentTraceParams({32, 32, 128, 32, ::opencensus::trace::ProbabilitySampler(1e-4)});
+  ::opencensus::trace::TraceConfig::SetCurrentTraceParams(
+      {32, 32, 128, 32, ::opencensus::trace::ProbabilitySampler(1e-4)});
 }
 
 TEST(OpenCensusTracerConfigTest, DoubleRegistrationTest) {
