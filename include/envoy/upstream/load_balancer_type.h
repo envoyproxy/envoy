@@ -58,6 +58,11 @@ public:
    * fraction of hosts removed from the original host set.
    */
   virtual bool scaleLocalityWeight() const PURE;
+
+  /*
+   * @return bool whether to pick any host if the fallback policy fails to find a host.
+   */
+  virtual bool panicModeAny() const PURE;
 };
 
 } // namespace Upstream

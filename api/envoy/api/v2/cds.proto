@@ -385,6 +385,9 @@ message Cluster {
     // going to an individual locality if said locality is disproportionally affected by the
     // subset predicate.
     bool scale_locality_weight = 5;
+
+    // If a fallback policy is set but still no host is selected, chose any.
+    bool panic_mode_any = 6;
   }
 
   // Configuration for load balancing subsetting.

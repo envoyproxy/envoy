@@ -36,6 +36,7 @@ public:
   MOCK_CONST_METHOD0(subsetKeys, const std::vector<std::set<std::string>>&());
   MOCK_CONST_METHOD0(localityWeightAware, bool());
   MOCK_CONST_METHOD0(scaleLocalityWeight, bool());
+  MOCK_CONST_METHOD0(panicModeAny, bool());
 
   std::vector<std::set<std::string>> subset_keys_;
 };
