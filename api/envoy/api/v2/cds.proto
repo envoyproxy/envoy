@@ -386,7 +386,9 @@ message Cluster {
     // subset predicate.
     bool scale_locality_weight = 5;
 
-    // If a fallback policy is set but still no host is selected, select any.
+    // If true, when a fallback policy is configured and it fails to find any host this will
+    // cause any host to be selected instead. This is useful when using the default subset
+    // as the fallback subset, given the default subset might become empty.
     bool panic_mode_any = 6;
   }
 
