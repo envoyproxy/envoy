@@ -1280,7 +1280,7 @@ TEST_F(ClusterManagerImplTest, HostsPostedToTlsCluster) {
 
   cluster1->priority_set_.updateHosts(
       0, HostSetImpl::partitionHosts(hosts_ptr, HostsPerLocalityImpl::empty()), nullptr, hosts, {},
-      {});
+      100);
 
   auto* tls_cluster = cluster_manager_->get(cluster1->info_->name());
 
@@ -1290,6 +1290,7 @@ TEST_F(ClusterManagerImplTest, HostsPostedToTlsCluster) {
   EXPECT_EQ(1, tls_cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ(host3, tls_cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts()[0]);
   EXPECT_EQ(3, tls_cluster->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ(100, tls_cluster->prioritySet().hostSetsPerPriority()[0]->overprovisioningFactor());
 
   factory_.tls_.shutdownThread();
 
