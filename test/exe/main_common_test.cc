@@ -197,6 +197,7 @@ protected:
       main_common_.reset();
       envoy_finished_ = true;
       envoy_return_ = status;
+      envoy_pid_ = getpid();
       finished_.Notify();
     });
   }
@@ -225,6 +226,7 @@ protected:
   absl::Notification finished_;
   absl::Notification resume_;
   absl::Notification pause_point_;
+  int envoy_pid_;
   bool envoy_return_;
   bool envoy_started_;
   bool envoy_finished_;
@@ -245,6 +247,7 @@ TEST_P(AdminRequestTest, AdminRequestGetStatsAndQuit) {
 TEST_P(AdminRequestTest, AdminRequestGetStatsAndKill) {
   startEnvoy();
   started_.WaitForNotification();
+  ENVOY_LOG_MISC(info, "HTD {} {}", getpid(), envoy_pid_);
   EXPECT_THAT(adminRequest("/stats", "GET"), HasSubstr("access_log_file.reopen_failed"));
   kill(getpid(), SIGTERM);
   EXPECT_TRUE(waitForEnvoyToExit());
