@@ -7,24 +7,27 @@ static_resources:
     filter_chains:
     - filters:
       - name: envoy.http_connection_manager
-        config:
-          deprecated_v1: true
-          value:
-            stat_prefix: ingress_http
-            route_config:
-              virtual_hosts:
-              - routes:
-                - prefix: "/"
-                  timeout_ms: 0
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
+          stat_prefix: ingress_http
+          route_config:
+            name: local_service
+            virtual_hosts:
+            - name: backend
+              domains:
+              - "*"
+              routes:
+              - match:
+                  prefix: "/"
+                route:
                   cluster: cluster1
-                domains:
-                - "*"
-                name: local_service
-            filters:
-            - name: router
-              config: {}
-            codec_type: auto
-    use_original_dst: true
+          http_filters:
+          - name: envoy.router
+            typed_config: {}
+          codec_type: auto
+    listener_filters:
+    - name: envoy.listener.original_dst
+      typed_config: {}
   clusters:
   - name: cluster1
     type: ORIGINAL_DST
@@ -34,7 +37,7 @@ static_resources:
 cluster_manager: {}
 watchdog: {}
 admin:
-  access_log_path: "/tmp/admin_access.log"
+  access_log_path: /tmp/admin_access.log
   address:
     socket_address:
       address: 127.0.0.1
