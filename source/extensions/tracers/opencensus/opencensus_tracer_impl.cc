@@ -50,8 +50,6 @@ private:
   ::opencensus::trace::NeverSampler never_sampler;
   ::opencensus::trace::StartSpanOptions opts{&never_sampler};
   if (traced) {
-    // opts.sampler = static_cast<::opencensus::trace::Sampler*>(traced ? &always_sampler :
-    // &never_sampler);
     opts.sampler = &always_sampler;
   }
   return ::opencensus::trace::Span::StartSpan(name, /*parent=*/nullptr, opts);
