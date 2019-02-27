@@ -68,6 +68,10 @@ for how to update or override dependencies.
     Alternatively, you can pass `--action_env` on the command line when running
     `bazel build`/`bazel test`.
 
+    Having the binutils keg installed in Brew is known to cause issues due to putting an incompatible
+    version of `ar` on the PATH, so if you run into issues building third party code like luajit
+    consider uninstalling binutils.
+
 1. Install Golang on your machine. This is required as part of building [BoringSSL](https://boringssl.googlesource.com/boringssl/+/HEAD/BUILDING.md)
    and also for [Buildifer](https://github.com/bazelbuild/buildtools) which is used for formatting bazel BUILD files.
 1. `go get -u github.com/bazelbuild/buildtools/buildifier` to install buildifier. You may need to set `BUILDIFIER_BIN` to `$GOPATH/bin/buildifier`
@@ -525,7 +529,7 @@ to run clang-format scripts on your workstation directly:
  * Type-ahead doesn't always work when waiting running a command through docker
 To run the tools directly, you must install the correct version of clang. This
 may change over time but as of January 2019,
-[clang+llvm-7.0.0](http://releases.llvm.org/download.html) works well. You must
+[clang+llvm-7.0.0](https://releases.llvm.org/download.html) works well. You must
 also have 'buildifier' installed from the bazel distribution.
 
 Edit the paths shown here to reflect the installation locations on your system:
