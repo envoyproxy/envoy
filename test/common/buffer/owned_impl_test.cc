@@ -140,15 +140,13 @@ TEST_F(OwnedImplTest, Write) {
 
   EXPECT_CALL(os_sys_calls, writev(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{-1, EBADF}));
   result = buffer.write(io_handle);
-  EXPECT_EQ(Network::IoError::IoErrorCode::BadHandle,
-            Network::IoError::getErrorCode(result.err_.get()));
+  EXPECT_EQ(Network::IoError::IoErrorCode::BadHandle, Network::IoError::getErrorCode(*result.err_));
   EXPECT_EQ(0, result.rc_);
   EXPECT_EQ(1, buffer.length());
 
   EXPECT_CALL(os_sys_calls, writev(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{-1, EAGAIN}));
   result = buffer.write(io_handle);
-  EXPECT_EQ(Network::IoError::IoErrorCode::Again,
-            Network::IoError::getErrorCode(result.err_.get()));
+  EXPECT_EQ(Network::IoError::IoErrorCode::Again, Network::IoError::getErrorCode(*result.err_));
   EXPECT_EQ(0, result.rc_);
   EXPECT_EQ(1, buffer.length());
 
@@ -178,15 +176,13 @@ TEST_F(OwnedImplTest, Read) {
 
   EXPECT_CALL(os_sys_calls, readv(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{-1, EBADF}));
   result = buffer.read(io_handle, 100);
-  EXPECT_EQ(Network::IoError::IoErrorCode::BadHandle,
-            Network::IoError::getErrorCode(result.err_.get()));
+  EXPECT_EQ(Network::IoError::IoErrorCode::BadHandle, Network::IoError::getErrorCode(*result.err_));
   EXPECT_EQ(0, result.rc_);
   EXPECT_EQ(0, buffer.length());
 
   EXPECT_CALL(os_sys_calls, readv(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{-1, EAGAIN}));
   result = buffer.read(io_handle, 100);
-  EXPECT_EQ(Network::IoError::IoErrorCode::Again,
-            Network::IoError::getErrorCode(result.err_.get()));
+  EXPECT_EQ(Network::IoError::IoErrorCode::Again, Network::IoError::getErrorCode(*result.err_));
   EXPECT_EQ(0, result.rc_);
   EXPECT_EQ(0, buffer.length());
 
