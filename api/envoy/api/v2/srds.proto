@@ -177,12 +177,15 @@ message ScopedRouteConfigurationsSet {
   // The key construction mechanism.
   ScopeKeyBuilder scope_key_builder = 2 [(validate.rules).message.required = true];
 
-  // Specifies a routing scope, which associates a :ref:`envoy_api_msg_RouteConfiguration` to a
-  // :ref:`Key <envoy_api_msg_ScopedRouteConfigurationsSet.Scope.Key>` which is matched against
-  // each HTTP request.
+  // Specifies a routing scope, which associates a :ref:`envoy_api_msg_RouteConfiguration`
+  // (identified by its resource name) to a
+  // :ref:`Key<envoy_api_msg_ScopedRouteConfigurationsSet.Scope.Key>` which is matched against each
+  // HTTP request.
   message Scope {
-    // Specifies a key which is matched against the output of a :ref:`ScopeKeyBuilder
-    // <envoy_api_msg_ScopedRouteConfigurationsSet.ScopeKeyBuilder>`.
+    // Specifies a key which is matched against the output of the
+    // :ref:`scope_key_builder<envoy_api_field_ScopedRouteConfigurationsSet.scope_key_builder>` to
+    // obtain the route_configuration_name/RouteConfiguration associated with the Scope. The
+    // matching is dependent on the order of the fragments contained in the Key.
     message Key {
       message Fragment {
         oneof type {
