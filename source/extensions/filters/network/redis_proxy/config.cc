@@ -30,13 +30,17 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
       proto_config, context.scope(), context.drainDecision(), context.runtime()));
   Common::Redis::ConnPool::InstancePtr conn_pool(new Common::Redis::ConnPool::InstanceImpl(
       filter_config->cluster_name_, context.clusterManager(),
-      Common::Redis::ConnPool::ClientFactoryImpl::instance_, context.threadLocal(), proto_config.settings()));
-  std::shared_ptr<Common::Redis::CommandSplitter::Instance> splitter(new Common::Redis::CommandSplitter::InstanceImpl(
-      std::move(conn_pool), context.scope(), filter_config->stat_prefix_, context.timeSource()));
+      Common::Redis::ConnPool::ClientFactoryImpl::instance_, context.threadLocal(),
+      proto_config.settings()));
+  std::shared_ptr<Common::Redis::CommandSplitter::Instance> splitter(
+      new Common::Redis::CommandSplitter::InstanceImpl(std::move(conn_pool), context.scope(),
+                                                       filter_config->stat_prefix_,
+                                                       context.timeSource()));
   return [splitter, filter_config](Network::FilterManager& filter_manager) -> void {
-      Common::Redis::DecoderFactoryImpl factory;
+    Common::Redis::DecoderFactoryImpl factory;
     filter_manager.addReadFilter(std::make_shared<ProxyFilter>(
-        factory, Common::Redis::EncoderPtr{new Common::Redis::EncoderImpl()}, *splitter, filter_config));
+        factory, Common::Redis::EncoderPtr{new Common::Redis::EncoderImpl()}, *splitter,
+        filter_config));
   };
 }
 

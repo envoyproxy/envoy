@@ -103,8 +103,8 @@ MockInstance::MockInstance() {}
 MockInstance::~MockInstance() {}
 
 } // namespace CommandSplitter
-} // namespace Redis 
-} // namespace Common 
+} // namespace Redis
+} // namespace Common
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy

@@ -298,7 +298,7 @@ private:
   TimeSource& time_source_;
 };
 
-} // namespace CommandSplitter 
+} // namespace CommandSplitter
 } // namespace Redis
 } // namespace Common
 } // namespace NetworkFilters

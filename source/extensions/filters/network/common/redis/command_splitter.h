@@ -58,12 +58,13 @@ public:
    *         been satisfied (via onResponse() being called). The splitter ALWAYS calls
    *         onResponse() for a given request.
    */
-  virtual SplitRequestPtr makeRequest(const Common::Redis::RespValue& request, SplitCallbacks& callbacks) PURE;
+  virtual SplitRequestPtr makeRequest(const Common::Redis::RespValue& request,
+                                      SplitCallbacks& callbacks) PURE;
 };
 
-} // namespace CommandSplitter 
-} // namespace Redis 
-} // namespace Common 
+} // namespace CommandSplitter
+} // namespace Redis
+} // namespace Common
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy

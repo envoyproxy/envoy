@@ -26,8 +26,10 @@ ProxyStats ProxyFilterConfig::generateStats(const std::string& prefix, Stats::Sc
       ALL_REDIS_PROXY_STATS(POOL_COUNTER_PREFIX(scope, prefix), POOL_GAUGE_PREFIX(scope, prefix))};
 }
 
-ProxyFilter::ProxyFilter(Common::Redis::DecoderFactory& factory, Common::Redis::EncoderPtr&& encoder,
-                         Common::Redis::CommandSplitter::Instance& splitter, ProxyFilterConfigSharedPtr config)
+ProxyFilter::ProxyFilter(Common::Redis::DecoderFactory& factory,
+                         Common::Redis::EncoderPtr&& encoder,
+                         Common::Redis::CommandSplitter::Instance& splitter,
+                         ProxyFilterConfigSharedPtr config)
     : decoder_(factory.create(*this)), encoder_(std::move(encoder)), splitter_(splitter),
       config_(config) {
   config_->stats_.downstream_cx_total_.inc();

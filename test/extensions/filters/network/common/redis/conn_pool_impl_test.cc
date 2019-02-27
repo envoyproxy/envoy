@@ -5,6 +5,7 @@
 #include "common/upstream/upstream_impl.h"
 
 #include "extensions/filters/network/common/redis/conn_pool_impl.h"
+
 #include "test/extensions/filters/network/common/redis/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
@@ -610,7 +611,7 @@ TEST_F(RedisConnPoolImplTest, RemoteClose) {
 
 } // namespace ConnPool
 } // namespace Redis
-} // namespace Common 
+} // namespace Common
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy

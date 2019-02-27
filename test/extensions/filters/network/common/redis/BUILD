@@ -18,7 +18,7 @@ envoy_extension_cc_test(
     srcs = ["codec_impl_test.cc"],
     extension_name = "envoy.filters.network.common.redis",
     deps = [
-#        ":redis_mocks",
+        #        ":redis_mocks",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/extensions/filters/network/common/redis:codec_lib",

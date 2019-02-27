@@ -416,7 +416,7 @@ void InstanceImpl::addHandler(Stats::Scope& scope, const std::string& stat_prefi
           handler}));
 }
 
-} // namespace CommandSplitter 
+} // namespace CommandSplitter
 } // namespace Redis
 } // namespace Common
 } // namespace NetworkFilters

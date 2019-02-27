@@ -20,8 +20,8 @@ envoy_extension_cc_test(
     deps = [
         "//source/common/config:filter_json_lib",
         "//source/common/event:dispatcher_lib",
-        "//test/extensions/filters/network/common/redis:redis_mocks",
         "//source/extensions/filters/network/redis_proxy:proxy_filter_lib",
+        "//test/extensions/filters/network/common/redis:redis_mocks",
         "//test/mocks:common_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/upstream:upstream_mocks",
@@ -38,4 +38,3 @@ envoy_extension_cc_test(
         "//test/mocks/server:server_mocks",
     ],
 )
-

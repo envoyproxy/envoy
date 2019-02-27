@@ -62,7 +62,7 @@ struct SupportedCommands {
 };
 
 } // namespace Redis
-} // namespace Common 
+} // namespace Common
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy

@@ -145,7 +145,7 @@ typedef std::unique_ptr<Instance> InstancePtr;
 
 } // namespace ConnPool
 } // namespace Redis
-} // namespace Common 
+} // namespace Common
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy

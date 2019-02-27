@@ -87,7 +87,8 @@ public:
     envoy::config::filter::network::redis_proxy::v2::RedisProxy proto_config =
         parseProtoFromJson(json_string);
     config_.reset(new ProxyFilterConfig(proto_config, store_, drain_decision_, runtime_));
-    filter_ = std::make_unique<ProxyFilter>(*this, Common::Redis::EncoderPtr{encoder_}, splitter_, config_);
+    filter_ = std::make_unique<ProxyFilter>(*this, Common::Redis::EncoderPtr{encoder_}, splitter_,
+                                            config_);
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
     EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
     EXPECT_EQ(1UL, config_->stats_.downstream_cx_total_.value());
@@ -127,9 +128,11 @@ TEST_F(RedisProxyFilterTest, OutOfOrderResponseWithDrainClose) {
   InSequence s;
 
   Buffer::OwnedImpl fake_data;
-  Common::Redis::CommandSplitter::MockSplitRequest* request_handle1 = new Common::Redis::CommandSplitter::MockSplitRequest();
+  Common::Redis::CommandSplitter::MockSplitRequest* request_handle1 =
+      new Common::Redis::CommandSplitter::MockSplitRequest();
   Common::Redis::CommandSplitter::SplitCallbacks* request_callbacks1;
-  Common::Redis::CommandSplitter::MockSplitRequest* request_handle2 = new Common::Redis::CommandSplitter::MockSplitRequest();
+  Common::Redis::CommandSplitter::MockSplitRequest* request_handle2 =
+      new Common::Redis::CommandSplitter::MockSplitRequest();
   Common::Redis::CommandSplitter::SplitCallbacks* request_callbacks2;
   EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     Common::Redis::RespValuePtr request1(new Common::Redis::RespValue());
@@ -168,9 +171,11 @@ TEST_F(RedisProxyFilterTest, OutOfOrderResponseDownstreamDisconnectBeforeFlush) 
   InSequence s;
 
   Buffer::OwnedImpl fake_data;
-  Common::Redis::CommandSplitter::MockSplitRequest* request_handle1 = new Common::Redis::CommandSplitter::MockSplitRequest();
+  Common::Redis::CommandSplitter::MockSplitRequest* request_handle1 =
+      new Common::Redis::CommandSplitter::MockSplitRequest();
   Common::Redis::CommandSplitter::SplitCallbacks* request_callbacks1;
-  Common::Redis::CommandSplitter::MockSplitRequest* request_handle2 = new Common::Redis::CommandSplitter::MockSplitRequest();
+  Common::Redis::CommandSplitter::MockSplitRequest* request_handle2 =
+      new Common::Redis::CommandSplitter::MockSplitRequest();
   Common::Redis::CommandSplitter::SplitCallbacks* request_callbacks2;
   EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     Common::Redis::RespValuePtr request1(new Common::Redis::RespValue());
@@ -199,7 +204,8 @@ TEST_F(RedisProxyFilterTest, DownstreamDisconnectWithActive) {
   InSequence s;
 
   Buffer::OwnedImpl fake_data;
-  Common::Redis::CommandSplitter::MockSplitRequest* request_handle1 = new Common::Redis::CommandSplitter::MockSplitRequest();
+  Common::Redis::CommandSplitter::MockSplitRequest* request_handle1 =
+      new Common::Redis::CommandSplitter::MockSplitRequest();
   Common::Redis::CommandSplitter::SplitCallbacks* request_callbacks1;
   EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     Common::Redis::RespValuePtr request1(new Common::Redis::RespValue());
@@ -222,24 +228,24 @@ TEST_F(RedisProxyFilterTest, ImmediateResponse) {
     decoder_callbacks_->onRespValue(std::move(request1));
   }));
   EXPECT_CALL(splitter_, makeRequest_(Ref(*request1), _))
-      .WillOnce(
-          Invoke([&](const Common::Redis::RespValue&,
-                     Common::Redis::CommandSplitter::SplitCallbacks& callbacks) -> Common::Redis::CommandSplitter::SplitRequest* {
-            Common::Redis::RespValuePtr error(new Common::Redis::RespValue());
-            error->type(Common::Redis::RespType::Error);
-            error->asString() = "no healthy upstream";
-            EXPECT_CALL(*encoder_, encode(Eq(ByRef(*error)), _));
-            EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
-            callbacks.onResponse(std::move(error));
-            return nullptr;
-          }));
+      .WillOnce(Invoke([&](const Common::Redis::RespValue&,
+                           Common::Redis::CommandSplitter::SplitCallbacks& callbacks)
+                           -> Common::Redis::CommandSplitter::SplitRequest* {
+        Common::Redis::RespValuePtr error(new Common::Redis::RespValue());
+        error->type(Common::Redis::RespType::Error);
+        error->asString() = "no healthy upstream";
+        EXPECT_CALL(*encoder_, encode(Eq(ByRef(*error)), _));
+        EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
+        callbacks.onResponse(std::move(error));
+        return nullptr;
+      }));
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
 TEST_F(RedisProxyFilterTest, ProtocolError) {
- InSequence s;
+  InSequence s;
 
   Buffer::OwnedImpl fake_data;
   EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {

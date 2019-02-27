@@ -768,8 +768,8 @@ INSTANTIATE_TEST_SUITE_P(RedisSplitKeysSumResultHandlerTest, RedisSplitKeysSumRe
                          testing::ValuesIn(SupportedCommands::hashMultipleSumResultCommands()));
 
 } // namespace CommandSplitter
-} // namespace Common
 } // namespace Redis
+} // namespace Common
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy

@@ -332,7 +332,7 @@ absl::string_view InstanceImpl::LbContextImpl::hashtag(absl::string_view v, bool
 
 } // namespace ConnPool
 } // namespace Redis
-} // namespace Common 
+} // namespace Common
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy

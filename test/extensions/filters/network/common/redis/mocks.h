@@ -141,7 +141,7 @@ public:
 
 } // namespace CommandSplitter
 } // namespace Redis
-} // namespace Common 
+} // namespace Common
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy

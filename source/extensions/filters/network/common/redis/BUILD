@@ -57,9 +57,9 @@ envoy_cc_library(
     srcs = ["command_splitter_impl.cc"],
     hdrs = ["command_splitter_impl.h"],
     deps = [
-        ":supported_commands_lib",
         ":command_splitter_interface",
         ":conn_pool_interface",
+        ":supported_commands_lib",
         "//include/envoy/stats:stats_macros",
         "//include/envoy/stats:timespan",
         "//source/common/common:assert_lib",
@@ -84,6 +84,6 @@ envoy_cc_library(
         "//source/common/network:filter_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/upstream:load_balancer_lib",
-        "@envoy_api//envoy/config/filter/network/redis_proxy/v2:redis_proxy_cc", # TODO: WTF is this?
+        "@envoy_api//envoy/config/filter/network/redis_proxy/v2:redis_proxy_cc",  # TODO: WTF is this?
     ],
 )
