@@ -128,7 +128,7 @@ TEST_P(EdsIntegrationTest, OverprovisioningFactorUpdate) {
 TEST_P(EdsIntegrationTest, BatchMemberUpdateCb) {
   initialize();
 
-  uint32_t member_update_count;
+  uint32_t member_update_count{};
 
   auto& priority_set = test_server_->server()
                            .clusterManager()
