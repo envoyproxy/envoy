@@ -87,6 +87,16 @@ TEST(HessianProtocolTest, deserializeRpcResult) {
     EXPECT_TRUE(result->hasException());
   }
 
+  {
+    Buffer::OwnedImpl buffer;
+    buffer.add(std::string({
+        '\x91',                   // return type
+        0x04, 't', 'e', 's', 't', // return body
+    }));
+    auto result = deserializer.deserializeRpcResult(buffer, 4);
+    EXPECT_TRUE(result->hasException());
+  }
+
   // incorrect body size
   {
     Buffer::OwnedImpl buffer;
