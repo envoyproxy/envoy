@@ -469,7 +469,8 @@ SubsetLoadBalancer::PrioritySubsetImpl::PrioritySubsetImpl(const SubsetLoadBalan
     // We should make the subset LB thread aware since the calculations are costly, and then we
     // can also use a thread aware sub-LB properly. The following works fine but is not optimal.
     thread_aware_lb_ = std::make_unique<MaglevLoadBalancer>(
-        *this, subset_lb.stats_, subset_lb.runtime_, subset_lb.random_, subset_lb.common_config_);
+        *this, subset_lb.stats_, subset_lb.scope_, subset_lb.runtime_, subset_lb.random_,
+        subset_lb.common_config_);
     thread_aware_lb_->initialize();
     lb_ = thread_aware_lb_->factory()->create();
     break;
