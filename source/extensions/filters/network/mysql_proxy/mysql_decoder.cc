@@ -161,8 +161,7 @@ void DecoderImpl::decode(Buffer::Instance& data, uint64_t& offset) {
 }
 
 void DecoderImpl::onData(Buffer::Instance& data) {
-  // TODO(venilnoronha): handle messages over 16 mb. See
-  // https://dev.mysql.com/doc/dev/mysql-server/8.0.2/page_protocol_basic_packets.html#sect_protocol_basic_packets_sending_mt_16mb.
+  // TODO(venilnoronha): handle messages over 16 mb. 
   uint64_t offset = 0;
   while (!BufferHelper::endOfBuffer(data, offset)) {
     decode(data, offset);
