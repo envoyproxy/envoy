@@ -2,6 +2,7 @@
 BROWSE
 /build
 /build_*
+*.bzlc
 .cache
 /ci/bazel-*
 /ci/prebuilt/thirdparty
