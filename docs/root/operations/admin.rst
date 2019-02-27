@@ -84,6 +84,7 @@ modify different aspects of the server:
       cx_total, Counter, Total connections
       cx_active, Gauge, Total active connections
       cx_connect_fail, Counter, Total connection failures
+      rq_hedge_abandoned, Counter, Total hedged requests that were canceled and abandoned due to accepting another response.
       rq_total, Counter, Total requests
       rq_timeout, Counter, Total timed out requests
       rq_success, Counter, Total requests with non-5xx responses

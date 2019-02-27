@@ -60,6 +60,7 @@ Every cluster has a statistics tree rooted at *cluster.<name>.* with the followi
   upstream_cx_max_requests, Counter, Total connections closed due to maximum requests
   upstream_cx_none_healthy, Counter, Total times connection not established due to no healthy hosts
   upstream_rq_total, Counter, Total requests
+  upstream_rq_hedge_abandoned, Counter, Number of hedged requests that were abandoned due to accepting another response.
   upstream_rq_active, Gauge, Total active requests
   upstream_rq_pending_total, Counter, Total requests pending a connection pool connection
   upstream_rq_pending_overflow, Counter, Total requests that overflowed connection pool circuit breaking and were failed

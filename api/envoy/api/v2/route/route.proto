@@ -143,7 +143,6 @@ message VirtualHost {
   // Indicates the hedge policy for all routes in this virtual host. Note that setting a
   // route level entry will take precedence over this config and it'll be treated
   // independently (e.g.: values are not inherited).
-  // [#not-implemented-hide:]
   HedgePolicy hedge_policy = 17;
 }
 
@@ -792,7 +791,6 @@ message RouteAction {
   // Indicates that the route has a hedge policy. Note that if this is set,
   // it'll take precedence over the virtual host level hedge policy entirely
   // (e.g.: policies are not merged, most internal one becomes the enforced policy).
-  // [#not-implemented-hide:]
   HedgePolicy hedge_policy = 27;
 }
 
@@ -859,17 +857,18 @@ message RetryPolicy {
   repeated uint32 retriable_status_codes = 7;
 }
 
-// HTTP request hedging TODO(mpuncel) docs
-// [#not-implemented-hide:]
+// HTTP request hedging :ref:`architecture overview <arch_overview_http_routing_hedging>`.
 message HedgePolicy {
   // Specifies the number of initial requests that should be sent upstream.
   // Must be at least 1.
   // Defaults to 1.
+  // [#not-implemented-hide:]
   google.protobuf.UInt32Value initial_requests = 1 [(validate.rules).uint32.gte = 1];
 
   // Specifies a probability that an additional upstream request should be sent
   // on top of what is specified by initial_requests.
   // Defaults to 0.
+  // [#not-implemented-hide:]
   envoy.type.FractionalPercent additional_request_chance = 2;
 
   // Indicates that a hedged request should be sent when the per-try timeout

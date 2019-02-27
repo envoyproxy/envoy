@@ -73,11 +73,11 @@ public:
   const envoy::type::FractionalPercent& additionalRequestChance() const override {
     return additional_request_chance_;
   }
-  bool hedgeOnPerTryTimeout() const override { return hedge_on_per_try_timeout; }
+  bool hedgeOnPerTryTimeout() const override { return hedge_on_per_try_timeout_; }
 
   uint32_t initial_requests_{};
   envoy::type::FractionalPercent additional_request_chance_{};
-  bool hedge_on_per_try_timeout{};
+  bool hedge_on_per_try_timeout_{};
 };
 
 class TestRetryPolicy : public RetryPolicy {
@@ -106,6 +106,7 @@ public:
   ~MockRetryState();
 
   void expectHeadersRetry();
+  void expectHedgedPerTryTimeoutRetry();
   void expectResetRetry();
 
   MOCK_METHOD0(enabled, bool());
@@ -113,6 +114,7 @@ public:
                RetryStatus(const Http::HeaderMap& response_headers, DoRetryCallback callback));
   MOCK_METHOD2(shouldRetryReset,
                RetryStatus(const Http::StreamResetReason reset_reason, DoRetryCallback callback));
+  MOCK_METHOD1(shouldHedgeRetryPerTryTimeout, RetryStatus(DoRetryCallback callback));
   MOCK_METHOD1(onHostAttempted, void(Upstream::HostDescriptionConstSharedPtr));
   MOCK_METHOD1(shouldSelectAnotherHost, bool(const Upstream::Host& host));
   MOCK_METHOD2(priorityLoadForRetry,

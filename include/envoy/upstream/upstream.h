@@ -474,6 +474,7 @@ public:
   COUNTER  (upstream_cx_max_requests)                                                              \
   COUNTER  (upstream_cx_none_healthy)                                                              \
   COUNTER  (upstream_rq_total)                                                                     \
+  COUNTER  (upstream_rq_hedge_abandoned)                                                           \
   GAUGE    (upstream_rq_active)                                                                    \
   COUNTER  (upstream_rq_completed)                                                                 \
   COUNTER  (upstream_rq_pending_total)                                                             \

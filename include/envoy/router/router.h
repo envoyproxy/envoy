@@ -254,6 +254,19 @@ public:
                                        DoRetryCallback callback) PURE;
 
   /**
+   * Determine whether a "hedged" retry should be sent after the per try
+   * timeout expires. This means the original request is not canceled, but a
+   * new one is sent to hedge against the original request taking even longer.
+   * @param callback supplies the callback that will be invoked when the retry should take place.
+   *                 This is used to add timed backoff, etc. The callback will never be called
+   *                 inline.
+   * @return RetryStatus if a retry should take place. @param callback will be called at some point
+   *         in the future. Otherwise a retry should not take place and the callback will never be
+   *         called. Calling code should proceed with error handling.
+   */
+  virtual RetryStatus shouldHedgeRetryPerTryTimeout(DoRetryCallback callback) PURE;
+
+  /**
    * Called when a host was attempted but the request failed and is eligible for another retry.
    * Should be used to update whatever internal state depends on previously attempted hosts.
    * @param host the previously attempted host.

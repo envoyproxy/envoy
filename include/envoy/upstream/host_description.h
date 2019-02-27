@@ -24,6 +24,7 @@ namespace Upstream {
   COUNTER(cx_total)                                                                                \
   GAUGE  (cx_active)                                                                               \
   COUNTER(cx_connect_fail)                                                                         \
+  COUNTER(rq_hedge_abandoned)                                                                      \
   COUNTER(rq_total)                                                                                \
   COUNTER(rq_timeout)                                                                              \
   COUNTER(rq_success)                                                                              \

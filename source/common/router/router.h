@@ -61,6 +61,11 @@ public:
     std::chrono::milliseconds per_try_timeout_{0};
   };
 
+  struct HedgingParams {
+    uint32_t initial_requests_;
+    bool hedge_on_per_try_timeout_;
+  };
+
   /**
    * Set the :scheme header based on the properties of the upstream cluster.
    */
@@ -88,6 +93,15 @@ public:
    */
   static TimeoutData finalTimeout(const RouteEntry& route, Http::HeaderMap& request_headers,
                                   bool insert_envoy_expected_request_timeout_ms, bool grpc_request);
+
+  /**
+   * Determine the final hedging settings after applying randomized behavior.
+   * @param route supplies the request route.
+   * @param random_value supplies a stable random value to use for evaluating whether an additional
+   *        initial request should be sent
+   * @return HedgingParams the final parameters to use for request hedging
+   */
+  static HedgingParams finalHedgingParams(const RouteEntry& route, uint64_t random_value);
 };
 
 /**
@@ -285,6 +299,9 @@ private:
       stream_info_.onUpstreamHostSelected(host);
       upstream_host_ = host;
       parent_.callbacks_->streamInfo().onUpstreamHostSelected(host);
+      if (parent_.retry_state_ && host) {
+        parent_.retry_state_->onHostAttempted(host);
+      }
     }
 
     // Http::StreamDecoder
@@ -347,8 +364,11 @@ private:
 
     bool calling_encode_headers_ : 1;
     bool upstream_canary_ : 1;
+    bool decode_complete_ : 1;
     bool encode_complete_ : 1;
     bool encode_trailers_ : 1;
+    bool retried_ : 1;
+    bool outlier_detection_timeout_recorded_ : 1;
   };
 
   typedef std::unique_ptr<UpstreamRequest> UpstreamRequestPtr;
@@ -360,6 +380,7 @@ private:
                           Upstream::HostDescriptionConstSharedPtr upstream_host, bool dropped);
   void chargeUpstreamCode(Http::Code code, Upstream::HostDescriptionConstSharedPtr upstream_host,
                           bool dropped);
+  void chargeUpstreamAbort(Http::Code code, bool dropped, UpstreamRequest* upstream_request);
   void cleanup();
   virtual RetryStatePtr createRetryState(const RetryPolicy& policy,
                                          Http::HeaderMap& request_headers,
@@ -369,32 +390,39 @@ private:
                                          Upstream::ResourcePriority priority) PURE;
   Http::ConnectionPool::Instance* getConnPool();
   void maybeDoShadowing();
-  bool maybeRetryReset(Http::StreamResetReason reset_reason);
-  void onPerTryTimeout();
+  bool maybeRetryReset(Http::StreamResetReason reset_reason, UpstreamRequest* upstream_request);
+  void onGlobalTimeout();
+  void onPerTryTimeout(UpstreamRequest* upstream_request);
   void onRequestComplete();
   void onResponseTimeout();
-  void onUpstream100ContinueHeaders(Http::HeaderMapPtr&& headers);
+  void onUpstream100ContinueHeaders(Http::HeaderMapPtr&& headers,
+                                    UpstreamRequest* upstream_request);
   // Handle an upstream request aborted due to a local timeout.
+  void onSoftPerTryTimeout();
+  void onSoftPerTryTimeout(UpstreamRequest* upstream_request);
   void onUpstreamTimeoutAbort(StreamInfo::ResponseFlag response_flag);
   // Handle an "aborted" upstream request, meaning we didn't see response
   // headers (e.g. due to a reset). Handles recording stats and responding
   // downstream if appropriate.
   void onUpstreamAbort(Http::Code code, StreamInfo::ResponseFlag response_flag,
                        absl::string_view body, bool dropped);
-  void onUpstreamHeaders(uint64_t response_code, Http::HeaderMapPtr&& headers, bool end_stream);
-  void onUpstreamData(Buffer::Instance& data, bool end_stream);
-  void onUpstreamTrailers(Http::HeaderMapPtr&& trailers);
-  void onUpstreamMetadata(Http::MetadataMapPtr&& metadata_map);
-  void onUpstreamComplete();
-  void onUpstreamReset(Http::StreamResetReason reset_reason);
+  void onUpstreamHeaders(uint64_t response_code, Http::HeaderMapPtr&& headers,
+                         UpstreamRequest* upstream_request, bool end_stream);
+  void onUpstreamData(Buffer::Instance& data, UpstreamRequest* upstream_request, bool end_stream);
+  void onUpstreamTrailers(Http::HeaderMapPtr&& trailers, UpstreamRequest* upstream_request);
+  void onUpstreamMetadata(Http::MetadataMapPtr&& metadata_map, UpstreamRequest* upstream_request);
+  void onUpstreamComplete(UpstreamRequest* upstream_request);
+  void onUpstreamReset(Http::StreamResetReason reset_reason, UpstreamRequest* upstream_request);
+  void resetOtherUpstreams(UpstreamRequest* upstream_request);
   void sendNoHealthyUpstreamResponse();
-  bool setupRetry(bool end_stream);
-  bool setupRedirect(const Http::HeaderMap& headers);
-  void updateOutlierDetection(Http::Code code);
+  bool setupRetry();
+  bool setupRedirect(const Http::HeaderMap& headers, UpstreamRequest* upstream_request);
+  void updateOutlierDetection(Http::Code code, UpstreamRequest* upstream_request);
   void doRetry();
   // Called immediately after a non-5xx header is received from upstream, performs stats accounting
   // and handle difference between gRPC and non-gRPC requests.
-  void handleNon5xxResponseHeaders(const Http::HeaderMap& headers, bool end_stream);
+  void handleNon5xxResponseHeaders(const Http::HeaderMap& headers,
+                                   UpstreamRequest* upstream_request, bool end_stream);
   TimeSource& timeSource() { return config_.timeSource(); }
   Http::Context& httpContext() { return config_.http_context_; }
 
@@ -407,8 +435,12 @@ private:
   const VirtualCluster* request_vcluster_;
   Event::TimerPtr response_timeout_;
   FilterUtility::TimeoutData timeout_;
+  FilterUtility::HedgingParams hedging_params_;
   Http::Code timeout_response_code_ = Http::Code::GatewayTimeout;
-  UpstreamRequestPtr upstream_request_;
+  std::vector<UpstreamRequestPtr> upstream_requests_;
+  // Tracks which upstream request "wins" and will have the corresponding
+  // response forwarded downstream
+  UpstreamRequest* final_upstream_request_;
   bool grpc_request_{};
   Http::HeaderMap* downstream_headers_{};
   Http::HeaderMap* downstream_trailers_{};

@@ -209,6 +209,16 @@ public:
     ON_CALL(callbacks_, connection()).WillByDefault(Return(&connection_));
   }
 
+  void enableHedgeOnPerTryTimeout() {
+    callbacks_.route_->route_entry_.hedge_policy_.initial_requests_ = 1;
+    callbacks_.route_->route_entry_.hedge_policy_.hedge_on_per_try_timeout_ = true;
+    callbacks_.route_->route_entry_.hedge_policy_.additional_request_chance_ =
+        envoy::type::FractionalPercent{};
+    callbacks_.route_->route_entry_.hedge_policy_.additional_request_chance_.set_numerator(0);
+    callbacks_.route_->route_entry_.hedge_policy_.additional_request_chance_.set_denominator(
+        envoy::type::FractionalPercent::HUNDRED);
+  }
+
   Event::SimulatedTimeSystem test_time_;
   std::string upstream_zone_{"to_az"};
   envoy::api::v2::core::Locality upstream_locality_;
@@ -1225,6 +1235,168 @@ TEST_F(RouterTest, UpstreamPerTryTimeoutExcludesNewStream) {
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 }
 
+// Tests that a retry is sent after the first request hits the per try timeout, but then
+// headers received in response to the first request are still used (and the 2nd request
+// canceled).
+TEST_F(RouterTest, HedgedPerTryTimeoutFirstRequestSucceeds) {
+  enableHedgeOnPerTryTimeout();
+
+  NiceMock<Http::MockStreamEncoder> encoder1;
+  Http::StreamDecoder* response_decoder1 = nullptr;
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+        response_decoder1 = &decoder;
+        EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
+        callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_);
+        return nullptr;
+      }));
+  expectResponseTimerCreate();
+  expectPerTryTimerCreate();
+
+  Http::TestHeaderMapImpl headers{{"x-envoy-upstream-rq-per-try-timeout-ms", "5"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, true);
+
+  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(504));
+  EXPECT_CALL(encoder1.stream_, resetStream(_)).Times(0);
+
+  NiceMock<Http::MockStreamEncoder> encoder2;
+  Http::StreamDecoder* response_decoder2 = nullptr;
+  router_.retry_state_->expectHedgedPerTryTimeoutRetry();
+  per_try_timeout_->callback_();
+
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+        response_decoder2 = &decoder;
+        EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
+        callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_);
+        return nullptr;
+      }));
+  expectPerTryTimerCreate();
+  router_.retry_state_->callback_();
+
+  // We should not have updated any stats yet because no requests have been
+  // canceled
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
+
+  // Now write a 200 back. We expect the 2nd stream to be reset and stats to be
+  // incremented properly.
+  Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl{{":status", "200"}});
+  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(200));
+  EXPECT_CALL(encoder1.stream_, resetStream(_)).Times(0);
+  EXPECT_CALL(encoder2.stream_, resetStream(_));
+
+  EXPECT_CALL(callbacks_, encodeHeaders_(_, _))
+      .WillOnce(Invoke([&](Http::HeaderMap& headers, bool end_stream) -> void {
+        EXPECT_EQ(headers.Status()->value(), "200");
+        EXPECT_TRUE(end_stream);
+      }));
+  response_decoder1->decodeHeaders(std::move(response_headers), true);
+  EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
+  EXPECT_EQ(1, cm_.conn_pool_.host_->stats_store_.counter("rq_hedge_abandoned").value());
+  EXPECT_EQ(1, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                   .counter("upstream_rq_hedge_abandoned")
+                   .value());
+}
+
+// Three requests sent: 1) 5xx error, 2) per try timeout, 3) gets good response
+// headers.
+TEST_F(RouterTest, HedgedPerTryTimeoutThirdRequestSucceeds) {
+  enableHedgeOnPerTryTimeout();
+
+  NiceMock<Http::MockStreamEncoder> encoder1;
+  Http::StreamDecoder* response_decoder1 = nullptr;
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+        response_decoder1 = &decoder;
+        EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
+        callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_);
+        return nullptr;
+      }));
+  expectResponseTimerCreate();
+  expectPerTryTimerCreate();
+
+  Http::TestHeaderMapImpl headers{{"x-envoy-upstream-rq-per-try-timeout-ms", "5"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, true);
+
+  EXPECT_CALL(encoder1.stream_, resetStream(_)).Times(0);
+
+  Http::HeaderMapPtr response_headers1(new Http::TestHeaderMapImpl{{":status", "500"}});
+  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(500));
+  EXPECT_CALL(encoder1.stream_, resetStream(_)).Times(0);
+  EXPECT_CALL(callbacks_, encodeHeaders_(_, _)).Times(0);
+  router_.retry_state_->expectHeadersRetry();
+  response_decoder1->decodeHeaders(std::move(response_headers1), true);
+
+  NiceMock<Http::MockStreamEncoder> encoder2;
+  Http::StreamDecoder* response_decoder2 = nullptr;
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+        response_decoder2 = &decoder;
+        EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
+        callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_);
+        return nullptr;
+      }));
+  expectPerTryTimerCreate();
+  router_.retry_state_->callback_();
+
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
+  EXPECT_EQ(0, cm_.conn_pool_.host_->stats_store_.counter("rq_hedge_abandoned").value());
+  EXPECT_EQ(0, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                   .counter("upstream_rq_hedge_abandoned")
+                   .value());
+
+  // Now trigger a per try timeout on the 2nd request, expect a 3rd
+  router_.retry_state_->expectHedgedPerTryTimeoutRetry();
+  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(504));
+  NiceMock<Http::MockStreamEncoder> encoder3;
+  Http::StreamDecoder* response_decoder3 = nullptr;
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+        response_decoder3 = &decoder;
+        EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
+        callbacks.onPoolReady(encoder3, cm_.conn_pool_.host_);
+        return nullptr;
+      }));
+
+  EXPECT_CALL(callbacks_, encodeHeaders_(_, _)).Times(0);
+  per_try_timeout_->callback_();
+  expectPerTryTimerCreate();
+  router_.retry_state_->callback_();
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
+  EXPECT_EQ(0, cm_.conn_pool_.host_->stats_store_.counter("rq_hedge_abandoned").value());
+  EXPECT_EQ(0, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                   .counter("upstream_rq_hedge_abandoned")
+                   .value());
+
+  // Now write a 200 back. We expect the 2nd stream to be reset and stats to be
+  // incremented properly.
+  Http::HeaderMapPtr response_headers2(new Http::TestHeaderMapImpl{{":status", "200"}});
+  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(200));
+  EXPECT_CALL(encoder1.stream_, resetStream(_)).Times(0);
+  EXPECT_CALL(encoder2.stream_, resetStream(_));
+  EXPECT_CALL(encoder3.stream_, resetStream(_)).Times(0);
+
+  EXPECT_CALL(callbacks_, encodeHeaders_(_, _))
+      .WillOnce(Invoke([&](Http::HeaderMap& headers, bool end_stream) -> void {
+        EXPECT_EQ(headers.Status()->value(), "200");
+        EXPECT_TRUE(end_stream);
+      }));
+  EXPECT_CALL(*router_.retry_state_, shouldRetryHeaders(_, _)).WillOnce(Return(RetryStatus::No));
+  response_decoder3->decodeHeaders(std::move(response_headers2), true);
+  EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
+  EXPECT_EQ(1, cm_.conn_pool_.host_->stats_store_.counter("rq_hedge_abandoned").value());
+  EXPECT_EQ(1, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                   .counter("upstream_rq_hedge_abandoned")
+                   .value());
+}
+
 TEST_F(RouterTest, RetryRequestNotComplete) {
   NiceMock<Http::MockStreamEncoder> encoder1;
   Http::StreamDecoder* response_decoder = nullptr;
@@ -1250,6 +1422,73 @@ TEST_F(RouterTest, RetryRequestNotComplete) {
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(503));
   encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
+}
+
+// Two requests are sent (slow request + hedged retry) and then global timeout
+// is hit. Verify everything gets cleaned up.
+TEST_F(RouterTest, HedgedPerTryTimeoutGlobalTimeout) {
+  enableHedgeOnPerTryTimeout();
+
+  NiceMock<Http::MockStreamEncoder> encoder1;
+  Http::StreamDecoder* response_decoder1 = nullptr;
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+        response_decoder1 = &decoder;
+        EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
+        callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_);
+        return nullptr;
+      }));
+  expectResponseTimerCreate();
+  expectPerTryTimerCreate();
+
+  Http::TestHeaderMapImpl headers{{"x-envoy-upstream-rq-per-try-timeout-ms", "5"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, true);
+
+  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(504));
+  EXPECT_CALL(encoder1.stream_, resetStream(_)).Times(0);
+  EXPECT_CALL(callbacks_, encodeHeaders_(_, _)).Times(0);
+  router_.retry_state_->expectHedgedPerTryTimeoutRetry();
+  per_try_timeout_->callback_();
+
+  NiceMock<Http::MockStreamEncoder> encoder2;
+  Http::StreamDecoder* response_decoder2 = nullptr;
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+        response_decoder2 = &decoder;
+        EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
+        callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_);
+        return nullptr;
+      }));
+  expectPerTryTimerCreate();
+  router_.retry_state_->callback_();
+
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
+  EXPECT_EQ(0, cm_.conn_pool_.host_->stats_store_.counter("rq_hedge_abandoned").value());
+  EXPECT_EQ(0, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                   .counter("upstream_rq_hedge_abandoned")
+                   .value());
+
+  // Now trigger global timeout, expect everything to be reset
+  EXPECT_CALL(encoder1.stream_, resetStream(_)).Times(1);
+  EXPECT_CALL(encoder2.stream_, resetStream(_)).Times(1);
+  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(504));
+
+  EXPECT_CALL(callbacks_, encodeHeaders_(_, _))
+      .WillOnce(Invoke([&](Http::HeaderMap& headers, bool) -> void {
+        EXPECT_EQ(headers.Status()->value(), "504");
+      }));
+  response_timeout_->callback_();
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 2));
+  EXPECT_EQ(0, cm_.conn_pool_.host_->stats_store_.counter("rq_hedge_abandoned").value());
+  EXPECT_EQ(2, cm_.conn_pool_.host_->stats_store_.counter("rq_timeout").value());
+  EXPECT_EQ(0, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                   .counter("upstream_rq_hedge_abandoned")
+                   .value());
+  EXPECT_EQ(2, cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_timeout")
+                   .value());
 }
 
 TEST_F(RouterTest, RetryNoneHealthy) {
@@ -1338,6 +1577,7 @@ TEST_F(RouterTest, RetryUpstreamPerTryTimeout) {
       .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
                            -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
+        EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
         callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_);
         return nullptr;
       }));
@@ -1350,7 +1590,6 @@ TEST_F(RouterTest, RetryUpstreamPerTryTimeout) {
   HttpTestUtility::addDefaultHeaders(headers);
   router_.decodeHeaders(headers, true);
 
-  EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
   router_.retry_state_->expectResetRetry();
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(504));
   per_try_timeout_->callback_();
@@ -1358,6 +1597,7 @@ TEST_F(RouterTest, RetryUpstreamPerTryTimeout) {
 
   // We expect this reset to kick off a new request.
   NiceMock<Http::MockStreamEncoder> encoder2;
+  EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
                            -> Http::ConnectionPool::Cancellable* {
@@ -1368,7 +1608,6 @@ TEST_F(RouterTest, RetryUpstreamPerTryTimeout) {
   expectPerTryTimerCreate();
   router_.retry_state_->callback_();
 
-  EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
   // Normal response.
   EXPECT_CALL(*router_.retry_state_, shouldRetryHeaders(_, _)).WillOnce(Return(RetryStatus::No));
   Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl{{":status", "200"}});
@@ -1407,12 +1646,11 @@ TEST_F(RouterTest, RetryUpstreamConnectionFailure) {
       .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
                            -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
+        EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
         callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_);
         return nullptr;
       }));
   router_.retry_state_->callback_();
-
-  EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
 
   // Normal response.
   EXPECT_CALL(*router_.retry_state_, shouldRetryHeaders(_, _)).WillOnce(Return(RetryStatus::No));
@@ -2410,6 +2648,38 @@ TEST_F(RouterTest, UpstreamTimingTimeout) {
   EXPECT_EQ(stream_info.firstUpstreamTxByteSent().value(), std::chrono::milliseconds(10));
   EXPECT_EQ(stream_info.lastUpstreamTxByteSent().value(), std::chrono::milliseconds(23));
   EXPECT_EQ(stream_info.firstUpstreamRxByteReceived().value(), std::chrono::milliseconds(56));
+}
+
+TEST(RouterFilterUtilityTest, FinalHedgingParams) {
+  { // no chance of additional request
+    NiceMock<MockRouteEntry> route;
+    route.hedge_policy_.initial_requests_ = 10;
+    EXPECT_CALL(route, hedgePolicy).WillRepeatedly(ReturnRef(route.hedge_policy_));
+    FilterUtility::HedgingParams hedgingParams = FilterUtility::finalHedgingParams(route, 0);
+    EXPECT_EQ(10, hedgingParams.initial_requests_);
+    hedgingParams = FilterUtility::finalHedgingParams(route, 10);
+    EXPECT_EQ(10, hedgingParams.initial_requests_);
+    hedgingParams = FilterUtility::finalHedgingParams(route, 100);
+    EXPECT_EQ(10, hedgingParams.initial_requests_);
+    hedgingParams = FilterUtility::finalHedgingParams(route, 1000);
+    EXPECT_EQ(10, hedgingParams.initial_requests_);
+  }
+  { // 50% chance additional request
+    NiceMock<MockRouteEntry> route;
+    route.hedge_policy_.initial_requests_ = 10;
+    route.hedge_policy_.additional_request_chance_.set_numerator(50);
+    EXPECT_CALL(route, hedgePolicy).WillRepeatedly(ReturnRef(route.hedge_policy_));
+    FilterUtility::HedgingParams hedgingParams = FilterUtility::finalHedgingParams(route, 0);
+    EXPECT_EQ(11, hedgingParams.initial_requests_);
+    hedgingParams = FilterUtility::finalHedgingParams(route, 49);
+    EXPECT_EQ(11, hedgingParams.initial_requests_);
+    hedgingParams = FilterUtility::finalHedgingParams(route, 50);
+    EXPECT_EQ(10, hedgingParams.initial_requests_);
+    hedgingParams = FilterUtility::finalHedgingParams(route, 99);
+    EXPECT_EQ(10, hedgingParams.initial_requests_);
+    hedgingParams = FilterUtility::finalHedgingParams(route, 100);
+    EXPECT_EQ(11, hedgingParams.initial_requests_);
+  }
 }
 
 TEST(RouterFilterUtilityTest, FinalTimeout) {

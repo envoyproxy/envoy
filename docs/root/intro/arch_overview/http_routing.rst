@@ -35,6 +35,7 @@ request. The router filter supports the following features:
 * Request timeout specified either via :ref:`HTTP
   header <config_http_filters_router_headers_consumed>` or via :ref:`route configuration
   <envoy_api_field_route.RouteAction.timeout>`.
+* :ref:`Request hedging <arch_overview_http_routing_hedging>` in response to a request (per try) timeout.
 * Traffic shifting from one upstream cluster to another via :ref:`runtime values
   <envoy_api_field_route.RouteMatch.runtime_fraction>` (see :ref:`traffic shifting/splitting
   <config_http_conn_man_route_table_traffic_splitting>`).
@@ -86,6 +87,16 @@ headers <config_http_filters_router_headers_consumed>`. The following configurat
 
 Note that retries may be disabled depending on the contents of the :ref:`x-envoy-overloaded
 <config_http_filters_router_x-envoy-overloaded_consumed>`.
+
+.. _arch_overview_http_routing_hedging:
+
+Request Hedging
+---------------
+
+Envoy supports request hedging via specifying a :ref:`hedge policy <envoy_api_msg_route.HedgePolicy>`. This means that Envoy
+will race multiple simultaneous upstream requests and return the first valid response to the downstream.
+
+Currently hedging can only be performed in response to a request timeout.
 
 .. _arch_overview_http_routing_priority:
 

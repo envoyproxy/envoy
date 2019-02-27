@@ -40,6 +40,7 @@ public:
                                  DoRetryCallback callback) override;
   RetryStatus shouldRetryReset(const Http::StreamResetReason reset_reason,
                                DoRetryCallback callback) override;
+  RetryStatus shouldHedgeRetryPerTryTimeout(DoRetryCallback callback) override;
 
   void onHostAttempted(Upstream::HostDescriptionConstSharedPtr host) override {
     std::for_each(retry_host_predicates_.begin(), retry_host_predicates_.end(),
