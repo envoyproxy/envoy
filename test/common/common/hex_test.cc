@@ -8,7 +8,6 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-namespace {
 TEST(Hex, SimpleEncode) {
   std::vector<uint8_t> bytes = {0x01, 0x02, 0x03, 0x0a, 0x0b, 0x0c};
   EXPECT_EQ("0102030a0b0c", Hex::encode(bytes));
@@ -35,5 +34,4 @@ TEST(Hex, UIntToHex) {
   EXPECT_EQ("25c6f38dd0600e78", base16_string);
   EXPECT_EQ("0000000000000000", Hex::uint64ToHex(0ULL));
 }
-} // namespace
 } // namespace Envoy

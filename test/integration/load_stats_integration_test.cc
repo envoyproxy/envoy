@@ -13,7 +13,6 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-namespace {
 
 class LoadStatsIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                  public HttpIntegrationTest {
@@ -596,5 +595,4 @@ TEST_P(LoadStatsIntegrationTest, Dropped) {
   cleanupLoadStatsConnection();
 }
 
-} // namespace
 } // namespace Envoy

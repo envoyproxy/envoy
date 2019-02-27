@@ -3,7 +3,6 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-namespace {
 TEST(CleanupTest, ScopeExitCallback) {
   bool callback_fired = false;
   {
@@ -12,5 +11,4 @@ TEST(CleanupTest, ScopeExitCallback) {
   }
   EXPECT_TRUE(callback_fired);
 }
-} // namespace
 } // namespace Envoy

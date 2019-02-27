@@ -3,7 +3,6 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-namespace {
 TEST(Hash, xxHash) {
   EXPECT_EQ(3728699739546630719U, HashUtil::xxHash64("foo"));
   EXPECT_EQ(5234164152756840025U, HashUtil::xxHash64("bar"));
@@ -38,5 +37,4 @@ TEST(Hash, stdhash) {
   EXPECT_EQ(std::hash<std::string>()(std::string("")), MurmurHash::murmurHash2_64(""));
 }
 #endif
-} // namespace
 } // namespace Envoy

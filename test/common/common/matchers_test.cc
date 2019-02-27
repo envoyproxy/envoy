@@ -11,7 +11,6 @@
 
 namespace Envoy {
 namespace Matcher {
-namespace {
 
 TEST(MetadataTest, MatchNullValue) {
   envoy::api::v2::core::Metadata metadata;
@@ -288,7 +287,5 @@ TEST(LowerCaseStringMatcher, MatchRegexValue) {
   EXPECT_TRUE(Envoy::Matchers::LowerCaseStringMatcher(matcher).match("foo.bar"));
   EXPECT_FALSE(Envoy::Matchers::LowerCaseStringMatcher(matcher).match("Foo.Bar"));
 }
-
-} // namespace
 } // namespace Matcher
 } // namespace Envoy

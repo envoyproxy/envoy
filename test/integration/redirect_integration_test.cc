@@ -1,7 +1,6 @@
 #include "test/integration/http_protocol_integration.h"
 
 namespace Envoy {
-namespace {
 class RedirectIntegrationTest : public HttpProtocolIntegrationTest {
 public:
   void initialize() override {
@@ -103,5 +102,4 @@ TEST_P(RedirectIntegrationTest, InvalidRedirect) {
 INSTANTIATE_TEST_SUITE_P(Protocols, RedirectIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
-} // namespace
 } // namespace Envoy

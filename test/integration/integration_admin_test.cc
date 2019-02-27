@@ -15,7 +15,6 @@
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
-namespace {
 INSTANTIATE_TEST_SUITE_P(Protocols, IntegrationAdminTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
                              {Http::CodecClient::Type::HTTP1, Http::CodecClient::Type::HTTP2},
@@ -524,5 +523,4 @@ TEST_P(StatsMatcherIntegrationTest, IncludeExact) {
   makeRequest();
   EXPECT_EQ(response_->body(), "listener_manager.listener_create_success: 1\n");
 }
-} // namespace
 } // namespace Envoy

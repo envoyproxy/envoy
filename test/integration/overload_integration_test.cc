@@ -3,7 +3,6 @@
 #include "absl/strings/str_cat.h"
 
 namespace Envoy {
-namespace {
 class OverloadIntegrationTest : public HttpProtocolIntegrationTest {
 protected:
   OverloadIntegrationTest()
@@ -160,5 +159,4 @@ TEST_P(OverloadIntegrationTest, StopAcceptingConnectionsWhenOverloaded) {
   EXPECT_EQ("envoy overloaded", response->body());
   codec_client_->close();
 }
-} // namespace
 } // namespace Envoy

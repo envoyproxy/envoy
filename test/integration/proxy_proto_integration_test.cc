@@ -10,7 +10,6 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-namespace {
 INSTANTIATE_TEST_SUITE_P(IpVersions, ProxyProtoIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
@@ -117,5 +116,4 @@ TEST_P(ProxyProtoIntegrationTest, OriginalDst) {
 
   testRouterRequestAndResponseWithBody(1024, 512, false, &creator);
 }
-} // namespace
 } // namespace Envoy

@@ -21,7 +21,6 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-namespace {
 
 class HdsIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                            public HttpIntegrationTest {
@@ -687,5 +686,4 @@ TEST_P(HdsIntegrationTest, TestUpdateMessage) {
   cleanupHdsConnection();
 }
 
-} // namespace
 } // namespace Envoy

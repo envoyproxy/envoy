@@ -8,7 +8,6 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-namespace {
 INSTANTIATE_TEST_SUITE_P(
     TestParameters, UdsUpstreamIntegrationTest,
     testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
@@ -104,5 +103,4 @@ TEST_P(UdsListenerIntegrationTest, DISABLED_RouterDownstreamDisconnectBeforeResp
   ConnectionCreationFunction creator = createConnectionFn();
   testRouterDownstreamDisconnectBeforeResponseComplete(&creator);
 }
-} // namespace
 } // namespace Envoy

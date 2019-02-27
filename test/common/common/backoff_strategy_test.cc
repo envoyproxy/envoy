@@ -8,7 +8,6 @@ using testing::NiceMock;
 using testing::Return;
 
 namespace Envoy {
-namespace {
 TEST(BackOffStrategyTest, JitteredBackOffBasicFlow) {
   NiceMock<Runtime::MockRandomGenerator> random;
   ON_CALL(random, random()).WillByDefault(Return(27));
@@ -56,5 +55,4 @@ TEST(BackOffStrategyTest, JitteredBackOffWithMaxIntervalReset) {
   jittered_back_off.reset();
   EXPECT_EQ(4, jittered_back_off.nextBackOffMs()); // Should start from start
 }
-} // namespace
 } // namespace Envoy
