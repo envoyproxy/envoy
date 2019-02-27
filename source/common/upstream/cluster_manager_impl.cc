@@ -688,8 +688,8 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(const Cluster& cluster, ui
   tls_->runOnAllThreads([this, name = cluster.info()->name(), priority, hosts_copy,
                          healthy_hosts_copy, degraded_hosts_copy, hosts_per_locality_copy,
                          healthy_hosts_per_locality_copy, degraded_hosts_per_locality_copy,
-                         locality_weights = host_set->localityWeights(), hosts_added,
-                         hosts_removed, overprovisioning_factor = host_set->overprovisioningFactor()]() {
+                         locality_weights = host_set->localityWeights(), hosts_added, hosts_removed,
+                         overprovisioning_factor = host_set->overprovisioningFactor()]() {
     ThreadLocalClusterManagerImpl::updateClusterMembership(
         name, priority,
         HostSetImpl::updateHostsParams(hosts_copy, hosts_per_locality_copy, healthy_hosts_copy,
