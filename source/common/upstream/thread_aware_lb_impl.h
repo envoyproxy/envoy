@@ -7,6 +7,8 @@
 namespace Envoy {
 namespace Upstream {
 
+typedef std::vector<std::pair<HostConstSharedPtr, double>> NormalizedHostWeightVector;
+
 class ThreadAwareLoadBalancerBase : public LoadBalancerBase, public ThreadAwareLoadBalancer {
 public:
   /**
@@ -77,8 +79,9 @@ private:
     std::shared_ptr<DegradedLoad> degraded_per_priority_load_ GUARDED_BY(mutex_);
   };
 
-  virtual HashingLoadBalancerSharedPtr createLoadBalancer(const HostSet& host_set,
-                                                          bool in_panic) PURE;
+  virtual HashingLoadBalancerSharedPtr
+  createLoadBalancer(const NormalizedHostWeightVector& normalized_host_weights,
+                     double min_normalized_weight, double max_normalized_weight) PURE;
   void refresh();
 
   std::shared_ptr<LoadBalancerFactoryImpl> factory_;
