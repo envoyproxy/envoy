@@ -52,6 +52,7 @@ private:
   if (traced) {
     opts.sampler = &always_sampler;
   }
+  // opts are not used after StartSpan.
   return ::opencensus::trace::Span::StartSpan(name, /*parent=*/nullptr, opts);
 }
 
