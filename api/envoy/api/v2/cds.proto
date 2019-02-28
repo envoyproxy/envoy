@@ -350,6 +350,9 @@ message Cluster {
     message LbSubsetSelector {
       // List of keys to match with the weighted cluster metadata.
       repeated string keys = 1;
+      // The behavior used when no endpoint subset matches the selected route's
+      // metadata.
+      LbSubsetFallbackPolicy fallback_policy = 2 [(validate.rules).enum.defined_only = true];
     }
 
     // For each entry, LbEndpoint.Metadata's

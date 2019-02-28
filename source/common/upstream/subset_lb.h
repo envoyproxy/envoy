@@ -36,6 +36,7 @@ public:
 
 private:
   typedef std::function<bool(const Host&)> HostPredicate;
+  void initSubsetSelectorMap();
 
   // Represents a subset of an original HostSet.
   class HostSubsetImpl : public HostSetImpl {
@@ -115,6 +116,11 @@ private:
   typedef std::unordered_map<HashedValue, LbSubsetEntryPtr> ValueSubsetMap;
   typedef std::unordered_map<std::string, ValueSubsetMap> LbSubsetMap;
 
+  struct SubsetSelectorMap {
+    std::unordered_map<std::string, SubsetSelectorMap> subset_keys;
+    absl::optional<envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy> fallback_policy;
+  };
+
   // Entry in the subset hierarchy.
   class LbSubsetEntry {
   public:
@@ -144,6 +150,8 @@ private:
       std::function<void(LbSubsetEntryPtr, HostPredicate, const SubsetMetadata&, bool)> cb);
 
   HostConstSharedPtr tryChooseHostFromContext(LoadBalancerContext* context, bool& host_chosen);
+  absl::optional<envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy>
+  tryFindSelectorFallbackPolicy();
 
   bool hostMatches(const SubsetMetadata& kvs, const Host& host);
 
@@ -178,6 +186,9 @@ private:
 
   // Forms a trie-like structure. Requires lexically sorted Host and Route metadata.
   LbSubsetMap subsets_;
+  // Forms a trie-like structure of lexically sorted keys+optional fallback policy from subset
+  // selectors configuration
+  SubsetSelectorMap selectors_;
 
   const bool locality_weight_aware_;
   const bool scale_locality_weight_;

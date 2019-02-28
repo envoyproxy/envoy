@@ -38,6 +38,9 @@ SubsetLoadBalancer::SubsetLoadBalancer(
   // Create filtered default subset (if necessary) and other subsets based on current hosts.
   refreshSubsets();
 
+  // Init subset keys map
+  initSubsetSelectorMap();
+
   // Configure future updates.
   original_priority_set_callback_handle_ = priority_set.addPriorityUpdateCb(
       [this](uint32_t priority, const HostVector& hosts_added, const HostVector& hosts_removed) {
@@ -82,6 +85,28 @@ void SubsetLoadBalancer::refreshSubsets(uint32_t priority) {
   update(priority, host_sets[priority]->hosts(), {});
 }
 
+void SubsetLoadBalancer::initSubsetSelectorMap() {
+  SubsetSelectorMap* selectors = &selectors_;
+  for (const auto& selector_keys : subset_keys_) {
+    unsigned long pos = 0;
+    for (const auto& key : selector_keys) {
+      const auto& selector_it = selectors->subset_keys.find(key);
+      if (selector_it == selectors->subset_keys.end()) {
+        // if this is last key for given selector, check if it has fallback specified
+        if (++pos == selector_keys.size()) {
+          // to be implemented
+          selectors->fallback_policy = absl::nullopt;
+        }
+        selectors->subset_keys.emplace(std::make_pair(key, SubsetSelectorMap()));
+        selectors = &selectors->subset_keys.find(key)->second;
+      } else {
+        selectors = &selector_it->second;
+      };
+    }
+    selectors = &selectors_;
+  }
+}
+
 HostConstSharedPtr SubsetLoadBalancer::chooseHost(LoadBalancerContext* context) {
   if (context) {
     bool host_chosen;
@@ -92,12 +117,25 @@ HostConstSharedPtr SubsetLoadBalancer::chooseHost(LoadBalancerContext* context) 
     }
   }
 
+  absl::optional<envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy>
+      selector_fallback_policy = tryFindSelectorFallbackPolicy();
+  // check if there is fallback policy configured for given route metadata
+  if (selector_fallback_policy) {
+    // return result according to configured fallback policy
+  }
+
   if (fallback_subset_ == nullptr) {
     return nullptr;
   }
 
   stats_.lb_subsets_fallback_.inc();
   return fallback_subset_->priority_subset_->lb_->chooseHost(context);
+}
+
+absl::optional<envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy>
+SubsetLoadBalancer::tryFindSelectorFallbackPolicy() {
+  // to be implemented
+  return absl::nullopt;
 }
 
 // Find a host from the subsets. Sets host_chosen to false and returns nullptr if the context has
