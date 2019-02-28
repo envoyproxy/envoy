@@ -5,6 +5,7 @@
 #include "gtest/gtest.h"
 #include "quiche/quic/platform/api/quic_aligned.h"
 #include "quiche/quic/platform/api/quic_arraysize.h"
+#include "quiche/quic/platform/api/quic_bug_tracker.h"
 #include "quiche/quic/platform/api/quic_cert_utils.h"
 #include "quiche/quic/platform/api/quic_client_stats.h"
 #include "quiche/quic/platform/api/quic_containers.h"
@@ -44,6 +45,14 @@ TEST(QuicPlatformTest, QuicArraysize) {
 }
 
 enum class TestEnum { ZERO = 0, ONE, TWO, COUNT };
+
+TEST(QuicPlatformTest, QuicBugTracker) {
+  // Just make sure they compile.
+  QUIC_BUG << "Here is a bug";
+  QUIC_BUG_IF(true) << "There is a bug";
+  QUIC_PEER_BUG << "A bug from peer";
+  QUIC_PEER_BUG_IF(true) << "Another bug from peer";
+}
 
 TEST(QuicPlatformTest, QuicClientStats) {
   // Just make sure they compile.

@@ -107,7 +107,9 @@ envoy_cc_library(
         "quic_str_cat_impl.h",
         "quic_string_utils_impl.h",
         "quic_text_utils_impl.h",
-    ],
+    ] + envoy_select_quiche([
+        "quic_bug_tracker_impl.h",
+    ]),
     external_deps = [
         "quiche_quic_platform_base",
         "abseil_str_format",
