@@ -41,7 +41,6 @@ using testing::Return;
 
 namespace Envoy {
 namespace Http {
-namespace {
 class FuzzConfig : public ConnectionManagerConfig {
 public:
   struct RouteConfigProvider : public Router::RouteConfigProvider {
@@ -438,6 +437,5 @@ DEFINE_PROTO_FUZZER(const test::common::http::ConnManagerImplTestCase& input) {
 
   filter_callbacks.connection_.dispatcher_.clearDeferredDeleteList();
 }
-} // namespace
 } // namespace Http
 } // namespace Envoy

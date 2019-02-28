@@ -31,7 +31,6 @@ using testing::InvokeWithoutArgs;
 
 namespace Envoy {
 namespace Http {
-namespace {
 // Force drain on each action, useful for figuring out what is going on when
 // debugging.
 constexpr bool DebugMode = false;
@@ -517,6 +516,5 @@ DEFINE_PROTO_FUZZER(const test::common::http::CodecImplFuzzTestCase& input) {
   codecFuzz(input, HttpVersion::Http1);
   codecFuzz(input, HttpVersion::Http2);
 }
-} // namespace
 } // namespace Http
 } // namespace Envoy

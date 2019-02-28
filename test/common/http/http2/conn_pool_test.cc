@@ -32,7 +32,6 @@ using testing::SaveArg;
 namespace Envoy {
 namespace Http {
 namespace Http2 {
-namespace {
 class TestConnPoolImpl : public ConnPoolImpl {
 public:
   using ConnPoolImpl::ConnPoolImpl;
@@ -726,7 +725,6 @@ TEST_F(Http2ConnPoolImplTest, DrainedConnectionsNotActive) {
 
   closeClient(0);
 }
-} // namespace
 } // namespace Http2
 } // namespace Http
 } // namespace Envoy

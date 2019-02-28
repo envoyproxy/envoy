@@ -7,7 +7,6 @@ using testing::_;
 
 namespace Envoy {
 namespace Http {
-namespace {
 class MockStreamEncoderWrapper : public StreamEncoderWrapper {
 public:
   MockStreamEncoderWrapper() : StreamEncoderWrapper(inner_encoder_) {}
@@ -72,6 +71,5 @@ TEST(StreamEncoderWrapper, 100ContinueHeaderEncode) {
   wrapper.encodeHeaders(TestHeaderMapImpl{{":status", "200"}}, true);
   EXPECT_TRUE(wrapper.encodeComplete());
 }
-} // namespace
 } // namespace Http
 } // namespace Envoy

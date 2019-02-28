@@ -30,7 +30,6 @@ using testing::Return;
 namespace Envoy {
 namespace Http {
 namespace Http2 {
-namespace {
 using Http2SettingsTuple = ::testing::tuple<uint32_t, uint32_t, uint32_t, uint32_t>;
 using Http2SettingsTestParam = ::testing::tuple<Http2SettingsTuple, Http2SettingsTuple>;
 
@@ -940,7 +939,6 @@ TEST_P(Http2CodecImplTest, TestCodecHeaderCompression) {
     EXPECT_EQ(0, nghttp2_session_get_hd_deflate_dynamic_table_size(server_->session()));
   }
 }
-} // namespace
 } // namespace Http2
 } // namespace Http
 } // namespace Envoy

@@ -8,7 +8,6 @@
 #include "test/fuzz/fuzz_runner.h"
 
 namespace Envoy {
-namespace {
 // Fuzz the header map implementation.
 DEFINE_PROTO_FUZZER(const test::common::http::HeaderMapImplFuzzTestCase& input) {
   Http::HeaderMapImplPtr header_map = std::make_unique<Http::HeaderMapImpl>();
@@ -166,5 +165,4 @@ DEFINE_PROTO_FUZZER(const test::common::http::HeaderMapImplFuzzTestCase& input) 
         nullptr);
   }
 }
-} // namespace
 } // namespace Envoy
