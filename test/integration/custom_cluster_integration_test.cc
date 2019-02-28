@@ -6,14 +6,13 @@
 #include "test/config/utility.h"
 #include "test/integration/http_integration.h"
 #include "test/proto/cluster_factory_config.pb.h"
-#include "test/test_common/network_utility.h"
 #include "test/test_common/test_base.h"
 
 namespace Envoy {
 namespace {
 
 const int UpstreamIndex = 0;
-static const std::string CUSTOM_CLUSTER_CONFIG = R"EOF(
+const std::string CUSTOM_CLUSTER_CONFIG = R"EOF(
 admin:
   access_log_path: /dev/null
   address:
@@ -56,7 +55,7 @@ static_resources:
             name: route_config_0
 )EOF";
 
-// Integration test for cluster extensibility using CustomStaticCluster.
+// Integration test for cluster extension using CustomStaticCluster.
 class CustomClusterIntegrationTest : public TestBaseWithParam<Network::Address::IpVersion>,
                                      public HttpIntegrationTest {
 public:
