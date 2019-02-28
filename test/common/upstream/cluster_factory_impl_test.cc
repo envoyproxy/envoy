@@ -50,7 +50,7 @@ private:
   // ClusterImplBase
   void startPreInit() override {
     HostVectorSharedPtr hosts(new HostVector(
-        {makeTestHost(this->info(), fmt::v5::format("tcp://{}:{}", "127.0.0.1", 80))}));
+        {makeTestHost(this->info(), "tcp://127.0.0.1:80")}));
     HostsPerLocalitySharedPtr hosts_per_locality = std::make_shared<HostsPerLocalityImpl>();
     HostVector hosts_added{hosts->front()};
     HostVector hosts_removed{};
