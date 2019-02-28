@@ -2227,6 +2227,8 @@ TEST_F(RouterTest, DirectResponseWithBody) {
   EXPECT_EQ(1UL, config_.stats_.rq_direct_response_.value());
 }
 
+// Verify that upstream timing information is set into the StreamInfo after the upstream
+// request completes.
 TEST_F(RouterTest, UpstreamTimingSingleRequest) {
   NiceMock<Http::MockStreamEncoder> encoder;
   Http::StreamDecoder* response_decoder = nullptr;
@@ -2259,7 +2261,7 @@ TEST_F(RouterTest, UpstreamTimingSingleRequest) {
   test_time_.sleep(std::chrono::milliseconds(43));
 
   // Confirm we still have no upstream timing data. It won't be set until after the
-  // stream had ended.
+  // stream has ended.
   EXPECT_FALSE(stream_info.firstUpstreamTxByteSent().has_value());
   EXPECT_FALSE(stream_info.lastUpstreamTxByteSent().has_value());
   EXPECT_FALSE(stream_info.firstUpstreamRxByteReceived().has_value());
@@ -2282,6 +2284,8 @@ TEST_F(RouterTest, UpstreamTimingSingleRequest) {
             std::chrono::milliseconds(32));
 }
 
+// Verify that upstream timing information is set into the StreamInfo when a
+// retry occurs (and not before).
 TEST_F(RouterTest, UpstreamTimingRetry) {
   NiceMock<Http::MockStreamEncoder> encoder;
   Http::StreamDecoder* response_decoder = nullptr;
@@ -2297,7 +2301,7 @@ TEST_F(RouterTest, UpstreamTimingRetry) {
   StreamInfo::StreamInfoImpl stream_info(test_time_);
   ON_CALL(callbacks_, streamInfo()).WillByDefault(ReturnRef(stream_info));
 
-  // Check that upstream timing is updated after first request.
+  // Check that upstream timing is updated after the first request.
   Http::TestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}};
   HttpTestUtility::addDefaultHeaders(headers);
   router_.decodeHeaders(headers, false);
@@ -2360,6 +2364,8 @@ TEST_F(RouterTest, UpstreamTimingRetry) {
             retry_time.time_since_epoch());
 }
 
+// Verify that upstream timing information is set into the StreamInfo when a
+// global timeout occurs.
 TEST_F(RouterTest, UpstreamTimingTimeout) {
   NiceMock<Http::MockStreamEncoder> encoder;
   Http::StreamDecoder* response_decoder = nullptr;
@@ -2377,7 +2383,7 @@ TEST_F(RouterTest, UpstreamTimingTimeout) {
   expectResponseTimerCreate();
   test_time_.sleep(std::chrono::milliseconds(10));
 
-  // Check that upstream timing is updated after first request.
+  // Check that upstream timing is updated after the first request.
   Http::TestHeaderMapImpl headers{{"x-envoy-upstream-rq-timeout-ms", "50"}};
   HttpTestUtility::addDefaultHeaders(headers);
   router_.decodeHeaders(headers, false);
