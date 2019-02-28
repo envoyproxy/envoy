@@ -413,13 +413,14 @@ TEST_F(ProtobufUtilityTest, GetBlockYamlStringFromRecursiveMessage) {
   bootstrap.mutable_node();
   bootstrap.mutable_static_resources()->add_listeners()->set_name("http");
 
-  const std::string expected_yaml = R"EOF(node:
+  const std::string expected_yaml = R"EOF(
+node:
   {}
 static_resources:
   listeners:
     - name: http
 flags_path: foo)EOF";
-  EXPECT_EQ(expected_yaml, MessageUtil::getYamlStringFromMessage(bootstrap, true, false));
+  EXPECT_EQ(expected_yaml, "\n" + MessageUtil::getYamlStringFromMessage(bootstrap, true, false));
 }
 
 TEST(DurationUtilTest, OutOfRange) {

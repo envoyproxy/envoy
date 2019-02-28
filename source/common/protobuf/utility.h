@@ -288,8 +288,8 @@ public:
    * @return std::string of formatted YAML object.
    */
   static std::string getYamlStringFromMessage(const Protobuf::Message& message,
-                                              const bool block_print,
-                                              const bool always_print_primitive_fields);
+                                              const bool block_print = true,
+                                              const bool always_print_primitive_fields = false);
 
   /**
    * Extract JSON as string from a google.protobuf.Message.
