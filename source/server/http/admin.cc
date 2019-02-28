@@ -516,6 +516,11 @@ Http::Code AdminImpl::handlerCpuProfiler(absl::string_view url, Http::HeaderMap&
 
 Http::Code AdminImpl::handlerHeapProfiler(absl::string_view url, Http::HeaderMap&,
                                           Buffer::Instance& response, AdminStream&) {
+  if (!Profiler::Heap::profilerEnabled()) {
+    response.add("The current build does not support heap profiler");
+    return Http::Code::InternalServerError;
+  }
+
   Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
   if (query_params.size() != 1 || query_params.begin()->first != "enable" ||
       (query_params.begin()->second != "y" && query_params.begin()->second != "n")) {
@@ -524,17 +529,28 @@ Http::Code AdminImpl::handlerHeapProfiler(absl::string_view url, Http::HeaderMap
   }
 
   bool enable = query_params.begin()->second == "y";
-  if (enable && !Profiler::Heap::profilerEnabled()) {
-    if (!Profiler::Heap::startProfiler(profile_path_)) {
-      response.add("failure to start the heap profiler");
-      return Http::Code::InternalServerError;
+  if (enable) {
+    if (Profiler::Heap::isProfilerStarted()) {
+      response.add("Fail to start heap profiler: already started");
+      return Http::Code::BadRequest;
     }
-  } else if (!enable && Profiler::Heap::profilerEnabled()) {
-    Profiler::Heap::stopProfiler();
+    if (!Profiler::Heap::startProfiler(profile_path_)) {
+      response.add("Fail to start the heap profiler");
+      return Http::Code::InternalServerError;
+    } else {
+      response.add("Starting heap profiler");
+      return Http::Code::OK;
+    }
+  } else {
+    // !enable
+    if (!Profiler::Heap::isProfilerStarted()) {
+      response.add("Fail to stop heap profiler: not started");
+      return Http::Code::BadRequest;
+    } else {
+      Profiler::Heap::stopProfiler();
+      return Http::Code::OK;
+    }
   }
-
-  response.add("OK\n");
-  return Http::Code::OK;
 }
 
 Http::Code AdminImpl::handlerHealthcheckFail(absl::string_view, Http::HeaderMap&,

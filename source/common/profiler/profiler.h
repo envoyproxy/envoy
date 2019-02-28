@@ -40,9 +40,14 @@ public:
 class Heap {
 public:
   /**
-   * @return whether the profiler is enabled or not.
+   * @return whether the profiler is enabled in this build or not.
    */
   static bool profilerEnabled();
+
+  /**
+   * @return whether the profiler is started or not
+   */
+  static bool isProfilerStarted();
 
   /**
    * Start the profiler and write to the specified path.

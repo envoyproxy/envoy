@@ -19,14 +19,12 @@ bool Cpu::startProfiler(const std::string& output_path) {
 void Cpu::stopProfiler() { ProfilerStop(); }
 
 bool Heap::profilerEnabled() {
-  // check tcmalloc
-  return IsHeapProfilerRunning();
+  // determined by PROFILER_AVAILABLE
+  return true;
 }
 
+bool Heap::isProfilerStarted() { return IsHeapProfilerRunning(); }
 bool Heap::startProfiler(const std::string& output_file_name_prefix) {
-  if (IsHeapProfilerRunning()) {
-    return false;
-  }
   HeapProfilerStart(output_file_name_prefix.c_str());
   return true;
 }
@@ -60,6 +58,7 @@ bool Cpu::startProfiler(const std::string&) { return false; }
 void Cpu::stopProfiler() {}
 
 bool Heap::profilerEnabled() { return false; }
+bool Heap::isProfilerStarted() { return false; }
 bool Heap::startProfiler(const std::string&) { return false; }
 bool Heap::stopProfiler() { return false; }
 } // namespace Profiler

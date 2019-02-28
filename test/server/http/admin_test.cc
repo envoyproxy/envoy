@@ -654,9 +654,32 @@ TEST_P(AdminInstanceTest, AdminCpuProfiler) {
   EXPECT_FALSE(Profiler::Cpu::profilerEnabled());
 }
 
+TEST_P(AdminInstanceTest, AdminHeapProfilerOnRepeatedRequest) {
+  Buffer::OwnedImpl data;
+  Http::HeaderMapImpl header_map;
+  bool eventually_stopped = false;
+  postCallback("/heapprofiler?enable=y", header_map, data);
+  postCallback("/heapprofiler?enable=y", header_map, data);
+  // eventually stopped after operator|| to avoid cut short
+  eventually_stopped =
+      (Http::Code::OK == postCallback("/heapprofiler?enable=n", header_map, data)) ||
+      eventually_stopped;
+  eventually_stopped =
+      (Http::Code::OK == postCallback("/heapprofiler?enable=n", header_map, data)) ||
+      eventually_stopped;
+
+  ASSERT_TRUE("Not crash on repeated request");
+#ifdef PROFILER_AVAILABLE
+  ASSERT_TRUE(eventually_stopped) << "Heap profiler failed to stop";
+#endif
+}
+
 TEST_P(AdminInstanceTest, AdminHeapProfiler) {
   Buffer::OwnedImpl data;
   Http::HeaderMapImpl header_map;
+
+  // The below flow need to begin with the profiler not running
+  Profiler::Heap::stopProfiler();
 
 #ifdef PROFILER_AVAILABLE
   EXPECT_EQ(Http::Code::OK, postCallback("/heapprofiler?enable=y", header_map, data));
@@ -668,7 +691,7 @@ TEST_P(AdminInstanceTest, AdminHeapProfiler) {
 #endif
 
   EXPECT_EQ(Http::Code::OK, postCallback("/heapprofiler?enable=n", header_map, data));
-  EXPECT_FALSE(Profiler::Heap::profilerEnabled());
+  EXPECT_FALSE(Profiler::Heap::isProfilerStarted());
 }
 
 TEST_P(AdminInstanceTest, MutatesErrorWithGet) {
