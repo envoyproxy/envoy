@@ -188,16 +188,13 @@ TEST_P(ClusterMemoryUtilization, MemoryLargeClusterSizeWithStats) {
   const size_t m1001 = memoryConsumedWithClusters(1001, true);
   EXPECT_LT(start_mem, m1001);
   size_t m_per_cluster = (m1001 - m1) / 1000;
-  // Make sure we don't regress. Data as of 2019/02/27:
-  //
-  // libstdc++:
-  // ----------
-  // m_per_cluster: 56119
-  //
-  // libc++:
-  // -------
-  // m_per_cluster: 52249
-  EXPECT_LT(m_per_cluster, 58000);
+  // As of 2019/02/27, m_per_cluster = 52249 (libc++).
+  #ifdef _LIBCPP_VERSION
+  EXPECT_LT(m_per_cluster, 53000);
+  #else
+  // As of 2019/02/27, m_per_cluster = 56119 (libstdc++).
+  EXPECT_LT(m_per_cluster, 57000);
+  #endif
 }
 
 } // namespace
