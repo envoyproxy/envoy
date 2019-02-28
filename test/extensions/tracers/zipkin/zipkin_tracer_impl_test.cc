@@ -451,6 +451,24 @@ TEST_F(ZipkinDriverTest, ZipkinSpanTest) {
   EXPECT_EQ(1ULL, zipkin_zipkin_span3.binaryAnnotations().size());
   EXPECT_EQ("key3", zipkin_zipkin_span3.binaryAnnotations()[0].key());
   EXPECT_EQ("value3", zipkin_zipkin_span3.binaryAnnotations()[0].value());
+
+  // ====
+  // Test effective log()
+  // ====
+
+  Tracing::SpanPtr span4 = driver_->startSpan(config_, request_headers_, operation_name_,
+                                              start_time_, {Tracing::Reason::Sampling, true});
+  const auto timestamp =
+      SystemTime{std::chrono::duration_cast<SystemTime::duration>(std::chrono::hours{123})};
+  const auto timestamp_count =
+      std::chrono::duration_cast<std::chrono::microseconds>(timestamp.time_since_epoch()).count();
+  span4->log(timestamp, "abc");
+
+  ZipkinSpanPtr zipkin_span4(dynamic_cast<ZipkinSpan*>(span4.release()));
+  Span& zipkin_zipkin_span4 = zipkin_span4->span();
+  EXPECT_FALSE(zipkin_zipkin_span4.annotations().empty());
+  EXPECT_EQ(timestamp_count, zipkin_zipkin_span4.annotations().back().timestamp());
+  EXPECT_EQ("abc", zipkin_zipkin_span4.annotations().back().value());
 }
 
 TEST_F(ZipkinDriverTest, ZipkinSpanContextFromB3HeadersTest) {
