@@ -6,7 +6,6 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-namespace {
 TEST(UUIDUtilsTest, mod) {
   uint64_t result;
   EXPECT_TRUE(UuidUtils::uuidModBy("00000000-0000-0000-0000-000000000000", result, 100));
@@ -92,5 +91,4 @@ TEST(UUIDUtilsTest, setAndCheckTraceable) {
   std::string invalid_uuid = "";
   EXPECT_FALSE(UuidUtils::setTraceableUuid(invalid_uuid, UuidTraceStatus::Forced));
 }
-} // namespace
 } // namespace Envoy

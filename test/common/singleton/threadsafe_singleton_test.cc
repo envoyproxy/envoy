@@ -11,7 +11,6 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-namespace {
 class TestSingleton {
 public:
   virtual ~TestSingleton() {}
@@ -93,5 +92,4 @@ TEST(ThreadSafeSingleton, Injection) {
   }
   EXPECT_EQ(latched_value, ThreadSafeSingleton<TestSingleton>::get().value());
 }
-} // namespace
 } // namespace Envoy

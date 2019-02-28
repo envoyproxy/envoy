@@ -8,7 +8,6 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-namespace {
 #if defined(__has_feature)
 #if __has_feature(address_sanitizer)
 #define ASANITIZED /* Sanitized by Clang */
@@ -124,5 +123,4 @@ TEST(Signals, HandlerTest) {
   fake_si.si_addr = nullptr;
   SignalAction::sigHandler(SIGURG, &fake_si, nullptr);
 }
-} // namespace
 } // namespace Envoy

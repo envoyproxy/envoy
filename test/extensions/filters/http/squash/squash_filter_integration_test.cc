@@ -15,7 +15,6 @@
 using Envoy::Protobuf::util::MessageDifferencer;
 
 namespace Envoy {
-namespace {
 class SquashFilterIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                     public HttpIntegrationTest {
 public:
@@ -219,5 +218,4 @@ TEST_P(SquashFilterIntegrationTest, BadGetResponse) {
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 }
-} // namespace
 } // namespace Envoy

@@ -25,7 +25,6 @@ using testing::HasSubstr;
 using testing::IsEmpty;
 
 namespace Envoy {
-namespace {
 /**
  * Captures common functions needed for invoking MainCommon. Generates a
  * unique --base-id setting based on the pid and a random number. Maintains
@@ -383,5 +382,4 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, AdminRequestTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-} // namespace
 } // namespace Envoy
