@@ -323,10 +323,11 @@ uint32_t bufferAction(Context& ctxt, char insert_value, uint32_t max_alloc, Buff
     do {
       const bool empty = target_buffer.length() == 0;
       const std::string previous_data = target_buffer.toString();
-      const auto result = target_buffer.write(pipe_fds[1]);
+      const auto result = target_buffer.write(io_handle);
       FUZZ_ASSERT(result.err_ == nullptr);
       rc = result.rc_;
-      ENVOY_LOG_MISC(trace, "Write rc: {} errno: {}", rc, ::strerror(result.err_),
+      ENVOY_LOG_MISC(trace, "Write rc: {} errno: {}", rc,
+                     Network::IoError::getErrorDetails(*result.err_));
       if (empty) {
         FUZZ_ASSERT(rc == 0);
       } else {
