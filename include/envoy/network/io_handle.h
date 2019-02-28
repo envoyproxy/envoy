@@ -6,12 +6,6 @@
 
 namespace Envoy {
 
-// IoErrorCode::Again is used frequently. Define it to be a distinguishable address to avoid
-// frequent memory allocation of IoError instance.
-// If this is used, IoHandleCallResult has to be instantiated with a deleter that does not
-// deallocate memory for this error.
-#define ENVOY_ERROR_AGAIN reinterpret_cast<Network::IoError*>(alignof(Network::IoError))
-
 namespace Buffer {
 struct RawSlice;
 } // namespace Buffer
@@ -45,25 +39,8 @@ public:
   };
   virtual ~IoError() {}
 
-  // Map platform specific error into IoErrorCode.
-  // Needed to hide errorCode() in case of ENVOY_ERROR_AGAIN.
-  static IoErrorCode getErrorCode(const IoError& err) {
-    if (&err == ENVOY_ERROR_AGAIN) {
-      return IoErrorCode::Again;
-    }
-    return err.errorCode();
-  }
-
-  static std::string getErrorDetails(const IoError& err) {
-    if (&err == ENVOY_ERROR_AGAIN) {
-      return "Try again later";
-    }
-    return err.errorDetails();
-  }
-
-protected:
-  virtual IoErrorCode errorCode() const PURE;
-  virtual std::string errorDetails() const PURE;
+  virtual IoErrorCode getErrorCode() const PURE;
+  virtual std::string getErrorDetails() const PURE;
 };
 
 using IoErrorDeleterType = void (*)(IoError*);

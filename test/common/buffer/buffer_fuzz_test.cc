@@ -327,7 +327,7 @@ uint32_t bufferAction(Context& ctxt, char insert_value, uint32_t max_alloc, Buff
       FUZZ_ASSERT(result.err_ == nullptr);
       rc = result.rc_;
       ENVOY_LOG_MISC(trace, "Write rc: {} errno: {}", rc,
-                     Network::IoError::getErrorDetails(*result.err_));
+                     result.err_->getErrorDetails());
       if (empty) {
         FUZZ_ASSERT(rc == 0);
       } else {

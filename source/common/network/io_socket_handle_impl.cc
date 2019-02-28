@@ -7,8 +7,8 @@
 #include "envoy/buffer/buffer.h"
 
 #include "common/api/os_sys_calls_impl.h"
-#include "common/common/assert.h"
 #include "common/common/stack_array.h"
+#include "common/network/io_socket_error_impl.h"
 
 using Envoy::Api::SysCallIntResult;
 using Envoy::Api::SysCallSizeResult;
@@ -16,40 +16,9 @@ using Envoy::Api::SysCallSizeResult;
 namespace Envoy {
 namespace Network {
 
-IoError::IoErrorCode IoSocketError::errorCode() const {
-  std::cerr << "errno = " << errno_ << "\n";
-  switch (errno_) {
-  case EAGAIN:
-    // EAGAIN should use specific error ENVOY_ERROR_AGAIN.
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  case EBADF:
-    return IoErrorCode::BadHandle;
-  case ENOTSUP:
-    return IoErrorCode::NoSupport;
-  case EAFNOSUPPORT:
-    return IoErrorCode::AddressFamilyNoSupport;
-  case EINPROGRESS:
-    return IoErrorCode::InProgress;
-  case EPERM:
-    return IoErrorCode::Permission;
-  default:
-    return IoErrorCode::UnknownError;
-  }
-}
-
-std::string IoSocketError::errorDetails() const { return ::strerror(errno_); }
-
 IoSocketHandleImpl::~IoSocketHandleImpl() {
   if (fd_ != -1) {
     IoSocketHandleImpl::close();
-  }
-}
-
-// Deallocate memory only if the error is not ENVOY_ERROR_AGAIN.
-void deleteIoError(IoError* err) {
-  ASSERT(err != nullptr);
-  if (err != ENVOY_ERROR_AGAIN) {
-    delete err;
   }
 }
 
@@ -109,7 +78,7 @@ IoSocketHandleImpl::sysCallResultToIoHandleCallResult(const Api::SysCallSizeResu
   return IoHandleCallUintResult(
       /*rc=*/0, (result.errno_ == EAGAIN
                      // EAGAIN is frequent enough that its memory allocation should be avoided.
-                     ? IoErrorPtr(ENVOY_ERROR_AGAIN, deleteIoError)
+                     ? IoErrorPtr(getIoSocketEagainInstance(), deleteIoError)
                      : IoErrorPtr(new IoSocketError(result.errno_), deleteIoError)));
 }
 

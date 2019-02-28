@@ -34,8 +34,8 @@ IoResult RawBufferSocket::doRead(Buffer::Instance& buffer) {
     } else {
       // Remote error (might be no data).
       ENVOY_CONN_LOG(trace, "read error: {}", callbacks_->connection(),
-                     Network::IoError::getErrorDetails(*result.err_));
-      if (Network::IoError::getErrorCode(*result.err_) != Network::IoError::IoErrorCode::Again) {
+                     result.err_->getErrorDetails());
+      if (result.err_->getErrorCode() != Network::IoError::IoErrorCode::Again) {
         action = PostIoAction::Close;
       }
       break;
@@ -67,8 +67,8 @@ IoResult RawBufferSocket::doWrite(Buffer::Instance& buffer, bool end_stream) {
       bytes_written += result.rc_;
     } else {
       ENVOY_CONN_LOG(trace, "write error: {}", callbacks_->connection(),
-                     Network::IoError::getErrorDetails(*result.err_));
-      if (Network::IoError::getErrorCode(*result.err_) == Network::IoError::IoErrorCode::Again) {
+                     result.err_->getErrorDetails() );
+      if (result.err_->getErrorCode() == Network::IoError::IoErrorCode::Again) {
         action = PostIoAction::KeepOpen;
       } else {
         action = PostIoAction::Close;

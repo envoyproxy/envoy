@@ -6,20 +6,6 @@
 namespace Envoy {
 namespace Network {
 
-class IoSocketError : public IoError {
-public:
-  explicit IoSocketError(int sys_errno) : errno_(sys_errno) {}
-
-  ~IoSocketError() override {}
-
-private:
-  IoErrorCode errorCode() const override;
-
-  std::string errorDetails() const override;
-
-  int errno_;
-};
-
 /**
  * IoHandle derivative for sockets
  */

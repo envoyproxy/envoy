@@ -4,6 +4,7 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/buffer/watermark_buffer.h"
+#include "common/network/io_socket_error_impl.h"
 
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
@@ -42,7 +43,7 @@ public:
   // A convenience function to invoke on write() which fails the write with EAGAIN.
   Network::IoHandleCallUintResult failWrite(Network::IoHandle&) {
     return Network::IoHandleCallUintResult(
-        /*rc=*/0, Network::IoErrorPtr(ENVOY_ERROR_AGAIN, [](Network::IoError*) {}));
+        /*rc=*/0, Network::IoErrorPtr(Network::getIoSocketEagainInstance(), [](Network::IoError*) {}));
   }
 
   int bytes_written() const { return bytes_written_; }
