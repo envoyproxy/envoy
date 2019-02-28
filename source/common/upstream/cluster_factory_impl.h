@@ -130,12 +130,12 @@ public:
                                                   ClusterFactoryContext& context);
 
   // Upstream::ClusterFactory
-  virtual ClusterSharedPtr create(const envoy::api::v2::Cluster& cluster,
-                                  ClusterFactoryContext& context) override;
+  ClusterSharedPtr create(const envoy::api::v2::Cluster& cluster,
+                          ClusterFactoryContext& context) override;
   std::string name() override { return name_; }
 
 protected:
-  ClusterFactoryImplBase(const std::string name) : name_(name) {}
+  ClusterFactoryImplBase(const std::string& name) : name_(name) {}
 
 private:
   /**

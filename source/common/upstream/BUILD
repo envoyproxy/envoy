@@ -431,6 +431,7 @@ envoy_cc_library(
         ":load_balancer_lib",
         ":outlier_detection_lib",
         ":resource_manager_lib",
+        ":upstream_includes",
         "//include/envoy/event:timer_interface",
         "//include/envoy/local_info:local_info_interface",
         "//include/envoy/network:dns_interface",
