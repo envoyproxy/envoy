@@ -200,9 +200,10 @@ bool updateHealthFlag(const Host& updated_host, Host& existing_host, Host::Healt
 HostVector filterHosts(const std::unordered_set<HostSharedPtr>& hosts,
                        const std::unordered_set<HostSharedPtr>& excluded_hosts) {
   HostVector net_hosts;
+  net_hosts.reserve(hosts.size());
 
   std::set_difference(hosts.begin(), hosts.end(), excluded_hosts.begin(), excluded_hosts.end(),
-                      net_hosts.begin());
+                      std::inserter(net_hosts, net_hosts.begin()));
 
   return net_hosts;
 }
@@ -960,8 +961,9 @@ ClusterInfoImpl::ResourceManagers::load(const envoy::api::v2::Cluster& config,
 }
 
 PriorityStateManager::PriorityStateManager(ClusterImplBase& cluster,
-                                           const LocalInfo::LocalInfo& local_info)
-    : parent_(cluster), local_info_node_(local_info.node()) {}
+                                           const LocalInfo::LocalInfo& local_info,
+                                           PrioritySet::HostUpdateCb* update_cb)
+    : parent_(cluster), local_info_node_(local_info.node()), update_cb_(update_cb) {}
 
 void PriorityStateManager::initializePriorityFor(
     const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint) {
@@ -1064,10 +1066,18 @@ void PriorityStateManager::updateClusterPrioritySet(
   auto per_locality_shared =
       std::make_shared<HostsPerLocalityImpl>(std::move(per_locality), non_empty_local_locality);
 
-  parent_.prioritySet().updateHosts(
-      priority, HostSetImpl::partitionHosts(hosts, per_locality_shared),
-      std::move(locality_weights), hosts_added.value_or(*hosts),
-      hosts_removed.value_or<HostVector>({}), overprovisioning_factor);
+  // If a batch update callback was provided, use that. Otherwise directly update
+  // the PrioritySet.
+  if (update_cb_ != nullptr) {
+    update_cb_->updateHosts(priority, HostSetImpl::partitionHosts(hosts, per_locality_shared),
+                            std::move(locality_weights), hosts_added.value_or(*hosts),
+                            hosts_removed.value_or<HostVector>({}), overprovisioning_factor);
+  } else {
+    parent_.prioritySet().updateHosts(
+        priority, HostSetImpl::partitionHosts(hosts, per_locality_shared),
+        std::move(locality_weights), hosts_added.value_or(*hosts),
+        hosts_removed.value_or<HostVector>({}), overprovisioning_factor);
+  }
 }
 
 StaticClusterImpl::StaticClusterImpl(
@@ -1075,7 +1085,8 @@ StaticClusterImpl::StaticClusterImpl(
     Server::Configuration::TransportSocketFactoryContext& factory_context,
     Stats::ScopePtr&& stats_scope, bool added_via_api)
     : ClusterImplBase(cluster, runtime, factory_context, std::move(stats_scope), added_via_api),
-      priority_state_manager_(new PriorityStateManager(*this, factory_context.localInfo())) {
+      priority_state_manager_(
+          new PriorityStateManager(*this, factory_context.localInfo(), nullptr)) {
   // TODO(dio): Use by-reference when cluster.hosts() is removed.
   const envoy::api::v2::ClusterLoadAssignment cluster_load_assignment(
       cluster.has_load_assignment() ? cluster.load_assignment()
@@ -1341,7 +1352,7 @@ void StrictDnsClusterImpl::startPreInit() {
 void StrictDnsClusterImpl::updateAllHosts(const HostVector& hosts_added,
                                           const HostVector& hosts_removed,
                                           uint32_t current_priority) {
-  PriorityStateManager priority_state_manager(*this, local_info_);
+  PriorityStateManager priority_state_manager(*this, local_info_, nullptr);
   // At this point we know that we are different so make a new host list and notify.
   //
   // TODO(dio): The uniqueness of a host address resolved in STRICT_DNS cluster per priority is not
