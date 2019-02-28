@@ -1,7 +1,6 @@
 #include "test/integration/h1_fuzz.h"
 
 namespace Envoy {
-namespace {
 void H1FuzzIntegrationTest::initialize() {
   const std::string body = "Response body";
   const std::string file_path = TestEnvironment::writeStringToFileForTest("test_envoy", body);
@@ -32,5 +31,4 @@ DEFINE_PROTO_FUZZER(const test::integration::CaptureFuzzTestCase& input) {
   H1FuzzIntegrationTest h1_fuzz_integration_test(ip_version);
   h1_fuzz_integration_test.replay(input);
 }
-} // namespace
 } // namespace Envoy

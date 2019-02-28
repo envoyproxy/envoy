@@ -32,7 +32,6 @@ using testing::Return;
 
 namespace Envoy {
 namespace Stats {
-namespace {
 class StatsThreadLocalStoreTest : public testing::Test {
 public:
   void SetUp() override {
@@ -995,6 +994,5 @@ TEST_F(TruncatingAllocTest, HistogramWithLongNameNotTruncated) {
     EXPECT_EQ(&histogram, &store_->histogram(long_name_));
   });
 }
-} // namespace
 } // namespace Stats
 } // namespace Envoy

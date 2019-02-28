@@ -10,7 +10,6 @@
 
 namespace Envoy {
 namespace Stats {
-namespace {
 TEST(StatsIsolatedStoreImplTest, All) {
   IsolatedStoreImpl store;
 
@@ -95,6 +94,5 @@ TEST(StatsMacros, All) {
   Histogram& histogram = test_stats.test_histogram_;
   EXPECT_EQ("test.test_histogram", histogram.name());
 }
-} // namespace
 } // namespace Stats
 } // namespace Envoy

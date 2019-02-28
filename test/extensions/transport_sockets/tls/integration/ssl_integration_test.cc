@@ -26,7 +26,6 @@ using testing::Return;
 
 namespace Envoy {
 namespace Ssl {
-namespace {
 
 void SslIntegrationTestBase::initialize() {
   config_helper_.addSslConfig(ConfigHelper::ServerSslOptions()
@@ -554,6 +553,5 @@ TEST_P(SslTapIntegrationTest, RequestWithJsonBodyAsString) {
   EXPECT_TRUE(trace.socket_buffered_trace().read_truncated());
   EXPECT_TRUE(trace.socket_buffered_trace().write_truncated());
 }
-} // namespace
 } // namespace Ssl
 } // namespace Envoy
