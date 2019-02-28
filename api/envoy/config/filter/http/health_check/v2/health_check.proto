@@ -32,7 +32,7 @@ message HealthCheck {
 
   // If operating in non-pass-through mode, specifies a set of upstream cluster
   // names and the minimum percentage of servers in each of those clusters that
-  // must be healthy in order for the filter to return a 200.
+  // must be healthy or degraded in order for the filter to return a 200.
   map<string, envoy.type.Percent> cluster_min_healthy_percentages = 4;
 
   // Specifies a set of health check request headers to match on. The health check filter will

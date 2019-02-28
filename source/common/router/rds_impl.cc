@@ -129,7 +129,8 @@ void RdsRouteConfigSubscription::onConfigUpdateFailed(const EnvoyException*) {
 }
 
 void RdsRouteConfigSubscription::registerInitTarget(Init::Manager& init_manager) {
-  init_manager.registerTarget(*this);
+  init_manager.registerTarget(*this,
+                              fmt::format("RdsRouteConfigSubscription {}", route_config_name_));
 }
 
 void RdsRouteConfigSubscription::runInitializeCallbackIfAny() {

@@ -4,6 +4,7 @@
 AAAA
 ACK
 AES
+AFAICT
 ALPN
 ALS
 AMZ
@@ -29,6 +30,7 @@ CPU
 CQ
 CR
 CRC
+CREAT
 CRL
 CRLFs
 CRT
@@ -153,6 +155,7 @@ Nilsson
 OCSP
 OK
 OOM
+OOMs
 OS
 OSI
 OSS
@@ -179,6 +182,7 @@ RBAC
 RCU
 RDN
 RDS
+RDWR
 REQ
 RFC
 RHS
@@ -356,9 +360,11 @@ dedupe
 deduplicate
 deflateInit
 deletable
+deleter
 delim
 dereference
 dereferences
+dereferencing
 deregistered
 deserialization
 deserialize
@@ -448,6 +454,7 @@ ie
 ifdef
 iff
 impl
+implementors
 impls
 incrementing
 ing
@@ -679,6 +686,8 @@ tmp
 tokenizing
 traceid
 trie
+tuple
+tuples
 typeid
 ucontext
 uint

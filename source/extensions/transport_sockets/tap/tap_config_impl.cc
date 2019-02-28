@@ -8,15 +8,19 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Tap {
 
+namespace TapCommon = Extensions::Common::Tap;
+
 PerSocketTapperImpl::PerSocketTapperImpl(SocketTapConfigImplSharedPtr config,
                                          const Network::Connection& connection)
-    : config_(std::move(config)), connection_(connection), statuses_(config_->numMatchers()),
-      trace_(std::make_shared<envoy::data::tap::v2alpha::BufferedTraceWrapper>()) {
+    : config_(std::move(config)),
+      sink_handle_(config_->createPerTapSinkHandleManager(connection.id())),
+      connection_(connection), statuses_(config_->createMatchStatusVector()),
+      trace_(TapCommon::makeTraceWrapper()) {
   config_->rootMatcher().onNewStream(statuses_);
 }
 
 void PerSocketTapperImpl::closeSocket(Network::ConnectionEvent) {
-  if (!config_->rootMatcher().matches(statuses_)) {
+  if (!config_->rootMatcher().matchStatus(statuses_).matches_) {
     return;
   }
 
@@ -26,7 +30,7 @@ void PerSocketTapperImpl::closeSocket(Network::ConnectionEvent) {
                                              *connection->mutable_local_address());
   Network::Utility::addressToProtobufAddress(*connection_.remoteAddress(),
                                              *connection->mutable_remote_address());
-  config_->submitBufferedTrace(trace_, connection_.id());
+  sink_handle_->submitTrace(trace_);
 }
 
 envoy::data::tap::v2alpha::SocketEvent& PerSocketTapperImpl::createEvent() {
@@ -39,7 +43,7 @@ envoy::data::tap::v2alpha::SocketEvent& PerSocketTapperImpl::createEvent() {
 }
 
 void PerSocketTapperImpl::onRead(const Buffer::Instance& data, uint32_t bytes_read) {
-  if (!config_->rootMatcher().matches(statuses_)) {
+  if (!config_->rootMatcher().matchStatus(statuses_).matches_) {
     return;
   }
 
@@ -58,7 +62,7 @@ void PerSocketTapperImpl::onRead(const Buffer::Instance& data, uint32_t bytes_re
 
 void PerSocketTapperImpl::onWrite(const Buffer::Instance& data, uint32_t bytes_written,
                                   bool end_stream) {
-  if (!config_->rootMatcher().matches(statuses_)) {
+  if (!config_->rootMatcher().matchStatus(statuses_).matches_) {
     return;
   }
 

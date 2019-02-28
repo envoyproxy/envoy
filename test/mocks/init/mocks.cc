@@ -22,9 +22,9 @@ MockTarget::MockTarget() {
 MockTarget::~MockTarget() {}
 
 MockManager::MockManager() {
-  ON_CALL(*this, registerTarget(_)).WillByDefault(Invoke([this](Target& target) -> void {
-    targets_.push_back(&target);
-  }));
+  ON_CALL(*this, registerTarget(_, _))
+      .WillByDefault(Invoke(
+          [this](Target& target, absl::string_view) -> void { targets_.push_back(&target); }));
 }
 
 MockManager::~MockManager() {}
