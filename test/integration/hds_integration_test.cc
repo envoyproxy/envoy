@@ -706,7 +706,7 @@ TEST_P(HdsIntegrationTest, TestUpdateChangesTimer) {
 
   // an update should be received after interval
   ASSERT_TRUE(
-      hds_stream_->waitForGrpcMessage(*dispatcher_, response_, std::chrono::milliseconds(100)));
+      hds_stream_->waitForGrpcMessage(*dispatcher_, response_, std::chrono::milliseconds(250)));
 
   // New HealthCheckSpecifier message
   server_health_check_specifier_.mutable_interval()->set_nanos(300000000); // 0.3 seconds
@@ -717,10 +717,10 @@ TEST_P(HdsIntegrationTest, TestUpdateChangesTimer) {
 
   // A response should not be received until the new timer is completed
   ASSERT_FALSE(
-      hds_stream_->waitForGrpcMessage(*dispatcher_, response_, std::chrono::milliseconds(200)));
+      hds_stream_->waitForGrpcMessage(*dispatcher_, response_, std::chrono::milliseconds(250)));
   // Response should be received now
   ASSERT_TRUE(
-      hds_stream_->waitForGrpcMessage(*dispatcher_, response_, std::chrono::milliseconds(200)));
+      hds_stream_->waitForGrpcMessage(*dispatcher_, response_, std::chrono::milliseconds(250)));
 
   // Clean up connections
   cleanupHostConnections();
