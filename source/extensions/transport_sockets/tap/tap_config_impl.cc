@@ -46,6 +46,12 @@ void PerSocketTapperImpl::closeSocket(Network::ConnectionEvent) {
     fillConnectionInfo(*buffered_trace_->mutable_socket_buffered_trace()->mutable_connection());
     sink_handle_->submitTrace(buffered_trace_);
   }
+
+  // Here we explicitly reset the sink_handle_ to release any sink resources and force a flush
+  // of any data (e.g., files). This is not explicitly needed in production, but is needed in
+  // tests to avoid race conditions due to deferred deletion. We could also do this with a stat,
+  // but this seems fine in general and is simpler.
+  sink_handle_.reset();
 }
 
 void PerSocketTapperImpl::initEvent(envoy::data::tap::v2alpha::SocketEvent& event) {
