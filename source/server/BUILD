@@ -169,6 +169,7 @@ envoy_cc_library(
         "//include/envoy/network:address_interface",
         "//include/envoy/server:options_interface",
         "//include/envoy/stats:stats_interface",
+        "//source/common/api:os_sys_calls_lib",
         "//source/common/common:logger_lib",
         "//source/common/common:macros",
         "//source/common/common:version_lib",
