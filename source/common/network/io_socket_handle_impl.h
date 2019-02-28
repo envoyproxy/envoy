@@ -6,7 +6,7 @@
 namespace Envoy {
 namespace Network {
 
-class IoSocketError : public IoError {
+class IoSocketError : public Api::IoError {
 public:
   explicit IoSocketError(int sys_errno) : errno_(sys_errno) {}
 
@@ -33,7 +33,7 @@ public:
   // TODO(sbelair2)  To be removed when the fd is fully abstracted from clients.
   int fd() const override { return fd_; }
 
-  IoHandleCallUintResult close() override;
+  Api::IoCallUintResult close() override;
 
   bool isOpen() const override;
 
