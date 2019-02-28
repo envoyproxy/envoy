@@ -6,10 +6,18 @@ import imp
 import json
 import os.path
 import re
+import subprocess
+import sys
 
 API_DEPS = imp.load_source('api', 'api/bazel/repository_locations.bzl')
 DEPS = imp.load_source('deps', 'bazel/repository_locations.bzl')
+RECIPE_MAP = imp.load_source('deps', 'bazel/target_recipes.bzl')
 RECIPE_INFO = imp.load_source('recipes', 'ci/build_container/build_recipes/versions.py')
+
+
+def print_deps(deps):
+  print(json.dumps(deps, sort_keys=True, indent=2))
+
 
 if __name__ == '__main__':
   deps = []
@@ -33,4 +41,36 @@ if __name__ == '__main__':
     })
 
   deps = sorted(deps, key=lambda k: k['identifier'])
-  print json.dumps(deps, sort_keys=True, indent=2)
+
+  # Print all dependencies if a target is unspecified
+  if len(sys.argv) == 1:
+    print_deps(deps)
+    exit(0)
+
+  # Bazel target to print
+  target = sys.argv[1]
+  output = subprocess.check_output(['bazel', 'query', 'deps(%s)' % target])
+
+  repos = set()
+
+  # Gather the explicit list of repositories
+  repo_regex = re.compile('^@(.*)\/\/')
+  for line in output.split('\n'):
+    match = repo_regex.match(line)
+    if match:
+      repos.add(match.group(1))
+
+  # Gather the build recipes repositories
+  # These are part of @envoy_deps repository ie @envoy_deps//:luajit
+  recipe_regex = re.compile('^@envoy_deps//:(\w+)$')
+  for line in output.split('\n'):
+    match = recipe_regex.match(line)
+    if not match:
+      continue
+    key = match.group(1)
+    repo = RECIPE_MAP.TARGET_RECIPES[key]
+    if repo:
+      repos.add(repo)
+
+  deps = filter(lambda dep: dep['identifier'] in repos, deps)
+  print_deps(deps)
