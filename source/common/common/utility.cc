@@ -18,6 +18,7 @@
 #include "absl/strings/match.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
+#include "absl/time/time.h"
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
@@ -41,10 +42,11 @@ std::string DateFormatter::fromTime(const SystemTime& time) const {
     // is 10.
     size_t seconds_length;
 
-    // A container object to hold a strftime'd string, its timestamp (in seconds) and a list of
-    // position offsets for each specifier found in a format string.
+    // A container object to hold a absl::FormatTime string, its timestamp (in seconds) and a list
+    // of position offsets for each specifier found in a format string.
     struct Formatted {
-      // The resulted string after format string is passed to strftime at a given point in time.
+      // The resulted string after format string is passed to absl::FormatTime at a given point in
+      // time.
       std::string str;
 
       // A timestamp (in seconds) when this object is created.
@@ -52,7 +54,7 @@ std::string DateFormatter::fromTime(const SystemTime& time) const {
 
       // List of offsets for each specifier found in a format string. This is needed to compensate
       // the position of each recorded specifier due to the possible size change of the previous
-      // segment (after strftime'd).
+      // segment (after being formatted).
       SpecifierOffsets specifier_offsets;
     };
     // A map is used to keep different formatted format strings at a given second.
@@ -163,31 +165,28 @@ void DateFormatter::parse(const std::string& format_string) {
 std::string
 DateFormatter::fromTimeAndPrepareSpecifierOffsets(time_t time, SpecifierOffsets& specifier_offsets,
                                                   const std::string& seconds_str) const {
-  tm current_tm;
-  gmtime_r(&time, &current_tm);
-
-  std::array<char, 1024> buf;
-  std::string formatted;
+  std::string formatted_time;
 
   size_t previous = 0;
   specifier_offsets.reserve(specifiers_.size());
   for (const auto& specifier : specifiers_) {
-    const size_t formatted_length =
-        strftime(&buf[0], buf.size(), specifier.segment_.c_str(), &current_tm);
-    absl::StrAppend(&formatted, absl::string_view(&buf[0], formatted_length),
+    std::string current_format =
+        absl::FormatTime(specifier.segment_, absl::FromTimeT(time), absl::UTCTimeZone());
+    absl::StrAppend(&formatted_time, current_format,
                     specifier.second_ ? seconds_str : std::string(specifier.width_, '?'));
 
     // This computes and saves offset of each specifier's pattern to correct its position after the
     // previous string segment is formatted. An offset can be a negative value.
     //
     // If the current specifier is a second specifier (%s), it needs to be corrected by 2.
-    const int32_t offset = (formatted_length + (specifier.second_ ? (seconds_str.size() - 2) : 0)) -
-                           specifier.segment_.size();
+    const int32_t offset =
+        (current_format.length() + (specifier.second_ ? (seconds_str.size() - 2) : 0)) -
+        specifier.segment_.size();
     specifier_offsets.emplace_back(previous + offset);
     previous += offset;
   }
 
-  return formatted;
+  return formatted_time;
 }
 
 std::string DateFormatter::now(TimeSource& time_source) {
@@ -408,45 +407,37 @@ std::string StringUtil::escape(const std::string& source) {
   return ret;
 }
 
-std::string AccessLogDateTimeFormatter::fromTime(const SystemTime& time) {
-  static const char DefaultDateFormat[] = "%Y-%m-%dT%H:%M:%S.000Z";
+std::string AccessLogDateTimeFormatter::fromTime(const SystemTime& system_time) {
+  static const std::string DefaultDateFormat = "%Y-%m-%dT%H:%M:%E3SZ";
 
   struct CachedTime {
     std::chrono::seconds epoch_time_seconds;
-    size_t formatted_time_length{0};
-    char formatted_time[32];
+    std::string formatted_time;
   };
   static thread_local CachedTime cached_time;
 
   const std::chrono::milliseconds epoch_time_ms =
-      std::chrono::duration_cast<std::chrono::milliseconds>(time.time_since_epoch());
+      std::chrono::duration_cast<std::chrono::milliseconds>(system_time.time_since_epoch());
 
   const std::chrono::seconds epoch_time_seconds =
       std::chrono::duration_cast<std::chrono::seconds>(epoch_time_ms);
 
-  if (cached_time.formatted_time_length == 0 ||
-      cached_time.epoch_time_seconds != epoch_time_seconds) {
-    time_t time = static_cast<time_t>(epoch_time_seconds.count());
-    tm date_time;
-    gmtime_r(&time, &date_time);
-    cached_time.formatted_time_length =
-        strftime(cached_time.formatted_time, sizeof(cached_time.formatted_time), DefaultDateFormat,
-                 &date_time);
+  if (cached_time.formatted_time.empty() || cached_time.epoch_time_seconds != epoch_time_seconds) {
+    cached_time.formatted_time =
+        absl::FormatTime(DefaultDateFormat, absl::FromChrono(system_time), absl::UTCTimeZone());
     cached_time.epoch_time_seconds = epoch_time_seconds;
+  } else {
+    // Overwrite the digits in the ".000Z" at the end of the string with the
+    // millisecond count from the input time.
+    ASSERT(cached_time.formatted_time.length() == 24);
+    size_t offset = cached_time.formatted_time.length() - 4;
+    uint32_t msec = epoch_time_ms.count() % 1000;
+    cached_time.formatted_time[offset++] = ('0' + (msec / 100));
+    msec %= 100;
+    cached_time.formatted_time[offset++] = ('0' + (msec / 10));
+    msec %= 10;
+    cached_time.formatted_time[offset++] = ('0' + msec);
   }
-
-  ASSERT(cached_time.formatted_time_length == 24 &&
-         cached_time.formatted_time_length < sizeof(cached_time.formatted_time));
-
-  // Overwrite the digits in the ".000Z" at the end of the string with the
-  // millisecond count from the input time.
-  size_t offset = cached_time.formatted_time_length - 4;
-  uint32_t msec = epoch_time_ms.count() % 1000;
-  cached_time.formatted_time[offset++] = ('0' + (msec / 100));
-  msec %= 100;
-  cached_time.formatted_time[offset++] = ('0' + (msec / 10));
-  msec %= 10;
-  cached_time.formatted_time[offset++] = ('0' + msec);
 
   return cached_time.formatted_time;
 }

@@ -529,18 +529,13 @@ TEST(AccessLogFormatterTest, JsonFormatterStartTimeTest) {
   Http::TestHeaderMapImpl response_header;
   Http::TestHeaderMapImpl response_trailer;
 
-  time_t test_epoch = 1522280158;
-  SystemTime time = std::chrono::system_clock::from_time_t(test_epoch);
+  time_t expected_time_in_epoch = 1522280158;
+  SystemTime time = std::chrono::system_clock::from_time_t(expected_time_in_epoch);
   EXPECT_CALL(stream_info, startTime()).WillRepeatedly(Return(time));
-
-  // Needed to take into account the behavior in non-GMT timezones.
-  struct tm time_val;
-  gmtime_r(&test_epoch, &time_val);
-  time_t expected_time_t = mktime(&time_val);
 
   std::unordered_map<std::string, std::string> expected_json_map = {
       {"simple_date", "2018/03/28"},
-      {"test_time", fmt::format("{}", expected_time_t)},
+      {"test_time", fmt::format("{}", expected_time_in_epoch)},
       {"bad_format", "bad_format"},
       {"default", "2018-03-28T23:35:58.000Z"},
       {"all_zeroes", "000000000.0.00.000"}};
@@ -637,18 +632,13 @@ TEST(AccessLogFormatterTest, CompositeFormatterSuccess) {
     const std::string format = "%START_TIME(%Y/%m/%d)%|%START_TIME(%s)%|%START_TIME(bad_format)%|"
                                "%START_TIME%|%START_TIME(%f.%1f.%2f.%3f)%";
 
-    time_t test_epoch = 1522280158;
-    SystemTime time = std::chrono::system_clock::from_time_t(test_epoch);
+    time_t expected_time_in_epoch = 1522280158;
+    SystemTime time = std::chrono::system_clock::from_time_t(expected_time_in_epoch);
     EXPECT_CALL(stream_info, startTime()).WillRepeatedly(Return(time));
     FormatterImpl formatter(format);
 
-    // Needed to take into account the behavior in non-GMT timezones.
-    struct tm time_val;
-    gmtime_r(&test_epoch, &time_val);
-    time_t expected_time_t = mktime(&time_val);
-
     EXPECT_EQ(fmt::format("2018/03/28|{}|bad_format|2018-03-28T23:35:58.000Z|000000000.0.00.000",
-                          expected_time_t),
+                          expected_time_in_epoch),
               formatter.format(request_header, response_header, response_trailer, stream_info));
   }
 
@@ -690,7 +680,7 @@ TEST(AccessLogFormatterTest, CompositeFormatterSuccess) {
 
   {
     // This tests START_TIME specifier that has shorter segments when formatted, i.e.
-    // strftime("%%%%"") equals "%%", %1f will have 1 as its size.
+    // absl::FormatTime("%%%%"") equals "%%", %1f will have 1 as its size.
     const std::string format = "%START_TIME(%%%%|%%%%%f|%s%%%%%3f|%1f%%%%%s)%";
     const SystemTime start_time(std::chrono::microseconds(1522796769123456));
     EXPECT_CALL(stream_info, startTime()).WillOnce(Return(start_time));
