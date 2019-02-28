@@ -424,7 +424,7 @@ TEST_P(SslTapIntegrationTest, TwoRequestsWithBinaryProto) {
   envoy::data::tap::v2alpha::TraceWrapper trace;
   MessageUtil::loadFromFile(fmt::format("{}_{}.pb", path_prefix_, first_id), trace, *api_);
   // Validate general expected properties in the trace.
-  EXPECT_EQ(first_id, trace.socket_buffered_trace().connection().id());
+  EXPECT_EQ(first_id, trace.socket_buffered_trace().trace_id());
   EXPECT_THAT(expected_local_address,
               ProtoEq(trace.socket_buffered_trace().connection().local_address()));
   EXPECT_THAT(expected_remote_address,
@@ -455,7 +455,7 @@ TEST_P(SslTapIntegrationTest, TwoRequestsWithBinaryProto) {
   test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 2);
   MessageUtil::loadFromFile(fmt::format("{}_{}.pb", path_prefix_, second_id), trace, *api_);
   // Validate second connection ID.
-  EXPECT_EQ(second_id, trace.socket_buffered_trace().connection().id());
+  EXPECT_EQ(second_id, trace.socket_buffered_trace().trace_id());
   ASSERT_GE(trace.socket_buffered_trace().events().size(), 2);
   EXPECT_TRUE(absl::StartsWith(trace.socket_buffered_trace().events(0).read().data().as_bytes(),
                                "GET /test/long/url HTTP/1.1"));

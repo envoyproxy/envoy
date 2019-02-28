@@ -52,6 +52,11 @@ public:
    * @param connection supplies the underlying network connection.
    */
   virtual PerSocketTapperPtr createPerSocketTapper(const Network::Connection& connection) PURE;
+
+  /**
+   * @return time source to use for stamping events.
+   */
+  virtual TimeSource& timeSource() const PURE;
 };
 
 using SocketTapConfigSharedPtr = std::shared_ptr<SocketTapConfig>;

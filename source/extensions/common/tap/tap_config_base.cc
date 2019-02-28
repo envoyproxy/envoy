@@ -125,6 +125,15 @@ void Utility::bodyBytesToString(envoy::data::tap::v2alpha::TraceWrapper& trace,
     }
     break;
   }
+  case envoy::data::tap::v2alpha::TraceWrapper::kSocketStreamedTraceSegment: {
+    auto& event = *trace.mutable_socket_streamed_trace_segment()->mutable_event();
+    if (event.has_read()) {
+      swapBytesToString(*event.mutable_read()->mutable_data());
+    } else if (event.has_write()) {
+      swapBytesToString(*event.mutable_write()->mutable_data());
+    }
+    break;
+  }
   case envoy::data::tap::v2alpha::TraceWrapper::TRACE_NOT_SET:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
