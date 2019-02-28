@@ -213,15 +213,13 @@ FakeHttpConnection::FakeHttpConnection(SharedConnectionWrapper& shared_connectio
     : FakeConnectionBase(shared_connection, time_system) {
   if (type == Type::HTTP1) {
     codec_ = std::make_unique<Http::Http1::ServerConnectionImpl>(
-        shared_connection_.connection(), *this, Http::Http1Settings(),
-        max_request_headers_kb);
+        shared_connection_.connection(), *this, Http::Http1Settings(), max_request_headers_kb);
   } else {
     auto settings = Http::Http2Settings();
     settings.allow_connect_ = true;
     settings.allow_metadata_ = true;
     codec_ = std::make_unique<Http::Http2::ServerConnectionImpl>(
-        shared_connection_.connection(), *this, store, settings,
-        max_request_headers_kb);
+        shared_connection_.connection(), *this, store, settings, max_request_headers_kb);
     ASSERT(type == Type::HTTP2);
   }
 
@@ -421,7 +419,8 @@ void FakeUpstream::threadRoutine() {
 
 AssertionResult FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
                                                     FakeHttpConnectionPtr& connection,
-                                                    milliseconds timeout, uint32_t max_request_headers_kb) {
+                                                    milliseconds timeout,
+                                                    uint32_t max_request_headers_kb) {
   Event::TestTimeSystem& time_system = timeSystem();
   auto end_time = time_system.monotonicTime() + timeout;
   {

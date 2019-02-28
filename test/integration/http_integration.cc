@@ -269,10 +269,9 @@ HttpIntegrationTest::waitForNextUpstreamRequest(const std::vector<uint64_t>& ups
   if (!fake_upstream_connection_) {
     AssertionResult result = AssertionFailure();
     for (auto upstream_index : upstream_indices) {
-      result = fake_upstreams_[upstream_index]->waitForHttpConnection(*dispatcher_,
-                                                                      fake_upstream_connection_,
-                                                                      TestUtility::DefaultTimeout,
-                                                                      max_request_headers_kb_);
+      result = fake_upstreams_[upstream_index]->waitForHttpConnection(
+          *dispatcher_, fake_upstream_connection_, TestUtility::DefaultTimeout,
+          max_request_headers_kb_);
       if (result) {
         upstream_with_request = upstream_index;
         break;
