@@ -201,6 +201,10 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
     // that can be known.
     concurrency_ = OptionsImplPlatform::getCpuCount();
   } else {
+    if (concurrency.isSet() && cpuset_threads_ && cpuset_threads.isSet()) {
+      ENVOY_LOG(warn, "Both --concurrency and --cpuset-threads options are set; not applying "
+                      "--cpuset-threads.");
+    }
     concurrency_ = std::max(1U, concurrency.getValue());
   }
 

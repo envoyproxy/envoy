@@ -8,6 +8,7 @@
 #include "envoy/server/options.h"
 #include "envoy/stats/stats_options.h"
 
+#include "common/common/logger.h"
 #include "common/stats/stats_options_impl.h"
 
 #include "spdlog/spdlog.h"
@@ -16,7 +17,7 @@ namespace Envoy {
 /**
  * Implementation of Server::Options.
  */
-class OptionsImpl : public Server::Options {
+class OptionsImpl : public Server::Options, protected Logger::Loggable<Logger::Id::config> {
 public:
   /**
    * Parameters are max_num_stats, max_stat_name_len, hot_restart_enabled
