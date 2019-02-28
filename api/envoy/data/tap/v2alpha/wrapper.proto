@@ -27,5 +27,8 @@ message TraceWrapper {
 
     // A socket buffered tap trace.
     SocketBufferedTrace socket_buffered_trace = 3;
+
+    // A socket streamed tap trace segment.
+    SocketStreamedTraceSegment socket_streamed_trace_segment = 4;
   }
 }
