@@ -19,12 +19,6 @@ namespace {
 
 namespace TapCommon = Extensions::Common::Tap;
 
-MATCHER_P(TraceEqual, rhs, "") {
-  envoy::data::tap::v2alpha::TraceWrapper expected_trace;
-  MessageUtil::loadFromYaml(rhs, expected_trace);
-  return arg.DebugString() == expected_trace.DebugString();
-}
-
 class HttpPerRequestTapperImplTest : public testing::Test {
 public:
   HttpPerRequestTapperImplTest() {
@@ -37,6 +31,7 @@ public:
   }
 
   std::shared_ptr<MockHttpTapConfig> config_{std::make_shared<MockHttpTapConfig>()};
+  // Raw pointer, returned via mock to unique_ptr.
   TapCommon::MockPerTapSinkHandleManager* sink_manager_ =
       new TapCommon::MockPerTapSinkHandleManager;
   std::unique_ptr<HttpPerRequestTapperImpl> tapper_;

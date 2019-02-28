@@ -116,9 +116,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/google/benchmark/archive/505be96ab23056580a3a2315abba048f4428b04e.tar.gz"],
     ),
     com_github_libevent_libevent = dict(
-        sha256 = "316ddb401745ac5d222d7c529ef1eada12f58f6376a66c1118eee803cb70f83d",
-        strip_prefix = "libevent-release-2.1.8-stable",
-        urls = ["https://github.com/libevent/libevent/archive/release-2.1.8-stable.tar.gz"],
+        sha256 = "0ab250abac1def3d1e20e23e05ce827efa81db65c9004ccfff58d16404e3e369",
+        strip_prefix = "libevent-release-2.1.9-beta",
+        urls = ["https://github.com/libevent/libevent/archive/release-2.1.9-beta.tar.gz"],
     ),
     com_github_madler_zlib = dict(
         sha256 = "629380c90a77b964d896ed37163f5c3a34f6e6d897311f1df2a7016355c45eff",
@@ -214,9 +214,10 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/bazelbuild/rules_go/releases/download/0.16.5/rules_go-0.16.5.tar.gz"],
     ),
     rules_foreign_cc = dict(
-        sha256 = "78cbd1a8134b2f0ead8e637228d8ac1ac7c0ab3f0fbcd149a85e55330697d9a3",
-        strip_prefix = "rules_foreign_cc-216ded8acb95d81e312b228dce3c39872c7a7c34",
-        urls = ["https://github.com/bazelbuild/rules_foreign_cc/archive/216ded8acb95d81e312b228dce3c39872c7a7c34.tar.gz"],
+        sha256 = "e1b67e1fda647c7713baac11752573bfd4c2d45ef09afb4d4de9eb9bd4e5ac76",
+        strip_prefix = "rules_foreign_cc-8648b0446092ef2a34d45b02c8dc4c35c3a8df79",
+        # 2019-02-14
+        urls = ["https://github.com/bazelbuild/rules_foreign_cc/archive/8648b0446092ef2a34d45b02c8dc4c35c3a8df79.tar.gz"],
     ),
     six_archive = dict(
         sha256 = "105f8d68616f8248e24bf0e9372ef04d3cc10104f1980f54d57b2ce73a5ad56a",
