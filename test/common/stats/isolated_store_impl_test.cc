@@ -4,10 +4,9 @@
 
 #include "common/stats/isolated_store_impl.h"
 
-#include "test/test_common/test_base.h"
-
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Stats {

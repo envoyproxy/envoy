@@ -79,7 +79,8 @@ inline HostSharedPtr makeTestHost(ClusterInfoConstSharedPtr cluster, const std::
   return HostSharedPtr{new HostImpl(
       cluster, "", Network::Utility::resolveUrl(url),
       envoy::api::v2::core::Metadata::default_instance(), weight, envoy::api::v2::core::Locality(),
-      envoy::api::v2::endpoint::Endpoint::HealthCheckConfig::default_instance(), 0)};
+      envoy::api::v2::endpoint::Endpoint::HealthCheckConfig::default_instance(), 0,
+      envoy::api::v2::core::HealthStatus::UNKNOWN)};
 }
 
 inline HostSharedPtr makeTestHost(ClusterInfoConstSharedPtr cluster, const std::string& url,
@@ -88,7 +89,8 @@ inline HostSharedPtr makeTestHost(ClusterInfoConstSharedPtr cluster, const std::
   return HostSharedPtr{
       new HostImpl(cluster, "", Network::Utility::resolveUrl(url), metadata, weight,
                    envoy::api::v2::core::Locality(),
-                   envoy::api::v2::endpoint::Endpoint::HealthCheckConfig::default_instance(), 0)};
+                   envoy::api::v2::endpoint::Endpoint::HealthCheckConfig::default_instance(), 0,
+                   envoy::api::v2::core::HealthStatus::UNKNOWN)};
 }
 
 inline HostSharedPtr
@@ -97,7 +99,8 @@ makeTestHost(ClusterInfoConstSharedPtr cluster, const std::string& url,
              uint32_t weight = 1) {
   return HostSharedPtr{new HostImpl(cluster, "", Network::Utility::resolveUrl(url),
                                     envoy::api::v2::core::Metadata::default_instance(), weight,
-                                    envoy::api::v2::core::Locality(), health_check_config, 0)};
+                                    envoy::api::v2::core::Locality(), health_check_config, 0,
+                                    envoy::api::v2::core::HealthStatus::UNKNOWN)};
 }
 
 inline HostDescriptionConstSharedPtr makeTestHostDescription(ClusterInfoConstSharedPtr cluster,
@@ -113,6 +116,11 @@ inline HostsPerLocalitySharedPtr makeHostsPerLocality(std::vector<HostVector>&& 
                                                       bool force_no_local_locality = false) {
   return std::make_shared<HostsPerLocalityImpl>(
       std::move(locality_hosts), !force_no_local_locality && !locality_hosts.empty());
+}
+
+inline LocalityWeightsSharedPtr
+makeLocalityWeights(std::initializer_list<uint32_t> locality_weights) {
+  return std::make_shared<LocalityWeights>(locality_weights);
 }
 
 inline envoy::api::v2::core::HealthCheck

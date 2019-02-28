@@ -4,7 +4,7 @@
 #include "extensions/filters/network/mongo_proxy/codec_impl.h"
 #include "extensions/filters/network/mongo_proxy/utility.h"
 
-#include "test/test_common/test_base.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Extensions {

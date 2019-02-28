@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 
 import argparse
-import os
 import json
+import os
 import subprocess
 
 
@@ -38,13 +38,18 @@ def isCompileTarget(target, args):
   return True
 
 
-def modifyCompileCommand(target):
-  cxx, options = target["command"].split(" ", 1)
+def modifyCompileCommand(target, args):
+  _, options = target["command"].split(" ", 1)
 
   # Workaround for bazel added C++11 options, those doesn't affect build itself but
   # clang-tidy will misinterpret them.
   options = options.replace("-std=c++0x ", "")
   options = options.replace("-std=c++11 ", "")
+
+  if args.vscode:
+    # Visual Studio Code doesn't seem to like "-iquote". Replace it with
+    # old-style "-I".
+    options = options.replace("-iquote ", "-I ")
 
   if isHeader(target["file"]):
     options += " -Wno-pragma-once-outside-header -Wno-unused-const-variable"
@@ -58,7 +63,7 @@ def fixCompilationDatabase(args):
   with open("compile_commands.json", "r") as db_file:
     db = json.load(db_file)
 
-  db = [modifyCompileCommand(target) for target in db if isCompileTarget(target, args)]
+  db = [modifyCompileCommand(target, args) for target in db if isCompileTarget(target, args)]
 
   # Remove to avoid writing into symlink
   os.remove("compile_commands.json")
@@ -72,6 +77,7 @@ if __name__ == "__main__":
   parser.add_argument('--include_external', action='store_true')
   parser.add_argument('--include_genfiles', action='store_true')
   parser.add_argument('--include_headers', action='store_true')
+  parser.add_argument('--vscode', action='store_true')
   parser.add_argument(
       'bazel_targets', nargs='*', default=["//source/...", "//test/...", "//tools/..."])
   args = parser.parse_args()

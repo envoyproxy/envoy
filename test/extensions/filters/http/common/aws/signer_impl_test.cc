@@ -17,7 +17,7 @@ namespace HttpFilters {
 namespace Common {
 namespace Aws {
 
-class SignerImplTest : public TestBase {
+class SignerImplTest : public testing::Test {
 public:
   SignerImplTest()
       : credentials_provider_(new NiceMock<MockCredentialsProvider>()),

@@ -1,6 +1,9 @@
 syntax = "proto3";
 
 package envoy.data.accesslog.v2;
+
+option java_outer_classname = "AccesslogProto";
+option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.data.accesslog.v2";
 
 import "envoy/api/v2/core/address.proto";
@@ -194,6 +197,9 @@ message ResponseFlags {
 
   // Indicates that the upstream retry limit was exceeded, resulting in a downstream error.
   bool upstream_retry_limit_exceeded = 16;
+
+  // Indicates that the stream idle timeout was hit, resulting in a downstream 408.
+  bool stream_idle_timeout = 17;
 }
 
 // [#not-implemented-hide:]

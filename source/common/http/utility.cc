@@ -229,7 +229,7 @@ bool Utility::hasSetCookie(const HeaderMap& headers, const std::string& key) {
 uint64_t Utility::getResponseStatus(const HeaderMap& headers) {
   const HeaderEntry* header = headers.Status();
   uint64_t response_code;
-  if (!header || !StringUtil::atoul(headers.Status()->value().c_str(), response_code)) {
+  if (!header || !StringUtil::atoull(headers.Status()->value().c_str(), response_code)) {
     throw CodecClientException(":status must be specified and a valid unsigned long");
   }
   return response_code;
@@ -442,6 +442,27 @@ std::string Utility::queryParamsToString(const QueryParams& params) {
     delim = "&";
   }
   return out;
+}
+
+const std::string Utility::resetReasonToString(const Http::StreamResetReason reset_reason) {
+  switch (reset_reason) {
+  case Http::StreamResetReason::ConnectionFailure:
+    return "connection failure";
+  case Http::StreamResetReason::ConnectionTermination:
+    return "connection termination";
+  case Http::StreamResetReason::LocalReset:
+    return "local reset";
+  case Http::StreamResetReason::LocalRefusedStreamReset:
+    return "local refused stream reset";
+  case Http::StreamResetReason::Overflow:
+    return "overflow";
+  case Http::StreamResetReason::RemoteReset:
+    return "remote reset";
+  case Http::StreamResetReason::RemoteRefusedStreamReset:
+    return "remote refused stream reset";
+  }
+
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 void Utility::transformUpgradeRequestFromH1toH2(HeaderMap& headers) {

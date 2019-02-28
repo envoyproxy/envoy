@@ -26,11 +26,11 @@
 #include "test/test_common/logging.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/match.h"
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::AllOf;
@@ -48,7 +48,7 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Server {
 
-class AdminStatsTest : public TestBaseWithParam<Network::Address::IpVersion> {
+class AdminStatsTest : public testing::TestWithParam<Network::Address::IpVersion> {
 public:
   AdminStatsTest() : alloc_(options_) {
     store_ = std::make_unique<Stats::ThreadLocalStoreImpl>(options_, alloc_);
@@ -71,7 +71,7 @@ public:
   std::unique_ptr<Stats::ThreadLocalStoreImpl> store_;
 };
 
-class AdminFilterTest : public TestBaseWithParam<Network::Address::IpVersion> {
+class AdminFilterTest : public testing::TestWithParam<Network::Address::IpVersion> {
 public:
   AdminFilterTest()
       : admin_(TestEnvironment::temporaryPath("envoy.prof"), server_),
@@ -588,7 +588,7 @@ TEST_P(AdminFilterTest, Trailers) {
   EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_.decodeTrailers(request_headers_));
 }
 
-class AdminInstanceTest : public TestBaseWithParam<Network::Address::IpVersion> {
+class AdminInstanceTest : public testing::TestWithParam<Network::Address::IpVersion> {
 public:
   AdminInstanceTest()
       : address_out_path_(TestEnvironment::temporaryPath("admin.address")),
@@ -899,9 +899,11 @@ TEST_P(AdminInstanceTest, Runtime) {
   auto layer1 = std::make_unique<NiceMock<Runtime::MockOverrideLayer>>();
   auto layer2 = std::make_unique<NiceMock<Runtime::MockOverrideLayer>>();
   std::unordered_map<std::string, Runtime::Snapshot::Entry> entries2{
-      {"string_key", {"override", {}, {}}}, {"extra_key", {"bar", {}, {}}}};
+      {"string_key", {"override", {}, {}, {}}}, {"extra_key", {"bar", {}, {}, {}}}};
   std::unordered_map<std::string, Runtime::Snapshot::Entry> entries1{
-      {"string_key", {"foo", {}, {}}}, {"int_key", {"1", 1, {}}}, {"other_key", {"bar", {}, {}}}};
+      {"string_key", {"foo", {}, {}, {}}},
+      {"int_key", {"1", 1, {}, {}}},
+      {"other_key", {"bar", {}, {}, {}}}};
 
   ON_CALL(*layer1, name()).WillByDefault(testing::ReturnRefOfCopy(std::string{"layer1"}));
   ON_CALL(*layer1, values()).WillByDefault(testing::ReturnRef(entries1));
@@ -992,7 +994,7 @@ TEST_P(AdminInstanceTest, ClustersJson) {
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
   ON_CALL(server_.cluster_manager_, clusters()).WillByDefault(ReturnPointee(&cluster_map));
 
-  NiceMock<Upstream::MockCluster> cluster;
+  NiceMock<Upstream::MockClusterMockPrioritySet> cluster;
   cluster_map.emplace(cluster.info_->name_, cluster);
 
   NiceMock<Upstream::Outlier::MockDetector> outlier_detector;
@@ -1032,6 +1034,8 @@ TEST_P(AdminInstanceTest, ClustersJson) {
   ON_CALL(*host, healthFlagGet(Upstream::Host::HealthFlag::FAILED_EDS_HEALTH))
       .WillByDefault(Return(false));
   ON_CALL(*host, healthFlagGet(Upstream::Host::HealthFlag::DEGRADED_ACTIVE_HC))
+      .WillByDefault(Return(true));
+  ON_CALL(*host, healthFlagGet(Upstream::Host::HealthFlag::DEGRADED_EDS_HEALTH))
       .WillByDefault(Return(true));
 
   ON_CALL(host->outlier_detector_, successRate()).WillByDefault(Return(43.2));
@@ -1089,7 +1093,7 @@ TEST_P(AdminInstanceTest, ClustersJson) {
       },
      ],
      "health_status": {
-      "eds_health_status": "HEALTHY",
+      "eds_health_status": "DEGRADED",
       "failed_active_health_check": true,
       "failed_outlier_check": true,
       "failed_active_degraded_check": true
@@ -1219,7 +1223,7 @@ private:
   histogram_t* histogram_;
 };
 
-class PrometheusStatsFormatterTest : public TestBase {
+class PrometheusStatsFormatterTest : public testing::Test {
 protected:
   void addCounter(const std::string& name, std::vector<Stats::Tag> cluster_tags) {
     std::string tname = std::string(name);

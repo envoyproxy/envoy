@@ -67,6 +67,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "io_handle_interface",
     hdrs = ["io_handle.h"],
+    deps = ["//source/common/common:assert_lib"],
 )
 
 envoy_cc_library(

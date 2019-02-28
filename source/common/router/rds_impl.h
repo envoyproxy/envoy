@@ -121,7 +121,7 @@ private:
 
   RdsRouteConfigSubscription(
       const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
-      const std::string& manager_identifier, Server::Configuration::FactoryContext& factory_context,
+      const uint64_t manager_identifier, Server::Configuration::FactoryContext& factory_context,
       const std::string& stat_prefix,
       RouteConfigProviderManagerImpl& route_config_provider_manager);
 
@@ -134,7 +134,7 @@ private:
   Stats::ScopePtr scope_;
   RdsStats stats_;
   RouteConfigProviderManagerImpl& route_config_provider_manager_;
-  const std::string manager_identifier_;
+  const uint64_t manager_identifier_;
   TimeSource& time_source_;
   SystemTime last_updated_;
   absl::optional<LastConfigInfo> config_info_;
@@ -202,7 +202,7 @@ private:
   // TODO(jsedgwick) These two members are prime candidates for the owned-entry list/map
   // as in ConfigTracker. I.e. the ProviderImpls would have an EntryOwner for these lists
   // Then the lifetime management stuff is centralized and opaque.
-  std::unordered_map<std::string, std::weak_ptr<RdsRouteConfigSubscription>>
+  std::unordered_map<uint64_t, std::weak_ptr<RdsRouteConfigSubscription>>
       route_config_subscriptions_;
   std::unordered_set<RouteConfigProvider*> static_route_config_providers_;
   Server::ConfigTracker::EntryOwnerPtr config_tracker_entry_;

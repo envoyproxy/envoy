@@ -41,7 +41,7 @@ where the extension reflects the underlying v2 config representation.
 
 The :ref:`Bootstrap <envoy_api_msg_config.bootstrap.v2.Bootstrap>` message is the root of the
 configuration. A key concept in the :ref:`Bootstrap <envoy_api_msg_config.bootstrap.v2.Bootstrap>`
-message is the distinction between static and dynamic resouces. Resources such
+message is the distinction between static and dynamic resources. Resources such
 as a :ref:`Listener <envoy_api_msg_Listener>` or :ref:`Cluster
 <envoy_api_msg_Cluster>` may be supplied either statically in
 :ref:`static_resources <envoy_api_field_config.bootstrap.v2.Bootstrap.static_resources>` or have
@@ -75,7 +75,8 @@ A minimal fully static bootstrap config is provided below:
       filter_chains:
       - filters:
         - name: envoy.http_connection_manager
-          config:
+          typed_config:
+            "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
             stat_prefix: ingress_http
             codec_type: AUTO
             route_config:
@@ -126,7 +127,8 @@ on 127.0.0.3:5678 is provided below:
       filter_chains:
       - filters:
         - name: envoy.http_connection_manager
-          config:
+          typed_config:
+            "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
             stat_prefix: ingress_http
             codec_type: AUTO
             route_config:
@@ -253,7 +255,8 @@ The management server could respond to LDS requests with:
     filter_chains:
     - filters:
       - name: envoy.http_connection_manager
-        config:
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
           stat_prefix: ingress_http
           codec_type: AUTO
           rds:
@@ -507,7 +510,7 @@ the management of multiple streams and connections to distinct management
 servers.
 
 ADS will allow for hitless updates of configuration by appropriate sequencing.
-For example, suppose *foo.com* was mappped to cluster *X*. We wish to change the
+For example, suppose *foo.com* was mapped to cluster *X*. We wish to change the
 mapping in the route table to point *foo.com* at cluster *Y*. In order to do
 this, a CDS/EDS update must first be delivered containing both clusters *X* and
 *Y*.
@@ -587,7 +590,7 @@ Management Server has a statistics tree rooted at *control_plane.* with the foll
    :header: Name, Type, Description
    :widths: 1, 1, 2
 
-   connected_state, Gauge, A boolan (1 for connected and 0 for disconnected) that indicates the current connection state with management server
+   connected_state, Gauge, A boolean (1 for connected and 0 for disconnected) that indicates the current connection state with management server
    rate_limit_enforced, Counter, Total number of times rate limit was enforced for management server requests
    pending_requests, Gauge, Total number of pending requests when the rate limit was enforced
    
@@ -619,7 +622,7 @@ likely to be at least partially implemented in Envoy but may have wire format
 breaking changes made prior to freezing.
 
 Protos tagged *experimental*, have the same caveats as draft protos
-and may have have major changes made prior to Envoy implementation and freezing.
+and may have major changes made prior to Envoy implementation and freezing.
 
 The current open v2 API issues are tracked `here
 <https://github.com/envoyproxy/envoy/issues?q=is%3Aopen+is%3Aissue+label%3A%22v2+API%22>`_.

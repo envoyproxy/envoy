@@ -1,11 +1,12 @@
 #include "extensions/filters/http/tap/tap_filter.h"
 
+#include "test/extensions/filters/http/tap/common.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::InSequence;
 using testing::Return;
@@ -25,28 +26,18 @@ public:
   FilterStats stats_{Filter::generateStats("foo", stats_store_)};
 };
 
-class MockHttpTapConfig : public HttpTapConfig {
-public:
-  HttpPerRequestTapperPtr createPerRequestTapper(uint64_t stream_id) override {
-    return HttpPerRequestTapperPtr{createPerRequestTapper_(stream_id)};
-  }
-
-  MOCK_METHOD1(createPerRequestTapper_, HttpPerRequestTapper*(uint64_t stream_id));
-};
-
 class MockHttpPerRequestTapper : public HttpPerRequestTapper {
 public:
   MOCK_METHOD1(onRequestHeaders, void(const Http::HeaderMap& headers));
+  MOCK_METHOD1(onRequestBody, void(const Buffer::Instance& data));
   MOCK_METHOD1(onRequestTrailers, void(const Http::HeaderMap& headers));
   MOCK_METHOD1(onResponseHeaders, void(const Http::HeaderMap& headers));
+  MOCK_METHOD1(onResponseBody, void(const Buffer::Instance& data));
   MOCK_METHOD1(onResponseTrailers, void(const Http::HeaderMap& headers));
-  MOCK_METHOD4(onDestroyLog,
-               bool(const Http::HeaderMap* request_headers, const Http::HeaderMap* request_trailers,
-                    const Http::HeaderMap* response_headers,
-                    const Http::HeaderMap* response_trailers));
+  MOCK_METHOD0(onDestroyLog, bool());
 };
 
-class TapFilterTest : public TestBase {
+class TapFilterTest : public testing::Test {
 public:
   void setup(bool has_config) {
     if (has_config) {
@@ -109,6 +100,7 @@ TEST_F(TapFilterTest, Config) {
   EXPECT_CALL(*http_per_request_tapper_, onRequestHeaders(_));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
   Buffer::OwnedImpl request_body;
+  EXPECT_CALL(*http_per_request_tapper_, onRequestBody(_));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(request_body, false));
   Http::TestHeaderMapImpl request_trailers;
   EXPECT_CALL(*http_per_request_tapper_, onRequestTrailers(_));
@@ -120,14 +112,13 @@ TEST_F(TapFilterTest, Config) {
   EXPECT_CALL(*http_per_request_tapper_, onResponseHeaders(_));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
   Buffer::OwnedImpl response_body;
+  EXPECT_CALL(*http_per_request_tapper_, onResponseBody(_));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_body, false));
   Http::TestHeaderMapImpl response_trailers;
   EXPECT_CALL(*http_per_request_tapper_, onResponseTrailers(_));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers));
 
-  EXPECT_CALL(*http_per_request_tapper_, onDestroyLog(&request_headers, &request_trailers,
-                                                      &response_headers, &response_trailers))
-      .WillOnce(Return(true));
+  EXPECT_CALL(*http_per_request_tapper_, onDestroyLog()).WillOnce(Return(true));
   filter_->log(&request_headers, &response_headers, &response_trailers, stream_info_);
   EXPECT_EQ(1UL, filter_config_->stats_.rq_tapped_.value());
 

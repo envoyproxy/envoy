@@ -80,11 +80,17 @@ void invokeDebugAssertionFailureRecordAction_ForAssertMacroUseOnly();
 #define _ASSERT_VERBOSE(X, Y) _ASSERT_IMPL(X, #X, ASSERT_ACTION, Y)
 #define _ASSERT_SELECTOR(_1, _2, ASSERT_MACRO, ...) ASSERT_MACRO
 
+// This is a workaround for fact that MSVC expands __VA_ARGS__ after passing them into a macro,
+// rather than before passing them into a macro. Without this, _ASSERT_SELECTOR does not work
+// correctly when compiled with MSVC
+#define EXPAND(X) X
+
 // If ASSERT is called with one argument, the ASSERT_SELECTOR will return
 // _ASSERT_ORIGINAL and this will call _ASSERT_ORIGINAL(__VA_ARGS__).
 // If ASSERT is called with two arguments, ASSERT_SELECTOR will return
 // _ASSERT_VERBOSE, and this will call _ASSERT_VERBOSE,(__VA_ARGS__)
-#define ASSERT(...) _ASSERT_SELECTOR(__VA_ARGS__, _ASSERT_VERBOSE, _ASSERT_ORIGINAL)(__VA_ARGS__)
+#define ASSERT(...)                                                                                \
+  EXPAND(_ASSERT_SELECTOR(__VA_ARGS__, _ASSERT_VERBOSE, _ASSERT_ORIGINAL)(__VA_ARGS__))
 #else
 // This non-implementation ensures that its argument is a valid expression that can be statically
 // casted to a bool, but the expression is never evaluated and will be compiled away.

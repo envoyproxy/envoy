@@ -59,6 +59,10 @@ void ConnPoolImpl::addDrainedCallback(DrainedCb cb) {
   checkForDrained();
 }
 
+bool ConnPoolImpl::hasActiveConnections() const {
+  return !pending_requests_.empty() || !busy_clients_.empty();
+}
+
 void ConnPoolImpl::attachRequestToClient(ActiveClient& client, StreamDecoder& response_decoder,
                                          ConnectionPool::Callbacks& callbacks) {
   ASSERT(!client.stream_wrapper_);
@@ -285,7 +289,7 @@ ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
       remaining_requests_(parent_.host_->cluster().maxRequestsPerConnection()) {
 
   parent_.conn_connect_ms_ = std::make_unique<Stats::Timespan>(
-      parent_.host_->cluster().stats().upstream_cx_connect_ms_, parent_.dispatcher_.timeSystem());
+      parent_.host_->cluster().stats().upstream_cx_connect_ms_, parent_.dispatcher_.timeSource());
   Upstream::Host::CreateConnectionData data =
       parent_.host_->createConnection(parent_.dispatcher_, parent_.socket_options_, nullptr);
   real_host_description_ = data.host_description_;
@@ -298,7 +302,7 @@ ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
   parent_.host_->stats().cx_total_.inc();
   parent_.host_->stats().cx_active_.inc();
   conn_length_ = std::make_unique<Stats::Timespan>(
-      parent_.host_->cluster().stats().upstream_cx_length_ms_, parent_.dispatcher_.timeSystem());
+      parent_.host_->cluster().stats().upstream_cx_length_ms_, parent_.dispatcher_.timeSource());
   connect_timer_->enableTimer(parent_.host_->cluster().connectTimeout());
   parent_.host_->cluster().resourceManager(parent_.priority_).connections().inc();
 
@@ -325,7 +329,7 @@ void ConnPoolImpl::ActiveClient::onConnectTimeout() {
   codec_client_->close();
 }
 
-CodecClientPtr ConnPoolImplProd::createCodecClient(Upstream::Host::CreateConnectionData& data) {
+CodecClientPtr ProdConnPoolImpl::createCodecClient(Upstream::Host::CreateConnectionData& data) {
   CodecClientPtr codec{new CodecClientProd(CodecClient::Type::HTTP1, std::move(data.connection_),
                                            data.host_description_, dispatcher_)};
   return codec;

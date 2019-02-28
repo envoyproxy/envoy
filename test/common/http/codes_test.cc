@@ -11,10 +11,10 @@
 
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Property;
@@ -22,7 +22,7 @@ using testing::Property;
 namespace Envoy {
 namespace Http {
 
-class CodeUtilityTest : public TestBase {
+class CodeUtilityTest : public testing::Test {
 public:
   void addResponse(uint64_t code, bool canary, bool internal_request,
                    const std::string& request_vhost_name = EMPTY_STRING,
@@ -235,7 +235,7 @@ TEST(CodeUtilityResponseTimingTest, All) {
   code_stats.chargeResponseTiming(info);
 }
 
-class CodeStatsTest : public TestBase {
+class CodeStatsTest : public testing::Test {
 protected:
   absl::string_view stripTrailingDot(absl::string_view prefix) {
     return CodeStatsImpl::stripTrailingDot(prefix);

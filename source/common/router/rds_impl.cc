@@ -56,7 +56,7 @@ StaticRouteConfigProviderImpl::~StaticRouteConfigProviderImpl() {
 // initialization needs to be fixed.
 RdsRouteConfigSubscription::RdsRouteConfigSubscription(
     const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
-    const std::string& manager_identifier, Server::Configuration::FactoryContext& factory_context,
+    const uint64_t manager_identifier, Server::Configuration::FactoryContext& factory_context,
     const std::string& stat_prefix,
     Envoy::Router::RouteConfigProviderManagerImpl& route_config_provider_manager)
     : route_config_name_(rds.route_config_name()),
@@ -129,7 +129,8 @@ void RdsRouteConfigSubscription::onConfigUpdateFailed(const EnvoyException*) {
 }
 
 void RdsRouteConfigSubscription::registerInitTarget(Init::Manager& init_manager) {
-  init_manager.registerTarget(*this);
+  init_manager.registerTarget(*this,
+                              fmt::format("RdsRouteConfigSubscription {}", route_config_name_));
 }
 
 void RdsRouteConfigSubscription::runInitializeCallbackIfAny() {
@@ -194,9 +195,7 @@ Router::RouteConfigProviderPtr RouteConfigProviderManagerImpl::createRdsRouteCon
     Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix) {
 
   // RdsRouteConfigSubscriptions are unique based on their serialized RDS config.
-  // TODO(htuch): Full serialization here gives large IDs, could get away with a
-  // strong hash instead.
-  const std::string manager_identifier = rds.SerializeAsString();
+  const uint64_t manager_identifier = MessageUtil::hash(rds);
 
   RdsRouteConfigSubscriptionSharedPtr subscription;
 

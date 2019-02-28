@@ -28,6 +28,7 @@ envoy_cc_library(
     srcs = ["ssl_socket.cc"],
     hdrs = ["ssl_socket.h"],
     external_deps = [
+        "abseil_optional",
         "abseil_synchronization",
         "ssl",
     ],
