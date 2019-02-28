@@ -79,8 +79,6 @@ template <typename T> struct IoCallResult {
   IoErrorPtr err_;
 };
 
-using IoCallBoolResult = IoCallResult<bool>;
-using IoCallSizeResult = IoCallResult<ssize_t>;
 using IoCallUintResult = IoCallResult<uint64_t>;
 
 } // namespace Api
