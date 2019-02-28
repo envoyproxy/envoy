@@ -176,7 +176,7 @@ public:
   /**
    * Sets the upstream timing information for this stream. This is useful for
    * when multiple upstream requests are issued and we want to save timing
-   * information for the one that "wins"
+   * information for the one that "wins".
    */
   virtual void setUpstreamTiming(const UpstreamTiming& upstream_timing) PURE;
 
