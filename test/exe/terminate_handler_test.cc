@@ -5,8 +5,10 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
+
 TEST(TerminateHandlerDeathTest, HandlerInstalledTest) {
   TerminateHandler handler;
   EXPECT_DEATH_LOG_TO_STDERR([]() -> void { std::terminate(); }(), ".*std::terminate called!.*");
 }
+
 } // namespace Envoy

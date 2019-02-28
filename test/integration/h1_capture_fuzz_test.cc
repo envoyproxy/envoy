@@ -10,4 +10,5 @@ DEFINE_PROTO_FUZZER(const test::integration::CaptureFuzzTestCase& input) {
   H1FuzzIntegrationTest h1_fuzz_integration_test(ip_version);
   h1_fuzz_integration_test.replay(input);
 }
+
 } // namespace Envoy

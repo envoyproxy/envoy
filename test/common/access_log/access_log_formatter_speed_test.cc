@@ -14,6 +14,7 @@ static std::unique_ptr<Envoy::TestStreamInfo> stream_info;
 } // namespace
 
 namespace Envoy {
+
 static void BM_AccessLogFormatter(benchmark::State& state) {
   size_t output_bytes = 0;
   Http::TestHeaderMapImpl request_headers;
@@ -27,6 +28,7 @@ static void BM_AccessLogFormatter(benchmark::State& state) {
   benchmark::DoNotOptimize(output_bytes);
 }
 BENCHMARK(BM_AccessLogFormatter);
+
 } // namespace Envoy
 
 // Boilerplate main(), which discovers benchmarks in the same file and runs them.

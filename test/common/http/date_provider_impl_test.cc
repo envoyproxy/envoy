@@ -14,6 +14,7 @@ using testing::NiceMock;
 
 namespace Envoy {
 namespace Http {
+
 TEST(DateProviderImplTest, All) {
   Event::MockDispatcher dispatcher;
   NiceMock<ThreadLocal::MockInstance> tls;
@@ -32,5 +33,6 @@ TEST(DateProviderImplTest, All) {
   provider.setDateHeader(headers);
   EXPECT_NE(nullptr, headers.Date());
 }
+
 } // namespace Http
 } // namespace Envoy

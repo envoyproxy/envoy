@@ -18,6 +18,7 @@
 #include "benchmark/benchmark.h"
 
 namespace Envoy {
+
 class ThreadLocalStorePerf {
 public:
   ThreadLocalStorePerf()
@@ -53,6 +54,7 @@ private:
   std::unique_ptr<ThreadLocal::InstanceImpl> tls_;
   envoy::config::metrics::v2::StatsConfig stats_config_;
 };
+
 } // namespace Envoy
 
 // Tests the single-threaded performance of the thread-local-store stats caches

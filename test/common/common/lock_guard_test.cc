@@ -5,6 +5,7 @@
 
 namespace Envoy {
 namespace Thread {
+
 class ThreadTest : public testing::Test {
 protected:
   ThreadTest() : a_(0), b_(0) {}
@@ -42,5 +43,6 @@ TEST_F(ThreadTest, TestTryLockGuard) {
     EXPECT_EQ(1, ++b_);
   }
 }
+
 } // namespace Thread
 } // namespace Envoy

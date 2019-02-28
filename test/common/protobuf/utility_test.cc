@@ -17,6 +17,7 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
+
 class ProtobufUtilityTest : public testing::Test {
 protected:
   ProtobufUtilityTest() : api_(Api::createApiForTest()) {}

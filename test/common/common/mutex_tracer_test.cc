@@ -10,6 +10,7 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
+
 class MutexTracerTest : public testing::Test {
 protected:
   void SetUp() override { tracer_.reset(); }
@@ -83,4 +84,5 @@ TEST_F(MutexTracerTest, TwoThreadsWithContention) {
     EXPECT_GT(tracer_.lifetimeWaitCycles(), curr_num_lifetime_wait_cycles);
   }
 }
+
 } // namespace Envoy

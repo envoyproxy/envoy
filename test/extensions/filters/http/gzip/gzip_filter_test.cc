@@ -19,6 +19,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Gzip {
+
 class GzipFilterTest : public testing::Test {
 protected:
   GzipFilterTest() {
@@ -706,6 +707,7 @@ TEST_F(GzipFilterTest, RemoveAcceptEncodingHeader) {
     EXPECT_EQ("deflate, gzip, br", headers.get_("accept-encoding"));
   }
 }
+
 } // namespace Gzip
 } // namespace HttpFilters
 } // namespace Extensions

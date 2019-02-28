@@ -47,6 +47,7 @@ using testing::ReturnRef;
 
 namespace Envoy {
 namespace Server {
+
 class AdminStatsTest : public testing::TestWithParam<Network::Address::IpVersion> {
 public:
   AdminStatsTest() : alloc_(options_) {
@@ -1508,5 +1509,6 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithUsedOnlyHistogram) {
     EXPECT_EQ(1UL, size);
   }
 }
+
 } // namespace Server
 } // namespace Envoy

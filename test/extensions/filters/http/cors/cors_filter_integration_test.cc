@@ -5,6 +5,7 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
+
 class CorsFilterIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                   public HttpIntegrationTest {
 public:

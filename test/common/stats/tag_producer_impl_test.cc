@@ -9,6 +9,7 @@
 
 namespace Envoy {
 namespace Stats {
+
 TEST(TagProducerTest, CheckConstructor) {
   envoy::config::metrics::v2::StatsConfig stats_config;
 
@@ -53,5 +54,6 @@ TEST(TagProducerTest, CheckConstructor) {
       TagProducerImpl{stats_config}, EnvoyException,
       "No regex specified for tag specifier and no default regex for name: 'test_extractor'");
 }
+
 } // namespace Stats
 } // namespace Envoy

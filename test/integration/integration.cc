@@ -45,6 +45,7 @@ using testing::NiceMock;
 using testing::ReturnRef;
 
 namespace Envoy {
+
 IntegrationStreamDecoder::IntegrationStreamDecoder(Event::Dispatcher& dispatcher)
     : dispatcher_(dispatcher) {}
 

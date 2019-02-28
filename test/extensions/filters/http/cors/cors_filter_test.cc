@@ -23,6 +23,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Cors {
+
 class CorsFilterTest : public testing::Test {
 public:
   CorsFilterTest() : config_(new CorsFilterConfig("test.", stats_)), filter_(config_) {
@@ -682,6 +683,7 @@ TEST_F(CorsFilterTest, OptionsRequestNotMatchingOriginByRegex) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(request_headers_));
 }
+
 } // namespace Cors
 } // namespace HttpFilters
 } // namespace Extensions

@@ -10,6 +10,7 @@
 namespace Envoy {
 namespace Network {
 namespace Address {
+
 static void Ipv4InstanceCreate(benchmark::State& state) {
   sockaddr_in addr;
   addr.sin_family = AF_INET;
@@ -35,6 +36,7 @@ static void Ipv6InstanceCreate(benchmark::State& state) {
   }
 }
 BENCHMARK(Ipv6InstanceCreate);
+
 } // namespace Address
 } // namespace Network
 } // namespace Envoy

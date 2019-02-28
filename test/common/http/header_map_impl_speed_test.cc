@@ -4,6 +4,7 @@
 
 namespace Envoy {
 namespace Http {
+
 /**
  * Add several dummy headers to a HeaderMap.
  * @param num_headers the number of dummy headers to add.
@@ -203,6 +204,7 @@ static void HeaderMapImplPopulate(benchmark::State& state) {
   }
 }
 BENCHMARK(HeaderMapImplPopulate);
+
 } // namespace Http
 } // namespace Envoy
 

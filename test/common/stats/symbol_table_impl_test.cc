@@ -14,6 +14,7 @@
 
 namespace Envoy {
 namespace Stats {
+
 // See comments in fake_symbol_table_impl.h: we need to test two implementations
 // of SymbolTable, which we'll do with a test parameterized on this enum.
 //
@@ -561,5 +562,6 @@ TEST(SymbolTableTest, Memory) {
     EXPECT_LT(symbol_table_mem_used, 1750000);
   }
 }
+
 } // namespace Stats
 } // namespace Envoy

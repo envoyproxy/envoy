@@ -9,6 +9,7 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
+
 class GzipIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                             public Event::SimulatedTimeSystem,
                             public HttpIntegrationTest {

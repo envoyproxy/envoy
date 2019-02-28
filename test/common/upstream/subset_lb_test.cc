@@ -30,6 +30,7 @@ using testing::ReturnRef;
 
 namespace Envoy {
 namespace Upstream {
+
 class SubsetLoadBalancerDescribeMetadataTester {
 public:
   SubsetLoadBalancerDescribeMetadataTester(std::shared_ptr<SubsetLoadBalancer> lb) : lb_(lb) {}

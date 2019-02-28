@@ -21,6 +21,7 @@ using testing::Property;
 
 namespace Envoy {
 namespace Http {
+
 class CodeUtilityTest : public testing::Test {
 public:
   void addResponse(uint64_t code, bool canary, bool internal_request,
@@ -259,5 +260,6 @@ TEST_F(CodeStatsTest, Join) {
   EXPECT_EQ("hello", join({"hello"}));
   EXPECT_EQ("", join({""}));
 }
+
 } // namespace Http
 } // namespace Envoy

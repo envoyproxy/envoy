@@ -7,6 +7,7 @@ using testing::InSequence;
 
 namespace Envoy {
 namespace Common {
+
 class CallbackManagerTest : public testing::Test {
 public:
   MOCK_METHOD1(called, void(int arg));
@@ -38,5 +39,6 @@ TEST_F(CallbackManagerTest, All) {
   EXPECT_CALL(*this, called(10));
   manager.runCallbacks(5);
 }
+
 } // namespace Common
 } // namespace Envoy

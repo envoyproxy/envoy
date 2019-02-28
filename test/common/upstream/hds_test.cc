@@ -30,6 +30,7 @@ using testing::ReturnRef;
 
 namespace Envoy {
 namespace Upstream {
+
 // Friend class of HdsDelegate, making it easier to access private fields
 class HdsDelegateFriend {
 public:
@@ -324,5 +325,6 @@ TEST_F(HdsTest, TestSendResponseOneEndpointTimeout) {
                 .port_value(),
             1234);
 }
+
 } // namespace Upstream
 } // namespace Envoy

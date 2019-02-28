@@ -50,12 +50,21 @@ public:
   void unregisterConfig(ExtensionConfig& config);
 
   // Extensions::Common::Tap::Sink
-  void
-  submitBufferedTrace(const std::shared_ptr<envoy::data::tap::v2alpha::BufferedTraceWrapper>& trace,
-                      envoy::service::tap::v2alpha::OutputSink::Format format,
-                      uint64_t trace_id) override;
+  PerTapSinkHandlePtr createPerTapSinkHandle(uint64_t) override {
+    return std::make_unique<AdminPerTapSinkHandle>(*this);
+  }
 
 private:
+  struct AdminPerTapSinkHandle : public PerTapSinkHandle {
+    AdminPerTapSinkHandle(AdminHandler& parent) : parent_(parent) {}
+
+    // Extensions::Common::Tap::PerTapSinkHandle
+    void submitTrace(const TraceWrapperSharedPtr& trace,
+                     envoy::service::tap::v2alpha::OutputSink::Format format) override;
+
+    AdminHandler& parent_;
+  };
+
   struct AttachedRequest {
     AttachedRequest(std::string config_id, Server::AdminStream* admin_stream)
         : config_id_(std::move(config_id)), admin_stream_(admin_stream) {}

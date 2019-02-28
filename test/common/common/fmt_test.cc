@@ -5,6 +5,7 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
+
 TEST(FormatHelpersTest, Format) {
   absl::string_view sv = "This is my string.";
   absl::string_view my_string = sv.substr(8, 9);
@@ -19,4 +20,5 @@ TEST(FormatHelpersTest, FormatLogMessages) {
   absl::string_view sv = "formatted";
   ENVOY_LOG_MISC(info, "fake {} message", sv);
 }
+
 } // namespace Envoy

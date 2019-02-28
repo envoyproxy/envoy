@@ -10,6 +10,7 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
+
 class TestFilterLog : public Logger::Loggable<Logger::Id::filter> {
 public:
   void logMessage() {
@@ -114,4 +115,5 @@ TEST(RegistryTest, LoggerWithName) {
   EXPECT_EQ(nullptr, Logger::Registry::logger("blah"));
   EXPECT_EQ("upstream", Logger::Registry::logger("upstream")->name());
 }
+
 } // namespace Envoy

@@ -45,7 +45,7 @@ using PerSocketTapperPtr = std::unique_ptr<PerSocketTapper>;
 /**
  * Abstract socket tap configuration.
  */
-class SocketTapConfig : public Extensions::Common::Tap::TapConfig {
+class SocketTapConfig : public virtual Extensions::Common::Tap::TapConfig {
 public:
   /**
    * @return a new per-socket tapper which is used to handle tapping of a discrete socket.

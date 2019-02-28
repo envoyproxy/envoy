@@ -17,6 +17,7 @@ using ::testing::HasSubstr;
 using ::testing::MatchesRegex;
 
 namespace Envoy {
+
 INSTANTIATE_TEST_SUITE_P(IpVersions, Http2IntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
@@ -1028,4 +1029,5 @@ TEST_P(Http2RingHashIntegrationTest, CookieRoutingWithCookieWithTtlSet) {
       });
   EXPECT_EQ(served_by.size(), 1);
 }
+
 } // namespace Envoy

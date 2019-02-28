@@ -14,6 +14,7 @@ using testing::Return;
 
 namespace Envoy {
 namespace Network {
+
 namespace {
 template <Network::Address::SocketType Type>
 class ListenSocketImplTest : public testing::TestWithParam<Address::IpVersion> {

@@ -19,6 +19,7 @@
 using testing::ContainerEq;
 
 namespace Envoy {
+
 TEST(StringUtil, strtoull) {
   uint64_t out;
   const char* rest;
@@ -828,4 +829,5 @@ TEST(DateFormatter, FromTimeSameWildcard) {
   EXPECT_EQ("2018-04-03T23:06:09.000Z114",
             DateFormatter("%Y-%m-%dT%H:%M:%S.000Z%1f%2f").fromTime(time1));
 }
+
 } // namespace Envoy

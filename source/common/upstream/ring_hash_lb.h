@@ -57,8 +57,9 @@ private:
   };
 
   struct Ring : public HashingLoadBalancer {
-    Ring(const HostSet& host_set, bool in_panic, uint64_t min_ring_size, uint64_t max_ring_size,
-         bool use_std_hash, HashFunction hash_function, RingHashLoadBalancerStats& stats);
+    Ring(const NormalizedHostWeightVector& normalized_host_weights, double min_normalized_weight,
+         uint64_t min_ring_size, uint64_t max_ring_size, bool use_std_hash,
+         HashFunction hash_function, RingHashLoadBalancerStats& stats);
 
     // ThreadAwareLoadBalancerBase::HashingLoadBalancer
     HostConstSharedPtr chooseHost(uint64_t hash) const override;
@@ -70,9 +71,11 @@ private:
   typedef std::shared_ptr<const Ring> RingConstSharedPtr;
 
   // ThreadAwareLoadBalancerBase
-  HashingLoadBalancerSharedPtr createLoadBalancer(const HostSet& host_set, bool in_panic) override {
-    return std::make_shared<Ring>(host_set, in_panic, min_ring_size_, max_ring_size_, use_std_hash_,
-                                  hash_function_, stats_);
+  HashingLoadBalancerSharedPtr
+  createLoadBalancer(const NormalizedHostWeightVector& normalized_host_weights,
+                     double min_normalized_weight, double /* max_normalized_weight */) override {
+    return std::make_shared<Ring>(normalized_host_weights, min_normalized_weight, min_ring_size_,
+                                  max_ring_size_, use_std_hash_, hash_function_, stats_);
   }
 
   static RingHashLoadBalancerStats generateStats(Stats::Scope& scope);

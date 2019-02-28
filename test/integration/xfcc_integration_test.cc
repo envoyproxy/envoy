@@ -26,6 +26,7 @@
 
 namespace Envoy {
 namespace Xfcc {
+
 void XfccIntegrationTest::TearDown() {
   test_server_.reset();
   client_mtls_ssl_ctx_.reset();

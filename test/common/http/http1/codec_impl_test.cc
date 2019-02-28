@@ -27,6 +27,7 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Http {
 namespace Http1 {
+
 class Http1ServerConnectionImplTest : public testing::Test {
 public:
   void initialize() {
@@ -1030,6 +1031,7 @@ TEST_F(Http1ServerConnectionImplTest, TestCodecHeaderLimits) {
   EXPECT_THROW_WITH_MESSAGE(codec_->dispatch(buffer), EnvoyException,
                             "http/1.1 protocol error: HPE_HEADER_OVERFLOW");
 }
+
 } // namespace Http1
 } // namespace Http
 } // namespace Envoy

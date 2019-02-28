@@ -32,6 +32,7 @@ using testing::ReturnRef;
 
 namespace Envoy {
 namespace Http {
+namespace {
 
 class AsyncClientImplTest : public testing::Test {
 public:
@@ -904,5 +905,6 @@ TEST_F(AsyncClientImplTest, RdsGettersTest) {
   EXPECT_CALL(stream_callbacks_, onReset());
 }
 
+} // namespace
 } // namespace Http
 } // namespace Envoy

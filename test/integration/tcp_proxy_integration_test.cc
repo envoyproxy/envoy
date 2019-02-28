@@ -20,6 +20,7 @@ using testing::MatchesRegex;
 using testing::NiceMock;
 
 namespace Envoy {
+namespace {
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, TcpProxyIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
@@ -496,4 +497,5 @@ TEST_P(TcpProxySslIntegrationTest, UpstreamHalfClose) {
   ASSERT_TRUE(fake_upstream_connection_->waitForHalfClose());
 }
 
+} // namespace
 } // namespace Envoy

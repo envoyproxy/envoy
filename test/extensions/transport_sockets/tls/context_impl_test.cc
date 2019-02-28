@@ -33,6 +33,7 @@ namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
+
 class SslContextImplTest : public SslCertsTest {
 protected:
   Event::SimulatedTimeSystem time_system_;
@@ -1199,6 +1200,7 @@ TEST_F(ServerContextConfigImplTest, InvalidIgnoreCertsNoCA) {
 
   EXPECT_NO_THROW(ServerContextConfigImpl server_context_config(tls_context, factory_context_));
 }
+
 } // namespace Tls
 } // namespace TransportSockets
 } // namespace Extensions

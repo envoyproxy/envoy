@@ -27,6 +27,7 @@ using testing::ReturnRef;
 
 namespace Envoy {
 namespace Http {
+
 class MockInternalAddressConfig : public Http::InternalAddressConfig {
 public:
   MOCK_CONST_METHOD1(isInternalAddress, bool(const Network::Address::Instance&));
@@ -85,7 +86,7 @@ public:
   ConnectionManagerUtilityTest() {
     ON_CALL(config_, userAgent()).WillByDefault(ReturnRef(user_agent_));
 
-    tracing_config_ = {Tracing::OperationName::Ingress, {}, 100, 10000, 100};
+    tracing_config_ = {Tracing::OperationName::Ingress, {}, 100, 10000, 100, false};
     ON_CALL(config_, tracingConfig()).WillByDefault(Return(&tracing_config_));
 
     ON_CALL(config_, via()).WillByDefault(ReturnRef(via_));
@@ -1091,5 +1092,6 @@ TEST_F(ConnectionManagerUtilityTest, RemovesProxyResponseHeaders) {
   EXPECT_FALSE(response_headers.has("keep-alive"));
   EXPECT_FALSE(response_headers.has("proxy-connection"));
 }
+
 } // namespace Http
 } // namespace Envoy

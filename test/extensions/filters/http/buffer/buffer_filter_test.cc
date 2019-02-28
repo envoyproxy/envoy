@@ -27,6 +27,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace BufferFilter {
+
 class BufferFilterTest : public testing::Test {
 public:
   BufferFilterConfigSharedPtr setupConfig() {
@@ -132,6 +133,7 @@ TEST_F(BufferFilterTest, RouteDisabledConfigOverride) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data1, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data1, true));
 }
+
 } // namespace BufferFilter
 } // namespace HttpFilters
 } // namespace Extensions

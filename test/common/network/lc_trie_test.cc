@@ -12,6 +12,7 @@
 namespace Envoy {
 namespace Network {
 namespace LcTrie {
+
 class LcTrieTest : public testing::Test {
 public:
   void setup(const std::vector<std::vector<std::string>>& cidr_range_strings,
@@ -368,6 +369,7 @@ TEST_F(LcTrieTest, MaximumEntriesExceptionOverride) {
                             "LC-Trie can only support '5242' CIDR ranges with "
                             "the specified fill factor.");
 }
+
 } // namespace LcTrie
 } // namespace Network
 } // namespace Envoy

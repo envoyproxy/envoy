@@ -8,6 +8,7 @@
 namespace Envoy {
 namespace Network {
 namespace Test {
+
 class NetworkUtilityTest : public testing::TestWithParam<Address::IpVersion> {
 protected:
   NetworkUtilityTest() : version_(GetParam()) {}
@@ -43,6 +44,7 @@ TEST_P(NetworkUtilityTest, DISABLED_ValidateBindFreeLoopbackPort) {
     seen[addr] = n;
   }
 }
+
 } // namespace Test
 } // namespace Network
 } // namespace Envoy

@@ -123,4 +123,5 @@ TEST(Signals, HandlerTest) {
   fake_si.si_addr = nullptr;
   SignalAction::sigHandler(SIGURG, &fake_si, nullptr);
 }
+
 } // namespace Envoy

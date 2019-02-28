@@ -13,6 +13,7 @@
 
 namespace Envoy {
 namespace Stats {
+
 TEST(TagExtractorTest, TwoSubexpressions) {
   TagExtractorImpl tag_extractor("cluster_name", "^cluster\\.((.+?)\\.)");
   EXPECT_EQ("cluster_name", tag_extractor.name());
@@ -349,5 +350,6 @@ TEST(TagExtractorTest, CreateTagExtractorNoRegex) {
   EXPECT_THROW_WITH_REGEX(TagExtractorImpl::createTagExtractor("no such default tag", ""),
                           EnvoyException, "^No regex specified for tag specifier and no default");
 }
+
 } // namespace Stats
 } // namespace Envoy

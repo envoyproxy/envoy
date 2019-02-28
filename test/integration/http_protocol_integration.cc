@@ -27,4 +27,5 @@ std::string HttpProtocolIntegrationTest::protocolTestParamsToString(
       (params.param.upstream_protocol == FakeHttpConnection::Type::HTTP2 ? "Http2Upstream"
                                                                          : "HttpUpstream"));
 }
+
 } // namespace Envoy

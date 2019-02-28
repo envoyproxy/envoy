@@ -16,6 +16,7 @@
 
 namespace Envoy {
 namespace Http {
+
 class CodeUtilitySpeedTest {
 public:
   void addResponse(uint64_t code, bool canary, bool internal_request,
@@ -54,6 +55,7 @@ public:
   Stats::IsolatedStoreImpl cluster_scope_;
   Http::CodeStatsImpl code_stats_;
 };
+
 } // namespace Http
 } // namespace Envoy
 

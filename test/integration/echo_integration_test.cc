@@ -4,6 +4,7 @@
 #include "test/test_common/utility.h"
 
 namespace Envoy {
+
 std::string echo_config;
 
 class EchoIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
@@ -144,4 +145,5 @@ TEST_P(EchoIntegrationTest, AddRemoveListener) {
   }
   ASSERT_TRUE(connect_fail);
 }
+
 } // namespace Envoy

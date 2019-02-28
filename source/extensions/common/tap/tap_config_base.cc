@@ -1,7 +1,5 @@
 #include "extensions/common/tap/tap_config_base.h"
 
-#include <fstream>
-
 #include "common/common/assert.h"
 #include "common/common/stack_array.h"
 #include "common/protobuf/utility.h"
@@ -46,8 +44,11 @@ TapConfigBaseImpl::TapConfigBaseImpl(envoy::service::tap::v2alpha::TapConfig&& p
     : max_buffered_rx_bytes_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           proto_config.output_config(), max_buffered_rx_bytes, DefaultMaxBufferedBytes)),
       max_buffered_tx_bytes_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-          proto_config.output_config(), max_buffered_tx_bytes, DefaultMaxBufferedBytes)) {
+          proto_config.output_config(), max_buffered_tx_bytes, DefaultMaxBufferedBytes)),
+      streaming_(proto_config.output_config().streaming()) {
   ASSERT(proto_config.output_config().sinks().size() == 1);
+  // TODO(mattklein123): Add per-sink checks to make sure format makes sense. I.e., when using
+  // streaming, we should require the length delimited version of binary proto, etc.
   sink_format_ = proto_config.output_config().sinks()[0].format();
   switch (proto_config.output_config().sinks()[0].output_sink_type_case()) {
   case envoy::service::tap::v2alpha::OutputSink::kStreamingAdmin:
@@ -72,7 +73,7 @@ TapConfigBaseImpl::TapConfigBaseImpl(envoy::service::tap::v2alpha::TapConfig&& p
   buildMatcher(proto_config.match_config(), matchers_);
 }
 
-Matcher& TapConfigBaseImpl::rootMatcher() const {
+const Matcher& TapConfigBaseImpl::rootMatcher() const {
   ASSERT(matchers_.size() >= 1);
   return *matchers_[0];
 }
@@ -83,76 +84,103 @@ void swapBytesToString(envoy::data::tap::v2alpha::Body& body) {
 }
 } // namespace
 
-void TapConfigBaseImpl::submitBufferedTrace(
-    const std::shared_ptr<envoy::data::tap::v2alpha::BufferedTraceWrapper>& trace,
-    uint64_t trace_id) {
+void Utility::bodyBytesToString(envoy::data::tap::v2alpha::TraceWrapper& trace,
+                                envoy::service::tap::v2alpha::OutputSink::Format sink_format) {
   // Swap the "bytes" string into the "string" string. This is done purely so that JSON
   // serialization will serialize as a string vs. doing base64 encoding.
-  if (sink_format_ == envoy::service::tap::v2alpha::OutputSink::JSON_BODY_AS_STRING) {
-    switch (trace->trace_case()) {
-    case envoy::data::tap::v2alpha::BufferedTraceWrapper::kHttpBufferedTrace: {
-      auto* http_trace = trace->mutable_http_buffered_trace();
-      if (http_trace->has_request() && http_trace->request().has_body()) {
-        swapBytesToString(*http_trace->mutable_request()->mutable_body());
-      }
-      if (http_trace->has_response() && http_trace->response().has_body()) {
-        swapBytesToString(*http_trace->mutable_response()->mutable_body());
-      }
-      break;
-    }
-    case envoy::data::tap::v2alpha::BufferedTraceWrapper::kSocketBufferedTrace: {
-      auto* socket_trace = trace->mutable_socket_buffered_trace();
-      for (auto& event : *socket_trace->mutable_events()) {
-        if (event.has_read()) {
-          swapBytesToString(*event.mutable_read()->mutable_data());
-        } else {
-          ASSERT(event.has_write());
-          swapBytesToString(*event.mutable_write()->mutable_data());
-        }
-      }
-      break;
-    }
-    case envoy::data::tap::v2alpha::BufferedTraceWrapper::TRACE_NOT_SET:
-      NOT_REACHED_GCOVR_EXCL_LINE;
-    }
+  if (sink_format != envoy::service::tap::v2alpha::OutputSink::JSON_BODY_AS_STRING) {
+    return;
   }
 
-  sink_to_use_->submitBufferedTrace(trace, sink_format_, trace_id);
-}
-
-void FilePerTapSink::submitBufferedTrace(
-    const std::shared_ptr<envoy::data::tap::v2alpha::BufferedTraceWrapper>& trace,
-    envoy::service::tap::v2alpha::OutputSink::Format format, uint64_t trace_id) {
-  std::string path = fmt::format("{}_{}", config_.path_prefix(), trace_id);
-  switch (format) {
-  case envoy::service::tap::v2alpha::OutputSink::PROTO_BINARY:
-    path += MessageUtil::FileExtensions::get().ProtoBinary;
+  switch (trace.trace_case()) {
+  case envoy::data::tap::v2alpha::TraceWrapper::kHttpBufferedTrace: {
+    auto* http_trace = trace.mutable_http_buffered_trace();
+    if (http_trace->has_request() && http_trace->request().has_body()) {
+      swapBytesToString(*http_trace->mutable_request()->mutable_body());
+    }
+    if (http_trace->has_response() && http_trace->response().has_body()) {
+      swapBytesToString(*http_trace->mutable_response()->mutable_body());
+    }
     break;
-  case envoy::service::tap::v2alpha::OutputSink::PROTO_TEXT:
-    path += MessageUtil::FileExtensions::get().ProtoText;
+  }
+  case envoy::data::tap::v2alpha::TraceWrapper::kHttpStreamedTraceSegment: {
+    auto* http_trace = trace.mutable_http_streamed_trace_segment();
+    if (http_trace->has_request_body_chunk()) {
+      swapBytesToString(*http_trace->mutable_request_body_chunk());
+    }
+    if (http_trace->has_response_body_chunk()) {
+      swapBytesToString(*http_trace->mutable_response_body_chunk());
+    }
     break;
-  case envoy::service::tap::v2alpha::OutputSink::JSON_BODY_AS_BYTES:
-  case envoy::service::tap::v2alpha::OutputSink::JSON_BODY_AS_STRING:
-    path += MessageUtil::FileExtensions::get().Json;
+  }
+  case envoy::data::tap::v2alpha::TraceWrapper::kSocketBufferedTrace: {
+    auto* socket_trace = trace.mutable_socket_buffered_trace();
+    for (auto& event : *socket_trace->mutable_events()) {
+      if (event.has_read()) {
+        swapBytesToString(*event.mutable_read()->mutable_data());
+      } else {
+        ASSERT(event.has_write());
+        swapBytesToString(*event.mutable_write()->mutable_data());
+      }
+    }
     break;
-  default:
+  }
+  case envoy::data::tap::v2alpha::TraceWrapper::TRACE_NOT_SET:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
+}
 
-  ENVOY_LOG_MISC(debug, "Writing tap for [id={}] to {}", trace_id, path);
-  ENVOY_LOG_MISC(trace, "Tap for [id={}]: {}", trace_id, trace->DebugString());
-  std::ofstream output_file(path);
+void TapConfigBaseImpl::PerTapSinkHandleManagerImpl::submitTrace(
+    const TraceWrapperSharedPtr& trace) {
+  Utility::bodyBytesToString(*trace, parent_.sink_format_);
+  handle_->submitTrace(trace, parent_.sink_format_);
+}
+
+void FilePerTapSink::FilePerTapSinkHandle::submitTrace(
+    const TraceWrapperSharedPtr& trace, envoy::service::tap::v2alpha::OutputSink::Format format) {
+  if (!output_file_.is_open()) {
+    std::string path = fmt::format("{}_{}", parent_.config_.path_prefix(), trace_id_);
+    switch (format) {
+    case envoy::service::tap::v2alpha::OutputSink::PROTO_BINARY:
+      path += MessageUtil::FileExtensions::get().ProtoBinary;
+      break;
+    case envoy::service::tap::v2alpha::OutputSink::PROTO_BINARY_LENGTH_DELIMITED:
+      path += MessageUtil::FileExtensions::get().ProtoBinaryLengthDelimited;
+      break;
+    case envoy::service::tap::v2alpha::OutputSink::PROTO_TEXT:
+      path += MessageUtil::FileExtensions::get().ProtoText;
+      break;
+    case envoy::service::tap::v2alpha::OutputSink::JSON_BODY_AS_BYTES:
+    case envoy::service::tap::v2alpha::OutputSink::JSON_BODY_AS_STRING:
+      path += MessageUtil::FileExtensions::get().Json;
+      break;
+    default:
+      NOT_REACHED_GCOVR_EXCL_LINE;
+    }
+
+    ENVOY_LOG_MISC(debug, "Opening tap file for [id={}] to {}", trace_id_, path);
+    output_file_.open(path);
+  }
+
+  ENVOY_LOG_MISC(trace, "Tap for [id={}]: {}", trace_id_, trace->DebugString());
 
   switch (format) {
   case envoy::service::tap::v2alpha::OutputSink::PROTO_BINARY:
-    trace->SerializeToOstream(&output_file);
+    trace->SerializeToOstream(&output_file_);
     break;
+  case envoy::service::tap::v2alpha::OutputSink::PROTO_BINARY_LENGTH_DELIMITED: {
+    Protobuf::io::OstreamOutputStream stream(&output_file_);
+    Protobuf::io::CodedOutputStream coded_stream(&stream);
+    coded_stream.WriteVarint32(trace->ByteSize());
+    trace->SerializeWithCachedSizes(&coded_stream);
+    break;
+  }
   case envoy::service::tap::v2alpha::OutputSink::PROTO_TEXT:
-    output_file << trace->DebugString();
+    output_file_ << trace->DebugString();
     break;
   case envoy::service::tap::v2alpha::OutputSink::JSON_BODY_AS_BYTES:
   case envoy::service::tap::v2alpha::OutputSink::JSON_BODY_AS_STRING:
-    output_file << MessageUtil::getJsonStringFromMessage(*trace, true, true);
+    output_file_ << MessageUtil::getJsonStringFromMessage(*trace, true, true);
     break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;

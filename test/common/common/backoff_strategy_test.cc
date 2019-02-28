@@ -8,6 +8,7 @@ using testing::NiceMock;
 using testing::Return;
 
 namespace Envoy {
+
 TEST(BackOffStrategyTest, JitteredBackOffBasicFlow) {
   NiceMock<Runtime::MockRandomGenerator> random;
   ON_CALL(random, random()).WillByDefault(Return(27));

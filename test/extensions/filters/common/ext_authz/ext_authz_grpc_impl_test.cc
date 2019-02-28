@@ -25,6 +25,7 @@ namespace Extensions {
 namespace Filters {
 namespace Common {
 namespace ExtAuthz {
+
 constexpr char V2[] = "envoy.service.auth.v2.Authorization";
 constexpr char V2Alpha[] = "envoy.service.auth.v2alpha.Authorization";
 
@@ -198,6 +199,7 @@ TEST_P(ExtAuthzGrpcClientTest, AuthorizationRequestTimeout) {
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzErrorResponse(CheckStatus::Error))));
   client_->onFailure(Grpc::Status::DeadlineExceeded, "", span_);
 }
+
 } // namespace ExtAuthz
 } // namespace Common
 } // namespace Filters

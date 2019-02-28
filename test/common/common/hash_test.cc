@@ -37,4 +37,5 @@ TEST(Hash, stdhash) {
   EXPECT_EQ(std::hash<std::string>()(std::string("")), MurmurHash::murmurHash2_64(""));
 }
 #endif
+
 } // namespace Envoy

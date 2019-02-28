@@ -11,6 +11,7 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
+
 INSTANTIATE_TEST_SUITE_P(IpVersions, Http2UpstreamIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
@@ -311,4 +312,5 @@ TEST_P(Http2UpstreamIntegrationTest, UpstreamConnectionCloseWithManyStreams) {
     responses[i]->waitForReset();
   }
 }
+
 } // namespace Envoy

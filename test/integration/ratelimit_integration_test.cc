@@ -12,6 +12,8 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
+namespace {
+
 // Tests Ratelimit functionality with config in filter.
 class RatelimitIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
                                  public HttpIntegrationTest {
@@ -366,4 +368,5 @@ TEST_P(RatelimitFailureModeIntegrationTest, ErrorWithFailureModeOff) {
   EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.failure_mode_allowed"));
 }
 
+} // namespace
 } // namespace Envoy

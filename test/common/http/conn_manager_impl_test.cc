@@ -59,6 +59,7 @@ using testing::Sequence;
 
 namespace Envoy {
 namespace Http {
+
 class HttpConnectionManagerImplTest : public testing::Test, public ConnectionManagerConfig {
 public:
   struct RouteConfigProvider : public Router::RouteConfigProvider {
@@ -117,9 +118,13 @@ public:
     conn_manager_->initializeReadFilterCallbacks(filter_callbacks_);
 
     if (tracing) {
-      tracing_config_ =
-          std::make_unique<TracingConnectionManagerConfig>(TracingConnectionManagerConfig{
-              Tracing::OperationName::Ingress, {LowerCaseString(":method")}, 100, 10000, 100});
+      tracing_config_ = std::make_unique<TracingConnectionManagerConfig>(
+          TracingConnectionManagerConfig{Tracing::OperationName::Ingress,
+                                         {LowerCaseString(":method")},
+                                         100,
+                                         10000,
+                                         100,
+                                         false});
     }
   }
 
@@ -732,7 +737,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowIngressDecorat
 TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorator) {
   setup(false, "");
   tracing_config_ = std::make_unique<TracingConnectionManagerConfig>(TracingConnectionManagerConfig{
-      Tracing::OperationName::Egress, {LowerCaseString(":method")}, 100, 10000, 100});
+      Tracing::OperationName::Egress, {LowerCaseString(":method")}, 100, 10000, 100, false});
 
   NiceMock<Tracing::MockSpan>* span = new NiceMock<Tracing::MockSpan>();
   EXPECT_CALL(tracer_, startSpan_(_, _, _, _))
@@ -799,7 +804,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
 TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecoratorOverrideOp) {
   setup(false, "");
   tracing_config_ = std::make_unique<TracingConnectionManagerConfig>(TracingConnectionManagerConfig{
-      Tracing::OperationName::Egress, {LowerCaseString(":method")}, 100, 10000, 100});
+      Tracing::OperationName::Egress, {LowerCaseString(":method")}, 100, 10000, 100, false});
 
   NiceMock<Tracing::MockSpan>* span = new NiceMock<Tracing::MockSpan>();
   EXPECT_CALL(tracer_, startSpan_(_, _, _, _))
@@ -861,7 +866,7 @@ TEST_F(HttpConnectionManagerImplTest,
        StartAndFinishSpanNormalFlowEgressDecoratorOverrideOpNoActiveSpan) {
   setup(false, "");
   tracing_config_ = std::make_unique<TracingConnectionManagerConfig>(TracingConnectionManagerConfig{
-      Tracing::OperationName::Egress, {LowerCaseString(":method")}, 100, 10000, 100});
+      Tracing::OperationName::Egress, {LowerCaseString(":method")}, 100, 10000, 100, false});
 
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
       .WillOnce(Return(false));
@@ -3630,5 +3635,6 @@ TEST_F(HttpConnectionManagerImplTest, OverlyLongHeadersAcceptedIfConfigured) {
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false); // kick off request
 }
+
 } // namespace Http
 } // namespace Envoy

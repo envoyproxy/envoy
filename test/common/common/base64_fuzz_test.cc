@@ -4,8 +4,10 @@
 
 namespace Envoy {
 namespace Fuzz {
+
 DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   Envoy::Base64::encode(reinterpret_cast<const char*>(buf), len);
 }
+
 } // namespace Fuzz
 } // namespace Envoy

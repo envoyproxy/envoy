@@ -27,6 +27,7 @@ using testing::ReturnRef;
 
 namespace Envoy {
 namespace Config {
+
 TEST(UtilityTest, GetTypedResources) {
   envoy::api::v2::DiscoveryResponse response;
   EXPECT_EQ(0, Utility::getTypedResources<envoy::api::v2::ClusterLoadAssignment>(response).size());
@@ -431,5 +432,6 @@ TEST(CheckApiConfigSourceSubscriptionBackingClusterTest, RestClusterTestAcrossTy
   EXPECT_CALL(*cluster.info_, type());
   Utility::checkApiConfigSourceSubscriptionBackingCluster(cluster_map, *api_config_source);
 }
+
 } // namespace Config
 } // namespace Envoy

@@ -21,6 +21,7 @@ using testing::Return;
 
 namespace Envoy {
 namespace Http {
+
 TEST(HttpUtility, parseQueryString) {
   EXPECT_EQ(Utility::QueryParams(), Utility::parseQueryString("/hello"));
   EXPECT_EQ(Utility::QueryParams(), Utility::parseQueryString("/hello?"));
@@ -772,5 +773,6 @@ TEST(Url, ParsingTest) {
   // Test https scheme
   ValidateUrl("https://www.host.com", "https", "www.host.com", "/");
 }
+
 } // namespace Http
 } // namespace Envoy

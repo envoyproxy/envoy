@@ -32,6 +32,7 @@ using testing::SaveArg;
 namespace Envoy {
 namespace Http {
 namespace Http2 {
+
 class TestConnPoolImpl : public ConnPoolImpl {
 public:
   using ConnPoolImpl::ConnPoolImpl;

@@ -11,6 +11,7 @@ using testing::IsTrue;
 
 namespace Envoy {
 namespace Stats {
+
 class StatsMatcherTest : public testing::Test {
 protected:
   envoy::type::matcher::StringMatcher* inclusionList() {
@@ -283,5 +284,6 @@ TEST_F(StatsMatcherTest, CheckMultipleAssortedExclusionMatchers) {
   EXPECT_FALSE(stats_matcher_impl_->acceptsAll());
   EXPECT_FALSE(stats_matcher_impl_->rejectsAll());
 }
+
 } // namespace Stats
 } // namespace Envoy

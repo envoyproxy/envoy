@@ -4,6 +4,7 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
+
 class TestEntry {
 public:
   TestEntry() { self_ = this; }
@@ -33,4 +34,5 @@ TEST(StackArray, Modification) {
     i++;
   }
 }
+
 } // namespace Envoy

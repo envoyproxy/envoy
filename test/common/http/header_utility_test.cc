@@ -13,6 +13,7 @@
 
 namespace Envoy {
 namespace Http {
+
 envoy::api::v2::route::HeaderMatcher parseHeaderMatcherFromYaml(const std::string& yaml) {
   envoy::api::v2::route::HeaderMatcher header_matcher;
   MessageUtil::loadFromYaml(yaml, header_matcher);
@@ -417,5 +418,6 @@ TEST(HeaderAddTest, HeaderAdd) {
       },
       &headers);
 }
+
 } // namespace Http
 } // namespace Envoy

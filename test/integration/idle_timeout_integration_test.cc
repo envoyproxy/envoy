@@ -2,6 +2,7 @@
 #include "test/test_common/test_time.h"
 
 namespace Envoy {
+namespace {
 
 class IdleTimeoutIntegrationTest : public HttpProtocolIntegrationTest {
 public:
@@ -376,4 +377,5 @@ TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutIsNotDisarmedByEncode100Continu
 // TODO(auni53) create a test filter that hangs and does not send data upstream, which would
 // trigger a configured request_timer
 
+} // namespace
 } // namespace Envoy
