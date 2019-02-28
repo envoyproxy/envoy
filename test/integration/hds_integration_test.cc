@@ -687,5 +687,45 @@ TEST_P(HdsIntegrationTest, TestUpdateMessage) {
   cleanupHdsConnection();
 }
 
+// Tests Envoy HTTP health checking a single endpoint, receiving an update
+// message from the management server and reporting in a new interval
+TEST_P(HdsIntegrationTest, TestUpdateChangesTimer) {
+  initialize();
+
+  // Server <--> Envoy
+  waitForHdsStream();
+  ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, envoy_msg_));
+
+  // Server asks for health checking
+  server_health_check_specifier_ = makeHttpHealthCheckSpecifier();
+  hds_stream_->startGrpcStream();
+  hds_stream_->sendGrpcMessage(server_health_check_specifier_);
+  test_server_->waitForCounterGe("hds_delegate.requests", ++hds_requests_);
+
+  healthcheckEndpoints();
+
+  // an update should be received after interval
+  ASSERT_TRUE(
+      hds_stream_->waitForGrpcMessage(*dispatcher_, response_, std::chrono::milliseconds(250)));
+
+  // New HealthCheckSpecifier message
+  server_health_check_specifier_.mutable_interval()->set_nanos(300000000); // 0.3 seconds
+
+  // Server asks for health checking with the new message
+  hds_stream_->sendGrpcMessage(server_health_check_specifier_);
+  test_server_->waitForCounterGe("hds_delegate.requests", ++hds_requests_);
+
+  // A response should not be received until the new timer is completed
+  ASSERT_FALSE(
+      hds_stream_->waitForGrpcMessage(*dispatcher_, response_, std::chrono::milliseconds(250)));
+  // Response should be received now
+  ASSERT_TRUE(
+      hds_stream_->waitForGrpcMessage(*dispatcher_, response_, std::chrono::milliseconds(250)));
+
+  // Clean up connections
+  cleanupHostConnections();
+  cleanupHdsConnection();
+}
+
 } // namespace
 } // namespace Envoy
