@@ -16,7 +16,7 @@ ROOT=$$(dirname $(rootpath boringssl/BUILDING.md))/..
 pushd $$ROOT
 
 # Build tools requirements:
-# - Clang compiler version 6.0.1 (http://releases.llvm.org/download.html)
+# - Clang compiler version 6.0.1 (https://releases.llvm.org/download.html)
 # - Go programming language version 1.10.3 (https://golang.org/dl/)
 # - Ninja build system version 1.8.2 (https://github.com/ninja-build/ninja/releases)
 

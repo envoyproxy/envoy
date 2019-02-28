@@ -3,10 +3,19 @@ licenses(["notice"])  # Apache 2
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
+    "envoy_cc_test_library",
     "envoy_package",
 )
 
 envoy_package()
+
+envoy_cc_test_library(
+    name = "common",
+    hdrs = ["common.h"],
+    deps = [
+        "//source/extensions/common/tap:tap_interface",
+    ],
+)
 
 envoy_cc_test(
     name = "admin_test",
@@ -23,5 +32,13 @@ envoy_cc_test(
     deps = [
         "//source/extensions/common/tap:tap_matcher",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "tap_config_base_test",
+    srcs = ["tap_config_base_test.cc"],
+    deps = [
+        "//source/extensions/common/tap:tap_config_base",
     ],
 )

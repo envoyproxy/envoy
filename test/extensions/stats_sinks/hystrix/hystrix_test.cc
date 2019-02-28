@@ -8,12 +8,12 @@
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/mocks.h"
-#include "test/test_common/test_base.h"
 
 #include "absl/strings/str_split.h"
 #include "circllhist.h"
 #include "fmt/printf.h"
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::HasSubstr;
@@ -116,7 +116,7 @@ private:
   histogram_t* histogram_;
 };
 
-class HystrixSinkTest : public TestBase {
+class HystrixSinkTest : public testing::Test {
 public:
   HystrixSinkTest() { sink_ = std::make_unique<HystrixSink>(server_, window_size_); }
 

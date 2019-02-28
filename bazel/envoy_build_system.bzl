@@ -98,7 +98,7 @@ def envoy_linkopts():
     return select({
                # The macOS system library transitively links common libraries (e.g., pthread).
                "@bazel_tools//tools/osx:darwin": [
-                   # See note here: http://luajit.org/install.html
+                   # See note here: https://luajit.org/install.html
                    "-pagezero_size 10000",
                    "-image_base 100000000",
                ],
@@ -151,7 +151,7 @@ def _envoy_stamped_deps():
 def envoy_test_linkopts():
     return select({
         "@bazel_tools//tools/osx:darwin": [
-            # See note here: http://luajit.org/install.html
+            # See note here: https://luajit.org/install.html
             "-pagezero_size 10000",
             "-image_base 100000000",
         ],

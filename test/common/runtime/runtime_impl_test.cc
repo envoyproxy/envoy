@@ -9,9 +9,9 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/environment.h"
-#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Invoke;
@@ -63,7 +63,7 @@ TEST(UUID, sanityCheckOfUniqueness) {
   EXPECT_EQ(num_of_uuids, uuids.size());
 }
 
-class DiskBackedLoaderImplTest : public TestBase {
+class DiskBackedLoaderImplTest : public testing::Test {
 protected:
   DiskBackedLoaderImplTest() : api_(Api::createApiForTest(store)) {}
 
@@ -203,6 +203,48 @@ TEST_F(DiskBackedLoaderImplTest, OverrideFolderDoesNotExist) {
   EXPECT_EQ("hello", loader->snapshot().get("file1"));
 }
 
+TEST_F(DiskBackedLoaderImplTest, PercentHandling) {
+  setup();
+  run("test/common/runtime/test_data/current", "envoy_override");
+
+  envoy::type::FractionalPercent default_value;
+
+  // Smoke test integer value of 0, should be interpreted as 0%
+  {
+    loader->mergeValues({{"foo", "0"}});
+
+    EXPECT_FALSE(loader->snapshot().featureEnabled("foo", default_value, 0));
+    EXPECT_FALSE(loader->snapshot().featureEnabled("foo", default_value, 5));
+  }
+
+  // Smoke test integer value of 5, should be interpreted as 5%
+  {
+    loader->mergeValues({{"foo", "5"}});
+    EXPECT_TRUE(loader->snapshot().featureEnabled("foo", default_value, 0));
+    EXPECT_TRUE(loader->snapshot().featureEnabled("foo", default_value, 4));
+    EXPECT_FALSE(loader->snapshot().featureEnabled("foo", default_value, 5));
+    EXPECT_TRUE(loader->snapshot().featureEnabled("foo", default_value, 100));
+  }
+
+  // Verify uint64 -> uint32 conversion by using a runtime value with all 0s in
+  // the bottom 32 bits. If it were to be naively treated as a uint32_t then it
+  // would appear as 0%, but it should be 100% because we assume the
+  // denominator is 100
+  {
+    // NOTE: high_value has to have the property that the lowest 32 bits % 100
+    // is less than 100. If it's greater than 100 the test will pass whether or
+    // not the uint32 conversion is handled properly.
+    uint64_t high_value = 1UL << 60;
+    std::string high_value_str = std::to_string(high_value);
+    loader->mergeValues({{"foo", high_value_str}});
+    EXPECT_TRUE(loader->snapshot().featureEnabled("foo", default_value, 0));
+    EXPECT_TRUE(loader->snapshot().featureEnabled("foo", default_value, 50));
+    EXPECT_TRUE(loader->snapshot().featureEnabled("foo", default_value, 100));
+    EXPECT_TRUE(loader->snapshot().featureEnabled("foo", default_value, 12389));
+    EXPECT_TRUE(loader->snapshot().featureEnabled("foo", default_value, 23859235));
+  }
+}
+
 void testNewOverrides(Loader& loader, Stats::Store& store) {
   // New string
   loader.mergeValues({{"foo", "bar"}});
@@ -273,7 +315,7 @@ TEST(LoaderImplTest, All) {
   testNewOverrides(loader, store);
 }
 
-class DiskLayerTest : public TestBase {
+class DiskLayerTest : public testing::Test {
 protected:
   DiskLayerTest() : api_(Api::createApiForTest()) {}
 

@@ -14,6 +14,7 @@
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_time.h"
@@ -131,12 +132,20 @@ struct ApiFilesystemConfig {
 class BaseIntegrationTest : Logger::Loggable<Logger::Id::testing> {
 public:
   using TestTimeSystemPtr = std::unique_ptr<Event::TestTimeSystem>;
+  using InstanceConstSharedPtrFn = std::function<Network::Address::InstanceConstSharedPtr(int)>;
 
+  // Creates a test fixture with an upstream bound to INADDR_ANY on an unspecified port using the
+  // provided IP |version|.
   BaseIntegrationTest(Network::Address::IpVersion version,
                       const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG);
   BaseIntegrationTest(Network::Address::IpVersion version, TestTimeSystemPtr,
                       const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG)
       : BaseIntegrationTest(version, config) {}
+  // Creates a test fixture with a specified |upstream_address| function that provides the IP and
+  // port to use.
+  BaseIntegrationTest(const InstanceConstSharedPtrFn& upstream_address_fn,
+                      Network::Address::IpVersion version,
+                      const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG);
 
   virtual ~BaseIntegrationTest() {}
 
@@ -236,6 +245,8 @@ protected:
 
   // The IpVersion (IPv4, IPv6) to use.
   Network::Address::IpVersion version_;
+  // IP Address to use when binding sockets on upstreams.
+  InstanceConstSharedPtrFn upstream_address_fn_;
   // The config for envoy start-up.
   ConfigHelper config_helper_;
 

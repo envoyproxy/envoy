@@ -5,8 +5,9 @@
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
+
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Return;
@@ -15,7 +16,7 @@ namespace Envoy {
 namespace Network {
 
 template <Network::Address::SocketType Type>
-class ListenSocketImplTest : public TestBaseWithParam<Address::IpVersion> {
+class ListenSocketImplTest : public testing::TestWithParam<Address::IpVersion> {
 protected:
   ListenSocketImplTest() : version_(GetParam()) {}
   const Address::IpVersion version_;
@@ -40,7 +41,8 @@ protected:
 
       auto addr_fd = Network::Test::bindFreeLoopbackPort(version_, Address::SocketType::Stream);
       auto addr = addr_fd.first;
-      EXPECT_LE(0, addr_fd.second);
+      Network::IoHandlePtr& io_handle = addr_fd.second;
+      EXPECT_LE(0, io_handle->fd());
 
       // Confirm that we got a reasonable address and port.
       ASSERT_EQ(Address::Type::Ip, addr->type());
@@ -48,7 +50,7 @@ protected:
       ASSERT_LT(0U, addr->ip()->port());
 
       // Release the socket and re-bind it.
-      EXPECT_EQ(0, close(addr_fd.second));
+      EXPECT_EQ(nullptr, io_handle->close().err_);
 
       auto option = std::make_unique<MockSocketOption>();
       auto options = std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>();
@@ -90,7 +92,7 @@ protected:
       EXPECT_THROW(createListenSocketPtr(addr, options2, true), SocketBindException);
 
       // Test the case of a socket with fd and given address and port.
-      IoHandlePtr dup_handle = std::make_unique<IoSocketHandle>(dup(socket1->ioHandle().fd()));
+      IoHandlePtr dup_handle = std::make_unique<IoSocketHandleImpl>(dup(socket1->ioHandle().fd()));
       auto socket3 = createListenSocketPtr(std::move(dup_handle), addr, nullptr);
       EXPECT_EQ(addr->asString(), socket3->localAddress()->asString());
 
@@ -130,7 +132,7 @@ TEST_P(ListenSocketImplTestTcp, BindSpecificPort) { testBindSpecificPort(); }
 class TestListenSocket : public ListenSocketImpl {
 public:
   TestListenSocket(Address::InstanceConstSharedPtr address)
-      : ListenSocketImpl(std::make_unique<Network::IoSocketHandle>(), address) {}
+      : ListenSocketImpl(std::make_unique<Network::IoSocketHandleImpl>(), address) {}
   Address::SocketType socketType() const override { return Address::SocketType::Stream; }
 };
 

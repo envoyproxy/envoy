@@ -34,6 +34,7 @@ void OwnedImpl::add(absl::string_view data) {
 }
 
 void OwnedImpl::add(const Instance& data) {
+  ASSERT(&data != this);
   uint64_t num_slices = data.getRawSlices(nullptr, 0);
   STACK_ARRAY(slices, RawSlice, num_slices);
   data.getRawSlices(slices.begin(), num_slices);
@@ -43,10 +44,21 @@ void OwnedImpl::add(const Instance& data) {
 }
 
 void OwnedImpl::prepend(absl::string_view data) {
+  // Prepending an empty string seems to mess up libevent internally.
+  // evbuffer_prepend doesn't have a check for empty (unlike
+  // evbuffer_prepend_buffer which does). This then results in an allocation of
+  // an empty chain, which causes problems with a following move/append. This
+  // only seems to happen the original buffer was created via
+  // addBufferFragment(), this forces the code execution path in
+  // evbuffer_prepend related to immutable buffers.
+  if (data.size() == 0) {
+    return;
+  }
   evbuffer_prepend(buffer_.get(), data.data(), data.size());
 }
 
 void OwnedImpl::prepend(Instance& data) {
+  ASSERT(&data != this);
   int rc =
       evbuffer_prepend_buffer(buffer_.get(), static_cast<LibEventInstance&>(data).buffer().get());
   ASSERT(rc == 0);
@@ -93,6 +105,7 @@ void* OwnedImpl::linearize(uint32_t size) {
 }
 
 void OwnedImpl::move(Instance& rhs) {
+  ASSERT(&rhs != this);
   // We do the static cast here because in practice we only have one buffer implementation right
   // now and this is safe. Using the evbuffer move routines require having access to both evbuffers.
   // This is a reasonable compromise in a high performance path where we want to maintain an
@@ -103,6 +116,7 @@ void OwnedImpl::move(Instance& rhs) {
 }
 
 void OwnedImpl::move(Instance& rhs, uint64_t length) {
+  ASSERT(&rhs != this);
   // See move() above for why we do the static cast.
   int rc = evbuffer_remove_buffer(static_cast<LibEventInstance&>(rhs).buffer().get(), buffer_.get(),
                                   length);
@@ -151,6 +165,7 @@ Api::SysCallIntResult OwnedImpl::read(int fd, uint64_t max_length) {
 }
 
 uint64_t OwnedImpl::reserve(uint64_t length, RawSlice* iovecs, uint64_t num_iovecs) {
+  ASSERT(length > 0);
   int ret = evbuffer_reserve_space(buffer_.get(), length, reinterpret_cast<evbuffer_iovec*>(iovecs),
                                    num_iovecs);
   RELEASE_ASSERT(ret >= 1, "Failure to allocate may result in callers writing to uninitialized "

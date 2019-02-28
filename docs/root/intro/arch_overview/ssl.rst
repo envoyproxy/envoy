@@ -86,7 +86,15 @@ Example configuration
       connect_timeout: 0.25s
       type: STATIC
       lb_policy: ROUND_ROBIN
-      hosts: [{ socket_address: { address: 127.0.0.2, port_value: 1234 }}]
+      load_assignment:
+        cluster_name: some_service
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.2
+                  port_value: 1234
       tls_context:
         common_tls_context:
           tls_certificates:

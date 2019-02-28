@@ -3,12 +3,13 @@
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
-#include "test/test_common/test_base.h"
+
+#include "gtest/gtest.h"
 
 using testing::ReturnRef;
 
 namespace Envoy {
-class SslCertsTest : public TestBase {
+class SslCertsTest : public testing::Test {
 public:
   static void SetUpTestSuite() {
     TestEnvironment::exec({TestEnvironment::runfilesPath(

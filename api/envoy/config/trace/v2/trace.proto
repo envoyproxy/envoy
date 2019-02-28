@@ -58,7 +58,7 @@ message LightstepConfig {
   string collector_cluster = 1 [(validate.rules).string.min_bytes = 1];
 
   // File containing the access token to the `LightStep
-  // <http://lightstep.com/>`_ API.
+  // <https://lightstep.com/>`_ API.
   string access_token_file = 2 [(validate.rules).string.min_bytes = 1];
 }
 

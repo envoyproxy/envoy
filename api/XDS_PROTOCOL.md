@@ -295,7 +295,7 @@ allows:
     This supports Envoy on-demand / lazily requesting additional resources. For
     example, this may occur when a request corresponding to an unknown cluster
     arrives.
-  * The xDS server can incremetally update the resources on the client.
+  * The xDS server can incrementally update the resources on the client.
     This supports the goal of scalability of xDS resources. Rather than deliver
     all 100k clusters when a single cluster is modified, the management server
     only needs to deliver the single cluster that changed.
