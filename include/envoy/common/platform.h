@@ -2,7 +2,7 @@
 
 // NOLINT(namespace-envoy)
 #ifdef _MSC_VER
-#include <malloc.h>
+#include <stdint.h>
 
 #define PACKED_STRUCT(definition, ...)                                                             \
   __pragma(pack(push, 1)) definition, ##__VA_ARGS__;                                               \
