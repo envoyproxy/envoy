@@ -49,8 +49,8 @@ public:
 private:
   // ClusterImplBase
   void startPreInit() override {
-    HostVectorSharedPtr hosts(new HostVector({makeTestHost(this->info(),
-                                                           fmt::v5::format("tcp://{}:{}", "127.0.0.1", 80))}));
+    HostVectorSharedPtr hosts(new HostVector(
+        {makeTestHost(this->info(), fmt::v5::format("tcp://{}:{}", "127.0.0.1", 80))}));
     HostsPerLocalitySharedPtr hosts_per_locality = std::make_shared<HostsPerLocalityImpl>();
     HostVector hosts_added{hosts->front()};
     HostVector hosts_removed{};
@@ -144,22 +144,16 @@ TEST_F(TestStaticClusterImplTest, createWithoutConfig) {
       std::move(outlier_event_logger_), false, *api_);
   cluster->initialize([] {});
 
-  EXPECT_EQ(1UL,
-            cluster->prioritySet().hostSetsPerPriority()[1]->healthyHosts().size());
-  EXPECT_EQ("",
-            cluster->prioritySet().hostSetsPerPriority()[1]->hosts()[0]->hostname());
+  EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[1]->healthyHosts().size());
+  EXPECT_EQ("", cluster->prioritySet().hostSetsPerPriority()[1]->hosts()[0]->hostname());
   EXPECT_EQ("127.0.0.1", cluster->prioritySet()
-                                .hostSetsPerPriority()[1]
-                                ->hosts()[0]
-                                ->address()
-                                ->ip()
-                                ->addressAsString());
-  EXPECT_EQ(80, cluster->prioritySet()
                              .hostSetsPerPriority()[1]
                              ->hosts()[0]
                              ->address()
                              ->ip()
-                             ->port());
+                             ->addressAsString());
+  EXPECT_EQ(80,
+            cluster->prioritySet().hostSetsPerPriority()[1]->hosts()[0]->address()->ip()->port());
   EXPECT_FALSE(cluster->info()->addedViaApi());
 }
 
@@ -193,14 +187,13 @@ TEST_F(TestStaticClusterImplTest, createWithStructConfig) {
   EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[10]->healthyHosts().size());
   EXPECT_EQ("", cluster->prioritySet().hostSetsPerPriority()[10]->hosts()[0]->hostname());
   EXPECT_EQ("127.0.0.1", cluster->prioritySet()
-                                .hostSetsPerPriority()[10]
-                                ->hosts()[0]
-                                ->address()
-                                ->ip()
-                                ->addressAsString());
-  EXPECT_EQ(
-    80,
-      cluster->prioritySet().hostSetsPerPriority()[10]->hosts()[0]->address()->ip()->port());
+                             .hostSetsPerPriority()[10]
+                             ->hosts()[0]
+                             ->address()
+                             ->ip()
+                             ->addressAsString());
+  EXPECT_EQ(80,
+            cluster->prioritySet().hostSetsPerPriority()[10]->hosts()[0]->address()->ip()->port());
   EXPECT_FALSE(cluster->info()->addedViaApi());
 }
 
@@ -233,14 +226,13 @@ TEST_F(TestStaticClusterImplTest, createWithTypedConfig) {
   EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[10]->healthyHosts().size());
   EXPECT_EQ("", cluster->prioritySet().hostSetsPerPriority()[10]->hosts()[0]->hostname());
   EXPECT_EQ("127.0.0.1", cluster->prioritySet()
-                                .hostSetsPerPriority()[10]
-                                ->hosts()[0]
-                                ->address()
-                                ->ip()
-                                ->addressAsString());
-  EXPECT_EQ(
-    80,
-      cluster->prioritySet().hostSetsPerPriority()[10]->hosts()[0]->address()->ip()->port());
+                             .hostSetsPerPriority()[10]
+                             ->hosts()[0]
+                             ->address()
+                             ->ip()
+                             ->addressAsString());
+  EXPECT_EQ(80,
+            cluster->prioritySet().hostSetsPerPriority()[10]->hosts()[0]->address()->ip()->port());
   EXPECT_FALSE(cluster->info()->addedViaApi());
 }
 
