@@ -178,7 +178,9 @@ TEST_P(ClusterMemoryUtilization, MemoryLargeClusterSizeWithStats) {
   const size_t start_mem = Memory::Stats::totalCurrentlyAllocated();
 
   auto IpVersions = testing::TestWithParam<Network::Address::IpVersion>::GetParam();
-
+  // A unique instance of BaseIntegrationTest allows for multiple runs of Envoy with
+  // differing configuration. This is necessary for measuring the memory consumption
+  // between the different instances within the same test.
   auto t1 = std::make_unique<BaseIntegrationTest>(IpVersions);
   t1->initialize();
   const size_t m1 = Memory::Stats::totalCurrentlyAllocated();
@@ -188,11 +190,10 @@ TEST_P(ClusterMemoryUtilization, MemoryLargeClusterSizeWithStats) {
   const size_t m1001 = memoryConsumedWithClusters(1001, true);
   EXPECT_LT(start_mem, m1001);
   size_t m_per_cluster = (m1001 - m1) / 1000;
-// As of 2019/02/27, m_per_cluster = 52249 (libc++).
+// As of 2019/02/27, m_per_cluster = 56119 (libstdc++), 52249 (libc++).
 #ifdef _LIBCPP_VERSION
   EXPECT_LT(m_per_cluster, 53000);
 #else
-  // As of 2019/02/27, m_per_cluster = 56119 (libstdc++).
   EXPECT_LT(m_per_cluster, 57000);
 #endif
 }
