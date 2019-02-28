@@ -35,7 +35,7 @@ namespace Upstream {
 class ClusterFactoryContext {
 
 public:
-  virtual ~ClusterFactoryContext(){};
+  virtual ~ClusterFactoryContext() = default;
 
   /**
    * @return bool flag indicating whether the cluster is added via api.
@@ -120,7 +120,7 @@ public:
  */
 class ClusterFactory {
 public:
-  virtual ~ClusterFactory(){};
+  virtual ~ClusterFactory() = default;
 
   /**
    * Create a new instance of cluster. If the implementation is unable to produce a cluster instance

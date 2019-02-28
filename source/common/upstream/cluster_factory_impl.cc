@@ -61,9 +61,10 @@ ClusterSharedPtr ClusterFactoryImplBase::create(
         "Didn't find a registered cluster factory implementation for name: '{}'", cluster_type));
   }
 
-  ClusterFactoryContextImpl context(cluster_manager, stats, tls, dns_resolver, ssl_context_manager,
-                                    runtime, random, dispatcher, log_manager, local_info, admin,
-                                    singleton_manager, outlier_event_logger, added_via_api, api);
+  ClusterFactoryContextImpl context(cluster_manager, stats, tls, std::move(dns_resolver),
+                                    ssl_context_manager, runtime, random, dispatcher, log_manager,
+                                    local_info, admin, singleton_manager,
+                                    std::move(outlier_event_logger), added_via_api, api);
   return factory->create(cluster, context);
 }
 

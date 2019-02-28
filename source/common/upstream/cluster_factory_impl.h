@@ -63,11 +63,12 @@ public:
                             Singleton::Manager& singleton_manager,
                             Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api,
                             Api::Api& api)
-      : cluster_manager_(cluster_manager), stats_(stats), tls_(tls), dns_resolver_(dns_resolver),
-        ssl_context_manager_(ssl_context_manager), runtime_(runtime), random_(random),
-        dispatcher_(dispatcher), log_manager_(log_manager), local_info_(local_info), admin_(admin),
-        singleton_manager_(singleton_manager), outlier_event_logger_(outlier_event_logger),
-        added_via_api_(added_via_api), api_(api) {}
+      : cluster_manager_(cluster_manager), stats_(stats), tls_(tls),
+        dns_resolver_(std::move(dns_resolver)), ssl_context_manager_(ssl_context_manager),
+        runtime_(runtime), random_(random), dispatcher_(dispatcher), log_manager_(log_manager),
+        local_info_(local_info), admin_(admin), singleton_manager_(singleton_manager),
+        outlier_event_logger_(std::move(outlier_event_logger)), added_via_api_(added_via_api),
+        api_(api) {}
 
   ClusterManager& clusterManager() override { return cluster_manager_; }
   Stats::Store& stats() override { return stats_; }
@@ -195,7 +196,7 @@ public:
   }
 
 protected:
-  ConfigurableClusterFactoryBase(std::string name) : ClusterFactoryImplBase(name) {}
+  ConfigurableClusterFactoryBase(const std::string& name) : ClusterFactoryImplBase(name) {}
 
 private:
   virtual ClusterImplBaseSharedPtr

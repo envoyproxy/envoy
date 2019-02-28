@@ -9,7 +9,6 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/network/address_impl.h"
-#include "common/singleton/manager_impl.h"
 #include "common/upstream/cluster_factory_impl.h"
 
 #include "server/transport_socket_config_impl.h"
@@ -26,9 +25,9 @@ public:
   CustomStaticCluster(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
                       Server::Configuration::TransportSocketFactoryContext& factory_context,
                       Stats::ScopePtr&& stats_scope, bool added_via_api, uint32_t priority,
-                      const std::string& address, uint32_t port)
+                      std::string address, uint32_t port)
       : ClusterImplBase(cluster, runtime, factory_context, std::move(stats_scope), added_via_api),
-        priority_(priority), address_(address), port_(port) {
+        priority_(priority), address_(std::move(address)), port_(port) {
     printf("CustomStaticCluster created");
   }
 
