@@ -10,11 +10,13 @@
 #include "quiche/quic/platform/api/quic_containers.h"
 #include "quiche/quic/platform/api/quic_endian.h"
 #include "quiche/quic/platform/api/quic_estimate_memory_usage.h"
+#include "quiche/quic/platform/api/quic_exported_stats.h"
 #include "quiche/quic/platform/api/quic_logging.h"
 #include "quiche/quic/platform/api/quic_map_util.h"
 #include "quiche/quic/platform/api/quic_mock_log.h"
 #include "quiche/quic/platform/api/quic_mutex.h"
 #include "quiche/quic/platform/api/quic_ptr_util.h"
+#include "quiche/quic/platform/api/quic_server_stats.h"
 #include "quiche/quic/platform/api/quic_sleep.h"
 #include "quiche/quic/platform/api/quic_stack_trace.h"
 #include "quiche/quic/platform/api/quic_string.h"
@@ -52,6 +54,16 @@ TEST(QuicPlatformTest, QuicClientStats) {
                               quic::QuicTime::Delta::FromSecond(3600), 100, "doc");
   QUIC_CLIENT_HISTOGRAM_COUNTS("my.count.histogram", 123, 0, 1000, 100, "doc");
   quic::QuicClientSparseHistogram("my.sparse.histogram", 345);
+}
+
+TEST(QuicPlatformTest, QuicExportedStats) {
+  // Just make sure they compile.
+  QUIC_HISTOGRAM_ENUM("my.enum.histogram", TestEnum::ONE, TestEnum::COUNT, "doc");
+  QUIC_HISTOGRAM_BOOL("my.bool.histogram", false, "doc");
+  QUIC_HISTOGRAM_TIMES("my.timing.histogram", quic::QuicTime::Delta::FromSeconds(5),
+                       quic::QuicTime::Delta::FromSeconds(1),
+                       quic::QuicTime::Delta::FromSecond(3600), 100, "doc");
+  QUIC_HISTOGRAM_COUNTS("my.count.histogram", 123, 0, 1000, 100, "doc");
 }
 
 TEST(QuicPlatformTest, QuicUnorderedMap) {
@@ -140,6 +152,16 @@ TEST(QuicPlatformTest, QuicMockLog) {
 
   EXPECT_QUIC_LOG_CALL_CONTAINS(outer_log, ERROR, "Outer log message");
   QUIC_LOG(ERROR) << "Outer log message should be captured.";
+}
+
+TEST(QuicPlatformTest, QuicServerStats) {
+  // Just make sure they compile.
+  QUIC_SERVER_HISTOGRAM_ENUM("my.enum.histogram", TestEnum::ONE, TestEnum::COUNT, "doc");
+  QUIC_SERVER_HISTOGRAM_BOOL("my.bool.histogram", false, "doc");
+  QUIC_SERVER_HISTOGRAM_TIMES("my.timing.histogram", quic::QuicTime::Delta::FromSeconds(5),
+                              quic::QuicTime::Delta::FromSeconds(1),
+                              quic::QuicTime::Delta::FromSecond(3600), 100, "doc");
+  QUIC_SERVER_HISTOGRAM_COUNTS("my.count.histogram", 123, 0, 1000, 100, "doc");
 }
 
 TEST(QuicPlatformTest, QuicStackTraceTest) {

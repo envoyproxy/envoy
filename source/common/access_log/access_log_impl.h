@@ -14,6 +14,8 @@
 #include "common/http/header_utility.h"
 #include "common/protobuf/protobuf.h"
 
+#include "absl/hash/hash.h"
+
 namespace Envoy {
 namespace AccessLog {
 
@@ -198,6 +200,9 @@ private:
  */
 class GrpcStatusFilter : public Filter {
 public:
+  using GrpcStatusHashSet =
+      std::unordered_set<Grpc::Status::GrpcStatus, absl::Hash<Grpc::Status::GrpcStatus>>;
+
   GrpcStatusFilter(const envoy::config::filter::accesslog::v2::GrpcStatusFilter& config);
 
   // AccessLog::Filter
@@ -206,7 +211,7 @@ public:
                 const Http::HeaderMap& response_trailers) override;
 
 private:
-  std::unordered_set<Grpc::Status::GrpcStatus> statuses_;
+  GrpcStatusHashSet statuses_;
   bool exclude_;
 
   /**

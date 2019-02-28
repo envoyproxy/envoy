@@ -15,6 +15,8 @@ class IoError;
 // frequent memory allocation of IoError instance.
 // If this is used, IoCallResult has to be instantiated with a deleter that does not
 // deallocate memory for this error.
+// TODO: This is probably not the best way to avoid allocations in the case of
+// EAGAIN. This will be fixed as a part of #6037.
 #define ENVOY_ERROR_AGAIN reinterpret_cast<Api::IoError*>(0x01)
 
 /**

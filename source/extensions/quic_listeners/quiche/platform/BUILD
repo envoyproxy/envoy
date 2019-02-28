@@ -65,6 +65,7 @@ envoy_cc_library(
         "quic_prefetch_impl.h",
         "quic_reference_counted_impl.h",
         "quic_ptr_util_impl.h",
+        "quic_server_stats_impl.h",
         "quic_string_impl.h",
         "quic_string_piece_impl.h",
         "quic_test_impl.h",
@@ -72,6 +73,7 @@ envoy_cc_library(
     ] + envoy_select_quiche([
         "quic_logging_impl.h",
         "quic_mock_log_impl.h",
+        "quic_singleton_impl.h",
         "quic_stack_trace_impl.h",
     ]),
     external_deps = [
@@ -89,6 +91,7 @@ envoy_cc_library(
     ] + envoy_select_quiche([
         "//source/common/common:assert_lib",
         "//source/server:backtrace_lib",
+        "//source/common/singleton:threadsafe_singleton",
     ]),
 )
 

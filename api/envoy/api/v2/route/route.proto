@@ -330,7 +330,7 @@ message RouteMatch {
     // regex must match the *:path* header once the query string is removed. The entire path
     // (without the query string) must match the regex. The rule will not match if only a
     // subsequence of the *:path* header matches the regex. The regex grammar is defined `here
-    // <http://en.cppreference.com/w/cpp/regex/ecmascript>`_.
+    // <https://en.cppreference.com/w/cpp/regex/ecmascript>`_.
     //
     // Examples:
     //
@@ -983,7 +983,7 @@ message Decorator {
 message VirtualCluster {
   // Specifies a regex pattern to use for matching requests. The entire path of the request
   // must match the regex. The regex grammar used is defined `here
-  // <http://en.cppreference.com/w/cpp/regex/ecmascript>`_.
+  // <https://en.cppreference.com/w/cpp/regex/ecmascript>`_.
   //
   // Examples:
   //
@@ -1179,7 +1179,7 @@ message HeaderMatcher {
     // If specified, this regex string is a regular expression rule which implies the entire request
     // header value must match the regex. The rule will not match if only a subsequence of the
     // request header value matches the regex. The regex grammar used in the value field is defined
-    // `here <http://en.cppreference.com/w/cpp/regex/ecmascript>`_.
+    // `here <https://en.cppreference.com/w/cpp/regex/ecmascript>`_.
     //
     // Examples:
     //

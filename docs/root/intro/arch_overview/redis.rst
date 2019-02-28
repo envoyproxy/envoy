@@ -21,6 +21,7 @@ The Redis project offers a thorough reference on partitioning as it relates to R
 * Ketama distribution.
 * Detailed command statistics.
 * Active and passive healthchecking.
+* Hash tagging.
 
 **Planned future enhancements**:
 
@@ -30,7 +31,6 @@ The Redis project offers a thorough reference on partitioning as it relates to R
 * Replication.
 * Built-in retry.
 * Tracing.
-* Hash tagging.
 
 .. _arch_overview_redis_configuration:
 

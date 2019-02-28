@@ -185,6 +185,44 @@ TEST(HttpConnManFinalizerImpl, NullRequestHeaders) {
   HttpTracerUtility::finalizeSpan(span, nullptr, stream_info, config);
 }
 
+TEST(HttpConnManFinalizerImpl, StreamInfoLogs) {
+  NiceMock<MockSpan> span;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  stream_info.host_->cluster_.name_ = "my_upstream_cluster";
+
+  EXPECT_CALL(stream_info, bytesReceived()).WillOnce(Return(10));
+  EXPECT_CALL(stream_info, bytesSent()).WillOnce(Return(11));
+  absl::optional<uint32_t> response_code;
+  EXPECT_CALL(stream_info, responseCode()).WillRepeatedly(ReturnPointee(&response_code));
+  EXPECT_CALL(stream_info, upstreamHost()).Times(2);
+  const auto start_timestamp =
+      SystemTime{std::chrono::duration_cast<SystemTime::duration>(std::chrono::hours{123})};
+  EXPECT_CALL(stream_info, startTime()).WillRepeatedly(Return(start_timestamp));
+
+  const absl::optional<std::chrono::nanoseconds> nanoseconds = std::chrono::nanoseconds{10};
+  EXPECT_CALL(stream_info, lastDownstreamRxByteReceived()).WillRepeatedly(Return(nanoseconds));
+  EXPECT_CALL(stream_info, firstUpstreamTxByteSent()).WillRepeatedly(Return(nanoseconds));
+  EXPECT_CALL(stream_info, lastUpstreamTxByteSent()).WillRepeatedly(Return(nanoseconds));
+  EXPECT_CALL(stream_info, firstUpstreamRxByteReceived()).WillRepeatedly(Return(nanoseconds));
+  EXPECT_CALL(stream_info, lastUpstreamRxByteReceived()).WillRepeatedly(Return(nanoseconds));
+  EXPECT_CALL(stream_info, firstDownstreamTxByteSent()).WillRepeatedly(Return(nanoseconds));
+  EXPECT_CALL(stream_info, lastDownstreamTxByteSent()).WillRepeatedly(Return(nanoseconds));
+
+  const auto log_timestamp =
+      start_timestamp + std::chrono::duration_cast<SystemTime::duration>(*nanoseconds);
+  EXPECT_CALL(span, log(log_timestamp, Tracing::Logs::get().LAST_DOWNSTREAM_RX_BYTE_RECEIVED));
+  EXPECT_CALL(span, log(log_timestamp, Tracing::Logs::get().FIRST_UPSTREAM_TX_BYTE_SENT));
+  EXPECT_CALL(span, log(log_timestamp, Tracing::Logs::get().LAST_UPSTREAM_TX_BYTE_SENT));
+  EXPECT_CALL(span, log(log_timestamp, Tracing::Logs::get().FIRST_UPSTREAM_RX_BYTE_RECEIVED));
+  EXPECT_CALL(span, log(log_timestamp, Tracing::Logs::get().LAST_UPSTREAM_RX_BYTE_RECEIVED));
+  EXPECT_CALL(span, log(log_timestamp, Tracing::Logs::get().FIRST_DOWNSTREAM_TX_BYTE_SENT));
+  EXPECT_CALL(span, log(log_timestamp, Tracing::Logs::get().LAST_DOWNSTREAM_TX_BYTE_SENT));
+
+  NiceMock<MockConfig> config;
+  EXPECT_CALL(config, verbose).WillOnce(Return(true));
+  HttpTracerUtility::finalizeSpan(span, nullptr, stream_info, config);
+}
+
 TEST(HttpConnManFinalizerImpl, UpstreamClusterTagSet) {
   NiceMock<MockSpan> span;
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
@@ -284,6 +322,7 @@ TEST(HttpConnManFinalizerImpl, SpanPopulatedFailureResponse) {
   EXPECT_CALL(span, setTag("aa", "a"));
   EXPECT_CALL(span, setTag("cc", "c"));
   EXPECT_CALL(config, requestHeadersForTags());
+  EXPECT_CALL(config, verbose).WillOnce(Return(false));
 
   absl::optional<uint32_t> response_code(503);
   EXPECT_CALL(stream_info, responseCode()).WillRepeatedly(ReturnPointee(&response_code));
