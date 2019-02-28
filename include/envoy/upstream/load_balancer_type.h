@@ -60,7 +60,8 @@ public:
   virtual bool scaleLocalityWeight() const PURE;
 
   /*
-   * @return bool whether to pick any host if the fallback policy fails to find a host.
+   * @return bool whether to attempt to select a host from the entire cluster if host
+   * selection from the fallback subset fails.
    */
   virtual bool panicModeAny() const PURE;
 };
