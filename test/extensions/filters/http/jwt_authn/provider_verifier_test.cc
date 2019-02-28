@@ -27,7 +27,7 @@ ProtobufWkt::Struct getExpectedPayload(const std::string& name) {
   return struct_obj;
 }
 
-class ProviderVerifierTest : public TestBase {
+class ProviderVerifierTest : public testing::Test {
 public:
   void createVerifier() {
     filter_config_ = ::std::make_shared<FilterConfig>(proto_config_, "", mock_factory_ctx_);

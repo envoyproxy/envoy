@@ -13,8 +13,9 @@
 #include "test/mocks/http/mocks.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
+
+#include "gtest/gtest.h"
 
 using Envoy::Http::Headers;
 using Envoy::Http::HeaderValueOf;
@@ -751,6 +752,16 @@ TEST_P(IntegrationTest, TestDelayedConnectionTeardownTimeoutTrigger) {
   EXPECT_EQ(codec_client_->last_connection_event(), Network::ConnectionEvent::RemoteClose);
   EXPECT_EQ(test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value(),
             1);
+}
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, UpstreamEndpointIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(UpstreamEndpointIntegrationTest, TestUpstreamEndpointAddress) {
+  initialize();
+  EXPECT_STREQ(fake_upstreams_[0]->localAddress()->ip()->addressAsString().c_str(),
+               Network::Test::getLoopbackAddressString(GetParam()).c_str());
 }
 
 } // namespace Envoy

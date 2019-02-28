@@ -61,6 +61,23 @@ public:
 
 typedef ConstSingleton<TracingTagValues> Tags;
 
+class TracingLogValues {
+public:
+  // OpenTracing standard key names.
+  const std::string EVENT_KEY = "event";
+
+  // Event names
+  const std::string LAST_DOWNSTREAM_RX_BYTE_RECEIVED = "last_downstream_rx_byte_received";
+  const std::string FIRST_UPSTREAM_TX_BYTE_SENT = "first_upstream_tx_byte_sent";
+  const std::string LAST_UPSTREAM_TX_BYTE_SENT = "last_upstream_tx_byte_sent";
+  const std::string FIRST_UPSTREAM_RX_BYTE_RECEIVED = "first_upstream_rx_byte_received";
+  const std::string LAST_UPSTREAM_RX_BYTE_RECEIVED = "last_upstream_rx_byte_received";
+  const std::string FIRST_DOWNSTREAM_TX_BYTE_SENT = "first_downstream_tx_byte_sent";
+  const std::string LAST_DOWNSTREAM_TX_BYTE_SENT = "last_downstream_tx_byte_sent";
+};
+
+typedef ConstSingleton<TracingLogValues> Logs;
+
 class HttpTracerUtility {
 public:
   /**
@@ -97,6 +114,7 @@ public:
   const std::vector<Http::LowerCaseString>& requestHeadersForTags() const override {
     return request_headers_for_tags_;
   }
+  bool verbose() const override { return false; }
 
 private:
   const std::vector<Http::LowerCaseString> request_headers_for_tags_;
@@ -114,6 +132,7 @@ public:
   // Tracing::Span
   void setOperation(const std::string&) override {}
   void setTag(const std::string&, const std::string&) override {}
+  void log(SystemTime, const std::string&) override {}
   void finishSpan() override {}
   void injectContext(Http::HeaderMap&) override {}
   SpanPtr spawnChild(const Config&, const std::string&, SystemTime) override {

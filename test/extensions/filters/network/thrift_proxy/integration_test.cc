@@ -3,7 +3,8 @@
 #include "test/extensions/filters/network/thrift_proxy/integration.h"
 #include "test/extensions/filters/network/thrift_proxy/utility.h"
 #include "test/test_common/network_utility.h"
-#include "test/test_common/test_base.h"
+
+#include "gtest/gtest.h"
 
 using testing::Combine;
 using ::testing::TestParamInfo;
@@ -15,7 +16,7 @@ namespace NetworkFilters {
 namespace ThriftProxy {
 
 class ThriftConnManagerIntegrationTest
-    : public TestBaseWithParam<std::tuple<TransportType, ProtocolType, bool>>,
+    : public testing::TestWithParam<std::tuple<TransportType, ProtocolType, bool>>,
       public BaseThriftIntegrationTest {
 public:
   static void SetUpTestSuite() {

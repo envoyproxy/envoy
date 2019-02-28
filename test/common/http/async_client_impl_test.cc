@@ -19,9 +19,9 @@
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Invoke;
@@ -34,7 +34,7 @@ namespace Envoy {
 namespace Http {
 namespace {
 
-class AsyncClientImplTest : public TestBase {
+class AsyncClientImplTest : public testing::Test {
 public:
   AsyncClientImplTest()
       : client_(cm_.thread_local_cluster_.cluster_.info_, stats_store_, dispatcher_, local_info_,
