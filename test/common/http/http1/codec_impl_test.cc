@@ -1017,7 +1017,6 @@ TEST_F(Http1ClientConnectionImplTest, HighwatermarkMultipleResponses) {
   static_cast<ClientConnection*>(codec_.get())
       ->onUnderlyingConnectionBelowWriteBufferLowWatermark();
 }
-
 TEST_F(Http1ServerConnectionImplTest, TestLargeRequestHeadersRejected) {
   // Default limit of 60 KiB
   initialize();
@@ -1035,8 +1034,7 @@ TEST_F(Http1ServerConnectionImplTest, TestLargeRequestHeadersRejected) {
   codec_->dispatch(buffer);
   std::string long_string = "big: " + std::string(60 * 1024, 'q') + "\r\n";
   buffer = Buffer::OwnedImpl(long_string);
-  EXPECT_THROW_WITH_MESSAGE(codec_->dispatch(buffer), EnvoyException,
-                            "http/1.1 protocol error: HPE_HEADER_OVERFLOW");
+  EXPECT_THROW_WITH_MESSAGE(codec_->dispatch(buffer), EnvoyException, "request headers too large");
 }
 
 TEST_F(Http1ServerConnectionImplTest, TestLargeRequestHeadersSplitRejected) {
@@ -1061,8 +1059,7 @@ TEST_F(Http1ServerConnectionImplTest, TestLargeRequestHeadersSplitRejected) {
   }
   // the 60th 1kb header should induce overflow
   buffer = Buffer::OwnedImpl(fmt::format("big: {}\r\n", long_string));
-  EXPECT_THROW_WITH_MESSAGE(codec_->dispatch(buffer), EnvoyException,
-                            "http/1.1 protocol error: HPE_HEADER_OVERFLOW");
+  EXPECT_THROW_WITH_MESSAGE(codec_->dispatch(buffer), EnvoyException, "request headers too large");
 }
 
 TEST_F(Http1ServerConnectionImplTest, TestLargeRequestHeadersAccepted) {

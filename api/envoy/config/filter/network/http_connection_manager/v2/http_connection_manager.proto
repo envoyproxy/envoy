@@ -136,6 +136,8 @@ message HttpConnectionManager {
   // The maximum request headers size for incoming connections.
   // If unconfigured, the default max request headers allowed is 60 KiB.
   // Requests that exceed this limit will receive a 431 response.
+  // The 96 KiB limit is based on bugs in nghttp2 parsing, and can be raised once those are
+  // resolved.
   google.protobuf.UInt32Value max_request_headers_kb = 29
       [(validate.rules).uint32.gt = 0, (validate.rules).uint32.lte = 96];
 

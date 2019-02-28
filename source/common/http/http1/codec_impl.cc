@@ -419,8 +419,8 @@ void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
     return;
   }
 
-  if ((current_header_field_.size() + length + current_header_map_->byteSize()) >
-      (max_request_headers_kb_ * 1024)) {
+  uint32_t total = current_header_field_.size() + length + current_header_map_->byteSize();
+  if (total > (max_request_headers_kb_ * 1024)) {
     error_code_ = Http::Code::RequestHeaderFieldsTooLarge;
     sendProtocolError();
     throw CodecProtocolException("request headers too large");
