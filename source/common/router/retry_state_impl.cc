@@ -147,8 +147,11 @@ void RetryStateImpl::resetRetry() {
   }
 }
 
-RetryStatus RetryStateImpl::shouldRetry(RetryPredicate would_retry, DoRetryCallback callback) {
-  if (callback_ && !would_retry()) {
+RetryStatus RetryStateImpl::shouldRetry(bool would_retry, DoRetryCallback callback) {
+  // If a callback is armed from a previous shouldRetry and we don't need to
+  // retry this particular request, we can infer that we did a retry earlier
+  // and it was successful.
+  if (callback_ && !would_retry) {
     cluster_.stats().upstream_rq_retry_success_.inc();
   }
 
@@ -159,7 +162,7 @@ RetryStatus RetryStateImpl::shouldRetry(RetryPredicate would_retry, DoRetryCallb
   }
 
   retries_remaining_--;
-  if (!would_retry()) {
+  if (!would_retry) {
     return RetryStatus::No;
   }
 
@@ -180,18 +183,14 @@ RetryStatus RetryStateImpl::shouldRetry(RetryPredicate would_retry, DoRetryCallb
   return RetryStatus::Yes;
 }
 
-RetryStatus RetryStateImpl::shouldRetryHeaders(const Http::HeaderMap* response_headers,
+RetryStatus RetryStateImpl::shouldRetryHeaders(const Http::HeaderMap& response_headers,
                                                DoRetryCallback callback) {
-  ASSERT(response_headers != nullptr);
-  return shouldRetry(
-      [this, response_headers]() -> bool { return wouldRetryFromHeaders(*response_headers); },
-      callback);
+  return shouldRetry(wouldRetryFromHeaders(response_headers), callback);
 }
 
 RetryStatus RetryStateImpl::shouldRetryReset(const Http::StreamResetReason reset_reason,
                                              DoRetryCallback callback) {
-  return shouldRetry([this, reset_reason]() -> bool { return wouldRetryFromReset(reset_reason); },
-                     callback);
+  return shouldRetry(wouldRetryFromReset(reset_reason), callback);
 }
 
 bool RetryStateImpl::wouldRetryFromHeaders(const Http::HeaderMap& response_headers) {

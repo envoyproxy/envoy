@@ -237,11 +237,11 @@ public:
    *         in the future. Otherwise a retry should not take place and the callback will never be
    *         called. Calling code should proceed with error handling.
    */
-  virtual RetryStatus shouldRetryHeaders(const Http::HeaderMap* response_headers,
+  virtual RetryStatus shouldRetryHeaders(const Http::HeaderMap& response_headers,
                                          DoRetryCallback callback) PURE;
 
   /**
-   * Determine whether a request should be retried after a reset based on the reason for the rest.
+   * Determine whether a request should be retried after a reset based on the reason for the reset.
    * @param reset_reason supplies the reset reason.
    * @param callback supplies the callback that will be invoked when the retry should take place.
    *                 This is used to add timed backoff, etc. The callback will never be called
