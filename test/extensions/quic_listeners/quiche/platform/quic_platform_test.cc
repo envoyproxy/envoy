@@ -1,4 +1,5 @@
 #include "test/extensions/transport_sockets/tls/ssl_test_utility.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
 
 #include "gmock/gmock.h"
@@ -358,6 +359,10 @@ TEST(QuicPlatformTest, QuicCertUtils) {
 
 TEST(QuicPlatformTest, QuicTestOutput) {
   QuicLogThresholdSaver saver;
+
+  if (!Envoy::TestEnvironment::getOptionalEnvVar("QUIC_TEST_OUTPUT_DIR").has_value()) {
+    Envoy::TestEnvironment::setEnvVar("QUIC_TEST_OUTPUT_DIR", "/tmp", /*overwrite=*/true);
+  }
 
   // Set log level to INFO to see the test output path in log.
   quic::GetLogger().set_level(quic::INFO);
