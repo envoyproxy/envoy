@@ -189,7 +189,7 @@ public:
     data_.value_ = value ? 1 : 0;
     data_.flags_ |= Flags::Used;
   }
-  virtual uint64_t value() const override { return data_.value_; }
+  virtual bool value() const override { return data_.value_; }
 
 private:
   StatData& data_;
@@ -210,7 +210,7 @@ public:
   const std::vector<Tag>& tags() const override { CONSTRUCT_ON_FIRST_USE(std::vector<Tag>, {}); }
   void set(bool) override {}
   bool used() const override { return false; }
-  uint64_t value() const override { return 0; }
+  bool value() const override { return false; }
 };
 
 template <class StatData>

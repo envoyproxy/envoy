@@ -88,7 +88,7 @@ public:
   MOCK_CONST_METHOD0(tags, const std::vector<Tag>&());
   MOCK_METHOD1(set, void(bool value));
   MOCK_CONST_METHOD0(used, bool());
-  MOCK_CONST_METHOD0(value, uint64_t());
+  MOCK_CONST_METHOD0(value, bool());
 
   bool used_;
   uint64_t value_;

@@ -102,7 +102,7 @@ public:
   virtual ~BoolIndicator() {}
 
   virtual void set(bool value) PURE;
-  virtual uint64_t value() const PURE;
+  virtual bool value() const PURE;
 };
 
 typedef std::shared_ptr<BoolIndicator> BoolIndicatorSharedPtr;
