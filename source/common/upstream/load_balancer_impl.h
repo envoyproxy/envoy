@@ -13,6 +13,8 @@
 #include "common/protobuf/utility.h"
 #include "common/upstream/edf_scheduler.h"
 
+#include "absl/types/optional.h"
+
 namespace Envoy {
 namespace Upstream {
 
@@ -488,8 +490,10 @@ public:
         panic_mode_any_(subset_config.panic_mode_any()) {
     for (const auto& subset : subset_config.subset_selectors()) {
       if (!subset.keys().empty()) {
-        subset_keys_.emplace_back(
-            std::set<std::string>(subset.keys().begin(), subset.keys().end()));
+        subset_selectors_.emplace_back(std::make_pair(
+            std::set<std::string>(subset.keys().begin(), subset.keys().end()),
+            absl::optional<envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelectorFallbackPolicy>(
+                subset.fallback_policy())));
       }
     }
   }
@@ -500,7 +504,7 @@ public:
     return fallback_policy_;
   }
   const ProtobufWkt::Struct& defaultSubset() const override { return default_subset_; }
-  const std::vector<std::set<std::string>>& subsetKeys() const override { return subset_keys_; }
+  const std::vector<SubsetSelector>& subsetSelectors() const override { return subset_selectors_; }
   bool localityWeightAware() const override { return locality_weight_aware_; }
   bool scaleLocalityWeight() const override { return scale_locality_weight_; }
   bool panicModeAny() const override { return panic_mode_any_; }
@@ -509,7 +513,7 @@ private:
   const bool enabled_;
   const envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy fallback_policy_;
   const ProtobufWkt::Struct default_subset_;
-  std::vector<std::set<std::string>> subset_keys_;
+  std::vector<SubsetSelector> subset_selectors_;
   const bool locality_weight_aware_;
   const bool scale_locality_weight_;
   const bool panic_mode_any_;

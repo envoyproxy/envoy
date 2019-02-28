@@ -29,7 +29,7 @@ SubsetLoadBalancer::SubsetLoadBalancer(
       scope_(scope), runtime_(runtime), random_(random), fallback_policy_(subsets.fallbackPolicy()),
       default_subset_metadata_(subsets.defaultSubset().fields().begin(),
                                subsets.defaultSubset().fields().end()),
-      subset_keys_(subsets.subsetKeys()), original_priority_set_(priority_set),
+      subset_selectors_(subsets.subsetSelectors()), original_priority_set_(priority_set),
       original_local_priority_set_(local_priority_set),
       locality_weight_aware_(subsets.localityWeightAware()),
       scale_locality_weight_(subsets.scaleLocalityWeight()) {
@@ -65,6 +65,8 @@ SubsetLoadBalancer::SubsetLoadBalancer(
 
   // Create filtered default subset (if necessary) and other subsets based on current hosts.
   refreshSubsets();
+
+  initSubsetSelectorMap();
 
   // Configure future updates.
   original_priority_set_callback_handle_ = priority_set.addPriorityUpdateCb(
@@ -110,11 +112,78 @@ void SubsetLoadBalancer::refreshSubsets(uint32_t priority) {
   update(priority, host_sets[priority]->hosts(), {});
 }
 
+void SubsetLoadBalancer::initSubsetSelectorMap() {
+  selectors_ = std::make_shared<SubsetSelectorMap>();
+  SubsetSelectorMapPtr selectors;
+  for (const auto& subset_selector : subset_selectors_) {
+    const auto& selector_keys = subset_selector.first;
+    unsigned long pos = 0;
+    selectors = selectors_;
+    for (const auto& key : selector_keys) {
+      const auto& selector_it = selectors->subset_keys.find(key);
+      pos++;
+      if (selector_it == selectors->subset_keys.end()) {
+        selectors->subset_keys.emplace(std::make_pair(key, std::make_shared<SubsetSelectorMap>()));
+        const auto& childSelector = selectors->subset_keys.find(key);
+        // if this is last key for given selector, check if it has fallback specified
+        if (pos == selector_keys.size()) {
+          const auto& selector_fallback_policy =
+              (subset_selector.second ==
+               envoy::api::v2::Cluster::LbSubsetConfig::NOT_DEFINED_PER_SELECTOR)
+                  ? absl::nullopt
+                  : subset_selector.second;
+          childSelector->second->fallback_policy = selector_fallback_policy;
+          initSelectorFallbackSubset(selector_fallback_policy);
+        }
+        selectors = childSelector->second;
+      } else {
+        selectors = selector_it->second;
+      };
+    }
+    selectors = selectors_;
+  }
+}
+
+void SubsetLoadBalancer::initSelectorFallbackSubset(
+    const absl::optional<envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelectorFallbackPolicy>&
+        fallback_policy) {
+  if (fallback_policy == envoy::api::v2::Cluster::LbSubsetConfig::NO_FALLBACK_PER_SELECTOR) {
+    return;
+  } else if (fallback_policy ==
+                 envoy::api::v2::Cluster::LbSubsetConfig::ANY_ENDPOINT_PER_SELECTOR &&
+             !selector_fallback_subset_any_) {
+    ENVOY_LOG(debug, "subset lb: creating any-endpoint fallback load balancer for selector");
+    HostPredicate predicate = [](const Host&) -> bool { return true; };
+    selector_fallback_subset_any_ = std::make_shared<LbSubsetEntry>();
+    selector_fallback_subset_any_.value()->priority_subset_.reset(
+        new PrioritySubsetImpl(*this, predicate, locality_weight_aware_, scale_locality_weight_));
+  } else if (fallback_policy ==
+                 envoy::api::v2::Cluster::LbSubsetConfig::DEFAULT_SUBSET_PER_SELECTOR &&
+             !selector_fallback_subset_default_) {
+    ENVOY_LOG(debug, "subset lb: creating default subset fallback load balancer for selector");
+    HostPredicate predicate = std::bind(&SubsetLoadBalancer::hostMatches, this,
+                                        default_subset_metadata_, std::placeholders::_1);
+    selector_fallback_subset_default_ = std::make_shared<LbSubsetEntry>();
+    selector_fallback_subset_default_.value()->priority_subset_.reset(
+        new PrioritySubsetImpl(*this, predicate, locality_weight_aware_, scale_locality_weight_));
+  }
+}
+
 HostConstSharedPtr SubsetLoadBalancer::chooseHost(LoadBalancerContext* context) {
   if (context) {
     bool host_chosen;
     HostConstSharedPtr host = tryChooseHostFromContext(context, host_chosen);
     if (host_chosen) {
+      // Subset lookup succeeded, return this result even if it's nullptr.
+      return host;
+    }
+    // otherwise check if there is fallback policy configured for given route metadata
+    absl::optional<envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelectorFallbackPolicy>
+        selector_fallback_policy = tryFindSelectorFallbackPolicy(context);
+    if (selector_fallback_policy) {
+      // return result according to configured fallback policy
+      HostConstSharedPtr host =
+          chooseHostForSelectorFallbackPolicy(selector_fallback_policy, context);
       // Subset lookup succeeded, return this result even if it's nullptr.
       return host;
     }
@@ -138,6 +207,64 @@ HostConstSharedPtr SubsetLoadBalancer::chooseHost(LoadBalancerContext* context) 
     }
   }
 
+  return nullptr;
+}
+
+absl::optional<envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelectorFallbackPolicy>
+SubsetLoadBalancer::tryFindSelectorFallbackPolicy(LoadBalancerContext* context) {
+  const Router::MetadataMatchCriteria* match_criteria = context->metadataMatchCriteria();
+  if (!match_criteria) {
+    return absl::nullopt;
+  }
+  const auto match_criteria_vec = match_criteria->metadataMatchCriteria();
+  SubsetSelectorMapPtr selectors = selectors_;
+  if (selectors == nullptr) {
+    return absl::nullopt;
+  }
+  for (uint32_t i = 0; i < match_criteria_vec.size(); i++) {
+    const Router::MetadataMatchCriterion& match_criterion = *match_criteria_vec[i];
+    const auto& subset_it = selectors->subset_keys.find(match_criterion.name());
+    if (subset_it == selectors->subset_keys.end()) {
+      // No subsets with this key (at this level in the hierarchy).
+      break;
+    }
+
+    if (i + 1 == match_criteria_vec.size()) {
+      // We've reached the end of the criteria, and they all matched.
+      return subset_it->second->fallback_policy;
+    }
+    selectors = subset_it->second;
+  }
+
+  return absl::nullopt;
+}
+
+HostConstSharedPtr SubsetLoadBalancer::chooseHostForSelectorFallbackPolicy(
+    const absl::optional<envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelectorFallbackPolicy>&
+        fallback_policy,
+    LoadBalancerContext* context) {
+  if (!fallback_policy) {
+    return nullptr;
+  }
+  const auto fallback = fallback_policy.value();
+  if (fallback == envoy::api::v2::Cluster::LbSubsetConfig::ANY_ENDPOINT_PER_SELECTOR &&
+      selector_fallback_subset_any_) {
+    HostConstSharedPtr host =
+        selector_fallback_subset_any_.value()->priority_subset_->lb_->chooseHost(context);
+    if (host != nullptr) {
+      // todo incr stats ?
+      return host;
+    }
+
+  } else if (fallback == envoy::api::v2::Cluster::LbSubsetConfig::DEFAULT_SUBSET_PER_SELECTOR &&
+             selector_fallback_subset_default_) {
+    HostConstSharedPtr host =
+        selector_fallback_subset_default_.value()->priority_subset_->lb_->chooseHost(context);
+    if (host != nullptr) {
+      // todo incr stats ?
+      return host;
+    }
+  }
   return nullptr;
 }
 
@@ -206,6 +333,17 @@ SubsetLoadBalancer::LbSubsetEntryPtr SubsetLoadBalancer::findSubset(
 
 void SubsetLoadBalancer::updateFallbackSubset(uint32_t priority, const HostVector& hosts_added,
                                               const HostVector& hosts_removed) {
+
+  if (selector_fallback_subset_any_) {
+    selector_fallback_subset_any_.value()->priority_subset_->update(priority, hosts_added,
+                                                                    hosts_removed);
+  }
+
+  if (selector_fallback_subset_default_) {
+    selector_fallback_subset_default_.value()->priority_subset_->update(priority, hosts_added,
+                                                                        hosts_removed);
+  }
+
   if (fallback_subset_ == nullptr) {
     ENVOY_LOG(debug, "subset lb: fallback load balancer disabled");
     return;
@@ -235,9 +373,9 @@ void SubsetLoadBalancer::processSubsets(
   for (const auto& step : steps) {
     const auto& hosts = step.first;
     const bool adding_hosts = step.second;
-
     for (const auto& host : hosts) {
-      for (const auto& keys : subset_keys_) {
+      for (const auto& subset_selector : subset_selectors_) {
+        const auto& keys = subset_selector.first;
         // For each host, for each subset key, attempt to extract the metadata corresponding to the
         // key from the host.
         SubsetMetadata kvs = extractSubsetMetadata(keys, *host);

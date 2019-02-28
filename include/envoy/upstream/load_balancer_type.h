@@ -9,6 +9,8 @@
 
 #include "common/protobuf/protobuf.h"
 
+#include "absl/types/optional.h"
+
 namespace Envoy {
 namespace Upstream {
 
@@ -16,6 +18,11 @@ namespace Upstream {
  * Type of load balancing to perform.
  */
 enum class LoadBalancerType { RoundRobin, LeastRequest, Random, RingHash, OriginalDst, Maglev };
+
+typedef std::pair<
+    std::set<std::string>,
+    absl::optional<envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelectorFallbackPolicy>>
+    SubsetSelector;
 
 /**
  * Load Balancer subset configuration.
@@ -46,7 +53,7 @@ public:
    * @return const std:vector<std:set<std::string>>& a vector of
    * sorted keys used to define load balancer subsets.
    */
-  virtual const std::vector<std::set<std::string>>& subsetKeys() const PURE;
+  virtual const std::vector<SubsetSelector>& subsetSelectors() const PURE;
 
   /*
    * @return bool whether routing to subsets should take locality weights into account.

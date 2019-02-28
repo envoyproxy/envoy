@@ -16,6 +16,7 @@
 #include "common/upstream/upstream_impl.h"
 
 #include "absl/types/optional.h"
+#include "external/envoy_api/envoy/api/v2/cds.pb.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -36,6 +37,14 @@ public:
 
 private:
   typedef std::function<bool(const Host&)> HostPredicate;
+  void initSubsetSelectorMap();
+  void initSelectorFallbackSubset(
+      const absl::optional<
+          envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelectorFallbackPolicy>&);
+  HostConstSharedPtr chooseHostForSelectorFallbackPolicy(
+      const absl::optional<envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelectorFallbackPolicy>&
+          fallback_policy,
+      LoadBalancerContext* context);
 
   // Represents a subset of an original HostSet.
   class HostSubsetImpl : public HostSetImpl {
@@ -111,9 +120,18 @@ private:
   typedef std::vector<std::pair<std::string, ProtobufWkt::Value>> SubsetMetadata;
 
   class LbSubsetEntry;
+  struct SubsetSelectorMap;
+
   typedef std::shared_ptr<LbSubsetEntry> LbSubsetEntryPtr;
+  typedef std::shared_ptr<SubsetSelectorMap> SubsetSelectorMapPtr;
   typedef std::unordered_map<HashedValue, LbSubsetEntryPtr> ValueSubsetMap;
   typedef std::unordered_map<std::string, ValueSubsetMap> LbSubsetMap;
+
+  struct SubsetSelectorMap {
+    std::unordered_map<std::string, SubsetSelectorMapPtr> subset_keys;
+    absl::optional<envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelectorFallbackPolicy>
+        fallback_policy;
+  };
 
   // Entry in the subset hierarchy.
   class LbSubsetEntry {
@@ -138,12 +156,16 @@ private:
 
   void updateFallbackSubset(uint32_t priority, const HostVector& hosts_added,
                             const HostVector& hosts_removed);
+
   void processSubsets(
       const HostVector& hosts_added, const HostVector& hosts_removed,
       std::function<void(LbSubsetEntryPtr)> update_cb,
       std::function<void(LbSubsetEntryPtr, HostPredicate, const SubsetMetadata&, bool)> cb);
 
   HostConstSharedPtr tryChooseHostFromContext(LoadBalancerContext* context, bool& host_chosen);
+
+  absl::optional<envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelectorFallbackPolicy>
+  tryFindSelectorFallbackPolicy(LoadBalancerContext* context);
 
   bool hostMatches(const SubsetMetadata& kvs, const Host& host);
 
@@ -168,7 +190,7 @@ private:
 
   const envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy fallback_policy_;
   const SubsetMetadata default_subset_metadata_;
-  const std::vector<std::set<std::string>> subset_keys_;
+  const std::vector<SubsetSelector> subset_selectors_;
 
   const PrioritySet& original_priority_set_;
   const PrioritySet* original_local_priority_set_;
@@ -177,8 +199,14 @@ private:
   LbSubsetEntryPtr fallback_subset_;
   LbSubsetEntryPtr panic_mode_subset_;
 
+  absl::optional<LbSubsetEntryPtr> selector_fallback_subset_any_;
+  absl::optional<LbSubsetEntryPtr> selector_fallback_subset_default_;
+
   // Forms a trie-like structure. Requires lexically sorted Host and Route metadata.
   LbSubsetMap subsets_;
+  // Forms a trie-like structure of lexically sorted keys+optional fallback policy from subset
+  // selectors configuration
+  SubsetSelectorMapPtr selectors_;
 
   const bool locality_weight_aware_;
   const bool scale_locality_weight_;
