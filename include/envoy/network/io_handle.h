@@ -4,8 +4,6 @@
 
 #include "envoy/common/pure.h"
 
-#include "common/common/assert.h"
-
 namespace Envoy {
 namespace Network {
 
