@@ -49,6 +49,7 @@ public:
   void setup(bool streaming) {
     connection_.local_address_ =
         std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1000);
+    ON_CALL(connection_, id()).WillByDefault(Return(1));
     EXPECT_CALL(*config_, createPerTapSinkHandleManager_(1)).WillOnce(Return(sink_manager_));
     EXPECT_CALL(*config_, createMatchStatusVector())
         .WillOnce(Return(TapCommon::Matcher::MatchStatusVector(1)));
