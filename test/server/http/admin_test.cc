@@ -657,21 +657,16 @@ TEST_P(AdminInstanceTest, AdminCpuProfiler) {
 TEST_P(AdminInstanceTest, AdminHeapProfilerOnRepeatedRequest) {
   Buffer::OwnedImpl data;
   Http::HeaderMapImpl header_map;
-  bool eventually_stopped = false;
-  postCallback("/heapprofiler?enable=y", header_map, data);
-  postCallback("/heapprofiler?enable=y", header_map, data);
-  // eventually stopped after operator|| to avoid cut short
-  eventually_stopped =
-      (Http::Code::OK == postCallback("/heapprofiler?enable=n", header_map, data)) ||
-      eventually_stopped;
-  eventually_stopped =
-      (Http::Code::OK == postCallback("/heapprofiler?enable=n", header_map, data)) ||
-      eventually_stopped;
-
-  ASSERT_TRUE("Not crash on repeated request");
-#ifdef PROFILER_AVAILABLE
-  ASSERT_TRUE(eventually_stopped) << "Heap profiler failed to stop";
+  auto repeatResultCode = Http::Code::BadRequest;
+#ifndef PROFILER_AVAILABLE
+  repeatResultCode = Http::Code::NotImplemented;
 #endif
+
+  postCallback("/heapprofiler?enable=y", header_map, data);
+  EXPECT_EQ(repeatResultCode, postCallback("/heapprofiler?enable=y", header_map, data));
+
+  postCallback("/heapprofiler?enable=n", header_map, data);
+  EXPECT_EQ(repeatResultCode, postCallback("/heapprofiler?enable=n", header_map, data));
 }
 
 TEST_P(AdminInstanceTest, AdminHeapProfiler) {
@@ -685,12 +680,16 @@ TEST_P(AdminInstanceTest, AdminHeapProfiler) {
   EXPECT_EQ(Http::Code::OK, postCallback("/heapprofiler?enable=y", header_map, data));
   EXPECT_TRUE(Profiler::Heap::profilerEnabled());
 #else
-  EXPECT_EQ(Http::Code::InternalServerError,
-            postCallback("/heapprofiler?enable=y", header_map, data));
+  EXPECT_EQ(Http::Code::NotImplemented, postCallback("/heapprofiler?enable=y", header_map, data));
   EXPECT_FALSE(Profiler::Heap::profilerEnabled());
 #endif
 
+#ifdef PROFILER_AVAILABLE
   EXPECT_EQ(Http::Code::OK, postCallback("/heapprofiler?enable=n", header_map, data));
+#else
+  EXPECT_EQ(Http::Code::NotImplemented, postCallback("/heapprofiler?enable=n", header_map, data));
+#endif
+
   EXPECT_FALSE(Profiler::Heap::isProfilerStarted());
 }
 
