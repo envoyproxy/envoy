@@ -109,10 +109,10 @@ public:
   void expectResetRetry();
 
   MOCK_METHOD0(enabled, bool());
-  MOCK_METHOD2(shouldRetryHeaders, RetryStatus(const Http::HeaderMap* response_headers,
-                                        DoRetryCallback callback));
-  MOCK_METHOD2(shouldRetryReset, RetryStatus(const Http::StreamResetReason reset_reason,
-                                        DoRetryCallback callback));
+  MOCK_METHOD2(shouldRetryHeaders,
+               RetryStatus(const Http::HeaderMap* response_headers, DoRetryCallback callback));
+  MOCK_METHOD2(shouldRetryReset,
+               RetryStatus(const Http::StreamResetReason reset_reason, DoRetryCallback callback));
   MOCK_METHOD1(onHostAttempted, void(Upstream::HostDescriptionConstSharedPtr));
   MOCK_METHOD1(shouldSelectAnotherHost, bool(const Upstream::Host& host));
   MOCK_METHOD2(priorityLoadForRetry,

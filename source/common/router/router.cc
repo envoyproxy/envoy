@@ -688,7 +688,8 @@ void Filter::onUpstreamHeaders(const uint64_t response_code, Http::HeaderMapPtr&
     // Notify retry modifiers about the attempted host.
     retry_state_->onHostAttempted(upstream_request_->upstream_host_);
 
-    RetryStatus retry_status = retry_state_->shouldRetryHeaders(headers.get(), [this]() -> void { doRetry(); });
+    RetryStatus retry_status =
+        retry_state_->shouldRetryHeaders(headers.get(), [this]() -> void { doRetry(); });
     // Capture upstream_host since setupRetry() in the following line will clear
     // upstream_request_.
     const auto upstream_host = upstream_request_->upstream_host_;

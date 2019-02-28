@@ -56,7 +56,8 @@ public:
   RetryState::DoRetryCallback callback_;
 
   const Http::StreamResetReason remote_reset_{Http::StreamResetReason::RemoteReset};
-  const Http::StreamResetReason remote_refused_stream_reset_{Http::StreamResetReason::RemoteRefusedStreamReset};
+  const Http::StreamResetReason remote_refused_stream_reset_{
+      Http::StreamResetReason::RemoteRefusedStreamReset};
   const Http::StreamResetReason overflow_reset_{Http::StreamResetReason::Overflow};
   const Http::StreamResetReason connect_failure_{Http::StreamResetReason::ConnectionFailure};
 };
@@ -73,8 +74,7 @@ TEST_F(RouterRetryStateImplTest, PolicyRefusedStream) {
   EXPECT_TRUE(state_->enabled());
 
   expectTimerCreateAndEnable();
-  EXPECT_EQ(RetryStatus::Yes,
-            state_->shouldRetryReset(remote_refused_stream_reset_, callback_));
+  EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryReset(remote_refused_stream_reset_, callback_));
   EXPECT_CALL(callback_ready_, ready());
   retry_timer_->callback_();
 
@@ -99,8 +99,7 @@ TEST_F(RouterRetryStateImplTest, Policy5xxRemoteReset) {
   EXPECT_CALL(callback_ready_, ready());
   retry_timer_->callback_();
 
-  EXPECT_EQ(RetryStatus::NoRetryLimitExceeded,
-            state_->shouldRetryReset(remote_reset_, callback_));
+  EXPECT_EQ(RetryStatus::NoRetryLimitExceeded, state_->shouldRetryReset(remote_reset_, callback_));
 }
 
 TEST_F(RouterRetryStateImplTest, Policy5xxRemote503) {
@@ -199,8 +198,7 @@ TEST_F(RouterRetryStateImplTest, PolicyGatewayErrorRemoteReset) {
   EXPECT_CALL(callback_ready_, ready());
   retry_timer_->callback_();
 
-  EXPECT_EQ(RetryStatus::NoRetryLimitExceeded,
-            state_->shouldRetryReset(remote_reset_, callback_));
+  EXPECT_EQ(RetryStatus::NoRetryLimitExceeded, state_->shouldRetryReset(remote_reset_, callback_));
 }
 
 TEST_F(RouterRetryStateImplTest, PolicyGrpcCancelled) {
@@ -285,8 +283,7 @@ TEST_F(RouterRetryStateImplTest, Policy5xxRemote200RemoteReset) {
   EXPECT_TRUE(state_->enabled());
   Http::TestHeaderMapImpl response_headers{{":status", "200"}};
   EXPECT_EQ(RetryStatus::No, state_->shouldRetryHeaders(&response_headers, callback_));
-  EXPECT_EQ(RetryStatus::NoRetryLimitExceeded,
-            state_->shouldRetryReset(remote_reset_, callback_));
+  EXPECT_EQ(RetryStatus::NoRetryLimitExceeded, state_->shouldRetryReset(remote_reset_, callback_));
 }
 
 TEST_F(RouterRetryStateImplTest, RuntimeGuard) {

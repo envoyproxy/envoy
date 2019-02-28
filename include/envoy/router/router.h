@@ -238,7 +238,7 @@ public:
    *         called. Calling code should proceed with error handling.
    */
   virtual RetryStatus shouldRetryHeaders(const Http::HeaderMap* response_headers,
-                                  DoRetryCallback callback) PURE;
+                                         DoRetryCallback callback) PURE;
 
   /**
    * Determine whether a request should be retried after a reset based on the reason for the rest.
@@ -251,7 +251,7 @@ public:
    *         called. Calling code should proceed with error handling.
    */
   virtual RetryStatus shouldRetryReset(const Http::StreamResetReason reset_reason,
-                                  DoRetryCallback callback) PURE;
+                                       DoRetryCallback callback) PURE;
 
   /**
    * Called when a host was attempted but the request failed and is eligible for another retry.

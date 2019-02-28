@@ -180,13 +180,18 @@ RetryStatus RetryStateImpl::shouldRetry(RetryPredicate would_retry, DoRetryCallb
   return RetryStatus::Yes;
 }
 
-RetryStatus RetryStateImpl::shouldRetryHeaders(const Http::HeaderMap* response_headers, DoRetryCallback callback) {
+RetryStatus RetryStateImpl::shouldRetryHeaders(const Http::HeaderMap* response_headers,
+                                               DoRetryCallback callback) {
   ASSERT(response_headers != nullptr);
-  return shouldRetry([this, response_headers]() -> bool { return wouldRetryFromHeaders(*response_headers); }, callback);
+  return shouldRetry(
+      [this, response_headers]() -> bool { return wouldRetryFromHeaders(*response_headers); },
+      callback);
 }
 
-RetryStatus RetryStateImpl::shouldRetryReset(const Http::StreamResetReason reset_reason, DoRetryCallback callback) {
-  return shouldRetry([this, reset_reason]() -> bool { return wouldRetryFromReset(reset_reason); }, callback);
+RetryStatus RetryStateImpl::shouldRetryReset(const Http::StreamResetReason reset_reason,
+                                             DoRetryCallback callback) {
+  return shouldRetry([this, reset_reason]() -> bool { return wouldRetryFromReset(reset_reason); },
+                     callback);
 }
 
 bool RetryStateImpl::wouldRetryFromHeaders(const Http::HeaderMap& response_headers) {

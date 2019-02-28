@@ -36,8 +36,10 @@ public:
 
   // Router::RetryState
   bool enabled() override { return retry_on_ != 0; }
-  RetryStatus shouldRetryHeaders(const Http::HeaderMap* response_headers, DoRetryCallback callback) override;
-  RetryStatus shouldRetryReset(const Http::StreamResetReason reset_reason, DoRetryCallback callback) override;
+  RetryStatus shouldRetryHeaders(const Http::HeaderMap* response_headers,
+                                 DoRetryCallback callback) override;
+  RetryStatus shouldRetryReset(const Http::StreamResetReason reset_reason,
+                               DoRetryCallback callback) override;
 
   void onHostAttempted(Upstream::HostDescriptionConstSharedPtr host) override {
     std::for_each(retry_host_predicates_.begin(), retry_host_predicates_.end(),
