@@ -877,7 +877,7 @@ bool Filter::setupRedirect(const Http::HeaderMap& headers) {
   // completion here and check it in onDestroy. This is annoyingly complicated but is better than
   // needlessly resetting streams.
   attempting_internal_redirect_with_complete_stream_ =
-      upstream_request_->stream_info_.lastUpstreamRxByteReceived() && downstream_end_stream_;
+      upstream_request_->upstream_timing_.last_upstream_rx_byte_received_ && downstream_end_stream_;
 
   // As with setupRetry, redirects are not supported for streaming requests yet.
   if (downstream_end_stream_ &&
