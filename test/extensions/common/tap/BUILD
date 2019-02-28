@@ -15,6 +15,7 @@ envoy_cc_test_library(
     hdrs = ["common.h"],
     deps = [
         "//source/extensions/common/tap:tap_interface",
+        "//test/test_common:utility_lib",
     ],
 )
 

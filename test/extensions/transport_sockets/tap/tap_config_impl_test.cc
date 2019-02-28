@@ -69,6 +69,7 @@ public:
   }
 
   std::shared_ptr<MockSocketTapConfig> config_{std::make_shared<MockSocketTapConfig>()};
+  // Raw pointer, returned via mock to unique_ptr.
   TapCommon::MockPerTapSinkHandleManager* sink_manager_ =
       new TapCommon::MockPerTapSinkHandleManager;
   std::unique_ptr<PerSocketTapperImpl> tapper_;

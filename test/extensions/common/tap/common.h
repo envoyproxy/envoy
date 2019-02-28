@@ -2,6 +2,8 @@
 
 #include "extensions/common/tap/tap.h"
 
+#include "test/test_common/utility.h"
+
 #include "gmock/gmock.h"
 
 namespace envoy {
@@ -21,10 +23,12 @@ std::ostream& operator<<(std::ostream& os, const TraceWrapper& trace);
 namespace Envoy {
 namespace Extensions {
 
+// TODO(mattklein123): Make this a common matcher called ProtoYamlEq and figure out how to
+// correctly templatize it.
 MATCHER_P(TraceEqual, rhs, "") {
   envoy::data::tap::v2alpha::TraceWrapper expected_trace;
   MessageUtil::loadFromYaml(rhs, expected_trace);
-  return arg.DebugString() == expected_trace.DebugString();
+  return TestUtility::protoEqual(expected_trace, arg);
 }
 
 namespace Common {

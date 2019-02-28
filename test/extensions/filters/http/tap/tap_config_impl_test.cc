@@ -31,6 +31,7 @@ public:
   }
 
   std::shared_ptr<MockHttpTapConfig> config_{std::make_shared<MockHttpTapConfig>()};
+  // Raw pointer, returned via mock to unique_ptr.
   TapCommon::MockPerTapSinkHandleManager* sink_manager_ =
       new TapCommon::MockPerTapSinkHandleManager;
   std::unique_ptr<HttpPerRequestTapperImpl> tapper_;
