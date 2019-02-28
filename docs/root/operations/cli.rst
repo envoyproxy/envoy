@@ -81,8 +81,8 @@ following are the command line options that Envoy supports.
    *(optional)* This flag is used to control the number of worker threads if :option:`--concurrency` is
    not set. If enabled, the assigned cpuset size is used to determine the number of worker threads on
    Linux-based systems. Otherwise the number of worker threads is set to the number of hardware threads
-   on the machine. You can read more about cpusets here:
-   https://www.kernel.org/doc/Documentation/cgroup-v1/cpusets.txt
+   on the machine. You can read more about cpusets in the
+   `kernel documentation <https://www.kernel.org/doc/Documentation/cgroup-v1/cpusets.txt>`_.
 
 .. option:: --log-path <path string>
 
