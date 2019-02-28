@@ -331,6 +331,12 @@ Similarly, for [thread sanitizer (TSAN)](https://github.com/google/sanitizers/wi
 bazel test -c dbg --config=clang-tsan //test/...
 ```
 
+To run the sanitizers on OS X, prefix `macos-` to the config option, e.g.:
+
+```
+bazel test -c dbg --config=macos-asan //test/...
+```
+
 ## Log Verbosity
 
 Log verbosity is controlled at runtime in all builds.
