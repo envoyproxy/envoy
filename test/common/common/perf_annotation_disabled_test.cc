@@ -9,7 +9,6 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-namespace {
 TEST(PerfAnnotationDisabled, testPerfAnnotation) {
   PERF_OPERATION(perf);
   PERF_RECORD(perf, "alpha", "0");
@@ -20,5 +19,4 @@ TEST(PerfAnnotationDisabled, testPerfAnnotation) {
   EXPECT_TRUE(report.empty());
   PERF_CLEAR();
 }
-} // namespace
 } // namespace Envoy

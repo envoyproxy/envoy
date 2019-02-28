@@ -147,7 +147,7 @@ route_config:
                   value: "token2"
 )EOF";
 
-} //namespace
+} // namespace
 
 class HeaderIntegrationTest
     : public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>>,

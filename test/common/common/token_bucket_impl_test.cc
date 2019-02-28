@@ -7,7 +7,6 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-namespace {
 class TokenBucketImplTest : public testing::Test {
 protected:
   Event::SimulatedTimeSystem time_system_;
@@ -72,5 +71,4 @@ TEST_F(TokenBucketImplTest, NextTokenAvailable) {
   EXPECT_FALSE(token_bucket.consume());
   EXPECT_EQ(200, token_bucket.nextTokenAvailableMs());
 }
-} // namespace
 } // namespace Envoy

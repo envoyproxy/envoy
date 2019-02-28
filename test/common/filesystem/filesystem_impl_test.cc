@@ -11,7 +11,6 @@
 
 namespace Envoy {
 namespace Filesystem {
-namespace {
 class FileSystemImplTest : public testing::Test {
 protected:
   int getFd(File* file) {
@@ -203,6 +202,5 @@ TEST_F(FileSystemImplTest, WriteAfterClose) {
   EXPECT_EQ(-1, result.rc_);
   EXPECT_EQ(EBADF, result.errno_);
 }
-} // namespace
 } // namespace Filesystem
 } // namespace Envoy

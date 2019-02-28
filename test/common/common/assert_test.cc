@@ -5,7 +5,6 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-namespace {
 TEST(ReleaseAssertDeathTest, VariousLogs) {
   Logger::StderrSinkDelegate stderr_sink(Logger::Registry::getSink()); // For coverage build.
   EXPECT_DEATH({ RELEASE_ASSERT(0, ""); }, ".*assert failure: 0.*");
@@ -41,5 +40,4 @@ TEST(AssertDeathTest, VariousLogs) {
 
   EXPECT_EQ(expected_counted_failures, assert_fail_count);
 }
-} // namespace
 } // namespace Envoy

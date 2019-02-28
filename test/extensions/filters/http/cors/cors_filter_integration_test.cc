@@ -5,7 +5,6 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-namespace {
 class CorsFilterIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                   public HttpIntegrationTest {
 public:
@@ -257,5 +256,4 @@ TEST_P(CorsFilterIntegrationTest, TestExposeHeaders) {
           {":status", "200"},
       });
 }
-} // namespace
 } // namespace Envoy
