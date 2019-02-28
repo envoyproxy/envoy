@@ -38,9 +38,9 @@ SubsetLoadBalancer::SubsetLoadBalancer(
   if (subsets.panicModeAny()) {
     HostPredicate predicate = [](const Host&) -> bool { return true; };
 
-    panic_mode_subset_.reset(new LbSubsetEntry());
-    panic_mode_subset_->priority_subset_.reset(
-        new PrioritySubsetImpl(*this, predicate, locality_weight_aware_, scale_locality_weight_));
+    panic_mode_subset_ = std::make_unique<LbSubsetEntry>();
+    panic_mode_subset_->priority_subset_ = std::make_unique<PrioritySubsetImpl>(
+        *this, predicate, locality_weight_aware_, scale_locality_weight_);
   }
 
   // Create filtered default subset (if necessary) and other subsets based on current hosts.
