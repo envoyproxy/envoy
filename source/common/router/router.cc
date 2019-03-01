@@ -556,6 +556,9 @@ void Filter::onUpstreamReset(UpstreamResetType type,
       retry_state_->onHostAttempted(upstream_host);
     }
 
+    // There must be a value for reset_reason because the only case where it's
+    // empty is when type == UpstreamResetType::GlobalTimeout.
+    ASSERT(reset_reason.has_value());
     RetryStatus retry_status =
         retry_state_->shouldRetryReset(reset_reason.value(), [this]() -> void { doRetry(); });
     if (retry_status == RetryStatus::Yes && setupRetry(true)) {
