@@ -30,6 +30,7 @@ using testing::SaveArg;
 namespace Envoy {
 namespace Upstream {
 namespace Outlier {
+namespace {
 
 TEST(OutlierDetectorImplFactoryTest, NoDetector) {
   NiceMock<MockClusterMockPrioritySet> cluster;
@@ -870,6 +871,7 @@ TEST(DetectorHostMonitorImpl, resultToHttpCode) {
             DetectorHostMonitorImpl::resultToHttpCode(Result::SERVER_FAILURE));
 }
 
+} // namespace
 } // namespace Outlier
 } // namespace Upstream
 } // namespace Envoy

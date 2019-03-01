@@ -14,6 +14,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace RouterFilter {
+namespace {
 
 TEST(RouterFilterConfigTest, RouterFilterInJson) {
   std::string json_string = R"EOF(
@@ -76,6 +77,7 @@ TEST(RouterFilterConfigTest, DoubleRegistrationTest) {
       fmt::format("Double registration for name: '{}'", HttpFilterNames::get().Router));
 }
 
+} // namespace
 } // namespace RouterFilter
 } // namespace HttpFilters
 } // namespace Extensions

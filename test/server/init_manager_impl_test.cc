@@ -11,6 +11,7 @@ using testing::Invoke;
 
 namespace Envoy {
 namespace Server {
+namespace {
 
 class InitManagerImplTest : public testing::Test {
 public:
@@ -75,5 +76,6 @@ TEST_F(InitManagerImplTest, Cancel) {
   delete manager;
 }
 
+} // namespace
 } // namespace Server
 } // namespace Envoy
