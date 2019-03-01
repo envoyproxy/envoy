@@ -385,6 +385,14 @@ message Cluster {
     // going to an individual locality if said locality is disproportionally affected by the
     // subset predicate.
     bool scale_locality_weight = 5;
+
+    // If true, when a fallback policy is configured and its corresponding subset fails to find
+    // a host this will cause any host to be selected instead.
+    //
+    // This is useful when using the default subset as the fallback policy, given the default
+    // subset might become empty. With this option enabled, if that happens the LB will attempt
+    // to select a host from the entire cluster.
+    bool panic_mode_any = 6;
   }
 
   // Configuration for load balancing subsetting.
