@@ -7,7 +7,7 @@ set -e
 build_setup_args=""
 if [[ "$1" == "fix_format" || "$1" == "check_format" || "$1" == "check_repositories" || \
         "$1" == "check_spelling" || "$1" == "fix_spelling" || "$1" == "bazel.clang_tidy" || \
-        "$1" == "check_spelling_pedantic" || "$1" == "fix_spelling_pedantic" ]]; then
+        "$1" == "check_spelling_pedantic" || "$1" == "fix_spelling_pedantic" || "$1" == "bazel.compile_time_options" ]]; then
   build_setup_args="-nofetch"
 fi
 
