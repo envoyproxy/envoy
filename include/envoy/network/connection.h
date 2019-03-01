@@ -184,7 +184,7 @@ public:
   /**
    * @return the const SSL connection data if this is an SSL connection, or nullptr if it is not.
    */
-  virtual const Ssl::Connection* ssl() const PURE;
+  virtual const Ssl::ConnectionInfo* ssl() const PURE;
 
   /**
    * @return requested server name (e.g. SNI in TLS), if any.

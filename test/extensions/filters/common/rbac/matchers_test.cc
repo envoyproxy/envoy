@@ -190,7 +190,7 @@ TEST(PortMatcher, PortMatcher) {
 
 TEST(AuthenticatedMatcher, uriSanPeerCertificate) {
   Envoy::Network::MockConnection conn;
-  Envoy::Ssl::MockConnection ssl;
+  Envoy::Ssl::MockConnectionInfo ssl;
 
   EXPECT_CALL(ssl, uriSanPeerCertificate()).WillRepeatedly(Return("foo"));
   EXPECT_CALL(Const(conn), ssl()).WillRepeatedly(Return(&ssl));
@@ -205,7 +205,7 @@ TEST(AuthenticatedMatcher, uriSanPeerCertificate) {
 
 TEST(AuthenticatedMatcher, subjectPeerCertificate) {
   Envoy::Network::MockConnection conn;
-  Envoy::Ssl::MockConnection ssl;
+  Envoy::Ssl::MockConnectionInfo ssl;
 
   EXPECT_CALL(ssl, uriSanPeerCertificate()).WillRepeatedly(Return(""));
   EXPECT_CALL(ssl, subjectPeerCertificate()).WillRepeatedly(Return("bar"));
@@ -221,7 +221,7 @@ TEST(AuthenticatedMatcher, subjectPeerCertificate) {
 
 TEST(AuthenticatedMatcher, AnySSLSubject) {
   Envoy::Network::MockConnection conn;
-  Envoy::Ssl::MockConnection ssl;
+  Envoy::Ssl::MockConnectionInfo ssl;
   EXPECT_CALL(ssl, uriSanPeerCertificate()).WillRepeatedly(Return("foo"));
   EXPECT_CALL(Const(conn), ssl()).WillRepeatedly(Return(&ssl));
 
@@ -269,7 +269,7 @@ TEST(PolicyMatcher, PolicyMatcher) {
   RBAC::PolicyMatcher matcher(policy);
 
   Envoy::Network::MockConnection conn;
-  Envoy::Ssl::MockConnection ssl;
+  Envoy::Ssl::MockConnectionInfo ssl;
   Envoy::Network::Address::InstanceConstSharedPtr addr =
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 456, false);
 

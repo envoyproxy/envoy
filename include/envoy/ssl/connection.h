@@ -14,9 +14,9 @@ namespace Ssl {
 /**
  * Base connection interface for all SSL connections.
  */
-class Connection {
+class ConnectionInfo {
 public:
-  virtual ~Connection() {}
+  virtual ~ConnectionInfo() {}
 
   /**
    * @return bool whether the peer certificate is presented.

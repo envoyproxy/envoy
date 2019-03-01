@@ -30,10 +30,10 @@ public:
   MOCK_METHOD1(iterateContexts, void(std::function<void(const Context&)> callback));
 };
 
-class MockConnection : public Connection {
+class MockConnectionInfo : public ConnectionInfo {
 public:
-  MockConnection();
-  ~MockConnection();
+  MockConnectionInfo();
+  ~MockConnectionInfo();
 
   MOCK_CONST_METHOD0(peerCertificatePresented, bool());
   MOCK_CONST_METHOD0(uriSanLocalCertificate, std::string());

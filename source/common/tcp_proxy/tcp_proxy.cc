@@ -203,6 +203,7 @@ void Filter::initialize(Network::ReadFilterCallbacks& callbacks, bool set_connec
   read_callbacks_->connection().enableHalfClose(true);
   getStreamInfo().setDownstreamLocalAddress(read_callbacks_->connection().localAddress());
   getStreamInfo().setDownstreamRemoteAddress(read_callbacks_->connection().remoteAddress());
+  getStreamInfo().setDownstreamSslConnection(read_callbacks_->connection().ssl());
 
   // Need to disable reads so that we don't write to an upstream that might fail
   // in onData(). This will get re-enabled when the upstream connection is

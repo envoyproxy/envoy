@@ -7,6 +7,7 @@
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/local_info/mocks.h"
+#include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 
@@ -325,6 +326,52 @@ http_logs:
           port_value: 0
       start_time:
         seconds: 3600
+    request:
+      request_method: "METHOD_UNSPECIFIED"
+    response: {}
+)EOF");
+    access_log_->log(nullptr, nullptr, nullptr, stream_info);
+  }
+
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    stream_info.host_ = nullptr;
+    stream_info.start_time_ = SystemTime(1h);
+
+    NiceMock<Ssl::MockConnectionInfo> connection_info;
+    ON_CALL(connection_info, uriSanPeerCertificate()).WillByDefault(Return("peerUriSan"));
+    ON_CALL(connection_info, uriSanLocalCertificate()).WillByDefault(Return("localUriSan"));
+    ON_CALL(connection_info, subjectPeerCertificate()).WillByDefault(Return("peerSubject"));
+    ON_CALL(connection_info, subjectLocalCertificate()).WillByDefault(Return("localSubject"));
+    stream_info.setDownstreamSslConnection(&connection_info);
+    stream_info.requested_server_name_ = "sni";
+
+    Http::TestHeaderMapImpl request_headers{
+        {":method", "WHACKADOO"},
+    };
+
+    expectLog(R"EOF(
+http_logs:
+  log_entry:
+    common_properties:
+      downstream_remote_address:
+        socket_address:
+          address: "127.0.0.1"
+          port_value: 0
+      downstream_local_address:
+        socket_address:
+          address: "127.0.0.2"
+          port_value: 0
+      start_time:
+        seconds: 3600
+      tls_properties:
+        tls_sni_hostname: sni
+        local_certificate_properties:
+          subject: localSubject
+          uri_san: localUriSan
+        peer_certificate_properties:
+          subject: peerSubject
+          uri_san: peerUriSan
     request:
       request_method: "METHOD_UNSPECIFIED"
     response: {}

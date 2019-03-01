@@ -21,6 +21,27 @@ namespace AccessLog {
 
 static const std::string UnspecifiedValueString = "-";
 
+namespace {
+
+// Helper that handles the case when the ConectionInfo is missiring or if the desired value is
+// empty.
+StreamInfoFormatter::FieldExtractor sslConnectionStringInfoExtractor(
+    std::function<std::string(const Ssl::ConnectionInfo& connection_info)> string_extractor) {
+  return [=](const StreamInfo::StreamInfo& stream_info) {
+    if (stream_info.downstreamSslConnection() == nullptr) {
+      return UnspecifiedValueString;
+    }
+
+    const auto value = string_extractor(*stream_info.downstreamSslConnection());
+    if (value.empty()) {
+      return UnspecifiedValueString;
+    } else {
+      return value;
+    }
+  };
+}
+} // namespace
+
 const std::string AccessLogFormatUtils::DEFAULT_FORMAT =
     "[%START_TIME%] \"%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%\" "
     "%RESPONSE_CODE% %RESPONSE_FLAGS% %BYTES_RECEIVED% %BYTES_SENT% %DURATION% "
@@ -350,6 +371,26 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
         return UnspecifiedValueString;
       }
     };
+  } else if (field_name == "DOWNSTREAM_PEER_URI_SAN") {
+    field_extractor_ =
+        sslConnectionStringInfoExtractor([](const Ssl::ConnectionInfo& connection_info) {
+          return connection_info.uriSanPeerCertificate();
+        });
+  } else if (field_name == "DOWNSTREAM_LOCAL_URI_SAN") {
+    field_extractor_ =
+        sslConnectionStringInfoExtractor([](const Ssl::ConnectionInfo& connection_info) {
+          return connection_info.uriSanLocalCertificate();
+        });
+  } else if (field_name == "DOWNSTREAM_PEER_SUBJECT") {
+    field_extractor_ =
+        sslConnectionStringInfoExtractor([](const Ssl::ConnectionInfo& connection_info) {
+          return connection_info.subjectPeerCertificate();
+        });
+  } else if (field_name == "DOWNSTREAM_LOCAL_SUBJECT") {
+    field_extractor_ =
+        sslConnectionStringInfoExtractor([](const Ssl::ConnectionInfo& connection_info) {
+          return connection_info.subjectLocalCertificate();
+        });
   } else {
     throw EnvoyException(fmt::format("Not supported field in StreamInfo: {}", field_name));
   }

@@ -34,7 +34,7 @@ public:
   NiceMock<Envoy::Http::MockStreamDecoderFilterCallbacks> callbacks_;
   NiceMock<Envoy::Network::MockReadFilterCallbacks> net_callbacks_;
   NiceMock<Envoy::Network::MockConnection> connection_;
-  NiceMock<Envoy::Ssl::MockConnection> ssl_;
+  NiceMock<Envoy::Ssl::MockConnectionInfo> ssl_;
   NiceMock<Envoy::StreamInfo::MockStreamInfo> req_info_;
 };
 

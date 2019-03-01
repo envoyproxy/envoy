@@ -34,7 +34,7 @@ public:
     return {PostIoAction::Close, 0, false};
   }
   void onConnected() override {}
-  const Ssl::Connection* ssl() const override { return nullptr; }
+  const Ssl::ConnectionInfo* ssl() const override { return nullptr; }
 };
 } // namespace
 

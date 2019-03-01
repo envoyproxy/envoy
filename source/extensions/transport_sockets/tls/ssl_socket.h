@@ -40,7 +40,7 @@ struct SslSocketFactoryStats {
 enum class InitialState { Client, Server };
 
 class SslSocket : public Network::TransportSocket,
-                  public Envoy::Ssl::Connection,
+                  public Envoy::Ssl::ConnectionInfo,
                   protected Logger::Loggable<Logger::Id::connection> {
 public:
   SslSocket(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
@@ -68,7 +68,7 @@ public:
   Network::IoResult doRead(Buffer::Instance& read_buffer) override;
   Network::IoResult doWrite(Buffer::Instance& write_buffer, bool end_stream) override;
   void onConnected() override;
-  const Ssl::Connection* ssl() const override { return this; }
+  const Ssl::ConnectionInfo* ssl() const override { return this; }
 
   SSL* rawSslForTest() const { return ssl_.get(); }
 

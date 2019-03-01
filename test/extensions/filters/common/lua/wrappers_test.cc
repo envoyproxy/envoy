@@ -62,7 +62,7 @@ protected:
   }
 
   NiceMock<Envoy::Network::MockConnection> connection_;
-  NiceMock<Envoy::Ssl::MockConnection> ssl_;
+  NiceMock<Envoy::Ssl::MockConnectionInfo> ssl_;
 };
 
 // Basic buffer wrapper methods test.
