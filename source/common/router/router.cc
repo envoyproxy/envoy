@@ -532,7 +532,7 @@ void Filter::onResponseTimeout() {
 }
 
 void Filter::onUpstreamReset(UpstreamResetType type,
-                             const absl::optional<Http::StreamResetReason>& reset_reason) {
+                             const absl::optional<Http::StreamResetReason> reset_reason) {
   ASSERT(type == UpstreamResetType::GlobalTimeout || upstream_request_);
   if (type == UpstreamResetType::Reset) {
     ENVOY_STREAM_LOG(debug, "upstream reset: reset reason {}", *callbacks_,
