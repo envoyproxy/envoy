@@ -247,6 +247,7 @@ decisions. Stats are rooted at *cluster.<name>.* and contain the following stati
   lb_subsets_removed, Counter, Number of subsets removed due to no hosts
   lb_subsets_selected, Counter, Number of times any subset was selected for load balancing
   lb_subsets_fallback, Counter, Number of times the fallback policy was invoked
+  lb_subsets_fallback_panic, Counter, Number of times the subset panic mode triggered
 
 .. _config_cluster_manager_cluster_stats_ring_hash_lb:
 
