@@ -2228,6 +2228,190 @@ TEST_F(RouterTest, DirectResponseWithBody) {
   EXPECT_EQ(1UL, config_.stats_.rq_direct_response_.value());
 }
 
+// Verify that upstream timing information is set into the StreamInfo after the upstream
+// request completes.
+TEST_F(RouterTest, UpstreamTimingSingleRequest) {
+  NiceMock<Http::MockStreamEncoder> encoder;
+  Http::StreamDecoder* response_decoder = nullptr;
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+        response_decoder = &decoder;
+        callbacks.onPoolReady(encoder, cm_.conn_pool_.host_);
+        return nullptr;
+      }));
+  expectResponseTimerCreate();
+
+  StreamInfo::StreamInfoImpl stream_info(test_time_.timeSystem());
+  ON_CALL(callbacks_, streamInfo()).WillByDefault(ReturnRef(stream_info));
+  EXPECT_FALSE(stream_info.firstUpstreamTxByteSent().has_value());
+  EXPECT_FALSE(stream_info.lastUpstreamTxByteSent().has_value());
+  EXPECT_FALSE(stream_info.firstUpstreamRxByteReceived().has_value());
+  EXPECT_FALSE(stream_info.lastUpstreamRxByteReceived().has_value());
+
+  Http::TestHeaderMapImpl headers{};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, false);
+
+  test_time_.sleep(std::chrono::milliseconds(32));
+  Buffer::OwnedImpl data;
+  router_.decodeData(data, true);
+
+  Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl{{":status", "503"}});
+  response_decoder->decodeHeaders(std::move(response_headers), false);
+  test_time_.sleep(std::chrono::milliseconds(43));
+
+  // Confirm we still have no upstream timing data. It won't be set until after the
+  // stream has ended.
+  EXPECT_FALSE(stream_info.firstUpstreamTxByteSent().has_value());
+  EXPECT_FALSE(stream_info.lastUpstreamTxByteSent().has_value());
+  EXPECT_FALSE(stream_info.firstUpstreamRxByteReceived().has_value());
+  EXPECT_FALSE(stream_info.lastUpstreamRxByteReceived().has_value());
+
+  response_decoder->decodeData(data, true);
+
+  // Now these should be set.
+  EXPECT_TRUE(stream_info.firstUpstreamTxByteSent().has_value());
+  EXPECT_TRUE(stream_info.lastUpstreamTxByteSent().has_value());
+  EXPECT_TRUE(stream_info.firstUpstreamRxByteReceived().has_value());
+  EXPECT_TRUE(stream_info.lastUpstreamRxByteReceived().has_value());
+
+  // Timings should match our sleep() calls.
+  EXPECT_EQ(stream_info.lastUpstreamRxByteReceived().value() -
+                stream_info.firstUpstreamRxByteReceived().value(),
+            std::chrono::milliseconds(43));
+  EXPECT_EQ(stream_info.lastUpstreamTxByteSent().value() -
+                stream_info.firstUpstreamTxByteSent().value(),
+            std::chrono::milliseconds(32));
+}
+
+// Verify that upstream timing information is set into the StreamInfo when a
+// retry occurs (and not before).
+TEST_F(RouterTest, UpstreamTimingRetry) {
+  NiceMock<Http::MockStreamEncoder> encoder;
+  Http::StreamDecoder* response_decoder = nullptr;
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+        response_decoder = &decoder;
+        callbacks.onPoolReady(encoder, cm_.conn_pool_.host_);
+        return nullptr;
+      }));
+  expectResponseTimerCreate();
+
+  StreamInfo::StreamInfoImpl stream_info(test_time_);
+  ON_CALL(callbacks_, streamInfo()).WillByDefault(ReturnRef(stream_info));
+
+  // Check that upstream timing is updated after the first request.
+  Http::TestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, false);
+
+  router_.retry_state_->expectRetry();
+
+  test_time_.sleep(std::chrono::milliseconds(32));
+  Buffer::OwnedImpl data;
+  router_.decodeData(data, true);
+
+  test_time_.sleep(std::chrono::milliseconds(43));
+
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+        response_decoder = &decoder;
+        callbacks.onPoolReady(encoder, cm_.conn_pool_.host_);
+        return nullptr;
+      }));
+
+  // Check that upstream timing is not set when a retry will occur.
+  Http::HeaderMapPtr bad_response_headers(new Http::TestHeaderMapImpl{{":status", "503"}});
+  response_decoder->decodeHeaders(std::move(bad_response_headers), true);
+  EXPECT_FALSE(stream_info.firstUpstreamTxByteSent().has_value());
+  EXPECT_FALSE(stream_info.lastUpstreamTxByteSent().has_value());
+  EXPECT_FALSE(stream_info.firstUpstreamRxByteReceived().has_value());
+  EXPECT_FALSE(stream_info.lastUpstreamRxByteReceived().has_value());
+
+  router_.retry_state_->callback_();
+  EXPECT_CALL(*router_.retry_state_, shouldRetry(_, _, _)).WillOnce(Return(RetryStatus::No));
+  MonotonicTime retry_time = test_time_.monotonicTime();
+
+  Http::HeaderMapPtr good_response_headers(new Http::TestHeaderMapImpl{{":status", "200"}});
+  response_decoder->decodeHeaders(std::move(good_response_headers), false);
+
+  test_time_.sleep(std::chrono::milliseconds(153));
+
+  response_decoder->decodeData(data, true);
+
+  EXPECT_TRUE(stream_info.firstUpstreamTxByteSent().has_value());
+  EXPECT_TRUE(stream_info.lastUpstreamTxByteSent().has_value());
+  EXPECT_TRUE(stream_info.firstUpstreamRxByteReceived().has_value());
+  EXPECT_TRUE(stream_info.lastUpstreamRxByteReceived().has_value());
+
+  EXPECT_EQ(stream_info.lastUpstreamRxByteReceived().value() -
+                stream_info.firstUpstreamRxByteReceived().value(),
+            std::chrono::milliseconds(153));
+
+  // Time spent in upstream tx is 0 because we're using simulated time and
+  // don't have a good way to insert a "sleep" there, but values being present
+  // and equal to the time the retry was sent is good enough of a test.
+  EXPECT_EQ(stream_info.lastUpstreamTxByteSent().value() -
+                stream_info.firstUpstreamTxByteSent().value(),
+            std::chrono::milliseconds(0));
+  EXPECT_EQ(stream_info.lastUpstreamTxByteSent().value() +
+                stream_info.startTimeMonotonic().time_since_epoch(),
+            retry_time.time_since_epoch());
+  EXPECT_EQ(stream_info.firstUpstreamTxByteSent().value() +
+                stream_info.startTimeMonotonic().time_since_epoch(),
+            retry_time.time_since_epoch());
+}
+
+// Verify that upstream timing information is set into the StreamInfo when a
+// global timeout occurs.
+TEST_F(RouterTest, UpstreamTimingTimeout) {
+  NiceMock<Http::MockStreamEncoder> encoder;
+  Http::StreamDecoder* response_decoder = nullptr;
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+        response_decoder = &decoder;
+        callbacks.onPoolReady(encoder, cm_.conn_pool_.host_);
+        return nullptr;
+      }));
+
+  StreamInfo::StreamInfoImpl stream_info(test_time_);
+  ON_CALL(callbacks_, streamInfo()).WillByDefault(ReturnRef(stream_info));
+
+  expectResponseTimerCreate();
+  test_time_.sleep(std::chrono::milliseconds(10));
+
+  // Check that upstream timing is updated after the first request.
+  Http::TestHeaderMapImpl headers{{"x-envoy-upstream-rq-timeout-ms", "50"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, false);
+  EXPECT_FALSE(stream_info.lastUpstreamRxByteReceived().has_value());
+
+  test_time_.sleep(std::chrono::milliseconds(13));
+  Buffer::OwnedImpl data;
+  router_.decodeData(data, true);
+
+  test_time_.sleep(std::chrono::milliseconds(33));
+
+  Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl{{":status", "200"}});
+  response_decoder->decodeHeaders(std::move(response_headers), false);
+
+  test_time_.sleep(std::chrono::milliseconds(99));
+  response_timeout_->callback_();
+
+  EXPECT_TRUE(stream_info.firstUpstreamTxByteSent().has_value());
+  EXPECT_TRUE(stream_info.lastUpstreamTxByteSent().has_value());
+  EXPECT_TRUE(stream_info.firstUpstreamRxByteReceived().has_value());
+  EXPECT_FALSE(stream_info.lastUpstreamRxByteReceived()
+                   .has_value()); // False because no end_stream was seen.
+  EXPECT_EQ(stream_info.firstUpstreamTxByteSent().value(), std::chrono::milliseconds(10));
+  EXPECT_EQ(stream_info.lastUpstreamTxByteSent().value(), std::chrono::milliseconds(23));
+  EXPECT_EQ(stream_info.firstUpstreamRxByteReceived().value(), std::chrono::milliseconds(56));
+}
+
 TEST(RouterFilterUtilityTest, FinalTimeout) {
   {
     NiceMock<MockRouteEntry> route;
