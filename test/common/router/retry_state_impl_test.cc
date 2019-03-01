@@ -22,6 +22,7 @@ using testing::Return;
 
 namespace Envoy {
 namespace Router {
+namespace {
 
 class RouterRetryStateImplTest : public testing::Test {
 public:
@@ -527,5 +528,6 @@ TEST_F(RouterRetryStateImplTest, Cancel) {
   EXPECT_EQ(RetryStatus::Yes, state_->shouldRetry(nullptr, connect_failure_, callback_));
 }
 
+} // namespace
 } // namespace Router
 } // namespace Envoy

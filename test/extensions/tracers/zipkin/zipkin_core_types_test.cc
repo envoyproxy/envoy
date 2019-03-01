@@ -13,6 +13,7 @@ namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace Zipkin {
+namespace {
 
 TEST(ZipkinCoreTypesEndpointTest, defaultConstructor) {
   Endpoint ep;
@@ -578,6 +579,7 @@ TEST(ZipkinCoreTypesSpanTest, setTag) {
   EXPECT_EQ("value2", bann.value());
 }
 
+} // namespace
 } // namespace Zipkin
 } // namespace Tracers
 } // namespace Extensions

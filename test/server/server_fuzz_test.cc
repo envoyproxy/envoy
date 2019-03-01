@@ -16,6 +16,7 @@
 
 namespace Envoy {
 namespace Server {
+namespace {
 
 void makePortHermetic(Fuzz::PerTestEnvironment& test_env, envoy::api::v2::core::Address& address) {
   if (address.has_socket_address()) {
@@ -89,5 +90,6 @@ DEFINE_PROTO_FUZZER(const envoy::config::bootstrap::v2::Bootstrap& input) {
   server->dispatcher().run(Event::Dispatcher::RunType::NonBlock);
 }
 
+} // namespace
 } // namespace Server
 } // namespace Envoy

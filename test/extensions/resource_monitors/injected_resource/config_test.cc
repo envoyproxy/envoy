@@ -16,6 +16,7 @@ namespace Envoy {
 namespace Extensions {
 namespace ResourceMonitors {
 namespace InjectedResourceMonitor {
+namespace {
 
 TEST(InjectedResourceMonitorFactoryTest, CreateMonitor) {
   auto factory =
@@ -32,6 +33,7 @@ TEST(InjectedResourceMonitorFactoryTest, CreateMonitor) {
   EXPECT_NE(monitor, nullptr);
 }
 
+} // namespace
 } // namespace InjectedResourceMonitor
 } // namespace ResourceMonitors
 } // namespace Extensions

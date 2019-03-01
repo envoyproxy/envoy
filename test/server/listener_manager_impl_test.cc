@@ -42,6 +42,7 @@ using testing::Throw;
 
 namespace Envoy {
 namespace Server {
+namespace {
 
 class ListenerHandle {
 public:
@@ -3032,5 +3033,6 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, VerifyIgnoreExpirationWithCA) {
   EXPECT_NO_THROW(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true));
 }
 
+} // namespace
 } // namespace Server
 } // namespace Envoy

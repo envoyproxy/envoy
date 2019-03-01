@@ -35,6 +35,7 @@ using testing::SaveArg;
 namespace Envoy {
 namespace Http {
 namespace Http1 {
+namespace {
 
 /**
  * A test version of ConnPoolImpl that allows for mocking beneath the codec clients.
@@ -763,6 +764,7 @@ TEST_F(Http1ConnPoolImplTest, PendingRequestIsConsideredActive) {
   dispatcher_.clearDeferredDeleteList();
 }
 
+} // namespace
 } // namespace Http1
 } // namespace Http
 } // namespace Envoy

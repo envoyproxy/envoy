@@ -18,6 +18,7 @@
 using testing::HasSubstr;
 
 namespace Envoy {
+namespace {
 
 class OptionsImplTest : public testing::Test {
 
@@ -305,4 +306,5 @@ TEST_F(OptionsImplTest, SaneTestConstructor) {
   EXPECT_EQ(regular_options_impl->hotRestartDisabled(), test_options_impl.hotRestartDisabled());
 }
 
+} // namespace
 } // namespace Envoy

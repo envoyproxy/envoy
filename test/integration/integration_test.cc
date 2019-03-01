@@ -26,7 +26,6 @@ using testing::MatchesRegex;
 using testing::Not;
 
 namespace Envoy {
-
 namespace {
 
 std::string normalizeDate(const std::string& s) {

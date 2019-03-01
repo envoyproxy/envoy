@@ -11,6 +11,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace GrpcHttp1Bridge {
+namespace {
 
 TEST(GrpcHttp1BridgeFilterConfigTest, GrpcHttp1BridgeFilter) {
   std::string json_string = R"EOF(
@@ -27,6 +28,7 @@ TEST(GrpcHttp1BridgeFilterConfigTest, GrpcHttp1BridgeFilter) {
   cb(filter_callback);
 }
 
+} // namespace
 } // namespace GrpcHttp1Bridge
 } // namespace HttpFilters
 } // namespace Extensions

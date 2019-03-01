@@ -23,6 +23,7 @@ using testing::NiceMock;
 
 namespace Envoy {
 namespace Server {
+namespace {
 
 class GuardDogTestBase : public testing::Test {
 protected:
@@ -262,5 +263,6 @@ TEST_F(GuardDogTestBase, AtomicIsAtomicTest) {
   ASSERT_EQ(atomic_time.is_lock_free(), true);
 }
 
+} // namespace
 } // namespace Server
 } // namespace Envoy

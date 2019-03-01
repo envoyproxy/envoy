@@ -24,6 +24,7 @@
 
 namespace Envoy {
 namespace Upstream {
+namespace {
 
 TEST(ValidationClusterManagerTest, MockedMethods) {
   Stats::IsolatedStoreImpl stats_store;
@@ -59,5 +60,6 @@ TEST(ValidationClusterManagerTest, MockedMethods) {
   EXPECT_EQ(nullptr, client.start(stream_callbacks, Http::AsyncClient::StreamOptions()));
 }
 
+} // namespace
 } // namespace Upstream
 } // namespace Envoy

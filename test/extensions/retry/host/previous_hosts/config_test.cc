@@ -15,6 +15,7 @@ namespace Envoy {
 namespace Extensions {
 namespace Retry {
 namespace Host {
+namespace {
 
 TEST(PreviousHostsRetryPredicateConfigTest, PredicateTest) {
   auto factory = Registry::FactoryRegistry<Upstream::RetryHostPredicateFactory>::getFactory(
@@ -47,6 +48,7 @@ TEST(PreviousHostsRetryPredicateConfigTest, PredicateTest) {
   ASSERT_TRUE(predicate->shouldSelectAnotherHost(*host2));
 }
 
+} // namespace
 } // namespace Host
 } // namespace Retry
 } // namespace Extensions
