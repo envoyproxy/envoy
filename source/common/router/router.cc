@@ -244,7 +244,7 @@ void Filter::chargeUpstreamCode(uint64_t response_status_code,
   }
 }
 
-void Filter::chargeUpstreamCode(Http::Code code,
+void Filter::chargeUpstreamCode(const Http::Code code,
                                 Upstream::HostDescriptionConstSharedPtr upstream_host,
                                 bool dropped) {
   const uint64_t response_status_code = enumToInt(code);
@@ -541,15 +541,15 @@ void Filter::onResponseTimeout() {
 void Filter::onPerTryTimeout() {
   updateOutlierDetection(timeout_response_code_);
 
-  if (maybeRetryReset(absl::optional<Http::StreamResetReason>(Http::StreamResetReason::LocalReset))) {
+  if (maybeRetryReset(Http::StreamResetReason::LocalReset)) {
     return;
   }
 
-  std::string body = timeout_response_code_ == Http::Code::GatewayTimeout ? "upstream request timeout" : "";
+  const std::string body = timeout_response_code_ == Http::Code::GatewayTimeout ? "upstream request timeout" : "";
   onUpstreamAbort(timeout_response_code_, StreamInfo::ResponseFlag::UpstreamRequestTimeout, body, false);
 }
 
-void Filter::updateOutlierDetection(Http::Code code) {
+void Filter::updateOutlierDetection(const Http::Code code) {
   Upstream::HostDescriptionConstSharedPtr upstream_host;
   if (upstream_request_) {
     upstream_host = upstream_request_->upstream_host_;
@@ -559,7 +559,7 @@ void Filter::updateOutlierDetection(Http::Code code) {
   }
 }
 
-void Filter::onUpstreamAbort(Http::Code code, StreamInfo::ResponseFlag response_flags, std::string body, bool dropped) {
+void Filter::onUpstreamAbort(const Http::Code code, const StreamInfo::ResponseFlag response_flags, const std::string& body, bool dropped) {
   Upstream::HostDescriptionConstSharedPtr upstream_host;
   if (upstream_request_) {
     upstream_host = upstream_request_->upstream_host_;
@@ -600,7 +600,7 @@ void Filter::onUpstreamAbort(Http::Code code, StreamInfo::ResponseFlag response_
   }
 }
 
-bool Filter::maybeRetryReset(const absl::optional<Http::StreamResetReason>& reset_reason) {
+bool Filter::maybeRetryReset(const Http::StreamResetReason reset_reason) {
   Upstream::HostDescriptionConstSharedPtr upstream_host;
   if (upstream_request_) {
     upstream_host = upstream_request_->upstream_host_;
@@ -631,17 +631,17 @@ bool Filter::maybeRetryReset(const absl::optional<Http::StreamResetReason>& rese
   return false;
 }
 
-void Filter::onUpstreamReset(const absl::optional<Http::StreamResetReason>& reset_reason) {
+void Filter::onUpstreamReset(const Http::StreamResetReason reset_reason) {
   ASSERT(upstream_request_);
   ENVOY_STREAM_LOG(debug, "upstream reset: reset reason {}", *callbacks_,
-                   reset_reason ? Http::Utility::resetReasonToString(reset_reason.value()) : "");
+                   Http::Utility::resetReasonToString(reset_reason));
 
   Upstream::HostDescriptionConstSharedPtr upstream_host;
   if (upstream_request_) {
     upstream_host = upstream_request_->upstream_host_;
   }
 
-  Http::Code code = Http::Code::ServiceUnavailable;
+  const Http::Code code = Http::Code::ServiceUnavailable;
 
   updateOutlierDetection(code);
 
@@ -649,13 +649,12 @@ void Filter::onUpstreamReset(const absl::optional<Http::StreamResetReason>& rese
     return;
   }
 
-  StreamInfo::ResponseFlag response_flags =
-      streamResetReasonToResponseFlag(reset_reason.value());
-  std::string body = absl::StrCat(
+  const StreamInfo::ResponseFlag response_flags = streamResetReasonToResponseFlag(reset_reason);
+  const std::string body = absl::StrCat(
         "upstream connect error or disconnect/reset before headers. reset reason: ",
-        reset_reason ? Http::Utility::resetReasonToString(reset_reason.value()) : "");
+        Http::Utility::resetReasonToString(reset_reason));
 
-  const bool dropped = reset_reason && reset_reason.value() == Http::StreamResetReason::Overflow;
+  const bool dropped = reset_reason == Http::StreamResetReason::Overflow;
   onUpstreamAbort(code, response_flags, body, dropped);
 }
 
@@ -1092,7 +1091,7 @@ void Filter::UpstreamRequest::onResetStream(Http::StreamResetReason reason) {
   clearRequestEncoder();
   if (!calling_encode_headers_) {
     stream_info_.setResponseFlag(parent_.streamResetReasonToResponseFlag(reason));
-    parent_.onUpstreamReset(absl::optional<Http::StreamResetReason>(reason));
+    parent_.onUpstreamReset(reason);
   } else {
     deferred_reset_reason_ = reason;
   }

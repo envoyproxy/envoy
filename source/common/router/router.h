@@ -369,18 +369,21 @@ private:
                                          Upstream::ResourcePriority priority) PURE;
   Http::ConnectionPool::Instance* getConnPool();
   void maybeDoShadowing();
-  bool maybeRetryReset(const absl::optional<Http::StreamResetReason>& reset_reason);
+  bool maybeRetryReset(const Http::StreamResetReason reset_reason);
   void onPerTryTimeout();
   void onRequestComplete();
   void onResponseTimeout();
   void onUpstream100ContinueHeaders(Http::HeaderMapPtr&& headers);
-  void onUpstreamAbort(Http::Code code, StreamInfo::ResponseFlag response_flag, std::string body, bool dropped);
+  // Handle an "aborted" upstream request, meaning we didn't see response
+  // headers (e.g. due to a reset). Handles recording stats and responding
+  // downstream if appropriate.
+  void onUpstreamAbort(const Http::Code code, const StreamInfo::ResponseFlag response_flag, const std::string& body, bool dropped);
   void onUpstreamHeaders(uint64_t response_code, Http::HeaderMapPtr&& headers, bool end_stream);
   void onUpstreamData(Buffer::Instance& data, bool end_stream);
   void onUpstreamTrailers(Http::HeaderMapPtr&& trailers);
   void onUpstreamMetadata(Http::MetadataMapPtr&& metadata_map);
   void onUpstreamComplete();
-  void onUpstreamReset(const absl::optional<Http::StreamResetReason> reset_reason);
+  void onUpstreamReset(const Http::StreamResetReason reset_reason);
   void sendNoHealthyUpstreamResponse();
   bool setupRetry(bool end_stream);
   bool setupRedirect(const Http::HeaderMap& headers);
