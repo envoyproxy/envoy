@@ -98,9 +98,13 @@ cc_library(
 
 cc_library(
     name = "quic_platform",
-    srcs = ["quiche/quic/platform/api/quic_mutex.cc"],
+    srcs = [
+        "quiche/quic/platform/api/quic_hostname_utils.cc",
+        "quiche/quic/platform/api/quic_mutex.cc",
+    ],
     hdrs = [
         "quiche/quic/platform/api/quic_cert_utils.h",
+        "quiche/quic/platform/api/quic_hostname_utils.h",
         "quiche/quic/platform/api/quic_mutex.h",
         "quiche/quic/platform/api/quic_str_cat.h",
     ],
@@ -158,7 +162,6 @@ cc_library(
         # "quiche/quic/platform/api/quic_flags.h",
         # "quiche/quic/platform/api/quic_fuzzed_data_provider.h",
         # "quiche/quic/platform/api/quic_goog_cc_sender.h",
-        # "quiche/quic/platform/api/quic_hostname_utils.h",
         # "quiche/quic/platform/api/quic_interval.h",
         # "quiche/quic/platform/api/quic_ip_address_family.h",
         # "quiche/quic/platform/api/quic_ip_address.h",
