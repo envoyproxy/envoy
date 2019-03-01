@@ -10,12 +10,9 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Tap {
 
-class SocketTapConfigImpl;
-using SocketTapConfigImplSharedPtr = std::shared_ptr<SocketTapConfigImpl>;
-
 class PerSocketTapperImpl : public PerSocketTapper {
 public:
-  PerSocketTapperImpl(SocketTapConfigImplSharedPtr config, const Network::Connection& connection);
+  PerSocketTapperImpl(SocketTapConfigSharedPtr config, const Network::Connection& connection);
 
   // PerSocketTapper
   void closeSocket(Network::ConnectionEvent event) override;
@@ -23,14 +20,27 @@ public:
   void onWrite(const Buffer::Instance& data, uint32_t bytes_written, bool end_stream) override;
 
 private:
-  envoy::data::tap::v2alpha::SocketEvent& createEvent();
+  void initEvent(envoy::data::tap::v2alpha::SocketEvent&);
+  void fillConnectionInfo(envoy::data::tap::v2alpha::Connection& connection);
+  void makeBufferedTraceIfNeeded() {
+    if (buffered_trace_ == nullptr) {
+      buffered_trace_ = Extensions::Common::Tap::makeTraceWrapper();
+      buffered_trace_->mutable_socket_buffered_trace()->set_trace_id(connection_.id());
+    }
+  }
+  Extensions::Common::Tap::TraceWrapperSharedPtr makeTraceSegment() {
+    Extensions::Common::Tap::TraceWrapperSharedPtr trace =
+        Extensions::Common::Tap::makeTraceWrapper();
+    trace->mutable_socket_streamed_trace_segment()->set_trace_id(connection_.id());
+    return trace;
+  }
 
-  SocketTapConfigImplSharedPtr config_;
+  SocketTapConfigSharedPtr config_;
   Extensions::Common::Tap::PerTapSinkHandleManagerPtr sink_handle_;
   const Network::Connection& connection_;
   Extensions::Common::Tap::Matcher::MatchStatusVector statuses_;
   // Must be a shared_ptr because of submitTrace().
-  Extensions::Common::Tap::TraceWrapperSharedPtr trace_;
+  Extensions::Common::Tap::TraceWrapperSharedPtr buffered_trace_;
   uint32_t rx_bytes_buffered_{};
   uint32_t tx_bytes_buffered_{};
 };
@@ -48,6 +58,7 @@ public:
   PerSocketTapperPtr createPerSocketTapper(const Network::Connection& connection) override {
     return std::make_unique<PerSocketTapperImpl>(shared_from_this(), connection);
   }
+  TimeSource& timeSource() const override { return time_source_; }
 
 private:
   TimeSource& time_source_;

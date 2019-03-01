@@ -110,7 +110,7 @@ void LogicalDnsCluster::startResolve() {
               break;
             }
             const auto& locality_lb_endpoint = localityLbEndpoint();
-            PriorityStateManager priority_state_manager(*this, local_info_);
+            PriorityStateManager priority_state_manager(*this, local_info_, nullptr);
             priority_state_manager.initializePriorityFor(locality_lb_endpoint);
             priority_state_manager.registerHostForPriority(logical_host_, locality_lb_endpoint);
 
