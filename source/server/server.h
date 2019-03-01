@@ -46,12 +46,12 @@ namespace Server {
  * All server wide stats. @see stats_macros.h
  */
 // clang-format off
-#define ALL_SERVER_STATS(COUNTER, GAUGE)                                                           \
+#define ALL_SERVER_STATS(BOOL_INDICATOR, COUNTER, GAUGE)                                           \
   GAUGE(uptime)                                                                                    \
   GAUGE(concurrency)                                                                               \
   GAUGE(memory_allocated)                                                                          \
   GAUGE(memory_heap_size)                                                                          \
-  GAUGE(live)                                                                                      \
+  BOOL_INDICATOR(live)                                                                             \
   GAUGE(parent_connections)                                                                        \
   GAUGE(total_connections)                                                                         \
   GAUGE(version)                                                                                   \
@@ -61,7 +61,7 @@ namespace Server {
 // clang-format on
 
 struct ServerStats {
-  ALL_SERVER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
+  ALL_SERVER_STATS(GENERATE_BOOL_INDICATOR_STRUCT, GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
 };
 
 /**

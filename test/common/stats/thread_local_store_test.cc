@@ -450,6 +450,38 @@ TEST_F(StatsThreadLocalStoreTest, OverlappingScopes) {
   tls_.shutdownThread();
 }
 
+// Demonstrates that counters, gauges, and indicators are all mixed together in
+// the shared memory, and not separated by type; only the name matters.
+TEST_F(StatsThreadLocalStoreTest, SameNameDifferentType) {
+  InSequence s;
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+  EXPECT_CALL(*alloc_, alloc(_)).Times(4);
+
+  Counter& c1 = store_->counter("samename");
+  EXPECT_EQ(&c1, &store_->counter("samename"));
+  Gauge& g1 = store_->gauge("samename");
+  EXPECT_EQ(&g1, &store_->gauge("samename"));
+  c1.add(5);
+  EXPECT_EQ(5UL, c1.value());
+  g1.add(3);
+  EXPECT_EQ(8UL, c1.value());
+
+  Gauge& g2 = store_->gauge("samename2");
+  EXPECT_EQ(&g2, &store_->gauge("samename2"));
+  BoolIndicator& b1 = store_->boolIndicator("samename2");
+  EXPECT_EQ(&b1, &store_->boolIndicator("samename2"));
+  g2.add(1);
+  EXPECT_EQ(1UL, g2.value());
+  EXPECT_TRUE(b1.value());
+  b1.set(false);
+  EXPECT_EQ(0UL, g2.value());
+
+  store_->shutdownThreading();
+  tls_.shutdownThread();
+  // Includes overflow stat.
+  EXPECT_CALL(*alloc_, free(_)).Times(5);
+}
+
 TEST_F(StatsThreadLocalStoreTest, AllocFailed) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);

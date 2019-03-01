@@ -206,6 +206,12 @@ public:
              std::function<void()> on_server_init_function, bool deterministic,
              bool defer_listener_finalization);
 
+  void waitForBoolIndicatorEq(const std::string& name, uint64_t value) {
+    while (boolIndicator(name) == nullptr || boolIndicator(name)->value() != value) {
+      time_system_.sleep(std::chrono::milliseconds(10));
+    }
+  }
+
   void waitForCounterGe(const std::string& name, uint64_t value) override {
     while (counter(name) == nullptr || counter(name)->value() < value) {
       time_system_.sleep(std::chrono::milliseconds(10));
@@ -222,6 +228,12 @@ public:
     while (gauge(name) == nullptr || gauge(name)->value() != value) {
       time_system_.sleep(std::chrono::milliseconds(10));
     }
+  }
+
+  Stats::BoolIndicatorSharedPtr boolIndicator(const std::string& name) {
+    // When using the thread local store, only boolIndicators() is thread safe. This also allows us
+    // to test if an indicator exists at all versus just defaulting to false.
+    return TestUtility::findBoolIndicator(stat_store(), name);
   }
 
   Stats::CounterSharedPtr counter(const std::string& name) override {
