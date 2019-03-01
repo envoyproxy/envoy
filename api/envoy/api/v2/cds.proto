@@ -392,7 +392,6 @@ message Cluster {
     // This is useful when using the default subset as the fallback policy, given the default
     // subset might become empty. With this option enabled, if that happens the LB will attempt
     // to select a host from the entire cluster.
-    which would cause requests to fail unless this option is enabled.
     bool panic_mode_any = 6;
   }
 
