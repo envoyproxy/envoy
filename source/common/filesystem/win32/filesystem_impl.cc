@@ -3,6 +3,11 @@
 #include <sys/stat.h>
 #include <windows.h>
 
+// <windows.h> uses macros to #define a ton of symbols, two of which (DELETE and GetMessage)
+// interfere with our code. DELETE shows up in the base.pb.h header generated from
+// api/envoy/api/core/base.proto. Since it's a generated header, we can't #undef DELETE at
+// the top of that header to avoid the collision. Similarly, GetMessage shows up in generated
+// protobuf code so we can't #undef the symbol there.
 #undef DELETE
 #undef GetMessage
 
@@ -81,7 +86,7 @@ std::string InstanceImplWin32::fileReadToEnd(const std::string& path) {
   // On Windows, we need to explicitly set the file mode as binary. Otherwise,
   // 0x1a will be treated as EOF
   std::ifstream file(path, std::ios_base::binary);
-  if (!file) {
+  if (file.fail()) {
     throw EnvoyException(fmt::format("unable to read file: {}", path));
   }
 

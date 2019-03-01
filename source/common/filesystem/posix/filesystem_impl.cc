@@ -76,7 +76,7 @@ std::string InstanceImplPosix::fileReadToEnd(const std::string& path) {
   std::ios::sync_with_stdio(false);
 
   std::ifstream file(path);
-  if (!file) {
+  if (file.fail()) {
     throw EnvoyException(fmt::format("unable to read file: {}", path));
   }
 

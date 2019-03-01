@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "envoy/api/io_error.h"
+#include "envoy/filesystem/filesystem.h"
 
 #include "common/common/assert.h"
 
@@ -35,6 +35,28 @@ template <typename T> Api::IoCallResult<T> resultFailure(T result, int sys_errno
 template <typename T> Api::IoCallResult<T> resultSuccess(T result) {
   return {result, IoFileErrorPtr(nullptr, [](Api::IoError*) { NOT_REACHED_GCOVR_EXCL_LINE; })};
 }
+
+class FileSharedImpl : public File {
+public:
+  FileSharedImpl(const std::string& path) : fd_(-1), path_(path) {}
+
+  virtual ~FileSharedImpl() {}
+
+  // Filesystem::File
+  Api::IoCallBoolResult open() override;
+  Api::IoCallSizeResult write(absl::string_view buffer) override;
+  Api::IoCallBoolResult close() override;
+  bool isOpen() const override;
+  std::string path() const override;
+
+protected:
+  virtual void openFile() PURE;
+  virtual ssize_t writeFile(absl::string_view buffer) PURE;
+  virtual bool closeFile() PURE;
+
+  int fd_;
+  const std::string path_;
+};
 
 } // namespace Filesystem
 } // namespace Envoy

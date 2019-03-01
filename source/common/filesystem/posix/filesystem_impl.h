@@ -4,18 +4,19 @@
 #include <string>
 
 #include "envoy/api/os_sys_calls.h"
-#include "envoy/filesystem/filesystem.h"
+
+#include "common/filesystem/file_shared_impl.h"
 
 namespace Envoy {
 namespace Filesystem {
 
-class FileImplPosix : public File {
+class FileImplPosix : public FileSharedImpl {
 public:
-  FileImplPosix(const std::string& path) : File(path) {}
+  FileImplPosix(const std::string& path) : FileSharedImpl(path) {}
   ~FileImplPosix();
 
 protected:
-  // Filesystem::File
+  // Filesystem::FileSharedImpl
   void openFile() override;
   ssize_t writeFile(absl::string_view buffer) override;
   bool closeFile() override;

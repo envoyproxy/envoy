@@ -3,18 +3,18 @@
 #include <cstdint>
 #include <string>
 
-#include "envoy/filesystem/filesystem.h"
+#include "common/filesystem/file_shared_impl.h"
 
 namespace Envoy {
 namespace Filesystem {
 
-class FileImplWin32 : public File {
+class FileImplWin32 : public FileSharedImpl {
 public:
-  FileImplWin32(const std::string& path) : File(path) {}
+  FileImplWin32(const std::string& path) : FileSharedImpl(path) {}
   ~FileImplWin32();
 
 protected:
-  // Filesystem::File
+  // Filesystem::FileSharedImpl
   void openFile() override;
   ssize_t writeFile(absl::string_view buffer) override;
   bool closeFile() override;

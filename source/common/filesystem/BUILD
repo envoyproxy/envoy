@@ -49,7 +49,7 @@ envoy_cc_posix_library(
     hdrs = ["posix/filesystem_impl.h"],
     strip_include_prefix = "posix",
     deps = [
-        "//include/envoy/filesystem:filesystem_interface",
+        ":file_shared_lib",
     ],
 )
 
@@ -59,16 +59,16 @@ envoy_cc_win32_library(
     hdrs = ["win32/filesystem_impl.h"],
     strip_include_prefix = "win32",
     deps = [
-        "//include/envoy/filesystem:filesystem_interface",
+        ":file_shared_lib",
     ],
 )
 
 envoy_cc_library(
-    name = "io_file_error_lib",
-    srcs = ["io_file_error.cc"],
-    hdrs = ["io_file_error.h"],
+    name = "file_shared_lib",
+    srcs = ["file_shared_impl.cc"],
+    hdrs = ["file_shared_impl.h"],
     deps = [
-        "//include/envoy/api:io_error_interface",
+        "//include/envoy/filesystem:filesystem_interface",
         "//source/common/common:assert_lib",
     ],
 )

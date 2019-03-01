@@ -18,9 +18,16 @@ public:
   MockFile();
   ~MockFile();
 
-  MOCK_METHOD0(open_, bool());
-  MOCK_METHOD1(write_, ssize_t(absl::string_view buffer));
-  MOCK_METHOD0(close_, bool());
+  // Filesystem::File
+  Api::IoCallBoolResult open() override;
+  Api::IoCallSizeResult write(absl::string_view buffer) override;
+  Api::IoCallBoolResult close() override;
+  bool isOpen() const override { return is_open_; };
+  MOCK_CONST_METHOD0(path, std::string());
+
+  MOCK_METHOD0(open_, Api::IoCallBoolResult());
+  MOCK_METHOD1(write_, Api::IoCallSizeResult(absl::string_view buffer));
+  MOCK_METHOD0(close_, Api::IoCallBoolResult());
 
   size_t num_opens_;
   size_t num_writes_;
@@ -29,14 +36,8 @@ public:
   Thread::CondVar open_event_;
   Thread::CondVar write_event_;
 
-protected:
-  // Filesystem::File
-  void openFile() override;
-  ssize_t writeFile(absl::string_view buffer) override;
-  bool closeFile() override;
-
 private:
-  void setFileOpen(bool is_open);
+  bool is_open_;
 };
 
 class MockInstance : public Instance {
