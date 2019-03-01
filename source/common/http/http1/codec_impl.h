@@ -333,7 +333,8 @@ private:
  */
 class ClientConnectionImpl : public ClientConnection, public ConnectionImpl {
 public:
-  ClientConnectionImpl(Network::Connection& connection, ConnectionCallbacks& callbacks, uint32_t max_response_headers_kb = 0x7fffffff);
+  ClientConnectionImpl(Network::Connection& connection, ConnectionCallbacks& callbacks,
+                       uint32_t max_response_headers_kb = 0x7fffffff);
   // Http::ClientConnection
   StreamEncoder& newStream(StreamDecoder& response_decoder) override;
 

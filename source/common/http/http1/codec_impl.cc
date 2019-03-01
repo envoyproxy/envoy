@@ -422,7 +422,8 @@ void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
   header_parsing_state_ = HeaderParsingState::Value;
   current_header_value_.append(data, length);
 
-  uint32_t total = current_header_field_.size() + current_header_value_.size() + current_header_map_->byteSize();
+  uint32_t total =
+      current_header_field_.size() + current_header_value_.size() + current_header_map_->byteSize();
   if (total > (max_headers_kb_ * 1024)) {
     error_code_ = Http::Code::RequestHeaderFieldsTooLarge;
     sendProtocolError();
@@ -652,7 +653,8 @@ void ServerConnectionImpl::onBelowLowWatermark() {
   }
 }
 
-ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection, ConnectionCallbacks&, uint32_t max_response_headers_kb)
+ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection, ConnectionCallbacks&,
+                                           uint32_t max_response_headers_kb)
     : ConnectionImpl(connection, HTTP_RESPONSE, max_response_headers_kb) {}
 
 bool ClientConnectionImpl::cannotHaveBody() {

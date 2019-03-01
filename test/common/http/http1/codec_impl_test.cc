@@ -679,9 +679,7 @@ TEST_F(Http1ServerConnectionImplTest, WatermarkTest) {
 
 class Http1ClientConnectionImplTest : public TestBase {
 public:
-  void initialize() {
-    codec_ = std::make_unique<ClientConnectionImpl>(connection_, callbacks_);
-  }
+  void initialize() { codec_ = std::make_unique<ClientConnectionImpl>(connection_, callbacks_); }
 
   NiceMock<Network::MockConnection> connection_;
   NiceMock<Http::MockConnectionCallbacks> callbacks_;
