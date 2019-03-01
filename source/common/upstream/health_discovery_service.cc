@@ -301,7 +301,7 @@ void HdsCluster::update(const envoy::api::v2::Cluster& cluster) {
     auto existing_host = all_hosts_.find(host->address()->asString());
     if (existing_host != all_hosts_.end()) {
       // TODO: update endpoint health check port
-      existing_hosts.emplace_back(host->address()->asString());
+      existing_hosts.emplace(host->address()->asString());
       updated_hosts[host->address()->asString()] = existing_host->second;
       final_hosts->push_back(existing_host->second);
     } else {
