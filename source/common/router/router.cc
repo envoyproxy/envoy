@@ -534,8 +534,10 @@ void Filter::onResponseTimeout() {
   }
 
   updateOutlierDetection(timeout_response_code_);
-  std::string body = timeout_response_code_ == Http::Code::GatewayTimeout ? "upstream request timeout" : "";
-  onUpstreamAbort(timeout_response_code_, StreamInfo::ResponseFlag::UpstreamRequestTimeout, body, false);
+  std::string body =
+      timeout_response_code_ == Http::Code::GatewayTimeout ? "upstream request timeout" : "";
+  onUpstreamAbort(timeout_response_code_, StreamInfo::ResponseFlag::UpstreamRequestTimeout, body,
+                  false);
 }
 
 void Filter::onPerTryTimeout() {
@@ -545,8 +547,10 @@ void Filter::onPerTryTimeout() {
     return;
   }
 
-  const std::string body = timeout_response_code_ == Http::Code::GatewayTimeout ? "upstream request timeout" : "";
-  onUpstreamAbort(timeout_response_code_, StreamInfo::ResponseFlag::UpstreamRequestTimeout, body, false);
+  const std::string body =
+      timeout_response_code_ == Http::Code::GatewayTimeout ? "upstream request timeout" : "";
+  onUpstreamAbort(timeout_response_code_, StreamInfo::ResponseFlag::UpstreamRequestTimeout, body,
+                  false);
 }
 
 void Filter::updateOutlierDetection(const Http::Code code) {
@@ -559,7 +563,8 @@ void Filter::updateOutlierDetection(const Http::Code code) {
   }
 }
 
-void Filter::onUpstreamAbort(const Http::Code code, const StreamInfo::ResponseFlag response_flags, const std::string& body, bool dropped) {
+void Filter::onUpstreamAbort(const Http::Code code, const StreamInfo::ResponseFlag response_flags,
+                             const std::string& body, bool dropped) {
   Upstream::HostDescriptionConstSharedPtr upstream_host;
   if (upstream_request_) {
     upstream_host = upstream_request_->upstream_host_;
@@ -650,9 +655,9 @@ void Filter::onUpstreamReset(const Http::StreamResetReason reset_reason) {
   }
 
   const StreamInfo::ResponseFlag response_flags = streamResetReasonToResponseFlag(reset_reason);
-  const std::string body = absl::StrCat(
-        "upstream connect error or disconnect/reset before headers. reset reason: ",
-        Http::Utility::resetReasonToString(reset_reason));
+  const std::string body =
+      absl::StrCat("upstream connect error or disconnect/reset before headers. reset reason: ",
+                   Http::Utility::resetReasonToString(reset_reason));
 
   const bool dropped = reset_reason == Http::StreamResetReason::Overflow;
   onUpstreamAbort(code, response_flags, body, dropped);
