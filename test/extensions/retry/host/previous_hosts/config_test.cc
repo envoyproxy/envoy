@@ -16,6 +16,7 @@ namespace Extensions {
 namespace Retry {
 namespace Host {
 namespace {
+
 TEST(PreviousHostsRetryPredicateConfigTest, PredicateTest) {
   auto factory = Registry::FactoryRegistry<Upstream::RetryHostPredicateFactory>::getFactory(
       RetryHostPredicateValues::get().PreviousHostsPredicate);
@@ -46,6 +47,7 @@ TEST(PreviousHostsRetryPredicateConfigTest, PredicateTest) {
   ASSERT_TRUE(predicate->shouldSelectAnotherHost(*host1));
   ASSERT_TRUE(predicate->shouldSelectAnotherHost(*host2));
 }
+
 } // namespace
 } // namespace Host
 } // namespace Retry

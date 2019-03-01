@@ -13,6 +13,7 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Alts {
 namespace {
+
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -405,6 +406,7 @@ TEST_F(TsiSocketFactoryTest, CreateTransportSocket) {
 TEST_F(TsiSocketFactoryTest, ImplementsSecureTransport) {
   EXPECT_TRUE(socket_factory_->implementsSecureTransport());
 }
+
 } // namespace
 } // namespace Alts
 } // namespace TransportSockets

@@ -12,6 +12,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GrpcWeb {
 namespace {
+
 TEST(GrpcWebFilterConfigTest, GrpcWebFilter) {
   std::string json_string = R"EOF(
   {
@@ -26,6 +27,7 @@ TEST(GrpcWebFilterConfigTest, GrpcWebFilter) {
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
 }
+
 } // namespace
 } // namespace GrpcWeb
 } // namespace HttpFilters

@@ -14,6 +14,7 @@ namespace Extensions {
 namespace Tracers {
 namespace Zipkin {
 namespace {
+
 TEST(ZipkinCoreTypesEndpointTest, defaultConstructor) {
   Endpoint ep;
 
@@ -577,6 +578,7 @@ TEST(ZipkinCoreTypesSpanTest, setTag) {
   EXPECT_EQ("key2", bann.key());
   EXPECT_EQ("value2", bann.value());
 }
+
 } // namespace
 } // namespace Zipkin
 } // namespace Tracers

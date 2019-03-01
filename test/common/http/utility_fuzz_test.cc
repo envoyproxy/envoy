@@ -7,6 +7,7 @@
 namespace Envoy {
 namespace Fuzz {
 namespace {
+
 DEFINE_PROTO_FUZZER(const test::common::http::UtilityTestCase& input) {
   switch (input.utility_selector_case()) {
   case test::common::http::UtilityTestCase::kParseQueryString: {
@@ -50,6 +51,7 @@ DEFINE_PROTO_FUZZER(const test::common::http::UtilityTestCase& input) {
     break;
   }
 }
+
 } // namespace
 } // namespace Fuzz
 } // namespace Envoy

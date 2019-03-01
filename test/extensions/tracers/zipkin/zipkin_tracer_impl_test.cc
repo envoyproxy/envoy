@@ -631,6 +631,7 @@ TEST_F(ZipkinDriverTest, DuplicatedHeader) {
       },
       &dup_callback);
 }
+
 } // namespace
 } // namespace Zipkin
 } // namespace Tracers

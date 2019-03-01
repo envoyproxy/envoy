@@ -394,6 +394,7 @@ TEST_F(LuaStreamInfoWrapperTest, DontFinishIterationForDynamicMetadata) {
       start("callMe"), Filters::Common::Lua::LuaException,
       "[string \"...\"]:6: cannot create a second iterator before completing the first");
 }
+
 } // namespace
 } // namespace Lua
 } // namespace HttpFilters

@@ -9,6 +9,7 @@ namespace Extensions {
 namespace Tracers {
 namespace Zipkin {
 namespace {
+
 TEST(ZipkinSpanBufferTest, defaultConstructorEndToEnd) {
   DangerousDeprecatedTestTime test_time;
   SpanBuffer buffer;
@@ -108,6 +109,7 @@ TEST(ZipkinSpanBufferTest, sizeConstructorEndtoEnd) {
   EXPECT_EQ(0ULL, buffer.pendingSpans());
   EXPECT_EQ("[]", buffer.toStringifiedJsonArray());
 }
+
 } // namespace
 } // namespace Zipkin
 } // namespace Tracers

@@ -16,6 +16,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace BufferFilter {
 namespace {
+
 TEST(BufferFilterFactoryTest, BufferFilterCorrectJson) {
   std::string json_string = R"EOF(
   {
@@ -101,6 +102,7 @@ TEST(BufferFilterFactoryTest, BufferFilterRouteSpecificConfig) {
   const auto* inflated = dynamic_cast<const BufferFilterSettings*>(route_config.get());
   EXPECT_TRUE(inflated);
 }
+
 } // namespace
 } // namespace BufferFilter
 } // namespace HttpFilters

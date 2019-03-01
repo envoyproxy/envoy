@@ -30,6 +30,7 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 namespace {
+
 TEST(FilterChainUtility, buildFilterChain) {
   Network::MockConnection connection;
   std::vector<Network::FilterFactoryCb> factories;
@@ -306,6 +307,7 @@ TEST_F(ConfigurationImplTest, StatsSinkWithNoName) {
                             EnvoyException,
                             "Provided name for static registration lookup was empty.");
 }
+
 } // namespace
 } // namespace Configuration
 } // namespace Server

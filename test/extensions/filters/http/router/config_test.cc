@@ -76,6 +76,7 @@ TEST(RouterFilterConfigTest, DoubleRegistrationTest) {
       EnvoyException,
       fmt::format("Double registration for name: '{}'", HttpFilterNames::get().Router));
 }
+
 } // namespace
 } // namespace RouterFilter
 } // namespace HttpFilters

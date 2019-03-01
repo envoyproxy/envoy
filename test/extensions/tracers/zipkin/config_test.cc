@@ -12,6 +12,7 @@ namespace Extensions {
 namespace Tracers {
 namespace Zipkin {
 namespace {
+
 TEST(ZipkinTracerConfigTest, ZipkinHttpTracer) {
   NiceMock<Server::MockInstance> server;
   EXPECT_CALL(server.cluster_manager_, get("fake_cluster"))
@@ -62,6 +63,7 @@ TEST(ZipkinTracerConfigTest, DoubleRegistrationTest) {
       (Registry::RegisterFactory<ZipkinTracerFactory, Server::Configuration::TracerFactory>()),
       EnvoyException, "Double registration for name: 'envoy.zipkin'");
 }
+
 } // namespace
 } // namespace Zipkin
 } // namespace Tracers

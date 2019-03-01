@@ -17,6 +17,7 @@
 namespace Envoy {
 namespace Server {
 namespace {
+
 void makePortHermetic(Fuzz::PerTestEnvironment& test_env, envoy::api::v2::core::Address& address) {
   if (address.has_socket_address()) {
     address.mutable_socket_address()->set_port_value(0);
@@ -88,6 +89,7 @@ DEFINE_PROTO_FUZZER(const envoy::config::bootstrap::v2::Bootstrap& input) {
   // explode and fail the test, hence we do this outside of the try-catch above.
   server->dispatcher().run(Event::Dispatcher::RunType::NonBlock);
 }
+
 } // namespace
 } // namespace Server
 } // namespace Envoy

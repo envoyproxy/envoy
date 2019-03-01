@@ -22,6 +22,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GrpcHttp1Bridge {
 namespace {
+
 class GrpcHttp1BridgeFilterTest : public testing::Test {
 public:
   GrpcHttp1BridgeFilterTest() {
@@ -211,6 +212,7 @@ TEST_F(GrpcHttp1BridgeFilterTest, HandlingBadGrpcStatus) {
   EXPECT_EQ("1", response_headers.get_("grpc-status"));
   EXPECT_EQ("foo", response_headers.get_("grpc-message"));
 }
+
 } // namespace
 } // namespace GrpcHttp1Bridge
 } // namespace HttpFilters

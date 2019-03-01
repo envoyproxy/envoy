@@ -31,6 +31,7 @@ using testing::StrictMock;
 namespace Envoy {
 namespace Server {
 namespace {
+
 TEST(ServerInstanceUtil, flushHelper) {
   InSequence s;
 
@@ -401,6 +402,7 @@ TEST_P(ServerInstanceImplTest, ZipkinHttpTracingEnabled) {
   // than HttpNullTracer.
   EXPECT_NE(nullptr, dynamic_cast<Tracing::HttpTracerImpl*>(tracer()));
 }
+
 } // namespace
 } // namespace Server
 } // namespace Envoy

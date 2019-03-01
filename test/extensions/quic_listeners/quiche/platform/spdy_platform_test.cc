@@ -20,6 +20,7 @@ namespace Extensions {
 namespace QuicListeners {
 namespace Quiche {
 namespace {
+
 TEST(SpdyPlatformTest, SpdyArraysize) {
   int array[] = {0, 1, 2, 3, 4};
   EXPECT_EQ(5, SPDY_ARRAYSIZE(array));
@@ -70,6 +71,7 @@ TEST(SpdyPlatformTest, SpdyStringPiece) {
   spdy::SpdyStringPiece sp(s);
   EXPECT_EQ('b', sp[0]);
 }
+
 } // namespace
 } // namespace Quiche
 } // namespace QuicListeners

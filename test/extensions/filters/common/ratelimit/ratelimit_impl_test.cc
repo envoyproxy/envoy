@@ -32,6 +32,7 @@ namespace Filters {
 namespace Common {
 namespace RateLimit {
 namespace {
+
 class MockRequestCallbacks : public RequestCallbacks {
 public:
   void complete(LimitStatus status, Http::HeaderMapPtr&& headers) {
@@ -154,6 +155,7 @@ TEST(RateLimitNullFactoryTest, Basic) {
   client->limit(request_callbacks, "foo", {{{{"foo", "bar"}}}}, Tracing::NullSpan::instance());
   client->cancel();
 }
+
 } // namespace
 } // namespace RateLimit
 } // namespace Common

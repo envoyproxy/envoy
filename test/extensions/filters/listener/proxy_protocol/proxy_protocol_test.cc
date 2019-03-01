@@ -999,6 +999,7 @@ TEST_P(WildcardProxyProtocolTest, BasicV6) {
 
   disconnect();
 }
+
 } // namespace
 } // namespace ProxyProtocol
 } // namespace ListenerFilters

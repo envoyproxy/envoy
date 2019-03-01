@@ -26,6 +26,7 @@ using testing::Return;
 namespace Envoy {
 namespace Upstream {
 namespace {
+
 class LoadStatsReporterTest : public testing::Test {
 public:
   LoadStatsReporterTest()
@@ -227,6 +228,7 @@ TEST_F(LoadStatsReporterTest, RemoteStreamClose) {
   expectSendMessage({});
   retry_timer_cb_();
 }
+
 } // namespace
 } // namespace Upstream
 } // namespace Envoy

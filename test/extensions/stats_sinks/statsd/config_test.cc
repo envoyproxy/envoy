@@ -201,6 +201,7 @@ TEST(StatsdConfigTest, ValidateFail) {
       StatsdSinkFactory().createStatsSink(envoy::config::metrics::v2::StatsdSink(), server),
       ProtoValidationException);
 }
+
 } // namespace
 } // namespace Statsd
 } // namespace StatSinks

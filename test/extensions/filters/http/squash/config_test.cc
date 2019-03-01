@@ -34,6 +34,7 @@ TEST(SquashFilterConfigFactoryTest, SquashFilterCorrectJson) {
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
   cb(filter_callback);
 }
+
 } // namespace
 } // namespace Squash
 } // namespace HttpFilters

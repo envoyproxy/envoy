@@ -36,6 +36,7 @@ namespace Extensions {
 namespace QuicListeners {
 namespace Quiche {
 namespace {
+
 TEST(QuicPlatformTest, QuicAlignOf) { EXPECT_LT(0, QUIC_ALIGN_OF(int)); }
 
 TEST(QuicPlatformTest, QuicArraysize) {
@@ -196,6 +197,7 @@ TEST(QuicPlatformTest, QuicPtrUtil) {
 }
 
 namespace {
+
 class QuicLogThresholdSaver {
 public:
   QuicLogThresholdSaver()
@@ -210,6 +212,7 @@ private:
   const quic::QuicLogLevel level_;
   const int verbosity_threshold_;
 };
+
 } // namespace
 
 TEST(QuicPlatformTest, QuicLog) {
@@ -376,6 +379,7 @@ TEST(QuicPlatformTest, QuicCertUtils) {
             out);
   OPENSSL_free(static_cast<void*>(der));
 }
+
 } // namespace
 } // namespace Quiche
 } // namespace QuicListeners

@@ -25,6 +25,7 @@ namespace Extensions {
 namespace StatSinks {
 namespace Hystrix {
 namespace {
+
 TEST(StatsConfigTest, ValidHystrixSink) {
   const std::string name = StatsSinkNames::get().Hystrix;
 
@@ -42,6 +43,7 @@ TEST(StatsConfigTest, ValidHystrixSink) {
   EXPECT_NE(sink, nullptr);
   EXPECT_NE(dynamic_cast<Hystrix::HystrixSink*>(sink.get()), nullptr);
 }
+
 } // namespace
 } // namespace Hystrix
 } // namespace StatSinks

@@ -19,6 +19,7 @@ namespace Extensions {
 namespace StatSinks {
 namespace MetricsService {
 namespace {
+
 class GrpcMetricsStreamerImplTest : public testing::Test {
 public:
   using MockMetricsStream = Grpc::MockAsyncStream;
@@ -152,6 +153,7 @@ TEST(MetricsServiceSinkTest, CheckStatsCount) {
   sink.flush(source);
   EXPECT_EQ(1, (*streamer_).metric_count);
 }
+
 } // namespace
 } // namespace MetricsService
 } // namespace StatSinks

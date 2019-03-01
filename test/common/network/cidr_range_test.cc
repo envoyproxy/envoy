@@ -30,6 +30,7 @@ namespace Envoy {
 namespace Network {
 namespace Address {
 namespace {
+
 TEST(TruncateIpAddressAndLength, Various) {
   std::map<std::pair<std::string, int>, std::pair<std::string, int>> test_cases = {
       // IPv4
@@ -570,6 +571,7 @@ TEST(IpListTest, MatchAnyAll) {
 
   EXPECT_FALSE(wl.contains(Address::PipeInstance("foo")));
 }
+
 } // namespace
 } // namespace Address
 } // namespace Network

@@ -18,6 +18,7 @@ namespace Extensions {
 namespace ResourceMonitors {
 namespace InjectedResourceMonitor {
 namespace {
+
 class TestableInjectedResourceMonitor : public InjectedResourceMonitor {
 public:
   TestableInjectedResourceMonitor(
@@ -99,6 +100,7 @@ TEST_F(InjectedResourceMonitorTest, ReportsErrorOnFileRead) {
   EXPECT_CALL(cb_, onFailure(ExceptionContains("Invalid path")));
   monitor_->updateResourceUsage(cb_);
 }
+
 } // namespace
 } // namespace InjectedResourceMonitor
 } // namespace ResourceMonitors

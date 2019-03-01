@@ -21,6 +21,7 @@ namespace Filters {
 namespace Common {
 namespace ExtAuthz {
 namespace {
+
 class CheckRequestUtilsTest : public testing::Test {
 public:
   CheckRequestUtilsTest() {
@@ -92,6 +93,7 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeer) {
   EXPECT_EQ("foo", request.attributes().source().service());
   EXPECT_EQ("value", request.attributes().context_extensions().at("key"));
 }
+
 } // namespace
 } // namespace ExtAuthz
 } // namespace Common

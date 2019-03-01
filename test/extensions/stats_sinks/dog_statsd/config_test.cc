@@ -26,6 +26,7 @@ namespace Extensions {
 namespace StatSinks {
 namespace DogStatsd {
 namespace {
+
 class DogStatsdConfigLoopbackTest : public testing::TestWithParam<Network::Address::IpVersion> {};
 INSTANTIATE_TEST_SUITE_P(IpVersions, DogStatsdConfigLoopbackTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
@@ -94,6 +95,7 @@ TEST_P(DogStatsdConfigLoopbackTest, WithCustomPrefix) {
   ASSERT_NE(udp_sink, nullptr);
   EXPECT_EQ(udp_sink->getPrefix(), customPrefix);
 }
+
 } // namespace
 } // namespace DogStatsd
 } // namespace StatSinks

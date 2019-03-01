@@ -19,6 +19,7 @@ using testing::HasSubstr;
 
 namespace Envoy {
 namespace {
+
 class OptionsImplTest : public testing::Test {
 
 public:
@@ -30,9 +31,9 @@ public:
     for (const std::string& s : words) {
       argv.push_back(s.c_str());
     }
-    return std::make_unique<OptionsImpl>(argv.size(), argv.data(),
-                                         [](uint64_t, uint64_t, bool) { return "1"; },
-                                         spdlog::level::warn);
+    return std::make_unique<OptionsImpl>(
+        argv.size(), argv.data(), [](uint64_t, uint64_t, bool) { return "1"; },
+        spdlog::level::warn);
   }
 };
 
@@ -304,5 +305,6 @@ TEST_F(OptionsImplTest, SaneTestConstructor) {
             test_options_impl.statsOptions().maxStatSuffixLength());
   EXPECT_EQ(regular_options_impl->hotRestartDisabled(), test_options_impl.hotRestartDisabled());
 }
+
 } // namespace
 } // namespace Envoy

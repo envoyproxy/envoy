@@ -9,6 +9,7 @@ namespace Extensions {
 namespace Tracers {
 namespace Zipkin {
 namespace {
+
 TEST(ZipkinUtilTest, utilTests) {
   DangerousDeprecatedTestTime time;
   EXPECT_EQ(typeid(uint64_t).name(), typeid(Util::generateRandom64(time.timeSystem())).name());
@@ -43,6 +44,7 @@ TEST(ZipkinUtilTest, utilTests) {
                   "\"val1\"}},\"array_field\":[],\"second_array\":[{\"a1\":10},{\"a2\":\"10\"}]}";
   EXPECT_EQ(expected_json, merged_json);
 }
+
 } // namespace
 } // namespace Zipkin
 } // namespace Tracers

@@ -13,6 +13,7 @@ namespace HttpFilters {
 namespace Common {
 namespace Aws {
 namespace {
+
 // Headers must be in alphabetical order by virtue of std::map
 TEST(UtilityTest, CanonicalizeHeadersInAlphabeticalOrder) {
   Http::TestHeaderMapImpl headers{
@@ -145,6 +146,7 @@ TEST(UtilityTest, JoinCanonicalHeaderNamesWithEmptyMap) {
   const auto names = Utility::joinCanonicalHeaderNames(headers);
   EXPECT_EQ("", names);
 }
+
 } // namespace
 } // namespace Aws
 } // namespace Common

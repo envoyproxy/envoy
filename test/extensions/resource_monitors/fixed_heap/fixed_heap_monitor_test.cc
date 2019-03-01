@@ -9,6 +9,7 @@ namespace Extensions {
 namespace ResourceMonitors {
 namespace FixedHeapMonitor {
 namespace {
+
 class MockMemoryStatsReader : public MemoryStatsReader {
 public:
   MockMemoryStatsReader() {}
@@ -49,6 +50,7 @@ TEST(FixedHeapMonitorTest, ComputesCorrectUsage) {
   EXPECT_FALSE(resource.hasError());
   EXPECT_EQ(resource.pressure(), 0.7);
 }
+
 } // namespace
 } // namespace FixedHeapMonitor
 } // namespace ResourceMonitors

@@ -42,6 +42,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GrpcJsonTranscoder {
 namespace {
+
 class GrpcJsonTranscoderFilterTestBase {
 protected:
   GrpcJsonTranscoderFilterTestBase() : api_(Api::createApiForTest()) {}

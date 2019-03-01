@@ -20,6 +20,7 @@ using testing::NiceMock;
 namespace Envoy {
 namespace Event {
 namespace {
+
 class DispatchedThreadTest : public testing::Test {
 protected:
   DispatchedThreadTest()
@@ -44,6 +45,7 @@ TEST_F(DispatchedThreadTest, PostCallbackTest) {
 
   thread_.exit();
 }
+
 } // namespace
 } // namespace Event
 } // namespace Envoy

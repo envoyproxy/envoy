@@ -23,6 +23,7 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Upstream {
 namespace {
+
 class LoadBalancerTestBase : public testing::TestWithParam<bool> {
 protected:
   // Run all tests against both priority 0 and priority 1 host sets, to ensure
@@ -1355,6 +1356,7 @@ TEST(LoadBalancerSubsetInfoImplTest, SubsetConfig) {
   EXPECT_EQ(subset_info.subsetKeys().size(), 1);
   EXPECT_EQ(subset_info.subsetKeys()[0], std::set<std::string>({"selector_key"}));
 }
+
 } // namespace
 } // namespace Upstream
 } // namespace Envoy

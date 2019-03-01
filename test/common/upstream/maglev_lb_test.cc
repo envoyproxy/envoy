@@ -8,6 +8,7 @@
 namespace Envoy {
 namespace Upstream {
 namespace {
+
 class TestLoadBalancerContext : public LoadBalancerContextBase {
 public:
   TestLoadBalancerContext(uint64_t hash_key) : hash_key_(hash_key) {}
@@ -297,6 +298,7 @@ TEST_F(MaglevLoadBalancerTest, LocalityWeightedLopsided) {
   // The heavy_but_sparse host should occupy the remainder of the table.
   EXPECT_EQ(MaglevTable::DefaultTableSize - 1023, counts[0]);
 }
+
 } // namespace
 } // namespace Upstream
 } // namespace Envoy

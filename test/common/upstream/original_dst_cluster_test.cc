@@ -631,6 +631,7 @@ TEST_F(OriginalDstClusterTest, UseHttpHeaderDisabled) {
   HostConstSharedPtr host3 = lb.chooseHost(&lb_context3);
   EXPECT_EQ(host3, nullptr);
 }
+
 } // namespace
 } // namespace OriginalDstClusterTest
 } // namespace Upstream

@@ -19,6 +19,7 @@ namespace Extensions {
 namespace AccessLoggers {
 namespace HttpGrpc {
 namespace {
+
 class HttpGrpcAccessLogConfigTest : public testing::Test {
 public:
   void SetUp() override {
@@ -55,6 +56,7 @@ TEST_F(HttpGrpcAccessLogConfigTest, Ok) {
   EXPECT_NE(nullptr, instance);
   EXPECT_NE(nullptr, dynamic_cast<HttpGrpcAccessLog*>(instance.get()));
 }
+
 } // namespace
 } // namespace HttpGrpc
 } // namespace AccessLoggers

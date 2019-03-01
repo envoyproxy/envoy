@@ -39,6 +39,7 @@ namespace Extensions {
 namespace Tracers {
 namespace Lightstep {
 namespace {
+
 class LightStepDriverTest : public testing::Test {
 public:
   void setup(envoy::config::trace::v2::LightstepConfig& lightstep_config, bool init_timer,
@@ -481,6 +482,7 @@ TEST_F(LightStepDriverTest, SpawnChild) {
   EXPECT_FALSE(base1_context.empty());
   EXPECT_FALSE(base2_context.empty());
 }
+
 } // namespace
 } // namespace Lightstep
 } // namespace Tracers

@@ -20,6 +20,7 @@ using Envoy::ProtobufWkt::Empty;
 
 namespace Envoy {
 namespace {
+
 class GrpcJsonTranscoderIntegrationTest
     : public testing::TestWithParam<Network::Address::IpVersion>,
       public HttpIntegrationTest {
@@ -330,5 +331,6 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, InvalidJson) {
       Http::TestHeaderMapImpl{{":status", "400"}, {"content-type", "text/plain"}},
       "Expected : between key:value pair.\n", false);
 }
+
 } // namespace
 } // namespace Envoy

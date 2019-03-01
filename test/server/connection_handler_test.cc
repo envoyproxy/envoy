@@ -25,6 +25,7 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Server {
 namespace {
+
 class ConnectionHandlerTest : public testing::Test, protected Logger::Loggable<Logger::Id::main> {
 public:
   ConnectionHandlerTest()
@@ -674,6 +675,7 @@ TEST_F(ConnectionHandlerTest, ListenerFilterDisabledTimeout) {
 
   EXPECT_CALL(*listener, onDestroy());
 }
+
 } // namespace
 } // namespace Server
 } // namespace Envoy

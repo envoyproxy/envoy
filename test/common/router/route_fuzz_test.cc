@@ -10,6 +10,7 @@
 namespace Envoy {
 namespace Router {
 namespace {
+
 // TODO(htuch): figure out how to generate via a genrule from config_impl_test the full corpus.
 DEFINE_PROTO_FUZZER(const test::common::router::RouteTestCase& input) {
   try {
@@ -38,6 +39,7 @@ DEFINE_PROTO_FUZZER(const test::common::router::RouteTestCase& input) {
     ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
   }
 }
+
 } // namespace
 } // namespace Router
 } // namespace Envoy

@@ -18,6 +18,7 @@ namespace Extensions {
 namespace Tracers {
 namespace DynamicOt {
 namespace {
+
 class DynamicOpenTracingDriverTest : public testing::Test {
 public:
   void setup(const std::string& library, const std::string& tracer_config) {
@@ -83,6 +84,7 @@ TEST_F(DynamicOpenTracingDriverTest, FlushSpans) {
   EXPECT_NE(spans_json, nullptr);
   EXPECT_EQ(spans_json->asObjectArray().size(), 1);
 }
+
 } // namespace
 } // namespace DynamicOt
 } // namespace Tracers

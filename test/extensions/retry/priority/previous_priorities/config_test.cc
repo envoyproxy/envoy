@@ -17,6 +17,7 @@ namespace Extensions {
 namespace Retry {
 namespace Priority {
 namespace {
+
 class RetryPriorityTest : public testing::Test {
 public:
   void initialize(const Upstream::HealthyLoad& original_healthy_priority_load,
@@ -280,6 +281,7 @@ TEST_F(RetryPriorityTest, OverridenFrequency) {
   retry_priority_->onHostAttempted(host1);
   verifyPriorityLoads(expected_priority_load, expected_degraded_priority_load);
 }
+
 } // namespace
 } // namespace Priority
 } // namespace Retry

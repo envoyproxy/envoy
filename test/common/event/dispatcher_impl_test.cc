@@ -18,6 +18,7 @@ using testing::InSequence;
 namespace Envoy {
 namespace Event {
 namespace {
+
 class TestDeferredDeletable : public DeferredDeletable {
 public:
   TestDeferredDeletable(std::function<void()> on_destroy) : on_destroy_(on_destroy) {}
@@ -169,6 +170,7 @@ TEST_F(DispatcherImplTest, Timer) {
     cv_.wait(mu_);
   }
 }
+
 } // namespace
 } // namespace Event
 } // namespace Envoy

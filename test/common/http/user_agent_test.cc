@@ -16,6 +16,7 @@ using testing::Property;
 namespace Envoy {
 namespace Http {
 namespace {
+
 TEST(UserAgentTest, All) {
   Stats::MockStore stat_store;
   NiceMock<Stats::MockHistogram> original_histogram;
@@ -73,6 +74,7 @@ TEST(UserAgentTest, All) {
     ua.completeConnectionLength(span);
   }
 }
+
 } // namespace
 } // namespace Http
 } // namespace Envoy

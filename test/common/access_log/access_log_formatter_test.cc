@@ -732,6 +732,7 @@ TEST(AccessLogFormatterTest, ParserFailures) {
     EXPECT_THROW(parser.parse(test_case), EnvoyException) << test_case;
   }
 }
+
 } // namespace
 } // namespace AccessLog
 } // namespace Envoy

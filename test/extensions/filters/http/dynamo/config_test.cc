@@ -12,6 +12,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Dynamo {
 namespace {
+
 TEST(DynamoFilterConfigTest, DynamoFilter) {
   std::string json_string = R"EOF(
   {
@@ -26,6 +27,7 @@ TEST(DynamoFilterConfigTest, DynamoFilter) {
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
 }
+
 } // namespace
 } // namespace Dynamo
 } // namespace HttpFilters

@@ -15,6 +15,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Fault {
 namespace {
+
 TEST(FaultFilterConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   envoy::config::filter::http::fault::v2::HTTPFault fault;
@@ -67,6 +68,7 @@ TEST(FaultFilterConfigTest, FaultFilterEmptyProto) {
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
   cb(filter_callback);
 }
+
 } // namespace
 } // namespace Fault
 } // namespace HttpFilters

@@ -14,6 +14,7 @@ namespace Extensions {
 namespace ResourceMonitors {
 namespace FixedHeapMonitor {
 namespace {
+
 TEST(FixedHeapMonitorFactoryTest, CreateMonitor) {
   auto factory =
       Registry::FactoryRegistry<Server::Configuration::ResourceMonitorFactory>::getFactory(
@@ -28,6 +29,7 @@ TEST(FixedHeapMonitorFactoryTest, CreateMonitor) {
   auto monitor = factory->createResourceMonitor(config, context);
   EXPECT_NE(monitor, nullptr);
 }
+
 } // namespace
 } // namespace FixedHeapMonitor
 } // namespace ResourceMonitors

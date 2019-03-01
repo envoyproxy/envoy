@@ -595,5 +595,6 @@ TEST_P(LoadStatsIntegrationTest, Dropped) {
 
   cleanupLoadStatsConnection();
 }
+
 } // namespace
 } // namespace Envoy

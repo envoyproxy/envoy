@@ -43,6 +43,7 @@ using testing::Throw;
 namespace Envoy {
 namespace Server {
 namespace {
+
 class ListenerHandle {
 public:
   ListenerHandle() { EXPECT_CALL(*drain_manager_, startParentShutdownSequence()).Times(0); }
@@ -3031,6 +3032,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, VerifyIgnoreExpirationWithCA) {
 
   EXPECT_NO_THROW(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true));
 }
+
 } // namespace
 } // namespace Server
 } // namespace Envoy

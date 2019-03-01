@@ -24,6 +24,7 @@ using testing::WithArg;
 namespace Envoy {
 namespace Server {
 namespace {
+
 class HotRestartImplTest : public testing::Test {
 public:
   void setup() {
@@ -246,6 +247,7 @@ TEST_P(HotRestartImplAlignmentTest, objectOverlap) {
 
 INSTANTIATE_TEST_SUITE_P(HotRestartImplAlignmentTest, HotRestartImplAlignmentTest,
                          testing::Range(0UL, alignof(Stats::RawStatData) + 1));
+
 } // namespace
 } // namespace Server
 } // namespace Envoy

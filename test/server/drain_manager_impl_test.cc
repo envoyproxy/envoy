@@ -15,6 +15,7 @@ using testing::SaveArg;
 namespace Envoy {
 namespace Server {
 namespace {
+
 class DrainManagerImplTest : public testing::Test {
 public:
   DrainManagerImplTest() {
@@ -71,6 +72,7 @@ TEST_F(DrainManagerImplTest, ModifyOnly) {
   EXPECT_CALL(server_, healthCheckFailed()).Times(0);
   EXPECT_FALSE(drain_manager.drainClose());
 }
+
 } // namespace
 } // namespace Server
 } // namespace Envoy

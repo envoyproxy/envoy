@@ -238,6 +238,7 @@ TEST(HealthCheckFilterConfig, HealthCheckFilterDuplicateNoMatch) {
 
   testHealthCheckHeaderMatch(config, headers, false);
 }
+
 } // namespace
 } // namespace HealthCheck
 } // namespace HttpFilters

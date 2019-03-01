@@ -28,6 +28,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace HealthCheck {
 namespace {
+
 class HealthCheckFilterTest : public testing::Test {
 public:
   HealthCheckFilterTest(bool pass_through, bool caching)
@@ -388,6 +389,7 @@ TEST_F(HealthCheckFilterCachingTest, NotHcRequest) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue,
             filter_->decodeHeaders(request_headers_no_hc_, true));
 }
+
 } // namespace
 } // namespace HealthCheck
 } // namespace HttpFilters

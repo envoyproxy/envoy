@@ -24,6 +24,7 @@ namespace Extensions {
 namespace Tracers {
 namespace Zipkin {
 namespace {
+
 class TestReporterImpl : public Reporter {
 public:
   TestReporterImpl(int value) : value_(value) {}
@@ -428,6 +429,7 @@ TEST_F(ZipkinTracerTest, NotSharedSpanContext) {
 
   EXPECT_EQ(parent_span->id(), child_span->parentId());
 }
+
 } // namespace
 } // namespace Zipkin
 } // namespace Tracers

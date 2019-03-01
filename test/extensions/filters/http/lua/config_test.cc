@@ -37,6 +37,7 @@ TEST(LuaFilterConfigTest, LuaFilterInJson) {
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
 }
+
 } // namespace
 } // namespace Lua
 } // namespace HttpFilters

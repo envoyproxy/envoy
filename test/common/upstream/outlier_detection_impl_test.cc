@@ -31,6 +31,7 @@ namespace Envoy {
 namespace Upstream {
 namespace Outlier {
 namespace {
+
 TEST(OutlierDetectorImplFactoryTest, NoDetector) {
   NiceMock<MockClusterMockPrioritySet> cluster;
   NiceMock<Event::MockDispatcher> dispatcher;
@@ -869,6 +870,7 @@ TEST(DetectorHostMonitorImpl, resultToHttpCode) {
   EXPECT_EQ(Http::Code::ServiceUnavailable,
             DetectorHostMonitorImpl::resultToHttpCode(Result::SERVER_FAILURE));
 }
+
 } // namespace
 } // namespace Outlier
 } // namespace Upstream

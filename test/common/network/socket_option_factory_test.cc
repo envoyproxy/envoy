@@ -13,6 +13,7 @@ using testing::_;
 namespace Envoy {
 namespace Network {
 namespace {
+
 class SocketOptionFactoryTest : public testing::Test {
 public:
   SocketOptionFactoryTest() = default;
@@ -121,6 +122,7 @@ TEST_F(SocketOptionFactoryTest, TestBuildIpv6TransparentOptions) {
   EXPECT_TRUE(Network::Socket::applyOptions(options, socket_mock_,
                                             envoy::api::v2::core::SocketOption::STATE_BOUND));
 }
+
 } // namespace
 } // namespace Network
 } // namespace Envoy

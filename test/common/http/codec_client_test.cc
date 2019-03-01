@@ -37,6 +37,7 @@ using testing::Throw;
 namespace Envoy {
 namespace Http {
 namespace {
+
 class CodecClientTest : public testing::Test {
 public:
   CodecClientTest() {

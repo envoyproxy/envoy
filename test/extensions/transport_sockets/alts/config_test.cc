@@ -19,6 +19,7 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Alts {
 namespace {
+
 TEST(UpstreamAltsConfigTest, CreateSocketFactory) {
   MockTransportSocketFactoryContext factory_context;
   UpstreamAltsTransportSocketConfigFactory factory;
@@ -54,6 +55,7 @@ TEST(DownstreamAltsConfigTest, CreateSocketFactory) {
   EXPECT_NE(nullptr, socket_factory);
   EXPECT_TRUE(socket_factory->implementsSecureTransport());
 }
+
 } // namespace
 } // namespace Alts
 } // namespace TransportSockets

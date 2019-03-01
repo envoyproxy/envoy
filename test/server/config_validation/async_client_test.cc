@@ -11,6 +11,7 @@
 namespace Envoy {
 namespace Http {
 namespace {
+
 TEST(ValidationAsyncClientTest, MockedMethods) {
   MessagePtr message{new RequestMessageImpl()};
   MockAsyncClientCallbacks callbacks;
@@ -22,6 +23,7 @@ TEST(ValidationAsyncClientTest, MockedMethods) {
   EXPECT_EQ(nullptr, client.send(std::move(message), callbacks, AsyncClient::RequestOptions()));
   EXPECT_EQ(nullptr, client.start(stream_callbacks, AsyncClient::StreamOptions()));
 }
+
 } // namespace
 } // namespace Http
 } // namespace Envoy

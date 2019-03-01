@@ -34,6 +34,7 @@ using testing::WithArgs;
 namespace Envoy {
 namespace Network {
 namespace {
+
 class NetworkFilterManagerTest : public testing::Test, public BufferSource {
 public:
   StreamBuffer getReadBuffer() override { return {read_buffer_, read_end_stream_}; }
@@ -221,6 +222,7 @@ TEST_F(NetworkFilterManagerTest, RateLimitAndTcpProxy) {
 
   connection.raiseEvent(ConnectionEvent::RemoteClose);
 }
+
 } // namespace
 } // namespace Network
 } // namespace Envoy
