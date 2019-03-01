@@ -47,14 +47,10 @@ TEST(QuicPlatformTest, QuicArraysize) {
 enum class TestEnum { ZERO = 0, ONE, TWO, COUNT };
 
 TEST(QuicPlatformTest, QuicBugTracker) {
-  if (false) {
-    // If the following compiles, they are likely to be optimized out because of the preceding "if
-    // (false)", but it's ok since we only need them to compile.
-    QUIC_BUG << "Here is a bug";
-    QUIC_BUG_IF(true) << "There is a bug";
-    QUIC_PEER_BUG << "A bug from peer";
-    QUIC_PEER_BUG_IF(true) << "Another bug from peer";
-  }
+  EXPECT_DEBUG_DEATH(QUIC_BUG << "Here is a bug,", "");
+  EXPECT_DEBUG_DEATH(QUIC_BUG_IF(true) << "There is a bug,", "");
+  QUIC_PEER_BUG << "Everywhere's a bug,";
+  QUIC_PEER_BUG_IF(true) << "Including here.";
 }
 
 TEST(QuicPlatformTest, QuicClientStats) {
