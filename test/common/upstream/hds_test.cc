@@ -173,8 +173,10 @@ TEST_F(HdsTest, TestProcessMessageEndpoints) {
   // Check Correctness
   for (int i = 0; i < 2; i++) {
     for (int j = 0; j < 3; j++) {
-      auto& host =
-          hds_delegate_->hdsClusters()[i]->prioritySet().hostSetsPerPriority()[0]->hosts()[j];
+      auto& host = hds_delegate_->hdsClusters()["anna" + std::to_string(i)]
+                       ->prioritySet()
+                       .hostSetsPerPriority()[0]
+                       ->hosts()[j];
       EXPECT_EQ(host->address()->ip()->addressAsString(), "127.0.0." + std::to_string(i));
       EXPECT_EQ(host->address()->ip()->port(), 1234 + j);
     }
@@ -215,8 +217,8 @@ TEST_F(HdsTest, TestProcessMessageHealthChecks) {
   hds_delegate_friend_.processPrivateMessage(*hds_delegate_, std::move(message));
 
   // Check Correctness
-  EXPECT_EQ(hds_delegate_->hdsClusters()[0]->healthCheckers().size(), 2);
-  EXPECT_EQ(hds_delegate_->hdsClusters()[1]->healthCheckers().size(), 3);
+  EXPECT_EQ(hds_delegate_->hdsClusters()["minkowski0"]->healthCheckers().size(), 2);
+  EXPECT_EQ(hds_delegate_->hdsClusters()["minkowski1"]->healthCheckers().size(), 3);
 }
 
 // Tests OnReceiveMessage given a minimal HealthCheckSpecifier message

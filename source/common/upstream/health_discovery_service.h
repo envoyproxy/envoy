@@ -61,6 +61,7 @@ public:
                          Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher);
 
   std::vector<Upstream::HealthCheckerSharedPtr> healthCheckers() { return health_checkers_; };
+  void update(const envoy::api::v2::Cluster& cluster);
 
 protected:
   PrioritySetImpl priority_set_;
@@ -77,12 +78,14 @@ private:
   Ssl::ContextManager& ssl_context_manager_;
   bool added_via_api_;
 
-  HostVectorSharedPtr initial_hosts_;
+  HostVectorSharedPtr hosts_;
+  HostMap all_hosts_;
   ClusterInfoConstSharedPtr info_;
   std::vector<Upstream::HealthCheckerSharedPtr> health_checkers_;
 };
 
 typedef std::shared_ptr<HdsCluster> HdsClusterPtr;
+typedef std::unordered_map<std::string, HdsClusterPtr> HdsClusterMap;
 
 /**
  * All hds stats. @see stats_macros.h
@@ -129,7 +132,7 @@ public:
   void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override;
   envoy::service::discovery::v2::HealthCheckRequestOrEndpointHealthResponse sendResponse();
 
-  std::vector<HdsClusterPtr> hdsClusters() { return hds_clusters_; };
+  HdsClusterMap hdsClusters() { return hds_clusters_; };
 
 private:
   friend class HdsDelegateFriend;
@@ -163,8 +166,7 @@ private:
   envoy::service::discovery::v2::HealthCheckRequestOrEndpointHealthResponse health_check_request_;
   std::unique_ptr<envoy::service::discovery::v2::HealthCheckSpecifier> health_check_message_;
 
-  std::vector<std::string> clusters_;
-  std::vector<HdsClusterPtr> hds_clusters_;
+  HdsClusterMap hds_clusters_;
 
   Event::TimerPtr hds_stream_response_timer_;
   Event::TimerPtr hds_retry_timer_;

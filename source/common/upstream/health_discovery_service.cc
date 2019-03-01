@@ -77,7 +77,7 @@ envoy::service::discovery::v2::HealthCheckRequestOrEndpointHealthResponse
 HdsDelegate::sendResponse() {
   envoy::service::discovery::v2::HealthCheckRequestOrEndpointHealthResponse response;
   for (const auto& cluster : hds_clusters_) {
-    for (const auto& hosts : cluster->prioritySet().hostSetsPerPriority()) {
+    for (const auto& hosts : cluster.second->prioritySet().hostSetsPerPriority()) {
       for (const auto& host : hosts->hosts()) {
         auto* endpoint = response.mutable_endpoint_health_response()->add_endpoints_health();
         Network::Utility::addressToProtobufAddress(
@@ -120,12 +120,20 @@ void HdsDelegate::processMessage(
   ENVOY_LOG(debug, "New health check response message {} ", message->DebugString());
   ASSERT(message);
 
+  std::unordered_set<std::string> clusters_to_remove;
+  for (const auto& current_cluster : hds_clusters_) {
+    clusters_to_remove.insert(current_cluster.first);
+  }
+
   for (const auto& cluster_health_check : message->cluster_health_checks()) {
-    // Create HdsCluster config
+    const auto& cluster_name = cluster_health_check.cluster_name();
     static const envoy::api::v2::core::BindConfig bind_config;
     envoy::api::v2::Cluster cluster_config;
 
-    cluster_config.set_name(cluster_health_check.cluster_name());
+    // Keep this cluster
+    clusters_to_remove.erase(cluster_name);
+
+    cluster_config.set_name(cluster_name);
     cluster_config.mutable_connect_timeout()->set_seconds(ClusterTimeoutSeconds);
     cluster_config.mutable_per_connection_buffer_limit_bytes()->set_value(
         ClusterConnectionBufferLimitBytes);
@@ -144,26 +152,35 @@ void HdsDelegate::processMessage(
       cluster_config.add_health_checks()->MergeFrom(health_check);
     }
 
-    ENVOY_LOG(debug, "New HdsCluster config {} ", cluster_config.DebugString());
+    // If the cluster already exists, update it in place
+    auto existing_cluster = hds_clusters_.find(cluster_name);
+    if (existing_cluster != hds_clusters_.end()) {
+      ENVOY_LOG(debug, "Updating existing HdsCluster with config {}", cluster_config.DebugString());
+      existing_cluster->second->update(cluster_config);
+      continue;
+    }
+
+    ENVOY_LOG(debug, "New HdsCluster with config {} ", cluster_config.DebugString());
 
     // Create HdsCluster
-    hds_clusters_.emplace_back(new HdsCluster(
+    hds_clusters_[cluster_name] = HdsClusterPtr{new HdsCluster(
         admin_, runtime_, cluster_config, bind_config, store_stats, ssl_context_manager_, false,
-        info_factory_, cm_, local_info_, dispatcher_, random_, singleton_manager_, tls_, api_));
+        info_factory_, cm_, local_info_, dispatcher_, random_, singleton_manager_, tls_, api_)};
 
-    hds_clusters_.back()->startHealthchecks(access_log_manager_, runtime_, random_, dispatcher_);
+    hds_clusters_[cluster_name]->startHealthchecks(access_log_manager_, runtime_, random_,
+                                                   dispatcher_);
+  }
+
+  for (const auto& cluster_name : clusters_to_remove) {
+    hds_clusters_.erase(cluster_name);
+    ENVOY_LOG(debug, "hds: remove cluster '{}'", cluster_name);
   }
 }
 
-// TODO(lilika): Add support for subsequent HealthCheckSpecifier messages that
-// might modify the HdsClusters
 void HdsDelegate::onReceiveMessage(
     std::unique_ptr<envoy::service::discovery::v2::HealthCheckSpecifier>&& message) {
   stats_.requests_.inc();
   ENVOY_LOG(debug, "New health check response message {} ", message->DebugString());
-
-  // Reset
-  hds_clusters_.clear();
 
   // Set response
   auto server_response_ms = PROTOBUF_GET_MS_REQUIRED(*message, interval);
@@ -199,7 +216,7 @@ HdsCluster::HdsCluster(Server::Admin& admin, Runtime::Loader& runtime,
                        ThreadLocal::SlotAllocator& tls, Api::Api& api)
     : runtime_(runtime), cluster_(cluster), bind_config_(bind_config), stats_(stats),
       ssl_context_manager_(ssl_context_manager), added_via_api_(added_via_api),
-      initial_hosts_(new HostVector()) {
+      hosts_(new HostVector()) {
   ENVOY_LOG(debug, "Creating an HdsCluster");
   priority_set_.getOrCreateHostSet(0);
 
@@ -208,7 +225,7 @@ HdsCluster::HdsCluster(Server::Admin& admin, Runtime::Loader& runtime,
                                           dispatcher, random, singleton_manager, tls, api});
 
   for (const auto& host : cluster.hosts()) {
-    initial_hosts_->emplace_back(
+    hosts_->emplace_back(
         new HostImpl(info_, "", Network::Address::resolveProtoAddress(host),
                      envoy::api::v2::core::Metadata::default_instance(), 1,
                      envoy::api::v2::core::Locality().default_instance(),
@@ -252,13 +269,71 @@ void HdsCluster::startHealthchecks(AccessLog::AccessLogManager& access_log_manag
 
 void HdsCluster::initialize(std::function<void()> callback) {
   initialization_complete_callback_ = callback;
-  for (const auto& host : *initial_hosts_) {
+  for (const auto& host : *hosts_) {
     host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
   }
 
-  priority_set_.updateHosts(
-      0, HostSetImpl::partitionHosts(initial_hosts_, HostsPerLocalityImpl::empty()), {},
-      *initial_hosts_, {}, absl::nullopt);
+  priority_set_.updateHosts(0, HostSetImpl::partitionHosts(hosts_, HostsPerLocalityImpl::empty()),
+                            {}, *hosts_, {}, absl::nullopt);
+}
+
+void HdsCluster::update(const envoy::api::v2::Cluster& cluster) {
+  // Update endpoints
+  HostVector added_hosts;
+  HostVector removed_hosts;
+  HostVectorSharedPtr current_hosts(new HostVector(*hosts_)); // Not sure if this copy is necessary
+  HostVectorSharedPtr final_hosts(new HostVector());
+  HostMap updated_hosts;
+  std::unordered_set<std::string> existing_hosts(hosts_->size());
+
+  for (const auto& address : cluster.hosts()) {
+    const HostSharedPtr& host = HostSharedPtr{
+        new HostImpl(info_, "", Network::Address::resolveProtoAddress(address),
+                     envoy::api::v2::core::Metadata::default_instance(), 1,
+                     envoy::api::v2::core::Locality().default_instance(),
+                     envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance(), 0,
+                     envoy::api::v2::core::HealthStatus::UNKNOWN)};
+
+    if (updated_hosts.count(host->address()->asString())) {
+      continue;
+    }
+
+    auto existing_host = all_hosts_.find(host->address()->asString());
+    if (existing_host != all_hosts_.end()) {
+      // TODO: update endpoint health check port
+      existing_hosts.emplace_back(host->address()->asString());
+      updated_hosts[host->address()->asString()] = existing_host->second;
+      final_hosts->push_back(existing_host->second);
+    } else {
+      added_hosts.push_back(host);
+      updated_hosts[host->address()->asString()] = host;
+      final_hosts->push_back(host);
+    }
+  }
+
+  // Remove found hosts from current hosts to get removed hosts
+  for (auto itr = current_hosts->begin(); itr != current_hosts->end();) {
+    auto existing_itr = existing_hosts.find((*itr)->address()->asString());
+
+    if (existing_itr != existing_hosts.end()) {
+      existing_hosts.erase(existing_itr);
+      itr = current_hosts->erase(itr);
+    } else {
+      itr++;
+    }
+  }
+
+  removed_hosts = std::move(*current_hosts);
+  hosts_ = std::move(final_hosts);
+
+  if (!added_hosts.empty() || !removed_hosts.empty()) {
+    priority_set_.updateHosts(0, HostSetImpl::partitionHosts(hosts_, HostsPerLocalityImpl::empty()),
+                              {}, added_hosts, removed_hosts, absl::nullopt);
+    ENVOY_LOG(debug, "updated priority set hosts");
+  }
+
+  // TODO: add/remove healthchecks
+  // TODO: start new healthchecks
 }
 
 void HdsCluster::setOutlierDetector(const Outlier::DetectorSharedPtr&) {
