@@ -67,7 +67,7 @@ TEST_F(CheckRequestUtilsTest, BasicHttp) {
 
   CheckRequestUtils::createHttpCheck(&callbacks_, headers, std::move(empty), request, true);
 
-  EXPECT_EQ("foo", request.attributes().request().http().body().inline_bytes());
+  EXPECT_EQ("foo", request.attributes().request().http().body());
 }
 
 // Verify that createHttpCheck extract the proper attributes from the http request into CheckRequest
