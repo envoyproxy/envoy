@@ -48,7 +48,7 @@ enum class TestEnum { ZERO = 0, ONE, TWO, COUNT };
 
 TEST(QuicPlatformTest, QuicBugTracker) {
   if (false) {
-    // If the following compiles, they are likely to be optimized out because of the preceeding "if
+    // If the following compiles, they are likely to be optimized out because of the preceding "if
     // (false)", but it's ok since we only need them to compile.
     QUIC_BUG << "Here is a bug";
     QUIC_BUG_IF(true) << "There is a bug";
