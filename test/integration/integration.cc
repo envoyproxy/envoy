@@ -305,8 +305,8 @@ void BaseIntegrationTest::createEnvoy() {
   // config, you will need to do so *after* initialize() (which calls this function) is done.
   config_helper_.finalize(ports);
 
-  ENVOY_LOG_MISC(debug, "Running Envoy with configuration {}",
-                 config_helper_.bootstrap().DebugString());
+  ENVOY_LOG_MISC(debug, "Running Envoy with configuration:\n{}",
+                 MessageUtil::getYamlStringFromMessage(config_helper_.bootstrap()));
 
   const std::string bootstrap_path = TestEnvironment::writeStringToFileForTest(
       "bootstrap.json", MessageUtil::getJsonStringFromMessage(config_helper_.bootstrap()));
