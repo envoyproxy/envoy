@@ -17,7 +17,7 @@ Api::IoCallBoolResult MockFile::open() {
   num_opens_++;
   open_event_.notifyOne();
 
-  return std::move(result);
+  return result;
 }
 
 Api::IoCallSizeResult MockFile::write(absl::string_view buffer) {
@@ -30,14 +30,14 @@ Api::IoCallSizeResult MockFile::write(absl::string_view buffer) {
   num_writes_++;
   write_event_.notifyOne();
 
-  return std::move(result);
+  return result;
 }
 
 Api::IoCallBoolResult MockFile::close() {
   Api::IoCallBoolResult result = close_();
   is_open_ = !result.rc_;
 
-  return std::move(result);
+  return result;
 }
 
 MockInstance::MockInstance() {}

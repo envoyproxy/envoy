@@ -77,6 +77,12 @@ template <typename T> struct IoCallResult {
 
   virtual ~IoCallResult() {}
 
+  IoCallResult& operator=(IoCallResult&& result) {
+    rc_ = result.rc_;
+    err_ = std::move(result.err_);
+    return *this;
+  }
+
   T rc_;
   IoErrorPtr err_;
 };
