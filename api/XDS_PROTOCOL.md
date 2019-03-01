@@ -321,8 +321,8 @@ stream. This allows the xDS server to keep track of the state of xDS clients
 connected to it. There is no REST version of Incremental xDS yet.
 
 In the delta xDS wire protocol, the nonce field is required and used to pair a
-[`DeltaDiscoveryResponse`](https://www.envoyproxy.io/docs/envoy/latest/api-v2/api/v2/discovery.proto#discoveryrequest)
-to a [`DeltaDiscoveryRequest`](https://www.envoyproxy.io/docs/envoy/latest/api-v2/api/v2/discovery.proto#discoveryrequest)
+[`DeltaDiscoveryResponse`](https://www.envoyproxy.io/docs/envoy/latest/api-v2/api/v2/discovery.proto#deltadiscoveryresponse)
+to a [`DeltaDiscoveryRequest`](https://www.envoyproxy.io/docs/envoy/latest/api-v2/api/v2/discovery.proto#deltadiscoveryrequest)
 ACK or NACK.
 Optionally, a response message level system_version_info is present for
 debugging purposes only.

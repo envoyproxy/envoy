@@ -198,8 +198,12 @@ void CdsApiImpl::onConfigUpdate(
   if (!exception_msgs.empty()) {
     throw EnvoyException(StringUtil::join(exception_msgs, "\n"));
   }
+<<<<<<< HEAD
   whole_update_version_info_ = system_version_info;
 >>>>>>> snapshot
+=======
+  system_version_info_ = system_version_info;
+>>>>>>> address most comments, needs further tests
 }
 
 void CdsApiImpl::onConfigUpdateFailed(const EnvoyException*) {

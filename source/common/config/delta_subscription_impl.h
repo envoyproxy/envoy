@@ -24,8 +24,11 @@ struct ResourceNameDiff {
   std::vector<std::string> removed_;
 };
 
+const char EmptyVersion[] = "";
+
 /**
  * Manages the logic of a (non-aggregated) delta xDS subscription.
+ * TOOD(fredlas) add aggregation support.
  */
 template <class ResourceType>
 class DeltaSubscriptionImpl
@@ -65,7 +68,7 @@ public:
                         resources.end(), std::inserter(diff.removed_, diff.removed_.begin()));
 
     for (const auto& added : diff.added_) {
-      resources_[added] = "";
+      resources_[added] = EmptyVersion;
       resource_names_.insert(added);
     }
     for (const auto& removed : diff.removed_) {
@@ -223,9 +226,10 @@ public:
 
 private:
   // A map from resource name to per-resource version.
-  std::map<std::string, std::string> resources_;
-  // The keys of resources_.
-  std::set<std::string> resource_names_;
+  std::unordered_map<std::string, std::string> resources_;
+  // The keys of resources_. Only tracked separately because std::map does not provide an iterator
+  // into just its keys, e.g. for use in std::set_difference.
+  std::unordered_set<std::string> resource_names_;
   const std::string type_url_;
   SubscriptionCallbacks<ResourceType>* callbacks_{};
   // In-flight or previously sent request.

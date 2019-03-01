@@ -34,7 +34,7 @@ public:
   void setInitializedCb(std::function<void()> callback) override {
     initialize_callback_ = callback;
   }
-  const std::string versionInfo() const override { return whole_update_version_info_; }
+  const std::string versionInfo() const override { return system_version_info_; }
 
 >>>>>>> consolidate CdsApiImpl
   // Config::SubscriptionCallbacks
@@ -71,7 +71,7 @@ private:
 >>>>>>> filesystem: convert free functions to object methods (#5692)
 
   std::unique_ptr<Config::Subscription<envoy::api::v2::Cluster>> subscription_;
-  std::string whole_update_version_info_;
+  std::string system_version_info_;
   std::function<void()> initialize_callback_;
 };
 
