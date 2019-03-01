@@ -4,23 +4,22 @@
 
 #include "common/common/assert.h"
 
-#define TRACE_INIT_MANAGER_WITH_DESCRIPTION(fmt, description, ...)                                 \
-  ENVOY_LOG(debug, "InitManagerImpl({}): " fmt, description, ##__VA_ARGS__)
-
 #define TRACE_INIT_MANAGER(fmt, ...)                                                               \
-  TRACE_INIT_MANAGER_WITH_DESCRIPTION(fmt, description_, ##__VA_ARGS__)
+  ENVOY_LOG(debug, "InitManagerImpl({}): " fmt, description_, ##__VA_ARGS__)
 
 namespace Envoy {
 namespace Server {
 
-InitManagerImpl::InitManagerImpl(absl::string_view description)
-    : self_(std::make_shared<InitManagerImpl*>(this)), description_(description) {
+InitManagerImpl::InitManagerImpl(absl::string_view description) : description_(description) {
   TRACE_INIT_MANAGER("constructor");
 }
 
 InitManagerImpl::~InitManagerImpl() {
   TRACE_INIT_MANAGER("destructor");
-  *self_ = nullptr;
+  for (auto& target : targets_) {
+    TRACE_INIT_MANAGER("canceling {}", target.second);
+    target.first->cancel();
+  }
 }
 
 void InitManagerImpl::initialize(std::function<void()> callback) {
@@ -45,19 +44,14 @@ void InitManagerImpl::initialize(std::function<void()> callback) {
 
 void InitManagerImpl::initializeTarget(TargetWithDescription& target) {
   TRACE_INIT_MANAGER("invoking initializeTarget {}", target.second);
-  target.first->initialize([self = self_, &target]() -> void {
-    if (*self != nullptr) {
-      const std::string& description = (*self)->description_;
-      TRACE_INIT_MANAGER_WITH_DESCRIPTION("completed initializeTarget {}", description,
-                                          target.second);
-      auto& targets = (*self)->targets_;
-      ASSERT(std::find(targets.begin(), targets.end(), target) != targets.end());
-      targets.remove(target);
-      if (targets.empty()) {
-        TRACE_INIT_MANAGER_WITH_DESCRIPTION("initialized", description);
-        (*self)->state_ = State::Initialized;
-        (*self)->callback_();
-      }
+  target.first->initialize([this, &target]() -> void {
+    TRACE_INIT_MANAGER("completed initializeTarget {}", target.second);
+    ASSERT(std::find(targets_.begin(), targets_.end(), target) != targets_.end());
+    targets_.remove(target);
+    if (targets_.empty()) {
+      TRACE_INIT_MANAGER("initialized");
+      state_ = State::Initialized;
+      callback_();
     }
   });
 }

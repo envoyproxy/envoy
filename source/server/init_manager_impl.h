@@ -29,7 +29,6 @@ private:
 
   void initializeTarget(TargetWithDescription& target);
 
-  std::shared_ptr<InitManagerImpl*> self_; // For safe use by callbacks passed to init targets.
   std::list<TargetWithDescription> targets_;
   State state_{State::NotInitialized};
   std::function<void()> callback_;

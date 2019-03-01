@@ -22,6 +22,11 @@ public:
    *        initialization.
    */
   virtual void initialize(std::function<void()> callback) PURE;
+
+  /**
+   * Called when the Manager is no longer interested in this target's initialization.
+   */
+  virtual void cancel() PURE;
 };
 
 /**

@@ -63,5 +63,17 @@ TEST_F(InitManagerImplTest, TargetAfterInitializing) {
   target1.callback_();
 }
 
+TEST_F(InitManagerImplTest, Cancel) {
+  InitManagerImpl* manager = new InitManagerImpl("test");
+  Init::MockTarget target;
+
+  manager->registerTarget(target, "");
+  EXPECT_CALL(target, initialize(_));
+  manager->initialize([&]() -> void { initialized_.ready(); });
+
+  EXPECT_CALL(target, cancel());
+  delete manager;
+}
+
 } // namespace Server
 } // namespace Envoy

@@ -32,6 +32,7 @@ public:
 
   // Init::Target
   void initialize(std::function<void()> callback) override;
+  void cancel() override;
 
   // Config::SubscriptionCallbacks
   void onConfigUpdate(const ResourceVector& resources, const std::string& version_info) override;
