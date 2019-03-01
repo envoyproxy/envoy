@@ -496,7 +496,7 @@ TEST_F(GrpcMuxImplTest, TooManyRequestsWithCustomRateLimitSettings) {
   EXPECT_EQ(0, stats_.counter("control_plane.pending_requests").value());
 }
 
-//  Verifies that a messsage with no resources is accepted.
+//  Verifies that a message with no resources is accepted.
 TEST_F(GrpcMuxImplTest, UnwatchedTypeAcceptsEmptyResources) {
   setup();
 
