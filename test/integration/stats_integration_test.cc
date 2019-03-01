@@ -37,13 +37,6 @@ class ClusterMemoryUtilization : public testing::TestWithParam<Network::Address:
 public:
   ClusterMemoryUtilization() : BaseIntegrationTest(GetParam(), realTime()) {}
 
-  void TearDown() override {
-    test_server_.reset();
-    fake_upstreams_.clear();
-  }
-
-  void initialize() override { BaseIntegrationTest::initialize(); }
-
   size_t memoryConsumedWithClusters(int num_clusters, bool allow_stats) {
     config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
       if (!allow_stats) {
