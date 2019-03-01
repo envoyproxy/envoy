@@ -463,6 +463,9 @@ void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callb
 }
 
 void Filter::cleanup() {
+  // upstream_request_ is only destroyed in this method (cleanup()) or when we
+  // do a retry (setupRetry()). In the latter case we don't want to save the
+  // upstream timings to the downstream info.
   if (upstream_request_) {
     callbacks_->streamInfo().setUpstreamTiming(upstream_request_->upstream_timing_);
   }
@@ -932,8 +935,8 @@ void Filter::doRetry() {
 Filter::UpstreamRequest::UpstreamRequest(Filter& parent, Http::ConnectionPool::Instance& pool)
     : parent_(parent), conn_pool_(pool), grpc_rq_success_deferred_(false),
       stream_info_(pool.protocol(), parent_.callbacks_->dispatcher().timeSource()),
-      upstream_timing_(), calling_encode_headers_(false), upstream_canary_(false),
-      encode_complete_(false), encode_trailers_(false) {
+      calling_encode_headers_(false), upstream_canary_(false), encode_complete_(false),
+      encode_trailers_(false) {
 
   if (parent_.config_.start_child_span_) {
     span_ = parent_.callbacks_->activeSpan().spawnChild(

@@ -15,7 +15,7 @@ namespace StreamInfo {
 struct StreamInfoImpl : public StreamInfo {
   explicit StreamInfoImpl(TimeSource& time_source)
       : time_source_(time_source), start_time_(time_source.systemTime()),
-        start_time_monotonic_(time_source.monotonicTime()), upstream_timing_() {}
+        start_time_monotonic_(time_source.monotonicTime()) {}
 
   StreamInfoImpl(Http::Protocol protocol, TimeSource& time_source) : StreamInfoImpl(time_source) {
     protocol_ = protocol;
