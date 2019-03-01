@@ -90,6 +90,7 @@ void OwnedImpl::prepend(absl::string_view data) {
 }
 
 void OwnedImpl::prepend(Instance& data) {
+  ASSERT(&data != this);
   // See the comments in move() for why we do the static_cast.
   if (old_impl_) {
     ASSERT(dynamic_cast<LibEventInstance*>(&data) != nullptr);
