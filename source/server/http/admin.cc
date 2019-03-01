@@ -535,6 +535,7 @@ Http::Code AdminImpl::handlerHeapProfiler(absl::string_view url, Http::HeaderMap
       response.add("Fail to start heap profiler: already started");
       res = Http::Code::BadRequest;
     } else if (!Profiler::Heap::startProfiler(profile_path_)) {
+      NOT_IMPLEMENTED_GCOVR_EXCL_LINE
       response.add("Fail to start the heap profiler");
       res = Http::Code::InternalServerError;
     } else {
