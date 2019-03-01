@@ -52,14 +52,14 @@ public:
   }
   void move(Buffer::Instance&) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   void move(Buffer::Instance&, uint64_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-  Network::IoHandleCallUintResult read(Network::IoHandle&, uint64_t) override {
+  Api::IoCallUintResult read(Network::IoHandle&, uint64_t) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
   uint64_t reserve(uint64_t, Buffer::RawSlice*, uint64_t) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
   ssize_t search(const void*, uint64_t, size_t) const override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-  Network::IoHandleCallUintResult write(Network::IoHandle&) override {
+  Api::IoCallUintResult write(Network::IoHandle&) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
 
