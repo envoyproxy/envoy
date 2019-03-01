@@ -170,8 +170,11 @@ TEST_P(ExtAuthzGrpcClientTest, UnknownError) {
   expectCallSend(request);
   client_->check(request_callbacks_, request, Tracing::NullSpan::instance());
 
-  EXPECT_CALL(request_callbacks_,
-              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzErrorResponse(CheckStatus::Error))));
+  auto authz_response = Response{};
+  authz_response.status = CheckStatus::Error;
+
+  EXPECT_CALL(request_callbacks_, onComplete_(WhenDynamicCastTo<ResponsePtr&>(
+                                      AuthzResponseNoAttributes(authz_response))));
   client_->onFailure(Grpc::Status::Unknown, "", span_);
 }
 
@@ -195,8 +198,11 @@ TEST_P(ExtAuthzGrpcClientTest, AuthorizationRequestTimeout) {
   expectCallSend(request);
   client_->check(request_callbacks_, request, Tracing::NullSpan::instance());
 
-  EXPECT_CALL(request_callbacks_,
-              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzErrorResponse(CheckStatus::Error))));
+  auto authz_response = Response{};
+  authz_response.status = CheckStatus::Error;
+
+  EXPECT_CALL(request_callbacks_, onComplete_(WhenDynamicCastTo<ResponsePtr&>(
+                                      AuthzResponseNoAttributes(authz_response))));
   client_->onFailure(Grpc::Status::DeadlineExceeded, "", span_);
 }
 
