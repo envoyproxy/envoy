@@ -23,7 +23,7 @@ static const std::string UnspecifiedValueString = "-";
 
 namespace {
 
-// Helper that handles the case when the ConectionInfo is missiring or if the desired value is
+// Helper that handles the case when the ConnectionInfo is missing or if the desired value is
 // empty.
 StreamInfoFormatter::FieldExtractor sslConnectionStringInfoExtractor(
     std::function<std::string(const Ssl::ConnectionInfo& connection_info)> string_extractor) {
