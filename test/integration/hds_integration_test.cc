@@ -16,6 +16,7 @@
 #include "test/config/utility.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/simulated_time_system.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -23,11 +24,20 @@
 namespace Envoy {
 namespace {
 
+class TestUsingSimulatedTime {
+ public:
+  Event::SimulatedTimeSystem& simTime() { return sim_time_; }
+
+ private:
+  Event::SimulatedTimeSystem sim_time_;
+};
+
 class HdsIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+                           public TestUsingSimulatedTime,
                            public HttpIntegrationTest {
 public:
   HdsIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()) {}
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
 
   void createUpstreams() override {
     fake_upstreams_.emplace_back(
