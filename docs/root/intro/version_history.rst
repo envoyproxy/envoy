@@ -50,7 +50,7 @@ Version history
 * upstream: added :ref:`degraded health value<arch_overview_load_balancing_degraded>` which allows
   routing to certain hosts only when there are insufficient healthy hosts available.
 * upstream: added support for host weighting and :ref:`locality weighting <arch_overview_load_balancing_locality_weighted_lb>` in the :ref:`ring hash load balancer <arch_overview_load_balancing_types_ring_hash>`, and added a :ref:`maximum_ring_size<envoy_api_field_Cluster.RingHashLbConfig.maximum_ring_size>` config parameter to strictly bound the ring size.
-* upstream: added configuration option to select any host when the fallback policy fails
+* upstream: added configuration option to select any host when the fallback policy fails.
 
 1.9.0 (Dec 20, 2018)
 ====================
