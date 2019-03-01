@@ -96,7 +96,8 @@ private:
   struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks {
     ActiveStreamFilterBase(ActiveStream& parent, bool dual_filter)
         : parent_(parent), headers_continued_(false), continue_headers_continued_(false),
-          stopped_(false), end_stream_(false), dual_filter_(dual_filter) {}
+          stopped_(false), iteration_state_(IterationState::Continue),
+          iterate_from_current_filter_(false), end_stream_(false), dual_filter_(dual_filter) {}
 
     bool commonHandleAfter100ContinueHeadersCallback(FilterHeadersStatus status);
     bool commonHandleAfterHeadersCallback(FilterHeadersStatus status, bool& headers_only);
@@ -129,21 +130,28 @@ private:
     Tracing::Span& activeSpan() override;
     Tracing::Config& tracingConfig() override;
 
+    // Functions to set or get iteration state.
+    bool canIterate() { return iteration_state_ == IterationState::Continue; }
+    bool shouldNotIterate() { return iteration_state_ != IterationState::Continue; }
+    void allowIteration() { iteration_state_ = IterationState::Continue; }
+
     ActiveStream& parent_;
     bool headers_continued_ : 1;
     bool continue_headers_continued_ : 1;
     bool stopped_ : 1;
-    // Return status of decodeHeaders().
-    enum class StopAllState {
-      None,             // Iteration has not stopped for all frame types.
-      StopAllBuffer,    // Iteration has stopped for all, and data should be buffered.
-      StopAllWatermark, // Iteration has stopped for all, and data should be buffered until high
-                        // watermark is reached.
+    // The state of iteration.
+    enum class IterationState {
+      Continue,            // Iteration has not stopped for any frame type.
+      StopSingleIteration, // Iteration has stopped for headers, 100-continue, or data.
+      StopAllBuffer,       // Iteration has stopped for all frame types, and following data should
+                           // be buffered.
+      StopAllWatermark,    // Iteration has stopped for all frame types, and following data should
+                           // be buffered until high watermark is reached.
     };
+    IterationState iteration_state_;
     // If true, ActiveStream::decodeData/Trailers should start iterating with the current filter
     // instead of the next one.
-    bool iterate_from_current_filter_{false};
-    StopAllState stop_all_state_{StopAllState::None};
+    bool iterate_from_current_filter_;
     // If true, end_stream is called for this filter.
     bool end_stream_ : 1;
     const bool dual_filter_ : 1;

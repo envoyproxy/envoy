@@ -818,9 +818,11 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilte
 
   if (continue_data_entry != decoder_filters_.end()) {
     // We use the continueDecoding() code since it will correctly handle not calling
-    // decodeHeaders() again. Fake setting stopped_ since the continueDecoding() code expects it.
+    // decodeHeaders() again. Fake setting StopSingleIteration since the continueDecoding() code
+    // expects it.
     ASSERT(buffered_request_data_);
-    (*continue_data_entry)->stopped_ = true;
+    (*continue_data_entry)->iteration_state_ =
+        ActiveStreamFilterBase::IterationState::StopSingleIteration;
     (*continue_data_entry)->continueDecoding();
   }
 
@@ -866,7 +868,8 @@ void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* 
   }
 
   for (; entry != decoder_filters_.end(); entry++) {
-    if ((*entry)->stop_all_state_ != ActiveStreamFilterBase::StopAllState::None) {
+    if ((*entry)->iteration_state_ == ActiveStreamFilterBase::IterationState::StopAllBuffer ||
+        (*entry)->iteration_state_ == ActiveStreamFilterBase::IterationState::StopAllWatermark) {
       (*entry)->commonHandleDataAfterStopAll(data, state_.decoder_filters_streaming_);
       return;
     }
@@ -1018,7 +1021,8 @@ void ConnectionManagerImpl::ActiveStream::decodeTrailers(ActiveStreamDecoderFilt
   }
 
   for (; entry != decoder_filters_.end(); entry++) {
-    if ((*entry)->stop_all_state_ != ActiveStreamFilterBase::StopAllState::None) {
+    if ((*entry)->iteration_state_ == ActiveStreamFilterBase::IterationState::StopAllBuffer ||
+        (*entry)->iteration_state_ == ActiveStreamFilterBase::IterationState::StopAllWatermark) {
       return;
     }
     ASSERT(!(state_.filter_call_state_ & FilterCallState::DecodeTrailers));
@@ -1284,9 +1288,11 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
       encoding_headers_only_ || (end_stream && continue_data_entry == encoder_filters_.end()));
   if (continue_data_entry != encoder_filters_.end()) {
     // We use the continueEncoding() code since it will correctly handle not calling
-    // encodeHeaders() again. Fake setting stopped_ since the continueEncoding() code expects it.
+    // encodeHeaders() again. Fake setting StopSingleIteration since the continueEncoding() code
+    // expects it.
     ASSERT(buffered_response_data_);
-    (*continue_data_entry)->stopped_ = true;
+    (*continue_data_entry)->iteration_state_ =
+        ActiveStreamFilterBase::IterationState::StopSingleIteration;
     (*continue_data_entry)->continueEncoding();
   } else {
     // End encoding if this is a header only response, either due to a filter converting it to one
@@ -1551,13 +1557,8 @@ void ConnectionManagerImpl::ActiveStreamFilterBase::commonContinue() {
 
   ENVOY_STREAM_LOG(trace, "continuing filter chain: filter={}", parent_,
                    static_cast<const void*>(this));
-  ASSERT(stopped_);
-  stopped_ = false;
-
-  if (stop_all_state_ != ActiveStreamFilterBase::StopAllState::None) {
-    // Resets StopAllState.
-    stop_all_state_ = ActiveStreamFilterBase::StopAllState::None;
-  }
+  ASSERT(shouldNotIterate());
+  allowIteration();
 
   // Only resume with do100ContinueHeaders() if we've actually seen a 100-Continue.
   if (parent_.has_continue_headers_ && !continue_headers_continued_) {
@@ -1595,10 +1596,10 @@ bool ConnectionManagerImpl::ActiveStreamFilterBase::commonHandleAfter100Continue
     FilterHeadersStatus status) {
   ASSERT(parent_.has_continue_headers_);
   ASSERT(!continue_headers_continued_);
-  ASSERT(!stopped_);
+  ASSERT(canIterate());
 
   if (status == FilterHeadersStatus::StopIteration) {
-    stopped_ = true;
+    iteration_state_ = IterationState::StopSingleIteration;
     return false;
   } else {
     ASSERT(status == FilterHeadersStatus::Continue);
@@ -1610,19 +1611,17 @@ bool ConnectionManagerImpl::ActiveStreamFilterBase::commonHandleAfter100Continue
 bool ConnectionManagerImpl::ActiveStreamFilterBase::commonHandleAfterHeadersCallback(
     FilterHeadersStatus status, bool& headers_only) {
   ASSERT(!headers_continued_);
-  ASSERT(!stopped_);
+  ASSERT(canIterate());
 
   if (status == FilterHeadersStatus::StopIteration) {
-    stopped_ = true;
+    iteration_state_ = IterationState::StopSingleIteration;
     return false;
   } else if (status == FilterHeadersStatus::StopAllIterationAndBuffer) {
-    stopped_ = true;
-    stop_all_state_ = StopAllState::StopAllBuffer;
+    iteration_state_ = IterationState::StopAllBuffer;
     iterate_from_current_filter_ = true;
     return false;
   } else if (status == FilterHeadersStatus::StopAllIterationAndWatermark) {
-    stopped_ = true;
-    stop_all_state_ = StopAllState::StopAllWatermark;
+    iteration_state_ = IterationState::StopAllWatermark;
     iterate_from_current_filter_ = true;
     return false;
   } else if (status == FilterHeadersStatus::ContinueAndEndStream) {
@@ -1659,7 +1658,7 @@ bool ConnectionManagerImpl::ActiveStreamFilterBase::commonHandleAfterDataCallbac
     FilterDataStatus status, Buffer::Instance& provided_data, bool& buffer_was_streaming) {
 
   if (status == FilterDataStatus::Continue) {
-    if (stopped_) {
+    if (iteration_state_ == IterationState::StopSingleIteration) {
       commonHandleBufferData(provided_data);
       commonContinue();
       return false;
@@ -1667,7 +1666,7 @@ bool ConnectionManagerImpl::ActiveStreamFilterBase::commonHandleAfterDataCallbac
       ASSERT(headers_continued_);
     }
   } else {
-    stopped_ = true;
+    iteration_state_ = IterationState::StopSingleIteration;
     if (status == FilterDataStatus::StopIterationAndBuffer ||
         status == FilterDataStatus::StopIterationAndWatermark) {
       buffer_was_streaming = status == FilterDataStatus::StopIterationAndWatermark;
@@ -1684,7 +1683,7 @@ bool ConnectionManagerImpl::ActiveStreamFilterBase::commonHandleAfterTrailersCal
     FilterTrailersStatus status) {
 
   if (status == FilterTrailersStatus::Continue) {
-    if (stopped_) {
+    if (iteration_state_ == IterationState::StopSingleIteration) {
       commonContinue();
       return false;
     } else {
@@ -1699,8 +1698,8 @@ bool ConnectionManagerImpl::ActiveStreamFilterBase::commonHandleAfterTrailersCal
 
 void ConnectionManagerImpl::ActiveStreamFilterBase::commonHandleDataAfterStopAll(
     Buffer::Instance& provided_data, bool& buffer_was_streaming) {
-  ASSERT(stopped_);
-  buffer_was_streaming = stop_all_state_ == StopAllState::StopAllWatermark;
+  ASSERT(shouldNotIterate());
+  buffer_was_streaming = iteration_state_ == IterationState::StopAllWatermark;
   commonHandleBufferData(provided_data);
 }
 
@@ -1909,7 +1908,7 @@ void ConnectionManagerImpl::ActiveStreamEncoderFilter::responseDataTooLarge() {
     if (!headers_continued_) {
       // Make sure we won't end up with nested watermark calls from the body buffer.
       parent_.state_.encoder_filters_streaming_ = true;
-      stopped_ = false;
+      allowIteration();
 
       Http::Utility::sendLocalReply(
           Grpc::Common::hasGrpcContentType(*parent_.request_headers_),
