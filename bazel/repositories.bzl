@@ -1,5 +1,6 @@
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 load(":genrule_repository.bzl", "genrule_repository")
+load("//api/bazel:envoy_http_archive.bzl", "envoy_http_archive")
 load(":repository_locations.bzl", "REPOSITORY_LOCATIONS")
 load(":target_recipes.bzl", "TARGET_RECIPES")
 load(
@@ -20,43 +21,22 @@ GO_VERSION = "1.10.4"
 BUILD_ALL_CONTENT = """filegroup(name = "all", srcs = glob(["**"]), visibility = ["//visibility:public"])"""
 
 def _repository_impl(name, **kwargs):
-    # `existing_rule_keys` contains the names of repositories that have already
-    # been defined in the Bazel workspace. By skipping repos with existing keys,
-    # users can override dependency versions by using standard Bazel repository
-    # rules in their WORKSPACE files.
-    existing_rule_keys = native.existing_rules().keys()
-    if name in existing_rule_keys:
-        # This repository has already been defined, probably because the user
-        # wants to override the version. Do nothing.
-        return
-
-    loc_key = kwargs.pop("repository_key", name)
-    location = REPOSITORY_LOCATIONS[loc_key]
-
-    # Git tags are mutable. We want to depend on commit IDs instead. Give the
-    # user a useful error if they accidentally specify a tag.
-    if "tag" in location:
-        fail(
-            "Refusing to depend on Git tag %r for external dependency %r: use 'commit' instead." %
-            (location["tag"], name),
-        )
-
-    # HTTP tarball at a given URL. Add a BUILD file if requested.
-    http_archive(
-        name = name,
-        urls = location["urls"],
-        sha256 = location["sha256"],
-        strip_prefix = location.get("strip_prefix", ""),
+    envoy_http_archive(
+        name,
+        locations = REPOSITORY_LOCATIONS,
         **kwargs
     )
 
 def _build_recipe_repository_impl(ctxt):
+    # on Windows, all deps use rules_foreign_cc
+    if ctxt.os.name.upper().startswith("WINDOWS"):
+        return
+
     # modify the recipes list based on the build context
     recipes = _apply_dep_blacklist(ctxt, ctxt.attr.recipes)
 
     # Setup the build directory with links to the relevant files.
     ctxt.symlink(Label("//bazel:repositories.sh"), "repositories.sh")
-    ctxt.symlink(Label("//bazel:repositories.bat"), "repositories.bat")
     ctxt.symlink(
         Label("//ci/build_container:build_and_install_deps.sh"),
         "build_and_install_deps.sh",
@@ -71,25 +51,9 @@ def _build_recipe_repository_impl(ctxt):
     ctxt.symlink(Label("//ci/prebuilt:BUILD"), "BUILD")
 
     # Run the build script.
-    command = []
-    env = {}
-    if ctxt.os.name.upper().startswith("WINDOWS"):
-        vc_path = find_vc_path(ctxt)
-        current_path = get_env_var(ctxt, "PATH", None, False)
-        env = setup_vc_env_vars(ctxt, vc_path)
-        env["PATH"] += (";%s" % current_path)
-        env["CC"] = "cl"
-        env["CXX"] = "cl"
-        env["CXXFLAGS"] = "-DNDEBUG"
-        env["CFLAGS"] = "-DNDEBUG"
-        command = ["./repositories.bat"] + recipes
-    else:
-        command = ["./repositories.sh"] + recipes
-
     print("Fetching external dependencies...")
     result = ctxt.execute(
-        command,
-        environment = env,
+        ["./repositories.sh"] + recipes,
         quiet = False,
     )
     print(result.stdout)
@@ -478,7 +442,6 @@ def _com_github_nghttp2_nghttp2():
         name = "com_github_nghttp2_nghttp2",
         build_file_content = BUILD_ALL_CONTENT,
         patch_args = ["-p1"],
-        patch_cmds = ["find . -name '*.sh' -exec sed -i.orig '1s|#!/usr/bin/env sh\$|/bin/sh\$|' {} +"],
         patches = ["@envoy//bazel/foreign_cc:nghttp2.patch"],
         **location
     )
@@ -584,6 +547,10 @@ def _com_google_absl():
     native.bind(
         name = "abseil_node_hash_set",
         actual = "@com_google_absl//absl/container:node_hash_set",
+    )
+    native.bind(
+        name = "abseil_str_format",
+        actual = "@com_google_absl//absl/strings:str_format",
     )
     native.bind(
         name = "abseil_strings",

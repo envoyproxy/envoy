@@ -5,8 +5,9 @@
 #include "common/config/filter_json.h"
 #include "common/json/json_loader.h"
 
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
+
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Config {

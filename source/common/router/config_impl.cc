@@ -57,6 +57,14 @@ std::string SslRedirector::newPath(const Http::HeaderMap& headers) const {
   return Http::Utility::createSslRedirectPath(headers);
 }
 
+HedgePolicyImpl::HedgePolicyImpl(const envoy::api::v2::route::HedgePolicy& hedge_policy)
+    : initial_requests_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(hedge_policy, initial_requests, 1)),
+      additional_request_chance_(hedge_policy.additional_request_chance()),
+      hedge_on_per_try_timeout_(hedge_policy.hedge_on_per_try_timeout()) {}
+
+HedgePolicyImpl::HedgePolicyImpl()
+    : initial_requests_(1), additional_request_chance_({}), hedge_on_per_try_timeout_(false) {}
+
 RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::route::RetryPolicy& retry_policy) {
   per_try_timeout_ =
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(retry_policy, per_try_timeout, 0));
@@ -318,6 +326,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       https_redirect_(route.redirect().https_redirect()),
       prefix_rewrite_redirect_(route.redirect().prefix_rewrite()),
       strip_query_(route.redirect().strip_query()),
+      hedge_policy_(buildHedgePolicy(vhost.hedgePolicy(), route.route())),
       retry_policy_(buildRetryPolicy(vhost.retryPolicy(), route.route())),
       rate_limit_policy_(route.route().rate_limits()), shadow_policy_(route.route()),
       priority_(ConfigUtility::parsePriority(route.route().priority())),
@@ -338,7 +347,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       direct_response_body_(ConfigUtility::parseDirectResponseBody(route, factory_context.api())),
       per_filter_configs_(route.typed_per_filter_config(), route.per_filter_config(),
                           factory_context),
-      time_system_(factory_context.dispatcher().timeSystem()),
+      time_source_(factory_context.dispatcher().timeSource()),
       internal_redirect_action_(convertInternalRedirectAction(route.route())) {
   if (route.route().has_metadata_match()) {
     const auto filter_it = route.route().metadata_match().filter_metadata().find(
@@ -493,7 +502,7 @@ void RouteEntryImplBase::finalizePathHeader(Http::HeaderMap& headers,
     return;
   }
 
-  std::string path = headers.Path()->value().c_str();
+  std::string path = std::string(headers.Path()->value().c_str(), headers.Path()->value().size());
   if (insert_envoy_original_path) {
     headers.insertEnvoyOriginalPath().value(*headers.Path());
   }
@@ -600,6 +609,23 @@ RouteEntryImplBase::parseOpaqueConfig(const envoy::api::v2::route::Route& route)
     }
   }
   return ret;
+}
+
+HedgePolicyImpl RouteEntryImplBase::buildHedgePolicy(
+    const absl::optional<envoy::api::v2::route::HedgePolicy>& vhost_hedge_policy,
+    const envoy::api::v2::route::RouteAction& route_config) const {
+  // Route specific policy wins, if available.
+  if (route_config.has_hedge_policy()) {
+    return HedgePolicyImpl(route_config.hedge_policy());
+  }
+
+  // If not, we fall back to the virtual host policy if there is one.
+  if (vhost_hedge_policy) {
+    return HedgePolicyImpl(vhost_hedge_policy.value());
+  }
+
+  // Otherwise, an empty policy will do.
+  return HedgePolicyImpl();
 }
 
 RetryPolicyImpl RouteEntryImplBase::buildRetryPolicy(
@@ -854,9 +880,12 @@ VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::route::VirtualHost& virtu
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
-  // Retry Policy must be set before routes, since they may use it.
+  // Retry and Hedge policies must be set before routes, since they may use them.
   if (virtual_host.has_retry_policy()) {
     retry_policy_ = virtual_host.retry_policy();
+  }
+  if (virtual_host.has_hedge_policy()) {
+    hedge_policy_ = virtual_host.hedge_policy();
   }
 
   for (const auto& route : virtual_host.routes()) {

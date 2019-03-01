@@ -13,9 +13,9 @@ Overview
 --------
 
 The HTTP Lua filter allows `Lua <https://www.lua.org/>`_ scripts to be run during both the request
-and response flows. `LuaJIT <http://luajit.org/>`_ is used as the runtime. Because of this, the
+and response flows. `LuaJIT <https://luajit.org/>`_ is used as the runtime. Because of this, the
 supported Lua version is mostly 5.1 with some 5.2 features. See the `LuaJIT documentation
-<http://luajit.org/extensions.html>`_ for more details.
+<https://luajit.org/extensions.html>`_ for more details.
 
 The filter only supports loading Lua code in-line in the configuration. If local filesystem code
 is desired, a trivial in-line script can be used to load the rest of the code from the local
@@ -74,7 +74,7 @@ more details on the supported API.
 
   -- Called on the response path.
   function envoy_on_response(response_handle)
-    -- Wait for the entire response body and a response header with the the body size.
+    -- Wait for the entire response body and a response header with the body size.
     response_handle:headers():add("response_body_size", response_handle:body():length())
     -- Remove a response header named 'foo'
     response_handle:headers():remove("foo")

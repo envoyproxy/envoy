@@ -19,7 +19,7 @@
 
 namespace Envoy {
 /**
- * Utility class for formatting dates given a strftime style format string.
+ * Utility class for formatting dates given an absl::FormatTime style format string.
  */
 class DateFormatter {
 public:
@@ -68,8 +68,9 @@ private:
     const size_t width_;
 
     // The string before the current specifier's position and after the previous found specifier. A
-    // segment may include strftime accepted specifiers. E.g. given "%3f-this-i%s-a-segment-%4f",
-    // the current specifier is "%4f" and the segment is "-this-i%s-a-segment-".
+    // segment may include absl::FormatTime accepted specifiers. E.g. given
+    // "%3f-this-i%s-a-segment-%4f", the current specifier is "%4f" and the segment is
+    // "-this-i%s-a-segment-".
     const std::string segment_;
 
     // As an indication that this specifier is a %s (expect to be replaced by seconds since the
@@ -149,19 +150,19 @@ public:
    * Convert a string to an unsigned long, checking for error.
    * @return pointer to the remainder of 'str' if successful, nullptr otherwise.
    */
-  static const char* strtoul(const char* str, uint64_t& out, int base = 10);
+  static const char* strtoull(const char* str, uint64_t& out, int base = 10);
 
   /**
    * Convert a string to an unsigned long, checking for error.
    * @param return true if successful, false otherwise.
    */
-  static bool atoul(const char* str, uint64_t& out, int base = 10);
+  static bool atoull(const char* str, uint64_t& out, int base = 10);
 
   /**
    * Convert a string to a long, checking for error.
    * @param return true if successful, false otherwise.
    */
-  static bool atol(const char* str, int64_t& out, int base = 10);
+  static bool atoll(const char* str, int64_t& out, int base = 10);
 
   /**
    * Convert an unsigned integer to a base 10 string as fast as possible.

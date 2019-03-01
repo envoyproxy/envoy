@@ -7,6 +7,8 @@
 
 #include "extensions/filters/http/well_known_names.h"
 
+#include "absl/container/flat_hash_set.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -16,7 +18,7 @@ namespace {
 // Asserts that the HTTP method is for a header-only request. For details
 // https://tools.ietf.org/html/rfc7231#section-4.3.
 bool isHeaderOnlyMethod(absl::string_view method) {
-  const static std::vector<std::string>* keys = new std::vector<std::string>(
+  const static absl::flat_hash_set<std::string>* keys = new absl::flat_hash_set<std::string>(
       {Http::Headers::get().MethodValues.Get, Http::Headers::get().MethodValues.Head,
        Http::Headers::get().MethodValues.Connect, Http::Headers::get().MethodValues.Options,
        Http::Headers::get().MethodValues.Trace});

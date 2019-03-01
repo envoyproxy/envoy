@@ -5,9 +5,9 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/tracing/mocks.h"
-#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 #include "opentracing/mocktracer/in_memory_recorder.h"
 #include "opentracing/mocktracer/tracer.h"
 
@@ -44,7 +44,7 @@ private:
   std::shared_ptr<opentracing::mocktracer::MockTracer> tracer_;
 };
 
-class OpenTracingDriverTest : public TestBase {
+class OpenTracingDriverTest : public testing::Test {
 public:
   void
   setupValidDriver(OpenTracingDriver::PropagationMode propagation_mode =
@@ -79,6 +79,23 @@ TEST_F(OpenTracingDriverTest, FlushSpanWithTag) {
 
   EXPECT_EQ(1, driver_->recorder().spans().size());
   EXPECT_EQ(expected_tags, driver_->recorder().top().tags);
+}
+
+TEST_F(OpenTracingDriverTest, FlushSpanWithLog) {
+  setupValidDriver();
+
+  Tracing::SpanPtr first_span = driver_->startSpan(config_, request_headers_, operation_name_,
+                                                   start_time_, {Tracing::Reason::Sampling, true});
+  const auto timestamp =
+      SystemTime{std::chrono::duration_cast<SystemTime::duration>(std::chrono::hours{123})};
+  first_span->log(timestamp, "abc");
+  first_span->finishSpan();
+
+  const std::vector<opentracing::LogRecord> expected_logs = {
+      {timestamp, {{"event", std::string{"abc"}}}}};
+
+  EXPECT_EQ(1, driver_->recorder().spans().size());
+  EXPECT_EQ(expected_logs, driver_->recorder().top().logs);
 }
 
 TEST_F(OpenTracingDriverTest, TagSamplingFalseByDecision) {

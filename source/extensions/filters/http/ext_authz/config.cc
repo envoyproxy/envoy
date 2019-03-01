@@ -42,13 +42,14 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
     // gRPC client.
     const uint32_t timeout_ms =
         PROTOBUF_GET_MS_OR_DEFAULT(proto_config.grpc_service(), timeout, DefaultTimeout);
-    callback = [grpc_service = proto_config.grpc_service(), &context, filter_config,
-                timeout_ms](Http::FilterChainFactoryCallbacks& callbacks) {
+    callback = [grpc_service = proto_config.grpc_service(), &context, filter_config, timeout_ms,
+                use_alpha =
+                    proto_config.use_alpha()](Http::FilterChainFactoryCallbacks& callbacks) {
       const auto async_client_factory =
           context.clusterManager().grpcAsyncClientManager().factoryForGrpcService(
               grpc_service, context.scope(), true);
       auto client = std::make_unique<Filters::Common::ExtAuthz::GrpcClientImpl>(
-          async_client_factory->create(), std::chrono::milliseconds(timeout_ms));
+          async_client_factory->create(), std::chrono::milliseconds(timeout_ms), use_alpha);
       callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr{
           std::make_shared<Filter>(filter_config, std::move(client))});
     };

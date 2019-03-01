@@ -37,7 +37,7 @@ Only organization members can assign or unassign other users, who must be organi
 [Demo PR](https://github.com/envoyproxy/envoybot/pull/6)
 
 ### [Review](https://github.com/repokitteh/modules/blob/master/review.star)
-Requests a a user to recview a pull request.
+Requests a user to review a pull request.
 
 Examples:
 ```

@@ -118,7 +118,7 @@ void CheckRequestUtils::setHttpRequest(
   // Set request body.
   const Buffer::Instance* buffer = sdfc->decodingBuffer();
   if (with_request_body && buffer != nullptr) {
-    httpreq.mutable_body()->set_inline_bytes(buffer->toString());
+    httpreq.set_body(buffer->toString());
   }
 }
 

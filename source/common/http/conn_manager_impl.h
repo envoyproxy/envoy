@@ -51,7 +51,7 @@ public:
                         Runtime::RandomGenerator& random_generator, Http::Context& http_context,
                         Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info,
                         Upstream::ClusterManager& cluster_manager,
-                        Server::OverloadManager* overload_manager, Event::TimeSystem& time_system);
+                        Server::OverloadManager* overload_manager, TimeSource& time_system);
   ~ConnectionManagerImpl();
 
   static ConnectionManagerStats generateStats(const std::string& prefix, Stats::Scope& scope);
@@ -85,7 +85,7 @@ public:
     codec_->onUnderlyingConnectionBelowWriteBufferLowWatermark();
   }
 
-  Event::TimeSystem& timeSystem() { return time_system_; }
+  TimeSource& timeSource() { return time_source_; }
 
 private:
   struct ActiveStream;
@@ -176,6 +176,12 @@ private:
     const Buffer::Instance* decodingBuffer() override {
       return parent_.buffered_request_data_.get();
     }
+
+    void modifyDecodingBuffer(std::function<void(Buffer::Instance&)> callback) override {
+      ASSERT(parent_.state_.latest_data_decoding_filter_ == this);
+      callback(*parent_.buffered_request_data_.get());
+    }
+
     void sendLocalReply(Code code, absl::string_view body,
                         std::function<void(HeaderMap& headers)> modify_headers,
                         const absl::optional<Grpc::Status::GrpcStatus> grpc_status) override {
@@ -202,7 +208,11 @@ private:
     // called here may change the content type, so we must check it before the call.
     FilterHeadersStatus decodeHeaders(HeaderMap& headers, bool end_stream) {
       is_grpc_request_ = Grpc::Common::hasGrpcContentType(headers);
-      return handle_->decodeHeaders(headers, end_stream);
+      FilterHeadersStatus status = handle_->decodeHeaders(headers, end_stream);
+      if (end_stream) {
+        handle_->decodeComplete();
+      }
+      return status;
     }
 
     void requestDataTooLarge();
@@ -251,6 +261,10 @@ private:
     void continueEncoding() override;
     const Buffer::Instance* encodingBuffer() override {
       return parent_.buffered_response_data_.get();
+    }
+    void modifyEncodingBuffer(std::function<void(Buffer::Instance&)> callback) override {
+      ASSERT(parent_.state_.latest_data_encoding_filter_ == this);
+      callback(*parent_.buffered_response_data_.get());
     }
 
     void responseDataTooLarge();
@@ -327,8 +341,9 @@ private:
     void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) override;
 
     // Tracing::TracingConfig
-    virtual Tracing::OperationName operationName() const override;
-    virtual const std::vector<Http::LowerCaseString>& requestHeadersForTags() const override;
+    Tracing::OperationName operationName() const override;
+    const std::vector<Http::LowerCaseString>& requestHeadersForTags() const override;
+    bool verbose() const override;
 
     void traceRequest();
 
@@ -384,6 +399,10 @@ private:
       // True if this stream is internally created. Currently only used for
       // internal redirects or other streams created via recreateStream().
       bool is_internally_created_ : 1;
+
+      // Used to track which filter is the latest filter that has received data.
+      ActiveStreamEncoderFilter* latest_data_encoding_filter_{};
+      ActiveStreamDecoderFilter* latest_data_decoding_filter_{};
     };
 
     // Possibly increases buffer_limit_ to the value of limit.
@@ -489,7 +508,7 @@ private:
   // lookup in the hot path of processing each request.
   const Server::OverloadActionState& overload_stop_accepting_requests_ref_;
   const Server::OverloadActionState& overload_disable_keepalive_ref_;
-  Event::TimeSystem& time_system_;
+  TimeSource& time_source_;
 };
 
 } // namespace Http

@@ -4,7 +4,8 @@
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/upstream/mocks.h"
-#include "test/test_common/test_base.h"
+
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Upstream {

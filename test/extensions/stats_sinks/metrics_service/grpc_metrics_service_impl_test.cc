@@ -19,7 +19,7 @@ namespace Extensions {
 namespace StatSinks {
 namespace MetricsService {
 
-class GrpcMetricsStreamerImplTest : public TestBase {
+class GrpcMetricsStreamerImplTest : public testing::Test {
 public:
   using MockMetricsStream = Grpc::MockAsyncStream;
   using MetricsServiceCallbacks =
@@ -95,7 +95,7 @@ public:
   }
 };
 
-class MetricsServiceSinkTest : public TestBase {};
+class MetricsServiceSinkTest : public testing::Test {};
 
 TEST(MetricsServiceSinkTest, CheckSendCall) {
   NiceMock<Stats::MockSource> source;

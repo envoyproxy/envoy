@@ -169,10 +169,14 @@ void setHealthFlag(Upstream::Host::HealthFlag flag, const Upstream::Host& host,
         host.healthFlagGet(Upstream::Host::HealthFlag::FAILED_OUTLIER_CHECK));
     break;
   case Upstream::Host::HealthFlag::FAILED_EDS_HEALTH:
-    health_status.set_eds_health_status(
-        host.healthFlagGet(Upstream::Host::HealthFlag::FAILED_EDS_HEALTH)
-            ? envoy::api::v2::core::HealthStatus::UNHEALTHY
-            : envoy::api::v2::core::HealthStatus::HEALTHY);
+  case Upstream::Host::HealthFlag::DEGRADED_EDS_HEALTH:
+    if (host.healthFlagGet(Upstream::Host::HealthFlag::FAILED_EDS_HEALTH)) {
+      health_status.set_eds_health_status(envoy::api::v2::core::HealthStatus::UNHEALTHY);
+    } else if (host.healthFlagGet(Upstream::Host::HealthFlag::DEGRADED_EDS_HEALTH)) {
+      health_status.set_eds_health_status(envoy::api::v2::core::HealthStatus::DEGRADED);
+    } else {
+      health_status.set_eds_health_status(envoy::api::v2::core::HealthStatus::HEALTHY);
+    }
     break;
   case Upstream::Host::HealthFlag::DEGRADED_ACTIVE_HC:
     health_status.set_failed_active_degraded_check(
@@ -1059,7 +1063,7 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
       stats_(Http::ConnectionManagerImpl::generateStats("http.admin.", server_.stats())),
       tracing_stats_(
           Http::ConnectionManagerImpl::generateTracingStats("http.admin.", no_op_store_)),
-      route_config_provider_(server.timeSystem()),
+      route_config_provider_(server.timeSource()),
       // TODO(jsedgwick) add /runtime_reset endpoint that removes all admin-set values
       handlers_{
           {"/", "Admin home page", MAKE_ADMIN_HANDLER(handlerAdminHome), false, false},
@@ -1099,14 +1103,15 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
           {"/runtime_modify", "modify runtime values", MAKE_ADMIN_HANDLER(handlerRuntimeModify),
            false, true},
       },
-      date_provider_(server.dispatcher().timeSystem()),
+      date_provider_(server.dispatcher().timeSource()),
       admin_filter_chain_(std::make_shared<AdminFilterChain>()) {}
 
 Http::ServerConnectionPtr AdminImpl::createCodec(Network::Connection& connection,
                                                  const Buffer::Instance& data,
                                                  Http::ServerConnectionCallbacks& callbacks) {
   return Http::ConnectionManagerUtility::autoCreateCodec(
-      connection, data, callbacks, server_.stats(), Http::Http1Settings(), Http::Http2Settings());
+      connection, data, callbacks, server_.stats(), Http::Http1Settings(), Http::Http2Settings(),
+      maxRequestHeadersKb());
 }
 
 bool AdminImpl::createNetworkFilterChain(Network::Connection& connection,
@@ -1115,7 +1120,7 @@ bool AdminImpl::createNetworkFilterChain(Network::Connection& connection,
   // the envoy is overloaded.
   connection.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(
       *this, server_.drainManager(), server_.random(), server_.httpContext(), server_.runtime(),
-      server_.localInfo(), server_.clusterManager(), nullptr, server_.timeSystem())});
+      server_.localInfo(), server_.clusterManager(), nullptr, server_.timeSource())});
   return true;
 }
 

@@ -40,7 +40,8 @@ namespace Router {
   COUNTER(no_cluster)                                                                              \
   COUNTER(rq_redirect)                                                                             \
   COUNTER(rq_direct_response)                                                                      \
-  COUNTER(rq_total)
+  COUNTER(rq_total)                                                                                \
+  COUNTER(rq_reset_after_downstream_response_started)                                              \
 // clang-format on
 
 /**
@@ -112,7 +113,7 @@ public:
                      context.runtime(), context.random(), std::move(shadow_writer),
                      PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, dynamic_stats, true),
                      config.start_child_span(), config.suppress_envoy_headers(),
-                     context.timeSource(), context.httpContext()) {
+                     context.api().timeSource(), context.httpContext()) {
     for (const auto& upstream_log : config.upstream_log()) {
       upstream_logs_.push_back(AccessLog::AccessLogFactory::fromProto(upstream_log, context));
     }

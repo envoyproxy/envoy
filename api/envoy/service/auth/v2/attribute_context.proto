@@ -1,6 +1,9 @@
 syntax = "proto3";
 
 package envoy.service.auth.v2;
+
+option java_outer_classname = "AttributeContextProto";
+option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.service.auth.v2";
 
 import "envoy/api/v2/core/base.proto";
@@ -105,7 +108,7 @@ message AttributeContext {
     string protocol = 10;
 
     // The HTTP request body.
-    envoy.api.v2.core.DataSource body = 11;
+    string body = 11;
   }
 
   // The source of a network activity, such as starting a TCP connection.

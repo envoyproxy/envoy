@@ -5,21 +5,23 @@
 
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
+#include "common/runtime/runtime_impl.h"
 #include "common/stats/isolated_store_impl.h"
 
+#include "test/mocks/server/mocks.h"
 #include "test/proto/deprecated.pb.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
+
+#include "gtest/gtest.h"
 
 namespace Envoy {
 
-class ProtobufUtilityTest : public TestBase {
+class ProtobufUtilityTest : public testing::Test {
 protected:
-  ProtobufUtilityTest() : api_(Api::createApiForTest(stats_store_)) {}
+  ProtobufUtilityTest() : api_(Api::createApiForTest()) {}
 
-  Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
 };
 
@@ -31,6 +33,83 @@ TEST_F(ProtobufUtilityTest, convertPercentNaN) {
                                                               healthy_panic_threshold, 100, 50),
                EnvoyException);
 }
+
+namespace ProtobufPercentHelper {
+
+TEST_F(ProtobufUtilityTest, evaluateFractionalPercent) {
+  { // 0/100 (default)
+    envoy::type::FractionalPercent percent;
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 0));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 50));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 100));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 1000));
+  }
+  { // 5/100
+    envoy::type::FractionalPercent percent;
+    percent.set_numerator(5);
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 0));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 4));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 5));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 50));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 100));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 104));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 105));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 204));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 1000));
+  }
+  { // 75/100
+    envoy::type::FractionalPercent percent;
+    percent.set_numerator(75);
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 0));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 4));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 5));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 74));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 80));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 100));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 104));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 105));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 200));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 274));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 280));
+  }
+  { // 5/10000
+    envoy::type::FractionalPercent percent;
+    percent.set_denominator(envoy::type::FractionalPercent::TEN_THOUSAND);
+    percent.set_numerator(5);
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 0));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 4));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 5));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 50));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 100));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 9000));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 10000));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 10004));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 10005));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 20004));
+  }
+  { // 5/MILLION
+    envoy::type::FractionalPercent percent;
+    percent.set_denominator(envoy::type::FractionalPercent::MILLION);
+    percent.set_numerator(5);
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 0));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 4));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 5));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 50));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 100));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 9000));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 10000));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 10004));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 10005));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 900005));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 900000));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 1000000));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 1000004));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 1000005));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 2000004));
+  }
+}
+
+} // namespace ProtobufPercentHelper
 
 TEST_F(ProtobufUtilityTest, RepeatedPtrUtilDebugString) {
   Protobuf::RepeatedPtrField<ProtobufWkt::UInt32Value> repeated;
@@ -316,6 +395,34 @@ TEST_F(ProtobufUtilityTest, YamlLoadFromStringFail) {
                           "Unable to parse JSON as proto.*Root element must be a message.*");
 }
 
+TEST_F(ProtobufUtilityTest, GetFlowYamlStringFromMessage) {
+  envoy::config::bootstrap::v2::Bootstrap bootstrap;
+  bootstrap.set_flags_path("foo");
+  EXPECT_EQ("{flags_path: foo}", MessageUtil::getYamlStringFromMessage(bootstrap, false, false));
+}
+
+TEST_F(ProtobufUtilityTest, GetBlockYamlStringFromMessage) {
+  envoy::config::bootstrap::v2::Bootstrap bootstrap;
+  bootstrap.set_flags_path("foo");
+  EXPECT_EQ("flags_path: foo", MessageUtil::getYamlStringFromMessage(bootstrap, true, false));
+}
+
+TEST_F(ProtobufUtilityTest, GetBlockYamlStringFromRecursiveMessage) {
+  envoy::config::bootstrap::v2::Bootstrap bootstrap;
+  bootstrap.set_flags_path("foo");
+  bootstrap.mutable_node();
+  bootstrap.mutable_static_resources()->add_listeners()->set_name("http");
+
+  const std::string expected_yaml = R"EOF(
+node:
+  {}
+static_resources:
+  listeners:
+    - name: http
+flags_path: foo)EOF";
+  EXPECT_EQ(expected_yaml, "\n" + MessageUtil::getYamlStringFromMessage(bootstrap, true, false));
+}
+
 TEST(DurationUtilTest, OutOfRange) {
   {
     ProtobufWkt::Duration duration;
@@ -339,73 +446,160 @@ TEST(DurationUtilTest, OutOfRange) {
   }
 }
 
-TEST(DeprecatedFields, NoErrorWhenDeprecatedFieldsUnused) {
+class DeprecatedFieldsTest : public testing::Test {
+protected:
+  DeprecatedFieldsTest()
+      : loader_(new Runtime::ScopedLoaderSingleton(
+            Runtime::LoaderPtr{new Runtime::LoaderImpl(rand_, store_, tls_)})) {}
+
+  NiceMock<ThreadLocal::MockInstance> tls_;
+  Stats::IsolatedStoreImpl store_;
+  Runtime::MockRandomGenerator rand_;
+  std::unique_ptr<Runtime::ScopedLoaderSingleton> loader_;
+};
+
+TEST_F(DeprecatedFieldsTest, NoCrashIfRuntimeMissing) {
+  loader_.reset();
+
   envoy::test::deprecation_test::Base base;
   base.set_not_deprecated("foo");
   // Fatal checks for a non-deprecated field should cause no problem.
-  MessageUtil::checkForDeprecation(base, true);
+  MessageUtil::checkForDeprecation(base);
 }
 
-TEST(DeprecatedFields, IndividualFieldDeprecated) {
+TEST_F(DeprecatedFieldsTest, NoErrorWhenDeprecatedFieldsUnused) {
+  envoy::test::deprecation_test::Base base;
+  base.set_not_deprecated("foo");
+  // Fatal checks for a non-deprecated field should cause no problem.
+  MessageUtil::checkForDeprecation(base);
+}
+
+TEST_F(DeprecatedFieldsTest, IndividualFieldDeprecated) {
   envoy::test::deprecation_test::Base base;
   base.set_is_deprecated("foo");
   // Non-fatal checks for a deprecated field should log rather than throw an exception.
   EXPECT_LOG_CONTAINS("warning",
-                      "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated'.",
-                      MessageUtil::checkForDeprecation(base, true));
-  // Fatal checks for a deprecated field should result in an exception.
-  EXPECT_THROW_WITH_REGEX(
-      MessageUtil::checkForDeprecation(base, false), ProtoValidationException,
-      "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated'.");
+                      "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated'",
+                      MessageUtil::checkForDeprecation(base));
 }
 
-TEST(DeprecatedFields, MessageDeprecated) {
+// Use of a deprecated and disallowed field should result in an exception.
+TEST_F(DeprecatedFieldsTest, IndividualFieldDisallowed) {
+  envoy::test::deprecation_test::Base base;
+  base.set_is_deprecated_fatal("foo");
+  EXPECT_THROW_WITH_REGEX(
+      MessageUtil::checkForDeprecation(base), ProtoValidationException,
+      "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated_fatal'");
+}
+
+TEST_F(DeprecatedFieldsTest, IndividualFieldDisallowedWithRuntimeOverride) {
+  envoy::test::deprecation_test::Base base;
+  base.set_is_deprecated_fatal("foo");
+
+  // Make sure this is set up right.
+  EXPECT_THROW_WITH_REGEX(
+      MessageUtil::checkForDeprecation(base), ProtoValidationException,
+      "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated_fatal'");
+  // The config will be rejected, so the feature will not be used.
+  EXPECT_EQ(0, store_.gauge("runtime.deprecated_feature_use").value());
+
+  // Now create a new snapshot with this feature allowed.
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.deprecated_features.deprecated.proto:is_deprecated_fatal", "TrUe "}});
+
+  // Now the same deprecation check should only trigger a warning.
+  EXPECT_LOG_CONTAINS(
+      "warning", "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated_fatal'",
+      MessageUtil::checkForDeprecation(base));
+  EXPECT_EQ(1, store_.gauge("runtime.deprecated_feature_use").value());
+}
+
+TEST_F(DeprecatedFieldsTest, DisallowViaRuntime) {
+  envoy::test::deprecation_test::Base base;
+  base.set_is_deprecated("foo");
+
+  EXPECT_LOG_CONTAINS("warning",
+                      "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated'",
+                      MessageUtil::checkForDeprecation(base));
+  EXPECT_EQ(1, store_.gauge("runtime.deprecated_feature_use").value());
+
+  // Now create a new snapshot with this feature disallowed.
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.deprecated_features.deprecated.proto:is_deprecated", " false"}});
+
+  EXPECT_THROW_WITH_REGEX(
+      MessageUtil::checkForDeprecation(base), ProtoValidationException,
+      "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated'");
+  EXPECT_EQ(1, store_.gauge("runtime.deprecated_feature_use").value());
+}
+
+// Note that given how Envoy config parsing works, the first time we hit a
+// 'fatal' error and throw, we won't log future warnings. That said, this tests
+// the case of the warning occurring before the fatal error.
+TEST_F(DeprecatedFieldsTest, MixOfFatalAndWarnings) {
+  envoy::test::deprecation_test::Base base;
+  base.set_is_deprecated("foo");
+  base.set_is_deprecated_fatal("foo");
+  EXPECT_LOG_CONTAINS(
+      "warning", "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated'", {
+        EXPECT_THROW_WITH_REGEX(
+            MessageUtil::checkForDeprecation(base), ProtoValidationException,
+            "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated_fatal'");
+      });
+}
+
+// Present (unused) deprecated messages should be detected as deprecated.
+TEST_F(DeprecatedFieldsTest, MessageDeprecated) {
   envoy::test::deprecation_test::Base base;
   base.mutable_deprecated_message();
-  // Fatal checks for a present (unused) deprecated message should result in an exception.
-  EXPECT_THROW_WITH_REGEX(
-      MessageUtil::checkForDeprecation(base, false), ProtoValidationException,
-      "Using deprecated option 'envoy.test.deprecation_test.Base.deprecated_message'.");
+  EXPECT_LOG_CONTAINS(
+      "warning", "Using deprecated option 'envoy.test.deprecation_test.Base.deprecated_message'",
+      MessageUtil::checkForDeprecation(base));
+  EXPECT_EQ(1, store_.gauge("runtime.deprecated_feature_use").value());
 }
 
-TEST(DeprecatedFields, InnerMessageDeprecated) {
+TEST_F(DeprecatedFieldsTest, InnerMessageDeprecated) {
   envoy::test::deprecation_test::Base base;
   base.mutable_not_deprecated_message()->set_inner_not_deprecated("foo");
-  // Non-fatal checks for a deprecated field shouldn't throw an exception.
-  MessageUtil::checkForDeprecation(base, true);
+  // Checks for a non-deprecated field shouldn't trigger warnings
+  EXPECT_LOG_NOT_CONTAINS("warning", "Using deprecated option",
+                          MessageUtil::checkForDeprecation(base));
 
   base.mutable_not_deprecated_message()->set_inner_deprecated("bar");
-  // Fatal checks for a deprecated sub-message should result in an exception.
-  EXPECT_THROW_WITH_REGEX(MessageUtil::checkForDeprecation(base, false), ProtoValidationException,
-                          "Using deprecated option "
-                          "'envoy.test.deprecation_test.Base.InnerMessage.inner_deprecated'.");
+  // Checks for a deprecated sub-message should result in a warning.
+  EXPECT_LOG_CONTAINS(
+      "warning",
+      "Using deprecated option 'envoy.test.deprecation_test.Base.InnerMessage.inner_deprecated'",
+      MessageUtil::checkForDeprecation(base));
 }
 
 // Check that repeated sub-messages get validated.
-TEST(DeprecatedFields, SubMessageDeprecated) {
+TEST_F(DeprecatedFieldsTest, SubMessageDeprecated) {
   envoy::test::deprecation_test::Base base;
   base.add_repeated_message();
   base.add_repeated_message()->set_inner_deprecated("foo");
   base.add_repeated_message();
 
   // Fatal checks for a repeated deprecated sub-message should result in an exception.
-  EXPECT_THROW_WITH_REGEX(MessageUtil::checkForDeprecation(base, false), ProtoValidationException,
-                          "Using deprecated option "
-                          "'envoy.test.deprecation_test.Base.InnerMessage.inner_deprecated'.");
+  EXPECT_LOG_CONTAINS("warning",
+                      "Using deprecated option "
+                      "'envoy.test.deprecation_test.Base.InnerMessage.inner_deprecated'",
+                      MessageUtil::checkForDeprecation(base));
 }
 
 // Check that deprecated repeated messages trigger
-TEST(DeprecatedFields, RepeatedMessageDeprecated) {
+TEST_F(DeprecatedFieldsTest, RepeatedMessageDeprecated) {
   envoy::test::deprecation_test::Base base;
   base.add_deprecated_repeated_message();
 
   // Fatal checks for a repeated deprecated sub-message should result in an exception.
-  EXPECT_THROW_WITH_REGEX(
-      MessageUtil::checkForDeprecation(base, false), ProtoValidationException,
-      "Using deprecated option 'envoy.test.deprecation_test.Base.deprecated_repeated_message'.");
+  EXPECT_LOG_CONTAINS("warning",
+                      "Using deprecated option "
+                      "'envoy.test.deprecation_test.Base.deprecated_repeated_message'",
+                      MessageUtil::checkForDeprecation(base));
 }
 
-class TimestampUtilTest : public TestBase, public ::testing::WithParamInterface<int64_t> {};
+class TimestampUtilTest : public testing::Test, public ::testing::WithParamInterface<int64_t> {};
 
 TEST_P(TimestampUtilTest, SystemClockToTimestampTest) {
   // Generate an input time_point<system_clock>,

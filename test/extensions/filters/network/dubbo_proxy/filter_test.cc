@@ -10,9 +10,9 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::NiceMock;
 
@@ -25,9 +25,9 @@ using ConfigProtocolType = envoy::config::filter::network::dubbo_proxy::v2alpha1
 using ConfigSerializationType =
     envoy::config::filter::network::dubbo_proxy::v2alpha1::SerializationType;
 
-class DubboFilterTest : public TestBase {
+class DubboFilterTest : public testing::Test {
 public:
-  TimeSource& timeSystem() { return factory_context_.dispatcher().timeSystem(); }
+  TimeSource& timeSource() { return factory_context_.dispatcher().timeSource(); }
 
   void initializeFilter() {
     for (const auto& counter : store_.counters()) {
@@ -35,7 +35,7 @@ public:
     }
 
     filter_ = std::make_unique<Filter>("test.", ConfigProtocolType::Dubbo,
-                                       ConfigSerializationType::Hessian2, store_, timeSystem());
+                                       ConfigSerializationType::Hessian2, store_, timeSource());
     filter_->initializeReadFilterCallbacks(read_filter_callbacks_);
     filter_->onNewConnection();
 

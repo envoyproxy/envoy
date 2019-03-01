@@ -162,12 +162,12 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
   callbacks_ = &callbacks;
 
   Http::HeaderMapPtr headers{};
-  const uint64_t request_length =
-      request.attributes().request().http().body().inline_bytes().length();
+  const uint64_t request_length = request.attributes().request().http().body().size();
   if (request_length > 0) {
-    const Http::HeaderMap& header_map =
-        Http::HeaderMapImpl{{Http::Headers::get().ContentLength, std::to_string(request_length)}};
-    headers = std::make_unique<Http::HeaderMapImpl>(header_map);
+    headers =
+        std::make_unique<Http::HeaderMapImpl,
+                         std::initializer_list<std::pair<Http::LowerCaseString, std::string>>>(
+            {{Http::Headers::get().ContentLength, std::to_string(request_length)}});
   } else {
     headers = std::make_unique<Http::HeaderMapImpl>(lengthZeroHeader());
   }
@@ -191,8 +191,8 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
 
   Http::MessagePtr message = std::make_unique<Envoy::Http::RequestMessageImpl>(std::move(headers));
   if (request_length > 0) {
-    message->body() = std::make_unique<Buffer::OwnedImpl>(
-        request.attributes().request().http().body().inline_bytes());
+    message->body() =
+        std::make_unique<Buffer::OwnedImpl>(request.attributes().request().http().body());
   }
 
   request_ = cm_.httpAsyncClientForCluster(config_->cluster())
@@ -215,7 +215,7 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::MessagePtr message) {
   // Set an error status if parsing status code fails. A Forbidden response is sent to the client
   // if the filter has not been configured with failure_mode_allow.
   uint64_t status_code{};
-  if (!StringUtil::atoul(message->headers().Status()->value().c_str(), status_code)) {
+  if (!StringUtil::atoull(message->headers().Status()->value().c_str(), status_code)) {
     ENVOY_LOG(warn, "ext_authz HTTP client failed to parse the HTTP status code.");
     return std::make_unique<Response>(errorResponse());
   }
