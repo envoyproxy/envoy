@@ -44,12 +44,12 @@ public:
  */
 // clang-format off
 #define ALL_RUNTIME_STATS(BOOL_INDICATOR, COUNTER, GAUGE)                                          \
-  COUNTER(load_error)                                                                              \
-  COUNTER(override_dir_not_exists)                                                                 \
-  COUNTER(override_dir_exists)                                                                     \
-  COUNTER(load_success)                                                                            \
-  COUNTER(deprecated_feature_use)                                                                  \
-  GAUGE  (num_keys)                                                                                \
+  COUNTER         (load_error)                                                                     \
+  COUNTER         (override_dir_not_exists)                                                        \
+  COUNTER         (override_dir_exists)                                                            \
+  COUNTER         (load_success)                                                                   \
+  COUNTER         (deprecated_feature_use)                                                         \
+  GAUGE           (num_keys)                                                                       \
   BOOL_INDICATOR  (admin_overrides_active)
 // clang-format on
 

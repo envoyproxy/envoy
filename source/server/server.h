@@ -47,17 +47,17 @@ namespace Server {
  */
 // clang-format off
 #define ALL_SERVER_STATS(BOOL_INDICATOR, COUNTER, GAUGE)                                           \
-  GAUGE(uptime)                                                                                    \
-  GAUGE(concurrency)                                                                               \
-  GAUGE(memory_allocated)                                                                          \
-  GAUGE(memory_heap_size)                                                                          \
   BOOL_INDICATOR(live)                                                                             \
-  GAUGE(parent_connections)                                                                        \
-  GAUGE(total_connections)                                                                         \
-  GAUGE(version)                                                                                   \
+  COUNTER(debug_assertion_failures)                                                                \
+  GAUGE(concurrency)                                                                               \
   GAUGE(days_until_first_cert_expiring)                                                            \
   GAUGE(hot_restart_epoch)                                                                         \
-  COUNTER(debug_assertion_failures)
+  GAUGE(memory_allocated)                                                                          \
+  GAUGE(memory_heap_size)                                                                          \
+  GAUGE(parent_connections)                                                                        \
+  GAUGE(total_connections)                                                                         \
+  GAUGE(uptime)                                                                                    \
+  GAUGE(version)
 // clang-format on
 
 struct ServerStats {

@@ -18,10 +18,10 @@ namespace Upstream {
 
 TEST(ResourceManagerImplTest, RuntimeResourceManager) {
   NiceMock<Runtime::MockLoader> runtime;
-  NiceMock<Stats::MockBoolIndicator> boolIndicator;
+  NiceMock<Stats::MockBoolIndicator> bool_indicator;
   NiceMock<Stats::MockStore> store;
 
-  ON_CALL(store, boolIndicator(_)).WillByDefault(ReturnRef(boolIndicator));
+  ON_CALL(store, boolIndicator(_)).WillByDefault(ReturnRef(bool_indicator));
 
   ResourceManagerImpl resource_manager(
       runtime, "circuit_breakers.runtime_resource_manager_test.default.", 0, 0, 0, 1,

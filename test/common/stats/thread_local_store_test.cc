@@ -452,6 +452,9 @@ TEST_F(StatsThreadLocalStoreTest, OverlappingScopes) {
 
 // Demonstrates that counters, gauges, and indicators are all mixed together in
 // the shared memory, and not separated by type; only the name matters.
+// This test is only here to reassure us that PR #5813, in the context of the current
+// state of the Envoy codebase it is being submitted into, will not break hot restart!
+// It is not meant to enforce this behavior as a desirable feature that must be kept.
 TEST_F(StatsThreadLocalStoreTest, SameNameDifferentType) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
