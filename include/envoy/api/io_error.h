@@ -17,8 +17,6 @@ public:
   enum class IoErrorCode {
     // No data available right now, try again later.
     Again,
-    // The IoHandle is in invalid state.
-    BadHandle,
     // Not supported.
     NoSupport,
     // Address family not supported.
@@ -64,6 +62,9 @@ template <typename T> struct IoCallResult {
 };
 
 using IoCallUintResult = IoCallResult<uint64_t>;
+
+#define IO_CALL_RESULT_NO_ERROR                                                                    \
+  Api::IoCallUintResult(0, Api::IoErrorPtr(nullptr, [](Api::IoError*) {}))
 
 } // namespace Api
 } // namespace Envoy

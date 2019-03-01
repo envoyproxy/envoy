@@ -38,9 +38,24 @@ public:
    */
   virtual bool isOpen() const PURE;
 
+  /**
+   * Read data into given slices.
+   * @param max_length supplies the maximum length to read.
+   * @param slices points to the output location.
+   * @param num_slice indicates the number of slices |slices| contains.
+   * @return a Api::IoCallUintResult with err_ = an Api::IoError instance or
+   * err_ = nullptr and rc_ = the bytes read for success.
+   */
   virtual Api::IoCallUintResult readv(uint64_t max_length, Buffer::RawSlice* slices,
                                       uint64_t num_slice) PURE;
 
+  /**
+   * Write the data in slices out.
+   * @param slices points to the location of data to be written.
+   * @param num_slice indicates number of slices |slices| contains.
+   * @return a Api::IoCallUintResult with err_ = an Api::IoError instance or
+   * err_ = nullptr and rc_ = the bytes written for success.
+   */
   virtual Api::IoCallUintResult writev(const Buffer::RawSlice* slices, uint64_t num_slice) PURE;
 };
 

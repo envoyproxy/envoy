@@ -59,9 +59,7 @@ public:
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
   ssize_t search(const void*, uint64_t, size_t) const override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-  Api::IoCallUintResult write(Network::IoHandle&) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
+  Api::IoCallUintResult write(Network::IoHandle&) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
 private:
   Buffer::Instance& underlying_;

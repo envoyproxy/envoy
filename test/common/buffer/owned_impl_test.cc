@@ -140,9 +140,9 @@ TEST_F(OwnedImplTest, Write) {
   EXPECT_EQ(0, result.rc_);
   EXPECT_EQ(1, buffer.length());
 
-  EXPECT_CALL(os_sys_calls, writev(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{-1, EBADF}));
+  EXPECT_CALL(os_sys_calls, writev(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{-1, 0}));
   result = buffer.write(io_handle);
-  EXPECT_EQ(Api::IoError::IoErrorCode::BadHandle, result.err_->getErrorCode());
+  EXPECT_EQ(Api::IoError::IoErrorCode::UnknownError, result.err_->getErrorCode());
   EXPECT_EQ(0, result.rc_);
   EXPECT_EQ(1, buffer.length());
 
@@ -176,9 +176,9 @@ TEST_F(OwnedImplTest, Read) {
   EXPECT_EQ(0, result.rc_);
   EXPECT_EQ(0, buffer.length());
 
-  EXPECT_CALL(os_sys_calls, readv(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{-1, EBADF}));
+  EXPECT_CALL(os_sys_calls, readv(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{-1, 0}));
   result = buffer.read(io_handle, 100);
-  EXPECT_EQ(Api::IoError::IoErrorCode::BadHandle, result.err_->getErrorCode());
+  EXPECT_EQ(Api::IoError::IoErrorCode::UnknownError, result.err_->getErrorCode());
   EXPECT_EQ(0, result.rc_);
   EXPECT_EQ(0, buffer.length());
 

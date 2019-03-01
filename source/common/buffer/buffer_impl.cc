@@ -125,7 +125,7 @@ void OwnedImpl::move(Instance& rhs, uint64_t length) {
 
 Api::IoCallUintResult OwnedImpl::read(Network::IoHandle& io_handle, uint64_t max_length) {
   if (max_length == 0) {
-    return Api::IoCallUintResult(0, Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
+    return IO_CALL_RESULT_NO_ERROR;
   }
   constexpr uint64_t MaxSlices = 2;
   RawSlice slices[MaxSlices];

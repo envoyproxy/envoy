@@ -62,7 +62,7 @@ Api::IoCallUintResult IoSocketHandleImpl::writev(const Buffer::RawSlice* slices,
     }
   }
   if (num_slices_to_write == 0) {
-    return Api::IoCallUintResult(0, Api::IoErrorPtr(nullptr, deleteIoError));
+    return IO_CALL_RESULT_NO_ERROR;
   }
   auto& os_syscalls = Api::OsSysCallsSingleton::get();
   const Api::SysCallSizeResult result = os_syscalls.writev(fd_, iov.begin(), num_slices_to_write);

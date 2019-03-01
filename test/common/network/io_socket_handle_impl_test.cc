@@ -9,7 +9,7 @@ namespace {
 
 TEST(IoSocketHandleImplTest, TestIoSocketError) {
   IoSocketError error1(EAGAIN);
-  EXPECT_DEATH(error1.getErrorCode(), "Didn't use IoSocketEagain to represent EAGAIN");
+  EXPECT_DEATH(error1.getErrorCode(), "Didn't use getIoSocketEagainInstance()");
 
   EXPECT_EQ(::strerror(EAGAIN), getIoSocketEagainInstance()->getErrorDetails());
 

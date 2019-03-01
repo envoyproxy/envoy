@@ -9,10 +9,8 @@ Api::IoError::IoErrorCode IoSocketError::getErrorCode() const {
   switch (errno_) {
   case EAGAIN:
     RELEASE_ASSERT(this == getIoSocketEagainInstance(),
-                   "Didn't use IoSocketEagain to represent EAGAIN.");
+                   "Didn't use getIoSocketEagainInstance() to generate `Again`.");
     return IoErrorCode::Again;
-  case EBADF:
-    return IoErrorCode::BadHandle;
   case ENOTSUP:
     return IoErrorCode::NoSupport;
   case EAFNOSUPPORT:
