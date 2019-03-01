@@ -859,15 +859,16 @@ void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* 
   if (!filter) {
     entry = decoder_filters_.begin();
   } else {
-    if ((*(filter->entry()))->iteration_state_ ==
-            ActiveStreamFilterBase::IterationState::StopAllBuffer ||
-        (*(filter->entry()))->iteration_state_ ==
-            ActiveStreamFilterBase::IterationState::StopAllWatermark) {
+    if ((*(filter->entry()))->stoppedAll()) {
       // If filter's iteration_state_ has been stopped, its decodeData() has not be called. Call it
       // now.
       entry = filter->entry();
     } else {
       entry = std::next(filter->entry());
+      if (entry != decoder_filters_.end() && (*entry)->stoppedAll()) {
+        (*entry)->commonHandleDataAfterStopAll(data, state_.decoder_filters_streaming_);
+        return;
+      }
     }
   }
 
@@ -940,9 +941,7 @@ void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* 
     }
 
     entry++;
-    if (entry != decoder_filters_.end() &&
-        ((*entry)->iteration_state_ == ActiveStreamFilterBase::IterationState::StopAllBuffer ||
-         (*entry)->iteration_state_ == ActiveStreamFilterBase::IterationState::StopAllWatermark)) {
+    if (entry != decoder_filters_.end() && (*entry)->stoppedAll()) {
       (*entry)->commonHandleDataAfterStopAll(data, state_.decoder_filters_streaming_);
       return;
     }
@@ -1014,10 +1013,7 @@ void ConnectionManagerImpl::ActiveStream::decodeTrailers(ActiveStreamDecoderFilt
   if (!filter) {
     entry = decoder_filters_.begin();
   } else {
-    if ((*(filter->entry()))->iteration_state_ ==
-            ActiveStreamFilterBase::IterationState::StopAllBuffer ||
-        (*(filter->entry()))->iteration_state_ ==
-            ActiveStreamFilterBase::IterationState::StopAllWatermark) {
+    if ((*(filter->entry()))->stoppedAll()) {
       // If filter's iteration_state_ has been stopped, its decodeTrailers() has not be called. Call
       // it now.
       entry = filter->entry();
@@ -1027,6 +1023,9 @@ void ConnectionManagerImpl::ActiveStream::decodeTrailers(ActiveStreamDecoderFilt
       (*entry)->allowIteration();
     } else {
       entry = std::next(filter->entry());
+      if (entry != decoder_filters_.end() && (*entry)->stoppedAll()) {
+        return;
+      }
     }
   }
 
@@ -1043,9 +1042,7 @@ void ConnectionManagerImpl::ActiveStream::decodeTrailers(ActiveStreamDecoderFilt
     }
 
     entry++;
-    if (entry != decoder_filters_.end() &&
-        ((*entry)->iteration_state_ == ActiveStreamFilterBase::IterationState::StopAllBuffer ||
-         (*entry)->iteration_state_ == ActiveStreamFilterBase::IterationState::StopAllWatermark)) {
+    if (entry != decoder_filters_.end() && (*entry)->stoppedAll()) {
       return;
     }
   }
@@ -1607,8 +1604,7 @@ void ConnectionManagerImpl::ActiveStreamFilterBase::commonContinue() {
     doTrailers();
   }
 
-  if (iteration_state_ == IterationState::StopAllBuffer ||
-      iteration_state_ == IterationState::StopAllWatermark) {
+  if (stoppedAll()) {
     allowIteration();
   }
 }

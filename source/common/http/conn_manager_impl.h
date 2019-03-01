@@ -133,6 +133,10 @@ private:
     // Functions to set or get iteration state.
     bool canIterate() { return iteration_state_ == IterationState::Continue; }
     bool shouldNotIterate() { return iteration_state_ != IterationState::Continue; }
+    bool stoppedAll() {
+      return iteration_state_ == IterationState::StopAllBuffer ||
+             iteration_state_ == IterationState::StopAllWatermark;
+    }
     void allowIteration() { iteration_state_ = IterationState::Continue; }
 
     ActiveStream& parent_;
