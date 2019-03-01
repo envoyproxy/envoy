@@ -274,7 +274,7 @@ private:
   Buffer::RawSlice reserved_iovec_;
   char* reserved_current_{};
   Protocol protocol_{Protocol::Http11};
-  const uint32_t max_request_headers_kb_;
+  const uint32_t max_headers_kb_;
 };
 
 /**
@@ -333,9 +333,7 @@ private:
  */
 class ClientConnectionImpl : public ClientConnection, public ConnectionImpl {
 public:
-  ClientConnectionImpl(Network::Connection& connection, ConnectionCallbacks& callbacks,
-                       uint32_t max_request_headers_kb);
-
+  ClientConnectionImpl(Network::Connection& connection, ConnectionCallbacks& callbacks, uint32_t max_response_headers_kb = 0x7fffffff);
   // Http::ClientConnection
   StreamEncoder& newStream(StreamDecoder& response_decoder) override;
 

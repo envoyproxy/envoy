@@ -317,10 +317,10 @@ const ToLowerTable& ConnectionImpl::toLowerTable() {
 }
 
 ConnectionImpl::ConnectionImpl(Network::Connection& connection, http_parser_type type,
-                               uint32_t max_request_headers_kb)
+                               uint32_t max_headers_kb)
     : connection_(connection), output_buffer_([&]() -> void { this->onBelowLowWatermark(); },
                                               [&]() -> void { this->onAboveHighWatermark(); }),
-      max_request_headers_kb_(max_request_headers_kb) {
+      max_headers_kb_(max_headers_kb) {
   output_buffer_.setWatermarks(connection.bufferLimit());
   http_parser_init(&parser_, type);
   parser_.data = this;
@@ -419,15 +419,15 @@ void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
     return;
   }
 
-  uint32_t total = current_header_field_.size() + length + current_header_map_->byteSize();
-  if (total > (max_request_headers_kb_ * 1024)) {
-    error_code_ = Http::Code::RequestHeaderFieldsTooLarge;
-    sendProtocolError();
-    throw CodecProtocolException("request headers too large");
-  }
-
   header_parsing_state_ = HeaderParsingState::Value;
   current_header_value_.append(data, length);
+
+  uint32_t total = current_header_field_.size() + current_header_value_.size() + current_header_map_->byteSize();
+  if (total > (max_headers_kb_ * 1024)) {
+    error_code_ = Http::Code::RequestHeaderFieldsTooLarge;
+    sendProtocolError();
+    throw CodecProtocolException("headers size exceeds limit");
+  }
 }
 
 int ConnectionImpl::onHeadersCompleteBase() {
@@ -652,9 +652,8 @@ void ServerConnectionImpl::onBelowLowWatermark() {
   }
 }
 
-ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection, ConnectionCallbacks&,
-                                           uint32_t max_request_headers_kb)
-    : ConnectionImpl(connection, HTTP_RESPONSE, max_request_headers_kb) {}
+ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection, ConnectionCallbacks&, uint32_t max_response_headers_kb)
+    : ConnectionImpl(connection, HTTP_RESPONSE, max_response_headers_kb) {}
 
 bool ClientConnectionImpl::cannotHaveBody() {
   if ((!pending_responses_.empty() && pending_responses_.front().head_request_) ||
