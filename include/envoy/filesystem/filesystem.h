@@ -36,7 +36,7 @@ public:
     }
 
     openFile();
-    return -1 != fd_ ? resultSuccess<bool>(true) : resultFailure<bool>(false, errno);
+    return fd_ != -1 ? resultSuccess<bool>(true) : resultFailure<bool>(false, errno);
   }
 
   /**
@@ -46,7 +46,7 @@ public:
    */
   Api::IoCallSizeResult write(absl::string_view buffer) {
     const ssize_t rc = writeFile(buffer);
-    return -1 != rc ? resultSuccess<ssize_t>(rc) : resultFailure<ssize_t>(rc, errno);
+    return rc != -1 ? resultSuccess<ssize_t>(rc) : resultFailure<ssize_t>(rc, errno);
   };
 
   /**
