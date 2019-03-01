@@ -19,7 +19,7 @@ class RoleBasedAccessControlNetworkFilterIntegrationTest
       public BaseIntegrationTest {
 public:
   RoleBasedAccessControlNetworkFilterIntegrationTest()
-      : BaseIntegrationTest(GetParam(), realTime(), rbac_config) {}
+      : BaseIntegrationTest(GetParam(), rbac_config) {}
 
   static void SetUpTestSuite() {
     rbac_config = ConfigHelper::BASE_CONFIG + R"EOF(

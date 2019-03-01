@@ -149,8 +149,6 @@ public:
 
   virtual ~BaseIntegrationTest() {}
 
-  static TestTimeSystemPtr realTime() { return TestTimeSystemPtr(); }
-
   // Initialize the basic proto configuration, create fake upstreams, and start Envoy.
   virtual void initialize();
   // Set up the fake upstream connections. This is called by initialize() and

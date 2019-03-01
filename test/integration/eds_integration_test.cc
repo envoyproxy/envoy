@@ -16,8 +16,7 @@ namespace {
 class EdsIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                            public HttpIntegrationTest {
 public:
-  EdsIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()) {}
+  EdsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
 
   // We need to supply the endpoints via EDS to provide health status. Use a
   // filesystem delivery to simplify test mechanics.

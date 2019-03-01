@@ -24,20 +24,11 @@
 namespace Envoy {
 namespace {
 
-class TestUsingSimulatedTime {
- public:
-  Event::SimulatedTimeSystem& simTime() { return sim_time_; }
-
- private:
-  Event::SimulatedTimeSystem sim_time_;
-};
-
 class HdsIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
-                           public TestUsingSimulatedTime,
+                           public Event::TestUsingSimulatedTime,
                            public HttpIntegrationTest {
 public:
-  HdsIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+  HdsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
 
   void createUpstreams() override {
     fake_upstreams_.emplace_back(

@@ -21,7 +21,7 @@ class ReverseBridgeIntegrationTest : public testing::TestWithParam<Network::Addr
                                      public HttpIntegrationTest {
 public:
   ReverseBridgeIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam(), realTime()) {}
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam()) {}
 
   void SetUp() override {
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP1);
