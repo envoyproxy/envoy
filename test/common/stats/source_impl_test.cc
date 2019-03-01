@@ -11,6 +11,7 @@ using testing::ReturnPointee;
 
 namespace Envoy {
 namespace Stats {
+namespace {
 
 TEST(SourceImplTest, Caching) {
   NiceMock<MockStore> store;
@@ -55,5 +56,6 @@ TEST(SourceImplTest, Caching) {
   EXPECT_EQ(source.cachedHistograms(), stored_histograms);
 }
 
+} // namespace
 } // namespace Stats
 } // namespace Envoy

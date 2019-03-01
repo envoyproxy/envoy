@@ -27,6 +27,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace HealthCheck {
+namespace {
 
 class HealthCheckFilterTest : public testing::Test {
 public:
@@ -389,6 +390,7 @@ TEST_F(HealthCheckFilterCachingTest, NotHcRequest) {
             filter_->decodeHeaders(request_headers_no_hc_, true));
 }
 
+} // namespace
 } // namespace HealthCheck
 } // namespace HttpFilters
 } // namespace Extensions

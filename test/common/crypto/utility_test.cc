@@ -7,6 +7,7 @@
 namespace Envoy {
 namespace Common {
 namespace Crypto {
+namespace {
 
 TEST(UtilityTest, TestSha256Digest) {
   const Buffer::OwnedImpl buffer("test data");
@@ -49,6 +50,7 @@ TEST(UtilityTest, TestSha256HmacWithEmptyArguments) {
   EXPECT_EQ("b613679a0814d9ec772f95d778c35fc5ff1697c493715653c6c712144292c5ad", Hex::encode(hmac));
 }
 
+} // namespace
 } // namespace Crypto
 } // namespace Common
 } // namespace Envoy

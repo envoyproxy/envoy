@@ -14,6 +14,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Fault {
+namespace {
 
 TEST(FaultFilterConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
@@ -68,6 +69,7 @@ TEST(FaultFilterConfigTest, FaultFilterEmptyProto) {
   cb(filter_callback);
 }
 
+} // namespace
 } // namespace Fault
 } // namespace HttpFilters
 } // namespace Extensions

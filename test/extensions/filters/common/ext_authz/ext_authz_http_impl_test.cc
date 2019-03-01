@@ -29,6 +29,7 @@ namespace Extensions {
 namespace Filters {
 namespace Common {
 namespace ExtAuthz {
+namespace {
 
 class ExtAuthzHttpClientTest : public testing::Test {
 public:
@@ -376,6 +377,7 @@ TEST_F(ExtAuthzHttpClientTest, CancelledAuthorizationRequest) {
   client_.cancel();
 }
 
+} // namespace
 } // namespace ExtAuthz
 } // namespace Common
 } // namespace Filters

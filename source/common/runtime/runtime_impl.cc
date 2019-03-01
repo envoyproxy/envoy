@@ -331,7 +331,7 @@ void DiskLayer::walkDirectory(const std::string& path, const std::string& prefix
                               Api::Api& api) {
   ENVOY_LOG(debug, "walking directory: {}", path);
   if (depth > MaxWalkDepth) {
-    throw EnvoyException(fmt::format("Walk recursion depth exceded {}", MaxWalkDepth));
+    throw EnvoyException(fmt::format("Walk recursion depth exceeded {}", MaxWalkDepth));
   }
   // Check if this is an obviously bad path.
   if (api.fileSystem().illegalPath(path)) {
