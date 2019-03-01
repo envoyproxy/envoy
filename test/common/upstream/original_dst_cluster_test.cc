@@ -37,6 +37,7 @@ using testing::SaveArg;
 namespace Envoy {
 namespace Upstream {
 namespace OriginalDstClusterTest {
+namespace {
 
 class TestLoadBalancerContext : public LoadBalancerContextBase {
 public:
@@ -631,6 +632,7 @@ TEST_F(OriginalDstClusterTest, UseHttpHeaderDisabled) {
   EXPECT_EQ(host3, nullptr);
 }
 
+} // namespace
 } // namespace OriginalDstClusterTest
 } // namespace Upstream
 } // namespace Envoy

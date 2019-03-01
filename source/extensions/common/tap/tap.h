@@ -5,12 +5,56 @@
 #include "envoy/http/header_map.h"
 #include "envoy/service/tap/v2alpha/common.pb.h"
 
+#include "extensions/common/tap/tap_matcher.h"
+
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Common {
 namespace Tap {
+
+using TraceWrapperSharedPtr = std::shared_ptr<envoy::data::tap::v2alpha::TraceWrapper>;
+inline TraceWrapperSharedPtr makeTraceWrapper() {
+  return std::make_shared<envoy::data::tap::v2alpha::TraceWrapper>();
+}
+
+/**
+ * A handle for a per-tap sink. This allows submitting either a single buffered trace, or a series
+ * of trace segments that the sink can aggregate in whatever way it chooses.
+ */
+class PerTapSinkHandle {
+public:
+  virtual ~PerTapSinkHandle() = default;
+
+  /**
+   * Send a trace wrapper to the sink. This may be a fully buffered trace or a segment of a larger
+   * trace depending on the contents of the wrapper.
+   * @param trace supplies the trace to send.
+   * @param format supplies the output format to use.
+   */
+  virtual void submitTrace(const TraceWrapperSharedPtr& trace,
+                           envoy::service::tap::v2alpha::OutputSink::Format format) PURE;
+};
+
+using PerTapSinkHandlePtr = std::unique_ptr<PerTapSinkHandle>;
+
+/**
+ * Wraps potentially multiple PerTapSinkHandle instances and any common pre-submit functionality.
+ * Each active tap will have a reference to one of these, which in turn may have references to
+ * one or more PerTapSinkHandle.
+ */
+class PerTapSinkHandleManager {
+public:
+  virtual ~PerTapSinkHandleManager() = default;
+
+  /**
+   * Submit a buffered or streamed trace segment to all managed per-tap sink handles.
+   */
+  virtual void submitTrace(const TraceWrapperSharedPtr& trace) PURE;
+};
+
+using PerTapSinkHandleManagerPtr = std::unique_ptr<PerTapSinkHandleManager>;
 
 /**
  * Sink for sending tap messages.
@@ -20,16 +64,10 @@ public:
   virtual ~Sink() = default;
 
   /**
-   * Send a fully buffered trace to the sink.
-   * @param trace supplies the trace to send. The trace message is a discrete trace message (as
-   *        opposed to a portion of a larger trace that should be aggregated).
-   * @param format supplies the output format to use.
+   * Create a per tap sink handle for use in submitting either buffered traces or trace segments.
    * @param trace_id supplies a locally unique trace ID. Some sinks use this for output generation.
    */
-  virtual void
-  submitBufferedTrace(const std::shared_ptr<envoy::data::tap::v2alpha::BufferedTraceWrapper>& trace,
-                      envoy::service::tap::v2alpha::OutputSink::Format format,
-                      uint64_t trace_id) PURE;
+  virtual PerTapSinkHandlePtr createPerTapSinkHandle(uint64_t trace_id) PURE;
 };
 
 using SinkPtr = std::unique_ptr<Sink>;
@@ -65,11 +103,45 @@ public:
 };
 
 /**
- * Abstract tap configuration base class. Used for type safety.
+ * Abstract tap configuration base class.
  */
 class TapConfig {
 public:
   virtual ~TapConfig() = default;
+
+  /**
+   * Return a per-tap sink handle manager for use by a tap session.
+   * @param trace_id supplies a locally unique trace ID. Some sinks use this for output generation.
+   */
+  virtual PerTapSinkHandleManagerPtr createPerTapSinkHandleManager(uint64_t trace_id) PURE;
+
+  /**
+   * Return the maximum received bytes that can be buffered in memory. Streaming taps are still
+   * subject to this limit depending on match status.
+   */
+  virtual uint32_t maxBufferedRxBytes() const PURE;
+
+  /**
+   * Return the maximum transmitted bytes that can be buffered in memory. Streaming taps are still
+   * subject to this limit depending on match status.
+   */
+  virtual uint32_t maxBufferedTxBytes() const PURE;
+
+  /**
+   * Return a new match status vector that is correctly sized for the number of matchers that are in
+   * the configuration.
+   */
+  virtual Matcher::MatchStatusVector createMatchStatusVector() const PURE;
+
+  /**
+   * Return the root matcher for use in updating a match status vector.
+   */
+  virtual const Matcher& rootMatcher() const PURE;
+
+  /**
+   * Return whether the tap session should run in streaming or buffering mode.
+   */
+  virtual bool streaming() const PURE;
 };
 
 using TapConfigSharedPtr = std::shared_ptr<TapConfig>;

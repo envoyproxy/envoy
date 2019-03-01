@@ -27,6 +27,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace JwtAuthn {
+namespace {
 
 class AuthenticatorTest : public testing::Test {
 public:
@@ -410,6 +411,7 @@ TEST_F(AuthenticatorTest, TestInvalidPubkeyKey) {
   expectVerifyStatus(Status::JwksPemBadBase64, headers);
 }
 
+} // namespace
 } // namespace JwtAuthn
 } // namespace HttpFilters
 } // namespace Extensions

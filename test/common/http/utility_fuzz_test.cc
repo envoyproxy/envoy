@@ -6,6 +6,7 @@
 
 namespace Envoy {
 namespace Fuzz {
+namespace {
 
 DEFINE_PROTO_FUZZER(const test::common::http::UtilityTestCase& input) {
   switch (input.utility_selector_case()) {
@@ -51,5 +52,6 @@ DEFINE_PROTO_FUZZER(const test::common::http::UtilityTestCase& input) {
   }
 }
 
+} // namespace
 } // namespace Fuzz
 } // namespace Envoy

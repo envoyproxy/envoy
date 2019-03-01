@@ -65,6 +65,7 @@ envoy_cc_library(
         "quic_prefetch_impl.h",
         "quic_reference_counted_impl.h",
         "quic_ptr_util_impl.h",
+        "quic_server_stats_impl.h",
         "quic_string_impl.h",
         "quic_string_piece_impl.h",
         "quic_test_impl.h",

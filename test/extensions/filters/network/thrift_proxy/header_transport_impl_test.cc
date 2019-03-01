@@ -20,7 +20,6 @@ namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
-
 namespace {
 
 class MockBuffer : public Envoy::MockBuffer {

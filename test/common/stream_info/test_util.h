@@ -100,35 +100,18 @@ public:
   }
 
   absl::optional<std::chrono::nanoseconds> firstUpstreamTxByteSent() const override {
-    return duration(first_upstream_tx_byte_sent_);
-  }
-
-  void onFirstUpstreamTxByteSent() override {
-    first_upstream_tx_byte_sent_ = timeSystem().monotonicTime();
+    return duration(upstream_timing_.first_upstream_tx_byte_sent_);
   }
 
   absl::optional<std::chrono::nanoseconds> lastUpstreamTxByteSent() const override {
-    return duration(last_upstream_tx_byte_sent_);
+    return duration(upstream_timing_.last_upstream_tx_byte_sent_);
   }
-
-  void onLastUpstreamTxByteSent() override {
-    last_upstream_tx_byte_sent_ = timeSystem().monotonicTime();
-  }
-
   absl::optional<std::chrono::nanoseconds> firstUpstreamRxByteReceived() const override {
-    return duration(first_upstream_rx_byte_received_);
-  }
-
-  void onFirstUpstreamRxByteReceived() override {
-    first_upstream_rx_byte_received_ = timeSystem().monotonicTime();
+    return duration(upstream_timing_.first_upstream_rx_byte_received_);
   }
 
   absl::optional<std::chrono::nanoseconds> lastUpstreamRxByteReceived() const override {
-    return duration(last_upstream_rx_byte_received_);
-  }
-
-  void onLastUpstreamRxByteReceived() override {
-    last_upstream_rx_byte_received_ = timeSystem().monotonicTime();
+    return duration(upstream_timing_.last_upstream_rx_byte_received_);
   }
 
   absl::optional<std::chrono::nanoseconds> firstDownstreamTxByteSent() const override {
@@ -149,11 +132,8 @@ public:
 
   void onRequestComplete() override { end_time_ = timeSystem().monotonicTime(); }
 
-  void resetUpstreamTimings() override {
-    first_upstream_tx_byte_sent_ = absl::optional<MonotonicTime>{};
-    last_upstream_tx_byte_sent_ = absl::optional<MonotonicTime>{};
-    first_upstream_rx_byte_received_ = absl::optional<MonotonicTime>{};
-    last_upstream_rx_byte_received_ = absl::optional<MonotonicTime>{};
+  void setUpstreamTiming(const Envoy::StreamInfo::UpstreamTiming& upstream_timing) override {
+    upstream_timing_ = upstream_timing;
   }
 
   absl::optional<std::chrono::nanoseconds> requestComplete() const override {
@@ -202,6 +182,7 @@ public:
   const Router::RouteEntry* route_entry_{};
   envoy::api::v2::core::Metadata metadata_{};
   Envoy::StreamInfo::FilterStateImpl filter_state_{};
+  Envoy::StreamInfo::UpstreamTiming upstream_timing_;
   std::string requested_server_name_;
   DangerousDeprecatedTestTime test_time_;
 };
