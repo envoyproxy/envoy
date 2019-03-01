@@ -1,5 +1,3 @@
-#include <http_parser.h>
-
 #include <memory>
 #include <string>
 
