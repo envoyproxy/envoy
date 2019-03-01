@@ -859,20 +859,19 @@ void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* 
   if (!filter) {
     entry = decoder_filters_.begin();
   } else {
-    if ((*(filter->entry()))->iterate_from_current_filter_) {
-      // (*entry)->decodeData() has not be called. Call it now.
+    if ((*(filter->entry()))->iteration_state_ ==
+            ActiveStreamFilterBase::IterationState::StopAllBuffer ||
+        (*(filter->entry()))->iteration_state_ ==
+            ActiveStreamFilterBase::IterationState::StopAllWatermark) {
+      // If filter's iteration_state_ has been stopped, its decodeData() has not be called. Call it
+      // now.
       entry = filter->entry();
     } else {
       entry = std::next(filter->entry());
     }
   }
 
-  for (; entry != decoder_filters_.end(); entry++) {
-    if ((*entry)->iteration_state_ == ActiveStreamFilterBase::IterationState::StopAllBuffer ||
-        (*entry)->iteration_state_ == ActiveStreamFilterBase::IterationState::StopAllWatermark) {
-      (*entry)->commonHandleDataAfterStopAll(data, state_.decoder_filters_streaming_);
-      return;
-    }
+  while (entry != decoder_filters_.end()) {
     // If end_stream_ is marked for a filter, the data is not for this filter and filters after.
     //
     // In following case, ActiveStreamFilterBase::commonContinue() could be called recursively and
@@ -939,6 +938,14 @@ void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* 
       // a previous filter has added trailers.
       return;
     }
+
+    entry++;
+    if (entry != decoder_filters_.end() &&
+        ((*entry)->iteration_state_ == ActiveStreamFilterBase::IterationState::StopAllBuffer ||
+         (*entry)->iteration_state_ == ActiveStreamFilterBase::IterationState::StopAllWatermark)) {
+      (*entry)->commonHandleDataAfterStopAll(data, state_.decoder_filters_streaming_);
+      return;
+    }
   }
 
   // If trailers were adding during decodeData we need to trigger decodeTrailers in order
@@ -976,12 +983,7 @@ void ConnectionManagerImpl::ActiveStream::addDecodedData(ActiveStreamDecoderFilt
   } else if (state_.filter_call_state_ & FilterCallState::DecodeTrailers) {
     // In this case we need to inline dispatch the data to further filters. If those filters
     // choose to buffer/stop iteration that's fine.
-    // We should ignore iterate_from_current_filter_ because data should always be passed to the
-    // next filter.
-    bool saved_value = (*(filter.entry()))->iterate_from_current_filter_;
-    (*(filter.entry()))->iterate_from_current_filter_ = false;
     decodeData(&filter, data, false);
-    (*(filter.entry()))->iterate_from_current_filter_ = saved_value;
   } else {
     // TODO(mattklein123): Formalize error handling for filters and add tests. Should probably
     // throw an exception here.
@@ -1012,19 +1014,23 @@ void ConnectionManagerImpl::ActiveStream::decodeTrailers(ActiveStreamDecoderFilt
   if (!filter) {
     entry = decoder_filters_.begin();
   } else {
-    if ((*(filter->entry()))->iterate_from_current_filter_) {
-      // (*entry)->decodeTrailers() has not be called. Call it now.
+    if ((*(filter->entry()))->iteration_state_ ==
+            ActiveStreamFilterBase::IterationState::StopAllBuffer ||
+        (*(filter->entry()))->iteration_state_ ==
+            ActiveStreamFilterBase::IterationState::StopAllWatermark) {
+      // If filter's iteration_state_ has been stopped, its decodeTrailers() has not be called. Call
+      // it now.
       entry = filter->entry();
+      // Needs to set the iteration state to Continue in case filter's decodeTrailers() calls
+      // addDecodedData(), which will consequently call decodeData(). We want decodeData() to
+      // iterate from the next filter.
+      (*entry)->allowIteration();
     } else {
       entry = std::next(filter->entry());
     }
   }
 
-  for (; entry != decoder_filters_.end(); entry++) {
-    if ((*entry)->iteration_state_ == ActiveStreamFilterBase::IterationState::StopAllBuffer ||
-        (*entry)->iteration_state_ == ActiveStreamFilterBase::IterationState::StopAllWatermark) {
-      return;
-    }
+  while (entry != decoder_filters_.end()) {
     ASSERT(!(state_.filter_call_state_ & FilterCallState::DecodeTrailers));
     state_.filter_call_state_ |= FilterCallState::DecodeTrailers;
     FilterTrailersStatus status = (*entry)->handle_->decodeTrailers(trailers);
@@ -1033,6 +1039,13 @@ void ConnectionManagerImpl::ActiveStream::decodeTrailers(ActiveStreamDecoderFilt
     ENVOY_STREAM_LOG(trace, "decode trailers called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
     if (!(*entry)->commonHandleAfterTrailersCallback(status)) {
+      return;
+    }
+
+    entry++;
+    if (entry != decoder_filters_.end() &&
+        ((*entry)->iteration_state_ == ActiveStreamFilterBase::IterationState::StopAllBuffer ||
+         (*entry)->iteration_state_ == ActiveStreamFilterBase::IterationState::StopAllWatermark)) {
       return;
     }
   }
@@ -1558,7 +1571,12 @@ void ConnectionManagerImpl::ActiveStreamFilterBase::commonContinue() {
   ENVOY_STREAM_LOG(trace, "continuing filter chain: filter={}", parent_,
                    static_cast<const void*>(this));
   ASSERT(shouldNotIterate());
-  allowIteration();
+  if (iteration_state_ == IterationState::StopSingleIteration) {
+    // Only allow iteration if it was stopped for one frame type. If the iteration has stopped for
+    // all, we need to keep the state to inform filters to iterate from the current filter instead
+    // of the next one, and continue will be set at the end of the function.
+    allowIteration();
+  }
 
   // Only resume with do100ContinueHeaders() if we've actually seen a 100-Continue.
   if (parent_.has_continue_headers_ && !continue_headers_continued_) {
@@ -1589,7 +1607,10 @@ void ConnectionManagerImpl::ActiveStreamFilterBase::commonContinue() {
     doTrailers();
   }
 
-  iterate_from_current_filter_ = false;
+  if (iteration_state_ == IterationState::StopAllBuffer ||
+      iteration_state_ == IterationState::StopAllWatermark) {
+    allowIteration();
+  }
 }
 
 bool ConnectionManagerImpl::ActiveStreamFilterBase::commonHandleAfter100ContinueHeadersCallback(
@@ -1618,11 +1639,9 @@ bool ConnectionManagerImpl::ActiveStreamFilterBase::commonHandleAfterHeadersCall
     return false;
   } else if (status == FilterHeadersStatus::StopAllIterationAndBuffer) {
     iteration_state_ = IterationState::StopAllBuffer;
-    iterate_from_current_filter_ = true;
     return false;
   } else if (status == FilterHeadersStatus::StopAllIterationAndWatermark) {
     iteration_state_ = IterationState::StopAllWatermark;
-    iterate_from_current_filter_ = true;
     return false;
   } else if (status == FilterHeadersStatus::ContinueAndEndStream) {
     // Set headers_only to true so we know to end early if necessary,

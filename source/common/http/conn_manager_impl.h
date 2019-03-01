@@ -96,8 +96,8 @@ private:
   struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks {
     ActiveStreamFilterBase(ActiveStream& parent, bool dual_filter)
         : parent_(parent), headers_continued_(false), continue_headers_continued_(false),
-          stopped_(false), iteration_state_(IterationState::Continue),
-          iterate_from_current_filter_(false), end_stream_(false), dual_filter_(dual_filter) {}
+          iteration_state_(IterationState::Continue), end_stream_(false),
+          dual_filter_(dual_filter) {}
 
     bool commonHandleAfter100ContinueHeadersCallback(FilterHeadersStatus status);
     bool commonHandleAfterHeadersCallback(FilterHeadersStatus status, bool& headers_only);
@@ -138,7 +138,6 @@ private:
     ActiveStream& parent_;
     bool headers_continued_ : 1;
     bool continue_headers_continued_ : 1;
-    bool stopped_ : 1;
     // The state of iteration.
     enum class IterationState {
       Continue,            // Iteration has not stopped for any frame type.
@@ -149,9 +148,6 @@ private:
                            // be buffered until high watermark is reached.
     };
     IterationState iteration_state_;
-    // If true, ActiveStream::decodeData/Trailers should start iterating with the current filter
-    // instead of the next one.
-    bool iterate_from_current_filter_;
     // If true, end_stream is called for this filter.
     bool end_stream_ : 1;
     const bool dual_filter_ : 1;
