@@ -166,12 +166,15 @@ void HdsDelegate::onReceiveMessage(
   hds_clusters_.clear();
 
   // Set response
-  server_response_ms_ = PROTOBUF_GET_MS_REQUIRED(*message, interval);
+  auto server_response_ms = PROTOBUF_GET_MS_REQUIRED(*message, interval);
 
   // Process the HealthCheckSpecifier message
   processMessage(std::move(message));
 
-  setHdsStreamResponseTimer();
+  if (server_response_ms_ != server_response_ms) {
+    server_response_ms_ = server_response_ms;
+    setHdsStreamResponseTimer();
+  }
 }
 
 void HdsDelegate::onReceiveTrailingMetadata(Http::HeaderMapPtr&& metadata) {
@@ -182,6 +185,7 @@ void HdsDelegate::onRemoteClose(Grpc::Status::GrpcStatus status, const std::stri
   ENVOY_LOG(warn, "gRPC config stream closed: {}, {}", status, message);
   hds_stream_response_timer_->disableTimer();
   stream_ = nullptr;
+  server_response_ms_ = 0;
   handleFailure();
 }
 

@@ -8,7 +8,8 @@ static_resources:
     filter_chains:
     - filters:
       - name: envoy.http_connection_manager
-        config:
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
           stat_prefix: ingress_http
           codec_type: auto
           route_config:
@@ -24,7 +25,8 @@ static_resources:
                   cluster: web_service
           http_filters:
           - name: envoy.lua
-            config:
+            typed_config:
+              "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
               inline_code: |
                 function envoy_on_request(request_handle)
                   request_handle:headers():add("foo", "bar")
@@ -34,17 +36,22 @@ static_resources:
                   response_handle:headers():add("response-body-size", tostring(body_size))
                 end
           - name: envoy.router
-            config: {}
+            typed_config: {}
 
   clusters:
   - name: web_service
     connect_timeout: 0.25s
     type: strict_dns # static
     lb_policy: round_robin
-    hosts:
-    - socket_address:
-        address: web_service
-        port_value: 80
+    load_assignment:
+      cluster_name: web_service
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: web_service
+                port_value: 80
 admin:
   access_log_path: "/dev/null"
   address:

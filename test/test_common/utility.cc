@@ -286,13 +286,6 @@ void ConditionalInitializer::wait() {
   }
 }
 
-ScopedFdCloser::ScopedFdCloser(int fd) : fd_(fd) {}
-ScopedFdCloser::~ScopedFdCloser() { ::close(fd_); }
-
-ScopedIoHandleCloser::ScopedIoHandleCloser(Network::IoHandlePtr& io_handle)
-    : io_handle_(io_handle) {}
-ScopedIoHandleCloser::~ScopedIoHandleCloser() { io_handle_->close(); }
-
 AtomicFileUpdater::AtomicFileUpdater(const std::string& filename)
     : link_(filename), new_link_(absl::StrCat(filename, ".new")),
       target1_(absl::StrCat(filename, ".target1")), target2_(absl::StrCat(filename, ".target2")),
@@ -417,35 +410,26 @@ protected:
 
 class TestImpl : public TestImplProvider, public Impl {
 public:
-  TestImpl(std::chrono::milliseconds file_flush_interval_msec,
-           Thread::ThreadFactory& thread_factory, Stats::Store& stats_store)
-      : Impl(file_flush_interval_msec, thread_factory, stats_store, global_time_system_) {}
-  TestImpl(std::chrono::milliseconds file_flush_interval_msec,
-           Thread::ThreadFactory& thread_factory, Event::TimeSystem& time_system)
-      : Impl(file_flush_interval_msec, thread_factory, default_stats_store_, time_system) {}
-  TestImpl(std::chrono::milliseconds file_flush_interval_msec,
-           Thread::ThreadFactory& thread_factory)
-      : Impl(file_flush_interval_msec, thread_factory, default_stats_store_, global_time_system_) {}
+  TestImpl(Thread::ThreadFactory& thread_factory, Stats::Store& stats_store)
+      : Impl(thread_factory, stats_store, global_time_system_) {}
+  TestImpl(Thread::ThreadFactory& thread_factory, Event::TimeSystem& time_system)
+      : Impl(thread_factory, default_stats_store_, time_system) {}
+  TestImpl(Thread::ThreadFactory& thread_factory)
+      : Impl(thread_factory, default_stats_store_, global_time_system_) {}
 };
 
-ApiPtr createApiForTest() {
-  return std::make_unique<TestImpl>(std::chrono::milliseconds(1000),
-                                    Thread::threadFactoryForTest());
-}
+ApiPtr createApiForTest() { return std::make_unique<TestImpl>(Thread::threadFactoryForTest()); }
 
 ApiPtr createApiForTest(Stats::Store& stat_store) {
-  return std::make_unique<TestImpl>(std::chrono::milliseconds(1000), Thread::threadFactoryForTest(),
-                                    stat_store);
+  return std::make_unique<TestImpl>(Thread::threadFactoryForTest(), stat_store);
 }
 
 ApiPtr createApiForTest(Event::TimeSystem& time_system) {
-  return std::make_unique<TestImpl>(std::chrono::milliseconds(1000), Thread::threadFactoryForTest(),
-                                    time_system);
+  return std::make_unique<TestImpl>(Thread::threadFactoryForTest(), time_system);
 }
 
 ApiPtr createApiForTest(Stats::Store& stat_store, Event::TimeSystem& time_system) {
-  return std::make_unique<Impl>(std::chrono::milliseconds(1000), Thread::threadFactoryForTest(),
-                                stat_store, time_system);
+  return std::make_unique<Impl>(Thread::threadFactoryForTest(), stat_store, time_system);
 }
 
 } // namespace Api

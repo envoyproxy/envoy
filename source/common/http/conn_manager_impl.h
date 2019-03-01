@@ -208,7 +208,11 @@ private:
     // called here may change the content type, so we must check it before the call.
     FilterHeadersStatus decodeHeaders(HeaderMap& headers, bool end_stream) {
       is_grpc_request_ = Grpc::Common::hasGrpcContentType(headers);
-      return handle_->decodeHeaders(headers, end_stream);
+      FilterHeadersStatus status = handle_->decodeHeaders(headers, end_stream);
+      if (end_stream) {
+        handle_->decodeComplete();
+      }
+      return status;
     }
 
     void requestDataTooLarge();
@@ -337,8 +341,9 @@ private:
     void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) override;
 
     // Tracing::TracingConfig
-    virtual Tracing::OperationName operationName() const override;
-    virtual const std::vector<Http::LowerCaseString>& requestHeadersForTags() const override;
+    Tracing::OperationName operationName() const override;
+    const std::vector<Http::LowerCaseString>& requestHeadersForTags() const override;
+    bool verbose() const override;
 
     void traceRequest();
 

@@ -17,9 +17,11 @@ public:
 
   MOCK_CONST_METHOD0(operationName, OperationName());
   MOCK_CONST_METHOD0(requestHeadersForTags, const std::vector<Http::LowerCaseString>&());
+  MOCK_CONST_METHOD0(verbose, bool());
 
   OperationName operation_name_{OperationName::Ingress};
   std::vector<Http::LowerCaseString> headers_;
+  bool verbose_{false};
 };
 
 class MockSpan : public Span {
@@ -29,6 +31,7 @@ public:
 
   MOCK_METHOD1(setOperation, void(const std::string& operation));
   MOCK_METHOD2(setTag, void(const std::string& name, const std::string& value));
+  MOCK_METHOD2(log, void(SystemTime timestamp, const std::string& event));
   MOCK_METHOD0(finishSpan, void());
   MOCK_METHOD1(injectContext, void(Http::HeaderMap& request_headers));
   MOCK_METHOD1(setSampled, void(const bool sampled));

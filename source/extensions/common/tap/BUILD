@@ -12,6 +12,7 @@ envoy_cc_library(
     name = "tap_interface",
     hdrs = ["tap.h"],
     deps = [
+        ":tap_matcher",
         "//include/envoy/http:header_map_interface",
         "@envoy_api//envoy/data/tap/v2alpha:wrapper_cc",
         "@envoy_api//envoy/service/tap/v2alpha:common_cc",

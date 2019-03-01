@@ -44,7 +44,6 @@ TEST_F(AddrFamilyAwareSocketOptionImplTest, SetOptionFailure) {
 TEST_F(AddrFamilyAwareSocketOptionImplTest, SetOptionSuccess) {
   Address::Ipv4Instance address("1.2.3.4", 5678);
   IoHandlePtr io_handle = address.socket(Address::SocketType::Stream);
-  ScopedIoHandleCloser closer(io_handle);
   EXPECT_CALL(testing::Const(socket_), ioHandle()).WillRepeatedly(testing::ReturnRef(*io_handle));
 
   AddrFamilyAwareSocketOptionImpl socket_option{envoy::api::v2::core::SocketOption::STATE_PREBIND,
@@ -59,7 +58,6 @@ TEST_F(AddrFamilyAwareSocketOptionImplTest, SetOptionSuccess) {
 TEST_F(AddrFamilyAwareSocketOptionImplTest, V4EmptyOptionNames) {
   Address::Ipv4Instance address("1.2.3.4", 5678);
   IoHandlePtr io_handle = address.socket(Address::SocketType::Stream);
-  ScopedIoHandleCloser closer(io_handle);
   EXPECT_CALL(testing::Const(socket_), ioHandle()).WillRepeatedly(testing::ReturnRef(*io_handle));
   AddrFamilyAwareSocketOptionImpl socket_option{
       envoy::api::v2::core::SocketOption::STATE_PREBIND, {}, {}, 1};
@@ -73,7 +71,6 @@ TEST_F(AddrFamilyAwareSocketOptionImplTest, V4EmptyOptionNames) {
 TEST_F(AddrFamilyAwareSocketOptionImplTest, V6EmptyOptionNames) {
   Address::Ipv6Instance address("::1:2:3:4", 5678);
   IoHandlePtr io_handle = address.socket(Address::SocketType::Stream);
-  ScopedIoHandleCloser closer(io_handle);
   EXPECT_CALL(testing::Const(socket_), ioHandle()).WillRepeatedly(testing::ReturnRef(*io_handle));
   AddrFamilyAwareSocketOptionImpl socket_option{
       envoy::api::v2::core::SocketOption::STATE_PREBIND, {}, {}, 1};
@@ -88,7 +85,6 @@ TEST_F(AddrFamilyAwareSocketOptionImplTest, V6EmptyOptionNames) {
 TEST_F(AddrFamilyAwareSocketOptionImplTest, V4IgnoreV6) {
   Address::Ipv4Instance address("1.2.3.4", 5678);
   IoHandlePtr io_handle = address.socket(Address::SocketType::Stream);
-  ScopedIoHandleCloser closer(io_handle);
   EXPECT_CALL(testing::Const(socket_), ioHandle()).WillRepeatedly(testing::ReturnRef(*io_handle));
 
   AddrFamilyAwareSocketOptionImpl socket_option{envoy::api::v2::core::SocketOption::STATE_PREBIND,
@@ -103,7 +99,6 @@ TEST_F(AddrFamilyAwareSocketOptionImplTest, V4IgnoreV6) {
 TEST_F(AddrFamilyAwareSocketOptionImplTest, V6Only) {
   Address::Ipv6Instance address("::1:2:3:4", 5678);
   IoHandlePtr io_handle = address.socket(Address::SocketType::Stream);
-  ScopedIoHandleCloser closer(io_handle);
   EXPECT_CALL(testing::Const(socket_), ioHandle()).WillRepeatedly(testing::ReturnRef(*io_handle));
 
   AddrFamilyAwareSocketOptionImpl socket_option{envoy::api::v2::core::SocketOption::STATE_PREBIND,
@@ -119,7 +114,6 @@ TEST_F(AddrFamilyAwareSocketOptionImplTest, V6Only) {
 TEST_F(AddrFamilyAwareSocketOptionImplTest, V6OnlyV4Fallback) {
   Address::Ipv6Instance address("::1:2:3:4", 5678);
   IoHandlePtr io_handle = address.socket(Address::SocketType::Stream);
-  ScopedIoHandleCloser closer(io_handle);
   EXPECT_CALL(testing::Const(socket_), ioHandle()).WillRepeatedly(testing::ReturnRef(*io_handle));
 
   AddrFamilyAwareSocketOptionImpl socket_option{envoy::api::v2::core::SocketOption::STATE_PREBIND,
@@ -135,7 +129,6 @@ TEST_F(AddrFamilyAwareSocketOptionImplTest, V6OnlyV4Fallback) {
 TEST_F(AddrFamilyAwareSocketOptionImplTest, V6Precedence) {
   Address::Ipv6Instance address("::1:2:3:4", 5678);
   IoHandlePtr io_handle = address.socket(Address::SocketType::Stream);
-  ScopedIoHandleCloser closer(io_handle);
   EXPECT_CALL(testing::Const(socket_), ioHandle()).WillRepeatedly(testing::ReturnRef(*io_handle));
 
   AddrFamilyAwareSocketOptionImpl socket_option{envoy::api::v2::core::SocketOption::STATE_PREBIND,
@@ -194,7 +187,7 @@ TEST_F(AddrFamilyAwareSocketOptionImplTest, GetSocketOptionCannotDetermineVersio
                                                 Network::SocketOptionName(std::make_pair(6, 11)),
                                                 5};
 
-  IoHandlePtr io_handle = std::make_unique<IoSocketHandle>();
+  IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>();
   EXPECT_CALL(testing::Const(socket_), ioHandle()).WillOnce(testing::ReturnRef(*io_handle));
   auto result =
       socket_option.getOptionDetails(socket_, envoy::api::v2::core::SocketOption::STATE_PREBIND);

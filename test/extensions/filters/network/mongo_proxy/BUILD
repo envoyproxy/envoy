@@ -46,7 +46,6 @@ envoy_extension_cc_test(
         "//test/common/stream_info:test_util",
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/event:event_mocks",
-        "//test/mocks/filesystem:filesystem_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",
     ],
