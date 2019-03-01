@@ -329,6 +329,8 @@ TEST_P(OwnedImplTest, Search) {
 
   EXPECT_EQ(-1, buffer.search("c", 1, 0));
   EXPECT_EQ(0, buffer.search("", 0, 0));
+  EXPECT_EQ(buffer.length(), buffer.search("", 0, buffer.length()));
+  EXPECT_EQ(-1, buffer.search("", 0, buffer.length() + 1));
   EXPECT_EQ(0, buffer.search("a", 1, 0));
   EXPECT_EQ(1, buffer.search("b", 1, 1));
   EXPECT_EQ(2, buffer.search("a", 1, 1));

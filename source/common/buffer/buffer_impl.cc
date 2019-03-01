@@ -512,7 +512,7 @@ ssize_t OwnedImpl::search(const void* data, uint64_t size, size_t start) const {
     // TODO(brian-pane): replace this with a more efficient search if it shows up
     // prominently in CPU profiling.
     if (size == 0) {
-      return 0;
+      return (start <= length_) ? start : -1;
     }
     ssize_t offset = 0;
     const uint8_t* needle = static_cast<const uint8_t*>(data);
