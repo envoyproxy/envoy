@@ -23,6 +23,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HealthCheckers {
 namespace RedisHealthChecker {
+namespace {
 
 class RedisHealthCheckerTest
     : public testing::Test,
@@ -462,6 +463,7 @@ TEST_F(RedisHealthCheckerTest, NoConnectionReuse) {
   EXPECT_EQ(2UL, cluster_->info_->stats_store_.counter("health_check.network_failure").value());
 }
 
+} // namespace
 } // namespace RedisHealthChecker
 } // namespace HealthCheckers
 } // namespace Extensions
