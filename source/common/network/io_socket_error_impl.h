@@ -1,18 +1,19 @@
 #pragma once
 
+#include "envoy/api/io_error.h"
+
 #include "common/common/assert.h"
-#include "envoy/network/io_handle.h"
 
 namespace Envoy {
 namespace Network {
 
-class IoSocketError : public IoError {
+class IoSocketError : public Api::IoError {
 public:
   explicit IoSocketError(int sys_errno) : errno_(sys_errno) {}
 
   ~IoSocketError() override {}
 
-  IoError::IoErrorCode getErrorCode() const override;
+  Api::IoError::IoErrorCode getErrorCode() const override;
   std::string getErrorDetails() const override;
 
 private:
@@ -24,7 +25,7 @@ private:
 // deleter deleteIoError() below to avoid deallocating memory for this error.
 class IoSocketEagain : public IoSocketError {
 public:
- IoSocketEagain() : IoSocketError(EAGAIN) {};
+  IoSocketEagain() : IoSocketError(EAGAIN){};
 };
 
 inline IoSocketEagain* getIoSocketEagainInstance() {
@@ -33,7 +34,7 @@ inline IoSocketEagain* getIoSocketEagainInstance() {
 }
 
 // Deallocate memory only if the error is not IoSocketErrorAgain.
-inline void deleteIoError(IoError* err) {
+inline void deleteIoError(Api::IoError* err) {
   ASSERT(err != nullptr);
   if (err != getIoSocketEagainInstance()) {
     delete err;

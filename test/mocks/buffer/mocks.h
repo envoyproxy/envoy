@@ -19,7 +19,7 @@ public:
   MockBufferBase();
   MockBufferBase(std::function<void()> below_low, std::function<void()> above_high);
 
-  MOCK_METHOD1(write, Network::IoHandleCallUintResult(Network::IoHandle& io_handle));
+  MOCK_METHOD1(write, Api::IoCallUintResult(Network::IoHandle& io_handle));
   MOCK_METHOD1(move, void(Buffer::Instance& rhs));
   MOCK_METHOD2(move, void(Buffer::Instance& rhs, uint64_t length));
   MOCK_METHOD1(drain, void(uint64_t size));
@@ -27,8 +27,8 @@ public:
   void baseMove(Buffer::Instance& rhs) { BaseClass::move(rhs); }
   void baseDrain(uint64_t size) { BaseClass::drain(size); }
 
-  Network::IoHandleCallUintResult trackWrites(Network::IoHandle& io_handle) {
-    Network::IoHandleCallUintResult result = BaseClass::write(io_handle);
+  Api::IoCallUintResult trackWrites(Network::IoHandle& io_handle) {
+    Api::IoCallUintResult result = BaseClass::write(io_handle);
     if (result.err_ == nullptr && result.rc_ > 0) {
       bytes_written_ += result.rc_;
     }
@@ -41,9 +41,9 @@ public:
   }
 
   // A convenience function to invoke on write() which fails the write with EAGAIN.
-  Network::IoHandleCallUintResult failWrite(Network::IoHandle&) {
-    return Network::IoHandleCallUintResult(
-        /*rc=*/0, Network::IoErrorPtr(Network::getIoSocketEagainInstance(), [](Network::IoError*) {}));
+  Api::IoCallUintResult failWrite(Network::IoHandle&) {
+    return Api::IoCallUintResult(
+        /*rc=*/0, Api::IoErrorPtr(Network::getIoSocketEagainInstance(), [](Api::IoError*) {}));
   }
 
   int bytes_written() const { return bytes_written_; }

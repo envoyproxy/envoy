@@ -107,10 +107,10 @@ public:
     src.data_ = src.data_.substr(length);
   }
 
-  Network::IoHandleCallUintResult read(Network::IoHandle& io_handle, uint64_t max_length) override {
+  Api::IoCallUintResult read(Network::IoHandle& io_handle, uint64_t max_length) override {
     FUZZ_ASSERT(max_length <= MaxAllocation);
     Buffer::RawSlice slice{tmp_buf_.get(), MaxAllocation};
-    Network::IoHandleCallUintResult result = io_handle.readv(max_length, &slice, 1);
+    Api::IoCallUintResult result = io_handle.readv(max_length, &slice, 1);
     FUZZ_ASSERT(result.err_ == nullptr && result.rc_ > 0);
     data_ += std::string(tmp_buf_.get(), result.rc_);
     return result;
@@ -130,9 +130,9 @@ public:
 
   std::string toString() const override { return data_; }
 
-  Network::IoHandleCallUintResult write(Network::IoHandle& io_handle) override {
+  Api::IoCallUintResult write(Network::IoHandle& io_handle) override {
     const Buffer::RawSlice slice{const_cast<char*>(data_.data()), data_.size()};
-    Network::IoHandleCallUintResult result = io_handle.writev(&slice, 1);
+    Api::IoCallUintResult result = io_handle.writev(&slice, 1);
     FUZZ_ASSERT(result.err_ == nullptr);
     data_ = data_.substr(result.rc_);
     return result;
@@ -307,7 +307,7 @@ uint32_t bufferAction(Context& ctxt, char insert_value, uint32_t max_alloc, Buff
     const int rc = ::write(pipe_fds[1], data.data(), max_length);
     FUZZ_ASSERT(rc > 0);
     const uint32_t previous_length = target_buffer.length();
-    Network::IoHandleCallUintResult result = target_buffer.read(io_handle, max_length);
+    Api::IoCallUintResult result = target_buffer.read(io_handle, max_length);
     FUZZ_ASSERT(result.rc_ == static_cast<uint64_t>(rc));
     FUZZ_ASSERT(::close(pipe_fds[1]) == 0);
     FUZZ_ASSERT(previous_length == target_buffer.search(data.data(), rc, previous_length));
@@ -326,8 +326,7 @@ uint32_t bufferAction(Context& ctxt, char insert_value, uint32_t max_alloc, Buff
       const auto result = target_buffer.write(io_handle);
       FUZZ_ASSERT(result.err_ == nullptr);
       rc = result.rc_;
-      ENVOY_LOG_MISC(trace, "Write rc: {} errno: {}", rc,
-                     result.err_->getErrorDetails());
+      ENVOY_LOG_MISC(trace, "Write rc: {} errno: {}", rc, result.err_->getErrorDetails());
       if (empty) {
         FUZZ_ASSERT(rc == 0);
       } else {

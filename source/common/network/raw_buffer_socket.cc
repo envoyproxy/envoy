@@ -17,7 +17,7 @@ IoResult RawBufferSocket::doRead(Buffer::Instance& buffer) {
   bool end_stream = false;
   do {
     // 16K read is arbitrary. TODO(mattklein123) PERF: Tune the read size.
-    Network::IoHandleCallUintResult result = buffer.read(callbacks_->ioHandle(), 16384);
+    Api::IoCallUintResult result = buffer.read(callbacks_->ioHandle(), 16384);
 
     if (result.err_ == nullptr) {
       ENVOY_CONN_LOG(trace, "read returns: {}", callbacks_->connection(), result.rc_);
@@ -35,7 +35,7 @@ IoResult RawBufferSocket::doRead(Buffer::Instance& buffer) {
       // Remote error (might be no data).
       ENVOY_CONN_LOG(trace, "read error: {}", callbacks_->connection(),
                      result.err_->getErrorDetails());
-      if (result.err_->getErrorCode() != Network::IoError::IoErrorCode::Again) {
+      if (result.err_->getErrorCode() != Api::IoError::IoErrorCode::Again) {
         action = PostIoAction::Close;
       }
       break;
@@ -60,15 +60,15 @@ IoResult RawBufferSocket::doWrite(Buffer::Instance& buffer, bool end_stream) {
       action = PostIoAction::KeepOpen;
       break;
     }
-    Network::IoHandleCallUintResult result = buffer.write(callbacks_->ioHandle());
+    Api::IoCallUintResult result = buffer.write(callbacks_->ioHandle());
 
     if (result.err_ == nullptr) {
       ENVOY_CONN_LOG(trace, "write returns: {}", callbacks_->connection(), result.rc_);
       bytes_written += result.rc_;
     } else {
       ENVOY_CONN_LOG(trace, "write error: {}", callbacks_->connection(),
-                     result.err_->getErrorDetails() );
-      if (result.err_->getErrorCode() == Network::IoError::IoErrorCode::Again) {
+                     result.err_->getErrorDetails());
+      if (result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
         action = PostIoAction::KeepOpen;
       } else {
         action = PostIoAction::Close;

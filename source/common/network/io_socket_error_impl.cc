@@ -1,10 +1,11 @@
-#include "common/common/assert.h"
 #include "common/network/io_socket_error_impl.h"
+
+#include "common/common/assert.h"
 
 namespace Envoy {
 namespace Network {
 
-IoError::IoErrorCode IoSocketError::getErrorCode() const {
+Api::IoError::IoErrorCode IoSocketError::getErrorCode() const {
   switch (errno_) {
   case EAGAIN:
     RELEASE_ASSERT(this == getIoSocketEagainInstance(),

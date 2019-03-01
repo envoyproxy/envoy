@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/api/io_error.h"
 #include "envoy/api/os_sys_calls.h"
 #include "envoy/network/io_handle.h"
 
@@ -19,18 +20,18 @@ public:
   // TODO(sbelair2)  To be removed when the fd is fully abstracted from clients.
   int fd() const override { return fd_; }
 
-  IoHandleCallUintResult close() override;
+  Api::IoCallUintResult close() override;
 
   bool isOpen() const override;
 
-  IoHandleCallUintResult readv(uint64_t max_length, Buffer::RawSlice* slices,
-                               uint64_t num_slice) override;
+  Api::IoCallUintResult readv(uint64_t max_length, Buffer::RawSlice* slices,
+                              uint64_t num_slice) override;
 
-  IoHandleCallUintResult writev(const Buffer::RawSlice* slices, uint64_t num_slice) override;
+  Api::IoCallUintResult writev(const Buffer::RawSlice* slices, uint64_t num_slice) override;
 
 private:
-  // Converts a SysCallSizeResult to IoHandleCallUintResult.
-  IoHandleCallUintResult sysCallResultToIoHandleCallResult(const Api::SysCallSizeResult& result);
+  // Converts a SysCallSizeResult to IoCallUintResult.
+  Api::IoCallUintResult sysCallResultToIoCallResult(const Api::SysCallSizeResult& result);
 
   int fd_;
 };

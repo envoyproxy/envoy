@@ -18,10 +18,6 @@ import "google/protobuf/timestamp.proto";
 
 // Connection properties.
 message Connection {
-  // Global unique connection ID for Envoy session. Matches connection IDs used
-  // in Envoy logs.
-  uint64 id = 1;
-
   // Local address.
   envoy.api.v2.core.Address local_address = 2;
 
@@ -51,26 +47,51 @@ message SocketEvent {
     bool end_stream = 2;
   }
 
+  // The connection was closed.
+  message Closed {
+    // TODO(mattklein123): Close event type.
+  }
+
   // Read or write with content as bytes string.
   oneof event_selector {
     Read read = 2;
     Write write = 3;
+    Closed closed = 4;
   }
 }
 
 // Sequence of read/write events that constitute a buffered trace on a socket.
 message SocketBufferedTrace {
+  // Trace ID unique to the originating Envoy only. Trace IDs can repeat and should not be used
+  // for long term stable uniqueness. Matches connection IDs used in Envoy logs.
+  uint64 trace_id = 1;
+
   // Connection properties.
-  Connection connection = 1;
+  Connection connection = 2;
 
   // Sequence of observed events.
-  repeated SocketEvent events = 2;
+  repeated SocketEvent events = 3;
 
   // Set to true if read events were truncated due to the :ref:`max_buffered_rx_bytes
   // <envoy_api_field_service.tap.v2alpha.OutputConfig.max_buffered_rx_bytes>` setting.
-  bool read_truncated = 3;
+  bool read_truncated = 4;
 
   // Set to true if write events were truncated due to the :ref:`max_buffered_tx_bytes
   // <envoy_api_field_service.tap.v2alpha.OutputConfig.max_buffered_tx_bytes>` setting.
-  bool write_truncated = 4;
+  bool write_truncated = 5;
+}
+
+// A streamed socket trace segment. Multiple segments make up a full trace.
+message SocketStreamedTraceSegment {
+  // Trace ID unique to the originating Envoy only. Trace IDs can repeat and should not be used
+  // for long term stable uniqueness. Matches connection IDs used in Envoy logs.
+  uint64 trace_id = 1;
+
+  oneof message_piece {
+    // Connection properties.
+    Connection connection = 2;
+
+    // Socket event.
+    SocketEvent event = 3;
+  }
 }

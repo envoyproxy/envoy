@@ -1,3 +1,5 @@
+#include "envoy/api/io_error.h"
+
 #include "common/buffer/buffer_impl.h"
 #include "common/network/io_socket_handle_impl.h"
 
@@ -120,7 +122,7 @@ TEST_F(OwnedImplTest, Write) {
   Network::IoSocketHandleImpl io_handle;
   buffer.add("example");
   EXPECT_CALL(os_sys_calls, writev(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{7, 0}));
-  Network::IoHandleCallUintResult result = buffer.write(io_handle);
+  Api::IoCallUintResult result = buffer.write(io_handle);
   EXPECT_EQ(nullptr, result.err_);
   EXPECT_EQ(7, result.rc_);
   EXPECT_EQ(0, buffer.length());
@@ -140,13 +142,13 @@ TEST_F(OwnedImplTest, Write) {
 
   EXPECT_CALL(os_sys_calls, writev(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{-1, EBADF}));
   result = buffer.write(io_handle);
-  EXPECT_EQ(Network::IoError::IoErrorCode::BadHandle, result.err_->getErrorCode());
+  EXPECT_EQ(Api::IoError::IoErrorCode::BadHandle, result.err_->getErrorCode());
   EXPECT_EQ(0, result.rc_);
   EXPECT_EQ(1, buffer.length());
 
   EXPECT_CALL(os_sys_calls, writev(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{-1, EAGAIN}));
   result = buffer.write(io_handle);
-  EXPECT_EQ(Network::IoError::IoErrorCode::Again, result.err_->getErrorCode());
+  EXPECT_EQ(Api::IoError::IoErrorCode::Again, result.err_->getErrorCode());
   EXPECT_EQ(0, result.rc_);
   EXPECT_EQ(1, buffer.length());
 
@@ -169,20 +171,20 @@ TEST_F(OwnedImplTest, Read) {
   Buffer::OwnedImpl buffer;
   Network::IoSocketHandleImpl io_handle;
   EXPECT_CALL(os_sys_calls, readv(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{0, 0}));
-  Network::IoHandleCallUintResult result = buffer.read(io_handle, 100);
+  Api::IoCallUintResult result = buffer.read(io_handle, 100);
   EXPECT_EQ(nullptr, result.err_);
   EXPECT_EQ(0, result.rc_);
   EXPECT_EQ(0, buffer.length());
 
   EXPECT_CALL(os_sys_calls, readv(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{-1, EBADF}));
   result = buffer.read(io_handle, 100);
-  EXPECT_EQ(Network::IoError::IoErrorCode::BadHandle, result.err_->getErrorCode());
+  EXPECT_EQ(Api::IoError::IoErrorCode::BadHandle, result.err_->getErrorCode());
   EXPECT_EQ(0, result.rc_);
   EXPECT_EQ(0, buffer.length());
 
   EXPECT_CALL(os_sys_calls, readv(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{-1, EAGAIN}));
   result = buffer.read(io_handle, 100);
-  EXPECT_EQ(Network::IoError::IoErrorCode::Again, result.err_->getErrorCode());
+  EXPECT_EQ(Api::IoError::IoErrorCode::Again, result.err_->getErrorCode());
   EXPECT_EQ(0, result.rc_);
   EXPECT_EQ(0, buffer.length());
 

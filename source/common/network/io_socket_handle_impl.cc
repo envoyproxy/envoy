@@ -22,17 +22,17 @@ IoSocketHandleImpl::~IoSocketHandleImpl() {
   }
 }
 
-IoHandleCallUintResult IoSocketHandleImpl::close() {
+Api::IoCallUintResult IoSocketHandleImpl::close() {
   ASSERT(fd_ != -1);
   const int rc = ::close(fd_);
   fd_ = -1;
-  return IoHandleCallResult<uint64_t>(rc, IoErrorPtr(nullptr, deleteIoError));
+  return Api::IoCallResult<uint64_t>(rc, Api::IoErrorPtr(nullptr, deleteIoError));
 }
 
 bool IoSocketHandleImpl::isOpen() const { return fd_ != -1; }
 
-IoHandleCallUintResult IoSocketHandleImpl::readv(uint64_t max_length, Buffer::RawSlice* slices,
-                                                 uint64_t num_slice) {
+Api::IoCallUintResult IoSocketHandleImpl::readv(uint64_t max_length, Buffer::RawSlice* slices,
+                                                uint64_t num_slice) {
   STACK_ARRAY(iov, iovec, num_slice);
   uint64_t num_slices_to_read = 0;
   uint64_t num_bytes_to_read = 0;
@@ -47,11 +47,11 @@ IoHandleCallUintResult IoSocketHandleImpl::readv(uint64_t max_length, Buffer::Ra
   auto& os_syscalls = Api::OsSysCallsSingleton::get();
   const Api::SysCallSizeResult result =
       os_syscalls.readv(fd_, iov.begin(), static_cast<int>(num_slices_to_read));
-  return sysCallResultToIoHandleCallResult(result);
+  return sysCallResultToIoCallResult(result);
 }
 
-IoHandleCallUintResult IoSocketHandleImpl::writev(const Buffer::RawSlice* slices,
-                                                  uint64_t num_slice) {
+Api::IoCallUintResult IoSocketHandleImpl::writev(const Buffer::RawSlice* slices,
+                                                 uint64_t num_slice) {
   STACK_ARRAY(iov, iovec, num_slice);
   uint64_t num_slices_to_write = 0;
   for (uint64_t i = 0; i < num_slice; i++) {
@@ -62,24 +62,24 @@ IoHandleCallUintResult IoSocketHandleImpl::writev(const Buffer::RawSlice* slices
     }
   }
   if (num_slices_to_write == 0) {
-    return IoHandleCallUintResult(0, IoErrorPtr(nullptr, deleteIoError));
+    return Api::IoCallUintResult(0, Api::IoErrorPtr(nullptr, deleteIoError));
   }
   auto& os_syscalls = Api::OsSysCallsSingleton::get();
   const Api::SysCallSizeResult result = os_syscalls.writev(fd_, iov.begin(), num_slices_to_write);
-  return sysCallResultToIoHandleCallResult(result);
+  return sysCallResultToIoCallResult(result);
 }
 
-IoHandleCallUintResult
-IoSocketHandleImpl::sysCallResultToIoHandleCallResult(const Api::SysCallSizeResult& result) {
+Api::IoCallUintResult
+IoSocketHandleImpl::sysCallResultToIoCallResult(const Api::SysCallSizeResult& result) {
   if (result.rc_ >= 0) {
     // Return nullptr as IoError upon success.
-    return IoHandleCallUintResult(result.rc_, IoErrorPtr(nullptr, deleteIoError));
+    return Api::IoCallUintResult(result.rc_, Api::IoErrorPtr(nullptr, deleteIoError));
   }
-  return IoHandleCallUintResult(
+  return Api::IoCallUintResult(
       /*rc=*/0, (result.errno_ == EAGAIN
                      // EAGAIN is frequent enough that its memory allocation should be avoided.
-                     ? IoErrorPtr(getIoSocketEagainInstance(), deleteIoError)
-                     : IoErrorPtr(new IoSocketError(result.errno_), deleteIoError)));
+                     ? Api::IoErrorPtr(getIoSocketEagainInstance(), deleteIoError)
+                     : Api::IoErrorPtr(new IoSocketError(result.errno_), deleteIoError)));
 }
 
 } // namespace Network

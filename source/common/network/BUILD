@@ -105,9 +105,9 @@ envoy_cc_library(
 envoy_cc_library(
     name = "io_socket_error_lib",
     srcs = ["io_socket_error_impl.cc"],
-    hdrs = ["io_socket_error_impl.h",],
+    hdrs = ["io_socket_error_impl.h"],
     deps = [
-        "//include/envoy/network:io_handle_interface",
+        "//include/envoy/api:io_error_interface",
         "//source/common/common:assert_lib",
     ],
 )

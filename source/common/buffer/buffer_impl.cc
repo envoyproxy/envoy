@@ -123,15 +123,14 @@ void OwnedImpl::move(Instance& rhs, uint64_t length) {
   static_cast<LibEventInstance&>(rhs).postProcess();
 }
 
-Network::IoHandleCallUintResult OwnedImpl::read(Network::IoHandle& io_handle, uint64_t max_length) {
+Api::IoCallUintResult OwnedImpl::read(Network::IoHandle& io_handle, uint64_t max_length) {
   if (max_length == 0) {
-    return Network::IoHandleCallUintResult(0,
-                                           Network::IoErrorPtr(nullptr, [](Network::IoError*) {}));
+    return Api::IoCallUintResult(0, Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
   }
   constexpr uint64_t MaxSlices = 2;
   RawSlice slices[MaxSlices];
   const uint64_t num_slices = reserve(max_length, slices, MaxSlices);
-  Network::IoHandleCallUintResult result = io_handle.readv(max_length, slices, num_slices);
+  Api::IoCallUintResult result = io_handle.readv(max_length, slices, num_slices);
   if (result.err_ == nullptr) {
     // Read succeeded.
     uint64_t num_slices_to_commit = 0;
@@ -170,11 +169,11 @@ ssize_t OwnedImpl::search(const void* data, uint64_t size, size_t start) const {
   return result_ptr.pos;
 }
 
-Network::IoHandleCallUintResult OwnedImpl::write(Network::IoHandle& io_handle) {
+Api::IoCallUintResult OwnedImpl::write(Network::IoHandle& io_handle) {
   constexpr uint64_t MaxSlices = 16;
   RawSlice slices[MaxSlices];
   const uint64_t num_slices = std::min(getRawSlices(slices, MaxSlices), MaxSlices);
-  Network::IoHandleCallUintResult result = io_handle.writev(slices, num_slices);
+  Api::IoCallUintResult result = io_handle.writev(slices, num_slices);
   if (result.err_ == nullptr && result.rc_ > 0) {
     drain(static_cast<uint64_t>(result.rc_));
   }
