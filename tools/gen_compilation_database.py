@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 
 import argparse
-import os
 import json
+import os
 import subprocess
 
 

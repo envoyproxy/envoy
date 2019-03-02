@@ -17,6 +17,7 @@ using testing::Return;
 
 namespace Envoy {
 namespace Router {
+namespace {
 
 class ShadowWriterImplTest : public testing::Test {
 public:
@@ -69,5 +70,6 @@ TEST_F(ShadowWriterImplTest, NoCluster) {
   writer_.shadow("foo", std::move(message), std::chrono::milliseconds(5));
 }
 
+} // namespace
 } // namespace Router
 } // namespace Envoy

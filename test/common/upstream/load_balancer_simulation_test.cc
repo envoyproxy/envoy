@@ -20,6 +20,7 @@ using testing::Return;
 
 namespace Envoy {
 namespace Upstream {
+namespace {
 
 static HostSharedPtr newTestHost(Upstream::ClusterInfoConstSharedPtr cluster,
                                  const std::string& url, uint32_t weight = 1,
@@ -261,5 +262,6 @@ TEST_F(DISABLED_SimulationTest, unequalZoneDistribution6) {
   run({3U, 2U, 5U}, {3U, 4U, 5U}, {3U, 4U, 5U});
 }
 
+} // namespace
 } // namespace Upstream
 } // namespace Envoy

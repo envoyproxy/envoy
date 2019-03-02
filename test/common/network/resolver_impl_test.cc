@@ -21,6 +21,8 @@
 namespace Envoy {
 namespace Network {
 namespace Address {
+namespace {
+
 class IpResolverTest : public testing::Test {
 public:
   Resolver* resolver_{Registry::FactoryRegistry<Resolver>::getFactory("envoy.ip")};
@@ -167,6 +169,7 @@ TEST(ResolverTest, NoSuchResolver) {
                             "Unknown address resolver: envoy.test.resolver");
 }
 
+} // namespace
 } // namespace Address
 } // namespace Network
 } // namespace Envoy

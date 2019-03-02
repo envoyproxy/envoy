@@ -18,6 +18,7 @@ namespace Envoy {
 namespace Extensions {
 namespace StatSinks {
 namespace MetricsService {
+namespace {
 
 class GrpcMetricsStreamerImplTest : public testing::Test {
 public:
@@ -153,6 +154,7 @@ TEST(MetricsServiceSinkTest, CheckStatsCount) {
   EXPECT_EQ(1, (*streamer_).metric_count);
 }
 
+} // namespace
 } // namespace MetricsService
 } // namespace StatSinks
 } // namespace Extensions

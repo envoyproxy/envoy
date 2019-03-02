@@ -13,6 +13,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Lua {
+namespace {
 
 TEST(LuaFilterConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
@@ -37,6 +38,7 @@ TEST(LuaFilterConfigTest, LuaFilterInJson) {
   cb(filter_callback);
 }
 
+} // namespace
 } // namespace Lua
 } // namespace HttpFilters
 } // namespace Extensions

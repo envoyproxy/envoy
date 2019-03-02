@@ -28,6 +28,10 @@ void ZipkinSpan::setTag(const std::string& name, const std::string& value) {
   span_.setTag(name, value);
 }
 
+void ZipkinSpan::log(SystemTime timestamp, const std::string& event) {
+  span_.log(timestamp, event);
+}
+
 void ZipkinSpan::injectContext(Http::HeaderMap& request_headers) {
   // Set the trace-id and span-id headers properly, based on the newly-created span structure.
   request_headers.setReferenceKey(ZipkinCoreConstants::get().X_B3_TRACE_ID,

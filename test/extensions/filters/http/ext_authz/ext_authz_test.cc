@@ -43,6 +43,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace ExtAuthz {
+namespace {
 
 template <class T> class HttpFilterTestBase : public T {
 public:
@@ -662,6 +663,7 @@ TEST_F(HttpFilterTestParam, ResetDuringCall) {
   filter_->onDestroy();
 }
 
+} // namespace
 } // namespace ExtAuthz
 } // namespace HttpFilters
 } // namespace Extensions

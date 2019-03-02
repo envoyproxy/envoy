@@ -10,6 +10,7 @@ namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
 namespace Alts {
+namespace {
 
 using testing::_;
 using testing::InSequence;
@@ -143,6 +144,7 @@ TEST_F(TsiFrameProtectorTest, UnprotectError) {
   raw_frame_protector_->vtable = vtable;
 }
 
+} // namespace
 } // namespace Alts
 } // namespace TransportSockets
 } // namespace Extensions

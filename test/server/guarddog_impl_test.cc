@@ -23,6 +23,7 @@ using testing::NiceMock;
 
 namespace Envoy {
 namespace Server {
+namespace {
 
 class GuardDogTestBase : public testing::Test {
 protected:
@@ -253,7 +254,7 @@ TEST_F(GuardDogTestBase, WatchDogThreadIdTest) {
 
 // If this test fails it is because the std::chrono::steady_clock::duration type has become
 // nontrivial or we are compiling under a compiler and library combo that makes
-// std::chrono::steady_clock::duration require a lock to be atomicly modified.
+// std::chrono::steady_clock::duration require a lock to be atomically modified.
 //
 // The WatchDog/GuardDog relies on this being a lock free atomic for perf reasons so some workaround
 // will be required if this test starts failing.
@@ -262,5 +263,6 @@ TEST_F(GuardDogTestBase, AtomicIsAtomicTest) {
   ASSERT_EQ(atomic_time.is_lock_free(), true);
 }
 
+} // namespace
 } // namespace Server
 } // namespace Envoy

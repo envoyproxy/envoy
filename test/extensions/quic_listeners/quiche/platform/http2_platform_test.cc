@@ -19,6 +19,7 @@ namespace Envoy {
 namespace Extensions {
 namespace QuicListeners {
 namespace Quiche {
+namespace {
 
 TEST(Http2PlatformTest, Http2Arraysize) {
   int array[] = {0, 1, 2, 3, 4};
@@ -60,6 +61,7 @@ TEST(Http2PlatformTest, Http2StringPiece) {
   EXPECT_EQ('b', sp[0]);
 }
 
+} // namespace
 } // namespace Quiche
 } // namespace QuicListeners
 } // namespace Extensions

@@ -341,6 +341,7 @@ private:
     DownstreamWatermarkManager downstream_watermark_manager_{*this};
     Tracing::SpanPtr span_;
     StreamInfo::StreamInfoImpl stream_info_;
+    StreamInfo::UpstreamTiming upstream_timing_;
     Http::HeaderMap* upstream_headers_{};
     Http::HeaderMap* upstream_trailers_{};
 
@@ -379,7 +380,7 @@ private:
   void onUpstreamMetadata(Http::MetadataMapPtr&& metadata_map);
   void onUpstreamComplete();
   void onUpstreamReset(UpstreamResetType type,
-                       const absl::optional<Http::StreamResetReason>& reset_reason);
+                       const absl::optional<Http::StreamResetReason> reset_reason);
   void sendNoHealthyUpstreamResponse();
   bool setupRetry(bool end_stream);
   bool setupRedirect(const Http::HeaderMap& headers);
