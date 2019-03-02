@@ -106,7 +106,6 @@ public:
     subscription_->start({route_config_name_}, *this);
   }
 
-  void cancel() override { initialize_callback_ = nullptr; }
   // Config::SubscriptionCallbacks
   void onConfigUpdate(const ResourceVector& resources, const std::string& version_info) override;
   void onConfigUpdateFailed(const EnvoyException* e) override;

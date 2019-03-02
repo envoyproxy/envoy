@@ -64,16 +64,17 @@ TEST_F(InitManagerImplTest, TargetAfterInitializing) {
   target1.callback_();
 }
 
-TEST_F(InitManagerImplTest, Cancel) {
-  InitManagerImpl* manager = new InitManagerImpl("test");
+// standalone test, not using manager_ and initialized_ from fixture
+TEST(StandaloneInitManagerImplTest, DeletedInitManagerImpl) {
+  auto manager = new InitManagerImpl("test");
   Init::MockTarget target;
 
   manager->registerTarget(target, "");
   EXPECT_CALL(target, initialize(_));
-  manager->initialize([&]() -> void { initialized_.ready(); });
+  manager->initialize([&]() -> void {});
 
-  EXPECT_CALL(target, cancel());
   delete manager;
+  target.callback_();
 }
 
 } // namespace

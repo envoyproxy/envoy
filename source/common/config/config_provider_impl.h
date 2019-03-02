@@ -149,8 +149,6 @@ public:
     start();
   }
 
-  void cancel() override { initialize_callback_ = nullptr; }
-
   /**
    * Starts the subscription corresponding to a config source.
    * A derived class must own the configuration proto specific Envoy::Config::Subscription to be
