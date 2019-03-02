@@ -2307,7 +2307,7 @@ TEST_F(RouterTest, UpstreamTimingRetry) {
   HttpTestUtility::addDefaultHeaders(headers);
   router_.decodeHeaders(headers, false);
 
-  router_.retry_state_->expectRetry();
+  router_.retry_state_->expectHeadersRetry();
 
   test_time_.sleep(std::chrono::milliseconds(32));
   Buffer::OwnedImpl data;
@@ -2332,7 +2332,7 @@ TEST_F(RouterTest, UpstreamTimingRetry) {
   EXPECT_FALSE(stream_info.lastUpstreamRxByteReceived().has_value());
 
   router_.retry_state_->callback_();
-  EXPECT_CALL(*router_.retry_state_, shouldRetry(_, _, _)).WillOnce(Return(RetryStatus::No));
+  EXPECT_CALL(*router_.retry_state_, shouldRetryHeaders(_, _)).WillOnce(Return(RetryStatus::No));
   MonotonicTime retry_time = test_time_.monotonicTime();
 
   Http::HeaderMapPtr good_response_headers(new Http::TestHeaderMapImpl{{":status", "200"}});
