@@ -41,7 +41,6 @@ using testing::Invoke;
 using testing::Not;
 
 namespace Envoy {
-
 namespace {
 
 envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::CodecType

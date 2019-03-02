@@ -17,6 +17,7 @@ using testing::InSequence;
 
 namespace Envoy {
 namespace Event {
+namespace {
 
 class TestDeferredDeletable : public DeferredDeletable {
 public:
@@ -170,5 +171,6 @@ TEST_F(DispatcherImplTest, Timer) {
   }
 }
 
+} // namespace
 } // namespace Event
 } // namespace Envoy

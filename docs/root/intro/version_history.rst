@@ -51,6 +51,7 @@ Version history
   routing to certain hosts only when there are insufficient healthy hosts available.
 * tracing: added :ref:`verbose <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.tracing>` to support logging annotations on spans.
 * upstream: added support for host weighting and :ref:`locality weighting <arch_overview_load_balancing_locality_weighted_lb>` in the :ref:`ring hash load balancer <arch_overview_load_balancing_types_ring_hash>`, and added a :ref:`maximum_ring_size<envoy_api_field_Cluster.RingHashLbConfig.maximum_ring_size>` config parameter to strictly bound the ring size.
+* upstream: added configuration option to select any host when the fallback policy fails.
 
 1.9.0 (Dec 20, 2018)
 ====================

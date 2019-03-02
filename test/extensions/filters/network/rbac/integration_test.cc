@@ -9,9 +9,10 @@ namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace RBAC {
-
 namespace {
+
 std::string rbac_config;
+
 } // namespace
 
 class RoleBasedAccessControlNetworkFilterIntegrationTest

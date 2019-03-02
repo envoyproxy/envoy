@@ -40,6 +40,7 @@ namespace Envoy {
 namespace Extensions {
 namespace ListenerFilters {
 namespace ProxyProtocol {
+namespace {
 
 // Build again on the basis of the connection_handler_test.cc
 
@@ -999,6 +1000,7 @@ TEST_P(WildcardProxyProtocolTest, BasicV6) {
   disconnect();
 }
 
+} // namespace
 } // namespace ProxyProtocol
 } // namespace ListenerFilters
 } // namespace Extensions

@@ -16,6 +16,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace JwtAuthn {
+namespace {
 
 class AllVerifierTest : public testing::Test {
 public:
@@ -75,6 +76,7 @@ TEST_F(AllVerifierTest, TestAllowFailed) {
   EXPECT_TRUE(headers.has("c"));
 }
 
+} // namespace
 } // namespace JwtAuthn
 } // namespace HttpFilters
 } // namespace Extensions
