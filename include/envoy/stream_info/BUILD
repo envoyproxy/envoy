@@ -17,8 +17,8 @@ envoy_cc_library(
         "//include/envoy/common:time_interface",
         "//include/envoy/http:protocol_interface",
         "//include/envoy/upstream:host_description_interface",
-        "//source/common/protobuf",
         "//source/common/common:assert_lib",
+        "//source/common/protobuf",
     ],
 )
 

@@ -11,8 +11,8 @@
 #include "envoy/stream_info/filter_state.h"
 #include "envoy/upstream/host_description.h"
 
-#include "common/protobuf/protobuf.h"
 #include "common/common/assert.h"
+#include "common/protobuf/protobuf.h"
 
 #include "absl/types/optional.h"
 
