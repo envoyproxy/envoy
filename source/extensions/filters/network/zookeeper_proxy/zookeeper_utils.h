@@ -14,6 +14,8 @@ namespace ZooKeeperProxy {
 
 /**
  * IO helpers for reading/writing ZooKeeper data from/to a buffer.
+ *
+ * Note: ZooKeeper's protocol uses network byte ordering (big-endian).
  */
 class BufferHelper : public Logger::Loggable<Logger::Id::filter> {
 public:
