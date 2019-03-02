@@ -76,17 +76,10 @@ private:
       Upstream::ClusterFactoryContext& context,
       Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
       Stats::ScopePtr&& stats_scope) override {
-    //    fmt::format("priority: {}", proto_config.address());
-    //      return std::make_unique<Upstream::StaticClusterImpl>(cluster, context.runtime(),
-    //      socket_factory_context,
-    //                                                 std::move(stats_scope),
-    //                                                 context.addedViaApi());
-    return std::make_unique<CustomStaticCluster>(
-        cluster, context.runtime(), socket_factory_context, std::move(stats_scope),
-        context.addedViaApi(), proto_config.priority(),
-        //                                                   cluster.hosts(0).socket_address().address(),
-        //                                                   cluster.hosts(0).socket_address().port_value());
-        proto_config.address(), proto_config.port_value());
+    return std::make_unique<CustomStaticCluster>(cluster, context.runtime(), socket_factory_context,
+                                                 std::move(stats_scope), context.addedViaApi(),
+                                                 proto_config.priority(), proto_config.address(),
+                                                 proto_config.port_value());
   }
 };
 

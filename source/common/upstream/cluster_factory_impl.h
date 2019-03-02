@@ -48,21 +48,21 @@
 
 #include "extensions/clusters/well_known_names.h"
 
+#include "include/envoy/thread_local/_virtual_includes/thread_local_interface/envoy/thread_local/thread_local.h"
+
 namespace Envoy {
 namespace Upstream {
 
 class ClusterFactoryContextImpl : public ClusterFactoryContext {
 
 public:
-  ClusterFactoryContextImpl(ClusterManager& cluster_manager, Stats::Store& stats,
-                            ThreadLocal::Instance& tls, Network::DnsResolverSharedPtr dns_resolver,
-                            Ssl::ContextManager& ssl_context_manager, Runtime::Loader& runtime,
-                            Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
-                            AccessLog::AccessLogManager& log_manager,
-                            const LocalInfo::LocalInfo& local_info, Server::Admin& admin,
-                            Singleton::Manager& singleton_manager,
-                            Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api,
-                            Api::Api& api)
+  ClusterFactoryContextImpl(
+      ClusterManager& cluster_manager, Stats::Store& stats, ThreadLocal::SlotAllocator& tls,
+      Network::DnsResolverSharedPtr dns_resolver, Ssl::ContextManager& ssl_context_manager,
+      Runtime::Loader& runtime, Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
+      AccessLog::AccessLogManager& log_manager, const LocalInfo::LocalInfo& local_info,
+      Server::Admin& admin, Singleton::Manager& singleton_manager,
+      Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api, Api::Api& api)
       : cluster_manager_(cluster_manager), stats_(stats), tls_(tls),
         dns_resolver_(std::move(dns_resolver)), ssl_context_manager_(ssl_context_manager),
         runtime_(runtime), random_(random), dispatcher_(dispatcher), log_manager_(log_manager),
@@ -72,7 +72,7 @@ public:
 
   ClusterManager& clusterManager() override { return cluster_manager_; }
   Stats::Store& stats() override { return stats_; }
-  ThreadLocal::Instance& tls() override { return tls_; }
+  ThreadLocal::SlotAllocator& tls() override { return tls_; }
   Network::DnsResolverSharedPtr dnsResolver() override { return dns_resolver_; }
   Ssl::ContextManager& sslContextManager() override { return ssl_context_manager_; }
   Runtime::Loader& runtime() override { return runtime_; }
@@ -89,7 +89,7 @@ public:
 private:
   ClusterManager& cluster_manager_;
   Stats::Store& stats_;
-  ThreadLocal::Instance& tls_;
+  ThreadLocal::SlotAllocator& tls_;
   Network::DnsResolverSharedPtr dns_resolver_;
   Ssl::ContextManager& ssl_context_manager_;
   Runtime::Loader& runtime_;
@@ -180,16 +180,13 @@ private:
 
 /**
  * Common base class for custom cluster factory with custom configuration.
- * @tparam ConfigProto is the configuration protobuf.
+ * @param ConfigProto is the configuration protobuf.
  */
 template <class ConfigProto> class ConfigurableClusterFactoryBase : public ClusterFactoryImplBase {
 
 public:
   /**
-   * @return ProtobufTypes::MessagePtr create empty config proto message for v2. The filter
-   *         config, which arrives in an opaque google.protobuf.Struct message, will be converted to
-   *         JSON and then parsed into this empty proto. Optional today, will be compulsory when v1
-   *         is deprecated.
+   * @return ProtobufTypes::MessagePtr create empty config proto message.
    */
   virtual ProtobufTypes::MessagePtr createEmptyConfigProto() {
     return std::make_unique<ConfigProto>();

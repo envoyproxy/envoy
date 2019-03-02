@@ -25,6 +25,8 @@
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/outlier_detection.h"
 
+#include "include/envoy/thread_local/_virtual_includes/thread_local_interface/envoy/thread_local/thread_local.h"
+
 namespace Envoy {
 namespace Upstream {
 
@@ -33,7 +35,6 @@ namespace Upstream {
  * the rest of the server through this context object.
  */
 class ClusterFactoryContext {
-
 public:
   virtual ~ClusterFactoryContext() = default;
 
@@ -106,7 +107,7 @@ public:
   /**
    * @return the server's TLS slot allocator.
    */
-  virtual ThreadLocal::Instance& tls() PURE;
+  virtual ThreadLocal::SlotAllocator& tls() PURE;
 
   /**
    * @return Outlier::EventLoggerSharedPtr sink for outlier detection event logs.
@@ -124,9 +125,8 @@ public:
 
   /**
    * Create a new instance of cluster. If the implementation is unable to produce a cluster instance
-   * with the provided parameters, it should throw an EnvoyException in the case of general error or
-   * a Json::Exception if the json configuration is erroneous.
-   * @param cluster supplies the general protobuf configuration for the cluster
+   * with the provided parameters, it should throw an EnvoyException in the case of general error.
+   * @param cluster supplies the general protobuf configuration for the cluster.
    * @param context supplies the cluster's context.
    * @return ClusterSharedPtr the cluster instance. The returned ClusterSharedPtr should not be
    * null.

@@ -1,19 +1,8 @@
 #include "common/upstream/eds.h"
 
 #include "envoy/api/v2/eds.pb.validate.h"
-#include "envoy/common/exception.h"
-#include "envoy/stats/scope.h"
 
-#include "common/common/fmt.h"
-#include "common/config/metadata.h"
 #include "common/config/subscription_factory.h"
-#include "common/config/utility.h"
-#include "common/config/well_known_names.h"
-#include "common/network/address_impl.h"
-#include "common/network/resolver_impl.h"
-#include "common/network/utility.h"
-#include "common/protobuf/utility.h"
-#include "common/upstream/load_balancer_impl.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -174,7 +163,6 @@ ClusterImplBaseSharedPtr EdsClusterFactory::createClusterImpl(
     throw EnvoyException("cannot create an EDS cluster without an EDS config");
   }
 
-  // We map SDS to EDS, since EDS provides backwards compatibility with SDS.
   return std::make_unique<EdsClusterImpl>(cluster, context.runtime(), socket_factory_context,
                                           std::move(stats_scope), context.addedViaApi());
 }

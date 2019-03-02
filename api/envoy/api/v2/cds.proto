@@ -96,9 +96,8 @@ message Cluster {
     ORIGINAL_DST = 4;
   }
 
-  // Extended cluster type
+  // Extended cluster type.
   message CustomClusterType {
-
     // The type of the cluster to instantiate. The name must match a supported cluster type.
     string name = 1 [(validate.rules).string.min_bytes = 1];
 
@@ -112,7 +111,7 @@ message Cluster {
     // to use for resolving the cluster.
     DiscoveryType type = 2 [(validate.rules).enum.defined_only = true];
 
-    // The custom cluster type
+    // The custom cluster type.
     CustomClusterType cluster_type = 38;
   }
 
