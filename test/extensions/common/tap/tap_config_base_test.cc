@@ -10,6 +10,58 @@ namespace Common {
 namespace Tap {
 namespace {
 
+TEST(BodyBytesToString, All) {
+  {
+    envoy::data::tap::v2alpha::TraceWrapper trace;
+    trace.mutable_http_streamed_trace_segment()->mutable_request_body_chunk()->set_as_bytes(
+        "hello");
+    Utility::bodyBytesToString(trace, envoy::service::tap::v2alpha::OutputSink::JSON_BODY_AS_BYTES);
+    EXPECT_EQ("hello", trace.http_streamed_trace_segment().request_body_chunk().as_bytes());
+  }
+
+  {
+    envoy::data::tap::v2alpha::TraceWrapper trace;
+    trace.mutable_http_streamed_trace_segment()->mutable_request_body_chunk()->set_as_bytes(
+        "hello");
+    Utility::bodyBytesToString(trace,
+                               envoy::service::tap::v2alpha::OutputSink::JSON_BODY_AS_STRING);
+    EXPECT_EQ("hello", trace.http_streamed_trace_segment().request_body_chunk().as_string());
+  }
+
+  {
+    envoy::data::tap::v2alpha::TraceWrapper trace;
+    trace.mutable_http_streamed_trace_segment()->mutable_response_body_chunk()->set_as_bytes(
+        "hello");
+    Utility::bodyBytesToString(trace,
+                               envoy::service::tap::v2alpha::OutputSink::JSON_BODY_AS_STRING);
+    EXPECT_EQ("hello", trace.http_streamed_trace_segment().response_body_chunk().as_string());
+  }
+
+  {
+    envoy::data::tap::v2alpha::TraceWrapper trace;
+    trace.mutable_socket_streamed_trace_segment()
+        ->mutable_event()
+        ->mutable_read()
+        ->mutable_data()
+        ->set_as_bytes("hello");
+    Utility::bodyBytesToString(trace,
+                               envoy::service::tap::v2alpha::OutputSink::JSON_BODY_AS_STRING);
+    EXPECT_EQ("hello", trace.socket_streamed_trace_segment().event().read().data().as_string());
+  }
+
+  {
+    envoy::data::tap::v2alpha::TraceWrapper trace;
+    trace.mutable_socket_streamed_trace_segment()
+        ->mutable_event()
+        ->mutable_write()
+        ->mutable_data()
+        ->set_as_bytes("hello");
+    Utility::bodyBytesToString(trace,
+                               envoy::service::tap::v2alpha::OutputSink::JSON_BODY_AS_STRING);
+    EXPECT_EQ("hello", trace.socket_streamed_trace_segment().event().write().data().as_string());
+  }
+}
+
 TEST(AddBufferToProtoBytes, All) {
   {
     Buffer::OwnedImpl data("hello");

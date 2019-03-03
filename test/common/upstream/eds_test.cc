@@ -26,6 +26,7 @@ using testing::ReturnRef;
 
 namespace Envoy {
 namespace Upstream {
+namespace {
 
 class EdsTest : public testing::Test {
 protected:
@@ -1467,5 +1468,6 @@ TEST_F(EdsTest, MalformedIP) {
                             "setting cluster type to 'STRICT_DNS' or 'LOGICAL_DNS'");
 }
 
+} // namespace
 } // namespace Upstream
 } // namespace Envoy

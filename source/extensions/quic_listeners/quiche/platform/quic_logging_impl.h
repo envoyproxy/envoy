@@ -52,9 +52,9 @@
   QUIC_LOG_IMPL_INTERNAL(quic::IsLogLevelEnabled(quic::severity),                                  \
                          quic::QuicLogEmitter(quic::severity).SetPerror().stream())
 
-#define QUIC_LOG_INFO_IS_ON_IMPL quic::IsLogLevelEnabled(quic::INFO)
-#define QUIC_LOG_WARNING_IS_ON_IMPL quic::IsLogLevelEnabled(quic::WARNING)
-#define QUIC_LOG_ERROR_IS_ON_IMPL quic::IsLogLevelEnabled(quic::ERROR)
+#define QUIC_LOG_INFO_IS_ON_IMPL() quic::IsLogLevelEnabled(quic::INFO)
+#define QUIC_LOG_WARNING_IS_ON_IMPL() quic::IsLogLevelEnabled(quic::WARNING)
+#define QUIC_LOG_ERROR_IS_ON_IMPL() quic::IsLogLevelEnabled(quic::ERROR)
 
 #ifdef NDEBUG
 // Release build
@@ -63,7 +63,7 @@
 #define QUIC_DVLOG_IF_IMPL(verbosity, condition) QUIC_COMPILED_OUT_LOG()
 #define QUIC_DLOG_IMPL(severity) QUIC_COMPILED_OUT_LOG()
 #define QUIC_DLOG_IF_IMPL(severity, condition) QUIC_COMPILED_OUT_LOG()
-#define QUIC_DLOG_INFO_IS_ON_IMPL 0
+#define QUIC_DLOG_INFO_IS_ON_IMPL() 0
 #define QUIC_NOTREACHED_IMPL()
 #else
 // Debug build
@@ -71,7 +71,7 @@
 #define QUIC_DVLOG_IF_IMPL(verbosity, condition) QUIC_VLOG_IF_IMPL(verbosity, condition)
 #define QUIC_DLOG_IMPL(severity) QUIC_LOG_IMPL(severity)
 #define QUIC_DLOG_IF_IMPL(severity, condition) QUIC_LOG_IF_IMPL(severity, condition)
-#define QUIC_DLOG_INFO_IS_ON_IMPL QUIC_LOG_INFO_IS_ON_IMPL
+#define QUIC_DLOG_INFO_IS_ON_IMPL() QUIC_LOG_INFO_IS_ON_IMPL()
 #define QUIC_NOTREACHED_IMPL() NOT_REACHED_GCOVR_EXCL_LINE
 #endif
 

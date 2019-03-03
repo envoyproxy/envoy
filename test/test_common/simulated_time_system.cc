@@ -157,7 +157,8 @@ void SimulatedTimeSystemHelper::sleep(const Duration& duration) {
 Thread::CondVar::WaitStatus SimulatedTimeSystemHelper::waitFor(Thread::MutexBasicLockable& mutex,
                                                                Thread::CondVar& condvar,
                                                                const Duration& duration) noexcept {
-  const Duration real_time_poll_delay(std::chrono::milliseconds(50));
+  const Duration real_time_poll_delay(
+      std::min(std::chrono::duration_cast<Duration>(std::chrono::milliseconds(50)), duration));
   const MonotonicTime end_time = monotonicTime() + duration;
 
   while (true) {

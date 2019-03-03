@@ -178,6 +178,7 @@ TEST_F(OriginalSrcTest, Mark0NotAdded) {
 
   ASSERT_FALSE(mark_option.has_value());
 }
+
 } // namespace
 } // namespace OriginalSrc
 } // namespace ListenerFilters

@@ -53,6 +53,11 @@ public:
    * @return list of headers to populate tags on the active span.
    */
   virtual const std::vector<Http::LowerCaseString>& requestHeadersForTags() const PURE;
+
+  /**
+   * @return true if spans should be annotated with more detailed information.
+   */
+  virtual bool verbose() const PURE;
 };
 
 class Span;
@@ -77,6 +82,13 @@ public:
    * @param value the value to associate with the tag
    */
   virtual void setTag(const std::string& name, const std::string& value) PURE;
+
+  /**
+   * Record an event associated with a span, to be handled in an implementation-dependent fashion.
+   * @param timestamp the time of the event.
+   * @param event the name of the event.
+   */
+  virtual void log(SystemTime timestamp, const std::string& event) PURE;
 
   /**
    * Capture the final duration for this Span and carry out any work necessary to complete it.
