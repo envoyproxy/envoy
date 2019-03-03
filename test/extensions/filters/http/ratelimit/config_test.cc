@@ -17,6 +17,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace RateLimitFilter {
+namespace {
 
 TEST(RateLimitFilterConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
@@ -197,6 +198,7 @@ TEST(RateLimitFilterConfigTest, BadRateLimitFilterConfig) {
   EXPECT_THROW(MessageUtil::loadFromYaml(yaml, proto_config), EnvoyException);
 }
 
+} // namespace
 } // namespace RateLimitFilter
 } // namespace HttpFilters
 } // namespace Extensions

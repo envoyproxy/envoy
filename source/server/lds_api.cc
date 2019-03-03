@@ -38,6 +38,7 @@ void LdsApiImpl::initialize(std::function<void()> callback) {
 void LdsApiImpl::onConfigUpdate(const ResourceVector& resources, const std::string& version_info) {
   cm_.adsMux().pause(Config::TypeUrl::get().RouteConfiguration);
   Cleanup rds_resume([this] { cm_.adsMux().resume(Config::TypeUrl::get().RouteConfiguration); });
+  std::vector<std::string> exception_msgs;
   std::unordered_set<std::string> listener_names;
   for (const auto& listener : resources) {
     if (!listener_names.insert(listener.name()).second) {
@@ -75,13 +76,16 @@ void LdsApiImpl::onConfigUpdate(const ResourceVector& resources, const std::stri
         ENVOY_LOG(debug, "lds: add/update listener '{}' skipped", listener_name);
       }
     } catch (const EnvoyException& e) {
-      throw EnvoyException(
-          fmt::format("Error adding/updating listener {}: {}", listener_name, e.what()));
+      exception_msgs.push_back(fmt::format("{}: {}", listener_name, e.what()));
     }
   }
 
   version_info_ = version_info;
   runInitializeCallbackIfAny();
+  if (!exception_msgs.empty()) {
+    throw EnvoyException(fmt::format("Error adding/updating listener(s) {}",
+                                     StringUtil::join(exception_msgs, ", ")));
+  }
 }
 
 void LdsApiImpl::onConfigUpdateFailed(const EnvoyException*) {

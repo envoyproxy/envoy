@@ -8,6 +8,7 @@ namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace Zipkin {
+namespace {
 
 TEST(ZipkinSpanBufferTest, defaultConstructorEndToEnd) {
   DangerousDeprecatedTestTime test_time;
@@ -109,6 +110,7 @@ TEST(ZipkinSpanBufferTest, sizeConstructorEndtoEnd) {
   EXPECT_EQ("[]", buffer.toStringifiedJsonArray());
 }
 
+} // namespace
 } // namespace Zipkin
 } // namespace Tracers
 } // namespace Extensions

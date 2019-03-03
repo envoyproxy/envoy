@@ -124,5 +124,46 @@ TEST_P(EdsIntegrationTest, OverprovisioningFactorUpdate) {
   get_and_compare(200);
 }
 
+// Verifies that EDS update only triggers member update callbacks once per update.
+TEST_P(EdsIntegrationTest, BatchMemberUpdateCb) {
+  initialize();
+
+  uint32_t member_update_count{};
+
+  auto& priority_set = test_server_->server()
+                           .clusterManager()
+                           .clusters()
+                           .find("cluster_0")
+                           ->second.get()
+                           .prioritySet();
+
+  // Keep track of how many times we're seeing a member update callback.
+  priority_set.addMemberUpdateCb([&](const auto& hosts_added, const auto&) {
+    // We should see both hosts present in the member update callback.
+    EXPECT_EQ(2, hosts_added.size());
+    member_update_count++;
+  });
+
+  envoy::api::v2::ClusterLoadAssignment cluster_load_assignment;
+  cluster_load_assignment.set_cluster_name("cluster_0");
+
+  {
+    auto* locality_lb_endpoints = cluster_load_assignment.add_endpoints();
+
+    auto* endpoint = locality_lb_endpoints->add_lb_endpoints();
+    setUpstreamAddress(0, *endpoint);
+  }
+
+  auto* locality_lb_endpoints = cluster_load_assignment.add_endpoints();
+  locality_lb_endpoints->set_priority(1);
+
+  auto* endpoint = locality_lb_endpoints->add_lb_endpoints();
+  setUpstreamAddress(1, *endpoint);
+
+  eds_helper_.setEds({cluster_load_assignment}, *test_server_);
+
+  EXPECT_EQ(1, member_update_count);
+}
+
 } // namespace
 } // namespace Envoy

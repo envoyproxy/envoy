@@ -186,6 +186,23 @@ TEST_F(OwnedImplTest, ToString) {
   EXPECT_EQ(absl::StrCat("Hello, world!" + long_string), buffer.toString());
 }
 
+// Regression test for oss-fuzz issue
+// https://bugs.chromium.org/p/oss-fuzz/issues/detail?id=13263, where prepending
+// an empty buffer resulted in a corrupted libevent internal state.
+TEST_F(OwnedImplTest, PrependEmpty) {
+  Buffer::OwnedImpl buf;
+  Buffer::OwnedImpl other_buf;
+  char input[] = "foo";
+  BufferFragmentImpl frag(input, 3, nullptr);
+  buf.addBufferFragment(frag);
+  buf.prepend("");
+  other_buf.move(buf, 1);
+  buf.add("bar");
+  EXPECT_EQ("oobar", buf.toString());
+  buf.drain(5);
+  EXPECT_EQ(0, buf.length());
+}
+
 } // namespace
 } // namespace Buffer
 } // namespace Envoy

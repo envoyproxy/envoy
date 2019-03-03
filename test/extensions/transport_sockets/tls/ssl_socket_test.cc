@@ -52,7 +52,6 @@ namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
-
 namespace {
 
 /**
@@ -2310,6 +2309,7 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
   EXPECT_EQ(expect_reuse ? 1UL : 0UL, server_stats_store.counter("ssl.session_reused").value());
   EXPECT_EQ(expect_reuse ? 1UL : 0UL, client_stats_store.counter("ssl.session_reused").value());
 }
+
 } // namespace
 
 TEST_P(SslSocketTest, TicketSessionResumption) {

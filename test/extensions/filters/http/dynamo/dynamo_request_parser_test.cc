@@ -15,6 +15,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Dynamo {
+namespace {
 
 TEST(DynamoRequestParser, parseOperation) {
   // Well formed x-amz-target header, in a format, Version.Operation
@@ -264,6 +265,7 @@ TEST(DynamoRequestParser, parsePartitionIds) {
   }
 }
 
+} // namespace
 } // namespace Dynamo
 } // namespace HttpFilters
 } // namespace Extensions

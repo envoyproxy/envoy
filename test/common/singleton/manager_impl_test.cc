@@ -8,6 +8,7 @@
 
 namespace Envoy {
 namespace Singleton {
+namespace {
 
 // Must be a dedicated function so that TID is within the death test.
 static void deathTestWorker() {
@@ -45,5 +46,6 @@ TEST(SingletonManagerImplTest, Basic) {
   singleton.reset();
 }
 
+} // namespace
 } // namespace Singleton
 } // namespace Envoy

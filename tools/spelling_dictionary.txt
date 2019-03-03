@@ -4,6 +4,7 @@
 AAAA
 ACK
 AES
+AFAICT
 ALPN
 ALS
 AMZ
@@ -154,6 +155,7 @@ Nilsson
 OCSP
 OK
 OOM
+OOMs
 OS
 OSI
 OSS
@@ -452,6 +454,7 @@ ie
 ifdef
 iff
 impl
+implementors
 impls
 incrementing
 ing
@@ -683,6 +686,8 @@ tmp
 tokenizing
 traceid
 trie
+tuple
+tuples
 typeid
 ucontext
 uint

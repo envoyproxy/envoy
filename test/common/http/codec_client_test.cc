@@ -36,6 +36,7 @@ using testing::Throw;
 
 namespace Envoy {
 namespace Http {
+namespace {
 
 class CodecClientTest : public testing::Test {
 public:
@@ -424,5 +425,6 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, CodecNetworkTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
+} // namespace
 } // namespace Http
 } // namespace Envoy

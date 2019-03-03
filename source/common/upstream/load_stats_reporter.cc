@@ -53,6 +53,9 @@ void LoadStatsReporter::sendLoadStatsRequest() {
     auto& cluster = it->second.get();
     auto* cluster_stats = request_.add_cluster_stats();
     cluster_stats->set_cluster_name(cluster_name);
+    if (cluster.info()->eds_service_name().has_value()) {
+      cluster_stats->set_cluster_service_name(cluster.info()->eds_service_name().value());
+    }
     for (auto& host_set : cluster.prioritySet().hostSetsPerPriority()) {
       ENVOY_LOG(trace, "Load report locality count {}", host_set->hostsPerLocality().get().size());
       for (auto& hosts : host_set->hostsPerLocality().get()) {
