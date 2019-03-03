@@ -95,8 +95,7 @@ void DecoderImpl::decode(Buffer::Instance& data, uint64_t& offset) {
 
 #define CHECK_LENGTH(LEN, MINL)                                                                    \
   if (LEN < MINL) {                                                                                \
-    callbacks_.onDecodeError();                                                                    \
-    return;                                                                                        \
+    throw new EnvoyException("Package is too small");                                              \
   }
 
 void DecoderImpl::parseConnect(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
@@ -109,7 +108,11 @@ void DecoderImpl::parseConnect(Buffer::Instance& data, uint64_t& offset, uint32_
 
   // Read readonly flag, if it's there.
   bool readonly{};
-  BufferHelper::peekBool(data, offset, readonly);
+  try {
+    BufferHelper::peekBool(data, offset, readonly);
+  } catch (EnvoyException& e) {
+    // Old libraries don't populate the readonly field.
+  }
 
   callbacks_.onConnect(readonly);
 }
@@ -267,22 +270,11 @@ void DecoderImpl::parseMultiRequest(Buffer::Instance& data, uint64_t& offset, ui
 
   while (true) {
     int32_t type;
-    if (!BufferHelper::peekInt32(data, offset, type)) {
-      callbacks_.onDecodeError();
-      return;
-    }
-
+    BufferHelper::peekInt32(data, offset, type);
     bool done{};
-    if (!BufferHelper::peekBool(data, offset, done)) {
-      callbacks_.onDecodeError();
-      return;
-    }
-
+    BufferHelper::peekBool(data, offset, done);
     int32_t error;
-    if (!BufferHelper::peekInt32(data, offset, error)) {
-      callbacks_.onDecodeError();
-      return;
-    }
+    BufferHelper::peekInt32(data, offset, error);
 
     if (done) {
       break;
@@ -300,8 +292,7 @@ void DecoderImpl::parseMultiRequest(Buffer::Instance& data, uint64_t& offset, ui
       break;
     default:
       // Should not happen.
-      callbacks_.onDecodeError();
-      break;
+      throw new EnvoyException("Unknown type within a transaction");
     }
   }
 
@@ -355,7 +346,11 @@ void DecoderImpl::skipStrings(Buffer::Instance& data, uint64_t& offset) const {
 void DecoderImpl::onData(Buffer::Instance& data) {
   uint64_t offset = 0;
   while (offset < data.length()) {
-    decode(data, offset);
+    try {
+      decode(data, offset);
+    } catch (EnvoyException& e) {
+      callbacks_.onDecodeError();
+    }
   }
 }
 

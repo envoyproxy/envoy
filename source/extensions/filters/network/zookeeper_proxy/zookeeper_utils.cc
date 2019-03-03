@@ -5,56 +5,34 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ZooKeeperProxy {
 
-bool BufferHelper::peekInt32(Buffer::Instance& buffer, uint64_t& offset, int32_t& val) {
-  try {
-    val = buffer.peekBEInt<int32_t>(offset);
-    offset += sizeof(int32_t);
-    return true;
-  } catch (EnvoyException& e) {
-    return false;
-  }
+void BufferHelper::peekInt32(Buffer::Instance& buffer, uint64_t& offset, int32_t& val) {
+  val = buffer.peekBEInt<int32_t>(offset);
+  offset += sizeof(int32_t);
 }
 
-bool BufferHelper::peekInt64(Buffer::Instance& buffer, uint64_t& offset, int64_t& val) {
-  try {
-    val = buffer.peekBEInt<int64_t>(offset);
-    offset += sizeof(int64_t);
-    return true;
-  } catch (EnvoyException& e) {
-    return false;
-  }
+void BufferHelper::peekInt64(Buffer::Instance& buffer, uint64_t& offset, int64_t& val) {
+  val = buffer.peekBEInt<int64_t>(offset);
+  offset += sizeof(int64_t);
 }
 
-bool BufferHelper::peekBool(Buffer::Instance& buffer, uint64_t& offset, bool& val) {
-  if (buffer.length() < (offset + 1)) {
-    return false;
-  }
-
-  try {
-    std::string str;
-    char byte = buffer.peekInt<char, ByteOrder::Host, 1>(offset);
-    val = static_cast<bool>(byte & 255);
-    offset += 1;
-    return true;
-  } catch (EnvoyException& e) {
-    return false;
-  }
+void BufferHelper::peekBool(Buffer::Instance& buffer, uint64_t& offset, bool& val) {
+  char byte = buffer.peekInt<char, ByteOrder::Host, 1>(offset);
+  val = static_cast<bool>(byte & 255);
+  offset += 1;
 }
 
-bool BufferHelper::peekString(Buffer::Instance& buffer, uint64_t& offset, std::string& str) {
+void BufferHelper::peekString(Buffer::Instance& buffer, uint64_t& offset, std::string& str) {
   int32_t len = 0;
   peekInt32(buffer, offset, len);
 
   if (buffer.length() < (offset + len) || !len) {
-    return false;
+    return;
   }
 
   std::unique_ptr<char[]> data(new char[len]);
   buffer.copyOut(offset, len, data.get());
   str.assign(data.get(), len);
   offset += len;
-
-  return true;
 }
 
 } // namespace ZooKeeperProxy
