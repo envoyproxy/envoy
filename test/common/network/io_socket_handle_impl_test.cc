@@ -1,5 +1,7 @@
 #include "common/network/io_socket_handle_impl.h"
 
+#include "gtest/gtest.h"
+
 namespace Envoy {
 namespace Network {
 namespace {
