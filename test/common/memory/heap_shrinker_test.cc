@@ -17,7 +17,7 @@ namespace Envoy {
 namespace Memory {
 namespace {
 
-class HeapShrinkerTest {
+class HeapShrinkerTest : public testing::Test {
 protected:
   HeapShrinkerTest()
       : api_(Api::createApiForTest(stats_, time_system_)), dispatcher_(*api_, time_system_) {}
