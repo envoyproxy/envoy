@@ -188,49 +188,45 @@ Stats::StatName CodeStatsImpl::upstreamRqGroup(Code response_code) const {
   return upstream_rq_unknown_;
 }
 
+CodeStatsImpl::RequestCodeGroup::RequestCodeGroup(absl::string_view prefix,
+                                                  CodeStatsImpl& code_stats)
+    : code_stats_(code_stats), prefix_(std::string(prefix)) {
+  for (uint32_t i = 0; i < NumHttpCodes; ++i) {
+    rc_stat_names_[i] = nullptr;
+  }
+
+  // Pre-allocate response codes 200, 404, and 503, as those seem quite likely.
+  statName(Code::OK);
+  statName(Code::NotFound);
+  statName(Code::ServiceUnavailable);
+}
+
 CodeStatsImpl::RequestCodeGroup::~RequestCodeGroup() {
-  for (auto& p : rc_stat_name_map_) {
-    std::unique_ptr<Stats::StatNameStorage>& storage = p.second;
-    storage->free(code_stats_.symbol_table_);
+  for (uint32_t i = 0; i < NumHttpCodes; ++i) {
+    Stats::StatNameStorage* storage = rc_stat_names_[i];
+    if (storage != nullptr) {
+      storage->free(code_stats_.symbol_table_);
+      delete storage;
+    }
   }
 }
 
 Stats::StatName CodeStatsImpl::RequestCodeGroup::statName(Code response_code) {
-  switch (response_code) {
-  case Code::OK:
-    return upstream_rq_200_;
-  case Code::NotFound:
-    return upstream_rq_404_;
-  case Code::ServiceUnavailable:
-    return upstream_rq_503_;
-  default:
-    break;
-  }
-  // RELEASE_ASSERT(false, absl::StrCat("need to optimize code ", response_code));
-  return makeStatName(response_code);
-}
-
-Stats::StatName CodeStatsImpl::RequestCodeGroup::makeStatName(Code response_code) {
-  {
-    absl::ReaderMutexLock lock(&mutex_);
-    auto p = rc_stat_name_map_.find(response_code);
-    if (p != rc_stat_name_map_.end()) {
-      return p->second->statName();
-    }
-  }
-
-  // Note -- another thread may swap in here and allocate the lock so we
-  // have to re-check after acquiring the write-lock.
-
-  {
+  // Take a lock only if we've never seen this response-code before.
+  uint32_t rc_int = static_cast<uint32_t>(response_code);
+  RELEASE_ASSERT(rc_int < NumHttpCodes, absl::StrCat("Unexpected http code: ", rc_int));
+  std::atomic<Stats::StatNameStorage*>& atomic_ref = rc_stat_names_[rc_int];
+  if (atomic_ref.load() == nullptr) {
     absl::MutexLock lock(&mutex_);
-    std::unique_ptr<Stats::StatNameStorage>& stat_name_storage = rc_stat_name_map_[response_code];
-    if (stat_name_storage == nullptr) {
-      stat_name_storage = std::make_unique<Stats::StatNameStorage>(
-          absl::StrCat(prefix_, enumToInt(response_code)), code_stats_.symbol_table_);
+
+    // Check again under lock as two threads might have raced to add a StatName
+    // for the same code.
+    if (atomic_ref.load() == nullptr) {
+      atomic_ref = new Stats::StatNameStorage(absl::StrCat(prefix_, enumToInt(response_code)),
+                                              code_stats_.symbol_table_);
     }
-    return stat_name_storage->statName();
   }
+  return atomic_ref.load()->statName();
 }
 
 std::string CodeUtility::groupStringForResponseCode(Code response_code) {

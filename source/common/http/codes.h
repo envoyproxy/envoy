@@ -33,10 +33,7 @@ private:
 
   class RequestCodeGroup {
   public:
-    RequestCodeGroup(absl::string_view prefix, CodeStatsImpl& code_stats)
-        : code_stats_(code_stats), prefix_(std::string(prefix)),
-          upstream_rq_200_(makeStatName(Code::OK)), upstream_rq_404_(makeStatName(Code::NotFound)),
-          upstream_rq_503_(makeStatName(Code::ServiceUnavailable)) {}
+    RequestCodeGroup(absl::string_view prefix, CodeStatsImpl& code_stats);
     ~RequestCodeGroup();
 
     Stats::StatName statName(Code response_code);
@@ -54,17 +51,22 @@ private:
     */
 
   private:
-    using RCStatNameMap = absl::flat_hash_map<Code, std::unique_ptr<Stats::StatNameStorage>>;
+    // Use an array of atomic pointers to hold StatNameStorage objects for
+    // every conceivable HTTP response code. In the hot-path we'll reference
+    // these with a null-check, and if we need to allocate a symbol for a
+    // new code, we'll take a mutex to avoid duplicate allocations and
+    // subsequent leaks. This is similar in principle to a ReaderMutexLock,
+    // but should be faster, as ReaderMutexLocks appear to be too expensive for
+    // fine-grained controls. Another option would be to use a lock per
+    // stat-name, which might have similar performance to atomics with default
+    // barrier policy.
 
-    Stats::StatName makeStatName(Code response_code);
+    static constexpr uint32_t NumHttpCodes = 1000;
+    std::atomic<Stats::StatNameStorage*> rc_stat_names_[NumHttpCodes];
 
     CodeStatsImpl& code_stats_;
     std::string prefix_;
     absl::Mutex mutex_;
-    RCStatNameMap rc_stat_name_map_ GUARDED_BY(mutex_);
-    Stats::StatName upstream_rq_200_;
-    Stats::StatName upstream_rq_404_;
-    Stats::StatName upstream_rq_503_;
   };
 
   static absl::string_view stripTrailingDot(absl::string_view prefix);
