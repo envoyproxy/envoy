@@ -86,8 +86,12 @@ class CdsIntegrationTestBase : public IncrementalXdsIntegrationTestBase,
 class CdsIntegrationTest : public Grpc::GrpcClientIntegrationParamTest, public HttpIntegrationTest {
 >>>>>>> Fix all tests that were failing the test-base assert due to multi-inheritance order. (#5855)
 public:
+<<<<<<< HEAD
   CdsIntegrationTestBase(const std::string& config)
       : IncrementalXdsIntegrationTestBase(Http::CodecClient::Type::HTTP2, ipVersion(), config) {}
+=======
+  CdsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), Config) {}
+>>>>>>> test: Make it easier to use simulated time in integration test, and switch hds_integration_test to use it. (#6139)
 
   void TearDown() override {
     cleanUpXdsConnection();

@@ -26,7 +26,7 @@ class GrpcJsonTranscoderIntegrationTest
       public HttpIntegrationTest {
 public:
   GrpcJsonTranscoderIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()) {}
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
   /**
    * Global initializer for all integration tests.
    */
