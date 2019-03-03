@@ -43,6 +43,7 @@ envoy_cc_library(
     srcs = ["isolated_store_impl.cc"],
     hdrs = ["isolated_store_impl.h"],
     deps = [
+        ":fake_symbol_table_lib",
         ":histogram_lib",
         ":scope_prefixer_lib",
         ":stats_lib",
