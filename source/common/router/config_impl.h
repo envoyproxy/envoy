@@ -135,6 +135,34 @@ private:
   bool legacy_enabled_;
 };
 
+/**
+ * Implementation of CsrfPolicy that reads from the proto route and virtual host config.
+ */
+class CsrfPolicyImpl : public CsrfPolicy {
+public:
+  CsrfPolicyImpl(const envoy::api::v2::route::CsrfPolicy& config, Runtime::Loader& loader)
+      : config_(config), loader_(loader) {}
+
+  // Router::CsrfPolicy
+  bool enabled() const override {
+    const auto& filter_enabled = config_.filter_enabled();
+    return loader_.snapshot().featureEnabled(filter_enabled.runtime_key(),
+                                             filter_enabled.default_value());
+  };
+  bool shadowEnabled() const override {
+    if (config_.has_shadow_enabled()) {
+      const auto& shadow_enabled = config_.shadow_enabled();
+      return loader_.snapshot().featureEnabled(shadow_enabled.runtime_key(),
+                                               shadow_enabled.default_value());
+    }
+    return false;
+  };
+
+private:
+  const envoy::api::v2::route::CsrfPolicy config_;
+  Runtime::Loader& loader_;
+};
+
 class ConfigImpl;
 /**
  * Holds all routing configuration for an entire virtual host.
@@ -154,6 +182,7 @@ public:
 
   // Router::VirtualHost
   const CorsPolicy* corsPolicy() const override { return cors_policy_.get(); }
+  const CsrfPolicy* csrfPolicy() const override { return csrf_policy_.get(); }
   const std::string& name() const override { return name_; }
   const RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
   const Config& routeConfig() const override;
@@ -196,6 +225,7 @@ private:
   SslRequirements ssl_requirements_;
   const RateLimitPolicyImpl rate_limit_policy_;
   std::unique_ptr<const CorsPolicyImpl> cors_policy_;
+  std::unique_ptr<const CsrfPolicyImpl> csrf_policy_;
   const ConfigImpl& global_route_config_; // See note in RouteEntryImplBase::clusterEntry() on why
                                           // raw ref to the top level config is currently safe.
   HeaderParserPtr request_headers_parser_;
@@ -366,6 +396,7 @@ public:
     return cluster_not_found_response_code_;
   }
   const CorsPolicy* corsPolicy() const override { return cors_policy_.get(); }
+  const CsrfPolicy* csrfPolicy() const override { return csrf_policy_.get(); }
   void finalizeRequestHeaders(Http::HeaderMap& headers, const StreamInfo::StreamInfo& stream_info,
                               bool insert_envoy_original_path) const override;
   void finalizeResponseHeaders(Http::HeaderMap& headers,
@@ -464,6 +495,7 @@ private:
     }
 
     const CorsPolicy* corsPolicy() const override { return parent_->corsPolicy(); }
+    const CsrfPolicy* csrfPolicy() const override { return parent_->csrfPolicy(); }
     const HashPolicy* hashPolicy() const override { return parent_->hashPolicy(); }
     const HedgePolicy& hedgePolicy() const override { return parent_->hedgePolicy(); }
     Upstream::ResourcePriority priority() const override { return parent_->priority(); }
@@ -591,6 +623,7 @@ private:
   static const uint64_t DEFAULT_ROUTE_TIMEOUT_MS = 15000;
 
   std::unique_ptr<const CorsPolicyImpl> cors_policy_;
+  std::unique_ptr<const CsrfPolicyImpl> csrf_policy_;
   const VirtualHostImpl& vhost_; // See note in RouteEntryImplBase::clusterEntry() on why raw ref
                                  // to virtual host is currently safe.
   const bool auto_host_rewrite_;

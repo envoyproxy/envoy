@@ -400,6 +400,10 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
     cors_policy_ =
         std::make_unique<CorsPolicyImpl>(route.route().cors(), factory_context.runtime());
   }
+  if (route.route().has_csrf()) {
+    csrf_policy_ =
+        std::make_unique<CsrfPolicyImpl>(route.route().csrf(), factory_context.runtime());
+  }
   for (const auto upgrade_config : route.route().upgrade_configs()) {
     const bool enabled = upgrade_config.has_enabled() ? upgrade_config.enabled().value() : true;
     const bool success =
@@ -913,6 +917,9 @@ VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::route::VirtualHost& virtu
 
   if (virtual_host.has_cors()) {
     cors_policy_ = std::make_unique<CorsPolicyImpl>(virtual_host.cors(), factory_context.runtime());
+  }
+  if (virtual_host.has_csrf()) {
+    csrf_policy_ = std::make_unique<CsrfPolicyImpl>(virtual_host.csrf(), factory_context.runtime());
   }
 }
 
