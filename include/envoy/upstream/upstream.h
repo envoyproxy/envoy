@@ -446,6 +446,7 @@ public:
   COUNTER  (lb_subsets_removed)                                                                    \
   COUNTER  (lb_subsets_selected)                                                                   \
   COUNTER  (lb_subsets_fallback)                                                                   \
+  COUNTER  (lb_subsets_fallback_panic)                                                             \
   COUNTER  (original_dst_host_invalid)                                                             \
   COUNTER  (upstream_cx_total)                                                                     \
   GAUGE    (upstream_cx_active)                                                                    \

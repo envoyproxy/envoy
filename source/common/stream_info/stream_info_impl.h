@@ -43,40 +43,24 @@ struct StreamInfoImpl : public StreamInfo {
     last_downstream_rx_byte_received = time_source_.monotonicTime();
   }
 
-  absl::optional<std::chrono::nanoseconds> firstUpstreamTxByteSent() const override {
-    return duration(first_upstream_tx_byte_sent_);
+  void setUpstreamTiming(const UpstreamTiming& upstream_timing) override {
+    upstream_timing_ = upstream_timing;
   }
 
-  void onFirstUpstreamTxByteSent() override {
-    ASSERT(!first_upstream_tx_byte_sent_);
-    first_upstream_tx_byte_sent_ = time_source_.monotonicTime();
+  absl::optional<std::chrono::nanoseconds> firstUpstreamTxByteSent() const override {
+    return duration(upstream_timing_.first_upstream_tx_byte_sent_);
   }
 
   absl::optional<std::chrono::nanoseconds> lastUpstreamTxByteSent() const override {
-    return duration(last_upstream_tx_byte_sent_);
-  }
-
-  void onLastUpstreamTxByteSent() override {
-    ASSERT(!last_upstream_tx_byte_sent_);
-    last_upstream_tx_byte_sent_ = time_source_.monotonicTime();
+    return duration(upstream_timing_.last_upstream_tx_byte_sent_);
   }
 
   absl::optional<std::chrono::nanoseconds> firstUpstreamRxByteReceived() const override {
-    return duration(first_upstream_rx_byte_received_);
-  }
-
-  void onFirstUpstreamRxByteReceived() override {
-    ASSERT(!first_upstream_rx_byte_received_);
-    first_upstream_rx_byte_received_ = time_source_.monotonicTime();
+    return duration(upstream_timing_.first_upstream_rx_byte_received_);
   }
 
   absl::optional<std::chrono::nanoseconds> lastUpstreamRxByteReceived() const override {
-    return duration(last_upstream_rx_byte_received_);
-  }
-
-  void onLastUpstreamRxByteReceived() override {
-    ASSERT(!last_upstream_rx_byte_received_);
-    last_upstream_rx_byte_received_ = time_source_.monotonicTime();
+    return duration(upstream_timing_.last_upstream_rx_byte_received_);
   }
 
   absl::optional<std::chrono::nanoseconds> firstDownstreamTxByteSent() const override {
@@ -104,13 +88,6 @@ struct StreamInfoImpl : public StreamInfo {
   void onRequestComplete() override {
     ASSERT(!final_time_);
     final_time_ = time_source_.monotonicTime();
-  }
-
-  void resetUpstreamTimings() override {
-    first_upstream_tx_byte_sent_ = absl::optional<MonotonicTime>{};
-    last_upstream_tx_byte_sent_ = absl::optional<MonotonicTime>{};
-    first_upstream_rx_byte_received_ = absl::optional<MonotonicTime>{};
-    last_upstream_rx_byte_received_ = absl::optional<MonotonicTime>{};
   }
 
   void addBytesReceived(uint64_t bytes_received) override { bytes_received_ += bytes_received; }
@@ -206,10 +183,6 @@ struct StreamInfoImpl : public StreamInfo {
   const MonotonicTime start_time_monotonic_;
 
   absl::optional<MonotonicTime> last_downstream_rx_byte_received;
-  absl::optional<MonotonicTime> first_upstream_tx_byte_sent_;
-  absl::optional<MonotonicTime> last_upstream_tx_byte_sent_;
-  absl::optional<MonotonicTime> first_upstream_rx_byte_received_;
-  absl::optional<MonotonicTime> last_upstream_rx_byte_received_;
   absl::optional<MonotonicTime> first_downstream_tx_byte_sent_;
   absl::optional<MonotonicTime> last_downstream_tx_byte_sent_;
   absl::optional<MonotonicTime> final_time_;
@@ -231,6 +204,7 @@ private:
   Network::Address::InstanceConstSharedPtr downstream_direct_remote_address_;
   Network::Address::InstanceConstSharedPtr downstream_remote_address_;
   std::string requested_server_name_;
+  UpstreamTiming upstream_timing_;
 };
 
 } // namespace StreamInfo

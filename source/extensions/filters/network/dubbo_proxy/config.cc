@@ -16,10 +16,14 @@ Network::FilterFactoryCb DubboProxyFilterConfigFactory::createFilterFactoryFromP
 
   const std::string stat_prefix = fmt::format("dubbo.{}.", proto_config.stat_prefix());
 
-  return [stat_prefix, &proto_config, &context](Network::FilterManager& filter_manager) -> void {
-    filter_manager.addFilter(std::make_shared<Filter>(
-        stat_prefix, proto_config.protocol_type(), proto_config.serialization_type(),
-        context.scope(), context.dispatcher().timeSource()));
+  Filter::ConfigProtocolType protocol_type = proto_config.protocol_type();
+  Filter::ConfigSerializationType serialization_type = proto_config.serialization_type();
+
+  return [stat_prefix, protocol_type, serialization_type,
+          &context](Network::FilterManager& filter_manager) -> void {
+    filter_manager.addFilter(std::make_shared<Filter>(stat_prefix, protocol_type,
+                                                      serialization_type, context.scope(),
+                                                      context.dispatcher().timeSource()));
   };
 }
 

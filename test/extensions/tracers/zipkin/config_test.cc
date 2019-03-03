@@ -11,6 +11,7 @@ namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace Zipkin {
+namespace {
 
 TEST(ZipkinTracerConfigTest, ZipkinHttpTracer) {
   NiceMock<Server::MockInstance> server;
@@ -63,6 +64,7 @@ TEST(ZipkinTracerConfigTest, DoubleRegistrationTest) {
       EnvoyException, "Double registration for name: 'envoy.zipkin'");
 }
 
+} // namespace
 } // namespace Zipkin
 } // namespace Tracers
 } // namespace Extensions

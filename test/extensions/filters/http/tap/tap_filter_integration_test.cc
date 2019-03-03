@@ -18,7 +18,7 @@ public:
       // HTTP/1 on OSX. In this test we close the admin /tap stream when we don't want any
       // more data, and without immediate close detection we can't have a flake free test.
       // Thus, we use HTTP/2 for everything here.
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam(), realTime()) {
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam()) {
 
     // Also use HTTP/2 for upstream so that we can fully test trailers.
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);

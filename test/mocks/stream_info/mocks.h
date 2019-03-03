@@ -24,6 +24,7 @@ public:
   MOCK_CONST_METHOD0(startTimeMonotonic, MonotonicTime());
   MOCK_CONST_METHOD0(lastDownstreamRxByteReceived, absl::optional<std::chrono::nanoseconds>());
   MOCK_METHOD0(onLastDownstreamRxByteReceived, void());
+  MOCK_METHOD1(setUpstreamTiming, void(const UpstreamTiming&));
   MOCK_CONST_METHOD0(firstUpstreamTxByteSent, absl::optional<std::chrono::nanoseconds>());
   MOCK_METHOD0(onFirstUpstreamTxByteSent, void());
   MOCK_CONST_METHOD0(lastUpstreamTxByteSent, absl::optional<std::chrono::nanoseconds>());
@@ -38,7 +39,6 @@ public:
   MOCK_METHOD0(onLastDownstreamTxByteSent, void());
   MOCK_METHOD0(onRequestComplete, void());
   MOCK_CONST_METHOD0(requestComplete, absl::optional<std::chrono::nanoseconds>());
-  MOCK_METHOD0(resetUpstreamTimings, void());
   MOCK_METHOD1(addBytesReceived, void(uint64_t));
   MOCK_CONST_METHOD0(bytesReceived, uint64_t());
   MOCK_CONST_METHOD0(protocol, absl::optional<Http::Protocol>());

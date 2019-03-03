@@ -18,6 +18,7 @@ namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
 namespace Alts {
+namespace {
 
 TEST(UpstreamAltsConfigTest, CreateSocketFactory) {
   MockTransportSocketFactoryContext factory_context;
@@ -55,6 +56,7 @@ TEST(DownstreamAltsConfigTest, CreateSocketFactory) {
   EXPECT_TRUE(socket_factory->implementsSecureTransport());
 }
 
+} // namespace
 } // namespace Alts
 } // namespace TransportSockets
 } // namespace Extensions
