@@ -21,7 +21,7 @@ class MetricsServiceIntegrationTest : public Grpc::GrpcClientIntegrationParamTes
                                       public HttpIntegrationTest {
 public:
   MetricsServiceIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion(), realTime()) {}
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion()) {}
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();

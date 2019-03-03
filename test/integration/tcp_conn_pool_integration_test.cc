@@ -115,8 +115,7 @@ class TcpConnPoolIntegrationTest : public testing::TestWithParam<Network::Addres
                                    public BaseIntegrationTest {
 public:
   TcpConnPoolIntegrationTest()
-      : BaseIntegrationTest(GetParam(), realTime(), tcp_conn_pool_config),
-        filter_resolver_(config_factory_) {}
+      : BaseIntegrationTest(GetParam(), tcp_conn_pool_config), filter_resolver_(config_factory_) {}
 
   // Called once by the gtest framework before any tests are run.
   static void SetUpTestSuite() {
