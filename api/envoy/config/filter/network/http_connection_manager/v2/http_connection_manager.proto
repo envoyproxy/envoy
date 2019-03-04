@@ -403,7 +403,8 @@ message HttpFilter {
   // * :ref:`envoy.ext_authz <config_http_filters_ext_authz>`
   // * :ref:`envoy.fault <config_http_filters_fault_injection>`
   // * :ref:`envoy.filters.http.header_to_metadata <config_http_filters_header_to_metadata>`
-  // * :ref:`envoy.filters.http.grpc_http1_reverse_bridge <config_http_filters_grpc_http1_reverse_bridge>`
+  // * :ref:`envoy.filters.http.grpc_http1_reverse_bridge \
+  //   <config_http_filters_grpc_http1_reverse_bridge>`
   // * :ref:`envoy.filters.http.jwt_authn <config_http_filters_jwt_authn>`
   // * :ref:`envoy.filters.http.rbac <config_http_filters_rbac>`
   // * :ref:`envoy.filters.http.tap <config_http_filters_tap>`
