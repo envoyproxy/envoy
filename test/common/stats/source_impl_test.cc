@@ -23,22 +23,21 @@ TEST(SourceImplTest, Caching) {
   ON_CALL(store, histograms()).WillByDefault(ReturnPointee(&stored_histograms));
 
   SourceImpl source(store);
-  SymbolTableImpl symbol_table;
 
   // Once cached, new values should not be reflected by the return value.
-  stored_counters.push_back(std::make_shared<MockCounter>(symbol_table));
+  stored_counters.push_back(std::make_shared<MockCounter>());
   EXPECT_EQ(source.cachedCounters(), stored_counters);
-  stored_counters.push_back(std::make_shared<MockCounter>(symbol_table));
+  stored_counters.push_back(std::make_shared<MockCounter>());
   EXPECT_NE(source.cachedCounters(), stored_counters);
 
-  stored_gauges.push_back(std::make_shared<MockGauge>(symbol_table));
+  stored_gauges.push_back(std::make_shared<MockGauge>());
   EXPECT_EQ(source.cachedGauges(), stored_gauges);
-  stored_gauges.push_back(std::make_shared<MockGauge>(symbol_table));
+  stored_gauges.push_back(std::make_shared<MockGauge>());
   EXPECT_NE(source.cachedGauges(), stored_gauges);
 
-  stored_histograms.push_back(std::make_shared<MockParentHistogram>(symbol_table));
+  stored_histograms.push_back(std::make_shared<MockParentHistogram>());
   EXPECT_EQ(source.cachedHistograms(), stored_histograms);
-  stored_histograms.push_back(std::make_shared<MockParentHistogram>(symbol_table));
+  stored_histograms.push_back(std::make_shared<MockParentHistogram>());
   EXPECT_NE(source.cachedHistograms(), stored_histograms);
 
   // After clearing, the new values should be reflected in the cache.

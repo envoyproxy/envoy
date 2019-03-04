@@ -39,10 +39,11 @@ public:
     code_stats_.chargeResponseStat(info);
   }
 
-  Stats::SymbolTableImpl symbol_table_;
+  Stats::FakeSymbolTableImpl symbol_table_;
   Stats::IsolatedStoreImpl global_store_;
   Stats::IsolatedStoreImpl cluster_scope_;
   Http::CodeStatsImpl code_stats_;
+  std::vector<Stats::StatNameStorage> stat_name_storage_;
 };
 
 TEST_F(CodeUtilityTest, GroupStrings) {
@@ -202,8 +203,8 @@ TEST_F(CodeUtilityTest, PerZoneStats) {
 }
 
 TEST_F(CodeUtilityTest, ResponseTimingTest) {
-  Stats::MockStore global_store(symbol_table_);
-  Stats::MockStore cluster_scope(symbol_table_);
+  Stats::MockStore global_store;  // (symbol_table_);
+  Stats::MockStore cluster_scope; // (symbol_table_);
 
   Http::CodeStats::ResponseTimingInfo info{
       global_store, cluster_scope, "prefix.",    std::chrono::milliseconds(5),

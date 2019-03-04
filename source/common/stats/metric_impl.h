@@ -29,6 +29,7 @@ public:
   std::string name() const override { return symbolTable().toString(statName()); }
   std::string tagExtractedName() const override;
   std::vector<Tag> tags() const override;
+  StatName tagExtractedStatName() const override;
 
 protected:
   /**
@@ -41,8 +42,6 @@ protected:
   void clear();
 
 private:
-  StatName tagExtractedStatName() const;
-
   StatNameList stat_names_;
 };
 

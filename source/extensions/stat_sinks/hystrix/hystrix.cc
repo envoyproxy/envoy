@@ -267,13 +267,16 @@ const std::string HystrixSink::printRollingWindows() {
 
 HystrixSink::HystrixSink(Server::Instance& server, const uint64_t num_buckets)
     : server_(server), current_index_(num_buckets > 0 ? num_buckets : DEFAULT_NUM_BUCKETS),
-      window_size_(current_index_ + 1) {
+      window_size_(current_index_ + 1),
+      cluster_upstream_rq_time_("cluster.upstream_rq_time", server.symbolTable()) {
   Server::Admin& admin = server_.admin();
   ENVOY_LOG(debug,
             "adding hystrix_event_stream endpoint to enable connection to hystrix dashboard");
   admin.addHandler("/hystrix_event_stream", "send hystrix event stream",
                    MAKE_ADMIN_HANDLER(handlerHystrixEventStream), false, false);
 }
+
+HystrixSink::~HystrixSink() { cluster_upstream_rq_time_.free(server_.symbolTable()); }
 
 Http::Code HystrixSink::handlerHystrixEventStream(absl::string_view,
                                                   Http::HeaderMap& response_headers,
@@ -327,7 +330,7 @@ void HystrixSink::flush(Stats::Source& source) {
   // Save a map of the relevant histograms per cluster in a convenient format.
   std::unordered_map<std::string, QuantileLatencyMap> time_histograms;
   for (const Stats::ParentHistogramSharedPtr& histogram : source.cachedHistograms()) {
-    if (histogram->tagExtractedName() == "cluster.upstream_rq_time") {
+    if (histogram->tagExtractedStatName() == cluster_upstream_rq_time_.statName()) {
       // TODO(mrice32): add an Envoy utility function to look up and return a tag for a metric.
       auto tags = histogram->tags();
       auto it = std::find_if(tags.begin(), tags.end(), [](const Stats::Tag& tag) {

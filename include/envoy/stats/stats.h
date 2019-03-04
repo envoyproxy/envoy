@@ -50,6 +50,12 @@ public:
   virtual std::string tagExtractedName() const PURE;
 
   /**
+   * Returns the name of the Metric with the portions designated as tags
+   * removed as a StatName
+   */
+  virtual StatName tagExtractedStatName() const PURE;
+
+  /**
    * Indicates whether this metric has been updated since the server was started.
    */
   virtual bool used() const PURE;

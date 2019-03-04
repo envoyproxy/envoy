@@ -27,7 +27,7 @@ namespace Stats {
 
 class MockMetric : public virtual Metric {
 public:
-  explicit MockMetric(SymbolTable& symbol_table);
+  // explicit MockMetric(SymbolTable& symbol_table);
   MockMetric();
   ~MockMetric();
 
@@ -40,6 +40,7 @@ public:
     ~MetricName();
 
     void operator=(absl::string_view str);
+    void operator=(StatName stat_name);
 
     std::string name() const { return name_; }
     StatName statName() const { return stat_name_storage_->statName(); }
@@ -50,8 +51,8 @@ public:
     std::unique_ptr<StatNameStorage> stat_name_storage_;
   };
 
-  SymbolTable& symbolTable() override { return *symbol_table_; }
-  const SymbolTable& symbolTable() const override { return *symbol_table_; }
+  SymbolTable& symbolTable() override { return symbol_table_.get(); }
+  const SymbolTable& symbolTable() const override { return symbol_table_.get(); }
 
   // Note: cannot be mocked because it is accessed as a Property in a gmock EXPECT_CALL. This
   // creates a deadlock in gmock and is an unintended use of mock functions.
@@ -59,21 +60,27 @@ public:
   StatName statName() const override { return name_.statName(); }
   // MOCK_CONST_METHOD0(tags, std::vector<Tag>());
   std::vector<Tag> tags() const override { return tags_; }
+  void setTagExtractedName(absl::string_view name);
   std::string tagExtractedName() const override {
     return tag_extracted_name_.empty() ? name() : tag_extracted_name_;
   }
+  StatName tagExtractedStatName() const override { return tag_extracted_stat_name_->statName(); }
+
   // MOCK_CONST_METHOD0(tagExtractedName, std::string());
 
-  SymbolTable* symbol_table_;
+  Test::Global<FakeSymbolTableImpl> symbol_table_; // Must outlive name_.
   MetricName name_;
-  std::string tag_extracted_name_;
   std::vector<Tag> tags_;
+
+private:
+  std::string tag_extracted_name_;
+  std::unique_ptr<StatNameTempStorage> tag_extracted_stat_name_;
 };
 
 class MockCounter : public Counter, public MockMetric {
 public:
   MockCounter();
-  explicit MockCounter(SymbolTable& symbol_table);
+  // explicit MockCounter(SymbolTable& symbol_table);
   ~MockCounter();
 
   MOCK_METHOD1(add, void(uint64_t amount));
@@ -91,7 +98,7 @@ public:
 class MockGauge : public Gauge, public MockMetric {
 public:
   MockGauge();
-  explicit MockGauge(SymbolTable& symbol_table);
+  // explicit MockGauge(SymbolTable& symbol_table);
   ~MockGauge();
 
   MOCK_METHOD1(add, void(uint64_t amount));
@@ -109,7 +116,7 @@ public:
 class MockHistogram : public Histogram, public MockMetric {
 public:
   MockHistogram();
-  explicit MockHistogram(SymbolTable& symbol_table);
+  // explicit MockHistogram(SymbolTable& symbol_table);
   ~MockHistogram();
 
   MOCK_METHOD1(recordValue, void(uint64_t value));
@@ -121,7 +128,7 @@ public:
 class MockParentHistogram : public ParentHistogram, public MockMetric {
 public:
   MockParentHistogram();
-  explicit MockParentHistogram(SymbolTable& symbol_table);
+  // explicit MockParentHistogram(SymbolTable& symbol_table);
   ~MockParentHistogram();
 
   void merge() override {}
@@ -165,7 +172,7 @@ public:
 
 class MockStore : public Store {
 public:
-  explicit MockStore(SymbolTable& symbol_table);
+  // explicit MockStore(SymbolTable& symbol_table);
   MockStore();
   ~MockStore();
 
@@ -181,15 +188,15 @@ public:
   MOCK_CONST_METHOD0(histograms, std::vector<ParentHistogramSharedPtr>());
   MOCK_CONST_METHOD0(statsOptions, const StatsOptions&());
 
-  Counter& counterx(StatName name) override { return counter(symbol_table_.toString(name)); }
-  Gauge& gaugex(StatName name) override { return gauge(symbol_table_.toString(name)); }
-  Histogram& histogramx(StatName name) override { return histogram(symbol_table_.toString(name)); }
+  Counter& counterx(StatName name) override { return counter(symbol_table_->toString(name)); }
+  Gauge& gaugex(StatName name) override { return gauge(symbol_table_->toString(name)); }
+  Histogram& histogramx(StatName name) override { return histogram(symbol_table_->toString(name)); }
 
-  SymbolTable& symbolTable() override { return symbol_table_; }
-  const SymbolTable& symbolTable() const override { return symbol_table_; }
+  SymbolTable& symbolTable() override { return symbol_table_.get(); }
+  const SymbolTable& symbolTable() const override { return symbol_table_.get(); }
 
-  FakeSymbolTableImpl owned_symbol_table_;
-  SymbolTable& symbol_table_;
+  Test::Global<FakeSymbolTableImpl> symbol_table_;
+  // SymbolTable& symbol_table_;
   testing::NiceMock<MockCounter> counter_;
   std::vector<std::unique_ptr<MockHistogram>> histograms_;
   StatsOptionsImpl stats_options_;
