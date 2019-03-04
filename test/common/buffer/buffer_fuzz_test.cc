@@ -330,9 +330,9 @@ uint32_t bufferAction(Context& ctxt, char insert_value, uint32_t max_alloc, Buff
         FUZZ_ASSERT(rc == 0);
       } else {
         FUZZ_ASSERT(rc > 0);
-        STACK_ARRAY(buf, char, rc);
-        FUZZ_ASSERT(::read(pipe_fds[0], buf.begin(), rc) == rc);
-        FUZZ_ASSERT(::memcmp(buf.begin(), previous_data.data(), rc) == 0);
+        auto buf = std::make_unique<char[]>(rc);
+        FUZZ_ASSERT(::read(pipe_fds[0], buf.get(), rc) == rc);
+        FUZZ_ASSERT(::memcmp(buf.get(), previous_data.data(), rc) == 0);
       }
     } while (rc > 0);
     FUZZ_ASSERT(::close(pipe_fds[0]) == 0);
@@ -366,7 +366,8 @@ DEFINE_PROTO_FUZZER(const test::common::buffer::BufferFuzzTestCase& input) {
   // Soft bound on the available memory for allocation to avoid OOMs and
   // timeouts.
   uint32_t available_alloc = 2 * MaxAllocation;
-  for (int i = 0; i < input.actions().size(); ++i) {
+  constexpr auto max_actions = 1024;
+  for (int i = 0; i < std::min(max_actions, input.actions().size()); ++i) {
     const char insert_value = 'a' + i % 26;
     const auto& action = input.actions(i);
     const uint64_t current_allocated_bytes = Memory::Stats::totalCurrentlyAllocated();
