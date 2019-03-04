@@ -6,6 +6,7 @@
 #include "common/protobuf/protobuf.h"
 
 #include "absl/strings/match.h"
+#include "yaml-cpp/yaml.h"
 
 namespace Envoy {
 namespace {
@@ -16,6 +17,21 @@ absl::string_view filenameFromPath(absl::string_view full_path) {
     return full_path;
   }
   return full_path.substr(index + 1, full_path.size());
+}
+
+void blockFormat(YAML::Node node) {
+  node.SetStyle(YAML::EmitterStyle::Block);
+
+  if (node.Type() == YAML::NodeType::Sequence) {
+    for (auto it : node) {
+      blockFormat(it);
+    }
+  }
+  if (node.Type() == YAML::NodeType::Map) {
+    for (auto it : node) {
+      blockFormat(it.second);
+    }
+  }
 }
 
 } // namespace
@@ -31,6 +47,11 @@ uint64_t convertPercent(double percent, uint64_t max_value) {
   // Checked by schema.
   ASSERT(percent >= 0.0 && percent <= 100.0);
   return max_value * (percent / 100.0);
+}
+
+bool evaluateFractionalPercent(envoy::type::FractionalPercent percent, uint64_t random_value) {
+  return random_value % fractionalPercentDenominatorToInt(percent.denominator()) <
+         percent.numerator();
 }
 
 uint64_t fractionalPercentDenominatorToInt(
@@ -171,6 +192,19 @@ void MessageUtil::checkForDeprecation(const Protobuf::Message& message, Runtime:
       }
     }
   }
+}
+
+std::string MessageUtil::getYamlStringFromMessage(const Protobuf::Message& message,
+                                                  const bool block_print,
+                                                  const bool always_print_primitive_fields) {
+  std::string json = getJsonStringFromMessage(message, false, always_print_primitive_fields);
+  auto node = YAML::Load(json);
+  if (block_print) {
+    blockFormat(node);
+  }
+  YAML::Emitter out;
+  out << node;
+  return out.c_str();
 }
 
 std::string MessageUtil::getJsonStringFromMessage(const Protobuf::Message& message,

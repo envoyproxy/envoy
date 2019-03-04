@@ -1,9 +1,9 @@
 #include "extensions/tracers/lightstep/config.h"
 
 #include "test/mocks/server/mocks.h"
-#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::NiceMock;
@@ -13,6 +13,7 @@ namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace Lightstep {
+namespace {
 
 TEST(LightstepTracerConfigTest, LightstepHttpTracer) {
   NiceMock<Server::MockInstance> server;
@@ -37,6 +38,7 @@ TEST(LightstepTracerConfigTest, LightstepHttpTracer) {
   EXPECT_NE(nullptr, lightstep_tracer);
 }
 
+} // namespace
 } // namespace Lightstep
 } // namespace Tracers
 } // namespace Extensions

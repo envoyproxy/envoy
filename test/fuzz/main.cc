@@ -17,8 +17,9 @@
 
 #include "test/fuzz/fuzz_runner.h"
 #include "test/test_common/environment.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
+
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace {
@@ -26,7 +27,7 @@ namespace {
 // List of paths for files in the test corpus.
 std::vector<std::string> test_corpus_;
 
-class FuzzerCorpusTest : public TestBaseWithParam<std::string> {
+class FuzzerCorpusTest : public testing::TestWithParam<std::string> {
 protected:
   FuzzerCorpusTest() : api_(Api::createApiForTest()) {}
 
@@ -71,8 +72,8 @@ int main(int argc, char** argv) {
     }
   }
   argc -= input_args;
-  for (size_t i = 0; i < Envoy::test_corpus_.size(); ++i) {
-    argv[i + 1] = argv[i + 1 + input_args];
+  for (ssize_t i = 1; i < argc; ++i) {
+    argv[i] = argv[i + input_args];
   }
 
   testing::InitGoogleTest(&argc, argv);

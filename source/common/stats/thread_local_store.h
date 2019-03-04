@@ -211,7 +211,7 @@ private:
 
     /**
      * Makes a stat either by looking it up in the central cache,
-     * generating it from the the parent allocator, or as a last
+     * generating it from the parent allocator, or as a last
      * result, creating it with the heap allocator.
      *
      * @param name the full name of the stat (not tag extracted).

@@ -1,12 +1,14 @@
 #include "extensions/tracers/zipkin/span_buffer.h"
 
-#include "test/test_common/test_base.h"
 #include "test/test_common/test_time.h"
+
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace Zipkin {
+namespace {
 
 TEST(ZipkinSpanBufferTest, defaultConstructorEndToEnd) {
   DangerousDeprecatedTestTime test_time;
@@ -108,6 +110,7 @@ TEST(ZipkinSpanBufferTest, sizeConstructorEndtoEnd) {
   EXPECT_EQ("[]", buffer.toStringifiedJsonArray());
 }
 
+} // namespace
 } // namespace Zipkin
 } // namespace Tracers
 } // namespace Extensions

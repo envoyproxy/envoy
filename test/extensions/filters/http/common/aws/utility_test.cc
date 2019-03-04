@@ -1,7 +1,8 @@
 #include "extensions/filters/http/common/aws/utility.h"
 
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
+
+#include "gtest/gtest.h"
 
 using testing::ElementsAre;
 using testing::Pair;
@@ -11,6 +12,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Common {
 namespace Aws {
+namespace {
 
 // Headers must be in alphabetical order by virtue of std::map
 TEST(UtilityTest, CanonicalizeHeadersInAlphabeticalOrder) {
@@ -145,6 +147,7 @@ TEST(UtilityTest, JoinCanonicalHeaderNamesWithEmptyMap) {
   EXPECT_EQ("", names);
 }
 
+} // namespace
 } // namespace Aws
 } // namespace Common
 } // namespace HttpFilters

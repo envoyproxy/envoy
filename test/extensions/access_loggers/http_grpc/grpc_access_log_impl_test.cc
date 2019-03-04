@@ -21,8 +21,9 @@ namespace Envoy {
 namespace Extensions {
 namespace AccessLoggers {
 namespace HttpGrpc {
+namespace {
 
-class GrpcAccessLogStreamerImplTest : public TestBase {
+class GrpcAccessLogStreamerImplTest : public testing::Test {
 public:
   using MockAccessLogStream = Grpc::MockAsyncStream;
   using AccessLogCallbacks =
@@ -112,7 +113,7 @@ public:
                           const std::string& log_name));
 };
 
-class HttpGrpcAccessLogTest : public TestBase {
+class HttpGrpcAccessLogTest : public testing::Test {
 public:
   void init() {
     ON_CALL(*filter_, evaluate(_, _, _, _)).WillByDefault(Return(true));
@@ -448,6 +449,7 @@ TEST(responseFlagsToAccessLogResponseFlagsTest, All) {
   EXPECT_EQ(common_access_log_expected.DebugString(), common_access_log.DebugString());
 }
 
+} // namespace
 } // namespace HttpGrpc
 } // namespace AccessLoggers
 } // namespace Extensions

@@ -4,9 +4,9 @@
 #include "extensions/filters/http/buffer/config.h"
 
 #include "test/mocks/server/mocks.h"
-#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::NiceMock;
@@ -15,6 +15,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace BufferFilter {
+namespace {
 
 TEST(BufferFilterFactoryTest, BufferFilterCorrectJson) {
   std::string json_string = R"EOF(
@@ -102,6 +103,7 @@ TEST(BufferFilterFactoryTest, BufferFilterRouteSpecificConfig) {
   EXPECT_TRUE(inflated);
 }
 
+} // namespace
 } // namespace BufferFilter
 } // namespace HttpFilters
 } // namespace Extensions

@@ -6,8 +6,9 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
+
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::InSequence;
@@ -19,8 +20,9 @@ using testing::Throw;
 
 namespace Envoy {
 namespace Server {
+namespace {
 
-class WorkerImplTest : public TestBase {
+class WorkerImplTest : public testing::Test {
 public:
   WorkerImplTest()
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()),
@@ -142,5 +144,6 @@ TEST_F(WorkerImplTest, ListenerException) {
   worker_.stop();
 }
 
+} // namespace
 } // namespace Server
 } // namespace Envoy

@@ -11,15 +11,16 @@
 #include "test/common/upstream/utility.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
-#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::NiceMock;
 using testing::Return;
 
 namespace Envoy {
 namespace Upstream {
+namespace {
 
 static HostSharedPtr newTestHost(Upstream::ClusterInfoConstSharedPtr cluster,
                                  const std::string& url, uint32_t weight = 1,
@@ -91,7 +92,7 @@ TEST(DISABLED_LeastRequestLoadBalancerWeightTest, Weight) {
 /**
  * This test is for simulation only and should not be run as part of unit tests.
  */
-class DISABLED_SimulationTest : public TestBase {
+class DISABLED_SimulationTest : public testing::Test {
 public:
   DISABLED_SimulationTest() : stats_(ClusterInfoImpl::generateStats(stats_store_)) {
     ON_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50U))
@@ -261,5 +262,6 @@ TEST_F(DISABLED_SimulationTest, unequalZoneDistribution6) {
   run({3U, 2U, 5U}, {3U, 4U, 5U}, {3U, 4U, 5U});
 }
 
+} // namespace
 } // namespace Upstream
 } // namespace Envoy

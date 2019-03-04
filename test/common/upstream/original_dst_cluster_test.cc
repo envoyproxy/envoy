@@ -22,10 +22,10 @@
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/mocks.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Invoke;
@@ -37,6 +37,7 @@ using testing::SaveArg;
 namespace Envoy {
 namespace Upstream {
 namespace OriginalDstClusterTest {
+namespace {
 
 class TestLoadBalancerContext : public LoadBalancerContextBase {
 public:
@@ -57,7 +58,7 @@ public:
   Http::HeaderMapPtr downstream_headers_;
 };
 
-class OriginalDstClusterTest : public TestBase {
+class OriginalDstClusterTest : public testing::Test {
 public:
   // cleanup timer must be created before the cluster (in setup()), so that we can set expectations
   // on it. Ownership is transferred to the cluster at the cluster constructor, so the cluster will
@@ -631,6 +632,7 @@ TEST_F(OriginalDstClusterTest, UseHttpHeaderDisabled) {
   EXPECT_EQ(host3, nullptr);
 }
 
+} // namespace
 } // namespace OriginalDstClusterTest
 } // namespace Upstream
 } // namespace Envoy

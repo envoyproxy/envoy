@@ -12,10 +12,10 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using Envoy::Http::HeaderValueOf;
 using testing::_;
@@ -26,8 +26,9 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace GrpcHttp1ReverseBridge {
+namespace {
 
-class ReverseBridgeTest : public TestBase {
+class ReverseBridgeTest : public testing::Test {
 protected:
   void initialize(bool withhold_grpc_headers = true) {
     filter_ = std::make_unique<Filter>("application/x-protobuf", withhold_grpc_headers);
@@ -481,6 +482,8 @@ TEST_F(ReverseBridgeTest, GrpcRequestBadResponse) {
                                      "envoy reverse bridge: upstream responded with unsupported "
                                      "content-type application/json, status code 400"));
 }
+
+} // namespace
 } // namespace GrpcHttp1ReverseBridge
 } // namespace HttpFilters
 } // namespace Extensions

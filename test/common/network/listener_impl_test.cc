@@ -7,10 +7,10 @@
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Invoke;
@@ -18,6 +18,7 @@ using testing::Return;
 
 namespace Envoy {
 namespace Network {
+namespace {
 
 static void errorCallbackTest(Address::IpVersion version) {
   // Force the error callback to fire by closing the socket under the listener. We run this entire
@@ -53,7 +54,7 @@ static void errorCallbackTest(Address::IpVersion version) {
   dispatcher->run(Event::Dispatcher::RunType::Block);
 }
 
-class ListenerImplDeathTest : public TestBaseWithParam<Address::IpVersion> {};
+class ListenerImplDeathTest : public testing::TestWithParam<Address::IpVersion> {};
 INSTANTIATE_TEST_SUITE_P(IpVersions, ListenerImplDeathTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
@@ -269,5 +270,6 @@ TEST_P(ListenerImplTest, DisableAndEnableListener) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
+} // namespace
 } // namespace Network
 } // namespace Envoy

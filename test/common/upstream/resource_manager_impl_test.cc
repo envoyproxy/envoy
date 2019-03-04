@@ -5,9 +5,9 @@
 
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
-#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::NiceMock;
@@ -15,6 +15,7 @@ using testing::Return;
 
 namespace Envoy {
 namespace Upstream {
+namespace {
 
 TEST(ResourceManagerImplTest, RuntimeResourceManager) {
   NiceMock<Runtime::MockLoader> runtime;
@@ -58,5 +59,6 @@ TEST(ResourceManagerImplTest, RuntimeResourceManager) {
   EXPECT_FALSE(resource_manager.retries().canCreate());
 }
 
+} // namespace
 } // namespace Upstream
 } // namespace Envoy

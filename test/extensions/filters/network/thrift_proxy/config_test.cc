@@ -6,9 +6,9 @@
 #include "test/extensions/filters/network/thrift_proxy/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/registry.h"
-#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 
@@ -16,7 +16,6 @@ namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
-
 namespace {
 
 std::vector<envoy::config::filter::network::thrift_proxy::v2alpha1::TransportType>
@@ -67,10 +66,10 @@ public:
   ThriftProxyFilterConfigFactory factory_;
 };
 
-class ThriftFilterConfigTest : public TestBase, public ThriftFilterConfigTestBase {};
+class ThriftFilterConfigTest : public testing::Test, public ThriftFilterConfigTestBase {};
 
 class ThriftFilterTransportConfigTest
-    : public TestBaseWithParam<
+    : public testing::TestWithParam<
           envoy::config::filter::network::thrift_proxy::v2alpha1::TransportType>,
       public ThriftFilterConfigTestBase {};
 
@@ -78,7 +77,7 @@ INSTANTIATE_TEST_SUITE_P(TransportTypes, ThriftFilterTransportConfigTest,
                          testing::ValuesIn(getTransportTypes()));
 
 class ThriftFilterProtocolConfigTest
-    : public TestBaseWithParam<
+    : public testing::TestWithParam<
           envoy::config::filter::network::thrift_proxy::v2alpha1::ProtocolType>,
       public ThriftFilterConfigTestBase {};
 

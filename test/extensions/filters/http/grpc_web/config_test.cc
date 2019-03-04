@@ -1,9 +1,9 @@
 #include "extensions/filters/http/grpc_web/config.h"
 
 #include "test/mocks/server/mocks.h"
-#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 
@@ -11,6 +11,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace GrpcWeb {
+namespace {
 
 TEST(GrpcWebFilterConfigTest, GrpcWebFilter) {
   std::string json_string = R"EOF(
@@ -27,6 +28,7 @@ TEST(GrpcWebFilterConfigTest, GrpcWebFilter) {
   cb(filter_callback);
 }
 
+} // namespace
 } // namespace GrpcWeb
 } // namespace HttpFilters
 } // namespace Extensions

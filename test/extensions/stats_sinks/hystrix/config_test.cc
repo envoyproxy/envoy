@@ -10,10 +10,10 @@
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::NiceMock;
@@ -24,6 +24,7 @@ namespace Envoy {
 namespace Extensions {
 namespace StatSinks {
 namespace Hystrix {
+namespace {
 
 TEST(StatsConfigTest, ValidHystrixSink) {
   const std::string name = StatsSinkNames::get().Hystrix;
@@ -43,6 +44,7 @@ TEST(StatsConfigTest, ValidHystrixSink) {
   EXPECT_NE(dynamic_cast<Hystrix::HystrixSink*>(sink.get()), nullptr);
 }
 
+} // namespace
 } // namespace Hystrix
 } // namespace StatSinks
 } // namespace Extensions

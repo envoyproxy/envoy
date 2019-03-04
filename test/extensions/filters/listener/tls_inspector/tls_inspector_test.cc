@@ -6,9 +6,9 @@
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/stats/mocks.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
+#include "gtest/gtest.h"
 #include "openssl/ssl.h"
 
 using testing::_;
@@ -27,12 +27,13 @@ namespace Envoy {
 namespace Extensions {
 namespace ListenerFilters {
 namespace TlsInspector {
+namespace {
 
-class TlsInspectorTest : public TestBase {
+class TlsInspectorTest : public testing::Test {
 public:
   TlsInspectorTest()
       : cfg_(std::make_shared<Config>(store_)),
-        io_handle_(std::make_unique<Network::IoSocketHandle>(42)) {}
+        io_handle_(std::make_unique<Network::IoSocketHandleImpl>(42)) {}
   ~TlsInspectorTest() { io_handle_->close(); }
 
   void init() {
@@ -230,6 +231,7 @@ TEST_F(TlsInspectorTest, NotSsl) {
   EXPECT_EQ(1, cfg_->stats().tls_not_found_.value());
 }
 
+} // namespace
 } // namespace TlsInspector
 } // namespace ListenerFilters
 } // namespace Extensions

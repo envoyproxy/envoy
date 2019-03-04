@@ -18,18 +18,8 @@ SysCallIntResult OsSysCallsImpl::ioctl(int sockfd, unsigned long int request, vo
   return {rc, errno};
 }
 
-SysCallIntResult OsSysCallsImpl::open(const std::string& full_path, int flags, int mode) {
-  const int rc = ::open(full_path.c_str(), flags, mode);
-  return {rc, errno};
-}
-
 SysCallIntResult OsSysCallsImpl::close(int fd) {
   const int rc = ::close(fd);
-  return {rc, errno};
-}
-
-SysCallSizeResult OsSysCallsImpl::write(int fd, const void* buffer, size_t num_bytes) {
-  const ssize_t rc = ::write(fd, buffer, num_bytes);
   return {rc, errno};
 }
 

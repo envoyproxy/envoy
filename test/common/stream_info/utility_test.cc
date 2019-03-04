@@ -2,9 +2,9 @@
 #include "common/stream_info/utility.h"
 
 #include "test/mocks/stream_info/mocks.h"
-#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::NiceMock;
@@ -12,6 +12,7 @@ using testing::Return;
 
 namespace Envoy {
 namespace StreamInfo {
+namespace {
 
 TEST(ResponseFlagUtilsTest, toShortStringConversion) {
   static_assert(ResponseFlag::LastFlag == 0x10000, "A flag has been added. Fix this code.");
@@ -100,5 +101,6 @@ TEST(UtilityTest, formatDownstreamAddressNoPort) {
             Utility::formatDownstreamAddressNoPort(Network::Address::PipeInstance("/hello")));
 }
 
+} // namespace
 } // namespace StreamInfo
 } // namespace Envoy

@@ -6,22 +6,23 @@
 
 #include "test/integration/http_integration.h"
 #include "test/mocks/http/mocks.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/match.h"
+#include "gtest/gtest.h"
 
 using Envoy::Http::HeaderValueOf;
 
 namespace Envoy {
+namespace {
 
 // Tests a downstream HTTP2 client sending gRPC requests that are converted into HTTP/1.1 for a
 // HTTP1 upstream.
-class ReverseBridgeIntegrationTest : public TestBaseWithParam<Network::Address::IpVersion>,
+class ReverseBridgeIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                      public HttpIntegrationTest {
 public:
   ReverseBridgeIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam(), realTime()) {}
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam()) {}
 
   void SetUp() override {
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP1);
@@ -113,4 +114,6 @@ TEST_P(ReverseBridgeIntegrationTest, EnabledRoute) {
   ASSERT_TRUE(fake_upstream_connection_->close());
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
 }
+
+} // namespace
 } // namespace Envoy

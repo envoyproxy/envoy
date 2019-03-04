@@ -3,10 +3,10 @@
 
 #include "test/extensions/filters/http/jwt_authn/mock.h"
 #include "test/mocks/server/mocks.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication;
 using ::google::jwt_verify::Status;
@@ -18,6 +18,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace JwtAuthn {
+namespace {
 
 class MockMatcher : public Matcher {
 public:
@@ -33,7 +34,7 @@ public:
   MOCK_CONST_METHOD1(findVerifier, const Verifier*(const Http::HeaderMap& headers));
 };
 
-class FilterTest : public TestBase {
+class FilterTest : public testing::Test {
 public:
   void SetUp() override {
     mock_config_ = ::std::make_shared<MockFilterConfig>(proto_config_, "", mock_context_);
@@ -187,6 +188,7 @@ TEST_F(FilterTest, TestNoRouteMatched) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(headers));
 }
 
+} // namespace
 } // namespace JwtAuthn
 } // namespace HttpFilters
 } // namespace Extensions

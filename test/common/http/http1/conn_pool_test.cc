@@ -17,10 +17,10 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::DoAll;
@@ -35,6 +35,7 @@ using testing::SaveArg;
 namespace Envoy {
 namespace Http {
 namespace Http1 {
+namespace {
 
 /**
  * A test version of ConnPoolImpl that allows for mocking beneath the codec clients.
@@ -120,7 +121,7 @@ public:
 /**
  * Test fixture for all connection pool tests.
  */
-class Http1ConnPoolImplTest : public TestBase {
+class Http1ConnPoolImplTest : public testing::Test {
 public:
   Http1ConnPoolImplTest()
       : upstream_ready_timer_(new NiceMock<Event::MockTimer>(&dispatcher_)),
@@ -763,6 +764,7 @@ TEST_F(Http1ConnPoolImplTest, PendingRequestIsConsideredActive) {
   dispatcher_.clearDeferredDeleteList();
 }
 
+} // namespace
 } // namespace Http1
 } // namespace Http
 } // namespace Envoy

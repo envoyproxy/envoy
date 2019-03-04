@@ -5,9 +5,9 @@
 
 #include "test/extensions/filters/network/thrift_proxy/mocks.h"
 #include "test/mocks/server/mocks.h"
-#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::ReturnRef;
@@ -16,14 +16,15 @@ namespace Envoy {
 namespace Extensions {
 namespace ThriftFilters {
 namespace RateLimitFilter {
-
 namespace {
+
 envoy::config::filter::thrift::rate_limit::v2alpha1::RateLimit
 parseRateLimitFromV2Yaml(const std::string& yaml) {
   envoy::config::filter::thrift::rate_limit::v2alpha1::RateLimit rate_limit;
   MessageUtil::loadFromYaml(yaml, rate_limit);
   return rate_limit;
 }
+
 } // namespace
 
 TEST(RateLimitFilterConfigTest, ValidateFail) {

@@ -25,9 +25,9 @@
 #include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Invoke;
@@ -41,6 +41,7 @@ using testing::SaveArg;
 
 namespace Envoy {
 namespace TcpProxy {
+namespace {
 
 using ::Envoy::Network::UpstreamServerName;
 
@@ -51,6 +52,7 @@ Config constructConfigFromJson(const Json::Object& json,
   Envoy::Config::FilterJson::translateTcpProxy(json, tcp_proxy);
   return Config(tcp_proxy, context);
 }
+
 } // namespace
 
 TEST(ConfigTest, NoRouteConfig) {
@@ -346,7 +348,7 @@ TEST(ConfigTest, AccessLogConfig) {
   EXPECT_EQ(2, config_obj.accessLogs().size());
 }
 
-class TcpProxyTest : public TestBase {
+class TcpProxyTest : public testing::Test {
 public:
   TcpProxyTest() {
     ON_CALL(*factory_context_.access_log_manager_.file_, write(_))
@@ -1076,7 +1078,7 @@ TEST_F(TcpProxyTest, UpstreamFlushReceiveUpstreamData) {
   upstream_callbacks_->onUpstreamData(buffer, false);
 }
 
-class TcpProxyRoutingTest : public TestBase {
+class TcpProxyRoutingTest : public testing::Test {
 public:
   TcpProxyRoutingTest() {
     std::string json = R"EOF(
@@ -1203,5 +1205,6 @@ TEST_F(TcpProxyRoutingTest, UpstreamServerName) {
   filter_->onNewConnection();
 }
 
+} // namespace
 } // namespace TcpProxy
 } // namespace Envoy

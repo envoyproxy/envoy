@@ -1,15 +1,16 @@
 #include "extensions/transport_sockets/alts/tsi_handshaker.h"
 
 #include "test/mocks/event/mocks.h"
-#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 #include "src/core/tsi/fake_transport_security.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
 namespace Alts {
+namespace {
 
 using testing::_;
 using testing::InSequence;
@@ -32,7 +33,7 @@ public:
   }
 };
 
-class TsiHandshakerTest : public TestBase {
+class TsiHandshakerTest : public testing::Test {
 public:
   TsiHandshakerTest()
       : server_handshaker_({tsi_create_fake_handshaker(0)}, dispatcher_),
@@ -163,6 +164,7 @@ TEST_F(TsiHandshakerTest, DeleteOnDone) {
   handshaker.release();
 }
 
+} // namespace
 } // namespace Alts
 } // namespace TransportSockets
 } // namespace Extensions

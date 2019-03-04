@@ -1,13 +1,13 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/buffer/zero_copy_input_stream_impl.h"
 
-#include "test/test_common/test_base.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Buffer {
 namespace {
 
-class ZeroCopyInputStreamTest : public TestBase {
+class ZeroCopyInputStreamTest : public testing::Test {
 public:
   ZeroCopyInputStreamTest() {
     Buffer::OwnedImpl buffer{"abcd"};

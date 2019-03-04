@@ -14,13 +14,16 @@
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/registry.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
+
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Network {
 namespace Address {
-class IpResolverTest : public TestBase {
+namespace {
+
+class IpResolverTest : public testing::Test {
 public:
   Resolver* resolver_{Registry::FactoryRegistry<Resolver>::getFactory("envoy.ip")};
 };
@@ -166,6 +169,7 @@ TEST(ResolverTest, NoSuchResolver) {
                             "Unknown address resolver: envoy.test.resolver");
 }
 
+} // namespace
 } // namespace Address
 } // namespace Network
 } // namespace Envoy

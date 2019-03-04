@@ -3,9 +3,9 @@
 #include "extensions/filters/http/fault/config.h"
 
 #include "test/mocks/server/mocks.h"
-#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Invoke;
@@ -14,6 +14,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Fault {
+namespace {
 
 TEST(FaultFilterConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
@@ -68,6 +69,7 @@ TEST(FaultFilterConfigTest, FaultFilterEmptyProto) {
   cb(filter_callback);
 }
 
+} // namespace
 } // namespace Fault
 } // namespace HttpFilters
 } // namespace Extensions

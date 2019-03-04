@@ -385,6 +385,14 @@ message Cluster {
     // going to an individual locality if said locality is disproportionally affected by the
     // subset predicate.
     bool scale_locality_weight = 5;
+
+    // If true, when a fallback policy is configured and its corresponding subset fails to find
+    // a host this will cause any host to be selected instead.
+    //
+    // This is useful when using the default subset as the fallback policy, given the default
+    // subset might become empty. With this option enabled, if that happens the LB will attempt
+    // to select a host from the entire cluster.
+    bool panic_mode_any = 6;
   }
 
   // Configuration for load balancing subsetting.
@@ -400,12 +408,10 @@ message Cluster {
   // Specific configuration for the :ref:`RingHash<arch_overview_load_balancing_types_ring_hash>`
   // load balancing policy.
   message RingHashLbConfig {
-    // Minimum hash ring size, i.e. total virtual nodes. A larger size
-    // will provide better request distribution since each host in the
-    // cluster will have more virtual nodes. Defaults to 1024. In the case
-    // that total number of hosts is greater than the minimum, each host will
-    // be allocated a single virtual node. This field is limited to 8M to bound
-    // resource use.
+    // Minimum hash ring size. The larger the ring is (that is, the more hashes there are for each
+    // provided host) the better the request distribution will reflect the desired weights. Defaults
+    // to 1024 entries, and limited to 8M entries. See also
+    // :ref:`maximum_ring_size<envoy_api_field_Cluster.RingHashLbConfig.maximum_ring_size>`.
     google.protobuf.UInt64Value minimum_ring_size = 1 [(validate.rules).uint64.lte = 8388608];
 
     // [#not-implemented-hide:] Hide from docs.
@@ -432,6 +438,11 @@ message Cluster {
     // The hash function used to hash hosts onto the ketama ring. The value defaults to
     // :ref:`XX_HASH<envoy_api_enum_value_Cluster.RingHashLbConfig.HashFunction.XX_HASH>`.
     HashFunction hash_function = 3 [(validate.rules).enum.defined_only = true];
+
+    // Maximum hash ring size. Defaults to 8M entries, and limited to 8M entries, but can be lowered
+    // to further constrain resource use. See also
+    // :ref:`minimum_ring_size<envoy_api_field_Cluster.RingHashLbConfig.minimum_ring_size>`.
+    google.protobuf.UInt64Value maximum_ring_size = 4 [(validate.rules).uint64.lte = 8388608];
   }
 
   // Specific configuration for the

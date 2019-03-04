@@ -157,6 +157,8 @@ configurable via the :ref:`max_buffered_rx_bytes
 :ref:`max_buffered_tx_bytes
 <envoy_api_field_service.tap.v2alpha.OutputConfig.max_buffered_tx_bytes>` settings.
 
+.. _config_http_filters_tap_streaming:
+
 Streaming matching
 ------------------
 
@@ -165,11 +167,64 @@ the request/response sequence, the filter will match incrementally as the reques
 first the request headers will be matched, then the request body if present, then the request
 trailers if present, then the response headers if present, etc.
 
-In the future, the filter will support streaming output. Currently only :ref:`fully buffered output
-<envoy_api_msg_data.tap.v2alpha.HttpBufferedTrace>` is implemented. However, even in the current
-implementation, if a tap is configured to match request headers and the request headers match,
-even if there is no response (upstream failure, etc.) the request will still be tapped and sent
-to the configured output.
+The filter additionally supports optional streamed output which is governed by the :ref:`streaming
+<envoy_api_field_service.tap.v2alpha.OutputConfig.streaming>` setting. If this setting is false
+(the default), Envoy will emit :ref:`fully buffered traces
+<envoy_api_msg_data.tap.v2alpha.HttpBufferedTrace>`. Users are likely to find this format easier
+to interact with for simple cases.
+
+In cases where fully buffered traces are not practical (e.g., very large request and responses,
+long lived streaming APIs, etc.), the streaming setting can be set to true, and Envoy will emit
+multiple :ref:`streamed trace segments <envoy_api_msg_data.tap.v2alpha.HttpStreamedTraceSegment>` for
+each tap. In this case, it is required that post-processing is performed to stitch all of the trace
+segments back together into a usable form. Also note that binary protobuf is not a self-delimiting
+format. If binary protobuf output is desired, the :ref:`PROTO_BINARY_LENGTH_DELIMITED
+<envoy_api_enum_value_service.tap.v2alpha.OutputSink.Format.PROTO_BINARY_LENGTH_DELIMITED>` output
+format should be used.
+
+An static filter configuration to enable streaming output looks like:
+
+.. code-block:: yaml
+
+  name: envoy.filters.http.tap
+  config:
+    common_config:
+      static_config:
+        match_config:
+          http_response_headers_match:
+            headers:
+              - name: bar
+                exact_match: baz
+        output_config:
+          streaming: true
+          sinks:
+            - format: PROTO_BINARY_LENGTH_DELIMITED
+              file_per_tap:
+                path_prefix: /tmp/
+
+The previous configuration will match response headers, and as such will buffer request headers,
+body, and trailers until a match can be determined (buffered data limits still apply as described
+in the previous section). If a match is determined, buffered data will be flushed in individual
+trace segments and then the rest of the tap will be streamed as data arrives. The messages output
+might look like this:
+
+.. code-block:: yaml
+
+  http_streamed_trace_segment:
+    trace_id: 1
+    request_headers:
+      headers:
+        - key: a
+          value: b
+
+.. code-block:: yaml
+
+  http_streamed_trace_segment:
+    trace_id: 1
+    request_body_chunk:
+      as_bytes: aGVsbG8=
+
+Etc.
 
 Statistics
 ----------

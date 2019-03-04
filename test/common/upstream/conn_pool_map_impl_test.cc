@@ -8,7 +8,6 @@
 #include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/conn_pool.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -22,8 +21,9 @@ using testing::SaveArg;
 
 namespace Envoy {
 namespace Upstream {
+namespace {
 
-class ConnPoolMapImplTest : public TestBase {
+class ConnPoolMapImplTest : public testing::Test {
 public:
   // Note, we could test with Http::ConnectionPool::MockInstance here, which would simplify the
   // test. However, it's nice to test against an actual interface we'll be using.
@@ -346,5 +346,7 @@ TEST_F(ConnPoolMapImplDeathTest, ReentryAddDrainedCallbackTripsAssert) {
       ".*Details: A resource should only be entered once");
 }
 #endif // !defined(NDEBUG)
+
+} // namespace
 } // namespace Upstream
 } // namespace Envoy

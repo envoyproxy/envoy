@@ -7,9 +7,9 @@
 #include "test/integration/server.h"
 #include "test/integration/ssl_utility.h"
 #include "test/mocks/secret/mocks.h"
-#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::NiceMock;
 
@@ -19,7 +19,7 @@ namespace Ssl {
 class SslIntegrationTestBase : public HttpIntegrationTest {
 public:
   SslIntegrationTestBase(Network::Address::IpVersion ip_version)
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ip_version, realTime()) {}
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ip_version) {}
 
   void initialize() override;
 
@@ -43,7 +43,7 @@ private:
   std::unique_ptr<ContextManager> context_manager_;
 };
 
-class SslIntegrationTest : public TestBaseWithParam<Network::Address::IpVersion>,
+class SslIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                            public SslIntegrationTestBase {
 public:
   SslIntegrationTest() : SslIntegrationTestBase(GetParam()) {}

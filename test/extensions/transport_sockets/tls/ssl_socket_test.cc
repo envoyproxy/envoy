@@ -32,11 +32,11 @@
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_replace.h"
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 #include "openssl/ssl.h"
 
 using testing::_;
@@ -52,7 +52,6 @@ namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
-
 namespace {
 
 /**
@@ -2302,6 +2301,7 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
   EXPECT_EQ(expect_reuse ? 1UL : 0UL, server_stats_store.counter("ssl.session_reused").value());
   EXPECT_EQ(expect_reuse ? 1UL : 0UL, client_stats_store.counter("ssl.session_reused").value());
 }
+
 } // namespace
 
 TEST_P(SslSocketTest, TicketSessionResumption) {

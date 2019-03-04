@@ -1,9 +1,9 @@
 #include "extensions/filters/http/dynamo/config.h"
 
 #include "test/mocks/server/mocks.h"
-#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 
@@ -11,6 +11,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Dynamo {
+namespace {
 
 TEST(DynamoFilterConfigTest, DynamoFilter) {
   std::string json_string = R"EOF(
@@ -27,6 +28,7 @@ TEST(DynamoFilterConfigTest, DynamoFilter) {
   cb(filter_callback);
 }
 
+} // namespace
 } // namespace Dynamo
 } // namespace HttpFilters
 } // namespace Extensions

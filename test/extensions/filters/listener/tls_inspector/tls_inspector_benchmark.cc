@@ -9,10 +9,10 @@
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/stats/mocks.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "benchmark/benchmark.h"
+#include "gtest/gtest.h"
 #include "openssl/ssl.h"
 
 using testing::_;
@@ -78,7 +78,7 @@ static void BM_TlsInspector(benchmark::State& state) {
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls};
   NiceMock<Stats::MockStore> store;
   ConfigSharedPtr cfg(std::make_shared<Config>(store));
-  Network::IoHandlePtr io_handle = std::make_unique<Network::IoSocketHandle>();
+  Network::IoHandlePtr io_handle = std::make_unique<Network::IoSocketHandleImpl>();
   Network::ConnectionSocketImpl socket(std::move(io_handle), nullptr, nullptr);
   NiceMock<FastMockDispatcher> dispatcher;
   FastMockListenerFilterCallbacks cb(socket, dispatcher);

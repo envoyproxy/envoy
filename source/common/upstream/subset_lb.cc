@@ -19,14 +19,14 @@ namespace Upstream {
 
 SubsetLoadBalancer::SubsetLoadBalancer(
     LoadBalancerType lb_type, PrioritySet& priority_set, const PrioritySet* local_priority_set,
-    ClusterStats& stats, Runtime::Loader& runtime, Runtime::RandomGenerator& random,
-    const LoadBalancerSubsetInfo& subsets,
+    ClusterStats& stats, Stats::Scope& scope, Runtime::Loader& runtime,
+    Runtime::RandomGenerator& random, const LoadBalancerSubsetInfo& subsets,
     const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig>& lb_ring_hash_config,
     const absl::optional<envoy::api::v2::Cluster::LeastRequestLbConfig>& least_request_config,
     const envoy::api::v2::Cluster::CommonLbConfig& common_config)
     : lb_type_(lb_type), lb_ring_hash_config_(lb_ring_hash_config),
       least_request_config_(least_request_config), common_config_(common_config), stats_(stats),
-      runtime_(runtime), random_(random), fallback_policy_(subsets.fallbackPolicy()),
+      scope_(scope), runtime_(runtime), random_(random), fallback_policy_(subsets.fallbackPolicy()),
       default_subset_metadata_(subsets.defaultSubset().fields().begin(),
                                subsets.defaultSubset().fields().end()),
       subset_keys_(subsets.subsetKeys()), original_priority_set_(priority_set),
@@ -34,6 +34,14 @@ SubsetLoadBalancer::SubsetLoadBalancer(
       locality_weight_aware_(subsets.localityWeightAware()),
       scale_locality_weight_(subsets.scaleLocalityWeight()) {
   ASSERT(subsets.isEnabled());
+
+  if (subsets.panicModeAny()) {
+    HostPredicate predicate = [](const Host&) -> bool { return true; };
+
+    panic_mode_subset_ = std::make_unique<LbSubsetEntry>();
+    panic_mode_subset_->priority_subset_ = std::make_unique<PrioritySubsetImpl>(
+        *this, predicate, locality_weight_aware_, scale_locality_weight_);
+  }
 
   // Create filtered default subset (if necessary) and other subsets based on current hosts.
   refreshSubsets();
@@ -96,8 +104,21 @@ HostConstSharedPtr SubsetLoadBalancer::chooseHost(LoadBalancerContext* context) 
     return nullptr;
   }
 
-  stats_.lb_subsets_fallback_.inc();
-  return fallback_subset_->priority_subset_->lb_->chooseHost(context);
+  HostConstSharedPtr host = fallback_subset_->priority_subset_->lb_->chooseHost(context);
+  if (host != nullptr) {
+    stats_.lb_subsets_fallback_.inc();
+    return host;
+  }
+
+  if (panic_mode_subset_ != nullptr) {
+    HostConstSharedPtr host = panic_mode_subset_->priority_subset_->lb_->chooseHost(context);
+    if (host != nullptr) {
+      stats_.lb_subsets_fallback_panic_.inc();
+      return host;
+    }
+  }
+
+  return nullptr;
 }
 
 // Find a host from the subsets. Sets host_chosen to false and returns nullptr if the context has
@@ -458,7 +479,7 @@ SubsetLoadBalancer::PrioritySubsetImpl::PrioritySubsetImpl(const SubsetLoadBalan
     // We should make the subset LB thread aware since the calculations are costly, and then we
     // can also use a thread aware sub-LB properly. The following works fine but is not optimal.
     thread_aware_lb_ = std::make_unique<RingHashLoadBalancer>(
-        *this, subset_lb.stats_, subset_lb.runtime_, subset_lb.random_,
+        *this, subset_lb.stats_, subset_lb.scope_, subset_lb.runtime_, subset_lb.random_,
         subset_lb.lb_ring_hash_config_, subset_lb.common_config_);
     thread_aware_lb_->initialize();
     lb_ = thread_aware_lb_->factory()->create();
@@ -469,7 +490,8 @@ SubsetLoadBalancer::PrioritySubsetImpl::PrioritySubsetImpl(const SubsetLoadBalan
     // We should make the subset LB thread aware since the calculations are costly, and then we
     // can also use a thread aware sub-LB properly. The following works fine but is not optimal.
     thread_aware_lb_ = std::make_unique<MaglevLoadBalancer>(
-        *this, subset_lb.stats_, subset_lb.runtime_, subset_lb.random_, subset_lb.common_config_);
+        *this, subset_lb.stats_, subset_lb.scope_, subset_lb.runtime_, subset_lb.random_,
+        subset_lb.common_config_);
     thread_aware_lb_->initialize();
     lb_ = thread_aware_lb_->factory()->create();
     break;

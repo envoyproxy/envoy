@@ -9,17 +9,18 @@ namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace RBAC {
-
 namespace {
+
 std::string rbac_config;
+
 } // namespace
 
 class RoleBasedAccessControlNetworkFilterIntegrationTest
-    : public TestBaseWithParam<Network::Address::IpVersion>,
+    : public testing::TestWithParam<Network::Address::IpVersion>,
       public BaseIntegrationTest {
 public:
   RoleBasedAccessControlNetworkFilterIntegrationTest()
-      : BaseIntegrationTest(GetParam(), realTime(), rbac_config) {}
+      : BaseIntegrationTest(GetParam(), rbac_config) {}
 
   static void SetUpTestSuite() {
     rbac_config = ConfigHelper::BASE_CONFIG + R"EOF(

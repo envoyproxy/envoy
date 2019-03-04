@@ -6,17 +6,18 @@
 #include "extensions/resource_monitors/injected_resource/injected_resource_monitor.h"
 
 #include "test/test_common/environment.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace ResourceMonitors {
 namespace InjectedResourceMonitor {
+namespace {
 
 class TestableInjectedResourceMonitor : public InjectedResourceMonitor {
 public:
@@ -42,7 +43,7 @@ public:
   MOCK_METHOD1(onFailure, void(const EnvoyException&));
 };
 
-class InjectedResourceMonitorTest : public TestBase {
+class InjectedResourceMonitorTest : public testing::Test {
 protected:
   InjectedResourceMonitorTest()
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()),
@@ -100,6 +101,7 @@ TEST_F(InjectedResourceMonitorTest, ReportsErrorOnFileRead) {
   monitor_->updateResourceUsage(cb_);
 }
 
+} // namespace
 } // namespace InjectedResourceMonitor
 } // namespace ResourceMonitors
 } // namespace Extensions

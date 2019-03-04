@@ -4,10 +4,12 @@
 #include "common/stats/stats_options_impl.h"
 
 #include "test/test_common/logging.h"
-#include "test/test_common/test_base.h"
+
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Stats {
+namespace {
 
 // No truncation occurs in the implementation of HeapStatData.
 // Note: a similar test using RawStatData* is in raw_stat_data_test.cc.
@@ -38,5 +40,6 @@ TEST(HeapStatDataTest, HeapAlloc) {
   alloc.free(*stat_3);
 }
 
+} // namespace
 } // namespace Stats
 } // namespace Envoy

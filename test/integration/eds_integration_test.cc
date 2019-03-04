@@ -5,18 +5,18 @@
 #include "test/config/utility.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/network_utility.h"
-#include "test/test_common/test_base.h"
+
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace {
 
 // Integration test for EDS features. EDS is consumed via filesystem
 // subscription.
-class EdsIntegrationTest : public TestBaseWithParam<Network::Address::IpVersion>,
+class EdsIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                            public HttpIntegrationTest {
 public:
-  EdsIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()) {}
+  EdsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
 
   // We need to supply the endpoints via EDS to provide health status. Use a
   // filesystem delivery to simplify test mechanics.
@@ -121,6 +121,47 @@ TEST_P(EdsIntegrationTest, OverprovisioningFactorUpdate) {
   // Use new overprovisioning factor 200.
   setEndpoints(4, 4, 0, 200);
   get_and_compare(200);
+}
+
+// Verifies that EDS update only triggers member update callbacks once per update.
+TEST_P(EdsIntegrationTest, BatchMemberUpdateCb) {
+  initialize();
+
+  uint32_t member_update_count{};
+
+  auto& priority_set = test_server_->server()
+                           .clusterManager()
+                           .clusters()
+                           .find("cluster_0")
+                           ->second.get()
+                           .prioritySet();
+
+  // Keep track of how many times we're seeing a member update callback.
+  priority_set.addMemberUpdateCb([&](const auto& hosts_added, const auto&) {
+    // We should see both hosts present in the member update callback.
+    EXPECT_EQ(2, hosts_added.size());
+    member_update_count++;
+  });
+
+  envoy::api::v2::ClusterLoadAssignment cluster_load_assignment;
+  cluster_load_assignment.set_cluster_name("cluster_0");
+
+  {
+    auto* locality_lb_endpoints = cluster_load_assignment.add_endpoints();
+
+    auto* endpoint = locality_lb_endpoints->add_lb_endpoints();
+    setUpstreamAddress(0, *endpoint);
+  }
+
+  auto* locality_lb_endpoints = cluster_load_assignment.add_endpoints();
+  locality_lb_endpoints->set_priority(1);
+
+  auto* endpoint = locality_lb_endpoints->add_lb_endpoints();
+  setUpstreamAddress(1, *endpoint);
+
+  eds_helper_.setEds({cluster_load_assignment}, *test_server_);
+
+  EXPECT_EQ(1, member_update_count);
 }
 
 } // namespace

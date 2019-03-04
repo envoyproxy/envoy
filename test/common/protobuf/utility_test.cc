@@ -12,12 +12,13 @@
 #include "test/proto/deprecated.pb.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
+
+#include "gtest/gtest.h"
 
 namespace Envoy {
 
-class ProtobufUtilityTest : public TestBase {
+class ProtobufUtilityTest : public testing::Test {
 protected:
   ProtobufUtilityTest() : api_(Api::createApiForTest()) {}
 
@@ -32,6 +33,83 @@ TEST_F(ProtobufUtilityTest, convertPercentNaN) {
                                                               healthy_panic_threshold, 100, 50),
                EnvoyException);
 }
+
+namespace ProtobufPercentHelper {
+
+TEST_F(ProtobufUtilityTest, evaluateFractionalPercent) {
+  { // 0/100 (default)
+    envoy::type::FractionalPercent percent;
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 0));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 50));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 100));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 1000));
+  }
+  { // 5/100
+    envoy::type::FractionalPercent percent;
+    percent.set_numerator(5);
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 0));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 4));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 5));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 50));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 100));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 104));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 105));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 204));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 1000));
+  }
+  { // 75/100
+    envoy::type::FractionalPercent percent;
+    percent.set_numerator(75);
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 0));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 4));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 5));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 74));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 80));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 100));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 104));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 105));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 200));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 274));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 280));
+  }
+  { // 5/10000
+    envoy::type::FractionalPercent percent;
+    percent.set_denominator(envoy::type::FractionalPercent::TEN_THOUSAND);
+    percent.set_numerator(5);
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 0));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 4));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 5));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 50));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 100));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 9000));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 10000));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 10004));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 10005));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 20004));
+  }
+  { // 5/MILLION
+    envoy::type::FractionalPercent percent;
+    percent.set_denominator(envoy::type::FractionalPercent::MILLION);
+    percent.set_numerator(5);
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 0));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 4));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 5));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 50));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 100));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 9000));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 10000));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 10004));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 10005));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 900005));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 900000));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 1000000));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 1000004));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 1000005));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 2000004));
+  }
+}
+
+} // namespace ProtobufPercentHelper
 
 TEST_F(ProtobufUtilityTest, RepeatedPtrUtilDebugString) {
   Protobuf::RepeatedPtrField<ProtobufWkt::UInt32Value> repeated;
@@ -317,6 +395,34 @@ TEST_F(ProtobufUtilityTest, YamlLoadFromStringFail) {
                           "Unable to parse JSON as proto.*Root element must be a message.*");
 }
 
+TEST_F(ProtobufUtilityTest, GetFlowYamlStringFromMessage) {
+  envoy::config::bootstrap::v2::Bootstrap bootstrap;
+  bootstrap.set_flags_path("foo");
+  EXPECT_EQ("{flags_path: foo}", MessageUtil::getYamlStringFromMessage(bootstrap, false, false));
+}
+
+TEST_F(ProtobufUtilityTest, GetBlockYamlStringFromMessage) {
+  envoy::config::bootstrap::v2::Bootstrap bootstrap;
+  bootstrap.set_flags_path("foo");
+  EXPECT_EQ("flags_path: foo", MessageUtil::getYamlStringFromMessage(bootstrap, true, false));
+}
+
+TEST_F(ProtobufUtilityTest, GetBlockYamlStringFromRecursiveMessage) {
+  envoy::config::bootstrap::v2::Bootstrap bootstrap;
+  bootstrap.set_flags_path("foo");
+  bootstrap.mutable_node();
+  bootstrap.mutable_static_resources()->add_listeners()->set_name("http");
+
+  const std::string expected_yaml = R"EOF(
+node:
+  {}
+static_resources:
+  listeners:
+    - name: http
+flags_path: foo)EOF";
+  EXPECT_EQ(expected_yaml, "\n" + MessageUtil::getYamlStringFromMessage(bootstrap, true, false));
+}
+
 TEST(DurationUtilTest, OutOfRange) {
   {
     ProtobufWkt::Duration duration;
@@ -340,7 +446,7 @@ TEST(DurationUtilTest, OutOfRange) {
   }
 }
 
-class DeprecatedFieldsTest : public TestBase {
+class DeprecatedFieldsTest : public testing::Test {
 protected:
   DeprecatedFieldsTest()
       : loader_(new Runtime::ScopedLoaderSingleton(
@@ -493,7 +599,7 @@ TEST_F(DeprecatedFieldsTest, RepeatedMessageDeprecated) {
                       MessageUtil::checkForDeprecation(base));
 }
 
-class TimestampUtilTest : public TestBase, public ::testing::WithParamInterface<int64_t> {};
+class TimestampUtilTest : public testing::Test, public ::testing::WithParamInterface<int64_t> {};
 
 TEST_P(TimestampUtilTest, SystemClockToTimestampTest) {
   // Generate an input time_point<system_clock>,

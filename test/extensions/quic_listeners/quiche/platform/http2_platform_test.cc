@@ -1,7 +1,6 @@
 #include <memory>
 
-#include "test/test_common/test_base.h"
-
+#include "gtest/gtest.h"
 #include "quiche/http2/platform/api/http2_arraysize.h"
 #include "quiche/http2/platform/api/http2_containers.h"
 #include "quiche/http2/platform/api/http2_estimate_memory_usage.h"
@@ -20,6 +19,7 @@ namespace Envoy {
 namespace Extensions {
 namespace QuicListeners {
 namespace Quiche {
+namespace {
 
 TEST(Http2PlatformTest, Http2Arraysize) {
   int array[] = {0, 1, 2, 3, 4};
@@ -61,6 +61,7 @@ TEST(Http2PlatformTest, Http2StringPiece) {
   EXPECT_EQ('b', sp[0]);
 }
 
+} // namespace
 } // namespace Quiche
 } // namespace QuicListeners
 } // namespace Extensions

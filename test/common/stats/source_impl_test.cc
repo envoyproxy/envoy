@@ -3,13 +3,15 @@
 #include "common/stats/source_impl.h"
 
 #include "test/mocks/stats/mocks.h"
-#include "test/test_common/test_base.h"
+
+#include "gtest/gtest.h"
 
 using testing::NiceMock;
 using testing::ReturnPointee;
 
 namespace Envoy {
 namespace Stats {
+namespace {
 
 TEST(SourceImplTest, Caching) {
   NiceMock<MockStore> store;
@@ -46,5 +48,6 @@ TEST(SourceImplTest, Caching) {
   EXPECT_EQ(source.cachedHistograms(), stored_histograms);
 }
 
+} // namespace
 } // namespace Stats
 } // namespace Envoy

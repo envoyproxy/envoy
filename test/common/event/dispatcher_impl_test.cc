@@ -8,15 +8,16 @@
 #include "common/stats/isolated_store_impl.h"
 
 #include "test/mocks/common.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::InSequence;
 
 namespace Envoy {
 namespace Event {
+namespace {
 
 class TestDeferredDeletable : public DeferredDeletable {
 public:
@@ -58,7 +59,7 @@ TEST(DeferredDeleteTest, DeferredDelete) {
   dispatcher->clearDeferredDeleteList();
 }
 
-class DispatcherImplTest : public TestBase {
+class DispatcherImplTest : public testing::Test {
 protected:
   DispatcherImplTest()
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()),
@@ -170,5 +171,6 @@ TEST_F(DispatcherImplTest, Timer) {
   }
 }
 
+} // namespace
 } // namespace Event
 } // namespace Envoy

@@ -21,10 +21,10 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Invoke;
@@ -32,10 +32,11 @@ using testing::NiceMock;
 
 namespace Envoy {
 namespace Upstream {
+namespace {
 
 enum class ConfigType { V2_YAML, V1_JSON };
 
-class LogicalDnsClusterTest : public TestBase {
+class LogicalDnsClusterTest : public testing::Test {
 protected:
   LogicalDnsClusterTest() : api_(Api::createApiForTest(stats_store_)) {}
 
@@ -422,5 +423,6 @@ TEST_F(LogicalDnsClusterTest, Basic) {
   testBasicSetup(basic_yaml_load_assignment, "foo.bar.com", 8000);
 }
 
+} // namespace
 } // namespace Upstream
 } // namespace Envoy
