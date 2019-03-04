@@ -534,7 +534,7 @@ void Filter::onResponseTimeout() {
   }
 
   updateOutlierDetection(timeout_response_code_);
-  std::string body =
+  const std::string body =
       timeout_response_code_ == Http::Code::GatewayTimeout ? "upstream request timeout" : "";
   onUpstreamAbort(timeout_response_code_, StreamInfo::ResponseFlag::UpstreamRequestTimeout, body,
                   false);
@@ -618,8 +618,8 @@ bool Filter::maybeRetryReset(const Http::StreamResetReason reset_reason) {
       retry_state_->onHostAttempted(upstream_host);
     }
 
-    RetryStatus retry_status =
-        retry_state_->shouldRetry(nullptr, reset_reason, [this]() -> void { doRetry(); });
+    const RetryStatus retry_status =
+        retry_state_->shouldRetryReset(reset_reason, [this]() -> void { doRetry(); });
     if (retry_status == RetryStatus::Yes && setupRetry(true)) {
       if (upstream_host) {
         upstream_host->stats().rq_error_.inc();
@@ -636,7 +636,7 @@ bool Filter::maybeRetryReset(const Http::StreamResetReason reset_reason) {
   return false;
 }
 
-void Filter::onUpstreamReset(const Http::StreamResetReason reset_reason) {
+void Filter::onUpstreamReset(Http::StreamResetReason reset_reason) {
   ASSERT(upstream_request_);
   ENVOY_STREAM_LOG(debug, "upstream reset: reset reason {}", *callbacks_,
                    Http::Utility::resetReasonToString(reset_reason));
@@ -730,7 +730,7 @@ void Filter::onUpstreamHeaders(const uint64_t response_code, Http::HeaderMapPtr&
     // Notify retry modifiers about the attempted host.
     retry_state_->onHostAttempted(upstream_request_->upstream_host_);
 
-    RetryStatus retry_status =
+    const RetryStatus retry_status =
         retry_state_->shouldRetryHeaders(*headers, [this]() -> void { doRetry(); });
     // Capture upstream_host since setupRetry() in the following line will clear
     // upstream_request_.
