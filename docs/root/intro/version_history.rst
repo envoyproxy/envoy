@@ -44,6 +44,7 @@ Version history
 * stats: added support for histograms in prometheus
 * stats: added usedonly flag to prometheus stats to only output metrics which have been
   updated at least once.
+* stats: added BoolIndicator stat type, converted the following 1-or-0 Gauges: control_plane.connected_state, cx_open, rq_pending_open, rq_open, rq_retry_open, runtime.admin_overrides_active, open_gauge, config.active, server.live.
 * tap: added new alpha :ref:`HTTP tap filter <config_http_filters_tap>`.
 * tls: enabled TLS 1.3 on the server-side (non-FIPS builds).
 * upstream: add hash_function to specify the hash function for :ref:`ring hash<envoy_api_msg_Cluster.RingHashLbConfig>` as either xxHash or `murmurHash2 <https://sites.google.com/site/murmurhash>`_. MurmurHash2 is compatible with std::hash in GNU libstdc++ 3.4.20 or above. This is typically the case when compiled on Linux and not macOS.
