@@ -1095,6 +1095,21 @@ TEST_F(Http1ServerConnectionImplTest, TestLargeRequestHeadersAcceptedMaxConfigur
   codec_->dispatch(buffer);
 }
 
+TEST_F(Http1ClientConnectionImplTest, TestLargeResponseHeadersRejected) {
+  initialize();
+
+  NiceMock<Http::MockStreamDecoder> response_decoder;
+  Http::StreamEncoder& request_encoder = codec_->newStream(response_decoder);
+  TestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+  request_encoder.encodeHeaders(headers, true);
+
+  Buffer::OwnedImpl buffer("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n");
+  codec_->dispatch(buffer);
+  std::string long_header = "big: " + std::string(80 * 1024, 'q') + "\r\n";
+  buffer = Buffer::OwnedImpl(long_header);
+  EXPECT_THROW_WITH_MESSAGE(codec_->dispatch(buffer), EnvoyException, "headers size exceeds limit");
+}
+
 TEST_F(Http1ClientConnectionImplTest, TestLargeResponseHeadersAccepted) {
   initialize();
 
@@ -1102,12 +1117,11 @@ TEST_F(Http1ClientConnectionImplTest, TestLargeResponseHeadersAccepted) {
   Http::StreamEncoder& request_encoder = codec_->newStream(response_decoder);
   TestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
   request_encoder.encodeHeaders(headers, true);
-  EXPECT_CALL(response_decoder, decodeHeaders_(_, true));
 
   Buffer::OwnedImpl buffer("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n");
   codec_->dispatch(buffer);
   std::string long_header = "big: " + std::string(79 * 1024, 'q') + "\r\n";
-  buffer = Buffer::OwnedImpl(long_header + "\r\n");
+  buffer = Buffer::OwnedImpl(long_header);
   codec_->dispatch(buffer);
 }
 

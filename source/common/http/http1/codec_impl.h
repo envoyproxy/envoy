@@ -333,11 +333,8 @@ private:
  */
 class ClientConnectionImpl : public ClientConnection, public ConnectionImpl {
 public:
-  // The default max_response_headers_kb of 80 KiB is the vanilla http_parser
-  // behaviour. Once this becomes a configurable setting, the default parameter
-  // will no longer be required.
-  ClientConnectionImpl(Network::Connection& connection, ConnectionCallbacks& callbacks,
-                       uint32_t max_response_headers_kb = 80);
+  ClientConnectionImpl(Network::Connection& connection, ConnectionCallbacks& callbacks);
+
   // Http::ClientConnection
   StreamEncoder& newStream(StreamDecoder& response_decoder) override;
 
@@ -368,6 +365,9 @@ private:
   std::list<PendingResponse> pending_responses_;
   // Set true between receiving 100-Continue headers and receiving the spurious onMessageComplete.
   bool ignore_message_complete_for_100_continue_{};
+
+  // The default limit of 80 KiB is the vanilla http_parser behaviour.
+  static constexpr uint32_t MAX_RESPONSE_HEADERS_KB = 80;
 };
 
 } // namespace Http1
