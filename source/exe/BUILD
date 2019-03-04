@@ -70,6 +70,7 @@ envoy_cc_library(
         "//source/common/common:compiler_requirements_lib",
         "//source/common/http/http2:codec_lib",
         "//source/common/common:perf_annotation_lib",
+        "//source/common/stats:fake_symbol_table_lib",
         "//source/common/thread:thread_factory_singleton_lib",
         "//source/server:hot_restart_lib",
         "//source/server:hot_restart_nop_lib",

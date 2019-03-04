@@ -135,6 +135,7 @@ public:
 #endif
 
 private:
+  friend struct HeapStatData;
   friend class StatNameStorage;
   friend class StatNameList;
 

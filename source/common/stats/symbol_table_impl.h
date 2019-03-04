@@ -157,7 +157,7 @@ private:
     uint32_t ref_count_;
   };
 
-  // This must be called during both encode() and free().
+  // This must be held during both encode() and free().
   mutable Thread::MutexBasicLockable lock_;
 
   /**

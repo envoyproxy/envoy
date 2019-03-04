@@ -462,17 +462,8 @@ TEST_F(HystrixSinkTest, HistogramTest) {
   // Create histogram for the Hystrix sink to read.
   auto histogram = std::make_shared<NiceMock<Stats::MockParentHistogram>>();
   histogram->name_ = "cluster." + cluster1_name_ + ".upstream_rq_time";
-  const std::string tag_extracted_name = "cluster.upstream_rq_time";
-  ON_CALL(*histogram, tagExtractedName())
-      .WillByDefault(testing::ReturnRefOfCopy(tag_extracted_name));
-  std::vector<Stats::Tag> tags;
-  Stats::Tag tag = {
-      Config::TagNames::get().CLUSTER_NAME, // name_
-      cluster1_name_                        // value_
-  };
-  tags.emplace_back(tag);
-  ON_CALL(*histogram, tags()).WillByDefault(testing::ReturnRef(tags));
-
+  histogram->setTagExtractedName("cluster.upstream_rq_time");
+  histogram->tags_.emplace_back(Stats::Tag{Config::TagNames::get().CLUSTER_NAME, cluster1_name_});
   histogram->used_ = true;
 
   // Init with data such that the quantile value is equal to the quantile.

@@ -12,7 +12,10 @@
 #include "common/common/utility.h"
 #include "common/stats/heap_stat_data.h"
 #include "common/stats/stats_options_impl.h"
+#include "common/stats/symbol_table_impl.h"
 #include "common/stats/utility.h"
+
+#include "absl/container/flat_hash_map.h"
 
 namespace Envoy {
 namespace Stats {
@@ -22,18 +25,18 @@ namespace Stats {
  */
 template <class Base> class IsolatedStatsCache {
 public:
-  typedef std::function<std::shared_ptr<Base>(const std::string& name)> Allocator;
+  using Allocator = std::function<std::shared_ptr<Base>(StatName name)>;
 
   IsolatedStatsCache(Allocator alloc) : alloc_(alloc) {}
 
-  Base& get(const std::string& name) {
+  Base& get(StatName name) {
     auto stat = stats_.find(name);
     if (stat != stats_.end()) {
       return *stat->second;
     }
 
     std::shared_ptr<Base> new_stat = alloc_(name);
-    stats_.emplace(name, new_stat);
+    stats_.emplace(new_stat->statName(), new_stat);
     return *new_stat;
   }
 
@@ -47,25 +50,31 @@ public:
     return vec;
   }
 
+  void clear() { stats_.clear(); }
+
 private:
-  std::unordered_map<std::string, std::shared_ptr<Base>> stats_;
+  StatNameHashMap<std::shared_ptr<Base>> stats_;
   Allocator alloc_;
 };
 
 class IsolatedStoreImpl : public Store {
 public:
   IsolatedStoreImpl();
+  explicit IsolatedStoreImpl(std::unique_ptr<SymbolTable> symbol_table);
+  explicit IsolatedStoreImpl(SymbolTable& symbol_table);
 
   // Stats::Scope
-  Counter& counter(const std::string& name) override { return counters_.get(name); }
+  Counter& counterx(StatName name) override { return counters_.get(name); }
   ScopePtr createScope(const std::string& name) override;
   void deliverHistogramToSinks(const Histogram&, uint64_t) override {}
-  Gauge& gauge(const std::string& name) override { return gauges_.get(name); }
-  Histogram& histogram(const std::string& name) override {
+  Gauge& gaugex(StatName name) override { return gauges_.get(name); }
+  Histogram& histogramx(StatName name) override {
     Histogram& histogram = histograms_.get(name);
     return histogram;
   }
   const Stats::StatsOptions& statsOptions() const override { return stats_options_; }
+  const SymbolTable& symbolTable() const override { return symbol_table_; }
+  virtual SymbolTable& symbolTable() override { return symbol_table_; }
 
   // Stats::Store
   std::vector<CounterSharedPtr> counters() const override { return counters_.toVector(); }
@@ -74,7 +83,24 @@ public:
     return std::vector<ParentHistogramSharedPtr>{};
   }
 
+  Counter& counter(const std::string& name) override {
+    StatNameTempStorage storage(name, symbolTable());
+    return counterx(storage.statName());
+  }
+  Gauge& gauge(const std::string& name) override {
+    StatNameTempStorage storage(name, symbolTable());
+    return gaugex(storage.statName());
+  }
+  Histogram& histogram(const std::string& name) override {
+    StatNameTempStorage storage(name, symbolTable());
+    return histogramx(storage.statName());
+  }
+
+  void clear();
+
 private:
+  std::unique_ptr<SymbolTable> symbol_table_storage_;
+  SymbolTable& symbol_table_;
   HeapStatDataAllocator alloc_;
   IsolatedStatsCache<Counter> counters_;
   IsolatedStatsCache<Gauge> gauges_;

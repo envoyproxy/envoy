@@ -261,12 +261,12 @@ public:
   DangerousDeprecatedTestTime test_time_;
   RouteConfigProvider route_config_provider_;
   NiceMock<Tracing::MockHttpTracer> tracer_;
+  Stats::IsolatedStoreImpl fake_stats_;
   Http::ContextImpl http_context_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Envoy::AccessLog::MockAccessLogManager> log_manager_;
   std::string access_log_path_;
   std::list<AccessLog::InstanceSharedPtr> access_logs_;
-  Stats::IsolatedStoreImpl fake_stats_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
   MockServerConnection* codec_;
   NiceMock<MockFilterChainFactory> filter_factory_;

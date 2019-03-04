@@ -75,21 +75,36 @@ public:
     wrapped_scope_->deliverHistogramToSinks(histogram, value);
   }
 
+  Counter& counterx(StatName name) override {
+    Thread::LockGuard lock(lock_);
+    return wrapped_scope_->counterx(name);
+  }
+
+  Gauge& gaugex(StatName name) override {
+    Thread::LockGuard lock(lock_);
+    return wrapped_scope_->gaugex(name);
+  }
+
+  Histogram& histogramx(StatName name) override {
+    Thread::LockGuard lock(lock_);
+    return wrapped_scope_->histogramx(name);
+  }
+
   Counter& counter(const std::string& name) override {
-    Thread::LockGuard lock(lock_);
-    return wrapped_scope_->counter(name);
+    StatNameTempStorage storage(name, symbolTable());
+    return counterx(storage.statName());
   }
-
   Gauge& gauge(const std::string& name) override {
-    Thread::LockGuard lock(lock_);
-    return wrapped_scope_->gauge(name);
+    StatNameTempStorage storage(name, symbolTable());
+    return gaugex(storage.statName());
   }
-
   Histogram& histogram(const std::string& name) override {
-    Thread::LockGuard lock(lock_);
-    return wrapped_scope_->histogram(name);
+    StatNameTempStorage storage(name, symbolTable());
+    return histogramx(storage.statName());
   }
 
+  const SymbolTable& symbolTable() const override { return wrapped_scope_->symbolTable(); }
+  SymbolTable& symbolTable() override { return wrapped_scope_->symbolTable(); }
   const StatsOptions& statsOptions() const override { return stats_options_; }
 
 private:
@@ -106,6 +121,10 @@ class TestIsolatedStoreImpl : public StoreRoot {
 public:
   TestIsolatedStoreImpl() : source_(*this) {}
   // Stats::Scope
+  Counter& counterx(StatName name) override {
+    Thread::LockGuard lock(lock_);
+    return store_.counterx(name);
+  }
   Counter& counter(const std::string& name) override {
     Thread::LockGuard lock(lock_);
     return store_.counter(name);
@@ -115,15 +134,25 @@ public:
     return ScopePtr{new TestScopeWrapper(lock_, store_.createScope(name))};
   }
   void deliverHistogramToSinks(const Histogram&, uint64_t) override {}
+  Gauge& gaugex(StatName name) override {
+    Thread::LockGuard lock(lock_);
+    return store_.gaugex(name);
+  }
   Gauge& gauge(const std::string& name) override {
     Thread::LockGuard lock(lock_);
     return store_.gauge(name);
+  }
+  Histogram& histogramx(StatName name) override {
+    Thread::LockGuard lock(lock_);
+    return store_.histogramx(name);
   }
   Histogram& histogram(const std::string& name) override {
     Thread::LockGuard lock(lock_);
     return store_.histogram(name);
   }
   const StatsOptions& statsOptions() const override { return stats_options_; }
+  const SymbolTable& symbolTable() const override { return store_.symbolTable(); }
+  SymbolTable& symbolTable() override { return store_.symbolTable(); }
 
   // Stats::Store
   std::vector<CounterSharedPtr> counters() const override {

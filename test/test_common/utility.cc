@@ -141,6 +141,10 @@ Stats::GaugeSharedPtr TestUtility::findGauge(Stats::Store& store, const std::str
   return findByName(store.gauges(), name);
 }
 
+Stats::HistogramSharedPtr TestUtility::findHistogram(Stats::Store& store, const std::string& name) {
+  return findByName(store.histograms(), name);
+}
+
 std::list<Network::Address::InstanceConstSharedPtr>
 TestUtility::makeDnsResponse(const std::list<std::string>& addresses) {
   std::list<Network::Address::InstanceConstSharedPtr> ret;
@@ -362,8 +366,9 @@ bool TestHeaderMapImpl::has(const LowerCaseString& key) { return get(key) != nul
 
 namespace Stats {
 
-MockedTestAllocator::MockedTestAllocator(const StatsOptions& stats_options)
-    : TestAllocator(stats_options) {
+MockedTestAllocator::MockedTestAllocator(const StatsOptions& stats_options,
+                                         SymbolTable& symbol_table)
+    : TestAllocator(stats_options, symbol_table) {
   ON_CALL(*this, alloc(_)).WillByDefault(Invoke([this](absl::string_view name) -> RawStatData* {
     return TestAllocator::alloc(name);
   }));

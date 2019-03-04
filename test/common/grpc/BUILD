@@ -108,6 +108,7 @@ envoy_cc_test_library(
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/server:server_mocks",
         "//test/proto:helloworld_proto_cc",
+        "//test/test_common:global_lib",
         "//test/test_common:test_time_lib",
         "//test/test_common:utility_lib",
     ],

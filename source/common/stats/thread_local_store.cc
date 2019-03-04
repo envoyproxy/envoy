@@ -13,6 +13,7 @@
 #include "envoy/stats/stats_options.h"
 
 #include "common/common/lock_guard.h"
+#include "common/stats/scope_prefixer.h"
 #include "common/stats/stats_matcher_impl.h"
 #include "common/stats/tag_producer_impl.h"
 
@@ -26,16 +27,23 @@ ThreadLocalStoreImpl::ThreadLocalStoreImpl(const StatsOptions& stats_options,
     : stats_options_(stats_options), alloc_(alloc), default_scope_(createScope("")),
       tag_producer_(std::make_unique<TagProducerImpl>()),
       stats_matcher_(std::make_unique<StatsMatcherImpl>()),
-      num_last_resort_stats_(default_scope_->counter("stats.overflow")), source_(*this) {}
+      stats_overflow_("stats.overflow", alloc.symbolTable()),
+      num_last_resort_stats_(default_scope_->counterx(stats_overflow_.statName())),
+      heap_allocator_(alloc.symbolTable()), source_(*this), null_counter_(alloc.symbolTable()),
+      null_gauge_(alloc.symbolTable()), null_histogram_(alloc.symbolTable()) {}
 
 ThreadLocalStoreImpl::~ThreadLocalStoreImpl() {
   ASSERT(shutting_down_);
   default_scope_.reset();
   ASSERT(scopes_.empty());
+  stats_overflow_.free(symbolTable());
 }
 
 void ThreadLocalStoreImpl::setStatsMatcher(StatsMatcherPtr&& stats_matcher) {
   stats_matcher_ = std::move(stats_matcher);
+  if (stats_matcher_->acceptsAll()) {
+    return;
+  }
 
   // The Filesystem and potentially other stat-registering objects are
   // constructed prior to the stat-matcher, and those add stats
@@ -51,13 +59,13 @@ void ThreadLocalStoreImpl::setStatsMatcher(StatsMatcherPtr&& stats_matcher) {
 
 template <class StatMapClass, class StatListClass>
 void ThreadLocalStoreImpl::removeRejectedStats(StatMapClass& map, StatListClass& list) {
-  std::vector<const char*> remove_list;
+  std::vector<StatName> remove_list;
   for (auto& stat : map) {
     if (rejects(stat.first)) {
       remove_list.push_back(stat.first);
     }
   }
-  for (const char* stat_name : remove_list) {
+  for (StatName stat_name : remove_list) {
     auto p = map.find(stat_name);
     ASSERT(p != map.end());
     list.push_back(p->second); // Save SharedPtr to the list to avoid invalidating refs to stat.
@@ -65,17 +73,27 @@ void ThreadLocalStoreImpl::removeRejectedStats(StatMapClass& map, StatListClass&
   }
 }
 
-bool ThreadLocalStoreImpl::rejects(const std::string& name) const {
+bool ThreadLocalStoreImpl::rejects(StatName stat_name) const {
+  // Don't both elaborating the StatName there are no pattern-based
+  // exclusions;/inclusions.
+  if (stats_matcher_->acceptsAll()) {
+    return false;
+  }
+
   // TODO(ambuc): If stats_matcher_ depends on regexes, this operation (on the
   // hot path) could become prohibitively expensive. Revisit this usage in the
   // future.
-  return stats_matcher_->rejects(name);
+  //
+  // Also note that the elaboration of the stat-name into a string is expensive,
+  // so I think it might be better to move the matcher test until after caching,
+  // unless its acceptsAll/rejectsAll.
+  return stats_matcher_->rejectsAll() || stats_matcher_->rejects(symbolTable().toString(stat_name));
 }
 
 std::vector<CounterSharedPtr> ThreadLocalStoreImpl::counters() const {
   // Handle de-dup due to overlapping scopes.
   std::vector<CounterSharedPtr> ret;
-  CharStarHashSet names;
+  StatNameHashSet names;
   Thread::LockGuard lock(lock_);
   for (ScopeImpl* scope : scopes_) {
     for (auto& counter : scope->central_cache_.counters_) {
@@ -89,7 +107,7 @@ std::vector<CounterSharedPtr> ThreadLocalStoreImpl::counters() const {
 }
 
 ScopePtr ThreadLocalStoreImpl::createScope(const std::string& name) {
-  std::unique_ptr<ScopeImpl> new_scope(new ScopeImpl(*this, name));
+  auto new_scope = std::make_unique<ScopeImpl>(*this, name);
   Thread::LockGuard lock(lock_);
   scopes_.emplace(new_scope.get());
   return std::move(new_scope);
@@ -98,7 +116,7 @@ ScopePtr ThreadLocalStoreImpl::createScope(const std::string& name) {
 std::vector<GaugeSharedPtr> ThreadLocalStoreImpl::gauges() const {
   // Handle de-dup due to overlapping scopes.
   std::vector<GaugeSharedPtr> ret;
-  CharStarHashSet names;
+  StatNameHashSet names;
   Thread::LockGuard lock(lock_);
   for (ScopeImpl* scope : scopes_) {
     for (auto& gauge : scope->central_cache_.gauges_) {
@@ -187,10 +205,12 @@ void ThreadLocalStoreImpl::releaseScopeCrossThread(ScopeImpl* scope) {
   }
 }
 
+/*
 std::string ThreadLocalStoreImpl::getTagsForName(const std::string& name,
                                                  std::vector<Tag>& tags) const {
   return tag_producer_->produceTags(name, tags);
 }
+*/
 
 void ThreadLocalStoreImpl::clearScopeFromCaches(uint64_t scope_id) {
   // If we are shutting down we no longer perform cache flushes as workers may be shutting down
@@ -208,31 +228,71 @@ absl::string_view ThreadLocalStoreImpl::truncateStatNameIfNeeded(absl::string_vi
   // allocation.
   if (alloc_.requiresBoundedStatNameSize()) {
     const uint64_t max_length = stats_options_.maxNameLength();
-    name = name.substr(0, max_length);
+    if (name.size() > max_length) {
+      ENVOY_LOG_MISC(
+          warn,
+          "Statistic '{}' is too long with {} characters, it will be truncated to {} characters",
+          name, name.size(), max_length);
+      name = name.substr(0, max_length);
+    }
   }
   return name;
 }
 
 std::atomic<uint64_t> ThreadLocalStoreImpl::ScopeImpl::next_scope_id_;
 
-ThreadLocalStoreImpl::ScopeImpl::~ScopeImpl() { parent_.releaseScopeCrossThread(this); }
+ThreadLocalStoreImpl::ScopeImpl::ScopeImpl(ThreadLocalStoreImpl& parent, const std::string& prefix)
+    : scope_id_(next_scope_id_++), parent_(parent),
+      prefix_(Utility::sanitizeStatsName(prefix), parent.symbolTable()) {}
+
+ThreadLocalStoreImpl::ScopeImpl::~ScopeImpl() {
+  parent_.releaseScopeCrossThread(this);
+  prefix_.free(symbolTable());
+}
+
+/*
+void ThreadLocalStoreImpl::ScopeImpl::extractTagsAndTruncate(
+    StatName& name, std::unique_ptr<StatNameTempStorage>& truncated_name_storage,
+    std::vector<Tag>& tags,
+    std::string& tag_extracted_name) {
+
+  // Tag extraction occurs on the original, untruncated name so the extraction
+  // can complete properly, even if the tag values are partially truncated.
+  std::string name_str = name.toString(parent_.symbolTable());
+  tag_extracted_name = parent_.getTagsForName(name_str, tags);
+  absl::string_view truncated_name = parent_.truncateStatNameIfNeeded(name_str);
+  if (truncated_name.size() < name_str.size()) {
+    truncated_name_storage = std::make_unique<StatNameTempStorage>(truncated_name, symbolTable());
+    name = truncated_name_storage->statName();
+  }
+  }*/
+
+// Manages the truncation and tag-extration of stat names. Tag extraction occurs
+// on the original, untruncated name so the extraction can complete properly,
+// even if the tag values are partially truncated.
+class TagExtraction {
+public:
+  TagExtraction(ThreadLocalStoreImpl& tls, StatName name) {
+    std::string name_str = tls.symbolTable().toString(name);
+    tag_extracted_name_ = tls.tagProducer().produceTags(name_str, tags_);
+  }
+
+  const std::vector<Tag>& tags() { return tags_; }
+  const std::string& tagExtractedName() { return tag_extracted_name_; }
+
+private:
+  std::vector<Tag> tags_;
+  std::string tag_extracted_name_;
+};
 
 template <class StatType>
 StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
-    const std::string& name, StatMap<std::shared_ptr<StatType>>& central_cache_map,
+    StatName name, StatMap<std::shared_ptr<StatType>>& central_cache_map,
     MakeStatFn<StatType> make_stat, StatMap<std::shared_ptr<StatType>>* tls_cache) {
-
-  const char* stat_key = name.c_str();
-  std::unique_ptr<std::string> truncation_buffer;
-  absl::string_view truncated_name = parent_.truncateStatNameIfNeeded(name);
-  if (truncated_name.size() < name.size()) {
-    truncation_buffer = std::make_unique<std::string>(std::string(truncated_name));
-    stat_key = truncation_buffer->c_str(); // must be nul-terminated.
-  }
 
   // If we have a valid cache entry, return it.
   if (tls_cache) {
-    auto pos = tls_cache->find(stat_key);
+    auto pos = tls_cache->find(name);
     if (pos != tls_cache->end()) {
       return *pos->second;
     }
@@ -241,50 +301,36 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
   // We must now look in the central store so we must be locked. We grab a reference to the
   // central store location. It might contain nothing. In this case, we allocate a new stat.
   Thread::LockGuard lock(parent_.lock_);
-  auto p = central_cache_map.find(stat_key);
+  auto p = central_cache_map.find(name);
   std::shared_ptr<StatType>* central_ref = nullptr;
   if (p != central_cache_map.end()) {
     central_ref = &(p->second);
   } else {
-    // If we had to truncate, warn now that we've missed all caches.
-    if (truncation_buffer != nullptr) {
-      ENVOY_LOG_MISC(
-          warn,
-          "Statistic '{}' is too long with {} characters, it will be truncated to {} characters",
-          name, name.size(), truncation_buffer->size());
-    }
-
-    std::vector<Tag> tags;
-
-    // Tag extraction occurs on the original, untruncated name so the extraction
-    // can complete properly, even if the tag values are partially truncated.
-    std::string tag_extracted_name = parent_.getTagsForName(name, tags);
+    TagExtraction extraction(parent_, name);
+    // std::shared_ptr<StatType> stat = make_stat(parent_.alloc_, extraction.truncatedStatName(),
+    // extraction.tagExtractedName(), extraction.tags());
     std::shared_ptr<StatType> stat =
-        make_stat(parent_.alloc_, truncated_name, std::move(tag_extracted_name), std::move(tags));
+        make_stat(parent_.alloc_, name, extraction.tagExtractedName(), extraction.tags());
     if (stat == nullptr) {
-      // TODO(jmarantz): If make_stat fails, the actual move does not actually occur
-      // for tag_extracted_name and tags, so there is no use-after-move problem.
-      // In order to increase the readability of the code, refactoring is done here.
       parent_.num_last_resort_stats_.inc();
-      stat = make_stat(parent_.heap_allocator_, truncated_name,
-                       std::move(tag_extracted_name), // NOLINT(bugprone-use-after-move)
-                       std::move(tags));              // NOLINT(bugprone-use-after-move)
+      stat = make_stat(parent_.heap_allocator_, name, extraction.tagExtractedName(),
+                       extraction.tags());
       ASSERT(stat != nullptr);
     }
-    central_ref = &central_cache_map[stat->nameCStr()];
+    central_ref = &central_cache_map[stat->statName()];
     *central_ref = stat;
   }
 
   // If we have a TLS cache, insert the stat.
   if (tls_cache) {
-    tls_cache->insert(std::make_pair((*central_ref)->nameCStr(), *central_ref));
+    tls_cache->insert(std::make_pair((*central_ref)->statName(), *central_ref));
   }
 
   // Finally we return the reference.
   return **central_ref;
 }
 
-Counter& ThreadLocalStoreImpl::ScopeImpl::counter(const std::string& name) {
+Counter& ThreadLocalStoreImpl::ScopeImpl::counterx(StatName name) {
   // Determine the final name based on the prefix and the passed name.
   //
   // Note that we can do map.find(final_name.c_str()), but we cannot do
@@ -294,9 +340,11 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counter(const std::string& name) {
   // after we construct the stat we can insert it into the required maps. This
   // strategy costs an extra hash lookup for each miss, but saves time
   // re-copying the string and significant memory overhead.
-  std::string final_name = prefix_ + name;
-  if (parent_.rejects(final_name)) {
-    return null_counter_;
+  Stats::SymbolTable::StoragePtr final_name = symbolTable().join({prefix_.statName(), name});
+  StatName final_stat_name(final_name.get());
+
+  if (parent_.rejects(final_stat_name)) {
+    return parent_.null_counter_;
   }
 
   // We now find the TLS cache. This might remain null if we don't have TLS
@@ -306,13 +354,13 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counter(const std::string& name) {
     tls_cache = &parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_].counters_;
   }
 
-  return safeMakeStat<Counter>(
-      final_name, central_cache_.counters_,
-      [](StatDataAllocator& allocator, absl::string_view name, std::string&& tag_extracted_name,
-         std::vector<Tag>&& tags) -> CounterSharedPtr {
-        return allocator.makeCounter(name, std::move(tag_extracted_name), std::move(tags));
-      },
-      tls_cache);
+  return safeMakeStat<Counter>(final_stat_name, central_cache_.counters_,
+                               [](StatDataAllocator& allocator, StatName name,
+                                  absl::string_view tag_extracted_name,
+                                  const std::vector<Tag>& tags) -> CounterSharedPtr {
+                                 return allocator.makeCounter(name, tag_extracted_name, tags);
+                               },
+                               tls_cache);
 }
 
 void ThreadLocalStoreImpl::ScopeImpl::deliverHistogramToSinks(const Histogram& histogram,
@@ -331,8 +379,8 @@ void ThreadLocalStoreImpl::ScopeImpl::deliverHistogramToSinks(const Histogram& h
   }
 }
 
-Gauge& ThreadLocalStoreImpl::ScopeImpl::gauge(const std::string& name) {
-  // See comments in counter(). There is no super clean way (via templates or otherwise) to
+Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugex(StatName name) {
+  // See comments in counterx(). There is no super clean way (via templates or otherwise) to
   // share this code so I'm leaving it largely duplicated for now.
   //
   // Note that we can do map.find(final_name.c_str()), but we cannot do
@@ -340,9 +388,11 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gauge(const std::string& name) {
   // a temporary, and address sanitization errors would follow. Instead we must
   // do a find() first, using that if it succeeds. If it fails, then after we
   // construct the stat we can insert it into the required maps.
-  std::string final_name = prefix_ + name;
-  if (parent_.rejects(final_name)) {
-    return null_gauge_;
+  Stats::SymbolTable::StoragePtr final_name = symbolTable().join({prefix_.statName(), name});
+  StatName final_stat_name(final_name.get());
+
+  if (parent_.rejects(final_stat_name)) {
+    return parent_.null_gauge_;
   }
 
   StatMap<GaugeSharedPtr>* tls_cache = nullptr;
@@ -350,17 +400,17 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gauge(const std::string& name) {
     tls_cache = &parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_].gauges_;
   }
 
-  return safeMakeStat<Gauge>(
-      final_name, central_cache_.gauges_,
-      [](StatDataAllocator& allocator, absl::string_view name, std::string&& tag_extracted_name,
-         std::vector<Tag>&& tags) -> GaugeSharedPtr {
-        return allocator.makeGauge(name, std::move(tag_extracted_name), std::move(tags));
-      },
-      tls_cache);
+  return safeMakeStat<Gauge>(final_stat_name, central_cache_.gauges_,
+                             [](StatDataAllocator& allocator, StatName name,
+                                absl::string_view tag_extracted_name,
+                                const std::vector<Tag>& tags) -> GaugeSharedPtr {
+                               return allocator.makeGauge(name, tag_extracted_name, tags);
+                             },
+                             tls_cache);
 }
 
-Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(const std::string& name) {
-  // See comments in counter(). There is no super clean way (via templates or otherwise) to
+Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramx(StatName name) {
+  // See comments in counterx(). There is no super clean way (via templates or otherwise) to
   // share this code so I'm leaving it largely duplicated for now.
   //
   // Note that we can do map.find(final_name.c_str()), but we cannot do
@@ -368,81 +418,87 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(const std::string& name) {
   // a temporary, and address sanitization errors would follow. Instead we must
   // do a find() first, using that if it succeeds. If it fails, then after we
   // construct the stat we can insert it into the required maps.
-  std::string final_name = prefix_ + name;
-  if (parent_.rejects(final_name)) {
-    return null_histogram_;
+  Stats::SymbolTable::StoragePtr final_name = symbolTable().join({prefix_.statName(), name});
+  StatName final_stat_name(final_name.get());
+
+  if (parent_.rejects(final_stat_name)) {
+    return parent_.null_histogram_;
   }
 
   StatMap<ParentHistogramSharedPtr>* tls_cache = nullptr;
   if (!parent_.shutting_down_ && parent_.tls_) {
     tls_cache =
         &parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_].parent_histograms_;
-    auto p = tls_cache->find(final_name.c_str());
+    auto p = tls_cache->find(final_stat_name);
     if (p != tls_cache->end()) {
       return *p->second;
     }
   }
 
   Thread::LockGuard lock(parent_.lock_);
-  auto p = central_cache_.histograms_.find(final_name.c_str());
+  auto p = central_cache_.histograms_.find(final_stat_name);
   ParentHistogramImplSharedPtr* central_ref = nullptr;
   if (p != central_cache_.histograms_.end()) {
     central_ref = &p->second;
   } else {
-    std::vector<Tag> tags;
-    std::string tag_extracted_name = parent_.getTagsForName(final_name, tags);
+    TagExtraction extraction(parent_, final_stat_name);
     auto stat = std::make_shared<ParentHistogramImpl>(
-        final_name, parent_, *this, std::move(tag_extracted_name), std::move(tags));
-    central_ref = &central_cache_.histograms_[stat->nameCStr()];
+        final_stat_name, parent_, *this, extraction.tagExtractedName(), extraction.tags());
+    central_ref = &central_cache_.histograms_[stat->statName()];
     *central_ref = stat;
   }
 
   if (tls_cache != nullptr) {
-    tls_cache->insert(std::make_pair((*central_ref)->nameCStr(), *central_ref));
+    tls_cache->insert(std::make_pair((*central_ref)->statName(), *central_ref));
   }
   return **central_ref;
 }
 
-Histogram& ThreadLocalStoreImpl::ScopeImpl::tlsHistogram(const std::string& name,
+Histogram& ThreadLocalStoreImpl::ScopeImpl::tlsHistogram(StatName name,
                                                          ParentHistogramImpl& parent) {
   if (parent_.rejects(name)) {
-    return null_histogram_;
+    return parent_.null_histogram_;
   }
 
-  // See comments in counter() which explains the logic here.
+  // See comments in counterx() which explains the logic here.
 
   StatMap<TlsHistogramSharedPtr>* tls_cache = nullptr;
   if (!parent_.shutting_down_ && parent_.tls_) {
     tls_cache = &parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_].histograms_;
-    auto p = tls_cache->find(name.c_str());
+    auto p = tls_cache->find(name);
     if (p != tls_cache->end()) {
       return *p->second;
     }
   }
 
   std::vector<Tag> tags;
-  std::string tag_extracted_name = parent_.getTagsForName(name, tags);
-  TlsHistogramSharedPtr hist_tls_ptr = std::make_shared<ThreadLocalHistogramImpl>(
-      name, std::move(tag_extracted_name), std::move(tags));
+  std::string tag_extracted_name =
+      parent_.tagProducer().produceTags(symbolTable().toString(name), tags);
+  TlsHistogramSharedPtr hist_tls_ptr =
+      std::make_shared<ThreadLocalHistogramImpl>(name, tag_extracted_name, tags, symbolTable());
 
   parent.addTlsHistogram(hist_tls_ptr);
 
   if (tls_cache) {
-    tls_cache->insert(std::make_pair(hist_tls_ptr->nameCStr(), hist_tls_ptr));
+    tls_cache->insert(std::make_pair(hist_tls_ptr->statName(), hist_tls_ptr));
   }
   return *hist_tls_ptr;
 }
 
-ThreadLocalHistogramImpl::ThreadLocalHistogramImpl(const std::string& name,
-                                                   std::string&& tag_extracted_name,
-                                                   std::vector<Tag>&& tags)
-    : MetricImpl(std::move(tag_extracted_name), std::move(tags)), current_active_(0), flags_(0),
-      created_thread_id_(std::this_thread::get_id()), name_(name) {
+ThreadLocalHistogramImpl::ThreadLocalHistogramImpl(StatName name,
+                                                   absl::string_view tag_extracted_name,
+                                                   const std::vector<Tag>& tags,
+                                                   SymbolTable& symbol_table)
+    : MetricImpl(tag_extracted_name, tags, symbol_table), current_active_(0), flags_(0),
+      created_thread_id_(std::this_thread::get_id()), name_(name, symbol_table),
+      symbol_table_(symbol_table) {
   histograms_[0] = hist_alloc();
   histograms_[1] = hist_alloc();
 }
 
 ThreadLocalHistogramImpl::~ThreadLocalHistogramImpl() {
+  MetricImpl::clear();
+  name_.free(symbolTable());
   hist_free(histograms_[0]);
   hist_free(histograms_[1]);
 }
@@ -459,21 +515,23 @@ void ThreadLocalHistogramImpl::merge(histogram_t* target) {
   hist_clear(*other_histogram);
 }
 
-ParentHistogramImpl::ParentHistogramImpl(const std::string& name, Store& parent,
-                                         TlsScope& tls_scope, std::string&& tag_extracted_name,
-                                         std::vector<Tag>&& tags)
-    : MetricImpl(std::move(tag_extracted_name), std::move(tags)), parent_(parent),
+ParentHistogramImpl::ParentHistogramImpl(StatName name, Store& parent, TlsScope& tls_scope,
+                                         absl::string_view tag_extracted_name,
+                                         const std::vector<Tag>& tags)
+    : MetricImpl(tag_extracted_name, tags, parent.symbolTable()), parent_(parent),
       tls_scope_(tls_scope), interval_histogram_(hist_alloc()), cumulative_histogram_(hist_alloc()),
       interval_statistics_(interval_histogram_), cumulative_statistics_(cumulative_histogram_),
-      merged_(false), name_(name) {}
+      merged_(false), name_(name, parent.symbolTable()) {}
 
 ParentHistogramImpl::~ParentHistogramImpl() {
+  MetricImpl::clear();
+  name_.free(symbolTable());
   hist_free(interval_histogram_);
   hist_free(cumulative_histogram_);
 }
 
 void ParentHistogramImpl::recordValue(uint64_t value) {
-  Histogram& tls_histogram = tls_scope_.tlsHistogram(name(), *this);
+  Histogram& tls_histogram = tls_scope_.tlsHistogram(statName(), *this);
   tls_histogram.recordValue(value);
   parent_.deliverHistogramToSinks(*this, value);
 }

@@ -24,6 +24,8 @@ uint64_t roundUpMultipleNaturalAlignment(uint64_t val) {
 
 } // namespace
 
+RawStatDataAllocator::~RawStatDataAllocator() {}
+
 // Normally the compiler would do this, but because name_ is a flexible-array-length
 // element, the compiler can't. RawStatData is put into an array in HotRestartImpl, so
 // it's important that each element starts on the required alignment for the type.
@@ -37,7 +39,13 @@ uint64_t RawStatData::structSizeWithOptions(const StatsOptions& stats_options) {
 
 void RawStatData::initialize(absl::string_view key, const StatsOptions& stats_options) {
   ASSERT(!initialized());
-  ASSERT(key.size() <= stats_options.maxNameLength());
+  if (key.size() > stats_options.maxNameLength()) {
+    ENVOY_LOG_MISC(
+        warn,
+        "Statistic '{}' is too long with {} characters, it will be truncated to {} characters", key,
+        key.size(), stats_options.maxNameLength());
+    key = key.substr(0, stats_options.maxNameLength());
+  }
   ref_count_ = 1;
   memcpy(name_, key.data(), key.size());
   name_[key.size()] = '\0';

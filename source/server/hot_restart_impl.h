@@ -114,7 +114,7 @@ private:
  */
 class HotRestartImpl : public HotRestart, Logger::Loggable<Logger::Id::main> {
 public:
-  HotRestartImpl(const Options& options);
+  HotRestartImpl(const Options& options, Stats::SymbolTable& symbol_table);
 
   // Server::HotRestart
   void drainParentListeners() override;

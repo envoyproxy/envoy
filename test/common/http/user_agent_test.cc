@@ -19,7 +19,7 @@ namespace {
 
 TEST(UserAgentTest, All) {
   Stats::MockStore stat_store;
-  NiceMock<Stats::MockHistogram> original_histogram;
+  NiceMock<Stats::MockHistogram> original_histogram; //(stat_store.symbolTable());
   Event::SimulatedTimeSystem time_system;
   Stats::Timespan span(original_histogram, time_system);
 

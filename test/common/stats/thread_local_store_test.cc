@@ -36,7 +36,7 @@ namespace Stats {
 class StatsThreadLocalStoreTest : public testing::Test {
 public:
   void SetUp() override {
-    alloc_ = std::make_unique<MockedTestAllocator>(options_);
+    alloc_ = std::make_unique<MockedTestAllocator>(options_, symbol_table_);
     resetStoreWithAlloc(*alloc_);
   }
 
@@ -45,6 +45,7 @@ public:
     store_->addSink(sink_);
   }
 
+  Stats::SymbolTableImpl symbol_table_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   StatsOptionsImpl options_;
@@ -75,7 +76,7 @@ class HistogramTest : public testing::Test {
 public:
   using NameHistogramMap = std::map<std::string, ParentHistogramSharedPtr>;
 
-  HistogramTest() : alloc_(options_) {}
+  HistogramTest() : alloc_(options_, symbol_table_) {}
 
   void SetUp() override {
     store_ = std::make_unique<ThreadLocalStoreImpl>(options_, alloc_);
@@ -168,6 +169,7 @@ public:
   MOCK_METHOD1(alloc, RawStatData*(const std::string& name));
   MOCK_METHOD1(free, void(RawStatData& data));
 
+  SymbolTableImpl symbol_table_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   StatsOptionsImpl options_;
@@ -445,11 +447,13 @@ TEST_F(StatsThreadLocalStoreTest, HotRestartTruncation) {
   // The stats did not overflow yet.
   EXPECT_EQ(0UL, store_->counter("stats.overflow").value());
 
-  // The name will be truncated, so we won't be able to find it with the entire name.
-  EXPECT_EQ(nullptr, TestUtility::findCounter(*store_, name_1).get());
+  // Truncation occurs in the underlying representation, but the by-name lookups
+  // are all based on the untruncated name.
+  EXPECT_NE(nullptr, TestUtility::findCounter(*store_, name_1).get());
 
-  // But we can find it based on the expected truncation.
-  EXPECT_NE(nullptr, TestUtility::findCounter(*store_, name_1.substr(0, max_name_length)).get());
+  // Outside the stats system, no Envoy code can see the truncated view, so
+  // lookups for truncated names will fail.
+  EXPECT_EQ(nullptr, TestUtility::findCounter(*store_, name_1.substr(0, max_name_length)).get());
 
   // The same should be true with heap allocation, which occurs when the default
   // allocator fails.
@@ -457,11 +461,11 @@ TEST_F(StatsThreadLocalStoreTest, HotRestartTruncation) {
   EXPECT_CALL(*alloc_, alloc(_)).WillOnce(Return(nullptr));
   store_->counter(name_2);
 
-  // Same deal: the name will be truncated, so we won't be able to find it with the entire name.
-  EXPECT_EQ(nullptr, TestUtility::findCounter(*store_, name_1).get());
+  // Same deal: the name will be truncated, but we find it with the entire name.
+  EXPECT_NE(nullptr, TestUtility::findCounter(*store_, name_1).get());
 
-  // But we can find it based on the expected truncation.
-  EXPECT_NE(nullptr, TestUtility::findCounter(*store_, name_1.substr(0, max_name_length)).get());
+  // But we can't find it based on the truncation -- that name is not visible at the API.
+  EXPECT_EQ(nullptr, TestUtility::findCounter(*store_, name_1.substr(0, max_name_length)).get());
 
   // Now the stats have overflowed.
   EXPECT_EQ(1UL, store_->counter("stats.overflow").value());
@@ -624,6 +628,8 @@ TEST_F(StatsMatcherTLSTest, TestExclusionRegex) {
 
 class HeapStatsThreadLocalStoreTest : public StatsThreadLocalStoreTest {
 public:
+  HeapStatsThreadLocalStoreTest() : heap_alloc_(symbol_table_) {}
+
   void SetUp() override {
     resetStoreWithAlloc(heap_alloc_);
     // Note: we do not call StatsThreadLocalStoreTest::SetUp here as that
@@ -703,7 +709,7 @@ TEST_F(HeapStatsThreadLocalStoreTest, MemoryWithoutTls) {
       1000, [this](absl::string_view name) { store_->counter(std::string(name)); });
   const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
   EXPECT_LT(start_mem, end_mem);
-  EXPECT_LT(end_mem - start_mem, 28 * million); // actual value: 27203216 as of Oct 29, 2018
+  EXPECT_LT(end_mem - start_mem, 13 * million); // actual value: 12443472 as of Nov 7, 2018
 }
 
 TEST_F(HeapStatsThreadLocalStoreTest, MemoryWithTls) {
@@ -726,7 +732,7 @@ TEST_F(HeapStatsThreadLocalStoreTest, MemoryWithTls) {
       1000, [this](absl::string_view name) { store_->counter(std::string(name)); });
   const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
   EXPECT_LT(start_mem, end_mem);
-  EXPECT_LT(end_mem - start_mem, 31 * million); // actual value: 30482576 as of Oct 29, 2018
+  EXPECT_LT(end_mem - start_mem, 16 * million); // actual value: 15722832 as of Nov 7, 2018
 }
 
 TEST_F(StatsThreadLocalStoreTest, ShuttingDown) {
@@ -946,13 +952,15 @@ TEST_F(HistogramTest, BasicHistogramUsed) {
 
 class TruncatingAllocTest : public HeapStatsThreadLocalStoreTest {
 protected:
-  TruncatingAllocTest() : test_alloc_(options_), long_name_(options_.maxNameLength() + 1, 'A') {}
+  TruncatingAllocTest()
+      : test_alloc_(options_, symbol_table_), long_name_(options_.maxNameLength() + 1, 'A') {}
 
   void SetUp() override {
     store_ = std::make_unique<ThreadLocalStoreImpl>(options_, test_alloc_);
     // Do not call superclass SetUp.
   }
 
+  SymbolTableImpl symbol_table_;
   TestAllocator test_alloc_;
   std::string long_name_;
 };

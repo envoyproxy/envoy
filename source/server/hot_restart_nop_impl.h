@@ -15,7 +15,7 @@ namespace Server {
  */
 class HotRestartNopImpl : public Server::HotRestart {
 public:
-  HotRestartNopImpl() {}
+  explicit HotRestartNopImpl(Stats::SymbolTable& symbol_table) : stats_allocator_(symbol_table) {}
 
   // Server::HotRestart
   void drainParentListeners() override {}

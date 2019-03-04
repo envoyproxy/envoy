@@ -2,11 +2,11 @@
 
 #include <cstdint>
 #include <memory>
-#include <string>
 
 #include "envoy/common/pure.h"
 #include "envoy/stats/histogram.h"
 #include "envoy/stats/stats_options.h"
+#include "envoy/stats/symbol_table.h"
 
 namespace Envoy {
 namespace Stats {
@@ -44,16 +44,19 @@ public:
   /**
    * @return a counter within the scope's namespace.
    */
+  virtual Counter& counterx(StatName name) PURE;
   virtual Counter& counter(const std::string& name) PURE;
 
   /**
    * @return a gauge within the scope's namespace.
    */
+  virtual Gauge& gaugex(StatName name) PURE;
   virtual Gauge& gauge(const std::string& name) PURE;
 
   /**
    * @return a histogram within the scope's namespace with a particular value type.
    */
+  virtual Histogram& histogramx(StatName name) PURE;
   virtual Histogram& histogram(const std::string& name) PURE;
 
   /**
@@ -61,6 +64,12 @@ public:
    * maximum allowable object name length and stat suffix length.
    */
   virtual const Stats::StatsOptions& statsOptions() const PURE;
+
+  /**
+   * @return a reference to the symbol table.
+   */
+  virtual const SymbolTable& symbolTable() const PURE;
+  virtual SymbolTable& symbolTable() PURE;
 };
 
 } // namespace Stats
