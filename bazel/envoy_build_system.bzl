@@ -513,7 +513,6 @@ def envoy_cc_test_library(
         tags = []):
     deps = deps + [
         repository + "//test/test_common:printers_includes",
-        repository + "//test/test_common:test_base",
     ]
     envoy_cc_test_infrastructure_library(
         name,
