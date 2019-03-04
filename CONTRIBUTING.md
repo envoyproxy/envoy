@@ -150,7 +150,7 @@ change).
 
 The canonical way to runtime guard a feature is
 ```
-if (Runtime::featureEnabled("envoy.reloadable_features.my_feature_name")) {
+if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.my_feature_name")) {
   [new code path]
 } else {
   [old_code_path]
@@ -162,7 +162,8 @@ true or false on running Envoy instances. In some situations, for example the bu
 latch the value in a member variable on class creation, for example:
 
 ```
-bool use_new_code_path_ = Runtime::featureEnabled("envoy.reloadable_features.my_feature_name")
+bool use_new_code_path_ =
+    Runtime::runtimeFeatureEnabled("envoy.reloadable_features.my_feature_name")
 ```
 
 Runtime guarded features may either set true (running the new code by default) in the initial PR,
@@ -176,8 +177,8 @@ There are four suggested options for testing new runtime features:
 
 1. Create a per-test Runtime::LoaderSingleton as done in [DeprecatedFieldsTest.IndividualFieldDisallowedWithRuntimeOverride](https://github.com/envoyproxy/envoy/blob/master/test/common/protobuf/utility_test.cc)
 2. Create a [parameterized test](https://github.com/google/googletest/blob/master/googletest/docs/advanced.md#how-to-write-value-parameterized-tests)
-   where the set up of the test sets the new runtime value explicitly true as
-   done in (1)
+   where the set up of the test sets the new runtime value explicitly to
+   GetParam() as outlined in (1).
 3. Set up integration tests with custom runtime defaults as documented in the
    [integration test README](https://github.com/envoyproxy/envoy/blob/master/test/integration/README.md)
 4. Run a given unit test with the new runtime value explicitly set true as done

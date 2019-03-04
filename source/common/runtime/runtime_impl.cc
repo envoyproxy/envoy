@@ -22,13 +22,13 @@
 namespace Envoy {
 namespace Runtime {
 
-bool featureEnabled(const std::string& feature) {
+bool runtimeFeatureEnabled(const std::string& feature) {
   if (Runtime::LoaderSingleton::getExisting()) {
     return Runtime::LoaderSingleton::getExisting()->snapshot().runtimeFeatureEnabled(feature);
   }
   ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::runtime), warn,
                       "Unable to use runtime singleton for feature {}", feature);
-  return false; //  return RuntimeFeaturesDefaults::get().enabledByDefault(feature);
+  return RuntimeFeaturesDefaults::get().enabledByDefault(feature);
 }
 
 const size_t RandomGeneratorImpl::UUID_LENGTH = 36;

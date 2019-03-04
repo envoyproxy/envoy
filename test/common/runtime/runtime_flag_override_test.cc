@@ -9,7 +9,7 @@ namespace Runtime {
 // "--runtime-feature-override-for-tests=envoy.reloadable_features.test_feature_false"
 TEST(RuntimeFlagOverrideTest, OverridesWork) {
   // Test the function wrapper suggested in docs.
-  EXPECT_TRUE(Runtime::featureEnabled("envoy.reloadable_features.test_feature_false"));
+  EXPECT_TRUE(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
 
   // Also explicitly make sure the singleton is initialized and configured correctly.
   const Snapshot& snapshot = Runtime::LoaderSingleton::getExisting()->snapshot();

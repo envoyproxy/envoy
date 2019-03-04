@@ -24,7 +24,7 @@
 namespace Envoy {
 namespace Runtime {
 
-bool featureEnabled(const std::string& feature);
+bool runtimeFeatureEnabled(const std::string& feature);
 
 using RuntimeSingleton = ThreadSafeSingleton<Loader>;
 
