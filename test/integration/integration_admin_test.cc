@@ -419,8 +419,7 @@ TEST_P(IntegrationAdminTest, AdminCpuProfilerStart) {
 class IntegrationAdminIpv4Ipv6Test : public testing::Test, public HttpIntegrationTest {
 public:
   IntegrationAdminIpv4Ipv6Test()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, Network::Address::IpVersion::v4,
-                            realTime()) {}
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, Network::Address::IpVersion::v4) {}
 
   void initialize() override {
     config_helper_.addConfigModifier(
@@ -451,7 +450,7 @@ TEST_F(IntegrationAdminIpv4Ipv6Test, Ipv4Ipv6Listen) {
 // restrictions on their names.
 class StatsMatcherIntegrationTest
     : public testing::Test,
-      public Event::SimulatedTimeSystem,
+      public Event::TestUsingSimulatedTime,
       public HttpIntegrationTest,
       public testing::WithParamInterface<Network::Address::IpVersion> {
 public:
