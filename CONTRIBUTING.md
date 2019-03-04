@@ -148,11 +148,9 @@ old code with new code, both code paths are supported for between one Envoy rele
 guarded due to performance concerns) and a full deprecation cycle (if it is a high risk behavioral
 change).
 
-The canonican way to runtime guard a feature is
+The canonical way to runtime guard a feature is
 ```
-if (Runtime::LoaderSingleton::getExisting() &&
-    Runtime::LoaderSingleton::getExisting()->snapshot()->runtimeFeatureEnabled("
-       envoy.reloadable_features.my_feature_name")) {
+if (Runtime::featureEnabled("envoy.reloadable_features.my_feature_name")) {
   [new code path]
 } else {
   [old_code_path]
@@ -164,9 +162,7 @@ true or false on running Envoy instances. In some situations, for example the bu
 latch the value in a member variable on class creation, for example:
 
 ```
-bool use_new_code_path_ = Runtime::LoaderSingleton::getExisting() &&
-  Runtime::LoaderSingleton::getExisting()->snapshot()->runtimeFeatureEnabled(
-      "envoy.reloadable_features.my_feature_name"));
+bool use_new_code_path_ = Runtime::featureEnabled("envoy.reloadable_features.my_feature_name")
 ```
 
 Runtime guarded features may either set true (running the new code by default) in the initial PR,
@@ -176,12 +172,15 @@ release is cut, and the old code path will be deprecated at that time. Runtime f
 are set true by default by inclusion in
 [source/common/runtime/runtime_features.h](https://github.com/envoyproxy/envoy/blob/master/source/common/runtime/runtime_features.h)
 
-There are three options for testing new runtime features:
+There are four suggested options for testing new runtime features:
 
 1. Create a per-test Runtime::LoaderSingleton as done in [DeprecatedFieldsTest.IndividualFieldDisallowedWithRuntimeOverride](https://github.com/envoyproxy/envoy/blob/master/test/common/protobuf/utility_test.cc)
-2. Set up integration tests with custom runtime defaults as documented in the
+2. Create a [parameterized test](https://github.com/google/googletest/blob/master/googletest/docs/advanced.md#how-to-write-value-parameterized-tests)
+   where the set up of the test sets the new runtime value explicitly true as
+   done in (1)
+3. Set up integration tests with custom runtime defaults as documented in the
    [integration test README](https://github.com/envoyproxy/envoy/blob/master/test/integration/README.md)
-3. Run a given unit test with the new runtime value explicitly set true as done
+4. Run a given unit test with the new runtime value explicitly set true as done
    for [runtime_flag_override_test](https://github.com/envoyproxy/envoy/blob/master/test/common/runtime/BUILD) 
 
 Runtime code is held to the same standard as regular Envoy code, so both the old
