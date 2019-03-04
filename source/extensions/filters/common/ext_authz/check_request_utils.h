@@ -49,7 +49,7 @@ public:
   createHttpCheck(const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
                   const Envoy::Http::HeaderMap& headers,
                   Protobuf::Map<ProtobufTypes::String, ProtobufTypes::String>&& context_extensions,
-                  envoy::service::auth::v2::CheckRequest& request, bool with_request_body);
+                  envoy::service::auth::v2::CheckRequest& request, uint64_t max_request_bytes);
 
   /**
    * createTcpCheck is used to extract the attributes from the network layer and fill them up
@@ -66,10 +66,11 @@ private:
                                  const bool local);
   static void setHttpRequest(::envoy::service::auth::v2::AttributeContext_HttpRequest& httpreq,
                              const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
-                             const Envoy::Http::HeaderMap& headers, bool with_request_body);
+                             const Envoy::Http::HeaderMap& headers, uint64_t max_request_bytes);
   static void setAttrContextRequest(::envoy::service::auth::v2::AttributeContext_Request& req,
                                     const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
-                                    const Envoy::Http::HeaderMap& headers, bool with_request_body);
+                                    const Envoy::Http::HeaderMap& headers,
+                                    uint64_t max_request_bytes);
   static std::string getHeaderStr(const Envoy::Http::HeaderEntry* entry);
   static Envoy::Http::HeaderMap::Iterate fillHttpHeaders(const Envoy::Http::HeaderEntry&, void*);
 };

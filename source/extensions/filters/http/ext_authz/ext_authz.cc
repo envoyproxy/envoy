@@ -70,7 +70,8 @@ void Filter::initiateCall(const Http::HeaderMap& headers) {
     context_extensions = maybe_merged_per_route_config.value().takeContextExtensions();
   }
   Filters::Common::ExtAuthz::CheckRequestUtils::createHttpCheck(
-      callbacks_, headers, std::move(context_extensions), check_request_, buffer_data_);
+      callbacks_, headers, std::move(context_extensions), check_request_,
+      config_->maxRequestBytes());
 
   state_ = State::Calling;
   // Don't let the filter chain continue as we are going to invoke check call.
@@ -89,7 +90,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 
   if (buffer_data_) {
     ENVOY_STREAM_LOG(debug, "ext_authz is buffering", *callbacks_);
-    callbacks_->setDecoderBufferLimit(config_->maxRequestBytes());
+    if (!config_->allowPartialMessage()) {
+      callbacks_->setDecoderBufferLimit(config_->maxRequestBytes());
+    }
     return Http::FilterHeadersStatus::StopIteration;
   }
 
@@ -100,9 +103,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 
 Http::FilterDataStatus Filter::decodeData(Buffer::Instance&, bool end_stream) {
   if (buffer_data_) {
-    if (!end_stream) {
-      // Buffer until the complete request has been processed or the ConnectionManagerImpl sends a
-      // 413.
+    if (!end_stream && !isBufferFull()) {
       return Http::FilterDataStatus::StopIterationAndBuffer;
     }
 
@@ -215,6 +216,13 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       callbacks_->continueDecoding();
     }
   }
+}
+
+bool Filter::isBufferFull() {
+  if (config_->allowPartialMessage()) {
+    return callbacks_->decodingBuffer()->length() >= config_->maxRequestBytes();
+  }
+  return false;
 }
 
 } // namespace ExtAuthz

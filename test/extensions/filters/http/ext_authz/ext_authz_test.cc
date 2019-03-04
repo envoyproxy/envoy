@@ -292,7 +292,43 @@ TEST_F(HttpFilterTest, RequestDataIsTooLarge) {
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(buffer2, false));
 }
 
-// Checks that filter buffers data and initiates the authorization request.
+// Checks that the filter initiates an authorization request when the buffer reaches max
+// request bytes and allow_partial_message is set to true.
+TEST_F(HttpFilterTest, RequestDataWithPartialMessage) {
+  InSequence s;
+
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  failure_mode_allow: false
+  with_request_body:
+    max_request_bytes: 10
+    allow_partial_message: true
+  )EOF");
+
+  ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
+  ON_CALL(filter_callbacks_, decodingBuffer()).WillByDefault(Return(&data_));
+  ;
+  EXPECT_CALL(filter_callbacks_, setDecoderBufferLimit(_)).Times(0);
+  EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
+  EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
+  EXPECT_CALL(*client_, check(_, _, _)).Times(1);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+
+  data_.add("foo");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data_, false));
+
+  data_.add("bar");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data_, false));
+
+  data_.add("barfoo");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, false));
+}
+
+// Checks that the filter buffers the data and initiates the authorization request.
 TEST_F(HttpFilterTest, AuthWithRequestData) {
   InSequence s;
 

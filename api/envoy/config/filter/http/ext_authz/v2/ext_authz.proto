@@ -47,7 +47,7 @@ message ExtAuthz {
   // version upgrade. See release notes for more details.
   bool use_alpha = 4 [deprecated = true];
 
-  // Enables filter to buffer and add the request body to the authorization request.
+  // Enables filter to buffer the client request body and send it within the authorization request.
   BufferSettings with_request_body = 5;
 }
 
@@ -59,10 +59,10 @@ message BufferSettings {
   // <envoy_api_field_config.filter.http.ext_authz.v2.ExtAuthz.failure_mode_allow>`.
   uint32 max_request_bytes = 1 [(validate.rules).uint32.gt = 0];
 
-  // When this field is true, Envoy buffers until *max_request_bytes* is reached. However, instead
-  // of rejecting the client request with an *HTTP 413*, the filter will send the authorization
-  // request with whatever data has been buffered.
-  bool allow_partial_request = 2;
+  // When this field is true, Envoy will buffer the message until *max_request_bytes* is reached.
+  // The authorization request will be dispatched and no 413 HTTP error will be returned by the
+  // filter.
+  bool allow_partial_message = 2;
 }
 
 // HttpService is used for raw HTTP communication between the filter and the authorization service.

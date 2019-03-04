@@ -74,7 +74,7 @@ std::string CheckRequestUtils::getHeaderStr(const Envoy::Http::HeaderEntry* entr
 void CheckRequestUtils::setHttpRequest(
     ::envoy::service::auth::v2::AttributeContext_HttpRequest& httpreq,
     const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
-    const Envoy::Http::HeaderMap& headers, bool with_request_body) {
+    const Envoy::Http::HeaderMap& headers, uint64_t max_request_bytes) {
 
   // Set id
   // The streamId is not qualified as a const. Although it is as it does not modify the object.
@@ -117,23 +117,26 @@ void CheckRequestUtils::setHttpRequest(
 
   // Set request body.
   const Buffer::Instance* buffer = sdfc->decodingBuffer();
-  if (with_request_body && buffer != nullptr) {
-    httpreq.set_body(buffer->toString());
+  if (max_request_bytes > 0 && buffer != nullptr) {
+    const uint64_t len = std::min(buffer->length(), max_request_bytes);
+    std::unique_ptr<char[]> data(new char[len]);
+    buffer->copyOut(0, len, data.get());
+    httpreq.set_body(data.get(), len);
   }
 }
 
 void CheckRequestUtils::setAttrContextRequest(
     ::envoy::service::auth::v2::AttributeContext_Request& req,
     const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
-    const Envoy::Http::HeaderMap& headers, bool with_request_body) {
-  setHttpRequest(*req.mutable_http(), callbacks, headers, with_request_body);
+    const Envoy::Http::HeaderMap& headers, uint64_t max_request_bytes) {
+  setHttpRequest(*req.mutable_http(), callbacks, headers, max_request_bytes);
 }
 
 void CheckRequestUtils::createHttpCheck(
     const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
     const Envoy::Http::HeaderMap& headers,
     Protobuf::Map<ProtobufTypes::String, ProtobufTypes::String>&& context_extensions,
-    envoy::service::auth::v2::CheckRequest& request, bool with_request_body) {
+    envoy::service::auth::v2::CheckRequest& request, uint64_t max_request_bytes) {
 
   auto attrs = request.mutable_attributes();
 
@@ -144,7 +147,7 @@ void CheckRequestUtils::createHttpCheck(
 
   setAttrContextPeer(*attrs->mutable_source(), *cb->connection(), service, false);
   setAttrContextPeer(*attrs->mutable_destination(), *cb->connection(), "", true);
-  setAttrContextRequest(*attrs->mutable_request(), callbacks, headers, with_request_body);
+  setAttrContextRequest(*attrs->mutable_request(), callbacks, headers, max_request_bytes);
 
   // Fill in the context extensions:
   (*attrs->mutable_context_extensions()) = std::move(context_extensions);

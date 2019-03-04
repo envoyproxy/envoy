@@ -39,15 +39,18 @@ public:
   FilterConfig(const envoy::config::filter::http::ext_authz::v2::ExtAuthz& config,
                const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
                Runtime::Loader& runtime, Http::Context& http_context)
-      : failure_mode_allow_(config.failure_mode_allow()),
+      : allow_partial_message_(config.with_request_body().allow_partial_message()),
+        failure_mode_allow_(config.failure_mode_allow()),
         max_request_bytes_(config.with_request_body().max_request_bytes()), local_info_(local_info),
         scope_(scope), runtime_(runtime), http_context_(http_context) {}
 
+  bool allowPartialMessage() const { return allow_partial_message_; }
+
   bool withRequestBody() const { return max_request_bytes_ > 0; }
 
-  uint32_t maxRequestBytes() const { return max_request_bytes_; }
-
   bool failureModeAllow() const { return failure_mode_allow_; }
+
+  uint32_t maxRequestBytes() const { return max_request_bytes_; }
 
   const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
 
@@ -58,6 +61,7 @@ public:
   Http::Context& httpContext() { return http_context_; }
 
 private:
+  const bool allow_partial_message_;
   const bool failure_mode_allow_;
   const uint32_t max_request_bytes_;
   const LocalInfo::LocalInfo& local_info_;
@@ -125,6 +129,8 @@ public:
 
 private:
   void addResponseHeaders(Http::HeaderMap& header_map, const Http::HeaderVector& headers);
+  void initiateCall(const Http::HeaderMap& headers);
+  bool isBufferFull();
 
   // State of this filter's communication with the external authorization service.
   // The filter has either not started calling the external service, in the middle of calling
@@ -136,7 +142,6 @@ private:
   // the filter chain should stop. Otherwise the filter chain can continue to the next filter.
   enum class FilterReturn { ContinueDecoding, StopDecoding };
 
-  void initiateCall(const Http::HeaderMap& headers);
   Http::HeaderMapPtr getHeaderMap(const Filters::Common::ExtAuthz::ResponsePtr& response);
   FilterConfigSharedPtr config_;
   Filters::Common::ExtAuthz::ClientPtr client_;

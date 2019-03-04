@@ -26,7 +26,7 @@ public:
   CheckRequestUtilsTest() {
     addr_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 1111);
     protocol_ = Envoy::Http::Protocol::Http10;
-    buffer_ = std::make_unique<Buffer::OwnedImpl>("foo");
+    buffer_ = std::make_unique<Buffer::OwnedImpl>("foobar");
   };
 
   Network::Address::InstanceConstSharedPtr addr_;
@@ -65,9 +65,9 @@ TEST_F(CheckRequestUtilsTest, BasicHttp) {
   EXPECT_CALL(req_info_, protocol()).Times(2).WillRepeatedly(ReturnPointee(&protocol_));
   Protobuf::Map<ProtobufTypes::String, ProtobufTypes::String> empty;
 
-  CheckRequestUtils::createHttpCheck(&callbacks_, headers, std::move(empty), request, true);
+  CheckRequestUtils::createHttpCheck(&callbacks_, headers, std::move(empty), request, 4);
 
-  EXPECT_EQ("foo", request.attributes().request().http().body());
+  EXPECT_EQ("foob", request.attributes().request().http().body());
 }
 
 // Verify that createHttpCheck extract the proper attributes from the http request into CheckRequest
