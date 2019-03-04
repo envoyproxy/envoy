@@ -62,6 +62,7 @@ TEST_F(OriginalSrcConfigTest, TestUseMarkMax) {
 
   EXPECT_EQ(config.mark(), std::numeric_limits<uint32_t>::max());
 }
+
 } // namespace
 } // namespace OriginalSrc
 } // namespace ListenerFilters

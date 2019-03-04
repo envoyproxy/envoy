@@ -21,6 +21,7 @@ using testing::ReturnNew;
 
 namespace Envoy {
 namespace Runtime {
+namespace {
 
 TEST(Random, DISABLED_benchmarkRandom) {
   Runtime::RandomGeneratorImpl random;
@@ -336,8 +337,9 @@ TEST_F(DiskLayerTest, Loop) {
   EXPECT_THROW_WITH_MESSAGE(
       DiskLayer("test", TestEnvironment::temporaryPath("test/common/runtime/test_data/loop"),
                 *api_),
-      EnvoyException, "Walk recursion depth exceded 16");
+      EnvoyException, "Walk recursion depth exceeded 16");
 }
 
+} // namespace
 } // namespace Runtime
 } // namespace Envoy

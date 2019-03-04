@@ -15,6 +15,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace BufferFilter {
+namespace {
 
 TEST(BufferFilterFactoryTest, BufferFilterCorrectJson) {
   std::string json_string = R"EOF(
@@ -102,6 +103,7 @@ TEST(BufferFilterFactoryTest, BufferFilterRouteSpecificConfig) {
   EXPECT_TRUE(inflated);
 }
 
+} // namespace
 } // namespace BufferFilter
 } // namespace HttpFilters
 } // namespace Extensions

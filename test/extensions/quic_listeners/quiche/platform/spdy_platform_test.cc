@@ -19,6 +19,7 @@ namespace Envoy {
 namespace Extensions {
 namespace QuicListeners {
 namespace Quiche {
+namespace {
 
 TEST(SpdyPlatformTest, SpdyArraysize) {
   int array[] = {0, 1, 2, 3, 4};
@@ -71,6 +72,7 @@ TEST(SpdyPlatformTest, SpdyStringPiece) {
   EXPECT_EQ('b', sp[0]);
 }
 
+} // namespace
 } // namespace Quiche
 } // namespace QuicListeners
 } // namespace Extensions

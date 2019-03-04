@@ -28,8 +28,8 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Squash {
-
 namespace {
+
 SquashFilterConfig constructSquashFilterConfigFromJson(
     const Envoy::Json::Object& json,
     NiceMock<Envoy::Server::Configuration::MockFactoryContext>& context) {

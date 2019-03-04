@@ -463,6 +463,12 @@ void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callb
 }
 
 void Filter::cleanup() {
+  // upstream_request_ is only destroyed in this method (cleanup()) or when we
+  // do a retry (setupRetry()). In the latter case we don't want to save the
+  // upstream timings to the downstream info.
+  if (upstream_request_) {
+    callbacks_->streamInfo().setUpstreamTiming(upstream_request_->upstream_timing_);
+  }
   upstream_request_.reset();
   retry_state_.reset();
   if (response_timeout_) {
@@ -532,7 +538,7 @@ void Filter::onResponseTimeout() {
 }
 
 void Filter::onUpstreamReset(UpstreamResetType type,
-                             const absl::optional<Http::StreamResetReason>& reset_reason) {
+                             const absl::optional<Http::StreamResetReason> reset_reason) {
   ASSERT(type == UpstreamResetType::GlobalTimeout || upstream_request_);
   if (type == UpstreamResetType::Reset) {
     ENVOY_STREAM_LOG(debug, "upstream reset: reset reason {}", *callbacks_,
@@ -556,8 +562,11 @@ void Filter::onUpstreamReset(UpstreamResetType type,
       retry_state_->onHostAttempted(upstream_host);
     }
 
+    // There must be a value for reset_reason because the only case where it's
+    // empty is when type == UpstreamResetType::GlobalTimeout.
+    ASSERT(reset_reason.has_value());
     RetryStatus retry_status =
-        retry_state_->shouldRetry(nullptr, reset_reason, [this]() -> void { doRetry(); });
+        retry_state_->shouldRetryReset(reset_reason.value(), [this]() -> void { doRetry(); });
     if (retry_status == RetryStatus::Yes && setupRetry(true)) {
       if (upstream_host) {
         upstream_host->stats().rq_error_.inc();
@@ -688,8 +697,8 @@ void Filter::onUpstreamHeaders(const uint64_t response_code, Http::HeaderMapPtr&
     // Notify retry modifiers about the attempted host.
     retry_state_->onHostAttempted(upstream_request_->upstream_host_);
 
-    RetryStatus retry_status = retry_state_->shouldRetry(
-        headers.get(), absl::optional<Http::StreamResetReason>(), [this]() -> void { doRetry(); });
+    RetryStatus retry_status =
+        retry_state_->shouldRetryHeaders(*headers, [this]() -> void { doRetry(); });
     // Capture upstream_host since setupRetry() in the following line will clear
     // upstream_request_.
     const auto upstream_host = upstream_request_->upstream_host_;
@@ -857,7 +866,6 @@ bool Filter::setupRetry(bool end_stream) {
   }
 
   upstream_request_.reset();
-  callbacks_->streamInfo().resetUpstreamTimings();
   return true;
 }
 
@@ -875,7 +883,7 @@ bool Filter::setupRedirect(const Http::HeaderMap& headers) {
   // completion here and check it in onDestroy. This is annoyingly complicated but is better than
   // needlessly resetting streams.
   attempting_internal_redirect_with_complete_stream_ =
-      upstream_request_->stream_info_.lastUpstreamRxByteReceived() && downstream_end_stream_;
+      upstream_request_->upstream_timing_.last_upstream_rx_byte_received_ && downstream_end_stream_;
 
   // As with setupRetry, redirects are not supported for streaming requests yet.
   if (downstream_end_stream_ &&
@@ -954,6 +962,7 @@ Filter::UpstreamRequest::~UpstreamRequest() {
   }
   clearRequestEncoder();
 
+  stream_info_.setUpstreamTiming(upstream_timing_);
   stream_info_.onRequestComplete();
   for (const auto& upstream_log : parent_.config_.upstream_logs_) {
     upstream_log->log(parent_.downstream_headers_, upstream_headers_, upstream_trailers_,
@@ -968,8 +977,7 @@ void Filter::UpstreamRequest::decode100ContinueHeaders(Http::HeaderMapPtr&& head
 
 void Filter::UpstreamRequest::decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
   // TODO(rodaine): This is actually measuring after the headers are parsed and not the first byte.
-  stream_info_.onFirstUpstreamRxByteReceived();
-  parent_.callbacks_->streamInfo().onFirstUpstreamRxByteReceived();
+  upstream_timing_.onFirstUpstreamRxByteReceived(parent_.callbacks_->dispatcher().timeSource());
   maybeEndDecode(end_stream);
 
   upstream_headers_ = headers.get();
@@ -996,8 +1004,7 @@ void Filter::UpstreamRequest::decodeMetadata(Http::MetadataMapPtr&& metadata_map
 
 void Filter::UpstreamRequest::maybeEndDecode(bool end_stream) {
   if (end_stream) {
-    stream_info_.onLastUpstreamRxByteReceived();
-    parent_.callbacks_->streamInfo().onLastUpstreamRxByteReceived();
+    upstream_timing_.onLastUpstreamRxByteReceived(parent_.callbacks_->dispatcher().timeSource());
   }
 }
 
@@ -1033,8 +1040,7 @@ void Filter::UpstreamRequest::encodeData(Buffer::Instance& data, bool end_stream
     stream_info_.addBytesSent(data.length());
     request_encoder_->encodeData(data, end_stream);
     if (end_stream) {
-      stream_info_.onLastUpstreamTxByteSent();
-      parent_.callbacks_->streamInfo().onLastUpstreamTxByteSent();
+      upstream_timing_.onLastUpstreamTxByteSent(parent_.callbacks_->dispatcher().timeSource());
     }
   }
 }
@@ -1049,8 +1055,7 @@ void Filter::UpstreamRequest::encodeTrailers(const Http::HeaderMap& trailers) {
   } else {
     ENVOY_STREAM_LOG(trace, "proxying trailers", *parent_.callbacks_);
     request_encoder_->encodeTrailers(trailers);
-    stream_info_.onLastUpstreamTxByteSent();
-    parent_.callbacks_->streamInfo().onLastUpstreamTxByteSent();
+    upstream_timing_.onLastUpstreamTxByteSent(parent_.callbacks_->dispatcher().timeSource());
   }
 }
 
@@ -1148,8 +1153,7 @@ void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
     span_->injectContext(*parent_.downstream_headers_);
   }
 
-  stream_info_.onFirstUpstreamTxByteSent();
-  parent_.callbacks_->streamInfo().onFirstUpstreamTxByteSent();
+  upstream_timing_.onFirstUpstreamTxByteSent(parent_.callbacks_->dispatcher().timeSource());
   request_encoder.encodeHeaders(*parent_.downstream_headers_,
                                 !buffered_request_body_ && encode_complete_ && !encode_trailers_);
   calling_encode_headers_ = false;
@@ -1172,8 +1176,7 @@ void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
     }
 
     if (encode_complete_) {
-      stream_info_.onLastUpstreamTxByteSent();
-      parent_.callbacks_->streamInfo().onLastUpstreamTxByteSent();
+      upstream_timing_.onLastUpstreamTxByteSent(parent_.callbacks_->dispatcher().timeSource());
     }
   }
 }

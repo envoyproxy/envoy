@@ -73,6 +73,14 @@ REPOSITORY_LOCATIONS = dict(
         # 2018-03-06
         urls = ["https://github.com/google/libprotobuf-mutator/archive/c3d2faf04a1070b0b852b0efdef81e1a81ba925e.tar.gz"],
     ),
+    com_github_gperftools_gperftools = dict(
+        # TODO(cmluciano): Bump to release 2.8
+        # This sha is specifically chosen to fix ppc64le builds that require inclusion
+        # of asm/ptrace.h
+        sha256 = "18574813a062eee487bc1b761e8024a346075a7cb93da19607af362dc09565ef",
+        strip_prefix = "gperftools-fc00474ddc21fff618fc3f009b46590e241e425e",
+        urls = ["https://github.com/gperftools/gperftools/archive/fc00474ddc21fff618fc3f009b46590e241e425e.tar.gz"],
+    ),
     com_github_grpc_grpc = dict(
         sha256 = "a5342629fe1b689eceb3be4d4f167b04c70a84b9d61cf8b555e968bc500bdb5a",
         strip_prefix = "grpc-1.16.1",
